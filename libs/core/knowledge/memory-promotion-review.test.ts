@@ -36,6 +36,10 @@ describe('memory-promotion-review', () => {
     if (safeExistsSync(queuePath)) safeRmSync(queuePath);
   });
 
+  const seedLegacyRow = (row: object): void => {
+    safeAppendFileSync(queuePath, `${JSON.stringify(row)}\n`);
+  };
+
   afterAll(() => {
     if (originalQueueRaw !== null) {
       safeWriteFile(queuePath, originalQueueRaw);
@@ -54,7 +58,8 @@ describe('memory-promotion-review', () => {
       evidenceRefs: ['package.json', 'artifact:ART-REVIEW-1'],
       sensitivityTier: 'confidential',
     });
-    enqueueMemoryPromotionCandidate({ ...candidate, audit_ref: 'audit:AUD-MISSING-1' });
+    // A legacy row written before D8 capture scope (registration now rejects it).
+    seedLegacyRow({ ...candidate, audit_ref: 'audit:AUD-MISSING-1' });
 
     const [review] = reviewMemoryPromotionCandidate(candidate.candidate_id);
     expect(review).toMatchObject({
@@ -149,12 +154,12 @@ describe('memory-promotion-review', () => {
         ...candidate,
         audit_ref: 'audit:AUD-MISSING-PERSONAL-OWNER-1',
       })
-    ).toThrow('Personal queue requires an explicit owner_nhi');
+    ).toThrow('explicit owner_nhi');
     expect(safeExistsSync(queuePath)).toBe(false);
 
     // Legacy unscoped rows remain inspectable, but cannot be approved without an owner.
     const { scope: _scope, ...legacy } = candidate;
-    enqueueMemoryPromotionCandidate({ ...legacy, audit_ref: 'audit:AUD-MISSING-PERSONAL-OWNER-1' });
+    seedLegacyRow({ ...legacy, audit_ref: 'audit:AUD-MISSING-PERSONAL-OWNER-1' });
     const [review] = reviewMemoryPromotionCandidate(candidate.candidate_id);
     expect(review.blockers.map((blocker) => blocker.code)).toContain('invalid_domain_scope');
     const before = safeReadFile(queuePath, { encoding: 'utf8' });

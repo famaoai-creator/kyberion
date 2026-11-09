@@ -890,7 +890,25 @@ export async function runMissionRetrospective(
       finishGateFailures: stats.finish_gate_failures.length,
     });
     if (outcome) {
-      const validation = validateMissionHeuristics(outcome);
+      // D8: heuristics carry the mission's tier and tenant scope from capture.
+      const usageScope = missionUsageScope(missionPath);
+      const validation = validateMissionHeuristics(
+        outcome,
+        usageScope
+          ? {
+              tier: usageScope.tier,
+              ...(usageScope.tenant_slug && usageScope.tier !== 'public'
+                ? {
+                    scope: {
+                      tier: usageScope.tier,
+                      tenant_slug: usageScope.tenant_slug,
+                      mission_id: missionId.toUpperCase(),
+                    },
+                  }
+                : {}),
+            }
+          : undefined
+      );
       for (const message of validation.errors) {
         logger.warn(`[mission-retrospective] heuristic validation skipped — ${message}`);
       }

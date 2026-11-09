@@ -256,15 +256,16 @@ export {
 
 export type { RateLimitDecision } from './organization/tenant-rate-limiter.js';
 
+/** @deprecated D8 aliases over the promoted lane; removed in the next release. */
 export {
   findRelevantDistilledKnowledge,
   formatDistilledKnowledgeSummary,
-} from './knowledge/distill-knowledge-injector.js';
+} from './knowledge/promoted-knowledge-retrieval.js';
 
 export type {
   DistilledKnowledgeEntry,
   FindRelevantInput,
-} from './knowledge/distill-knowledge-injector.js';
+} from './knowledge/promoted-knowledge-retrieval.js';
 
 export {
   loadKnowledgeSlicesFile,

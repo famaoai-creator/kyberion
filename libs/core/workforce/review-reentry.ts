@@ -9,6 +9,7 @@ import {
 import { logger } from '../core.js';
 import { persistHints } from '../knowledge/feedback-loop.js';
 import { queueMissionMemoryPromotionCandidate } from '../knowledge/memory-promotion-queue.js';
+import { missionMemoryCaptureScope } from '../knowledge/memory-capture-scope.js';
 import type { RejectionReasonCategory } from '../contracts/rejection-reason.js';
 
 /**
@@ -126,11 +127,14 @@ function persistRejectionLearning(record: ReviewReentryRequest): void {
     logger.warn(`[review-reentry] failed to persist rejection hint: ${detail}`);
   }
   try {
+    // D8: the lesson carries the rejected mission's own tier and tenant scope.
+    const capture = missionMemoryCaptureScope(record.mission_id);
     queueMissionMemoryPromotionCandidate({
       missionId: record.mission_id,
-      tier: 'confidential',
+      tier: capture.tier,
       summary,
       evidenceRefs: [`review-reentry:${record.request_id}`],
+      ...(capture.scope ? { scope: capture.scope } : {}),
     });
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);

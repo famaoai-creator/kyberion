@@ -1324,10 +1324,6 @@
       "types": "./dist/knowledge/distill-candidate-registry.d.ts",
       "default": "./dist/knowledge/distill-candidate-registry.js"
     },
-    "./distill-knowledge-injector": {
-      "types": "./dist/knowledge/distill-knowledge-injector.d.ts",
-      "default": "./dist/knowledge/distill-knowledge-injector.js"
-    },
     "./document-reader": {
       "types": "./dist/media/document-reader.d.ts",
       "default": "./dist/media/document-reader.js"
@@ -2463,10 +2459,6 @@
     "./knowledge/distill-candidate-registry": {
       "types": "./dist/knowledge/distill-candidate-registry.d.ts",
       "default": "./dist/knowledge/distill-candidate-registry.js"
-    },
-    "./knowledge/distill-knowledge-injector": {
-      "types": "./dist/knowledge/distill-knowledge-injector.d.ts",
-      "default": "./dist/knowledge/distill-knowledge-injector.js"
     },
     "./knowledge/feedback-loop": {
       "types": "./dist/knowledge/feedback-loop.d.ts",
