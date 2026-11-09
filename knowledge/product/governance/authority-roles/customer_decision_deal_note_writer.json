@@ -5,5 +5,9 @@
   "write_scopes": ["knowledge/confidential/${KYBERION_TENANT}/deals/"],
   "scope_classes": ["operations_runtime"],
   "allowed_actuators": [],
-  "tier_access": ["public", "confidential"]
+  "tier_access": ["public", "confidential"],
+  "permissions": {
+    "allow_read": ["knowledge/confidential/${KYBERION_TENANT}/deals/"],
+    "allow_write": ["knowledge/confidential/${KYBERION_TENANT}/deals/"]
+  }
 }

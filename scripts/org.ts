@@ -10,6 +10,10 @@ import { safeExistsSync, safeMkdir, safeReaddir, safeWriteFile } from '@agent/co
 import { defineCatalog, nowIso, writeJson, type GovernedCatalog } from '@agent/core/foundation';
 import { withExecutionContext } from '@agent/core/governance';
 import {
+  loadAuthorityRoleCards,
+  type AuthorityRoleCard,
+} from '@agent/core/organization/authority-role-registry';
+import {
   draftRoleFromIntent,
   loadRoleDraftInventory,
   type ActuatorConnectionProbe,
@@ -716,14 +720,33 @@ export function collectExistingRoleIds(rootDir: string): Set<string> {
   return ids;
 }
 
+function existingAuthorityRoleCard(rootDir: string, roleId: string): AuthorityRoleCard | undefined {
+  const directory = path.join(rootDir, 'knowledge', 'product', 'governance', 'authority-roles');
+  const hasDirectoryEntries =
+    safeExistsSync(directory) && safeReaddir(directory).some((entry) => entry.endsWith('.json'));
+  return hasDirectoryEntries ? (loadAuthorityRoleCards(rootDir) ?? {})[roleId] : undefined;
+}
+
+/**
+ * Writes the role's card in the one Authority Role registry (concept model
+ * v2 D6). The card's `permissions` are kept: they change only through
+ * {@link upsertSecurityPolicy}. Writing a profile makes a process role
+ * assignable, as creating its card did before the registries merged; both
+ * callers run behind the authenticated human approval.
+ */
 function writeAuthorityRoleBundle(
   rootDir: string,
   roleId: string,
   record: AuthorityRoleRecord
 ): void {
+  const existing = existingAuthorityRoleCard(rootDir, roleId);
   const directory = path.join(rootDir, 'knowledge', 'product', 'governance', 'authority-roles');
   safeMkdir(directory, { recursive: true });
-  writeJson(path.join(directory, `${roleId}.json`), { role: roleId, ...record });
+  writeJson(path.join(directory, `${roleId}.json`), {
+    role: roleId,
+    ...record,
+    ...(existing?.permissions ? { permissions: existing.permissions } : {}),
+  });
 }
 
 function syncAuthorityRoleSnapshot(
@@ -884,11 +907,27 @@ function upsertSecurityPolicy(
   assertSecurityPolicyApproval(approvalId);
   const filePath = path.join(rootDir, 'knowledge', 'product', 'governance', 'security-policy.json');
   const policy = loadSecurityPolicy(rootDir);
-  policy.authority_role_permissions = policy.authority_role_permissions || {};
-  policy.authority_role_permissions[authorityRoleId] = {
+  const permissions = {
     allow_read: [...record.write_scopes],
     allow_write: [...record.write_scopes],
   };
+  // The card is the registry; security-policy.json carries its generated
+  // projection. Both are written here so the drift gate stays green.
+  const cardPath = path.join(
+    rootDir,
+    'knowledge',
+    'product',
+    'governance',
+    'authority-roles',
+    `${authorityRoleId}.json`
+  );
+  const card = existingAuthorityRoleCard(rootDir, authorityRoleId) ?? {
+    role: authorityRoleId,
+    ...record,
+  };
+  writeJson(cardPath, { ...card, permissions });
+  policy.authority_role_permissions = policy.authority_role_permissions || {};
+  policy.authority_role_permissions[authorityRoleId] = permissions;
   writeJson(filePath, policy);
   resetOrgCatalog(filePath);
 }

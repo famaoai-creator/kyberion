@@ -81,7 +81,7 @@ Kyberion 自体のメンテナンス。
 - **mission_roles** (5): `mission_controller`, `software_developer`, `sovereign_concierge`, `incident_commander`, `performance_engineer`
 - **context_roles** (16): `ceo`, `business_owner`, `product_manager` など。Authority Role はなく、ナレッジ上の責務定義のみ。
 
-Authority role definitions: `knowledge/product/governance/authority-roles/*.json`
+Authority role definitions: `knowledge/product/governance/authority-roles/*.json`（唯一のレジストリ）。カードには役割の説明・`tier_access` などのプロフィールと、パスの許可 `permissions` を書きます。`authority-role-index.json`（割り当てできるロールの一覧）と `security-policy.json` の `authority_role_permissions` は、`pnpm kyberion sync authority-roles` がカードから生成します。手で編集せず、カードを直してから再生成します。食い違いは `governance-rules` のゲートが止めます。`"assignable": false` のカードはスクリプトやサービスが引き受けるだけのプロセスロールで、チーム・組織・dot には割り当てられません。
 
 ### B2. ロールの解決順序とロール引き受けポリシー (RA-01 / RA-02)
 

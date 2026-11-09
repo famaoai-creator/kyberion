@@ -1,0 +1,16 @@
+{
+  "role": "ops_alert_store",
+  "assignable": false,
+  "permissions": {
+    "allow_read": [
+      "active/shared/observability/ops-alerts.jsonl",
+      "active/shared/observability/ops-alerts.dedupe.json",
+      "active/shared/runtime/state/scheduler-ops-alert-days.json"
+    ],
+    "allow_write": [
+      "active/shared/observability/ops-alerts.jsonl",
+      "active/shared/observability/ops-alerts.dedupe.json",
+      "active/shared/runtime/state/scheduler-ops-alert-days.json"
+    ]
+  }
+}

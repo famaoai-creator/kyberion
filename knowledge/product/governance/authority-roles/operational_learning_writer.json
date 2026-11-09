@@ -11,5 +11,14 @@
   ],
   "scope_classes": ["organization_operations"],
   "allowed_actuators": ["artifact-actuator"],
-  "tier_access": ["personal", "confidential", "public"]
+  "tier_access": ["personal", "confidential", "public"],
+  "permissions": {
+    "allow_write": [
+      "active/organizations/personal/shared/${KYBERION_ORGANIZATION_ID}/state/learning/",
+      "active/organizations/personal/${KYBERION_TENANT}/${KYBERION_ORGANIZATION_ID}/state/learning/",
+      "active/organizations/confidential/${KYBERION_TENANT}/${KYBERION_ORGANIZATION_ID}/state/learning/",
+      "active/organizations/public/shared/${KYBERION_ORGANIZATION_ID}/state/learning/",
+      "active/organizations/public/${KYBERION_TENANT}/${KYBERION_ORGANIZATION_ID}/state/learning/"
+    ]
+  }
 }

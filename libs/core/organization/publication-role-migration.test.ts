@@ -465,6 +465,27 @@ describe('explicit installation publication role migration', () => {
       'incomplete source issuance right'
     );
   });
+  it('accepts registry cards that carry their policy permissions, and refuses a card/policy disagreement', () => {
+    const role = 'tool_runtime_policy_reader';
+    const profile = {
+      role,
+      description: role,
+      write_scopes: [],
+      scope_classes: [],
+      allowed_actuators: [],
+      tier_access: ['personal'],
+    };
+    source(`authority-roles/${role}.json`, {
+      ...profile,
+      permissions: { allow_read: [`only/${role}`], allow_write: [] },
+    });
+    expect(() => previewPublicationRoleMigration('/source')).not.toThrow();
+    source(`authority-roles/${role}.json`, {
+      ...profile,
+      permissions: { allow_read: ['/'], allow_write: ['/'] },
+    });
+    expect(() => previewPublicationRoleMigration('/source')).toThrow('card/policy mismatch');
+  });
   it('refuses source role/index disagreement or missing assumption registration', () => {
     source('authority-roles/tool_runtime_policy_reader.json', {
       role: 'tool_runtime_policy_reader',

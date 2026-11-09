@@ -101,6 +101,13 @@ function stable(value: unknown): string {
       .join(',')}}`;
   return JSON.stringify(value);
 }
+/** A card without the registry-only fields that never reach the role index. */
+function withoutRegistryOnlyFields(card: JsonObject): JsonObject {
+  const profile = { ...card };
+  delete profile.permissions;
+  delete profile.assignable;
+  return profile;
+}
 function object(value: unknown, label: string): JsonObject {
   if (!value || typeof value !== 'object' || Array.isArray(value))
     throw new Error(`[PUBLICATION_ROLE_MIGRATION] ${label} must be an object`);
@@ -283,17 +290,30 @@ function previewPublicationRoleMigrationInScope(sourceRoot: string): Publication
       );
     const indexed = { ...object(sourceIndex[role], role) };
     delete indexed.role;
-    const cardRecord = { ...card };
+    const cardRecord = withoutRegistryOnlyFields(card);
     delete cardRecord.role;
     if (stable(indexed) !== stable(cardRecord))
       throw new Error(`[PUBLICATION_ROLE_MIGRATION] source index/card mismatch: ${role}`);
+    // The card is the registry and the policy entry its projection (concept
+    // model v2 D6); a source whose two disagree is not migrated.
+    if (
+      card.permissions !== undefined &&
+      stable(card.permissions) !== stable(sourcePermissions[role])
+    )
+      throw new Error(`[PUBLICATION_ROLE_MIGRATION] source card/policy mismatch: ${role}`);
     addExact(targetPermissions, role, sourcePermissions[role]);
     addExact(targetIndex, role, sourceIndex[role]);
     const destination = path.join(targetRoot, relative);
     const before = safeExistsSync(destination)
       ? safeReadFile(destination, { encoding: 'utf8' }).toString()
       : null;
-    if (before !== null && stable(parseSafeJsonObjectInput(before, relative)) !== stable(card))
+    // An installation from before the registries merged has cards without
+    // `permissions`; its profile must still agree exactly.
+    if (
+      before !== null &&
+      stable(withoutRegistryOnlyFields(parseSafeJsonObjectInput(before, relative))) !==
+        stable(withoutRegistryOnlyFields(card))
+    )
       throw new Error(`[PUBLICATION_ROLE_MIGRATION] divergent role card: ${role}`);
     if (before === null) change(relative, null, `${JSON.stringify(card, null, 2)}\n`);
     if (!targetShared.includes(role)) targetShared.push(role);

@@ -1,0 +1,7 @@
+{
+  "role": "onboarding",
+  "assignable": false,
+  "permissions": {
+    "allow_write": ["customer/", "knowledge/personal/stances/", "knowledge/confidential/"]
+  }
+}

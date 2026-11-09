@@ -5,5 +5,9 @@
   "write_scopes": [],
   "scope_classes": ["operations_runtime", "audit"],
   "allowed_actuators": ["ingest-actuator"],
-  "tier_access": ["public", "confidential", "personal"]
+  "tier_access": ["public", "confidential", "personal"],
+  "permissions": {
+    "allow_read": ["knowledge/personal/tenants/", "knowledge/confidential/${KYBERION_TENANT}/"],
+    "allow_write": []
+  }
 }
