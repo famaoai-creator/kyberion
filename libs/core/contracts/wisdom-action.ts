@@ -31,6 +31,7 @@ export type WisdomActuatorRequest = {
   };
   options?: PipelineOptions;
   strategy_path?: string;
+  op?: string;
 } & (
   | {
       action: 'knowledge_search';
@@ -93,6 +94,7 @@ export type PipelineStep =
   | {
       type: 'apply';
       op:
+        | 'document_review'
         | 'a2a_fanout'
         | 'perspective_fanout'
         | 'a2a_roleplay'
