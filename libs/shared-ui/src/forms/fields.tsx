@@ -224,7 +224,7 @@ export function Segmented(props: KbSegmentedProps & KbFormComponentId) {
 
 // -- text field / textarea ---------------------------------------------------
 
-const TEXT_TYPES: ReadonlySet<string> = new Set(['email', 'url', 'number', 'search']);
+const TEXT_TYPES: ReadonlySet<string> = new Set(['email', 'url', 'number', 'search', 'time']);
 
 /** `ui:text-field` → labelled `input.kb-input`. */
 export function TextField(p: KbTextFieldProps & KbFormComponentId) {
