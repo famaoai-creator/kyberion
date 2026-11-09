@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import { randomUUID, createHash } from 'node:crypto';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { nowIso } from '../foundation/time.js';
@@ -20,7 +21,7 @@ import * as path from 'node:path';
 export interface DistillCandidateRecord {
   candidate_id: string;
   source_type: 'task_session' | 'mission' | 'artifact';
-  tier?: 'personal' | 'confidential' | 'public';
+  tier?: StorageDataTier;
   project_id?: string;
   track_id?: string;
   track_name?: string;
@@ -289,7 +290,7 @@ export interface DistillCandidateTenantReadScope {
   tenantSlugs: readonly string[];
   organizationIds?: readonly string[] | 'all';
   projectIds?: readonly string[] | 'all';
-  tierAccess: readonly ('public' | 'confidential' | 'personal')[];
+  tierAccess: readonly StorageDataTier[];
 }
 export function listDistillCandidateRecordsForTenants(
   access: DistillCandidateTenantReadScope

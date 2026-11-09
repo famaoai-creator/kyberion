@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import { logger } from '../core.js';
 import { metrics, type MetricsCollector, type ResourceUsageRecord } from '../analysis/metrics.js';
 import { PROVIDER_IDS } from '../provider/provider-permission-profiles.js';
@@ -32,7 +33,7 @@ export interface DirectCliUsageInput {
    * confidential mission without a tenant fails scope validation and records
    * nothing (with a warning) rather than being downgraded.
    */
-  state: { tier: 'personal' | 'confidential' | 'public'; tenant_slug?: string };
+  state: { tier: StorageDataTier; tenant_slug?: string };
   /** Injected collector for isolated runtimes / tests; defaults to the shared one. */
   collector?: Pick<MetricsCollector, 'recordResourceUsage'>;
 }

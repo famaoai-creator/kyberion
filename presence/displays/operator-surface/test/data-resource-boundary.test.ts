@@ -61,8 +61,7 @@ describe('operator surface resource boundaries', () => {
       expect(listRecentAuditEvents().some((event) => event.id === `audit-${suffix}`)).toBe(false);
       expect(getMissionDetail(`MSN-BOUNDARY-${suffix}`)).toBeNull();
     });
-  }, // can exceed the 5s default on a loaded machine. // The projection scan runs against the real active/missions tree, which
-  30000);
+  }, 30000); // can exceed the 5s default on a loaded machine. // The projection scan runs against the real active/missions tree, which
 
   it('skips malformed mission state without failing the projection', () => {
     withExecutionContext('mission_controller', () => {
@@ -86,7 +85,7 @@ describe('operator surface resource boundaries', () => {
           status: 'active',
           execution_mode: 'local',
           priority: 1,
-          assigned_persona: 'operator',
+          org_role: 'operator',
           confidence_score: 1,
           git: { branch: 'main', start_commit: 'a', latest_commit: 'b', checkpoints: [] },
           history: [],
@@ -173,7 +172,7 @@ describe('operator surface resource boundaries', () => {
           status: 'active',
           execution_mode: 'local',
           priority: 1,
-          assigned_persona: 'operator',
+          org_role: 'operator',
           confidence_score: 1,
           git: { branch: 'main', start_commit: 'a', latest_commit: 'b', checkpoints: [] },
           history: [],

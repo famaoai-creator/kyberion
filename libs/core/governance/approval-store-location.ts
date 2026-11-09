@@ -23,6 +23,7 @@
  * it. Mutators write back to where the record was found, never to a
  * caller-derived location.
  */
+import type { StorageDataTier } from '../storage-layout.js';
 import * as path from 'node:path';
 import { resolveIdentityContext, withExecutionContext } from '../authority.js';
 import { appendJsonLine, readJsonLines, writeJson } from '../foundation/json.js';
@@ -79,7 +80,7 @@ export const TENANT_ACTIVATION_STORAGE_CHANNEL = 'tenant-activation';
 /** Kind of a tenant-activation request (the only kind the activation exception applies to). */
 export const TENANT_ACTIVATION_REQUEST_KIND = 'mission_gate';
 
-export type ApprovalPartitionTier = 'personal' | 'confidential';
+export type ApprovalPartitionTier = Exclude<StorageDataTier, 'public'>;
 
 export interface ApprovalTenantPartition {
   kind: 'tenant';

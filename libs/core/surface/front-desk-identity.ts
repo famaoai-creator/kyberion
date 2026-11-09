@@ -10,6 +10,7 @@
  * race; a follow-up can consolidate once both land.
  */
 
+import type { MemberRole } from '../organization/member-registry.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { currentScope } from '../scope-context.js';
 import { resolveOperatorDisplayName } from './operator-identity.js';
@@ -27,7 +28,7 @@ import {
 import { narrowSurfaceViewerTenant, type SurfaceViewerScope } from './surface-mutation-guard.js';
 
 /** Human-facing role union (plan §2.3). `approver` arrives with FD-07. */
-export type FrontDeskRole = 'owner' | 'approver' | 'operator' | 'viewer';
+export type FrontDeskRole = MemberRole;
 
 /**
  * FD-07: a member resolved by `resolveMemberByPrincipal`, projected to the

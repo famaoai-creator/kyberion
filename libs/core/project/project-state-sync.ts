@@ -15,7 +15,7 @@ export async function syncProjectOperationalStateIfLinked(missionId: string): Pr
       tenant_slug: state.tenant_slug,
       tenant_id: state.tenant_id,
       relationships: state.relationships,
-      assigned_persona: state.assigned_persona,
+      org_role: state.org_role,
       context: state.context,
       outcome_contract: state.outcome_contract,
     });

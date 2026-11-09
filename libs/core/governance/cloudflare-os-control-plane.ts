@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import { timingSafeEqual, randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { auditChain } from './audit-chain.js';
@@ -76,7 +77,7 @@ export type HeldActionStatus =
   'pending' | 'approved' | 'applied' | 'rejected' | 'cancelled' | 'failed';
 export type ResourceScope = 'read' | 'write';
 export type IntroductionMode = 'warn' | 'enforce';
-export type OsKnowledgeTier = 'personal' | 'confidential' | 'public';
+export type OsKnowledgeTier = StorageDataTier;
 
 /** Validate the execution envelope without pretending to know generic `T`. */
 export function normalizeGovernedCodeEnvelope(value: unknown): { value: unknown } | undefined {

@@ -73,7 +73,7 @@ describe('meeting-to-value contract', () => {
           mission_id: MISSION_ID,
           tier: 'confidential',
           status: 'active',
-          assigned_persona: 'operator',
+          org_role: 'operator',
           // mission-state.json is now loaded through a schema-validated
           // governed catalog; a fixture missing these required fields fails
           // closed, so listMissionSummaries never sees the mission and the

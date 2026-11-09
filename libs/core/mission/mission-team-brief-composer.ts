@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import * as path from 'node:path';
 import {
   mapMissionClassToMissionTypeTemplate,
@@ -32,7 +33,7 @@ export interface MissionTeamCompositionBriefInput {
   request: string;
   artifactPaths?: string[];
   progressSignals?: string[];
-  tier?: 'personal' | 'confidential' | 'public';
+  tier?: StorageDataTier;
   assignedPersona?: string;
   tenantSlug?: string;
   organizationProfile?: OrganizationProfile | null;

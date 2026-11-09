@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import type { ValidateFunction } from 'ajv';
 import { pathResolver } from '../path-resolver.js';
 import { compileSchema } from '../foundation/ajv.js';
@@ -33,7 +34,7 @@ export interface ExecutionBriefSeed {
   requiredInputs?: string[];
   outcomeIds?: string[];
   confidence?: number;
-  tier?: 'personal' | 'confidential' | 'public';
+  tier?: StorageDataTier;
   locale?: string;
   projectName?: string;
   trackName?: string;

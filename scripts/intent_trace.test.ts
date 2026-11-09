@@ -28,7 +28,7 @@ function makeEvidence(tier: 'confidential' | 'public') {
           status: 'active',
           execution_mode: 'local',
           priority: 1,
-          assigned_persona: 'worker',
+          org_role: 'worker',
           confidence_score: 0.9,
           git: { branch: 'main', start_commit: 'a', latest_commit: 'b', checkpoints: [] },
           history: [],
