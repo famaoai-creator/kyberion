@@ -1,6 +1,8 @@
 /**
  * libs/core/mission/mission-distill.ts
- * Knowledge distillation (Wisdom extraction) for completed missions.
+ * Mission distillation: distill = mission → memory candidate (D8). The
+ * candidate is promoted to knowledge separately; "wisdom" names only the
+ * wisdom-actuator.
  */
 
 import type { StorageDataTier } from '../storage-layout.js';
@@ -95,7 +97,7 @@ const WISDOM_POLICY_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/wisdom-policy.schema.json'
 );
 
-interface WisdomPolicyFile {
+interface DistillPolicyFile {
   version: string;
   name: string;
   description?: string;
@@ -104,16 +106,16 @@ interface WisdomPolicyFile {
   tier_mapping: Record<string, string>;
 }
 
-const wisdomPolicyCatalog = defineCatalog<WisdomPolicyFile>({
+const distillPolicyCatalog = defineCatalog<DistillPolicyFile>({
   id: 'wisdom-policy',
   path: WISDOM_POLICY_PATH,
   schema: WISDOM_POLICY_SCHEMA_PATH,
 });
 
-export function loadWisdomPolicy(): WisdomPolicyFile | null {
+export function loadDistillPolicy(): DistillPolicyFile | null {
   if (!safeExistsSync(WISDOM_POLICY_PATH)) return null;
   try {
-    return wisdomPolicyCatalog.load();
+    return distillPolicyCatalog.load();
   } catch (error: any) {
     logger.warn(`⚠️ Failed to load wisdom-policy.json: ${error.message}`);
     return null;
@@ -153,8 +155,8 @@ function listMissionEvidenceRefs(evidenceDir: string, rootDir: string): string[]
   return refs.sort();
 }
 
-export function resolveWisdomOutputPath(outputDir: string, wisdomFileName: string): string {
-  return assertSafeRepositoryPath(pathResolver.rootResolve(path.join(outputDir, wisdomFileName)), {
+export function resolveDistillationOutputPath(outputDir: string, fileName: string): string {
+  return assertSafeRepositoryPath(pathResolver.rootResolve(path.join(outputDir, fileName)), {
     allowMissingLeaf: true,
   });
 }
@@ -198,7 +200,7 @@ const DISTILL_EXPERIENCE_SCHEMA = z.object({
   confidence: z.enum(['high', 'medium', 'low']),
 });
 
-export const WISDOM_SCHEMA = z.object({
+export const DISTILLATION_SCHEMA = z.object({
   title: z.string(),
   category: z.enum(['Evolution', 'Incident', 'Operations']),
   tags: z.array(z.string()),
@@ -270,7 +272,7 @@ export function gatherDistillContext(
   return parts.join('\n');
 }
 
-export function buildFallbackWisdom(missionId: string, state: MissionState): any {
+export function buildFallbackDistillation(missionId: string, state: MissionState): any {
   const distillPolicy = resolveMissionDistillMarkdownPolicy();
   const failureEvents = state.history.filter(
     (h) =>
@@ -303,8 +305,8 @@ export function buildFallbackWisdom(missionId: string, state: MissionState): any
   };
 }
 
-export function formatWisdomMarkdown(
-  wisdom: any,
+export function formatDistillationMarkdown(
+  distillation: any,
   missionId: string,
   provenance?: Pick<
     NonNullable<MissionState['distillation']>,
@@ -313,17 +315,17 @@ export function formatWisdomMarkdown(
 ): string {
   const distillPolicy = resolveMissionDistillMarkdownPolicy();
   const now = nowIso().slice(0, 10);
-  const tags = (wisdom.tags || []).map((t: string) => `"${t}"`).join(', ');
-  const sections = wisdom.sections || {};
+  const tags = (distillation.tags || []).map((t: string) => `"${t}"`).join(', ');
+  const sections = distillation.sections || {};
 
   const lines: string[] = [
     '---',
-    `title: "${wisdom.title || `Distillation: ${missionId}`}"`,
-    `category: ${wisdom.category || 'Operations'}`,
+    `title: "${distillation.title || `Distillation: ${missionId}`}"`,
+    `category: ${distillation.category || 'Operations'}`,
     `tags: [${tags}]`,
-    `importance: ${wisdom.importance || 3}`,
+    `importance: ${distillation.importance || 3}`,
     `source_mission: ${missionId}`,
-    `author: Kyberion Wisdom Distiller`,
+    `author: Kyberion Mission Distiller`,
     `last_updated: ${now}`,
     ...(provenance?.mode
       ? [
@@ -336,7 +338,7 @@ export function formatWisdomMarkdown(
       : []),
     '---',
     '',
-    `# ${wisdom.title || `Distillation: ${missionId}`}`,
+    `# ${distillation.title || `Distillation: ${missionId}`}`,
     '',
   ];
 
@@ -375,9 +377,9 @@ export function formatWisdomMarkdown(
     lines.push('');
   }
 
-  if (wisdom.edit_rows?.length) {
+  if (distillation.edit_rows?.length) {
     lines.push(`## ${distillPolicy.section_titles.change_attribution ?? 'Change Attribution'}`);
-    for (const row of wisdom.edit_rows) {
+    for (const row of distillation.edit_rows) {
       lines.push(
         `- **${row.component}** (${row.verdict}): ${row.change} — observed: ${row.observed}`
       );
@@ -385,11 +387,11 @@ export function formatWisdomMarkdown(
     lines.push('');
   }
 
-  if (wisdom.experience) {
+  if (distillation.experience) {
     lines.push(`## ${distillPolicy.section_titles.transferable_lesson ?? 'Transferable Lesson'}`);
     for (const field of ['cue', 'lesson', 'evidence', 'confidence'] as const) {
-      if (wisdom.experience[field]) {
-        lines.push(`- **${field}**: ${wisdom.experience[field]}`);
+      if (distillation.experience[field]) {
+        lines.push(`- **${field}**: ${distillation.experience[field]}`);
       }
     }
     lines.push('');
@@ -439,7 +441,7 @@ export async function distillMission(id: string, rootDir: string): Promise<void>
     return;
   }
 
-  logger.info(`🧠 Distilling Wisdom for Mission ${upperId}...`);
+  logger.info(`Distilling mission ${upperId} into a memory candidate...`);
 
   const context = gatherDistillContext(upperId, state, missionPath);
 
@@ -463,54 +465,59 @@ export async function distillMission(id: string, rootDir: string): Promise<void>
     '```',
   ].join('\n');
 
-  const wisdomPolicy = loadWisdomPolicy();
+  const distillPolicy = loadDistillPolicy();
 
-  let wisdom: any = null;
+  let distillation: any = null;
   let llmUsed = false;
   let structuralReason: 'stub_requested' | 'llm_unavailable' | undefined;
   const stubRequested = getRegisteredEnvText('KYBERION_WISDOM_LLM_PROFILE')?.trim() === 'stub';
   try {
-    const llmPolicy: LlmPolicyConfig | undefined = wisdomPolicy?.llm;
-    wisdom = await runAdaptiveStructuredLlmProfile('distill', fullPrompt, WISDOM_SCHEMA, {
-      policy: llmPolicy,
-      // The prompt carries the mission state and evidence: providers must
-      // clear the tier egress gate before they see it.
-      egress: {
-        // A state without a tier is treated as confidential (fail closed).
-        dataTier: state.tier || 'confidential',
-        ...(state.tenant_slug ? { tenantSlug: state.tenant_slug } : {}),
-      },
-      systemPrompt:
-        "You are Kyberion's Wisdom Distiller. Return exactly one JSON object matching the schema.",
-    });
+    const llmPolicy: LlmPolicyConfig | undefined = distillPolicy?.llm;
+    distillation = await runAdaptiveStructuredLlmProfile(
+      'distill',
+      fullPrompt,
+      DISTILLATION_SCHEMA,
+      {
+        policy: llmPolicy,
+        // The prompt carries the mission state and evidence: providers must
+        // clear the tier egress gate before they see it.
+        egress: {
+          // A state without a tier is treated as confidential (fail closed).
+          dataTier: state.tier || 'confidential',
+          ...(state.tenant_slug ? { tenantSlug: state.tenant_slug } : {}),
+        },
+        systemPrompt:
+          "You are Kyberion's Mission Distiller. Return exactly one JSON object matching the schema.",
+      }
+    );
     llmUsed = true;
   } catch {
     structuralReason = stubRequested ? 'stub_requested' : 'llm_unavailable';
     logger.warn(
-      `LLM distillation unavailable — ${structuralReason} | next: inspect wisdom profile configuration or review structural evidence | evidence: mission ${upperId}`
+      `LLM distillation unavailable — ${structuralReason} | next: inspect the llm profile in wisdom-policy.json or review structural evidence | evidence: mission ${upperId}`
     );
     logger.info('Falling back to structural distillation (no LLM)...');
-    wisdom = buildFallbackWisdom(upperId, state);
+    distillation = buildFallbackDistillation(upperId, state);
   }
 
   const dateSlug = nowIso().slice(0, 10).replace(/-/g, '_');
-  const wisdomFileName = 'distillation.md';
-  const wisdomFilePath = assertSafeRepositoryPath(
-    path.join(missionPath, 'evidence', wisdomFileName),
+  const distillationFileName = 'distillation.md';
+  const distillationFilePath = assertSafeRepositoryPath(
+    path.join(missionPath, 'evidence', distillationFileName),
     { allowMissingLeaf: true }
   );
-  const wisdomDirPath = path.dirname(wisdomFilePath);
+  const distillationDirPath = path.dirname(distillationFilePath);
 
-  if (!safeExistsSync(wisdomDirPath)) safeMkdir(wisdomDirPath, { recursive: true });
+  if (!safeExistsSync(distillationDirPath)) safeMkdir(distillationDirPath, { recursive: true });
 
   const provenance = {
     mode: llmUsed ? ('llm' as const) : ('structural' as const),
     llm_used: llmUsed,
     ...(structuralReason ? { structural_reason: structuralReason } : {}),
   };
-  const wisdomMd = formatWisdomMarkdown(wisdom, upperId, provenance);
-  safeWriteFile(wisdomFilePath, wisdomMd);
-  logger.info(`📝 Wisdom written to ${path.relative(rootDir, wisdomFilePath)}`);
+  const distillationMd = formatDistillationMarkdown(distillation, upperId, provenance);
+  safeWriteFile(distillationFilePath, distillationMd);
+  logger.info(`Distillation written to ${path.relative(rootDir, distillationFilePath)}`);
 
   const completedAt = nowIso();
   state.status = transitionStatus(state.status, 'completed');
@@ -519,20 +526,20 @@ export async function distillMission(id: string, rootDir: string): Promise<void>
     status: 'completed',
     completed_at: completedAt,
     ...provenance,
-    output_path: wisdomFilePath,
+    output_path: distillationFilePath,
   };
   state.context = {
     ...(state.context || {}),
-    distill_output_path: wisdomFilePath,
-    distill_output_dir: path.relative(rootDir, wisdomDirPath),
+    distill_output_path: distillationFilePath,
+    distill_output_dir: path.relative(rootDir, distillationDirPath),
   } as any;
   state.history.push({
     ts: nowIso(),
     event: 'DISTILL',
-    note: `Knowledge extraction completed (${provenance.mode}${structuralReason ? `: ${structuralReason}; no LLM distillation` : ''}). Output: ${wisdomFileName}`,
+    note: `Knowledge extraction completed (${provenance.mode}${structuralReason ? `: ${structuralReason}; no LLM distillation` : ''}). Output: ${distillationFileName}`,
   });
 
-  // Auto-enqueue the distilled wisdom into the memory-promotion queue so the
+  // Auto-enqueue the distilled lesson into the memory-promotion queue so the
   // mission-closure path of the corporate-memory loop (execute → distill →
   // promote) advances without manual operator glue. Higher tiers require human
   // ratification before promotion.
@@ -540,24 +547,26 @@ export async function distillMission(id: string, rootDir: string): Promise<void>
     state.tier === 'public' ? 'public' : state.tier === 'personal' ? 'personal' : 'confidential';
   const candidate: MemoryCandidate = {
     candidate_id: `mem-${upperId}-${dateSlug}`,
+    // D8: distill = mission → candidate; the candidate is a lesson.
+    kind: 'lesson',
     source_type: 'mission',
     source_ref: `mission:${upperId}`,
     proposed_memory_kind:
-      wisdom.category === 'Incident'
+      distillation.category === 'Incident'
         ? 'risk_rule'
-        : wisdom.category === 'Operations'
+        : distillation.category === 'Operations'
           ? 'sop'
           : 'heuristic',
-    summary: wisdom.sections.summary || `Distilled wisdom from mission ${upperId}`,
+    summary: distillation.sections.summary || `Distilled lesson from mission ${upperId}`,
     knowledge_domain: 'unclassified',
     // Harness2 experience contract: a distillation that produced no
     // cue/lesson/evidence record is marked declined so the review surface can
     // flag it — the edit rows are still kept on the mission's distillation.
     // Only an actual LLM run can "decline": a structural fallback means the
     // record was never inspected, which is unknown, not declined.
-    ...(wisdom.experience ? { distill_experience: wisdom.experience } : {}),
-    ...(llmUsed ? { distill_experience_declined: !wisdom.experience } : {}),
-    evidence_refs: listMissionEvidenceRefs(wisdomDirPath, rootDir),
+    ...(distillation.experience ? { distill_experience: distillation.experience } : {}),
+    ...(llmUsed ? { distill_experience_declined: !distillation.experience } : {}),
+    evidence_refs: listMissionEvidenceRefs(distillationDirPath, rootDir),
     ...(state.tenant_slug
       ? {
           scope: {
@@ -593,8 +602,8 @@ export async function distillMission(id: string, rootDir: string): Promise<void>
 
   ledger.record('MISSION_DISTILL', {
     mission_id: upperId,
-    wisdom_file: wisdomFileName,
-    output_dir: path.relative(rootDir, wisdomDirPath),
+    wisdom_file: distillationFileName,
+    output_dir: path.relative(rootDir, distillationDirPath),
     llm_used: llmUsed,
     distillation_mode: llmUsed ? 'llm' : 'structural',
     ...(structuralReason ? { structural_reason: structuralReason } : {}),
@@ -624,3 +633,14 @@ function logDistillationOutcome(
     );
   }
 }
+
+/** @deprecated D8 terms: use {@link loadDistillPolicy}. Removed in the next release. */
+export const loadWisdomPolicy = loadDistillPolicy;
+/** @deprecated D8 terms: use {@link resolveDistillationOutputPath}. */
+export const resolveWisdomOutputPath = resolveDistillationOutputPath;
+/** @deprecated D8 terms: use {@link DISTILLATION_SCHEMA}. */
+export const WISDOM_SCHEMA = DISTILLATION_SCHEMA;
+/** @deprecated D8 terms: use {@link buildFallbackDistillation}. */
+export const buildFallbackWisdom = buildFallbackDistillation;
+/** @deprecated D8 terms: use {@link formatDistillationMarkdown}. */
+export const formatWisdomMarkdown = formatDistillationMarkdown;

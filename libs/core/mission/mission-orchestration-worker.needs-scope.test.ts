@@ -1,13 +1,18 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  findRelevantDistilledKnowledge: vi.fn(),
+  findRelevantPromotedKnowledge: vi.fn(),
+  queryTenantKnowledge: vi.fn(),
   recordKnowledgeDelivery: vi.fn(),
 }));
 
-vi.mock('../knowledge/distill-knowledge-injector.js', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../knowledge/distill-knowledge-injector.js')>()),
-  findRelevantDistilledKnowledge: mocks.findRelevantDistilledKnowledge,
+vi.mock('../knowledge/promoted-knowledge-retrieval.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../knowledge/promoted-knowledge-retrieval.js')>()),
+  findRelevantPromotedKnowledge: mocks.findRelevantPromotedKnowledge,
+}));
+vi.mock('../organization/tenant-knowledge-retrieval.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../organization/tenant-knowledge-retrieval.js')>()),
+  queryTenantKnowledge: mocks.queryTenantKnowledge,
 }));
 vi.mock('../knowledge/knowledge-feedback-loop.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../knowledge/knowledge-feedback-loop.js')>()),
@@ -26,14 +31,17 @@ const entry = (path: string) => ({
 });
 
 afterEach(() => {
-  mocks.findRelevantDistilledKnowledge.mockReset();
+  mocks.findRelevantPromotedKnowledge.mockReset();
+  mocks.queryTenantKnowledge.mockReset();
   mocks.recordKnowledgeDelivery.mockReset();
 });
 
 describe('needs-driven retry retrieval uses the first-round scope', () => {
   it('searches the confidential tenant lane and honors governed slice excludes', async () => {
-    mocks.findRelevantDistilledKnowledge.mockResolvedValue([
+    mocks.findRelevantPromotedKnowledge.mockResolvedValue([
       entry('knowledge/product/evolution/distill_unreviewed.md'),
+    ]);
+    mocks.queryTenantKnowledge.mockResolvedValue([
       entry('knowledge/confidential/tenant-a/evolution/distill_rollback.md'),
     ]);
 
@@ -62,12 +70,17 @@ describe('needs-driven retry retrieval uses the first-round scope', () => {
       },
     });
 
-    expect(mocks.findRelevantDistilledKnowledge.mock.calls[0][0].scope).toEqual({
+    const tenantScope = {
       tier: 'confidential',
       tenant_slug: 'tenant-a',
       organization_id: 'org-a',
       project_id: 'PRJ-A',
       mission_id: 'MSN-NEEDS',
+    };
+    expect(mocks.findRelevantPromotedKnowledge.mock.calls[0][0].scope).toEqual(tenantScope);
+    expect(mocks.queryTenantKnowledge.mock.calls[0][0]).toMatchObject({
+      tenantSlug: 'tenant-a',
+      scope: tenantScope,
     });
     const text = lines.join('\n');
     expect(text).toContain('knowledge/confidential/tenant-a/evolution/distill_rollback.md');
@@ -89,7 +102,7 @@ describe('needs-driven retry retrieval uses the first-round scope', () => {
   });
 
   it('a public mission searches without a tenant scope', async () => {
-    mocks.findRelevantDistilledKnowledge.mockResolvedValue([]);
+    mocks.findRelevantPromotedKnowledge.mockResolvedValue([]);
     await buildNeedsKnowledgeReinforcementLines({
       missionId: 'MSN-NEEDS-PUBLIC',
       taskId: 'T1',
@@ -103,6 +116,10 @@ describe('needs-driven retry retrieval uses the first-round scope', () => {
         purpose: 'mission-execution',
       },
     });
-    expect(mocks.findRelevantDistilledKnowledge.mock.calls[0][0]).not.toHaveProperty('scope');
+    expect(mocks.findRelevantPromotedKnowledge.mock.calls[0][0].scope).toEqual({
+      tier: 'public',
+      mission_id: 'MSN-NEEDS-PUBLIC',
+    });
+    expect(mocks.queryTenantKnowledge).not.toHaveBeenCalled();
   });
 });

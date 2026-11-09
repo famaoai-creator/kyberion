@@ -709,6 +709,14 @@ function opNominatePromotion(params: Record<string, unknown>): unknown {
       : [];
 
   if (evidenceRefs.length === 0) return { nominated: false, reason: 'no evidence_refs' };
+  // D8: a volatile face carries no tenant/owner scope envelope, so only a
+  // public-tier nomination can be captured here; the queue would reject the rest.
+  if (sensitivityTier !== 'public') {
+    return {
+      nominated: false,
+      reason: `no capture scope for a ${sensitivityTier} candidate (MEMORY_SCOPE_REQUIRED)`,
+    };
+  }
 
   const candidate = createMemoryPromotionCandidate({
     sourceType,
@@ -717,7 +725,7 @@ function opNominatePromotion(params: Record<string, unknown>): unknown {
     summary,
     evidenceRefs,
     sensitivityTier,
-    ratificationRequired: sensitivityTier !== 'personal',
+    ratificationRequired: true,
   });
   enqueueMemoryPromotionCandidate(candidate);
 
