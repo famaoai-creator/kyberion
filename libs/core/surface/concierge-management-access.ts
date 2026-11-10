@@ -54,7 +54,7 @@ function prepare(request: ConciergeManagementRequest): {
   const role = CONCIERGE_MANAGEMENT_ISSUANCE_RIGHTS[kind];
   assertStoreGrantIssuanceAllowed(role);
   // S4 (owner decision): a management read is an audited disclosure. It is recorded
-  // here, before the exact ceiling is entered (audit persistence keeps the ceiling).
+  // here, before the exact ceiling is entered, and the grant consumes the receipt.
   const disclosureReceipt =
     kind === 'reader'
       ? recordStoreGrantDisclosure(role, {

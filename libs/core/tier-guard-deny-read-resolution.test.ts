@@ -35,7 +35,7 @@ vi.mock('./fs-primitives.js', async (importOriginal) => {
 });
 
 vi.mock('./governance/audit-chain.js', () => ({
-  auditChain: { record: vi.fn() },
+  auditChain: { record: vi.fn(), recordDurable: vi.fn() },
 }));
 
 import { validateReadPermission } from './tier-guard.js';

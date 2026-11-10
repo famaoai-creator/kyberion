@@ -20,7 +20,9 @@ import {
 import { executeSurfaceManagementMutation } from './surface/surface-management-mutations.js';
 import { asRoleOrGrant } from './testing/role-or-store-grant.js';
 
-vi.mock('./governance/audit-chain.js', () => ({ auditChain: { record: vi.fn() } }));
+vi.mock('./governance/audit-chain.js', () => ({
+  auditChain: { record: vi.fn(), recordDurable: vi.fn() },
+}));
 vi.mock('./governance/policy-engine.js', () => ({
   policyEngine: { evaluate: () => ({ allowed: true }) },
 }));

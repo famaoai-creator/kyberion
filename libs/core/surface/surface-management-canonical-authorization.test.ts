@@ -18,6 +18,12 @@ vi.mock('../authority.js', async () => {
     // The management grant binds to a real execution scope (G2).
     withExecutionContextAsync: async (role: string, fn: () => unknown) =>
       runInExecutionScope({ tenantBound: false, assumedRole: role }, fn),
+    // S4: the management facade opens declared store grants; the reader records a disclosure.
+    withStoreGrant: (role: string, fn: () => unknown) =>
+      runInExecutionScope({ tenantBound: false, assumedRole: role }, fn),
+    withStoreGrantAsync: async (role: string, fn: () => unknown) =>
+      runInExecutionScope({ tenantBound: false, assumedRole: role }, fn),
+    recordStoreGrantDisclosure: () => Object.freeze({}),
     assertStoreGrantIssuanceAllowed: () => undefined,
     resolveRole: () => 'concierge',
   };

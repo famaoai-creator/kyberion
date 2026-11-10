@@ -11,6 +11,7 @@ import { withStoreGrant } from './authority.js';
 vi.mock('./governance/audit-chain.js', () => ({
   auditChain: {
     record: vi.fn(),
+    recordDurable: vi.fn(),
   },
 }));
 
