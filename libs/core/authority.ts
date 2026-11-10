@@ -39,7 +39,10 @@ import {
   type ExecutionScope,
   type ExecutionIdentityBinding,
 } from './foundation/execution-scope.js';
-import { currentResourceAccessScope } from './foundation/resource-access-scope.js';
+import {
+  currentResourceAccessScope,
+  runDisclosureAuditOutsideResourceCeilings,
+} from './foundation/resource-access-scope.js';
 import { RETIRED_STORE_ROLE_NAMES } from './foundation/retired-store-roles.js';
 import {
   closeDeclaredStoreGrantToken,
@@ -980,10 +983,9 @@ export interface StoreGrantBinding {
   organizationId?: string;
   identity?: ExecutionIdentityBinding;
   /**
-   * A disclosure grant opened inside a resource ceiling cannot write its audit
-   * record (audit persistence keeps the caller's ceiling): its facade records the
-   * disclosure with {@link recordStoreGrantDisclosure} before it enters the
-   * ceiling and passes the one-shot receipt here.
+   * A facade that records its disclosure ahead of time with
+   * {@link recordStoreGrantDisclosure} (before it enters its own resource
+   * ceiling) passes the one-shot receipt here instead of a second record.
    */
   disclosureReceipt?: object;
 }
@@ -1027,37 +1029,47 @@ export function recordStoreGrantDisclosure(
   return receipt;
 }
 
+/**
+ * The governed system-scope disclosure writer. The record holds no tenant
+ * content — grant name, principal, bound scope, operation — and is built here.
+ * It is a system-scope record: it carries no tenant stamp and is checked and
+ * written in a tenant-cleared execution scope, so it lands in the master chain
+ * only (never a tenant's mirror, where the bound tenant's name would leak to
+ * another tenant), whatever the caller's active tenant or the grant's bound
+ * tenant. Its append is written by the audit chain as its own store writer
+ * (`audit_mirror_writer`, never the caller) outside any request ceiling the
+ * caller is in, so a disclosure is recorded even from inside an exact resource
+ * ceiling; the master-chain write must land (`recordDurable`) or the
+ * disclosure is refused (fail closed). Nothing the caller supplies runs there.
+ */
 function auditStoreGrantDisclosure(name: string, binding: StoreGrantBinding): void {
   const caller = resolveIdentityContext();
-  const tenantSlug = binding.tenantSlug || undefined;
+  const entry = {
+    agentId: caller.role || 'unknown',
+    action: 'store_grant.disclosure',
+    operation: name,
+    result: 'allowed' as const,
+    reason: `cross-store read grant '${name}' issued to role '${caller.role || 'unknown'}'`,
+    metadata: {
+      store_grant: name,
+      caller_role: caller.role ?? null,
+      caller_tenant: caller.tenantSlug ?? null,
+      bound_tenant: binding.tenantSlug || null,
+      bound_organization: binding.organizationId ?? null,
+    },
+  };
+  const systemScope: ExecutionScope = {
+    ...currentExecutionScope(),
+    tenantBound: true,
+    tenantSlug: undefined,
+    tenantCleared: true,
+  };
   try {
-    auditChainModule.auditChain.record({
-      agentId: caller.role || 'unknown',
-      action: 'store_grant.disclosure',
-      operation: name,
-      result: 'allowed',
-      reason: `cross-store read grant '${name}' issued to role '${caller.role || 'unknown'}'`,
-      ...(tenantSlug ? { tenantSlug } : {}),
-      metadata: {
-        store_grant: name,
-        caller_role: caller.role ?? null,
-        caller_tenant: caller.tenantSlug ?? null,
-        bound_tenant: tenantSlug ?? null,
-        bound_organization: binding.organizationId ?? null,
-      },
-    });
+    runInExecutionScope(systemScope, () =>
+      auditChainModule.auditChain.recordDurable(entry, runDisclosureAuditOutsideResourceCeilings)
+    );
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
-    // Inside an exact server-built resource ceiling the read is already bounded to the
-    // ceiling's named paths, and audit persistence keeps that ceiling (it may refuse the
-    // audit file itself), the same as tier-guard's own access audits. The disclosure then
-    // proceeds with a diagnostic; outside any ceiling an unrecorded disclosure is refused.
-    if (currentResourceAccessScope()) {
-      logger.warn(
-        `[STORE_GRANT_DISCLOSURE_UNAUDITED] the '${name}' disclosure inside an exact resource ceiling was not persisted — ${detail} | record it before entering the ceiling (recordStoreGrantDisclosure) | grant=${name}`
-      );
-      return;
-    }
     throw new Error(
       `[STORE_GRANT_DISCLOSURE_UNAUDITED] the '${name}' disclosure could not be recorded, so it is refused — ${detail} | restore audit chain persistence and retry | grant=${name}`
     );

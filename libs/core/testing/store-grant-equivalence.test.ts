@@ -14,7 +14,12 @@ vi.mock('../governance/audit-chain.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../governance/audit-chain.js')>();
   return {
     ...actual,
-    auditChain: { ...actual.auditChain, record: auditRecord, recordDeferrable: vi.fn() },
+    auditChain: {
+      ...actual.auditChain,
+      record: auditRecord,
+      recordDurable: auditRecord,
+      recordDeferrable: vi.fn(),
+    },
   };
 });
 

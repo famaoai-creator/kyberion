@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Disclosure grants record to the audit chain: observe (and fail) the record.
-const audit = vi.hoisted(() => ({ record: vi.fn() }));
+const audit = vi.hoisted(() => ({ recordDurable: vi.fn() }));
 vi.mock('../governance/audit-chain.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../governance/audit-chain.js')>();
-  return { ...actual, auditChain: { ...actual.auditChain, record: audit.record } };
+  return { ...actual, auditChain: { ...actual.auditChain, recordDurable: audit.recordDurable } };
 });
 
 import {
@@ -13,7 +13,7 @@ import {
   withStoreGrant,
   withStoreGrantAsync,
 } from '../authority.js';
-import { runInResourceAccessScope } from './resource-access-scope.js';
+import { currentResourceAccessScope, runInResourceAccessScope } from './resource-access-scope.js';
 import {
   liveDeclaredStoreGrant,
   openDeclaredStoreGrantToken,
@@ -149,18 +149,18 @@ describe('declared store grants (S4 slice 3)', () => {
   });
 
   it('records every cross-store read grant as an audited disclosure, and refuses it unaudited', () => {
-    audit.record.mockReset();
+    audit.recordDurable.mockReset();
     expect(withStoreGrant('workspace_graph_reader', () => 'read', { tenantSlug: '' })).toBe('read');
-    expect(audit.record).toHaveBeenCalledTimes(1);
-    expect(audit.record.mock.calls[0]![0]).toMatchObject({
+    expect(audit.recordDurable).toHaveBeenCalledTimes(1);
+    expect(audit.recordDurable.mock.calls[0]![0]).toMatchObject({
       action: 'store_grant.disclosure',
       operation: 'workspace_graph_reader',
       result: 'allowed',
     });
     // A non-disclosure grant records nothing.
     withStoreGrant(GRANT, () => undefined, { tenantSlug: 'acme-corp' });
-    expect(audit.record).toHaveBeenCalledTimes(1);
-    audit.record.mockImplementationOnce(() => {
+    expect(audit.recordDurable).toHaveBeenCalledTimes(1);
+    audit.recordDurable.mockImplementationOnce(() => {
       throw new Error('audit persistence down');
     });
     const ran = vi.fn();
@@ -168,11 +168,11 @@ describe('declared store grants (S4 slice 3)', () => {
       /\[STORE_GRANT_DISCLOSURE_UNAUDITED\]/
     );
     expect(ran).not.toHaveBeenCalled();
-    audit.record.mockReset();
+    audit.recordDurable.mockReset();
   });
 
   it('accepts a pre-recorded disclosure receipt once, for its grant and tenant only', () => {
-    audit.record.mockReset();
+    audit.recordDurable.mockReset();
     const ceiling = {
       tenantSlug: 'acme-corp',
       readExact: ['knowledge/personal/tenants/acme-corp.json'],
@@ -189,7 +189,7 @@ describe('declared store grants (S4 slice 3)', () => {
     const receipt = recordStoreGrantDisclosure('concierge_management_reader', {
       tenantSlug: 'acme-corp',
     });
-    expect(audit.record).toHaveBeenCalledTimes(1);
+    expect(audit.recordDurable).toHaveBeenCalledTimes(1);
     expect(open(receipt)).toBe('read');
     expect(() => open(receipt)).toThrow(/\[STORE_GRANT_DISCLOSURE_UNAUDITED\]/);
     const other = recordStoreGrantDisclosure('concierge_management_reader', {
@@ -200,26 +200,54 @@ describe('declared store grants (S4 slice 3)', () => {
     expect(() => recordStoreGrantDisclosure(GRANT, { tenantSlug: 'acme-corp' })).toThrow(
       /\[STORE_GRANT_UNKNOWN\]/
     );
-    audit.record.mockReset();
+    audit.recordDurable.mockReset();
   });
 
-  it('inside an exact resource ceiling an unpersisted disclosure proceeds with a diagnostic', () => {
-    audit.record.mockReset();
-    audit.record.mockImplementationOnce(() => {
-      throw new Error('[RESOURCE_SCOPE_DENIED] audit file outside the ceiling');
-    });
+  it('records a disclosure from inside an exact resource ceiling outside that ceiling, and refuses it unrecorded', () => {
+    audit.recordDurable.mockReset();
     const ceiling = {
       tenantSlug: 'acme-corp',
       readExact: ['knowledge/personal/tenants/acme-corp.json'],
       writeExact: [],
       mkdirExact: [],
     };
-    expect(
+    // The entry is checked in the caller's scope; only its append leaves the ceiling.
+    const seen: Array<{ checked: unknown; appended: unknown }> = [];
+    audit.recordDurable.mockImplementation(
+      (_entry: unknown, persistence: <T>(append: () => T) => T) => {
+        const checked = currentResourceAccessScope();
+        return persistence(() => {
+          seen.push({ checked, appended: currentResourceAccessScope() });
+          return {};
+        });
+      }
+    );
+    const ran = vi.fn(() => currentResourceAccessScope());
+    const inside = runInResourceAccessScope(ceiling, () =>
+      withStoreGrant('workspace_graph_reader', ran, { tenantSlug: '' })
+    );
+    expect(audit.recordDurable).toHaveBeenCalledTimes(1);
+    expect(audit.recordDurable.mock.calls[0]![0]).toMatchObject({
+      action: 'store_grant.disclosure',
+      operation: 'workspace_graph_reader',
+    });
+    expect(seen).toHaveLength(1);
+    expect(seen[0]!.checked).toMatchObject({ tenantSlug: 'acme-corp' });
+    expect(seen[0]!.appended).toBeUndefined();
+    // The read itself still runs inside the caller's ceiling.
+    expect(inside).toMatchObject({ tenantSlug: 'acme-corp' });
+
+    // A record that cannot land refuses the read, inside a ceiling as outside.
+    ran.mockClear();
+    audit.recordDurable.mockImplementation(() => {
+      throw new Error('[AUDIT_CHAIN_PERSIST_FAILED] audit file not writable');
+    });
+    expect(() =>
       runInResourceAccessScope(ceiling, () =>
-        withStoreGrant('workspace_graph_reader', () => 'bounded read', { tenantSlug: '' })
+        withStoreGrant('workspace_graph_reader', ran, { tenantSlug: '' })
       )
-    ).toBe('bounded read');
-    expect(audit.record).toHaveBeenCalledTimes(1);
-    audit.record.mockReset();
+    ).toThrow(/\[STORE_GRANT_DISCLOSURE_UNAUDITED\]/);
+    expect(ran).not.toHaveBeenCalled();
+    audit.recordDurable.mockReset();
   });
 });

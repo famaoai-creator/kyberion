@@ -125,7 +125,22 @@ it('persists real scoped actor audit, releases real locks and replays the commit
     )
   ).toBe(true);
   expect(events.slice(2).every((entry) => entry.scope?.project_id === projectId)).toBe(true);
-  expect(auditChain.verify()).toMatchObject({ valid: 4, corrupted: [], total: 4 });
+  // S4: each management read is an audited disclosure, recorded in the master
+  // chain as a system-scope entry (no tenant stamp, the tenant in its metadata).
+  const disclosures = auditChain
+    .loadAll()
+    .filter((entry) => entry.action === 'store_grant.disclosure');
+  expect(disclosures.length).toBeGreaterThan(0);
+  expect(
+    disclosures.every(
+      (entry) =>
+        entry.tenantSlug === undefined &&
+        entry.operation === 'concierge_management_reader' &&
+        entry.metadata?.bound_tenant === tenant
+    )
+  ).toBe(true);
+  const total = 4 + disclosures.length;
+  expect(auditChain.verify()).toMatchObject({ valid: total, corrupted: [], total });
   expect(
     safeExistsSync(
       pathResolver.rootResolve('active/shared/runtime/locks/surface-management-mutations.lock')
