@@ -89,6 +89,10 @@ export const DECLARED_STORE_GRANTS: Readonly<Record<string, DeclaredStoreGrantDe
       persona: 'worker',
       tenantBound: false,
     }),
+    // surface/operator-notifications.ts: the operator notification routing preferences file.
+    notification_preferences_reader: Object.freeze({ persona: 'worker', tenantBound: false }),
+    // tool/tool-runtime-policy.ts: the canonical tool runtime policy and its configured overlay.
+    tool_runtime_policy_reader: Object.freeze({ persona: 'worker', tenantBound: false }),
     // Owner decision (2026-11-10): deny-only roles become explicit deny declarations
     // (store_grants.<name>.narrow) on the grant their facade opens, not roles.
     // task/deliverable-inbox.ts addInboxEntry (bolt review, operator hand-off, escalation).

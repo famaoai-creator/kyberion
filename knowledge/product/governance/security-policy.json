@@ -881,18 +881,6 @@
     "dot_lifecycle_worker": {
       "allow_read": ["active/shared/runtime/locks/"],
       "allow_write": ["active/shared/runtime/locks/"]
-    },
-    "notification_preferences_reader": {
-      "allow_read": ["knowledge/personal/notification-preferences.json"],
-      "allow_write": []
-    },
-    "tool_runtime_policy_reader": {
-      "allow_read": [
-        "knowledge/product/governance/tool-runtime-policy.json",
-        "knowledge/personal/onboarding/tool-runtime-policy.json",
-        "knowledge/personal/stances/${KYBERION_STANCE}/onboarding/tool-runtime-policy.json"
-      ],
-      "allow_write": []
     }
   },
   "store_grants": {
@@ -1424,6 +1412,20 @@
         "knowledge/confidential/${KYBERION_TENANT}/"
       ],
       "deny_read": ["knowledge/confidential/${KYBERION_TENANT}/connections/"],
+      "allow_write": []
+    },
+    "notification_preferences_reader": {
+      "description": "S4 (ADR concept-model-v2 D6): read-only grant of the single knowledge/personal/notification-preferences.json routing file, issued by libs/core/surface/operator-notifications.ts loadNotificationPreferences for shared operator delivery callers (persona worker; no tenant). Reads validated notification preferences only; no other personal files, writes, or decision authority. Formerly the notification_preferences_reader Authority Role (same allow_read / allow_write).",
+      "allow_read": ["knowledge/personal/notification-preferences.json"],
+      "allow_write": []
+    },
+    "tool_runtime_policy_reader": {
+      "description": "S4 (ADR concept-model-v2 D6): read-only grant of the tool availability policy, issued by libs/core/tool/tool-runtime-policy.ts getToolRuntimePolicy for the canonical product policy and the exact operator or configured customer onboarding policy (persona worker; no tenant). An explicit KYBERION_TOOL_RUNTIME_POLICY_PATH keeps the caller's own permissions (no grant). No installation, pinning, writes, or decision authority. Formerly the tool_runtime_policy_reader Authority Role (same allow_read / allow_write).",
+      "allow_read": [
+        "knowledge/product/governance/tool-runtime-policy.json",
+        "knowledge/personal/onboarding/tool-runtime-policy.json",
+        "knowledge/personal/stances/${KYBERION_STANCE}/onboarding/tool-runtime-policy.json"
+      ],
       "allow_write": []
     }
   },

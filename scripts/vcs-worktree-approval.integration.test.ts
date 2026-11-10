@@ -94,6 +94,8 @@ const catalogNames = [
   'authority-role-index.json',
   'role-assumption-policy.json',
 ];
+// S4: declared store grants; an old installation lacks their store_grants declaration and
+// issuance right (and carries no role card for them).
 const roles = ['notification_preferences_reader', 'tool_runtime_policy_reader'];
 // G2: the PR publication and person charter stores have no role; an old installation lacks
 // only their issuance rights.
@@ -107,8 +109,15 @@ function gitSource(args: string[]): string {
 }
 function withoutMigratedRoles(relative: string, raw: string) {
   const value = JSON.parse(raw);
-  if (relative.endsWith('/security-policy.json'))
-    for (const role of roles) delete value.authority_role_permissions[role];
+  if (relative.endsWith('/security-policy.json')) {
+    for (const role of roles) {
+      delete value.authority_role_permissions[role];
+      if (value.store_grants) delete value.store_grants[role];
+    }
+    // An installation that predated declared store grants gains the section itself.
+    if (value.store_grants && Object.keys(value.store_grants).length === 0)
+      delete value.store_grants;
+  }
   if (relative.endsWith('/authority-role-index.json'))
     for (const role of roles) delete value.authority_roles[role];
   if (relative.endsWith('/role-assumption-policy.json'))
@@ -163,7 +172,10 @@ function prepareFixture(legacyWithoutPerson: boolean) {
       const value = JSON.parse(bytes);
       const before = JSON.stringify(value);
       if (relative.endsWith('/security-policy.json'))
-        for (const role of omittedRoles) delete value.authority_role_permissions[role];
+        for (const role of omittedRoles) {
+          delete value.authority_role_permissions[role];
+          if (value.store_grants) delete value.store_grants[role];
+        }
       if (relative.endsWith('/authority-role-index.json'))
         for (const role of omittedRoles) delete value.authority_roles[role];
       if (relative.endsWith('/role-assumption-policy.json'))
@@ -233,10 +245,7 @@ export const runVcsMutationWithApproval = (mutation, invocationId, print) => rea
   // Source declarations are new, while the canonical installation remains
   // unchanged until an exact human-approved additive migration is applied.
   for (const worktree of [first, second])
-    for (const relative of [
-      ...catalogNames.map((name) => governance + name),
-      ...roles.map((role) => governance + `authority-roles/${role}.json`),
-    ])
+    for (const relative of catalogNames.map((name) => governance + name))
       safeWriteFile(
         path.join(worktree, relative),
         safeReadFile(pathResolver.rootResolve(relative), { encoding: 'utf8' })

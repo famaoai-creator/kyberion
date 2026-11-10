@@ -8,7 +8,7 @@ import {
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { resolveActiveProfileRoot } from '../authn/profile-root.js';
-import { withExecutionContext } from '../authority.js';
+import { withStoreGrant } from '../authority.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -73,7 +73,7 @@ export function getToolRuntimePolicy(): ToolRuntimePolicy {
   // opens the canonical policy and the configured operator/customer overlay.
   cachedPolicy = explicitPath
     ? policyCatalog.load()
-    : withExecutionContext('tool_runtime_policy_reader', () => policyCatalog.load());
+    : withStoreGrant('tool_runtime_policy_reader', () => policyCatalog.load());
   cachedPolicyPath = policyPath;
   return cachedPolicy;
 }
