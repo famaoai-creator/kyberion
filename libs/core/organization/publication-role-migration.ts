@@ -1,7 +1,9 @@
 /**
- * Explicit, additive installation upgrade for the PR host's narrow IO roles. The PR publication
- * and person charter stores need no role (G2: their grants are the authority); only their
- * issuance rights are registered.
+ * Explicit, additive installation upgrade for the PR host's narrow store access. The PR
+ * publication and person charter stores need no role (G2: their grants are the authority); only
+ * their issuance rights are registered. The notification preferences and tool runtime policy
+ * readers are declared store grants (S4, ADR concept-model-v2 D6): their `store_grants`
+ * declarations and issuance rights are copied, never a role card, permission or index entry.
  */
 import { createHash } from 'node:crypto';
 import * as path from 'node:path';
@@ -44,6 +46,7 @@ import { hasDelegatedExecutionContext } from '../governance/delegated-execution.
 import { hasHumanExecutionContext } from '../governance/human-execution.js';
 import { hasExternalOperationAuthority } from '../governance/external-operation.js';
 import { getPluginExecutionContext } from '../shell/sandbox-policy.js';
+import { isDeclaredStoreGrantName } from '../foundation/declared-store-grant.js';
 import {
   safeExecResult,
   safeExistsSync,
@@ -52,7 +55,12 @@ import {
   safeWriteFile,
 } from '../secure-io.js';
 
-export const PUBLICATION_MIGRATION_ROLES = [
+/**
+ * Declared store grants the PR host needs (S4): the executing code declares them
+ * (foundation/declared-store-grant.ts); the migration copies their security-policy
+ * `store_grants` entry and registers their issuance right in shared core roles.
+ */
+export const PUBLICATION_MIGRATION_STORE_GRANTS = [
   'notification_preferences_reader',
   'tool_runtime_policy_reader',
 ] as const;
@@ -71,10 +79,7 @@ const CATALOGS = [
   'authority-role-index.json',
   'role-assumption-policy.json',
 ];
-const SOURCE_PATHS = [
-  ...CATALOGS.map((name) => GOVERNANCE + name),
-  ...PUBLICATION_MIGRATION_ROLES.map((role) => `${GOVERNANCE}authority-roles/${role}.json`),
-];
+const SOURCE_PATHS = CATALOGS.map((name) => GOVERNANCE + name);
 type JsonObject = Record<string, unknown>;
 export interface PublicationRoleMigrationChange {
   path: string;
@@ -86,7 +91,7 @@ export interface PublicationRoleMigrationChange {
 export interface PublicationRoleMigrationPlan {
   sourceRoot: string;
   targetRoot: string;
-  roles: readonly string[];
+  storeGrants: readonly string[];
   digest: string;
   requestedEffect: string;
   changes: PublicationRoleMigrationChange[];
@@ -101,22 +106,13 @@ function stable(value: unknown): string {
       .join(',')}}`;
   return JSON.stringify(value);
 }
-/** A card without the registry-only fields that never reach the role index. */
-function withoutRegistryOnlyFields(card: JsonObject): JsonObject {
-  const profile = { ...card };
-  delete profile.permissions;
-  delete profile.assignable;
-  return profile;
-}
 function object(value: unknown, label: string): JsonObject {
   if (!value || typeof value !== 'object' || Array.isArray(value))
     throw new Error(`[PUBLICATION_ROLE_MIGRATION] ${label} must be an object`);
   return value as JsonObject;
 }
 function validateCatalog(name: string, value: unknown, sourceRoot: string): void {
-  const schema = name.startsWith('authority-roles/')
-    ? 'authority-role'
-    : name.replace(/\.json$/, '');
+  const schema = name.replace(/\.json$/, '');
   defineCatalog({
     id: `publication-migration-${schema}`,
     path: name,
@@ -229,21 +225,19 @@ function previewPublicationRoleMigrationInScope(sourceRoot: string): Publication
     targetCatalogs[name] = parseSafeJsonObjectInput(raw, relative);
     validateCatalog(name, targetCatalogs[name], targetRoot);
   }
+  const sourcePolicy = sourceCatalogs['security-policy.json'];
+  const targetPolicy = targetCatalogs['security-policy.json'];
   const sourcePermissions = object(
-    sourceCatalogs['security-policy.json'].authority_role_permissions,
+    sourcePolicy.authority_role_permissions,
     'source role permissions'
   );
-  const targetPermissions = object(
-    targetCatalogs['security-policy.json'].authority_role_permissions,
-    'target role permissions'
-  );
+  const sourceGrants = object(sourcePolicy.store_grants, 'source store grants');
+  // An installation from before declared store grants has no `store_grants` yet.
+  if (targetPolicy.store_grants === undefined) targetPolicy.store_grants = {};
+  const targetGrants = object(targetPolicy.store_grants, 'target store grants');
   const sourceIndex = object(
     sourceCatalogs['authority-role-index.json'].authority_roles,
     'source role index'
-  );
-  const targetIndex = object(
-    targetCatalogs['authority-role-index.json'].authority_roles,
-    'target role index'
   );
   const sourceShared = object(
     sourceCatalogs['role-assumption-policy.json'].shared_core_roles,
@@ -273,50 +267,29 @@ function previewPublicationRoleMigrationInScope(sourceRoot: string): Publication
       );
     destination[key] = expected;
   }
-  for (const role of PUBLICATION_MIGRATION_ROLES) {
-    const relative = `${GOVERNANCE}authority-roles/${role}.json`;
-    const card = parseSafeJsonObjectInput(source[relative], relative);
-    validateCatalog(`authority-roles/${role}.json`, card, targetRoot);
-    if (
-      card.role !== role ||
-      !sourceShared.includes(role) ||
-      !sourcePermissions[role] ||
-      !sourceIndex[role]
-    )
-      throw new Error(`[PUBLICATION_ROLE_MIGRATION] incomplete source role: ${role}`);
-    if (hasDeny(sourcePermissions[role]) || hasDeny(targetPermissions[role]))
+  for (const grant of PUBLICATION_MIGRATION_STORE_GRANTS) {
+    // The declaration only takes effect where the executing code issues the grant; an
+    // installation whose code still assumes a role of this name must upgrade its code first.
+    if (!isDeclaredStoreGrantName(grant))
       throw new Error(
-        `[PUBLICATION_ROLE_MIGRATION] explicit deny requires separate policy review: ${role}`
+        `[PUBLICATION_ROLE_MIGRATION] this installation's code does not declare the store grant: ${grant}`
       );
-    const indexed = { ...object(sourceIndex[role], role) };
-    delete indexed.role;
-    const cardRecord = withoutRegistryOnlyFields(card);
-    delete cardRecord.role;
-    if (stable(indexed) !== stable(cardRecord))
-      throw new Error(`[PUBLICATION_ROLE_MIGRATION] source index/card mismatch: ${role}`);
-    // The card is the registry and the policy entry its projection (concept
-    // model v2 D6); a source whose two disagree is not migrated.
+    // A store grant is never a role: a source that still carries a role entry under the
+    // name, lacks the declaration or the issuance right is not migrated.
     if (
-      card.permissions !== undefined &&
-      stable(card.permissions) !== stable(sourcePermissions[role])
+      !Object.hasOwn(sourceGrants, grant) ||
+      !sourceShared.includes(grant) ||
+      Object.hasOwn(sourcePermissions, grant) ||
+      Object.hasOwn(sourceIndex, grant)
     )
-      throw new Error(`[PUBLICATION_ROLE_MIGRATION] source card/policy mismatch: ${role}`);
-    addExact(targetPermissions, role, sourcePermissions[role]);
-    addExact(targetIndex, role, sourceIndex[role]);
-    const destination = path.join(targetRoot, relative);
-    const before = safeExistsSync(destination)
-      ? safeReadFile(destination, { encoding: 'utf8' }).toString()
-      : null;
-    // An installation from before the registries merged has cards without
-    // `permissions`; its profile must still agree exactly.
-    if (
-      before !== null &&
-      stable(withoutRegistryOnlyFields(parseSafeJsonObjectInput(before, relative))) !==
-        stable(withoutRegistryOnlyFields(card))
-    )
-      throw new Error(`[PUBLICATION_ROLE_MIGRATION] divergent role card: ${role}`);
-    if (before === null) change(relative, null, `${JSON.stringify(card, null, 2)}\n`);
-    if (!targetShared.includes(role)) targetShared.push(role);
+      throw new Error(`[PUBLICATION_ROLE_MIGRATION] incomplete source store grant: ${grant}`);
+    object(sourceGrants[grant], grant);
+    if (hasDeny(sourceGrants[grant]) || hasDeny(targetGrants[grant]))
+      throw new Error(
+        `[PUBLICATION_ROLE_MIGRATION] explicit deny requires separate policy review: ${grant}`
+      );
+    addExact(targetGrants, grant, sourceGrants[grant]);
+    if (!targetShared.includes(grant)) targetShared.push(grant);
   }
   for (const right of PUBLICATION_MIGRATION_ISSUANCE_RIGHTS) {
     if (!sourceShared.includes(right) || sourcePermissions[right] || sourceIndex[right])
@@ -347,7 +320,7 @@ function previewPublicationRoleMigrationInScope(sourceRoot: string): Publication
   return {
     targetRoot,
     sourceRoot: path.resolve(sourceRoot),
-    roles: PUBLICATION_MIGRATION_ROLES,
+    storeGrants: PUBLICATION_MIGRATION_STORE_GRANTS,
     digest,
     requestedEffect: `publication-role-migration:${digest}`,
     changes,
@@ -633,7 +606,7 @@ export function requestPublicationRoleMigrationApproval(
         },
         draft: {
           title: 'PR publication installation role catalog migration',
-          summary: `Approve ${plan.changes.length} additive catalog changes for ${plan.roles.join(', ')}. No PR is created by this approval.`,
+          summary: `Approve ${plan.changes.length} additive catalog changes for ${plan.storeGrants.join(', ')}. No PR is created by this approval.`,
           details,
           severity: 'high',
         },
