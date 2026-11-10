@@ -1,0 +1,5 @@
+---
+category: Added
+---
+
+- **Concept registry and the `concept-registry` gate** — `knowledge/product/governance/concept-registry.json` holds one definition, canonical doc, GLOSSARY anchor and owner per high-confusion term (29 seeded: units of work, scope, identity, surfaces). The gate rejects duplicate GLOSSARY definitions (homonyms must be declared senses), GLOSSARY rows that drift from the registry, aliases with their own definition, retired docs (`doc_status: superseded|historical`) still listed as canonical, `superseded` without `superseded_by`, new architecture docs without `concepts:` (shrink-only baseline), and monthly plan folders whose README does not link every plan. Retired docs drop to `advisory` retrieval authority with no recency credit. The superseded `kyberion-canonical-concept-index.md` moves to historical; GLOSSARY WorkItem / Task Session / Pipeline / Stance contradictions are resolved; 2026-10 and 2026-11 plan indexes are added. Workflow: `knowledge/product/governance/concept-registry-workflow.md`.
