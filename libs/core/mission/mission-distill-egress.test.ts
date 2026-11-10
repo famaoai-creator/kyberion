@@ -109,16 +109,16 @@ function writeMissionState(tier: 'public' | 'confidential' | undefined, tenantSl
 
 async function runDistill(): Promise<void> {
   const previousRole = process.env.MISSION_ROLE;
-  const previousPersona = process.env.KYBERION_PERSONA;
+  const previousPersona = process.env.KYBERION_BASE_ROLE;
   process.env.MISSION_ROLE = 'ecosystem_architect';
-  process.env.KYBERION_PERSONA = 'ecosystem_architect';
+  process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
   try {
     await distillMission(MISSION_ID, pathResolver.rootDir());
   } finally {
     if (previousRole === undefined) delete process.env.MISSION_ROLE;
     else process.env.MISSION_ROLE = previousRole;
-    if (previousPersona === undefined) delete process.env.KYBERION_PERSONA;
-    else process.env.KYBERION_PERSONA = previousPersona;
+    if (previousPersona === undefined) delete process.env.KYBERION_BASE_ROLE;
+    else process.env.KYBERION_BASE_ROLE = previousPersona;
   }
 }
 

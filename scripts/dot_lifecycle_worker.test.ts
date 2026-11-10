@@ -131,7 +131,7 @@ describe('dot lifecycle worker under its own system role (L1)', () => {
     };
     safeWriteFile(`${ROOT}/dots/worker-activate.json`, JSON.stringify(charter));
     vi.stubEnv('SYSTEM_ROLE', 'dot_lifecycle_worker');
-    vi.stubEnv('KYBERION_PERSONA', 'worker');
+    vi.stubEnv('KYBERION_BASE_ROLE', 'worker');
     vi.stubEnv('MISSION_ROLE', '');
     try {
       // The activation gate reads the canonical role registry (repo root) and

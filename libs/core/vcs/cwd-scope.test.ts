@@ -82,7 +82,7 @@ beforeEach(() => {
   vi.spyOn(pathResolver, 'rootResolve').mockImplementation((value) => path.resolve(root, value));
   vi.stubEnv('SYSTEM_ROLE', '');
   vi.stubEnv('MISSION_ROLE', 'mission_controller');
-  vi.stubEnv('KYBERION_PERSONA', 'ecosystem_architect');
+  vi.stubEnv('KYBERION_BASE_ROLE', 'ecosystem_architect');
   vi.stubEnv('KYBERION_TENANT', '');
   resetRoleAssumptionPolicyCache();
   state.tier = 'public';

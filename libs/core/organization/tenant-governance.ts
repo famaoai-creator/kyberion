@@ -1,6 +1,6 @@
 import * as path from 'node:path';
+import { baseRoleEnvText } from '../foundation/base-role-env.js';
 import { executionAgentId } from '../governance/execution-agent-id.js';
-import { getRegisteredEnvText } from '../foundation/env.js';
 import { auditChain } from '../governance/audit-chain.js';
 import {
   approvalRequesterActorId,
@@ -422,10 +422,7 @@ export function captureAttestationInvoker(): AttestationInvoker {
   } catch {
     // An unresolvable identity still gets a named actor below.
   }
-  const base =
-    persona && persona !== 'unknown'
-      ? persona
-      : getRegisteredEnvText('KYBERION_PERSONA')?.trim() || 'operator';
+  const base = persona && persona !== 'unknown' ? persona : baseRoleEnvText()?.trim() || 'operator';
   return {
     actor: role ? `${base}:${role}` : base,
     ...(tenantSlug ? { tenantSlug } : {}),
@@ -740,11 +737,7 @@ export function requestTenantProviderAttestationApproval(
   }
   const resolved = input.invoker?.approvalRequester;
   const requestedBy =
-    input.actor ||
-    resolved?.requestedBy ||
-    input.invoker?.actor ||
-    getRegisteredEnvText('KYBERION_PERSONA') ||
-    'operator';
+    input.actor || resolved?.requestedBy || input.invoker?.actor || baseRoleEnvText() || 'operator';
   // The detected principal is always kept; an explicit actor only adds one.
   const requesterActor = resolved ? approvalRequesterActorId(resolved) : requestedBy;
   const requestedByDisplayName = resolved?.displayName;
@@ -954,8 +947,7 @@ export function attestTenantProvider(
   input: AttestTenantProviderInput
 ): TenantProviderAttestationResult {
   const { slug, provider } = validateAttestationInput(input);
-  const actor =
-    input.actor || input.invoker?.actor || getRegisteredEnvText('KYBERION_PERSONA') || 'operator';
+  const actor = input.actor || input.invoker?.actor || baseRoleEnvText() || 'operator';
   let approved:
     { approval: ApprovalRequestRecord; humanDecider: string; claimId: string } | undefined;
   let delegated:

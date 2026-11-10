@@ -66,7 +66,7 @@ permission_denied 分類は正しい fail-closed であり、本書で扱った�
 
 永続 scope.env は **tier/tenant だけ**を運び、persona/role は運ばない:
 
-- persona: `scopedPersona()` → `KYBERION_PERSONA` — 未設定なら
+- persona: `scopedPersona()` → `KYBERION_BASE_ROLE` — 未設定なら
   `normalizePersona` で `'unknown'` (`authority.ts:262-275`, `1112-1197`)。
 - role: `resolveRole()` — assumed role も `SYSTEM_ROLE`/`MISSION_ROLE` も無ければ
   `argv[1]` basename のヒューリスティック (`authority.ts:317-331`) に落ち、
@@ -98,7 +98,7 @@ permission_denied 分類は正しい fail-closed であり、本書で扱った�
   つまり `perceptionErrorNext` が指す「claimed WorkItem 経由」は現行コードで
   成立する正常系であり、欠けているのは **interactive CLI (bare `pnpm kyberion
 listen`) の identity** だけ。
-- `buildSafeExecEnv` は `MISSION_ROLE`/`KYBERION_PERSONA` と assumed scope の
+- `buildSafeExecEnv` は `MISSION_ROLE`/`KYBERION_BASE_ROLE` と assumed scope の
   role/persona を子へ引き継ぐ (`secure-io.ts:77-139, 244-252`) — Kyberion-aware
   な子にも同じ identity が伝播する設計は既に存在する。
 
@@ -189,6 +189,6 @@ claimed-WorkItem 正常系と同じ effective identity を interactive CLI に�
 (= R04 landed)。`perceptionErrorNext` の「operator shell」表現は不正確 —
 bare shell では persona が `unknown` のままで依然拒否される。
 現行コードで直ちに成功させたい場合の正式な道筋は、worker persona に解決される
-claimed WorkItem 経由 (または operator が `KYBERION_PERSONA=worker` を明示宣言 —
+claimed WorkItem 経由 (または operator が `KYBERION_BASE_ROLE=worker` を明示宣言 —
 env 宣言は governed claim ではないことに注意) であり、本 residual は
 「interactive CLI に governed な実行 context を与えるか」の設計判断として保留する。

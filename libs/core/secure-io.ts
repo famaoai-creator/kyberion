@@ -1,4 +1,5 @@
 import * as fs from 'node:fs';
+import { writeBaseRoleEnv } from './foundation/base-role-env.js';
 import * as path from 'node:path';
 import { rawReadFileSnapshot } from './fs-primitives.js';
 import {
@@ -130,6 +131,7 @@ const SAFE_EXEC_ENV_ALLOWLIST = [
   'VOLTA_HOME',
   'MISSION_ID',
   'MISSION_ROLE',
+  'KYBERION_BASE_ROLE',
   'KYBERION_PERSONA',
   'KYBERION_SUDO',
   'CODEX_HOME',
@@ -258,8 +260,7 @@ export function buildSafeExecEnv(
   const scope = currentExecutionScope();
   if (scope?.assumedRole) {
     safeEnv.MISSION_ROLE = scope.assumedRole;
-    if (typeof scope.assumedPersona === 'string') safeEnv.KYBERION_PERSONA = scope.assumedPersona;
-    else if (scope.assumedPersona === null) delete safeEnv.KYBERION_PERSONA;
+    if (scope.assumedPersona !== undefined) writeBaseRoleEnv(safeEnv, scope.assumedPersona);
   }
   if (scope?.tenantBound && scope.tenantSlug) {
     safeEnv.KYBERION_TENANT = scope.tenantSlug;

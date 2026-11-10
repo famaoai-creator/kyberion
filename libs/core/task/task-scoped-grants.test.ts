@@ -50,7 +50,7 @@ const OTHER_GRANTEE = 'kyberion://agent/demo-org/other-agent';
 const SAVED_ENV_KEYS = [
   TASK_GRANTS_PATH_ENV,
   'MISSION_ROLE',
-  'KYBERION_PERSONA',
+  'KYBERION_BASE_ROLE',
   'MISSION_ID',
   'TASK_ID',
   'KYBERION_NHI_ID',
@@ -344,7 +344,7 @@ describe('task-scoped grants: authority.resolveIdentityContext integration', () 
     process.env.MISSION_ID = 'MSN-A';
     process.env.TASK_ID = 'task-1';
     process.env.KYBERION_NHI_ID = GRANTEE;
-    process.env.KYBERION_PERSONA = 'worker';
+    process.env.KYBERION_BASE_ROLE = 'worker';
     process.env.MISSION_ROLE = 'software_developer';
 
     const context = resolveIdentityContext();
@@ -355,7 +355,7 @@ describe('task-scoped grants: authority.resolveIdentityContext integration', () 
 
   it('contributes nothing for a mismatched mission, task, or actor', () => {
     issueGoverned({ scope: { capabilities: ['GIT_WRITE'] } });
-    process.env.KYBERION_PERSONA = 'worker';
+    process.env.KYBERION_BASE_ROLE = 'worker';
     process.env.MISSION_ROLE = 'software_developer';
     process.env.KYBERION_NHI_ID = GRANTEE;
 
@@ -380,7 +380,7 @@ describe('task-scoped grants: authority.resolveIdentityContext integration', () 
     process.env.MISSION_ID = 'MSN-A';
     process.env.TASK_ID = 'task-1';
     process.env.KYBERION_NHI_ID = GRANTEE;
-    process.env.KYBERION_PERSONA = 'worker';
+    process.env.KYBERION_BASE_ROLE = 'worker';
     process.env.MISSION_ROLE = 'software_developer';
 
     // Revoked grant.
@@ -409,7 +409,7 @@ describe('task-scoped grants: authority.resolveIdentityContext integration', () 
     process.env.MISSION_ID = 'MSN-A';
     process.env.TASK_ID = 'task-1';
     process.env.KYBERION_NHI_ID = GRANTEE;
-    process.env.KYBERION_PERSONA = 'worker';
+    process.env.KYBERION_BASE_ROLE = 'worker';
     process.env.MISSION_ROLE = 'software_developer';
     process.env[TASK_GRANTS_PATH_ENV] = '/tmp/task-grants-external.jsonl';
 
@@ -421,7 +421,7 @@ describe('task-scoped grants: authority.resolveIdentityContext integration', () 
     process.env.MISSION_ID = 'MSN-A';
     process.env.TASK_ID = 'task-1';
     process.env.KYBERION_NHI_ID = GRANTEE;
-    process.env.KYBERION_PERSONA = 'worker';
+    process.env.KYBERION_BASE_ROLE = 'worker';
     process.env.MISSION_ROLE = 'software_developer';
 
     const context = resolveIdentityContext();

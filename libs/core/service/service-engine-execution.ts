@@ -51,7 +51,7 @@ function buildChildEnv(env?: Record<string, unknown>): Record<string, string> | 
 /**
  * A preset's child-process env overlay (`alt.env`): like buildChildEnv, but a
  * preset may not set execution authority (SYSTEM_ROLE, MISSION_ROLE,
- * KYBERION_PERSONA, KYBERION_DELEGATED_ROLE, KYBERION_SUDO — DR-01).
+ * KYBERION_BASE_ROLE, KYBERION_DELEGATED_ROLE, KYBERION_SUDO — DR-01).
  */
 export function buildPresetProcessEnv(
   env?: Record<string, unknown>

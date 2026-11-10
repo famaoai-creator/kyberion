@@ -8,16 +8,16 @@ describe('pipeline report contract', () => {
   const externalSchema = pathResolver.sharedTmp('report-contract-test.json');
 
   afterEach(() => {
-    const savedPersona = process.env.KYBERION_PERSONA;
+    const savedPersona = process.env.KYBERION_BASE_ROLE;
     const savedRole = process.env.MISSION_ROLE;
-    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     process.env.MISSION_ROLE = 'mission_controller';
     try {
       safeRmSync(schemaLink, { recursive: true, force: true });
       safeRmSync(externalSchema, { recursive: true, force: true });
     } finally {
-      if (savedPersona === undefined) delete process.env.KYBERION_PERSONA;
-      else process.env.KYBERION_PERSONA = savedPersona;
+      if (savedPersona === undefined) delete process.env.KYBERION_BASE_ROLE;
+      else process.env.KYBERION_BASE_ROLE = savedPersona;
       if (savedRole === undefined) delete process.env.MISSION_ROLE;
       else process.env.MISSION_ROLE = savedRole;
     }
@@ -51,9 +51,9 @@ describe('pipeline report contract', () => {
   });
 
   it('rejects a product schema leaf replaced by a symlink', async () => {
-    const savedPersona = process.env.KYBERION_PERSONA;
+    const savedPersona = process.env.KYBERION_BASE_ROLE;
     const savedRole = process.env.MISSION_ROLE;
-    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     process.env.MISSION_ROLE = 'mission_controller';
     try {
       safeWriteFile(externalSchema, JSON.stringify({ type: 'object' }));
@@ -67,8 +67,8 @@ describe('pipeline report contract', () => {
         )
       ).rejects.toThrow(/RESOURCE_PATH_SYMLINK/);
     } finally {
-      if (savedPersona === undefined) delete process.env.KYBERION_PERSONA;
-      else process.env.KYBERION_PERSONA = savedPersona;
+      if (savedPersona === undefined) delete process.env.KYBERION_BASE_ROLE;
+      else process.env.KYBERION_BASE_ROLE = savedPersona;
       if (savedRole === undefined) delete process.env.MISSION_ROLE;
       else process.env.MISSION_ROLE = savedRole;
     }

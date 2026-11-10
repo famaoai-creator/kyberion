@@ -36,7 +36,7 @@ const TENANT = 'hearing-access-alpha';
 const OTHER = 'hearing-access-bravo';
 const ENV_KEYS = [
   'KYBERION_ROOT',
-  'KYBERION_PERSONA',
+  'KYBERION_BASE_ROLE',
   'MISSION_ROLE',
   'SYSTEM_ROLE',
   'MISSION_ID',
@@ -96,7 +96,7 @@ beforeAll(async () => {
 beforeEach(() => {
   policyState.mode = 'loaded';
   for (const key of ENV_KEYS) if (key !== 'KYBERION_ROOT') delete process.env[key];
-  process.env.KYBERION_PERSONA = 'worker';
+  process.env.KYBERION_BASE_ROLE = 'worker';
   process.env.SYSTEM_ROLE = 'presence_studio';
   process.env.MISSION_ID = MISSION;
 });
@@ -150,7 +150,7 @@ function snapshot() {
     persona: state.persona,
     role: state.role,
     tenantSlug: state.tenantSlug,
-    envPersona: process.env.KYBERION_PERSONA,
+    envPersona: process.env.KYBERION_BASE_ROLE,
     envRole: process.env.MISSION_ROLE,
     envTenant: process.env.KYBERION_TENANT,
   };

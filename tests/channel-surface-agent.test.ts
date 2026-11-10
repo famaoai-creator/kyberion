@@ -38,16 +38,16 @@ describe('Channel surface agents', { concurrent: false }, () => {
   const agentIdentityPath = pathResolver.rootResolve('knowledge/personal/agent-identity.json');
   const withRole = <T>(role: string, fn: () => T, persona?: string): T => {
     const previous = process.env.MISSION_ROLE;
-    const previousPersona = process.env.KYBERION_PERSONA;
+    const previousPersona = process.env.KYBERION_BASE_ROLE;
     process.env.MISSION_ROLE = role;
-    if (persona !== undefined) process.env.KYBERION_PERSONA = persona;
+    if (persona !== undefined) process.env.KYBERION_BASE_ROLE = persona;
     try {
       return fn();
     } finally {
       if (previous === undefined) delete process.env.MISSION_ROLE;
       else process.env.MISSION_ROLE = previous;
-      if (previousPersona === undefined) delete process.env.KYBERION_PERSONA;
-      else process.env.KYBERION_PERSONA = previousPersona;
+      if (previousPersona === undefined) delete process.env.KYBERION_BASE_ROLE;
+      else process.env.KYBERION_BASE_ROLE = previousPersona;
     }
   };
   const baselineIdentity = withRole(
@@ -132,7 +132,7 @@ describe('Channel surface agents', { concurrent: false }, () => {
     else process.env.KYBERION_LOCALE = savedLocale;
     cleanupSurfaceState();
     process.env.MISSION_ROLE = 'mission_controller';
-    process.env.KYBERION_PERSONA = 'sovereign';
+    process.env.KYBERION_BASE_ROLE = 'sovereign';
     if (baselineIdentity !== null) core.safeWriteFile(identityPath, baselineIdentity);
     else if (safeExistsSync(identityPath)) safeRmSync(identityPath);
     if (baselineVision !== null) core.safeWriteFile(visionPath, baselineVision);
@@ -320,7 +320,7 @@ describe('Channel surface agents', { concurrent: false }, () => {
 
   it('routes uninitialized Slack threads into onboarding and persists identity artifacts', () => {
     process.env.MISSION_ROLE = 'mission_controller';
-    process.env.KYBERION_PERSONA = 'sovereign';
+    process.env.KYBERION_BASE_ROLE = 'sovereign';
     if (safeExistsSync(identityPath)) safeRmSync(identityPath);
     if (safeExistsSync(visionPath)) safeRmSync(visionPath);
     if (safeExistsSync(agentIdentityPath)) safeRmSync(agentIdentityPath);

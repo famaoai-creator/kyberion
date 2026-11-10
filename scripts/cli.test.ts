@@ -442,7 +442,7 @@ describe('Kyberion CLI helpers', () => {
 
   it('reports not_found (exit 0, no writes) for a scope with no active trees', async () => {
     vi.stubEnv('MISSION_ROLE', 'mission_controller');
-    vi.stubEnv('KYBERION_PERSONA', 'worker');
+    vi.stubEnv('KYBERION_BASE_ROLE', 'worker');
     vi.stubEnv('SYSTEM_ROLE', '');
     vi.stubEnv('KYBERION_TENANT', '');
     vi.stubEnv('KYBERION_SUDO', '');
@@ -460,7 +460,7 @@ describe('Kyberion CLI helpers', () => {
 
   it('denies a roleless offboarding query even when the lineage index is absent', async () => {
     vi.stubEnv('MISSION_ROLE', '');
-    vi.stubEnv('KYBERION_PERSONA', '');
+    vi.stubEnv('KYBERION_BASE_ROLE', '');
     vi.stubEnv('SYSTEM_ROLE', '');
     vi.stubEnv('KYBERION_TENANT', '');
     vi.stubEnv('KYBERION_SUDO', '');

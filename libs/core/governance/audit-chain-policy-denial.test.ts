@@ -154,7 +154,7 @@ describe('audit-owned persistence under real production authority', () => {
       }));
       // Inspect only this synthetic fixture after leaving every tested scope.
       process.env.MISSION_ROLE = 'mission_controller';
-      process.env.KYBERION_PERSONA = 'sovereign';
+      process.env.KYBERION_BASE_ROLE = 'sovereign';
       process.env.KYBERION_TENANT = '';
       const readRows = (dir) => io.safeExistsSync(dir)
         ? io.safeReaddir(dir).filter(name => name.endsWith('.jsonl')).flatMap(name =>
@@ -178,7 +178,7 @@ describe('audit-owned persistence under real production authority', () => {
       timeoutMs: 30_000,
       env: {
         KYBERION_ROOT: fixture,
-        KYBERION_PERSONA: 'worker',
+        KYBERION_BASE_ROLE: 'worker',
         MISSION_ROLE: 'worker',
         SYSTEM_ROLE: '',
         KYBERION_DELEGATED_ROLE: '',

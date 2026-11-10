@@ -116,7 +116,7 @@ export async function setUpFirstJob(options: { bound?: boolean } = {}): Promise<
   ])
     vi.stubEnv(key, '');
   vi.stubEnv('MISSION_ROLE', 'worker');
-  vi.stubEnv('KYBERION_PERSONA', 'worker');
+  vi.stubEnv('KYBERION_BASE_ROLE', 'worker');
   vi.stubEnv('KYBERION_REASONING_BACKEND', 'stub');
   vi.stubEnv('KYBERION_SESSION_SECRET', fj.fixture.FIRST_JOB_TEST_SESSION_KEY);
   vi.stubEnv('KYBERION_OIDC_ISSUER', fj.fixture.FIRST_JOB_TEST_ISSUER);

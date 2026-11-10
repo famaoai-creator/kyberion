@@ -178,7 +178,7 @@ describe('scheduler reconcile', () => {
         instance.repoRoot,
         'dist/scripts/chronos_daemon.js',
         {
-          KYBERION_PERSONA: 'sovereign',
+          KYBERION_BASE_ROLE: 'sovereign',
         }
       ),
       [foreignSupervisor]: legacyPlist(
@@ -199,7 +199,7 @@ describe('scheduler reconcile', () => {
     expect(host.loaded.has('com.kyberion.chronos')).toBe(false);
     // Forwarded operator settings survive the migration (allowlisted names only).
     expect(host.files[`${AGENTS}/com.kyberion.chronos.${instance.id}.plist`]).toContain(
-      '<key>KYBERION_PERSONA</key>'
+      '<key>KYBERION_BASE_ROLE</key>'
     );
     // The other checkout's unit: reported, never booted out or removed.
     expect(host.files[foreignSupervisor]).toBeDefined();

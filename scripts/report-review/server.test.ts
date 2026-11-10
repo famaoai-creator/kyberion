@@ -139,8 +139,8 @@ describe('report review server (live handler)', () => {
   let savedPersona: string | undefined;
 
   beforeAll(async () => {
-    savedPersona = process.env.KYBERION_PERSONA;
-    process.env.KYBERION_PERSONA = 'sovereign';
+    savedPersona = process.env.KYBERION_BASE_ROLE;
+    process.env.KYBERION_BASE_ROLE = 'sovereign';
     safeWriteFile(pathResolver.rootResolve(target), original, { mkdir: true, encoding: 'utf8' });
     server = http.createServer(
       createReportReviewRequestHandler({ token, target, reviewContext, print: () => undefined })
@@ -153,8 +153,8 @@ describe('report review server (live handler)', () => {
     await new Promise<void>((resolve) => server.close(() => resolve()));
     safeRmSync(pathResolver.rootResolve(dir), { recursive: true, force: true });
     safeRmSync(pathResolver.rootResolve(reviewReceiptLogicalPath(reviewContext)), { force: true });
-    if (savedPersona === undefined) delete process.env.KYBERION_PERSONA;
-    else process.env.KYBERION_PERSONA = savedPersona;
+    if (savedPersona === undefined) delete process.env.KYBERION_BASE_ROLE;
+    else process.env.KYBERION_BASE_ROLE = savedPersona;
   });
 
   it('serves the report with the save config and a served-asset layer in the request locale', async () => {

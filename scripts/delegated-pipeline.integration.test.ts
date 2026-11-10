@@ -48,11 +48,15 @@ describe('real pipeline delegated execution and control composition', () => {
       `pipeline-delegation-${randomUUID()}`
     );
     saved = Object.fromEntries(
-      ['KYBERION_PERSONA', 'MISSION_ROLE', 'MISSION_ID', 'KYBERION_TASK_ID', 'KYBERION_TENANT'].map(
-        (key) => [key, process.env[key]]
-      )
+      [
+        'KYBERION_BASE_ROLE',
+        'MISSION_ROLE',
+        'MISSION_ID',
+        'KYBERION_TASK_ID',
+        'KYBERION_TENANT',
+      ].map((key) => [key, process.env[key]])
     );
-    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     process.env.MISSION_ROLE = 'mission_controller';
     delete process.env.MISSION_ID;
     delete process.env.KYBERION_TASK_ID;

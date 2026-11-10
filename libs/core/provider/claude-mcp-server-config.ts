@@ -1,6 +1,7 @@
 import * as nodePath from 'node:path';
 import type { McpServerConfig } from '@anthropic-ai/claude-agent-sdk';
 import { safeChildEnv } from '../foundation/env.js';
+import { baseRoleEnvText } from '../foundation/base-role-env.js';
 import { pathResolver } from '../path-resolver.js';
 
 /** Transport configuration is independent of SDK tool-policy execution. */
@@ -13,7 +14,7 @@ export function buildKyberionMcpServerConfig(
       command: 'node',
       args: [nodePath.join(repoRoot, 'dist/scripts/mcp_server.js')],
       cwd: repoRoot,
-      env: { KYBERION_PERSONA: safeChildEnv().KYBERION_PERSONA ?? 'sovereign_concierge' },
+      env: { KYBERION_BASE_ROLE: baseRoleEnvText(safeChildEnv()) ?? 'sovereign_concierge' },
     } as McpServerConfig,
   };
 }

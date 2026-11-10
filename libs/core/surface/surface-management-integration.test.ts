@@ -48,7 +48,7 @@ function clean(): void {
 }
 beforeEach(() => {
   vi.stubEnv('KYBERION_SUDO', 'true');
-  vi.stubEnv('KYBERION_PERSONA', 'sovereign');
+  vi.stubEnv('KYBERION_BASE_ROLE', 'sovereign');
   vi.stubEnv('SYSTEM_ROLE', '');
   vi.stubEnv('MISSION_ROLE', '');
   vi.stubEnv('KYBERION_TENANT', tenant);
@@ -75,13 +75,13 @@ beforeEach(() => {
 afterEach(() => {
   vi.stubEnv('KYBERION_SUDO', 'true');
   vi.stubEnv('SYSTEM_ROLE', '');
-  vi.stubEnv('KYBERION_PERSONA', 'sovereign');
+  vi.stubEnv('KYBERION_BASE_ROLE', 'sovereign');
   clean();
   vi.unstubAllEnvs();
 });
 it('persists real scoped actor audit, releases real locks and replays the committed receipt without SUDO', async () => {
   vi.stubEnv('KYBERION_SUDO', 'false');
-  vi.stubEnv('KYBERION_PERSONA', '');
+  vi.stubEnv('KYBERION_BASE_ROLE', '');
   vi.stubEnv('SYSTEM_ROLE', 'concierge');
   vi.stubEnv('KYBERION_TENANT', 'ambient-other-tenant');
   const command = {
@@ -153,7 +153,7 @@ it('persists real scoped actor audit, releases real locks and replays the commit
 
 it('isolates concurrent audit tenant bindings from the ambient tenant', async () => {
   vi.stubEnv('KYBERION_SUDO', 'false');
-  vi.stubEnv('KYBERION_PERSONA', '');
+  vi.stubEnv('KYBERION_BASE_ROLE', '');
   vi.stubEnv('SYSTEM_ROLE', 'concierge');
   vi.stubEnv('KYBERION_TENANT', 'ambient-other-tenant');
   await Promise.all(
@@ -213,7 +213,7 @@ it('canonicalizes new actor/scope input order without changing a valid legacy en
   const line = JSON.stringify(legacy);
   safeWriteFile(file, line + '\n');
   vi.stubEnv('KYBERION_SUDO', 'false');
-  vi.stubEnv('KYBERION_PERSONA', '');
+  vi.stubEnv('KYBERION_BASE_ROLE', '');
   vi.stubEnv('SYSTEM_ROLE', 'concierge');
   const scope = {
     scope_kind: 'tenant' as const,

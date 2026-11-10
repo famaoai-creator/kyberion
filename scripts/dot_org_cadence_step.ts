@@ -5,7 +5,7 @@
  * operation tick, standup and retro run by the supervisor — inside
  * `runAsDotCharter` (the charter's authority role, tenant and organization),
  * using the scoped cadence mode, so no chronos daemon has to run as
- * KYBERION_PERSONA=sovereign. The repo cadence pipelines
+ * KYBERION_BASE_ROLE=sovereign. The repo cadence pipelines
  * (pipelines/organization-{operation-tick,standup,retro}.json) stay the
  * sovereign-only cross-tenant path.
  *

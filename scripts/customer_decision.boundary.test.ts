@@ -35,7 +35,7 @@ const CASE = 'case-cd';
 const NOW = '2026-10-24T00:00:00.000Z';
 const ACTOR = 'customer:acme-cto';
 const keys = [
-  'KYBERION_PERSONA',
+  'KYBERION_BASE_ROLE',
   'MISSION_ROLE',
   'SYSTEM_ROLE',
   'MISSION_ID',
@@ -76,7 +76,7 @@ beforeAll(async () => {
   io = await import('@agent/core/secure-io');
   facade = await import('./customer_decision.js');
   expect((await import('@agent/core/path-resolver')).rootDir()).toBe(ROOT);
-  process.env.KYBERION_PERSONA = 'sovereign';
+  process.env.KYBERION_BASE_ROLE = 'sovereign';
   for (const tenant of [TENANT, OTHER])
     io.safeWriteFile(
       path.join(ROOT, 'knowledge/personal/tenants', `${tenant}.json`),

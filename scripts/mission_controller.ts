@@ -16,6 +16,7 @@
  */
 
 import * as path from 'node:path';
+import { baseRoleEnvText } from '@agent/core/foundation';
 import { withMissionPrerequisiteIdentityProbe } from '@agent/core/mission/mission-prerequisite-identity';
 import { inspectMissionPrerequisiteIdentity } from './lib/installed-identity.js';
 import { auditChain } from '@agent/core/governance/audit-chain';
@@ -1275,7 +1276,7 @@ async function gatePass(missionId: string, gateFile?: string, note?: string): Pr
     gateId: path.basename(gatePath).replace(/-\w+\.json$/u, ''),
     outcome: 'passed',
     note,
-    actorId: registeredEnv('KYBERION_PERSONA') || 'operator',
+    actorId: baseRoleEnvText() || 'operator',
     evidenceDir: path.dirname(gatePath),
   });
   auditChain.record({
@@ -1340,7 +1341,7 @@ async function gateFail(missionId: string, gateFile?: string, note?: string): Pr
     gateId: path.basename(gatePath).replace(/-\w+\.json$/u, ''),
     outcome: 'rejected',
     note,
-    actorId: registeredEnv('KYBERION_PERSONA') || 'operator',
+    actorId: baseRoleEnvText() || 'operator',
     evidenceDir: path.dirname(gatePath),
   });
   auditChain.record({

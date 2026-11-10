@@ -23,7 +23,7 @@ sketch-input の描画ツールを画像背景向けに流用した **127.0.0.1 
 ## 使い方
 
 ```bash
-KYBERION_PERSONA=sovereign node_modules/.bin/tsx scripts/screenshot-annotate/server.ts \
+KYBERION_BASE_ROLE=sovereign node_modules/.bin/tsx scripts/screenshot-annotate/server.ts \
   [--out active/shared/tmp/screenshot-annotate] \
   [--instruction "この注釈を要件に整理して"] \
   [port]

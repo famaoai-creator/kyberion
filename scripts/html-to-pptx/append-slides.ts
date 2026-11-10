@@ -14,7 +14,7 @@
  * （4:3 のデッキに 16:9 のスライドを入れると右側が切れるため）。
  *
  * Run:
- *   KYBERION_PERSONA=sovereign node_modules/.bin/tsx scripts/html-to-pptx/append-slides.ts \
+ *   KYBERION_BASE_ROLE=sovereign node_modules/.bin/tsx scripts/html-to-pptx/append-slides.ts \
  *     <target.pptx> <source.pptx> <out.pptx> [--at <1-based index>]
  */
 import AdmZip from 'adm-zip';

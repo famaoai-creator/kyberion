@@ -15,7 +15,7 @@ describe('service preset process env (DR-01)', () => {
         RETRIES: 3,
         SYSTEM_ROLE: 'ecosystem_architect',
         MISSION_ROLE: 'mission_controller',
-        KYBERION_PERSONA: 'sovereign',
+        KYBERION_BASE_ROLE: 'sovereign',
         KYBERION_DELEGATED_ROLE: 'ecosystem_architect@concierge',
         KYBERION_SUDO: 'true',
       })

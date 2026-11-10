@@ -8,7 +8,7 @@
  * it from the registry.
  *
  * A principal is a (role, persona, entry) triple: the persona named through
- * KYBERION_PERSONA (with MISSION_ROLE for the role), or the role assumed
+ * KYBERION_BASE_ROLE (with MISSION_ROLE for the role), or the role assumed
  * in-process with an explicit persona (withExecutionContext).
  *
  * Re-record (only when the policy itself changes, never to hide a difference):
@@ -127,7 +127,7 @@ function probedPaths(
 
 const ENV_KEYS = [
   'KYBERION_TENANT',
-  'KYBERION_PERSONA',
+  'KYBERION_BASE_ROLE',
   'KYBERION_PROJECT_ID',
   'KYBERION_ORGANIZATION_ID',
   'MISSION_ROLE',
@@ -148,7 +148,7 @@ function withPrincipalEnv<T>(principal: Principal, fn: () => T): T {
   process.env.KYBERION_PROJECT_ID = 'prj-a';
   process.env.MISSION_ID = MISSION;
   if (principal.entry === 'env') {
-    if (principal.persona) process.env.KYBERION_PERSONA = principal.persona;
+    if (principal.persona) process.env.KYBERION_BASE_ROLE = principal.persona;
     if (principal.role) process.env.MISSION_ROLE = principal.role;
   }
   try {
