@@ -46,6 +46,8 @@ describe('module boundary ratchet', () => {
       'libs/core/secure-io-path-guard.ts -> libs/core/secret/vault-mount.ts',
       'libs/core/secure-io-path-guard.ts -> libs/core/tier-guard.ts',
       'libs/core/secure-io.ts -> libs/core/governance/audit-chain.ts',
+      // the policy gates key the policy-engine agentId on the execution's NHI id (S4).
+      'libs/core/secure-io.ts -> libs/core/governance/execution-agent-id.ts',
       'libs/core/secure-io.ts -> libs/core/shell/sandbox-policy.ts',
       'libs/core/secure-io.ts -> libs/core/tier-guard.ts',
     ]);
