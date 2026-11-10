@@ -14,7 +14,7 @@
  */
 
 import * as path from 'node:path';
-import { withExecutionContext } from '../authority.js';
+import { withStoreGrant } from '../authority.js';
 import { listAgentIdentities } from '../agent/agent-identity.js';
 import { listApprovalRequests } from '../governance/approval-store-reader.js';
 import type { ApprovalRequestRecord } from '../governance/approval-store.js';
@@ -36,6 +36,7 @@ import {
 import { decisionReasonText } from './decision-reason-text.js';
 import { readableMissionName } from './display-humanize.js';
 import type { WorkItem } from '../workforce/work-coordination-types.js';
+import { summarizeChildProgress } from '../workforce/work-item-hierarchy.js';
 import {
   admitsCustody,
   authorizeSurfaceOperation,
@@ -84,6 +85,10 @@ export interface GraphNode extends GraphRef {
   facts?: Record<string, string | number | boolean>;
   /** Approvals: what to decide and what each answer does, in plain words (display only). */
   brief?: DecisionBrief;
+  /** Work items (D1): the Issue this step belongs to; absent on an Issue. */
+  parentItemId?: string;
+  /** Work items listed as Issues: how many visible steps they have and how many are finished. */
+  steps?: { total: number; done: number };
 }
 
 export interface WorkspaceGraph {
@@ -231,7 +236,7 @@ export function goalOf(state: unknown): string | undefined {
 /** Production readers, each run as the read-only graph reader role. */
 export function defaultWorkspaceGraphSources(): WorkspaceGraphSources {
   const read = <T>(fn: () => T): T =>
-    withExecutionContext(WORKSPACE_GRAPH_READER_ROLE, fn, undefined, '');
+    withStoreGrant(WORKSPACE_GRAPH_READER_ROLE, fn, { tenantSlug: '' });
   return {
     tenants: () =>
       read(() =>
@@ -475,15 +480,29 @@ export function collectWorkspaceGraph(
     if (assignee) actors.push({ actorId: assignee, role: 'assignee' });
     const holder = item.claimed_by_user_id || item.claimed_by_peer_id;
     if (holder && holder !== assignee) actors.push({ actorId: holder, role: 'claim_holder' });
+    // A mission's ownership item is the mission's Issue (D1): it reads as the
+    // mission (its name, its project), not as the internal claim record.
+    const ownedMissionId =
+      item.metadata?.kind === 'mission_ownership' && typeof item.metadata.mission_id === 'string'
+        ? item.metadata.mission_id
+        : undefined;
+    const ownedMission = ownedMissionId ? nodes.get(key('mission', ownedMissionId)) : undefined;
     put({
       kind: 'work_item',
       id: item.item_id,
-      label: item.title || item.item_id,
-      summary: item.description,
+      label: ownedMission?.label || item.title || item.item_id,
+      ...(ownedMissionId ? {} : { summary: item.description }),
       status: item.status,
       updatedAt: item.updated_at,
       ...scope,
+      ...(ownedMissionId
+        ? {
+            missionId: ownedMissionId,
+            projectId: ownedMission?.projectId,
+          }
+        : {}),
       ...(actors.length ? { actors } : {}),
+      ...(item.parent_item_id ? { parentItemId: item.parent_item_id } : {}),
       facts: { priority: item.priority, source: item.source },
     });
   }
@@ -679,6 +698,13 @@ export interface GraphListFilter {
   status?: string;
   q?: string;
   limit?: number;
+  /**
+   * Work items (W2): only Issues — items without a parent, or whose parent is
+   * not in this (viewer-scoped) graph, so no step is ever unreachable.
+   */
+  topLevelOnly?: boolean;
+  /** Work items (W2): only the direct steps of this Issue. */
+  parentItemId?: string;
 }
 
 function matchesQuery(node: GraphNode, q: string): boolean {
@@ -688,10 +714,30 @@ function matchesQuery(node: GraphNode, q: string): boolean {
     .some((value) => String(value).toLowerCase().includes(needle));
 }
 
+/** Step progress per visible Issue, from the work items in this graph only. */
+function workItemStepProgress(graph: WorkspaceGraph): Map<string, { total: number; done: number }> {
+  return summarizeChildProgress(
+    graph.nodes
+      .filter((node) => node.kind === 'work_item')
+      .map((node) => ({
+        parent_item_id: node.parentItemId,
+        status: (node.status ?? 'backlog') as WorkItem['status'],
+      }))
+  );
+}
+
 export function listGraphNodes(graph: WorkspaceGraph, filter: GraphListFilter = {}): GraphNode[] {
+  const workItemIds = new Set(
+    graph.nodes.filter((node) => node.kind === 'work_item').map((node) => node.id)
+  );
+  const isStep = (node: GraphNode) =>
+    node.kind === 'work_item' && Boolean(node.parentItemId && workItemIds.has(node.parentItemId));
   const result = graph.nodes.filter(
     (node) =>
       (!filter.kind || node.kind === filter.kind) &&
+      (!filter.topLevelOnly || !isStep(node)) &&
+      (!filter.parentItemId ||
+        (node.kind === 'work_item' && node.parentItemId === filter.parentItemId)) &&
       (!filter.tenantSlug ||
         node.tenantSlug === filter.tenantSlug ||
         String(node.facts?.tenants ?? '')
@@ -705,7 +751,13 @@ export function listGraphNodes(graph: WorkspaceGraph, filter: GraphListFilter = 
       (!filter.q || matchesQuery(node, filter.q))
   );
   result.sort((a, b) => String(b.updatedAt ?? '').localeCompare(String(a.updatedAt ?? '')));
-  return result.slice(0, Math.max(1, Math.min(filter.limit ?? 200, 500)));
+  const limited = result.slice(0, Math.max(1, Math.min(filter.limit ?? 200, 500)));
+  if (!limited.some((node) => node.kind === 'work_item')) return limited;
+  const progress = workItemStepProgress(graph);
+  return limited.map((node) => {
+    const steps = node.kind === 'work_item' ? progress.get(node.id) : undefined;
+    return steps ? { ...node, steps: { ...steps } } : node;
+  });
 }
 
 export interface GraphEntityView {
@@ -749,6 +801,9 @@ export function getGraphEntity(
     // An unknown parent is still shown (as its id) so the chain never breaks.
     lineage.push(parent ? ref(parent) : { kind: k, id: i, label: i });
   }
+  // A step's Issue is its nearest container (shown only when visible here).
+  const issue = node.kind === 'work_item' ? find('work_item', node.parentItemId) : undefined;
+  if (issue) lineage.push(ref(issue));
 
   const children: GraphEntityView['children'] = {};
   const add = (child: GraphNode) => {
@@ -780,6 +835,8 @@ export function getGraphEntity(
     ) {
       if (other.kind !== 'work_item' || !other.missionId) add(other);
     }
+    if (node.kind === 'work_item' && other.kind === 'work_item' && other.parentItemId === node.id)
+      add(other);
     if (
       node.kind === 'mission' &&
       other.missionId === node.id &&
@@ -830,7 +887,7 @@ export function getGraphEntity(
     })
     .map((link) => {
       // Staffing names an agent by its profile slug; the identity ledger by
-      // its full ActorRef (kyberion://agent/<org>/<slug>). Either resolves.
+      // its full ActorRef (kyberion://agent/<tenant>/<org|_>/<slug>). Either resolves.
       const actor =
         find('actor', link.actorId) ??
         graph.nodes.find(

@@ -1,6 +1,6 @@
 /** Local credential allocations reuse standing grants; material stays in the secret store. */
 import { timingSafeEqual } from 'node:crypto';
-import { assertStoreGrantIssuanceAllowed, withExecutionContext } from '../authority.js';
+import { assertStoreGrantIssuanceAllowed, withStoreGrant } from '../authority.js';
 import { currentExecutionScope, runInExecutionScope } from '../foundation/execution-scope.js';
 import { resolvePolicyIdentityContext } from '../identity-context-bridge.js';
 import {
@@ -53,9 +53,12 @@ const denied = () =>
 function reader<T>(tenant: string, run: () => T): T {
   const identity = credentialExecutionIdentity();
   if (identity.tenantSlug && identity.tenantSlug !== tenant) throw denied();
-  return withExecutionContext('credential_allocation_reader', run, undefined, tenant, undefined, {
-    missionId: identity.missionId ?? null,
-    taskId: identity.taskId ?? null,
+  return withStoreGrant('credential_allocation_reader', run, {
+    tenantSlug: tenant,
+    identity: {
+      missionId: identity.missionId ?? null,
+      taskId: identity.taskId ?? null,
+    },
   });
 }
 

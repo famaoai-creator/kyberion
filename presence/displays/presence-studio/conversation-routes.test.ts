@@ -19,6 +19,9 @@ vi.mock('@agent/core/task/task-session', () => ({
   },
 }));
 vi.mock('@agent/core/authority', () => ({
+  // S4: store facades open their declared store grant (withStoreGrant).
+  withStoreGrant: (_name: string, fn: () => unknown) => fn(),
+  withStoreGrantAsync: async (_name: string, fn: () => unknown) => fn(),
   withExecutionContext: (_role: string, fn: () => unknown) => fn(),
 }));
 vi.mock('@agent/core/foundation/lock-utils', () => ({

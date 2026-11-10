@@ -19,7 +19,7 @@ describe('sdlc-gate-readiness', () => {
 
   beforeEach(() => {
     process.env.MISSION_ROLE = 'mission_controller';
-    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     process.env.KYBERION_SUDO = 'true';
     safeRmSync(pathResolver.active('projects/test-sdlc-skeleton'), {
       recursive: true,

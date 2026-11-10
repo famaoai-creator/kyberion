@@ -623,6 +623,41 @@ describe('run_pipeline compatibility', () => {
     );
   });
 
+  it('maps envelope transforms and payload captures onto pipeline channels', async () => {
+    const transform = await runSteps(
+      [
+        {
+          op: 'system:json_query',
+          type: 'transform',
+          params: { from: 'seed_data', path: 'status', export_as: 'got' },
+        },
+      ],
+      { seed_data: { status: 'accepted' } },
+      { quiet: true }
+    );
+    expect(transform.status).toBe('succeeded');
+    expect(transform.context.got).toBe('accepted');
+
+    const capture = await runSteps(
+      [
+        {
+          op: 'vcs:log',
+          type: 'capture',
+          params: { limit: 1, oneline: true },
+        },
+      ],
+      {},
+      { quiet: true }
+    );
+    expect(capture.status).toBe('succeeded');
+    expect(capture.context.last_capture).toEqual(
+      expect.objectContaining({
+        op: 'log',
+        output: expect.any(String),
+      })
+    );
+  });
+
   it('executes direct commands without shell expansion', async () => {
     const result = await runSteps([
       {

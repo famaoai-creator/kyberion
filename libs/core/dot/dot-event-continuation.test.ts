@@ -153,7 +153,7 @@ function child(
         cwd: process.cwd(),
         env: {
           ...process.env,
-          KYBERION_PERSONA: 'mission_owner',
+          KYBERION_BASE_ROLE: 'mission_owner',
           KYBERION_WISDOM_LLM_PROFILE: 'stub',
           KYBERION_REASONING_BACKEND: 'stub',
         },

@@ -15,7 +15,7 @@ import { defineScript, isDirectScript } from './lib/harness.js';
 // terminal's raw-mode capability. The old run_with_env wrapper used a
 // synchronous captured child process, which is correct for snapshots but not
 // for an Ink application.
-setRegisteredEnv('KYBERION_PERSONA', 'sovereign');
+setRegisteredEnv('KYBERION_BASE_ROLE', 'sovereign');
 const SOURCE_ENTRY = '../presence/displays/terminal-hud/src/main.js';
 
 export async function main(args: string[] = []): Promise<void> {

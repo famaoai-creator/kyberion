@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import {
   isScopedLearningApprovalRequest,
   resolveScopedLearningApprovalCandidate,
@@ -33,7 +34,7 @@ import { t } from '../localization/t.js';
 export interface OperatorHomeMissionItem {
   missionId: string;
   status: string;
-  tier: 'personal' | 'confidential' | 'public';
+  tier: StorageDataTier;
   missionType?: string;
   tenantSlug?: string;
   tenantId?: string;
@@ -179,7 +180,7 @@ export interface OperatorHomeSummary {
 }
 
 export interface OperatorHomeScopeFilter {
-  tiers?: Array<'personal' | 'confidential' | 'public'> | 'all';
+  tiers?: Array<StorageDataTier> | 'all';
   tenantSlugs?: string[] | 'all';
   organizationIds?: string[] | 'all';
   projectIds?: string[] | 'all';
@@ -416,7 +417,7 @@ function collectMissionStates(scope?: OperatorHomeScopeFilter): OperatorHomeMiss
             tenantSlug: state.tenant_slug,
             tenantId: state.tenant_id,
             organizationId,
-            persona: state.assigned_persona,
+            persona: state.org_role,
             projectId,
             trackId: state.relationships?.track?.track_id,
             trackName: state.relationships?.track?.track_name,

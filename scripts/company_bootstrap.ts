@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /** CLI compatibility wrapper for the canonical company bootstrap service. */
 import * as path from 'node:path';
+import { baseRoleEnvText } from '@agent/core/foundation';
 import { logger } from '@agent/core/core';
 import { getRegisteredEnvText, setRegisteredEnv } from '@agent/core/foundation';
 import { bootstrapCompany, listCompanyVerticals } from '@agent/core/organization/company-bootstrap';
@@ -25,7 +26,7 @@ export function main(argv: string[], print: (value: unknown) => void = () => und
   if (!getRegisteredEnvText('MISSION_ROLE')) {
     setRegisteredEnv('MISSION_ROLE', 'mission_controller');
   }
-  setRegisteredEnv('KYBERION_PERSONA', getRegisteredEnvText('KYBERION_PERSONA') || 'sovereign');
+  setRegisteredEnv('KYBERION_BASE_ROLE', baseRoleEnvText() || 'sovereign');
   const vertical = getFlag(argv, '--vertical');
   const slug = getFlag(argv, '--slug');
   const companyName = getFlag(argv, '--name');

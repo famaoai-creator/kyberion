@@ -37,11 +37,11 @@ describe('orchestrator task plan to NEXT_TASKS', () => {
   const missionId = 'MSN-TASK-PLAN-BOARD-WRITER-001';
   const missionDir = pathResolver.missionDir(missionId, 'public');
 
-  const savedEnv = { role: process.env.MISSION_ROLE, persona: process.env.KYBERION_PERSONA };
+  const savedEnv = { role: process.env.MISSION_ROLE, persona: process.env.KYBERION_BASE_ROLE };
 
   beforeEach(() => {
     process.env.MISSION_ROLE = 'mission_controller';
-    process.env.KYBERION_PERSONA = 'worker';
+    process.env.KYBERION_BASE_ROLE = 'worker';
     proof.proven = true;
   });
 
@@ -49,8 +49,8 @@ describe('orchestrator task plan to NEXT_TASKS', () => {
     safeRmSync(missionDir, { recursive: true, force: true });
     if (savedEnv.role === undefined) delete process.env.MISSION_ROLE;
     else process.env.MISSION_ROLE = savedEnv.role;
-    if (savedEnv.persona === undefined) delete process.env.KYBERION_PERSONA;
-    else process.env.KYBERION_PERSONA = savedEnv.persona;
+    if (savedEnv.persona === undefined) delete process.env.KYBERION_BASE_ROLE;
+    else process.env.KYBERION_BASE_ROLE = savedEnv.persona;
   });
 
   const superseded = {

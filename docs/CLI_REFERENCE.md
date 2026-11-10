@@ -214,6 +214,7 @@ Every governed `kyberion` command and `pnpm` script, generated from the command 
 | `pnpm kyberion daily-desk server`                           |                                     | Start the daily desk pad                                                                                                                                           |
 | `pnpm kyberion dashboard`                                   | `pnpm dashboard`                    | Open the sovereign dashboard                                                                                                                                       |
 | `pnpm kyberion decisions`                                   | `pnpm decisions`                    | Work with the decision ledger                                                                                                                                      |
+| `pnpm kyberion delegate`                                    | `pnpm delegate`                     | Hand a bounded task to a governed sub-agent — **[state change]**                                                                                                   |
 | `pnpm kyberion doc-drop server`                             |                                     | Start the document drop pad                                                                                                                                        |
 | `pnpm kyberion dot activate`                                |                                     | Activate a dot charter after the role/heartbeat gate passes                                                                                                        |
 | `pnpm kyberion dot capacity`                                |                                     | Preview or configure a paused Dot delegation capacity; inherit the installation default with --inherit                                                             |
@@ -331,7 +332,7 @@ Every governed `kyberion` command and `pnpm` script, generated from the command 
 | `pnpm kyberion skill install`                               |                                     | Install a skill bundle                                                                                                                                             |
 | `pnpm kyberion stance create`                               | `pnpm stance:create`                | Create a stance (knowledge/personal/stances/{slug}/)                                                                                                               |
 | `pnpm kyberion stance migrate-from-personal`                | `pnpm stance:migrate-from-personal` | Migrate personal data into a stance overlay                                                                                                                        |
-| `pnpm kyberion stance switch`                               | `pnpm stance:switch`                | Switch the active stance overlay                                                                                                                                   |
+| `pnpm kyberion stance switch`                               | `pnpm stance:switch`                | Switch the stance: which permitted tenant, Org and Org Role you act for                                                                                            |
 | `pnpm kyberion storage recover-compaction-copies`           |                                     | Merge leftover compaction copies back into their stores (dry-run; apply needs approval)                                                                            |
 | `pnpm kyberion surface outbox`                              |                                     | Inspect or drain the surface notification outbox.                                                                                                                  |
 | `pnpm kyberion surfaces`                                    | `pnpm surfaces`                     | Manage runtime surfaces                                                                                                                                            |
@@ -368,83 +369,84 @@ Every governed `kyberion` command and `pnpm` script, generated from the command 
 
 Repository build, test, generator and gate scripts for contributors.
 
-| Command                                             | pnpm script                                | What it does                                                               |
-| --------------------------------------------------- | ------------------------------------------ | -------------------------------------------------------------------------- |
-| `pnpm kyberion build`                               | `pnpm build`                               | Build everything (packages, actuators, repo, UI)                           |
-| `pnpm kyberion build actuators`                     | `pnpm build:actuators`                     | Build actuators                                                            |
-| `pnpm kyberion build bundle`                        | `pnpm build:bundle`                        | Bundle hot script entry points                                             |
-| `pnpm kyberion build packages`                      | `pnpm build:packages`                      | Build shared packages                                                      |
-| `pnpm kyberion build repo`                          | `pnpm build:repo`                          | Compile repository TypeScript                                              |
-| `pnpm kyberion build ui`                            | `pnpm build:ui`                            | Build the UI apps                                                          |
-| `pnpm kyberion chat local`                          |                                            | Start an interactive local-LLM chat with tool use.                         |
-| `pnpm kyberion check`                               | `pnpm check`                               | Run repository checks (pnpm check -- --changed before a PR)                |
-| `pnpm kyberion check apple-fm`                      | `pnpm check:apple-fm`                      | Check on-device Apple Intelligence availability                            |
-| `pnpm kyberion check backend-conformance`           |                                            | Check reasoning backend conformance                                        |
-| `pnpm kyberion check backend-live-scenarios`        |                                            | Run live reasoning backend scenarios (spends model turns; requires --live) |
-| `pnpm kyberion check chronos-perf`                  |                                            | Check Chronos performance baseline (browser)                               |
-| `pnpm kyberion check commit-subject`                | `pnpm check:commit-subject`                | Check the HEAD commit subject                                              |
-| `pnpm kyberion check contract-semver`               | `pnpm check:contract-semver`               | Check contract semver changes                                              |
-| `pnpm kyberion check dead-code`                     |                                            | List dead-code candidates for review (advisory; deletes nothing).          |
-| `pnpm kyberion check dep-cycles`                    | `pnpm check:dep-cycles`                    | Check for dependency cycles                                                |
-| `pnpm kyberion check improvement-plan-metadata`     |                                            | Check improvement plan metadata                                            |
-| `pnpm kyberion check plugin-views-e2e`              |                                            | End-to-end check of Chronos plugin views                                   |
-| `pnpm kyberion check pr-title`                      | `pnpm check:pr-title`                      | Check a PR title against Conventional Commits                              |
-| `pnpm kyberion check rt-mode`                       |                                            | Check the runtime mode configuration for consistency.                      |
-| `pnpm kyberion check script-integrity`              |                                            | Check package script integrity                                             |
-| `pnpm kyberion ci`                                  | `pnpm ci`                                  | Run the full CI sequence locally                                           |
-| `pnpm kyberion ci triage`                           |                                            | Classify a red CI log and print the next command per failure               |
-| `pnpm kyberion deps check`                          | `pnpm deps:check`                          | Check dependencies                                                         |
-| `pnpm kyberion design import-md-catalog`            |                                            | Import a Markdown design catalog into the governed design data.            |
-| `pnpm kyberion design verify-resolution`            |                                            | Verify layout and body-zone resolution for each scenario brief.            |
-| `pnpm kyberion docs check`                          |                                            | Check docs for stale commands, broken links and unlisted pipelines         |
-| `pnpm kyberion eval harness`                        |                                            | Run the deterministic, named eval harness table.                           |
-| `pnpm kyberion eval intent-trace`                   |                                            | Trace how an utterance is classified and routed to an intent.              |
-| `pnpm kyberion eval japanese-intent`                |                                            | Evaluate contextual Japanese intent classification against fixtures.       |
-| `pnpm kyberion eval learning-efficiency`            |                                            | Benchmark how efficiently recorded learnings are reused.                   |
-| `pnpm kyberion eval mission-orchestration`          |                                            | Evaluate mission orchestration quality on recorded scenarios.              |
-| `pnpm kyberion eval model-role-fitness`             |                                            | Ask a model whether it can hold a team role before a mission relies on it. |
-| `pnpm kyberion examples discover`                   | `pnpm examples`                            | Discover actuator example catalogs                                         |
-| `pnpm kyberion format`                              | `pnpm format`                              | Format the repository with Prettier                                        |
-| `pnpm kyberion generate artifact-kinds`             |                                            | Generate schema-backed artifact, intent and work policy types              |
-| `pnpm kyberion generate capability-seams`           |                                            | Regenerate the capability seam graph                                       |
-| `pnpm kyberion generate cli-reference`              | `pnpm generate:cli-reference`              | Regenerate the CLI command reference page                                  |
-| `pnpm kyberion generate env-registry`               | `pnpm generate:env-registry`               | Regenerate the environment variable registry                               |
-| `pnpm kyberion generate governance-import-baseline` | `pnpm generate:governance-import-baseline` | Regenerate the governance import baseline fixture                          |
-| `pnpm kyberion generate knowledge-index`            | `pnpm generate:knowledge-index`            | Regenerate the knowledge index                                             |
-| `pnpm kyberion generate op-registry`                | `pnpm generate:op-registry`                | Regenerate the actuator op registry                                        |
-| `pnpm kyberion generate pii-rules`                  | `pnpm generate:pii-rules`                  | Regenerate PII rules                                                       |
-| `pnpm kyberion generate platform-read-baseline`     | `pnpm generate:platform-read-baseline`     | Regenerate the platform-read baseline fixture                              |
-| `pnpm kyberion generate pseudo-locale`              | `pnpm generate:pseudo-locale`              | Regenerate the pseudo-locale catalog                                       |
-| `pnpm kyberion generate service-harness-registry`   |                                            | Regenerate the service harness registry.                                   |
-| `pnpm kyberion generate trace-docs`                 |                                            | Regenerate trace documentation from recorded traces.                       |
-| `pnpm kyberion generate types`                      | `pnpm generate:types`                      | Regenerate types                                                           |
-| `pnpm kyberion generate vocabulary-types`           | `pnpm generate:vocabulary-types`           | Regenerate vocabulary key types                                            |
-| `pnpm kyberion i18n report`                         | `pnpm i18n:report`                         | Report translation coverage                                                |
-| `pnpm kyberion inventory resource-loaders`          |                                            | Inventory resource loader helpers                                          |
-| `pnpm kyberion license audit`                       | `pnpm license:audit`                       | Audit third-party licenses                                                 |
-| `pnpm kyberion lint`                                | `pnpm lint`                                | Run ESLint                                                                 |
-| `pnpm kyberion media intro-scratch`                 |                                            | Build the scratch-first narrated intro video.                              |
-| `pnpm kyberion patch dependency`                    |                                            | Apply a governed dependency patch                                          |
-| `pnpm kyberion prepare`                             | `pnpm prepare`                             | Install git hooks                                                          |
-| `pnpm kyberion provider-capabilities report`        |                                            | Report which capabilities each installed provider CLI supports.            |
-| `pnpm kyberion release changelog-draft`             |                                            | Draft CHANGELOG entries from Conventional Commits since the last tag.      |
-| `pnpm kyberion resolve generated`                   |                                            | Regenerate tracked generated files to resolve conflicts                    |
-| `pnpm kyberion scenario run`                        | `pnpm scenario`                            | Run scenario files                                                         |
-| `pnpm kyberion scenario storage-governance`         |                                            | Exercise the audit chain, data vault and process logger end to end.        |
-| `pnpm kyberion smoke agent-pane-runtime`            |                                            | Smoke-test the opt-in pane agent-runtime launch mode.                      |
-| `pnpm kyberion smoke intent`                        |                                            | Run the intent smoke test                                                  |
-| `pnpm kyberion surfaces screenshots`                |                                            | Capture before/after screenshots of the UI surfaces.                       |
-| `pnpm kyberion sync agent-profiles`                 |                                            | Regenerate the agent profile index from the canonical profiles directory.  |
-| `pnpm kyberion sync authority-roles`                |                                            | Regenerate the authority role index from the role definitions.             |
-| `pnpm kyberion sync service-endpoints`              |                                            | Regenerate the service endpoint catalog from its sources.                  |
-| `pnpm kyberion sync specialist-catalog`             |                                            | Regenerate the specialist catalog from its sources.                        |
-| `pnpm kyberion sync team-roles`                     |                                            | Regenerate the team role index from the team role definitions.             |
-| `pnpm kyberion test`                                | `pnpm test`                                | Run the test suite                                                         |
-| `pnpm kyberion test unit`                           | `pnpm test:unit`                           | Run the unit test suite                                                    |
-| `pnpm kyberion test watch`                          | `pnpm test:watch`                          | Watch core tests                                                           |
-| `pnpm kyberion typecheck`                           | `pnpm typecheck`                           | Typecheck the repository                                                   |
-| `pnpm kyberion validate`                            | `pnpm validate`                            | Build, typecheck, and run full checks                                      |
-| `pnpm kyberion verify`                              | `pnpm verify`                              | Typecheck, lint, and run unit tests                                        |
+| Command                                             | pnpm script                                | What it does                                                                                      |
+| --------------------------------------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------- |
+| `pnpm kyberion build`                               | `pnpm build`                               | Build everything (packages, actuators, repo, UI)                                                  |
+| `pnpm kyberion build actuators`                     | `pnpm build:actuators`                     | Build actuators                                                                                   |
+| `pnpm kyberion build bundle`                        | `pnpm build:bundle`                        | Bundle hot script entry points                                                                    |
+| `pnpm kyberion build packages`                      | `pnpm build:packages`                      | Build shared packages                                                                             |
+| `pnpm kyberion build repo`                          | `pnpm build:repo`                          | Compile repository TypeScript                                                                     |
+| `pnpm kyberion build ui`                            | `pnpm build:ui`                            | Build the UI apps                                                                                 |
+| `pnpm kyberion chat local`                          |                                            | Start an interactive local-LLM chat with tool use.                                                |
+| `pnpm kyberion check`                               | `pnpm check`                               | Run repository checks (pnpm check -- --changed before a PR)                                       |
+| `pnpm kyberion check apple-fm`                      | `pnpm check:apple-fm`                      | Check on-device Apple Intelligence availability                                                   |
+| `pnpm kyberion check backend-conformance`           |                                            | Check reasoning backend conformance                                                               |
+| `pnpm kyberion check backend-live-scenarios`        |                                            | Run live reasoning backend scenarios (spends model turns; requires --live)                        |
+| `pnpm kyberion check chronos-perf`                  |                                            | Check Chronos performance baseline (browser)                                                      |
+| `pnpm kyberion check commit-subject`                | `pnpm check:commit-subject`                | Check the HEAD commit subject                                                                     |
+| `pnpm kyberion check contract-semver`               | `pnpm check:contract-semver`               | Check contract semver changes                                                                     |
+| `pnpm kyberion check dead-code`                     |                                            | List dead-code candidates for review (advisory; deletes nothing).                                 |
+| `pnpm kyberion check dep-cycles`                    | `pnpm check:dep-cycles`                    | Check for dependency cycles                                                                       |
+| `pnpm kyberion check docs-impact`                   | `pnpm check:docs-impact`                   | Report documented surfaces a change set did not update                                            |
+| `pnpm kyberion check improvement-plan-metadata`     |                                            | Check improvement plan metadata                                                                   |
+| `pnpm kyberion check plugin-views-e2e`              |                                            | End-to-end check of Chronos plugin views                                                          |
+| `pnpm kyberion check pr-title`                      | `pnpm check:pr-title`                      | Check a PR title against Conventional Commits                                                     |
+| `pnpm kyberion check rt-mode`                       |                                            | Check the runtime mode configuration for consistency.                                             |
+| `pnpm kyberion check script-integrity`              |                                            | Check package script integrity                                                                    |
+| `pnpm kyberion ci`                                  | `pnpm ci`                                  | Run the full CI sequence locally                                                                  |
+| `pnpm kyberion ci triage`                           |                                            | Classify a red CI log and print the next command per failure                                      |
+| `pnpm kyberion deps check`                          | `pnpm deps:check`                          | Check dependencies                                                                                |
+| `pnpm kyberion design import-md-catalog`            |                                            | Import a Markdown design catalog into the governed design data.                                   |
+| `pnpm kyberion design verify-resolution`            |                                            | Verify layout and body-zone resolution for each scenario brief.                                   |
+| `pnpm kyberion docs check`                          |                                            | Check docs for stale commands, broken links and unlisted pipelines                                |
+| `pnpm kyberion eval harness`                        |                                            | Run the deterministic, named eval harness table.                                                  |
+| `pnpm kyberion eval intent-trace`                   |                                            | Trace how an utterance is classified and routed to an intent.                                     |
+| `pnpm kyberion eval japanese-intent`                |                                            | Evaluate contextual Japanese intent classification against fixtures.                              |
+| `pnpm kyberion eval learning-efficiency`            |                                            | Benchmark how efficiently recorded learnings are reused.                                          |
+| `pnpm kyberion eval mission-orchestration`          |                                            | Evaluate mission orchestration quality on recorded scenarios.                                     |
+| `pnpm kyberion eval model-role-fitness`             |                                            | Ask a model whether it can hold a team role before a mission relies on it.                        |
+| `pnpm kyberion examples discover`                   | `pnpm examples`                            | Discover actuator example catalogs                                                                |
+| `pnpm kyberion format`                              | `pnpm format`                              | Format the repository with Prettier                                                               |
+| `pnpm kyberion generate artifact-kinds`             |                                            | Generate schema-backed artifact, intent and work policy types                                     |
+| `pnpm kyberion generate capability-seams`           |                                            | Regenerate the capability seam graph                                                              |
+| `pnpm kyberion generate cli-reference`              | `pnpm generate:cli-reference`              | Regenerate the CLI command reference page                                                         |
+| `pnpm kyberion generate env-registry`               | `pnpm generate:env-registry`               | Regenerate the environment variable registry                                                      |
+| `pnpm kyberion generate governance-import-baseline` | `pnpm generate:governance-import-baseline` | Regenerate the governance import baseline fixture                                                 |
+| `pnpm kyberion generate knowledge-index`            | `pnpm generate:knowledge-index`            | Regenerate the knowledge index                                                                    |
+| `pnpm kyberion generate op-registry`                | `pnpm generate:op-registry`                | Regenerate the actuator op registry                                                               |
+| `pnpm kyberion generate pii-rules`                  | `pnpm generate:pii-rules`                  | Regenerate PII rules                                                                              |
+| `pnpm kyberion generate platform-read-baseline`     | `pnpm generate:platform-read-baseline`     | Regenerate the platform-read baseline fixture                                                     |
+| `pnpm kyberion generate pseudo-locale`              | `pnpm generate:pseudo-locale`              | Regenerate the pseudo-locale catalog                                                              |
+| `pnpm kyberion generate service-harness-registry`   |                                            | Regenerate the service harness registry.                                                          |
+| `pnpm kyberion generate trace-docs`                 |                                            | Regenerate trace documentation from recorded traces.                                              |
+| `pnpm kyberion generate types`                      | `pnpm generate:types`                      | Regenerate types                                                                                  |
+| `pnpm kyberion generate vocabulary-types`           | `pnpm generate:vocabulary-types`           | Regenerate vocabulary key types                                                                   |
+| `pnpm kyberion i18n report`                         | `pnpm i18n:report`                         | Report translation coverage                                                                       |
+| `pnpm kyberion inventory resource-loaders`          |                                            | Inventory resource loader helpers                                                                 |
+| `pnpm kyberion license audit`                       | `pnpm license:audit`                       | Audit third-party licenses                                                                        |
+| `pnpm kyberion lint`                                | `pnpm lint`                                | Run ESLint                                                                                        |
+| `pnpm kyberion media intro-scratch`                 |                                            | Build the scratch-first narrated intro video.                                                     |
+| `pnpm kyberion patch dependency`                    |                                            | Apply a governed dependency patch                                                                 |
+| `pnpm kyberion prepare`                             | `pnpm prepare`                             | Install git hooks                                                                                 |
+| `pnpm kyberion provider-capabilities report`        |                                            | Report which capabilities each installed provider CLI supports.                                   |
+| `pnpm kyberion release changelog-draft`             |                                            | Draft CHANGELOG entries from Conventional Commits since the last tag.                             |
+| `pnpm kyberion resolve generated`                   |                                            | Regenerate tracked generated files to resolve conflicts                                           |
+| `pnpm kyberion scenario run`                        | `pnpm scenario`                            | Run scenario files                                                                                |
+| `pnpm kyberion scenario storage-governance`         |                                            | Exercise the audit chain, data vault and process logger end to end.                               |
+| `pnpm kyberion smoke agent-pane-runtime`            |                                            | Smoke-test the opt-in pane agent-runtime launch mode.                                             |
+| `pnpm kyberion smoke intent`                        |                                            | Run the intent smoke test                                                                         |
+| `pnpm kyberion surfaces screenshots`                |                                            | Capture before/after screenshots of the UI surfaces.                                              |
+| `pnpm kyberion sync agent-profiles`                 |                                            | Regenerate the agent profile index from the canonical profiles directory.                         |
+| `pnpm kyberion sync authority-roles`                |                                            | Regenerate the authority role index and the security policy role permissions from the role cards. |
+| `pnpm kyberion sync service-endpoints`              |                                            | Regenerate the service endpoint catalog from its sources.                                         |
+| `pnpm kyberion sync specialist-catalog`             |                                            | Regenerate the specialist catalog from its sources.                                               |
+| `pnpm kyberion sync team-roles`                     |                                            | Regenerate the team role index from the team role definitions.                                    |
+| `pnpm kyberion test`                                | `pnpm test`                                | Run the test suite                                                                                |
+| `pnpm kyberion test unit`                           | `pnpm test:unit`                           | Run the unit test suite                                                                           |
+| `pnpm kyberion test watch`                          | `pnpm test:watch`                          | Watch core tests                                                                                  |
+| `pnpm kyberion typecheck`                           | `pnpm typecheck`                           | Typecheck the repository                                                                          |
+| `pnpm kyberion validate`                            | `pnpm validate`                            | Build, typecheck, and run full checks                                                             |
+| `pnpm kyberion verify`                              | `pnpm verify`                              | Typecheck, lint, and run unit tests                                                               |
 
 ## Scopes and areas
 

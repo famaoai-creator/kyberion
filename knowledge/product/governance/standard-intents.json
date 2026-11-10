@@ -33,7 +33,6 @@
         "build a service"
       ],
       "resolution": {
-        "shape": "project_bootstrap",
         "result_shape": "project_created"
       },
       "legacy_category": "surface",
@@ -63,7 +62,6 @@
       "specialist_id": "surface-concierge",
       "trigger_keywords": ["写真", "撮影", "photo", "picture", "camera", "OCR"],
       "resolution": {
-        "shape": "task_session",
         "task_kind": "capture_photo",
         "result_shape": "artifact"
       },
@@ -90,7 +88,6 @@
       "specialist_id": "browser-operator",
       "trigger_keywords": ["open", "site", "browser", "開いて", "サイト", "見せて"],
       "resolution": {
-        "shape": "browser_session",
         "result_shape": "browser_navigation"
       },
       "legacy_category": "surface",
@@ -116,7 +113,6 @@
       "specialist_id": "browser-operator",
       "trigger_keywords": ["押して", "クリック", "1つ目", "2つ目", "それ", "進めて"],
       "resolution": {
-        "shape": "browser_session",
         "result_shape": "browser_step"
       },
       "legacy_category": "surface",
@@ -163,7 +159,6 @@
         "パワポを作"
       ],
       "resolution": {
-        "shape": "task_session",
         "task_kind": "presentation_deck",
         "result_shape": "artifact"
       },
@@ -198,7 +193,6 @@
         "レポートを作"
       ],
       "resolution": {
-        "shape": "task_session",
         "task_kind": "report_document",
         "result_shape": "artifact"
       },
@@ -225,7 +219,6 @@
       "specialist_id": "document-specialist",
       "trigger_keywords": ["xlsx", "excel", "wbs", "エクセル", "ワークブック", "スプレッドシート"],
       "resolution": {
-        "shape": "task_session",
         "task_kind": "workbook_wbs",
         "result_shape": "artifact"
       },
@@ -269,7 +262,6 @@
         "私の声で"
       ],
       "resolution": {
-        "shape": "pipeline",
         "result_shape": "summary"
       },
       "pipeline": [
@@ -310,7 +302,6 @@
       "specialist_id": "document-specialist",
       "trigger_keywords": ["ナレーション", "説明", "解説", "レポート", "narrated", "voice-over"],
       "resolution": {
-        "shape": "pipeline",
         "result_shape": "summary"
       },
       "pipeline": [
@@ -350,7 +341,6 @@
       "specialist_id": "document-specialist",
       "trigger_keywords": ["動画", "ビデオ", "video", "clip", "generate video"],
       "resolution": {
-        "shape": "pipeline",
         "result_shape": "summary"
       },
       "pipeline": [
@@ -397,7 +387,6 @@
         "音声認識"
       ],
       "resolution": {
-        "shape": "pipeline",
         "result_shape": "summary"
       },
       "legacy_category": "surface",
@@ -429,7 +418,6 @@
       "specialist_id": "service-operator",
       "trigger_keywords": ["live voice", "voice conversation", "会話", "音声対話"],
       "resolution": {
-        "shape": "task_session",
         "task_kind": "voice_conversation",
         "result_shape": "summary"
       },
@@ -464,7 +452,6 @@
       "specialist_id": "service-operator",
       "trigger_keywords": ["status", "logs", "state", "状態", "ログを見", "ログを確認"],
       "resolution": {
-        "shape": "task_session",
         "task_kind": "service_operation",
         "result_shape": "summary"
       },
@@ -498,7 +485,6 @@
         "start"
       ],
       "resolution": {
-        "shape": "task_session",
         "result_shape": "service_started"
       },
       "pipeline": [
@@ -533,7 +519,6 @@
       "specialist_id": "service-operator",
       "trigger_keywords": ["サービスを停止して", "stop the service", "止めて", "停止", "stop"],
       "resolution": {
-        "shape": "task_session",
         "result_shape": "service_stopped"
       },
       "pipeline": [
@@ -568,7 +553,6 @@
       "specialist_id": "knowledge-specialist",
       "trigger_keywords": ["knowledge", "ナレッジ", "教えて", "社内ナレッジ", "ナレッジベース"],
       "resolution": {
-        "shape": "direct_reply",
         "result_shape": "knowledge_answer"
       },
       "legacy_category": "surface",
@@ -612,7 +596,6 @@
         "恒久対策"
       ],
       "resolution": {
-        "shape": "task_session",
         "task_kind": "analysis",
         "result_shape": "plan"
       },
@@ -658,7 +641,6 @@
         "postmortem"
       ],
       "resolution": {
-        "shape": "task_session",
         "task_kind": "analysis",
         "result_shape": "review"
       },
@@ -696,7 +678,6 @@
         "automation candidates"
       ],
       "resolution": {
-        "shape": "task_session",
         "task_kind": "analysis",
         "result_shape": "candidate_ranking"
       },
@@ -743,7 +724,6 @@
         "legal risk"
       ],
       "resolution": {
-        "shape": "pipeline",
         "result_shape": "review"
       },
       "legacy_category": "surface",
@@ -783,7 +763,6 @@
         "persona"
       ],
       "resolution": {
-        "shape": "pipeline",
         "result_shape": "review"
       },
       "legacy_category": "surface",
@@ -829,7 +808,6 @@
         "discard"
       ],
       "resolution": {
-        "shape": "task_session",
         "task_kind": "analysis",
         "result_shape": "report"
       },
@@ -891,7 +869,6 @@
         "サブスク更新"
       ],
       "resolution": {
-        "shape": "task_session",
         "task_kind": "booking_planning",
         "result_shape": "plan"
       },
@@ -937,7 +914,6 @@
         "参加"
       ],
       "resolution": {
-        "shape": "task_session",
         "task_kind": "meeting_operations",
         "result_shape": "summary"
       },
@@ -1028,7 +1004,6 @@
         "見せて"
       ],
       "resolution": {
-        "shape": "direct_reply",
         "result_shape": "calendar_agenda_summary"
       },
       "legacy_category": "surface",
@@ -1072,7 +1047,6 @@
         "カレンダー"
       ],
       "resolution": {
-        "shape": "task_session",
         "task_kind": "service_operation",
         "result_shape": "summary"
       },
@@ -1104,7 +1078,6 @@
       "specialist_id": "browser-operator",
       "trigger_keywords": ["学習", "自動化", "pipeline化", "learn", "automate", "record flow"],
       "resolution": {
-        "shape": "task_session",
         "task_kind": "workflow_distillation",
         "result_shape": "pipeline"
       },
@@ -1136,7 +1109,6 @@
       "specialist_id": "surface-concierge",
       "trigger_keywords": ["マクロ", "PC操作", "macro", "record desktop"],
       "resolution": {
-        "shape": "task_session",
         "task_kind": "macro_distillation",
         "result_shape": "pipeline"
       },
@@ -1168,7 +1140,6 @@
       "specialist_id": "harness-engineer",
       "trigger_keywords": ["修正パターン", "横展開", "codemod", "learn code pattern"],
       "resolution": {
-        "shape": "task_session",
         "task_kind": "codemod_distillation",
         "result_shape": "pipeline"
       },
@@ -1207,7 +1178,6 @@
         "brand styles"
       ],
       "resolution": {
-        "shape": "task_session",
         "task_kind": "design_extraction",
         "result_shape": "design_spec"
       },
@@ -1246,7 +1216,6 @@
         "landing page"
       ],
       "resolution": {
-        "shape": "task_session",
         "task_kind": "web_development",
         "result_shape": "web_assets"
       },
@@ -1278,7 +1247,6 @@
       "specialist_id": "document-specialist",
       "trigger_keywords": ["pptxテーマ", "PowerPoint取り込み", "テーマ登録", "pptx import"],
       "resolution": {
-        "shape": "task_session",
         "task_kind": "design_extraction",
         "result_shape": "design_spec"
       },
@@ -1310,7 +1278,6 @@
       "specialist_id": "document-specialist",
       "trigger_keywords": ["webテーマ", "HTML取り込み", "テーマ登録", "html import"],
       "resolution": {
-        "shape": "task_session",
         "task_kind": "design_extraction",
         "result_shape": "design_spec"
       },
@@ -1345,7 +1312,6 @@
       "specialist_id": "service-operator",
       "trigger_keywords": ["Telegram", "iMessage", "連携", "bridge", "messaging"],
       "resolution": {
-        "shape": "task_session",
         "task_kind": "service_onboarding",
         "result_shape": "summary"
       },
@@ -1385,7 +1351,6 @@
       "specialist_id": "service-operator",
       "trigger_keywords": ["音声入力", "dictation", "voice input", "入力モード"],
       "resolution": {
-        "shape": "task_session",
         "task_kind": "service_operation",
         "result_shape": "summary"
       },
@@ -1433,7 +1398,6 @@
         "私の声"
       ],
       "resolution": {
-        "shape": "pipeline",
         "result_shape": "summary"
       },
       "pipeline": [
@@ -1472,7 +1436,6 @@
       "specialist_id": "service-operator",
       "trigger_keywords": ["ネットワーク", "回線", "通信速度", "network", "latency", "wifi"],
       "resolution": {
-        "shape": "task_session",
         "result_shape": "summary"
       },
       "legacy_category": "surface",
@@ -1511,7 +1474,6 @@
         "monitor"
       ],
       "resolution": {
-        "shape": "task_session",
         "result_shape": "summary"
       },
       "legacy_category": "surface",
@@ -1542,7 +1504,6 @@
       "specialist_id": "service-operator",
       "trigger_keywords": ["生存確認", "疎通", "レスポンス", "health check", "bridge health"],
       "resolution": {
-        "shape": "task_session",
         "result_shape": "summary"
       },
       "legacy_category": "surface",
@@ -1589,7 +1550,6 @@
         "何ができ"
       ],
       "resolution": {
-        "shape": "direct_reply",
         "result_shape": "capability_guide"
       },
       "legacy_category": "surface",
@@ -1619,7 +1579,6 @@
       "specialist_id": "knowledge-specialist",
       "trigger_keywords": ["location", "web", "search", "場所", "検索"],
       "resolution": {
-        "shape": "direct_reply",
         "result_shape": "live_answer"
       },
       "legacy_category": "surface",
@@ -1663,7 +1622,6 @@
         "ask"
       ],
       "resolution": {
-        "shape": "direct_reply",
         "result_shape": "clarification_packet"
       },
       "legacy_category": "surface",
@@ -1708,7 +1666,6 @@
         "こんにちは"
       ],
       "resolution": {
-        "shape": "direct_reply",
         "result_shape": "conversation_reply"
       },
       "legacy_category": "surface",
@@ -1754,7 +1711,6 @@
         "action items"
       ],
       "resolution": {
-        "shape": "direct_reply",
         "result_shape": "conversation_summary"
       },
       "legacy_category": "surface",
@@ -1797,7 +1753,6 @@
         "会話をミッション"
       ],
       "resolution": {
-        "shape": "direct_reply",
         "result_shape": "mission_brief"
       },
       "legacy_category": "surface",
@@ -1828,7 +1783,6 @@
       "specialist_id": "project-lead",
       "trigger_keywords": ["戦略", "成長戦略", "strategy", "事業戦略", "選択肢", "推奨案"],
       "resolution": {
-        "shape": "direct_reply",
         "result_shape": "strategy_brief"
       },
       "legacy_category": "surface",
@@ -1859,7 +1813,6 @@
       "specialist_id": "project-lead",
       "trigger_keywords": ["優先順位", "四半期", "やらない", "prioritize", "roadmap", "絞って"],
       "resolution": {
-        "shape": "direct_reply",
         "result_shape": "priority_roadmap"
       },
       "legacy_category": "surface",
@@ -1897,7 +1850,6 @@
         "1枚"
       ],
       "resolution": {
-        "shape": "direct_reply",
         "result_shape": "executive_report"
       },
       "legacy_category": "surface",
@@ -1935,7 +1887,6 @@
         "communication"
       ],
       "resolution": {
-        "shape": "direct_reply",
         "result_shape": "stakeholder_message"
       },
       "legacy_category": "surface",
@@ -1977,7 +1928,6 @@
         "customer onboarding"
       ],
       "resolution": {
-        "shape": "direct_reply",
         "result_shape": "account_strategy_plan"
       },
       "legacy_category": "surface",
@@ -2015,7 +1965,6 @@
         "tradeoff"
       ],
       "resolution": {
-        "shape": "direct_reply",
         "result_shape": "technical_decision_memo"
       },
       "legacy_category": "surface",
@@ -2055,7 +2004,6 @@
         "品質"
       ],
       "resolution": {
-        "shape": "direct_reply",
         "result_shape": "provider_selection_report"
       },
       "legacy_category": "surface",
@@ -2095,7 +2043,6 @@
         "agent runtime"
       ],
       "resolution": {
-        "shape": "direct_reply",
         "result_shape": "runtime_tuning_plan"
       },
       "legacy_category": "surface",
@@ -2126,7 +2073,6 @@
       "specialist_id": "service-operator",
       "trigger_keywords": ["go/no-go", "リリース", "デプロイ", "readiness", "判定", "rollback"],
       "resolution": {
-        "shape": "direct_reply",
         "result_shape": "release_readiness_report"
       },
       "legacy_category": "surface",
@@ -2174,7 +2120,6 @@
         "semgrep"
       ],
       "resolution": {
-        "shape": "mission",
         "result_shape": "review"
       },
       "legacy_category": "surface",
@@ -2222,7 +2167,6 @@
         "delivery"
       ],
       "resolution": {
-        "shape": "mission",
         "result_shape": "summary"
       },
       "legacy_category": "surface",
@@ -2273,7 +2217,6 @@
         "障害発生"
       ],
       "resolution": {
-        "shape": "mission",
         "result_shape": "summary"
       },
       "legacy_category": "surface",
@@ -2319,7 +2262,6 @@
         "審査会議"
       ],
       "resolution": {
-        "shape": "mission",
         "result_shape": "review"
       },
       "legacy_category": "surface",
@@ -2366,7 +2308,6 @@
         "versioning"
       ],
       "resolution": {
-        "shape": "mission",
         "result_shape": "summary"
       },
       "legacy_category": "surface",
@@ -2413,7 +2354,6 @@
         "dry-run"
       ],
       "resolution": {
-        "shape": "mission",
         "result_shape": "summary"
       },
       "legacy_category": "surface",
@@ -2451,7 +2391,6 @@
         "preference"
       ],
       "resolution": {
-        "shape": "direct_reply",
         "result_shape": "operator_learning_update"
       },
       "legacy_category": "surface",
@@ -2624,7 +2563,6 @@
       "specialist_id": "service-operator",
       "trigger_keywords": ["bootstrap", "runtime", "環境", "起動"],
       "resolution": {
-        "shape": "task_session",
         "result_shape": "environment_bootstrapped"
       },
       "legacy_category": "surface",
@@ -2650,7 +2588,6 @@
       "specialist_id": "service-operator",
       "trigger_keywords": ["verify", "readiness", "環境", "manifest"],
       "resolution": {
-        "shape": "task_session",
         "result_shape": "environment_readiness_report"
       },
       "legacy_category": "surface",
@@ -2684,7 +2621,6 @@
       "specialist_id": "service-operator",
       "trigger_keywords": ["reasoning", "backend", "model", "設定"],
       "resolution": {
-        "shape": "task_session",
         "result_shape": "reasoning_backend_configured"
       },
       "legacy_category": "surface",
@@ -2710,7 +2646,6 @@
       "specialist_id": "service-operator",
       "trigger_keywords": ["actuator", "register", "adapter"],
       "resolution": {
-        "shape": "task_session",
         "result_shape": "actuator_adapter_registered"
       },
       "legacy_category": "surface",
@@ -2750,7 +2685,6 @@
         "workspace"
       ],
       "resolution": {
-        "shape": "task_session",
         "result_shape": "organization_toolchain_configured"
       },
       "legacy_category": "surface",
@@ -2781,7 +2715,6 @@
       "specialist_id": "service-operator",
       "trigger_keywords": ["onboarding", "初回", "セットアップ", "案内", "first run", "wizard"],
       "resolution": {
-        "shape": "task_session",
         "result_shape": "onboarding_plan"
       },
       "pipeline": [
@@ -2829,7 +2762,6 @@
         "プレゼン"
       ],
       "resolution": {
-        "shape": "task_session",
         "result_shape": "presentation_preference_profile_registered"
       },
       "legacy_category": "surface",
@@ -2855,7 +2787,6 @@
       "specialist_id": "service-operator",
       "trigger_keywords": ["actuator", "capability", "verify"],
       "resolution": {
-        "shape": "task_session",
         "result_shape": "actuator_capability_report"
       },
       "legacy_category": "surface",
@@ -2889,7 +2820,6 @@
       "specialist_id": "service-operator",
       "trigger_keywords": ["secret", "rotate", "token"],
       "resolution": {
-        "shape": "task_session",
         "result_shape": "secret_rotation_completed"
       },
       "legacy_category": "surface",
@@ -2915,7 +2845,6 @@
       "specialist_id": "service-operator",
       "trigger_keywords": ["upgrade", "check", "diagnostics"],
       "resolution": {
-        "shape": "pipeline",
         "result_shape": "system_upgrade_check_report"
       },
       "legacy_category": "surface",
@@ -2941,7 +2870,6 @@
       "specialist_id": "knowledge-specialist",
       "trigger_keywords": ["knowledge", "検索", "query"],
       "resolution": {
-        "shape": "direct_reply",
         "result_shape": "knowledge_answer"
       },
       "legacy_category": "surface",
@@ -2967,7 +2895,6 @@
       "specialist_id": "knowledge-specialist",
       "trigger_keywords": ["distill", "knowledge", "mission"],
       "resolution": {
-        "shape": "task_session",
         "result_shape": "knowledge_distill_report"
       },
       "legacy_category": "surface",
@@ -2993,7 +2920,6 @@
       "specialist_id": "knowledge-specialist",
       "trigger_keywords": ["knowledge", "organize", "taxonomy"],
       "resolution": {
-        "shape": "task_session",
         "result_shape": "knowledge_organization_report"
       },
       "legacy_category": "surface",
@@ -3019,7 +2945,6 @@
       "specialist_id": "knowledge-specialist",
       "trigger_keywords": ["memory", "promote", "knowledge"],
       "resolution": {
-        "shape": "task_session",
         "result_shape": "memory_promotion_result"
       },
       "legacy_category": "surface",
@@ -3048,7 +2973,6 @@
       "specialist_id": "knowledge-specialist",
       "trigger_keywords": ["sanitize", "public", "tier"],
       "resolution": {
-        "shape": "task_session",
         "result_shape": "knowledge_sanitization_report"
       },
       "legacy_category": "surface",
@@ -3074,7 +2998,6 @@
       "specialist_id": "knowledge-specialist",
       "trigger_keywords": ["retire", "stale", "knowledge"],
       "resolution": {
-        "shape": "task_session",
         "result_shape": "knowledge_retirement_report"
       },
       "legacy_category": "surface",
@@ -3109,7 +3032,6 @@
         "不整合"
       ],
       "resolution": {
-        "shape": "task_session",
         "result_shape": "knowledge_reconciliation_report"
       },
       "legacy_category": "surface",
@@ -3142,7 +3064,6 @@
         "ベースラインチェック"
       ],
       "resolution": {
-        "shape": "pipeline",
         "result_shape": "kyberion_baseline_status"
       },
       "legacy_category": "surface",
@@ -3184,7 +3105,6 @@
         "kyberionの健康"
       ],
       "resolution": {
-        "shape": "pipeline",
         "result_shape": "kyberion_vital_status"
       },
       "legacy_category": "surface",
@@ -3219,7 +3139,6 @@
         "診断して"
       ],
       "resolution": {
-        "shape": "pipeline",
         "result_shape": "kyberion_diagnostics_report"
       },
       "legacy_category": "surface",
@@ -3263,7 +3182,6 @@
         "ミッション状態"
       ],
       "resolution": {
-        "shape": "task_session",
         "result_shape": "mission_state_summary"
       },
       "legacy_category": "surface",
@@ -3294,7 +3212,6 @@
       "specialist_id": "service-operator",
       "trigger_keywords": ["mission", "missions", "ミッション", "active", "inventory"],
       "resolution": {
-        "shape": "task_session",
         "result_shape": "mission_inventory_summary"
       },
       "legacy_category": "surface",
@@ -3341,7 +3258,6 @@
         "タスク"
       ],
       "resolution": {
-        "shape": "task_session",
         "result_shape": "generation_schedule_summary"
       },
       "legacy_category": "surface",
@@ -3400,7 +3316,6 @@
         "機能一覧"
       ],
       "resolution": {
-        "shape": "pipeline",
         "result_shape": "capability_lifecycle_report"
       },
       "pipeline": [
@@ -3430,7 +3345,6 @@
       "specialist_id": "service-operator",
       "trigger_keywords": ["supervisor", "runtime", "workers"],
       "resolution": {
-        "shape": "task_session",
         "result_shape": "runtime_supervisor_summary"
       },
       "legacy_category": "surface",
@@ -3468,7 +3382,6 @@
       "specialist_id": "service-operator",
       "trigger_keywords": ["restart", "reboot", "再起動", "再起動して"],
       "resolution": {
-        "shape": "task_session",
         "result_shape": "service_restarted"
       },
       "pipeline": [
@@ -3502,7 +3415,6 @@
       "specialist_id": "service-operator",
       "trigger_keywords": ["audit", "chain", "verify"],
       "resolution": {
-        "shape": "task_session",
         "result_shape": "audit_chain_verification_result"
       },
       "legacy_category": "surface",
@@ -3536,7 +3448,6 @@
       "specialist_id": "service-operator",
       "trigger_keywords": ["environment", "inspect", "readiness"],
       "resolution": {
-        "shape": "task_session",
         "result_shape": "environment_readiness_report"
       },
       "legacy_category": "surface",
@@ -3570,7 +3481,6 @@
       "specialist_id": "project-lead",
       "trigger_keywords": ["mission", "create", "start"],
       "resolution": {
-        "shape": "mission",
         "result_shape": "mission_created"
       },
       "legacy_category": "surface",
@@ -3596,7 +3506,6 @@
       "specialist_id": "project-lead",
       "trigger_keywords": ["mission", "classify", "risk"],
       "resolution": {
-        "shape": "task_session",
         "result_shape": "mission_classification_result"
       },
       "legacy_category": "surface",
@@ -3622,7 +3531,6 @@
       "specialist_id": "project-lead",
       "trigger_keywords": ["workflow", "mission", "select"],
       "resolution": {
-        "shape": "task_session",
         "result_shape": "mission_workflow_selected"
       },
       "legacy_category": "surface",
@@ -3648,7 +3556,6 @@
       "specialist_id": "project-lead",
       "trigger_keywords": ["team", "compose", "mission"],
       "resolution": {
-        "shape": "task_session",
         "result_shape": "mission_team_composed"
       },
       "legacy_category": "surface",
@@ -3674,7 +3581,6 @@
       "specialist_id": "project-lead",
       "trigger_keywords": ["prewarm", "team", "mission"],
       "resolution": {
-        "shape": "task_session",
         "result_shape": "mission_team_prewarmed"
       },
       "legacy_category": "surface",
@@ -3700,7 +3606,6 @@
       "specialist_id": "project-lead",
       "trigger_keywords": ["delegate", "worker", "task"],
       "resolution": {
-        "shape": "mission",
         "result_shape": "mission_task_delegated"
       },
       "legacy_category": "surface",
@@ -3726,7 +3631,6 @@
       "specialist_id": "project-lead",
       "trigger_keywords": ["worker", "review", "output"],
       "resolution": {
-        "shape": "task_session",
         "result_shape": "worker_output_reviewed"
       },
       "legacy_category": "surface",
@@ -3752,7 +3656,6 @@
       "specialist_id": "project-lead",
       "trigger_keywords": ["handoff", "mission", "owner"],
       "resolution": {
-        "shape": "mission",
         "result_shape": "mission_handoff_completed"
       },
       "legacy_category": "surface",
@@ -3778,7 +3681,6 @@
       "specialist_id": "project-lead",
       "trigger_keywords": ["mission", "distill", "learning"],
       "resolution": {
-        "shape": "mission",
         "result_shape": "mission_distilled"
       },
       "legacy_category": "surface",
@@ -3804,7 +3706,6 @@
       "specialist_id": "project-lead",
       "trigger_keywords": ["close", "mission", "archive"],
       "resolution": {
-        "shape": "mission",
         "result_shape": "mission_closed"
       },
       "legacy_category": "surface",
@@ -3838,7 +3739,6 @@
       "specialist_id": "service-operator",
       "trigger_keywords": ["deprecate", "actuatorを非推奨化して"],
       "resolution": {
-        "shape": "task_session",
         "result_shape": "summary"
       }
     },
@@ -3864,7 +3764,6 @@
       "specialist_id": "service-operator",
       "trigger_keywords": ["rollback", "actuatorをロールバックして"],
       "resolution": {
-        "shape": "task_session",
         "result_shape": "summary"
       }
     },
@@ -3890,7 +3789,6 @@
       "specialist_id": "service-operator",
       "trigger_keywords": ["recover", "環境を復旧して"],
       "resolution": {
-        "shape": "task_session",
         "result_shape": "summary"
       }
     },
@@ -3916,7 +3814,6 @@
       "specialist_id": "service-operator",
       "trigger_keywords": ["reset", "環境状態をリセットして"],
       "resolution": {
-        "shape": "task_session",
         "result_shape": "summary"
       }
     },
@@ -3942,7 +3839,6 @@
       "specialist_id": "knowledge-specialist",
       "trigger_keywords": ["audit", "ナレッジtier境界を監査して"],
       "resolution": {
-        "shape": "task_session",
         "result_shape": "summary"
       }
     },
@@ -3968,7 +3864,6 @@
       "specialist_id": "knowledge-specialist",
       "trigger_keywords": ["trace", "memory昇格判断を追跡して"],
       "resolution": {
-        "shape": "task_session",
         "result_shape": "summary"
       }
     },
@@ -4005,7 +3900,6 @@
         "ミッションのオーナー"
       ],
       "resolution": {
-        "shape": "mission",
         "result_shape": "summary"
       }
     },
@@ -4036,7 +3930,6 @@
         "ミッションを取り消"
       ],
       "resolution": {
-        "shape": "mission",
         "result_shape": "summary"
       }
     },
@@ -4062,7 +3955,6 @@
       "specialist_id": "project-lead",
       "trigger_keywords": ["pause", "ミッションを一時停止して"],
       "resolution": {
-        "shape": "mission",
         "result_shape": "summary"
       }
     },
@@ -4098,7 +3990,6 @@
         "承認リクエスト"
       ],
       "resolution": {
-        "shape": "task_session",
         "result_shape": "summary"
       }
     },
@@ -4129,7 +4020,6 @@
       "specialist_id": "service-operator",
       "trigger_keywords": ["resolve", "承認依頼を解決して", "稟議", "決裁", "承認して", "approve"],
       "resolution": {
-        "shape": "task_session",
         "result_shape": "summary"
       }
     },
@@ -4155,7 +4045,6 @@
       "specialist_id": "service-operator",
       "trigger_keywords": ["escalate", "ガバナンス問題をエスカレーションして"],
       "resolution": {
-        "shape": "task_session",
         "result_shape": "summary"
       }
     },
@@ -4191,7 +4080,6 @@
         "APIを取り込"
       ],
       "resolution": {
-        "shape": "pipeline",
         "task_kind": "service_onboarding",
         "result_shape": "summary"
       },
@@ -4209,7 +4097,7 @@
           "params": {
             "cmd": "node dist/scripts/run_pipeline.js --input pipelines/assimilate-gateway-capability.json --context '{\"service_name\": \"{{service_name}}\", \"openapi_url\": \"{{openapi_url_or_docs}}\"}'",
             "env": {
-              "KYBERION_PERSONA": "sovereign"
+              "KYBERION_BASE_ROLE": "sovereign"
             },
             "export_as": "assimilation_result"
           }
@@ -4254,7 +4142,6 @@
         "多角的"
       ],
       "resolution": {
-        "shape": "pipeline",
         "result_shape": "hypothesis_tree_result"
       },
       "exposed_to_surface": true,
@@ -4308,7 +4195,6 @@
         "step by step"
       ],
       "resolution": {
-        "shape": "task_session",
         "task_kind": "planning",
         "result_shape": "task_plan"
       },
@@ -4316,7 +4202,7 @@
       "target": "outcome",
       "action": "compose",
       "object": "task_plan",
-      "execution_shape": "pipeline",
+      "execution_shape": "task_session",
       "mission_class": "decision_support",
       "risk_profile": "review_required",
       "pipeline": [
@@ -4377,7 +4263,6 @@
         "順番に実行"
       ],
       "resolution": {
-        "shape": "task_session",
         "task_kind": "execution",
         "result_shape": "execution_result"
       },
@@ -4385,7 +4270,7 @@
       "target": "outcome",
       "action": "execute",
       "object": "task_plan",
-      "execution_shape": "pipeline",
+      "execution_shape": "task_session",
       "mission_class": "decision_support",
       "risk_profile": "approval_required",
       "pipeline": [
@@ -4453,14 +4338,13 @@
         "類似の失敗"
       ],
       "resolution": {
-        "shape": "direct_reply",
         "result_shape": "prior_knowledge_summary"
       },
       "exposed_to_surface": true,
       "target": "knowledge",
       "action": "query",
       "object": "distilled_knowledge",
-      "execution_shape": "pipeline",
+      "execution_shape": "direct_reply",
       "mission_class": "research_and_absorption",
       "risk_profile": "low",
       "pipeline": [
@@ -4516,7 +4400,6 @@
         "debate"
       ],
       "resolution": {
-        "shape": "pipeline",
         "result_shape": "consensus_result"
       },
       "exposed_to_surface": true,
@@ -4571,7 +4454,6 @@
         "シナリオ分析"
       ],
       "resolution": {
-        "shape": "pipeline",
         "result_shape": "gate_verdict"
       },
       "exposed_to_surface": true,
@@ -4650,14 +4532,13 @@
         "として分析"
       ],
       "resolution": {
-        "shape": "direct_reply",
         "result_shape": "adaptive_analysis"
       },
       "exposed_to_surface": true,
       "target": "outcome",
       "action": "inspect",
       "object": "reasoning_output",
-      "execution_shape": "pipeline",
+      "execution_shape": "direct_reply",
       "mission_class": "decision_support",
       "risk_profile": "review_required",
       "pipeline": [
@@ -4707,7 +4588,6 @@
         "tool_use"
       ],
       "resolution": {
-        "shape": "pipeline",
         "result_shape": "tool_use_result"
       },
       "exposed_to_surface": true,
@@ -4758,14 +4638,13 @@
         "active learning"
       ],
       "resolution": {
-        "shape": "direct_reply",
         "result_shape": "review_record"
       },
       "exposed_to_surface": true,
       "target": "outcome",
       "action": "review",
       "object": "review_request",
-      "execution_shape": "pipeline",
+      "execution_shape": "direct_reply",
       "mission_class": "operations_and_release",
       "risk_profile": "approval_required",
       "pipeline": [
@@ -4825,7 +4704,6 @@
         "このページ"
       ],
       "resolution": {
-        "shape": "task_session",
         "task_kind": "service_operation",
         "result_shape": "summary"
       },
@@ -4872,7 +4750,6 @@
         "sunny"
       ],
       "resolution": {
-        "shape": "task_session",
         "task_kind": "service_operation",
         "result_shape": "summary"
       },
@@ -4933,7 +4810,6 @@
         "station"
       ],
       "resolution": {
-        "shape": "task_session",
         "task_kind": "service_operation",
         "result_shape": "summary"
       },
@@ -4989,7 +4865,6 @@
         "booking"
       ],
       "resolution": {
-        "shape": "task_session",
         "task_kind": "service_operation",
         "result_shape": "summary"
       },
@@ -5046,7 +4921,6 @@
         "最近の動向"
       ],
       "resolution": {
-        "shape": "task_session",
         "task_kind": "service_operation",
         "result_shape": "summary"
       },
@@ -5097,7 +4971,6 @@
         "write"
       ],
       "resolution": {
-        "shape": "task_session",
         "task_kind": "service_operation",
         "result_shape": "summary"
       },
@@ -5149,7 +5022,6 @@
         "meeting"
       ],
       "resolution": {
-        "shape": "task_session",
         "task_kind": "service_operation",
         "result_shape": "summary"
       },
@@ -5208,7 +5080,6 @@
         "電源を消して"
       ],
       "resolution": {
-        "shape": "task_session",
         "task_kind": "service_operation",
         "result_shape": "summary"
       },
@@ -5261,7 +5132,6 @@
         "通知して"
       ],
       "resolution": {
-        "shape": "task_session",
         "task_kind": "service_operation",
         "result_shape": "summary"
       },
@@ -5320,7 +5190,6 @@
         "韓国語に"
       ],
       "resolution": {
-        "shape": "task_session",
         "task_kind": "service_operation",
         "result_shape": "summary"
       },
@@ -5366,7 +5235,6 @@
         "engineering governance"
       ],
       "resolution": {
-        "shape": "project_bootstrap",
         "result_shape": "track_created"
       },
       "exposed_to_surface": true,
@@ -5403,7 +5271,6 @@
         "operational process"
       ],
       "resolution": {
-        "shape": "project_bootstrap",
         "result_shape": "track_created"
       },
       "exposed_to_surface": true,
@@ -5441,7 +5308,6 @@
         "accounts payable"
       ],
       "resolution": {
-        "shape": "mission",
         "result_shape": "summary"
       },
       "legacy_category": "surface",
@@ -5484,7 +5350,6 @@
         "annual plan"
       ],
       "resolution": {
-        "shape": "mission",
         "result_shape": "summary"
       },
       "legacy_category": "surface",
@@ -5516,7 +5381,6 @@
       "specialist_id": "project-lead",
       "trigger_keywords": ["ロードマップ", "プロダクト計画", "製品計画", "roadmap", "product plan"],
       "resolution": {
-        "shape": "mission",
         "result_shape": "summary"
       },
       "legacy_category": "surface",
@@ -5555,7 +5419,6 @@
         "kickoff"
       ],
       "resolution": {
-        "shape": "mission",
         "result_shape": "summary"
       },
       "legacy_category": "surface",
@@ -5595,7 +5458,6 @@
         "reimbursement"
       ],
       "resolution": {
-        "shape": "mission",
         "result_shape": "summary"
       },
       "legacy_category": "surface",
@@ -5638,7 +5500,6 @@
         "payment reminder"
       ],
       "resolution": {
-        "shape": "mission",
         "result_shape": "summary"
       },
       "legacy_category": "surface",
@@ -5670,7 +5531,6 @@
       "specialist_id": "project-lead",
       "trigger_keywords": ["給与", "給与計算", "勤怠", "賞与", "payroll", "salary calculation"],
       "resolution": {
-        "shape": "mission",
         "result_shape": "summary"
       },
       "legacy_category": "surface",
@@ -5702,7 +5562,6 @@
       "specialist_id": "project-lead",
       "trigger_keywords": ["OKR", "目標設定", "四半期計画", "部門目標", "okr", "quarterly goals"],
       "resolution": {
-        "shape": "mission",
         "result_shape": "summary"
       },
       "legacy_category": "surface",
@@ -5742,7 +5601,6 @@
         "acquire a company"
       ],
       "resolution": {
-        "shape": "mission",
         "result_shape": "summary"
       },
       "legacy_category": "surface",
@@ -5786,7 +5644,6 @@
         "製品発売"
       ],
       "resolution": {
-        "shape": "mission",
         "result_shape": "summary"
       },
       "legacy_category": "surface",
@@ -5818,7 +5675,6 @@
       "specialist_id": "project-lead",
       "trigger_keywords": ["RFP", "提案書", "入札", "プロポーザル", "rfp", "proposal", "bid"],
       "resolution": {
-        "shape": "mission",
         "result_shape": "summary"
       },
       "legacy_category": "surface",
@@ -5863,7 +5719,6 @@
         "案件の状況"
       ],
       "resolution": {
-        "shape": "mission",
         "result_shape": "summary"
       },
       "legacy_category": "surface",
@@ -5903,7 +5758,6 @@
         "delivery tracking"
       ],
       "resolution": {
-        "shape": "mission",
         "result_shape": "summary"
       },
       "legacy_category": "surface",
@@ -5949,7 +5803,6 @@
         "チケットを対応"
       ],
       "resolution": {
-        "shape": "mission",
         "result_shape": "summary"
       },
       "legacy_category": "surface",
@@ -5989,7 +5842,6 @@
         "quarterly business review"
       ],
       "resolution": {
-        "shape": "mission",
         "result_shape": "summary"
       },
       "legacy_category": "surface",
@@ -6035,7 +5887,6 @@
         "employee onboarding"
       ],
       "resolution": {
-        "shape": "mission",
         "result_shape": "summary"
       },
       "legacy_category": "surface",
@@ -6075,7 +5926,6 @@
         "controls testing"
       ],
       "resolution": {
-        "shape": "mission",
         "result_shape": "summary"
       },
       "legacy_category": "surface",
@@ -6115,7 +5965,6 @@
         "regulatory submission"
       ],
       "resolution": {
-        "shape": "mission",
         "result_shape": "summary"
       },
       "legacy_category": "surface",
@@ -6155,7 +6004,6 @@
         "workflow optimization"
       ],
       "resolution": {
-        "shape": "mission",
         "result_shape": "summary"
       },
       "legacy_category": "surface",
@@ -6195,7 +6043,6 @@
         "asset inventory"
       ],
       "resolution": {
-        "shape": "mission",
         "result_shape": "summary"
       },
       "legacy_category": "surface",
@@ -6238,7 +6085,6 @@
         "risk analysis"
       ],
       "resolution": {
-        "shape": "mission",
         "result_shape": "summary"
       },
       "legacy_category": "surface",
@@ -6278,7 +6124,6 @@
         "disaster recovery"
       ],
       "resolution": {
-        "shape": "mission",
         "result_shape": "summary"
       },
       "legacy_category": "surface",
@@ -6327,7 +6172,6 @@
         "サプライヤの審査"
       ],
       "resolution": {
-        "shape": "mission",
         "result_shape": "summary"
       },
       "legacy_category": "surface",
@@ -6367,7 +6211,6 @@
         "strategic partner"
       ],
       "resolution": {
-        "shape": "mission",
         "result_shape": "summary"
       },
       "legacy_category": "surface",
@@ -6407,7 +6250,6 @@
         "pr release"
       ],
       "resolution": {
-        "shape": "mission",
         "result_shape": "summary"
       },
       "legacy_category": "surface",
@@ -6446,7 +6288,6 @@
         "knowledge base"
       ],
       "resolution": {
-        "shape": "mission",
         "result_shape": "summary"
       },
       "legacy_category": "surface",
@@ -6489,7 +6330,6 @@
         "マネジメントシステム"
       ],
       "resolution": {
-        "shape": "mission",
         "result_shape": "summary"
       },
       "legacy_category": "surface",
@@ -6529,7 +6369,6 @@
         "service operations"
       ],
       "resolution": {
-        "shape": "mission",
         "result_shape": "summary"
       },
       "legacy_category": "surface",
@@ -6572,7 +6411,6 @@
         "demand forecast"
       ],
       "resolution": {
-        "shape": "mission",
         "result_shape": "summary"
       },
       "legacy_category": "surface",
@@ -6613,7 +6451,6 @@
         "変更"
       ],
       "resolution": {
-        "shape": "mission",
         "result_shape": "summary"
       },
       "legacy_category": "surface",
@@ -6659,7 +6496,6 @@
         "book close"
       ],
       "resolution": {
-        "shape": "mission",
         "result_shape": "summary"
       },
       "legacy_category": "surface",
@@ -6707,7 +6543,6 @@
         "実績と計画"
       ],
       "resolution": {
-        "shape": "mission",
         "result_shape": "summary"
       },
       "legacy_category": "surface",
@@ -6749,7 +6584,6 @@
         "investor deck"
       ],
       "resolution": {
-        "shape": "mission",
         "result_shape": "summary"
       },
       "legacy_category": "surface",
@@ -6801,7 +6635,6 @@
         "面接官"
       ],
       "resolution": {
-        "shape": "mission",
         "result_shape": "summary"
       },
       "legacy_category": "surface",
@@ -6842,7 +6675,6 @@
         "360 feedback"
       ],
       "resolution": {
-        "shape": "mission",
         "result_shape": "summary"
       },
       "legacy_category": "surface",
@@ -6883,7 +6715,6 @@
         "board pack"
       ],
       "resolution": {
-        "shape": "mission",
         "result_shape": "summary"
       },
       "legacy_category": "surface",
@@ -6929,7 +6760,6 @@
         "request for quotation"
       ],
       "resolution": {
-        "shape": "mission",
         "result_shape": "summary"
       },
       "legacy_category": "surface",
@@ -6940,6 +6770,45 @@
       "execution_shape": "mission",
       "mission_class": "procurement_and_supply",
       "risk_profile": "approval_required"
+    },
+    {
+      "id": "improve-web-design",
+      "category": "outcome_execution",
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "change",
+      "object": "web_ui_design",
+      "execution_shape": "task_session",
+      "mission_class": "web_design_improvement",
+      "risk_profile": "review_required",
+      "description": "Improve an existing web UI surface: inventory enumerable-but-freeform inputs, share a change plan (wireframe + approval only when the user asks or the change is large), then implement with shared UI components.",
+      "surface_examples": [
+        "設定画面が見づらいのでUI改善して",
+        "このページを使いやすくデザインし直して",
+        "ワイヤフレームを作ってから実装して"
+      ],
+      "plan_outline": [
+        "inventory current surface inputs and components (usability heuristics check)",
+        "share a change plan / layout proposal (wireframe + approval only if requested or high-risk)",
+        "implement with shared UI components and system-provided options",
+        "verify states, links, and contracts; apply diff-matched quality inspections"
+      ],
+      "outcome_ids": ["artifact:design_spec"],
+      "trigger_keywords": [
+        "UI改善",
+        "UX改善",
+        "デザイン改善",
+        "見づらい",
+        "ごちゃごちゃ",
+        "ワイヤフレーム",
+        "wireframe",
+        "ui improvement",
+        "web design"
+      ],
+      "resolution": {
+        "result_shape": "artifact:design_spec"
+      }
     }
   ]
 }

@@ -16,6 +16,9 @@ vi.mock('../../../lib/viewer-context', () => ({
   conciergeErrorResponse: vi.fn((e: unknown) => new Response(String(e), { status: 500 }) as never),
 }));
 vi.mock('@agent/core/authority', () => ({
+  // S4: store facades open their declared store grant (withStoreGrant).
+  withStoreGrant: (_name: string, fn: () => unknown) => fn(),
+  withStoreGrantAsync: async (_name: string, fn: () => unknown) => fn(),
   withExecutionContext: vi.fn((_r: string, fn: () => unknown) => fn()),
 }));
 vi.mock('@agent/core/secure-io', () => ({

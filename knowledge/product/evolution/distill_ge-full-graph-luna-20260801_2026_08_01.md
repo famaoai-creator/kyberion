@@ -14,6 +14,7 @@ importance: 6
 source_mission: GE-FULL-GRAPH-LUNA-20260801
 author: Kyberion Wisdom Distiller
 last_updated: 2026-08-01
+doc_status: historical
 ---
 
 # Recovering a Multi-Agent Research Graph from Dispatch and Reviewer Readiness Failures

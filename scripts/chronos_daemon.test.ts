@@ -262,7 +262,8 @@ describe('chronos pipeline scope', () => {
             KYBERION_TENANT: 'acme-corp',
             KYBERION_TENANT_SCOPE_REQUIRED: '1',
             MISSION_ROLE: 'chronos_tenant_runner',
-            KYBERION_PERSONA: 'worker',
+            KYBERION_BASE_ROLE: 'worker',
+            KYBERION_PERSONA: '',
             KYBERION_SUDO: '',
           });
           // A pipeline that declares nothing gets explicit blanks, not the daemon's values.

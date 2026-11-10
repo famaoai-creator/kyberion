@@ -56,6 +56,7 @@ import {
   assertPipelineExecutionCurrent,
   PipelineSuspendedError,
   resolveStepType,
+  resolveSemanticActuatorStepKind,
   resolveExportKey,
   buildReasoningPolicyNote,
   resolvePipelineReasoningOptions,
@@ -997,6 +998,31 @@ const INLINE_OP_HANDLERS: Record<string, InlineOpHandler> = {
 
     return (await domainOps()).runInlineOrganizationRetro(step, params, ctx);
   },
+  'core:organization_improvement_scan': async ({ step, params, ctx }) => {
+    const { runOrganizationImprovementScanOp } = await import('./organization_improvement_scan.js');
+    const tier = String(resolveVars(params.tier ?? 'confidential', ctx));
+    const organizationId = String(resolveVars(params.organization_id ?? '', ctx));
+    if (!organizationId)
+      throw new Error('core:organization_improvement_scan requires organization_id');
+    const apply = resolveVars(params.apply ?? false, ctx) === true;
+    const result = await runOrganizationImprovementScanOp(
+      {
+        organizationId,
+        tier: tier as 'personal' | 'confidential' | 'public',
+        ...(params.tenant_slug ? { tenantSlug: String(resolveVars(params.tenant_slug, ctx)) } : {}),
+        ...(params.window_days !== undefined
+          ? { windowDays: Number(resolveVars(params.window_days, ctx)) }
+          : {}),
+        ...(params.max_candidates !== undefined
+          ? { maxCandidates: Number(resolveVars(params.max_candidates, ctx)) }
+          : {}),
+      },
+      ctx,
+      {},
+      { apply }
+    );
+    return { ...ctx, [resolveExportKey(step, 'improvement_scan')]: result };
+  },
   'core:accountability_report': async (dctx) => {
     const { step, params, ctx } = dctx;
 
@@ -1422,7 +1448,9 @@ async function dispatchResolvedActuatorOperation(
 
   // CRITICAL: Safety check for source (capture) ops.
   // Resolve export key via produces > params.export_as > default.
-  if (effectiveType === 'capture') {
+  // Use registry semantics — prepareEngineSteps collapses capture → apply.
+  const semanticType = resolveSemanticActuatorStepKind(domain, action, effectiveType);
+  if (semanticType === 'capture') {
     const exportKey = resolveExportKey(step, 'last_capture');
     const actualCtx =
       result.ctx && typeof result.ctx === 'object' && 'context' in result.ctx

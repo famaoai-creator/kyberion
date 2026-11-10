@@ -8,7 +8,7 @@ import {
   safeWriteFile,
 } from '../secure-io.js';
 import * as pathResolver from '../path-resolver.js';
-import { withExecutionContext } from '../authority.js';
+import { withStoreGrant } from '../authority.js';
 
 // Capture the metrics logger only; tier-guard and secure-io stay REAL here.
 const warnings = vi.hoisted(() => [] as string[]);
@@ -83,13 +83,13 @@ describe('resource-usage ledger under a real tenant binding', () => {
 
     // The existing narrow ledger reader supplies read authority, not tenant bypass.
     delete process.env.KYBERION_TENANT;
-    withExecutionContext(METRICS_CAP_READER_ROLE, () => {
+    withStoreGrant(METRICS_CAP_READER_ROLE, () => {
       expect(ids(mc.loadResourceUsageHistory({ tenants: ['tenant-b'] }))).toEqual(['legacy-b']);
     });
 
     // Bound to tenant-a: tenant-b's legacy rows are withheld in every mode.
     process.env.KYBERION_TENANT = 'tenant-a';
-    withExecutionContext(METRICS_CAP_READER_ROLE, () => {
+    withStoreGrant(METRICS_CAP_READER_ROLE, () => {
       expect(ids(mc.loadResourceUsageHistory({ tenants: ['tenant-b'] }))).toEqual([]);
       expect(
         ids(

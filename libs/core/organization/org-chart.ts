@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import * as path from 'node:path';
 import { defineCatalog, type GovernedCatalog } from '../foundation/governed-catalog.js';
 import { assertSafeRepositoryPath } from '../secure-io.js';
@@ -24,7 +25,7 @@ export interface OrganizationOrgChart {
   version: string;
   organization_id: string;
   name: string;
-  source_kind: 'confidential' | 'public' | 'derived';
+  source_kind: Exclude<StorageDataTier, 'personal'> | 'derived';
   source_path: string;
   domains: OrganizationOrgChartDomain[];
   positions: OrganizationOrgChartPosition[];

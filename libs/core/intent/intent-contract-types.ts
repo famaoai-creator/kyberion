@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import type { OrganizationWorkLoopSummary } from '../workforce/work-design.js';
 import type { IntentResolutionPacket, StandardIntentDefinition } from './intent-resolution.js';
 import type { ReasoningLevelDecision } from '../reasoning/reasoning-level-policy.js';
@@ -6,9 +7,11 @@ import type { IntentUseCaseScenario } from './intent-use-case-scenario.js';
 import type { WorkflowExecutionShape } from '../contracts/execution-shape.js';
 import type { ActuatorExecutionBrief } from '../contracts/actuator-execution-brief.js';
 import type { OperatorInteractionPacket } from '../contracts/operator-interaction-packet.js';
+import type { RoutingDecision, RoutingDeliveryMode } from '../contracts/routing-decision.js';
 
 export type IntentCompilerProvider = 'codex' | 'claude' | 'gemini';
-export type IntentDeliveryMode = 'one_shot' | 'managed_program';
+/** Same vocabulary as RoutingDecision.delivery_mode (contracts/routing-decision.ts). */
+export type IntentDeliveryMode = RoutingDeliveryMode;
 
 export interface IntentContract {
   kind: 'intent-contract';
@@ -81,12 +84,17 @@ export interface CompileUserIntentFlowInput {
   projectName?: string;
   trackId?: string;
   trackName?: string;
-  tier?: 'personal' | 'confidential' | 'public';
+  tier?: StorageDataTier;
   tenantId?: string;
   tenantSlug?: string;
   serviceBindings?: string[];
   runtimeContext?: Record<string, unknown>;
   resolutionPacket?: IntentResolutionPacket;
+  /**
+   * The RoutingDecision the entry resolved for this same request (D7). The
+   * fallback execution brief uses its intent instead of re-resolving the text.
+   */
+  carriedRoutingDecision?: RoutingDecision;
 }
 
 export interface IntentCompilerTarget {

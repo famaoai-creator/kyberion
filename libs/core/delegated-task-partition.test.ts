@@ -33,6 +33,7 @@ import {
   enqueueDelegationNotification,
   listDelegationNotifications,
 } from './mission/delegation-notifications.js';
+import { asRoleOrGrant } from './testing/role-or-store-grant.js';
 
 const STORE = `active/shared/tmp/delegation-partition-tests/store-${process.pid}`;
 const ENV_KEYS = [
@@ -41,7 +42,7 @@ const ENV_KEYS = [
   'KYBERION_DELEGATION_NOTIFICATIONS_PATH',
   'KYBERION_TENANT',
   'MISSION_ROLE',
-  'KYBERION_PERSONA',
+  'KYBERION_BASE_ROLE',
 ] as const;
 const saved = Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]]));
 
@@ -173,7 +174,7 @@ describe('delegation store tier-guard boundary (decisions only)', () => {
     bindTenant('acme');
     expect(validateWritePermission(record('acme')).allowed).toBe(false);
     expect(validateReadPermission(record('acme')).allowed).toBe(false);
-    withExecutionContext(
+    asRoleOrGrant(
       DELEGATION_RECORD_STORE_ROLE,
       () => {
         expect(validateWritePermission(record('acme')).allowed).toBe(true);
@@ -185,7 +186,7 @@ describe('delegation store tier-guard boundary (decisions only)', () => {
       'acme'
     );
     expect(() =>
-      withExecutionContext(DELEGATION_RECORD_STORE_ROLE, () => undefined, undefined, 'beta')
+      asRoleOrGrant(DELEGATION_RECORD_STORE_ROLE, () => undefined, undefined, 'beta')
     ).toThrow('ROLE_TENANT_SCOPE_MISMATCH');
     // The system partition keeps the ordinary runtime grants.
     expect(

@@ -87,7 +87,7 @@ function writeMission(): void {
     JSON.stringify({
       mission_id: MISSION_ID,
       tier: 'confidential',
-      assigned_persona: 'ecosystem_architect',
+      org_role: 'ecosystem_architect',
     })
   );
 }
@@ -95,11 +95,11 @@ function writeMission(): void {
 const savedEnv: Record<string, string | undefined> = {};
 
 beforeEach(() => {
-  for (const key of ['MISSION_ROLE', 'KYBERION_PERSONA', 'KYBERION_SUDO']) {
+  for (const key of ['MISSION_ROLE', 'KYBERION_BASE_ROLE', 'KYBERION_SUDO']) {
     savedEnv[key] = process.env[key];
   }
   process.env.MISSION_ROLE = 'mission_controller';
-  process.env.KYBERION_PERSONA = 'ecosystem_architect';
+  process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
   delete process.env.KYBERION_SUDO;
   safeRmSync(GRANTS_ROOT, { recursive: true, force: true });
 });

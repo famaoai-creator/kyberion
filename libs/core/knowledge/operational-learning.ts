@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { logger } from '../core.js';
 import { formatDiagnostic } from '../logger.js';
-import { resolveIdentityContext, withExecutionContext } from '../authority.js';
+import { resolveIdentityContext, withStoreGrant } from '../authority.js';
 import { currentExecutionScope } from '../foundation/execution-scope.js';
 import { withLockSync } from '../foundation/lock-utils.js';
 import { loadOrganizationProfile } from '../organization/organization-profile.js';
@@ -143,16 +143,14 @@ export function enqueueOperationalLearningSignal(
   const learningId = `ops-${day}-${slug(signal.signalId)}-${scope.tier}-${slug(scope.tenantSlug || 'shared')}`;
 
   try {
-    withExecutionContext(
+    withStoreGrant(
       'operational_learning_writer',
       () =>
         enqueueOrganizationLearningCandidate({
           ...candidateInput(signal, learningId, scope),
           ...(options.rootDir ? { rootDir: options.rootDir } : {}),
         }),
-      undefined,
-      scope.tenantSlug,
-      scope.organizationId
+      { tenantSlug: scope.tenantSlug, organizationId: scope.organizationId }
     );
     return learningId;
   } catch (error) {
@@ -206,7 +204,7 @@ export function enqueueOperationalLearningCandidateOnce(
     .digest('hex')
     .slice(0, 24)}`;
   return withLockSync(lockId, () =>
-    withExecutionContext(
+    withStoreGrant(
       'operational_learning_writer',
       () => {
         const matches = listOrganizationLearningCandidates({
@@ -235,9 +233,7 @@ export function enqueueOperationalLearningCandidateOnce(
         });
         return { learning_id: signal.learningId, created: true };
       },
-      undefined,
-      scope.tenantSlug,
-      scope.organizationId
+      { tenantSlug: scope.tenantSlug, organizationId: scope.organizationId }
     )
   );
 }

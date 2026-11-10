@@ -83,20 +83,20 @@ function bindAndActivate(): void {
 }
 
 // Onboarding bootstrap is an owner-context operation: the core CI suites run
-// under KYBERION_PERSONA=worker, so the fixture must declare its persona.
-const previousPersona = process.env.KYBERION_PERSONA;
+// under KYBERION_BASE_ROLE=worker, so the fixture must declare its persona.
+const previousPersona = process.env.KYBERION_BASE_ROLE;
 const previousRole = process.env.MISSION_ROLE;
 
 beforeEach(() => {
-  process.env.KYBERION_PERSONA = 'sovereign';
+  process.env.KYBERION_BASE_ROLE = 'sovereign';
   process.env.MISSION_ROLE = 'sovereign';
 });
 
 afterEach(() => safeRmSync(rootDir, { recursive: true, force: true }));
 
 afterAll(() => {
-  if (previousPersona === undefined) delete process.env.KYBERION_PERSONA;
-  else process.env.KYBERION_PERSONA = previousPersona;
+  if (previousPersona === undefined) delete process.env.KYBERION_BASE_ROLE;
+  else process.env.KYBERION_BASE_ROLE = previousPersona;
   if (previousRole === undefined) delete process.env.MISSION_ROLE;
   else process.env.MISSION_ROLE = previousRole;
 });

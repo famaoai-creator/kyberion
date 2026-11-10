@@ -115,6 +115,7 @@ export const PRESENCE_STUDIO_VOCABULARY_KEYS = [
   'presence_studio:loading_memory',
   'presence_studio:open_raw_memory',
   'presence_studio:select_memory_hint',
+  'presence_studio:label_reuse_proposal',
   'presence_studio:no_summary_yet',
   'presence_studio:no_detail',
   'presence_studio:no_approvals_waiting',

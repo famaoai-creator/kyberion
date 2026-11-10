@@ -36,12 +36,39 @@ import {
   type ScopedLearningPublicationIdentity,
 } from './scoped-learning-domain.js';
 import { assertMemoryWriteCapability } from './memory-capability-token.js';
+import { resolvePromotionLane, type PromotionLane } from './promotion-lanes.js';
 import type { HumanDecidedBy } from '../mission/mission-types.js';
 
 export type MemoryCandidateSourceType =
   'mission' | 'task_session' | 'artifact' | 'incident' | 'authored';
 export type MemoryCandidateKind =
   'sop' | 'template' | 'heuristic' | 'risk_rule' | 'clarification_prompt' | 'archive_advisory';
+/**
+ * D8: what a captured learning is. `MemoryCandidate` is the one candidate
+ * type for every learning (mission distill, organization learning, process
+ * improvement, execution feedback, heuristics, hints); `kind` says which, and
+ * `proposed_memory_kind` stays the knowledge format it would be promoted to.
+ */
+export type MemoryLearningKind =
+  | 'lesson'
+  | 'heuristic'
+  | 'process_improvement'
+  | 'hint'
+  | 'execution_feedback'
+  | 'organization_learning'
+  | 'advisory'
+  | 'asset_promotion';
+export const MEMORY_LEARNING_KINDS: readonly MemoryLearningKind[] = [
+  'lesson',
+  'heuristic',
+  'process_improvement',
+  'hint',
+  'execution_feedback',
+  'organization_learning',
+  'advisory',
+  'asset_promotion',
+];
+export type { PromotionLane } from './promotion-lanes.js';
 /** D7: sensitivity tier is single-sourced from the scope envelope (MemoryScopeEnvelope['tier']). */
 export type MemoryCandidateTier = MemoryScopeEnvelope['tier'];
 export type MemoryCandidateStatus = 'queued' | 'approved' | 'rejected' | 'promoted';
@@ -94,6 +121,14 @@ export interface MemoryDistillExperience {
 
 export interface MemoryCandidate {
   candidate_id: string;
+  /**
+   * D8: what this learning is. Written at capture; legacy rows are migrated
+   * on load (`migrateLegacyMemoryCandidate`), so every row the queue returns
+   * carries it.
+   */
+  kind?: MemoryLearningKind;
+  /** D8: the promotion lane resolved at capture (same guarantee as `kind`). */
+  lane?: PromotionLane;
   source_type: MemoryCandidateSourceType;
   source_ref: string;
   /** Knowledge ownership, distinct from sensitivity_tier. Legacy records omit this and retain organization routing. */
@@ -133,6 +168,42 @@ export interface MemoryCandidate {
   distill_experience?: MemoryDistillExperience;
   /** True when distillation ran but declined to emit a lesson (no reusable contrast). */
   distill_experience_declined?: boolean;
+  /**
+   * D8: the decision-owning record a candidate stands for, when a facade other
+   * than the generic promotion workflow decides it (organization learning via
+   * `pnpm organization learning transition`, process improvement via
+   * `pnpm mission improvements`). The queue row is the single
+   * source of truth; `origin` keeps the facade's own fields so it can project
+   * the row back into its view. Such rows are never promoted by
+   * `promoteMemoryCandidateToKnowledge` — one promotion path per learning.
+   */
+  origin?: MemoryCandidateOrigin;
+}
+
+export type MemoryCandidateOriginKind =
+  | 'organization_learning'
+  | 'process_improvement'
+  /** HA-01 skill / pipeline / memory-consolidation patch proposal (`pnpm background-review`). */
+  | 'background_review'
+  /** Execution-feedback improvement proposal (`pnpm kyberion improvements`). */
+  | 'execution_feedback'
+  /** Reuse plan from learning intake (`pnpm kyberion learning prepare`). */
+  | 'learning_intake'
+  /** Review-only procedure distilled from a service recording (Concierge). */
+  | 'service_procedure'
+  /** Reuse proposal from a promoted project mission seed (Concierge). */
+  | 'mission_seed';
+export interface MemoryCandidateOrigin {
+  record_kind: MemoryCandidateOriginKind;
+  /** The facade's own id (learning_id / proposal_id). */
+  record_id: string;
+  title?: string;
+  /** Facade-specific fields that have no MemoryCandidate column. */
+  attributes?: Record<string, unknown>;
+  /** Set when the row was imported from the facade's legacy store. */
+  migrated_from?: string;
+  /** The command that decides this row, e.g. `pnpm background-review`. */
+  decided_via?: string;
 }
 
 const SCHEMA_PATH = pathResolver.rootResolve(
@@ -527,11 +598,113 @@ function readQueueRows(queuePath: string): MemoryCandidate[] {
   if (!safeLstat(safePath).isFile()) {
     throw new Error(`[MEMORY_PROMOTION] queue must be a regular file: ${safePath}`);
   }
-  return readJsonLines<MemoryCandidate>(safePath);
+  return readJsonLines<MemoryCandidate>(safePath).map(migrateLegacyMemoryCandidate);
+}
+
+/**
+ * D8: the learning kind a row implies when its producer did not write one —
+ * from the producer's own source-ref / id convention first, then from the
+ * proposed knowledge format. Used for legacy rows and producers that omit it.
+ */
+export function defaultMemoryLearningKind(
+  candidate: Pick<MemoryCandidate, 'proposed_memory_kind'> &
+    Partial<Pick<MemoryCandidate, 'source_ref' | 'candidate_id'>>
+): MemoryLearningKind {
+  const sourceRef = String(candidate.source_ref || '');
+  const candidateId = String(candidate.candidate_id || '');
+  if (sourceRef.startsWith('tier_promotion:')) return 'asset_promotion';
+  if (sourceRef.startsWith('curation:')) return 'advisory';
+  if (sourceRef.startsWith('heuristic:')) return 'heuristic';
+  if (sourceRef.startsWith('deal:') || sourceRef.startsWith('doctrine:'))
+    return 'organization_learning';
+  if (candidateId.startsWith('MEM-FB-')) return 'execution_feedback';
+  switch (candidate.proposed_memory_kind) {
+    case 'heuristic':
+      return 'heuristic';
+    case 'clarification_prompt':
+      return 'hint';
+    case 'archive_advisory':
+      return 'advisory';
+    default:
+      return 'lesson';
+  }
+}
+
+/**
+ * D8: the lane a candidate travels, resolved once at capture. The more
+ * restrictive of the destination tier and the source scope's tier decides,
+ * so a tenant-scoped row never lands on a cheaper lane than steward.
+ */
+export function resolveMemoryCandidateLane(
+  candidate: Pick<
+    MemoryCandidate,
+    'proposed_memory_kind' | 'sensitivity_tier' | 'scope' | 'summary' | 'source_ref'
+  >
+): PromotionLane {
+  const sourceTier = candidate.scope?.tier;
+  const tier = sourceTier && sourceTier !== 'public' ? sourceTier : candidate.sensitivity_tier;
+  return resolvePromotionLane({
+    proposed_memory_kind: candidate.proposed_memory_kind,
+    tier,
+    summary: candidate.summary,
+    source_ref: candidate.source_ref,
+  });
+}
+
+/**
+ * D8 load-time migration: rows written before kind/lane existed gain them on
+ * read, so legacy readers keep working and the next rewrite persists them.
+ * Scope is never inferred here — an unscoped legacy row stays unscoped.
+ */
+export function migrateLegacyMemoryCandidate(row: MemoryCandidate): MemoryCandidate {
+  if (row.kind && row.lane) return row;
+  return {
+    ...row,
+    kind: row.kind ?? defaultMemoryLearningKind(row),
+    lane: row.lane ?? resolveMemoryCandidateLane(row),
+  };
+}
+
+/**
+ * D8: tier and entity scope are written at capture and never inferred at
+ * promotion or ingest. A non-public candidate must carry its scope envelope —
+ * tenant for confidential (enforced by `assertMemoryScope`), owner_nhi for
+ * personal. Public candidates have no disclosure boundary to declare (product
+ * knowledge is unscoped by contract, see `assertPublicTierReferencesSafe`);
+ * `asset_promotion` approval tokens are the one non-public exception.
+ */
+export function assertMemoryCandidateCaptureScope(
+  candidate: Pick<
+    MemoryCandidate,
+    'sensitivity_tier' | 'scope' | 'candidate_id' | 'kind' | 'source_ref'
+  >
+): void {
+  const scope = candidate.scope;
+  if (!scope) {
+    if (candidate.sensitivity_tier === 'public') return;
+    // Ingest tier-promotion approvals name the shared landing root
+    // (`knowledge/confidential/common`) in source_ref; they are approval
+    // tokens, not learnings, and have no tenant to carry.
+    if (
+      candidate.kind === 'asset_promotion' &&
+      String(candidate.source_ref || '').startsWith('tier_promotion:knowledge/confidential/common:')
+    )
+      return;
+    throw new Error(
+      `[MEMORY_SCOPE_REQUIRED] ${candidate.sensitivity_tier} memory candidate '${candidate.candidate_id}' has no scope — tier and entity scope must be written at capture, never inferred later | next: pass scope (tenant_slug for confidential, owner_nhi for personal) from the producer`
+    );
+  }
+  if (scope.tier === 'personal' && !String(scope.owner_nhi || '').trim()) {
+    throw new Error(
+      `[MEMORY_SCOPE_REQUIRED] personal memory candidate '${candidate.candidate_id}' needs an explicit owner_nhi in its scope`
+    );
+  }
 }
 
 export function createMemoryPromotionCandidate(input: {
   candidateId?: string;
+  /** D8: learning kind; defaults from proposedMemoryKind when omitted. */
+  kind?: MemoryLearningKind;
   sourceType: MemoryCandidateSourceType;
   sourceRef: string;
   knowledgeDomain?: MemoryKnowledgeDomain;
@@ -549,12 +722,29 @@ export function createMemoryPromotionCandidate(input: {
 }): MemoryCandidate {
   const now = input.queuedAt || nowIso();
   const summary = normalizeMemoryFact(String(input.summary || ''), Date.parse(now) || Date.now());
+  const scope = input.scope ? assertMemoryScope(input.scope, input.scope.tier) : undefined;
+  const sourceRef = String(input.sourceRef || '').trim();
+  const candidateId =
+    input.candidateId ||
+    `MEM-${Date.now().toString(36).toUpperCase()}-${randomUUID().slice(0, 8).toUpperCase()}`;
   return {
-    candidate_id:
-      input.candidateId ||
-      `MEM-${Date.now().toString(36).toUpperCase()}-${randomUUID().slice(0, 8).toUpperCase()}`,
+    candidate_id: candidateId,
+    kind:
+      input.kind ??
+      defaultMemoryLearningKind({
+        proposed_memory_kind: input.proposedMemoryKind,
+        source_ref: sourceRef,
+        candidate_id: candidateId,
+      }),
+    lane: resolveMemoryCandidateLane({
+      proposed_memory_kind: input.proposedMemoryKind,
+      sensitivity_tier: input.sensitivityTier,
+      ...(scope ? { scope } : {}),
+      summary,
+      source_ref: sourceRef,
+    }),
     source_type: input.sourceType,
-    source_ref: String(input.sourceRef || '').trim(),
+    source_ref: sourceRef,
     ...(input.knowledgeDomain ? { knowledge_domain: input.knowledgeDomain } : {}),
     proposed_memory_kind: input.proposedMemoryKind,
     summary,
@@ -569,7 +759,7 @@ export function createMemoryPromotionCandidate(input: {
     content_hash: computeContentHash({ summary }),
     occurrences: 1,
     last_seen: now,
-    ...(input.scope ? { scope: assertMemoryScope(input.scope, input.scope.tier) } : {}),
+    ...(scope ? { scope } : {}),
     ...(input.promotion ? { promotion: input.promotion } : {}),
     ...(input.distillExperience ? { distill_experience: input.distillExperience } : {}),
     ...(input.distillExperienceDeclined !== undefined || input.distillExperience
@@ -611,12 +801,14 @@ function enqueueMemoryPromotionCandidateUnlocked(
   if ((candidate.evidence_refs || []).length === 0) {
     throw new Error('Memory promotion candidate requires at least one evidence_ref.');
   }
-  const normalizedCandidate: MemoryCandidate = {
+  const normalizedCandidate: MemoryCandidate = migrateLegacyMemoryCandidate({
     ...candidate,
     summary: normalizeMemoryFact(candidate.summary, Date.parse(candidate.queued_at) || Date.now()),
-  };
+  });
   assertPublicTierReferencesSafe(normalizedCandidate);
   assertBoundTenantScopePresent(normalizedCandidate);
+  // D8: registration is where scope is enforced — never at promotion/ingest.
+  assertMemoryCandidateCaptureScope(normalizedCandidate);
   // W3: capability gate — asserted once here so both the merge-rewrite and
   // the append commits below are covered; a no-op unless the env flag is on.
   assertQueueWriteCapability(options?.capability, normalizedCandidate);
@@ -836,6 +1028,11 @@ function updateMemoryPromotionCandidateStatusUnlocked(input: {
   ratification?: { ratifiedAt: string; ratifiedCommit: string; ratificationTarget: string };
   /** W3: capability token asserted (only when required) before the write commits. */
   capability?: MemoryWriteCapability;
+  /**
+   * D8: facade-owned rows only — shallow-merged into `origin.attributes`
+   * (the facade's own decision fields). Rejected for rows without `origin`.
+   */
+  originAttributes?: Record<string, unknown>;
 }): MemoryCandidate | null {
   if (
     input.approvalChannel !== undefined &&
@@ -970,8 +1167,20 @@ function updateMemoryPromotionCandidateStatusUnlocked(input: {
       // promotion; its ratified_at is only written from input.ratification.
       const approvalChannel = input.approvalChannel || current.approval_channel;
       const deferRatification = approvalChannel === 'pr_review';
+      if (input.originAttributes && !current.origin)
+        throw new Error(
+          `[MEMORY_ORIGIN_REQUIRED] candidate '${input.candidateId}' has no origin; origin attributes belong to facade-owned rows only`
+        );
       const next: MemoryCandidate = {
         ...current,
+        ...(input.originAttributes && current.origin
+          ? {
+              origin: {
+                ...current.origin,
+                attributes: { ...(current.origin.attributes || {}), ...input.originAttributes },
+              },
+            }
+          : {}),
         status: input.status,
         ...(input.curation && normalizedCurationRefs
           ? {

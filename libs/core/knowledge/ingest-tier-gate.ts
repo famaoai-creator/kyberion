@@ -152,6 +152,9 @@ export function enqueueTierPromotionCandidate(input: TierPromotionCandidateInput
     evidenceRefs: input.evidence_refs,
     sensitivityTier: targetRoot === 'knowledge/public' ? 'public' : 'confidential',
     ratificationRequired: true,
+    // D8: an approval token for a named shared landing root (in source_ref),
+    // not a learning — the one candidate kind that carries no entity scope.
+    kind: 'asset_promotion',
   });
   enqueueMemoryPromotionCandidate(candidate);
   return candidate;

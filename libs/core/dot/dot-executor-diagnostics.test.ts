@@ -57,7 +57,7 @@ function charter(
     attention: { triggers: [{ kind: 'cron', cron: '0 9 * * *' }] },
     authority: {
       authority_role: 'infrastructure_sentinel',
-      allowed_work_shapes: ['task_session'],
+      allowed_execution_shapes: ['task_session'],
     },
     notification: { deliver_to: { surface: 'slack', channel: '#ops' } },
     runtime: { heartbeat_id: 'dot-ops' },

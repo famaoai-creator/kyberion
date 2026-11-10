@@ -110,7 +110,7 @@ describe('orchestrator-actuator', () => {
             relationships: {
               project: { project_id: 'project-1', relationship_type: 'belongs_to' },
             },
-            assigned_persona: 'operator',
+            org_role: 'operator',
           }
         : null
     );

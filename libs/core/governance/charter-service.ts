@@ -1,3 +1,4 @@
+import type { MemberRole } from '../organization/member-registry.js';
 import {
   parseExternalOperationGrants,
   type ExternalOperationGrant,
@@ -455,7 +456,7 @@ export interface AcceptFromFormInput {
   /** The authenticated human (an owner of `form.tenant_slug`). */
   acceptedBy: ActorRef;
   displayName: string;
-  holderRole: 'owner' | 'approver' | 'operator' | 'viewer' | undefined;
+  holderRole: MemberRole | undefined;
   /** Digest of the statement the human was shown. */
   statementSha256: string;
   /** The tenant's active charter this one replaces, if any. */

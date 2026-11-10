@@ -6,6 +6,9 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@agent/core/authority', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@agent/core/authority')>()),
+  // S4: store facades open their declared store grant (withStoreGrant).
+  withStoreGrant: (_name: string, fn: () => unknown) => fn(),
+  withStoreGrantAsync: async (_name: string, fn: () => unknown) => fn(),
   withExecutionContext: mocks.withExecutionContext,
 }));
 
@@ -54,6 +57,24 @@ describe('operations viewer helpers (one viewer model)', () => {
     expect(() => strictViewerScopeOrganizationIds(scoped, 'org-b')).toThrow(ConciergeViewerError);
     expect(strictViewerTier(scoped, 'public')).toBe('public');
     expect(() => strictViewerTier(scoped, 'confidential')).toThrow(ConciergeViewerError);
+  });
+
+  it('denies explicit empty tier caps while retaining omitted defaults and nonempty caps', () => {
+    for (const role of ['readonly', 'localadmin'] as const) {
+      const empty = { ...scoped, role, tierAccess: [] };
+      for (const tier of ['public', 'confidential', 'personal'] as const) {
+        expect(() => strictViewerTier(empty, tier)).toThrow(ConciergeViewerError);
+      }
+
+      const omitted = { ...scoped, role, tierAccess: undefined };
+      expect(strictViewerTier(omitted, 'public')).toBe('public');
+      expect(strictViewerTier(omitted, 'confidential')).toBe('confidential');
+      expect(() => strictViewerTier(omitted, 'personal')).toThrow(ConciergeViewerError);
+
+      const narrowed: ViewerContext = { ...scoped, role, tierAccess: ['public'] };
+      expect(strictViewerTier(narrowed, 'public')).toBe('public');
+      expect(() => strictViewerTier(narrowed, 'confidential')).toThrow(ConciergeViewerError);
+    }
   });
 
   it('never exposes the personal tier', () => {

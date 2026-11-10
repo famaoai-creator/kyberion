@@ -10,7 +10,13 @@ import { parseSafeJsonObjectValue, readJson } from '../foundation/json.js';
 import { safeExistsSync, safeLstat } from '../secure-io.js';
 import { isValidTenantSlug } from '../entity-scope.js';
 import { activeTenantSlug, tenantHomePath, TENANT_COMPANY_FILE } from './tenant-home.js';
-import { loadOrganizationProfileAtPath } from './organization-profile.js';
+import {
+  legacyOrganizationProfilePath,
+  loadOrganizationProfileAtPath,
+  ORGANIZATION_PROFILE_FILE,
+  organizationProfilePath,
+  resolveTenantOrganizationProfilePath,
+} from './organization-profile.js';
 
 export interface CompanyComponentRef<T = unknown> {
   path: string;
@@ -71,20 +77,32 @@ function readStringField(
   return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
+/**
+ * The company's organization profile through the one organization-profile
+ * resolution path (`resolveTenantOrganizationProfilePath`: the organization's
+ * own profile, else the legacy tenant-root profile for one release), then the
+ * product default. Company is an alias of tenant (concept model v2 D3), so
+ * there is no company-specific profile store.
+ */
 function loadCompanyOrganizationProfile(
   baseDir: string,
-  tenantSlug: string
+  tenantSlug: string,
+  organizationId?: string | null
 ): CompanyComponentRef<OrganizationProfile> {
-  const tenantProfilePath = tenantHomePath(tenantSlug, 'organization-profile.json', baseDir);
+  const tenantProfilePath =
+    resolveTenantOrganizationProfilePath(tenantSlug, organizationId, baseDir)?.path ??
+    (organizationId
+      ? organizationProfilePath(tenantSlug, organizationId, baseDir)
+      : legacyOrganizationProfilePath(tenantSlug, baseDir));
   const publicProfilePath = path.join(
     baseDir,
     'knowledge',
     'product',
     'governance',
-    'organization-profile.json'
+    ORGANIZATION_PROFILE_FILE
   );
   const fallbackProfilePath = pathResolver.knowledge(
-    'product/governance/organization-profile.json'
+    `product/governance/${ORGANIZATION_PROFILE_FILE}`
   );
   const candidates = [tenantProfilePath, publicProfilePath, fallbackProfilePath];
 
@@ -143,16 +161,35 @@ function resolveSovereignName(
   );
 }
 
-export function resolveCompany(tenantSlug?: string | null, rootDir?: string): CompanyAggregate {
-  const baseDir = resolveBaseDir(rootDir);
-  const resolvedTenantSlug = tenantSlug?.trim() || activeTenantSlug() || 'default';
-  if (!isValidTenantSlug(resolvedTenantSlug)) {
-    throw new Error(`[COMPANY_TENANT_SCOPE] invalid tenant slug: ${resolvedTenantSlug}`);
+/**
+ * Company is an alias of tenant (concept model v2 D3), not a third level: the
+ * company id IS the tenant slug, resolved the same way every tenant-scoped
+ * reader resolves it — explicit, else the active tenant. `'default'` remains
+ * only the no-tenant placeholder of the product checkout.
+ */
+export function resolveCompanyTenantSlug(tenantSlug?: string | null): string {
+  const resolved = tenantSlug?.trim() || activeTenantSlug() || 'default';
+  if (!isValidTenantSlug(resolved)) {
+    throw new Error(`[COMPANY_TENANT_SCOPE] invalid tenant slug: ${resolved}`);
   }
+  return resolved;
+}
+
+export function resolveCompany(
+  tenantSlug?: string | null,
+  rootDir?: string,
+  organizationId?: string | null
+): CompanyAggregate {
+  const baseDir = resolveBaseDir(rootDir);
+  const resolvedTenantSlug = resolveCompanyTenantSlug(tenantSlug);
   const company = loadJsonComponent<Record<string, unknown>>(
     tenantHomePath(resolvedTenantSlug, TENANT_COMPANY_FILE, baseDir)
   );
-  const organizationProfile = loadCompanyOrganizationProfile(baseDir, resolvedTenantSlug);
+  const organizationProfile = loadCompanyOrganizationProfile(
+    baseDir,
+    resolvedTenantSlug,
+    organizationId
+  );
   const vision = resolveVision(resolvedTenantSlug, baseDir);
   const orgChart = resolveOrganizationOrgChart(resolvedTenantSlug, baseDir);
   const financial = resolveFinancialModel(resolvedTenantSlug, baseDir);

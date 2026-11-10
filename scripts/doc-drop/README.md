@@ -5,7 +5,7 @@ meeting-notepad / sketch-input と同型の **127.0.0.1 限定ローカルポー
 ## 使い方
 
 ```bash
-KYBERION_PERSONA=sovereign node_modules/.bin/tsx scripts/doc-drop/server.ts \
+KYBERION_BASE_ROLE=sovereign node_modules/.bin/tsx scripts/doc-drop/server.ts \
   [--out active/shared/tmp/doc-drop] \
   [--instruction "この資料をパースして"] \
   [8153]

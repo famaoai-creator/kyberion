@@ -1,7 +1,7 @@
 /** Resolve only the exact canonical action bound to the visible approval, never an evidence path. */
 import type { ApprovalRequestRecord } from '@agent/core/governance/approval-store';
 import { findDotCharter } from '@agent/core/dot/dot-charter';
-import { readDotActionLedgerStrict } from '@agent/core/dot/dot-action-ledger';
+import { readDotActionLedgerStrict, writtenDotProposal } from '@agent/core/dot/dot-action-ledger';
 import { withConciergeApproval } from './personal-approval-server';
 import type { ConciergeViewerContext } from './viewer-context';
 
@@ -49,7 +49,8 @@ export function conciergeApprovalReviewScope(
           admission_sha256: hash,
           scope: owner.scope,
           plan: action.continuous_work,
-          proposal: action.admission?.proposal,
+          // The proposal exactly as written, i.e. what admission_sha256 pins.
+          proposal: action.admission ? writtenDotProposal(action.admission.proposal) : undefined,
         },
         null,
         2

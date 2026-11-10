@@ -45,7 +45,7 @@ vi.mock('@agent/core/secure-io', async (importOriginal) => {
   };
 });
 
-const ENV_KEYS = ['SYSTEM_ROLE', 'MISSION_ROLE', 'KYBERION_PERSONA', 'KYBERION_DELEGATED_ROLE'];
+const ENV_KEYS = ['SYSTEM_ROLE', 'MISSION_ROLE', 'KYBERION_BASE_ROLE', 'KYBERION_DELEGATED_ROLE'];
 
 function ingestRequest(extra: Record<string, string> = {}): NextRequest {
   const form = new FormData();

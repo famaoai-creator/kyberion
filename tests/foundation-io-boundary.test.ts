@@ -8,7 +8,13 @@ const allowedImporters = new Set([
   'libs/core/authority.ts',
   'libs/core/core.ts',
   'libs/core/authn/stance-resolver.ts',
+  // Stance env reader shared with tier-guard: one existence probe for the
+  // retired KYBERION_CUSTOMER migration, below secure-io to avoid a cycle.
+  'libs/core/authn/stance-env.ts',
   'libs/core/foundation/project-scope-env.ts',
+  // Foundation-level mission scope reader: raw fs reads only (sibling of
+  // project-scope-env), used by metering paths reached inside secure-io authz.
+  'libs/core/foundation/mission-scope-env.ts',
   'libs/core/path-resolver.ts',
   'libs/core/tier-guard.ts',
   // Policy-enforced snapshot wrapper delegates only its low-level file mechanics.

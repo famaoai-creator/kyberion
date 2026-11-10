@@ -297,7 +297,7 @@ export function consumeTenantBudget(input: {
     throw new Error('[RESOURCE_SCOPE_DENIED] Advisory quota accounting requires the active tenant');
   }
 
-  const persona = input.personaOverride ?? ctx.persona ?? '';
+  const persona = input.personaOverride ?? ctx.baseRole ?? '';
   if ((policy.exempt_personas ?? []).includes(persona)) {
     return { allowed: true };
   }

@@ -11,7 +11,7 @@
       "args": ["dist/satellites/slack-bridge/src/index.js"],
       "env": {
         "MISSION_ID": "MSN-SYSTEM-SENSORY-HUB",
-        "KYBERION_PERSONA": "sovereign",
+        "KYBERION_BASE_ROLE": "sovereign",
         "MISSION_ROLE": "slack_bridge"
       },
       "cwd": ".",

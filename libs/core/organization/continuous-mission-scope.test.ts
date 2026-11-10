@@ -27,7 +27,7 @@ beforeEach(() => {
   for (const name of ['SYSTEM_ROLE', 'KYBERION_TENANT', 'MISSION_ID', 'KYBERION_ORGANIZATION_ID'])
     vi.stubEnv(name, '');
   vi.stubEnv('MISSION_ROLE', 'mission_controller');
-  vi.stubEnv('KYBERION_PERSONA', '');
+  vi.stubEnv('KYBERION_BASE_ROLE', '');
   vi.stubEnv('KYBERION_DELEGATION_DEPTH', '0');
   vi.stubEnv('KYBERION_TIER', 'public');
   resetRoleAssumptionPolicyCache();

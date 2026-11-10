@@ -15,7 +15,7 @@
  * ページを共有できない。計測は1回の browser アクション内で行う必要がある。
  *
  * Run:
- *   KYBERION_PERSONA=sovereign node_modules/.bin/tsx scripts/html-to-pptx/measure-deck.ts \
+ *   KYBERION_BASE_ROLE=sovereign node_modules/.bin/tsx scripts/html-to-pptx/measure-deck.ts \
  *     <report.html> <out.json> [--aspect 4:3|16:9] [--viewport 1000] [--port 7401]
  */
 import http from 'node:http';

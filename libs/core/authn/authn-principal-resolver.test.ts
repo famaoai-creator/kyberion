@@ -107,7 +107,7 @@ function seedActiveAgent(slug: string): string {
   const record_ = withExecutionContext('mission_controller', () => {
     const issued = issueAgentIdentity({
       kind: 'agent',
-      organizationId: 'default',
+      // No tenant in scope: a tenantless identity (D3 `_/_`, no 'default' org).
       slug,
       accountableHumanId: 'user:founder',
     });
@@ -585,12 +585,12 @@ describe('authn provider — agent-context', () => {
 
   it('never authenticates a wire request from ambient process env', () => {
     // No executionContext attached (i.e. this is a remote request): ambient
-    // KYBERION_PERSONA must not authenticate it.
+    // KYBERION_BASE_ROLE must not authenticate it.
     expectAuthnRejection(
       () =>
         resolveAuthnPrincipal(
           { credential: { type: 'none' }, serverTenant: 'default' },
-          { deps: { env: { KYBERION_PERSONA: 'some-agent' } } }
+          { deps: { env: { KYBERION_BASE_ROLE: 'some-agent' } } }
         ),
       401
     );

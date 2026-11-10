@@ -19,7 +19,7 @@ import { getRegisteredEnvText } from '../foundation/env.js';
 import { logger } from '../core.js';
 import { pathResolver } from '../path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeReaddir } from '../secure-io.js';
-import { withExecutionContext, withExecutionContextAsync } from '../authority.js';
+import { withStoreGrant, withStoreGrantAsync } from '../authority.js';
 import { isReservedScopeName, isValidTenantSlug } from '../foundation/scope.js';
 import { DELEGATION_RECORD_ROOT_PATH } from '../foundation/runtime-state-roots.js';
 import { storagePartitionSegments, tenantStoreLedgerPartitionOf } from '../storage-layout.js';
@@ -110,7 +110,7 @@ export function delegationRecordPathIn(tenant: string | undefined, delegationId:
 export function asDelegationStore<T>(filePath: string, fn: () => T): T {
   const partition = tenantStoreLedgerPartitionOf(filePath);
   if (partition?.storeRole !== DELEGATION_RECORD_STORE_ROLE || !partition.tenant) return fn();
-  return withExecutionContext(DELEGATION_RECORD_STORE_ROLE, fn, undefined, partition.tenant);
+  return withStoreGrant(DELEGATION_RECORD_STORE_ROLE, fn, { tenantSlug: partition.tenant });
 }
 
 export async function asDelegationStoreAsync<T>(
@@ -119,7 +119,7 @@ export async function asDelegationStoreAsync<T>(
 ): Promise<T> {
   const partition = tenantStoreLedgerPartitionOf(filePath);
   if (partition?.storeRole !== DELEGATION_RECORD_STORE_ROLE || !partition.tenant) return fn();
-  return withExecutionContextAsync(DELEGATION_RECORD_STORE_ROLE, fn, undefined, partition.tenant);
+  return withStoreGrantAsync(DELEGATION_RECORD_STORE_ROLE, fn, { tenantSlug: partition.tenant });
 }
 
 /** Tenant partitions present under the store root (directory names only). */

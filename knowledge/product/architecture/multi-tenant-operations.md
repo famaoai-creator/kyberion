@@ -4,6 +4,7 @@ category: Architecture
 tags: [multi-tenant, isolation, tier, governance, audit, operations]
 importance: 8
 last_updated: 2026-11-05
+concepts: [tenant, tier]
 ---
 
 # Multi-Tenant Operations

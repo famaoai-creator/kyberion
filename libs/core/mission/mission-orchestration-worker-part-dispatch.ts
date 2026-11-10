@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import type { MissionTeamAssignment } from './mission-team-plan-composer.js';
 import { sanitizeIdSegment } from '../foundation/text.js';
 import { agentRegistry } from '../agent/agent-registry.js';
@@ -20,6 +21,7 @@ import {
   type WorkItem,
 } from '../workforce/work-coordination.js';
 import { logger } from '../core.js';
+import { resolveMissionTaskParentItemId } from './mission-ownership-item.js';
 import { dispatchThroughMissionWorkerCore } from './mission-orchestration-worker-dispatch-port.js';
 import { canonicalizeTeamRole } from '../workforce/working-principles.js';
 import {
@@ -549,11 +551,11 @@ export async function provisionGoalDrivenTaskKnowledge(input: {
       form: 'system_prompt',
       missionPath: resolvedMissionDir(
         input.missionId,
-        (tier as 'personal' | 'confidential' | 'public') || 'public',
+        (tier as StorageDataTier) || 'public',
         tenantSlug
       ),
       missionId: input.missionId,
-      tier: (tier as 'personal' | 'confidential' | 'public') || 'public',
+      tier: (tier as StorageDataTier) || 'public',
       recipientKind: 'agent',
       teamRole: input.teamRole,
       assigneePeerId: input.agentId,
@@ -597,6 +599,8 @@ export async function dispatchGoalDrivenMissionTask(
   traceCtx: TraceContext
 ): Promise<DispatchMissionTaskOutcome | null> {
   const workItemSourceRef = `mission:${input.missionId}:${input.task.task_id}:goal`;
+  // D1: the goal-driven task is a step of the mission's Issue (its ownership item).
+  const parentItemId = resolveMissionTaskParentItemId(input.missionId, undefined);
   const workItem = importExternalWorkItem({
     source: 'local',
     sourceRef: workItemSourceRef,
@@ -607,6 +611,7 @@ export async function dispatchGoalDrivenMissionTask(
     projectId: input.missionId,
     assigneePeerId: input.assignment.agent_id,
     labels: [`mission:${input.missionId}`, `team_role:${input.teamRole}`, 'goal_driven'],
+    ...(parentItemId ? { parentItemId } : {}),
     dependencies: Array.isArray(input.task.dependencies) ? input.task.dependencies : [],
     metadata: {
       deliverable: input.task.deliverable,
@@ -896,8 +901,8 @@ export interface DispatchPlannedMissionTaskInput {
  * registry record at spawn; falls back to the deterministic name derivation
  * when the runtime is not up yet (dispatch opens its trace before
  * ensure/spawn). `organizationId`, when the caller has one in scope, keeps
- * that derivation inside the mission's own organization instead of the
- * agent-identity 'default' fallback. Best-effort — attribution must never
+ * that derivation inside the mission's own organization (within the active
+ * tenant; D3 removed the old 'default' organization fallback). Best-effort — attribution must never
  * affect dispatch.
  */
 export function resolveDispatchActorNhiId(

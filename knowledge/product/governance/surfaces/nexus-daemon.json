@@ -6,12 +6,10 @@
       "kind": "service",
       "description": "Background system nerve daemon for stimuli routing and terminal dispatch",
       "command": "node",
-      "args": [
-        "dist/presence/bridge/nexus-daemon.js"
-      ],
+      "args": ["dist/presence/bridge/nexus-daemon.js"],
       "env": {
         "MISSION_ID": "MSN-SYSTEM-NERVE",
-        "KYBERION_PERSONA": "sovereign",
+        "KYBERION_BASE_ROLE": "sovereign",
         "MISSION_ROLE": "nexus_daemon"
       },
       "cwd": ".",

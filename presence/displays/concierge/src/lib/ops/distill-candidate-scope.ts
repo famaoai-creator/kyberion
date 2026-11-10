@@ -8,6 +8,15 @@ import {
   type DistillCandidateRecord,
 } from '@agent/core/knowledge/distill-candidate-registry';
 import type { MemoryScopeEnvelope } from '@agent/core/knowledge/memory-scope';
+import {
+  listMemoryPromotionCandidates,
+  type MemoryCandidate,
+} from '@agent/core/knowledge/memory-promotion-queue';
+import {
+  projectAnyFacadeProposal,
+  type FacadeProposalRecord,
+} from '@agent/core/knowledge/facade-proposal-rows';
+import { memoryCandidateVisibleToViewer } from './knowledge-scope';
 import { admitsScopeAudience, viewerPersonIds } from '@agent/core/surface/surface-authorization';
 import {
   viewerCanReadTier,
@@ -124,6 +133,41 @@ export function resolveDistillCandidateForViewer(
 ): DistillCandidateRecord | null {
   const matches = listDistillCandidatesForViewer(viewer, requestedTenant).filter(
     (candidate) => candidate.candidate_id === candidateId
+  );
+  if (matches.length > 1)
+    throw new DistillCandidateAmbiguityError(
+      'Distill candidate identity is ambiguous; narrow the viewer scope.'
+    );
+  return matches[0] ?? null;
+}
+
+/**
+ * D8: reuse proposals that live on the MemoryCandidate queue (background
+ * review, execution feedback, learning intake, service procedures, mission
+ * seeds), projected for display. Visibility is the queue row's own scope
+ * checked against the server-resolved viewer — never a client parameter.
+ */
+export function listReuseProposalsForViewer(
+  viewer: ViewerContext,
+  requestedTenant?: string,
+  rows: readonly MemoryCandidate[] = listMemoryPromotionCandidates()
+): FacadeProposalRecord[] {
+  return rows
+    .filter((row) => row.origin && memoryCandidateVisibleToViewer(row, viewer, requestedTenant))
+    .flatMap((row) => {
+      const view = projectAnyFacadeProposal(row);
+      return view ? [view] : [];
+    })
+    .sort((a, b) => b.updated_at.localeCompare(a.updated_at));
+}
+
+export function resolveReuseProposalForViewer(
+  candidateId: string,
+  viewer: ViewerContext,
+  requestedTenant?: string
+): FacadeProposalRecord | null {
+  const matches = listReuseProposalsForViewer(viewer, requestedTenant).filter(
+    (proposal) => proposal.candidate_id === candidateId
   );
   if (matches.length > 1)
     throw new DistillCandidateAmbiguityError(

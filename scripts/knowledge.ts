@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { currentScope } from '@agent/core/scope-context';
-import { getRegisteredEnv } from '@agent/core/foundation/env';
+import { baseRoleEnvText } from '@agent/core/foundation';
 import { isValidTenantSlug } from '@agent/core/foundation/scope';
 import { knowledgeWritePathFor } from '@agent/core/knowledge/knowledge-scope';
 import {
@@ -102,7 +102,7 @@ export const main = defineScript({
         document_path: documentPath,
         verdict,
         reason: flag(args, '--reason'),
-        actor: (getRegisteredEnv<string>('KYBERION_PERSONA') as string) || 'operator',
+        actor: baseRoleEnvText() || 'operator',
         source: 'cli',
         scope: currentScope(),
       });

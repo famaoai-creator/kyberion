@@ -23,6 +23,12 @@ import {
 } from '@agent/core/surface/surface-ux';
 import { getPresenceAvatarProfile } from '@agent/core/presence-avatar';
 import { listDistillCandidateRecords } from '@agent/core/knowledge/distill-candidate-registry';
+import { listMemoryPromotionCandidates } from '@agent/core/knowledge/memory-promotion-queue';
+import {
+  CONCIERGE_DECIDED_VIA,
+  projectAnyFacadeProposal,
+} from '@agent/core/knowledge/facade-proposal-rows';
+import type { MemoryScopeEnvelope } from '@agent/core/knowledge/memory-scope';
 import { listProjectRecords } from '@agent/core/project/project-registry';
 import { listTaskSessions } from '@agent/core/task/task-session';
 import { logger } from '@agent/core/core';
@@ -162,6 +168,85 @@ export function inferProjectIdForApprovalRecord(record: any): string | undefined
     if (byService) return byService.project_id;
   }
   return undefined;
+}
+
+/** The fields the /work "learned" links read; nothing else leaves the server. */
+export interface PresenceStudioReuseItem {
+  candidate_id: string;
+  title: string;
+  status: 'proposed' | 'promoted' | 'archived';
+  promoted_ref?: string;
+  project_id?: string;
+  task_session_id?: string;
+  artifact_ids?: string[];
+  review: 'here' | 'elsewhere' | 'history';
+}
+
+function scopeVisibleToViewer(
+  scope: MemoryScopeEnvelope | undefined,
+  viewer: {
+    principalId?: string;
+    tenantSlugs: string[] | 'all';
+    organizationIds?: string[] | 'all';
+    projectIds?: string[] | 'all';
+  }
+): boolean {
+  if (!scope || scope.tier === 'personal') return false;
+  const narrowed = (allowed: string[] | 'all' | undefined, value?: string) =>
+    allowed === undefined || allowed === 'all' || Boolean(value && allowed.includes(value));
+  if (scope.tier === 'confidential') {
+    if (!scope.tenant_slug || !narrowed(viewer.tenantSlugs, scope.tenant_slug)) return false;
+  }
+  if (!narrowed(viewer.organizationIds, scope.organization_id)) return false;
+  if (!narrowed(viewer.projectIds, scope.project_id)) return false;
+  const audience = scope.allowed_audience ?? [];
+  return !audience.length || Boolean(viewer.principalId && audience.includes(viewer.principalId));
+}
+
+/**
+ * D8: reuse proposals for one server-resolved viewer — queue rows by their own
+ * scope (never personal), then legacy DistillCandidateRecords as history
+ * (all of them only for an all-tenant viewer; public ones otherwise).
+ */
+export function listReuseItemsForViewer(viewer: {
+  principalId?: string;
+  tenantSlugs: string[] | 'all';
+  organizationIds?: string[] | 'all';
+  projectIds?: string[] | 'all';
+}): PresenceStudioReuseItem[] {
+  const proposals = listMemoryPromotionCandidates()
+    .filter((row) => row.origin && scopeVisibleToViewer(row.scope, viewer))
+    .flatMap((row) => {
+      const view = projectAnyFacadeProposal(row);
+      return view ? [view] : [];
+    })
+    .map((view): PresenceStudioReuseItem => ({
+      candidate_id: view.candidate_id,
+      title: view.title,
+      status: view.status,
+      ...(view.promoted_ref ? { promoted_ref: view.promoted_ref } : {}),
+      ...(view.project_id ? { project_id: view.project_id } : {}),
+      ...(view.task_session_id ? { task_session_id: view.task_session_id } : {}),
+      review: view.decided_via === CONCIERGE_DECIDED_VIA ? 'here' : 'elsewhere',
+    }));
+  const onQueue = new Set(proposals.map((item) => item.candidate_id));
+  const history = listDistillCandidateRecords()
+    .filter(
+      (record) =>
+        !onQueue.has(record.candidate_id) &&
+        (viewer.tenantSlugs === 'all' || record.tier === 'public')
+    )
+    .map((record): PresenceStudioReuseItem => ({
+      candidate_id: record.candidate_id,
+      title: record.title,
+      status: record.status,
+      ...(record.promoted_ref ? { promoted_ref: record.promoted_ref } : {}),
+      ...(record.project_id ? { project_id: record.project_id } : {}),
+      ...(record.task_session_id ? { task_session_id: record.task_session_id } : {}),
+      ...(record.artifact_ids?.length ? { artifact_ids: record.artifact_ids } : {}),
+      review: 'history',
+    }));
+  return [...proposals, ...history];
 }
 
 export function buildApprovalInboxItem(record: any) {

@@ -51,7 +51,7 @@ describe('tier-guard tenant scope (IP-1)', () => {
 
   beforeEach(() => {
     savedTenant = process.env.KYBERION_TENANT;
-    savedPersona = process.env.KYBERION_PERSONA;
+    savedPersona = process.env.KYBERION_BASE_ROLE;
     savedRole = process.env.MISSION_ROLE;
     savedSudo = process.env.KYBERION_SUDO;
     savedMission = process.env.MISSION_ID;
@@ -73,8 +73,8 @@ describe('tier-guard tenant scope (IP-1)', () => {
     }
     if (savedTenant === undefined) delete process.env.KYBERION_TENANT;
     else process.env.KYBERION_TENANT = savedTenant;
-    if (savedPersona === undefined) delete process.env.KYBERION_PERSONA;
-    else process.env.KYBERION_PERSONA = savedPersona;
+    if (savedPersona === undefined) delete process.env.KYBERION_BASE_ROLE;
+    else process.env.KYBERION_BASE_ROLE = savedPersona;
     if (savedRole === undefined) delete process.env.MISSION_ROLE;
     else process.env.MISSION_ROLE = savedRole;
     if (savedSudo === undefined) delete process.env.KYBERION_SUDO;
@@ -110,7 +110,7 @@ describe('tier-guard tenant scope (IP-1)', () => {
 
   it('allows write inside the same tenant prefix', () => {
     process.env.KYBERION_TENANT = 'acme-corp';
-    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     const target = path.join(ROOT, 'knowledge/confidential/acme-corp/notes.md');
     const result = validateWritePermission(target);
     // Tenant scope passes; whatever else policy decides is fine.
@@ -121,7 +121,7 @@ describe('tier-guard tenant scope (IP-1)', () => {
 
   it('denies write to a different tenant prefix', () => {
     process.env.KYBERION_TENANT = 'acme-corp';
-    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     const target = path.join(ROOT, 'knowledge/confidential/other-tenant/notes.md');
     const result = validateWritePermission(target);
     expect(result.allowed).toBe(false);
@@ -134,7 +134,7 @@ describe('tier-guard tenant scope (IP-1)', () => {
 
   it('scopes the partitioned resource-usage ledger to the bound tenant', () => {
     process.env.KYBERION_TENANT = 'acme-corp';
-    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     const ledger = (tenant: string) =>
       path.join(
         ROOT,
@@ -150,7 +150,7 @@ describe('tier-guard tenant scope (IP-1)', () => {
 
   it('denies read from a different tenant prefix', () => {
     process.env.KYBERION_TENANT = 'acme-corp';
-    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     const target = path.join(ROOT, 'knowledge/confidential/other-tenant/secret.md');
     const result = validateReadPermission(target);
     expect(result.allowed).toBe(false);
@@ -162,7 +162,7 @@ describe('tier-guard tenant scope (IP-1)', () => {
 
     it('denies a tenant-bound actor both writing and reading it', () => {
       process.env.KYBERION_TENANT = 'acme-corp';
-      process.env.KYBERION_PERSONA = 'ecosystem_architect';
+      process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
       const write = validateWritePermission(path.join(ROOT, INDEX));
       expect(write.allowed).toBe(false);
       expect(write.reason).toMatch(/tenant\.scope_violation/);
@@ -173,7 +173,7 @@ describe('tier-guard tenant scope (IP-1)', () => {
 
     it('lets only the system registry reader role read it, audited, and never write it', async () => {
       process.env.KYBERION_TENANT_SCOPE_REQUIRED = '1';
-      delete process.env.KYBERION_PERSONA;
+      delete process.env.KYBERION_BASE_ROLE;
       const { auditChain } = await import('./governance/audit-chain.js');
       vi.mocked(auditChain.record).mockClear();
       const asReader = <T>(fn: () => T): T =>
@@ -200,7 +200,7 @@ describe('tier-guard tenant scope (IP-1)', () => {
     ['project', 'active/projects/confidential/other-tenant/PRJ-FOO/state.json'],
   ])('denies and audits cross-tenant %s writes', async (_kind, relativePath) => {
     process.env.KYBERION_TENANT = 'acme-corp';
-    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     const target = path.join(ROOT, relativePath);
     const result = validateWritePermission(target);
     expect(result.allowed).toBe(false);
@@ -214,7 +214,7 @@ describe('tier-guard tenant scope (IP-1)', () => {
 
   it('denies cross-tenant reads of confidential/personal active mission dirs at the io layer', () => {
     process.env.KYBERION_TENANT = 'acme-corp';
-    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     for (const relativePath of [
       'active/missions/confidential/beta-co/MSN-FOO/evidence/leak.json',
       'active/missions/personal/beta-co/MSN-FOO/evidence/leak.json',
@@ -236,7 +236,7 @@ describe('tier-guard tenant scope (IP-1)', () => {
 
     // Bound to the owning tenant — same as before (no new tier block on active dirs).
     process.env.KYBERION_TENANT = 'acme-corp';
-    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     expect(validateReadPermission(confidential('acme-corp')).allowed).toBe(true);
     // Untenanted flat confidential missions stay resolvable (legacy exemption).
     expect(validateReadPermission(confidential()).allowed).toBe(true);
@@ -254,7 +254,7 @@ describe('tier-guard tenant scope (IP-1)', () => {
   });
 
   it('limits worker public project writes to the bound project and public partition', () => {
-    process.env.KYBERION_PERSONA = 'worker';
+    process.env.KYBERION_BASE_ROLE = 'worker';
     process.env.MISSION_ROLE = 'worker';
     process.env.KYBERION_TENANT = 'acme-corp';
     process.env.KYBERION_PROJECT_ID = 'PRJ-TG-PUBLIC';
@@ -287,7 +287,7 @@ describe('tier-guard tenant scope (IP-1)', () => {
     // A fresh worktree has no active/shared/tmp/ yet.
     fs.mkdirSync(path.dirname(scopePath), { recursive: true });
     process.env.KYBERION_SCOPE_ENV_PATH = scopePath;
-    process.env.KYBERION_PERSONA = 'worker';
+    process.env.KYBERION_BASE_ROLE = 'worker';
     process.env.MISSION_ROLE = 'worker';
     delete process.env.KYBERION_TENANT;
     delete process.env.KYBERION_PROJECT_ID;
@@ -334,7 +334,7 @@ describe('tier-guard tenant scope (IP-1)', () => {
     'isolates tenant partitions of the %s storage floor',
     (floor) => {
       process.env.KYBERION_TENANT = 'acme-corp';
-      process.env.KYBERION_PERSONA = 'ecosystem_architect';
+      process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
       const own = path.join(ROOT, `active/shared/${floor}/confidential/acme-corp/d/x.json`);
       const other = path.join(ROOT, `active/shared/${floor}/confidential/other-tenant/d/x.json`);
       const untenanted = path.join(ROOT, `active/shared/${floor}/confidential/shared/d/x.json`);
@@ -355,7 +355,7 @@ describe('tier-guard tenant scope (IP-1)', () => {
   it('gates reads of confidential storage floors by tier, not system or legacy paths', () => {
     delete process.env.KYBERION_TENANT;
     process.env.MISSION_ROLE = 'worker';
-    process.env.KYBERION_PERSONA = 'worker';
+    process.env.KYBERION_BASE_ROLE = 'worker';
 
     expect(
       validateReadPermission(path.join(ROOT, 'active/shared/cache/confidential/acme-corp/d/x'))
@@ -406,7 +406,7 @@ describe('tier-guard tenant scope (IP-1)', () => {
 
   it('SUDO bypasses tenant scope (cross-tenant tooling)', () => {
     process.env.KYBERION_TENANT = 'acme-corp';
-    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     process.env.KYBERION_SUDO = 'true';
     const target = path.join(ROOT, 'knowledge/confidential/other-tenant/file.md');
     const result = validateWritePermission(target);
@@ -420,7 +420,7 @@ describe('tier-guard tenant scope (IP-1)', () => {
     // Registered boolean settings use the canonical 1/0 representation at
     // runtime; the guard must not compare the normalized text with "true".
     process.env.KYBERION_TENANT_SCOPE_REQUIRED = '1';
-    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     const target = path.join(ROOT, 'knowledge/confidential/other-tenant/file.md');
     const result = validateWritePermission(target);
     expect(result.allowed).toBe(false);
@@ -483,7 +483,7 @@ describe('tier-guard tenant scope (IP-1)', () => {
   it('legacy non-slug confidential paths remain outside tenant scope until migrated', () => {
     // Existing single-tenant layouts use confidential/{MSN-...}/ which are not slugs.
     process.env.KYBERION_TENANT = 'acme-corp';
-    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     const target = path.join(
       ROOT,
       'active/missions/confidential/MSN-LEGACY-MISSION/evidence/note.md'
@@ -496,7 +496,7 @@ describe('tier-guard tenant scope (IP-1)', () => {
 
   it('allows the bound legacy mission path during tenant storage migration', () => {
     process.env.KYBERION_TENANT = 'acme-corp';
-    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     process.env.MISSION_ID = 'MSN-LEGACY-MISSION';
     const target = path.join(
       ROOT,
@@ -507,7 +507,7 @@ describe('tier-guard tenant scope (IP-1)', () => {
 
   it('rejects malformed tenant slug from env', async () => {
     process.env.KYBERION_TENANT = 'Acme Corp!';
-    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     const { resolveIdentityContext } = await import('./authority.js');
     const ctx = resolveIdentityContext();
     expect(ctx.tenantSlug).toBeUndefined();
@@ -515,7 +515,7 @@ describe('tier-guard tenant scope (IP-1)', () => {
 
   it('allows a tenant to access its active confidential shared group', () => {
     process.env.KYBERION_TENANT = 'acme-corp';
-    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     const dir = path.join(ROOT, 'knowledge/confidential/tenant-groups');
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(
@@ -540,7 +540,7 @@ describe('tier-guard tenant scope (IP-1)', () => {
 
   it('denies a tenant outside a confidential shared group', () => {
     process.env.KYBERION_TENANT = 'gamma-org';
-    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     const dir = path.join(ROOT, 'knowledge/confidential/tenant-groups');
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(
@@ -562,7 +562,7 @@ describe('tier-guard tenant scope (IP-1)', () => {
 
   it('denies shared group access when the group registry entry is malformed', () => {
     process.env.KYBERION_TENANT = 'acme-corp';
-    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     const dir = path.join(ROOT, 'knowledge/confidential/tenant-groups');
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(
@@ -584,7 +584,7 @@ describe('tier-guard tenant scope (IP-1)', () => {
 
   it('denies a tenant group that uses a reserved scope name as a member', () => {
     process.env.KYBERION_TENANT = 'acme-corp';
-    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     const dir = path.join(ROOT, 'knowledge/confidential/tenant-groups');
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(
@@ -605,7 +605,7 @@ describe('tier-guard tenant scope (IP-1)', () => {
   });
 
   it('limits worker reads of confidential project state to the bound tenant and project', () => {
-    process.env.KYBERION_PERSONA = 'worker';
+    process.env.KYBERION_BASE_ROLE = 'worker';
     process.env.MISSION_ROLE = 'worker';
     process.env.KYBERION_TENANT = 'acme-corp';
     process.env.KYBERION_PROJECT_ID = 'PRJ-ACME-OPS';
@@ -649,7 +649,7 @@ describe('tier-guard tenant scope (IP-1)', () => {
       vi.mocked(auditChain.record).mockReset();
       process.env.KYBERION_TENANT = 'acme-corp';
       process.env.KYBERION_TENANT_SCOPE_REQUIRED = '0';
-      process.env.KYBERION_PERSONA = 'ecosystem_architect';
+      process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
       delete process.env.KYBERION_SUDO;
       savedArgv = process.argv;
       process.argv = [...process.argv, '--json'];
@@ -877,7 +877,7 @@ describe('tier-guard tenant scope (IP-1)', () => {
   });
 
   it('denies worker access to confidential projects when project scope is missing or invalid', () => {
-    process.env.KYBERION_PERSONA = 'worker';
+    process.env.KYBERION_BASE_ROLE = 'worker';
     process.env.MISSION_ROLE = 'worker';
     process.env.KYBERION_TENANT = 'acme-corp';
     delete process.env.KYBERION_PROJECT_ID;
@@ -901,7 +901,7 @@ describe('tier-guard brokered missions (C8)', () => {
 
   beforeEach(async () => {
     savedTenant = process.env.KYBERION_TENANT;
-    savedPersona = process.env.KYBERION_PERSONA;
+    savedPersona = process.env.KYBERION_BASE_ROLE;
     savedMission = process.env.MISSION_ID;
     // Console failures in earlier suites park the stream process-wide
     // (logger broken-stream parking); reset so this suite starts unparked.
@@ -919,7 +919,7 @@ describe('tier-guard brokered missions (C8)', () => {
         {
           mission_id: FIX_MISSION,
           tier: 'public',
-          assigned_persona: 'ecosystem_architect',
+          org_role: 'ecosystem_architect',
           cross_tenant_brokerage: {
             source_tenants: ['acme-corp', 'beta-co'],
             purpose: 'test broker',
@@ -937,8 +937,8 @@ describe('tier-guard brokered missions (C8)', () => {
   afterEach(async () => {
     if (savedTenant === undefined) delete process.env.KYBERION_TENANT;
     else process.env.KYBERION_TENANT = savedTenant;
-    if (savedPersona === undefined) delete process.env.KYBERION_PERSONA;
-    else process.env.KYBERION_PERSONA = savedPersona;
+    if (savedPersona === undefined) delete process.env.KYBERION_BASE_ROLE;
+    else process.env.KYBERION_BASE_ROLE = savedPersona;
     if (savedMission === undefined) delete process.env.MISSION_ID;
     else process.env.MISSION_ID = savedMission;
     // Best-effort cleanup; do not fail test if tier-guard rejects (e.g. in CI sandboxes).
@@ -977,7 +977,7 @@ describe('tier-guard brokered missions (C8)', () => {
   it('broker mission: allows access to tenants in source_tenants list', () => {
     delete process.env.KYBERION_TENANT;
     process.env.MISSION_ID = FIX_MISSION;
-    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     const targetA = path.join(ROOT, 'knowledge/confidential/acme-corp/notes.md');
     const a = validateWritePermission(targetA);
     if (!a.allowed) {
@@ -993,7 +993,7 @@ describe('tier-guard brokered missions (C8)', () => {
   it('broker mission: emits a tenant.broker_access audit entry', async () => {
     delete process.env.KYBERION_TENANT;
     process.env.MISSION_ID = FIX_MISSION;
-    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     const target = path.join(ROOT, 'knowledge/confidential/acme-corp/audit-marker.md');
     const result = validateWritePermission(target);
     if (!result.allowed) {
@@ -1017,7 +1017,7 @@ describe('tier-guard brokered missions (C8)', () => {
     await vi.dynamicImportSettled();
     delete process.env.KYBERION_TENANT;
     process.env.MISSION_ID = FIX_MISSION;
-    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     const { auditChain } = await import('./governance/audit-chain.js');
     const record = vi.mocked(auditChain.record);
     record.mockReset();
@@ -1061,7 +1061,7 @@ describe('tier-guard brokered missions (C8)', () => {
   it('broker mission: still denies tenants outside source_tenants list', () => {
     delete process.env.KYBERION_TENANT;
     process.env.MISSION_ID = FIX_MISSION;
-    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     const target = path.join(ROOT, 'knowledge/confidential/gamma-org/secret.md');
     const r = validateWritePermission(target);
     expect(r.allowed).toBe(false);
@@ -1073,7 +1073,7 @@ describe('tier-guard brokered missions (C8)', () => {
     // KYBERION_TENANT route only.
     delete process.env.MISSION_ID;
     process.env.KYBERION_TENANT = 'acme-corp';
-    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     const target = path.join(ROOT, 'knowledge/confidential/beta-co/secret.md');
     const r = validateWritePermission(target);
     expect(r.allowed).toBe(false);
@@ -1090,7 +1090,7 @@ describe('tier-guard brokered missions (C8)', () => {
         {
           mission_id: FIX_MISSION,
           tier: 'public',
-          assigned_persona: 'ecosystem_architect',
+          org_role: 'ecosystem_architect',
           cross_tenant_brokerage: {
             source_tenants: ['acme-corp'],
             purpose: 'expired broker',
@@ -1105,7 +1105,7 @@ describe('tier-guard brokered missions (C8)', () => {
     );
     delete process.env.KYBERION_TENANT;
     process.env.MISSION_ID = FIX_MISSION;
-    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     const target = path.join(ROOT, 'knowledge/confidential/acme-corp/secret.md');
     const result = validateWritePermission(target);
     expect(result.allowed).toBe(false);
@@ -1122,7 +1122,7 @@ describe('tier-guard audit module load failure', () => {
     });
     vi.stubEnv('KYBERION_TENANT', 'acme-corp');
     vi.stubEnv('KYBERION_TENANT_SCOPE_REQUIRED', '0');
-    vi.stubEnv('KYBERION_PERSONA', 'ecosystem_architect');
+    vi.stubEnv('KYBERION_BASE_ROLE', 'ecosystem_architect');
     vi.stubEnv('KYBERION_SUDO', '0');
     vi.stubEnv('MISSION_ID', '');
     vi.stubEnv('LOG_LEVEL', 'silent');

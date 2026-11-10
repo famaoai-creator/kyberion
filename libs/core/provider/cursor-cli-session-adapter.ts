@@ -32,6 +32,7 @@ import {
   DelegationWallClockExceededError,
 } from '../mission/delegation-concurrency.js';
 import * as pathResolver from '../path-resolver.js';
+import { parseCursorCliUsage, recordCliUsage } from './cli-usage-metering.js';
 
 const DEFAULT_BIN = 'cursor-agent';
 const DEFAULT_MODEL = 'auto';
@@ -169,8 +170,29 @@ export class CursorCliSessionAdapter {
       prompt,
     ];
 
-    const stdout = await this.spawnCli(args, options.signal);
-    const { text, sessionId } = this.parseEnvelope(stdout);
+    const started = Date.now();
+    const capture = { stdout: '', requestNotSent: true };
+    let completionChars = 0;
+    let status: 'success' | 'error' = 'error';
+    let text: string;
+    let sessionId: string | undefined;
+    try {
+      const stdout = await this.spawnCli(args, options.signal, capture);
+      capture.stdout = stdout;
+      const parsed = this.parseEnvelope(stdout);
+      text = parsed.text;
+      sessionId = parsed.sessionId;
+      status = 'success';
+      completionChars = text.length;
+    } finally {
+      recordCliUsage('cursor-cli', model, started, status, {
+        report: parseCursorCliUsage(capture.stdout),
+        promptChars: prompt.length,
+        completionChars,
+        requestNotSent: capture.requestNotSent,
+        cause: 'subagent',
+      });
+    }
     const effort = options.effort ?? 'medium';
     const nativeSubagent: CursorNativeSubagentInfo = {
       provider: 'cursor',
@@ -244,7 +266,11 @@ export class CursorCliSessionAdapter {
     );
   }
 
-  private spawnCli(args: string[], signal?: AbortSignal): Promise<string> {
+  private spawnCli(
+    args: string[],
+    signal?: AbortSignal,
+    capture: { stdout: string; requestNotSent: boolean } = { stdout: '', requestNotSent: true }
+  ): Promise<string> {
     // No profile: every native delegation already runs in its own
     // `--worktree`, and a GIT_INDEX_FILE seeded from this checkout would
     // override that worktree's own index.
@@ -260,6 +286,7 @@ export class CursorCliSessionAdapter {
           env: spawnEnv.env,
         }) as ChildProcessWithoutNullStreams
     );
+    capture.requestNotSent = false;
 
     return withWallClockBudget(
       {
@@ -286,6 +313,7 @@ export class CursorCliSessionAdapter {
             resolve(stdout);
           });
           child.on('error', (err) => {
+            if (!stdout) capture.requestNotSent = true;
             reject(new Error(`[cursor-cli] spawn failed: ${err.message}`));
           });
           child.stdin.end();

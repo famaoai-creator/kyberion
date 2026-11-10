@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 // budget pruning) + saveMissionContextPack (persistence) +
 // renderMissionContextPack/render-form (presentation). Selection itself
 // (knowledge search, tags, scoring) is already covered by
-// mission-context-pack.test.ts and distill-knowledge-injector.test.ts; here
+// mission-context-pack.test.ts and promoted-knowledge-retrieval tests; here
 // we mock resolveMissionContextPack to a deterministic fixture pack (built
 // with buildMissionContextPack + explicit knowledgeHints, exactly like
 // mission-context-pack.test.ts does) so these tests stay hermetic and focus
@@ -69,7 +69,7 @@ function buildFixturePack(
       status: 'active',
       execution_mode: 'local',
       priority: 3,
-      assigned_persona: 'worker',
+      org_role: 'worker',
       confidence_score: 1,
       git: { branch: 'main', start_commit: 'a', latest_commit: 'a', checkpoints: [] },
       history: [],

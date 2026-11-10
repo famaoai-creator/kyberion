@@ -311,15 +311,15 @@ describe('ingest tenant-local duplicate evidence', () => {
     const doc = path.join(fixtureRoot, 'x.md');
     safeMkdir(fixtureRoot, { recursive: true });
     safeWriteFile(doc, '# X\n');
-    const previous = { persona: process.env.KYBERION_PERSONA, role: process.env.MISSION_ROLE };
-    delete process.env.KYBERION_PERSONA;
+    const previous = { persona: process.env.KYBERION_BASE_ROLE, role: process.env.MISSION_ROLE };
+    delete process.env.KYBERION_BASE_ROLE;
     delete process.env.MISSION_ROLE;
     try {
       await expect(
         main(['--tenant', 'acme-corp', '--file', doc, '--ingested-by', 'test', '--dry-run'])
       ).rejects.toThrow(/cannot read the tenant profile[\s\S]*MISSION_ROLE=mission_controller/);
     } finally {
-      if (previous.persona !== undefined) process.env.KYBERION_PERSONA = previous.persona;
+      if (previous.persona !== undefined) process.env.KYBERION_BASE_ROLE = previous.persona;
       if (previous.role !== undefined) process.env.MISSION_ROLE = previous.role;
     }
   });

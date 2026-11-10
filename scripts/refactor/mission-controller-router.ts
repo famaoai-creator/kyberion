@@ -10,8 +10,8 @@ import {
   type TaskEvidenceBinding,
 } from '@agent/core/mission/mission-task-evidence-binding';
 import { auditChain } from '@agent/core/governance/audit-chain';
+import { executionAgentId } from '@agent/core/governance/execution-agent-id';
 import type { resolveIntentTrackGate } from '@agent/core/intent/intent-track-resolver';
-import { getRegisteredEnvText } from '@agent/core/foundation/env';
 import { parseSafeJsonInput } from '@agent/core/foundation/safe-json';
 import type { HumanDecidedBy, MissionRelationships } from '@agent/core/mission/mission-types';
 import { getOptionValue, parseCsvOption } from './mission-cli-args.js';
@@ -781,7 +781,7 @@ export async function runMissionControllerAction(
       await syncRoutingDecisionSummary(context, arg1!, routingDecision, 'CREATE');
       if (Object.keys(routingDecision).length > 0) {
         auditChain.record({
-          agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'mission_controller',
+          agentId: executionAgentId('mission_controller'),
           action: 'mission.routing_decision_recorded',
           operation: `create:${arg1}`,
           result: 'completed',
@@ -853,7 +853,7 @@ export async function runMissionControllerAction(
       await syncRoutingDecisionSummary(context, arg1!, routingDecision, 'START');
       if (Object.keys(routingDecision).length > 0) {
         auditChain.record({
-          agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'mission_controller',
+          agentId: executionAgentId('mission_controller'),
           action: 'mission.routing_decision_recorded',
           operation: `${action}:${arg1}`,
           result: 'completed',
@@ -998,8 +998,18 @@ export async function runMissionControllerAction(
         applyProcessImprovementProposal,
         decideProcessImprovementProposal,
         listProcessImprovementProposals,
+        migrateLegacyProcessImprovementProposals,
       } = await import('@agent/core/mission/mission-retrospective');
-      if (approveId) {
+      if (context.argv.includes('--migrate')) {
+        // D8 one-release migration of the legacy shared proposal queue.
+        context.print?.(
+          JSON.stringify(
+            migrateLegacyProcessImprovementProposals({ apply: context.argv.includes('--write') }),
+            null,
+            2
+          )
+        );
+      } else if (approveId) {
         context.print?.(
           JSON.stringify(decideProcessImprovementProposal(approveId, 'approved'), null, 2)
         );

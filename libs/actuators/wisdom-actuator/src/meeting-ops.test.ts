@@ -142,7 +142,7 @@ describe('action-item follow-up ops', () => {
   beforeEach(() => {
     setWorkCoordinationNamespace(`meeting-ops-test-${process.pid}`);
     clearWorkCoordinationStore();
-    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     process.env.MISSION_ROLE = 'mission_controller';
     process.env.MISSION_ID = FIX_MISSION;
     safeMkdir(path.join(MISSION_DIR, 'evidence'), { recursive: true });
@@ -151,7 +151,7 @@ describe('action-item follow-up ops', () => {
       JSON.stringify({
         mission_id: FIX_MISSION,
         tier: 'confidential',
-        assigned_persona: 'ecosystem_architect',
+        org_role: 'ecosystem_architect',
       })
     );
     registerReasoningBackend({
@@ -300,7 +300,7 @@ describe('action-item follow-up ops', () => {
 
 describe('auditSpeakerFairnessOp', () => {
   beforeEach(() => {
-    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     process.env.MISSION_ROLE = 'mission_controller';
     process.env.MISSION_ID = FIX_MISSION;
     safeMkdir(path.join(MISSION_DIR, 'evidence'), { recursive: true });
@@ -309,7 +309,7 @@ describe('auditSpeakerFairnessOp', () => {
       JSON.stringify({
         mission_id: FIX_MISSION,
         tier: 'confidential',
-        assigned_persona: 'ecosystem_architect',
+        org_role: 'ecosystem_architect',
       })
     );
   });

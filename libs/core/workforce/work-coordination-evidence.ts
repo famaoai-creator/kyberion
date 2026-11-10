@@ -47,7 +47,9 @@ function validateEvidenceLease(value: unknown): void {
       (key) => value[key] === undefined || evidenceString(value[key])
     ) ||
     (value.expected_version !== undefined &&
-      (!Number.isSafeInteger(value.expected_version) || (value.expected_version as number) < 1))
+      (!Number.isSafeInteger(value.expected_version) || (value.expected_version as number) < 1)) ||
+    (value.fence !== undefined &&
+      (!Number.isSafeInteger(value.fence) || (value.fence as number) < 0))
   )
     throw new Error('invalid historical lease');
 }

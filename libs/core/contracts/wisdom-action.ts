@@ -9,6 +9,7 @@
 /**
  * Canonical direct-action, pipeline, and wisdom-owned reconcile contract.
  */
+import type { StorageDataTier } from '../storage-layout.js';
 export type WisdomActuatorRequest = {
   action:
     | 'knowledge_search'
@@ -31,6 +32,7 @@ export type WisdomActuatorRequest = {
   };
   options?: PipelineOptions;
   strategy_path?: string;
+  op?: string;
 } & (
   | {
       action: 'knowledge_search';
@@ -93,6 +95,7 @@ export type PipelineStep =
   | {
       type: 'apply';
       op:
+        | 'document_review'
         | 'a2a_fanout'
         | 'perspective_fanout'
         | 'a2a_roleplay'
@@ -166,7 +169,7 @@ export type PipelineStep =
       op: 'if' | 'while';
       params?: PipelineParams;
     };
-export type KnowledgeTier = 'personal' | 'confidential' | 'public';
+export type KnowledgeTier = StorageDataTier;
 export type ExportAs = string;
 export type KnowledgeImportParams = KnowledgeImportParams1 & {
   package_path?: string;

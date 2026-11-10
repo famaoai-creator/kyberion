@@ -41,6 +41,7 @@ export interface FacadeOutcome {
 export const FACADE_CHILD_CLEARED_ENV = [
   'MISSION_ROLE',
   'MISSION_ID',
+  'KYBERION_BASE_ROLE',
   'KYBERION_PERSONA',
   'KYBERION_SUDO',
   'HF_TOKEN',

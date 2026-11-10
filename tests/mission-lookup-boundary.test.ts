@@ -70,6 +70,9 @@ const DIRECT_CALLERS: Record<string, LookupCategory> = {
   // mission's tenant; a hidden/ambiguous mission must leave it unattributed
   // (hidden from tenants).
   'libs/core/workforce/delegation-store-partition.ts': 'scope-derivation',
+  // D8: a memory candidate's tier and tenant scope come from its mission's
+  // state at capture; a hidden/ambiguous mission must throw, never queue looser.
+  'libs/core/knowledge/memory-capture-scope.ts': 'scope-derivation',
   'libs/core/search/history-search-index.ts': 'scope-derivation',
   'libs/core/governance/injection-signal.ts': 'scope-derivation',
   'libs/shared-perception/src/mark-target-resolver.ts': 'scope-derivation',
@@ -89,6 +92,9 @@ const DIRECT_CALLERS: Record<string, LookupCategory> = {
   'presence/displays/concierge/src/lib/ops/su-surface-data.ts': 'scope-derivation',
   // The hearing mission hand-off verifies the created mission (shared by Studio and Concierge).
   'libs/core/surface/hearing-mission-service.ts': 'scope-derivation',
+  // Usage metering reads the mission's own scope fields to attribute a ledger
+  // row; a hidden/ambiguous mission leaves the row unscoped, never guessed.
+  'libs/core/foundation/mission-scope-env.ts': 'scope-derivation',
   // placement
   'libs/actuators/system-actuator/src/system-pipeline-core-helpers.ts': 'placement',
   'libs/actuators/vision-actuator/src/vision-scope.ts': 'placement',

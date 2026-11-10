@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import type { KnowledgeVerification } from '../knowledge/knowledge-verification.js';
 import type { ArtifactKind, ArtifactOwnershipRecord } from '../workforce/artifact-registry.js';
 import type {
@@ -17,7 +18,7 @@ import type { SkillResourceDescriptor } from '../plugin/skill-resource-loader.js
 import type { TaskSession } from '../task/task-session.js';
 import type { WorkItem } from '../workforce/work-coordination.js';
 
-export type MissionTier = 'personal' | 'confidential' | 'public';
+export type MissionTier = StorageDataTier;
 import type { MissionStatus } from './mission-status.js';
 export type { MissionStatus } from './mission-status.js';
 export type MissionContextRecipientKind =
@@ -34,7 +35,7 @@ export interface MissionStateSummary {
   tier: MissionTier;
   status: MissionStatus | string;
   execution_mode?: string;
-  assigned_persona: string;
+  org_role: string;
   priority?: number;
   confidence_score?: number;
   git: {
@@ -215,7 +216,7 @@ export interface MissionContextPackMissionSummary {
   mission_type?: string;
   tier: MissionTier;
   status: MissionStatus | string;
-  assigned_persona: string;
+  org_role: string;
   tenant_id?: string;
   tenant_slug?: string;
   vision_ref?: string;
@@ -429,6 +430,9 @@ export interface LoadKnowledgeHintsInput {
   knowledgeSlicesPath?: string;
   /** KP-04: scales the hint budget. Omitted = `M` (pre-KP-04 default). */
   estimatedScope?: 'S' | 'M' | 'L';
-  /** DA-07 test seam for tenant-scoped retrieval fixtures. */
+  /**
+   * DA-07 test seam: fixture repo root for tenant-scoped retrieval and the
+   * promoted-record lane (`findRelevantPromotedKnowledge`).
+   */
   tenantKnowledgeRootDir?: string;
 }

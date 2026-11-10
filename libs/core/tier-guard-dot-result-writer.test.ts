@@ -73,7 +73,7 @@ beforeEach(() => {
   vi.stubEnv('KYBERION_TENANT', tenant);
   vi.stubEnv('SYSTEM_ROLE', '');
   vi.stubEnv('MISSION_ROLE', 'infrastructure_sentinel');
-  vi.stubEnv('KYBERION_PERSONA', 'worker');
+  vi.stubEnv('KYBERION_BASE_ROLE', 'worker');
   vi.stubEnv('KYBERION_SUDO', 'false');
   resetRoleAssumptionPolicyCache();
 });

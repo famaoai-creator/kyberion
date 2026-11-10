@@ -34,4 +34,4 @@ export type {
   ApprovalTargetDescriptor,
   ApprovalWorkflowState,
 } from './governance/approval-store.js';
-export type { IdentityContext, Persona, Authority } from './types.js';
+export type { IdentityContext, BaseRole, Authority } from './types.js';

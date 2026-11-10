@@ -14,3 +14,4 @@ export * from './process-env.js';
 export * from './service-endpoints.js';
 export * from './text.js';
 export * from './time.js';
+export * from './base-role-env.js';

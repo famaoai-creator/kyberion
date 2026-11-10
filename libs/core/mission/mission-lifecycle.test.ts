@@ -153,7 +153,7 @@ function prepareMissionState(
         status,
         execution_mode: 'local',
         priority: 1,
-        assigned_persona: 'tester',
+        org_role: 'tester',
         confidence_score: 1,
         git: {
           branch: 'test',
@@ -195,7 +195,7 @@ beforeEach(() => {
   vi.mocked(runMissionRetrospective).mockClear();
   vi.mocked(safeExec).mockClear();
   process.env.MISSION_ROLE = 'mission_controller';
-  process.env.KYBERION_PERSONA = 'worker';
+  process.env.KYBERION_BASE_ROLE = 'worker';
   if (!safeExistsSync(missionPath)) safeMkdir(missionPath, { recursive: true });
   // Keep finishMission's Git writes inside the fixture, even when its parent
   // checkout has uncommitted changes. Never discover the enclosing repository.
@@ -328,7 +328,7 @@ describe('mission lifecycle finish gate', () => {
       unknown
     >;
     expect(updated.promotion_candidate_id).toBe('candidate-1');
-    expect(updated.status).toBe('promoted');
+    expect(updated.status).toBe('nominated');
     expect(updated.updated_at).not.toBe('2026-01-01T00:00:00.000Z');
     expect(() => {
       safeWriteFile(sidecarPath, JSON.stringify({ ...updated, unexpected: true }));

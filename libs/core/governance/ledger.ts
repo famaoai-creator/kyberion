@@ -17,7 +17,7 @@ import {
   safeReaddir,
 } from '../secure-io.js';
 import { validateReadPermission } from '../tier-guard.js';
-import { resolveIdentityContext, withExecutionContext } from '../authority.js';
+import { resolveIdentityContext, withStoreGrant } from '../authority.js';
 import * as pathResolver from '../path-resolver.js';
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
@@ -84,7 +84,7 @@ export const TENANT_LEDGER_FILE = 'ledger.jsonl';
 export const TENANT_LEDGER_STORE_ROLE = 'tenant_ledger_store';
 
 function asTenantLedgerStore<T>(tenantSlug: string, fn: () => T): T {
-  return withExecutionContext(TENANT_LEDGER_STORE_ROLE, fn, undefined, tenantSlug);
+  return withStoreGrant(TENANT_LEDGER_STORE_ROLE, fn, { tenantSlug: tenantSlug });
 }
 
 /**
@@ -106,7 +106,9 @@ function tenantBindingConflict(tenantSlug: string): string | undefined {
  * `confidential` partition (a tenant_scope protected prefix); its recorded
  * scope keeps tier `public`.
  */
-export function tenantLedgerPartitionTier(tier: StorageDataTier): 'personal' | 'confidential' {
+export function tenantLedgerPartitionTier(
+  tier: StorageDataTier
+): Exclude<StorageDataTier, 'public'> {
   return tier === 'personal' ? 'personal' : 'confidential';
 }
 

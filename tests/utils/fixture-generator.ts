@@ -190,7 +190,7 @@ export function generateMissionState(options?: MissionStateOptions) {
     status: options?.status || 'planned',
     execution_mode: options?.execution_mode || 'local',
     priority: 5,
-    assigned_persona: 'test-persona',
+    org_role: 'test-persona',
     confidence_score: 0.8,
     git: {
       branch: 'main',

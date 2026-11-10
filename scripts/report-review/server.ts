@@ -5,7 +5,7 @@
  * オーバーレイ注入する。ブラウザで編集/コメント/音声入力し、💾でファイルへ直書き保存する。
  *
  * 使い方:
- *   KYBERION_PERSONA=sovereign node_modules/.bin/tsx scripts/report-review/server.ts <report.html> [port]
+ *   KYBERION_BASE_ROLE=sovereign node_modules/.bin/tsx scripts/report-review/server.ts <report.html> [port]
  *   → http://127.0.0.1:<port>/ を開く（localhost=セキュアコンテキスト＝🎤マイク可）。Ctrl-C で停止。
  *
  * 安全策:

@@ -4,7 +4,7 @@ category: Architecture
 tags: [cli, harness, skills, plugins, agents, browser, computer-use, governance]
 importance: 9
 author: Ecosystem Architect
-last_updated: 2026-04-18
+last_updated: 2026-11-10
 ---
 
 # CLI Harness Coordination Model
@@ -183,7 +183,7 @@ That last mode is likely to be the most powerful pattern in practice.
 
 ## Required Contracts
 
-Reasoning-specific routing should use the policy surface in [`wisdom-policy.json`](../governance/wisdom-policy.json).
+Reasoning-specific routing should use the policy surface in [`distill-policy.json`](../governance/distill-policy.json).
 That policy declares the profile, command, and adapter that should be used for mission distillation and similar structured reasoning tasks.
 
 ## 1. Harness Capability Registry

@@ -14,7 +14,8 @@
  * (never the shared `workerStateKernel` singleton).
  *
  * Canonical identity id (`nhi_id`) is a stable URI, SPIFFE-shaped
- * (`kyberion://agent/<org>/<slug>`); the slug is the same grammar as
+ * (`kyberion://agent/<tenant>/<org|_>/<slug>`, concept model v2 D3; see
+ * `contracts/nhi-id.ts` for the tenantless and legacy-alias forms); the slug is the same grammar as
  * agent-manifest `agentId` (`^[a-z][a-z0-9-]*$`), so a manifest's agentId is
  * reconciled against the ledger as the slug of a provisioned identity.
  * provider/model are *hints*, not identity (AO-05).
@@ -55,6 +56,7 @@ import { pathResolver } from '../path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '../secure-io.js';
 import { resolveRole, withExecutionContext } from '../authority.js';
 import { loadOrganizationProfile } from '../organization/organization-profile.js';
+import { activeTenantSlug } from '../organization/tenant-home.js';
 import { ownerAccountableHumanId } from '../organization/member-registry.js';
 import { isValidTenantSlug } from '../entity-scope.js';
 import { logger } from '../core.js';
@@ -69,13 +71,21 @@ import {
   NHI_SLUG_PATTERN,
   NHI_ID_PREFIX,
   NHI_ID_PATTERN,
+  CANONICAL_NHI_ID_PATTERN,
+  LEGACY_NHI_ID_PATTERN,
+  NHI_NO_ORGANIZATION,
+  NHI_NO_TENANT,
   AgentIdentityFormatError,
   buildNhiId,
+  buildTenantlessNhiId,
+  canonicalNhiIdFromLegacy,
+  isLegacyNhiId,
   parseNhiId,
+  type ParsedNhiId,
 } from '../contracts/nhi-id.js';
 
 // ---------------------------------------------------------------------------
-// NHI id: kyberion://agent/<org>/<slug> (SPIFFE-shaped URI; NI-05 maps it out)
+// NHI id: kyberion://agent/<tenant>/<org|_>/<slug> (SPIFFE-shaped URI; NI-05 maps it out)
 //
 // The grammar itself lives in `nhi-id.ts` (a dependency-free leaf module) —
 // re-exported here for backward compatibility with every existing
@@ -89,28 +99,122 @@ export {
   NHI_SLUG_PATTERN,
   NHI_ID_PREFIX,
   NHI_ID_PATTERN,
+  CANONICAL_NHI_ID_PATTERN,
+  LEGACY_NHI_ID_PATTERN,
+  NHI_NO_ORGANIZATION,
+  NHI_NO_TENANT,
   AgentIdentityFormatError,
   buildNhiId,
+  buildTenantlessNhiId,
+  canonicalNhiIdFromLegacy,
+  isLegacyNhiId,
   parseNhiId,
+  type ParsedNhiId,
 };
 
-/** Active organization id: explicit > organization profile > 'default'. */
-export function resolveAgentIdentityOrganizationId(organizationId?: string | null): string {
+/**
+ * The organization id the pre-D3 fallback produced (the product default
+ * profile's `organization_id`). D3 removed that fallback: it is never adopted
+ * as an org segment again; an NHI without an organization is written `_`.
+ */
+const LEGACY_DEFAULT_ORGANIZATION_ID = 'default';
+
+/**
+ * Organization of an NHI inside `tenantSlug`: explicit > the tenant's own
+ * organization profile. `null` means "no organization" (`_`). The product
+ * default profile's `'default'` id is never adopted, and without a tenant
+ * there is no organization to resolve.
+ */
+export function resolveAgentIdentityOrganizationId(
+  organizationId?: string | null,
+  tenantSlug?: string | null
+): string | null {
   const explicit = organizationId?.trim();
-  if (explicit) return explicit;
-  return loadOrganizationProfile()?.organization_id || 'default';
+  if (explicit) return explicit === NHI_NO_ORGANIZATION ? null : explicit;
+  if (!tenantSlug) return null;
+  const profileOrg = loadOrganizationProfile(undefined, tenantSlug)?.organization_id?.trim();
+  return profileOrg && profileOrg !== LEGACY_DEFAULT_ORGANIZATION_ID ? profileOrg : null;
+}
+
+/** What an nhi_id is derived from: the slug plus the tenancy the caller knows. */
+export interface AgentIdentityTenancyInput {
+  /** Owning tenant. Falls back to `affiliation.tenant_slug`, then the active tenant. */
+  tenantSlug?: string | null;
+  /** Organization inside the tenant; omitted → the tenant's organization profile, else `_`. */
+  organizationId?: string | null;
+  affiliation?: { tenant_slug?: string };
+  /**
+   * Person-scope identity (personal onboarding): never inherit the ambient
+   * active tenant — without an explicit tenant the identity is tenantless.
+   */
+  personScope?: boolean;
+}
+
+/** Owning tenant for an NHI: explicit > affiliation > active tenant (not for person scope). */
+export function resolveAgentIdentityTenantSlug(input: AgentIdentityTenancyInput): string | null {
+  const explicit = input.tenantSlug?.trim();
+  const affiliated = input.affiliation?.tenant_slug?.trim();
+  if (explicit && affiliated && explicit !== affiliated) {
+    throw new AgentIdentityFormatError(
+      `tenant slug "${explicit}" conflicts with affiliation tenant "${affiliated}"`
+    );
+  }
+  if (explicit || affiliated) return (explicit || affiliated)!;
+  if (input.personScope) return null;
+  return activeTenantSlug();
+}
+
+interface ResolvedAgentIdentityName {
+  nhiId: string;
+  tenantSlug: string | null;
+  organizationId: string | null;
+}
+
+/**
+ * Resolve the canonical nhi_id for `slug`. Throws {@link AgentIdentityFormatError}
+ * when an organization is named without a tenant (an organization lives inside
+ * a tenant), on a reserved/invalid tenant, or on invalid org/slug grammar.
+ * With no tenant and no organization the identity is tenantless (`_/_`).
+ */
+function resolveAgentIdentityName(
+  slug: string,
+  input: AgentIdentityTenancyInput
+): ResolvedAgentIdentityName {
+  const tenantSlug = resolveAgentIdentityTenantSlug(input);
+  if (!tenantSlug) {
+    const org = input.organizationId?.trim();
+    if (org && org !== NHI_NO_ORGANIZATION) {
+      throw new AgentIdentityFormatError(
+        `tenant slug is required for an nhi_id in organization "${org}"`
+      );
+    }
+    return { nhiId: buildTenantlessNhiId(slug), tenantSlug: null, organizationId: null };
+  }
+  const organizationId = resolveAgentIdentityOrganizationId(input.organizationId, tenantSlug);
+  return { nhiId: buildNhiId(tenantSlug, organizationId, slug), tenantSlug, organizationId };
 }
 
 /**
  * Derive the canonical nhi_id for an agent slug without touching the ledger
  * (pure name derivation — used by team-role selection and staffing views).
- * Returns `null` when the slug or resolved org is not nhi-grammar-valid
- * (e.g. service ids like `service:stripe`).
+ * The tenant is `tenantSlug`, else the active tenant. With no tenant in scope
+ * the name is tenantless (`_/_/<slug>`, the organization dropped — the same
+ * name a runtime spawned there records). Returns `null` when the slug, tenant
+ * or org is not nhi-grammar-valid (e.g. service ids like `service:stripe`).
  */
-export function deriveAgentNhiId(slug: string, organizationId?: string | null): string | null {
-  const org = resolveAgentIdentityOrganizationId(organizationId);
-  if (!NHI_SLUG_PATTERN.test(org) || !NHI_SLUG_PATTERN.test(slug)) return null;
-  return buildNhiId(org, slug);
+export function deriveAgentNhiId(
+  slug: string,
+  organizationId?: string | null,
+  tenantSlug?: string | null
+): string | null {
+  if (!NHI_SLUG_PATTERN.test(slug)) return null;
+  try {
+    if (!resolveAgentIdentityTenantSlug({ tenantSlug })) return buildTenantlessNhiId(slug);
+    return resolveAgentIdentityName(slug, { organizationId, tenantSlug }).nhiId;
+  } catch (error) {
+    if (error instanceof AgentIdentityFormatError) return null;
+    throw error;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -187,6 +291,11 @@ export type AgentIdentityRecord = z.infer<typeof agentIdentityRecordSchema>;
 export interface AgentIdentityState {
   /** Keyed by nhi_id. */
   identities: Record<string, AgentIdentityRecord>;
+  /**
+   * D3 id migration: legacy `kyberion://agent/<org>/<slug>` alias → the
+   * canonical nhi_id its record moved to. Resolved for one release.
+   */
+  aliases?: Record<string, string>;
 }
 
 function initialAgentIdentityState(): AgentIdentityState {
@@ -210,6 +319,7 @@ export const AGENT_IDENTITY_OPS = {
   accountabilityReassigned: 'accountability_reassigned',
   instanceBound: 'instance_bound',
   instanceReleased: 'instance_released',
+  identityIdMigrated: 'identity_id_migrated',
 } as const;
 
 const identityProvisionedPayloadSchema = z
@@ -296,7 +406,7 @@ agentIdentityKernel.defineOp(AGENT_IDENTITY_OPS.identityProvisioned, {
       ...(payload.model_hint ? { model_hint: payload.model_hint } : {}),
       ...(payload.trust_ref ? { trust_ref: payload.trust_ref } : {}),
     };
-    return { identities: { ...state.identities, [record.nhi_id]: record } };
+    return { ...state, identities: { ...state.identities, [record.nhi_id]: record } };
   },
 });
 
@@ -312,7 +422,7 @@ agentIdentityKernel.defineOp(AGENT_IDENTITY_OPS.identityActivated, {
     // when that suspension arrived after the caller's lifecycle precheck.
     if (payload.only_provisioned && existing.lifecycle_status !== 'provisioned') return state;
     const activated: AgentIdentityRecord = { ...existing, lifecycle_status: 'active' };
-    return { identities: { ...state.identities, [payload.nhi_id]: activated } };
+    return { ...state, identities: { ...state.identities, [payload.nhi_id]: activated } };
   },
 });
 
@@ -329,6 +439,7 @@ agentIdentityKernel.defineOp(AGENT_IDENTITY_OPS.accountabilityReassigned, {
     )
       return state;
     return {
+      ...state,
       identities: {
         ...state.identities,
         [payload.nhi_id]: {
@@ -365,7 +476,7 @@ agentIdentityKernel.defineOp(AGENT_IDENTITY_OPS.identitySuspended, {
     // Suspension kills session-admission bindings ('nhi-session:' prefix is the
     // admission-ceremony convention): reactivation must never resurrect a
     // token issued before the incident — re-admission requires fresh approval.
-    return { identities: { ...state.identities, [payload.nhi_id]: suspended } };
+    return { ...state, identities: { ...state.identities, [payload.nhi_id]: suspended } };
   },
 });
 
@@ -384,7 +495,7 @@ agentIdentityKernel.defineOp(AGENT_IDENTITY_OPS.identityRetired, {
     // Retire implicitly releases any still-bound runtime instances: a retired
     // identity has no legitimate live runtime.
     delete retired.runtime_instances;
-    return { identities: { ...state.identities, [payload.nhi_id]: retired } };
+    return { ...state, identities: { ...state.identities, [payload.nhi_id]: retired } };
   },
 });
 
@@ -419,6 +530,7 @@ agentIdentityKernel.defineOp(AGENT_IDENTITY_OPS.instanceBound, {
         ? current.map((entry, index) => (index === priorIndex ? instance : entry))
         : [...current, instance];
     return {
+      ...state,
       identities: {
         ...state.identities,
         [payload.nhi_id]: {
@@ -443,7 +555,42 @@ agentIdentityKernel.defineOp(AGENT_IDENTITY_OPS.instanceReleased, {
     const next: AgentIdentityRecord = { ...existing };
     if (remaining.length > 0) next.runtime_instances = remaining;
     else delete next.runtime_instances;
-    return { identities: { ...state.identities, [payload.nhi_id]: next } };
+    return { ...state, identities: { ...state.identities, [payload.nhi_id]: next } };
+  },
+});
+
+const identityIdMigratedPayloadSchema = z
+  .object({
+    legacy_nhi_id: z.string().regex(LEGACY_NHI_ID_PATTERN),
+    nhi_id: z.string().regex(CANONICAL_NHI_ID_PATTERN),
+    /** Org segment of the canonical id (`_` = no organization). */
+    organization_id: z.string(),
+    migrated_at: z.string(),
+  })
+  .strict();
+
+/**
+ * D3 id migration: move the record from its legacy key to the canonical id
+ * and remember the legacy id as an alias. Idempotent — a missing legacy
+ * record or an occupied canonical id is a no-op (same state reference).
+ */
+agentIdentityKernel.defineOp(AGENT_IDENTITY_OPS.identityIdMigrated, {
+  model: agentIdentityModel,
+  schema: identityIdMigratedPayloadSchema,
+  apply: (state, payload) => {
+    const existing = state.identities[payload.legacy_nhi_id];
+    if (!existing || state.identities[payload.nhi_id]) return state;
+    const { [payload.legacy_nhi_id]: _legacy, ...rest } = state.identities;
+    const migrated: AgentIdentityRecord = {
+      ...existing,
+      nhi_id: payload.nhi_id,
+      affiliation: { ...existing.affiliation, organization_id: payload.organization_id },
+    };
+    return {
+      ...state,
+      identities: { ...rest, [payload.nhi_id]: migrated },
+      aliases: { ...(state.aliases || {}), [payload.legacy_nhi_id]: payload.nhi_id },
+    };
   },
 });
 
@@ -923,8 +1070,17 @@ function appendGoverned(
 
 export interface IssueAgentIdentityParams {
   kind: AgentIdentityKind;
-  /** Org segment of the nhi_id. Omit to resolve from the organization profile ('default' fallback). */
+  /**
+   * Owning tenant (D3: an NHI belongs to a tenant). Omit to use
+   * `affiliation.tenant_slug`, else the active tenant. It is recorded as
+   * `affiliation.tenant_slug`. With no tenant at all the identity is
+   * tenantless (`kyberion://agent/_/_/<slug>`) and may name no organization.
+   */
+  tenantSlug?: string;
+  /** Org segment of the nhi_id. Omit to resolve from the tenant's organization profile, else `_`. */
   organizationId?: string;
+  /** Person-scope identity: never inherit the ambient active tenant. */
+  personScope?: boolean;
   /** Slug segment of the nhi_id — same grammar as agent-manifest agentId. */
   slug: string;
   displayName?: string;
@@ -935,16 +1091,35 @@ export interface IssueAgentIdentityParams {
   trustRef?: string;
 }
 
-function coreParamsMatch(existing: AgentIdentityRecord, params: IssueAgentIdentityParams): boolean {
-  const affiliation: AgentIdentityAffiliation = {
-    organization_id: existing.affiliation.organization_id,
-    ...(params.affiliation || {}),
+/** The affiliation an identity is issued with: its org segment and tenant always recorded. */
+function issuedAffiliation(
+  name: ResolvedAgentIdentityName,
+  affiliation: IssueAgentIdentityParams['affiliation']
+): AgentIdentityAffiliation {
+  const { tenant_slug: _tenant, ...rest } = affiliation || {};
+  return {
+    organization_id: name.organizationId ?? NHI_NO_ORGANIZATION,
+    ...(name.tenantSlug ? { tenant_slug: name.tenantSlug } : {}),
+    ...rest,
   };
+}
+
+function sortedJson(value: Record<string, unknown>): string {
+  return JSON.stringify(
+    Object.fromEntries(Object.entries(value).sort(([a], [b]) => a.localeCompare(b)))
+  );
+}
+
+function coreParamsMatch(
+  existing: AgentIdentityRecord,
+  params: IssueAgentIdentityParams,
+  affiliation: AgentIdentityAffiliation
+): boolean {
   return (
     existing.kind === params.kind &&
     existing.accountable_human_id === params.accountableHumanId &&
     existing.display_name === (params.displayName || params.slug) &&
-    JSON.stringify(existing.affiliation) === JSON.stringify(affiliation)
+    sortedJson(existing.affiliation) === sortedJson(affiliation)
   );
 }
 
@@ -961,19 +1136,19 @@ function coreParamsMatch(existing: AgentIdentityRecord, params: IssueAgentIdenti
  */
 export function issueAgentIdentity(params: IssueAgentIdentityParams): AgentIdentityRecord {
   assertAgentIdentityGovernedContext('issueAgentIdentity');
-  const organizationId = resolveAgentIdentityOrganizationId(params.organizationId);
-  const nhiId = buildNhiId(organizationId, params.slug);
   if (params.affiliation?.tenant_slug && !isValidTenantSlug(params.affiliation.tenant_slug)) {
     throw new AgentIdentityFormatError(
       `invalid affiliation tenant slug "${params.affiliation.tenant_slug}"`
     );
   }
+  const name = resolveAgentIdentityName(params.slug, params);
+  const nhiId = name.nhiId;
+  const affiliation = issuedAffiliation(name, params.affiliation);
   if (!params.accountableHumanId?.trim()) {
     throw new AgentIdentityAccountabilityError(nhiId, params.kind);
   }
 
-  const state = ensureState();
-  const existing = state.identities[nhiId];
+  const existing = lookupIdentity(ensureState(), nhiId);
   if (existing) {
     if (existing.lifecycle_status === 'retired') {
       throw new AgentIdentityConflictError(
@@ -982,7 +1157,11 @@ export function issueAgentIdentity(params: IssueAgentIdentityParams): AgentIdent
           'retired identities are never re-issued — mint a new slug instead'
       );
     }
-    if (coreParamsMatch(existing, params)) return existing;
+    // A not-yet-migrated legacy record keeps its legacy org segment until migrated.
+    const comparable = isLegacyNhiId(existing.nhi_id)
+      ? { ...affiliation, organization_id: existing.affiliation.organization_id }
+      : affiliation;
+    if (coreParamsMatch(existing, params, comparable)) return existing;
     throw new AgentIdentityConflictError(
       nhiId,
       'already issued with different core params (kind/accountable_human_id/display_name/affiliation)'
@@ -994,7 +1173,7 @@ export function issueAgentIdentity(params: IssueAgentIdentityParams): AgentIdent
     kind: params.kind,
     display_name: params.displayName || params.slug,
     accountable_human_id: params.accountableHumanId,
-    affiliation: { organization_id: organizationId, ...(params.affiliation || {}) },
+    affiliation,
     ...(params.providerHint ? { provider_hint: params.providerHint } : {}),
     ...(params.modelHint ? { model_hint: params.modelHint } : {}),
     ...(params.trustRef ? { trust_ref: params.trustRef } : {}),
@@ -1008,13 +1187,94 @@ export function issueAgentIdentity(params: IssueAgentIdentityParams): AgentIdent
   return record;
 }
 
-/** Read-only, ungated: the identity for `nhiId`, or `null`. */
+const warnedLegacyNhiIds = new Set<string>();
+
+/** One deprecation line per legacy id per process; never repeated on every read. */
+function warnLegacyNhiIdOnce(legacyId: string, canonicalId: string | null): void {
+  if (warnedLegacyNhiIds.has(legacyId)) return;
+  warnedLegacyNhiIds.add(legacyId);
+  logger.warn(
+    canonicalId
+      ? `[agent-identity] legacy nhi_id ${legacyId} resolved as an alias of ${canonicalId} — ` +
+          'legacy ids are deprecated (concept model v2 D3) | next: use the canonical id; ' +
+          'aliases resolve for one release only'
+      : `[agent-identity] legacy nhi_id ${legacyId} has not been migrated — ` +
+          'kyberion://agent/<org>/<slug> is deprecated (concept model v2 D3) | ' +
+          'next: pnpm nhi migrate-ids (dry run), then pnpm nhi migrate-ids --apply'
+  );
+}
+
+/** Where a legacy-keyed record moves under the D3 migration (tenant from its own affiliation). */
+function migrationTargetFor(record: AgentIdentityRecord): {
+  nhiId: string | null;
+  tenantSlug: string | null;
+  organizationId: string | null;
+} {
+  const tenantSlug = record.affiliation.tenant_slug ?? null;
+  const legacyOrg = record.affiliation.organization_id;
+  const organizationId =
+    !tenantSlug ||
+    legacyOrg === LEGACY_DEFAULT_ORGANIZATION_ID ||
+    legacyOrg === NHI_NO_ORGANIZATION ||
+    !NHI_SLUG_PATTERN.test(legacyOrg)
+      ? null
+      : legacyOrg;
+  try {
+    return {
+      nhiId: canonicalNhiIdFromLegacy(record.nhi_id, tenantSlug, organizationId),
+      tenantSlug,
+      organizationId,
+    };
+  } catch {
+    return { nhiId: null, tenantSlug, organizationId };
+  }
+}
+
+function lookupIdentity(state: AgentIdentityState, nhiId: string): AgentIdentityRecord | null {
+  const direct = state.identities[nhiId];
+  if (direct) {
+    if (isLegacyNhiId(nhiId)) warnLegacyNhiIdOnce(nhiId, null);
+    return direct;
+  }
+  const canonical = state.aliases?.[nhiId];
+  if (canonical) {
+    warnLegacyNhiIdOnce(nhiId, canonical);
+    return state.identities[canonical] ?? null;
+  }
+  // Not migrated yet: a canonical id still finds the legacy-keyed record it
+  // will move to, so a pre-migration ledger is never re-issued under a new name.
+  if (!isLegacyNhiId(nhiId) && parseNhiId(nhiId)) {
+    for (const record of Object.values(state.identities)) {
+      if (!isLegacyNhiId(record.nhi_id) || migrationTargetFor(record).nhiId !== nhiId) continue;
+      warnLegacyNhiIdOnce(record.nhi_id, null);
+      return record;
+    }
+  }
+  return null;
+}
+
+/** The id a caller-supplied (possibly legacy alias) nhi_id is recorded under now. */
+export function canonicalAgentNhiId(nhiId: string): string {
+  return lookupIdentity(ensureState(), nhiId)?.nhi_id ?? nhiId;
+}
+
+/** Test-only: forget which legacy ids already logged their deprecation line. */
+export function resetLegacyNhiIdWarningsForTests(): void {
+  warnedLegacyNhiIds.clear();
+}
+
+/**
+ * Read-only, ungated: the identity for `nhiId`, or `null`. A legacy
+ * `kyberion://agent/<org>/<slug>` id resolves to its migrated record for one
+ * release (deprecation logged once per id); the returned record carries the
+ * canonical `nhi_id`.
+ */
 export function getAgentIdentity(nhiId: string): AgentIdentityRecord | null {
-  return ensureState().identities[nhiId] ?? null;
+  return lookupIdentity(ensureState(), nhiId);
 }
 
 export function getAgentIdentityRevision(nhiId: string): number {
-  return getDefaultJournal().revision(nhiId);
+  return getDefaultJournal().revision(canonicalAgentNhiId(nhiId));
 }
 
 /** Optional diagnostic reference; not admission or authenticated execution proof. */
@@ -1044,6 +1304,7 @@ export function reassignAgentIdentityAccountability(input: {
   reason: string;
 }): AgentIdentityRecord {
   assertAgentIdentityGovernedContext('reassignAgentIdentityAccountability');
+  input = { ...input, nhiId: canonicalAgentNhiId(input.nhiId) };
   const current = getAgentIdentity(input.nhiId);
   if (!current) throw new AgentIdentityNotFoundError(input.nhiId);
   if (current.lifecycle_status === 'retired')
@@ -1104,14 +1365,15 @@ export function listAgentIdentities(filter?: ListAgentIdentitiesFilter): AgentId
 }
 
 function requireIdentity(nhiId: string): AgentIdentityRecord {
-  const record = ensureState().identities[nhiId];
+  const record = lookupIdentity(ensureState(), nhiId);
   if (!record) throw new AgentIdentityNotFoundError(nhiId);
   return record;
 }
 
 /** Governed. provisioned/suspended -> active. Idempotent when already active. Retired is terminal. */
-export function activateAgentIdentity(nhiId: string): AgentIdentityRecord {
+export function activateAgentIdentity(requestedNhiId: string): AgentIdentityRecord {
   assertAgentIdentityGovernedContext('activateAgentIdentity');
+  const nhiId = canonicalAgentNhiId(requestedNhiId);
   const existing = requireIdentity(nhiId);
   if (existing.lifecycle_status === 'retired') {
     throw new AgentIdentityLifecycleError(nhiId, 'cannot activate a retired identity');
@@ -1125,8 +1387,9 @@ export function activateAgentIdentity(nhiId: string): AgentIdentityRecord {
 }
 
 /** Initial activation only. Unlike operational reactivation this cannot lift a suspension. */
-export function activateProvisionedAgentIdentity(nhiId: string): AgentIdentityRecord {
+export function activateProvisionedAgentIdentity(requestedNhiId: string): AgentIdentityRecord {
   assertAgentIdentityGovernedContext('activateProvisionedAgentIdentity');
+  const nhiId = canonicalAgentNhiId(requestedNhiId);
   const existing = requireIdentity(nhiId);
   if (existing.lifecycle_status === 'active') return existing;
   if (existing.lifecycle_status !== 'provisioned')
@@ -1146,8 +1409,9 @@ export function activateProvisionedAgentIdentity(nhiId: string): AgentIdentityRe
 }
 
 /** Governed. provisioned/active -> suspended. Idempotent when already suspended. Retired is terminal. */
-export function suspendAgentIdentity(nhiId: string, reason?: string): AgentIdentityRecord {
+export function suspendAgentIdentity(requestedNhiId: string, reason?: string): AgentIdentityRecord {
   assertAgentIdentityGovernedContext('suspendAgentIdentity');
+  const nhiId = canonicalAgentNhiId(requestedNhiId);
   const existing = requireIdentity(nhiId);
   if (existing.lifecycle_status === 'retired') {
     throw new AgentIdentityLifecycleError(nhiId, 'cannot suspend a retired identity');
@@ -1162,8 +1426,9 @@ export function suspendAgentIdentity(nhiId: string, reason?: string): AgentIdent
 }
 
 /** Governed. Any status -> retired (terminal). Idempotent when already retired. */
-export function retireAgentIdentity(nhiId: string, reason: string): AgentIdentityRecord {
+export function retireAgentIdentity(requestedNhiId: string, reason: string): AgentIdentityRecord {
   assertAgentIdentityGovernedContext('retireAgentIdentity');
+  const nhiId = canonicalAgentNhiId(requestedNhiId);
   const existing = requireIdentity(nhiId);
   if (existing.lifecycle_status === 'retired') return existing;
   appendGoverned(AGENT_IDENTITY_OPS.identityRetired, {
@@ -1197,6 +1462,7 @@ export interface BindRuntimeInstanceParams {
  */
 export function bindRuntimeInstance(params: BindRuntimeInstanceParams): AgentIdentityRecord {
   assertAgentIdentityGovernedContext('bindRuntimeInstance');
+  params = { ...params, nhiId: canonicalAgentNhiId(params.nhiId) };
   const revision = params.expectedIdentityRevision ?? getAgentIdentityRevision(params.nhiId);
   const existing = requireIdentity(params.nhiId);
   if (existing.lifecycle_status === 'retired') {
@@ -1242,12 +1508,13 @@ export function bindRuntimeInstance(params: BindRuntimeInstanceParams): AgentIde
  * itself stays active until explicitly retired.
  */
 export function releaseRuntimeInstance(
-  nhiId: string,
+  requestedNhiId: string,
   instanceId: string,
   reason?: string
 ): AgentIdentityRecord | null {
   assertAgentIdentityGovernedContext('releaseRuntimeInstance');
-  const existing = ensureState().identities[nhiId];
+  const existing = lookupIdentity(ensureState(), requestedNhiId);
+  const nhiId = existing?.nhi_id ?? requestedNhiId;
   if (!existing) return null;
   if (!(existing.runtime_instances || []).some((entry) => entry.instance_id === instanceId)) {
     return existing;
@@ -1268,7 +1535,11 @@ export function releaseRuntimeInstance(
 export interface EnsureAgentIdentityParams {
   slug: string;
   kind?: AgentIdentityKind;
+  /** Owning tenant; see {@link IssueAgentIdentityParams.tenantSlug}. */
+  tenantSlug?: string;
   organizationId?: string;
+  /** Person-scope identity: never inherit the ambient active tenant. */
+  personScope?: boolean;
   displayName?: string;
   /** Falls back to the organization profile's `accountable_human_resource_id`. */
   accountableHumanId?: string;
@@ -1300,7 +1571,7 @@ function resolveDefaultAccountableHumanId(): string {
 
 /**
  * Governed resolve-or-issue: return the existing identity for
- * `<org>/<slug>` only while usable and compatible with explicit identity bounds, or issue a fresh
+ * `<tenant>/<org|_>/<slug>` only while usable and compatible with explicit identity bounds, or issue a fresh
  * 'provisioned' one. Accountable human resolution: explicit param > the
  * organization profile's `accountable_human_resource_id` (falling back to the
  * owner member when that is unset or still the legacy `human:operator`
@@ -1309,8 +1580,8 @@ function resolveDefaultAccountableHumanId(): string {
 export function ensureAgentIdentityProvisioned(
   params: EnsureAgentIdentityParams
 ): AgentIdentityRecord {
-  const organizationId = resolveAgentIdentityOrganizationId(params.organizationId);
-  const nhiId = buildNhiId(organizationId, params.slug);
+  const name = resolveAgentIdentityName(params.slug, params);
+  const nhiId = name.nhiId;
   const existing = getAgentIdentity(nhiId);
   if (existing) {
     if (['suspended', 'retired'].includes(existing.lifecycle_status))
@@ -1332,7 +1603,9 @@ export function ensureAgentIdentityProvisioned(
     params.accountableHumanId?.trim() || resolveDefaultAccountableHumanId();
   return issueAgentIdentity({
     kind: params.kind ?? 'agent',
-    organizationId,
+    ...(name.tenantSlug ? { tenantSlug: name.tenantSlug } : {}),
+    ...(name.organizationId ? { organizationId: name.organizationId } : {}),
+    personScope: true, // the tenant is already resolved; never re-read the ambient one
     slug: params.slug,
     displayName: params.displayName,
     accountableHumanId,
@@ -1362,10 +1635,14 @@ export interface BestEffortAgentIdentityResult {
 export function ensureAgentIdentityBestEffort(
   params: EnsureAgentIdentityParams
 ): BestEffortAgentIdentityResult {
-  const nhiId = deriveAgentNhiId(params.slug, params.organizationId);
-  if (!nhiId) {
+  let nhiId: string;
+  try {
+    nhiId = resolveAgentIdentityName(params.slug, params).nhiId;
+  } catch (error) {
     logger.warn(
-      `[agent-identity] best-effort ensure skipped: "${params.slug}" is not a valid nhi slug`
+      `[agent-identity] best-effort ensure skipped for "${params.slug}": ${
+        error instanceof Error ? error.message : String(error)
+      }`
     );
     return { nhi_id: null, record: null, recorded: false };
   }
@@ -1418,4 +1695,86 @@ export function releaseAgentRuntimeInstanceBestEffort(
       }`
     );
   }
+}
+
+// ---------------------------------------------------------------------------
+// D3 id migration: kyberion://agent/<org>/<slug> -> kyberion://agent/<tenant>/<org|_>/<slug>
+// ---------------------------------------------------------------------------
+
+export interface AgentIdentityIdMigrationEntry {
+  legacy_nhi_id: string;
+  /** Target canonical id; `null` when the entry is skipped. */
+  nhi_id: string | null;
+  tenant_slug: string | null;
+  organization_id: string | null;
+  status: 'migrate' | 'skipped';
+  /** Why a legacy record is not migrated (the alias keeps resolving it meanwhile). */
+  reason?: 'target_exists' | 'invalid_tenant';
+}
+
+/**
+ * Read-only plan of the D3 id migration. Every record still keyed by a legacy
+ * id moves to `kyberion://agent/<tenant>/<org|_>/<slug>`, taking the tenant
+ * from its own `affiliation.tenant_slug` (a record without one — person-scope
+ * agents, pre-tenant runtimes — becomes tenantless `_/_`). The removed
+ * `'default'` organization becomes `_`. Nothing is guessed from the ambient
+ * tenant: a person-scope identity must never be bound to a tenant by a
+ * migration. Already-migrated records are not listed (idempotent).
+ */
+export function planAgentIdentityIdMigration(): AgentIdentityIdMigrationEntry[] {
+  const state = ensureState();
+  return Object.values(state.identities)
+    .filter((record) => isLegacyNhiId(record.nhi_id))
+    .sort((a, b) => a.created_at.localeCompare(b.created_at))
+    .map((record): AgentIdentityIdMigrationEntry => {
+      const { nhiId, tenantSlug, organizationId } = migrationTargetFor(record);
+      if (!nhiId) {
+        return {
+          legacy_nhi_id: record.nhi_id,
+          nhi_id: null,
+          tenant_slug: tenantSlug,
+          organization_id: organizationId,
+          status: 'skipped',
+          reason: 'invalid_tenant',
+        };
+      }
+      if (state.identities[nhiId]) {
+        return {
+          legacy_nhi_id: record.nhi_id,
+          nhi_id: nhiId,
+          tenant_slug: tenantSlug,
+          organization_id: organizationId,
+          status: 'skipped',
+          reason: 'target_exists',
+        };
+      }
+      return {
+        legacy_nhi_id: record.nhi_id,
+        nhi_id: nhiId,
+        tenant_slug: tenantSlug,
+        organization_id: organizationId,
+        status: 'migrate',
+      };
+    });
+}
+
+/**
+ * Governed: apply {@link planAgentIdentityIdMigration} by appending one
+ * `identity_id_migrated` journal event per record (the journal is never
+ * rewritten in place). Re-running is a no-op once every record is migrated.
+ * Returns the plan that was applied.
+ */
+export function applyAgentIdentityIdMigration(): AgentIdentityIdMigrationEntry[] {
+  assertAgentIdentityGovernedContext('applyAgentIdentityIdMigration');
+  const plan = planAgentIdentityIdMigration();
+  for (const entry of plan) {
+    if (entry.status !== 'migrate' || !entry.nhi_id) continue;
+    appendGoverned(AGENT_IDENTITY_OPS.identityIdMigrated, {
+      legacy_nhi_id: entry.legacy_nhi_id,
+      nhi_id: entry.nhi_id,
+      organization_id: entry.organization_id ?? NHI_NO_ORGANIZATION,
+      migrated_at: nowIso(),
+    });
+  }
+  return plan;
 }

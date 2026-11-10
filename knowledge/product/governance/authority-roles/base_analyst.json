@@ -1,0 +1,14 @@
+{
+  "role": "base_analyst",
+  "description": "Base Authority Role (S4 slice 4, ADR concept-model-v2 D5/D6): the operation bundle every principal whose persona is 'analyst' runs on — formerly security-policy.json persona_permissions.analyst, verbatim. Never a principal's own role (libs/core/foundation/base-authority-role.ts).",
+  "assignable": false,
+  "permissions": {
+    "allow_read": ["knowledge/", "active/audit/"],
+    "allow_write": [
+      "active/shared/tmp/",
+      "knowledge/product/evolution/",
+      "active/audit/",
+      "active/shared/logs/"
+    ]
+  }
+}

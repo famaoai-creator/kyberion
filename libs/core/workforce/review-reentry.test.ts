@@ -52,6 +52,14 @@ const secureIoPath = (filePath: string) =>
   path.isAbsolute(filePath) ? filePath : path.join(process.env.KYBERION_ROOT || '', filePath);
 
 vi.mock('../secure-io.js', () => secureIo);
+// D8: hints land in the rejected mission's capture scope. These fixture
+// missions have no mission state, so the scope is supplied explicitly.
+const captureScope = vi.hoisted(() => ({
+  value: { tier: 'public' } as { tier: string; scope?: Record<string, unknown> },
+}));
+vi.mock('../knowledge/memory-capture-scope.js', () => ({
+  missionMemoryCaptureScope: () => captureScope.value,
+}));
 
 describe('review re-entry queue (LC-11)', () => {
   let tmpRoot: string;
@@ -136,7 +144,8 @@ describe('review re-entry queue (LC-11)', () => {
       reviewer: 'human:test',
     });
 
-    const hintsDir = path.join(tmpRoot, 'active/shared/runtime/feedback-loop/hints');
+    // D8: the public mission's partition of the one hint store.
+    const hintsDir = path.join(tmpRoot, 'active/shared/runtime/hints/public/shared');
     expect(fs.existsSync(hintsDir)).toBe(true);
     const hintFiles = fs.readdirSync(hintsDir);
     expect(hintFiles.length).toBeGreaterThan(0);
@@ -149,6 +158,27 @@ describe('review re-entry queue (LC-11)', () => {
     expect(rejectionHint).toBeDefined();
     expect(rejectionHint.hint).toContain('summary-doc');
     expect(rejectionHint.tags).toContain('human_rejection');
+  });
+
+  it('D8: never stores a rejection hint for a mission whose scope is undetermined', async () => {
+    captureScope.value = { tier: 'confidential' };
+    try {
+      const { enqueueReviewReentryRequest } = await import('./review-reentry.js');
+      enqueueReviewReentryRequest('mission_controller', {
+        missionId: 'MSN-LC12-NOSCOPE',
+        artifactId: 'summary-doc',
+        verdict: 'reject',
+        comment: 'no scope',
+        reasonCategory: 'wrong_direction',
+        reviewer: 'human:test',
+      });
+      expect(fs.existsSync(path.join(tmpRoot, 'active/shared/runtime/hints'))).toBe(false);
+      expect(fs.existsSync(path.join(tmpRoot, 'active/shared/runtime/feedback-loop/hints'))).toBe(
+        false
+      );
+    } finally {
+      captureScope.value = { tier: 'public' };
+    }
   });
 
   it('builds a gap brief carrying verdict, category guidance, and comment', async () => {

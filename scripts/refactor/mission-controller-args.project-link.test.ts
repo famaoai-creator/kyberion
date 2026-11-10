@@ -9,7 +9,7 @@ import { validateMissionStartCreateInput } from './mission-controller-args.js';
 const suffix = `${process.pid}-${Date.now().toString(36)}`.toUpperCase();
 const PROJECT_ID = `PRJ-LINK-ARGS-${suffix}`;
 const PROJECT_PATH = `active/shared/tmp/system/test-project-link/${suffix}`;
-const savedEnv = { persona: process.env.KYBERION_PERSONA, role: process.env.MISSION_ROLE };
+const savedEnv = { persona: process.env.KYBERION_BASE_ROLE, role: process.env.MISSION_ROLE };
 
 function argv(...extra: string[]): string[] {
   return [
@@ -28,13 +28,13 @@ function argv(...extra: string[]): string[] {
 }
 
 beforeEach(() => {
-  process.env.KYBERION_PERSONA = 'ecosystem_architect';
+  process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
   process.env.MISSION_ROLE = 'mission_controller';
 });
 
 afterEach(() => {
   safeRmSync(projectRecordPath(PROJECT_ID), { force: true });
-  process.env.KYBERION_PERSONA = savedEnv.persona;
+  process.env.KYBERION_BASE_ROLE = savedEnv.persona;
   process.env.MISSION_ROLE = savedEnv.role;
 });
 

@@ -21,6 +21,7 @@
  */
 
 import { createHash } from 'node:crypto';
+import { baseRoleEnvText } from '../foundation/base-role-env.js';
 import * as path from 'node:path';
 import { auditChain } from '../governance/audit-chain.js';
 import { logger } from '../core.js';
@@ -186,9 +187,7 @@ export function matchSeamSelectionRule(
 }
 
 function actor(): string {
-  return (
-    getRegisteredEnvText('KYBERION_PERSONA') || getRegisteredEnvText('MISSION_ROLE') || 'operator'
-  );
+  return baseRoleEnvText() || getRegisteredEnvText('MISSION_ROLE') || 'operator';
 }
 
 export function setSeamSelectionRule(input: {

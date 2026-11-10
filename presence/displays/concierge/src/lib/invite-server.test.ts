@@ -21,6 +21,9 @@ vi.mock('@agent/core/organization/member-registry', async (importOriginal) => ({
   resolveMemberByPrincipal: resolveMember,
 }));
 vi.mock('@agent/core/authority', () => ({
+  // S4: store facades open their declared store grant (withStoreGrant).
+  withStoreGrant: (_name: string, fn: () => unknown) => fn(),
+  withStoreGrantAsync: async (_name: string, fn: () => unknown) => fn(),
   withExecutionContext: (_role: string, fn: () => unknown) => fn(),
 }));
 
@@ -56,14 +59,14 @@ describe('invite-server', () => {
       'tmp',
       `invite-srv-${randomUUID()}`
     );
-    savedPersona = process.env.KYBERION_PERSONA;
+    savedPersona = process.env.KYBERION_BASE_ROLE;
     savedRole = process.env.MISSION_ROLE;
-    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     process.env.MISSION_ROLE = 'mission_controller';
   });
   afterAll(() => {
-    if (savedPersona === undefined) delete process.env.KYBERION_PERSONA;
-    else process.env.KYBERION_PERSONA = savedPersona;
+    if (savedPersona === undefined) delete process.env.KYBERION_BASE_ROLE;
+    else process.env.KYBERION_BASE_ROLE = savedPersona;
     if (savedRole === undefined) delete process.env.MISSION_ROLE;
     else process.env.MISSION_ROLE = savedRole;
     if (root) safeRmSync(root, { recursive: true, force: true });

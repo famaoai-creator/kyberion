@@ -15,6 +15,7 @@
  */
 
 import {
+  cloneFencedLeaseRecord,
   registerLeaseBackend,
   type FencedLeaseRecord,
   type LeaseBackend,
@@ -54,18 +55,20 @@ export function createKvLeaseBackendStub(options: KvLeaseBackendStubOptions = {}
     id: KV_LEASE_BACKEND_STUB_ID,
     async withLock<T>(namespace: string, fn: () => Promise<T>): Promise<T> {
       const previous = store.queues.get(namespace) ?? Promise.resolve();
-      const run = previous.then(async () => {
+      const execute = async (): Promise<T> => {
         if (lockDelayMs > 0) {
           await new Promise<void>((resolve) => setTimeout(resolve, lockDelayMs));
         }
         return fn();
-      }, fn);
-      store.queues.set(
-        namespace,
-        run.finally(() => {
-          if (store.queues.get(namespace) === run) store.queues.delete(namespace);
-        })
-      );
+      };
+      const run = previous.then(execute, execute);
+      // Keep caller errors on `run`, never on the shared queue tail. A
+      // finishing predecessor must not erase a later node's reservation.
+      const release = (): void => {
+        if (store.queues.get(namespace) === tail) store.queues.delete(namespace);
+      };
+      const tail = run.then(release, release);
+      store.queues.set(namespace, tail);
       return run;
     },
     withLockSync<T>(_namespace: string, _fn: () => T): T {
@@ -76,10 +79,10 @@ export function createKvLeaseBackendStub(options: KvLeaseBackendStubOptions = {}
     },
     read(leaseKey: string): FencedLeaseRecord | undefined {
       const record = store.records.get(leaseKey);
-      return record ? { ...record } : undefined;
+      return record ? cloneFencedLeaseRecord(record) : undefined;
     },
     write(leaseKey: string, record: FencedLeaseRecord): void {
-      store.records.set(leaseKey, { ...record });
+      store.records.set(leaseKey, cloneFencedLeaseRecord(record));
     },
     metricsPath(): null {
       return null;

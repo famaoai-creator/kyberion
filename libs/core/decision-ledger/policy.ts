@@ -9,11 +9,12 @@
  * and tests need no I/O. Callers with I/O (the facade, the ledger) load the
  * catalog once with {@link loadDecisionAuthorityPolicy}.
  */
+import type { MemberRole } from '../organization/member-registry.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { pathResolver } from '../path-resolver.js';
 import type { DecisionLevel } from './model.js';
 
-export type DecidingRole = 'owner' | 'approver' | 'viewer';
+export type DecidingRole = Extract<MemberRole, 'owner' | 'approver' | 'viewer'>;
 
 export interface DecisionLevelPolicy {
   /** Front-desk roles that may promote this level on the product side. Empty = no member may. */

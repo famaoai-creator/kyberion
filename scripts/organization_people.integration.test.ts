@@ -61,7 +61,7 @@ beforeAll(async () => {
   ])
     vi.stubEnv(key, '');
   vi.stubEnv('MISSION_ROLE', 'sovereign_concierge');
-  vi.stubEnv('KYBERION_PERSONA', 'sovereign_concierge');
+  vi.stubEnv('KYBERION_BASE_ROLE', 'sovereign_concierge');
   vi.resetModules();
   authority = await import('@agent/core/authority');
   const registry = await import('@agent/core/organization/member-registry');

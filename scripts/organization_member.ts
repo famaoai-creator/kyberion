@@ -1,6 +1,6 @@
 import { withExecutionContext } from '@agent/core/governance';
 import { auditChain } from '@agent/core/governance/audit-chain';
-import { getRegisteredEnvText } from '@agent/core/foundation/env';
+import { executionAgentId } from '@agent/core/governance/execution-agent-id';
 import { ensureOwnerMember } from '@agent/core/organization/member-registry';
 import type { MemberRole } from '@agent/core/organization/member-registry';
 import {
@@ -128,7 +128,7 @@ export async function runOrganizationMember(
   if (command.action === 'ensure-owner') {
     const owner = withExecutionContext('sovereign_concierge', () => ensureOwnerMember());
     auditChain.record({
-      agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'operator',
+      agentId: executionAgentId('operator'),
       action: 'member.ensure-owner',
       operation: `user:${owner.member_id}`,
       result: 'completed',
@@ -240,7 +240,7 @@ export async function runOrganizationMember(
   const result = { status: command.action === 'link-identity' ? 'linked' : 'unlinked', member };
   // An identity link grants a chat actor the member's authority: audit it.
   auditChain.record({
-    agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'operator',
+    agentId: executionAgentId('operator'),
     action: `member.${command.action}`,
     operation: `user:${command.memberId}`,
     result: 'completed',

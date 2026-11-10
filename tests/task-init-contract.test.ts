@@ -16,11 +16,11 @@ const ANSWERS_FILE = pathResolver.rootResolve('active/shared/tmp/task-init-answe
 const OVERRIDE_SCENARIO_DIR = pathResolver.rootResolve('active/shared/tmp/task-init-scenarios');
 
 describe('task init contract', () => {
-  const originalPersona = process.env.KYBERION_PERSONA;
+  const originalPersona = process.env.KYBERION_BASE_ROLE;
   const originalRole = process.env.MISSION_ROLE;
 
   beforeEach(() => {
-    process.env.KYBERION_PERSONA = 'sovereign';
+    process.env.KYBERION_BASE_ROLE = 'sovereign';
     process.env.MISSION_ROLE = 'sovereign_concierge';
   });
 
@@ -30,8 +30,8 @@ describe('task init contract', () => {
     if (safeExistsSync(ANSWERS_FILE)) safeRmSync(ANSWERS_FILE);
     if (safeExistsSync(OVERRIDE_SCENARIO_DIR))
       safeRmSync(OVERRIDE_SCENARIO_DIR, { recursive: true, force: true });
-    if (originalPersona === undefined) delete process.env.KYBERION_PERSONA;
-    else process.env.KYBERION_PERSONA = originalPersona;
+    if (originalPersona === undefined) delete process.env.KYBERION_BASE_ROLE;
+    else process.env.KYBERION_BASE_ROLE = originalPersona;
     if (originalRole === undefined) delete process.env.MISSION_ROLE;
     else process.env.MISSION_ROLE = originalRole;
   });

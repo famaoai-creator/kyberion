@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import {
   coreSeamCatalog,
   createSeam,
@@ -27,7 +28,7 @@ export interface KnowledgeQuery {
 export interface KnowledgePromotionCandidate {
   id: string;
   source_record_id: string;
-  target_tier: 'personal' | 'confidential' | 'public';
+  target_tier: StorageDataTier;
   summary: string;
   evidence_refs: string[];
   requires_approval: boolean;

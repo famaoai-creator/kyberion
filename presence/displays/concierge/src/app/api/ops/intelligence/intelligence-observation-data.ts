@@ -742,7 +742,7 @@ export function buildLearnedNotificationText(input: {
   projectId?: string;
   language?: SupportedLocale;
   /** Already viewer-authorized rows; absent preserves legacy global-only behavior. */
-  candidates?: ReturnType<typeof listDistillCandidateRecords>;
+  candidates?: ReadonlyArray<{ project_id?: string; promoted_ref?: string; title: string }>;
 }): string {
   if (!input.projectId) return '';
   const titles = (input.candidates ?? listDistillCandidateRecords())

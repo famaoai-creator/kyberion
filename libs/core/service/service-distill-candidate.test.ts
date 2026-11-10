@@ -1,14 +1,27 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { withExecutionContext } from '../authority.js';
+import { pathResolver } from '../path-resolver.js';
 import { safeRmSync } from '../secure-io.js';
 import {
   assessServiceDistillCandidate,
   buildServiceProcedureCandidate,
 } from './service-distill-candidate.js';
 import {
-  loadDistillCandidateRecord,
-  distillCandidateRecordPath,
-  type DistillCandidateRecord,
-} from '../knowledge/distill-candidate-registry.js';
+  loadFacadeProposal,
+  type FacadeProposalRecord,
+} from '../knowledge/facade-proposal-rows.js';
+import { memoryPromotionQueuePath } from '../knowledge/memory-promotion-queue.js';
+import { SERVICE_PROCEDURE_PROPOSAL } from '../knowledge/reuse-proposals.js';
+
+const queuePath = `active/shared/tmp/test-memory-queue-service-distill-${process.pid}.jsonl`;
+const originalQueuePath = process.env.KYBERION_MEMORY_QUEUE_PATH;
+beforeAll(() => {
+  process.env.KYBERION_MEMORY_QUEUE_PATH = queuePath;
+});
+afterAll(() => {
+  if (originalQueuePath === undefined) delete process.env.KYBERION_MEMORY_QUEUE_PATH;
+  else process.env.KYBERION_MEMORY_QUEUE_PATH = originalQueuePath;
+});
 
 const recording = {
   schema_version: 'service-recording.v1',
@@ -30,17 +43,21 @@ const recording = {
 };
 
 describe('service-distill-candidate', () => {
-  const candidates: DistillCandidateRecord[] = [];
+  const candidates: FacadeProposalRecord[] = [];
+  const load = (id: string, scope?: FacadeProposalRecord['scope']) =>
+    loadFacadeProposal(SERVICE_PROCEDURE_PROPOSAL, id, scope);
 
   afterEach(() => {
-    for (const candidate of candidates.splice(0)) {
-      safeRmSync(distillCandidateRecordPath(candidate.candidate_id, candidate.scope), {
-        force: true,
-      });
-    }
+    withExecutionContext('surface_runtime', () => {
+      // A personal owner queue is never redirected by the test override.
+      for (const candidate of candidates.splice(0))
+        if (candidate.scope?.tier === 'personal')
+          safeRmSync(memoryPromotionQueuePath(candidate.scope), { force: true });
+      safeRmSync(pathResolver.rootResolve(queuePath), { force: true });
+    });
   });
 
-  it('persists a scoped, review-only service procedure candidate', () => {
+  it('captures a scoped, review-only service procedure candidate on the queue', () => {
     const result = buildServiceProcedureCandidate(recording, {
       procedureId: 'service.issue-intake.candidate-test',
       intentPhrases: ['create an issue'],
@@ -65,18 +82,24 @@ describe('service-distill-candidate', () => {
         promotion_policy: 'human_review',
       },
       metadata: { executable: false, review_required: true, promotion_state: 'review_required' },
+      record_kind: 'service_procedure',
+      decided_via: 'concierge',
     });
-    expect(loadDistillCandidateRecord(result.candidate.candidate_id)).toBeNull();
     expect(
-      loadDistillCandidateRecord(result.candidate.candidate_id, {
+      load(result.candidate.candidate_id, {
         ...result.candidate.scope!,
         tenant_slug: 'other-tenant',
       })
     ).toBeNull();
-    expect(
-      loadDistillCandidateRecord(result.candidate.candidate_id, result.candidate.scope)
-        ?.candidate_id
-    ).toBe(result.candidate.candidate_id);
+    expect(load(result.candidate.candidate_id, result.candidate.scope)?.candidate_id).toBe(
+      result.candidate.candidate_id
+    );
+  });
+
+  it('refuses an owner-less personal candidate instead of capturing it unscoped', () => {
+    expect(() =>
+      buildServiceProcedureCandidate(recording, { intentPhrases: ['create an issue'] })
+    ).toThrow('MEMORY_SCOPE_REQUIRED');
   });
 
   it('preserves a personal owner-only service candidate without inventing a tenant', () => {
@@ -87,13 +110,11 @@ describe('service-distill-candidate', () => {
     });
     candidates.push(result.candidate);
     expect(result.candidate.scope?.tenant_slug).toBeUndefined();
+    expect(load(result.candidate.candidate_id, result.candidate.scope)?.candidate_id).toBe(
+      result.candidate.candidate_id
+    );
     expect(
-      loadDistillCandidateRecord(result.candidate.candidate_id, result.candidate.scope)
-        ?.candidate_id
-    ).toBe(result.candidate.candidate_id);
-    expect(loadDistillCandidateRecord(result.candidate.candidate_id)).toBeNull();
-    expect(
-      loadDistillCandidateRecord(result.candidate.candidate_id, {
+      load(result.candidate.candidate_id, {
         ...result.candidate.scope!,
         owner_nhi: 'nhi:other-owner',
       })

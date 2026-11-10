@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import * as pathResolver from '../path-resolver.js';
 import { transitionStatus } from './mission-status.js';
 import { type ArtifactReviewFinding } from '../workforce/artifact-review.js';
@@ -84,7 +85,7 @@ export function buildMissionSystem(rootDir = pathResolver.rootDir()) {
     writeFocusedMissionId: writeFocusedMissionIdBound,
     async create(
       id: string,
-      tier: 'personal' | 'confidential' | 'public' = 'confidential',
+      tier: StorageDataTier = 'confidential',
       tenantId: string = 'default',
       missionType: string = 'development',
       visionRef?: string,
@@ -119,7 +120,7 @@ export function buildMissionSystem(rootDir = pathResolver.rootDir()) {
     },
     async start(
       id: string,
-      tier: 'personal' | 'confidential' | 'public' = 'confidential',
+      tier: StorageDataTier = 'confidential',
       persona: string = 'worker',
       tenantId: string = 'default',
       missionType: string = 'development',

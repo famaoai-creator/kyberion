@@ -5,7 +5,7 @@ meeting-notepad / sketch-input と同型の **127.0.0.1 限定ローカルポー
 ## 使い方
 
 ```bash
-KYBERION_PERSONA=sovereign node_modules/.bin/tsx scripts/daily-desk/server.ts \
+KYBERION_BASE_ROLE=sovereign node_modules/.bin/tsx scripts/daily-desk/server.ts \
   [--out active/shared/tmp/daily-desk] \
   [--instruction "今日のフォーカスを整理"] \
   [8152]

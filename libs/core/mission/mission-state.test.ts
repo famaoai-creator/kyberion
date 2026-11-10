@@ -9,6 +9,7 @@ import {
   writeFocusedMissionId,
 } from './mission-state.js';
 import { writeMissionStateAtPath } from './mission-state-reader.js';
+import { readJson } from '../foundation/json.js';
 import { safeMkdir, safeRmSync, safeSymlinkSync, safeWriteFile } from '../secure-io.js';
 
 const rootDir = pathResolver.sharedTmp('mission-state-loader-test');
@@ -32,7 +33,7 @@ describe('mission-state loader', () => {
       status: 'active',
       execution_mode: 'local',
       priority: 1,
-      assigned_persona: 'worker',
+      org_role: 'worker',
       confidence_score: 1,
       git: {
         branch: 'mission/state-loader-test',
@@ -67,7 +68,7 @@ describe('mission-state loader', () => {
       status: 'active',
       execution_mode: 'local',
       priority: 1,
-      assigned_persona: 'worker',
+      org_role: 'worker',
       confidence_score: 1,
       git: {
         branch: 'mission/state-loader-test',
@@ -116,5 +117,37 @@ describe('mission-state loader', () => {
         status: 'active',
       } as unknown as Parameters<typeof writeMissionStateAtPath>[1])
     ).toThrow(/Invalid catalog mission-state/);
+  });
+  it('reads a legacy assigned_persona state as org_role and writes only org_role', () => {
+    const legacyState = {
+      mission_id: missionId,
+      tier: 'public',
+      status: 'active',
+      execution_mode: 'local',
+      priority: 1,
+      assigned_persona: 'qa_lead',
+      confidence_score: 1,
+      git: {
+        branch: 'mission/state-loader-test',
+        start_commit: 'abc123',
+        latest_commit: 'abc123',
+        checkpoints: [],
+      },
+      history: [],
+    };
+    writeState(legacyState);
+
+    const loaded = loadStateAtPath(`${missionDir}/mission-state.json`);
+    expect(loaded?.org_role).toBe('qa_lead');
+    expect(loaded).not.toHaveProperty('assigned_persona');
+    expect(loadStateForRepair(missionId, { rootDir })?.org_role).toBe('qa_lead');
+
+    const target = writeMissionStateAtPath(
+      `${missionDir}/mission-state.json`,
+      legacyState as unknown as Parameters<typeof writeMissionStateAtPath>[1]
+    );
+    const persisted = readJson<Record<string, unknown>>(target);
+    expect(persisted.org_role).toBe('qa_lead');
+    expect(persisted).not.toHaveProperty('assigned_persona');
   });
 });

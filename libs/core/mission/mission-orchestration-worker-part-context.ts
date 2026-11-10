@@ -1,8 +1,10 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import { a2aBridge } from '../mesh/a2a-bridge.js';
 import { createKnowledgeDeliverySnapshot } from '../knowledge/knowledge-delivery-snapshot.js';
 import { clamp, readTextFile } from '../foundation/text.js';
 import { nowIso } from '../foundation/time.js';
 import { readHintsByCategory } from '../knowledge/feedback-loop.js';
+import { missionMemoryCaptureScope } from '../knowledge/memory-capture-scope.js';
 import { resolveMissionTeamReceiver } from './mission-team-plan-composer.js';
 import {
   classifyQuestionDecision,
@@ -26,7 +28,8 @@ import {
   recordKnowledgeDelivery,
   type DeliveredKnowledgeRef,
 } from '../knowledge/knowledge-feedback-loop.js';
-import { findRelevantDistilledKnowledge } from '../knowledge/distill-knowledge-injector.js';
+import { findRelevantPromotedKnowledge } from '../knowledge/promoted-knowledge-retrieval.js';
+import { queryTenantKnowledge } from '../organization/tenant-knowledge-retrieval.js';
 import { isKnowledgePathExcluded, resolveKnowledgeSlice } from '../knowledge/knowledge-slices.js';
 import * as nodePath from 'node:path';
 import * as path from 'node:path';
@@ -89,7 +92,7 @@ import {
  */
 export function resolvedMissionDir(
   missionId: string,
-  _fallbackTier: 'personal' | 'confidential' | 'public' = 'public',
+  _fallbackTier: StorageDataTier = 'public',
   tenantSlug?: string
 ): string {
   const explicitTenant = tenantSlug?.trim();
@@ -892,9 +895,13 @@ export function buildMissionGoalLines(missionState: Record<string, unknown>): st
  * repeating a rejection the operator already explained. Ephemeral advisory
  * lines — deliberately outside the context-pack pruning budget.
  */
-export function buildRejectionLessonLines(): string[] {
+export function buildRejectionLessonLines(missionId?: string): string[] {
   try {
-    return readHintsByCategory('human-rejection')
+    // D8: only lessons captured in this mission's own scope (never another
+    // tenant's). A mission whose scope is undetermined gets none.
+    if (!missionId) return [];
+    const capture = missionMemoryCaptureScope(missionId);
+    return readHintsByCategory('human-rejection', capture.scope ?? { tier: capture.tier })
       .slice(-3)
       .map((hint) => `- ${hint.hint}`);
   } catch {
@@ -906,7 +913,7 @@ export function buildRejectionLessonLines(): string[] {
  * Each team-role assignment carries its own `authority_role` (e.g. a
  * `tester` task's assignee might be authorized as `qa_lead`, an
  * `implementer` task's as `software_developer`) — a different, finer-grained
- * concept than the single mission-wide `assigned_persona` that
+ * concept than the single mission-wide `org_role` that
  * syncRoleProcedure (mission-governance.ts) mirrors at mission activation.
  * That mission-wide copy is fine as an audit artifact, but injecting it into
  * every task regardless of which role is actually doing the work would hand
@@ -1036,9 +1043,10 @@ export const NEEDS_KNOWLEDGE_RETRIEVAL_LIMIT = 3;
  * KP-04: when a `task_result` reports unresolved `needs`, the pre-KP-04
  * retry prompt only re-sent the same objective/context and asked again — it
  * never looked anything up. This targets a fresh, small retrieval using the
- * needs strings themselves as the query (`findRelevantDistilledKnowledge`,
- * the same entry point `loadKnowledgeHintsIfPossible` in
- * mission-context-pack.ts uses), excludes any path already delivered in the
+ * needs strings themselves as the query over the same two lanes
+ * `loadKnowledgeHintsIfPossible` in mission-context-pack-knowledge.ts uses
+ * (D8: promoted records via `findRelevantPromotedKnowledge`, plus the
+ * mission's own tenant subtree via `queryTenantKnowledge`), excludes any path already delivered in the
  * first-round context pack (`deliveredKnowledgeRefs`), and records what it
  * delivers via `recordKnowledgeDelivery` so KP-05 telemetry sees this
  * second round too. Fails open: a retrieval error must never block the
@@ -1066,22 +1074,40 @@ export async function buildNeedsKnowledgeReinforcementLines(input: {
       ...(tenantSlug ? { tenant: tenantSlug } : {}),
       ...(scope?.project_id ? { project: scope.project_id } : {}),
     });
-    const found = await findRelevantDistilledKnowledge({
-      topic: input.needs.join(' '),
-      limit: NEEDS_KNOWLEDGE_RETRIEVAL_LIMIT * 2,
-      minScore: 0.08,
-      ...(scope && tenantSlug
+    const topic = input.needs.join(' ');
+    const fetchLimit = NEEDS_KNOWLEDGE_RETRIEVAL_LIMIT * 2;
+    const tenantScope =
+      scope && tenantSlug
         ? {
-            scope: {
-              tier: 'confidential' as const,
-              tenant_slug: tenantSlug,
-              ...(scope.organization_id ? { organization_id: scope.organization_id } : {}),
-              ...(scope.project_id ? { project_id: scope.project_id } : {}),
-              mission_id: scope.mission_id,
-            },
+            tier: 'confidential' as const,
+            tenant_slug: tenantSlug,
+            ...(scope.organization_id ? { organization_id: scope.organization_id } : {}),
+            ...(scope.project_id ? { project_id: scope.project_id } : {}),
+            mission_id: scope.mission_id,
           }
-        : {}),
-    });
+        : undefined;
+    const [promoted, tenantHits] = await Promise.all([
+      findRelevantPromotedKnowledge({
+        topic,
+        limit: fetchLimit,
+        minScore: 0.08,
+        scope: tenantScope ?? {
+          tier: scope?.write_tier === 'confidential' ? 'confidential' : 'public',
+          mission_id: input.missionId,
+        },
+      }),
+      tenantScope
+        ? queryTenantKnowledge({
+            tenantSlug: tenantScope.tenant_slug,
+            topic,
+            limit: fetchLimit,
+            scope: tenantScope,
+          })
+        : Promise.resolve([]),
+    ]);
+    const found = [...promoted, ...tenantHits].sort(
+      (a, b) => b.score - a.score || (a.path < b.path ? -1 : a.path > b.path ? 1 : 0)
+    );
     const fresh = found
       .filter((entry) => !excludePaths.has(entry.path))
       .filter((entry) => !isKnowledgePathExcluded(entry.path, slice.exclude))

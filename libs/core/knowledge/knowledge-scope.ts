@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import * as path from 'node:path';
 import type { ScopeContext } from '../scope-context.js';
 import { assertScopeContext, scopeContextKey } from '../scope-context.js';
@@ -21,7 +22,10 @@ function cleanSegment(value: string | undefined): string | undefined {
   return normalized;
 }
 
-function entityRoot(scope: ScopeContext, root: 'confidential' | 'personal'): string | undefined {
+function entityRoot(
+  scope: ScopeContext,
+  root: Exclude<StorageDataTier, 'public'>
+): string | undefined {
   const tenant = cleanSegment(scope.tenant_slug);
   if (!tenant) return undefined;
   const segments = [root, tenant];

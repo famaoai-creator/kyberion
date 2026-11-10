@@ -28,7 +28,7 @@ import * as spendGuard from '../finance/spend-guard.js';
 import { computeBudgetUsage } from '../governance/org-budget-governor.js';
 import { buildCostReportFromHistory, formatCostReport } from '../finance/cost-report.js';
 import { validateReadPermission } from '../tier-guard.js';
-import { withExecutionContext } from '../authority.js';
+import { withStoreGrant } from '../authority.js';
 import { logger as coreLogger } from '../core.js';
 import { runDegradationWatch } from '../daemon/health-degradation.js';
 import { resolveFinanceControllerDecision } from '../finance/finance-controller.js';
@@ -59,11 +59,11 @@ const collector = new MetricsCollector({
   // pointed at it below), so its costed appends update the spend cache.
   sharedLedger: true,
 });
-const ENV_KEYS = ['KYBERION_PERSONA', 'MISSION_ROLE', 'KYBERION_TENANT', 'MISSION_ID'] as const;
+const ENV_KEYS = ['KYBERION_BASE_ROLE', 'MISSION_ROLE', 'KYBERION_TENANT', 'MISSION_ID'] as const;
 const saved = Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]]));
 
 function setIdentity(persona: string, role?: string): void {
-  process.env.KYBERION_PERSONA = persona;
+  process.env.KYBERION_BASE_ROLE = persona;
   if (role) process.env.MISSION_ROLE = role;
   else delete process.env.MISSION_ROLE;
 }
@@ -215,14 +215,14 @@ describe('governed enforcement aggregate over persona-gated metrics ledgers', ()
     setIdentity('worker');
     const ledgerFile = path.join(executionRoot, 'confidential', TENANT, 'execution-metrics.jsonl');
     expect(validateReadPermission(ledgerFile).allowed).toBe(false);
-    withExecutionContext(metricsModule.METRICS_CAP_READER_ROLE, () => {
+    withStoreGrant(metricsModule.METRICS_CAP_READER_ROLE, () => {
       expect(validateReadPermission(ledgerFile).allowed).toBe(true);
       expect(validateReadPermission(path.join(ROOT, 'knowledge/confidential')).allowed).toBe(false);
       expect(validateReadPermission(path.join(ROOT, 'knowledge/personal')).allowed).toBe(false);
     });
     // Tenant binding still applies under the role.
     process.env.KYBERION_TENANT = 'other-tenant';
-    withExecutionContext(metricsModule.METRICS_CAP_READER_ROLE, () => {
+    withStoreGrant(metricsModule.METRICS_CAP_READER_ROLE, () => {
       expect(validateReadPermission(ledgerFile).allowed).toBe(false);
     });
   });

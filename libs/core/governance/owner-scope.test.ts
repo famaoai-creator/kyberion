@@ -34,7 +34,7 @@ function writeMission(relativeDir: string, state: Record<string, unknown>): void
     JSON.stringify({
       execution_mode: 'local',
       priority: 1,
-      assigned_persona: 'worker',
+      org_role: 'worker',
       confidence_score: 1,
       status: 'active',
       git: { branch: 'm', start_commit: 'a', latest_commit: 'a', checkpoints: [] },
@@ -71,7 +71,7 @@ describe('resolveOwnerScope', () => {
     process.env.KYBERION_ROOT = tmpRoot;
     process.env.MISSION_ROLE = 'mission_controller';
     // Owner discovery spans public and confidential synthetic organizations.
-    vi.stubEnv('KYBERION_PERSONA', 'sovereign');
+    vi.stubEnv('KYBERION_BASE_ROLE', 'sovereign');
     delete process.env.KYBERION_TENANT;
     scope = await import('./owner-scope.js');
     projects = await import('../project/project-registry.js');

@@ -1,0 +1,7 @@
+{
+  "role": "ops_alerts",
+  "assignable": false,
+  "permissions": {
+    "allow_write": ["active/shared/observability/ops-alerts.jsonl"]
+  }
+}

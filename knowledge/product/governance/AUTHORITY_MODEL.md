@@ -1,6 +1,6 @@
 ---
 title: 'Authority, Role & Persona Model (v3.0)'
-last_updated: 2026-11-01
+last_updated: 2026-11-10
 ---
 
 # Authority, Role & Persona Model (v3.0)
@@ -62,7 +62,7 @@ Kyberion 自体のメンテナンス。
 
 ### A. Persona (実行 ID)
 
-`KYBERION_PERSONA` 環境変数または `resolveIdentityContext()` で解決されます。
+`KYBERION_BASE_ROLE` 環境変数または `resolveIdentityContext()` で解決されます。値は base Authority Role の短い名前です（`worker` はカード `base_worker`。カード名そのものも受け付けます）。旧名の `KYBERION_PERSONA` は 1 リリースだけ、`KYBERION_BASE_ROLE` が env に無いときに限り、診断形式の警告付きで読みます（`foundation/base-role-env.ts`）。空の `KYBERION_BASE_ROLE` は「base role なし」で、旧名の値に戻ることはありません。子プロセスへ渡す／消す env の一覧は両方の名前を書きます（`tests/base-role-env-key-list-boundary.test.ts`）。
 
 - **sovereign**: 全境界を超越。すべてが audit 記録対象。
 - **ecosystem_architect**: SYSTEM モード。Kyberion コアの維持管理専用。
@@ -70,6 +70,8 @@ Kyberion 自体のメンテナンス。
 - **worker**: MISSION モード。プロジェクト・ミッションのサンドボックス内に制限。
 - **analyst**: MISSION モード。ナレッジ読み取りと蒸留書き込みに特化。
 - **unknown**: 未解決。ほとんどの書き込みが拒否される。
+
+**Persona の権限は base Authority Role（S4 の 4 つ目）**: `sovereign` / `ecosystem_architect` / `worker` / `analyst` が持つパスの権限は、レジストリの base Authority Role `base_sovereign` / `base_ecosystem_architect` / `base_worker` / `base_analyst`（`authority-roles/base_<persona>.json`、`"assignable": false`）にあり、`pnpm kyberion sync authority-roles` が `authority_role_permissions` へ写します。以前の `security-policy.json` の `persona_permissions` の中身をそのまま移しました。tier-guard はプリンシパルの persona が指す base role の権限を、自分のロールと authority の権限に足します（`libs/core/foundation/base-authority-role.ts`）。判定は前後で同じです（`libs/core/testing/base-authority-role-equivalence.test.ts`、基準は `tests/fixtures/base-authority-role-equivalence.json`）。base role は自分のロールにはなりません。`withExecutionContext('base_…')` は拒否し、`MISSION_ROLE` / `SYSTEM_ROLE` でその名前として動いても何も得ません。`mission_owner` と `unknown` には base role がありません。base role を持たない古いインストール先の catalog は、1 リリースの間だけ `persona_permissions` から読みます。宣言された許可証の `persona` の項目は `baseRole`（`base_worker`）になりました。
 
 ### B. Authority Role (機能ロール)
 
@@ -81,7 +83,19 @@ Kyberion 自体のメンテナンス。
 - **mission_roles** (5): `mission_controller`, `software_developer`, `sovereign_concierge`, `incident_commander`, `performance_engineer`
 - **context_roles** (16): `ceo`, `business_owner`, `product_manager` など。Authority Role はなく、ナレッジ上の責務定義のみ。
 
-Authority role definitions: `knowledge/product/governance/authority-roles/*.json`
+Authority role definitions: `knowledge/product/governance/authority-roles/*.json`（唯一のレジストリ）。カードには役割の説明・`tier_access` などのプロフィールと、パスの許可 `permissions` を書きます。`authority-role-index.json`（割り当てできるロールの一覧）と `security-policy.json` の `authority_role_permissions` は、`pnpm kyberion sync authority-roles` がカードから生成します。手で編集せず、カードを直してから再生成します。食い違いは `governance-rules` のゲートが止めます。`"assignable": false` のカードはスクリプトやサービスが引き受けるだけのプロセスロールで、チーム・組織・dot には割り当てられません。
+
+### B3. 保存先の許可証（store grants、S4）
+
+保存先 1 つ（または決まった数個）だけを読み書きするための専用ロールは、Authority Role ではなく **保存先の許可証（declared store grant）** になりました（[Concept Model v2 D6](../architecture/decisions/2026-11-10-concept-model-v2.md)）。
+
+- 宣言は `security-policy.json` の `store_grants.<name>`（`allow_read` / `allow_write` / `deny_read` / `deny_read_descendants` / `narrow`）、名前の一覧は `libs/core/foundation/declared-store-grant.ts` の `DECLARED_STORE_GRANTS` です。カード、`authority-role-index.json`、`authority_role_permissions` には載りません。
+- 発行するのは保存先の窓口だけです。窓口は `withStoreGrant(name, fn, { tenantSlug, organizationId })`（非同期は `withStoreGrantAsync`）で許可証を開きます。発行の条件は以前のロールの引き受けと同じです（RA-02。名前は `role-assumption-policy.json` に発行の権利として残る。tenant に束縛する許可証は、明示した tenant が呼び出し元の有効な tenant と一致する必要がある）。
+- 許可証が開いている間だけ、その宣言が判定に使われます。`withExecutionContext(name)` は `[ROLE_ASSUMPTION_DENIED]` で拒否し、`SYSTEM_ROLE` / `MISSION_ROLE` / 委譲された環境変数でその名前として動くプロセスや、許可証の中から起動した子プロセスは、I/O が一切できません（`[STORE_GRANT_REQUIRED]`）。以前のロールより狭くなる側の、意図した違いです。
+- 横断して読む許可証（`disclosure`：`workspace_graph_reader`、`concierge_management_reader`、`peer_responder_reader`）は、開くたびに監査チェーンへ `store_grant.disclosure` を記録します。記録できなければ開きません。自分の正確な上限（resource ceiling）の中で開く窓口は、上限に入る前に `recordStoreGrantDisclosure` で記録し、1 回だけ使える受領を渡します。呼び出し元がすでに上限の中にいても記録します。記録（許可証の名前、主体、束縛した範囲、操作。tenant の中身は含みません）はシステムの範囲の記録です。tenant の印を付けず（束縛した tenant と呼び出し元の tenant はメタデータに入れる）、台帳本体だけに入り、tenant ごとの写しには入りません。監査チェーン自身の書き手が呼び出し元の上限の外で追記し（`auditChain.recordDurable`）、残せなければ読みません。呼び出し元の I/O は上限の中のままです。
+- 別のインストール先へ写すとき（`pnpm organization role migrate-publication-store`）は、`store_grants` の宣言と発行の権利だけを写します。ロールのカード、権限、索引の項目は写しません。実行するコードが宣言していない名前は写しません。
+- 名前は新しいロールに使えません（`pnpm organization role create` が予約する）。同じ名前のロールの項目があっても、許可証の宣言は変わりません。
+- 移行の前後で判定が同じことは `libs/core/testing/store-grant-equivalence.test.ts`（基準は `tests/fixtures/store-grant-equivalence.json`）が (呼び出し元, パス, 操作) の表で確かめます。
 
 ### B2. ロールの解決順序とロール引き受けポリシー (RA-01 / RA-02)
 
@@ -93,11 +107,11 @@ Authority role definitions: `knowledge/product/governance/authority-roles/*.json
 4. `MISSION_ROLE`
 5. `process.argv[1]` のファイル名からの推定
 
-Persona も同じスコープに従います（`resolveExecutionPersona()`）。引き受け（委譲を含む）で決まった Persona が `KYBERION_PERSONA` より優先されます。
+Persona も同じスコープに従います（`resolveExecutionPersona()`）。引き受け（委譲を含む）で決まった Persona が `KYBERION_BASE_ROLE` より優先されます。
 
 環境変数への反映（ミラー）は同期版の `withExecutionContext` だけが行います。同期の `fn` の実行中は他のコンテキストが割り込めないため、書き込みと復元が交差しません。また `fn` 自身が書き換えた値は上書きして戻しません。非同期版の `withExecutionContextAsync` は `process.env` に一切触れません。同期版に Promise を返す `fn` を渡した場合、スコープのロールはその Promise の継続（`await` の後）にも引き継がれますが、環境変数のミラーは `fn` が返った時点で元に戻ります。非同期の処理には `withExecutionContextAsync` を使ってください。環境変数はプロセス全体で 1 つなので、並行する非同期コンテキストが書き込みと復元を交互に行うと、値が壊れたまま残るためです。子プロセス用の env（`buildExecutionEnv` / `buildSafeExecEnv`）は現在のスコープの引き受けを反映します。**正しさは環境変数に依存しません**。認可判定では環境変数を直接読まず、`resolveRole()` / `resolveIdentityContext()` / `resolveExecutionPersona()` を使ってください。
 
-認可の入力になる Persona は実行スコープから解決します: secure-io の policy-engine 判定（`file_write` / `execute_command` の `agentId`）、`operation-policy-gate`、`organization-digest` の sovereign 判定は `executionPersonaText()` / `resolveExecutionPersona()` を使います。`MISSION_ROLE` / `KYBERION_PERSONA` を今も直接読む既知の箇所は、監査・トレースの帰属ラベル、または CLI の操作者 ID 照合だけです（非同期の引き受けの中では外側の値になります）:
+認可の入力になる Persona は実行スコープから解決します: secure-io の policy-engine 判定（`file_write` / `execute_command` の `agentId`）、`operation-policy-gate`、`organization-digest` の sovereign 判定は `executionPersonaText()` / `resolveExecutionPersona()` を使います。`MISSION_ROLE` / `KYBERION_BASE_ROLE` を今も直接読む既知の箇所は、監査・トレースの帰属ラベル、または CLI の操作者 ID 照合だけです（非同期の引き受けの中では外側の値になります）:
 
 - 帰属ラベル: `network.ts`、`secret-guard.ts`、`secret-introduction.ts`、`delegated-task-observability.ts`、`provider-pins-store.ts`、`seam-provider-selection.ts`、`seam-selection-rules.ts`、`mission-lifecycle-service.ts`、`reasoning-bootstrap.ts`、`work-coordination.ts`、`project-management.ts`、`organization-operating-model*.ts`、`organization-operation-run-recording.ts`、`tenant-governance.ts`、`cloudflare-os-control-plane.ts`、`acp-mediator.ts`、`claude-agent-governance.ts`
 - CLI の操作者 ID 照合: `mission-maintenance.ts`（承認者）、`mission-work-reconciliation.ts`（採用者）
@@ -131,11 +145,11 @@ Persona も同じスコープに従います（`resolveExecutionPersona()`）。
 
 - **優先順位**: プロセス内の引き受けより下、`SYSTEM_ROLE` より上です。`resolveRole()` / `resolveAssumedRole()` / `resolveIdentityContext()`、Persona（`resolveExecutionPersona()`。ロールの既定 Persona）、子プロセス env（`buildExecutionEnv()` / `buildSafeExecEnv()`）が同じように従います。
 - **上限**: 引き受けと同じ `isRoleAssumptionAllowed(SYSTEM_ROLE, role)` で検査します。許可されない委譲は `[ROLE_DELEGATION_DENIED]` の警告を出して無視され、子は `SYSTEM_ROLE` として、固定の低い Persona `worker` で動きます（fail closed。`nexus_daemon` のように `SYSTEM_ROLE` の既定 Persona が `sovereign` でも、それにはなりません）。子の中の引き受けの上限は、委譲されたロールではなく元の `SYSTEM_ROLE` の `may_assume` のままです。
-- **新しい `SYSTEM_ROLE` での起動**: `SYSTEM_ROLE` を設定してプロセスを起動するもの（`surface_runtime` のサーフェス起動、`pnpm config-mission` のパイプライン、terminal HUD のサーフェス操作）は、必ず `buildSystemRoleLaunchEnv(env, systemRole, { persona, missionRole })` で env を作ります。これは `SYSTEM_ROLE` を設定し、起動元の委譲を必ず消し、`MISSION_ROLE` / `KYBERION_PERSONA` も起動の契約が明示した値（サーフェス manifest の `env` など）以外は消します。サーフェスの Persona は manifest の明示値、なければ `pnpm surfaces` の契約どおり `worker` です（起動元から継承した Persona は使いません）。manifest の `env` で `SYSTEM_ROLE` や委譲は設定できません。これがないと、`buildExecutionEnv(process.env, 'surface_runtime')` で起動された surface_runtime（`surface_runtime@X`）がサーフェス X を起動し直したとき、束縛が一致してサーフェス全体が surface_runtime として動いてしまいます。
+- **新しい `SYSTEM_ROLE` での起動**: `SYSTEM_ROLE` を設定してプロセスを起動するもの（`surface_runtime` のサーフェス起動、`pnpm config-mission` のパイプライン、terminal HUD のサーフェス操作）は、必ず `buildSystemRoleLaunchEnv(env, systemRole, { persona, missionRole })` で env を作ります。これは `SYSTEM_ROLE` を設定し、起動元の委譲を必ず消し、`MISSION_ROLE` / `KYBERION_BASE_ROLE` も起動の契約が明示した値（サーフェス manifest の `env` など）以外は消します。サーフェスの Persona は manifest の明示値、なければ `pnpm surfaces` の契約どおり `worker` です（起動元から継承した Persona は使いません）。manifest の `env` で `SYSTEM_ROLE` や委譲は設定できません。これがないと、`buildExecutionEnv(process.env, 'surface_runtime')` で起動された surface_runtime（`surface_runtime@X`）がサーフェス X を起動し直したとき、束縛が一致してサーフェス全体が surface_runtime として動いてしまいます。
 - **空の値は未設定**: `buildSystemRoleLaunchEnv` は消すキーを削除せず空文字列（`MISSION_ROLE=` など）にします。Kyberion は空の値を未設定として扱うため、Node 以外の子プロセスや env を読む外部ツールも、空の値を「未設定」と解釈してください。
 - **束縛**: 値は発行したときの `SYSTEM_ROLE` に束縛され、別の `SYSTEM_ROLE` のプロセスでは無視されます（上の起動規則に対する二重の防御）。`SYSTEM_ROLE` のないプロセスでは何もせず、従来どおり `MISSION_ROLE` が使われます。
 - **孫プロセス**: 子が自分の `buildExecutionEnv(env, role)` を呼ぶと委譲は置き換わり、ロールを渡さなければ現在のスコープのロール（引き受けの中ならその引き受け、なければ自分の委譲）が委譲されます。上限はどちらでも元の `SYSTEM_ROLE` のものです。
-- **伝播しない先**: プロバイダー / エージェント CLI の子（`buildProviderChildEnv`、SO-03）には `SYSTEM_ROLE` と同じく渡しません。`buildSafeExecEnv` も `SYSTEM_ROLE` と同じく既定では引き継がず、呼び出し側が明示的に渡した env（`buildExecutionEnv` の結果）でだけ届きます。呼び出し側やデータが渡す env（terminal / process アクチュエーターの `params.env`、system アクチュエーターの `exec` / シェル実行の `params.env`、ミッションゲート `command_succeeds` の `params.env`、service アクチュエーターの manifest の `env`、サービスプリセットの `alt.env`）からは `stripAuthorityEnvOverrides` が `SYSTEM_ROLE`・`MISSION_ROLE`・`KYBERION_PERSONA`・`KYBERION_DELEGATED_ROLE`・`KYBERION_SUDO` を取り除くため、クライアントや ADF の入力から設定する経路はありません。
+- **伝播しない先**: プロバイダー / エージェント CLI の子（`buildProviderChildEnv`、SO-03）には `SYSTEM_ROLE` と同じく渡しません。`buildSafeExecEnv` も `SYSTEM_ROLE` と同じく既定では引き継がず、呼び出し側が明示的に渡した env（`buildExecutionEnv` の結果）でだけ届きます。呼び出し側やデータが渡す env（terminal / process アクチュエーターの `params.env`、system アクチュエーターの `exec` / シェル実行の `params.env`、ミッションゲート `command_succeeds` の `params.env`、service アクチュエーターの manifest の `env`、サービスプリセットの `alt.env`）からは `stripAuthorityEnvOverrides` が `SYSTEM_ROLE`・`MISSION_ROLE`・`KYBERION_BASE_ROLE`・`KYBERION_DELEGATED_ROLE`・`KYBERION_SUDO` を取り除くため、クライアントや ADF の入力から設定する経路はありません。
 - **トレース**: 委譲の判定は `KYBERION_ROLE_ASSUMPTION_TRACE` にプロセスごとに 1 回、`source: "delegation"` つきで記録されます。
 - **到達可能性**: 解析は、`SYSTEM_ROLE` を運びうる env（`undefined` や省略は `process.env` の意味）に対する `buildExecutionEnv(env, role)` の呼び出しを `role` の引き受け箇所（`… [delegated child role]`）として数えます。env リテラルが `SYSTEM_ROLE` を設定している場合は、その `SYSTEM_ROLE` の到達可能ロールとして数えます。`buildSystemRoleLaunchEnv` で作った env は親の `SYSTEM_ROLE` を運ばないとみなします。子のエントリポイントは従来どおり子プロセスとしてたどり、子の中の引き受けは親の `SYSTEM_ROLE` の上限で数えます。
 
@@ -214,11 +228,11 @@ SUDO が必要な操作のうち `scope-approve` (origin intent のリベース�
 
 ## 6. 起動時の環境変数
 
-サーフェスやバックグラウンドサービスを起動する際、`KYBERION_PERSONA` と `MISSION_ROLE` を正しく渡す必要があります。設定は `knowledge/product/governance/surfaces/<surface-id>.json` の `"env"` プロパティに定義します。
+サーフェスやバックグラウンドサービスを起動する際、`KYBERION_BASE_ROLE` と `MISSION_ROLE` を正しく渡す必要があります。設定は `knowledge/product/governance/surfaces/<surface-id>.json` の `"env"` プロパティに定義します。
 
 ```json
 "env": {
-  "KYBERION_PERSONA": "worker",
+  "KYBERION_BASE_ROLE": "worker",
   "MISSION_ROLE": "surface_runtime"
 }
 ```

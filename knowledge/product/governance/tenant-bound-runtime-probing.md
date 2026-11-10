@@ -3,7 +3,7 @@ title: Running and Probing Tenant-Bound Pipelines Without Policy Violations
 category: Governance
 tags: [governance, tenant, persona, authority, chronos, kill-switch, probing, tier-guard]
 importance: 7
-last_updated: 2026-09-24
+last_updated: 2026-11-10
 role_affinity: [mission_controller, ecosystem_architect, operator]
 phase_affinity: [execution, review]
 ---
@@ -23,7 +23,7 @@ Model background: [AUTHORITY_MODEL](./AUTHORITY_MODEL.md) (evaluation order,
 | Symptom (denial text)                                                                                                                                                             | Env / identity that causes it                                                                                             | Why                                                                                                                                                                                                                                                       |
 | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `Organization Confidential: Higher tier required` on a read of `knowledge/confidential/...`                                                                                       | No `MISSION_ROLE`, or a role/persona whose grants do not cover the path (`worker`, `analyst`, `unknown`)                  | Confidential reads need an authority, role or persona grant (`tier-guard.ts` `validateReadPermission`). Listing `knowledge/confidential/` itself is a confidential read — even an `lstat` walk through secure-io.                                         |
-| Same text on **write**, although `MISSION_ROLE` looks right                                                                                                                       | `withExecutionContext(role)` replaced your persona with the role's default persona (e.g. `knowledge_steward` → `analyst`) | `enterExecutionEnv` in `authority.ts` sets `KYBERION_PERSONA` from the role; the persona-intrinsic `KNOWLEDGE_WRITE` authority exists only for `sovereign` / `ecosystem_architect`. A role without its own `allow_write` for the path is then denied.     |
+| Same text on **write**, although `MISSION_ROLE` looks right                                                                                                                       | `withExecutionContext(role)` replaced your persona with the role's default persona (e.g. `knowledge_steward` → `analyst`) | `enterExecutionEnv` in `authority.ts` sets `KYBERION_BASE_ROLE` from the role; the persona-intrinsic `KNOWLEDGE_WRITE` authority exists only for `sovereign` / `ecosystem_architect`. A role without its own `allow_write` for the path is then denied.   |
 | `Persona 'worker' with authority role '<role>' is NOT authorized to write to 'active/shared/runtime/audit-mirror/confidential/{tenant}/...'` (audit-chain "Tenant mirror failed") | A tenant-bound process (`KYBERION_TENANT` set) whose role has no grant for the tenant audit/trace mirror                  | `audit-chain.ts` mirrors every record into `active/shared/runtime/audit-mirror/confidential/{tenant}/`. Grant it with the `${KYBERION_TENANT}` placeholder (`active/shared/runtime/audit-mirror/confidential/${KYBERION_TENANT}/`), never a literal slug. |
 | `tenant.scope_violation` / `tenant.scope_missing`                                                                                                                                 | `KYBERION_TENANT=a` touching `knowledge/confidential/b/`, or `KYBERION_TENANT_SCOPE_REQUIRED=1` with no binding           | `checkTenantScope` (deny-unless-brokered). Correct behaviour — fix the caller, not the binding.                                                                                                                                                           |
 | `Ring 3 agents are restricted to read-only operations`                                                                                                                            | `KYBERION_AGENT_RING=3` (sandboxed child) attempting a write/exec                                                         | `agent-policies.yaml` `ring-3` rule.                                                                                                                                                                                                                      |
@@ -38,7 +38,7 @@ A tenant pipeline runs exactly as chronos runs it: in its own process with
 KYBERION_TENANT=<tenant>              # binds every tenant-scoped grant (${KYBERION_TENANT})
 KYBERION_TENANT_SCOPE_REQUIRED=1      # protected paths without a binding are denied
 MISSION_ROLE=chronos_tenant_runner    # reads: tenant registry + knowledge/confidential/${KYBERION_TENANT}/
-KYBERION_PERSONA=worker               # no persona-intrinsic authorities
+KYBERION_BASE_ROLE=worker               # no persona-intrinsic authorities
 KYBERION_SUDO=                        # never inherited
 # plus ONLY what the ADF `runtime` block declares, resolved by chronos:
 AUTHORIZED_SCOPE=<service>                     # runtime.authorized_scope (one service)
@@ -60,13 +60,13 @@ switches to the narrow `ingest_commit` role for the write itself.
 
 Interactive, non-tenant-bound CLI work that writes confidential knowledge
 still needs a persona with a write grant (e.g.
-`KYBERION_PERSONA=ecosystem_architect`, `MISSION_ROLE=mission_controller` for
+`KYBERION_BASE_ROLE=ecosystem_architect`, `MISSION_ROLE=mission_controller` for
 tenant-registry reads) — see [AUTHORITY_MODEL §6](./AUTHORITY_MODEL.md).
 
 ## 3. Probing safely
 
 1. **Read the grant before you run.** Check `security-policy.json`
-   `authority_role_permissions.<role>` and `persona_permissions.<persona>` for
+   `authority_role_permissions.<role>` and `authority_role_permissions.base_<persona>` for
    the exact path. One denial is information; a second with a guessed
    persona is noise that counts toward the kill switch.
 2. **Probe with the real entry point in the real shape**: the tenant-bound

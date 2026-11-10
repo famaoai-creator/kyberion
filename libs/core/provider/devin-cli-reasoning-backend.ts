@@ -22,8 +22,17 @@
  */
 
 import { spawn } from 'node:child_process';
+import path from 'node:path';
 import { memoizedCliSpawnSync } from './provider-discovery.js';
 import { logger } from '../core.js';
+import { readTextFile } from '../foundation/text.js';
+import { safeExistsSync, safeRmSync } from '../secure-io.js';
+import * as pathResolver from '../path-resolver.js';
+import {
+  parseDevinCliTranscriptUsage,
+  recordCliUsage,
+  type CliUsageReport,
+} from './cli-usage-metering.js';
 import { resolveRuntimeModelId } from '../tool/runtime-model-defaults.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import {
@@ -291,6 +300,10 @@ export class DevinCliReasoningBackend implements ReasoningBackend {
       ? `\n\nRespond with exactly this JSON shape (top-level keys, nesting, and field names must match): ${options.shapeHint.trim()}`
       : '';
     const prompt = `${systemPrompt.trim()}\n\n${userPrompt.trim()}${hint}`.trim();
+    // `--export` lands the session transcript (with `final_metrics` token
+    // totals) in scratch; the flag sits after extraArgs so an operator-passed
+    // export path cannot silently disable metering (final flag wins).
+    const exportPath = this.tempFilePath('devin-export', 'json');
     const args = [
       '--model',
       model,
@@ -298,27 +311,67 @@ export class DevinCliReasoningBackend implements ReasoningBackend {
       '--respect-workspace-trust',
       'false',
       ...this.extraArgs,
+      '--export',
+      exportPath,
       '-p',
       '--',
       prompt,
     ];
 
-    const stdout = await this.spawnCli(
-      args,
-      options?.signal,
-      resolveEffectiveProviderPermissionProfile('devin', options?.profile)
-    );
-    const result = stdout.trim();
-    if (!result) {
-      throw new Error('[devin-cli] CLI returned no text');
+    const started = Date.now();
+    const capture = { requestNotSent: true };
+    let completionChars = 0;
+    let status: 'success' | 'error' = 'error';
+    try {
+      const stdout = await this.spawnCli(
+        args,
+        options?.signal,
+        resolveEffectiveProviderPermissionProfile('devin', options?.profile),
+        capture
+      );
+      const result = stdout.trim();
+      if (!result) {
+        throw new Error('[devin-cli] CLI returned no text');
+      }
+      status = 'success';
+      completionChars = result.length;
+      return result;
+    } finally {
+      recordCliUsage('devin-cli', model, started, status, {
+        report: this.readExportUsage(exportPath),
+        promptChars: prompt.length,
+        completionChars,
+        requestNotSent: capture.requestNotSent,
+      });
+      try {
+        safeRmSync(exportPath, { force: true });
+      } catch (err) {
+        logger.debug(
+          `[devin-cli] export transcript cleanup failed: ${err instanceof Error ? err.message : String(err)}`
+        );
+      }
     }
-    return result;
+  }
+
+  private tempFilePath(prefix: string, extension: string): string {
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    return path.join(pathResolver.sharedTmp(), `kyberion-${prefix}-${id}.${extension}`);
+  }
+
+  private readExportUsage(exportPath: string): CliUsageReport | undefined {
+    try {
+      if (!safeExistsSync(exportPath)) return undefined;
+      return parseDevinCliTranscriptUsage(readTextFile(exportPath));
+    } catch {
+      return undefined;
+    }
   }
 
   private spawnCli(
     args: string[],
     signal?: AbortSignal,
-    profile?: ProviderPermissionProfileName
+    profile?: ProviderPermissionProfileName,
+    capture: { requestNotSent: boolean } = { requestNotSent: true }
   ): Promise<string> {
     const spawnEnv = buildDelegationSpawnEnv({
       provider: 'devin',
@@ -331,6 +384,7 @@ export class DevinCliReasoningBackend implements ReasoningBackend {
         env: spawnEnv.env,
       })
     );
+    capture.requestNotSent = false;
 
     return withWallClockBudget(
       {
@@ -357,6 +411,8 @@ export class DevinCliReasoningBackend implements ReasoningBackend {
             resolve(stdout);
           });
           child.on('error', (err) => {
+            // Exec-level failure (e.g. ENOENT): the provider saw no request.
+            if (!stdout) capture.requestNotSent = true;
             reject(new Error(`[devin-cli] spawn failed: ${err.message}`));
           });
           child.stdin.end();

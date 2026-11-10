@@ -30,7 +30,7 @@ const purposePath = persistence.organizationPurposePath(
 );
 beforeEach(() => {
   vi.stubEnv('KYBERION_SUDO', 'true');
-  vi.stubEnv('KYBERION_PERSONA', 'sovereign');
+  vi.stubEnv('KYBERION_BASE_ROLE', 'sovereign');
   vi.stubEnv('KYBERION_TENANT', scope.tenantSlug);
   io.safeRmSync(workspace, { recursive: true, force: true });
 });

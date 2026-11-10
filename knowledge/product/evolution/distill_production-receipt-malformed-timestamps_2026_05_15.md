@@ -6,6 +6,7 @@ importance: 4
 source_mission: PRODUCTION-RECEIPT-MALFORMED-TIMESTAMPS
 author: Kyberion Wisdom Distiller
 last_updated: 2026-05-15
+doc_status: historical
 ---
 
 # Fail-Closed Validation for Receipt Timestamps

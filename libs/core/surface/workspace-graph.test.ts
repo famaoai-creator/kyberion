@@ -483,3 +483,124 @@ describe('surface operation registry', () => {
     );
   });
 });
+
+describe('work items read in Issue units (W2)', () => {
+  const base = {
+    description: '',
+    priority: 'normal',
+    source: 'local',
+    source_ref: '',
+    project_id: 'PRJ-A',
+    labels: [],
+    dependencies: [],
+    version: 1,
+    created_at: '2026-11-01T00:00:00Z',
+    updated_at: '2026-11-02T00:00:00Z',
+    context: { tenant_slug: 'acme', organization_id: 'acme-hq', project_id: 'PRJ-A' },
+  };
+  const issueSources = () =>
+    sources({
+      workItems: () =>
+        [
+          { ...base, item_id: 'ISSUE-1', title: 'Launch checklist', status: 'in_progress' },
+          {
+            ...base,
+            item_id: 'STEP-1',
+            title: 'Write copy',
+            status: 'done',
+            parent_item_id: 'ISSUE-1',
+          },
+          {
+            ...base,
+            item_id: 'STEP-2',
+            title: 'Review copy',
+            status: 'ready',
+            parent_item_id: 'ISSUE-1',
+          },
+          // Its Issue is not visible here: the step must stay reachable as a card.
+          {
+            ...base,
+            item_id: 'STEP-ORPHAN',
+            title: 'Orphaned step',
+            status: 'ready',
+            parent_item_id: 'ISSUE-ELSEWHERE',
+          },
+          {
+            ...base,
+            item_id: 'mission-ownership:MSN-A1',
+            title: 'Mission ownership: MSN-A1',
+            description: 'SO-03 mission-ownership claim item for mission MSN-A1.',
+            status: 'in_progress',
+            project_id: 'orchestrator-sessions',
+            context: { tenant_slug: 'acme', organization_id: 'acme-hq' },
+            metadata: { mission_id: 'MSN-A1', kind: 'mission_ownership' },
+          },
+        ] as unknown as WorkItem[],
+    });
+  const list = (input: Record<string, unknown>) => {
+    const result = invokeSurfaceOperation(
+      'workspace.list',
+      { kind: 'work_item', ...input },
+      { viewer: acmeViewer, sources: issueSources() }
+    );
+    expect(result.ok).toBe(true);
+    return (
+      result as {
+        data: { items: Array<{ id: string; steps?: unknown; label: string; projectId?: string }> };
+      }
+    ).data.items;
+  };
+
+  it('lists Issues with their step progress; steps only under their Issue', () => {
+    const issues = list({ top_level: 'true' });
+    expect(issues.map((node) => node.id).sort()).toEqual([
+      'ISSUE-1',
+      'STEP-ORPHAN',
+      'mission-ownership:MSN-A1',
+    ]);
+    expect(issues.find((node) => node.id === 'ISSUE-1')?.steps).toEqual({ total: 2, done: 1 });
+    expect(issues.find((node) => node.id === 'STEP-ORPHAN')?.steps).toBeUndefined();
+    expect(
+      list({ parent_item_id: 'ISSUE-1' })
+        .map((node) => node.id)
+        .sort()
+    ).toEqual(['STEP-1', 'STEP-2']);
+    // Without the flag every item is listed (existing callers unchanged).
+    expect(list({})).toHaveLength(5);
+  });
+
+  it('reads a mission ownership item as the mission, not as a claim record', () => {
+    const owner = list({ top_level: 'true' }).find(
+      (node) => node.id === 'mission-ownership:MSN-A1'
+    );
+    const mission = collectWorkspaceGraph(issueSources()).nodes.find(
+      (node) => node.kind === 'mission' && node.id === 'MSN-A1'
+    );
+    expect(mission?.label).toBeTruthy();
+    expect(owner).toMatchObject({ label: mission?.label, projectId: 'PRJ-A' });
+    expect(owner?.label).not.toContain('Mission ownership');
+    expect(owner).not.toHaveProperty('summary');
+  });
+
+  it('shows a step inside its Issue and the Issue in the step lineage', () => {
+    const graph = collectWorkspaceGraph(issueSources());
+    const issue = getGraphEntity(graph, 'work_item', 'ISSUE-1');
+    expect(issue?.children.work_item?.map((node) => node.id).sort()).toEqual(['STEP-1', 'STEP-2']);
+    const step = getGraphEntity(graph, 'work_item', 'STEP-2');
+    expect(step?.lineage.at(-1)).toEqual({
+      kind: 'work_item',
+      id: 'ISSUE-1',
+      label: 'Launch checklist',
+    });
+  });
+
+  it('rejects a malformed top_level flag', () => {
+    expect(
+      invokeSurfaceOperation(
+        'workspace.list',
+        { kind: 'work_item', top_level: 'yes' },
+        { viewer: acmeViewer, sources: issueSources() }
+      )
+    ).toMatchObject({ ok: false, status: 400 });
+  });
+});

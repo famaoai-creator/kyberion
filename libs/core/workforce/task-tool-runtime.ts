@@ -8,6 +8,7 @@ import {
 } from '../event/event-scope.js';
 import { getWorkItem, listActiveWorkLeases } from './work-coordination.js';
 import { coordinationNamespace } from './work-coordination-ledger.js';
+import { isWorkLeaseLive } from './work-item-lease.js';
 import type { WorkItem, WorkLease } from './work-coordination-types.js';
 import {
   getSubagentCapabilityProfile,
@@ -324,11 +325,7 @@ export function createRuntimeForTask(
         entry.item_id === workItemId &&
         entry.holder_peer_id === holder
     );
-    if (
-      !lease ||
-      lease.status !== 'active' ||
-      Date.parse(lease.expires_at) <= (options.now ?? Date.now)()
-    )
+    if (!lease || !isWorkLeaseLive(lease, (options.now ?? Date.now)()))
       throw new Error('[TASK_TOOL_LEASE_LOST] Task lease expired');
     const state = options.mission
       ? options.mission(missionId)

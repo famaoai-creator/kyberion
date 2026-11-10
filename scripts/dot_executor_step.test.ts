@@ -64,7 +64,7 @@ describe('buildDotExecutorPorts', () => {
       attention: { triggers: [] },
       authority: {
         authority_role: 'infrastructure_sentinel',
-        allowed_work_shapes: ['pipeline'],
+        allowed_execution_shapes: ['pipeline'],
         allowed_pipelines: ['pipelines/front-desk-request-receipt.json'],
       },
       decisions: { default_decision: 'approve' },
@@ -464,7 +464,7 @@ describe('dot-executor supervisor step', () => {
               ...CHARTER,
               authority: {
                 ...CHARTER.authority,
-                allowed_work_shapes: ['task_session', 'pipeline'],
+                allowed_execution_shapes: ['task_session', 'pipeline'],
               },
             },
           },

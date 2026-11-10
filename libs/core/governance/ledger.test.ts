@@ -26,6 +26,7 @@ import { getFoundationIo } from '../foundation/io.js';
 import { readTextFile } from '../foundation/text.js';
 import { withExecutionContext } from '../authority.js';
 import { validateWritePermission } from '../tier-guard.js';
+import { asRoleOrGrant } from '../testing/role-or-store-grant.js';
 
 /** Append an unkeyed (`sha256`) entry — what anyone can compute without the chain key. */
 function appendUnkeyedEntry(ledgerPath: string, type: string): void {
@@ -562,7 +563,7 @@ describe('ledger core', () => {
         record(type, { tenant_slug: 'client-anchor', tier: 'confidential' })
       );
       const partition = tenantLedgerPath('confidential', 'client-anchor');
-      const segments = withExecutionContext(
+      const segments = asRoleOrGrant(
         TENANT_LEDGER_STORE_ROLE,
         () => listLedgerSegments(partition),
         undefined,
@@ -655,7 +656,7 @@ describe('ledger core', () => {
       const partition = tenantLedgerPath('confidential', 'client-rot');
       const segmentPath = path.join(path.dirname(partition), `ledger-${STAMP}.jsonl`);
       // The production role's write scope covers the live file and its segments.
-      const scope = withExecutionContext(
+      const scope = asRoleOrGrant(
         TENANT_LEDGER_STORE_ROLE,
         () => ({
           live: validateWritePermission(partition).allowed,
@@ -669,7 +670,7 @@ describe('ledger core', () => {
       ['T_1', 'T_2', 'T_3'].forEach((type) =>
         record(type, { tenant_slug: 'client-rot', tier: 'confidential' })
       );
-      const segments = withExecutionContext(
+      const segments = asRoleOrGrant(
         TENANT_LEDGER_STORE_ROLE,
         () => listLedgerSegments(partition),
         undefined,

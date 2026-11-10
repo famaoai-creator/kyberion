@@ -97,7 +97,7 @@ describe('Config mission contract', () => {
     const pkg = JSON.parse(read('package.json')) as { scripts: Record<string, string> };
     const script = pkg.scripts['config-mission'];
     expect(script).toBeDefined();
-    expect(script).toContain('KYBERION_PERSONA=worker');
+    expect(script).toContain('KYBERION_BASE_ROLE=worker');
     expect(script).toContain('SYSTEM_ROLE=system_configurator');
     expect(script).toContain('config_mission.js');
   });

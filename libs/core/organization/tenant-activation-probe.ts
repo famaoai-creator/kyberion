@@ -4,11 +4,11 @@
  * prints the refs `activate` needs. It never activates anything and never
  * issues an NHI: it only observes, so a failed probe names what to fix.
  */
+import type { StorageDataTier } from '../storage-layout.js';
 import * as path from 'node:path';
 import { getAgentIdentity } from '../agent/agent-identity.js';
 import { getRegisteredEnvText, nowIso } from '../foundation/index.js';
-import { companyProfileHome, loadOnboardingContextBinding } from './onboarding-context.js';
-import { tenantHomePath } from './tenant-home.js';
+import { companyProfilePath, loadOnboardingContextBinding } from './onboarding-context.js';
 import {
   TENANT_ACTIVATION_PROBE_CHECKS,
   TENANT_ACTIVATION_PROBE_EVIDENCE_KIND,
@@ -31,7 +31,7 @@ export interface TenantActivationProbeInput {
   customerSlug: string;
   tenantSlug: string;
   organizationId: string;
-  tier?: 'personal' | 'confidential' | 'public';
+  tier?: StorageDataTier;
   nhiIds: string[];
   serviceIds: string[];
   rootDir?: string;
@@ -79,14 +79,9 @@ function checkTenantScopedConsistency(
     )
       return failure;
     const profile = loadOrganizationProfileAtPath(
-      assertSafeRepositoryPath(
-        tenantHomePath(
-          companyProfileHome(input.tenantSlug, input.customerSlug, rootDir),
-          'organization-profile.json',
-          rootDir
-        ),
-        { rootDir }
-      )
+      assertSafeRepositoryPath(companyProfilePath(input.tenantSlug, input.customerSlug, rootDir), {
+        rootDir,
+      })
     );
     if (profile.organization_id !== input.organizationId) return failure;
     const { checks } = resolveTenantActivation(input).record;
@@ -177,7 +172,7 @@ function nhiProbe(input: TenantActivationProbeInput, deps: TenantActivationProbe
   if (input.nhiIds.length === 0) {
     return {
       passed: false,
-      detail: `pass --nhi-id kyberion://agent/${input.organizationId}/<agent-slug> for each AI worker`,
+      detail: `pass --nhi-id kyberion://agent/${input.tenantSlug}/${input.organizationId}/<agent-slug> for each AI worker`,
     };
   }
   const problems = input.nhiIds.flatMap((nhiId) => {

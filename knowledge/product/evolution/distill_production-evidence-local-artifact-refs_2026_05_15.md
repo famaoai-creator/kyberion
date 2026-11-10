@@ -6,6 +6,7 @@ importance: 5
 source_mission: PRODUCTION-EVIDENCE-LOCAL-ARTIFACT-REFS
 author: Kyberion Wisdom Distiller
 last_updated: 2026-05-15
+doc_status: historical
 ---
 
 # Production Evidence Integrity: Local Artifact Validation

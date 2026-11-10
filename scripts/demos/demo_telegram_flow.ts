@@ -1,4 +1,5 @@
 import { logger } from '@agent/core/core';
+import { baseRoleEnvText } from '@agent/core/foundation';
 import { runSurfaceMessageConversation } from '@agent/core/surface/surface-runtime-orchestrator';
 import { getRegisteredEnvText, nowIso, setRegisteredEnv } from '@agent/core/foundation';
 import { currentProcessArgv, defineScript, isDirectScript } from '../lib/harness.js';
@@ -6,8 +7,8 @@ import { currentProcessArgv, defineScript, isDirectScript } from '../lib/harness
 export const simulateTelegram = defineScript({
   name: 'telegram-demo',
   async run({ print }) {
-    if (!getRegisteredEnvText('KYBERION_PERSONA')) {
-      setRegisteredEnv('KYBERION_PERSONA', 'ecosystem_architect');
+    if (!baseRoleEnvText()) {
+      setRegisteredEnv('KYBERION_BASE_ROLE', 'ecosystem_architect');
     }
     if (!getRegisteredEnvText('MISSION_ROLE')) {
       setRegisteredEnv('MISSION_ROLE', 'mission_controller');

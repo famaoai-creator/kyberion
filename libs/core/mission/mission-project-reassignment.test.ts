@@ -28,7 +28,7 @@ const TARGET_TRACK_ID = 'TRK-PM-TEST-TARGET';
 const TEST_TENANT = 'tenant-reassignment';
 const SOURCE_PATH = `active/projects/confidential/${TEST_TENANT}/${SOURCE_PROJECT_ID}`;
 const TARGET_PATH = `active/projects/confidential/${TEST_TENANT}/${TARGET_PROJECT_ID}`;
-const ORIGINAL_PERSONA = process.env.KYBERION_PERSONA;
+const ORIGINAL_PERSONA = process.env.KYBERION_BASE_ROLE;
 const ORIGINAL_ROLE = process.env.MISSION_ROLE;
 const ORIGINAL_TENANT = process.env.KYBERION_TENANT;
 
@@ -77,7 +77,7 @@ function fixtureMission(): MissionState {
     tenant_slug: TEST_TENANT,
     execution_mode: 'local',
     priority: 1,
-    assigned_persona: 'worker',
+    org_role: 'worker',
     confidence_score: 1,
     relationships: {
       project: {
@@ -102,7 +102,7 @@ function fixtureMission(): MissionState {
 
 describe('mission Project reassignment', () => {
   beforeEach(() => {
-    process.env.KYBERION_PERSONA = 'sovereign';
+    process.env.KYBERION_BASE_ROLE = 'sovereign';
     process.env.MISSION_ROLE = 'sovereign';
     process.env.KYBERION_TENANT = TEST_TENANT;
     cleanup();
@@ -127,10 +127,10 @@ describe('mission Project reassignment', () => {
   });
 
   afterEach(() => {
-    process.env.KYBERION_PERSONA = 'sovereign';
+    process.env.KYBERION_BASE_ROLE = 'sovereign';
     process.env.MISSION_ROLE = 'sovereign';
     cleanup();
-    process.env.KYBERION_PERSONA = ORIGINAL_PERSONA;
+    process.env.KYBERION_BASE_ROLE = ORIGINAL_PERSONA;
     process.env.MISSION_ROLE = ORIGINAL_ROLE;
     if (ORIGINAL_TENANT === undefined) delete process.env.KYBERION_TENANT;
     else process.env.KYBERION_TENANT = ORIGINAL_TENANT;

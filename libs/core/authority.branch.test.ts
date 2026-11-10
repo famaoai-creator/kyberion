@@ -68,7 +68,7 @@ describe('authority branch coverage', () => {
     mocks.rawReaddir.mockReturnValue([]);
     mocks.rawReadTextFile.mockReturnValue('{}');
 
-    delete process.env.KYBERION_PERSONA;
+    delete process.env.KYBERION_BASE_ROLE;
     delete process.env.MISSION_ROLE;
     delete process.env.SYSTEM_ROLE;
     delete process.env.MISSION_ID;
@@ -122,30 +122,34 @@ describe('authority branch coverage', () => {
     }
   });
 
-  it('resolves persona from mission-state when env persona is unknown', async () => {
+  it('runs a mission-bound execution as worker and never derives a persona from the org role', async () => {
     process.env.MISSION_ID = 'MSN-1';
     process.env.MISSION_ROLE = 'chronos_gateway';
-    process.env.KYBERION_PERSONA = 'mystery';
+    process.env.KYBERION_BASE_ROLE = 'mystery';
     mocks.rawExistsSync.mockImplementation((p: string) =>
       p.endsWith('/missions/MSN-1/mission-state.json')
     );
     mocks.rawReadTextFile.mockImplementation((p: string) => {
       if (p.endsWith('/missions/MSN-1/mission-state.json')) {
-        return JSON.stringify({ assigned_persona: 'Ecosystem Architect' });
+        return JSON.stringify({ org_role: 'Ecosystem Architect' });
       }
       return '[]';
     });
 
     const { resolveIdentityContext } = await import('./authority.js');
     const ctx = resolveIdentityContext();
-    expect(ctx.persona).toBe('ecosystem_architect');
+    // Concept model v2 D5: the Org Role is descriptive metadata. Before S1 an
+    // org role spelled like a persona ("Ecosystem Architect") escalated the
+    // process to ecosystem_architect with its intrinsic authorities.
+    expect(ctx.baseRole).toBe('worker');
+    expect(ctx.authorities).not.toContain('SECRET_READ');
     expect(ctx.role).toBe('chronos_gateway');
   });
 
   it('treats an ambiguous mission id as no mission identity instead of throwing', async () => {
     process.env.MISSION_ID = 'MSN-TWIN';
     process.env.MISSION_ROLE = 'chronos_gateway';
-    process.env.KYBERION_PERSONA = 'mystery';
+    process.env.KYBERION_BASE_ROLE = 'mystery';
     mocks.findMissionPath.mockImplementation(() => {
       throw Object.assign(new Error('[OWNER_AMBIGUOUS] mission MSN-TWIN exists in 2 scopes'), {
         code: 'OWNER_AMBIGUOUS',
@@ -156,7 +160,7 @@ describe('authority branch coverage', () => {
     const ctx = resolveIdentityContext();
     // No mission state is consulted: the persona is not taken from either twin
     // (an unrecognized env persona keeps the default, as with no mission state).
-    expect(ctx.persona).toBe('worker');
+    expect(ctx.baseRole).toBe('worker');
     expect(ctx.role).toBe('chronos_gateway');
     expect(mocks.findMissionPath).toHaveBeenCalledWith('MSN-TWIN');
   });
@@ -174,7 +178,7 @@ describe('authority branch coverage', () => {
 
     const { resolveIdentityContext } = await import('./authority.js');
     const ctx = resolveIdentityContext();
-    expect(ctx.persona).toBe('unknown');
+    expect(ctx.baseRole).toBe('unknown');
     expect(ctx.authorities).not.toContain('SYSTEM_EXEC');
   });
 
@@ -182,12 +186,12 @@ describe('authority branch coverage', () => {
     process.argv[1] = '/tmp/my-controller.ts';
     const { resolveIdentityContext } = await import('./authority.js');
     const ctx = resolveIdentityContext();
-    expect(ctx.persona).toBe('ecosystem_architect');
+    expect(ctx.baseRole).toBe('ecosystem_architect');
     expect(ctx.role).toBe('my_controller');
   });
 
   it('adds persona intrinsic authorities and mission temporal grants', async () => {
-    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     process.env.MISSION_ID = 'MSN-42';
     mocks.rawExistsSync.mockImplementation((p: string) =>
       p.endsWith('/active/shared/auth-grants.json')
@@ -243,7 +247,7 @@ describe('authority branch coverage', () => {
   });
 
   it('handles malformed grants file without throwing', async () => {
-    process.env.KYBERION_PERSONA = 'worker';
+    process.env.KYBERION_BASE_ROLE = 'worker';
     process.env.MISSION_ID = 'MSN-9';
     mocks.rawExistsSync.mockImplementation((p: string) =>
       p.endsWith('/active/shared/auth-grants.json')
@@ -266,12 +270,12 @@ describe('authority branch coverage', () => {
     );
 
     const { inferPersonaFromRole, resolveIdentityContext } = await import('./authority.js');
-    expect(resolveIdentityContext().persona).toBe('unknown');
+    expect(resolveIdentityContext().baseRole).toBe('unknown');
     expect(inferPersonaFromRole('unmapped_role')).toBe('unknown');
   });
 
   it('does not accept arbitrary personas or authorities from malformed records', async () => {
-    process.env.KYBERION_PERSONA = 'worker';
+    process.env.KYBERION_BASE_ROLE = 'worker';
     process.env.MISSION_ID = 'MSN-MALFORMED-GRANT';
     mocks.rawExistsSync.mockImplementation(
       (p: string) =>
@@ -298,29 +302,30 @@ describe('authority branch coverage', () => {
 
   it('buildExecutionEnv keeps existing persona when explicit persona is unknown', async () => {
     const { buildExecutionEnv } = await import('./authority.js');
-    const env = buildExecutionEnv({ KYBERION_PERSONA: 'worker' }, 'unmapped_role');
+    const env = buildExecutionEnv({ KYBERION_BASE_ROLE: 'worker' }, 'unmapped_role');
     expect(env.MISSION_ROLE).toBe('unmapped_role');
-    expect(env.KYBERION_PERSONA).toBe('worker');
+    expect(env.KYBERION_BASE_ROLE).toBe('worker');
   });
 
   it('withExecutionContext deletes temporary persona when role has no inferred persona', async () => {
     process.env.MISSION_ROLE = 'software_developer';
-    process.env.KYBERION_PERSONA = 'analyst';
+    process.env.KYBERION_BASE_ROLE = 'analyst';
     const { withExecutionContext } = await import('./authority.js');
     const inside = withExecutionContext('unmapped_role', () => ({
       role: process.env.MISSION_ROLE,
-      persona: process.env.KYBERION_PERSONA,
+      persona: process.env.KYBERION_BASE_ROLE,
     }));
     expect(inside.role).toBe('unmapped_role');
-    expect(inside.persona).toBeUndefined();
+    // Cleared as '' (not deleted) so a retired KYBERION_PERSONA cannot show through.
+    expect(inside.persona).toBe('');
     expect(process.env.MISSION_ROLE).toBe('software_developer');
-    expect(process.env.KYBERION_PERSONA).toBe('analyst');
+    expect(process.env.KYBERION_BASE_ROLE).toBe('analyst');
   });
 
   it('hasAuthority respects SUDO override and direct authority match', async () => {
     const mod = await import('./authority.js');
 
-    process.env.KYBERION_PERSONA = 'worker';
+    process.env.KYBERION_BASE_ROLE = 'worker';
     process.env.MISSION_ID = 'MSN-SUDO';
     process.env.KYBERION_SUDO = 'true';
     expect(mod.hasAuthority('SECRET_READ')).toBe(true);

@@ -22,7 +22,7 @@ export function firstJobActionMatches(
     action.dot_id === charter.dot_id &&
     action.actor_id === 'dot:' + charter.dot_id &&
     action.action_id === expected.action_id &&
-    action.work_shape === expected.work_shape &&
+    action.execution_shape === expected.execution_shape &&
     action.pipeline_ref === expected.pipeline_ref &&
     action.target === expected.target &&
     action.intent === expected.intent &&

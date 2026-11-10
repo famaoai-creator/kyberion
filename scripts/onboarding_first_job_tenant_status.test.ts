@@ -29,7 +29,7 @@ const charter: DotCharter = {
   attention: { triggers: [] },
   authority: {
     authority_role: 'infrastructure_sentinel',
-    allowed_work_shapes: ['pipeline'],
+    allowed_execution_shapes: ['pipeline'],
     allowed_pipelines: ['pipelines/front-desk-request-receipt.json'],
     max_concurrent_delegations: 1,
   },
@@ -109,7 +109,7 @@ beforeAll(async () => {
   vi.stubEnv('KYBERION_ROOT', root);
   vi.stubEnv('MISSION_ID', '');
   vi.stubEnv('MISSION_ROLE', 'worker');
-  vi.stubEnv('KYBERION_PERSONA', 'worker');
+  vi.stubEnv('KYBERION_BASE_ROLE', 'worker');
   vi.stubEnv('SYSTEM_ROLE', '');
   vi.stubEnv('KYBERION_SUDO', '');
   vi.stubEnv('KYBERION_TENANT', '');
@@ -173,7 +173,7 @@ describe('first-job bound tenant status, real production authority', () => {
         missionId: undefined,
         authorities: [],
         role: 'infrastructure_sentinel',
-        persona: 'worker',
+        baseRole: 'worker',
       });
       expect(
         store.inspectFrontDeskExecution(proposal.front_desk_execution!, charter)
@@ -189,11 +189,12 @@ describe('first-job bound tenant status, real production authority', () => {
           assertTenant: callback,
           countOpenWorkItems: () => 0,
         })
-      ).toEqual({ ok: true });
+      ).toMatchObject({ ok: true, routing_decision: { execution_shape: 'pipeline' } });
     });
   });
   it('grants the new role only the bound record, without writes or neighboring personal reads', () => {
-    authority.withExecutionContext(
+    // S4: a declared store grant, opened as its facade opens it.
+    authority.withStoreGrant(
       'first_job_tenant_status_reader',
       () => {
         expect(String(io.safeReadFile(path.join(root, profilePath)))).toContain(
@@ -206,24 +207,19 @@ describe('first-job bound tenant status, real production authority', () => {
           expect(() => io.safeReadFile(path.join(root, file))).toThrow();
         expect(() => io.safeWriteFile(path.join(root, profilePath), 'forbidden')).toThrow();
       },
-      'worker',
-      tenant
+      { tenantSlug: tenant }
     );
-    authority.withExecutionContext(
-      'first_job_tenant_status_reader',
-      () => {
-        expect(() => io.safeReadFile(path.join(root, profilePath))).toThrow();
-      },
-      'worker'
-    );
+    authority.withStoreGrant('first_job_tenant_status_reader', () => {
+      expect(() => io.safeReadFile(path.join(root, profilePath))).toThrow();
+    });
+    expect(() =>
+      authority.withExecutionContext('first_job_tenant_status_reader', () => undefined)
+    ).toThrow('ROLE_ASSUMPTION_DENIED');
     vi.stubEnv('SYSTEM_ROLE', 'presence_studio');
     expect(() =>
-      authority.withExecutionContext(
-        'first_job_tenant_status_reader',
-        () => undefined,
-        'worker',
-        tenant
-      )
+      authority.withStoreGrant('first_job_tenant_status_reader', () => undefined, {
+        tenantSlug: tenant,
+      })
     ).toThrow('ROLE_ASSUMPTION_DENIED');
     vi.stubEnv('SYSTEM_ROLE', '');
   });

@@ -7,11 +7,11 @@ vi.mock('../reasoning/judgment-provider-bootstrap.js', async (importOriginal) =>
 }));
 const relevance = vi.hoisted(() => ({ selectRelevantKnowledge: vi.fn() }));
 vi.mock('../knowledge/knowledge-relevance-judgment.js', () => relevance);
-vi.mock('../knowledge/distill-knowledge-injector.js', () => ({
-  findRelevantDistilledKnowledge: vi.fn(async () => []),
+vi.mock('../knowledge/promoted-knowledge-retrieval.js', () => ({
+  findRelevantPromotedKnowledge: vi.fn(async () => []),
 }));
 
-import { findRelevantDistilledKnowledge } from '../knowledge/distill-knowledge-injector.js';
+import { findRelevantPromotedKnowledge } from '../knowledge/promoted-knowledge-retrieval.js';
 import { loadKnowledgeHintsIfPossible } from './mission-context-pack-knowledge.js';
 import type { MissionStateSummary } from './mission-context-pack-types.js';
 
@@ -39,7 +39,7 @@ async function load() {
 }
 
 beforeEach(() => {
-  vi.mocked(findRelevantDistilledKnowledge).mockImplementation(async (input) =>
+  vi.mocked(findRelevantPromotedKnowledge).mockImplementation(async (input) =>
     distill.slice(0, input.limit)
   );
 });
@@ -47,13 +47,13 @@ beforeEach(() => {
 afterEach(() => {
   gate.ready = false;
   relevance.selectRelevantKnowledge.mockReset();
-  vi.mocked(findRelevantDistilledKnowledge).mockReset();
+  vi.mocked(findRelevantPromotedKnowledge).mockReset();
 });
 
 describe('relevance narrowing keeps the hint budget', () => {
   it('without a calibrated judgment, fetches and delivers exactly the budget', async () => {
     const hints = await load();
-    expect(vi.mocked(findRelevantDistilledKnowledge).mock.calls[0][0].limit).toBe(3);
+    expect(vi.mocked(findRelevantPromotedKnowledge).mock.calls[0][0].limit).toBe(3);
     expect(hints.map((h) => h.path)).toEqual(distill.slice(0, 3).map((d) => d.path));
     expect(relevance.selectRelevantKnowledge).not.toHaveBeenCalled();
   });
@@ -67,7 +67,7 @@ describe('relevance narrowing keeps the hint budget', () => {
     }));
 
     const hints = await load();
-    expect(vi.mocked(findRelevantDistilledKnowledge).mock.calls[0][0].limit).toBe(6);
+    expect(vi.mocked(findRelevantPromotedKnowledge).mock.calls[0][0].limit).toBe(6);
     expect(relevance.selectRelevantKnowledge.mock.calls[0][0].candidates).toHaveLength(6);
     expect(hints.map((h) => h.path)).toEqual(distill.slice(1, 4).map((d) => d.path));
   });
@@ -93,7 +93,7 @@ describe('retrieval scope and source snapshot precede provider judgment', () => 
       path: 'knowledge/confidential/tenant-a/organizations/org-b/projects/PRJ-B/secret.md',
       excerpt: 'DO NOT EGRESS',
     };
-    vi.mocked(findRelevantDistilledKnowledge).mockResolvedValue([own, sibling, distill[2]]);
+    vi.mocked(findRelevantPromotedKnowledge).mockResolvedValue([own, sibling, distill[2]]);
     relevance.selectRelevantKnowledge.mockImplementation(async ({ candidates }) => ({
       source: 'judgment',
       kept: candidates,
@@ -113,7 +113,7 @@ describe('retrieval scope and source snapshot precede provider judgment', () => 
     expect(JSON.stringify(relevance.selectRelevantKnowledge.mock.calls)).not.toContain(
       'DO NOT EGRESS'
     );
-    expect(vi.mocked(findRelevantDistilledKnowledge).mock.calls[0][0].scope).toMatchObject({
+    expect(vi.mocked(findRelevantPromotedKnowledge).mock.calls[0][0].scope).toMatchObject({
       organization_id: 'org-a',
       project_id: 'PRJ-A',
     });
@@ -122,7 +122,7 @@ describe('retrieval scope and source snapshot precede provider judgment', () => 
   it('retains the source hash paired with the extracted hint across awaited judgment', async () => {
     gate.ready = true;
     const source = { ...distill[0], source_sha256: 'a'.repeat(64) };
-    vi.mocked(findRelevantDistilledKnowledge).mockResolvedValue([source, distill[1]]);
+    vi.mocked(findRelevantPromotedKnowledge).mockResolvedValue([source, distill[1]]);
     relevance.selectRelevantKnowledge.mockImplementation(async ({ candidates }) => {
       source.source_sha256 = 'b'.repeat(64);
       source.excerpt = 'later source version';

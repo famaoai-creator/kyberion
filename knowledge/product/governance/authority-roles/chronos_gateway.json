@@ -21,5 +21,29 @@
     "audit"
   ],
   "allowed_actuators": ["presence-actuator", "artifact-actuator"],
-  "tier_access": ["public", "confidential"]
+  "tier_access": ["public", "confidential"],
+  "permissions": {
+    "allow_read": [
+      "active/shared/coordination/chronos/",
+      "active/shared/coordination/channels/chronos/",
+      "active/shared/coordination/orchestration/",
+      "active/shared/observability/chronos/",
+      "active/shared/observability/mission-control/",
+      "active/shared/runtime/terminal/",
+      "active/audit/",
+      "active/shared/observability/ops-alerts.jsonl",
+      "active/shared/runtime/delegation-records/system/"
+    ],
+    "allow_write": [
+      "active/shared/coordination/chronos/",
+      "active/shared/coordination/channels/chronos/",
+      "active/shared/coordination/orchestration/",
+      "active/shared/observability/chronos/",
+      "active/shared/observability/mission-control/",
+      "active/shared/runtime/terminal/",
+      "active/audit/",
+      "active/shared/observability/ops-alerts.jsonl",
+      "active/shared/runtime/delegation-records/system/"
+    ]
+  }
 }

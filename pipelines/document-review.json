@@ -1,0 +1,35 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "document-review",
+  "version": "1.0.0",
+  "name": "Document Review",
+  "description": "Bounded tools-off review of an explicit document and references. Returns a tier-preserving report in document_review; persist through writeScopedArtifact under the caller governed scope.",
+  "context": {
+    "target": "docs/GLOSSARY.md",
+    "references": [],
+    "sources": [],
+    "preset": "comprehension",
+    "generator": "claude"
+  },
+  "steps": [
+    {
+      "id": "review_document",
+      "role": "sink",
+      "op": "wisdom:document_review",
+      "produces": {
+        "channel": "document_review",
+        "type": "DocumentReviewReport",
+        "sensitive": true
+      },
+      "params": {
+        "target": "{{target}}",
+        "references": "{{references}}",
+        "sources": "{{sources}}",
+        "preset": "{{preset}}",
+        "generator": "{{generator}}",
+        "timeout_ms": 120000,
+        "export_as": "document_review"
+      }
+    }
+  ]
+}

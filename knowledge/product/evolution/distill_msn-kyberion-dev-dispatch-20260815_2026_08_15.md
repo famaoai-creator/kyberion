@@ -6,6 +6,7 @@ importance: 6
 source_mission: MSN-KYBERION-DEV-DISPATCH-20260815
 author: Kyberion Wisdom Distiller
 last_updated: 2026-08-15
+doc_status: historical
 ---
 
 # Tenant-scoped mission dispatch with provider-independent CLI guards

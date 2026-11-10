@@ -21,6 +21,8 @@ pnpm mission start <ID> \
 # work through NEXT_TASKS.json phases; each task auto-completes when its
 # deliverable exists under evidence/ and you run:
 pnpm mission record-evidence <ID> <task_id> "<note>" --actor-id <your-agent-id>
+# dev/refactor missions include a docs-sync delivery task:
+pnpm check:docs-impact --out evidence/docs-sync-report.md   # close every finding
 # review-kind tasks additionally need an independent reviewer:
 pnpm mission review-task <ID> <review_task_id> <different-agent-id> --findings '<json>'
 pnpm mission verify <ID> verified "<why the success condition holds>"
