@@ -11,8 +11,8 @@ import { getAllFiles } from '@agent/core/fs-utils';
  * (`RECEIPT_WRITERS`). `PENDING_MIGRATION` lists the producers that still
  * write a non-receipt (proposed) record and have not been moved to the queue
  * yet; it may only shrink — remove a file when its producer moves, never add
- * one. Background-review and execution-feedback proposals moved in M2 and
- * must never write one again.
+ * one. Every proposal producer moved in M2 (`MOVED_PRODUCERS`) and must never
+ * write one again.
  *
  * Test files are exempt (legacy fixtures write read-only history on purpose).
  */
@@ -25,17 +25,12 @@ const WRITER_CALL = /\b(?:save|update|mutate)DistillCandidateRecord\s*\(/u;
 const REGISTRY = 'libs/core/knowledge/distill-candidate-registry.ts';
 /** Writes the receipt of a promotion (proposed → promoted / archived in one call). */
 const RECEIPT_WRITERS = ['libs/core/knowledge/memory-promotion-workflow.ts'];
-/** Non-receipt producers not yet on the queue. Shrink only. */
-const PENDING_MIGRATION = [
-  // learning intake (`pnpm kyberion learning prepare`)
-  'libs/core/knowledge/reusable-learning.ts',
-  // service-recording procedure candidates
-  'libs/core/service/service-distill-candidate.ts',
-  // browser-extension completed-procedure candidates
-  'scripts/browser_bridge_host.ts',
-  // Concierge mission-seed promotion candidates and legacy record decisions
-  'presence/displays/concierge/src/app/api/ops/intelligence/actions.ts',
-];
+/**
+ * Non-receipt producers not yet on the queue. Shrink only — empty since the
+ * last four (learning intake, service procedures, the browser extension and
+ * Concierge mission-seed promotion) moved in M2.
+ */
+const PENDING_MIGRATION: string[] = [];
 /** Flows moved onto the queue in M2: never a DistillCandidateRecord writer again. */
 const MOVED_PRODUCERS = [
   /^libs\/core\/workforce\/background-review-/u,
@@ -43,6 +38,11 @@ const MOVED_PRODUCERS = [
   /^libs\/core\/dot\//u,
   /^scripts\/background_review\.ts$/u,
   /^scripts\/operator-home-/u,
+  /^libs\/core\/knowledge\/reusable-learning/u,
+  /^libs\/core\/knowledge\/reuse-proposals\.ts$/u,
+  /^libs\/core\/service\//u,
+  /^scripts\/browser_bridge_host\.ts$/u,
+  /^presence\/displays\/concierge\//u,
 ];
 
 function walk(relative: string, out: string[]): void {
@@ -87,7 +87,7 @@ describe('DistillCandidateRecord receipt-only boundary (D8)', () => {
     ).toEqual({ added: [], removed: [] });
   });
 
-  it('keeps background-review and execution-feedback proposals on the queue', () => {
+  it('keeps every moved producer on the queue', () => {
     expect(writers.filter((file) => MOVED_PRODUCERS.some((pattern) => pattern.test(file)))).toEqual(
       []
     );

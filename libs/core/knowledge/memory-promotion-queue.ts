@@ -186,7 +186,13 @@ export type MemoryCandidateOriginKind =
   /** HA-01 skill / pipeline / memory-consolidation patch proposal (`pnpm background-review`). */
   | 'background_review'
   /** Execution-feedback improvement proposal (`pnpm kyberion improvements`). */
-  | 'execution_feedback';
+  | 'execution_feedback'
+  /** Reuse plan from learning intake (`pnpm kyberion learning prepare`). */
+  | 'learning_intake'
+  /** Review-only procedure distilled from a service recording (Concierge). */
+  | 'service_procedure'
+  /** Reuse proposal from a promoted project mission seed (Concierge). */
+  | 'mission_seed';
 export interface MemoryCandidateOrigin {
   record_kind: MemoryCandidateOriginKind;
   /** The facade's own id (learning_id / proposal_id). */
