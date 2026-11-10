@@ -699,6 +699,7 @@ governance root（main の checkout）を `KYBERION_ROOT` にした子プロセ�
 コードより古いとロールが無いので、`organization/publication-role-migration.ts` が source worktree から
 ロール定義、security-policy の権限、ロールの索引、共有コアロールの登録を、人の承認つきで追加する
 （`publication-role-installation-upgrade.ja.md`）。4 つの対象のうち保存先専用のロールはこれだけである。
+（2026-11-10 追記、S4：残りの 2 件 `notification_preferences_reader` と `tool_runtime_policy_reader` も宣言された許可証になった。`PUBLICATION_MIGRATION_ROLES` は `PUBLICATION_MIGRATION_STORE_GRANTS` になり、移行は `store_grants` の宣言と発行の権利だけを写す。）
 
 **許可証の形。** 窓口 1 回が既に 1 種類・1 保存先なので、「保存先ごとに 1 つの許可証」は今の種類
 そのものである。1 回の公開全体に複数の保存先の上限を持つ 1 つの許可証は要らない。種類ごとの同期の

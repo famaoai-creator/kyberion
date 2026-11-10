@@ -522,7 +522,7 @@
       },
       "tiers": ["personal"],
       "status": "active",
-      "legacy_roles": ["notification_preferences_reader"],
+      "grants": ["notification_preferences_reader"],
       "sources": ["role-policy"]
     },
     {
@@ -534,7 +534,7 @@
       },
       "tiers": ["personal"],
       "status": "active",
-      "legacy_roles": ["tool_runtime_policy_reader"],
+      "grants": ["tool_runtime_policy_reader"],
       "sources": ["role-policy"]
     },
     {
@@ -606,7 +606,7 @@
       },
       "tiers": ["public"],
       "status": "active",
-      "legacy_roles": ["tool_runtime_policy_reader"],
+      "grants": ["tool_runtime_policy_reader"],
       "sources": ["role-policy"]
     },
     {
@@ -946,7 +946,7 @@
       "status": "active",
       "sources": ["scope-model", "role-policy"],
       "note": "S1 done: the operator's stances (identity, connections, policy, voice, mission seeds, tenant profiles, onboarding, organization profile).",
-      "legacy_roles": ["tool_runtime_policy_reader"]
+      "grants": ["tool_runtime_policy_reader"]
     },
     {
       "id": "stance-logs",

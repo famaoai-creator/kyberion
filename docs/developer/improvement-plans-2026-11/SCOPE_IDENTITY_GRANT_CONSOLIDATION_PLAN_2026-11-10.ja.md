@@ -116,10 +116,11 @@ Org Role を `KYBERION_PERSONA` に写していた `scripts/compose_mission_team
 | ------------------------- | -------------- | ------------------------------------------------ | ---------------- |
 | 3 つ目の前（`19b0a6a01`） | 90             | 30（`dot_lifecycle_writer` を分けた 2 件を含む） | 0                |
 | 3 つ目の後                | 62             | 2                                                | 28               |
+| 残り 2 件の後             | 60             | 0                                                | 30               |
 
 #### 残り（2026-11-10 時点）
 
-1. **保存先専用ロールの残り 2 件。** `notification_preferences_reader` と `tool_runtime_policy_reader` はロールのまま。インストール先の公開ロールの移行（`organization/publication-role-migration.ts`、`pnpm organization role migrate-publication-store`）が、この 2 件をロールのカードとして別のインストール先へ写すため。移行を `store_grants` の宣言と発行の権利を写す形に直してから外す。比較の表（基準）は既に記録してある。
+1. **保存先専用ロールの残り 2 件（2026-11-10、済み）。** `notification_preferences_reader`（`surface/operator-notifications.ts`）と `tool_runtime_policy_reader`（`tool/tool-runtime-policy.ts`）も宣言された許可証にした。インストール先の公開ロールの移行（`organization/publication-role-migration.ts`、`pnpm organization role migrate-publication-store`）は、ロールのカード・権限・索引ではなく、`store_grants` の宣言と発行の権利（shared core roles）を写す。実行するコードが宣言していない名前、移行元にまだロールとして残っている名前、移行元に宣言か発行の権利が無い名前は写さない。比較の表は 3 つ目と同じ基準で、違いは env の行だけ。
 2. **Execution Persona をなくす（S4 の 4 つ目）。** 手を付けていない。`persona_permissions` の 4 つの束（`sovereign` / `ecosystem_architect` / `worker` / `analyst`）をレジストリの Authority Role として表し直すこと、`Persona` 型の import（`authority.ts`、`authn/actor-context.ts`、`governance.ts` の再 export、`scripts/org.ts` の同じ型）を 0 にすること、`KYBERION_PERSONA` を 1 リリースだけ非推奨の別名として Authority Role に写し診断形式で警告すること（env-registry と生成文書も）、agent ID として使っている箇所（`network.ts` ほか、棚卸しの表）を NHI の ID にすることが残っている。宣言された許可証は、旧ロールの判定を変えないために `persona`（旧ロールの既定の persona。多くは `worker`）を持っている。束を Authority Role にするときに、ここも一緒に置き換える。
 3. **`role-authority-map.json` と `role-write-access.json`。** まだレジストリに入っていない。`role-write-access.json` からは、許可証にした 28 件の項目を消した（読む側は `scripts/org.ts` などのロールの草案と mission の書き込みの案内で、許可証の名前は割り当てられないので使われない）。`role-authority-map.json`（Org Role → Authority Role と persona）は persona を含むので、2 と一緒に生成物にするか削除する。
 

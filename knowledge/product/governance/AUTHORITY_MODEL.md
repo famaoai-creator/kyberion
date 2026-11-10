@@ -91,6 +91,7 @@ Authority role definitions: `knowledge/product/governance/authority-roles/*.json
 - 発行するのは保存先の窓口だけです。窓口は `withStoreGrant(name, fn, { tenantSlug, organizationId })`（非同期は `withStoreGrantAsync`）で許可証を開きます。発行の条件は以前のロールの引き受けと同じです（RA-02。名前は `role-assumption-policy.json` に発行の権利として残る。tenant に束縛する許可証は、明示した tenant が呼び出し元の有効な tenant と一致する必要がある）。
 - 許可証が開いている間だけ、その宣言が判定に使われます。`withExecutionContext(name)` は `[ROLE_ASSUMPTION_DENIED]` で拒否し、`SYSTEM_ROLE` / `MISSION_ROLE` / 委譲された環境変数でその名前として動くプロセスや、許可証の中から起動した子プロセスは、I/O が一切できません（`[STORE_GRANT_REQUIRED]`）。以前のロールより狭くなる側の、意図した違いです。
 - 横断して読む許可証（`disclosure`：`workspace_graph_reader`、`concierge_management_reader`、`peer_responder_reader`）は、開くたびに監査チェーンへ `store_grant.disclosure` を記録します。記録できなければ開きません。自分の正確な上限（resource ceiling）の中で開く窓口は、上限に入る前に `recordStoreGrantDisclosure` で記録し、1 回だけ使える受領を渡します。呼び出し元がすでに上限の中にいても記録します。記録（許可証の名前、主体、束縛した範囲、操作。tenant の中身は含みません）はシステムの範囲の記録です。tenant の印を付けず（束縛した tenant と呼び出し元の tenant はメタデータに入れる）、台帳本体だけに入り、tenant ごとの写しには入りません。監査チェーン自身の書き手が呼び出し元の上限の外で追記し（`auditChain.recordDurable`）、残せなければ読みません。呼び出し元の I/O は上限の中のままです。
+- 別のインストール先へ写すとき（`pnpm organization role migrate-publication-store`）は、`store_grants` の宣言と発行の権利だけを写します。ロールのカード、権限、索引の項目は写しません。実行するコードが宣言していない名前は写しません。
 - 名前は新しいロールに使えません（`pnpm organization role create` が予約する）。同じ名前のロールの項目があっても、許可証の宣言は変わりません。
 - 移行の前後で判定が同じことは `libs/core/testing/store-grant-equivalence.test.ts`（基準は `tests/fixtures/store-grant-equivalence.json`）が (呼び出し元, パス, 操作) の表で確かめます。
 

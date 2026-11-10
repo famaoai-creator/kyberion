@@ -25,6 +25,7 @@ const fixture = vi.hoisted(() => ({
   claim: vi.fn(),
   complete: vi.fn(),
   policyFloor: undefined as 'A3' | undefined,
+  undeclared: new Set<string>(),
 }));
 vi.mock('../path-resolver.js', () => ({ pathResolver: { rootDir: () => '/canonical' } }));
 vi.mock('../secure-io.js', () => ({
@@ -76,6 +77,9 @@ vi.mock('../governance/external-operation.js', () => ({
   hasExternalOperationAuthority: () => false,
 }));
 vi.mock('../shell/sandbox-policy.js', () => ({ getPluginExecutionContext: () => undefined }));
+vi.mock('../foundation/declared-store-grant.js', () => ({
+  isDeclaredStoreGrantName: (name: string) => !fixture.undeclared.has(name),
+}));
 vi.mock('../workforce/artifact-store.js', () => ({ writeScopedArtifact: fixture.artifact }));
 vi.mock('../organization/member-registry.js', () => ({
   ownerAccountableHumanId: () => 'user:owner',
@@ -98,7 +102,7 @@ vi.mock('../governance/approval-store.js', async () => ({
 
 import {
   PUBLICATION_MIGRATION_ISSUANCE_RIGHTS,
-  PUBLICATION_MIGRATION_ROLES,
+  PUBLICATION_MIGRATION_STORE_GRANTS,
   applyPublicationRoleMigration,
   previewPublicationRoleMigration,
   requestPublicationRoleMigrationApproval,
@@ -185,32 +189,20 @@ beforeEach(() => {
     fixture.files.set(`/canonical/${relative}`, JSON.stringify(input.content));
     return { absolute_path: `/canonical/${relative}`, repo_relative_path: relative };
   });
-  const cards = Object.fromEntries(
-    PUBLICATION_MIGRATION_ROLES.map((role) => [
-      role,
-      {
-        description: role,
-        write_scopes: [],
-        scope_classes: [],
-        allowed_actuators: [],
-        tier_access: ['personal'],
-      },
-    ])
-  );
-  for (const role of PUBLICATION_MIGRATION_ROLES)
-    source(`authority-roles/${role}.json`, { role, ...cards[role] });
+  fixture.undeclared.clear();
   source('security-policy.json', {
-    authority_role_permissions: Object.fromEntries(
-      PUBLICATION_MIGRATION_ROLES.map((role) => [
-        role,
-        { allow_read: [`only/${role}`], allow_write: [] },
+    authority_role_permissions: { existing: { allow_read: ['untouched/'] } },
+    store_grants: Object.fromEntries(
+      PUBLICATION_MIGRATION_STORE_GRANTS.map((grant) => [
+        grant,
+        { description: grant, allow_read: [`only/${grant}`], allow_write: [] },
       ])
     ),
   });
-  source('authority-role-index.json', { authority_roles: cards });
+  source('authority-role-index.json', { authority_roles: { existing: { description: 'x' } } });
   source('role-assumption-policy.json', {
     shared_core_roles: {
-      roles: [...PUBLICATION_MIGRATION_ROLES, ...PUBLICATION_MIGRATION_ISSUANCE_RIGHTS],
+      roles: [...PUBLICATION_MIGRATION_STORE_GRANTS, ...PUBLICATION_MIGRATION_ISSUANCE_RIGHTS],
     },
     system_roles: {},
   });
@@ -231,7 +223,7 @@ describe('explicit installation publication role migration', () => {
     const plan = previewPublicationRoleMigration('/source');
     fixture.approval = legacyApproval(plan) as ApprovalFixture;
     applyPublicationRoleMigration('/source', { approvalId: 'legacy', expectedDigest: plan.digest });
-    expect(fixture.writes).toHaveBeenCalledTimes(5);
+    expect(fixture.writes).toHaveBeenCalledTimes(2);
     expect(fixture.claim).toHaveBeenCalledTimes(1);
   });
   it.each([
@@ -318,10 +310,13 @@ describe('explicit installation publication role migration', () => {
     ]);
     expect(fixture.writes).not.toHaveBeenCalled();
   });
-  it('previews only two named roles and three catalog deltas without writing', () => {
+  it('previews only two named store grants and two catalog deltas without writing', () => {
     const plan = previewPublicationRoleMigration('/source');
-    expect(plan.changes).toHaveLength(5);
-    expect(plan.roles).toEqual(PUBLICATION_MIGRATION_ROLES);
+    expect(plan.changes.map((entry) => entry.path)).toEqual([
+      `${prefix}security-policy.json`,
+      `${prefix}role-assumption-policy.json`,
+    ]);
+    expect(plan.storeGrants).toEqual(PUBLICATION_MIGRATION_STORE_GRANTS);
     expect(plan.digest).toMatch(/^[a-f0-9]{64}$/);
     expect(fixture.writes).not.toHaveBeenCalled();
   });
@@ -419,27 +414,64 @@ describe('explicit installation publication role migration', () => {
   it('rejects unrelated source repositories', () => {
     expect(() => previewPublicationRoleMigration('/foreign')).toThrow('different repository');
   });
-  it('refuses divergent existing permissions including explicit empty grants', () => {
+  it('copies each store grant declaration and its issuance right, never a role card, permission or index entry', () => {
     setTarget('security-policy.json', {
-      authority_role_permissions: {
-        tool_runtime_policy_reader: { allow_read: [], allow_write: [] },
-      },
+      authority_role_permissions: { existing: { allow_read: ['untouched/'] } },
+      store_grants: { other_grant: { allow_read: ['kept/'], allow_write: [] } },
+    });
+    const plan = previewPublicationRoleMigration('/source');
+    const policy = JSON.parse(
+      plan.changes.find((entry) => entry.path.endsWith('/security-policy.json'))!.after
+    );
+    expect(policy.store_grants).toEqual({
+      other_grant: { allow_read: ['kept/'], allow_write: [] },
+      ...Object.fromEntries(
+        PUBLICATION_MIGRATION_STORE_GRANTS.map((grant) => [
+          grant,
+          { description: grant, allow_read: [`only/${grant}`], allow_write: [] },
+        ])
+      ),
+    });
+    expect(policy.authority_role_permissions).toEqual({ existing: { allow_read: ['untouched/'] } });
+    const assumptions = JSON.parse(
+      plan.changes.find((entry) => entry.path.endsWith('/role-assumption-policy.json'))!.after
+    );
+    expect(assumptions.shared_core_roles.roles).toEqual(
+      expect.arrayContaining([...PUBLICATION_MIGRATION_STORE_GRANTS])
+    );
+    expect(plan.changes.some((entry) => entry.path.includes('authority-roles/'))).toBe(false);
+    expect(plan.changes.some((entry) => entry.path.endsWith('authority-role-index.json'))).toBe(
+      false
+    );
+  });
+  it('refuses divergent existing store grant declarations including explicit empty grants', () => {
+    setTarget('security-policy.json', {
+      store_grants: { tool_runtime_policy_reader: { allow_read: [], allow_write: [] } },
     });
     expect(() => previewPublicationRoleMigration('/source')).toThrow('divergent');
     expect(fixture.writes).not.toHaveBeenCalled();
   });
   it('refuses explicit denies', () => {
     setTarget('security-policy.json', {
-      authority_role_permissions: { tool_runtime_policy_reader: { deny_read: ['only/'] } },
+      store_grants: { tool_runtime_policy_reader: { deny_read: ['only/'] } },
     });
     expect(() => previewPublicationRoleMigration('/source')).toThrow('explicit deny');
-  });
-  it('refuses divergent existing role cards', () => {
-    setTarget('authority-roles/tool_runtime_policy_reader.json', {
-      role: 'tool_runtime_policy_reader',
-      write_scopes: ['/'],
+    source('security-policy.json', {
+      authority_role_permissions: {},
+      store_grants: {
+        notification_preferences_reader: { allow_read: [], allow_write: [] },
+        tool_runtime_policy_reader: { allow_read: [], allow_write: [], deny_read: ['x/'] },
+      },
     });
-    expect(() => previewPublicationRoleMigration('/source')).toThrow('divergent role card');
+    setTarget('security-policy.json', {});
+    expect(() => previewPublicationRoleMigration('/source')).toThrow('explicit deny');
+  });
+  it('refuses a store grant the executing code does not declare', () => {
+    fixture.undeclared.add('notification_preferences_reader');
+    expect(() => previewPublicationRoleMigration('/source')).toThrow(
+      'does not declare the store grant'
+    );
+    expect(fixture.writes).not.toHaveBeenCalled();
   });
   it.each(['pr_publication_store', 'person_charter_store'])(
     'registers the %s grant issuance right without a role card, permission or index',
@@ -458,42 +490,49 @@ describe('explicit installation publication role migration', () => {
   );
   it('refuses a source without the issuance rights registered', () => {
     source('role-assumption-policy.json', {
-      shared_core_roles: { roles: [...PUBLICATION_MIGRATION_ROLES] },
+      shared_core_roles: { roles: [...PUBLICATION_MIGRATION_STORE_GRANTS] },
       system_roles: {},
     });
     expect(() => previewPublicationRoleMigration('/source')).toThrow(
       'incomplete source issuance right'
     );
   });
-  it('accepts registry cards that carry their policy permissions, and refuses a card/policy disagreement', () => {
-    const role = 'tool_runtime_policy_reader';
-    const profile = {
-      role,
-      description: role,
-      write_scopes: [],
-      scope_classes: [],
-      allowed_actuators: [],
-      tier_access: ['personal'],
-    };
-    source(`authority-roles/${role}.json`, {
-      ...profile,
-      permissions: { allow_read: [`only/${role}`], allow_write: [] },
+  it('refuses a source whose name is still a role, or lacks the declaration or issuance right', () => {
+    const grants = Object.fromEntries(
+      PUBLICATION_MIGRATION_STORE_GRANTS.map((grant) => [
+        grant,
+        { allow_read: [], allow_write: [] },
+      ])
+    );
+    source('security-policy.json', {
+      authority_role_permissions: { tool_runtime_policy_reader: { allow_read: [] } },
+      store_grants: grants,
     });
-    expect(() => previewPublicationRoleMigration('/source')).not.toThrow();
-    source(`authority-roles/${role}.json`, {
-      ...profile,
-      permissions: { allow_read: ['/'], allow_write: ['/'] },
+    expect(() => previewPublicationRoleMigration('/source')).toThrow(
+      'incomplete source store grant'
+    );
+    source('security-policy.json', { authority_role_permissions: {}, store_grants: grants });
+    source('authority-role-index.json', {
+      authority_roles: { tool_runtime_policy_reader: { description: 'role' } },
     });
-    expect(() => previewPublicationRoleMigration('/source')).toThrow('card/policy mismatch');
-  });
-  it('refuses source role/index disagreement or missing assumption registration', () => {
-    source('authority-roles/tool_runtime_policy_reader.json', {
-      role: 'tool_runtime_policy_reader',
-      description: 'different',
+    expect(() => previewPublicationRoleMigration('/source')).toThrow(
+      'incomplete source store grant'
+    );
+    source('authority-role-index.json', { authority_roles: {} });
+    source('security-policy.json', {
+      authority_role_permissions: {},
+      store_grants: { notification_preferences_reader: { allow_read: [], allow_write: [] } },
     });
-    expect(() => previewPublicationRoleMigration('/source')).toThrow('index/card mismatch');
-    source('role-assumption-policy.json', { shared_core_roles: { roles: [] } });
-    expect(() => previewPublicationRoleMigration('/source')).toThrow('incomplete source role');
+    expect(() => previewPublicationRoleMigration('/source')).toThrow(
+      'incomplete source store grant'
+    );
+    source('security-policy.json', { authority_role_permissions: {}, store_grants: grants });
+    source('role-assumption-policy.json', {
+      shared_core_roles: { roles: [...PUBLICATION_MIGRATION_ISSUANCE_RIGHTS] },
+    });
+    expect(() => previewPublicationRoleMigration('/source')).toThrow(
+      'incomplete source store grant'
+    );
   });
   it('requires authenticated human approval for the exact digest and every path', () => {
     const plan = previewPublicationRoleMigration('/source');
@@ -566,7 +605,7 @@ describe('explicit installation publication role migration', () => {
     const plan = previewPublicationRoleMigration('/source');
     authorize(plan);
     applyPublicationRoleMigration('/source', { approvalId: 'a', expectedDigest: plan.digest });
-    expect(fixture.writes).toHaveBeenCalledTimes(5);
+    expect(fixture.writes).toHaveBeenCalledTimes(2);
     const policy = JSON.parse(fixture.files.get(`/canonical/${prefix}security-policy.json`)!);
     expect(policy.authority_role_permissions.existing).toEqual({ allow_read: ['untouched/'] });
     expect(policy.tenant_scope).toEqual({ untouched: true });
