@@ -17,6 +17,7 @@ import {
   classifyStorageFloorPath,
   STORAGE_FLOOR_ROOTS,
 } from './storage-layout.js';
+import { rolePermissionRecord } from './foundation/declared-store-grant.js';
 import type { TierLevel } from './types.js';
 import { isRecord } from './foundation/primitives.js';
 import { isValidTenantSlug } from './entity-scope.js';
@@ -212,7 +213,7 @@ export function tenantStorePartitionWriteDecision(
   if (authorities.includes('SUDO') && deps.sudoAllows(sudoScope)) return { allowed: true };
   const grants = [
     ...(role === partition.storeRole
-      ? (policy.authority_role_permissions?.[role]?.allow_write ?? [])
+      ? (rolePermissionRecord(policy, role)?.allow_write ?? [])
       : []),
     ...(policy.persona_permissions?.[persona]?.allow_write ?? []),
   ];

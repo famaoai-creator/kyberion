@@ -29,7 +29,7 @@ import * as os from 'node:os';
 import { createLogger } from '../logger.js';
 import { withLock } from '../foundation/lock-utils.js';
 import { isPidAlive } from '../workforce/workspace-process-identity.js';
-import { withExecutionContext } from '../authority.js';
+import { withStoreGrant } from '../authority.js';
 import { isValidTenantSlug } from '../entity-scope.js';
 import { pathResolver } from '../path-resolver.js';
 import { nowIso } from '../foundation/time.js';
@@ -197,7 +197,7 @@ export function peerTaskCatalogPath(tenantId: string): string {
 
 /**
  * Load the recipient's task catalog. The tenant catalog is read under the
- * tenant-bound `peer_catalog_reader` role; an explicit `catalogPath` (tests)
+ * tenant-bound `peer_catalog_reader` store grant; an explicit `catalogPath` (tests)
  * is read with the caller's own authority. A missing catalog means no task
  * type is offered.
  */
@@ -214,12 +214,9 @@ export function loadPeerTaskCatalog(
     return parsed.data;
   };
   if (options.catalogPath) return read(options.catalogPath);
-  return withExecutionContext(
-    PEER_CATALOG_READER_ROLE,
-    () => read(peerTaskCatalogPath(tenantId)),
-    undefined,
-    tenantId
-  );
+  return withStoreGrant(PEER_CATALOG_READER_ROLE, () => read(peerTaskCatalogPath(tenantId)), {
+    tenantSlug: tenantId,
+  });
 }
 
 function catalogEntryFor(
@@ -727,7 +724,7 @@ export const PEER_TASK_ARTIFACT_WRITER_ROLE = 'peer_task_artifact_writer';
 
 /** Tenant-scoped report artifact (`active/shared/artifacts/confidential/<tenant>/report/peer-tasks/...`). */
 export const writePeerTaskArtifact: PeerTaskArtifactWriter = ({ tenantId, name, content }) =>
-  withExecutionContext(
+  withStoreGrant(
     PEER_TASK_ARTIFACT_WRITER_ROLE,
     () =>
       writeScopedArtifact({
@@ -737,8 +734,7 @@ export const writePeerTaskArtifact: PeerTaskArtifactWriter = ({ tenantId, name, 
         content,
         format: 'text',
       }).repo_relative_path,
-    undefined,
-    tenantId
+    { tenantSlug: tenantId }
   );
 
 export interface DecidePeerTaskInput {
@@ -861,7 +857,7 @@ async function executeAcceptedPeerTask(
   // The tenant registration check runs under the caller's authority; the
   // tenant-bound catalog reader also grants this tenant's profile, so a plain
   // operator shell can accept without a broader role.
-  const workItem = withExecutionContext(
+  const workItem = withStoreGrant(
     PEER_CATALOG_READER_ROLE,
     () =>
       createWorkItemIfAbsent({
@@ -880,8 +876,7 @@ async function executeAcceptedPeerTask(
           executor: entry.executor,
         },
       }),
-    undefined,
-    input.tenantId
+    { tenantSlug: input.tenantId }
   );
   // A resumed task may find its WorkItem already closed by the interrupted run.
   if (workItem.status !== 'in_progress') {

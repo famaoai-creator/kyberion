@@ -16,10 +16,11 @@
  * - Tenant-bound ids are built only by {@link buildNhiId}, which requires a
  *   valid tenant slug and rejects reserved scope names (a tier or partition
  *   name is never a tenant).
- * - `kyberion://agent/_/_/<slug>` ({@link buildTenantlessNhiId}) is the interim
- *   form for identities that belong to no tenant at all (person-scope
- *   onboarding agents, runtimes started with no tenant in scope). An
- *   organization never appears without its tenant.
+ * - `kyberion://agent/_/_/<slug>` ({@link buildTenantlessNhiId}) is the form
+ *   for identities that belong to no tenant at all (person-scope onboarding
+ *   agents, runtimes started with no tenant in scope): `_` in the tenant
+ *   position formally means "no tenant" (owner decision 2026-11-10) and is
+ *   never a tenant slug. An organization never appears without its tenant.
  * - The pre-D3 shape `kyberion://agent/<org>/<slug>` is a *legacy alias*: it
  *   still parses (and the ledger resolves it to the migrated id) for one
  *   release, then the legacy branch is removed. Nothing mints it any more.
@@ -105,7 +106,7 @@ export function buildNhiId(
   return `${NHI_ID_PREFIX}${tenant}/${org}/${slug}`;
 }
 
-/** `kyberion://agent/_/_/<slug>` — an identity that belongs to no tenant (interim). */
+/** `kyberion://agent/_/_/<slug>` — an identity that belongs to no tenant (`_` = no tenant). */
 export function buildTenantlessNhiId(slug: string): string {
   assertSlug(slug);
   return `${NHI_ID_PREFIX}${NHI_NO_TENANT}/${NHI_NO_ORGANIZATION}/${slug}`;

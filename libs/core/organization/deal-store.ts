@@ -6,7 +6,7 @@ import * as path from 'node:path';
 import * as crypto from 'node:crypto';
 import { pathResolver } from '../path-resolver.js';
 import { TENANT_DEALS_DIR, TENANT_HOME_ROOT } from './tenant-home.js';
-import { withExecutionContext } from '../authority.js';
+import { withStoreGrant } from '../authority.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -96,7 +96,7 @@ function dealCatalogAtPath(filePath: string) {
 export const DEAL_STORE_ROLE = 'customer_decision_deal_note_writer';
 
 export function asDealStore<T>(tenantSlug: string, fn: () => T): T {
-  return withExecutionContext(DEAL_STORE_ROLE, fn, 'worker', tenantSlug);
+  return withStoreGrant(DEAL_STORE_ROLE, fn, { tenantSlug: tenantSlug });
 }
 
 function dealsDir(tenantSlug: string): string {

@@ -25,7 +25,7 @@
  */
 import type { StorageDataTier } from '../storage-layout.js';
 import * as path from 'node:path';
-import { resolveIdentityContext, withExecutionContext } from '../authority.js';
+import { resolveIdentityContext, withExecutionContext, withStoreGrant } from '../authority.js';
 import { appendJsonLine, readJsonLines, writeJson } from '../foundation/json.js';
 import { isValidTenantSlug } from '../foundation/scope.js';
 import { currentExecutionScope } from '../foundation/execution-scope.js';
@@ -281,7 +281,7 @@ function assertMayBindApprovalTenant(tenantSlug: string): void {
 
 /** Run `fn` as `tenant_approval_store` bound to `tenantSlug`. */
 export function asTenantApprovalStore<T>(tenantSlug: string, fn: () => T): T {
-  return withExecutionContext(TENANT_APPROVAL_STORE_ROLE, fn, undefined, tenantSlug);
+  return withStoreGrant(TENANT_APPROVAL_STORE_ROLE, fn, { tenantSlug: tenantSlug });
 }
 function mayBindPersonal(partition: ApprovalPersonalPartition): boolean {
   return currentPersonalApprovalOwnerHash() === partition.owner_hash;
@@ -569,14 +569,10 @@ export function readApprovalJsonlAt<T = Record<string, unknown>>(
 function listTierTenants(tier: ApprovalPartitionTier): string[] {
   const dir = `${approvalStoreRoots().tenantApprovals}/${tier}`;
   try {
-    return withExecutionContext(
-      TENANT_APPROVAL_PARTITION_INDEX_READER_ROLE,
-      () => {
-        const resolved = pathResolver.resolve(dir);
-        return safeExistsSync(resolved) ? safeReaddir(resolved).sort() : [];
-      },
-      'worker'
-    ).filter((name) => normalizedTenant(name) === name);
+    return withStoreGrant(TENANT_APPROVAL_PARTITION_INDEX_READER_ROLE, () => {
+      const resolved = pathResolver.resolve(dir);
+      return safeExistsSync(resolved) ? safeReaddir(resolved).sort() : [];
+    }).filter((name) => normalizedTenant(name) === name);
   } catch (err) {
     logger.warn(
       `tenant approval partitions not listed — the ${tier} tier directory is unreadable, so its tenants' approvals are invisible to this process | next: check the tenant approval root and the ${TENANT_APPROVAL_PARTITION_INDEX_READER_ROLE} grant | evidence: ${dir}: ${err instanceof Error ? err.message : String(err)}`

@@ -14,7 +14,7 @@
  * and left in place.
  */
 import * as path from 'node:path';
-import { withExecutionContext } from '@agent/core/authority';
+import { withExecutionContext, withStoreGrant } from '@agent/core/authority';
 import { logger } from '@agent/core/core';
 import { readJsonIfPresent, writeJson } from '@agent/core/foundation';
 import { isValidTenantSlug } from '@agent/core/foundation/scope';
@@ -112,15 +112,14 @@ function moveAuditMirror(slug: string, move: Move, dryRun: boolean): void {
   if (dryRun) return;
   const files = safeReaddir(from).sort();
   // Only audit_mirror_writer, bound to the tenant, may write a mirror partition.
-  withExecutionContext(
+  withStoreGrant(
     'audit_mirror_writer',
     () => {
       safeMkdir(to, { recursive: true });
       for (const file of files)
         safeWriteFile(path.join(to, file), safeReadFile(path.join(from, file)));
     },
-    undefined,
-    slug
+    { tenantSlug: slug }
   );
   safeRmSync(from, { recursive: true, force: true });
 }

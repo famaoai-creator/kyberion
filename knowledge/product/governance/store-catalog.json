@@ -30,7 +30,7 @@
       },
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
-      "legacy_roles": ["archived_mission_state_reader", "workspace_graph_reader"],
+      "grants": ["archived_mission_state_reader", "workspace_graph_reader"],
       "sources": ["role-policy"]
     },
     {
@@ -133,7 +133,7 @@
       },
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
-      "legacy_roles": ["concierge_management_reader", "dot_lifecycle_runtime_store"],
+      "grants": ["dot_lifecycle_runtime_store", "concierge_management_reader"],
       "sources": ["runtime-state-roots", "role-policy"],
       "registration": {
         "family": "state",
@@ -149,7 +149,7 @@
         "kind": "system"
       },
       "status": "active",
-      "legacy_roles": ["dot_charter_store"],
+      "grants": ["dot_charter_store"],
       "sources": ["role-policy"],
       "note": "Resident-agent charters shipped with the repository."
     },
@@ -181,7 +181,7 @@
       },
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
-      "legacy_roles": ["peer_task_artifact_writer"],
+      "grants": ["peer_task_artifact_writer"],
       "sources": ["storage-floor", "role-policy"],
       "note": "Floors also hold a system/ partition (custody system).",
       "registration": {
@@ -220,7 +220,7 @@
       },
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
-      "legacy_roles": ["dot_charter_store", "dot_lifecycle_runtime_store"],
+      "grants": ["dot_charter_store", "dot_lifecycle_runtime_store"],
       "sources": ["storage-floor", "role-policy"],
       "note": "Floors also hold a system/ partition (custody system).",
       "registration": {
@@ -277,7 +277,7 @@
       },
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
-      "legacy_roles": ["credential_allocation_reader"],
+      "grants": ["credential_allocation_reader"],
       "sources": ["runtime-state-roots", "role-policy"],
       "registration": {
         "family": "state",
@@ -415,7 +415,7 @@
       },
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
-      "legacy_roles": ["workspace_graph_reader"],
+      "grants": ["workspace_graph_reader"],
       "sources": ["role-policy"]
     },
     {
@@ -428,12 +428,12 @@
       },
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
-      "legacy_roles": [
-        "concierge_management_reader",
+      "grants": [
+        "operational_learning_writer",
         "concierge_management_writer",
         "dot_charter_store",
-        "operational_learning_writer",
-        "workspace_graph_reader"
+        "workspace_graph_reader",
+        "concierge_management_reader"
       ],
       "sources": ["role-policy"]
     },
@@ -446,7 +446,7 @@
       },
       "tiers": ["personal"],
       "status": "active",
-      "legacy_roles": ["dot_lifecycle_runtime_store"],
+      "grants": ["dot_lifecycle_runtime_store"],
       "sources": ["role-policy"],
       "note": "Tracks the existing namespace and its raw projected-tier policy reference, like the tenant-knowledge aggregate. The runtime store virtual projection grant is unusable on actual knowledge files because read/metadata/write/mkdir purpose ceilings apply first. No new storage root, runtime registration or permission is introduced."
     },
@@ -470,7 +470,7 @@
       },
       "tiers": ["personal"],
       "status": "active",
-      "legacy_roles": ["chronos_token_registry_reader"],
+      "grants": ["chronos_token_registry_reader"],
       "sources": ["role-policy"]
     },
     {
@@ -482,7 +482,7 @@
       },
       "tiers": ["personal"],
       "status": "active",
-      "legacy_roles": ["dot_charter_store"],
+      "grants": ["dot_charter_store"],
       "sources": ["role-policy"]
     },
     {
@@ -494,10 +494,10 @@
       },
       "tiers": ["personal"],
       "status": "active",
-      "legacy_roles": [
-        "concierge_management_reader",
+      "grants": [
         "nhi_accountability_reader",
-        "workspace_graph_reader"
+        "workspace_graph_reader",
+        "concierge_management_reader"
       ],
       "sources": ["role-policy"]
     },
@@ -510,7 +510,7 @@
       },
       "tiers": ["personal"],
       "status": "active",
-      "legacy_roles": ["workspace_graph_reader"],
+      "grants": ["workspace_graph_reader"],
       "sources": ["role-policy"]
     },
     {
@@ -546,16 +546,16 @@
       },
       "tiers": ["personal"],
       "status": "active",
-      "legacy_roles": [
-        "concierge_management_reader",
+      "grants": [
+        "peer_catalog_reader",
+        "first_job_tenant_status_reader",
+        "workspace_tenant_registry_reader",
+        "workspace_tenant_registry_index_reader",
         "concierge_management_writer",
         "dot_charter_store",
-        "first_job_tenant_status_reader",
-        "peer_catalog_reader",
-        "peer_responder_reader",
         "workspace_graph_reader",
-        "workspace_tenant_registry_index_reader",
-        "workspace_tenant_registry_reader"
+        "concierge_management_reader",
+        "peer_responder_reader"
       ],
       "sources": ["role-policy"]
     },
@@ -619,10 +619,10 @@
       },
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
-      "legacy_roles": [
-        "concierge_management_reader",
+      "grants": [
         "concierge_management_writer",
-        "workspace_graph_reader"
+        "workspace_graph_reader",
+        "concierge_management_reader"
       ],
       "sources": ["role-policy"]
     },
@@ -635,7 +635,7 @@
       },
       "tiers": ["confidential"],
       "status": "active",
-      "legacy_roles": ["delegation_record_store"],
+      "grants": ["delegation_record_store"],
       "sources": ["runtime-state-roots", "role-policy"],
       "registration": {
         "family": "ledger",
@@ -690,7 +690,7 @@
       "status": "active",
       "sources": ["role-policy", "scope-model"],
       "note": "Tenant partition of the execution-metrics metrics ledger (protected prefixes active/shared/runtime/execution-metrics/<personal|confidential>/); the root stays an unscoped system ledger.",
-      "legacy_roles": ["metrics_cap_reader"]
+      "grants": ["metrics_cap_reader"]
     },
     {
       "id": "runtime.locks",
@@ -699,7 +699,7 @@
         "kind": "unscoped-legacy"
       },
       "status": "active",
-      "legacy_roles": ["deliverable_inbox_writer"],
+      "grants": ["deliverable_inbox_writer"],
       "sources": ["role-policy"]
     },
     {
@@ -718,7 +718,7 @@
         "kind": "unscoped-legacy"
       },
       "status": "active",
-      "legacy_roles": ["concierge_management_reader", "concierge_management_writer"],
+      "grants": ["concierge_management_writer", "concierge_management_reader"],
       "sources": ["role-policy"]
     },
     {
@@ -745,7 +745,7 @@
         "kind": "unscoped-legacy"
       },
       "status": "active",
-      "legacy_roles": ["concierge_management_reader"],
+      "grants": ["concierge_management_reader"],
       "sources": ["role-policy"]
     },
     {
@@ -755,7 +755,7 @@
         "kind": "unscoped-legacy"
       },
       "status": "active",
-      "legacy_roles": ["ops_alert_store"],
+      "grants": ["ops_alert_store"],
       "sources": ["role-policy"]
     },
     {
@@ -768,7 +768,7 @@
       },
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
-      "legacy_roles": ["concierge_management_reader", "concierge_management_writer"],
+      "grants": ["concierge_management_writer", "concierge_management_reader"],
       "sources": ["role-policy"]
     },
     {
@@ -781,7 +781,7 @@
       },
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
-      "legacy_roles": ["tenant_approval_partition_index_reader", "tenant_approval_store"],
+      "grants": ["tenant_approval_store", "tenant_approval_partition_index_reader"],
       "sources": ["role-policy"],
       "registration": {
         "family": "ledger",
@@ -800,7 +800,7 @@
       },
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
-      "legacy_roles": ["tenant_ledger_store"],
+      "grants": ["tenant_ledger_store"],
       "sources": ["role-policy"],
       "registration": {
         "family": "ledger",
@@ -845,7 +845,7 @@
       "status": "active",
       "sources": ["role-policy", "scope-model"],
       "note": "Tenant partition of the usage-ledger metrics ledger (protected prefixes active/shared/runtime/usage-ledger/<personal|confidential>/); the root stays an unscoped system ledger.",
-      "legacy_roles": ["metrics_cap_reader"]
+      "grants": ["metrics_cap_reader"]
     },
     {
       "id": "runtime.vitest-approvals",
@@ -863,7 +863,7 @@
         "kind": "unscoped-legacy"
       },
       "status": "active",
-      "legacy_roles": ["workspace_graph_reader"],
+      "grants": ["workspace_graph_reader"],
       "sources": ["role-policy"]
     },
     {
@@ -891,7 +891,7 @@
         "kind": "unscoped-legacy"
       },
       "status": "active",
-      "legacy_roles": ["workspace_graph_reader"],
+      "grants": ["workspace_graph_reader"],
       "sources": ["role-policy"]
     },
     {
@@ -901,7 +901,7 @@
         "kind": "unscoped-legacy"
       },
       "status": "active",
-      "legacy_roles": ["deliverable_inbox_writer"],
+      "grants": ["deliverable_inbox_writer"],
       "sources": ["role-policy"]
     },
     {
@@ -911,7 +911,7 @@
         "kind": "unscoped-legacy"
       },
       "status": "active",
-      "legacy_roles": ["ops_alert_store"],
+      "grants": ["ops_alert_store"],
       "sources": ["role-policy"]
     },
     {
@@ -921,7 +921,7 @@
         "kind": "unscoped-legacy"
       },
       "status": "active",
-      "legacy_roles": ["dot_charter_store", "dot_lifecycle_runtime_store"],
+      "grants": ["dot_charter_store", "dot_lifecycle_runtime_store"],
       "sources": ["role-policy"],
       "note": "Dot charter validation reads use dot_charter_store; lifecycle runtime writes use dot_lifecycle_runtime_store narrowed to audit, heartbeat and event-continuation artifacts. The rejected asset_derivation_store role remains absent."
     },
@@ -932,7 +932,7 @@
         "kind": "unscoped-legacy"
       },
       "status": "active",
-      "legacy_roles": ["reasoning_settings_writer"],
+      "grants": ["reasoning_settings_writer"],
       "sources": ["role-policy"]
     },
     {
@@ -989,7 +989,7 @@
       "status": "active",
       "sources": ["scope-model", "role-policy"],
       "note": "S2 done: per-tenant copy of the master audit chain, written only by audit_mirror_writer (storage-layout TENANT_STORE_LEDGER_ROOTS).",
-      "legacy_roles": ["audit_mirror_writer"],
+      "grants": ["audit_mirror_writer"],
       "registration": {
         "family": "ledger",
         "key": "tenant_audit_mirror",
@@ -1008,7 +1008,7 @@
       "status": "active",
       "sources": ["scope-model", "role-policy"],
       "note": "S2 done: the tenant's customer channel bindings (customer-channel-binding.ts, scripts/customer-channel/bindings.ts).",
-      "legacy_roles": ["customer_channel_binding_store"]
+      "grants": ["customer_channel_binding_store"]
     },
     {
       "id": "tenant-customer-records",
@@ -1031,7 +1031,7 @@
       },
       "tiers": ["confidential"],
       "status": "active",
-      "legacy_roles": ["customer_decision_deal_note_writer"],
+      "grants": ["customer_decision_deal_note_writer"],
       "sources": ["scope-model", "role-policy"],
       "note": "S3 done: the tenant's customer records (deals, deal documents, requirements captures, escalations, deal log), read and written only as the tenant-bound deal store (libs/core/organization/deal-store.ts asDealStore)."
     },
@@ -1044,7 +1044,7 @@
       },
       "tiers": ["confidential"],
       "status": "active",
-      "legacy_roles": ["dot_lifecycle_runtime_store", "peer_responder_reader"],
+      "grants": ["dot_lifecycle_runtime_store", "peer_responder_reader"],
       "sources": ["role-policy"],
       "note": "The raw policy inventory includes the lifecycle runtime store projection grant. Its physical knowledge access remains denied by raw-purpose operation ceilings; this entry does not confer authority."
     },
@@ -1090,7 +1090,7 @@
       },
       "tiers": ["confidential"],
       "status": "active",
-      "legacy_roles": ["customer_channel_binding_store", "peer_catalog_reader"],
+      "grants": ["peer_catalog_reader", "customer_channel_binding_store"],
       "sources": ["role-policy"]
     },
     {
@@ -1113,7 +1113,7 @@
       },
       "tiers": ["confidential"],
       "status": "active",
-      "legacy_roles": ["dot_charter_store"],
+      "grants": ["dot_charter_store"],
       "sources": ["role-policy"]
     },
     {
@@ -1125,7 +1125,7 @@
       },
       "tiers": ["confidential"],
       "status": "active",
-      "legacy_roles": ["scope_locale_reader"],
+      "grants": ["scope_locale_reader"],
       "sources": ["role-policy"]
     }
   ]

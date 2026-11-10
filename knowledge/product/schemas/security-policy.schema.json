@@ -21,6 +21,23 @@
         }
       }
     },
+    "store_grants": {
+      "description": "S4 (ADR concept-model-v2 D6): store grants that replaced store-only Authority Roles. Not roles: never assumable and never in the authority role registry. A store facade issues one with authority.ts withStoreGrant; while it is live its operations are exactly this declaration, bound to the issuance tenant/organization. The names are listed in libs/core/foundation/declared-store-grant.ts.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["description"],
+        "properties": {
+          "description": { "type": "string", "minLength": 1 },
+          "allow_read": { "type": "array", "items": { "type": "string" } },
+          "allow_write": { "type": "array", "items": { "type": "string" } },
+          "deny_read": { "type": "array", "items": { "type": "string" } },
+          "deny_read_descendants": { "type": "array", "items": { "type": "string" } },
+          "narrow": { "$ref": "#/$defs/narrow_declaration" }
+        }
+      }
+    },
     "authority_permissions": { "type": "object", "additionalProperties": true },
     "project_permissions": { "type": "object", "additionalProperties": true },
     "network_guardrails": { "type": "object", "additionalProperties": true },
