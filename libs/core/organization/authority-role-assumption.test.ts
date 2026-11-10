@@ -73,7 +73,7 @@ describe('RA-01 scoped role assumption', () => {
     const inside = withExecutionContext('chronos_localadmin', () => ({
       role: resolveRole(),
       identityRole: resolveIdentityContext().role,
-      persona: resolveIdentityContext().persona,
+      persona: resolveIdentityContext().baseRole,
     }));
     expect(inside).toEqual({
       role: 'chronos_localadmin',
@@ -562,7 +562,7 @@ describe('DR-01 delegated child role', () => {
     try {
       expect(resolveRole()).toBe('slack_bridge');
       expect(resolveExecutionPersona()).not.toBe('sovereign');
-      expect(resolveIdentityContext().persona).not.toBe('sovereign');
+      expect(resolveIdentityContext().baseRole).not.toBe('sovereign');
       expect(warn).toHaveBeenCalledWith(expect.stringContaining('[ROLE_DELEGATION_DENIED]'));
       expect(warn).toHaveBeenCalledWith(expect.stringContaining('chronos_localadmin'));
     } finally {
@@ -627,7 +627,7 @@ describe('DR-01 delegated child role', () => {
       expect(resolveRole()).toBe('nexus_daemon');
       expect(resolveExecutionPersona()).toBe('worker');
       const identity = resolveIdentityContext();
-      expect(identity.persona).toBe('worker');
+      expect(identity.baseRole).toBe('worker');
       expect(identity.authorities).not.toContain('SECRET_READ');
     } finally {
       warn.mockRestore();

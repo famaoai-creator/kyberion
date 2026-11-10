@@ -188,7 +188,7 @@ describe('TR-01 chronos_token_registry_reader', () => {
     const { authority, registry, tierGuard } = await loadModules();
     const abs = (relative: string) => path.join(root, relative);
     const verdicts = authority.withStoreGrant(registry.CHRONOS_TOKEN_REGISTRY_READER_ROLE, () => ({
-      persona: authority.resolveIdentityContext().persona,
+      persona: authority.resolveIdentityContext().baseRole,
       readRegistry: tierGuard.validateReadPermission(abs(REGISTRY_RELATIVE)).allowed,
       readOtherConnection: tierGuard.validateReadPermission(
         abs('knowledge/personal/connections/other-service.json')
@@ -239,7 +239,7 @@ describe('TR-01 chronos_token_registry_reader', () => {
       expect(fs.readFileSync(registryPath, 'utf8')).not.toContain(issued.hash);
 
       const result = authority.withStoreGrant(registry.CHRONOS_TOKEN_REGISTRY_READER_ROLE, () => ({
-        persona: authority.resolveIdentityContext().persona,
+        persona: authority.resolveIdentityContext().baseRole,
         registrations: registry.readChronosTokenRegistrations(),
       }));
       expect(result.persona).toBe('worker');

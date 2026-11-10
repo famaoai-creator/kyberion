@@ -27,8 +27,8 @@ describe('remaining sole seam ports', () => {
         KYBERION_BASE_ROLE: 'vitest-promoter',
         MISSION_ROLE: 'reviewer',
       })
-    ).toEqual({ persona: 'vitest-promoter', role: 'reviewer' });
-    expect(readConfiguredActorIdentity({})).toEqual({ persona: undefined, role: undefined });
+    ).toEqual({ baseRole: 'vitest-promoter', role: 'reviewer' });
+    expect(readConfiguredActorIdentity({})).toEqual({ baseRole: undefined, role: undefined });
   });
 
   it('registers and disposes the runtime ensurer seam', async () => {
@@ -66,7 +66,7 @@ describe('remaining sole seam ports', () => {
 
   it('keeps identity context bootstrap safe and rejects replacement', () => {
     const first = (tenantOverride?: string) => ({
-      persona: 'worker' as const,
+      baseRole: 'worker' as const,
       executionMode: 'mission' as const,
       authorities: [],
       tenantSlug: tenantOverride,

@@ -12,12 +12,12 @@ import {
 } from '../authority.js';
 import { isDeclaredStoreGrantName } from '../foundation/declared-store-grant.js';
 import type { ExecutionIdentityBinding } from '../foundation/execution-scope.js';
-import type { Persona } from '../types.js';
+import type { BaseRole } from '../types.js';
 
 export function asRoleOrGrant<T>(
   role: string,
   fn: () => T,
-  persona?: Persona,
+  persona?: BaseRole,
   tenantSlug?: string,
   organizationId?: string,
   identity?: ExecutionIdentityBinding
@@ -30,7 +30,7 @@ export function asRoleOrGrant<T>(
 export function asRoleOrGrantAsync<T>(
   role: string,
   fn: () => Promise<T> | T,
-  persona?: Persona,
+  persona?: BaseRole,
   tenantSlug?: string,
   organizationId?: string,
   identity?: ExecutionIdentityBinding

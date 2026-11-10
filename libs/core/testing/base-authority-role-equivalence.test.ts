@@ -21,7 +21,7 @@ import { resolveIdentityContext, withExecutionContext } from '../authority.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeReadFile, safeWriteFile } from '../secure-io.js';
 import { validateReadPermission, validateWritePermission } from '../tier-guard.js';
-import type { Persona } from '../types.js';
+import type { BaseRole } from '../types.js';
 
 const TENANT = 'acme-corp';
 const OTHER_TENANT = 'other-corp';
@@ -29,7 +29,7 @@ const MISSION = 'MSN-MATRIX-1';
 const OPERATIONS = ['read', 'write', 'mkdir'] as const;
 type Operation = (typeof OPERATIONS)[number];
 const BASES = ['sovereign', 'ecosystem_architect', 'worker', 'analyst'] as const;
-const PERSONAS: readonly (Persona | '')[] = [...BASES, 'mission_owner', ''];
+const PERSONAS: readonly (BaseRole | '')[] = [...BASES, 'mission_owner', ''];
 const ROLES = [
   '',
   'mission_controller',
@@ -42,7 +42,7 @@ type Entry = 'env' | 'scope';
 interface Principal {
   id: string;
   role: string;
-  persona: Persona | '';
+  persona: BaseRole | '';
   entry: Entry;
 }
 
@@ -187,7 +187,7 @@ function principalRow(principal: Principal, paths: readonly string[]): Principal
   return withPrincipalEnv(principal, () => {
     const identity = resolveIdentityContext();
     return {
-      persona: identity.persona,
+      persona: identity.baseRole,
       authorities: [...identity.authorities].sort(),
       cells: paths.map((relative) => OPERATIONS.map((op) => decide(relative, op)).join('|')),
     };

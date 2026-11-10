@@ -173,7 +173,7 @@ describe('first-job bound tenant status, real production authority', () => {
         missionId: undefined,
         authorities: [],
         role: 'infrastructure_sentinel',
-        persona: 'worker',
+        baseRole: 'worker',
       });
       expect(
         store.inspectFrontDeskExecution(proposal.front_desk_execution!, charter)

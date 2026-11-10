@@ -234,7 +234,7 @@ export function renameTenantWithPlan(input: TenantRenameInput): TenantRenameResu
   const { fromSlug, toSlug } = input;
   const current = assertRenamePreconditions(input, rootDir);
   const apply = Boolean(input.apply);
-  const actorId = input.actor || readConfiguredActorIdentity().persona || 'operator';
+  const actorId = input.actor || readConfiguredActorIdentity().baseRole || 'operator';
   const renameOrg = input.renameOrganization !== false;
 
   // Both audit entries this rename writes are checked before anything moves:

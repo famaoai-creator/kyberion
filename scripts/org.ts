@@ -30,13 +30,13 @@ import {
 
 type Print = (value: unknown) => void;
 
-type Persona =
+type BaseRole =
   'sovereign' | 'ecosystem_architect' | 'mission_owner' | 'worker' | 'analyst' | 'unknown';
 type AutonomyLevel = 'low' | 'medium' | 'high';
 
 type AuthorityRoleRecord = {
   description: string;
-  default_persona?: Persona;
+  default_persona?: BaseRole;
   write_scopes: string[];
   scope_classes: string[];
   allowed_actuators: string[];
@@ -60,7 +60,7 @@ type TeamRoleRecord = {
 
 type RoleAuthorityEntry = {
   role: string;
-  persona: Persona;
+  persona: BaseRole;
   execution_mode?: string;
   authority_role?: string;
 };
@@ -105,7 +105,7 @@ type OrgRoleCreateOptions = {
   name: string;
   domain: string;
   authorityRoleId: string;
-  persona: Persona;
+  persona: BaseRole;
   description?: string;
   ownershipScope?: string;
   requiredCapabilities: string[];
@@ -126,7 +126,7 @@ type OrgRoleCreateOptions = {
 type OrgRolePromoteOptions = {
   roleId: string;
   authorityRoleId: string;
-  persona: Persona;
+  persona: BaseRole;
   description?: string;
   writeScopes: string[];
   scopeClasses: string[];
@@ -153,14 +153,14 @@ type OrgCommand =
   | { kind: 'role-draft'; options: RoleDraftCliOptions }
   | { kind: 'help' };
 
-const DEFAULT_PERSONA: Persona = 'analyst';
+const DEFAULT_PERSONA: BaseRole = 'analyst';
 const DEFAULT_SELECTION_AGENTS = ['nerve-agent'];
 const DEFAULT_SELECTION_MODELS = ['auto-gemini-3'];
 
 const DOMAIN_TEMPLATES: Record<
   string,
   {
-    persona: Persona;
+    persona: BaseRole;
     requiredCapabilities: string[];
     scopeClasses: string[];
     allowedActuators: string[];
@@ -459,10 +459,10 @@ function resolveDomainTemplate(domain: string) {
   return DOMAIN_TEMPLATES[domain.toLowerCase()] || DOMAIN_TEMPLATES.default;
 }
 
-function resolvePersona(inputPersona: string | undefined, fallback: Persona): Persona {
+function resolvePersona(inputPersona: string | undefined, fallback: BaseRole): BaseRole {
   if (!inputPersona) return fallback;
-  const normalized = inputPersona.trim().toLowerCase().replace(/\s+/g, '_') as Persona;
-  const allowed: Persona[] = [
+  const normalized = inputPersona.trim().toLowerCase().replace(/\s+/g, '_') as BaseRole;
+  const allowed: BaseRole[] = [
     'sovereign',
     'ecosystem_architect',
     'mission_owner',
@@ -582,7 +582,7 @@ function resolveRoleAuthorityEntry(
 function resolvePromotionRoleAuthorityEntry(
   roleId: string,
   authorityRoleId: string,
-  persona: Persona
+  persona: BaseRole
 ): RoleAuthorityEntry {
   return {
     role: roleId,
@@ -625,7 +625,7 @@ status: active
 You are the governed role for ${toTitleCase(input.name)} work in the ${input.domain} domain.
 
 - **Authority Role**: \`${authorityRoleId}\`
-- **Default Persona**: \`${authorityRole.default_persona || DEFAULT_PERSONA}\`
+- **Default BaseRole**: \`${authorityRole.default_persona || DEFAULT_PERSONA}\`
 - **Team Role**: \`${input.teamRoleId}\`
 - **Primary Write Scopes**:
 ${writeScopeList || '- (none configured)'}
@@ -665,7 +665,7 @@ Deliver governed ${input.domain} outcomes with the minimum authority required.
 ## 2. Authority Boundaries
 - Runtime authority role: \`${authorityRoleId}\`
 - Role identity: \`${input.teamRoleId}\`
-- Persona: \`${input.persona}\`
+- BaseRole: \`${input.persona}\`
 
 ## 3. Core Capabilities
 ${input.requiredCapabilities.map((capability) => `- ${capability}`).join('\n')}
@@ -1363,7 +1363,7 @@ export async function main(
             authorityRoleId: normalizeRoleId(
               String(command.options.authorityRoleId || command.options.name)
             ),
-            persona: (command.options.persona as Persona) || DEFAULT_PERSONA,
+            persona: (command.options.persona as BaseRole) || DEFAULT_PERSONA,
             description: command.options.description,
             ownershipScope: command.options.ownershipScope,
             requiredCapabilities: (command.options.requiredCapabilities as string[]) || [],
@@ -1383,7 +1383,7 @@ export async function main(
           promoteRoleBundle(rootDir, {
             roleId: command.options.roleId,
             authorityRoleId: command.options.authorityRoleId,
-            persona: (command.options.persona as Persona) || DEFAULT_PERSONA,
+            persona: (command.options.persona as BaseRole) || DEFAULT_PERSONA,
             description: command.options.description,
             writeScopes: (command.options.writeScopes as string[]) || [],
             scopeClasses: (command.options.scopeClasses as string[]) || [],
