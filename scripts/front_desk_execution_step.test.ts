@@ -60,6 +60,7 @@ let safeRmSync: typeof import('@agent/core/secure-io').safeRmSync;
 let safeWriteFile: typeof import('@agent/core/secure-io').safeWriteFile;
 let withExecutionContext: typeof import('@agent/core/authority').withExecutionContext;
 let withExecutionContextAsync: typeof import('@agent/core/authority').withExecutionContextAsync;
+let withStoreGrant: typeof import('@agent/core/authority').withStoreGrant;
 let mintBrowserSessionToken: typeof import('@agent/core/authn/authn-providers').mintBrowserSessionToken;
 let readFirstJobApprovals: typeof import('@agent/core/surface/first-job-approval').readFirstJobApprovals;
 let decideFirstJobApproval: typeof import('@agent/core/surface/first-job-approval').decideFirstJobApproval;
@@ -93,7 +94,7 @@ const deps = () => ({
 const bound = <T>(fn: () => T) =>
   withExecutionContext('infrastructure_sentinel', fn, 'worker', tenant);
 const writeFixtureCharter = (value: unknown) =>
-  withExecutionContext('dot_charter_store', () =>
+  withStoreGrant('dot_charter_store', () =>
     safeWriteFile(fixture.charters[0].path, JSON.stringify(value))
   );
 const prepareReceipt = (...args: Parameters<typeof prepareFrontDeskExecution>) =>
@@ -151,7 +152,8 @@ beforeAll(async () => {
   } = await import('@agent/core/workforce/work-coordination'));
   ({ safeExistsSync, safeReadFile, safeRmSync, safeWriteFile } =
     await import('@agent/core/secure-io'));
-  ({ withExecutionContext, withExecutionContextAsync } = await import('@agent/core/authority'));
+  ({ withExecutionContext, withExecutionContextAsync, withStoreGrant } =
+    await import('@agent/core/authority'));
   ({ mintBrowserSessionToken } = await import('@agent/core/authn/authn-providers'));
   ({ readFirstJobApprovals, decideFirstJobApproval } =
     await import('@agent/core/surface/first-job-approval'));
@@ -698,7 +700,7 @@ describe('durable diagnostic intake vertical slice', () => {
       executePipeline.mockImplementation(async (ref, context, c) => {
         const result = await run(ref, context, c);
         if (change === 'removed')
-          withExecutionContext('dot_charter_store', () => safeRmSync(fixture.charters[0].path));
+          withStoreGrant('dot_charter_store', () => safeRmSync(fixture.charters[0].path));
         else
           writeFixtureCharter({
             ...charter,

@@ -127,6 +127,13 @@ describe('org role create', () => {
     );
   });
 
+  it('reserves declared store grant names for new roles (S4)', () => {
+    // tempRoot carries a copy of the checked-in security-policy.json.
+    const ids = org.collectExistingRoleIds(tempRoot);
+    for (const name of ['scope_locale_reader', 'deliverable_inbox_writer', 'peer_responder_reader'])
+      expect(ids.has(name), name).toBe(true);
+  });
+
   it('resolves existing authority roles through the governed directory loader', () => {
     const source = fs.readFileSync(fileURLToPath(new URL('./org.ts', import.meta.url)), 'utf8');
 

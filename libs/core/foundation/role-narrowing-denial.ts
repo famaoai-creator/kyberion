@@ -11,6 +11,7 @@ import { rolePermissionRecord } from './declared-store-grant.js';
 
 /**
  * Generic evaluator for `authority_role_permissions.<role>.narrow` declarations
+ * (and, S4, `store_grants.<name>.narrow` of a live declared store grant)
  * in security-policy.json (G3): deny-only overlays that narrow what a role may
  * touch. The rule lives here in the gate so it takes effect even when no
  * store module is loaded; the role names live only in the policy data.

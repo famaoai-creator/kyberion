@@ -14,7 +14,7 @@
  */
 
 import * as path from 'node:path';
-import { withExecutionContext } from '../authority.js';
+import { withStoreGrant } from '../authority.js';
 import { listAgentIdentities } from '../agent/agent-identity.js';
 import { listApprovalRequests } from '../governance/approval-store-reader.js';
 import type { ApprovalRequestRecord } from '../governance/approval-store.js';
@@ -236,7 +236,7 @@ export function goalOf(state: unknown): string | undefined {
 /** Production readers, each run as the read-only graph reader role. */
 export function defaultWorkspaceGraphSources(): WorkspaceGraphSources {
   const read = <T>(fn: () => T): T =>
-    withExecutionContext(WORKSPACE_GRAPH_READER_ROLE, fn, undefined, '');
+    withStoreGrant(WORKSPACE_GRAPH_READER_ROLE, fn, { tenantSlug: '' });
   return {
     tenants: () =>
       read(() =>

@@ -99,12 +99,6 @@
         "active/audit/"
       ]
     },
-    "workspace_graph_reader": {
-      "allow": []
-    },
-    "peer_responder_reader": {
-      "allow": []
-    },
     "surface_runtime": {
       "allow": [
         "active/shared/inbox/",
@@ -159,26 +153,6 @@
         "active/shared/logs/traces/",
         "active/shared/logs/stances/${KYBERION_STANCE}/traces/"
       ]
-    },
-    "deliverable_inbox_writer": {
-      "allow": ["active/shared/inbox/", "active/shared/runtime/locks/"]
-    },
-    "archived_mission_state_reader": {
-      "allow": []
-    },
-    "customer_channel_binding_store": {
-      "allow": ["knowledge/confidential/${KYBERION_TENANT}/connections/"]
-    },
-    "dot_charter_store": {
-      "allow": [
-        "dots/",
-        "knowledge/personal/dots/",
-        "knowledge/confidential/${KYBERION_TENANT}/dots/",
-        "active/shared/tmp/"
-      ]
-    },
-    "dot_lifecycle_runtime_store": {
-      "allow": ["active/shared/runtime/", "active/shared/tmp/"]
     },
     "dot_lifecycle_worker": {
       "allow": ["active/shared/runtime/locks/"]
