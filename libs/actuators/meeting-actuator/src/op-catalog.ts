@@ -47,6 +47,7 @@ const INTELLIGENCE_PROPERTIES = {
   attendees: { type: 'array' },
   attendees_from: { type: 'string' },
   answers: { type: 'array' },
+  context: { type: 'string' },
   counterparty_label: { type: 'string' },
   counterparty_ref: { type: 'string' },
   current_topic: { type: 'string' },
