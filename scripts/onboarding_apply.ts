@@ -670,7 +670,7 @@ export function buildApplySummary(
     `Summary: ${paths.summaryPath}`,
     '',
     'Next steps:',
-    `1. Export the persona in your shell: \`export KYBERION_PERSONA=${resolveInputPersona(input)}\` (.env.local is not loaded by pnpm scripts).`,
+    `1. Export the persona in your shell: \`export KYBERION_BASE_ROLE=${resolveInputPersona(input)}\` (.env.local is not loaded by pnpm scripts).`,
     `2. ${activationNextStep(paths.activation)}`,
     '3. Run `pnpm pipeline --input pipelines/baseline-check.json` and continue the onboarding flow from its status.',
     '4. Open Concierge and inspect First Job readiness at /first-job.',
@@ -691,12 +691,12 @@ export async function applyOnboardingInput(
   );
 
   setRegisteredEnv('MISSION_ROLE', 'sovereign_concierge');
-  setRegisteredEnv('KYBERION_PERSONA', 'sovereign');
+  setRegisteredEnv('KYBERION_BASE_ROLE', 'sovereign');
   const now = nowIso();
   const persona = resolveInputPersona(input);
   const personaEnvPath = persistPersona(persona);
-  setRegisteredEnv('KYBERION_PERSONA', persona);
-  print(`Persisted KYBERION_PERSONA=${persona} to ${personaEnvPath}`);
+  setRegisteredEnv('KYBERION_BASE_ROLE', persona);
+  print(`Persisted KYBERION_BASE_ROLE=${persona} to ${personaEnvPath}`);
   await applyIdentity(validatedInput, now);
   const tenantEntries = await applyTenants(validatedInput, now);
   const tutorial = await applyTutorial(validatedInput, now);
@@ -764,7 +764,7 @@ export async function main(argv: string[] = [], print: Print = () => undefined) 
     .parse();
 
   setRegisteredEnv('MISSION_ROLE', 'sovereign_concierge');
-  setRegisteredEnv('KYBERION_PERSONA', 'sovereign');
+  setRegisteredEnv('KYBERION_BASE_ROLE', 'sovereign');
 
   const input = await readInput(parsed.identity as string | undefined);
   validateInput(input);

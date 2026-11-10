@@ -100,7 +100,7 @@
       "args": ["dist/satellites/discord-bridge/src/index.js"],
       "env": {
         "MISSION_ID": "MSN-SYSTEM-SENSORY-HUB",
-        "KYBERION_PERSONA": "sovereign",
+        "KYBERION_BASE_ROLE": "sovereign",
         "MISSION_ROLE": "surface_runtime"
       },
       "cwd": ".",
@@ -148,7 +148,7 @@
       "args": ["dist/satellites/imessage-bridge/src/index.js"],
       "env": {
         "MISSION_ID": "MSN-SYSTEM-SENSORY-HUB",
-        "KYBERION_PERSONA": "sovereign",
+        "KYBERION_BASE_ROLE": "sovereign",
         "MISSION_ROLE": "surface_runtime"
       },
       "cwd": ".",
@@ -166,7 +166,7 @@
       "command": "node",
       "args": ["dist/scripts/mcp_server.js"],
       "env": {
-        "KYBERION_PERSONA": "sovereign",
+        "KYBERION_BASE_ROLE": "sovereign",
         "MISSION_ROLE": "mcp_server",
         "KYBERION_MCP_CALLER_ROLE": "cowork"
       },
@@ -186,7 +186,7 @@
       "args": ["dist/presence/bridge/nexus-daemon.js"],
       "env": {
         "MISSION_ID": "MSN-SYSTEM-NERVE",
-        "KYBERION_PERSONA": "sovereign",
+        "KYBERION_BASE_ROLE": "sovereign",
         "MISSION_ROLE": "nexus_daemon"
       },
       "cwd": ".",
@@ -271,7 +271,7 @@
       "args": ["dist/satellites/slack-bridge/src/index.js"],
       "env": {
         "MISSION_ID": "MSN-SYSTEM-SENSORY-HUB",
-        "KYBERION_PERSONA": "sovereign",
+        "KYBERION_BASE_ROLE": "sovereign",
         "MISSION_ROLE": "slack_bridge"
       },
       "cwd": ".",
@@ -290,7 +290,7 @@
       "args": ["dist/satellites/telegram-bridge/src/index.js"],
       "env": {
         "MISSION_ID": "MSN-SYSTEM-SENSORY-HUB",
-        "KYBERION_PERSONA": "sovereign",
+        "KYBERION_BASE_ROLE": "sovereign",
         "MISSION_ROLE": "surface_runtime"
       },
       "cwd": ".",
@@ -308,7 +308,7 @@
       "command": "node",
       "args": ["dist/presence/bridge/terminal/server.js"],
       "env": {
-        "KYBERION_PERSONA": "sovereign",
+        "KYBERION_BASE_ROLE": "sovereign",
         "MISSION_ROLE": "infrastructure_sentinel"
       },
       "cwd": ".",
@@ -339,7 +339,7 @@
       "command": "node",
       "args": ["dist/satellites/voice-hub/server.js"],
       "env": {
-        "KYBERION_PERSONA": "sovereign",
+        "KYBERION_BASE_ROLE": "sovereign",
         "MISSION_ROLE": "surface_runtime"
       },
       "cwd": ".",

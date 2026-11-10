@@ -26,8 +26,8 @@ describe('video content brief contract', () => {
   it('applies tenant css vars via design_profile.tenant_slug (VDS-07 / E2E-02)', () => {
     const slug = 'e2e02-video-fixture';
     const designDir = pathResolver.knowledge(`confidential/${slug}/design`);
-    const prevPersona = process.env.KYBERION_PERSONA;
-    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    const prevPersona = process.env.KYBERION_BASE_ROLE;
+    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     safeMkdir(designDir, { recursive: true });
     safeWriteFile(
       path.join(designDir, 'tenant-override.json'),
@@ -71,8 +71,8 @@ describe('video content brief contract', () => {
       expect(storyboard.design_system_ref.css_vars?.['--kb-primary']).toBe('#123456');
     } finally {
       safeRmSync(pathResolver.knowledge(`confidential/${slug}`), { recursive: true, force: true });
-      if (prevPersona === undefined) delete process.env.KYBERION_PERSONA;
-      else process.env.KYBERION_PERSONA = prevPersona;
+      if (prevPersona === undefined) delete process.env.KYBERION_BASE_ROLE;
+      else process.env.KYBERION_BASE_ROLE = prevPersona;
     }
   });
 

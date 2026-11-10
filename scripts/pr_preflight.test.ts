@@ -232,6 +232,7 @@ describe('pr preflight', () => {
               LC_ALL: 'C.UTF-8',
               CI: 'true',
               KYBERION_TEST_LEAK_STRICT: '1',
+              KYBERION_BASE_ROLE: '',
               KYBERION_PERSONA: '',
               MISSION_ROLE: '',
               MISSION_ID: '',

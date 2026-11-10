@@ -111,7 +111,7 @@ export interface PluginViewsE2eReport {
 /**
  * The environment a Chronos launched by `pnpm surfaces` receives on top of
  * its own: surface_runtime.ts injects `AUTHORIZED_SCOPE=<service id>` and
- * `SYSTEM_ROLE=<surface id with - -> _>` and binds `KYBERION_PERSONA=worker`
+ * `SYSTEM_ROLE=<surface id with - -> _>` and binds `KYBERION_BASE_ROLE=worker`
  * (the `pnpm surfaces` launch contract) while clearing its own MISSION_ROLE
  * and delegated role (buildSurfaceLaunchEnv). Kept in sync with that function
  * by check_plugin_views_e2e.test.ts.
@@ -332,6 +332,7 @@ function seedViewerTokenRegistry(root: string): string {
         KYBERION_REASONING_BACKEND: 'stub',
         MISSION_ID: '',
         MISSION_ROLE: '',
+        KYBERION_BASE_ROLE: '',
         KYBERION_PERSONA: '',
         KYBERION_SUDO: '',
         SYSTEM_ROLE: '',

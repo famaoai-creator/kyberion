@@ -6,7 +6,7 @@
  * for Kyberion to pick up (no auto mission start in MVP).
  *
  * Usage:
- *   KYBERION_PERSONA=sovereign node_modules/.bin/tsx scripts/sketch-input/server.ts \
+ *   KYBERION_BASE_ROLE=sovereign node_modules/.bin/tsx scripts/sketch-input/server.ts \
  *     [--out <path.png>] [--instruction <text>] [port]
  */
 import http from 'node:http';

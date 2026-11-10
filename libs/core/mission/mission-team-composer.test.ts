@@ -232,9 +232,9 @@ describe('mission-team-composer classification integration', () => {
     const missionId = 'MSN-TENANT-RESELECT-001';
     const missionPath = pathResolver.missionDir(missionId, 'public');
     const previousRole = process.env.MISSION_ROLE;
-    const previousPersona = process.env.KYBERION_PERSONA;
+    const previousPersona = process.env.KYBERION_BASE_ROLE;
     process.env.MISSION_ROLE = 'mission_controller';
-    process.env.KYBERION_PERSONA = 'mission-controller-test';
+    process.env.KYBERION_BASE_ROLE = 'mission-controller-test';
     try {
       safeMkdir(missionPath, { recursive: true });
       const original = composeMissionTeamPlan({
@@ -262,8 +262,8 @@ describe('mission-team-composer classification integration', () => {
       safeRmSync(missionPath, { recursive: true, force: true });
       if (previousRole === undefined) delete process.env.MISSION_ROLE;
       else process.env.MISSION_ROLE = previousRole;
-      if (previousPersona === undefined) delete process.env.KYBERION_PERSONA;
-      else process.env.KYBERION_PERSONA = previousPersona;
+      if (previousPersona === undefined) delete process.env.KYBERION_BASE_ROLE;
+      else process.env.KYBERION_BASE_ROLE = previousPersona;
     }
   });
 
@@ -271,9 +271,9 @@ describe('mission-team-composer classification integration', () => {
     const missionId = 'MSN-OBSOLETE-PROVIDER-001';
     const missionPath = pathResolver.missionDir(missionId, 'public');
     const previousRole = process.env.MISSION_ROLE;
-    const previousPersona = process.env.KYBERION_PERSONA;
+    const previousPersona = process.env.KYBERION_BASE_ROLE;
     process.env.MISSION_ROLE = 'mission_controller';
-    process.env.KYBERION_PERSONA = 'mission-controller-test';
+    process.env.KYBERION_BASE_ROLE = 'mission-controller-test';
     try {
       safeMkdir(missionPath, { recursive: true });
       const original = composeMissionTeamPlan({
@@ -310,8 +310,8 @@ describe('mission-team-composer classification integration', () => {
       safeRmSync(missionPath, { recursive: true, force: true });
       if (previousRole === undefined) delete process.env.MISSION_ROLE;
       else process.env.MISSION_ROLE = previousRole;
-      if (previousPersona === undefined) delete process.env.KYBERION_PERSONA;
-      else process.env.KYBERION_PERSONA = previousPersona;
+      if (previousPersona === undefined) delete process.env.KYBERION_BASE_ROLE;
+      else process.env.KYBERION_BASE_ROLE = previousPersona;
     }
   });
 
@@ -319,9 +319,9 @@ describe('mission-team-composer classification integration', () => {
     const missionId = 'MSN-TEAM-PLAN-SCOPE-001';
     const missionPath = pathResolver.missionDir(missionId, 'public');
     const previousRole = process.env.MISSION_ROLE;
-    const previousPersona = process.env.KYBERION_PERSONA;
+    const previousPersona = process.env.KYBERION_BASE_ROLE;
     process.env.MISSION_ROLE = 'mission_controller';
-    process.env.KYBERION_PERSONA = 'mission-controller-test';
+    process.env.KYBERION_BASE_ROLE = 'mission-controller-test';
     try {
       safeMkdir(missionPath, { recursive: true });
       const plan = composeMissionTeamPlan({
@@ -349,8 +349,8 @@ describe('mission-team-composer classification integration', () => {
       safeRmSync(missionPath, { recursive: true, force: true });
       if (previousRole === undefined) delete process.env.MISSION_ROLE;
       else process.env.MISSION_ROLE = previousRole;
-      if (previousPersona === undefined) delete process.env.KYBERION_PERSONA;
-      else process.env.KYBERION_PERSONA = previousPersona;
+      if (previousPersona === undefined) delete process.env.KYBERION_BASE_ROLE;
+      else process.env.KYBERION_BASE_ROLE = previousPersona;
     }
   });
 
@@ -445,9 +445,9 @@ describe('mission-team-composer classification integration', () => {
     const missionId = 'MSN-INDEPENDENT-REVIEWER-001';
     const missionPath = pathResolver.missionDir(missionId, 'public');
     const previousRole = process.env.MISSION_ROLE;
-    const previousPersona = process.env.KYBERION_PERSONA;
+    const previousPersona = process.env.KYBERION_BASE_ROLE;
     process.env.MISSION_ROLE = 'mission_controller';
-    process.env.KYBERION_PERSONA = 'mission-controller-test';
+    process.env.KYBERION_BASE_ROLE = 'mission-controller-test';
     try {
       safeMkdir(missionPath, { recursive: true });
       seedPublicMissionState(missionPath, missionId);
@@ -499,8 +499,8 @@ describe('mission-team-composer classification integration', () => {
       safeRmSync(missionPath, { recursive: true, force: true });
       if (previousRole === undefined) delete process.env.MISSION_ROLE;
       else process.env.MISSION_ROLE = previousRole;
-      if (previousPersona === undefined) delete process.env.KYBERION_PERSONA;
-      else process.env.KYBERION_PERSONA = previousPersona;
+      if (previousPersona === undefined) delete process.env.KYBERION_BASE_ROLE;
+      else process.env.KYBERION_BASE_ROLE = previousPersona;
     }
   });
 

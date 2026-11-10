@@ -7,13 +7,13 @@ describe('Governance Policy-as-Code Enforcement', () => {
   const TEST_FILE = pathResolver.knowledge('public/test-policy-effect.md');
 
   afterAll(() => {
-    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     process.env.MISSION_ROLE = 'ecosystem_architect';
     if (safeExistsSync(TEST_FILE)) safeUnlinkSync(TEST_FILE);
   });
 
   it('Scenario: ecosystem_architect persona can write to knowledge (Allowed by Policy)', async () => {
-    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     process.env.MISSION_ROLE = 'software_developer';
     const check = validateWritePermission(TEST_FILE);
     expect(check.allowed).toBe(true);
@@ -27,7 +27,7 @@ describe('Governance Policy-as-Code Enforcement', () => {
     const CUSTOMER_FILE = pathResolver.rootResolve(
       'knowledge/confidential/story-demo/company.json'
     );
-    process.env.KYBERION_PERSONA = 'sovereign';
+    process.env.KYBERION_BASE_ROLE = 'sovereign';
     process.env.MISSION_ROLE = 'sovereign_concierge';
     const check = validateWritePermission(CUSTOMER_FILE);
     expect(check.allowed).toBe(true);
@@ -37,7 +37,7 @@ describe('Governance Policy-as-Code Enforcement', () => {
     const TENANT_FILE = pathResolver.rootResolve(
       'knowledge/personal/stances/story-demo/tenants/acme.json'
     );
-    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     process.env.MISSION_ROLE = 'knowledge_steward';
     const check = validateWritePermission(TENANT_FILE);
     expect(check.allowed).toBe(true);
@@ -47,7 +47,7 @@ describe('Governance Policy-as-Code Enforcement', () => {
     const CONFIDENTIAL_FILE = pathResolver.knowledge('confidential/test-block.md');
 
     process.env.MISSION_ROLE = 'unknown_intruder';
-    process.env.KYBERION_PERSONA = 'unknown';
+    process.env.KYBERION_BASE_ROLE = 'unknown';
     process.env.MISSION_ID = '';
 
     const root = pathResolver.rootDir();
@@ -72,7 +72,7 @@ describe('Governance Policy-as-Code Enforcement', () => {
   it('Scenario: Default allow runtime temp paths work for everyone', async () => {
     const SCRATCH_FILE = pathResolver.sharedTmp('tests/test-default-allow.txt');
     process.env.MISSION_ROLE = 'any_role';
-    process.env.KYBERION_PERSONA = 'unknown';
+    process.env.KYBERION_BASE_ROLE = 'unknown';
     const check = validateWritePermission(SCRATCH_FILE);
     expect(check.allowed).toBe(true);
 
@@ -86,7 +86,7 @@ describe('Governance Policy-as-Code Enforcement', () => {
       'knowledge/evolution/test-mission-controller-distill.md'
     );
     process.env.MISSION_ROLE = 'mission_controller';
-    process.env.KYBERION_PERSONA = 'worker';
+    process.env.KYBERION_BASE_ROLE = 'worker';
 
     const check = validateWritePermission(WISDOM_FILE);
     expect(check.allowed).toBe(true);
@@ -97,7 +97,7 @@ describe('Governance Policy-as-Code Enforcement', () => {
   });
 
   it('Scenario: business roles can act within explicit limited authority scopes', async () => {
-    process.env.KYBERION_PERSONA = 'analyst';
+    process.env.KYBERION_BASE_ROLE = 'analyst';
 
     process.env.MISSION_ROLE = 'finance_controller';
     expect(
@@ -129,14 +129,14 @@ describe('Governance Policy-as-Code Enforcement', () => {
 
 describe('Read Permission Control (validateReadPermission)', () => {
   afterAll(() => {
-    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     process.env.MISSION_ROLE = 'ecosystem_architect';
   });
 
   it('public knowledge is always readable', () => {
     const file = pathResolver.knowledge('product/governance/security-policy.json');
     process.env.MISSION_ROLE = 'any_role';
-    process.env.KYBERION_PERSONA = 'unknown';
+    process.env.KYBERION_BASE_ROLE = 'unknown';
     const result = validateReadPermission(file);
     expect(result.allowed).toBe(true);
   });
@@ -144,7 +144,7 @@ describe('Read Permission Control (validateReadPermission)', () => {
   it('non-knowledge paths are always readable', () => {
     const file = pathResolver.rootResolve('scripts/mission_controller.ts');
     process.env.MISSION_ROLE = 'any_role';
-    process.env.KYBERION_PERSONA = 'unknown';
+    process.env.KYBERION_BASE_ROLE = 'unknown';
     const result = validateReadPermission(file);
     expect(result.allowed).toBe(true);
   });
@@ -152,7 +152,7 @@ describe('Read Permission Control (validateReadPermission)', () => {
   it('personal knowledge is blocked for unknown persona and authority role', () => {
     const file = pathResolver.knowledge('personal/my-identity.json');
     process.env.MISSION_ROLE = 'unknown_intruder';
-    process.env.KYBERION_PERSONA = 'unknown';
+    process.env.KYBERION_BASE_ROLE = 'unknown';
     process.env.MISSION_ID = '';
     const result = validateReadPermission(file);
     expect(result.allowed).toBe(false);
@@ -161,7 +161,7 @@ describe('Read Permission Control (validateReadPermission)', () => {
   it('confidential knowledge is blocked for unknown roles', () => {
     const file = pathResolver.knowledge('confidential/secret-doc.md');
     process.env.MISSION_ROLE = 'unknown_intruder';
-    process.env.KYBERION_PERSONA = 'unknown';
+    process.env.KYBERION_BASE_ROLE = 'unknown';
     process.env.MISSION_ID = '';
     const result = validateReadPermission(file);
     expect(result.allowed).toBe(false);
@@ -170,7 +170,7 @@ describe('Read Permission Control (validateReadPermission)', () => {
   it('mission_controller authority role can read personal knowledge', () => {
     const file = pathResolver.knowledge('personal/my-identity.json');
     process.env.MISSION_ROLE = 'mission_controller';
-    process.env.KYBERION_PERSONA = 'worker';
+    process.env.KYBERION_BASE_ROLE = 'worker';
     const result = validateReadPermission(file);
     expect(result.allowed).toBe(true);
   });
@@ -178,7 +178,7 @@ describe('Read Permission Control (validateReadPermission)', () => {
   it('chronos_operator cannot read personal mission knowledge', () => {
     const file = pathResolver.knowledge('personal/missions');
     process.env.MISSION_ROLE = 'chronos_operator';
-    process.env.KYBERION_PERSONA = 'worker';
+    process.env.KYBERION_BASE_ROLE = 'worker';
     const result = validateReadPermission(file);
     expect(result.allowed).toBe(false);
   });
@@ -186,7 +186,7 @@ describe('Read Permission Control (validateReadPermission)', () => {
   it('chronos_localadmin remains blocked from personal mission knowledge', () => {
     const file = pathResolver.knowledge('personal/missions');
     process.env.MISSION_ROLE = 'chronos_localadmin';
-    process.env.KYBERION_PERSONA = 'worker';
+    process.env.KYBERION_BASE_ROLE = 'worker';
     const result = validateReadPermission(file);
     expect(result.allowed).toBe(false);
   });
@@ -194,21 +194,21 @@ describe('Read Permission Control (validateReadPermission)', () => {
   it('ecosystem_architect persona can read confidential knowledge', () => {
     const file = pathResolver.knowledge('confidential/secret-doc.md');
     process.env.MISSION_ROLE = 'software_developer';
-    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     const result = validateReadPermission(file);
     expect(result.allowed).toBe(true);
   });
 });
 
 describe('Scoped SUDO enforcement', () => {
-  const originalPersona = process.env.KYBERION_PERSONA;
+  const originalPersona = process.env.KYBERION_BASE_ROLE;
   const originalRole = process.env.MISSION_ROLE;
   const originalSudo = process.env.KYBERION_SUDO;
   const originalSudoScope = process.env.KYBERION_SUDO_SCOPE;
 
   afterEach(() => {
-    if (originalPersona === undefined) delete process.env.KYBERION_PERSONA;
-    else process.env.KYBERION_PERSONA = originalPersona;
+    if (originalPersona === undefined) delete process.env.KYBERION_BASE_ROLE;
+    else process.env.KYBERION_BASE_ROLE = originalPersona;
     if (originalRole === undefined) delete process.env.MISSION_ROLE;
     else process.env.MISSION_ROLE = originalRole;
     if (originalSudo === undefined) delete process.env.KYBERION_SUDO;
@@ -218,7 +218,7 @@ describe('Scoped SUDO enforcement', () => {
   });
 
   it('limits SUDO writes to configured scope when scope is present', () => {
-    process.env.KYBERION_PERSONA = 'unknown';
+    process.env.KYBERION_BASE_ROLE = 'unknown';
     process.env.MISSION_ROLE = 'unknown_intruder';
     process.env.KYBERION_SUDO = 'true';
     process.env.KYBERION_SUDO_SCOPE = 'active/shared/tmp/';

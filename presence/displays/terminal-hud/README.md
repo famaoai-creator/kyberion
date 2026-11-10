@@ -14,7 +14,7 @@ pnpm tui --dev  # ソース実行 (@agent/core の dist は事前ビルドが必
 
 画面上部は `KYBERION / Terminal HUD`、現在のパネル、デーモン状態を表示します。その下の `Operator Cockpit` に現在の運用状態、承認待ち、ブロック、次アクション、ローカル operator / tenant scope を表示します。中央が選択中のデータ、下部が質問・コマンド入力とショートカットです。
 
-すべて `KYBERION_PERSONA=sovereign` で動作する（personal tier ミッションの読み取りに必要。書き込みは各公認 API 経由）。
+すべて `KYBERION_BASE_ROLE=sovereign` で動作する（personal tier ミッションの読み取りに必要。書き込みは各公認 API 経由）。
 
 ## パネル
 

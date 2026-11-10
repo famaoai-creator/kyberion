@@ -233,15 +233,15 @@ The `:81xx` ports above are the **legacy standalone** ports (used only when you 
 Start the Capture desk and open the printed URL:
 
 ```bash
-KYBERION_PERSONA=sovereign KYBERION_TENANT=<tenant-slug> pnpm pads
+KYBERION_BASE_ROLE=sovereign KYBERION_TENANT=<tenant-slug> pnpm pads
 # open http://127.0.0.1:8160/
 
 # Legacy individual entry point (still supported during migration)
-KYBERION_PERSONA=sovereign KYBERION_TENANT=<tenant-slug> \
+KYBERION_BASE_ROLE=sovereign KYBERION_TENANT=<tenant-slug> \
   node_modules/.bin/tsx scripts/meeting-notepad/server.ts        # or sketch-input, daily-desk, …
 
 # report-review wraps an existing report instead of a blank page
-KYBERION_PERSONA=sovereign KYBERION_TENANT=<tenant-slug> \
+KYBERION_BASE_ROLE=sovereign KYBERION_TENANT=<tenant-slug> \
   node_modules/.bin/tsx scripts/report-review/server.ts active/shared/tmp/report.html
 ```
 

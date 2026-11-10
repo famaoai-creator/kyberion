@@ -51,7 +51,7 @@ export function useOnboardingAuthorityFixture() {
     vi.stubEnv('KYBERION_ROOT', root);
     vi.stubEnv('SYSTEM_ROLE', 'concierge');
     vi.stubEnv('MISSION_ROLE', 'worker');
-    vi.stubEnv('KYBERION_PERSONA', 'worker');
+    vi.stubEnv('KYBERION_BASE_ROLE', 'worker');
     for (const key of [
       'MISSION_ID',
       'KYBERION_TENANT',

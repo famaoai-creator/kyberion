@@ -23,11 +23,11 @@ objectives and key results, members, roles, subsidiaries), use the
   confidential or public organization state, prefer the least-privilege
   `MISSION_ROLE=organization_operator` with `KYBERION_TENANT=<slug>`. It cannot
   write another tenant, the personal tier, or `knowledge/`.
-- Reserve `KYBERION_PERSONA=sovereign` for steps that need more: listing
+- Reserve `KYBERION_BASE_ROLE=sovereign` for steps that need more: listing
   tenants, personal-tier organizations, cross-tenant views, and `project create`
   (step 5). The commands below use `sovereign` because the acceptance run did;
   for routine single-tenant work, substitute the operator role.
-- Pick a **registered** tenant slug (`KYBERION_PERSONA=sovereign pnpm tenant list`).
+- Pick a **registered** tenant slug (`KYBERION_BASE_ROLE=sovereign pnpm tenant list`).
   `public`, `confidential`, `personal`, and `shared` are reserved
   tier/partition names and are never valid tenants.
 - Always try `--dry-run` before `--apply` on every authoring command.
@@ -37,7 +37,7 @@ objectives and key results, members, roles, subsidiaries), use the
 ### 1. Form the organization
 
 ```bash
-KYBERION_PERSONA=sovereign pnpm organization init --organization-id <org> --name "<name>" \
+KYBERION_BASE_ROLE=sovereign pnpm organization init --organization-id <org> --name "<name>" \
   --tier confidential --tenant-slug <slug> --purpose "<purpose>" \
   --principle "<principle>" --owner-role ops_owner --dry-run --json
 # then the same with --apply
@@ -46,16 +46,16 @@ KYBERION_PERSONA=sovereign pnpm organization init --organization-id <org> --name
 ### 2. Add domain, service, and service health
 
 ```bash
-KYBERION_PERSONA=sovereign pnpm organization domain add --organization-id <org> \
+KYBERION_BASE_ROLE=sovereign pnpm organization domain add --organization-id <org> \
   --tier confidential --tenant-slug <slug> --domain-id <dom> --name "<name>" \
   --owner-role ops_owner --apply --json
 
-KYBERION_PERSONA=sovereign pnpm organization service add --organization-id <org> \
+KYBERION_BASE_ROLE=sovereign pnpm organization service add --organization-id <org> \
   --tier confidential --tenant-slug <slug> --service-id <svc> --domain-id <dom> \
   --name "<name>" --outcome "<outcome>" --owner-role ops_owner --consumer <team> --apply --json
 
 # Declare runtime health (reconcile never infers health from absence).
-KYBERION_PERSONA=sovereign pnpm organization service state set --organization-id <org> \
+KYBERION_BASE_ROLE=sovereign pnpm organization service state set --organization-id <org> \
   --tier confidential --tenant-slug <slug> --service-id <svc> --health-status healthy \
   --reconcile-status current --freshness-seconds 3600 --confidence 0.9 --apply --json
 ```
@@ -66,7 +66,7 @@ reported by `reconcile` as `stale_services` (expected governance signal, not a b
 ### 3. Register a scheduled operation
 
 ```bash
-KYBERION_PERSONA=sovereign pnpm organization operation add --organization-id <org> \
+KYBERION_BASE_ROLE=sovereign pnpm organization operation add --organization-id <org> \
   --tier confidential --tenant-slug <slug> --operation-id <op> --name "<name>" \
   --operation-type scheduled --owner-role ops_owner --service-id <svc> \
   --trigger-kind schedule --trigger-expression "0 9 * * *" --timezone Asia/Tokyo \
@@ -80,13 +80,13 @@ records cite **evidence inside the operation scope** instead (see §5).
 ### 4. Add governance cadence and drive a decision through its lifecycle
 
 ```bash
-KYBERION_PERSONA=sovereign pnpm organization cadence add --organization-id <org> \
+KYBERION_BASE_ROLE=sovereign pnpm organization cadence add --organization-id <org> \
   --tier confidential --tenant-slug <slug> --cadence-id <cad> --name "<name>" \
   --cadence-type weekly --schedule "<schedule>" --owner-role ops_owner \
   --record-status active --apply --json
 
 # New decisions ALWAYS start as proposed (omit --record-status or pass 'proposed').
-KYBERION_PERSONA=sovereign pnpm organization decision add --organization-id <org> \
+KYBERION_BASE_ROLE=sovereign pnpm organization decision add --organization-id <org> \
   --tier confidential --tenant-slug <slug> --decision-id <dec> --cadence-id <cad> \
   --title "<title>" --decision-owner ops_owner --due-at <iso> \
   --option <a> --option <b> --apply --json
@@ -114,7 +114,7 @@ detected -> triaging -> mitigating -> resolved -> closed
 
 ```bash
 # Sovereign is required: project creation updates organization state.
-KYBERION_PERSONA=sovereign pnpm project create --project-id <prj> --name "<name>" \
+KYBERION_BASE_ROLE=sovereign pnpm project create --project-id <prj> --name "<name>" \
   --summary "<summary>" --tier confidential --tenant-slug <slug> \
   --organization-id <org> --json
 
@@ -131,7 +131,7 @@ organization (attaching twice errors with a hint).
 ```bash
 # succeeded runs REQUIRE --evidence-ref: an existing file inside the operation scope,
 # e.g. a trace log. The pipelines/ ref lives on the operation definition, not here.
-KYBERION_PERSONA=sovereign pnpm organization operation run record \
+KYBERION_BASE_ROLE=sovereign pnpm organization operation run record \
   --organization-id <org> --tier confidential --tenant-slug <slug> \
   --operation-id <op> --run-id <op>-<yyyymmdd> --run-status succeeded \
   --result-summary "<summary>" \
@@ -143,7 +143,7 @@ selection first — even for `--dry-run`:
 
 ```bash
 pnpm scope use --tier confidential --tenant <slug> --organization <org>
-KYBERION_PERSONA=sovereign pnpm organization operation tick \
+KYBERION_BASE_ROLE=sovereign pnpm organization operation tick \
   --organization-id <org> --tier confidential --tenant-slug <slug> --dry-run --json
 pnpm scope clear   # restore the default scope when finished
 ```
@@ -155,7 +155,7 @@ correctly reports `"due": []` with the next due date projected.
 
 ```bash
 # Incident (detected -> triaging -> ...).
-KYBERION_PERSONA=sovereign pnpm organization incident add --organization-id <org> \
+KYBERION_BASE_ROLE=sovereign pnpm organization incident add --organization-id <org> \
   --tier confidential --tenant-slug <slug> --incident-id <inc> --title "<title>" \
   --severity low --owner-role ops_owner --impact-summary "<text>" \
   --service-id <svc> --apply --json
@@ -163,18 +163,18 @@ KYBERION_PERSONA=sovereign pnpm organization incident add --organization-id <org
 # Learning candidates use closed vocabularies:
 #   --source-type: incident_review|routine_exception|project_closure|governance_decision
 #   --target-kind: pattern|sop_candidate|knowledge_hint|report_template
-KYBERION_PERSONA=sovereign pnpm organization learning enqueue --organization-id <org> \
+KYBERION_BASE_ROLE=sovereign pnpm organization learning enqueue --organization-id <org> \
   --tier confidential --tenant-slug <slug> --learning-id <learn> \
   --source-type routine_exception --source-ref <run-id> --title "<title>" \
   --summary "<summary>" --target-kind pattern \
   --evidence-ref "active/shared/logs/traces/traces-<yyyy-mm-dd>.jsonl" --apply --json
 
 # Governance health check and projections.
-KYBERION_PERSONA=sovereign pnpm organization reconcile --organization-id <org> \
+KYBERION_BASE_ROLE=sovereign pnpm organization reconcile --organization-id <org> \
   --tier confidential --tenant-slug <slug> --dry-run --json
-KYBERION_PERSONA=sovereign pnpm organization status --organization-id <org> \
+KYBERION_BASE_ROLE=sovereign pnpm organization status --organization-id <org> \
   --tier confidential --tenant-slug <slug> --json
-KYBERION_PERSONA=sovereign pnpm organization lineage --organization-id <org> \
+KYBERION_BASE_ROLE=sovereign pnpm organization lineage --organization-id <org> \
   --tier confidential --tenant-slug <slug> --json
 pnpm project show <prj> --json
 pnpm project reconcile <prj> --dry-run --json
@@ -214,19 +214,19 @@ documented move is the standard procedure.
 
 ## Troubleshooting (first-run friction log, 2026-09-28)
 
-| Symptom                                                                            | Cause                                                                           | Fix applied                                                                                                                                                                                       |
-| ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `invalid tenant slug 'shared'`                                                     | Reserved partition name used as tenant                                          | Error now names the reserved set and points at `KYBERION_PERSONA=sovereign pnpm tenant list` to find a valid `--tenant-slug`; empty residue dirs under `*/shared/` and unregistered slugs removed |
-| `decision add --record-status decided` rejected                                    | New decisions must start `proposed`; no `decided` state exists                  | Error now shows the full transition path and approval requirements; `usage()` Notes document the lifecycle                                                                                        |
-| `proposed -> decided` transition rejected                                          | Must advance one step (`pending_approval` next)                                 | Transition errors now list allowed next states plus the full lifecycle diagram (decisions and incidents)                                                                                          |
-| `project create` → `POLICY_VIOLATION`                                              | Organization-state write needs sovereign                                        | Documented in flow (§5); `usage()` Notes cover it                                                                                                                                                 |
-| `project attach` → `already attached`                                              | `project create --organization-id` auto-attaches                                | Error now says no action is needed and when a separate attach applies                                                                                                                             |
-| `run record --run-status succeeded` rejected                                       | `--evidence-ref` mandatory for success                                          | Error now shows the expected flag and an example trace path                                                                                                                                       |
-| `execution ref must be an existing path within the operation scope: pipelines/...` | Run refs are scope-restricted; `pipelines/` belongs on the operation definition | Error now lists the allowed prefixes and explains the definition-vs-evidence split                                                                                                                |
-| `operation tick` → scope error (even `--dry-run`)                                  | Confidential/personal execution needs `pnpm scope use` first                    | Error now prints expected vs actual scope and the exact `scope use` command; `usage()` Notes document it                                                                                          |
-| `Invalid organization learning candidate: /source_type ...`                        | Closed enum vocabularies                                                        | Error appends the allowed values; `usage()` line shows the enums inline                                                                                                                           |
-| `pending_approval -> pending_approval --request-approval` rejected (2026-10-11)    | Same-status transition refused; requests opened only on status change           | Repeat `pending_approval` with `--request-approval --chosen-option` now re-requests (`re_request:true`), no deferred detour                                                                       |
-| `finish` blocked, then status active again + `archive not confirmed` (2026-10-11)  | Goal-gap dispatch realigns to active silently with no fresh gate reason         | Gap dispatch records a fresh gate reason; controller reports it instead of the archive fallback                                                                                                   |
-| `finish` blocked on review task despite `review-task` success (2026-10-11)         | Receipt ≠ task completion; REVIEW deliverable + `record-evidence` still needed  | `review-task` prints next-step guidance and warns when the REVIEW doc is missing                                                                                                                  |
-| `scope use` clobbers the current scope before `tick` (2026-10-11)                  | No stash/restore; `clear` only deletes                                          | `pnpm scope push` / `pnpm scope pop` stash and restore scope.env                                                                                                                                  |
-| Residue org dirs removed with `rm` (2026-10-11)                                    | Deletion loses evidence; ad-hoc dirs violate the layout                         | Retire to `active/archive/organizations/<tier>/<tenant>/<slug>-<yyyymmdd>/` per §Retiring residue                                                                                                 |
+| Symptom                                                                            | Cause                                                                           | Fix applied                                                                                                                                                                                         |
+| ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `invalid tenant slug 'shared'`                                                     | Reserved partition name used as tenant                                          | Error now names the reserved set and points at `KYBERION_BASE_ROLE=sovereign pnpm tenant list` to find a valid `--tenant-slug`; empty residue dirs under `*/shared/` and unregistered slugs removed |
+| `decision add --record-status decided` rejected                                    | New decisions must start `proposed`; no `decided` state exists                  | Error now shows the full transition path and approval requirements; `usage()` Notes document the lifecycle                                                                                          |
+| `proposed -> decided` transition rejected                                          | Must advance one step (`pending_approval` next)                                 | Transition errors now list allowed next states plus the full lifecycle diagram (decisions and incidents)                                                                                            |
+| `project create` → `POLICY_VIOLATION`                                              | Organization-state write needs sovereign                                        | Documented in flow (§5); `usage()` Notes cover it                                                                                                                                                   |
+| `project attach` → `already attached`                                              | `project create --organization-id` auto-attaches                                | Error now says no action is needed and when a separate attach applies                                                                                                                               |
+| `run record --run-status succeeded` rejected                                       | `--evidence-ref` mandatory for success                                          | Error now shows the expected flag and an example trace path                                                                                                                                         |
+| `execution ref must be an existing path within the operation scope: pipelines/...` | Run refs are scope-restricted; `pipelines/` belongs on the operation definition | Error now lists the allowed prefixes and explains the definition-vs-evidence split                                                                                                                  |
+| `operation tick` → scope error (even `--dry-run`)                                  | Confidential/personal execution needs `pnpm scope use` first                    | Error now prints expected vs actual scope and the exact `scope use` command; `usage()` Notes document it                                                                                            |
+| `Invalid organization learning candidate: /source_type ...`                        | Closed enum vocabularies                                                        | Error appends the allowed values; `usage()` line shows the enums inline                                                                                                                             |
+| `pending_approval -> pending_approval --request-approval` rejected (2026-10-11)    | Same-status transition refused; requests opened only on status change           | Repeat `pending_approval` with `--request-approval --chosen-option` now re-requests (`re_request:true`), no deferred detour                                                                         |
+| `finish` blocked, then status active again + `archive not confirmed` (2026-10-11)  | Goal-gap dispatch realigns to active silently with no fresh gate reason         | Gap dispatch records a fresh gate reason; controller reports it instead of the archive fallback                                                                                                     |
+| `finish` blocked on review task despite `review-task` success (2026-10-11)         | Receipt ≠ task completion; REVIEW deliverable + `record-evidence` still needed  | `review-task` prints next-step guidance and warns when the REVIEW doc is missing                                                                                                                    |
+| `scope use` clobbers the current scope before `tick` (2026-10-11)                  | No stash/restore; `clear` only deletes                                          | `pnpm scope push` / `pnpm scope pop` stash and restore scope.env                                                                                                                                    |
+| Residue org dirs removed with `rm` (2026-10-11)                                    | Deletion loses evidence; ad-hoc dirs violate the layout                         | Retire to `active/archive/organizations/<tier>/<tenant>/<slug>-<yyyymmdd>/` per §Retiring residue                                                                                                   |

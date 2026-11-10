@@ -22,7 +22,7 @@ report-review と同型の **127.0.0.1 限定ローカルポート**。ペイン
 ## 使い方
 
 ```bash
-KYBERION_PERSONA=sovereign node_modules/.bin/tsx scripts/sketch-input/server.ts \
+KYBERION_BASE_ROLE=sovereign node_modules/.bin/tsx scripts/sketch-input/server.ts \
   [--out active/shared/tmp/sketch-input/latest.png] \
   [--instruction "この図を要件として整理して"] \
   [--artifact-ref artifact://… ] [--tier public|confidential|personal] [--tenant <slug>] \

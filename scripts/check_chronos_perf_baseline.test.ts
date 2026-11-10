@@ -15,7 +15,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
  */
 
 const REPO_ROOT = fileURLToPath(new URL('../', import.meta.url));
-const ENV_KEYS = ['KYBERION_ROOT', 'SYSTEM_ROLE', 'MISSION_ROLE', 'KYBERION_PERSONA'] as const;
+const ENV_KEYS = ['KYBERION_ROOT', 'SYSTEM_ROLE', 'MISSION_ROLE', 'KYBERION_BASE_ROLE'] as const;
 
 let root = '';
 const original: Record<string, string | undefined> = {};

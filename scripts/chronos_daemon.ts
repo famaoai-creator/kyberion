@@ -78,7 +78,7 @@ const triggerRunner = createTriggerRunner();
  * Schedules whose ops are sovereign-only (cross-tenant aggregation). The
  * chronos_gateway role binds persona `worker` into the execution scope, which
  * outranks the process env, so these run under an explicit sovereign scope —
- * but only when the operator started the daemon with KYBERION_PERSONA=sovereign.
+ * but only when the operator started the daemon with KYBERION_BASE_ROLE=sovereign.
  * Adding an id here is a privilege decision; keep the list minimal.
  */
 const SOVEREIGN_SCHEDULE_IDS: ReadonlySet<string> = new Set(['organization-daily-digest']);
@@ -394,7 +394,8 @@ export function buildTenantRunEnv(
     KYBERION_TENANT: tenantSlug,
     KYBERION_TENANT_SCOPE_REQUIRED: '1',
     MISSION_ROLE: CHRONOS_TENANT_RUNNER_ROLE,
-    KYBERION_PERSONA: 'worker',
+    KYBERION_BASE_ROLE: 'worker',
+    KYBERION_PERSONA: '',
     // A daemon-level sudo must never leak into a tenant run.
     KYBERION_SUDO: '',
   };

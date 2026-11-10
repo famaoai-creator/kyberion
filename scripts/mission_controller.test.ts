@@ -1619,7 +1619,7 @@ describe('mission_controller argument parsing', () => {
   it('fails fast when a linked project path is not writable for the current authority', () => {
     registerLinkTestProject('PRJ-3');
     process.env.MISSION_ROLE = 'mission_controller';
-    process.env.KYBERION_PERSONA = 'worker';
+    process.env.KYBERION_BASE_ROLE = 'worker';
     process.env.KYBERION_SUDO = 'false';
 
     expect(() =>
@@ -1653,7 +1653,7 @@ describe('mission_controller argument parsing', () => {
 
   it('requires sudo authority before granting mission access', () => {
     process.env.MISSION_ROLE = 'mission_controller';
-    process.env.KYBERION_PERSONA = 'worker';
+    process.env.KYBERION_BASE_ROLE = 'worker';
     process.env.KYBERION_SUDO = 'false';
 
     expect(() => assertCanGrantMissionAuthority()).toThrow('Sudo authority is required');
@@ -1661,7 +1661,7 @@ describe('mission_controller argument parsing', () => {
 
   it('allows grant flows when the caller has sudo authority', () => {
     process.env.MISSION_ROLE = 'mission_controller';
-    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     process.env.KYBERION_SUDO = 'true';
 
     expect(() => assertCanGrantMissionAuthority()).not.toThrow();
@@ -1674,7 +1674,7 @@ describe('handoffMission — SO-02 orchestrator-session release hook', () => {
 
   beforeEach(() => {
     process.env.MISSION_ROLE = 'mission_controller';
-    process.env.KYBERION_PERSONA = 'worker';
+    process.env.KYBERION_BASE_ROLE = 'worker';
     safeMkdir(missionPath, { recursive: true });
     safeWriteFile(
       `${missionPath}/mission-state.json`,
@@ -1699,7 +1699,7 @@ describe('handoffMission — SO-02 orchestrator-session release hook', () => {
   afterEach(() => {
     safeRmSync(missionPath, { recursive: true, force: true });
     delete process.env.MISSION_ROLE;
-    delete process.env.KYBERION_PERSONA;
+    delete process.env.KYBERION_BASE_ROLE;
   });
 
   it('triggers a best-effort orchestrator-session release with reason "handoff" after a successful handoff', async () => {

@@ -15,7 +15,7 @@ import {
 const TENANT = 'wc-authority-tenant';
 const ENV_KEYS = [
   'KYBERION_ENTITY_GOVERNANCE',
-  'KYBERION_PERSONA',
+  'KYBERION_BASE_ROLE',
   'MISSION_ROLE',
   'KYBERION_SUDO',
   'KYBERION_TENANT',
@@ -27,7 +27,7 @@ describe('work item tenant validation authority', () => {
   beforeEach(() => {
     for (const key of ENV_KEYS) saved[key] = process.env[key];
     process.env.KYBERION_ENTITY_GOVERNANCE = 'enforce';
-    process.env.KYBERION_PERSONA = 'sovereign';
+    process.env.KYBERION_BASE_ROLE = 'sovereign';
     delete process.env.MISSION_ROLE;
     delete process.env.KYBERION_SUDO;
     delete process.env.KYBERION_TENANT;

@@ -44,11 +44,11 @@ const collector = () =>
     executionMetricsRoot: executionRoot,
     costRegistry: { models: {}, aliases: {}, default: { prompt: 0, completion: 0 } },
   });
-const ENV_KEYS = ['KYBERION_PERSONA', 'MISSION_ROLE', 'KYBERION_TENANT', 'MISSION_ID'] as const;
+const ENV_KEYS = ['KYBERION_BASE_ROLE', 'MISSION_ROLE', 'KYBERION_TENANT', 'MISSION_ID'] as const;
 const saved = Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]]));
 
 function setIdentity(persona: string, role?: string): void {
-  process.env.KYBERION_PERSONA = persona;
+  process.env.KYBERION_BASE_ROLE = persona;
   if (role) process.env.MISSION_ROLE = role;
   else delete process.env.MISSION_ROLE;
 }

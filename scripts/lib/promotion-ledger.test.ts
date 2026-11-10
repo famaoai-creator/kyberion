@@ -43,10 +43,10 @@ describe('promotion-ledger', () => {
   });
 
   it('resolves the actor like ingest:commit and refuses anonymous promotions', () => {
-    vi.stubEnv('KYBERION_PERSONA', 'alice');
+    vi.stubEnv('KYBERION_BASE_ROLE', 'alice');
     vi.stubEnv('MISSION_ROLE', 'worker');
     expect(resolvePromotionActor('[x]')).toBe('alice');
-    vi.stubEnv('KYBERION_PERSONA', '');
+    vi.stubEnv('KYBERION_BASE_ROLE', '');
     expect(resolvePromotionActor('[x]')).toBe('worker');
     vi.stubEnv('MISSION_ROLE', '');
     expect(() => resolvePromotionActor('[x]')).toThrow(/\[x\] tenant promotion refused/);

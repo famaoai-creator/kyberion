@@ -42,7 +42,7 @@ describe('provider auth HOME spawn fence', () => {
                 MISSION_ID: 'MSN-FOREIGN',
                 KYBERION_TASK_ID: 'foreign-task',
                 KYBERION_SUDO: 'true',
-                KYBERION_PERSONA: 'sovereign',
+                KYBERION_BASE_ROLE: 'sovereign',
                 KYBERION_DELEGATED_ROLE: 'mission_controller',
                 AUTHORIZED_SCOPE: 'all',
               },
@@ -57,7 +57,7 @@ describe('provider auth HOME spawn fence', () => {
             });
             for (const key of [
               'KYBERION_SUDO',
-              'KYBERION_PERSONA',
+              'KYBERION_BASE_ROLE',
               'KYBERION_DELEGATED_ROLE',
               'AUTHORIZED_SCOPE',
             ])

@@ -120,8 +120,8 @@ describe('sketch input pad page and export (live handler)', () => {
 
   beforeAll(async () => {
     // The export writes a receipt under active/shared/observability (like the CLI run).
-    savedPersona = process.env.KYBERION_PERSONA;
-    process.env.KYBERION_PERSONA = 'sovereign';
+    savedPersona = process.env.KYBERION_BASE_ROLE;
+    process.env.KYBERION_BASE_ROLE = 'sovereign';
     server = http.createServer(
       createSketchInputRequestHandler({
         token,
@@ -143,8 +143,8 @@ describe('sketch input pad page and export (live handler)', () => {
       force: true,
     });
     safeRmSync(pathResolver.rootResolve(sketchReceiptLogicalPath(sketchContext)), { force: true });
-    if (savedPersona === undefined) delete process.env.KYBERION_PERSONA;
-    else process.env.KYBERION_PERSONA = savedPersona;
+    if (savedPersona === undefined) delete process.env.KYBERION_BASE_ROLE;
+    else process.env.KYBERION_BASE_ROLE = savedPersona;
   });
 
   it('renders the shared-kit page in the requested locale', async () => {

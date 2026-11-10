@@ -26,7 +26,11 @@ export interface ConceptBaseline {
 // Canonical implementations contain these concepts by design. No consumer exemption.
 const CANONICAL: Partial<Record<ConceptMetric, readonly string[]>> = {
   // Process-configured actor identity is deliberately centralized at this boundary.
-  env_direct_read_budget: ['libs/core/foundation/identity-context.ts'],
+  // The execution's NHI id (S4) is resolved once from the process tenant / organization.
+  env_direct_read_budget: [
+    'libs/core/foundation/identity-context.ts',
+    'libs/core/governance/execution-agent-id.ts',
+  ],
   runtime_path_literal_budget: ['libs/core/foundation/runtime-state-roots.ts'],
   rate_limiter_impl_budget: [
     'libs/core/foundation/rate-limit.ts',
@@ -38,7 +42,13 @@ const CANONICAL: Partial<Record<ConceptMetric, readonly string[]>> = {
     'libs/core/harnessing/check-harness.ts',
   ],
 };
-const CONTEXT_ENV = new Set(['KYBERION_TENANT', 'KYBERION_PERSONA', 'MISSION_ROLE', 'MISSION_ID']);
+const CONTEXT_ENV = new Set([
+  'KYBERION_TENANT',
+  'KYBERION_BASE_ROLE',
+  'KYBERION_PERSONA',
+  'MISSION_ROLE',
+  'MISSION_ID',
+]);
 export function countConcepts(source: string, filename = 'input.ts'): ConceptCounts {
   const result = Object.fromEntries(METRICS.map((k) => [k, 0])) as ConceptCounts;
   const file = ts.createSourceFile(filename, source, ts.ScriptTarget.Latest, true);

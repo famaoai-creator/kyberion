@@ -31,7 +31,7 @@ import { normalizeCard, type NormalizeCardResult } from './normalize-card.js';
 
 const EMPTY_ENV = {} as NodeJS.ProcessEnv;
 const NOW = '2026-07-28T09:00:00.000Z';
-const ENV_KEYS = ['KYBERION_PERSONA', 'MISSION_ROLE', 'KYBERION_INGEST_QUOTA_TEST'] as const;
+const ENV_KEYS = ['KYBERION_BASE_ROLE', 'MISSION_ROLE', 'KYBERION_INGEST_QUOTA_TEST'] as const;
 
 let fixtureRoot = '';
 let options: { rootDir: string; env: NodeJS.ProcessEnv };
@@ -121,7 +121,7 @@ afterAll(() => {
 
 beforeEach(() => {
   for (const key of ENV_KEYS) savedEnv[key] = process.env[key];
-  process.env.KYBERION_PERSONA = 'ecosystem_architect';
+  process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
   process.env.KYBERION_INGEST_QUOTA_TEST = '1';
 });
 

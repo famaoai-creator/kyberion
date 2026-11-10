@@ -208,7 +208,7 @@ rework.
 
 ## Persona and authority split
 
-- `KYBERION_PERSONA` describes the display / reasoning persona.
+- `KYBERION_BASE_ROLE` describes the display / reasoning persona.
 - `MISSION_ROLE` and the authority model decide what the process can write.
 - `org_role` (formerly `assigned_persona`) in mission state is mission metadata, not write authority.
 

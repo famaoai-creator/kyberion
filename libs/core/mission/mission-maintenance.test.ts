@@ -159,9 +159,9 @@ describe('shouldSkipResumeEntry (Phase B-3 idempotency)', () => {
 
   it('records task details into the mission state context', async (ctx) => {
     const previousRole = process.env.MISSION_ROLE;
-    const previousPersona = process.env.KYBERION_PERSONA;
+    const previousPersona = process.env.KYBERION_BASE_ROLE;
     process.env.MISSION_ROLE = 'mission_controller';
-    process.env.KYBERION_PERSONA = 'worker';
+    process.env.KYBERION_BASE_ROLE = 'worker';
     const missionId = RECORD_TASK_MISSION_ID;
     const missionPath = pathResolver.missionDir(missionId, 'public');
     // The fixture mission lives in the live mission tree; leave nothing behind.
@@ -169,8 +169,8 @@ describe('shouldSkipResumeEntry (Phase B-3 idempotency)', () => {
       safeRmSync(missionPath, { recursive: true, force: true });
       if (previousRole === undefined) delete process.env.MISSION_ROLE;
       else process.env.MISSION_ROLE = previousRole;
-      if (previousPersona === undefined) delete process.env.KYBERION_PERSONA;
-      else process.env.KYBERION_PERSONA = previousPersona;
+      if (previousPersona === undefined) delete process.env.KYBERION_BASE_ROLE;
+      else process.env.KYBERION_BASE_ROLE = previousPersona;
     });
     safeMkdir(missionPath, { recursive: true });
     safeWriteFile(
@@ -280,14 +280,14 @@ describe('shouldSkipResumeEntry (Phase B-3 idempotency)', () => {
 
   it('creates a reconcile-work scaffold for interrupted artifact recovery', () => {
     const previousRole = process.env.MISSION_ROLE;
-    const previousPersona = process.env.KYBERION_PERSONA;
+    const previousPersona = process.env.KYBERION_BASE_ROLE;
     const missionId = 'MSN-MAINTENANCE-SCAFFOLD';
     const missionPath = pathResolver.missionDir(missionId, 'public');
     const scaffoldPath = pathResolver.rootResolve(
       `active/shared/tmp/reconciliation-${missionId}.scaffold.json`
     );
     process.env.MISSION_ROLE = 'mission_controller';
-    process.env.KYBERION_PERSONA = 'mission_controller';
+    process.env.KYBERION_BASE_ROLE = 'mission_controller';
     safeRmSync(missionPath, { recursive: true, force: true });
     safeRmSync(scaffoldPath, { force: true });
     safeMkdir(missionPath, { recursive: true });
@@ -302,8 +302,8 @@ describe('shouldSkipResumeEntry (Phase B-3 idempotency)', () => {
       safeRmSync(scaffoldPath, { force: true });
       if (previousRole === undefined) delete process.env.MISSION_ROLE;
       else process.env.MISSION_ROLE = previousRole;
-      if (previousPersona === undefined) delete process.env.KYBERION_PERSONA;
-      else process.env.KYBERION_PERSONA = previousPersona;
+      if (previousPersona === undefined) delete process.env.KYBERION_BASE_ROLE;
+      else process.env.KYBERION_BASE_ROLE = previousPersona;
     }
   });
 });

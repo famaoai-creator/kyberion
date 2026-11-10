@@ -415,7 +415,7 @@ export function buildManagedProjectRecord(input: ManagedProjectCreateInput): Pro
     throw new Error(
       `tenant_slug 'shared' is not a tenant for confidential project records (${projectId}): ` +
         `'shared' is a reserved partition name, not a tenant. ` +
-        `Run 'KYBERION_PERSONA=sovereign pnpm tenant list' to see registered tenant slugs and pass one via --tenant-slug.`
+        `Run 'KYBERION_BASE_ROLE=sovereign pnpm tenant list' to see registered tenant slugs and pass one via --tenant-slug.`
     );
   }
   if (

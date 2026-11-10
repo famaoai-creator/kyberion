@@ -43,12 +43,12 @@ function readPipeline(): {
 describe('meeting-to-value contract', () => {
   const originalMissionId = process.env.MISSION_ID;
   const originalMissionRole = process.env.MISSION_ROLE;
-  const originalPersona = process.env.KYBERION_PERSONA;
+  const originalPersona = process.env.KYBERION_BASE_ROLE;
 
   beforeEach(() => {
     process.env.MISSION_ID = MISSION_ID;
     process.env.MISSION_ROLE = 'mission_controller';
-    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     setWorkCoordinationNamespace(`meeting-to-value-contract-${process.pid}`);
     clearWorkCoordinationStore();
     createWorkItem({
@@ -113,8 +113,8 @@ describe('meeting-to-value contract', () => {
     else process.env.MISSION_ID = originalMissionId;
     if (originalMissionRole === undefined) delete process.env.MISSION_ROLE;
     else process.env.MISSION_ROLE = originalMissionRole;
-    if (originalPersona === undefined) delete process.env.KYBERION_PERSONA;
-    else process.env.KYBERION_PERSONA = originalPersona;
+    if (originalPersona === undefined) delete process.env.KYBERION_BASE_ROLE;
+    else process.env.KYBERION_BASE_ROLE = originalPersona;
   });
 
   it('keeps the meeting follow-up pipeline wired to minutes and action-item extraction', () => {

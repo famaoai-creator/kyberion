@@ -14,7 +14,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
  */
 
 const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
-const ENV_KEYS = ['KYBERION_ROOT', 'SYSTEM_ROLE', 'MISSION_ROLE', 'KYBERION_PERSONA'] as const;
+const ENV_KEYS = ['KYBERION_ROOT', 'SYSTEM_ROLE', 'MISSION_ROLE', 'KYBERION_BASE_ROLE'] as const;
 const JOURNAL_RELATIVE = 'presence/bridge/runtime/stimuli.jsonl';
 const MAX_BYTES = 256;
 
@@ -108,7 +108,7 @@ describe('SB-01 stimuli-journal rotation under SYSTEM_ROLE=slack_bridge', () => 
     // Per-test isolation: no test may inherit a role/persona left by another;
     // afterAll restores the values saved in beforeAll.
     delete process.env.MISSION_ROLE;
-    delete process.env.KYBERION_PERSONA;
+    delete process.env.KYBERION_BASE_ROLE;
     authority.resetRoleAssumptionPolicyCache();
     for (const segment of segmentPaths()) fs.rmSync(segment, { force: true });
     fs.writeFileSync(journalPath(), journalLines(20));

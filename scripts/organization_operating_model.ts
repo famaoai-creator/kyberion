@@ -1,4 +1,5 @@
 import { createManagedOrganization } from '@agent/core/organization/organization-management';
+import { baseRoleEnvText } from '@agent/core/foundation';
 import { cliApprovalRequester } from './lib/cli-approval-requester.js';
 import {
   buildOrganizationManagementView,
@@ -61,7 +62,6 @@ import { memoryPromotionQueuePath } from '@agent/core/knowledge/memory-promotion
 import { resolveScopeResolution } from '@agent/core/scope-context';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync } from '@agent/core/secure-io';
-import { getRegisteredEnvText } from '@agent/core/foundation/env';
 import {
   createOrganizationIncident,
   transitionOrganizationIncident,
@@ -109,8 +109,8 @@ function resolveWriteMode(parsed: ParsedArgs, command: string): 'dry_run' | 'app
     const guard = validateWritePermission(writePreflightTarget);
     if (!guard.allowed) {
       throw new Error(
-        `${command} --apply is not permitted for persona '${getRegisteredEnvText('KYBERION_PERSONA') || 'unknown'}' (${guard.reason}). ` +
-          'Organization writes need KYBERION_PERSONA=sovereign, or MISSION_ROLE=organization_operator with KYBERION_TENANT set to this tenant; nothing was written.'
+        `${command} --apply is not permitted for persona '${baseRoleEnvText() || 'unknown'}' (${guard.reason}). ` +
+          'Organization writes need KYBERION_BASE_ROLE=sovereign, or MISSION_ROLE=organization_operator with KYBERION_TENANT set to this tenant; nothing was written.'
       );
     }
   }

@@ -5,7 +5,7 @@
  * for Kyberion pickup (no auto knowledge commit).
  *
  * Usage:
- *   KYBERION_PERSONA=sovereign node_modules/.bin/tsx scripts/doc-drop/server.ts \
+ *   KYBERION_BASE_ROLE=sovereign node_modules/.bin/tsx scripts/doc-drop/server.ts \
  *     [--out <dir>] [--instruction <text>] [port]
  */
 import http from 'node:http';

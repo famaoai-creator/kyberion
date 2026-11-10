@@ -4,7 +4,7 @@
  * Personal brain-dump pad on 127.0.0.1: notes, tags, target, voice, handoff.
  *
  * Usage:
- *   KYBERION_PERSONA=sovereign node_modules/.bin/tsx scripts/memory-capture/server.ts \
+ *   KYBERION_BASE_ROLE=sovereign node_modules/.bin/tsx scripts/memory-capture/server.ts \
  *     [--out <dir>] [--instruction <text>] [port]
  */
 import http from 'node:http';

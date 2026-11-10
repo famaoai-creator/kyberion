@@ -168,7 +168,7 @@ file to read a document.
 4. **Chart images OCR badly.** Record only the data labels printed on the chart and
    say that unlabeled points must be read from the source.
 5. **Identity for confidential writes.** `pnpm knowledge:ingest` needs
-   `KYBERION_PERSONA=ecosystem_architect MISSION_ROLE=mission_controller`. The
+   `KYBERION_BASE_ROLE=ecosystem_architect MISSION_ROLE=mission_controller`. The
    ceremony now checks this up front and refuses — without a policy violation —
    with the exact command to run, so there is no reason to guess roles (three
    violations in ten minutes trip the kill switch).

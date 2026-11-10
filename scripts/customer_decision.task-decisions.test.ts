@@ -39,7 +39,7 @@ const CONSUMER = `mission-${MISSION}.${TASK}`;
 /** A value no audit record or id-only output may contain. */
 const SENTINEL = 'release-window-sentinel-7731';
 const keys = [
-  'KYBERION_PERSONA',
+  'KYBERION_BASE_ROLE',
   'MISSION_ROLE',
   'SYSTEM_ROLE',
   'MISSION_ID',
@@ -83,7 +83,7 @@ beforeAll(async () => {
   io = await import('@agent/core/secure-io');
   facade = await import('./customer_decision.js');
   expect((await import('@agent/core/path-resolver')).rootDir()).toBe(ROOT);
-  process.env.KYBERION_PERSONA = 'sovereign';
+  process.env.KYBERION_BASE_ROLE = 'sovereign';
   for (const [tenant, status] of [
     [TENANT, 'active'],
     [OTHER, 'active'],

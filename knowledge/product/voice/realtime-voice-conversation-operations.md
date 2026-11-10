@@ -45,7 +45,7 @@ pnpm voice:conversation-config show --json
 セッションごとに新しい `--session-id` を付ける。
 
 ```sh
-KYBERION_PERSONA=ecosystem_architect \
+KYBERION_BASE_ROLE=ecosystem_architect \
 MISSION_ID=MSN-... \
 node dist/scripts/run_realtime_voice_conversation.js \
   --session-id realtime-voice-$(date +%Y%m%d-%H%M%S) \

@@ -52,7 +52,7 @@ describe('tenant-rate-limiter (IP-29)', () => {
 
   beforeEach(() => {
     savedTenant = process.env.KYBERION_TENANT;
-    savedPersona = process.env.KYBERION_PERSONA;
+    savedPersona = process.env.KYBERION_BASE_ROLE;
     safeRmSync(lockPath, { recursive: true, force: true });
     safeRmSync(externalLockPath, { recursive: true, force: true });
     _resetTenantRateLimitStateForTests();
@@ -62,8 +62,8 @@ describe('tenant-rate-limiter (IP-29)', () => {
   afterEach(() => {
     if (savedTenant === undefined) delete process.env.KYBERION_TENANT;
     else process.env.KYBERION_TENANT = savedTenant;
-    if (savedPersona === undefined) delete process.env.KYBERION_PERSONA;
-    else process.env.KYBERION_PERSONA = savedPersona;
+    if (savedPersona === undefined) delete process.env.KYBERION_BASE_ROLE;
+    else process.env.KYBERION_BASE_ROLE = savedPersona;
     safeRmSync(lockPath, { recursive: true, force: true });
     safeRmSync(externalLockPath, { recursive: true, force: true });
     _resetTenantRateLimitStateForTests();
@@ -161,7 +161,7 @@ describe('tenant-rate-limiter (IP-29)', () => {
     safeSymlinkSync(externalLockPath, lockPath, 'file');
 
     process.env.KYBERION_TENANT = 'acme-corp';
-    process.env.KYBERION_PERSONA = 'worker';
+    process.env.KYBERION_BASE_ROLE = 'worker';
     expect(consumeTenantBudget({ op: 'wisdom:a2a_fanout', cost: 1 })).toMatchObject({
       allowed: true,
     });
@@ -174,7 +174,7 @@ describe('tenant-rate-limiter (IP-29)', () => {
   it('reclaims a malformed lock through the stale-lock path', () => {
     safeWriteFile(lockPath, '{');
     process.env.KYBERION_TENANT = 'acme-corp';
-    process.env.KYBERION_PERSONA = 'worker';
+    process.env.KYBERION_BASE_ROLE = 'worker';
 
     expect(consumeTenantBudget({ op: 'wisdom:a2a_fanout', cost: 1 })).toMatchObject({
       allowed: true,
@@ -183,14 +183,14 @@ describe('tenant-rate-limiter (IP-29)', () => {
 
   it('passes through when no tenant slug is bound (tenant-agnostic)', () => {
     delete process.env.KYBERION_TENANT;
-    process.env.KYBERION_PERSONA = 'worker';
+    process.env.KYBERION_BASE_ROLE = 'worker';
     const decision = consumeTenantBudget({ op: 'wisdom:a2a_fanout' });
     expect(decision.allowed).toBe(true);
   });
 
   it('exempt personas (sovereign / ecosystem_architect) bypass the limit', () => {
     process.env.KYBERION_TENANT = 'acme-corp';
-    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     // Even with cost > capacity, ecosystem_architect should be exempt.
     const decision = consumeTenantBudget({ op: 'wisdom:a2a_fanout', cost: 9999 });
     expect(decision.allowed).toBe(true);
@@ -198,7 +198,7 @@ describe('tenant-rate-limiter (IP-29)', () => {
 
   it('debits the tenant bucket on each consume and refuses when empty', () => {
     process.env.KYBERION_TENANT = 'acme-corp';
-    process.env.KYBERION_PERSONA = 'worker';
+    process.env.KYBERION_BASE_ROLE = 'worker';
     // Default policy: 60 burst, 60/min refill. Force a frozen "now" so refill doesn't kick in.
     const fixedNow = new Date('2026-04-27T00:00:00Z');
     const denyAfter = 60;
@@ -222,7 +222,7 @@ describe('tenant-rate-limiter (IP-29)', () => {
 
   it('refills tokens over time (linear refill rate)', () => {
     process.env.KYBERION_TENANT = 'acme-corp';
-    process.env.KYBERION_PERSONA = 'worker';
+    process.env.KYBERION_BASE_ROLE = 'worker';
     const start = new Date('2026-04-27T00:00:00Z');
     // Drain the bucket
     for (let i = 0; i < 60; i++) {
@@ -237,7 +237,7 @@ describe('tenant-rate-limiter (IP-29)', () => {
 
   it('inspectTenantBudget reads without mutating state', () => {
     process.env.KYBERION_TENANT = 'acme-corp';
-    process.env.KYBERION_PERSONA = 'worker';
+    process.env.KYBERION_BASE_ROLE = 'worker';
     const before = inspectTenantBudget('acme-corp');
     const after = inspectTenantBudget('acme-corp');
     expect(after.tokens).toBeCloseTo(before.tokens, 1);
@@ -246,7 +246,7 @@ describe('tenant-rate-limiter (IP-29)', () => {
 
   it('withTenantBudget throws TenantRateLimitExceededError on denial', async () => {
     process.env.KYBERION_TENANT = 'acme-corp';
-    process.env.KYBERION_PERSONA = 'worker';
+    process.env.KYBERION_BASE_ROLE = 'worker';
     // Drain the bucket using consumeTenantBudget directly (60 of cost 1)
     const start = new Date('2026-04-27T00:00:00Z');
     for (let i = 0; i < 60; i++) {
@@ -274,7 +274,7 @@ describe('tenant-rate-limiter (IP-29)', () => {
       JSON.stringify({ tenants: { 'acme-corp': { tokens: 'not-a-number', updated_at: 'bad' } } })
     );
     process.env.KYBERION_TENANT = 'acme-corp';
-    process.env.KYBERION_PERSONA = 'worker';
+    process.env.KYBERION_BASE_ROLE = 'worker';
 
     expect(() => consumeTenantBudget({ op: 'wisdom:a2a_fanout', cost: 1 })).toThrow(
       'Invalid catalog tenant-rate-limit-state'
@@ -283,7 +283,7 @@ describe('tenant-rate-limiter (IP-29)', () => {
 
   it('persists a canonical state payload after quota enforcement', () => {
     process.env.KYBERION_TENANT = 'acme-corp';
-    process.env.KYBERION_PERSONA = 'worker';
+    process.env.KYBERION_BASE_ROLE = 'worker';
     consumeTenantBudget({ op: 'wisdom:a2a_fanout', cost: 1 });
 
     const persisted = JSON.parse(

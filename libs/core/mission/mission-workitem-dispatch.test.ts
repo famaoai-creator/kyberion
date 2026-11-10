@@ -279,7 +279,7 @@ function makeTaskResultText(input: {
 
 beforeEach(() => {
   process.env.MISSION_ROLE = 'mission_controller';
-  process.env.KYBERION_PERSONA = 'worker';
+  process.env.KYBERION_BASE_ROLE = 'worker';
   artifactRegistryStore.records.length = 0;
   setWorkCoordinationNamespace(workCoordinationNamespace);
   clearWorkCoordinationStore();

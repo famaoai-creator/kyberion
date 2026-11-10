@@ -95,11 +95,11 @@ describe('install_chronos_launchd plist generation', () => {
   it('checks the forwardable allowlist before reading any shell value', () => {
     const readEnv = vi.fn((name: string) => `value-of-${name}`);
     expect(() =>
-      resolveForwardedChronosEnv(['KYBERION_PERSONA', 'SLACK_BOT_TOKEN'], readEnv)
+      resolveForwardedChronosEnv(['KYBERION_BASE_ROLE', 'SLACK_BOT_TOKEN'], readEnv)
     ).toThrow(/SLACK_BOT_TOKEN cannot be forwarded/);
     expect(readEnv).not.toHaveBeenCalledWith('SLACK_BOT_TOKEN');
-    expect(resolveForwardedChronosEnv(['KYBERION_PERSONA'], readEnv)).toEqual({
-      KYBERION_PERSONA: 'value-of-KYBERION_PERSONA',
+    expect(resolveForwardedChronosEnv(['KYBERION_BASE_ROLE'], readEnv)).toEqual({
+      KYBERION_BASE_ROLE: 'value-of-KYBERION_BASE_ROLE',
     });
   });
 

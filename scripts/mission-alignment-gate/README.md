@@ -34,7 +34,7 @@ node dist/scripts/mission_controller.js plan-tasks <MISSION_ID> --refresh-catalo
 node dist/scripts/mission_alignment_request.js --mission <MISSION_ID>
 
 # 4) canonical mission surface で配信（localhost=🎤可）
-KYBERION_PERSONA=<persona> node_modules/.bin/tsx scripts/mission-alignment-gate/serve-brief.ts --mission <MISSION_ID> --port 8137
+KYBERION_BASE_ROLE=<persona> node_modules/.bin/tsx scripts/mission-alignment-gate/serve-brief.ts --mission <MISSION_ID> --port 8137
 #   → http://127.0.0.1:8137/ で ✏️/💬/🎤 → ✅承認 or ✏️要修正
 
 # 5) approval-store を正本として strict gate を評価
@@ -51,7 +51,7 @@ node_modules/.bin/tsx scripts/mission-alignment-gate/render-brief.ts <mission-br
 node_modules/.bin/tsx scripts/mission-alignment-gate/read-decision.ts <out.html> <mission-brief.json>
 
 # 任意HTMLの一般レビュー/保存。mission gate の approval-store とは別用途
-KYBERION_PERSONA=<persona> node_modules/.bin/tsx scripts/report-review/server.ts <out.html> 8137
+KYBERION_BASE_ROLE=<persona> node_modules/.bin/tsx scripts/report-review/server.ts <out.html> 8137
 ```
 
 `serve-brief.ts` は mission gate の標準サーフェスである。新しい人間向け UI を追加する場合も、専用の承認ストアや独自決裁 API を作らず、既存の approval-store に `mission_gate` リクエストを載せる。
@@ -78,5 +78,5 @@ KYBERION_PERSONA=<persona> node_modules/.bin/tsx scripts/report-review/server.ts
 ## 依存
 
 - `scripts/report-review/`（レビュー/音声/描画レイヤ）を流用。決裁の書き込み口は共有 `approval-store`。
-- ファイルI/Oは `@agent/core/secure-io`。confidential出力/保存には適切な `KYBERION_PERSONA`。
+- ファイルI/Oは `@agent/core/secure-io`。confidential出力/保存には適切な `KYBERION_BASE_ROLE`。
 - ゲート定義は `humanConfirmed` の自動充足に依存せず、ハッシュと approval-store を確認する `command_succeeds` を使う。

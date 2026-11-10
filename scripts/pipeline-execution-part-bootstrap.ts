@@ -1,4 +1,5 @@
 import { recordGovernanceAction } from '@agent/core/governance/governance-action-recorder';
+import { baseRoleEnvText } from '@agent/core/foundation';
 import { TraceContext, finalizeAndPersist, persistTrace } from '@agent/core/analysis/trace';
 import { logger } from '@agent/core/core';
 import {
@@ -290,7 +291,7 @@ export async function resolvePipelineReasoningOptions(
   const resolvedPersona =
     (typeof ctx.persona === 'string' ? ctx.persona : undefined) ||
     (typeof ctx.assigned_persona === 'string' ? ctx.assigned_persona : undefined) ||
-    registeredEnv('KYBERION_PERSONA') ||
+    baseRoleEnvText() ||
     'default';
   // `unknown` is the "no identity resolved" sentinel, not a persona; treating it
   // as one leaks into the reasoning role and fails every `reasoning:*` step in an
@@ -806,7 +807,7 @@ export async function loadActuatorDispatch(
   dispatchCache[domain] = async (op, params, ctx, type, trace?) => {
     // SA-05 Task 1: actuator dispatch feeds kill-switch anomaly tracking.
     recordGovernanceAction(
-      registeredEnv('KYBERION_PERSONA') || 'unknown',
+      baseRoleEnvText() || 'unknown',
       'actuator_dispatch',
       `${domain}:${op}`,
       false

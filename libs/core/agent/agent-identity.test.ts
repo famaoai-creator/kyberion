@@ -59,10 +59,10 @@ let currentJournalPath = '';
 
 beforeEach(() => {
   previousMissionRole = process.env.MISSION_ROLE;
-  previousPersona = process.env.KYBERION_PERSONA;
+  previousPersona = process.env.KYBERION_BASE_ROLE;
   previousTenant = process.env.KYBERION_TENANT;
   delete process.env.MISSION_ROLE;
-  delete process.env.KYBERION_PERSONA;
+  delete process.env.KYBERION_BASE_ROLE;
   // D3: an NHI belongs to a tenant; the suite runs inside one active tenant.
   process.env.KYBERION_TENANT = 'demo-tenant';
   currentJournalPath = nextJournalPath();
@@ -73,8 +73,8 @@ afterEach(() => {
   vi.restoreAllMocks();
   if (previousMissionRole === undefined) delete process.env.MISSION_ROLE;
   else process.env.MISSION_ROLE = previousMissionRole;
-  if (previousPersona === undefined) delete process.env.KYBERION_PERSONA;
-  else process.env.KYBERION_PERSONA = previousPersona;
+  if (previousPersona === undefined) delete process.env.KYBERION_BASE_ROLE;
+  else process.env.KYBERION_BASE_ROLE = previousPersona;
   if (previousTenant === undefined) delete process.env.KYBERION_TENANT;
   else process.env.KYBERION_TENANT = previousTenant;
   resetAgentIdentityServiceForTests();

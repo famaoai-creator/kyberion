@@ -12,7 +12,7 @@ describe('Runtime surface operations contract', () => {
   it('exposes one governed surface lifecycle entrypoint from package.json', () => {
     const pkg = JSON.parse(read('package.json')) as { scripts: Record<string, string> };
     expect(pkg.scripts.surfaces).toContain('scripts/run_with_env.ts');
-    expect(pkg.scripts.surfaces).toContain('KYBERION_PERSONA=worker');
+    expect(pkg.scripts.surfaces).toContain('KYBERION_BASE_ROLE=worker');
     expect(pkg.scripts.surfaces).toContain('SYSTEM_ROLE=surface_runtime');
     expect(pkg.scripts.surfaces).toContain('dist/scripts/surface_runtime.bundle.js');
     for (const action of ['setup', 'reconcile', 'status', 'repair', 'start', 'stop'])

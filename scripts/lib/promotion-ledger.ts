@@ -8,7 +8,7 @@
  *
  * Call plan + append inside the caller's tenant-bound `asset_promoter`
  * context; resolve the actor BEFORE entering it (the context rewrites
- * MISSION_ROLE / KYBERION_PERSONA).
+ * MISSION_ROLE / KYBERION_BASE_ROLE).
  */
 import { createHash } from 'node:crypto';
 import { readConfiguredActorIdentity } from '@agent/core/identity-context-bridge';
@@ -33,7 +33,7 @@ export function sha256Text(text: string): string {
 
 /**
  * Who promoted, resolved like the ingest commit's `ingested_by`
- * (KYBERION_PERSONA, else MISSION_ROLE). Throws when neither is set: a tenant
+ * (KYBERION_BASE_ROLE, else MISSION_ROLE). Throws when neither is set: a tenant
  * asset is never landed anonymously.
  */
 export function resolvePromotionActor(tag: string): string {
@@ -44,7 +44,7 @@ export function resolvePromotionActor(tag: string): string {
   if (role) return role;
   throw new Error(
     `${tag} tenant promotion refused — no identity for the asset ledger's ingested_by | ` +
-      'run with KYBERION_PERSONA or MISSION_ROLE set (no anonymous tenant assets) | evidence: env'
+      'run with KYBERION_BASE_ROLE or MISSION_ROLE set (no anonymous tenant assets) | evidence: env'
   );
 }
 

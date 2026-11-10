@@ -1158,7 +1158,7 @@ export async function runOnboarding(
     throw error;
   }
   setRegisteredEnv('MISSION_ROLE', 'sovereign_concierge');
-  setRegisteredEnv('KYBERION_PERSONA', 'sovereign');
+  setRegisteredEnv('KYBERION_BASE_ROLE', 'sovereign');
   const rootDir = pathResolver.rootDir();
   let stanceSlug = customerResolver.activeStance();
 

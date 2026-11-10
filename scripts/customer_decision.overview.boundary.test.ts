@@ -44,7 +44,7 @@ const ACTOR = 'customer:acme-cto';
 const TITLE = 'Inception decisions';
 const SECRETS = ['secret-comment-1', 'secret-comment-2', 'secret-comment-3', 'secret-question'];
 const keys = [
-  'KYBERION_PERSONA',
+  'KYBERION_BASE_ROLE',
   'MISSION_ROLE',
   'SYSTEM_ROLE',
   'MISSION_ID',
@@ -151,7 +151,7 @@ beforeAll(async () => {
   learningQueue = await import('@agent/core/organization/organization-learning-queue');
   facade = await import('./customer_decision.js');
   expect((await import('@agent/core/path-resolver')).rootDir()).toBe(ROOT);
-  process.env.KYBERION_PERSONA = 'sovereign';
+  process.env.KYBERION_BASE_ROLE = 'sovereign';
   for (const tenant of [TENANT, OTHER]) {
     writeFixtureJson(`knowledge/personal/tenants/${tenant}.json`, {
       tenant_slug: tenant,
@@ -678,7 +678,7 @@ describe('customer-decision overview and learning (CD-12, real paths)', () => {
         'KYBERION_TENANT',
         'KYBERION_TENANT_SCOPE_REQUIRED',
         'MISSION_ROLE',
-        'KYBERION_PERSONA',
+        'KYBERION_BASE_ROLE',
       ] as const)
         process.env[key] = env[key];
       process.env.SYSTEM_ROLE = 'chronos_mirror_v2';

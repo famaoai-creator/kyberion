@@ -127,7 +127,7 @@ const ENV_KEYS = [
   'KYBERION_TENANT',
   'KYBERION_ORGANIZATION_ID',
   'KYBERION_NHI_ID',
-  'KYBERION_PERSONA',
+  'KYBERION_BASE_ROLE',
   'MISSION_ROLE',
   'SYSTEM_ROLE',
   'KYBERION_DELEGATED_ROLE',
@@ -143,7 +143,7 @@ function asPrincipal<T>(world: World, principal: Principal, fn: () => T): T {
   if (world.organization) process.env.KYBERION_ORGANIZATION_ID = world.organization;
   if (world.nhiId) process.env.KYBERION_NHI_ID = world.nhiId;
   if (principal.entry === 'env' && principal.baseRole) {
-    process.env.KYBERION_PERSONA = principal.baseRole;
+    process.env.KYBERION_BASE_ROLE = principal.baseRole;
   }
   try {
     return principal.entry === 'scope'

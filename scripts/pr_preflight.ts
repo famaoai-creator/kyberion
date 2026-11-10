@@ -53,7 +53,7 @@ const gitRunner: GitRunner = (args) =>
  * The CI test environment (checklist locale row): the GitHub-hosted runner's
  * locale (C.UTF-8), CI mode, strict leak checking (as the test workflows set
  * it), and no operator persona / role / mission / sudo. Without this the
- * operator's profile leaks into the run — e.g. `KYBERION_PERSONA=sovereign`
+ * operator's profile leaks into the run — e.g. `KYBERION_BASE_ROLE=sovereign`
  * makes locale resolution read the personal identity language (`ja`), and
  * tests asserting the default English vocabulary fail locally but pass in CI.
  * Empty values override the inherited ones (safeExecResult applies extra env
@@ -64,6 +64,7 @@ export const AFFECTED_TESTS_ENV = {
   LC_ALL: 'C.UTF-8',
   CI: 'true',
   KYBERION_TEST_LEAK_STRICT: '1',
+  KYBERION_BASE_ROLE: '',
   KYBERION_PERSONA: '',
   MISSION_ROLE: '',
   MISSION_ID: '',

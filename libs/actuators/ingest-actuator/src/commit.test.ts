@@ -31,7 +31,7 @@ import { parseDocument } from './parse-document.js';
 const EMPTY_ENV = {} as NodeJS.ProcessEnv;
 const NOW = '2026-07-28T09:00:00.000Z';
 const IDENTITY_ENV_KEYS = [
-  'KYBERION_PERSONA',
+  'KYBERION_BASE_ROLE',
   'MISSION_ROLE',
   'SYSTEM_ROLE',
   'KYBERION_SUDO',
@@ -97,7 +97,7 @@ afterAll(() => {
 
 beforeEach(() => {
   for (const key of IDENTITY_ENV_KEYS) savedEnv[key] = process.env[key];
-  process.env.KYBERION_PERSONA = 'ecosystem_architect';
+  process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
   delete process.env.KYBERION_TENANT;
   delete process.env.KYBERION_SUDO;
 });
@@ -171,7 +171,7 @@ describe('ingest:commit fail-closed path guard (DA-05 acceptance 1)', () => {
   });
 
   it('refuses anonymous ingests (no ingested_by and no identity context)', async () => {
-    for (const key of ['KYBERION_PERSONA', 'MISSION_ROLE'] as const) delete process.env[key];
+    for (const key of ['KYBERION_BASE_ROLE', 'MISSION_ROLE'] as const) delete process.env[key];
     const card = normalizedCard('# Card\n\nBody.');
     await expect(
       commitIngest({ tenant_slug: 'acme-corp', normalized: card, now: NOW, path_options: options })
@@ -209,7 +209,7 @@ describe('ingest_commit security-policy grant scoping (DA-05 acceptance 1)', () 
   });
 
   it('knowledge/confidential/ writes are denied without the role and allowed under it', () => {
-    delete process.env.KYBERION_PERSONA;
+    delete process.env.KYBERION_BASE_ROLE;
     process.env.MISSION_ROLE = 'unit_test_ingest_denied';
     const target = pathResolver.knowledge('confidential/acme-corp/reports/q1.md');
     expect(validateWritePermission(target).allowed).toBe(false);

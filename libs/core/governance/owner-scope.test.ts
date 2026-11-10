@@ -71,7 +71,7 @@ describe('resolveOwnerScope', () => {
     process.env.KYBERION_ROOT = tmpRoot;
     process.env.MISSION_ROLE = 'mission_controller';
     // Owner discovery spans public and confidential synthetic organizations.
-    vi.stubEnv('KYBERION_PERSONA', 'sovereign');
+    vi.stubEnv('KYBERION_BASE_ROLE', 'sovereign');
     delete process.env.KYBERION_TENANT;
     scope = await import('./owner-scope.js');
     projects = await import('../project/project-registry.js');

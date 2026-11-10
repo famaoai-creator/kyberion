@@ -56,7 +56,7 @@ const OPERATOR = 'user:owner';
 /** Not a registered member. */
 const STRANGER = 'user:stranger';
 const keys = [
-  'KYBERION_PERSONA',
+  'KYBERION_BASE_ROLE',
   'MISSION_ROLE',
   'SYSTEM_ROLE',
   'MISSION_ID',
@@ -135,7 +135,7 @@ beforeAll(async () => {
   io = await import('@agent/core/secure-io');
   facade = await import('./customer_decision.js');
   expect((await import('@agent/core/path-resolver')).rootDir()).toBe(ROOT);
-  process.env.KYBERION_PERSONA = 'sovereign';
+  process.env.KYBERION_BASE_ROLE = 'sovereign';
   for (const tenant of [TENANT, OTHER]) {
     writeFixtureJson(`knowledge/personal/tenants/${tenant}.json`, {
       tenant_slug: tenant,
@@ -198,7 +198,7 @@ describe('customer-decision confirm releases a held task (CD-09, governed entry,
         env: {
           MISSION_ROLE: '',
           MISSION_ID: '',
-          KYBERION_PERSONA: '',
+          KYBERION_BASE_ROLE: '',
           KYBERION_SUDO: '',
           SYSTEM_ROLE: '',
           KYBERION_TENANT: boundTenant,

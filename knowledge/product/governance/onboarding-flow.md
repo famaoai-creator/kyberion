@@ -61,12 +61,12 @@ Step 1〜2 → Step 3（個人 identity） → Step 4 → Step 5（onboard compa
 同じ環境で動く。
 
 persona が要るのは Step 10 の `pnpm organization` の書き込み系だけである。これは組織の運営状態を
-変える操作なので、操作者を明示する。`pnpm onboarding apply` は `KYBERION_PERSONA` を `.env.local` に
+変える操作なので、操作者を明示する。`pnpm onboarding apply` は `KYBERION_BASE_ROLE` を `.env.local` に
 記録するが、**pnpm script は `.env.local` を読み込まない**ため、組織を運営するシェルでは次を実行する
 （tenant を限定したい場合は `MISSION_ROLE=organization_operator` と `KYBERION_TENANT=<tenant>`）。
 
 ```bash
-export KYBERION_PERSONA=sovereign
+export KYBERION_BASE_ROLE=sovereign
 ```
 
 ## 2. 3 つの名前を混同しない
@@ -626,7 +626,7 @@ governed facade で登録して回す。状態ファイル（`active/organizatio
 （引数なしの `pnpm organization` は運営モデルのカタログ JSON を出す）。
 
 ```bash
-export KYBERION_PERSONA=sovereign   # organization の書き込みに必要（操作シェルの前提を参照）
+export KYBERION_BASE_ROLE=sovereign   # organization の書き込みに必要（操作シェルの前提を参照）
 O="--organization-id <organization-id> --tier confidential --tenant-slug <tenant-slug>"
 
 # 1. 現状を見る（未登録の項目と次の行動が出る）
@@ -688,7 +688,7 @@ project を通して目標にたどれる。指定した objective はその組�
 `organization status` は目標の行の下に、その目標を指す project を並べる。
 
 ```bash
-export KYBERION_PERSONA=sovereign
+export KYBERION_BASE_ROLE=sovereign
 O="--organization-id <organization-id> --tier confidential --tenant-slug <tenant-slug>"
 
 # 1. 目標に key result（KR）を付ける。自動で計測する指標
