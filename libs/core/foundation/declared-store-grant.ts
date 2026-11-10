@@ -67,6 +67,28 @@ export const DECLARED_STORE_GRANTS: Readonly<Record<string, DeclaredStoreGrantDe
     customer_decision_deal_note_writer: Object.freeze({ persona: 'worker', tenantBound: true }),
     // secret/credential-allocations.ts: a tenant's credential allocation records.
     credential_allocation_reader: Object.freeze({ tenantBound: true }),
+    // governance/ledger.ts: one tenant's hybrid ledger partition.
+    tenant_ledger_store: Object.freeze({ persona: 'worker', tenantBound: true }),
+    // workforce/delegation-store-partition.ts: one tenant's delegated-task partition.
+    delegation_record_store: Object.freeze({ persona: 'worker', tenantBound: true }),
+    // governance/approval-store-location.ts: one tenant's approval store partition.
+    tenant_approval_store: Object.freeze({ persona: 'worker', tenantBound: true }),
+    // governance/approval-store-location.ts: the tenant directory names of the approval store.
+    tenant_approval_partition_index_reader: Object.freeze({
+      persona: 'worker',
+      tenantBound: false,
+    }),
+    // governance/audit-chain.ts tenant mirror (seam registered by authority.ts), bound per entry.
+    audit_mirror_writer: Object.freeze({ persona: 'worker', tenantBound: false }),
+    // foundation/operational-store-policy.ts (seam registered by authority.ts): ops alert files.
+    ops_alert_store: Object.freeze({ persona: 'worker', tenantBound: false }),
+    // tenant registry: one tenant profile (operational membership, mission, egress, workspace).
+    workspace_tenant_registry_reader: Object.freeze({ persona: 'worker', tenantBound: true }),
+    // tenant registry: the tenant directory listing only (descendant reads denied).
+    workspace_tenant_registry_index_reader: Object.freeze({
+      persona: 'worker',
+      tenantBound: false,
+    }),
   });
 
 export function isDeclaredStoreGrantName(name: string | undefined): boolean {

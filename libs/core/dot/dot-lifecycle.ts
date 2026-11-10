@@ -36,7 +36,7 @@ import { isDeepStrictEqual } from 'node:util';
 import { pathResolver } from '../path-resolver.js';
 import { safeExistsSync, safeLstat, safeMkdir, safeReadFile, safeWriteFile } from '../secure-io.js';
 import { parseSafeJsonObjectInput } from '../foundation/safe-json.js';
-import { withExecutionContext } from '../authority.js';
+import { withExecutionContext, withStoreGrant } from '../authority.js';
 import { recordDaemonHeartbeat } from '../daemon/daemon-heartbeat.js';
 import { loadAuthorityRoleIndex } from '../organization/authority-role-registry.js';
 import { appendJsonLine, writeJson } from '../foundation/json.js';
@@ -172,14 +172,13 @@ function assertActivationReady(
 }
 
 function readWorkspaceTenant(slug: string, rootDir: string) {
-  return withExecutionContext(
+  return withStoreGrant(
     'workspace_tenant_registry_reader',
     () => {
       const profile = readTenantProfile(slug, { rootDir });
       return profile ? { tenant_slug: profile.tenant_slug } : null;
     },
-    'worker',
-    slug
+    { tenantSlug: slug }
   );
 }
 

@@ -46,7 +46,7 @@ import type { TierLevel } from '../types.js';
 import { sendOpsAlert } from '../daemon/ops-alert.js';
 import { createLogger } from '../logger.js';
 import { resolveTenant } from '../organization/tenant-registry.js';
-import { resolveIdentityContext, withExecutionContext } from '../authority.js';
+import { resolveIdentityContext, withStoreGrant } from '../authority.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { resolveReasoningProviderDescriptor } from '../reasoning/reasoning-provider-registry.js';
 import {
@@ -335,11 +335,10 @@ function readTenantProfileAsPolicyInput(
   provider: string,
   rootDir?: string
 ): TenantPolicyInput {
-  const profile = withExecutionContext(
+  const profile = withStoreGrant(
     'workspace_tenant_registry_reader',
     () => resolveTenant(slug, { ...(rootDir ? { rootDir } : {}) }),
-    undefined,
-    slug
+    { tenantSlug: slug }
   ).profile;
   // Keep the policy seam narrow: the gate needs the tenant allowlist and the
   // one provider's attestation, not a capability to hand the whole profile to

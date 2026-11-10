@@ -7,7 +7,7 @@ import { CUSTOMER_CHANNEL_BINDING_STORE_ROLE } from '../foundation/customer-chan
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeReaddir } from '../secure-io.js';
 import { logger } from '../core.js';
 import { isValidTenantSlug } from '../foundation/scope.js';
-import { withExecutionContext } from '../authority.js';
+import { withExecutionContext, withStoreGrant } from '../authority.js';
 
 /** Reads exactly `knowledge/personal/tenants/<tenant>.json` (shared core role). */
 const TENANT_REGISTRY_READER_ROLE = 'workspace_tenant_registry_reader';
@@ -91,11 +91,10 @@ function readBindingsFile(
  */
 function isActiveTenant(tenantSlug: string, rootDir: string, strict = false): boolean {
   try {
-    return withExecutionContext(
+    return withStoreGrant(
       TENANT_REGISTRY_READER_ROLE,
       () => readTenantProfile(tenantSlug, { rootDir })?.status === 'active',
-      'worker',
-      tenantSlug
+      { tenantSlug: tenantSlug }
     );
   } catch (err) {
     if (strict) throw err;
@@ -150,18 +149,14 @@ function activeRegisteredTenantSlugs(rootDir: string, strict = false): Set<strin
   let slugs: string[];
   try {
     // The index reader lists names only; each profile is then checked by isActiveTenant.
-    slugs = withExecutionContext(
-      TENANT_REGISTRY_INDEX_READER_ROLE,
-      () => {
-        const dir = tenantProfileDir({ rootDir });
-        if (!safeExistsSync(dir)) return [];
-        return safeReaddir(dir)
-          .filter((entry) => entry.endsWith('.json'))
-          .map((entry) => entry.slice(0, -'.json'.length))
-          .filter(isValidTenantSlug);
-      },
-      'worker'
-    );
+    slugs = withStoreGrant(TENANT_REGISTRY_INDEX_READER_ROLE, () => {
+      const dir = tenantProfileDir({ rootDir });
+      if (!safeExistsSync(dir)) return [];
+      return safeReaddir(dir)
+        .filter((entry) => entry.endsWith('.json'))
+        .map((entry) => entry.slice(0, -'.json'.length))
+        .filter(isValidTenantSlug);
+    });
   } catch (err) {
     if (strict) throw err;
     return registered;
