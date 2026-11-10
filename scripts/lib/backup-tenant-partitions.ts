@@ -6,7 +6,7 @@
  */
 import { createHash } from 'node:crypto';
 import * as path from 'node:path';
-import { withExecutionContext } from '@agent/core/authority';
+import { withStoreGrant } from '@agent/core/authority';
 import { getAuditChainKeyId } from '@agent/core/chain-integrity';
 import { logger } from '@agent/core/core';
 import { pathResolver } from '@agent/core/path-resolver';
@@ -241,13 +241,13 @@ function asPartitionStore<T>(absolutePath: string, fn: () => T): T {
   const store = tenantStoreLedgerPartitionOf(absolutePath);
   if (!store || !store.tenant) return fn();
   if (store.storeRole === 'tenant_ledger_store') {
-    return withExecutionContext('tenant_ledger_store', fn, undefined, store.tenant);
+    return withStoreGrant('tenant_ledger_store', fn, { tenantSlug: store.tenant });
   }
   if (store.storeRole === 'tenant_approval_store') {
-    return withExecutionContext('tenant_approval_store', fn, undefined, store.tenant);
+    return withStoreGrant('tenant_approval_store', fn, { tenantSlug: store.tenant });
   }
   if (store.storeRole === 'delegation_record_store') {
-    return withExecutionContext('delegation_record_store', fn, undefined, store.tenant);
+    return withStoreGrant('delegation_record_store', fn, { tenantSlug: store.tenant });
   }
   throw new Error(`[BACKUP_RESTORE_STORE_ROLE_UNKNOWN] ${store.storeRole}`);
 }

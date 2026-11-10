@@ -548,11 +548,14 @@
         "concierge_management_writer",
         "dot_charter_store",
         "peer_responder_reader",
-        "workspace_graph_reader",
-        "workspace_tenant_registry_index_reader",
-        "workspace_tenant_registry_reader"
+        "workspace_graph_reader"
       ],
-      "grants": ["peer_catalog_reader", "first_job_tenant_status_reader"],
+      "grants": [
+        "peer_catalog_reader",
+        "first_job_tenant_status_reader",
+        "workspace_tenant_registry_reader",
+        "workspace_tenant_registry_index_reader"
+      ],
       "sources": ["role-policy"]
     },
     {
@@ -631,7 +634,7 @@
       },
       "tiers": ["confidential"],
       "status": "active",
-      "legacy_roles": ["delegation_record_store"],
+      "grants": ["delegation_record_store"],
       "sources": ["runtime-state-roots", "role-policy"],
       "registration": {
         "family": "ledger",
@@ -751,7 +754,7 @@
         "kind": "unscoped-legacy"
       },
       "status": "active",
-      "legacy_roles": ["ops_alert_store"],
+      "grants": ["ops_alert_store"],
       "sources": ["role-policy"]
     },
     {
@@ -777,7 +780,7 @@
       },
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
-      "legacy_roles": ["tenant_approval_partition_index_reader", "tenant_approval_store"],
+      "grants": ["tenant_approval_store", "tenant_approval_partition_index_reader"],
       "sources": ["role-policy"],
       "registration": {
         "family": "ledger",
@@ -796,7 +799,7 @@
       },
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
-      "legacy_roles": ["tenant_ledger_store"],
+      "grants": ["tenant_ledger_store"],
       "sources": ["role-policy"],
       "registration": {
         "family": "ledger",
@@ -907,7 +910,7 @@
         "kind": "unscoped-legacy"
       },
       "status": "active",
-      "legacy_roles": ["ops_alert_store"],
+      "grants": ["ops_alert_store"],
       "sources": ["role-policy"]
     },
     {
@@ -985,7 +988,7 @@
       "status": "active",
       "sources": ["scope-model", "role-policy"],
       "note": "S2 done: per-tenant copy of the master audit chain, written only by audit_mirror_writer (storage-layout TENANT_STORE_LEDGER_ROOTS).",
-      "legacy_roles": ["audit_mirror_writer"],
+      "grants": ["audit_mirror_writer"],
       "registration": {
         "family": "ledger",
         "key": "tenant_audit_mirror",

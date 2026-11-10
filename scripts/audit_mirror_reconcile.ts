@@ -52,6 +52,7 @@ import {
   safeWriteFile,
 } from '@agent/core/secure-io';
 import { withExecutionContext } from '@agent/core/governance';
+import { withStoreGrant } from '@agent/core/authority';
 import { logger } from '@agent/core/core';
 import type { AuditEntry } from '@agent/core/governance/audit-chain';
 import { nowIso, readJsonLines } from '@agent/core/foundation';
@@ -654,15 +655,14 @@ export function runAuditMirrorReconciliation(input: {
                     safeReadFile(path.join(source, file))
                   );
                 const entries = masterByTenant.get(finding.slug) || [];
-                withExecutionContext(
+                withStoreGrant(
                   'audit_mirror_writer',
                   () => {
                     safeRmSync(source, { recursive: true, force: true });
                     if (finding.action === 'quarantine_and_rebuild')
                       rebuildMirror(source, entries, rootDir);
                   },
-                  undefined,
-                  finding.slug
+                  { tenantSlug: finding.slug }
                 );
                 receipt.archived.push({
                   from: finding.path,

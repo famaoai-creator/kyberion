@@ -68,7 +68,6 @@ const LEGACY_ROLE_PERSONA_DEFAULTS: Record<string, Persona> = {
   integration_steward: 'ecosystem_architect',
   reliability_engineer: 'worker',
   infrastructure_sentinel: 'worker',
-  ops_alert_store: 'worker',
   task_runtime_worker: 'worker',
   // mission roles
   sovereign_concierge: 'sovereign',
@@ -83,14 +82,7 @@ const LEGACY_ROLE_PERSONA_DEFAULTS: Record<string, Persona> = {
   chronos_localadmin: 'worker',
   workspace_graph_reader: 'worker',
   engine_runtime_preferences_operator: 'worker',
-  workspace_tenant_registry_reader: 'worker',
-  workspace_tenant_registry_index_reader: 'worker',
   peer_responder_reader: 'worker',
-  audit_mirror_writer: 'worker',
-  tenant_ledger_store: 'worker',
-  tenant_approval_store: 'worker',
-  delegation_record_store: 'worker',
-  tenant_approval_partition_index_reader: 'worker',
   service_actuator: 'worker',
   surface_runtime: 'worker',
   // context roles
@@ -752,12 +744,8 @@ export const TENANT_BOUND_READER_ROLES: ReadonlySet<string> = new Set([
   'actuator_playground_worker',
   ARCHIVED_MISSION_STATE_READER_ROLE,
   'customer_channel_binding_store',
-  'delegation_record_store',
   'peer_responder_reader',
   'perception_media_worker',
-  'tenant_approval_store',
-  'tenant_ledger_store',
-  'workspace_tenant_registry_reader',
 ]);
 
 /**
@@ -1464,14 +1452,13 @@ export function resolveIdentityContext(tenantOverride?: string): IdentityContext
 
 registerIdentityContextResolver(resolveIdentityContext);
 registerOperationalTenantMembership((tenant, rootDir) =>
-  withExecutionContext(
+  withStoreGrant(
     'workspace_tenant_registry_reader',
     () => Boolean(resolveTenant(tenant, { rootDir })),
-    'worker',
-    tenant
+    { tenantSlug: tenant }
   )
 );
-registerOperationalAlertStore((fn) => withExecutionContext('ops_alert_store', fn, 'worker'));
+registerOperationalAlertStore((fn) => withStoreGrant('ops_alert_store', fn));
 
 /**
  * G17: the audit chain's tenant mirror (active/shared/runtime/audit-mirror/confidential/{slug}/) is written
@@ -1490,7 +1477,7 @@ try {
     .registerTenantMirrorWriterContext;
   if (typeof register === 'function') {
     (register as typeof auditChainModule.registerTenantMirrorWriterContext)((tenantSlug, fn) =>
-      withExecutionContext(TENANT_AUDIT_MIRROR_WRITER_ROLE, fn, undefined, tenantSlug)
+      withStoreGrant(TENANT_AUDIT_MIRROR_WRITER_ROLE, fn, { tenantSlug: tenantSlug })
     );
   }
 } catch {

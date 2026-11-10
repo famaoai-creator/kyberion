@@ -882,11 +882,16 @@ describe('tenant-bound reader roles never follow a caller-supplied tenant', () =
     ).toThrow(/\[ROLE_TENANT_SCOPE_MISMATCH\]/);
   });
 
-  it('other roles keep binding a caller-supplied tenant', () => {
+  it('other roles and grants keep binding a caller-supplied tenant', () => {
     process.env.KYBERION_TENANT = 'tenant-a';
+    // audit_mirror_writer is a declared store grant that is not tenant-bound: the audit
+    // chain binds each mirror write to its entry's tenant, whatever the caller's tenant.
+    expect(
+      enter('audit_mirror_writer', () => currentExecutionScope()?.tenantSlug, 'tenant-b')
+    ).toBe('tenant-b');
     expect(
       withExecutionContext(
-        'audit_mirror_writer',
+        'mission_controller',
         () => currentExecutionScope()?.tenantSlug,
         undefined,
         'tenant-b'
