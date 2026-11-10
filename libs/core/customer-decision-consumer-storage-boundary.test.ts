@@ -22,7 +22,7 @@ const NOW = '2026-10-24T00:00:00.000Z';
 const LATER = '2026-10-25T00:00:00.000Z';
 const savedRoot = process.env.KYBERION_ROOT;
 const keys = [
-  'KYBERION_PERSONA',
+  'KYBERION_BASE_ROLE',
   'MISSION_ROLE',
   'SYSTEM_ROLE',
   'MISSION_ID',
@@ -183,13 +183,13 @@ beforeAll(async () => {
   grantAccess = await import('./customer-decision/consumer-grant-access.js');
   coordination = await import('./workforce/work-coordination.js');
   expect((await import('./path-resolver.js')).rootDir()).toBe(ROOT);
-  process.env.KYBERION_PERSONA = 'sovereign';
+  process.env.KYBERION_BASE_ROLE = 'sovereign';
   for (const tenant of [TENANT, OTHER])
     io.safeWriteFile(
       path.join(ROOT, 'knowledge/personal/tenants', `${tenant}.json`),
       JSON.stringify(profile(tenant))
     );
-  delete process.env.KYBERION_PERSONA;
+  delete process.env.KYBERION_BASE_ROLE;
 }, 120_000);
 
 beforeEach(() => {
@@ -322,20 +322,20 @@ describe('customer decision consumer locks on the real tier/tenant guard', () =>
   });
 
   it('with tenant enforcement on, an unregistered tenant warns and never throws', () => {
-    process.env.KYBERION_PERSONA = 'sovereign';
+    process.env.KYBERION_BASE_ROLE = 'sovereign';
     io.safeWriteFile(
       path.join(ROOT, 'knowledge/personal/tenants', `${UNREGISTERED}.json`),
       JSON.stringify(profile(UNREGISTERED))
     );
-    delete process.env.KYBERION_PERSONA;
+    delete process.env.KYBERION_BASE_ROLE;
     seedCase(UNREGISTERED);
     lockModule.pinTaskDecisions(task, { decisionCase: decisionCase(UNREGISTERED), now: NOW });
     lockModule.reconcileTaskDecisions(task, { decisionCase: decisionCase(UNREGISTERED), now: NOW });
     customerDecides(UNREGISTERED);
     // The tenant is then removed from the registry.
-    process.env.KYBERION_PERSONA = 'sovereign';
+    process.env.KYBERION_BASE_ROLE = 'sovereign';
     io.safeRmSync(path.join(ROOT, 'knowledge/personal/tenants', `${UNREGISTERED}.json`));
-    delete process.env.KYBERION_PERSONA;
+    delete process.env.KYBERION_BASE_ROLE;
     process.env.KYBERION_ENTITY_GOVERNANCE = 'enforce';
     process.env.KYBERION_TENANT = UNREGISTERED;
     const warn = vi.spyOn(core.logger, 'warn').mockImplementation(() => undefined);

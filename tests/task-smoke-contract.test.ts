@@ -10,11 +10,11 @@ const LEGACY_PROFILE_PATH = pathResolver.rootResolve(
 );
 
 describe('task smoke contract', () => {
-  const originalPersona = process.env.KYBERION_PERSONA;
+  const originalPersona = process.env.KYBERION_BASE_ROLE;
   const originalRole = process.env.MISSION_ROLE;
 
   beforeEach(() => {
-    process.env.KYBERION_PERSONA = 'sovereign';
+    process.env.KYBERION_BASE_ROLE = 'sovereign';
     process.env.MISSION_ROLE = 'sovereign_concierge';
   });
 
@@ -26,8 +26,8 @@ describe('task smoke contract', () => {
     if (safeExistsSync(LEGACY_PROFILE_PATH)) {
       safeRmSync(LEGACY_PROFILE_PATH);
     }
-    if (originalPersona === undefined) delete process.env.KYBERION_PERSONA;
-    else process.env.KYBERION_PERSONA = originalPersona;
+    if (originalPersona === undefined) delete process.env.KYBERION_BASE_ROLE;
+    else process.env.KYBERION_BASE_ROLE = originalPersona;
     if (originalRole === undefined) delete process.env.MISSION_ROLE;
     else process.env.MISSION_ROLE = originalRole;
   });

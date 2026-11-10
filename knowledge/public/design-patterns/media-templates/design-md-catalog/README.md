@@ -63,6 +63,6 @@ pnpm control catalog design-recommend "developer platform observability"
 Refresh the imported catalog after updating the cloned source:
 
 ```bash
-KYBERION_PERSONA=ecosystem_architect MISSION_ROLE=ecosystem_architect MISSION_ID=MSN-DESIGN-MD-IMPORT \
+KYBERION_BASE_ROLE=ecosystem_architect MISSION_ROLE=ecosystem_architect MISSION_ID=MSN-DESIGN-MD-IMPORT \
   pnpm exec tsx scripts/import_design_md_catalog.ts
 ```

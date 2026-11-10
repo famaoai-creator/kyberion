@@ -5,6 +5,7 @@
  * opened — see `ApprovalRequesterInput`.
  */
 import { getRegisteredEnvText } from '@agent/core/foundation/env';
+import { baseRoleEnvText } from '@agent/core/foundation';
 import type { ApprovalRequesterRef } from '@agent/core/governance/approval-requester';
 import { resolveCliApprovalRequester } from '@agent/core/governance/cli-operator-principal';
 
@@ -20,6 +21,6 @@ export function cliApprovalRequester(
 export function missionControllerRequester(explicit?: string): () => ApprovalRequesterRef {
   return cliApprovalRequester(
     explicit,
-    getRegisteredEnvText('KYBERION_PERSONA') || getRegisteredEnvText('USER') || 'mission_controller'
+    baseRoleEnvText() || getRegisteredEnvText('USER') || 'mission_controller'
   );
 }

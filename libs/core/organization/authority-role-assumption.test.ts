@@ -33,7 +33,7 @@ import { validateReadPermission } from '../tier-guard.js';
 const ENV_KEYS = [
   'SYSTEM_ROLE',
   'MISSION_ROLE',
-  'KYBERION_PERSONA',
+  'KYBERION_BASE_ROLE',
   'MISSION_ID',
   'KYBERION_DELEGATED_ROLE',
 ] as const;
@@ -73,7 +73,7 @@ describe('RA-01 scoped role assumption', () => {
     const inside = withExecutionContext('chronos_localadmin', () => ({
       role: resolveRole(),
       identityRole: resolveIdentityContext().role,
-      persona: resolveIdentityContext().persona,
+      persona: resolveIdentityContext().baseRole,
     }));
     expect(inside).toEqual({
       role: 'chronos_localadmin',
@@ -162,7 +162,7 @@ describe('RA-01 scoped role assumption', () => {
 
   it('restores the env mirror after the context, including on throw', async () => {
     process.env.MISSION_ROLE = 'outer_role';
-    process.env.KYBERION_PERSONA = 'analyst';
+    process.env.KYBERION_BASE_ROLE = 'analyst';
 
     expect(() =>
       withExecutionContext('mission_controller', () => {
@@ -171,7 +171,7 @@ describe('RA-01 scoped role assumption', () => {
       })
     ).toThrow('boom');
     expect(process.env.MISSION_ROLE).toBe('outer_role');
-    expect(process.env.KYBERION_PERSONA).toBe('analyst');
+    expect(process.env.KYBERION_BASE_ROLE).toBe('analyst');
 
     await withExecutionContextAsync('surface_runtime', async () => {
       await Promise.resolve();
@@ -180,12 +180,12 @@ describe('RA-01 scoped role assumption', () => {
       expect(resolveRole()).toBe('surface_runtime');
     });
     expect(process.env.MISSION_ROLE).toBe('outer_role');
-    expect(process.env.KYBERION_PERSONA).toBe('analyst');
+    expect(process.env.KYBERION_BASE_ROLE).toBe('analyst');
   });
 
   it('leaves the process env intact when async contexts interleave (B1)', async () => {
     process.env.MISSION_ROLE = 'outer_role';
-    process.env.KYBERION_PERSONA = 'worker';
+    process.env.KYBERION_BASE_ROLE = 'worker';
     const aEntered = deferred();
     const bEntered = deferred();
     const aDone = deferred();
@@ -216,7 +216,7 @@ describe('RA-01 scoped role assumption', () => {
       b: { role: 'mission_controller', persona: 'ecosystem_architect' },
     });
     expect(process.env.MISSION_ROLE).toBe('outer_role');
-    expect(process.env.KYBERION_PERSONA).toBe('worker');
+    expect(process.env.KYBERION_BASE_ROLE).toBe('worker');
     expect(resolveRole()).toBe('outer_role');
   });
 
@@ -255,7 +255,7 @@ describe('RA-01 scoped role assumption', () => {
     );
     const env = await a;
     expect(env.MISSION_ROLE).toBe('chronos_localadmin');
-    expect(env.KYBERION_PERSONA).toBe('worker');
+    expect(env.KYBERION_BASE_ROLE).toBe('worker');
   });
 
   it('gives safe-exec children the scoped role, not the shared env mirror', async () => {
@@ -274,7 +274,7 @@ describe('RA-01 scoped role assumption', () => {
     );
     const env = await a;
     expect(env.MISSION_ROLE).toBe('chronos_localadmin');
-    expect(env.KYBERION_PERSONA).toBe('worker');
+    expect(env.KYBERION_BASE_ROLE).toBe('worker');
   });
 });
 
@@ -313,8 +313,8 @@ describe('S6 role normalization', () => {
 
 describe('B2 persona authorization inputs', () => {
   it('gives the secure-io policy gate the execution-scope persona', async () => {
-    const saved = process.env.KYBERION_PERSONA;
-    process.env.KYBERION_PERSONA = 'worker';
+    const saved = process.env.KYBERION_BASE_ROLE;
+    process.env.KYBERION_BASE_ROLE = 'worker';
     const evaluate = vi.spyOn(policyEngine, 'evaluate');
     const target = pathResolver.sharedTmp(`ra-b2-${process.pid}.txt`);
     try {
@@ -327,13 +327,16 @@ describe('B2 persona authorization inputs', () => {
         'analyst'
       );
       expect(evaluate).toHaveBeenCalledWith(
-        expect.objectContaining({ operation: 'file_write', agentId: 'analyst' })
+        expect.objectContaining({
+          operation: 'file_write',
+          agentId: expect.stringMatching(/^kyberion:\/\/agent\/.+\/analyst$/u),
+        })
       );
     } finally {
       evaluate.mockRestore();
       safeRmSync(target, { force: true });
-      if (saved === undefined) delete process.env.KYBERION_PERSONA;
-      else process.env.KYBERION_PERSONA = saved;
+      if (saved === undefined) delete process.env.KYBERION_BASE_ROLE;
+      else process.env.KYBERION_BASE_ROLE = saved;
     }
   });
 });
@@ -553,13 +556,13 @@ describe('DR-01 delegated child role', () => {
   it('ignores a denied delegation with a warning and falls back to SYSTEM_ROLE', () => {
     becomeChild(buildExecutionEnv({ SYSTEM_ROLE: 'slack_bridge' }, 'chronos_localadmin'));
     // The parent-side env still claims the role; the child must not trust it.
-    expect(process.env.KYBERION_PERSONA).toBe('worker');
-    process.env.KYBERION_PERSONA = 'sovereign';
+    expect(process.env.KYBERION_BASE_ROLE).toBe('worker');
+    process.env.KYBERION_BASE_ROLE = 'sovereign';
     const warn = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
     try {
       expect(resolveRole()).toBe('slack_bridge');
       expect(resolveExecutionPersona()).not.toBe('sovereign');
-      expect(resolveIdentityContext().persona).not.toBe('sovereign');
+      expect(resolveIdentityContext().baseRole).not.toBe('sovereign');
       expect(warn).toHaveBeenCalledWith(expect.stringContaining('[ROLE_DELEGATION_DENIED]'));
       expect(warn).toHaveBeenCalledWith(expect.stringContaining('chronos_localadmin'));
     } finally {
@@ -618,13 +621,13 @@ describe('DR-01 delegated child role', () => {
     // nexus_daemon's default persona is sovereign; the denied child must not get it.
     expect(inferPersonaFromRole('nexus_daemon')).toBe('sovereign');
     becomeChild(buildExecutionEnv({ SYSTEM_ROLE: 'nexus_daemon' }, 'chronos_localadmin'));
-    process.env.KYBERION_PERSONA = 'sovereign';
+    process.env.KYBERION_BASE_ROLE = 'sovereign';
     const warn = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
     try {
       expect(resolveRole()).toBe('nexus_daemon');
       expect(resolveExecutionPersona()).toBe('worker');
       const identity = resolveIdentityContext();
-      expect(identity.persona).toBe('worker');
+      expect(identity.baseRole).toBe('worker');
       expect(identity.authorities).not.toContain('SECRET_READ');
     } finally {
       warn.mockRestore();
@@ -695,7 +698,7 @@ describe('DR-01 delegated child role', () => {
       {
         SYSTEM_ROLE: 'surface_runtime',
         MISSION_ROLE: 'surface_runtime',
-        KYBERION_PERSONA: 'sovereign',
+        KYBERION_BASE_ROLE: 'sovereign',
         [DELEGATED_ROLE_ENV]: 'surface_runtime@concierge',
       },
       'concierge',
@@ -704,7 +707,7 @@ describe('DR-01 delegated child role', () => {
     expect(launched).toMatchObject({
       SYSTEM_ROLE: 'concierge',
       MISSION_ROLE: '',
-      KYBERION_PERSONA: 'worker',
+      KYBERION_BASE_ROLE: 'worker',
       [DELEGATED_ROLE_ENV]: '',
     });
     becomeChild(launched);
@@ -720,7 +723,7 @@ describe('DR-01 delegated child role', () => {
         PATH: '/bin',
         SYSTEM_ROLE: 'x',
         MISSION_ROLE: 'x',
-        KYBERION_PERSONA: 'sovereign',
+        KYBERION_BASE_ROLE: 'sovereign',
         [DELEGATED_ROLE_ENV]: 'x@y',
         KYBERION_SUDO: 'true',
       })

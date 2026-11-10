@@ -1012,7 +1012,7 @@ describe('video cache fail-closed classification', () => {
     const slug = `vo${randomUUID().slice(0, 8)}`;
     const orgRoot = path.join(root, 'active/organizations/confidential', slug);
     const file = path.join(orgRoot, 'org-1', 'clip.mp4');
-    vi.stubEnv('KYBERION_PERSONA', 'sovereign');
+    vi.stubEnv('KYBERION_BASE_ROLE', 'sovereign');
     try {
       safeMkdir(path.dirname(file), { recursive: true });
       safeWriteFile(file, 'org-clip');

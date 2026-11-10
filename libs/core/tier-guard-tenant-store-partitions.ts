@@ -184,7 +184,7 @@ interface PartitionWritePolicy {
 }
 
 interface PartitionWriteIdentity {
-  persona: string;
+  baseRole: string;
   role?: string;
   authorities: readonly string[];
   sudoScope?: string[];
@@ -210,7 +210,7 @@ export function tenantStorePartitionWriteDecision(
   // Creating the bare tier directory (the parent of every tenant partition)
   // follows the ordinary rules; any file at or under it does not.
   if (!partition.tenant && deps.operation === 'mkdir') return null;
-  const { persona, role, authorities, sudoScope } = identity;
+  const { baseRole: persona, role, authorities, sudoScope } = identity;
   if (authorities.includes('SUDO') && deps.sudoAllows(sudoScope)) return { allowed: true };
   const grants = [
     ...(role === partition.storeRole

@@ -52,7 +52,7 @@ beforeAll(async () => {
   );
   bootstrap.safeWriteFile(path.join(root, 'package.json'), '{}');
   vi.stubEnv('KYBERION_ROOT', root);
-  vi.stubEnv('KYBERION_PERSONA', 'sovereign');
+  vi.stubEnv('KYBERION_BASE_ROLE', 'sovereign');
   vi.stubEnv('MISSION_ROLE', 'mission_controller');
   vi.stubEnv('KYBERION_TENANT', 'ordinary-compat');
   vi.stubEnv('SYSTEM_ROLE', '');

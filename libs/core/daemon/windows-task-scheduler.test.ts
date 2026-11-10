@@ -11,7 +11,7 @@ const ctx: DaemonRenderContext & { userId: string; systemRoot: string } = {
   stagingDir: 'C:\\work\\kyberion\\active\\shared\\tmp',
   userId: 'DOMAIN\\alice',
   systemRoot: 'C:\\Windows',
-  env: { KYBERION_PERSONA: 'operator' },
+  env: { KYBERION_BASE_ROLE: 'operator' },
 };
 const spec = DAEMON_SPECS.chronos;
 describe('Windows Task Scheduler manager', () => {
@@ -21,7 +21,7 @@ describe('Windows Task Scheduler manager', () => {
     expect(xml).toContain('<RunLevel>LeastPrivilege</RunLevel>');
     expect(xml).toContain('-EncodedCommand');
     expect(xml).toContain('DOMAIN\\alice');
-    expect(xml).not.toContain('KYBERION_PERSONA');
+    expect(xml).not.toContain('KYBERION_BASE_ROLE');
     const staged = daemonUnitFileBytes('windows-task-scheduler', xml) as Buffer;
     expect(staged.subarray(0, 2)).toEqual(Buffer.from([0xff, 0xfe]));
     expect(staged.subarray(2).toString('utf16le')).toContain('encoding="UTF-16"');

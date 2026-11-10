@@ -24,7 +24,7 @@ let runtime: TaskToolRuntime | undefined;
 let readResult: unknown;
 beforeEach(() => {
   vi.stubEnv('MISSION_ROLE', 'mission_controller');
-  vi.stubEnv('KYBERION_PERSONA', 'worker');
+  vi.stubEnv('KYBERION_BASE_ROLE', 'worker');
   vi.stubEnv('MISSION_ID', missionId);
   vi.stubEnv('KYBERION_TIER', 'public');
   vi.stubEnv('KYBERION_TENANT', '');

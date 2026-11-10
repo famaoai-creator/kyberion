@@ -8,7 +8,7 @@ describe('concept consolidation regression budgets', () => {
       const text = "process.env.KYBERION_TENANT";
       const a = process.env.MISSION_ID;
       const b = process.env['KYBERION_TENANT'];
-      getRegisteredEnvText('KYBERION_PERSONA');
+      getRegisteredEnvText('KYBERION_BASE_ROLE');
       safeWriteFile(p, JSON.stringify(v));
       const p = 'active/shared/runtime/example.json';
       function fixedWindowLimiter() {}

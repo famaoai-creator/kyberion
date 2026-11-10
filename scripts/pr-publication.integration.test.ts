@@ -126,7 +126,7 @@ it('clean headless host queues one real human-only request, writes protected rev
       cwd: pathResolver.rootDir(),
       env: {
         KYBERION_ROOT: root,
-        KYBERION_PERSONA: '',
+        KYBERION_BASE_ROLE: '',
         SYSTEM_ROLE: '',
         MISSION_ROLE: '',
         MISSION_ID: '',

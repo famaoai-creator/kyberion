@@ -159,16 +159,16 @@ describe('mission-distill end-to-end promotion flow', () => {
 
   async function runDistillAsArchitect(): Promise<void> {
     const previousRole = process.env.MISSION_ROLE;
-    const previousPersona = process.env.KYBERION_PERSONA;
+    const previousPersona = process.env.KYBERION_BASE_ROLE;
     process.env.MISSION_ROLE = 'ecosystem_architect';
-    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     try {
       await distillMission(missionId, pathResolver.rootDir());
     } finally {
       if (previousRole === undefined) delete process.env.MISSION_ROLE;
       else process.env.MISSION_ROLE = previousRole;
-      if (previousPersona === undefined) delete process.env.KYBERION_PERSONA;
-      else process.env.KYBERION_PERSONA = previousPersona;
+      if (previousPersona === undefined) delete process.env.KYBERION_BASE_ROLE;
+      else process.env.KYBERION_BASE_ROLE = previousPersona;
     }
   }
 
@@ -229,16 +229,16 @@ describe('mission-distill end-to-end promotion flow', () => {
 
   it('keeps raw distillation mission-local and queues a classified promotion candidate', async () => {
     const previousRole = process.env.MISSION_ROLE;
-    const previousPersona = process.env.KYBERION_PERSONA;
+    const previousPersona = process.env.KYBERION_BASE_ROLE;
     process.env.MISSION_ROLE = 'ecosystem_architect';
-    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     try {
       await distillMission(missionId, pathResolver.rootDir());
     } finally {
       if (previousRole === undefined) delete process.env.MISSION_ROLE;
       else process.env.MISSION_ROLE = previousRole;
-      if (previousPersona === undefined) delete process.env.KYBERION_PERSONA;
-      else process.env.KYBERION_PERSONA = previousPersona;
+      if (previousPersona === undefined) delete process.env.KYBERION_BASE_ROLE;
+      else process.env.KYBERION_BASE_ROLE = previousPersona;
     }
 
     const queued = listMemoryPromotionCandidates().find(
@@ -262,9 +262,9 @@ describe('mission-distill end-to-end promotion flow', () => {
     });
 
     const promotePreviousRole = process.env.MISSION_ROLE;
-    const promotePreviousPersona = process.env.KYBERION_PERSONA;
+    const promotePreviousPersona = process.env.KYBERION_BASE_ROLE;
     process.env.MISSION_ROLE = 'ecosystem_architect';
-    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     let result;
     try {
       result = await promoteMemoryCandidateToKnowledge({
@@ -274,8 +274,8 @@ describe('mission-distill end-to-end promotion flow', () => {
     } finally {
       if (promotePreviousRole === undefined) delete process.env.MISSION_ROLE;
       else process.env.MISSION_ROLE = promotePreviousRole;
-      if (promotePreviousPersona === undefined) delete process.env.KYBERION_PERSONA;
-      else process.env.KYBERION_PERSONA = promotePreviousPersona;
+      if (promotePreviousPersona === undefined) delete process.env.KYBERION_BASE_ROLE;
+      else process.env.KYBERION_BASE_ROLE = promotePreviousPersona;
     }
 
     expect(result.promotedRef).toContain('knowledge/public/common/patterns/generated/');
@@ -400,9 +400,9 @@ describe('mission-distill end-to-end promotion flow', () => {
       throw new Error('queue unavailable');
     });
     const previousRole = process.env.MISSION_ROLE;
-    const previousPersona = process.env.KYBERION_PERSONA;
+    const previousPersona = process.env.KYBERION_BASE_ROLE;
     process.env.MISSION_ROLE = 'ecosystem_architect';
-    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     try {
       await distillMission(missionId, pathResolver.rootDir());
       const outboxPath = `${missionPath}/evidence/memory-promotion-outbox.json`;
@@ -423,16 +423,16 @@ describe('mission-distill end-to-end promotion flow', () => {
       enqueue.mockRestore();
       if (previousRole === undefined) delete process.env.MISSION_ROLE;
       else process.env.MISSION_ROLE = previousRole;
-      if (previousPersona === undefined) delete process.env.KYBERION_PERSONA;
-      else process.env.KYBERION_PERSONA = previousPersona;
+      if (previousPersona === undefined) delete process.env.KYBERION_BASE_ROLE;
+      else process.env.KYBERION_BASE_ROLE = previousPersona;
     }
   });
 
   it('preserves an approved candidate when delivery acknowledgement was lost', async () => {
     const previousRole = process.env.MISSION_ROLE;
-    const previousPersona = process.env.KYBERION_PERSONA;
+    const previousPersona = process.env.KYBERION_BASE_ROLE;
     process.env.MISSION_ROLE = 'ecosystem_architect';
-    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     try {
       await distillMission(missionId, pathResolver.rootDir());
       const outboxPath = `${missionPath}/evidence/memory-promotion-outbox.json`;
@@ -458,18 +458,18 @@ describe('mission-distill end-to-end promotion flow', () => {
     } finally {
       if (previousRole === undefined) delete process.env.MISSION_ROLE;
       else process.env.MISSION_ROLE = previousRole;
-      if (previousPersona === undefined) delete process.env.KYBERION_PERSONA;
-      else process.env.KYBERION_PERSONA = previousPersona;
+      if (previousPersona === undefined) delete process.env.KYBERION_BASE_ROLE;
+      else process.env.KYBERION_BASE_ROLE = previousPersona;
     }
   });
 
   it('recovers a physically archived mission through visible archive state and rejects mismatched scope', async () => {
     const previousRole = process.env.MISSION_ROLE;
-    const previousPersona = process.env.KYBERION_PERSONA;
+    const previousPersona = process.env.KYBERION_BASE_ROLE;
     const activePath = missionPath;
     const archiveRoot = pathResolver.shared('tmp/mission-distill-archive');
     process.env.MISSION_ROLE = 'ecosystem_architect';
-    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     try {
       await distillMission(missionId, pathResolver.rootDir());
       let outboxPath = `${missionPath}/evidence/memory-promotion-outbox.json`;
@@ -519,8 +519,8 @@ describe('mission-distill end-to-end promotion flow', () => {
       safeRmSync(archiveRoot, { recursive: true, force: true });
       if (previousRole === undefined) delete process.env.MISSION_ROLE;
       else process.env.MISSION_ROLE = previousRole;
-      if (previousPersona === undefined) delete process.env.KYBERION_PERSONA;
-      else process.env.KYBERION_PERSONA = previousPersona;
+      if (previousPersona === undefined) delete process.env.KYBERION_BASE_ROLE;
+      else process.env.KYBERION_BASE_ROLE = previousPersona;
     }
   });
 });

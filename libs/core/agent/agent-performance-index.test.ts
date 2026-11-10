@@ -26,7 +26,7 @@ describe('agent performance index', () => {
   });
 
   beforeEach(() => {
-    vi.stubEnv('KYBERION_PERSONA', 'worker');
+    vi.stubEnv('KYBERION_BASE_ROLE', 'worker');
     vi.stubEnv('MISSION_ROLE', 'mission_controller');
     safeRmSync(outcomesPath, { force: true });
     safeRmSync(indexPath, { force: true });

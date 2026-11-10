@@ -61,7 +61,7 @@ beforeAll(async () => {
   sourceAudit = Object.getOwnPropertyDescriptor(globalThis, auditKey);
   vi.stubEnv('KYBERION_ROOT', root);
   expect(Reflect.deleteProperty(globalThis, auditKey)).toBe(true);
-  vi.stubEnv('KYBERION_PERSONA', 'sovereign');
+  vi.stubEnv('KYBERION_BASE_ROLE', 'sovereign');
   vi.stubEnv('MISSION_ROLE', 'mission_controller');
   vi.stubEnv('KYBERION_TENANT', 'result-hook');
   vi.stubEnv('SYSTEM_ROLE', '');

@@ -17,7 +17,7 @@ const ROOT = path.join(SOURCE_ROOT, 'active/shared/tmp/cd-inbox-writer-' + proce
 const TENANT = 'cd-inbox-writer';
 const savedRoot = process.env.KYBERION_ROOT;
 const keys = [
-  'KYBERION_PERSONA',
+  'KYBERION_BASE_ROLE',
   'MISSION_ROLE',
   'SYSTEM_ROLE',
   'MISSION_ID',

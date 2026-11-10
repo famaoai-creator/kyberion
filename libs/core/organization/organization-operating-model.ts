@@ -1,8 +1,8 @@
 import type { StorageDataTier } from '../storage-layout.js';
+import { executionAgentId } from '../governance/execution-agent-id.js';
 import { type OrganizationProfile } from './organization-profile.js';
 import type { SupportedLocale } from '../localization/locale.js';
 import { auditChain } from '../governance/audit-chain.js';
-import { getRegisteredEnvText } from '../foundation/env.js';
 import { nowIso } from '../foundation/time.js';
 import { safeRmSync } from '../secure-io.js';
 import type { KeyResultSpec } from './key-result-spec.js';
@@ -828,7 +828,7 @@ export function retireOrganizationEntity(input: {
   };
   handler.save(next, { rootDir: input.rootDir });
   auditChain.record({
-    agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'organization_controller',
+    agentId: executionAgentId('organization_controller'),
     action: `organization.${input.kind}.retire`,
     operation: `retire:${input.recordId}`,
     result: 'completed',
@@ -877,7 +877,7 @@ export function removeOrganizationEntity(input: {
     { force: true }
   );
   auditChain.record({
-    agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'organization_controller',
+    agentId: executionAgentId('organization_controller'),
     action: `organization.${input.kind}.remove`,
     operation: `remove:${input.recordId}`,
     result: 'completed',

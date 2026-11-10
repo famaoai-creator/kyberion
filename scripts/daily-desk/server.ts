@@ -5,7 +5,7 @@
  * faces when present; exports journal.md / todo.md / now.md + handoff.json.
  *
  * Usage:
- *   KYBERION_PERSONA=sovereign node_modules/.bin/tsx scripts/daily-desk/server.ts \
+ *   KYBERION_BASE_ROLE=sovereign node_modules/.bin/tsx scripts/daily-desk/server.ts \
  *     [--out <dir>] [--instruction <text>] [port]
  */
 import http from 'node:http';

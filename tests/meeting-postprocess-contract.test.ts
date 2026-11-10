@@ -31,12 +31,12 @@ function readText(relativePath: string): string {
 }
 
 describe('meeting postprocess contract', () => {
-  const originalPersona = process.env.KYBERION_PERSONA;
+  const originalPersona = process.env.KYBERION_BASE_ROLE;
   const originalRole = process.env.MISSION_ROLE;
   const originalMissionId = process.env.MISSION_ID;
 
   beforeEach(() => {
-    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     process.env.MISSION_ROLE = 'mission_controller';
     process.env.MISSION_ID = FIXTURE_MISSION_ID;
     setWorkCoordinationNamespace(`meeting-postprocess-${process.pid}`);
@@ -76,8 +76,8 @@ describe('meeting postprocess contract', () => {
     setWorkCoordinationNamespace(null);
     vi.restoreAllMocks();
     safeRmSync(FIXTURE_MISSION_DIR, { recursive: true, force: true });
-    if (originalPersona === undefined) delete process.env.KYBERION_PERSONA;
-    else process.env.KYBERION_PERSONA = originalPersona;
+    if (originalPersona === undefined) delete process.env.KYBERION_BASE_ROLE;
+    else process.env.KYBERION_BASE_ROLE = originalPersona;
     if (originalRole === undefined) delete process.env.MISSION_ROLE;
     else process.env.MISSION_ROLE = originalRole;
     if (originalMissionId === undefined) delete process.env.MISSION_ID;

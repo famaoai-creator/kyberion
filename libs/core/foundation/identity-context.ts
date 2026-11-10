@@ -10,6 +10,7 @@
  * answers — identical semantics to the previous bridge fallback.
  */
 import type { Authority, IdentityContext } from '../types.js';
+import { baseRoleEnvText } from './base-role-env.js';
 import { getRegisteredEnvBool, getRegisteredEnvText } from './env.js';
 import { resolveProjectScope } from './project-scope-env.js';
 import { scopedAssumedRole, scopedPersona } from './execution-scope.js';
@@ -17,7 +18,8 @@ import { scopedAssumedRole, scopedPersona } from './execution-scope.js';
 export type IdentityContextResolver = (tenantOverride?: string) => IdentityContext;
 
 export interface ConfiguredActorIdentity {
-  persona?: string;
+  /** The base role named by KYBERION_BASE_ROLE (or its retired name). */
+  baseRole?: string;
   role?: string;
 }
 
@@ -26,7 +28,7 @@ export function readConfiguredActorIdentity(
   env?: Record<string, string | undefined>
 ): ConfiguredActorIdentity {
   return {
-    persona: getRegisteredEnvText('KYBERION_PERSONA', { env }),
+    baseRole: baseRoleEnvText(env),
     role: getRegisteredEnvText('MISSION_ROLE', { env }),
   };
 }
@@ -60,7 +62,7 @@ const defaultResolver: IdentityContextResolver = (tenantOverride) => {
   const scoped = scopedPersona();
   const projectScope = resolveProjectScope();
   const configured = readConfiguredActorIdentity();
-  const envPersona = scoped.bound ? scoped.persona : configured.persona;
+  const envPersona = scoped.bound ? scoped.persona : configured.baseRole;
   const persona =
     envPersona === 'sovereign' ||
     envPersona === 'ecosystem_architect' ||
@@ -75,7 +77,7 @@ const defaultResolver: IdentityContextResolver = (tenantOverride) => {
       : [];
   if (getRegisteredEnvBool('KYBERION_SUDO')) authorities.push('SUDO');
   return {
-    persona,
+    baseRole: persona,
     executionMode:
       persona === 'sovereign'
         ? 'sovereign'

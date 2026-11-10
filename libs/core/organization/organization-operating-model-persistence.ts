@@ -1,4 +1,5 @@
 import * as path from 'node:path';
+import { executionAgentId } from '../governance/execution-agent-id.js';
 import type { ValidateFunction } from 'ajv';
 import {
   classifyOrganizationWork,
@@ -166,7 +167,7 @@ export function assertRecordIdentity(
     throw new Error(
       `tenant_slug 'shared' is not a tenant for confidential organization records (${record.organization_id}): ` +
         `'shared' is a reserved partition name, not a tenant. ` +
-        `Run 'KYBERION_PERSONA=sovereign pnpm tenant list' to see registered tenant slugs and pass one via --tenant-slug.`
+        `Run 'KYBERION_BASE_ROLE=sovereign pnpm tenant list' to see registered tenant slugs and pass one via --tenant-slug.`
     );
   }
   recordTenant(record);
@@ -667,7 +668,7 @@ export function transitionOrganizationLifecycle(input: {
   };
   saveOrganizationOperationalState(next, { rootDir: input.rootDir });
   auditChain.record({
-    agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'organization_controller',
+    agentId: executionAgentId('organization_controller'),
     action: `organization.${input.verb}`,
     operation: `${input.verb}:${input.organizationId}`,
     result: 'completed',
@@ -733,7 +734,7 @@ export function setOrganizationParent(input: {
   };
   saveOrganizationOperationalState(next, { rootDir: input.rootDir });
   auditChain.record({
-    agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'organization_controller',
+    agentId: executionAgentId('organization_controller'),
     action: 'organization.parent_set',
     operation: `parent_set:${input.organizationId}`,
     result: 'completed',

@@ -22,7 +22,7 @@ UI 文言は `resolveLocale()` の ja/en マップ（語彙カタログは後付
 ## 使い方
 
 ```bash
-KYBERION_PERSONA=sovereign node_modules/.bin/tsx scripts/clipboard-inbox/server.ts \
+KYBERION_BASE_ROLE=sovereign node_modules/.bin/tsx scripts/clipboard-inbox/server.ts \
   [--out active/shared/tmp/clipboard-inbox] \
   [--instruction "これらのクリップを整理して"] \
   [port]

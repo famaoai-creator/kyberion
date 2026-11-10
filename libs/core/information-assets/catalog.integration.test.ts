@@ -10,7 +10,7 @@ const SOURCE = rootDir();
 const ROOT = path.join(SOURCE, 'active/shared/tmp/information-catalog-integration-' + process.pid);
 const keys = [
   'KYBERION_ROOT',
-  'KYBERION_PERSONA',
+  'KYBERION_BASE_ROLE',
   'MISSION_ROLE',
   'SYSTEM_ROLE',
   'MISSION_ID',

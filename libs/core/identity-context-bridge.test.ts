@@ -7,7 +7,7 @@ import {
 import { registerPolicyIdentityResolver } from './foundation/identity-context.js';
 
 const resolver = () => ({
-  persona: 'worker' as const,
+  baseRole: 'worker' as const,
   executionMode: 'mission' as const,
   authorities: [],
   tenantSlug: 'registered-tenant',

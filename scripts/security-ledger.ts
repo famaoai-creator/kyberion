@@ -13,6 +13,7 @@
  */
 
 import * as path from 'node:path';
+import { baseRoleEnvText } from '@agent/core/foundation';
 
 import {
   CHECK_STALE_DAYS,
@@ -63,7 +64,7 @@ Options:
                            repeatable (owner, department, contract_ref, auth_method,
                            mfa_status, log_access, account_admin, data_classification)
   --approval-id <id>       Approval reference recorded on appended records
-  --promoted-by <who>      Ceremony identity (default: KYBERION_PERSONA, then MISSION_ROLE;
+  --promoted-by <who>      Ceremony identity (default: KYBERION_BASE_ROLE, then MISSION_ROLE;
                            refused when none is resolvable)
   --lineage <service_id>   Print the full version chain of one service_id
   --dry-run                Print what would be appended and stop before any write
@@ -196,12 +197,12 @@ function parseArgs(argv: string[]): CliArgs {
 function resolveIdentity(args: CliArgs): string {
   const explicit = String(args.promotedBy || '').trim();
   if (explicit) return explicit;
-  const persona = String(getRegisteredEnvText('KYBERION_PERSONA') || '').trim();
+  const persona = String(baseRoleEnvText() || '').trim();
   if (persona) return persona;
   const role = String(getRegisteredEnvText('MISSION_ROLE') || '').trim();
   if (role) return role;
   throw new Error(
-    'no ceremony identity — pass --promoted-by <who> or run with KYBERION_PERSONA / MISSION_ROLE set. ' +
+    'no ceremony identity — pass --promoted-by <who> or run with KYBERION_BASE_ROLE / MISSION_ROLE set. ' +
       'The ledger records WHO performed every promotion; anonymous writes are refused.'
   );
 }
@@ -214,7 +215,7 @@ function assertCeremonyIdentity(tenant: string): void {
   throw new Error(
     `the current identity cannot read the tenant profile (${path.relative(pathResolver.rootDir(), profile)}): ` +
       `${String(decision.reason || 'denied').replace(/[.\s]+$/, '')}. Run the ceremony as ` +
-      '`KYBERION_PERSONA=ecosystem_architect MISSION_ROLE=mission_controller pnpm security:ledger …`. ' +
+      '`KYBERION_BASE_ROLE=ecosystem_architect MISSION_ROLE=mission_controller pnpm security:ledger …`. ' +
       'Nothing was read or written.'
   );
 }

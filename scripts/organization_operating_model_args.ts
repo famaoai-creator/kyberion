@@ -322,7 +322,7 @@ export function usage(): string {
     '  pnpm organization remove --organization-id <id> --tier <tier> --kind <domain|capability|service|operation|cadence> --record-id <id> [--tenant-slug <slug>] [--reason <text>] [--dry-run|--apply]',
     '',
     'Notes:',
-    '  - Writes under active/organizations/ are authority-gated: run with KYBERION_PERSONA=sovereign, or MISSION_ROLE=organization_operator with KYBERION_TENANT=<slug> for that tenant only. Tenant-bound roles do not cover shared-scope organizations (active/organizations/<tier>/shared/ is not tenant-owned): shared-scope writes need sovereign, or an execution scope bound to that organization.',
+    '  - Writes under active/organizations/ are authority-gated: run with KYBERION_BASE_ROLE=sovereign, or MISSION_ROLE=organization_operator with KYBERION_TENANT=<slug> for that tenant only. Tenant-bound roles do not cover shared-scope organizations (active/organizations/<tier>/shared/ is not tenant-owned): shared-scope writes need sovereign, or an execution scope bound to that organization.',
     '  - Reads use the current `pnpm scope` tier and tenant unless explicitly narrowed by flags.',
     '  - Select an organization with --organization-id or `pnpm scope use --organization <id> ...`.',
     '  - confidential reads require --tenant-slug or an active tenant in `pnpm scope`.',

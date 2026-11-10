@@ -2,6 +2,7 @@ import {
   currentResourceAccessScope,
   runInResourceAccessScope,
 } from '../foundation/resource-access-scope.js';
+import { baseRoleEnvText } from '../foundation/base-role-env.js';
 import { resolvePolicyIdentityContext } from '../identity-context-bridge.js';
 import { getActiveSandboxPolicy, withSandboxPolicy } from '../shell/sandbox-policy.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
@@ -1016,7 +1017,7 @@ export function createDelegationHandle(input: {
     owner:
       input.owner ||
       getRegisteredEnvText('MISSION_ROLE') ||
-      getRegisteredEnvText('KYBERION_PERSONA') ||
+      baseRoleEnvText() ||
       'reasoning-backend',
     instruction: input.instruction,
     ...(input.context ? { context: input.context } : {}),

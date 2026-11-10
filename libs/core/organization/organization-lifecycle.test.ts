@@ -23,7 +23,7 @@ describe('organization lifecycle governance', () => {
   const workspace = pathResolver.organizationWorkspaceDir(organizationId, tier, tenantSlug);
 
   beforeEach(() => {
-    process.env.KYBERION_PERSONA = 'sovereign';
+    process.env.KYBERION_BASE_ROLE = 'sovereign';
     process.env.MISSION_ROLE = 'sovereign';
     process.env.KYBERION_SUDO = 'true';
     safeRmSync(workspace, { recursive: true, force: true });

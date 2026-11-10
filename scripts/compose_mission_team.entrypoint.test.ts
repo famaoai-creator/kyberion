@@ -24,7 +24,7 @@ describe('mission team composition entrypoint', () => {
       })
     );
 
-    expect(source).not.toContain("setRegisteredEnv('KYBERION_PERSONA'");
+    expect(source).not.toContain("setRegisteredEnv('KYBERION_BASE_ROLE'");
   });
 
   it('handles help without requiring a mission or writing bindings', async () => {

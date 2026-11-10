@@ -2,6 +2,7 @@ import {
   isArchivedMissionStateCapability,
   ARCHIVED_MISSION_STATE_READER_ROLE,
 } from './foundation/archived-mission-state-capability.js';
+import { baseRoleEnvText, writeBaseRoleEnv, BASE_ROLE_ENV } from './foundation/base-role-env.js';
 import * as path from 'node:path';
 // Identity resolution must not depend on policy-enforced IO: secure-io's
 // guards consult the identity this module computes, so importing secure-io
@@ -24,7 +25,7 @@ import { resolveProjectScope } from './foundation/project-scope-env.js';
 export { isBoundTenantInvalid } from './foundation/project-scope-env.js';
 import { isScopeEnvOnly } from './foundation/scope-resolution-mode.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
-import { Persona, Authority, ExecutionMode, IdentityContext } from './types.js';
+import { BaseRole, Authority, ExecutionMode, IdentityContext } from './types.js';
 import { getServiceAuthorities } from './service/service-authority-map.js';
 import { createLogger } from './logger.js';
 import { registerIdentityContextResolver } from './identity-context-bridge.js';
@@ -64,10 +65,10 @@ import {
 const logger = createLogger('authority');
 
 type RolePersonaIndex = {
-  authority_roles?: Record<string, { default_persona?: Persona }>;
+  authority_roles?: Record<string, { default_persona?: BaseRole }>;
 };
 
-const LEGACY_ROLE_PERSONA_DEFAULTS: Record<string, Persona> = {
+const LEGACY_ROLE_PERSONA_DEFAULTS: Record<string, BaseRole> = {
   // system roles
   ecosystem_architect: 'ecosystem_architect',
   knowledge_steward: 'analyst',
@@ -135,9 +136,9 @@ function optionalStringFieldIsValid(record: JsonRecord, key: string): boolean {
   return record[key] === undefined || typeof record[key] === 'string';
 }
 
-let cachedRoleAuthorityMap: Record<string, Persona> | null = null;
+let cachedRoleAuthorityMap: Record<string, BaseRole> | null = null;
 
-function loadRoleAuthorityMapPersonas(): Record<string, Persona> {
+function loadRoleAuthorityMapPersonas(): Record<string, BaseRole> {
   if (cachedRoleAuthorityMap) return cachedRoleAuthorityMap;
   const filePath = pathResolver.knowledge('product/governance/role-authority-map.json');
   try {
@@ -150,7 +151,7 @@ function loadRoleAuthorityMapPersonas(): Record<string, Persona> {
       cachedRoleAuthorityMap = {};
       return cachedRoleAuthorityMap;
     }
-    const result: Record<string, Persona> = {};
+    const result: Record<string, BaseRole> = {};
     for (const group of ['system_roles', 'mission_roles', 'context_roles']) {
       const entries = raw[group];
       if (!Array.isArray(entries)) continue;
@@ -181,7 +182,7 @@ function loadRolePersonaIndexDirectory(): RolePersonaIndex | null {
     return null;
   }
 
-  const authority_roles: Record<string, { default_persona?: Persona }> = {};
+  const authority_roles: Record<string, { default_persona?: BaseRole }> = {};
   for (const file of files) {
     const filePath = pathResolver.knowledge(`product/governance/authority-roles/${file}`);
     const payload = parseJsonRecord(rawReadTextFile(filePath));
@@ -237,7 +238,7 @@ function loadRolePersonaIndex(): RolePersonaIndex {
  * Resolves logical identity and temporal authorities for the current execution.
  */
 
-function normalizePersona(value: unknown): Persona {
+function normalizePersona(value: unknown): BaseRole {
   if (typeof value !== 'string' || !value) return 'unknown';
   const normalized = value.toLowerCase().replace(/\s+/g, '_');
   if (
@@ -310,7 +311,7 @@ export function resolveRole(): string | undefined {
 
 /**
  * The persona of the current execution: the persona bound by the innermost
- * withExecutionContext* when it decided one, else `KYBERION_PERSONA`.
+ * withExecutionContext* when it decided one, else `KYBERION_BASE_ROLE`.
  * Use this (not the raw env var) for authorization decisions — the env var is
  * process-global and races between concurrent async contexts.
  */
@@ -460,7 +461,7 @@ export const DELEGATED_ROLE_ENV = 'KYBERION_DELEGATED_ROLE';
  * never SYSTEM_ROLE's default (which may be sovereign, e.g. nexus_daemon), so a
  * denied delegation can never raise the persona.
  */
-const DENIED_DELEGATION_PERSONA: Persona = 'worker';
+const DENIED_DELEGATION_PERSONA: BaseRole = 'worker';
 
 let delegationSnapshot: { systemRole?: string; raw?: string } | null = null;
 
@@ -595,7 +596,7 @@ export function isStoreGrantIssuanceRightRegistered(issuanceRight: string): bool
   );
 }
 
-export function inferPersonaFromRole(role?: string): Persona {
+export function inferPersonaFromRole(role?: string): BaseRole {
   if (!role) return 'unknown';
   const normalized = role.toLowerCase().replace(/\s+/g, '_');
   const fromIndex = normalizePersona(
@@ -622,7 +623,7 @@ export function inferPersonaFromRole(role?: string): Persona {
 export function buildExecutionEnv(
   baseEnv: NodeJS.ProcessEnv = process.env,
   role?: string,
-  persona?: Persona
+  persona?: BaseRole
 ): NodeJS.ProcessEnv {
   const nextEnv: NodeJS.ProcessEnv = { ...baseEnv };
   const identity = currentExecutionScope()?.executionIdentity;
@@ -640,8 +641,7 @@ export function buildExecutionEnv(
     const scope = currentExecutionScope();
     if (scope?.assumedRole) {
       nextEnv.MISSION_ROLE = scope.assumedRole;
-      if (typeof scope.assumedPersona === 'string') nextEnv.KYBERION_PERSONA = scope.assumedPersona;
-      else if (scope.assumedPersona === null) delete nextEnv.KYBERION_PERSONA;
+      if (scope.assumedPersona !== undefined) writeBaseRoleEnv(nextEnv, scope.assumedPersona);
       // DR-01: the child continues as the scope's role (an in-process
       // assumption or this process's own delegation), never as a stale value.
       setDelegatedRole(nextEnv, scope.assumedRole);
@@ -657,9 +657,11 @@ export function buildExecutionEnv(
   }
   const resolvedPersona = persona || inferPersonaFromRole(role);
   if (resolvedPersona !== 'unknown') {
-    nextEnv.KYBERION_PERSONA = resolvedPersona;
-  } else if (!persona && !baseEnv.KYBERION_PERSONA) {
+    writeBaseRoleEnv(nextEnv, resolvedPersona);
+  } else if (!persona && !baseRoleEnvText(baseEnv)) {
+    // Nothing to inherit: drop both names (an empty KYBERION_BASE_ROLE stays empty).
     delete nextEnv.KYBERION_PERSONA;
+    if (!nextEnv.KYBERION_BASE_ROLE) delete nextEnv.KYBERION_BASE_ROLE;
   }
   return nextEnv;
 }
@@ -682,6 +684,7 @@ function setDelegatedRole(env: NodeJS.ProcessEnv, role: string): void {
 export const AUTHORITY_ENV_KEYS = [
   'SYSTEM_ROLE',
   'MISSION_ROLE',
+  'KYBERION_BASE_ROLE',
   'KYBERION_PERSONA',
   DELEGATED_ROLE_ENV,
   'KYBERION_SUDO',
@@ -701,7 +704,7 @@ export function stripAuthorityEnvOverrides<T extends Record<string, string | und
  * starting a surface, `pnpm config-mission` starting its pipeline). It sets
  * SYSTEM_ROLE and clears everything that describes the launcher's own
  * identity: the DR-01 delegated role always, and MISSION_ROLE /
- * KYBERION_PERSONA unless the launch contract declares them explicitly
+ * KYBERION_BASE_ROLE unless the launch contract declares them explicitly
  * (`options.missionRole` / `options.persona`, e.g. a surface manifest's own
  * env). Cleared keys are set to '' (not deleted) so the result also works as a
  * secure-io `safeExec` env overlay, where an absent key would fall back to the
@@ -718,7 +721,8 @@ export function buildSystemRoleLaunchEnv(
     SYSTEM_ROLE: systemRole,
     MISSION_ROLE: options.missionRole ?? '',
     [DELEGATED_ROLE_ENV]: '',
-    KYBERION_PERSONA: options.persona ?? '',
+    KYBERION_BASE_ROLE: options.persona ?? '',
+    KYBERION_PERSONA: '',
   } as NodeJS.ProcessEnv;
 }
 
@@ -726,7 +730,7 @@ interface PreparedExecutionContext {
   /** The role normalized once, so the scope, the env mirror and children agree. */
   role: string;
   scope: ExecutionScope;
-  resolvedPersona: Persona;
+  resolvedPersona: BaseRole;
 }
 
 /**
@@ -787,7 +791,7 @@ interface StoreGrantIssuance {
 
 function prepareExecutionContext(
   role: string,
-  persona: Persona | undefined,
+  persona: BaseRole | undefined,
   tenantSlug: string | undefined,
   organizationId: string | undefined,
   identity?: ExecutionIdentityBinding,
@@ -890,7 +894,7 @@ function prepareExecutionContext(
 
 /**
  * Backwards-compatible env mirror of a SYNCHRONOUS assumption, for code that
- * still reads MISSION_ROLE / KYBERION_PERSONA directly (attribution labels,
+ * still reads MISSION_ROLE / KYBERION_BASE_ROLE directly (attribution labels,
  * children spawned from a raw `process.env`). Only the sync helper mirrors:
  * nothing else can run while a synchronous `fn` runs, so its write/restore
  * pair cannot interleave with another context. The async helper never
@@ -899,25 +903,36 @@ function prepareExecutionContext(
  */
 function applyExecutionEnv(
   role: string,
-  persona: Persona | undefined,
-  resolvedPersona: Persona
-): { role: string; persona: string | undefined } {
+  persona: BaseRole | undefined,
+  resolvedPersona: BaseRole
+): { role: string; baseRole: string | undefined } {
   setRegisteredEnv('MISSION_ROLE', role);
   if (resolvedPersona !== 'unknown') {
-    setRegisteredEnv('KYBERION_PERSONA', resolvedPersona);
+    setRegisteredEnv(BASE_ROLE_ENV, resolvedPersona);
   } else if (persona === undefined) {
-    setRegisteredEnv('KYBERION_PERSONA', undefined);
+    // '' (not deleted): an absent KYBERION_BASE_ROLE would let a retired
+    // KYBERION_BASE_ROLE value in the process env through.
+    setRegisteredEnv(BASE_ROLE_ENV, '');
   }
-  return { role, persona: getRegisteredEnvText('KYBERION_PERSONA') };
+  return { role, baseRole: mirroredEnvValue(BASE_ROLE_ENV) };
+}
+
+type MirroredEnvKey = 'MISSION_ROLE' | typeof BASE_ROLE_ENV;
+
+/** A mirrored variable as written; the base role keeps '' (present, no base role) apart from absent. */
+function mirroredEnvValue(key: MirroredEnvKey): string | undefined {
+  return key === BASE_ROLE_ENV
+    ? getRegisteredEnvText(key, { preserveEmpty: true })
+    : getRegisteredEnvText(key);
 }
 
 /** Restore one mirrored variable unless something else changed it since we wrote it. */
 function restoreMirroredEnv(
-  key: 'MISSION_ROLE' | 'KYBERION_PERSONA',
+  key: MirroredEnvKey,
   written: string | undefined,
   previous: string | undefined
 ): void {
-  if (getRegisteredEnvText(key) === written) setRegisteredEnv(key, previous);
+  if (mirroredEnvValue(key) === written) setRegisteredEnv(key, previous);
 }
 
 /**
@@ -938,7 +953,7 @@ function restoreMirroredEnv(
 export function withExecutionContext<T>(
   role: string,
   fn: () => T,
-  persona?: Persona,
+  persona?: BaseRole,
   tenantSlug?: string,
   organizationId?: string,
   identity?: ExecutionIdentityBinding
@@ -950,17 +965,17 @@ export function withExecutionContext<T>(
 /** Run a prepared synchronous assumption with its env mirror written and restored around it. */
 function runMirroredSync<T>(
   prepared: PreparedExecutionContext,
-  persona: Persona | undefined,
+  persona: BaseRole | undefined,
   fn: () => T
 ): T {
   const previousRole = getRegisteredEnvText('MISSION_ROLE');
-  const previousPersona = getRegisteredEnvText('KYBERION_PERSONA');
+  const previousBaseRole = mirroredEnvValue(BASE_ROLE_ENV);
   const written = applyExecutionEnv(prepared.role, persona, prepared.resolvedPersona);
   try {
     return runInExecutionScope(prepared.scope, fn);
   } finally {
     restoreMirroredEnv('MISSION_ROLE', written.role, previousRole);
-    restoreMirroredEnv('KYBERION_PERSONA', written.persona, previousPersona);
+    restoreMirroredEnv(BASE_ROLE_ENV, written.baseRole, previousBaseRole);
   }
 }
 
@@ -968,7 +983,7 @@ function runMirroredSync<T>(
  * Async counterpart of withExecutionContext: the scoped assumption follows
  * `fn` across awaits. It deliberately does NOT mirror the role/persona into
  * `process.env` (B1): concurrent async contexts would interleave the
- * write/restore pairs and leave MISSION_ROLE / KYBERION_PERSONA wrong for the
+ * write/restore pairs and leave MISSION_ROLE / KYBERION_BASE_ROLE wrong for the
  * rest of the process. Read the role with `resolveRole()` /
  * `resolveIdentityContext()` / `resolveExecutionPersona()`, and build child
  * envs with `buildExecutionEnv()` / `buildSafeExecEnv()`, which follow the scope.
@@ -976,7 +991,7 @@ function runMirroredSync<T>(
 export async function withExecutionContextAsync<T>(
   role: string,
   fn: () => Promise<T> | T,
-  persona?: Persona,
+  persona?: BaseRole,
   tenantSlug?: string,
   organizationId?: string,
   identity?: ExecutionIdentityBinding
@@ -1284,7 +1299,7 @@ export function resolveIdentityContext(tenantOverride?: string): IdentityContext
   const envPersona = resolveExecutionPersona();
   const envRole = resolveRole();
 
-  let persona: Persona = normalizePersona(envPersona);
+  let persona: BaseRole = normalizePersona(envPersona);
   const authorities: Authority[] = [];
   const executionScope = currentExecutionScope();
   let tenantSlug: string | undefined = normalizeTenantSlug(
@@ -1349,7 +1364,7 @@ export function resolveIdentityContext(tenantOverride?: string): IdentityContext
 
   // 2. A functional mission/system role outranks the operator's default
   // persona. This prevents a persisted sovereign profile from escalating a
-  // worker/controller process that intentionally omitted KYBERION_PERSONA.
+  // worker/controller process that intentionally omitted KYBERION_BASE_ROLE.
   if (persona === 'unknown' && envRole) {
     persona = inferPersonaFromRole(envRole);
   }
@@ -1512,7 +1527,7 @@ export function resolveIdentityContext(tenantOverride?: string): IdentityContext
         : 'mission';
 
   return {
-    persona,
+    baseRole: persona,
     executionMode,
     authorities: Array.from(new Set(authorities)),
     missionId,

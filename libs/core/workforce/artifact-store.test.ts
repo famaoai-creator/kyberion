@@ -47,7 +47,7 @@ describe('artifact attempts with the unchanged tenant security policy', () => {
     );
     vi.stubEnv('KYBERION_ROOT', policyRoot);
     vi.stubEnv('KYBERION_TENANT', 'synthetic-latency');
-    vi.stubEnv('KYBERION_PERSONA', 'sovereign');
+    vi.stubEnv('KYBERION_BASE_ROLE', 'sovereign');
     vi.stubEnv('MISSION_ROLE', 'mission_controller');
     vi.resetModules();
     const { saveProjectRecord } = await import('../project/project-registry.js');
@@ -162,7 +162,7 @@ describe('writeScopedArtifact (AL-02)', () => {
     vi.stubEnv('MISSION_ROLE', 'mission_controller');
     // This placement suite deliberately spans confidential tenant fixtures;
     // use the canonical permitted persona rather than relying on absent policy.
-    vi.stubEnv('KYBERION_PERSONA', 'sovereign');
+    vi.stubEnv('KYBERION_BASE_ROLE', 'sovereign');
     store = await import('./artifact-store.js');
     // Owned scopes are placed by their owner's record, so the owners exist.
     const missionState = (missionId: string, tier: string) =>

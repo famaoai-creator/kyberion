@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { randomUUID } from 'node:crypto';
+import { baseRoleEnvText } from '@agent/core/foundation';
 import * as path from 'node:path';
 import { GENERATION_QUOTA_COUNTER_REPO_SUBPATH } from '@agent/core/generation-quota';
 import { isValidTenantSlug } from '@agent/core/foundation/scope';
@@ -39,13 +40,7 @@ import {
   portableProtocolServicePathRef,
   recordProtocolServiceLifecycleBestEffort,
 } from '@agent/core/protocol-service-lifecycle';
-import {
-  getRegisteredEnvText,
-  isRecord,
-  nowIso,
-  parseSafeJsonInput,
-  readTextFile,
-} from '@agent/core/foundation';
+import { isRecord, nowIso, parseSafeJsonInput, readTextFile } from '@agent/core/foundation';
 import {
   backupArchiveTimeoutMs,
   interpretTarResult,
@@ -1592,7 +1587,7 @@ export function main(argv: string[], print: (value: unknown) => void = () => und
       scope,
       actorRole: 'infrastructure_sentinel',
       principal: { kind: 'service', id: 'backup-restore' },
-      requestedBy: getRegisteredEnvText('KYBERION_PERSONA') || 'backup-operator',
+      requestedBy: baseRoleEnvText() || 'backup-operator',
       metadata: {
         archive: portableProtocolServicePathRef(result.archive),
         target: portableProtocolServicePathRef(result.target),
@@ -1609,7 +1604,7 @@ export function main(argv: string[], print: (value: unknown) => void = () => und
         scope,
         actorRole: 'infrastructure_sentinel',
         principal: { kind: 'service', id: 'backup-restore' },
-        requestedBy: getRegisteredEnvText('KYBERION_PERSONA') || 'backup-operator',
+        requestedBy: baseRoleEnvText() || 'backup-operator',
         metadata: { quarantine_count: result.quarantinePaths.length },
       });
       if (!quarantineReceipt) logger.warn('[backup] quarantine lifecycle receipt unavailable');

@@ -128,7 +128,7 @@ beforeAll(async () => {
   ])
     vi.stubEnv(key, '');
   vi.stubEnv('MISSION_ROLE', 'worker');
-  vi.stubEnv('KYBERION_PERSONA', 'worker');
+  vi.stubEnv('KYBERION_BASE_ROLE', 'worker');
   vi.stubEnv('KYBERION_REASONING_BACKEND', 'stub');
   vi.useFakeTimers({ now: new Date('2026-10-06T00:00:00Z'), toFake: ['Date'] });
   vi.resetModules();

@@ -22,7 +22,7 @@ const OTHER = 'cc-other';
 const SUSPENDED = 'cc-suspended';
 const BODY_MARKER = 'Confidential quote 7,654,321 JPY';
 const keys = [
-  'KYBERION_PERSONA',
+  'KYBERION_BASE_ROLE',
   'MISSION_ROLE',
   'SYSTEM_ROLE',
   'MISSION_ID',
@@ -71,7 +71,7 @@ beforeAll(async () => {
   io = await import('@agent/core/secure-io');
   cli = await import('./customer_channel.js');
   expect((await import('@agent/core/path-resolver')).rootDir()).toBe(ROOT);
-  process.env.KYBERION_PERSONA = 'sovereign';
+  process.env.KYBERION_BASE_ROLE = 'sovereign';
   for (const [tenant, status] of [
     [TENANT, 'active'],
     [OTHER, 'active'],

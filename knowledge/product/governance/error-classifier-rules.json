@@ -51,9 +51,9 @@
       "id": "kyberion.tier-guard",
       "category": "tier_violation",
       "label": "Tier guard refused access",
-      "remediation": "Higher tier required. Set `KYBERION_PERSONA` or `MISSION_ROLE` to a role authorized for this tier.",
+      "remediation": "Higher tier required. Set `KYBERION_BASE_ROLE` or `MISSION_ROLE` to a role authorized for this tier.",
       "patterns": ["tier[\\s_-]?guard|TIER_VIOLATION|tier policy"],
-      "repairAction": "Consult organization-profile.md for required roles. Suggest adding `KYBERION_PERSONA=ecosystem_architect` or `MISSION_ROLE=knowledge_steward` to the environment configuration to authorize access."
+      "repairAction": "Consult organization-profile.md for required roles. Suggest adding `KYBERION_BASE_ROLE=ecosystem_architect` or `MISSION_ROLE=knowledge_steward` to the environment configuration to authorize access."
     },
     {
       "id": "runtime.property-access",
@@ -82,15 +82,15 @@
       "id": "kyberion.path-scope-persona-unset",
       "category": "permission_denied",
       "label": "Operator persona not set in this shell",
-      "remediation": "No operator persona is set for this process. `pnpm onboarding apply` records `KYBERION_PERSONA` in `.env.local`, but pnpm scripts do not load that file — run `export KYBERION_PERSONA=sovereign` in this shell, then rerun the same command.",
+      "remediation": "No operator persona is set for this process. `pnpm onboarding apply` records `KYBERION_BASE_ROLE` in `.env.local`, but pnpm scripts do not load that file — run `export KYBERION_BASE_ROLE=sovereign` in this shell, then rerun the same command.",
       "patterns": ["POLICY_VIOLATION\\] Persona 'unknown'"],
-      "repairAction": "Export KYBERION_PERSONA for the operator shell and rerun the same command."
+      "repairAction": "Export KYBERION_BASE_ROLE for the operator shell and rerun the same command."
     },
     {
       "id": "kyberion.path-scope",
       "category": "permission_denied",
       "label": "Path scope policy denied write",
-      "remediation": "The path-scope policy refused this write. Check `KYBERION_PERSONA` / `MISSION_ROLE` env vars match the persona authorized to write this path.",
+      "remediation": "The path-scope policy refused this write. Check `KYBERION_BASE_ROLE` / `MISSION_ROLE` env vars match the persona authorized to write this path.",
       "patterns": ["POLICY_VIOLATION.*authorized|path-scope-policy|outside project root"],
       "repairAction": "Adjust the target path to be within the allowed mission or shared workspace root."
     },
@@ -306,7 +306,7 @@
       "explanation": "The current persona is not authorized to access this project.",
       "required_role": "mission_controller or project owner persona",
       "repair_steps": [
-        "Set KYBERION_PERSONA to a persona listed in the project's auth-grants.json.",
+        "Set KYBERION_BASE_ROLE to a persona listed in the project's auth-grants.json.",
         "Run `pnpm mission list` to verify the mission ID is correct.",
         "If you need project access, ask the project owner to add your persona to auth-grants.json."
       ]
@@ -343,7 +343,7 @@
       "repair_steps": [
         "Set KYBERION_TENANT to the correct tenant slug (KYBERION_STANCE selects the stance, not the tenant).",
         "Verify the tenant slug is registered in knowledge/confidential/{tenant}/.",
-        "Ensure KYBERION_PERSONA is bound to this tenant in the mission state."
+        "Ensure KYBERION_BASE_ROLE is bound to this tenant in the mission state."
       ]
     },
     {
@@ -353,7 +353,7 @@
       "required_role": "mission_controller",
       "repair_steps": [
         "Confirm the target path is under active/missions/{id}/ or active/shared/.",
-        "Set KYBERION_PERSONA and MISSION_ROLE to match the mission owner.",
+        "Set KYBERION_BASE_ROLE and MISSION_ROLE to match the mission owner.",
         "Use tenantMissionDir() instead of a hardcoded path for tenant-scoped writes."
       ]
     },
@@ -375,7 +375,7 @@
       "required_role": "knowledge_steward or ecosystem_architect",
       "required_authority": "KNOWLEDGE_WRITE",
       "repair_steps": [
-        "Set KYBERION_PERSONA to a persona with the required tier access.",
+        "Set KYBERION_BASE_ROLE to a persona with the required tier access.",
         "Personal tier (knowledge/personal/) requires sovereign or personal persona.",
         "Confidential tier (knowledge/confidential/) requires ecosystem_architect or knowledge_steward."
       ]

@@ -194,8 +194,8 @@ describe('renderOrganizationStandupText', () => {
 
 describe('runOrganizationStandup', () => {
   it('requires the sovereign persona', () => {
-    expect(() => runOrganizationStandup({ env: { KYBERION_PERSONA: 'worker' } }, deps())).toThrow(
-      /requires KYBERION_PERSONA=sovereign/
+    expect(() => runOrganizationStandup({ env: { KYBERION_BASE_ROLE: 'worker' } }, deps())).toThrow(
+      /requires KYBERION_BASE_ROLE=sovereign/
     );
   });
 
@@ -206,7 +206,7 @@ describe('runOrganizationStandup', () => {
     const notify = vi.fn().mockReturnValue(true);
     const audit = vi.fn();
     const result = runOrganizationStandup(
-      { env: { KYBERION_PERSONA: 'sovereign' }, locale: 'en' },
+      { env: { KYBERION_BASE_ROLE: 'sovereign' }, locale: 'en' },
       {
         ...deps(),
         writeArtifact: writeArtifact as never,
@@ -268,7 +268,12 @@ describe('runOrganizationStandup scoped mode', () => {
     const other = { ...scope, organizationId: 'org-b' };
     const result = bound('acme', () =>
       runOrganizationStandup(
-        { scope: cadenceScope, persist: false, locale: 'en', env: { KYBERION_PERSONA: 'worker' } },
+        {
+          scope: cadenceScope,
+          persist: false,
+          locale: 'en',
+          env: { KYBERION_BASE_ROLE: 'worker' },
+        },
         { ...deps(), audit, listOrganizations: () => [scope, other] }
       )
     );

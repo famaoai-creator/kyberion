@@ -28,7 +28,7 @@ describe('entity governance acceptance boundaries', () => {
 
   beforeEach(() => {
     process.env.KYBERION_ENTITY_GOVERNANCE = 'enforce';
-    process.env.KYBERION_PERSONA = 'sovereign';
+    process.env.KYBERION_BASE_ROLE = 'sovereign';
     process.env.MISSION_ROLE = 'sovereign';
     process.env.KYBERION_SUDO = 'true';
   });

@@ -106,7 +106,7 @@ function start(
         KYBERION_OIDC_CLIENT_ID: 'fixture',
         MISSION_ID: '',
         MISSION_ROLE: 'worker',
-        KYBERION_PERSONA: 'worker',
+        KYBERION_BASE_ROLE: 'worker',
         KYBERION_TENANT: '',
         KYBERION_ORGANIZATION: '',
         KYBERION_PROJECT_ID: '',

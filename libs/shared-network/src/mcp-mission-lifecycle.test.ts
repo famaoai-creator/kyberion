@@ -137,7 +137,7 @@ describe('governed mission lifecycle MCP tools', () => {
     const identity = vi.spyOn(authority, 'resolveIdentityContext').mockReturnValue({
       missionId: 'MSN-SIBLING',
       role: 'mission_controller',
-      persona: 'worker',
+      baseRole: 'worker',
       authorities: [],
       executionMode: 'mission',
     });

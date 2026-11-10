@@ -198,7 +198,7 @@ beforeAll(async () => {
   fixture.seedFirstJobTestRoot(sourceRoot, root);
   vi.stubEnv('KYBERION_ROOT', root);
   vi.stubEnv('MISSION_ROLE', 'worker');
-  vi.stubEnv('KYBERION_PERSONA', 'worker');
+  vi.stubEnv('KYBERION_BASE_ROLE', 'worker');
   vi.resetModules();
   core = await import('./first-job.js');
   setupModule = await import('./first-job-setup.js');

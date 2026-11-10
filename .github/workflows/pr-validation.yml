@@ -204,7 +204,7 @@ jobs:
 
       - name: Run core tests (shard ${{ matrix.shard }}/${{ matrix.total }})
         env:
-          KYBERION_PERSONA: worker
+          KYBERION_BASE_ROLE: worker
           MISSION_ROLE: mission_controller
         shell: bash
         run: pnpm test -- --suite core --shard=${{ matrix.shard }}/${{ matrix.total }} 2>&1 | tee -a "$RUNNER_TEMP/kyberion-ci-output.log"

@@ -26,6 +26,7 @@ export { resolveMissionTeamSelectionScope } from './mission-team-selection.js';
  * state, so gating/auditing it would only add noise.
  */
 import type { StorageDataTier } from '../storage-layout.js';
+import { baseRoleEnvText } from '../foundation/base-role-env.js';
 import { buildMissionSystem, missionSystem } from './mission-system.js';
 import { assertCanGrantMissionAuthority } from './mission-state.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
@@ -90,11 +91,7 @@ function assertMissionControllerContext(verb: string): void {
 }
 
 function resolveActor(): string {
-  return (
-    getRegisteredEnvText('KYBERION_PERSONA') ||
-    getRegisteredEnvText('MISSION_ROLE') ||
-    'mission_controller'
-  );
+  return baseRoleEnvText() || getRegisteredEnvText('MISSION_ROLE') || 'mission_controller';
 }
 
 /**

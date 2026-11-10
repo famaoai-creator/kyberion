@@ -15,7 +15,7 @@ vi.mock('./governance/audit-chain.js', () => ({ auditChain: { record: vi.fn() } 
 const ROOT = pathResolver.rootDir();
 const ENV_KEYS = [
   'KYBERION_TENANT',
-  'KYBERION_PERSONA',
+  'KYBERION_BASE_ROLE',
   'MISSION_ROLE',
   'SYSTEM_ROLE',
   'KYBERION_SUDO',

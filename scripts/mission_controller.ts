@@ -16,9 +16,11 @@
  */
 
 import * as path from 'node:path';
+import { baseRoleEnvText } from '@agent/core/foundation';
 import { withMissionPrerequisiteIdentityProbe } from '@agent/core/mission/mission-prerequisite-identity';
 import { inspectMissionPrerequisiteIdentity } from './lib/installed-identity.js';
 import { auditChain } from '@agent/core/governance/audit-chain';
+import { executionAgentId } from '@agent/core/governance/execution-agent-id';
 import { getRegisteredEnvText, setRegisteredEnv } from '@agent/core/foundation/env';
 import { nowIso } from '@agent/core/foundation/time';
 import { missionActionCredentialRequirement } from '@agent/core/foundation/command-credential-policy';
@@ -1197,7 +1199,7 @@ async function gatePass(missionId: string, gateFile?: string, note?: string): Pr
         activate: activateMissionOnGateProgress,
         recordEvaluation: (upperId, gateId, stored) => {
           auditChain.record({
-            agentId: registeredEnv('KYBERION_PERSONA') || 'mission_controller',
+            agentId: executionAgentId('mission_controller'),
             action: stored.evaluation?.verdict === 'pass' ? 'gate.passed' : 'gate.rejected',
             operation: `gate-pass:${gateId}`,
             result: 'completed',
@@ -1233,7 +1235,7 @@ async function gatePass(missionId: string, gateFile?: string, note?: string): Pr
     if (stored.found && stored.evaluation) {
       const upperId = missionId.toUpperCase();
       auditChain.record({
-        agentId: registeredEnv('KYBERION_PERSONA') || 'operator',
+        agentId: executionAgentId('operator'),
         action: stored.evaluation.verdict === 'pass' ? 'gate.passed' : 'gate.rejected',
         operation: `gate-pass:${gateFile}`,
         result: 'completed',
@@ -1274,11 +1276,11 @@ async function gatePass(missionId: string, gateFile?: string, note?: string): Pr
     gateId: path.basename(gatePath).replace(/-\w+\.json$/u, ''),
     outcome: 'passed',
     note,
-    actorId: registeredEnv('KYBERION_PERSONA') || 'operator',
+    actorId: baseRoleEnvText() || 'operator',
     evidenceDir: path.dirname(gatePath),
   });
   auditChain.record({
-    agentId: registeredEnv('KYBERION_PERSONA') || 'operator',
+    agentId: executionAgentId('operator'),
     action: 'gate.passed',
     operation: `gate-pass:${path.basename(gatePath)}`,
     result: 'completed',
@@ -1313,7 +1315,7 @@ async function gateFail(missionId: string, gateFile?: string, note?: string): Pr
       const upperId = missionId.toUpperCase();
       const reworked = stored.phase ? markPhaseTasksForRework(upperId, stored.phase) : 0;
       auditChain.record({
-        agentId: registeredEnv('KYBERION_PERSONA') || 'operator',
+        agentId: executionAgentId('operator'),
         action: 'gate.rejected',
         operation: `gate-fail:${gateFile}`,
         result: 'completed',
@@ -1339,11 +1341,11 @@ async function gateFail(missionId: string, gateFile?: string, note?: string): Pr
     gateId: path.basename(gatePath).replace(/-\w+\.json$/u, ''),
     outcome: 'rejected',
     note,
-    actorId: registeredEnv('KYBERION_PERSONA') || 'operator',
+    actorId: baseRoleEnvText() || 'operator',
     evidenceDir: path.dirname(gatePath),
   });
   auditChain.record({
-    agentId: registeredEnv('KYBERION_PERSONA') || 'operator',
+    agentId: executionAgentId('operator'),
     action: 'gate.rejected',
     operation: `gate-fail:${path.basename(gatePath)}`,
     result: 'completed',

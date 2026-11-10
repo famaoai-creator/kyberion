@@ -60,7 +60,7 @@ const ACTOR = 'customer:acme-cto';
 const UNBOUND = 'customer:acme-pm';
 const TITLE = 'Secret project kickoff';
 const keys = [
-  'KYBERION_PERSONA',
+  'KYBERION_BASE_ROLE',
   'MISSION_ROLE',
   'SYSTEM_ROLE',
   'MISSION_ID',
@@ -149,7 +149,7 @@ beforeAll(async () => {
   io = await import('@agent/core/secure-io');
   facade = await import('./customer_decision.js');
   expect((await import('@agent/core/path-resolver')).rootDir()).toBe(ROOT);
-  process.env.KYBERION_PERSONA = 'sovereign';
+  process.env.KYBERION_BASE_ROLE = 'sovereign';
   for (const tenant of [TENANT, CHARTERED, MOVE, LATE, REVERSE, HOURLY]) {
     writeFixtureJson(`knowledge/personal/tenants/${tenant}.json`, {
       tenant_slug: tenant,
@@ -467,7 +467,7 @@ describe('customer-decision reminders and hand-offs (CD-11, real paths)', () => 
     const { acceptCharter } =
       await import('@agent/core/governance/accountability-charter-registry');
     const { humanActor } = await import('@agent/core/actor');
-    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     process.env.MISSION_ROLE = 'mission_controller';
     try {
       acceptCharter({
@@ -506,7 +506,7 @@ describe('customer-decision reminders and hand-offs (CD-11, real paths)', () => 
         now: new Date(NOW),
       });
     } finally {
-      delete process.env.KYBERION_PERSONA;
+      delete process.env.KYBERION_BASE_ROLE;
       delete process.env.MISSION_ROLE;
     }
     const chartered = await sendAgenda(CHARTERED);
@@ -661,7 +661,7 @@ describe('customer-decision reminders and hand-offs (CD-11, real paths)', () => 
         'KYBERION_TENANT',
         'KYBERION_TENANT_SCOPE_REQUIRED',
         'MISSION_ROLE',
-        'KYBERION_PERSONA',
+        'KYBERION_BASE_ROLE',
       ] as const)
         process.env[key] = env[key];
       process.env.SYSTEM_ROLE = 'chronos_mirror_v2';
@@ -670,7 +670,7 @@ describe('customer-decision reminders and hand-offs (CD-11, real paths)', () => 
         expect(reminderFacadeEnv(TENANT)).toMatchObject({
           SYSTEM_ROLE: '',
           MISSION_ROLE: '',
-          KYBERION_PERSONA: '',
+          KYBERION_BASE_ROLE: '',
           KYBERION_TENANT: TENANT,
           KYBERION_TENANT_SCOPE_REQUIRED: '1',
           KYBERION_ROOT: ROOT,
@@ -707,9 +707,9 @@ describe('customer-decision reminders and hand-offs (CD-11, real paths)', () => 
 
   it('reminders --install promotes the template into the tenant pipeline catalog', async () => {
     // No identity env: the operator's --by is the asset ledger's ingested_by.
-    const savedPersona = process.env.KYBERION_PERSONA;
+    const savedPersona = process.env.KYBERION_BASE_ROLE;
     const savedRole = process.env.MISSION_ROLE;
-    delete process.env.KYBERION_PERSONA;
+    delete process.env.KYBERION_BASE_ROLE;
     delete process.env.MISSION_ROLE;
     try {
       const out = await run([
@@ -751,8 +751,8 @@ describe('customer-decision reminders and hand-offs (CD-11, real paths)', () => 
       );
       expect(ledger).toContain('"ingested_by":"user:ops-lead"');
     } finally {
-      if (savedPersona === undefined) delete process.env.KYBERION_PERSONA;
-      else process.env.KYBERION_PERSONA = savedPersona;
+      if (savedPersona === undefined) delete process.env.KYBERION_BASE_ROLE;
+      else process.env.KYBERION_BASE_ROLE = savedPersona;
       if (savedRole === undefined) delete process.env.MISSION_ROLE;
       else process.env.MISSION_ROLE = savedRole;
     }

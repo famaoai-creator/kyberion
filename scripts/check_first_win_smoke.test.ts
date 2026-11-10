@@ -19,9 +19,9 @@ describe('check_first_win_smoke', () => {
   let savedRole: string | undefined;
 
   beforeEach(() => {
-    savedPersona = process.env.KYBERION_PERSONA;
+    savedPersona = process.env.KYBERION_BASE_ROLE;
     savedRole = process.env.MISSION_ROLE;
-    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     process.env.MISSION_ROLE = 'mission_controller';
     savedReadme = String(safeReadFile(readmePath, { encoding: 'utf8' }) || '');
   });
@@ -30,8 +30,8 @@ describe('check_first_win_smoke', () => {
     if (savedReadme !== null) {
       safeWriteFile(readmePath, savedReadme, { encoding: 'utf8' });
     }
-    if (savedPersona === undefined) delete process.env.KYBERION_PERSONA;
-    else process.env.KYBERION_PERSONA = savedPersona;
+    if (savedPersona === undefined) delete process.env.KYBERION_BASE_ROLE;
+    else process.env.KYBERION_BASE_ROLE = savedPersona;
     if (savedRole === undefined) delete process.env.MISSION_ROLE;
     else process.env.MISSION_ROLE = savedRole;
   });

@@ -263,7 +263,7 @@ describe('pipeline promotion resource boundaries', () => {
       // A private, freshly cleaned pool prevents another test from supplying
       // missing journal ancestors and masking fixture setup omissions.
       vi.stubEnv('VITEST_POOL_ID', 'pipeline-ledger-' + process.pid);
-      vi.stubEnv('KYBERION_PERSONA', 'vitest-promoter');
+      vi.stubEnv('KYBERION_BASE_ROLE', 'vitest-promoter');
       writeSource('one');
     });
 

@@ -57,7 +57,7 @@ const result = {
 };
 await withStoreGrantAsync('reasoning_settings_writer', async () => {
   const identity = resolveIdentityContext();
-  result.identity = { persona: identity.persona, role: identity.role };
+  result.identity = { persona: identity.baseRole, role: identity.role };
   result.writes = [config, config + '.previous', config + '.history/1.json'].map(file => {
     if (!validateWritePermission(at(file)).allowed) return false;
     io.safeWriteFile(at(file), 'synthetic reasoning setting');
@@ -130,7 +130,7 @@ beforeAll(async () => {
       env: {
         KYBERION_ROOT: fixture,
         SYSTEM_ROLE: 'operator_surface',
-        KYBERION_PERSONA: '',
+        KYBERION_BASE_ROLE: '',
         MISSION_ROLE: '',
         MISSION_ID: '',
         KYBERION_SUDO: 'false',

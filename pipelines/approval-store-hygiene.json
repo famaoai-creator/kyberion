@@ -5,7 +5,7 @@
   "description": "Daily sweep that expires pending approvals nobody will act on, so they leave the operator's queue and show up in the digest as expired. Moving test-fixture records to the trash needs the sovereign persona and stays a manual step (approval_store_hygiene.js --apply).",
   "_refs": {
     "plan": "docs/developer/improvement-plans-2026-09/AUTONOMOUS_OPERATION_MOBILE_DECISION_PLAN_2026-09-27.ja.md",
-    "cli": "KYBERION_PERSONA=sovereign node dist/scripts/approval_store_hygiene.js --apply"
+    "cli": "KYBERION_BASE_ROLE=sovereign node dist/scripts/approval_store_hygiene.js --apply"
   },
   "schedule": {
     "id": "approval-store-hygiene-daily",

@@ -225,7 +225,7 @@ export function onboardAiCompany(input: AiCompanyOnboardingInput): AiCompanyOnbo
     'export KYBERION_TENANT_SCOPE_REQUIRED=true',
     // pnpm scripts do not load .env.local: without these exports the governed
     // commands below fail with ROLE_VIOLATION / tenant.scope_missing.
-    'export KYBERION_PERSONA=sovereign',
+    'export KYBERION_BASE_ROLE=sovereign',
     `export KYBERION_TENANT=${tenantSlug}`,
     // The stance has its own profile root (knowledge/personal/stances/<slug>/): missions refuse
     // to start until my-identity.json / my-vision.md / agent-identity.json exist there.

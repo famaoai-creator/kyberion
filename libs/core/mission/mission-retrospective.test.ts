@@ -148,7 +148,7 @@ describe('mission retrospective loop', () => {
       );
     }
     vi.stubEnv('KYBERION_ROOT', tmpRoot);
-    vi.stubEnv('KYBERION_PERSONA', 'sovereign');
+    vi.stubEnv('KYBERION_BASE_ROLE', 'sovereign');
     vi.stubEnv('MISSION_ROLE', 'mission_controller');
 
     fs.writeFileSync(

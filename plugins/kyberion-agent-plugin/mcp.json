@@ -7,7 +7,7 @@
       "args": ["${PLUGIN_ROOT}/bin/kyberion-mcp.mjs"],
       "cwd": "${PLUGIN_ROOT}",
       "env": {
-        "KYBERION_PERSONA": "sovereign_concierge",
+        "KYBERION_BASE_ROLE": "sovereign_concierge",
         "SYSTEM_ROLE": "mcp_server_cowork",
         "KYBERION_MCP_CALLER_ROLE": "operator",
         "NODE_ENV": "production"

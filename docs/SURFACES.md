@@ -145,7 +145,7 @@ FD-08 で廃止した旧 Companion Hub(Home / Learn / Discover / Work / Connect 
 | [doc-drop](../scripts/doc-drop/)                       | 8153 | pdf / 画像 / txt / md / docx のドロップ → ingest handoff                                                 |
 | [personal-workbench](../scripts/personal-workbench/)   | 8154 | Link / Task / Follow-up / Decision / Expense / Daily Review の提案 inbox(governed OCR・メール下書きのみ) |
 
-統合入口は `KYBERION_PERSONA=sovereign KYBERION_TENANT=<slug> pnpm pads`（`http://127.0.0.1:8160/`）。既存の個別入口は互換用に `node_modules/.bin/tsx scripts/<pad>/server.ts [--tier …] [port]` で起動できる。`confidential` / `personal` tier は server-side `KYBERION_TENANT` が必須。書き込み API は起動時に表示されるローカルトークンを要求するが、これは人間承認の代替ではない。
+統合入口は `KYBERION_BASE_ROLE=sovereign KYBERION_TENANT=<slug> pnpm pads`（`http://127.0.0.1:8160/`）。既存の個別入口は互換用に `node_modules/.bin/tsx scripts/<pad>/server.ts [--tier …] [port]` で起動できる。`confidential` / `personal` tier は server-side `KYBERION_TENANT` が必須。書き込み API は起動時に表示されるローカルトークンを要求するが、これは人間承認の代替ではない。
 
 Related guidance:
 
