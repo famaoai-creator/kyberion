@@ -1,5 +1,5 @@
 import { parseArgs } from 'node:util';
-import { withExecutionContext, withExecutionContextAsync } from '@agent/core/authority';
+import { withExecutionContextAsync, withStoreGrant } from '@agent/core/authority';
 import { credentialExecutionIdentity } from '@agent/core/foundation/credential-binding';
 import { resolveCliApprovalRequester } from '@agent/core/governance/cli-operator-principal';
 import {
@@ -81,11 +81,10 @@ export async function runCredentialAllocationCommand(
     'credential_allocation_manager',
     async () => {
       if (action === 'assign') {
-        const profile = withExecutionContext(
+        const profile = withStoreGrant(
           'workspace_tenant_registry_reader',
           () => readTenantProfile(tenant),
-          undefined,
-          tenant
+          { tenantSlug: tenant }
         );
         if (!profile || profile.status !== 'active')
           throw new ScriptExitError(2, 'An existing active tenant is required.');
