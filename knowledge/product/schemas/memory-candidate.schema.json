@@ -492,7 +492,10 @@
             "organization_learning",
             "process_improvement",
             "background_review",
-            "execution_feedback"
+            "execution_feedback",
+            "learning_intake",
+            "service_procedure",
+            "mission_seed"
           ]
         },
         "record_id": {

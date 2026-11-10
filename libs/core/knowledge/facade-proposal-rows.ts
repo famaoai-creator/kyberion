@@ -1,10 +1,12 @@
 /**
  * D8 / MEMORY_LOOP_CLOSURE M2: facade-decided proposals on the one queue.
  *
- * Background-review patch proposals (`pnpm background-review`) and
- * execution-feedback improvement proposals (`pnpm kyberion improvements`)
- * are `MemoryCandidate` rows with an `origin` naming the facade and the
- * command that decides them. This module is the shared projection between such
+ * Background-review patch proposals (`pnpm background-review`),
+ * execution-feedback improvement proposals (`pnpm kyberion improvements`),
+ * learning-intake reuse plans (`pnpm kyberion learning prepare`), service
+ * procedure candidates and mission-seed reuse proposals (both decided in
+ * Concierge) are `MemoryCandidate` rows with an `origin` naming the facade and
+ * the command that decides them. This module is the shared projection between such
  * a row and the proposal view the facade reasons about (status, metadata,
  * target), so approve / apply / archive act on queue rows and
  * `DistillCandidateRecord` stays a promotion receipt.
@@ -56,10 +58,32 @@ export interface FacadeProposalRecord {
   scope?: MemoryScopeEnvelope;
   /** Set when the row was imported from the read-only legacy record store. */
   migrated_from?: string;
+  project_id?: string;
+  track_id?: string;
+  track_name?: string;
+  specialist_id?: string;
+  work_loop?: Record<string, unknown>;
+  /** Which facade owns the row (`origin.record_kind`); set on projection. */
+  record_kind?: FacadeProposalKind;
+  /** The command or surface that decides the row (`origin.decided_via`). */
+  decided_via?: string;
 }
 
+/** Facade kinds whose rows project into {@link FacadeProposalRecord}. */
+export const FACADE_PROPOSAL_KINDS = [
+  'background_review',
+  'execution_feedback',
+  'learning_intake',
+  'service_procedure',
+  'mission_seed',
+] as const satisfies readonly MemoryCandidateOriginKind[];
+export type FacadeProposalKind = (typeof FACADE_PROPOSAL_KINDS)[number];
+
+/** `origin.decided_via` of rows decided on the Concierge reuse-proposal panel. */
+export const CONCIERGE_DECIDED_VIA = 'concierge';
+
 export interface FacadeProposalSpec {
-  recordKind: Extract<MemoryCandidateOriginKind, 'background_review' | 'execution_feedback'>;
+  recordKind: FacadeProposalKind;
   learningKind: MemoryLearningKind;
   /** The command that decides the row (`origin.decided_via`). */
   decidedVia: string;
@@ -95,7 +119,15 @@ function storageScope(scope: MemoryScopeEnvelope): MemoryScopeEnvelope {
 
 export interface CaptureFacadeProposalInput extends Omit<
   FacadeProposalRecord,
-  'candidate_id' | 'created_at' | 'updated_at' | 'tier' | 'scope' | 'status' | 'migrated_from'
+  | 'candidate_id'
+  | 'created_at'
+  | 'updated_at'
+  | 'tier'
+  | 'scope'
+  | 'status'
+  | 'migrated_from'
+  | 'record_kind'
+  | 'decided_via'
 > {
   candidate_id?: string;
   created_at?: string;
@@ -107,11 +139,11 @@ export interface CaptureFacadeProposalInput extends Omit<
   migratedFrom?: string;
 }
 
-/** Capture one proposal as a queue row with its scope; returns the view. */
-export function captureFacadeProposal(
+/** Build (without persisting) the queue row of one proposal; scope required. */
+export function buildFacadeProposalRow(
   spec: FacadeProposalSpec,
   input: CaptureFacadeProposalInput
-): FacadeProposalRecord {
+): MemoryCandidate {
   if (!input.scope)
     throw new Error(
       `[MEMORY_SCOPE_REQUIRED] ${spec.recordKind} proposal has no scope — pass the mission or session scope at capture`
@@ -150,6 +182,11 @@ export function captureFacadeProposal(
         source_type: input.source_type,
         ...(input.mission_id ? { mission_id: input.mission_id } : {}),
         ...(input.task_session_id ? { task_session_id: input.task_session_id } : {}),
+        ...(input.project_id ? { project_id: input.project_id } : {}),
+        ...(input.track_id ? { track_id: input.track_id } : {}),
+        ...(input.track_name ? { track_name: input.track_name } : {}),
+        ...(input.specialist_id ? { specialist_id: input.specialist_id } : {}),
+        ...(input.work_loop ? { work_loop: input.work_loop } : {}),
         title,
         summary: input.summary,
         target_kind: input.target_kind,
@@ -162,8 +199,18 @@ export function captureFacadeProposal(
       ...(input.migratedFrom ? { migrated_from: input.migratedFrom } : {}),
     },
   };
+  return row;
+}
+
+/** Capture one proposal as a queue row with its scope; returns the view. */
+export function captureFacadeProposal(
+  spec: FacadeProposalSpec,
+  input: CaptureFacadeProposalInput
+): FacadeProposalRecord {
+  const row = buildFacadeProposalRow(spec, input);
   enqueueMemoryPromotionCandidate(row);
-  const stored = loadFacadeProposal(spec, candidateId, scope);
+  const candidateId = row.candidate_id;
+  const stored = loadFacadeProposal(spec, candidateId, row.scope);
   if (!stored)
     throw new Error(`[FACADE_PROPOSAL_PERSISTENCE] ${candidateId} was not found after capture`);
   return stored;
@@ -183,6 +230,13 @@ export function projectFacadeProposal(
   const missionId = attr<string>(attributes, 'mission_id');
   const taskSessionId = attr<string>(attributes, 'task_session_id');
   const locale = attr<string>(attributes, 'locale');
+  const optional = Object.fromEntries(
+    (['project_id', 'track_id', 'track_name', 'specialist_id'] as const).flatMap((key) => {
+      const value = attr<string>(attributes, key);
+      return typeof value === 'string' && value ? [[key, value]] : [];
+    })
+  ) as Pick<FacadeProposalRecord, 'project_id' | 'track_id' | 'track_name' | 'specialist_id'>;
+  const workLoop = attr<Record<string, unknown>>(attributes, 'work_loop');
   return {
     candidate_id: row.candidate_id,
     source_type:
@@ -193,6 +247,8 @@ export function projectFacadeProposal(
     tier: row.sensitivity_tier,
     ...(missionId ? { mission_id: missionId } : {}),
     ...(taskSessionId ? { task_session_id: taskSessionId } : {}),
+    ...optional,
+    ...(workLoop && typeof workLoop === 'object' ? { work_loop: structuredClone(workLoop) } : {}),
     title: attr<string>(attributes, 'title') || row.origin.title || row.candidate_id,
     summary: attr<string>(attributes, 'summary') ?? row.summary,
     status: FROM_QUEUE_STATUS[row.status],
@@ -205,7 +261,16 @@ export function projectFacadeProposal(
     metadata: structuredClone(attr<Record<string, unknown>>(attributes, 'metadata') || {}),
     ...(row.scope ? { scope: row.scope } : {}),
     ...(row.origin.migrated_from ? { migrated_from: row.origin.migrated_from } : {}),
+    record_kind: row.origin.record_kind as FacadeProposalKind,
+    ...(row.origin.decided_via ? { decided_via: row.origin.decided_via } : {}),
   };
+}
+
+/** Project any facade-owned row (every {@link FACADE_PROPOSAL_KINDS} kind); null otherwise. */
+export function projectAnyFacadeProposal(row: MemoryCandidate): FacadeProposalRecord | null {
+  const kind = row.origin?.record_kind;
+  if (!kind || !(FACADE_PROPOSAL_KINDS as readonly string[]).includes(kind)) return null;
+  return projectFacadeProposal({ recordKind: kind as FacadeProposalKind }, row);
 }
 
 /**

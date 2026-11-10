@@ -11,12 +11,15 @@ import {
 } from '../secure-io.js';
 import { assertMemoryScope, type MemoryScopeEnvelope } from './memory-scope.js';
 import {
-  createDistillCandidateRecord,
-  loadDistillCandidateRecord,
-  saveDistillCandidateRecord,
-  updateDistillCandidateRecord,
-  type DistillCandidateRecord,
-} from './distill-candidate-registry.js';
+  buildFacadeProposalRow,
+  captureFacadeProposal,
+  loadFacadeProposal,
+  projectFacadeProposal,
+  updateFacadeProposal,
+  type CaptureFacadeProposalInput,
+  type FacadeProposalRecord,
+} from './facade-proposal-rows.js';
+import { LEARNING_INTAKE_PROPOSAL } from './reuse-proposals.js';
 import {
   createMemoryPromotionCandidate,
   enqueueMemoryPromotionCandidate,
@@ -358,15 +361,20 @@ export function planReusableLearning(input: PrepareReusableLearningInput): Reusa
   };
 }
 
-/** Queue only a review proposal in the existing registry. No promotion or approval is implied. */
+/**
+ * D8: a learning-intake plan is a MemoryCandidate queue row
+ * (`origin.record_kind: learning_intake`, LEARNING_INTAKE_PROPOSAL) with the
+ * plan's own scope, handed to steward review by `--queue`.
+ */
+export type ReusableLearningProposal = FacadeProposalRecord;
+
+/** Queue only a review proposal on the memory queue. No promotion or approval is implied. */
 export function prepareReusableLearning(
   input: PrepareReusableLearningInput,
   options: { dryRun?: boolean } = {}
-): { plan: ReusableLearningPlan; candidate?: DistillCandidateRecord; persisted: boolean } {
+): { plan: ReusableLearningPlan; candidate?: ReusableLearningProposal; persisted: boolean } {
   const plan = planReusableLearning(input);
   if (plan.decision === 'no_change') return { plan, persisted: false };
-  const storageScope =
-    plan.scope.tier === 'public' && !plan.scope.tenant_slug ? undefined : plan.scope;
   const id = `DSC-LEARN-${digest(
     JSON.stringify({
       digest: plan.source_sha256,
@@ -381,17 +389,18 @@ export function prepareReusableLearning(
     })
   ).slice(0, 24)}`;
   plan.next_steps.push(`pnpm kyberion learning prepare --queue --candidate ${id}`);
-  const existing = options.dryRun ? null : loadDistillCandidateRecord(id, storageScope);
+  const existing = options.dryRun
+    ? null
+    : loadFacadeProposal(LEARNING_INTAKE_PROPOSAL, id, plan.scope);
   if (existing) return { plan, candidate: existing, persisted: true };
-  const candidate = createDistillCandidateRecord({
+  const capture: CaptureFacadeProposalInput = {
     candidate_id: id,
     source_type: plan.scope.mission_id ? 'mission' : 'artifact',
-    tier: plan.scope.tier,
-    ...(storageScope ? { scope: storageScope } : {}),
+    scope: plan.scope,
     ...(plan.scope.mission_id ? { mission_id: plan.scope.mission_id } : {}),
     title: input.title.trim(),
     summary: `${input.intent.trim()}\n\n${plan.reason}`,
-    status: 'proposed',
+    proposedMemoryKind: 'sop',
     target_kind:
       plan.destination === 'procedure'
         ? 'procedure'
@@ -401,12 +410,22 @@ export function prepareReusableLearning(
     evidence_refs: [plan.source_ref],
     metadata: {
       origin: 'learning_intake',
-      learning_plan: plan,
+      learning_plan: plan as unknown as Record<string, unknown>,
       maintenance: { automatic_archive: false },
     },
-  });
-  if (!options.dryRun) saveDistillCandidateRecord(candidate);
-  return { plan, candidate, persisted: !options.dryRun };
+  };
+  if (options.dryRun) {
+    const preview = projectFacadeProposal(
+      LEARNING_INTAKE_PROPOSAL,
+      buildFacadeProposalRow(LEARNING_INTAKE_PROPOSAL, capture)
+    );
+    return { plan, ...(preview ? { candidate: preview } : {}), persisted: false };
+  }
+  return {
+    plan,
+    candidate: captureFacadeProposal(LEARNING_INTAKE_PROPOSAL, capture),
+    persisted: true,
+  };
 }
 
 /** Explicit handoff to the existing steward review queue. This is not approval. */
@@ -423,7 +442,7 @@ export function queueReusableLearning(
   )
     throw new Error('[LEARNING_SOURCE_SCOPE] Unknown scope fields cannot be dropped');
   const scope = canonical.tier === 'public' && !canonical.tenant_slug ? undefined : canonical;
-  const row = loadDistillCandidateRecord(candidateId, scope);
+  const row = loadFacadeProposal(LEARNING_INTAKE_PROPOSAL, candidateId, canonical);
   if (!row || row.metadata?.origin !== 'learning_intake' || row.status !== 'proposed')
     throw new Error(
       '[LEARNING_LINK_INVALID] Proposed learning intake not found in this exact scope'
@@ -465,7 +484,8 @@ export function queueReusableLearning(
     const queued = loadMemoryPromotionCandidate(queueId, scope);
     if (!queued || queued.source_ref !== sourceRef)
       throw new Error('[LEARNING_LINK_INVALID] Review queue persistence failed');
-    updateDistillCandidateRecord(
+    updateFacadeProposal(
+      LEARNING_INTAKE_PROPOSAL,
       candidateId,
       {
         metadata: {
@@ -473,7 +493,7 @@ export function queueReusableLearning(
           learning_link: { candidate_id: queueId, source_ref: sourceRef },
         },
       },
-      scope
+      { scope: canonical }
     );
   }
   return {

@@ -18,9 +18,11 @@ vi.mock('@agent/core/mission/mission-state', () => ({ loadState: mocks.mission }
 import {
   distillCandidateVisibleToViewer,
   listDistillCandidatesForViewer,
+  listReuseProposalsForViewer,
   resolveDistillCandidateForViewer,
   DistillCandidateAmbiguityError,
 } from './distill-candidate-scope';
+import { buildFacadeProposalRow } from '@agent/core/knowledge/facade-proposal-rows';
 
 const scope = {
   tier: 'confidential' as const,
@@ -203,5 +205,55 @@ describe('selected tenant duplicate identity', () => {
     );
     expect(resolveDistillCandidateForViewer(acme.candidate_id, all, 'acme')).toBe(acme);
     expect(() => resolveDistillCandidateForViewer(acme.candidate_id, viewer(), 'beta')).toThrow();
+  });
+});
+
+describe('reuse proposals on the queue (D8)', () => {
+  const capture = (id: string, rowScope: Record<string, unknown>, via = 'concierge') =>
+    buildFacadeProposalRow(
+      {
+        recordKind: via === 'concierge' ? 'mission_seed' : 'background_review',
+        learningKind: 'lesson',
+        decidedVia: via,
+        idPrefix: 'DSC',
+      },
+      {
+        candidate_id: id,
+        source_type: 'mission',
+        title: `title ${id}`,
+        summary: `summary ${id}`,
+        target_kind: 'sop_candidate',
+        evidence_refs: [`mission:${id}`],
+        metadata: {},
+        proposedMemoryKind: 'sop',
+        scope: rowScope as never,
+        project_id: 'proj-a',
+      }
+    );
+
+  it('lists only queue rows the server-resolved viewer may read, with their decider', () => {
+    const rows = [
+      capture('DSC-MINE', scope),
+      capture('DSC-OTHER-TENANT', { ...scope, tenant_slug: 'globex' }),
+      capture('DSC-OWNER', { tier: 'personal', owner_nhi: 'user:reviewer' }),
+      capture('DSC-BR', scope, 'pnpm background-review'),
+    ];
+    const listed = listReuseProposalsForViewer(viewer(), undefined, rows);
+    expect(listed.map((row) => [row.candidate_id, row.decided_via, row.project_id])).toEqual(
+      expect.arrayContaining([
+        ['DSC-MINE', 'concierge', 'proj-a'],
+        ['DSC-BR', 'pnpm background-review', 'proj-a'],
+      ])
+    );
+    expect(listed).toHaveLength(2);
+    // A client tenant parameter only narrows; it never admits another tenant.
+    expect(() => listReuseProposalsForViewer(viewer(), 'globex', rows)).toThrow(
+      'tenant scope denied'
+    );
+    expect(
+      listReuseProposalsForViewer(viewer({ tenantSlugs: 'all' }), 'globex', rows).map(
+        (row) => row.candidate_id
+      )
+    ).toEqual(['DSC-OTHER-TENANT']);
   });
 });
