@@ -22,10 +22,11 @@
  * front-desk-nav.ts / front-desk-identity.ts: this module must stay free of
  * any node:fs-touching import so it can be pulled into a client bundle.
  */
+import type { MemberRole } from '../organization/member-registry.js';
 import type { ChronosAccessRole } from '../authn/chronos-access-registry.js';
 import type { SurfacePermission } from './surface-authorization.js';
 
-export type FrontDeskHumanRole = 'owner' | 'approver' | 'operator' | 'viewer';
+export type FrontDeskHumanRole = MemberRole;
 
 export interface FrontDeskRoleAuthority {
   /** The server-side role this human role executes as. */

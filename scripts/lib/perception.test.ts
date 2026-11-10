@@ -24,7 +24,7 @@ vi.mock('@agent/core/governance/audit-chain', () => ({
 const ENV_KEYS = [
   'KYBERION_TENANT',
   'KYBERION_TIER',
-  'KYBERION_PERSONA',
+  'KYBERION_BASE_ROLE',
   'MISSION_ROLE',
   'SYSTEM_ROLE',
   'MISSION_ID',

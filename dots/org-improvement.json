@@ -1,0 +1,91 @@
+{
+  "$schema": "../knowledge/product/schemas/dot-charter.schema.json",
+  "kind": "dot-charter",
+  "dot_id": "org-improvement",
+  "version": "1.0.0",
+  "title": "Organization Improvement Scout",
+  "purpose": "組織目的(Purpose+OKR)とのギャップを能動的に発見する。improvement-scan レポートと outcome 停滞を読み、改善仮説を優先度付きで起票・提案する。実行は行わない — 発見と提案に専念し、実行権は dispatch ゲートと人間承認が握る。",
+  "status": "draft",
+  "scope": {
+    "tier": "confidential",
+    "tenant_slug": "kyberion-service-studio",
+    "organization_id": "kyberion-development-team"
+  },
+  "goal": {
+    "statement": "組織の objectives に対するギャップ(未測定KR・停滞・コスト増・非改善ストリーク)を週次で棚卸し、測定可能な改善仮説を ranked backlog として提示する。",
+    "success_signals": [
+      "全 objectives の KR が測定済み(unmeasured_krs = 0)",
+      "unknown_cost_calls が 0 (コスト評価が完全)",
+      "非改善ストリークが週次で解消方向にある"
+    ],
+    "key_results": [
+      {
+        "kr_id": "measurement_coverage",
+        "title": "KR 測定カバレッジ",
+        "metric": { "source": "org_metric", "metric": "unknown_cost_calls", "window_days": 7 },
+        "target": 0,
+        "direction": "decrease",
+        "unit": "calls",
+        "every_s": 86400
+      },
+      {
+        "kr_id": "weekly_cost",
+        "title": "週次コスト観測",
+        "metric": { "source": "org_metric", "metric": "cost_usd", "window_days": 7 },
+        "target": 100,
+        "direction": "maintain",
+        "unit": "USD",
+        "every_s": 86400
+      }
+    ],
+    "budget": {
+      "max_turns_per_wake": 5,
+      "wall_clock_ms_per_wake": 600000,
+      "token_cap_per_day": 100000
+    }
+  },
+  "attention": {
+    "triggers": [
+      {
+        "kind": "cron",
+        "cron": "0 10 * * 1",
+        "timezone": "Asia/Tokyo"
+      },
+      {
+        "kind": "wake",
+        "channels": ["inbox"]
+      }
+    ]
+  },
+  "authority": {
+    "authority_role": "organization_operator",
+    "allowed_work_shapes": ["direct_reply", "pipeline"],
+    "allowed_pipelines": ["pipelines/organization-improvement-scan.json"]
+  },
+  "decisions": {
+    "default_decision": "approve",
+    "veto_window_minutes": 120,
+    "escalate_channel": "slack"
+  },
+  "notification": {
+    "deliver_to": {
+      "surface": "slack",
+      "channel": "kyberion-executive"
+    },
+    "digest_cron": "0 10 * * 1",
+    "quiet_hours": {
+      "start": "22:00",
+      "end": "08:00",
+      "timezone": "Asia/Tokyo"
+    }
+  },
+  "team": {
+    "responsibilities": ["organization.improvement-scan"],
+    "accepts_handoffs_from": ["org-operations"],
+    "goal_ref": "Kyberion runs its own operations autonomously and safely"
+  },
+  "runtime": {
+    "heartbeat_id": "dot-org-improvement",
+    "max_idle_wake_ms": 604800000
+  }
+}

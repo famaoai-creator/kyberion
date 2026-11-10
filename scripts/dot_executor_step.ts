@@ -345,11 +345,11 @@ export function buildDotExecutorPorts(
     // The driver has goal-control tools only here: no discovered work tools or
     // executeTool port, so a claimed "complete" cannot prove task execution —
     // task sessions run advisory reasoning turns bounded by the goalTurn
-    // budget/turn caps. Enabled per-charter via authority.allowed_work_shapes:
+    // budget/turn caps. Enabled per-charter via authority.allowed_execution_shapes:
     // a charter that declares task_session opts into the bounded goalTurn
     // session; charters without it keep the governed-unavailable refusal.
     taskSessionUnavailable:
-      resolved && charter.authority.allowed_work_shapes?.includes('task_session')
+      resolved && charter.authority.allowed_execution_shapes?.includes('task_session')
         ? undefined
         : DOT_EXECUTOR_TASK_SESSION_GUIDANCE,
     goalMode: () => goalModeOf(resolution),

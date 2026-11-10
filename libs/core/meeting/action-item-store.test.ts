@@ -23,10 +23,10 @@ describe('action-item-store', () => {
   let savedMission: string | undefined;
 
   beforeEach(() => {
-    savedPersona = process.env.KYBERION_PERSONA;
+    savedPersona = process.env.KYBERION_BASE_ROLE;
     savedRole = process.env.MISSION_ROLE;
     savedMission = process.env.MISSION_ID;
-    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     process.env.MISSION_ROLE = 'mission_controller';
     process.env.MISSION_ID = FIX_MISSION;
     fs.mkdirSync(path.join(MISSION_DIR, 'evidence'), { recursive: true });
@@ -35,14 +35,14 @@ describe('action-item-store', () => {
       JSON.stringify({
         mission_id: FIX_MISSION,
         tier: 'confidential',
-        assigned_persona: 'ecosystem_architect',
+        org_role: 'ecosystem_architect',
       })
     );
   });
 
   afterEach(() => {
-    if (savedPersona === undefined) delete process.env.KYBERION_PERSONA;
-    else process.env.KYBERION_PERSONA = savedPersona;
+    if (savedPersona === undefined) delete process.env.KYBERION_BASE_ROLE;
+    else process.env.KYBERION_BASE_ROLE = savedPersona;
     if (savedRole === undefined) delete process.env.MISSION_ROLE;
     else process.env.MISSION_ROLE = savedRole;
     if (savedMission === undefined) delete process.env.MISSION_ID;

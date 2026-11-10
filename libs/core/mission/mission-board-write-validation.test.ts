@@ -34,9 +34,9 @@ let previousPersona: string | undefined;
 
 beforeEach(() => {
   previousMissionRole = process.env.MISSION_ROLE;
-  previousPersona = process.env.KYBERION_PERSONA;
+  previousPersona = process.env.KYBERION_BASE_ROLE;
   process.env.MISSION_ROLE = 'mission_controller';
-  process.env.KYBERION_PERSONA = 'board-validation-test-actor';
+  process.env.KYBERION_BASE_ROLE = 'board-validation-test-actor';
   safeRmSync(missionPath, { recursive: true, force: true });
   safeMkdir(missionPath, { recursive: true });
 });
@@ -45,8 +45,8 @@ afterEach(() => {
   safeRmSync(missionPath, { recursive: true, force: true });
   if (previousMissionRole === undefined) delete process.env.MISSION_ROLE;
   else process.env.MISSION_ROLE = previousMissionRole;
-  if (previousPersona === undefined) delete process.env.KYBERION_PERSONA;
-  else process.env.KYBERION_PERSONA = previousPersona;
+  if (previousPersona === undefined) delete process.env.KYBERION_BASE_ROLE;
+  else process.env.KYBERION_BASE_ROLE = previousPersona;
 });
 
 describe('blueprint validation at the NEXT_TASKS write boundary', () => {

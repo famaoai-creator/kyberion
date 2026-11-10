@@ -377,7 +377,7 @@ describe('organization digest', () => {
       safeSymlinkSync(outsideDir, path.join(operationsDir, 'linked'), 'dir');
 
       const run = runOrganizationDigest({
-        env: { KYBERION_PERSONA: 'sovereign' },
+        env: { KYBERION_BASE_ROLE: 'sovereign' },
         rootDir,
         tiers: ['public'],
         now: NOW,
@@ -414,8 +414,8 @@ describe('organization digest', () => {
   });
 
   it('gates on the execution-scope persona, not the process env (B2)', async () => {
-    const saved = process.env.KYBERION_PERSONA;
-    process.env.KYBERION_PERSONA = 'sovereign';
+    const saved = process.env.KYBERION_BASE_ROLE;
+    process.env.KYBERION_BASE_ROLE = 'sovereign';
     try {
       await expect(
         withExecutionContextAsync(
@@ -423,17 +423,17 @@ describe('organization digest', () => {
           async () => runOrganizationDigest(),
           'worker'
         )
-      ).rejects.toThrow(/requires KYBERION_PERSONA=sovereign \(got worker\)/);
+      ).rejects.toThrow(/requires KYBERION_BASE_ROLE=sovereign \(got worker\)/);
     } finally {
-      if (saved === undefined) delete process.env.KYBERION_PERSONA;
-      else process.env.KYBERION_PERSONA = saved;
+      if (saved === undefined) delete process.env.KYBERION_BASE_ROLE;
+      else process.env.KYBERION_BASE_ROLE = saved;
     }
   });
 
   it('refuses cross-tenant aggregation without the sovereign persona', () => {
     expect(() =>
-      runOrganizationDigest({ env: { KYBERION_PERSONA: 'ecosystem_architect' } })
-    ).toThrow(/requires KYBERION_PERSONA=sovereign/);
+      runOrganizationDigest({ env: { KYBERION_BASE_ROLE: 'ecosystem_architect' } })
+    ).toThrow(/requires KYBERION_BASE_ROLE=sovereign/);
     expect(() => runOrganizationDigest({ env: {} })).toThrow(/got unset/);
   });
 });

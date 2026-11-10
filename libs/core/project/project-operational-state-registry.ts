@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import * as path from 'node:path';
 import { defineCatalog, type GovernedCatalog } from '../foundation/governed-catalog.js';
 import { nowIso } from '../foundation/time.js';
@@ -56,7 +57,7 @@ export interface ProjectOperationalState {
   name: string;
   summary: string;
   status: 'draft' | 'active' | 'paused' | 'archived';
-  tier: 'personal' | 'confidential' | 'public';
+  tier: StorageDataTier;
   tenant_slug?: string;
   project_path?: string;
   current_phase?:
@@ -75,7 +76,7 @@ export interface ProjectOperationalState {
 
 export interface ProjectOperationalStateQuery {
   projectId?: string;
-  tier?: 'personal' | 'confidential' | 'public';
+  tier?: StorageDataTier;
   tenantSlug?: string;
   rootDir?: string;
 }
@@ -83,7 +84,7 @@ export interface ProjectOperationalStateQuery {
 export interface ProjectOperationalStateMissionContext {
   mission_id: string;
   mission_type?: string;
-  tier: 'personal' | 'confidential' | 'public';
+  tier: StorageDataTier;
   status: string;
   tenant_slug?: string;
   tenant_id?: string;
@@ -107,7 +108,7 @@ export interface ProjectOperationalStateMissionContext {
       note?: string;
     };
   };
-  assigned_persona?: string;
+  org_role?: string;
   context?: {
     last_action?: string;
     next_step?: string;
@@ -686,7 +687,7 @@ export function syncProjectOperationalStateFromMission(
       last_mission_id: input.mission_id,
       last_mission_status: input.status,
       last_mission_type: input.mission_type,
-      last_assigned_persona: input.assigned_persona,
+      last_org_role: input.org_role,
     },
   };
 

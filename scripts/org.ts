@@ -10,6 +10,10 @@ import { safeExistsSync, safeMkdir, safeReaddir, safeWriteFile } from '@agent/co
 import { defineCatalog, nowIso, writeJson, type GovernedCatalog } from '@agent/core/foundation';
 import { withExecutionContext } from '@agent/core/governance';
 import {
+  loadAuthorityRoleCards,
+  type AuthorityRoleCard,
+} from '@agent/core/organization/authority-role-registry';
+import {
   draftRoleFromIntent,
   loadRoleDraftInventory,
   type ActuatorConnectionProbe,
@@ -26,13 +30,13 @@ import {
 
 type Print = (value: unknown) => void;
 
-type Persona =
+type BaseRole =
   'sovereign' | 'ecosystem_architect' | 'mission_owner' | 'worker' | 'analyst' | 'unknown';
 type AutonomyLevel = 'low' | 'medium' | 'high';
 
 type AuthorityRoleRecord = {
   description: string;
-  default_persona?: Persona;
+  default_persona?: BaseRole;
   write_scopes: string[];
   scope_classes: string[];
   allowed_actuators: string[];
@@ -56,7 +60,7 @@ type TeamRoleRecord = {
 
 type RoleAuthorityEntry = {
   role: string;
-  persona: Persona;
+  persona: BaseRole;
   execution_mode?: string;
   authority_role?: string;
 };
@@ -65,7 +69,6 @@ type SecurityPolicy = {
   version?: string;
   default_allow?: string[];
   tier_restrictions?: Record<string, unknown>;
-  persona_permissions?: Record<string, { allow_read?: string[]; allow_write?: string[] }>;
   authority_role_permissions?: Record<string, { allow_read?: string[]; allow_write?: string[] }>;
   [key: string]: unknown;
 };
@@ -102,7 +105,7 @@ type OrgRoleCreateOptions = {
   name: string;
   domain: string;
   authorityRoleId: string;
-  persona: Persona;
+  persona: BaseRole;
   description?: string;
   ownershipScope?: string;
   requiredCapabilities: string[];
@@ -123,7 +126,7 @@ type OrgRoleCreateOptions = {
 type OrgRolePromoteOptions = {
   roleId: string;
   authorityRoleId: string;
-  persona: Persona;
+  persona: BaseRole;
   description?: string;
   writeScopes: string[];
   scopeClasses: string[];
@@ -150,14 +153,14 @@ type OrgCommand =
   | { kind: 'role-draft'; options: RoleDraftCliOptions }
   | { kind: 'help' };
 
-const DEFAULT_PERSONA: Persona = 'analyst';
+const DEFAULT_PERSONA: BaseRole = 'analyst';
 const DEFAULT_SELECTION_AGENTS = ['nerve-agent'];
 const DEFAULT_SELECTION_MODELS = ['auto-gemini-3'];
 
 const DOMAIN_TEMPLATES: Record<
   string,
   {
-    persona: Persona;
+    persona: BaseRole;
     requiredCapabilities: string[];
     scopeClasses: string[];
     allowedActuators: string[];
@@ -456,10 +459,10 @@ function resolveDomainTemplate(domain: string) {
   return DOMAIN_TEMPLATES[domain.toLowerCase()] || DOMAIN_TEMPLATES.default;
 }
 
-function resolvePersona(inputPersona: string | undefined, fallback: Persona): Persona {
+function resolvePersona(inputPersona: string | undefined, fallback: BaseRole): BaseRole {
   if (!inputPersona) return fallback;
-  const normalized = inputPersona.trim().toLowerCase().replace(/\s+/g, '_') as Persona;
-  const allowed: Persona[] = [
+  const normalized = inputPersona.trim().toLowerCase().replace(/\s+/g, '_') as BaseRole;
+  const allowed: BaseRole[] = [
     'sovereign',
     'ecosystem_architect',
     'mission_owner',
@@ -579,7 +582,7 @@ function resolveRoleAuthorityEntry(
 function resolvePromotionRoleAuthorityEntry(
   roleId: string,
   authorityRoleId: string,
-  persona: Persona
+  persona: BaseRole
 ): RoleAuthorityEntry {
   return {
     role: roleId,
@@ -622,7 +625,7 @@ status: active
 You are the governed role for ${toTitleCase(input.name)} work in the ${input.domain} domain.
 
 - **Authority Role**: \`${authorityRoleId}\`
-- **Default Persona**: \`${authorityRole.default_persona || DEFAULT_PERSONA}\`
+- **Default BaseRole**: \`${authorityRole.default_persona || DEFAULT_PERSONA}\`
 - **Team Role**: \`${input.teamRoleId}\`
 - **Primary Write Scopes**:
 ${writeScopeList || '- (none configured)'}
@@ -662,7 +665,7 @@ Deliver governed ${input.domain} outcomes with the minimum authority required.
 ## 2. Authority Boundaries
 - Runtime authority role: \`${authorityRoleId}\`
 - Role identity: \`${input.teamRoleId}\`
-- Persona: \`${input.persona}\`
+- BaseRole: \`${input.persona}\`
 
 ## 3. Core Capabilities
 ${input.requiredCapabilities.map((capability) => `- ${capability}`).join('\n')}
@@ -687,7 +690,7 @@ function loadAuthorityRoleDirectory(rootDir: string): Record<string, AuthorityRo
 /**
  * Every role id that any store `role create` writes already holds: team and
  * authority roles, the role-authority map (role and authority_role values),
- * role-write-access, security-policy authority permissions, and role docs.
+ * role-write-access, security-policy authority permissions and store grants, and role docs.
  * A new role must not take one of these ids — the create would merge into
  * or overwrite that role's records.
  */
@@ -704,9 +707,14 @@ export function collectExistingRoleIds(rootDir: string): Set<string> {
     }
   }
   for (const role of Object.keys(loadRoleWriteAccess(rootDir).roles || {})) ids.add(role);
-  for (const role of Object.keys(loadSecurityPolicy(rootDir).authority_role_permissions || {})) {
+  const policy = loadSecurityPolicy(rootDir);
+  for (const role of Object.keys(policy.authority_role_permissions || {})) {
     ids.add(role);
   }
+  // S4: a declared store grant's name is never taken by a new role.
+  const storeGrants = policy.store_grants;
+  if (storeGrants && typeof storeGrants === 'object' && !Array.isArray(storeGrants))
+    for (const name of Object.keys(storeGrants)) ids.add(name);
   const docsDir = path.join(rootDir, 'knowledge', 'product', 'roles');
   if (safeExistsSync(docsDir)) {
     for (const entry of safeReaddir(docsDir)) {
@@ -716,14 +724,33 @@ export function collectExistingRoleIds(rootDir: string): Set<string> {
   return ids;
 }
 
+function existingAuthorityRoleCard(rootDir: string, roleId: string): AuthorityRoleCard | undefined {
+  const directory = path.join(rootDir, 'knowledge', 'product', 'governance', 'authority-roles');
+  const hasDirectoryEntries =
+    safeExistsSync(directory) && safeReaddir(directory).some((entry) => entry.endsWith('.json'));
+  return hasDirectoryEntries ? (loadAuthorityRoleCards(rootDir) ?? {})[roleId] : undefined;
+}
+
+/**
+ * Writes the role's card in the one Authority Role registry (concept model
+ * v2 D6). The card's `permissions` are kept: they change only through
+ * {@link upsertSecurityPolicy}. Writing a profile makes a process role
+ * assignable, as creating its card did before the registries merged; both
+ * callers run behind the authenticated human approval.
+ */
 function writeAuthorityRoleBundle(
   rootDir: string,
   roleId: string,
   record: AuthorityRoleRecord
 ): void {
+  const existing = existingAuthorityRoleCard(rootDir, roleId);
   const directory = path.join(rootDir, 'knowledge', 'product', 'governance', 'authority-roles');
   safeMkdir(directory, { recursive: true });
-  writeJson(path.join(directory, `${roleId}.json`), { role: roleId, ...record });
+  writeJson(path.join(directory, `${roleId}.json`), {
+    role: roleId,
+    ...record,
+    ...(existing?.permissions ? { permissions: existing.permissions } : {}),
+  });
 }
 
 function syncAuthorityRoleSnapshot(
@@ -884,11 +911,27 @@ function upsertSecurityPolicy(
   assertSecurityPolicyApproval(approvalId);
   const filePath = path.join(rootDir, 'knowledge', 'product', 'governance', 'security-policy.json');
   const policy = loadSecurityPolicy(rootDir);
-  policy.authority_role_permissions = policy.authority_role_permissions || {};
-  policy.authority_role_permissions[authorityRoleId] = {
+  const permissions = {
     allow_read: [...record.write_scopes],
     allow_write: [...record.write_scopes],
   };
+  // The card is the registry; security-policy.json carries its generated
+  // projection. Both are written here so the drift gate stays green.
+  const cardPath = path.join(
+    rootDir,
+    'knowledge',
+    'product',
+    'governance',
+    'authority-roles',
+    `${authorityRoleId}.json`
+  );
+  const card = existingAuthorityRoleCard(rootDir, authorityRoleId) ?? {
+    role: authorityRoleId,
+    ...record,
+  };
+  writeJson(cardPath, { ...card, permissions });
+  policy.authority_role_permissions = policy.authority_role_permissions || {};
+  policy.authority_role_permissions[authorityRoleId] = permissions;
   writeJson(filePath, policy);
   resetOrgCatalog(filePath);
 }
@@ -1320,7 +1363,7 @@ export async function main(
             authorityRoleId: normalizeRoleId(
               String(command.options.authorityRoleId || command.options.name)
             ),
-            persona: (command.options.persona as Persona) || DEFAULT_PERSONA,
+            persona: (command.options.persona as BaseRole) || DEFAULT_PERSONA,
             description: command.options.description,
             ownershipScope: command.options.ownershipScope,
             requiredCapabilities: (command.options.requiredCapabilities as string[]) || [],
@@ -1340,7 +1383,7 @@ export async function main(
           promoteRoleBundle(rootDir, {
             roleId: command.options.roleId,
             authorityRoleId: command.options.authorityRoleId,
-            persona: (command.options.persona as Persona) || DEFAULT_PERSONA,
+            persona: (command.options.persona as BaseRole) || DEFAULT_PERSONA,
             description: command.options.description,
             writeScopes: (command.options.writeScopes as string[]) || [],
             scopeClasses: (command.options.scopeClasses as string[]) || [],

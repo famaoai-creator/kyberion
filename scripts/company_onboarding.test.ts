@@ -41,7 +41,7 @@ describe('AI company onboarding', () => {
     expect(result.status).toBe('planned');
     expect(result.writtenFiles).toHaveLength(0);
     expect(result.nextCommands).toContain('pnpm kyberion setup report --persona first-time-user');
-    expect(result.nextCommands).toContain('export KYBERION_PERSONA=sovereign');
+    expect(result.nextCommands).toContain('export KYBERION_BASE_ROLE=sovereign');
     expect(result.nextCommands).toContain('export KYBERION_TENANT=<registered-tenant>');
     expect(result.nextCommands).toContain(
       'pnpm onboarding:context first-work --customer-slug acme-ai --intent "Define the first customer outcome and launch plan" --dry-run --json'
@@ -53,7 +53,7 @@ describe('AI company onboarding', () => {
       'pnpm onboarding:context bind --customer-slug acme-ai --tenant-slug <registered-tenant> --organization-id <organization> --apply --json'
     );
     expect(result.nextCommands.join('\n')).toContain(
-      '--nhi-id kyberion://agent/acme-ai/ceo-operator'
+      '--nhi-id kyberion://agent/acme-ai/acme-ai/ceo-operator'
     );
     expect(result.nextCommands.join('\n')).toContain('pnpm tenant:activation probe');
     expect(result.nextCommands.join('\n')).not.toContain('pnpm mission --start');
@@ -71,9 +71,12 @@ describe('AI company onboarding', () => {
     });
     expect(result.status).toBe('ready');
     const profile = JSON.parse(
-      safeReadFile(`${rootDir}/knowledge/confidential/acme-ai/organization-profile.json`, {
-        encoding: 'utf8',
-      }) as string
+      safeReadFile(
+        `${rootDir}/knowledge/confidential/acme-ai/organizations/acme-ai/organization-profile.json`,
+        {
+          encoding: 'utf8',
+        }
+      ) as string
     );
     expect(profile.accountable_human_resource_id).toBe('human:founder');
     expect(profile.workforce.default_budget_posture).toBe('block');
@@ -111,7 +114,9 @@ describe('AI company onboarding', () => {
       })
     ).toThrow("Tenant 'acme-prod' already belongs to 'Another Company'");
     expect(
-      safeExistsSync(`${rootDir}/knowledge/confidential/acme-prod/organization-profile.json`)
+      safeExistsSync(
+        `${rootDir}/knowledge/confidential/acme-prod/organizations/acme-ai/organization-profile.json`
+      )
     ).toBe(false);
     expect(
       safeExistsSync(
@@ -139,9 +144,9 @@ describe('AI company onboarding', () => {
     );
     // The declared AI worker's NHI id is returned for tenant activation (the
     // ledger write itself is refused on the shared journal under vitest).
-    expect(result.workerNhiId).toBe('kyberion://agent/acme-ai/ceo-operator');
+    expect(result.workerNhiId).toBe('kyberion://agent/acme-prod/acme-ai/ceo-operator');
     expect(result.nextCommands.join('\n')).toContain(
-      'pnpm tenant:activation probe --customer-slug acme-ai --tenant-slug acme-prod --organization-id acme-ai --nhi-id kyberion://agent/acme-ai/ceo-operator'
+      'pnpm tenant:activation probe --customer-slug acme-ai --tenant-slug acme-prod --organization-id acme-ai --nhi-id kyberion://agent/acme-prod/acme-ai/ceo-operator'
     );
     const tenant = JSON.parse(readTextFile(`${rootDir}/knowledge/personal/tenants/acme-prod.json`));
     expect(tenant.isolation_policy).toEqual({

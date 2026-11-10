@@ -98,7 +98,7 @@ function writeMissionState(tier: 'public' | 'confidential' | undefined, tenantSl
         status: 'distilling',
         execution_mode: 'local',
         priority: 1,
-        assigned_persona: 'worker',
+        org_role: 'worker',
         confidence_score: 1,
         git: { branch: 'test', start_commit: 'abc123', latest_commit: 'abc123', checkpoints: [] },
         history: [{ ts: '2026-10-08T00:00:00.000Z', event: 'VERIFY', note: 'ready' }],
@@ -109,16 +109,16 @@ function writeMissionState(tier: 'public' | 'confidential' | undefined, tenantSl
 
 async function runDistill(): Promise<void> {
   const previousRole = process.env.MISSION_ROLE;
-  const previousPersona = process.env.KYBERION_PERSONA;
+  const previousPersona = process.env.KYBERION_BASE_ROLE;
   process.env.MISSION_ROLE = 'ecosystem_architect';
-  process.env.KYBERION_PERSONA = 'ecosystem_architect';
+  process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
   try {
     await distillMission(MISSION_ID, pathResolver.rootDir());
   } finally {
     if (previousRole === undefined) delete process.env.MISSION_ROLE;
     else process.env.MISSION_ROLE = previousRole;
-    if (previousPersona === undefined) delete process.env.KYBERION_PERSONA;
-    else process.env.KYBERION_PERSONA = previousPersona;
+    if (previousPersona === undefined) delete process.env.KYBERION_BASE_ROLE;
+    else process.env.KYBERION_BASE_ROLE = previousPersona;
   }
 }
 

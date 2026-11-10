@@ -64,7 +64,15 @@ function isInternalCodeSpecifier(specifier: string): boolean {
   return !last.includes('.') || CODE_EXTENSION.test(last);
 }
 
-const ASSUMPTION_FUNCTIONS = new Set(['withExecutionContext', 'withExecutionContextAsync']);
+// S4: a declared store grant is issued under the same RA-02 rule as a role assumption
+// (authority.ts withStoreGrant / withStoreGrantAsync; the name is argument 0), so its call
+// sites count as assumption sites of the grant's issuance right.
+const ASSUMPTION_FUNCTIONS = new Set([
+  'withExecutionContext',
+  'withExecutionContextAsync',
+  'withStoreGrant',
+  'withStoreGrantAsync',
+]);
 const AUTHORITY_FILE = 'libs/core/authority.ts';
 
 /**

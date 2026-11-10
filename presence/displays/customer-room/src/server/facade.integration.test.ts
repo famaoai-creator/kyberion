@@ -536,7 +536,7 @@ describe('customer-room facade child env', () => {
     const keys = [
       'SYSTEM_ROLE',
       'MISSION_ROLE',
-      'KYBERION_PERSONA',
+      'KYBERION_BASE_ROLE',
       'KYBERION_SUDO',
       'KYBERION_DELEGATED_ROLE',
       'CD_ROOM_SECRET_TEST',
@@ -544,7 +544,7 @@ describe('customer-room facade child env', () => {
     const saved = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
     process.env.SYSTEM_ROLE = 'customer_room';
     process.env.MISSION_ROLE = 'mission_controller';
-    process.env.KYBERION_PERSONA = 'sovereign';
+    process.env.KYBERION_BASE_ROLE = 'sovereign';
     process.env.KYBERION_SUDO = 'true';
     process.env.KYBERION_DELEGATED_ROLE = 'mission_controller@customer_room';
     process.env.CD_ROOM_SECRET_TEST = 'do-not-leak';

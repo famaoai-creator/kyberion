@@ -1,6 +1,20 @@
 import { afterEach, describe, it, expect, vi } from 'vitest';
 
 const existingPaths = new Set<string>();
+const stanceWarn = vi.hoisted(() => vi.fn());
+vi.mock('../logger.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../logger.js')>();
+  return {
+    ...actual,
+    createLogger: (name: string, ...rest: unknown[]) => {
+      const created = (actual.createLogger as (...args: unknown[]) => Record<string, unknown>)(
+        name,
+        ...rest
+      );
+      return name === 'stance-resolver' ? { ...created, warn: stanceWarn } : created;
+    },
+  };
+});
 vi.mock('../fs-primitives.js', () => ({
   rawExistsSync: (p: string) => existingPaths.has(p),
   // assertSafeRepositoryPath lstats every path segment to reject symlink
@@ -156,15 +170,41 @@ describe('stance-resolver', () => {
   });
 });
 
-describe('stance-resolver deprecated env name', () => {
-  it('reads KYBERION_CUSTOMER only when KYBERION_STANCE is unset', async () => {
+describe('stance-resolver retired KYBERION_CUSTOMER', () => {
+  afterEach(() => {
+    existingPaths.clear();
+    vi.restoreAllMocks();
+  });
+
+  it('maps KYBERION_CUSTOMER to an existing stance directory, once, with a diagnostic warning', async () => {
     const { activeStance, __test__ } = await import('./stance-resolver.js');
     __test__.resetLegacyEnvWarning();
-    expect(activeStance({ KYBERION_CUSTOMER: 'legacy' })).toBe('legacy');
-    expect(activeStance({ KYBERION_STANCE: 'current', KYBERION_CUSTOMER: 'legacy' })).toBe(
+    stanceWarn.mockClear();
+    const root = '/repo';
+    existingPaths.add('/repo/knowledge/personal/stances/legacy');
+
+    expect(activeStance({ KYBERION_CUSTOMER: 'legacy' }, root)).toBe('legacy');
+    expect(activeStance({ KYBERION_CUSTOMER: 'legacy' }, root)).toBe('legacy');
+    expect(stanceWarn).toHaveBeenCalledTimes(1);
+    expect(stanceWarn.mock.calls[0][0]).toMatch(
+      /^KYBERION_CUSTOMER is retired — .+ \| next: set KYBERION_STANCE=legacy .+ \| evidence: /u
+    );
+    expect(activeStance({ KYBERION_STANCE: 'current', KYBERION_CUSTOMER: 'legacy' }, root)).toBe(
       'current'
     );
-    expect(activeStance({})).toBeNull();
+    expect(activeStance({}, root)).toBeNull();
+  });
+
+  it('ignores KYBERION_CUSTOMER when no stance directory exists to map it to', async () => {
+    const { activeStance, __test__ } = await import('./stance-resolver.js');
+    __test__.resetLegacyEnvWarning();
+    stanceWarn.mockClear();
+    expect(activeStance({ KYBERION_CUSTOMER: 'acme' }, '/repo')).toBeNull();
+    expect(stanceWarn).toHaveBeenCalledTimes(1);
+    expect(stanceWarn.mock.calls[0][0]).toMatch(/^KYBERION_CUSTOMER is retired — ignored /u);
+    __test__.resetLegacyEnvWarning();
+    // A malformed legacy value is ignored instead of failing the process.
+    expect(activeStance({ KYBERION_CUSTOMER: '../etc' }, '/repo')).toBeNull();
   });
 
   it('classifies legacy customer/<slug> entries into stance and tenant files', async () => {

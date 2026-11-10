@@ -2,10 +2,49 @@
 title: 'Operations Hygiene Runbook: keeping fixed operational gaps fixed'
 tags:
   [governance, operations, ci, retention, daemons, tests, recurrence-prevention, secure-io, symlink]
-last_updated: 2026-11-08
+last_updated: 2026-11-10
 ---
 
 # Operations Hygiene Runbook
+
+## Checkout relocation preserves resource tiers
+
+Classify logical repository paths through the shared policy-relative authority
+mapping before interpreting tier markers. An outer scratch, artifact or knowledge
+partition describes the checkout's location, not every resource inside it.
+Preserve primary authority-store mapping and normalized outside-root fallback;
+do not repair ancestor shadowing by reordering tier substring checks.
+
+Gate changes with `libs/core/tier-guard.path-model.test.ts` and the tier-guard,
+preflight observation, tenant-store and tiered-mission suites. Build before
+compiled-module integration tests. The [relocation model](../architecture/checkout-tier-path-model.md)
+checks declared inner partitions across tiered ancestor layouts, including a
+negative ancestor-first control; it does not replace tenant or symlink guards.
+
+After promoting or revising product lessons, rerun
+`tests/scratch-usage-baseline.test.ts` and the catalogs gate. Generated knowledge
+participates in source and policy scans; passing tests before promotion does not
+validate the final promoted records.
+
+## Explicit viewer tier caps
+
+At a data-bearing narrowing boundary, an already resolved empty cap means no
+access. Never restore role defaults because its array is empty. Default/role
+policy resolution belongs upstream; a client request can only select inside the
+server viewer's supplied set. Missing or non-array resolved caps fail closed.
+
+After changing tier narrowing, run `surface-viewer-tier.model.test.ts`,
+`surface-mutation-guard.test.ts` and the real Concierge `ops-viewer.test.ts` from
+the repository root with its canonical Vitest aliases. Gate all role/tier/subset
+combinations, grant-removal monotonicity, empty/default distinction and a negative
+fallback mutation. A zero-file test selection is not validation. The
+[subset model](../architecture/viewer-tier-subset-model.md) covers this finite
+boundary; it does not establish route-wide custody or credential guarantees.
+
+Caller fixtures must supply a resolved `ViewerContext`. Prefer partial mocks
+that preserve real scope predicates over whole-module mocks that silently omit
+new exports. Preserve no-inspection/no-execution assertions on refusal, including
+404 non-disclosure for an invisible cross-tenant mission.
 
 ## Review independence assurance
 
@@ -83,6 +122,30 @@ diff; they do not prove that an arbitrary starting checkout was current. This
 checkout comparison is a required operational preflight, not a new claim made
 by those automated checks.
 
+## Lease backend exclusion across callback modes
+
+A namespace mutex must span the complete protected callback, even when a writer
+lease's TTL has elapsed. Memory providers must use shared admission for sync and
+async callers: refuse synchronous entry while async ownership is pending or
+active, retain sync re-entry refusal, and keep different namespaces independent.
+A timeout does not establish that an earlier callback has stopped.
+
+Keep the caller's returned Promise separate from the queue's private tail. The
+tail must settle successfully on callback success or failure and remove its
+reservation only if the map still contains that exact tail. Never compare a
+`finally`-derived tail with the original callback Promise: that retains entries
+and can create an unhandled rejection. Preserve callback error identity and FIFO
+handoff; KV-stub acquisition delay must also apply after predecessor failure.
+
+After changing a lease backend, run `lease-backend-exclusion.test.ts`,
+`lease-backend.model.test.ts`, `lease-backend.test.ts` and `writer-lease.test.ts`
+under strict live-state checking. Use deferred Promises and injected/fake clocks,
+not real sleeps. The independent model must reject a conflicting-admission
+mutation. These suites are the regression gate for this procedure. Affected-test
+selection follows imports; run all four explicitly even when the selected subset
+is smaller. Their finite model and KV
+stub do not establish real multi-node exclusion or crash recovery.
+
 ## NHI lifecycle and session-admission fencing
 
 Allocate identity-journal sequence numbers and check the expected identity revision
@@ -119,6 +182,17 @@ Gates: agent-identity lease-interleaving and alternating-writer tests, session-a
 ABA/legacy-plan tests, post-append and uncertain-result compensation tests, live-before-
 expiry control and suspension/replay regressions. These synthetic gates do not establish
 that a real organization has been onboarded or admitted.
+
+Writer-lease numeric safety is a separate gate: run
+`libs/core/lease/writer-lease.numeric-model.test.ts` with the writer/backend and NHI
+lifecycle suites after changing token or expiry handling. Reject unsafe persisted
+fences and non-finite/negative clocks; refuse allocation at MAX_SAFE_INTEGER and
+validate finite, strictly-future expiry before writing. Never reset or clamp a
+fence to recover from malformed or exhausted state. Preserve fresh post-write and
+exit observations and the original-token-after-renew contract. A later clock
+failure can follow a valid write; do not describe that as an unchanged record.
+The [fencing model](../architecture/writer-fencing-safety-model.md) defines the
+initial-input no-write guarantee and its limits.
 
 ## Private task source preparation and local test boundaries
 
@@ -189,6 +263,8 @@ had regressed.
 ---
 
 ## §1 CI workflows
+
+Generated Markdown that a commit hook formats must use the same repository Prettier configuration in its canonical generator. Verify formatter idempotence and rerun the generator in check mode after formatting; do not bypass hooks or weaken byte-comparison gates to ship generated inventory. The component inventory generator enforces this with `scripts/sync_component_inventory.contract.test.ts`.
 
 **Compiler readiness and recovery accounting.** `pnpm build`, `pnpm build:packages` and
 `pnpm build:repo` enter the source-only `scripts/build_repository.ts` bootstrap. The compiler
@@ -737,6 +813,8 @@ gets clean JSON.
 
 ## §5 Tests: pollution and host dependencies
 
+Before entering an exact-path resource scope, initialize any test-owned sandbox ancestor directories in fixture setup. A narrow capability may create its admitted leaf directories, never missing ancestors outside its grant. Verify a fresh sandbox as well as a warmed one; `scripts/pipeline_promote.resource-boundary.test.ts` covers journal setup without weakening the runtime guard.
+
 Production source inventories must exclude runtime storage roots before traversing
 them. The single-instance scan skips legacy root-level `work/` metrics, whose I/O is
 redirected into a per-test fixture; it still scans nested code directories named
@@ -972,7 +1050,7 @@ the catalog`, 2026-10). Every `createSeam({ catalog: coreSeamCatalog })` declare
    the suspect suite.
 5. **Reported only on CI, even from a fresh tree:** CI runs with a different identity. Reproduce
    with the CI environment, not your shell's:
-   `KYBERION_PERSONA=worker MISSION_ROLE=mission_controller KYBERION_TEST_LEAK_STRICT=1 pnpm test -- --suite core`.
+   `KYBERION_BASE_ROLE=worker MISSION_ROLE=mission_controller KYBERION_TEST_LEAK_STRICT=1 pnpm test -- --suite core`.
    Persona-dependent code paths (stores that only persist for some roles, default-tenant bootstrap)
    diverge between the two. Platform-only code paths (for example the macOS Apple FM bridge compiling
    into `active/shared/runtime/apple-intelligence/`) leak only on that OS's runner; read the
@@ -1257,13 +1335,15 @@ Legacy unscoped candidates retain their existing storage compatibility; this doe
 3. Verify onboarding-flow commands with the real CLI in a throwaway worktree.
    - Create the throwaway company with `pnpm onboarding company … --slug probe-co --tenant-slug probe-co`.
    - Then run `tenant:activation plan|probe` and `work create-item` with `KYBERION_STANCE`,
-     `KYBERION_TENANT_SCOPE_REQUIRED=true` and `KYBERION_PERSONA=sovereign`.
+     `KYBERION_TENANT_SCOPE_REQUIRED=true` and `KYBERION_BASE_ROLE=sovereign`.
    - Remove the throwaway state afterwards: `customer/`, `knowledge/personal/tenants/`,
      `knowledge/confidential/`, `active/organizations/`.
 
 ---
 
 ## §7 LLM and provider calls
+
+Document/design review snapshots must reject unknown-tier runtime locations before content I/O or provider dispatch, and retain the more restrictive of canonical path and source classification. Case variants and archived mission paths must not fall back to public. Use the existing source classifiers; `document-review.test.ts` enforces this boundary without a caller public waiver.
 
 **Non-public reasoning scopes declare `training_use`.** A `withReasoningPayloadScope` scope with tier `confidential` or `personal` names its `training_use` explicitly. An omitted posture falls back to `local_only` inside the egress gate, which denies every external backend (claude-cli included), and callers used to report that as a generic backend failure. Choose the posture from what the call sends: `no_training` for tenant working material that may reach a provider the tenant attested (as peer auto-reply drafting does), and an explicit `local_only` for personal material or anything that must stay on this host. Never weaken the gate to make a call pass. Report an egress denial as its own status (`egress_denied`) with the denial's `next:` step (`isReasoningEgressDenial`, `reasoningEgressDenialNext`), not as `backend_unavailable`. Public material may be used for provider training: a `public` scope that declares no posture is `training_eligible` (`effectiveReasoningTrainingUse`, decided 2026-11-05), and the same default applies to explicitly public OCR requests and knowledge contexts. An explicit `local_only` on public material is still honoured. Gates: `ReasoningPayloadScope` makes the field required at the type level, and `tests/reasoning-payload-scope-training-use.test.ts` (registration-tests) statically backstops untyped and dynamic call sites. Its allowlist stays empty.
 
@@ -1392,11 +1472,11 @@ isolation and parent-capability denial with an ordinary organization operator.
     deciders) are listed in [approval-gate-design](./approval-gate-design.md).
 - **Prompts and secrets go on stdin, never argv.** argv is visible in the process table and is capped
   at about 128 KB per argument. Shell-invoked LLM profiles use `prompt_via: "stdin"` (the `claude`
-  profile in `wisdom-policy.json` does), and the system prompt travels on stdin with the prompt.
+  profile in `distill-policy.json` does), and the system prompt travels on stdin with the prompt.
   The same applies to passwords and tokens for any CLI.
 - **Provider CLIs run tool-less from a scratch cwd.** A model that passed the gate for one payload
   must not be able to read other files. Run provider CLIs for one-shot answers with tools disabled
-  and a single turn (for `claude`, the flags of the `claude` profile in `wisdom-policy.json`:
+  and a single turn (for `claude`, the flags of the `claude` profile in `distill-policy.json`:
   `--max-turns 1`, `--tools ""`, `--strict-mcp-config`, `--setting-sources=`,
   `--disable-slash-commands`, `--no-session-persistence`), and start them in an
   empty directory on the scratch floor (`active/shared/tmp/system/<domain>/`), not the repository
@@ -1483,7 +1563,7 @@ call fails.
   turn includes process start, sandbox setup and the user's default model and effort. The only
   in-repo latency figure (4.3s, `realtime-media-session-architecture.md`) is for a one-sentence
   reply on a fast model at `low` effort, which the wisdom profiles do not request.
-- `wisdom-policy.json` profiles stay between the 120s built-in fallback and 300s. The codex `light`
+- `distill-policy.json` profiles stay between the 120s built-in fallback and 300s. The codex `light`
   profile (summarize, classify) was 30s and is now 120s, the same as `standard` (gemini) and
   `BUILTIN_FALLBACK`. `heavy` (codex) and `claude` stay at 180s for distillation.
   `mission-llm.test.ts` enforces this range for provider-CLI adapters (`codex-cli`, `gemini-cli`,
@@ -1651,7 +1731,7 @@ These cover archive entry-point parity, restore, and track state/projection chan
 **Defect class.** The tier guard (`validateWritePermission` / `validateReadPermission`) judges a
 path as written, but the OS follows symbolic links in every component, and a hard link is a second
 name for an inode that lives elsewhere. Before this fix a data-only persona
-(`KYBERION_PERSONA=worker MISSION_ROLE=finance_controller`) could call
+(`KYBERION_BASE_ROLE=worker MISSION_ROLE=finance_controller`) could call
 `safeSymlinkSync('scripts', 'active/shared/tmp/link')` (the target needed only _read_ permission)
 and then `safeWriteFile('active/shared/tmp/link/x.ts', …)` — landing code in `scripts/`. The same
 link turned every write helper (append, copy, move, mkdir, rm) into a write anywhere readable; a
@@ -3274,6 +3354,14 @@ A rejected write must remain rejected and its required policy-violation record m
 Keep each gate's deadline and checks unchanged when isolating resource-intensive work. `ci-gates.json` may mark a gate `exclusive`: all earlier selected work drains, that gate runs alone, and subsequent gates resume the requested concurrency. Golden baseline compiler scans use this isolation; a measured standalone run took 62 seconds and exited naturally. A buffered success line alone does not prove a retained handle or the exact failed-runner cause. Record gate execution time separately from package-manager queue wait, and observe child exit/close when investigating a deadline.
 
 Runner, manifest, schema or CI workflow changes must also run the combined full profile on PR/merge-group CI. Separate `pr` and `full-only` jobs do not exercise the combined scheduling used on main. Gate tests enforce exact-once selection, stable output order, rejection continuation, exclusive barriers, unchanged default concurrency and deadlines (`run_checks.test.ts`, `run_checks.concurrency.test.ts`). Strict local tests require a quiet owned worktree: stop only a verified worktree-owned background process through its graceful shutdown path, keep real primary/other-provider processes running, and use the offline reasoning stub for deterministic validation.
+
+Filesystem-allocation fixtures must supply deterministic finite volume statistics
+while retaining the real workspace budget policy. Restore execution spies in
+guaranteed test cleanup: an earlier failed assertion must not leave a spy that
+the next test captures as its original implementation. Gate offline source clone
+failure, ledger rollback and reuse with
+`libs/core/mission/mission-development-offline-clone.test.ts`; never raise budget
+limits or delete live workspaces to make that fixture pass.
 
 ## Capture audit input before delegating persistence
 

@@ -60,7 +60,7 @@ beforeEach(async () => {
   for (const key of [
     'SYSTEM_ROLE',
     'MISSION_ROLE',
-    'KYBERION_PERSONA',
+    'KYBERION_BASE_ROLE',
     'KYBERION_SUDO',
     'KYBERION_TENANT',
     'KYBERION_DELEGATED_ROLE',

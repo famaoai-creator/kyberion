@@ -74,13 +74,13 @@ const recordingDirs: string[] = [];
  * directory and is removed in afterEach.
  */
 function withPersonalAccess<T>(fn: () => T): T {
-  const savedPersona = process.env.KYBERION_PERSONA;
-  process.env.KYBERION_PERSONA = 'sovereign';
+  const savedPersona = process.env.KYBERION_BASE_ROLE;
+  process.env.KYBERION_BASE_ROLE = 'sovereign';
   try {
     return fn();
   } finally {
-    if (savedPersona === undefined) delete process.env.KYBERION_PERSONA;
-    else process.env.KYBERION_PERSONA = savedPersona;
+    if (savedPersona === undefined) delete process.env.KYBERION_BASE_ROLE;
+    else process.env.KYBERION_BASE_ROLE = savedPersona;
   }
 }
 

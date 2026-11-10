@@ -1,5 +1,6 @@
 /** Operator-facing mission controls that do not perform completion gates. */
 
+import type { StorageDataTier } from '../storage-layout.js';
 import * as path from 'node:path';
 import * as pathResolver from '../path-resolver.js';
 import { findMissionPath } from '../path-resolver.js';
@@ -203,9 +204,7 @@ export async function cancelMission(
   logger.warn(`🛑 Mission ${upperId} cancelled.`);
 }
 
-function inferMissionTierFromPath(
-  missionPath: string
-): 'personal' | 'confidential' | 'public' | null {
+function inferMissionTierFromPath(missionPath: string): StorageDataTier | null {
   const relative = path
     .relative(pathResolver.rootDir(), path.resolve(missionPath))
     .split(path.sep)
@@ -268,7 +267,7 @@ export async function repairLegacyMissionState(id: string, note?: string): Promi
   if (state.tenant_slug && !isValidTenantSlug(state.tenant_slug)) delete state.tenant_slug;
   state.execution_mode = state.execution_mode === 'delegated' ? 'delegated' : 'local';
   state.priority = typeof state.priority === 'number' ? state.priority : 3;
-  state.assigned_persona = state.assigned_persona || 'operator';
+  state.org_role = state.org_role || 'operator';
   state.confidence_score = typeof state.confidence_score === 'number' ? state.confidence_score : 1;
   state.git = {
     branch,

@@ -2,17 +2,21 @@
 title: Kyberion Canonical Concept Index
 category: Architecture
 tags: [architecture, concept, canonical, intent, governance]
-importance: 10
+importance: 3
 author: Codex
-last_updated: 2026-04-26
+last_updated: 2026-11-09
+doc_status: superseded
+superseded_by: knowledge/product/architecture/organization-work-loop.md
 ---
 
 # Kyberion Canonical Concept Index
 
+> **Superseded (2026-11-09).** This index is no longer canonical. The parent model is [organization-work-loop](./organization-work-loop.md); single definitions of the high-confusion terms live in [`concept-registry.json`](../governance/concept-registry.json) and the [GLOSSARY](../../../docs/GLOSSARY.md). Its Request / Plan / State / Result vocabulary and seven-primitive list below are kept for history only.
+
 ## 1. Purpose
 
 This document defines the canonical concept set for implementation decisions.
-Use this as the first reference when concept documents appear to overlap.
+~~Use this as the first reference when concept documents appear to overlap.~~ (superseded — see the banner above)
 
 ## 2. Canonical User Vocabulary
 

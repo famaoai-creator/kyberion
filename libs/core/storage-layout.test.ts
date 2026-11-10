@@ -237,6 +237,8 @@ describe('durable partitioned runtime state', () => {
       'active/shared/runtime/health/api-verification/confidential/',
       'active/shared/runtime/provider-attestations/personal/',
       'active/shared/runtime/provider-attestations/confidential/',
+      'active/shared/runtime/hints/personal/',
+      'active/shared/runtime/hints/confidential/',
     ]);
     expect(
       partitionedRuntimeStateTierInPath(
@@ -258,7 +260,7 @@ describe('durable partitioned runtime state', () => {
         prefix.includes('/discussion-create-requests/')
       )
     ).toBe(false);
-    for (const field of ['default_allow', 'persona_permissions', 'authority_permissions'])
+    for (const field of ['default_allow', 'authority_permissions'])
       expect(JSON.stringify(policy[field])).not.toContain('runtime/discussion-create-requests');
     // Discussion request receipts (G2): no role grants them; only the opaque request grant does.
     expect(policy.authority_role_permissions.discussion_request_store).toBeUndefined();
@@ -268,7 +270,7 @@ describe('durable partitioned runtime state', () => {
     expect(policy.authority_role_permissions.customer_decision_invite_store).toBeUndefined();
     for (const grant of Object.values(policy.authority_role_permissions))
       expect(JSON.stringify(grant)).not.toContain('runtime/customer-decision-invites');
-    for (const field of ['default_allow', 'persona_permissions', 'authority_permissions'])
+    for (const field of ['default_allow', 'authority_permissions'])
       expect(JSON.stringify(policy[field])).not.toContain('runtime/customer-decision-invites');
     // Credential allocation administration and dispatch metadata access reuse
     // the existing GrantStore. Both grants are confined to the selected tenant;
@@ -278,14 +280,17 @@ describe('durable partitioned runtime state', () => {
       allow_read: [allocationPartition],
       allow_write: [allocationPartition],
     });
-    expect(policy.authority_role_permissions.credential_allocation_reader).toEqual({
+    // S4: the dispatch reader is a declared store grant, not an Authority Role.
+    expect(policy.authority_role_permissions.credential_allocation_reader).toBeUndefined();
+    expect(policy.store_grants.credential_allocation_reader).toMatchObject({
       allow_read: [allocationPartition],
     });
+    expect(policy.store_grants.credential_allocation_reader.allow_write).toBeUndefined();
     for (const store of ['hearing', 'grants', 'autonomy-learning']) {
       expect(
         policy.tenant_scope.shared_prefixes.some((prefix: string) => prefix.includes(`/${store}/`))
       ).toBe(false);
-      for (const field of ['default_allow', 'persona_permissions', 'authority_permissions']) {
+      for (const field of ['default_allow', 'authority_permissions']) {
         expect(JSON.stringify(policy[field])).not.toContain(`runtime/${store}`);
       }
       for (const [role, grant] of Object.entries(policy.authority_role_permissions)) {
@@ -359,13 +364,16 @@ describe('tenant approval partitions', () => {
         prefix.includes('/tenant-approvals/')
       )
     ).toBe(false);
-    for (const field of ['default_allow', 'persona_permissions', 'authority_permissions'])
+    for (const field of ['default_allow', 'authority_permissions'])
       expect(JSON.stringify(policy[field])).not.toContain('runtime/tenant-approvals');
     const own = [
       'active/shared/runtime/tenant-approvals/personal/${KYBERION_TENANT}/',
       'active/shared/runtime/tenant-approvals/confidential/${KYBERION_TENANT}/',
     ];
-    expect(policy.authority_role_permissions.tenant_approval_store).toEqual({
+    // S4: both are declared store grants (store_grants), not Authority Roles.
+    const withoutDescription = ({ description: _d, ...rules }: Record<string, unknown>) => rules;
+    expect(policy.authority_role_permissions.tenant_approval_store).toBeUndefined();
+    expect(withoutDescription(policy.store_grants.tenant_approval_store)).toEqual({
       allow_read: own,
       allow_write: own,
     });
@@ -373,13 +381,18 @@ describe('tenant approval partitions', () => {
       'active/shared/runtime/tenant-approvals/personal/',
       'active/shared/runtime/tenant-approvals/confidential/',
     ];
-    expect(policy.authority_role_permissions.tenant_approval_partition_index_reader).toEqual({
+    expect(
+      policy.authority_role_permissions.tenant_approval_partition_index_reader
+    ).toBeUndefined();
+    expect(withoutDescription(policy.store_grants.tenant_approval_partition_index_reader)).toEqual({
       allow_read: tiers,
       deny_read_descendants: tiers,
       allow_write: [],
     });
-    for (const [role, grant] of Object.entries(policy.authority_role_permissions))
-      if (role !== 'tenant_approval_store' && role !== 'tenant_approval_partition_index_reader')
+    for (const grant of Object.values(policy.authority_role_permissions))
+      expect(JSON.stringify(grant)).not.toContain('runtime/tenant-approvals');
+    for (const [name, grant] of Object.entries(policy.store_grants))
+      if (name !== 'tenant_approval_store' && name !== 'tenant_approval_partition_index_reader')
         expect(JSON.stringify(grant)).not.toContain('runtime/tenant-approvals');
     // G2: the personal owner partitions are reached through the owner window, not a role.
     expect(policy.authority_role_permissions.personal_approval_store).toBeUndefined();

@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import { pathResolver } from '../path-resolver.js';
@@ -8,7 +9,7 @@ import { runHardenedGitProbe } from '../shell/git-probe-hardening.js';
 import { governVcsCommand } from './external-vcs.js';
 
 export interface GitPublicationSource {
-  publication_source_tier: 'public' | 'personal' | 'confidential' | 'protected_or_unknown';
+  publication_source_tier: StorageDataTier | 'protected_or_unknown';
   publication_source_tenant?: string;
   publication_source_scope_conflict?: true;
   publication_history_sha256?: string;
@@ -50,7 +51,7 @@ export function readGitPublicationSource(
     return unknown;
   }
   if (result.error || result.status !== 0 || (!result.stdout && !remoteHead)) return unknown;
-  let tier: 'public' | 'personal' | 'confidential' = 'public';
+  let tier: StorageDataTier = 'public';
   let tenant: string | undefined;
   for (const raw of result.stdout.split('\0')) {
     // Git emits a newline between commit records, outside the NUL path names.

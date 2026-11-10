@@ -41,7 +41,7 @@ import { parseDocument } from './parse-document.js';
 const EMPTY_ENV = {} as NodeJS.ProcessEnv;
 const NOW = '2026-07-28T09:00:00.000Z';
 const ENV_KEYS = [
-  'KYBERION_PERSONA',
+  'KYBERION_BASE_ROLE',
   'MISSION_ROLE',
   'KYBERION_TENANT',
   'KYBERION_SUDO',
@@ -125,7 +125,7 @@ afterAll(() => {
 
 beforeEach(() => {
   for (const key of ENV_KEYS) savedEnv[key] = process.env[key];
-  process.env.KYBERION_PERSONA = 'ecosystem_architect';
+  process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
   delete process.env.KYBERION_TENANT;
   delete process.env.KYBERION_SUDO;
   process.env.KYBERION_MEMORY_QUEUE_PATH = `${fixtureRelative}/promotion-queue.jsonl`;

@@ -96,7 +96,7 @@ describe('continuous managed work plan', () => {
     const normalized = normalizeDotProposal({
       title: 'Fix',
       objective: 'Restore service',
-      work_shape: 'pipeline',
+      execution_shape: 'pipeline',
     });
     const first = dotProposalHash('operator', { ...normalized, continuous_work: plan });
     const changed = parseContinuousWorkPlan({
@@ -175,7 +175,7 @@ describe('continuous managed work plan', () => {
     const proposal = {
       title: 'Investigate',
       objective: 'Fix failures',
-      work_shape: 'pipeline',
+      execution_shape: 'pipeline',
       continuous_work: { kind: 'mission', missions: [mission] },
     };
     const normalized = normalizeDotProposal(proposal);

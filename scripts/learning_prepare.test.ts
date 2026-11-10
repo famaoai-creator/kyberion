@@ -19,6 +19,16 @@ const selected = vi.hoisted(() => ({
     queued: true,
     next_steps: ['pnpm mission memory-review MEM-LEARN-example'],
   })),
+  migrate: vi.fn((options: { apply?: boolean }) => ({
+    mode: options.apply ? 'apply' : 'dry_run',
+    imported: [{ candidate_id: 'DSC-SEED-1', record_kind: 'mission_seed' }],
+    already_on_queue: [],
+    unresolved: [{ candidate_id: 'DSC-OLD-1', reason: '[MEMORY_SCOPE_REQUIRED] no scope' }],
+    left_as_history: [],
+  })),
+}));
+vi.mock('@agent/core/knowledge/reuse-proposals', () => ({
+  migrateLegacyReuseProposals: selected.migrate,
 }));
 vi.mock('@agent/core/scope-context', () => ({ currentScope: () => selected.scope }));
 vi.mock('@agent/core/knowledge/reusable-learning', () => ({
@@ -41,6 +51,18 @@ afterEach(() => {
 });
 
 describe('learning prepare facade', () => {
+  it('migrates legacy reuse proposals for one release, dry run first', async () => {
+    await runLearningPrepare(['--migrate', '--dry-run']);
+    expect(selected.migrate).toHaveBeenLastCalledWith({ apply: false });
+    expect(console.log).toHaveBeenCalledWith(expect.stringContaining('Would import: 1'));
+    await runLearningPrepare(['--migrate']);
+    expect(selected.migrate).toHaveBeenLastCalledWith({ apply: true });
+    expect(console.log).toHaveBeenCalledWith(
+      expect.stringContaining('DSC-OLD-1: [MEMORY_SCOPE_REQUIRED] no scope')
+    );
+    expect(selected.prepare).not.toHaveBeenCalled();
+  });
+
   it('handles help and rejects misspelled flags without preparing or publishing anything', async () => {
     await runLearningPrepare(['--help']);
     expect(console.log).toHaveBeenCalledWith(expect.stringContaining('learning prepare'));

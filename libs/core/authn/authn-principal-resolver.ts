@@ -61,11 +61,11 @@ export interface AuthnCredential {
 }
 
 export interface AuthnExecutionContext {
-  /** KYBERION_PERSONA-style agent slug, or a canonical nhi_id via actorHint. */
+  /** KYBERION_BASE_ROLE-style agent slug, or a canonical nhi_id via actorHint. */
   persona?: string;
   missionRole?: string;
   missionId?: string;
-  /** A canonical actor id (`kyberion://agent/<org>/<slug>`) asserted by the runtime. */
+  /** A canonical actor id (`kyberion://agent/<tenant>/<org|_>/<slug>`) asserted by the runtime. */
   actorHint?: string;
 }
 

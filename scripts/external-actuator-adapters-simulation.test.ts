@@ -46,7 +46,7 @@ afterAll(() => {
 
 beforeAll(() => {
   vi.stubEnv('KYBERION_ALLOW_TEST_NOTIFICATIONS', '0');
-  vi.stubEnv('KYBERION_PERSONA', 'ecosystem_architect');
+  vi.stubEnv('KYBERION_BASE_ROLE', 'ecosystem_architect');
   vi.stubEnv('MISSION_ROLE', 'mission_controller');
 });
 

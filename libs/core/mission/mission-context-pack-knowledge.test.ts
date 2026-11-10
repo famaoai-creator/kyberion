@@ -20,8 +20,8 @@ vi.mock('../knowledge/knowledge-slices.js', () => ({
   isKnowledgePathExcluded: () => false,
   isKnowledgePathInSearchRoots: () => true,
 }));
-vi.mock('../knowledge/distill-knowledge-injector.js', () => ({
-  findRelevantDistilledKnowledge: async () => [],
+vi.mock('../knowledge/promoted-knowledge-retrieval.js', () => ({
+  findRelevantPromotedKnowledge: async () => [],
 }));
 vi.mock('../organization/tenant-knowledge-retrieval.js', () => ({
   buildTenantKnowledgeScopeSet: () => null,
@@ -65,7 +65,7 @@ function pinFixture() {
             tier: 'confidential',
             tenant_slug: 'pinned-fixture',
             status: 'active',
-            assigned_persona: 'worker',
+            org_role: 'worker',
             git: {
               branch: 'fixture',
               start_commit: 'fixture',

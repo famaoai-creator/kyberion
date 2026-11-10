@@ -9,7 +9,7 @@ import '../authority.js';
 vi.mock('../governance/audit-chain.js', () => ({ auditChain: { record: vi.fn() } }));
 
 const ROOT = pathResolver.rootDir();
-const ENV_KEYS = ['KYBERION_TENANT', 'KYBERION_PERSONA', 'MISSION_ROLE', 'SYSTEM_ROLE'] as const;
+const ENV_KEYS = ['KYBERION_TENANT', 'KYBERION_BASE_ROLE', 'MISSION_ROLE', 'SYSTEM_ROLE'] as const;
 
 const ledgerFile = (tenant: string) =>
   path.join(ROOT, `knowledge/confidential/${tenant}/decisions/case-1/decisions.jsonl`);

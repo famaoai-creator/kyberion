@@ -60,7 +60,7 @@ describe('personal development approval placement', () => {
         action_id: 'dot_delegate_work',
         title: 'Develop',
         objective: 'Implement approved change',
-        work_shape: 'pipeline',
+        execution_shape: 'pipeline',
         pipeline_ref: 'pipelines/continuous-managed-work.json',
         continuous_work: {
           kind: 'mission',

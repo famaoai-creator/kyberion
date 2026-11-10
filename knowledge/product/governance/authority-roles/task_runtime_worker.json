@@ -1,0 +1,8 @@
+{
+  "role": "task_runtime_worker",
+  "assignable": false,
+  "permissions": {
+    "allow_read": [],
+    "allow_write": []
+  }
+}

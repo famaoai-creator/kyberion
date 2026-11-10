@@ -28,6 +28,7 @@ import {
   type ApprovalRequesterInput,
   type ApprovalRequesterRef,
 } from '../governance/approval-requester.js';
+import { baseRoleEnvText } from '../foundation/base-role-env.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { evaluateApprovalUsability } from '../governance/approval-separation-of-duties.js';
 import { computeApprovalPayloadHash } from '../governance/approval-presentation.js';
@@ -152,7 +153,7 @@ export function createMissionScopeApprovalRequest(input: {
     : {
         requestedBy:
           input.requestedBy?.trim() ||
-          getRegisteredEnvText('KYBERION_PERSONA') ||
+          baseRoleEnvText() ||
           getRegisteredEnvText('USER') ||
           'mission_controller',
       };

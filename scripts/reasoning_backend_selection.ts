@@ -15,12 +15,27 @@ import {
   type ReasoningBackendMode,
 } from '@agent/core/reasoning/reasoning-backend-policy';
 import { getReasoningProviderDescriptor } from '@agent/core/reasoning/reasoning-provider-registry';
-import { pathResolver } from '@agent/core/path-resolver';
-import { safeExistsSync, safeLstat, safeWriteFile } from '@agent/core/secure-io';
-import { readTextFile } from '@agent/core/foundation';
+import {
+  defaultEnvLocalPath,
+  persistEnvValue,
+  readPersistedEnvValue,
+  readReasoningSelectionTextFile,
+  upsertEnvVarLine,
+} from '@agent/core/foundation/env-dotenv';
+
+export {
+  defaultEnvLocalPath,
+  persistEnvValue,
+  readPersistedEnvValue,
+  readReasoningSelectionTextFile,
+  upsertEnvVarLine,
+};
 
 export const REASONING_BACKEND_ENV_KEY = 'KYBERION_REASONING_BACKEND';
-export const PERSONA_ENV_KEY = 'KYBERION_PERSONA';
+/** The base role an onboarding run persists into `.env.local` (S4: was KYBERION_BASE_ROLE). */
+export const PERSONA_ENV_KEY = 'KYBERION_BASE_ROLE';
+/** @deprecated retired name, still read from an existing `.env.local` for one release. */
+export const LEGACY_PERSONA_ENV_KEY = 'KYBERION_PERSONA';
 
 /** Canonical selectable backends, in policy order. */
 export function listReasoningBackendChoices(): ReasoningBackendMode[] {
@@ -77,64 +92,6 @@ export function resolveReasoningBackendMenuSelection(
   return normalized && choices.includes(normalized) ? normalized : null;
 }
 
-export function defaultEnvLocalPath(): string {
-  return pathResolver.rootResolve('.env.local');
-}
-
-export function readReasoningSelectionTextFile(filePath: string): string {
-  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
-    throw new Error(`${filePath} must be a regular file`);
-  }
-  return readTextFile(filePath);
-}
-
-/** Pure upsert of one `KEY=value` line in dotenv-style content. */
-export function upsertEnvVarLine(content: string, key: string, value: string): string {
-  const line = `${key}=${value}`;
-  const matcher = new RegExp(`^\\s*${key}=.*$`, 'gm');
-  if (matcher.test(content)) {
-    return content.replace(matcher, line);
-  }
-  let next = content;
-  if (next.length > 0 && !next.endsWith('\n')) next += '\n';
-  return `${next}${line}\n`;
-}
-
-/** Read one persisted dotenv value without loading secrets into process.env. */
-export function readPersistedEnvValue(
-  key: string,
-  envLocalPath: string = defaultEnvLocalPath()
-): string | null {
-  if (!safeExistsSync(envLocalPath)) return null;
-  const content = readReasoningSelectionTextFile(envLocalPath);
-  const match = new RegExp(`^\\s*${key}=(.*)$`, 'm').exec(content);
-  const value = match?.[1]?.trim();
-  return value || null;
-}
-
-/**
- * Persist one non-secret operator preference in `.env.local`.
- *
- * Only the one `KEY=` line changes. `.env.local` usually also holds secrets,
- * so the write is atomic (safeWriteFile: temp + rename) and keeps the
- * existing file mode; a new file is created owner-only (0600) rather than
- * world-readable.
- */
-export function persistEnvValue(
-  key: string,
-  value: string,
-  envLocalPath: string = defaultEnvLocalPath()
-): string {
-  let content = '';
-  let mode = 0o600;
-  if (safeExistsSync(envLocalPath)) {
-    content = readReasoningSelectionTextFile(envLocalPath);
-    mode = safeLstat(envLocalPath).mode & 0o777;
-  }
-  safeWriteFile(envLocalPath, upsertEnvVarLine(content, key, value), { mode });
-  return envLocalPath;
-}
-
 /** The backend currently persisted in `.env.local`, or `null`. */
 export function readPersistedReasoningBackend(
   envLocalPath: string = defaultEnvLocalPath()
@@ -151,7 +108,10 @@ export function persistReasoningBackend(
 }
 
 export function readPersistedPersona(envLocalPath: string = defaultEnvLocalPath()): string | null {
-  return readPersistedEnvValue(PERSONA_ENV_KEY, envLocalPath);
+  return (
+    readPersistedEnvValue(PERSONA_ENV_KEY, envLocalPath) ??
+    readPersistedEnvValue(LEGACY_PERSONA_ENV_KEY, envLocalPath)
+  );
 }
 
 export function persistPersona(

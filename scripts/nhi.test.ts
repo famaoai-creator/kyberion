@@ -37,8 +37,7 @@ describe('nhi CLI', () => {
       'issue',
       '--slug',
       'haru',
-      '--organization-id',
-      'personal',
+      '--person-scope',
       '--accountable-human',
       'user:owner',
       '--apply',
@@ -47,7 +46,7 @@ describe('nhi CLI', () => {
       version: 1,
       persona_id: 'haru',
       accountable_human_id: 'user:owner',
-      personal_nhi_id: 'kyberion://agent/personal/haru',
+      personal_nhi_id: 'kyberion://agent/_/_/haru',
       tenant_bindings: [],
     };
     const file = `${profileRoot}/agent-identity.json`;
@@ -93,6 +92,8 @@ describe('nhi CLI', () => {
         'issue',
         '--slug',
         'devin-sim-agent',
+        '--tenant-slug',
+        'acme-tenant',
         '--organization-id',
         'acme-org',
         '--accountable-human',
@@ -102,7 +103,7 @@ describe('nhi CLI', () => {
     );
     const parsed = JSON.parse(out[0]);
     expect(parsed.status).toBe('dry-run');
-    expect(parsed.would_issue.nhi_id).toBe('kyberion://agent/acme-org/devin-sim-agent');
+    expect(parsed.would_issue.nhi_id).toBe('kyberion://agent/acme-tenant/acme-org/devin-sim-agent');
   });
 
   it('issues, lists, and stays idempotent on identical re-issue', () => {
@@ -127,15 +128,59 @@ describe('nhi CLI', () => {
     main(['list', '--organization-id', 'acme-org'], listPrint);
     const records = JSON.parse(out[0]);
     expect(records).toHaveLength(1);
-    expect(records[0].nhi_id).toBe('kyberion://agent/acme-org/devin-sim-agent');
+    expect(records[0].nhi_id).toBe('kyberion://agent/acme-tenant/acme-org/devin-sim-agent');
     expect(records[0].lifecycle_status).toBe('provisioned');
   });
 
   it('rejects a missing accountable human on apply', () => {
     const { print } = capture();
     expect(() =>
-      main(['issue', '--slug', 'rogue-agent', '--organization-id', 'acme-org', '--apply'], print)
-    ).toThrow();
+      main(
+        [
+          'issue',
+          '--slug',
+          'rogue-agent',
+          '--tenant-slug',
+          'acme-tenant',
+          '--organization-id',
+          'acme-org',
+          '--apply',
+        ],
+        print
+      )
+    ).toThrow(/accountable_human_id/);
+  });
+
+  it('requires a tenant (or --person-scope) and rejects a reserved scope name', () => {
+    const { print } = capture();
+    expect(() =>
+      main(
+        [
+          'issue',
+          '--slug',
+          'tenantless',
+          '--organization-id',
+          'acme-org',
+          '--accountable-human',
+          'human:alice',
+        ],
+        print
+      )
+    ).toThrow(/requires --tenant-slug/);
+    expect(() =>
+      main(
+        [
+          'issue',
+          '--slug',
+          'reserved',
+          '--tenant-slug',
+          'public',
+          '--accountable-human',
+          'human:alice',
+        ],
+        print
+      )
+    ).toThrow(/cannot derive an nhi_id/);
   });
 
   it('drives the full lifecycle: issue -> suspend -> resume -> retire', () => {
@@ -145,6 +190,8 @@ describe('nhi CLI', () => {
         'issue',
         '--slug',
         'ops-agent',
+        '--tenant-slug',
+        'acme-tenant',
         '--organization-id',
         'acme-org',
         '--accountable-human',
@@ -153,7 +200,7 @@ describe('nhi CLI', () => {
       ],
       print
     );
-    const nhi = 'kyberion://agent/acme-org/ops-agent';
+    const nhi = 'kyberion://agent/acme-tenant/acme-org/ops-agent';
     main(['suspend', nhi, '--reason', 'maintenance', '--apply'], print);
     main(['resume', nhi, '--apply'], print);
     main(['retire', nhi, '--reason', 'replaced by ops-agent-v2', '--apply'], print);
@@ -165,6 +212,8 @@ describe('nhi CLI', () => {
           'issue',
           '--slug',
           'ops-agent',
+          '--tenant-slug',
+          'acme-tenant',
           '--organization-id',
           'acme-org',
           '--accountable-human',
@@ -173,7 +222,7 @@ describe('nhi CLI', () => {
         ],
         print
       )
-    ).toThrow();
+    ).toThrow(/retired/);
   });
 
   it('requires --reason for retire even in dry-run', () => {
@@ -181,5 +230,14 @@ describe('nhi CLI', () => {
     expect(() => main(['retire', 'kyberion://agent/acme-org/x'], print)).toThrow(
       /retire requires --reason/
     );
+  });
+
+  it('migrate-ids is a dry run by default and a no-op once nothing is legacy', () => {
+    const dry = capture();
+    main(['migrate-ids', '--json'], dry.print);
+    expect(JSON.parse(dry.out[0])).toMatchObject({ status: 'dry-run', would_migrate: 0 });
+    const applied = capture();
+    main(['migrate-ids', '--apply', '--json'], applied.print);
+    expect(JSON.parse(applied.out[0])).toMatchObject({ status: 'applied', migrated: 0 });
   });
 });

@@ -22,7 +22,9 @@ export function WorkItemMissionAlignmentAction({
   const eligible = Boolean(
     item.context?.tenant_slug &&
     item.metadata?.admission_only === true &&
-    item.metadata?.requested_work_shape === 'mission' &&
+    // Legacy key read for one release (items created from version-1 dot actions).
+    (item.metadata?.requested_execution_shape ?? item.metadata?.requested_work_shape) ===
+      'mission' &&
     ['blocked', 'ready'].includes(item.status)
   );
   if (!eligible && !admission) return null;

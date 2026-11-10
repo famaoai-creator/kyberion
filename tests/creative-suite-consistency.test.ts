@@ -25,8 +25,8 @@ let prevPersona: string | undefined;
 
 describe('creative suite design consistency (E2E-02)', () => {
   beforeAll(() => {
-    prevPersona = process.env.KYBERION_PERSONA;
-    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    prevPersona = process.env.KYBERION_BASE_ROLE;
+    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     const designDir = pathResolver.knowledge(`confidential/${SLUG}/design`);
     safeMkdir(designDir, { recursive: true });
     safeWriteFile(
@@ -52,8 +52,8 @@ describe('creative suite design consistency (E2E-02)', () => {
 
   afterAll(() => {
     safeRmSync(pathResolver.knowledge(`confidential/${SLUG}`), { recursive: true, force: true });
-    if (prevPersona === undefined) delete process.env.KYBERION_PERSONA;
-    else process.env.KYBERION_PERSONA = prevPersona;
+    if (prevPersona === undefined) delete process.env.KYBERION_BASE_ROLE;
+    else process.env.KYBERION_BASE_ROLE = prevPersona;
   });
 
   it('resolves the identical primary hex across all four projections (G1/G2)', () => {

@@ -289,7 +289,9 @@ describe('runCodexIsolatedQuery', () => {
 
   it('spawns every isolation flag in an empty scratch cwd with a minimal env, then removes it', async () => {
     vi.stubEnv('KYBERION_PEER_SHARED_SECRET', 'secret-value');
-    vi.stubEnv('MISSION_ROLE', 'peer_responder_reader');
+    // Any inherited role must not reach the child (peer_responder_reader is a store grant
+    // now, so the parent uses an ordinary runtime role here).
+    vi.stubEnv('MISSION_ROLE', 'surface_runtime');
     vi.stubEnv('OPENAI_API_KEY', 'sk-should-not-leak');
     vi.stubEnv('HOME', '/home/tester');
     vi.stubEnv('PATH', '/usr/bin');
@@ -338,7 +340,9 @@ describe('runCodexIsolatedQuery', () => {
     for (const call of calls) {
       expect(Object.keys(call.options.env).sort()).toEqual(
         Object.keys(call.options.env)
-          .filter((key) => ['PATH', 'HOME', 'USER', 'LANG', 'TMPDIR', 'CODEX_HOME'].includes(key))
+          .filter((key) =>
+            ['PATH', 'HOME', 'USER', 'LANG', 'TMPDIR', 'CODEX_HOME', 'SYSTEM_ROLE'].includes(key)
+          )
           .sort()
       );
       expect(call.options.env.HOME).toBe('/home/tester');
@@ -347,6 +351,7 @@ describe('runCodexIsolatedQuery', () => {
         false
       );
       expect(call.options.env.OPENAI_API_KEY).toBeUndefined();
+      expect(call.options.env.SYSTEM_ROLE).toBeUndefined();
     }
   });
 

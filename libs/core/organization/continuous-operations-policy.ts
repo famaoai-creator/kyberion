@@ -1,4 +1,5 @@
 /** Deterministic observation-to-proposal policy. External observations never supply actions. */
+import type { StorageDataTier } from '../storage-layout.js';
 import { isReservedScopeName, isValidTenantSlug } from '../entity-scope.js';
 import { classifyStorageFloorPath, storageFloorRelativePath } from '../storage-layout.js';
 import {
@@ -13,7 +14,7 @@ import {
 } from '../dot/dot-proposals.js';
 
 export interface ContinuousOperationsScope {
-  tier: 'public' | 'confidential' | 'personal';
+  tier: StorageDataTier;
   tenant_slug?: string;
   organization_id: string;
   project_id?: string;
@@ -372,7 +373,7 @@ export function evaluateContinuousOperations(
       action_id: DEFAULT_DOT_ACTION_ID,
       title: rule.title,
       objective: rule.objective,
-      work_shape: 'pipeline',
+      execution_shape: 'pipeline',
       pipeline_ref: rule.pipeline_ref,
       rationale: `Continuous operations ${config.loop_id}: ${rule.source_id}/${rule.metric} matched rule ${rule.rule_id}.`,
     };

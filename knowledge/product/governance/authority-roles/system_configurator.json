@@ -12,5 +12,23 @@
   ],
   "scope_classes": ["capability_registration", "tenant_configuration", "audit"],
   "allowed_actuators": ["service-actuator", "voice-actuator", "file-actuator"],
-  "tier_access": ["public", "confidential"]
+  "tier_access": ["public", "confidential"],
+  "permissions": {
+    "allow_read": [
+      "knowledge/product/governance/service-presets/",
+      "knowledge/product/governance/voice-engine-registry.json",
+      "knowledge/product/governance/voice-engines/",
+      "knowledge/product/config-missions/",
+      "knowledge/confidential/",
+      "active/audit/"
+    ],
+    "allow_write": [
+      "knowledge/product/governance/service-presets/",
+      "knowledge/product/governance/voice-engine-registry.json",
+      "knowledge/product/governance/voice-engines/",
+      "knowledge/confidential/",
+      "active/audit/",
+      "active/shared/logs/"
+    ]
+  }
 }

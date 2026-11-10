@@ -26,7 +26,9 @@ import {
 } from './surface-management-mutations.js';
 import { auditChain } from '../governance/audit-chain.js';
 
-vi.mock('../governance/audit-chain.js', () => ({ auditChain: { record: vi.fn() } }));
+vi.mock('../governance/audit-chain.js', () => ({
+  auditChain: { record: vi.fn(), recordDurable: vi.fn() },
+}));
 vi.mock('../foundation/lock-utils.js', () => ({
   acquireLock: vi.fn(async () => true),
   releaseLock: vi.fn(),
@@ -89,7 +91,7 @@ function cleanup(): void {
 }
 beforeEach(() => {
   vi.stubEnv('KYBERION_SUDO', 'true');
-  vi.stubEnv('KYBERION_PERSONA', 'sovereign');
+  vi.stubEnv('KYBERION_BASE_ROLE', 'sovereign');
   vi.stubEnv('MISSION_ROLE', '');
   vi.stubEnv('SYSTEM_ROLE', '');
   vi.stubEnv('KYBERION_TENANT', tenant);
@@ -115,14 +117,14 @@ beforeEach(() => {
 afterEach(() => {
   vi.restoreAllMocks();
   vi.useRealTimers();
-  vi.stubEnv('KYBERION_PERSONA', 'sovereign');
+  vi.stubEnv('KYBERION_BASE_ROLE', 'sovereign');
   cleanup();
   vi.unstubAllEnvs();
 });
 describe('bounded surface management service', () => {
   it('runs admitted owner operations without SUDO or sovereign persona', async () => {
     vi.stubEnv('KYBERION_SUDO', 'false');
-    vi.stubEnv('KYBERION_PERSONA', '');
+    vi.stubEnv('KYBERION_BASE_ROLE', '');
     vi.stubEnv('SYSTEM_ROLE', 'concierge');
     try {
       const org = await createOrg();
@@ -425,7 +427,7 @@ describe('bounded surface management service', () => {
         expectedVersion: org.version,
       })
     ).rejects.toMatchObject({ status: 400 });
-    vi.stubEnv('KYBERION_PERSONA', 'worker');
+    vi.stubEnv('KYBERION_BASE_ROLE', 'worker');
     await expect(createProject(org.organizationId)).rejects.toThrow('mission owner');
   });
   it('refuses creation under a paused organization', async () => {

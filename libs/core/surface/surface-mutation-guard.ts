@@ -275,10 +275,10 @@ export function narrowSurfaceViewerTier(
   viewer: Pick<SurfaceViewerScope, 'role' | 'tierAccess'>,
   requested: OsKnowledgeTier
 ): OsKnowledgeTier {
-  const allowed = viewer.tierAccess.length
-    ? viewer.tierAccess
-    : defaultSurfaceViewerTierAccess(viewer.role);
-  if (!allowed.includes(requested)) {
+  // This boundary receives a resolved cap. Empty or malformed caps must not
+  // regain role defaults; default resolution belongs to the credential issuer.
+  const allowed = viewer.tierAccess;
+  if (!Array.isArray(allowed) || !allowed.includes(requested)) {
     throw new SurfaceViewerScopeError(403, `viewer tier scope denied: ${requested}`);
   }
   return requested;

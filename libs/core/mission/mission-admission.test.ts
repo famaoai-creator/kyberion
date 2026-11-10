@@ -174,7 +174,7 @@ beforeEach(() => {
     },
     authority: {
       authority_role: 'mission_controller',
-      allowed_work_shapes: ['mission'],
+      allowed_execution_shapes: ['mission'],
       mission_mandate_refs: ['docs'],
     },
   };
@@ -192,7 +192,7 @@ beforeEach(() => {
       title: 'Docs',
       objective: 'Update docs',
       action_id: 'dot_delegate_work',
-      work_shape: 'mission',
+      execution_shape: 'mission',
     },
   ];
   mocks.item = {
@@ -301,7 +301,7 @@ describe('Dot mission admission production and human receipt', () => {
     const proposal = normalizeDotProposal({
       title: 'Docs',
       objective: 'Update docs',
-      work_shape: 'mission',
+      execution_shape: 'mission',
       mission_admission: admission,
     });
     expect(proposal.mission_admission).toEqual(admission);

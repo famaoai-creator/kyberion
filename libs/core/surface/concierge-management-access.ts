@@ -6,16 +6,18 @@
  *
  * One call: the server-created exact resource ceiling, the Concierge-only issuance right checked
  * the way assuming the role was bounded (RA-02, role-assumption-policy
- * `system_roles.concierge.may_assume`), the management role assumption bound to the request's
- * tenant and organization, and the grant bound to that assumption. A request with writes is a
+ * `system_roles.concierge.may_assume`), the management store grant (S4: a declared store grant,
+ * not a role; the reader is an audited disclosure, the writer is issued per write) bound to the
+ * request's tenant and organization, and the grant bound to that scope. A request with writes is a
  * writer and needs its organization; one without is a read-only reader. The grant lives exactly as
  * long as the call: the synchronous form until its callback returns, the asynchronous form until
  * the awaited body settles.
  */
 import {
   assertStoreGrantIssuanceAllowed,
-  withExecutionContext,
-  withExecutionContextAsync,
+  recordStoreGrantDisclosure,
+  withStoreGrant,
+  withStoreGrantAsync,
 } from '../authority.js';
 import type { ExecutionIdentityBinding } from '../foundation/execution-scope.js';
 import {
@@ -45,11 +47,21 @@ function prepare(request: ConciergeManagementRequest): {
   kind: ConciergeManagementGrantKind;
   role: string;
   enter: <T>(run: () => T) => T;
+  disclosureReceipt?: object;
 } {
   const kind: ConciergeManagementGrantKind =
     (request.writer ?? request.writes.length > 0) ? 'writer' : 'reader';
   const role = CONCIERGE_MANAGEMENT_ISSUANCE_RIGHTS[kind];
   assertStoreGrantIssuanceAllowed(role);
+  // S4 (owner decision): a management read is an audited disclosure. It is recorded
+  // here, before the exact ceiling is entered, and the grant consumes the receipt.
+  const disclosureReceipt =
+    kind === 'reader'
+      ? recordStoreGrantDisclosure(role, {
+          tenantSlug: request.tenantSlug,
+          organizationId: request.organizationId,
+        })
+      : undefined;
   const ceiling = {
     tenantSlug: request.tenantSlug,
     ...(request.organizationId ? { organizationId: request.organizationId } : {}),
@@ -60,7 +72,12 @@ function prepare(request: ConciergeManagementRequest): {
     mkdirExact: [...request.mkdir],
     allowProductKnowledgeRead: true,
   };
-  return { kind, role, enter: (run) => runInResourceAccessScope(ceiling, run) };
+  return {
+    kind,
+    role,
+    enter: (run) => runInResourceAccessScope(ceiling, run),
+    ...(disclosureReceipt ? { disclosureReceipt } : {}),
+  };
 }
 
 /** One synchronous exact management access; the grant ends when `action` returns. */
@@ -68,18 +85,20 @@ export function withConciergeManagementAccess<T>(
   request: ConciergeManagementRequest,
   action: () => T
 ): T {
-  const { kind, role, enter } = prepare(request);
+  const { kind, role, enter, disclosureReceipt } = prepare(request);
   return enter(() =>
-    withExecutionContext(
-      // A literal role union keeps the RN-03 reachability analysis bounded.
+    withStoreGrant(
+      // A literal name union keeps the RN-03 reachability analysis bounded.
       role === 'concierge_management_writer'
         ? 'concierge_management_writer'
         : 'concierge_management_reader',
       () => withConciergeManagementGrant(kind, action),
-      undefined,
-      request.tenantSlug,
-      request.organizationId,
-      request.identity
+      {
+        tenantSlug: request.tenantSlug,
+        organizationId: request.organizationId,
+        identity: request.identity,
+        disclosureReceipt,
+      }
     )
   );
 }
@@ -89,17 +108,19 @@ export async function withConciergeManagementAccessAsync<T>(
   request: ConciergeManagementRequest,
   action: () => Promise<T> | T
 ): Promise<T> {
-  const { kind, role, enter } = prepare(request);
+  const { kind, role, enter, disclosureReceipt } = prepare(request);
   return enter(() =>
-    withExecutionContextAsync(
+    withStoreGrantAsync(
       role === 'concierge_management_writer'
         ? 'concierge_management_writer'
         : 'concierge_management_reader',
       () => withConciergeManagementGrantAsync(kind, action),
-      undefined,
-      request.tenantSlug,
-      request.organizationId,
-      request.identity
+      {
+        tenantSlug: request.tenantSlug,
+        organizationId: request.organizationId,
+        identity: request.identity,
+        disclosureReceipt,
+      }
     )
   );
 }

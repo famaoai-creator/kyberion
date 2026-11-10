@@ -1,4 +1,5 @@
 import { createManagedOrganization } from '@agent/core/organization/organization-management';
+import { baseRoleEnvText } from '@agent/core/foundation';
 import { cliApprovalRequester } from './lib/cli-approval-requester.js';
 import {
   buildOrganizationManagementView,
@@ -24,7 +25,6 @@ import {
   buildOrganizationServiceState,
   ensureOrganizationOperationalState,
   enqueueOrganizationLearningCandidate,
-  saveOrganizationLearningCandidate,
   loadOrganizationOperation,
   listOrganizationOperationRuns,
   saveOrganizationOperation,
@@ -54,10 +54,14 @@ import {
   retireOrganizationEntity,
   type OrganizationTier,
 } from '@agent/core/organization/organization-operating-model';
+import {
+  migrateLegacyOrganizationLearningCandidates,
+  saveOrganizationLearningDecision,
+} from '@agent/core/organization/organization-learning-queue';
+import { memoryPromotionQueuePath } from '@agent/core/knowledge/memory-promotion-queue';
 import { resolveScopeResolution } from '@agent/core/scope-context';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync } from '@agent/core/secure-io';
-import { getRegisteredEnvText } from '@agent/core/foundation/env';
 import {
   createOrganizationIncident,
   transitionOrganizationIncident,
@@ -105,8 +109,8 @@ function resolveWriteMode(parsed: ParsedArgs, command: string): 'dry_run' | 'app
     const guard = validateWritePermission(writePreflightTarget);
     if (!guard.allowed) {
       throw new Error(
-        `${command} --apply is not permitted for persona '${getRegisteredEnvText('KYBERION_PERSONA') || 'unknown'}' (${guard.reason}). ` +
-          'Organization writes need KYBERION_PERSONA=sovereign, or MISSION_ROLE=organization_operator with KYBERION_TENANT set to this tenant; nothing was written.'
+        `${command} --apply is not permitted for persona '${baseRoleEnvText() || 'unknown'}' (${guard.reason}). ` +
+          'Organization writes need KYBERION_BASE_ROLE=sovereign, or MISSION_ROLE=organization_operator with KYBERION_TENANT set to this tenant; nothing was written.'
       );
     }
   }
@@ -630,8 +634,26 @@ const ORGANIZATION_COMMAND_HANDLERS: Record<string, OrgCommandHandler> = {
       {
         mode,
         learning,
-        saved_path: mode === 'apply' ? saveOrganizationLearningCandidate(learning) : null,
+        // D8: the decision lands on the MemoryCandidate queue row.
+        saved_path:
+          mode === 'apply'
+            ? memoryPromotionQueuePath(saveOrganizationLearningDecision(current, learning).scope)
+            : null,
       },
+      parsed.json
+    );
+    return;
+  },
+  'learning migrate': (ctx) => {
+    const { parsed, organizationId } = ctx;
+    const mode = resolveWriteMode(parsed, 'learning migrate');
+    emit(
+      migrateLegacyOrganizationLearningCandidates({
+        ...(organizationId ? { organizationId } : {}),
+        ...(parsed.tier ? { tier: parsed.tier } : {}),
+        ...(parsed.tenantSlug ? { tenantSlug: parsed.tenantSlug } : {}),
+        apply: mode === 'apply',
+      }),
       parsed.json
     );
     return;

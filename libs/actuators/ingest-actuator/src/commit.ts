@@ -17,7 +17,7 @@
  *      auto-promotion toward lower tiers is structurally impossible.
  *   2. duplicate — a dedup_result.duplicate commits nothing.
  *   3. identity — ingested_by must be resolvable (explicit input, or
- *      KYBERION_PERSONA / MISSION_ROLE); anonymous ingests are refused.
+ *      KYBERION_BASE_ROLE / MISSION_ROLE); anonymous ingests are refused.
  *   4. PII・秘匿ガード (DA-06) — the normalized card (frontmatter + body) is
  *      scanned against knowledge-sync-rules.json pii_patterns BEFORE any
  *      write: block-action findings refuse the commit (structured error with
@@ -34,6 +34,7 @@
  */
 
 import * as path from 'node:path';
+import { baseRoleEnvText } from '@agent/core/foundation';
 import {
   appendAssetRecord,
   assetProvenanceRef,
@@ -99,7 +100,7 @@ export interface IngestCommitInput {
   steward_approval_id?: string;
   /** DA-06: false-positive override — block-action rules listed here are masked instead (audited). */
   override?: IngestScrubOverride;
-  /** Defaults to KYBERION_PERSONA, then MISSION_ROLE. Refused when unresolvable. */
+  /** Defaults to KYBERION_BASE_ROLE, then MISSION_ROLE. Refused when unresolvable. */
   ingested_by?: string;
   /** Recorded verbatim; defaults to ['normalize_card'] (the input is a normalize_card output). */
   transform_chain?: string[];
@@ -173,13 +174,13 @@ export function assertTargetInsideTenantRoot(
 function resolveIngestedBy(input: IngestCommitInput): string {
   const explicit = String(input.ingested_by || '').trim();
   if (explicit) return explicit;
-  const persona = String(getRegisteredEnvText('KYBERION_PERSONA') || '').trim();
+  const persona = String(baseRoleEnvText() || '').trim();
   if (persona) return persona;
   const role = String(getRegisteredEnvText('MISSION_ROLE') || '').trim();
   if (role) return role;
   fail(
     'ingested_by is required and no identity context is active — pass ingested_by explicitly ' +
-      'or run with KYBERION_PERSONA / MISSION_ROLE set (explicit ingest ceremony, no anonymous ingest)'
+      'or run with KYBERION_BASE_ROLE / MISSION_ROLE set (explicit ingest ceremony, no anonymous ingest)'
   );
 }
 

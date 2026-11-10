@@ -1,19 +1,21 @@
 ---
-title: Wisdom Policy Adapter Guide
+title: Distill Policy Adapter Guide
 category: Governance
 tags: [llm, policy, adapter, distillation, governance]
 importance: 7
 author: Ecosystem Architect
-last_updated: 2026-09-30
+last_updated: 2026-11-10
 ---
 
-# Wisdom Policy Adapter Guide
+# Distill Policy Adapter Guide
 
 This guide explains how Kyberion selects and runs reasoning backends for mission distillation and related knowledge operations.
 
+> The policy file was `wisdom-policy.json` and the override env var `KYBERION_WISDOM_LLM_PROFILE` until 2026-11 (Concept Model v2 D8: "wisdom" names the actuator only). Both old names are still read for one release with a deprecation warning; use `distill-policy.json` and `KYBERION_DISTILL_LLM_PROFILE`.
+
 ## Core Rule
 
-`wisdom-policy.json` is the source of truth for which profile is used for each purpose.
+`distill-policy.json` is the source of truth for which profile is used for each purpose.
 
 - `purpose_map` decides which profile name a purpose should try first
 - `profiles.<name>.command` declares the executable
@@ -37,7 +39,7 @@ If `adapter` is omitted, the runtime falls back to `shell-json`.
 
 ## Adding A New Local LLM
 
-1. Add a new profile under `llm.profiles` in [`wisdom-policy.json`](wisdom-policy.json).
+1. Add a new profile under `llm.profiles` in [`distill-policy.json`](distill-policy.json).
 2. Set `command`, `args`, `timeout_ms`, and `adapter` for that runner.
 3. If the adapter is new, register a structured runner in `libs/core/mission/mission-llm.ts`.
 4. Add or update tests that prove the new adapter can execute a structured schema.

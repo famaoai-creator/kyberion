@@ -13,7 +13,11 @@ vi.mock('@agent/core/mesh/peer-messaging', () => ({
 vi.mock('@agent/core/authority', async () => {
   const actual =
     await vi.importActual<typeof import('@agent/core/authority')>('@agent/core/authority');
-  return { ...actual, withExecutionContext: mocks.withExecutionContext };
+  return {
+    ...actual,
+    withStoreGrant: (_name: string, fn: () => unknown) => fn(),
+    withExecutionContext: mocks.withExecutionContext,
+  };
 });
 
 vi.mock('@agent/core/core', async () => {

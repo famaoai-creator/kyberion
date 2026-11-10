@@ -198,7 +198,7 @@ beforeAll(async () => {
   fixture.seedFirstJobTestRoot(sourceRoot, root);
   vi.stubEnv('KYBERION_ROOT', root);
   vi.stubEnv('MISSION_ROLE', 'worker');
-  vi.stubEnv('KYBERION_PERSONA', 'worker');
+  vi.stubEnv('KYBERION_BASE_ROLE', 'worker');
   vi.resetModules();
   core = await import('./first-job.js');
   setupModule = await import('./first-job-setup.js');
@@ -235,7 +235,7 @@ beforeEach(() => {
     attention: { triggers: [] },
     authority: {
       authority_role: 'infrastructure_sentinel',
-      allowed_work_shapes: ['pipeline'],
+      allowed_execution_shapes: ['pipeline'],
       allowed_pipelines: [execution.FRONT_DESK_RECEIPT_PIPELINE],
     },
     decisions: { default_decision: 'approve', escalate_channel: 'surface' },

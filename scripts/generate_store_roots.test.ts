@@ -135,7 +135,7 @@ describe('catalog root projection', () => {
       custody: { kind: 'tenant', ref: '<tenant>' },
       tiers: ['confidential'],
       status: 'active',
-      legacy_roles: ['delegation_record_store'],
+      grants: ['delegation_record_store'],
       registration: {
         family: 'ledger',
         key: 'delegations',

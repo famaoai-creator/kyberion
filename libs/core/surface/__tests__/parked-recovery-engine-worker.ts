@@ -33,6 +33,7 @@ import {
   type DotActionRecord,
 } from '../../dot/dot-dispatch.js';
 import { DOT_WORK_RESULTS_FILE, dotStatePath } from '../../dot/dot-state-paths.js';
+import { writtenDotActionRow } from '../../dot/dot-action-ledger-version.js';
 import {
   frontDeskExecutionProposal,
   prepareFrontDeskExecution,
@@ -113,7 +114,7 @@ const charter: DotCharter = {
   attention: { triggers: [] },
   authority: {
     authority_role: 'infrastructure_sentinel',
-    allowed_work_shapes: ['pipeline'],
+    allowed_execution_shapes: ['pipeline'],
     allowed_pipelines: ['pipelines/front-desk-request-receipt.json'],
   },
   decisions: { default_decision: 'approve', escalate_channel: 'surface' },
@@ -218,7 +219,7 @@ function seed() {
     action_id: proposal.action_id,
     title: proposal.title,
     objective: proposal.objective,
-    work_shape: 'pipeline',
+    execution_shape: 'pipeline',
     status: 'parked',
     proposal_hash: dotProposalHash(charter.dot_id, proposal),
     decision: 'approve',
@@ -325,11 +326,14 @@ function seedRevision(validChildProof = false) {
     },
     {}
   );
-  appendJsonLine(DOT_ACTION_LEDGER_PATH, {
-    ...parentState.original,
-    status: 'dispatched',
-    work_item_id: parent.work_item_id,
-  });
+  appendJsonLine(
+    DOT_ACTION_LEDGER_PATH,
+    writtenDotActionRow({
+      ...parentState.original,
+      status: 'dispatched',
+      work_item_id: parent.work_item_id,
+    })
+  );
   const childId = '00000000-0000-4000-8000-000000000002';
   reserveConversationTurn(
     viewer,
@@ -404,7 +408,7 @@ function seedRevision(validChildProof = false) {
     action_id: proposal.action_id,
     title: proposal.title,
     objective: proposal.objective,
-    work_shape: proposal.work_shape,
+    execution_shape: proposal.execution_shape,
     status: 'parked',
     proposal_hash: dotProposalHash(charter.dot_id, proposal),
     decision: 'approve',
@@ -601,7 +605,10 @@ function run(mode: string) {
   } else if (mode === 'settle') {
     settleDotParkedActions(charter, { assertTenant: () => undefined });
   } else if (mode === 'ambiguous') {
-    appendJsonLine(DOT_ACTION_LEDGER_PATH, { ...original, action_ref: 'alternate-linked-action' });
+    appendJsonLine(
+      DOT_ACTION_LEDGER_PATH,
+      writtenDotActionRow({ ...original, action_ref: 'alternate-linked-action' })
+    );
   } else if (mode === 'restore-actions') {
     safeWriteFile(
       DOT_ACTION_LEDGER_PATH,
@@ -615,7 +622,7 @@ function run(mode: string) {
           at: receipt.terminated_at,
         },
       ]
-        .map((row) => JSON.stringify(row) + '\n')
+        .map((row) => JSON.stringify(writtenDotActionRow(row)) + '\n')
         .join('')
     );
   } else if (mode === 'pause') {

@@ -53,7 +53,7 @@ function makeMissionState(): MissionState {
     status: 'active',
     execution_mode: 'local',
     priority: 1,
-    assigned_persona: 'worker',
+    org_role: 'worker',
     confidence_score: 1,
     git: {
       branch: 'mission/board-writers-lease-test',
@@ -93,7 +93,7 @@ function statusOf(taskId: string): unknown {
 
 beforeEach(() => {
   process.env.MISSION_ROLE = 'mission_controller';
-  process.env.KYBERION_PERSONA = 'worker';
+  process.env.KYBERION_BASE_ROLE = 'worker';
   setWorkCoordinationNamespace('mission-board-writers-lease-test');
   clearWorkCoordinationStore();
   if (!safeExistsSync(missionPath)) safeMkdir(missionPath, { recursive: true });

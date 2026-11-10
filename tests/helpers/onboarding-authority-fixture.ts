@@ -51,7 +51,7 @@ export function useOnboardingAuthorityFixture() {
     vi.stubEnv('KYBERION_ROOT', root);
     vi.stubEnv('SYSTEM_ROLE', 'concierge');
     vi.stubEnv('MISSION_ROLE', 'worker');
-    vi.stubEnv('KYBERION_PERSONA', 'worker');
+    vi.stubEnv('KYBERION_BASE_ROLE', 'worker');
     for (const key of [
       'MISSION_ID',
       'KYBERION_TENANT',
@@ -124,7 +124,8 @@ export function useOnboardingAuthorityFixture() {
       const issued = identities.issueAgentIdentity({
         kind: 'agent',
         slug,
-        organizationId: 'fixture-system',
+        // The installed personal agent belongs to no tenant (person scope, D3 `_/_`).
+        personScope: true,
         displayName: 'Synthetic installed agent',
         accountableHumanId: 'user:owner',
       });

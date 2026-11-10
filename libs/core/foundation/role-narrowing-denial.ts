@@ -7,9 +7,11 @@ import type {
 import type { WriteContent } from './customer-decision-record-content.js';
 import { isValidTenantSlug } from './scope.js';
 import { isRecord } from './text.js';
+import { rolePermissionRecord } from './declared-store-grant.js';
 
 /**
  * Generic evaluator for `authority_role_permissions.<role>.narrow` declarations
+ * (and, S4, `store_grants.<name>.narrow` of a live declared store grant)
  * in security-policy.json (G3): deny-only overlays that narrow what a role may
  * touch. The rule lives here in the gate so it takes effect even when no
  * store module is loaded; the role names live only in the policy data.
@@ -93,8 +95,9 @@ function roleRulesRecord(
   if (!isRecord(policy)) return null;
   const permissions = policy.authority_role_permissions;
   if (!isRecord(permissions)) return null;
-  if (!Object.hasOwn(permissions, role)) return undefined;
-  const roleRules = permissions[role];
+  // S4: a live declared store grant's `store_grants` declaration narrows like a role's.
+  const roleRules = rolePermissionRecord(policy, role);
+  if (roleRules === undefined) return undefined;
   return isRecord(roleRules) ? roleRules : null;
 }
 

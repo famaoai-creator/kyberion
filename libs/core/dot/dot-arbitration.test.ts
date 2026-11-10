@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { appendJsonLine } from '../foundation/json.js';
+import { DOT_ACTION_SCHEMA_VERSION, writtenDotActionRow } from './dot-action-ledger-version.js';
 import { safeMkdir, safeRmSync } from '../secure-io.js';
 import type {
   AutonomousOpsGateInput,
@@ -64,7 +65,7 @@ const PROPOSAL: DotProposal = {
   action_id: 'dot_delegate_work',
   title: 'Remove the legacy config',
   objective: 'Delete src/legacy/config.ts.',
-  work_shape: 'direct_reply',
+  execution_shape: 'direct_reply',
   target: 'path:src/legacy/**',
   intent: 'remove',
 };
@@ -78,7 +79,7 @@ function seedOlder(overrides: Partial<DotActionRecord> = {}): DotActionRecord {
     action_id: 'dot_delegate_work',
     title: 'Create the legacy config',
     objective: 'Add src/legacy/config.ts.',
-    work_shape: 'direct_reply',
+    execution_shape: 'direct_reply',
     status: 'parked',
     proposal_hash: 'h-older',
     request_id: 'req-older',
@@ -89,7 +90,7 @@ function seedOlder(overrides: Partial<DotActionRecord> = {}): DotActionRecord {
   };
   const file = path.join(TEST_ROOT, DOT_ACTION_LEDGER_PATH);
   safeMkdir(path.dirname(file), { recursive: true });
-  appendJsonLine(file, row);
+  appendJsonLine(file, writtenDotActionRow(row));
   return row;
 }
 
@@ -298,6 +299,7 @@ describe('dot arbitration — escalation and settlement', () => {
   function seedNewcomer(status: DotActionRecord['status'], reason?: string): void {
     const file = path.join(TEST_ROOT, DOT_ACTION_LEDGER_PATH);
     appendJsonLine(file, {
+      schema_version: DOT_ACTION_SCHEMA_VERSION,
       scope: { tier: 'public' },
       action_ref: 'dact-new-1',
       dot_id: 'newcomer',
@@ -305,7 +307,7 @@ describe('dot arbitration — escalation and settlement', () => {
       action_id: 'dot_delegate_work',
       title: PROPOSAL.title,
       objective: PROPOSAL.objective,
-      work_shape: 'direct_reply',
+      execution_shape: 'direct_reply',
       status,
       proposal_hash: 'h-new',
       request_id: 'req-new',

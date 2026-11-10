@@ -6,12 +6,13 @@
  * and run `pnpm generate:types` to regenerate this file.
  */
 
+import type { StorageDataTier } from '../storage-layout.js';
 export interface MissionContract {
   mission_id: string;
   /**
    * The security tier of the mission. 'personal' missions are stored in knowledge/personal/missions, 'confidential' in active/missions/confidential, and 'public' in active/missions/public.
    */
-  tier: 'personal' | 'confidential' | 'public';
+  tier: StorageDataTier;
   role?: string;
   skill: string;
   action: string;
@@ -31,7 +32,7 @@ export interface MissionContract {
     /**
      * Knowledge tier this entry draws from; drives mission tier auto-elevation directly (no path sniffing).
      */
-    tier: 'personal' | 'confidential' | 'public';
+    tier: StorageDataTier;
     /**
      * Required scoping when tier is 'confidential': the tenant slug segment of knowledge/confidential/{tenant-slug}/. The field name is historical — this segment is a tenant (a confidentiality boundary from the tenant registry), not a project.
      */

@@ -2,6 +2,7 @@
  * Pure validation of a trusted in-process canonical-human ownership marker.
  * This contract does not authenticate a transport or read the member registry.
  */
+import type { StorageDataTier } from '../storage-layout.js';
 import { isValidChronosScopeId, isValidMemberId, isValidTenantSlug } from '../foundation/scope.js';
 import {
   SurfaceViewerScopeError,
@@ -41,11 +42,11 @@ export function normalizeHumanRequestScopeList(
 export function normalizeHumanRequestScopeIds(value: unknown): string[] | 'all' {
   return value === 'all' ? 'all' : normalizeHumanRequestScopeList(value, isValidChronosScopeId);
 }
-export function normalizeHumanRequestTiers(value: unknown): ('public' | 'confidential')[] {
+export function normalizeHumanRequestTiers(value: unknown): Exclude<StorageDataTier, 'personal'>[] {
   return normalizeHumanRequestScopeList(
     value,
     (tier) => tier === 'public' || tier === 'confidential'
-  ) as ('public' | 'confidential')[];
+  ) as Exclude<StorageDataTier, 'personal'>[];
 }
 
 /**

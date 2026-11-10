@@ -48,7 +48,7 @@ describe('chronos knowledge scope', () => {
           status: 'active',
           execution_mode: 'local',
           priority: 1,
-          assigned_persona: 'operator',
+          org_role: 'operator',
           confidence_score: 1,
           tenant_slug: 'tenant-a',
           git: { branch: 'main', start_commit: 'a', latest_commit: 'b', checkpoints: [] },

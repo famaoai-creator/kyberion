@@ -1,6 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, describe, expect, it, vi } from 'vitest';
-import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync } from '@agent/core/secure-io';
+import {
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeRmSync,
+  safeWriteFile,
+} from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
 import * as discovery from '@agent/core/actuator/actuator-op-discovery';
 import * as nodePath from 'node:path';
@@ -19,9 +25,11 @@ import {
   readPlaygroundSession,
   recordPlaygroundStep,
   resetPlaygroundSession,
+  playgroundTenantFromPath,
   resolveActuatorDomain,
   resolvePlaygroundCapabilities,
   resolvePlaygroundParamsInput,
+  resolvePlaygroundScratchLocation,
   runPlayground,
 } from './actuator_playground.js';
 
@@ -584,7 +592,7 @@ describe('actuator playground session recording → ADF emit', () => {
     );
     expect(result).toMatchObject({ trust_request_id: 'req-999' });
     const steps = result?.next_steps as string[];
-    expect(steps[0]).toContain('approve req-999 project-trust');
+    expect(steps[0]).toContain('approvals --approve req-999');
     expect(steps[1]).toContain('--project-trust-approval req-999');
   });
 
@@ -621,12 +629,56 @@ describe('actuator playground session recording → ADF emit', () => {
       trustRequestId: 'req-1',
     });
     expect(steps[0]).toContain(`--context '{"api_key":"<value>"}'`);
+    expect(steps.at(-1)).toContain('--source-is-public');
     const delegated = buildPlaygroundEmitNextSteps({
       adfRepoPath: 'active/shared/tmp/x.adf.json',
       redactedKeys: [],
       delegatedScope: 'person',
     });
     expect(delegated[0]).toContain('--delegated-trust person');
+  });
+
+  it('routes playground scratch to the active scope partition', () => {
+    const scopeFile = pathResolver.sharedTmp(`playground-scope-${randomUUID()}.env`);
+    safeMkdir(nodePath.dirname(scopeFile), { recursive: true });
+    safeWriteFile(
+      scopeFile,
+      [
+        'KYBERION_TIER=confidential',
+        'KYBERION_TENANT=acme-corp',
+        'KYBERION_ORGANIZATION_ID=',
+        'KYBERION_PROJECT_ID=',
+        'MISSION_ID=',
+        'KYBERION_TASK_ID=',
+        '',
+      ].join('\n')
+    );
+    const previous = process.env.KYBERION_SCOPE_ENV_PATH;
+    process.env.KYBERION_SCOPE_ENV_PATH = scopeFile;
+    try {
+      const located = resolvePlaygroundScratchLocation();
+      expect(located.tier).toBe('confidential');
+      expect(located.tenant).toBe('acme-corp');
+      expect(located.repoPath).toBe('active/shared/tmp/confidential/acme-corp/actuator-playground');
+      expect(
+        playgroundTenantFromPath(
+          'active/shared/tmp/confidential/acme-corp/actuator-playground/demo.adf.json'
+        )
+      ).toBe('acme-corp');
+      const promote = buildPlaygroundEmitNextSteps({
+        adfRepoPath: 'active/shared/tmp/confidential/acme-corp/actuator-playground/demo.adf.json',
+        redactedKeys: [],
+        trustRequestId: 'req-9',
+        trustRequested: true,
+      });
+      expect(promote[0]).toContain('approvals --approve req-9');
+      expect(promote.at(-1)).toContain('--tenant acme-corp');
+      expect(promote.at(-1)).not.toContain('--source-is-public');
+    } finally {
+      if (previous === undefined) delete process.env.KYBERION_SCOPE_ENV_PATH;
+      else process.env.KYBERION_SCOPE_ENV_PATH = previous;
+      safeRmSync(scopeFile, { force: true });
+    }
   });
 
   it('lists and shows recorded sessions', async () => {

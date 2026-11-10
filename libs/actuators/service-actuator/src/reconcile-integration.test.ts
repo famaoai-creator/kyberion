@@ -246,7 +246,7 @@ describe('service-actuator: RECONCILE with auth check', () => {
           PORT: '3317',
           SYSTEM_ROLE: 'ecosystem_architect',
           MISSION_ROLE: 'mission_controller',
-          KYBERION_PERSONA: 'sovereign',
+          KYBERION_BASE_ROLE: 'sovereign',
           KYBERION_DELEGATED_ROLE: 'ecosystem_architect@nexus_daemon',
           KYBERION_SUDO: 'true',
         },
@@ -275,7 +275,7 @@ describe('service-actuator: RECONCILE with auth check', () => {
     for (const key of [
       'SYSTEM_ROLE',
       'MISSION_ROLE',
-      'KYBERION_PERSONA',
+      'KYBERION_BASE_ROLE',
       'KYBERION_DELEGATED_ROLE',
       'KYBERION_SUDO',
     ]) {

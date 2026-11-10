@@ -940,8 +940,12 @@ describe('governance contracts', () => {
     for (const payload of authorityDirPayloads) {
       expect(authoritySchema(payload)).toBe(true);
     }
+    // Process roles (`assignable: false`) are registry cards with no catalog entry.
     expect(
-      authorityDirPayloads.map((payload) => (payload as { role?: string }).role).sort()
+      authorityDirPayloads
+        .filter((payload) => (payload as { assignable?: boolean }).assignable !== false)
+        .map((payload) => (payload as { role?: string }).role)
+        .sort()
     ).toEqual(Object.keys(authoritySnapshot.authority_roles || {}).sort());
   });
 

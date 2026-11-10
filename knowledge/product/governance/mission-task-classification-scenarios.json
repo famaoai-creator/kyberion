@@ -1031,6 +1031,36 @@
         "promotion_required": true
       },
       "notes": "Explicit mission_type=refactoring under class code_change binds code-refactoring-aidlc (audit→pin→reshape→equivalence)."
+    },
+    {
+      "scenario_id": "web-design-improvement-ja",
+      "utterance": "設定画面がごちゃごちゃして見づらいので、選択できる項目は選択式にしてUI改善してほしい",
+      "classification_input": {
+        "progress_signals": ["plan_ready"],
+        "mission_type_hint": "web_design_improvement"
+      },
+      "work_scope_input": {
+        "catalog_minimum_shape": "task_session"
+      },
+      "expected": {
+        "intent_id": "improve-web-design",
+        "execution_shape": "task_session",
+        "mission_class": "web_design_improvement",
+        "delivery_shape": "single_artifact",
+        "risk_profile": "review_required",
+        "stage": "planning",
+        "workflow_id": "single-track-default",
+        "workflow_pattern": "single_track_execution",
+        "review_mode": "standard",
+        "required_gate_ids": [
+          "CONTRACT_VALID",
+          "QA_READY",
+          "INTENT_DRIFT",
+          "ARTIFACT_BUNDLE",
+          "DELIVERABLE_QUALITY"
+        ],
+        "promotion_required": false
+      }
     }
   ]
 }

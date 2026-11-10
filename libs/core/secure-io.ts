@@ -1,4 +1,5 @@
 import * as fs from 'node:fs';
+import { writeBaseRoleEnv } from './foundation/base-role-env.js';
 import * as path from 'node:path';
 import { rawReadFileSnapshot } from './fs-primitives.js';
 import {
@@ -48,7 +49,8 @@ import { policyEngine } from './governance/policy-engine.js';
 import * as auditChainModule from './governance/audit-chain.js';
 import { recordGovernanceAction } from './governance/governance-action-recorder.js';
 import { createLogger } from './logger.js';
-import { currentExecutionScope, executionPersonaText } from './foundation/execution-scope.js';
+import { currentExecutionScope } from './foundation/execution-scope.js';
+import { executionAgentId } from './governance/execution-agent-id.js';
 import {
   assertScopedMetadataReadable,
   assertCanonicalReadable,
@@ -129,6 +131,7 @@ const SAFE_EXEC_ENV_ALLOWLIST = [
   'VOLTA_HOME',
   'MISSION_ID',
   'MISSION_ROLE',
+  'KYBERION_BASE_ROLE',
   'KYBERION_PERSONA',
   'KYBERION_SUDO',
   'CODEX_HOME',
@@ -249,12 +252,18 @@ export function buildSafeExecEnv(
 
   // RA-01: a child inherits the role/persona assumed by the caller's own
   // execution scope, not whatever a concurrent async context last mirrored
-  // into the process-global env.
+  // into the process-global env. Tenant-bound assumptions also carry the
+  // bound tenant so `${KYBERION_TENANT}` grants expand in the child the same
+  // way the parent's ALS identity did (scope.env alone is not on the
+  // allowlist, so without this a confidential playground/perception spawn
+  // would keep MISSION_ROLE but lose the tenant binding).
   const scope = currentExecutionScope();
   if (scope?.assumedRole) {
     safeEnv.MISSION_ROLE = scope.assumedRole;
-    if (typeof scope.assumedPersona === 'string') safeEnv.KYBERION_PERSONA = scope.assumedPersona;
-    else if (scope.assumedPersona === null) delete safeEnv.KYBERION_PERSONA;
+    if (scope.assumedPersona !== undefined) writeBaseRoleEnv(safeEnv, scope.assumedPersona);
+  }
+  if (scope?.tenantBound && scope.tenantSlug) {
+    safeEnv.KYBERION_TENANT = scope.tenantSlug;
   }
 
   for (const [key, value] of Object.entries(extraEnv)) {
@@ -632,7 +641,7 @@ export function safeWriteFile(
     _policyCheckInProgress = true;
     try {
       const policyDecision = policyEngine.evaluate({
-        agentId: executionPersonaText() || 'unknown',
+        agentId: executionAgentId(),
         operation: 'file_write',
         ...(instructionEffect
           ? {
@@ -649,17 +658,12 @@ export function safeWriteFile(
         message: `Write to ${resolved}`,
       });
       if (!policyDecision.allowed) {
-        recordGovernanceAction(
-          executionPersonaText() || 'unknown',
-          'file_write',
-          `${resolved}:denied`,
-          true
-        );
+        recordGovernanceAction(executionAgentId(), 'file_write', `${resolved}:denied`, true);
         // A write made under the audit chain lock (mirror reconcile, tenant
         // rename) would otherwise wait out the lock on itself and surface as
         // a lock timeout instead of this denial.
         auditChain.recordDeferrable({
-          agentId: executionPersonaText() || 'unknown',
+          agentId: executionAgentId(),
           action: 'policy_violation',
           operation: 'file_write',
           result: 'failed',
@@ -754,7 +758,7 @@ export function safeWriteFile(
     if (instructionEffect) {
       try {
         auditChain.recordDeferrable({
-          agentId: executionPersonaText() || 'unknown',
+          agentId: executionAgentId(),
           action: 'persistent_instruction_write',
           operation: 'file_write',
           result: 'completed',
@@ -1198,21 +1202,16 @@ function assertExecPolicy(command: string, args: readonly string[] = []): void {
   const ringRaw = getRegisteredEnvText('KYBERION_AGENT_RING');
   const ring = ringRaw !== undefined && ringRaw !== '' ? Number(ringRaw) : Number.NaN;
   const decision = policyEngine.evaluate({
-    agentId: executionPersonaText() || 'unknown',
+    agentId: executionAgentId(),
     operation: 'execute_command',
     ...(describeOpaqueInstructionExecution(command, args) ?? {}),
     message: `Execute ${command}`,
     ...(Number.isFinite(ring) ? { agent_ring: ring } : {}),
   });
   if (!decision.allowed) {
-    recordGovernanceAction(
-      executionPersonaText() || 'unknown',
-      'execute_command',
-      `${command}:denied`,
-      true
-    );
+    recordGovernanceAction(executionAgentId(), 'execute_command', `${command}:denied`, true);
     auditChain.recordDeferrable({
-      agentId: executionPersonaText() || 'unknown',
+      agentId: executionAgentId(),
       action: 'policy_violation',
       operation: 'execute_command',
       result: 'failed',

@@ -14,7 +14,7 @@
  * operator inbox entry with a deterministic id. Ids and counts only.
  */
 import { createHash } from 'node:crypto';
-import { withExecutionContext } from '../authority.js';
+import { withStoreGrant } from '../authority.js';
 import { logger } from '../core.js';
 import { addInboxEntry } from '../task/deliverable-inbox.js';
 import { DELIVERABLE_INBOX_WRITER_ROLE } from '../foundation/deliverable-inbox-writer-capability.js';
@@ -144,7 +144,7 @@ export function notifyCustomerDecisionPinFailedRepeatedly(input: {
   };
   try {
     // The inbox's own narrow writer: it can write nothing else.
-    withExecutionContext(DELIVERABLE_INBOX_WRITER_ROLE, () =>
+    withStoreGrant(DELIVERABLE_INBOX_WRITER_ROLE, () =>
       addInboxEntry({
         entryId,
         ifAbsent: true,

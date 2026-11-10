@@ -1,4 +1,5 @@
 import type { WorkItem } from '../workforce/work-coordination-types.js';
+import { requestedExecutionShape } from '../dot/dot-requested-shape.js';
 export const INFORMATION_ASSET_WORK_PIPELINE =
   'knowledge/product/pipeline-templates/information-asset-work.json';
 import type {
@@ -149,7 +150,7 @@ export function buildInformationAssetMissionExecutionPlan(
 ): InformationAssetMissionExecutionPlan {
   const binding = parseInformationAssetWorkBinding(item.metadata?.information_asset_work);
   if (
-    item.metadata?.requested_work_shape !== 'mission' ||
+    requestedExecutionShape(item.metadata) !== 'mission' ||
     item.metadata.mission_id !== missionId ||
     typeof item.metadata.dot_id !== 'string' ||
     !item.metadata.mission_admission

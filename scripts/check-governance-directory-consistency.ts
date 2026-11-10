@@ -18,6 +18,12 @@ import { loadVoiceEngineRegistryDirectory } from '@agent/core/voice/voice-engine
 import { loadVoiceProfileRegistryDirectory } from '@agent/core/voice/voice-profile-registry';
 import { loadSpecialistCatalog } from '@agent/core/workforce/work-design';
 import { defineCatalog } from '@agent/core/foundation';
+import {
+  isAssignableAuthorityRoleCard,
+  loadAuthorityRoleCards,
+  projectAuthorityRolePermissions,
+  type AuthorityRoleCard,
+} from '@agent/core/organization/authority-role-registry';
 
 type VoiceProfileSnapshot = {
   default_profile_id?: string;
@@ -75,6 +81,12 @@ const authorityRoleSnapshotCatalog = defineCatalog<AuthorityRoleSnapshot>({
   id: 'authority-role-index-snapshot',
   path: pathResolver.knowledge('product/governance/authority-role-index.json'),
   schema: pathResolver.knowledge('product/schemas/authority-role-index.schema.json'),
+});
+
+const securityPolicyCatalog = defineCatalog<{ authority_role_permissions?: unknown }>({
+  id: 'security-policy-authority-role-projection',
+  path: pathResolver.knowledge('product/governance/security-policy.json'),
+  schema: pathResolver.knowledge('product/schemas/security-policy.schema.json'),
 });
 
 const surfaceProviderSnapshotCatalog = defineCatalog<SurfaceProviderSnapshot>({
@@ -253,9 +265,12 @@ export function validateAuthorityRoleDirectoryConsistency(violations: string[]) 
     return;
   }
   const seenRoleIds = new Set<string>();
+  const cards = loadAuthorityRoleCards() ?? {};
 
   for (const file of files) {
     const role = file.replace(/\.json$/i, '');
+    const card = cards[role];
+    if (card && !isAssignableAuthorityRoleCard(card)) continue;
     const data = directoryRoles[role];
     if (!data) {
       violations.push(`authority-role-index/${file}: canonical loader did not return this role`);
@@ -278,6 +293,58 @@ export function validateAuthorityRoleDirectoryConsistency(violations: string[]) 
   const directoryIds = [...seenRoleIds].sort();
   if (JSON.stringify(snapshotIds) !== JSON.stringify(directoryIds)) {
     violations.push('authority-role-index: snapshot and canonical directory role ids diverge');
+  }
+
+  validateAuthorityRolePermissionProjection(cards, violations);
+}
+
+function stableJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
+  if (value && typeof value === 'object')
+    return `{${Object.entries(value)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, child]) => `${JSON.stringify(key)}:${stableJson(child)}`)
+      .join(',')}}`;
+  return JSON.stringify(value);
+}
+
+/**
+ * Drift gate of the one Authority Role registry (concept model v2 D6):
+ * security-policy.json `authority_role_permissions` must be exactly the
+ * projection of the cards' `permissions` — no role, path or rule that the
+ * registry does not declare, and none missing.
+ */
+export function validateAuthorityRolePermissionProjection(
+  cards: Record<string, AuthorityRoleCard>,
+  violations: string[],
+  policy: { authority_role_permissions?: unknown } = securityPolicyCatalog.load()
+) {
+  const expected = projectAuthorityRolePermissions(cards);
+  const actual = policy.authority_role_permissions;
+  if (!actual || typeof actual !== 'object' || Array.isArray(actual)) {
+    violations.push(
+      'security-policy: authority_role_permissions is missing | run pnpm kyberion sync authority-roles'
+    );
+    return;
+  }
+  const actualRoles = actual as Record<string, unknown>;
+  for (const role of Object.keys(actualRoles)) {
+    if (!Object.hasOwn(expected, role)) {
+      violations.push(
+        `security-policy: authority_role_permissions.${role} has no card in knowledge/product/governance/authority-roles/ | declare it in the card's permissions, then run pnpm kyberion sync authority-roles`
+      );
+    } else if (stableJson(actualRoles[role]) !== stableJson(expected[role])) {
+      violations.push(
+        `security-policy: authority_role_permissions.${role} differs from authority-roles/${role}.json permissions | edit the card, then run pnpm kyberion sync authority-roles`
+      );
+    }
+  }
+  for (const role of Object.keys(expected)) {
+    if (!Object.hasOwn(actualRoles, role)) {
+      violations.push(
+        `security-policy: authority_role_permissions.${role} is missing (declared in authority-roles/${role}.json) | run pnpm kyberion sync authority-roles`
+      );
+    }
   }
 }
 

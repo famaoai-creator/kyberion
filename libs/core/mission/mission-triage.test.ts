@@ -26,7 +26,7 @@ function prepareMission(
         status,
         execution_mode: 'local',
         priority: 1,
-        assigned_persona: 'triage-test-actor',
+        org_role: 'triage-test-actor',
         confidence_score: 1,
         intent: { goal_summary: 'original mission goal' },
         git: {
@@ -56,9 +56,9 @@ let previousPersona: string | undefined;
 
 beforeEach(() => {
   previousMissionRole = process.env.MISSION_ROLE;
-  previousPersona = process.env.KYBERION_PERSONA;
+  previousPersona = process.env.KYBERION_BASE_ROLE;
   process.env.MISSION_ROLE = 'mission_controller';
-  process.env.KYBERION_PERSONA = 'triage-test-actor';
+  process.env.KYBERION_BASE_ROLE = 'triage-test-actor';
   safeRmSync(missionPath, { recursive: true, force: true });
 });
 
@@ -66,8 +66,8 @@ afterEach(() => {
   safeRmSync(missionPath, { recursive: true, force: true });
   if (previousMissionRole === undefined) delete process.env.MISSION_ROLE;
   else process.env.MISSION_ROLE = previousMissionRole;
-  if (previousPersona === undefined) delete process.env.KYBERION_PERSONA;
-  else process.env.KYBERION_PERSONA = previousPersona;
+  if (previousPersona === undefined) delete process.env.KYBERION_BASE_ROLE;
+  else process.env.KYBERION_BASE_ROLE = previousPersona;
 });
 
 describe('collectMissionTriageReport', () => {
@@ -170,7 +170,7 @@ describe('collectMissionTriageReport', () => {
           status: 'archived',
           execution_mode: 'local',
           priority: 1,
-          assigned_persona: 'triage-test-actor',
+          org_role: 'triage-test-actor',
           confidence_score: 1,
           git: { branch: 'test', start_commit: 'a', latest_commit: 'a', checkpoints: [] },
           history: [],

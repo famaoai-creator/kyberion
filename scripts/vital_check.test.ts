@@ -28,7 +28,7 @@ vi.mock('@agent/core/profile-root', () => ({
 
 describe('vital_check', () => {
   beforeEach(() => {
-    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     process.env.MISSION_ROLE = 'mission_controller';
     process.env.KYBERION_STANCE = CUSTOMER_SLUG;
     safeRmSync(FIXTURE_ROOT);
@@ -42,7 +42,7 @@ describe('vital_check', () => {
     safeRmSync(ACTIVE_MISSION);
     safeRmSync(PERSONAL_MISSION);
     safeRmSync(CUSTOMER_OVERLAY_ROOT);
-    delete process.env.KYBERION_PERSONA;
+    delete process.env.KYBERION_BASE_ROLE;
     delete process.env.MISSION_ROLE;
     delete process.env.KYBERION_STANCE;
   });

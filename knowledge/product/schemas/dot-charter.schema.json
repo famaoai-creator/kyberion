@@ -168,8 +168,18 @@
                     "overdue_operations",
                     "open_incidents",
                     "pending_decisions",
-                    "unhealthy_services"
+                    "unhealthy_services",
+                    "cost_usd",
+                    "llm_tokens",
+                    "llm_calls",
+                    "unknown_cost_calls"
                   ]
+                },
+                "window_days": {
+                  "type": "number",
+                  "exclusiveMinimum": 0,
+                  "maximum": 90,
+                  "description": "Trailing measurement window for cost metrics, in days (default 7)."
                 }
               }
             }
@@ -616,12 +626,19 @@
           "type": "string",
           "description": "Optional reference to a governance accountability-charter that bounds delegated authority."
         },
+        "allowed_execution_shapes": {
+          "type": "array",
+          "items": {
+            "enum": ["mission", "task_session", "pipeline", "direct_reply"]
+          },
+          "description": "Execution shapes (ExecutionShape subset) the dot may dispatch. The dot itself never writes outside its authority role's scopes; substantive work is delegated as WorkItems."
+        },
         "allowed_work_shapes": {
           "type": "array",
           "items": {
             "enum": ["mission", "task_session", "pipeline", "direct_reply"]
           },
-          "description": "Work shapes the dot may dispatch. The dot itself never writes outside its authority role's scopes; substantive work is delegated as WorkItems."
+          "description": "Deprecated alias of allowed_execution_shapes, accepted for one release and normalized at load. Use allowed_execution_shapes."
         },
         "max_concurrent_delegations": {
           "type": "integer",

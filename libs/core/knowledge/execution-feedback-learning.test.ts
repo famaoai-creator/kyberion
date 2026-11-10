@@ -1,10 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createDistillCandidateRecord } from './distill-candidate-registry.js';
+import {
+  createDistillCandidateRecord,
+  saveDistillCandidateRecord,
+} from './distill-candidate-registry.js';
 import {
   inspectExecutionFeedbackLearning,
   queueExecutionFeedbackLearning,
 } from './execution-feedback-learning.js';
 import {
+  listMemoryPromotionCandidates,
   loadMemoryPromotionCandidate,
   memoryPromotionQueuePath,
   updateMemoryPromotionCandidateStatus,
@@ -12,7 +16,6 @@ import {
 import { safeExistsSync, safeReadFile, safeRmSync, safeWriteFile } from '../secure-io.js';
 import { pathResolver } from '../path-resolver.js';
 import {
-  executionFeedbackCandidatePath,
   executionFeedbackScopeRoot,
   loadExecutionFeedbackCandidate,
   saveExecutionFeedbackCandidate,
@@ -41,11 +44,26 @@ function candidate(overrides: Record<string, unknown> = {}) {
     metadata: { improvement_kind: 'execution_feedback', review_required: true },
     ...overrides,
   });
-  if (row.scope) extraRoots.add(executionFeedbackScopeRoot(row.scope));
-  saveExecutionFeedbackCandidate(row);
+  if (row.scope?.tenant_slug) extraRoots.add(executionFeedbackScopeRoot(row.scope));
   ids.add(row.candidate_id);
-  return row;
+  // D8: unscoped rows can only be legacy (read-only) records; scoped ones are
+  // MemoryCandidate queue rows.
+  if (!row.scope) {
+    saveDistillCandidateRecord(row);
+    return row;
+  }
+  return saveExecutionFeedbackCandidate({
+    ...row,
+    evidence_refs: row.evidence_refs || [],
+    metadata: row.metadata || {},
+  });
 }
+/** Stable snapshot of a proposal (the queue row's view). */
+const snapshot = (id: string, selected?: MemoryScopeEnvelope) =>
+  JSON.stringify(loadExecutionFeedbackCandidate(id, selected));
+/** Learning rows handed to human review (`MEM-FB-*`) in a scope. */
+const learningRows = (selected: MemoryScopeEnvelope) =>
+  listMemoryPromotionCandidates(selected).filter((row) => row.candidate_id.startsWith('MEM-FB-'));
 afterEach(() => {
   vi.restoreAllMocks();
   for (const id of ids)
@@ -59,16 +77,15 @@ afterEach(() => {
 describe('execution feedback learning handoff', () => {
   it('reports a proposed candidate without approving, publishing, or claiming retrieval', () => {
     const row = candidate();
-    const file = executionFeedbackCandidatePath(row.candidate_id, scope);
-    const before = safeReadFile(file, { encoding: 'utf8' });
+    const before = snapshot(row.candidate_id, scope);
     expect(inspectExecutionFeedbackLearning(row.candidate_id, scope)).toMatchObject({
       queue: { status: 'not_queued' },
       human_review: { status: 'pending' },
       promotion: { status: 'none' },
       retrieval: { status: 'unmeasured' },
     });
-    expect(safeReadFile(file, { encoding: 'utf8' })).toEqual(before);
-    expect(safeExistsSync(memoryPromotionQueuePath(scope))).toBe(false);
+    expect(snapshot(row.candidate_id, scope)).toEqual(before);
+    expect(learningRows(scope)).toEqual([]);
   });
   it('queues once with exact scope and an immutable digest link, without ratification', () => {
     const row = candidate();
@@ -139,22 +156,23 @@ describe('execution feedback learning handoff', () => {
     { tier: 'public' },
   ])('keeps unsupported publisher scope read-only: %j', (extra) => {
     const restricted = { ...scope, ...extra } as MemoryScopeEnvelope;
+    if (restricted.tier === 'public') {
+      // D8: the queue never holds a tenant-scoped public row without a brokered
+      // promotion, so such a proposal is not captured at all.
+      expect(() => candidate({ scope: restricted, tier: restricted.tier })).toThrow(/brokered/);
+      expect(listExecutionFeedbackCandidates(restricted)).toEqual([]);
+      return;
+    }
     const row = candidate({ scope: restricted, tier: restricted.tier });
-    const before = safeReadFile(executionFeedbackCandidatePath(row.candidate_id, restricted), {
-      encoding: 'utf8',
-    });
+    const before = snapshot(row.candidate_id, restricted);
     expect(inspectExecutionFeedbackLearning(row.candidate_id, restricted).blockers[0]).toMatch(
       /^promotion_scope_not_preserved:/
     );
     expect(() => queueExecutionFeedbackLearning(row.candidate_id, restricted)).toThrow(
       /PROMOTION_SCOPE_UNSUPPORTED/
     );
-    expect(
-      safeReadFile(executionFeedbackCandidatePath(row.candidate_id, restricted), {
-        encoding: 'utf8',
-      })
-    ).toBe(before);
-    expect(safeExistsSync(memoryPromotionQueuePath(scope))).toBe(false);
+    expect(snapshot(row.candidate_id, restricted)).toBe(before);
+    expect(learningRows(restricted)).toEqual([]);
     expect(listExecutionFeedbackCandidates(scope)).toEqual([]);
   });
   it('uses separate tenant and exact-scope files and never writes scoped proposals globally', () => {
@@ -237,10 +255,17 @@ describe('execution feedback learning handoff', () => {
     const row = candidate();
     const review = queueExecutionFeedbackLearning(row.candidate_id, scope);
     const queued = loadMemoryPromotionCandidate(review.queue.candidate_id!, scope)!;
-    safeWriteFile(
-      memoryPromotionQueuePath(scope),
-      JSON.stringify({ ...queued, summary: 'Tampered fictional summary.' }) + '\n'
-    );
+    // Tamper only the learning row; the proposal row shares the queue file.
+    const lines = String(safeReadFile(memoryPromotionQueuePath(scope), { encoding: 'utf8' }))
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => {
+        const parsed = JSON.parse(line);
+        return parsed.candidate_id === queued.candidate_id
+          ? JSON.stringify({ ...queued, summary: 'Tampered fictional summary.' })
+          : line;
+      });
+    safeWriteFile(memoryPromotionQueuePath(scope), lines.join('\n') + '\n');
     expect(inspectExecutionFeedbackLearning(row.candidate_id, scope).blockers).toContain(
       'queue_digest_or_scope_mismatch'
     );
@@ -261,9 +286,7 @@ describe('execution feedback learning handoff', () => {
     ids.add(first.candidate_id);
     extraRoots.add(executionFeedbackScopeRoot(scope));
     queueExecutionFeedbackLearning(first.candidate_id, scope);
-    const before = safeReadFile(executionFeedbackCandidatePath(first.candidate_id, scope), {
-      encoding: 'utf8',
-    });
+    const before = snapshot(first.candidate_id, scope);
     const next = materializeExecutionFeedbackCandidate({
       feedback: recordExecutionFeedback({
         scenario_id: 'synthetic-linked',
@@ -275,9 +298,7 @@ describe('execution feedback learning handoff', () => {
     }).candidate!;
     ids.add(next.candidate_id);
     expect(next.candidate_id).not.toBe(first.candidate_id);
-    expect(
-      safeReadFile(executionFeedbackCandidatePath(first.candidate_id, scope), { encoding: 'utf8' })
-    ).toBe(before);
+    expect(snapshot(first.candidate_id, scope)).toBe(before);
     expect(inspectExecutionFeedbackLearning(first.candidate_id, scope).queue.status).toBe('queued');
   });
 });

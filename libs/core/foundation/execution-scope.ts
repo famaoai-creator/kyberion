@@ -1,5 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { config } from './config.js';
+import { baseRoleEnvText } from './base-role-env.js';
 import { getRegisteredEnvText } from './env.js';
 import { createLogger } from '../logger.js';
 
@@ -12,7 +12,7 @@ const logger = createLogger('execution-scope');
  * `withExecutionContextAsync` (authority.ts).
  *
  * The assumed role and persona live here rather than only in
- * `process.env.MISSION_ROLE` / `KYBERION_PERSONA` because
+ * `process.env.MISSION_ROLE` / `KYBERION_BASE_ROLE` because
  *   - a surface launched by surface_runtime runs with `SYSTEM_ROLE`, which
  *     outranks `MISSION_ROLE`, so an env-only assumption was silently ignored;
  *   - mutating process-global env from an async helper races between
@@ -59,6 +59,12 @@ export interface ExecutionScope {
    * the persona; `undefined` means the assumption left it to the environment.
    */
   readonly assumedPersona?: string | null;
+  /**
+   * Opaque token of the declared store grant this scope was opened for
+   * (authority.ts `withStoreGrant`, foundation/declared-store-grant.ts). Only
+   * a token that module issued and has not revoked resolves a grant.
+   */
+  readonly storeGrantToken?: object;
 }
 
 /** Returns false when the current process may not act as `role` (RA-02). */
@@ -174,7 +180,7 @@ export function scopedAssumedRole(): string | undefined {
 /**
  * The persona bound by the innermost withExecutionContext*.
  * `bound: false` means no assumption decided the persona, so callers fall back
- * to the `KYBERION_PERSONA` environment variable.
+ * to the `KYBERION_BASE_ROLE` environment variable.
  */
 export function scopedPersona(): { bound: boolean; persona?: string } {
   const scope = currentExecutionScope();
@@ -187,11 +193,11 @@ export function scopedPersona(): { bound: boolean; persona?: string } {
 /**
  * The persona of the current execution (B2): the persona bound by the
  * innermost withExecutionContext* when it decided one, else
- * `KYBERION_PERSONA`. Authorization inputs (policy-engine agentId, persona
+ * `KYBERION_BASE_ROLE`. Authorization inputs (policy-engine agentId, persona
  * gates) must use this rather than the raw env var, which the async helper
  * never mirrors and which is shared by every async context in the process.
  */
 export function executionPersonaText(): string | undefined {
   const scoped = scopedPersona();
-  return scoped.bound ? scoped.persona : config.text('KYBERION_PERSONA');
+  return scoped.bound ? scoped.persona : baseRoleEnvText();
 }

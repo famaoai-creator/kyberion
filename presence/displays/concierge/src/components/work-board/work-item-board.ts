@@ -56,6 +56,16 @@ export interface BoardCard {
   updatedAt?: string;
   description?: string;
   href?: string;
+  /** An Issue's steps (D1): how many there are and how many are finished. */
+  steps?: { total: number; done: number };
+}
+
+/** One step shown inside its Issue's card. */
+export interface BoardStep {
+  id: string;
+  title: string;
+  status: string;
+  href?: string;
 }
 
 export interface BoardColumn<T extends BoardCard = BoardCard> {
@@ -267,5 +277,60 @@ export function summarizeWorkItemDescription(
     summary,
     ...(deliverable ? { deliverable } : {}),
     hasMore: full !== summary,
+  };
+}
+
+/** An Issue's step progress for its card, or null when it has no steps. Percent is whole, 0–100. */
+export function stepProgress(
+  steps: BoardCard['steps']
+): { total: number; done: number; percent: number } | null {
+  if (!steps || steps.total <= 0) return null;
+  const done = Math.min(Math.max(0, steps.done), steps.total);
+  return { total: steps.total, done, percent: Math.round((done / steps.total) * 100) };
+}
+
+/** Steps in board order (backlog → done, archived last), then by title. */
+export function orderBoardSteps<T extends Pick<BoardStep, 'status' | 'title'>>(
+  steps: readonly T[]
+): T[] {
+  const rank = (status: string) => {
+    const index = WORK_ITEM_STATUS_ORDER.indexOf(status);
+    return index < 0 ? WORK_ITEM_STATUS_ORDER.length : index;
+  };
+  return [...steps].sort(
+    (left, right) => rank(left.status) - rank(right.status) || left.title.localeCompare(right.title)
+  );
+}
+
+/**
+ * Issue cards and their steps from one flat item list (D1): an item whose
+ * parent is in the list is a step of that card; any other item is a card
+ * (a step whose Issue is not visible stays reachable as its own card).
+ */
+export function groupIssueCards<T extends BoardCard & { parentId?: string }>(
+  items: readonly T[]
+): { cards: T[]; stepsOf: Map<string, T[]> } {
+  const ids = new Set(items.map((item) => item.id));
+  const stepsOf = new Map<string, T[]>();
+  const cards: T[] = [];
+  for (const item of items) {
+    if (item.parentId && item.parentId !== item.id && ids.has(item.parentId)) {
+      const list = stepsOf.get(item.parentId) ?? [];
+      list.push(item);
+      stepsOf.set(item.parentId, list);
+    } else {
+      cards.push(item);
+    }
+  }
+  return {
+    cards: cards.map((card) => {
+      const steps = stepsOf.get(card.id);
+      if (!steps) return card;
+      const done = steps.filter(
+        (step) => step.status === 'done' || step.status === ARCHIVED_STATUS
+      ).length;
+      return { ...card, steps: { total: steps.length, done } };
+    }),
+    stepsOf,
   };
 }

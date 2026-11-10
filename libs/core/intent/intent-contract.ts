@@ -11,7 +11,10 @@ import {
   overlayCanonicalWorkScopeDecision,
   type OrganizationWorkLoopSummary,
 } from '../workforce/work-design.js';
-import { resolveWorkScopeSignalOptions } from '../workforce/work-scope-decision.js';
+import {
+  catalogShapePromotesToMission,
+  resolveWorkScopeSignalOptions,
+} from '../workforce/work-scope-decision.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { parseSafeJsonObjectInput } from '../foundation/safe-json.js';
 import { discoverProviders, type ProviderInfo } from '../provider/provider-discovery.js';
@@ -25,10 +28,8 @@ import {
   summarizeRelevantExecutionProfilesForIntentIds,
   summarizeRelevantExecutionProfilesForIntentIdsCompact,
 } from './intent-execution-profile-registry.js';
-import {
-  loadResolvedStandardIntentCatalog,
-  resolveIntentResolutionPacket,
-} from './intent-resolution.js';
+import { loadResolvedStandardIntentCatalog } from './intent-resolution.js';
+import { resolveRoutingPacket } from './intent-resolver-entry.js';
 import type {
   IntentResolutionOptions,
   IntentResolutionPacket,
@@ -145,6 +146,8 @@ interface DeliveryModeDecisionRule {
   shapes?: ExecutionShape[];
   text_patterns?: Array<TextMatchRule | string>;
   min_required_inputs?: number;
+  /** Match only when work-scope-policy.json promotes the shape to mission scope. */
+  work_scope_promotion?: boolean;
 }
 
 interface IntentPolicyFile {
@@ -485,12 +488,12 @@ function resolveIntentAwareCompilerTarget(
 
 export function summarizeRelevantIntents(
   text: string,
-  packet?: ReturnType<typeof resolveIntentResolutionPacket>,
+  packet?: IntentResolutionPacket,
   options: IntentResolutionOptions = {}
 ): { text: string; omitted_count: number } {
   const policy = loadIntentPolicy();
   const intents = loadResolvedStandardIntentCatalog(options);
-  const resolvedPacket = packet || resolveIntentResolutionPacket(text);
+  const resolvedPacket = packet || resolveRoutingPacket(text);
   const catalogById = new Map(intents.map((intent) => [String(intent.id || ''), intent]));
   const scored = resolvedPacket.candidates
     .slice(0, policy.compiler.relevant_intent_limit)
@@ -642,12 +645,15 @@ function deliveryRuleMatches(
   rule: DeliveryModeDecisionRule
 ): boolean {
   const shapeMatch = !rule.shapes?.length || rule.shapes.includes(context.shape);
+  const promotionMatch =
+    rule.work_scope_promotion === undefined ||
+    rule.work_scope_promotion === catalogShapePromotesToMission(context.shape);
   const minRequiredInputsMatch =
     rule.min_required_inputs === undefined ||
     context.requiredInputs.length >= rule.min_required_inputs;
   const textMatch =
     !rule.text_patterns?.length || matchesAnyTextRule(context.text, rule.text_patterns);
-  return shapeMatch && minRequiredInputsMatch && textMatch;
+  return shapeMatch && promotionMatch && minRequiredInputsMatch && textMatch;
 }
 
 export function inferGovernedDeliveryMode(
@@ -682,11 +688,12 @@ function toExecutionBriefSeed(
     serviceBindings: input.serviceBindings,
     summaryHint: extras.summaryHint,
     contextualFrame: extras.contextualFrame || input.resolutionPacket?.contextual_frame,
+    ...(input.carriedRoutingDecision ? { routingDecision: input.carriedRoutingDecision } : {}),
   };
 }
 
 function resolveIntentPacketForInput(input: CompileUserIntentFlowInput): IntentResolutionPacket {
-  return resolveIntentResolutionPacket(input.text, {
+  return resolveRoutingPacket(input.text, {
     tier: input.tier,
     tenantId: resolveTenantId(input),
   });
@@ -1278,7 +1285,7 @@ function attachCorrelationId(
 }
 
 export function deriveIntentDeliveryDecision(contract: IntentContract): IntentDeliveryDecision {
-  return deriveIntentDeliveryDecisionFromModule(contract);
+  return deriveIntentDeliveryDecisionFromModule(contract, catalogShapePromotesToMission);
 }
 
 export function deriveAgentRoutingDecision(
@@ -1289,6 +1296,7 @@ export function deriveAgentRoutingDecision(
   return deriveAgentRoutingDecisionWithDependencies(contract, workLoop, sourceText, {
     resolvePolicyRoutingDecision,
     findStandardIntentById,
+    shapePromotesToMission: catalogShapePromotesToMission,
   });
 }
 

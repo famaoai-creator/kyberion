@@ -61,7 +61,7 @@ function makeMissionState(): MissionState {
     execution_mode: 'local',
     relationships: {},
     priority: 3,
-    assigned_persona: 'worker',
+    org_role: 'worker',
     confidence_score: 1,
     git: {
       branch: 'mission/process-plan',
@@ -75,7 +75,7 @@ function makeMissionState(): MissionState {
 
 beforeEach(() => {
   process.env.MISSION_ROLE = 'mission_controller';
-  process.env.KYBERION_PERSONA = 'worker';
+  process.env.KYBERION_BASE_ROLE = 'worker';
   if (!safeExistsSync(missionPath)) safeMkdir(missionPath, { recursive: true });
   safeWriteFile(`${missionPath}/mission-state.json`, JSON.stringify(makeMissionState(), null, 2));
   safeWriteFile(`${missionPath}/TASK_BOARD.md`, `# Task Board: ${missionId}\n`);

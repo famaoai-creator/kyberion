@@ -1,0 +1,7 @@
+{
+  "role": "ingest_commit",
+  "assignable": false,
+  "permissions": {
+    "allow_write": ["knowledge/confidential/", "knowledge/public/ingest/"]
+  }
+}

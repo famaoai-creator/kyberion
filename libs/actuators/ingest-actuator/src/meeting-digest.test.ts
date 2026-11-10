@@ -39,7 +39,12 @@ const TENANT = 'example-tenant';
 const ROOT_REL = `knowledge/confidential/${TENANT}`;
 const TARGET_DIR = `${ROOT_REL}/governance/weekly-sync`;
 const NOW_FRI = '2026-09-25T00:00:00.000Z'; // Fri 09:00 JST
-const IDENTITY_ENV_KEYS = ['KYBERION_PERSONA', 'MISSION_ROLE', 'KYBERION_TENANT', 'KYBERION_SUDO'];
+const IDENTITY_ENV_KEYS = [
+  'KYBERION_BASE_ROLE',
+  'MISSION_ROLE',
+  'KYBERION_TENANT',
+  'KYBERION_SUDO',
+];
 
 interface FakePage {
   id: string;
@@ -263,7 +268,7 @@ function seedBackfill(root: string): void {
 
 beforeEach(() => {
   for (const key of IDENTITY_ENV_KEYS) savedEnv[key] = process.env[key];
-  process.env.KYBERION_PERSONA = 'ecosystem_architect';
+  process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
   delete process.env.KYBERION_TENANT;
   delete process.env.KYBERION_SUDO;
 });

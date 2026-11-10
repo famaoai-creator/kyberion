@@ -1,4 +1,5 @@
 import { auditChain } from '@agent/core/governance/audit-chain';
+import { executionAgentId } from '@agent/core/governance/execution-agent-id';
 import {
   assertMemoryPromotionReviewReady,
   reviewMemoryPromotionCandidate,
@@ -373,7 +374,7 @@ export function acceptRubricOverride(
   }
   const missionId = registeredEnv('MISSION_ID') || getOptionValue('--mission-id') || '';
   const entry = auditChain.record({
-    agentId: registeredEnv('KYBERION_PERSONA') || 'mission_controller',
+    agentId: executionAgentId('mission_controller'),
     action: 'rubric.override_accepted',
     operation: `accept-with-override:${hypothesisOrBranchId}`,
     result: 'allowed',
@@ -458,6 +459,8 @@ export async function promotePendingMemoryCandidates(
   }
   const approved = listMemoryPromotionCandidates()
     .filter((row) => row.status === 'approved')
+    // D8: facade-owned rows (organization learning, process improvement) promote through their facade.
+    .filter((row) => !row.origin)
     .filter((row) => !missionId || isMissionCandidate(row, missionId))
     .sort((a, b) => a.queued_at.localeCompare(b.queued_at));
   // A sibling-worktree target only carries PR-reviewed product knowledge;

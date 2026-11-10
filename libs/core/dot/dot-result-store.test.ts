@@ -59,7 +59,7 @@ beforeAll(async () => {
   );
   bootstrap.safeWriteFile(path.join(root, 'package.json'), '{}');
   vi.stubEnv('KYBERION_ROOT', root);
-  vi.stubEnv('KYBERION_PERSONA', 'sovereign');
+  vi.stubEnv('KYBERION_BASE_ROLE', 'sovereign');
   vi.stubEnv('MISSION_ROLE', 'mission_controller');
   vi.stubEnv('KYBERION_TENANT', 'result-tenant');
   vi.stubEnv('SYSTEM_ROLE', '');
@@ -137,7 +137,7 @@ function fixture(
     attention: { triggers: [{ kind: 'cron', cron: '*/15 * * * *' }] },
     authority: {
       authority_role: 'infrastructure_sentinel',
-      allowed_work_shapes: ['pipeline'],
+      allowed_execution_shapes: ['pipeline'],
       allowed_pipelines: ['pipelines/result-fixture.json'],
       max_concurrent_delegations: 10,
     },
@@ -150,7 +150,7 @@ function fixture(
   const proposal = proposals.normalizeDotProposal({
     title: 'Record synthetic result',
     objective: 'Persist status only',
-    work_shape: 'pipeline',
+    execution_shape: 'pipeline',
     pipeline_ref: 'pipelines/result-fixture.json',
     target: 'service:' + id,
     intent: 'apply',

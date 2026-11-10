@@ -9,11 +9,11 @@
     "status",
     "execution_mode",
     "priority",
-    "assigned_persona",
     "confidence_score",
     "git",
     "history"
   ],
+  "anyOf": [{ "required": ["org_role"] }, { "required": ["assigned_persona"] }],
   "properties": {
     "mission_id": { "type": "string", "minLength": 1 },
     "correlation_id": { "type": "string", "minLength": 1 },
@@ -169,7 +169,16 @@
     "completed_at": { "type": "string", "minLength": 1 },
     "execution_mode": { "type": "string", "enum": ["local", "delegated"] },
     "priority": { "type": "number" },
-    "assigned_persona": { "type": "string", "minLength": 1 },
+    "org_role": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Org Role the mission is assigned (knowledge/product/roles/). Descriptive metadata; never an authority source."
+    },
+    "assigned_persona": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Deprecated legacy name of org_role. Accepted on read for one release and normalised to org_role at the mission-state load boundary; writers never emit it."
+    },
     "confidence_score": { "type": "number" },
     "git": {
       "type": "object",

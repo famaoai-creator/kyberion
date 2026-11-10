@@ -73,7 +73,7 @@ describe('mission artifact promotion', () => {
     process.env.KYBERION_ROOT = tmpRoot;
     process.env.MISSION_ROLE = 'mission_controller';
     // Promotion includes confidential organization-owned fixture deliverables.
-    vi.stubEnv('KYBERION_PERSONA', 'sovereign');
+    vi.stubEnv('KYBERION_BASE_ROLE', 'sovereign');
     store = await import('../workforce/artifact-store.js');
     records = await import('../workforce/artifact-record.js');
     promotion = await import('./mission-artifact-promotion.js');
@@ -92,7 +92,7 @@ describe('mission artifact promotion', () => {
           status: 'completed',
           execution_mode: 'local',
           priority: 1,
-          assigned_persona: 'worker',
+          org_role: 'worker',
           confidence_score: 1,
           git: { branch: 'm', start_commit: 'a', latest_commit: 'a', checkpoints: [] },
           history: [],

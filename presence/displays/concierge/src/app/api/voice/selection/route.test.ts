@@ -16,6 +16,9 @@ vi.mock('@agent/shared-voice/voice-selection-preferences', async () => {
   return { ...core, voiceSelectionRequestSchema: actual.voiceSelectionRequestSchema };
 });
 vi.mock('@agent/core/authority', () => ({
+  // S4: store facades open their declared store grant (withStoreGrant).
+  withStoreGrant: (_name: string, fn: () => unknown) => fn(),
+  withStoreGrantAsync: async (_name: string, fn: () => unknown) => fn(),
   withExecutionContext: vi.fn((role: string, fn: () => unknown) => {
     roles.push(role);
     return fn();

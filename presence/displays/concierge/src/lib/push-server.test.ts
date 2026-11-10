@@ -23,8 +23,8 @@ describe('push-server', () => {
   const opts = () => ({ rootDir: root });
   beforeAll(() => {
     root = path.join(pathResolver.rootDir(), 'active', 'shared', 'tmp', `push-srv-${randomUUID()}`);
-    for (const k of ['KYBERION_PERSONA', 'MISSION_ROLE']) saved[k] = process.env[k];
-    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    for (const k of ['KYBERION_BASE_ROLE', 'MISSION_ROLE']) saved[k] = process.env[k];
+    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     process.env.MISSION_ROLE = 'mission_controller';
   });
   afterAll(() => {

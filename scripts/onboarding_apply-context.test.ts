@@ -16,7 +16,7 @@ describe('onboarding directory writer context', () => {
 
   it('creates a fresh profile directory using the onboarding writer, preserving the selected persona', () => {
     vi.stubEnv('MISSION_ROLE', 'sovereign_concierge');
-    vi.stubEnv('KYBERION_PERSONA', 'mission_owner');
+    vi.stubEnv('KYBERION_BASE_ROLE', 'mission_owner');
     const writes: Array<{ role: string | undefined; persona: string | undefined }> = [];
     vi.mocked(safeMkdir).mockImplementation(() => {
       writes.push({ role: resolveRole(), persona: resolveExecutionPersona() });

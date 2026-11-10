@@ -11,7 +11,7 @@ export interface IntelligenceProjectManagement {
  * Project management views for projects the route already narrowed to the
  * viewer's tenants and tiers (server-side `ViewerContext`).
  *
- * The server runs with `KYBERION_PERSONA=worker`, and `getProjectManagementView`
+ * The server runs with `KYBERION_BASE_ROLE=worker`, and `getProjectManagementView`
  * fences worker processes to their own `KYBERION_PROJECT_ID`
  * (`assertWorkerProjectScope`), so reading it under the ambient persona always
  * failed with [PROJECT_SCOPE_MISSING] and the project lineage stayed empty.
