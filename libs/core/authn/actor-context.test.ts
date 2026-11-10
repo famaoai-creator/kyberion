@@ -3,7 +3,7 @@ import type { IdentityContext } from '../types.js';
 
 const runtime = vi.hoisted(() => ({
   identity: {
-    persona: 'worker',
+    baseRole: 'worker',
     executionMode: 'mission',
     authorities: [],
     role: 'worker',
@@ -23,7 +23,7 @@ const input = (member = 'alice') => ({
 
 afterEach(() => {
   runtime.identity = {
-    persona: 'worker',
+    baseRole: 'worker',
     executionMode: 'mission',
     authorities: [],
     role: 'worker',
@@ -55,7 +55,7 @@ describe('actor attribution context', () => {
 
   it('re-resolves current authority instead of preserving an elevated snapshot', () => {
     runtime.identity = {
-      persona: 'sovereign',
+      baseRole: 'sovereign',
       executionMode: 'sovereign',
       authorities: ['SUDO'],
       role: 'owner',
@@ -63,7 +63,7 @@ describe('actor attribution context', () => {
     withActorContext(input(), () => {
       expect(currentActor()?.authority.sudo).toBe(true);
       runtime.identity = {
-        persona: 'worker',
+        baseRole: 'worker',
         executionMode: 'mission',
         authorities: [],
         role: 'worker',

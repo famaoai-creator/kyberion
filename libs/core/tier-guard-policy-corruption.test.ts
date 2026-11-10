@@ -31,7 +31,7 @@ vi.mock('./fs-primitives.js', () => ({
 
 vi.mock('./authority.js', () => ({
   resolveIdentityContext: () => ({
-    persona: 'test-persona',
+    baseRole: 'test-persona',
     role: null,
     authorities: [],
     sudoScope: null,

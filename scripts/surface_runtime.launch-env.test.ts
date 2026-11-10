@@ -22,7 +22,7 @@ function probe(env: NodeJS.ProcessEnv): { role: string; persona: string } {
       '-e',
       [
         `const a = await import(${JSON.stringify(authorityUrl)});`,
-        'console.log("PROBE " + JSON.stringify({ role: a.resolveRole(), persona: a.resolveIdentityContext().persona }));',
+        'console.log("PROBE " + JSON.stringify({ role: a.resolveRole(), persona: a.resolveIdentityContext().baseRole }));',
       ].join('\n'),
     ],
     { env, cwd: pathResolver.rootDir(), timeoutMs: 60_000 }

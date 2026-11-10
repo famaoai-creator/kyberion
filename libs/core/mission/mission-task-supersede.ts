@@ -178,7 +178,7 @@ export function missionTaskSupersedeApprovalPayload(
 /** The executing actor (persona, else the OS user), as reconcile-work records it. */
 function actorId(): string {
   return (
-    readConfiguredActorIdentity().persona || getRegisteredEnvText('USER') || 'mission_controller'
+    readConfiguredActorIdentity().baseRole || getRegisteredEnvText('USER') || 'mission_controller'
   );
 }
 

@@ -147,7 +147,7 @@ const actor: HearingDecidedBy = { kind: 'human', id: 'user:owner-member', role: 
 function snapshot() {
   const state = authority.resolveIdentityContext();
   return {
-    persona: state.persona,
+    persona: state.baseRole,
     role: state.role,
     tenantSlug: state.tenantSlug,
     envPersona: process.env.KYBERION_BASE_ROLE,

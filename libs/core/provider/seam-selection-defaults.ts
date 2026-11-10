@@ -296,7 +296,7 @@ export function resolveSavedSeamDefault(
 }
 
 function actor(): string {
-  const { persona, role } = readConfiguredActorIdentity();
+  const { baseRole: persona, role } = readConfiguredActorIdentity();
   return persona || role || 'operator';
 }
 

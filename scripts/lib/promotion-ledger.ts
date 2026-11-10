@@ -38,7 +38,7 @@ export function sha256Text(text: string): string {
  */
 export function resolvePromotionActor(tag: string): string {
   const identity = readConfiguredActorIdentity();
-  const persona = String(identity.persona || '').trim();
+  const persona = String(identity.baseRole || '').trim();
   if (persona) return persona;
   const role = String(identity.role || '').trim();
   if (role) return role;

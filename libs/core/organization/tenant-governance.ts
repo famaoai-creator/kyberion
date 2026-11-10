@@ -151,7 +151,7 @@ export function mutateTenant(input: TenantMutationInput): TenantMutationResult {
     if (!safeExistsSync(knowledgeRootPath)) safeMkdir(knowledgeRootPath, { recursive: true });
     auditChain.record({
       agentId:
-        input.actor || currentActor()?.actor.id || resolveIdentityContext().persona || 'operator',
+        input.actor || currentActor()?.actor.id || resolveIdentityContext().baseRole || 'operator',
       action: `tenant.${input.verb}`,
       operation: `tenant:${profile.tenant_slug}`,
       result: 'completed',
@@ -416,7 +416,7 @@ export function captureAttestationInvoker(): AttestationInvoker {
   let tenantSlug: string | undefined;
   try {
     const identity = resolveIdentityContext();
-    persona = String(identity.persona || '');
+    persona = String(identity.baseRole || '');
     role = identity.role;
     tenantSlug = identity.tenantSlug?.trim() || undefined;
   } catch {
