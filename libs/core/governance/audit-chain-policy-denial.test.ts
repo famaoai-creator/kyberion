@@ -33,14 +33,15 @@ describe('audit-owned persistence under real production authority', () => {
     );
     const script = `
       const io = await import(${JSON.stringify(moduleUrl('secure-io.js'))});
-      const { withExecutionContext, resolveRole } = await import(${JSON.stringify(moduleUrl('authority.js'))});
+      const { withStoreGrant, resolveRole } = await import(${JSON.stringify(moduleUrl('authority.js'))});
       const { auditChain, withAuditChainLock } = await import(${JSON.stringify(moduleUrl('governance/audit-chain.js'))});
       const { policyEngine } = await import(${JSON.stringify(moduleUrl('governance/policy-engine.js'))});
       const { runInResourceAccessScope } = await import(${JSON.stringify(moduleUrl('foundation/resource-access-scope.js'))});
       const root = process.env.KYBERION_ROOT;
       const tenant = 'audit-fixture-a';
       const role = 'dot_lifecycle_runtime_store';
-      const asRuntime = (fn) => withExecutionContext(role, fn, undefined, tenant);
+      // S4: dot_lifecycle_runtime_store is a declared store grant.
+      const asRuntime = (fn) => withStoreGrant(role, fn, { tenantSlug: tenant });
       const entry = (action) => ({agentId:'original-worker', action, operation:'fixture', result:'completed'});
       const errorOf = (fn) => { try { fn(); return null; } catch (error) { return String(error.message); } };
       // A cold key preflight must use the same private persistence boundary.
@@ -144,11 +145,11 @@ describe('audit-owned persistence under real production authority', () => {
         })));
       }
       process.env.KYBERION_TIER = 'public';
-      withExecutionContext(role, () => auditChain.record({
+      withStoreGrant(role, () => auditChain.record({
         ...entry('cleared-global'),tenantSlug:'',scope:{tier:'public',tenant_slug:''}
-      }), undefined, '');
+      }), { tenantSlug: '' });
       process.env.KYBERION_TENANT = '';
-      withExecutionContext(role, () => auditChain.record({
+      withStoreGrant(role, () => auditChain.record({
         ...entry('unbound-global'),tenantSlug:null
       }));
       // Inspect only this synthetic fixture after leaving every tested scope.

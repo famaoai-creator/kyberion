@@ -30,7 +30,10 @@ vi.mock('@agent/core/mission-lookup', () => ({
 }));
 vi.mock('@agent/core/authority', () => ({
   // S4: store facades open their declared store grant (withStoreGrant).
-  withStoreGrant: (_name: string, fn: () => unknown) => fn(),
+  withStoreGrant: (name: string, fn: () => unknown) => {
+    mocks.roles.push(name);
+    return fn();
+  },
   withStoreGrantAsync: async (_name: string, fn: () => unknown) => fn(),
   withExecutionContext: (role: string, fn: () => unknown) => {
     mocks.roles.push(role);

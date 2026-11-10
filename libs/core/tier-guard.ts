@@ -1008,7 +1008,8 @@ function requestResourceDenial(
   );
   if (grantDenial) return { allowed: false, reason: grantDenial };
   // G3: deny-only role narrowing is a security-policy declaration
-  // (authority_role_permissions.<role>.narrow), evaluated by one generic rule —
+  // (authority_role_permissions.<role>.narrow, or store_grants.<name>.narrow of a live
+  // declared store grant), evaluated by one generic rule —
   // per-role modules and role-name branches are gone from the gate. A missing or
   // corrupt policy must not remove an explicit role's deny-only constraints.
   // With no assumed role the policy is not loaded by this stage.

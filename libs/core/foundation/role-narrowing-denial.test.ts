@@ -1,4 +1,25 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+/**
+ * S4: the deny-only declarations sit on declared store grants
+ * (store_grants.<name>.narrow), which resolve only while that grant is live.
+ * This suite asserts the declaration evaluator itself, so each decision is
+ * taken as if the asked name's grant were live (the live-token mechanism has
+ * its own tests in declared-store-grant.test.ts).
+ */
+const live = vi.hoisted(() => ({ name: undefined as string | undefined }));
+vi.mock('./declared-store-grant.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./declared-store-grant.js')>();
+  return {
+    ...actual,
+    // The live grant's record, as rolePermissionRecord returns it inside the grant.
+    rolePermissionRecord: (policy: unknown, role: string | undefined) =>
+      role !== undefined && role === live.name && actual.isDeclaredStoreGrantName(role)
+        ? ((policy as { store_grants?: Record<string, unknown> }).store_grants?.[role] as
+            Record<string, unknown> | undefined)
+        : actual.rolePermissionRecord(policy, role),
+  };
+});
 import { safeReadFile } from '../secure-io.js';
 import { pathResolver } from '../path-resolver.js';
 import type { ResourceAccessScope } from './resource-access-scope.js';
@@ -27,7 +48,8 @@ const deny = (input: {
   scope?: ResourceAccessScope;
   content?: string | Buffer;
   previous?: string;
-}) =>
+}) => (
+  (live.name = input.role),
   roleNarrowingDenial({
     policy: POLICY,
     role: input.role,
@@ -36,7 +58,8 @@ const deny = (input: {
     scope: input.scope,
     content: input.content,
     readRepoFile: () => input.previous,
-  });
+  })
+);
 
 const INBOX = 'active/shared/inbox/entries.jsonl';
 const LOCK = `active/shared/runtime/locks/deliverable-inbox-${'a'.repeat(64)}.lock`;
@@ -384,10 +407,17 @@ describe('concierge management narrowing declarations', () => {
   });
 
   it('marks only the writer structural-mkdir capable', () => {
-    expect(roleNarrowAllowsStructuralMkdir(POLICY, 'concierge_management_writer')).toBe(true);
-    expect(roleNarrowAllowsStructuralMkdir(POLICY, 'concierge_management_reader')).toBe(false);
-    expect(roleNarrowAllowsStructuralMkdir(POLICY, 'deliverable_inbox_writer')).toBe(false);
-    expect(roleNarrowAllowsStructuralMkdir(POLICY, undefined)).toBe(false);
+    const asLive = (name: string | undefined) => {
+      live.name = name;
+      return roleNarrowAllowsStructuralMkdir(POLICY, name);
+    };
+    expect(asLive('concierge_management_writer')).toBe(true);
+    expect(asLive('concierge_management_reader')).toBe(false);
+    expect(asLive('deliverable_inbox_writer')).toBe(false);
+    expect(asLive(undefined)).toBe(false);
+    // Not live: a declared grant name carries no declaration at all.
+    live.name = undefined;
+    expect(roleNarrowAllowsStructuralMkdir(POLICY, 'concierge_management_writer')).toBe(false);
   });
 });
 

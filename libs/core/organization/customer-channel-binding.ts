@@ -7,7 +7,7 @@ import { CUSTOMER_CHANNEL_BINDING_STORE_ROLE } from '../foundation/customer-chan
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeReaddir } from '../secure-io.js';
 import { logger } from '../core.js';
 import { isValidTenantSlug } from '../foundation/scope.js';
-import { withExecutionContext, withStoreGrant } from '../authority.js';
+import { withStoreGrant } from '../authority.js';
 
 /** Reads exactly `knowledge/personal/tenants/<tenant>.json` (shared core role). */
 const TENANT_REGISTRY_READER_ROLE = 'workspace_tenant_registry_reader';
@@ -122,11 +122,10 @@ function readTenantBindingsFile(
   strict = false
 ): CustomerChannelBinding[] {
   const filePath = tenantHomePath(tenantSlug, TENANT_CHANNEL_BINDINGS_FILE, rootDir);
-  return withExecutionContext(
+  return withStoreGrant(
     CUSTOMER_CHANNEL_BINDING_STORE_ROLE,
     () => readBindingsFile(filePath, rootDir, strict),
-    'worker',
-    tenantSlug
+    { tenantSlug: tenantSlug }
   );
 }
 
