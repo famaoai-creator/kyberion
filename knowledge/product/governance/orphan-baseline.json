@@ -137,6 +137,10 @@
       "reason": "OW-05 example pipeline: the runnable caller of modeling:asset_inventory_to_ledger (asserted by scripts/orphan_op_reachability.test.ts); run by hand per pipelines/README.md."
     },
     {
+      "id": "pipelines/hearing-agenda-generation.json",
+      "reason": "Avatar-concierge deliverable-review flow: authors a hearing agenda and screen-spotlight definitions from a deliverable and customer persona via meeting:hearing_session (pipelines/README.md 'Meeting & Voice' row); run by hand, nothing schedules or invokes it."
+    },
+    {
       "id": "pipelines/incident-review.json",
       "reason": "OW-05 example pipeline: the runnable caller of system:list_incidents / sre_analyze (asserted by scripts/orphan_op_reachability.test.ts); run by hand per pipelines/README.md."
     },

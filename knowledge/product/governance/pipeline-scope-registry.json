@@ -265,6 +265,12 @@
       "reason": "Premium PPTX demo deliverable (product/GTM), not a self-op."
     },
     {
+      "pipeline": "pipelines/hearing-agenda-generation.json",
+      "audience": "personal",
+      "placement": "should_be_template",
+      "reason": "User-facing avatar-concierge deliverable-review / hearing-agenda workflow."
+    },
+    {
       "pipeline": "pipelines/health-degradation-watch.json",
       "audience": "system",
       "placement": "canonical"
