@@ -1896,6 +1896,10 @@
       "types": "./dist/governance/delegated-execution.d.ts",
       "default": "./dist/governance/delegated-execution.js"
     },
+    "./governance/execution-agent-id": {
+      "types": "./dist/governance/execution-agent-id.d.ts",
+      "default": "./dist/governance/execution-agent-id.js"
+    },
     "./governance/external-operation": {
       "types": "./dist/governance/external-operation.d.ts",
       "default": "./dist/governance/external-operation.js"

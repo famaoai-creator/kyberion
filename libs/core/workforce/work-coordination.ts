@@ -2,12 +2,12 @@ import {
   continueSuspendedPipelineWorkItem,
   type ResumeSuspendedPipelineWorkItemInput,
 } from './work-coordination-pipeline-continuation.js';
+import { executionAgentId } from '../governance/execution-agent-id.js';
 import { readWorkItemInventoryAtPath } from './work-coordination-inventory.js';
 import { finalizeWorkItemAttempt } from './work-item-attempt.js';
 import * as crypto from 'node:crypto';
 import { slugify } from '../foundation/text.js';
 import { nowIso } from '../foundation/time.js';
-import { getRegisteredEnvText } from '../foundation/env.js';
 import { withExecutionContext } from '../authority.js';
 import { withImmutableWorkItemInventorySnapshot } from './work-coordination-snapshot.js';
 import { enforceNhiActorPolicy } from '../agent/nhi-actor-verification.js';
@@ -411,7 +411,7 @@ function createWorkItemInternal(input: CreateWorkItemInput): WorkItem {
     payload: { project_id: item.project_id, priority: item.priority, source: item.source },
   });
   auditChain.record({
-    agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'work-coordination',
+    agentId: executionAgentId('work-coordination'),
     action: 'work_item.created',
     operation: `create:${item.item_id}`,
     result: 'completed',

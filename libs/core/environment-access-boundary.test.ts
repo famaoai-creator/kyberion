@@ -69,7 +69,10 @@ describe('environment access boundary', () => {
         safeReadFile(pathResolver.rootResolve(relativePath), { encoding: 'utf8' })
       );
       expect(source, relativePath).not.toMatch(directAccessPattern);
-      expect(source, relativePath).toMatch(/getRegisteredEnvText|isVitestProcess/u);
+      // executionAgentId reads the NHI / tenant / organization settings through the registered API.
+      expect(source, relativePath).toMatch(
+        /getRegisteredEnvText|isVitestProcess|executionAgentId/u
+      );
     }
   });
 });
