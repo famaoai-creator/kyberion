@@ -54,7 +54,7 @@ importance: 9
 **状況（2026-11-10、実装済み・統合待ち）**
 
 - ID の文法は `libs/core/contracts/nhi-id.ts` にあります。`buildNhiId(tenant, org, slug)` は tenant がないとき、予約名（`public` / `confidential` / `personal` / `shared`）のときに拒否します。Org がなければ `_` と書き、`'default'` への切り替えはなくしました。tenant に属する Org を tenant なしで指定すると拒否します。
-- テナントに属さない NHI（個人用オンボーディングのエージェント、tenant なしで起動した実行体）は、暫定で `kyberion://agent/_/_/<slug>` としました。D3 の「tenant は必須」とどう両立させるかは、オーナーの判断待ちです。
+- テナントに属さない NHI（個人用オンボーディングのエージェント、tenant なしで起動した実行体）は `kyberion://agent/_/_/<slug>` です。オーナーの判断（2026-11-10）で、tenant の位置の `_` は正式に「tenant なし」を表すことになりました（GLOSSARY、NHI_IDENTITY_MAPPING に記載。コードの変更はなし）。`_` は tenant の slug にはなりません。
 - 移行は `pnpm nhi migrate-ids`（既定は dry run、`--apply` で書き込み）です。ジャーナルは書き換えず、`identity_id_migrated` のイベントを追記します。2 回目以降は何もしません。旧 ID は別名として解決し、ID ごとに 1 回だけ非推奨の警告を出します。移行前の台帳でも、新しい ID で引けば旧レコードが見つかるので、同じ NHI が二重に発行されることはありません。
 - Organization profile は `knowledge/confidential/{tenant}/organizations/{org}/organization-profile.json` に置きます。読み込みは新しい置き場所を優先し、旧来の tenant 直下は 1 リリースだけ警告付きで読みます。移動は migration `0004-organization-profile-home` です。`company.ts` は同じ解決関数を使い、Company 専用の置き場所は持ちません。
 
@@ -90,14 +90,40 @@ Org Role を `KYBERION_PERSONA` に写していた `scripts/compose_mission_team
 - `pnpm organization role create` / `promote` は、カードの `permissions` と `security-policy.json` を同じ承認の下で一緒に書く。プロフィールの書き換えでカードの `permissions` は消えない。`publication-role-migration` は、カードの `permissions` と移行元の `security-policy.json` が違えば拒否する。
 - `role-authority-map.json`（Org Role → Authority Role と persona）と `role-write-access.json` は、このレジストリにはまだ入っていない。
 
+#### 保存先専用ロールの許可証化（2026-11-10、S4 の 3 つ目）
+
+オーナーの判断（2026-11-10）：
+
+- 横断して読む 3 件（`workspace_graph_reader`、`concierge_management_reader`、`peer_responder_reader`）は常設のロールにせず、読むたびに確かめて監査に残す開示（スコープモデル P4）にする。
+- 業務の流れで書く 2 件（`concierge_management_writer`、`dot_lifecycle_writer`）は、流れの窓口が書き込みごとに狭い許可証を出す。常設のロールにしない。
+- 拒否だけの 3 件（`deliverable_inbox_writer`、`customer_channel_binding_store`、`archived_mission_state_reader`）は、ロールではなく `security-policy.json` の明示した拒否の宣言にする。
+- tenant を持たない NHI の ID は `kyberion://agent/_/_/<slug>` のまま。tenant の位置の `_` は正式に「tenant なし」を表す（GLOSSARY、NHI_IDENTITY_MAPPING に記載。コードの変更なし）。
+
+実装（`libs/core/foundation/declared-store-grant.ts`、`authority.ts` の `withStoreGrant` / `withStoreGrantAsync`）：
+
+- 保存先専用ロールは **宣言された許可証（declared store grant）** になった。許可証の操作は `security-policy.json` の `store_grants.<name>` に、旧ロールの `allow_read` / `allow_write` / `deny_read` / `deny_read_descendants` / `narrow` をそのまま移した。カード、`authority-role-index.json`、`authority_role_permissions`、`role-write-access.json` からは消え、保存先カタログでは `legacy_roles` から `grants` に移した。
+- 許可証を開けるのは保存先の窓口だけ（`withStoreGrant`）。発行の条件は旧ロールの引き受けと同じ RA-02 の規則（名前は `role-assumption-policy.json` に発行の権利として残る）と、tenant の束縛の規則。`withExecutionContext(name)` は拒否する。窓口が開いたモジュール内の token がある間だけ宣言が判定に使われ、偽造・複製・期限切れの token は何も解決しない。RN-02 の到達性解析は `withStoreGrant*` の呼び出しも数える。
+- 横断して読む許可証（`disclosure`）は、開くたびに監査チェーンへ `store_grant.disclosure` を記録し、記録できなければ開かない。Concierge の管理の窓口は、正確な上限に入る前に記録して 1 回だけ使える受領を渡す（`recordStoreGrantDisclosure`）。呼び出し元がすでに別の上限の中にいて監査を書けないとき（情報資産のカタログなど。監査の書き込みも呼び出し元の上限に従う）は、診断形式の警告を出して続ける。ここは「記録できなければ開かない」より弱い、残った隙間である。
+- 許可証の名前は新しいロールに使えない（`collectExistingRoleIds` が予約する）。同じ名前の `authority_role_permissions` の項目があっても、許可証の宣言は変わらない（`rolePermissionRecord`）。
+- 流れで書く 2 件：Concierge の管理の書き込みは、窓口が書き込みのたびに正確な上限の中で許可証を出す。`dot_lifecycle_writer` は以前に `dot_charter_store` と `dot_lifecycle_runtime_store` に分けてあり、その 2 つを dot の窓口が書き込みのたびに出す許可証にした。
+- 拒否だけの 3 件：`narrow` の宣言（`only` / `deny` / `content_check` / `require_scope`）を `store_grants.<name>.narrow` に移した。これが security-policy の明示した拒否の宣言で、許可証が開いている間だけ効く（許可証が開いていない名前の I/O は、そもそもすべて拒否する）。
+- 意図した違い（狭くなる側だけ）：`SYSTEM_ROLE` / `MISSION_ROLE` / 委譲された環境変数でその名前として動くプロセスや、許可証の中から起動した子プロセスは I/O が一切できない（`[STORE_GRANT_REQUIRED]`）。旧ロールではそのロールの権限を持てた。
+- 比較：`tests/fixtures/store-grant-equivalence.json` に、基準 `19b0a6a01` で 30 件のロールそれぞれの (呼び出し元 6 種, パス, 操作 5 種) の判定を記録した。`libs/core/testing/store-grant-equivalence.test.ts` が、許可証にしたものは許可証で、まだロールのものはロールで同じ表を作り直して突き合わせる。違いは上の env の行だけ。
+
+数（カードの数。`authority-roles/*.json`）：
+
+| 時点                      | Authority Role | うち保存先専用                                   | 宣言された許可証 |
+| ------------------------- | -------------- | ------------------------------------------------ | ---------------- |
+| 3 つ目の前（`19b0a6a01`） | 90             | 30（`dot_lifecycle_writer` を分けた 2 件を含む） | 0                |
+| 3 つ目の後                | 62             | 2                                                | 28               |
+
 #### 残り（2026-11-10 時点）
 
-S4 は棚卸しとレジストリの一本化までで止めた。次の 2 つは、まだ済んでいない。
+1. **保存先専用ロールの残り 2 件。** `notification_preferences_reader` と `tool_runtime_policy_reader` はロールのまま。インストール先の公開ロールの移行（`organization/publication-role-migration.ts`、`pnpm organization role migrate-publication-store`）が、この 2 件をロールのカードとして別のインストール先へ写すため。移行を `store_grants` の宣言と発行の権利を写す形に直してから外す。比較の表（基準）は既に記録してある。
+2. **Execution Persona をなくす（S4 の 4 つ目）。** 手を付けていない。`persona_permissions` の 4 つの束（`sovereign` / `ecosystem_architect` / `worker` / `analyst`）をレジストリの Authority Role として表し直すこと、`Persona` 型の import（`authority.ts`、`authn/actor-context.ts`、`governance.ts` の再 export、`scripts/org.ts` の同じ型）を 0 にすること、`KYBERION_PERSONA` を 1 リリースだけ非推奨の別名として Authority Role に写し診断形式で警告すること（env-registry と生成文書も）、agent ID として使っている箇所（`network.ts` ほか、棚卸しの表）を NHI の ID にすることが残っている。宣言された許可証は、旧ロールの判定を変えないために `persona`（旧ロールの既定の persona。多くは `worker`）を持っている。束を Authority Role にするときに、ここも一緒に置き換える。
+3. **`role-authority-map.json` と `role-write-access.json`。** まだレジストリに入っていない。`role-write-access.json` からは、許可証にした 28 件の項目を消した（読む側は `scripts/org.ts` などのロールの草案と mission の書き込みの案内で、許可証の名前は割り当てられないので使われない）。`role-authority-map.json`（Org Role → Authority Role と persona）は persona を含むので、2 と一緒に生成物にするか削除する。
 
-1. **保存先専用ロールを許可証に置き換える。** 残りは 29 件（`STORE_CATALOG_GRANT_GUARD_DESIGN` の G3 の節の一覧）。そのうち少なくとも 8 件は許可証の形にならないと G3 で確かめてあり、オーナーの判断を待っている。横断して読む 3 件（`workspace_graph_reader`、`concierge_management_reader`、`peer_responder_reader`）を開示（スコープモデル P4）の問いとして扱うか。業務の流れで書く 2 件（`concierge_management_writer`、`dot_lifecycle_writer`）を、流れの facade が出す複数の許可証にするか。拒否だけの 3 件（`deliverable_inbox_writer`、`customer_channel_binding_store`、`archived_mission_state_reader`）を security-policy の宣言にするか。残りの 21 件は、呼び出し元ごとに許可証の発行を足し、(主体, パス, 操作) の判定が前後で同じことを比べる表のテストを付けて、1 件ずつ外す。Authority Role の数（90）は、この段階で減る。
-2. **Execution Persona をなくす。** `Persona` 型の import（3 ファイル）と、`persona_permissions` の 4 つの束（`sovereign` / `ecosystem_architect` / `worker` / `analyst`）を、レジストリの Authority Role として表し直す。`KYBERION_PERSONA` は運用者の `.env.local`、サーフェスの起動 env、CI が使っているので、1 リリースは非推奨の別名として読み、診断形式の警告を出す。1 の後に行う。
-
-このため、concept-registry の `lifecycle` は外していない。
+このため、concept-registry の `lifecycle` は外していない（完了の合図は満たしていない）。
 
 ## 完了の合図
 
