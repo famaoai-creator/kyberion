@@ -142,7 +142,7 @@ export async function runOrganizationImprovementScanOp(
   );
   if (!charter) throw new Error('Improvement scan apply requires an active scoped charter');
   if (
-    !(charter.authority.allowed_work_shapes ?? []).includes('pipeline') ||
+    !(charter.authority.allowed_execution_shapes ?? []).includes('pipeline') ||
     !(charter.authority.allowed_pipelines ?? []).includes(ORGANIZATION_IMPROVEMENT_SCAN_PIPELINE)
   )
     throw new Error('Improvement scan pipeline is not permitted by the charter');
