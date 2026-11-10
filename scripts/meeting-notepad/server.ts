@@ -5,7 +5,7 @@
  * recording (+ STT), camera/file attachments, create-minutes, and handoff.
  *
  * Usage:
- *   KYBERION_PERSONA=sovereign node_modules/.bin/tsx scripts/meeting-notepad/server.ts \
+ *   KYBERION_BASE_ROLE=sovereign node_modules/.bin/tsx scripts/meeting-notepad/server.ts \
  *     [--out <dir>] [--instruction <text>] [--title <text>] [port]
  */
 import http from 'node:http';

@@ -32,7 +32,10 @@ export {
 };
 
 export const REASONING_BACKEND_ENV_KEY = 'KYBERION_REASONING_BACKEND';
-export const PERSONA_ENV_KEY = 'KYBERION_PERSONA';
+/** The base role an onboarding run persists into `.env.local` (S4: was KYBERION_BASE_ROLE). */
+export const PERSONA_ENV_KEY = 'KYBERION_BASE_ROLE';
+/** @deprecated retired name, still read from an existing `.env.local` for one release. */
+export const LEGACY_PERSONA_ENV_KEY = 'KYBERION_PERSONA';
 
 /** Canonical selectable backends, in policy order. */
 export function listReasoningBackendChoices(): ReasoningBackendMode[] {
@@ -105,7 +108,10 @@ export function persistReasoningBackend(
 }
 
 export function readPersistedPersona(envLocalPath: string = defaultEnvLocalPath()): string | null {
-  return readPersistedEnvValue(PERSONA_ENV_KEY, envLocalPath);
+  return (
+    readPersistedEnvValue(PERSONA_ENV_KEY, envLocalPath) ??
+    readPersistedEnvValue(LEGACY_PERSONA_ENV_KEY, envLocalPath)
+  );
 }
 
 export function persistPersona(

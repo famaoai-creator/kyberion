@@ -13,9 +13,9 @@ describe('check_pipeline_shell_independence', () => {
   let savedRole: string | undefined;
 
   beforeEach(() => {
-    savedPersona = process.env.KYBERION_PERSONA;
+    savedPersona = process.env.KYBERION_BASE_ROLE;
     savedRole = process.env.MISSION_ROLE;
-    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     process.env.MISSION_ROLE = 'mission_controller';
   });
 
@@ -23,8 +23,8 @@ describe('check_pipeline_shell_independence', () => {
     if (safeExistsSync(PROBE)) {
       safeRmSync(PROBE, { force: true });
     }
-    if (savedPersona === undefined) delete process.env.KYBERION_PERSONA;
-    else process.env.KYBERION_PERSONA = savedPersona;
+    if (savedPersona === undefined) delete process.env.KYBERION_BASE_ROLE;
+    else process.env.KYBERION_BASE_ROLE = savedPersona;
     if (savedRole === undefined) delete process.env.MISSION_ROLE;
     else process.env.MISSION_ROLE = savedRole;
   });

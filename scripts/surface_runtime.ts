@@ -39,6 +39,7 @@ import {
 import { inspectServiceAuth } from '@agent/core/service/service-validator';
 import { auditChain } from '@agent/core/governance/audit-chain';
 import { executionAgentId } from '@agent/core/governance/execution-agent-id';
+import { baseRoleEnvText } from '@agent/core/foundation';
 import { buildNextAction, formatNextAction } from '@agent/core/next-action';
 import { getProtocolServiceRegistryEntry } from '@agent/core/protocol-service-registry';
 import { recordProtocolServiceLifecycle } from '@agent/core/protocol-service-lifecycle';
@@ -292,7 +293,7 @@ function buildSurfaceNextAction(
  * _>`, `AUTHORIZED_SCOPE=<service id>`, and no MISSION_ROLE or delegated role
  * inherited from this launcher (buildSystemRoleLaunchEnv). MISSION_ROLE is the
  * manifest's own, if it declares one; the persona is the manifest's explicit
- * KYBERION_PERSONA, else `worker` — the persona the `pnpm surfaces` launch
+ * KYBERION_BASE_ROLE (or its retired name KYBERION_BASE_ROLE), else `worker` — the persona the `pnpm surfaces` launch
  * contract gives surface_runtime and its surfaces — never one inherited from
  * whoever started this runtime. A manifest cannot set SYSTEM_ROLE or
  * KYBERION_DELEGATED_ROLE.
@@ -311,7 +312,7 @@ export function buildSurfaceLaunchEnv(
     },
     surfaceId.replace(/-/g, '_'), // Inject role for secure-io (e.g., slack_bridge)
     {
-      persona: manifestEnv.KYBERION_PERSONA || 'worker',
+      persona: baseRoleEnvText(manifestEnv) || 'worker',
       ...(manifestEnv.MISSION_ROLE ? { missionRole: manifestEnv.MISSION_ROLE } : {}),
     }
   );

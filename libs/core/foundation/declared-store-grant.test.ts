@@ -32,7 +32,7 @@ const POLICY = {
     },
   },
 };
-const ENV_KEYS = ['KYBERION_TENANT', 'SYSTEM_ROLE', 'MISSION_ROLE', 'KYBERION_PERSONA'] as const;
+const ENV_KEYS = ['KYBERION_TENANT', 'SYSTEM_ROLE', 'MISSION_ROLE', 'KYBERION_BASE_ROLE'] as const;
 
 describe('declared store grants (S4 slice 3)', () => {
   const saved: Record<string, string | undefined> = {};

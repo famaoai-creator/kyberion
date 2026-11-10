@@ -14,6 +14,7 @@
  */
 
 import * as nodePath from 'node:path';
+import { baseRoleEnvText } from '@agent/core/foundation';
 import {
   assertSafeRepositoryPath,
   safeExec,
@@ -36,7 +37,7 @@ import {
   loadApprovalRequest,
   recordApprovalApplyResult,
 } from '@agent/core/governance/approval-store';
-import { getRegisteredEnvText, nowIso } from '@agent/core/foundation';
+import { nowIso } from '@agent/core/foundation';
 import {
   loadConfigMissionBriefAtPath,
   loadConfigMissionPresetAtPath,
@@ -330,8 +331,7 @@ function cmdCreate(argv: string[]): void {
     change_id: instanceId,
     scope: scopeInput,
     target_kind: targetKind,
-    requested_by:
-      getOption(argv, '--requested-by') || getRegisteredEnvText('KYBERION_PERSONA') || 'operator',
+    requested_by: getOption(argv, '--requested-by') || baseRoleEnvText() || 'operator',
     nhi_id: getOption(argv, '--nhi-id'),
     risk,
     before_hash: getOption(argv, '--before-hash'),

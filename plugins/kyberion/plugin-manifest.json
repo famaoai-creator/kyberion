@@ -13,7 +13,7 @@
     "args": ["mcp:server"],
     "cwd": ".",
     "env": {
-      "KYBERION_PERSONA": "sovereign_concierge",
+      "KYBERION_BASE_ROLE": "sovereign_concierge",
       "NODE_ENV": "production"
     },
     "health_check": {
@@ -23,20 +23,25 @@
   },
 
   "tools": [
-    { "name": "kyberion.pipeline.list",          "category": "pipeline",    "risk_class": "low" },
-    { "name": "kyberion.pipeline.run",           "category": "pipeline",    "risk_class": "medium" },
-    { "name": "kyberion.knowledge.search",       "category": "knowledge",   "risk_class": "low" },
-    { "name": "kyberion.knowledge.cowork_sync",  "category": "knowledge",   "risk_class": "medium" },
-    { "name": "kyberion.capability.list",        "category": "capability",  "risk_class": "low" },
-    { "name": "kyberion.mission.create",         "category": "mission",     "risk_class": "medium" },
-    { "name": "kyberion.mission.status",         "category": "mission",     "risk_class": "low" },
-    { "name": "kyberion.mission.journal",        "category": "mission",     "risk_class": "low" },
-    { "name": "kyberion.approval.list_pending",  "category": "approval",    "risk_class": "low" },
-    { "name": "kyberion.approval.decide",        "category": "approval",    "risk_class": "high", "requires_approval": true },
-    { "name": "kyberion.audit.export",           "category": "audit",       "risk_class": "low" },
-    { "name": "kyberion.audit.verify",           "category": "audit",       "risk_class": "low" },
-    { "name": "kyberion.surface.cowork.deliver", "category": "surface",     "risk_class": "low" },
-    { "name": "kyberion.surface.cowork.list",    "category": "surface",     "risk_class": "low" }
+    { "name": "kyberion.pipeline.list", "category": "pipeline", "risk_class": "low" },
+    { "name": "kyberion.pipeline.run", "category": "pipeline", "risk_class": "medium" },
+    { "name": "kyberion.knowledge.search", "category": "knowledge", "risk_class": "low" },
+    { "name": "kyberion.knowledge.cowork_sync", "category": "knowledge", "risk_class": "medium" },
+    { "name": "kyberion.capability.list", "category": "capability", "risk_class": "low" },
+    { "name": "kyberion.mission.create", "category": "mission", "risk_class": "medium" },
+    { "name": "kyberion.mission.status", "category": "mission", "risk_class": "low" },
+    { "name": "kyberion.mission.journal", "category": "mission", "risk_class": "low" },
+    { "name": "kyberion.approval.list_pending", "category": "approval", "risk_class": "low" },
+    {
+      "name": "kyberion.approval.decide",
+      "category": "approval",
+      "risk_class": "high",
+      "requires_approval": true
+    },
+    { "name": "kyberion.audit.export", "category": "audit", "risk_class": "low" },
+    { "name": "kyberion.audit.verify", "category": "audit", "risk_class": "low" },
+    { "name": "kyberion.surface.cowork.deliver", "category": "surface", "risk_class": "low" },
+    { "name": "kyberion.surface.cowork.list", "category": "surface", "risk_class": "low" }
   ],
 
   "skills": [

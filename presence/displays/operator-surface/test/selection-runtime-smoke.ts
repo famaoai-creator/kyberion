@@ -247,7 +247,7 @@ async function parent() {
       },
       'operator_surface'
     );
-    env.KYBERION_PERSONA = '';
+    env.KYBERION_BASE_ROLE = '';
     const result = await safeExecResultAsync(
       process.execPath,
       [

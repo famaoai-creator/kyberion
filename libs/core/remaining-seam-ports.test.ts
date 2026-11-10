@@ -23,7 +23,10 @@ import {
 describe('remaining sole seam ports', () => {
   it('reads configured actor identity through one explicit boundary', () => {
     expect(
-      readConfiguredActorIdentity({ KYBERION_PERSONA: 'vitest-promoter', MISSION_ROLE: 'reviewer' })
+      readConfiguredActorIdentity({
+        KYBERION_BASE_ROLE: 'vitest-promoter',
+        MISSION_ROLE: 'reviewer',
+      })
     ).toEqual({ persona: 'vitest-promoter', role: 'reviewer' });
     expect(readConfiguredActorIdentity({})).toEqual({ persona: undefined, role: undefined });
   });

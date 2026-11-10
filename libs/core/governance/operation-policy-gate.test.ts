@@ -52,8 +52,8 @@ describe('operation-policy-gate (SA-05)', () => {
   });
 
   it('evaluates with the execution-scope persona, not the process env (B2)', async () => {
-    const saved = process.env.KYBERION_PERSONA;
-    process.env.KYBERION_PERSONA = 'worker';
+    const saved = process.env.KYBERION_BASE_ROLE;
+    process.env.KYBERION_BASE_ROLE = 'worker';
     const evaluate = vi.spyOn(policyEngine, 'evaluate');
     try {
       await withExecutionContextAsync(
@@ -71,8 +71,8 @@ describe('operation-policy-gate (SA-05)', () => {
       );
     } finally {
       evaluate.mockRestore();
-      if (saved === undefined) delete process.env.KYBERION_PERSONA;
-      else process.env.KYBERION_PERSONA = saved;
+      if (saved === undefined) delete process.env.KYBERION_BASE_ROLE;
+      else process.env.KYBERION_BASE_ROLE = saved;
     }
   });
 

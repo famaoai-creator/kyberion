@@ -5,8 +5,8 @@
  * a light, injectable core.
  */
 import * as path from 'node:path';
+import { baseRoleEnvText } from '../foundation/base-role-env.js';
 import { auditChain } from '../governance/audit-chain.js';
-import { getRegisteredEnvText } from '../foundation/env.js';
 import { currentExecutionScope, executionPersonaText } from '../foundation/execution-scope.js';
 import { isReservedScopeName, isValidTenantSlug } from '../entity-scope.js';
 import { pathResolver } from '../path-resolver.js';
@@ -85,10 +85,10 @@ export function assertSovereignCadencePersona(
   what: string,
   env?: Record<string, string | undefined>
 ): string {
-  const persona = env ? getRegisteredEnvText('KYBERION_PERSONA', { env }) : executionPersonaText();
+  const persona = env ? baseRoleEnvText(env) : executionPersonaText();
   if (persona !== 'sovereign') {
     throw new Error(
-      `[POLICY_VIOLATION] The organization ${what} aggregates across tenants and requires KYBERION_PERSONA=sovereign (got ${persona || 'unset'}).`
+      `[POLICY_VIOLATION] The organization ${what} aggregates across tenants and requires KYBERION_BASE_ROLE=sovereign (got ${persona || 'unset'}).`
     );
   }
   return persona;

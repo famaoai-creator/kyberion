@@ -35,7 +35,7 @@ function fixture() {
       ['--import', pathResolver.rootResolve('scripts/ts-loader.mjs'), script],
       {
         cwd: pathResolver.rootDir(),
-        env: { MISSION_ROLE: 'mission_controller', KYBERION_PERSONA: 'mission_controller' },
+        env: { MISSION_ROLE: 'mission_controller', KYBERION_BASE_ROLE: 'mission_controller' },
         timeoutMs: 20_000,
         maxOutputMB: 1,
       }

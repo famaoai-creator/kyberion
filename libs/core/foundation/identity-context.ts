@@ -10,6 +10,7 @@
  * answers — identical semantics to the previous bridge fallback.
  */
 import type { Authority, IdentityContext } from '../types.js';
+import { baseRoleEnvText } from './base-role-env.js';
 import { getRegisteredEnvBool, getRegisteredEnvText } from './env.js';
 import { resolveProjectScope } from './project-scope-env.js';
 import { scopedAssumedRole, scopedPersona } from './execution-scope.js';
@@ -26,7 +27,7 @@ export function readConfiguredActorIdentity(
   env?: Record<string, string | undefined>
 ): ConfiguredActorIdentity {
   return {
-    persona: getRegisteredEnvText('KYBERION_PERSONA', { env }),
+    persona: baseRoleEnvText(env),
     role: getRegisteredEnvText('MISSION_ROLE', { env }),
   };
 }

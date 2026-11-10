@@ -15,7 +15,7 @@ import { registerAuditChainIo, type AuditChainIo } from './audit-chain.js';
 // the audit chain's own store writer outside the ceiling; a record that does
 // not land refuses the read. The fixture I/O enforces the tier guard on every
 // append, as secure-io does.
-const ENV_KEYS = ['KYBERION_PERSONA', 'MISSION_ROLE', 'SYSTEM_ROLE', 'KYBERION_TENANT'] as const;
+const ENV_KEYS = ['KYBERION_BASE_ROLE', 'MISSION_ROLE', 'SYSTEM_ROLE', 'KYBERION_TENANT'] as const;
 const CEILING = {
   tenantSlug: 'acme-corp',
   readExact: ['knowledge/confidential/acme-corp/catalog.json'],

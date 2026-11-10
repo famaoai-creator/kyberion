@@ -48,7 +48,7 @@ function probeChild(env: NodeJS.ProcessEnv): {
 
 function surfaceEnv(systemRole: string): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = { ...process.env, SYSTEM_ROLE: systemRole };
-  for (const key of ['MISSION_ROLE', 'KYBERION_PERSONA', DELEGATED_ROLE_ENV]) delete env[key];
+  for (const key of ['MISSION_ROLE', 'KYBERION_BASE_ROLE', DELEGATED_ROLE_ENV]) delete env[key];
   return env;
 }
 

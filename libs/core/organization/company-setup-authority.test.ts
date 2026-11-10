@@ -60,7 +60,7 @@ function reserve(file: string): void {
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'], now: new Date() });
   const launched = buildSystemRoleLaunchEnv({}, 'concierge');
-  for (const key of ['SYSTEM_ROLE', 'MISSION_ROLE', 'KYBERION_PERSONA', DELEGATED_ROLE_ENV])
+  for (const key of ['SYSTEM_ROLE', 'MISSION_ROLE', 'KYBERION_BASE_ROLE', DELEGATED_ROLE_ENV])
     vi.stubEnv(key, launched[key] ?? '');
   vi.stubEnv('KYBERION_SUDO', 'false');
   vi.stubEnv('KYBERION_TENANT', '');
@@ -174,7 +174,7 @@ describe('real Concierge company setup authority', () => {
     expect(resolveRole()).toBe('concierge');
     expect(process.env.KYBERION_SUDO).toBe('false');
     expect(process.env.MISSION_ROLE).toBeFalsy();
-    expect(process.env.KYBERION_PERSONA).toBeFalsy();
+    expect(process.env.KYBERION_BASE_ROLE).toBeFalsy();
     expect(isRoleAssumptionAllowed('concierge', 'check_tenant_registry_consistency')).toBe(false);
     expect(() =>
       withExecutionContext('check_tenant_registry_consistency', () => undefined)
@@ -280,6 +280,6 @@ describe('real Concierge company setup authority', () => {
     });
     expect(resolveRole()).toBe('concierge');
     expect(process.env.MISSION_ROLE).toBeFalsy();
-    expect(process.env.KYBERION_PERSONA).toBeFalsy();
+    expect(process.env.KYBERION_BASE_ROLE).toBeFalsy();
   });
 });

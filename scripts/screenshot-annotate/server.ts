@@ -5,7 +5,7 @@
  * darwin `screencapture -x` via POST /screenshot.
  *
  * Usage:
- *   KYBERION_PERSONA=sovereign node_modules/.bin/tsx scripts/screenshot-annotate/server.ts \
+ *   KYBERION_BASE_ROLE=sovereign node_modules/.bin/tsx scripts/screenshot-annotate/server.ts \
  *     [--out <dir>] [--instruction <text>] [port]
  */
 import http from 'node:http';

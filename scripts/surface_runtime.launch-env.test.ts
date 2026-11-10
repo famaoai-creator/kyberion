@@ -37,7 +37,7 @@ describe('surface_runtime launch env (DR-01)', () => {
     ...process.env,
     SYSTEM_ROLE: 'surface_runtime',
     MISSION_ROLE: 'surface_runtime',
-    KYBERION_PERSONA: 'sovereign',
+    KYBERION_BASE_ROLE: 'sovereign',
     KYBERION_DELEGATED_ROLE: 'surface_runtime@concierge',
   };
 
@@ -49,7 +49,7 @@ describe('surface_runtime launch env (DR-01)', () => {
       MISSION_ROLE: '',
       KYBERION_DELEGATED_ROLE: '',
       // The launch contract's persona, never the launcher's inherited one.
-      KYBERION_PERSONA: 'worker',
+      KYBERION_BASE_ROLE: 'worker',
     });
     expect(probe(env)).toEqual({ role: 'concierge', persona: 'worker' });
   }, 60_000);
@@ -59,7 +59,7 @@ describe('surface_runtime launch env (DR-01)', () => {
       'mcp-server-cowork',
       'mcp-server-cowork',
       {
-        KYBERION_PERSONA: 'sovereign',
+        KYBERION_BASE_ROLE: 'sovereign',
         MISSION_ROLE: 'mcp_server',
         KYBERION_DELEGATED_ROLE: 'ecosystem_architect@mcp_server_cowork',
         SYSTEM_ROLE: 'ecosystem_architect',
@@ -69,7 +69,7 @@ describe('surface_runtime launch env (DR-01)', () => {
     expect(env).toMatchObject({
       SYSTEM_ROLE: 'mcp_server_cowork',
       MISSION_ROLE: 'mcp_server',
-      KYBERION_PERSONA: 'sovereign',
+      KYBERION_BASE_ROLE: 'sovereign',
       KYBERION_DELEGATED_ROLE: '',
     });
   });

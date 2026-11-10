@@ -3,6 +3,7 @@
  */
 
 import type { StorageDataTier } from '../storage-layout.js';
+import { baseRoleEnvText } from '../foundation/base-role-env.js';
 import {
   approvalRequesterActorId,
   resolveApprovalRequesterInput,
@@ -335,7 +336,7 @@ export function createMissionWorkReconciliationApprovalRequest(input: {
     : {
         requestedBy:
           input.requestedBy?.trim() ||
-          getRegisteredEnvText('KYBERION_PERSONA') ||
+          baseRoleEnvText() ||
           getRegisteredEnvText('USER') ||
           'mission_controller',
       };
@@ -892,10 +893,7 @@ export function generateMissionWorkReconciliationScaffold(input: {
     mission_id: missionId,
     generated_at: nowIso(),
     source: { repository: '.', branch, commit },
-    adopted_by:
-      getRegisteredEnvText('KYBERION_PERSONA') ||
-      getRegisteredEnvText('USER') ||
-      'mission_controller',
+    adopted_by: baseRoleEnvText() || getRegisteredEnvText('USER') || 'mission_controller',
     reason: input.reason || `Adopt verified existing work for ${missionId}.`,
     tasks: tasks.map((task) => ({
       task_id: String(task.task_id || ''),
@@ -940,10 +938,7 @@ export async function reconcileMissionExistingWork(input: {
       `Manifest mission_id ${manifest.mission_id} does not match requested mission ${missionId}`
     );
   }
-  const actorId =
-    getRegisteredEnvText('KYBERION_PERSONA') ||
-    getRegisteredEnvText('USER') ||
-    'mission_controller';
+  const actorId = baseRoleEnvText() || getRegisteredEnvText('USER') || 'mission_controller';
   if (manifest.adopted_by !== actorId) {
     throw new Error(
       `Manifest adopted_by ${manifest.adopted_by} does not match execution actor ${actorId}`

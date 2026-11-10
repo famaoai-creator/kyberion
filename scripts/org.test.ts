@@ -103,7 +103,7 @@ describe('org role create', () => {
   beforeAll(async () => {
     tempRoot = makeTempRoot();
     vi.stubEnv('KYBERION_ROOT', tempRoot);
-    vi.stubEnv('KYBERION_PERSONA', 'ecosystem_architect');
+    vi.stubEnv('KYBERION_BASE_ROLE', 'ecosystem_architect');
     const { approvalRequestLogicalPath } = await import('@agent/core/governance/approval-store');
     seedSecurityPolicyApproval(tempRoot, APPROVAL_IDS.create, approvalRequestLogicalPath);
     seedSecurityPolicyApproval(tempRoot, APPROVAL_IDS.promote, approvalRequestLogicalPath);

@@ -27,14 +27,14 @@ describe('fs-utils traversal', () => {
 
   it('rethrows a refusal to list the walk root instead of returning []', () => {
     // A data-only role may not list the personal tier.
-    const saved = { persona: process.env.KYBERION_PERSONA, role: process.env.MISSION_ROLE };
-    process.env.KYBERION_PERSONA = 'worker';
+    const saved = { persona: process.env.KYBERION_BASE_ROLE, role: process.env.MISSION_ROLE };
+    process.env.KYBERION_BASE_ROLE = 'worker';
     process.env.MISSION_ROLE = 'finance_controller';
     try {
       expect(() => getAllFiles(pathResolver.knowledge('personal'))).toThrow(/ROLE_VIOLATION/);
     } finally {
-      if (saved.persona === undefined) delete process.env.KYBERION_PERSONA;
-      else process.env.KYBERION_PERSONA = saved.persona;
+      if (saved.persona === undefined) delete process.env.KYBERION_BASE_ROLE;
+      else process.env.KYBERION_BASE_ROLE = saved.persona;
       if (saved.role === undefined) delete process.env.MISSION_ROLE;
       else process.env.MISSION_ROLE = saved.role;
     }

@@ -8,7 +8,7 @@
       "command": "node",
       "args": ["dist/presence/bridge/terminal/server.js"],
       "env": {
-        "KYBERION_PERSONA": "sovereign",
+        "KYBERION_BASE_ROLE": "sovereign",
         "MISSION_ROLE": "infrastructure_sentinel"
       },
       "cwd": ".",

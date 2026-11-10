@@ -298,7 +298,7 @@ describe('scratch:promote', () => {
     }
 
     beforeEach(() => {
-      vi.stubEnv('KYBERION_PERSONA', 'vitest-promoter');
+      vi.stubEnv('KYBERION_BASE_ROLE', 'vitest-promoter');
     });
 
     afterEach(() => {
@@ -379,7 +379,7 @@ describe('scratch:promote', () => {
     });
 
     it('refuses an anonymous tenant promotion before writing anything', async () => {
-      vi.stubEnv('KYBERION_PERSONA', '');
+      vi.stubEnv('KYBERION_BASE_ROLE', '');
       vi.stubEnv('MISSION_ROLE', '');
       const errors: string[] = [];
       const { logger } = await import('@agent/core/core');

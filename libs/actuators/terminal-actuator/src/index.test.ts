@@ -265,7 +265,7 @@ describe('terminal-actuator direct actions', () => {
           FOO: 'bar',
           SYSTEM_ROLE: 'ecosystem_architect',
           MISSION_ROLE: 'mission_controller',
-          KYBERION_PERSONA: 'sovereign',
+          KYBERION_BASE_ROLE: 'sovereign',
           KYBERION_DELEGATED_ROLE: 'ecosystem_architect@terminal_bridge',
           KYBERION_SUDO: 'true',
         },

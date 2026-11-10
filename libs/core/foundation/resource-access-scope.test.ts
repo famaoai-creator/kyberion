@@ -54,7 +54,7 @@ const ROOT = pathResolver.rootDir();
 const ENV = [
   'SYSTEM_ROLE',
   'MISSION_ROLE',
-  'KYBERION_PERSONA',
+  'KYBERION_BASE_ROLE',
   'KYBERION_SUDO',
   'KYBERION_TENANT',
   'KYBERION_PROJECT_ID',
@@ -406,7 +406,7 @@ describe('request resource ceiling', () => {
 
   it('is enforced before SUDO, sovereign persona, and nested broad role assumptions', () => {
     process.env.KYBERION_SUDO = 'true';
-    process.env.KYBERION_PERSONA = 'sovereign';
+    process.env.KYBERION_BASE_ROLE = 'sovereign';
     runInResourceAccessScope(scope(), () =>
       withExecutionContext('ecosystem_architect', () => {
         expect(validateWritePermission(abs(foreign)).allowed).toBe(false);

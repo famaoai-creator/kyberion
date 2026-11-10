@@ -42,7 +42,7 @@ const ENV_KEYS = [
   'KYBERION_DELEGATION_NOTIFICATIONS_PATH',
   'KYBERION_TENANT',
   'MISSION_ROLE',
-  'KYBERION_PERSONA',
+  'KYBERION_BASE_ROLE',
 ] as const;
 const saved = Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]]));
 

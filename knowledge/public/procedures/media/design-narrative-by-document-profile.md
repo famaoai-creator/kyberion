@@ -200,7 +200,7 @@ Because the loader now scans directories instead of a single monolithic JSON fil
 Imported DESIGN.md systems can be refreshed with:
 
 ```bash
-KYBERION_PERSONA=ecosystem_architect MISSION_ROLE=ecosystem_architect MISSION_ID=MSN-DESIGN-MD-IMPORT \
+KYBERION_BASE_ROLE=ecosystem_architect MISSION_ROLE=ecosystem_architect MISSION_ID=MSN-DESIGN-MD-IMPORT \
   pnpm exec tsx scripts/import_design_md_catalog.ts
 ```
 

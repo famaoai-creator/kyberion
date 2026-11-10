@@ -1050,7 +1050,7 @@ the catalog`, 2026-10). Every `createSeam({ catalog: coreSeamCatalog })` declare
    the suspect suite.
 5. **Reported only on CI, even from a fresh tree:** CI runs with a different identity. Reproduce
    with the CI environment, not your shell's:
-   `KYBERION_PERSONA=worker MISSION_ROLE=mission_controller KYBERION_TEST_LEAK_STRICT=1 pnpm test -- --suite core`.
+   `KYBERION_BASE_ROLE=worker MISSION_ROLE=mission_controller KYBERION_TEST_LEAK_STRICT=1 pnpm test -- --suite core`.
    Persona-dependent code paths (stores that only persist for some roles, default-tenant bootstrap)
    diverge between the two. Platform-only code paths (for example the macOS Apple FM bridge compiling
    into `active/shared/runtime/apple-intelligence/`) leak only on that OS's runner; read the
@@ -1335,7 +1335,7 @@ Legacy unscoped candidates retain their existing storage compatibility; this doe
 3. Verify onboarding-flow commands with the real CLI in a throwaway worktree.
    - Create the throwaway company with `pnpm onboarding company … --slug probe-co --tenant-slug probe-co`.
    - Then run `tenant:activation plan|probe` and `work create-item` with `KYBERION_STANCE`,
-     `KYBERION_TENANT_SCOPE_REQUIRED=true` and `KYBERION_PERSONA=sovereign`.
+     `KYBERION_TENANT_SCOPE_REQUIRED=true` and `KYBERION_BASE_ROLE=sovereign`.
    - Remove the throwaway state afterwards: `customer/`, `knowledge/personal/tenants/`,
      `knowledge/confidential/`, `active/organizations/`.
 
@@ -1731,7 +1731,7 @@ These cover archive entry-point parity, restore, and track state/projection chan
 **Defect class.** The tier guard (`validateWritePermission` / `validateReadPermission`) judges a
 path as written, but the OS follows symbolic links in every component, and a hard link is a second
 name for an inode that lives elsewhere. Before this fix a data-only persona
-(`KYBERION_PERSONA=worker MISSION_ROLE=finance_controller`) could call
+(`KYBERION_BASE_ROLE=worker MISSION_ROLE=finance_controller`) could call
 `safeSymlinkSync('scripts', 'active/shared/tmp/link')` (the target needed only _read_ permission)
 and then `safeWriteFile('active/shared/tmp/link/x.ts', …)` — landing code in `scripts/`. The same
 link turned every write helper (append, copy, move, mkdir, rm) into a write anywhere readable; a

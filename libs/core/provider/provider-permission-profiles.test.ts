@@ -178,7 +178,7 @@ describe('provider-permission-profiles', () => {
         CUSTOM_SECRET_TOKEN: 'fake-custom-token',
         CODEX_HOME: '/home/test/.codex',
         AGY_PROFILE: 'work',
-        KYBERION_PERSONA: 'implementer',
+        KYBERION_BASE_ROLE: 'implementer',
         MISSION_ID: 'MSN-1',
         UNRELATED_VAR: 'should-not-leak',
       }) as NodeJS.ProcessEnv;
@@ -256,7 +256,7 @@ describe('provider-permission-profiles', () => {
     it('carries KYBERION_*/MISSION_* vars for every provider, but not unrelated vars', () => {
       for (const provider of providers) {
         const env = buildProviderChildEnv({ provider, baseEnv: fakeBaseEnv() });
-        expect(env.KYBERION_PERSONA).toBe('implementer');
+        expect(env.KYBERION_BASE_ROLE).toBe('implementer');
         expect(env.MISSION_ID).toBe('MSN-1');
         expect(env.UNRELATED_VAR).toBeUndefined();
       }

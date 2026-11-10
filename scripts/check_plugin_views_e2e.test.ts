@@ -56,7 +56,7 @@ describe('check_plugin_views_e2e helpers (PE-02)', () => {
     const pkg = JSON.parse(
       String(safeReadFile(pathResolver.rootResolve('package.json'), { encoding: 'utf8' }))
     ) as { scripts: Record<string, string> };
-    expect(pkg.scripts.surfaces).toContain('KYBERION_PERSONA=worker SYSTEM_ROLE=surface_runtime');
+    expect(pkg.scripts.surfaces).toContain('KYBERION_BASE_ROLE=worker SYSTEM_ROLE=surface_runtime');
     expect(manifest.env ?? {}).toEqual({
       KYBERION_SCOPE_ENV_PATH: 'active/shared/runtime/scope-surfaces.env',
     });

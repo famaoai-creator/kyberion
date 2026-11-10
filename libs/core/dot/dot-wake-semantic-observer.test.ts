@@ -259,7 +259,7 @@ beforeAll(async () => {
   io.safeWriteFile(path.join(root, 'package.json'), '{}');
   vi.stubEnv('KYBERION_ROOT', root);
   vi.stubEnv('MISSION_ROLE', 'mission_controller');
-  vi.stubEnv('KYBERION_PERSONA', 'sovereign');
+  vi.stubEnv('KYBERION_BASE_ROLE', 'sovereign');
   vi.stubEnv('KYBERION_TENANT', 'synthetic-latency');
   io.safeMkdir(path.join(root, 'knowledge/personal/tenants'), { recursive: true });
   io.safeWriteFile(

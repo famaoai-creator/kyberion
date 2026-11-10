@@ -130,7 +130,7 @@ beforeAll(async () => {
       env: {
         KYBERION_ROOT: fixture,
         SYSTEM_ROLE: 'operator_surface',
-        KYBERION_PERSONA: '',
+        KYBERION_BASE_ROLE: '',
         MISSION_ROLE: '',
         MISSION_ID: '',
         KYBERION_SUDO: 'false',
