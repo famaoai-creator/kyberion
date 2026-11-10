@@ -49,7 +49,7 @@ describe('one resolution per request (R2)', () => {
     expect(executeRegisteredSuperPipeline).toHaveBeenCalledTimes(1);
     const [steps, context] = executeRegisteredSuperPipeline.mock.calls[0] as unknown as [
       Array<{ op: string }>,
-      Record<string, any>,
+      Record<string, unknown>,
     ];
     expect(steps[0]?.op).toBe('system:shell');
     expect(context.routing_decision).toMatchObject({

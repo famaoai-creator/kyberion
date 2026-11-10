@@ -7,7 +7,10 @@ vi.mock('../logger.js', async (importOriginal) => {
   return {
     ...actual,
     createLogger: (name: string, ...rest: unknown[]) => {
-      const created = (actual.createLogger as (...args: unknown[]) => any)(name, ...rest);
+      const created = (actual.createLogger as (...args: unknown[]) => Record<string, unknown>)(
+        name,
+        ...rest
+      );
       return name === 'stance-resolver' ? { ...created, warn: stanceWarn } : created;
     },
   };
