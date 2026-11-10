@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { safeExistsSync, safeReadFile } from '@agent/core/secure-io';
+import { getAllFiles } from '@agent/core/fs-utils';
 
 /**
  * D8 / MEMORY_LOOP_CLOSURE M2 — DistillCandidateRecord is a promotion receipt.
@@ -46,16 +47,14 @@ const MOVED_PRODUCERS = [
 
 function walk(relative: string, out: string[]): void {
   const absolute = path.join(rootDir, relative);
-  if (!fs.existsSync(absolute)) return;
-  for (const entry of fs.readdirSync(absolute, { withFileTypes: true })) {
-    const child = path.posix.join(relative, entry.name);
-    if (entry.isDirectory()) {
-      if (!SKIP_DIRS.has(entry.name)) walk(child, out);
-      continue;
-    }
-    if (!/\.(?:ts|tsx|mts)$/u.test(entry.name) || /\.test\.(?:ts|tsx|mts)$/u.test(entry.name))
-      continue;
-    if (/\.d\.ts$/u.test(entry.name)) continue;
+  if (!safeExistsSync(absolute)) return;
+  for (const file of getAllFiles(absolute)) {
+    const child = path.relative(rootDir, file).split(path.sep).join('/');
+    const segments = child.split('/');
+    if (segments.slice(0, -1).some((segment) => SKIP_DIRS.has(segment))) continue;
+    const name = segments[segments.length - 1];
+    if (!/\.(?:ts|tsx|mts)$/u.test(name) || /\.test\.(?:ts|tsx|mts)$/u.test(name)) continue;
+    if (/\.d\.ts$/u.test(name)) continue;
     out.push(child);
   }
 }
@@ -65,7 +64,9 @@ function distillRecordWriters(): string[] {
   for (const root of SCAN_ROOTS) walk(root, files);
   return files
     .filter((file) => file !== REGISTRY)
-    .filter((file) => WRITER_CALL.test(fs.readFileSync(path.join(rootDir, file), 'utf8')))
+    .filter((file) =>
+      WRITER_CALL.test(safeReadFile(path.join(rootDir, file), { encoding: 'utf8' }) as string)
+    )
     .sort();
 }
 
