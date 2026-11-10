@@ -2,6 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ConciergeViewerContext } from './viewer-context';
 const s = vi.hoisted(() => ({ memberId: 'owner', active: true }));
 vi.mock('@agent/core/authority', () => ({
+  // S4: store facades open their declared store grant (withStoreGrant).
+  withStoreGrant: (_name: string, fn: () => unknown) => fn(),
+  withStoreGrantAsync: async (_name: string, fn: () => unknown) => fn(),
   withExecutionContext: (_role: string, action: () => unknown) => action(),
 }));
 vi.mock('@agent/core/organization/member-registry', () => ({

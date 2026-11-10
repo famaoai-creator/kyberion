@@ -874,10 +874,9 @@ describe('tenant-bound reader roles never follow a caller-supplied tenant', () =
 
   it('an outer tenant-bound scope is the active tenant for a nested assumption', () => {
     expect(() =>
-      withExecutionContext(
+      enter(
         'peer_responder_reader',
-        () => withExecutionContext('peer_catalog_reader', () => 'ran', undefined, 'tenant-b'),
-        undefined,
+        () => enter('peer_catalog_reader', () => 'ran', 'tenant-b'),
         'tenant-a'
       )
     ).toThrow(/\[ROLE_TENANT_SCOPE_MISMATCH\]/);
