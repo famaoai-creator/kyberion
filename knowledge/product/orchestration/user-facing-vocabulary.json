@@ -6184,9 +6184,9 @@
         "qps-ploc": "⟦Ḓïşŧïŀŀ Ƈȧñḓïḓȧŧėş ŀőřėɱ⟧"
       },
       "chronos_mip_distill_candidates_description": {
-        "en": "Completed work can become reusable organizational memory. This queue highlights outcome-backed candidates that may be promoted into patterns, SOPs, or governed knowledge later.",
-        "ja": "完了した仕事は再利用できる組織の記憶になります。成果に裏付けられた候補を、パターン・SOP・管理されたナレッジへ昇格できるよう一覧にしています。",
-        "qps-ploc": "⟦Ƈőɱṗŀėŧėḓ ẇőřķ ƈȧñ ƀėƈőɱė řėůşȧƀŀė őřɠȧñïẑȧŧïőñȧŀ ɱėɱőřẏ. Ŧħïş ɋůėůė ħïɠħŀïɠħŧş őůŧƈőɱė-ƀȧƈķėḓ ƈȧñḓïḓȧŧėş ŧħȧŧ ɱȧẏ ƀė ṗřőɱőŧėḓ ïñŧő ṗȧŧŧėřñş, ŞŐṖş, őř ɠőṽėřñėḓ ķñőẇŀėḓɠė ŀȧŧėř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ⟧"
+        "en": "Completed work can become reusable organizational memory. Proposals waiting for a decision come first, each with how it is decided; past proposals stay below as history.",
+        "ja": "完了した仕事は、再利用できる組織の記憶になります。判断を待っている提案を先に、それぞれの判断の方法と一緒に並べます。過去の提案は、その下に記録として残します。",
+        "qps-ploc": "⟦Ƈőɱṗŀėŧėḓ ẇőřķ ƈȧñ ƀėƈőɱė řėůşȧƀŀė őřɠȧñïẑȧŧïőñȧŀ ɱėɱőřẏ. Ṗřőṗőşȧŀş ẇȧïŧïñɠ ƒőř ȧ ḓėƈïşïőñ ƈőɱė ƒïřşŧ, ėȧƈħ ẇïŧħ ħőẇ ïŧ ïş ḓėƈïḓėḓ; ṗȧşŧ ṗřőṗőşȧŀş şŧȧẏ ƀėŀőẇ ȧş ħïşŧőřẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗ⟧"
       },
       "chronos_mip_dry_run": {
         "en": "dry-run",
@@ -8437,6 +8437,36 @@
         "en": "Freshness target",
         "ja": "鮮度の目標",
         "qps-ploc": "⟦Ƒřėşħñėşş ŧȧřɠėŧ ŀőřėɱ⟧"
+      },
+      "chronos_mip_reuse_review_label": {
+        "en": "how it is decided",
+        "ja": "判断の方法",
+        "qps-ploc": "⟦ħőẇ ïŧ ïş ḓėƈïḓėḓ ŀőřėɱ⟧"
+      },
+      "chronos_mip_reuse_review_here": {
+        "en": "Decide here: promote it for reuse, or archive it.",
+        "ja": "ここで判断します。再利用できるように昇格するか、アーカイブします。",
+        "qps-ploc": "⟦Ḓėƈïḓė ħėřė: ṗřőɱőŧė ïŧ ƒőř řėůşė, őř ȧřƈħïṽė ïŧ. ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "chronos_mip_reuse_review_history": {
+        "en": "A past proposal kept as history. It can no longer be decided.",
+        "ja": "過去の提案で、記録として残しています。もう判断はできません。",
+        "qps-ploc": "⟦Ȧ ṗȧşŧ ṗřőṗőşȧŀ ķėṗŧ ȧş ħïşŧőřẏ. Ïŧ ƈȧñ ñő ŀőñɠėř ƀė ḓėƈïḓėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "chronos_mip_reuse_review_background_review": {
+        "en": "Decided in the background review (pnpm background-review).",
+        "ja": "バックグラウンドレビューで判断します（pnpm background-review）。",
+        "qps-ploc": "⟦Ḓėƈïḓėḓ ïñ ŧħė ƀȧƈķɠřőůñḓ řėṽïėẇ (ṗñṗɱ ƀȧƈķɠřőůñḓ-řėṽïėẇ). ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "chronos_mip_reuse_review_execution_feedback": {
+        "en": "Decided in the improvement review (pnpm kyberion improvements).",
+        "ja": "改善のレビューで判断します（pnpm kyberion improvements）。",
+        "qps-ploc": "⟦Ḓėƈïḓėḓ ïñ ŧħė ïɱṗřőṽėɱėñŧ řėṽïėẇ (ṗñṗɱ ķẏƀėřïőñ ïɱṗřőṽėɱėñŧş). ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "chronos_mip_reuse_review_learning_intake": {
+        "en": "Sent to the knowledge review with pnpm kyberion learning prepare --queue.",
+        "ja": "pnpm kyberion learning prepare --queue で、ナレッジのレビューに回します。",
+        "qps-ploc": "⟦Şėñŧ ŧő ŧħė ķñőẇŀėḓɠė řėṽïėẇ ẇïŧħ ṗñṗɱ ķẏƀėřïőñ ŀėȧřñïñɠ ṗřėṗȧřė --ɋůėůė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
       }
     },
     "cli": {
@@ -27014,6 +27044,11 @@
         "en": "Command template: {{audio}} is the input audio file and {{language}} the requested language.",
         "ja": "コマンドの {{audio}} は入力音声ファイル、{{language}} は指定した言語に置き換わります。",
         "qps-ploc": "⟦Ƈőɱɱȧñḓ ŧėɱṗŀȧŧė: {{audio}} ïş ŧħė ïñṗůŧ ȧůḓïő ƒïŀė ȧñḓ {{language}} ŧħė řėɋůėşŧėḓ ŀȧñɠůȧɠė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñş⟧"
+      },
+      "label_reuse_proposal": {
+        "en": "proposed for reuse",
+        "ja": "再利用の提案",
+        "qps-ploc": "⟦ṗřőṗőşėḓ ƒőř řėůşė ŀőřėɱ⟧"
       }
     },
     "tui": {

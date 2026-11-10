@@ -31,7 +31,9 @@ const DISTILL_TARGET_KINDS = new Set([
   'sop_candidate',
   'knowledge_hint',
   'report_template',
+  'procedure',
 ]);
+const DISTILL_REVIEWS = new Set(['here', 'elsewhere', 'history']);
 const APPROVAL_KINDS = new Set(['channel-approval', 'secret_mutation', 'mission_gate']);
 const RISK_LEVELS = new Set(['low', 'medium', 'high', 'critical']);
 const SURFACE_TONES = new Set(['stable', 'attention', 'offline', 'pending']);
@@ -287,6 +289,10 @@ function parseDistillCandidate(value: unknown): boolean {
     optionalString(value.locale) &&
     optionalString(value.promoted_ref) &&
     optionalStringArray(value.evidence_refs) &&
+    (value.review === undefined ||
+      (typeof value.review === 'string' && DISTILL_REVIEWS.has(value.review))) &&
+    optionalString(value.record_kind) &&
+    optionalString(value.decided_via) &&
     (value.work_loop === undefined || isWorkLoop(value.work_loop))
   );
 }

@@ -1,10 +1,8 @@
 /** Immutable link from a reuse proposal to the existing memory review queue. */
 import { createHash } from 'node:crypto';
 import { assertMemoryScope, type MemoryScopeEnvelope } from './memory-scope.js';
-import {
-  loadDistillCandidateRecord,
-  type DistillCandidateRecord,
-} from './distill-candidate-registry.js';
+import { loadDistillCandidateRecord } from './distill-candidate-registry.js';
+import { loadFacadeProposal } from './facade-proposal-rows.js';
 import { assertSafeRepositoryPath, safeReadFileSnapshot } from '../secure-io.js';
 import { pathResolver } from '../path-resolver.js';
 
@@ -67,7 +65,17 @@ export function learningSourceAllowed(ref: string, scope: MemoryScopeEnvelope): 
   return false;
 }
 
-export function reusableLearningBindingDigest(record: DistillCandidateRecord): string {
+/** The persisted plan a binding names: a learning-intake queue row (or a read-only legacy record). */
+export interface LearningIntakeProposalView {
+  candidate_id: string;
+  title: string;
+  summary: string;
+  tier?: MemoryScopeEnvelope['tier'];
+  scope?: MemoryScopeEnvelope;
+  metadata?: Record<string, unknown>;
+}
+
+export function reusableLearningBindingDigest(record: LearningIntakeProposalView): string {
   const plan = record.metadata?.learning_plan as Record<string, unknown> | undefined;
   if (record.metadata?.origin !== 'learning_intake' || !plan || plan.version !== 1)
     throw new Error('[LEARNING_LINK_INVALID] Expected a persisted learning intake plan');
@@ -90,7 +98,7 @@ export function reusableLearningBindingDigest(record: DistillCandidateRecord): s
   );
 }
 
-export function reusableLearningMemorySourceRef(record: DistillCandidateRecord): string {
+export function reusableLearningMemorySourceRef(record: LearningIntakeProposalView): string {
   return `${PREFIX}${record.candidate_id}:${reusableLearningBindingDigest(record)}`;
 }
 
@@ -109,13 +117,17 @@ function verifyFile(ref: unknown, hash: unknown): void {
 export function assertReusableLearningBinding(candidate: {
   source_ref: string;
   scope?: MemoryScopeEnvelope;
-}): DistillCandidateRecord | undefined {
+}): LearningIntakeProposalView | undefined {
   if (!candidate.source_ref.startsWith(PREFIX)) return undefined;
   const match = candidate.source_ref
     .slice(PREFIX.length)
     .match(/^([A-Za-z0-9._-]+):([a-f0-9]{64})$/u);
   if (!match) throw new Error('[LEARNING_LINK_INVALID] Malformed learning intake binding');
-  const record = loadDistillCandidateRecord(match[1], candidate.scope);
+  // D8: the plan is a learning-intake queue row. Plans prepared before D8 stay
+  // in the read-only legacy record store for one release; read them, never write.
+  const record: LearningIntakeProposalView | null =
+    loadFacadeProposal({ recordKind: 'learning_intake' }, match[1], candidate.scope) ??
+    loadDistillCandidateRecord(match[1], candidate.scope);
   if (!record || reusableLearningBindingDigest(record) !== match[2])
     throw new Error('[LEARNING_LINK_STALE] Persisted learning proposal changed or disappeared');
   const plan = record.metadata!.learning_plan as {

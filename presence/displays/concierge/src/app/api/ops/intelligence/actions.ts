@@ -16,13 +16,15 @@ import { memoryCandidateVisibleToViewer } from '../../../../lib/ops/knowledge-sc
 import {
   DistillCandidateAmbiguityError,
   resolveDistillCandidateForViewer,
+  resolveReuseProposalForViewer,
 } from '../../../../lib/ops/distill-candidate-scope';
+import { CONCIERGE_DECIDED_VIA } from '@agent/core/knowledge/facade-proposal-rows';
 import { applyBrowserSessionControl } from '../../../../lib/ops/browser-session-control';
 import {
   buildTrackGateReadinessSummaries,
   buildTrackNextWorkProposal,
+  captureMissionSeedProposal,
   clearSurfaceOutboxMessage,
-  createDistillCandidateRecord,
   decideApprovalRequest,
   loadApprovalRequest,
   normalizeRejectionReasonCategory,
@@ -45,13 +47,12 @@ import {
   promotePersonalMemoryCandidates,
   restartAgentRuntime,
   safeExec,
-  saveDistillCandidateRecord,
   saveMissionSeedRecord,
   saveProjectRecord,
   savePromotedMemoryRecord,
   startMissionOrchestrationWorker,
   stopAgentRuntime,
-  updateDistillCandidateRecord,
+  updateFacadeProposal,
 } from '../../../../lib/ops/intelligence-primitives';
 import { withExecutionContext } from '@agent/core/authority';
 import {
@@ -366,13 +367,26 @@ export const INTELLIGENCE_ACTION_HANDLERS: Record<string, IntelligenceActionHand
       );
     }
     const requestedTenant = typeof body?.tenant === 'string' ? body.tenant : undefined;
+    // D8: proposals are MemoryCandidate queue rows resolved for this viewer
+    // server-side. Legacy DistillCandidateRecords are read-only history.
     let candidate;
     try {
-      candidate = resolveDistillCandidateForViewer(
+      candidate = resolveReuseProposalForViewer(
         candidateId,
         resolvedViewer.context,
         requestedTenant
       );
+      if (
+        !candidate &&
+        resolveDistillCandidateForViewer(candidateId, resolvedViewer.context, requestedTenant)
+      )
+        return NextResponse.json(
+          {
+            error:
+              'This is a past proposal kept as history. It can no longer be decided here; an operator can move pending ones onto the review queue with pnpm kyberion learning prepare --migrate.',
+          },
+          { status: 409 }
+        );
     } catch (error) {
       if (error instanceof DistillCandidateAmbiguityError)
         return NextResponse.json({ error: error.message }, { status: 409 });
@@ -381,18 +395,38 @@ export const INTELLIGENCE_ACTION_HANDLERS: Record<string, IntelligenceActionHand
     if (!candidate) {
       return NextResponse.json({ error: 'Distill candidate not found' }, { status: 404 });
     }
+    if (candidate.decided_via !== CONCIERGE_DECIDED_VIA)
+      return NextResponse.json(
+        { error: `This proposal is decided with ${candidate.decided_via}, not on this page.` },
+        { status: 409 }
+      );
+    if (candidate.status !== 'proposed')
+      return NextResponse.json({ error: 'This proposal was already decided.' }, { status: 409 });
+    const spec = { recordKind: candidate.record_kind! };
     let updated: typeof candidate | null = candidate;
     if (decision === 'archive') {
-      updated = updateDistillCandidateRecord(candidateId, { status: 'archived' }, candidate.scope);
-    } else {
-      const saved = savePromotedMemoryRecord(candidate, { executionRole: 'chronos_gateway' });
-      updated = updateDistillCandidateRecord(
+      updated = updateFacadeProposal(
+        spec,
         candidateId,
+        { status: 'archived' },
+        { scope: candidate.scope }
+      );
+    } else {
+      // Pre-D8 public proposals were unscoped; the publication guard still
+      // reads "no scope" as public product knowledge.
+      const { scope, record_kind: _kind, decided_via: _via, ...view } = candidate;
+      const saved = savePromotedMemoryRecord(
         {
-          status: 'promoted',
-          promoted_ref: saved.logicalPath,
-        },
-        candidate.scope
+          ...view,
+          ...(scope && scope.tier !== 'public' ? { scope } : {}),
+        } as Parameters<typeof savePromotedMemoryRecord>[0],
+        { executionRole: 'chronos_gateway' }
+      );
+      updated = updateFacadeProposal(
+        spec,
+        candidateId,
+        { status: 'promoted', promoted_ref: saved.logicalPath },
+        { scope: candidate.scope }
       );
     }
     if (!updated)
@@ -402,10 +436,9 @@ export const INTELLIGENCE_ACTION_HANDLERS: Record<string, IntelligenceActionHand
       );
     // Presence still aggregates notifications without viewer authorization.
     // Keep scoped content in the authorized response, never that broad feed.
-    if (!updated.scope)
+    if (!updated.scope || updated.scope.tier === 'public')
       enqueueSurfaceNotification({
         surface: 'presence',
-        ...(updated.scope ? { scope: updated.scope } : {}),
         requestId: updated.candidate_id,
         title: decision === 'promote' ? 'Memory promoted' : 'Memory archived',
         channel: 'chronos',
@@ -625,31 +658,17 @@ export const INTELLIGENCE_ACTION_HANDLERS: Record<string, IntelligenceActionHand
         last_promoted_seed_id: seed.seed_id,
       },
     });
-    saveDistillCandidateRecord(
-      createDistillCandidateRecord({
-        source_type: 'mission',
-        tier: project.tier,
-        project_id: project.project_id,
-        track_id: seed.track_id,
-        track_name: seed.track_name,
-        mission_id: missionId,
-        task_session_id: seed.source_task_session_id,
-        title: `Promote durable mission orchestration for ${seed.title}`,
-        summary: `${seed.title} was promoted from a project mission seed into durable mission ${missionId}. This transition may be reusable as governed organizational memory.`,
-        status: 'proposed',
-        target_kind: intelligenceData.inferMissionSeedPromotionTargetKind(seed),
-        specialist_id: seed.specialist_id,
-        locale: seed.locale || project.primary_locale,
-        work_loop: seed.work_loop,
-        evidence_refs: [
-          `project:${project.project_id}`,
-          `mission_seed:${seed.seed_id}`,
-          `mission:${missionId}`,
-          ...(seed.source_task_session_id ? [`task_session:${seed.source_task_session_id}`] : []),
-        ],
-        metadata: intelligenceData.buildMissionSeedPromotionMetadata(seed, project),
-      })
-    );
+    // D8: the reuse proposal is a queue row with the started mission's own
+    // tier and tenant (and the project when it belongs to that tenant). A
+    // non-public mission without a tenant in its state has no scope to write,
+    // so nothing is captured.
+    captureMissionSeedProposal({
+      missionId,
+      project,
+      seed,
+      targetKind: intelligenceData.inferMissionSeedPromotionTargetKind(seed),
+      metadata: intelligenceData.buildMissionSeedPromotionMetadata(seed, project),
+    });
     emitMissionOrchestrationObservation({
       decision: 'mission_seed_promoted',
       event_type: 'mission_seed_promoted',

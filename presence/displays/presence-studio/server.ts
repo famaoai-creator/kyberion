@@ -43,7 +43,6 @@ import { listProjectTrackRecords } from '@agent/core/project/project-track-regis
 import { listServiceBindingRecords } from '@agent/core/service/service-binding-registry';
 import { registerServiceBindingsRoute } from './service-bindings-route.js';
 import { listMissionSeedRecords } from '@agent/core/mission/mission-seed-registry';
-import { listDistillCandidateRecords } from '@agent/core/knowledge/distill-candidate-registry';
 import { getActiveTaskSession, listTaskSessions } from '@agent/core/task/task-session';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
@@ -291,11 +290,17 @@ presenceStudioData.app.get('/api/mission-seeds', (_req, res) => {
   });
 });
 
-presenceStudioData.app.get('/api/distill-candidates', (_req, res) => {
-  res.json({
-    ok: true,
-    items: listDistillCandidateRecords(),
-  });
+presenceStudioData.app.get('/api/distill-candidates', (req, res) => {
+  // D8: queue-row proposals and legacy history, scoped to the viewer resolved
+  // server-side (a `?tenant=` only narrows a loopback owner's view).
+  try {
+    const access = resolvePresenceStudioViewerContext(req);
+    res.setHeader('Cache-Control', 'private, no-store');
+    return res.json({ ok: true, items: presenceStudioData.listReuseItemsForViewer(access) });
+  } catch (error: unknown) {
+    const status = error instanceof PresenceStudioViewerError ? error.status : 500;
+    return res.status(status).json(presenceStudioData.presenceStudioWireError(error, status));
+  }
 });
 
 presenceStudioData.app.get('/api/async-requests', (_req, res) => {
