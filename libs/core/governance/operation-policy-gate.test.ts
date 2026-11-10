@@ -64,7 +64,11 @@ describe('operation-policy-gate (SA-05)', () => {
         },
         'analyst'
       );
-      expect(evaluate).toHaveBeenCalledWith(expect.objectContaining({ agentId: 'analyst' }));
+      expect(evaluate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          agentId: expect.stringMatching(/^kyberion:\/\/agent\/.+\/analyst$/u),
+        })
+      );
     } finally {
       evaluate.mockRestore();
       if (saved === undefined) delete process.env.KYBERION_PERSONA;

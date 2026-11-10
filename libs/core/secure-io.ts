@@ -48,7 +48,8 @@ import { policyEngine } from './governance/policy-engine.js';
 import * as auditChainModule from './governance/audit-chain.js';
 import { recordGovernanceAction } from './governance/governance-action-recorder.js';
 import { createLogger } from './logger.js';
-import { currentExecutionScope, executionPersonaText } from './foundation/execution-scope.js';
+import { currentExecutionScope } from './foundation/execution-scope.js';
+import { executionAgentId } from './governance/execution-agent-id.js';
 import {
   assertScopedMetadataReadable,
   assertCanonicalReadable,
@@ -639,7 +640,7 @@ export function safeWriteFile(
     _policyCheckInProgress = true;
     try {
       const policyDecision = policyEngine.evaluate({
-        agentId: executionPersonaText() || 'unknown',
+        agentId: executionAgentId(),
         operation: 'file_write',
         ...(instructionEffect
           ? {
@@ -656,17 +657,12 @@ export function safeWriteFile(
         message: `Write to ${resolved}`,
       });
       if (!policyDecision.allowed) {
-        recordGovernanceAction(
-          executionPersonaText() || 'unknown',
-          'file_write',
-          `${resolved}:denied`,
-          true
-        );
+        recordGovernanceAction(executionAgentId(), 'file_write', `${resolved}:denied`, true);
         // A write made under the audit chain lock (mirror reconcile, tenant
         // rename) would otherwise wait out the lock on itself and surface as
         // a lock timeout instead of this denial.
         auditChain.recordDeferrable({
-          agentId: executionPersonaText() || 'unknown',
+          agentId: executionAgentId(),
           action: 'policy_violation',
           operation: 'file_write',
           result: 'failed',
@@ -761,7 +757,7 @@ export function safeWriteFile(
     if (instructionEffect) {
       try {
         auditChain.recordDeferrable({
-          agentId: executionPersonaText() || 'unknown',
+          agentId: executionAgentId(),
           action: 'persistent_instruction_write',
           operation: 'file_write',
           result: 'completed',
@@ -1205,21 +1201,16 @@ function assertExecPolicy(command: string, args: readonly string[] = []): void {
   const ringRaw = getRegisteredEnvText('KYBERION_AGENT_RING');
   const ring = ringRaw !== undefined && ringRaw !== '' ? Number(ringRaw) : Number.NaN;
   const decision = policyEngine.evaluate({
-    agentId: executionPersonaText() || 'unknown',
+    agentId: executionAgentId(),
     operation: 'execute_command',
     ...(describeOpaqueInstructionExecution(command, args) ?? {}),
     message: `Execute ${command}`,
     ...(Number.isFinite(ring) ? { agent_ring: ring } : {}),
   });
   if (!decision.allowed) {
-    recordGovernanceAction(
-      executionPersonaText() || 'unknown',
-      'execute_command',
-      `${command}:denied`,
-      true
-    );
+    recordGovernanceAction(executionAgentId(), 'execute_command', `${command}:denied`, true);
     auditChain.recordDeferrable({
-      agentId: executionPersonaText() || 'unknown',
+      agentId: executionAgentId(),
       action: 'policy_violation',
       operation: 'execute_command',
       result: 'failed',

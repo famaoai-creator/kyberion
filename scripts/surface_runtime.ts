@@ -38,6 +38,7 @@ import {
 } from '@agent/core/workforce/workspace-process-identity';
 import { inspectServiceAuth } from '@agent/core/service/service-validator';
 import { auditChain } from '@agent/core/governance/audit-chain';
+import { executionAgentId } from '@agent/core/governance/execution-agent-id';
 import { buildNextAction, formatNextAction } from '@agent/core/next-action';
 import { getProtocolServiceRegistryEntry } from '@agent/core/protocol-service-registry';
 import { recordProtocolServiceLifecycle } from '@agent/core/protocol-service-lifecycle';
@@ -980,7 +981,7 @@ function setSurfaceEnabled(surfaceId: string, manifestPath: string, enabled: boo
     storage = manifestPath;
   }
   auditChain.record({
-    agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'worker',
+    agentId: executionAgentId('worker'),
     action: enabled ? 'surface.enable' : 'surface.disable',
     operation: surfaceId,
     result: 'completed',
@@ -1038,7 +1039,7 @@ async function registerSurface(params: {
   saveSurfaceManifest(manifest, params.manifestPath);
 
   auditChain.record({
-    agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'worker',
+    agentId: executionAgentId('worker'),
     action: 'surface.register',
     operation: params.id,
     result: 'completed',
@@ -1060,7 +1061,7 @@ async function unregisterSurfaceById(surfaceId: string, manifestPath: string) {
   await stopSurfaceById(surfaceId);
 
   auditChain.record({
-    agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'worker',
+    agentId: executionAgentId('worker'),
     action: 'surface.unregister',
     operation: surfaceId,
     result: 'completed',

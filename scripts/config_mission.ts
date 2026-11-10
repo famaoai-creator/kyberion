@@ -24,6 +24,7 @@ import {
   safeReaddir,
 } from '@agent/core/secure-io';
 import { auditChain } from '@agent/core/governance/audit-chain';
+import { executionAgentId } from '@agent/core/governance/execution-agent-id';
 import {
   assertConfigChangeApplyable,
   computeConfigChangeFingerprint,
@@ -361,7 +362,7 @@ function cmdCreate(argv: string[]): void {
   safeWriteFile(briefPath(tenant, instanceId), JSON.stringify(brief, null, 2));
 
   auditChain.record({
-    agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'worker',
+    agentId: executionAgentId('worker'),
     action: 'config_mission.create',
     operation: `${presetId}/${instanceId}`,
     result: 'completed',
@@ -528,7 +529,7 @@ async function cmdApply(argv: string[]): Promise<void> {
     safeWriteFile(bPath, JSON.stringify(brief, null, 2));
 
     auditChain.record({
-      agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'worker',
+      agentId: executionAgentId('worker'),
       action: 'config_mission.apply',
       operation: `${brief.preset_id}/${id}`,
       result: 'completed',
@@ -556,7 +557,7 @@ async function cmdApply(argv: string[]): Promise<void> {
     safeWriteFile(bPath, JSON.stringify(brief, null, 2));
 
     auditChain.record({
-      agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'worker',
+      agentId: executionAgentId('worker'),
       action: 'config_mission.apply',
       operation: `${brief.preset_id}/${id}`,
       result: 'failed',

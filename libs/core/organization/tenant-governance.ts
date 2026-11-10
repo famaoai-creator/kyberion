@@ -1,4 +1,5 @@
 import * as path from 'node:path';
+import { executionAgentId } from '../governance/execution-agent-id.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { auditChain } from '../governance/audit-chain.js';
 import {
@@ -285,7 +286,7 @@ export function renameTenant(input: TenantRenameInput): TenantRenameResult {
   }
   safeUnlinkSync(profilePath);
   auditChain.record({
-    agentId: input.actor || getRegisteredEnvText('KYBERION_PERSONA') || 'operator',
+    agentId: input.actor || executionAgentId('operator'),
     action: 'tenant.rename',
     operation: `tenant:${slug}`,
     result: 'completed',
@@ -365,7 +366,7 @@ export function deleteTenant(input: TenantDeleteInput): TenantDeleteResult {
   }
   safeUnlinkSync(profilePath);
   auditChain.record({
-    agentId: input.actor || getRegisteredEnvText('KYBERION_PERSONA') || 'operator',
+    agentId: input.actor || executionAgentId('operator'),
     action: 'tenant.delete',
     operation: `tenant:${slug}`,
     result: 'completed',

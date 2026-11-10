@@ -1,4 +1,5 @@
 import * as path from 'node:path';
+import { executionAgentId } from '../governance/execution-agent-id.js';
 import type { ValidateFunction } from 'ajv';
 import {
   classifyOrganizationWork,
@@ -667,7 +668,7 @@ export function transitionOrganizationLifecycle(input: {
   };
   saveOrganizationOperationalState(next, { rootDir: input.rootDir });
   auditChain.record({
-    agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'organization_controller',
+    agentId: executionAgentId('organization_controller'),
     action: `organization.${input.verb}`,
     operation: `${input.verb}:${input.organizationId}`,
     result: 'completed',
@@ -733,7 +734,7 @@ export function setOrganizationParent(input: {
   };
   saveOrganizationOperationalState(next, { rootDir: input.rootDir });
   auditChain.record({
-    agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'organization_controller',
+    agentId: executionAgentId('organization_controller'),
     action: 'organization.parent_set',
     operation: `parent_set:${input.organizationId}`,
     result: 'completed',
