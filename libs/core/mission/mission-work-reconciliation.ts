@@ -2,6 +2,7 @@
  * Adopt work completed outside dispatch-workitems without weakening the mission exit gate.
  */
 
+import type { StorageDataTier } from '../storage-layout.js';
 import {
   approvalRequesterActorId,
   resolveApprovalRequesterInput,
@@ -416,7 +417,7 @@ function validateEvidence(input: {
   task: MissionWorkReconciliationTask;
   sourceRepository: string;
   sourceCommit: string;
-  missionTier: 'personal' | 'confidential' | 'public';
+  missionTier: StorageDataTier;
 }): void {
   const seen = new Set<string>();
   const evidenceKinds = new Map<string, MissionWorkReconciliationEvidence['kind']>();

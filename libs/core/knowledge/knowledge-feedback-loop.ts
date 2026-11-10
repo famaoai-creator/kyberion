@@ -421,6 +421,7 @@ export function recordKnowledgeGap(input: {
       const candidate = createMemoryPromotionCandidate({
         sourceType: 'task_session',
         sourceRef,
+        kind: 'hint',
         proposedMemoryKind: 'clarification_prompt',
         summary: `Repeated scoped knowledge gap (3 observations): ${topic}`,
         evidenceRefs: [sourceRef, target],
@@ -529,6 +530,8 @@ function bumpUsageAggregate(
       not_used_count: current.not_used_count + (delta.not_used_count || 0),
       occurrences: current.occurrences + 1,
       last_seen: at,
+      ...(delta.delivered_count ? { last_delivered_at: at } : {}),
+      ...(delta.used_count ? { last_used_at: at } : {}),
     };
   } else {
     if (entries.length >= cap.max_usage_entries) {
@@ -545,6 +548,8 @@ function bumpUsageAggregate(
       not_used_count: delta.not_used_count || 0,
       occurrences: 1,
       last_seen: at,
+      ...(delta.delivered_count ? { last_delivered_at: at } : {}),
+      ...(delta.used_count ? { last_used_at: at } : {}),
     });
   }
   const serialized = JSON.stringify(entries, null, 2);
@@ -820,6 +825,7 @@ function recordKnowledgeUsageFeedbackUnlocked(input: {
         // Closest existing kind (memory-candidate.schema.json enum) for "a
         // document/topic that was needed but not found" — a prompt to
         // clarify/author knowledge, not yet a validated SOP/heuristic.
+        kind: 'hint',
         proposedMemoryKind: 'clarification_prompt',
         summary: `Knowledge gap reported by ${sourceRef}: ${topic}`,
         evidenceRefs: [sourceRef],

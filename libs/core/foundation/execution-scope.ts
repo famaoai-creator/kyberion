@@ -59,6 +59,12 @@ export interface ExecutionScope {
    * the persona; `undefined` means the assumption left it to the environment.
    */
   readonly assumedPersona?: string | null;
+  /**
+   * Opaque token of the declared store grant this scope was opened for
+   * (authority.ts `withStoreGrant`, foundation/declared-store-grant.ts). Only
+   * a token that module issued and has not revoked resolves a grant.
+   */
+  readonly storeGrantToken?: object;
 }
 
 /** Returns false when the current process may not act as `role` (RA-02). */

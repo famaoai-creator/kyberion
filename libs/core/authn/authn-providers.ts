@@ -48,7 +48,12 @@ import { getRegisteredEnvBool, isVitestProcess } from '../foundation/env.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import { readTextFile } from '../foundation/text.js';
 import { getAgentIdentity, deriveAgentNhiId } from '../agent/agent-identity.js';
-import { resolveAssumedRole, resolveExecutionPersona, withExecutionContext } from '../authority.js';
+import {
+  resolveAssumedRole,
+  resolveExecutionPersona,
+  withExecutionContext,
+  withStoreGrant,
+} from '../authority.js';
 import { frontDeskRoleAuthority } from '../surface/front-desk-roles.js';
 import { isValidMemberId } from '../organization/member-id-grammar.js';
 import {
@@ -282,12 +287,9 @@ function loadRegistrations(deps?: AuthnResolveDeps) {
   // TR-01: least privilege — the reader role's only grant is chronos-access.json.
   // Authentication precedes viewer tenant admission. This exact-file reader
   // uses system scope; its role cannot read other personal connection files.
-  return withExecutionContext(
-    CHRONOS_TOKEN_REGISTRY_READER_ROLE,
-    () => readChronosTokenRegistrations(),
-    undefined,
-    ''
-  );
+  return withStoreGrant(CHRONOS_TOKEN_REGISTRY_READER_ROLE, () => readChronosTokenRegistrations(), {
+    tenantSlug: '',
+  });
 }
 
 const registryTokenProvider: AuthnProvider = {

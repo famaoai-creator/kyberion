@@ -15,7 +15,7 @@ describe('su surface data', () => {
           status: 'completed',
           execution_mode: 'local',
           priority: 1,
-          assigned_persona: 'operator',
+          org_role: 'operator',
           confidence_score: 0.9,
           git: { branch: 'main', start_commit: 'a', latest_commit: 'b', checkpoints: [] },
           history: [{ ts: '2026-07-01T00:00:00.000Z', event: 'done', note: 'done' }],
@@ -262,7 +262,7 @@ it('narrows mission history by all authorized hierarchy dimensions before the li
     history: [],
     execution_mode: 'local',
     priority: 1,
-    assigned_persona: 'operator',
+    org_role: 'operator',
     confidence_score: 1,
     git: { branch: 'main', start_commit: 'a', latest_commit: 'a', checkpoints: [] },
   };

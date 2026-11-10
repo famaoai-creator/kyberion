@@ -30,7 +30,7 @@ import { addInboxEntry, listInboxEntries } from '../task/deliverable-inbox.js';
 import { sendIMessage } from '../integrations/imessage-bridge.js';
 import { currentTriggerDeliveryId } from '../event/trigger-correlation.js';
 import { appendOpsAlertLogRecord } from '../daemon/ops-alert-log.js';
-import { withExecutionContext } from '../authority.js';
+import { withExecutionContext, withStoreGrant } from '../authority.js';
 import { sendWebPushForEvent, webPushWouldDeliver } from './web-push.js';
 
 /**
@@ -271,7 +271,7 @@ function notificationPreferencesCatalogAtPath(filePath: string) {
 export function loadNotificationPreferences(): NotificationPreferences {
   try {
     // Shared delivery callers only need this one routing-preferences file.
-    return withExecutionContext('notification_preferences_reader', () => {
+    return withStoreGrant('notification_preferences_reader', () => {
       const filePath = notificationPreferencesPath();
       if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) return {};
       return (

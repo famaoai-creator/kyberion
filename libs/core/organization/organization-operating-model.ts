@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import { type OrganizationProfile } from './organization-profile.js';
 import type { SupportedLocale } from '../localization/locale.js';
 import { auditChain } from '../governance/audit-chain.js';
@@ -6,7 +7,7 @@ import { nowIso } from '../foundation/time.js';
 import { safeRmSync } from '../secure-io.js';
 import type { KeyResultSpec } from './key-result-spec.js';
 
-export type OrganizationTier = 'personal' | 'confidential' | 'public';
+export type OrganizationTier = StorageDataTier;
 export type OrganizationWorkShape =
   | 'solution_project'
   | 'service_operation'
@@ -414,6 +415,8 @@ export interface QueueOrganizationLearningCandidateInput {
   targetKind: OrganizationLearningCandidate['target_kind'];
   tier: OrganizationTier;
   tenantSlug?: string;
+  /** Personal-tier learnings need their owner (D8: scope is written at capture, never inferred). */
+  ownerNhi?: string;
   metadata?: Record<string, unknown>;
   rootDir?: string;
 }

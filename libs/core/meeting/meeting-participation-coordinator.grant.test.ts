@@ -79,7 +79,7 @@ function writeMission(tenant: string | null = 'acme'): void {
     JSON.stringify({
       mission_id: MISSION_ID,
       tier: 'confidential',
-      assigned_persona: 'ecosystem_architect',
+      org_role: 'ecosystem_architect',
       ...(tenant ? { tenant_slug: tenant } : {}),
     })
   );

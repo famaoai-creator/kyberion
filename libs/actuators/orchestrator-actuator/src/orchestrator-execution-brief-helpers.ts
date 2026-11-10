@@ -1011,7 +1011,7 @@ export function collectMissionStatusSnapshot(targetId?: string) {
         tier: state.tier,
         status: state.status,
         project_id: state.relationships?.project?.project_id || null,
-        assigned_persona: state.assigned_persona || null,
+        org_role: state.org_role || null,
         path: logicalPath,
       },
     ];

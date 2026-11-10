@@ -1,3 +1,4 @@
+import type { KnowledgeTier } from './knowledge-tier.js';
 import { createHash } from 'node:crypto';
 import { isValidTenantSlug } from './scope.js';
 
@@ -35,6 +36,7 @@ export const PARTITIONED_RUNTIME_STATE_ROOTS = {
   generation_cost_settlements: 'active/shared/runtime/media-generation/cost-settlements',
   api_verification: 'active/shared/runtime/health/api-verification',
   provider_attestations: 'active/shared/runtime/provider-attestations',
+  hints: 'active/shared/runtime/hints',
 } as const;
 
 export const PARTITIONED_RUNTIME_LEDGER_ROOTS = {
@@ -157,7 +159,7 @@ export const RUNTIME_STATE_PATHS = {
 export type RuntimeStateKey = keyof typeof RUNTIME_STATE_PATHS;
 export interface RuntimeStateScope {
   tenant_slug?: string;
-  tier?: 'public' | 'confidential' | 'personal';
+  tier?: KnowledgeTier;
   owner_nhi?: string;
 }
 

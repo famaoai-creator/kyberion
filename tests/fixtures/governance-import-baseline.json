@@ -34,7 +34,6 @@
     "libs/core/intent/intent-handoff.test.ts",
     "libs/core/intent/intent-reconciliation.test.ts",
     "libs/core/intent/intent-track-resolver.test.ts",
-    "libs/core/knowledge/distill-knowledge-injector.test.ts",
     "libs/core/knowledge/feedback-loop.test.ts",
     "libs/core/knowledge/heuristic-feedback.test.ts",
     "libs/core/knowledge/knowledge-cache-budget.test.ts",

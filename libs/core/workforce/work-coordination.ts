@@ -11,11 +11,9 @@ import { getRegisteredEnvText } from '../foundation/env.js';
 import { withExecutionContext } from '../authority.js';
 import { withImmutableWorkItemInventorySnapshot } from './work-coordination-snapshot.js';
 import { enforceNhiActorPolicy } from '../agent/nhi-actor-verification.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeRmSync } from '../secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeRmSync } from '../secure-io.js';
 import { buildWorkItemHandoffPacket, type HandoffPacket } from '../mesh/handoff-packet.js';
 import { auditChain } from '../governance/audit-chain.js';
-import { pathResolver } from '../path-resolver.js';
-import { defineCatalog } from '../foundation/governed-catalog.js';
 import { WorkCoordinationError, assertWorkClaimsAllowed } from './work-coordination-error.js';
 import { logger } from '../core.js';
 import {
@@ -32,6 +30,12 @@ import {
   type EffectReleaseInput,
 } from './work-effect-transitions.js';
 import { applyWorkItemFilters, sortItems } from './work-coordination-query.js';
+import { loadWorkBoardCatalogAtPath, workBoardCatalogAtPath } from './work-board-catalog.js';
+import * as parentStatus from './work-item-parent-status.js';
+import * as workLease from './work-item-lease.js';
+export { loadWorkBoardCatalogAtPath } from './work-board-catalog.js';
+export { issueBoardView } from './work-item-hierarchy.js';
+import { assertCreatedWorkItemParent, workItemHierarchyUpdate } from './work-item-hierarchy.js';
 import {
   assertClaimPayloadReplayable,
   assertOriginalWorkItemIdentity,
@@ -110,9 +114,6 @@ export type {
   WorkLeaseStatus,
 } from './work-coordination-types.js';
 
-const WORK_BOARD_CATALOG_SCHEMA_PATH = pathResolver.knowledge(
-  'product/schemas/work-board-catalog.schema.json'
-);
 import {
   appendEvent,
   appendItemSnapshot,
@@ -123,6 +124,7 @@ import {
   createWorkItemAttempt,
   currentLeaseById,
   currentLeaseForItem,
+  leaseRecordsForItem,
   currentLeaseRecords,
   currentWorkItem,
   currentWorkItems,
@@ -232,26 +234,18 @@ export function withUndispatchedWorkItemEvidence<T>(
   );
 }
 
-function activeLeaseForItem(itemId: string): WorkLease | null {
-  return currentLeaseForItem(itemId);
-}
+const activeLeaseForItem: (itemId: string) => WorkLease | null = currentLeaseForItem;
 
-function workBoardCatalogAtPath(filePath: string) {
-  return defineCatalog<WorkBoardCatalog>({
-    id: 'work-board-catalog',
-    path: filePath,
-    schema: WORK_BOARD_CATALOG_SCHEMA_PATH,
-  });
-}
-
-/** Load the persisted work-board catalog through the shared schema boundary. */
-export function loadWorkBoardCatalogAtPath(filePath: string): WorkBoardCatalog {
-  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: false });
-  if (!safeLstat(safeFilePath).isFile()) {
-    throw new Error(`[WORK_BOARD_CATALOG] catalog must be a regular file: ${filePath}`);
-  }
-  return workBoardCatalogAtPath(safeFilePath).load();
-}
+// W2: every item snapshot is written through the parent-status sync.
+const parentStatusStore: parentStatus.ParentStatusStore = {
+  currentWorkItem,
+  currentWorkItems,
+  activeLeaseForItem,
+  appendItemSnapshot,
+  updateItemSnapshot,
+  appendEvent,
+};
+const writeItemSnapshot = parentStatus.bindItemSnapshotWriter(parentStatusStore);
 
 function materializeBoardCatalog(): WorkBoardCatalog {
   const filePath = boardsPath();
@@ -407,7 +401,8 @@ function createWorkItemInternal(input: CreateWorkItemInput): WorkItem {
       { item_id: item.item_id }
     );
   }
-  appendItemSnapshot(item);
+  assertCreatedWorkItemParent(item, currentWorkItem);
+  writeItemSnapshot(null, item);
   appendEvent({
     eventType: 'item_created',
     itemId: item.item_id,
@@ -469,8 +464,7 @@ function updateItemSnapshot(
       ? { current_attempt_id: patch.current_attempt_id }
       : {}),
   };
-  appendItemSnapshot(next);
-  return next;
+  return writeItemSnapshot(current, next);
 }
 
 export function updateWorkItem(input: UpdateWorkItemInput): WorkItem {
@@ -509,7 +503,12 @@ function updateWorkItemInternal(input: UpdateWorkItemInput): WorkItem {
       );
   }
 
+  const parentPatch = workItemHierarchyUpdate(current, input, {
+    lookup: currentWorkItem,
+    items: currentWorkItems,
+  });
   const nextStatus = input.status || current.status;
+  const statusOrigin = parentStatus.nextStatusOrigin(parentStatusStore, current, input);
   const shouldClearLease =
     isTerminalStatus(nextStatus) || (input.endAttempt === true && nextStatus === 'blocked');
   const attemptStatus: Exclude<WorkItemAttemptStatus, 'running'> =
@@ -547,6 +546,8 @@ function updateWorkItemInternal(input: UpdateWorkItemInput): WorkItem {
       ...(input.labels ? { labels: [...input.labels] } : {}),
       ...(input.dependencies ? { dependencies: [...input.dependencies] } : {}),
       ...(input.context ? { context: { ...input.context } } : {}),
+      ...parentPatch,
+      ...(statusOrigin ? { status_origin: statusOrigin } : {}),
       ...(input.metadata ? { metadata: input.metadata } : {}),
       ...(finalizedAttempt
         ? {
@@ -598,7 +599,7 @@ function updateWorkItemInternal(input: UpdateWorkItemInput): WorkItem {
       ),
     },
   });
-  return next;
+  return statusOrigin === 'children' ? parentStatus.handBack(parentStatusStore, next) : next;
 }
 
 export function listBoards(): WorkBoard[] {
@@ -773,8 +774,9 @@ const pipelineContinuationStore = {
   currentWorkItem,
   activeLeaseForItem,
   currentLeaseById,
+  leasesForItem: leaseRecordsForItem,
   appendLeaseSnapshot,
-  appendItemSnapshot,
+  appendItemSnapshot: (item: WorkItem) => writeItemSnapshot(currentWorkItem(item.item_id), item),
   appendLeaseEvent,
   appendWorkItemAttemptEvent,
   randomId,
@@ -857,14 +859,19 @@ function claimWorkItemInternal(input: ClaimWorkItemInput): {
   const target = assertEffectClaimable(current, currentWorkItems());
 
   const now = nowIso();
+  const terms = workLease.grantWorkItemLeaseTerms({
+    itemId: current.item_id,
+    holder: input.actorPeerId,
+    ...(input.ttlMs ? { ttlMs: input.ttlMs } : {}),
+    history: leaseRecordsForItem(current.item_id),
+  });
   const lease: WorkLease = {
     lease_id: randomId('wlease'),
     item_id: current.item_id,
-    holder_peer_id: input.actorPeerId,
+    ...terms,
     ...(input.actorUserId ? { holder_user_id: input.actorUserId } : {}),
     purpose: input.purpose,
     status: 'active',
-    expires_at: new Date(Date.now() + (input.ttlMs || 15 * 60 * 1000)).toISOString(),
     created_at: now,
     renewed_at: now,
     ...(idempotencyKey ? { idempotency_key: idempotencyKey } : {}),
@@ -885,7 +892,7 @@ function claimWorkItemInternal(input: ClaimWorkItemInput): {
     metadata: input.metadata,
   });
 
-  const next: WorkItem = appendItemSnapshot({
+  const next: WorkItem = writeItemSnapshot(current, {
     ...current,
     status: 'in_progress',
     version: current.version + 1,
@@ -915,6 +922,7 @@ function claimWorkItemInternal(input: ClaimWorkItemInput): {
     input.actorUserId,
     input.expectedVersion
   );
+  workLease.auditWorkItemLease('acquire', lease, current);
   appendWorkItemAttemptEvent(
     'item_attempt_started',
     current.item_id,
@@ -967,7 +975,7 @@ function releaseWorkItemInternal(input: ReleaseWorkItemInput): {
       active_lease_id: activeLease.lease_id,
     });
   }
-  if (activeLease.holder_peer_id !== input.actorPeerId) {
+  if (!workLease.isWorkLeaseHeldBy(activeLease, input.actorPeerId)) {
     throw new WorkCoordinationError(
       'lease_conflict',
       `lease owner mismatch for ${current.item_id}`,
@@ -1006,7 +1014,7 @@ function releaseWorkItemInternal(input: ReleaseWorkItemInput): {
   const requestedStatus = input.nextStatus || 'ready';
   const shouldPark = requestedStatus === 'ready' && trailingFailures >= DEFAULT_MAX_ERROR_ATTEMPTS;
 
-  const next: WorkItem = appendItemSnapshot({
+  const next: WorkItem = writeItemSnapshot(current, {
     ...current,
     status: shouldPark ? 'blocked' : requestedStatus,
     effect_ownership: effectOwnership,
@@ -1051,6 +1059,7 @@ function releaseWorkItemInternal(input: ReleaseWorkItemInput): {
     input.actorUserId,
     input.expectedVersion
   );
+  workLease.auditWorkItemLease('release', released, current);
   appendWorkItemAttemptEvent(
     'item_attempt_released',
     current.item_id,
@@ -1078,7 +1087,7 @@ export function quarantineWorkItemExecution(input: {
       !lease ||
       current.lease_id !== input.leaseId ||
       lease.item_id !== current.item_id ||
-      lease.holder_peer_id !== input.actorPeerId ||
+      !workLease.isWorkLeaseHeldBy(lease, input.actorPeerId) ||
       lease.status === 'released' ||
       !current.current_attempt_id
     )
@@ -1093,7 +1102,7 @@ export function quarantineWorkItemExecution(input: {
         'lease_conflict',
         'another unresolved effect owner must not be replaced'
       );
-    const next = appendItemSnapshot({
+    const next = writeItemSnapshot(current, {
       ...current,
       status: 'blocked',
       version: current.version + 1,
@@ -1147,6 +1156,7 @@ export function releaseWorkItemEffectOwnership(input: EffectReleaseInput): WorkI
     let next = verified;
     if (expiredLease && current) {
       appendLeaseSnapshot({ ...expiredLease, status: 'expired', released_at: now });
+      workLease.auditWorkItemLease('expire', expiredLease, current, 'effect-release');
       const final = finalizeWorkItemAttempt(current, 'released', {
         summary: 'Authenticated human reconciled the expired uncertain attempt',
       });
@@ -1160,7 +1170,7 @@ export function releaseWorkItemEffectOwnership(input: EffectReleaseInput): WorkI
         current_attempt_id: final.currentAttemptId,
       };
     }
-    const updated = appendItemSnapshot(next);
+    const updated = writeItemSnapshot(current, next);
     appendEvent(effectReleaseEvent(updated));
     return updated;
   });
@@ -1181,30 +1191,18 @@ function renewWorkItemLeaseInternal(input: RenewWorkItemLeaseInput): WorkLease {
       status: current.status,
     });
   }
-  if (input.actorPeerId && current.holder_peer_id !== input.actorPeerId) {
-    throw new WorkCoordinationError(
-      'lease_conflict',
-      `lease holder mismatch for renewal: ${input.leaseId}`,
-      {
-        lease_id: input.leaseId,
-        holder_peer_id: current.holder_peer_id,
-        actor_peer_id: input.actorPeerId,
-      }
-    );
-  }
-  const expiresAtMs = new Date(current.expires_at).getTime();
-  if (Number.isFinite(expiresAtMs) && expiresAtMs <= Date.now()) {
-    throw new WorkCoordinationError('lease_conflict', `lease already lapsed: ${input.leaseId}`, {
-      lease_id: input.leaseId,
-      expires_at: current.expires_at,
-    });
-  }
+  const terms = workLease.renewWorkItemLeaseTerms(current, {
+    leaseId: input.leaseId,
+    ...(input.actorPeerId ? { holder: input.actorPeerId } : {}),
+    ...(input.ttlMs ? { ttlMs: input.ttlMs } : {}),
+  });
   const renewed: WorkLease = {
     ...current,
-    expires_at: new Date(Date.now() + (input.ttlMs || 15 * 60 * 1000)).toISOString(),
+    ...terms,
     renewed_at: nowIso(),
   };
   appendLeaseSnapshot(renewed);
+  workLease.auditWorkItemLease('renew', renewed);
   return renewed;
 }
 
@@ -1216,7 +1214,7 @@ function expireWorkItemLeasesInternal(now: string): WorkLease[] {
   const nowMs = new Date(now).getTime();
   const expired: WorkLease[] = [];
   for (const lease of currentLeaseRecords()) {
-    if (lease.status === 'active' && new Date(lease.expires_at).getTime() <= nowMs) {
+    if (lease.status === 'active' && !workLease.isWorkLeaseLive(lease, nowMs)) {
       const next: WorkLease = {
         ...lease,
         status: 'expired',
@@ -1224,6 +1222,7 @@ function expireWorkItemLeasesInternal(now: string): WorkLease[] {
       expired.push(next);
       appendLeaseSnapshot(next);
       appendLeaseEvent('lease_expired', lease.item_id, next, `expired lease ${lease.lease_id}`);
+      workLease.auditWorkItemLease('expire', next, null, 'lease-reaper');
     }
   }
   return expired;
@@ -1294,7 +1293,7 @@ function reapExpiredWorkLeasesInternal(options: ReapWorkLeasesOptions): ReapWork
         summary: 'completion evidence replayed after orphaned worker recovery',
         metadata: { ...(item.metadata || {}), replayed: true },
       });
-      const next = appendItemSnapshot({
+      const next = writeItemSnapshot(item, {
         ...item,
         status: 'done',
         effect_ownership: settledWorkEffect(item, 'completed', now),
@@ -1337,7 +1336,7 @@ function reapExpiredWorkLeasesInternal(options: ReapWorkLeasesOptions): ReapWork
     ).length;
     const shouldPark = claimAttempts >= maxClaims || errorAttempts >= maxErrors;
 
-    const next: WorkItem = appendItemSnapshot({
+    const next: WorkItem = writeItemSnapshot(item, {
       ...item,
       ...(workEffectOwnership(item) ? { effect_ownership: workEffectOwnership(item) } : {}),
       status: shouldPark ? 'blocked' : 'ready',
@@ -1403,7 +1402,7 @@ function reapExpiredWorkLeasesInternal(options: ReapWorkLeasesOptions): ReapWork
     if (!runningAttempt) continue;
     if (activeLeaseForItem(item.item_id)) continue;
     const lease = currentLeaseById(runningAttempt.lease_id);
-    if (lease?.status === 'active' && new Date(lease.expires_at).getTime() > nowMs) continue;
+    if (lease && workLease.isWorkLeaseLive(lease, nowMs)) continue;
 
     const index = (item.attempts || []).findIndex(
       (attempt) => attempt.run_id === runningAttempt.run_id
@@ -1416,7 +1415,7 @@ function reapExpiredWorkLeasesInternal(options: ReapWorkLeasesOptions): ReapWork
       failure_reason: 'lease_lost',
       summary: 'running attempt orphaned without a live lease; reconciled by reaper',
     };
-    const next = appendItemSnapshot({
+    const next = writeItemSnapshot(item, {
       ...item,
       version: item.version + 1,
       updated_at: now,
@@ -1557,6 +1556,8 @@ export function importExternalWorkItem(input: {
   labels?: string[];
   dependencies?: string[];
   context?: WorkItemContext;
+  /** D1: the Issue this imported step belongs to (kept when omitted on re-sync). */
+  parentItemId?: string;
   metadata?: Record<string, unknown>;
 }): WorkItem {
   // Tenant registration gates creation only (as before): re-syncing an item
@@ -1588,6 +1589,7 @@ export function importExternalWorkItem(input: {
         labels: input.labels || existing.labels,
         dependencies: input.dependencies || existing.dependencies,
         context: input.context || existing.context,
+        parentItemId: input.parentItemId,
         metadata: input.metadata || existing.metadata,
       });
     }
@@ -1604,6 +1606,7 @@ export function importExternalWorkItem(input: {
       labels: input.labels,
       dependencies: input.dependencies,
       context: input.context,
+      parentItemId: input.parentItemId,
       metadata: input.metadata,
     });
     appendEvent({
@@ -1643,17 +1646,13 @@ export function describeWorkCoordinationStore(): Record<string, unknown> {
     events_path: eventsPath(),
     item_count: items.length,
     board_count: listBoards().length,
-    active_lease_count: currentLeaseRecords().filter(
-      (lease) => lease.status === 'active' && new Date(lease.expires_at).getTime() > Date.now()
-    ).length,
+    active_lease_count: listActiveWorkLeases().length,
     active_attempt_count: activeAttempts,
   };
 }
 
 export function listActiveWorkLeases(): WorkLease[] {
-  return currentLeaseRecords().filter(
-    (lease) => lease.status === 'active' && new Date(lease.expires_at).getTime() > Date.now()
-  );
+  return currentLeaseRecords().filter((lease) => workLease.isWorkLeaseLive(lease));
 }
 
 export function ensureDefaultWorkCoordinationCatalog(): void {

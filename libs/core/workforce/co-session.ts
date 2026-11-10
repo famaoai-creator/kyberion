@@ -20,6 +20,19 @@ import { nowIso } from '../foundation/time.js';
 import { withLockSync } from '../foundation/lock-utils.js';
 import { pathResolver } from '../path-resolver.js';
 import { withExecutionContext } from '../authority.js';
+import { resolveLeaseBackend } from '../lease/lease-backend.js';
+import '../lease/local-lease-backend.js';
+import { recordLeaseAuditEvent } from '../lease/lease-audit.js';
+import {
+  grantLeaseTerms,
+  isLeaseHeldBy,
+  isLeaseLive,
+  leaseExpiresAtIso,
+  LeaseTermsError,
+  leaseTermsFromRecord,
+  renewLeaseTerms,
+  type LeaseTerms,
+} from '../lease/lease-terms.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -91,6 +104,8 @@ export interface CoSessionPathLease {
   expires_at: string;
   renewed_at: string;
   released_at?: string;
+  /** Lease generation (W3); absent on records written before W3 (read as 0). */
+  fence?: number;
 }
 
 export interface CoSessionHandoff {
@@ -676,6 +691,62 @@ function leaseLockId(sessionId: string, pathHash: string): string {
   return `co-session-lease:${sessionId}:${pathHash}`;
 }
 
+/** Path leases serialize on the lease-backend seam (local-file-lock by default). */
+function withPathLeaseLock<T>(sessionId: string, pathHash: string, fn: () => T): T {
+  return resolveLeaseBackend().withLockSync(leaseLockId(sessionId, pathHash), fn);
+}
+
+/** Holder identity of a path lease as the lease primitive sees it. */
+function coSessionHolderId(provider: string, participantId: string): string {
+  return `${provider}/${participantId}`;
+}
+
+/** Holder fields of a path lease, copied from the decided terms. */
+function pathLeaseHolderFields(
+  terms: LeaseTerms
+): Pick<CoSessionPathLease, 'holder_provider' | 'holder_participant_id'> {
+  const cut = terms.holder.indexOf('/');
+  return {
+    holder_provider: assertProvider(terms.holder.slice(0, cut)),
+    holder_participant_id: terms.holder.slice(cut + 1),
+  };
+}
+
+function pathLeaseResourceId(sessionId: string, repoPath: string): string {
+  return `${sessionId}:${repoPath}`;
+}
+
+/** Terms view of a stored path lease (legacy records have no fence: 0). */
+function pathLeaseTerms(lease: CoSessionPathLease): LeaseTerms {
+  return leaseTermsFromRecord({
+    kind: 'path',
+    resourceId: pathLeaseResourceId(lease.session_id, lease.path),
+    holder: coSessionHolderId(lease.holder_provider, lease.holder_participant_id),
+    ...(lease.fence !== undefined ? { fence: lease.fence } : {}),
+    expires_at: lease.expires_at,
+    acquired_at: lease.created_at,
+    renewed_at: lease.renewed_at,
+  });
+}
+
+function auditPathLease(
+  event: 'acquire' | 'renew' | 'release' | 'expire',
+  lease: CoSessionPathLease,
+  actorId?: string
+): void {
+  const terms = pathLeaseTerms(lease);
+  recordLeaseAuditEvent({
+    event,
+    resource_kind: 'path',
+    resource_id: terms.resource_id,
+    holder: terms.holder,
+    fence: terms.fence,
+    ...(event === 'release' ? {} : { expires_at_ms: terms.expires_at_ms }),
+    lease_id: lease.lease_id,
+    ...(actorId && actorId !== terms.holder ? { actor_id: actorId } : {}),
+  });
+}
+
 /**
  * Pure expiry evaluation — no writes. Readers must not persist state: a
  * lock-free write here could clobber an active lease created between the
@@ -683,7 +754,7 @@ function leaseLockId(sessionId: string, pathHash: string): string {
  * `persistLeaseExpiry` under the path lock.
  */
 function refreshLeaseStatus(lease: CoSessionPathLease): CoSessionPathLease {
-  if (lease.status === 'active' && Date.parse(lease.expires_at) <= Date.now()) {
+  if (lease.status === 'active' && !isLeaseLive(lease)) {
     return { ...lease, status: 'expired' };
   }
   return lease;
@@ -699,7 +770,7 @@ function persistLeaseExpiry(lease: CoSessionPathLease): void {
   if (lease.status !== 'expired') return;
   let flipped = false;
   try {
-    flipped = withLockSync(leaseLockId(lease.session_id, lease.path_hash), () => {
+    flipped = withPathLeaseLock(lease.session_id, lease.path_hash, () => {
       const onDisk = readJsonIfPresent<CoSessionPathLease>(
         leaseFile(lease.session_id, lease.path_hash)
       );
@@ -709,7 +780,7 @@ function persistLeaseExpiry(lease: CoSessionPathLease): void {
       if (
         onDisk?.lease_id !== lease.lease_id ||
         onDisk.status !== 'active' ||
-        Date.parse(onDisk.expires_at) > Date.now()
+        isLeaseLive(onDisk)
       ) {
         return false;
       }
@@ -727,6 +798,7 @@ function persistLeaseExpiry(lease: CoSessionPathLease): void {
       path: lease.path,
       lease_id: lease.lease_id,
     });
+    auditPathLease('expire', lease);
   }
 }
 
@@ -785,7 +857,8 @@ export function acquireCoSessionLease(input: {
   const path_hash = pathHashForLease(repoPath);
   const participant_id = input.participant_id?.trim() || `${provider}-${process.pid}`;
   let displacedLease: CoSessionPathLease | undefined;
-  const lease = withLockSync(leaseLockId(session_id, path_hash), () => {
+  let renewal = false;
+  const lease = withPathLeaseLock(session_id, path_hash, () => {
     // closeCoSession flips the session to closed BEFORE releasing leases, so
     // re-checking inside the per-path lock closes the acquire-vs-close race.
     if (readSession(session_id).status !== 'open') {
@@ -796,29 +869,59 @@ export function acquireCoSessionLease(input: {
     if (existing?.status === 'active' && current?.status === 'expired') {
       displacedLease = current;
     }
-    if (
-      current?.status === 'active' &&
-      !(current.holder_provider === provider && current.holder_participant_id === participant_id)
-    ) {
-      throw new CoSessionError(
-        'lease_held',
-        `path leased by ${current.holder_provider}/${current.holder_participant_id} until ${current.expires_at}`
-      );
+    const holderId = coSessionHolderId(provider, participant_id);
+    const ttlMs = input.ttl_ms ?? DEFAULT_LEASE_TTL_MS;
+    const nowMs = Date.now();
+    const previous = current ? pathLeaseTerms(current) : undefined;
+    // Same holder on a live lease renews it (lease id, created_at and fence
+    // are kept); anyone else gets a new generation or LEASE_HELD.
+    renewal = Boolean(
+      current?.status === 'active' && previous && isLeaseHeldBy(previous, holderId)
+    );
+    let terms: LeaseTerms;
+    try {
+      terms =
+        renewal && previous
+          ? renewLeaseTerms(previous, { holder: holderId, ttlMs, nowMs })
+          : grantLeaseTerms({
+              kind: 'path',
+              resourceId: pathLeaseResourceId(session_id, repoPath),
+              holder: holderId,
+              ttlMs,
+              nowMs,
+              ...(previous
+                ? {
+                    previous: {
+                      holder: previous.holder,
+                      fence: previous.fence,
+                      expires_at: previous.expires_at_ms,
+                      released: current?.status === 'released',
+                    },
+                  }
+                : {}),
+            });
+    } catch (error) {
+      if (error instanceof LeaseTermsError && error.code === 'LEASE_HELD' && current) {
+        throw new CoSessionError(
+          'lease_held',
+          `path leased by ${current.holder_provider}/${current.holder_participant_id} until ${current.expires_at}`
+        );
+      }
+      throw error;
     }
     const now = nowIso();
-    const ttl = input.ttl_ms ?? DEFAULT_LEASE_TTL_MS;
     const next: CoSessionPathLease = {
       lease_id: current?.lease_id || `csl-${randomUUID()}`,
       session_id,
       path: repoPath,
       path_hash,
-      holder_provider: provider,
-      holder_participant_id: participant_id,
+      ...pathLeaseHolderFields(terms),
       purpose: input.purpose?.trim() || 'implementation',
       status: 'active',
       created_at: current?.created_at || now,
-      expires_at: new Date(Date.now() + ttl).toISOString(),
+      expires_at: leaseExpiresAtIso(terms),
       renewed_at: now,
+      fence: terms.fence,
     };
     withCoSessionWrite(() => {
       safeMkdir(leasesDir(session_id), { recursive: true });
@@ -843,7 +946,9 @@ export function acquireCoSessionLease(input: {
       path: repoPath,
       lease_id: displacedLease.lease_id,
     });
+    auditPathLease('expire', displacedLease, coSessionHolderId(provider, participant_id));
   }
+  auditPathLease(renewal ? 'renew' : 'acquire', lease);
   return lease;
 }
 
@@ -860,14 +965,14 @@ export function releaseCoSessionLease(input: {
   const repoPath = normalizeCoSessionPath(input.path);
   const path_hash = pathHashForLease(repoPath);
   const participant_id = input.participant_id?.trim() || `${provider}-${process.pid}`;
-  const released = withLockSync(leaseLockId(session_id, path_hash), () => {
+  const released = withPathLeaseLock(session_id, path_hash, () => {
     const existing = readJsonIfPresent<CoSessionPathLease>(leaseFile(session_id, path_hash));
     if (!existing) throw new CoSessionError('not_found', `no lease for path: ${repoPath}`);
     const current = refreshLeaseStatus(existing);
     if (
       !input.force &&
       current.status === 'active' &&
-      (current.holder_provider !== provider || current.holder_participant_id !== participant_id)
+      !isLeaseHeldBy(pathLeaseTerms(current), coSessionHolderId(provider, participant_id))
     ) {
       throw new CoSessionError(
         'lease_held',
@@ -886,6 +991,7 @@ export function releaseCoSessionLease(input: {
     path: repoPath,
     lease_id: released.lease_id,
   });
+  auditPathLease('release', released, coSessionHolderId(provider, participant_id));
   return released;
 }
 

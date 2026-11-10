@@ -276,7 +276,7 @@ async function fixture(
   const proposal = proposals.normalizeDotProposal({
     title: 'Fixed synthetic repair',
     objective: 'Retain the immutable original constraints',
-    work_shape: 'pipeline',
+    execution_shape: 'pipeline',
     pipeline_ref: latency.SYNTHETIC_LATENCY_PIPELINE_REF,
     target: 'service:synthetic-latency-service',
     intent: 'apply',

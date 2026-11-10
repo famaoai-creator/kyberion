@@ -16,7 +16,7 @@ const mocks = vi.hoisted(() => ({
   buildMissionTeamView: vi.fn(),
   record: vi.fn(),
   emitMissionTaskEvent: vi.fn(),
-  findRelevantDistilledKnowledge: vi.fn(),
+  findRelevantPromotedKnowledge: vi.fn(),
   pinTaskDecisions: vi.fn(),
   reconcileTaskDecisions: vi.fn(),
   recordTaskDecisionProposals: vi.fn(),
@@ -76,12 +76,12 @@ vi.mock('./mission-task-events.js', () => ({
     `active/missions/public/${missionId}/coordination/events/task-events.jsonl`,
 }));
 
-vi.mock('../knowledge/distill-knowledge-injector.js', async (importOriginal) => {
+vi.mock('../knowledge/promoted-knowledge-retrieval.js', async (importOriginal) => {
   const actual =
-    await importOriginal<typeof import('../knowledge/distill-knowledge-injector.js')>();
+    await importOriginal<typeof import('../knowledge/promoted-knowledge-retrieval.js')>();
   return {
     ...actual,
-    findRelevantDistilledKnowledge: mocks.findRelevantDistilledKnowledge,
+    findRelevantPromotedKnowledge: mocks.findRelevantPromotedKnowledge,
   };
 });
 
@@ -163,7 +163,7 @@ describe(
             status: 'active',
             execution_mode: 'local',
             priority: 3,
-            assigned_persona: 'worker',
+            org_role: 'worker',
             confidence_score: 1,
             git: {
               branch: 'mission/cd09-proposals',
@@ -275,7 +275,7 @@ describe(
       );
       mocks.importExternalWorkItem.mockImplementation(actual.importExternalWorkItem);
       mocks.updateWorkItem.mockImplementation(actual.updateWorkItem);
-      mocks.findRelevantDistilledKnowledge.mockResolvedValue([]);
+      mocks.findRelevantPromotedKnowledge.mockResolvedValue([]);
       mocks.pinTaskDecisions.mockReturnValue(null);
       mocks.reconcileTaskDecisions.mockReturnValue({
         checked: 0,

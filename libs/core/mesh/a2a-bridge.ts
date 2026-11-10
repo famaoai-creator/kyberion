@@ -102,7 +102,7 @@ export interface A2AMessage {
     sig_alg?: string;
     /**
      * NI-02 sender identity claim: the canonical NHI id
-     * (`kyberion://agent/<org>/<slug>`, agent-identity.ts) of the sending
+     * (`kyberion://agent/<tenant>/<org|_>/<slug>`, agent-identity.ts) of the sending
      * agent. Part of the HMAC-signed content (the whole header is signed —
      * see canonicalA2AEnvelopeContent), so within AA-03's same-host
      * integrity boundary the claim cannot be altered without breaking the

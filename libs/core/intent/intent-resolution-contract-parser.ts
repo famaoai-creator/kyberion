@@ -1,11 +1,18 @@
 import { isRecord } from '../foundation/primitives.js';
+import {
+  INTENT_RESOLUTION_SHAPE_VALUES,
+  parseExecutionShape,
+  projectExecutionShapeToIntentResolutionShape,
+  type ExecutionShape,
+  type IntentResolutionShape,
+} from '../contracts/execution-shape.js';
+import type { RoutingAuthorityLevel } from '../contracts/routing-decision.js';
 
-export type IntentResolutionShape =
-  'direct_answer' | 'task_session' | 'mission' | 'project_bootstrap';
+export type { IntentResolutionShape } from '../contracts/execution-shape.js';
 export type IntentOutcomeKind =
   'answer' | 'artifact' | 'approval_ready_plan' | 'service_change' | 'status_report';
-export type IntentAuthorityLevel =
-  'autonomous' | 'approval_required' | 'human_clarification_required';
+/** Same vocabulary as RoutingDecision.authority_level (contracts/routing-decision.ts). */
+export type IntentAuthorityLevel = RoutingAuthorityLevel;
 export type IntentNextActionKind = 'request_approval' | 'provide_input' | 'continue';
 
 export interface IntentResolutionNextAction {
@@ -18,7 +25,13 @@ export interface IntentResolutionContract {
   request_id: string;
   normalized_intent: string;
   missing_inputs: string[];
+  /** Legacy projection of `execution_shape` (see projectExecutionShapeToIntentResolutionShape). */
   resolution_shape: IntentResolutionShape;
+  /**
+   * The unfolded ExecutionShape the projection was derived from. Optional only so
+   * contracts serialized before it existed still parse; the resolver always sets it.
+   */
+  execution_shape?: ExecutionShape;
   outcome_kind: IntentOutcomeKind;
   authority_level: IntentAuthorityLevel;
   next_action: IntentResolutionNextAction;
@@ -49,6 +62,7 @@ export function parseIntentResolutionContract(
       'normalized_intent',
       'missing_inputs',
       'resolution_shape',
+      'execution_shape',
       'outcome_kind',
       'authority_level',
       'next_action',
@@ -64,12 +78,7 @@ export function parseIntentResolutionContract(
     return undefined;
   }
 
-  const resolutionShapes: IntentResolutionShape[] = [
-    'direct_answer',
-    'task_session',
-    'mission',
-    'project_bootstrap',
-  ];
+  const resolutionShapes: readonly IntentResolutionShape[] = INTENT_RESOLUTION_SHAPE_VALUES;
   const outcomeKinds: IntentOutcomeKind[] = [
     'answer',
     'artifact',
@@ -92,6 +101,17 @@ export function parseIntentResolutionContract(
     !nextActionKinds.includes(value.next_action.kind as IntentNextActionKind) ||
     !isNonEmptyString(value.next_action.label) ||
     !isNonEmptyString(value.next_action.consequence)
+  ) {
+    return undefined;
+  }
+
+  // A carried execution_shape must be valid and agree with its own projection.
+  const executionShape =
+    value.execution_shape === undefined ? undefined : parseExecutionShape(value.execution_shape);
+  if (
+    value.execution_shape !== undefined &&
+    (!executionShape ||
+      projectExecutionShapeToIntentResolutionShape(executionShape) !== value.resolution_shape)
   ) {
     return undefined;
   }
@@ -128,6 +148,7 @@ export function parseIntentResolutionContract(
     normalized_intent: value.normalized_intent,
     missing_inputs: [...value.missing_inputs],
     resolution_shape: resolutionShape,
+    ...(executionShape ? { execution_shape: executionShape } : {}),
     outcome_kind: outcomeKind,
     authority_level: authorityLevel,
     next_action: {

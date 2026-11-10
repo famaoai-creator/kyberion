@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import { randomUUID } from 'node:crypto';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { nowIso } from '../foundation/time.js';
@@ -80,7 +81,8 @@ import {
   type SurfaceRuntimeRouteContext,
 } from './surface-runtime-router.js';
 import { resolveSurfaceIntent } from '../intent/router-contract.js';
-import { resolveIntentResolutionPacket } from '../intent/intent-resolution.js';
+import { resolveRoutingPacket } from '../intent/intent-resolver-entry.js';
+import { buildRoutingDecision } from '../intent/routing-decision.js';
 import {
   resolveIntentResolutionContract,
   type IntentResolutionContract,
@@ -914,7 +916,7 @@ async function routeMissionTeamDelegation(
       teamRoles: [teamRole],
       scope: {
         scope_kind: 'mission',
-        tier: plan.tier as 'personal' | 'confidential' | 'public',
+        tier: plan.tier as StorageDataTier,
         mission_id: missionId,
         ...(plan.tenant_slug ? { tenant_slug: plan.tenant_slug } : {}),
       },
@@ -1264,10 +1266,8 @@ async function runSurfaceConversationTurn(
   const resolutionText = [pendingIntent?.source_text, originalText]
     .filter((part): part is string => Boolean(part?.trim()))
     .join('\n');
-  const originalResolutionPacket = resolveIntentResolutionPacket(originalText, {
-    tier: input.scope?.tier,
-    tenantId: input.scope?.tenant_slug,
-  });
+  const routingScope = { tier: input.scope?.tier, tenantId: input.scope?.tenant_slug };
+  const originalResolutionPacket = resolveRoutingPacket(originalText, routingScope);
   const intentResolution: IntentResolutionContract = resolveIntentResolutionContract(
     resolutionText,
     {
@@ -1330,6 +1330,10 @@ async function runSurfaceConversationTurn(
                 ...(input.scope ? { surface_scope: input.scope } : {}),
               },
               resolutionPacket: originalResolutionPacket,
+              carriedRoutingDecision: buildRoutingDecision(originalResolutionPacket, {
+                ...routingScope,
+                contract: pendingIntent ? undefined : intentResolution,
+              }),
             },
             { model_tier: 'fast' }
           );

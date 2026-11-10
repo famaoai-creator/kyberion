@@ -1,0 +1,7 @@
+{
+  "role": "customer_create",
+  "assignable": false,
+  "permissions": {
+    "allow_write": ["knowledge/personal/stances/", "knowledge/confidential/"]
+  }
+}

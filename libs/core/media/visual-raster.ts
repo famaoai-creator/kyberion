@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import * as path from 'node:path';
 import { loadMissionStateAtPath } from '../mission/mission-state-reader.js';
 import { createLogger } from '../logger.js';
@@ -161,7 +162,7 @@ function resolveWorkDir(label: string, workDirOverride?: string): string {
   return dir;
 }
 
-export type VisualReviewTier = 'public' | 'confidential' | 'personal';
+export type VisualReviewTier = StorageDataTier;
 
 function tierFromPath(relativePath: string): VisualReviewTier | undefined {
   const normalized = relativePath.replace(/\\/g, '/');

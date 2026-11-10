@@ -6,6 +6,7 @@ importance: 4
 source_mission: MSN-KYB-COMPANION-001
 author: Kyberion Wisdom Distiller
 last_updated: 2026-07-08
+doc_status: historical
 ---
 
 # Data-driven SwiftUI companion home screen

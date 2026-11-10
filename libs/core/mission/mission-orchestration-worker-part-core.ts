@@ -11,6 +11,7 @@ import {
   updateWorkItem,
 } from '../workforce/work-coordination.js';
 import { logger } from '../core.js';
+import { resolveMissionTaskParentItemId } from './mission-ownership-item.js';
 import { canonicalizeTeamRole } from '../workforce/working-principles.js';
 import { TraceContext } from '../analysis/trace.js';
 import { nowIso } from '../foundation/time.js';
@@ -129,6 +130,13 @@ export async function dispatchPlannedMissionTaskCore(
     : Array.isArray(previousRewrites) && previousRewrites.length > 0
       ? previousRewrites
       : undefined;
+  const workItemContext = {
+    ...(previousWorkItem?.context || {}),
+    mission_id: input.missionId,
+    task_id: input.task.task_id,
+  };
+  // D1: the task is a step of the mission's Issue (its ownership item).
+  const parentItemId = resolveMissionTaskParentItemId(input.missionId, workItemContext);
   const workItem = importExternalWorkItem({
     source: 'local',
     sourceRef: workItemSourceRef,
@@ -143,11 +151,8 @@ export async function dispatchPlannedMissionTaskCore(
     // Typed `context` is written alongside so search / restoration paths resolve
     // via `context.mission_id` without depending on label strings.
     labels: [`mission:${input.missionId}`, `team_role:${input.teamRole}`],
-    context: {
-      ...(previousWorkItem?.context || {}),
-      mission_id: input.missionId,
-      task_id: input.task.task_id,
-    },
+    context: workItemContext,
+    ...(parentItemId ? { parentItemId } : {}),
     dependencies: Array.isArray(input.task.dependencies) ? input.task.dependencies : [],
     metadata: {
       deliverable: input.task.deliverable,

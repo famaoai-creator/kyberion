@@ -13,6 +13,7 @@ import {
 import { safeExistsSync, safeReadFile, safeRmSync, safeWriteFile } from '../secure-io.js';
 import { executionFeedbackScopeRoot } from './execution-feedback-candidates.js';
 import { pathResolver } from '../path-resolver.js';
+import { loadMemoryPromotionCandidate } from './memory-promotion-queue.js';
 import {
   getIntentPhraseMatcher,
   resetIntentPhraseLexiconCache,
@@ -24,8 +25,12 @@ describe('execution feedback loop', () => {
   let originalRaw: string | null = null;
   const createdCandidateIds = new Set<string>();
   const scopedRoots = new Set<string>();
+  // D8: proposals are MemoryCandidate queue rows; namespace the queue.
+  const queuePath = `active/shared/tmp/test-memory-queue-execution-feedback-${process.pid}.jsonl`;
+  const originalQueuePath = process.env.KYBERION_MEMORY_QUEUE_PATH;
 
   beforeAll(() => {
+    process.env.KYBERION_MEMORY_QUEUE_PATH = queuePath;
     originalExists = safeExistsSync(feedbackPath);
     originalRaw = originalExists
       ? (safeReadFile(feedbackPath, { encoding: 'utf8' }) as string)
@@ -40,9 +45,12 @@ describe('execution feedback loop', () => {
   afterAll(() => {
     if (originalExists && originalRaw !== null) safeWriteFile(feedbackPath, originalRaw);
     else if (safeExistsSync(feedbackPath)) safeRmSync(feedbackPath);
+    if (originalQueuePath === undefined) delete process.env.KYBERION_MEMORY_QUEUE_PATH;
+    else process.env.KYBERION_MEMORY_QUEUE_PATH = originalQueuePath;
   });
 
   afterEach(() => {
+    safeRmSync(pathResolver.rootResolve(queuePath), { force: true });
     for (const candidateId of createdCandidateIds) {
       safeRmSync(pathResolver.shared(`runtime/distill-candidates/${candidateId}.json`), {
         force: true,
@@ -168,10 +176,14 @@ describe('execution feedback loop', () => {
       if (result.candidate) createdCandidateIds.add(result.candidate.candidate_id);
       expect(result.summary.sample_count).toBe(1);
       expect(result.summary.common_corrections).toEqual(['Fictional correction ' + index]);
-      return result.candidate!;
+      // D8: legacy unscoped feedback is recorded, but its proposal is not captured.
+      if (!scope) expect(result.not_captured).toMatch(/MEMORY_SCOPE_REQUIRED/);
+      return result.candidate;
     });
-    expect(new Set(candidates.map((entry) => entry.candidate_id)).size).toBe(4);
-    expect(candidates[0].scope).toBeUndefined();
+    expect(candidates[0]).toBeNull();
+    const scoped = candidates.slice(1).map((entry) => entry!);
+    expect(new Set(scoped.map((entry) => entry.candidate_id)).size).toBe(3);
+    expect(scoped.map((entry) => entry.scope)).toEqual(scopes.slice(1));
     expect(loadExecutionFeedbackStore().entries.every((entry) => !entry.scope)).toBe(true);
     expect(resolveExecutionFeedbackPath(a)).not.toBe(resolveExecutionFeedbackPath());
   });
@@ -272,6 +284,7 @@ describe('execution feedback loop', () => {
       outcome: 'dissatisfied',
       correction: '送信前に内容を確認したい',
       source: 'operator',
+      scope: { tier: 'confidential', tenant_slug: 'synthetic-feedback-a' },
     });
     const result = materializeExecutionFeedbackCandidate({
       feedback,
@@ -282,6 +295,22 @@ describe('execution feedback loop', () => {
     expect(result.summary.improvement_status).toBe('candidate');
     expect(result.candidate?.status).toBe('proposed');
     expect(result.candidate?.target_kind).toBe('procedure');
+    // D8: a queue row with origin, never a DistillCandidateRecord file.
+    expect(
+      safeExistsSync(
+        pathResolver.shared(`runtime/distill-candidates/${result.candidate?.candidate_id}.json`)
+      )
+    ).toBe(false);
+    expect(
+      loadMemoryPromotionCandidate(result.candidate!.candidate_id, {
+        tier: 'confidential',
+        tenant_slug: 'synthetic-feedback-a',
+      })
+    ).toMatchObject({
+      kind: 'execution_feedback',
+      status: 'queued',
+      origin: { record_kind: 'execution_feedback', decided_via: 'pnpm kyberion improvements' },
+    });
     expect(result.candidate?.metadata).toMatchObject({
       improvement_kind: 'execution_feedback',
       procedure_id: 'invoice.submit',

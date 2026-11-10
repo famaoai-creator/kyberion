@@ -97,7 +97,7 @@ export function runKnowledgeHygieneProbe(deps: KnowledgeHygieneDeps = {}): {
           title: `[knowledge] ${f.summary.slice(0, 120)}`,
           description: `Detected by knowledge-hygiene-probe. Evidence: ${JSON.stringify(f.evidence)}`,
           labels: ['ops-health', 'knowledge-hygiene', f.kind, `severity:${f.severity}`],
-          metadata: { dot_id: OPS_WORK_ITEM_DOT_ID, requested_work_shape: 'direct_reply' },
+          metadata: { dot_id: OPS_WORK_ITEM_DOT_ID, requested_execution_shape: 'direct_reply' },
           rootDir: deps.rootDir,
         });
         filed.push(f.finding_id);

@@ -23,12 +23,12 @@ describe('governed Dot execution policy', () => {
     const base = loadDotExecutionPolicy();
     configure({
       ...base,
-      intake: { ...base.intake, max_proposals_per_wake: 2, allowed_work_shapes: ['mission'] },
+      intake: { ...base.intake, max_proposals_per_wake: 2, allowed_execution_shapes: ['mission'] },
       learning: { ...base.learning, l2_release_approvals: 1 },
     });
     expect(loadDotExecutionPolicy().intake).toMatchObject({
       max_proposals_per_wake: 2,
-      allowed_work_shapes: ['mission'],
+      allowed_execution_shapes: ['mission'],
     });
     const feedback = [
       { outcome: 'rejected', recorded_at: '2026-10-01T00:00:00Z' },

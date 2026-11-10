@@ -91,6 +91,11 @@ describe('tier-guard policy corruption fail-closed (IP-08)', () => {
     'concierge_management_reader',
     'concierge_management_writer',
   ])('does not erase %s restrictions when policy is unavailable', (role) => {
+    // S4: these names are declared store grants. A process running as one through env
+    // holds no live grant and is refused before the policy is consulted
+    // ([STORE_GRANT_REQUIRED]); inside a live grant the same narrowing stage refuses with
+    // [ROLE_NARROWING_POLICY_UNAVAILABLE]. Either way nothing is admitted.
+    const refusal = /ROLE_NARROWING_POLICY_UNAVAILABLE|STORE_GRANT_REQUIRED/;
     const target = 'active/shared/inbox/entries.jsonl';
     const foreign = 'active/shared/inbox/another.jsonl';
     vi.stubEnv('SYSTEM_ROLE', role);
@@ -104,12 +109,12 @@ describe('tier-guard policy corruption fail-closed (IP-08)', () => {
             for (const operation of ['write', 'append', 'mkdir'] as const) {
               const decision = validateWritePermission(file, operation, '{"id":"replacement"}\n');
               expect(decision.allowed).toBe(false);
-              expect(decision.reason).toContain('ROLE_NARROWING_POLICY_UNAVAILABLE');
+              expect(decision.reason).toMatch(refusal);
             }
             for (const operation of ['read', 'metadata'] as const) {
               const decision = validateReadPermission(file, operation);
               expect(decision.allowed).toBe(false);
-              expect(decision.reason).toContain('ROLE_NARROWING_POLICY_UNAVAILABLE');
+              expect(decision.reason).toMatch(refusal);
             }
           }
         };

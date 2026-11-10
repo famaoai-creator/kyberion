@@ -36,6 +36,7 @@ vi.mock('../intent/intent-contract.js', () => ({
   compileUserIntentFlow: mocks.compileUserIntentFlow,
   formatClarificationPacketConcise: () => 'clarification',
   isSimpleGreetingText: () => false,
+  inferGovernedDeliveryMode: () => 'one_shot',
 }));
 
 vi.mock('../intent/router-contract.js', () => ({

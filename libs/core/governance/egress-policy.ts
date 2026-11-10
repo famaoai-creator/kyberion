@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import * as path from 'node:path';
 import { pathResolver } from '../path-resolver.js';
@@ -52,7 +53,7 @@ export interface EgressPolicyDecision {
   matchedDomain?: string;
   mode: EgressPolicyMode;
   /** Tier the decision was made for, when the caller declared one. */
-  tier?: 'public' | 'confidential' | 'personal';
+  tier?: StorageDataTier;
 }
 
 const DEFAULT_POLICY_PATH = pathResolver.knowledge('product/governance/egress-policy.json');
@@ -374,7 +375,7 @@ export function loadAllowedEgressDomains(): string[] {
  */
 export interface EgressPayloadContext {
   /** Most sensitive tier represented in the payload. */
-  tier?: 'public' | 'confidential' | 'personal';
+  tier?: StorageDataTier;
   /** Tenant the material belongs to, when tier is above public. */
   tenant_slug?: string;
   /** Short description of what is being sent, for the audit trail. */
@@ -582,7 +583,7 @@ export function evaluateEgressPolicy(
   };
 }
 
-export type EgressAudience = 'public' | 'confidential' | 'personal' | 'external';
+export type EgressAudience = StorageDataTier | 'external';
 
 /**
  * Classify where a payload is actually going, from policy rather than from any

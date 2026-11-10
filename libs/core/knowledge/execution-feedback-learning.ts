@@ -3,8 +3,6 @@ import { assertScopedLearningApproval } from './scoped-learning-approval-verific
  * Never decides a human review, invokes a model, or edits the procedure catalog.
  */
 import { createHash } from 'node:crypto';
-import * as path from 'node:path';
-import { pathResolver } from '../path-resolver.js';
 import {
   assertScopedLearningScope,
   verifyScopedLearningPublication,
@@ -12,11 +10,10 @@ import {
 import { assertMemoryScope, type MemoryScopeEnvelope } from './memory-scope.js';
 import {
   executionFeedbackScopeKey,
-  executionFeedbackCandidatePath,
   loadExecutionFeedbackCandidate,
   saveExecutionFeedbackCandidate,
+  type ExecutionFeedbackCandidate,
 } from './execution-feedback-candidates.js';
-import { type DistillCandidateRecord } from './distill-candidate-registry.js';
 import {
   createMemoryPromotionCandidate,
   enqueueMemoryPromotionCandidate,
@@ -31,7 +28,7 @@ interface LearningLink {
 }
 export interface ExecutionFeedbackLearningReview {
   candidate_id: string;
-  candidate_status: DistillCandidateRecord['status'];
+  candidate_status: ExecutionFeedbackCandidate['status'];
   scope_disposition: 'canonical' | 'legacy_unscoped';
   queue: { status: 'not_queued' | 'invalid' | MemoryCandidate['status']; candidate_id?: string };
   human_review: { status: 'pending' | 'recorded' | 'rejected' | 'unverified'; decided_by?: string };
@@ -41,7 +38,7 @@ export interface ExecutionFeedbackLearningReview {
   next_action: string;
 }
 const digest = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
-function sourceDigest(row: DistillCandidateRecord): string {
+function sourceDigest(row: ExecutionFeedbackCandidate): string {
   return digest({
     id: row.candidate_id,
     title: row.title,
@@ -66,7 +63,7 @@ function queueDigest(row: MemoryCandidate): string {
     ratification_required: row.ratification_required,
   });
 }
-function loadCandidate(id: string, scope?: MemoryScopeEnvelope): DistillCandidateRecord {
+function loadCandidate(id: string, scope?: MemoryScopeEnvelope): ExecutionFeedbackCandidate {
   if (!/^[A-Za-z0-9][A-Za-z0-9._-]{2,127}$/.test(id))
     throw new Error('[FEEDBACK_CANDIDATE_INVALID] Invalid candidate id');
   const row = loadExecutionFeedbackCandidate(id, scope);
@@ -77,7 +74,7 @@ function loadCandidate(id: string, scope?: MemoryScopeEnvelope): DistillCandidat
   }
   return row;
 }
-function linkFor(row: DistillCandidateRecord): LearningLink | undefined {
+function linkFor(row: ExecutionFeedbackCandidate): LearningLink | undefined {
   const value = row.metadata?.learning_link;
   if (!value || typeof value !== 'object') return undefined;
   const link = value as Partial<LearningLink>;
@@ -246,15 +243,20 @@ export function queueExecutionFeedbackLearning(
   }
   if (row.status !== 'proposed')
     throw new Error('[FEEDBACK_NOT_PROPOSED] Only a proposed candidate can be queued');
+  if (row.legacy_read_only)
+    throw new Error(
+      '[FEEDBACK_CANDIDATE_READ_ONLY] Legacy execution-feedback records are read-only | next: pnpm kyberion improvements --migrate --write, then queue the migrated proposal'
+    );
   const source = sourceDigest(row);
   const queueId = 'MEM-FB-' + digest({ id, source }).slice(0, 32);
-  const evidence = path
-    .relative(pathResolver.rootDir(), executionFeedbackCandidatePath(id, canonical))
-    .replaceAll('\\', '/');
+  // D8: the proposal is a queue row (source_ref `execution_feedback:<id>`) in
+  // this scope; cite it as a typed artifact reference, not a file path.
+  const evidence = 'artifact:execution_feedback:' + id;
   const expected = createMemoryPromotionCandidate({
     candidateId: queueId,
     sourceType: 'task_session',
     sourceRef: 'task_session:' + id,
+    kind: 'execution_feedback',
     knowledgeDomain: 'organization',
     proposedMemoryKind: 'sop',
     summary: row.summary,

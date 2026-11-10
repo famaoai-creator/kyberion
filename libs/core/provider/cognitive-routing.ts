@@ -22,7 +22,7 @@ export interface CognitiveRouteCandidate {
   mission_id: string;
   mission_type?: string;
   tenant_slug?: string;
-  assigned_persona?: string;
+  org_role?: string;
   status?: string;
   team_role?: string;
   recipient_kind?: string;
@@ -367,7 +367,7 @@ export function buildCognitiveRouteDecision(
       input.mission_id,
       input.mission_type,
       input.tenant_slug,
-      input.assigned_persona,
+      input.org_role,
       input.status,
       input.team_role,
       input.recipient_kind,

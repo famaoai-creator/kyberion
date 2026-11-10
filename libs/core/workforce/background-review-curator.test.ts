@@ -1,14 +1,18 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { randomUUID } from 'node:crypto';
 import { withExecutionContext } from '../authority.js';
 import { safeReadFile, safeRmSync, safeWriteFile } from '../secure-io.js';
 import { pathResolver } from '../path-resolver.js';
 import {
   createDistillCandidateRecord,
-  loadDistillCandidateRecord,
+  loadDistillCandidateRecord as loadLegacyDistillCandidateRecord,
   saveDistillCandidateRecord,
-  updateDistillCandidateRecord,
 } from '../knowledge/distill-candidate-registry.js';
+import {
+  captureBackgroundReviewProposal,
+  loadBackgroundReviewProposal,
+  updateBackgroundReviewProposal,
+} from './background-review-proposals.js';
 import type { MemoryScopeEnvelope } from '../knowledge/memory-scope.js';
 import * as approvalReader from '../governance/approval-store-reader.js';
 import {
@@ -18,6 +22,39 @@ import {
 } from './background-review-curator.js';
 
 const createdPaths: string[] = [];
+// D8: proposals are MemoryCandidate queue rows; the test namespaces the queue.
+const queuePath = `active/shared/tmp/test-memory-queue-background-review-curator-${process.pid}.jsonl`;
+const originalQueuePath = process.env.KYBERION_MEMORY_QUEUE_PATH;
+const defaultScope = { tier: 'confidential', tenant_slug: 'curator-test-tenant' } as const;
+beforeAll(() => {
+  process.env.KYBERION_MEMORY_QUEUE_PATH = queuePath;
+});
+afterAll(() => {
+  if (originalQueuePath === undefined) delete process.env.KYBERION_MEMORY_QUEUE_PATH;
+  else process.env.KYBERION_MEMORY_QUEUE_PATH = originalQueuePath;
+});
+function loadDistillCandidateRecord(candidateId: string, scope?: MemoryScopeEnvelope) {
+  return loadBackgroundReviewProposal(candidateId, scope || defaultScope);
+}
+function updateDistillCandidateRecord(
+  candidateId: string,
+  patch: Parameters<typeof updateBackgroundReviewProposal>[1]
+) {
+  return updateBackgroundReviewProposal(candidateId, patch, defaultScope);
+}
+/** Backdate a queue row's retention clock (the facade's `updated_at`). */
+function backdate(candidateId: string, updatedAt: string): void {
+  withExecutionContext('surface_runtime', () => {
+    const file = pathResolver.rootResolve(queuePath);
+    const rows = String(safeReadFile(file, { encoding: 'utf8' }))
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => JSON.parse(line));
+    for (const row of rows)
+      if (row.candidate_id === candidateId) row.origin.attributes.updated_at = updatedAt;
+    safeWriteFile(file, rows.map((row) => JSON.stringify(row)).join('\n') + '\n');
+  });
+}
 
 function createRecord(input: {
   candidateId: string;
@@ -25,37 +62,36 @@ function createRecord(input: {
   status?: 'proposed' | 'promoted' | 'archived';
   scope?: MemoryScopeEnvelope;
 }) {
-  const record = createDistillCandidateRecord({
-    candidate_id: input.candidateId,
-    ...(input.scope ? { scope: input.scope, tier: input.scope.tier } : {}),
-    source_type: 'task_session',
-    task_session_id: 'CURATOR-TEST-SESSION',
-    title: `Curator test ${input.candidateId}`,
-    summary: 'A reusable review proposal for curator testing.',
-    status: input.status || 'proposed',
-    target_kind: 'pattern',
-    evidence_refs: [`surface:test:background-review:${input.candidateId}`],
-    metadata:
-      input.origin === 'background_review_fork'
-        ? {
-            origin: 'background_review_fork',
-            maintenance: { automatic_archive: true },
-            provenance: {
-              generated_by: 'background-review-fork',
-              session_id: 'CURATOR-TEST-SESSION',
-            },
-          }
-        : { origin: 'manual', provenance: { generated_by: 'operator' } },
-  });
-  createdPaths.push(
-    withExecutionContext('surface_runtime', () => saveDistillCandidateRecord(record))
+  return withExecutionContext('surface_runtime', () =>
+    captureBackgroundReviewProposal({
+      candidate_id: input.candidateId,
+      scope: input.scope || defaultScope,
+      status: input.status || 'proposed',
+      source_type: 'task_session',
+      task_session_id: 'CURATOR-TEST-SESSION',
+      title: `Curator test ${input.candidateId}`,
+      summary: 'A reusable review proposal for curator testing.',
+      target_kind: 'pattern',
+      evidence_refs: [`surface:test:background-review:${input.candidateId}`],
+      metadata:
+        input.origin === 'background_review_fork'
+          ? {
+              origin: 'background_review_fork',
+              maintenance: { automatic_archive: true },
+              provenance: {
+                generated_by: 'background-review-fork',
+                session_id: 'CURATOR-TEST-SESSION',
+              },
+            }
+          : { origin: 'manual', provenance: { generated_by: 'operator' } },
+    })
   );
-  return record;
 }
 
 afterEach(() => {
   vi.restoreAllMocks();
   withExecutionContext('surface_runtime', () => {
+    safeRmSync(pathResolver.rootResolve(queuePath), { force: true });
     for (const candidatePath of createdPaths.splice(0)) {
       safeRmSync(candidatePath, {
         force: true,
@@ -146,14 +182,7 @@ describe('background-review-curator', () => {
       status: 'promoted',
     });
 
-    withExecutionContext('surface_runtime', () => {
-      const stalePath = pathResolver.shared(
-        `runtime/distill-candidates/${stale.candidate_id}.json`
-      );
-      const staleRecord = JSON.parse(safeReadFile(stalePath, { encoding: 'utf8' }) as string);
-      const old = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString();
-      safeWriteFile(stalePath, JSON.stringify({ ...staleRecord, updated_at: old }));
-    });
+    backdate(stale.candidate_id, new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString());
 
     const now = new Date();
     const result = withExecutionContext('surface_runtime', () =>
@@ -372,13 +401,30 @@ describe('background-review-curator', () => {
       origin: 'background_review_fork',
       scope: sibling,
     });
-    createRecord({ candidateId: scoped.candidate_id, origin: 'background_review_fork' });
+    // A legacy (read-only) record with the same id is history, never curated.
+    const legacy = createDistillCandidateRecord({
+      candidate_id: scoped.candidate_id,
+      source_type: 'task_session',
+      title: 'Legacy curator record',
+      summary: 'A legacy unscoped background-review record.',
+      status: 'proposed',
+      target_kind: 'pattern',
+      evidence_refs: ['surface:test:background-review:legacy'],
+      metadata: {
+        origin: 'background_review_fork',
+        maintenance: { automatic_archive: true },
+        provenance: { generated_by: 'background-review-fork' },
+      },
+    });
+    createdPaths.push(
+      withExecutionContext('surface_runtime', () => saveDistillCandidateRecord(legacy))
+    );
     withExecutionContext('surface_runtime', () => {
       const now = new Date(Date.now() + 30 * 86400000);
       expect(curateBackgroundReviewProposals({ now, scope }).archived).toEqual([
         scoped.candidate_id,
       ]);
-      expect(loadDistillCandidateRecord(scoped.candidate_id)?.status).toBe('proposed');
+      expect(loadLegacyDistillCandidateRecord(scoped.candidate_id)?.status).toBe('proposed');
       expect(loadDistillCandidateRecord(scoped.candidate_id, sibling)?.status).toBe('proposed');
       expect(() =>
         restoreBackgroundReviewProposal({
@@ -406,7 +452,13 @@ describe('background-review-curator', () => {
       candidateId: 'CURATOR-RACE-PROMOTE',
       origin: 'background_review_fork',
     });
+    // The race happens once, during the scan snapshot. Later approval reads
+    // (the queue's own scoped-review check runs under the proposal lock) see
+    // the settled state.
+    let raced = false;
     vi.spyOn(approvalReader, 'listApprovalRequests').mockImplementation(() => {
+      if (raced) return [];
+      raced = true;
       setBackgroundReviewProposalMaintenance({
         candidateId: pinned.candidate_id,
         actorId: 'operator',

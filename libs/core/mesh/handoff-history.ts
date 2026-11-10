@@ -79,7 +79,7 @@ export function buildIntegratedHandoffHistory(
         timestamp: timestamp(entry.ts),
         source: 'mission',
         event: `mission:${entry.event}`,
-        actor: entry.from || mission.state.assigned_persona,
+        actor: entry.from || mission.state.org_role,
         summary: missionSummary(mission.state, entry.note, entry.event),
         refs: [mission.missionId],
       });

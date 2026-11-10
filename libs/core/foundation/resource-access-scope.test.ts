@@ -8,6 +8,7 @@ import {
 import {
   withExecutionContext,
   withExecutionContextAsync,
+  withStoreGrant,
   resetRoleAssumptionPolicyCache,
 } from '../authority.js';
 import { validateReadPermission, validateWritePermission } from '../tier-guard.js';
@@ -40,9 +41,10 @@ import {
   DELIVERABLE_INBOX_ENTRIES_PATH,
   DELIVERABLE_INBOX_WRITER_ROLE,
 } from './deliverable-inbox-writer-capability.js';
+import { asRoleOrGrant } from '../testing/role-or-store-grant.js';
 
 vi.mock('../governance/audit-chain.js', () => ({
-  auditChain: { record: vi.fn() },
+  auditChain: { record: vi.fn(), recordDurable: vi.fn() },
 }));
 vi.mock('../governance/policy-engine.js', () => ({
   policyEngine: { evaluate: () => ({ allowed: true }) },
@@ -188,16 +190,20 @@ describe('request resource ceiling', () => {
         encoding: 'utf8',
       }) as string
     );
+    // S4: the declaration belongs to the deliverable inbox store grant; it applies while
+    // the grant is live.
     expect(
-      roleNarrowingDenial({
-        policy,
-        role: DELIVERABLE_INBOX_WRITER_ROLE,
-        relativePath: DELIVERABLE_INBOX_ENTRIES_PATH,
-        operation: 'append',
-        scope: undefined,
-        content: undefined,
-        readRepoFile: () => undefined,
-      })
+      withStoreGrant(DELIVERABLE_INBOX_WRITER_ROLE, () =>
+        roleNarrowingDenial({
+          policy,
+          role: DELIVERABLE_INBOX_WRITER_ROLE,
+          relativePath: DELIVERABLE_INBOX_ENTRIES_PATH,
+          operation: 'append',
+          scope: undefined,
+          content: undefined,
+          readRepoFile: () => undefined,
+        })
+      )
     ).toContain('DELIVERABLE_INBOX_WRITE_REFUSED');
   });
   it.each(['discussion_request_store', 'pipeline_journal_store'])(
@@ -537,7 +543,7 @@ describe('request resource ceiling', () => {
 describe('management authority requires a resource capability', () => {
   it('denies management writer with no binding even on default_allow paths', () => {
     process.env.SYSTEM_ROLE = 'concierge';
-    expect(() => withExecutionContext('concierge_management_writer', () => null)).toThrow(
+    expect(() => asRoleOrGrant('concierge_management_writer', () => null)).toThrow(
       /RESOURCE_SCOPE_REQUIRED/
     );
     delete process.env.SYSTEM_ROLE;
@@ -550,13 +556,7 @@ describe('management authority requires a resource capability', () => {
     process.env.SYSTEM_ROLE = 'chronos_mirror_v2';
     runInResourceAccessScope(scope(), () => {
       expect(() =>
-        withExecutionContext(
-          'concierge_management_writer',
-          () => null,
-          undefined,
-          'acme-corp',
-          'org-a'
-        )
+        asRoleOrGrant('concierge_management_writer', () => null, undefined, 'acme-corp', 'org-a')
       ).toThrow(/ROLE_ASSUMPTION_DENIED/);
     });
   });
@@ -566,15 +566,9 @@ describe('management authority requires a resource capability', () => {
     process.env.KYBERION_PROJECT_ID = 'foreign-project';
     runInResourceAccessScope(scope(), () => {
       expect(() =>
-        withExecutionContext(
-          'concierge_management_writer',
-          () => null,
-          undefined,
-          'other-tenant',
-          'org-a'
-        )
+        asRoleOrGrant('concierge_management_writer', () => null, undefined, 'other-tenant', 'org-a')
       ).toThrow(/RESOURCE_SCOPE_REQUIRED/);
-      withExecutionContext(
+      asRoleOrGrant(
         'concierge_management_writer',
         () => {
           expect(validateWritePermission(abs(exact)).allowed).toBe(true);
@@ -602,7 +596,7 @@ describe('management authority requires a resource capability', () => {
         mkdirExact: [],
       }),
       () => {
-        withExecutionContext(
+        asRoleOrGrant(
           'concierge_management_reader',
           () => {
             expect(validateReadPermission(abs(profile)).allowed).toBe(true);
@@ -618,7 +612,7 @@ describe('management authority requires a resource capability', () => {
     );
     runInResourceAccessScope(scope(), () => {
       expect(() =>
-        withExecutionContext('concierge_management_reader', () => null, undefined, 'acme-corp')
+        asRoleOrGrant('concierge_management_reader', () => null, undefined, 'acme-corp')
       ).toThrow(/RESOURCE_SCOPE_REQUIRED/);
     });
   });

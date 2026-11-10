@@ -80,6 +80,12 @@
           "uniqueItems": true,
           "description": "Store-scoped authority roles whose security-policy paths reach this store today (G2 replaces them with grants)."
         },
+        "grants": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+          "uniqueItems": true,
+          "description": "Declared store grants (security-policy.json store_grants, issued by the store facade with withStoreGrant) whose declaration reaches this store (S4: they replaced store-only authority roles)."
+        },
         "sources": {
           "type": "array",
           "items": {

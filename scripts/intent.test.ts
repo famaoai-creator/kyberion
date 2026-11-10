@@ -33,7 +33,7 @@ describe('intent trace', () => {
       status: 'active',
       execution_mode: 'local',
       priority: 10,
-      assigned_persona: 'tester',
+      org_role: 'tester',
       confidence_score: 0.9,
       git: {
         branch: 'main',
@@ -187,7 +187,7 @@ describe('intent trace', () => {
     status: 'active',
     execution_mode: 'local',
     priority: 10,
-    assigned_persona: 'tester',
+    org_role: 'tester',
     confidence_score: 0.9,
     git: { branch: 'main', start_commit: 'abc', latest_commit: 'def', checkpoints: [] },
     history: [],

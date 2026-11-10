@@ -3,6 +3,7 @@
  * Project ledger synchronization utilities for missions.
  */
 
+import type { StorageDataTier } from '../storage-layout.js';
 import * as path from 'node:path';
 import * as pathResolver from '../path-resolver.js';
 import { logger } from '../core.js';
@@ -152,7 +153,7 @@ export async function syncProjectLedger(id: string, rootDir: string): Promise<vo
   if (!safeExistsSync(ledgerDir)) safeMkdir(ledgerDir, { recursive: true });
 
   const summary = escapeTableCell(
-    project.note || `${state.mission_type || 'mission'} / ${state.assigned_persona}`
+    project.note || `${state.mission_type || 'mission'} / ${state.org_role}`
   );
   const artifacts = escapeTableCell((project.affected_artifacts || []).join(', '));
   const traceability = escapeTableCell((project.traceability_refs || []).join(', '));
@@ -177,11 +178,11 @@ export async function syncProjectLedger(id: string, rootDir: string): Promise<vo
     mission_id: upperId,
     relationship_type: project.relationship_type,
     status: state.status,
-    summary: project.note || `${state.mission_type || 'mission'} / ${state.assigned_persona}`,
+    summary: project.note || `${state.mission_type || 'mission'} / ${state.org_role}`,
     affected_artifacts: project.affected_artifacts || [],
     gate_impact: project.gate_impact || 'none',
     traceability_refs: project.traceability_refs || [],
-    owner: state.assigned_persona,
+    owner: state.org_role,
     last_updated: nowIso(),
     ...(projectScope ? { scope: projectScope } : {}),
   };
@@ -202,7 +203,7 @@ function resolveProjectLedgerScope(
   try {
     return normalizeEventScope({
       scope_kind: 'project',
-      tier: (state.tier_scope || state.tier || 'public') as 'personal' | 'confidential' | 'public',
+      tier: (state.tier_scope || state.tier || 'public') as StorageDataTier,
       tenant_slug: state.tenant_slug,
       organization_id: state.organization_id,
       project_id: projectId,
