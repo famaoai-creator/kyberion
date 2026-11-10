@@ -85,7 +85,7 @@ const SOVEREIGN_SCHEDULE_IDS: ReadonlySet<string> = new Set(['organization-daily
 
 function sovereignPersonaFor(scheduleId: string): 'sovereign' | undefined {
   return SOVEREIGN_SCHEDULE_IDS.has(scheduleId) &&
-    readConfiguredActorIdentity().persona === 'sovereign'
+    readConfiguredActorIdentity().baseRole === 'sovereign'
     ? 'sovereign'
     : undefined;
 }

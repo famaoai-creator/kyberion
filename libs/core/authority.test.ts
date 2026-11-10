@@ -50,7 +50,7 @@ describe('resolveIdentityContext', () => {
     delete process.env.MISSION_ID;
 
     const result = resolveIdentityContext();
-    expect(result.persona).toBe('worker');
+    expect(result.baseRole).toBe('worker');
     expect(result.role).toBe('mission_controller');
   });
 
@@ -59,7 +59,7 @@ describe('resolveIdentityContext', () => {
     process.env.MISSION_ROLE = 'chronos_gateway';
 
     const result = resolveIdentityContext();
-    expect(result.persona).toBe('ecosystem_architect');
+    expect(result.baseRole).toBe('ecosystem_architect');
     expect(result.role).toBe('chronos_gateway');
   });
 
@@ -68,7 +68,7 @@ describe('resolveIdentityContext', () => {
     process.env.MISSION_ROLE = 'mission_controller';
 
     const result = resolveIdentityContext();
-    expect(result.persona).toBe('worker');
+    expect(result.baseRole).toBe('worker');
     expect(result.role).toBe('mission_controller');
   });
 
@@ -189,7 +189,7 @@ describe('resolveIdentityContext', () => {
       const identity = resolveIdentityContext();
       return {
         role: identity.role,
-        persona: identity.persona,
+        persona: identity.baseRole,
         // B1: the async helper keeps the assumption in scope only.
         envRole: process.env.MISSION_ROLE,
       };

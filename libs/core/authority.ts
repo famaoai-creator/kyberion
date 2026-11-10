@@ -25,7 +25,7 @@ import { resolveProjectScope } from './foundation/project-scope-env.js';
 export { isBoundTenantInvalid } from './foundation/project-scope-env.js';
 import { isScopeEnvOnly } from './foundation/scope-resolution-mode.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
-import { Persona, Authority, ExecutionMode, IdentityContext } from './types.js';
+import { BaseRole, Authority, ExecutionMode, IdentityContext } from './types.js';
 import { getServiceAuthorities } from './service/service-authority-map.js';
 import { createLogger } from './logger.js';
 import { registerIdentityContextResolver } from './identity-context-bridge.js';
@@ -65,10 +65,10 @@ import {
 const logger = createLogger('authority');
 
 type RolePersonaIndex = {
-  authority_roles?: Record<string, { default_persona?: Persona }>;
+  authority_roles?: Record<string, { default_persona?: BaseRole }>;
 };
 
-const LEGACY_ROLE_PERSONA_DEFAULTS: Record<string, Persona> = {
+const LEGACY_ROLE_PERSONA_DEFAULTS: Record<string, BaseRole> = {
   // system roles
   ecosystem_architect: 'ecosystem_architect',
   knowledge_steward: 'analyst',
@@ -136,9 +136,9 @@ function optionalStringFieldIsValid(record: JsonRecord, key: string): boolean {
   return record[key] === undefined || typeof record[key] === 'string';
 }
 
-let cachedRoleAuthorityMap: Record<string, Persona> | null = null;
+let cachedRoleAuthorityMap: Record<string, BaseRole> | null = null;
 
-function loadRoleAuthorityMapPersonas(): Record<string, Persona> {
+function loadRoleAuthorityMapPersonas(): Record<string, BaseRole> {
   if (cachedRoleAuthorityMap) return cachedRoleAuthorityMap;
   const filePath = pathResolver.knowledge('product/governance/role-authority-map.json');
   try {
@@ -151,7 +151,7 @@ function loadRoleAuthorityMapPersonas(): Record<string, Persona> {
       cachedRoleAuthorityMap = {};
       return cachedRoleAuthorityMap;
     }
-    const result: Record<string, Persona> = {};
+    const result: Record<string, BaseRole> = {};
     for (const group of ['system_roles', 'mission_roles', 'context_roles']) {
       const entries = raw[group];
       if (!Array.isArray(entries)) continue;
@@ -182,7 +182,7 @@ function loadRolePersonaIndexDirectory(): RolePersonaIndex | null {
     return null;
   }
 
-  const authority_roles: Record<string, { default_persona?: Persona }> = {};
+  const authority_roles: Record<string, { default_persona?: BaseRole }> = {};
   for (const file of files) {
     const filePath = pathResolver.knowledge(`product/governance/authority-roles/${file}`);
     const payload = parseJsonRecord(rawReadTextFile(filePath));
@@ -238,7 +238,7 @@ function loadRolePersonaIndex(): RolePersonaIndex {
  * Resolves logical identity and temporal authorities for the current execution.
  */
 
-function normalizePersona(value: unknown): Persona {
+function normalizePersona(value: unknown): BaseRole {
   if (typeof value !== 'string' || !value) return 'unknown';
   const normalized = value.toLowerCase().replace(/\s+/g, '_');
   if (
@@ -461,7 +461,7 @@ export const DELEGATED_ROLE_ENV = 'KYBERION_DELEGATED_ROLE';
  * never SYSTEM_ROLE's default (which may be sovereign, e.g. nexus_daemon), so a
  * denied delegation can never raise the persona.
  */
-const DENIED_DELEGATION_PERSONA: Persona = 'worker';
+const DENIED_DELEGATION_PERSONA: BaseRole = 'worker';
 
 let delegationSnapshot: { systemRole?: string; raw?: string } | null = null;
 
@@ -596,7 +596,7 @@ export function isStoreGrantIssuanceRightRegistered(issuanceRight: string): bool
   );
 }
 
-export function inferPersonaFromRole(role?: string): Persona {
+export function inferPersonaFromRole(role?: string): BaseRole {
   if (!role) return 'unknown';
   const normalized = role.toLowerCase().replace(/\s+/g, '_');
   const fromIndex = normalizePersona(
@@ -623,7 +623,7 @@ export function inferPersonaFromRole(role?: string): Persona {
 export function buildExecutionEnv(
   baseEnv: NodeJS.ProcessEnv = process.env,
   role?: string,
-  persona?: Persona
+  persona?: BaseRole
 ): NodeJS.ProcessEnv {
   const nextEnv: NodeJS.ProcessEnv = { ...baseEnv };
   const identity = currentExecutionScope()?.executionIdentity;
@@ -730,7 +730,7 @@ interface PreparedExecutionContext {
   /** The role normalized once, so the scope, the env mirror and children agree. */
   role: string;
   scope: ExecutionScope;
-  resolvedPersona: Persona;
+  resolvedPersona: BaseRole;
 }
 
 /**
@@ -791,7 +791,7 @@ interface StoreGrantIssuance {
 
 function prepareExecutionContext(
   role: string,
-  persona: Persona | undefined,
+  persona: BaseRole | undefined,
   tenantSlug: string | undefined,
   organizationId: string | undefined,
   identity?: ExecutionIdentityBinding,
@@ -903,8 +903,8 @@ function prepareExecutionContext(
  */
 function applyExecutionEnv(
   role: string,
-  persona: Persona | undefined,
-  resolvedPersona: Persona
+  persona: BaseRole | undefined,
+  resolvedPersona: BaseRole
 ): { role: string; baseRole: string | undefined } {
   setRegisteredEnv('MISSION_ROLE', role);
   if (resolvedPersona !== 'unknown') {
@@ -953,7 +953,7 @@ function restoreMirroredEnv(
 export function withExecutionContext<T>(
   role: string,
   fn: () => T,
-  persona?: Persona,
+  persona?: BaseRole,
   tenantSlug?: string,
   organizationId?: string,
   identity?: ExecutionIdentityBinding
@@ -965,7 +965,7 @@ export function withExecutionContext<T>(
 /** Run a prepared synchronous assumption with its env mirror written and restored around it. */
 function runMirroredSync<T>(
   prepared: PreparedExecutionContext,
-  persona: Persona | undefined,
+  persona: BaseRole | undefined,
   fn: () => T
 ): T {
   const previousRole = getRegisteredEnvText('MISSION_ROLE');
@@ -991,7 +991,7 @@ function runMirroredSync<T>(
 export async function withExecutionContextAsync<T>(
   role: string,
   fn: () => Promise<T> | T,
-  persona?: Persona,
+  persona?: BaseRole,
   tenantSlug?: string,
   organizationId?: string,
   identity?: ExecutionIdentityBinding
@@ -1299,7 +1299,7 @@ export function resolveIdentityContext(tenantOverride?: string): IdentityContext
   const envPersona = resolveExecutionPersona();
   const envRole = resolveRole();
 
-  let persona: Persona = normalizePersona(envPersona);
+  let persona: BaseRole = normalizePersona(envPersona);
   const authorities: Authority[] = [];
   const executionScope = currentExecutionScope();
   let tenantSlug: string | undefined = normalizeTenantSlug(
@@ -1527,7 +1527,7 @@ export function resolveIdentityContext(tenantOverride?: string): IdentityContext
         : 'mission';
 
   return {
-    persona,
+    baseRole: persona,
     executionMode,
     authorities: Array.from(new Set(authorities)),
     missionId,

@@ -141,7 +141,7 @@ describe('authority branch coverage', () => {
     // Concept model v2 D5: the Org Role is descriptive metadata. Before S1 an
     // org role spelled like a persona ("Ecosystem Architect") escalated the
     // process to ecosystem_architect with its intrinsic authorities.
-    expect(ctx.persona).toBe('worker');
+    expect(ctx.baseRole).toBe('worker');
     expect(ctx.authorities).not.toContain('SECRET_READ');
     expect(ctx.role).toBe('chronos_gateway');
   });
@@ -160,7 +160,7 @@ describe('authority branch coverage', () => {
     const ctx = resolveIdentityContext();
     // No mission state is consulted: the persona is not taken from either twin
     // (an unrecognized env persona keeps the default, as with no mission state).
-    expect(ctx.persona).toBe('worker');
+    expect(ctx.baseRole).toBe('worker');
     expect(ctx.role).toBe('chronos_gateway');
     expect(mocks.findMissionPath).toHaveBeenCalledWith('MSN-TWIN');
   });
@@ -178,7 +178,7 @@ describe('authority branch coverage', () => {
 
     const { resolveIdentityContext } = await import('./authority.js');
     const ctx = resolveIdentityContext();
-    expect(ctx.persona).toBe('unknown');
+    expect(ctx.baseRole).toBe('unknown');
     expect(ctx.authorities).not.toContain('SYSTEM_EXEC');
   });
 
@@ -186,7 +186,7 @@ describe('authority branch coverage', () => {
     process.argv[1] = '/tmp/my-controller.ts';
     const { resolveIdentityContext } = await import('./authority.js');
     const ctx = resolveIdentityContext();
-    expect(ctx.persona).toBe('ecosystem_architect');
+    expect(ctx.baseRole).toBe('ecosystem_architect');
     expect(ctx.role).toBe('my_controller');
   });
 
@@ -270,7 +270,7 @@ describe('authority branch coverage', () => {
     );
 
     const { inferPersonaFromRole, resolveIdentityContext } = await import('./authority.js');
-    expect(resolveIdentityContext().persona).toBe('unknown');
+    expect(resolveIdentityContext().baseRole).toBe('unknown');
     expect(inferPersonaFromRole('unmapped_role')).toBe('unknown');
   });
 

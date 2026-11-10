@@ -1152,7 +1152,7 @@ function personaTierWriteDecision(
   operation: 'write' | 'append' | 'mkdir'
 ): { allowed: boolean; reason?: string } {
   const {
-    persona: currentPersona,
+    baseRole: currentPersona,
     role: currentRole,
     authorities,
     sudoScope,
@@ -1530,7 +1530,7 @@ function personaTierReadDecision(
   identity: ReturnType<typeof resolvePolicyIdentityContext>
 ): ReadPermissionDecision {
   const {
-    persona: currentPersona,
+    baseRole: currentPersona,
     role: currentRole,
     authorities,
     sudoScope,
