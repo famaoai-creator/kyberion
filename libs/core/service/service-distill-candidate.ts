@@ -1,10 +1,10 @@
 import type { StorageDataTier } from '../storage-layout.js';
 import { assertMemoryScope, type MemoryScopeEnvelope } from '../knowledge/memory-scope.js';
 import {
-  createDistillCandidateRecord,
-  saveDistillCandidateRecord,
-  type DistillCandidateRecord,
-} from '../knowledge/distill-candidate-registry.js';
+  captureFacadeProposal,
+  type FacadeProposalRecord,
+} from '../knowledge/facade-proposal-rows.js';
+import { SERVICE_PROCEDURE_PROPOSAL } from '../knowledge/reuse-proposals.js';
 import { validatePipelineAdf } from '../pipeline/pipeline-contract.js';
 import { validatePipelineGuardrails } from '../pipeline/adf-guardrails.js';
 import {
@@ -29,11 +29,17 @@ export interface BuildServiceProcedureCandidateOptions {
   locale?: string;
 }
 
+/**
+ * D8: a service procedure candidate is a MemoryCandidate queue row
+ * (`origin.record_kind: service_procedure`, SERVICE_PROCEDURE_PROPOSAL)
+ * captured with the recording's scope and decided on the Concierge
+ * reuse-proposal panel.
+ */
 export interface ServiceProcedureCandidateResult {
   procedure_id: string;
   pipeline: CompileServiceResult['pipeline'];
   preflight: { ok: boolean; findings: string[] };
-  candidate: DistillCandidateRecord;
+  candidate: FacadeProposalRecord;
 }
 
 export interface ServiceDistillCandidateAssessmentInput {
@@ -105,7 +111,7 @@ export function assessServiceDistillCandidate(
 function buildScope(
   options: BuildServiceProcedureCandidateOptions,
   recordingId: string
-): MemoryScopeEnvelope | undefined {
+): MemoryScopeEnvelope {
   const tier = options.tier ?? 'personal';
   // Service recordings can contain business data and are never published as
   // public knowledge by this path. Publication needs its own brokered gate.
@@ -124,19 +130,13 @@ function buildScope(
     promotion_policy: 'human_review',
     provenance_refs: [`recording:${recordingId}`],
   };
-  // Validate only when an explicit scope was requested. Legacy personal
-  // candidates may remain unscoped until the caller supplies an owner.
-  if (
-    options.tier ||
-    options.tenantSlug ||
-    options.projectId ||
-    options.missionId ||
-    options.taskSessionId ||
-    options.ownerNhi
-  ) {
-    return assertMemoryScope(scope, tier);
-  }
-  return undefined;
+  // D8: scope is required at capture and never inferred — a personal
+  // candidate names its owner, a confidential one its tenant.
+  if (tier === 'personal' && !options.ownerNhi?.trim())
+    throw new Error(
+      '[MEMORY_SCOPE_REQUIRED] personal service procedure candidate needs --owner-nhi (or pass --tier confidential --tenant-slug <slug>)'
+    );
+  return assertMemoryScope(scope, tier);
 }
 
 /**
@@ -174,9 +174,9 @@ export function buildServiceProcedureCandidate(
   };
   const sourceType = options.missionId ? 'mission' : 'task_session';
   const scope = buildScope(options, validated.recording_id);
-  const candidate = createDistillCandidateRecord({
+  const candidate = captureFacadeProposal(SERVICE_PROCEDURE_PROPOSAL, {
     source_type: sourceType,
-    tier: options.tier ?? 'personal',
+    proposedMemoryKind: 'sop',
     ...(options.projectId ? { project_id: options.projectId } : {}),
     ...(options.missionId ? { mission_id: options.missionId } : {}),
     task_session_id: options.taskSessionId ?? validated.recording_id,
@@ -184,14 +184,13 @@ export function buildServiceProcedureCandidate(
     summary:
       options.summary?.trim() ||
       `Review candidate distilled from service recording ${validated.recording_id}; it remains non-executable until human approval.`,
-    status: 'proposed',
     target_kind: 'procedure',
     ...(options.locale ? { locale: options.locale } : {}),
     evidence_refs: [
       `recording:${validated.recording_id}`,
       `pipeline:${compiled.procedureEntry.procedure_id}`,
     ],
-    ...(scope ? { scope } : {}),
+    scope,
     metadata: {
       pipeline: validatedPipeline,
       procedure: compiled.procedureEntry,
@@ -204,7 +203,6 @@ export function buildServiceProcedureCandidate(
       promotion_state: 'review_required',
     },
   });
-  saveDistillCandidateRecord(candidate);
   return {
     procedure_id: compiled.procedureEntry.procedure_id,
     pipeline: compiled.pipeline,
