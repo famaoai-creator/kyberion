@@ -7,6 +7,7 @@ import {
   isBoundTenantInvalid,
   resolveIdentityContext,
   withExecutionContext,
+  withStoreGrant,
 } from '@agent/core/authority';
 import { getRegisteredEnvText, isVitestProcess } from '@agent/core/foundation';
 import { logger } from '@agent/core/core';
@@ -412,15 +413,14 @@ export function noteDealSwitches(
   try {
     const text = dealNoteForSwitches([...switches], agenda, agenda.locale);
     if (!text.trim()) return false;
-    return withExecutionContext(
+    return withStoreGrant(
       DEAL_NOTE_ROLE,
       () => {
         if (!getDeal(tenant, dealId)) return false;
         appendDealNote({ tenantSlug: tenant, dealId, role: 'kyberion', text });
         return true;
       },
-      undefined,
-      tenant
+      { tenantSlug: tenant }
     );
   } catch (error) {
     const code = diagnosticCode(error);

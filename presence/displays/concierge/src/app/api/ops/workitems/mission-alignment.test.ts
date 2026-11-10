@@ -20,6 +20,9 @@ vi.mock('@agent/core/authority', () => ({
     KYBERION_DELEGATED_ROLE: '',
     KYBERION_PERSONA: 'worker',
   }),
+  // S4: store facades open their declared store grant (withStoreGrant).
+  withStoreGrant: (_name: string, fn: () => unknown) => fn(),
+  withStoreGrantAsync: async (_name: string, fn: () => unknown) => fn(),
   withExecutionContext: (_r: unknown, fn: () => unknown) => fn(),
 }));
 vi.mock('@agent/core/path-resolver', () => ({

@@ -27,7 +27,7 @@
       "additionalProperties": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["description", "allow_read", "allow_write"],
+        "required": ["description"],
         "properties": {
           "description": { "type": "string", "minLength": 1 },
           "allow_read": { "type": "array", "items": { "type": "string" } },

@@ -181,7 +181,7 @@
       },
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
-      "legacy_roles": ["peer_task_artifact_writer"],
+      "grants": ["peer_task_artifact_writer"],
       "sources": ["storage-floor", "role-policy"],
       "note": "Floors also hold a system/ partition (custody system).",
       "registration": {
@@ -277,7 +277,7 @@
       },
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
-      "legacy_roles": ["credential_allocation_reader"],
+      "grants": ["credential_allocation_reader"],
       "sources": ["runtime-state-roots", "role-policy"],
       "registration": {
         "family": "state",
@@ -432,9 +432,9 @@
         "concierge_management_reader",
         "concierge_management_writer",
         "dot_charter_store",
-        "operational_learning_writer",
         "workspace_graph_reader"
       ],
+      "grants": ["operational_learning_writer"],
       "sources": ["role-policy"]
     },
     {
@@ -470,7 +470,7 @@
       },
       "tiers": ["personal"],
       "status": "active",
-      "legacy_roles": ["chronos_token_registry_reader"],
+      "grants": ["chronos_token_registry_reader"],
       "sources": ["role-policy"]
     },
     {
@@ -494,11 +494,8 @@
       },
       "tiers": ["personal"],
       "status": "active",
-      "legacy_roles": [
-        "concierge_management_reader",
-        "nhi_accountability_reader",
-        "workspace_graph_reader"
-      ],
+      "legacy_roles": ["concierge_management_reader", "workspace_graph_reader"],
+      "grants": ["nhi_accountability_reader"],
       "sources": ["role-policy"]
     },
     {
@@ -550,13 +547,12 @@
         "concierge_management_reader",
         "concierge_management_writer",
         "dot_charter_store",
-        "first_job_tenant_status_reader",
-        "peer_catalog_reader",
         "peer_responder_reader",
         "workspace_graph_reader",
         "workspace_tenant_registry_index_reader",
         "workspace_tenant_registry_reader"
       ],
+      "grants": ["peer_catalog_reader", "first_job_tenant_status_reader"],
       "sources": ["role-policy"]
     },
     {
@@ -690,7 +686,7 @@
       "status": "active",
       "sources": ["role-policy", "scope-model"],
       "note": "Tenant partition of the execution-metrics metrics ledger (protected prefixes active/shared/runtime/execution-metrics/<personal|confidential>/); the root stays an unscoped system ledger.",
-      "legacy_roles": ["metrics_cap_reader"]
+      "grants": ["metrics_cap_reader"]
     },
     {
       "id": "runtime.locks",
@@ -845,7 +841,7 @@
       "status": "active",
       "sources": ["role-policy", "scope-model"],
       "note": "Tenant partition of the usage-ledger metrics ledger (protected prefixes active/shared/runtime/usage-ledger/<personal|confidential>/); the root stays an unscoped system ledger.",
-      "legacy_roles": ["metrics_cap_reader"]
+      "grants": ["metrics_cap_reader"]
     },
     {
       "id": "runtime.vitest-approvals",
@@ -932,7 +928,7 @@
         "kind": "unscoped-legacy"
       },
       "status": "active",
-      "legacy_roles": ["reasoning_settings_writer"],
+      "grants": ["reasoning_settings_writer"],
       "sources": ["role-policy"]
     },
     {
@@ -1031,7 +1027,7 @@
       },
       "tiers": ["confidential"],
       "status": "active",
-      "legacy_roles": ["customer_decision_deal_note_writer"],
+      "grants": ["customer_decision_deal_note_writer"],
       "sources": ["scope-model", "role-policy"],
       "note": "S3 done: the tenant's customer records (deals, deal documents, requirements captures, escalations, deal log), read and written only as the tenant-bound deal store (libs/core/organization/deal-store.ts asDealStore)."
     },
@@ -1090,7 +1086,8 @@
       },
       "tiers": ["confidential"],
       "status": "active",
-      "legacy_roles": ["customer_channel_binding_store", "peer_catalog_reader"],
+      "legacy_roles": ["customer_channel_binding_store"],
+      "grants": ["peer_catalog_reader"],
       "sources": ["role-policy"]
     },
     {
