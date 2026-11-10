@@ -54,7 +54,7 @@ import {
   stopAgentRuntime,
   updateFacadeProposal,
 } from '../../../../lib/ops/intelligence-primitives';
-import { withExecutionContext } from '@agent/core/authority';
+import { withStoreGrant } from '@agent/core/authority';
 import {
   memberBindingDenied,
   resolveMemberByPrincipal,
@@ -234,7 +234,7 @@ export const INTELLIGENCE_ACTION_HANDLERS: Record<string, IntelligenceActionHand
     // Member profiles live under knowledge/personal/members/ (personal
     // tier). chronos_gateway has no personal tier_access, so resolve with
     // nhi_accountability_reader — the read-only member-lookup role.
-    const decisionMember = withExecutionContext('nhi_accountability_reader', () =>
+    const decisionMember = withStoreGrant('nhi_accountability_reader', () =>
       resolveMemberByPrincipal({
         principalId: resolvedViewer.context.principalId,
         source: resolvedViewer.context.source,
@@ -248,7 +248,7 @@ export const INTELLIGENCE_ACTION_HANDLERS: Record<string, IntelligenceActionHand
     // sovereign identity (F1).
     const bindingDenied =
       !decisionMember &&
-      withExecutionContext('nhi_accountability_reader', () =>
+      withStoreGrant('nhi_accountability_reader', () =>
         memberBindingDenied({
           principalId: resolvedViewer.context.principalId,
           source: resolvedViewer.context.source,

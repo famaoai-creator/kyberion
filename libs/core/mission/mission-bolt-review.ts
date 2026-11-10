@@ -18,7 +18,7 @@
  * so the WorkItem, the inbox entry and the notification carry ids only; the
  * customer's comment stays in the confidential case.
  */
-import { assertStoreGrantIssuanceAllowed, withExecutionContext } from '../authority.js';
+import { assertStoreGrantIssuanceAllowed, withStoreGrant } from '../authority.js';
 import { currentExecutionScope, runInExecutionScope } from '../foundation/execution-scope.js';
 import { resolvePolicyIdentityContext } from '../identity-context-bridge.js';
 import { logger } from '../core.js';
@@ -263,7 +263,7 @@ export function fileBoltReviewWorkItem(
     });
   try {
     // Same identity rule as the CD-09 rework item (mission-decision-lock.ts).
-    withExecutionContext(TENANT_REGISTRY_READER_ROLE, create, 'worker', input.tenantSlug);
+    withStoreGrant(TENANT_REGISTRY_READER_ROLE, create, { tenantSlug: input.tenantSlug });
   } catch (error) {
     if (
       error instanceof WorkCoordinationError &&
@@ -301,7 +301,7 @@ export function notifyBoltReviewRejected(input: BoltRoutingInput): BoltRejectNot
   const body = t('customer_decision:bolt_review_rejected_body', params);
   // The inbox's own narrow writer: the facade (customer-triggered respond) has
   // no inbox grant, and this role can write nothing else.
-  withExecutionContext(INBOX_WRITER_ROLE, () =>
+  withStoreGrant(INBOX_WRITER_ROLE, () =>
     addInboxEntry({
       entryId,
       ifAbsent: true,
