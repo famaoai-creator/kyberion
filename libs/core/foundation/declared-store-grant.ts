@@ -23,13 +23,15 @@
  * precondition (as for every store grant, G2).
  */
 import { currentExecutionScope } from './execution-scope.js';
+import { isBaseAuthorityRoleName } from './base-authority-role.js';
 
 export interface DeclaredStoreGrantDefinition {
   /**
-   * The persona bundle the grant's operations are evaluated under — the former
-   * role's default persona, so the decisions inside the grant are unchanged.
+   * The base Authority Role the grant's operations are evaluated on — the
+   * former role's default persona's bundle, so the decisions inside the grant
+   * are unchanged (S4 slice 4: formerly `persona: 'worker'`).
    */
-  readonly persona?: 'worker';
+  readonly baseRole?: 'base_worker';
   /** The grant is bound to an explicit tenant, equal to the caller's active tenant. */
   readonly tenantBound: boolean;
   /**
@@ -46,53 +48,56 @@ export interface DeclaredStoreGrantDefinition {
 export const DECLARED_STORE_GRANTS: Readonly<Record<string, DeclaredStoreGrantDefinition>> =
   Object.freeze({
     // localization/locale.ts: the tenant reply locale, bound to the turn's tenant.
-    scope_locale_reader: Object.freeze({ persona: 'worker', tenantBound: true }),
+    scope_locale_reader: Object.freeze({ baseRole: 'base_worker', tenantBound: true }),
     // mesh/peer-conversation.ts, peer-task-exchange.ts: a tenant's peer catalogs and profile.
-    peer_catalog_reader: Object.freeze({ persona: 'worker', tenantBound: true }),
+    peer_catalog_reader: Object.freeze({ baseRole: 'base_worker', tenantBound: true }),
     // mesh/peer-task-exchange.ts: an accepted peer task's report and the tenant artifact index.
-    peer_task_artifact_writer: Object.freeze({ persona: 'worker', tenantBound: true }),
+    peer_task_artifact_writer: Object.freeze({ baseRole: 'base_worker', tenantBound: true }),
     // scripts/onboarding_first_job_tenant_status.ts: one tenant profile.
-    first_job_tenant_status_reader: Object.freeze({ persona: 'worker', tenantBound: false }),
+    first_job_tenant_status_reader: Object.freeze({ baseRole: 'base_worker', tenantBound: false }),
     // authn/authn-providers.ts, concierge viewer-context.ts: the viewer token registry.
-    chronos_token_registry_reader: Object.freeze({ persona: 'worker', tenantBound: false }),
+    chronos_token_registry_reader: Object.freeze({ baseRole: 'base_worker', tenantBound: false }),
     // agent/nhi-lifecycle-governance.ts: accountable member status.
-    nhi_accountability_reader: Object.freeze({ persona: 'worker', tenantBound: false }),
+    nhi_accountability_reader: Object.freeze({ baseRole: 'base_worker', tenantBound: false }),
     // operator-surface selection-service.ts: the reasoning route settings and their history.
-    reasoning_settings_writer: Object.freeze({ persona: 'worker', tenantBound: false }),
+    reasoning_settings_writer: Object.freeze({ baseRole: 'base_worker', tenantBound: false }),
     // analysis/metrics.ts: the partitioned metrics ledgers for cap enforcement (numbers only).
-    metrics_cap_reader: Object.freeze({ persona: 'worker', tenantBound: false }),
+    metrics_cap_reader: Object.freeze({ baseRole: 'base_worker', tenantBound: false }),
     // knowledge/operational-learning.ts: organization learning candidates.
-    operational_learning_writer: Object.freeze({ persona: 'worker', tenantBound: false }),
+    operational_learning_writer: Object.freeze({ baseRole: 'base_worker', tenantBound: false }),
     // organization/deal-store.ts: a tenant's deal files.
-    customer_decision_deal_note_writer: Object.freeze({ persona: 'worker', tenantBound: true }),
+    customer_decision_deal_note_writer: Object.freeze({
+      baseRole: 'base_worker',
+      tenantBound: true,
+    }),
     // secret/credential-allocations.ts: a tenant's credential allocation records.
     credential_allocation_reader: Object.freeze({ tenantBound: true }),
     // governance/ledger.ts: one tenant's hybrid ledger partition.
-    tenant_ledger_store: Object.freeze({ persona: 'worker', tenantBound: true }),
+    tenant_ledger_store: Object.freeze({ baseRole: 'base_worker', tenantBound: true }),
     // workforce/delegation-store-partition.ts: one tenant's delegated-task partition.
-    delegation_record_store: Object.freeze({ persona: 'worker', tenantBound: true }),
+    delegation_record_store: Object.freeze({ baseRole: 'base_worker', tenantBound: true }),
     // governance/approval-store-location.ts: one tenant's approval store partition.
-    tenant_approval_store: Object.freeze({ persona: 'worker', tenantBound: true }),
+    tenant_approval_store: Object.freeze({ baseRole: 'base_worker', tenantBound: true }),
     // governance/approval-store-location.ts: the tenant directory names of the approval store.
     tenant_approval_partition_index_reader: Object.freeze({
-      persona: 'worker',
+      baseRole: 'base_worker',
       tenantBound: false,
     }),
     // governance/audit-chain.ts tenant mirror (seam registered by authority.ts), bound per entry.
-    audit_mirror_writer: Object.freeze({ persona: 'worker', tenantBound: false }),
+    audit_mirror_writer: Object.freeze({ baseRole: 'base_worker', tenantBound: false }),
     // foundation/operational-store-policy.ts (seam registered by authority.ts): ops alert files.
-    ops_alert_store: Object.freeze({ persona: 'worker', tenantBound: false }),
+    ops_alert_store: Object.freeze({ baseRole: 'base_worker', tenantBound: false }),
     // tenant registry: one tenant profile (operational membership, mission, egress, workspace).
-    workspace_tenant_registry_reader: Object.freeze({ persona: 'worker', tenantBound: true }),
+    workspace_tenant_registry_reader: Object.freeze({ baseRole: 'base_worker', tenantBound: true }),
     // tenant registry: the tenant directory listing only (descendant reads denied).
     workspace_tenant_registry_index_reader: Object.freeze({
-      persona: 'worker',
+      baseRole: 'base_worker',
       tenantBound: false,
     }),
     // surface/operator-notifications.ts: the operator notification routing preferences file.
-    notification_preferences_reader: Object.freeze({ persona: 'worker', tenantBound: false }),
+    notification_preferences_reader: Object.freeze({ baseRole: 'base_worker', tenantBound: false }),
     // tool/tool-runtime-policy.ts: the canonical tool runtime policy and its configured overlay.
-    tool_runtime_policy_reader: Object.freeze({ persona: 'worker', tenantBound: false }),
+    tool_runtime_policy_reader: Object.freeze({ baseRole: 'base_worker', tenantBound: false }),
     // Owner decision (2026-11-10): deny-only roles become explicit deny declarations
     // (store_grants.<name>.narrow) on the grant their facade opens, not roles.
     // task/deliverable-inbox.ts addInboxEntry (bolt review, operator hand-off, escalation).
@@ -105,12 +110,12 @@ export const DECLARED_STORE_GRANTS: Readonly<Record<string, DeclaredStoreGrantDe
     // surface/concierge-management-access.ts, per request inside its exact writer capability.
     concierge_management_writer: Object.freeze({ tenantBound: false }),
     // dot/dot-lifecycle.ts (the decomposed dot_lifecycle_writer), per charter/runtime write.
-    dot_charter_store: Object.freeze({ persona: 'worker', tenantBound: false }),
-    dot_lifecycle_runtime_store: Object.freeze({ persona: 'worker', tenantBound: false }),
+    dot_charter_store: Object.freeze({ baseRole: 'base_worker', tenantBound: false }),
+    dot_lifecycle_runtime_store: Object.freeze({ baseRole: 'base_worker', tenantBound: false }),
     // Owner decision: cross-store readers are audited disclosures (scope model P4).
     // surface/workspace-graph.ts (system scope), concierge home-dashboard.ts.
     workspace_graph_reader: Object.freeze({
-      persona: 'worker',
+      baseRole: 'base_worker',
       tenantBound: false,
       disclosure: true,
     }),
@@ -118,7 +123,7 @@ export const DECLARED_STORE_GRANTS: Readonly<Record<string, DeclaredStoreGrantDe
     concierge_management_reader: Object.freeze({ tenantBound: false, disclosure: true }),
     // mesh/peer-auto-reply.ts: tenant knowledge for an opt-in peer reply.
     peer_responder_reader: Object.freeze({
-      persona: 'worker',
+      baseRole: 'base_worker',
       tenantBound: true,
       disclosure: true,
     }),
@@ -194,6 +199,10 @@ export function rolePermissionRecord(
   role: string | undefined
 ): PolicyPermissionRecord | undefined {
   if (!role || !isRecord(policy)) return undefined;
+  // S4 slice 4: a base Authority Role is never a principal's own role; running as its
+  // name (SYSTEM_ROLE / MISSION_ROLE) resolves no record (the tier guard adds a base
+  // role only through the principal's persona).
+  if (isBaseAuthorityRoleName(role)) return undefined;
   if (isDeclaredStoreGrantName(role)) {
     if (liveDeclaredStoreGrant() !== role) return undefined;
     const grants = policy.store_grants;

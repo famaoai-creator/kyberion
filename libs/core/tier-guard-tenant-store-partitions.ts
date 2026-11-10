@@ -18,6 +18,7 @@ import {
   STORAGE_FLOOR_ROOTS,
 } from './storage-layout.js';
 import { rolePermissionRecord } from './foundation/declared-store-grant.js';
+import { baseAuthorityRolePermissionRecord } from './foundation/base-authority-role.js';
 import type { TierLevel } from './types.js';
 import { isRecord } from './foundation/primitives.js';
 import { isValidTenantSlug } from './entity-scope.js';
@@ -215,7 +216,7 @@ export function tenantStorePartitionWriteDecision(
     ...(role === partition.storeRole
       ? (rolePermissionRecord(policy, role)?.allow_write ?? [])
       : []),
-    ...(policy.persona_permissions?.[persona]?.allow_write ?? []),
+    ...(baseAuthorityRolePermissionRecord(policy, persona)?.allow_write ?? []),
   ];
   if (grants.some((pattern) => typeof pattern === 'string' && deps.matches(pattern)))
     return { allowed: true };

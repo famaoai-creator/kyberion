@@ -112,19 +112,22 @@ Org Role を `KYBERION_PERSONA` に写していた `scripts/compose_mission_team
 
 数（カードの数。`authority-roles/*.json`）：
 
-| 時点                      | Authority Role | うち保存先専用                                   | 宣言された許可証 |
-| ------------------------- | -------------- | ------------------------------------------------ | ---------------- |
-| 3 つ目の前（`19b0a6a01`） | 90             | 30（`dot_lifecycle_writer` を分けた 2 件を含む） | 0                |
-| 3 つ目の後                | 62             | 2                                                | 28               |
-| 残り 2 件の後             | 60             | 0                                                | 30               |
+| 時点                      | Authority Role    | うち保存先専用                                   | 宣言された許可証 |
+| ------------------------- | ----------------- | ------------------------------------------------ | ---------------- |
+| 3 つ目の前（`19b0a6a01`） | 90                | 30（`dot_lifecycle_writer` を分けた 2 件を含む） | 0                |
+| 3 つ目の後                | 62                | 2                                                | 28               |
+| 残り 2 件の後             | 60                | 0                                                | 30               |
+| base role を足した後      | 64（うち base 4） | 0                                                | 30               |
 
 #### 残り（2026-11-10 時点）
 
 1. **保存先専用ロールの残り 2 件（2026-11-10、済み）。** `notification_preferences_reader`（`surface/operator-notifications.ts`）と `tool_runtime_policy_reader`（`tool/tool-runtime-policy.ts`）も宣言された許可証にした。インストール先の公開ロールの移行（`organization/publication-role-migration.ts`、`pnpm organization role migrate-publication-store`）は、ロールのカード・権限・索引ではなく、`store_grants` の宣言と発行の権利（shared core roles）を写す。実行するコードが宣言していない名前、移行元にまだロールとして残っている名前、移行元に宣言か発行の権利が無い名前は写さない。比較の表は 3 つ目と同じ基準で、違いは env の行だけ。
-2. **Execution Persona をなくす（S4 の 4 つ目）。** 手を付けていない。`persona_permissions` の 4 つの束（`sovereign` / `ecosystem_architect` / `worker` / `analyst`）をレジストリの Authority Role として表し直すこと、`Persona` 型の import（`authority.ts`、`authn/actor-context.ts`、`governance.ts` の再 export、`scripts/org.ts` の同じ型）を 0 にすること、`KYBERION_PERSONA` を 1 リリースだけ非推奨の別名として Authority Role に写し診断形式で警告すること（env-registry と生成文書も）、agent ID として使っている箇所（`network.ts` ほか、棚卸しの表）を NHI の ID にすることが残っている。宣言された許可証は、旧ロールの判定を変えないために `persona`（旧ロールの既定の persona。多くは `worker`）を持っている。束を Authority Role にするときに、ここも一緒に置き換える。
-3. **`role-authority-map.json` と `role-write-access.json`。** まだレジストリに入っていない。`role-write-access.json` からは、許可証にした 28 件の項目を消した（読む側は `scripts/org.ts` などのロールの草案と mission の書き込みの案内で、許可証の名前は割り当てられないので使われない）。`role-authority-map.json`（Org Role → Authority Role と persona）は persona を含むので、2 と一緒に生成物にするか削除する。
+2. **Execution Persona をなくす（S4 の 4 つ目）。** 一部済み（2026-11-10）。
+   - 済み：`persona_permissions` の 4 つの束を、レジストリの base Authority Role `base_sovereign` / `base_ecosystem_architect` / `base_worker` / `base_analyst`（`"assignable": false` のカード、`authority_role_permissions` は生成物）として表し直し、`security-policy.json` から `persona_permissions` を外した（スキーマでは 1 リリースだけ任意の非推奨の項目として残し、base role の無い古い catalog はそこから読む）。tier-guard（`tier-guard.ts`、`tier-guard-tenant-store-partitions.ts`）は persona が指す base role の権限を足す（`foundation/base-authority-role.ts`）。base role は自分のロールにならない（引き受けは `[ROLE_ASSUMPTION_DENIED]`、env でその名前として動いても記録を解決しない）。宣言された許可証の `persona: 'worker'` は `baseRole: 'base_worker'` にした。比較：`tests/fixtures/base-authority-role-equivalence.json` に、変更前の (プリンシパル 54 種 = ロール 5 種 × persona 6 種 × env／プロセス内, パス 215, 操作 3 種) の判定と、解決した persona・authority を記録し、`libs/core/testing/base-authority-role-equivalence.test.ts` が作り直して突き合わせる。違いは無い。
+   - 残り：`Persona` 型の import を 0 にすること（`IdentityContext.persona` の契約、`.persona` を読む本番コード約 60 か所とテスト約 1,000 か所）、`KYBERION_PERSONA` を 1 リリースだけの非推奨の別名にして診断形式の警告を出すこと（新しい env 名と、子プロセスへ渡す／消す env の一覧をすべて同時に切り替える必要がある。一覧の書き漏らしは子プロセスがロールの既定の persona に戻ることになり、明示した低い persona より広がりうるので、部分的には入れない）、agent ID として使っている箇所（`network.ts` ほか）を NHI の ID にすること（`agentId` は policy-engine の判定の入力にもなるので、判定が変わらないことの確認が先に要る）、`project_permissions.allowed_personas` の言い換え。
+3. **`role-authority-map.json` と `role-write-access.json`（2026-11-10 時点、見送り）。** まだレジストリに入っていない。`role-authority-map.json` は Org Role（`ceo`、`mission_controller` など 27 件）から Authority Role・persona・実行モードへの対応で、Authority Role のレジストリの項目ではない（D6 の「Org Role は既定の Grant に写る」の側）。`authority.ts` の `inferPersonaFromRole` が persona の推定に読むので、persona をなくす（2 の残り）までは生成物にも削除にもできない。`role-write-access.json` は実行時の判定には使われていない（tier-guard は読まない。読むのは `scripts/org.ts` のロールの草案と書き込みの案内）。中身はカードの `write_scopes` とも `authority_role_permissions` の `allow_write` とも一致しないので、カードからの生成にすると内容が変わる。`pnpm organization role create` / `promote` が承認の下で書いているので、外すには役割の作成の流れを変える必要があり、別の変更にする。
 
-このため、concept-registry の `lifecycle` は外していない（完了の合図は満たしていない）。
+このため、concept-registry の `lifecycle` は外していない（完了の合図は満たしていない）。`execution-persona` も、`Persona` 型と `KYBERION_PERSONA` が残っている間はレジストリと GLOSSARY に残す。
 
 ## 完了の合図
 

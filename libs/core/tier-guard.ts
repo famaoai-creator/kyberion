@@ -6,6 +6,7 @@ import {
   liveDeclaredStoreGrant,
   rolePermissionRecord,
 } from './foundation/declared-store-grant.js';
+import { baseAuthorityRolePermissionRecord } from './foundation/base-authority-role.js';
 import {
   storeGrantAuthorizes as registeredStoreGrantAuthorizes,
   storeGrantNarrowingDenial,
@@ -1177,7 +1178,7 @@ function personaTierWriteDecision(
     return { allowed: true };
   }
 
-  const personaRules = policy.persona_permissions?.[currentPersona];
+  const personaRules = baseAuthorityRolePermissionRecord(policy, currentPersona);
   if (
     personaRules?.allow_write?.some((p: string) =>
       policyPathMatches(relativePath, p, currentMission, tenantSlug)
@@ -1569,7 +1570,7 @@ function personaTierReadDecision(
   const roleRules = rolePermissionRecord(policy, currentRole);
   if (grants(roleRules?.allow_read) || grants(roleRules?.allow_write)) return { allowed: true };
 
-  const personaRules = policy.persona_permissions?.[currentPersona];
+  const personaRules = baseAuthorityRolePermissionRecord(policy, currentPersona);
   if (grants(personaRules?.allow_read) || grants(personaRules?.allow_write))
     return { allowed: true };
 
