@@ -26,7 +26,9 @@ import {
 } from './surface-management-mutations.js';
 import { auditChain } from '../governance/audit-chain.js';
 
-vi.mock('../governance/audit-chain.js', () => ({ auditChain: { record: vi.fn() } }));
+vi.mock('../governance/audit-chain.js', () => ({
+  auditChain: { record: vi.fn(), recordDurable: vi.fn() },
+}));
 vi.mock('../foundation/lock-utils.js', () => ({
   acquireLock: vi.fn(async () => true),
   releaseLock: vi.fn(),
