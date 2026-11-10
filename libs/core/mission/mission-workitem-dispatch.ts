@@ -436,10 +436,10 @@ async function dispatchMissionWorkItemsRound(
     // failure never blocks the dispatch itself. Revoked at
     // reflectTicketOutcome (done/blocked); lazy expiry covers the rest.
     const grantTaskId = getWorkItemTaskId(item);
-    const granteeNhiId = assigneePeerId
-      ? deriveAgentNhiId(assigneePeerId, item.context?.organization_id)
-      : null;
     const grantTenant = item.context?.tenant_slug || state.tenant_slug || state.tenant_id;
+    const granteeNhiId = assigneePeerId
+      ? deriveAgentNhiId(assigneePeerId, item.context?.organization_id, grantTenant)
+      : null;
     if (grantTaskId && granteeNhiId && grantTenant) {
       const taskGrant = issueTaskGrantBestEffort({
         granteeNhiId,

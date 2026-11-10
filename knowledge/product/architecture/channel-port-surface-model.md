@@ -13,6 +13,7 @@ role_affinity: [ecosystem_architect, solution_architect, sovereign_concierge]
 applies_to: [channels, surface_agents, slack, chronos]
 owner: ecosystem_architect
 status: active
+concepts: [channel, surface]
 ---
 
 # Channel, Port, and Surface Agent Model

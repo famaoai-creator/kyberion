@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import { randomUUID } from 'node:crypto';
 import type { ScopedArtifactScope } from '../workforce/artifact-store.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
@@ -14,7 +15,7 @@ export interface DelegationResultProjection {
     expectedResults?: number;
   };
   artifactScope?: ScopedArtifactScope;
-  tier?: 'personal' | 'confidential' | 'public';
+  tier?: StorageDataTier;
   /** Internal dispatch fence; not a source of ownership or authority. */
   canAcceptResult?: () => boolean;
 }

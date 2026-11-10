@@ -1,12 +1,13 @@
+import type { StorageDataTier } from '../storage-layout.js';
+import { executionAgentId } from '../governance/execution-agent-id.js';
 import { type OrganizationProfile } from './organization-profile.js';
 import type { SupportedLocale } from '../localization/locale.js';
 import { auditChain } from '../governance/audit-chain.js';
-import { getRegisteredEnvText } from '../foundation/env.js';
 import { nowIso } from '../foundation/time.js';
 import { safeRmSync } from '../secure-io.js';
 import type { KeyResultSpec } from './key-result-spec.js';
 
-export type OrganizationTier = 'personal' | 'confidential' | 'public';
+export type OrganizationTier = StorageDataTier;
 export type OrganizationWorkShape =
   | 'solution_project'
   | 'service_operation'
@@ -414,6 +415,8 @@ export interface QueueOrganizationLearningCandidateInput {
   targetKind: OrganizationLearningCandidate['target_kind'];
   tier: OrganizationTier;
   tenantSlug?: string;
+  /** Personal-tier learnings need their owner (D8: scope is written at capture, never inferred). */
+  ownerNhi?: string;
   metadata?: Record<string, unknown>;
   rootDir?: string;
 }
@@ -825,7 +828,7 @@ export function retireOrganizationEntity(input: {
   };
   handler.save(next, { rootDir: input.rootDir });
   auditChain.record({
-    agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'organization_controller',
+    agentId: executionAgentId('organization_controller'),
     action: `organization.${input.kind}.retire`,
     operation: `retire:${input.recordId}`,
     result: 'completed',
@@ -874,7 +877,7 @@ export function removeOrganizationEntity(input: {
     { force: true }
   );
   auditChain.record({
-    agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'organization_controller',
+    agentId: executionAgentId('organization_controller'),
     action: `organization.${input.kind}.remove`,
     operation: `remove:${input.recordId}`,
     result: 'completed',

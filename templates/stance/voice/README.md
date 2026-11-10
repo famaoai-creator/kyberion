@@ -1,6 +1,13 @@
-# Customer Voice Profile
+# Stance Voice Profile
 
-If the customer wants a custom voice persona (different name, language, tone, or local voice model), place the profile here.
+If you want Kyberion to speak with a different voice persona while acting under
+this stance (different name, language or local voice model), place the profile
+here. It overrides `knowledge/personal/voice/`.
+
+This is your own voice, not customer communication. How a tenant talks to its
+customers (language, conversation mode, contact channel) is tenant data: see the
+channel bindings in `knowledge/confidential/{tenant}/connections/channel-bindings.json`
+and the customer actors under `knowledge/confidential/{tenant}/customers/`.
 
 Schema follows `knowledge/personal/voice/profile-registry.json`.
 

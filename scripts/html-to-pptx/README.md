@@ -22,7 +22,7 @@ Kyberion のレポートHTMLを、**編集可能なネイティブPPTX**に変�
 ## CLI（薄いラッパ）
 
 ```bash
-KYBERION_PERSONA=sovereign node_modules/.bin/tsx scripts/html-to-pptx/convert.ts <input.html> [output.pptx]
+KYBERION_BASE_ROLE=sovereign node_modules/.bin/tsx scripts/html-to-pptx/convert.ts <input.html> [output.pptx]
 ```
 
 出力省略時は `<input>.pptx`。内部で `deck_from_html → pptx_render` の2段パイプラインを生成・実行するだけ（CLIとpipelineで実装は共通）。

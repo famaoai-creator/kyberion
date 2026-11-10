@@ -89,6 +89,7 @@ export function resolveStableNodePath(
  * bridge sends with its own credentials.
  */
 export const CHRONOS_FORWARDABLE_ENV = [
+  'KYBERION_BASE_ROLE',
   'KYBERION_PERSONA',
   'KYBERION_CHRONOS_SCHEDULES',
   'KYBERION_OPERATOR_SLACK_DM',

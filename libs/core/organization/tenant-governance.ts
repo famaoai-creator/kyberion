@@ -1,5 +1,6 @@
 import * as path from 'node:path';
-import { getRegisteredEnvText } from '../foundation/env.js';
+import { baseRoleEnvText } from '../foundation/base-role-env.js';
+import { executionAgentId } from '../governance/execution-agent-id.js';
 import { auditChain } from '../governance/audit-chain.js';
 import {
   approvalRequesterActorId,
@@ -150,7 +151,7 @@ export function mutateTenant(input: TenantMutationInput): TenantMutationResult {
     if (!safeExistsSync(knowledgeRootPath)) safeMkdir(knowledgeRootPath, { recursive: true });
     auditChain.record({
       agentId:
-        input.actor || currentActor()?.actor.id || resolveIdentityContext().persona || 'operator',
+        input.actor || currentActor()?.actor.id || resolveIdentityContext().baseRole || 'operator',
       action: `tenant.${input.verb}`,
       operation: `tenant:${profile.tenant_slug}`,
       result: 'completed',
@@ -285,7 +286,7 @@ export function renameTenant(input: TenantRenameInput): TenantRenameResult {
   }
   safeUnlinkSync(profilePath);
   auditChain.record({
-    agentId: input.actor || getRegisteredEnvText('KYBERION_PERSONA') || 'operator',
+    agentId: input.actor || executionAgentId('operator'),
     action: 'tenant.rename',
     operation: `tenant:${slug}`,
     result: 'completed',
@@ -365,7 +366,7 @@ export function deleteTenant(input: TenantDeleteInput): TenantDeleteResult {
   }
   safeUnlinkSync(profilePath);
   auditChain.record({
-    agentId: input.actor || getRegisteredEnvText('KYBERION_PERSONA') || 'operator',
+    agentId: input.actor || executionAgentId('operator'),
     action: 'tenant.delete',
     operation: `tenant:${slug}`,
     result: 'completed',
@@ -415,16 +416,13 @@ export function captureAttestationInvoker(): AttestationInvoker {
   let tenantSlug: string | undefined;
   try {
     const identity = resolveIdentityContext();
-    persona = String(identity.persona || '');
+    persona = String(identity.baseRole || '');
     role = identity.role;
     tenantSlug = identity.tenantSlug?.trim() || undefined;
   } catch {
     // An unresolvable identity still gets a named actor below.
   }
-  const base =
-    persona && persona !== 'unknown'
-      ? persona
-      : getRegisteredEnvText('KYBERION_PERSONA')?.trim() || 'operator';
+  const base = persona && persona !== 'unknown' ? persona : baseRoleEnvText()?.trim() || 'operator';
   return {
     actor: role ? `${base}:${role}` : base,
     ...(tenantSlug ? { tenantSlug } : {}),
@@ -739,11 +737,7 @@ export function requestTenantProviderAttestationApproval(
   }
   const resolved = input.invoker?.approvalRequester;
   const requestedBy =
-    input.actor ||
-    resolved?.requestedBy ||
-    input.invoker?.actor ||
-    getRegisteredEnvText('KYBERION_PERSONA') ||
-    'operator';
+    input.actor || resolved?.requestedBy || input.invoker?.actor || baseRoleEnvText() || 'operator';
   // The detected principal is always kept; an explicit actor only adds one.
   const requesterActor = resolved ? approvalRequesterActorId(resolved) : requestedBy;
   const requestedByDisplayName = resolved?.displayName;
@@ -953,8 +947,7 @@ export function attestTenantProvider(
   input: AttestTenantProviderInput
 ): TenantProviderAttestationResult {
   const { slug, provider } = validateAttestationInput(input);
-  const actor =
-    input.actor || input.invoker?.actor || getRegisteredEnvText('KYBERION_PERSONA') || 'operator';
+  const actor = input.actor || input.invoker?.actor || baseRoleEnvText() || 'operator';
   let approved:
     { approval: ApprovalRequestRecord; humanDecider: string; claimId: string } | undefined;
   let delegated:

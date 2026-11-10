@@ -17,6 +17,16 @@ describe('mission team composition entrypoint', () => {
     expect(source).not.toContain('console.log(');
   });
 
+  it('never copies the mission Org Role into the execution persona (concept model v2 D5)', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/compose_mission_team.ts'), {
+        encoding: 'utf8',
+      })
+    );
+
+    expect(source).not.toContain("setRegisteredEnv('KYBERION_BASE_ROLE'");
+  });
+
   it('handles help without requiring a mission or writing bindings', async () => {
     await expect(main(['--help'])).resolves.toEqual({
       status: 'help',

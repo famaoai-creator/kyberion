@@ -17,6 +17,7 @@ import {
 import { dotStatePath } from './dot/dot-state-paths.js';
 import { eventContinuationPath } from './dot/dot-event-continuation.js';
 import type { DotCharter } from './dot/dot-charter.js';
+import { asRoleOrGrant } from './testing/role-or-store-grant.js';
 
 vi.mock('./governance/audit-chain.js', () => ({ auditChain: { record: vi.fn() } }));
 vi.mock('./governance/policy-engine.js', () => ({
@@ -51,7 +52,7 @@ let escapeAlias: string;
 const escapeContent = 'synthetic private source must remain unchanged\n';
 const at = (target: string) => path.join(root, target);
 const assume = <T>(role: string, fn: () => T, tenant = tenantA): T =>
-  withExecutionContext(role, fn, undefined, tenant);
+  asRoleOrGrant(role, fn, undefined, tenant);
 
 beforeEach(() => {
   root = path.join(sourceRoot, 'active/shared/tmp/dot-purpose-' + randomUUID());
@@ -87,7 +88,7 @@ beforeEach(() => {
   ])
     vi.stubEnv(key, '');
   vi.stubEnv('MISSION_ROLE', 'worker');
-  vi.stubEnv('KYBERION_PERSONA', 'worker');
+  vi.stubEnv('KYBERION_BASE_ROLE', 'worker');
   vi.stubEnv('KYBERION_SUDO', 'false');
   vi.stubEnv('KYBERION_TENANT', tenantA);
   resetRoleAssumptionPolicyCache();

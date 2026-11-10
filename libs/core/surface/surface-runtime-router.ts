@@ -1,9 +1,7 @@
 import { classifyTaskSessionIntent } from '../task/task-session.js';
 import { detectTextLocale } from '../foundation/locale-normalize.js';
-import {
-  resolveIntentResolutionPacket,
-  type IntentResolutionPacket,
-} from '../intent/intent-resolution.js';
+import type { IntentResolutionPacket } from '../intent/intent-resolution.js';
+import { decideSurfaceCompilation, resolveRoutingPacket } from '../intent/intent-resolver-entry.js';
 import {
   deriveSurfaceDelegationReceiverForProvider,
   getSurfaceProviderManifestRecord,
@@ -145,6 +143,10 @@ export function surfaceRoutingText(input: SurfaceConversationInput): {
   };
 }
 
+/**
+ * Thin adapter (R3): report this turn's surface facts and let the resolver
+ * entry decide whether it must pass through the shared intent compiler.
+ */
 export function shouldCompileSurfaceIntent(
   input: SurfaceConversationInput,
   routingText: string,
@@ -153,53 +155,21 @@ export function shouldCompileSurfaceIntent(
 ): boolean {
   const originalText = (input.surfaceText || input.query || '').trim();
   const normalized = routingText.trim();
-  if (!normalized || !originalText) return false;
-  if (
-    input.agentId === 'slack-surface-agent' &&
-    !shouldForceSurfaceDelegationFromProviderPolicy('slack', normalized)
-  ) {
-    return false;
-  }
-  // Mission-team handoff already has a dedicated delegation path and must
-  // not be replaced by a clarification response from the shared compiler.
-  if (input.missionId && input.teamRole) return false;
-  // Presence already owns an explicit receiver route that must remain a
-  // direct A2A handoff. Other surfaces still pass forced receivers through
-  // the shared compiler so a caller cannot bypass governed classification.
-  if (input.agentId === 'presence-surface-agent' && ruleBasedReceiver) return false;
-  const packet =
-    resolvedPacket ||
-    resolveIntentResolutionPacket(originalText, {
-      tier: input.scope?.tier,
-      tenantId: input.scope?.tenant_slug,
-    });
-  const selectedShape = packet.selected_resolution?.shape;
-  const governedShape =
-    selectedShape === 'task_session' ||
-    selectedShape === 'mission' ||
-    selectedShape === 'project_bootstrap' ||
-    selectedShape === 'pipeline';
-  const approvalIntent = packet.candidates.some(
-    (candidate) =>
-      candidate.intent_id === packet.selected_intent_id &&
-      candidate.resolution?.result_shape === 'plan'
+  const scope = { tier: input.scope?.tier, tenantId: input.scope?.tenant_slug };
+  return decideSurfaceCompilation(
+    {
+      agent_id: input.agentId,
+      utterance_length: originalText.length,
+      routing_text_length: normalized.length,
+      multiline: originalText.includes('\n'),
+      provider_forces_delegation:
+        input.agentId === 'slack-surface-agent' && normalized
+          ? shouldForceSurfaceDelegationFromProviderPolicy('slack', normalized)
+          : false,
+      mission_team_handoff: Boolean(input.missionId && input.teamRole),
+      has_rule_based_receiver: Boolean(ruleBasedReceiver),
+    },
+    () => resolvedPacket || resolveRoutingPacket(originalText, scope),
+    (packet) => Boolean(classifyTaskSessionIntent(originalText, packet, scope))
   );
-  const confidentGovernedIntent = (packet.selected_confidence || 0) >= 0.8 && governedShape;
-
-  // Lightweight direct replies can keep their deterministic route. Governed
-  // shapes, unresolved requests, and approval-ready plans must pass through
-  // the shared compiler before any surface-specific delegation is selected.
-  if (!packet.selected_intent_id) return input.agentId !== 'slack-surface-agent';
-  if (
-    confidentGovernedIntent ||
-    ((packet.selected_confidence || 0) >= 0.8 && approvalIntent) ||
-    classifyTaskSessionIntent(originalText, packet, {
-      tier: input.scope?.tier,
-      tenantId: input.scope?.tenant_slug,
-    })
-  ) {
-    return true;
-  }
-  if (ruleBasedReceiver) return false;
-  return originalText.length > 80 || originalText.includes('\n');
 }

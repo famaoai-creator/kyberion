@@ -1324,10 +1324,6 @@
       "types": "./dist/knowledge/distill-candidate-registry.d.ts",
       "default": "./dist/knowledge/distill-candidate-registry.js"
     },
-    "./distill-knowledge-injector": {
-      "types": "./dist/knowledge/distill-knowledge-injector.d.ts",
-      "default": "./dist/knowledge/distill-knowledge-injector.js"
-    },
     "./document-reader": {
       "types": "./dist/media/document-reader.d.ts",
       "default": "./dist/media/document-reader.js"
@@ -1900,6 +1896,10 @@
       "types": "./dist/governance/delegated-execution.d.ts",
       "default": "./dist/governance/delegated-execution.js"
     },
+    "./governance/execution-agent-id": {
+      "types": "./dist/governance/execution-agent-id.d.ts",
+      "default": "./dist/governance/execution-agent-id.js"
+    },
     "./governance/external-operation": {
       "types": "./dist/governance/external-operation.d.ts",
       "default": "./dist/governance/external-operation.js"
@@ -2464,9 +2464,13 @@
       "types": "./dist/knowledge/distill-candidate-registry.d.ts",
       "default": "./dist/knowledge/distill-candidate-registry.js"
     },
-    "./knowledge/distill-knowledge-injector": {
-      "types": "./dist/knowledge/distill-knowledge-injector.d.ts",
-      "default": "./dist/knowledge/distill-knowledge-injector.js"
+    "./knowledge/facade-proposal-rows": {
+      "types": "./dist/knowledge/facade-proposal-rows.d.ts",
+      "default": "./dist/knowledge/facade-proposal-rows.js"
+    },
+    "./knowledge/reuse-proposals": {
+      "types": "./dist/knowledge/reuse-proposals.d.ts",
+      "default": "./dist/knowledge/reuse-proposals.js"
     },
     "./knowledge/feedback-loop": {
       "types": "./dist/knowledge/feedback-loop.d.ts",
@@ -4084,6 +4088,10 @@
       "types": "./dist/organization/organization-cadence.d.ts",
       "default": "./dist/organization/organization-cadence.js"
     },
+    "./organization/organization-cost-metrics": {
+      "types": "./dist/organization/organization-cost-metrics.d.ts",
+      "default": "./dist/organization/organization-cost-metrics.js"
+    },
     "./organization/organization-digest": {
       "types": "./dist/organization/organization-digest.d.ts",
       "default": "./dist/organization/organization-digest.js"
@@ -4091,6 +4099,10 @@
     "./organization/organization-digest-artifacts": {
       "types": "./dist/organization/organization-digest-artifacts.d.ts",
       "default": "./dist/organization/organization-digest-artifacts.js"
+    },
+    "./organization/organization-improvement-scan": {
+      "types": "./dist/organization/organization-improvement-scan.d.ts",
+      "default": "./dist/organization/organization-improvement-scan.js"
     },
     "./organization/organization-interventions": {
       "types": "./dist/organization/organization-interventions.d.ts",
@@ -4107,6 +4119,10 @@
     "./organization/organization-operating-model": {
       "types": "./dist/organization/organization-operating-model.d.ts",
       "default": "./dist/organization/organization-operating-model.js"
+    },
+    "./organization/organization-learning-queue": {
+      "types": "./dist/organization/organization-learning-queue.d.ts",
+      "default": "./dist/organization/organization-learning-queue.js"
     },
     "./organization/organization-operating-model-management": {
       "types": "./dist/organization/organization-operating-model-management.d.ts",
@@ -7575,6 +7591,10 @@
     "./workforce/background-review-curator": {
       "types": "./dist/workforce/background-review-curator.d.ts",
       "default": "./dist/workforce/background-review-curator.js"
+    },
+    "./workforce/background-review-proposals": {
+      "types": "./dist/workforce/background-review-proposals.d.ts",
+      "default": "./dist/workforce/background-review-proposals.js"
     },
     "./workforce/background-review-nudge": {
       "types": "./dist/workforce/background-review-nudge.d.ts",

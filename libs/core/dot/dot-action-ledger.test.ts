@@ -15,6 +15,8 @@ import {
   type DotActionRecord,
 } from './dot-action-ledger.js';
 import { readJsonLines } from '../foundation/json.js';
+import { writtenDotActionRow } from './dot-action-ledger-version.js';
+import { recoveryEvidenceHash } from '../surface/front-desk-recovery-receipt.js';
 
 const ledgerWarn = vi.hoisted(() => vi.fn());
 // Size seam for the strict reader: report the ledger as larger than it is.
@@ -86,7 +88,7 @@ function judgedRecord(): DotActionRecord {
     proposal: normalizeDotProposal({
       title: 'Private judged repair',
       objective: 'Preserve the original goal',
-      work_shape: 'pipeline',
+      execution_shape: 'pipeline',
       pipeline_ref: data.charter.authority.allowed_pipelines![0],
     }),
   });
@@ -100,7 +102,7 @@ function judgedRecord(): DotActionRecord {
     action_id: proposal.action_id,
     title: proposal.title,
     objective: proposal.objective,
-    work_shape: proposal.work_shape,
+    execution_shape: proposal.execution_shape,
     pipeline_ref: proposal.pipeline_ref,
     status: 'admitted',
     proposal_hash: dotProposalHash(data.charter.dot_id, proposal),
@@ -121,7 +123,7 @@ describe('private Dot action evidence', () => {
       action_id: 'repair',
       title: 'personal-secret',
       objective: 'private objective',
-      work_shape: 'pipeline',
+      execution_shape: 'pipeline',
       status: 'admitted',
       proposal_hash: 'hash',
       at: '2026-10-26T00:00:00Z',
@@ -141,15 +143,16 @@ describe('private Dot action evidence', () => {
   });
   it('does not treat legacy unscoped prose as public and requires reviewed operator adoption', () => {
     const scope = { tier: 'confidential' as const, tenant_slug: 'acme' };
-    const raw: DotActionRecord = {
+    // A version-1 row as written before the execution_shape rename.
+    const raw = {
       action_ref: 'old',
       dot_id: 'old-dot',
       actor_id: 'dot:old-dot',
       action_id: 'repair',
       title: 'legacy-secret',
       objective: 'legacy-objective',
-      work_shape: 'pipeline',
-      status: 'parked',
+      work_shape: 'pipeline' as const,
+      status: 'parked' as const,
       proposal_hash: 'hash',
       at: '2026-10-26T00:00:00Z',
     };
@@ -166,7 +169,11 @@ describe('private Dot action evidence', () => {
       'sovereign'
     );
     expect(moved).toBe(1);
-    expect(currentDotActions(raw.dot_id, { rootDir })).toEqual([{ ...raw, scope }]);
+    const { work_shape: shape, ...fields } = raw;
+    const adopted = currentDotActions(raw.dot_id, { rootDir });
+    expect(adopted).toEqual([{ ...fields, execution_shape: shape, schema_version: 1, scope }]);
+    // Adoption keeps the version-1 row exactly as written (hash over the stored form).
+    expect(dotActionRecordHash(adopted[0])).toBe(recoveryEvidenceHash({ ...raw, scope }));
     expect(String(safeReadFile(`${rootDir}/${DOT_ACTION_LEDGER_PATH}`))).not.toContain(
       'legacy-secret'
     );
@@ -182,7 +189,7 @@ describe('private Dot action evidence', () => {
       objective: 'synthetic-private-objective',
       rationale: 'synthetic-private-rationale',
       target: 'synthetic-private-target',
-      work_shape: 'pipeline',
+      execution_shape: 'pipeline',
       status: 'admitted',
       proposal_hash: 'hash',
       at: '2026-10-26T00:00:00Z',
@@ -266,7 +273,7 @@ describe('private Dot action evidence', () => {
         'action_id',
         'title',
         'objective',
-        'work_shape',
+        'execution_shape',
         'rationale',
         'priority',
         'pipeline_ref',
@@ -299,9 +306,9 @@ describe('private Dot action evidence', () => {
     const malformed = structuredClone(record);
     delete malformed.admission!.proposal.semantic_judgment;
     const file = `${rootDir}/${dotStatePath({ scope: record.scope! }, 'action-ledger.jsonl')}`;
-    writeJsonLines(file, [malformed]);
+    writeJsonLines(file, [writtenDotActionRow(malformed)]);
     writeJsonLines(`${rootDir}/${DOT_ACTION_LEDGER_PATH}`, [
-      { ...index, private_content_hash: dotActionRecordHash(malformed) },
+      writtenDotActionRow({ ...index, private_content_hash: dotActionRecordHash(malformed) }),
     ]);
     expect(() => currentDotActions(record.dot_id, { rootDir })).toThrow('Judgment action');
     expect(() => readDotActionLedgerStrict({ rootDir, dotId: record.dot_id })).toThrow(
@@ -326,7 +333,7 @@ describe('private Dot action evidence', () => {
     expect(() => appendActionRecord(index, { rootDir })).toThrow('shared index');
   });
 
-  it.each(['pipeline_ref', 'title', 'objective', 'work_shape'] as const)(
+  it.each(['pipeline_ref', 'title', 'objective', 'execution_shape'] as const)(
     'rejects hydrated executable %s changes despite an updated shared content hash',
     (field) => {
       const record = judgedRecord();
@@ -335,10 +342,10 @@ describe('private Dot action evidence', () => {
       const malformed = { ...structuredClone(record), [field]: 'changed' } as DotActionRecord;
       writeJsonLines(
         `${rootDir}/${dotStatePath({ scope: record.scope! }, 'action-ledger.jsonl')}`,
-        [malformed]
+        [writtenDotActionRow(malformed)]
       );
       writeJsonLines(`${rootDir}/${DOT_ACTION_LEDGER_PATH}`, [
-        { ...index, private_content_hash: dotActionRecordHash(malformed) },
+        writtenDotActionRow({ ...index, private_content_hash: dotActionRecordHash(malformed) }),
       ]);
       expect(() => currentDotActions(record.dot_id, { rootDir })).toThrow(
         'Judgment action executable field'
@@ -356,7 +363,7 @@ describe('private Dot action evidence', () => {
       action_id: 'dot_delegate_work',
       title: 'Legacy',
       objective: 'Legacy',
-      work_shape: 'direct_reply',
+      execution_shape: 'direct_reply',
       status: 'admitted',
       proposal_hash: 'legacy-hash',
       semantic_judgment: undefined,
@@ -407,7 +414,7 @@ describe('observeDotActions (R07 status observation)', () => {
     action_id: 'repair',
     title: 'scoped-secret-title',
     objective: 'scoped-secret-objective',
-    work_shape: 'pipeline',
+    execution_shape: 'pipeline',
     status: 'admitted',
     proposal_hash: 'hash',
     at: '2026-10-26T00:00:00Z',
@@ -430,7 +437,8 @@ describe('observeDotActions (R07 status observation)', () => {
       scope: { tier: 'confidential', tenant_slug: 'acme-missing' },
       actor_id: 'dot:obs-dot',
       action_id: 'repair',
-      work_shape: 'pipeline',
+      execution_shape: 'pipeline',
+      schema_version: 2,
       status: 'admitted',
       proposal_hash: 'hash',
       at: '2026-10-26T00:01:00Z',
@@ -479,7 +487,7 @@ describe('observeDotActions (R07 status observation)', () => {
     safeMkdir(`${rootDir}/active/shared/runtime`, { recursive: true });
     appendJsonLine(
       `${rootDir}/${DOT_ACTION_LEDGER_PATH}`,
-      scopedRecord({ scope: { tier: 'public' } })
+      writtenDotActionRow(scopedRecord({ scope: { tier: 'public' } }))
     );
     const parsed = observeDotActions('obs-dot', { rootDir });
     expect(parsed.integrity).toBe('complete');
@@ -522,7 +530,7 @@ describe('observeDotActions (R07 status observation)', () => {
         action_id: 'repair',
         title: `title ${actionRef} ${status}`,
         objective: 'keep the store bounded',
-        work_shape: 'pipeline',
+        execution_shape: 'pipeline',
         status,
         proposal_hash: `hash-${actionRef}`,
         at: '2026-11-01T00:00:00.000Z',
@@ -590,7 +598,7 @@ describe('observeDotActions (R07 status observation)', () => {
     });
 
     it('warns on growth once per doubling and never fails the append', () => {
-      const deps = { rootDir, growthWarnBytes: 600 };
+      const deps = { rootDir, growthWarnBytes: 700 };
       appendActionRecord(row('g1', 'admitted', publicScope), deps);
       expect(ledgerWarn).not.toHaveBeenCalled();
       for (let i = 0; i < 3; i++)

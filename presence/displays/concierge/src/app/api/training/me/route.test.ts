@@ -89,7 +89,7 @@ beforeAll(async () => {
   bootstrap.safeWriteFile(path.join(root, 'package.json'), '{}');
   vi.stubEnv('KYBERION_ROOT', root);
   vi.stubEnv('SYSTEM_ROLE', 'concierge');
-  vi.stubEnv('KYBERION_PERSONA', 'worker');
+  vi.stubEnv('KYBERION_BASE_ROLE', 'worker');
   vi.resetModules();
   io = await import('@agent/core');
   authority = await import('@agent/core/authority');

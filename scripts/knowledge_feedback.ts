@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { recordHumanKnowledgeFeedback } from '@agent/core/knowledge/knowledge-feedback-loop';
+import { baseRoleEnvText } from '@agent/core/foundation';
 import { currentScope } from '@agent/core/scope-context';
-import { getRegisteredEnvText } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 function flag(args: string[], name: string): string | undefined {
@@ -29,7 +29,7 @@ export const runKnowledgeFeedback = defineScript({
       document_path: documentPath,
       verdict,
       reason: flag(context.argv, '--reason'),
-      actor: getRegisteredEnvText('KYBERION_PERSONA') || 'operator',
+      actor: baseRoleEnvText() || 'operator',
       source: 'cli',
       scope: currentScope(),
     });

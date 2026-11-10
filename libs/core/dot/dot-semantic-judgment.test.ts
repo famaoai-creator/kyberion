@@ -103,7 +103,7 @@ function fixture() {
     action_id: 'dot_delegate_work',
     title: 'Synthetic latency',
     objective: 'Prepare the bounded fixture repair',
-    work_shape: 'pipeline',
+    execution_shape: 'pipeline',
     pipeline_ref: latency.SYNTHETIC_LATENCY_PIPELINE_REF,
   };
   const input: DotSemanticJudgmentInput = {

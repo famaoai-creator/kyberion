@@ -2,7 +2,7 @@
 title: 'Operations Hygiene Runbook: keeping fixed operational gaps fixed'
 tags:
   [governance, operations, ci, retention, daemons, tests, recurrence-prevention, secure-io, symlink]
-last_updated: 2026-11-09
+last_updated: 2026-11-10
 ---
 
 # Operations Hygiene Runbook
@@ -1050,7 +1050,7 @@ the catalog`, 2026-10). Every `createSeam({ catalog: coreSeamCatalog })` declare
    the suspect suite.
 5. **Reported only on CI, even from a fresh tree:** CI runs with a different identity. Reproduce
    with the CI environment, not your shell's:
-   `KYBERION_PERSONA=worker MISSION_ROLE=mission_controller KYBERION_TEST_LEAK_STRICT=1 pnpm test -- --suite core`.
+   `KYBERION_BASE_ROLE=worker MISSION_ROLE=mission_controller KYBERION_TEST_LEAK_STRICT=1 pnpm test -- --suite core`.
    Persona-dependent code paths (stores that only persist for some roles, default-tenant bootstrap)
    diverge between the two. Platform-only code paths (for example the macOS Apple FM bridge compiling
    into `active/shared/runtime/apple-intelligence/`) leak only on that OS's runner; read the
@@ -1335,7 +1335,7 @@ Legacy unscoped candidates retain their existing storage compatibility; this doe
 3. Verify onboarding-flow commands with the real CLI in a throwaway worktree.
    - Create the throwaway company with `pnpm onboarding company … --slug probe-co --tenant-slug probe-co`.
    - Then run `tenant:activation plan|probe` and `work create-item` with `KYBERION_STANCE`,
-     `KYBERION_TENANT_SCOPE_REQUIRED=true` and `KYBERION_PERSONA=sovereign`.
+     `KYBERION_TENANT_SCOPE_REQUIRED=true` and `KYBERION_BASE_ROLE=sovereign`.
    - Remove the throwaway state afterwards: `customer/`, `knowledge/personal/tenants/`,
      `knowledge/confidential/`, `active/organizations/`.
 
@@ -1472,11 +1472,11 @@ isolation and parent-capability denial with an ordinary organization operator.
     deciders) are listed in [approval-gate-design](./approval-gate-design.md).
 - **Prompts and secrets go on stdin, never argv.** argv is visible in the process table and is capped
   at about 128 KB per argument. Shell-invoked LLM profiles use `prompt_via: "stdin"` (the `claude`
-  profile in `wisdom-policy.json` does), and the system prompt travels on stdin with the prompt.
+  profile in `distill-policy.json` does), and the system prompt travels on stdin with the prompt.
   The same applies to passwords and tokens for any CLI.
 - **Provider CLIs run tool-less from a scratch cwd.** A model that passed the gate for one payload
   must not be able to read other files. Run provider CLIs for one-shot answers with tools disabled
-  and a single turn (for `claude`, the flags of the `claude` profile in `wisdom-policy.json`:
+  and a single turn (for `claude`, the flags of the `claude` profile in `distill-policy.json`:
   `--max-turns 1`, `--tools ""`, `--strict-mcp-config`, `--setting-sources=`,
   `--disable-slash-commands`, `--no-session-persistence`), and start them in an
   empty directory on the scratch floor (`active/shared/tmp/system/<domain>/`), not the repository
@@ -1563,7 +1563,7 @@ call fails.
   turn includes process start, sandbox setup and the user's default model and effort. The only
   in-repo latency figure (4.3s, `realtime-media-session-architecture.md`) is for a one-sentence
   reply on a fast model at `low` effort, which the wisdom profiles do not request.
-- `wisdom-policy.json` profiles stay between the 120s built-in fallback and 300s. The codex `light`
+- `distill-policy.json` profiles stay between the 120s built-in fallback and 300s. The codex `light`
   profile (summarize, classify) was 30s and is now 120s, the same as `standard` (gemini) and
   `BUILTIN_FALLBACK`. `heavy` (codex) and `claude` stay at 180s for distillation.
   `mission-llm.test.ts` enforces this range for provider-CLI adapters (`codex-cli`, `gemini-cli`,
@@ -1731,7 +1731,7 @@ These cover archive entry-point parity, restore, and track state/projection chan
 **Defect class.** The tier guard (`validateWritePermission` / `validateReadPermission`) judges a
 path as written, but the OS follows symbolic links in every component, and a hard link is a second
 name for an inode that lives elsewhere. Before this fix a data-only persona
-(`KYBERION_PERSONA=worker MISSION_ROLE=finance_controller`) could call
+(`KYBERION_BASE_ROLE=worker MISSION_ROLE=finance_controller`) could call
 `safeSymlinkSync('scripts', 'active/shared/tmp/link')` (the target needed only _read_ permission)
 and then `safeWriteFile('active/shared/tmp/link/x.ts', …)` — landing code in `scripts/`. The same
 link turned every write helper (append, copy, move, mkdir, rm) into a write anywhere readable; a

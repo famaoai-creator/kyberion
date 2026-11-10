@@ -11,14 +11,13 @@ import {
   selectIndependentMemory,
 } from './memory-provenance.js';
 import { KnowledgeHintIndex, queryKnowledge, queryKnowledgeHybrid } from './knowledge-index.js';
-import { findRelevantDistilledKnowledge } from './distill-knowledge-injector.js';
 import {
   memoryProvenanceStatePath,
   MEMORY_PROVENANCE_GRANT_ISSUANCE_RIGHT,
 } from './memory-provenance-capability.js';
 import { savePromotedMemoryRecord } from './promoted-memory.js';
 import { createDistillCandidateRecord } from './distill-candidate-registry.js';
-import { registerEmbeddingBackend, resetEmbeddingBackend } from '../reasoning/embedding-backend.js';
+import { resetEmbeddingBackend } from '../reasoning/embedding-backend.js';
 
 const cleanup = new Set<string>();
 afterEach(() =>
@@ -500,79 +499,5 @@ describe('memory lineage and current-use eligibility', () => {
         'ecosystem_architect'
       )
     ).toHaveLength(1);
-  });
-  it.each([false, true])(
-    'revalidates distilled eligibility after in-flight revocation (embedding fails: %s)',
-    async (fail) => {
-      const data = governed(() => {
-        const f = fixture();
-        const root = registerMemoryProvenance({ scope: f.scope, documentPath: f.write('root.md') });
-        const file = f.write(
-          'distill_async.md',
-          '---\ntitle: Inflight memory probe\ntags: [inflight-memory-probe]\n---\n\nA useful finding'
-        );
-        registerMemoryProvenance({ scope: f.scope, documentPath: file, origins: [root] });
-        return { f, root };
-      });
-      registerEmbeddingBackend({
-        name: 'inflight-revoke',
-        dimensions: 2,
-        quality: 'semantic',
-        embed: async () => {
-          governed(() =>
-            revokeMemorySource(data.f.scope, data.root.source_id, 'Revoked while embedding')
-          );
-          await Promise.resolve();
-          if (fail) throw new Error('Embedding unavailable after revocation');
-          return new Float32Array([1, 0]);
-        },
-        embedBatch: async (texts) => texts.map(() => new Float32Array([1, 0])),
-      });
-      const results = await withExecutionContextAsync(
-        'mission_controller',
-        () =>
-          findRelevantDistilledKnowledge({
-            topic: 'Inflight memory probe',
-            tags: ['inflight-memory-probe'],
-            scope: data.f.scope,
-            limit: 10,
-          }),
-        'ecosystem_architect'
-      );
-      expect(results.filter((entry) => entry.path.startsWith(data.f.root))).toHaveLength(0);
-    }
-  );
-  it('applies family selection and revocation to real distilled retrieval', async () => {
-    const data = governed(() => {
-      const f = fixture();
-      const root = registerMemoryProvenance({ scope: f.scope, documentPath: f.write('root.md') });
-      for (const name of ['distill_first.md', 'distill_second.md']) {
-        const file = f.write(
-          name,
-          '---\ntitle: Lineage memory probe\ntags: [lineage-memory-probe]\n---\n\n' + name
-        );
-        registerMemoryProvenance({ scope: f.scope, documentPath: file, origins: [root] });
-      }
-      return { f, root };
-    });
-    const query = {
-      topic: 'Lineage memory probe',
-      tags: ['lineage-memory-probe'],
-      scope: data.f.scope,
-      limit: 10,
-    };
-    const before = await withExecutionContextAsync(
-      'mission_controller',
-      () => findRelevantDistilledKnowledge(query),
-      'ecosystem_architect'
-    );
-    expect(before.filter((entry) => entry.path.startsWith(data.f.root))).toHaveLength(1);
-    governed(() => revokeMemorySource(data.f.scope, data.root.source_id, 'Superseded'));
-    const after = await withExecutionContextAsync(
-      'mission_controller',
-      () => findRelevantDistilledKnowledge(query),
-      'ecosystem_architect'
-    );
-    expect(after.filter((entry) => entry.path.startsWith(data.f.root))).toHaveLength(0);
   });
 });

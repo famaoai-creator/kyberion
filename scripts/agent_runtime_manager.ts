@@ -4,8 +4,8 @@ import { agentRegistry } from '@agent/core/agent/agent-registry';
 import { getAgentManifest, loadAgentManifests } from '@agent/core/agent/agent-manifest';
 import { logger } from '@agent/core/core';
 import { auditChain } from '@agent/core/governance/audit-chain';
+import { executionAgentId } from '@agent/core/governance/execution-agent-id';
 import { classifyError } from '@agent/core/error-classifier';
-import { getRegisteredEnvText } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 type AgentAction = 'ps' | 'spawn' | 'shutdown' | 'list-manifests' | 'inspect';
@@ -145,7 +145,7 @@ export async function spawnAgent(
   } catch (err: any) {
     const classification = classifyError(err);
     auditChain.record({
-      agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'operator',
+      agentId: executionAgentId('operator'),
       action: 'agent.manual_spawn',
       operation: manifestId,
       result: 'failed',
@@ -158,7 +158,7 @@ export async function spawnAgent(
   }
 
   auditChain.record({
-    agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'operator',
+    agentId: executionAgentId('operator'),
     action: 'agent.manual_spawn',
     operation: handle.agentId,
     result: 'completed',
@@ -176,7 +176,7 @@ export async function shutdownAgent(agentId: string) {
   await agentLifecycle.shutdown(agentId);
 
   auditChain.record({
-    agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'operator',
+    agentId: executionAgentId('operator'),
     action: 'agent.manual_shutdown',
     operation: agentId,
     result: 'completed',

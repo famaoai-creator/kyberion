@@ -15,7 +15,7 @@ const confidential = (tenant: string) =>
 const moved = path.join(ROOT, 'active/shared/tmp/moved');
 const keys = [
   'KYBERION_ROOT',
-  'KYBERION_PERSONA',
+  'KYBERION_BASE_ROLE',
   'MISSION_ROLE',
   'SYSTEM_ROLE',
   'MISSION_ID',

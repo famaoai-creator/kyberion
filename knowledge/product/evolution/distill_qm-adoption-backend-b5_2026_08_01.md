@@ -6,6 +6,7 @@ importance: 6
 source_mission: QM-ADOPTION-BACKEND-B5
 author: Kyberion Wisdom Distiller
 last_updated: 2026-08-01
+doc_status: historical
 ---
 
 # Audience-floor egress enforcement hardened through adversarial review

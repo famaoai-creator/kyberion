@@ -141,9 +141,9 @@ describe('screenshot annotate pad page, capture and export (live handler)', () =
   const saved: Record<string, string | undefined> = {};
 
   beforeAll(async () => {
-    saved.persona = process.env.KYBERION_PERSONA;
+    saved.persona = process.env.KYBERION_BASE_ROLE;
     saved.screenshot = process.env.KYBERION_SCREENSHOT_PATH;
-    process.env.KYBERION_PERSONA = 'sovereign';
+    process.env.KYBERION_BASE_ROLE = 'sovereign';
     safeWriteFile(pathResolver.rootResolve(capture), Buffer.from(PNG_1X1, 'base64'), {
       mkdir: true,
     });
@@ -169,7 +169,7 @@ describe('screenshot annotate pad page, capture and export (live handler)', () =
       force: true,
     });
     for (const [key, env] of [
-      ['persona', 'KYBERION_PERSONA'],
+      ['persona', 'KYBERION_BASE_ROLE'],
       ['screenshot', 'KYBERION_SCREENSHOT_PATH'],
     ] as const) {
       if (saved[key] === undefined) delete process.env[env];

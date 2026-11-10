@@ -291,7 +291,7 @@ function locateFixtureCandidates(
 }
 
 /** How an operator shell gains the only persona allowed to write the trash. */
-export const APPROVAL_TRASH_PERSONA_ENV = 'KYBERION_PERSONA=sovereign';
+export const APPROVAL_TRASH_PERSONA_ENV = 'KYBERION_BASE_ROLE=sovereign';
 
 /**
  * Whether the current identity may move `logicalPath` into the soft-delete

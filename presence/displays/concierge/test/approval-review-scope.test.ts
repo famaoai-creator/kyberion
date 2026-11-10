@@ -3,7 +3,10 @@ import type { ApprovalRequestRecord } from '@agent/core/governance/approval-stor
 import type { ConciergeViewerContext } from '../src/lib/viewer-context';
 const deps = vi.hoisted(() => ({ charter: vi.fn(), ledger: vi.fn() }));
 vi.mock('@agent/core/dot/dot-charter', () => ({ findDotCharter: deps.charter }));
-vi.mock('@agent/core/dot/dot-action-ledger', () => ({ readDotActionLedgerStrict: deps.ledger }));
+vi.mock('@agent/core/dot/dot-action-ledger', () => ({
+  readDotActionLedgerStrict: deps.ledger,
+  writtenDotProposal: (proposal: unknown) => proposal,
+}));
 vi.mock('../src/lib/personal-approval-server', () => ({
   withConciergeApproval: (_viewer: unknown, _record: unknown, run: () => unknown) => run(),
 }));

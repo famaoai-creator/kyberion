@@ -215,7 +215,7 @@ describe('purgeFixtureApprovals', () => {
     expect(result.candidates).toHaveLength(2);
     expect(result.applied).toEqual([]);
     expect(result.errors).toHaveLength(1);
-    expect(result.errors[0]).toContain('KYBERION_PERSONA=sovereign');
+    expect(result.errors[0]).toContain('KYBERION_BASE_ROLE=sovereign');
     expect(trashAccess.check).toHaveBeenCalledTimes(1);
     expect(janitor.softDeleteToTrash).not.toHaveBeenCalled();
   });

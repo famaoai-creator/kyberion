@@ -35,7 +35,7 @@ This is a procedure (not architecture). Architecture lives under
 2. Read in this order, ≤ 5 minutes each:
    - [`AGENTS.md`](../../../../AGENTS.md) — operator rules, especially the canonical work-scope policy
    - [`docs/USER_EXPERIENCE_CONTRACT.md`](../../../../docs/USER_EXPERIENCE_CONTRACT.md)
-   - [`knowledge/product/architecture/kyberion-canonical-concept-index.md`](../../../product/architecture/kyberion-canonical-concept-index.md)
+   - [`knowledge/product/architecture/organization-work-loop.md`](../../../product/architecture/organization-work-loop.md) — the parent model; term definitions in [`concept-registry.json`](../../../product/governance/concept-registry.json)
    - [`docs/INTENT_LOOP_CONCEPT.md`](../../../../docs/INTENT_LOOP_CONCEPT.md)
 3. Run baseline:
    ```bash
@@ -117,7 +117,7 @@ This is a procedure (not architecture). Architecture lives under
 Read each doc once, then come back to whichever maps closest to the
 work you actually do.
 
-1. [`kyberion-concept-evaluation-2026-04-26.md`](../../../product/architecture/kyberion-concept-evaluation-2026-04-26.md) — Codex audit of the system
+1. [`kyberion-concept-evaluation-2026-04-26.md`](../../../product/architecture/kyberion-concept-evaluation-2026-04-26.md) — Codex audit of the system (historical, 2026-04-26)
 2. [`kyberion-intent-catalog.md`](../../../product/architecture/kyberion-intent-catalog.md) — what users can ask for
 3. [`kyberion-scenario-coverage-matrix.md`](../../../product/architecture/kyberion-scenario-coverage-matrix.md) — what scenarios are covered
 4. [`multi-tenant-operations.md`](../../../product/architecture/multi-tenant-operations.md) — multi-tenant operations

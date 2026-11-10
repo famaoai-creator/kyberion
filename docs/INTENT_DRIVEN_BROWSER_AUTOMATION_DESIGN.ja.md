@@ -236,7 +236,7 @@ export interface ProcedureDelta {
   - `resolveRefsToSelectors(draft): {resolved, unresolved[]}` — role/name/snapshot文脈から堅牢な locator を決定。解決不能は人へ戻す（自動昇格しない原則は維持）。
   - `rehearseDraft(draft): RehearsalResult` — `execution_substrate` に応じた dry-run（extension は dry実行 or Playwright headless で再現）。`Math.random()/Date.now()` は使わない（決定性）。
   - `extractGoldenScenario(rehearsalResult): GoldenScenario` — 終端の成功 DOM（トースト等）を §6.4 形式で同梱。
-  - 秘密参照は `{{secrets.*}}` へ。Service preset 認証（`auth:secret-guard` + `AUTHORIZED_SCOPE` + `KYBERION_PERSONA`）の3点に接続。
+  - 秘密参照は `{{secrets.*}}` へ。Service preset 認証（`auth:secret-guard` + `AUTHORIZED_SCOPE` + `KYBERION_BASE_ROLE`）の3点に接続。
   - **【追加要件 / agyレビュー A】SPA・iframe 動的ロード対応**: 勤怠/社内系は SPA（同一URLでDOM書き換え）と iframe を多用するため、(a) 各 step の ref に「対象がDOMに出現しかつ操作可能(interactable)になるまでの自動待機（タイムアウト付き）」を必須化、(b) ref メタに iframe コンテキスト（frame chain / origin）を保持し、再生時に自動でフレーム切替する。固定 `wait` 秒（既存プロトタイプの1秒）は使わず条件待機にする。
 - **対象ファイル**: `libs/core/browser/browser-extension-bridge.ts`, 新規 `libs/core/browser/browser-recording-compiler.ts`（肥大化する場合は分離）, `knowledge/product/pipeline-templates/automate-browser-workflow.json`, `tools/adf-replay-extension/content.js`（再生時の interactable 待機・iframe 切替）
 - **受入条件**: 全 step の ref が selector 解決 or 明示的に「要人手」に分類される。dry-run 成功時のみ Golden が付く。draft は依然 `_draft:true` で、人間レビュー通過まで `pipelines/` へ昇格しない。**SPA再描画・iframe内要素・遅延出現要素を含む手順が、固定待機なしで安定再生される（回帰テストあり）。**

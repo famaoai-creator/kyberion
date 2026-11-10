@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import { t } from '../localization/t.js';
 import { randomUUID } from 'node:crypto';
 import { resolveCollaborationKind } from '../event/event-vocabulary.js';
@@ -82,7 +83,7 @@ export interface AgentCollaborationEvent {
   channel?: string;
   related_ids: string[];
   evidence_refs: string[];
-  tier?: 'personal' | 'confidential' | 'public';
+  tier?: StorageDataTier;
   tenant_slug?: string;
   organization_id?: string;
   project_id?: string;

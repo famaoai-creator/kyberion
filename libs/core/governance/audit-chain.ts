@@ -566,6 +566,22 @@ class AuditChainImpl {
   }
 
   /**
+   * `record()` whose master-chain write must land: a failed persistence throws
+   * (`[AUDIT_CHAIN_PERSIST_FAILED]`) instead of only being logged. For a caller
+   * that refuses its action when the record is lost (a store grant disclosure,
+   * S4 / scope model P4). The tenant mirror stays best effort, as for `record()`.
+   * The entry is checked against the caller's identity and scope here; only the
+   * append runs inside `persistence` (the disclosure writer's ceiling exit).
+   */
+  recordDurable(
+    entry: AuditRecordInput,
+    persistence: <T>(append: () => T) => T = (append) => append()
+  ): AuditEntry {
+    const prepared = this.prepare(entry);
+    return persistence(() => this.append(prepared, true));
+  }
+
+  /**
    * `record()` for a caller that may run inside {@link withAuditChainLock}
    * (a policy denial raised by a write the locked section makes). Inside the
    * lock the entry is checked now, against the current identity, and appended
@@ -671,9 +687,9 @@ class AuditChainImpl {
     return fullEntry;
   }
 
-  private append(prepared: PreparedAuditRecord): AuditEntry {
+  private append(prepared: PreparedAuditRecord, durable = false): AuditEntry {
     const fullEntry = asAuditStoreWriter(prepared.requestedTenantSlug ?? '', () =>
-      withAuditChainLock(() => this.appendUnderLock(prepared))
+      withAuditChainLock(() => this.appendUnderLock(prepared, durable))
     );
 
     // Fan-out to the optional audit forwarder (SIEM / log sink). The
@@ -684,7 +700,10 @@ class AuditChainImpl {
     return fullEntry;
   }
 
-  private appendUnderLock({ entry, requestedTenantSlug }: PreparedAuditRecord): AuditEntry {
+  private appendUnderLock(
+    { entry, requestedTenantSlug }: PreparedAuditRecord,
+    durable = false
+  ): AuditEntry {
     // Refresh the in-memory cursor while holding the inter-process lock;
     // another process may have appended since this module was loaded.
     this.seedFromDisk();
@@ -752,7 +771,7 @@ class AuditChainImpl {
     );
     this.lastHash = nextEntry.currentHash;
 
-    this.appendToFile(nextEntry);
+    this.appendToFile(nextEntry, durable);
     return nextEntry;
   }
 
@@ -1174,9 +1193,13 @@ class AuditChainImpl {
     return this.readAuditFileForVerify(filePath).entries;
   }
 
-  private appendToFile(entry: AuditEntry): void {
+  private appendToFile(entry: AuditEntry, durable = false): void {
     if (!auditIo) {
       logger.error('[AUDIT_CHAIN] Secure audit I/O is not registered; refusing to persist');
+      if (durable)
+        throw new Error(
+          '[AUDIT_CHAIN_PERSIST_FAILED] secure audit I/O is not registered | register the audit I/O before recording'
+        );
       return;
     }
     try {
@@ -1186,6 +1209,10 @@ class AuditChainImpl {
       appendRecordLine(auditIo, this.getFilePath(entry.timestamp), entry);
     } catch (err: any) {
       logger.error(`[AUDIT_CHAIN] Failed to persist: ${err.message}`);
+      if (durable)
+        throw new Error(
+          `[AUDIT_CHAIN_PERSIST_FAILED] the audit entry was not persisted — ${err.message} | restore audit chain persistence and retry`
+        );
     }
 
     // Per-tenant mirror: copy to the tenant's partition of the audit mirror store

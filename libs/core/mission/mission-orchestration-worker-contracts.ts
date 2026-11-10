@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import {
   isSurfaceAsyncChannel,
   type SurfaceAsyncChannel,
@@ -13,14 +14,14 @@ export interface SlackPayload {
   threadTs: string;
   sourceText?: string;
   proposal?: Record<string, unknown>;
-  tier?: 'personal' | 'confidential' | 'public';
+  tier?: StorageDataTier;
   persona?: string;
   missionType?: string;
   teamRoles?: string[];
   /** Team Channel P2: principal that confirmed the mission proposal. */
   confirmedBy?: string;
   /** Team Channel P2: tenant scope of the originating channel. */
-  scope?: { tenant_slug: string; tier?: 'personal' | 'confidential' | 'public' };
+  scope?: { tenant_slug: string; tier?: StorageDataTier };
 }
 
 export function payloadSurface(payload: SlackPayload): SurfaceAsyncChannel {

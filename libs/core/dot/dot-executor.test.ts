@@ -65,7 +65,7 @@ function charter(overrides: Partial<DotCharter> = {}): DotCharter {
     attention: { triggers: [{ kind: 'cron', cron: '0 9 * * *' }] },
     authority: {
       authority_role: 'infrastructure_sentinel',
-      allowed_work_shapes: ['task_session', 'pipeline', 'direct_reply', 'mission'],
+      allowed_execution_shapes: ['task_session', 'pipeline', 'direct_reply', 'mission'],
       allowed_pipelines: ['pipelines/ok.json'],
     },
     notification: { deliver_to: { surface: 'slack', channel: '#ops' } },

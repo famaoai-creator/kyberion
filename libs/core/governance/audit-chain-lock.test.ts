@@ -16,7 +16,12 @@ import { policyEngine } from './policy-engine.js';
 // 5s lock on itself and surfaced as a lock timeout instead of the denial.
 
 const TENANT = 'audit-lock-co';
-const ENV_KEYS = ['KYBERION_PERSONA', 'MISSION_ROLE', 'KYBERION_SUDO', 'KYBERION_TENANT'] as const;
+const ENV_KEYS = [
+  'KYBERION_BASE_ROLE',
+  'MISSION_ROLE',
+  'KYBERION_SUDO',
+  'KYBERION_TENANT',
+] as const;
 
 interface Append {
   file: string;
@@ -55,7 +60,7 @@ describe('audit chain lock', () => {
     delete process.env.MISSION_ROLE;
     delete process.env.KYBERION_SUDO;
     delete process.env.KYBERION_TENANT;
-    process.env.KYBERION_PERSONA = 'sovereign';
+    process.env.KYBERION_BASE_ROLE = 'sovereign';
   });
 
   afterEach(() => {

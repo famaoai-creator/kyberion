@@ -21,6 +21,7 @@
  * The window is synchronous: it ends when the callback returns, a thenable
  * result is refused, and a captured continuation finds no window.
  */
+import type { KnowledgeTier } from './knowledge-tier.js';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { runtimeStatePath } from './runtime-state-roots.js';
 import { isValidTenantSlug } from './scope.js';
@@ -32,7 +33,7 @@ export interface TaskSourceWorkspaceWindow {
   /** Repository-relative target file. */
   readonly target: string;
   readonly writing: boolean;
-  readonly tier: 'personal' | 'confidential';
+  readonly tier: Exclude<KnowledgeTier, 'public'>;
   /** Tenant slug, or `shared` for the untenanted partition. */
   readonly tenant: string;
 }

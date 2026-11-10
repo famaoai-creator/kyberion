@@ -49,7 +49,7 @@ export function frontDeskExecutionProposal(binding: FrontDeskExecutionBinding): 
           binding.receipt_format +
           '. Preserve the old artifact; create a separately approved revision.'
         : '.'),
-    work_shape: 'pipeline',
+    execution_shape: 'pipeline',
     pipeline_ref: FRONT_DESK_RECEIPT_PIPELINE,
     requested_decision: 'approve',
     target: 'work_item:' + binding.work_item_id,

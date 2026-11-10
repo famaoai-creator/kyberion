@@ -26,7 +26,7 @@ const STT_CACHE_ENTRY = path.join(
 const OLD_CACHE_ENTRY = path.join(ROOT, 'active/shared/cache/system/ts-loader/ab/ab00.transpiled');
 const ENV_KEYS = [
   'KYBERION_TENANT',
-  'KYBERION_PERSONA',
+  'KYBERION_BASE_ROLE',
   'MISSION_ROLE',
   'SYSTEM_ROLE',
   'KYBERION_SUDO',
@@ -35,7 +35,6 @@ const ENV_KEYS = [
 ] as const;
 
 type Policy = {
-  persona_permissions: Record<string, unknown>;
   authority_role_permissions: Record<string, unknown>;
 };
 
@@ -70,10 +69,13 @@ describe('private host caches (ts-loader, STT discovery) are not writable by gov
   });
 
   it('denies every persona', () => {
-    const personas = Object.keys(policy.persona_permissions);
+    // S4 slice 4: the persona bundles are the base Authority Roles base_<persona>.
+    const personas = Object.keys(policy.authority_role_permissions)
+      .filter((role) => role.startsWith('base_'))
+      .map((role) => role.slice('base_'.length));
     expect(personas.length).toBeGreaterThan(3);
     const allowed = personas.filter((persona) => {
-      process.env.KYBERION_PERSONA = persona;
+      process.env.KYBERION_BASE_ROLE = persona;
       return (
         validateWritePermission(CACHE_ENTRY).allowed ||
         validateWritePermission(STT_CACHE_ENTRY).allowed
@@ -86,7 +88,7 @@ describe('private host caches (ts-loader, STT discovery) are not writable by gov
     const roles = Object.keys(policy.authority_role_permissions);
     expect(roles.length).toBeGreaterThan(3);
     const allowed = roles.filter((role) => {
-      process.env.KYBERION_PERSONA = 'worker';
+      process.env.KYBERION_BASE_ROLE = 'worker';
       process.env.MISSION_ROLE = role;
       return (
         validateWritePermission(CACHE_ENTRY).allowed ||
@@ -97,7 +99,7 @@ describe('private host caches (ts-loader, STT discovery) are not writable by gov
   });
 
   it('the old location under the cache floor was writable by a data-only role (why it moved)', () => {
-    process.env.KYBERION_PERSONA = 'finance_controller';
+    process.env.KYBERION_BASE_ROLE = 'finance_controller';
     expect(validateWritePermission(OLD_CACHE_ENTRY).allowed).toBe(true);
     expect(validateWritePermission(CACHE_ENTRY).allowed).toBe(false);
     expect(

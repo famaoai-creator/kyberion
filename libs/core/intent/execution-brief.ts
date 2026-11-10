@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import type { ValidateFunction } from 'ajv';
 import { pathResolver } from '../path-resolver.js';
 import { compileSchema } from '../foundation/ajv.js';
@@ -18,7 +19,9 @@ import { resolveInputBindings, type InputBinding } from '../contracts/input-bind
 import { type WorkflowExecutionShape } from '../contracts/execution-shape.js';
 import { clamp } from '../foundation/text.js';
 import { findIntentPhrase, matchesIntentPhrase } from './intent-phrase-lexicon.js';
-import { isDocumentProjectRequest, resolveIntentResolutionPacket } from './intent-resolution.js';
+import type { RoutingDecision } from '../contracts/routing-decision.js';
+import { isDocumentProjectRequest } from './intent-resolution.js';
+import { resolveRoutingPacket } from './intent-resolver-entry.js';
 
 const EXECUTION_BRIEF_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/actuator-execution-brief.schema.json'
@@ -33,7 +36,7 @@ export interface ExecutionBriefSeed {
   requiredInputs?: string[];
   outcomeIds?: string[];
   confidence?: number;
-  tier?: 'personal' | 'confidential' | 'public';
+  tier?: StorageDataTier;
   locale?: string;
   projectName?: string;
   trackName?: string;
@@ -42,6 +45,8 @@ export interface ExecutionBriefSeed {
   contextualFrame?: ContextualIntentFrame;
   approvalSystemHint?: string;
   approvalScopeHint?: string;
+  /** The request's carried RoutingDecision (D7); its intent replaces re-resolution. */
+  routingDecision?: RoutingDecision;
 }
 
 function clampConfidence(value: unknown, fallback = 0.65): number {
@@ -124,7 +129,11 @@ function isProjectBootstrapSeed(seed: ExecutionBriefSeed): boolean {
   return isProjectBootstrapRequest(seed.requestText) || isDocumentProjectSeed(seed);
 }
 
-/** Preserve a supplied scoped intent; raw project mentions use the public resolver. */
+/**
+ * Preserve a supplied scoped intent. A raw project mention takes the intent
+ * of the request's carried RoutingDecision when there is one (D7: the text is
+ * not read again); only an uncarried seed resolves it, at the public tier.
+ */
 function resolveProjectBriefSeed(seed: ExecutionBriefSeed): ExecutionBriefSeed {
   if (
     seed.intentId ||
@@ -132,9 +141,9 @@ function resolveProjectBriefSeed(seed: ExecutionBriefSeed): ExecutionBriefSeed {
       !matchesIntentPhrase(seed.requestText, 'project.explicit_new_project'))
   )
     return seed;
-  const intentId = resolveIntentResolutionPacket(seed.requestText, {
-    tier: 'public',
-  }).selected_intent_id;
+  const intentId = seed.routingDecision
+    ? seed.routingDecision.intent_id
+    : resolveRoutingPacket(seed.requestText, { tier: 'public' }).selected_intent_id;
   return intentId ? { ...seed, intentId } : seed;
 }
 

@@ -19,7 +19,7 @@ const ROOT = pathResolver.rootDir();
 const ENV_KEYS = [
   'KYBERION_TENANT',
   'KYBERION_TIER',
-  'KYBERION_PERSONA',
+  'KYBERION_BASE_ROLE',
   'MISSION_ROLE',
   'SYSTEM_ROLE',
   'KYBERION_SUDO',

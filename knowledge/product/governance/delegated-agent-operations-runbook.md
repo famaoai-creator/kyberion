@@ -111,7 +111,7 @@ the KL-03 knowledge gate, then a **human external-publication approval**.
 
 - Publication artifacts live under
   `active/shared/artifacts/confidential/<tenant>/…`; run pr create with
-  `KYBERION_PERSONA=sovereign KYBERION_TENANT=<tenant>` or the artifact-index
+  `KYBERION_BASE_ROLE=sovereign KYBERION_TENANT=<tenant>` or the artifact-index
   lstat fails with ROLE_VIOLATION.
 - After approval, rerun the _same_ command — changed content requires a new
   decision.

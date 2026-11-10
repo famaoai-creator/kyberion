@@ -1,4 +1,5 @@
 /** Promotion consumes the engine's durable journal, never a caller's success claim. */
+import type { StorageDataTier } from '../storage-layout.js';
 import * as path from 'node:path';
 import { currentExecutionScope } from '../foundation/execution-scope.js';
 import { currentScopeEnvelope } from '../scope-envelope.js';
@@ -25,7 +26,7 @@ export interface VerifiedPipelinePromotionEvidence {
   journal_ref: string;
   source_sha256: string;
   completed_at: string;
-  tier: 'public' | 'confidential';
+  tier: Exclude<StorageDataTier, 'personal'>;
   tenant_slug?: string;
 }
 
@@ -103,7 +104,7 @@ export function verifyPipelinePromotionEvidence(
     journal_ref: path.relative(rootDir(), journalPath).split(path.sep).join('/'),
     source_sha256: input.sourceSha256,
     completed_at: terminal.timestamp,
-    tier: scope.tier as 'public' | 'confidential',
+    tier: scope.tier as Exclude<StorageDataTier, 'personal'>,
     ...(input.tenantSlug ? { tenant_slug: input.tenantSlug } : {}),
   };
 }

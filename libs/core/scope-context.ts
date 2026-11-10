@@ -1,3 +1,4 @@
+import type { StorageDataTier } from './storage-layout.js';
 import type { TierLevel } from './types.js';
 import path from 'node:path';
 import { isScopeEnvOnly, transportedScopeLineage } from './foundation/scope-resolution-mode.js';
@@ -182,7 +183,7 @@ function knowledgeRoots(scope: ScopeContext): string[] {
     ['tasks', scope.task_id],
     ['sessions', scope.session_id],
   ] as const;
-  const entity = (tier: 'confidential' | 'personal') => {
+  const entity = (tier: Exclude<StorageDataTier, 'public'>) => {
     if (!tenant) return undefined;
     const parts = [tier, tenant];
     for (const [directory, value] of chain) {

@@ -10,7 +10,7 @@
  *
  * 使い方:
  *   node_modules/.bin/tsx scripts/mission-alignment-gate/render-brief.ts <mission-brief.json> [out.html]
- *   （confidential階層へ出力する場合は KYBERION_PERSONA を適切に設定）
+ *   （confidential階層へ出力する場合は KYBERION_BASE_ROLE を適切に設定）
  *
  * スキーマは README.md 参照。
  */
@@ -401,7 +401,7 @@ export const runRenderBrief = defineScript({
     print(missingStaticPreviewMessage());
     print(`  node dist/scripts/mission_alignment_request.js --mission <ID>`);
     print(
-      `  KYBERION_PERSONA=<p> node_modules/.bin/tsx scripts/mission-alignment-gate/serve-brief.ts --mission <ID>`
+      `  KYBERION_BASE_ROLE=<p> node_modules/.bin/tsx scripts/mission-alignment-gate/serve-brief.ts --mission <ID>`
     );
     return out;
   },

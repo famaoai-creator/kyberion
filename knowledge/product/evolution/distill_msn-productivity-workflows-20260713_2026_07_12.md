@@ -6,6 +6,7 @@ importance: 7
 source_mission: MSN-PRODUCTIVITY-WORKFLOWS-20260713
 author: Kyberion Wisdom Distiller
 last_updated: 2026-07-13
+doc_status: historical
 ---
 
 # Cross-tool Productivity Planning Foundation

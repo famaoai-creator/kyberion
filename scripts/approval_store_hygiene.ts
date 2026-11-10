@@ -24,7 +24,7 @@ import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js'
  * Dry-run by default; `--apply` performs the sweeps (expired passkey
  * challenge files are deleted). Fixture records go to
  * `active/archive/.trash/` (30-day restore window), which only the sovereign
- * persona may write, so `--apply` needs `KYBERION_PERSONA=sovereign`.
+ * persona may write, so `--apply` needs `KYBERION_BASE_ROLE=sovereign`.
  *
  * `--migrate-tenant-partitions` instead moves tenant-scoped records written to
  * the system tree before the per-tenant partitions existed into their
@@ -38,7 +38,7 @@ import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js'
  * the system copy removed).
  *
  *   node dist/scripts/approval_store_hygiene.js [--stale-days N] [--json]
- *   KYBERION_PERSONA=sovereign node dist/scripts/approval_store_hygiene.js --apply
+ *   KYBERION_BASE_ROLE=sovereign node dist/scripts/approval_store_hygiene.js --apply
  *   node dist/scripts/approval_store_hygiene.js --migrate-tenant-partitions [--apply] [--json]
  */
 

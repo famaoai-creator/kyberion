@@ -33,7 +33,7 @@ function seedActiveMissionState(missionPath: string, missionId: string): void {
         status: 'active',
         execution_mode: 'local',
         priority: 1,
-        assigned_persona: 'tester',
+        org_role: 'tester',
         confidence_score: 1,
         git: { branch: 'test', start_commit: 'abc123', latest_commit: 'abc123', checkpoints: [] },
         history: [],
@@ -53,7 +53,7 @@ function readState(missionPath: string): MissionState {
 
 beforeEach(() => {
   process.env.MISSION_ROLE = 'mission_controller';
-  process.env.KYBERION_PERSONA = 'worker';
+  process.env.KYBERION_BASE_ROLE = 'worker';
   seedActiveMissionState(pausePath, pauseMissionId);
   seedActiveMissionState(cancelPath, cancelMissionId);
 });

@@ -11,7 +11,7 @@ import {
   validateMissionQuality,
 } from './mission-governance.js';
 
-const previousPersona = process.env.KYBERION_PERSONA;
+const previousPersona = process.env.KYBERION_BASE_ROLE;
 const previousRole = process.env.MISSION_ROLE;
 
 function prepareMission(missionId: string): string {
@@ -29,7 +29,7 @@ function prepareMission(missionId: string): string {
         status: 'completed',
         execution_mode: 'local',
         priority: 1,
-        assigned_persona: 'tester',
+        org_role: 'tester',
         confidence_score: 1,
         git: {
           branch: 'test',
@@ -47,13 +47,13 @@ function prepareMission(missionId: string): string {
 }
 
 beforeEach(() => {
-  process.env.KYBERION_PERSONA = 'worker';
+  process.env.KYBERION_BASE_ROLE = 'worker';
   process.env.MISSION_ROLE = 'mission_controller';
 });
 
 afterEach(() => {
-  if (previousPersona === undefined) delete process.env.KYBERION_PERSONA;
-  else process.env.KYBERION_PERSONA = previousPersona;
+  if (previousPersona === undefined) delete process.env.KYBERION_BASE_ROLE;
+  else process.env.KYBERION_BASE_ROLE = previousPersona;
   if (previousRole === undefined) delete process.env.MISSION_ROLE;
   else process.env.MISSION_ROLE = previousRole;
 });

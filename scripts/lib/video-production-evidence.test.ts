@@ -155,7 +155,7 @@ function rendered(mode: VideoScene['generation']['mode'] = 'reference_image') {
 
 beforeEach(() => {
   vi.stubEnv('MISSION_ROLE', 'mission_controller');
-  vi.stubEnv('KYBERION_PERSONA', 'worker');
+  vi.stubEnv('KYBERION_BASE_ROLE', 'worker');
   const id = 'MSN-VIDEO-GATE-' + randomUUID().slice(0, 8).toUpperCase();
   vi.stubEnv('VITEST_POOL_ID', 'video-' + id);
   mission = {
@@ -173,7 +173,7 @@ beforeEach(() => {
       status: 'planned',
       execution_mode: 'local',
       priority: 3,
-      assigned_persona: 'worker',
+      org_role: 'worker',
       confidence_score: 1,
       relationships: {},
       git: {

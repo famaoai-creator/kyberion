@@ -23,9 +23,16 @@ import {
   sameRecoveryReceipt,
   type FrontDeskExecutionRecoveryReceipt,
 } from '../surface/front-desk-recovery-receipt.js';
-import type { DotWorkShape, DotDecisionLevel, DotProposal } from './dot-proposals.js';
+import type { DotExecutionShape, DotDecisionLevel, DotProposal } from './dot-proposals.js';
 import { parseMissionAdmissionRequest } from '../governance/mandate-shadow.js';
 import type { DotCharter } from './dot-charter.js';
+import {
+  dotActionRecordSchemaVersion,
+  dotActionShapeKey,
+  dotProposalEvidenceHash,
+  readDotActionRow,
+  writtenDotActionRow,
+} from './dot-action-ledger-version.js';
 import { dotStatePath } from './dot-state-paths.js';
 import { judgmentCanonicalHash } from '../organization/judgment-precedents.js';
 import {
@@ -34,6 +41,8 @@ import {
   type DotJudgmentBinding,
 } from './dot-judgment-binding.js';
 export const DOT_ACTION_LEDGER_PATH = 'active/shared/runtime/dot-action-ledger.jsonl';
+export { DOT_ACTION_SCHEMA_VERSION, writtenDotProposal } from './dot-action-ledger-version.js';
+export { requestedExecutionShape } from './dot-requested-shape.js';
 
 const logger = createLogger('dot-action-ledger');
 
@@ -92,7 +101,13 @@ export interface DotActionRecord {
   action_id: string;
   title: string;
   objective: string;
-  work_shape: DotWorkShape;
+  /** Stored as `work_shape` in version-1 rows; code reads the mapped view (dot-action-ledger-version.ts). */
+  execution_shape: DotExecutionShape;
+  /**
+   * In-memory legacy marker: `1` on a view of a version-1 row (stored without
+   * `schema_version`); absent means the current version. See dot-action-ledger-version.ts.
+   */
+  schema_version?: 1;
   mission_admission?: DotProposal['mission_admission'];
   status: DotActionStatus;
   proposal_hash: string;
@@ -148,14 +163,19 @@ export function assertDotActionJudgmentBinding(record: DotActionRecord): void {
     !isDotAdmissionIdentity(record.admission) ||
     judgmentCanonicalHash(binding) !== judgmentCanonicalHash(admittedBinding) ||
     judgmentCanonicalHash(record.scope) !== judgmentCanonicalHash(binding.scope) ||
-    recoveryEvidenceHash(admitted) !== record.admission.semantic_hash
+    dotProposalEvidenceHash(admitted) !== record.admission.semantic_hash
   )
     throw new Error('Judgment action scope, admission or immutable binding differs');
+  // Compare the row and its admitted proposal as written: a row keeps the schema
+  // version of its admitted proposal, so both name the shape key the same way.
+  const written = writtenDotActionRow(record);
+  const writtenAdmitted = (written.admission as { proposal: Record<string, unknown> }).proposal;
+  const shapeKey = dotActionShapeKey(dotActionRecordSchemaVersion(record));
   for (const field of [
     'action_id',
     'title',
     'objective',
-    'work_shape',
+    shapeKey,
     'rationale',
     'priority',
     'pipeline_ref',
@@ -167,9 +187,9 @@ export function assertDotActionJudgmentBinding(record: DotActionRecord): void {
     'continuous_work',
     'information_asset_work',
     'front_desk_execution',
-  ] as const) {
-    const actual = record[field],
-      original = admitted[field];
+  ]) {
+    const actual = written[field],
+      original = writtenAdmitted[field];
     if (actual === undefined && original === undefined) continue;
     if (
       actual === undefined ||
@@ -231,16 +251,17 @@ function hydratePrivateAction(record: DotActionRecord, deps: DotActionLedgerDeps
     dotStatePath({ scope: record.scope }, 'action-ledger.jsonl')
   );
   let full: DotActionRecord | undefined;
-  for (const row of streamJsonLines<DotActionRecord>(file, {
+  for (const row of streamJsonLines<Record<string, unknown>>(file, {
     onMalformed: 'skip',
     chunkBytes: deps.readChunkBytes,
   })) {
+    // The index pins the scoped row exactly as written; map only the matching row.
     if (
-      row.action_ref === record.action_ref &&
+      row?.action_ref === record.action_ref &&
       !row.private_content_hash &&
-      dotActionRecordHash(row) === record.private_content_hash
+      recoveryEvidenceHash(row) === record.private_content_hash
     ) {
-      full = row;
+      full = readDotActionRow(row);
       break;
     }
   }
@@ -254,12 +275,13 @@ function hydratePrivateAction(record: DotActionRecord, deps: DotActionLedgerDeps
 
 /** Streaming shared-index rows (constant memory, no size cap). */
 function* iterateDotActionLedger(deps: DotActionLedgerDeps): Generator<DotActionRecord> {
-  for (const row of streamJsonLines<DotActionRecord>(ledgerFile(deps), {
+  for (const stored of streamJsonLines<DotActionRecord>(ledgerFile(deps), {
     onMalformed: 'skip',
     chunkBytes: deps.readChunkBytes,
   })) {
-    if (typeof row?.action_ref !== 'string' || typeof row.dot_id !== 'string') continue;
-    assertPrivateIndexHasNoJudgmentBody(row);
+    if (typeof stored?.action_ref !== 'string' || typeof stored.dot_id !== 'string') continue;
+    assertPrivateIndexHasNoJudgmentBody(stored);
+    const row = readDotActionRow(stored);
     yield !row.scope || (row.scope.tier !== 'public' && !row.private_content_hash)
       ? actionIndex(row)
       : row;
@@ -280,7 +302,9 @@ function actionIndex(record: DotActionRecord): DotActionRecord {
     action_id: record.action_id,
     title: '[scoped action]',
     objective: '[scoped action]',
-    work_shape: record.work_shape,
+    execution_shape: record.execution_shape,
+    // The index is written in the schema version of the row it summarizes.
+    ...(dotActionRecordSchemaVersion(record) === 1 ? { schema_version: 1 as const } : {}),
     status: record.status,
     proposal_hash: record.proposal_hash,
     at: record.at,
@@ -299,17 +323,20 @@ export function migrateLegacyDotActions(
   charter: DotCharter,
   deps: DotActionLedgerDeps = {}
 ): number {
-  if (!['sovereign', 'ecosystem_architect'].includes(resolvePolicyIdentityContext().persona))
+  if (!['sovereign', 'ecosystem_architect'].includes(resolvePolicyIdentityContext().baseRole))
     throw new Error(
       '[DOT_STATE_MIGRATION_AUTHORITY] action classification requires an authorized operator'
     );
   return withLockSync(actionLedgerLock(deps), () => {
     const file = ledgerFile(deps);
-    const rows = [...streamJsonLines<DotActionRecord>(file, { chunkBytes: deps.readChunkBytes })];
+    const stored = [
+      ...streamJsonLines<Record<string, unknown>>(file, { chunkBytes: deps.readChunkBytes }),
+    ];
     let migrated = 0;
-    const rewritten = rows.map((row) => {
+    const rewritten = stored.map((raw) => {
+      const row = readDotActionRow(raw);
       if (row.dot_id !== charter.dot_id || row.private_content_hash || row.scope?.tier === 'public')
-        return row;
+        return raw;
       if (row.scope && JSON.stringify(row.scope) !== JSON.stringify(charter.scope))
         throw new Error(
           '[DOT_STATE_MIGRATION_SCOPE] inline action scope differs from reviewed charter'
@@ -321,9 +348,9 @@ export function migrateLegacyDotActions(
         dotStatePath(charter, 'action-ledger.jsonl')
       );
       safeMkdir(path.dirname(scopedFile), { recursive: true });
-      appendJsonLine(scopedFile, full);
+      appendJsonLine(scopedFile, writtenDotActionRow(full));
       migrated++;
-      return charter.scope.tier === 'public' ? full : actionIndex(full);
+      return writtenDotActionRow(charter.scope.tier === 'public' ? full : actionIndex(full));
     });
     if (migrated) writeJsonLines(file, rewritten);
     return migrated;
@@ -337,11 +364,17 @@ export function readDotActionLedgerStrict(deps: DotActionLedgerDeps = {}): DotAc
   // No size cap: the proof streams the full retained history, so a large
   // ledger never turns into a refusal (growth is warned at append time).
   if (!stat.isFile()) throw new Error('incomplete_action_evidence');
-  const validateRow = (row: unknown): DotActionRecord => {
-    if (!row || typeof row !== 'object' || Array.isArray(row))
+  const validateRow = (stored: unknown): DotActionRecord => {
+    if (!stored || typeof stored !== 'object' || Array.isArray(stored))
       throw new Error('invalid_action_evidence');
-    const value = row as Record<string, unknown>;
-    assertPrivateIndexHasNoJudgmentBody(row as DotActionRecord);
+    assertPrivateIndexHasNoJudgmentBody(stored as DotActionRecord);
+    let row: DotActionRecord;
+    try {
+      row = readDotActionRow(stored);
+    } catch {
+      throw new Error('invalid_action_evidence');
+    }
+    const value = row as unknown as Record<string, unknown>;
     if (
       value.private_content_hash !== undefined &&
       (typeof value.private_content_hash !== 'string' ||
@@ -364,7 +397,9 @@ export function readDotActionLedgerStrict(deps: DotActionLedgerDeps = {}): DotAc
         'at',
       ].every((key) => typeof value[key] === 'string' && (value[key] as string).trim()) ||
       !Number.isFinite(Date.parse(value.at as string)) ||
-      !['mission', 'task_session', 'pipeline', 'direct_reply'].includes(String(value.work_shape)) ||
+      !['mission', 'task_session', 'pipeline', 'direct_reply'].includes(
+        String(value.execution_shape)
+      ) ||
       ![
         'admitted',
         'dispatched',
@@ -459,8 +494,9 @@ export function readDotActionLedgerStrict(deps: DotActionLedgerDeps = {}): DotAc
     throw new Error('action_evidence_changed');
   return rows;
 }
+/** Hash of a record exactly as written (version-1 rows hash with `work_shape`). */
 export function dotActionRecordHash(record: DotActionRecord): string {
-  return recoveryEvidenceHash(record);
+  return recoveryEvidenceHash(writtenDotActionRow(record));
 }
 /** Only the authenticated recovery facade may supply this decision. Does not touch approval. */
 export function declineRecoveredDotAction(
@@ -536,6 +572,8 @@ export function appendActionRecord(
     throw new Error('[DOT_ACTION_SCOPE_REQUIRED] action writers must bind a trusted charter scope');
   dotStatePath({ scope: record.scope }); // Validate every declared tier/owner/tenant before persistence.
   assertDotActionJudgmentBinding(record);
+  // Persisted in the schema version of its admitted proposal (new work: version 2).
+  const written = writtenDotActionRow(record);
   const write = () => {
     // A stale writer can never erase the terminal receipt or restore a parked row.
     const current = record.front_desk_execution
@@ -554,12 +592,12 @@ export function appendActionRecord(
         dotStatePath({ scope: record.scope }, 'action-ledger.jsonl')
       );
       safeMkdir(path.dirname(scopedFile), { recursive: true });
-      appendJsonLine(scopedFile, record);
+      appendJsonLine(scopedFile, written);
       // Shared inventory carries no proposal prose, paths, private request
       // payload, or approval bindings. Full evidence must be read in scope.
       const index = actionIndex(record);
-      appendJsonLine(filePath, index);
-    } else appendJsonLine(filePath, record);
+      appendJsonLine(filePath, writtenDotActionRow(index));
+    } else appendJsonLine(filePath, written);
     warnOnLedgerGrowth(filePath, deps);
     return record;
   };
@@ -666,7 +704,8 @@ function hydrateRefusalKind(error: unknown): 'malformed' | 'missing_evidence' | 
   const message = error instanceof Error ? error.message : String(error);
   if (
     message.includes('invalid private content identity') ||
-    message.includes('invalid private index scope')
+    message.includes('invalid private index scope') ||
+    message.includes('[DOT_ACTION_SCHEMA]')
   )
     return 'malformed';
   if (message.includes('missing or changed')) return 'missing_evidence';
@@ -703,7 +742,7 @@ export function observeDotActions(
       "the shared action index could not be read, so even row counts are unknown — check this process's scope, then re-run status under an identity that may read it",
     ],
   });
-  let rows: Iterator<DotActionRecord>;
+  let rows: Iterator<DotActionRecord | undefined>;
   try {
     rows = streamJsonLines<DotActionRecord>(file, {
       chunkBytes: deps.readChunkBytes,
@@ -728,7 +767,12 @@ export function observeDotActions(
       return unreadable();
     }
     if (next.done) break;
-    const row = next.value;
+    let row: DotActionRecord | undefined;
+    try {
+      row = readDotActionRow(next.value);
+    } catch {
+      row = undefined;
+    }
     if (!row || typeof row.action_ref !== 'string' || typeof row.dot_id !== 'string') {
       malformed += 1;
       continue;
@@ -819,20 +863,23 @@ export function assertDotActionInformationBinding(record: DotActionRecord): void
     !record.admission ||
     !isDotAdmissionIdentity(record.admission) ||
     recoveryEvidenceHash(binding) !== recoveryEvidenceHash(admitted) ||
-    recoveryEvidenceHash(record.admission.proposal) !== record.admission.semantic_hash ||
+    dotProposalEvidenceHash(record.admission.proposal) !== record.admission.semantic_hash ||
     record.scope?.tenant_slug !== binding.observation.scope.tenant_slug ||
     record.scope?.organization_id !== binding.observation.scope.organization_id ||
     record.scope?.project_id !== binding.observation.scope.project_id
   )
     throw new Error('Information work immutable admission or scope differs');
+  // Like-for-like over the written forms (row and admitted proposal share one version).
+  const written = writtenDotActionRow(record);
+  const writtenAdmitted = (written.admission as { proposal: Record<string, unknown> }).proposal;
   for (const key of [
     'action_id',
-    'work_shape',
+    dotActionShapeKey(dotActionRecordSchemaVersion(record)),
     'pipeline_ref',
     'target',
     'objective',
     'title',
-  ] as const)
-    if (record[key] !== record.admission.proposal[key])
+  ])
+    if (written[key] !== writtenAdmitted[key])
       throw new Error('Information work executable field differs: ' + key);
 }

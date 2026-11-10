@@ -17,5 +17,39 @@
   ],
   "scope_classes": ["mission_state", "coordination_runtime", "observability", "audit"],
   "allowed_actuators": ["artifact-actuator", "approval-actuator", "orchestrator-actuator"],
-  "tier_access": ["public", "confidential", "personal"]
+  "tier_access": ["public", "confidential", "personal"],
+  "permissions": {
+    "allow_read": [
+      "active/missions/",
+      "active/projects/",
+      "active/archive/missions/",
+      "active/archive/failed_missions/",
+      "active/audit/",
+      "active/shared/",
+      "customer/",
+      "knowledge/personal/",
+      "knowledge/confidential/",
+      "knowledge/evolution/",
+      "knowledge/product/evolution/",
+      "registry.json"
+    ],
+    "allow_write": [
+      "active/missions/",
+      "active/projects/",
+      "active/archive/missions/",
+      "active/archive/failed_missions/",
+      "active/audit/",
+      "active/shared/",
+      "active/shared/coordination/",
+      "active/shared/observability/mission-control/",
+      "customer/",
+      "knowledge/personal/stances/",
+      "knowledge/personal/missions/",
+      "knowledge/personal/governance/",
+      "knowledge/evolution/",
+      "knowledge/product/evolution/",
+      "vault/private/wisdom/",
+      "registry.json"
+    ]
+  }
 }

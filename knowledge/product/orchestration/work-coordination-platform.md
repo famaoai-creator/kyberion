@@ -56,6 +56,8 @@ Common commands:
 - `import-github-issue-file`
 - `import-jira-issue-file`
 
+Issues and steps (concept model v2 D1): a top-level WorkItem is the Issue and its steps carry `parent_item_id`. `list-board --board-id <id>` lists the board's Issues with `steps: { total, done }` (`--all-items` lists the steps too); `list-items` accepts `--top-level` and `--parent-id`. A parent's status follows its steps after every step write (rule table: [GLOSSARY → WorkItem](../../../docs/GLOSSARY.md#workitem)); `update-status --status-from-children` hands a parent whose status a person set back to its steps.
+
 Import commands are catalog-driven from [`knowledge/product/governance/work-coordination-import-catalog.json`](../governance/work-coordination-import-catalog.json). Additions should go through the catalog instead of hardcoding new command bindings in the CLI.
 
 Mission-specific registration is separate from external import:

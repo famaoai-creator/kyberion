@@ -2,5 +2,5 @@
   "slug": "your-stance-slug",
   "display_name": "Which hat this is (e.g. Acme engagement, Board seat at Example Co.)",
   "kind": "engagement",
-  "notes": "kind is engagement (acting for an end customer) or affiliation (acting as one of several entities you belong to). Free-form notes are not parsed by Kyberion."
+  "notes": "Add \"acting_for\": {\"tenant_slug\": \"...\", \"organization_id\": \"...\", \"org_role\": \"...\"} to name the tenant you act for under this stance, and as which Organization and Org Role (organization_id and org_role are optional). pnpm stance:switch rejects a tenant that is not an active profile in knowledge/personal/tenants/ and binds KYBERION_TENANT / KYBERION_ORGANIZATION_ID to it; without acting_for the stance is only a personal overlay. kind is engagement (acting for an end customer) or affiliation (acting as one of several entities you belong to). Free-form notes are not parsed by Kyberion."
 }

@@ -10,13 +10,34 @@
     "volatile_face_policy": { "type": "object", "additionalProperties": true },
     "tenant_scope": { "type": "object", "additionalProperties": true },
     "tier_restrictions": { "type": "object", "additionalProperties": true },
-    "persona_permissions": { "type": "object", "additionalProperties": true },
+    "persona_permissions": {
+      "description": "Deprecated (S4 slice 4): the Execution Persona bundles are base Authority Roles (authority-roles/base_<persona>.json, projected into authority_role_permissions). Read only from an installation catalog that predates them, for one release.",
+      "type": "object",
+      "additionalProperties": true
+    },
     "authority_role_permissions": {
       "type": "object",
       "additionalProperties": {
         "type": "object",
         "additionalProperties": true,
         "properties": {
+          "narrow": { "$ref": "#/$defs/narrow_declaration" }
+        }
+      }
+    },
+    "store_grants": {
+      "description": "S4 (ADR concept-model-v2 D6): store grants that replaced store-only Authority Roles. Not roles: never assumable and never in the authority role registry. A store facade issues one with authority.ts withStoreGrant; while it is live its operations are exactly this declaration, bound to the issuance tenant/organization. The names are listed in libs/core/foundation/declared-store-grant.ts.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["description"],
+        "properties": {
+          "description": { "type": "string", "minLength": 1 },
+          "allow_read": { "type": "array", "items": { "type": "string" } },
+          "allow_write": { "type": "array", "items": { "type": "string" } },
+          "deny_read": { "type": "array", "items": { "type": "string" } },
+          "deny_read_descendants": { "type": "array", "items": { "type": "string" } },
           "narrow": { "$ref": "#/$defs/narrow_declaration" }
         }
       }
@@ -33,7 +54,6 @@
     "volatile_face_policy",
     "tenant_scope",
     "tier_restrictions",
-    "persona_permissions",
     "authority_role_permissions"
   ],
   "$defs": {

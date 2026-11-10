@@ -16,7 +16,7 @@
  *
  * Kind grammar:
  *   - `human`  — id = `user:<member_id>` (`member-registry.ts` grammar).
- *   - `agent`  — id = a canonical `nhi_id` (`kyberion://agent/<org>/<slug>`,
+ *   - `agent`  — id = a canonical `nhi_id` (`kyberion://agent/<tenant>/<org|_>/<slug>`,
  *     `agent-identity.ts` grammar).
  *   - `service` — id = `service:<slug>` (same slug grammar as nhi segments).
  *
@@ -105,7 +105,7 @@ export function humanActor(memberId: string, displayName?: string): ActorRef {
   };
 }
 
-/** `id` = a canonical nhi_id (`kyberion://agent/<org>/<slug>`). */
+/** `id` = a canonical nhi_id (`kyberion://agent/<tenant>/<org|_>/<slug>`). */
 export function agentActor(nhiId: string, onBehalfOf?: string): ActorRef {
   const trimmed = trimmedOrThrow(nhiId, 'nhi_id');
   if (!parseNhiId(trimmed)) {

@@ -6,6 +6,7 @@ importance: 4
 source_mission: PRODUCTION-EVIDENCE-REGISTER-TEXT-NONBLANK
 author: Kyberion Wisdom Distiller
 last_updated: 2026-05-15
+doc_status: historical
 ---
 
 # Hardening Schema Validation for Non-Blank Text Fields

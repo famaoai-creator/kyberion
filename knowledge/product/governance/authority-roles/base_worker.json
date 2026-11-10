@@ -1,0 +1,36 @@
+{
+  "role": "base_worker",
+  "description": "Base Authority Role (S4 slice 4, ADR concept-model-v2 D5/D6): the operation bundle every principal whose persona is 'worker' runs on (the default of mission-bound executions and most narrow roles and store grants) — formerly security-policy.json persona_permissions.worker, verbatim. Never a principal's own role (libs/core/foundation/base-authority-role.ts).",
+  "assignable": false,
+  "permissions": {
+    "allow_read": [
+      "active/projects/public/shared/${KYBERION_PROJECT_ID}/",
+      "active/projects/public/${KYBERION_TENANT}/${KYBERION_PROJECT_ID}/",
+      "active/projects/confidential/${KYBERION_TENANT}/${KYBERION_PROJECT_ID}/",
+      "active/shared/tmp/",
+      "active/shared/tmp/confidential/${KYBERION_TENANT}/",
+      "active/shared/staging/confidential/${KYBERION_TENANT}/",
+      "active/shared/cache/confidential/${KYBERION_TENANT}/",
+      "active/missions/${MISSION_ID}/",
+      "active/missions/confidential/${KYBERION_TENANT}/${MISSION_ID}/",
+      "active/missions/confidential/${MISSION_ID}/",
+      "active/missions/personal/${MISSION_ID}/",
+      "active/missions/public/${MISSION_ID}/",
+      "active/shared/MEMORY.md",
+      "active/INDEX.volatile.md",
+      "knowledge/public/",
+      "knowledge/product/"
+    ],
+    "allow_write": [
+      "active/projects/public/shared/${KYBERION_PROJECT_ID}/",
+      "active/projects/public/${KYBERION_TENANT}/${KYBERION_PROJECT_ID}/",
+      "active/projects/confidential/${KYBERION_TENANT}/${KYBERION_PROJECT_ID}/",
+      "active/shared/tmp/",
+      "active/missions/${MISSION_ID}/evidence/",
+      "active/missions/confidential/${KYBERION_TENANT}/${MISSION_ID}/evidence/",
+      "active/missions/confidential/${MISSION_ID}/evidence/",
+      "active/missions/personal/${MISSION_ID}/evidence/",
+      "active/missions/public/${MISSION_ID}/evidence/"
+    ]
+  }
+}

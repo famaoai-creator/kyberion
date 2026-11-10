@@ -1,7 +1,8 @@
 ---
 title: Canonical Entity Scope Hierarchy
 tags: [architecture, governance, tenant, organization, project, mission, task, session]
-last_updated: 2026-08-16
+last_updated: 2026-11-10
+concepts: [entity-scope, tenant, organization, project, work-shape]
 ---
 
 # Canonical Entity Scope Hierarchy
@@ -37,7 +38,22 @@ Kyberion is acting as — and is deliberately orthogonal to scope
 | Work items            | Persist references in typed `context`, never labels or metadata fallbacks |
 | Artifacts             | Persist `tenant_slug` and `organization_id` with the ownership record     |
 | Retention/offboarding | Query ownership and registry records before path traversal                |
-| Identity              | `AgentIdentity.affiliation.tenant_slug` is the boundary claim             |
+| Identity              | `AgentIdentity.affiliation.tenant_slug` is the boundary claim; the NHI id |
+|                       | carries it too: `kyberion://agent/<tenant>/<org\|_>/<slug>`               |
+| Organization profile  | Per organization: `knowledge/confidential/{tenant}/organizations/{org}/`  |
+
+Concept Model v2 D3 (Tenant 1:N Organization): an NHI belongs to a tenant and
+optionally to one organization inside it, so its id is
+`kyberion://agent/<tenant>/<org|_>/<slug>` (`libs/core/contracts/nhi-id.ts`).
+The tenant is required — `buildNhiId` rejects a missing tenant and a reserved
+scope name — and the old `'default'` organization fallback is gone (`_` means
+"no organization"). An organization is never named without its tenant; an
+identity with no tenant at all (person-scope agents) is the interim
+`kyberion://agent/_/_/<slug>`. Pre-D3 `kyberion://agent/<org>/<slug>` ids
+resolve as aliases for one release after `pnpm nhi migrate-ids --apply`.
+Organization profiles follow the same chain: one per organization under the
+tenant home; the tenant-root `organization-profile.json` is a one-release
+fallback (migration `0004-organization-profile-home`).
 
 `shared` is an explicit public/shared storage partition. It is not a tenant
 and must not satisfy the required `tenant_slug` field for confidential data.

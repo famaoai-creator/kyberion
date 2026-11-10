@@ -261,17 +261,17 @@ describe('check_tenant_registry_consistency (DA-01)', () => {
     // persona/role (Sovereign Sanctuary); the CLI entrypoint gets this from
     // its script-name-derived authority — in-process we set the same env the
     // sibling tenant-registry suite uses.
-    const savedPersona = process.env.KYBERION_PERSONA;
+    const savedPersona = process.env.KYBERION_BASE_ROLE;
     const savedRole = process.env.MISSION_ROLE;
-    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     process.env.MISSION_ROLE = 'mission_controller';
     try {
       const { exitCode, output } = runCheck();
       expect(output).toContain('[check:tenant-registry] OK');
       expect(exitCode).toBe(0);
     } finally {
-      if (savedPersona === undefined) delete process.env.KYBERION_PERSONA;
-      else process.env.KYBERION_PERSONA = savedPersona;
+      if (savedPersona === undefined) delete process.env.KYBERION_BASE_ROLE;
+      else process.env.KYBERION_BASE_ROLE = savedPersona;
       if (savedRole === undefined) delete process.env.MISSION_ROLE;
       else process.env.MISSION_ROLE = savedRole;
     }

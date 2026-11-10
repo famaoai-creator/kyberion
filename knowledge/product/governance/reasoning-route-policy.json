@@ -148,8 +148,16 @@
       "supported_parameters": ["stop"]
     },
     "openai-api": {
-      "adapter": "openai-responses", "selection": { "display_name": "OpenAI API (Responses)", "model_provider": "openai", "availability": { "kind": "env_any", "names": ["OPENAI_API_KEY"] } },
-      "endpoint_policy": "public", "model_policy": "approved", "capabilities": ["text", "structured_output"], "supported_parameters": []
+      "adapter": "openai-responses",
+      "selection": {
+        "display_name": "OpenAI API (Responses)",
+        "model_provider": "openai",
+        "availability": { "kind": "env_any", "names": ["OPENAI_API_KEY"] }
+      },
+      "endpoint_policy": "public",
+      "model_policy": "approved",
+      "capabilities": ["text", "structured_output"],
+      "supported_parameters": []
     },
     "openrouter": {
       "adapter": "openai-compatible",

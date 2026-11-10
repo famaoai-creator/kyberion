@@ -1,4 +1,5 @@
 /** Bounded document review inspired by EGM; all authority stays in existing I/O/egress seams. */
+import type { StorageDataTier } from '../storage-layout.js';
 import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 import { z } from 'zod';
@@ -92,7 +93,7 @@ export interface DocumentReviewSnapshot {
   path: string;
   sha256: string;
   bytes: number;
-  tier: 'public' | 'confidential' | 'personal';
+  tier: StorageDataTier;
   tenant_slug?: string;
 }
 interface Snapshot extends DocumentReviewSnapshot {

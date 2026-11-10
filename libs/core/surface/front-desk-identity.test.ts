@@ -350,9 +350,9 @@ describe('readFrontDeskMe', () => {
     );
     // Tenant profiles live under the personal tier: an authorized execution
     // context is required to write/read them, same as tenant-registry.test.ts.
-    savedPersona = process.env.KYBERION_PERSONA;
+    savedPersona = process.env.KYBERION_BASE_ROLE;
     savedRole = process.env.MISSION_ROLE;
-    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     process.env.MISSION_ROLE = 'mission_controller';
 
     writeTenantProfile(
@@ -376,8 +376,8 @@ describe('readFrontDeskMe', () => {
   });
 
   afterAll(() => {
-    if (savedPersona === undefined) delete process.env.KYBERION_PERSONA;
-    else process.env.KYBERION_PERSONA = savedPersona;
+    if (savedPersona === undefined) delete process.env.KYBERION_BASE_ROLE;
+    else process.env.KYBERION_BASE_ROLE = savedPersona;
     if (savedRole === undefined) delete process.env.MISSION_ROLE;
     else process.env.MISSION_ROLE = savedRole;
     if (fixtureRoot) safeRmSync(fixtureRoot, { recursive: true, force: true });

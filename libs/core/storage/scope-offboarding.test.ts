@@ -252,7 +252,7 @@ function missionState(overrides: Record<string, unknown> = {}): Record<string, u
     status: 'active',
     execution_mode: 'local',
     priority: 1,
-    assigned_persona: 'worker',
+    org_role: 'worker',
     confidence_score: 1,
     git: {
       branch: 'scope-offboarding-test',
@@ -289,7 +289,7 @@ function auditEvents(): Array<Record<string, any>> {
 beforeEach(() => {
   vi.stubEnv('MISSION_ROLE', 'mission_controller');
   vi.stubEnv('SYSTEM_ROLE', '');
-  vi.stubEnv('KYBERION_PERSONA', 'sovereign');
+  vi.stubEnv('KYBERION_BASE_ROLE', 'sovereign');
   vi.stubEnv('KYBERION_TENANT', '');
   setRootDirState(undefined);
   const root = currentRoot();

@@ -12,10 +12,29 @@ function missionStateCatalog(filePath: string) {
   });
 }
 
+/**
+ * The one load boundary for the `assigned_persona` → `org_role` rename
+ * (concept model v2 D5). A legacy state that still carries `assigned_persona`
+ * is read as `org_role`; the legacy key is dropped, so a state written back
+ * carries only `org_role`. Kept for one release, then the legacy branch and the
+ * schema alias are removed.
+ */
+export function normalizeMissionStateRecord<T>(state: T): T {
+  if (!state || typeof state !== 'object' || Array.isArray(state)) return state;
+  if (!('assigned_persona' in state)) return state;
+  const { assigned_persona: legacy, ...rest } = state as Record<string, unknown>;
+  const orgRole = rest.org_role;
+  const normalized =
+    (typeof orgRole !== 'string' || !orgRole) && typeof legacy === 'string' && legacy
+      ? { ...rest, org_role: legacy }
+      : rest;
+  return normalized as T;
+}
+
 /** Load mission state from an already resolved repository path. */
 export function loadMissionStateAtPath(statePath: string): MissionState | null {
   try {
-    return missionStateCatalog(statePath).load();
+    return normalizeMissionStateRecord(missionStateCatalog(statePath).load());
   } catch (_) {
     return null;
   }
@@ -27,7 +46,7 @@ export function loadMissionStateAtPath(statePath: string): MissionState | null {
  * "denied" from "absent". The caller checks the file exists first.
  */
 export function readMissionStateAtPath(statePath: string): MissionState {
-  return missionStateCatalog(statePath).load();
+  return normalizeMissionStateRecord(missionStateCatalog(statePath).load());
 }
 
 /**
@@ -44,7 +63,7 @@ export function loadMissionStateForInference(statePath: string): Partial<Mission
   try {
     const parsed = loadJsonIfPresent<unknown>(statePath);
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
-    return parsed as Partial<MissionState>;
+    return normalizeMissionStateRecord(parsed as Partial<MissionState>);
   } catch (_) {
     return null;
   }
@@ -52,7 +71,10 @@ export function loadMissionStateForInference(statePath: string): Partial<Mission
 
 export function writeMissionStateAtPath(statePath: string, state: MissionState): string {
   const safePath = assertSafeRepositoryPath(statePath, { allowMissingLeaf: true });
-  const validated = missionStateCatalog(safePath).validate(state, safePath);
+  const validated = missionStateCatalog(safePath).validate(
+    normalizeMissionStateRecord(state),
+    safePath
+  );
   safeWriteFile(safePath, JSON.stringify(validated, null, 2), {
     encoding: 'utf8',
     mkdir: true,

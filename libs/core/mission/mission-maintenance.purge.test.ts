@@ -60,7 +60,7 @@ function seedMission(id: string, status: string, ageDays: number): string {
         status,
         execution_mode: 'local',
         priority: 0,
-        assigned_persona: 'mission-controller-test',
+        org_role: 'mission-controller-test',
         confidence_score: 1,
         git: {
           branch: 'test',
@@ -245,7 +245,7 @@ describe('purgeMissions (AL-01)', () => {
         status: 'failed',
         execution_mode: 'local',
         priority: 0,
-        assigned_persona: 'mission-controller-test',
+        org_role: 'mission-controller-test',
         confidence_score: 1,
         git: { branch: 'test', start_commit: 'test', latest_commit: 'test', checkpoints: [] },
         history: [],

@@ -11,8 +11,20 @@ export const KEY_RESULT_ORG_METRICS = [
   'open_incidents',
   'pending_decisions',
   'unhealthy_services',
+  'cost_usd',
+  'llm_tokens',
+  'llm_calls',
+  'unknown_cost_calls',
 ] as const;
 export type KeyResultOrgMetric = (typeof KEY_RESULT_ORG_METRICS)[number];
+
+/** Org metrics measured from the usage/cost ledgers rather than org records. */
+export const COST_ORG_METRICS: ReadonlySet<KeyResultOrgMetric> = new Set([
+  'cost_usd',
+  'llm_tokens',
+  'llm_calls',
+  'unknown_cost_calls',
+]);
 
 export type KeyResultAggregate = 'value' | 'count';
 
@@ -22,7 +34,12 @@ export type KeyResultMetric =
   | { source: 'file'; path: string; json_path: string; aggregate?: KeyResultAggregate }
   /** Percent of recent dot-signal-ledger rows that were healthy. */
   | { source: 'signal_ratio'; signal: string; window_hours?: number }
-  | { source: 'org_metric'; metric: KeyResultOrgMetric }
+  | {
+      source: 'org_metric';
+      metric: KeyResultOrgMetric;
+      /** Trailing window for cost metrics, in days (default 7). */
+      window_days?: number;
+    }
   /** Organization KRs only: a person records the value (`objective kr record`); sweeps skip it. */
   | { source: 'manual' };
 

@@ -13,6 +13,7 @@ import { pathResolver, findMissionPath } from '../path-resolver.js';
 import { findDotCharter } from '../dot/dot-charter.js';
 import { assertDotAccountabilityCharter } from '../dot/dot-authority.js';
 import { readDotActionLedgerStrict } from '../dot/dot-action-ledger.js';
+import { requestedExecutionShape } from '../dot/dot-requested-shape.js';
 import { dotAdmissionMissionId } from '../dot/dot-admission-identity.js';
 import {
   getWorkItem,
@@ -234,7 +235,7 @@ function verifiedDotMissionAdmission(item: WorkItem, deps: Deps) {
     typeof dotId !== 'string' ||
     typeof actionRef !== 'string' ||
     item.metadata?.admission_only !== true ||
-    item.metadata?.requested_work_shape !== 'mission' ||
+    requestedExecutionShape(item.metadata) !== 'mission' ||
     item.metadata?.mission_id !== dotAdmissionMissionId(actionRef)
   )
     throw new Error('unbound mission intake');
@@ -248,7 +249,7 @@ function verifiedDotMissionAdmission(item: WorkItem, deps: Deps) {
     dot.scope.tenant_slug !== tenant ||
     dot.scope.organization_id !== item.context?.organization_id ||
     dotContext?.project_id !== item.context?.project_id ||
-    !dot.authority.allowed_work_shapes?.includes('mission') ||
+    !dot.authority.allowed_execution_shapes?.includes('mission') ||
     !dot.authority.mission_mandate_refs?.includes(admission.mandate_ref)
   )
     throw new Error('current Dot admission authority missing');

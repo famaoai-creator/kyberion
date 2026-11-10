@@ -1,4 +1,5 @@
 import * as path from 'node:path';
+import { baseRoleEnvText } from '../foundation/base-role-env.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { scopedPersona } from '../foundation/execution-scope.js';
 import { resolveProjectScope } from '../foundation/project-scope-env.js';
@@ -17,7 +18,7 @@ function kyberionEnv(name: string): string | undefined {
 export function isWorkerProjectContext(): boolean {
   const executionPersona = scopedPersona();
   if (executionPersona.bound) return executionPersona.persona === 'worker';
-  return kyberionEnv('KYBERION_PERSONA') === 'worker' || kyberionEnv('MISSION_ROLE') === 'worker';
+  return baseRoleEnvText() === 'worker' || kyberionEnv('MISSION_ROLE') === 'worker';
 }
 
 export function assertWorkerProjectScope(projectId: string, project?: ProjectRecord): void {

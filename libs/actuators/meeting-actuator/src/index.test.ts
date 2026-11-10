@@ -334,10 +334,10 @@ describe('meeting-actuator voice-consent gate', () => {
   beforeEach(() => {
     savedMission = process.env.MISSION_ID;
     savedSudo = process.env.KYBERION_SUDO;
-    savedPersona = process.env.KYBERION_PERSONA;
+    savedPersona = process.env.KYBERION_BASE_ROLE;
     savedTenant = process.env.KYBERION_TENANT;
     process.env.MISSION_ID = FIX_MISSION;
-    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     delete process.env.KYBERION_SUDO;
     delete process.env.KYBERION_TENANT;
     safeMkdir(path.join(MISSION_DIR, 'evidence'), { recursive: true });
@@ -346,7 +346,7 @@ describe('meeting-actuator voice-consent gate', () => {
       JSON.stringify({
         mission_id: FIX_MISSION,
         tier: 'confidential',
-        assigned_persona: 'ecosystem_architect',
+        org_role: 'ecosystem_architect',
       })
     );
   });
@@ -362,8 +362,8 @@ describe('meeting-actuator voice-consent gate', () => {
     else process.env.MISSION_ID = savedMission;
     if (savedSudo === undefined) delete process.env.KYBERION_SUDO;
     else process.env.KYBERION_SUDO = savedSudo;
-    if (savedPersona === undefined) delete process.env.KYBERION_PERSONA;
-    else process.env.KYBERION_PERSONA = savedPersona;
+    if (savedPersona === undefined) delete process.env.KYBERION_BASE_ROLE;
+    else process.env.KYBERION_BASE_ROLE = savedPersona;
     if (savedTenant === undefined) delete process.env.KYBERION_TENANT;
     else process.env.KYBERION_TENANT = savedTenant;
   });
@@ -436,7 +436,7 @@ describe('meeting-actuator voice-consent gate', () => {
       JSON.stringify({
         mission_id: FIX_MISSION,
         tier: 'confidential',
-        assigned_persona: 'ecosystem_architect',
+        org_role: 'ecosystem_architect',
         tenant_slug: 'alpha-team',
       })
     );
