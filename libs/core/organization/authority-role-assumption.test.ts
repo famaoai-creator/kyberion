@@ -327,7 +327,10 @@ describe('B2 persona authorization inputs', () => {
         'analyst'
       );
       expect(evaluate).toHaveBeenCalledWith(
-        expect.objectContaining({ operation: 'file_write', agentId: 'analyst' })
+        expect.objectContaining({
+          operation: 'file_write',
+          agentId: expect.stringMatching(/^kyberion:\/\/agent\/.+\/analyst$/u),
+        })
       );
     } finally {
       evaluate.mockRestore();
