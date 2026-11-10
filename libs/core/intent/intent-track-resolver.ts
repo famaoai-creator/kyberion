@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import * as path from 'node:path';
 import type { ValidateFunction } from 'ajv';
 import { pathResolver } from '../path-resolver.js';
@@ -27,7 +28,7 @@ export interface TrackTypePolicy {
   exit_criteria?: string[];
   recommended_pipeline?: string;
   mission_class?: string;
-  tier?: 'personal' | 'confidential' | 'public';
+  tier?: StorageDataTier;
   note?: string;
   [key: string]: unknown;
 }
@@ -79,7 +80,7 @@ export interface ResolveIntentTrackGateInput {
   intentId: string;
   confidence: number;
   tenantId?: string;
-  targetTier?: 'personal' | 'confidential' | 'public';
+  targetTier?: StorageDataTier;
   projectId?: string;
   missionId?: string;
   title?: string;
@@ -181,7 +182,7 @@ function mergeJson(base: unknown, override: unknown): unknown {
 
 function collectOverridePaths(
   tenantId?: string,
-  targetTier: 'personal' | 'confidential' | 'public' = 'confidential',
+  targetTier: StorageDataTier = 'confidential',
   additionalOverridePaths: string[] = []
 ): string[] {
   const paths: string[] = [];
@@ -249,7 +250,7 @@ export async function resolveIntentToTrackPolicy(
   intentId: string,
   tenantId?: string,
   overridePaths: string[] = [],
-  targetTier: 'personal' | 'confidential' | 'public' = 'confidential'
+  targetTier: StorageDataTier = 'confidential'
 ): Promise<TrackPolicy> {
   const normalizedIntentId = String(intentId || '').trim();
   if (!normalizedIntentId) throw new Error('intentId is required');

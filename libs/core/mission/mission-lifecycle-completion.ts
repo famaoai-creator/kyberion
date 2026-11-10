@@ -388,7 +388,7 @@ export function updateMissionMemorySidecar(mdPath: string, candidateId: string):
   saveVolatileSidecarAtPath(sidecarPath, {
     ...sidecar,
     promotion_candidate_id: candidateId,
-    status: 'promoted',
+    status: 'nominated',
     updated_at: nowIso(),
   });
 }

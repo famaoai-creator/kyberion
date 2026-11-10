@@ -27,6 +27,7 @@
  * never read. Viewer role / tier / tenant gating is evaluated server-side by
  * `isPluginViewVisible`; a client filter can only narrow it.
  */
+import type { StorageDataTier } from '../storage-layout.js';
 import * as path from 'node:path';
 import type { ValidateFunction } from 'ajv';
 import { compileSchema, createAjv2020 } from '../foundation/ajv.js';
@@ -62,7 +63,7 @@ export { pluginViewMaySendActions };
 
 export type PluginViewIsolation = 'in-process-a2ui' | 'sandboxed-iframe';
 export type PluginViewRole = 'readonly' | 'localadmin';
-export type PluginViewTier = 'public' | 'confidential' | 'personal';
+export type PluginViewTier = StorageDataTier;
 export type PluginViewActionAuthority = 'agent' | 'human';
 
 export interface PluginViewAction {

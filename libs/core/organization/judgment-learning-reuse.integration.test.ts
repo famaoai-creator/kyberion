@@ -15,9 +15,9 @@ import type { DeliveredKnowledgeRef } from '../knowledge/knowledge-feedback-loop
 import type { ScopeContext } from '../scope-context.js';
 // Fuzzy/index searches are stubbed; the synchronous first-enqueue audit wrapper below still calls real storage.
 // Actual pinned bytes, scope and publication proof are real; production automatic audit behavior is not asserted.
-vi.mock('../knowledge/distill-knowledge-injector.js', async (original) => ({
-  ...(await original<typeof import('../knowledge/distill-knowledge-injector.js')>()),
-  findRelevantDistilledKnowledge: vi.fn(async () => []),
+vi.mock('../knowledge/promoted-knowledge-retrieval.js', async (original) => ({
+  ...(await original<typeof import('../knowledge/promoted-knowledge-retrieval.js')>()),
+  findRelevantPromotedKnowledge: vi.fn(async () => []),
 }));
 vi.mock('./tenant-knowledge-retrieval.js', async (original) => ({
   ...(await original<typeof import('./tenant-knowledge-retrieval.js')>()),
@@ -101,7 +101,7 @@ beforeAll(async () => {
     );
   bootstrap.safeWriteFile(path.join(root, 'package.json'), '{}');
   vi.stubEnv('KYBERION_ROOT', root);
-  vi.stubEnv('KYBERION_PERSONA', 'sovereign');
+  vi.stubEnv('KYBERION_BASE_ROLE', 'sovereign');
   vi.stubEnv('MISSION_ROLE', 'mission_controller');
   vi.stubEnv('SYSTEM_ROLE', 'operator_surface');
   vi.stubEnv('KYBERION_TENANT', 'synthetic-latency');
@@ -249,7 +249,7 @@ async function fixture() {
     const proposal = proposals.normalizeDotProposal({
       title: 'Independent synthetic ' + kind,
       objective: 'Preserve 100 users, 500 ms and zero added JPY',
-      work_shape: 'pipeline',
+      execution_shape: 'pipeline',
       pipeline_ref: latency.SYNTHETIC_LATENCY_PIPELINE_REF,
       target: 'service:' + id,
       intent: 'apply',
@@ -552,7 +552,7 @@ async function fixture() {
         tier: recipient.tier,
         tenant_slug: recipient.tenant_slug,
         status: 'active',
-        assigned_persona: 'worker',
+        org_role: 'worker',
         git: {
           branch: 'fixture',
           start_commit: 'fixture',

@@ -490,7 +490,7 @@ function ambientCliUsageAttribution(): UsageAttribution | undefined {
     }
     if (!scope) return undefined;
     const identity = resolvePolicyIdentityContext();
-    const actorName = identity.role || identity.persona;
+    const actorName = identity.role || identity.baseRole;
     return {
       actor_id: `kyberion:${actorName && actorName !== 'unknown' ? actorName : 'process'}`,
       scope,

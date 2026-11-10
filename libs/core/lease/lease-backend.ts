@@ -34,6 +34,18 @@ export const LEASE_BACKEND_SEAM = 'lease-backend';
 /** Builtin default provider id; also the governed `default_provider`. */
 export const LOCAL_LEASE_BACKEND_ID = 'local-file-lock';
 
+/**
+ * What a lease is over (Concept Model v2 D2). Every lease in Kyberion is one
+ * of these kinds; adapters pass the kind plus a resource name and never keep
+ * holder/expiry bookkeeping of their own.
+ */
+export const LEASE_RESOURCE_KINDS = ['work_item', 'mission', 'path', 'device', 'dot_slot'] as const;
+export type LeaseResourceKind = (typeof LEASE_RESOURCE_KINDS)[number];
+
+export function isLeaseResourceKind(value: unknown): value is LeaseResourceKind {
+  return typeof value === 'string' && (LEASE_RESOURCE_KINDS as readonly string[]).includes(value);
+}
+
 /** Minimal fenced lease record: TTL + fencing token are contractual. */
 export interface FencedLeaseRecord {
   resource_id: string;
@@ -42,6 +54,25 @@ export interface FencedLeaseRecord {
   fence: number;
   /** Epoch ms after which the record no longer counts as held. */
   expires_at_ms: number;
+  /**
+   * Resource kind (W3). Optional so records written before W3 (writer-lease
+   * journals, mission leases) still load; absent means "unclassified".
+   */
+  resource_kind?: LeaseResourceKind;
+  /** Epoch ms the current fence was granted (detached leases only). */
+  acquired_at_ms?: number;
+  /** Epoch ms of the last renewal (detached leases only). */
+  renewed_at_ms?: number;
+  /** Adapter-owned descriptive fields (never holder/expiry — those are above). */
+  attributes?: Record<string, string | number | boolean>;
+}
+
+/** Copy a record so stored attributes are never shared with a caller. */
+export function cloneFencedLeaseRecord(record: FencedLeaseRecord): FencedLeaseRecord {
+  return {
+    ...record,
+    ...(record.attributes ? { attributes: { ...record.attributes } } : {}),
+  };
 }
 
 export interface LeaseBackend {

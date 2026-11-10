@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 
@@ -53,7 +54,7 @@ export interface SecurityAssetEntry {
     | 'identity';
   endpoints: string[];
   exposure: 'public' | 'partner-restricted' | 'internal-only' | 'unknown';
-  data_classification: 'personal' | 'confidential' | 'public' | 'unknown';
+  data_classification: StorageDataTier | 'unknown';
   auth_method: 'sso' | 'local-password' | 'api-key' | 'federated' | 'unknown';
   mfa_status: 'enforced' | 'optional' | 'unavailable' | 'unknown';
   log_access: string;
@@ -82,7 +83,7 @@ export interface SecurityAssetRecord {
   service_id: string;
   entry: SecurityAssetEntry;
   promoted_at: string;
-  /** Who performed the promotion ceremony (KYBERION_PERSONA / MISSION_ROLE). */
+  /** Who performed the promotion ceremony (KYBERION_BASE_ROLE / MISSION_ROLE). */
   promoted_by: string;
   /** Approval reference for a governed promotion or verification, if any. */
   approval_id?: string;
@@ -329,7 +330,7 @@ export interface SecurityLedgerDraftLike {
 }
 
 export interface PromoteOptions extends SecurityLedgerPathOptions {
-  /** Who performs the ceremony (KYBERION_PERSONA / MISSION_ROLE). */
+  /** Who performs the ceremony (KYBERION_BASE_ROLE / MISSION_ROLE). */
   promotedBy: string;
   /** Date (YYYY-MM-DD) recorded when entries are verified via verify_ids.
    *  Defaults to the promotion date. */

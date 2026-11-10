@@ -221,15 +221,24 @@ export type { MissionContract } from './contracts/mission-contract.js';
 // ---------------------------------------------------------------------------
 
 /**
- * Execution identity — 6 fixed values that determine runtime access scope.
- * Distinct from the 27 thinking-style Perspectives in knowledge/product/personalities/matrix.md.
+ * The base Authority Role an execution runs on, by short name (ADR
+ * concept-model-v2 D5: Execution Persona is removed; its authority bundles are
+ * the registry cards `base_<name>`, see `foundation/base-authority-role.ts`).
+ * Set by `KYBERION_BASE_ROLE`, an in-process assumption, or the role's default.
+ * `mission_owner` and `unknown` have no card.
  *
  * system mode  → ecosystem_architect
  * mission mode → worker | mission_owner | analyst
  * admin mode   → sovereign
  */
-export type Persona =
+export type BaseRole =
   'sovereign' | 'ecosystem_architect' | 'mission_owner' | 'worker' | 'analyst' | 'unknown';
+
+/**
+ * @deprecated Execution Persona is retired (Concept Model v2 D5); use
+ * {@link BaseRole}. Kept for one release for external consumers only.
+ */
+export type Persona = BaseRole;
 
 /**
  * Derived execution mode — which operational domain the process is in.
@@ -253,8 +262,9 @@ export type Authority =
 
 /** Unified context for the current execution thread. */
 export interface IdentityContext {
-  persona: Persona;
-  /** Derived from persona — which operational domain this process is in. */
+  /** The base Authority Role this execution runs on (formerly `persona`). */
+  baseRole: BaseRole;
+  /** Derived from the base role — which operational domain this process is in. */
   executionMode: ExecutionMode;
   authorities: Authority[];
   missionId?: string;

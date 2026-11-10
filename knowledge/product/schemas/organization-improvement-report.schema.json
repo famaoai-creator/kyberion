@@ -1,0 +1,246 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/organization-improvement-report.schema.json",
+  "title": "Organization Improvement Scan Report",
+  "description": "Output of core:organization_improvement_scan — the discovery artifact of the purpose-driven improvement loop. Candidates are proposals only; execution routes through existing governed facades.",
+  "type": "object",
+  "required": [
+    "version",
+    "report_id",
+    "generated_at",
+    "scope",
+    "window_days",
+    "objectives",
+    "purpose_missing",
+    "kr_trends",
+    "operations",
+    "outcomes",
+    "cost",
+    "candidates"
+  ],
+  "properties": {
+    "version": { "const": "1" },
+    "report_id": { "type": "string", "minLength": 1 },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "scope": {
+      "type": "object",
+      "required": ["tier", "organization_id"],
+      "properties": {
+        "tier": { "enum": ["personal", "confidential", "public"] },
+        "tenant_slug": { "type": "string", "minLength": 1 },
+        "organization_id": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "window_days": { "type": "number", "exclusiveMinimum": 0 },
+    "objectives": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["objective_id", "title", "key_results", "unmeasured_krs"],
+        "properties": {
+          "objective_id": { "type": "string", "minLength": 1 },
+          "title": { "type": "string" },
+          "progress": { "type": "number", "minimum": 0, "maximum": 1 },
+          "key_results": { "type": "array" },
+          "unmeasured_krs": { "type": "array", "items": { "type": "string" } }
+        },
+        "additionalProperties": true
+      }
+    },
+    "purpose_missing": { "type": "boolean" },
+    "kr_trends": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "kr_id",
+          "latest_progress",
+          "latest_value",
+          "measurements",
+          "stagnant",
+          "last_measured_at"
+        ],
+        "properties": {
+          "objective_id": { "type": "string" },
+          "kr_id": { "type": "string", "minLength": 1 },
+          "latest_progress": { "type": "number" },
+          "latest_value": { "type": "number" },
+          "measurements": { "type": "integer", "minimum": 0 },
+          "stagnant": { "type": "boolean" },
+          "last_measured_at": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "operations": { "type": "object" },
+    "outcomes": {
+      "type": "object",
+      "required": [
+        "dots_observed",
+        "improved",
+        "no_change",
+        "regressed",
+        "unmeasurable",
+        "non_improving_streaks"
+      ],
+      "properties": {
+        "dots_observed": { "type": "integer", "minimum": 0 },
+        "improved": { "type": "integer", "minimum": 0 },
+        "no_change": { "type": "integer", "minimum": 0 },
+        "regressed": { "type": "integer", "minimum": 0 },
+        "unmeasurable": { "type": "integer", "minimum": 0 },
+        "non_improving_streaks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["dot_id", "ref", "streak", "unmeasurable_only"],
+            "properties": {
+              "dot_id": { "type": "string" },
+              "ref": { "type": "string" },
+              "streak": { "type": "integer", "minimum": 2 },
+              "unmeasurable_only": { "type": "boolean" }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "cost": {
+      "type": "object",
+      "required": [
+        "window_days",
+        "current",
+        "cost_delta_pct",
+        "unscoped_total_usd",
+        "unattributed_usd",
+        "unattributed_share_pct",
+        "unscoped_withheld_partitions",
+        "top_models",
+        "top_missions"
+      ],
+      "properties": {
+        "window_days": { "type": "number" },
+        "current": {
+          "type": "object",
+          "required": [
+            "since",
+            "until",
+            "cost_usd",
+            "llm_tokens",
+            "llm_calls",
+            "unknown_cost_calls",
+            "cost_complete",
+            "withheld_partitions"
+          ],
+          "properties": {
+            "since": { "type": "string" },
+            "until": { "type": "string" },
+            "cost_usd": { "type": "number" },
+            "llm_tokens": { "type": "number" },
+            "llm_calls": { "type": "number" },
+            "unknown_cost_calls": { "type": "number" },
+            "cost_complete": { "type": "boolean" },
+            "withheld_partitions": { "type": "number" }
+          },
+          "additionalProperties": false
+        },
+        "prior": {
+          "type": ["object", "null"],
+          "required": ["cost_usd", "llm_tokens", "llm_calls"],
+          "properties": {
+            "cost_usd": { "type": "number" },
+            "llm_tokens": { "type": "number" },
+            "llm_calls": { "type": "number" }
+          },
+          "additionalProperties": false
+        },
+        "cost_delta_pct": { "type": ["number", "null"] },
+        "unscoped_total_usd": { "type": "number" },
+        "unattributed_usd": { "type": "number", "minimum": 0 },
+        "unattributed_share_pct": { "type": ["number", "null"], "minimum": 0, "maximum": 100 },
+        "unscoped_withheld_partitions": { "type": "number", "minimum": 0 },
+        "top_models": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["model", "cost_usd", "share_pct", "calls"],
+            "properties": {
+              "model": { "type": "string" },
+              "cost_usd": { "type": "number" },
+              "share_pct": { "type": "number" },
+              "calls": { "type": "number" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "top_missions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["mission_id", "cost_usd", "calls"],
+            "properties": {
+              "mission_id": { "type": "string" },
+              "cost_usd": { "type": "number" },
+              "calls": { "type": "number" }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "candidates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "candidate_id",
+          "rule_id",
+          "target_kind",
+          "title",
+          "summary",
+          "evidence_refs",
+          "expected_kr_effect",
+          "priority_score",
+          "status"
+        ],
+        "properties": {
+          "candidate_id": { "type": "string", "pattern": "^imp-[0-9a-f]{12}$" },
+          "rule_id": { "type": "string", "minLength": 1 },
+          "target_kind": {
+            "enum": [
+              "pipeline",
+              "charter",
+              "runbook",
+              "kr_definition",
+              "process",
+              "measurement",
+              "cost"
+            ]
+          },
+          "title": { "type": "string", "minLength": 1 },
+          "summary": { "type": "string", "minLength": 1 },
+          "evidence_refs": { "type": "array", "items": { "type": "string" } },
+          "expected_kr_effect": {
+            "type": "object",
+            "required": ["metric", "direction"],
+            "properties": {
+              "objective_id": { "type": "string" },
+              "kr_id": { "type": "string" },
+              "metric": { "type": "string", "minLength": 1 },
+              "direction": { "enum": ["increase", "decrease"] },
+              "note": { "type": "string" }
+            },
+            "additionalProperties": false
+          },
+          "priority_score": { "type": "number", "minimum": 0, "maximum": 1 },
+          "status": { "const": "proposed" }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

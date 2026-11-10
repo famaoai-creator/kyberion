@@ -58,7 +58,7 @@ describe('error-classifier', () => {
       );
       expect(c.category).toBe('permission_denied');
       expect(c.ruleId).toBe('kyberion.path-scope-persona-unset');
-      expect(c.remediation).toContain('export KYBERION_PERSONA=sovereign');
+      expect(c.remediation).toContain('export KYBERION_BASE_ROLE=sovereign');
     });
 
     it('classifies project-root path violations', () => {
@@ -280,7 +280,7 @@ describe('explainPolicyViolation', () => {
     expect(d.violationType).toBe('project_scope_denied');
     expect(d.requiredRole).toBeTruthy();
     expect(d.repairSteps.length).toBeGreaterThan(0);
-    expect(d.repairSteps[0]).toContain('KYBERION_PERSONA');
+    expect(d.repairSteps[0]).toContain('KYBERION_BASE_ROLE');
   });
 
   it('diagnoses path scope denial', () => {

@@ -1,6 +1,6 @@
 import * as path from 'node:path';
+import { executionAgentId } from './execution-agent-id.js';
 import { auditChain } from './audit-chain.js';
-import { getRegisteredEnvText } from '../foundation/env.js';
 import {
   appendJournalEventLocked,
   appendJournalEventLockedIf,
@@ -54,7 +54,7 @@ function audit(
   metadata: Record<string, unknown>
 ): void {
   auditChain.record({
-    agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'cloudflare-os-journal-store',
+    agentId: executionAgentId('cloudflare-os-journal-store'),
     action: 'control_plane',
     operation,
     result,

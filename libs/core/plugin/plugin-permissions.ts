@@ -17,6 +17,7 @@
  * This module only computes and records grants; runtime enforcement is a
  * separate layer.
  */
+import type { StorageDataTier } from '../storage-layout.js';
 import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 import { defineCatalog, type GovernedCatalog } from '../foundation/governed-catalog.js';
@@ -59,7 +60,7 @@ export function findDisallowedOfficialOnlySeam(
 
 export type PluginNetworkMode = 'none' | 'loopback' | 'allowlist';
 export type PluginFsMode = 'none' | 'readonly' | 'readwrite';
-export type PluginPermissionTier = 'public' | 'confidential' | 'personal';
+export type PluginPermissionTier = StorageDataTier;
 
 export interface PluginFsPathScope {
   tier: PluginPermissionTier;

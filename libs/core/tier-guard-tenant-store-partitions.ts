@@ -9,6 +9,7 @@
  * the store role's own grant (resolved through its bound tenant) apply. The
  * tenant scope check runs before this in tier-guard.validateWritePermission.
  */
+import type { StorageDataTier } from './storage-layout.js';
 import {
   tenantStoreLedgerPartitionOf,
   PARTITIONED_RUNTIME_LEDGER_ROOTS,
@@ -16,6 +17,8 @@ import {
   classifyStorageFloorPath,
   STORAGE_FLOOR_ROOTS,
 } from './storage-layout.js';
+import { rolePermissionRecord } from './foundation/declared-store-grant.js';
+import { baseAuthorityRolePermissionRecord } from './foundation/base-authority-role.js';
 import type { TierLevel } from './types.js';
 import { isRecord } from './foundation/primitives.js';
 import { isValidTenantSlug } from './entity-scope.js';
@@ -51,7 +54,9 @@ export function protectedFloorPartitionPrefix(relativePath: string): string | un
   return `${STORAGE_FLOOR_ROOTS[floor.floor]}/${tier}/`;
 }
 
-export function partitionedRuntimeTier(prefix: string): 'personal' | 'confidential' | undefined {
+export function partitionedRuntimeTier(
+  prefix: string
+): Exclude<StorageDataTier, 'public'> | undefined {
   const normalized = normalizeTenantPolicyPath(prefix);
   for (const root of [
     ...Object.values(PARTITIONED_RUNTIME_LEDGER_ROOTS),
@@ -179,7 +184,7 @@ interface PartitionWritePolicy {
 }
 
 interface PartitionWriteIdentity {
-  persona: string;
+  baseRole: string;
   role?: string;
   authorities: readonly string[];
   sudoScope?: string[];
@@ -205,13 +210,13 @@ export function tenantStorePartitionWriteDecision(
   // Creating the bare tier directory (the parent of every tenant partition)
   // follows the ordinary rules; any file at or under it does not.
   if (!partition.tenant && deps.operation === 'mkdir') return null;
-  const { persona, role, authorities, sudoScope } = identity;
+  const { baseRole: persona, role, authorities, sudoScope } = identity;
   if (authorities.includes('SUDO') && deps.sudoAllows(sudoScope)) return { allowed: true };
   const grants = [
     ...(role === partition.storeRole
-      ? (policy.authority_role_permissions?.[role]?.allow_write ?? [])
+      ? (rolePermissionRecord(policy, role)?.allow_write ?? [])
       : []),
-    ...(policy.persona_permissions?.[persona]?.allow_write ?? []),
+    ...(baseAuthorityRolePermissionRecord(policy, persona)?.allow_write ?? []),
   ];
   if (grants.some((pattern) => typeof pattern === 'string' && deps.matches(pattern)))
     return { allowed: true };

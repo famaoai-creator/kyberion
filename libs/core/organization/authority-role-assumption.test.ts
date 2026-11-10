@@ -14,8 +14,11 @@ import {
   resolveRole,
   withExecutionContext,
   withExecutionContextAsync,
+  withStoreGrant,
+  withStoreGrantAsync,
 } from '../authority.js';
 import { currentExecutionScope } from '../foundation/execution-scope.js';
+import { isDeclaredStoreGrantName } from '../foundation/declared-store-grant.js';
 import { pathResolver } from '../path-resolver.js';
 import { policyEngine } from '../governance/policy-engine.js';
 import {
@@ -30,7 +33,7 @@ import { validateReadPermission } from '../tier-guard.js';
 const ENV_KEYS = [
   'SYSTEM_ROLE',
   'MISSION_ROLE',
-  'KYBERION_PERSONA',
+  'KYBERION_BASE_ROLE',
   'MISSION_ID',
   'KYBERION_DELEGATED_ROLE',
 ] as const;
@@ -70,7 +73,7 @@ describe('RA-01 scoped role assumption', () => {
     const inside = withExecutionContext('chronos_localadmin', () => ({
       role: resolveRole(),
       identityRole: resolveIdentityContext().role,
-      persona: resolveIdentityContext().persona,
+      persona: resolveIdentityContext().baseRole,
     }));
     expect(inside).toEqual({
       role: 'chronos_localadmin',
@@ -159,7 +162,7 @@ describe('RA-01 scoped role assumption', () => {
 
   it('restores the env mirror after the context, including on throw', async () => {
     process.env.MISSION_ROLE = 'outer_role';
-    process.env.KYBERION_PERSONA = 'analyst';
+    process.env.KYBERION_BASE_ROLE = 'analyst';
 
     expect(() =>
       withExecutionContext('mission_controller', () => {
@@ -168,7 +171,7 @@ describe('RA-01 scoped role assumption', () => {
       })
     ).toThrow('boom');
     expect(process.env.MISSION_ROLE).toBe('outer_role');
-    expect(process.env.KYBERION_PERSONA).toBe('analyst');
+    expect(process.env.KYBERION_BASE_ROLE).toBe('analyst');
 
     await withExecutionContextAsync('surface_runtime', async () => {
       await Promise.resolve();
@@ -177,12 +180,12 @@ describe('RA-01 scoped role assumption', () => {
       expect(resolveRole()).toBe('surface_runtime');
     });
     expect(process.env.MISSION_ROLE).toBe('outer_role');
-    expect(process.env.KYBERION_PERSONA).toBe('analyst');
+    expect(process.env.KYBERION_BASE_ROLE).toBe('analyst');
   });
 
   it('leaves the process env intact when async contexts interleave (B1)', async () => {
     process.env.MISSION_ROLE = 'outer_role';
-    process.env.KYBERION_PERSONA = 'worker';
+    process.env.KYBERION_BASE_ROLE = 'worker';
     const aEntered = deferred();
     const bEntered = deferred();
     const aDone = deferred();
@@ -213,7 +216,7 @@ describe('RA-01 scoped role assumption', () => {
       b: { role: 'mission_controller', persona: 'ecosystem_architect' },
     });
     expect(process.env.MISSION_ROLE).toBe('outer_role');
-    expect(process.env.KYBERION_PERSONA).toBe('worker');
+    expect(process.env.KYBERION_BASE_ROLE).toBe('worker');
     expect(resolveRole()).toBe('outer_role');
   });
 
@@ -252,7 +255,7 @@ describe('RA-01 scoped role assumption', () => {
     );
     const env = await a;
     expect(env.MISSION_ROLE).toBe('chronos_localadmin');
-    expect(env.KYBERION_PERSONA).toBe('worker');
+    expect(env.KYBERION_BASE_ROLE).toBe('worker');
   });
 
   it('gives safe-exec children the scoped role, not the shared env mirror', async () => {
@@ -271,7 +274,7 @@ describe('RA-01 scoped role assumption', () => {
     );
     const env = await a;
     expect(env.MISSION_ROLE).toBe('chronos_localadmin');
-    expect(env.KYBERION_PERSONA).toBe('worker');
+    expect(env.KYBERION_BASE_ROLE).toBe('worker');
   });
 });
 
@@ -310,8 +313,8 @@ describe('S6 role normalization', () => {
 
 describe('B2 persona authorization inputs', () => {
   it('gives the secure-io policy gate the execution-scope persona', async () => {
-    const saved = process.env.KYBERION_PERSONA;
-    process.env.KYBERION_PERSONA = 'worker';
+    const saved = process.env.KYBERION_BASE_ROLE;
+    process.env.KYBERION_BASE_ROLE = 'worker';
     const evaluate = vi.spyOn(policyEngine, 'evaluate');
     const target = pathResolver.sharedTmp(`ra-b2-${process.pid}.txt`);
     try {
@@ -324,13 +327,16 @@ describe('B2 persona authorization inputs', () => {
         'analyst'
       );
       expect(evaluate).toHaveBeenCalledWith(
-        expect.objectContaining({ operation: 'file_write', agentId: 'analyst' })
+        expect.objectContaining({
+          operation: 'file_write',
+          agentId: expect.stringMatching(/^kyberion:\/\/agent\/.+\/analyst$/u),
+        })
       );
     } finally {
       evaluate.mockRestore();
       safeRmSync(target, { force: true });
-      if (saved === undefined) delete process.env.KYBERION_PERSONA;
-      else process.env.KYBERION_PERSONA = saved;
+      if (saved === undefined) delete process.env.KYBERION_BASE_ROLE;
+      else process.env.KYBERION_BASE_ROLE = saved;
     }
   });
 });
@@ -550,13 +556,13 @@ describe('DR-01 delegated child role', () => {
   it('ignores a denied delegation with a warning and falls back to SYSTEM_ROLE', () => {
     becomeChild(buildExecutionEnv({ SYSTEM_ROLE: 'slack_bridge' }, 'chronos_localadmin'));
     // The parent-side env still claims the role; the child must not trust it.
-    expect(process.env.KYBERION_PERSONA).toBe('worker');
-    process.env.KYBERION_PERSONA = 'sovereign';
+    expect(process.env.KYBERION_BASE_ROLE).toBe('worker');
+    process.env.KYBERION_BASE_ROLE = 'sovereign';
     const warn = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
     try {
       expect(resolveRole()).toBe('slack_bridge');
       expect(resolveExecutionPersona()).not.toBe('sovereign');
-      expect(resolveIdentityContext().persona).not.toBe('sovereign');
+      expect(resolveIdentityContext().baseRole).not.toBe('sovereign');
       expect(warn).toHaveBeenCalledWith(expect.stringContaining('[ROLE_DELEGATION_DENIED]'));
       expect(warn).toHaveBeenCalledWith(expect.stringContaining('chronos_localadmin'));
     } finally {
@@ -615,13 +621,13 @@ describe('DR-01 delegated child role', () => {
     // nexus_daemon's default persona is sovereign; the denied child must not get it.
     expect(inferPersonaFromRole('nexus_daemon')).toBe('sovereign');
     becomeChild(buildExecutionEnv({ SYSTEM_ROLE: 'nexus_daemon' }, 'chronos_localadmin'));
-    process.env.KYBERION_PERSONA = 'sovereign';
+    process.env.KYBERION_BASE_ROLE = 'sovereign';
     const warn = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
     try {
       expect(resolveRole()).toBe('nexus_daemon');
       expect(resolveExecutionPersona()).toBe('worker');
       const identity = resolveIdentityContext();
-      expect(identity.persona).toBe('worker');
+      expect(identity.baseRole).toBe('worker');
       expect(identity.authorities).not.toContain('SECRET_READ');
     } finally {
       warn.mockRestore();
@@ -692,7 +698,7 @@ describe('DR-01 delegated child role', () => {
       {
         SYSTEM_ROLE: 'surface_runtime',
         MISSION_ROLE: 'surface_runtime',
-        KYBERION_PERSONA: 'sovereign',
+        KYBERION_BASE_ROLE: 'sovereign',
         [DELEGATED_ROLE_ENV]: 'surface_runtime@concierge',
       },
       'concierge',
@@ -701,7 +707,7 @@ describe('DR-01 delegated child role', () => {
     expect(launched).toMatchObject({
       SYSTEM_ROLE: 'concierge',
       MISSION_ROLE: '',
-      KYBERION_PERSONA: 'worker',
+      KYBERION_BASE_ROLE: 'worker',
       [DELEGATED_ROLE_ENV]: '',
     });
     becomeChild(launched);
@@ -717,7 +723,7 @@ describe('DR-01 delegated child role', () => {
         PATH: '/bin',
         SYSTEM_ROLE: 'x',
         MISSION_ROLE: 'x',
-        KYBERION_PERSONA: 'sovereign',
+        KYBERION_BASE_ROLE: 'sovereign',
         [DELEGATED_ROLE_ENV]: 'x@y',
         KYBERION_SUDO: 'true',
       })
@@ -819,64 +825,76 @@ describe('tenant-bound reader roles never follow a caller-supplied tenant', () =
     resetRoleAssumptionPolicyCache();
   });
 
+  // S4: a tenant-bound reader that became a declared store grant is entered through its
+  // facade's grant (withStoreGrant) with the same tenant binding rule.
+  const enter = <T>(role: string, fn: () => T, tenant?: string): T =>
+    isDeclaredStoreGrantName(role)
+      ? withStoreGrant(role, fn, tenant === undefined ? {} : { tenantSlug: tenant })
+      : withExecutionContext(role, fn, undefined, tenant);
+  const enterAsync = <T>(role: string, fn: () => Promise<T>, tenant?: string): Promise<T> =>
+    isDeclaredStoreGrantName(role)
+      ? withStoreGrantAsync(role, fn, tenant === undefined ? {} : { tenantSlug: tenant })
+      : withExecutionContextAsync(role, fn, undefined, tenant);
+
   for (const role of ['peer_catalog_reader', 'peer_responder_reader', 'scope_locale_reader']) {
     it(`${role}: another tenant than the active one is rejected`, () => {
       process.env.KYBERION_TENANT = 'tenant-a';
-      expect(() => withExecutionContext(role, () => 'ran', undefined, 'tenant-b')).toThrow(
+      expect(() => enter(role, () => 'ran', 'tenant-b')).toThrow(
         /\[ROLE_TENANT_SCOPE_MISMATCH\].*active tenant is 'tenant-a'/
       );
     });
 
     it(`${role}: the active tenant binds`, () => {
       process.env.KYBERION_TENANT = 'tenant-a';
-      expect(
-        withExecutionContext(role, () => currentExecutionScope()?.tenantSlug, undefined, 'tenant-a')
-      ).toBe('tenant-a');
+      expect(enter(role, () => currentExecutionScope()?.tenantSlug, 'tenant-a')).toBe('tenant-a');
     });
 
     it(`${role}: without an active tenant the process binds its own tenant`, async () => {
-      expect(
-        withExecutionContext(role, () => currentExecutionScope()?.tenantSlug, undefined, 'tenant-b')
-      ).toBe('tenant-b');
+      expect(enter(role, () => currentExecutionScope()?.tenantSlug, 'tenant-b')).toBe('tenant-b');
       await expect(
-        withExecutionContextAsync(
-          role,
-          async () => currentExecutionScope()?.tenantSlug,
-          undefined,
-          'tenant-b'
-        )
+        enterAsync(role, async () => currentExecutionScope()?.tenantSlug, 'tenant-b')
       ).resolves.toBe('tenant-b');
     });
 
     it(`${role}: a missing or invalid tenant is rejected`, async () => {
-      expect(() => withExecutionContext(role, () => 'ran')).toThrow(
-        /\[ROLE_TENANT_SCOPE_REQUIRED\]/
-      );
-      expect(() => withExecutionContext(role, () => 'ran', undefined, '../x')).toThrow(
-        /\[ROLE_TENANT_SCOPE_REQUIRED\]/
-      );
-      await expect(withExecutionContextAsync(role, async () => 'ran')).rejects.toThrow(
+      expect(() => enter(role, () => 'ran')).toThrow(/\[ROLE_TENANT_SCOPE_REQUIRED\]/);
+      expect(() => enter(role, () => 'ran', '../x')).toThrow(/\[ROLE_TENANT_SCOPE_REQUIRED\]/);
+      await expect(enterAsync(role, async () => 'ran')).rejects.toThrow(
         /\[ROLE_TENANT_SCOPE_REQUIRED\]/
       );
     });
+
+    if (isDeclaredStoreGrantName(role))
+      it(`${role}: is a store grant, never assumable as a role`, async () => {
+        expect(() => withExecutionContext(role, () => 'ran', undefined, 'tenant-a')).toThrow(
+          /\[ROLE_ASSUMPTION_DENIED\].*store grant/
+        );
+        await expect(
+          withExecutionContextAsync(role, async () => 'ran', undefined, 'tenant-a')
+        ).rejects.toThrow(/\[ROLE_ASSUMPTION_DENIED\].*store grant/);
+      });
   }
 
   it('an outer tenant-bound scope is the active tenant for a nested assumption', () => {
     expect(() =>
-      withExecutionContext(
+      enter(
         'peer_responder_reader',
-        () => withExecutionContext('peer_catalog_reader', () => 'ran', undefined, 'tenant-b'),
-        undefined,
+        () => enter('peer_catalog_reader', () => 'ran', 'tenant-b'),
         'tenant-a'
       )
     ).toThrow(/\[ROLE_TENANT_SCOPE_MISMATCH\]/);
   });
 
-  it('other roles keep binding a caller-supplied tenant', () => {
+  it('other roles and grants keep binding a caller-supplied tenant', () => {
     process.env.KYBERION_TENANT = 'tenant-a';
+    // audit_mirror_writer is a declared store grant that is not tenant-bound: the audit
+    // chain binds each mirror write to its entry's tenant, whatever the caller's tenant.
+    expect(
+      enter('audit_mirror_writer', () => currentExecutionScope()?.tenantSlug, 'tenant-b')
+    ).toBe('tenant-b');
     expect(
       withExecutionContext(
-        'audit_mirror_writer',
+        'mission_controller',
         () => currentExecutionScope()?.tenantSlug,
         undefined,
         'tenant-b'

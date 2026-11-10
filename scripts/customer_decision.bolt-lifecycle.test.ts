@@ -68,7 +68,7 @@ function writeMission(id: string, status: string, tier: Tier = 'public'): void {
         status,
         execution_mode: 'local',
         priority: 1,
-        assigned_persona: 'tester',
+        org_role: 'tester',
         confidence_score: 1,
         git: { branch: 'test', start_commit: 'abc123', latest_commit: head, checkpoints: [] },
         history: [],
@@ -118,10 +118,10 @@ async function ensureCase(): Promise<void> {
 describe('bolt review through the real mission lifecycle (CD-10)', () => {
   const saved: Record<string, string | undefined> = {};
   beforeAll(() => {
-    for (const key of ['MISSION_ROLE', 'KYBERION_PERSONA', 'KYBERION_MEMORY_QUEUE_PATH'])
+    for (const key of ['MISSION_ROLE', 'KYBERION_BASE_ROLE', 'KYBERION_MEMORY_QUEUE_PATH'])
       saved[key] = process.env[key];
     process.env.MISSION_ROLE = 'mission_controller';
-    process.env.KYBERION_PERSONA = 'worker';
+    process.env.KYBERION_BASE_ROLE = 'worker';
     process.env.KYBERION_MEMORY_QUEUE_PATH = queuePath;
   });
   afterAll(() => {
@@ -255,11 +255,11 @@ describe('bolt review through the real mission lifecycle (CD-10)', () => {
       `active/archive/missions/confidential/${TENANT}/${MISSION_C}`
     );
 
-    // The operator's own CLI: no MISSION_ROLE / KYBERION_PERSONA.
+    // The operator's own CLI: no MISSION_ROLE / KYBERION_BASE_ROLE.
     const role = process.env.MISSION_ROLE;
-    const persona = process.env.KYBERION_PERSONA;
+    const persona = process.env.KYBERION_BASE_ROLE;
     delete process.env.MISSION_ROLE;
-    delete process.env.KYBERION_PERSONA;
+    delete process.env.KYBERION_BASE_ROLE;
     const summary = pathResolver.sharedTmp(`cd10-lifecycle-summary-c-${suffix}.md`);
     safeWriteFile(summary, 'The stock search shows the bin.');
     let drafted: { agenda_id: string; bolt_mission_id: string };
@@ -301,7 +301,7 @@ describe('bolt review through the real mission lifecycle (CD-10)', () => {
       ).rejects.toThrow(/was not found or has no decision case/u);
     } finally {
       process.env.MISSION_ROLE = role;
-      process.env.KYBERION_PERSONA = persona;
+      process.env.KYBERION_BASE_ROLE = persona;
       safeRmSync(summary, { force: true });
     }
     expect(drafted.bolt_mission_id).toBe(MISSION_C);

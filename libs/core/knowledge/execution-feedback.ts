@@ -9,16 +9,16 @@ import {
 export {
   executionFeedbackScopeKey,
   listExecutionFeedbackCandidates,
+  migrateLegacyExecutionFeedbackCandidates,
+  type ExecutionFeedbackCandidate,
 } from './execution-feedback-candidates.js';
 import { assertMemoryScope, type MemoryScopeEnvelope } from './memory-scope.js';
 import { defineCatalog, type GovernedCatalog } from '../foundation/governed-catalog.js';
 import { nowIso } from '../foundation/time.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeExistsSync, safeMkdir, safeWriteFile } from '../secure-io.js';
-import {
-  createDistillCandidateRecord,
-  type DistillCandidateRecord,
-} from './distill-candidate-registry.js';
+import type { ExecutionFeedbackCandidate } from './execution-feedback-candidates.js';
+import { logger } from '../core.js';
 import {
   getIntentPhraseMatcher,
   matchesIntentPhrase,
@@ -90,7 +90,9 @@ export interface ExecutionFeedbackRequest {
 
 export interface ExecutionFeedbackCandidateResult {
   summary: ExecutionFeedbackSummary;
-  candidate: DistillCandidateRecord | null;
+  candidate: ExecutionFeedbackCandidate | null;
+  /** D8: why a candidate-worthy result was not captured (no scope at capture). */
+  not_captured?: string;
 }
 
 /**
@@ -99,10 +101,16 @@ export interface ExecutionFeedbackCandidateResult {
  * Feedback is deliberately kept separate from the procedure catalog: a user
  * correction proposes a change, but never silently changes an executable
  * procedure. A human must review the candidate before it can be promoted.
+ *
+ * D8: the candidate is a MemoryCandidate queue row captured with the
+ * feedback's scope (or the caller's explicit `scope`, e.g. the dot charter's).
+ * Without a scope nothing is captured — the result says why.
  */
 export function materializeExecutionFeedbackCandidate(input: {
   feedback: ExecutionFeedbackRecord;
   procedureId?: string;
+  /** Capture scope when it differs from the feedback store scope. */
+  scope?: MemoryScopeEnvelope;
 }): ExecutionFeedbackCandidateResult {
   const summary = summarizeExecutionFeedback({
     scenarioId: input.feedback.scenario_id,
@@ -112,13 +120,21 @@ export function materializeExecutionFeedbackCandidate(input: {
   if (summary.improvement_status !== 'candidate') {
     return { summary, candidate: null };
   }
+  const captureScope = input.scope || input.feedback.scope;
+  if (!captureScope) {
+    const reason = `[MEMORY_SCOPE_REQUIRED] feedback ${input.feedback.feedback_id} has no scope — its improvement proposal is not captured (scope is never inferred)`;
+    logger.warn(
+      `[execution-feedback] ${reason} | next: record the feedback with an explicit scope | evidence: scenario ${input.feedback.scenario_id}`
+    );
+    return { summary, candidate: null, not_captured: reason };
+  }
 
-  const existing = listExecutionFeedbackCandidates(input.feedback.scope).find((candidate) => {
+  const existing = listExecutionFeedbackCandidates(captureScope).find((candidate) => {
     const metadata = candidate.metadata;
     return (
+      !candidate.legacy_read_only &&
       candidate.status === 'proposed' &&
-      executionFeedbackScopeKey(candidate.scope) ===
-        executionFeedbackScopeKey(input.feedback.scope) &&
+      executionFeedbackScopeKey(candidate.scope) === executionFeedbackScopeKey(captureScope) &&
       metadata?.improvement_kind === 'execution_feedback' &&
       !metadata.learning_link &&
       metadata.scenario_id === input.feedback.scenario_id &&
@@ -142,9 +158,8 @@ export function materializeExecutionFeedbackCandidate(input: {
   );
   const candidateInput = {
     source_type: 'task_session' as const,
-    tier: input.feedback.scope?.tier || ('personal' as const),
-    ...(input.feedback.scope ? { scope: assertMemoryScope(input.feedback.scope) } : {}),
-    task_session_id: input.feedback.correlation_id,
+    scope: assertMemoryScope(captureScope),
+    ...(input.feedback.correlation_id ? { task_session_id: input.feedback.correlation_id } : {}),
     title,
     summary: t(
       'recorder:recorder_candidate_summary',
@@ -174,24 +189,16 @@ export function materializeExecutionFeedbackCandidate(input: {
     },
   };
   const candidate = existing
-    ? (() => {
-        const updated = {
-          ...existing,
-          title: candidateInput.title,
-          summary: candidateInput.summary,
-          evidence_refs: [
-            ...new Set([...(existing.evidence_refs || []), ...candidateInput.evidence_refs]),
-          ],
-          metadata: { ...(existing.metadata || {}), ...candidateInput.metadata },
-        };
-        saveExecutionFeedbackCandidate(updated);
-        return updated;
-      })()
-    : (() => {
-        const created = createDistillCandidateRecord(candidateInput);
-        saveExecutionFeedbackCandidate(created);
-        return created;
-      })();
+    ? saveExecutionFeedbackCandidate({
+        ...existing,
+        title: candidateInput.title,
+        summary: candidateInput.summary,
+        evidence_refs: [
+          ...new Set([...(existing.evidence_refs || []), ...candidateInput.evidence_refs]),
+        ],
+        metadata: { ...(existing.metadata || {}), ...candidateInput.metadata },
+      })
+    : saveExecutionFeedbackCandidate(candidateInput);
   return { summary, candidate };
 }
 

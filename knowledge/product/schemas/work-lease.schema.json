@@ -30,7 +30,8 @@
     "idempotency_key": { "type": "string" },
     "payload_hash": { "type": "string" },
     "expected_version": { "type": "integer" },
-    "previous_lease_id": { "type": "string" }
+    "previous_lease_id": { "type": "string" },
+    "fence": { "type": "integer", "minimum": 0 }
   },
   "additionalProperties": true
 }

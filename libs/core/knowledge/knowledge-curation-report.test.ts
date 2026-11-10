@@ -378,6 +378,10 @@ describe('writeCurationReport / generateKnowledgeCurationReport', () => {
     expect(written).toBe(renderCurationReportMarkdown(report));
     expect(written).toContain('Low-Yield Hints');
     expect(written).toContain('Freshness SLO Breaches');
+    // D8 loop health is a visible header line of the weekly report.
+    expect(written).toMatch(
+      /^memory_loop: promoted \d+ → retrieved \d+ → used \d+ \(last 28 days\)$/m
+    );
     expect(written).toContain('knowledge/product/foo.md');
     expect(written.toLowerCase()).toContain('candidates only');
     expect(written.toLowerCase()).toContain('do not edit manually');

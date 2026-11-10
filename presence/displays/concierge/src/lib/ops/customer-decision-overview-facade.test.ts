@@ -91,11 +91,11 @@ describe('customer-decision facade child (CD-12)', () => {
     expect(env).toMatchObject({
       KYBERION_TENANT: 'acme',
       SYSTEM_ROLE: CUSTOMER_DECISION_READER_ROLE,
-      KYBERION_PERSONA: 'worker',
+      KYBERION_BASE_ROLE: 'worker',
       KYBERION_DELEGATED_ROLE: '',
     });
     for (const key of OVERVIEW_CHILD_CLEARED_ENV)
-      if (key !== 'KYBERION_PERSONA') expect(env[key]).toBe('');
+      if (key !== 'KYBERION_BASE_ROLE') expect(env[key]).toBe('');
     expect(Object.keys(env).sort()).toEqual(
       [
         ...OVERVIEW_CHILD_CLEARED_ENV,

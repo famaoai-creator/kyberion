@@ -109,7 +109,7 @@ pnpm pipeline --input active/shared/tmp/confidential/<slug>/actuator-playground/
 # public drafts:
 pnpm pipeline:promote --input <adf>.json --run <run-id> --source-is-public
 # tenant drafts (confidential/personal partition) — identity required for the asset ledger:
-MISSION_ROLE=worker KYBERION_PERSONA=worker \
+MISSION_ROLE=worker KYBERION_BASE_ROLE=worker \
   pnpm pipeline:promote --input <adf>.json --run <run-id> --tenant <slug>
 ```
 
@@ -337,4 +337,4 @@ declared channels so context-patch returns become rare. `actionInput` stays.
   or context patches at the SDK boundary (see §5 Dispatch ABI).
 - `pipeline:promote --tenant` from another checkout failed with missing ADF /
   journal / personal tenant profile — documented in §2 tenant-trial notes
-  (same root, copy profile, set `MISSION_ROLE`/`KYBERION_PERSONA`).
+  (same root, copy profile, set `MISSION_ROLE`/`KYBERION_BASE_ROLE`).

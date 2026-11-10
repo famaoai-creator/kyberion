@@ -1,6 +1,6 @@
 import { auditChain } from './audit-chain.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
-import { executionPersonaText } from '../foundation/execution-scope.js';
+import { executionAgentId } from './execution-agent-id.js';
 import { recordGovernanceAction } from './governance-action-recorder.js';
 import { policyEngine, type PolicyDecision } from './policy-engine.js';
 import {
@@ -35,7 +35,7 @@ export function assertOperationPolicy(input: {
   message?: string;
   context?: Record<string, unknown>;
 }): PolicyDecision {
-  const agentId = executionPersonaText() || 'unknown';
+  const agentId = executionAgentId();
   const ring = Number(getRegisteredEnvText('KYBERION_AGENT_RING'));
   const decision = policyEngine.evaluate({
     agentId,

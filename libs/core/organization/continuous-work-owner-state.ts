@@ -1,4 +1,5 @@
 /** Mission-owner execution surface. The dot worker executor cannot run these bindings. */
+import type { StorageDataTier } from '../storage-layout.js';
 import { currentExecutionScope } from '../foundation/execution-scope.js';
 import { assertContinuousDevelopmentApprovalPresentation } from './continuous-development-consent.js';
 import type { DotCharter } from '../dot/dot-charter.js';
@@ -6,6 +7,7 @@ import { assertDotAccountabilityCharter } from '../dot/dot-authority.js';
 import { readDotActionLedgerStrict } from '../dot/dot-action-ledger.js';
 import { dotWorkItemInput } from '../dot/dot-work-item.js';
 import { dotAdmissionScopeHash } from '../dot/dot-admission-identity.js';
+import { dotProposalEvidenceHash } from '../dot/dot-action-ledger-version.js';
 import { recoveryEvidenceHash } from '../surface/front-desk-recovery-receipt.js';
 import {
   loadApprovalRequest,
@@ -35,7 +37,7 @@ import { assertSafeRepositoryPath } from '../secure-io.js';
 import { storagePartitionSegments } from '../storage-layout.js';
 
 export interface ContinuousWorkOwnerScope {
-  tier: 'personal' | 'confidential' | 'public';
+  tier: StorageDataTier;
   tenant_slug?: string;
   organization_id: string;
 }
@@ -187,7 +189,7 @@ export function authorizeItem(
     !record.admission ||
     record.admission.scope_hash !== dotAdmissionScopeHash(charter) ||
     record.admission.authority_role !== charter.authority.authority_role ||
-    record.admission.semantic_hash !== recoveryEvidenceHash(record.admission.proposal) ||
+    record.admission.semantic_hash !== dotProposalEvidenceHash(record.admission.proposal) ||
     digest(record.admission.proposal.continuous_work) !== digest(record.continuous_work)
   )
     throw new Error('Managed admission binding changed');

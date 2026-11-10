@@ -1,4 +1,5 @@
 import { t } from '../localization/t.js';
+import { baseRoleEnvText } from '../foundation/base-role-env.js';
 import { appendJsonLine, readJsonLines } from '../foundation/json.js';
 /**
  * libs/core/mission/mission-maintenance.ts
@@ -136,10 +137,7 @@ export function loadMissionFlightRecorderAtPath(filePath: string): MissionFlight
 }
 
 function resolveApprovalActor(requestedBy?: string): string {
-  const resolvedActor =
-    getRegisteredEnvText('KYBERION_PERSONA') ||
-    getRegisteredEnvText('USER') ||
-    'mission_controller';
+  const resolvedActor = baseRoleEnvText() || getRegisteredEnvText('USER') || 'mission_controller';
   const requested = String(requestedBy || '').trim();
   if (requested && requested !== resolvedActor) {
     throw new Error(
@@ -580,10 +578,7 @@ export async function approveScopeChange(args: {
         requestId: approvalRequestId,
         applyResult: {
           appliedAt: nowIso(),
-          appliedBy:
-            getRegisteredEnvText('KYBERION_PERSONA') ||
-            getRegisteredEnvText('USER') ||
-            'mission_controller',
+          appliedBy: baseRoleEnvText() || getRegisteredEnvText('USER') || 'mission_controller',
           result: 'success',
         },
       });

@@ -7,7 +7,7 @@
   "command": "pnpm",
   "args": ["--dir", "${KYBERION_REPO_PATH}", "mcp:server"],
   "env": {
-    "KYBERION_PERSONA": "sovereign_concierge",
+    "KYBERION_BASE_ROLE": "sovereign_concierge",
     "NODE_ENV": "production"
   },
   "setup": {

@@ -70,7 +70,7 @@ describe('intent coverage contract', () => {
     for (const entry of coverage) {
       const intent = standardIntents.find((candidate) => candidate.id === entry.intent_id);
       expect(intent, `missing standard intent for ${entry.intent_id}`).toBeTruthy();
-      expect(intent?.resolution?.shape, `missing resolution shape for ${entry.intent_id}`).toBe(
+      expect(intent?.execution_shape, `execution shape mismatch for ${entry.intent_id}`).toBe(
         entry.execution_shape
       );
 

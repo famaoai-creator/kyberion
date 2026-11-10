@@ -1,6 +1,6 @@
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { pathResolver } from '../path-resolver.js';
-import { resolveIntentResolutionPacket } from './intent-resolution.js';
+import { resolveRoutingPacket } from './intent-resolver-entry.js';
 
 /**
  * Deterministic evaluation of utterance → selected intent against a labelled
@@ -61,7 +61,7 @@ export function evaluateIntentResolutionCorpus(
   const misses: IntentResolutionEvalMiss[] = [];
 
   for (const testCase of cases) {
-    const actual = resolveIntentResolutionPacket(testCase.utterance).selected_intent_id;
+    const actual = resolveRoutingPacket(testCase.utterance).selected_intent_id;
     const expected = testCase.expect_no_intent ? undefined : testCase.expected_intent_id;
     const passed = actual === expected;
     const group = testCase.expect_no_intent ? negative : positive;

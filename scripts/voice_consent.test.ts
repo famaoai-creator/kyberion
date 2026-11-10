@@ -18,11 +18,11 @@ describe('voice_consent CLI helpers', () => {
 
   beforeEach(() => {
     savedMission = process.env.MISSION_ID;
-    savedPersona = process.env.KYBERION_PERSONA;
+    savedPersona = process.env.KYBERION_BASE_ROLE;
     savedRole = process.env.MISSION_ROLE;
     savedTenant = process.env.KYBERION_TENANT;
     process.env.MISSION_ID = FIX_MISSION;
-    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     process.env.MISSION_ROLE = 'mission_controller';
     process.env.KYBERION_TENANT = 'alpha-team';
     fs.mkdirSync(path.join(MISSION_DIR, 'evidence'), { recursive: true });
@@ -31,7 +31,7 @@ describe('voice_consent CLI helpers', () => {
       JSON.stringify({
         mission_id: FIX_MISSION,
         tier: 'confidential',
-        assigned_persona: 'ecosystem_architect',
+        org_role: 'ecosystem_architect',
         tenant_slug: 'alpha-team',
       })
     );
@@ -47,8 +47,8 @@ describe('voice_consent CLI helpers', () => {
     });
     if (savedMission === undefined) delete process.env.MISSION_ID;
     else process.env.MISSION_ID = savedMission;
-    if (savedPersona === undefined) delete process.env.KYBERION_PERSONA;
-    else process.env.KYBERION_PERSONA = savedPersona;
+    if (savedPersona === undefined) delete process.env.KYBERION_BASE_ROLE;
+    else process.env.KYBERION_BASE_ROLE = savedPersona;
     if (savedRole === undefined) delete process.env.MISSION_ROLE;
     else process.env.MISSION_ROLE = savedRole;
     if (savedTenant === undefined) delete process.env.KYBERION_TENANT;

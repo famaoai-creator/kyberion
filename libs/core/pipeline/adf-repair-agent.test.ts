@@ -19,7 +19,7 @@ import {
   safeSymlinkSync,
   safeWriteFile,
 } from '../secure-io.js';
-import { findRelevantDistilledKnowledge } from '../knowledge/distill-knowledge-injector.js';
+import { findRelevantPromotedKnowledge } from '../knowledge/promoted-knowledge-retrieval.js';
 import { knowledgeDeliveryLogDir } from '../knowledge/knowledge-feedback-loop.js';
 import {
   clearWorkCoordinationStore,
@@ -41,8 +41,8 @@ vi.mock('../provider/provider-permission-profiles.js', async (importOriginal) =>
 
 // KP-02: mocked so the delegation-context tests below are deterministic and
 // do not depend on the real knowledge/product/evolution corpus contents.
-vi.mock('../knowledge/distill-knowledge-injector.js', () => ({
-  findRelevantDistilledKnowledge: vi.fn(async () => []),
+vi.mock('../knowledge/promoted-knowledge-retrieval.js', () => ({
+  findRelevantPromotedKnowledge: vi.fn(async () => []),
 }));
 
 const tmpRoot = pathResolver.sharedTmp('adf-repair-agent-tests');
@@ -105,8 +105,8 @@ describe('validateAndRepairAdf', () => {
   beforeEach(() => {
     safeMkdir(tmpRoot, { recursive: true });
     resetReasoningBackend();
-    vi.mocked(findRelevantDistilledKnowledge).mockReset();
-    vi.mocked(findRelevantDistilledKnowledge).mockResolvedValue([]);
+    vi.mocked(findRelevantPromotedKnowledge).mockReset();
+    vi.mocked(findRelevantPromotedKnowledge).mockResolvedValue([]);
     process.env.KYBERION_KNOWLEDGE_DELIVERY_DIR = knowledgeDeliveryDirOverride;
     safeRmSync(knowledgeDeliveryDirOverride, { recursive: true, force: true });
     setWorkCoordinationNamespace(`adf-repair-agent-caller-tests-${process.pid}`);
@@ -822,7 +822,7 @@ describe('validateAndRepairAdf', () => {
 
   describe('KP-02: delegateTask knowledge context', () => {
     it('attaches a "Relevant knowledge" section to the delegation context when hints are found', async () => {
-      vi.mocked(findRelevantDistilledKnowledge).mockResolvedValueOnce([
+      vi.mocked(findRelevantPromotedKnowledge).mockResolvedValueOnce([
         {
           path: 'knowledge/product/evolution/distill_adf_example_2026-07-01.md',
           title: 'ADF repair example',
@@ -850,7 +850,7 @@ describe('validateAndRepairAdf', () => {
     });
 
     it('fails open when knowledge retrieval throws — repair still delegates with the original context', async () => {
-      vi.mocked(findRelevantDistilledKnowledge).mockRejectedValueOnce(new Error('boom'));
+      vi.mocked(findRelevantPromotedKnowledge).mockRejectedValueOnce(new Error('boom'));
       const filePath = writeFixture(
         'schema-invalid-knowledge-fail.json',
         JSON.stringify({ capability: 'demo' }, null, 2)
@@ -868,7 +868,7 @@ describe('validateAndRepairAdf', () => {
     });
 
     it('records knowledge delivery telemetry with a non-mission scope marker', async () => {
-      vi.mocked(findRelevantDistilledKnowledge).mockResolvedValueOnce([
+      vi.mocked(findRelevantPromotedKnowledge).mockResolvedValueOnce([
         {
           path: 'knowledge/product/evolution/distill_adf_delivery_2026-07-01.md',
           title: 'ADF repair delivery test doc',

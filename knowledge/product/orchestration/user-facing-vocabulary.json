@@ -6184,9 +6184,9 @@
         "qps-ploc": "⟦Ḓïşŧïŀŀ Ƈȧñḓïḓȧŧėş ŀőřėɱ⟧"
       },
       "chronos_mip_distill_candidates_description": {
-        "en": "Completed work can become reusable organizational memory. This queue highlights outcome-backed candidates that may be promoted into patterns, SOPs, or governed knowledge later.",
-        "ja": "完了した仕事は再利用できる組織の記憶になります。成果に裏付けられた候補を、パターン・SOP・管理されたナレッジへ昇格できるよう一覧にしています。",
-        "qps-ploc": "⟦Ƈőɱṗŀėŧėḓ ẇőřķ ƈȧñ ƀėƈőɱė řėůşȧƀŀė őřɠȧñïẑȧŧïőñȧŀ ɱėɱőřẏ. Ŧħïş ɋůėůė ħïɠħŀïɠħŧş őůŧƈőɱė-ƀȧƈķėḓ ƈȧñḓïḓȧŧėş ŧħȧŧ ɱȧẏ ƀė ṗřőɱőŧėḓ ïñŧő ṗȧŧŧėřñş, ŞŐṖş, őř ɠőṽėřñėḓ ķñőẇŀėḓɠė ŀȧŧėř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ⟧"
+        "en": "Completed work can become reusable organizational memory. Proposals waiting for a decision come first, each with how it is decided; past proposals stay below as history.",
+        "ja": "完了した仕事は、再利用できる組織の記憶になります。判断を待っている提案を先に、それぞれの判断の方法と一緒に並べます。過去の提案は、その下に記録として残します。",
+        "qps-ploc": "⟦Ƈőɱṗŀėŧėḓ ẇőřķ ƈȧñ ƀėƈőɱė řėůşȧƀŀė őřɠȧñïẑȧŧïőñȧŀ ɱėɱőřẏ. Ṗřőṗőşȧŀş ẇȧïŧïñɠ ƒőř ȧ ḓėƈïşïőñ ƈőɱė ƒïřşŧ, ėȧƈħ ẇïŧħ ħőẇ ïŧ ïş ḓėƈïḓėḓ; ṗȧşŧ ṗřőṗőşȧŀş şŧȧẏ ƀėŀőẇ ȧş ħïşŧőřẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗ⟧"
       },
       "chronos_mip_dry_run": {
         "en": "dry-run",
@@ -8437,6 +8437,36 @@
         "en": "Freshness target",
         "ja": "鮮度の目標",
         "qps-ploc": "⟦Ƒřėşħñėşş ŧȧřɠėŧ ŀőřėɱ⟧"
+      },
+      "chronos_mip_reuse_review_label": {
+        "en": "how it is decided",
+        "ja": "判断の方法",
+        "qps-ploc": "⟦ħőẇ ïŧ ïş ḓėƈïḓėḓ ŀőřėɱ⟧"
+      },
+      "chronos_mip_reuse_review_here": {
+        "en": "Decide here: promote it for reuse, or archive it.",
+        "ja": "ここで判断します。再利用できるように昇格するか、アーカイブします。",
+        "qps-ploc": "⟦Ḓėƈïḓė ħėřė: ṗřőɱőŧė ïŧ ƒőř řėůşė, őř ȧřƈħïṽė ïŧ. ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "chronos_mip_reuse_review_history": {
+        "en": "A past proposal kept as history. It can no longer be decided.",
+        "ja": "過去の提案で、記録として残しています。もう判断はできません。",
+        "qps-ploc": "⟦Ȧ ṗȧşŧ ṗřőṗőşȧŀ ķėṗŧ ȧş ħïşŧőřẏ. Ïŧ ƈȧñ ñő ŀőñɠėř ƀė ḓėƈïḓėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "chronos_mip_reuse_review_background_review": {
+        "en": "Decided in the background review (pnpm background-review).",
+        "ja": "バックグラウンドレビューで判断します（pnpm background-review）。",
+        "qps-ploc": "⟦Ḓėƈïḓėḓ ïñ ŧħė ƀȧƈķɠřőůñḓ řėṽïėẇ (ṗñṗɱ ƀȧƈķɠřőůñḓ-řėṽïėẇ). ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "chronos_mip_reuse_review_execution_feedback": {
+        "en": "Decided in the improvement review (pnpm kyberion improvements).",
+        "ja": "改善のレビューで判断します（pnpm kyberion improvements）。",
+        "qps-ploc": "⟦Ḓėƈïḓėḓ ïñ ŧħė ïɱṗřőṽėɱėñŧ řėṽïėẇ (ṗñṗɱ ķẏƀėřïőñ ïɱṗřőṽėɱėñŧş). ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "chronos_mip_reuse_review_learning_intake": {
+        "en": "Sent to the knowledge review with pnpm kyberion learning prepare --queue.",
+        "ja": "pnpm kyberion learning prepare --queue で、ナレッジのレビューに回します。",
+        "qps-ploc": "⟦Şėñŧ ŧő ŧħė ķñőẇŀėḓɠė řėṽïėẇ ẇïŧħ ṗñṗɱ ķẏƀėřïőñ ŀėȧřñïñɠ ṗřėṗȧřė --ɋůėůė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
       }
     },
     "cli": {
@@ -10441,9 +10471,9 @@
         "qps-ploc": "⟦Ɱïɠřȧŧė ṗėřşőñȧŀ ḓȧŧȧ ïñŧő ȧ şŧȧñƈė őṽėřŀȧẏ ŀőřėɱ ïṗşůɱ ḓő⟧"
       },
       "cli_cmd_script_stance_switch": {
-        "en": "Switch the active stance overlay",
-        "ja": "有効なスタンスのオーバーレイを切り替え",
-        "qps-ploc": "⟦Şẇïŧƈħ ŧħė ȧƈŧïṽė şŧȧñƈė őṽėřŀȧẏ ŀőřėɱ ïṗşů⟧"
+        "en": "Switch the stance: which permitted tenant, Org and Org Role you act for",
+        "ja": "スタンスを切り替え（どの許可テナントの、どの Org と Org Role として動くか）",
+        "qps-ploc": "⟦Şẇïŧƈħ ŧħė şŧȧñƈė: ẇħïƈħ ṗėřɱïŧŧėḓ ŧėñȧñŧ, Őřɠ ȧñḓ Őřɠ Řőŀė ẏőů ȧƈŧ ƒőř ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
       },
       "cli_cmd_script_backup": {
         "en": "Back up or export tenant data",
@@ -11016,9 +11046,9 @@
         "qps-ploc": "⟦Řėɠėñėřȧŧė ŧħė ȧɠėñŧ ṗřőƒïŀė ïñḓėẋ ƒřőɱ ŧħė ƈȧñőñïƈȧŀ ṗřőƒïŀėş ḓïřėƈŧőřẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
       },
       "cli_cmd_script_sync_authority_roles": {
-        "en": "Regenerate the authority role index from the role definitions.",
-        "ja": "ロール定義から権限ロール索引を再生成する。",
-        "qps-ploc": "⟦Řėɠėñėřȧŧė ŧħė ȧůŧħőřïŧẏ řőŀė ïñḓėẋ ƒřőɱ ŧħė řőŀė ḓėƒïñïŧïőñş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+        "en": "Regenerate the authority role index and the security policy role permissions from the role cards.",
+        "ja": "ロールのカードから、権限ロール索引とセキュリティポリシーのロール許可を再生成する。",
+        "qps-ploc": "⟦Řėɠėñėřȧŧė ŧħė ȧůŧħőřïŧẏ řőŀė ïñḓėẋ ȧñḓ ŧħė şėƈůřïŧẏ ṗőŀïƈẏ řőŀė ṗėřɱïşşïőñş ƒřőɱ ŧħė řőŀė ƈȧřḓş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈ⟧"
       },
       "cli_cmd_script_sync_service_endpoints": {
         "en": "Regenerate the service endpoint catalog from its sources.",
@@ -13568,6 +13598,41 @@
         "ja": "{age}に更新",
         "qps-ploc": "⟦Ůṗḓȧŧėḓ {age} ŀőřė⟧"
       },
+      "ux_b_card_steps_progress": {
+        "en": "{done} of {total} steps done",
+        "ja": "ステップ {total} 件中 {done} 件が完了",
+        "qps-ploc": "⟦{done} őƒ {total} şŧėṗş ḓőñė ŀőřėɱ ïṗş⟧"
+      },
+      "ux_b_card_steps_show": {
+        "en": "Show steps",
+        "ja": "ステップを見る",
+        "qps-ploc": "⟦Şħőẇ şŧėṗş ŀőř⟧"
+      },
+      "ux_b_card_steps_label": {
+        "en": "Steps of {title}",
+        "ja": "「{title}」のステップ",
+        "qps-ploc": "⟦Şŧėṗş őƒ {title} ŀőřėɱ⟧"
+      },
+      "ux_b_card_steps_loading": {
+        "en": "Loading steps…",
+        "ja": "ステップを読み込んでいます…",
+        "qps-ploc": "⟦Ŀőȧḓïñɠ şŧėṗş… ŀőřė⟧"
+      },
+      "ux_b_card_steps_failed": {
+        "en": "The steps could not be loaded. Close and open this again to retry.",
+        "ja": "ステップを読み込めませんでした。閉じてもう一度開くと再試行します。",
+        "qps-ploc": "⟦Ŧħė şŧėṗş ƈőůŀḓ ñőŧ ƀė ŀőȧḓėḓ. Ƈŀőşė ȧñḓ őṗėñ ŧħïş ȧɠȧïñ ŧő řėŧřẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "ux_b_card_steps_empty": {
+        "en": "No steps you can see.",
+        "ja": "表示できるステップはありません。",
+        "qps-ploc": "⟦Ñő şŧėṗş ẏőů ƈȧñ şėė. ŀőřėɱ ⟧"
+      },
+      "ux_b_board_issues_hint": {
+        "en": "Each card is one piece of work. Its steps open inside the card, and its status follows them: when every step is done it moves to review.",
+        "ja": "カードは 1 件の仕事です。ステップはカードの中で開けます。状態はステップに合わせて進み、すべて完了するとレビューに移ります。",
+        "qps-ploc": "⟦Ėȧƈħ ƈȧřḓ ïş őñė ṗïėƈė őƒ ẇőřķ. Ïŧş şŧėṗş őṗėñ ïñşïḓė ŧħė ƈȧřḓ, ȧñḓ ïŧş şŧȧŧůş ƒőŀŀőẇş ŧħėɱ: ẇħėñ ėṽėřẏ şŧėṗ ïş ḓőñė ïŧ ɱőṽėş ŧő řėṽïėẇ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈï⟧"
+      },
       "ux_b_lineage_label": {
         "en": "Project and mission",
         "ja": "プロジェクトとミッション",
@@ -13597,6 +13662,11 @@
         "en": "Change the status?",
         "ja": "状態を変更しますか",
         "qps-ploc": "⟦Ƈħȧñɠė ŧħė şŧȧŧůş? ŀőřėɱ⟧"
+      },
+      "ux_b_move_confirm_pins": {
+        "en": "This work has steps. Once you set its status yourself, it stops following them.",
+        "ja": "この仕事にはステップがあります。ここで状態を決めると、以後はステップに合わせて変わらなくなります。",
+        "qps-ploc": "⟦Ŧħïş ẇőřķ ħȧş şŧėṗş. Őñƈė ẏőů şėŧ ïŧş şŧȧŧůş ẏőůřşėŀƒ, ïŧ şŧőṗş ƒőŀŀőẇïñɠ ŧħėɱ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
       },
       "ux_b_move_confirm_message": {
         "en": "\"{title}\" moves from {from} to {to}.",
@@ -26974,6 +27044,11 @@
         "en": "Command template: {{audio}} is the input audio file and {{language}} the requested language.",
         "ja": "コマンドの {{audio}} は入力音声ファイル、{{language}} は指定した言語に置き換わります。",
         "qps-ploc": "⟦Ƈőɱɱȧñḓ ŧėɱṗŀȧŧė: {{audio}} ïş ŧħė ïñṗůŧ ȧůḓïő ƒïŀė ȧñḓ {{language}} ŧħė řėɋůėşŧėḓ ŀȧñɠůȧɠė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñş⟧"
+      },
+      "label_reuse_proposal": {
+        "en": "proposed for reuse",
+        "ja": "再利用の提案",
+        "qps-ploc": "⟦ṗřőṗőşėḓ ƒőř řėůşė ŀőřėɱ⟧"
       }
     },
     "tui": {

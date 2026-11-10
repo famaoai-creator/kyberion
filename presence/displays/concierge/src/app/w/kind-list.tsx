@@ -19,8 +19,11 @@ import {
 import {
   WORK_ITEM_STATUS_LABEL_KEYS,
   actorDisplayName,
+  cardTitle,
   type BoardCard,
+  type BoardStep,
 } from '../../components/work-board/work-item-board';
+import { frontDeskFetch } from '../../lib/front-desk-fetch';
 import {
   approvalNeedsDecision,
   entityHref,
@@ -97,8 +100,11 @@ export function KindList({
   }, [draft, query.q, replaceQuery]);
 
   const { status, ...serverQuery } = query;
+  // Work items read as Issues (D1): steps open inside their Issue. A text
+  // search still finds a step by itself.
+  const issuesOnly = kind === 'work_item' && !serverQuery.q;
   const list = useWorkspaceResource<{ items: GraphNode[] }>(
-    workspaceApiPath('list', { kind, ...serverQuery })
+    workspaceApiPath('list', { kind, ...serverQuery, ...(issuesOnly ? { top_level: 'true' } : {}) })
   );
   const summary = useWorkspaceResource<WorkspaceGraphSummary>(workspaceApiPath('summary'));
   const labels = React.useMemo(
@@ -355,10 +361,31 @@ function WorkItemGraphBoard({
           updatedAt: node.updatedAt,
           description: node.summary,
           href: entityHref('work_item', node.id),
+          ...(node.steps ? { steps: node.steps } : {}),
         };
       }),
     [items, labels, renderActor]
   );
+
+  // An Issue's steps, read through the same viewer-scoped list when its card opens.
+  const loadSteps = React.useCallback(async (card: GraphCard): Promise<BoardStep[]> => {
+    const response = await frontDeskFetch(
+      workspaceApiPath('list', { kind: 'work_item', parent_item_id: card.id })
+    );
+    const body = (await response.json().catch(() => null)) as {
+      ok?: boolean;
+      data?: { items?: GraphNode[] };
+    } | null;
+    if (!response.ok || !body?.ok || !Array.isArray(body.data?.items)) {
+      throw new Error('work item steps unavailable');
+    }
+    return body.data.items.map((node) => ({
+      id: node.id,
+      title: cardTitle(node.label, node.missionId),
+      status: node.status ?? 'backlog',
+      href: entityHref('work_item', node.id),
+    }));
+  }, []);
 
   const move = React.useCallback(
     async (card: GraphCard, status: string) => {
@@ -382,6 +409,7 @@ function WorkItemGraphBoard({
       locale={localeToBcp47(uiLocale)}
       canMove={canMove}
       onMove={move}
+      loadSteps={loadSteps}
       label={boardT('ux_b_board_label')}
     />
   );

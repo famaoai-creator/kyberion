@@ -8,6 +8,7 @@
  * across all tenants, and records one audit-chain entry per run.
  */
 import * as path from 'node:path';
+import { baseRoleEnvText } from '../foundation/base-role-env.js';
 import { auditChain } from '../governance/audit-chain.js';
 import {
   calendarDateInZone,
@@ -15,7 +16,6 @@ import {
   type CalendarDate,
 } from '../temporal/business-calendar.js';
 import { isValidTenantSlug } from '../entity-scope.js';
-import { getRegisteredEnvText } from '../foundation/env.js';
 import { executionPersonaText } from '../foundation/execution-scope.js';
 import {
   listOrganizationDecisions,
@@ -571,12 +571,10 @@ export function runOrganizationDigest(
 ): OrganizationDigestRun {
   // An injected env is authoritative (tests, adapters); otherwise the
   // execution scope's persona outranks the process-global env (B2).
-  const persona = options.env
-    ? getRegisteredEnvText('KYBERION_PERSONA', { env: options.env })
-    : executionPersonaText();
+  const persona = options.env ? baseRoleEnvText(options.env) : executionPersonaText();
   if (persona !== 'sovereign') {
     throw new Error(
-      `[POLICY_VIOLATION] The organization digest aggregates across tenants and requires KYBERION_PERSONA=sovereign (got ${persona || 'unset'}).`
+      `[POLICY_VIOLATION] The organization digest aggregates across tenants and requires KYBERION_BASE_ROLE=sovereign (got ${persona || 'unset'}).`
     );
   }
   const tiers = options.tiers || ['confidential', 'public'];

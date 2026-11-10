@@ -8,7 +8,7 @@ const file = pathResolver.knowledge('personal/onboarding/engine-runtime.json');
 beforeEach(() => {
   vi.stubEnv('KYBERION_SUDO', '');
   vi.stubEnv('MISSION_ROLE', '');
-  vi.stubEnv('KYBERION_PERSONA', 'worker');
+  vi.stubEnv('KYBERION_BASE_ROLE', 'worker');
 });
 afterEach(() => vi.unstubAllEnvs());
 

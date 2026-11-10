@@ -6,6 +6,7 @@ importance: 5
 source_mission: MSN-BROWSER-SUBSTRATE-001
 author: Kyberion Wisdom Distiller
 last_updated: 2026-07-21
+doc_status: historical
 ---
 
 # Mission MSN-BROWSER-SUBSTRATE-001 Completion Summary

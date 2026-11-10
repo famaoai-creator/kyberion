@@ -73,7 +73,7 @@ function fixture(mode: 'off' | 'shadow' = 'shadow') {
   const proposal = {
     title: 'Synthetic latency',
     objective: 'Prepare the bounded fixture repair',
-    work_shape: 'pipeline',
+    execution_shape: 'pipeline',
     pipeline_ref: latency.SYNTHETIC_LATENCY_PIPELINE_REF,
   } as const;
   const charter: DotCharter = {
@@ -259,7 +259,7 @@ beforeAll(async () => {
   io.safeWriteFile(path.join(root, 'package.json'), '{}');
   vi.stubEnv('KYBERION_ROOT', root);
   vi.stubEnv('MISSION_ROLE', 'mission_controller');
-  vi.stubEnv('KYBERION_PERSONA', 'sovereign');
+  vi.stubEnv('KYBERION_BASE_ROLE', 'sovereign');
   vi.stubEnv('KYBERION_TENANT', 'synthetic-latency');
   io.safeMkdir(path.join(root, 'knowledge/personal/tenants'), { recursive: true });
   io.safeWriteFile(

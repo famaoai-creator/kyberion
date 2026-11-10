@@ -15,6 +15,7 @@ importance: 5
 source_mission: MSN-UIUX-SUSTAINABILITY-20260713
 author: Kyberion Wisdom Distiller
 last_updated: 2026-07-12
+doc_status: historical
 ---
 
 # UI/UX Governance Made Repeatable Through Tokens, Contracts, and Lifecycle Repair

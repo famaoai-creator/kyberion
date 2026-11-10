@@ -21,7 +21,9 @@
       "used_count": { "type": "integer", "minimum": 0 },
       "not_used_count": { "type": "integer", "minimum": 0 },
       "occurrences": { "type": "integer", "minimum": 0 },
-      "last_seen": { "type": "string", "minLength": 1 }
+      "last_seen": { "type": "string", "minLength": 1 },
+      "last_delivered_at": { "type": "string", "minLength": 1 },
+      "last_used_at": { "type": "string", "minLength": 1 }
     }
   }
 }

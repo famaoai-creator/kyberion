@@ -102,7 +102,7 @@ export default async function MissionDetailPage({ params }: { params: Promise<{ 
               },
               { label: t('col_tier'), value: tierLabel(detail.tier, t) },
               { label: t('col_tenant'), value: detail.tenant_slug ?? '—', mono: true },
-              { label: t('col_persona'), value: detail.assigned_persona ?? '—' },
+              { label: t('col_persona'), value: detail.org_role ?? '—' },
               { label: t('col_mission_type'), value: detail.mission_type ?? '—' },
               {
                 label: t('col_latest_commit'),

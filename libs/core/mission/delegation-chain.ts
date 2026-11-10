@@ -101,7 +101,7 @@ export type DelegationGrantedScope = {
 
 /**
  * One hop of the delegation chain. `actor` is preferably a canonical nhi_id
- * (`kyberion://agent/<org>/<slug>`, NI-01) or `user:<id>`; legacy actor
+ * (`kyberion://agent/<tenant>/<org|_>/<slug>`, NI-01) or `user:<id>`; legacy actor
  * strings are accepted so chains can be stamped before every path is
  * migrated to durable identities.
  */

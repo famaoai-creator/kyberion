@@ -5,5 +5,17 @@
   "write_scopes": ["active/shared/coordination/chronos/", "active/shared/observability/chronos/"],
   "scope_classes": ["communication_surface"],
   "allowed_actuators": ["presence-actuator"],
-  "tier_access": ["public", "confidential"]
+  "tier_access": ["public", "confidential"],
+  "permissions": {
+    "allow_read": [
+      "active/shared/coordination/chronos/",
+      "active/shared/observability/chronos/",
+      "active/audit/"
+    ],
+    "allow_write": [
+      "active/shared/coordination/chronos/",
+      "active/shared/observability/chronos/",
+      "active/audit/"
+    ]
+  }
 }

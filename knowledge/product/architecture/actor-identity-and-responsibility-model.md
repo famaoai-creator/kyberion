@@ -2,6 +2,7 @@
 title: Actor identity and responsibility model
 tags: [architecture, governance, identity, nhi, tenant, organization, delegation, review]
 last_updated: 2026-11-04
+concepts: [nhi, conversational-persona, execution-persona, org-role, team-role]
 ---
 
 # Actor identity and responsibility model
@@ -24,7 +25,7 @@ credential, a tenant membership, or proof that two workers are independent.
 | Task role                        | What is this worker doing on this task?                              | Owner, planner, implementer, reviewer, and other bounded responsibilities. |
 | Delegated authority              | What may the worker do here and for how long?                        | Existing grants, scope envelopes, contracts, and approval gates.           |
 
-The existing `Persona` / `KYBERION_PERSONA` vocabulary in `libs/core/types.ts`
+The existing `Persona` / `KYBERION_BASE_ROLE` vocabulary in `libs/core/types.ts`
 and `libs/core/authority.ts` is a **legacy execution identity class**, not the
 conversational persona defined here. Likewise, the historical mission
 `--persona` flag selects an Org Role. This model does not rename those runtime

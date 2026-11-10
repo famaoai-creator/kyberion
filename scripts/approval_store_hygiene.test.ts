@@ -114,7 +114,7 @@ describe('approval_store_hygiene', () => {
   });
 
   it('runs --migrate-tenant-partitions as a dry run without the sovereign persona', async () => {
-    vi.stubEnv('KYBERION_PERSONA', 'analyst');
+    vi.stubEnv('KYBERION_BASE_ROLE', 'analyst');
     try {
       const result = (await runApprovalStoreHygiene([
         '--migrate-tenant-partitions',
@@ -146,14 +146,14 @@ describe('approval_store_hygiene', () => {
   });
 
   it('refuses --apply without the sovereign persona and names the fix', async () => {
-    vi.stubEnv('KYBERION_PERSONA', 'analyst');
+    vi.stubEnv('KYBERION_BASE_ROLE', 'analyst');
     const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
     process.exitCode = undefined;
     try {
       expect(await runApprovalStoreHygiene(['--apply'])).toBeUndefined();
       expect(process.exitCode).toBe(2);
       expect(errors.mock.calls.flat().join('\n')).toContain(
-        'KYBERION_PERSONA=sovereign node dist/scripts/approval_store_hygiene.js --apply'
+        'KYBERION_BASE_ROLE=sovereign node dist/scripts/approval_store_hygiene.js --apply'
       );
     } finally {
       process.exitCode = undefined;

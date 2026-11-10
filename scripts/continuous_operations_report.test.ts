@@ -51,7 +51,7 @@ function fixture() {
     scope,
     authority: {
       authority_role: 'organization_operator',
-      allowed_work_shapes: ['pipeline'],
+      allowed_execution_shapes: ['pipeline'],
       allowed_pipelines: [CONTINUOUS_OPERATIONS_REPORT_PIPELINE],
     },
   } as DotCharter;

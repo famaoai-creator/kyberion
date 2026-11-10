@@ -6,12 +6,10 @@
       "kind": "gateway",
       "description": "Discord Bot ingress gateway and surface-agent host",
       "command": "node",
-      "args": [
-        "dist/satellites/discord-bridge/src/index.js"
-      ],
+      "args": ["dist/satellites/discord-bridge/src/index.js"],
       "env": {
         "MISSION_ID": "MSN-SYSTEM-SENSORY-HUB",
-        "KYBERION_PERSONA": "sovereign",
+        "KYBERION_BASE_ROLE": "sovereign",
         "MISSION_ROLE": "surface_runtime"
       },
       "cwd": ".",

@@ -343,6 +343,7 @@ it('rejects an NHI accountable to a different human and non-owner requesters', a
     f.identities.issueAgentIdentity({
       kind: 'agent',
       slug: 'foreign-agent',
+      tenantSlug: ORG_TENANT,
       organizationId: ORG_TENANT,
       displayName: 'Accountable elsewhere',
       accountableHumanId: 'user:someone-else',
@@ -482,9 +483,11 @@ it('does not infer tenant affiliation from an organization name or override a fo
       f.identities.issueAgentIdentity({
         kind: 'agent',
         slug,
-        organizationId: ORG_TENANT,
+        // No tenant: a tenantless identity (D3 `_/_`) — never inferred from an org name.
+        ...(tenant
+          ? { organizationId: ORG_TENANT, affiliation: { tenant_slug: tenant } }
+          : { personScope: true }),
         accountableHumanId: 'user:owner',
-        ...(tenant ? { affiliation: { tenant_slug: tenant } } : {}),
       })
     );
     expect(() =>
@@ -521,7 +524,7 @@ it('consumes an attested legacy session only in its approved tenant, never throu
     f.identities.issueAgentIdentity({
       kind: 'agent',
       slug: 'legacy-bound',
-      organizationId: 'unrelated-org',
+      personScope: true,
       accountableHumanId: 'user:owner',
     })
   );

@@ -24,7 +24,11 @@ export function applyWorkItemFilters(items: WorkItem[], filter: WorkItemFilter):
   const labelSet = new Set(normalizeArray(filter.labels));
   const query = filter.text ? filter.text.trim().toLowerCase() : '';
 
+  const parentItemId = filter.parentItemId?.trim();
   return items.filter((item) => {
+    // D1: hierarchy filters; both default off, so existing callers see every item.
+    if (filter.topLevelOnly && item.parent_item_id) return false;
+    if (parentItemId && item.parent_item_id !== parentItemId) return false;
     const metadata = item.metadata || {};
     const context = item.context || {};
     const organizationId =

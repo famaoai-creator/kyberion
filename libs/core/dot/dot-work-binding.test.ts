@@ -37,7 +37,7 @@ describe('frozen operation work responsibility', () => {
       action_id: 'dot.work.direct_reply' as const,
       title: 'Report',
       objective: 'Review report',
-      work_shape: 'direct_reply' as const,
+      execution_shape: 'direct_reply' as const,
     };
     const identity = genericDotActionIdentity(first, proposal, 0, 'wake-1');
     const record: DotActionRecord = {
@@ -47,7 +47,7 @@ describe('frozen operation work responsibility', () => {
       action_id: proposal.action_id,
       title: proposal.title,
       objective: proposal.objective,
-      work_shape: proposal.work_shape,
+      execution_shape: proposal.execution_shape,
       status: 'admitted',
       proposal_hash: 'hash',
       at: '2026-10-21T00:00:00Z',

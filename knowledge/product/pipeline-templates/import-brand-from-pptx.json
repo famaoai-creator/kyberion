@@ -6,14 +6,14 @@
   "description": "既存 PPTX からテーマカラー・フォント・スライドジオメトリを抽出し、knowledge/confidential/{tenant_slug}/design/ へ書き込む。テナントレジストリも更新する。",
   "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
   "knowledge_scope": { "tiers": ["public", "confidential"] },
-  "env": { "KYBERION_PERSONA": "sovereign", "MISSION_ROLE": "mission_controller" },
+  "env": { "KYBERION_BASE_ROLE": "sovereign", "MISSION_ROLE": "mission_controller" },
   "inputs": {
-    "source_file_path":  "抽出元 PPTX ファイルパス（例: active/missions/confidential/MSN-XXX/evidence/template.pptx）",
-    "tenant_slug":       "テナントスラグ（例: sbiss）",
-    "brand_name":        "表示用ブランド名（例: SBIセキュリティソリューションズ株式会社）",
-    "matchers":          "マッチャー文字列配列（例: [\"sbiss\", \"sbi security\"]）",
-    "design_system_id":  "使用デザインシステム（省略時: executive-standard）",
-    "logo_url":          "ロゴファイルパス（省略可）"
+    "source_file_path": "抽出元 PPTX ファイルパス（例: active/missions/confidential/MSN-XXX/evidence/template.pptx）",
+    "tenant_slug": "テナントスラグ（例: sbiss）",
+    "brand_name": "表示用ブランド名（例: SBIセキュリティソリューションズ株式会社）",
+    "matchers": "マッチャー文字列配列（例: [\"sbiss\", \"sbi security\"]）",
+    "design_system_id": "使用デザインシステム（省略時: executive-standard）",
+    "logo_url": "ロゴファイルパス（省略可）"
   },
   "steps": [
     {
@@ -53,14 +53,14 @@
       "op": "media:save_brand_to_confidential",
       "consumes": ["active_theme", "last_layout_geometry"],
       "params": {
-        "tenant_slug":       "{{tenant_slug}}",
-        "brand_name":        "{{brand_name}}",
-        "matchers":          "{{matchers}}",
-        "design_system_id":  "{{design_system_id}}",
-        "theme_from":        "active_theme",
-        "layout_from":       "last_layout_geometry",
-        "pptx_from":         "source_pptx_design",
-        "logo_url":          "{{logo_url}}"
+        "tenant_slug": "{{tenant_slug}}",
+        "brand_name": "{{brand_name}}",
+        "matchers": "{{matchers}}",
+        "design_system_id": "{{design_system_id}}",
+        "theme_from": "active_theme",
+        "layout_from": "last_layout_geometry",
+        "pptx_from": "source_pptx_design",
+        "logo_url": "{{logo_url}}"
       }
     },
     {

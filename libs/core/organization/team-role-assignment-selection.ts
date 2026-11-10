@@ -563,7 +563,7 @@ export function selectAgentForTeamRole(input: SelectAgentForTeamRoleInput): Miss
           }
         : {}),
       // NI-01: canonical durable-identity name for the selected agent
-      // (kyberion://agent/<org>/<slug>). Pure derivation — the provisioned
+      // (kyberion://agent/<tenant>/<org|_>/<slug>). Pure derivation — the provisioned
       // ledger record is ensured downstream at staffing/spawn time.
       runtime_identity: deriveAgentNhiId(winner.agentId, organizationId),
       authority_role: winner.authorityRole,

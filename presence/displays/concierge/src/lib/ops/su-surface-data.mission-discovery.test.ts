@@ -75,7 +75,7 @@ function addMission(tier: MissionState['tier'], tenant: string, missionId: strin
     status: 'active',
     execution_mode: 'local',
     priority: 1,
-    assigned_persona: 'operator',
+    org_role: 'operator',
     confidence_score: 1,
     git: { branch: 'main', start_commit: 'a', latest_commit: 'a', checkpoints: [] },
     history: [{ ts: '2026-10-18T00:00:00.000Z', event: 'started', note: 'fixture' }],

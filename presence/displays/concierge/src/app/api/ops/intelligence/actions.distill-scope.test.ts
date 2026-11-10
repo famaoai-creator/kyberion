@@ -1,16 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   resolve: vi.fn(),
+  resolveLegacy: vi.fn(),
   update: vi.fn(),
   promote: vi.fn(),
   notify: vi.fn(),
 }));
 vi.mock('../../../../lib/ops/distill-candidate-scope', () => ({
-  resolveDistillCandidateForViewer: mocks.resolve,
+  resolveReuseProposalForViewer: mocks.resolve,
+  resolveDistillCandidateForViewer: mocks.resolveLegacy,
   DistillCandidateAmbiguityError: class extends Error {},
 }));
 vi.mock('../../../../lib/ops/intelligence-primitives', () => ({
-  updateDistillCandidateRecord: mocks.update,
+  updateFacadeProposal: mocks.update,
   savePromotedMemoryRecord: mocks.promote,
   enqueueSurfaceNotification: mocks.notify,
 }));
@@ -26,7 +28,17 @@ const scope = {
   project_id: 'proj-a',
   provenance_refs: ['recording:one'],
 };
-const row = { candidate_id: 'DSC-TEST', title: 'private title', scope, status: 'proposed' };
+// D8: the proposal is a queue row decided on this page (`decided_via: concierge`).
+const row = {
+  candidate_id: 'DSC-TEST',
+  title: 'private title',
+  scope,
+  status: 'proposed',
+  record_kind: 'mission_seed',
+  decided_via: 'concierge',
+};
+const spec = { recordKind: 'mission_seed' };
+const { record_kind: _kind, decided_via: _via, ...promotedView } = row;
 const resolvedViewer = {
   context: {
     role: 'localadmin' as const,
@@ -46,18 +58,19 @@ const run = (decision: 'archive' | 'promote' = 'archive') =>
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.resolve.mockReturnValue(row);
-  mocks.update.mockImplementation((_id, patch) => ({ ...row, ...patch }));
+  mocks.resolveLegacy.mockReturnValue(null);
+  mocks.update.mockImplementation((_spec, _id, patch) => ({ ...row, ...patch }));
   mocks.promote.mockReturnValue({ logicalPath: 'knowledge/confidential/acme/approved.md' });
 });
 describe('scoped distill decision', () => {
   it('archives with exact server-resolved scope without publishing its private title', async () => {
     expect((await run()).status).toBe(200);
     expect(mocks.resolve).toHaveBeenCalledWith('DSC-TEST', resolvedViewer.context, 'acme');
-    expect(mocks.update).toHaveBeenCalledWith('DSC-TEST', { status: 'archived' }, scope);
+    expect(mocks.update).toHaveBeenCalledWith(spec, 'DSC-TEST', { status: 'archived' }, { scope });
     expect(mocks.notify).not.toHaveBeenCalled();
   });
-  it('preserves legacy notifications without admitting scoped content', async () => {
-    const legacy = { ...row, scope: undefined };
+  it('notifies public proposals without admitting scoped content', async () => {
+    const legacy = { ...row, scope: { tier: 'public' as const } };
     mocks.resolve.mockReturnValue(legacy);
     mocks.update.mockReturnValue({ ...legacy, status: 'archived' });
     expect((await run()).status).toBe(200);
@@ -66,12 +79,34 @@ describe('scoped distill decision', () => {
   });
   it('promotes through the existing canonical publication guard and updates same scope', async () => {
     expect((await run('promote')).status).toBe(200);
-    expect(mocks.promote).toHaveBeenCalledWith(row, { executionRole: 'chronos_gateway' });
+    expect(mocks.promote).toHaveBeenCalledWith(promotedView, {
+      executionRole: 'chronos_gateway',
+    });
     expect(mocks.update).toHaveBeenCalledWith(
+      spec,
       'DSC-TEST',
       { status: 'promoted', promoted_ref: 'knowledge/confidential/acme/approved.md' },
-      scope
+      { scope }
     );
+  });
+  it('keeps legacy records read-only history', async () => {
+    mocks.resolve.mockReturnValue(null);
+    mocks.resolveLegacy.mockReturnValue({ ...row, record_kind: undefined });
+    expect((await run()).status).toBe(409);
+    expect(mocks.update).not.toHaveBeenCalled();
+    expect(mocks.notify).not.toHaveBeenCalled();
+  });
+  it('refuses proposals another facade decides', async () => {
+    mocks.resolve.mockReturnValue({
+      ...row,
+      record_kind: 'background_review',
+      decided_via: 'pnpm background-review',
+    });
+    const response = await run('promote');
+    expect(response.status).toBe(409);
+    expect((await response.json()).error).toContain('pnpm background-review');
+    expect(mocks.promote).not.toHaveBeenCalled();
+    expect(mocks.update).not.toHaveBeenCalled();
   });
   it('does not mutate or notify when invisible', async () => {
     mocks.resolve.mockReturnValue(null);

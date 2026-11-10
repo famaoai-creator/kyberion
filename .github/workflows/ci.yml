@@ -129,7 +129,7 @@ jobs:
           # The tenant-registry gate verifies the personal-tier tenant spine.
           # Give the governed checker its read authority explicitly instead of
           # relying on a developer shell's ambient role.
-          KYBERION_PERSONA: worker
+          KYBERION_BASE_ROLE: worker
           MISSION_ROLE: mission_controller
           CHECK_SCOPE: ${{ (github.event_name == 'pull_request' || github.event_name == 'merge_group') && 'full-only' || 'full' }}
           CHECK_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
@@ -380,7 +380,7 @@ jobs:
         if: ${{ !((github.event_name == 'pull_request' || github.event_name == 'merge_group') && matrix.pr-duplicate) }}
         continue-on-error: ${{ matrix.experimental == true }}
         env:
-          KYBERION_PERSONA: ${{ matrix.test-suite == 'core' && 'worker' || '' }}
+          KYBERION_BASE_ROLE: ${{ matrix.test-suite == 'core' && 'worker' || '' }}
           MISSION_ROLE: ${{ matrix.test-suite == 'core' && 'mission_controller' || '' }}
         shell: bash
         run: ${{ matrix.command }} 2>&1 | tee -a "$RUNNER_TEMP/kyberion-ci-output.log"
@@ -464,7 +464,7 @@ jobs:
 
       - name: Run core coverage shard
         env:
-          KYBERION_PERSONA: worker
+          KYBERION_BASE_ROLE: worker
           MISSION_ROLE: mission_controller
         shell: bash
         run: >-

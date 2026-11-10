@@ -2,7 +2,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { agentActor, parseActorRef, type ActorRef } from '../contracts/actor.js';
 import { resolveIdentityContext } from '../authority.js';
 import { assertScopeContext, type ScopeContext } from '../foundation/scope-context-validation.js';
-import type { Authority, Persona } from '../types.js';
+import type { Authority, BaseRole } from '../types.js';
 
 /** Attribution projection, never authentication proof or an authorization grant. */
 export interface ActorContext {
@@ -11,7 +11,7 @@ export interface ActorContext {
   readonly provenance: 'claim' | 'explicit';
   readonly authority: {
     readonly role?: string;
-    readonly persona: Persona;
+    readonly baseRole: BaseRole;
     readonly authorities: readonly Authority[];
     readonly sudo: boolean;
     readonly sudoScope?: readonly string[];
@@ -54,7 +54,7 @@ export function resolveActorContext(input: ActorContextInput): ActorContext {
     provenance: input.provenance,
     authority: Object.freeze({
       ...(identity.role ? { role: identity.role } : {}),
-      persona: identity.persona,
+      baseRole: identity.baseRole,
       authorities: Object.freeze([...identity.authorities]),
       sudo: identity.authorities.includes('SUDO'),
       ...(identity.sudoScope ? { sudoScope: Object.freeze([...identity.sudoScope]) } : {}),

@@ -19,7 +19,7 @@ import {
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 
-const ORIGINAL_PERSONA = process.env.KYBERION_PERSONA;
+const ORIGINAL_PERSONA = process.env.KYBERION_BASE_ROLE;
 const ORIGINAL_ROLE = process.env.MISSION_ROLE;
 
 function cleanupWorkspace(
@@ -35,7 +35,7 @@ function cleanupWorkspace(
 
 describe('project-operational-state-registry', () => {
   beforeEach(() => {
-    process.env.KYBERION_PERSONA = 'worker';
+    process.env.KYBERION_BASE_ROLE = 'worker';
     process.env.MISSION_ROLE = 'software_developer';
     cleanupWorkspace('PRJ-TEST-OPS', 'public', 'tenant-alpha');
     cleanupWorkspace('PRJ-TEST-OPS-2', 'confidential', 'shared');
@@ -44,7 +44,7 @@ describe('project-operational-state-registry', () => {
 
   afterEach(() => {
     cleanupWorkspace('PRJ-TEST-OPS-TENANTLESS', 'public', 'shared');
-    process.env.KYBERION_PERSONA = ORIGINAL_PERSONA;
+    process.env.KYBERION_BASE_ROLE = ORIGINAL_PERSONA;
     process.env.MISSION_ROLE = ORIGINAL_ROLE;
   });
 

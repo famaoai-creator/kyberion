@@ -7,7 +7,7 @@
  * This CLI just assembles the two-step pipeline and runs it, so command-line use
  * and pipeline use share one implementation.
  *
- *   KYBERION_PERSONA=sovereign node_modules/.bin/tsx scripts/html-to-pptx/convert.ts \\
+ *   KYBERION_BASE_ROLE=sovereign node_modules/.bin/tsx scripts/html-to-pptx/convert.ts \\
  *     <input.html> [output.pptx] [--aspect 4:3|16:9] [--strict]
  *
  * `--strict` は収まりの検査（pptx_layout_preflight）で溢れが出たら出力せず失敗させる。

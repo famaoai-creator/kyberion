@@ -452,12 +452,20 @@ interface DistillCandidateSummary {
   title: string;
   summary: string;
   status: 'proposed' | 'promoted' | 'archived';
-  target_kind: 'pattern' | 'sop_candidate' | 'knowledge_hint' | 'report_template';
+  target_kind: 'pattern' | 'sop_candidate' | 'knowledge_hint' | 'report_template' | 'procedure';
   specialist_id?: string;
   locale?: string;
   work_loop?: OrganizationWorkLoopSummary;
   promoted_ref?: string;
   evidence_refs?: string[];
+  /**
+   * D8: where the proposal is decided — on this page (`here`), by its own
+   * facade (`elsewhere`, see `record_kind`), or not at all (`history`: a
+   * read-only legacy record).
+   */
+  review?: 'here' | 'elsewhere' | 'history';
+  record_kind?: string;
+  decided_via?: string;
 }
 
 interface AgentMessageSummary {

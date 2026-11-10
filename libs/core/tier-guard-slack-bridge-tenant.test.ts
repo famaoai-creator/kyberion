@@ -14,7 +14,12 @@ vi.mock('./governance/audit-chain.js', () => ({
 }));
 
 const ROOT = pathResolver.rootDir();
-const ENV_KEYS = ['KYBERION_TENANT', 'KYBERION_PERSONA', 'MISSION_ROLE', 'KYBERION_SUDO'] as const;
+const ENV_KEYS = [
+  'KYBERION_TENANT',
+  'KYBERION_BASE_ROLE',
+  'MISSION_ROLE',
+  'KYBERION_SUDO',
+] as const;
 
 function knowledge(rel: string): string {
   return path.join(ROOT, 'knowledge', rel);

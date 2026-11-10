@@ -51,7 +51,7 @@ export interface IngestAssetRecord {
   content_sha256: string;
   retrieved_at: string;
   ingested_at: string;
-  /** Who performed the ingest ceremony (KYBERION_PERSONA / MISSION_ROLE). */
+  /** Who performed the ingest ceremony (KYBERION_BASE_ROLE / MISSION_ROLE). */
   ingested_by: string;
   approval_id?: string;
   /** DA-06: KM-03 steward approval that authorized a common/public landing. */

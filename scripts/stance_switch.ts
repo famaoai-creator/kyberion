@@ -9,7 +9,15 @@ import {
   safeMkdir,
   safeWriteFile,
 } from '@agent/core/secure-io';
-import { STANCE_ENV_VAR, stanceDirForSlug } from '@agent/core/stance-resolver';
+import { readJson } from '@agent/core/foundation/json';
+import {
+  STANCE_ENV_VAR,
+  parseStanceSelection,
+  resolveStance,
+  stanceDirForSlug,
+  type ResolvedStance,
+} from '@agent/core/stance-resolver';
+import { listTenantProfileSlugs, readTenantProfile } from '@agent/core/tenant-registry';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 type Print = (value: unknown) => void;
@@ -19,7 +27,26 @@ export const STANCE_ENV_PATH = pathResolver.shared('runtime/stance.env');
 /** Files a stance needs before it can be selected. */
 export const STANCE_REQUIRED_FILES = ['stance.json', 'identity.json'];
 
-export function switchStance(slugInput: string): { slug: string; envPath: string } {
+/**
+ * Tenants the operator may act for: the active profiles in the durable tenant
+ * registry (`knowledge/personal/tenants/`). Server-side authority, never the
+ * stance's own declaration.
+ */
+export function permittedStanceTenants(): string[] {
+  return listTenantProfileSlugs().filter((slug) => readTenantProfile(slug)?.status === 'active');
+}
+
+export interface SwitchedStance {
+  slug: string;
+  envPath: string;
+  /** The acting-for selection, when `stance.json` declares `acting_for`. */
+  stance?: ResolvedStance;
+}
+
+export function switchStance(
+  slugInput: string,
+  options: { permittedTenants?: () => readonly string[] } = {}
+): SwitchedStance {
   const slug = slugInput.trim();
   const rootDir = pathResolver.rootDir();
   const stanceDir = stanceDirForSlug(slug, rootDir);
@@ -42,14 +69,43 @@ export function switchStance(slugInput: string): { slug: string; envPath: string
     );
   }
 
+  const stanceJsonPath = assertSafeRepositoryPath(path.join(stanceDir, 'stance.json'), {
+    rootDir,
+  });
+  const selection = parseStanceSelection(readJson<unknown>(stanceJsonPath));
+  // Selecting a tenant the operator may not serve is rejected before anything is written.
+  const stance = selection
+    ? resolveStance({
+        permittedTenants: (options.permittedTenants ?? permittedStanceTenants)(),
+        selection,
+      })
+    : undefined;
+
+  const lines = [`export ${STANCE_ENV_VAR}=${slug}`];
+  if (stance) {
+    lines.push(`export KYBERION_TENANT=${stance.selected.tenantSlug}`);
+    lines.push(
+      stance.selected.organizationId
+        ? `export KYBERION_ORGANIZATION_ID=${stance.selected.organizationId}`
+        : 'unset KYBERION_ORGANIZATION_ID'
+    );
+  }
   safeMkdir(path.dirname(STANCE_ENV_PATH), { recursive: true });
-  safeWriteFile(STANCE_ENV_PATH, `export ${STANCE_ENV_VAR}=${slug}\n`, { encoding: 'utf8' });
-  return { slug, envPath: STANCE_ENV_PATH };
+  safeWriteFile(STANCE_ENV_PATH, `${lines.join('\n')}\n`, { encoding: 'utf8' });
+  return { slug, envPath: STANCE_ENV_PATH, ...(stance ? { stance } : {}) };
 }
 
-export function formatSwitchedStance(result: { slug: string; envPath: string }): string[] {
+export function formatSwitchedStance(result: SwitchedStance): string[] {
+  const selected = result.stance?.selected;
   return [
     `Switched stance to ${result.slug}`,
+    ...(selected
+      ? [
+          `Acting for tenant ${selected.tenantSlug}` +
+            (selected.organizationId ? `, organization ${selected.organizationId}` : '') +
+            (selected.orgRole ? `, as ${selected.orgRole}` : ''),
+        ]
+      : []),
     `Activation profile: ${path.relative(pathResolver.rootDir(), result.envPath)}`,
     `Source it with: source ${path.relative(pathResolver.rootDir(), result.envPath)}`,
   ];

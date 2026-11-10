@@ -28,15 +28,15 @@ import {
 import { entriesFromMissionContextPackSources, entryCost } from './mission-context-condenser.js';
 import { loadMissionWorkItemDispatchManifestAtPath } from './mission-workitem-dispatch-manifest.js';
 import { _resetKnowledgeSlicesCacheForTests } from '../knowledge/knowledge-slices.js';
-import { findRelevantDistilledKnowledge } from '../knowledge/distill-knowledge-injector.js';
+import { findRelevantPromotedKnowledge } from '../knowledge/promoted-knowledge-retrieval.js';
 import { projectRecordPath, saveProjectRecord } from '../project/project-registry.js';
 import {
   organizationPurposePath,
   saveOrganizationPurpose,
 } from '../organization/organization-operating-model.js';
 
-vi.mock('../knowledge/distill-knowledge-injector.js', () => ({
-  findRelevantDistilledKnowledge: vi.fn(async () => []),
+vi.mock('../knowledge/promoted-knowledge-retrieval.js', () => ({
+  findRelevantPromotedKnowledge: vi.fn(async () => []),
 }));
 
 const missionId = 'MSN-CONTEXT-PACK-TEST-001';
@@ -242,7 +242,7 @@ function makePack(): MissionContextPack {
       mission_type: 'product_development',
       tier: 'public',
       status: 'active',
-      assigned_persona: 'worker',
+      org_role: 'worker',
       tenant_slug: 'acme',
       execution_mode: 'delegated',
       priority: 3,
@@ -468,7 +468,7 @@ function makePrunablePack(): MissionContextPack {
       mission_type: 'product_development',
       tier: 'public',
       status: 'active',
-      assigned_persona: 'worker',
+      org_role: 'worker',
       tenant_slug: 'acme',
       execution_mode: 'delegated',
       priority: 3,
@@ -674,7 +674,7 @@ function condensablePackInput(): BuildMissionContextPackInput {
       mission_type: 'product_development',
       tier: 'public',
       status: 'active',
-      assigned_persona: 'worker',
+      org_role: 'worker',
       tenant_slug: 'acme',
       execution_mode: 'delegated',
       priority: 3,
@@ -737,7 +737,7 @@ describe('mission-context-pack', () => {
         mission_id: `${missionId}-SKILL`,
         tier: 'public',
         status: 'active',
-        assigned_persona: 'worker',
+        org_role: 'worker',
         execution_mode: 'local',
         priority: 3,
         confidence_score: 1,
@@ -765,7 +765,7 @@ describe('mission-context-pack', () => {
             mission_id: `${missionId}-PRIVATE-NO-TENANT`,
             tier,
             status: 'active',
-            assigned_persona: 'worker',
+            org_role: 'worker',
             execution_mode: 'local',
             priority: 3,
             confidence_score: 1,
@@ -787,7 +787,7 @@ describe('mission-context-pack', () => {
           mission_id: `${missionId}-SKILL-PRETRUST`,
           tier: 'public',
           status: 'active',
-          assigned_persona: 'worker',
+          org_role: 'worker',
           execution_mode: 'local',
           priority: 3,
           confidence_score: 1,
@@ -833,7 +833,7 @@ describe('mission-context-pack', () => {
         mission_id: `${missionId}-RESTRICTED-SKILL`,
         tier: 'public',
         status: 'active',
-        assigned_persona: 'worker',
+        org_role: 'worker',
         execution_mode: 'local',
         priority: 3,
         confidence_score: 1,
@@ -936,7 +936,7 @@ describe('mission-context-pack', () => {
         mission_type: 'product_development',
         tier: 'public',
         status: 'active',
-        assigned_persona: 'worker',
+        org_role: 'worker',
         tenant_slug: 'acme',
         execution_mode: 'delegated',
         priority: 3,
@@ -974,7 +974,7 @@ describe('mission-context-pack', () => {
         mission_id: `${missionId}-REGISTRY-SCOPE`,
         tier: 'confidential',
         status: 'active',
-        assigned_persona: 'worker',
+        org_role: 'worker',
         tenant_slug: 'acme',
         execution_mode: 'delegated',
         priority: 3,
@@ -1009,7 +1009,7 @@ describe('mission-context-pack', () => {
         mission_id: `${missionId}-REGISTRY-PRECEDENCE`,
         tier: 'confidential',
         status: 'active',
-        assigned_persona: 'worker',
+        org_role: 'worker',
         tenant_slug: 'acme',
         execution_mode: 'delegated',
         priority: 3,
@@ -1044,7 +1044,7 @@ describe('mission-context-pack', () => {
         mission_id: `${missionId}-ORG-INTENT`,
         tier: 'confidential',
         status: 'active',
-        assigned_persona: 'worker',
+        org_role: 'worker',
         tenant_slug: 'acme',
         organization_id: intentOrgId,
         execution_mode: 'delegated',
@@ -1093,7 +1093,7 @@ describe('mission-context-pack', () => {
         mission_id: `${missionId}-ORG-INTENT-PUBLIC`,
         tier: 'public',
         status: 'active',
-        assigned_persona: 'worker',
+        org_role: 'worker',
         tenant_slug: 'acme',
         organization_id: intentOrgId,
         execution_mode: 'delegated',
@@ -1161,7 +1161,7 @@ describe('mission-context-pack', () => {
             mission_id: `${missionId}-SYMLINK`,
             tier: 'public',
             status: 'active',
-            assigned_persona: 'worker',
+            org_role: 'worker',
             execution_mode: 'local',
             priority: 3,
             confidence_score: 1,
@@ -1314,7 +1314,7 @@ describe('mission-context-pack', () => {
         mission_type: 'product_development',
         tier: 'public',
         status: 'active',
-        assigned_persona: 'worker',
+        org_role: 'worker',
         tenant_slug: 'acme',
         execution_mode: 'delegated',
         priority: 3,
@@ -1333,7 +1333,7 @@ describe('mission-context-pack', () => {
             relationship_type: 'supports',
           },
         },
-        assigned_persona: 'worker',
+        org_role: 'worker',
       },
       teamRole: 'implementer',
       recipientKind: 'agent',
@@ -1441,7 +1441,7 @@ describe('loadKnowledgeHintsIfPossible (KP-03 knowledge slices)', () => {
       mission_type: missionType,
       tier: 'public',
       status: 'active',
-      assigned_persona: 'worker',
+      org_role: 'worker',
       git: { branch: 'b', start_commit: 's', latest_commit: 'l', checkpoints: [] },
       history: [],
     };
@@ -1450,7 +1450,7 @@ describe('loadKnowledgeHintsIfPossible (KP-03 knowledge slices)', () => {
   afterEach(() => {
     _resetKnowledgeSlicesCacheForTests();
     if (safeExistsSync(slicesDir)) safeRmSync(slicesDir, { recursive: true, force: true });
-    vi.mocked(findRelevantDistilledKnowledge).mockReset();
+    vi.mocked(findRelevantPromotedKnowledge).mockReset();
   });
 
   it('(a) delivers the pinned working-philosophy doc as the first hint for implementer/execution', async () => {
@@ -1464,7 +1464,7 @@ describe('loadKnowledgeHintsIfPossible (KP-03 knowledge slices)', () => {
         },
       ],
     });
-    vi.mocked(findRelevantDistilledKnowledge).mockResolvedValue([]);
+    vi.mocked(findRelevantPromotedKnowledge).mockResolvedValue([]);
 
     const hints = await loadKnowledgeHintsIfPossible({
       missionState: baseMissionState(),
@@ -1489,7 +1489,7 @@ describe('loadKnowledgeHintsIfPossible (KP-03 knowledge slices)', () => {
         },
       ],
     });
-    vi.mocked(findRelevantDistilledKnowledge).mockResolvedValue([]);
+    vi.mocked(findRelevantPromotedKnowledge).mockResolvedValue([]);
 
     const hints = await loadKnowledgeHintsIfPossible({
       missionState: baseMissionState(),
@@ -1528,7 +1528,7 @@ describe('loadKnowledgeHintsIfPossible (KP-03 knowledge slices)', () => {
           },
         ],
       });
-      vi.mocked(findRelevantDistilledKnowledge).mockResolvedValue([]);
+      vi.mocked(findRelevantPromotedKnowledge).mockResolvedValue([]);
 
       const hints = await loadKnowledgeHintsIfPossible({
         missionState: baseMissionState(),
@@ -1556,7 +1556,7 @@ describe('loadKnowledgeHintsIfPossible (KP-03 knowledge slices)', () => {
         },
       ],
     });
-    vi.mocked(findRelevantDistilledKnowledge).mockResolvedValue([
+    vi.mocked(findRelevantPromotedKnowledge).mockResolvedValue([
       {
         path: 'knowledge/product/evolution/distill_should_be_excluded.md',
         title: 'Excluded distill',
@@ -1591,7 +1591,7 @@ describe('loadKnowledgeHintsIfPossible (KP-03 knowledge slices)', () => {
         score: 0.5,
       },
     ];
-    vi.mocked(findRelevantDistilledKnowledge).mockResolvedValue(searchResult as any);
+    vi.mocked(findRelevantPromotedKnowledge).mockResolvedValue(searchResult as any);
 
     const hints = await loadKnowledgeHintsIfPossible({
       missionState: baseMissionState(),
@@ -1608,7 +1608,7 @@ describe('loadKnowledgeHintsIfPossible (KP-03 knowledge slices)', () => {
         score: 0.5,
       },
     ]);
-    expect(findRelevantDistilledKnowledge).toHaveBeenCalledWith(
+    expect(findRelevantPromotedKnowledge).toHaveBeenCalledWith(
       expect.objectContaining({ limit: 3, minScore: 0.08 })
     );
   });
@@ -1622,7 +1622,7 @@ describe('loadKnowledgeHintsIfPossible (KP-03 knowledge slices)', () => {
     const searchResult = [
       { path: 'knowledge/product/architecture/a.md', title: 'A', excerpt: 'ex-a', tags: [] },
     ];
-    vi.mocked(findRelevantDistilledKnowledge).mockResolvedValue(searchResult as any);
+    vi.mocked(findRelevantPromotedKnowledge).mockResolvedValue(searchResult as any);
     // knowledge-slices logs through the shared logger, which writes to stderr.
     const stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
 
@@ -1655,14 +1655,14 @@ describe('KP-04 scope-linked budgets', () => {
       execution_mode: 'local',
       priority: 3,
       confidence_score: 1,
-      assigned_persona: 'worker',
+      org_role: 'worker',
       git: { branch: 'b', start_commit: 's', latest_commit: 'l', checkpoints: [] },
       history: [],
     };
   }
 
   afterEach(() => {
-    vi.mocked(findRelevantDistilledKnowledge).mockReset();
+    vi.mocked(findRelevantPromotedKnowledge).mockReset();
   });
 
   it('(a) hint count scales with estimated_scope: S=2, M=3, L=5', async () => {
@@ -1673,10 +1673,10 @@ describe('KP-04 scope-linked budgets', () => {
       tags: [],
       score: 0.9 - index * 0.01,
     }));
-    vi.mocked(findRelevantDistilledKnowledge).mockResolvedValue(searchResult as any);
+    vi.mocked(findRelevantPromotedKnowledge).mockResolvedValue(searchResult as any);
 
     for (const scope of ['S', 'M', 'L'] as const) {
-      vi.mocked(findRelevantDistilledKnowledge).mockClear();
+      vi.mocked(findRelevantPromotedKnowledge).mockClear();
       const expectedLimit = SCOPE_KNOWLEDGE_BUDGETS[scope].hintLimit;
 
       const hints = await loadKnowledgeHintsIfPossible({
@@ -1687,7 +1687,7 @@ describe('KP-04 scope-linked budgets', () => {
       });
 
       expect(hints).toHaveLength(expectedLimit);
-      expect(findRelevantDistilledKnowledge).toHaveBeenCalledWith(
+      expect(findRelevantPromotedKnowledge).toHaveBeenCalledWith(
         expect.objectContaining({ limit: expectedLimit, minScore: 0.08 })
       );
     }

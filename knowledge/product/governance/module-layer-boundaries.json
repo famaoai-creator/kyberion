@@ -18,6 +18,11 @@
     },
     {
       "source": "libs/core/secure-io.ts",
+      "target": "libs/core/governance/execution-agent-id.ts",
+      "reason": "secure-io's policy gates key the policy-engine agentId and the audit subject on the execution's NHI id (S4; the id grammar lives in contracts/nhi-id.ts)"
+    },
+    {
+      "source": "libs/core/secure-io.ts",
       "target": "libs/core/shell/sandbox-policy.ts",
       "reason": "secure-io enforces the active provider sandbox before filesystem and network operations"
     },

@@ -19,6 +19,7 @@
  * Leaf module on purpose: it imports nothing but the slug rules, so both the
  * reasoning-send gate and the delegation gate can depend on it without a cycle.
  */
+import type { StorageDataTier } from '../storage-layout.js';
 import { isReservedScopeName, isValidTenantSlug } from '../foundation/scope.js';
 
 export type CustodyOwner =
@@ -42,7 +43,7 @@ export class CustodyOwnerConflictError extends Error {
 
 export interface CustodyOwnerInput {
   /** Most sensitive tier represented in the material. */
-  tier: 'public' | 'confidential' | 'personal';
+  tier: StorageDataTier;
   /** Tenant the material belongs to, if any. */
   tenant_slug?: string;
   /** Explicit custody declaration; may only agree with `tenant_slug`. */

@@ -27,7 +27,7 @@ vi.mock('./fs-primitives.js', async (importOriginal) => {
         return text;
       }
       const policy = JSON.parse(text);
-      const role = policy.authority_role_permissions.peer_responder_reader;
+      const role = policy.store_grants.peer_responder_reader;
       role.deny_read = [...(role.deny_read ?? []), ...state.extraDenyRead];
       return JSON.stringify(policy);
     },
@@ -35,18 +35,18 @@ vi.mock('./fs-primitives.js', async (importOriginal) => {
 });
 
 vi.mock('./governance/audit-chain.js', () => ({
-  auditChain: { record: vi.fn() },
+  auditChain: { record: vi.fn(), recordDurable: vi.fn() },
 }));
 
 import { validateReadPermission } from './tier-guard.js';
 import * as pathResolver from './path-resolver.js';
-import './authority.js';
+import { withStoreGrant } from './authority.js';
 
 const ROOT = pathResolver.rootDir();
 const at = (relative: string): string => path.join(ROOT, relative);
 const ENV_KEYS = [
   'KYBERION_TENANT',
-  'KYBERION_PERSONA',
+  'KYBERION_BASE_ROLE',
   'MISSION_ROLE',
   'SYSTEM_ROLE',
   'KYBERION_SUDO',
@@ -56,6 +56,10 @@ const ENV_KEYS = [
 ] as const;
 
 describe('tier-guard deny_read on resolved paths', () => {
+  // S4: peer_responder_reader is a declared store grant (an audited disclosure), opened as
+  // mesh/peer-auto-reply.ts opens it, bound to the receiving tenant.
+  const itGrant = (name: string, body: () => void) =>
+    it(name, () => withStoreGrant('peer_responder_reader', body, { tenantSlug: 'acme-corp' }));
   const saved: Partial<Record<(typeof ENV_KEYS)[number], string | undefined>> = {};
 
   beforeEach(() => {
@@ -63,7 +67,6 @@ describe('tier-guard deny_read on resolved paths', () => {
       saved[key] = process.env[key];
       delete process.env[key];
     }
-    process.env.MISSION_ROLE = 'peer_responder_reader';
     process.env.KYBERION_TENANT = 'acme-corp';
     state.realpaths.clear();
     state.extraDenyRead = [];
@@ -76,7 +79,7 @@ describe('tier-guard deny_read on resolved paths', () => {
     }
   });
 
-  it('denies a symlinked spelling that physically resolves into the carve-out', () => {
+  itGrant('denies a symlinked spelling that physically resolves into the carve-out', () => {
     const link = at('knowledge/confidential/acme-corp/notes/link');
     state.realpaths.set(link, at('knowledge/confidential/acme-corp/connections'));
     const decision = validateReadPermission(path.join(link, 'peer-network.json'));
@@ -84,13 +87,13 @@ describe('tier-guard deny_read on resolved paths', () => {
     expect(decision.reason).toMatch(/deny_read/);
   });
 
-  it('keeps an unlinked sibling readable (control)', () => {
+  itGrant('keeps an unlinked sibling readable (control)', () => {
     expect(
       validateReadPermission(at('knowledge/confidential/acme-corp/notes/link/peer-network.json'))
     ).toEqual({ allowed: true });
   });
 
-  it('applies deny_read to the real path on the partitioned runtime-ledger branch', () => {
+  itGrant('applies deny_read to the real path on the partitioned runtime-ledger branch', () => {
     const ledger = 'active/shared/runtime/usage-ledger/confidential/acme-corp/resource-usage.jsonl';
     // Without a carve-out the role reads its own tenant partition through the
     // knowledge/confidential/<tenant> mirror.

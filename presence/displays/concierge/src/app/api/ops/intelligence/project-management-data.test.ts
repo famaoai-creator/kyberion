@@ -3,11 +3,11 @@ import { currentExecutionScope } from '@agent/core/foundation';
 import type { ProjectRecord } from '@agent/core/project/project-registry';
 import { readProjectManagementForViewer } from './project-management-data';
 
-const ORIGINAL_PERSONA = process.env.KYBERION_PERSONA;
+const ORIGINAL_PERSONA = process.env.KYBERION_BASE_ROLE;
 
 afterEach(() => {
-  if (ORIGINAL_PERSONA === undefined) delete process.env.KYBERION_PERSONA;
-  else process.env.KYBERION_PERSONA = ORIGINAL_PERSONA;
+  if (ORIGINAL_PERSONA === undefined) delete process.env.KYBERION_BASE_ROLE;
+  else process.env.KYBERION_BASE_ROLE = ORIGINAL_PERSONA;
 });
 
 function project(id: string, tenant: string): ProjectRecord {
@@ -18,7 +18,7 @@ describe('readProjectManagementForViewer', () => {
   it('reads each view outside the worker project fence, bound to the project tenant', () => {
     // The server process runs as a worker; the ambient context would trip
     // assertWorkerProjectScope ([PROJECT_SCOPE_MISSING]) on every project.
-    process.env.KYBERION_PERSONA = 'worker';
+    process.env.KYBERION_BASE_ROLE = 'worker';
     const seen: Array<{ id: string; role?: string; tenant?: string; worker: boolean }> = [];
     const views = readProjectManagementForViewer(
       [project('PRJ-A', 'acme'), project('PRJ-B', 'globex')],

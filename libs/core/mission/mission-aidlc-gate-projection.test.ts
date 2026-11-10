@@ -52,7 +52,7 @@ function receipt(gate: string, verdict: 'pass' | 'fail', second: number): void {
 
 beforeEach(() => {
   vi.stubEnv('MISSION_ROLE', 'mission_controller');
-  vi.stubEnv('KYBERION_PERSONA', 'worker');
+  vi.stubEnv('KYBERION_BASE_ROLE', 'worker');
   dispatchPort.mockReset();
   safeMkdir(path.join(directory, 'evidence'), { recursive: true });
   safeMkdir(path.join(directory, 'gates/definitions'), { recursive: true });
@@ -66,7 +66,7 @@ beforeEach(() => {
       execution_mode: 'local',
       relationships: {},
       priority: 3,
-      assigned_persona: 'worker',
+      org_role: 'worker',
       confidence_score: 1,
       git: { branch: 'mission/aidlc', start_commit: 'abc', latest_commit: 'abc', checkpoints: [] },
       history: [],

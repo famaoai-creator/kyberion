@@ -75,7 +75,7 @@ describe('organization operating model', () => {
   const originalEnv = { ...process.env };
 
   beforeEach(() => {
-    process.env.KYBERION_PERSONA = 'sovereign';
+    process.env.KYBERION_BASE_ROLE = 'sovereign';
     process.env.KYBERION_SUDO = 'true';
     process.env.KYBERION_TENANT = tenantSlug;
     safeRmSync(workspace);

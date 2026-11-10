@@ -89,6 +89,14 @@ function createWorkItem(input: Parameters<typeof createCanonicalWorkItem>[0]) {
 // that file in a loop during a run). Ownership records therefore stay in this
 // process: no shared file to lose, and this suite stops clobbering the file the
 // other two suites back up.
+// Promoted lessons from the live repo corpus would enter these prompts by
+// relevance (D8) and make prompt-size-sensitive echo mocks corpus-dependent.
+// Retrieval and its scoping are covered by mission-context-pack-promoted-knowledge*.
+vi.mock('../knowledge/promoted-knowledge-retrieval.js', async (original) => ({
+  ...(await original<typeof import('../knowledge/promoted-knowledge-retrieval.js')>()),
+  findRelevantPromotedKnowledge: async () => [],
+}));
+
 const artifactRegistryStore = vi.hoisted(() => ({ records: [] as ArtifactOwnershipRecord[] }));
 
 vi.mock('../workforce/artifact-registry.js', async () => {
@@ -199,7 +207,7 @@ function makeMissionState(): MissionState {
       },
     },
     priority: 3,
-    assigned_persona: 'worker',
+    org_role: 'worker',
     confidence_score: 1,
     git: {
       branch: 'mission/workitem-dispatch',
@@ -271,7 +279,7 @@ function makeTaskResultText(input: {
 
 beforeEach(() => {
   process.env.MISSION_ROLE = 'mission_controller';
-  process.env.KYBERION_PERSONA = 'worker';
+  process.env.KYBERION_BASE_ROLE = 'worker';
   artifactRegistryStore.records.length = 0;
   setWorkCoordinationNamespace(workCoordinationNamespace);
   clearWorkCoordinationStore();

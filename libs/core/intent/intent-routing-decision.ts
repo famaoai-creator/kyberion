@@ -15,6 +15,8 @@ export interface IntentRoutingDecisionDependencies {
     workLoop: OrganizationWorkLoopSummary
   ) => AgentRoutingDecision | null;
   findStandardIntentById: (intentId: string) => StandardIntentDefinition | undefined;
+  /** The work-scope-policy.json promotion verdict for a catalog shape alone (D7). */
+  shapePromotesToMission: (shape: string) => boolean;
 }
 
 export function deriveAgentRoutingDecision(
@@ -28,9 +30,8 @@ export function deriveAgentRoutingDecision(
 
   const intent = dependencies.findStandardIntentById(contract.intent_id);
   const managedProgram = contract.delivery_mode === 'managed_program';
-  const durableShape =
-    contract.resolution.execution_shape === 'project_bootstrap' ||
-    contract.resolution.execution_shape === 'mission';
+  // The promotion verdict lives in work-scope-policy.json only (D7).
+  const durableShape = dependencies.shapePromotesToMission(contract.resolution.execution_shape);
   const boundaryCrossing =
     managedProgram ||
     durableShape ||

@@ -1,10 +1,10 @@
 /** CLI-only, status-only tenant boundary for explicit first-job status/tick. */
 import { isDeepStrictEqual } from 'node:util';
 import {
-  resolveRole,
   resolveExecutionPersona,
   resolveIdentityContext,
-  withExecutionContext,
+  resolveRole,
+  withStoreGrant,
 } from '@agent/core/authority';
 import {
   currentExecutionScope,
@@ -62,7 +62,7 @@ export function createFirstJobTenantStatusAssertion(
       if (
         !binding ||
         proposal.action_id !== 'dot_delegate_work' ||
-        proposal.work_shape !== 'pipeline' ||
+        proposal.execution_shape !== 'pipeline' ||
         proposal.pipeline_ref !== FRONT_DESK_RECEIPT_PIPELINE ||
         proposal.handoff_to !== undefined
       )
@@ -101,12 +101,10 @@ export function createFirstJobTenantStatusAssertion(
         throw new Error('unbound');
       // Read only this tenant JSON, within the new exact-file role. Do not
       // resolveTenant: that materializes protected knowledge and overlay paths.
-      const operational = withExecutionContext(
+      const operational = withStoreGrant(
         'first_job_tenant_status_reader',
         () => readTenantProfile(tenant)?.status === 'active',
-        'worker',
-        tenant,
-        organization
+        { tenantSlug: tenant, organizationId: organization }
       );
       if (!operational) throw new Error('inactive');
     } catch {

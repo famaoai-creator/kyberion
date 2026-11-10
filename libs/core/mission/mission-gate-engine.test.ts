@@ -61,7 +61,7 @@ describe('mission-gate-engine', () => {
     const probe = [
       'const e = process.env;',
       "const ok = e.FOO === 'bar' && e.SYSTEM_ROLE !== 'ecosystem_architect' &&",
-      "  e.MISSION_ROLE !== 'gate_injected' && e.KYBERION_PERSONA !== 'gate_injected' &&",
+      "  e.MISSION_ROLE !== 'gate_injected' && e.KYBERION_BASE_ROLE !== 'gate_injected' &&",
       "  e.KYBERION_DELEGATED_ROLE !== 'ecosystem_architect@concierge' && e.KYBERION_SUDO !== 'gate_injected';",
       'process.exit(ok ? 0 : 3);',
     ].join('\n');
@@ -79,7 +79,7 @@ describe('mission-gate-engine', () => {
                 FOO: 'bar',
                 SYSTEM_ROLE: 'ecosystem_architect',
                 MISSION_ROLE: 'gate_injected',
-                KYBERION_PERSONA: 'gate_injected',
+                KYBERION_BASE_ROLE: 'gate_injected',
                 KYBERION_DELEGATED_ROLE: 'ecosystem_architect@concierge',
                 KYBERION_SUDO: 'gate_injected',
               },

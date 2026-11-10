@@ -96,7 +96,7 @@ describe('mission ledger scope (D9)', () => {
     for (const key of [
       'KYBERION_ROOT',
       'MISSION_ROLE',
-      'KYBERION_PERSONA',
+      'KYBERION_BASE_ROLE',
       'KYBERION_TENANT',
       'KYBERION_AUDIT_CHAIN_KEY',
     ])
@@ -104,7 +104,7 @@ describe('mission ledger scope (D9)', () => {
     process.env.KYBERION_ROOT = tmpRoot;
     // `pnpm mission ...` runs as mission_controller (mission_controller.ts sets it).
     process.env.MISSION_ROLE = 'mission_controller';
-    process.env.KYBERION_PERSONA = 'worker';
+    process.env.KYBERION_BASE_ROLE = 'worker';
     delete process.env.KYBERION_TENANT;
     // No env key: the chain key file is read/created by the first writer
     // (the tenant_ledger_store role in the first test).
@@ -300,8 +300,8 @@ describe('mission ledger scope (D9)', () => {
     ).toThrow(/ROLE_TENANT_SCOPE_MISMATCH/);
   });
 
-  it('lets only the tenant ledger store role write a tenant partition, bound or not', async () => {
-    const { withExecutionContext } = await import('../authority.js');
+  it('lets only the tenant ledger store grant write a tenant partition, bound or not', async () => {
+    const { withExecutionContext, withStoreGrant } = await import('../authority.js');
     const { safeAppendFileSync, safeWriteFile } = await import('../secure-io.js');
     const { validateWritePermission } = await import('../tier-guard.js');
     const partitionFile = path.join(
@@ -319,12 +319,9 @@ describe('mission ledger scope (D9)', () => {
       });
     }
     expect(
-      withExecutionContext(
-        'tenant_ledger_store',
-        () => validateWritePermission(partitionFile).allowed,
-        undefined,
-        TENANT
-      )
+      withStoreGrant('tenant_ledger_store', () => validateWritePermission(partitionFile).allowed, {
+        tenantSlug: TENANT,
+      })
     ).toBe(true);
   });
 

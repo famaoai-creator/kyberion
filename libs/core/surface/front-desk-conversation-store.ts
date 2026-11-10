@@ -1291,7 +1291,7 @@ function verifiedTerminalRecovery(request: FrontDeskExecutionRequest, rootDir?: 
       original.decision !== 'approve' ||
       original.actor_id !== 'dot:' + charter.dot_id ||
       original.action_id !== expected.action_id ||
-      original.work_shape !== expected.work_shape ||
+      original.execution_shape !== expected.execution_shape ||
       original.pipeline_ref !== expected.pipeline_ref ||
       original.target !== expected.target ||
       original.intent !== expected.intent ||

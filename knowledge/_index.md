@@ -209,6 +209,7 @@
 - [音声・リアルタイム映像の技術再評価 2026-10](./product/architecture/realtime-av-technology-review-2026-10.md) (public | Unknown)
 
 ## 📁 product/architecture/decisions
+- [Concept Model v2: WorkItem as Issue, one Lease, Tenant 1:N Organization, Stance as acting-for, Grant = principal × scope × operation, one intent resolver, a closed memory loop](./product/architecture/decisions/2026-11-10-concept-model-v2.md) (public | Ecosystem Architect)
 - [Constrain Mesh Hub v1 to a Same-Tenant Single-Writer Control Plane](./product/architecture/decisions/2026-06-24-mesh-hub-v1-boundaries.md) (public | Ecosystem Architect)
 - [Keep Nine Mission Classes and Treat `knowledge_lifecycle` as a Category](./product/architecture/decisions/2026-06-22-knowledge-lifecycle-taxonomy-decision.md) (public | Ecosystem Architect)
 
@@ -251,12 +252,14 @@
 - [Build-Generation Receipt v1 — 設計レビュー (R12)](./product/governance/build-generation-receipt-review.ja.md) (public | Unknown)
 - [CLI 信頼性ゲート — CI レーンマップ](./product/governance/cli-reliability-gates.ja.md) (public | Unknown)
 - [Claude に聞く効率チェック質問リスト](./product/governance/agent-efficiency-questions.md) (public | Unknown)
+- [Concept Registry Workflow: one definition per term, retire instead of accumulate](./product/governance/concept-registry-workflow.md) (public | Unknown)
 - [Config Protocol: The Sovereign Rule of System State](./product/governance/config-protocol.md) (public | Ecosystem Architect)
 - [Contract Design Principles — Absence, Failure, and Backend Opacity](./product/governance/contract-design-principles.md) (public | Unknown)
 - [Declarative Authorization Registry (3-layer model, 4 subject axes)](./product/governance/declarative-authorization-registry.md) (public | Unknown)
 - [Delegated Agent Operations Runbook](./product/governance/delegated-agent-operations-runbook.md) (public | Unknown)
 - [Dependency Placement Policy](./product/governance/dependency-placement-policy.md) (public | Unknown)
 - [Dev-IdP onboarding runbook — signing in to Concierge locally](./product/governance/dev-idp-onboarding-runbook.md) (public | Unknown)
+- [Distill Policy Adapter Guide](./product/governance/wisdom-policy-guide.md) (public | Ecosystem Architect)
 - [Dot の委任枠と満杯時の待機運用](./product/governance/dot-capacity-operations.ja.md) (public | Unknown)
 - [Dual-Key Policy](./product/governance/dual-key-policy.md) (public | Unknown)
 - [Dynamic Capability and Actuator Governance Policy](./product/governance/governance-policy.md) (public | Ecosystem Architect)
@@ -285,7 +288,6 @@
 - [SOP: TypeScript Core Base Stabilization](./product/governance/ts-base-stabilization-sop.md) (public | Ecosystem Architect)
 - [SOP: Unit Test Modernization & Alias Integrity](./product/governance/test-modernization-sop.md) (public | Ecosystem Architect)
 - [Sovereign Onboarding Protocol](./product/governance/onboarding-protocol.md) (public | sovereign_concierge)
-- [Wisdom Policy Adapter Guide](./product/governance/wisdom-policy-guide.md) (public | Ecosystem Architect)
 - [Working Philosophy — Frontier-Model Operating Rules for Every Tier](./product/governance/working-philosophy.md) (public | Unknown)
 - [portfolio-status](./product/governance/portfolio-status.md) (public | Unknown)
 - [オンボーディング標準フロー — 環境 / Identity / Tenant / Activation / First Work](./product/governance/onboarding-flow.md) (public | Unknown)
@@ -564,6 +566,7 @@
 - [手順の成功チェック プレイブック（golden シナリオ）](./product/orchestration/procedure-success-check-playbook.ja.md) (public | Unknown)
 - [文書理解・設計レビューの実行と証跡](./product/orchestration/document-review-playbook.md) (public | Unknown)
 - [残留データ（残骸）運用プレイブック — 実測スナップショットと掃除・運用の虎の巻](./product/orchestration/storage-residue-operations-playbook.ja.md) (public | Unknown)
+- [目的駆動の改善ループ — improvement-scan](./product/orchestration/organization-improvement-loop.md) (public | Unknown)
 - [知覚プレイブック（read / see / listen / watch — 感覚ごとに入口はひとつ）](./product/orchestration/perception-playbook.ja.md) (public | Ecosystem Architect)
 - [能力動詞の棚卸し（どの能力が一語になっていて、どれがなっていないか）](./product/orchestration/capability-verb-inventory.ja.md) (public | Ecosystem Architect)
 - [自律型シナジー標準基準 (Autonomous Synergy Standards)](./product/orchestration/optimization-standards.md) (public | Ecosystem Architect)

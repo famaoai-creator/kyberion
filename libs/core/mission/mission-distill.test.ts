@@ -68,10 +68,10 @@ import { loadMissionStateIncludingArchive, loadState } from './mission-state.js'
 import {
   gatherDistillContext,
   distillMission,
-  formatWisdomMarkdown,
+  formatDistillationMarkdown,
   isRegularMissionDistillPromptPath,
-  resolveWisdomOutputPath,
-  WISDOM_SCHEMA,
+  resolveDistillationOutputPath,
+  DISTILLATION_SCHEMA,
 } from './mission-distill.js';
 import { promoteMemoryCandidateToKnowledge } from '../knowledge/memory-promotion-workflow.js';
 import { safeExec } from '../secure-io.js';
@@ -132,7 +132,7 @@ describe('mission-distill end-to-end promotion flow', () => {
             status: 'distilling',
             execution_mode: 'local',
             priority: 1,
-            assigned_persona: 'worker',
+            org_role: 'worker',
             confidence_score: 1,
             git: {
               branch: 'test',
@@ -159,16 +159,16 @@ describe('mission-distill end-to-end promotion flow', () => {
 
   async function runDistillAsArchitect(): Promise<void> {
     const previousRole = process.env.MISSION_ROLE;
-    const previousPersona = process.env.KYBERION_PERSONA;
+    const previousPersona = process.env.KYBERION_BASE_ROLE;
     process.env.MISSION_ROLE = 'ecosystem_architect';
-    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     try {
       await distillMission(missionId, pathResolver.rootDir());
     } finally {
       if (previousRole === undefined) delete process.env.MISSION_ROLE;
       else process.env.MISSION_ROLE = previousRole;
-      if (previousPersona === undefined) delete process.env.KYBERION_PERSONA;
-      else process.env.KYBERION_PERSONA = previousPersona;
+      if (previousPersona === undefined) delete process.env.KYBERION_BASE_ROLE;
+      else process.env.KYBERION_BASE_ROLE = previousPersona;
     }
   }
 
@@ -229,16 +229,16 @@ describe('mission-distill end-to-end promotion flow', () => {
 
   it('keeps raw distillation mission-local and queues a classified promotion candidate', async () => {
     const previousRole = process.env.MISSION_ROLE;
-    const previousPersona = process.env.KYBERION_PERSONA;
+    const previousPersona = process.env.KYBERION_BASE_ROLE;
     process.env.MISSION_ROLE = 'ecosystem_architect';
-    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     try {
       await distillMission(missionId, pathResolver.rootDir());
     } finally {
       if (previousRole === undefined) delete process.env.MISSION_ROLE;
       else process.env.MISSION_ROLE = previousRole;
-      if (previousPersona === undefined) delete process.env.KYBERION_PERSONA;
-      else process.env.KYBERION_PERSONA = previousPersona;
+      if (previousPersona === undefined) delete process.env.KYBERION_BASE_ROLE;
+      else process.env.KYBERION_BASE_ROLE = previousPersona;
     }
 
     const queued = listMemoryPromotionCandidates().find(
@@ -262,9 +262,9 @@ describe('mission-distill end-to-end promotion flow', () => {
     });
 
     const promotePreviousRole = process.env.MISSION_ROLE;
-    const promotePreviousPersona = process.env.KYBERION_PERSONA;
+    const promotePreviousPersona = process.env.KYBERION_BASE_ROLE;
     process.env.MISSION_ROLE = 'ecosystem_architect';
-    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     let result;
     try {
       result = await promoteMemoryCandidateToKnowledge({
@@ -274,8 +274,8 @@ describe('mission-distill end-to-end promotion flow', () => {
     } finally {
       if (promotePreviousRole === undefined) delete process.env.MISSION_ROLE;
       else process.env.MISSION_ROLE = promotePreviousRole;
-      if (promotePreviousPersona === undefined) delete process.env.KYBERION_PERSONA;
-      else process.env.KYBERION_PERSONA = promotePreviousPersona;
+      if (promotePreviousPersona === undefined) delete process.env.KYBERION_BASE_ROLE;
+      else process.env.KYBERION_BASE_ROLE = promotePreviousPersona;
     }
 
     expect(result.promotedRef).toContain('knowledge/public/common/patterns/generated/');
@@ -292,7 +292,7 @@ describe('mission-distill end-to-end promotion flow', () => {
     );
 
     const hints = safeReadFile(scratchHintsPath, { encoding: 'utf8' }) as string;
-    expect(hints).not.toContain('Distilled wisdom from mission'); // risk_rule records do not pollute operational hints
+    expect(hints).not.toContain('Distilled lesson from mission'); // risk_rule records do not pollute operational hints
     expect(hints).not.toContain(`source_ref: ${queued.candidate_id}`);
     expect(queued?.evidence_refs).toContain(
       path
@@ -400,9 +400,9 @@ describe('mission-distill end-to-end promotion flow', () => {
       throw new Error('queue unavailable');
     });
     const previousRole = process.env.MISSION_ROLE;
-    const previousPersona = process.env.KYBERION_PERSONA;
+    const previousPersona = process.env.KYBERION_BASE_ROLE;
     process.env.MISSION_ROLE = 'ecosystem_architect';
-    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     try {
       await distillMission(missionId, pathResolver.rootDir());
       const outboxPath = `${missionPath}/evidence/memory-promotion-outbox.json`;
@@ -423,16 +423,16 @@ describe('mission-distill end-to-end promotion flow', () => {
       enqueue.mockRestore();
       if (previousRole === undefined) delete process.env.MISSION_ROLE;
       else process.env.MISSION_ROLE = previousRole;
-      if (previousPersona === undefined) delete process.env.KYBERION_PERSONA;
-      else process.env.KYBERION_PERSONA = previousPersona;
+      if (previousPersona === undefined) delete process.env.KYBERION_BASE_ROLE;
+      else process.env.KYBERION_BASE_ROLE = previousPersona;
     }
   });
 
   it('preserves an approved candidate when delivery acknowledgement was lost', async () => {
     const previousRole = process.env.MISSION_ROLE;
-    const previousPersona = process.env.KYBERION_PERSONA;
+    const previousPersona = process.env.KYBERION_BASE_ROLE;
     process.env.MISSION_ROLE = 'ecosystem_architect';
-    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     try {
       await distillMission(missionId, pathResolver.rootDir());
       const outboxPath = `${missionPath}/evidence/memory-promotion-outbox.json`;
@@ -458,18 +458,18 @@ describe('mission-distill end-to-end promotion flow', () => {
     } finally {
       if (previousRole === undefined) delete process.env.MISSION_ROLE;
       else process.env.MISSION_ROLE = previousRole;
-      if (previousPersona === undefined) delete process.env.KYBERION_PERSONA;
-      else process.env.KYBERION_PERSONA = previousPersona;
+      if (previousPersona === undefined) delete process.env.KYBERION_BASE_ROLE;
+      else process.env.KYBERION_BASE_ROLE = previousPersona;
     }
   });
 
   it('recovers a physically archived mission through visible archive state and rejects mismatched scope', async () => {
     const previousRole = process.env.MISSION_ROLE;
-    const previousPersona = process.env.KYBERION_PERSONA;
+    const previousPersona = process.env.KYBERION_BASE_ROLE;
     const activePath = missionPath;
     const archiveRoot = pathResolver.shared('tmp/mission-distill-archive');
     process.env.MISSION_ROLE = 'ecosystem_architect';
-    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     try {
       await distillMission(missionId, pathResolver.rootDir());
       let outboxPath = `${missionPath}/evidence/memory-promotion-outbox.json`;
@@ -519,15 +519,15 @@ describe('mission-distill end-to-end promotion flow', () => {
       safeRmSync(archiveRoot, { recursive: true, force: true });
       if (previousRole === undefined) delete process.env.MISSION_ROLE;
       else process.env.MISSION_ROLE = previousRole;
-      if (previousPersona === undefined) delete process.env.KYBERION_PERSONA;
-      else process.env.KYBERION_PERSONA = previousPersona;
+      if (previousPersona === undefined) delete process.env.KYBERION_BASE_ROLE;
+      else process.env.KYBERION_BASE_ROLE = previousPersona;
     }
   });
 });
 
-describe('resolveWisdomOutputPath', () => {
+describe('resolveDistillationOutputPath', () => {
   it('rejects output directories outside the repository root', () => {
-    expect(() => resolveWisdomOutputPath('../../outside-wisdom', 'distill.md')).toThrow(
+    expect(() => resolveDistillationOutputPath('../../outside-wisdom', 'distill.md')).toThrow(
       '[RESOURCE_PATH_SCOPE]'
     );
   });
@@ -540,7 +540,7 @@ describe('resolveWisdomOutputPath', () => {
     safeSymlinkSync(target, link);
     try {
       expect(() =>
-        resolveWisdomOutputPath(
+        resolveDistillationOutputPath(
           `active/shared/tmp/mission-distill-output-link-${suffix}`,
           'distill.md'
         )
@@ -552,7 +552,7 @@ describe('resolveWisdomOutputPath', () => {
   });
 });
 
-describe('WISDOM_SCHEMA harness2 experience contract', () => {
+describe('DISTILLATION_SCHEMA harness2 experience contract', () => {
   const baseWisdom = {
     title: 'Test wisdom',
     category: 'Evolution' as const,
@@ -568,15 +568,15 @@ describe('WISDOM_SCHEMA harness2 experience contract', () => {
   };
 
   it('accepts a wisdom object without the new optional fields (backward compatible)', () => {
-    expect(WISDOM_SCHEMA.safeParse(baseWisdom).success).toBe(true);
+    expect(DISTILLATION_SCHEMA.safeParse(baseWisdom).success).toBe(true);
   });
 
   it('accepts explicit null optional lessons from structured-output providers', () => {
     expect(
-      WISDOM_SCHEMA.safeParse({ ...baseWisdom, experience: null, edit_rows: null }).success
+      DISTILLATION_SCHEMA.safeParse({ ...baseWisdom, experience: null, edit_rows: null }).success
     ).toBe(true);
     expect(
-      WISDOM_SCHEMA.safeParse({
+      DISTILLATION_SCHEMA.safeParse({
         ...baseWisdom,
         experience: { cue: 'c', lesson: 'l', confidence: 'high' },
         edit_rows: null,
@@ -608,7 +608,7 @@ describe('WISDOM_SCHEMA harness2 experience contract', () => {
         },
       ],
     };
-    expect(WISDOM_SCHEMA.safeParse(wisdom).success).toBe(true);
+    expect(DISTILLATION_SCHEMA.safeParse(wisdom).success).toBe(true);
   });
 
   it('rejects a partial experience block (missing evidence)', () => {
@@ -616,12 +616,12 @@ describe('WISDOM_SCHEMA harness2 experience contract', () => {
       ...baseWisdom,
       experience: { cue: 'cue', lesson: 'lesson', confidence: 'high' },
     };
-    expect(WISDOM_SCHEMA.safeParse(wisdom).success).toBe(false);
+    expect(DISTILLATION_SCHEMA.safeParse(wisdom).success).toBe(false);
   });
 
   it('rejects empty-string fields inside an experience block', () => {
     expect(
-      WISDOM_SCHEMA.safeParse({
+      DISTILLATION_SCHEMA.safeParse({
         ...baseWisdom,
         experience: { cue: 'c', lesson: 'l', evidence: '', confidence: 'high' },
       }).success
@@ -633,11 +633,11 @@ describe('WISDOM_SCHEMA harness2 experience contract', () => {
       ...baseWisdom,
       edit_rows: [{ component: 'c', change: 'x', observed: 'y', verdict: 'probably_helped' }],
     };
-    expect(WISDOM_SCHEMA.safeParse(wisdom).success).toBe(false);
+    expect(DISTILLATION_SCHEMA.safeParse(wisdom).success).toBe(false);
   });
 });
 
-describe('formatWisdomMarkdown experience rendering', () => {
+describe('formatDistillationMarkdown experience rendering', () => {
   const baseWisdom = {
     title: 'Render Test',
     category: 'Operations',
@@ -653,7 +653,7 @@ describe('formatWisdomMarkdown experience rendering', () => {
   };
 
   it('renders change-attribution rows and the transferable lesson when present', () => {
-    const md = formatWisdomMarkdown(
+    const md = formatDistillationMarkdown(
       {
         ...baseWisdom,
         edit_rows: [
@@ -681,7 +681,7 @@ describe('formatWisdomMarkdown experience rendering', () => {
   });
 
   it('omits both sections when the fields are absent', () => {
-    const md = formatWisdomMarkdown(baseWisdom, 'MSN-RENDER-2');
+    const md = formatDistillationMarkdown(baseWisdom, 'MSN-RENDER-2');
     expect(md).not.toContain('What Each Change Did');
     expect(md).not.toContain('Transferable Lesson');
   });

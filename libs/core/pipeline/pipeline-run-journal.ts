@@ -784,7 +784,7 @@ export function createPipelineRunJournal(
     execution_authority: {
       system_role: getRegisteredEnvText('SYSTEM_ROLE') || '',
       mission_role: identity.role === 'unknown' ? '' : identity.role,
-      persona: identity.persona === 'unknown' ? '' : identity.persona || '',
+      persona: identity.baseRole === 'unknown' ? '' : identity.baseRole || '',
       scope: currentScopeEnvelope()?.identity ?? resolveScopeContext(),
       nhi_id: getRegisteredEnvText('KYBERION_NHI_ID') || '',
       agent_id: getRegisteredEnvText('KYBERION_AGENT_ID') || '',

@@ -14,6 +14,7 @@
  */
 
 import * as nodePath from 'node:path';
+import { baseRoleEnvText } from '@agent/core/foundation';
 import {
   assertSafeRepositoryPath,
   safeExec,
@@ -24,6 +25,7 @@ import {
   safeReaddir,
 } from '@agent/core/secure-io';
 import { auditChain } from '@agent/core/governance/audit-chain';
+import { executionAgentId } from '@agent/core/governance/execution-agent-id';
 import {
   assertConfigChangeApplyable,
   computeConfigChangeFingerprint,
@@ -35,7 +37,7 @@ import {
   loadApprovalRequest,
   recordApprovalApplyResult,
 } from '@agent/core/governance/approval-store';
-import { getRegisteredEnvText, nowIso } from '@agent/core/foundation';
+import { nowIso } from '@agent/core/foundation';
 import {
   loadConfigMissionBriefAtPath,
   loadConfigMissionPresetAtPath,
@@ -329,8 +331,7 @@ function cmdCreate(argv: string[]): void {
     change_id: instanceId,
     scope: scopeInput,
     target_kind: targetKind,
-    requested_by:
-      getOption(argv, '--requested-by') || getRegisteredEnvText('KYBERION_PERSONA') || 'operator',
+    requested_by: getOption(argv, '--requested-by') || baseRoleEnvText() || 'operator',
     nhi_id: getOption(argv, '--nhi-id'),
     risk,
     before_hash: getOption(argv, '--before-hash'),
@@ -361,7 +362,7 @@ function cmdCreate(argv: string[]): void {
   safeWriteFile(briefPath(tenant, instanceId), JSON.stringify(brief, null, 2));
 
   auditChain.record({
-    agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'worker',
+    agentId: executionAgentId('worker'),
     action: 'config_mission.create',
     operation: `${presetId}/${instanceId}`,
     result: 'completed',
@@ -528,7 +529,7 @@ async function cmdApply(argv: string[]): Promise<void> {
     safeWriteFile(bPath, JSON.stringify(brief, null, 2));
 
     auditChain.record({
-      agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'worker',
+      agentId: executionAgentId('worker'),
       action: 'config_mission.apply',
       operation: `${brief.preset_id}/${id}`,
       result: 'completed',
@@ -556,7 +557,7 @@ async function cmdApply(argv: string[]): Promise<void> {
     safeWriteFile(bPath, JSON.stringify(brief, null, 2));
 
     auditChain.record({
-      agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'worker',
+      agentId: executionAgentId('worker'),
       action: 'config_mission.apply',
       operation: `${brief.preset_id}/${id}`,
       result: 'failed',

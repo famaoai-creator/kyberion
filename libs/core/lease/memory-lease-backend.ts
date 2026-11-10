@@ -15,6 +15,7 @@
  */
 
 import {
+  cloneFencedLeaseRecord,
   registerLeaseBackend,
   type FencedLeaseRecord,
   type LeaseBackend,
@@ -58,11 +59,11 @@ class MemoryLeaseBackend implements LeaseBackend {
 
   read(leaseKey: string): FencedLeaseRecord | undefined {
     const record = this.records.get(leaseKey);
-    return record ? { ...record } : undefined;
+    return record ? cloneFencedLeaseRecord(record) : undefined;
   }
 
   write(leaseKey: string, record: FencedLeaseRecord): void {
-    this.records.set(leaseKey, { ...record });
+    this.records.set(leaseKey, cloneFencedLeaseRecord(record));
   }
 
   metricsPath(): null {

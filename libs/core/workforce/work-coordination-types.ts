@@ -56,8 +56,25 @@ export interface WorkItem {
   current_attempt_id?: string;
   attempts?: WorkItemAttempt[];
   context?: WorkItemContext;
+  /**
+   * D1 (concept model v2): a top-level WorkItem is the Issue; a step that
+   * needs its own ownership (mission task, dot action on an existing item) is
+   * a child WorkItem pointing at its Issue. Absent on top-level items. The
+   * parent must exist, share the child's tenant scope, and never form a cycle
+   * (see `work-item-hierarchy.ts`).
+   */
+  parent_item_id?: string;
+  /**
+   * W2: who set a parent Issue's status last. `children` — aggregated from
+   * its steps (`work-item-parent-status.ts`); `manual` — set directly while
+   * it had steps, which pins it until it is handed back with
+   * `statusFromChildren`. Absent on items that never had steps.
+   */
+  status_origin?: WorkItemStatusOrigin;
   metadata?: Record<string, unknown>;
 }
+
+export type WorkItemStatusOrigin = 'children' | 'manual';
 
 export interface WorkEffectOwnership {
   target: string;
@@ -137,6 +154,8 @@ export interface WorkLease {
   payload_hash?: string;
   expected_version?: number;
   previous_lease_id?: string;
+  /** Claim generation (W3); absent on leases written before W3 (read as 0). */
+  fence?: number;
 }
 
 export type WorkCoordinationEventType =
@@ -200,6 +219,8 @@ export interface CreateWorkItemInput {
   attempts?: WorkItemAttempt[];
   currentAttemptId?: string;
   context?: WorkItemContext;
+  /** D1: the Issue this step belongs to; omit for a top-level WorkItem. */
+  parentItemId?: string;
   rootDir?: string;
 }
 
@@ -219,6 +240,13 @@ export interface UpdateWorkItemInput {
   attempts?: WorkItemAttempt[];
   currentAttemptId?: string;
   context?: WorkItemContext;
+  /** D1: set (string) or detach (null) the parent Issue; omit to keep it. */
+  parentItemId?: string | null;
+  /**
+   * W2: hand a parent Issue's status back to its steps — clears a `manual`
+   * pin and applies the aggregated status now. Ignored with `status`.
+   */
+  statusFromChildren?: boolean;
   /**
    * With `status: 'blocked'`: end the running attempt as blocked and release
    * its lease now. For a block that waits on someone else (a customer
@@ -355,4 +383,8 @@ export interface WorkItemFilter {
   assigneeUserId?: string;
   labels?: string[];
   text?: string;
+  /** D1: only top-level WorkItems (Issues). Default false: every item. */
+  topLevelOnly?: boolean;
+  /** D1: only the direct children of this parent Issue. */
+  parentItemId?: string;
 }

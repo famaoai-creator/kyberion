@@ -30,7 +30,6 @@ const allowedCoreFsImports = [
   'libs/core/design/semantic-design-tokens.test.ts',
   'libs/core/mission/delegation-concurrency.test.ts',
   'libs/core/task/deliverable-inbox.test.ts',
-  'libs/core/knowledge/distill-knowledge-injector.test.ts',
   'libs/core/surface/operator-home-summary.test.ts',
   'libs/core/surface/operator-notifications.test.ts',
   'libs/core/mission/mission-retrospective.test.ts',

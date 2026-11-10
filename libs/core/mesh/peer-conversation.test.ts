@@ -25,6 +25,7 @@ import {
   readPeerConversationEdges,
   sendPeerConversationMessageToPeer,
 } from './peer-conversation.js';
+import { asRoleOrGrant } from '../testing/role-or-store-grant.js';
 
 const SHARED_SECRET = 'peer-conversation-test-secret';
 const TENANT_ID = 'tenant-acme';
@@ -354,7 +355,7 @@ describe('peer conversation tenant catalog (peer_catalog_reader)', () => {
       safeWriteFile(`${tenantRoot}/locale.json`, JSON.stringify({ locale: 'ja' }))
     );
     const asReader = <T>(fn: () => T): T =>
-      withExecutionContext(PEER_CATALOG_READER_ROLE, fn, undefined, tenant);
+      asRoleOrGrant(PEER_CATALOG_READER_ROLE, fn, undefined, tenant);
 
     expect(
       asReader(() => safeReadFile(peerNetworkCatalogPath(tenant), { encoding: 'utf8' }))

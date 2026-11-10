@@ -22,7 +22,7 @@ import {
   startDelegatedTaskTrace,
 } from '../workforce/delegated-task-observability.js';
 import { createGapRecorder } from '../analysis/gap-phase.js';
-import { findRelevantDistilledKnowledge } from '../knowledge/distill-knowledge-injector.js';
+import { findRelevantPromotedKnowledge } from '../knowledge/promoted-knowledge-retrieval.js';
 import { recordKnowledgeDelivery } from '../knowledge/knowledge-feedback-loop.js';
 import { readHintsByCategory } from '../knowledge/feedback-loop.js';
 import { isLocalReasoningBackend } from '../reasoning/reasoning-egress-scope.js';
@@ -285,9 +285,9 @@ function validateRepairTarget(
  * embedded directly in `instruction`'s "## Expected Schema" section — that
  * is the repair agent's existing ground truth for the op, so there is
  * nothing left for this helper to resolve there.
- * (b) This adds top `findRelevantDistilledKnowledge` hits for the schema
- * name + error/hint text (e.g. prior incident write-ups about the same kind
- * of schema violation), mirroring the excerpt/truncation conventions from
+ * (b) This adds top `findRelevantPromotedKnowledge` hits (D8: promoted
+ * records, ranked by the knowledge index) for the schema name + error/hint
+ * text (e.g. prior lessons about the same kind of schema violation), mirroring the excerpt/truncation conventions from
  * task-knowledge-provisioning.ts (200-char excerpts).
  *
  * `provisionTaskKnowledge` is not used here for the same reason as
@@ -319,9 +319,10 @@ async function buildAdfRepairKnowledgeContext(
   try {
     const topic = [schemaName, errorSummary, hints].filter(Boolean).join(' ').slice(0, 2_000);
     if (!topic.trim()) return baseContext;
-    const entries = await findRelevantDistilledKnowledge({
+    // No mission here, so the reader is a public, tenantless scope: only
+    // product/public promoted records can be admitted (D8).
+    const entries = await findRelevantPromotedKnowledge({
       topic,
-      tags: [schemaName],
       limit: ADF_REPAIR_KNOWLEDGE_HINT_LIMIT,
       minScore: 0.08,
     });

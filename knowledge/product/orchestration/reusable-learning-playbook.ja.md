@@ -1,7 +1,7 @@
 ---
 title: 依頼を再利用可能な知識・スキル・pipeline に育てる
 tags: [learning, skills, aidlc, pipeline, promotion, reuse]
-last_updated: 2026-10-28
+last_updated: 2026-11-10
 ---
 
 # 依頼から再利用へ
@@ -30,8 +30,13 @@ pnpm kyberion learning prepare \
 planner は既存資産を検索して `extend_existing` / `replace_existing` /
 `create_new` / `no_change` を返し、対象の base digest と理由を残す。
 `--replace-target` は明示された読み取り可能な対象だけを置換候補にする。
-候補作成は公開でも承認でもない。dry-run を外しても既存 candidate registry
-に review 待ちとして保存するだけである。第三者 plugin の install は既存の
+候補作成は公開でも承認でもない。dry-run を外しても、計画の scope を付けた
+記憶の候補キューの行（`origin.record_kind: learning_intake`）として
+review 待ちで保存するだけである。D8 より前に作った候補（古い
+distill-candidate の記録）は読むだけで、1 リリースの間
+`pnpm kyberion learning prepare --migrate [--dry-run]` が、保留中のものを
+記録自身の scope でキューに取り込む。scope が決まらないものは取り込まず、
+理由を表示する。第三者 plugin の install は既存の
 provenance gate を通す。
 
 準備した候補を既存の memory review に渡すには、表示された候補 ID を使う。

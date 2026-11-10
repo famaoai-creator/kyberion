@@ -24,6 +24,9 @@ vi.mock('@agent/core/foundation/authorization-registry', () => ({
   }),
 }));
 vi.mock('@agent/core/authority', () => ({
+  // S4: store facades open their declared store grant (withStoreGrant).
+  withStoreGrant: (_name: string, fn: () => unknown) => fn(),
+  withStoreGrantAsync: async (_name: string, fn: () => unknown) => fn(),
   withExecutionContext: (
     role: string,
     fn: () => unknown,

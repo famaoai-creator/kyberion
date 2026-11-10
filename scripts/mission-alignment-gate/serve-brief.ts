@@ -5,7 +5,7 @@
  * (✏️/💬/🎤) plus a decision bar, and writes the Sovereign's verdict into the
  * SAME approval record every other surface uses.
  *
- *   KYBERION_PERSONA=<p> node_modules/.bin/tsx \
+ *   KYBERION_BASE_ROLE=<p> node_modules/.bin/tsx \
  *     scripts/mission-alignment-gate/serve-brief.ts --mission <ID> [--port 8137]
  *
  * What this is NOT: a second approval channel. The decision goes through

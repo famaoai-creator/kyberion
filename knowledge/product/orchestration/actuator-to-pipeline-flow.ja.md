@@ -71,7 +71,7 @@ pnpm pipeline --input active/shared/tmp/confidential/<slug>/actuator-playground/
 # public draft:
 pnpm pipeline:promote --input <adf>.json --run <run-id> --source-is-public
 # tenant draft（confidential/personal）— asset ledger 用に identity が必要:
-MISSION_ROLE=worker KYBERION_PERSONA=worker \
+MISSION_ROLE=worker KYBERION_BASE_ROLE=worker \
   pnpm pipeline:promote --input <adf>.json --run <run-id> --tenant <slug>
 ```
 
@@ -249,4 +249,4 @@ context-patch を減らす。`actionInput` は維持。
   されます（§5 Dispatch ABI 参照）。
 - 別 checkout からの `pipeline:promote --tenant` が ADF / journal /
   personal tenant profile 欠落で失敗 — §2 の tenant 試行メモに同 root・
-  profile コピー・`MISSION_ROLE`/`KYBERION_PERSONA` を記載。
+  profile コピー・`MISSION_ROLE`/`KYBERION_BASE_ROLE` を記載。

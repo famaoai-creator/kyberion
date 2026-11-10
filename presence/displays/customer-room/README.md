@@ -81,7 +81,7 @@ Routes — everything else is a plain 404:
   a `tenant`/`case`/`dir` in a body or query string is ignored (and the facade
   refuses `--dir` outside test runs).
 - The child gets a minimal env (`facadeChildEnv`): the secure-io exec allowlist
-  with any ambient `MISSION_ROLE` / `KYBERION_PERSONA` / `KYBERION_SUDO` /
+  with any ambient `MISSION_ROLE` / `KYBERION_BASE_ROLE` / `KYBERION_SUDO` /
   `MISSION_ID` blanked, `KYBERION_TENANT`, and `KYBERION_ROOT` when set — never
   `SYSTEM_ROLE`. The facade assumes its own narrow tenant-bound roles.
 - An unexpected facade failure answers `unavailable` to the customer; the room

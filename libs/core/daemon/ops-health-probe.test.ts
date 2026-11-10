@@ -85,7 +85,7 @@ describe('ops-health-probe', () => {
     // Without these the item is never claimed: addressedTo() keys on
     // metadata.dot_id / handoff_to and the executor routes by work shape.
     expect(item.metadata?.dot_id).toBe('org-operations');
-    expect(item.metadata?.requested_work_shape).toBe('direct_reply');
+    expect(item.metadata?.requested_execution_shape).toBe('direct_reply');
   });
 
   it('does not file findings on a healthy store set', () => {

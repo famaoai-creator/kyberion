@@ -69,7 +69,7 @@ describe('wisdom public contract boundaries', () => {
         status: 'active',
         execution_mode: 'local',
         priority: 1,
-        assigned_persona: 'worker',
+        org_role: 'worker',
         confidence_score: 1,
         git: {
           branch: `mission/${missionId}`,

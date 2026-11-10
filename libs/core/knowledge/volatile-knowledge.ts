@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { parseSafeJsonObjectValue } from '../foundation/json.js';
 import * as pathResolver from '../path-resolver.js';
@@ -11,8 +12,15 @@ import type { VolatileCadence, VolatileScope } from '../path-resolver.js';
 
 export type { VolatileCadence, VolatileScope } from '../path-resolver.js';
 
-export type VolatileStatus = 'active' | 'expired' | 'rolled-over' | 'promoted' | 'archived';
-export type VolatileTier = 'personal' | 'confidential' | 'public';
+/**
+ * `nominated`: the volatile note was nominated as a MemoryCandidate (D8 / M3 —
+ * nominating is not promoting). Sidecars written before the rename say
+ * `promoted`; `parseVolatileSidecar` reads that legacy value as `nominated`.
+ */
+export type VolatileStatus = 'active' | 'expired' | 'rolled-over' | 'nominated' | 'archived';
+/** @deprecated legacy on-disk spelling of `nominated`; accepted on read for one release. */
+export const LEGACY_VOLATILE_NOMINATED_STATUS = 'promoted';
+export type VolatileTier = StorageDataTier;
 export type VolatileLifetime =
   'session' | 'mission' | 'daily' | 'weekly' | 'ttl' | 'until-distilled' | 'sticky';
 
@@ -63,7 +71,7 @@ const VOLATILE_STATUSES = new Set<VolatileStatus>([
   'active',
   'expired',
   'rolled-over',
-  'promoted',
+  'nominated',
   'archived',
 ]);
 
@@ -105,6 +113,7 @@ export function parseVolatileSidecar(
     const rollupTo = record.rollup_to;
     const promoteTarget = record.promote_target;
     const promotionCandidateId = record.promotion_candidate_id;
+    const status = record.status === LEGACY_VOLATILE_NOMINATED_STATUS ? 'nominated' : record.status;
     if (
       !VOLATILE_SCOPES.has(record.scope as VolatileScope) ||
       !isNullableText(scopeRef) ||
@@ -121,7 +130,7 @@ export function parseVolatileSidecar(
       !nonEmptyText(record.updated_at) ||
       !isIsoDateTime(record.created_at) ||
       !isIsoDateTime(record.updated_at) ||
-      !VOLATILE_STATUSES.has(record.status as VolatileStatus) ||
+      !VOLATILE_STATUSES.has(status as VolatileStatus) ||
       (record.pinned !== undefined && typeof record.pinned !== 'boolean')
     ) {
       return null;
@@ -153,7 +162,7 @@ export function parseVolatileSidecar(
       rollup_to: rollupTo ?? null,
       promote_target: promoteTarget ?? null,
       promotion_candidate_id: promotionCandidateId ?? null,
-      status: record.status as VolatileStatus,
+      status: status as VolatileStatus,
       pinned: record.pinned === undefined ? false : (record.pinned as boolean),
     };
   } catch {

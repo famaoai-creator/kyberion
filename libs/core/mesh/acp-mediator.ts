@@ -1,4 +1,5 @@
 import { logger } from '../core.js';
+import { executionAgentId } from '../governance/execution-agent-id.js';
 import {
   buildProxyPassthroughEnv,
   getRegisteredEnvText,
@@ -248,7 +249,7 @@ export async function resolveAcpPermissionRequest(
   try {
     const approval = requireRiskyApproval({
       opId: 'acp:tool',
-      agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'acp-session',
+      agentId: executionAgentId('acp-session'),
       ...(mediatorOptions.hasHuman !== undefined ? { hasHuman: mediatorOptions.hasHuman } : {}),
       ...(mediatorOptions.hasUI !== undefined ? { hasUI: mediatorOptions.hasUI } : {}),
       ...(mediatorOptions.nonInteractive !== undefined

@@ -6,6 +6,7 @@ importance: 4
 source_mission: MSN-WI-CONSENT-CODEQL-20260922
 author: Kyberion Wisdom Distiller
 last_updated: 2026-09-22
+doc_status: historical
 ---
 
 # Evidence-gated consent and CodeQL change delivery

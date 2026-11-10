@@ -7,6 +7,7 @@ importance: 6
 source_mission: MSN-QM-RESIDUALS-20260808
 author: Kyberion Wisdom Distiller
 last_updated: 2026-08-08
+doc_status: historical
 ---
 
 # Reconcile direct mission work before lifecycle completion

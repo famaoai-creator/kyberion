@@ -1,3 +1,5 @@
+import type { StorageDataTier } from '../storage-layout.js';
+import { baseRoleEnvText } from '../foundation/base-role-env.js';
 import { timingSafeEqual, randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { auditChain } from './audit-chain.js';
@@ -28,7 +30,6 @@ import {
 } from './cloudflare-os-held-executors.js';
 import type { HeldActionApprovalLink, HeldActionSteeringSpec } from './held-effect-bridge.js';
 import { pathResolver } from '../path-resolver.js';
-import { getRegisteredEnvText } from '../foundation/env.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import {
   applyControlPlaneJournalEvent,
@@ -76,7 +77,7 @@ export type HeldActionStatus =
   'pending' | 'approved' | 'applied' | 'rejected' | 'cancelled' | 'failed';
 export type ResourceScope = 'read' | 'write';
 export type IntroductionMode = 'warn' | 'enforce';
-export type OsKnowledgeTier = 'personal' | 'confidential' | 'public';
+export type OsKnowledgeTier = StorageDataTier;
 
 /** Validate the execution envelope without pretending to know generic `T`. */
 export function normalizeGovernedCodeEnvelope(value: unknown): { value: unknown } | undefined {
@@ -321,7 +322,7 @@ export interface CloudflareOsControlPlaneOptions {
 }
 
 function actor(input?: string): string {
-  return input?.trim() || getRegisteredEnvText('KYBERION_PERSONA') || 'cloudflare-os-control-plane';
+  return input?.trim() || baseRoleEnvText() || 'cloudflare-os-control-plane';
 }
 
 function audit(

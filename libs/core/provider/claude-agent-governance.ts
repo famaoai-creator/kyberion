@@ -1,5 +1,5 @@
 import type { CanUseTool, PermissionResult } from '@anthropic-ai/claude-agent-sdk';
-import { getRegisteredEnvText } from '../foundation/env.js';
+import { executionAgentId } from '../governance/execution-agent-id.js';
 export { buildKyberionMcpServerConfig } from './claude-mcp-server-config.js';
 import { auditChain } from '../governance/audit-chain.js';
 import { evaluatePreToolUse } from './claude-code-hook.js';
@@ -178,7 +178,7 @@ export function createKyberionCanUseTool(options: KyberionCanUseToolOptions = {}
         const { requireApprovalForOp } = await import('../governance/risky-op-registry.js');
         const approval = requireApprovalForOp({
           opId: 'subagent:bash',
-          agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'sub-agent',
+          agentId: executionAgentId('sub-agent'),
           payload: { command },
           actionDescriptor: shellCommandApprovalDescriptor(decision),
           draft: {

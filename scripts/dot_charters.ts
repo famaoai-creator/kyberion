@@ -110,7 +110,7 @@ type Subcommand = (typeof SUBCOMMANDS)[number];
 function visibleCharter(charter: DotCharter, argv: string[] = []): boolean {
   const identity = resolveIdentityContext();
   const system = hasCliFlag(argv, '--system');
-  if (system && !['sovereign', 'ecosystem_architect'].includes(identity.persona))
+  if (system && !['sovereign', 'ecosystem_architect'].includes(identity.baseRole))
     throw new Error('[DOT_INVENTORY_SCOPE] --system requires an authorized operator');
   const tier = argv.find((arg) => arg.startsWith('--tier='))?.slice(7);
   const tenant = argv.find((arg) => arg.startsWith('--tenant='))?.slice(9);
@@ -134,7 +134,7 @@ function visibleCharter(charter: DotCharter, argv: string[] = []): boolean {
 
 function loadAll(argv: string[] = []) {
   const system = hasCliFlag(argv, '--system');
-  if (system && !['sovereign', 'ecosystem_architect'].includes(resolveIdentityContext().persona))
+  if (system && !['sovereign', 'ecosystem_architect'].includes(resolveIdentityContext().baseRole))
     throw new Error('[DOT_INVENTORY_SCOPE] --system requires an authorized operator');
   const errors: DotCharterLoadError[] = [];
   const loaded = listDotCharters(undefined, { errors });
@@ -665,7 +665,7 @@ function printIntake(intake: DotIntakePlan, print: (line: string) => void): void
       `${pad(row.source, 20)} ${pad(row.mode, 4)} ${pad(row.dot_id, 22)} ${pad(row.armed ? 'yes' : 'no', 5)} ${pad(
         row.types.join(',') || '(all)',
         34
-      )} ${row.authority_role} / ${row.work_shapes.join('|')} / ${row.decision}`
+      )} ${row.authority_role} / ${row.execution_shapes.join('|')} / ${row.decision}`
     );
     print(
       `  ${row.mode === 'pull' ? `feed ${row.feed?.service_id}:${row.feed?.action} every ${row.feed?.every_s}s — ${row.feed?.coverage.state}: ${row.feed?.coverage.detail}` : `enablement: ${row.enabled_by}`}`

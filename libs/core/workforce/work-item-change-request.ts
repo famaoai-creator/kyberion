@@ -8,6 +8,7 @@
  */
 import { WorkCoordinationError } from './work-coordination-error.js';
 import { isTerminalStatus } from './work-coordination-identity.js';
+import { isWorkLeaseLive } from './work-item-lease.js';
 import type { WorkItem, WorkLease } from './work-coordination-types.js';
 import {
   appendCoordinationEvent,
@@ -93,7 +94,7 @@ export function readWorkItemChangeRequest(item: WorkItem): WorkItemChangeRequest
 function liveLeaseFor(itemId: string, now: number = Date.now()): WorkLease | null {
   return (
     listActiveWorkLeases().find(
-      (lease) => lease.item_id === itemId && Date.parse(lease.expires_at) > now
+      (lease) => lease.item_id === itemId && isWorkLeaseLive(lease, now)
     ) || null
   );
 }
@@ -334,7 +335,7 @@ export function listChangeRequestLinks(
 ): ChangeRequestResolution[] {
   const leases = new Map(
     listActiveWorkLeases()
-      .filter((lease) => Date.parse(lease.expires_at) > Date.now())
+      .filter((lease) => isWorkLeaseLive(lease))
       .map((lease) => [lease.item_id, lease] as const)
   );
   return listWorkItems()

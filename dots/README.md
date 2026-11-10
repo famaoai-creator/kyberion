@@ -72,7 +72,7 @@ optional; the full design is in
   },
   "authority": {
     "authority_role": "infrastructure_sentinel",
-    "allowed_work_shapes": ["direct_reply", "pipeline"],
+    "allowed_execution_shapes": ["direct_reply", "pipeline"],
     "allowed_pipelines": ["pipelines/ok.json"]
   },
   "memory": { "enabled": true, "max_bytes": 8192 },

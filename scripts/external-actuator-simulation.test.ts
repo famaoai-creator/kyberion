@@ -61,7 +61,7 @@ describe('external calendar actuator real governance simulation', () => {
     start_date: '2026-10-22T09:00:00Z',
   };
   beforeAll(() => {
-    vi.stubEnv('KYBERION_PERSONA', 'ecosystem_architect');
+    vi.stubEnv('KYBERION_BASE_ROLE', 'ecosystem_architect');
     vi.stubEnv('MISSION_ROLE', 'mission_controller');
   });
   afterAll(() => {

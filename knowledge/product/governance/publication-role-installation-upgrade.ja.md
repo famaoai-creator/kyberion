@@ -1,7 +1,7 @@
 ---
 title: PR publication store の明示的な installation catalog 更新
 tags: [governance, organization, roles, pr-publication, operations]
-last_updated: '2026-11-06'
+last_updated: '2026-11-10'
 ---
 
 # PR publication store の installation catalog 更新
@@ -18,7 +18,7 @@ last_updated: '2026-11-06'
 pnpm organization role migrate-publication-store --source-root <built-worktree>
 ```
 
-Preview はファイルを変更しない。差分の本文、before/after SHA256、`digest`、`requestedEffect` を確認する。対象は `notification_preferences_reader`、`tool_runtime_policy_reader` の role card、security-policy の対象 role permission、authority-role-index の対象 entry、role-assumption-policy の shared core role 登録に限定する。PR publication store と person charter store 自体は role を持たない（G2: 同期の store grant が権限）。この手続きはそれらの role card・permission・index を追加せず、発行の権利の名前 `pr_publication_store` と `person_charter_store` を shared core role に登録するだけである。登録の無い installation では grant は絞り込みだけを行い何も認めないので、外部操作の予約は拒否される。通知先と tool availability の読み取りは、承認要求を人に届ける既存の実行経路で必要になる。
+Preview はファイルを変更しない。差分の本文、before/after SHA256、`digest`、`requestedEffect` を確認する。対象は security-policy の `store_grants` にある `notification_preferences_reader`、`tool_runtime_policy_reader` の宣言と、role-assumption-policy の shared core role への発行の権利の登録に限定する。この 2 つは宣言された許可証（declared store grant、S4）で、role card・role permission・authority-role-index の entry は追加しない。許可証は実行するコードが宣言している名前だけ写し（`foundation/declared-store-grant.ts`）、コードが宣言していない installation では拒否する。source に同じ名前の role permission や index entry が残っているときも拒否する。PR publication store と person charter store 自体は role を持たない（G2: 同期の store grant が権限）。この手続きはそれらの role card・permission・index を追加せず、発行の権利の名前 `pr_publication_store` と `person_charter_store` を shared core role に登録するだけである。登録の無い installation では grant は絞り込みだけを行い何も認めないので、外部操作の予約は拒否される。通知先と tool availability の読み取りは、承認要求を人に届ける既存の実行経路で必要になる。
 
 terminal channel の authenticated human approval を取得する。`accountability.finalDecision` は `human_only`、`justification.requestedEffects` は preview の `requestedEffect` と全 `changes[].path` を、それぞれ完全一致する文字列として含める。agent が人の判断を代行して承認してはならない。
 
@@ -36,7 +36,7 @@ pnpm organization role migrate-publication-store --source-root <built-worktree> 
 pnpm organization role migrate-publication-store --source-root <built-worktree> --apply --expected-digest <reviewed-digest> --approval-id <human-approval-id>
 ```
 
-Apply は最新 preview と digest を照合し、既存の異なる定義・明示的な deny・空の既存 grant の上書きを拒否する。source の role card と index、schema、shared role 登録を照合する。無関係な policy entry や system-role ごとの may_assume は保持する。apply の前後に hash 付き audit を記録する。
+Apply は最新 preview と digest を照合し、既存の異なる定義・明示的な deny・空の既存 grant の上書きを拒否する。source の `store_grants` の宣言、role として残っていないこと、schema、shared role 登録を照合する。以前の移行で写した role card・permission・index entry が target に残っていても書き換えない（許可証の名前は role として解決されないので、判定には使われない）。無関係な policy entry や system-role ごとの may_assume は保持する。apply の前後に hash 付き audit を記録する。
 
 ## 運用上の確認
 

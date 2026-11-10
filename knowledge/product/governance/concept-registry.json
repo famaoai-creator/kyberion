@@ -1,0 +1,431 @@
+{
+  "$schema": "../schemas/concept-registry.schema.json",
+  "manifest_version": 1,
+  "last_reviewed": "2026-11-10",
+  "purpose": "One registered definition, canonical document, glossary entry and owner per high-confusion Kyberion term. A term or alias may belong to exactly one entry; a homonym is declared through `senses`. The concept-registry gate (scripts/check_concept_registry.ts) enforces this file against docs/GLOSSARY.md, docs/documentation-source-map.json and doc_status frontmatter. Workflow: knowledge/product/governance/concept-registry-workflow.md.",
+  "terms": [
+    {
+      "id": "mission",
+      "term": "Mission",
+      "category": "unit_of_work",
+      "definition": "A bounded unit of work with lifecycle state and evidence.",
+      "glossary_anchor": "mission",
+      "canonical_doc": "knowledge/product/architecture/agent-mission-control-model.md",
+      "owner_modules": ["libs/core/mission/mission-status.ts", "scripts/mission_controller.ts"],
+      "not_to_confuse_with": ["project", "task-session", "work-item"]
+    },
+    {
+      "id": "task",
+      "term": "Task",
+      "aliases": ["mission task"],
+      "category": "unit_of_work",
+      "definition": "One step inside a mission, listed in that mission's NEXT_TASKS.json.",
+      "glossary_anchor": "units-of-work",
+      "canonical_doc": "docs/GLOSSARY.md#units-of-work",
+      "owner_modules": ["libs/core/mission/mission-status.ts"],
+      "not_to_confuse_with": ["task-contract", "task-session"]
+    },
+    {
+      "id": "task-contract",
+      "term": "Task Contract",
+      "category": "unit_of_work",
+      "definition": "What exactly one worker is allowed to do for a task: objective, write scope, outputs and acceptance criteria.",
+      "glossary_anchor": "task-contract",
+      "canonical_doc": "docs/GLOSSARY.md#units-of-work",
+      "owner_modules": [],
+      "not_to_confuse_with": ["task", "task-session"]
+    },
+    {
+      "id": "task-session",
+      "term": "Task Session",
+      "category": "unit_of_work",
+      "definition": "A lighter-weight durable work record for conversational work that does not need a mission.",
+      "glossary_anchor": "task-session",
+      "canonical_doc": "docs/GLOSSARY.md#units-of-work",
+      "owner_modules": ["libs/core/task/task-session.ts"],
+      "not_to_confuse_with": ["mission", "task-contract"]
+    },
+    {
+      "id": "work-item",
+      "term": "WorkItem",
+      "aliases": ["work item"],
+      "category": "unit_of_work",
+      "definition": "The trackable unit of work (an Issue); missions, task sessions, pipelines and dot runs execute it, and steps that need ownership are child WorkItems that carry the lease.",
+      "glossary_anchor": "workitem",
+      "canonical_doc": "docs/GLOSSARY.md#units-of-work",
+      "owner_modules": ["libs/core/workforce/work-coordination.ts"],
+      "not_to_confuse_with": ["mission", "task", "lease"]
+    },
+    {
+      "id": "project",
+      "term": "Project",
+      "category": "unit_of_work",
+      "definition": "The long-lived container around a body of work that owns missions, repositories, artifacts and service bindings.",
+      "glossary_anchor": "project",
+      "canonical_doc": "knowledge/product/architecture/entity-scope-hierarchy.md",
+      "owner_modules": ["libs/core/project/project-management.ts"],
+      "not_to_confuse_with": ["mission"]
+    },
+    {
+      "id": "pipeline",
+      "term": "Pipeline",
+      "category": "execution",
+      "definition": "A declarative, validated ADF execution graph that Kyberion runs under governance; a parameterized variant for user workflows is a Pipeline Template.",
+      "glossary_anchor": "execution-definitions",
+      "canonical_doc": "pipelines/README.md",
+      "owner_modules": ["libs/core/pipeline/adf-lifecycle.ts"],
+      "not_to_confuse_with": ["mission"]
+    },
+    {
+      "id": "actuator-op",
+      "term": "Operation",
+      "aliases": ["actuator op"],
+      "category": "execution",
+      "definition": "An actuator operation named domain:action; routine_operation and service_operation are Work Shape values, not operations.",
+      "glossary_anchor": "units-of-work",
+      "canonical_doc": "knowledge/product/architecture/actuator-op-taxonomy.md",
+      "owner_modules": [],
+      "not_to_confuse_with": ["work-shape"]
+    },
+    {
+      "id": "execution-shape",
+      "term": "Execution Shape",
+      "category": "execution",
+      "definition": "The selected execution rung for an intent; the only execution vocabulary, of which route families and resolution shapes are projections.",
+      "glossary_anchor": "execution-shape",
+      "canonical_doc": "docs/GLOSSARY.md#execution-shape",
+      "owner_modules": ["libs/core/contracts/execution-shape.ts"],
+      "not_to_confuse_with": ["work-shape"]
+    },
+    {
+      "id": "work-shape",
+      "term": "Work Shape",
+      "category": "unit_of_work",
+      "definition": "The kind of work a top-level WorkItem is (solution_project, service_operation, …).",
+      "glossary_anchor": "work-shape",
+      "canonical_doc": "knowledge/product/architecture/entity-scope-hierarchy.md",
+      "owner_modules": ["libs/core/entity-scope.ts"],
+      "not_to_confuse_with": ["execution-shape", "actuator-op"]
+    },
+    {
+      "id": "tier",
+      "term": "Tier",
+      "aliases": ["data tier"],
+      "category": "scope",
+      "definition": "The classification label personal, confidential or public that caps disclosure and processing; an axis orthogonal to tenant and never a tenant slug.",
+      "glossary_anchor": "tier-isolation",
+      "canonical_doc": "knowledge/product/architecture/multi-tenant-operations.md",
+      "owner_modules": ["libs/core/tier-guard.ts"],
+      "not_to_confuse_with": ["tenant", "stance"]
+    },
+    {
+      "id": "tenant",
+      "term": "Tenant",
+      "category": "scope",
+      "definition": "The contract and isolation boundary, identified by a tenant slug; it contains one or more Organizations (Company is an alias).",
+      "glossary_anchor": "tenant",
+      "canonical_doc": "knowledge/product/architecture/multi-tenant-operations.md",
+      "owner_modules": ["libs/core/organization/tenant-registry.ts", "libs/core/entity-scope.ts"],
+      "not_to_confuse_with": ["tier", "stance", "tenants-customers", "organization"],
+      "aliases": ["Company"],
+      "lifecycle": {
+        "state": "transitioning",
+        "decision": "knowledge/product/architecture/decisions/2026-11-10-concept-model-v2.md#d3--tenant-1n-organization",
+        "plan": "docs/developer/improvement-plans-2026-11/SCOPE_IDENTITY_GRANT_CONSOLIDATION_PLAN_2026-11-10.ja.md"
+      }
+    },
+    {
+      "id": "stance",
+      "term": "Stance",
+      "category": "scope",
+      "definition": "The acting-for selection: which permitted tenant an operator (human or agent) is acting for now, as which Organization and Org Role; switching it switches the data scope.",
+      "glossary_anchor": "stance",
+      "canonical_doc": "knowledge/product/architecture/stance-tenant-customer-model.md",
+      "owner_modules": ["libs/core/authn/stance-resolver.ts"],
+      "not_to_confuse_with": ["tenant", "tenants-customers"],
+      "lifecycle": {
+        "state": "transitioning",
+        "decision": "knowledge/product/architecture/decisions/2026-11-10-concept-model-v2.md#d4--stance-is-the-acting-for-selection",
+        "plan": "docs/developer/improvement-plans-2026-11/SCOPE_IDENTITY_GRANT_CONSOLIDATION_PLAN_2026-11-10.ja.md"
+      }
+    },
+    {
+      "id": "tenants-customers",
+      "term": "Tenant's Customers",
+      "category": "scope",
+      "definition": "The end customers a tenant delivers to, stored inside that tenant's own boundary and never deduplicated across tenants.",
+      "glossary_anchor": "tenants-customers",
+      "canonical_doc": "knowledge/product/architecture/stance-tenant-customer-model.md",
+      "owner_modules": [],
+      "not_to_confuse_with": ["tenant", "stance"]
+    },
+    {
+      "id": "organization",
+      "term": "Organization",
+      "category": "scope",
+      "definition": "An operating unit (department, business unit) inside a tenant; a tenant has one or more (organization_id in the entity scope chain).",
+      "glossary_anchor": "organization-and-tenancy-terms",
+      "canonical_doc": "knowledge/product/architecture/entity-scope-hierarchy.md",
+      "owner_modules": ["libs/core/organization/organization-operating-model.ts"],
+      "not_to_confuse_with": ["tenant"],
+      "lifecycle": {
+        "state": "transitioning",
+        "decision": "knowledge/product/architecture/decisions/2026-11-10-concept-model-v2.md#d3--tenant-1n-organization",
+        "plan": "docs/developer/improvement-plans-2026-11/SCOPE_IDENTITY_GRANT_CONSOLIDATION_PLAN_2026-11-10.ja.md"
+      }
+    },
+    {
+      "id": "entity-scope",
+      "term": "Entity scope chain",
+      "aliases": ["entity scope"],
+      "category": "scope",
+      "definition": "The containment chain tenant_slug → organization_id → project_id → mission_id → task_id → session declared in libs/core/entity-scope.ts.",
+      "glossary_anchor": "scope-terms",
+      "canonical_doc": "knowledge/product/architecture/entity-scope-hierarchy.md",
+      "owner_modules": ["libs/core/entity-scope.ts"],
+      "not_to_confuse_with": ["tier", "stance"]
+    },
+    {
+      "id": "nhi",
+      "term": "NHI",
+      "aliases": ["Non-Human Identity", "durable NHI"],
+      "category": "identity",
+      "definition": "A ledger-backed non-human identity with an accountable human owner, scope affiliation and lifecycle; the identity that receives authority.",
+      "glossary_anchor": "nhi-non-human-identity",
+      "canonical_doc": "knowledge/product/architecture/actor-identity-and-responsibility-model.md",
+      "owner_modules": ["libs/core/agent/agent-identity.ts"],
+      "not_to_confuse_with": ["conversational-persona", "execution-persona"]
+    },
+    {
+      "id": "conversational-persona",
+      "term": "Conversational persona",
+      "category": "identity",
+      "definition": "The human-facing name and conversational window, such as Haru; not a credential or execution authority.",
+      "glossary_anchor": "actor-identity-and-responsibility",
+      "canonical_doc": "knowledge/product/architecture/actor-identity-and-responsibility-model.md",
+      "owner_modules": [],
+      "not_to_confuse_with": ["nhi", "execution-persona", "org-role"]
+    },
+    {
+      "id": "execution-persona",
+      "term": "Execution Persona",
+      "aliases": ["KYBERION_PERSONA"],
+      "category": "identity",
+      "definition": "Deprecated: the execution identity class of the running process (KYBERION_PERSONA, legacy API Persona); its authority purpose moves to Authority Role/Grant and its prompt framing to the Team Role addendum.",
+      "glossary_anchor": "role-terms",
+      "canonical_doc": "docs/GLOSSARY.md#role-terms",
+      "owner_modules": ["libs/core/types.ts", "libs/core/authority.ts"],
+      "not_to_confuse_with": ["conversational-persona", "org-role"],
+      "lifecycle": {
+        "state": "deprecated",
+        "decision": "knowledge/product/architecture/decisions/2026-11-10-concept-model-v2.md#d5--role-axes-one-type-each-execution-persona-is-removed",
+        "plan": "docs/developer/improvement-plans-2026-11/SCOPE_IDENTITY_GRANT_CONSOLIDATION_PLAN_2026-11-10.ja.md",
+        "replaced_by": ["authority-role", "grant", "team-role"]
+      }
+    },
+    {
+      "id": "org-role",
+      "term": "Org Role",
+      "category": "identity",
+      "definition": "The org-chart role a mission is assigned at activation (field org_role, historically assigned_persona and the --persona flag); it carries no permissions of its own.",
+      "glossary_anchor": "team-role-vs-org-role",
+      "canonical_doc": "docs/GLOSSARY.md#role-terms",
+      "owner_modules": [],
+      "not_to_confuse_with": ["team-role", "execution-persona"],
+      "lifecycle": {
+        "state": "transitioning",
+        "decision": "knowledge/product/architecture/decisions/2026-11-10-concept-model-v2.md#d5--role-axes-one-type-each-execution-persona-is-removed",
+        "plan": "docs/developer/improvement-plans-2026-11/SCOPE_IDENTITY_GRANT_CONSOLIDATION_PLAN_2026-11-10.ja.md"
+      }
+    },
+    {
+      "id": "team-role",
+      "term": "Team Role",
+      "category": "identity",
+      "definition": "The per-task role inside a mission team (owner, planner, implementer, reviewer, …); its prompt addendum carries the role framing.",
+      "glossary_anchor": "team-role-vs-org-role",
+      "canonical_doc": "docs/GLOSSARY.md#role-terms",
+      "owner_modules": [],
+      "not_to_confuse_with": ["org-role"],
+      "lifecycle": {
+        "state": "transitioning",
+        "decision": "knowledge/product/architecture/decisions/2026-11-10-concept-model-v2.md#d5--role-axes-one-type-each-execution-persona-is-removed",
+        "plan": "docs/developer/improvement-plans-2026-11/SCOPE_IDENTITY_GRANT_CONSOLIDATION_PLAN_2026-11-10.ja.md"
+      }
+    },
+    {
+      "id": "surface",
+      "term": "Surface",
+      "aliases": ["entry point"],
+      "category": "surface",
+      "definition": "A human-facing entrance to Kyberion; surfaces show state and take requests but never own missions.",
+      "glossary_anchor": "surface",
+      "canonical_doc": "docs/SURFACES.md",
+      "owner_modules": ["knowledge/product/governance/surface-roles.json"],
+      "not_to_confuse_with": ["display", "channel"]
+    },
+    {
+      "id": "display",
+      "term": "Display",
+      "aliases": ["UI surface"],
+      "category": "surface",
+      "definition": "A surface implemented as a web UI under presence/displays/<name>/; Display names the implementation form, Surface the role.",
+      "glossary_anchor": "display",
+      "canonical_doc": "docs/SURFACES.md",
+      "owner_modules": [],
+      "not_to_confuse_with": ["surface"]
+    },
+    {
+      "id": "channel",
+      "term": "Channel",
+      "category": "surface",
+      "definition": "A homonym; always name the sense: a delivery route, or an external interaction context.",
+      "glossary_anchor": "surfaces-and-channels",
+      "canonical_doc": "knowledge/product/architecture/channel-port-surface-model.md",
+      "owner_modules": ["presence/bridge/channel-registry.json"],
+      "not_to_confuse_with": ["surface"],
+      "senses": [
+        {
+          "qualifier": "delivery route",
+          "glossary_anchor": "channel-delivery-route",
+          "definition": "A named delivery route for one surface or chat conversation, backed by a per-surface outbox."
+        },
+        {
+          "qualifier": "interaction context",
+          "glossary_anchor": "channel-interaction-context",
+          "definition": "An external interaction context such as Slack or Chronos, exposing one or more ports."
+        }
+      ]
+    },
+    {
+      "id": "front-desk",
+      "term": "Front Desk",
+      "category": "surface",
+      "definition": "The shared menu rail rendered by Concierge and Presence Studio from one implementation.",
+      "glossary_anchor": "front-desk",
+      "canonical_doc": "docs/SURFACES.md",
+      "owner_modules": ["libs/core/surface/front-desk-nav.ts"],
+      "not_to_confuse_with": ["concierge"]
+    },
+    {
+      "id": "concierge",
+      "term": "Concierge",
+      "aliases": ["秘書室"],
+      "category": "surface",
+      "definition": "The CEO-secretary surface that answers what do I need to decide now.",
+      "glossary_anchor": "concierge",
+      "canonical_doc": "docs/SURFACES.md",
+      "owner_modules": [],
+      "not_to_confuse_with": ["front-desk"]
+    },
+    {
+      "id": "runtime-supervisor",
+      "term": "Runtime Supervisor",
+      "category": "governance",
+      "definition": "The runtime ownership registry for PTY sessions, agent runtimes and services (liveness, idle reaping, resource snapshots).",
+      "glossary_anchor": "runtime-supervisor",
+      "canonical_doc": "docs/GLOSSARY.md#runtime-supervisor",
+      "owner_modules": [],
+      "not_to_confuse_with": ["agent-runtime-supervisor"]
+    },
+    {
+      "id": "agent-runtime-supervisor",
+      "term": "Agent Runtime Supervisor",
+      "category": "governance",
+      "definition": "The front door for agent runtimes: ensure, ask, refresh, restart, stop and prewarm, so callers never spawn providers independently.",
+      "glossary_anchor": "agent-runtime-supervisor",
+      "canonical_doc": "knowledge/product/architecture/agent-runtime-supervisor-daemon.md",
+      "owner_modules": [],
+      "not_to_confuse_with": ["runtime-supervisor"]
+    },
+    {
+      "id": "organization-work-loop",
+      "term": "Organization Work Loop",
+      "category": "governance",
+      "definition": "The parent model of Kyberion: organizational intent becomes governed execution, evidence and reusable memory; the Intent Loop, Company OS and Enterprise Operating Kernel are projections of it, not competing models.",
+      "glossary_anchor": "organization-work-loop",
+      "canonical_doc": "knowledge/product/architecture/organization-work-loop.md",
+      "owner_modules": [],
+      "not_to_confuse_with": []
+    },
+    {
+      "id": "lease",
+      "term": "Lease",
+      "category": "governance",
+      "definition": "Time-bounded, fenced exclusive control of one named resource by one holder; the single primitive behind WorkItem claims, Mission Lease, path and device leases.",
+      "glossary_anchor": "lease",
+      "canonical_doc": "knowledge/product/architecture/decisions/2026-11-10-concept-model-v2.md",
+      "owner_modules": ["libs/core/lease/lease-backend.ts", "libs/core/lease/lease-terms.ts"],
+      "not_to_confuse_with": ["work-item", "grant"]
+    },
+    {
+      "id": "member-role",
+      "term": "Member Role",
+      "category": "identity",
+      "definition": "A human member's standing in a tenant or organization: owner, approver, operator or viewer.",
+      "glossary_anchor": "member-role",
+      "canonical_doc": "knowledge/product/architecture/decisions/2026-11-10-concept-model-v2.md",
+      "owner_modules": ["libs/core/organization/member-registry.ts"],
+      "not_to_confuse_with": ["org-role", "authority-role"],
+      "lifecycle": {
+        "state": "transitioning",
+        "decision": "knowledge/product/architecture/decisions/2026-11-10-concept-model-v2.md#d5--role-axes-one-type-each-execution-persona-is-removed",
+        "plan": "docs/developer/improvement-plans-2026-11/SCOPE_IDENTITY_GRANT_CONSOLIDATION_PLAN_2026-11-10.ja.md"
+      }
+    },
+    {
+      "id": "authority-role",
+      "term": "Authority Role",
+      "category": "governance",
+      "definition": "A named bundle of operations; which information it may touch is decided by the Grant's scope, never by the role name.",
+      "glossary_anchor": "authority-role",
+      "canonical_doc": "knowledge/product/architecture/decisions/2026-11-10-concept-model-v2.md",
+      "owner_modules": ["libs/core/organization/authority-role-registry.ts"],
+      "not_to_confuse_with": ["org-role", "team-role", "grant"],
+      "lifecycle": {
+        "state": "transitioning",
+        "decision": "knowledge/product/architecture/decisions/2026-11-10-concept-model-v2.md#d6--grant--principal--scope--operation",
+        "plan": "docs/developer/improvement-plans-2026-11/SCOPE_IDENTITY_GRANT_CONSOLIDATION_PLAN_2026-11-10.ja.md"
+      }
+    },
+    {
+      "id": "grant",
+      "term": "Grant",
+      "category": "governance",
+      "definition": "Permission for a principal (Member or NHI) to perform an operation set within a scope for a lifetime; standing, task-scoped and store grants are instances.",
+      "glossary_anchor": "grant",
+      "canonical_doc": "knowledge/product/architecture/decisions/2026-11-10-concept-model-v2.md",
+      "owner_modules": ["libs/core/governance/grant-resolver.ts"],
+      "not_to_confuse_with": ["authority-role", "lease"],
+      "lifecycle": {
+        "state": "transitioning",
+        "decision": "knowledge/product/architecture/decisions/2026-11-10-concept-model-v2.md#d6--grant--principal--scope--operation",
+        "plan": "docs/developer/improvement-plans-2026-11/SCOPE_IDENTITY_GRANT_CONSOLIDATION_PLAN_2026-11-10.ja.md"
+      }
+    },
+    {
+      "id": "routing-decision",
+      "term": "RoutingDecision",
+      "category": "execution",
+      "definition": "The one decision the intent resolver emits per request: intent id, Execution Shape, authority level, delivery mode and promotion verdict.",
+      "glossary_anchor": "routingdecision",
+      "canonical_doc": "knowledge/product/architecture/decisions/2026-11-10-concept-model-v2.md",
+      "owner_modules": [
+        "libs/core/contracts/routing-decision.ts",
+        "libs/core/intent/routing-decision.ts",
+        "libs/core/intent/intent-resolver-entry.ts"
+      ],
+      "not_to_confuse_with": ["execution-shape"]
+    },
+    {
+      "id": "memory-candidate",
+      "term": "Memory Candidate",
+      "category": "governance",
+      "definition": "A captured learning awaiting promotion, of one type with kind and lane, carrying tier and entity scope from the moment of capture.",
+      "glossary_anchor": "memory-candidate",
+      "canonical_doc": "knowledge/product/architecture/decisions/2026-11-10-concept-model-v2.md",
+      "owner_modules": ["libs/core/knowledge/memory-promotion-queue.ts"],
+      "not_to_confuse_with": []
+    }
+  ]
+}

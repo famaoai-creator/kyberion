@@ -10,6 +10,7 @@ import { assertRecordIdentity } from './organization/organization-operating-mode
 import { withOpsAlertFileStore } from './daemon/ops-alert-log.js';
 import { defaultOpsAlertLogPath } from './daemon/ops-alert.js';
 import { pathResolver } from './path-resolver.js';
+import { asRoleOrGrant } from './testing/role-or-store-grant.js';
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -24,7 +25,7 @@ describe('bounded operational store authority', () => {
       seen.push({ role: identity.role, tenant: identity.tenantSlug });
       return { profile: { private_metadata: 'must not escape' } };
     });
-    withExecutionContext(
+    asRoleOrGrant(
       'operational_learning_writer',
       () => {
         expect(isRegisteredOperationalTenant('acme')).toBe(true);
@@ -46,7 +47,7 @@ describe('bounded operational store authority', () => {
     resolveTenant.mockImplementation(() => {
       throw new Error('tenant inactive');
     });
-    withExecutionContext(
+    asRoleOrGrant(
       'operational_learning_writer',
       () => {
         expect(() => isRegisteredOperationalTenant('acme')).toThrow('tenant inactive');

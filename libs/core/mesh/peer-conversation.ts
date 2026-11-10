@@ -9,7 +9,7 @@ import * as path from 'node:path';
 import { isValidTenantSlug } from '../entity-scope.js';
 
 import { logger } from '../core.js';
-import { withExecutionContext } from '../authority.js';
+import { withExecutionContext, withStoreGrant } from '../authority.js';
 import { pathResolver } from '../path-resolver.js';
 import {
   buildPeerMessageEnvelope,
@@ -815,12 +815,9 @@ function loadSenderPeerCatalog(input: SendPeerConversationMessageInput) {
     input.tenantId &&
     resolvePeerNetworkCatalogPath(options) === peerNetworkCatalogPath(input.tenantId);
   if (!tenantCatalog) return loadPeerNetworkCatalog(options);
-  return withExecutionContext(
-    PEER_CATALOG_READER_ROLE,
-    () => loadPeerNetworkCatalog(options),
-    undefined,
-    input.tenantId
-  );
+  return withStoreGrant(PEER_CATALOG_READER_ROLE, () => loadPeerNetworkCatalog(options), {
+    tenantSlug: input.tenantId,
+  });
 }
 
 export async function sendPeerConversationMessageToPeer(

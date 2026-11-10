@@ -1,6 +1,9 @@
 import * as path from 'node:path';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { withExecutionContext as initialContext } from './authority.js';
+import {
+  withExecutionContext as initialContext,
+  withStoreGrant as initialGrant,
+} from './authority.js';
 import { rootDir } from './path-resolver.js';
 import * as initialIO from './secure-io.js';
 
@@ -16,7 +19,7 @@ const STORE = 'active/shared/runtime/delegation-records';
 const TENANT = 'dlgown-' + process.pid;
 const OTHER = 'dlgother-' + process.pid;
 const keys = [
-  'KYBERION_PERSONA',
+  'KYBERION_BASE_ROLE',
   'MISSION_ROLE',
   'SYSTEM_ROLE',
   'MISSION_ID',
@@ -35,6 +38,7 @@ let io: typeof import('./secure-io.js');
 let delegations: typeof import('./workforce/delegated-task-observability.js');
 let notifications: typeof import('./mission/delegation-notifications.js');
 let withExecutionContext = initialContext;
+let withStoreGrant = initialGrant;
 
 function bind(role: string | undefined, tenant: string | undefined): void {
   for (const key of keys) delete process.env[key];
@@ -64,7 +68,7 @@ beforeAll(async () => {
   process.env.KYBERION_ROOT = ROOT;
   vi.resetModules();
   io = await import('./secure-io.js');
-  ({ withExecutionContext } = await import('./authority.js'));
+  ({ withExecutionContext, withStoreGrant } = await import('./authority.js'));
   delegations = await import('./workforce/delegated-task-observability.js');
   notifications = await import('./mission/delegation-notifications.js');
   expect((await import('./path-resolver.js')).rootDir()).toBe(ROOT);
@@ -113,7 +117,7 @@ describe('delegation partitions use real secure-io tier and tenant boundaries', 
     // The caller's own role cannot touch the partition directly.
     expect(() => io.safeReadFile(recordFile, { encoding: 'utf8' })).toThrow();
     expect(() => io.safeWriteFile(recordFile, 'forged')).toThrow();
-    withExecutionContext(
+    withStoreGrant(
       'delegation_record_store',
       () => {
         const traceFile = path.join(ROOT, STORE, 'confidential', TENANT, 'delegations.jsonl');
@@ -123,8 +127,7 @@ describe('delegation partitions use real secure-io tier and tenant boundaries', 
             .split('\n')
         ).toHaveLength(2);
       },
-      undefined,
-      TENANT
+      { tenantSlug: TENANT }
     );
     // Untenanted delegations stay in system/ under the ordinary grants.
     bind('chronos_gateway', undefined);
@@ -182,18 +185,16 @@ describe('delegation partitions use real secure-io tier and tenant boundaries', 
     // A process bound to another tenant cannot bind the store role to this one,
     // and its own binding of the store role does not reach this partition.
     expect(() =>
-      withExecutionContext(
+      withStoreGrant(
         'delegation_record_store',
         () => io.safeReadFile(queueFile, { encoding: 'utf8' }),
-        undefined,
-        TENANT
+        { tenantSlug: TENANT }
       )
     ).toThrow('ROLE_TENANT_SCOPE_MISMATCH');
-    withExecutionContext(
+    withStoreGrant(
       'delegation_record_store',
       () => expect(() => io.safeReadFile(queueFile, { encoding: 'utf8' })).toThrow(),
-      undefined,
-      OTHER
+      { tenantSlug: OTHER }
     );
 
     bind('chronos_gateway', undefined);

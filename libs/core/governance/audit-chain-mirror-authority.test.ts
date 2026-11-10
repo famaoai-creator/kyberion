@@ -5,6 +5,7 @@ import { currentExecutionScope, scopedAssumedRole } from '../foundation/executio
 import { pathResolver } from '../path-resolver.js';
 import { validateWritePermission } from '../tier-guard.js';
 import { auditChain, registerAuditChainIo, type AuditChainIo } from './audit-chain.js';
+import { asRoleOrGrant } from '../testing/role-or-store-grant.js';
 
 // G17: under a company stance, `pnpm work create-item` recorded its audit
 // entry inside work coordination's infrastructure_sentinel store fence, so the
@@ -17,7 +18,12 @@ const MIRROR_SEGMENT = path.join('runtime', 'audit-mirror', 'confidential');
 const MIRROR_WRITER = 'audit_mirror_writer';
 const TENANT = 'mirror-authority-co';
 const OTHER_TENANT = 'mirror-other-co';
-const ENV_KEYS = ['KYBERION_PERSONA', 'MISSION_ROLE', 'KYBERION_SUDO', 'KYBERION_TENANT'] as const;
+const ENV_KEYS = [
+  'KYBERION_BASE_ROLE',
+  'MISSION_ROLE',
+  'KYBERION_SUDO',
+  'KYBERION_TENANT',
+] as const;
 
 function mirrorPath(slug: string): string {
   return path.join(
@@ -39,7 +45,7 @@ describe('audit chain tenant mirror authority', () => {
     delete process.env.MISSION_ROLE;
     delete process.env.KYBERION_SUDO;
     delete process.env.KYBERION_TENANT;
-    process.env.KYBERION_PERSONA = 'sovereign';
+    process.env.KYBERION_BASE_ROLE = 'sovereign';
   });
 
   afterEach(() => {
@@ -52,7 +58,7 @@ describe('audit chain tenant mirror authority', () => {
   });
 
   const allowedAs = (role: string, slug: string | undefined, file: string): boolean =>
-    withExecutionContext(role, () => validateWritePermission(file).allowed, undefined, slug);
+    asRoleOrGrant(role, () => validateWritePermission(file).allowed, undefined, slug);
 
   it('grants the tenant-bound mirror writer only its own tenant mirror', () => {
     const allowed = (slug: string | undefined, file: string): boolean =>

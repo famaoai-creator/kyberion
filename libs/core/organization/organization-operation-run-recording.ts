@@ -1,6 +1,6 @@
 import * as path from 'node:path';
+import { executionAgentId } from '../governance/execution-agent-id.js';
 import { auditChain } from '../governance/audit-chain.js';
-import { getRegisteredEnvText } from '../foundation/env.js';
 import { loadState } from '../mission/mission-state.js';
 import { findMissionPath, pathResolver } from '../path-resolver.js';
 import { safeExistsSync } from '../secure-io.js';
@@ -276,7 +276,7 @@ export function recordOrganizationOperationRun(
   }
   const saved_paths = [runPath, saveOrganizationOperationState(state, saveOptions)];
   auditChain.record({
-    agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'organization_controller',
+    agentId: executionAgentId('organization_controller'),
     action: 'organization.operation_run_recorded',
     operation: `operation_run_recorded:${input.organizationId}/${operation.operation_id}`,
     result: 'completed',

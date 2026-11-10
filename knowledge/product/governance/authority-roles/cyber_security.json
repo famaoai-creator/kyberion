@@ -5,5 +5,9 @@
   "write_scopes": ["active/audit/security/", "knowledge/security/"],
   "scope_classes": ["codebase_core", "security_validation", "audit"],
   "allowed_actuators": ["code-actuator", "artifact-actuator"],
-  "tier_access": ["public", "confidential"]
+  "tier_access": ["public", "confidential"],
+  "permissions": {
+    "allow_read": ["active/audit/security/", "knowledge/security/"],
+    "allow_write": ["active/audit/security/", "knowledge/security/"]
+  }
 }

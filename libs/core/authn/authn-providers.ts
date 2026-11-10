@@ -14,7 +14,7 @@
  *   stub           — deterministic synthetic principal (tests only)
  *   env-token      — KYBERION_API_TOKEN / KYBERION_LOCALADMIN_TOKEN
  *   loopback-local — proven loopback, no credential (local dev / operator)
- *   agent-context  — in-process agent identity (KYBERION_PERSONA /
+ *   agent-context  — in-process agent identity (KYBERION_BASE_ROLE /
  *                    MISSION_ROLE / actorHint) verified via NI-02 policy
  *   registry-token — chronos-access.json hashed registrations (FD-07)
  *   agent-token    — `kya1.` HMAC-signed workload credential bound to the
@@ -32,6 +32,7 @@ import {
   verify,
   type webcrypto,
 } from 'node:crypto';
+import { baseRoleEnvText } from '../foundation/base-role-env.js';
 
 import { agentActor, humanActor, parseActorRef, serviceActor } from '../contracts/actor.js';
 import { browserSessionKey } from './authn-browser-session-key.js';
@@ -48,7 +49,12 @@ import { getRegisteredEnvBool, isVitestProcess } from '../foundation/env.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import { readTextFile } from '../foundation/text.js';
 import { getAgentIdentity, deriveAgentNhiId } from '../agent/agent-identity.js';
-import { resolveAssumedRole, resolveExecutionPersona, withExecutionContext } from '../authority.js';
+import {
+  resolveAssumedRole,
+  resolveExecutionPersona,
+  withExecutionContext,
+  withStoreGrant,
+} from '../authority.js';
 import { frontDeskRoleAuthority } from '../surface/front-desk-roles.js';
 import { isValidMemberId } from '../organization/member-id-grammar.js';
 import {
@@ -97,7 +103,7 @@ function envText(deps: AuthnResolveDeps | undefined, name: string): string | und
  * concurrent async contexts.
  */
 function ambientPersona(deps: AuthnResolveDeps | undefined): string | undefined {
-  return deps?.env ? envText(deps, 'KYBERION_PERSONA') : resolveExecutionPersona();
+  return deps?.env ? baseRoleEnvText(deps.env) : resolveExecutionPersona();
 }
 
 function ambientMissionRole(deps: AuthnResolveDeps | undefined): string | undefined {
@@ -282,12 +288,9 @@ function loadRegistrations(deps?: AuthnResolveDeps) {
   // TR-01: least privilege — the reader role's only grant is chronos-access.json.
   // Authentication precedes viewer tenant admission. This exact-file reader
   // uses system scope; its role cannot read other personal connection files.
-  return withExecutionContext(
-    CHRONOS_TOKEN_REGISTRY_READER_ROLE,
-    () => readChronosTokenRegistrations(),
-    undefined,
-    ''
-  );
+  return withStoreGrant(CHRONOS_TOKEN_REGISTRY_READER_ROLE, () => readChronosTokenRegistrations(), {
+    tenantSlug: '',
+  });
 }
 
 const registryTokenProvider: AuthnProvider = {
@@ -448,7 +451,7 @@ const agentContextProvider: AuthnProvider = {
     }
     // The provider is for IN-PROCESS agents: the adapter must attach an
     // executionContext object (even empty) as the runtime assertion that this
-    // is not a remote request. Without it, ambient KYBERION_PERSONA /
+    // is not a remote request. Without it, ambient KYBERION_BASE_ROLE /
     // MISSION_ROLE process env must never authenticate a wire request.
     if (!request.executionContext) {
       return { eligible: false, unmet: ['requires an in-process executionContext assertion'] };

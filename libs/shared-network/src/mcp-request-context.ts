@@ -1,4 +1,5 @@
 import { normalizeEventScope, type EventScope } from '@agent/core/event-scope';
+import { baseRoleEnvText } from '@agent/core/foundation';
 import { getRegisteredEnvText } from '@agent/core/foundation/env';
 import { resolveClaimedNhiId } from '@agent/core/contracts/nhi-id';
 
@@ -109,8 +110,7 @@ export function resolveMcpRequestContext(input: McpRequestContextInput = {}): Mc
   ) as McpCallerRole | undefined;
   return {
     principal:
-      clean(envText(env, 'KYBERION_MCP_PRINCIPAL') || envText(env, 'KYBERION_PERSONA')) ||
-      'mcp-client',
+      clean(envText(env, 'KYBERION_MCP_PRINCIPAL') || baseRoleEnvText(env)) || 'mcp-client',
     caller_role:
       callerRole && ['operator', 'agent', 'cowork', 'service'].includes(callerRole)
         ? callerRole

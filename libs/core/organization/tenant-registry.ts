@@ -137,7 +137,7 @@ function assertTenantSlug(slug: string): void {
   if (isReservedScopeName(slug)) {
     throw new Error(
       `[tenant-registry] invalid tenant slug '${slug}': '${slug}' is a reserved tier/partition name, not a tenant. ` +
-        `Run 'KYBERION_PERSONA=sovereign pnpm tenant list' to see registered tenant slugs and pass one via --tenant-slug.`
+        `Run 'KYBERION_BASE_ROLE=sovereign pnpm tenant list' to see registered tenant slugs and pass one via --tenant-slug.`
     );
   }
   throw new Error(
@@ -288,7 +288,7 @@ function profileReadHint(file: string): string {
   if (!normalized.includes('/knowledge/personal/')) return '';
   return (
     '. Personal-tier profiles require an authorized execution context — ' +
-    'check KYBERION_PERSONA / MISSION_ROLE before suspecting the file itself'
+    'check KYBERION_BASE_ROLE / MISSION_ROLE before suspecting the file itself'
   );
 }
 

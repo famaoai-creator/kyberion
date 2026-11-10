@@ -1,3 +1,5 @@
+import type { MemberRole } from '../organization/member-registry.js';
+import type { StorageDataTier } from '../storage-layout.js';
 import {
   parseExternalOperationGrants,
   parseExternalOperationGrant,
@@ -37,11 +39,11 @@ import { parseActorRef, type ActorRef } from '../contracts/actor.js';
 export type CharterScope = { kind: 'person' } | { kind: 'organization'; tenant_slug: string };
 
 export type AuthorityBasisKind = 'owner' | 'officer' | 'delegated' | 'self';
-export type CharterHolderRole = 'owner' | 'approver' | 'operator' | 'viewer';
+export type CharterHolderRole = MemberRole;
 
 export type ExternalEffectPolicy = 'forbid' | 'allow' | 'allow_with_review';
 export type IrreversiblePolicy = 'forbid' | 'named_actions_only' | 'allow';
-export type DataTier = 'public' | 'confidential' | 'personal';
+export type DataTier = StorageDataTier;
 export type ReputationalClass = 'A' | 'B' | 'C' | 'D';
 
 /** Deterministic, boundary-derived information facts used for autonomous egress. */

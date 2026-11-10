@@ -240,7 +240,7 @@
     },
     "mission": {
       "type": "object",
-      "required": ["mission_id", "tier", "status", "assigned_persona"],
+      "required": ["mission_id", "tier", "status", "org_role"],
       "properties": {
         "mission_id": {
           "type": "string",
@@ -257,7 +257,7 @@
           "type": "string",
           "minLength": 1
         },
-        "assigned_persona": {
+        "org_role": {
           "type": "string",
           "minLength": 1
         },

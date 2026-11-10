@@ -1,12 +1,12 @@
 ---
 title: Identity Management Operations (human + NHI)
 tags: [organization, member, nhi, operations]
-last_updated: 2026-10-08
+last_updated: 2026-11-10
 ---
 
 # 人とNHIの管理
 
-Actor語彙: `human=user:<member_id>` / `agent|service=kyberion://agent/<org>/<slug>`。空一覧(`[]`)は該当なし、`show`の不一致は `identity not found`。`orphan=true` は責任者・scopeの再指定が必要。
+Actor語彙: `human=user:<member_id>` / `agent|service=kyberion://agent/<tenant>/<org|_>/<slug>`(tenant は必須、組織に属さない NHI は `_`。テナントに属さない個人用は `kyberion://agent/_/_/<slug>`)。旧形式 `kyberion://agent/<org>/<slug>` は 1 リリースだけ別名として解決されます。台帳の書き換えは `pnpm nhi migrate-ids`(既定は dry run、`--apply` で書き込み、再実行しても変化なし)。空一覧(`[]`)は該当なし、`show`の不一致は `identity not found`。`orphan=true` は責任者・scopeの再指定が必要。
 
 ## 読取(新規・非破壊)
 

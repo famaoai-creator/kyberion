@@ -68,7 +68,7 @@ const diagnostic = (): DotCharter => ({
   attention: { triggers: [] },
   authority: {
     authority_role: 'infrastructure_sentinel',
-    allowed_work_shapes: ['pipeline'],
+    allowed_execution_shapes: ['pipeline'],
     allowed_pipelines: [FRONT_DESK_DIAGNOSTIC_PIPELINE],
     max_concurrent_delegations: 1,
   },
@@ -133,13 +133,13 @@ describe('front-desk diagnostic charter boundary', () => {
     [
       'implicit shapes',
       (c) => {
-        delete c.authority.allowed_work_shapes;
+        delete c.authority.allowed_execution_shapes;
       },
     ],
     [
       'model-driven shape',
       (c) => {
-        c.authority.allowed_work_shapes = ['pipeline', 'direct_reply'];
+        c.authority.allowed_execution_shapes = ['pipeline', 'direct_reply'];
       },
     ],
     [
@@ -282,7 +282,7 @@ describe('front-desk diagnostic charter boundary', () => {
     const c = diagnostic();
     delete c.runtime.execution_mode;
     delete c.scope.tenant_slug;
-    c.authority.allowed_work_shapes = ['direct_reply'];
+    c.authority.allowed_execution_shapes = ['direct_reply'];
     c.attention.triggers = [{ kind: 'wake', channels: ['slack'] }];
     c.notification = { deliver_to: { surface: 'slack', channel: '#ops' } };
     expect(validateDotCharter(c)).toEqual(c);
@@ -416,7 +416,7 @@ describe('provider-free diagnostic lifecycle', () => {
   it('fails closed when a saved diagnostic charter broadens after it was loaded', async () => {
     const entry = loaded(),
       changed = structuredClone(entry.charter);
-    changed.authority.allowed_work_shapes = ['pipeline', 'direct_reply'];
+    changed.authority.allowed_execution_shapes = ['pipeline', 'direct_reply'];
     write('dots/diagnostic.json', changed);
     const resolveWakeExecution = vi.fn();
     expect(await runDotWake(entry, { rootDir: ROOT, now, resolveWakeExecution })).toMatchObject({

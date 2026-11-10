@@ -47,7 +47,7 @@ A tenant promotion lands a tenant asset, so it is recorded in the tenant's infor
 | `scratch:promote --tenant` (incl. `--candidate`) | `scratch` / the scratch directory | `scratch_promote:tool` | the written `TOOL.json`            |
 | `pipeline:promote --tenant`                      | `adf` / the source ADF file       | `pipeline_promote`     | the written pipeline JSON          |
 
-- `visible_to` is the tenant. `ingested_by` is `KYBERION_PERSONA`, else `MISSION_ROLE`. With neither set, the command refuses before it writes anything.
+- `visible_to` is the tenant. `ingested_by` is `KYBERION_BASE_ROLE`, else `MISSION_ROLE`. With neither set, the command refuses before it writes anything.
 - `source_id` is the real source path, also for `--candidate`. That is safe: the tier guard only lets a tenant promote its own partition or unpartitioned scratch, and the record stays in that tenant's ledger.
 - A `--force` re-promotion with new content appends version+1 with `supersedes: <asset_id>@v<n>`. Identical content keeps the earlier `promoted_at`, so the file is byte-identical and no record is added (`recorded: false`).
 - A re-promotion from a new source onto the same target starts a new asset at version 1 whose `supersedes` names the asset that held the target. One source cannot feed two targets: the command refuses with a ledger conflict.

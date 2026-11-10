@@ -53,6 +53,7 @@ describe('memory-promotion-queue', () => {
       summary: 'Promote repeatable mission closing flow.',
       evidenceRefs: ['active/missions/MSN-TEST-QUEUE-1/evidence/ledger.jsonl'],
       sensitivityTier: 'confidential',
+      scope: { tier: 'confidential', tenant_slug: 'tenant-queue' },
     });
     enqueueMemoryPromotionCandidate(one);
 
@@ -181,6 +182,7 @@ describe('memory-promotion-queue', () => {
       missionId: 'MSN-TEST-STATUS',
       missionType: 'incident_response',
       tier: 'confidential',
+      scope: { tier: 'confidential', tenant_slug: 'tenant-queue', mission_id: 'MSN-TEST-STATUS' },
       summary: 'Mission produced reusable incident containment flow.',
       evidenceRefs: ['active/missions/MSN-TEST-STATUS/evidence/ledger.jsonl'],
     });
@@ -209,6 +211,11 @@ describe('memory-promotion-queue', () => {
       missionId: 'MSN-TEST-DECIDED-BY',
       missionType: 'incident_response',
       tier: 'confidential',
+      scope: {
+        tier: 'confidential',
+        tenant_slug: 'tenant-queue',
+        mission_id: 'MSN-TEST-DECIDED-BY',
+      },
       summary: 'Mission produced reusable incident containment flow.',
       evidenceRefs: ['active/missions/MSN-TEST-DECIDED-BY/evidence/ledger.jsonl'],
     });
@@ -238,6 +245,11 @@ describe('memory-promotion-queue', () => {
       missionId: 'MSN-TEST-DECIDED-BY-LEGACY',
       missionType: 'incident_response',
       tier: 'confidential',
+      scope: {
+        tier: 'confidential',
+        tenant_slug: 'tenant-queue',
+        mission_id: 'MSN-TEST-DECIDED-BY-LEGACY',
+      },
       summary: 'Legacy candidate without a decision maker.',
       evidenceRefs: ['active/missions/MSN-TEST-DECIDED-BY-LEGACY/evidence/ledger.jsonl'],
     });
@@ -263,7 +275,7 @@ describe('memory-promotion-queue', () => {
       proposedMemoryKind: 'heuristic',
       summary: 'Reuse the weekly review summary step.',
       evidenceRefs: ['active/missions/MSN-TEST-DEDUP/evidence/one.jsonl'],
-      sensitivityTier: 'personal',
+      sensitivityTier: 'public',
       queuedAt: '2026-07-01T00:00:00.000Z',
     });
     enqueueMemoryPromotionCandidate(first);
@@ -274,7 +286,7 @@ describe('memory-promotion-queue', () => {
       proposedMemoryKind: 'heuristic',
       summary: 'Reuse the weekly review summary step.',
       evidenceRefs: ['active/missions/MSN-TEST-DEDUP/evidence/two.jsonl'],
-      sensitivityTier: 'personal',
+      sensitivityTier: 'public',
       queuedAt: '2026-07-02T00:00:00.000Z',
     });
     enqueueMemoryPromotionCandidate(second);
@@ -379,7 +391,7 @@ describe('memory-promotion-queue', () => {
         proposed_memory_kind: 'heuristic',
         summary: 'Reuse the weekly review summary step.',
         evidence_refs: ['active/missions/MSN-TEST-LEGACY/evidence/one.jsonl'],
-        sensitivity_tier: 'personal',
+        sensitivity_tier: 'public',
         ratification_required: false,
         status: 'queued',
         queued_at: '2026-07-01T00:00:00.000Z',
@@ -392,7 +404,7 @@ describe('memory-promotion-queue', () => {
       proposedMemoryKind: 'heuristic',
       summary: 'Reuse the weekly review summary step.',
       evidenceRefs: ['active/missions/MSN-TEST-LEGACY/evidence/two.jsonl'],
-      sensitivityTier: 'personal',
+      sensitivityTier: 'public',
       queuedAt: '2026-07-03T00:00:00.000Z',
     });
     enqueueMemoryPromotionCandidate(candidate);

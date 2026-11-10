@@ -17,7 +17,7 @@ describe('ace-core minutes boundary', () => {
 
   beforeEach(() => {
     process.env.MISSION_ROLE = 'mission_controller';
-    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     safeRmSync(root, { recursive: true, force: true });
     safeRmSync(externalPath, { recursive: true, force: true });
   });

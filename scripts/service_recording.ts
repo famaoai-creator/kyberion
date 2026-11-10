@@ -89,7 +89,7 @@ function printUsage(): string {
   return `Usage:
   service_recording capture --target-name <name> --calls <json|@path> [--recording-id <id>]
   service_recording compile --recording <path> --procedure-id <id> --intent-phrases <json> [--output <path>] [--dry-run]
-  service_recording candidate --recording <path> --procedure-id <id> --intent-phrases <json> [--mission-id <id>] [--tenant-slug <slug>] [--tier <personal|confidential>] [--title <text>]
+  service_recording candidate --recording <path> --procedure-id <id> --intent-phrases <json> [--mission-id <id>] [--tenant-slug <slug>] [--tier <personal|confidential>] [--owner-nhi <id>] [--title <text>]
   service_recording request-review --recording <path> [--requested-by <id>]
   service_recording review --recording <path> --approve|--reject [--reviewer <id>] [--note <text>]
   service_recording promote --recording <path> --procedure-id <id> --intent-phrases <json>`;
