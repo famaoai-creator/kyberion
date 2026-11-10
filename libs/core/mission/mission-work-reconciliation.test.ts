@@ -125,7 +125,7 @@ function prepareMission(tasks?: Array<Record<string, unknown>>): void {
         status: 'validating',
         execution_mode: 'local',
         priority: 1,
-        assigned_persona: actorId,
+        org_role: actorId,
         confidence_score: 1,
         git: {
           branch: 'test',

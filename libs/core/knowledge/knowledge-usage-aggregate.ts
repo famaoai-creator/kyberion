@@ -17,6 +17,10 @@ export interface KnowledgeUsageAggregateEntry {
   not_used_count: number;
   occurrences: number;
   last_seen: string;
+  /** When the document was last delivered (e.g. included in a context pack). */
+  last_delivered_at?: string;
+  /** When a worker last reported the document as used. */
+  last_used_at?: string;
 }
 
 const KNOWLEDGE_USAGE_AGGREGATE_SCHEMA_PATH = pathResolver.knowledge(

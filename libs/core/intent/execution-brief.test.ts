@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { RoutingDecision } from '../contracts/routing-decision.js';
 import { buildFallbackExecutionBrief } from './execution-brief.js';
 import { resolveIntentResolutionPacket } from './intent-resolution.js';
 
@@ -72,6 +73,29 @@ describe('execution-brief', () => {
       expect(brief.deliverables).toContain('project_created');
     }
   );
+
+  it("takes a raw project request's intent from the carried RoutingDecision", () => {
+    const requestText = 'Webサービスを作って、その使い方の文書を書いて';
+    const carried: RoutingDecision = {
+      kind: 'routing_decision',
+      intent_id: 'tenant-service-bootstrap',
+      execution_shape: 'project_bootstrap',
+      authority_level: 'autonomous',
+      delivery_mode: 'one_shot',
+      promotion: {
+        required: false,
+        execution_shape: 'project_bootstrap',
+        reasons: [],
+        matched_rule_ids: [],
+        policy_version: 'test',
+      },
+    };
+    // Without the carried decision the public resolver is consulted again.
+    expect(buildFallbackExecutionBrief({ requestText }).archetype_id).toBe('bootstrap-project');
+    expect(
+      buildFallbackExecutionBrief({ requestText, routingDecision: carried }).archetype_id
+    ).toBe('tenant-service-bootstrap');
+  });
 
   it('keeps raw fallback incident intent aligned with the resolver', () => {
     const brief = buildFallbackExecutionBrief({

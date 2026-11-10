@@ -1,4 +1,5 @@
 /** Durable transcript schema and request admission snapshots. No dispatch, results or status projection. */
+import type { StorageDataTier } from '../storage-layout.js';
 import { createHash } from 'node:crypto';
 import { withExecutionContext } from '../authority.js';
 import { physicalScopedPath } from '../storage/physical-namespace.js';
@@ -489,7 +490,7 @@ export function inspectFrontDeskPendingRequest(
     status: string;
     runtime?: { execution_mode?: string };
     scope: {
-      tier: 'public' | 'confidential' | 'personal';
+      tier: StorageDataTier;
       tenant_slug?: string;
       organization_id?: string;
       project_id?: string;

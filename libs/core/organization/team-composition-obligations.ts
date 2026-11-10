@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import * as pathResolver from '../path-resolver.js';
 import type { MissionClassification } from '../mission/mission-classification.js';
@@ -26,7 +27,7 @@ export interface TeamCompositionObligationRule {
     delivery_shape?: string[];
     risk_profile?: string[];
     stage?: string[];
-    tier?: Array<'personal' | 'confidential' | 'public'>;
+    tier?: Array<StorageDataTier>;
   };
   require_roles: string[];
 }
@@ -125,7 +126,7 @@ function facetMatches(declared: string[] | undefined, actual: string | undefined
 
 export interface TeamCompositionObligationInput {
   classification?: MissionClassification;
-  tier?: 'personal' | 'confidential' | 'public';
+  tier?: StorageDataTier;
 }
 
 /**

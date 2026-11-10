@@ -2,6 +2,7 @@
 import { createHash } from 'node:crypto';
 import { pathResolver } from '@agent/core/path-resolver';
 import { listDotCharters, type DotCharter } from '@agent/core/dot/dot-charter';
+import { requestedExecutionShape } from '@agent/core/dot/dot-action-ledger';
 import { getWorkItem, listActiveWorkLeases } from '@agent/core/workforce/work-coordination';
 import type { WorkItem, WorkLease } from '@agent/core/workforce/work-coordination-types';
 import {
@@ -66,7 +67,7 @@ function assertClaim(
     item.claimed_by_peer_id !== actor ||
     item.metadata?.dot_id !== dotId ||
     item.metadata.pipeline_ref !== CONTINUOUS_OPERATIONS_REPORT_PIPELINE ||
-    item.metadata.requested_work_shape !== 'pipeline' ||
+    requestedExecutionShape(item.metadata) !== 'pipeline' ||
     item.metadata.continuous_work ||
     item.metadata.authority_role !== charter.authority.authority_role ||
     (item.context?.tenant_slug ?? '') !== (config.scope.tenant_slug ?? '') ||
@@ -107,7 +108,7 @@ export async function runContinuousOperationsReport(
       'Scoped report requires an enabled configuration containing only organization_metrics sources'
     );
   if (
-    !(charter.authority.allowed_work_shapes ?? []).includes('pipeline') ||
+    !(charter.authority.allowed_execution_shapes ?? []).includes('pipeline') ||
     !(charter.authority.allowed_pipelines ?? []).includes(CONTINUOUS_OPERATIONS_REPORT_PIPELINE)
   )
     throw new Error('Report pipeline is not permitted by the charter');
@@ -152,7 +153,7 @@ export async function runContinuousOperationsReport(
     !(currentCharter.authority.allowed_pipelines ?? []).includes(
       CONTINUOUS_OPERATIONS_REPORT_PIPELINE
     ) ||
-    !(currentCharter.authority.allowed_work_shapes ?? []).includes('pipeline')
+    !(currentCharter.authority.allowed_execution_shapes ?? []).includes('pipeline')
   )
     throw new Error('Report charter no longer authorizes this pipeline');
   (deps.authorize ?? assertContinuousOperationsCollectionAuthority)(config, currentCharter);

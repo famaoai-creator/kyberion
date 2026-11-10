@@ -20,7 +20,9 @@ export async function requestWorkItemMissionAlignment(authorized: WorkItem) {
   const scope = authorized.context;
   if (
     !scope?.tenant_slug ||
-    authorized.metadata?.requested_work_shape !== 'mission' ||
+    // Legacy key read for one release (items created from version-1 dot actions).
+    (authorized.metadata?.requested_execution_shape ??
+      authorized.metadata?.requested_work_shape) !== 'mission' ||
     authorized.metadata?.admission_only !== true ||
     !['ready', 'blocked'].includes(authorized.status)
   )

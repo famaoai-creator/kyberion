@@ -210,6 +210,21 @@ export function currentResourceAccessScope(): ResourceAccessScope | undefined {
   return registry.storage.getStore()?.at(-1);
 }
 
+/**
+ * S4 (scope model P4): run the audit chain's own system-scope record of a store
+ * grant disclosure outside every request ceiling. The record holds no tenant
+ * content (grant name, principal, bound scope, operation), and audit
+ * persistence writes it as the chain's own store writer, never as the caller,
+ * so leaving the ceiling grants the caller nothing: it only lets the
+ * disclosure's record land (fail closed) even when the caller is already inside
+ * an exact ceiling. The ceilings are restored when `fn` returns. Callable only
+ * from authority.ts's disclosure writer (tests/resource-ceiling-audit-exit-boundary.test.ts);
+ * `fn` must run only canonical audit code, never a caller callback.
+ */
+export function runDisclosureAuditOutsideResourceCeilings<T>(fn: () => T): T {
+  return registry.storage.exit(fn);
+}
+
 export interface SynchronousResourceGrantIssuer<Binding> {
   /** The domain facade validates and freezes its binding before calling this. No role is assumed. */
   run<T>(binding: Readonly<Binding>, scope: ResourceAccessScope, action: () => T): T;

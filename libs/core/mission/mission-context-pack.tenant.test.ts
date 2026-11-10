@@ -32,7 +32,7 @@ import { provisionTaskKnowledge } from '../task/task-knowledge-provisioning.js';
 import { recordKnowledgeVerifiedRun } from '../knowledge/knowledge-verification.js';
 import { _resetKnowledgeSlicesCacheForTests } from '../knowledge/knowledge-slices.js';
 import { _resetTenantKnowledgeWarningsForTests } from '../organization/tenant-knowledge-retrieval.js';
-import { findRelevantDistilledKnowledge } from '../knowledge/distill-knowledge-injector.js';
+import { findRelevantPromotedKnowledge } from '../knowledge/promoted-knowledge-retrieval.js';
 import {
   knowledgeDeliveryLogDir,
   loadKnowledgeUsageAggregate,
@@ -43,8 +43,8 @@ import {
 } from '../provider/provider-egress-gate.js';
 import type { WorkItem } from '../workforce/work-coordination.js';
 
-vi.mock('../knowledge/distill-knowledge-injector.js', () => ({
-  findRelevantDistilledKnowledge: vi.fn(async () => []),
+vi.mock('../knowledge/promoted-knowledge-retrieval.js', () => ({
+  findRelevantPromotedKnowledge: vi.fn(async () => []),
 }));
 
 // XP-03: checkProviderEgress emits an ops-alert on denial; mock the sink so
@@ -145,7 +145,7 @@ function makeMissionState(
     execution_mode: 'local',
     priority: 3,
     confidence_score: 1,
-    assigned_persona: 'worker',
+    org_role: 'worker',
     git: { branch: 'b', start_commit: 's', latest_commit: 'l', checkpoints: [] },
     history: [],
     ...overrides,
@@ -190,8 +190,8 @@ beforeEach(() => {
   process.env.KYBERION_KNOWLEDGE_FEEDBACK_DIR = feedbackDirOverride;
   _resetKnowledgeSlicesCacheForTests();
   _resetTenantKnowledgeWarningsForTests();
-  vi.mocked(findRelevantDistilledKnowledge).mockReset();
-  vi.mocked(findRelevantDistilledKnowledge).mockResolvedValue([]);
+  vi.mocked(findRelevantPromotedKnowledge).mockReset();
+  vi.mocked(findRelevantPromotedKnowledge).mockResolvedValue([]);
   seedFixture();
 });
 
@@ -285,7 +285,7 @@ describe('DA-07 (1)(2): tenant knowledge reaches the pack; other tenants never d
         score: 0.5,
       },
     ];
-    vi.mocked(findRelevantDistilledKnowledge).mockResolvedValue(distillResult as any);
+    vi.mocked(findRelevantPromotedKnowledge).mockResolvedValue(distillResult as any);
 
     const hints = await loadKnowledgeHintsIfPossible({
       missionState: makeMissionState(), // no tenant_slug anywhere
@@ -298,7 +298,7 @@ describe('DA-07 (1)(2): tenant knowledge reaches the pack; other tenants never d
   });
 
   it('merges deterministically: score-desc with ties going to tenant docs, distill preserved', async () => {
-    vi.mocked(findRelevantDistilledKnowledge).mockResolvedValue([
+    vi.mocked(findRelevantPromotedKnowledge).mockResolvedValue([
       {
         path: 'knowledge/product/architecture/high.md',
         title: 'High distill',

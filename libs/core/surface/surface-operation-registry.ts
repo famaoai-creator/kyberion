@@ -137,7 +137,7 @@ const operations = [
     id: 'workspace.list',
     title: 'List workspace entities',
     description:
-      'List entities of one kind, optionally narrowed by tenant, organization, project, mission, actor, status or a text query.',
+      'List entities of one kind, optionally narrowed by tenant, organization, project, mission, actor, status or a text query. Work items: `top_level=true` lists Issues only (each with its step progress); `parent_item_id` lists the steps of one Issue.',
     policy: readPolicy('workspace.list'),
     input: z
       .object({
@@ -148,6 +148,8 @@ const operations = [
         status: ID.optional(),
         q: z.string().trim().max(200).optional(),
         limit: z.coerce.number().int().min(1).max(500).optional(),
+        top_level: z.enum(['true', 'false']).optional(),
+        parent_item_id: ID.optional(),
       })
       .strict(),
     run: (
@@ -162,6 +164,8 @@ const operations = [
         status?: string;
         q?: string;
         limit?: number;
+        top_level?: 'true' | 'false';
+        parent_item_id?: string;
       }
     ) => ({
       items: listGraphNodes(viewerGraph(ctx), {
@@ -174,6 +178,8 @@ const operations = [
         status: input.status,
         q: input.q,
         limit: input.limit,
+        topLevelOnly: input.top_level === 'true',
+        parentItemId: input.parent_item_id,
       }),
     }),
   },

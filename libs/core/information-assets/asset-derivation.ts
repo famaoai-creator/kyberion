@@ -18,6 +18,7 @@
  * runtime state, or the ledgers themselves); and deletion only ever removes
  * regular files that satisfy the same ceiling the write path enforced.
  */
+import type { StorageDataTier } from '../storage-layout.js';
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import { resolveRole } from '../authority.js';
@@ -1071,7 +1072,7 @@ function recordsAllCustodians(options: DerivationPathOptions): LedgerEntry[] {
   const root = path.join(rootOf(options), DERIVATION_LEDGER_ROOT);
   if (!safeExistsSync(root)) return [];
   const partitions: DerivationCustody[] = [{ kind: 'system' }];
-  const collect = (tier: 'confidential' | 'personal'): void => {
+  const collect = (tier: Exclude<StorageDataTier, 'public'>): void => {
     const dir = path.join(root, tier);
     if (!safeExistsSync(dir)) return;
     let segments: string[];

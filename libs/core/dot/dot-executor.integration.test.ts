@@ -64,7 +64,7 @@ const CHARTER: DotCharter = {
   attention: { triggers: [{ kind: 'cron', cron: '0 9 * * *' }] },
   authority: {
     authority_role: 'infrastructure_sentinel',
-    allowed_work_shapes: ['direct_reply', 'pipeline'],
+    allowed_execution_shapes: ['direct_reply', 'pipeline'],
     allowed_pipelines: ['pipelines/ok.json'],
     max_concurrent_delegations: 2,
   },
@@ -120,7 +120,7 @@ const PROPOSALS: DotProposal[] = [
     action_id: 'dot_delegate_work',
     title: 'Run the ok pipeline',
     objective: 'Run it.',
-    work_shape: 'pipeline',
+    execution_shape: 'pipeline',
     pipeline_ref: 'pipelines/ok.json',
     expected_effect: { kr_id: 'overdue', direction: 'decrease' },
     target: 'service:ops',
@@ -130,7 +130,7 @@ const PROPOSALS: DotProposal[] = [
     action_id: 'dot_delegate_work',
     title: 'Answer the runbook question',
     objective: 'Answer it.',
-    work_shape: 'direct_reply',
+    execution_shape: 'direct_reply',
   },
 ];
 
@@ -173,7 +173,7 @@ describe('dot executor end to end', () => {
     const { records } = dispatchDotProposals(CHARTER, PROPOSALS, dispatchDeps());
     expect(records.map((r) => r.status)).toEqual(['dispatched', 'dispatched']);
     const created = listWorkItems({}).filter((i) => i.metadata?.dot_id === 'exec-it');
-    const pipelineItem = created.find((i) => i.metadata?.requested_work_shape === 'pipeline')!;
+    const pipelineItem = created.find((i) => i.metadata?.requested_execution_shape === 'pipeline')!;
     expect(pipelineItem.metadata).toMatchObject({
       pipeline_ref: 'pipelines/ok.json',
       expected_effect: { kr_id: 'overdue', direction: 'decrease' },
@@ -203,7 +203,14 @@ describe('dot executor end to end', () => {
       expect(item.attempts?.at(-1)).toMatchObject({ status: 'released' });
     }
     expect(countOpen('exec-it')).toBe(0);
-    expect(checkDotProposalBounds(CHARTER, third, dispatchDeps()).ok).toBe(true);
+    const verdict = checkDotProposalBounds(CHARTER, third, dispatchDeps());
+    expect(verdict.ok).toBe(true);
+    // The bounds verdict carries the dot's RoutingDecision for its charter-bounded shape.
+    expect(verdict.ok && verdict.routing_decision).toMatchObject({
+      kind: 'routing_decision',
+      execution_shape: third.execution_shape,
+      promotion: { execution_shape: third.execution_shape },
+    });
 
     const rows = readJsonLines<DotWorkResultRow>(
       path.join(TEST_ROOT, dotStatePath(CHARTER, DOT_WORK_RESULTS_FILE))

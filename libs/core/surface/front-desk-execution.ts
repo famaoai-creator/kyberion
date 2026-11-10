@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import { assertBuiltinOnlyWorkerEventStream } from '../workforce/worker-event-stream.js';
 import {
   isFrontDeskDiagnosticDot,
@@ -14,7 +15,7 @@ import { withFrontDeskDispatchLock } from './front-desk-dispatch-lock.js';
 import { safeReadFile, safeExistsSync, safeLstat } from '../secure-io.js';
 import { writeScopedArtifact } from '../workforce/artifact-store.js';
 import { physicalScopedPath } from '../storage/physical-namespace.js';
-import { resolveWorkScopeDecision } from '../workforce/work-scope-decision.js';
+import { routingDecisionForConfiguredShape } from '../intent/routing-decision.js';
 import { getWorkItem, type WorkItem } from '../workforce/work-coordination.js';
 import {
   dispatchDotProposals,
@@ -24,6 +25,7 @@ import {
 } from '../dot/dot-dispatch.js';
 import { runAsDotCharter } from '../dot/dot-key-results.js';
 import type { DotCharter, LoadedDotCharter } from '../dot/dot-charter.js';
+import { requestedExecutionShape } from '../dot/dot-requested-shape.js';
 import type { FrontDeskArtifactVerification } from '../dot/dot-state-paths.js';
 import { AUTONOMY_APPROVAL_CHANNEL } from '../governance/approval-decision-card.js';
 import { assertApprovalUsable } from '../governance/approval-separation-of-duties.js';
@@ -48,6 +50,16 @@ import {
   frontDeskBindingsEqual,
   frontDeskExecutionProposal,
 } from './front-desk-execution-proposal.js';
+
+/**
+ * Thin adapter (R3): the front desk's execution shape is configured (the
+ * receipt pipeline), not read from text, so it asks the resolver entry for the
+ * decision of that configured shape. A work-scope policy that promotes it is
+ * seen as a different execution shape and the front desk refuses.
+ */
+function frontDeskRoutingDecision() {
+  return routingDecisionForConfiguredShape('pipeline', { authorityLevel: 'approval_required' });
+}
 
 /** Durable outbox reader called by the existing supervisor, never from a chat request. */
 export async function runFrontDeskExecutionIntake(
@@ -87,8 +99,7 @@ export async function runFrontDeskExecutionIntake(
         // Capacity waiting owns no approval or executable reservation. Only
         // this original, revalidated outbox may retry it when a slot is free.
         if (prior && prior.status !== 'waiting_capacity') return;
-        const shape = resolveWorkScopeDecision({ catalogMinimumShape: 'pipeline' });
-        if (shape.execution_shape !== 'pipeline') return;
+        if (frontDeskRoutingDecision().promotion.execution_shape !== 'pipeline') return;
         dispatchDotProposals(charter, [frontDeskExecutionProposal(entry.binding)], deps);
       });
     });
@@ -101,7 +112,7 @@ export interface PreparedFrontDeskExecution {
   expectedContent: string;
   outputPath: string;
   tenant: string;
-  tier: 'public' | 'confidential';
+  tier: Exclude<StorageDataTier, 'personal'>;
 }
 
 /** Fail closed before effects, including on edited/revoked mappings or stale approvals. */
@@ -126,13 +137,13 @@ export function prepareFrontDeskExecution(
   }
   if (
     charter.status !== 'active' ||
-    !charter.authority.allowed_work_shapes?.includes('pipeline') ||
+    !charter.authority.allowed_execution_shapes?.includes('pipeline') ||
     !charter.authority.allowed_pipelines?.includes(FRONT_DESK_RECEIPT_PIPELINE)
   )
     throw new Error('configured pipeline capability is unavailable');
   if (
     item.metadata?.pipeline_ref !== FRONT_DESK_RECEIPT_PIPELINE ||
-    item.metadata?.requested_work_shape !== 'pipeline' ||
+    requestedExecutionShape(item.metadata) !== 'pipeline' ||
     item.metadata?.dot_id !== charter.dot_id
   )
     throw new Error('WorkItem execution target changed');
@@ -143,7 +154,7 @@ export function prepareFrontDeskExecution(
     )
       throw new Error('WorkItem authority scope changed');
   }
-  if (resolveWorkScopeDecision({ catalogMinimumShape: 'pipeline' }).execution_shape !== 'pipeline')
+  if (frontDeskRoutingDecision().promotion.execution_shape !== 'pipeline')
     throw new Error('work-scope policy requires another execution shape');
   const row = currentDotActions(charter.dot_id, deps).find(
     (value) => value.action_ref === item.metadata?.action_ref

@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import type { ValidateFunction } from 'ajv';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -21,10 +22,10 @@ import {
 } from '../workforce/work-design.js';
 import {
   loadResolvedStandardIntentCatalog,
-  resolveIntentResolutionPacket,
   type IntentResolutionOptions,
   type IntentResolutionPacket,
 } from '../intent/intent-resolution.js';
+import { resolveRoutingPacket } from '../intent/intent-resolver-entry.js';
 import { resolveAnalysisExecutionContract } from '../analysis/analysis-contract.js';
 import { resolveApprovalPolicy } from '../governance/approval-policy.js';
 import {
@@ -113,7 +114,7 @@ export interface TaskSession {
     track_id?: string;
     track_name?: string;
     tenant_slug?: string;
-    tier?: 'personal' | 'confidential' | 'public';
+    tier?: StorageDataTier;
     service_bindings?: string[];
     locale?: string;
   };
@@ -1137,7 +1138,7 @@ export function classifyTaskSessionIntent(
 ): TaskSessionIntent | null {
   const trimmed = utterance.trim();
   if (!trimmed) return null;
-  const packet = resolvedPacket || resolveIntentResolutionPacket(trimmed, options);
+  const packet = resolvedPacket || resolveRoutingPacket(trimmed, options);
   const intentId = packet.selected_intent_id;
   const builder = intentId ? getTaskIntentBuilder(intentId) : undefined;
   if (builder) return builder(trimmed, packet);

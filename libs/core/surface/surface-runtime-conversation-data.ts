@@ -1534,6 +1534,9 @@ export async function startSurfaceBackgroundReview(
       surface: input.surface,
       missionId: input.missionId,
       ...(input.scope?.tenant_slug ? { tenantSlug: input.scope.tenant_slug } : {}),
+      ...(input.scope?.nhi_id || input.scope?.viewer_principal
+        ? { ownerNhi: input.scope.nhi_id || input.scope.viewer_principal }
+        : {}),
       approvalChannel: input.channel,
       approvalThreadTs: input.threadTs,
       snapshot: [

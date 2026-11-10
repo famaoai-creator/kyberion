@@ -209,6 +209,7 @@
 - [音声・リアルタイム映像の技術再評価 2026-10](./product/architecture/realtime-av-technology-review-2026-10.md) (public | Unknown)
 
 ## 📁 product/architecture/decisions
+- [Concept Model v2: WorkItem as Issue, one Lease, Tenant 1:N Organization, Stance as acting-for, Grant = principal × scope × operation, one intent resolver, a closed memory loop](./product/architecture/decisions/2026-11-10-concept-model-v2.md) (public | Ecosystem Architect)
 - [Constrain Mesh Hub v1 to a Same-Tenant Single-Writer Control Plane](./product/architecture/decisions/2026-06-24-mesh-hub-v1-boundaries.md) (public | Ecosystem Architect)
 - [Keep Nine Mission Classes and Treat `knowledge_lifecycle` as a Category](./product/architecture/decisions/2026-06-22-knowledge-lifecycle-taxonomy-decision.md) (public | Ecosystem Architect)
 
@@ -258,6 +259,7 @@
 - [Delegated Agent Operations Runbook](./product/governance/delegated-agent-operations-runbook.md) (public | Unknown)
 - [Dependency Placement Policy](./product/governance/dependency-placement-policy.md) (public | Unknown)
 - [Dev-IdP onboarding runbook — signing in to Concierge locally](./product/governance/dev-idp-onboarding-runbook.md) (public | Unknown)
+- [Distill Policy Adapter Guide](./product/governance/wisdom-policy-guide.md) (public | Ecosystem Architect)
 - [Dot の委任枠と満杯時の待機運用](./product/governance/dot-capacity-operations.ja.md) (public | Unknown)
 - [Dual-Key Policy](./product/governance/dual-key-policy.md) (public | Unknown)
 - [Dynamic Capability and Actuator Governance Policy](./product/governance/governance-policy.md) (public | Ecosystem Architect)
@@ -286,7 +288,6 @@
 - [SOP: TypeScript Core Base Stabilization](./product/governance/ts-base-stabilization-sop.md) (public | Ecosystem Architect)
 - [SOP: Unit Test Modernization & Alias Integrity](./product/governance/test-modernization-sop.md) (public | Ecosystem Architect)
 - [Sovereign Onboarding Protocol](./product/governance/onboarding-protocol.md) (public | sovereign_concierge)
-- [Wisdom Policy Adapter Guide](./product/governance/wisdom-policy-guide.md) (public | Ecosystem Architect)
 - [Working Philosophy — Frontier-Model Operating Rules for Every Tier](./product/governance/working-philosophy.md) (public | Unknown)
 - [portfolio-status](./product/governance/portfolio-status.md) (public | Unknown)
 - [オンボーディング標準フロー — 環境 / Identity / Tenant / Activation / First Work](./product/governance/onboarding-flow.md) (public | Unknown)

@@ -10,6 +10,10 @@ import { safeExistsSync, safeMkdir, safeReaddir, safeWriteFile } from '@agent/co
 import { defineCatalog, nowIso, writeJson, type GovernedCatalog } from '@agent/core/foundation';
 import { withExecutionContext } from '@agent/core/governance';
 import {
+  loadAuthorityRoleCards,
+  type AuthorityRoleCard,
+} from '@agent/core/organization/authority-role-registry';
+import {
   draftRoleFromIntent,
   loadRoleDraftInventory,
   type ActuatorConnectionProbe,
@@ -65,7 +69,6 @@ type SecurityPolicy = {
   version?: string;
   default_allow?: string[];
   tier_restrictions?: Record<string, unknown>;
-  persona_permissions?: Record<string, { allow_read?: string[]; allow_write?: string[] }>;
   authority_role_permissions?: Record<string, { allow_read?: string[]; allow_write?: string[] }>;
   [key: string]: unknown;
 };
@@ -687,7 +690,7 @@ function loadAuthorityRoleDirectory(rootDir: string): Record<string, AuthorityRo
 /**
  * Every role id that any store `role create` writes already holds: team and
  * authority roles, the role-authority map (role and authority_role values),
- * role-write-access, security-policy authority permissions, and role docs.
+ * role-write-access, security-policy authority permissions and store grants, and role docs.
  * A new role must not take one of these ids — the create would merge into
  * or overwrite that role's records.
  */
@@ -704,9 +707,14 @@ export function collectExistingRoleIds(rootDir: string): Set<string> {
     }
   }
   for (const role of Object.keys(loadRoleWriteAccess(rootDir).roles || {})) ids.add(role);
-  for (const role of Object.keys(loadSecurityPolicy(rootDir).authority_role_permissions || {})) {
+  const policy = loadSecurityPolicy(rootDir);
+  for (const role of Object.keys(policy.authority_role_permissions || {})) {
     ids.add(role);
   }
+  // S4: a declared store grant's name is never taken by a new role.
+  const storeGrants = policy.store_grants;
+  if (storeGrants && typeof storeGrants === 'object' && !Array.isArray(storeGrants))
+    for (const name of Object.keys(storeGrants)) ids.add(name);
   const docsDir = path.join(rootDir, 'knowledge', 'product', 'roles');
   if (safeExistsSync(docsDir)) {
     for (const entry of safeReaddir(docsDir)) {
@@ -716,14 +724,33 @@ export function collectExistingRoleIds(rootDir: string): Set<string> {
   return ids;
 }
 
+function existingAuthorityRoleCard(rootDir: string, roleId: string): AuthorityRoleCard | undefined {
+  const directory = path.join(rootDir, 'knowledge', 'product', 'governance', 'authority-roles');
+  const hasDirectoryEntries =
+    safeExistsSync(directory) && safeReaddir(directory).some((entry) => entry.endsWith('.json'));
+  return hasDirectoryEntries ? (loadAuthorityRoleCards(rootDir) ?? {})[roleId] : undefined;
+}
+
+/**
+ * Writes the role's card in the one Authority Role registry (concept model
+ * v2 D6). The card's `permissions` are kept: they change only through
+ * {@link upsertSecurityPolicy}. Writing a profile makes a process role
+ * assignable, as creating its card did before the registries merged; both
+ * callers run behind the authenticated human approval.
+ */
 function writeAuthorityRoleBundle(
   rootDir: string,
   roleId: string,
   record: AuthorityRoleRecord
 ): void {
+  const existing = existingAuthorityRoleCard(rootDir, roleId);
   const directory = path.join(rootDir, 'knowledge', 'product', 'governance', 'authority-roles');
   safeMkdir(directory, { recursive: true });
-  writeJson(path.join(directory, `${roleId}.json`), { role: roleId, ...record });
+  writeJson(path.join(directory, `${roleId}.json`), {
+    role: roleId,
+    ...record,
+    ...(existing?.permissions ? { permissions: existing.permissions } : {}),
+  });
 }
 
 function syncAuthorityRoleSnapshot(
@@ -884,11 +911,27 @@ function upsertSecurityPolicy(
   assertSecurityPolicyApproval(approvalId);
   const filePath = path.join(rootDir, 'knowledge', 'product', 'governance', 'security-policy.json');
   const policy = loadSecurityPolicy(rootDir);
-  policy.authority_role_permissions = policy.authority_role_permissions || {};
-  policy.authority_role_permissions[authorityRoleId] = {
+  const permissions = {
     allow_read: [...record.write_scopes],
     allow_write: [...record.write_scopes],
   };
+  // The card is the registry; security-policy.json carries its generated
+  // projection. Both are written here so the drift gate stays green.
+  const cardPath = path.join(
+    rootDir,
+    'knowledge',
+    'product',
+    'governance',
+    'authority-roles',
+    `${authorityRoleId}.json`
+  );
+  const card = existingAuthorityRoleCard(rootDir, authorityRoleId) ?? {
+    role: authorityRoleId,
+    ...record,
+  };
+  writeJson(cardPath, { ...card, permissions });
+  policy.authority_role_permissions = policy.authority_role_permissions || {};
+  policy.authority_role_permissions[authorityRoleId] = permissions;
   writeJson(filePath, policy);
   resetOrgCatalog(filePath);
 }

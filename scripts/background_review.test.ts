@@ -4,8 +4,12 @@ const calls = vi.hoisted(() => ({
   curate: vi.fn(() => ({ archived: [], would_archive: ['candidate-1'], protected_reasons: {} })),
   restore: vi.fn(() => ({ candidate_id: 'candidate-1', status: 'proposed', changed: true })),
   maintenance: vi.fn(() => ({ candidate_id: 'candidate-1', status: 'proposed', changed: true })),
-  request: vi.fn(),
-  apply: vi.fn(),
+  request: vi.fn(() => ({ id: 'approval-1', storageChannel: 'background-review' })),
+  apply: vi.fn(() => ({ candidate_id: 'candidate-1' })),
+  migrate: vi.fn(() => ({ mode: 'dry_run', imported: [], unresolved: [] })),
+}));
+vi.mock('@agent/core/workforce/background-review-proposals', () => ({
+  migrateLegacyBackgroundReviewProposals: calls.migrate,
 }));
 vi.mock('@agent/core/workforce/background-review-curator', () => ({
   curateBackgroundReviewProposals: calls.curate,
@@ -130,7 +134,7 @@ describe('background-review maintenance CLI', () => {
     }
   });
 
-  it('never executes approval/apply effects when dry-run or maintenance scope flags are supplied', async () => {
+  it('never executes approval/apply effects when dry-run is supplied or approval is missing', async () => {
     for (const command of ['request', 'apply', 'apply-skill', 'apply-memory']) {
       await main([
         command,
@@ -149,5 +153,41 @@ describe('background-review maintenance CLI', () => {
     await main(['apply', '--candidate', 'candidate-1', '--scope-json', '{}']);
     expect(calls.request).not.toHaveBeenCalled();
     expect(calls.apply).not.toHaveBeenCalled();
+  });
+
+  it('migrates legacy proposals as a dry run unless --dry-run is omitted (D8, one release)', async () => {
+    await main(['migrate', '--dry-run']);
+    expect(calls.migrate).toHaveBeenLastCalledWith({ apply: false });
+    await main(['migrate']);
+    expect(calls.migrate).toHaveBeenLastCalledWith({ apply: true });
+    expect(calls.apply).not.toHaveBeenCalled();
+  });
+
+  it('passes an exact scope to approval and apply so a session proposal can be found', async () => {
+    const scope = { tier: 'personal', owner_nhi: 'user:operator' };
+    await main([
+      'request',
+      '--candidate',
+      'candidate-1',
+      '--expected-sha256',
+      'a'.repeat(64),
+      '--scope-json',
+      JSON.stringify(scope),
+    ]);
+    expect(calls.request).toHaveBeenCalledWith(expect.objectContaining({ scope }));
+    await main([
+      'apply',
+      '--candidate',
+      'candidate-1',
+      '--expected-sha256',
+      'a'.repeat(64),
+      '--approved-by',
+      'operator',
+      '--approval-ref',
+      'approval-1',
+      '--scope-json',
+      JSON.stringify(scope),
+    ]);
+    expect(calls.apply).toHaveBeenCalledWith(expect.objectContaining({ scope }));
   });
 });

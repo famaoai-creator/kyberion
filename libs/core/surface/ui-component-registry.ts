@@ -10,6 +10,7 @@
  * Governed data: `knowledge/product/orchestration/ui-component-registry.json`
  * (schema `ui-component-registry.schema.json`, catalog integrity registered).
  */
+import type { MemberRole } from '../organization/member-registry.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { pathResolver } from '../path-resolver.js';
 
@@ -17,7 +18,7 @@ export type UiComponentKind = 'flow' | 'view';
 export type UiComponentStatus = 'a2ui' | 'page' | 'planned';
 export type UiComponentHost = 'presence-studio' | 'concierge';
 export type UiComponentMenuGroup = 'home' | 'ask' | 'decide' | 'progress' | 'settings';
-export type UiComponentRole = 'viewer' | 'approver' | 'owner';
+export type UiComponentRole = Extract<MemberRole, 'owner' | 'approver' | 'viewer'>;
 
 export interface UiComponentInput {
   operation_id: string;

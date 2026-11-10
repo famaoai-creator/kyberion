@@ -5,5 +5,9 @@
   "write_scopes": ["active/projects/", "tests/", "libs/actuators/"],
   "scope_classes": ["project_delivery", "codebase_core", "quality_validation"],
   "allowed_actuators": ["code-actuator", "file-actuator", "system-actuator"],
-  "tier_access": ["public", "confidential", "personal"]
+  "tier_access": ["public", "confidential", "personal"],
+  "permissions": {
+    "allow_read": ["active/projects/", "tests/", "libs/actuators/"],
+    "allow_write": ["active/projects/", "tests/", "libs/actuators/"]
+  }
 }

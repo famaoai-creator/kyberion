@@ -15,12 +15,13 @@
  * the other half of the leak — the tenant-slug directory around it survived,
  * so `alpha-team/`, `other-tenant/` and friends stayed behind as empty shells.
  */
+import type { StorageDataTier } from '../storage-layout.js';
 import * as path from 'node:path';
 import { missionDir, tenantMissionDir, rootDir } from '../path-resolver.js';
 import { safeExistsSync, safeReaddir, safeRmSync } from '../secure-io.js';
 import { withExecutionContext } from '../authority.js';
 
-export type MissionTier = 'personal' | 'confidential' | 'public';
+export type MissionTier = StorageDataTier;
 
 export interface MissionFixtureRef {
   missionId: string;

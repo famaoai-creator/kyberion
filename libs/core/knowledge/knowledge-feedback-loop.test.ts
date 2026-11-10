@@ -345,6 +345,10 @@ describe('recordKnowledgeDelivery', () => {
     expect(loadKnowledgeUsageAggregate(tenantScope)).toMatchObject([
       { document_path: doc, delivered_count: 1, used_count: 1 },
     ]);
+    // D8 loop health windows retrieval and use on these stamps.
+    const [stamped] = loadKnowledgeUsageAggregate(tenantScope);
+    expect(stamped.last_delivered_at).toEqual(expect.any(String));
+    expect(stamped.last_used_at).toEqual(expect.any(String));
     expect(knowledgeUsageAggregatePath(missionScope)).toBe(
       knowledgeUsageAggregatePath(tenantScope)
     );
@@ -503,9 +507,11 @@ describe('recordKnowledgeUsageFeedback', () => {
   });
 
   it('enqueues missing_topics as knowledge-gap promotion candidates', () => {
+    const scope = { tier: 'confidential' as const, tenant_slug: 'tenant-kp05' };
     const result = recordKnowledgeUsageFeedback({
       missionId: 'MSN-KP05-GAP',
       taskId: 'T2',
+      scope,
       feedback: { missing_topics: ['how to configure the widget exporter'] },
     });
 
@@ -513,14 +519,26 @@ describe('recordKnowledgeUsageFeedback', () => {
     const rows = listMemoryPromotionCandidates();
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
+      kind: 'hint',
       source_type: 'task_session',
       source_ref: 'mission:MSN-KP05-GAP:task:T2',
       proposed_memory_kind: 'clarification_prompt',
       sensitivity_tier: 'confidential',
       status: 'queued',
+      scope: { tier: 'confidential', tenant_slug: 'tenant-kp05' },
     });
     expect(rows[0]?.summary).toContain('how to configure the widget exporter');
     expect(safeExistsSync(memoryPromotionQueuePath())).toBe(true);
+  });
+
+  it('does not queue a knowledge gap captured without a scope (D8)', () => {
+    const result = recordKnowledgeUsageFeedback({
+      missionId: 'MSN-KP05-GAP-UNSCOPED',
+      taskId: 'T2',
+      feedback: { missing_topics: ['how to configure the widget exporter'] },
+    });
+    expect(result.promotionCandidateIds).toHaveLength(0);
+    expect(listMemoryPromotionCandidates()).toHaveLength(0);
   });
 
   it.each(['public', 'personal'] as const)(

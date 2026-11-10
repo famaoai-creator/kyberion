@@ -90,7 +90,7 @@ async function seedMission(options: { withReviewTask: boolean }): Promise<string
       // class is invisible to the code_change review gate.
       execution_mode: 'local',
       priority: 3,
-      assigned_persona: 'operator',
+      org_role: 'operator',
       confidence_score: 1.0,
       classification: { mission_class: 'code_change', risk_profile: 'standard' },
       outcome_contract: {

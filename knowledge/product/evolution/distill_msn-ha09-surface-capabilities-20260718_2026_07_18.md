@@ -6,6 +6,7 @@ importance: 5
 source_mission: MSN-HA09-SURFACE-CAPABILITIES-20260718
 author: Kyberion Wisdom Distiller
 last_updated: 2026-07-18
+doc_status: historical
 ---
 
 # Mission MSN-HA09-SURFACE-CAPABILITIES-20260718 Completion Summary

@@ -82,13 +82,13 @@ the canonical surface(s) involved.
 
 ## E. Knowledge accumulation
 
-| #   | Scenario                           | Mechanism                                                                                                               | Status |
-| --- | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ------ |
-| E1  | Mission distill                    | `mission_controller distill` → `knowledge/product/evolution/distill_*.md`                                               | ✅     |
-| E2  | Memory promotion queue             | `memory-list` / `memory-approve` / `memory-promote`                                                                     | ✅     |
-| E3  | Cross-tenant promotion             | `memory-promote` + tier-hygiene + `multi-tenant-operations.md §7`                                                       | ✅     |
-| E4  | Post-release retrospective         | `post-release-retrospective` pipeline                                                                                   | ✅     |
-| E5  | Distill auto-reuse on new missions | `wisdom:inject_prior_knowledge` op + `findRelevantDistilledKnowledge`; runs as the first step in `hypothesis-tree.json` | ✅     |
+| #   | Scenario                           | Mechanism                                                                                                                                 | Status |
+| --- | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| E1  | Mission distill                    | `mission_controller distill` → `knowledge/product/evolution/distill_*.md`                                                                 | ✅     |
+| E2  | Memory promotion queue             | `memory-list` / `memory-approve` / `memory-promote`                                                                                       | ✅     |
+| E3  | Cross-tenant promotion             | `memory-promote` + tier-hygiene + `multi-tenant-operations.md §7`                                                                         | ✅     |
+| E4  | Post-release retrospective         | `post-release-retrospective` pipeline                                                                                                     | ✅     |
+| E5  | Distill auto-reuse on new missions | `wisdom:inject_prior_knowledge` op + `findRelevantPromotedKnowledge` (promoted records); runs as the first step in `hypothesis-tree.json` | ✅     |
 
 ## F. Cross-device / handoff
 

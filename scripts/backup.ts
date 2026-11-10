@@ -753,7 +753,9 @@ export function buildBackupManifest(
     ...(plan.scope === 'tenant'
       ? {
           tenant_runtime_partitions: plan.tenantRuntimePartitions.map((partition) => ({
-            key: partition.key,
+            // Widened to the manifest's serialized `string` (RestoredBackupManifest):
+            // the inferred registry-key union is not nameable in emitted declarations.
+            key: partition.key as string,
             path: partition.path,
             append_only: partition.appendOnly,
             hash_chained: partition.hashChained,

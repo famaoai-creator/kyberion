@@ -50,7 +50,7 @@ describe('chronos quick action mission projection', () => {
             git: { checkpoints: [{ id: 'checkpoint-1' }] },
             execution_mode: 'local',
             priority: 1,
-            assigned_persona: 'operator',
+            org_role: 'operator',
             confidence_score: 1,
             history: [],
           },

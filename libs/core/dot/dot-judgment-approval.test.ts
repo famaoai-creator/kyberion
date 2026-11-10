@@ -21,7 +21,7 @@ function fixture() {
   const proposal = normalizeDotProposal({
     title: 'Fixture repair',
     objective: 'Keep the original goal',
-    work_shape: 'pipeline',
+    execution_shape: 'pipeline',
     pipeline_ref: data.charter.authority.allowed_pipelines![0],
   });
   const binding = {
@@ -58,7 +58,7 @@ function fixture() {
     action_id: bound.action_id,
     title: bound.title,
     objective: bound.objective,
-    work_shape: bound.work_shape,
+    execution_shape: bound.execution_shape,
     pipeline_ref: bound.pipeline_ref,
     proposal_hash: dotProposalHash(data.charter.dot_id, bound),
     status: 'parked',

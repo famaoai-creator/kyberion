@@ -3,7 +3,8 @@
  *
  * `templates/companies/<vertical>/` に定義された業態テンプレート
  * (organization-profile / org-chart / company / identity / vision)を
- * テナントのホーム `knowledge/confidential/<slug>/`（identity はスタンス）へプレースホルダ({COMPANY_SLUG} / {COMPANY_NAME})を
+ * テナントのホーム `knowledge/confidential/<slug>/`（identity はスタンス、organization-profile は
+ * 組織ごとの `organizations/<slug>/`）へプレースホルダ({COMPANY_SLUG} / {COMPANY_NAME})を
  * 置換してコピーする。チームテンプレートカタログはテンプレート ID のまま
  * `knowledge/product/governance/organization-team-template-catalogs/` を
  * 参照するためコピー不要。
@@ -23,7 +24,11 @@ import {
   safeWriteFile,
 } from '../secure-io.js';
 import { readTextFile } from '../foundation/index.js';
-import { loadOrganizationProfileAtPath } from './organization-profile.js';
+import {
+  loadOrganizationProfileAtPath,
+  ORGANIZATION_PROFILE_FILE,
+  TENANT_ORGANIZATIONS_DIR,
+} from './organization-profile.js';
 import { isStanceEntry, stanceDirForSlug } from '../authn/stance-resolver.js';
 import { tenantHomeDir } from './tenant-home.js';
 
@@ -47,6 +52,22 @@ export interface BootstrapCompanyResult {
   stanceDir: string;
   writtenFiles: string[];
   catalogId: string;
+}
+
+/**
+ * Where a company template entry is materialized: stance entries in the
+ * stance, the organization profile in the company's own organization
+ * (`{tenant home}/organizations/{org}/`, concept model v2 D3 — profiles are per
+ * organization), everything else in the tenant home.
+ */
+export function companyTemplateEntryPath(
+  entry: string,
+  dirs: { tenantDir: string; stanceDir: string; organizationId: string }
+): string {
+  if (isStanceEntry(entry)) return path.join(dirs.stanceDir, entry);
+  if (entry === ORGANIZATION_PROFILE_FILE)
+    return path.join(dirs.tenantDir, TENANT_ORGANIZATIONS_DIR, dirs.organizationId, entry);
+  return path.join(dirs.tenantDir, entry);
 }
 
 export function listCompanyVerticals(rootDir?: string): string[] {
@@ -92,15 +113,19 @@ export function bootstrapCompany(input: BootstrapCompanyInput): BootstrapCompany
   // overlay (the company's operating identity) go to the stance of the same slug.
   const tenantDir = tenantHomeDir(input.tenantSlug?.trim() || slug, rootDir);
   const stanceDir = stanceDirForSlug(slug, rootDir);
-  const targetDirFor = (entry: string): string => (isStanceEntry(entry) ? stanceDir : tenantDir);
-  const profileTarget = assertSafeRepositoryPath(
-    path.join(targetDirFor('organization-profile.json'), 'organization-profile.json'),
-    {
-      allowMissingLeaf: true,
-      rootDir,
-    }
-  );
-  if (safeExistsSync(profileTarget) && !input.force) {
+  // The company's organization is keyed by its slug (the template's {COMPANY_SLUG}).
+  const targetFor = (entry: string): string =>
+    companyTemplateEntryPath(entry, { tenantDir, stanceDir, organizationId: slug });
+  const profileTarget = assertSafeRepositoryPath(targetFor(ORGANIZATION_PROFILE_FILE), {
+    allowMissingLeaf: true,
+    rootDir,
+  });
+  // A company onboarded before D3 keeps its profile at the tenant-home root.
+  const legacyProfile = assertSafeRepositoryPath(path.join(tenantDir, ORGANIZATION_PROFILE_FILE), {
+    allowMissingLeaf: true,
+    rootDir,
+  });
+  if ((safeExistsSync(profileTarget) || safeExistsSync(legacyProfile)) && !input.force) {
     throw new Error(
       `[company-bootstrap] company '${slug}' already has an organization profile. Re-run with --force to overwrite.`
     );
@@ -125,10 +150,11 @@ export function bootstrapCompany(input: BootstrapCompanyInput): BootstrapCompany
     const materialized = raw
       .replaceAll('{COMPANY_SLUG}', slug)
       .replaceAll('{COMPANY_NAME}', () => templateCompanyName);
-    const targetPath = assertSafeRepositoryPath(path.join(targetDirFor(entry), entry), {
+    const targetPath = assertSafeRepositoryPath(targetFor(entry), {
       allowMissingLeaf: true,
       rootDir,
     });
+    safeMkdir(path.dirname(targetPath), { recursive: true });
     safeWriteFile(targetPath, materialized);
     writtenFiles.push(targetPath);
   }

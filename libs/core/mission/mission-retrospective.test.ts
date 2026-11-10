@@ -132,6 +132,7 @@ describe('mission retrospective loop', () => {
       'model-role-outcome',
       'model-performance-index',
       'process-improvement-proposal',
+      'memory-candidate',
     ]) {
       fs.copyFileSync(
         path.resolve(process.cwd(), `knowledge/product/schemas/${schemaName}.schema.json`),
@@ -187,7 +188,7 @@ describe('mission retrospective loop', () => {
         status: 'active',
         execution_mode: 'local',
         priority: 1,
-        assigned_persona: 'worker',
+        org_role: 'worker',
         confidence_score: 1,
         git: {
           branch: 'mission-retrospective-test',
@@ -401,7 +402,7 @@ describe('mission retrospective loop', () => {
         status: 'archived',
         execution_mode: 'local',
         priority: 1,
-        assigned_persona: 'worker',
+        org_role: 'worker',
         confidence_score: 1,
         git: {
           branch: 'mission-retrospective-test',
@@ -750,38 +751,86 @@ describe('mission retrospective loop', () => {
     expect(result.proposals).toHaveLength(1);
 
     const queuePath = mod.processImprovementQueuePath();
+    fs.mkdirSync(path.dirname(queuePath), { recursive: true });
     fs.appendFileSync(queuePath, `${JSON.stringify([])}\n${JSON.stringify({ proposal: 'bad' })}\n`);
     expect(mod.listProcessImprovementProposals()).toHaveLength(1);
     expect(mod.normalizeProcessImprovementProposal([])).toBeUndefined();
   });
 
-  it('rewrites queued proposals through the canonical schema boundary', async () => {
+  it('D8: queues proposals on the MemoryCandidate queue with the mission scope', async () => {
     backendPrompt.mockResolvedValue(
       JSON.stringify({
-        proposals: [
-          {
-            kind: 'tooling',
-            target: 'queue',
-            proposal: 'queue schemaを適用する',
-            rationale: 'durable queue contract',
-            evidence: ['queue.jsonl'],
-          },
-        ],
+        proposals: [{ kind: 'tooling', target: 'queue', proposal: 'one queue', evidence: ['x'] }],
       })
     );
     const result = await mod.runMissionRetrospective(MISSION);
+    const queue = await import('../knowledge/memory-promotion-queue.js');
+    const rows = queue
+      .listMemoryPromotionCandidates()
+      .filter((row) => row.origin?.record_kind === 'process_improvement');
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      candidate_id: result.proposals[0].proposal_id,
+      kind: 'process_improvement',
+      status: 'queued',
+      scope: { tier: 'public', mission_id: MISSION },
+    });
+    // The legacy shared queue is never written again.
+    expect(fs.existsSync(mod.processImprovementQueuePath())).toBe(false);
+  });
+
+  it('D8: migrates pending legacy proposals with their mission scope and reports the rest', () => {
     const queuePath = mod.processImprovementQueuePath();
-    const proposal = result.proposals[0];
-    fs.writeFileSync(
-      queuePath,
-      `${JSON.stringify({ $schema: 'https://example.invalid/proposal.json', ...proposal })}\n`
+    fs.mkdirSync(path.dirname(queuePath), { recursive: true });
+    const legacy = (proposal_id: string, mission_id: string, status: string) => ({
+      $schema: 'https://example.invalid/proposal.json',
+      proposal_id,
+      mission_id,
+      kind: 'tooling',
+      target: 'queue',
+      proposal: `proposal ${proposal_id}`,
+      rationale: 'legacy',
+      evidence: [],
+      status,
+      created_at: '2026-11-01T00:00:00.000Z',
+    });
+    const legacyText = [
+      legacy('PIP-LEGACY01', MISSION, 'proposed'),
+      legacy('PIP-LEGACY02', MISSION, 'applied'),
+      legacy('PIP-LEGACY03', 'MSN-DOES-NOT-EXIST', 'proposed'),
+    ]
+      .map((row) => JSON.stringify(row))
+      .join('\n');
+    fs.writeFileSync(queuePath, `${legacyText}\n`);
+
+    expect(() => mod.decideProcessImprovementProposal('PIP-LEGACY01', 'approved')).toThrow(
+      'PROCESS_IMPROVEMENT_NOT_ON_QUEUE'
     );
+    const dryRun = mod.migrateLegacyProcessImprovementProposals();
+    expect(dryRun.imported.map((entry) => entry.proposal_id)).toEqual(['PIP-LEGACY01']);
+    expect(dryRun.left_as_history).toEqual(['PIP-LEGACY02']);
+    expect(dryRun.unresolved).toEqual([
+      expect.objectContaining({ proposal_id: 'PIP-LEGACY03', mission_id: 'MSN-DOES-NOT-EXIST' }),
+    ]);
 
-    mod.decideProcessImprovementProposal(proposal.proposal_id, 'approved');
-
-    const persisted = JSON.parse(fs.readFileSync(queuePath, 'utf8').trim());
-    expect(persisted.$schema).toBeUndefined();
-    expect(persisted.status).toBe('approved');
+    const applied = mod.migrateLegacyProcessImprovementProposals({ apply: true });
+    expect(applied.imported).toHaveLength(1);
+    expect(mod.migrateLegacyProcessImprovementProposals().already_on_queue).toEqual([
+      'PIP-LEGACY01',
+    ]);
+    expect(mod.decideProcessImprovementProposal('PIP-LEGACY01', 'approved').status).toBe(
+      'approved'
+    );
+    // The legacy store stays read-only.
+    expect(fs.readFileSync(queuePath, 'utf8')).toBe(`${legacyText}\n`);
+    const statuses = Object.fromEntries(
+      mod.listProcessImprovementProposals().map((entry) => [entry.proposal_id, entry.status])
+    );
+    expect(statuses).toEqual({
+      'PIP-LEGACY01': 'approved',
+      'PIP-LEGACY02': 'applied',
+      'PIP-LEGACY03': 'proposed',
+    });
   });
 
   it('does not promote dangerous LLM proposal responses', async () => {

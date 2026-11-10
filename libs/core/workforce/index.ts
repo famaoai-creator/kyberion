@@ -49,6 +49,7 @@ export {
   listActiveWorkLeases,
   ensureDefaultWorkCoordinationCatalog,
 } from './work-coordination.js';
+export * from './work-item-hierarchy.js';
 export * from './work-design.js';
 export * from './work-graph-projection.js';
 export * from './work-graph.js';

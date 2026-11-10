@@ -23,6 +23,7 @@ import {
 } from '../pipeline/pipeline-scheduler.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeReadFile, safeWriteFile } from '../secure-io.js';
+import { hintPartitionDir } from './hint-store.js';
 
 const PUBLIC_HINTS = path.resolve(
   process.cwd(),
@@ -30,8 +31,11 @@ const PUBLIC_HINTS = path.resolve(
 );
 // Resolved through pathResolver: under Vitest this is the vitest-live sandbox,
 // so the rmSync cleanup below can never touch the operator's real hints.
-const RUNTIME_HINTS_DIR = pathResolver.shared('runtime/feedback-loop/hints');
+// D8: the public partition of the one runtime hint store.
+const RUNTIME_HINTS_DIR = hintPartitionDir({ tier: 'public' });
 const RUNTIME_HINTS = path.join(RUNTIME_HINTS_DIR, 'auto-learned.json');
+const TENANT_HINTS_DIR = hintPartitionDir({ tier: 'confidential', tenant_slug: 'tenant-hints' });
+const LEGACY_HINTS_DIR = pathResolver.shared('runtime/feedback-loop/hints');
 
 function makeTrace(): Trace {
   return {
@@ -77,6 +81,8 @@ function makeTrace(): Trace {
 describe('feedback-loop', () => {
   beforeEach(() => {
     fs.rmSync(RUNTIME_HINTS_DIR, { recursive: true, force: true });
+    fs.rmSync(TENANT_HINTS_DIR, { recursive: true, force: true });
+    fs.rmSync(LEGACY_HINTS_DIR, { recursive: true, force: true });
     if (fs.existsSync(PUBLIC_HINTS)) {
       fs.unlinkSync(PUBLIC_HINTS);
     }
@@ -84,6 +90,8 @@ describe('feedback-loop', () => {
 
   afterEach(() => {
     fs.rmSync(RUNTIME_HINTS_DIR, { recursive: true, force: true });
+    fs.rmSync(TENANT_HINTS_DIR, { recursive: true, force: true });
+    fs.rmSync(LEGACY_HINTS_DIR, { recursive: true, force: true });
     if (fs.existsSync(PUBLIC_HINTS)) {
       fs.unlinkSync(PUBLIC_HINTS);
     }
@@ -125,6 +133,37 @@ describe('feedback-loop', () => {
     ]);
   });
 
+  it('D8: keeps a tenant hint in its own partition, invisible to public readers', () => {
+    const hint = {
+      topic: 'human-rejection:tone',
+      hint: 'Tenant reviewer rejected the tone.',
+      source: 'review-reentry:R-1',
+      confidence: 0.8,
+    };
+    persistHints([hint], 'human-rejection', { tier: 'confidential', tenant_slug: 'tenant-hints' });
+    expect(fs.existsSync(path.join(TENANT_HINTS_DIR, 'human-rejection.json'))).toBe(true);
+    expect(fs.existsSync(path.join(RUNTIME_HINTS_DIR, 'human-rejection.json'))).toBe(false);
+    expect(
+      readHintsByCategory('human-rejection', { tier: 'confidential', tenant_slug: 'tenant-hints' })
+    ).toMatchObject([{ topic: 'human-rejection:tone' }]);
+    expect(readHintsByCategory('human-rejection', { tier: 'public' })).toEqual([]);
+    expect(readHintsByCategory('human-rejection')).toEqual([]);
+    // A tenantless confidential scope is refused, never widened to public.
+    expect(() => persistHints([hint], 'human-rejection', { tier: 'confidential' })).toThrow(
+      'HINT_SCOPE_UNSUPPORTED'
+    );
+  });
+
+  it('D8: reads the pre-partition legacy directory only for unscoped readers', () => {
+    fs.mkdirSync(LEGACY_HINTS_DIR, { recursive: true });
+    safeWriteFile(
+      path.join(LEGACY_HINTS_DIR, 'adf-repair.json'),
+      JSON.stringify([{ topic: 'legacy', hint: 'legacy lesson', source: 'old', confidence: 0.5 }])
+    );
+    expect(readHintsByCategory('adf-repair')).toMatchObject([{ topic: 'legacy' }]);
+    expect(readHintsByCategory('adf-repair', { tier: 'public' })).toEqual([]);
+  });
+
   it('rejects malformed persisted hints instead of returning them to callers', () => {
     fs.mkdirSync(RUNTIME_HINTS_DIR, { recursive: true });
     safeWriteFile(
@@ -141,14 +180,22 @@ describe('feedback-loop', () => {
   });
 
   it('keeps feedback hint persistence on the canonical loader boundary', () => {
+    // D8: persistence moved into the one hint store; the feedback loop delegates.
     const source = String(
       safeReadFile(pathResolver.rootResolve('libs/core/knowledge/feedback-loop.ts'), {
         encoding: 'utf8',
       })
     );
     expect(source).toContain('loadFeedbackHintsAtPath(');
-    expect(source).toContain('feedbackHintsCatalogAtPath(filePath).validate(');
+    expect(source).toContain('persistScopedHints(');
+    const store = String(
+      safeReadFile(pathResolver.rootResolve('libs/core/knowledge/hint-store.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(store).toContain('catalogAt(filePath).validate(');
     expect(source).not.toContain('readJson<KnowledgeHint[]>');
+    expect(store).not.toContain('readJson<');
   });
 });
 

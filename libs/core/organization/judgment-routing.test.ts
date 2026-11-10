@@ -276,6 +276,8 @@ describe('synthetic judgment routing with actual isolated persisted receipts', (
       'autonomous-ops-policy.json',
       'dot-execution-policy.json',
       'autonomy-learning-policy.json',
+      // Dot dispatch reads the work-scope verdict through its RoutingDecision adapter.
+      'work-scope-policy.json',
     ])
       copy(
         path.join(sourceRoot, 'knowledge/product/governance', name),
@@ -423,7 +425,7 @@ describe('synthetic judgment routing with actual isolated persisted receipts', (
       attention: { triggers: [{ kind: 'cron', cron: '0 9 * * *', timezone: 'UTC' }] },
       authority: {
         authority_role: 'organization_operator',
-        allowed_work_shapes: ['direct_reply'],
+        allowed_execution_shapes: ['direct_reply'],
         max_concurrent_delegations: 2,
       },
       decisions: { default_decision: 'approve' },
@@ -434,7 +436,7 @@ describe('synthetic judgment routing with actual isolated persisted receipts', (
       action_id: 'dot_delegate_work',
       title: 'Synthetic investigation plan',
       objective: 'Plan the fixture repair',
-      work_shape: 'direct_reply',
+      execution_shape: 'direct_reply',
     };
     const base = gateModule.evaluateAutonomousOpsAction({
       actionId: 'dot_intake_work',

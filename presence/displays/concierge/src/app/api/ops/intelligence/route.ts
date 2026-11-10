@@ -17,7 +17,11 @@ import {
   readChronosOptionalStringParam,
 } from '../../../../lib/ops/request-input';
 import { memoryCandidateVisibleToViewer } from '../../../../lib/ops/knowledge-scope';
-import { listDistillCandidatesForViewer } from '../../../../lib/ops/distill-candidate-scope';
+import {
+  listDistillCandidatesForViewer,
+  listReuseProposalsForViewer,
+} from '../../../../lib/ops/distill-candidate-scope';
+import { CONCIERGE_DECIDED_VIA } from '@agent/core/knowledge/facade-proposal-rows';
 import { collectAgentActivity } from '../../../../lib/ops/agent-message-feed';
 import { createIntelligenceObservationReadCache } from './intelligence-control-data';
 import {
@@ -232,16 +236,27 @@ export async function GET(req: NextRequest) {
     );
     const missionSeeds = listMissionSeedRecords().filter((seed) => projectIds.has(seed.project_id));
     const missionSeedAssessment = summarizeMissionSeedAssessment(missionSeeds);
-    const distillCandidates = listDistillCandidatesForViewer(
+    const requestedTenant = readChronosOptionalStringParam(req.nextUrl.searchParams.get('tenant'));
+    const queueRows = listMemoryPromotionCandidates();
+    // D8: reuse proposals are queue rows (viewer-scoped by their own scope);
+    // legacy DistillCandidateRecords are shown after them as read-only history.
+    const reuseProposals = listReuseProposalsForViewer(
       resolvedViewer.context,
-      readChronosOptionalStringParam(req.nextUrl.searchParams.get('tenant'))
-    );
-    const memoryCandidates = listMemoryPromotionCandidates().filter((candidate) =>
-      memoryCandidateVisibleToViewer(
-        candidate,
-        resolvedViewer.context,
-        readChronosOptionalStringParam(req.nextUrl.searchParams.get('tenant'))
-      )
+      requestedTenant,
+      queueRows
+    ).map(({ metadata: _metadata, ...proposal }) => ({
+      ...proposal,
+      review: proposal.decided_via === CONCIERGE_DECIDED_VIA ? 'here' : 'elsewhere',
+    }));
+    const onQueue = new Set(reuseProposals.map((proposal) => proposal.candidate_id));
+    const distillCandidates = [
+      ...reuseProposals,
+      ...listDistillCandidatesForViewer(resolvedViewer.context, requestedTenant)
+        .filter((record) => !onQueue.has(record.candidate_id))
+        .map((record) => ({ ...record, review: 'history' as const })),
+    ];
+    const memoryCandidates = queueRows.filter((candidate) =>
+      memoryCandidateVisibleToViewer(candidate, resolvedViewer.context, requestedTenant)
     );
     const nextActions = intelligenceData.buildChronosNextActions({
       pendingApprovals: pendingApprovals.length,

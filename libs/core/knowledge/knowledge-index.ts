@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import { STANCES_DIR } from '../authn/stance-resolver.js';
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
@@ -7,6 +8,7 @@ import { readTextFile } from '../foundation/text.js';
 import { nowIso } from '../foundation/time.js';
 import { createLogger } from '../logger.js';
 import * as pathResolver from '../path-resolver.js';
+import { hintPartitionDir, legacyHintsDir } from './hint-store.js';
 import {
   safeExistsSync,
   safeReaddir,
@@ -70,7 +72,7 @@ export interface KnowledgeHint {
   learning_candidate_id?: string;
   confidence: number;
   tags?: string[];
-  tier?: 'public' | 'confidential' | 'personal' | 'product';
+  tier?: StorageDataTier | 'product';
   customerId?: string;
   /**
    * DA-07: lexical relevance score for the active query. Populated only when
@@ -275,7 +277,7 @@ export interface KnowledgeScope {
    * customer records live in its confidential subtree (S3), so there is no
    * separate customer tier.
    */
-  tiers: Array<'public' | 'confidential' | 'personal' | 'product'>;
+  tiers: Array<StorageDataTier | 'product'>;
   /**
    * Restrict 'confidential' scanning to one customer subdirectory.
    * Also activates customer/ overlay for 'personal' tier.
@@ -704,9 +706,12 @@ function _scanProductTier(knowledgeBase: string, domains: string[], hints: Knowl
   // ingested here so trace-derived lessons re-enter resolution / mission context
   // via queryKnowledge. Without this the feedback loop only ever writes, never
   // reads back (the "溜まるだけで参照されない" failure the concept warns of).
-  const feedbackHintsDir = pathResolver.shared('runtime/feedback-loop/hints');
-  if (safeExistsSync(feedbackHintsDir)) {
-    _loadJsonHints(feedbackHintsDir, knowledgeBase, 'product', undefined, hints);
+  // D8: only the public partition of the hint store is product-level; the
+  // pre-partition legacy directory is read for one release.
+  for (const feedbackHintsDir of [hintPartitionDir({ tier: 'public' }), legacyHintsDir()]) {
+    if (safeExistsSync(feedbackHintsDir)) {
+      _loadJsonHints(feedbackHintsDir, knowledgeBase, 'product', undefined, hints);
+    }
   }
 
   // Scan declared domains; fall back to full product root when using TIER1_SUBDIRS default

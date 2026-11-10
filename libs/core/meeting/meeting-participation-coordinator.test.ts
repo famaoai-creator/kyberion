@@ -50,7 +50,7 @@ function writeVoiceConsent(record: Record<string, unknown>): void {
     JSON.stringify({
       mission_id: CONSENT_MISSION,
       tier: 'confidential',
-      assigned_persona: 'ecosystem_architect',
+      org_role: 'ecosystem_architect',
     })
   );
   fs.writeFileSync(path.join(evidenceDir, 'voice-consent.json'), JSON.stringify(record));
@@ -331,7 +331,7 @@ describe('MeetingParticipationCoordinator (stub end-to-end)', () => {
       JSON.stringify({
         mission_id: CONSENT_MISSION,
         tier: 'confidential',
-        assigned_persona: 'ecosystem_architect',
+        org_role: 'ecosystem_architect',
       })
     );
     const bus = new StubAudioBus();
@@ -390,7 +390,7 @@ describe('MeetingParticipationCoordinator (stub end-to-end)', () => {
         JSON.stringify({
           mission_id: CONSENT_MISSION,
           tier: 'confidential',
-          assigned_persona: 'ecosystem_architect',
+          org_role: 'ecosystem_architect',
         })
       );
       safeSymlinkSync(outsideDir, evidenceDir, 'dir');

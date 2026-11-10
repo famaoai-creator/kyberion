@@ -3,6 +3,8 @@
  * Core type definitions for the Mission Controller.
  */
 
+import type { MemberRole } from '../organization/member-registry.js';
+import type { StorageDataTier } from '../storage-layout.js';
 import type { HandoffPacket } from '../mesh/handoff-packet.js';
 import type { ArtifactKind } from '../workforce/artifact-registry.js';
 import type { MissionClassification } from './mission-classification.js';
@@ -15,7 +17,7 @@ import type { WorkflowPhaseSpec } from './mission-workflow-catalog.js';
  * (FD-10a, a concurrently developed sibling module) will eventually supply a
  * shared actor type; this interface is additive and does not depend on it.
  */
-export type HumanDecidedByRole = 'owner' | 'approver' | 'viewer';
+export type HumanDecidedByRole = Extract<MemberRole, 'owner' | 'approver' | 'viewer'>;
 
 export interface HumanDecidedBy {
   kind: 'human';
@@ -85,7 +87,7 @@ export interface MissionState {
     expires_at?: string;
   };
   vision_ref?: string;
-  tier: 'personal' | 'confidential' | 'public';
+  tier: StorageDataTier;
   status:
     | 'planned'
     | 'active'
@@ -157,7 +159,13 @@ export interface MissionState {
     evidence_hashes?: Record<string, string>;
   };
   priority: number;
-  assigned_persona: string;
+  /**
+   * Org Role the mission is assigned (knowledge/product/roles/). Descriptive
+   * metadata and prompt context only — never an authority source (concept
+   * model v2 D5). Renamed from `assigned_persona`; legacy states are
+   * normalised at the load boundary (mission-state-reader.ts).
+   */
+  org_role: string;
   confidence_score: number;
   git: {
     branch: string;

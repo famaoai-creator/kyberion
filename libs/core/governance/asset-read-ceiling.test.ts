@@ -6,6 +6,7 @@ import { pathResolver } from '../path-resolver.js';
 import { assetReadCeilingFor, declaredReadTiers } from './asset-read-ceiling.js';
 import { loadAuthorityRoleIndex } from '../organization/authority-role-registry.js';
 import { inspectAssetScopeRead } from './asset-scope-inspection.js';
+import { asRoleOrGrant } from '../testing/role-or-store-grant.js';
 
 const stores = readJson<{ stores: Array<AssetStoreDeclaration & { path: string }> }>(
   pathResolver.knowledge('product/governance/store-catalog.json')
@@ -14,7 +15,7 @@ const roleIndex = loadAuthorityRoleIndex();
 
 /** The guard's decision and the catalog ceiling's observation, inside one identity. */
 function compare(role: string, tenant: string | undefined, relative: string) {
-  return withExecutionContext(
+  return asRoleOrGrant(
     role,
     () => {
       const result = inspectAssetScopeRead(

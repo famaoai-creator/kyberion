@@ -30,6 +30,19 @@
       "type": "string",
       "enum": ["direct_answer", "task_session", "mission", "project_bootstrap"]
     },
+    "execution_shape": {
+      "type": "string",
+      "enum": [
+        "direct_reply",
+        "actuator_action",
+        "browser_session",
+        "task_session",
+        "pipeline",
+        "mission",
+        "project_bootstrap"
+      ],
+      "description": "Unfolded ExecutionShape; resolution_shape is its legacy projection."
+    },
     "outcome_kind": {
       "type": "string",
       "enum": ["answer", "artifact", "approval_ready_plan", "service_change", "status_report"]

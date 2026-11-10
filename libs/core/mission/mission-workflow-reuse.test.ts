@@ -57,7 +57,7 @@ vi.mock('../path-resolver.js', () => ({
 vi.mock('./mission-state-reader.js', () => ({ loadMissionStateAtPath: () => fixture.state }));
 vi.mock('./mission-llm.js', () => ({ runAdaptiveStructuredLlmProfile: fixture.llm }));
 vi.mock('./mission-distill.js', () => ({
-  loadWisdomPolicy: () => ({
+  loadDistillPolicy: () => ({
     llm: { default_profile: 'heavy', profiles: { heavy: { command: 'codex', args: [] } } },
   }),
 }));

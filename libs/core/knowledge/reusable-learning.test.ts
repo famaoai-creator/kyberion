@@ -1,13 +1,11 @@
 import { randomUUID, createHash } from 'node:crypto';
 import * as path from 'node:path';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { withExecutionContext } from '../authority.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '../secure-io.js';
-import {
-  distillCandidateRecordPath,
-  loadDistillCandidateRecord,
-} from './distill-candidate-registry.js';
+import { loadFacadeProposal } from './facade-proposal-rows.js';
+import { LEARNING_INTAKE_PROPOSAL } from './reuse-proposals.js';
 import {
   planReusableLearning,
   prepareReusableLearning,
@@ -48,6 +46,12 @@ function input(
     ...overrides,
   };
 }
+beforeEach(() => {
+  // D8: plans are queue rows; keep every test on its own queue file.
+  const queue = pathResolver.sharedTmp(`reusable-learning-${randomUUID()}.jsonl`);
+  vi.stubEnv('KYBERION_MEMORY_QUEUE_PATH', queue);
+  cleanup.add(queue);
+});
 afterEach(() => {
   withExecutionContext('ecosystem_architect', () => {
     for (const ref of cleanup) safeRmSync(ref, { force: true, recursive: true });
@@ -101,7 +105,7 @@ describe('reuse-first learning intake', () => {
     );
   });
 
-  it('queues an idempotent review proposal in the existing registry, not an executable asset', () => {
+  it('queues an idempotent review proposal on the memory queue, not an executable asset', () => {
     const item = input({ destination: 'skill' });
     const first = prepareReusableLearning(item);
     const second = prepareReusableLearning(item);
@@ -110,13 +114,16 @@ describe('reuse-first learning intake', () => {
       String(safeReadFile(pathResolver.rootResolve(item.sourceRef)))
     );
     const fromAnotherRun = prepareReusableLearning({ ...item, sourceRef: repeatedSource });
-    const file = distillCandidateRecordPath(first.candidate!.candidate_id);
-    cleanup.add(file);
     expect(second.candidate?.candidate_id).toBe(first.candidate?.candidate_id);
     expect(fromAnotherRun.candidate?.candidate_id).toBe(first.candidate?.candidate_id);
-    expect(loadDistillCandidateRecord(first.candidate!.candidate_id)).toMatchObject({
+    expect(
+      loadFacadeProposal(LEARNING_INTAKE_PROPOSAL, first.candidate!.candidate_id, item.scope)
+    ).toMatchObject({
       status: 'proposed',
       tier: 'public',
+      record_kind: 'learning_intake',
+      decided_via: 'pnpm kyberion learning prepare --queue',
+      scope: { tier: 'public' },
       metadata: {
         origin: 'learning_intake',
         learning_plan: { destination: 'skill', approval_required: true },
@@ -134,7 +141,9 @@ describe('reuse-first learning intake', () => {
     const item = input({ destination: 'skill' });
     const result = prepareReusableLearning(item, { dryRun: true });
     expect(result.persisted).toBe(false);
-    expect(loadDistillCandidateRecord(result.candidate!.candidate_id)).toBeNull();
+    expect(
+      loadFacadeProposal(LEARNING_INTAKE_PROPOSAL, result.candidate!.candidate_id, item.scope)
+    ).toBeNull();
     expect(() =>
       planReusableLearning({ ...item, sourceRef: 'knowledge/confidential/other-org/private.md' })
     ).toThrow('LEARNING_SOURCE_SCOPE');
@@ -214,7 +223,6 @@ describe('reuse-first learning intake', () => {
     cleanup.add(queue);
     const item = input({ destination: 'skill' });
     const prepared = prepareReusableLearning(item);
-    cleanup.add(distillCandidateRecordPath(prepared.candidate!.candidate_id));
     expect(prepared.plan.next_steps.join('\n')).toContain(
       `--queue --candidate ${prepared.candidate!.candidate_id}`
     );

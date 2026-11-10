@@ -465,6 +465,8 @@ export interface DotMemoryDistillDeps {
 export interface DotMemoryDistillFeedback {
   dot_id: string;
   tenant: boolean;
+  /** D8: the charter's own scope — the review candidate is captured in it. */
+  scope: DotCharter['scope'];
   key: string;
   outcome: 'satisfied' | 'dissatisfied';
   comment: string;
@@ -485,23 +487,21 @@ async function recordDistillFeedback(
     ...(input.correction ? { correction: input.correction } : {}),
     source: 'operator',
   });
+  // D8: the candidate is a queue row in the charter's scope (tenant dots:
+  // the tenant's confidential partition), never a shared unscoped record.
   const { candidate } = materializeExecutionFeedbackCandidate({
     feedback,
     procedureId: `dot:${input.dot_id}`,
+    scope: input.scope,
   });
-  if (candidate && input.tenant) {
-    const { updateDistillCandidateRecord } =
-      await import('../knowledge/distill-candidate-registry.js');
-    updateDistillCandidateRecord(candidate.candidate_id, { tier: 'confidential' });
-  }
   return candidate ? { candidate_id: candidate.candidate_id } : {};
 }
 
 /**
  * Once per ISO week per dot: distill hypotheses resolved since the last
  * distillation into an execution-feedback record (+ review candidate). Tenant
- * dots keep prose out of the shared feedback store (counts only) and their
- * candidate is tiered `confidential`.
+ * dots keep prose out of the shared feedback store (counts only); the
+ * candidate is captured on the memory queue in the charter's own scope.
  */
 export async function distillDotMemory(
   c: DotCharter,
@@ -527,6 +527,7 @@ export async function distillDotMemory(
   const candidate = await (deps.recordFeedback ?? recordDistillFeedback)({
     dot_id: c.dot_id,
     tenant,
+    scope: c.scope,
     key,
     outcome: refuted.length > 0 ? 'dissatisfied' : 'satisfied',
     comment:

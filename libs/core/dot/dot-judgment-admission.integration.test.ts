@@ -18,6 +18,7 @@ let bootstrapIo: typeof import('../secure-io.js');
 let io: typeof import('../secure-io.js');
 let dispatch: typeof import('./dot-dispatch.js');
 let actions: typeof import('./dot-action-ledger.js');
+let schema: typeof import('./dot-action-ledger-version.js');
 let identity: typeof import('./dot-admission-identity.js');
 let workInput: typeof import('./dot-work-item.js');
 let coordination: typeof import('../workforce/work-coordination.js');
@@ -88,6 +89,7 @@ beforeAll(async () => {
     organization_id: 'synthetic-org',
   } as Parameters<typeof saveProjectRecord>[0]);
   dispatch = await import('./dot-dispatch.js');
+  schema = await import('./dot-action-ledger-version.js');
   actions = await import('./dot-action-ledger.js');
   identity = await import('./dot-admission-identity.js');
   workInput = await import('./dot-work-item.js');
@@ -126,7 +128,7 @@ function fixture() {
   const proposal = proposals.normalizeDotProposal({
     title: 'Synthetic bounded repair',
     objective: 'Keep the original 100-user goal',
-    work_shape: 'pipeline',
+    execution_shape: 'pipeline',
     pipeline_ref: latency.SYNTHETIC_LATENCY_PIPELINE_REF,
   });
   const judgmentBinding = {
@@ -465,7 +467,7 @@ describe('synthetic judgment binding propagation through actual admission and Wo
       if (condition === 'diagnostic') f.charter.runtime.execution_mode = 'front_desk_diagnostic';
       if (condition === 'paused') f.charter.status = 'paused';
       if (condition === 'pipeline-removed') f.charter.authority.allowed_pipelines = [];
-      if (condition === 'shape-removed') f.charter.authority.allowed_work_shapes = [];
+      if (condition === 'shape-removed') f.charter.authority.allowed_execution_shapes = [];
       const forged = {
         ...f.bound,
         semantic_judgment: {
@@ -491,7 +493,7 @@ describe('synthetic judgment binding propagation through actual admission and Wo
         action_id: forged.action_id,
         title: forged.title,
         objective: forged.objective,
-        work_shape: forged.work_shape,
+        execution_shape: forged.execution_shape,
         pipeline_ref: forged.pipeline_ref,
         proposal_hash: actions.dotProposalHash(f.id, forged),
         status: 'admitted',
@@ -530,7 +532,7 @@ describe('synthetic judgment binding propagation through actual admission and Wo
       else {
         const malformed: DotActionRecord = structuredClone(admitted);
         delete malformed.semantic_judgment;
-        json.writeJsonLines(file, [malformed]);
+        json.writeJsonLines(file, [schema.writtenDotActionRow(malformed)]);
         const index = actions
           .readDotActionLedger({ rootDir: root })
           .filter((row) => row.action_ref !== admitted.action_ref);
@@ -543,16 +545,16 @@ describe('synthetic judgment binding propagation through actual admission and Wo
           action_id: admitted.action_id,
           title: '[scoped action]',
           objective: '[scoped action]',
-          work_shape: admitted.work_shape,
+          execution_shape: admitted.execution_shape,
           status: admitted.status,
           proposal_hash: admitted.proposal_hash,
           at: admitted.at,
           work_item_id: admitted.work_item_id,
         };
-        json.writeJsonLines(path.join(root, actions.DOT_ACTION_LEDGER_PATH), [
-          ...index,
-          originalIndex,
-        ]);
+        json.writeJsonLines(
+          path.join(root, actions.DOT_ACTION_LEDGER_PATH),
+          [...index, originalIndex].map((row) => schema.writtenDotActionRow(row as DotActionRecord))
+        );
       }
       expect(() => f.recover()).toThrow();
       expect(f.items()).toEqual([]);

@@ -23,8 +23,13 @@ import { DOT_PROPOSE_TOOL_NAME, DOT_PROPOSALS_FENCE } from './dot-extensions.js'
 export { DOT_PROPOSE_TOOL_NAME, DOT_PROPOSALS_FENCE } from './dot-extensions.js';
 
 import type { ToolDefinition } from '../reasoning/reasoning-backend-contracts.js';
+import type { ExecutionShape } from '../contracts/execution-shape.js';
 
-export type DotWorkShape = 'mission' | 'task_session' | 'pipeline' | 'direct_reply';
+/** The ExecutionShape subset a dot may propose (ExecutionShape is the only execution vocabulary). */
+export type DotExecutionShape = Extract<
+  ExecutionShape,
+  'mission' | 'task_session' | 'pipeline' | 'direct_reply'
+>;
 export type DotDecisionLevel = 'auto' | 'notify' | 'approve';
 
 import {
@@ -48,7 +53,14 @@ export interface DotProposal {
   title: string;
   /** What the delegated worker (or receiving dot) should accomplish. */
   objective: string;
-  work_shape: DotWorkShape;
+  /** The ExecutionShape the dot asks for (formerly `work_shape`; the parser still reads that alias). */
+  execution_shape: DotExecutionShape;
+  /**
+   * In-memory marker set only by the ledger read-mapping (`dot-action-ledger-version.ts`) on a
+   * proposal admitted under action schema version 1, so it is hashed and written back
+   * exactly as stored (`work_shape`). Never persisted, never model-authored.
+   */
+  schema_version?: 1;
   rationale?: string;
   /** Repo-relative paths the work is expected to touch (high-risk paths force approve). */
   changed_paths?: string[];
@@ -105,7 +117,8 @@ export const MAX_DOT_PROPOSALS_PER_WAKE = 10;
 export const DOT_TASK_SESSION_UNAVAILABLE_GUIDANCE =
   'task_session is unavailable: no governed task-session executor is configured — propose a pipeline from your charter allowed_pipelines (pipeline_ref) or an advisory direct_reply, or ask the operator to do the work';
 
-const WORK_SHAPES: readonly DotWorkShape[] = [
+/** Every ExecutionShape a dot may propose. */
+export const DOT_EXECUTION_SHAPES: readonly DotExecutionShape[] = [
   'mission',
   'task_session',
   'pipeline',
@@ -128,9 +141,9 @@ export function buildDotProposeToolDefinition(): ToolDefinition {
           type: 'string',
           description: 'What the delegated worker should accomplish, with acceptance criteria.',
         },
-        work_shape: {
+        execution_shape: {
           type: 'string',
-          enum: [...WORK_SHAPES],
+          enum: [...DOT_EXECUTION_SHAPES],
           description:
             'Use a shape your charter allows (listed in your bounds): pipeline with an allowed pipeline_ref, or direct_reply for advice. task_session is refused while no task-session executor is configured.',
         },
@@ -170,7 +183,7 @@ export function buildDotProposeToolDefinition(): ToolDefinition {
         pipeline_ref: {
           type: 'string',
           description:
-            'Repo-relative pipeline to run (pipeline work_shape; must be allowed by your charter).',
+            'Repo-relative pipeline to run (pipeline execution_shape; must be allowed by your charter).',
         },
         expected_effect: {
           type: 'object',
@@ -189,7 +202,7 @@ export function buildDotProposeToolDefinition(): ToolDefinition {
         },
         intent: { type: 'string', enum: [...DOT_PROPOSAL_INTENTS] },
       },
-      required: ['title', 'objective', 'work_shape'],
+      required: ['title', 'objective', 'execution_shape'],
     },
   };
 }
@@ -213,12 +226,24 @@ export function normalizeDotProposal(value: unknown): DotProposal {
     throw new Error('semantic_judgment is reserved for server-authored synthetic references');
   if (Object.hasOwn(raw, 'information_asset_work'))
     throw new Error('information_asset_work is reserved for server-authored recipes');
+  if (Object.hasOwn(raw, 'schema_version'))
+    throw new Error('schema_version is reserved for the action ledger read-mapping');
+  // Deprecated alias, read for one release: a model (or stored v1 proposal) may still
+  // name the key `work_shape`. Both present and different is ambiguous and refused.
+  if (
+    Object.hasOwn(raw, 'work_shape') &&
+    Object.hasOwn(raw, 'execution_shape') &&
+    raw.work_shape !== raw.execution_shape
+  )
+    throw new Error('execution_shape and its deprecated alias work_shape differ');
+  const executionShape = Object.hasOwn(raw, 'execution_shape')
+    ? raw.execution_shape
+    : raw.work_shape;
   const missionAdmission = parseMissionAdmissionRequest(raw.mission_admission);
-  if (missionAdmission && (raw.work_shape !== 'mission' || raw.handoff_to))
+  if (missionAdmission && (executionShape !== 'mission' || raw.handoff_to))
     throw new Error('mission_admission requires direct mission work');
-  const workShape = raw.work_shape;
-  if (!WORK_SHAPES.includes(workShape as DotWorkShape)) {
-    throw new Error(`work_shape must be one of ${WORK_SHAPES.join(', ')}`);
+  if (!DOT_EXECUTION_SHAPES.includes(executionShape as DotExecutionShape)) {
+    throw new Error(`execution_shape must be one of ${DOT_EXECUTION_SHAPES.join(', ')}`);
   }
   const requested = raw.requested_decision;
   if (requested !== undefined && !DECISIONS.includes(requested as DotDecisionLevel)) {
@@ -269,7 +294,7 @@ export function normalizeDotProposal(value: unknown): DotProposal {
     ...(missionAdmission ? { mission_admission: missionAdmission } : {}),
     title: text(raw.title, 'title', 200),
     objective: text(raw.objective, 'objective'),
-    work_shape: workShape as DotWorkShape,
+    execution_shape: executionShape as DotExecutionShape,
     ...(optionalText(raw.rationale) ? { rationale: optionalText(raw.rationale) } : {}),
     ...(changedPaths?.length ? { changed_paths: changedPaths } : {}),
     ...(requested ? { requested_decision: requested as DotDecisionLevel } : {}),
@@ -330,14 +355,14 @@ export function dotProposalInstructions(mode: 'tool' | 'fence'): string {
   const how =
     mode === 'tool'
       ? `Call the ${DOT_PROPOSE_TOOL_NAME} tool once per action you want taken.`
-      : `End your reply with a fenced block \`\`\`${DOT_PROPOSALS_FENCE}\n[{"title": "...", "objective": "...", "work_shape": "direct_reply"}]\n\`\`\` listing every action you want taken (an empty array when none).`;
+      : `End your reply with a fenced block \`\`\`${DOT_PROPOSALS_FENCE}\n[{"title": "...", "objective": "...", "execution_shape": "direct_reply"}]\n\`\`\` listing every action you want taken (an empty array when none).`;
   return [
     'You do not act directly. Every action is a proposal that the runtime governs:',
     'it is scored by the autonomous-ops gate, raised to your charter decision floor, and then',
     'delegated as a WorkItem, sent to the operator for a decision, or refused.',
     how,
     'Use handoff_to to give work to another dot that accepts your handoffs.',
-    'Use only a work_shape your bounds allow. Prefer pipeline (with an allowed pipeline_ref) for effects and direct_reply for analysis or advice; task_session is refused while no task-session executor is configured.',
+    'Use only an execution_shape your bounds allow. Prefer pipeline (with an allowed pipeline_ref) for effects and direct_reply for analysis or advice; task_session is refused while no task-session executor is configured.',
     'For pipeline work set pipeline_ref (it must be one your charter allows). Set expected_effect (kr_id or signal, direction) so the outcome is measured, and target + intent so conflicting proposals from other dots are arbitrated.',
   ].join('\n');
 }

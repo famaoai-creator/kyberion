@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import { appendJsonLine } from '../foundation/json.js';
 import { jsonlFileSize, streamJsonLines } from '../storage/jsonl-read.js';
 import { maintainStoreAfterAppend } from '../storage/append-only-store.js';
@@ -72,7 +73,7 @@ function queueRecordCatalog(filePath: string) {
 
 export interface AgentInputQueueOptions {
   missionId: string;
-  tier?: 'personal' | 'confidential' | 'public';
+  tier?: StorageDataTier;
   tenantSlug?: string;
   /** Test/embedding seam; production defaults to mission-local coordination. */
   queuePath?: string;
@@ -115,7 +116,7 @@ export interface SurfaceAgentInput {
   text: string;
   surface: string;
   /** Optional explicit mission visibility scope; defaults to the resolved mission scope. */
-  tier?: 'personal' | 'confidential' | 'public';
+  tier?: StorageDataTier;
   tenantSlug?: string;
   channel?: string;
   threadTs?: string;
@@ -743,7 +744,7 @@ function registryEntryStillRegistered(
 /** Register a process-local wake handler for a durable mission next_run lane. */
 export function registerMissionAgentInputWorker(input: {
   missionId: string;
-  tier?: 'personal' | 'confidential' | 'public';
+  tier?: StorageDataTier;
   tenantSlug?: string;
   queuePath?: string;
   scope?: AgentInputQueueScope;

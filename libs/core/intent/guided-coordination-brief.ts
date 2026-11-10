@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import type { ValidateFunction } from 'ajv';
 import { pathResolver } from '../path-resolver.js';
 import { compileSchema } from '../foundation/ajv.js';
@@ -28,7 +29,7 @@ export interface GuidedCoordinationBriefSeed {
     | 'decision_support'
     | 'service_operation'
     | 'general';
-  tier?: 'personal' | 'confidential' | 'public';
+  tier?: StorageDataTier;
   locale?: string;
   preferenceProfileRefs?: string[];
   summaryHint?: string;

@@ -173,7 +173,7 @@ describe('MOS no-write-API contract', () => {
       safeReadFile(path.join(SRC, 'lib/selection-service.ts'), { encoding: 'utf8' })
     );
     expect(service).toContain('isGlobalSelectionAdmin(viewer)');
-    expect(service).toContain("withExecutionContextAsync('reasoning_settings_writer'");
+    expect(service).toContain("withStoreGrantAsync('reasoning_settings_writer'");
     expect(service).not.toContain("withExecutionContextAsync('ecosystem_architect'");
     expect(service).toContain('requireSelectionMission(viewer, id)');
     expect(service).toContain('expected_scope: missionScope(state)');

@@ -38,18 +38,40 @@ describe('sync_authority_roles', () => {
       'knowledge/product/governance/authority-role-index.json'
     );
     const snapshotRoles = snapshot.authority_roles || {};
+    const cards = files.map((file) =>
+      readJson<{ role?: string; assignable?: boolean; [key: string]: unknown }>(
+        `knowledge/product/governance/authority-roles/${file}`
+      )
+    );
+    const assignable = cards.filter((card) => card.assignable !== false);
     expect(Object.keys(snapshotRoles).sort()).toEqual(
-      files.map((file) => file.replace(/\.json$/i, '')).sort()
+      assignable.map((card) => String(card.role)).sort()
     );
 
-    for (const file of files) {
-      const payload = readJson<{ role?: string; [key: string]: unknown }>(
-        `knowledge/product/governance/authority-roles/${file}`
-      );
-      expect(payload.role).toBe(file.replace(/\.json$/i, ''));
+    for (const [index, payload] of cards.entries()) {
+      expect(payload.role).toBe(files[index]!.replace(/\.json$/i, ''));
+      if (payload.assignable === false) {
+        expect(snapshotRoles[payload.role!]).toBeUndefined();
+        continue;
+      }
       expect(snapshotRoles[payload.role!]).toBeDefined();
-      const { role, ...record } = payload;
+      const { role, permissions, ...record } = payload;
       expect(record).toEqual(snapshotRoles[payload.role!]);
     }
+  });
+
+  it('projects every card permission verbatim into security-policy.json', () => {
+    const dir = path.join(rootDir, 'knowledge/product/governance/authority-roles');
+    const expected: Record<string, unknown> = {};
+    for (const file of safeReaddir(dir).filter((entry) => entry.endsWith('.json'))) {
+      const card = readJson<{ role: string; permissions?: unknown }>(
+        `knowledge/product/governance/authority-roles/${file}`
+      );
+      if (card.permissions) expected[card.role] = card.permissions;
+    }
+    const policy = readJson<{ authority_role_permissions?: Record<string, unknown> }>(
+      'knowledge/product/governance/security-policy.json'
+    );
+    expect(policy.authority_role_permissions).toEqual(expected);
   });
 });

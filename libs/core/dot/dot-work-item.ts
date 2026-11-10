@@ -1,5 +1,6 @@
 import { dotGoalRefLabel, type DotCharter } from './dot-charter.js';
 import { assertDotActionJudgmentBinding, type DotActionRecord } from './dot-action-ledger.js';
+import { dotActionRecordSchemaVersion } from './dot-action-ledger-version.js';
 import { parseDotJudgmentBinding } from './dot-judgment-binding.js';
 import type { CreateWorkItemInput, WorkItem } from '../workforce/work-coordination-types.js';
 import { buildWorkItemCreation } from '../workforce/work-coordination-identity.js';
@@ -16,7 +17,7 @@ function workItemDescription(charter: DotCharter, record: DotActionRecord): stri
     record.objective,
     charter.work_binding ? `Organization operation: ${charter.work_binding.operation_id}` : '',
     record.rationale ? `\nRationale: ${record.rationale}` : '',
-    `\nProposed by ${'dot:' + charter.dot_id} (${charter.title}) under role ${charter.authority.authority_role}; requested shape: ${record.work_shape}; decision: ${record.decision ?? 'n/a'}.`,
+    `\nProposed by ${'dot:' + charter.dot_id} (${charter.title}) under role ${charter.authority.authority_role}; requested shape: ${record.execution_shape}; decision: ${record.decision ?? 'n/a'}.`,
     dotGoalRefLabel(charter) ? `Contributes to: ${dotGoalRefLabel(charter)}` : '',
   ]
     .filter(Boolean)
@@ -132,7 +133,11 @@ export function dotWorkItemInput(
       actor_id: actor,
       action_ref: record.action_ref,
       action_id: record.action_id,
-      requested_work_shape: record.work_shape,
+      // Key follows the action schema version so a WorkItem created from a version-1
+      // action keeps its original immutable envelope (readers accept both for one release).
+      [dotActionRecordSchemaVersion(record) === 1
+        ? 'requested_work_shape'
+        : 'requested_execution_shape']: record.execution_shape,
       authority_role: charter.authority.authority_role,
       ...(record.decision ? { decision: record.decision } : {}),
       ...(record.request_id ? { approval_request_id: record.request_id } : {}),

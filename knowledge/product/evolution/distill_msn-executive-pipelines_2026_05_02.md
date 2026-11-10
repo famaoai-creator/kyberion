@@ -6,6 +6,7 @@ importance: 5
 source_mission: MSN-EXECUTIVE-PIPELINES
 author: Kyberion Wisdom Distiller
 last_updated: 2026-05-02
+doc_status: historical
 ---
 
 # Executive ADF Pipelines with Environment-Resilient Validation

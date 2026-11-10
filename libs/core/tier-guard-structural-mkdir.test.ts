@@ -18,8 +18,11 @@ import {
   safeWriteFile,
 } from './secure-io.js';
 import { executeSurfaceManagementMutation } from './surface/surface-management-mutations.js';
+import { asRoleOrGrant } from './testing/role-or-store-grant.js';
 
-vi.mock('./governance/audit-chain.js', () => ({ auditChain: { record: vi.fn() } }));
+vi.mock('./governance/audit-chain.js', () => ({
+  auditChain: { record: vi.fn(), recordDurable: vi.fn() },
+}));
 vi.mock('./governance/policy-engine.js', () => ({
   policyEngine: { evaluate: () => ({ allowed: true }) },
 }));
@@ -57,7 +60,7 @@ function capability(patch: Partial<ResourceAccessScope> = {}): ResourceAccessSco
 }
 function writer<T>(fn: () => T, patch: Partial<ResourceAccessScope> = {}): T {
   return runInResourceAccessScope(capability(patch), () =>
-    withExecutionContext('concierge_management_writer', fn, undefined, TENANT, ORG)
+    asRoleOrGrant('concierge_management_writer', fn, undefined, TENANT, ORG)
   );
 }
 function profile(status: string): void {
@@ -246,7 +249,7 @@ describe('scoped creation of missing structural tenant parents', () => {
       );
     });
     expect(() =>
-      withExecutionContext('concierge_management_writer', () => null, undefined, TENANT, ORG)
+      asRoleOrGrant('concierge_management_writer', () => null, undefined, TENANT, ORG)
     ).toThrow(/RESOURCE_SCOPE_REQUIRED/);
   });
 

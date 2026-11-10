@@ -107,7 +107,7 @@ function seedActiveAgent(slug: string): string {
   const record_ = withExecutionContext('mission_controller', () => {
     const issued = issueAgentIdentity({
       kind: 'agent',
-      organizationId: 'default',
+      // No tenant in scope: a tenantless identity (D3 `_/_`, no 'default' org).
       slug,
       accountableHumanId: 'user:founder',
     });

@@ -60,7 +60,9 @@ const PEER_SECRETS: Record<string, string> = {
   KYBERION_PEER_SHARED_SECRET: 'conformance-peer-secret',
   KYBERION_PEER_SHARED_SECRET_NEXT: 'conformance-peer-secret-next',
   MISSION_ID: 'MSN-CONFORMANCE',
-  MISSION_ROLE: 'peer_responder_reader',
+  // A parent role with ordinary worker I/O. S4: peer_responder_reader is a declared
+  // store grant now; a process running as its name through env gets no I/O at all.
+  MISSION_ROLE: 'software_developer',
 };
 
 /**

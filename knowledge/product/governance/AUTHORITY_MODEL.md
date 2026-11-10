@@ -1,6 +1,6 @@
 ---
 title: 'Authority, Role & Persona Model (v3.0)'
-last_updated: 2026-11-01
+last_updated: 2026-11-10
 ---
 
 # Authority, Role & Persona Model (v3.0)
@@ -71,6 +71,8 @@ Kyberion 自体のメンテナンス。
 - **analyst**: MISSION モード。ナレッジ読み取りと蒸留書き込みに特化。
 - **unknown**: 未解決。ほとんどの書き込みが拒否される。
 
+**Persona の権限は base Authority Role（S4 の 4 つ目）**: `sovereign` / `ecosystem_architect` / `worker` / `analyst` が持つパスの権限は、レジストリの base Authority Role `base_sovereign` / `base_ecosystem_architect` / `base_worker` / `base_analyst`（`authority-roles/base_<persona>.json`、`"assignable": false`）にあり、`pnpm kyberion sync authority-roles` が `authority_role_permissions` へ写します。以前の `security-policy.json` の `persona_permissions` の中身をそのまま移しました。tier-guard はプリンシパルの persona が指す base role の権限を、自分のロールと authority の権限に足します（`libs/core/foundation/base-authority-role.ts`）。判定は前後で同じです（`libs/core/testing/base-authority-role-equivalence.test.ts`、基準は `tests/fixtures/base-authority-role-equivalence.json`）。base role は自分のロールにはなりません。`withExecutionContext('base_…')` は拒否し、`MISSION_ROLE` / `SYSTEM_ROLE` でその名前として動いても何も得ません。`mission_owner` と `unknown` には base role がありません。base role を持たない古いインストール先の catalog は、1 リリースの間だけ `persona_permissions` から読みます。宣言された許可証の `persona` の項目は `baseRole`（`base_worker`）になりました。
+
 ### B. Authority Role (機能ロール)
 
 `MISSION_ROLE` として注入され、`security-policy.json` の `authority_role_permissions` と対応します。
@@ -81,7 +83,19 @@ Kyberion 自体のメンテナンス。
 - **mission_roles** (5): `mission_controller`, `software_developer`, `sovereign_concierge`, `incident_commander`, `performance_engineer`
 - **context_roles** (16): `ceo`, `business_owner`, `product_manager` など。Authority Role はなく、ナレッジ上の責務定義のみ。
 
-Authority role definitions: `knowledge/product/governance/authority-roles/*.json`
+Authority role definitions: `knowledge/product/governance/authority-roles/*.json`（唯一のレジストリ）。カードには役割の説明・`tier_access` などのプロフィールと、パスの許可 `permissions` を書きます。`authority-role-index.json`（割り当てできるロールの一覧）と `security-policy.json` の `authority_role_permissions` は、`pnpm kyberion sync authority-roles` がカードから生成します。手で編集せず、カードを直してから再生成します。食い違いは `governance-rules` のゲートが止めます。`"assignable": false` のカードはスクリプトやサービスが引き受けるだけのプロセスロールで、チーム・組織・dot には割り当てられません。
+
+### B3. 保存先の許可証（store grants、S4）
+
+保存先 1 つ（または決まった数個）だけを読み書きするための専用ロールは、Authority Role ではなく **保存先の許可証（declared store grant）** になりました（[Concept Model v2 D6](../architecture/decisions/2026-11-10-concept-model-v2.md)）。
+
+- 宣言は `security-policy.json` の `store_grants.<name>`（`allow_read` / `allow_write` / `deny_read` / `deny_read_descendants` / `narrow`）、名前の一覧は `libs/core/foundation/declared-store-grant.ts` の `DECLARED_STORE_GRANTS` です。カード、`authority-role-index.json`、`authority_role_permissions` には載りません。
+- 発行するのは保存先の窓口だけです。窓口は `withStoreGrant(name, fn, { tenantSlug, organizationId })`（非同期は `withStoreGrantAsync`）で許可証を開きます。発行の条件は以前のロールの引き受けと同じです（RA-02。名前は `role-assumption-policy.json` に発行の権利として残る。tenant に束縛する許可証は、明示した tenant が呼び出し元の有効な tenant と一致する必要がある）。
+- 許可証が開いている間だけ、その宣言が判定に使われます。`withExecutionContext(name)` は `[ROLE_ASSUMPTION_DENIED]` で拒否し、`SYSTEM_ROLE` / `MISSION_ROLE` / 委譲された環境変数でその名前として動くプロセスや、許可証の中から起動した子プロセスは、I/O が一切できません（`[STORE_GRANT_REQUIRED]`）。以前のロールより狭くなる側の、意図した違いです。
+- 横断して読む許可証（`disclosure`：`workspace_graph_reader`、`concierge_management_reader`、`peer_responder_reader`）は、開くたびに監査チェーンへ `store_grant.disclosure` を記録します。記録できなければ開きません。自分の正確な上限（resource ceiling）の中で開く窓口は、上限に入る前に `recordStoreGrantDisclosure` で記録し、1 回だけ使える受領を渡します。呼び出し元がすでに上限の中にいても記録します。記録（許可証の名前、主体、束縛した範囲、操作。tenant の中身は含みません）はシステムの範囲の記録です。tenant の印を付けず（束縛した tenant と呼び出し元の tenant はメタデータに入れる）、台帳本体だけに入り、tenant ごとの写しには入りません。監査チェーン自身の書き手が呼び出し元の上限の外で追記し（`auditChain.recordDurable`）、残せなければ読みません。呼び出し元の I/O は上限の中のままです。
+- 別のインストール先へ写すとき（`pnpm organization role migrate-publication-store`）は、`store_grants` の宣言と発行の権利だけを写します。ロールのカード、権限、索引の項目は写しません。実行するコードが宣言していない名前は写しません。
+- 名前は新しいロールに使えません（`pnpm organization role create` が予約する）。同じ名前のロールの項目があっても、許可証の宣言は変わりません。
+- 移行の前後で判定が同じことは `libs/core/testing/store-grant-equivalence.test.ts`（基準は `tests/fixtures/store-grant-equivalence.json`）が (呼び出し元, パス, 操作) の表で確かめます。
 
 ### B2. ロールの解決順序とロール引き受けポリシー (RA-01 / RA-02)
 

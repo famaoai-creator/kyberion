@@ -2,6 +2,7 @@
  * libs/core/mission/mission-state.ts
  * State management and prerequisite validation for missions.
  */
+import type { StorageDataTier } from '../storage-layout.js';
 import { KNOWLEDGE_TIER_RANK } from '../foundation/knowledge-tier.js';
 import {
   MISSION_IDENTITY_FILES,
@@ -41,7 +42,11 @@ import { loadMissionManagementConfig } from './mission-management-config.js';
 import '../governance/owner-scope.js';
 import { boundTenant, missionTierScanDirs } from '../governance/owner-scope.js';
 import { readOrNullOnMissionRefusal } from './mission-lookup.js';
-import { loadMissionStateAtPath, writeMissionStateAtPath } from './mission-state-reader.js';
+import {
+  loadMissionStateAtPath,
+  normalizeMissionStateRecord,
+  writeMissionStateAtPath,
+} from './mission-state-reader.js';
 let missionStateValidate: ReturnType<typeof compileSchema> | undefined;
 const MISSION_FOCUS_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/mission-focus.schema.json'
@@ -189,7 +194,7 @@ export function checkPrerequisites(): void {
 }
 
 export interface KnowledgeInjectionDeclaration {
-  tier: 'personal' | 'confidential' | 'public';
+  tier: StorageDataTier;
   project?: string;
   domains?: string[];
   tags?: string[];
@@ -203,11 +208,11 @@ export interface KnowledgeInjectionDeclaration {
 export function calculateRequiredTier(
   injections: KnowledgeInjectionDeclaration[] = [],
   requestedTier?: string
-): 'personal' | 'confidential' | 'public' {
+): StorageDataTier {
   const tierWeight: Readonly<Record<string, number>> = KNOWLEDGE_TIER_RANK;
 
   let maxWeight = requestedTier ? (tierWeight[requestedTier] ?? 0) : 0;
-  let currentTier: 'personal' | 'confidential' | 'public' = (requestedTier as any) || 'public';
+  let currentTier: StorageDataTier = (requestedTier as any) || 'public';
 
   for (const injection of injections) {
     const tier = injection.tier;
@@ -364,7 +369,7 @@ export function loadStateForRepair(
   if (!safeExistsSync(statePath)) return null;
   try {
     if (!safeLstat(statePath).isFile()) return null;
-    return readJson<MissionState>(statePath);
+    return normalizeMissionStateRecord(readJson<MissionState>(statePath));
   } catch (_) {
     return null;
   }

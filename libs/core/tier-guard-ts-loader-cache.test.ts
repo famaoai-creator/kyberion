@@ -35,7 +35,6 @@ const ENV_KEYS = [
 ] as const;
 
 type Policy = {
-  persona_permissions: Record<string, unknown>;
   authority_role_permissions: Record<string, unknown>;
 };
 
@@ -70,7 +69,10 @@ describe('private host caches (ts-loader, STT discovery) are not writable by gov
   });
 
   it('denies every persona', () => {
-    const personas = Object.keys(policy.persona_permissions);
+    // S4 slice 4: the persona bundles are the base Authority Roles base_<persona>.
+    const personas = Object.keys(policy.authority_role_permissions)
+      .filter((role) => role.startsWith('base_'))
+      .map((role) => role.slice('base_'.length));
     expect(personas.length).toBeGreaterThan(3);
     const allowed = personas.filter((persona) => {
       process.env.KYBERION_PERSONA = persona;

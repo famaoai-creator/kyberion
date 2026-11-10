@@ -128,6 +128,34 @@ function normalizeCount(value: unknown): number {
   return typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0;
 }
 
+/**
+ * The catalog-floor rule that promotes a shape by itself: a promoting rule whose
+ * only condition is `minimum_catalog_shapes`. work-scope-policy.json is the only
+ * place that names which execution shapes are durable (mission-scoped).
+ */
+function findCatalogFloorRule(shape: ExecutionShape, policy: WorkScopePolicy) {
+  return policy.rules.find(
+    (rule) =>
+      rule.promotion_required &&
+      rule.when?.minimum_catalog_shapes?.includes(shape) &&
+      rule.when.mandatory_trigger_present === undefined &&
+      rule.when.accumulation_trigger_count_at_least === undefined
+  );
+}
+
+/**
+ * Promotion verdict for a catalog shape alone (no triggers): does
+ * work-scope-policy.json make this shape mission scope? Every component that
+ * needs to know whether a shape is durable reads this instead of keeping its
+ * own list (concept model v2, D7).
+ */
+export function catalogShapePromotesToMission(
+  shape: string | undefined,
+  policy: WorkScopePolicy = loadWorkScopePolicy()
+): boolean {
+  return Boolean(findCatalogFloorRule(normalizeExecutionShape(shape), policy));
+}
+
 type MandatoryTriggerEmitter = (input: WorkScopeDecisionInput) => boolean;
 
 /**
@@ -187,12 +215,7 @@ function shouldPromoteToMission(input: {
   accumulationTriggers: string[];
   policy: WorkScopePolicy;
 }): boolean {
-  if (
-    input.minimumCatalogShape === 'mission' ||
-    input.minimumCatalogShape === 'project_bootstrap'
-  ) {
-    return true;
-  }
+  if (catalogShapePromotesToMission(input.minimumCatalogShape, input.policy)) return true;
   if (input.mandatoryTriggers.length > 0) return true;
   return input.accumulationTriggers.length >= input.policy.defaults.accumulation_trigger_threshold;
 }
@@ -220,11 +243,9 @@ function pickRuleIds(input: {
     return minimumCatalogShapeMatches && mandatoryMatches && accumulationMatches;
   });
 
-  if (
-    input.minimumCatalogShape === 'mission' ||
-    input.minimumCatalogShape === 'project_bootstrap'
-  ) {
-    matchedRuleIds.push('catalog-floor');
+  const floorRule = findCatalogFloorRule(input.minimumCatalogShape, input.policy);
+  if (floorRule) {
+    matchedRuleIds.push(floorRule.id);
   }
   if (input.mandatoryTriggers.length > 0) {
     matchedRuleIds.push('mandatory-trigger-promotion');

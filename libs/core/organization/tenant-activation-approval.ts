@@ -5,7 +5,7 @@ import { z } from 'zod';
 import type { ResolvedPrincipal } from '../authn/authn-principal-resolver.js';
 import { humanActor } from '../contracts/actor.js';
 import { getAgentIdentity } from '../agent/agent-identity.js';
-import { parseNhiId } from '../contracts/nhi-id.js';
+import { nhiIdBelongsToOrganization } from '../contracts/nhi-id.js';
 import { acquireLock, releaseLock } from '../foundation/lock-utils.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import { isRecord, readTextFile } from '../foundation/text.js';
@@ -290,11 +290,9 @@ function snapshotState(
     rootDir,
   });
   const nhi = command.nhiIds.map((id) => {
-    const parsed = parseNhiId(id);
     const identity = getAgentIdentity(id);
     if (
-      !parsed ||
-      parsed.organization_id !== command.organizationId ||
+      !nhiIdBelongsToOrganization(id, command.tenantSlug, command.organizationId) ||
       !identity ||
       !['active', 'provisioned'].includes(identity.lifecycle_status) ||
       identity.affiliation.organization_id !== command.organizationId ||

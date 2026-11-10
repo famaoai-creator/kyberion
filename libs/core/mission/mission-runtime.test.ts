@@ -93,7 +93,7 @@ describe('mission-runtime organization defaults', () => {
       mission_type: 'development',
       tier: 'public',
       priority: 3,
-      assigned_persona: 'operator',
+      org_role: 'operator',
       confidence_score: 1,
       relationships: {},
       git: {

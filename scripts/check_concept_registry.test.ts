@@ -14,6 +14,7 @@ import {
   collectHeadings,
   listArchitectureDocs,
   createCheckoutView,
+  foldMultilineList,
   headingSlug,
   pruneBaseline,
   splitQualifiedHeading,
@@ -133,6 +134,23 @@ describe('markdown helpers', () => {
     expect(splitQualifiedHeading('Mission')).toEqual({ base: 'mission' });
   });
 
+  it('folds multi-line concepts lists and rejects anything else', () => {
+    const fm = (body: string) => `---\ntitle: T\n${body}\n---\n# T\n`;
+    expect(foldMultilineList(fm('concepts:\n  [\n    a,\n    b,\n  ]'), 'concepts')).toBe(
+      '[ a, b, ]'
+    );
+    expect(foldMultilineList(fm('concepts:\n  [a, b]').replace(/\n/g, '\r\n'), 'concepts')).toBe(
+      '[a, b]'
+    );
+    expect(foldMultilineList(fm('concepts:\n  - a\n  - "b"\nother: x'), 'concepts')).toBe(
+      '[a, "b"]'
+    );
+    expect(foldMultilineList(fm('concepts:\n- a\n- b'), 'concepts')).toBe('[a, b]');
+    expect(foldMultilineList(fm('concepts:\n  just prose'), 'concepts')).toBeUndefined();
+    expect(foldMultilineList(fm('concepts:'), 'concepts')).toBeUndefined();
+    expect(foldMultilineList(fm('concepts.x:\n  [a]'), 'concepts')).toBeUndefined();
+  });
+
   it('reads the contributor vocabulary table only', () => {
     const rows = collectContributorVocabulary(GLOSSARY_OK + '\n| Other | not in table |');
     expect([...rows.keys()]).toEqual(['workitem']);
@@ -159,6 +177,122 @@ describe('validateRegistry (C1)', () => {
       memoryView(baseFiles)
     );
     expect(failures.join('\n')).toMatch(/"Work Item" is claimed by both work-item and work-unit/);
+  });
+
+  it('accepts transitioning and deprecated terms that cite a decision and a plan', () => {
+    const view = memoryView({ ...baseFiles, 'adr.md': '# adr\n\n## Lease\n', 'plan.md': '# plan' });
+    expect(
+      validateRegistry(
+        registry([
+          {
+            id: 'lease',
+            term: 'Lease',
+            category: 'governance',
+            definition: 'x',
+            glossary_anchor: 'lease',
+            canonical_doc: 'docs/GLOSSARY.md',
+            lifecycle: { state: 'transitioning', decision: 'adr.md#lease', plan: 'plan.md' },
+          },
+          {
+            id: 'old-lease',
+            term: 'Old Lease',
+            category: 'governance',
+            definition: 'x',
+            glossary_anchor: 'old-lease',
+            canonical_doc: 'docs/GLOSSARY.md',
+            lifecycle: { state: 'deprecated', decision: 'adr.md', replaced_by: ['lease'] },
+          },
+        ]),
+        view
+      )
+    ).toEqual([]);
+  });
+
+  it('rejects lifecycles without evidence or with dangling replacements', () => {
+    const failures = validateRegistry(
+      registry([
+        {
+          id: 'moving',
+          term: 'Moving',
+          category: 'scope',
+          definition: 'x',
+          glossary_anchor: 'moving',
+          canonical_doc: 'docs/GLOSSARY.md',
+          lifecycle: { state: 'transitioning', decision: 'missing-adr.md' },
+        },
+        {
+          id: 'gone',
+          term: 'Gone',
+          category: 'scope',
+          definition: 'x',
+          glossary_anchor: 'gone',
+          canonical_doc: 'docs/GLOSSARY.md',
+          lifecycle: { state: 'deprecated', decision: 'docs/GLOSSARY.md', replaced_by: ['gone2'] },
+        },
+        {
+          id: 'gone2',
+          term: 'Gone2',
+          category: 'scope',
+          definition: 'x',
+          glossary_anchor: 'gone2',
+          canonical_doc: 'docs/GLOSSARY.md',
+          lifecycle: { state: 'deprecated', decision: 'docs/GLOSSARY.md', replaced_by: ['nobody'] },
+        },
+        {
+          id: 'stray',
+          term: 'Stray',
+          category: 'scope',
+          definition: 'x',
+          glossary_anchor: 'stray',
+          canonical_doc: 'docs/GLOSSARY.md',
+          lifecycle: {
+            state: 'transitioning',
+            decision: 'docs/GLOSSARY.md',
+            plan: 'docs/GLOSSARY.md',
+            replaced_by: ['gone'],
+          },
+        },
+      ]),
+      memoryView(baseFiles)
+    ).join('\n');
+    expect(failures).toMatch(/moving lifecycle\.decision does not exist/);
+    expect(failures).toMatch(/moving is transitioning — name the migration plan/);
+    expect(failures).toMatch(/gone replaced_by gone2, which is itself deprecated/);
+    expect(failures).toMatch(/gone2 replaced_by unknown id nobody/);
+    expect(failures).toMatch(/stray lists replaced_by but is not deprecated/);
+  });
+
+  it('rejects a lifecycle anchor that names no heading', () => {
+    const view = memoryView({
+      ...baseFiles,
+      'adr.md': '# ADR\n\n## D1 — Real\n',
+      'plan.md': '# p',
+    });
+    const failures = validateRegistry(
+      registry([
+        {
+          id: 'moving',
+          term: 'Moving',
+          category: 'scope',
+          definition: 'x',
+          glossary_anchor: 'moving',
+          canonical_doc: 'docs/GLOSSARY.md',
+          lifecycle: { state: 'transitioning', decision: 'adr.md#d9--renamed', plan: 'plan.md' },
+        },
+        {
+          id: 'fine',
+          term: 'Fine',
+          category: 'scope',
+          definition: 'x',
+          glossary_anchor: 'fine',
+          canonical_doc: 'docs/GLOSSARY.md',
+          lifecycle: { state: 'transitioning', decision: 'adr.md#d1--real', plan: 'plan.md' },
+        },
+      ]),
+      view
+    ).join('\n');
+    expect(failures).toMatch(/moving lifecycle\.decision has no heading #d9--renamed/);
+    expect(failures).not.toMatch(/fine/);
   });
 
   it('rejects missing canonical docs, owner modules and unknown confusion ids', () => {
@@ -286,6 +420,24 @@ describe('architecture concepts ratchet (C6)', () => {
     expect(failures).toMatch(/fresh.md: new architecture docs must declare concepts/);
     expect(failures).toMatch(/typo.md: concepts lists unregistered id "stanse"/);
     expect(failures).not.toMatch(/legacy.md/);
+  });
+
+  it('reads prettier-wrapped flow lists and block lists as concepts', () => {
+    const baseline: ConceptRegistryBaseline = {
+      version: 1,
+      architecture_docs_without_concepts: [],
+    };
+    const view = memoryView({
+      ...baseFiles,
+      [`${ARCHITECTURE_ROOT}/wrapped.md`]:
+        '---\ntitle: W\nconcepts:\n  [\n    stance,\n    work-item,\n  ]\n---\n',
+      [`${ARCHITECTURE_ROOT}/block.md`]: '---\ntitle: B\nconcepts:\n  - stance\n  - stanse\n---\n',
+      [`${ARCHITECTURE_ROOT}/prose.md`]: '---\ntitle: P\nconcepts:\n  stance and more\n---\n',
+    });
+    const failures = checkArchitectureConcepts(registry(), baseline, view).join('\n');
+    expect(failures).not.toMatch(/wrapped.md/);
+    expect(failures).toMatch(/block.md: concepts lists unregistered id "stanse"/);
+    expect(failures).toMatch(/prose.md: concepts must be an inline list/);
   });
 
   it('fails on stale baseline entries and prunes them without adding any', () => {

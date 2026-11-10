@@ -17,7 +17,7 @@ import { buildAgentActivityBoard } from '@agent/core/agent/agent-activity-board'
 import { listAgentRuntimeSnapshots } from '@agent/core/agent/agent-runtime-supervisor';
 import { resolveCompany } from '@agent/core/company';
 import { getRegisteredEnvText } from '@agent/core/foundation';
-import { withExecutionContext } from '@agent/core/authority';
+import { withStoreGrant } from '@agent/core/authority';
 import { listMissionsInSearchDirs, loadState } from '@agent/core/mission/mission-state';
 import { readOrNullOnMissionRefusal } from '@agent/core/mission-lookup';
 import type { MissionState } from '@agent/core/mission/mission-types';
@@ -402,15 +402,14 @@ export function collectHomeDashboard(
   const authorization = toSurfaceAuthorizationContext(viewer);
   const missions = (() => {
     try {
-      const states = withExecutionContext(
+      const states = withStoreGrant(
         WORKSPACE_GRAPH_READER_ROLE,
         () =>
           listMissionsInSearchDirs().flatMap(({ missionId }): MissionState[] => {
             const state = readOrNullOnMissionRefusal(() => loadState(missionId));
             return state ? [state] : [];
           }),
-        undefined,
-        ''
+        { tenantSlug: '' }
       );
       return projectMissionHistoryItems(states, [], { limit: 100_000 }).filter(
         (mission) =>

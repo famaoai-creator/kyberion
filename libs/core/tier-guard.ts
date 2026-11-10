@@ -2,6 +2,12 @@ import { engineRuntimeResourceAccessDenial as resourceAccessDenial } from './voi
 import { isMemoryProvenanceStatePath } from './knowledge/memory-provenance-capability.js';
 import { RETIRED_STORE_ROLE_NAMES } from './foundation/retired-store-roles.js';
 import {
+  isDeclaredStoreGrantName,
+  liveDeclaredStoreGrant,
+  rolePermissionRecord,
+} from './foundation/declared-store-grant.js';
+import { baseAuthorityRolePermissionRecord } from './foundation/base-authority-role.js';
+import {
   storeGrantAuthorizes as registeredStoreGrantAuthorizes,
   storeGrantNarrowingDenial,
   storeGrantRule,
@@ -27,6 +33,7 @@ import { rawExistsSync, rawReadTextFile, rawRealpathSync } from './fs-primitives
 import { resolveProjectScope, resolveProjectScopeId } from './foundation/project-scope-env.js';
 import { resolvePolicyIdentityContext } from './foundation/identity-context.js';
 import { createLogger, emitConsoleLine } from './logger.js';
+import { STANCE_SLUG_PATTERN, stanceSlugFromEnv } from './authn/stance-env.js';
 import type { AuditEntry } from './governance/audit-chain.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import {
@@ -271,10 +278,10 @@ function expandPolicyPath(pattern: string, missionId?: string, tenantSlug?: stri
     if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u.test(projectId)) return null;
     pattern = pattern.split(PROJECT_ID_PLACEHOLDER).join(projectId);
   }
-  const slug = getRegisteredEnvText('KYBERION_STANCE') || getRegisteredEnvText('KYBERION_CUSTOMER');
+  const slug = stanceSlugFromEnv();
   return pattern
     .replace('${MISSION_ID}', missionId || 'NONE')
-    .replace('${KYBERION_STANCE}', slug?.trim() || 'NONE');
+    .replace('${KYBERION_STANCE}', slug && STANCE_SLUG_PATTERN.test(slug) ? slug : 'NONE');
 }
 
 function policyPathMatches(
@@ -911,6 +918,17 @@ function requestResourceDenial(
       allowed: false,
       reason: `[ROLE_ASSUMPTION_DENIED] '${normalizedRole}' is a retired store role name, not a role`,
     };
+  // S4: a declared store grant authorizes I/O only inside the scope its facade opened; a process
+  // running as the name (SYSTEM_ROLE / MISSION_ROLE / delegated env, a forged scope) gets none.
+  if (
+    normalizedRole &&
+    isDeclaredStoreGrantName(normalizedRole) &&
+    liveDeclaredStoreGrant() !== normalizedRole
+  )
+    return {
+      allowed: false,
+      reason: `[STORE_GRANT_REQUIRED] '${normalizedRole}' is a store grant, not a role — only its store facade's live grant performs its I/O`,
+    };
   const readRepoFile = (relative: string) => {
     const target = path.join(projectRoot(), relative);
     return rawExistsSync(target) ? rawReadTextFile(target) : undefined;
@@ -991,7 +1009,8 @@ function requestResourceDenial(
   );
   if (grantDenial) return { allowed: false, reason: grantDenial };
   // G3: deny-only role narrowing is a security-policy declaration
-  // (authority_role_permissions.<role>.narrow), evaluated by one generic rule —
+  // (authority_role_permissions.<role>.narrow, or store_grants.<name>.narrow of a live
+  // declared store grant), evaluated by one generic rule —
   // per-role modules and role-name branches are gone from the gate. A missing or
   // corrupt policy must not remove an explicit role's deny-only constraints.
   // With no assumed role the policy is not loaded by this stage.
@@ -1145,7 +1164,7 @@ function personaTierWriteDecision(
   if (hasAuthorityAccess(policy, authorities, relativePath, currentMission, 'allow_write'))
     return { allowed: true };
 
-  const roleRules = currentRole ? policy.authority_role_permissions?.[currentRole] : null;
+  const roleRules = rolePermissionRecord(policy, currentRole);
   if (
     roleRules?.allow_write?.some(
       (p: string) =>
@@ -1159,7 +1178,7 @@ function personaTierWriteDecision(
     return { allowed: true };
   }
 
-  const personaRules = policy.persona_permissions?.[currentPersona];
+  const personaRules = baseAuthorityRolePermissionRecord(policy, currentPersona);
   if (
     personaRules?.allow_write?.some((p: string) =>
       policyPathMatches(relativePath, p, currentMission, tenantSlug)
@@ -1291,7 +1310,7 @@ export function inspectReadPermission(
         // ledger root itself; it never widens knowledge/ access.
         if (
           informationAssetCoverageReadAllowed(relativePath, identity.role) &&
-          loaded.policy.authority_role_permissions?.[identity.role]?.allow_read?.some(
+          rolePermissionRecord(loaded.policy, identity.role)?.allow_read?.some(
             (pattern: string) => {
               const expanded = expandPolicyPath(
                 pattern,
@@ -1386,7 +1405,7 @@ export function inspectReadPermission(
   if (storeGrantAuthorizes(relativePath, operation, projectRoot())) return { allowed: true };
 
   if (operation === 'metadata' && currentResourceAccessScope() && identity.role) {
-    const rules = policy.authority_role_permissions?.[identity.role];
+    const rules = rolePermissionRecord(policy, identity.role);
     const patterns: string[] = [...(rules?.allow_read ?? []), ...(rules?.allow_write ?? [])];
     if (
       patterns.some((pattern) =>
@@ -1421,7 +1440,7 @@ function ledgerRoleReadGrant(
   identity: ReturnType<typeof resolvePolicyIdentityContext>
 ): boolean {
   if (!identity.role) return false;
-  const patterns: unknown = policy.authority_role_permissions?.[identity.role]?.allow_read;
+  const patterns: unknown = rolePermissionRecord(policy, identity.role)?.allow_read;
   if (!Array.isArray(patterns)) return false;
   const missionId = resolveProjectScope().missionId;
   return patterns.some((pattern) => {
@@ -1458,7 +1477,7 @@ function roleDenyReadDecision(
   if (!currentRole) return undefined;
   const currentMission = resolveProjectScope().missionId;
   const candidates = denyCandidatePaths(relativePath);
-  const rules = policy.authority_role_permissions?.[currentRole];
+  const rules = rolePermissionRecord(policy, currentRole);
   // A listing grant can admit the directory itself while denying every child.
   // Keep policy in the catalog and enforce all physical aliases, just as deny_read.
   const listingRoots = rules?.deny_read_descendants;
@@ -1548,10 +1567,10 @@ function personaTierReadDecision(
       return { allowed: true };
   }
 
-  const roleRules = currentRole ? policy.authority_role_permissions?.[currentRole] : null;
+  const roleRules = rolePermissionRecord(policy, currentRole);
   if (grants(roleRules?.allow_read) || grants(roleRules?.allow_write)) return { allowed: true };
 
-  const personaRules = policy.persona_permissions?.[currentPersona];
+  const personaRules = baseAuthorityRolePermissionRecord(policy, currentPersona);
   if (grants(personaRules?.allow_read) || grants(personaRules?.allow_write))
     return { allowed: true };
 

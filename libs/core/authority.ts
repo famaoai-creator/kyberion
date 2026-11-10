@@ -10,6 +10,12 @@ import * as path from 'node:path';
 // resolveIdentityContext. Read-only bootstrap IO goes through fs-primitives.
 import { rawExistsSync, rawLstatSync, rawReaddir, rawReadTextFile } from './fs-primitives.js';
 import { isValidTenantSlug } from './entity-scope.js';
+import {
+  NHI_ID_PATTERN,
+  NHI_SLUG_PATTERN,
+  buildNhiId,
+  buildTenantlessNhiId,
+} from './contracts/nhi-id.js';
 import * as pathResolver from './path-resolver.js';
 import { missionPathOrNull } from './mission/mission-lookup.js';
 import { getRegisteredEnvText, setRegisteredEnv } from './foundation/env.js';
@@ -33,8 +39,22 @@ import {
   type ExecutionScope,
   type ExecutionIdentityBinding,
 } from './foundation/execution-scope.js';
-import { currentResourceAccessScope } from './foundation/resource-access-scope.js';
+import {
+  currentResourceAccessScope,
+  runDisclosureAuditOutsideResourceCeilings,
+} from './foundation/resource-access-scope.js';
+import {
+  isBaseAuthorityRoleName,
+  personaOfBaseAuthorityRole,
+} from './foundation/base-authority-role.js';
 import { RETIRED_STORE_ROLE_NAMES } from './foundation/retired-store-roles.js';
+import {
+  closeDeclaredStoreGrantToken,
+  declaredStoreGrantDefinition,
+  isDeclaredStoreGrantName,
+  openDeclaredStoreGrantToken,
+  type DeclaredStoreGrantDefinition,
+} from './foundation/declared-store-grant.js';
 import { traceRoleAssumption } from './organization/role-assumption-trace.js';
 import { resolveTenant } from './organization/tenant-registry.js';
 import {
@@ -55,7 +75,6 @@ const LEGACY_ROLE_PERSONA_DEFAULTS: Record<string, Persona> = {
   integration_steward: 'ecosystem_architect',
   reliability_engineer: 'worker',
   infrastructure_sentinel: 'worker',
-  ops_alert_store: 'worker',
   task_runtime_worker: 'worker',
   // mission roles
   sovereign_concierge: 'sovereign',
@@ -68,22 +87,7 @@ const LEGACY_ROLE_PERSONA_DEFAULTS: Record<string, Persona> = {
   chronos_gateway: 'worker',
   chronos_operator: 'worker',
   chronos_localadmin: 'worker',
-  chronos_token_registry_reader: 'worker',
-  workspace_graph_reader: 'worker',
-  scope_locale_reader: 'worker',
   engine_runtime_preferences_operator: 'worker',
-  workspace_tenant_registry_reader: 'worker',
-  workspace_tenant_registry_index_reader: 'worker',
-  peer_catalog_reader: 'worker',
-  peer_responder_reader: 'worker',
-  peer_task_artifact_writer: 'worker',
-  metrics_cap_reader: 'worker',
-  audit_mirror_writer: 'worker',
-  tenant_ledger_store: 'worker',
-  tenant_approval_store: 'worker',
-  delegation_record_store: 'worker',
-  tenant_approval_partition_index_reader: 'worker',
-  customer_decision_deal_note_writer: 'worker',
   service_actuator: 'worker',
   surface_runtime: 'worker',
   // context roles
@@ -732,8 +736,9 @@ interface PreparedExecutionContext {
  * from the caller, so it must be the caller's own: a caller-supplied tenant
  * never broadens access (peer-network.md). Kept as a typed constant rather
  * than governance data so the check cannot disappear with a missing or
- * malformed policy file. metrics_cap_reader is deliberately absent: its grant
- * names no tenant placeholder and its caller binds the active tenant itself.
+ * malformed policy file. S4: the former store-only tenant-bound roles are
+ * declared store grants now; their binding rule is `tenantBound` in
+ * foundation/declared-store-grant.ts, checked by the same function.
  *
  * A process that runs AS one of these roles through SYSTEM_ROLE / MISSION_ROLE
  * env is bound to its own process tenant (KYBERION_TENANT / project scope).
@@ -743,19 +748,7 @@ interface PreparedExecutionContext {
  */
 export const TENANT_BOUND_READER_ROLES: ReadonlySet<string> = new Set([
   'actuator_playground_worker',
-  'credential_allocation_reader',
-  ARCHIVED_MISSION_STATE_READER_ROLE,
-  'customer_channel_binding_store',
-  'customer_decision_deal_note_writer',
-  'delegation_record_store',
-  'peer_catalog_reader',
-  'peer_responder_reader',
-  'peer_task_artifact_writer',
   'perception_media_worker',
-  'scope_locale_reader',
-  'tenant_approval_store',
-  'tenant_ledger_store',
-  'workspace_tenant_registry_reader',
 ]);
 
 /**
@@ -764,8 +757,12 @@ export const TENANT_BOUND_READER_ROLES: ReadonlySet<string> = new Set([
  * (operator CLI, a server process configured for one tenant) the binding is
  * the process's own choice and stays allowed.
  */
-function assertTenantBoundReaderScope(role: string, tenantSlug: string | undefined): void {
-  if (!TENANT_BOUND_READER_ROLES.has(role)) return;
+function assertTenantBoundReaderScope(
+  role: string,
+  tenantSlug: string | undefined,
+  tenantBound = TENANT_BOUND_READER_ROLES.has(role)
+): void {
+  if (!tenantBound) return;
   const requested = normalizeTenantSlug(tenantSlug);
   if (!requested) {
     throw new Error(
@@ -782,12 +779,19 @@ function assertTenantBoundReaderScope(role: string, tenantSlug: string | undefin
   }
 }
 
+/** A declared store grant being opened by {@link withStoreGrant} (never by a role assumption). */
+interface StoreGrantIssuance {
+  token: object;
+  definition: DeclaredStoreGrantDefinition;
+}
+
 function prepareExecutionContext(
   role: string,
   persona: Persona | undefined,
   tenantSlug: string | undefined,
   organizationId: string | undefined,
-  identity?: ExecutionIdentityBinding
+  identity?: ExecutionIdentityBinding,
+  grant?: StoreGrantIssuance
 ): PreparedExecutionContext {
   const normalizedRole = normalizeRoleName(role.trim());
   const executionIdentity = { ...currentExecutionScope()?.executionIdentity, ...identity };
@@ -795,14 +799,32 @@ function prepareExecutionContext(
     if (value !== null && value !== undefined && !/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u.test(value))
       throw new Error('[SCOPE_CONTEXT_INVALID] invalid execution identity');
   }
-  assertRoleAssumptionAllowed(normalizedRole);
-  // G2: former store roles are retired into grants or narrower stores. Refusing them keeps an
-  // installation whose catalogs still declare an old role from granting its policy.
-  if (RETIRED_STORE_ROLE_NAMES.has(normalizedRole))
-    throw new Error(
-      `[ROLE_ASSUMPTION_DENIED] '${normalizedRole}' is a retired store role name, not an assumable role`
-    );
-  assertTenantBoundReaderScope(normalizedRole, tenantSlug);
+  if (grant) {
+    // S4: a declared store grant is issued where the former role could have been assumed (RA-02).
+    assertStoreGrantIssuanceAllowed(normalizedRole);
+  } else {
+    assertRoleAssumptionAllowed(normalizedRole);
+    // G2: former store roles are retired into grants or narrower stores. Refusing them keeps an
+    // installation whose catalogs still declare an old role from granting its policy.
+    if (RETIRED_STORE_ROLE_NAMES.has(normalizedRole))
+      throw new Error(
+        `[ROLE_ASSUMPTION_DENIED] '${normalizedRole}' is a retired store role name, not an assumable role`
+      );
+    if (isDeclaredStoreGrantName(normalizedRole))
+      throw new Error(
+        `[ROLE_ASSUMPTION_DENIED] '${normalizedRole}' is a store grant, not an assumable role — only its store facade issues it (withStoreGrant)`
+      );
+    // S4 slice 4: a base Authority Role is reached only through a principal's persona.
+    if (isBaseAuthorityRoleName(normalizedRole))
+      throw new Error(
+        `[ROLE_ASSUMPTION_DENIED] '${normalizedRole}' is a base Authority Role, not an assumable role — a principal runs on it through its persona`
+      );
+  }
+  assertTenantBoundReaderScope(
+    normalizedRole,
+    tenantSlug,
+    grant ? grant.definition.tenantBound : undefined
+  );
   if (
     normalizedRole === ARCHIVED_MISSION_STATE_READER_ROLE &&
     (!isArchivedMissionStateCapability(currentResourceAccessScope()) ||
@@ -861,6 +883,7 @@ function prepareExecutionContext(
         : {}),
       assumedRole: normalizedRole,
       assumedPersona,
+      ...(grant ? { storeGrantToken: grant.token } : {}),
     },
   };
 }
@@ -921,6 +944,15 @@ export function withExecutionContext<T>(
   identity?: ExecutionIdentityBinding
 ): T {
   const prepared = prepareExecutionContext(role, persona, tenantSlug, organizationId, identity);
+  return runMirroredSync(prepared, persona, fn);
+}
+
+/** Run a prepared synchronous assumption with its env mirror written and restored around it. */
+function runMirroredSync<T>(
+  prepared: PreparedExecutionContext,
+  persona: Persona | undefined,
+  fn: () => T
+): T {
   const previousRole = getRegisteredEnvText('MISSION_ROLE');
   const previousPersona = getRegisteredEnvText('KYBERION_PERSONA');
   const written = applyExecutionEnv(prepared.role, persona, prepared.resolvedPersona);
@@ -953,6 +985,188 @@ export async function withExecutionContextAsync<T>(
   return await runInExecutionScope(prepared.scope, fn);
 }
 
+/** Tenant / organization / execution identity a store facade binds its grant to. */
+export interface StoreGrantBinding {
+  /** The store's tenant; `''` is an explicit system (tenant-less) scope. */
+  tenantSlug?: string;
+  organizationId?: string;
+  identity?: ExecutionIdentityBinding;
+  /**
+   * A facade that records its disclosure ahead of time with
+   * {@link recordStoreGrantDisclosure} (before it enters its own resource
+   * ceiling) passes the one-shot receipt here instead of a second record.
+   */
+  disclosureReceipt?: object;
+}
+
+function isThenable(value: unknown): value is PromiseLike<unknown> {
+  return (
+    value !== null &&
+    (typeof value === 'object' || typeof value === 'function') &&
+    typeof (value as { then?: unknown }).then === 'function'
+  );
+}
+
+/**
+ * S4 (scope model P4): a cross-store read grant is a disclosure. It is recorded
+ * in the audit chain before the grant opens; when the record cannot be written
+ * the disclosure does not happen (fail closed).
+ */
+/** One-shot receipts of recorded disclosures: receipt -> `<grant>|<tenant>`. */
+const disclosureReceipts = new WeakMap<object, string>();
+
+function disclosureKey(name: string, binding: StoreGrantBinding): string {
+  return `${name}|${binding.tenantSlug ?? ''}`;
+}
+
+/**
+ * Record a disclosure grant's audit entry ahead of opening it, for a facade
+ * that opens the grant inside a server-built resource ceiling. Checks the
+ * issuance right first; returns a one-shot receipt for that grant and tenant.
+ */
+export function recordStoreGrantDisclosure(
+  name: string,
+  binding: Omit<StoreGrantBinding, 'disclosureReceipt'>
+): object {
+  const normalized = normalizeRoleName(name.trim());
+  if (!declaredStoreGrantDefinition(normalized)?.disclosure)
+    throw new Error(`[STORE_GRANT_UNKNOWN] '${normalized}' is not a disclosure store grant`);
+  assertStoreGrantIssuanceAllowed(normalized);
+  auditStoreGrantDisclosure(normalized, binding);
+  const receipt = Object.freeze({});
+  disclosureReceipts.set(receipt, disclosureKey(normalized, binding));
+  return receipt;
+}
+
+/**
+ * The governed system-scope disclosure writer. The record holds no tenant
+ * content — grant name, principal, bound scope, operation — and is built here.
+ * It is a system-scope record: it carries no tenant stamp and is checked and
+ * written in a tenant-cleared execution scope, so it lands in the master chain
+ * only (never a tenant's mirror, where the bound tenant's name would leak to
+ * another tenant), whatever the caller's active tenant or the grant's bound
+ * tenant. Its append is written by the audit chain as its own store writer
+ * (`audit_mirror_writer`, never the caller) outside any request ceiling the
+ * caller is in, so a disclosure is recorded even from inside an exact resource
+ * ceiling; the master-chain write must land (`recordDurable`) or the
+ * disclosure is refused (fail closed). Nothing the caller supplies runs there.
+ */
+function auditStoreGrantDisclosure(name: string, binding: StoreGrantBinding): void {
+  const caller = resolveIdentityContext();
+  const entry = {
+    agentId: caller.role || 'unknown',
+    action: 'store_grant.disclosure',
+    operation: name,
+    result: 'allowed' as const,
+    reason: `cross-store read grant '${name}' issued to role '${caller.role || 'unknown'}'`,
+    metadata: {
+      store_grant: name,
+      caller_role: caller.role ?? null,
+      caller_tenant: caller.tenantSlug ?? null,
+      bound_tenant: binding.tenantSlug || null,
+      bound_organization: binding.organizationId ?? null,
+    },
+  };
+  const systemScope: ExecutionScope = {
+    ...currentExecutionScope(),
+    tenantBound: true,
+    tenantSlug: undefined,
+    tenantCleared: true,
+  };
+  try {
+    runInExecutionScope(systemScope, () =>
+      auditChainModule.auditChain.recordDurable(entry, runDisclosureAuditOutsideResourceCeilings)
+    );
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `[STORE_GRANT_DISCLOSURE_UNAUDITED] the '${name}' disclosure could not be recorded, so it is refused — ${detail} | restore audit chain persistence and retry | grant=${name}`
+    );
+  }
+}
+
+function openStoreGrant(
+  name: string,
+  binding: StoreGrantBinding
+): { prepared: PreparedExecutionContext; token: object } {
+  const normalized = normalizeRoleName(name.trim());
+  const definition = declaredStoreGrantDefinition(normalized);
+  if (!definition)
+    throw new Error(
+      `[STORE_GRANT_UNKNOWN] '${normalized}' is not a declared store grant (foundation/declared-store-grant.ts, security-policy.json store_grants)`
+    );
+  const token = openDeclaredStoreGrantToken(normalized);
+  try {
+    const prepared = prepareExecutionContext(
+      normalized,
+      personaOfBaseAuthorityRole(definition.baseRole),
+      binding.tenantSlug,
+      binding.organizationId,
+      binding.identity,
+      { token, definition }
+    );
+    if (definition.disclosure) {
+      const receipt = binding.disclosureReceipt;
+      if (receipt !== undefined) {
+        // A receipt is valid once, for the grant and tenant it was recorded for.
+        const recorded = disclosureReceipts.get(receipt);
+        disclosureReceipts.delete(receipt);
+        if (recorded !== disclosureKey(normalized, binding))
+          throw new Error(
+            `[STORE_GRANT_DISCLOSURE_UNAUDITED] the '${normalized}' disclosure receipt is unknown, used or for another grant | record the disclosure with recordStoreGrantDisclosure right before opening the grant | grant=${normalized}`
+          );
+      } else {
+        auditStoreGrantDisclosure(normalized, binding);
+      }
+    }
+    return { prepared, token };
+  } catch (error) {
+    closeDeclaredStoreGrantToken(token);
+    throw error;
+  }
+}
+
+/**
+ * S4 slice 3 (ADR concept-model-v2 D6): run `fn` under the declared store grant
+ * `name` — the store facade's grant that replaced a store-only Authority Role.
+ * Issued only where the former role could have been assumed (RA-02 issuance
+ * right) and, for a tenant-bound grant, only for an explicit tenant equal to
+ * the caller's active tenant. While `fn` runs, the I/O it may perform is the
+ * grant's `store_grants` declaration bound to that tenant; the grant is revoked
+ * when `fn` returns (or, for a returned promise, when it settles). Like a
+ * synchronous role assumption the effective name is mirrored into MISSION_ROLE
+ * for raw-env readers; a child process inherits only the name, which carries
+ * no grant outside this scope.
+ */
+export function withStoreGrant<T>(name: string, fn: () => T, binding: StoreGrantBinding = {}): T {
+  const { prepared, token } = openStoreGrant(name, binding);
+  let deferred = false;
+  try {
+    const result = runMirroredSync(prepared, undefined, fn);
+    if (isThenable(result)) {
+      deferred = true;
+      return Promise.resolve(result).finally(() => closeDeclaredStoreGrantToken(token)) as T;
+    }
+    return result;
+  } finally {
+    if (!deferred) closeDeclaredStoreGrantToken(token);
+  }
+}
+
+/** Async counterpart of {@link withStoreGrant}; never mirrors the env (B1). */
+export async function withStoreGrantAsync<T>(
+  name: string,
+  fn: () => Promise<T> | T,
+  binding: StoreGrantBinding = {}
+): Promise<T> {
+  const { prepared, token } = openStoreGrant(name, binding);
+  try {
+    return await runInExecutionScope(prepared.scope, fn);
+  } finally {
+    closeDeclaredStoreGrantToken(token);
+  }
+}
+
 function resolveSudoScope(): string[] | undefined {
   const raw = getRegisteredEnvText('KYBERION_SUDO_SCOPE');
   if (!raw) return undefined;
@@ -981,9 +1195,10 @@ function normalizeTenantSlug(value: string | undefined | null): string | undefin
 // KYBERION_TASK_GRANTS_PATH-or-default rule so they always read the same file.
 // ---------------------------------------------------------------------------
 
-/** Mirrors NHI_ID_PATTERN in agent-identity.ts (not importable here — see above). */
-const TASK_GRANT_NHI_ID_PATTERN = /^kyberion:\/\/agent\/[a-z][a-z0-9-]*\/[a-z][a-z0-9-]*$/;
-const TASK_GRANT_NHI_SLUG_PATTERN = /^[a-z][a-z0-9-]*$/;
+// The NHI grammar lives in the dependency-free leaf `contracts/nhi-id.ts`
+// (no secure-io / authority import), so it is safe to use here directly.
+const TASK_GRANT_NHI_ID_PATTERN = NHI_ID_PATTERN;
+const TASK_GRANT_NHI_SLUG_PATTERN = NHI_SLUG_PATTERN;
 
 /**
  * Authority names a task grant's `scope.capabilities` may confer. SUDO is
@@ -1034,29 +1249,29 @@ function resolveTaskGrantsReadPath(): string | undefined {
  *    supervisor / dispatch env stamps this for spawned workers);
  * 2. else, when the resolved role string is itself nhi-slug-shaped (an agent
  *    slug such as `implementation-architect`, not an underscore authority
- *    role like `mission_controller`), derive `kyberion://agent/<org>/<role>`
- *    with the org read raw from the organization profile ('default'
- *    fallback) — the same derivation as agent-identity.ts deriveAgentNhiId.
+ *    role like `mission_controller`), derive
+ *    `kyberion://agent/<tenant>/<org|_>/<role>` from the identity context's
+ *    resolved tenant and the active organization (`KYBERION_ORGANIZATION_ID`), or the
+ *    tenantless `kyberion://agent/_/_/<role>` when no tenant is in scope. The
+ *    pre-D3 'default' organization fallback is gone.
  * Fail-closed: no resolvable actor identity means no task grants are served.
  */
-function resolveGrantActorNhiId(role: string | undefined): string | undefined {
+function resolveGrantActorNhiId(
+  role: string | undefined,
+  tenantSlug: string | undefined
+): string | undefined {
   const explicit = getRegisteredEnvText('KYBERION_NHI_ID')?.trim();
   if (explicit) {
     return TASK_GRANT_NHI_ID_PATTERN.test(explicit) ? explicit : undefined;
   }
   if (!role || !TASK_GRANT_NHI_SLUG_PATTERN.test(role)) return undefined;
-  let organizationId = 'default';
-  try {
-    const profilePath = pathResolver.knowledge('product/governance/organization-profile.json');
-    if (rawExistsSync(profilePath)) {
-      const profile = parseJsonRecord(rawReadTextFile(profilePath));
-      const candidate = profile ? stringField(profile, 'organization_id') || '' : '';
-      if (TASK_GRANT_NHI_SLUG_PATTERN.test(candidate)) organizationId = candidate;
-    }
-  } catch (err) {
-    logger.debug(`task-grant actor org resolution fell back to 'default': ${err}`);
-  }
-  return `kyberion://agent/${organizationId}/${role}`;
+  if (!tenantSlug || !isValidTenantSlug(tenantSlug)) return buildTenantlessNhiId(role);
+  const organizationId = getRegisteredEnvText('KYBERION_ORGANIZATION_ID')?.trim();
+  return buildNhiId(
+    tenantSlug,
+    organizationId && TASK_GRANT_NHI_SLUG_PATTERN.test(organizationId) ? organizationId : null,
+    role
+  );
 }
 
 export function resolveIdentityContext(tenantOverride?: string): IdentityContext {
@@ -1101,7 +1316,11 @@ export function resolveIdentityContext(tenantOverride?: string): IdentityContext
         if (rawExistsSync(statePath)) {
           const state = parseJsonRecord(rawReadTextFile(statePath));
           if (!state) continue;
-          if (persona === 'unknown') persona = normalizePersona(state.assigned_persona);
+          // A mission-bound execution without an explicit persona runs as a
+          // worker. The mission's Org Role (`org_role`, formerly
+          // `assigned_persona`) is descriptive metadata and is never
+          // normalised into an execution persona (concept model v2 D5).
+          if (persona === 'unknown') persona = 'worker';
           if (!tenantSlug) tenantSlug = normalizeTenantSlug(stringField(state, 'tenant_slug'));
           const brokerage = state.cross_tenant_brokerage;
           const brokered = isJsonRecord(brokerage) ? brokerage.source_tenants : undefined;
@@ -1195,7 +1414,7 @@ export function resolveIdentityContext(tenantOverride?: string): IdentityContext
     try {
       const taskGrantsPath = resolveTaskGrantsReadPath();
       if (taskGrantsPath && rawExistsSync(taskGrantsPath)) {
-        const actorNhiId = resolveGrantActorNhiId(envRole);
+        const actorNhiId = resolveGrantActorNhiId(envRole, tenantSlug);
         if (actorNhiId) {
           const taskId =
             identity?.taskId !== undefined
@@ -1307,14 +1526,13 @@ export function resolveIdentityContext(tenantOverride?: string): IdentityContext
 
 registerIdentityContextResolver(resolveIdentityContext);
 registerOperationalTenantMembership((tenant, rootDir) =>
-  withExecutionContext(
+  withStoreGrant(
     'workspace_tenant_registry_reader',
     () => Boolean(resolveTenant(tenant, { rootDir })),
-    'worker',
-    tenant
+    { tenantSlug: tenant }
   )
 );
-registerOperationalAlertStore((fn) => withExecutionContext('ops_alert_store', fn, 'worker'));
+registerOperationalAlertStore((fn) => withStoreGrant('ops_alert_store', fn));
 
 /**
  * G17: the audit chain's tenant mirror (active/shared/runtime/audit-mirror/confidential/{slug}/) is written
@@ -1333,7 +1551,7 @@ try {
     .registerTenantMirrorWriterContext;
   if (typeof register === 'function') {
     (register as typeof auditChainModule.registerTenantMirrorWriterContext)((tenantSlug, fn) =>
-      withExecutionContext(TENANT_AUDIT_MIRROR_WRITER_ROLE, fn, undefined, tenantSlug)
+      withStoreGrant(TENANT_AUDIT_MIRROR_WRITER_ROLE, fn, { tenantSlug: tenantSlug })
     );
   }
 } catch {

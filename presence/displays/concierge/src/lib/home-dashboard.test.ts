@@ -29,6 +29,12 @@ vi.mock('@agent/core/mission-lookup', () => ({
   readOrNullOnMissionRefusal: (fn: () => unknown) => fn(),
 }));
 vi.mock('@agent/core/authority', () => ({
+  // S4: store facades open their declared store grant (withStoreGrant).
+  withStoreGrant: (name: string, fn: () => unknown) => {
+    mocks.roles.push(name);
+    return fn();
+  },
+  withStoreGrantAsync: async (_name: string, fn: () => unknown) => fn(),
   withExecutionContext: (role: string, fn: () => unknown) => {
     mocks.roles.push(role);
     return fn();

@@ -74,7 +74,7 @@ function charter(overrides: Partial<DotCharter> = {}): DotCharter {
     },
     authority: {
       authority_role: 'infrastructure_sentinel',
-      allowed_work_shapes: ['direct_reply', 'pipeline'],
+      allowed_execution_shapes: ['direct_reply', 'pipeline'],
     },
     decisions: { default_decision: 'notify' },
     notification: { deliver_to: { surface: 'slack', channel: '#ops' } },
@@ -102,7 +102,7 @@ describe('describeDotIntakePlan', () => {
       enabled_by: 'policy',
       tenant_ok: true,
       authority_role: 'infrastructure_sentinel',
-      work_shapes: ['direct_reply', 'pipeline'],
+      execution_shapes: ['direct_reply', 'pipeline'],
       decision: 'notify',
     });
     expect(push?.types).toEqual(['issues', 'workflow_run']);

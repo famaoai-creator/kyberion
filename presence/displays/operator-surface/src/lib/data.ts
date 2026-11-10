@@ -107,7 +107,7 @@ export interface MissionRow {
   status: string;
   tier: 'personal' | 'confidential' | 'public';
   tenant_slug?: string;
-  assigned_persona?: string;
+  org_role?: string;
   latest_commit?: string;
   history_count?: number;
   checkpoints_count?: number;
@@ -209,7 +209,7 @@ function listMissionsForTier(tier: 'personal' | 'confidential' | 'public'): Miss
           status: state.status,
           tier,
           tenant_slug: detectMissionTenantSlug(state, abs),
-          assigned_persona: state.assigned_persona,
+          org_role: state.org_role,
           latest_commit: state.git?.latest_commit?.slice(0, 8),
           history_count: state.history?.length ?? 0,
           checkpoints_count: state.git?.checkpoints?.length ?? 0,
@@ -294,7 +294,7 @@ export function getMissionDetail(missionId: string): MissionDetail | null {
           tier: state.tier,
           mission_type: state.mission_type,
           ...(tenantSlug ? { tenant_slug: tenantSlug } : {}),
-          assigned_persona: state.assigned_persona,
+          org_role: state.org_role,
           latest_commit: state.git?.latest_commit,
           history_count: state.history?.length ?? 0,
           checkpoints_count: state.git?.checkpoints?.length ?? 0,

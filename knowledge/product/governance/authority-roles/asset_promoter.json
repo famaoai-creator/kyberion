@@ -1,0 +1,26 @@
+{
+  "role": "asset_promoter",
+  "assignable": false,
+  "permissions": {
+    "allow_read": [
+      "knowledge/personal/tenants/${KYBERION_TENANT}.json",
+      "knowledge/confidential/${KYBERION_TENANT}/pipelines/",
+      "knowledge/confidential/${KYBERION_TENANT}/tools/",
+      "active/shared/tmp/",
+      "active/shared/tmp/confidential/${KYBERION_TENANT}/",
+      "active/shared/staging/",
+      "active/shared/staging/confidential/${KYBERION_TENANT}/",
+      "active/missions/",
+      "active/missions/confidential/${KYBERION_TENANT}/"
+    ],
+    "allow_write": [
+      "knowledge/confidential/${KYBERION_TENANT}/pipelines/",
+      "knowledge/confidential/${KYBERION_TENANT}/tools/",
+      "knowledge/confidential/${KYBERION_TENANT}/_ledger/",
+      "active/shared/tmp/",
+      "active/shared/tmp/confidential/${KYBERION_TENANT}/",
+      "active/shared/staging/",
+      "active/shared/staging/confidential/${KYBERION_TENANT}/"
+    ]
+  }
+}

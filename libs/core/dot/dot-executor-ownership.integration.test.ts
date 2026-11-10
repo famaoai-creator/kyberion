@@ -219,7 +219,7 @@ describe('real isolated dot behavior', () => {
           action_id: 'dot_delegate_work',
           title: 'Conflicting new work',
           objective: 'Write same target',
-          work_shape: 'pipeline',
+          execution_shape: 'pipeline',
           pipeline_ref: 'pipelines/evaluation.json',
           target,
         },

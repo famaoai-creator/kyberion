@@ -31,7 +31,7 @@ const state: MissionState = {
   status: 'active',
   execution_mode: 'local',
   priority: 1,
-  assigned_persona: 'fixture',
+  org_role: 'fixture',
   confidence_score: 1,
   intent: { goal_summary: 'Deliver verified change', success_condition: 'Unit tests pass' },
   git: { branch: 'fixture', start_commit: 'a', latest_commit: 'a', checkpoints: [] },

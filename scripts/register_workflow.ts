@@ -280,7 +280,8 @@ function buildIntent(req: RegistrationRequest): Json {
     outcome_ids: req.intent.outcome_ids,
     specialist_id: req.intent.specialist_id,
     trigger_keywords: req.intent.trigger_keywords,
-    resolution: { shape: 'mission', result_shape: 'summary' },
+    // resolution.shape is derived from execution_shape at load time; never store it.
+    resolution: { result_shape: 'summary' },
     legacy_category: 'surface',
     exposed_to_surface: req.intent.exposed_to_surface ?? true,
     target: req.intent.target,

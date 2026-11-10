@@ -16,7 +16,7 @@ const mocks = vi.hoisted(() => ({
   buildMissionTeamView: vi.fn(),
   record: vi.fn(),
   emitMissionTaskEvent: vi.fn(),
-  findRelevantDistilledKnowledge: vi.fn(),
+  findRelevantPromotedKnowledge: vi.fn(),
   pinTaskDecisions: vi.fn(),
   reconcileTaskDecisions: vi.fn(),
   importExternalWorkItem: vi.fn(),
@@ -80,12 +80,12 @@ vi.mock('./mission-task-events.js', () => ({
     `active/missions/public/${missionId}/coordination/events/task-events.jsonl`,
 }));
 
-vi.mock('../knowledge/distill-knowledge-injector.js', async (importOriginal) => {
+vi.mock('../knowledge/promoted-knowledge-retrieval.js', async (importOriginal) => {
   const actual =
-    await importOriginal<typeof import('../knowledge/distill-knowledge-injector.js')>();
+    await importOriginal<typeof import('../knowledge/promoted-knowledge-retrieval.js')>();
   return {
     ...actual,
-    findRelevantDistilledKnowledge: mocks.findRelevantDistilledKnowledge,
+    findRelevantPromotedKnowledge: mocks.findRelevantPromotedKnowledge,
   };
 });
 
@@ -293,7 +293,7 @@ describe('mission-orchestration-worker CD-09 customer decision lock', { timeout:
           status: 'active',
           execution_mode: 'local',
           priority: 3,
-          assigned_persona: 'worker',
+          org_role: 'worker',
           confidence_score: 1,
           git: {
             branch: 'mission/cd09-lock',
@@ -396,7 +396,7 @@ describe('mission-orchestration-worker CD-09 customer decision lock', { timeout:
     );
     mocks.importExternalWorkItem.mockImplementation(actual.importExternalWorkItem);
     mocks.updateWorkItem.mockImplementation(actual.updateWorkItem);
-    mocks.findRelevantDistilledKnowledge.mockResolvedValue([]);
+    mocks.findRelevantPromotedKnowledge.mockResolvedValue([]);
     mocks.pinTaskDecisions.mockReturnValue({
       consumer: 'mission-MSN-CD09-WORKER.task-1',
       pinned_count: 3,
@@ -475,7 +475,7 @@ describe('mission-orchestration-worker CD-09 customer decision lock', { timeout:
       );
       mocks.importExternalWorkItem.mockImplementation(actual.importExternalWorkItem);
       mocks.updateWorkItem.mockImplementation(actual.updateWorkItem);
-      mocks.findRelevantDistilledKnowledge.mockResolvedValue([]);
+      mocks.findRelevantPromotedKnowledge.mockResolvedValue([]);
     }
     /** Every file under the shared runtime and the public mission directory that holds `needle`. */
     async function filesContaining(needle: string): Promise<string[]> {
@@ -1256,7 +1256,7 @@ describe('mission-orchestration-worker CD-09 customer decision lock', { timeout:
     );
     mocks.importExternalWorkItem.mockImplementation(actual.importExternalWorkItem);
     mocks.updateWorkItem.mockImplementation(actual.updateWorkItem);
-    mocks.findRelevantDistilledKnowledge.mockResolvedValue([]);
+    mocks.findRelevantPromotedKnowledge.mockResolvedValue([]);
     const consumer = 'mission-MSN-CD09-WORKER.task-1';
     mocks.pinTaskDecisions.mockImplementation((input: { taskId: string }) =>
       input.taskId === 'task-1'
@@ -1394,7 +1394,7 @@ describe('mission-orchestration-worker CD-09 customer decision lock', { timeout:
     );
     mocks.importExternalWorkItem.mockImplementation(actual.importExternalWorkItem);
     mocks.updateWorkItem.mockImplementation(actual.updateWorkItem);
-    mocks.findRelevantDistilledKnowledge.mockResolvedValue([]);
+    mocks.findRelevantPromotedKnowledge.mockResolvedValue([]);
     mocks.pinTaskDecisions.mockReturnValue(null);
     const { missionDir } = await import('../path-resolver.js');
     const { safeWriteFile } = await import('../secure-io.js');
@@ -1430,7 +1430,7 @@ describe('mission-orchestration-worker CD-09 customer decision lock', { timeout:
     );
     mocks.importExternalWorkItem.mockImplementation(actual.importExternalWorkItem);
     mocks.updateWorkItem.mockImplementation(actual.updateWorkItem);
-    mocks.findRelevantDistilledKnowledge.mockResolvedValue([]);
+    mocks.findRelevantPromotedKnowledge.mockResolvedValue([]);
     mocks.pinTaskDecisions.mockReturnValue({
       consumer: 'mission-MSN-CD09-WORKER.task-1',
       pinned_count: 1,
@@ -1472,7 +1472,7 @@ describe('mission-orchestration-worker CD-09 customer decision lock', { timeout:
     );
     mocks.importExternalWorkItem.mockImplementation(actual.importExternalWorkItem);
     mocks.updateWorkItem.mockImplementation(actual.updateWorkItem);
-    mocks.findRelevantDistilledKnowledge.mockResolvedValue([]);
+    mocks.findRelevantPromotedKnowledge.mockResolvedValue([]);
     mocks.pinTaskDecisions.mockReturnValue(null);
     mocks.reconcileTaskDecisions.mockReturnValue({
       checked: 0,

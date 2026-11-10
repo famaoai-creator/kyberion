@@ -24,7 +24,7 @@ export type ChronosAccessRole = 'readonly' | 'localadmin';
  * only grant (security-policy.json) is read access to `chronos-access.json`;
  * it has no role write grant (persona worker). Surfaces whose SYSTEM_ROLE cannot read the personal tier
  * wrap `readChronosTokenRegistrations()` in
- * `withExecutionContext(CHRONOS_TOKEN_REGISTRY_READER_ROLE, …)` instead of a
+ * `withStoreGrant(CHRONOS_TOKEN_REGISTRY_READER_ROLE, …)` (a declared store grant) instead of a
  * broad role such as sovereign_concierge (role-assumption-policy.json lists
  * the surfaces that may assume it).
  */

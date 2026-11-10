@@ -47,7 +47,7 @@ function state(id: string, tenant: string): string {
     status: 'archived',
     execution_mode: 'local',
     priority: 1,
-    assigned_persona: 'tester',
+    org_role: 'tester',
     confidence_score: 1,
     git: { branch: 'test', start_commit: 'abc123', latest_commit: 'abc123', checkpoints: [] },
     history: [],
@@ -162,7 +162,7 @@ describe('loadDecisionCaseMissionState (archived confidential tenant mission)', 
     const run = <T>(fn: () => T): T =>
       resourceScope.runInResourceAccessScope(
         lockModule.archivedMissionStateCapability(TENANT, statePath),
-        () => authority.withExecutionContext('archived_mission_state_reader', fn, undefined, TENANT)
+        () => authority.withStoreGrant('archived_mission_state_reader', fn, { tenantSlug: TENANT })
       );
     expect(
       String(run(() => io.safeReadFile(path.join(ROOT, statePath), { encoding: 'utf8' })))
@@ -180,18 +180,24 @@ describe('loadDecisionCaseMissionState (archived confidential tenant mission)', 
     const role = 'archived_mission_state_reader';
     const statePath = `active/archive/missions/confidential/${TENANT}/${MISSION}/mission-state.json`;
     const capability = lockModule.archivedMissionStateCapability(TENANT, statePath);
-    // No capability, or one bound to another tenant: refused at assumption.
-    expect(() => authority.withExecutionContext(role, () => undefined, undefined, TENANT)).toThrow(
+    // S4: a declared store grant, never assumable as a role.
+    expect(() =>
+      resourceScope.runInResourceAccessScope(capability, () =>
+        authority.withExecutionContext(role, () => undefined, undefined, TENANT)
+      )
+    ).toThrow(/ROLE_ASSUMPTION_DENIED/u);
+    // No capability, or one bound to another tenant: refused when the grant opens.
+    expect(() => authority.withStoreGrant(role, () => undefined, { tenantSlug: TENANT })).toThrow(
       /RESOURCE_SCOPE_REQUIRED/u
     );
     expect(() =>
       resourceScope.runInResourceAccessScope(capability, () =>
-        authority.withExecutionContext(role, () => undefined, undefined, OTHER)
+        authority.withStoreGrant(role, () => undefined, { tenantSlug: OTHER })
       )
     ).toThrow(/RESOURCE_SCOPE_REQUIRED|ROLE_TENANT_SCOPE/u);
     expect(() =>
       resourceScope.runInResourceAccessScope(capability, () =>
-        authority.withExecutionContext(role, () => undefined)
+        authority.withStoreGrant(role, () => undefined)
       )
     ).toThrow(/ROLE_TENANT_SCOPE_REQUIRED/u);
     // The capability names only a tenant's own archived mission-state.json.
@@ -216,11 +222,10 @@ describe('loadDecisionCaseMissionState (archived confidential tenant mission)', 
     // Never a write, even of the file it may read.
     expect(() =>
       resourceScope.runInResourceAccessScope(capability, () =>
-        authority.withExecutionContext(
+        authority.withStoreGrant(
           role,
           () => io.safeWriteFile(path.join(ROOT, statePath), state(MISSION, TENANT)),
-          undefined,
-          TENANT
+          { tenantSlug: TENANT }
         )
       )
     ).toThrow(/RESOURCE_SCOPE_REQUIRED|RESOURCE_SCOPE_DENIED/u);

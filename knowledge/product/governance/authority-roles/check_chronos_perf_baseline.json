@@ -5,5 +5,8 @@
   "write_scopes": ["active/shared/observability/chronos/ce-08-perf-baseline.json"],
   "scope_classes": ["observability"],
   "allowed_actuators": [],
-  "tier_access": ["public"]
+  "tier_access": ["public"],
+  "permissions": {
+    "allow_write": ["active/shared/observability/chronos/ce-08-perf-baseline.json"]
+  }
 }

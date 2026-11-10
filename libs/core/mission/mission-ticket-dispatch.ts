@@ -14,6 +14,7 @@ import { resolveTaskModelHint, type TaskModelHint } from '../reasoning/reasoning
 import { loadMissionTeamPlan, resolveMissionTeamReceiver } from './mission-team-plan-composer.js';
 import { safeExistsSync } from '../secure-io.js';
 import { importExternalWorkItem } from '../workforce/work-coordination.js';
+import { resolveMissionTaskParentItemId } from './mission-ownership-item.js';
 import { sendOpsAlert } from '../daemon/ops-alert.js';
 import { findMissionPath } from '../path-resolver.js';
 import type { MissionState } from './mission-types.js';
@@ -359,6 +360,20 @@ export async function dispatchMissionTickets(
     }
 
     if (status !== 'failed' && targets.includes('workitem')) {
+      const workItemContext = {
+        ...(projectRecord?.organization_id
+          ? { organization_id: projectRecord.organization_id }
+          : {}),
+        ...(state.tenant_slug || projectRecord?.tenant_slug
+          ? { tenant_slug: state.tenant_slug || projectRecord?.tenant_slug }
+          : {}),
+        mission_id: missionId,
+        project_id: projectLink.project_id || missionId,
+        task_id: task.task_id,
+        work_shape: 'solution_project' as const,
+      };
+      // D1: the ticketed task is a step of the mission's Issue (its ownership item).
+      const parentItemId = resolveMissionTaskParentItemId(missionId, workItemContext);
       const sourceResult = importExternalWorkItem({
         source: 'local',
         sourceRef: workItemSourceRef,
@@ -379,18 +394,8 @@ export async function dispatchMissionTickets(
         // only in metadata. The latter is a compatibility echo consumed by
         // older mission dispatch paths and must not be the only graph edge.
         dependencies: task.dependencies || [],
-        context: {
-          ...(projectRecord?.organization_id
-            ? { organization_id: projectRecord.organization_id }
-            : {}),
-          ...(state.tenant_slug || projectRecord?.tenant_slug
-            ? { tenant_slug: state.tenant_slug || projectRecord?.tenant_slug }
-            : {}),
-          mission_id: missionId,
-          project_id: projectLink.project_id || missionId,
-          task_id: task.task_id,
-          work_shape: 'solution_project',
-        },
+        context: workItemContext,
+        ...(parentItemId ? { parentItemId } : {}),
         labels: [
           `mission:${missionId}`,
           ...(state.mission_type ? [`mission_type:${state.mission_type}`] : []),

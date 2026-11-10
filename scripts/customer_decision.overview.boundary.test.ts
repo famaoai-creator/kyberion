@@ -94,6 +94,7 @@ const STALE_DIST = staleDistReason();
 
 let facade: typeof import('./customer_decision.js');
 let io: typeof import('@agent/core/secure-io');
+let learningQueue: typeof import('@agent/core/organization/organization-learning-queue');
 
 function writeFixtureJson(relative: string, value: unknown): void {
   io.safeWriteFile(path.join(ROOT, relative), `${JSON.stringify(value, null, 2)}\n`);
@@ -147,6 +148,7 @@ beforeAll(async () => {
   process.env.KYBERION_ROOT = ROOT;
   vi.resetModules();
   io = await import('@agent/core/secure-io');
+  learningQueue = await import('@agent/core/organization/organization-learning-queue');
   facade = await import('./customer_decision.js');
   expect((await import('@agent/core/path-resolver')).rootDir()).toBe(ROOT);
   process.env.KYBERION_PERSONA = 'sovereign';
@@ -449,9 +451,21 @@ describe('customer-decision overview and learning (CD-12, real paths)', () => {
     'decisions/_reports',
     `learning-${REPORT_DATE}.json`
   );
-  const candidateFiles = (): string[] =>
-    [...snapshot(['active/organizations']).keys()].filter((file) =>
-      file.endsWith('candidate.json')
+  // Organization learnings are rows on the memory candidate queue (D8, M2).
+  // Each tenant's queue is its own promotion-queue.jsonl under the runtime root.
+  const queueFiles = (): string[] =>
+    [...snapshot(['active/shared/runtime']).keys()].filter((file) =>
+      file.endsWith('promotion-queue.jsonl')
+    );
+  const learningRows = (): Array<{ file: string; raw: string; row: Out }> =>
+    initialContext('ecosystem_architect', () =>
+      queueFiles().flatMap((file) =>
+        String(io.safeReadFile(path.join(ROOT, file), { encoding: 'utf8' }))
+          .split('\n')
+          .filter((line) => line.trim())
+          .map((raw) => ({ file, raw, row: JSON.parse(raw) as Out }))
+          .filter(({ row }) => row.kind === 'organization_learning')
+      )
     );
 
   it('learning --dry-run computes the suggestions and writes nothing', async () => {
@@ -516,23 +530,19 @@ describe('customer-decision overview and learning (CD-12, real paths)', () => {
     const reportText = JSON.stringify(report);
     for (const secret of SECRETS) expect(reportText).not.toContain(secret);
 
-    const files = candidateFiles();
-    expect(files).toEqual([
-      path.join(
-        'active/organizations/confidential',
-        TENANT,
-        'default/state/learning',
-        String(suggestion.learning_id),
-        'candidate.json'
-      ),
-    ]);
-    const read = () =>
-      initialContext('ecosystem_architect', () =>
-        String(io.safeReadFile(path.join(ROOT, files[0]), { encoding: 'utf8' }))
-      );
+    const rows = learningRows();
+    expect(rows).toHaveLength(1);
+    // The row lives in this tenant's queue only, never the shared one.
+    expect(rows[0].file).toContain(TENANT);
+    const read = () => learningRows()[0].raw;
     const first = read();
-    const candidate = JSON.parse(first) as Out;
+    const candidate = learningQueue.fromOrganizationLearningMemoryCandidate(
+      JSON.parse(first) as Parameters<
+        typeof learningQueue.fromOrganizationLearningMemoryCandidate
+      >[0]
+    ) as unknown as Out;
     expect(candidate).toMatchObject({
+      learning_id: suggestion.learning_id,
       source_type: 'customer_decision',
       tier: 'confidential',
       tenant_slug: TENANT,
@@ -553,7 +563,7 @@ describe('customer-decision overview and learning (CD-12, real paths)', () => {
     const again = await run(['learning', '--tenant', TENANT], '2026-10-24T12:00:00.000Z');
     expect(again).toMatchObject({ counts: { created: 0, existing: 1 } });
     expect(read()).toBe(first);
-    expect(candidateFiles()).toHaveLength(1);
+    expect(learningRows()).toHaveLength(1);
     // A week later, or for another organization: the same suggestion with the
     // same evidence is not queued again (one standing candidate per tenant).
     const nextWeek = await run(['learning', '--tenant', TENANT], '2026-10-31T00:00:00.000Z');
@@ -566,7 +576,7 @@ describe('customer-decision overview and learning (CD-12, real paths)', () => {
     });
     const otherOrg = await run(['learning', '--tenant', TENANT, '--organization-id', 'other-org']);
     expect(otherOrg).toMatchObject({ counts: { created: 0, existing: 1 } });
-    expect(candidateFiles()).toHaveLength(1);
+    expect(learningRows()).toHaveLength(1);
     expect(read()).toBe(first);
     // The later report names the candidate that stands.
     const later = JSON.parse(

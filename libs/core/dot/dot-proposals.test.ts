@@ -8,6 +8,7 @@ import {
   normalizeDotProposal,
   parseDotProposalsFromText,
   buildDotProposeToolDefinition,
+  dotProposalInstructions,
 } from './dot-proposals.js';
 
 describe('normalizeDotProposal', () => {
@@ -15,7 +16,7 @@ describe('normalizeDotProposal', () => {
     const proposal = {
       title: 't',
       objective: 'o',
-      work_shape: 'pipeline',
+      execution_shape: 'pipeline',
       pipeline_ref: 'pipelines/x.json',
     };
     for (const value of [
@@ -47,14 +48,14 @@ describe('normalizeDotProposal', () => {
     const proposal = normalizeDotProposal({
       title: 'Tick overdue operations',
       objective: 'Run the overdue operation tick and record the result.',
-      work_shape: 'task_session',
+      execution_shape: 'task_session',
       unexpected: 'dropped',
     });
     expect(proposal).toEqual({
       action_id: DEFAULT_DOT_ACTION_ID,
       title: 'Tick overdue operations',
       objective: 'Run the overdue operation tick and record the result.',
-      work_shape: 'task_session',
+      execution_shape: 'task_session',
     });
   });
 
@@ -62,7 +63,7 @@ describe('normalizeDotProposal', () => {
     const proposal = normalizeDotProposal({
       title: 'Investigate CI',
       objective: 'Look at the red main build.',
-      work_shape: 'task_session',
+      execution_shape: 'task_session',
       handoff_to: 'repo-guardian',
     });
     expect(proposal.action_id).toBe(DOT_HANDOFF_ACTION_ID);
@@ -73,26 +74,66 @@ describe('normalizeDotProposal', () => {
     const proposal = normalizeDotProposal({
       title: 't',
       objective: 'o',
-      work_shape: 'task_session',
+      execution_shape: 'task_session',
       action_id: 'some_low_risk_policy_action',
     });
     expect(proposal.action_id).toBe(DEFAULT_DOT_ACTION_ID);
   });
 
-  it('rejects unknown shapes, decisions, and malformed ids', () => {
-    expect(() =>
-      normalizeDotProposal({ title: 't', objective: 'o', work_shape: 'deploy' })
-    ).toThrow(/work_shape/);
+  it('reads the deprecated work_shape alias for one release and refuses a conflicting pair', () => {
+    const legacy = normalizeDotProposal({ title: 't', objective: 'o', work_shape: 'pipeline' });
+    expect(legacy.execution_shape).toBe('pipeline');
+    expect(legacy).not.toHaveProperty('work_shape');
+    expect(
+      normalizeDotProposal({
+        title: 't',
+        objective: 'o',
+        execution_shape: 'pipeline',
+        work_shape: 'pipeline',
+      }).execution_shape
+    ).toBe('pipeline');
     expect(() =>
       normalizeDotProposal({
         title: 't',
         objective: 'o',
-        work_shape: 'task_session',
+        execution_shape: 'pipeline',
+        work_shape: 'mission',
+      })
+    ).toThrow(/differ/);
+    expect(() =>
+      normalizeDotProposal({
+        title: 't',
+        objective: 'o',
+        execution_shape: 'pipeline',
+        schema_version: 1,
+      })
+    ).toThrow(/schema_version/);
+  });
+
+  it('names execution_shape in the tool schema and the fenced-reply instructions', () => {
+    const tool = buildDotProposeToolDefinition();
+    const schema = tool.inputSchema as { properties: Record<string, unknown>; required: string[] };
+    expect(schema.properties).toHaveProperty('execution_shape');
+    expect(schema.properties).not.toHaveProperty('work_shape');
+    expect(schema.required).toContain('execution_shape');
+    expect(dotProposalInstructions('fence')).toContain('"execution_shape": "direct_reply"');
+    expect(dotProposalInstructions('fence')).not.toContain('work_shape');
+  });
+
+  it('rejects unknown shapes, decisions, and malformed ids', () => {
+    expect(() =>
+      normalizeDotProposal({ title: 't', objective: 'o', work_shape: 'deploy' })
+    ).toThrow(/execution_shape/);
+    expect(() =>
+      normalizeDotProposal({
+        title: 't',
+        objective: 'o',
+        execution_shape: 'task_session',
         requested_decision: 'never',
       })
     ).toThrow(/requested_decision/);
     expect(() =>
-      normalizeDotProposal({ title: ' ', objective: 'o', work_shape: 'task_session' })
+      normalizeDotProposal({ title: ' ', objective: 'o', execution_shape: 'task_session' })
     ).toThrow(/title/);
   });
 });
@@ -102,7 +143,7 @@ describe('collectDotProposals', () => {
     const many = Array.from({ length: MAX_DOT_PROPOSALS_PER_WAKE + 2 }, (_, i) => ({
       title: `t${i}`,
       objective: 'o',
-      work_shape: 'task_session',
+      execution_shape: 'task_session',
     }));
     const result = collectDotProposals(many);
     expect(result.proposals).toHaveLength(MAX_DOT_PROPOSALS_PER_WAKE);
@@ -115,7 +156,7 @@ describe('parseDotProposalsFromText', () => {
     const reply = [
       'Findings: two overdue operations.',
       '```dot-proposals',
-      '[{"title":"Tick ops","objective":"Tick the overdue ops.","work_shape":"task_session"}]',
+      '[{"title":"Tick ops","objective":"Tick the overdue ops.","execution_shape":"task_session"}]',
       '```',
       '```dot-proposals',
       '{not json}',
@@ -134,7 +175,7 @@ describe('parseDotProposalsFromText', () => {
     const proposal = normalizeDotProposal({
       title: 'Run it',
       objective: 'Run the pipeline',
-      work_shape: 'pipeline',
+      execution_shape: 'pipeline',
       pipeline_ref: 'pipelines/x.json',
       expected_effect: { kr_id: 'ci-green', direction: 'increase' },
       target: 'service:github',
@@ -149,7 +190,7 @@ describe('parseDotProposalsFromText', () => {
   });
 
   it('drops malformed expected_effect, target and intent but keeps the proposal', () => {
-    const base = { title: 't', objective: 'o', work_shape: 'task_session' };
+    const base = { title: 't', objective: 'o', execution_shape: 'task_session' };
     for (const extra of [
       { expected_effect: { direction: 'increase' } },
       { expected_effect: { signal: 's', direction: 'up' } },
@@ -166,7 +207,7 @@ describe('parseDotProposalsFromText', () => {
 
   it('parses the new fields from a fenced block', () => {
     const reply =
-      '```dot-proposals\n[{"title":"t","objective":"o","work_shape":"pipeline","target":"pr:a/b#12","intent":"merge"}]\n```';
+      '```dot-proposals\n[{"title":"t","objective":"o","execution_shape":"pipeline","target":"pr:a/b#12","intent":"merge"}]\n```';
     expect(parseDotProposalsFromText(reply).proposals[0]).toMatchObject({
       target: 'pr:a/b#12',
       intent: 'merge',

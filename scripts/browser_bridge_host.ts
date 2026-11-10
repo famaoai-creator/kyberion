@@ -63,9 +63,10 @@ import {
 } from '@agent/core/secure-io';
 import { auditChain } from '@agent/core/governance/audit-chain';
 import {
-  createDistillCandidateRecord,
-  saveDistillCandidateRecord,
-} from '@agent/core/knowledge/distill-candidate-registry';
+  createMemoryPromotionCandidate,
+  enqueueMemoryPromotionCandidate,
+} from '@agent/core/knowledge/memory-promotion-queue';
+import { resolveCliOperatorIdentity } from '@agent/core/governance/cli-operator-principal';
 import { withExecutionContext, withExecutionContextAsync } from '@agent/core/authority';
 import {
   BrowserBridgeMailboxError,
@@ -252,8 +253,9 @@ function handleSubmitReceipt(message: any): HostResponse {
   // browser automation is no longer an audit silo — WITHOUT creating a mission
   // (zero mission-store churn, fully reversible). (1) record it on the
   // hash-chained audit trail (which Chronos surfaces), and (2) for a successful
-  // run, seed a distill-candidate so the procedure can enter the memory/promotion
-  // loop. Both are best-effort enrichment; never fail the receipt on them.
+  // run, capture a learning on the memory queue so the procedure can enter the
+  // memory/promotion loop. Both are best-effort enrichment; never fail the
+  // receipt on them.
   withExecutionContext('surface_runtime', () => {
     try {
       auditChain.record({
@@ -279,26 +281,33 @@ function handleSubmitReceipt(message: any): HostResponse {
       /* audit enrichment is best-effort */
     }
 
-    if (receipt.status === 'completed') {
+    // D8: the extension acts for this machine's owner, so the learning is
+    // personal to that owner and goes through the personal promotion path.
+    // Without a local owner member there is no scope to write — not captured.
+    const ownerNhi =
+      receipt.status === 'completed' ? resolveCliOperatorIdentity().principalId : null;
+    if (ownerNhi) {
       try {
-        saveDistillCandidateRecord(
-          createDistillCandidateRecord({
-            source_type: 'task_session',
-            tier: 'confidential',
-            title: `Browser procedure on ${receipt.origin}`,
-            summary: receipt.summary || `Completed browser automation on ${receipt.origin}`,
-            status: 'proposed',
-            target_kind: 'sop_candidate',
-            evidence_refs: [persisted.path || `receipt:${receipt.receipt_id}`],
-            metadata: {
-              surface: 'browser-extension',
-              origin: receipt.origin,
-              recording_id: receipt.recording_id,
-            },
+        enqueueMemoryPromotionCandidate(
+          createMemoryPromotionCandidate({
+            kind: 'lesson',
+            sourceType: 'task_session',
+            sourceRef: `browser_receipt:${receipt.receipt_id}`,
+            proposedMemoryKind: 'sop',
+            summary: `Browser procedure on ${receipt.origin}: ${
+              receipt.summary || 'completed browser automation'
+            }`,
+            evidenceRefs: [
+              persisted.path
+                ? pathResolver.toRepoRelative(persisted.path)
+                : `receipt:${receipt.receipt_id}`,
+            ],
+            sensitivityTier: 'personal',
+            scope: { tier: 'personal', owner_nhi: ownerNhi },
           })
         );
       } catch {
-        /* distill enrichment is best-effort */
+        /* learning capture is best-effort */
       }
     }
   });

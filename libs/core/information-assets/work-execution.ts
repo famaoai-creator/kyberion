@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import { isDeepStrictEqual } from 'node:util';
 import {
   getWorkItem,
@@ -27,7 +28,7 @@ import {
 import type { InformationAssetObservation } from './types.js';
 export interface InformationAssetWorkDeps {
   rootDir?: string;
-  tier: 'confidential' | 'personal';
+  tier: Exclude<StorageDataTier, 'public'>;
   loadObservation(
     binding: InformationAssetWorkBinding
   ): Promise<InformationAssetObservation> | InformationAssetObservation;

@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
-  "required": ["role", "description", "write_scopes", "scope_classes", "allowed_actuators", "tier_access"],
+  "required": ["role"],
   "properties": {
     "role": { "type": "string" },
     "description": { "type": "string" },
@@ -9,6 +9,30 @@
     "write_scopes": { "type": "array", "items": { "type": "string" } },
     "scope_classes": { "type": "array", "items": { "type": "string" } },
     "allowed_actuators": { "type": "array", "items": { "type": "string" } },
-    "tier_access": { "type": "array", "items": { "type": "string" } }
+    "tier_access": { "type": "array", "items": { "type": "string" } },
+    "assignable": {
+      "type": "boolean",
+      "description": "false for a process role: assumed by a script or service only, never offered to teams, organizations or dots, and absent from authority-role-index.json."
+    },
+    "permissions": {
+      "type": "object",
+      "description": "The role's path permissions. sync_authority_roles copies them verbatim into security-policy.json authority_role_permissions (validated there by security-policy.schema.json)."
+    }
+  },
+  "if": { "properties": { "assignable": { "const": false } }, "required": ["assignable"] },
+  "then": {
+    "required": ["permissions"],
+    "not": {
+      "anyOf": [
+        { "required": ["default_persona"] },
+        { "required": ["write_scopes"] },
+        { "required": ["scope_classes"] },
+        { "required": ["allowed_actuators"] },
+        { "required": ["tier_access"] }
+      ]
+    }
+  },
+  "else": {
+    "required": ["description", "write_scopes", "scope_classes", "allowed_actuators", "tier_access"]
   }
 }

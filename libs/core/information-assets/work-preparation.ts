@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import {
   delegateTaskWithUntrustedData,
   getReasoningBackend,
@@ -35,7 +36,10 @@ const validate = createAjv().compile({
 export async function prepareInformationAssetWork(
   recipe: InformationIntakeRecipe,
   observation: InformationAssetObservation,
-  options: { tier: 'confidential' | 'personal'; backend?: Pick<ReasoningBackend, 'delegateTask'> }
+  options: {
+    tier: Exclude<StorageDataTier, 'public'>;
+    backend?: Pick<ReasoningBackend, 'delegateTask'>;
+  }
 ): Promise<PreparedInformationWork> {
   if (
     recipe.completion === 'external_readback' &&

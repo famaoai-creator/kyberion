@@ -5,6 +5,10 @@
  * delete. It only archives stale proposal records that carry the exact
  * background-review provenance marker. Bundled, manually authored, promoted,
  * and otherwise unprovenanced records are protected by default.
+ *
+ * D8: proposals are MemoryCandidate queue rows (background-review-proposals.ts);
+ * archiving sets the row `rejected` with its provenance kept, restoring sets
+ * it back to `queued`.
  */
 
 import { assertBackgroundReviewOperationAllowed } from './background-review-policy.js';
@@ -17,11 +21,11 @@ import { readTextFile } from '../foundation/text.js';
 import { runtimeStatePath } from '../foundation/runtime-state-roots.js';
 import { assertMemoryScope } from '../knowledge/memory-scope.js';
 import {
-  loadDistillCandidateRecord,
-  listDistillCandidateRecords,
-  mutateDistillCandidateRecord,
-  type DistillCandidateRecord,
-} from '../knowledge/distill-candidate-registry.js';
+  listBackgroundReviewProposals,
+  loadBackgroundReviewProposal,
+  mutateBackgroundReviewProposal,
+  type BackgroundReviewProposalRecord,
+} from './background-review-proposals.js';
 
 const DEFAULT_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 const DEFAULT_LIMIT = 50;
@@ -33,7 +37,10 @@ export interface BackgroundReviewCuratorInput {
   maxAgeMs?: number;
   limit?: number;
   dryRun?: boolean;
-  /** Exact storage scope; omitted addresses only the legacy candidate registry. */
+  /**
+   * Exact capture scope. Omitted: the shared and tenant queues (personal owner
+   * partitions are reached only with their exact scope).
+   */
   scope?: MemoryScopeEnvelope;
 }
 
@@ -57,7 +64,7 @@ interface ProposalMaintenance {
   updated_at?: string;
 }
 
-function maintenanceFor(record: DistillCandidateRecord): ProposalMaintenance | null {
+function maintenanceFor(record: BackgroundReviewProposalRecord): ProposalMaintenance | null {
   const value = record.metadata?.maintenance;
   if (value === undefined) return {};
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
@@ -74,10 +81,13 @@ function maintenanceFor(record: DistillCandidateRecord): ProposalMaintenance | n
 }
 
 function sameApprovalScope(
-  record: DistillCandidateRecord,
+  record: BackgroundReviewProposalRecord,
   approvalScope: ReturnType<typeof listApprovalRequests>[number]['scope']
 ): boolean {
-  if (!record.scope || !approvalScope) return !record.scope && !approvalScope;
+  // Background-review approvals are bound to the candidate id, not a scope:
+  // an unscoped approval protects the proposal it names in any scope.
+  if (!approvalScope) return true;
+  if (!record.scope) return false;
   if (record.scope.owner_nhi && record.scope.owner_nhi !== approvalScope.nhi_id) return false;
   return (
     [
@@ -98,7 +108,7 @@ function positiveInteger(value: number | undefined, fallback: number): number {
   return Math.max(0, Math.floor(value));
 }
 
-function isBackgroundReviewProposal(record: DistillCandidateRecord): boolean {
+function isBackgroundReviewProposal(record: BackgroundReviewProposalRecord): boolean {
   const metadata = record.metadata;
   if (!metadata || metadata.origin !== BACKGROUND_REVIEW_ORIGIN) return false;
   const provenance = metadata.provenance;
@@ -109,7 +119,7 @@ function isBackgroundReviewProposal(record: DistillCandidateRecord): boolean {
   );
 }
 
-function timestampFor(record: DistillCandidateRecord): number {
+function timestampFor(record: BackgroundReviewProposalRecord): number {
   const used = maintenanceFor(record)?.last_used_at;
   return Math.max(
     Date.parse(String(record.updated_at || record.created_at || '')),
@@ -181,7 +191,7 @@ function retentionReferences(scope?: MemoryScopeEnvelope): {
 }
 
 function referenceProtection(
-  record: DistillCandidateRecord,
+  record: BackgroundReviewProposalRecord,
   references: ReturnType<typeof retentionReferences>
 ): string[] {
   if (!references.complete) return ['reference_scan_incomplete'];
@@ -204,7 +214,7 @@ export interface BackgroundReviewMaintenanceInput {
 
 export interface BackgroundReviewMaintenanceResult {
   candidate_id: string;
-  status: DistillCandidateRecord['status'];
+  status: BackgroundReviewProposalRecord['status'];
   changed: boolean;
   dry_run: boolean;
   pinned: boolean;
@@ -213,8 +223,8 @@ export interface BackgroundReviewMaintenanceResult {
 
 function maintenanceRecord(
   input: BackgroundReviewMaintenanceInput,
-  record = loadDistillCandidateRecord(input.candidateId, input.scope)
-): DistillCandidateRecord {
+  record = loadBackgroundReviewProposal(input.candidateId, input.scope)
+): BackgroundReviewProposalRecord {
   if (!input.actorId.trim() || input.actorId.length > 200 || /[\r\n\u0000]/u.test(input.actorId))
     throw new Error('[BACKGROUND_REVIEW_MAINTENANCE] A bounded actor id is required');
   if (!record || !isBackgroundReviewProposal(record) || record.status === 'promoted')
@@ -228,24 +238,24 @@ function maintenanceRecord(
 
 function maintainProposal(
   input: BackgroundReviewMaintenanceInput,
-  transform: (record: DistillCandidateRecord) => DistillCandidateRecord
+  transform: (record: BackgroundReviewProposalRecord) => BackgroundReviewProposalRecord
 ): BackgroundReviewMaintenanceResult {
   let result: BackgroundReviewMaintenanceResult | undefined;
-  const mutate = (record: DistillCandidateRecord) => {
+  const mutate = (record: BackgroundReviewProposalRecord) => {
     const next = transform(maintenanceRecord(input, record));
     const changed = next !== record;
     result = maintenanceResult(next, changed, input.dryRun);
     return changed ? { status: next.status, metadata: next.metadata } : null;
   };
   if (input.dryRun) mutate(maintenanceRecord(input));
-  else mutateDistillCandidateRecord(input.candidateId, mutate, input.scope);
+  else mutateBackgroundReviewProposal(input.candidateId, mutate, input.scope);
   if (!result)
     throw new Error('[BACKGROUND_REVIEW_MAINTENANCE] Eligible proposal not found in this scope');
   return result;
 }
 
 function maintenanceResult(
-  record: DistillCandidateRecord,
+  record: BackgroundReviewProposalRecord,
   changed: boolean,
   dryRun = false
 ): BackgroundReviewMaintenanceResult {
@@ -336,18 +346,24 @@ export function curateBackgroundReviewProposals(
   const maxAgeMs = positiveInteger(input.maxAgeMs, DEFAULT_MAX_AGE_MS);
   const limit = positiveInteger(input.limit, DEFAULT_LIMIT);
   if (!Number.isFinite(nowMs)) throw new Error('[BACKGROUND_REVIEW_CURATOR] Invalid now timestamp');
-  const records = listDistillCandidateRecords(input.scope);
-  const references = retentionReferences(input.scope);
+  const records = listBackgroundReviewProposals(input.scope);
+  // Each proposal is checked against public catalogs and its own tenant's.
+  const referenceCache = new Map<string, ReturnType<typeof retentionReferences>>();
+  const referencesFor = (record: BackgroundReviewProposalRecord, fresh = false) => {
+    const key = record.scope?.tenant_slug || '';
+    if (fresh || !referenceCache.has(key))
+      referenceCache.set(key, retentionReferences(record.scope));
+    return referenceCache.get(key)!;
+  };
   // The existing approval store is authoritative for work awaiting a decision or
   // application. Do not archive a proposal out from under either state.
   const listActiveApprovals = () =>
     listApprovalRequests({
       storageChannels: ['background-review'],
       status: ['pending', 'approved'],
-      ...(input.scope ? { scope: input.scope } : {}),
     });
   const hasActiveApproval = (
-    record: DistillCandidateRecord,
+    record: BackgroundReviewProposalRecord,
     approvals: ReturnType<typeof listActiveApprovals>
   ) =>
     approvals.some(
@@ -379,7 +395,7 @@ export function curateBackgroundReviewProposals(
     if (!maintenance) reasons.push('invalid_maintenance');
     if (maintenance?.pinned) reasons.push('pinned');
     if (maintenance?.automatic_archive !== true) reasons.push('automatic_archive_disabled');
-    reasons.push(...referenceProtection(record, references));
+    reasons.push(...referenceProtection(record, referencesFor(record)));
     if (hasActiveApproval(record, approvals)) reasons.push('active_approval');
     if (reasons.length) {
       result.protected_records.push(record.candidate_id);
@@ -402,7 +418,7 @@ export function curateBackgroundReviewProposals(
     if (input.dryRun) continue;
 
     let archived = false;
-    mutateDistillCandidateRecord(
+    mutateBackgroundReviewProposal(
       record.candidate_id,
       (current) => {
         const liveMaintenance = maintenanceFor(current);
@@ -420,7 +436,7 @@ export function curateBackgroundReviewProposals(
         // Approval request creation holds this same candidate lock. Re-read
         // references here, rather than trusting the earlier scan snapshot.
         if (hasActiveApproval(current, listActiveApprovals())) return null;
-        if (referenceProtection(current, retentionReferences(input.scope)).length) return null;
+        if (referenceProtection(current, referencesFor(current, true)).length) return null;
         archived = true;
         return {
           status: 'archived',
@@ -435,7 +451,7 @@ export function curateBackgroundReviewProposals(
           },
         };
       },
-      input.scope
+      record.scope
     );
     if (archived) result.archived.push(record.candidate_id);
     else {

@@ -4,7 +4,7 @@ import { listIdentityDirectory, showIdentity } from '@agent/core/organization/id
 const HELP = [
   'Usage: pnpm organization identity <list|show> [options]',
   '',
-  'Unified human + NHI directory reader (ActorRef: human=user:<member_id>, agent/service=kyberion://agent/<org>/<slug>).',
+  'Unified human + NHI directory reader (ActorRef: human=user:<member_id>, agent/service=kyberion://agent/<tenant>/<org|_>/<slug>).',
   'Writes stay on existing governed verbs (member link-identity, mission team/staff/restaff,',
   'onboarding company, tenant activation probe) — this command never writes the ledger.',
   'Use organization_id together with tenant_slug to project organizational responsibilities for humans and agents.',
@@ -12,7 +12,7 @@ const HELP = [
   'orphan=true means accountability or scope needs attention.',
   '',
   '  list [--organization-id <id>] [--tenant-slug <slug>] [--kind human|agent|service] [--include-retired] [--json]',
-  '  show --actor <user:<member_id>|kyberion://agent/<org>/<slug>> [--json]',
+  '  show --actor <user:<member_id>|kyberion://agent/<tenant>/<org|_>/<slug>> [--json]',
   'Empty list ([]) means no match; show throws identity not found.',
 ].join('\n');
 
@@ -49,7 +49,9 @@ export async function runOrganizationIdentity(args: string[]): Promise<void> {
   if (cmd === 'show') {
     const actor = flag(rest, '--actor') ?? rest.find((a) => !a.startsWith('--'));
     if (!actor)
-      throw new Error('show requires --actor <user:<member_id>|kyberion://agent/<org>/<slug>>');
+      throw new Error(
+        'show requires --actor <user:<member_id>|kyberion://agent/<tenant>/<org|_>/<slug>>'
+      );
     const result = withExecutionContext('sovereign_concierge', () => showIdentity(actor));
     if (!result) throw new Error(`identity not found: ${actor}`);
     process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);

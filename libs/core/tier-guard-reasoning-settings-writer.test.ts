@@ -37,7 +37,7 @@ function copyProductDirectory(relative: string): void {
 }
 
 const child = String.raw`
-import { withExecutionContextAsync, resolveIdentityContext, isRoleAssumptionAllowed } from '@agent/core/authority';
+import { withStoreGrantAsync, resolveIdentityContext, isRoleAssumptionAllowed } from '@agent/core/authority';
 import * as io from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
 import { validateReadPermission, validateWritePermission } from '@agent/core/tier-guard';
@@ -55,7 +55,7 @@ const result = {
   operatorAllowed: isRoleAssumptionAllowed('operator_surface', 'reasoning_settings_writer'),
   unrelatedSystemAllowed: isRoleAssumptionAllowed('slack_bridge', 'reasoning_settings_writer'),
 };
-await withExecutionContextAsync('reasoning_settings_writer', async () => {
+await withStoreGrantAsync('reasoning_settings_writer', async () => {
   const identity = resolveIdentityContext();
   result.identity = { persona: identity.persona, role: identity.role };
   result.writes = [config, config + '.previous', config + '.history/1.json'].map(file => {
@@ -152,21 +152,24 @@ beforeAll(async () => {
 
 afterAll(() => safeRmSync(fixture, { recursive: true, force: true }));
 
-describe('reasoning settings writer role boundaries', () => {
+describe('reasoning settings writer store grant boundaries', () => {
   it('adds only the three bounded role grants and no actuator authority', () => {
     const security = loadJson(path.join(ROOT, 'knowledge/product/governance/security-policy.json'));
-    expect(security.authority_role_permissions[ROLE]).toEqual({
+    // S4: a declared store grant, not an Authority Role (no card, no index entry).
+    expect(security.authority_role_permissions[ROLE]).toBeUndefined();
+    expect(security.store_grants[ROLE]).toMatchObject({
       allow_read: GRANTS,
       allow_write: GRANTS,
     });
+    expect(Object.keys(security.store_grants[ROLE]).sort()).toEqual([
+      'allow_read',
+      'allow_write',
+      'description',
+    ]);
     const index = loadJson(
       path.join(ROOT, 'knowledge/product/governance/authority-role-index.json')
     );
-    expect(index.authority_roles[ROLE]).toMatchObject({
-      default_persona: 'worker',
-      write_scopes: GRANTS,
-      allowed_actuators: [],
-    });
+    expect(index.authority_roles[ROLE]).toBeUndefined();
     const assumptions = loadJson(
       path.join(ROOT, 'knowledge/product/governance/role-assumption-policy.json')
     );

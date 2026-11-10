@@ -1,7 +1,7 @@
 ---
 title: 'listen の confidential scratch — backend 読み取り権限の橋渡し設計ノート (R04 residual)'
 tags: [perception, listen, stt, tier-guard, role-assumption, design-note, r04]
-last_updated: 2026-11-06
+last_updated: 2026-11-10
 ---
 
 # listen の confidential scratch — backend 読み取り権限の橋渡し (R04 residual)
@@ -83,7 +83,7 @@ permission_denied 分類は正しい fail-closed であり、本書で扱った�
 
 `active/shared/tmp/confidential/${KYBERION_TENANT}/` を読める grant:
 
-- **persona `worker`**: `persona_permissions.worker.allow_read` に tenant 展開
+- **persona `worker`**: base Authority Role `base_worker`（`authority_role_permissions.base_worker.allow_read`、旧 `persona_permissions.worker`）に tenant 展開
   対応の当該 prefix が明示登録されている。
 - **広い tmp grant を持つ role**: `infrastructure_sentinel` / `asset_promoter` /
   `secret_introduce` / `dot_lifecycle_writer` /

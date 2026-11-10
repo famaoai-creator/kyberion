@@ -35,7 +35,7 @@ function runtime() {
         action_id: candidate.proposal.action_id,
         title: candidate.proposal.title,
         objective: candidate.proposal.objective,
-        work_shape: candidate.proposal.work_shape,
+        execution_shape: candidate.proposal.execution_shape,
         pipeline_ref: candidate.proposal.pipeline_ref,
         status: 'admitted',
         proposal_hash: dotProposalHash(charter.dot_id, candidate.proposal),

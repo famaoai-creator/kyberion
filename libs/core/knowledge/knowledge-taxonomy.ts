@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { pathResolver } from '../path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '../secure-io.js';
@@ -21,7 +22,7 @@ export interface KnowledgeTaxonomyDirectoryDefault {
 
 export interface KnowledgeTaxonomy {
   version: string;
-  default_tier_inference?: Record<string, 'public' | 'confidential' | 'personal'>;
+  default_tier_inference?: Record<string, StorageDataTier>;
   kinds: Record<string, KnowledgeTaxonomyKind>;
   directory_defaults: KnowledgeTaxonomyDirectoryDefault[];
   overlay_precedence: KnowledgeTaxonomyScope[];
