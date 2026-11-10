@@ -263,6 +263,10 @@ describe('agent-identity — legacy id migration and aliases', () => {
   });
 
   it('migration writes are governed', () => {
-    expect(() => applyAgentIdentityIdMigration()).toThrow(/requires an agent-runtime-managing/);
+    // Explicit non-writer context: CI exports MISSION_ROLE=mission_controller,
+    // so the ambient role would be allowed.
+    expect(() => withExecutionContext('worker', () => applyAgentIdentityIdMigration())).toThrow(
+      /requires an agent-runtime-managing/
+    );
   });
 });
