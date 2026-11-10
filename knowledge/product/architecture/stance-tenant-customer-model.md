@@ -2,6 +2,7 @@
 title: Stance / Tenant / Customer — three layers that all get called "customer"
 tags: [architecture, governance, tenant, customer, stance, affiliation, multi-tenant]
 last_updated: 2026-11-06
+concepts: [stance, tenant, tenants-customers]
 ---
 
 # Stance / Tenant / Customer

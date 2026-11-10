@@ -207,6 +207,15 @@
       "rationale": "Keeps status, concept, and onboarding documentation anchored to one explicit source map."
     },
     {
+      "id": "concept-registry",
+      "scope": "pr",
+      "executable": "node",
+      "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check_concept_registry.ts"],
+      "baseline": "knowledge/product/governance/concept-registry-baseline.json",
+      "owner": "documentation",
+      "rationale": "One registered definition, canonical doc and glossary entry per high-confusion term; retired docs carry doc_status + superseded_by and never stay canonical; new architecture docs map onto registered concepts; every monthly plan is indexed."
+    },
+    {
       "id": "documentation-links",
       "scope": "pr",
       "executable": "node",

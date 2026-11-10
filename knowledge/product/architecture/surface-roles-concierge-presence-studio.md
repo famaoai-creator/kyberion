@@ -2,6 +2,7 @@
 title: 'Surface roles: Concierge vs Presence Studio (and Chronos Mirror)'
 tags: [surfaces, architecture, concierge, presence-studio, roles]
 last_updated: 2026-11-08
+concepts: [surface, concierge, front-desk]
 ---
 
 # Surface roles: Concierge vs Presence Studio (and Chronos Mirror)
