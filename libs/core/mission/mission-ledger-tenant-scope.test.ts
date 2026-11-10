@@ -300,8 +300,8 @@ describe('mission ledger scope (D9)', () => {
     ).toThrow(/ROLE_TENANT_SCOPE_MISMATCH/);
   });
 
-  it('lets only the tenant ledger store role write a tenant partition, bound or not', async () => {
-    const { withExecutionContext } = await import('../authority.js');
+  it('lets only the tenant ledger store grant write a tenant partition, bound or not', async () => {
+    const { withExecutionContext, withStoreGrant } = await import('../authority.js');
     const { safeAppendFileSync, safeWriteFile } = await import('../secure-io.js');
     const { validateWritePermission } = await import('../tier-guard.js');
     const partitionFile = path.join(
@@ -319,12 +319,9 @@ describe('mission ledger scope (D9)', () => {
       });
     }
     expect(
-      withExecutionContext(
-        'tenant_ledger_store',
-        () => validateWritePermission(partitionFile).allowed,
-        undefined,
-        TENANT
-      )
+      withStoreGrant('tenant_ledger_store', () => validateWritePermission(partitionFile).allowed, {
+        tenantSlug: TENANT,
+      })
     ).toBe(true);
   });
 

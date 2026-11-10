@@ -21,7 +21,11 @@ vi.mock('@agent/core/foundation', () => ({
 }));
 vi.mock('@agent/core/scope-context', () => ({ resolveScopeResolution: mocks.serverScope }));
 vi.mock('@agent/core/mission/mission-state', () => ({ loadState: mocks.state }));
-vi.mock('@agent/core/authority', () => ({ withExecutionContextAsync: mocks.context }));
+vi.mock('@agent/core/authority', () => ({
+  withExecutionContextAsync: mocks.context,
+  // S4: the settings save opens the reasoning_settings_writer store grant.
+  withStoreGrantAsync: mocks.context,
+}));
 vi.mock('@agent/core/mission/mission-lifecycle-service', () => ({
   resolveMissionTeamSelectionScope: mocks.scope,
   missionLifecycleService: {

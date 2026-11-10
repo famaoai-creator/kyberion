@@ -27,7 +27,7 @@ import * as crypto from 'node:crypto';
 import { z } from 'zod';
 
 import { createLogger } from '../logger.js';
-import { withExecutionContextAsync } from '../authority.js';
+import { withStoreGrantAsync } from '../authority.js';
 import { isRecord } from '../foundation/text.js';
 import { appendGovernedArtifactJsonl } from '../workforce/artifact-store.js';
 import { frameUntrustedInput } from '../governance/untrusted-input-framing.js';
@@ -407,7 +407,7 @@ export async function defaultPeerAutoReplyGenerate(
   const generator = resolveIsolatedTextGenerator(
     options.backend ?? DEFAULT_PEER_AUTO_REPLY_BACKEND
   );
-  const result = await withExecutionContextAsync(
+  const result = await withStoreGrantAsync(
     PEER_RESPONDER_READER_ROLE,
     () =>
       withReasoningPayloadScope(
@@ -429,8 +429,7 @@ export async function defaultPeerAutoReplyGenerate(
             allowUntestedVersion: options.allowUntestedVersion === true,
           })
       ),
-    undefined,
-    input.tenantId
+    { tenantSlug: input.tenantId }
   );
   return result.reply;
 }
@@ -440,7 +439,7 @@ async function defaultRetrieveKnowledge(input: {
   topic: string;
   limit: number;
 }): Promise<TenantKnowledgeHit[]> {
-  return withExecutionContextAsync(
+  return withStoreGrantAsync(
     PEER_RESPONDER_READER_ROLE,
     () =>
       queryTenantKnowledge({
@@ -448,8 +447,7 @@ async function defaultRetrieveKnowledge(input: {
         topic: input.topic,
         limit: input.limit,
       }),
-    undefined,
-    input.tenantId
+    { tenantSlug: input.tenantId }
   );
 }
 

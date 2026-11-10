@@ -23,7 +23,7 @@ import { resolveAuthnSurfaceViewerScope } from '@agent/core/surface/surface-auth
 import { anonymousLoopbackAllowed } from '@agent/core/surface/installation-owner-access';
 import type { ResolvedPrincipal } from '@agent/core/authn-principal-resolver';
 import type { EventScopeInput } from '@agent/core/event-scope';
-import { withExecutionContext } from '@agent/core/authority';
+import { withExecutionContext, withStoreGrant } from '@agent/core/authority';
 import { getRegisteredEnvBool, getRegisteredEnvText } from '@agent/core/foundation';
 import type { HeadlessViewerScope } from '@agent/core/headless-surface-contract';
 import type { SurfaceAuthorizationContext } from '@agent/core/surface/surface-authorization';
@@ -166,11 +166,10 @@ function registrations(): ChronosTokenRegistration[] | null {
     // every token viewer is rejected as unknown.
     // TR-01: the narrow reader role (only grant: chronos-access.json) instead
     // of the broad sovereign_concierge.
-    return withExecutionContext(
+    return withStoreGrant(
       CHRONOS_TOKEN_REGISTRY_READER_ROLE,
       () => readChronosTokenRegistrations(),
-      undefined,
-      ''
+      { tenantSlug: '' }
     );
   } catch {
     throw new ConciergeViewerError(401, 'Concierge viewer token registry is unavailable.');

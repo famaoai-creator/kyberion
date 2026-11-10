@@ -1534,6 +1534,10 @@ secure-io の 40 以下は別の段階）。上の表は G0 の時点の見込�
 | R-05 判定関数の共有                  | `decide` 一つ                                         |
 | R-09 派生をたどる削除                | カタログの `derived_from` と `retention`（P3 で使う） |
 
+### S4: 保存先専用ロールの宣言された許可証化（2026-11-10）
+
+[スコープ・ID・Grant の統合計画](./SCOPE_IDENTITY_GRANT_CONSOLIDATION_PLAN_2026-11-10.ja.md) の S4 で、残っていた保存先専用ロール 30 件（G3 の一覧の 29 件。`dot_lifecycle_writer` は 2 件に分けたもの）のうち 28 件を、ロールではなく **宣言された許可証** にした。G2 の許可証ごとのモジュールではなく、1 つの汎用の仕組み（`foundation/declared-store-grant.ts`、`authority.ts` の `withStoreGrant`）で、旧ロールの権限を `security-policy.json` の `store_grants` にそのまま移した。判定の道筋は旧ロールと同じ（`rolePermissionRecord` が、許可証が開いている間だけ宣言を返す）ので、(呼び出し元, パス, 操作) の判定は変わらない。違いは、その名前として env で動くプロセスと許可証の中の子プロセスが I/O を一切できないこと（狭くなる側）だけ。G3 で決めた 3 つの問い（横断読み、流れの書き込み、拒否だけ）はオーナーの判断で決まり、それぞれ開示（監査に残す）、書き込みごとの許可証、`store_grants.<name>.narrow` の明示した拒否になった。詳細と残り（`notification_preferences_reader`、`tool_runtime_policy_reader`）は統合計画の S4 の節を参照。
+
 ## 統合時の安全性補強（2026-11-08）
 
 - narrow 宣言は schema と同じく、各階層の未知キー、空の拒否理由・パス・matcher・content ID を拒否する。不正な policy / role コンテナーを「宣言なし」と扱わない。

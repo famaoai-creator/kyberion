@@ -1,6 +1,9 @@
 import * as path from 'node:path';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { withExecutionContext as initialContext } from '../authority.js';
+import {
+  withExecutionContext as initialContext,
+  withStoreGrant as initialGrant,
+} from '../authority.js';
 import { rootDir } from '../path-resolver.js';
 import * as initialIO from '../secure-io.js';
 
@@ -13,6 +16,7 @@ import * as initialIO from '../secure-io.js';
 const SOURCE_ROOT = rootDir();
 const ROOT = path.join(SOURCE_ROOT, 'active/shared/tmp/tenant-approval-boundary-' + process.pid);
 let withExecutionContext = initialContext;
+let withStoreGrant = initialGrant;
 let { safeExistsSync, safeReadFile, safeReaddir, safeRmSync, safeWriteFile } = initialIO;
 let retention: typeof import('../storage/storage-retention-catalog.js');
 let guard: typeof import('../tier-guard.js');
@@ -45,8 +49,9 @@ const keys = [
 ] as const;
 const saved = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
 const privileged = <T>(fn: () => T) => withExecutionContext('ecosystem_architect', fn);
+// S4: tenant_approval_store is a declared store grant, opened as the approval store opens it.
 const asStore = <T>(fn: () => T, tenant: string) =>
-  withExecutionContext('tenant_approval_store', fn, undefined, tenant);
+  withStoreGrant('tenant_approval_store', fn, { tenantSlug: tenant });
 const asCaller = <T>(role: string, fn: () => T, tenant?: string) =>
   withExecutionContext(role, fn, undefined, tenant);
 
@@ -82,7 +87,7 @@ beforeAll(async () => {
   vi.resetModules();
   ({ safeExistsSync, safeReadFile, safeReaddir, safeRmSync, safeWriteFile } =
     await import('../secure-io.js'));
-  ({ withExecutionContext } = await import('../authority.js'));
+  ({ withExecutionContext, withStoreGrant } = await import('../authority.js'));
   retention = await import('../storage/storage-retention-catalog.js');
   guard = await import('../tier-guard.js');
   store = await import('./approval-store.js');
@@ -140,9 +145,12 @@ describe('tenant approval partitions use real secure-io tier and tenant boundari
     expect(() =>
       asCaller('mission_controller', () => asStore(() => undefined, OTHER), TENANT)
     ).toThrow(/ROLE_TENANT_SCOPE_MISMATCH/);
-    expect(() => withExecutionContext('tenant_approval_store', () => undefined)).toThrow(
+    expect(() => withStoreGrant('tenant_approval_store', () => undefined)).toThrow(
       /ROLE_TENANT_SCOPE_REQUIRED/
     );
+    expect(() =>
+      withExecutionContext('tenant_approval_store', () => undefined, undefined, TENANT)
+    ).toThrow(/ROLE_ASSUMPTION_DENIED/);
   });
 
   it('denies a caller without the store role reads and writes of a tenant record, bound or not', () => {
@@ -192,18 +200,14 @@ describe('tenant approval partitions use real secure-io tier and tenant boundari
   });
 
   it('lets the index reader list tenant directory names but never read a record', () =>
-    withExecutionContext(
-      'tenant_approval_partition_index_reader',
-      () => {
-        expect(safeReaddir(path.join(ROOT, STORE, 'confidential'))).toEqual(
-          expect.arrayContaining([TENANT, OTHER])
-        );
-        expect(() => safeReadFile(recordFile(TENANT), { encoding: 'utf8' })).toThrow(
-          /SECURITY|POLICY|tenant\.|denied/i
-        );
-      },
-      'worker'
-    ));
+    withStoreGrant('tenant_approval_partition_index_reader', () => {
+      expect(safeReaddir(path.join(ROOT, STORE, 'confidential'))).toEqual(
+        expect.arrayContaining([TENANT, OTHER])
+      );
+      expect(() => safeReadFile(recordFile(TENANT), { encoding: 'utf8' })).toThrow(
+        /SECURITY|POLICY|tenant\.|denied/i
+      );
+    }));
 
   it('places a tenant-scoped approval in the protected partition and hides it from another tenant', () => {
     asStore(() => safeRmSync(recordFile(TENANT), { force: true }), TENANT);

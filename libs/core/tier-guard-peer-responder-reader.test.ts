@@ -4,7 +4,7 @@ import { validateReadPermission, validateWritePermission } from './tier-guard.js
 import * as pathResolver from './path-resolver.js';
 // Install the full identity resolver (MISSION_ROLE / tenant resolution) the
 // production read path uses, instead of the bootstrap fallback.
-import './authority.js';
+import { withStoreGrant } from './authority.js';
 
 // The tier guard emits best-effort audit events on denial; keep them off the
 // real audit chain so the suite stays hermetic.
@@ -29,6 +29,10 @@ const ENV_KEYS = [
 const at = (relative: string): string => path.join(ROOT, relative);
 
 describe('tier-guard peer_responder_reader authority role', () => {
+  // S4: peer_responder_reader is a declared store grant (an audited disclosure), opened as
+  // mesh/peer-auto-reply.ts opens it, bound to the receiving tenant.
+  const itGrant = (name: string, body: () => void) =>
+    it(name, () => withStoreGrant('peer_responder_reader', body, { tenantSlug: 'acme-corp' }));
   const saved: Partial<Record<(typeof ENV_KEYS)[number], string | undefined>> = {};
 
   beforeEach(() => {
@@ -36,7 +40,6 @@ describe('tier-guard peer_responder_reader authority role', () => {
       saved[key] = process.env[key];
       delete process.env[key];
     }
-    process.env.MISSION_ROLE = 'peer_responder_reader';
     process.env.KYBERION_TENANT = 'acme-corp';
   });
 
@@ -47,7 +50,7 @@ describe('tier-guard peer_responder_reader authority role', () => {
     }
   });
 
-  it('reads the bound tenant profile, confidential knowledge and customer overlay', () => {
+  itGrant('reads the bound tenant profile, confidential knowledge and customer overlay', () => {
     for (const relative of [
       'knowledge/personal/tenants/acme-corp.json',
       'knowledge/confidential/acme-corp/notes/handbook.md',
@@ -57,18 +60,21 @@ describe('tier-guard peer_responder_reader authority role', () => {
     }
   });
 
-  it('never reads another tenant, other personal files, or the shared confidential tier', () => {
-    for (const relative of [
-      'knowledge/personal/tenants/other-corp.json',
-      'knowledge/personal/my-identity.json',
-      'knowledge/confidential/other-corp/notes/handbook.md',
-      'knowledge/confidential/common/glossary.md',
-    ]) {
-      expect(validateReadPermission(at(relative)).allowed, relative).toBe(false);
+  itGrant(
+    'never reads another tenant, other personal files, or the shared confidential tier',
+    () => {
+      for (const relative of [
+        'knowledge/personal/tenants/other-corp.json',
+        'knowledge/personal/my-identity.json',
+        'knowledge/confidential/other-corp/notes/handbook.md',
+        'knowledge/confidential/common/glossary.md',
+      ]) {
+        expect(validateReadPermission(at(relative)).allowed, relative).toBe(false);
+      }
     }
-  });
+  );
 
-  it('never reads the bound tenant connection secrets (deny_read carve-out)', () => {
+  itGrant('never reads the bound tenant connection secrets (deny_read carve-out)', () => {
     for (const relative of [
       'knowledge/confidential/acme-corp/connections/peer-network.json',
       'knowledge/confidential/acme-corp/connections/',
@@ -85,7 +91,7 @@ describe('tier-guard peer_responder_reader authority role', () => {
     ).toEqual({ allowed: true });
   });
 
-  it('matches the deny_read carve-out case-insensitively and after `..` resolution', () => {
+  itGrant('matches the deny_read carve-out case-insensitively and after `..` resolution', () => {
     // Case-insensitive volumes (APFS, NTFS) open these as the carved-out files,
     // so the broader allow_read grant must not reach them through a respelling.
     for (const relative of [
@@ -108,17 +114,24 @@ describe('tier-guard peer_responder_reader authority role', () => {
     ).toEqual({ allowed: true });
   });
 
-  it('the peer catalog reader still reads the bound tenant peer catalog', () => {
-    process.env.MISSION_ROLE = 'peer_catalog_reader';
+  it('the peer catalog store grant still reads the bound tenant peer catalog', () => {
+    process.env.MISSION_ROLE = '';
     expect(
-      validateReadPermission(at('knowledge/confidential/acme-corp/connections/peer-network.json'))
+      withStoreGrant(
+        'peer_catalog_reader',
+        () =>
+          validateReadPermission(
+            at('knowledge/confidential/acme-corp/connections/peer-network.json')
+          ),
+        { tenantSlug: 'acme-corp' }
+      )
     ).toEqual({ allowed: true });
   });
 
   // customer/ overlays and active/shared/runtime/ are not tier-protected
   // paths, so the role adds nothing there; only its confidential/personal
   // grants are asserted.
-  it('writes nothing in the tiers it can read, not even inside its own tenant', () => {
+  itGrant('writes nothing in the tiers it can read, not even inside its own tenant', () => {
     for (const relative of [
       'knowledge/personal/tenants/acme-corp.json',
       'knowledge/confidential/acme-corp/notes/handbook.md',

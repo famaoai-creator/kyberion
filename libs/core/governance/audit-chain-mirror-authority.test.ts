@@ -5,6 +5,7 @@ import { currentExecutionScope, scopedAssumedRole } from '../foundation/executio
 import { pathResolver } from '../path-resolver.js';
 import { validateWritePermission } from '../tier-guard.js';
 import { auditChain, registerAuditChainIo, type AuditChainIo } from './audit-chain.js';
+import { asRoleOrGrant } from '../testing/role-or-store-grant.js';
 
 // G17: under a company stance, `pnpm work create-item` recorded its audit
 // entry inside work coordination's infrastructure_sentinel store fence, so the
@@ -52,7 +53,7 @@ describe('audit chain tenant mirror authority', () => {
   });
 
   const allowedAs = (role: string, slug: string | undefined, file: string): boolean =>
-    withExecutionContext(role, () => validateWritePermission(file).allowed, undefined, slug);
+    asRoleOrGrant(role, () => validateWritePermission(file).allowed, undefined, slug);
 
   it('grants the tenant-bound mirror writer only its own tenant mirror', () => {
     const allowed = (slug: string | undefined, file: string): boolean =>

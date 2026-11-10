@@ -121,7 +121,7 @@ describe('TR-01 chronos_token_registry_reader', () => {
 
   it('reads the registry under SYSTEM_ROLE=concierge through the reader role', async () => {
     const { authority, registry } = await loadModules();
-    const registrations = authority.withExecutionContext(
+    const registrations = authority.withStoreGrant(
       registry.CHRONOS_TOKEN_REGISTRY_READER_ROLE,
       () => registry.readChronosTokenRegistrations()
     );
@@ -136,11 +136,11 @@ describe('TR-01 chronos_token_registry_reader', () => {
     const { authority, registry, secureIo } = await loadModules();
     process.env.KYBERION_TENANT = 'acme-corp';
     expect(() =>
-      authority.withExecutionContext(registry.CHRONOS_TOKEN_REGISTRY_READER_ROLE, () =>
+      authority.withStoreGrant(registry.CHRONOS_TOKEN_REGISTRY_READER_ROLE, () =>
         registry.readChronosTokenRegistrations()
       )
     ).toThrow('CREDENTIAL_CONNECTION_DENIED');
-    const registrations = authority.withExecutionContext(
+    const registrations = authority.withStoreGrant(
       registry.CHRONOS_TOKEN_REGISTRY_READER_ROLE,
       () => {
         expect(() =>
@@ -152,8 +152,7 @@ describe('TR-01 chronos_token_registry_reader', () => {
         ).toThrow();
         return registry.readChronosTokenRegistrations();
       },
-      undefined,
-      ''
+      { tenantSlug: '' }
     );
     expect(registry.findChronosTokenRegistration(issued.token, registrations ?? [])?.role).toBe(
       'readonly'
@@ -188,34 +187,29 @@ describe('TR-01 chronos_token_registry_reader', () => {
   it('grants nothing beyond reading that single file', async () => {
     const { authority, registry, tierGuard } = await loadModules();
     const abs = (relative: string) => path.join(root, relative);
-    const verdicts = authority.withExecutionContext(
-      registry.CHRONOS_TOKEN_REGISTRY_READER_ROLE,
-      () => ({
-        persona: authority.resolveIdentityContext().persona,
-        readRegistry: tierGuard.validateReadPermission(abs(REGISTRY_RELATIVE)).allowed,
-        readOtherConnection: tierGuard.validateReadPermission(
-          abs('knowledge/personal/connections/other-service.json')
-        ).allowed,
-        readSibling: tierGuard.validateReadPermission(
-          abs('knowledge/personal/connections/chronos-access.json.bak')
-        ).allowed,
-        readTenant: tierGuard.validateReadPermission(
-          abs('knowledge/personal/tenants/acme-corp.json')
-        ).allowed,
-        readConfidential: tierGuard.validateReadPermission(
-          abs('knowledge/confidential/acme-corp/notes.md')
-        ).allowed,
-        writeRegistry: tierGuard.validateWritePermission(abs(REGISTRY_RELATIVE)).allowed,
-        writePersonal: tierGuard.validateWritePermission(abs('knowledge/personal/notes.md'))
-          .allowed,
-        writeChronosCoordination: tierGuard.validateWritePermission(
-          abs('active/shared/coordination/chronos/state.json')
-        ).allowed,
-        writeProduct: tierGuard.validateWritePermission(
-          abs('knowledge/product/governance/security-policy.json')
-        ).allowed,
-      })
-    );
+    const verdicts = authority.withStoreGrant(registry.CHRONOS_TOKEN_REGISTRY_READER_ROLE, () => ({
+      persona: authority.resolveIdentityContext().persona,
+      readRegistry: tierGuard.validateReadPermission(abs(REGISTRY_RELATIVE)).allowed,
+      readOtherConnection: tierGuard.validateReadPermission(
+        abs('knowledge/personal/connections/other-service.json')
+      ).allowed,
+      readSibling: tierGuard.validateReadPermission(
+        abs('knowledge/personal/connections/chronos-access.json.bak')
+      ).allowed,
+      readTenant: tierGuard.validateReadPermission(abs('knowledge/personal/tenants/acme-corp.json'))
+        .allowed,
+      readConfidential: tierGuard.validateReadPermission(
+        abs('knowledge/confidential/acme-corp/notes.md')
+      ).allowed,
+      writeRegistry: tierGuard.validateWritePermission(abs(REGISTRY_RELATIVE)).allowed,
+      writePersonal: tierGuard.validateWritePermission(abs('knowledge/personal/notes.md')).allowed,
+      writeChronosCoordination: tierGuard.validateWritePermission(
+        abs('active/shared/coordination/chronos/state.json')
+      ).allowed,
+      writeProduct: tierGuard.validateWritePermission(
+        abs('knowledge/product/governance/security-policy.json')
+      ).allowed,
+    }));
     expect(verdicts).toEqual({
       persona: 'worker',
       readRegistry: true,
@@ -244,13 +238,10 @@ describe('TR-01 chronos_token_registry_reader', () => {
       fs.writeFileSync(registryPath, `${JSON.stringify(envelope)}\n`);
       expect(fs.readFileSync(registryPath, 'utf8')).not.toContain(issued.hash);
 
-      const result = authority.withExecutionContext(
-        registry.CHRONOS_TOKEN_REGISTRY_READER_ROLE,
-        () => ({
-          persona: authority.resolveIdentityContext().persona,
-          registrations: registry.readChronosTokenRegistrations(),
-        })
-      );
+      const result = authority.withStoreGrant(registry.CHRONOS_TOKEN_REGISTRY_READER_ROLE, () => ({
+        persona: authority.resolveIdentityContext().persona,
+        registrations: registry.readChronosTokenRegistrations(),
+      }));
       expect(result.persona).toBe('worker');
       expect(
         registry.findChronosTokenRegistration(issued.token, result.registrations ?? [])
@@ -311,7 +302,7 @@ describe('TR-01 chronos_token_registry_reader', () => {
   it('cannot store a registration through the governed writer', async () => {
     const { authority, registry } = await loadModules();
     expect(() =>
-      authority.withExecutionContext(registry.CHRONOS_TOKEN_REGISTRY_READER_ROLE, () =>
+      authority.withStoreGrant(registry.CHRONOS_TOKEN_REGISTRY_READER_ROLE, () =>
         registry.issueChronosAccessToken({ role: 'readonly', tenantSlugs: ['acme-corp'] })
       )
     ).toThrow(/Sovereign Sanctuary: Access restricted/);

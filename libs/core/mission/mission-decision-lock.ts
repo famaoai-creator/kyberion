@@ -26,7 +26,7 @@
  * rework WorkItem (the work-coordination store is not tenant-partitioned)
  * carry counts, the consumer id, the case id and WorkItem ids only.
  */
-import { withExecutionContext } from '../authority.js';
+import { withStoreGrant } from '../authority.js';
 import { logger } from '../core.js';
 import { listDeals, type DealRecord } from '../organization/deal-store.js';
 import {
@@ -455,11 +455,10 @@ export function loadDecisionCaseMissionState(
   let state: MissionState | null;
   try {
     state = runInResourceAccessScope(archivedMissionStateCapability(tenant, relative), () =>
-      withExecutionContext(
+      withStoreGrant(
         ARCHIVED_MISSION_STATE_READ_ROLE,
         () => (safeExistsSync(statePath) ? readMissionStateAtPath(statePath) : null),
-        undefined,
-        tenant
+        { tenantSlug: tenant }
       )
     );
   } catch (error) {
@@ -1061,7 +1060,7 @@ export function fileDecisionReworkWorkItem(
     // infrastructure-metadata role other libs use for that one profile: a
     // customer-triggered respond carries no persona that could read it, and
     // the store fence takes its own role for the item write.
-    withExecutionContext(TENANT_REGISTRY_READER_ROLE, create, 'worker', input.tenantSlug);
+    withStoreGrant(TENANT_REGISTRY_READER_ROLE, create, { tenantSlug: input.tenantSlug });
   } catch (error) {
     // Another boundary filed the same id first (the title may render in another locale).
     if (

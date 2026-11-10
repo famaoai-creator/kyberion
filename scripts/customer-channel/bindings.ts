@@ -4,7 +4,7 @@
  * libs/core/organization/customer-channel-binding.ts; this module is the only writer.
  */
 import * as path from 'node:path';
-import { withExecutionContext } from '@agent/core/authority';
+import { withStoreGrant } from '@agent/core/authority';
 import {
   CUSTOMER_CHANNEL_BINDINGS_SCHEMA_PATH,
   isActiveCustomerTenant,
@@ -159,7 +159,7 @@ function writeBindingChange(
     precheck?.();
     // The store role writes the bindings file only; the audit record (its own
     // lock and chain) is written under the caller's identity.
-    const written = withExecutionContext(
+    const written = withStoreGrant(
       CUSTOMER_CHANNEL_BINDING_WRITE_ROLE,
       () => {
         const filePath = assertSafeRepositoryPath(bindingFilePath(tenantSlug, rootDir), {
@@ -186,8 +186,7 @@ function writeBindingChange(
           bindings: next.bindings.length,
         };
       },
-      undefined,
-      tenantSlug
+      { tenantSlug: tenantSlug }
     );
     if (!written) return null;
     const next = written;

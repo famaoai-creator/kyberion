@@ -90,6 +90,10 @@
     {
       "id": "libs/core/foundation/authorization-policy-document.ts",
       "reason": "Published serialization contract @agent/core/foundation/authorization-policy-document (P4 of docs/UNIFIED_AUTHORIZATION_POLICY_DESIGN.ja.md): the Cedar-compatible policy document, normalized request and 3-value decision are the fixed engine-facing API. Read-only by design (no runtime caller is intended); consumed by tests/authorization-policy-document.test.ts meaning-preservation gate and by future external policy engines."
+    },
+    {
+      "id": "libs/core/testing/role-or-store-grant.ts",
+      "reason": "S4 slice 3 test harness: asRoleOrGrant opens a name the way its production facade does (a declared store grant through withStoreGrant, anything else as a role), so the existing role-matrix suites (asset-read-ceiling, audit-chain mirror, operational store policy, peer conversation) keep probing the same names after a store-only role became a store grant. Production code calls withStoreGrant or withExecutionContext directly; a production caller would blur which one it means."
     }
   ],
   "scripts": [

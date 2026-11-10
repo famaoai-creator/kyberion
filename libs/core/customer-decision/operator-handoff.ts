@@ -20,7 +20,7 @@
  * notification stack, which the pure modules must not.
  */
 import { createHash } from 'node:crypto';
-import { withExecutionContext } from '../authority.js';
+import { withStoreGrant } from '../authority.js';
 import { addInboxEntry, listInboxEntries } from '../task/deliverable-inbox.js';
 import { DELIVERABLE_INBOX_WRITER_ROLE } from '../foundation/deliverable-inbox-writer-capability.js';
 import { notifyOperatorWithReceiptSync } from '../surface/operator-notifications.js';
@@ -64,7 +64,7 @@ function addOperatorTask(input: {
   body: string;
   linkHint: string;
 }): OperatorTaskNotice {
-  withExecutionContext(INBOX_WRITER_ROLE, () => {
+  withStoreGrant(INBOX_WRITER_ROLE, () => {
     try {
       addInboxEntry({
         entryId: input.entryId,
