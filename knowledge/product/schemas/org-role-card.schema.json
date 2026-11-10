@@ -1,0 +1,42 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "org-role-card.schema.json",
+  "title": "Org Role card",
+  "description": "The machine-readable card of one Org Role (knowledge/product/roles/<role>/role.json). Concept model v2 D6: an Org Role carries no permissions of its own; default_grant only points at registry entries (an Authority Role card and a base Authority Role). pnpm kyberion sync org-role-grants projects the cards into role-authority-map.json.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["role", "role_class", "default_grant"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "role": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$",
+      "description": "The Org Role id; equals the directory name."
+    },
+    "role_class": {
+      "enum": ["system", "mission", "context"],
+      "description": "system: maintains Kyberion itself; mission: executes user work; context: knowledge-only (no runtime authority). The role-authority-map.json group is <role_class>_roles."
+    },
+    "default_grant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["authority_role", "base_role", "execution_mode"],
+      "properties": {
+        "authority_role": {
+          "type": ["string", "null"],
+          "minLength": 1,
+          "description": "An Authority Role card in knowledge/product/governance/authority-roles/, or null when the role has no Authority Role."
+        },
+        "base_role": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The base Authority Role short name (sovereign, ecosystem_architect, worker, analyst) the role runs on by default; its card base_<name>.json must exist."
+        },
+        "execution_mode": {
+          "enum": ["system", "mission", "sovereign"],
+          "description": "How the role executes: maintaining the system, inside a mission, or as the sovereign's concierge."
+        }
+      }
+    }
+  }
+}

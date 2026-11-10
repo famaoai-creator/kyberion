@@ -1,0 +1,10 @@
+{
+  "$schema": "../../schemas/org-role-card.schema.json",
+  "role": "knowledge_steward",
+  "role_class": "system",
+  "default_grant": {
+    "authority_role": "knowledge_steward",
+    "base_role": "analyst",
+    "execution_mode": "system"
+  }
+}

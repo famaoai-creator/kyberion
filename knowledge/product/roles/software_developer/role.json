@@ -1,0 +1,10 @@
+{
+  "$schema": "../../schemas/org-role-card.schema.json",
+  "role": "software_developer",
+  "role_class": "mission",
+  "default_grant": {
+    "authority_role": "software_developer",
+    "base_role": "worker",
+    "execution_mode": "mission"
+  }
+}
