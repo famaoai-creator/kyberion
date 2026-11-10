@@ -24,7 +24,7 @@ beforeEach(() => {
   vi.stubEnv('SYSTEM_ROLE', '');
   vi.stubEnv('MISSION_ROLE', 'mission_controller');
   vi.stubEnv('KYBERION_TIER', 'public');
-  vi.stubEnv('KYBERION_PERSONA', '');
+  vi.stubEnv('KYBERION_BASE_ROLE', '');
   vi.stubEnv('KYBERION_TENANT', '');
   vi.stubEnv('KYBERION_ORGANIZATION_ID', '');
   vi.stubEnv('MISSION_ID', '');

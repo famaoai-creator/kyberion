@@ -26,7 +26,13 @@ export const REMINDER_FACADE_SCRIPT = 'dist/scripts/customer_decision.js';
 export const REMINDER_FACADE_TIMEOUT_MS = 10 * 60 * 1000;
 
 /** Keys of the secure-io exec allowlist the facade child must not inherit. */
-const CLEARED_ENV = ['MISSION_ROLE', 'MISSION_ID', 'KYBERION_PERSONA', 'KYBERION_SUDO'] as const;
+const CLEARED_ENV = [
+  'MISSION_ROLE',
+  'MISSION_ID',
+  'KYBERION_BASE_ROLE',
+  'KYBERION_PERSONA',
+  'KYBERION_SUDO',
+] as const;
 
 /** The facade child's env on top of the secure-io exec allowlist. */
 export function reminderFacadeEnv(tenant: string): Record<string, string> {

@@ -20,7 +20,7 @@
  * `--dir <path>` (tests only) replaces `--tenant/--case` with a ledger
  * directory; it is still confined to the repository root by secure-io.
  * Confidential writes need the confidential/sovereign persona
- * (`KYBERION_PERSONA`) and the tenant-bound scope like every other tenant write.
+ * (`KYBERION_BASE_ROLE`) and the tenant-bound scope like every other tenant write.
  */
 import * as path from 'node:path';
 import { humanActor } from '@agent/core/actor';

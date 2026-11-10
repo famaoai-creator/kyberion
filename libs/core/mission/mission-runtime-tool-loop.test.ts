@@ -58,7 +58,7 @@ describe('runtime task tool loop with native mission contracts', () => {
       vi.stubEnv('KYBERION_PROJECT_ID', '');
       vi.stubEnv('KYBERION_REASONING_BACKEND', 'stub');
       vi.stubEnv('MISSION_ROLE', 'mission_controller');
-      vi.stubEnv('KYBERION_PERSONA', 'worker');
+      vi.stubEnv('KYBERION_BASE_ROLE', 'worker');
       setWorkCoordinationNamespace(`runtime-tool-loop-${process.pid}`);
       const state = {
         mission_id: missionId,

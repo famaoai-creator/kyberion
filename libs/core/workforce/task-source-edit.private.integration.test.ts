@@ -44,7 +44,7 @@ describe('actual private task source IO under canonical policy', () => {
       );
       vi.stubEnv('SYSTEM_ROLE', '');
       vi.stubEnv('MISSION_ROLE', 'worker');
-      vi.stubEnv('KYBERION_PERSONA', 'worker');
+      vi.stubEnv('KYBERION_BASE_ROLE', 'worker');
       vi.stubEnv('KYBERION_SUDO', 'false');
       vi.stubEnv('KYBERION_TENANT', tier === 'confidential' ? 'acme' : '');
       vi.stubEnv('KYBERION_TIER', tier);

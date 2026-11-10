@@ -72,7 +72,7 @@ const approvalRefs = new Set<string>();
 const outboxRefs = new Set<string>();
 const originalQueuePath = process.env.KYBERION_MEMORY_QUEUE_PATH;
 const originalRole = process.env.MISSION_ROLE;
-const originalPersona = process.env.KYBERION_PERSONA;
+const originalPersona = process.env.KYBERION_BASE_ROLE;
 
 // KP-02: hermetic isolation for knowledge delivery telemetry, same
 // convention as knowledge-feedback-loop.test.ts (KP-05).
@@ -117,7 +117,7 @@ function cleanup(): void {
 beforeAll(() => {
   process.env.KYBERION_MEMORY_QUEUE_PATH = queuePath;
   process.env.MISSION_ROLE = 'surface_runtime';
-  process.env.KYBERION_PERSONA = 'worker';
+  process.env.KYBERION_BASE_ROLE = 'worker';
   process.env.KYBERION_KNOWLEDGE_DELIVERY_DIR = knowledgeDeliveryDirOverride;
 });
 
@@ -136,8 +136,8 @@ afterAll(() => {
   else process.env.KYBERION_MEMORY_QUEUE_PATH = originalQueuePath;
   if (originalRole === undefined) delete process.env.MISSION_ROLE;
   else process.env.MISSION_ROLE = originalRole;
-  if (originalPersona === undefined) delete process.env.KYBERION_PERSONA;
-  else process.env.KYBERION_PERSONA = originalPersona;
+  if (originalPersona === undefined) delete process.env.KYBERION_BASE_ROLE;
+  else process.env.KYBERION_BASE_ROLE = originalPersona;
   if (originalKnowledgeDeliveryDir === undefined)
     delete process.env.KYBERION_KNOWLEDGE_DELIVERY_DIR;
   else process.env.KYBERION_KNOWLEDGE_DELIVERY_DIR = originalKnowledgeDeliveryDir;

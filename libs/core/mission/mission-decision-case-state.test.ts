@@ -20,7 +20,7 @@ const FOREIGN = 'MSN-CDARCH-FOREIGN';
 const EMPTY = 'MSN-CDARCH-EMPTY';
 const savedRoot = process.env.KYBERION_ROOT;
 const keys = [
-  'KYBERION_PERSONA',
+  'KYBERION_BASE_ROLE',
   'MISSION_ROLE',
   'SYSTEM_ROLE',
   'MISSION_ID',

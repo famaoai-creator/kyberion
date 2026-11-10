@@ -28,7 +28,7 @@ Kyberion separates two kinds of roles:
 ### Persona vs authority
 
 - `org_role` (formerly `assigned_persona`) is mission metadata and prompt-shaping context.
-- Mission file writes are governed by the process execution context (`MISSION_ROLE` / `KYBERION_PERSONA`), not by the descriptive persona string stored in mission state.
+- Mission file writes are governed by the process execution context (`MISSION_ROLE` / `KYBERION_BASE_ROLE`), not by the descriptive persona string stored in mission state.
 - Mission lifecycle commands default to the safe worker persona. Use a more specific persona only when the mission explicitly needs that reasoning style.
 - `Ecosystem Architect` remains the system-maintenance persona for product-level editing, but it should not be the default mission lifecycle persona.
 

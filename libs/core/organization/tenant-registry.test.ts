@@ -25,14 +25,14 @@ describe('tenant-registry', () => {
   let savedUnitSharedGroup: string | null;
 
   beforeEach(() => {
-    savedPersona = process.env.KYBERION_PERSONA;
+    savedPersona = process.env.KYBERION_BASE_ROLE;
     savedRole = process.env.MISSION_ROLE;
     savedTenant = process.env.KYBERION_TENANT;
     const defaultPath = path.join(TENANT_DIR, 'default.json');
     const groupPath = path.join(GROUP_DIR, 'unit-shared.json');
     savedDefaultProfile = fs.existsSync(defaultPath) ? fs.readFileSync(defaultPath, 'utf8') : null;
     savedUnitSharedGroup = fs.existsSync(groupPath) ? fs.readFileSync(groupPath, 'utf8') : null;
-    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     process.env.MISSION_ROLE = 'mission_controller';
     delete process.env.KYBERION_TENANT;
   });
@@ -52,8 +52,8 @@ describe('tenant-registry', () => {
     } catch {
       /* best-effort cleanup */
     }
-    if (savedPersona === undefined) delete process.env.KYBERION_PERSONA;
-    else process.env.KYBERION_PERSONA = savedPersona;
+    if (savedPersona === undefined) delete process.env.KYBERION_BASE_ROLE;
+    else process.env.KYBERION_BASE_ROLE = savedPersona;
     if (savedRole === undefined) delete process.env.MISSION_ROLE;
     else process.env.MISSION_ROLE = savedRole;
     if (savedTenant === undefined) delete process.env.KYBERION_TENANT;
@@ -245,7 +245,7 @@ describe('resolveTenant (DA-01 spine)', () => {
     expect(message).not.toMatch(/not valid JSON/);
     expect(message).toMatch(/regular file/);
     // The hint is keyed off the personal-tier location, not the error text.
-    expect(message).toMatch(/KYBERION_PERSONA/);
+    expect(message).toMatch(/KYBERION_BASE_ROLE/);
   });
 
   it('still reports genuinely corrupt profile JSON as a JSON failure', () => {
@@ -330,9 +330,9 @@ describe('resolveTenant (DA-01 spine)', () => {
   it('resolves every registered tenant profile in the current checkout', () => {
     // Reading the real knowledge/personal/tenants dir requires an authorized
     // persona/role (Sovereign Sanctuary) — same env the sibling suite uses.
-    const savedPersona = process.env.KYBERION_PERSONA;
+    const savedPersona = process.env.KYBERION_BASE_ROLE;
     const savedRole = process.env.MISSION_ROLE;
-    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     process.env.MISSION_ROLE = 'mission_controller';
     try {
       const seen = new Set<string>();
@@ -351,8 +351,8 @@ describe('resolveTenant (DA-01 spine)', () => {
         seen.add(resolved.knowledge_root);
       }
     } finally {
-      if (savedPersona === undefined) delete process.env.KYBERION_PERSONA;
-      else process.env.KYBERION_PERSONA = savedPersona;
+      if (savedPersona === undefined) delete process.env.KYBERION_BASE_ROLE;
+      else process.env.KYBERION_BASE_ROLE = savedPersona;
       if (savedRole === undefined) delete process.env.MISSION_ROLE;
       else process.env.MISSION_ROLE = savedRole;
     }

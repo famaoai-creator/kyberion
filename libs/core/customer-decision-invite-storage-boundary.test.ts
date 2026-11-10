@@ -19,7 +19,7 @@ const NOW = '2026-10-24T00:00:00.000Z';
 const STORE = 'active/shared/runtime/customer-decision-invites';
 const savedRoot = process.env.KYBERION_ROOT;
 const keys = [
-  'KYBERION_PERSONA',
+  'KYBERION_BASE_ROLE',
   'MISSION_ROLE',
   'SYSTEM_ROLE',
   'MISSION_ID',
@@ -80,7 +80,7 @@ beforeAll(async () => {
 /** Write (or, with `null`, remove) one tenant registry profile on the fixture root. */
 function setProfile(tenant: string, status: string | null): void {
   const file = path.join(ROOT, 'knowledge/personal/tenants', `${tenant}.json`);
-  process.env.KYBERION_PERSONA = 'sovereign';
+  process.env.KYBERION_BASE_ROLE = 'sovereign';
   try {
     if (status === null) io.safeRmSync(file, { force: true });
     else
@@ -94,7 +94,7 @@ function setProfile(tenant: string, status: string | null): void {
         })
       );
   } finally {
-    delete process.env.KYBERION_PERSONA;
+    delete process.env.KYBERION_BASE_ROLE;
   }
 }
 

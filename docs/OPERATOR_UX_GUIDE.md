@@ -545,20 +545,20 @@ pnpm kyberion scope inspect knowledge/product/governance/store-catalog.json --js
 汎用の organization profile は運用中の組織を表さない。
 
 ```bash
-KYBERION_PERSONA=sovereign pnpm organization list --tier confidential --tenant-slug <slug> --json
+KYBERION_BASE_ROLE=sovereign pnpm organization list --tier confidential --tenant-slug <slug> --json
 pnpm scope use --tier confidential --tenant <slug> --organization <id>
-KYBERION_PERSONA=sovereign pnpm organization init --organization-id <id> --name <名前> --tier confidential --tenant-slug <slug> --purpose "<目的>" --dry-run   # まず dry-run
-KYBERION_PERSONA=sovereign pnpm organization objective add --organization-id <id> --tier confidential --tenant-slug <slug> --objective-id obj-1 --title "<目標>" --apply
-KYBERION_PERSONA=sovereign pnpm organization domain add / service add / operation add ...   # 詳細は pnpm organization --help
-KYBERION_PERSONA=sovereign pnpm organization project attach --organization-id <id> --project-id PRJ-XXXX --tier confidential --tenant-slug <slug> --apply
-KYBERION_PERSONA=sovereign pnpm organization status --organization-id <id> --tier confidential --tenant-slug <slug>
-KYBERION_PERSONA=sovereign pnpm organization reconcile --organization-id <id> --tier confidential --tenant-slug <slug> --dry-run --json
+KYBERION_BASE_ROLE=sovereign pnpm organization init --organization-id <id> --name <名前> --tier confidential --tenant-slug <slug> --purpose "<目的>" --dry-run   # まず dry-run
+KYBERION_BASE_ROLE=sovereign pnpm organization objective add --organization-id <id> --tier confidential --tenant-slug <slug> --objective-id obj-1 --title "<目標>" --apply
+KYBERION_BASE_ROLE=sovereign pnpm organization domain add / service add / operation add ...   # 詳細は pnpm organization --help
+KYBERION_BASE_ROLE=sovereign pnpm organization project attach --organization-id <id> --project-id PRJ-XXXX --tier confidential --tenant-slug <slug> --apply
+KYBERION_BASE_ROLE=sovereign pnpm organization status --organization-id <id> --tier confidential --tenant-slug <slug>
+KYBERION_BASE_ROLE=sovereign pnpm organization reconcile --organization-id <id> --tier confidential --tenant-slug <slug> --dry-run --json
 ```
 
 組織 state(`active/organizations/`)は必ずこの facade 経由で作成・変更する
 (JSON 手編集は不変条件違反)。各 authoring コマンドは `--dry-run` で保存前の
 レコードを確認でき、`--apply` で保存する。confidential tier は `--tenant-slug`
-必須。読み書きとも authority ゲートがあるため `KYBERION_PERSONA=sovereign` で
+必須。読み書きとも authority ゲートがあるため `KYBERION_BASE_ROLE=sovereign` で
 実行する。role/authority の authoring は `pnpm organization role ...` から実行する。
 `services_without_state` はサービスの状態観測が未登録であることを示す。
 健全性を測定できるまで `healthy` として埋めず、観測元・更新時刻・確信度を

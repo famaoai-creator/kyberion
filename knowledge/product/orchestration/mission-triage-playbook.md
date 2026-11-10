@@ -9,7 +9,7 @@ runtime_stages: [execution, review]
 
 How to maintain missions that stall before `finish` — the intent-drift gate, unfinished
 exit-gate tasks, lost evidence, or a deleted worktree. The design principle: **the agent
-diagnoses and prepares; the human only approves**. Nobody needs `KYBERION_PERSONA`,
+diagnoses and prepares; the human only approves**. Nobody needs `KYBERION_BASE_ROLE`,
 `MISSION_ROLE`, or `KYBERION_SUDO` on the command line for the standard path.
 
 ## Detect

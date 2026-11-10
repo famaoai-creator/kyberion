@@ -59,7 +59,7 @@ const ROOT = pathResolver.rootDir();
 const RUN = `${process.pid}-${Date.now()}`;
 const ENV_KEYS = [
   'KYBERION_TENANT',
-  'KYBERION_PERSONA',
+  'KYBERION_BASE_ROLE',
   'MISSION_ROLE',
   'SYSTEM_ROLE',
   'KYBERION_SUDO',
@@ -80,7 +80,7 @@ const personalRel = `knowledge/personal/vitest-secure-io-symlink-${RUN}`;
 const abs = (rel: string) => path.join(ROOT, rel);
 
 function asDataOnlyPersona(): void {
-  process.env.KYBERION_PERSONA = 'worker';
+  process.env.KYBERION_BASE_ROLE = 'worker';
   process.env.MISSION_ROLE = 'finance_controller';
 }
 

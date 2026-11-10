@@ -100,7 +100,7 @@ describe('existing main service proof satisfies shared external admission exactl
     )
   );
   beforeEach(() => {
-    vi.stubEnv('KYBERION_PERSONA', 'ecosystem_architect');
+    vi.stubEnv('KYBERION_BASE_ROLE', 'ecosystem_architect');
     vi.stubEnv('MISSION_ROLE', 'mission_controller');
     root = rootResolve(`active/shared/tmp/external-proof-${randomUUID()}`);
     channels = [];

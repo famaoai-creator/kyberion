@@ -84,8 +84,8 @@ describe('media-actuator pdf to pptx bridge', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.documentOcr.mockReset();
-    prevPersona = process.env.KYBERION_PERSONA;
-    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    prevPersona = process.env.KYBERION_BASE_ROLE;
+    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     safeMkdir(tenantOverrideRoot, { recursive: true });
     safeWriteFile(
       tenantOverridePath,
@@ -109,8 +109,8 @@ describe('media-actuator pdf to pptx bridge', () => {
     );
   });
   afterEach(() => {
-    if (prevPersona === undefined) delete process.env.KYBERION_PERSONA;
-    else process.env.KYBERION_PERSONA = prevPersona;
+    if (prevPersona === undefined) delete process.env.KYBERION_BASE_ROLE;
+    else process.env.KYBERION_BASE_ROLE = prevPersona;
     withExecutionContext('mission_controller', () => {
       const previousSudo = process.env.KYBERION_SUDO;
       process.env.KYBERION_SUDO = 'true';
@@ -760,8 +760,8 @@ describe('media-actuator pdf to pptx bridge', () => {
   it('persists web brand registration as a web theme pack', async () => {
     const tenantSlug = '__web_theme_pack_test';
     const confDir = path.resolve(ROOT, `knowledge/confidential/${tenantSlug}/design`);
-    const prevPersona = process.env.KYBERION_PERSONA;
-    process.env.KYBERION_PERSONA = 'sovereign';
+    const prevPersona = process.env.KYBERION_BASE_ROLE;
+    process.env.KYBERION_BASE_ROLE = 'sovereign';
     const cleanupTenant = tenantDesignFixture(tenantSlug);
 
     try {
@@ -873,7 +873,7 @@ describe('media-actuator pdf to pptx bridge', () => {
       );
     } finally {
       cleanupTenant();
-      process.env.KYBERION_PERSONA = prevPersona;
+      process.env.KYBERION_BASE_ROLE = prevPersona;
     }
   });
 

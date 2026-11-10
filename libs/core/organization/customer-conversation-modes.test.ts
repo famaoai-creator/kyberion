@@ -27,7 +27,7 @@ afterEach(() => {
 });
 
 beforeEach(() => {
-  vi.stubEnv('KYBERION_PERSONA', 'knowledge_steward');
+  vi.stubEnv('KYBERION_BASE_ROLE', 'knowledge_steward');
   vi.stubEnv('MISSION_ROLE', 'knowledge_steward');
 });
 

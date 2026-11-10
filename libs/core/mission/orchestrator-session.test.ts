@@ -66,9 +66,9 @@ let previousPersona: string | undefined;
 
 beforeEach(() => {
   previousMissionRole = process.env.MISSION_ROLE;
-  previousPersona = process.env.KYBERION_PERSONA;
+  previousPersona = process.env.KYBERION_BASE_ROLE;
   delete process.env.MISSION_ROLE;
-  delete process.env.KYBERION_PERSONA;
+  delete process.env.KYBERION_BASE_ROLE;
   setWorkCoordinationNamespace(`orchestrator-session-so03-tests-${process.pid}`);
   clearWorkCoordinationStore();
   resetOrchestratorSessionServiceForTests(nextJournalPath());
@@ -77,8 +77,8 @@ beforeEach(() => {
 afterEach(() => {
   if (previousMissionRole === undefined) delete process.env.MISSION_ROLE;
   else process.env.MISSION_ROLE = previousMissionRole;
-  if (previousPersona === undefined) delete process.env.KYBERION_PERSONA;
-  else process.env.KYBERION_PERSONA = previousPersona;
+  if (previousPersona === undefined) delete process.env.KYBERION_BASE_ROLE;
+  else process.env.KYBERION_BASE_ROLE = previousPersona;
   clearWorkCoordinationStore();
   clearWorkCoordinationNamespace();
 });

@@ -29,7 +29,7 @@ beforeAll(async () => {
   vi.stubEnv('KYBERION_ROOT', fixtureRoot);
   vi.stubEnv('VITEST', '');
   vi.stubEnv('MISSION_ROLE', 'mission_controller');
-  vi.stubEnv('KYBERION_PERSONA', 'ecosystem_architect');
+  vi.stubEnv('KYBERION_BASE_ROLE', 'ecosystem_architect');
   for (const key of [
     'SYSTEM_ROLE',
     'MISSION_ID',

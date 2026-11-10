@@ -18,7 +18,12 @@ const MIRROR_SEGMENT = path.join('runtime', 'audit-mirror', 'confidential');
 const MIRROR_WRITER = 'audit_mirror_writer';
 const TENANT = 'mirror-authority-co';
 const OTHER_TENANT = 'mirror-other-co';
-const ENV_KEYS = ['KYBERION_PERSONA', 'MISSION_ROLE', 'KYBERION_SUDO', 'KYBERION_TENANT'] as const;
+const ENV_KEYS = [
+  'KYBERION_BASE_ROLE',
+  'MISSION_ROLE',
+  'KYBERION_SUDO',
+  'KYBERION_TENANT',
+] as const;
 
 function mirrorPath(slug: string): string {
   return path.join(
@@ -40,7 +45,7 @@ describe('audit chain tenant mirror authority', () => {
     delete process.env.MISSION_ROLE;
     delete process.env.KYBERION_SUDO;
     delete process.env.KYBERION_TENANT;
-    process.env.KYBERION_PERSONA = 'sovereign';
+    process.env.KYBERION_BASE_ROLE = 'sovereign';
   });
 
   afterEach(() => {

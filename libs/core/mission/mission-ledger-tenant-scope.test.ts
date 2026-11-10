@@ -96,7 +96,7 @@ describe('mission ledger scope (D9)', () => {
     for (const key of [
       'KYBERION_ROOT',
       'MISSION_ROLE',
-      'KYBERION_PERSONA',
+      'KYBERION_BASE_ROLE',
       'KYBERION_TENANT',
       'KYBERION_AUDIT_CHAIN_KEY',
     ])
@@ -104,7 +104,7 @@ describe('mission ledger scope (D9)', () => {
     process.env.KYBERION_ROOT = tmpRoot;
     // `pnpm mission ...` runs as mission_controller (mission_controller.ts sets it).
     process.env.MISSION_ROLE = 'mission_controller';
-    process.env.KYBERION_PERSONA = 'worker';
+    process.env.KYBERION_BASE_ROLE = 'worker';
     delete process.env.KYBERION_TENANT;
     // No env key: the chain key file is read/created by the first writer
     // (the tenant_ledger_store role in the first test).

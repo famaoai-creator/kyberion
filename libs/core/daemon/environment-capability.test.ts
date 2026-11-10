@@ -286,9 +286,9 @@ describe('platform-specific environment installers', () => {
 
 describe('bootstrapManifest dry-run', () => {
   it('does not install when apply=false; receipts list everything as unsatisfied', async () => {
-    const savedPersona = process.env.KYBERION_PERSONA;
+    const savedPersona = process.env.KYBERION_BASE_ROLE;
     const savedRole = process.env.MISSION_ROLE;
-    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     process.env.MISSION_ROLE = 'mission_controller';
     delete process.env.PROBE_BOOTSTRAP_DRY;
     try {
@@ -314,8 +314,8 @@ describe('bootstrapManifest dry-run', () => {
       expect(receipt.unsatisfied[0].reason).toContain('dry run');
       expect(receipt.installs_performed).toHaveLength(0);
     } finally {
-      if (savedPersona === undefined) delete process.env.KYBERION_PERSONA;
-      else process.env.KYBERION_PERSONA = savedPersona;
+      if (savedPersona === undefined) delete process.env.KYBERION_BASE_ROLE;
+      else process.env.KYBERION_BASE_ROLE = savedPersona;
       if (savedRole === undefined) delete process.env.MISSION_ROLE;
       else process.env.MISSION_ROLE = savedRole;
     }
@@ -329,7 +329,7 @@ describe('verifyReady', () => {
     path.join(MISSION_DIR, 'evidence', `env-setup-receipt.${manifestId}.json`);
 
   beforeEach(() => {
-    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     process.env.MISSION_ROLE = 'mission_controller';
     process.env.MISSION_ID = FIX_MISSION;
     fs.mkdirSync(path.join(MISSION_DIR, 'evidence'), { recursive: true });

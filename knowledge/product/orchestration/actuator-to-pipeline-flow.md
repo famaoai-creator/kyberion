@@ -109,7 +109,7 @@ pnpm pipeline --input active/shared/tmp/confidential/<slug>/actuator-playground/
 # public drafts:
 pnpm pipeline:promote --input <adf>.json --run <run-id> --source-is-public
 # tenant drafts (confidential/personal partition) — identity required for the asset ledger:
-MISSION_ROLE=worker KYBERION_PERSONA=worker \
+MISSION_ROLE=worker KYBERION_BASE_ROLE=worker \
   pnpm pipeline:promote --input <adf>.json --run <run-id> --tenant <slug>
 ```
 
@@ -312,4 +312,4 @@ through the normal compile path.
   payload-only dispatch results is a follow-up.
 - `pipeline:promote --tenant` from another checkout failed with missing ADF /
   journal / personal tenant profile — documented in §2 tenant-trial notes
-  (same root, copy profile, set `MISSION_ROLE`/`KYBERION_PERSONA`).
+  (same root, copy profile, set `MISSION_ROLE`/`KYBERION_BASE_ROLE`).

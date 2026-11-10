@@ -236,13 +236,20 @@ function checkProjectScope(
   const projectPerms = policy.project_permissions?.[project];
   if (!projectPerms) return null; // No project-specific rules; fall through to default tier check
 
+  // S4 (concept-model-v2 D5): `allowed_base_roles` names the base Authority
+  // Roles admitted to the project. An installation catalog that predates the
+  // rename still declares `allowed_personas` (the same values); it is read for
+  // one release only when `allowed_base_roles` is absent.
+  const allowedBaseRoles: unknown = Object.hasOwn(projectPerms, 'allowed_base_roles')
+    ? projectPerms.allowed_base_roles
+    : projectPerms.allowed_personas;
   const allowed =
-    projectPerms.allowed_personas?.includes(currentPersona) ||
+    (Array.isArray(allowedBaseRoles) && allowedBaseRoles.includes(currentPersona)) ||
     projectPerms.allowed_roles?.some((r: string) => authorities.includes(r as Authority));
   if (!allowed) {
     return {
       allowed: false,
-      reason: `[POLICY_VIOLATION] Persona '${currentPersona}' is not authorized for project '${project}'.`,
+      reason: `[POLICY_VIOLATION] Base role '${currentPersona}' is not authorized for project '${project}'.`,
     };
   }
   return null;
@@ -1152,7 +1159,7 @@ function personaTierWriteDecision(
   operation: 'write' | 'append' | 'mkdir'
 ): { allowed: boolean; reason?: string } {
   const {
-    persona: currentPersona,
+    baseRole: currentPersona,
     role: currentRole,
     authorities,
     sudoScope,
@@ -1530,7 +1537,7 @@ function personaTierReadDecision(
   identity: ReturnType<typeof resolvePolicyIdentityContext>
 ): ReadPermissionDecision {
   const {
-    persona: currentPersona,
+    baseRole: currentPersona,
     role: currentRole,
     authorities,
     sudoScope,

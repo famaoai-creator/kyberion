@@ -1,4 +1,5 @@
 import { getRegisteredEnvText, setRegisteredEnv } from '@agent/core/foundation/env';
+import { baseRoleEnvText } from '@agent/core/foundation';
 import { createHash } from 'node:crypto';
 import { currentExecutionScope } from '@agent/core/foundation';
 import {
@@ -564,7 +565,7 @@ async function executePipelineFileOnce(
               role,
               persona:
                 scope?.assumedPersona ??
-                (identity.persona === 'unknown' ? undefined : identity.persona),
+                (identity.baseRole === 'unknown' ? undefined : identity.baseRole),
               tenant_slug: scope?.tenantSlug ?? effectivePayloadScope.tenant_slug,
               organization_id: scope?.organizationId,
             },
@@ -944,12 +945,8 @@ export async function main(args?: string[], print: Print = () => undefined) {
   }
   // `unknown` is the sentinel for "no persona resolved"; publishing it as an
   // identity would corrupt every consumer that treats a set persona as real.
-  if (
-    identity.persona &&
-    identity.persona !== 'unknown' &&
-    !getRegisteredEnvText('KYBERION_PERSONA')
-  ) {
-    setRegisteredEnv('KYBERION_PERSONA', identity.persona);
+  if (identity.baseRole && identity.baseRole !== 'unknown' && !baseRoleEnvText()) {
+    setRegisteredEnv('KYBERION_BASE_ROLE', identity.baseRole);
   }
 
   const effectiveArgs = args ?? currentProcessArgv().slice(2);

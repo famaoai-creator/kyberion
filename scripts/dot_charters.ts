@@ -110,7 +110,7 @@ type Subcommand = (typeof SUBCOMMANDS)[number];
 function visibleCharter(charter: DotCharter, argv: string[] = []): boolean {
   const identity = resolveIdentityContext();
   const system = hasCliFlag(argv, '--system');
-  if (system && !['sovereign', 'ecosystem_architect'].includes(identity.persona))
+  if (system && !['sovereign', 'ecosystem_architect'].includes(identity.baseRole))
     throw new Error('[DOT_INVENTORY_SCOPE] --system requires an authorized operator');
   const tier = argv.find((arg) => arg.startsWith('--tier='))?.slice(7);
   const tenant = argv.find((arg) => arg.startsWith('--tenant='))?.slice(9);
@@ -134,7 +134,7 @@ function visibleCharter(charter: DotCharter, argv: string[] = []): boolean {
 
 function loadAll(argv: string[] = []) {
   const system = hasCliFlag(argv, '--system');
-  if (system && !['sovereign', 'ecosystem_architect'].includes(resolveIdentityContext().persona))
+  if (system && !['sovereign', 'ecosystem_architect'].includes(resolveIdentityContext().baseRole))
     throw new Error('[DOT_INVENTORY_SCOPE] --system requires an authorized operator');
   const errors: DotCharterLoadError[] = [];
   const loaded = listDotCharters(undefined, { errors });

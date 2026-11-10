@@ -6,7 +6,7 @@
  * `authority_role_permissions` by `pnpm kyberion sync authority-roles`).
  *
  * Every principal runs on exactly one base role, the one its persona names
- * (KYBERION_PERSONA, the assumed scope's persona, or the role's default); the
+ * (KYBERION_BASE_ROLE, the assumed scope's persona, or the role's default); the
  * tier guard adds that base role's operations to the principal's own role and
  * authorities, exactly as `persona_permissions` did. A base role is never a
  * principal's own role: it cannot be assumed (`withExecutionContext` refuses

@@ -323,7 +323,7 @@ export function migrateLegacyDotActions(
   charter: DotCharter,
   deps: DotActionLedgerDeps = {}
 ): number {
-  if (!['sovereign', 'ecosystem_architect'].includes(resolvePolicyIdentityContext().persona))
+  if (!['sovereign', 'ecosystem_architect'].includes(resolvePolicyIdentityContext().baseRole))
     throw new Error(
       '[DOT_STATE_MIGRATION_AUTHORITY] action classification requires an authorized operator'
     );

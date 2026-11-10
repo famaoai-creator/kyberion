@@ -8,7 +8,7 @@
  * it from the registry.
  *
  * A principal is a (role, persona, entry) triple: the persona named through
- * KYBERION_PERSONA (with MISSION_ROLE for the role), or the role assumed
+ * KYBERION_BASE_ROLE (with MISSION_ROLE for the role), or the role assumed
  * in-process with an explicit persona (withExecutionContext).
  *
  * Re-record (only when the policy itself changes, never to hide a difference):
@@ -21,7 +21,7 @@ import { resolveIdentityContext, withExecutionContext } from '../authority.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeReadFile, safeWriteFile } from '../secure-io.js';
 import { validateReadPermission, validateWritePermission } from '../tier-guard.js';
-import type { Persona } from '../types.js';
+import type { BaseRole } from '../types.js';
 
 const TENANT = 'acme-corp';
 const OTHER_TENANT = 'other-corp';
@@ -29,7 +29,7 @@ const MISSION = 'MSN-MATRIX-1';
 const OPERATIONS = ['read', 'write', 'mkdir'] as const;
 type Operation = (typeof OPERATIONS)[number];
 const BASES = ['sovereign', 'ecosystem_architect', 'worker', 'analyst'] as const;
-const PERSONAS: readonly (Persona | '')[] = [...BASES, 'mission_owner', ''];
+const PERSONAS: readonly (BaseRole | '')[] = [...BASES, 'mission_owner', ''];
 const ROLES = [
   '',
   'mission_controller',
@@ -42,7 +42,7 @@ type Entry = 'env' | 'scope';
 interface Principal {
   id: string;
   role: string;
-  persona: Persona | '';
+  persona: BaseRole | '';
   entry: Entry;
 }
 
@@ -127,7 +127,7 @@ function probedPaths(
 
 const ENV_KEYS = [
   'KYBERION_TENANT',
-  'KYBERION_PERSONA',
+  'KYBERION_BASE_ROLE',
   'KYBERION_PROJECT_ID',
   'KYBERION_ORGANIZATION_ID',
   'MISSION_ROLE',
@@ -148,7 +148,7 @@ function withPrincipalEnv<T>(principal: Principal, fn: () => T): T {
   process.env.KYBERION_PROJECT_ID = 'prj-a';
   process.env.MISSION_ID = MISSION;
   if (principal.entry === 'env') {
-    if (principal.persona) process.env.KYBERION_PERSONA = principal.persona;
+    if (principal.persona) process.env.KYBERION_BASE_ROLE = principal.persona;
     if (principal.role) process.env.MISSION_ROLE = principal.role;
   }
   try {
@@ -187,7 +187,7 @@ function principalRow(principal: Principal, paths: readonly string[]): Principal
   return withPrincipalEnv(principal, () => {
     const identity = resolveIdentityContext();
     return {
-      persona: identity.persona,
+      persona: identity.baseRole,
       authorities: [...identity.authorities].sort(),
       cells: paths.map((relative) => OPERATIONS.map((op) => decide(relative, op)).join('|')),
     };

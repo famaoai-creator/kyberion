@@ -22,10 +22,11 @@
  * all resolve under the given fixture root instead of the repo.
  *
  * Identity is explicit over implicit: without --ingested-by or an active
- * KYBERION_PERSONA / MISSION_ROLE, the ceremony refuses to run.
+ * KYBERION_BASE_ROLE / MISSION_ROLE, the ceremony refuses to run.
  */
 
 import * as path from 'node:path';
+import { baseRoleEnvText } from '@agent/core/foundation';
 import {
   deriveAssetId,
   findAssetByContentHash,
@@ -89,7 +90,7 @@ Options:
                            (default: ingest/<file-stem>.md)
   --kind <kind>            knowledge-card kind for taxonomy defaults (default: reference)
   --approval-id <id>       Approval reference recorded in the ledger
-  --ingested-by <who>      Ceremony identity (default: KYBERION_PERSONA, then MISSION_ROLE;
+  --ingested-by <who>      Ceremony identity (default: KYBERION_BASE_ROLE, then MISSION_ROLE;
                            refused when none is resolvable)
   --ocr                    pptx/pdf/docx: OCR embedded images with local providers (pasted figures/tables)
   --reparse                Re-parse an already-ingested, unchanged source (e.g. after a reader
@@ -261,7 +262,7 @@ function assertCeremonyIdentity(tenant: string): void {
   throw new Error(
     `the current identity cannot read the tenant profile (${path.relative(pathResolver.rootDir(), profile)}): ` +
       `${String(decision.reason || 'denied').replace(/[.\s]+$/, '')}. Run the ceremony as ` +
-      '`KYBERION_PERSONA=ecosystem_architect MISSION_ROLE=mission_controller pnpm knowledge:ingest …`. ' +
+      '`KYBERION_BASE_ROLE=ecosystem_architect MISSION_ROLE=mission_controller pnpm knowledge:ingest …`. ' +
       'Nothing was read or written.'
   );
 }
@@ -290,12 +291,12 @@ function listTenantFolders(tenant: string, pathOptions: { rootDir?: string }): s
 function resolveIdentity(args: CliArgs): string {
   const explicit = String(args.ingestedBy || '').trim();
   if (explicit) return explicit;
-  const persona = String(getRegisteredEnvText('KYBERION_PERSONA') || '').trim();
+  const persona = String(baseRoleEnvText() || '').trim();
   if (persona) return persona;
   const role = String(getRegisteredEnvText('MISSION_ROLE') || '').trim();
   if (role) return role;
   throw new Error(
-    'no ingest identity — pass --ingested-by <who> or run with KYBERION_PERSONA / MISSION_ROLE set. ' +
+    'no ingest identity — pass --ingested-by <who> or run with KYBERION_BASE_ROLE / MISSION_ROLE set. ' +
       'The ledger records WHO performed every ingest; anonymous ingests are refused.'
   );
 }

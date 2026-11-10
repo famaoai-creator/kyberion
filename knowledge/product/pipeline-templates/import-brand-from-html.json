@@ -6,12 +6,12 @@
   "description": "指定URLのCSSカラー・フォントを取得し、knowledge/confidential/{tenant_slug}/design/ へ書き込む。レイアウトは PPTX から別途取得推奨。",
   "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
   "knowledge_scope": { "tiers": ["public", "confidential"] },
-  "env": { "KYBERION_PERSONA": "sovereign", "MISSION_ROLE": "mission_controller" },
+  "env": { "KYBERION_BASE_ROLE": "sovereign", "MISSION_ROLE": "mission_controller" },
   "inputs": {
-    "source_url":       "抽出元 URL（例: https://example.com）",
-    "tenant_slug":      "テナントスラグ（例: client-a）",
-    "brand_name":       "表示用ブランド名",
-    "matchers":         "マッチャー文字列配列",
+    "source_url": "抽出元 URL（例: https://example.com）",
+    "tenant_slug": "テナントスラグ（例: client-a）",
+    "brand_name": "表示用ブランド名",
+    "matchers": "マッチャー文字列配列",
     "design_system_id": "使用デザインシステム（省略時: executive-standard）"
   },
   "steps": [
@@ -50,13 +50,13 @@
       "op": "media:save_brand_to_confidential",
       "consumes": "active_web_theme",
       "params": {
-        "tenant_slug":      "{{tenant_slug}}",
-        "brand_name":       "{{brand_name}}",
-        "matchers":         "{{matchers}}",
+        "tenant_slug": "{{tenant_slug}}",
+        "brand_name": "{{brand_name}}",
+        "matchers": "{{matchers}}",
         "design_system_id": "{{design_system_id}}",
-        "theme_from":       "active_web_theme",
-        "web_theme_from":   "active_web_theme",
-        "web_from":         "web_snapshot"
+        "theme_from": "active_web_theme",
+        "web_theme_from": "active_web_theme",
+        "web_from": "web_snapshot"
       }
     },
     {

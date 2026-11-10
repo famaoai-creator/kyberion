@@ -105,7 +105,7 @@ const personal = path.join(
   'personal/shared/unscoped/boundary-' + process.pid + '.json'
 );
 const keys = [
-  'KYBERION_PERSONA',
+  'KYBERION_BASE_ROLE',
   'MISSION_ROLE',
   'SYSTEM_ROLE',
   'MISSION_ID',

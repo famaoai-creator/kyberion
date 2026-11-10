@@ -37,7 +37,12 @@ export async function main(args: string[] = [], print: Print = defaultPrint): Pr
     ['--import', './scripts/ts-loader.mjs', 'scripts/oauth_callback_surface.ts'],
     {
       cwd: pathResolver.rootDir(),
-      env: { ...process.env, KYBERION_PERSONA: 'sovereign', AUTHORIZED_SCOPE: serviceId },
+      env: {
+        ...process.env,
+        KYBERION_BASE_ROLE: 'sovereign',
+        KYBERION_PERSONA: '',
+        AUTHORIZED_SCOPE: serviceId,
+      },
       stdio: 'inherit',
     }
   );

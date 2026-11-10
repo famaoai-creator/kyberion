@@ -13,13 +13,13 @@ describe('run_with_env', () => {
   });
 
   it('injects assignments unchanged and notes variable names (not values) at debug level', () => {
-    main(['KYBERION_PERSONA=worker', 'SYSTEM_ROLE=surface_runtime', 'node', 'x.js']);
+    main(['KYBERION_BASE_ROLE=worker', 'SYSTEM_ROLE=surface_runtime', 'node', 'x.js']);
     expect(safeExec).toHaveBeenCalledWith('node', ['x.js'], {
-      env: { KYBERION_PERSONA: 'worker', SYSTEM_ROLE: 'surface_runtime' },
+      env: { KYBERION_BASE_ROLE: 'worker', SYSTEM_ROLE: 'surface_runtime' },
     });
     expect(debug).toHaveBeenCalledTimes(1);
     const note = String(debug.mock.calls[0][0]);
-    expect(note).toContain('KYBERION_PERSONA, SYSTEM_ROLE');
+    expect(note).toContain('KYBERION_BASE_ROLE, SYSTEM_ROLE');
     expect(note).not.toContain('worker');
   });
 

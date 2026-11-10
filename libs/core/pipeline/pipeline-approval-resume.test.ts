@@ -8,7 +8,7 @@ vi.mock('../authority.js', () => ({
     ...base,
     SYSTEM_ROLE: systemRole,
     MISSION_ROLE: options.missionRole,
-    KYBERION_PERSONA: options.persona,
+    KYBERION_BASE_ROLE: options.persona,
     KYBERION_DELEGATED_ROLE: '',
   }),
 }));
@@ -136,7 +136,7 @@ describe('pipeline approval resume', () => {
               SYSTEM_ROLE: 'concierge',
               MISSION_ROLE: 'chronos_operator',
               KYBERION_DELEGATED_ROLE: '',
-              KYBERION_PERSONA: '',
+              KYBERION_BASE_ROLE: '',
               KYBERION_TENANT: 'original',
               KYBERION_TIER: 'confidential',
               KYBERION_ORGANIZATION_ID: 'org-original',

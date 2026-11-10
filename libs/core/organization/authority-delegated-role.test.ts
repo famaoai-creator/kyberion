@@ -20,7 +20,7 @@ function probeChild(env: NodeJS.ProcessEnv): {
     `const a = await import(${JSON.stringify(authorityUrl)});`,
     'let bounded = false;',
     "try { a.withExecutionContext('dot_lifecycle_writer', () => undefined); } catch { bounded = true; }",
-    'console.log("PROBE " + JSON.stringify({ role: a.resolveRole(), persona: a.resolveIdentityContext().persona, bounded }));',
+    'console.log("PROBE " + JSON.stringify({ role: a.resolveRole(), persona: a.resolveIdentityContext().baseRole, bounded }));',
   ].join('\n');
   const result = safeExecResult(
     process.execPath,
@@ -48,7 +48,7 @@ function probeChild(env: NodeJS.ProcessEnv): {
 
 function surfaceEnv(systemRole: string): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = { ...process.env, SYSTEM_ROLE: systemRole };
-  for (const key of ['MISSION_ROLE', 'KYBERION_PERSONA', DELEGATED_ROLE_ENV]) delete env[key];
+  for (const key of ['MISSION_ROLE', 'KYBERION_BASE_ROLE', DELEGATED_ROLE_ENV]) delete env[key];
   return env;
 }
 

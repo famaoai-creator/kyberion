@@ -119,7 +119,7 @@ beforeAll(async () => {
   vi.stubEnv('KYBERION_ROOT', root);
   vi.stubEnv('MISSION_ID', '');
   vi.stubEnv('MISSION_ROLE', 'worker');
-  vi.stubEnv('KYBERION_PERSONA', 'worker');
+  vi.stubEnv('KYBERION_BASE_ROLE', 'worker');
   vi.stubEnv('SYSTEM_ROLE', '');
   vi.stubEnv('KYBERION_SUDO', '');
   vi.stubEnv('KYBERION_TENANT', '');

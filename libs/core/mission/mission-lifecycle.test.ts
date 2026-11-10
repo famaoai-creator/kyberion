@@ -195,7 +195,7 @@ beforeEach(() => {
   vi.mocked(runMissionRetrospective).mockClear();
   vi.mocked(safeExec).mockClear();
   process.env.MISSION_ROLE = 'mission_controller';
-  process.env.KYBERION_PERSONA = 'worker';
+  process.env.KYBERION_BASE_ROLE = 'worker';
   if (!safeExistsSync(missionPath)) safeMkdir(missionPath, { recursive: true });
   // Keep finishMission's Git writes inside the fixture, even when its parent
   // checkout has uncommitted changes. Never discover the enclosing repository.

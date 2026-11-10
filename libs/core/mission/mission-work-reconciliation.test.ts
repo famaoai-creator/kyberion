@@ -412,10 +412,10 @@ function prepareReviewReconciliationFixture(input?: {
 
 beforeEach(() => {
   previousMissionRole = process.env.MISSION_ROLE;
-  previousPersona = process.env.KYBERION_PERSONA;
+  previousPersona = process.env.KYBERION_BASE_ROLE;
   previousUser = process.env.USER;
   process.env.MISSION_ROLE = 'mission_controller';
-  process.env.KYBERION_PERSONA = actorId;
+  process.env.KYBERION_BASE_ROLE = actorId;
   setWorkCoordinationNamespace(namespace);
   safeRmSync(missionPath, { recursive: true, force: true });
   safeRmSync(fixtureRoot, { recursive: true, force: true });
@@ -442,8 +442,8 @@ afterEach(() => {
   clearWorkCoordinationNamespace();
   if (previousMissionRole === undefined) delete process.env.MISSION_ROLE;
   else process.env.MISSION_ROLE = previousMissionRole;
-  if (previousPersona === undefined) delete process.env.KYBERION_PERSONA;
-  else process.env.KYBERION_PERSONA = previousPersona;
+  if (previousPersona === undefined) delete process.env.KYBERION_BASE_ROLE;
+  else process.env.KYBERION_BASE_ROLE = previousPersona;
   if (previousUser === undefined) delete process.env.USER;
   else process.env.USER = previousUser;
 });
@@ -489,7 +489,7 @@ describe('mission existing work reconciliation', () => {
   it('uses the governed USER accessor when no persona, agent session or owner member is present', () => {
     prepareMission();
     writeManifest(buildManifest());
-    delete process.env.KYBERION_PERSONA;
+    delete process.env.KYBERION_BASE_ROLE;
     process.env.USER = actorId;
     for (const name of cliAgentSessionEnv()) vi.stubEnv(name, '');
     ownerMember.present = false;
@@ -525,9 +525,9 @@ describe('mission existing work reconciliation', () => {
   it('requires mission-controller authority and a governed output location', () => {
     prepareMission();
     const previousRole = process.env.MISSION_ROLE;
-    const previousPersona = process.env.KYBERION_PERSONA;
+    const previousPersona = process.env.KYBERION_BASE_ROLE;
     process.env.MISSION_ROLE = 'software_developer';
-    process.env.KYBERION_PERSONA = 'worker';
+    process.env.KYBERION_BASE_ROLE = 'worker';
     expect(() =>
       generateMissionWorkReconciliationScaffold({
         missionId,
@@ -535,7 +535,7 @@ describe('mission existing work reconciliation', () => {
       })
     ).toThrow(/Mission controller authority/);
     process.env.MISSION_ROLE = previousRole;
-    process.env.KYBERION_PERSONA = previousPersona;
+    process.env.KYBERION_BASE_ROLE = previousPersona;
 
     expect(() =>
       generateMissionWorkReconciliationScaffold({
