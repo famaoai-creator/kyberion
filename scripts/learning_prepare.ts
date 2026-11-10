@@ -4,6 +4,7 @@ import {
   queueReusableLearning,
   type LearningDestination,
 } from '@agent/core/knowledge/reusable-learning';
+import { migrateLegacyReuseProposals } from '@agent/core/knowledge/reuse-proposals';
 import { currentScope } from '@agent/core/scope-context';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync } from '@agent/core/secure-io';
@@ -26,6 +27,7 @@ export const LEARNING_PREPARE_CLI: CliGuardSpec = {
     { flag: '--replace-target', value: '<existing-asset>' },
     { flag: '--queue' },
     { flag: '--candidate', value: '<learning-candidate-id>' },
+    { flag: '--migrate' },
     { flag: '--dry-run' },
     { flag: '--json' },
   ],
@@ -79,6 +81,23 @@ export const runLearningPrepare = defineScript({
     const parsed = parseGuardedCliArgs(argv, LEARNING_PREPARE_CLI, print);
     if (parsed.handled) return;
     const options = parsed.options;
+    if (options['--migrate']) {
+      // One release (D8): pending legacy reuse proposals onto the queue, with
+      // the scope each record declares; the rest is reported, never guessed.
+      const report = migrateLegacyReuseProposals({ apply: !dryRun });
+      print(
+        json
+          ? report
+          : [
+              `${report.mode === 'apply' ? 'Imported' : 'Would import'}: ${report.imported.length}`,
+              `Already on the queue: ${report.already_on_queue.length}`,
+              `Kept as history: ${report.left_as_history.length}`,
+              `Scope not determined (not imported): ${report.unresolved.length}`,
+              ...report.unresolved.map((item) => `  ${item.candidate_id}: ${item.reason}`),
+            ].join('\n')
+      );
+      return;
+    }
     if (options['--queue']) {
       const candidate = value(options, '--candidate');
       if (

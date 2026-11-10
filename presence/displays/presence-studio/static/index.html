@@ -1613,7 +1613,7 @@
            <div class="small">${escapeHtml(uiText("project", "project"))}: <span class="mono">${escapeHtml(item.project_id || "standalone")}</span> · ${escapeHtml(uiText("track", "track"))}: <span class="mono">${escapeHtml(item.track_name || item.track_id || item.work_loop?.context?.track_name || item.work_loop?.context?.track_id || "-")}</span></div>
            <div class="small">${escapeHtml(uiText("storage", "storage"))}: <span class="mono">${escapeHtml(item.storage_class || "unknown")}</span></div>
            <div class="small">${escapeHtml(uiText("artifact", "artifact"))}: <span class="mono">${escapeHtml(item.artifact_id || "unknown")}</span></div>
-           ${(item.distill_titles || []).length ? `<div class="small">${escapeHtml(uiText("memory candidate", "memory candidate"))}: ${escapeHtml((item.distill_titles || []).join(" · "))}</div>` : ""}
+           ${(item.distill_titles || []).length ? `<div class="small">${escapeHtml(uiTextKey("presence_studio:label_reuse_proposal", "proposed for reuse"))}: ${escapeHtml((item.distill_titles || []).join(" · "))}</div>` : ""}
            ${(item.promoted_refs || []).length ? `<div class="small">${escapeHtml(uiText("promoted", "promoted"))}: ${(item.promoted_refs || []).map((ref) => `<button class="button button-link" type="button" data-knowledge-ref="${escapeHtml(ref)}">${escapeHtml(String(ref).split("/").pop() || ref)}</button>`).join(" · ")}</div>` : ""}
            ${item.downloadable ? `<div class="small"><a href="/api/artifacts/${encodeURIComponent(item.artifact_id)}">${escapeHtml(uiTextKey("presence_studio:download_artifact", "Download artifact"))}</a></div>` : ""}`
         );

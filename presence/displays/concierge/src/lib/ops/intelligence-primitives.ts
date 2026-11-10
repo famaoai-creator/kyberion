@@ -33,13 +33,14 @@ export {
   restartAgentRuntime,
   stopAgentRuntime,
 } from '@agent/core/agent/agent-runtime-supervisor';
+// D8: legacy DistillCandidateRecords are read-only history here; proposals
+// are MemoryCandidate queue rows (facade-proposal-rows / reuse-proposals).
 export {
-  createDistillCandidateRecord,
   listDistillCandidateRecords,
   loadDistillCandidateRecord,
-  saveDistillCandidateRecord,
-  updateDistillCandidateRecord,
 } from '@agent/core/knowledge/distill-candidate-registry';
+export { updateFacadeProposal } from '@agent/core/knowledge/facade-proposal-rows';
+export { captureMissionSeedProposal } from '@agent/core/knowledge/reuse-proposals';
 export {
   listMissionSeedRecords,
   loadMissionSeedRecord,
