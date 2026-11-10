@@ -183,7 +183,6 @@
     "tests/browser-bridge-a11y.test.ts",
     "tests/cli-reliability.smoke.test.ts",
     "tests/customer-dialogue-e2e.test.ts",
-    "tests/distill-candidate-receipt-boundary.test.ts",
     "tests/impact-analysis.test.ts",
     "tests/knowledge-store-purity.test.ts",
     "tests/meet-copilot-built-in-ai.test.ts",
