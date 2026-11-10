@@ -6,6 +6,7 @@ importance: 8
 author: Ecosystem Architect
 last_updated: 2026-10-05
 kind: evergreen
+concepts: [agent-runtime-supervisor]
 ---
 
 # Agent Runtime Supervisor Daemon

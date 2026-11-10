@@ -205,7 +205,7 @@ in `meeting-proxy-workflow.json` with real ops (`wisdom:extract_requirements`
 ## Cross-references
 
 - [`kyberion-intent-catalog.md`](kyberion-intent-catalog.md) — what to ask for
-- [`kyberion-canonical-concept-index.md`](kyberion-canonical-concept-index.md) — primitives and vocabulary
+- [`organization-work-loop.md`](organization-work-loop.md) and [concept registry](../governance/concept-registry.json) — parent model and single term definitions
 - [`multi-tenant-operations.md`](multi-tenant-operations.md) — multi-tenant operational baseline
 - [`operator-surface-strategy.md`](operator-surface-strategy.md) — UI strategy
 - [`../procedures/system/developer-onboarding.md`](../../public/procedures/system/developer-onboarding.md) — developer first month

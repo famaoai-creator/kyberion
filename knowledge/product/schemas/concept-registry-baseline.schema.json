@@ -1,0 +1,24 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/concept-registry-baseline.schema.json",
+  "title": "Kyberion concept registry baseline (shrink-only exemptions)",
+  "type": "object",
+  "required": ["version", "architecture_docs_without_concepts"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "version": {
+      "const": 1
+    },
+    "architecture_docs_without_concepts": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^knowledge/product/architecture/.+\\.md$"
+      }
+    }
+  }
+}
