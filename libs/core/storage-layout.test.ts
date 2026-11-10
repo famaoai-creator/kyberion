@@ -260,7 +260,7 @@ describe('durable partitioned runtime state', () => {
         prefix.includes('/discussion-create-requests/')
       )
     ).toBe(false);
-    for (const field of ['default_allow', 'persona_permissions', 'authority_permissions'])
+    for (const field of ['default_allow', 'authority_permissions'])
       expect(JSON.stringify(policy[field])).not.toContain('runtime/discussion-create-requests');
     // Discussion request receipts (G2): no role grants them; only the opaque request grant does.
     expect(policy.authority_role_permissions.discussion_request_store).toBeUndefined();
@@ -270,7 +270,7 @@ describe('durable partitioned runtime state', () => {
     expect(policy.authority_role_permissions.customer_decision_invite_store).toBeUndefined();
     for (const grant of Object.values(policy.authority_role_permissions))
       expect(JSON.stringify(grant)).not.toContain('runtime/customer-decision-invites');
-    for (const field of ['default_allow', 'persona_permissions', 'authority_permissions'])
+    for (const field of ['default_allow', 'authority_permissions'])
       expect(JSON.stringify(policy[field])).not.toContain('runtime/customer-decision-invites');
     // Credential allocation administration and dispatch metadata access reuse
     // the existing GrantStore. Both grants are confined to the selected tenant;
@@ -290,7 +290,7 @@ describe('durable partitioned runtime state', () => {
       expect(
         policy.tenant_scope.shared_prefixes.some((prefix: string) => prefix.includes(`/${store}/`))
       ).toBe(false);
-      for (const field of ['default_allow', 'persona_permissions', 'authority_permissions']) {
+      for (const field of ['default_allow', 'authority_permissions']) {
         expect(JSON.stringify(policy[field])).not.toContain(`runtime/${store}`);
       }
       for (const [role, grant] of Object.entries(policy.authority_role_permissions)) {
@@ -364,7 +364,7 @@ describe('tenant approval partitions', () => {
         prefix.includes('/tenant-approvals/')
       )
     ).toBe(false);
-    for (const field of ['default_allow', 'persona_permissions', 'authority_permissions'])
+    for (const field of ['default_allow', 'authority_permissions'])
       expect(JSON.stringify(policy[field])).not.toContain('runtime/tenant-approvals');
     const own = [
       'active/shared/runtime/tenant-approvals/personal/${KYBERION_TENANT}/',

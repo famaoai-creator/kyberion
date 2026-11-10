@@ -71,6 +71,8 @@ Kyberion 自体のメンテナンス。
 - **analyst**: MISSION モード。ナレッジ読み取りと蒸留書き込みに特化。
 - **unknown**: 未解決。ほとんどの書き込みが拒否される。
 
+**Persona の権限は base Authority Role（S4 の 4 つ目）**: `sovereign` / `ecosystem_architect` / `worker` / `analyst` が持つパスの権限は、レジストリの base Authority Role `base_sovereign` / `base_ecosystem_architect` / `base_worker` / `base_analyst`（`authority-roles/base_<persona>.json`、`"assignable": false`）にあり、`pnpm kyberion sync authority-roles` が `authority_role_permissions` へ写します。以前の `security-policy.json` の `persona_permissions` の中身をそのまま移しました。tier-guard はプリンシパルの persona が指す base role の権限を、自分のロールと authority の権限に足します（`libs/core/foundation/base-authority-role.ts`）。判定は前後で同じです（`libs/core/testing/base-authority-role-equivalence.test.ts`、基準は `tests/fixtures/base-authority-role-equivalence.json`）。base role は自分のロールにはなりません。`withExecutionContext('base_…')` は拒否し、`MISSION_ROLE` / `SYSTEM_ROLE` でその名前として動いても何も得ません。`mission_owner` と `unknown` には base role がありません。base role を持たない古いインストール先の catalog は、1 リリースの間だけ `persona_permissions` から読みます。宣言された許可証の `persona` の項目は `baseRole`（`base_worker`）になりました。
+
 ### B. Authority Role (機能ロール)
 
 `MISSION_ROLE` として注入され、`security-policy.json` の `authority_role_permissions` と対応します。

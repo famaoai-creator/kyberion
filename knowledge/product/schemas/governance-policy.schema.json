@@ -6,7 +6,6 @@
     "version",
     "default_allow",
     "tier_restrictions",
-    "persona_permissions",
     "authority_role_permissions",
     "authority_permissions",
     "quality_requirements",
@@ -30,6 +29,7 @@
       }
     },
     "persona_permissions": {
+      "description": "Deprecated (S4 slice 4): the Execution Persona bundles are base Authority Roles (authority-roles/base_<persona>.json, projected into authority_role_permissions). Read only from an installation catalog that predates them, for one release.",
       "type": "object",
       "additionalProperties": {
         "type": "object",
