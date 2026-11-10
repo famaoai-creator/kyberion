@@ -1,4 +1,4 @@
-import { withExecutionContextAsync } from '@agent/core/authority';
+import { withExecutionContextAsync, withStoreGrantAsync } from '@agent/core/authority';
 import {
   missionLifecycleService,
   resolveMissionTeamSelectionScope,
@@ -192,7 +192,7 @@ export async function changeReasoningSelection(
   // Reject already-stale requests before role entry; the store repeats CAS under its lock.
   if (getReasoningSelectionSettings().revision !== expectedRevision)
     throw new SelectionAccessError(409, 'STALE_SELECTION');
-  const saved = await withExecutionContextAsync('reasoning_settings_writer', () =>
+  const saved = await withStoreGrantAsync('reasoning_settings_writer', () =>
     saveReasoningSelection({
       role: command.role,
       selection,

@@ -6,7 +6,7 @@ authority: reference
 phase: [alignment, execution, review]
 tags: [mission, lifecycle, kanban, a2a, transport, evidence, record-keeping]
 owner: ecosystem_architect
-last_updated: 2026-10-05
+last_updated: 2026-11-10
 ---
 
 # Mission Lifecycle and Record Keeping
@@ -26,7 +26,7 @@ Separate these concerns explicitly:
 - `agmsg`-style or peer transport owns short-lived agent-to-agent messages
 - `agent_runtime_supervisor` owns live runtime liveness
 
-`assigned_persona` in mission state is descriptive metadata. It is not the
+`org_role` (formerly `assigned_persona`) in mission state is descriptive metadata. It is not the
 same thing as the process execution authority that writes mission files.
 
 ## Stable flow
@@ -210,7 +210,7 @@ rework.
 
 - `KYBERION_PERSONA` describes the display / reasoning persona.
 - `MISSION_ROLE` and the authority model decide what the process can write.
-- `assigned_persona` in mission state is mission metadata, not write authority.
+- `org_role` (formerly `assigned_persona`) in mission state is mission metadata, not write authority.
 
 Mission lifecycle commands default to the safe worker persona unless an
 explicit override is needed.

@@ -44,7 +44,9 @@ describe('summarize_memory_promotion_queue', () => {
       proposedMemoryKind: 'heuristic',
       summary: 'Reusable operational hint for weekly review.',
       evidenceRefs: ['active/missions/MSN-QUEUE-SUMMARY/evidence/ledger.jsonl'],
-      sensitivityTier: 'personal',
+      // Public: personal/confidential candidates need a capture scope and are
+      // only listed to readers inside it (MEMORY_SCOPE_REQUIRED, D8).
+      sensitivityTier: 'public',
       queuedAt: '2026-07-01T00:00:00.000Z',
     });
     enqueueMemoryPromotionCandidate(candidate);
@@ -56,7 +58,8 @@ describe('summarize_memory_promotion_queue', () => {
       status: 'queued',
       source_ref: 'mission:MSN-QUEUE-SUMMARY',
       occurrences: 1,
-      ratification_required: false,
+      // Public candidates always need ratification before promotion.
+      ratification_required: true,
     });
     expect(rows[0]?.age_days).toBeGreaterThanOrEqual(0);
   });

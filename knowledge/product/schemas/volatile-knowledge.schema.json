@@ -65,8 +65,8 @@
     },
     "status": {
       "type": "string",
-      "enum": ["active", "expired", "rolled-over", "promoted", "archived"],
-      "description": "Lifecycle status"
+      "enum": ["active", "expired", "rolled-over", "nominated", "promoted", "archived"],
+      "description": "Lifecycle status. `nominated` = nominated as a MemoryCandidate; `promoted` is the deprecated spelling of the same state, accepted on read for one release and rewritten as `nominated`."
     },
     "pinned": {
       "type": "boolean",

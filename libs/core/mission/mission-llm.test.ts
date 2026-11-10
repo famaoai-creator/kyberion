@@ -8,6 +8,7 @@ import * as pathResolver from '../path-resolver.js';
 vi.mock('../daemon/ops-alert.js', () => ({ sendOpsAlert: vi.fn() }));
 import {
   BUILTIN_FALLBACK,
+  distillLlmProfileOverride,
   inspectLlmResolution,
   invokeLlm,
   invokeShellProfile,
@@ -283,10 +284,10 @@ describe('probeLlmCommandAvailability', () => {
   });
 });
 
-describe('shipped wisdom-policy claude profile', () => {
+describe('shipped distill-policy claude profile', () => {
   const originalProfile = process.env.KYBERION_WISDOM_LLM_PROFILE;
   const shippedPolicy = readJson<{ llm: LlmPolicyConfig }>(
-    pathResolver.knowledge('product/governance/wisdom-policy.json')
+    pathResolver.knowledge('product/governance/distill-policy.json')
   ).llm;
 
   beforeEach(() => {
@@ -363,7 +364,7 @@ describe('shipped wisdom-policy claude profile', () => {
  * falls through only on quota errors). A provider-CLI turn (process start,
  * sandbox, the user's default model and effort) needs well over 30s.
  */
-describe('shipped wisdom-policy profile timeouts', () => {
+describe('shipped distill-policy profile timeouts', () => {
   const PROVIDER_CLI_ADAPTERS = new Set(['codex-cli', 'gemini-cli', 'claude-cli']);
   /** Ceiling for one structured provider-CLI turn: the codex/gemini adapter default before #1006. */
   const MAX_PROFILE_TIMEOUT_MS = 300_000;
@@ -380,7 +381,7 @@ describe('shipped wisdom-policy profile timeouts', () => {
       : BUILTIN_FALLBACK.timeout_ms!); // invokeShellProfile default
   const profiles = Object.entries(
     readJson<{ llm: LlmPolicyConfig }>(
-      pathResolver.knowledge('product/governance/wisdom-policy.json')
+      pathResolver.knowledge('product/governance/distill-policy.json')
     ).llm.profiles ?? {}
   );
 
@@ -447,7 +448,7 @@ describe('LLM prompt transport', () => {
 
   it('ships the claude profile with the prompt on stdin, never in argv', () => {
     const claude = readJson<{ llm: LlmPolicyConfig }>(
-      pathResolver.knowledge('product/governance/wisdom-policy.json')
+      pathResolver.knowledge('product/governance/distill-policy.json')
     ).llm.profiles.claude;
     expect(claude.prompt_via).toBe('stdin');
     expect(claude.args).not.toContain('{prompt}');
@@ -479,7 +480,7 @@ describe('LLM prompt transport', () => {
 
   it('ships the claude profile as a single tool-less turn without user settings', () => {
     const claude = readJson<{ llm: LlmPolicyConfig }>(
-      pathResolver.knowledge('product/governance/wisdom-policy.json')
+      pathResolver.knowledge('product/governance/distill-policy.json')
     ).llm.profiles.claude;
     // Same flags as the repo's tool-less claude turn (agent-adapter.ts) plus
     // the --max-turns flag the shell backend uses.
@@ -500,7 +501,7 @@ describe('LLM prompt transport', () => {
   it('runs the claude profile from a scratch cwd with its flags and the system prompt on stdin', async () => {
     process.env.KYBERION_CLAUDE_CLI_BIN = process.execPath;
     const shipped = readJson<{ llm: LlmPolicyConfig }>(
-      pathResolver.knowledge('product/governance/wisdom-policy.json')
+      pathResolver.knowledge('product/governance/distill-policy.json')
     ).llm.profiles.claude;
     // node stands in for claude: it echoes stdin, argv and cwd inside the
     // print-mode JSON envelope the profile parses.
@@ -677,5 +678,30 @@ describe('llmProfileProviderId', () => {
     expect(llmProfileProviderId({ command: 'gemini', args: [], adapter: 'gemini-cli' })).toBe(
       'gemini'
     );
+  });
+});
+
+describe('distill LLM profile override (D8 / M3 rename)', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('reads KYBERION_DISTILL_LLM_PROFILE first', () => {
+    vi.stubEnv('KYBERION_DISTILL_LLM_PROFILE', 'stub');
+    vi.stubEnv('KYBERION_WISDOM_LLM_PROFILE', 'standard');
+    expect(distillLlmProfileOverride()).toBe('stub');
+  });
+
+  it('still accepts the deprecated KYBERION_WISDOM_LLM_PROFILE for one release', () => {
+    vi.stubEnv('KYBERION_DISTILL_LLM_PROFILE', undefined);
+    vi.stubEnv('KYBERION_WISDOM_LLM_PROFILE', 'stub');
+    expect(distillLlmProfileOverride()).toBe('stub');
+    expect(inspectLlmResolution('distill', { profiles: {} }).checkedProfiles[0]?.name).toBe('stub');
+  });
+
+  it('returns undefined when neither name is set', () => {
+    vi.stubEnv('KYBERION_DISTILL_LLM_PROFILE', undefined);
+    vi.stubEnv('KYBERION_WISDOM_LLM_PROFILE', undefined);
+    expect(distillLlmProfileOverride()).toBeUndefined();
   });
 });

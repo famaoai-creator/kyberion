@@ -18,7 +18,7 @@
   <dict>
     <key>NODE_ENV</key>
     <string>production</string>
-    <key>KYBERION_CUSTOMER</key>
+    <key>KYBERION_STANCE</key>
     <string>customer-slug</string>
   </dict>
   <key>RunAtLoad</key>

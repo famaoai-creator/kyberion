@@ -6,6 +6,7 @@ importance: 5
 source_mission: MSN-SERVICE-HARNESS-20260816
 author: Kyberion Wisdom Distiller
 last_updated: 2026-08-16
+doc_status: historical
 ---
 
 # 自己記述・計画・検証を備えたService Harness契約

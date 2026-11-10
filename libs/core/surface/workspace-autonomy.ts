@@ -1,4 +1,5 @@
 /** Workspace controls narrow existing dot ownership; they never confer tool authority. */
+import type { StorageDataTier } from '../storage-layout.js';
 import { listDotCharters, type DotCharter } from '../dot/dot-charter.js';
 import {
   checkDotActivationReadiness,
@@ -69,7 +70,7 @@ export function readWorkspaceAutonomy(
     // A project-limited viewer cannot inspect aggregate sibling spending.
     const canReadBudget =
       ['public', 'confidential', 'personal'].every((tier) =>
-        viewer.tierAccess.includes(tier as 'public' | 'confidential' | 'personal')
+        viewer.tierAccess.includes(tier as StorageDataTier)
       ) &&
       viewer.projectIds === 'all' &&
       (Boolean(charter.scope.organization_id) || viewer.organizationIds === 'all');

@@ -127,7 +127,7 @@ function fixture(judged = true) {
   const proposal = proposals.normalizeDotProposal({
     title: 'Bounded synthetic repair',
     objective: 'Preserve all original goals',
-    work_shape: 'pipeline',
+    execution_shape: 'pipeline',
     pipeline_ref: latency.SYNTHETIC_LATENCY_PIPELINE_REF,
   });
   const binding = {

@@ -458,6 +458,8 @@ export async function promotePendingMemoryCandidates(
   }
   const approved = listMemoryPromotionCandidates()
     .filter((row) => row.status === 'approved')
+    // D8: facade-owned rows (organization learning, process improvement) promote through their facade.
+    .filter((row) => !row.origin)
     .filter((row) => !missionId || isMissionCandidate(row, missionId))
     .sort((a, b) => a.queued_at.localeCompare(b.queued_at));
   // A sibling-worktree target only carries PR-reviewed product knowledge;

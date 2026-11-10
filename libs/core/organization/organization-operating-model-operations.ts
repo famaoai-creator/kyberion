@@ -3,6 +3,7 @@ import { pathResolver } from '../path-resolver.js';
 import { nowIso } from '../foundation/time.js';
 import { safeExistsSync } from '../secure-io.js';
 import type { KeyResultSpec } from './key-result-spec.js';
+import { enqueueOrganizationLearningOnQueue } from './organization-learning-queue.js';
 
 import {
   validatorFor,
@@ -422,6 +423,13 @@ export function saveOrganizationDecision(
   );
 }
 
+/**
+ * @deprecated D8: the per-organization learning store is read-only legacy.
+ * Production code captures with `enqueueOrganizationLearningCandidate` and
+ * decides with `saveOrganizationLearningDecision` (both on the MemoryCandidate
+ * queue). Kept for one release so fixtures can seed legacy records for
+ * `migrateLegacyOrganizationLearningCandidates`.
+ */
 export function saveOrganizationLearningCandidate(
   record: OrganizationLearningCandidate,
   options: { rootDir?: string } = {}
@@ -481,8 +489,8 @@ export function enqueueOrganizationLearningCandidate(
   input: QueueOrganizationLearningCandidateInput
 ): OrganizationLearningCandidate {
   const record = buildOrganizationLearningCandidate(input);
-  saveOrganizationLearningCandidate(record, { rootDir: input.rootDir });
-  return record;
+  // D8: captured on the single MemoryCandidate queue with its real scope.
+  return enqueueOrganizationLearningOnQueue(record, { ownerNhi: input.ownerNhi });
 }
 
 export interface BuildOrganizationScaffoldInput {

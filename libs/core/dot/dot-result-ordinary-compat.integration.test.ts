@@ -114,7 +114,7 @@ function fixture(role: 'ecosystem_architect' | 'infrastructure_sentinel' = 'ecos
     attention: { triggers: [{ kind: 'cron', cron: '*/15 * * * *' }] },
     authority: {
       authority_role: role,
-      allowed_work_shapes: ['pipeline'],
+      allowed_execution_shapes: ['pipeline'],
       allowed_pipelines: ['pipelines/ordinary-fixture.json'],
       max_concurrent_delegations: 2,
     },
@@ -130,7 +130,7 @@ function fixture(role: 'ecosystem_architect' | 'infrastructure_sentinel' = 'ecos
       proposals.normalizeDotProposal({
         title: 'Ordinary result',
         objective: 'Retain full protected evidence',
-        work_shape: 'pipeline',
+        execution_shape: 'pipeline',
         pipeline_ref: 'pipelines/ordinary-fixture.json',
         target: 'service:' + id,
         intent: 'apply',

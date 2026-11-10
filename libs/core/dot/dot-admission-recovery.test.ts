@@ -50,7 +50,7 @@ const CHARTER: DotCharter = {
   attention: { triggers: [{ kind: 'cron', cron: '0 9 * * *', timezone: 'UTC' }] },
   authority: {
     authority_role: 'organization_operator',
-    allowed_work_shapes: ['direct_reply'],
+    allowed_execution_shapes: ['direct_reply'],
     max_concurrent_delegations: 20,
   },
   notification: { deliver_to: { surface: 'surface', channel: 'inbox' } },
@@ -60,7 +60,7 @@ const PROPOSAL: DotProposal = {
   action_id: 'dot_delegate_work',
   title: 'Durable operation',
   objective: 'Create exactly one durable item',
-  work_shape: 'direct_reply',
+  execution_shape: 'direct_reply',
 };
 let rootDir: string;
 const children: ManagedProcessHandle[] = [];
@@ -380,7 +380,7 @@ describe('durable generic dot admission', () => {
       let options = deps();
       if (kind === 'inactive') charter.status = 'paused';
       if (kind === 'role') charter.authority.authority_role = 'different-role';
-      if (kind === 'shape') charter.authority.allowed_work_shapes = [];
+      if (kind === 'shape') charter.authority.allowed_execution_shapes = [];
       if (kind === 'gate') {
         const gate = options.gate!;
         options = { ...options, gate: (input) => ({ ...gate(input), allowed: false }) };
@@ -449,6 +449,9 @@ function seedChildRoot(): string {
       'knowledge/product/schemas/workitem-label-taxonomy.schema.json',
       'knowledge/product/governance/security-policy.json',
       'knowledge/product/governance/role-assumption-policy.json',
+      // Dot dispatch reads the work-scope verdict through its RoutingDecision adapter.
+      'knowledge/product/governance/work-scope-policy.json',
+      'knowledge/product/schemas/work-scope-policy.schema.json',
     ]) {
       safeMkdir(path.dirname(path.join(fixtureRoot, relative)), { recursive: true });
       safeCopyFileSync(pathResolver.rootResolve(relative), path.join(fixtureRoot, relative));

@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import * as crypto from 'node:crypto';
 import * as nodePath from 'node:path';
 import { knowledge, shared } from '../path-resolver.js';
@@ -13,7 +14,7 @@ import {
 import { logger } from '../core.js';
 import { nowIso } from '../foundation/time.js';
 
-export type DataVaultTier = 'personal' | 'confidential' | 'public';
+export type DataVaultTier = StorageDataTier;
 
 export interface VaultEntry<T = unknown> {
   sourceType: string;

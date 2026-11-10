@@ -1,6 +1,5 @@
 /** Domain barrel — public surface for libs/core/knowledge */
 export * from './distill-candidate-registry.js';
-export * from './distill-knowledge-injector.js';
 export * from './feedback-loop.js';
 export * from './knowledge-adapter.js';
 export * from './knowledge-context.js';
@@ -32,5 +31,6 @@ export * from './procedure-inputs.js';
 export * from './procedure-registry.js';
 export * from './procedure-self-repair.js';
 export * from './procedure-types.js';
+export * from './promoted-knowledge-retrieval.js';
 export * from './vocabulary-catalog.js';
 export * from './vocabulary-keys.generated.js';

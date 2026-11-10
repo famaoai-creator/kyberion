@@ -16,7 +16,7 @@ project / mission 群は下記の接続済み経路で作成する。任意 SaaS
 ## 準備
 
 1. 対象 tenant / organization / project を既存 facade で用意し、`pnpm scope use` で選択する。既存 scope を勝手に作り直さない。
-2. [dot authoring](../../../dots/README.md)に従い、同一 tier / tenant / organization / project の charter を作る。CLI の運転 role は `organization_operator`。charter の `authority_role` もこれにそろえる。pipeline 形と対象 pipeline を `allowed_work_shapes` / `allowed_pipelines` で許可し、同時実行数・予算・承認方針を設定する。通知は inbox から始める。
+2. [dot authoring](../../../dots/README.md)に従い、同一 tier / tenant / organization / project の charter を作る。CLI の運転 role は `organization_operator`。charter の `authority_role` もこれにそろえる。pipeline 形と対象 pipeline を `allowed_execution_shapes` / `allowed_pipelines` で許可し、同時実行数・予算・承認方針を設定する。通知は inbox から始める。
 3. 既存 tenant-ingest / connector とデータ別 adapter で観測 snapshot を生成する。collector は下記 JSON を読み取る。adapter は取得成功時だけ atomic に更新し、失敗時に古い値へ新しい時刻を付けない。
 4. `knowledge/product/governance/continuous-operations/example.json` を新しい固定 ID の設定として作成し、scope、dot、source、metric、目標、閾値、実行 pipeline をレビューする。実データは設定に埋め込まない。設定はこの product governance directory 内の JSON に限定され、symlink は受け付けない。
 5. 設定の `enabled` を true にする。初期 example と schedule は無効で出荷される。disabled でも charter と実行 scope の検証は必要。

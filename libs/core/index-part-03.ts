@@ -274,6 +274,13 @@ export * from './workforce/worker-state-journal.js';
 // event-sourcing kernel; see the module docstring for the KD-03 lineage).
 
 export * from './mission/orchestrator-session.js';
+export {
+  ensureMissionOwnershipWorkItem,
+  migrateMissionTaskWorkItemParents,
+  resolveMissionTaskParentItemId,
+  type MissionOwnershipScope,
+  type MissionTaskParentMigrationResult,
+} from './mission/mission-ownership-item.js';
 // NI-01: durable NHI registry for agent identities (journal-backed, SO-02
 // pattern); AL-01 retention catalog is the storage-lifecycle counterpart.
 

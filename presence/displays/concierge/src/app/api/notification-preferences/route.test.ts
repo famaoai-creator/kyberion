@@ -16,6 +16,9 @@ vi.mock('../../../lib/viewer-context', () => ({
   ),
 }));
 vi.mock('@agent/core/authority', () => ({
+  // S4: store facades open their declared store grant (withStoreGrant).
+  withStoreGrant: (_name: string, fn: () => unknown) => fn(),
+  withStoreGrantAsync: async (_name: string, fn: () => unknown) => fn(),
   withExecutionContext: vi.fn((_role: string, fn: () => unknown) => fn()),
 }));
 vi.mock('@agent/core/secure-io', () => ({

@@ -1,7 +1,7 @@
 ---
 title: README
 tags: [improvement-plan, 2026-11]
-last_updated: 2026-11-09
+last_updated: 2026-11-10
 status: active
 ---
 
@@ -14,6 +14,15 @@ status: active
 - [情報資産のスコープモデル（管理・開示・加工）の設計](./INFORMATION_ASSET_SCOPE_MODEL_DESIGN_2026-11-05.ja.md) — planned
 - [保存先カタログと許可証による権限判定（tier-guard の再設計）](./STORE_CATALOG_GRANT_GUARD_DESIGN_2026-11-05.ja.md) — planned
 - [情報資産カタログ・収集・dots intake 統合実装計画](./INFORMATION_ASSET_INTAKE_IMPLEMENTATION_PLAN_2026-11-02.ja.md) — active
+
+## 概念モデル v2 の移行
+
+決定記録は [Concept Model v2](../../../knowledge/product/architecture/decisions/2026-11-10-concept-model-v2.md) です。依存関係の順に並べています。
+
+1. [スコープ・ID・権限（Grant）の統合計画](./SCOPE_IDENTITY_GRANT_CONSOLIDATION_PLAN_2026-11-10.ja.md) — planned
+2. [WorkItem（Issue と子ステップ）と Lease の統合計画](./WORKITEM_ISSUE_LEASE_CONSOLIDATION_PLAN_2026-11-10.ja.md) — planned
+3. [意図の解決器の一本化計画](./INTENT_RESOLVER_UNIFICATION_PLAN_2026-11-10.ja.md) — completed
+4. [記憶のループを閉じる計画](./MEMORY_LOOP_CLOSURE_PLAN_2026-11-10.ja.md) — planned
 
 ## 外部ホスト連携
 

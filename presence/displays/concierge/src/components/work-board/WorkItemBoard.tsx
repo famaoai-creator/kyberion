@@ -8,10 +8,13 @@ import {
   boardMoveTargets,
   cardTitle,
   groupBoardColumns,
+  orderBoardSteps,
   resolveBoardDrop,
+  stepProgress,
   summarizeWorkItemDescription,
   withCardStatus,
   type BoardCard,
+  type BoardStep,
 } from './work-item-board';
 import './work-item-board.css';
 
@@ -69,6 +72,93 @@ export interface WorkItemBoardProps<T extends BoardCard> {
   label: string;
   /** `list`: the same status groups stacked, empty ones omitted (same move path). */
   layout?: BoardViewMode;
+  /** An Issue's steps, read when its card is expanded (cards are Issues; D1). */
+  loadSteps?: (card: T) => Promise<readonly BoardStep[]>;
+}
+
+type StepsState =
+  { state: 'idle' | 'loading' | 'error' } | { state: 'ready'; steps: readonly BoardStep[] };
+
+/**
+ * An Issue's step progress and, on demand, its steps. Steps are read once when
+ * the card is first expanded; a failed read retries on the next expansion.
+ */
+function CardSteps<T extends BoardCard>({
+  card,
+  title,
+  t,
+  statusLabel,
+  loadSteps,
+}: {
+  card: T;
+  title: string;
+  t: BoardTranslate;
+  statusLabel: (status: string) => string;
+  loadSteps?: (card: T) => Promise<readonly BoardStep[]>;
+}) {
+  const progress = stepProgress(card.steps);
+  const [steps, setSteps] = React.useState<StepsState>({ state: 'idle' });
+  if (!progress) return null;
+  const load = () => {
+    if (!loadSteps || steps.state === 'loading' || steps.state === 'ready') return;
+    setSteps({ state: 'loading' });
+    loadSteps(card).then(
+      (list) => setSteps({ state: 'ready', steps: orderBoardSteps(list) }),
+      () => setSteps({ state: 'error' })
+    );
+  };
+  const progressText = t('ux_b_card_steps_progress', {
+    done: progress.done,
+    total: progress.total,
+  });
+  return (
+    <div className="wb-card__steps">
+      <p className="wb-card__progress">
+        <span>{progressText}</span>
+        <progress max={progress.total} value={progress.done} aria-label={progressText} />
+      </p>
+      {loadSteps ? (
+        <details
+          className="wb-card__more"
+          onToggle={(event) => {
+            if ((event.currentTarget as HTMLDetailsElement).open) load();
+          }}
+        >
+          <summary>{t('ux_b_card_steps_show')}</summary>
+          {steps.state === 'ready' ? (
+            steps.steps.length ? (
+              <ul className="wb-steps" aria-label={t('ux_b_card_steps_label', { title })}>
+                {steps.steps.map((step) => (
+                  <li key={step.id} className="wb-steps__item">
+                    {step.href ? (
+                      <a href={step.href} title={step.title}>
+                        {step.title}
+                      </a>
+                    ) : (
+                      <span title={step.title}>{step.title}</span>
+                    )}
+                    <span className="wb-steps__status" data-status={step.status}>
+                      {statusLabel(step.status)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="wb-hint">{t('ux_b_card_steps_empty')}</p>
+            )
+          ) : steps.state === 'error' ? (
+            <p className="wb-hint" role="alert">
+              {t('ux_b_card_steps_failed')}
+            </p>
+          ) : (
+            <p className="wb-hint" role="status">
+              {t('ux_b_card_steps_loading')}
+            </p>
+          )}
+        </details>
+      ) : null}
+    </div>
+  );
 }
 
 type PendingMove<T> = { card: T; to: string };
@@ -90,6 +180,7 @@ export function WorkItemBoard<T extends BoardCard>({
   renderCardExtra,
   label,
   layout = 'board',
+  loadSteps,
 }: WorkItemBoardProps<T>) {
   const [overrides, setOverrides] = React.useState<Record<string, string>>({});
   const [pending, setPending] = React.useState<PendingMove<T> | null>(null);
@@ -227,6 +318,15 @@ export function WorkItemBoard<T extends BoardCard>({
             {lineage.map((ref) => ref.label).join(' › ')}
           </p>
         ) : null}
+        <CardSteps
+          // New progress remounts it, so an expanded list is never stale.
+          key={`steps:${card.steps?.done ?? 0}/${card.steps?.total ?? 0}`}
+          card={card}
+          title={title}
+          t={t}
+          statusLabel={statusLabel}
+          loadSteps={loadSteps}
+        />
         <p className="wb-card__meta">
           <span>{card.assignee || t('ux_b_card_unassigned')}</span>
           {age !== null ? (
@@ -318,6 +418,9 @@ export function WorkItemBoard<T extends BoardCard>({
         </div>
       ) : null}
       {!movable ? <p className="wb-hint">{t('ux_b_board_readonly')}</p> : null}
+      {cards.some((card) => stepProgress(card.steps)) ? (
+        <p className="wb-hint">{t('ux_b_board_issues_hint')}</p>
+      ) : null}
       <div className="wb-board" data-layout={layout} role="list" aria-label={label}>
         {grouped.columns
           .filter((column) => layout === 'board' || column.cards.length > 0)
@@ -368,11 +471,15 @@ export function WorkItemBoard<T extends BoardCard>({
           title={t('ux_b_move_confirm_title')}
           message={
             pending
-              ? t('ux_b_move_confirm_message', {
-                  title: cardTitle(pending.card.title, pending.card.mission?.id),
-                  from: statusLabel(pending.card.status),
-                  to: statusLabel(pending.to),
-                })
+              ? [
+                  t('ux_b_move_confirm_message', {
+                    title: cardTitle(pending.card.title, pending.card.mission?.id),
+                    from: statusLabel(pending.card.status),
+                    to: statusLabel(pending.to),
+                  }),
+                  // An Issue with steps keeps a status a person sets (W2 rule table).
+                  ...(stepProgress(pending.card.steps) ? [t('ux_b_move_confirm_pins')] : []),
+                ].join(' ')
               : ''
           }
           confirm_label={t('ux_b_move_confirm')}

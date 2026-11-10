@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { pathResolver } from '../path-resolver.js';
 import type { ConfigChangeEnvelope, ConfigChangeTargetKind } from '../governance/config-change.js';
@@ -21,7 +22,7 @@ export interface ConfigMissionPreset {
   authority_role: string;
   target_kind?: ConfigChangeTargetKind;
   scope_kind?: 'system' | 'tenant' | 'organization' | 'project' | 'mission' | 'task';
-  tier?: 'public' | 'confidential' | 'personal';
+  tier?: StorageDataTier;
   notes?: string;
 }
 

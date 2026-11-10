@@ -20,6 +20,25 @@
       "type": "string",
       "minLength": 1
     },
+    "kind": {
+      "description": "D8: what the captured learning is. Written at capture; legacy rows gain it on load.",
+      "type": "string",
+      "enum": [
+        "lesson",
+        "heuristic",
+        "process_improvement",
+        "hint",
+        "execution_feedback",
+        "organization_learning",
+        "advisory",
+        "asset_promotion"
+      ]
+    },
+    "lane": {
+      "description": "D8: promotion lane resolved at capture (see knowledge-promotion-policy.json).",
+      "type": "string",
+      "enum": ["auto", "evidence_gated", "pr_review", "steward"]
+    },
     "source_type": {
       "type": "string",
       "enum": ["mission", "task_session", "artifact", "incident", "authored"]
@@ -458,6 +477,46 @@
         "markdown_sha256": {
           "type": "string",
           "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "origin": {
+      "description": "D8: the decision-owning record (organization learning / process improvement / background-review proposal / execution-feedback proposal) this candidate stands for; its facade decides it, the generic promotion workflow never promotes it.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["record_kind", "record_id"],
+      "properties": {
+        "record_kind": {
+          "type": "string",
+          "enum": [
+            "organization_learning",
+            "process_improvement",
+            "background_review",
+            "execution_feedback",
+            "learning_intake",
+            "service_procedure",
+            "mission_seed"
+          ]
+        },
+        "record_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "attributes": {
+          "type": "object"
+        },
+        "migrated_from": {
+          "type": "string",
+          "minLength": 1
+        },
+        "decided_via": {
+          "description": "The command that decides this row (e.g. `pnpm background-review`).",
+          "type": "string",
+          "minLength": 1
         }
       }
     }

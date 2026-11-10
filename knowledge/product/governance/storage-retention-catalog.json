@@ -901,13 +901,13 @@
       "path": "active/shared/runtime/video-leases",
       "artifact_class": "state",
       "action": "review_required",
-      "note": "G02: video device lease files (libs/core/video/video-device-lease.ts); the lease manager reclaims expired/dead-pid leases itself."
+      "note": "G02: one fenced lease record per video device uid (libs/core/video/video-device-lease.ts on libs/core/lease/device-lease.ts, W3); released records stay to keep the fence, expired ones are replaced on the next acquire."
     },
     {
       "path": "active/shared/runtime/audio-leases",
       "artifact_class": "state",
       "action": "review_required",
-      "note": "Audio device lease files (libs/core/voice/audio-device-lease.ts); the lease manager reclaims expired/dead-pid leases itself."
+      "note": "One fenced lease record per audio device uid (libs/core/voice/audio-device-lease.ts on libs/core/lease/device-lease.ts, W3); released records stay to keep the fence, expired ones are replaced on the next acquire."
     },
     {
       "path": "active/shared/runtime/service-bindings-backup",
@@ -978,6 +978,12 @@
       "artifact_class": "state",
       "action": "review_required",
       "note": "Saved seam provider defaults per tenant / organization / project (libs/core/provider/seam-selection-defaults.ts), tier/tenant partitioned — human judgment, never auto-deleted; offboarded with the tenant."
+    },
+    {
+      "path": "active/shared/runtime/hints",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "D8 runtime hint store (libs/core/knowledge/hint-store.ts), partitioned <tier>/<tenant|shared>/<category>.json. Trace, learning-signal and human-rejection hints plus the promoted hints that generate HINTS.md views; tenant partitions are offboarded with the tenant, never auto-deleted."
     },
     {
       "path": "active/shared/runtime/provider-attestations",

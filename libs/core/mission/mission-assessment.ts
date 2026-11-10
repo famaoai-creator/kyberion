@@ -1,9 +1,10 @@
+import type { StorageDataTier } from '../storage-layout.js';
 export interface MissionMemoryCandidateAssessmentInput {
   missionId: string;
   missionType?: string;
   summary?: string;
   evidenceCount: number;
-  tier: 'personal' | 'confidential' | 'public';
+  tier: StorageDataTier;
 }
 
 export interface MissionMemoryCandidateAssessment {

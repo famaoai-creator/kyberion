@@ -28,10 +28,11 @@ describe('approved Quickstart maintenance scope', () => {
   );
 
   it('adds no directory-wide documentation or personal-data grant to the maintenance persona', () => {
+    // S4 slice 4: the persona bundle is the base Authority Role base_ecosystem_architect.
     const policy = readJson<{
-      persona_permissions: { ecosystem_architect: { allow_write: string[] } };
+      authority_role_permissions: { base_ecosystem_architect: { allow_write: string[] } };
     }>(pathResolver.rootResolve('knowledge/product/governance/security-policy.json'));
-    const writes = policy.persona_permissions.ecosystem_architect.allow_write;
+    const writes = policy.authority_role_permissions.base_ecosystem_architect.allow_write;
     expect(writes.filter((entry) => entry.startsWith('docs/'))).toEqual([
       'docs/developer/',
       'docs/CLI_REFERENCE.md',

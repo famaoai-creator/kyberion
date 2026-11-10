@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import * as path from 'node:path';
 import { pathResolver } from '../path-resolver.js';
 import { readJsonLines } from '../foundation/json.js';
@@ -23,7 +24,7 @@ export interface ConversationTurn {
   provider_session_id?: string;
   /** Explicit mission binding for governed tier-scoped history collection. */
   mission_id?: string;
-  tier?: 'public' | 'confidential' | 'personal';
+  tier?: StorageDataTier;
 }
 
 const MAX_TURNS = 500;
@@ -131,13 +132,11 @@ function assertRegularConversationFile(filePath: string): void {
   }
 }
 
-function resolveMissionTier(
-  missionId: string | undefined
-): 'public' | 'confidential' | 'personal' | undefined {
+function resolveMissionTier(missionId: string | undefined): StorageDataTier | undefined {
   if (!missionId) return undefined;
   const missionPath = findMissionPath(missionId)?.toLowerCase() || '';
   const match = missionPath.match(/\/(public|confidential|personal)\//u);
-  return match?.[1] as 'public' | 'confidential' | 'personal' | undefined;
+  return match?.[1] as StorageDataTier | undefined;
 }
 
 /**

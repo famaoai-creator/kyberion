@@ -55,8 +55,6 @@ describe('Customer aggregation contract', () => {
     expect(customerReadme).toContain('pnpm stance:list');
     expect(customerReadme).toContain('pnpm stance:switch acme-corp');
     expect(customerReadme).toContain('knowledge/personal/stances/{slug}/');
-    expect(customerReadme).toContain(
-      '`KYBERION_CUSTOMER` is the deprecated name of `KYBERION_STANCE`'
-    );
+    expect(customerReadme).toContain('`KYBERION_CUSTOMER` is retired');
   });
 });

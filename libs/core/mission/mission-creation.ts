@@ -3,6 +3,7 @@
  * Mission creation and activation helpers.
  */
 
+import type { StorageDataTier } from '../storage-layout.js';
 import * as path from 'node:path';
 import { composeMissionTeamPlan, writeMissionTeamPlan } from './mission-team-plan-composer.js';
 import { resolveCompany, buildCompanyVisionRef } from '../organization/company.js';
@@ -131,7 +132,7 @@ export function normalizeMissionVisionRef(
 
 export async function createMission(args: {
   id: string;
-  tier?: 'personal' | 'confidential' | 'public';
+  tier?: StorageDataTier;
   tenantId?: string;
   /** Organization scope for the canonical work-item context chain. */
   organizationId?: string;
@@ -477,7 +478,7 @@ export async function createMission(args: {
       ? { origin_utterance_ref: intentHandoff.origin_utterance_ref }
       : {}),
     priority: 3,
-    assigned_persona: persona,
+    org_role: persona,
     confidence_score: 1.0,
     git: {
       branch: missionBranch,
@@ -565,7 +566,7 @@ export function assertValidMissionId(missionId: string): void {
 
 export async function startMission(args: {
   id: string;
-  tier?: 'personal' | 'confidential' | 'public';
+  tier?: StorageDataTier;
   persona?: string;
   tenantId?: string;
   /** Organization scope for the canonical work-item context chain. */

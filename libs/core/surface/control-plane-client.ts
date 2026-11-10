@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import { validateNextActionContract } from '../contracts/next-action-contract.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
@@ -43,7 +44,7 @@ export interface ControlPlaneApprovalRecord {
 export interface ControlPlaneDistillCandidateRecord {
   candidate_id: string;
   source_type: 'task_session' | 'mission' | 'artifact';
-  tier?: 'personal' | 'confidential' | 'public';
+  tier?: StorageDataTier;
   project_id?: string;
   track_id?: string;
   track_name?: string;
@@ -64,7 +65,7 @@ export interface ControlPlaneMemoryCandidateRecord {
   candidate_id: string;
   status: 'queued' | 'approved' | 'rejected' | 'promoted';
   proposed_memory_kind: string;
-  sensitivity_tier: 'public' | 'confidential' | 'personal';
+  sensitivity_tier: StorageDataTier;
   source_ref: string;
   evidence_refs: string[];
   promoted_ref?: string;

@@ -83,8 +83,9 @@ describe('information asset canonical authorization subjects', () => {
         },
         () => informationAssetCoverageReadAllowed(checkpoint, undefined)
       );
-    // G2: the role name alone (no live grant) no longer admits the coverage read.
-    expect(
+    // G2/S4: the former role name alone admits nothing — it is a store grant now, so
+    // assuming it is refused before any read.
+    expect(() =>
       runInResourceAccessScope(
         {
           tenantSlug: 'acme',
@@ -103,7 +104,7 @@ describe('information asset canonical authorization subjects', () => {
             { projectId: null }
           )
       )
-    ).toBe(false);
+    ).toThrow(/ROLE_ASSUMPTION_DENIED/);
     expect(allowed()).toBe(true);
     state.overrides.set(coverage, { authority: { kind: 'approval' } });
     expect(allowed()).toBe(false);

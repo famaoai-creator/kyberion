@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import chalk from 'chalk';
 import { readTextFile } from '@agent/core/foundation';
-import { resolveIntentResolutionPacket } from '@agent/core/intent/intent-resolution';
+import { resolveRoutingPacket } from '@agent/core/intent';
 import { pathResolver } from '@agent/core/path-resolver';
 import { resolveLocale as resolveUnifiedLocale, type SupportedLocale } from '@agent/core/locale';
 import {
@@ -365,7 +365,7 @@ export async function handleTaskCommand(
     throw new Error('task request is required; pass it as text or with --request');
   }
 
-  const resolutionPacket = resolveIntentResolutionPacket(request);
+  const resolutionPacket = resolveRoutingPacket(request);
   const plan = buildProductivityTaskPlan(request, { resolutionPacket });
 
   if (subcommand === 'plan') {

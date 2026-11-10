@@ -289,7 +289,9 @@ describe('runCodexIsolatedQuery', () => {
 
   it('spawns every isolation flag in an empty scratch cwd with a minimal env, then removes it', async () => {
     vi.stubEnv('KYBERION_PEER_SHARED_SECRET', 'secret-value');
-    vi.stubEnv('MISSION_ROLE', 'peer_responder_reader');
+    // Any inherited role must not reach the child (peer_responder_reader is a store grant
+    // now, so the parent uses an ordinary runtime role here).
+    vi.stubEnv('MISSION_ROLE', 'surface_runtime');
     vi.stubEnv('OPENAI_API_KEY', 'sk-should-not-leak');
     vi.stubEnv('HOME', '/home/tester');
     vi.stubEnv('PATH', '/usr/bin');

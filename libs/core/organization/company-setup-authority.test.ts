@@ -197,7 +197,7 @@ describe('real Concierge company setup authority', () => {
     if (!('setup' in registered)) throw new Error('Expected registration result');
     expect(registered.setup.stage).toBe('registered');
     expect(
-      owner(() => getAgentIdentity('kyberion://agent/' + tenant + '/ceo-operator'))
+      owner(() => getAgentIdentity('kyberion://agent/' + tenant + '/' + tenant + '/ceo-operator'))
     ).toMatchObject({
       accountable_human_id: 'human:' + member,
       affiliation: { organization_id: tenant, tenant_slug: tenant },

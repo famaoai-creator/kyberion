@@ -56,7 +56,7 @@ export async function runContinuousWorkOwner(
     throw new Error('Continuous owner requires organization scope');
   if (
     charter.status !== 'active' ||
-    !(charter.authority.allowed_work_shapes ?? ['direct_reply']).includes('pipeline')
+    !(charter.authority.allowed_execution_shapes ?? ['direct_reply']).includes('pipeline')
   )
     return [];
   if (!(charter.authority.allowed_pipelines ?? []).includes(CONTINUOUS_MANAGED_WORK_PIPELINE))
@@ -221,7 +221,7 @@ export async function runContinuousWorkOwner(
                   current.status !== 'active' ||
                   digest(current.scope) !== digest(charter.scope) ||
                   current.authority.authority_role !== charter.authority.authority_role ||
-                  !current.authority.allowed_work_shapes?.includes('pipeline') ||
+                  !current.authority.allowed_execution_shapes?.includes('pipeline') ||
                   !current.authority.allowed_pipelines?.includes(CONTINUOUS_MANAGED_WORK_PIPELINE)
                 )
                   throw new Error('Managed owner charter changed or became inactive');

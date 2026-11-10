@@ -275,14 +275,14 @@ The kernel of the ecosystem. Important responsibilities:
 
 - secure file/process helpers
 - path resolution for tiered directories
-- resource locks, leases, and concurrency guards
+- resource locks, leases, and concurrency guards: one lease primitive in `lease/` — `lease-backend.ts` (exclusion, fenced records, `resource_kind`), `lease-terms.ts` (holder, expiry, fence), `resource-lease.ts` / `device-lease.ts` (held leases on the backend), `lease-audit.ts` (one audit shape); WorkItem claims (`workforce/work-item-lease.ts`), Co-Session path leases, Mission Lease and device leases are adapters
 - CLI utilities and common runtime helpers
 - runtime supervision for agent, PTY, and service ownership
 - control-plane helpers for channel routing, feedback, and session-scoped artifacts
 - mission orchestration worker and event contracts
 - agent collaboration observability: worker-event + mission-control JSONL projected into a nodes/edges/attention graph (`agent/agent-collaboration-projection.ts`, `agent/agent-collaboration-events.ts`) and folded into a `mission -> task -> agent -> child agent` wait-tree (`agent/agent-collaboration-tree.ts`, `composeCollaborationTree`)
 - generic surface outbox and delivery helpers
-- organization and tenancy: `organization/organization-operating-model.ts`, `project/project-management.ts`, `workforce/work-coordination.ts` + `workforce/work-visibility.ts` (work-item context chain and visibility projections), `organization/tenant-registry.ts`, `organization/tenant-knowledge-retrieval.ts`, `mesh/peer-messaging.ts` (tenant peer mesh)
+- organization and tenancy: `organization/organization-operating-model.ts`, `project/project-management.ts`, `workforce/work-coordination.ts` + `workforce/work-visibility.ts` (work-item context chain and visibility projections) + `workforce/work-item-hierarchy.ts` / `workforce/work-item-parent-status.ts` (Issue and step links, parent status from steps), `organization/tenant-registry.ts`, `organization/tenant-knowledge-retrieval.ts`, `mesh/peer-messaging.ts` (tenant peer mesh)
 - identity and authorization: `agent/agent-identity.ts` (NHI), `authority.ts`, `tier-guard.ts`, `mission/delegation-chain.ts`
 - history search: `history-search-index.ts` (SQLite FTS5, tier-isolated)
 

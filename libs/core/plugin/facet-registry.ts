@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import * as path from 'node:path';
 
 import { isValidTenantSlug } from '../entity-scope.js';
@@ -8,7 +9,7 @@ import { isManagedPluginActivationAllowed, listManagedPlugins } from './plugin-m
 import { type ResourceProvenance, type ResourceTrust } from '../contracts/resource-provenance.js';
 
 export type FacetKind = 'persona' | 'policy' | 'instruction' | 'output-contract';
-export type FacetTier = 'personal' | 'confidential' | 'public';
+export type FacetTier = StorageDataTier;
 
 export interface FacetScope {
   tier: FacetTier;
