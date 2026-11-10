@@ -1,0 +1,541 @@
+{
+  "roles": {
+    "business_owner": {
+      "map": {
+        "group": "context_roles",
+        "persona": "analyst",
+        "execution_mode": "mission"
+      },
+      "infer": "analyst",
+      "env": {
+        "baseRole": "analyst",
+        "authorities": []
+      },
+      "scope": "analyst"
+    },
+    "ceo": {
+      "map": {
+        "group": "context_roles",
+        "persona": "analyst",
+        "execution_mode": "mission"
+      },
+      "infer": "analyst",
+      "env": {
+        "baseRole": "analyst",
+        "authorities": []
+      },
+      "scope": "analyst"
+    },
+    "customer_success": {
+      "map": {
+        "group": "context_roles",
+        "persona": "worker",
+        "execution_mode": "mission"
+      },
+      "infer": "worker",
+      "env": {
+        "baseRole": "worker",
+        "authorities": []
+      },
+      "scope": "worker"
+    },
+    "cyber_security": {
+      "map": {
+        "group": "context_roles",
+        "persona": "analyst",
+        "execution_mode": "mission"
+      },
+      "infer": "analyst",
+      "env": {
+        "baseRole": "analyst",
+        "authorities": []
+      },
+      "scope": "analyst"
+    },
+    "designer": {
+      "map": {
+        "group": "context_roles",
+        "persona": "worker",
+        "execution_mode": "mission"
+      },
+      "infer": "worker",
+      "env": {
+        "baseRole": "worker",
+        "authorities": []
+      },
+      "scope": "worker"
+    },
+    "ecosystem_architect": {
+      "map": {
+        "group": "system_roles",
+        "authority_role": "ecosystem_architect",
+        "persona": "ecosystem_architect",
+        "execution_mode": "system"
+      },
+      "infer": "ecosystem_architect",
+      "env": {
+        "baseRole": "ecosystem_architect",
+        "authorities": [
+          "GIT_WRITE",
+          "KNOWLEDGE_WRITE",
+          "NETWORK_FETCH",
+          "SECRET_READ",
+          "SYSTEM_EXEC"
+        ]
+      },
+      "scope": "ecosystem_architect"
+    },
+    "executive_assistant": {
+      "map": {
+        "group": "context_roles",
+        "persona": "worker",
+        "execution_mode": "mission"
+      },
+      "infer": "worker",
+      "env": {
+        "baseRole": "worker",
+        "authorities": []
+      },
+      "scope": "worker"
+    },
+    "finance_controller": {
+      "map": {
+        "group": "context_roles",
+        "authority_role": "finance_controller",
+        "persona": "analyst",
+        "execution_mode": "mission"
+      },
+      "infer": "analyst",
+      "env": {
+        "baseRole": "analyst",
+        "authorities": []
+      },
+      "scope": "analyst"
+    },
+    "incident_commander": {
+      "map": {
+        "group": "mission_roles",
+        "authority_role": "mission_controller",
+        "persona": "worker",
+        "execution_mode": "mission"
+      },
+      "infer": "worker",
+      "env": {
+        "baseRole": "worker",
+        "authorities": []
+      },
+      "scope": "worker"
+    },
+    "infrastructure_sentinel": {
+      "map": {
+        "group": "system_roles",
+        "authority_role": "surface_runtime",
+        "persona": "worker",
+        "execution_mode": "system"
+      },
+      "infer": "worker",
+      "env": {
+        "baseRole": "worker",
+        "authorities": []
+      },
+      "scope": "worker"
+    },
+    "integration_steward": {
+      "map": {
+        "group": "system_roles",
+        "authority_role": "ecosystem_architect",
+        "persona": "ecosystem_architect",
+        "execution_mode": "system"
+      },
+      "infer": "ecosystem_architect",
+      "env": {
+        "baseRole": "ecosystem_architect",
+        "authorities": [
+          "GIT_WRITE",
+          "KNOWLEDGE_WRITE",
+          "NETWORK_FETCH",
+          "SECRET_READ",
+          "SYSTEM_EXEC"
+        ]
+      },
+      "scope": "ecosystem_architect"
+    },
+    "knowledge_steward": {
+      "map": {
+        "group": "system_roles",
+        "authority_role": "knowledge_steward",
+        "persona": "analyst",
+        "execution_mode": "system"
+      },
+      "infer": "analyst",
+      "env": {
+        "baseRole": "analyst",
+        "authorities": []
+      },
+      "scope": "analyst"
+    },
+    "legal_strategist": {
+      "map": {
+        "group": "context_roles",
+        "persona": "analyst",
+        "execution_mode": "mission"
+      },
+      "infer": "analyst",
+      "env": {
+        "baseRole": "analyst",
+        "authorities": []
+      },
+      "scope": "analyst"
+    },
+    "line_manager": {
+      "map": {
+        "group": "context_roles",
+        "authority_role": "line_manager",
+        "persona": "worker",
+        "execution_mode": "mission"
+      },
+      "infer": "worker",
+      "env": {
+        "baseRole": "worker",
+        "authorities": []
+      },
+      "scope": "worker"
+    },
+    "marketing_growth": {
+      "map": {
+        "group": "context_roles",
+        "authority_role": "marketing_growth",
+        "persona": "analyst",
+        "execution_mode": "mission"
+      },
+      "infer": "analyst",
+      "env": {
+        "baseRole": "analyst",
+        "authorities": []
+      },
+      "scope": "analyst"
+    },
+    "mission_controller": {
+      "map": {
+        "group": "mission_roles",
+        "authority_role": "mission_controller",
+        "persona": "worker",
+        "execution_mode": "mission"
+      },
+      "infer": "worker",
+      "env": {
+        "baseRole": "worker",
+        "authorities": []
+      },
+      "scope": "worker"
+    },
+    "performance_engineer": {
+      "map": {
+        "group": "mission_roles",
+        "authority_role": "software_developer",
+        "persona": "worker",
+        "execution_mode": "mission"
+      },
+      "infer": "worker",
+      "env": {
+        "baseRole": "worker",
+        "authorities": []
+      },
+      "scope": "worker"
+    },
+    "pmo_governance": {
+      "map": {
+        "group": "context_roles",
+        "persona": "analyst",
+        "execution_mode": "mission"
+      },
+      "infer": "analyst",
+      "env": {
+        "baseRole": "analyst",
+        "authorities": []
+      },
+      "scope": "analyst"
+    },
+    "product_manager": {
+      "map": {
+        "group": "context_roles",
+        "persona": "analyst",
+        "execution_mode": "mission"
+      },
+      "infer": "analyst",
+      "env": {
+        "baseRole": "analyst",
+        "authorities": []
+      },
+      "scope": "analyst"
+    },
+    "qa_lead": {
+      "map": {
+        "group": "context_roles",
+        "persona": "analyst",
+        "execution_mode": "mission"
+      },
+      "infer": "analyst",
+      "env": {
+        "baseRole": "analyst",
+        "authorities": []
+      },
+      "scope": "analyst"
+    },
+    "reliability_engineer": {
+      "map": {
+        "group": "system_roles",
+        "authority_role": "surface_runtime",
+        "persona": "worker",
+        "execution_mode": "system"
+      },
+      "infer": "worker",
+      "env": {
+        "baseRole": "worker",
+        "authorities": []
+      },
+      "scope": "worker"
+    },
+    "ruthless_auditor": {
+      "map": {
+        "group": "context_roles",
+        "persona": "analyst",
+        "execution_mode": "mission"
+      },
+      "infer": "analyst",
+      "env": {
+        "baseRole": "analyst",
+        "authorities": []
+      },
+      "scope": "analyst"
+    },
+    "software_developer": {
+      "map": {
+        "group": "mission_roles",
+        "authority_role": "software_developer",
+        "persona": "worker",
+        "execution_mode": "mission"
+      },
+      "infer": "worker",
+      "env": {
+        "baseRole": "worker",
+        "authorities": []
+      },
+      "scope": "worker"
+    },
+    "solution_architect": {
+      "map": {
+        "group": "system_roles",
+        "authority_role": "ecosystem_architect",
+        "persona": "ecosystem_architect",
+        "execution_mode": "system"
+      },
+      "infer": "ecosystem_architect",
+      "env": {
+        "baseRole": "ecosystem_architect",
+        "authorities": [
+          "GIT_WRITE",
+          "KNOWLEDGE_WRITE",
+          "NETWORK_FETCH",
+          "SECRET_READ",
+          "SYSTEM_EXEC"
+        ]
+      },
+      "scope": "ecosystem_architect"
+    },
+    "sovereign_concierge": {
+      "map": {
+        "group": "mission_roles",
+        "authority_role": "sovereign_concierge",
+        "persona": "sovereign",
+        "execution_mode": "sovereign"
+      },
+      "infer": "sovereign",
+      "env": {
+        "baseRole": "sovereign",
+        "authorities": [
+          "GIT_WRITE",
+          "KNOWLEDGE_WRITE",
+          "NETWORK_FETCH",
+          "SECRET_READ",
+          "SYSTEM_EXEC"
+        ]
+      },
+      "scope": "sovereign"
+    },
+    "strategic_sales": {
+      "map": {
+        "group": "context_roles",
+        "authority_role": "strategic_sales",
+        "persona": "analyst",
+        "execution_mode": "mission"
+      },
+      "infer": "analyst",
+      "env": {
+        "baseRole": "analyst",
+        "authorities": []
+      },
+      "scope": "analyst"
+    },
+    "talent_culture": {
+      "map": {
+        "group": "context_roles",
+        "authority_role": "talent_culture",
+        "persona": "worker",
+        "execution_mode": "mission"
+      },
+      "infer": "worker",
+      "env": {
+        "baseRole": "worker",
+        "authorities": []
+      },
+      "scope": "worker"
+    },
+    "no_such_org_role": {
+      "map": null,
+      "infer": "unknown",
+      "env": {
+        "baseRole": "unknown",
+        "authorities": []
+      },
+      "scope": "NONE"
+    },
+    "": {
+      "map": null,
+      "infer": "unknown",
+      "env": {
+        "baseRole": "unknown",
+        "authorities": []
+      },
+      "scope": "NO_ROLE"
+    }
+  },
+  "existing_role_ids": [
+    "README.md",
+    "actuator_playground_worker",
+    "archived_mission_state_reader",
+    "assemble_changelog",
+    "asset_promoter",
+    "attacker",
+    "audit_mirror_writer",
+    "base_analyst",
+    "base_ecosystem_architect",
+    "base_sovereign",
+    "base_worker",
+    "build_repository",
+    "business_owner",
+    "ceo",
+    "check_chronos_perf_baseline",
+    "check_tenant_registry_consistency",
+    "chronos_gateway",
+    "chronos_localadmin",
+    "chronos_mirror_v2",
+    "chronos_operator",
+    "chronos_tenant_runner",
+    "chronos_token_registry_reader",
+    "concierge_localadmin",
+    "concierge_management_reader",
+    "concierge_management_writer",
+    "concierge_operator",
+    "counterparty_persona",
+    "credential_allocation_manager",
+    "credential_allocation_probe",
+    "credential_allocation_reader",
+    "customer_channel_binding_store",
+    "customer_create",
+    "customer_decision_deal_note_writer",
+    "customer_success",
+    "cyber_security",
+    "daemon_watchdog",
+    "decision_ledger",
+    "defender",
+    "delegation_record_store",
+    "deliverable_inbox_writer",
+    "designer",
+    "devils_advocate",
+    "dot_charter_store",
+    "dot_lifecycle_runtime_store",
+    "dot_lifecycle_worker",
+    "ecosystem_architect",
+    "engine_runtime_preferences_operator",
+    "evaluate_model_role_fitness",
+    "executive_assistant",
+    "experience_designer",
+    "facilitator",
+    "finance_controller",
+    "first_job_tenant_status_reader",
+    "generate_changelog",
+    "generate_design_tokens",
+    "generate_provider_hook_configs",
+    "generate_subagent_definitions",
+    "generation_scheduler",
+    "implementer",
+    "incident_commander",
+    "infrastructure_sentinel",
+    "ingest_commit",
+    "integration_steward",
+    "knowledge_steward",
+    "legal_strategist",
+    "line_manager",
+    "marketing_growth",
+    "metrics_cap_reader",
+    "mission_controller",
+    "nexus_daemon",
+    "nhi_accountability_reader",
+    "notification_preferences_reader",
+    "onboarding",
+    "operational_learning_writer",
+    "operator",
+    "ops_alert_store",
+    "ops_alerts",
+    "orchestrator",
+    "organization_operator",
+    "owner",
+    "peer_catalog_reader",
+    "peer_responder_reader",
+    "peer_task_artifact_writer",
+    "perception_media_worker",
+    "performance_engineer",
+    "physical_namespace_migration",
+    "planner",
+    "pmo_governance",
+    "product_manager",
+    "product_strategist",
+    "public_tool_promoter",
+    "qa_lead",
+    "reasoning_settings_writer",
+    "reconcile_config_fallbacks",
+    "register_workflow",
+    "relationship_curator",
+    "reliability_engineer",
+    "researcher",
+    "reviewer",
+    "run_baseline_check",
+    "run_pipeline",
+    "run_super_pipeline",
+    "ruthless_auditor",
+    "scope_locale_reader",
+    "scribe",
+    "secret_introduce",
+    "service_actuator",
+    "slack_bridge",
+    "software_developer",
+    "solution_architect",
+    "sovereign_concierge",
+    "strategic_sales",
+    "surface_liaison",
+    "surface_runtime",
+    "system_configurator",
+    "talent_culture",
+    "task_runtime_worker",
+    "tenant_approval_partition_index_reader",
+    "tenant_approval_store",
+    "tenant_ledger_store",
+    "tester",
+    "tool_runtime_policy_reader",
+    "tracker",
+    "workspace_graph_reader",
+    "workspace_tenant_registry_index_reader",
+    "workspace_tenant_registry_reader"
+  ]
+}
