@@ -64,7 +64,7 @@ export type {
   ModelCostRegistry,
 } from '../finance/metrics-cost-registry.js';
 import { resolvePolicyIdentityContext } from '../identity-context-bridge.js';
-import { withExecutionContext } from '../authority.js';
+import { withStoreGrant } from '../authority.js';
 import { withLockSync } from '../foundation/lock-utils.js';
 import { isValidTenantSlug } from '../foundation/scope.js';
 const logger = createLogger('metrics');
@@ -1583,7 +1583,7 @@ export function aggregateMetricsForEnforcement<M extends string>(input: {
     withheld = partitions;
   };
   const tenant = resolvePolicyIdentityContext().tenantSlug;
-  const rows = withExecutionContext(
+  const rows = withStoreGrant(
     METRICS_CAP_READER_ROLE,
     (): Array<Record<string, unknown>> =>
       input.ledger === 'execution_metrics'
@@ -1601,8 +1601,7 @@ export function aggregateMetricsForEnforcement<M extends string>(input: {
         : (collector.loadResourceUsageHistory(input.read, { onWithheld }) as unknown as Array<
             Record<string, unknown>
           >),
-    undefined,
-    tenant
+    { tenantSlug: tenant }
   );
   // The classifier sees the whitelisted projection only, never the raw row.
   let unknownCostRows = 0;

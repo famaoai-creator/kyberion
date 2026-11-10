@@ -47,6 +47,26 @@ export const DECLARED_STORE_GRANTS: Readonly<Record<string, DeclaredStoreGrantDe
   Object.freeze({
     // localization/locale.ts: the tenant reply locale, bound to the turn's tenant.
     scope_locale_reader: Object.freeze({ persona: 'worker', tenantBound: true }),
+    // mesh/peer-conversation.ts, peer-task-exchange.ts: a tenant's peer catalogs and profile.
+    peer_catalog_reader: Object.freeze({ persona: 'worker', tenantBound: true }),
+    // mesh/peer-task-exchange.ts: an accepted peer task's report and the tenant artifact index.
+    peer_task_artifact_writer: Object.freeze({ persona: 'worker', tenantBound: true }),
+    // scripts/onboarding_first_job_tenant_status.ts: one tenant profile.
+    first_job_tenant_status_reader: Object.freeze({ persona: 'worker', tenantBound: false }),
+    // authn/authn-providers.ts, concierge viewer-context.ts: the viewer token registry.
+    chronos_token_registry_reader: Object.freeze({ persona: 'worker', tenantBound: false }),
+    // agent/nhi-lifecycle-governance.ts: accountable member status.
+    nhi_accountability_reader: Object.freeze({ persona: 'worker', tenantBound: false }),
+    // operator-surface selection-service.ts: the reasoning route settings and their history.
+    reasoning_settings_writer: Object.freeze({ persona: 'worker', tenantBound: false }),
+    // analysis/metrics.ts: the partitioned metrics ledgers for cap enforcement (numbers only).
+    metrics_cap_reader: Object.freeze({ persona: 'worker', tenantBound: false }),
+    // knowledge/operational-learning.ts: organization learning candidates.
+    operational_learning_writer: Object.freeze({ persona: 'worker', tenantBound: false }),
+    // organization/deal-store.ts: a tenant's deal files.
+    customer_decision_deal_note_writer: Object.freeze({ persona: 'worker', tenantBound: true }),
+    // secret/credential-allocations.ts: a tenant's credential allocation records.
+    credential_allocation_reader: Object.freeze({ tenantBound: true }),
   });
 
 export function isDeclaredStoreGrantName(name: string | undefined): boolean {

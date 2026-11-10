@@ -193,7 +193,8 @@ describe('first-job bound tenant status, real production authority', () => {
     });
   });
   it('grants the new role only the bound record, without writes or neighboring personal reads', () => {
-    authority.withExecutionContext(
+    // S4: a declared store grant, opened as its facade opens it.
+    authority.withStoreGrant(
       'first_job_tenant_status_reader',
       () => {
         expect(String(io.safeReadFile(path.join(root, profilePath)))).toContain(
@@ -206,24 +207,19 @@ describe('first-job bound tenant status, real production authority', () => {
           expect(() => io.safeReadFile(path.join(root, file))).toThrow();
         expect(() => io.safeWriteFile(path.join(root, profilePath), 'forbidden')).toThrow();
       },
-      'worker',
-      tenant
+      { tenantSlug: tenant }
     );
-    authority.withExecutionContext(
-      'first_job_tenant_status_reader',
-      () => {
-        expect(() => io.safeReadFile(path.join(root, profilePath))).toThrow();
-      },
-      'worker'
-    );
+    authority.withStoreGrant('first_job_tenant_status_reader', () => {
+      expect(() => io.safeReadFile(path.join(root, profilePath))).toThrow();
+    });
+    expect(() =>
+      authority.withExecutionContext('first_job_tenant_status_reader', () => undefined)
+    ).toThrow('ROLE_ASSUMPTION_DENIED');
     vi.stubEnv('SYSTEM_ROLE', 'presence_studio');
     expect(() =>
-      authority.withExecutionContext(
-        'first_job_tenant_status_reader',
-        () => undefined,
-        'worker',
-        tenant
-      )
+      authority.withStoreGrant('first_job_tenant_status_reader', () => undefined, {
+        tenantSlug: tenant,
+      })
     ).toThrow('ROLE_ASSUMPTION_DENIED');
     vi.stubEnv('SYSTEM_ROLE', '');
   });

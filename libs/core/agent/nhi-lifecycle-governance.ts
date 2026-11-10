@@ -42,7 +42,7 @@ import { safeExistsSync } from '../secure-io.js';
 import { readTenantProfile } from '../organization/tenant-registry.js';
 import { HUMAN_ACTOR_PREFIX } from '../contracts/actor.js';
 import { resolveAccountableHuman } from '../organization/member-registry.js';
-import { withExecutionContext } from '../authority.js';
+import { withStoreGrant } from '../authority.js';
 import { logger } from '../core.js';
 import { auditChain } from '../governance/audit-chain.js';
 import { nowIso } from '../foundation/time.js';
@@ -272,7 +272,7 @@ export function listOrphanNhiIdentities(): NhiOrphanIdentity[] {
     // orphaned.
     if (
       record.accountable_human_id.startsWith(HUMAN_ACTOR_PREFIX) &&
-      withExecutionContext(NHI_ACCOUNTABILITY_READER_ROLE, () =>
+      withStoreGrant(NHI_ACCOUNTABILITY_READER_ROLE, () =>
         resolveAccountableHuman(record.accountable_human_id)
       )?.status !== 'active'
     ) {

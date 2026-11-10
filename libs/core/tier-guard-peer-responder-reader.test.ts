@@ -4,7 +4,7 @@ import { validateReadPermission, validateWritePermission } from './tier-guard.js
 import * as pathResolver from './path-resolver.js';
 // Install the full identity resolver (MISSION_ROLE / tenant resolution) the
 // production read path uses, instead of the bootstrap fallback.
-import './authority.js';
+import { withStoreGrant } from './authority.js';
 
 // The tier guard emits best-effort audit events on denial; keep them off the
 // real audit chain so the suite stays hermetic.
@@ -108,10 +108,17 @@ describe('tier-guard peer_responder_reader authority role', () => {
     ).toEqual({ allowed: true });
   });
 
-  it('the peer catalog reader still reads the bound tenant peer catalog', () => {
-    process.env.MISSION_ROLE = 'peer_catalog_reader';
+  it('the peer catalog store grant still reads the bound tenant peer catalog', () => {
+    process.env.MISSION_ROLE = '';
     expect(
-      validateReadPermission(at('knowledge/confidential/acme-corp/connections/peer-network.json'))
+      withStoreGrant(
+        'peer_catalog_reader',
+        () =>
+          validateReadPermission(
+            at('knowledge/confidential/acme-corp/connections/peer-network.json')
+          ),
+        { tenantSlug: 'acme-corp' }
+      )
     ).toEqual({ allowed: true });
   });
 

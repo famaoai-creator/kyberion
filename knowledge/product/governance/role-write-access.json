@@ -99,28 +99,10 @@
         "active/audit/"
       ]
     },
-    "chronos_token_registry_reader": {
-      "allow": []
-    },
     "workspace_graph_reader": {
       "allow": []
     },
-    "peer_catalog_reader": {
-      "allow": []
-    },
     "peer_responder_reader": {
-      "allow": []
-    },
-    "peer_task_artifact_writer": {
-      "allow": [
-        "active/shared/artifacts/confidential/${KYBERION_TENANT}/report/peer-tasks/",
-        "active/shared/artifacts/confidential/${KYBERION_TENANT}/artifacts-index.jsonl"
-      ]
-    },
-    "metrics_cap_reader": {
-      "allow": []
-    },
-    "nhi_accountability_reader": {
       "allow": []
     },
     "audit_mirror_writer": {
@@ -162,15 +144,6 @@
     },
     "knowledge_steward": {
       "allow": ["knowledge/"]
-    },
-    "operational_learning_writer": {
-      "allow": [
-        "active/organizations/personal/shared/${KYBERION_ORGANIZATION_ID}/state/learning/",
-        "active/organizations/personal/${KYBERION_TENANT}/${KYBERION_ORGANIZATION_ID}/state/learning/",
-        "active/organizations/confidential/${KYBERION_TENANT}/${KYBERION_ORGANIZATION_ID}/state/learning/",
-        "active/organizations/public/shared/${KYBERION_ORGANIZATION_ID}/state/learning/",
-        "active/organizations/public/${KYBERION_TENANT}/${KYBERION_ORGANIZATION_ID}/state/learning/"
-      ]
     },
     "ceo": {
       "allow": ["knowledge/ceo/", "knowledge/personal/my-identity.json"]

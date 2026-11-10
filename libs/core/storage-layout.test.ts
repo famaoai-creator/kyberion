@@ -280,9 +280,12 @@ describe('durable partitioned runtime state', () => {
       allow_read: [allocationPartition],
       allow_write: [allocationPartition],
     });
-    expect(policy.authority_role_permissions.credential_allocation_reader).toEqual({
+    // S4: the dispatch reader is a declared store grant, not an Authority Role.
+    expect(policy.authority_role_permissions.credential_allocation_reader).toBeUndefined();
+    expect(policy.store_grants.credential_allocation_reader).toMatchObject({
       allow_read: [allocationPartition],
     });
+    expect(policy.store_grants.credential_allocation_reader.allow_write).toBeUndefined();
     for (const store of ['hearing', 'grants', 'autonomy-learning']) {
       expect(
         policy.tenant_scope.shared_prefixes.some((prefix: string) => prefix.includes(`/${store}/`))

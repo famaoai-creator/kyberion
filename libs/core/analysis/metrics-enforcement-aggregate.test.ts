@@ -28,7 +28,7 @@ import * as spendGuard from '../finance/spend-guard.js';
 import { computeBudgetUsage } from '../governance/org-budget-governor.js';
 import { buildCostReportFromHistory, formatCostReport } from '../finance/cost-report.js';
 import { validateReadPermission } from '../tier-guard.js';
-import { withExecutionContext } from '../authority.js';
+import { withStoreGrant } from '../authority.js';
 import { logger as coreLogger } from '../core.js';
 import { runDegradationWatch } from '../daemon/health-degradation.js';
 import { resolveFinanceControllerDecision } from '../finance/finance-controller.js';
@@ -215,14 +215,14 @@ describe('governed enforcement aggregate over persona-gated metrics ledgers', ()
     setIdentity('worker');
     const ledgerFile = path.join(executionRoot, 'confidential', TENANT, 'execution-metrics.jsonl');
     expect(validateReadPermission(ledgerFile).allowed).toBe(false);
-    withExecutionContext(metricsModule.METRICS_CAP_READER_ROLE, () => {
+    withStoreGrant(metricsModule.METRICS_CAP_READER_ROLE, () => {
       expect(validateReadPermission(ledgerFile).allowed).toBe(true);
       expect(validateReadPermission(path.join(ROOT, 'knowledge/confidential')).allowed).toBe(false);
       expect(validateReadPermission(path.join(ROOT, 'knowledge/personal')).allowed).toBe(false);
     });
     // Tenant binding still applies under the role.
     process.env.KYBERION_TENANT = 'other-tenant';
-    withExecutionContext(metricsModule.METRICS_CAP_READER_ROLE, () => {
+    withStoreGrant(metricsModule.METRICS_CAP_READER_ROLE, () => {
       expect(validateReadPermission(ledgerFile).allowed).toBe(false);
     });
   });
