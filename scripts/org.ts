@@ -69,7 +69,6 @@ type SecurityPolicy = {
   version?: string;
   default_allow?: string[];
   tier_restrictions?: Record<string, unknown>;
-  persona_permissions?: Record<string, { allow_read?: string[]; allow_write?: string[] }>;
   authority_role_permissions?: Record<string, { allow_read?: string[]; allow_write?: string[] }>;
   [key: string]: unknown;
 };

@@ -3,7 +3,7 @@ title: Running and Probing Tenant-Bound Pipelines Without Policy Violations
 category: Governance
 tags: [governance, tenant, persona, authority, chronos, kill-switch, probing, tier-guard]
 importance: 7
-last_updated: 2026-09-24
+last_updated: 2026-11-10
 role_affinity: [mission_controller, ecosystem_architect, operator]
 phase_affinity: [execution, review]
 ---
@@ -66,7 +66,7 @@ tenant-registry reads) — see [AUTHORITY_MODEL §6](./AUTHORITY_MODEL.md).
 ## 3. Probing safely
 
 1. **Read the grant before you run.** Check `security-policy.json`
-   `authority_role_permissions.<role>` and `persona_permissions.<persona>` for
+   `authority_role_permissions.<role>` and `authority_role_permissions.base_<persona>` for
    the exact path. One denial is information; a second with a guessed
    persona is noise that counts toward the kill switch.
 2. **Probe with the real entry point in the real shape**: the tenant-bound

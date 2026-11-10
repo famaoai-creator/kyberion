@@ -43,6 +43,10 @@ import {
   currentResourceAccessScope,
   runDisclosureAuditOutsideResourceCeilings,
 } from './foundation/resource-access-scope.js';
+import {
+  isBaseAuthorityRoleName,
+  personaOfBaseAuthorityRole,
+} from './foundation/base-authority-role.js';
 import { RETIRED_STORE_ROLE_NAMES } from './foundation/retired-store-roles.js';
 import {
   closeDeclaredStoreGrantToken,
@@ -810,6 +814,11 @@ function prepareExecutionContext(
       throw new Error(
         `[ROLE_ASSUMPTION_DENIED] '${normalizedRole}' is a store grant, not an assumable role — only its store facade issues it (withStoreGrant)`
       );
+    // S4 slice 4: a base Authority Role is reached only through a principal's persona.
+    if (isBaseAuthorityRoleName(normalizedRole))
+      throw new Error(
+        `[ROLE_ASSUMPTION_DENIED] '${normalizedRole}' is a base Authority Role, not an assumable role — a principal runs on it through its persona`
+      );
   }
   assertTenantBoundReaderScope(
     normalizedRole,
@@ -1090,7 +1099,7 @@ function openStoreGrant(
   try {
     const prepared = prepareExecutionContext(
       normalized,
-      definition.persona,
+      personaOfBaseAuthorityRole(definition.baseRole),
       binding.tenantSlug,
       binding.organizationId,
       binding.identity,
