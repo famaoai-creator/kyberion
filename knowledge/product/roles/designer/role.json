@@ -1,0 +1,10 @@
+{
+  "$schema": "../../schemas/org-role-card.schema.json",
+  "role": "designer",
+  "role_class": "context",
+  "default_grant": {
+    "authority_role": null,
+    "base_role": "worker",
+    "execution_mode": "mission"
+  }
+}

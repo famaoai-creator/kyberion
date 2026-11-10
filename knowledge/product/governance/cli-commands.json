@@ -4154,6 +4154,17 @@
       "group": "operate"
     },
     {
+      "id": "script.sync.org-role-grants",
+      "module": "scripts/sync_org_role_grants.ts",
+      "command": "sync org-role-grants",
+      "noun": "sync",
+      "verb": "org-role-grants",
+      "audience": "dev",
+      "description": "cli_cmd_script_sync_org_role_grants",
+      "group": "dev",
+      "native_help": true
+    },
+    {
       "id": "script.sync.service-endpoints",
       "module": "scripts/sync_service_endpoints.ts",
       "command": "sync service-endpoints",

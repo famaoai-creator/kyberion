@@ -1,0 +1,10 @@
+{
+  "$schema": "../../schemas/org-role-card.schema.json",
+  "role": "reliability_engineer",
+  "role_class": "system",
+  "default_grant": {
+    "authority_role": "surface_runtime",
+    "base_role": "worker",
+    "execution_mode": "system"
+  }
+}

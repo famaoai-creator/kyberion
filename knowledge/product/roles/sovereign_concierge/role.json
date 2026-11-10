@@ -1,0 +1,10 @@
+{
+  "$schema": "../../schemas/org-role-card.schema.json",
+  "role": "sovereign_concierge",
+  "role_class": "mission",
+  "default_grant": {
+    "authority_role": "sovereign_concierge",
+    "base_role": "sovereign",
+    "execution_mode": "sovereign"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "$schema": "../../schemas/org-role-card.schema.json",
+  "role": "finance_controller",
+  "role_class": "context",
+  "default_grant": {
+    "authority_role": "finance_controller",
+    "base_role": "analyst",
+    "execution_mode": "mission"
+  }
+}

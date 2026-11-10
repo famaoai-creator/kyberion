@@ -238,6 +238,17 @@ describe('org role create', () => {
           entry.persona === 'analyst'
       )
     ).toBe(true);
+    // D6: the default grant is declared on the Org Role card; the map is its projection.
+    expect(readJson('knowledge/product/roles/cfo/role.json')).toEqual({
+      $schema: '../../schemas/org-role-card.schema.json',
+      role: 'cfo',
+      role_class: 'context',
+      default_grant: {
+        authority_role: 'finance_controller',
+        base_role: 'analyst',
+        execution_mode: 'mission',
+      },
+    });
 
     const policy = readJson<{
       authority_role_permissions?: Record<
@@ -352,6 +363,14 @@ describe('org role create', () => {
         (entry) => entry.role === 'sales_advisor' && entry.authority_role === 'strategic_sales'
       )
     ).toBe(true);
+    expect(
+      readJson<{ default_grant: unknown }>('knowledge/product/roles/sales_advisor/role.json')
+        .default_grant
+    ).toEqual({
+      authority_role: 'strategic_sales',
+      base_role: 'analyst',
+      execution_mode: 'mission',
+    });
 
     const promotionNotes = readText('knowledge/product/roles/sales_advisor/PROMOTION.md');
     expect(promotionNotes).toContain('explicit advise-to-act promotion');
