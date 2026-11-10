@@ -50,7 +50,7 @@ beforeAll(async () => {
   ])
     vi.stubEnv(key, '');
   vi.stubEnv('MISSION_ROLE', 'sovereign_concierge');
-  vi.stubEnv('KYBERION_PERSONA', 'sovereign_concierge');
+  vi.stubEnv('KYBERION_BASE_ROLE', 'sovereign_concierge');
   vi.stubEnv('KYBERION_SESSION_SECRET', FIRST_JOB_TEST_SESSION_KEY);
   vi.stubEnv('KYBERION_OIDC_ISSUER', FIRST_JOB_TEST_ISSUER);
   vi.stubEnv('KYBERION_OIDC_CLIENT_ID', 'synthetic-dashboard-fixture');

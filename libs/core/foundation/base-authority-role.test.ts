@@ -13,7 +13,7 @@ import { rolePermissionRecord } from './declared-store-grant.js';
 
 // S4 slice 4: the Execution Persona bundles are base Authority Roles. A
 // principal reaches one only through its persona, never as its own role.
-const ENV_KEYS = ['KYBERION_PERSONA', 'MISSION_ROLE', 'SYSTEM_ROLE', 'KYBERION_SUDO'] as const;
+const ENV_KEYS = ['KYBERION_BASE_ROLE', 'MISSION_ROLE', 'SYSTEM_ROLE', 'KYBERION_SUDO'] as const;
 const BUNDLE = { allow_read: ['a/'], allow_write: ['b/'] };
 
 describe('base Authority Roles (S4 slice 4)', () => {
@@ -85,11 +85,11 @@ describe('base Authority Roles (S4 slice 4)', () => {
     );
     // MISSION_ROLE=base_sovereign with a worker persona writes no more than a plain worker.
     const target = path.join(pathResolver.rootDir(), 'libs/core/base-role-probe.ts');
-    process.env.KYBERION_PERSONA = 'worker';
+    process.env.KYBERION_BASE_ROLE = 'worker';
     const plain = validateWritePermission(target).allowed;
     process.env.MISSION_ROLE = 'base_sovereign';
     expect(validateWritePermission(target).allowed).toBe(plain);
-    process.env.KYBERION_PERSONA = 'sovereign';
+    process.env.KYBERION_BASE_ROLE = 'sovereign';
     delete process.env.MISSION_ROLE;
     expect(validateWritePermission(target).allowed).toBe(true);
   });

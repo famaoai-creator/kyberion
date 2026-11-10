@@ -741,7 +741,7 @@ describe('real child-process reservation and restart boundaries', () => {
             SYSTEM_ROLE: '',
             MISSION_ID: '',
             KYBERION_TENANT_SLUG: '',
-            KYBERION_PERSONA: '',
+            KYBERION_BASE_ROLE: '',
             KYBERION_SUDO: '',
           },
         }

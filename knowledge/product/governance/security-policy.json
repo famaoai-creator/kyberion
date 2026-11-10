@@ -1474,12 +1474,12 @@
   "project_permissions": {
     "canton-node": {
       "description": "Canton SV Node project data",
-      "allowed_personas": ["ecosystem_architect"],
+      "allowed_base_roles": ["ecosystem_architect"],
       "allowed_roles": ["SUDO", "canton-admin"]
     },
     "_default": {
       "description": "Default confidential access",
-      "allowed_personas": ["ecosystem_architect"],
+      "allowed_base_roles": ["ecosystem_architect"],
       "allowed_roles": ["SUDO"]
     }
   },

@@ -123,7 +123,7 @@ beforeAll(async () => {
   process.env.KYBERION_ROOT = tmpRoot;
   process.env.MISSION_ROLE = 'mission_controller';
   // Accountable-human fixtures are personal records, accessed as their owner.
-  vi.stubEnv('KYBERION_PERSONA', 'sovereign');
+  vi.stubEnv('KYBERION_BASE_ROLE', 'sovereign');
 
   // safeWriteFile runs the policy-engine gate — seed the real policy file so
   // writes inside the temp root are allowed.

@@ -25,7 +25,7 @@ sketch-input / report-review と同型の **127.0.0.1 限定ローカルポー�
 ## 使い方 / Usage
 
 ```bash
-KYBERION_PERSONA=sovereign node_modules/.bin/tsx scripts/meeting-notepad/server.ts \
+KYBERION_BASE_ROLE=sovereign node_modules/.bin/tsx scripts/meeting-notepad/server.ts \
   [--out active/shared/tmp/meeting-notepad] \
   [--instruction "決定事項とアクションを整理して"] \
   [--title "週次ミーティング"] \

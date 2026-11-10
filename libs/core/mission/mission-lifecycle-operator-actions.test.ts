@@ -53,7 +53,7 @@ function readState(missionPath: string): MissionState {
 
 beforeEach(() => {
   process.env.MISSION_ROLE = 'mission_controller';
-  process.env.KYBERION_PERSONA = 'worker';
+  process.env.KYBERION_BASE_ROLE = 'worker';
   seedActiveMissionState(pausePath, pauseMissionId);
   seedActiveMissionState(cancelPath, cancelMissionId);
 });

@@ -13,7 +13,7 @@ describe('virtual office surface', () => {
   beforeAll(async () => {
     // This operator-owned fixture reads personal tenant registrations and
     // confidential alerts; do not inherit the test wrapper's ambient identity.
-    vi.stubEnv('KYBERION_PERSONA', 'sovereign');
+    vi.stubEnv('KYBERION_BASE_ROLE', 'sovereign');
     vi.stubEnv('MISSION_ROLE', 'mission_controller');
     vi.resetModules();
     tmpRoot = path.join(os.tmpdir(), `kyb-office-${randomUUID()}`);

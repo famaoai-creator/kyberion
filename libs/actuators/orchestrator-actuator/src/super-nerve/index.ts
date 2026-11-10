@@ -1,4 +1,5 @@
 import { attemptAutonomousRepair } from '@agent/core/autonomous-repair';
+import { baseRoleEnvText } from '@agent/core/foundation';
 import { classifyError } from '@agent/core/error-classifier';
 import { recordGovernanceAction } from '@agent/core/governance/governance-action-recorder';
 import { determineActuatorStepType } from '@agent/core/actuator/actuator-op-registry';
@@ -17,12 +18,7 @@ import { suggestClosestStrings } from '@agent/core/pipeline/op-suggestions';
 import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
 import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
 import { registerSuperNerveExecutor } from '@agent/core/super-nerve-execution-port';
-import {
-  getRegisteredEnvText,
-  nowIso,
-  parseSafeJsonObjectValue,
-  readJson,
-} from '@agent/core/foundation';
+import { nowIso, parseSafeJsonObjectValue, readJson } from '@agent/core/foundation';
 import { loadPipelineAdfAtPath } from '@agent/core/pipeline/pipeline-contract';
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -368,7 +364,7 @@ async function dispatchToActuator(domain: string, action: string, params: any, c
   // handler directly; the handler returns { status, results, context }.
   // SA-05 Task 1: actuator dispatch feeds kill-switch anomaly tracking.
   recordGovernanceAction(
-    getRegisteredEnvText('KYBERION_PERSONA') || 'unknown',
+    baseRoleEnvText() || 'unknown',
     'actuator_dispatch',
     `${domain}:${action}`,
     false

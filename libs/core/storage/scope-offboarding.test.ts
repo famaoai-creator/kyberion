@@ -289,7 +289,7 @@ function auditEvents(): Array<Record<string, any>> {
 beforeEach(() => {
   vi.stubEnv('MISSION_ROLE', 'mission_controller');
   vi.stubEnv('SYSTEM_ROLE', '');
-  vi.stubEnv('KYBERION_PERSONA', 'sovereign');
+  vi.stubEnv('KYBERION_BASE_ROLE', 'sovereign');
   vi.stubEnv('KYBERION_TENANT', '');
   setRootDirState(undefined);
   const root = currentRoot();

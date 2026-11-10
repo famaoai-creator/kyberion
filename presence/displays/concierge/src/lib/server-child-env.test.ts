@@ -108,7 +108,7 @@ describe('server child-process environments (H1)', () => {
       SYSTEM_ROLE: 'concierge',
       MISSION_ROLE: '',
       KYBERION_DELEGATED_ROLE: '',
-      KYBERION_PERSONA: 'worker',
+      KYBERION_BASE_ROLE: 'worker',
       KYBERION_SUDO: '',
     });
     expect(serverDelegatedChildEnv('mission_controller', { KYBERION_SUDO: 'true' })).toMatchObject({

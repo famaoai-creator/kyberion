@@ -9,6 +9,7 @@
 // Core Foundation (logger, ui, sre, Cache, fileUtils, errorHandler)
 export * from './core.js';
 export * from './governance/governance-action-recorder.js';
+export * from './governance/execution-agent-id.js';
 
 // Specific Wrappers & Metrics
 

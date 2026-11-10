@@ -273,7 +273,7 @@ function invoke(worktree: string, action = 'publish') {
       KYBERION_TASK_ID: '',
       KYBERION_NHI_ACTOR: '',
       KYBERION_STANCE: '',
-      KYBERION_PERSONA: '',
+      KYBERION_BASE_ROLE: '',
       SYSTEM_ROLE: '',
       MISSION_ROLE: '',
       MISSION_ID: '',

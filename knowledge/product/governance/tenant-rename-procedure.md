@@ -44,7 +44,7 @@ pnpm tenant rename <旧slug> --to <新slug> --display-name '<新商号>' --apply
 | `--no-scan`              | 残存参照のスキャンを省く（全ツリーを読むため数秒かかる） |
 | `--apply`                | 実行。付けなければ dry-run                               |
 
-`active/organizations/` への書き込みは権限で守られているため `KYBERION_PERSONA=sovereign` が要る。
+`active/organizations/` への書き込みは権限で守られているため `KYBERION_BASE_ROLE=sovereign` が要る。
 
 ## 3. コマンドがやること
 

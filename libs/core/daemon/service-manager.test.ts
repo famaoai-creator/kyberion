@@ -94,11 +94,11 @@ describe('systemd-user manager plans', () => {
       ...ctx,
       repoRoot: '/repo/Space %n $HOME',
       nodePath: '/opt/Node Bin/node',
-      env: { KYBERION_ROOT: '/hostile', KYBERION_PERSONA: 'worker with spaces %n $HOME' },
+      env: { KYBERION_ROOT: '/hostile', KYBERION_BASE_ROLE: 'worker with spaces %n $HOME' },
     });
     expect(unit).toContain('WorkingDirectory=/repo/Space %%n $HOME\n');
     expect(unit).toContain('Environment="KYBERION_ROOT=/repo/Space %%n $HOME"\n');
-    expect(unit).toContain('Environment="KYBERION_PERSONA=worker with spaces %%n $HOME"\n');
+    expect(unit).toContain('Environment="KYBERION_BASE_ROLE=worker with spaces %%n $HOME"\n');
     expect(unit).toContain(
       'ExecStart="/opt/Node Bin/node" "/repo/Space %%n $$HOME/dist/scripts/chronos_daemon.js"\n'
     );

@@ -25,7 +25,7 @@ vi.mock('./governance/audit-chain.js', () => ({
 const ROOT = pathResolver.rootDir();
 const ENV_KEYS = [
   'KYBERION_TENANT',
-  'KYBERION_PERSONA',
+  'KYBERION_BASE_ROLE',
   'MISSION_ROLE',
   'SYSTEM_ROLE',
   'KYBERION_SUDO',
@@ -58,7 +58,7 @@ describe('tier-guard organization_operator authority role (R8)', () => {
   function operator(tenant?: string, persona?: string): void {
     process.env.MISSION_ROLE = 'organization_operator';
     if (tenant) process.env.KYBERION_TENANT = tenant;
-    if (persona) process.env.KYBERION_PERSONA = persona;
+    if (persona) process.env.KYBERION_BASE_ROLE = persona;
   }
 
   it('allows writing and reading its own tenant organization state', () => {
@@ -121,7 +121,7 @@ describe('tier-guard organization_operator authority role (R8)', () => {
   });
 
   it('leaves the sovereign persona unchanged', () => {
-    process.env.KYBERION_PERSONA = 'sovereign';
+    process.env.KYBERION_BASE_ROLE = 'sovereign';
     expect(validateWritePermission(orgPath('confidential', 'acme-corp')).allowed).toBe(true);
     expect(validateWritePermission(orgPath('confidential', 'other-tenant')).allowed).toBe(true);
     expect(validateWritePermission(path.join(ROOT, 'knowledge/product/x.md')).allowed).toBe(true);

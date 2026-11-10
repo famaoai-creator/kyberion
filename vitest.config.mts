@@ -159,7 +159,11 @@ export default defineConfig({
     pool: 'forks',
     maxWorkers: 4,
     // The approval-store guard keeps per-pool approval state from leaking between files.
-    setupFiles: ['./tests/vitest-network-guard.ts', './tests/vitest-approval-store-guard.ts'],
+    setupFiles: [
+      './tests/vitest-network-guard.ts',
+      './tests/vitest-approval-store-guard.ts',
+      './tests/vitest-legacy-base-role-env-guard.ts',
+    ],
     // Setup-file afterAll hooks must run after the file's own (the
     // approval-store guard checks what the file left once its cleanup ran).
     sequence: { hooks: 'stack' },

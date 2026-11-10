@@ -620,6 +620,15 @@
       "documented": true
     },
     {
+      "name": "KYBERION_BASE_ROLE",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "Base Authority Role the process runs on, by short name (sovereign, ecosystem_architect, worker, analyst, mission_owner; the card name base_<name> is accepted). Set by withExecutionContext and the launchers; a present empty value means no base role and is never replaced by the retired KYBERION_PERSONA.",
+      "documented": true,
+      "subsystem": "governance"
+    },
+    {
       "name": "KYBERION_BEST_OF_N",
       "category": "runtime",
       "type": "string",
@@ -3255,9 +3264,10 @@
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "Active persona for the policy engine (set by withExecutionContext; rarely set manually).",
+      "description": "Retired name of KYBERION_BASE_ROLE (Concept Model v2 D5). For one release it is read, with a deprecation warning, only when KYBERION_BASE_ROLE is absent; set KYBERION_BASE_ROLE instead.",
       "documented": true,
-      "subsystem": "governance"
+      "subsystem": "governance",
+      "deprecated": "2026-11"
     },
     {
       "name": "KYBERION_PERSONAL_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH",

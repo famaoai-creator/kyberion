@@ -221,7 +221,7 @@ jobs:
       # the Windows-native surface in the windows-native job below.
       - name: Unit tests (core, shard ${{ matrix.shard }}/${{ matrix.total }})
         env:
-          KYBERION_PERSONA: worker
+          KYBERION_BASE_ROLE: worker
           MISSION_ROLE: mission_controller
         # On pull requests and in the merge queue pr-validation.yml runs the
         # Linux core shards; this workflow adds the macOS coverage only.
@@ -252,7 +252,7 @@ jobs:
       - name: Stance resolution smoke
         env:
           KYBERION_STANCE: smoke-test
-          KYBERION_PERSONA: ecosystem_architect
+          KYBERION_BASE_ROLE: ecosystem_architect
           MISSION_ROLE: mission_controller
         run: |
           # Exercise the published stance API on every OS, not a retired dist path.
@@ -353,7 +353,7 @@ jobs:
         timeout-minutes: 18
         env:
           KYBERION_UIA_LIVE_SMOKE: '1'
-          KYBERION_PERSONA: worker
+          KYBERION_BASE_ROLE: worker
           MISSION_ROLE: mission_controller
         run: pnpm exec vitest run libs/core/virtual/os-accessibility-detector.live.test.ts
 

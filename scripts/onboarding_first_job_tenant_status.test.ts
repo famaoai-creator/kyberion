@@ -109,7 +109,7 @@ beforeAll(async () => {
   vi.stubEnv('KYBERION_ROOT', root);
   vi.stubEnv('MISSION_ID', '');
   vi.stubEnv('MISSION_ROLE', 'worker');
-  vi.stubEnv('KYBERION_PERSONA', 'worker');
+  vi.stubEnv('KYBERION_BASE_ROLE', 'worker');
   vi.stubEnv('SYSTEM_ROLE', '');
   vi.stubEnv('KYBERION_SUDO', '');
   vi.stubEnv('KYBERION_TENANT', '');
@@ -173,7 +173,7 @@ describe('first-job bound tenant status, real production authority', () => {
         missionId: undefined,
         authorities: [],
         role: 'infrastructure_sentinel',
-        persona: 'worker',
+        baseRole: 'worker',
       });
       expect(
         store.inspectFrontDeskExecution(proposal.front_desk_execution!, charter)

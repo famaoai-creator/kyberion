@@ -237,7 +237,7 @@ function publishConfig(
     throw error;
   }
   recordGovernanceAction(
-    actorId || resolveIdentityContext().persona,
+    actorId || resolveIdentityContext().baseRole,
     'reasoning_route_config_update',
     change + ':revision=' + next.revision
   );
