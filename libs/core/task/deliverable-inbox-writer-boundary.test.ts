@@ -81,8 +81,9 @@ afterAll(() => {
   }
 });
 
+// S4: the inbox writer is a declared store grant (an explicit deny declaration).
 const asWriter = <T>(fn: () => T): T =>
-  authority.withExecutionContext(writer.DELIVERABLE_INBOX_WRITER_ROLE, fn);
+  authority.withStoreGrant(writer.DELIVERABLE_INBOX_WRITER_ROLE, fn);
 const entries = () => asWriter(() => inbox.listInboxEntries({ limit: 50 }));
 
 describe('deliverable_inbox_writer on the real tier guard', () => {
@@ -212,15 +213,17 @@ describe('deliverable_inbox_writer on the real tier guard', () => {
       )
     );
     const denial = (relativePath: string, operation: 'write' | 'mkdir', content?: Buffer) =>
-      narrowing.roleNarrowingDenial({
-        policy,
-        role: writer.DELIVERABLE_INBOX_WRITER_ROLE,
-        relativePath,
-        operation,
-        scope: undefined,
-        content,
-        readRepoFile: () => undefined,
-      });
+      asWriter(() =>
+        narrowing.roleNarrowingDenial({
+          policy,
+          role: writer.DELIVERABLE_INBOX_WRITER_ROLE,
+          relativePath,
+          operation,
+          scope: undefined,
+          content,
+          readRepoFile: () => undefined,
+        })
+      );
     // A path outside the declared `only` set is refused with the SCOPE reason;
     // inside the set the entries file then reaches its declared content check.
     const pathAllowed = (relativePath: string, operation: 'write' | 'mkdir') =>

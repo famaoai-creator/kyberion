@@ -606,29 +606,6 @@
         "active/audit/"
       ]
     },
-    "workspace_graph_reader": {
-      "allow_read": [
-        "active/missions/",
-        "active/archive/missions/",
-        "active/projects/",
-        "active/organizations/",
-        "active/shared/runtime/work-coordination/",
-        "active/shared/coordination/channels/",
-        "active/shared/coordination/identity/",
-        "knowledge/personal/tenants/",
-        "knowledge/personal/members/",
-        "knowledge/personal/missions/"
-      ],
-      "allow_write": []
-    },
-    "peer_responder_reader": {
-      "allow_read": [
-        "knowledge/personal/tenants/${KYBERION_TENANT}.json",
-        "knowledge/confidential/${KYBERION_TENANT}/"
-      ],
-      "deny_read": ["knowledge/confidential/${KYBERION_TENANT}/connections/"],
-      "allow_write": []
-    },
     "perception_media_worker": {
       "allow_read": [
         "active/shared/tmp/confidential/${KYBERION_TENANT}/",
@@ -840,54 +817,6 @@
       ],
       "allow_write": []
     },
-    "concierge_management_reader": {
-      "allow_read": [
-        "active/shared/runtime/dot/confidential/${KYBERION_TENANT}/",
-        "active/shared/runtime/service-bindings/",
-        "knowledge/personal/members/",
-        "knowledge/personal/tenants/${KYBERION_TENANT}.json",
-        "active/organizations/confidential/${KYBERION_TENANT}/",
-        "active/organizations/public/${KYBERION_TENANT}/",
-        "active/projects/confidential/${KYBERION_TENANT}/",
-        "active/projects/public/${KYBERION_TENANT}/",
-        "active/shared/runtime/projects/",
-        "active/shared/runtime/surface-management/confidential/${KYBERION_TENANT}/"
-      ],
-      "allow_write": [],
-      "narrow": {
-        "deny": ["write", "mkdir"],
-        "deny_reason": "[RESOURCE_SCOPE_REQUIRED] Management reader needs a read-only tenant capability",
-        "require_scope": {
-          "reason": "[RESOURCE_SCOPE_REQUIRED] Management reader needs a read-only tenant capability"
-        }
-      }
-    },
-    "concierge_management_writer": {
-      "allow_read": [
-        "knowledge/personal/tenants/${KYBERION_TENANT}.json",
-        "active/organizations/confidential/${KYBERION_TENANT}/${KYBERION_ORGANIZATION_ID}/",
-        "active/organizations/public/${KYBERION_TENANT}/${KYBERION_ORGANIZATION_ID}/",
-        "active/projects/confidential/${KYBERION_TENANT}/",
-        "active/projects/public/${KYBERION_TENANT}/",
-        "active/shared/runtime/projects/",
-        "active/shared/runtime/surface-management/confidential/${KYBERION_TENANT}/"
-      ],
-      "allow_write": [
-        "active/organizations/confidential/${KYBERION_TENANT}/${KYBERION_ORGANIZATION_ID}/",
-        "active/organizations/public/${KYBERION_TENANT}/${KYBERION_ORGANIZATION_ID}/",
-        "active/projects/confidential/${KYBERION_TENANT}/",
-        "active/projects/public/${KYBERION_TENANT}/",
-        "active/shared/runtime/projects/",
-        "active/shared/runtime/surface-management/confidential/${KYBERION_TENANT}/"
-      ],
-      "narrow": {
-        "require_scope": {
-          "fields": ["organizationId"],
-          "reason": "[RESOURCE_SCOPE_REQUIRED] Management writer needs a bound request capability"
-        },
-        "structural_mkdir": true
-      }
-    },
     "organization_operator": {
       "allow_read": [
         "active/organizations/confidential/${KYBERION_TENANT}/",
@@ -939,82 +868,6 @@
         "active/audit/"
       ]
     },
-    "deliverable_inbox_writer": {
-      "allow_read": ["active/shared/inbox/", "active/shared/runtime/locks/"],
-      "allow_write": ["active/shared/inbox/", "active/shared/runtime/locks/"],
-      "narrow": {
-        "only": {
-          "write": [
-            {
-              "path": "active/shared/inbox/entries.jsonl"
-            },
-            {
-              "pattern": "^active/shared/runtime/locks/deliverable-inbox-[a-f0-9]{64}\\.lock[.A-Za-z0-9_-]{0,160}$"
-            }
-          ],
-          "mkdir": [
-            {
-              "path": "active/shared/inbox"
-            },
-            {
-              "path": "active/shared/runtime"
-            },
-            {
-              "path": "active/shared/runtime/locks"
-            }
-          ]
-        },
-        "only_reason": "[DELIVERABLE_INBOX_WRITER_SCOPE] The inbox writer writes only the deliverable inbox and its own lock",
-        "content_check": [
-          {
-            "path": "active/shared/inbox/entries.jsonl",
-            "kind": "append_only_jsonl",
-            "id_field": "entry_id",
-            "refusal_prefix": "[DELIVERABLE_INBOX_WRITE_REFUSED]"
-          }
-        ]
-      }
-    },
-    "archived_mission_state_reader": {
-      "allow_read": [
-        "active/archive/missions/confidential/${KYBERION_TENANT}/",
-        "active/archive/missions/personal/${KYBERION_TENANT}/"
-      ],
-      "allow_write": [],
-      "narrow": {
-        "deny": ["write", "mkdir"],
-        "deny_reason": "[RESOURCE_SCOPE_REQUIRED] Archived mission state reads require their exact read-only capability",
-        "require_scope": {
-          "custody": "tenant",
-          "exact": {
-            "read_only": true,
-            "read_path_pattern": "^active/archive/missions/(personal|confidential)/([a-z][a-z0-9-]{1,30})/[A-Za-z0-9][A-Za-z0-9._-]{0,160}/mission-state\\.json$",
-            "read_path_tenant_group": 2,
-            "allow_product_knowledge_read": true
-          },
-          "reason": "[RESOURCE_SCOPE_REQUIRED] Archived mission state reads require their exact read-only capability"
-        }
-      }
-    },
-    "customer_channel_binding_store": {
-      "allow_read": ["knowledge/confidential/${KYBERION_TENANT}/connections/channel-bindings.json"],
-      "allow_write": ["knowledge/confidential/${KYBERION_TENANT}/connections/"],
-      "narrow": {
-        "only": {
-          "write": [
-            {
-              "pattern": "^knowledge/confidential/[a-z][a-z0-9-]{1,30}/connections/channel-bindings\\.json$"
-            }
-          ],
-          "mkdir": [
-            {
-              "pattern": "^knowledge/confidential(/[a-z][a-z0-9-]{1,30}(/connections)?)?$"
-            }
-          ]
-        },
-        "only_reason": "[CUSTOMER_CHANNEL_BINDING_STORE_SCOPE] The binding store writes only knowledge/confidential/<tenant>/connections/channel-bindings.json"
-      }
-    },
     "engine_runtime_preferences_operator": {
       "allow_read": [
         "knowledge/product/schemas/engine-runtime-preferences.schema.json",
@@ -1024,232 +877,6 @@
         "knowledge/product/governance/agent-policies.yaml"
       ],
       "allow_write": ["knowledge/personal/"]
-    },
-    "dot_charter_store": {
-      "allow_read": [
-        "dots/",
-        "knowledge/personal/dots/",
-        "knowledge/personal/tenants/${KYBERION_TENANT}.json",
-        "active/organizations/confidential/${KYBERION_TENANT}/${KYBERION_ORGANIZATION_ID}/",
-        "active/organizations/public/shared/${KYBERION_ORGANIZATION_ID}/",
-        "knowledge/confidential/${KYBERION_TENANT}/dots/",
-        "active/shared/runtime/",
-        "active/shared/tmp/"
-      ],
-      "allow_write": [
-        "dots/",
-        "knowledge/personal/dots/",
-        "knowledge/confidential/${KYBERION_TENANT}/dots/",
-        "active/shared/tmp/"
-      ],
-      "narrow": {
-        "only": {
-          "write": [
-            {
-              "pattern": "^dots/[^/]+\\.json$"
-            },
-            {
-              "pattern": "^knowledge/confidential/[^/]+/dots/[^/]+\\.json$"
-            },
-            {
-              "pattern": "^knowledge/personal/dots/[^/]+/[^/]+\\.json$"
-            },
-            {
-              "pattern": "^active/shared/tmp/.+/dots/[^/]+\\.json$"
-            },
-            {
-              "pattern": "^active/shared/tmp/.+/knowledge/confidential/[^/]+/dots/[^/]+\\.json$"
-            },
-            {
-              "pattern": "^active/shared/tmp/.+/knowledge/personal/dots/[^/]+/[^/]+\\.json$"
-            }
-          ],
-          "mkdir": [
-            {
-              "path": "dots"
-            },
-            {
-              "path": "knowledge/personal/dots"
-            },
-            {
-              "pattern": "^knowledge/personal/dots/[^/]+$"
-            },
-            {
-              "pattern": "^knowledge/confidential/[^/]+/dots$"
-            },
-            {
-              "path": "active/shared/tmp"
-            },
-            {
-              "pattern": "^active/shared/tmp/.+$"
-            }
-          ]
-        },
-        "only_reason": "[DOT_CHARTER_SCOPE] The dot charter store writes only dot charter documents under the three custody dot roots",
-        "structural_mkdir": true
-      }
-    },
-    "dot_lifecycle_runtime_store": {
-      "allow_read": [
-        "active/shared/runtime/dot-lifecycle-audit.jsonl",
-        "active/shared/runtime/heartbeats/",
-        "active/shared/runtime/dot/public/shared/",
-        "active/shared/runtime/dot/personal/shared/owners/",
-        "active/shared/runtime/dot/confidential/${KYBERION_TENANT}/",
-        "active/shared/tmp/",
-        "knowledge/personal/",
-        "knowledge/confidential/${KYBERION_TENANT}/"
-      ],
-      "allow_write": [
-        "active/shared/runtime/dot-lifecycle-audit.jsonl",
-        "active/shared/runtime/heartbeats/",
-        "active/shared/runtime/dot/public/shared/",
-        "active/shared/runtime/dot/personal/shared/owners/",
-        "active/shared/runtime/dot/confidential/${KYBERION_TENANT}/",
-        "active/shared/tmp/",
-        "knowledge/personal/",
-        "knowledge/confidential/${KYBERION_TENANT}/"
-      ],
-      "narrow": {
-        "only": {
-          "write": [
-            {
-              "path": "active/shared/runtime/dot-lifecycle-audit.jsonl"
-            },
-            {
-              "pattern": "^active/shared/runtime/dot/(?:public|confidential|personal)/.+/event-continuations/[^/]+\\.json$"
-            },
-            {
-              "pattern": "^active/shared/runtime/dot/(?:public|confidential|personal)/.+/events\\.jsonl$"
-            },
-            {
-              "pattern": "^active/shared/runtime/heartbeats/[^/]+\\.json$"
-            },
-            {
-              "pattern": "^active/shared/tmp/.+/active/shared/runtime/dot-lifecycle-audit\\.jsonl$"
-            },
-            {
-              "pattern": "^active/shared/tmp/.+/active/shared/runtime/dot/(?:public|confidential|personal)/.+/event-continuations/[^/]+\\.json$"
-            },
-            {
-              "pattern": "^active/shared/tmp/.+/active/shared/runtime/dot/(?:public|confidential|personal)/.+/events\\.jsonl$"
-            },
-            {
-              "pattern": "^active/shared/tmp/.+/active/shared/runtime/heartbeats/[^/]+\\.json$"
-            }
-          ],
-          "mkdir": [
-            {
-              "path": "active"
-            },
-            {
-              "path": "active/shared"
-            },
-            {
-              "path": "active/shared/runtime"
-            },
-            {
-              "path": "active/shared/runtime/heartbeats"
-            },
-            {
-              "pattern": "^active/shared/runtime/dot(/.*)?$"
-            },
-            {
-              "path": "active/shared/tmp"
-            },
-            {
-              "pattern": "^active/shared/tmp/.+$"
-            }
-          ],
-          "read": [
-            {
-              "prefix": "knowledge/product/"
-            },
-            {
-              "path": "active/shared/runtime/dot-lifecycle-audit.jsonl"
-            },
-            {
-              "prefix": "active/shared/runtime/heartbeats/"
-            },
-            {
-              "prefix": "active/shared/runtime/dot/public/shared/"
-            },
-            {
-              "prefix": "active/shared/runtime/dot/personal/shared/owners/"
-            },
-            {
-              "prefix": "active/shared/runtime/dot/confidential/"
-            },
-            {
-              "prefix": "active/shared/tmp/"
-            }
-          ],
-          "metadata": [
-            {
-              "prefix": "knowledge/product/"
-            },
-            {
-              "path": "active/shared/runtime/dot-lifecycle-audit.jsonl"
-            },
-            {
-              "prefix": "active/shared/runtime/heartbeats/"
-            },
-            {
-              "prefix": "active/shared/runtime/dot/public/shared/"
-            },
-            {
-              "prefix": "active/shared/runtime/dot/personal/shared/owners/"
-            },
-            {
-              "prefix": "active/shared/runtime/dot/confidential/"
-            },
-            {
-              "prefix": "active/shared/tmp/"
-            },
-            {
-              "path": "knowledge/product"
-            },
-            {
-              "path": "active"
-            },
-            {
-              "path": "active/shared"
-            },
-            {
-              "path": "active/shared/runtime"
-            },
-            {
-              "path": "active/shared/runtime/heartbeats"
-            },
-            {
-              "path": "active/shared/runtime/dot"
-            },
-            {
-              "path": "active/shared/runtime/dot/public"
-            },
-            {
-              "path": "active/shared/runtime/dot/public/shared"
-            },
-            {
-              "path": "active/shared/runtime/dot/personal"
-            },
-            {
-              "path": "active/shared/runtime/dot/personal/shared"
-            },
-            {
-              "path": "active/shared/runtime/dot/personal/shared/owners"
-            },
-            {
-              "path": "active/shared/runtime/dot/confidential"
-            },
-            {
-              "path": "active/shared/tmp"
-            }
-          ]
-        },
-        "only_reason": "[DOT_LIFECYCLE_RUNTIME_SCOPE] The lifecycle runtime store writes only the lifecycle audit ledger, dot event-continuation state and activation heartbeats",
-        "structural_mkdir": true
-      }
     },
     "dot_lifecycle_worker": {
       "allow_read": ["active/shared/runtime/locks/"],
@@ -1415,6 +1042,388 @@
       "description": "Shared core read-only workspace tenant selector index reader. Used only for authenticated viewers whose tenant grants are all. Enumerates registry filenames only; descendant file reads are explicitly denied. Each valid slug is subsequently checked by the exact tenant-bound registry reader; no personal profile fields or write authority are exposed.",
       "allow_read": ["knowledge/personal/tenants/"],
       "deny_read_descendants": ["knowledge/personal/tenants/"],
+      "allow_write": []
+    },
+    "deliverable_inbox_writer": {
+      "description": "Deliverable inbox writer (libs/core/foundation/deliverable-inbox-writer-capability.ts): libs/core assumes it only to add an operator task to the deliverable inbox (active/shared/inbox/entries.jsonl, libs/core/task/deliverable-inbox.ts addInboxEntry) on behalf of a caller with no inbox grant: the CD-10 bolt-review rejection (libs/core/mission/mission-bolt-review.ts) and the CD-11 operator hand-off / manual reminder tasks (libs/core/customer-decision/operator-handoff.ts). Its grant is the inbox and the shared lock directory; the tier guard narrows every write and mkdir to the inbox entries file, its directory and the inbox's own deliverable-inbox-<sha256>.lock files. No other active/shared/runtime/ path, no knowledge, mission, approval or surface state.",
+      "allow_read": ["active/shared/inbox/", "active/shared/runtime/locks/"],
+      "allow_write": ["active/shared/inbox/", "active/shared/runtime/locks/"],
+      "narrow": {
+        "only": {
+          "write": [
+            {
+              "path": "active/shared/inbox/entries.jsonl"
+            },
+            {
+              "pattern": "^active/shared/runtime/locks/deliverable-inbox-[a-f0-9]{64}\\.lock[.A-Za-z0-9_-]{0,160}$"
+            }
+          ],
+          "mkdir": [
+            {
+              "path": "active/shared/inbox"
+            },
+            {
+              "path": "active/shared/runtime"
+            },
+            {
+              "path": "active/shared/runtime/locks"
+            }
+          ]
+        },
+        "only_reason": "[DELIVERABLE_INBOX_WRITER_SCOPE] The inbox writer writes only the deliverable inbox and its own lock",
+        "content_check": [
+          {
+            "path": "active/shared/inbox/entries.jsonl",
+            "kind": "append_only_jsonl",
+            "id_field": "entry_id",
+            "refusal_prefix": "[DELIVERABLE_INBOX_WRITE_REFUSED]"
+          }
+        ]
+      }
+    },
+    "customer_channel_binding_store": {
+      "description": "Customer channel binding storage (libs/core/foundation/customer-channel-binding-store-capability.ts): scripts/customer-channel/bindings.ts writeBindingChange (pnpm kyberion customer-channel bind|unbind) assumes it to read and write one tenant's knowledge/confidential/<tenant>/connections/channel-bindings.json; tenant-bound (libs/core/authority.ts TENANT_BOUND_READER_ROLES). Its grant is the bound tenant's knowledge/confidential/<tenant>/connections/ directory; the tier guard narrows every write and mkdir to the bindings file and the directories leading to it. No connection secrets, no other customer/ file, no knowledge or runtime state (it replaces customer_create on that write).",
+      "allow_read": ["knowledge/confidential/${KYBERION_TENANT}/connections/channel-bindings.json"],
+      "allow_write": ["knowledge/confidential/${KYBERION_TENANT}/connections/"],
+      "narrow": {
+        "only": {
+          "write": [
+            {
+              "pattern": "^knowledge/confidential/[a-z][a-z0-9-]{1,30}/connections/channel-bindings\\.json$"
+            }
+          ],
+          "mkdir": [
+            {
+              "pattern": "^knowledge/confidential(/[a-z][a-z0-9-]{1,30}(/connections)?)?$"
+            }
+          ]
+        },
+        "only_reason": "[CUSTOMER_CHANNEL_BINDING_STORE_SCOPE] The binding store writes only knowledge/confidential/<tenant>/connections/channel-bindings.json"
+      }
+    },
+    "archived_mission_state_reader": {
+      "description": "Archived mission state reader (libs/core/foundation/archived-mission-state-capability.ts): read-only, tenant-bound (libs/core/authority.ts TENANT_BOUND_READER_ROLES). libs/core/mission/mission-decision-lock.ts loadDecisionCaseMissionState assumes it to read one archived tenant mission's active/archive/missions/<personal|confidential>/<tenant>/<id>/mission-state.json, always inside an exact read-only capability naming that file (plus product schemas). No write, no other file of the mission folder or archive, no mission lifecycle authority (it replaces the borrowed mission_controller role on that read).",
+      "allow_read": [
+        "active/archive/missions/confidential/${KYBERION_TENANT}/",
+        "active/archive/missions/personal/${KYBERION_TENANT}/"
+      ],
+      "allow_write": [],
+      "narrow": {
+        "deny": ["write", "mkdir"],
+        "deny_reason": "[RESOURCE_SCOPE_REQUIRED] Archived mission state reads require their exact read-only capability",
+        "require_scope": {
+          "custody": "tenant",
+          "exact": {
+            "read_only": true,
+            "read_path_pattern": "^active/archive/missions/(personal|confidential)/([a-z][a-z0-9-]{1,30})/[A-Za-z0-9][A-Za-z0-9._-]{0,160}/mission-state\\.json$",
+            "read_path_tenant_group": 2,
+            "allow_product_knowledge_read": true
+          },
+          "reason": "[RESOURCE_SCOPE_REQUIRED] Archived mission state reads require their exact read-only capability"
+        }
+      }
+    },
+    "concierge_management_writer": {
+      "description": "Authenticated human-owner organization/project descriptive mutation role. Requires a matching immutable request resource capability; exact ceiling precedes all ambient/default grants. No lifecycle, membership, provisioning or deployment authority.",
+      "allow_read": [
+        "knowledge/personal/tenants/${KYBERION_TENANT}.json",
+        "active/organizations/confidential/${KYBERION_TENANT}/${KYBERION_ORGANIZATION_ID}/",
+        "active/organizations/public/${KYBERION_TENANT}/${KYBERION_ORGANIZATION_ID}/",
+        "active/projects/confidential/${KYBERION_TENANT}/",
+        "active/projects/public/${KYBERION_TENANT}/",
+        "active/shared/runtime/projects/",
+        "active/shared/runtime/surface-management/confidential/${KYBERION_TENANT}/"
+      ],
+      "allow_write": [
+        "active/organizations/confidential/${KYBERION_TENANT}/${KYBERION_ORGANIZATION_ID}/",
+        "active/organizations/public/${KYBERION_TENANT}/${KYBERION_ORGANIZATION_ID}/",
+        "active/projects/confidential/${KYBERION_TENANT}/",
+        "active/projects/public/${KYBERION_TENANT}/",
+        "active/shared/runtime/projects/",
+        "active/shared/runtime/surface-management/confidential/${KYBERION_TENANT}/"
+      ],
+      "narrow": {
+        "require_scope": {
+          "fields": ["organizationId"],
+          "reason": "[RESOURCE_SCOPE_REQUIRED] Management writer needs a bound request capability"
+        },
+        "structural_mkdir": true
+      }
+    },
+    "dot_charter_store": {
+      "description": "Store role of dot charter documents (libs/core/dot/dot-lifecycle.ts): dots/ at repo root, knowledge/confidential/<tenant>/dots/ and knowledge/personal/dots/<owner-hash>/ — all three custodies. The lifecycle facade assumes it (withExecutionContext) at each charter read/write inside the dot_lifecycle_worker process, binding the charter's tenant for confidential custody and explicitly clearing the ambient tenant ('' tenantCleared) for personal and system custody. Its read scopes additionally carry the validation reads that ran under the former dot_lifecycle_writer (tenants/<t>.json, organization operational state, runtime projects). Deliberately not a role a dot may bind at runtime, so an active dot can never rewrite the contract it runs under. The lifecycle audit ledger, activation heartbeats, event-continuation state and inter-process locks live under other roles (dot_lifecycle_runtime_store / the worker's ambient locks grant).",
+      "allow_read": [
+        "dots/",
+        "knowledge/personal/dots/",
+        "knowledge/personal/tenants/${KYBERION_TENANT}.json",
+        "active/organizations/confidential/${KYBERION_TENANT}/${KYBERION_ORGANIZATION_ID}/",
+        "active/organizations/public/shared/${KYBERION_ORGANIZATION_ID}/",
+        "knowledge/confidential/${KYBERION_TENANT}/dots/",
+        "active/shared/runtime/",
+        "active/shared/tmp/"
+      ],
+      "allow_write": [
+        "dots/",
+        "knowledge/personal/dots/",
+        "knowledge/confidential/${KYBERION_TENANT}/dots/",
+        "active/shared/tmp/"
+      ],
+      "narrow": {
+        "only": {
+          "write": [
+            {
+              "pattern": "^dots/[^/]+\\.json$"
+            },
+            {
+              "pattern": "^knowledge/confidential/[^/]+/dots/[^/]+\\.json$"
+            },
+            {
+              "pattern": "^knowledge/personal/dots/[^/]+/[^/]+\\.json$"
+            },
+            {
+              "pattern": "^active/shared/tmp/.+/dots/[^/]+\\.json$"
+            },
+            {
+              "pattern": "^active/shared/tmp/.+/knowledge/confidential/[^/]+/dots/[^/]+\\.json$"
+            },
+            {
+              "pattern": "^active/shared/tmp/.+/knowledge/personal/dots/[^/]+/[^/]+\\.json$"
+            }
+          ],
+          "mkdir": [
+            {
+              "path": "dots"
+            },
+            {
+              "path": "knowledge/personal/dots"
+            },
+            {
+              "pattern": "^knowledge/personal/dots/[^/]+$"
+            },
+            {
+              "pattern": "^knowledge/confidential/[^/]+/dots$"
+            },
+            {
+              "path": "active/shared/tmp"
+            },
+            {
+              "pattern": "^active/shared/tmp/.+$"
+            }
+          ]
+        },
+        "only_reason": "[DOT_CHARTER_SCOPE] The dot charter store writes only dot charter documents under the three custody dot roots",
+        "structural_mkdir": true
+      }
+    },
+    "dot_lifecycle_runtime_store": {
+      "description": "Store role of the dot lifecycle runtime surfaces (libs/core/dot/dot-lifecycle.ts): the lifecycle audit ledger (active/shared/runtime/dot-lifecycle-audit.jsonl, append-only), activation heartbeats (active/shared/runtime/heartbeats/) and dot event-continuation state (active/shared/runtime/dot/.../event-continuations/ + events.jsonl). Assumed inside the lifecycle facade for these writes only — charter documents go through dot_charter_store and inter-process locks stay under the dot_lifecycle_worker ambient role. The narrow.only declaration restricts writes to exactly those artifacts and their mkdir ancestors. Tenant-confidential event-continuation partitions bind the charter's tenant; personal and system partitions run with the ambient tenant explicitly cleared. Protected runtime data also requires projected knowledge-tier grants; the raw read/metadata/write/mkdir purpose ceilings forbid using those virtual grants on actual knowledge files. Confidential projection grants expand only from the bound tenant; cleared custody does not admit confidential data.",
+      "allow_read": [
+        "active/shared/runtime/dot-lifecycle-audit.jsonl",
+        "active/shared/runtime/heartbeats/",
+        "active/shared/runtime/dot/public/shared/",
+        "active/shared/runtime/dot/personal/shared/owners/",
+        "active/shared/runtime/dot/confidential/${KYBERION_TENANT}/",
+        "active/shared/tmp/",
+        "knowledge/personal/",
+        "knowledge/confidential/${KYBERION_TENANT}/"
+      ],
+      "allow_write": [
+        "active/shared/runtime/dot-lifecycle-audit.jsonl",
+        "active/shared/runtime/heartbeats/",
+        "active/shared/runtime/dot/public/shared/",
+        "active/shared/runtime/dot/personal/shared/owners/",
+        "active/shared/runtime/dot/confidential/${KYBERION_TENANT}/",
+        "active/shared/tmp/",
+        "knowledge/personal/",
+        "knowledge/confidential/${KYBERION_TENANT}/"
+      ],
+      "narrow": {
+        "only": {
+          "write": [
+            {
+              "path": "active/shared/runtime/dot-lifecycle-audit.jsonl"
+            },
+            {
+              "pattern": "^active/shared/runtime/dot/(?:public|confidential|personal)/.+/event-continuations/[^/]+\\.json$"
+            },
+            {
+              "pattern": "^active/shared/runtime/dot/(?:public|confidential|personal)/.+/events\\.jsonl$"
+            },
+            {
+              "pattern": "^active/shared/runtime/heartbeats/[^/]+\\.json$"
+            },
+            {
+              "pattern": "^active/shared/tmp/.+/active/shared/runtime/dot-lifecycle-audit\\.jsonl$"
+            },
+            {
+              "pattern": "^active/shared/tmp/.+/active/shared/runtime/dot/(?:public|confidential|personal)/.+/event-continuations/[^/]+\\.json$"
+            },
+            {
+              "pattern": "^active/shared/tmp/.+/active/shared/runtime/dot/(?:public|confidential|personal)/.+/events\\.jsonl$"
+            },
+            {
+              "pattern": "^active/shared/tmp/.+/active/shared/runtime/heartbeats/[^/]+\\.json$"
+            }
+          ],
+          "mkdir": [
+            {
+              "path": "active"
+            },
+            {
+              "path": "active/shared"
+            },
+            {
+              "path": "active/shared/runtime"
+            },
+            {
+              "path": "active/shared/runtime/heartbeats"
+            },
+            {
+              "pattern": "^active/shared/runtime/dot(/.*)?$"
+            },
+            {
+              "path": "active/shared/tmp"
+            },
+            {
+              "pattern": "^active/shared/tmp/.+$"
+            }
+          ],
+          "read": [
+            {
+              "prefix": "knowledge/product/"
+            },
+            {
+              "path": "active/shared/runtime/dot-lifecycle-audit.jsonl"
+            },
+            {
+              "prefix": "active/shared/runtime/heartbeats/"
+            },
+            {
+              "prefix": "active/shared/runtime/dot/public/shared/"
+            },
+            {
+              "prefix": "active/shared/runtime/dot/personal/shared/owners/"
+            },
+            {
+              "prefix": "active/shared/runtime/dot/confidential/"
+            },
+            {
+              "prefix": "active/shared/tmp/"
+            }
+          ],
+          "metadata": [
+            {
+              "prefix": "knowledge/product/"
+            },
+            {
+              "path": "active/shared/runtime/dot-lifecycle-audit.jsonl"
+            },
+            {
+              "prefix": "active/shared/runtime/heartbeats/"
+            },
+            {
+              "prefix": "active/shared/runtime/dot/public/shared/"
+            },
+            {
+              "prefix": "active/shared/runtime/dot/personal/shared/owners/"
+            },
+            {
+              "prefix": "active/shared/runtime/dot/confidential/"
+            },
+            {
+              "prefix": "active/shared/tmp/"
+            },
+            {
+              "path": "knowledge/product"
+            },
+            {
+              "path": "active"
+            },
+            {
+              "path": "active/shared"
+            },
+            {
+              "path": "active/shared/runtime"
+            },
+            {
+              "path": "active/shared/runtime/heartbeats"
+            },
+            {
+              "path": "active/shared/runtime/dot"
+            },
+            {
+              "path": "active/shared/runtime/dot/public"
+            },
+            {
+              "path": "active/shared/runtime/dot/public/shared"
+            },
+            {
+              "path": "active/shared/runtime/dot/personal"
+            },
+            {
+              "path": "active/shared/runtime/dot/personal/shared"
+            },
+            {
+              "path": "active/shared/runtime/dot/personal/shared/owners"
+            },
+            {
+              "path": "active/shared/runtime/dot/confidential"
+            },
+            {
+              "path": "active/shared/tmp"
+            }
+          ]
+        },
+        "only_reason": "[DOT_LIFECYCLE_RUNTIME_SCOPE] The lifecycle runtime store writes only the lifecycle audit ledger, dot event-continuation state and activation heartbeats",
+        "structural_mkdir": true
+      }
+    },
+    "workspace_graph_reader": {
+      "description": "Workspace graph read model (MSN-SURFACE-UNIFY-20261103): read-only join of missions, projects, organizations, work items, approvals, agent identities, tenant profiles and member profiles for libs/core/surface/workspace-graph.ts. It is never tenant-bound: rows are filtered afterwards by the caller's server-resolved SurfaceAuthorizationContext (viewerAdmitsNode), so a client tenant can only narrow. No write grant; persona worker.",
+      "allow_read": [
+        "active/missions/",
+        "active/archive/missions/",
+        "active/projects/",
+        "active/organizations/",
+        "active/shared/runtime/work-coordination/",
+        "active/shared/coordination/channels/",
+        "active/shared/coordination/identity/",
+        "knowledge/personal/tenants/",
+        "knowledge/personal/members/",
+        "knowledge/personal/missions/"
+      ],
+      "allow_write": []
+    },
+    "concierge_management_reader": {
+      "description": "Read-only management projection and fresh owner-membership verification. Requires an exact request resource capability; no write operations or credential access.",
+      "allow_read": [
+        "active/shared/runtime/dot/confidential/${KYBERION_TENANT}/",
+        "active/shared/runtime/service-bindings/",
+        "knowledge/personal/members/",
+        "knowledge/personal/tenants/${KYBERION_TENANT}.json",
+        "active/organizations/confidential/${KYBERION_TENANT}/",
+        "active/organizations/public/${KYBERION_TENANT}/",
+        "active/projects/confidential/${KYBERION_TENANT}/",
+        "active/projects/public/${KYBERION_TENANT}/",
+        "active/shared/runtime/projects/",
+        "active/shared/runtime/surface-management/confidential/${KYBERION_TENANT}/"
+      ],
+      "allow_write": [],
+      "narrow": {
+        "deny": ["write", "mkdir"],
+        "deny_reason": "[RESOURCE_SCOPE_REQUIRED] Management reader needs a read-only tenant capability",
+        "require_scope": {
+          "reason": "[RESOURCE_SCOPE_REQUIRED] Management reader needs a read-only tenant capability"
+        }
+      }
+    },
+    "peer_responder_reader": {
+      "description": "Least-privilege reader for peer conversation auto replies. libs/core/mesh/peer-auto-reply.ts assumes it, bound to the receiving tenant, to retrieve tenant knowledge (queryTenantKnowledge) that grounds an opt-in LLM reply; it reads that tenant's profile, knowledge/confidential/<tenant>/ only, never knowledge/confidential/<tenant>/connections/ (peer secrets; security-policy.json deny_read), and writes nothing (persona worker). It is a tenant-bound reader (authority.ts TENANT_BOUND_READER_ROLES): the bound tenant must be explicit and equal the caller's active tenant when one exists.",
+      "allow_read": [
+        "knowledge/personal/tenants/${KYBERION_TENANT}.json",
+        "knowledge/confidential/${KYBERION_TENANT}/"
+      ],
+      "deny_read": ["knowledge/confidential/${KYBERION_TENANT}/connections/"],
       "allow_write": []
     }
   },

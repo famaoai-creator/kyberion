@@ -30,7 +30,7 @@
       },
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
-      "legacy_roles": ["archived_mission_state_reader", "workspace_graph_reader"],
+      "grants": ["archived_mission_state_reader", "workspace_graph_reader"],
       "sources": ["role-policy"]
     },
     {
@@ -133,7 +133,7 @@
       },
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
-      "legacy_roles": ["concierge_management_reader", "dot_lifecycle_runtime_store"],
+      "grants": ["dot_lifecycle_runtime_store", "concierge_management_reader"],
       "sources": ["runtime-state-roots", "role-policy"],
       "registration": {
         "family": "state",
@@ -149,7 +149,7 @@
         "kind": "system"
       },
       "status": "active",
-      "legacy_roles": ["dot_charter_store"],
+      "grants": ["dot_charter_store"],
       "sources": ["role-policy"],
       "note": "Resident-agent charters shipped with the repository."
     },
@@ -220,7 +220,7 @@
       },
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
-      "legacy_roles": ["dot_charter_store", "dot_lifecycle_runtime_store"],
+      "grants": ["dot_charter_store", "dot_lifecycle_runtime_store"],
       "sources": ["storage-floor", "role-policy"],
       "note": "Floors also hold a system/ partition (custody system).",
       "registration": {
@@ -415,7 +415,7 @@
       },
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
-      "legacy_roles": ["workspace_graph_reader"],
+      "grants": ["workspace_graph_reader"],
       "sources": ["role-policy"]
     },
     {
@@ -428,13 +428,13 @@
       },
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
-      "legacy_roles": [
-        "concierge_management_reader",
+      "grants": [
+        "operational_learning_writer",
         "concierge_management_writer",
         "dot_charter_store",
-        "workspace_graph_reader"
+        "workspace_graph_reader",
+        "concierge_management_reader"
       ],
-      "grants": ["operational_learning_writer"],
       "sources": ["role-policy"]
     },
     {
@@ -446,7 +446,7 @@
       },
       "tiers": ["personal"],
       "status": "active",
-      "legacy_roles": ["dot_lifecycle_runtime_store"],
+      "grants": ["dot_lifecycle_runtime_store"],
       "sources": ["role-policy"],
       "note": "Tracks the existing namespace and its raw projected-tier policy reference, like the tenant-knowledge aggregate. The runtime store virtual projection grant is unusable on actual knowledge files because read/metadata/write/mkdir purpose ceilings apply first. No new storage root, runtime registration or permission is introduced."
     },
@@ -482,7 +482,7 @@
       },
       "tiers": ["personal"],
       "status": "active",
-      "legacy_roles": ["dot_charter_store"],
+      "grants": ["dot_charter_store"],
       "sources": ["role-policy"]
     },
     {
@@ -494,8 +494,11 @@
       },
       "tiers": ["personal"],
       "status": "active",
-      "legacy_roles": ["concierge_management_reader", "workspace_graph_reader"],
-      "grants": ["nhi_accountability_reader"],
+      "grants": [
+        "nhi_accountability_reader",
+        "workspace_graph_reader",
+        "concierge_management_reader"
+      ],
       "sources": ["role-policy"]
     },
     {
@@ -507,7 +510,7 @@
       },
       "tiers": ["personal"],
       "status": "active",
-      "legacy_roles": ["workspace_graph_reader"],
+      "grants": ["workspace_graph_reader"],
       "sources": ["role-policy"]
     },
     {
@@ -543,18 +546,16 @@
       },
       "tiers": ["personal"],
       "status": "active",
-      "legacy_roles": [
-        "concierge_management_reader",
-        "concierge_management_writer",
-        "dot_charter_store",
-        "peer_responder_reader",
-        "workspace_graph_reader"
-      ],
       "grants": [
         "peer_catalog_reader",
         "first_job_tenant_status_reader",
         "workspace_tenant_registry_reader",
-        "workspace_tenant_registry_index_reader"
+        "workspace_tenant_registry_index_reader",
+        "concierge_management_writer",
+        "dot_charter_store",
+        "workspace_graph_reader",
+        "concierge_management_reader",
+        "peer_responder_reader"
       ],
       "sources": ["role-policy"]
     },
@@ -618,10 +619,10 @@
       },
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
-      "legacy_roles": [
-        "concierge_management_reader",
+      "grants": [
         "concierge_management_writer",
-        "workspace_graph_reader"
+        "workspace_graph_reader",
+        "concierge_management_reader"
       ],
       "sources": ["role-policy"]
     },
@@ -698,7 +699,7 @@
         "kind": "unscoped-legacy"
       },
       "status": "active",
-      "legacy_roles": ["deliverable_inbox_writer"],
+      "grants": ["deliverable_inbox_writer"],
       "sources": ["role-policy"]
     },
     {
@@ -717,7 +718,7 @@
         "kind": "unscoped-legacy"
       },
       "status": "active",
-      "legacy_roles": ["concierge_management_reader", "concierge_management_writer"],
+      "grants": ["concierge_management_writer", "concierge_management_reader"],
       "sources": ["role-policy"]
     },
     {
@@ -744,7 +745,7 @@
         "kind": "unscoped-legacy"
       },
       "status": "active",
-      "legacy_roles": ["concierge_management_reader"],
+      "grants": ["concierge_management_reader"],
       "sources": ["role-policy"]
     },
     {
@@ -767,7 +768,7 @@
       },
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
-      "legacy_roles": ["concierge_management_reader", "concierge_management_writer"],
+      "grants": ["concierge_management_writer", "concierge_management_reader"],
       "sources": ["role-policy"]
     },
     {
@@ -862,7 +863,7 @@
         "kind": "unscoped-legacy"
       },
       "status": "active",
-      "legacy_roles": ["workspace_graph_reader"],
+      "grants": ["workspace_graph_reader"],
       "sources": ["role-policy"]
     },
     {
@@ -890,7 +891,7 @@
         "kind": "unscoped-legacy"
       },
       "status": "active",
-      "legacy_roles": ["workspace_graph_reader"],
+      "grants": ["workspace_graph_reader"],
       "sources": ["role-policy"]
     },
     {
@@ -900,7 +901,7 @@
         "kind": "unscoped-legacy"
       },
       "status": "active",
-      "legacy_roles": ["deliverable_inbox_writer"],
+      "grants": ["deliverable_inbox_writer"],
       "sources": ["role-policy"]
     },
     {
@@ -920,7 +921,7 @@
         "kind": "unscoped-legacy"
       },
       "status": "active",
-      "legacy_roles": ["dot_charter_store", "dot_lifecycle_runtime_store"],
+      "grants": ["dot_charter_store", "dot_lifecycle_runtime_store"],
       "sources": ["role-policy"],
       "note": "Dot charter validation reads use dot_charter_store; lifecycle runtime writes use dot_lifecycle_runtime_store narrowed to audit, heartbeat and event-continuation artifacts. The rejected asset_derivation_store role remains absent."
     },
@@ -1007,7 +1008,7 @@
       "status": "active",
       "sources": ["scope-model", "role-policy"],
       "note": "S2 done: the tenant's customer channel bindings (customer-channel-binding.ts, scripts/customer-channel/bindings.ts).",
-      "legacy_roles": ["customer_channel_binding_store"]
+      "grants": ["customer_channel_binding_store"]
     },
     {
       "id": "tenant-customer-records",
@@ -1043,7 +1044,7 @@
       },
       "tiers": ["confidential"],
       "status": "active",
-      "legacy_roles": ["dot_lifecycle_runtime_store", "peer_responder_reader"],
+      "grants": ["dot_lifecycle_runtime_store", "peer_responder_reader"],
       "sources": ["role-policy"],
       "note": "The raw policy inventory includes the lifecycle runtime store projection grant. Its physical knowledge access remains denied by raw-purpose operation ceilings; this entry does not confer authority."
     },
@@ -1089,8 +1090,7 @@
       },
       "tiers": ["confidential"],
       "status": "active",
-      "legacy_roles": ["customer_channel_binding_store"],
-      "grants": ["peer_catalog_reader"],
+      "grants": ["peer_catalog_reader", "customer_channel_binding_store"],
       "sources": ["role-policy"]
     },
     {
@@ -1113,7 +1113,7 @@
       },
       "tiers": ["confidential"],
       "status": "active",
-      "legacy_roles": ["dot_charter_store"],
+      "grants": ["dot_charter_store"],
       "sources": ["role-policy"]
     },
     {

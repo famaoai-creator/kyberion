@@ -89,6 +89,35 @@ export const DECLARED_STORE_GRANTS: Readonly<Record<string, DeclaredStoreGrantDe
       persona: 'worker',
       tenantBound: false,
     }),
+    // Owner decision (2026-11-10): deny-only roles become explicit deny declarations
+    // (store_grants.<name>.narrow) on the grant their facade opens, not roles.
+    // task/deliverable-inbox.ts addInboxEntry (bolt review, operator hand-off, escalation).
+    deliverable_inbox_writer: Object.freeze({ tenantBound: false }),
+    // organization/customer-channel-binding.ts, scripts/customer-channel/bindings.ts.
+    customer_channel_binding_store: Object.freeze({ tenantBound: true }),
+    // mission/mission-decision-lock.ts, inside the exact archived state capability.
+    archived_mission_state_reader: Object.freeze({ tenantBound: true }),
+    // Owner decision: flow writers are issued per write by the flow's facade.
+    // surface/concierge-management-access.ts, per request inside its exact writer capability.
+    concierge_management_writer: Object.freeze({ tenantBound: false }),
+    // dot/dot-lifecycle.ts (the decomposed dot_lifecycle_writer), per charter/runtime write.
+    dot_charter_store: Object.freeze({ persona: 'worker', tenantBound: false }),
+    dot_lifecycle_runtime_store: Object.freeze({ persona: 'worker', tenantBound: false }),
+    // Owner decision: cross-store readers are audited disclosures (scope model P4).
+    // surface/workspace-graph.ts (system scope), concierge home-dashboard.ts.
+    workspace_graph_reader: Object.freeze({
+      persona: 'worker',
+      tenantBound: false,
+      disclosure: true,
+    }),
+    // surface/concierge-management-access.ts, inside its exact read-only capability.
+    concierge_management_reader: Object.freeze({ tenantBound: false, disclosure: true }),
+    // mesh/peer-auto-reply.ts: tenant knowledge for an opt-in peer reply.
+    peer_responder_reader: Object.freeze({
+      persona: 'worker',
+      tenantBound: true,
+      disclosure: true,
+    }),
   });
 
 export function isDeclaredStoreGrantName(name: string | undefined): boolean {
@@ -147,24 +176,29 @@ function isRecord(value: unknown): value is PermissionRecord {
 }
 
 /**
- * The permission record the tier guard evaluates for `role`: its
- * `authority_role_permissions` entry, else — only while that store grant is
- * live in the current scope — its `store_grants` declaration. A name that is
- * both is a policy defect; the role entry is never shadowed by a grant.
- * Returns `undefined` when there is no record, and the raw (possibly
- * malformed) value otherwise so callers keep their own fail-closed checks.
+ * The permission record the tier guard evaluates for `role`. A declared store
+ * grant name resolves only its `store_grants` declaration, and only while that
+ * grant is live in the current scope — never an `authority_role_permissions`
+ * entry of the same name (a role created later under a grant's name cannot
+ * change what the grant permits). Any other name resolves its
+ * `authority_role_permissions` entry. Returns `undefined` when there is no
+ * record, and the raw (possibly malformed) value otherwise so callers keep
+ * their own fail-closed checks.
  */
 export function rolePermissionRecord(
   policy: unknown,
   role: string | undefined
 ): PolicyPermissionRecord | undefined {
   if (!role || !isRecord(policy)) return undefined;
+  if (isDeclaredStoreGrantName(role)) {
+    if (liveDeclaredStoreGrant() !== role) return undefined;
+    const grants = policy.store_grants;
+    return isRecord(grants) && Object.hasOwn(grants, role)
+      ? (grants[role] as PolicyPermissionRecord | undefined)
+      : undefined;
+  }
   const roles = policy.authority_role_permissions;
-  if (isRecord(roles) && Object.hasOwn(roles, role))
-    return roles[role] as PolicyPermissionRecord | undefined;
-  if (!isDeclaredStoreGrantName(role) || liveDeclaredStoreGrant() !== role) return undefined;
-  const grants = policy.store_grants;
-  return isRecord(grants) && Object.hasOwn(grants, role)
-    ? (grants[role] as PolicyPermissionRecord | undefined)
+  return isRecord(roles) && Object.hasOwn(roles, role)
+    ? (roles[role] as PolicyPermissionRecord | undefined)
     : undefined;
 }

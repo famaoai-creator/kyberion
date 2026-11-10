@@ -36,7 +36,7 @@ import { isDeepStrictEqual } from 'node:util';
 import { pathResolver } from '../path-resolver.js';
 import { safeExistsSync, safeLstat, safeMkdir, safeReadFile, safeWriteFile } from '../secure-io.js';
 import { parseSafeJsonObjectInput } from '../foundation/safe-json.js';
-import { withExecutionContext, withStoreGrant } from '../authority.js';
+import { withStoreGrant } from '../authority.js';
 import { recordDaemonHeartbeat } from '../daemon/daemon-heartbeat.js';
 import { loadAuthorityRoleIndex } from '../organization/authority-role-registry.js';
 import { appendJsonLine, writeJson } from '../foundation/json.js';
@@ -89,22 +89,16 @@ function asDotCharterStore<T>(
   fn: () => T,
   organizationId?: string
 ): T {
-  return withExecutionContext(
-    DOT_CHARTER_STORE_ROLE,
-    fn,
-    undefined,
-    lifecycleCustodyBinding(tenantSlug),
-    organizationId
-  );
+  return withStoreGrant(DOT_CHARTER_STORE_ROLE, fn, {
+    tenantSlug: lifecycleCustodyBinding(tenantSlug),
+    organizationId: organizationId,
+  });
 }
 
 function asDotLifecycleRuntimeStore<T>(tenantSlug: string | undefined, fn: () => T): T {
-  return withExecutionContext(
-    DOT_LIFECYCLE_RUNTIME_STORE_ROLE,
-    fn,
-    undefined,
-    lifecycleCustodyBinding(tenantSlug)
-  );
+  return withStoreGrant(DOT_LIFECYCLE_RUNTIME_STORE_ROLE, fn, {
+    tenantSlug: lifecycleCustodyBinding(tenantSlug),
+  });
 }
 
 const TERMINAL_STATUSES: readonly DotCharterStatus[] = ['retired'];

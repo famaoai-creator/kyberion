@@ -10,14 +10,6 @@
       "allowed_actuators": [],
       "tier_access": ["personal", "confidential"]
     },
-    "archived_mission_state_reader": {
-      "description": "Archived mission state reader (libs/core/foundation/archived-mission-state-capability.ts): read-only, tenant-bound (libs/core/authority.ts TENANT_BOUND_READER_ROLES). libs/core/mission/mission-decision-lock.ts loadDecisionCaseMissionState assumes it to read one archived tenant mission's active/archive/missions/<personal|confidential>/<tenant>/<id>/mission-state.json, always inside an exact read-only capability naming that file (plus product schemas). No write, no other file of the mission folder or archive, no mission lifecycle authority (it replaces the borrowed mission_controller role on that read).",
-      "default_persona": "unknown",
-      "write_scopes": [],
-      "scope_classes": [],
-      "allowed_actuators": [],
-      "tier_access": ["personal", "confidential"]
-    },
     "check_chronos_perf_baseline": {
       "description": "CE-08: weekly Chronos performance baseline (pnpm kyberion check chronos-perf, schedule ce-chronos-perf). Samples FPS and JS heap of the Chronos UI in a headless browser and writes exactly one report file; it never changes Chronos state.",
       "default_persona": "worker",
@@ -98,37 +90,6 @@
       "allowed_actuators": ["ingest-actuator"],
       "tier_access": ["public", "confidential", "personal"]
     },
-    "concierge_management_reader": {
-      "description": "Read-only management projection and fresh owner-membership verification. Requires an exact request resource capability; no write operations or credential access.",
-      "default_persona": "unknown",
-      "write_scopes": [],
-      "scope_classes": [],
-      "allowed_actuators": [],
-      "tier_access": ["personal", "confidential"]
-    },
-    "concierge_management_writer": {
-      "description": "Authenticated human-owner organization/project descriptive mutation role. Requires a matching immutable request resource capability; exact ceiling precedes all ambient/default grants. No lifecycle, membership, provisioning or deployment authority.",
-      "default_persona": "unknown",
-      "write_scopes": [
-        "active/organizations/confidential/${KYBERION_TENANT}/${KYBERION_ORGANIZATION_ID}/",
-        "active/organizations/public/${KYBERION_TENANT}/${KYBERION_ORGANIZATION_ID}/",
-        "active/projects/confidential/${KYBERION_TENANT}/",
-        "active/projects/public/${KYBERION_TENANT}/",
-        "active/shared/runtime/projects/",
-        "active/shared/runtime/surface-management/confidential/${KYBERION_TENANT}/"
-      ],
-      "scope_classes": ["organization_operating_model", "project_metadata"],
-      "allowed_actuators": [],
-      "tier_access": ["confidential"]
-    },
-    "customer_channel_binding_store": {
-      "description": "Customer channel binding storage (libs/core/foundation/customer-channel-binding-store-capability.ts): scripts/customer-channel/bindings.ts writeBindingChange (pnpm kyberion customer-channel bind|unbind) assumes it to read and write one tenant's knowledge/confidential/<tenant>/connections/channel-bindings.json; tenant-bound (libs/core/authority.ts TENANT_BOUND_READER_ROLES). Its grant is the bound tenant's knowledge/confidential/<tenant>/connections/ directory; the tier guard narrows every write and mkdir to the bindings file and the directories leading to it. No connection secrets, no other customer/ file, no knowledge or runtime state (it replaces customer_create on that write).",
-      "default_persona": "unknown",
-      "write_scopes": ["knowledge/confidential/${KYBERION_TENANT}/connections/"],
-      "scope_classes": ["customer_overlay"],
-      "allowed_actuators": [],
-      "tier_access": ["confidential"]
-    },
     "cyber_security": {
       "description": "Security review authority for threat modeling, vulnerability analysis, and mission veto power.",
       "default_persona": "cyber_security",
@@ -162,14 +123,6 @@
       "allowed_actuators": ["artifact-actuator"],
       "tier_access": ["confidential"]
     },
-    "deliverable_inbox_writer": {
-      "description": "Deliverable inbox writer (libs/core/foundation/deliverable-inbox-writer-capability.ts): libs/core assumes it only to add an operator task to the deliverable inbox (active/shared/inbox/entries.jsonl, libs/core/task/deliverable-inbox.ts addInboxEntry) on behalf of a caller with no inbox grant: the CD-10 bolt-review rejection (libs/core/mission/mission-bolt-review.ts) and the CD-11 operator hand-off / manual reminder tasks (libs/core/customer-decision/operator-handoff.ts). Its grant is the inbox and the shared lock directory; the tier guard narrows every write and mkdir to the inbox entries file, its directory and the inbox's own deliverable-inbox-<sha256>.lock files. No other active/shared/runtime/ path, no knowledge, mission, approval or surface state.",
-      "default_persona": "unknown",
-      "write_scopes": ["active/shared/inbox/", "active/shared/runtime/locks/"],
-      "scope_classes": ["operations_runtime"],
-      "allowed_actuators": [],
-      "tier_access": ["public"]
-    },
     "designer": {
       "description": "Visual identity and UX authority for interaction design and design-system stewardship.",
       "default_persona": "designer",
@@ -177,32 +130,6 @@
       "scope_classes": ["codebase_core", "design_system"],
       "allowed_actuators": ["file-actuator", "artifact-actuator"],
       "tier_access": ["public", "confidential"]
-    },
-    "dot_charter_store": {
-      "description": "Store role of dot charter documents (libs/core/dot/dot-lifecycle.ts): dots/ at repo root, knowledge/confidential/<tenant>/dots/ and knowledge/personal/dots/<owner-hash>/ — all three custodies. The lifecycle facade assumes it (withExecutionContext) at each charter read/write inside the dot_lifecycle_worker process, binding the charter's tenant for confidential custody and explicitly clearing the ambient tenant ('' tenantCleared) for personal and system custody. Its read scopes additionally carry the validation reads that ran under the former dot_lifecycle_writer (tenants/<t>.json, organization operational state, runtime projects). Deliberately not a role a dot may bind at runtime, so an active dot can never rewrite the contract it runs under. The lifecycle audit ledger, activation heartbeats, event-continuation state and inter-process locks live under other roles (dot_lifecycle_runtime_store / the worker's ambient locks grant).",
-      "default_persona": "worker",
-      "write_scopes": [
-        "dots/",
-        "knowledge/personal/dots/",
-        "knowledge/confidential/${KYBERION_TENANT}/dots/"
-      ],
-      "scope_classes": ["operations_runtime"],
-      "allowed_actuators": [],
-      "tier_access": ["public", "confidential", "personal"]
-    },
-    "dot_lifecycle_runtime_store": {
-      "description": "Store role of the dot lifecycle runtime surfaces (libs/core/dot/dot-lifecycle.ts): the lifecycle audit ledger (active/shared/runtime/dot-lifecycle-audit.jsonl, append-only), activation heartbeats (active/shared/runtime/heartbeats/) and dot event-continuation state (active/shared/runtime/dot/.../event-continuations/ + events.jsonl). Assumed inside the lifecycle facade for these writes only — charter documents go through dot_charter_store and inter-process locks stay under the dot_lifecycle_worker ambient role. The narrow.only declaration restricts writes to exactly those artifacts and their mkdir ancestors. Tenant-confidential event-continuation partitions bind the charter's tenant; personal and system partitions run with the ambient tenant explicitly cleared. Protected runtime data also requires projected knowledge-tier grants; the raw read/metadata/write/mkdir purpose ceilings forbid using those virtual grants on actual knowledge files. Confidential projection grants expand only from the bound tenant; cleared custody does not admit confidential data.",
-      "default_persona": "worker",
-      "write_scopes": [
-        "active/shared/runtime/dot-lifecycle-audit.jsonl",
-        "active/shared/runtime/heartbeats/",
-        "active/shared/runtime/dot/public/shared/",
-        "active/shared/runtime/dot/personal/shared/owners/",
-        "active/shared/runtime/dot/confidential/${KYBERION_TENANT}/"
-      ],
-      "scope_classes": ["audit", "operations_runtime"],
-      "allowed_actuators": [],
-      "tier_access": ["confidential", "personal", "public"]
     },
     "ecosystem_architect": {
       "description": "Core architecture and repo evolution authority.",
@@ -324,14 +251,6 @@
       "allowed_actuators": ["process-actuator"],
       "tier_access": ["confidential", "public"]
     },
-    "peer_responder_reader": {
-      "description": "Least-privilege reader for peer conversation auto replies. libs/core/mesh/peer-auto-reply.ts assumes it, bound to the receiving tenant, to retrieve tenant knowledge (queryTenantKnowledge) that grounds an opt-in LLM reply; it reads that tenant's profile, knowledge/confidential/<tenant>/ only, never knowledge/confidential/<tenant>/connections/ (peer secrets; security-policy.json deny_read), and writes nothing (persona worker). It is a tenant-bound reader (authority.ts TENANT_BOUND_READER_ROLES): the bound tenant must be explicit and equal the caller's active tenant when one exists.",
-      "default_persona": "worker",
-      "write_scopes": [],
-      "scope_classes": [],
-      "allowed_actuators": [],
-      "tier_access": ["confidential", "personal"]
-    },
     "perception_media_worker": {
       "description": "Shared core exact-tenant media-perception scratch worker. The perception CLI commands (see/listen/watch) normalize media into a scratch dir on the persisted scope's own tier partition — the write side is admitted by the tmp/cache default_allow, but reads on protected tiers need an authorized identity. This role gives the STT/OCR bridge stage and the --index/--search semantic-index stage of that command the same effective identity the claimed-WorkItem path already has: read+write on active/shared/tmp/{confidential,personal}/${KYBERION_TENANT}/ and active/shared/staging/{confidential,personal}/${KYBERION_TENANT}/, plus the semantic index subtree active/shared/cache/{confidential,personal}/${KYBERION_TENANT}/perception/ only (never the rest of the cache floor), bound to the scope's own tenant. It never reads knowledge/, other tenants, other partitions, or system floors.",
       "default_persona": "worker",
@@ -435,14 +354,6 @@
       "scope_classes": [],
       "allowed_actuators": [],
       "tier_access": ["public", "personal", "confidential"]
-    },
-    "workspace_graph_reader": {
-      "description": "Workspace graph read model (MSN-SURFACE-UNIFY-20261103): read-only join of missions, projects, organizations, work items, approvals, agent identities, tenant profiles and member profiles for libs/core/surface/workspace-graph.ts. It is never tenant-bound: rows are filtered afterwards by the caller's server-resolved SurfaceAuthorizationContext (viewerAdmitsNode), so a client tenant can only narrow. No write grant; persona worker.",
-      "default_persona": "worker",
-      "write_scopes": [],
-      "scope_classes": [],
-      "allowed_actuators": [],
-      "tier_access": ["personal", "confidential", "public"]
     }
   }
 }

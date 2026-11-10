@@ -80,9 +80,7 @@ const LEGACY_ROLE_PERSONA_DEFAULTS: Record<string, Persona> = {
   chronos_gateway: 'worker',
   chronos_operator: 'worker',
   chronos_localadmin: 'worker',
-  workspace_graph_reader: 'worker',
   engine_runtime_preferences_operator: 'worker',
-  peer_responder_reader: 'worker',
   service_actuator: 'worker',
   surface_runtime: 'worker',
   // context roles
@@ -731,8 +729,9 @@ interface PreparedExecutionContext {
  * from the caller, so it must be the caller's own: a caller-supplied tenant
  * never broadens access (peer-network.md). Kept as a typed constant rather
  * than governance data so the check cannot disappear with a missing or
- * malformed policy file. metrics_cap_reader is deliberately absent: its grant
- * names no tenant placeholder and its caller binds the active tenant itself.
+ * malformed policy file. S4: the former store-only tenant-bound roles are
+ * declared store grants now; their binding rule is `tenantBound` in
+ * foundation/declared-store-grant.ts, checked by the same function.
  *
  * A process that runs AS one of these roles through SYSTEM_ROLE / MISSION_ROLE
  * env is bound to its own process tenant (KYBERION_TENANT / project scope).
@@ -742,9 +741,6 @@ interface PreparedExecutionContext {
  */
 export const TENANT_BOUND_READER_ROLES: ReadonlySet<string> = new Set([
   'actuator_playground_worker',
-  ARCHIVED_MISSION_STATE_READER_ROLE,
-  'customer_channel_binding_store',
-  'peer_responder_reader',
   'perception_media_worker',
 ]);
 
@@ -983,6 +979,13 @@ export interface StoreGrantBinding {
   tenantSlug?: string;
   organizationId?: string;
   identity?: ExecutionIdentityBinding;
+  /**
+   * A disclosure grant opened inside a resource ceiling cannot write its audit
+   * record (audit persistence keeps the caller's ceiling): its facade records the
+   * disclosure with {@link recordStoreGrantDisclosure} before it enters the
+   * ceiling and passes the one-shot receipt here.
+   */
+  disclosureReceipt?: object;
 }
 
 function isThenable(value: unknown): value is PromiseLike<unknown> {
@@ -998,7 +1001,33 @@ function isThenable(value: unknown): value is PromiseLike<unknown> {
  * in the audit chain before the grant opens; when the record cannot be written
  * the disclosure does not happen (fail closed).
  */
-function recordStoreGrantDisclosure(name: string, binding: StoreGrantBinding): void {
+/** One-shot receipts of recorded disclosures: receipt -> `<grant>|<tenant>`. */
+const disclosureReceipts = new WeakMap<object, string>();
+
+function disclosureKey(name: string, binding: StoreGrantBinding): string {
+  return `${name}|${binding.tenantSlug ?? ''}`;
+}
+
+/**
+ * Record a disclosure grant's audit entry ahead of opening it, for a facade
+ * that opens the grant inside a server-built resource ceiling. Checks the
+ * issuance right first; returns a one-shot receipt for that grant and tenant.
+ */
+export function recordStoreGrantDisclosure(
+  name: string,
+  binding: Omit<StoreGrantBinding, 'disclosureReceipt'>
+): object {
+  const normalized = normalizeRoleName(name.trim());
+  if (!declaredStoreGrantDefinition(normalized)?.disclosure)
+    throw new Error(`[STORE_GRANT_UNKNOWN] '${normalized}' is not a disclosure store grant`);
+  assertStoreGrantIssuanceAllowed(normalized);
+  auditStoreGrantDisclosure(normalized, binding);
+  const receipt = Object.freeze({});
+  disclosureReceipts.set(receipt, disclosureKey(normalized, binding));
+  return receipt;
+}
+
+function auditStoreGrantDisclosure(name: string, binding: StoreGrantBinding): void {
   const caller = resolveIdentityContext();
   const tenantSlug = binding.tenantSlug || undefined;
   try {
@@ -1018,8 +1047,19 @@ function recordStoreGrantDisclosure(name: string, binding: StoreGrantBinding): v
       },
     });
   } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    // Inside an exact server-built resource ceiling the read is already bounded to the
+    // ceiling's named paths, and audit persistence keeps that ceiling (it may refuse the
+    // audit file itself), the same as tier-guard's own access audits. The disclosure then
+    // proceeds with a diagnostic; outside any ceiling an unrecorded disclosure is refused.
+    if (currentResourceAccessScope()) {
+      logger.warn(
+        `[STORE_GRANT_DISCLOSURE_UNAUDITED] the '${name}' disclosure inside an exact resource ceiling was not persisted — ${detail} | record it before entering the ceiling (recordStoreGrantDisclosure) | grant=${name}`
+      );
+      return;
+    }
     throw new Error(
-      `[STORE_GRANT_DISCLOSURE_UNAUDITED] the '${name}' disclosure could not be recorded, so it is refused — ${error instanceof Error ? error.message : String(error)} | restore audit chain persistence and retry | grant=${name}`
+      `[STORE_GRANT_DISCLOSURE_UNAUDITED] the '${name}' disclosure could not be recorded, so it is refused — ${detail} | restore audit chain persistence and retry | grant=${name}`
     );
   }
 }
@@ -1044,7 +1084,20 @@ function openStoreGrant(
       binding.identity,
       { token, definition }
     );
-    if (definition.disclosure) recordStoreGrantDisclosure(normalized, binding);
+    if (definition.disclosure) {
+      const receipt = binding.disclosureReceipt;
+      if (receipt !== undefined) {
+        // A receipt is valid once, for the grant and tenant it was recorded for.
+        const recorded = disclosureReceipts.get(receipt);
+        disclosureReceipts.delete(receipt);
+        if (recorded !== disclosureKey(normalized, binding))
+          throw new Error(
+            `[STORE_GRANT_DISCLOSURE_UNAUDITED] the '${normalized}' disclosure receipt is unknown, used or for another grant | record the disclosure with recordStoreGrantDisclosure right before opening the grant | grant=${normalized}`
+          );
+      } else {
+        auditStoreGrantDisclosure(normalized, binding);
+      }
+    }
     return { prepared, token };
   } catch (error) {
     closeDeclaredStoreGrantToken(token);

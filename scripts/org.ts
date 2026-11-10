@@ -691,7 +691,7 @@ function loadAuthorityRoleDirectory(rootDir: string): Record<string, AuthorityRo
 /**
  * Every role id that any store `role create` writes already holds: team and
  * authority roles, the role-authority map (role and authority_role values),
- * role-write-access, security-policy authority permissions, and role docs.
+ * role-write-access, security-policy authority permissions and store grants, and role docs.
  * A new role must not take one of these ids — the create would merge into
  * or overwrite that role's records.
  */
@@ -708,9 +708,14 @@ export function collectExistingRoleIds(rootDir: string): Set<string> {
     }
   }
   for (const role of Object.keys(loadRoleWriteAccess(rootDir).roles || {})) ids.add(role);
-  for (const role of Object.keys(loadSecurityPolicy(rootDir).authority_role_permissions || {})) {
+  const policy = loadSecurityPolicy(rootDir);
+  for (const role of Object.keys(policy.authority_role_permissions || {})) {
     ids.add(role);
   }
+  // S4: a declared store grant's name is never taken by a new role.
+  const storeGrants = policy.store_grants;
+  if (storeGrants && typeof storeGrants === 'object' && !Array.isArray(storeGrants))
+    for (const name of Object.keys(storeGrants)) ids.add(name);
   const docsDir = path.join(rootDir, 'knowledge', 'product', 'roles');
   if (safeExistsSync(docsDir)) {
     for (const entry of safeReaddir(docsDir)) {

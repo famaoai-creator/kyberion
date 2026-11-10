@@ -2,10 +2,10 @@ import type { ResourceAccessScope } from './resource-access-scope.js';
 import { isValidTenantSlug } from './scope.js';
 
 /**
- * Read-only role for one archived tenant mission's state
+ * Read-only store grant (S4; formerly a role) for one archived tenant mission's state
  * (`active/archive/missions/<personal|confidential>/<tenant>/<id>/mission-state.json`).
  * libs/core/mission/mission-decision-lock.ts `loadDecisionCaseMissionState`
- * assumes it, bound to the tenant and inside {@link archivedMissionStateCapability},
+ * opens it (withStoreGrant), bound to the tenant and inside {@link archivedMissionStateCapability},
  * to find a finished bolt's decision case: no mission authority, no write, no
  * other file of the mission folder or the tenant's archive.
  */

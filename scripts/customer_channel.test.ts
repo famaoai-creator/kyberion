@@ -316,8 +316,9 @@ describe('customer_channel_binding_store on the real guard', () => {
   it("writes only its bound tenant's channel-bindings.json, nothing else in the tenant home", async () => {
     const authority = await import('@agent/core/authority');
     const role = 'customer_channel_binding_store';
+    // S4: a declared store grant (explicit deny declaration), opened as its facade opens it.
     const asStore = (fn: () => unknown, tenant = TENANT) =>
-      authority.withExecutionContext(role, fn, undefined, tenant);
+      authority.withStoreGrant(role, fn, { tenantSlug: tenant });
     ensureBound(TENANT, 'C-ACME');
     // The bound tenant's bindings file is writable (rewritten unchanged).
     const current = JSON.stringify(readBindings(TENANT));
@@ -344,8 +345,11 @@ describe('customer_channel_binding_store on the real guard', () => {
       asStore(() => io.safeWriteFile(bindingsFile(OTHER), JSON.stringify({ bindings: [] })))
     ).toThrow();
     // Tenant-bound: never without a tenant.
-    expect(() => authority.withExecutionContext(role, () => undefined)).toThrow(
+    expect(() => authority.withStoreGrant(role, () => undefined)).toThrow(
       /ROLE_TENANT_SCOPE_REQUIRED/u
+    );
+    expect(() => authority.withExecutionContext(role, () => undefined, undefined, TENANT)).toThrow(
+      /ROLE_ASSUMPTION_DENIED/u
     );
   });
 });
