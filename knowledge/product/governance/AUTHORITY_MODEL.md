@@ -1,6 +1,6 @@
 ---
 title: 'Authority, Role & Persona Model (v3.0)'
-last_updated: 2026-11-10
+last_updated: 2026-11-11
 ---
 
 # Authority, Role & Persona Model (v3.0)
@@ -77,7 +77,7 @@ Kyberion 自体のメンテナンス。
 
 `MISSION_ROLE` として注入され、`security-policy.json` の `authority_role_permissions` と対応します。
 
-28 の知識ロールと Authority Role の対応は `knowledge/product/governance/role-authority-map.json` を参照してください。
+27 の Org Role（`knowledge/product/roles/` のディレクトリ）と Authority Role の対応は `knowledge/product/governance/role-authority-map.json` にあります。この表は生成物です。正本は各 Org Role のカード `knowledge/product/roles/<role>/role.json` の `default_grant`（`authority_role`、`base_role`、`execution_mode`）で、`pnpm kyberion sync org-role-grants` が表を作り直します（[Concept Model v2 D6](../architecture/decisions/2026-11-10-concept-model-v2.md)：Org Role は自分の権限を持たず、既定の Grant に写る）。カードはレジストリの項目を指すだけで、それ自体は何も許可しません。`authority_role` がレジストリに無い、`base_role` が知られていない base role のとき、`--check`（`org-role-grants` のゲート）は失敗します。手で表を編集せず、カードを直してから再生成します。
 
 - **system_roles** (6): `ecosystem_architect`, `knowledge_steward`, `solution_architect`, `integration_steward`, `reliability_engineer`, `infrastructure_sentinel`
 - **mission_roles** (5): `mission_controller`, `software_developer`, `sovereign_concierge`, `incident_commander`, `performance_engineer`
