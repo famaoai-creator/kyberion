@@ -27,9 +27,6 @@ import {
 import { listProjectTracksForProject, loadProjectTrackRecord } from './project-track-registry.js';
 import { assertManagedProjectTrackScope } from './project-track-scope.js';
 
-function kyberionEnv(name: string): string | undefined {
-  return getRegisteredEnvText(name);
-}
 import { missionSeedRecordPath, saveMissionSeedRecord } from '../mission/mission-seed-registry.js';
 import {
   createTaskSession,
@@ -421,7 +418,7 @@ export function buildManagedProjectRecord(input: ManagedProjectCreateInput): Pro
   if (
     input.tier === 'confidential' &&
     input.tenant_slug &&
-    (kyberionEnv('KYBERION_ENTITY_GOVERNANCE') === 'enforce' || !isVitestProcess())
+    (getRegisteredEnvText('KYBERION_ENTITY_GOVERNANCE') === 'enforce' || !isVitestProcess())
   ) {
     resolveTenant(input.tenant_slug, { rootDir: input.rootDir });
   }
@@ -540,7 +537,7 @@ function createManagedProjectInternal(
   const record = buildManagedProjectRecord(input);
   assertProjectObjectiveLinks(record, input.rootDir);
   const enforceEntityGovernance =
-    kyberionEnv('KYBERION_ENTITY_GOVERNANCE') === 'enforce' || !isVitestProcess();
+    getRegisteredEnvText('KYBERION_ENTITY_GOVERNANCE') === 'enforce' || !isVitestProcess();
   const organizationState =
     enforceEntityGovernance && input.organization_id
       ? loadOrganizationOperationalState(input.organization_id, {
