@@ -2460,6 +2460,14 @@
       "types": "./dist/knowledge/distill-candidate-registry.d.ts",
       "default": "./dist/knowledge/distill-candidate-registry.js"
     },
+    "./knowledge/facade-proposal-rows": {
+      "types": "./dist/knowledge/facade-proposal-rows.d.ts",
+      "default": "./dist/knowledge/facade-proposal-rows.js"
+    },
+    "./knowledge/reuse-proposals": {
+      "types": "./dist/knowledge/reuse-proposals.d.ts",
+      "default": "./dist/knowledge/reuse-proposals.js"
+    },
     "./knowledge/feedback-loop": {
       "types": "./dist/knowledge/feedback-loop.d.ts",
       "default": "./dist/knowledge/feedback-loop.js"
