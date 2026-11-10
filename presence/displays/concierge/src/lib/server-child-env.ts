@@ -13,7 +13,7 @@
  *   governedWorkerEnv(systemRole)— a governed worker under its own narrow system role
  *
  * Each clears the launcher's own identity (MISSION_ROLE, the delegated role,
- * KYBERION_PERSONA) and KYBERION_SUDO, which secure-io's allowlisted env would
+ * KYBERION_BASE_ROLE) and KYBERION_SUDO, which secure-io's allowlisted env would
  * otherwise pass through from the server process.
  */
 import { buildExecutionEnv, buildSystemRoleLaunchEnv } from '@agent/core/authority';

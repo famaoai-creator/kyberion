@@ -21,7 +21,7 @@ vi.mock('../governance/policy-engine.js', () => ({
 }));
 
 const ROOT = pathResolver.rootDir();
-const ENV = ['KYBERION_TENANT', 'KYBERION_SUDO', 'KYBERION_PERSONA', 'MISSION_ID'] as const;
+const ENV = ['KYBERION_TENANT', 'KYBERION_SUDO', 'KYBERION_BASE_ROLE', 'MISSION_ID'] as const;
 const saved: Record<string, string | undefined> = {};
 let base: string;
 let exact: string;

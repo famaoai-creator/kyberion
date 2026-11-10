@@ -3,7 +3,7 @@ title: Kyberion Intent Catalog
 category: Architecture
 tags: [intent, pipelines, mission-classes, actuators, env-integration, audit, catalog]
 importance: 9
-last_updated: 2026-04-27
+last_updated: 2026-11-10
 ---
 
 # Kyberion Intent Catalog
@@ -16,7 +16,8 @@ and environment integration points so operators know **what to ask for** and
 implementers know **what is wired**.
 
 For naming and primitives, see
-[`kyberion-canonical-concept-index.md`](kyberion-canonical-concept-index.md).
+[`organization-work-loop.md`](organization-work-loop.md) and the
+[concept registry](../governance/concept-registry.json).
 For the human-boundary contract, see [`../../../docs/USER_EXPERIENCE_CONTRACT.md`](../../../docs/USER_EXPERIENCE_CONTRACT.md).
 
 ## 2. User-Facing Vocabulary
@@ -210,8 +211,8 @@ single-tenant → multi-tenant migration recipe.
 
 Mission distillation and other structured reasoning workflows are policy-driven through:
 
-- [`wisdom-policy.json`](../governance/wisdom-policy.json)
-- [`Wisdom Policy Adapter Guide`](../governance/wisdom-policy-guide.md)
+- [`distill-policy.json`](../governance/distill-policy.json)
+- [`Distill Policy Adapter Guide`](../governance/wisdom-policy-guide.md)
 
 Use this policy surface to select profiles and adapters without hardcoding provider branches in mission scripts.
 
@@ -226,7 +227,7 @@ Use this policy surface to select profiles and adapters without hardcoding provi
 | Nemotron OpenAI-compatible API | `KYBERION_NEMOTRON_URL`, `KYBERION_NEMOTRON_KEY`, `KYBERION_NEMOTRON_MODEL`                                                             |
 | Local OpenAI-compatible API    | `KYBERION_LOCAL_LLM_URL`, `KYBERION_LOCAL_LLM_KEY`, `KYBERION_LOCAL_LLM_MODEL`                                                          |
 
-Auto-selection order for runtime reasoning remains env-driven unless `KYBERION_REASONING_BACKEND` is set. Distillation policy selection is handled separately by `wisdom-policy.json`.
+Auto-selection order for runtime reasoning remains env-driven unless `KYBERION_REASONING_BACKEND` is set. Distillation policy selection is handled separately by `distill-policy.json`.
 
 ### 4.3 Voice / audio (record → STT/TTS → profile)
 
@@ -548,7 +549,7 @@ Remaining genuine gaps:
 
 ## 12. References
 
-- [`kyberion-canonical-concept-index.md`](kyberion-canonical-concept-index.md)
+- [`organization-work-loop.md`](organization-work-loop.md) and [concept registry](../governance/concept-registry.json) — parent model and single term definitions
   — canonical primitives and vocabulary
 - [`kyberion-concept-evaluation-2026-04-26.md`](kyberion-concept-evaluation-2026-04-26.md)
   — concept evaluation and improvement plan (origin/main 2026-04-26)

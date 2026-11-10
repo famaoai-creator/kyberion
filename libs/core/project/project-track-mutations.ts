@@ -1,4 +1,4 @@
-import { getRegisteredEnvText } from '../foundation/env.js';
+import { executionAgentId } from '../governance/execution-agent-id.js';
 import { auditChain } from '../governance/audit-chain.js';
 import { safeUnlinkSync } from '../secure-io.js';
 import { loadProjectRecord, saveProjectRecord } from './project-registry.js';
@@ -59,7 +59,6 @@ export function createProjectTrackMutations(dependencies: {
   reconcile: (projectId: string) => void;
 }) {
   const ACTIVE_MISSION_STATUSES = ACTIVE_PROJECT_MISSION_STATUSES;
-  const kyberionEnv = getRegisteredEnvText;
   function createManagedProjectTrack(input: ManagedProjectTrackCreateInput): ProjectTrackRecord {
     assertProjectLifecycleOwner();
     const projectId = normalizeId(input.project_id, 'project_id');
@@ -126,7 +125,7 @@ export function createProjectTrackMutations(dependencies: {
       });
       dependencies.reconcile(projectId);
       auditChain.record({
-        agentId: kyberionEnv('KYBERION_PERSONA') || 'project_controller',
+        agentId: executionAgentId('project_controller'),
         action: 'project.track_created',
         operation: `create:${trackId}`,
         result: 'completed',
@@ -251,7 +250,7 @@ export function createProjectTrackMutations(dependencies: {
       }
       dependencies.reconcile(current.project_id);
       auditChain.record({
-        agentId: kyberionEnv('KYBERION_PERSONA') || 'project_controller',
+        agentId: executionAgentId('project_controller'),
         action: 'project.track_updated',
         operation: `update:${current.track_id}`,
         result: 'completed',

@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import {
   buildScopedIndex,
   DEFAULT_SCOPE,
@@ -724,7 +725,7 @@ function resolvedSurfaceIntent(context: {
     surfaceText?: string;
     query?: string;
     threadContext?: string;
-    scope?: { tier?: 'personal' | 'confidential' | 'public'; tenant_slug?: string };
+    scope?: { tier?: StorageDataTier; tenant_slug?: string };
   };
   structuredQuery?: string;
   resolvedIntent?: ReturnType<typeof resolveSurfaceIntent>;

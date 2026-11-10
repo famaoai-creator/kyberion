@@ -22,7 +22,7 @@ meeting-notepad / sketch-input と同型の **127.0.0.1 限定ローカルポー
 ## 使い方 / Usage
 
 ```bash
-KYBERION_PERSONA=sovereign node_modules/.bin/tsx scripts/memory-capture/server.ts \
+KYBERION_BASE_ROLE=sovereign node_modules/.bin/tsx scripts/memory-capture/server.ts \
   [--out active/shared/tmp/memory-capture] \
   [--instruction "このメモを作業記憶に整理して"] \
   [--artifact-ref artifact://… ] [--tier public|confidential|personal] [--tenant <slug>] \

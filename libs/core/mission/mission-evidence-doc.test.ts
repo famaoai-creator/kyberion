@@ -24,7 +24,7 @@ function isSampleDoc(d: unknown): d is SampleDoc {
 
 describe('MissionEvidenceDoc', () => {
   beforeEach(() => {
-    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     process.env.MISSION_ROLE = 'mission_controller';
     process.env.MISSION_ID = FIX_MISSION;
     fs.mkdirSync(path.join(MISSION_DIR, 'evidence'), { recursive: true });
@@ -33,7 +33,7 @@ describe('MissionEvidenceDoc', () => {
       JSON.stringify({
         mission_id: FIX_MISSION,
         tier: 'confidential',
-        assigned_persona: 'ecosystem_architect',
+        org_role: 'ecosystem_architect',
       })
     );
   });

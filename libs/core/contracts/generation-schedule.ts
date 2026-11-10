@@ -9,13 +9,14 @@
 /**
  * Schedule contract for recurring image, video, music, or workflow generation jobs.
  */
+import type { StorageDataTier } from '../storage-layout.js';
 export interface GenerationSchedule {
   kind: 'generation-schedule';
   schedule_id: string;
   enabled: boolean;
   scope?: {
     scope_kind: 'system' | 'tenant' | 'organization' | 'project' | 'mission' | 'task' | 'session';
-    tier: 'public' | 'confidential' | 'personal';
+    tier: StorageDataTier;
     tenant_slug?: string;
     organization_id?: string;
     project_id?: string;

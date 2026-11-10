@@ -46,7 +46,7 @@ const TRACK_PROJECT_ID = 'PRJ-PMC-TRACK';
 const BOOTSTRAP_PROJECT_ID = 'PRJ-PMC-TEST-BOOT';
 const CALLBACK_ROOT = pathResolver.sharedTmp('project-management-callback-test');
 const PERSISTED_SCOPE_ENV_PATH = pathResolver.sharedTmp('project-management-worker-scope.env');
-const ORIGINAL_PERSONA = process.env.KYBERION_PERSONA;
+const ORIGINAL_PERSONA = process.env.KYBERION_BASE_ROLE;
 const ORIGINAL_ROLE = process.env.MISSION_ROLE;
 const ORIGINAL_TENANT = process.env.KYBERION_TENANT;
 const ORIGINAL_PROJECT_ID = process.env.KYBERION_PROJECT_ID;
@@ -159,20 +159,20 @@ describe('project-management facade', () => {
   beforeEach(() => {
     setWorkCoordinationNamespace('project-management-facade-test');
     clearWorkCoordinationStore();
-    process.env.KYBERION_PERSONA = 'sovereign';
+    process.env.KYBERION_BASE_ROLE = 'sovereign';
     process.env.MISSION_ROLE = 'sovereign';
     process.env.KYBERION_TENANT = 'tenant-pmc-test';
     cleanup();
   });
 
   afterEach(() => {
-    process.env.KYBERION_PERSONA = 'sovereign';
+    process.env.KYBERION_BASE_ROLE = 'sovereign';
     process.env.MISSION_ROLE = 'sovereign';
     process.env.KYBERION_TENANT = 'tenant-pmc-test';
     clearWorkCoordinationStore();
     clearWorkCoordinationNamespace();
     cleanup();
-    process.env.KYBERION_PERSONA = ORIGINAL_PERSONA;
+    process.env.KYBERION_BASE_ROLE = ORIGINAL_PERSONA;
     process.env.MISSION_ROLE = ORIGINAL_ROLE;
     if (ORIGINAL_TENANT === undefined) delete process.env.KYBERION_TENANT;
     else process.env.KYBERION_TENANT = ORIGINAL_TENANT;
@@ -269,7 +269,7 @@ describe('project-management facade', () => {
       status: 'active',
       execution_mode: 'local',
       priority: 1,
-      assigned_persona: 'worker',
+      org_role: 'worker',
       confidence_score: 1,
       relationships: { project: { project_id: PROJECT_ID } },
       git: {
@@ -285,7 +285,7 @@ describe('project-management facade', () => {
     expect(() => updateManagedProject(PROJECT_ID, { status: 'archived' })).toThrow(
       'active missions'
     );
-    process.env.KYBERION_PERSONA = 'worker';
+    process.env.KYBERION_BASE_ROLE = 'worker';
     process.env.MISSION_ROLE = 'worker';
     process.env.KYBERION_PROJECT_ID = PROJECT_ID;
     process.env.MISSION_ID = mission.mission_id;
@@ -570,7 +570,7 @@ describe('project-management facade', () => {
       tenant_slug: 'tenant-pmc-test',
       execution_mode: 'local',
       priority: 1,
-      assigned_persona: 'worker',
+      org_role: 'worker',
       confidence_score: 1,
       relationships: { project: { project_id: ownProject.project_id } },
       git: {
@@ -582,7 +582,7 @@ describe('project-management facade', () => {
       history: [{ ts: new Date().toISOString(), event: 'CREATE', note: 'fixture' }],
     };
     await saveState(mission.mission_id, mission);
-    process.env.KYBERION_PERSONA = 'worker';
+    process.env.KYBERION_BASE_ROLE = 'worker';
     process.env.MISSION_ROLE = 'worker';
     process.env.KYBERION_TENANT = 'tenant-pmc-test';
     process.env.KYBERION_PROJECT_ID = ownProject.project_id;
@@ -619,7 +619,7 @@ describe('project-management facade', () => {
       tenant_slug: 'tenant-pmc-test',
       execution_mode: 'local',
       priority: 1,
-      assigned_persona: 'worker',
+      org_role: 'worker',
       confidence_score: 1,
       relationships: { project: { project_id: project.project_id } },
       git: {
@@ -665,7 +665,7 @@ describe('project-management facade', () => {
       tier: 'personal',
       status: 'active',
     });
-    process.env.KYBERION_PERSONA = 'worker';
+    process.env.KYBERION_BASE_ROLE = 'worker';
     process.env.MISSION_ROLE = 'worker';
     process.env.KYBERION_PROJECT_ID = project.project_id;
 
@@ -815,7 +815,7 @@ describe('project-management facade', () => {
       tenant_slug: 'tenant-pmc-test',
       execution_mode: 'local',
       priority: 1,
-      assigned_persona: 'worker',
+      org_role: 'worker',
       confidence_score: 1,
       relationships: { project: { project_id: project.project_id } },
       git: {
@@ -891,7 +891,7 @@ describe('project-management facade', () => {
       tenant_slug: 'other-tenant',
       execution_mode: 'local',
       priority: 1,
-      assigned_persona: 'worker',
+      org_role: 'worker',
       confidence_score: 1,
       relationships: {
         project: {
@@ -937,7 +937,7 @@ describe('project-management facade', () => {
       tenant_slug: 'tenant-pmc-test',
       status: 'active',
     });
-    process.env.KYBERION_PERSONA = 'worker';
+    process.env.KYBERION_BASE_ROLE = 'worker';
     process.env.MISSION_ROLE = 'worker';
     process.env.KYBERION_PROJECT_ID = 'PRJ-PMC-OTHER-PROJECT';
 
@@ -1000,16 +1000,16 @@ describe('project-management facade', () => {
         })
       );
 
-      process.env.KYBERION_PERSONA = 'worker';
+      process.env.KYBERION_BASE_ROLE = 'worker';
       process.env.KYBERION_PROJECT_ID = projectId;
       expect(() =>
         reconcileProjectOperationalState(projectId, { includeCrossScopeDiagnostics: true })
       ).toThrow(/requires the sovereign persona/);
     } finally {
-      const previousPersona = process.env.KYBERION_PERSONA;
+      const previousPersona = process.env.KYBERION_BASE_ROLE;
       const previousRole = process.env.MISSION_ROLE;
       const previousTenant = process.env.KYBERION_TENANT;
-      process.env.KYBERION_PERSONA = 'sovereign';
+      process.env.KYBERION_BASE_ROLE = 'sovereign';
       process.env.MISSION_ROLE = 'sovereign';
       process.env.KYBERION_TENANT = 'tenant-pmc-test';
       try {
@@ -1017,8 +1017,8 @@ describe('project-management facade', () => {
           safeRmSync(workspace, { recursive: true, force: true });
         }
       } finally {
-        if (previousPersona === undefined) delete process.env.KYBERION_PERSONA;
-        else process.env.KYBERION_PERSONA = previousPersona;
+        if (previousPersona === undefined) delete process.env.KYBERION_BASE_ROLE;
+        else process.env.KYBERION_BASE_ROLE = previousPersona;
         if (previousRole === undefined) delete process.env.MISSION_ROLE;
         else process.env.MISSION_ROLE = previousRole;
         if (previousTenant === undefined) delete process.env.KYBERION_TENANT;

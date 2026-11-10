@@ -4,7 +4,7 @@ category: Architecture
 tags: [architecture, co-session, multi-provider, coordination, peer-messaging, work-coordination]
 importance: 8
 author: Ecosystem Architect
-last_updated: 2026-10-18
+last_updated: 2026-11-10
 ---
 
 # Co-Session Coordination
@@ -61,7 +61,7 @@ co-session はその coordination の **same-checkout 面**である。
 [`multi-provider-coexecution-contract.md`](../governance/multi-provider-coexecution-contract.md) を継承する。
 
 1. **読み取り**は全参加者並行可。
-2. **mission-optional の書き込み調整**には path lease を使う（短 TTL、heartbeat 切れで解放可）。これは協調用の目印であり、認可や強制的な permission enforcement ではない。WorkItem claim が必要な作業では claim が書き込み権限の正本となる。**例外（実効化）**: hook 対応 CLI（Claude Code・Gemini CLI）では PreToolUse / BeforeTool hook が他 participant の active lease への書き込みを deny する。その CLI 内では lease は実効的な排他として働くが、store 読み取り不能時は fail-open で advisory に戻る。hook を持たない CLI では従来どおり advisory のみ。lease の read-check-write 自体は `withLockSync('co-session-lease:<session>:<path_hash>')` でプロセス間直列化される。
+2. **mission-optional の書き込み調整**には path lease を使う（短 TTL、heartbeat 切れで解放可）。これは協調用の目印であり、認可や強制的な permission enforcement ではない。WorkItem claim が必要な作業では claim が書き込み権限の正本となる。**例外（実効化）**: hook 対応 CLI（Claude Code・Gemini CLI）では PreToolUse / BeforeTool hook が他 participant の active lease への書き込みを deny する。その CLI 内では lease は実効的な排他として働くが、store 読み取り不能時は fail-open で advisory に戻る。hook を持たない CLI では従来どおり advisory のみ。lease の read-check-write 自体は lease-backend の `withLockSync('co-session-lease:<session>:<path_hash>')` でプロセス間直列化される。保持者・期限・世代（`fence`）は `libs/core/lease/lease-terms.ts` が決め（`resource_kind: path`、W3）、co-session はその値を lease ファイルに写すだけ。同じ保持者の再取得は更新（`lease_id` と `fence` を保つ）、別の保持者は次の `fence` を得る。W3 より前のファイルは `fence` を持たず、世代 0 として読む。取得・更新・解放・期限切れは監査チェーンにも `lease.acquire|renew|release|expire` として残る。
 3. **`.git` / repo config** は co-session では触らない。commit が要る場合は mission owner へ昇格。
 4. **一時ファイル**は `active/shared/tmp/` または session 配下のみ。
 5. **peer / Mesh の禁止を継承**: co-session → peer の bridge は mission を作らない・承認しない（Mesh ADR）。
@@ -75,7 +75,7 @@ active/shared/runtime/co-sessions/
     session.json              # goal, status, created_at, checkout_root
     presence.jsonl            # heartbeat
     blackboard.md             # 共有メモ
-    leases/{path_hash}.json   # path 単位リース
+    leases/{path_hash}.json   # path 単位リース（fence 付き、W3）
     handoffs.jsonl            # 依頼・完了通知
 active/shared/observability/co-sessions/
   {session_id}/events.jsonl   # 監査イベント
@@ -159,7 +159,7 @@ participant_id は `<provider>-<session_id>`（hook payload の `session_id`）�
 
 ## 8. 実装マップ
 
-- Core: `libs/core/workforce/co-session.ts`（lease 直列化は `foundation/lock-utils.ts` の `withLockSync`）
+- Core: `libs/core/workforce/co-session.ts`（lease 直列化は lease-backend seam の `withLockSync`、期限と保持者は `libs/core/lease/lease-terms.ts`）
 - Hook bridge core: `libs/core/provider/co-session-hook.ts`
 - Hook entries: `scripts/claude_code_hook.ts`（Claude: 同 `libs/core/provider/claude-code-hook.ts`）、`scripts/gemini_cli_hook.ts`（Gemini）、`scripts/codex_cli_hook.ts`（Codex）
 - 配線: `.claude/settings.json`（tracked・直接配線）、`pnpm generate:provider-hooks` → `.gemini/settings.json` / `.codex/hooks.json`（gitignore・生成物）

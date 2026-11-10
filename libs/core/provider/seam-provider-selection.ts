@@ -24,6 +24,7 @@
  */
 
 import { auditChain } from '../governance/audit-chain.js';
+import { baseRoleEnvText } from '../foundation/base-role-env.js';
 import {
   loadSeamProviderPin,
   pinSeamProviderDecision,
@@ -349,11 +350,7 @@ function scoreCandidate(
 }
 
 function actorId(): string {
-  return (
-    getRegisteredEnvText('KYBERION_PERSONA') ||
-    getRegisteredEnvText('MISSION_ROLE') ||
-    'seam-provider-selection'
-  );
+  return baseRoleEnvText() || getRegisteredEnvText('MISSION_ROLE') || 'seam-provider-selection';
 }
 
 function recordDecision(decision: SeamProviderDecision): void {

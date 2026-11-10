@@ -809,7 +809,7 @@ export function renderMissionContextPack(pack: MissionContextPack): string {
     `- Pack ID: ${pack.context_pack_id}`,
     `- Scope: mission=${pack.scope.mission_id}; tier=${pack.scope.tier}${pack.scope.tenant_slug ? `; tenant=${pack.scope.tenant_slug}` : ''}${pack.scope.organization_id ? `; organization=${pack.scope.organization_id}` : ''}${pack.scope.project_id ? `; project=${pack.scope.project_id}` : ''}${pack.scope.task_session_id ? `; task_session=${pack.scope.task_session_id}` : ''}${pack.scope.work_item_id ? `; work_item=${pack.scope.work_item_id}` : ''}`,
     `- Recipient: ${pack.recipient.kind}${pack.recipient.team_role ? ` / role=${pack.recipient.team_role}` : ''}${pack.recipient.agent_id ? ` / agent=${pack.recipient.agent_id}` : ''}${pack.recipient.authority_role ? ` / authority=${pack.recipient.authority_role}` : ''}`,
-    `- Mission: ${pack.mission.mission_id} | ${pack.mission.status}${pack.mission.mission_type ? ` | type=${pack.mission.mission_type}` : ''}${pack.mission.assigned_persona ? ` | persona=${pack.mission.assigned_persona}` : ''}`,
+    `- Mission: ${pack.mission.mission_id} | ${pack.mission.status}${pack.mission.mission_type ? ` | type=${pack.mission.mission_type}` : ''}${pack.mission.org_role ? ` | org_role=${pack.mission.org_role}` : ''}`,
   ];
 
   if (pack.organization_intent) {
@@ -1086,7 +1086,7 @@ export function buildMissionContextPack(input: BuildMissionContextPackInput): Mi
     mission_type: input.missionState.mission_type,
     tier: missionTier,
     status: input.missionState.status,
-    assigned_persona: input.missionState.assigned_persona,
+    org_role: input.missionState.org_role,
     ...(input.missionState.tenant_id ? { tenant_id: input.missionState.tenant_id } : {}),
     ...(input.missionState.tenant_slug ? { tenant_slug: input.missionState.tenant_slug } : {}),
     ...(input.missionState.vision_ref ? { vision_ref: input.missionState.vision_ref } : {}),
@@ -1398,7 +1398,7 @@ export async function resolveMissionContextPack(
         missionId: input.missionId,
         missionType: missionState.mission_type,
         tier,
-        assignedPersona: missionState.assigned_persona,
+        assignedPersona: missionState.org_role,
         ...(missionState.tenant_slug ? { tenantSlug: missionState.tenant_slug } : {}),
       })
     : null;

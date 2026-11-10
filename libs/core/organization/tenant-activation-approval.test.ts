@@ -422,7 +422,7 @@ describe('exact human tenant activation approval', () => {
         tenant_slug: companyTenant,
         organization_id: companyTenant,
         tier: 'confidential',
-        nhi_ids: ['kyberion://agent/org-test/ceo-operator'],
+        nhi_ids: ['kyberion://agent/org-test/org-test/ceo-operator'],
         created_at: new Date(Date.now() - 1000).toISOString(),
         results,
       });

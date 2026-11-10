@@ -15,7 +15,7 @@ import {
   type TenantRegistryPathOptions,
 } from './tenant-registry.js';
 import { pathResolver } from '../path-resolver.js';
-import { withExecutionContext } from '../authority.js';
+import { withStoreGrant } from '../authority.js';
 import {
   safeExistsSync,
   safeMkdir,
@@ -234,7 +234,7 @@ export function renameTenantWithPlan(input: TenantRenameInput): TenantRenameResu
   const { fromSlug, toSlug } = input;
   const current = assertRenamePreconditions(input, rootDir);
   const apply = Boolean(input.apply);
-  const actorId = input.actor || readConfiguredActorIdentity().persona || 'operator';
+  const actorId = input.actor || readConfiguredActorIdentity().baseRole || 'operator';
   const renameOrg = input.renameOrganization !== false;
 
   // Both audit entries this rename writes are checked before anything moves:
@@ -350,21 +350,19 @@ export function renameTenantWithPlan(input: TenantRenameInput): TenantRenameResu
       // partition: copy into the new slug's partition, then clear the old one.
       withAuditChainLock(() => {
         const files = safeReaddir(fromMirror).sort();
-        withExecutionContext(
+        withStoreGrant(
           'audit_mirror_writer',
           () => {
             safeMkdir(toMirror, { recursive: true });
             for (const file of files)
               safeWriteFile(path.join(toMirror, file), safeReadFile(path.join(fromMirror, file)));
           },
-          undefined,
-          toSlug
+          { tenantSlug: toSlug }
         );
-        withExecutionContext(
+        withStoreGrant(
           'audit_mirror_writer',
           () => safeRmSync(fromMirror, { recursive: true, force: true }),
-          undefined,
-          fromSlug
+          { tenantSlug: fromSlug }
         );
         mirrorMovedId = auditChain.recordHeld(mirrorMovedEntry).id;
       });

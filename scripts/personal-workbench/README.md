@@ -8,7 +8,7 @@
 保存データは既定で `personal` tier です。`/capture` は常に `proposed` handoff のみを書き、知識キュー投入を自動では行いません。
 
 ```bash
-KYBERION_PERSONA=sovereign KYBERION_TENANT=<tenant> \
+KYBERION_BASE_ROLE=sovereign KYBERION_TENANT=<tenant> \
   node_modules/.bin/tsx scripts/personal-workbench/server.ts \
   --out active/shared/tmp/personal-workbench
 ```

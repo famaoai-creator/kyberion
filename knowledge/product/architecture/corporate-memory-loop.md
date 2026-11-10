@@ -4,7 +4,7 @@ category: Architecture
 tags: [architecture, memory, distillation, sop, patterns, learning]
 importance: 9
 author: Ecosystem Architect
-last_updated: 2026-10-20
+last_updated: 2026-11-10
 kind: evergreen
 ---
 
@@ -194,6 +194,10 @@ Changes to high-impact procedures or organizational rules should be reviewable a
 ### 7.6 Preserve scope, provenance and authority
 
 Feedback binds to trusted work context, not scope claimed by a model or correction payload. Preserve tier, tenant, organization, project, mission/task and owner/audience restrictions where applicable, together with source feedback/correlation and evidence. An aggregated candidate may link several work items; it must not pretend they were one execution or combine different scopes.
+
+Scope is captured, not inferred (D8). Every learning is one `MemoryCandidate` with a `kind` (lesson, heuristic, process_improvement, hint, execution_feedback, organization_learning, advisory, asset_promotion) and a `lane`, both written at capture. Registration rejects a confidential or personal candidate that has no scope envelope (`MEMORY_SCOPE_REQUIRED`), so a producer passes the tenant (or the personal owner) it ran in; a producer that has none skips the capture and says so. Rows written before `kind`/`lane` existed gain them on load; their scope is never inferred.
+
+One queue, one promotion path. Organization learning candidates (`pnpm organization learning`), process-improvement proposals (`pnpm mission improvements`), background-review patch proposals (`pnpm background-review`), execution-feedback proposals (`pnpm kyberion improvements`), learning-intake reuse plans (`pnpm kyberion learning prepare`), service procedure candidates and mission-seed reuse proposals (both decided on the Concierge reuse-proposal panel, `decided_via: concierge`) are queue rows too. A completed browser-extension run is a plain personal learning of the local owner (not captured without one). Their facade decides them (the row's `origin` names it, and `origin.decided_via` names the command), and the generic promotion workflow refuses them (`MEMORY_PROMOTION_OWNED`). A session background-review proposal lives in its owner's personal partition and is addressed with its exact scope. A `DistillCandidateRecord` is written only as the receipt of a promotion (`tests/distill-candidate-receipt-boundary.test.ts`; no producer writes a proposed one any more). Their old stores are read-only, with a one-release `migrate` (`pnpm kyberion learning prepare --migrate` for the reuse proposals) that imports pending items with their real scope and reports the ones it cannot scope. Concierge and Presence Studio list the queue-row proposals for the viewer resolved server-side, each with how it is decided, and the old records after them as history. Runtime hints live in one hint store partitioned by scope (`active/shared/runtime/hints/<tier>/<tenant|shared>/`); every `HINTS.md` is a view generated from it — the product view from public hints only, a tenant view from that tenant's hints only.
 
 A legacy unscoped candidate is not silently adopted into the current organization. If the publisher cannot preserve a narrower scope, keep the proposal review-only; never drop fields to make promotion succeed. The scoped SOP handoff preserves confidential tenant, organization and project scope through authenticated review, exact publication and scoped retrieval. Owner/audience/mission/task restrictions and other unsupported scope fields remain review-only. A success does not grant execution authority.
 

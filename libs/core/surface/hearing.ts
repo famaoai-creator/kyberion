@@ -1,3 +1,4 @@
+import type { MemberRole } from '../organization/member-registry.js';
 import type { IntentResolutionContract } from '../intent/intent-resolution-contract-parser.js';
 import {
   findHearingScenario,
@@ -106,7 +107,7 @@ export interface HearingDecidedBy {
   kind: 'human';
   id: string;
   display_name?: string;
-  role: 'owner' | 'approver' | 'viewer';
+  role: Extract<MemberRole, 'owner' | 'approver' | 'viewer'>;
 }
 
 /** HT-02: coarse status of the model-generated canvas for the *current*

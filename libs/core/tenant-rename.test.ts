@@ -18,6 +18,7 @@ import {
 } from './organization/tenant-rename.js';
 import { auditChain, holdsAuditChainLock } from './governance/audit-chain.js';
 import { withExecutionContext } from './authority.js';
+import { asRoleOrGrant } from './testing/role-or-store-grant.js';
 
 const ROOT = pathResolver.rootDir();
 const FROM = 'zz-rename-src';
@@ -30,7 +31,7 @@ function mirrorDir(slug: string): string {
 
 function seedMirror(slug: string): string {
   const file = path.join(mirrorDir(slug), 'audit-2026-07-01.jsonl');
-  withExecutionContext(
+  asRoleOrGrant(
     'audit_mirror_writer',
     () => safeWriteFile(file, '', { mkdir: true }),
     undefined,
@@ -65,9 +66,9 @@ describe('renameTenant', () => {
   let savedRole: string | undefined;
 
   beforeEach(() => {
-    savedPersona = process.env.KYBERION_PERSONA;
+    savedPersona = process.env.KYBERION_BASE_ROLE;
     savedRole = process.env.MISSION_ROLE;
-    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     process.env.MISSION_ROLE = 'mission_controller';
     removeFixtures();
     mutateTenant({ verb: 'create', slug: FROM, displayName: 'Old Trade Name', apply: true });
@@ -82,8 +83,8 @@ describe('renameTenant', () => {
   afterEach(() => {
     vi.restoreAllMocks();
     removeFixtures();
-    if (savedPersona === undefined) delete process.env.KYBERION_PERSONA;
-    else process.env.KYBERION_PERSONA = savedPersona;
+    if (savedPersona === undefined) delete process.env.KYBERION_BASE_ROLE;
+    else process.env.KYBERION_BASE_ROLE = savedPersona;
     if (savedRole === undefined) delete process.env.MISSION_ROLE;
     else process.env.MISSION_ROLE = savedRole;
   });

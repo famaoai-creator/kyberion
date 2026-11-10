@@ -6,11 +6,10 @@ import { resolveActiveProfileRoot } from '../authn/profile-root.js';
 import { readPersonalAgentIdentityStrictAtPath as loadPersonalAgentIdentityAtPath } from '../authn/personal-identity-state.js';
 import {
   getAgentIdentity,
-  deriveAgentNhiId,
   captureRuntimeBindingReference,
   type RuntimeBindingReference,
 } from '../agent/agent-identity.js';
-import { parseNhiId } from '../contracts/nhi-id.js';
+import { buildTenantlessNhiId, NHI_SLUG_PATTERN, parseNhiId } from '../contracts/nhi-id.js';
 import {
   resolvePersonaIdentity,
   personaIdentityBindingsSchema,
@@ -44,7 +43,7 @@ export function normalizeOnboardingAgentSlug(agentId: string): string {
 export function onboardingAgentIdentityParameters(
   agentId: string,
   accountableId: string
-): { slug: string; organizationId?: string } {
+): { slug: string; tenantSlug?: string; organizationId?: string; personScope: true } {
   const previous = loadPersonalAgentIdentityAtPath(
     path.join(resolveActiveProfileRoot(), 'agent-identity.json')
   );
@@ -59,15 +58,25 @@ export function onboardingAgentIdentityParameters(
       throw new Error('Explicitly clear persona bindings before changing the persona handle.');
   }
   if (previous?.agent_id === agentId && typeof previous.nhi_id === 'string') {
-    const parsed = parseNhiId(previous.nhi_id);
     const registered = getAgentIdentity(previous.nhi_id);
+    // Read the recorded (possibly migrated) id, never the stale profile link.
+    const parsed = registered ? parseNhiId(registered.nhi_id) : null;
     if (parsed && registered) {
       if (registered.accountable_human_id !== accountableId)
         throw new Error('Installed agent accountability mismatch.');
-      return { slug: parsed.slug, organizationId: parsed.organization_id };
+      // Same tenant/org the record has (or migrates to), so it is found again.
+      const tenantSlug = registered.affiliation.tenant_slug;
+      const org = registered.affiliation.organization_id;
+      return {
+        slug: parsed.slug,
+        ...(tenantSlug ? { tenantSlug } : {}),
+        ...(tenantSlug && org && org !== '_' && org !== 'default' ? { organizationId: org } : {}),
+        personScope: true,
+      };
     }
   }
-  return { slug: normalizeOnboardingAgentSlug(agentId) };
+  // Personal onboarding never inherits the ambient tenant (person scope).
+  return { slug: normalizeOnboardingAgentSlug(agentId), personScope: true };
 }
 
 export type InstalledOnboardingRuntime =
@@ -169,7 +178,10 @@ export function inspectInstalledOnboardingRuntime(scope: CharterScope): Installe
             : typeof profile.agent_id === 'string' && parseNhiId(profile.agent_id)
               ? profile.agent_id
               : typeof profile.agent_id === 'string'
-                ? deriveAgentNhiId(profile.agent_id)
+                ? // Person scope: tenantless, never the ambient tenant.
+                  NHI_SLUG_PATTERN.test(profile.agent_id)
+                  ? buildTenantlessNhiId(profile.agent_id)
+                  : null
                 : null;
       const agent = profileId ? getAgentIdentity(profileId) : null;
       if (!agent || !['active', 'provisioned'].includes(agent.lifecycle_status))

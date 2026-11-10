@@ -42,7 +42,7 @@ function makeMissionState(): MissionState {
       },
     },
     priority: 1,
-    assigned_persona: 'worker',
+    org_role: 'worker',
     confidence_score: 1,
     git: {
       branch: 'mission/recovery-test',
@@ -56,7 +56,7 @@ function makeMissionState(): MissionState {
 
 beforeEach(() => {
   process.env.MISSION_ROLE = 'mission_controller';
-  process.env.KYBERION_PERSONA = 'worker';
+  process.env.KYBERION_BASE_ROLE = 'worker';
   setWorkCoordinationNamespace('mission-task-recovery-test');
   clearWorkCoordinationStore();
   if (!safeExistsSync(missionPath)) safeMkdir(missionPath, { recursive: true });

@@ -69,7 +69,7 @@ beforeAll(async () => {
   );
   bootstrap.safeWriteFile(path.join(root, 'package.json'), '{}');
   vi.stubEnv('KYBERION_ROOT', root);
-  vi.stubEnv('KYBERION_PERSONA', 'sovereign');
+  vi.stubEnv('KYBERION_BASE_ROLE', 'sovereign');
   vi.stubEnv('MISSION_ROLE', 'mission_controller');
   vi.stubEnv('KYBERION_TENANT', 'synthetic-latency');
   // Model the existing signed-in human surface port, not an agent decision or a shipped server.
@@ -127,7 +127,7 @@ function fixture(judged = true) {
   const proposal = proposals.normalizeDotProposal({
     title: 'Bounded synthetic repair',
     objective: 'Preserve all original goals',
-    work_shape: 'pipeline',
+    execution_shape: 'pipeline',
     pipeline_ref: latency.SYNTHETIC_LATENCY_PIPELINE_REF,
   });
   const binding = {

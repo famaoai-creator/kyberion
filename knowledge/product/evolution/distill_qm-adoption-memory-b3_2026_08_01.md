@@ -6,6 +6,7 @@ importance: 6
 source_mission: QM-ADOPTION-MEMORY-B3
 author: Kyberion Wisdom Distiller
 last_updated: 2026-08-01
+doc_status: historical
 ---
 
 # Posture-Driven Memory Capture with Adversarial Verification

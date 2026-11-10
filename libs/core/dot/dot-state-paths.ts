@@ -117,7 +117,7 @@ export function migrateLegacyDotState(
   root = pathResolver.rootDir()
 ): { moved: string[]; destination: string } {
   const actor = resolvePolicyIdentityContext();
-  if (!['sovereign', 'ecosystem_architect'].includes(actor.persona))
+  if (!['sovereign', 'ecosystem_architect'].includes(actor.baseRole))
     throw new Error(
       '[DOT_STATE_MIGRATION_AUTHORITY] legacy classification requires an authorized operator'
     );
@@ -306,7 +306,7 @@ export function migrateLegacyDotState(
         source,
         moved: entries,
         ...(migrateTenantEvents ? { tenant_events_source: tenantEventSource } : {}),
-        actor: actor.role ?? actor.persona,
+        actor: actor.role ?? actor.baseRole,
         migrated_at: new Date().toISOString(),
       });
       for (const plan of plans) {

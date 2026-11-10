@@ -37,7 +37,7 @@ const charter = {
   scope: { ...scope, tier: 'confidential' },
   authority: {
     allowed_pipelines: [INFORMATION_ASSET_WORK_PIPELINE],
-    allowed_work_shapes: ['pipeline', 'mission'],
+    allowed_execution_shapes: ['pipeline', 'mission'],
     mission_mandate_refs: ['fixture-mandate'],
   },
 } as DotCharter;
@@ -327,7 +327,7 @@ describe('information intake work', () => {
       recipeIds: ['jira.approval_pending'],
       missionAdmission: admission,
     })[0];
-    expect(proposal.work_shape).toBe('mission');
+    expect(proposal.execution_shape).toBe('mission');
     expect(proposal.mission_admission).toEqual(admission);
     const item = {
       ...f.item(),

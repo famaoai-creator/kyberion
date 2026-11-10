@@ -1,7 +1,7 @@
 /** Request selection narrows an authenticated viewer; registry records bind its parents. */
 import type { OsKnowledgeTier } from '../governance/cloudflare-os-control-plane.js';
 import { isValidTenantSlug } from '../entity-scope.js';
-import { withExecutionContext } from '../authority.js';
+import { withStoreGrant } from '../authority.js';
 import { safeReaddir } from '../secure-io.js';
 import { tenantProfileDir } from '../organization/tenant-registry.js';
 import { readTenantProfile } from '../organization/tenant-registry.js';
@@ -63,14 +63,13 @@ const defaults: WorkspaceScopeDependencies = {
   // Registry membership is infrastructure metadata, not a personal-tier grant
   // to the viewer. Enter only after the requested tenant passed viewer narrowing.
   readTenant: (slug) =>
-    withExecutionContext(
+    withStoreGrant(
       'workspace_tenant_registry_reader',
       () => {
         const profile = readTenantProfile(slug);
         return profile ? { tenant_slug: profile.tenant_slug } : null;
       },
-      'worker',
-      slug
+      { tenantSlug: slug }
     ),
   readOrganization: loadOrganizationOperationalState,
   readProject: loadProjectRecord,
@@ -83,13 +82,10 @@ export function listWorkspaceTenantOptions(
 ): { slug: string; displayName: string }[] {
   const candidates =
     viewer.tenantSlugs === 'all'
-      ? withExecutionContext(
-          'workspace_tenant_registry_index_reader',
-          () =>
-            safeReaddir(tenantProfileDir())
-              .filter((name) => name.endsWith('.json'))
-              .map((name) => name.slice(0, -5)),
-          'worker'
+      ? withStoreGrant('workspace_tenant_registry_index_reader', () =>
+          safeReaddir(tenantProfileDir())
+            .filter((name) => name.endsWith('.json'))
+            .map((name) => name.slice(0, -5))
         )
       : viewer.tenantSlugs;
   return [...new Set(candidates)]

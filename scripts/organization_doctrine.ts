@@ -101,6 +101,7 @@ export function issueOrganizationDoctrine(args: string[], print: Print): void {
   const candidate = createMemoryPromotionCandidate({
     sourceType: 'authored',
     sourceRef,
+    kind: 'organization_learning',
     knowledgeDomain: 'organization',
     proposedMemoryKind: 'sop',
     summary: doctrineSummary(body),

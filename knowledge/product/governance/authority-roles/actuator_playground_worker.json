@@ -1,0 +1,19 @@
+{
+  "role": "actuator_playground_worker",
+  "description": "Exact-tenant actuator-playground scratch worker. Interactive `pnpm playground` records sessions and ADF drafts under active/shared/tmp/{confidential,personal}/${KYBERION_TENANT}/actuator-playground/. Writes on the tmp floor are admitted by default_allow, but child actuators and session reads need an authorized identity on that partition. This role gives the playground the same effective identity on its own tenant scratch that the claimed-WorkItem path already has — never knowledge/, other tenants, other domains on the tmp floor, staging, cache, or system floors.",
+  "default_persona": "worker",
+  "write_scopes": [],
+  "scope_classes": [],
+  "allowed_actuators": [],
+  "tier_access": ["personal", "confidential"],
+  "permissions": {
+    "allow_read": [
+      "active/shared/tmp/confidential/${KYBERION_TENANT}/actuator-playground/",
+      "active/shared/tmp/personal/${KYBERION_TENANT}/actuator-playground/"
+    ],
+    "allow_write": [
+      "active/shared/tmp/confidential/${KYBERION_TENANT}/actuator-playground/",
+      "active/shared/tmp/personal/${KYBERION_TENANT}/actuator-playground/"
+    ]
+  }
+}

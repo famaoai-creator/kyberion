@@ -82,13 +82,13 @@ the canonical surface(s) involved.
 
 ## E. Knowledge accumulation
 
-| #   | Scenario                           | Mechanism                                                                                                               | Status |
-| --- | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ------ |
-| E1  | Mission distill                    | `mission_controller distill` → `knowledge/product/evolution/distill_*.md`                                               | ✅     |
-| E2  | Memory promotion queue             | `memory-list` / `memory-approve` / `memory-promote`                                                                     | ✅     |
-| E3  | Cross-tenant promotion             | `memory-promote` + tier-hygiene + `multi-tenant-operations.md §7`                                                       | ✅     |
-| E4  | Post-release retrospective         | `post-release-retrospective` pipeline                                                                                   | ✅     |
-| E5  | Distill auto-reuse on new missions | `wisdom:inject_prior_knowledge` op + `findRelevantDistilledKnowledge`; runs as the first step in `hypothesis-tree.json` | ✅     |
+| #   | Scenario                           | Mechanism                                                                                                                                 | Status |
+| --- | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| E1  | Mission distill                    | `mission_controller distill` → `knowledge/product/evolution/distill_*.md`                                                                 | ✅     |
+| E2  | Memory promotion queue             | `memory-list` / `memory-approve` / `memory-promote`                                                                                       | ✅     |
+| E3  | Cross-tenant promotion             | `memory-promote` + tier-hygiene + `multi-tenant-operations.md §7`                                                                         | ✅     |
+| E4  | Post-release retrospective         | `post-release-retrospective` pipeline                                                                                                     | ✅     |
+| E5  | Distill auto-reuse on new missions | `wisdom:inject_prior_knowledge` op + `findRelevantPromotedKnowledge` (promoted records); runs as the first step in `hypothesis-tree.json` | ✅     |
 
 ## F. Cross-device / handoff
 
@@ -205,7 +205,7 @@ in `meeting-proxy-workflow.json` with real ops (`wisdom:extract_requirements`
 ## Cross-references
 
 - [`kyberion-intent-catalog.md`](kyberion-intent-catalog.md) — what to ask for
-- [`kyberion-canonical-concept-index.md`](kyberion-canonical-concept-index.md) — primitives and vocabulary
+- [`organization-work-loop.md`](organization-work-loop.md) and [concept registry](../governance/concept-registry.json) — parent model and single term definitions
 - [`multi-tenant-operations.md`](multi-tenant-operations.md) — multi-tenant operational baseline
 - [`operator-surface-strategy.md`](operator-surface-strategy.md) — UI strategy
 - [`../procedures/system/developer-onboarding.md`](../../public/procedures/system/developer-onboarding.md) — developer first month

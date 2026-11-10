@@ -4,7 +4,7 @@ import type { DotProposal } from './dot-proposals.js';
 export type DotScopedProposal = Pick<
   DotProposal,
   | 'action_id'
-  | 'work_shape'
+  | 'execution_shape'
   | 'handoff_to'
   | 'pipeline_ref'
   | 'front_desk_execution'
@@ -24,9 +24,9 @@ export function informationWorkProposalRefusal(
         scope.tenant_slug !== charter.scope.tenant_slug ||
         scope.organization_id !== charter.scope.organization_id ||
         scope.project_id !== charter.scope.project_id ||
-        (proposal.work_shape !== 'pipeline' &&
-          !(proposal.work_shape === 'mission' && proposal.mission_admission)) ||
-        (proposal.work_shape === 'pipeline' && !!proposal.mission_admission) ||
+        (proposal.execution_shape !== 'pipeline' &&
+          !(proposal.execution_shape === 'mission' && proposal.mission_admission)) ||
+        (proposal.execution_shape === 'pipeline' && !!proposal.mission_admission) ||
         proposal.pipeline_ref !==
           'knowledge/product/pipeline-templates/information-asset-work.json' ||
         proposal.handoff_to ||

@@ -507,6 +507,8 @@ export const TENANT_RUNTIME_PARTITION_TARGET_KINDS = {
   generation_cost_settlements: 'tenant_runtime_state',
   // Reasoning API credential proofs (valid for 15 minutes): purge with the tenant.
   api_verification: 'tenant_runtime_state',
+  // D8 runtime hint store: the tenant's trace / rejection / promoted hints: purge with the tenant.
+  hints: 'tenant_runtime_state',
   // Delegation trace + records hold tenant instruction / context / result text:
   // exported, then removed with the tenant (legacy shared copies: see
   // computeLegacyDelegationTracePrunes / collectLegacyDelegationRecordTargets).

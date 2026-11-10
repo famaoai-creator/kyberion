@@ -10,10 +10,11 @@
  * Pure and deterministic — the only I/O is the optional, best-effort
  * manifest read in `readFrontDeskSurfacePorts()`, which never throws.
  */
+import type { MemberRole } from '../organization/member-registry.js';
 import { loadSurfaceManifest } from './surface-runtime.js';
 import { resolveSurfaceBrowserUrl } from './surface-url.js';
 
-export type FrontDeskRole = 'owner' | 'approver' | 'operator' | 'viewer';
+export type FrontDeskRole = MemberRole;
 
 export type FrontDeskPrimarySurfaceId = 'presence-studio' | 'concierge';
 export type FrontDeskOptionalSurfaceId = 'chronos-mirror-v2' | 'operator-surface';

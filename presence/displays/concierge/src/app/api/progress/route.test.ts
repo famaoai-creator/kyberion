@@ -103,7 +103,7 @@ beforeAll(async () => {
   bootstrap.safeWriteFile(path.join(root, 'package.json'), '{}');
   vi.stubEnv('KYBERION_ROOT', root);
   vi.stubEnv('SYSTEM_ROLE', 'concierge');
-  vi.stubEnv('KYBERION_PERSONA', 'worker');
+  vi.stubEnv('KYBERION_BASE_ROLE', 'worker');
   vi.resetModules();
   io = await import('@agent/core');
   const authority = await import('@agent/core/authority');
@@ -124,7 +124,7 @@ beforeAll(async () => {
         status: 'active',
         execution_mode: 'local',
         priority: 3,
-        assigned_persona: 'worker',
+        org_role: 'worker',
         confidence_score: 1,
         tenant_slug: 'alpha',
         git: { branch: 'main', start_commit: 'x', latest_commit: 'x', checkpoints: [] },

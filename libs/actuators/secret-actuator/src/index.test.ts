@@ -68,7 +68,7 @@ describe('secret-actuator: governed mutation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     originalEnv = { ...process.env };
-    process.env.KYBERION_PERSONA = 'sovereign';
+    process.env.KYBERION_BASE_ROLE = 'sovereign';
     platformSpy = vi.spyOn(process, 'platform', 'get').mockReturnValue('darwin');
   });
 

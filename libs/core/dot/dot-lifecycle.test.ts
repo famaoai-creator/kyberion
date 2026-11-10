@@ -307,7 +307,7 @@ describe('create public draft charter', () => {
       attention: { triggers: [] },
       authority: {
         authority_role: 'infrastructure_sentinel',
-        allowed_work_shapes: ['pipeline' as const],
+        allowed_execution_shapes: ['pipeline' as const],
         allowed_pipelines: [FRONT_DESK_DIAGNOSTIC_PIPELINE],
       },
       decisions: { default_decision: 'approve' as const, escalate_channel: 'surface' },

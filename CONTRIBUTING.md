@@ -123,7 +123,7 @@ If you observe a real-world error that the classifier returns `'unknown'` for, a
 - Unit tests live next to source as `<file>.test.ts`.
 - Integration tests live in `tests/`.
 - Run with `pnpm vitest run <path>`.
-- For tests that touch tier-guarded paths, set `KYBERION_PERSONA=ecosystem_architect` and `MISSION_ROLE=mission_controller` in `beforeEach`.
+- For tests that touch tier-guarded paths, set `KYBERION_BASE_ROLE=ecosystem_architect` and `MISSION_ROLE=mission_controller` in `beforeEach`.
 
 ### Documentation
 

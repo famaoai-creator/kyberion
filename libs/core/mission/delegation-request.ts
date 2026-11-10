@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import type { ValidateFunction } from 'ajv';
 import { pathResolver } from '../path-resolver.js';
 import { compileSchema } from '../foundation/ajv.js';
@@ -29,7 +30,7 @@ export interface AssistantDelegationRequest {
   source_text: string;
   context: {
     locale?: string;
-    tier: 'personal' | 'confidential' | 'public';
+    tier: StorageDataTier;
     project_id?: string;
     project_name?: string;
     track_id?: string;
@@ -59,7 +60,7 @@ export interface CreateAssistantDelegationRequestInput {
   workLoop: OrganizationWorkLoopSummary;
   clarificationPacket?: OperatorInteractionPacket;
   locale?: string;
-  tier?: 'personal' | 'confidential' | 'public';
+  tier?: StorageDataTier;
   projectId?: string;
   projectName?: string;
   trackId?: string;

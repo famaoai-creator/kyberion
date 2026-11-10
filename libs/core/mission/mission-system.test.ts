@@ -181,9 +181,9 @@ describe('mission system work-item handoff', () => {
     const missionId = 'MSN-HANDOFF-TENANT-TEST';
     const missionPath = pathResolver.missionDir(missionId, 'confidential');
     const previousRole = process.env.MISSION_ROLE;
-    const previousPersona = process.env.KYBERION_PERSONA;
+    const previousPersona = process.env.KYBERION_BASE_ROLE;
     process.env.MISSION_ROLE = 'mission_controller';
-    process.env.KYBERION_PERSONA = 'sovereign';
+    process.env.KYBERION_BASE_ROLE = 'sovereign';
     try {
       safeMkdir(missionPath, { recursive: true });
       safeWriteFile(
@@ -245,8 +245,8 @@ describe('mission system work-item handoff', () => {
       safeRmSync(missionPath, { recursive: true, force: true });
       if (previousRole === undefined) delete process.env.MISSION_ROLE;
       else process.env.MISSION_ROLE = previousRole;
-      if (previousPersona === undefined) delete process.env.KYBERION_PERSONA;
-      else process.env.KYBERION_PERSONA = previousPersona;
+      if (previousPersona === undefined) delete process.env.KYBERION_BASE_ROLE;
+      else process.env.KYBERION_BASE_ROLE = previousPersona;
     }
   });
 });

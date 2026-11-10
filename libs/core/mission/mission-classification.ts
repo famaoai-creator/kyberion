@@ -21,6 +21,10 @@ export const MISSION_CLASS_VALUES = [
   'legal_and_compliance',
   'strategy_and_governance',
   'procurement_and_supply',
+  // UX/design improvement work on web surfaces: wireframe → approval →
+  // implementation. Rides the code-change workflow template; the class
+  // playbook carries the design-review steps.
+  'web_design_improvement',
 ] as const;
 
 export type MissionClass = (typeof MISSION_CLASS_VALUES)[number];
@@ -371,6 +375,7 @@ export function mapMissionClassToMissionTypeTemplate(missionClass: MissionClass)
     case 'decision_support':
     case 'content_and_media':
     case 'code_change':
+    case 'web_design_improvement':
       return 'development';
   }
 }

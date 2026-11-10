@@ -26,7 +26,7 @@ const TRACK_ID = `TRK-LINK-IDX-${suffix}`;
 const M1 = `MSN-LINK-IDX-A-${suffix}`;
 const M2 = `MSN-LINK-IDX-B-${suffix}`;
 const created: string[] = [];
-const savedEnv = { persona: process.env.KYBERION_PERSONA, role: process.env.MISSION_ROLE };
+const savedEnv = { persona: process.env.KYBERION_BASE_ROLE, role: process.env.MISSION_ROLE };
 
 function mission(id: string, status: string): MissionState {
   return {
@@ -35,7 +35,7 @@ function mission(id: string, status: string): MissionState {
     status,
     execution_mode: 'local',
     priority: 1,
-    assigned_persona: 'worker',
+    org_role: 'worker',
     confidence_score: 1,
     git: { branch: `mission/${id}`, start_commit: 'a', latest_commit: 'a', checkpoints: [] },
     history: [],
@@ -67,7 +67,7 @@ function sync(state: MissionState): void {
 }
 
 beforeEach(() => {
-  process.env.KYBERION_PERSONA = 'ecosystem_architect';
+  process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
   process.env.MISSION_ROLE = 'mission_controller';
   created.push(pathResolver.projectWorkspaceDir(PROJECT_ID, 'public', 'shared'));
   created.push(projectRecordPath(PROJECT_ID));
@@ -83,7 +83,7 @@ beforeEach(() => {
 
 afterEach(() => {
   for (const target of created.splice(0)) safeRmSync(target, { recursive: true, force: true });
-  process.env.KYBERION_PERSONA = savedEnv.persona;
+  process.env.KYBERION_BASE_ROLE = savedEnv.persona;
   process.env.MISSION_ROLE = savedEnv.role;
 });
 
@@ -127,7 +127,7 @@ describe('project mission index (single source: relationships.project)', () => {
     // E2E regression: the post-start sync ran as persona worker + role
     // mission_controller; it used to be skipped (policy) and, through the
     // worker-scoped projectMissions view, would have dropped sibling missions.
-    process.env.KYBERION_PERSONA = 'worker';
+    process.env.KYBERION_BASE_ROLE = 'worker';
     writeAt(pathResolver.missionDir(M1, 'public'), mission(M1, 'active'));
     writeAt(pathResolver.missionDir(M2, 'public'), mission(M2, 'active'));
     sync(mission(M2, 'active'));

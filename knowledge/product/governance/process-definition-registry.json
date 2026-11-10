@@ -46,7 +46,7 @@
         "libs/core/mission/mission-task-classification-scenarios.test.ts"
       ],
       "expected_counts": {
-        "scenarios": 34
+        "scenarios": 35
       }
     },
     {

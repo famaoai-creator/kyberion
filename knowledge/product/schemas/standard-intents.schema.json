@@ -22,7 +22,10 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "shape": { "type": "string" },
+        "shape": {
+          "type": "string",
+          "description": "Deprecated: derived from execution_shape at load time. Do not store it in the base catalog; an overlay value loses to execution_shape."
+        },
         "task_kind": { "type": "string" },
         "result_shape": { "type": "string" }
       }
@@ -125,6 +128,7 @@
             "legal_and_compliance",
             "strategy_and_governance",
             "procurement_and_supply",
+            "web_design_improvement",
             "long_running_job"
           ]
         },

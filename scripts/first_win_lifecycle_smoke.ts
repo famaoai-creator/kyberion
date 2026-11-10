@@ -266,7 +266,7 @@ function runCommand(
 ): StageObservation {
   const result = runner(command, args, {
     cwd: process.cwd(),
-    env: { KYBERION_PERSONA: 'sovereign', MISSION_ROLE: 'mission_controller' },
+    env: { KYBERION_BASE_ROLE: 'sovereign', MISSION_ROLE: 'mission_controller' },
     timeoutMs: 120_000,
   });
   const stdout = result.stdout || '';

@@ -18,6 +18,31 @@ import {
   metaLine,
 } from './MissionIntelligenceBFeed';
 
+/** Plain-language line saying how a reuse proposal is decided (D8). */
+function reuseReviewText(candidate: any, mt: (key: string, fallback: string) => string): string {
+  if (candidate.review === 'here')
+    return mt('chronos_mip_reuse_review_here', 'Decide here: promote it for reuse, or archive it.');
+  if (candidate.review === 'history' || !candidate.review)
+    return mt(
+      'chronos_mip_reuse_review_history',
+      'A past proposal kept as history. It can no longer be decided.'
+    );
+  if (candidate.record_kind === 'background_review')
+    return mt(
+      'chronos_mip_reuse_review_background_review',
+      'Decided in the background review (pnpm background-review).'
+    );
+  if (candidate.record_kind === 'execution_feedback')
+    return mt(
+      'chronos_mip_reuse_review_execution_feedback',
+      'Decided in the improvement review (pnpm kyberion improvements).'
+    );
+  return mt(
+    'chronos_mip_reuse_review_learning_intake',
+    'Sent to the knowledge review with pnpm kyberion learning prepare --queue.'
+  );
+}
+
 export function MissionIntelligenceApprovalsPanel({ context }: { context: Record<string, any> }) {
   const {
     data,
@@ -137,6 +162,10 @@ export function MissionIntelligenceApprovalsPanel({ context }: { context: Record
                   <KeyValue
                     items={[
                       {
+                        label: mt('chronos_mip_reuse_review_label', 'how it is decided'),
+                        value: reuseReviewText(candidate, mt),
+                      },
+                      {
                         label: mt('chronos_mip_source', 'source'),
                         value: candidate.source_type,
                         mono: true,
@@ -197,34 +226,36 @@ export function MissionIntelligenceApprovalsPanel({ context }: { context: Record
                     workLoop={buildDistillCandidateWorkLoopPreview(candidate)}
                     mt={mt}
                   />
-                  <FeedActions>
-                    <Button
-                      label={
-                        distillCandidateTarget === candidate.candidate_id
-                          ? mt('chronos_mip_processing', 'processing')
-                          : mt('chronos_mip_promote', 'promote')
-                      }
-                      variant="primary"
-                      onClick={() => decideDistillCandidate(candidate, 'promote')}
-                      disabled={
-                        candidate.status !== 'proposed' ||
-                        distillCandidateTarget === candidate.candidate_id
-                      }
-                    />
-                    <Button
-                      label={
-                        distillCandidateTarget === candidate.candidate_id
-                          ? mt('chronos_mip_processing', 'processing')
-                          : mt('chronos_mip_archive', 'archive')
-                      }
-                      variant="secondary"
-                      onClick={() => decideDistillCandidate(candidate, 'archive')}
-                      disabled={
-                        candidate.status !== 'proposed' ||
-                        distillCandidateTarget === candidate.candidate_id
-                      }
-                    />
-                  </FeedActions>
+                  {candidate.review === 'here' ? (
+                    <FeedActions>
+                      <Button
+                        label={
+                          distillCandidateTarget === candidate.candidate_id
+                            ? mt('chronos_mip_processing', 'processing')
+                            : mt('chronos_mip_promote', 'promote')
+                        }
+                        variant="primary"
+                        onClick={() => decideDistillCandidate(candidate, 'promote')}
+                        disabled={
+                          candidate.status !== 'proposed' ||
+                          distillCandidateTarget === candidate.candidate_id
+                        }
+                      />
+                      <Button
+                        label={
+                          distillCandidateTarget === candidate.candidate_id
+                            ? mt('chronos_mip_processing', 'processing')
+                            : mt('chronos_mip_archive', 'archive')
+                        }
+                        variant="secondary"
+                        onClick={() => decideDistillCandidate(candidate, 'archive')}
+                        disabled={
+                          candidate.status !== 'proposed' ||
+                          distillCandidateTarget === candidate.candidate_id
+                        }
+                      />
+                    </FeedActions>
+                  ) : null}
                 </FeedItem>
               ))}
             </FeedList>
@@ -278,18 +309,22 @@ export function MissionIntelligenceApprovalsPanel({ context }: { context: Record
                 mono: true,
               },
             ]}
-            rows={filteredMemoryCandidatesByTrack.slice(0, 12).map((candidate: any) => ({
-              candidate: candidate.candidate_id,
-              status:
-                looseStatus(candidate.status) === 'n/a'
-                  ? candidate.status
-                  : looseStatus(candidate.status),
-              kind: candidate.proposed_memory_kind,
-              tier: candidate.sensitivity_tier,
-              source: candidate.source_ref,
-              evidence: candidate.evidence_refs?.join(', ') || '-',
-              promoted: candidate.promoted_ref || '-',
-            }))}
+            rows={filteredMemoryCandidatesByTrack
+              // D8: facade-owned rows are listed (and decided) in the reuse proposals above.
+              .filter((candidate: any) => !candidate.origin)
+              .slice(0, 12)
+              .map((candidate: any) => ({
+                candidate: candidate.candidate_id,
+                status:
+                  looseStatus(candidate.status) === 'n/a'
+                    ? candidate.status
+                    : looseStatus(candidate.status),
+                kind: candidate.proposed_memory_kind,
+                tier: candidate.sensitivity_tier,
+                source: candidate.source_ref,
+                evidence: candidate.evidence_refs?.join(', ') || '-',
+                promoted: candidate.promoted_ref || '-',
+              }))}
             empty={mt('chronos_mip_no_memory_candidates', 'No memory candidates queued.')}
           />
         </Panel>

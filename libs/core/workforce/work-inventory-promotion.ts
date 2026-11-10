@@ -19,6 +19,7 @@
  * - The pipeline path only *plans* the `pnpm pipeline:promote` invocation; it
  *   never executes it (promotion of an ADF stays an operator step).
  */
+import type { StorageDataTier } from '../storage-layout.js';
 import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 import { defineCatalog } from '../foundation/governed-catalog.js';
@@ -137,7 +138,7 @@ export interface WorkInventoryMissionBrief {
   missionId: string;
   title: string;
   intent: string;
-  tier: 'personal' | 'confidential';
+  tier: Exclude<StorageDataTier, 'public'>;
   source: WorkInventoryMissionBriefSource;
   victoryConditions: string[];
   scope: { in: string[]; out?: string[] };
@@ -155,7 +156,7 @@ export interface WorkInventoryMissionPromotionPlan {
   decided_by: WorkInventoryDecidedBy;
   planned_at: string;
   mission_id: string;
-  tier: 'personal' | 'confidential';
+  tier: Exclude<StorageDataTier, 'public'>;
   tenant_slug?: string;
   brief: WorkInventoryMissionBrief;
   /** argv for `dist/scripts/mission_controller.js` (script path not included). */
@@ -283,7 +284,7 @@ function frequencyLine(entry: WorkInventoryEntry): string | undefined {
 function buildMissionBrief(
   entry: WorkInventoryEntry,
   missionId: string,
-  tier: 'personal' | 'confidential',
+  tier: Exclude<StorageDataTier, 'public'>,
   decidedBy: WorkInventoryDecidedBy
 ): WorkInventoryMissionBrief {
   const automated = entry.steps.filter((step) => AUTOMATED_METHODS.includes(step.method.assigned));
@@ -451,7 +452,7 @@ export function planWorkInventoryPromotion(
   if (options.kind === 'mission') {
     const missionId = workInventoryMissionId(entry.entry_id, entry.scope, options.missionIdPrefix);
     const tenantSlug = entry.scope.tenant_slug;
-    const tier: 'personal' | 'confidential' = tenantSlug ? 'confidential' : 'personal';
+    const tier: Exclude<StorageDataTier, 'public'> = tenantSlug ? 'confidential' : 'personal';
     const brief = buildMissionBrief(entry, missionId, tier, decidedBy);
     return {
       kind: 'mission',

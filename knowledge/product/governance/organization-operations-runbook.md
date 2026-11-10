@@ -1,14 +1,14 @@
 ---
 title: Organization Operations Runbook
 tags: [organization, operation, incident, decision, governance]
-last_updated: 2026-10-22
+last_updated: 2026-11-10
 ---
 
 # Organization operations
 
 Use `pnpm organization` for organization state changes. Select a tenant and organization scope first, and include `--tier confidential --tenant-slug <slug>` for confidential operations. Writes require an explicit `--apply` and either the sovereign persona or the least-privilege `MISSION_ROLE=organization_operator` with `KYBERION_TENANT=<slug>` (own tenant's confidential/public organization state only); inspect the same command with `--dry-run` first.
 
-Shared-scope organizations (`active/organizations/<tier>/shared/…`) are not tenant-owned, so a tenant-bound `organization_operator` cannot write them from an interactive CLI call — use `KYBERION_PERSONA=sovereign` there. The role does cover shared orgs when a delegated execution scope binds the organization (`scope.organization_id`, e.g. a resident-dot cadence), via the `…/shared/${KYBERION_ORGANIZATION_ID}/` grant. An organization with records but no `organization-state.json` reports `organization_state:missing` in reconcile; repair it with `pnpm organization state ensure --organization-id <id> --tier <tier> --apply` (idempotent).
+Shared-scope organizations (`active/organizations/<tier>/shared/…`) are not tenant-owned, so a tenant-bound `organization_operator` cannot write them from an interactive CLI call — use `KYBERION_BASE_ROLE=sovereign` there. The role does cover shared orgs when a delegated execution scope binds the organization (`scope.organization_id`, e.g. a resident-dot cadence), via the `…/shared/${KYBERION_ORGANIZATION_ID}/` grant. An organization with records but no `organization-state.json` reports `organization_state:missing` in reconcile; repair it with `pnpm organization state ensure --organization-id <id> --tier <tier> --apply` (idempotent).
 
 Setting up an organization for the first time? Follow the [Organization Lifecycle Verification Playbook](./organization-lifecycle-verification-playbook.md) end to end first (formation, domain and service, operation, cadence and decision, project, run, incident and learning, reconcile), then use this runbook for routine operation.
 
@@ -25,7 +25,7 @@ pnpm organization operation tick --organization-id ORG --tier confidential --ten
 
 ### Scheduled cadences (tick, standup, retro)
 
-Prefer the per-tenant resident-dot cadence: give the organization's dot charter an `operations_cadence` block (`tick_every_minutes`, `standup.cron`, `retro.cron`; requires `scope.organization_id` and `authority_role: organization_operator`). The agent-runtime supervisor then ticks due operations, files the standup and the weekly retro for that organization only, as `organization_operator` bound to the organization's tenant; a run whose bound tenant differs is refused and nothing needs `KYBERION_PERSONA=sovereign`. Each cadence is audited as `tick:scoped` / `standup:scoped` / `retro:scoped`, skipped while the organization budget is at the hard limit, and caught up at most once after downtime. `dots/org-operations.json` is the reference charter. See `dots/README.md`.
+Prefer the per-tenant resident-dot cadence: give the organization's dot charter an `operations_cadence` block (`tick_every_minutes`, `standup.cron`, `retro.cron`; requires `scope.organization_id` and `authority_role: organization_operator`). The agent-runtime supervisor then ticks due operations, files the standup and the weekly retro for that organization only, as `organization_operator` bound to the organization's tenant; a run whose bound tenant differs is refused and nothing needs `KYBERION_BASE_ROLE=sovereign`. Each cadence is audited as `tick:scoped` / `standup:scoped` / `retro:scoped`, skipped while the organization budget is at the hard limit, and caught up at most once after downtime. `dots/org-operations.json` is the reference charter. See `dots/README.md`.
 
 Use the sovereign Chronos schedules (`organization-operation-tick`, `organization-standup`, `organization-retro`, `organization-daily-digest`) only for a single operator who needs the cross-tenant view; they aggregate every tenant and refuse any persona other than `sovereign`. Do not enable both paths for the same organization, or its standup and retro are filed twice.
 
@@ -37,7 +37,7 @@ When recording a completed Run for a mission-backed Operation, `--execution-ref`
 
 An Operation may carry a `deadline` (`--deadline-business-day <n> --deadline-time <HH:MM>`), evaluated in the trigger timezone on the Japanese bank calendar: weekends, national holidays (including substitute and citizen's holidays) and December 31 – January 3 are closed. A business day past the month's count is clamped to the month's last business day. A period is met only by a succeeded Run completed inside the period and at or before the deadline; a later success stays missed and is marked `completed_late`. The builder stamps `deadline.deadline_effective_from` when a deadline is added or its day/time changes and carries it forward otherwise, so a period whose deadline passed before that moment is `untracked` rather than missed. Editing other fields does not hide a missed period. Records without the field fall back to `updated_at`.
 
-`pipelines/organization-daily-digest.json` (08:30 Asia/Tokyo) aggregates every organization across tenants for the sovereign operator: overdue and due Operations, business-day deadlines, pending Decisions, service observations that are stale or expire within seven days, and open Incidents. It runs only as `KYBERION_PERSONA=sovereign`, records one audit entry naming the tenants read, and skips a tenant it cannot read, listing it in the digest and the audit entry. Delivery goes to Slack through Chronos `deliver_to` with `channel: env:KYBERION_OPERATOR_SLACK_DM`; an unset value fails closed. On a host, `KYBERION_CHRONOS_SCHEDULES` (comma-separated schedule ids) limits which schedules Chronos runs; a value that lists no ids runs nothing. Install the daemon with `pnpm kyberion scheduler install --apply --forward-env KYBERION_PERSONA --forward-env KYBERION_CHRONOS_SCHEDULES --forward-env KYBERION_OPERATOR_SLACK_DM`.
+`pipelines/organization-daily-digest.json` (08:30 Asia/Tokyo) aggregates every organization across tenants for the sovereign operator: overdue and due Operations, business-day deadlines, pending Decisions, service observations that are stale or expire within seven days, and open Incidents. It runs only as `KYBERION_BASE_ROLE=sovereign`, records one audit entry naming the tenants read, and skips a tenant it cannot read, listing it in the digest and the audit entry. Delivery goes to Slack through Chronos `deliver_to` with `channel: env:KYBERION_OPERATOR_SLACK_DM`; an unset value fails closed. On a host, `KYBERION_CHRONOS_SCHEDULES` (comma-separated schedule ids) limits which schedules Chronos runs; a value that lists no ids runs nothing. Install the daemon with `pnpm kyberion scheduler install --apply --forward-env KYBERION_BASE_ROLE --forward-env KYBERION_CHRONOS_SCHEDULES --forward-env KYBERION_OPERATOR_SLACK_DM`.
 
 ## Incidents and decisions
 
@@ -56,6 +56,8 @@ Keep human intervention focused on the concrete missing authority and retain
 the original attempt when an external outcome is unknown.
 
 Incidents, routine exceptions, project closures and governance decisions become learning candidates with `learning enqueue`. Triage them with `learning transition`: `proposed → approved → promoted`, or `→ rejected` with `--reason`. Promote only after the learning is written into `knowledge/` in the same tier and tenant, and pass that document as `--promoted-ref`. `status` lists candidates still waiting.
+
+A learning candidate is a row on the one memory candidate queue (`kind: organization_learning`, scope = the organization's tier, tenant and organization id), so `learning enqueue` and `learning transition` read and decide that row, and the generic memory promotion never promotes it. The old per-organization `learning/<id>/candidate.json` files are read-only history. For one release, `learning migrate --dry-run|--apply` imports their pending (proposed / approved) items onto the queue with the scope the record itself declares; an item whose scope the record does not determine (a personal-tier learning has no owner) is listed under `unresolved` and left alone. A transition on a learning that is only in the old store fails with `ORGANIZATION_LEARNING_NOT_ON_QUEUE` until it is migrated.
 
 ## Objectives and key results
 

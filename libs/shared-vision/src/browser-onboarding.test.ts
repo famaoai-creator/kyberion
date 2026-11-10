@@ -297,7 +297,7 @@ describe('browser onboarding', () => {
 
   it('stores supported voice samples only inside the active profile', async () => {
     const { saveBrowserOnboardingVoiceSample } = await import('./browser-onboarding.js');
-    vi.stubEnv('KYBERION_PERSONA', 'worker');
+    vi.stubEnv('KYBERION_BASE_ROLE', 'worker');
     const sample = saveBrowserOnboardingVoiceSample({
       profileId: 'my-voice',
       contentType: 'audio/webm;codecs=opus',
@@ -359,7 +359,7 @@ describe('browser onboarding', () => {
 
   it('keeps personal onboarding writes inside the sovereign concierge context', async () => {
     const { applyBrowserOnboarding } = await import('./browser-onboarding.js');
-    vi.stubEnv('KYBERION_PERSONA', 'worker');
+    vi.stubEnv('KYBERION_BASE_ROLE', 'worker');
     const result = await applyBrowserOnboarding(validDraft());
     expect(result.ok).toBe(true);
     expect(safeExistsSync(path.join(PROFILE_ROOT, 'my-identity.json'))).toBe(true);

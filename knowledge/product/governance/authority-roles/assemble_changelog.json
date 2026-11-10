@@ -1,0 +1,7 @@
+{
+  "role": "assemble_changelog",
+  "assignable": false,
+  "permissions": {
+    "allow_write": ["CHANGELOG.md", "changelog.d/"]
+  }
+}

@@ -169,8 +169,8 @@ describe('renderOrganizationRetroText', () => {
 
 describe('runOrganizationRetro', () => {
   it('is sovereign-only', () => {
-    expect(() => runOrganizationRetro({ env: { KYBERION_PERSONA: 'x' } }, deps())).toThrow(
-      /requires KYBERION_PERSONA=sovereign/
+    expect(() => runOrganizationRetro({ env: { KYBERION_BASE_ROLE: 'x' } }, deps())).toThrow(
+      /requires KYBERION_BASE_ROLE=sovereign/
     );
   });
 
@@ -179,7 +179,7 @@ describe('runOrganizationRetro', () => {
     const notify = vi.fn().mockReturnValue(true);
     const audit = vi.fn();
     const result = runOrganizationRetro(
-      { env: { KYBERION_PERSONA: 'sovereign' }, locale: 'en' },
+      { env: { KYBERION_BASE_ROLE: 'sovereign' }, locale: 'en' },
       {
         ...deps(),
         writeArtifact: writeArtifact as never,
@@ -223,7 +223,12 @@ describe('runOrganizationRetro scoped mode', () => {
     const other = { ...scope, organizationId: 'org-b' };
     const result = bound('acme', () =>
       runOrganizationRetro(
-        { scope: cadenceScope, persist: false, locale: 'en', env: { KYBERION_PERSONA: 'worker' } },
+        {
+          scope: cadenceScope,
+          persist: false,
+          locale: 'en',
+          env: { KYBERION_BASE_ROLE: 'worker' },
+        },
         { ...deps(), audit, listOrganizations: () => [scope, other] }
       )
     );

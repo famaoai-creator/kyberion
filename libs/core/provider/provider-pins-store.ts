@@ -9,6 +9,7 @@
  */
 
 import * as path from 'node:path';
+import { baseRoleEnvText } from '../foundation/base-role-env.js';
 import { pathResolver } from '../path-resolver.js';
 import { openJsonState } from '../foundation/json-state.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '../secure-io.js';
@@ -47,11 +48,7 @@ const PROVIDER_PINS_SCHEMA_PATH = pathResolver.rootResolve(
 );
 
 export function pinActorId(): string {
-  return (
-    getRegisteredEnvText('KYBERION_PERSONA') ||
-    getRegisteredEnvText('MISSION_ROLE') ||
-    'capability-broker'
-  );
+  return baseRoleEnvText() || getRegisteredEnvText('MISSION_ROLE') || 'capability-broker';
 }
 
 /**

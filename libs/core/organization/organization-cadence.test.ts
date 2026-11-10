@@ -143,7 +143,7 @@ describe('runOrganizationOperationTick', () => {
     );
     const executeOperation = vi.fn().mockResolvedValue(undefined);
     const report = await runOrganizationOperationTick(
-      { tiers: ['public'], apply: true, rootDir, env: { KYBERION_PERSONA: 'sovereign' } },
+      { tiers: ['public'], apply: true, rootDir, env: { KYBERION_BASE_ROLE: 'sovereign' } },
       { executeOperation }
     );
     expect(report.failures).toEqual([]);
@@ -189,7 +189,7 @@ describe('scoped cadence mode', () => {
     const executeOperation = vi.fn().mockResolvedValue(undefined);
     const report = await asOperator('acme', 'ORG-2', () =>
       runOrganizationOperationTick(
-        { scope, apply: true, rootDir, env: { KYBERION_PERSONA: 'worker' } },
+        { scope, apply: true, rootDir, env: { KYBERION_BASE_ROLE: 'worker' } },
         { executeOperation }
       )
     );
@@ -243,10 +243,10 @@ describe('scoped cadence mode', () => {
     await expect(
       asOperator('acme', 'ORG-2', () =>
         runOrganizationOperationTick(
-          { apply: false, rootDir, env: { KYBERION_PERSONA: 'worker' } },
+          { apply: false, rootDir, env: { KYBERION_BASE_ROLE: 'worker' } },
           { executeOperation: vi.fn() }
         )
       )
-    ).rejects.toThrow(/requires KYBERION_PERSONA=sovereign/);
+    ).rejects.toThrow(/requires KYBERION_BASE_ROLE=sovereign/);
   });
 });

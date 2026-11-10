@@ -35,6 +35,14 @@ const mockBuildScopedIndex = vi.mocked(buildScopedIndex);
 
 describe('memory-promotion-workflow', () => {
   const queuePath = memoryPromotionQueuePath();
+  // Unscoped confidential/personal rows written before D8 capture scope:
+  // registration now rejects them, but stored legacy rows still promote.
+  const seedLegacyRow = (row: object): void => {
+    const existing = safeExistsSync(queuePath)
+      ? String(safeReadFile(queuePath, { encoding: 'utf8' }))
+      : '';
+    safeWriteFile(queuePath, `${existing}${JSON.stringify(row)}\n`);
+  };
   let originalQueueRaw: string | null = null;
   const originalAutopromote = process.env.KYBERION_MEMORY_AUTOPROMOTE;
 
@@ -158,7 +166,7 @@ describe('memory-promotion-workflow', () => {
       ratificationRequired: true,
     });
     createdDistillCandidateIds.add(queued.candidate_id);
-    enqueueMemoryPromotionCandidate(queued);
+    seedLegacyRow(queued);
     const approved = updateMemoryPromotionCandidateStatus({
       candidateId: queued.candidate_id,
       status: 'approved',
@@ -242,7 +250,7 @@ describe('memory-promotion-workflow', () => {
       ratificationRequired: true,
     });
     createdDistillCandidateIds.add(queued.candidate_id);
-    enqueueMemoryPromotionCandidate(queued);
+    seedLegacyRow(queued);
     updateMemoryPromotionCandidateStatus({
       candidateId: queued.candidate_id,
       status: 'approved',
@@ -341,7 +349,7 @@ describe('memory-promotion-workflow', () => {
       ratificationRequired: true,
     });
     createdDistillCandidateIds.add(queued.candidate_id);
-    enqueueMemoryPromotionCandidate(queued);
+    seedLegacyRow(queued);
 
     await expect(
       promoteMemoryCandidateToKnowledge({
@@ -361,7 +369,7 @@ describe('memory-promotion-workflow', () => {
       ratificationRequired: true,
     });
     createdDistillCandidateIds.add(queued.candidate_id);
-    enqueueMemoryPromotionCandidate(queued);
+    seedLegacyRow(queued);
     updateMemoryPromotionCandidateStatus({
       candidateId: queued.candidate_id,
       status: 'approved',
@@ -395,7 +403,7 @@ describe('memory-promotion-workflow', () => {
       sensitivityTier: 'personal',
     });
     createdDistillCandidateIds.add(queued.candidate_id);
-    enqueueMemoryPromotionCandidate(queued);
+    seedLegacyRow(queued);
 
     const result = await promotePersonalMemoryCandidates({
       executionRole: 'mission_controller',

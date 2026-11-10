@@ -250,7 +250,7 @@ export function evaluatePreToolUse(input: PreToolUseInput): PreToolUseHookOutput
       return pre(
         'deny',
         `Kyberion tier-guard blocked a write into the ${tier} tier: ${verdict.reason ?? 'not authorized'}. ` +
-          'Use a Kyberion mission / the kyberion.* MCP tools, or configure KYBERION_PERSONA + authority.'
+          'Use a Kyberion mission / the kyberion.* MCP tools, or configure KYBERION_BASE_ROLE + authority.'
       );
     }
   }

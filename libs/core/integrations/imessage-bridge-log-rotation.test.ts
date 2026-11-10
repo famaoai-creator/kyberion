@@ -17,7 +17,7 @@ const ENV_KEYS = [
   'KYBERION_ROOT',
   'SYSTEM_ROLE',
   'MISSION_ROLE',
-  'KYBERION_PERSONA',
+  'KYBERION_BASE_ROLE',
   'MISSION_ID',
   'KYBERION_TENANT',
   'KYBERION_SUDO',
@@ -33,7 +33,7 @@ let lockUtils: typeof import('../foundation/lock-utils.js');
 function bridgeEnv(): void {
   process.env.SYSTEM_ROLE = 'imessage_bridge';
   process.env.MISSION_ROLE = 'surface_runtime';
-  process.env.KYBERION_PERSONA = 'sovereign';
+  process.env.KYBERION_BASE_ROLE = 'sovereign';
   process.env.MISSION_ID = 'MSN-SYSTEM-SENSORY-HUB';
 }
 

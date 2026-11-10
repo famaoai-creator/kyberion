@@ -4,7 +4,7 @@
  * Park clipboard snippets on 127.0.0.1; optional OS clipboard pull (pbpaste/xclip).
  *
  * Usage:
- *   KYBERION_PERSONA=sovereign node_modules/.bin/tsx scripts/clipboard-inbox/server.ts \
+ *   KYBERION_BASE_ROLE=sovereign node_modules/.bin/tsx scripts/clipboard-inbox/server.ts \
  *     [--out <dir>] [--instruction <text>] [port]
  */
 import http from 'node:http';

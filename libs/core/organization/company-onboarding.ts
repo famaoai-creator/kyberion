@@ -2,7 +2,7 @@
  * AI company onboarding: materialize a vertical, bind human accountability,
  * create the initial AI workforce, and leave one reviewed first-work plan.
  */
-import { isStanceEntry, stanceDirForSlug } from '../authn/stance-resolver.js';
+import { stanceDirForSlug } from '../authn/stance-resolver.js';
 import { tenantHomeDir } from './tenant-home.js';
 import * as path from 'node:path';
 import { pathResolver } from '../path-resolver.js';
@@ -25,7 +25,10 @@ import {
   safeWriteFile,
 } from '../secure-io.js';
 import { applyOnboardingContextBinding } from './onboarding-context.js';
-import { loadOrganizationProfileAtPath } from './organization-profile.js';
+import {
+  loadOrganizationProfileAtPath,
+  ORGANIZATION_PROFILE_FILE,
+} from './organization-profile.js';
 import { loadOrganizationDomain, saveOrganizationDomain } from './organization-operating-model.js';
 import { buildOrganizationDomainRecord } from './organization-operating-model-operations.js';
 import {
@@ -34,7 +37,11 @@ import {
   readTextFile,
   setRegisteredEnv,
 } from '../foundation/index.js';
-import { bootstrapCompany, listCompanyVerticals } from './company-bootstrap.js';
+import {
+  bootstrapCompany,
+  companyTemplateEntryPath,
+  listCompanyVerticals,
+} from './company-bootstrap.js';
 
 const SLUG_PATTERN = /^[a-z][a-z0-9-]{1,30}$/;
 /** The AI worker every company starts with (readiness `workforce[0]`). */
@@ -218,7 +225,7 @@ export function onboardAiCompany(input: AiCompanyOnboardingInput): AiCompanyOnbo
     'export KYBERION_TENANT_SCOPE_REQUIRED=true',
     // pnpm scripts do not load .env.local: without these exports the governed
     // commands below fail with ROLE_VIOLATION / tenant.scope_missing.
-    'export KYBERION_PERSONA=sovereign',
+    'export KYBERION_BASE_ROLE=sovereign',
     `export KYBERION_TENANT=${tenantSlug}`,
     // The stance has its own profile root (knowledge/personal/stances/<slug>/): missions refuse
     // to start until my-identity.json / my-vision.md / agent-identity.json exist there.
@@ -230,7 +237,7 @@ export function onboardAiCompany(input: AiCompanyOnboardingInput): AiCompanyOnbo
     `pnpm onboarding:context bind --customer-slug ${normalized.slug} --tenant-slug ${tenantSlug} --organization-id ${organizationId} --dry-run --json`,
     `pnpm onboarding:context bind --customer-slug ${normalized.slug} --tenant-slug ${tenantSlug} --organization-id ${organizationId} --apply --json`,
     `pnpm tenant:activation plan --customer-slug ${normalized.slug} --tenant-slug ${tenantSlug} --organization-id ${organizationId}`,
-    `pnpm tenant:activation probe --customer-slug ${normalized.slug} --tenant-slug ${tenantSlug} --organization-id ${organizationId} --nhi-id kyberion://agent/${normalized.slug}/${CEO_OPERATOR_SLUG}`,
+    `pnpm tenant:activation probe --customer-slug ${normalized.slug} --tenant-slug ${tenantSlug} --organization-id ${organizationId} --nhi-id kyberion://agent/${normalized.tenantSlug || normalized.slug}/${normalized.slug}/${CEO_OPERATOR_SLUG}`,
     `# probe prints the activate command citing its evidence; run it with --owner-id ${normalized.accountableHumanId}`,
     `pnpm onboarding:context first-work --customer-slug ${normalized.slug} --intent "${normalized.firstWork}" --dry-run --json`,
     '# after human review: apply first-work, then create and start a governed mission when the work shape requires it',
@@ -256,17 +263,18 @@ export function onboardAiCompany(input: AiCompanyOnboardingInput): AiCompanyOnbo
     };
   }
 
-  const profilePath = assertSafeRepositoryPath(path.join(tenantDir, 'organization-profile.json'), {
-    allowMissingLeaf: true,
-    rootDir,
-  });
+  const entryDirs = { tenantDir, stanceDir, organizationId: normalized.slug };
+  const profilePath = assertSafeRepositoryPath(
+    companyTemplateEntryPath(ORGANIZATION_PROFILE_FILE, entryDirs),
+    { allowMissingLeaf: true, rootDir }
+  );
   const templateDir = assertSafeRepositoryPath(
     path.join(pathResolver.rootDir(), 'templates', 'companies', normalized.vertical),
     { rootDir: pathResolver.rootDir() }
   );
   const templatePaths = safeExistsSync(templateDir)
     ? safeReaddir(templateDir).map((entry) =>
-        assertSafeRepositoryPath(path.join(isStanceEntry(entry) ? stanceDir : tenantDir, entry), {
+        assertSafeRepositoryPath(companyTemplateEntryPath(entry, entryDirs), {
           allowMissingLeaf: true,
           rootDir,
         })
@@ -440,10 +448,12 @@ export function onboardAiCompany(input: AiCompanyOnboardingInput): AiCompanyOnbo
       ensureAgentIdentityBestEffort({
         slug: CEO_OPERATOR_SLUG,
         kind: 'agent',
+        // Company is an alias of tenant (D3): before a tenant is bound the
+        // company's own slug is its tenant, as for its tenant-home files.
+        tenantSlug: tenantSlugToBind || normalized.slug,
         organizationId: normalized.slug,
         displayName: 'AI CEO Operator',
         accountableHumanId: normalized.accountableHumanId,
-        ...(tenantSlugToBind ? { affiliation: { tenant_slug: tenantSlugToBind } } : {}),
       })
     );
     return {

@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import { logger } from '../core.js';
 import { validateReasoningEgress } from '../governance/context-security-scope.js';
 import { getReasoningBackend } from '../reasoning/reasoning-backend.js';
@@ -73,7 +74,7 @@ export function buildMissionAdvisoryPanel(
   const includeStandby = options.includeStandby !== false;
   const allowedRoles = options.roles ? new Set(options.roles) : null;
   const excludedRoles = new Set(options.excludeRoles || []);
-  const missionTier = plan.tier as 'personal' | 'confidential' | 'public';
+  const missionTier = plan.tier as StorageDataTier;
 
   const advisors: MissionAdvisor[] = [];
   for (const assignment of plan.assignments) {

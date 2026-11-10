@@ -77,7 +77,7 @@ beforeAll(async () => {
   );
   bootstrap.safeWriteFile(path.join(root, 'package.json'), '{}');
   vi.stubEnv('KYBERION_ROOT', root);
-  vi.stubEnv('KYBERION_PERSONA', 'sovereign');
+  vi.stubEnv('KYBERION_BASE_ROLE', 'sovereign');
   vi.stubEnv('MISSION_ROLE', 'mission_controller');
   vi.stubEnv('KYBERION_TENANT', 'synthetic-latency');
   vi.stubEnv('SYSTEM_ROLE', 'operator_surface');
@@ -276,7 +276,7 @@ async function fixture(
   const proposal = proposals.normalizeDotProposal({
     title: 'Fixed synthetic repair',
     objective: 'Retain the immutable original constraints',
-    work_shape: 'pipeline',
+    execution_shape: 'pipeline',
     pipeline_ref: latency.SYNTHETIC_LATENCY_PIPELINE_REF,
     target: 'service:synthetic-latency-service',
     intent: 'apply',

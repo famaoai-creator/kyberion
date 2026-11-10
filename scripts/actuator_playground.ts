@@ -20,7 +20,14 @@ import {
   resolveCliActionKind,
   type ActuatorPipelineStepType,
 } from '@agent/core/actuator/actuator-sdk';
-import { createAjv, nowIso, readJsonIfPresent, slugify, writeJson } from '@agent/core/foundation';
+import {
+  config,
+  createAjv,
+  nowIso,
+  readJsonIfPresent,
+  slugify,
+  writeJson,
+} from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import { compileSchemaFromPath } from '@agent/core/schema-loader';
 import { determineActuatorStepType } from '@agent/core/actuator/actuator-op-registry';
@@ -33,6 +40,14 @@ import {
   loadActuatorOpDiscoveryAtPath,
   type ActuatorOpDiscoveryOperation,
 } from '@agent/core/actuator/actuator-op-discovery';
+import { withExecutionContext, withExecutionContextAsync } from '@agent/core/authority';
+import { resolveScopeContext } from '@agent/core/scope-context';
+import {
+  STORAGE_DATA_TIERS,
+  classifyStorageFloorPath,
+  resolveStorageFloor,
+  type StorageDataTier,
+} from '@agent/core/storage-layout';
 import * as readline from 'node:readline';
 import chalk from 'chalk';
 import * as path from 'node:path';
@@ -70,12 +85,15 @@ Record a session of successful live runs and emit a PipelineAdf draft:
                              drop it and record this run in its place)
   --sessions                 list recorded sessions
   --show <name>              print a session's recorded steps
-  --emit-adf <name>          write active/shared/tmp/actuator-playground/<name>.adf.json
+  --emit-adf <name>          write <scoped-scratch>/<name>.adf.json
       [--name <slug>]        pipeline_id/name override (default: session name)
       [--out <path>]         output path override (repo-relative)
       [--request-trust]      open a project-trust approval request for the draft
+  Scratch root follows the active scope partition:
+    active/shared/tmp/<tier>/<tenant|shared>/actuator-playground/
   Next steps (printed by --emit-adf): project-trust approve → pnpm pipeline run
-  → pnpm pipeline:promote --input <adf>.json --run <run-id> --source-is-public
+  → public drafts: pipeline:promote --source-is-public
+  → tenant drafts: pipeline:promote --tenant <slug>
   A charter that delegates 'pipeline_trust_grant' skips the approval round-trip:
   pnpm pipeline --input <adf>.json --delegated-trust [person|tenant:<slug>]
 
@@ -305,9 +323,14 @@ export function assertPlaygroundSecretMutationAllowed(args: {
 // session file; `--emit-adf <name>` converts the recorded steps into a
 // PipelineAdf draft (`domain:op` + Typed Flow role) that `pnpm pipeline:promote`
 // can lift into pipelines/. Session files and drafts stay on the scratch floor
-// (active/shared/tmp/actuator-playground/) — review them before promoting.
+// under the active scope partition
+// (`active/shared/tmp/<tier>/<tenant|shared>/actuator-playground/`) — review
+// them before promoting. Tenant trials land in the tenant partition so
+// confidential browser discovery (e.g. 稟議 automation) never mixes into the
+// legacy unpartitioned scratch root.
 
 const PLAYGROUND_SESSION_NAME = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$/;
+const PLAYGROUND_SCRATCH_DOMAIN = 'actuator-playground';
 /** Param keys whose recorded values are replaced by {{placeholders}} on emit. */
 const SENSITIVE_PARAM_KEY =
   /pass|secret|token|otp|credential|api[-_]?key|private[-_]?key|cookie|authorization/i;
@@ -330,13 +353,142 @@ export interface PlaygroundSessionFile {
   steps: PlaygroundRecordedStep[];
 }
 
+export interface PlaygroundScratchLocation {
+  absolutePath: string;
+  /** Repo-relative POSIX path for printed commands. */
+  repoPath: string;
+  tier: StorageDataTier;
+  /** Present when the active scope binds a tenant slug. */
+  tenant?: string;
+}
+
 /** ADF domain prefix for an actuator (`browser-actuator` → `browser`). */
 export function resolveActuatorDomain(actuatorId: string): string {
   return actuatorId.replace(/-actuator$/u, '');
 }
 
+/** Repo-relative POSIX path for printed commands. */
+function playgroundRepoRelative(absolutePath: string): string {
+  return path.relative(pathResolver.rootDir(), absolutePath).split(path.sep).join('/');
+}
+
+/**
+ * Scratch root for playground sessions / ADF drafts / live input payloads.
+ * Follows the active scope's storage partition so tenant trials stay tenant-owned.
+ * Tests pass `scratchDir` to keep hermetic fixtures off the live floor.
+ */
+export function resolvePlaygroundScratchLocation(scratchDir?: string): PlaygroundScratchLocation {
+  if (scratchDir) {
+    const absolutePath = assertSafeRepositoryPath(scratchDir, { allowMissingLeaf: true });
+    const classified = classifyStorageFloorPath(absolutePath);
+    const partition = classified?.partition;
+    if (partition && partition.kind === 'tier') {
+      return {
+        absolutePath,
+        repoPath: playgroundRepoRelative(absolutePath),
+        tier: partition.tier,
+        ...(partition.tenant ? { tenant: partition.tenant } : {}),
+      };
+    }
+    return {
+      absolutePath,
+      repoPath: playgroundRepoRelative(absolutePath),
+      tier: 'public',
+    };
+  }
+  const scope = resolveScopeContext();
+  const candidateTier = scope.tier || 'public';
+  const tier = (
+    STORAGE_DATA_TIERS.includes(candidateTier as StorageDataTier) ? candidateTier : 'public'
+  ) as StorageDataTier;
+  const tenant = scope.tenant_slug?.trim() || undefined;
+  const absolutePath = resolveStorageFloor(
+    'scratch',
+    { kind: 'tier', tier, ...(tenant ? { tenant } : {}) },
+    PLAYGROUND_SCRATCH_DOMAIN
+  );
+  return {
+    absolutePath,
+    repoPath: playgroundRepoRelative(absolutePath),
+    tier,
+    ...(tenant ? { tenant } : {}),
+  };
+}
+
 function playgroundScratchDir(scratchDir?: string): string {
-  return scratchDir ?? pathResolver.sharedTmp('actuator-playground');
+  return resolvePlaygroundScratchLocation(scratchDir).absolutePath;
+}
+
+/** Tenant slug when an ADF / scratch path sits on a confidential|personal tenant partition. */
+export function playgroundTenantFromPath(filePath: string): string | undefined {
+  const classified = classifyStorageFloorPath(filePath);
+  const partition = classified?.partition;
+  if (!partition || partition.kind !== 'tier' || !partition.tenant) return undefined;
+  if (partition.tier === 'public') return undefined;
+  return partition.tenant;
+}
+
+/**
+ * Run `fn` under the tenant-bound `actuator_playground_worker` role when the
+ * playground scratch sits on a protected tier. Writes on the tmp floor are
+ * admitted by default_allow, but session / ADF / live-input reads — and child
+ * actuators that inherit MISSION_ROLE through buildSafeExecEnv — need an
+ * authorized identity on that partition. Public scratch stays grant-less.
+ * A protected location without a tenant throws [ROLE_TENANT_SCOPE_REQUIRED]
+ * rather than assuming unbound.
+ */
+export async function withPlaygroundScratchRole<T>(
+  location: PlaygroundScratchLocation,
+  fn: () => T | Promise<T>
+): Promise<T> {
+  if (location.tier === 'public') return fn();
+  return withExecutionContextAsync('actuator_playground_worker', fn, 'worker', location.tenant);
+}
+
+function resolveProtectedPlaygroundLocation(filePath: string): PlaygroundScratchLocation | null {
+  let absolute: string;
+  try {
+    absolute = assertSafeRepositoryPath(pathResolver.rootResolve(filePath), {
+      allowMissingLeaf: true,
+    });
+  } catch {
+    return null;
+  }
+  const classified = classifyStorageFloorPath(absolute);
+  const partition = classified?.partition;
+  if (!partition || partition.kind !== 'tier' || partition.tier === 'public') return null;
+  const rel = playgroundRepoRelative(absolute);
+  if (!/(?:^|\/)actuator-playground(?:\/|$)/.test(rel)) return null;
+  return {
+    absolutePath: absolute,
+    repoPath: rel,
+    tier: partition.tier,
+    ...(partition.tenant ? { tenant: partition.tenant } : {}),
+  };
+}
+
+/**
+ * When `filePath` sits on a protected-tier `actuator-playground/` partition,
+ * run `fn` under {@link withPlaygroundScratchRole}. Used by `pnpm pipeline`
+ * so a tenant scratch draft can be hashed, loaded, and re-read for the run
+ * journal without a broader confidential grant. Non-playground paths (catalog
+ * pipelines, knowledge/confidential/.../pipelines/, public scratch) are
+ * unchanged.
+ */
+export async function withPlaygroundPathRole<T>(
+  filePath: string,
+  fn: () => T | Promise<T>
+): Promise<T> {
+  const location = resolveProtectedPlaygroundLocation(filePath);
+  if (!location) return fn();
+  return withPlaygroundScratchRole(location, fn);
+}
+
+/** Sync counterpart of {@link withPlaygroundPathRole} for sync ADF loaders. */
+export function withPlaygroundPathRoleSync<T>(filePath: string, fn: () => T): T {
+  const location = resolveProtectedPlaygroundLocation(filePath);
+  if (!location || location.tier === 'public') return fn();
+  return withExecutionContext('actuator_playground_worker', fn, 'worker', location.tenant);
 }
 
 export function resolvePlaygroundSessionPath(session: string, scratchDir?: string): string {
@@ -548,6 +700,8 @@ export function buildPlaygroundEmitNextSteps(args: {
   storageChannel?: string;
   /** Scope whose charter already delegates the trust grant (`person` / `tenant:<slug>`). */
   delegatedScope?: string;
+  /** Override tenant detection from the ADF path (tests / callers). */
+  tenant?: string | null;
 }): string[] {
   const contextArg =
     args.redactedKeys.length > 0
@@ -555,7 +709,13 @@ export function buildPlaygroundEmitNextSteps(args: {
           Object.fromEntries(args.redactedKeys.map((key) => [key, '<value>']))
         )}'`
       : '';
-  const promote = `pnpm pipeline:promote --input ${args.adfRepoPath} --run <run-id> --source-is-public`;
+  const tenant =
+    args.tenant === null ? undefined : (args.tenant ?? playgroundTenantFromPath(args.adfRepoPath));
+  const promote = tenant
+    ? `pnpm pipeline:promote --input ${args.adfRepoPath} --run <run-id> --tenant ${tenant}`
+    : `pnpm pipeline:promote --input ${args.adfRepoPath} --run <run-id> --source-is-public`;
+  const approve = (id: string) =>
+    `a human approves the request: pnpm kyberion approvals --approve ${id}`;
   if (args.delegatedScope) {
     return [
       `pnpm pipeline --input ${args.adfRepoPath} --delegated-trust ${args.delegatedScope}${contextArg}`,
@@ -563,9 +723,8 @@ export function buildPlaygroundEmitNextSteps(args: {
     ];
   }
   if (args.trustRequestId && args.trustRequested) {
-    const channel = args.storageChannel || 'project-trust';
     return [
-      `a human approves the request: pnpm kyberion approve ${args.trustRequestId} ${channel}`,
+      approve(args.trustRequestId),
       `pnpm pipeline --input ${args.adfRepoPath} --project-trust-approval ${args.trustRequestId}${contextArg}`,
       promote,
     ];
@@ -578,7 +737,7 @@ export function buildPlaygroundEmitNextSteps(args: {
   }
   return [
     `pnpm kyberion project-trust request ${args.adfRepoPath}`,
-    'a human approves the request: pnpm kyberion approve <request-id> project-trust',
+    'a human approves the request: pnpm kyberion approvals --approve <request-id>',
     `pnpm pipeline --input ${args.adfRepoPath} --project-trust-approval <request-id>${contextArg}`,
     promote,
   ];
@@ -705,14 +864,23 @@ function defaultExecuteActuator(args: {
   inputPath: string;
   extraArgs: string[];
 }): string {
+  // Child actuators are a fresh process: ALS does not cross the spawn, and
+  // SAFE_EXEC_ENV_ALLOWLIST does not pass KYBERION_TENANT / SCOPE_ENV_PATH.
+  // buildSafeExecEnv already mirrors MISSION_ROLE from the assumed playground
+  // role; pass the active scope's tenant (and scope-env path) so
+  // ${KYBERION_TENANT} grants expand the same way the parent ALS read did.
+  const scope = resolveScopeContext();
+  const childEnv: Record<string, string | undefined> = {};
+  if (scope.tenant_slug) childEnv.KYBERION_TENANT = scope.tenant_slug;
+  if (scope.tier) childEnv.KYBERION_TIER = scope.tier;
+  const scopeEnvPath = config.text('KYBERION_SCOPE_ENV_PATH')?.trim();
+  if (scopeEnvPath) {
+    childEnv.KYBERION_SCOPE_ENV_PATH = scopeEnvPath;
+  }
   return safeExec('node', [args.execPath, '--input', args.inputPath, ...args.extraArgs], {
     cwd: pathResolver.rootDir(),
+    env: childEnv,
   });
-}
-
-/** Repo-relative POSIX path for printed commands. */
-function playgroundRepoRelative(absolutePath: string): string {
-  return path.relative(pathResolver.rootDir(), absolutePath).split(path.sep).join('/');
 }
 
 async function defaultFindTrustApproval(adfRepoPath: string): Promise<string | null> {
@@ -805,95 +973,104 @@ export async function runPlayground(
       throw new ScriptExitError(1, '--emit-adf requires a session name.');
     }
     try {
-      const emitted = emitPlaygroundSessionAdf({
-        session,
-        name: cliParams.name,
-        out: cliParams.out,
-        scratchDir: options.scratchDir,
-      });
-      const adfRepoPath = playgroundRepoRelative(emitted.output_path);
-      // Verified-evidence chain: a scratch draft is project-local content and
-      // needs project-trust to run; catalog promotion needs the engine run id.
-      // Reuse a still-valid approval when one is already on file, or open the
-      // request now with --request-trust so the operator only has to approve.
-      let trustRequestId: string | null = null;
-      let trustRequested = false;
-      let storageChannel: string | undefined;
-      let trustWarning: string | undefined;
-      if (cliParams['request-trust'] !== undefined) {
-        const requestTrust = options.requestTrustApproval ?? defaultRequestTrustApproval;
-        try {
-          const record = await requestTrust(adfRepoPath);
-          trustRequestId = record.id;
-          storageChannel = record.storageChannel;
-          trustRequested = true;
-        } catch (err) {
-          trustWarning = `project-trust request failed — request it manually: ${
-            err instanceof Error ? err.message : String(err)
-          }`;
+      const scratch = resolvePlaygroundScratchLocation(options.scratchDir);
+      return await withPlaygroundScratchRole(scratch, async () => {
+        const emitted = emitPlaygroundSessionAdf({
+          session,
+          name: cliParams.name,
+          out: cliParams.out,
+          scratchDir: options.scratchDir,
+        });
+        const adfRepoPath = playgroundRepoRelative(emitted.output_path);
+        // Verified-evidence chain: a scratch draft is project-local content and
+        // needs project-trust to run; catalog promotion needs the engine run id.
+        // Reuse a still-valid approval when one is already on file, or open the
+        // request now with --request-trust so the operator only has to approve.
+        let trustRequestId: string | null = null;
+        let trustRequested = false;
+        let storageChannel: string | undefined;
+        let trustWarning: string | undefined;
+        if (cliParams['request-trust'] !== undefined) {
+          const requestTrust = options.requestTrustApproval ?? defaultRequestTrustApproval;
+          try {
+            const record = await requestTrust(adfRepoPath);
+            trustRequestId = record.id;
+            storageChannel = record.storageChannel;
+            trustRequested = true;
+          } catch (err) {
+            trustWarning = `project-trust request failed — request it manually: ${
+              err instanceof Error ? err.message : String(err)
+            }`;
+          }
+        } else {
+          const findApproval = options.findTrustApproval ?? defaultFindTrustApproval;
+          trustRequestId = await findApproval(adfRepoPath);
         }
-      } else {
-        const findApproval = options.findTrustApproval ?? defaultFindTrustApproval;
-        trustRequestId = await findApproval(adfRepoPath);
-      }
-      // No approval on file and no explicit request: a charter that already
-      // delegates pipeline_trust_grant lets the draft run without the human
-      // round-trip — the card then shows the --delegated-trust form.
-      let delegatedScope: string | undefined;
-      let delegatedCharterId: string | undefined;
-      if (!trustRequestId && !trustRequested) {
-        const evaluateDelegation =
-          options.evaluateTrustDelegation ?? defaultEvaluateTrustDelegation;
-        const delegated = await evaluateDelegation(adfRepoPath);
-        if (delegated) {
-          delegatedScope = delegated.delegatedScope;
-          delegatedCharterId = delegated.charterId;
+        // No approval on file and no explicit request: a charter that already
+        // delegates pipeline_trust_grant lets the draft run without the human
+        // round-trip — the card then shows the --delegated-trust form.
+        let delegatedScope: string | undefined;
+        let delegatedCharterId: string | undefined;
+        if (!trustRequestId && !trustRequested) {
+          const evaluateDelegation =
+            options.evaluateTrustDelegation ?? defaultEvaluateTrustDelegation;
+          const delegated = await evaluateDelegation(adfRepoPath);
+          if (delegated) {
+            delegatedScope = delegated.delegatedScope;
+            delegatedCharterId = delegated.charterId;
+          }
         }
-      }
-      const nextSteps = buildPlaygroundEmitNextSteps({
-        adfRepoPath,
-        redactedKeys: emitted.redacted_keys,
-        trustRequestId,
-        trustRequested,
-        ...(storageChannel ? { storageChannel } : {}),
-        ...(delegatedScope ? { delegatedScope } : {}),
+        const tenant = playgroundTenantFromPath(emitted.output_path) ?? scratch.tenant;
+        const nextSteps = buildPlaygroundEmitNextSteps({
+          adfRepoPath,
+          redactedKeys: emitted.redacted_keys,
+          trustRequestId,
+          trustRequested,
+          ...(storageChannel ? { storageChannel } : {}),
+          ...(delegatedScope ? { delegatedScope } : {}),
+          ...(tenant ? { tenant } : { tenant: null }),
+        });
+        const result = {
+          ok: true,
+          mode: 'emit-adf',
+          session,
+          steps: emitted.steps,
+          redacted_keys: emitted.redacted_keys,
+          unverified_ops: emitted.unverified_ops,
+          output_path: emitted.output_path,
+          scratch_dir: scratch.repoPath,
+          scratch_tier: scratch.tier,
+          ...(scratch.tenant ? { scratch_tenant: scratch.tenant } : {}),
+          ...(trustRequestId ? { trust_request_id: trustRequestId } : {}),
+          ...(delegatedScope ? { delegated_scope: delegatedScope } : {}),
+          ...(delegatedCharterId ? { delegated_charter_id: delegatedCharterId } : {}),
+          ...(trustWarning ? { trust_warning: trustWarning } : {}),
+          next_steps: nextSteps,
+        };
+        if (options.json) return result;
+        emit(`Scratch: ${scratch.repoPath}`);
+        emit(`Wrote ADF draft (${emitted.steps} step(s)): ${emitted.output_path}`);
+        if (emitted.redacted_keys.length > 0) {
+          emit(`Redacted sensitive params → {{placeholders}}: ${emitted.redacted_keys.join(', ')}`);
+        }
+        if (emitted.unverified_ops.length > 0) {
+          emit(
+            `⚠️  Ops not in the actuator op registry — verify they dispatch as ADF steps: ${emitted.unverified_ops.join(', ')}`
+          );
+        }
+        if (trustRequested && trustRequestId) {
+          emit(`Opened project-trust request ${trustRequestId}.`);
+        }
+        if (delegatedScope && delegatedCharterId) {
+          emit(`Charter ${delegatedCharterId} delegates 'pipeline_trust_grant' for this draft.`);
+        }
+        if (trustWarning) {
+          emit(`⚠️  ${trustWarning}`);
+        }
+        emit('Review the draft, then:');
+        nextSteps.forEach((step, index) => emit(`  ${index + 1}. ${step}`));
+        return result;
       });
-      const result = {
-        ok: true,
-        mode: 'emit-adf',
-        session,
-        steps: emitted.steps,
-        redacted_keys: emitted.redacted_keys,
-        unverified_ops: emitted.unverified_ops,
-        output_path: emitted.output_path,
-        ...(trustRequestId ? { trust_request_id: trustRequestId } : {}),
-        ...(delegatedScope ? { delegated_scope: delegatedScope } : {}),
-        ...(delegatedCharterId ? { delegated_charter_id: delegatedCharterId } : {}),
-        ...(trustWarning ? { trust_warning: trustWarning } : {}),
-        next_steps: nextSteps,
-      };
-      if (options.json) return result;
-      emit(`Wrote ADF draft (${emitted.steps} step(s)): ${emitted.output_path}`);
-      if (emitted.redacted_keys.length > 0) {
-        emit(`Redacted sensitive params → {{placeholders}}: ${emitted.redacted_keys.join(', ')}`);
-      }
-      if (emitted.unverified_ops.length > 0) {
-        emit(
-          `⚠️  Ops not in the actuator op registry — verify they dispatch as ADF steps: ${emitted.unverified_ops.join(', ')}`
-        );
-      }
-      if (trustRequested && trustRequestId) {
-        emit(`Opened project-trust request ${trustRequestId}.`);
-      }
-      if (delegatedScope && delegatedCharterId) {
-        emit(`Charter ${delegatedCharterId} delegates 'pipeline_trust_grant' for this draft.`);
-      }
-      if (trustWarning) {
-        emit(`⚠️  ${trustWarning}`);
-      }
-      emit('Review the draft, then:');
-      nextSteps.forEach((step, index) => emit(`  ${index + 1}. ${step}`));
-      return result;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       throw new ScriptExitError(1, message);
@@ -917,21 +1094,32 @@ export async function runPlayground(
   // --sessions / --show inspect recorded sessions without touching actuators.
   if (cliParams.sessions !== undefined) {
     rl.close();
-    const sessions = listPlaygroundSessions(options.scratchDir).map((file) => ({
-      session: file.session,
-      created_at: file.created_at,
-      steps: file.steps.length,
-    }));
-    const result = { ok: true, mode: 'sessions', sessions };
-    if (options.json) return result;
-    if (sessions.length === 0) {
-      emit('No recorded playground sessions.');
-    } else {
-      sessions.forEach((entry) =>
-        emit(`  ${entry.session} — ${entry.steps} step(s), created ${entry.created_at}`)
-      );
-    }
-    return result;
+    const scratch = resolvePlaygroundScratchLocation(options.scratchDir);
+    return await withPlaygroundScratchRole(scratch, async () => {
+      const sessions = listPlaygroundSessions(options.scratchDir).map((file) => ({
+        session: file.session,
+        created_at: file.created_at,
+        steps: file.steps.length,
+      }));
+      const result = {
+        ok: true,
+        mode: 'sessions',
+        scratch_dir: scratch.repoPath,
+        scratch_tier: scratch.tier,
+        ...(scratch.tenant ? { scratch_tenant: scratch.tenant } : {}),
+        sessions,
+      };
+      if (options.json) return result;
+      emit(`Scratch: ${scratch.repoPath}`);
+      if (sessions.length === 0) {
+        emit('No recorded playground sessions.');
+      } else {
+        sessions.forEach((entry) =>
+          emit(`  ${entry.session} — ${entry.steps} step(s), created ${entry.created_at}`)
+        );
+      }
+      return result;
+    });
   }
   if (cliParams.show !== undefined) {
     rl.close();
@@ -939,7 +1127,10 @@ export async function runPlayground(
     if (session === 'true') {
       throw new ScriptExitError(1, '--show requires a session name.');
     }
-    const file = readPlaygroundSession(session, options.scratchDir);
+    const scratch = resolvePlaygroundScratchLocation(options.scratchDir);
+    const file = await withPlaygroundScratchRole(scratch, () =>
+      readPlaygroundSession(session, options.scratchDir)
+    );
     if (file.steps.length === 0) {
       throw new ScriptExitError(
         1,
@@ -963,15 +1154,22 @@ export async function runPlayground(
       throw new ScriptExitError(1, '--record requires a session name.');
     }
     try {
-      resolvePlaygroundSessionPath(cliParams.record, options.scratchDir);
-      if (cliParams.reset !== undefined) {
-        resetPlaygroundSession(cliParams.record, options.scratchDir);
-      }
-      // Standalone drop: no actuator means "remove the last step and stop".
-      // With --actuator/--op the run below records the replacement step.
-      if (cliParams['drop-last'] !== undefined && cliParams.actuator === undefined) {
+      const recordScratch = resolvePlaygroundScratchLocation(options.scratchDir);
+      const dropOnly =
+        cliParams['drop-last'] !== undefined && cliParams.actuator === undefined
+          ? await withPlaygroundScratchRole(recordScratch, () => {
+              resolvePlaygroundSessionPath(cliParams.record, options.scratchDir);
+              if (cliParams.reset !== undefined) {
+                resetPlaygroundSession(cliParams.record, options.scratchDir);
+              }
+              // Standalone drop: no actuator means "remove the last step and stop".
+              // With --actuator/--op the run below records the replacement step.
+              return dropLastPlaygroundStep(cliParams.record, options.scratchDir);
+            })
+          : null;
+      if (dropOnly) {
         rl.close();
-        const { removed, remaining } = dropLastPlaygroundStep(cliParams.record, options.scratchDir);
+        const { removed, remaining } = dropOnly;
         const result = {
           ok: true,
           mode: 'drop-last',
@@ -985,6 +1183,12 @@ export async function runPlayground(
         );
         return result;
       }
+      await withPlaygroundScratchRole(recordScratch, () => {
+        resolvePlaygroundSessionPath(cliParams.record, options.scratchDir);
+        if (cliParams.reset !== undefined) {
+          resetPlaygroundSession(cliParams.record, options.scratchDir);
+        }
+      });
     } catch (err) {
       rl.close();
       const message = err instanceof Error ? err.message : String(err);
@@ -1337,141 +1541,149 @@ export async function runPlayground(
     }
   }
 
-  // 7. Write to temp file inside active/shared/tmp/
-  const tempDir = pathResolver.sharedTmp('actuator-playground');
-  const tempPath = assertSafeRepositoryPath(
-    path.join(tempDir, `input-${manifest.actuator_id}-${Date.now()}.json`),
-    { allowMissingLeaf: true }
-  );
-
-  log(chalk.white(`\nWriting payload to temporary file: ${chalk.bold(tempPath)}...`));
-  safeWriteFile(tempPath, JSON.stringify(payload, null, 2), { mkdir: true });
-
-  // 8. Find executable path
-  // Standard compile target paths
-  const distDir = pathResolver.rootResolve('dist/libs/actuators');
-  const execPath1 = assertSafeRepositoryPath(
-    path.join(distDir, manifest.actuator_id, 'src/index.js'),
-    { allowMissingLeaf: true }
-  );
-  const execPath2 = assertSafeRepositoryPath(path.join(distDir, manifest.actuator_id, 'index.js'), {
-    allowMissingLeaf: true,
-  });
-
-  let execPath = options.resolveExecutable?.(manifest.actuator_id) ?? '';
-  if (!execPath && safeExistsSync(execPath1)) {
-    execPath = execPath1;
-  } else if (!execPath && safeExistsSync(execPath2)) {
-    execPath = execPath2;
-  } else if (!execPath) {
-    log(
-      chalk.yellow(
-        `\n⚠️  Could not find compiled JavaScript under dist/libs/actuators/${manifest.actuator_id}.`
-      )
+  // 7–9. Write the live payload, find the executable, invoke the actuator, and
+  // optionally record — all under the tenant scratch role when needed so the
+  // child inherits MISSION_ROLE via buildSafeExecEnv.
+  const scratch = resolvePlaygroundScratchLocation(options.scratchDir);
+  return await withPlaygroundScratchRole(scratch, async () => {
+    const tempDir = scratch.absolutePath;
+    const tempPath = assertSafeRepositoryPath(
+      path.join(tempDir, `input-${manifest.actuator_id}-${Date.now()}.json`),
+      { allowMissingLeaf: true }
     );
-    log(chalk.white('Attempting to compile actuators monorepo-wide first...'));
-    try {
-      safeExec('pnpm', ['run', 'build:actuators'], { cwd: pathResolver.rootDir() });
-      if (safeExistsSync(execPath1)) {
-        execPath = execPath1;
-      } else if (safeExistsSync(execPath2)) {
-        execPath = execPath2;
+
+    log(chalk.white(`\nWriting payload to temporary file: ${chalk.bold(tempPath)}...`));
+    safeWriteFile(tempPath, JSON.stringify(payload, null, 2), { mkdir: true });
+
+    // 8. Find executable path
+    // Standard compile target paths
+    const distDir = pathResolver.rootResolve('dist/libs/actuators');
+    const execPath1 = assertSafeRepositoryPath(
+      path.join(distDir, manifest.actuator_id, 'src/index.js'),
+      { allowMissingLeaf: true }
+    );
+    const execPath2 = assertSafeRepositoryPath(
+      path.join(distDir, manifest.actuator_id, 'index.js'),
+      {
+        allowMissingLeaf: true,
       }
-    } catch (err: any) {
-      logError(chalk.red(`❌ Compilation failed: ${err.message}`));
-    }
-  }
+    );
 
-  if (!execPath) {
-    logError(chalk.red(`\n❌ Executable not found. Make sure the actuator is built successfully.`));
-    rl.close();
-    throw new ScriptExitError(1, 'Actuator executable not found');
-  }
-
-  // 9. Execute Actuator (capture `--dry-run` still invokes the handler)
-  const extraArgs = options.dryRun === true ? ['--dry-run'] : [];
-  const executeActuator = options.executeActuator ?? defaultExecuteActuator;
-  log(chalk.bold.yellow(`\n⚡ Executing [${manifest.actuator_id}] with command:`));
-  log(
-    chalk.gray(
-      `node ${execPath} --input ${tempPath}${extraArgs.length ? ` ${extraArgs.join(' ')}` : ''}\n`
-    )
-  );
-
-  try {
-    const stdout = executeActuator({ execPath, inputPath: tempPath, extraArgs });
-    log(chalk.bold.green('🎉 Execution completed successfully! Result output:'));
-    log(chalk.white(stdout.trim()));
-    let recorded: Record<string, unknown> | undefined;
-    if (cliParams.record !== undefined && options.dryRun !== true) {
-      // --drop-last with a run replaces the previous step only on success —
-      // a failing replacement never loses the recorded original.
-      if (cliParams['drop-last'] !== undefined) {
-        try {
-          dropLastPlaygroundStep(cliParams.record, options.scratchDir);
-        } catch {
-          // Empty session: nothing to replace — record normally.
-        }
-      }
-      const sessionFile = recordPlaygroundStep(
-        cliParams.record,
-        {
-          actuator_id: manifest.actuator_id,
-          domain: resolveActuatorDomain(manifest.actuator_id),
-          op,
-          kind: resolvedKind,
-          params: paramsObject,
-        },
-        options.scratchDir
-      );
-      recorded = { session: cliParams.record, steps: sessionFile.steps.length };
+    let execPath = options.resolveExecutable?.(manifest.actuator_id) ?? '';
+    if (!execPath && safeExistsSync(execPath1)) {
+      execPath = execPath1;
+    } else if (!execPath && safeExistsSync(execPath2)) {
+      execPath = execPath2;
+    } else if (!execPath) {
       log(
-        chalk.gray(
-          `  Recorded step ${sessionFile.steps.length} into session '${cliParams.record}'. ` +
-            `Export with: pnpm playground -- --emit-adf ${cliParams.record}`
+        chalk.yellow(
+          `\n⚠️  Could not find compiled JavaScript under dist/libs/actuators/${manifest.actuator_id}.`
         )
       );
+      log(chalk.white('Attempting to compile actuators monorepo-wide first...'));
+      try {
+        safeExec('pnpm', ['run', 'build:actuators'], { cwd: pathResolver.rootDir() });
+        if (safeExistsSync(execPath1)) {
+          execPath = execPath1;
+        } else if (safeExistsSync(execPath2)) {
+          execPath = execPath2;
+        }
+      } catch (err: any) {
+        logError(chalk.red(`❌ Compilation failed: ${err.message}`));
+      }
     }
-    rl.close();
-    return {
-      ok: true,
-      mode: options.dryRun === true ? 'dry-run' : 'execute',
-      actuator_id: manifest.actuator_id,
-      operation: op,
-      kind: resolvedKind,
-      dry_run: options.dryRun === true,
-      handler: resolvedKind,
-      handler_invoked: true,
-      input_path: tempPath,
-      executable_path: execPath,
-      stdout: stdout.trim(),
-      ...(recorded ? { recorded } : {}),
-    };
-  } catch (err: any) {
-    logError(chalk.bold.red('\n❌ Execution error encountered:'));
-    logError(chalk.red(err.message));
-    if (err.stdout) {
-      logError(chalk.yellow('\nStdout:'));
-      logError(chalk.white(err.stdout.toString().trim()));
-    }
-    if (err.stderr) {
-      logError(chalk.yellow('\nStderr:'));
-      logError(chalk.red(err.stderr.toString().trim()));
-    }
-    rl.close();
-    return {
-      ok: false,
-      mode: options.dryRun === true ? 'dry-run' : 'execute',
-      actuator_id: manifest.actuator_id,
-      operation: op,
-      handler_invoked: true,
-      error: err.message,
-      ...(err.stdout ? { stdout: String(err.stdout).trim() } : {}),
-      ...(err.stderr ? { stderr: String(err.stderr).trim() } : {}),
-    };
-  }
 
-  rl.close();
+    if (!execPath) {
+      logError(
+        chalk.red(`\n❌ Executable not found. Make sure the actuator is built successfully.`)
+      );
+      rl.close();
+      throw new ScriptExitError(1, 'Actuator executable not found');
+    }
+
+    // 9. Execute Actuator (capture `--dry-run` still invokes the handler)
+    const extraArgs = options.dryRun === true ? ['--dry-run'] : [];
+    const executeActuator = options.executeActuator ?? defaultExecuteActuator;
+    log(chalk.bold.yellow(`\n⚡ Executing [${manifest.actuator_id}] with command:`));
+    log(
+      chalk.gray(
+        `node ${execPath} --input ${tempPath}${extraArgs.length ? ` ${extraArgs.join(' ')}` : ''}\n`
+      )
+    );
+
+    try {
+      const stdout = executeActuator({ execPath, inputPath: tempPath, extraArgs });
+      log(chalk.bold.green('🎉 Execution completed successfully! Result output:'));
+      log(chalk.white(stdout.trim()));
+      let recorded: Record<string, unknown> | undefined;
+      if (cliParams.record !== undefined && options.dryRun !== true) {
+        // --drop-last with a run replaces the previous step only on success —
+        // a failing replacement never loses the recorded original.
+        if (cliParams['drop-last'] !== undefined) {
+          try {
+            dropLastPlaygroundStep(cliParams.record, options.scratchDir);
+          } catch {
+            // Empty session: nothing to replace — record normally.
+          }
+        }
+        const sessionFile = recordPlaygroundStep(
+          cliParams.record,
+          {
+            actuator_id: manifest.actuator_id,
+            domain: resolveActuatorDomain(manifest.actuator_id),
+            op,
+            kind: resolvedKind,
+            params: paramsObject,
+          },
+          options.scratchDir
+        );
+        recorded = { session: cliParams.record, steps: sessionFile.steps.length };
+        log(
+          chalk.gray(
+            `  Recorded step ${sessionFile.steps.length} into session '${cliParams.record}'. ` +
+              `Export with: pnpm playground -- --emit-adf ${cliParams.record}`
+          )
+        );
+      }
+      rl.close();
+      return {
+        ok: true,
+        mode: options.dryRun === true ? 'dry-run' : 'execute',
+        actuator_id: manifest.actuator_id,
+        operation: op,
+        kind: resolvedKind,
+        dry_run: options.dryRun === true,
+        handler: resolvedKind,
+        handler_invoked: true,
+        input_path: tempPath,
+        executable_path: execPath,
+        stdout: stdout.trim(),
+        ...(recorded ? { recorded } : {}),
+      };
+    } catch (err: any) {
+      logError(chalk.bold.red('\n❌ Execution error encountered:'));
+      logError(chalk.red(err.message));
+      if (err.stdout) {
+        logError(chalk.yellow('\nStdout:'));
+        logError(chalk.white(err.stdout.toString().trim()));
+      }
+      if (err.stderr) {
+        logError(chalk.yellow('\nStderr:'));
+        logError(chalk.red(err.stderr.toString().trim()));
+      }
+      rl.close();
+      return {
+        ok: false,
+        mode: options.dryRun === true ? 'dry-run' : 'execute',
+        actuator_id: manifest.actuator_id,
+        operation: op,
+        handler_invoked: true,
+        error: err.message,
+        ...(err.stdout ? { stdout: String(err.stdout).trim() } : {}),
+        ...(err.stderr ? { stderr: String(err.stderr).trim() } : {}),
+      };
+    }
+  });
 }
 
 const script = defineScript({

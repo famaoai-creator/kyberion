@@ -242,7 +242,7 @@ describe('continuous operations policy', () => {
       value: 5,
       proposal: {
         action_id: 'dot_delegate_work',
-        work_shape: 'pipeline',
+        execution_shape: 'pipeline',
         pipeline_ref: 'pipelines/diagnose.json',
       },
     });

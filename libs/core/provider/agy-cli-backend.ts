@@ -7,6 +7,7 @@ import * as os from 'node:os';
 import { z, type ZodType } from 'zod';
 import { logger } from '../core.js';
 import { safeExistsSync } from '../secure-io.js';
+import { parseAgyCliUsage, recordCliUsage } from './cli-usage-metering.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { parseSafeJsonInput, parseSafeJsonObjectValue } from '../foundation/json.js';
 import {
@@ -562,12 +563,24 @@ export class AgyCliBackend implements ReasoningBackend {
         env: spawnEnv.env,
       })
     );
+    const started = Date.now();
+    const model = this.resolveModelArgs(options?.model)[1] ?? this.model;
     let stderr = '';
+    let stdout = '';
+    let requestNotSent = false;
+    let completionChars = 0;
+    let status: 'success' | 'error' = 'error';
+    child.stdout.on('data', (chunk) => {
+      stdout += chunk.toString();
+    });
     child.stderr.on('data', (chunk) => {
       stderr = `${stderr}${chunk.toString()}`.slice(-2000);
     });
     const closePromise = new Promise<number>((resolve, reject) => {
-      child.once('error', reject);
+      child.once('error', (err) => {
+        if (!stdout) requestNotSent = true;
+        reject(err);
+      });
       child.once('close', (code) => resolve(code ?? 1));
     });
     const boundedClose = withWallClockBudget(
@@ -604,6 +617,7 @@ export class AgyCliBackend implements ReasoningBackend {
                 if (typeof delta === 'string' && delta) {
                   emittedPartialText = true;
                   yielded = true;
+                  completionChars += delta.length;
                   yield delta;
                 }
               }
@@ -618,6 +632,7 @@ export class AgyCliBackend implements ReasoningBackend {
                 : undefined;
             if (typeof response === 'string' && response.trim()) {
               yielded = true;
+              completionChars += response.length;
               yield response;
             }
           }
@@ -632,7 +647,14 @@ export class AgyCliBackend implements ReasoningBackend {
         );
       }
       if (!yielded) throw new Error('[agy-cli] streaming CLI returned no text');
+      status = 'success';
     } finally {
+      recordCliUsage('agy-cli', model, started, status, {
+        report: parseAgyCliUsage(stdout),
+        promptChars: prompt.length,
+        completionChars,
+        requestNotSent,
+      });
       options?.signal?.removeEventListener('abort', onAbort);
       if (child.exitCode === null && child.signalCode === null) child.kill('SIGTERM');
       spawnEnv.dispose();
@@ -681,20 +703,48 @@ export class AgyCliBackend implements ReasoningBackend {
       '-p',
       prompt,
       ...this.extraArgs,
+      // Last flag wins: the backend's format choice cannot be overridden by
+      // extraArgs, which keeps the usage envelope guaranteed.
+      '--output-format',
+      'json',
     ];
 
-    const stdout = await this.spawnCli(args, undefined, params.profile);
+    const started = Date.now();
+    const capture = { stdout: '', requestNotSent: true };
+    let completionChars = 0;
+    let status: 'success' | 'error' = 'error';
+    try {
+      const stdout = await this.spawnCli(args, undefined, params.profile, capture);
+      capture.stdout = stdout;
+      const result = this.parseStructuredEnvelope(stdout, params.schema);
+      status = 'success';
+      completionChars = JSON.stringify(result).length;
+      return result;
+    } finally {
+      recordCliUsage('agy-cli', this.model, started, status, {
+        report: parseAgyCliUsage(capture.stdout),
+        promptChars: prompt.length,
+        completionChars,
+        requestNotSent: capture.requestNotSent,
+      });
+    }
+  }
+
+  private parseStructuredEnvelope<T>(stdout: string, schema: ZodType<T>): T {
     let cliResult: any;
     try {
-      cliResult = parseSafeJsonInput(extractJsonPayload(stdout), 'agy-cli JSON output');
+      cliResult = parseSafeJsonInput(stdout, 'agy-cli JSON output');
     } catch (err: any) {
       throw new Error(
         `[agy-cli] failed to parse CLI JSON output: ${err?.message ?? err}. Raw: ${stdout.slice(0, 500)}`
       );
     }
-    if (cliResult.is_error) {
+    if (
+      cliResult.is_error ||
+      (typeof cliResult.status === 'string' && cliResult.status !== 'SUCCESS')
+    ) {
       throw new Error(
-        `[agy-cli] CLI reported error: ${cliResult.result ?? JSON.stringify(cliResult)}`
+        `[agy-cli] CLI reported error: ${cliResult.result ?? cliResult.response ?? JSON.stringify(cliResult)}`
       );
     }
     const structured = cliResult.structured_output ?? cliResult.response ?? cliResult;
@@ -716,7 +766,7 @@ export class AgyCliBackend implements ReasoningBackend {
         );
       }
     }
-    const parsed = params.schema.safeParse(structuredValue);
+    const parsed = schema.safeParse(structuredValue);
     if (!parsed.success) {
       throw new Error(
         `[agy-cli] schema validation failed: ${parsed.error.message}. Structured: ${JSON.stringify(structured).slice(0, 500)}`
@@ -742,12 +792,35 @@ export class AgyCliBackend implements ReasoningBackend {
       '-p',
       prompt,
       ...this.extraArgs,
+      '--output-format',
+      'json',
     ];
 
-    const stdout = await this.spawnCli(args, signal, profile);
+    const started = Date.now();
+    const capture = { stdout: '', requestNotSent: true };
+    let completionChars = 0;
+    let status: 'success' | 'error' = 'error';
+    try {
+      const stdout = await this.spawnCli(args, signal, profile, capture);
+      capture.stdout = stdout;
+      const result = this.parsePromptEnvelope(stdout);
+      status = 'success';
+      completionChars = result.length;
+      return result;
+    } finally {
+      recordCliUsage('agy-cli', model?.trim() || this.model, started, status, {
+        report: parseAgyCliUsage(capture.stdout),
+        promptChars: prompt.length,
+        completionChars,
+        requestNotSent: capture.requestNotSent,
+      });
+    }
+  }
+
+  private parsePromptEnvelope(stdout: string): string {
     try {
       const cliResult = parseSafeJsonObjectValue(
-        parseSafeJsonInput(extractJsonPayload(stdout), 'agy-cli JSON output'),
+        parseSafeJsonInput(stdout, 'agy-cli JSON output'),
         'agy-cli JSON output'
       );
       const responseStr = typeof cliResult.response === 'string' ? cliResult.response : undefined;
@@ -888,7 +961,8 @@ export class AgyCliBackend implements ReasoningBackend {
   private spawnCli(
     args: string[],
     signal?: AbortSignal,
-    profile?: ProviderPermissionProfileName
+    profile?: ProviderPermissionProfileName,
+    capture: { stdout: string; requestNotSent: boolean } = { stdout: '', requestNotSent: true }
   ): Promise<string> {
     assertReasoningEgressAllowed(this.name);
     const spawnEnv = this.buildSpawnEnv(profile);
@@ -898,6 +972,7 @@ export class AgyCliBackend implements ReasoningBackend {
         env: spawnEnv.env,
       })
     );
+    capture.requestNotSent = false;
 
     return withWallClockBudget(
       {
@@ -920,6 +995,7 @@ export class AgyCliBackend implements ReasoningBackend {
             resolve(stdout);
           });
           child.on('error', (err) => {
+            if (!stdout) capture.requestNotSent = true;
             reject(new Error(`[agy-cli] spawn failed: ${err.message}`));
           });
           child.stdin.end();

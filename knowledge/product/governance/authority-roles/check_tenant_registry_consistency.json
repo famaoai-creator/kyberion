@@ -1,0 +1,11 @@
+{
+  "role": "check_tenant_registry_consistency",
+  "assignable": false,
+  "permissions": {
+    "allow_read": [
+      "knowledge/personal/tenants/",
+      "knowledge/personal/stances/",
+      "knowledge/confidential/tenants/index.json"
+    ]
+  }
+}

@@ -1,3 +1,4 @@
+import type { StorageDataTier } from '../storage-layout.js';
 import { createHash } from 'node:crypto';
 import * as nodePath from 'node:path';
 
@@ -31,7 +32,7 @@ import {
 export type AcceptedPipelineBindingStatus = 'candidate' | 'active' | 'deprecated' | 'revoked';
 
 export interface AcceptedPipelineBindingScope {
-  tier: 'public' | 'confidential' | 'personal';
+  tier: StorageDataTier;
   tenant_slug?: string;
   organization_id?: string;
   project_id?: string;

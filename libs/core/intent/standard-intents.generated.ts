@@ -72,6 +72,7 @@ export interface Intent {
     | 'legal_and_compliance'
     | 'strategy_and_governance'
     | 'procurement_and_supply'
+    | 'web_design_improvement'
     | 'long_running_job';
   risk_profile: 'low' | 'review_required' | 'approval_required' | 'high_stakes';
   description: string;
@@ -86,6 +87,9 @@ export interface Intent {
   pipeline?: PipelineStep[];
 }
 export interface Resolution {
+  /**
+   * Deprecated: derived from execution_shape at load time. Do not store it in the base catalog; an overlay value loses to execution_shape.
+   */
   shape?: string;
   task_kind?: string;
   result_shape?: string;

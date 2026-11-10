@@ -27,7 +27,7 @@ UI は共有 A2UI キット（`kyberion-base`: `ui:toolbar` / `ui:dialog` / `ui:
 ### 方式B（推奨・往復編集 / 🎤も使える）
 
 ```bash
-KYBERION_PERSONA=sovereign node_modules/.bin/tsx scripts/report-review/server.ts <report.html> [port] \
+KYBERION_BASE_ROLE=sovereign node_modules/.bin/tsx scripts/report-review/server.ts <report.html> [port] \
   --artifact-ref artifact://tenant-a/report-1 --tier confidential --tenant tenant-a
 # → http://127.0.0.1:<port>/ を開く（localhost=セキュアコンテキストなので 🎤 マイク可）
 ```
@@ -59,7 +59,7 @@ node_modules/.bin/tsx scripts/report-review/stamp.ts <report.html> --remove # �
 ## セキュリティ/機密の注意
 
 - 🎤（Web Speech API）は機種により**音声がブラウザ提供元のクラウドへ送信**される。機微な内容は **OSディクテーション（端末内）** を使うこと。
-- confidential 階層のレポートを保存する場合、secure-io のティアガードにより適切な `KYBERION_PERSONA` が必要。
+- confidential 階層のレポートを保存する場合、secure-io のティアガードにより適切な `KYBERION_BASE_ROLE` が必要。
 - 保存成功時は `active/shared/observability/review-service/tenants/{tenant}/receipts/` に
   review session、scope、viewer、backup、comment 数を記録する。これは承認の代替ではなく、
   review artifact の保存証跡である。

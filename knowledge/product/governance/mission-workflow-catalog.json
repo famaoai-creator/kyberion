@@ -11313,7 +11313,8 @@
           "content_and_media",
           "operations_and_release",
           "environment_and_recovery",
-          "platform_onboarding"
+          "platform_onboarding",
+          "web_design_improvement"
         ],
         "delivery_shapes": ["interactive_exploration"]
       },
@@ -11451,7 +11452,8 @@
           "content_and_media",
           "operations_and_release",
           "environment_and_recovery",
-          "platform_onboarding"
+          "platform_onboarding",
+          "web_design_improvement"
         ],
         "delivery_shapes": ["cross_system_change", "multi_artifact_pipeline"],
         "execution_shapes": ["mission", "project_bootstrap", "task_session"]
@@ -11778,7 +11780,7 @@
       "description": "Structure-only refactoring under AI-DLC: audit smells, pin behavior, reshape atomically, prove equivalence. Binds engineering-refactoring-playbook.",
       "playbook_ref": "knowledge/product/orchestration/engineering-refactoring-playbook.md",
       "match": {
-        "mission_classes": ["code_change"],
+        "mission_classes": ["code_change", "web_design_improvement"],
         "execution_shapes": ["mission"],
         "task_types": ["refactoring"]
       },
@@ -12030,6 +12032,21 @@
               "estimated_scope": "S",
               "risk": "medium",
               "deliverable_kind": "doc"
+            },
+            {
+              "task_id_suffix": "docs-sync",
+              "team_role": "implementer",
+              "phase_kind": "implement",
+              "description": "変更差分に対して pnpm check:docs-impact を実行し、ドキュメント面の抜け漏れを evidence/docs-sync-report.md に記録する。not_updated / unmapped の各項目は、ドキュメント更新を同じ変更に含めるか、対象外の理由をレポートの Resolution に記録して解消する",
+              "deliverable": "evidence/docs-sync-report.md",
+              "acceptance_criteria": [
+                "evidence/docs-sync-report.md に base・changed files・findings が記録されている",
+                "not_updated / unmapped の各項目について、ドキュメント更新または対象外理由が記録されている"
+              ],
+              "expected_output_format": "files",
+              "estimated_scope": "S",
+              "risk": "low",
+              "deliverable_kind": "doc"
             }
           ],
           "exit_gate": {
@@ -12039,6 +12056,12 @@
                 "kind": "evidence_exists",
                 "params": {
                   "path": "evidence/delivery-report.md"
+                }
+              },
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/docs-sync-report.md"
                 }
               },
               {
@@ -12086,7 +12109,7 @@
       "pattern": "aidlc_code_change",
       "description": "Code-change missions follow the AI-DLC phase structure with per-phase default tasks and gates (MO-01/MO-02); each phase references its SDLC pipeline template.",
       "match": {
-        "mission_classes": ["code_change"],
+        "mission_classes": ["code_change", "web_design_improvement"],
         "execution_shapes": ["mission"]
       },
       "phases": [
@@ -12351,6 +12374,21 @@
               "estimated_scope": "S",
               "risk": "medium",
               "deliverable_kind": "doc"
+            },
+            {
+              "task_id_suffix": "docs-sync",
+              "team_role": "implementer",
+              "phase_kind": "implement",
+              "description": "変更差分に対して pnpm check:docs-impact を実行し、ドキュメント面の抜け漏れを evidence/docs-sync-report.md に記録する。not_updated / unmapped の各項目は、ドキュメント更新を同じ変更に含めるか、対象外の理由をレポートの Resolution に記録して解消する",
+              "deliverable": "evidence/docs-sync-report.md",
+              "acceptance_criteria": [
+                "evidence/docs-sync-report.md に base・changed files・findings が記録されている",
+                "not_updated / unmapped の各項目について、ドキュメント更新または対象外理由が記録されている"
+              ],
+              "expected_output_format": "files",
+              "estimated_scope": "S",
+              "risk": "low",
+              "deliverable_kind": "doc"
             }
           ],
           "exit_gate": {
@@ -12360,6 +12398,12 @@
                 "kind": "evidence_exists",
                 "params": {
                   "path": "evidence/delivery-report.md"
+                }
+              },
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/docs-sync-report.md"
                 }
               },
               {
@@ -13183,7 +13227,8 @@
           "people_and_talent",
           "legal_and_compliance",
           "strategy_and_governance",
-          "procurement_and_supply"
+          "procurement_and_supply",
+          "web_design_improvement"
         ],
         "delivery_shapes": ["single_artifact", "long_running_job", "*"],
         "execution_shapes": ["direct_reply", "task_session", "mission", "project_bootstrap"]
