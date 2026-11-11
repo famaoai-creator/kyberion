@@ -34,7 +34,8 @@ export interface MissionTeamCompositionBriefInput {
   artifactPaths?: string[];
   progressSignals?: string[];
   tier?: StorageDataTier;
-  assignedPersona?: string;
+  /** The mission's Org Role (knowledge/product/roles/); descriptive team metadata. */
+  orgRole?: string;
   tenantSlug?: string;
   organizationProfile?: OrganizationProfile | null;
   executionShape?: 'direct_reply' | 'task_session' | 'mission' | 'project_bootstrap';
@@ -111,7 +112,7 @@ export function composeMissionTeamBrief(
     artifactPaths: input.artifactPaths,
     progressSignals: input.progressSignals,
     tier,
-    assignedPersona: input.assignedPersona,
+    orgRole: input.orgRole,
     tenantSlug: input.tenantSlug,
     organizationProfile: input.organizationProfile,
   });

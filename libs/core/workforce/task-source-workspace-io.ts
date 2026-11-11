@@ -12,7 +12,7 @@ import { runtimeStatePath } from '../foundation/runtime-state-roots.js';
 import { storagePartitionSegments } from '../storage-layout.js';
 import type { TaskToolBinding } from './task-tool-runtime.js';
 import { currentExecutionScope, runInExecutionScope } from '../foundation/execution-scope.js';
-import { resolveRole, resolveExecutionPersona } from '../authority.js';
+import { resolveRole, resolveExecutionBaseRole } from '../authority.js';
 import {
   taskSourceWorkspaceIoActive as windowActive,
   withTaskSourceWorkspaceCapability,
@@ -53,7 +53,7 @@ export function withTaskSourceWorkspaceIo<T>(
     tenantBound: Boolean(binding.scope.tenant_slug),
     tenantSlug: binding.scope.tenant_slug,
     assumedRole: resolveRole() || 'worker',
-    assumedPersona: resolveExecutionPersona(),
+    assumedBaseRole: resolveExecutionBaseRole(),
   };
   const validate = () => runInExecutionScope(caller, assertCurrent);
   // The binding the former role assumption applied (withExecutionContext with the task's

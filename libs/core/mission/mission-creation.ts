@@ -305,7 +305,7 @@ export async function createMission(args: {
     missionId: upperId,
     missionType: effectiveMissionTypeEarly,
     tier: finalTier,
-    assignedPersona: persona,
+    orgRole: persona,
     tenantSlug,
     organizationProfile,
     utterance: resolvedVision,

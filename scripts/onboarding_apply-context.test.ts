@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { resolveExecutionPersona, resolveRole } from '@agent/core/authority';
+import { resolveExecutionBaseRole, resolveRole } from '@agent/core/authority';
 import { safeMkdir } from '@agent/core/secure-io';
 import { ensureDir } from './onboarding_apply.js';
 
@@ -19,12 +19,12 @@ describe('onboarding directory writer context', () => {
     vi.stubEnv('KYBERION_BASE_ROLE', 'mission_owner');
     const writes: Array<{ role: string | undefined; persona: string | undefined }> = [];
     vi.mocked(safeMkdir).mockImplementation(() => {
-      writes.push({ role: resolveRole(), persona: resolveExecutionPersona() });
+      writes.push({ role: resolveRole(), persona: resolveExecutionBaseRole() });
     });
 
     ensureDir('knowledge/personal/onboarding/context-regression-missing');
 
     expect(writes).toEqual([{ role: 'sovereign_concierge', persona: 'sovereign' }]);
-    expect(resolveExecutionPersona()).toBe('mission_owner');
+    expect(resolveExecutionBaseRole()).toBe('mission_owner');
   });
 });

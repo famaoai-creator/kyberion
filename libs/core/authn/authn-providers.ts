@@ -51,7 +51,7 @@ import { readTextFile } from '../foundation/text.js';
 import { getAgentIdentity, deriveAgentNhiId } from '../agent/agent-identity.js';
 import {
   resolveAssumedRole,
-  resolveExecutionPersona,
+  resolveExecutionBaseRole,
   withExecutionContext,
   withStoreGrant,
 } from '../authority.js';
@@ -82,6 +82,7 @@ import {
   authnEnvText,
   credentialToken,
   registerAuthnProvider,
+  type AuthnExecutionContext,
   type AuthnProvider,
   type AuthnRequest,
   type AuthnResolveDeps,
@@ -103,7 +104,16 @@ function envText(deps: AuthnResolveDeps | undefined, name: string): string | und
  * concurrent async contexts.
  */
 function ambientPersona(deps: AuthnResolveDeps | undefined): string | undefined {
-  return deps?.env ? baseRoleEnvText(deps.env) : resolveExecutionPersona();
+  return deps?.env ? baseRoleEnvText(deps.env) : resolveExecutionBaseRole();
+}
+
+/**
+ * The context's base-role hint. `persona` is the pre-S4 name, read for one
+ * release only when `baseRole` is absent (a present `baseRole`, even blank,
+ * wins — the allowed_base_roles precedent).
+ */
+function contextBaseRole(ctx: AuthnExecutionContext): string | undefined {
+  return ctx.baseRole !== undefined ? ctx.baseRole : ctx.persona;
 }
 
 function ambientMissionRole(deps: AuthnResolveDeps | undefined): string | undefined {
@@ -459,12 +469,15 @@ const agentContextProvider: AuthnProvider = {
     const ctx = request.executionContext;
     const hinted =
       ctx.actorHint?.trim() ||
-      ctx.persona?.trim() ||
+      contextBaseRole(ctx)?.trim() ||
       ctx.missionRole?.trim() ||
       ambientPersona(deps)?.trim() ||
       ambientMissionRole(deps)?.trim();
     if (!hinted) {
-      return { eligible: false, unmet: ['no agent identity hint (persona/missionRole/actorHint)'] };
+      return {
+        eligible: false,
+        unmet: ['no agent identity hint (baseRole/missionRole/actorHint)'],
+      };
     }
     return { eligible: true };
   },
@@ -473,7 +486,7 @@ const agentContextProvider: AuthnProvider = {
     const ctx = request.executionContext;
     const hint =
       ctx.actorHint?.trim() ||
-      ctx.persona?.trim() ||
+      contextBaseRole(ctx)?.trim() ||
       ctx.missionRole?.trim() ||
       ambientPersona(deps)?.trim() ||
       ambientMissionRole(deps)?.trim() ||
