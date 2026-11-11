@@ -193,6 +193,7 @@
     "completion_summary": {
       "type": "object",
       "properties": {
+        "outcome_result": { "$ref": "outcome-result.schema.json" },
         "requested_result": { "type": "string", "minLength": 1 },
         "satisfied": { "type": "boolean" },
         "delivered": {
