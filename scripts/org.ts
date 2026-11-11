@@ -78,12 +78,6 @@ type SecurityPolicy = {
   [key: string]: unknown;
 };
 
-type RoleWriteAccess = {
-  version?: string;
-  default_allow?: string[];
-  roles?: Record<string, { allow?: string[] }>;
-};
-
 type RoleAuthorityMap = {
   version?: string;
   description?: string;
@@ -98,13 +92,9 @@ const ROLE_AUTHORITY_MAP_SCHEMA_PATH = pathResolver.knowledge(
 const SECURITY_POLICY_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/security-policy.schema.json'
 );
-const ROLE_WRITE_ACCESS_SCHEMA_PATH = pathResolver.knowledge(
-  'product/schemas/role-write-access.schema.json'
-);
 
 const roleAuthorityMapCatalogs = new Map<string, GovernedCatalog<RoleAuthorityMap>>();
 const securityPolicyCatalogs = new Map<string, GovernedCatalog<SecurityPolicy>>();
-const roleWriteAccessCatalogs = new Map<string, GovernedCatalog<RoleWriteAccess>>();
 
 type OrgRoleCreateOptions = {
   name: string;
@@ -441,23 +431,9 @@ function securityPolicyCatalog(filePath: string): GovernedCatalog<SecurityPolicy
   return catalog;
 }
 
-function roleWriteAccessCatalog(filePath: string): GovernedCatalog<RoleWriteAccess> {
-  const existing = roleWriteAccessCatalogs.get(filePath);
-  if (existing) return existing;
-  const catalog = defineCatalog<RoleWriteAccess>({
-    id: 'role-write-access',
-    path: filePath,
-    schema: ROLE_WRITE_ACCESS_SCHEMA_PATH,
-    fallback: () => ({ version: '1.0.0', default_allow: [], roles: {} }),
-  });
-  roleWriteAccessCatalogs.set(filePath, catalog);
-  return catalog;
-}
-
 function resetOrgCatalog(filePath: string): void {
   roleAuthorityMapCatalogs.get(filePath)?.reset();
   securityPolicyCatalogs.get(filePath)?.reset();
-  roleWriteAccessCatalogs.get(filePath)?.reset();
 }
 
 function resolveDomainTemplate(domain: string) {
@@ -695,7 +671,7 @@ function loadAuthorityRoleDirectory(rootDir: string): Record<string, AuthorityRo
 /**
  * Every role id that any store `role create` writes already holds: team and
  * authority roles, the role-authority map (role and authority_role values),
- * role-write-access, security-policy authority permissions and store grants, and role docs.
+ * security-policy authority permissions and store grants, and role docs.
  * A new role must not take one of these ids — the create would merge into
  * or overwrite that role's records.
  */
@@ -711,7 +687,6 @@ export function collectExistingRoleIds(rootDir: string): Set<string> {
       if (entry.authority_role) ids.add(entry.authority_role);
     }
   }
-  for (const role of Object.keys(loadRoleWriteAccess(rootDir).roles || {})) ids.add(role);
   const policy = loadSecurityPolicy(rootDir);
   for (const role of Object.keys(policy.authority_role_permissions || {})) {
     ids.add(role);
@@ -880,32 +855,6 @@ function loadSecurityPolicy(rootDir: string): SecurityPolicy {
   return securityPolicyCatalog(filePath).load();
 }
 
-function loadRoleWriteAccess(rootDir: string): RoleWriteAccess {
-  const filePath = path.join(
-    rootDir,
-    'knowledge',
-    'product',
-    'governance',
-    'role-write-access.json'
-  );
-  return roleWriteAccessCatalog(filePath).load();
-}
-
-function upsertRoleWriteAccess(rootDir: string, roleId: string, scopes: string[]): void {
-  const filePath = path.join(
-    rootDir,
-    'knowledge',
-    'product',
-    'governance',
-    'role-write-access.json'
-  );
-  const access = loadRoleWriteAccess(rootDir);
-  access.roles = access.roles || {};
-  access.roles[roleId] = { allow: unique(scopes) };
-  writeJson(filePath, access);
-  resetOrgCatalog(filePath);
-}
-
 function assertSecurityPolicyApproval(approvalId?: string): void {
   if (!approvalId) {
     throw new Error(
@@ -1072,7 +1021,6 @@ function promoteRoleBundle(rootDir: string, input: OrgRolePromoteOptions): Recor
       resolvePromotionRoleAuthorityEntry(roleId, authorityRoleId, input.persona)
     );
     upsertSecurityPolicy(rootDir, authorityRoleId, updatedAuthority, input.approvalId);
-    upsertRoleWriteAccess(rootDir, authorityRoleId, updatedAuthority.write_scopes);
     writePromotionNotes(rootDir, roleId, authorityRoleId, updatedAuthority, updatedTeam);
   }
 
@@ -1133,7 +1081,6 @@ export function createRoleBundle(
     syncTeamRoleSnapshot(rootDir, teamRoles);
     upsertOrgRoleDefaultGrant(rootDir, resolveRoleAuthorityEntry(normalizedInput, authorityRoleId));
     upsertSecurityPolicy(rootDir, authorityRoleId, authorityRole, normalizedInput.approvalId);
-    upsertRoleWriteAccess(rootDir, authorityRoleId, authorityRole.write_scopes);
     writeRoleDocs(rootDir, normalizedInput, authorityRoleId, teamRole, authorityRole);
   }
 

@@ -386,7 +386,7 @@ function assertOrchestratorSessionGovernedContext(verb: string): void {
 // Service: module-level singleton, lazy replay on first access
 // ---------------------------------------------------------------------------
 
-/** Governed storage scope granted to `mission_controller` (SN-01) — see role-write-access.json. */
+/** Governed storage scope granted to `mission_controller` (SN-01) — see its Authority Role card (`authority-roles/mission_controller.json`). */
 export const ORCHESTRATOR_SESSION_JOURNAL_PATH = pathResolver.shared(
   'coordination/orchestration/orchestrator-sessions.jsonl'
 );

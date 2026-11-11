@@ -23,11 +23,14 @@ describe('Slack and Chronos governance contract', () => {
         encoding: 'utf8',
       }) as string
     );
-    const roleAccess = JSON.parse(
-      safeReadFile('knowledge/product/governance/role-write-access.json', {
-        encoding: 'utf8',
-      }) as string
-    );
+    // The Authority Role card is the per-role registry; its enforced write
+    // grant is permissions.allow_write (security-policy holds the projection).
+    const writeScopes = (role: string): string[] =>
+      JSON.parse(
+        safeReadFile(`knowledge/product/governance/authority-roles/${role}.json`, {
+          encoding: 'utf8',
+        }) as string
+      ).permissions.allow_write;
 
     expect(securityPolicy.authority_role_permissions.mission_controller.allow_write).toContain(
       'active/shared/coordination/'
@@ -95,37 +98,29 @@ describe('Slack and Chronos governance contract', () => {
       'active/shared/coordination/channels/telegram/'
     );
 
-    expect(roleAccess.roles.slack_bridge.allow).toContain(
-      'active/shared/coordination/channels/slack/'
-    );
-    expect(roleAccess.roles.slack_bridge.allow).toContain(
+    expect(writeScopes('slack_bridge')).toContain('active/shared/coordination/channels/slack/');
+    expect(writeScopes('slack_bridge')).toContain(
       'active/shared/coordination/channels/chronos/outbox/'
     );
-    expect(roleAccess.roles.slack_bridge.allow).toContain(
+    expect(writeScopes('slack_bridge')).toContain('active/shared/coordination/orchestration/');
+    expect(writeScopes('chronos_gateway')).toContain('active/shared/coordination/chronos/');
+    expect(writeScopes('chronos_gateway')).toContain('active/shared/coordination/orchestration/');
+    expect(writeScopes('chronos_operator')).toEqual([]);
+    expect(writeScopes('chronos_localadmin')).toContain(
       'active/shared/coordination/orchestration/'
     );
-    expect(roleAccess.roles.chronos_gateway.allow).toContain('active/shared/coordination/chronos/');
-    expect(roleAccess.roles.chronos_gateway.allow).toContain(
-      'active/shared/coordination/orchestration/'
-    );
-    expect(roleAccess.roles.chronos_operator.allow).toEqual([]);
-    expect(roleAccess.roles.chronos_localadmin.allow).toContain(
-      'active/shared/coordination/orchestration/'
-    );
-    expect(roleAccess.roles.surface_runtime.allow).toContain('active/shared/runtime/');
-    expect(roleAccess.roles.surface_runtime.allow).toContain(
-      'knowledge/product/governance/surfaces/'
-    );
-    expect(roleAccess.roles.surface_runtime.allow).toContain(
+    expect(writeScopes('surface_runtime')).toContain('active/shared/runtime/');
+    expect(writeScopes('surface_runtime')).toContain('knowledge/product/governance/surfaces/');
+    expect(writeScopes('surface_runtime')).toContain(
       'knowledge/product/governance/active-surfaces.json'
     );
-    expect(roleAccess.roles.surface_runtime.allow).toContain(
+    expect(writeScopes('surface_runtime')).toContain(
       'active/shared/coordination/channels/imessage/'
     );
-    expect(roleAccess.roles.surface_runtime.allow).toContain(
+    expect(writeScopes('surface_runtime')).toContain(
       'active/shared/coordination/channels/discord/'
     );
-    expect(roleAccess.roles.surface_runtime.allow).toContain(
+    expect(writeScopes('surface_runtime')).toContain(
       'active/shared/coordination/channels/telegram/'
     );
   });
