@@ -564,7 +564,7 @@ async function executePipelineFileOnce(
             identity: {
               role,
               persona:
-                scope?.assumedPersona ??
+                scope?.assumedBaseRole ??
                 (identity.baseRole === 'unknown' ? undefined : identity.baseRole),
               tenant_slug: scope?.tenantSlug ?? effectivePayloadScope.tenant_slug,
               organization_id: scope?.organizationId,

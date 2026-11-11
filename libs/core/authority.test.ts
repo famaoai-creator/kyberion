@@ -4,7 +4,7 @@ import { pathResolver } from './path-resolver.js';
 import { safeReadFile } from './secure-io.js';
 import {
   buildExecutionEnv,
-  inferPersonaFromRole,
+  inferBaseRoleFromRole,
   resolveIdentityContext,
   resolveRole,
   withExecutionContext,
@@ -76,7 +76,7 @@ describe('resolveIdentityContext', () => {
     const env = buildExecutionEnv({}, 'sovereign_concierge');
     expect(env.MISSION_ROLE).toBe('sovereign_concierge');
     expect(env.KYBERION_BASE_ROLE).toBe('sovereign');
-    expect(inferPersonaFromRole('ruthless_auditor')).toBe('analyst');
+    expect(inferBaseRoleFromRole('ruthless_auditor')).toBe('analyst');
   });
 
   it('isolates explicit mission/project/task boundaries across concurrent role scopes', async () => {

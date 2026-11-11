@@ -30,7 +30,7 @@ import {
   parseNhiId,
 } from '../contracts/nhi-id.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
-import { executionPersonaText } from '../foundation/execution-scope.js';
+import { executionBaseRoleText } from '../foundation/execution-scope.js';
 import { isValidTenantSlug } from '../foundation/scope.js';
 
 /** Slug of an execution whose base role and component are both unknown. */
@@ -48,7 +48,7 @@ function agentSlug(value: string | undefined): string | undefined {
 export function executionAgentId(fallback: string = UNKNOWN_AGENT_SLUG): string {
   const claimed = getRegisteredEnvText('KYBERION_NHI_ID')?.trim();
   if (claimed && parseNhiId(claimed)) return claimed;
-  const slug = agentSlug(executionPersonaText()) ?? agentSlug(fallback) ?? UNKNOWN_AGENT_SLUG;
+  const slug = agentSlug(executionBaseRoleText()) ?? agentSlug(fallback) ?? UNKNOWN_AGENT_SLUG;
   const tenant = getRegisteredEnvText('KYBERION_TENANT')?.trim();
   if (!tenant || !isValidTenantSlug(tenant)) return buildTenantlessNhiId(slug);
   const organization = getRegisteredEnvText('KYBERION_ORGANIZATION_ID')?.trim();

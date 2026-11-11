@@ -53,7 +53,7 @@ function asOperator<T>(
       ...(tenantSlug ? { tenantSlug } : {}),
       ...(organizationId ? { organizationId } : {}),
       assumedRole: 'organization_operator',
-      assumedPersona: null,
+      assumedBaseRole: null,
     },
     fn
   );
