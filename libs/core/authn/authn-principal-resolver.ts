@@ -62,6 +62,11 @@ export interface AuthnCredential {
 
 export interface AuthnExecutionContext {
   /** KYBERION_BASE_ROLE-style agent slug, or a canonical nhi_id via actorHint. */
+  baseRole?: string;
+  /**
+   * @deprecated Renamed to `baseRole` (concept model v2 S4). Read for one
+   * release only when `baseRole` is absent.
+   */
   persona?: string;
   missionRole?: string;
   missionId?: string;

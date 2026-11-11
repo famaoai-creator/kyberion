@@ -467,6 +467,24 @@ describe('base-role record field equivalence (S4)', () => {
     }
   });
 
+  it('resolves the new baseRole name, and baseRole when both are given', () => {
+    const fixture = loadFixture();
+    for (const testCase of AUTHN_LEGACY_CASES) {
+      const { persona, ...rest } = testCase.executionContext;
+      if (persona === undefined) continue;
+      expect({ id: testCase.id, row: authnRow({ ...rest, baseRole: persona }) }).toEqual({
+        id: testCase.id,
+        row: fixture.authn[testCase.id],
+      });
+      expect({
+        id: testCase.id,
+        row: authnRow({ ...rest, baseRole: persona, persona: 'conflicting-legacy-agent' }),
+      }).toEqual({ id: testCase.id, row: fixture.authn[testCase.id] });
+    }
+    // A present baseRole, even blank, wins: the legacy name is not consulted.
+    expect(authnRow({ baseRole: '', persona: 'worker' })).toEqual(fixture.authn.empty);
+  });
+
   it('loads an old-format team plan exactly as before', () => {
     const fixture = loadFixture();
     for (const testCase of TEAM_PLAN_LEGACY_CASES) {
