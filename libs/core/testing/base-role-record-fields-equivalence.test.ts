@@ -143,12 +143,12 @@ async function withCleanEnv<T>(env: Record<string, string | undefined>, fn: () =
 
 /** The stored execution authority's base role, as the current reader exposes it. */
 function storedAuthorityBaseRole(state: PipelineRunJournalState): string {
-  return state.started!.execution_authority!.persona;
+  return state.started!.execution_authority!.base_role;
 }
 
 /** The stored library identity's base role, as the current reader exposes it. */
 function storedIdentityBaseRole(state: PipelineRunJournalState): string | undefined {
-  return state.started!.library_execution!.identity.persona;
+  return state.started!.library_execution!.identity.base_role;
 }
 
 /** What the two resume paths derive from a journal read through the current reader. */
@@ -202,7 +202,7 @@ async function writeJournal(testCase: PipelineCase): Promise<PipelineRunJournalS
               payload_scope: { tier: 'public' as const },
               identity: {
                 role: testCase.library.role,
-                ...(testCase.library.baseRole ? { persona: testCase.library.baseRole } : {}),
+                ...(testCase.library.baseRole ? { base_role: testCase.library.baseRole } : {}),
               },
               trust_resolved: false,
             },
@@ -221,6 +221,33 @@ function replayJournal(raw: Record<string, unknown>): PipelineRunJournalState {
   safeWriteFile(filePath, `${JSON.stringify(raw)}\n`);
   createdJournals.add(filePath);
   return readPipelineRunJournal(filePath);
+}
+
+type RawShape = 'new' | 'both';
+
+/**
+ * The stored old-format line rewritten to the new field name (`new`), or
+ * carrying both names with a conflicting legacy value (`both`: the new name
+ * must win).
+ */
+function reshapeRaw(raw: Record<string, unknown>, shape: RawShape): Record<string, unknown> {
+  const copy = structuredClone(raw) as {
+    run_id: string;
+    payload: {
+      execution_authority: Record<string, unknown>;
+      library_execution?: { identity: Record<string, unknown> };
+    };
+  };
+  copy.run_id = `${copy.run_id}-${shape}`;
+  const move = (record: Record<string, unknown>) => {
+    if (!('persona' in record)) return;
+    record.base_role = record.persona;
+    if (shape === 'new') delete record.persona;
+    else record.persona = 'sovereign_conflicting_legacy_value';
+  };
+  move(copy.payload.execution_authority);
+  if (copy.payload.library_execution) move(copy.payload.library_execution.identity);
+  return copy as unknown as Record<string, unknown>;
 }
 
 function rawRunStarted(state: PipelineRunJournalState): Record<string, unknown> {
@@ -393,10 +420,34 @@ describe('base-role record field equivalence (S4)', () => {
     }
   });
 
+  it('reads the new field name, and the new name when both are stored', async () => {
+    const fixture = loadFixture();
+    for (const shape of ['new', 'both'] as const) {
+      for (const [id, row] of Object.entries(fixture.pipeline)) {
+        const state = replayJournal(reshapeRaw(row.raw_run_started, shape));
+        expect(state.started!.execution_authority).not.toHaveProperty('persona');
+        expect(state.started!.library_execution?.identity ?? {}).not.toHaveProperty('persona');
+        expect({ id, shape, ...(await derive(state)) }).toEqual({
+          id,
+          shape,
+          resume_env: row.resume_env,
+          library_scope: row.library_scope,
+        });
+      }
+    }
+  });
+
   it('a record written by the current writer resumes the same as the stored old-format record', async () => {
     const fixture = loadFixture();
     for (const testCase of PIPELINE_CASES) {
       const state = await writeJournal(testCase);
+      const written = rawRunStarted(state).payload as {
+        execution_authority: Record<string, unknown>;
+        library_execution?: { identity: Record<string, unknown> };
+      };
+      expect(written.execution_authority).not.toHaveProperty('persona');
+      expect(written.execution_authority).toHaveProperty('base_role');
+      expect(written.library_execution?.identity ?? {}).not.toHaveProperty('persona');
       const row = fixture.pipeline[testCase.id]!;
       expect({ id: testCase.id, ...(await derive(state)) }).toEqual({
         id: testCase.id,

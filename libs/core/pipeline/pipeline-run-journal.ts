@@ -74,7 +74,8 @@ export interface PipelineRunStartedPayload {
   execution_authority?: {
     system_role: string;
     mission_role: string;
-    persona: string;
+    /** Base role the run started under (`''` when none). Stored as `persona` before S4. */
+    base_role: string;
     scope: ScopeContext;
     nhi_id: string;
     agent_id: string;
@@ -88,7 +89,8 @@ export interface PipelineRunStartedPayload {
     source_sha256: string;
     initial_context: Record<string, unknown>;
     payload_scope: { tier: StorageDataTier; tenant_slug?: string; purpose?: string };
-    identity: { role: string; persona?: string; tenant_slug?: string; organization_id?: string };
+    /** `base_role` was stored as `persona` before S4. */
+    identity: { role: string; base_role?: string; tenant_slug?: string; organization_id?: string };
     scope_identity?: ScopeContext;
     work_item?: { id: string; tenantSlug: string; agentId: string; attemptId?: string };
     trust_resolved: boolean;
@@ -270,7 +272,7 @@ const pipelineJournalModel = pipelineJournalKernel.defineModel<PipelineJournalPr
   'pipeline-run',
   () => ({ completed_nodes: {} })
 );
-const pipelineStartedSchema = z.object({
+const pipelineStartedFieldsSchema = z.object({
   pipeline_id: z.string(),
   input_path: z.string(),
   pipeline_sha256: z
@@ -284,7 +286,7 @@ const pipelineStartedSchema = z.object({
     .object({
       system_role: z.string(),
       mission_role: z.string(),
-      persona: z.string(),
+      base_role: z.string(),
       scope: z.object({
         tier: z.enum(['public', 'confidential', 'personal']),
         tenant_slug: z.string().optional(),
@@ -331,7 +333,7 @@ const pipelineStartedSchema = z.object({
       }),
       identity: z.object({
         role: z.string().min(1),
-        persona: z.string().optional(),
+        base_role: z.string().optional(),
         tenant_slug: z.string().optional(),
         organization_id: z.string().optional(),
       }),
@@ -363,6 +365,45 @@ const pipelineStartedSchema = z.object({
     })
     .optional(),
 });
+
+/**
+ * One-release read of the pre-S4 field name (concept model v2 D6): a stored
+ * `persona` is read as `base_role`. When both are present the new name wins.
+ * The legacy key is dropped, so the reader and every re-validated append
+ * expose `base_role` only.
+ */
+function readLegacyPersonaAsBaseRole(value: unknown): unknown {
+  if (!value || typeof value !== 'object' || Array.isArray(value) || !('persona' in value))
+    return value;
+  const { persona, ...rest } = value as Record<string, unknown>;
+  return 'base_role' in rest ? rest : { ...rest, base_role: persona };
+}
+
+/** `execution_authority.persona` and `library_execution.identity.persona` (pre-S4 records). */
+function readLegacyStartedFieldNames(value: unknown): unknown {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return value;
+  const started = value as Record<string, unknown>;
+  const library = started.library_execution;
+  return {
+    ...started,
+    ...('execution_authority' in started
+      ? { execution_authority: readLegacyPersonaAsBaseRole(started.execution_authority) }
+      : {}),
+    ...(library && typeof library === 'object' && !Array.isArray(library)
+      ? {
+          library_execution: {
+            ...(library as Record<string, unknown>),
+            identity: readLegacyPersonaAsBaseRole((library as Record<string, unknown>).identity),
+          },
+        }
+      : {}),
+  };
+}
+
+const pipelineStartedSchema = z.preprocess(
+  readLegacyStartedFieldNames,
+  pipelineStartedFieldsSchema
+);
 const pipelineNodeCompletedSchema = z.object({
   step_id: z.string(),
   output_channels_snapshot: z.record(z.string(), z.unknown()),
@@ -784,7 +825,7 @@ export function createPipelineRunJournal(
     execution_authority: {
       system_role: getRegisteredEnvText('SYSTEM_ROLE') || '',
       mission_role: identity.role === 'unknown' ? '' : identity.role,
-      persona: identity.baseRole === 'unknown' ? '' : identity.baseRole || '',
+      base_role: identity.baseRole === 'unknown' ? '' : identity.baseRole || '',
       scope: currentScopeEnvelope()?.identity ?? resolveScopeContext(),
       nhi_id: getRegisteredEnvText('KYBERION_NHI_ID') || '',
       agent_id: getRegisteredEnvText('KYBERION_AGENT_ID') || '',
