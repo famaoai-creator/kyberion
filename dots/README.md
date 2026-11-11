@@ -319,8 +319,7 @@ enabling a source; a row that says `stalled` is a blind watcher.
 1. Copy an existing charter, keep `status: "draft"`.
 2. Pick an `authority_role` that already exists in the canonical role
    registry (`knowledge/product/governance/authority-roles/`) — create the
-   role card plus its `security-policy.json` / `role-write-access.json`
-   grants first (run `sync_authority_roles` to regenerate the index) if none
+   role card plus its `security-policy.json` grants first (run `sync_authority_roles` to regenerate the index) if none
    fits.
 3. Validate: `pnpm kyberion dot validate <dot_id>` checks the schema and the
    activation gate; `pnpm kyberion dot activate <dot_id>` flips to active.
