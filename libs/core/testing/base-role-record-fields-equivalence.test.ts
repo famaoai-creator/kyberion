@@ -18,7 +18,10 @@
  *   for in-process `executionContext` inputs carrying `persona`;
  * - `team_plan`: what `loadMissionTeamPlanAtPath` returns for a stored team plan
  *   carrying `assigned_persona` (the Org Role).
- * The suite replays the stored raw records / inputs through the current readers.
+ * The suite replays the stored raw records / inputs through the current readers
+ * (the pipeline and authn results must be identical; a team plan must load
+ * identically except that the Org Role is exposed as `org_role`), and checks the
+ * new-name and both-names-present shapes (the new name wins).
  *
  * Re-record (never to hide a difference):
  *   KYBERION_RECORD_BASE_ROLE_RECORD_FIELDS=1 pnpm exec vitest run libs/core/testing/base-role-record-fields-equivalence.test.ts
@@ -349,6 +352,14 @@ function loadTeamPlan(id: string, plan: Record<string, unknown>): unknown {
   }
 }
 
+/** A recorded plan with its Org Role moved from `assigned_persona` to `org_role`. */
+function underNewName(recorded: unknown): unknown {
+  if (!recorded || typeof recorded !== 'object' || !('assigned_persona' in recorded))
+    return recorded;
+  const { assigned_persona: orgRole, ...rest } = recorded as Record<string, unknown>;
+  return { ...rest, org_role: orgRole };
+}
+
 // ---------------------------------------------------------------------------
 // fixture
 // ---------------------------------------------------------------------------
@@ -485,13 +496,30 @@ describe('base-role record field equivalence (S4)', () => {
     expect(authnRow({ baseRole: '', persona: 'worker' })).toEqual(fixture.authn.empty);
   });
 
-  it('loads an old-format team plan exactly as before', () => {
+  it('loads an old-format team plan as before, with the Org Role under org_role', () => {
     const fixture = loadFixture();
     for (const testCase of TEAM_PLAN_LEGACY_CASES) {
       expect({ id: testCase.id, plan: loadTeamPlan(testCase.id, testCase.plan) }).toEqual({
         id: testCase.id,
-        plan: fixture.team_plan[testCase.id],
+        plan: underNewName(fixture.team_plan[testCase.id]),
       });
+    }
+  });
+
+  it('loads a new-format team plan, and org_role when both names are stored', () => {
+    const fixture = loadFixture();
+    for (const testCase of TEAM_PLAN_LEGACY_CASES) {
+      const { assigned_persona: legacy, ...rest } = testCase.plan;
+      if (legacy === undefined) continue;
+      const expected = underNewName(fixture.team_plan[testCase.id]);
+      expect(loadTeamPlan(`${testCase.id}-new`, { ...rest, org_role: legacy })).toEqual(expected);
+      expect(
+        loadTeamPlan(`${testCase.id}-both`, {
+          ...rest,
+          org_role: legacy,
+          assigned_persona: 'conflicting_legacy_role',
+        })
+      ).toEqual(expected);
     }
   });
 });

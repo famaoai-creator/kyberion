@@ -63,7 +63,8 @@ export interface MissionTeamPlan {
     available_providers: string[];
   };
   template: string;
-  assigned_persona?: string;
+  /** The mission's Org Role (renamed from `assigned_persona`; legacy plans are read as this). */
+  org_role?: string;
   organization_profile?: MissionTeamOrganizationProfileSummary;
   organization_chart?: OrganizationOrgChartSummary;
   mission_classification?: MissionClassification;
@@ -84,13 +85,28 @@ function missionTeamPlanCatalog(filePath: string) {
   });
 }
 
+/**
+ * The one load boundary for the team plan `assigned_persona` → `org_role`
+ * rename (concept model v2 D5, the mission-state precedent). A legacy plan that
+ * still carries `assigned_persona` is read as `org_role`; when both are present
+ * the new name wins. The legacy key is dropped, so a plan written back carries
+ * only `org_role`. Kept for one release.
+ */
+function normalizeMissionTeamPlanRecord(plan: MissionTeamPlan): MissionTeamPlan {
+  if (!('assigned_persona' in plan)) return plan;
+  const { assigned_persona: legacy, ...rest } = plan as MissionTeamPlan & {
+    assigned_persona?: unknown;
+  };
+  return 'org_role' in rest || typeof legacy !== 'string' ? rest : { ...rest, org_role: legacy };
+}
+
 /** Load one persisted team plan through the shared schema and mission boundary. */
 export function loadMissionTeamPlanAtPath(filePath: string, missionId: string): MissionTeamPlan {
   const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: false });
   if (!safeLstat(safeFilePath).isFile()) {
     throw new Error(`[MISSION_TEAM_PLAN] plan must be a regular file: ${filePath}`);
   }
-  const plan = missionTeamPlanCatalog(safeFilePath).load();
+  const plan = normalizeMissionTeamPlanRecord(missionTeamPlanCatalog(safeFilePath).load());
   const expectedMissionId = missionId.trim().toUpperCase();
   if (plan.mission_id.trim().toUpperCase() !== expectedMissionId) {
     throw new Error(
@@ -160,7 +176,8 @@ export interface ResolveMissionTeamOptions {
   artifactPaths?: string[];
   progressSignals?: string[];
   tier?: StorageDataTier;
-  assignedPersona?: string;
+  /** The mission's Org Role (knowledge/product/roles/); descriptive team metadata. */
+  orgRole?: string;
   tenantSlug?: string;
   organizationProfile?: OrganizationProfile | null;
   scope?: ScopeContext;
@@ -399,7 +416,8 @@ export function composeMissionTeamPlan(input: {
   artifactPaths?: string[];
   progressSignals?: string[];
   tier: StorageDataTier;
-  assignedPersona?: string;
+  /** The mission's Org Role (knowledge/product/roles/); descriptive team metadata. */
+  orgRole?: string;
   tenantSlug?: string;
   organizationProfile?: OrganizationProfile | null;
   scope?: ScopeContext;
@@ -632,7 +650,7 @@ export function composeMissionTeamPlan(input: {
       : organizationDefaultTemplate && templates[organizationDefaultTemplate]
         ? organizationDefaultTemplate
         : 'default',
-    assigned_persona: input.assignedPersona,
+    org_role: input.orgRole,
     organization_profile: summarizeMissionOrganizationProfile(organizationProfile),
     organization_chart: organizationChart,
     mission_classification: missionClassification,
@@ -795,7 +813,7 @@ export function resolveMissionTeamPlan(input: ResolveMissionTeamOptions): Missio
     artifactPaths: input.artifactPaths,
     progressSignals: input.progressSignals,
     tier: input.tier || 'public',
-    assignedPersona: input.assignedPersona,
+    orgRole: input.orgRole,
     ...(tenantSlug ? { tenantSlug } : {}),
     organizationProfile: input.organizationProfile,
     providerPreference: input.providerPreference,

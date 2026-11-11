@@ -1,5 +1,6 @@
 import * as path from 'node:path';
 import { createStandardYargs } from '@agent/core/cli-utils';
+import { logger } from '@agent/core/core';
 import {
   composeMissionTeamPlan,
   writeMissionTeamPlan,
@@ -18,7 +19,7 @@ import { withOrganizationContext } from './refactor/organization-context.js';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 export const MISSION_TEAM_COMPOSITION_USAGE =
-  'Usage: pnpm mission:compose-team --mission-id <id> [--request <text>] [--write]';
+  'Usage: pnpm mission:compose-team --mission-id <id> [--request <text>] [--org-role <role>] [--write]';
 
 /**
  * Writes the team plan as the mission controller. The mission's Org Role is
@@ -39,6 +40,19 @@ function withMissionWriteContext<T>(fn: () => T): T {
   } finally {
     setRegisteredEnv('MISSION_ROLE', previousRole);
   }
+}
+
+/**
+ * `--org-role`, or the pre-S4 `--persona` for one release (with a diagnostic
+ * warning) when `--org-role` is absent. When both are given `--org-role` wins.
+ */
+export function orgRoleArgument(orgRole: unknown, legacyPersona: unknown): string | undefined {
+  if (orgRole !== undefined) return orgRole ? String(orgRole) : undefined;
+  if (!legacyPersona) return undefined;
+  logger.warn(
+    '--persona is retired — read once more as --org-role because --org-role is not given; it stops being read next release | next: pass --org-role <role> | evidence: docs/developer/improvement-plans-2026-11/SCOPE_IDENTITY_GRANT_CONSOLIDATION_PLAN_2026-11-10.ja.md (S4)'
+  );
+  return String(legacyPersona);
 }
 
 export async function main(args: string[] = []): Promise<unknown> {
@@ -69,7 +83,15 @@ export async function main(args: string[] = []): Promise<unknown> {
       type: 'string',
       description: 'Comma-separated progress signals used for stage detection',
     })
-    .option('persona', { type: 'string' })
+    .option('org-role', {
+      type: 'string',
+      description: "The mission's Org Role (default: the mission state's org_role)",
+    })
+    .option('persona', {
+      type: 'string',
+      deprecated: 'use --org-role',
+      description: 'Deprecated alias of --org-role, accepted for one release',
+    })
     .option('organization-id', {
       type: 'string',
       description: 'Explicit organization slug used to resolve organization defaults and catalogs',
@@ -94,7 +116,7 @@ export async function main(args: string[] = []): Promise<unknown> {
   const missionPath = tryResolveOwnerScope({ kind: 'mission', id: missionId })?.dir ?? null;
 
   let tier = String(argv.tier || 'public') as 'personal' | 'confidential' | 'public';
-  let assignedPersona = argv.persona ? String(argv.persona) : undefined;
+  let orgRole = orgRoleArgument(argv['org-role'], argv.persona);
   let missionTenantSlug: string | undefined;
 
   if (missionPath) {
@@ -107,7 +129,7 @@ export async function main(args: string[] = []): Promise<unknown> {
       throw new Error(`Mission state is invalid or unreadable: ${missionStatePath}`);
     }
     tier = state.tier;
-    assignedPersona = assignedPersona || state.org_role;
+    orgRole = orgRole || state.org_role;
     missionTenantSlug = state.tenant_slug;
   }
 
@@ -140,7 +162,7 @@ export async function main(args: string[] = []): Promise<unknown> {
       artifactPaths,
       progressSignals,
       tier,
-      assignedPersona,
+      orgRole,
       tenantSlug,
       organizationProfile,
       ...(argv.provider
@@ -164,7 +186,7 @@ export async function main(args: string[] = []): Promise<unknown> {
           artifactPaths,
           progressSignals,
           tier,
-          assignedPersona,
+          orgRole,
           tenantSlug,
           organizationProfile,
           executionShape: argv['execution-shape'] as
