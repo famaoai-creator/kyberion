@@ -28,7 +28,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as path from 'node:path';
 import {
   buildSystemRoleLaunchEnv,
-  resolveExecutionPersona,
+  resolveExecutionBaseRole,
   resolveRole,
   withExecutionContextAsync,
 } from '../authority.js';
@@ -174,7 +174,7 @@ async function derive(state: PipelineRunJournalState): Promise<PipelineDerived> 
           identity.role,
           () => ({
             role: resolveRole() ?? 'NONE',
-            base_role: resolveExecutionPersona() ?? 'NONE',
+            base_role: resolveExecutionBaseRole() ?? 'NONE',
           }),
           storedIdentityBaseRole(state) as BaseRole | undefined,
           identity.tenant_slug,

@@ -32,7 +32,7 @@ import { registerIdentityContextResolver } from './identity-context-bridge.js';
 import * as auditChainModule from './governance/audit-chain.js';
 import {
   currentExecutionScope,
-  executionPersonaText,
+  executionBaseRoleText,
   registerAssumedRoleValidator,
   registerRootExecutionScopeProvider,
   runInExecutionScope,
@@ -310,14 +310,20 @@ export function resolveRole(): string | undefined {
 }
 
 /**
- * The persona of the current execution: the persona bound by the innermost
+ * The base role of the current execution: the base role bound by the innermost
  * withExecutionContext* when it decided one, else `KYBERION_BASE_ROLE`.
  * Use this (not the raw env var) for authorization decisions — the env var is
  * process-global and races between concurrent async contexts.
  */
-export function resolveExecutionPersona(): string | undefined {
-  return executionPersonaText();
+export function resolveExecutionBaseRole(): string | undefined {
+  return executionBaseRoleText();
 }
+
+/**
+ * @deprecated Renamed to {@link resolveExecutionBaseRole} (concept model v2
+ * S4). Kept for one release for `@agent/core/authority` consumers.
+ */
+export const resolveExecutionPersona = resolveExecutionBaseRole;
 
 // ---------------------------------------------------------------------------
 // RA-02 role assumption policy
@@ -479,7 +485,7 @@ function parseDelegatedRole(raw: string): { role: string; issuer: string } | nul
 }
 
 function rootPersonaFor(role: string): string | null {
-  const persona = inferPersonaFromRole(role);
+  const persona = inferBaseRoleFromRole(role);
   return persona === 'unknown' ? null : persona;
 }
 
@@ -524,12 +530,12 @@ function resolveDelegatedRootScope(): ExecutionScope | undefined {
       ? {
           tenantBound: false,
           assumedRole: parsed.role,
-          assumedPersona: rootPersonaFor(parsed.role),
+          assumedBaseRole: rootPersonaFor(parsed.role),
         }
       : {
           tenantBound: false,
           assumedRole: normalizedSystemRole,
-          assumedPersona: DENIED_DELEGATION_PERSONA,
+          assumedBaseRole: DENIED_DELEGATION_PERSONA,
         }
   );
   // Memoize before tracing / warning: both may re-enter the scope readers.
@@ -596,7 +602,7 @@ export function isStoreGrantIssuanceRightRegistered(issuanceRight: string): bool
   );
 }
 
-export function inferPersonaFromRole(role?: string): BaseRole {
+export function inferBaseRoleFromRole(role?: string): BaseRole {
   if (!role) return 'unknown';
   const normalized = role.toLowerCase().replace(/\s+/g, '_');
   const fromIndex = normalizePersona(
@@ -606,6 +612,13 @@ export function inferPersonaFromRole(role?: string): BaseRole {
   const fromMap = loadRoleAuthorityMapPersonas()[normalized];
   return fromMap || LEGACY_ROLE_PERSONA_DEFAULTS[normalized] || 'unknown';
 }
+
+/**
+ * @deprecated Renamed to {@link inferBaseRoleFromRole} (concept model v2 S4).
+ * Kept for one release for `@agent/core` / `@agent/core/authority` /
+ * `@agent/core/governance` consumers.
+ */
+export const inferPersonaFromRole = inferBaseRoleFromRole;
 
 /**
  * Environment for a child process. With an explicit `role` the child runs as
@@ -641,7 +654,7 @@ export function buildExecutionEnv(
     const scope = currentExecutionScope();
     if (scope?.assumedRole) {
       nextEnv.MISSION_ROLE = scope.assumedRole;
-      if (scope.assumedPersona !== undefined) writeBaseRoleEnv(nextEnv, scope.assumedPersona);
+      if (scope.assumedBaseRole !== undefined) writeBaseRoleEnv(nextEnv, scope.assumedBaseRole);
       // DR-01: the child continues as the scope's role (an in-process
       // assumption or this process's own delegation), never as a stale value.
       setDelegatedRole(nextEnv, scope.assumedRole);
@@ -655,7 +668,7 @@ export function buildExecutionEnv(
     nextEnv.MISSION_ROLE = role;
     setDelegatedRole(nextEnv, role);
   }
-  const resolvedPersona = persona || inferPersonaFromRole(role);
+  const resolvedPersona = persona || inferBaseRoleFromRole(role);
   if (resolvedPersona !== 'unknown') {
     writeBaseRoleEnv(nextEnv, resolvedPersona);
   } else if (!persona && !baseRoleEnvText(baseEnv)) {
@@ -865,15 +878,15 @@ function prepareExecutionContext(
   if (organizationId !== undefined && !/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u.test(organizationId)) {
     throw new Error(`[SCOPE_CONTEXT_INVALID] organization id '${organizationId}' is invalid`);
   }
-  const resolvedPersona = persona || inferPersonaFromRole(normalizedRole);
+  const resolvedPersona = persona || inferBaseRoleFromRole(normalizedRole);
   // Mirror the env semantics below: a known persona is bound, an unknown one
   // with no explicit persona clears it, an explicit unknown keeps the outer one.
-  const assumedPersona: string | null | undefined =
+  const assumedBaseRole: string | null | undefined =
     resolvedPersona !== 'unknown'
       ? resolvedPersona
       : persona === undefined
         ? null
-        : currentExecutionScope()?.assumedPersona;
+        : currentExecutionScope()?.assumedBaseRole;
   return {
     role: normalizedRole,
     resolvedPersona,
@@ -886,7 +899,7 @@ function prepareExecutionContext(
         ? { executionIdentity: Object.freeze(executionIdentity) }
         : {}),
       assumedRole: normalizedRole,
-      assumedPersona,
+      assumedBaseRole,
       ...(grant ? { storeGrantToken: grant.token } : {}),
     },
   };
@@ -985,7 +998,7 @@ function runMirroredSync<T>(
  * `process.env` (B1): concurrent async contexts would interleave the
  * write/restore pairs and leave MISSION_ROLE / KYBERION_BASE_ROLE wrong for the
  * rest of the process. Read the role with `resolveRole()` /
- * `resolveIdentityContext()` / `resolveExecutionPersona()`, and build child
+ * `resolveIdentityContext()` / `resolveExecutionBaseRole()`, and build child
  * envs with `buildExecutionEnv()` / `buildSafeExecEnv()`, which follow the scope.
  */
 export async function withExecutionContextAsync<T>(
@@ -1296,7 +1309,7 @@ export function resolveIdentityContext(tenantOverride?: string): IdentityContext
     identity?.missionId !== undefined
       ? (identity.missionId ?? undefined)
       : getRegisteredEnvText('MISSION_ID')?.trim() || projectScope.missionId;
-  const envPersona = resolveExecutionPersona();
+  const envPersona = resolveExecutionBaseRole();
   const envRole = resolveRole();
 
   let persona: BaseRole = normalizePersona(envPersona);
@@ -1366,7 +1379,7 @@ export function resolveIdentityContext(tenantOverride?: string): IdentityContext
   // persona. This prevents a persisted sovereign profile from escalating a
   // worker/controller process that intentionally omitted KYBERION_BASE_ROLE.
   if (persona === 'unknown' && envRole) {
-    persona = inferPersonaFromRole(envRole);
+    persona = inferBaseRoleFromRole(envRole);
   }
 
   // 3. Default Persona from process name if still unknown. The persisted

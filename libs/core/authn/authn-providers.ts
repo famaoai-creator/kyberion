@@ -51,7 +51,7 @@ import { readTextFile } from '../foundation/text.js';
 import { getAgentIdentity, deriveAgentNhiId } from '../agent/agent-identity.js';
 import {
   resolveAssumedRole,
-  resolveExecutionPersona,
+  resolveExecutionBaseRole,
   withExecutionContext,
   withStoreGrant,
 } from '../authority.js';
@@ -103,7 +103,7 @@ function envText(deps: AuthnResolveDeps | undefined, name: string): string | und
  * concurrent async contexts.
  */
 function ambientPersona(deps: AuthnResolveDeps | undefined): string | undefined {
-  return deps?.env ? baseRoleEnvText(deps.env) : resolveExecutionPersona();
+  return deps?.env ? baseRoleEnvText(deps.env) : resolveExecutionBaseRole();
 }
 
 function ambientMissionRole(deps: AuthnResolveDeps | undefined): string | undefined {
