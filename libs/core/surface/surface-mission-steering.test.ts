@@ -59,7 +59,7 @@ const RUN_ID = `${process.pid}-${Date.now()}`;
 // (and other suites) wipe the REAL shared 'slack' coordination dir in their
 // beforeEach; running in parallel forks that would delete this suite's
 // approval records mid-test. 'telegram' is (a) writable by the
-// surface_runtime governed role (role-write-access.json — an invented
+// surface_runtime governed role (its Authority Role card — an invented
 // surface name would fail the write-permission policy) and (b) only ever
 // cleaned per-record by other suites (surface-approval-ui.test.ts), never
 // dir-wiped. Channel/thread ids are RUN_ID-scoped below so records from

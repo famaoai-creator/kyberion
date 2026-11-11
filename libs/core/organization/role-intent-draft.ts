@@ -88,7 +88,7 @@ export interface RoleDraftInventory {
   authority_roles: string[];
   /**
    * Every role id any store `role create` writes already knows (role-authority
-   * map, role-write-access, security-policy permissions, role docs, …).
+   * map, security-policy permissions, role docs, …).
    * Supplied by the caller that owns those stores; unioned with
    * `team_roles` and `authority_roles` when reserving a drafted id.
    */

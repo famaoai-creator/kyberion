@@ -1,0 +1,5 @@
+---
+category: Changed
+---
+
+- **`role-write-access.json` is retired** (concept model v2 D6). Each Authority Role card in `knowledge/product/governance/authority-roles/` is now the only per-role write list: `write_scopes`, and `permissions.allow_write`, which tier-guard enforces through `security-policy.json`. The file and its schema `role-write-access.schema.json` are deleted, and `pnpm organization role create` / `promote` no longer write it. No permission decision changes, because nothing read the file at runtime. Role-id reservation (`collectExistingRoleIds`) is also unchanged: every id in the file is still reserved through a card or a role directory. Seven entries existed only in this file and were never enforced, so they are dropped: `ecosystem_architect` `README.md`, `CAPABILITIES_GUIDE.md`, `CONTRIBUTING.md`, `evidence/browser/`; `infrastructure_sentinel` `../../../Library/LaunchAgents/`; `ceo` `knowledge/ceo/`, `knowledge/personal/my-identity.json`. If any of them is needed, add it to that role's card under approval.

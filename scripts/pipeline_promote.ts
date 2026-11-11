@@ -674,7 +674,7 @@ async function main(
     logger.info(`[promote] (dry-run) would write pipelines/${slug}.json`);
   } else {
     // Catalog writes run under the same authority role as registry generation
-    // (see role-write-access.json: ecosystem_architect owns pipelines/).
+    // (the ecosystem_architect card's write_scopes include pipelines/).
     withExecutionContext('ecosystem_architect', () => {
       writeJson(targetPath, promoted);
     });

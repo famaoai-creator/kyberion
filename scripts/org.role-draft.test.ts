@@ -30,7 +30,6 @@ const GOVERNED_ROLE_FILES = [
   'knowledge/product/governance/authority-role-index.json',
   'knowledge/product/governance/role-authority-map.json',
   'knowledge/product/governance/security-policy.json',
-  'knowledge/product/governance/role-write-access.json',
 ];
 
 function snapshotRoleState(): Record<string, string> {
