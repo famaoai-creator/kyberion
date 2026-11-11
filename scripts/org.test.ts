@@ -266,12 +266,15 @@ describe('org role create', () => {
       ).permissions
     ).toEqual(policy.authority_role_permissions?.finance_controller);
 
-    const roleWriteAccess = readJson<{
-      roles?: Record<string, { allow?: string[] }>;
-    }>('knowledge/product/governance/role-write-access.json');
-    expect(roleWriteAccess.roles?.finance_controller?.allow).toEqual(
-      expect.arrayContaining(['knowledge/product/governance/finance/'])
-    );
+    // The card's write_scopes is the per-role write list (role-write-access.json retired).
+    expect(
+      readJson<{ write_scopes?: string[] }>(
+        'knowledge/product/governance/authority-roles/finance_controller.json'
+      ).write_scopes
+    ).toEqual(expect.arrayContaining(['knowledge/product/governance/finance/']));
+    expect(
+      fs.existsSync(path.join(tempRoot, 'knowledge/product/governance/role-write-access.json'))
+    ).toBe(false);
 
     const procedure = readText('knowledge/product/roles/cfo/PROCEDURE.md');
     expect(procedure).toContain('Role Procedure: CFO');
@@ -376,11 +379,10 @@ describe('org role create', () => {
     expect(promotionNotes).toContain('explicit advise-to-act promotion');
     expect(promotionNotes).toContain('strategic_sales');
 
-    const promotedRoleWriteAccess = readJson<{
-      roles?: Record<string, { allow?: string[] }>;
-    }>('knowledge/product/governance/role-write-access.json');
-    expect(promotedRoleWriteAccess.roles?.strategic_sales?.allow).toEqual(
-      expect.arrayContaining(['active/projects/contracts/'])
-    );
+    expect(
+      readJson<{ write_scopes?: string[] }>(
+        'knowledge/product/governance/authority-roles/strategic_sales.json'
+      ).write_scopes
+    ).toEqual(expect.arrayContaining(['active/projects/contracts/']));
   });
 });
