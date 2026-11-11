@@ -563,7 +563,7 @@ async function executePipelineFileOnce(
             payload_scope: effectivePayloadScope,
             identity: {
               role,
-              persona:
+              base_role:
                 scope?.assumedBaseRole ??
                 (identity.baseRole === 'unknown' ? undefined : identity.baseRole),
               tenant_slug: scope?.tenantSlug ?? effectivePayloadScope.tenant_slug,
@@ -929,7 +929,7 @@ export async function resumeLibraryPipelineRun(
           throw error;
         }
       },
-      snapshot.identity.persona as Parameters<typeof withExecutionContextAsync>[2],
+      snapshot.identity.base_role as Parameters<typeof withExecutionContextAsync>[2],
       snapshot.identity.tenant_slug,
       snapshot.identity.organization_id
     )
