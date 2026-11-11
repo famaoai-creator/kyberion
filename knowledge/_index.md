@@ -212,6 +212,7 @@
 - [Concept Model v2: WorkItem as Issue, one Lease, Tenant 1:N Organization, Stance as acting-for, Grant = principal × scope × operation, one intent resolver, a closed memory loop](./product/architecture/decisions/2026-11-10-concept-model-v2.md) (public | Ecosystem Architect)
 - [Constrain Mesh Hub v1 to a Same-Tenant Single-Writer Control Plane](./product/architecture/decisions/2026-06-24-mesh-hub-v1-boundaries.md) (public | Ecosystem Architect)
 - [Keep Nine Mission Classes and Treat `knowledge_lifecycle` as a Category](./product/architecture/decisions/2026-06-22-knowledge-lifecycle-taxonomy-decision.md) (public | Ecosystem Architect)
+- [Outcome, Artifact, Evidence, Delivery and Result](./product/architecture/decisions/2026-11-12-outcome-result-model.md) (public | Unknown)
 
 ## 📁 product/capability-assets
 - [Legacy Capability Resources](./product/capability-assets/README.md) (public | Ecosystem Architect)
