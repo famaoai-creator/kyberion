@@ -4,7 +4,7 @@ category: Orchestration
 tags: [actuator, playground, collaboration, adf, pipeline-promote, procedure, trust]
 importance: 8
 author: Kyberion
-last_updated: 2026-11-08
+last_updated: 2026-11-09
 role_affinity: [ecosystem_architect, mission_controller, operator, researcher]
 phase_affinity: [alignment, execution, review]
 ---
@@ -104,8 +104,10 @@ tenant-bound の `actuator_playground_worker` ロールで動きます（media s
   voice / secrets が必要なステップは従来どおり claimed WorkItem が必要です。
 - **capture チャネル。** bare action payload（例: `vcs:log`）は
   `last_capture` / `last_transform`（または `params.export_as`）に載ります。
-  one-step pipeline envelope は `.context` unwrap のままなので PTC /
-  `system:json_query` も動きます。記録時は具体的な params を好みます
+  one-step pipeline envelope は SDK 境界で畳まれ、`export_as` / `last_*`
+  キーがあれば channel 値、なければ branded context patch になるので
+  PTC / `system:json_query` も同じ channel 値を見ます（§5 Dispatch ABI
+  参照）。記録時は具体的な params を好みます
   （例: `vcs:log` は `{"limit":5,"oneline":true}`）。
 - **編集は trust を無効化。** ADF のバイトが変わったら、再度
   `--request-trust` / 承認が必要です。
@@ -185,7 +187,27 @@ Trust: `pipelines/` と templates 以外は `[TRUST_REQUIRED]` で失敗しま�
 スケジュールは `schedule{id,cron,timezone,enabled}` ブロックと
 `pnpm kyberion schedule register` が別途必要です。
 
-## 5. 詰まり地図（今回直した箇所）
+## 5. Dispatch ABI（入力と出力）
+
+混同しやすい2つの seam:
+
+- **入力（`actionInput`、#860）** — `defineCatalogBackedActuator` のオプション。
+  handler が受け取る形を決める。既定は one-step pipeline envelope。
+  `{ op, params }` / `{ action, params }` を取る actuator（vcs / calendar /
+  terminal など）は `actionInput` を宣言してその形を維持する。出力変更の
+  ついでに撤去しない。
+- **出力（catalog dispatch payload）** — `actuator.dispatch` の `output` は
+  **op の結果**であり、one-step の pipeline run レポート（`status` /
+  `results` / `context` / `total_steps`）ではない。SDK がレガシー envelope
+  を剥がし、`export_as` / `last_capture` / `last_transform` があればその
+  channel 値、なければ ad-hoc キー用の branded context patch（例:
+  `file:exists` → `exists`）を返す。エンジンは channel 載せか merge のみ。
+  PTC の `callOp` も同じ channel 値を見る。
+
+follow-up（今回外）: 残る ad-hoc context キーを宣言 channel へ寄せて
+context-patch を減らす。`actionInput` は維持。
+
+## 6. 詰まり地図（今回直した箇所）
 
 - playground が正当な step op を拒否（`Machine mode requires --op`）—
   discovery マージ＋ pipeline 受付型の自動包みで解消。
@@ -222,8 +244,9 @@ Trust: `pipelines/` と templates 以外は `[TRUST_REQUIRED]` で失敗しま�
   bare payload を `last_capture` / `last_transform`（または `export_as`）へ
   載せるよう修正。envelope ごとチャネルに載せた初版は
   `core:ptc`/`system:json_query` を壊したため、output 形で分岐
-  （envelope は `.context` unwrap を維持）。SDK を payload 一本化するのは
-  後続。
+  （envelope は `.context` unwrap を維持）。その後 SDK は payload 一本化
+  され、envelope は SDK 境界で channel 値 / context patch に正規化
+  されます（§5 Dispatch ABI 参照）。
 - 別 checkout からの `pipeline:promote --tenant` が ADF / journal /
   personal tenant profile 欠落で失敗 — §2 の tenant 試行メモに同 root・
   profile コピー・`MISSION_ROLE`/`KYBERION_BASE_ROLE` を記載。

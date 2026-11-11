@@ -51,6 +51,73 @@ export interface ActuatorResult<Output = unknown> {
   error?: string;
 }
 
+/** Brand for a context merge patch returned by catalog dispatch (not a channel value). */
+export const CONTEXT_PATCH_BRAND = '__kyberion_context_patch' as const;
+
+export type ActuatorContextPatch = Record<string, unknown> & {
+  [CONTEXT_PATCH_BRAND]: true;
+};
+
+/** One-step catalog sub-pipeline run report (legacy dispatch output). */
+export function isPipelineRunEnvelope(value: unknown): value is {
+  status: unknown;
+  results: unknown;
+  context: Record<string, unknown>;
+  total_steps: unknown;
+} {
+  if (!isRecord(value)) return false;
+  return (
+    Object.hasOwn(value, 'status') &&
+    Object.hasOwn(value, 'results') &&
+    Object.hasOwn(value, 'total_steps') &&
+    isRecord(value.context)
+  );
+}
+
+export function isActuatorContextPatch(value: unknown): value is ActuatorContextPatch {
+  return isRecord(value) && value[CONTEXT_PATCH_BRAND] === true;
+}
+
+export function asActuatorContextPatch(context: Record<string, unknown>): ActuatorContextPatch {
+  return { [CONTEXT_PATCH_BRAND]: true, ...context };
+}
+
+export function stripActuatorContextPatchBrand(
+  patch: ActuatorContextPatch
+): Record<string, unknown> {
+  const { [CONTEXT_PATCH_BRAND]: _brand, ...rest } = patch;
+  return rest;
+}
+
+function defaultChannelForKind(kind: PipelineStepType): string | undefined {
+  if (kind === 'capture') return 'last_capture';
+  if (kind === 'transform') return 'last_transform';
+  return undefined;
+}
+
+/**
+ * Collapse legacy one-step pipeline run reports into a dispatch payload:
+ * channel value when export_as / last_* is present, otherwise a branded
+ * context patch for top-level merge. Bare action payloads pass through.
+ */
+export function normalizeCatalogDispatchOutput(
+  result: unknown,
+  kind: PipelineStepType,
+  params: Record<string, unknown>
+): unknown {
+  if (!isPipelineRunEnvelope(result)) return result;
+  const context = result.context;
+  const explicitExport =
+    typeof params.export_as === 'string' && params.export_as.trim()
+      ? params.export_as.trim()
+      : undefined;
+  const exportKey = explicitExport || defaultChannelForKind(kind);
+  if (exportKey && Object.hasOwn(context, exportKey)) {
+    return context[exportKey];
+  }
+  return asActuatorContextPatch(context);
+}
+
 export interface ActuatorOpDescription {
   op: string;
   kind: PipelineStepType;
@@ -667,7 +734,7 @@ export function defineCatalogBackedActuator(options: {
                   `Actuator sub-pipeline reported failure for ${options.id}:${description.op}`
               );
             }
-            return result;
+            return normalizeCatalogDispatchOutput(result, description.kind, params);
           },
         } satisfies ActuatorOpDefinition,
       ];

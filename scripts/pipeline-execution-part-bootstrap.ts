@@ -19,6 +19,11 @@ import {
   determineActuatorStepType,
   resolveActuatorOperation,
 } from '@agent/core/actuator/actuator-op-registry';
+import {
+  isActuatorContextPatch,
+  isPipelineRunEnvelope,
+  stripActuatorContextPatchBrand,
+} from '@agent/core/actuator/actuator-sdk';
 import { checkActuatorCapabilities } from '@agent/core/actuator/actuator-capability';
 import { validateOpInput } from '@agent/core/pipeline/op-input-contracts';
 import { getRegisteredEnv } from '@agent/core/foundation/env';
@@ -631,25 +636,6 @@ export function resolveReasoningContextParam(
   return params.context ?? ctx;
 }
 
-/** One-step catalog sub-pipeline result still returned by many actuators. */
-export function isPipelineRunEnvelope(output: unknown): output is {
-  status: unknown;
-  results: unknown;
-  context: Record<string, unknown>;
-  total_steps: unknown;
-} {
-  if (!output || typeof output !== 'object' || Array.isArray(output)) return false;
-  const record = output as Record<string, unknown>;
-  return (
-    Object.hasOwn(record, 'status') &&
-    Object.hasOwn(record, 'results') &&
-    Object.hasOwn(record, 'total_steps') &&
-    !!record.context &&
-    typeof record.context === 'object' &&
-    !Array.isArray(record.context)
-  );
-}
-
 /**
  * ADF engine routing collapses capture/transform into `apply` via
  * `prepareEngineSteps` / `resolveEngineStepType`. Recover the catalog kind so
@@ -671,9 +657,8 @@ export function resolveSemanticActuatorStepKind(
 }
 
 /**
- * Map an actuator SDK `output` onto pipeline context. Envelope outputs keep
- * their shape for the downstream `.context` unwrap; bare payloads land on the
- * capture/transform channel (or `export_as`).
+ * Map normalized actuator SDK output onto pipeline context.
+ * Expects payload / context-patch (never a run envelope — SDK strips those).
  */
 export function mapActuatorDispatchOutputToContext(
   ctx: Record<string, unknown>,
@@ -682,9 +667,12 @@ export function mapActuatorDispatchOutputToContext(
   params: Record<string, unknown>
 ): Record<string, unknown> {
   if (isPipelineRunEnvelope(output)) {
-    // Preserve top-level `context` so dispatchResolvedActuatorOperation can
-    // unwrap the sub-pipeline's channel map (including PTC `__ptc_result_*`).
-    return { ...ctx, ...(output as Record<string, unknown>) };
+    throw new Error(
+      '[ACTUATOR_OUTPUT_ENVELOPE] Catalog dispatch returned a pipeline run envelope; normalize at the SDK boundary'
+    );
+  }
+  if (isActuatorContextPatch(output)) {
+    return { ...ctx, ...stripActuatorContextPatchBrand(output) };
   }
   const explicitExport =
     typeof params.export_as === 'string' && params.export_as.trim()
@@ -862,17 +850,8 @@ export async function loadActuatorDispatch(
         );
       }
       const output = sdkResult.output;
-      // Interim dual-shape adapter (converge later at the SDK boundary onto
-      // payload-only dispatch results — see actuator-to-pipeline-flow failure
-      // map). Today `defineCatalogBackedActuator` still returns either:
-      //   A) a one-step pipeline envelope `{ status, results, context, total_steps }`
-      //      (system/file/network/…); downstream unwraps `.context`
-      //   B) a bare action payload / array (vcs/calendar/terminal/…)
-      // Capture / transform must put B onto `last_capture` / `last_transform`
-      // (or `export_as`). A must keep the envelope so the existing unwrap and
-      // PTC `export_as` path keep working — never stash the whole envelope under
-      // the channel key. Semantic kind comes from the op registry when the ADF
-      // engine has already collapsed capture/transform → apply.
+      // Semantic kind comes from the op registry when the ADF engine has
+      // already collapsed capture/transform → apply.
       const semanticType = resolveSemanticActuatorStepKind(domain, op, type);
       result = {
         handled: true,

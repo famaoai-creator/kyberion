@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { asActuatorContextPatch, CONTEXT_PATCH_BRAND } from '@agent/core/actuator/actuator-sdk';
 import {
-  isPipelineRunEnvelope,
   mapActuatorDispatchOutputToContext,
   resolveSemanticActuatorStepKind,
 } from './pipeline-execution-part-bootstrap.js';
@@ -13,53 +13,30 @@ describe('actuator dispatch output → pipeline context mapping', () => {
     expect(resolveSemanticActuatorStepKind('vcs', 'log', 'capture')).toBe('capture');
   });
 
-  it('detects one-step pipeline envelopes', () => {
+  it('merges branded context patches from legacy envelope ops', () => {
     expect(
-      isPipelineRunEnvelope({
-        status: 'succeeded',
-        results: [{ op: 'json_query', status: 'success' }],
-        context: { last_transform: 'accepted' },
-        total_steps: 1,
-      })
-    ).toBe(true);
-    expect(isPipelineRunEnvelope({ op: 'log', cwd: '.', output: 'abc' })).toBe(false);
-    expect(isPipelineRunEnvelope([{ name: 'cal' }])).toBe(false);
+      mapActuatorDispatchOutputToContext(
+        { seed: 1 },
+        asActuatorContextPatch({ exists: true, seed: 1 }),
+        'capture',
+        {}
+      )
+    ).toEqual({ seed: 1, exists: true });
   });
 
-  it('keeps envelopes so downstream unwrap can read nested channels', () => {
-    const ctx = mapActuatorDispatchOutputToContext(
-      { seed: 1 },
-      {
-        status: 'succeeded',
-        results: [],
-        context: { __ptc_result_1: 'accepted', seed: 1 },
-        total_steps: 1,
-      },
-      'transform',
-      { export_as: '__ptc_result_1' }
-    );
-    expect(ctx).toMatchObject({
-      seed: 1,
-      status: 'succeeded',
-      total_steps: 1,
-      context: { __ptc_result_1: 'accepted', seed: 1 },
-    });
-    expect(ctx.__ptc_result_1).toBeUndefined();
-  });
-
-  it('lands bare capture payloads on last_capture (vcs:log shape)', () => {
+  it('lands bare capture payloads on last_capture', () => {
     const payload = { op: 'log', cwd: '/repo', output: 'abc\n' };
     expect(mapActuatorDispatchOutputToContext({}, payload, 'capture', {})).toEqual({
       last_capture: payload,
     });
   });
 
-  it('lands bare transform payloads on export_as when set', () => {
+  it('lands channel values on export_as', () => {
     expect(
-      mapActuatorDispatchOutputToContext({}, { rows: [1] }, 'transform', {
-        export_as: 'filtered',
+      mapActuatorDispatchOutputToContext({}, 'accepted', 'transform', {
+        export_as: 'got',
       })
-    ).toEqual({ filtered: { rows: [1] } });
+    ).toEqual({ got: 'accepted' });
   });
 
   it('lands array payloads on the capture channel', () => {
@@ -67,5 +44,32 @@ describe('actuator dispatch output → pipeline context mapping', () => {
     expect(mapActuatorDispatchOutputToContext({}, calendars, 'capture', {})).toEqual({
       last_capture: calendars,
     });
+  });
+
+  it('refuses legacy run envelopes at the engine boundary', () => {
+    expect(() =>
+      mapActuatorDispatchOutputToContext(
+        {},
+        {
+          status: 'succeeded',
+          results: [],
+          context: { last_capture: 'x' },
+          total_steps: 1,
+        },
+        'capture',
+        {}
+      )
+    ).toThrow(/ACTUATOR_OUTPUT_ENVELOPE/);
+  });
+
+  it('does not leak the patch brand into context', () => {
+    const mapped = mapActuatorDispatchOutputToContext(
+      {},
+      asActuatorContextPatch({ exists: true }),
+      'apply',
+      {}
+    );
+    expect(mapped[CONTEXT_PATCH_BRAND]).toBeUndefined();
+    expect(mapped.exists).toBe(true);
   });
 });

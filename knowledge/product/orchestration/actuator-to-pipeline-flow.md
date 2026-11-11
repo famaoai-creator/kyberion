@@ -4,7 +4,7 @@ category: Orchestration
 tags: [actuator, playground, collaboration, adf, pipeline-promote, procedure, trust]
 importance: 8
 author: Kyberion
-last_updated: 2026-11-08
+last_updated: 2026-11-09
 role_affinity: [ecosystem_architect, mission_controller, operator, researcher]
 phase_affinity: [alignment, execution, review]
 ---
@@ -136,8 +136,10 @@ When the draft declares `{{placeholders}}`, the run card appends the matching
   voice / secrets still require a claimed WorkItem binding.
 - **Capture channel.** Bare action payloads (e.g. `vcs:log`) land on
   `last_capture` / `last_transform` (or `params.export_as`). One-step pipeline
-  envelopes still unwrap via `.context` so PTC / `system:json_query` keep
-  working. Prefer concrete params when recording (e.g. `vcs:log` with
+  envelopes are collapsed at the SDK boundary — to the channel value when
+  `export_as` / a `last_*` key is present, otherwise to a branded context
+  patch — so PTC / `system:json_query` see the same channel value (see §5
+  Dispatch ABI). Prefer concrete params when recording (e.g. `vcs:log` with
   `{"limit":5,"oneline":true}`) so the draft is reviewable before promote.
 - **Edits invalidate trust.** Any byte change to the ADF needs a new
   `--request-trust` / approval before `--project-trust-approval` will accept
@@ -231,7 +233,29 @@ utterance class. The bar is deliberately high — `shape: pipeline`,
 and a hash-matched successful run — so most actuator work still routes
 through the normal compile path.
 
-## 5. Known gaps (verified 2026-10-26)
+## 5. Dispatch ABI (input vs output)
+
+Two different seams are easy to conflate:
+
+- **Input (`actionInput`, #860)** — optional adapter on
+  `defineCatalogBackedActuator` that shapes what the handler receives.
+  Default is a one-step `{ action: 'pipeline', steps: [...] }` envelope;
+  actuators whose handlers take `{ op, params }` / `{ action, params }`
+  (vcs, calendar, terminal, …) declare `actionInput` and keep that shape.
+  Do not remove it when changing output.
+- **Output (catalog dispatch payload)** — `actuator.dispatch` returns an
+  `ActuatorResult` whose `output` is the **op result**, never a one-step
+  pipeline run report (`status` / `results` / `context` / `total_steps`).
+  The SDK collapses legacy sub-pipeline envelopes: a channel value when
+  `export_as` / `last_capture` / `last_transform` is present, otherwise a
+  branded context patch for ad-hoc keys (`file:exists` → `exists`). The
+  pipeline engine then assigns capture/transform/`export_as` to a context
+  key or merges a patch. PTC `callOp` sees the same channel value.
+
+Follow-up (not this change): migrate remaining ad-hoc context keys onto
+declared channels so context-patch returns become rare. `actionInput` stays.
+
+## 6. Known gaps (verified 2026-10-26)
 
 - `actuator_action` in the execution-shape enum is declarative only — it
   projects to `task_session` and no route handler dispatches a bare actuator
@@ -251,7 +275,7 @@ through the normal compile path.
 - super-nerve `system:shell` execs `zsh -lc` directly, bypassing the
   typed-op/approval machinery it otherwise enforces.
 
-## 6. Failure map (where this flow used to stall)
+## 7. Failure map (where this flow used to stall)
 
 - Playground rejected valid step ops (`Machine mode requires --op`) — fixed by
   merging discovery ops; discovery-only ops on pipeline-accepting actuators
@@ -308,8 +332,9 @@ through the normal compile path.
   `last_capture` / `last_transform` (or `export_as`). A first cut that also
   wrapped one-step pipeline envelopes under the channel key broke
   `core:ptc`/`system:json_query` (envelope must keep its `.context` unwrap);
-  the engine now branches on output shape. Converging the SDK onto
-  payload-only dispatch results is a follow-up.
+  the engine now branches on output shape. The SDK has since been converged
+  onto payload-only dispatch results — envelopes normalize to channel values
+  or context patches at the SDK boundary (see §5 Dispatch ABI).
 - `pipeline:promote --tenant` from another checkout failed with missing ADF /
   journal / personal tenant profile — documented in §2 tenant-trial notes
   (same root, copy profile, set `MISSION_ROLE`/`KYBERION_BASE_ROLE`).
