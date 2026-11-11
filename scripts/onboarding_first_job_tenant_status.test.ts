@@ -181,7 +181,7 @@ describe('first-job bound tenant status, real production authority', () => {
       expect(assertStatus()).toBeUndefined();
       expect(foundation.currentExecutionScope()).toEqual(scope);
       expect(authority.resolveRole()).toBe('infrastructure_sentinel');
-      expect(authority.resolveExecutionPersona()).toBe('worker');
+      expect(authority.resolveExecutionBaseRole()).toBe('worker');
       expect(() => io.safeReadFile(path.join(root, profilePath))).toThrow();
       expect(
         dispatch.checkDotProposalBounds(charter, proposal, {
@@ -236,7 +236,7 @@ describe('first-job bound tenant status, real production authority', () => {
       expect(assertStatus).toThrow(/^first_job_tenant_status_unavailable$/);
       expect(foundation.currentExecutionScope()).toEqual(scope);
       expect(authority.resolveRole()).toBe('infrastructure_sentinel');
-      expect(authority.resolveExecutionPersona()).toBe('worker');
+      expect(authority.resolveExecutionBaseRole()).toBe('worker');
     });
   });
   it('fails closed for a missing record', () => {

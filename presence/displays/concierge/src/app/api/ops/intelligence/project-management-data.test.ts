@@ -29,7 +29,7 @@ describe('readProjectManagementForViewer', () => {
           role: scope?.assumedRole,
           tenant: scope?.tenantSlug,
           // assertWorkerProjectScope keys off the bound persona (scopedPersona).
-          worker: scope?.assumedPersona === 'worker',
+          worker: scope?.assumedBaseRole === 'worker',
         });
         return {
           project: { project_id: id, name: id },

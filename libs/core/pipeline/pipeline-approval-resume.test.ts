@@ -83,7 +83,7 @@ describe('pipeline approval resume', () => {
         execution_authority: {
           system_role: 'concierge',
           mission_role: 'chronos_operator',
-          persona: '',
+          base_role: '',
           scope: {
             tier: 'confidential',
             tenant_slug: 'original',

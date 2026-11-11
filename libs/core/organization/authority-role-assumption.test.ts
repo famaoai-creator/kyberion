@@ -4,12 +4,12 @@ import {
   buildExecutionEnv,
   buildSystemRoleLaunchEnv,
   DELEGATED_ROLE_ENV,
-  inferPersonaFromRole,
+  inferBaseRoleFromRole,
   isRoleAssumptionAllowed,
   stripAuthorityEnvOverrides,
   resetRoleAssumptionPolicyCache,
   resolveAssumedRole,
-  resolveExecutionPersona,
+  resolveExecutionBaseRole,
   resolveIdentityContext,
   resolveRole,
   withExecutionContext,
@@ -117,7 +117,7 @@ describe('RA-01 scoped role assumption', () => {
       aEntered.resolve();
       await bEntered.promise;
       // B has now overwritten the process-global env mirror.
-      return { role: resolveRole(), persona: resolveExecutionPersona() };
+      return { role: resolveRole(), persona: resolveExecutionBaseRole() };
     });
     await aEntered.promise;
     const b = withExecutionContextAsync(
@@ -125,7 +125,7 @@ describe('RA-01 scoped role assumption', () => {
       async () => {
         bEntered.resolve();
         await new Promise((r) => setTimeout(r, 5));
-        return { role: resolveRole(), persona: resolveExecutionPersona() };
+        return { role: resolveRole(), persona: resolveExecutionBaseRole() };
       },
       'ecosystem_architect'
     );
@@ -195,7 +195,7 @@ describe('RA-01 scoped role assumption', () => {
     const a = withExecutionContextAsync('knowledge_steward', async () => {
       aEntered.resolve();
       await bEntered.promise;
-      seen.a = { role: resolveRole(), persona: resolveExecutionPersona() };
+      seen.a = { role: resolveRole(), persona: resolveExecutionBaseRole() };
     });
     await aEntered.promise;
     const b = withExecutionContextAsync(
@@ -203,7 +203,7 @@ describe('RA-01 scoped role assumption', () => {
       async () => {
         bEntered.resolve();
         await aDone.promise;
-        seen.b = { role: resolveRole(), persona: resolveExecutionPersona() };
+        seen.b = { role: resolveRole(), persona: resolveExecutionBaseRole() };
       },
       'ecosystem_architect'
     );
@@ -299,7 +299,7 @@ describe('S6 role normalization', () => {
       mirror: process.env.MISSION_ROLE,
       child: buildExecutionEnv().MISSION_ROLE,
       safeChild: buildSafeExecEnv().MISSION_ROLE,
-      persona: resolveExecutionPersona(),
+      persona: resolveExecutionBaseRole(),
     }));
     expect(seen).toEqual({
       role: 'mission_controller',
@@ -460,10 +460,10 @@ describe('S1 scope integrity', () => {
     const warn = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
     try {
       const seen = rawStorage().run(
-        { tenantBound: false, assumedRole: 'chronos_localadmin', assumedPersona: 'sovereign' },
+        { tenantBound: false, assumedRole: 'chronos_localadmin', assumedBaseRole: 'sovereign' },
         () => ({
           role: resolveRole(),
-          persona: resolveExecutionPersona(),
+          persona: resolveExecutionBaseRole(),
           child: buildSafeExecEnv().MISSION_ROLE,
           identity: resolveIdentityContext().role,
         })
@@ -547,7 +547,7 @@ describe('DR-01 delegated child role', () => {
     becomeChild(buildExecutionEnv({ SYSTEM_ROLE: 'concierge' }, 'sovereign_concierge'));
     expect(resolveRole()).toBe('sovereign_concierge');
     expect(resolveAssumedRole()).toBe('sovereign_concierge');
-    expect(resolveExecutionPersona()).toBe('sovereign');
+    expect(resolveExecutionBaseRole()).toBe('sovereign');
     expect(resolveIdentityContext().role).toBe('sovereign_concierge');
     // The child's own children inherit it (safe-exec env follows the scope).
     expect(buildSafeExecEnv().MISSION_ROLE).toBe('sovereign_concierge');
@@ -561,7 +561,7 @@ describe('DR-01 delegated child role', () => {
     const warn = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
     try {
       expect(resolveRole()).toBe('slack_bridge');
-      expect(resolveExecutionPersona()).not.toBe('sovereign');
+      expect(resolveExecutionBaseRole()).not.toBe('sovereign');
       expect(resolveIdentityContext().baseRole).not.toBe('sovereign');
       expect(warn).toHaveBeenCalledWith(expect.stringContaining('[ROLE_DELEGATION_DENIED]'));
       expect(warn).toHaveBeenCalledWith(expect.stringContaining('chronos_localadmin'));
@@ -619,13 +619,13 @@ describe('DR-01 delegated child role', () => {
 
   it('never raises the persona on a denied delegation, even for a sovereign-default SYSTEM_ROLE', () => {
     // nexus_daemon's default persona is sovereign; the denied child must not get it.
-    expect(inferPersonaFromRole('nexus_daemon')).toBe('sovereign');
+    expect(inferBaseRoleFromRole('nexus_daemon')).toBe('sovereign');
     becomeChild(buildExecutionEnv({ SYSTEM_ROLE: 'nexus_daemon' }, 'chronos_localadmin'));
     process.env.KYBERION_BASE_ROLE = 'sovereign';
     const warn = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
     try {
       expect(resolveRole()).toBe('nexus_daemon');
-      expect(resolveExecutionPersona()).toBe('worker');
+      expect(resolveExecutionBaseRole()).toBe('worker');
       const identity = resolveIdentityContext();
       expect(identity.baseRole).toBe('worker');
       expect(identity.authorities).not.toContain('SECRET_READ');
@@ -654,7 +654,7 @@ describe('DR-01 delegated child role', () => {
     expect(resolveRole()).toBe('sovereign_concierge');
     resetRoleAssumptionPolicyCache();
     expect(resolveRole()).toBe('sovereign_concierge');
-    expect(resolveExecutionPersona()).toBe('sovereign');
+    expect(resolveExecutionBaseRole()).toBe('sovereign');
   });
 
   it('falls back to the delegated root when an in-process scope carries a rejected role', () => {

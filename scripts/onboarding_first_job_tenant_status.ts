@@ -1,7 +1,7 @@
 /** CLI-only, status-only tenant boundary for explicit first-job status/tick. */
 import { isDeepStrictEqual } from 'node:util';
 import {
-  resolveExecutionPersona,
+  resolveExecutionBaseRole,
   resolveIdentityContext,
   resolveRole,
   withStoreGrant,
@@ -50,7 +50,7 @@ export function createFirstJobTenantStatusAssertion(
         getRegisteredEnvText('SYSTEM_ROLE') ||
         getRegisteredEnvBool('KYBERION_SUDO') ||
         resolveRole() !== 'infrastructure_sentinel' ||
-        resolveExecutionPersona() !== 'worker' ||
+        resolveExecutionBaseRole() !== 'worker' ||
         !scope?.tenantBound ||
         !diagnostic ||
         !isDeepStrictEqual(diagnostic.charter, expectedCharter)

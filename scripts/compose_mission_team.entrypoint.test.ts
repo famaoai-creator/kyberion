@@ -1,7 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { logger } from '@agent/core/core';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeReadFile } from '@agent/core/secure-io';
-import { main } from './compose_mission_team.js';
+import { main, orgRoleArgument } from './compose_mission_team.js';
 
 describe('mission team composition entrypoint', () => {
   it('keeps composition output behind the shared harness', () => {
@@ -32,5 +33,31 @@ describe('mission team composition entrypoint', () => {
       status: 'help',
       usage: expect.stringContaining('mission:compose-team'),
     });
+  });
+
+  it('selects the Org Role with --org-role; --persona is a deprecated alias for one release', () => {
+    const warn = vi.spyOn(logger, 'warn');
+    try {
+      expect(orgRoleArgument('qa_lead', undefined)).toBe('qa_lead');
+      expect(warn).not.toHaveBeenCalled();
+      expect(orgRoleArgument(undefined, undefined)).toBeUndefined();
+
+      expect(orgRoleArgument(undefined, 'qa_lead')).toBe('qa_lead');
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('--persona is retired'));
+      warn.mockClear();
+
+      // Both given: --org-role wins and the legacy flag is not consulted.
+      expect(orgRoleArgument('qa_lead', 'product_manager')).toBe('qa_lead');
+      expect(orgRoleArgument('', 'product_manager')).toBeUndefined();
+      expect(warn).not.toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+    }
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/compose_mission_team.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).toContain("orgRoleArgument(argv['org-role'], argv.persona)");
   });
 });

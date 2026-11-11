@@ -18,7 +18,7 @@
 import { getRegisteredEnvText } from '@agent/core/foundation';
 import { BACKUP_PASSPHRASE_CONNECTION_FILES } from './backup-file-selection.js';
 import { logger } from '@agent/core/core';
-import { resolveExecutionPersona } from '@agent/core/authority';
+import { resolveExecutionBaseRole } from '@agent/core/authority';
 import { auditChain } from '@agent/core/governance/audit-chain';
 import { readNativeSecretSync } from '@agent/core/secret/secret-bridge';
 import { isWindows } from '@agent/core/platform-facts';
@@ -102,7 +102,7 @@ export const governedBackupPassphraseBackend: BackupPassphraseSecretBackend = {
 function defaultAudit(record: BackupPassphraseAuditRecord): void {
   try {
     auditChain.record({
-      agentId: resolveExecutionPersona() || 'backup-operator',
+      agentId: resolveExecutionBaseRole() || 'backup-operator',
       action: record.action,
       operation: record.operation,
       result: 'completed',

@@ -309,7 +309,7 @@ async context. Only the synchronous helper mirrors it into the
 `MISSION_ROLE` / `KYBERION_BASE_ROLE` env vars (a compatibility mirror for
 attribution labels); the async helper never does, so authorization code must
 resolve the role through `resolveRole()` / `resolveIdentityContext()` /
-`resolveExecutionPersona()`, never read the env, and child envs must come
+`resolveExecutionBaseRole()`, never read the env, and child envs must come
 from `buildExecutionEnv()` / `buildSafeExecEnv()`.
 Under `SYSTEM_ROLE` (every surface launched by surface_runtime) a role must be
 allowed by `role-assumption-policy.json` or the assumption throws

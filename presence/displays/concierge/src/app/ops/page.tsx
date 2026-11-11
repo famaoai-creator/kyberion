@@ -191,7 +191,7 @@ function ChronosMirrorV2Content() {
   const currentPlanPreviewSignature = buildPlanPreviewSignature({
     requestText: planRequestText,
     missionType: planMissionType,
-    assignedPersona: planPersona,
+    orgRole: planPersona,
     tier: planTier,
   });
   const planPreviewIsStale = isPlanPreviewStale(planPreviewSignature, currentPlanPreviewSignature);
@@ -657,7 +657,7 @@ function ChronosMirrorV2Content() {
         body: JSON.stringify({
           requestText: planRequestText,
           missionType: planMissionType,
-          assignedPersona: planPersona,
+          orgRole: planPersona,
           tier: planTier,
           locale: locale,
         }),

@@ -1,0 +1,601 @@
+{
+  "pipeline": {
+    "mission-worker": {
+      "raw_run_started": {
+        "version": 3,
+        "sequence": 1,
+        "run_id": "base-role-equivalence-mission-worker-96852",
+        "event": "run_started",
+        "timestamp": "2026-11-11T15:23:46.939Z",
+        "payload": {
+          "pipeline_id": "equivalence-mission-worker",
+          "input_path": "pipelines/example.json",
+          "step_ids": ["step"],
+          "execution_authority": {
+            "system_role": "",
+            "mission_role": "mission_controller",
+            "persona": "worker",
+            "scope": {
+              "tier": "public"
+            },
+            "nhi_id": "",
+            "agent_id": "",
+            "task_grants_path": "",
+            "policy_env": {
+              "KYBERION_NHI_ACTOR": "off",
+              "KYBERION_ALLOW_FILE_SECRETS": "",
+              "KYBERION_ALLOW_LOCAL_NETWORK": "",
+              "KYBERION_ALLOW_STUB_FALLBACK": "",
+              "KYBERION_ALLOW_TEST_NOTIFICATIONS": "",
+              "KYBERION_ALLOW_UNAUTH_REMOTE": "",
+              "KYBERION_ALLOW_UNSAFE_CLI": "",
+              "KYBERION_ALLOW_UNSAFE_JS": "",
+              "KYBERION_ALLOW_UNSAFE_SHELL": "",
+              "KYBERION_APPROVAL_ASSURANCE": "",
+              "KYBERION_AUTHZ_POLICY_PATH": "",
+              "KYBERION_AUTONOMOUS_OPS_POLICY_PATH": "",
+              "KYBERION_CODEX_APPROVAL": "",
+              "KYBERION_EGRESS_POLICY": "",
+              "KYBERION_EGRESS_POLICY_PATH": "",
+              "KYBERION_KNOWLEDGE_FEEDBACK_POLICY_PATH": "",
+              "KYBERION_OIDC_ALLOW_HS256": "",
+              "KYBERION_OPENROUTER_COST_POLICY": "",
+              "KYBERION_PROVIDER_EGRESS_POLICY_PATH": "",
+              "KYBERION_PROVIDER_ENV_ALLOWLIST": "",
+              "KYBERION_REASONING_ALLOW_SHELL_TOOL": "",
+              "KYBERION_RESTRICTED_ACTIONS_POLICY": "",
+              "KYBERION_SERVICE_RUNTIME_POLICY_PATH": "",
+              "KYBERION_SHARE_GRANTS_PATH": "",
+              "KYBERION_SHELL_COMMAND_POLICY_PATH": "",
+              "KYBERION_SURFACE_ALLOWLISTS": "",
+              "KYBERION_TENANT_EGRESS_POLICY_PATH": "",
+              "KYBERION_TOOL_ACTUATOR_ROUTING_POLICY_PATH": "",
+              "KYBERION_TOOL_RUNTIME_POLICY_PATH": "",
+              "KYBERION_TRUST_PROXY": "",
+              "KYBERION_VIDEO_RENDER_RUNTIME_POLICY_PATH": "",
+              "KYBERION_VOICE_RUNTIME_POLICY_PATH": "",
+              "KYBERION_VOICE_SAMPLE_INGESTION_POLICY_PATH": ""
+            },
+            "unsupported_policy_env": []
+          }
+        }
+      },
+      "resume_env": {
+        "SYSTEM_ROLE": "",
+        "MISSION_ROLE": "mission_controller",
+        "KYBERION_DELEGATED_ROLE": "",
+        "KYBERION_BASE_ROLE": "worker",
+        "KYBERION_PERSONA": ""
+      },
+      "library_scope": null
+    },
+    "mission-sovereign": {
+      "raw_run_started": {
+        "version": 3,
+        "sequence": 1,
+        "run_id": "base-role-equivalence-mission-sovereign-96852",
+        "event": "run_started",
+        "timestamp": "2026-11-11T15:23:47.191Z",
+        "payload": {
+          "pipeline_id": "equivalence-mission-sovereign",
+          "input_path": "pipelines/example.json",
+          "step_ids": ["step"],
+          "execution_authority": {
+            "system_role": "",
+            "mission_role": "mission_controller",
+            "persona": "sovereign",
+            "scope": {
+              "tier": "public"
+            },
+            "nhi_id": "",
+            "agent_id": "",
+            "task_grants_path": "",
+            "policy_env": {
+              "KYBERION_NHI_ACTOR": "off",
+              "KYBERION_ALLOW_FILE_SECRETS": "",
+              "KYBERION_ALLOW_LOCAL_NETWORK": "",
+              "KYBERION_ALLOW_STUB_FALLBACK": "",
+              "KYBERION_ALLOW_TEST_NOTIFICATIONS": "",
+              "KYBERION_ALLOW_UNAUTH_REMOTE": "",
+              "KYBERION_ALLOW_UNSAFE_CLI": "",
+              "KYBERION_ALLOW_UNSAFE_JS": "",
+              "KYBERION_ALLOW_UNSAFE_SHELL": "",
+              "KYBERION_APPROVAL_ASSURANCE": "",
+              "KYBERION_AUTHZ_POLICY_PATH": "",
+              "KYBERION_AUTONOMOUS_OPS_POLICY_PATH": "",
+              "KYBERION_CODEX_APPROVAL": "",
+              "KYBERION_EGRESS_POLICY": "",
+              "KYBERION_EGRESS_POLICY_PATH": "",
+              "KYBERION_KNOWLEDGE_FEEDBACK_POLICY_PATH": "",
+              "KYBERION_OIDC_ALLOW_HS256": "",
+              "KYBERION_OPENROUTER_COST_POLICY": "",
+              "KYBERION_PROVIDER_EGRESS_POLICY_PATH": "",
+              "KYBERION_PROVIDER_ENV_ALLOWLIST": "",
+              "KYBERION_REASONING_ALLOW_SHELL_TOOL": "",
+              "KYBERION_RESTRICTED_ACTIONS_POLICY": "",
+              "KYBERION_SERVICE_RUNTIME_POLICY_PATH": "",
+              "KYBERION_SHARE_GRANTS_PATH": "",
+              "KYBERION_SHELL_COMMAND_POLICY_PATH": "",
+              "KYBERION_SURFACE_ALLOWLISTS": "",
+              "KYBERION_TENANT_EGRESS_POLICY_PATH": "",
+              "KYBERION_TOOL_ACTUATOR_ROUTING_POLICY_PATH": "",
+              "KYBERION_TOOL_RUNTIME_POLICY_PATH": "",
+              "KYBERION_TRUST_PROXY": "",
+              "KYBERION_VIDEO_RENDER_RUNTIME_POLICY_PATH": "",
+              "KYBERION_VOICE_RUNTIME_POLICY_PATH": "",
+              "KYBERION_VOICE_SAMPLE_INGESTION_POLICY_PATH": ""
+            },
+            "unsupported_policy_env": []
+          }
+        }
+      },
+      "resume_env": {
+        "SYSTEM_ROLE": "",
+        "MISSION_ROLE": "mission_controller",
+        "KYBERION_DELEGATED_ROLE": "",
+        "KYBERION_BASE_ROLE": "sovereign",
+        "KYBERION_PERSONA": ""
+      },
+      "library_scope": null
+    },
+    "mission-no-base-role": {
+      "raw_run_started": {
+        "version": 3,
+        "sequence": 1,
+        "run_id": "base-role-equivalence-mission-no-base-role-96852",
+        "event": "run_started",
+        "timestamp": "2026-11-11T15:23:47.434Z",
+        "payload": {
+          "pipeline_id": "equivalence-mission-no-base-role",
+          "input_path": "pipelines/example.json",
+          "step_ids": ["step"],
+          "execution_authority": {
+            "system_role": "",
+            "mission_role": "mission_controller",
+            "persona": "worker",
+            "scope": {
+              "tier": "public"
+            },
+            "nhi_id": "",
+            "agent_id": "",
+            "task_grants_path": "",
+            "policy_env": {
+              "KYBERION_NHI_ACTOR": "off",
+              "KYBERION_ALLOW_FILE_SECRETS": "",
+              "KYBERION_ALLOW_LOCAL_NETWORK": "",
+              "KYBERION_ALLOW_STUB_FALLBACK": "",
+              "KYBERION_ALLOW_TEST_NOTIFICATIONS": "",
+              "KYBERION_ALLOW_UNAUTH_REMOTE": "",
+              "KYBERION_ALLOW_UNSAFE_CLI": "",
+              "KYBERION_ALLOW_UNSAFE_JS": "",
+              "KYBERION_ALLOW_UNSAFE_SHELL": "",
+              "KYBERION_APPROVAL_ASSURANCE": "",
+              "KYBERION_AUTHZ_POLICY_PATH": "",
+              "KYBERION_AUTONOMOUS_OPS_POLICY_PATH": "",
+              "KYBERION_CODEX_APPROVAL": "",
+              "KYBERION_EGRESS_POLICY": "",
+              "KYBERION_EGRESS_POLICY_PATH": "",
+              "KYBERION_KNOWLEDGE_FEEDBACK_POLICY_PATH": "",
+              "KYBERION_OIDC_ALLOW_HS256": "",
+              "KYBERION_OPENROUTER_COST_POLICY": "",
+              "KYBERION_PROVIDER_EGRESS_POLICY_PATH": "",
+              "KYBERION_PROVIDER_ENV_ALLOWLIST": "",
+              "KYBERION_REASONING_ALLOW_SHELL_TOOL": "",
+              "KYBERION_RESTRICTED_ACTIONS_POLICY": "",
+              "KYBERION_SERVICE_RUNTIME_POLICY_PATH": "",
+              "KYBERION_SHARE_GRANTS_PATH": "",
+              "KYBERION_SHELL_COMMAND_POLICY_PATH": "",
+              "KYBERION_SURFACE_ALLOWLISTS": "",
+              "KYBERION_TENANT_EGRESS_POLICY_PATH": "",
+              "KYBERION_TOOL_ACTUATOR_ROUTING_POLICY_PATH": "",
+              "KYBERION_TOOL_RUNTIME_POLICY_PATH": "",
+              "KYBERION_TRUST_PROXY": "",
+              "KYBERION_VIDEO_RENDER_RUNTIME_POLICY_PATH": "",
+              "KYBERION_VOICE_RUNTIME_POLICY_PATH": "",
+              "KYBERION_VOICE_SAMPLE_INGESTION_POLICY_PATH": ""
+            },
+            "unsupported_policy_env": []
+          }
+        }
+      },
+      "resume_env": {
+        "SYSTEM_ROLE": "",
+        "MISSION_ROLE": "mission_controller",
+        "KYBERION_DELEGATED_ROLE": "",
+        "KYBERION_BASE_ROLE": "worker",
+        "KYBERION_PERSONA": ""
+      },
+      "library_scope": null
+    },
+    "system-analyst": {
+      "raw_run_started": {
+        "version": 3,
+        "sequence": 1,
+        "run_id": "base-role-equivalence-system-analyst-96852",
+        "event": "run_started",
+        "timestamp": "2026-11-11T15:23:47.635Z",
+        "payload": {
+          "pipeline_id": "equivalence-system-analyst",
+          "input_path": "pipelines/example.json",
+          "step_ids": ["step"],
+          "execution_authority": {
+            "system_role": "concierge",
+            "mission_role": "concierge",
+            "persona": "analyst",
+            "scope": {
+              "tier": "public"
+            },
+            "nhi_id": "",
+            "agent_id": "",
+            "task_grants_path": "",
+            "policy_env": {
+              "KYBERION_NHI_ACTOR": "off",
+              "KYBERION_ALLOW_FILE_SECRETS": "",
+              "KYBERION_ALLOW_LOCAL_NETWORK": "",
+              "KYBERION_ALLOW_STUB_FALLBACK": "",
+              "KYBERION_ALLOW_TEST_NOTIFICATIONS": "",
+              "KYBERION_ALLOW_UNAUTH_REMOTE": "",
+              "KYBERION_ALLOW_UNSAFE_CLI": "",
+              "KYBERION_ALLOW_UNSAFE_JS": "",
+              "KYBERION_ALLOW_UNSAFE_SHELL": "",
+              "KYBERION_APPROVAL_ASSURANCE": "",
+              "KYBERION_AUTHZ_POLICY_PATH": "",
+              "KYBERION_AUTONOMOUS_OPS_POLICY_PATH": "",
+              "KYBERION_CODEX_APPROVAL": "",
+              "KYBERION_EGRESS_POLICY": "",
+              "KYBERION_EGRESS_POLICY_PATH": "",
+              "KYBERION_KNOWLEDGE_FEEDBACK_POLICY_PATH": "",
+              "KYBERION_OIDC_ALLOW_HS256": "",
+              "KYBERION_OPENROUTER_COST_POLICY": "",
+              "KYBERION_PROVIDER_EGRESS_POLICY_PATH": "",
+              "KYBERION_PROVIDER_ENV_ALLOWLIST": "",
+              "KYBERION_REASONING_ALLOW_SHELL_TOOL": "",
+              "KYBERION_RESTRICTED_ACTIONS_POLICY": "",
+              "KYBERION_SERVICE_RUNTIME_POLICY_PATH": "",
+              "KYBERION_SHARE_GRANTS_PATH": "",
+              "KYBERION_SHELL_COMMAND_POLICY_PATH": "",
+              "KYBERION_SURFACE_ALLOWLISTS": "",
+              "KYBERION_TENANT_EGRESS_POLICY_PATH": "",
+              "KYBERION_TOOL_ACTUATOR_ROUTING_POLICY_PATH": "",
+              "KYBERION_TOOL_RUNTIME_POLICY_PATH": "",
+              "KYBERION_TRUST_PROXY": "",
+              "KYBERION_VIDEO_RENDER_RUNTIME_POLICY_PATH": "",
+              "KYBERION_VOICE_RUNTIME_POLICY_PATH": "",
+              "KYBERION_VOICE_SAMPLE_INGESTION_POLICY_PATH": ""
+            },
+            "unsupported_policy_env": []
+          }
+        }
+      },
+      "resume_env": {
+        "SYSTEM_ROLE": "concierge",
+        "MISSION_ROLE": "concierge",
+        "KYBERION_DELEGATED_ROLE": "",
+        "KYBERION_BASE_ROLE": "analyst",
+        "KYBERION_PERSONA": ""
+      },
+      "library_scope": null
+    },
+    "library-worker": {
+      "raw_run_started": {
+        "version": 3,
+        "sequence": 1,
+        "run_id": "base-role-equivalence-library-worker-96852",
+        "event": "run_started",
+        "timestamp": "2026-11-11T15:23:47.837Z",
+        "payload": {
+          "pipeline_id": "equivalence-library-worker",
+          "input_path": "pipelines/example.json",
+          "step_ids": ["step"],
+          "execution_authority": {
+            "system_role": "",
+            "mission_role": "mission_controller",
+            "persona": "worker",
+            "scope": {
+              "tier": "public"
+            },
+            "nhi_id": "",
+            "agent_id": "",
+            "task_grants_path": "",
+            "policy_env": {
+              "KYBERION_NHI_ACTOR": "off",
+              "KYBERION_ALLOW_FILE_SECRETS": "",
+              "KYBERION_ALLOW_LOCAL_NETWORK": "",
+              "KYBERION_ALLOW_STUB_FALLBACK": "",
+              "KYBERION_ALLOW_TEST_NOTIFICATIONS": "",
+              "KYBERION_ALLOW_UNAUTH_REMOTE": "",
+              "KYBERION_ALLOW_UNSAFE_CLI": "",
+              "KYBERION_ALLOW_UNSAFE_JS": "",
+              "KYBERION_ALLOW_UNSAFE_SHELL": "",
+              "KYBERION_APPROVAL_ASSURANCE": "",
+              "KYBERION_AUTHZ_POLICY_PATH": "",
+              "KYBERION_AUTONOMOUS_OPS_POLICY_PATH": "",
+              "KYBERION_CODEX_APPROVAL": "",
+              "KYBERION_EGRESS_POLICY": "",
+              "KYBERION_EGRESS_POLICY_PATH": "",
+              "KYBERION_KNOWLEDGE_FEEDBACK_POLICY_PATH": "",
+              "KYBERION_OIDC_ALLOW_HS256": "",
+              "KYBERION_OPENROUTER_COST_POLICY": "",
+              "KYBERION_PROVIDER_EGRESS_POLICY_PATH": "",
+              "KYBERION_PROVIDER_ENV_ALLOWLIST": "",
+              "KYBERION_REASONING_ALLOW_SHELL_TOOL": "",
+              "KYBERION_RESTRICTED_ACTIONS_POLICY": "",
+              "KYBERION_SERVICE_RUNTIME_POLICY_PATH": "",
+              "KYBERION_SHARE_GRANTS_PATH": "",
+              "KYBERION_SHELL_COMMAND_POLICY_PATH": "",
+              "KYBERION_SURFACE_ALLOWLISTS": "",
+              "KYBERION_TENANT_EGRESS_POLICY_PATH": "",
+              "KYBERION_TOOL_ACTUATOR_ROUTING_POLICY_PATH": "",
+              "KYBERION_TOOL_RUNTIME_POLICY_PATH": "",
+              "KYBERION_TRUST_PROXY": "",
+              "KYBERION_VIDEO_RENDER_RUNTIME_POLICY_PATH": "",
+              "KYBERION_VOICE_RUNTIME_POLICY_PATH": "",
+              "KYBERION_VOICE_SAMPLE_INGESTION_POLICY_PATH": ""
+            },
+            "unsupported_policy_env": []
+          },
+          "library_execution": {
+            "source_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "initial_context": {},
+            "payload_scope": {
+              "tier": "public"
+            },
+            "identity": {
+              "role": "mission_controller",
+              "persona": "worker"
+            },
+            "trust_resolved": false
+          }
+        }
+      },
+      "resume_env": {
+        "SYSTEM_ROLE": "",
+        "MISSION_ROLE": "mission_controller",
+        "KYBERION_DELEGATED_ROLE": "",
+        "KYBERION_BASE_ROLE": "worker",
+        "KYBERION_PERSONA": ""
+      },
+      "library_scope": {
+        "role": "mission_controller",
+        "base_role": "worker"
+      }
+    },
+    "library-ecosystem-architect": {
+      "raw_run_started": {
+        "version": 3,
+        "sequence": 1,
+        "run_id": "base-role-equivalence-library-ecosystem-architect-96852",
+        "event": "run_started",
+        "timestamp": "2026-11-11T15:23:48.030Z",
+        "payload": {
+          "pipeline_id": "equivalence-library-ecosystem-architect",
+          "input_path": "pipelines/example.json",
+          "step_ids": ["step"],
+          "execution_authority": {
+            "system_role": "",
+            "mission_role": "mission_controller",
+            "persona": "ecosystem_architect",
+            "scope": {
+              "tier": "public"
+            },
+            "nhi_id": "",
+            "agent_id": "",
+            "task_grants_path": "",
+            "policy_env": {
+              "KYBERION_NHI_ACTOR": "off",
+              "KYBERION_ALLOW_FILE_SECRETS": "",
+              "KYBERION_ALLOW_LOCAL_NETWORK": "",
+              "KYBERION_ALLOW_STUB_FALLBACK": "",
+              "KYBERION_ALLOW_TEST_NOTIFICATIONS": "",
+              "KYBERION_ALLOW_UNAUTH_REMOTE": "",
+              "KYBERION_ALLOW_UNSAFE_CLI": "",
+              "KYBERION_ALLOW_UNSAFE_JS": "",
+              "KYBERION_ALLOW_UNSAFE_SHELL": "",
+              "KYBERION_APPROVAL_ASSURANCE": "",
+              "KYBERION_AUTHZ_POLICY_PATH": "",
+              "KYBERION_AUTONOMOUS_OPS_POLICY_PATH": "",
+              "KYBERION_CODEX_APPROVAL": "",
+              "KYBERION_EGRESS_POLICY": "",
+              "KYBERION_EGRESS_POLICY_PATH": "",
+              "KYBERION_KNOWLEDGE_FEEDBACK_POLICY_PATH": "",
+              "KYBERION_OIDC_ALLOW_HS256": "",
+              "KYBERION_OPENROUTER_COST_POLICY": "",
+              "KYBERION_PROVIDER_EGRESS_POLICY_PATH": "",
+              "KYBERION_PROVIDER_ENV_ALLOWLIST": "",
+              "KYBERION_REASONING_ALLOW_SHELL_TOOL": "",
+              "KYBERION_RESTRICTED_ACTIONS_POLICY": "",
+              "KYBERION_SERVICE_RUNTIME_POLICY_PATH": "",
+              "KYBERION_SHARE_GRANTS_PATH": "",
+              "KYBERION_SHELL_COMMAND_POLICY_PATH": "",
+              "KYBERION_SURFACE_ALLOWLISTS": "",
+              "KYBERION_TENANT_EGRESS_POLICY_PATH": "",
+              "KYBERION_TOOL_ACTUATOR_ROUTING_POLICY_PATH": "",
+              "KYBERION_TOOL_RUNTIME_POLICY_PATH": "",
+              "KYBERION_TRUST_PROXY": "",
+              "KYBERION_VIDEO_RENDER_RUNTIME_POLICY_PATH": "",
+              "KYBERION_VOICE_RUNTIME_POLICY_PATH": "",
+              "KYBERION_VOICE_SAMPLE_INGESTION_POLICY_PATH": ""
+            },
+            "unsupported_policy_env": []
+          },
+          "library_execution": {
+            "source_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "initial_context": {},
+            "payload_scope": {
+              "tier": "public"
+            },
+            "identity": {
+              "role": "mission_controller",
+              "persona": "ecosystem_architect"
+            },
+            "trust_resolved": false
+          }
+        }
+      },
+      "resume_env": {
+        "SYSTEM_ROLE": "",
+        "MISSION_ROLE": "mission_controller",
+        "KYBERION_DELEGATED_ROLE": "",
+        "KYBERION_BASE_ROLE": "ecosystem_architect",
+        "KYBERION_PERSONA": ""
+      },
+      "library_scope": {
+        "role": "mission_controller",
+        "base_role": "ecosystem_architect"
+      }
+    },
+    "library-no-base-role": {
+      "raw_run_started": {
+        "version": 3,
+        "sequence": 1,
+        "run_id": "base-role-equivalence-library-no-base-role-96852",
+        "event": "run_started",
+        "timestamp": "2026-11-11T15:23:48.215Z",
+        "payload": {
+          "pipeline_id": "equivalence-library-no-base-role",
+          "input_path": "pipelines/example.json",
+          "step_ids": ["step"],
+          "execution_authority": {
+            "system_role": "",
+            "mission_role": "mission_controller",
+            "persona": "worker",
+            "scope": {
+              "tier": "public"
+            },
+            "nhi_id": "",
+            "agent_id": "",
+            "task_grants_path": "",
+            "policy_env": {
+              "KYBERION_NHI_ACTOR": "off",
+              "KYBERION_ALLOW_FILE_SECRETS": "",
+              "KYBERION_ALLOW_LOCAL_NETWORK": "",
+              "KYBERION_ALLOW_STUB_FALLBACK": "",
+              "KYBERION_ALLOW_TEST_NOTIFICATIONS": "",
+              "KYBERION_ALLOW_UNAUTH_REMOTE": "",
+              "KYBERION_ALLOW_UNSAFE_CLI": "",
+              "KYBERION_ALLOW_UNSAFE_JS": "",
+              "KYBERION_ALLOW_UNSAFE_SHELL": "",
+              "KYBERION_APPROVAL_ASSURANCE": "",
+              "KYBERION_AUTHZ_POLICY_PATH": "",
+              "KYBERION_AUTONOMOUS_OPS_POLICY_PATH": "",
+              "KYBERION_CODEX_APPROVAL": "",
+              "KYBERION_EGRESS_POLICY": "",
+              "KYBERION_EGRESS_POLICY_PATH": "",
+              "KYBERION_KNOWLEDGE_FEEDBACK_POLICY_PATH": "",
+              "KYBERION_OIDC_ALLOW_HS256": "",
+              "KYBERION_OPENROUTER_COST_POLICY": "",
+              "KYBERION_PROVIDER_EGRESS_POLICY_PATH": "",
+              "KYBERION_PROVIDER_ENV_ALLOWLIST": "",
+              "KYBERION_REASONING_ALLOW_SHELL_TOOL": "",
+              "KYBERION_RESTRICTED_ACTIONS_POLICY": "",
+              "KYBERION_SERVICE_RUNTIME_POLICY_PATH": "",
+              "KYBERION_SHARE_GRANTS_PATH": "",
+              "KYBERION_SHELL_COMMAND_POLICY_PATH": "",
+              "KYBERION_SURFACE_ALLOWLISTS": "",
+              "KYBERION_TENANT_EGRESS_POLICY_PATH": "",
+              "KYBERION_TOOL_ACTUATOR_ROUTING_POLICY_PATH": "",
+              "KYBERION_TOOL_RUNTIME_POLICY_PATH": "",
+              "KYBERION_TRUST_PROXY": "",
+              "KYBERION_VIDEO_RENDER_RUNTIME_POLICY_PATH": "",
+              "KYBERION_VOICE_RUNTIME_POLICY_PATH": "",
+              "KYBERION_VOICE_SAMPLE_INGESTION_POLICY_PATH": ""
+            },
+            "unsupported_policy_env": []
+          },
+          "library_execution": {
+            "source_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "initial_context": {},
+            "payload_scope": {
+              "tier": "public"
+            },
+            "identity": {
+              "role": "mission_controller"
+            },
+            "trust_resolved": false
+          }
+        }
+      },
+      "resume_env": {
+        "SYSTEM_ROLE": "",
+        "MISSION_ROLE": "mission_controller",
+        "KYBERION_DELEGATED_ROLE": "",
+        "KYBERION_BASE_ROLE": "worker",
+        "KYBERION_PERSONA": ""
+      },
+      "library_scope": {
+        "role": "mission_controller",
+        "base_role": "worker"
+      }
+    }
+  },
+  "authn": {
+    "persona-worker": {
+      "eligible": true,
+      "principal": "kyberion://agent/_/_/worker"
+    },
+    "persona-ecosystem-architect": {
+      "eligible": true,
+      "principal": null
+    },
+    "persona-slug": {
+      "eligible": true,
+      "principal": "kyberion://agent/_/_/release-bot"
+    },
+    "persona-padded": {
+      "eligible": true,
+      "principal": "kyberion://agent/_/_/worker"
+    },
+    "persona-blank": {
+      "eligible": false,
+      "principal": null
+    },
+    "persona-and-mission-role": {
+      "eligible": true,
+      "principal": "kyberion://agent/_/_/analyst"
+    },
+    "mission-role-only": {
+      "eligible": true,
+      "principal": null
+    },
+    "actor-hint-outranks-persona": {
+      "eligible": true,
+      "principal": "kyberion://agent/_/_/hinted-agent"
+    },
+    "persona-not-slug": {
+      "eligible": true,
+      "principal": null
+    },
+    "empty": {
+      "eligible": false,
+      "principal": null
+    }
+  },
+  "team_plan": {
+    "assigned-product-manager": {
+      "mission_id": "MSN-BASE-ROLE-EQUIVALENCE",
+      "mission_type": "development",
+      "tier": "public",
+      "template": "default",
+      "generated_at": "2026-11-12T00:00:00.000Z",
+      "assignments": [],
+      "assigned_persona": "product_manager"
+    },
+    "assigned-worker": {
+      "mission_id": "MSN-BASE-ROLE-EQUIVALENCE",
+      "mission_type": "development",
+      "tier": "public",
+      "template": "default",
+      "generated_at": "2026-11-12T00:00:00.000Z",
+      "assignments": [],
+      "assigned_persona": "worker"
+    },
+    "unassigned": {
+      "mission_id": "MSN-BASE-ROLE-EQUIVALENCE",
+      "mission_type": "development",
+      "tier": "public",
+      "template": "default",
+      "generated_at": "2026-11-12T00:00:00.000Z",
+      "assignments": []
+    }
+  }
+}

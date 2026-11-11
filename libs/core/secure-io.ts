@@ -260,7 +260,7 @@ export function buildSafeExecEnv(
   const scope = currentExecutionScope();
   if (scope?.assumedRole) {
     safeEnv.MISSION_ROLE = scope.assumedRole;
-    if (scope.assumedPersona !== undefined) writeBaseRoleEnv(safeEnv, scope.assumedPersona);
+    if (scope.assumedBaseRole !== undefined) writeBaseRoleEnv(safeEnv, scope.assumedBaseRole);
   }
   if (scope?.tenantBound && scope.tenantSlug) {
     safeEnv.KYBERION_TENANT = scope.tenantSlug;
