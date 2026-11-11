@@ -181,13 +181,13 @@ export const OPERATOR_LAYOUT_PREFS_KEY = 'chronos.operator-layout.prefs';
 export function buildPlanPreviewSignature(input: {
   requestText: string;
   missionType: string;
-  assignedPersona: string;
+  orgRole: string;
   tier: 'personal' | 'confidential' | 'public';
 }): string {
   return JSON.stringify({
     requestText: input.requestText.trim(),
     missionType: input.missionType.trim(),
-    assignedPersona: input.assignedPersona.trim(),
+    orgRole: input.orgRole.trim(),
     tier: input.tier,
   });
 }
