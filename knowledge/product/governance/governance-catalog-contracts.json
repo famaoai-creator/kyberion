@@ -130,7 +130,6 @@
       "system_roles",
       "version"
     ],
-    "role-write-access.json": ["default_allow", "roles", "version"],
     "runtime-design-profiles.json": ["profiles", "version"],
     "sdlc-gate-catalog.json": [
       "concept",

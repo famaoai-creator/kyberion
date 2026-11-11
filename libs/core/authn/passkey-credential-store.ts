@@ -12,7 +12,7 @@
  * The file stays in the personal tier rather than the runtime floor: it is
  * gitignored, the knowledge index scans only Markdown, tenant ingest never
  * reads `knowledge/personal/members/`, and `sovereign_concierge` (the only
- * writer) already holds personal-tier write authority (role-write-access.json).
+ * writer) already holds personal-tier write authority (its Authority Role card).
  */
 import * as path from 'node:path';
 import { randomBytes } from 'node:crypto';
