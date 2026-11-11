@@ -1,0 +1,10 @@
+{
+  "$schema": "../../schemas/org-role-card.schema.json",
+  "role": "talent_culture",
+  "role_class": "context",
+  "default_grant": {
+    "authority_role": "talent_culture",
+    "base_role": "worker",
+    "execution_mode": "mission"
+  }
+}

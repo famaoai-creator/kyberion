@@ -1,7 +1,8 @@
 import * as path from 'node:path';
 import { defineCatalog, type GovernedCatalog } from '../foundation/governed-catalog.js';
 import { pathResolver } from '../path-resolver.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeReaddir } from '../secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeReaddir, safeStat } from '../secure-io.js';
+import { baseAuthorityRoleOf, isBaseAuthorityRoleName } from '../foundation/base-authority-role.js';
 
 /** The governed authority role shape shared by runtime consumers. */
 export interface AuthorityRoleRecord {
@@ -168,4 +169,151 @@ export function loadAuthorityRoleIndex(rootDir?: string): Record<string, Authori
   const indexPath = knowledgePath(rootDir, 'product/governance/authority-role-index.json');
   const index = getAuthorityRoleIndexCatalog(indexPath).load();
   return index.authority_roles;
+}
+
+// ---------------------------------------------------------------------------
+// Org Role cards (concept model v2 D6): an Org Role carries no permissions of
+// its own; its card (`knowledge/product/roles/<role>/role.json`) names the
+// default Grant it maps to — registry entries only. `pnpm kyberion sync
+// org-role-grants` projects the cards into role-authority-map.json.
+
+/** The groups of role-authority-map.json, in file order (`<role_class>_roles`). */
+export const ORG_ROLE_CLASSES = ['system', 'mission', 'context'] as const;
+export type OrgRoleClass = (typeof ORG_ROLE_CLASSES)[number];
+
+/** The default Grant of an Org Role: pointers into the role registry. */
+export interface OrgRoleDefaultGrant {
+  /** An Authority Role card, or null when the role has none. */
+  authority_role: string | null;
+  /** The base Authority Role short name (`worker` runs on `base_worker`). */
+  base_role: string;
+  execution_mode: string;
+}
+
+export interface OrgRoleCard {
+  role: string;
+  role_class: OrgRoleClass;
+  default_grant: OrgRoleDefaultGrant;
+}
+
+/** One role-authority-map.json entry (the generated projection of a card). */
+export interface RoleAuthorityMapEntry {
+  role: string;
+  authority_role?: string;
+  persona: string;
+  execution_mode: string;
+}
+
+export type RoleAuthorityMapGroups = Record<`${OrgRoleClass}_roles`, RoleAuthorityMapEntry[]>;
+
+/** Base role values with no base Authority Role card (they never had a bundle). */
+const BASE_ROLES_WITHOUT_CARD: ReadonlySet<string> = new Set(['mission_owner']);
+
+const ORG_ROLE_CARD_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/org-role-card.schema.json'
+);
+const orgRoleCardCatalogs = new Map<string, GovernedCatalog<OrgRoleCard>>();
+
+function getOrgRoleCardCatalog(filePath: string): GovernedCatalog<OrgRoleCard> {
+  const existing = orgRoleCardCatalogs.get(filePath);
+  if (existing) return existing;
+  const catalog = defineCatalog<OrgRoleCard>({
+    id: 'org-role-card',
+    path: filePath,
+    schema: ORG_ROLE_CARD_SCHEMA_PATH,
+  });
+  orgRoleCardCatalogs.set(filePath, catalog);
+  return catalog;
+}
+
+/**
+ * Every Org Role card under `knowledge/product/roles/`, keyed by role id (the
+ * directory name). A role directory without `role.json` has no card.
+ */
+export function loadOrgRoleCards(rootDir?: string): Record<string, OrgRoleCard> {
+  const directory = knowledgePath(rootDir, 'product/roles');
+  if (!safeExistsSync(directory)) return {};
+  const cards: Record<string, OrgRoleCard> = {};
+  for (const entry of safeReaddir(directory).sort()) {
+    if (entry.startsWith('.') || !safeStat(path.join(directory, entry)).isDirectory()) continue;
+    const filePath = assertSafeRepositoryPath(path.join(directory, entry, 'role.json'), {
+      allowMissingLeaf: true,
+    });
+    if (!safeExistsSync(filePath)) continue;
+    const catalog = getOrgRoleCardCatalog(filePath);
+    catalog.reset();
+    const card = catalog.load();
+    if (card.role !== entry) {
+      throw new Error(`Org Role card ${entry}/role.json must match its directory (${card.role})`);
+    }
+    cards[entry] = card;
+  }
+  return cards;
+}
+
+/**
+ * The reasons the cards do not point at registry entries: an `authority_role`
+ * with no Authority Role card (or naming a base role, which is never a
+ * principal's own role), or a `base_role` that is not a known base role.
+ */
+export function validateOrgRoleCards(
+  cards: Readonly<Record<string, OrgRoleCard>>,
+  authorityRoles: Readonly<Record<string, unknown>>
+): string[] {
+  const errors: string[] = [];
+  for (const [role, card] of Object.entries(cards)) {
+    const { authority_role: authorityRole, base_role: baseRole } = card.default_grant;
+    if (authorityRole !== null) {
+      if (isBaseAuthorityRoleName(authorityRole)) {
+        errors.push(`${role}: authority_role '${authorityRole}' is a base role; use base_role`);
+      } else if (!Object.hasOwn(authorityRoles, authorityRole)) {
+        errors.push(
+          `${role}: authority_role '${authorityRole}' has no card in knowledge/product/governance/authority-roles/`
+        );
+      }
+    }
+    const baseCard = baseAuthorityRoleOf(baseRole);
+    if (baseCard) {
+      if (!Object.hasOwn(authorityRoles, baseCard)) {
+        errors.push(`${role}: base_role '${baseRole}' has no registry card ${baseCard}.json`);
+      }
+    } else if (!BASE_ROLES_WITHOUT_CARD.has(baseRole)) {
+      errors.push(`${role}: base_role '${baseRole}' is not a known base role`);
+    }
+  }
+  return errors;
+}
+
+/** The role-authority-map.json entry a card projects to. */
+export function roleAuthorityMapEntryOf(card: OrgRoleCard): RoleAuthorityMapEntry {
+  const grant = card.default_grant;
+  return {
+    role: card.role,
+    ...(grant.authority_role ? { authority_role: grant.authority_role } : {}),
+    persona: grant.base_role,
+    execution_mode: grant.execution_mode,
+  };
+}
+
+/**
+ * The role-authority-map.json groups projected from the cards. Roles keep
+ * their position in `existingOrder` (the current map's order per group) so a
+ * regeneration only moves what changed; new roles follow, sorted.
+ */
+export function projectRoleAuthorityMap(
+  cards: Readonly<Record<string, OrgRoleCard>>,
+  existingOrder: Partial<Record<keyof RoleAuthorityMapGroups, readonly string[]>> = {}
+): RoleAuthorityMapGroups {
+  const groups = {} as RoleAuthorityMapGroups;
+  for (const roleClass of ORG_ROLE_CLASSES) {
+    const group = `${roleClass}_roles` as const;
+    const members = Object.keys(cards).filter((role) => cards[role]!.role_class === roleClass);
+    const order = existingOrder[group] ?? [];
+    const ordered = [
+      ...order.filter((role) => members.includes(role)),
+      ...members.filter((role) => !order.includes(role)).sort(),
+    ];
+    groups[group] = ordered.map((role) => roleAuthorityMapEntryOf(cards[role]!));
+  }
+  return groups;
 }

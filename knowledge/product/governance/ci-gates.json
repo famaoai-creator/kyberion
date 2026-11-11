@@ -146,6 +146,14 @@
       "rationale": "Keeps static foundation state/ledger/floor roots projected from validated catalog registrations without runtime catalog I/O."
     },
     {
+      "id": "org-role-grants",
+      "scope": "pr",
+      "executable": "node",
+      "args": ["--import", "./scripts/ts-loader.mjs", "scripts/sync_org_role_grants.ts", "--check"],
+      "owner": "governance",
+      "rationale": "Keeps role-authority-map.json generated from the Org Role cards' default_grant (concept model v2 D6) and fails when a card points at an Authority Role or base role the registry does not have."
+    },
+    {
       "id": "package-dependency-graph",
       "scope": "pr",
       "executable": "node",
