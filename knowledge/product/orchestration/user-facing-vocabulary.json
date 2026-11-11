@@ -11050,6 +11050,11 @@
         "ja": "ロールのカードから、権限ロール索引とセキュリティポリシーのロール許可を再生成する。",
         "qps-ploc": "⟦Řėɠėñėřȧŧė ŧħė ȧůŧħőřïŧẏ řőŀė ïñḓėẋ ȧñḓ ŧħė şėƈůřïŧẏ ṗőŀïƈẏ řőŀė ṗėřɱïşşïőñş ƒřőɱ ŧħė řőŀė ƈȧřḓş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈ⟧"
       },
+      "cli_cmd_script_sync_org_role_grants": {
+        "en": "Regenerate the role authority map from the default grants on the Org Role cards.",
+        "ja": "組織ロールのカードの既定の権限から、ロールと権限の対応表を再生成する。",
+        "qps-ploc": "⟦Řėɠėñėřȧŧė ŧħė řőŀė ȧůŧħőřïŧẏ ɱȧṗ ƒřőɱ ŧħė ḓėƒȧůŀŧ ɠřȧñŧş őñ ŧħė Őřɠ Řőŀė ƈȧřḓş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
+      },
       "cli_cmd_script_sync_service_endpoints": {
         "en": "Regenerate the service endpoint catalog from its sources.",
         "ja": "ソースからサービスエンドポイントカタログを再生成する。",

@@ -438,6 +438,7 @@ Repository build, test, generator and gate scripts for contributors.
 | `pnpm kyberion surfaces screenshots`                |                                            | Capture before/after screenshots of the UI surfaces.                                              |
 | `pnpm kyberion sync agent-profiles`                 |                                            | Regenerate the agent profile index from the canonical profiles directory.                         |
 | `pnpm kyberion sync authority-roles`                |                                            | Regenerate the authority role index and the security policy role permissions from the role cards. |
+| `pnpm kyberion sync org-role-grants`                |                                            | Regenerate the role authority map from the default grants on the Org Role cards.                  |
 | `pnpm kyberion sync service-endpoints`              |                                            | Regenerate the service endpoint catalog from its sources.                                         |
 | `pnpm kyberion sync specialist-catalog`             |                                            | Regenerate the specialist catalog from its sources.                                               |
 | `pnpm kyberion sync team-roles`                     |                                            | Regenerate the team role index from the team role definitions.                                    |

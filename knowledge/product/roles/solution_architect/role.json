@@ -1,0 +1,10 @@
+{
+  "$schema": "../../schemas/org-role-card.schema.json",
+  "role": "solution_architect",
+  "role_class": "system",
+  "default_grant": {
+    "authority_role": "ecosystem_architect",
+    "base_role": "ecosystem_architect",
+    "execution_mode": "system"
+  }
+}

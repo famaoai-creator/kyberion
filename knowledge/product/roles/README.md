@@ -4,7 +4,7 @@ category: Roles
 tags: [roles, persona, procedure, mission-lifecycle]
 importance: 6
 author: Ecosystem Architect
-last_updated: 2026-10-21
+last_updated: 2026-11-11
 kind: reference
 scope: global
 applies_to: [missions, roles]
@@ -24,6 +24,11 @@ Each persona directory holds:
 
 - `mission.md` — the role's mission statement (why this persona exists).
 - `PROCEDURE.md` — the role's standard operating procedure (how it works day to day).
+- `role.json` — the Org Role card (schema `org-role-card.schema.json`): its `role_class` and its
+  `default_grant` (`authority_role`, `base_role`, `execution_mode`). An Org Role carries no
+  permissions of its own (concept model v2 D6); the card only points at registry entries.
+  `knowledge/product/governance/role-authority-map.json` is generated from these cards by
+  `pnpm kyberion sync org-role-grants`.
 
 ## How a persona's PROCEDURE.md reaches a running mission
 

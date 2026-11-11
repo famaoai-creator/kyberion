@@ -1,0 +1,10 @@
+{
+  "$schema": "../../schemas/org-role-card.schema.json",
+  "role": "business_owner",
+  "role_class": "context",
+  "default_grant": {
+    "authority_role": null,
+    "base_role": "analyst",
+    "execution_mode": "mission"
+  }
+}

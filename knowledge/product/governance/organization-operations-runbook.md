@@ -1,7 +1,7 @@
 ---
 title: Organization Operations Runbook
 tags: [organization, operation, incident, decision, governance]
-last_updated: 2026-11-10
+last_updated: 2026-11-11
 ---
 
 # Organization operations
@@ -73,7 +73,7 @@ pnpm organization objective kr record --organization-id ORG --tier confidential 
 
 ## Members and roles
 
-Link a chat or IdP identity to an existing member so team channels resolve the speaker: `pnpm organization member link-identity <member-id> --slack <user-id>` (or `--issuer <iss> --subject <sub>`; `unlink-identity` reverses it). Author roles with `pnpm organization role create --name <name> --domain <domain>` and grant authority with `role promote --role <role-id> --authority <authority-role-id>`.
+Link a chat or IdP identity to an existing member so team channels resolve the speaker: `pnpm organization member link-identity <member-id> --slack <user-id>` (or `--issuer <iss> --subject <sub>`; `unlink-identity` reverses it). Author roles with `pnpm organization role create --name <name> --domain <domain>` and grant authority with `role promote --role <role-id> --authority <authority-role-id>`. Both write the Org Role card's `default_grant` (`knowledge/product/roles/<role>/role.json`) and regenerate its projection `role-authority-map.json` under the same approval; to change a default grant by hand, edit the card and run `pnpm kyberion sync org-role-grants` (`--check` is the drift gate).
 
 ### People, responsibilities and identities
 

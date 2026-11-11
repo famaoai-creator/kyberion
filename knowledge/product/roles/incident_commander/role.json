@@ -1,0 +1,10 @@
+{
+  "$schema": "../../schemas/org-role-card.schema.json",
+  "role": "incident_commander",
+  "role_class": "mission",
+  "default_grant": {
+    "authority_role": "mission_controller",
+    "base_role": "worker",
+    "execution_mode": "mission"
+  }
+}

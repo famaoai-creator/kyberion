@@ -11,7 +11,12 @@ import { defineCatalog, nowIso, writeJson, type GovernedCatalog } from '@agent/c
 import { withExecutionContext } from '@agent/core/governance';
 import {
   loadAuthorityRoleCards,
+  loadOrgRoleCards,
+  ORG_ROLE_CLASSES,
+  projectRoleAuthorityMap,
   type AuthorityRoleCard,
+  type OrgRoleCard,
+  type OrgRoleClass,
 } from '@agent/core/organization/authority-role-registry';
 import {
   draftRoleFromIntent,
@@ -822,7 +827,26 @@ function loadRoleAuthorityMap(rootDir: string): RoleAuthorityMap {
   return roleAuthorityMapCatalog(filePath).load();
 }
 
-function upsertRoleAuthorityMap(rootDir: string, entry: RoleAuthorityEntry): void {
+function orgRoleCardOf(entry: RoleAuthorityEntry, roleClass: OrgRoleClass): OrgRoleCard {
+  return {
+    role: entry.role,
+    role_class: roleClass,
+    default_grant: {
+      authority_role: entry.authority_role ?? null,
+      base_role: entry.persona,
+      execution_mode: entry.execution_mode ?? 'mission',
+    },
+  };
+}
+
+/**
+ * Writes the Org Role card's default grant (concept model v2 D6: the card only
+ * points at registry entries) and its role-authority-map.json projection
+ * together, so the `org-role-grants` drift gate stays green. A role keeps its
+ * card's role class (new roles are context roles); map entries without a card
+ * (an installation that predates the cards) are kept as they are.
+ */
+function upsertOrgRoleDefaultGrant(rootDir: string, entry: RoleAuthorityEntry): void {
   const filePath = path.join(
     rootDir,
     'knowledge',
@@ -831,15 +855,23 @@ function upsertRoleAuthorityMap(rootDir: string, entry: RoleAuthorityEntry): voi
     'role-authority-map.json'
   );
   const map = loadRoleAuthorityMap(rootDir);
-  const buckets = ['system_roles', 'mission_roles', 'context_roles'] as const;
-  for (const bucket of buckets) {
-    const existing = Array.isArray(map[bucket]) ? map[bucket]! : [];
-    map[bucket] = existing.filter((item) => item.role !== entry.role);
+  const cards: Record<string, OrgRoleCard> = {};
+  const order: Partial<Record<`${OrgRoleClass}_roles`, string[]>> = {};
+  for (const roleClass of ORG_ROLE_CLASSES) {
+    const entries = map[`${roleClass}_roles`] || [];
+    order[`${roleClass}_roles`] = entries.map((existing) => existing.role);
+    for (const existing of entries) cards[existing.role] = orgRoleCardOf(existing, roleClass);
   }
-  map.context_roles = [...(map.context_roles || []), entry].sort((left, right) =>
-    left.role.localeCompare(right.role)
-  );
-  writeJson(filePath, map);
+  Object.assign(cards, loadOrgRoleCards(rootDir));
+  const card = orgRoleCardOf(entry, cards[entry.role]?.role_class ?? 'context');
+  cards[entry.role] = card;
+  const roleDir = path.join(rootDir, 'knowledge', 'product', 'roles', entry.role);
+  safeMkdir(roleDir, { recursive: true });
+  writeJson(path.join(roleDir, 'role.json'), {
+    $schema: '../../schemas/org-role-card.schema.json',
+    ...card,
+  });
+  writeJson(filePath, { ...map, ...projectRoleAuthorityMap(cards, order) });
   resetOrgCatalog(filePath);
 }
 
@@ -1035,7 +1067,7 @@ function promoteRoleBundle(rootDir: string, input: OrgRolePromoteOptions): Recor
     syncAuthorityRoleSnapshot(rootDir, authorityRoles);
     writeTeamRoleBundle(rootDir, roleId, updatedTeam);
     syncTeamRoleSnapshot(rootDir, teamRoles);
-    upsertRoleAuthorityMap(
+    upsertOrgRoleDefaultGrant(
       rootDir,
       resolvePromotionRoleAuthorityEntry(roleId, authorityRoleId, input.persona)
     );
@@ -1055,6 +1087,7 @@ function promoteRoleBundle(rootDir: string, input: OrgRolePromoteOptions): Recor
       authority_role_index: 'knowledge/product/governance/authority-role-index.json',
       team_role: `knowledge/product/orchestration/team-roles/${roleId}.json`,
       team_role_index: 'knowledge/product/orchestration/team-role-index.json',
+      org_role_card: `knowledge/product/roles/${roleId}/role.json`,
       role_authority_map: 'knowledge/product/governance/role-authority-map.json',
       security_policy: 'knowledge/product/governance/security-policy.json',
       promotion_notes: `knowledge/product/roles/${roleId}/PROMOTION.md`,
@@ -1098,7 +1131,7 @@ export function createRoleBundle(
     syncAuthorityRoleSnapshot(rootDir, authorityRoles);
     writeTeamRoleBundle(rootDir, teamRoleId, teamRole);
     syncTeamRoleSnapshot(rootDir, teamRoles);
-    upsertRoleAuthorityMap(rootDir, resolveRoleAuthorityEntry(normalizedInput, authorityRoleId));
+    upsertOrgRoleDefaultGrant(rootDir, resolveRoleAuthorityEntry(normalizedInput, authorityRoleId));
     upsertSecurityPolicy(rootDir, authorityRoleId, authorityRole, normalizedInput.approvalId);
     upsertRoleWriteAccess(rootDir, authorityRoleId, authorityRole.write_scopes);
     writeRoleDocs(rootDir, normalizedInput, authorityRoleId, teamRole, authorityRole);
@@ -1116,6 +1149,7 @@ export function createRoleBundle(
       authority_role_index: 'knowledge/product/governance/authority-role-index.json',
       team_role: `knowledge/product/orchestration/team-roles/${teamRoleId}.json`,
       team_role_index: 'knowledge/product/orchestration/team-role-index.json',
+      org_role_card: `knowledge/product/roles/${teamRoleId}/role.json`,
       role_authority_map: 'knowledge/product/governance/role-authority-map.json',
       security_policy: 'knowledge/product/governance/security-policy.json',
       procedure: `knowledge/product/roles/${teamRoleId}/PROCEDURE.md`,
