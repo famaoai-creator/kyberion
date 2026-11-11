@@ -6,7 +6,7 @@ authority: reference
 phase: [alignment, execution]
 tags: [mission, team-composition, authority-role, team-role, agents]
 owner: ecosystem_architect
-last_updated: 2026-11-10
+last_updated: 2026-11-12
 ---
 
 # Mission Team Composition Model
@@ -23,7 +23,7 @@ Kyberion separates two kinds of roles:
 3. Match each `team_role` against candidate agent profiles
 4. Validate that the chosen agent exposes a compatible `authority_role`
 5. Emit a `team-composition.json` artifact into the mission directory
-6. When writing from CLI, execute with mission authority context. `scripts/compose_mission_team.ts --write` resolves the mission's assigned persona and applies it for governed writes.
+6. When writing from CLI, execute with mission authority context. `scripts/compose_mission_team.ts --write` writes as `mission_controller`. It records the mission's Org Role (`--org-role`, else the mission state's `org_role`; `--persona` is a deprecated alias read for one release) in the plan's `org_role` field, and never copies it into the execution identity. A stored plan that still carries the old `assigned_persona` field is read as `org_role` for one release.
 
 ### Persona vs authority
 
