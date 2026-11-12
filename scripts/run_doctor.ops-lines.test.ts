@@ -82,6 +82,19 @@ describe('run_doctor mesh delivery line', () => {
     expect(mocks.inspectMeshHub).toHaveBeenCalledWith({ tenantId: 'acme' });
     expect(lines[0]).toContain('Mesh delivery: idle');
   });
+
+  it('names the resolved tenant in the dead-letter hint, since mesh-hub inspect does not read KYBERION_TENANT', async () => {
+    vi.stubEnv('KYBERION_TENANT', 'acme');
+    vi.stubEnv('KYBERION_TENANT_ID', '');
+    mocks.inspectMeshHub.mockResolvedValue({ delivery_count: 1, dead_letter_count: 1, routes: [] });
+    const { collectMeshDeliveryDoctorLines } = await import('./run_doctor.js');
+
+    const lines = await collectMeshDeliveryDoctorLines();
+
+    expect(lines).toContain(
+      '  - inspect dead letters via `pnpm kyberion mesh-hub inspect dead-letters --tenant-id acme`'
+    );
+  });
 });
 
 describe('run_doctor resident ops verdict lines', () => {
