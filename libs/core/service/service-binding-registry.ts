@@ -1,10 +1,21 @@
+import {
+  BINDING_DIR,
+  serviceBindingRecordCatalogAtPath,
+  serviceBindingRecordPath as bindingPath,
+  listServiceBindingRecords,
+} from './service-binding-reader.js';
+export {
+  serviceBindingRecordPath,
+  loadServiceBindingRecord,
+  listServiceBindingRecords,
+  validateServiceBindingRecord,
+} from './service-binding-reader.js';
 import * as path from 'node:path';
 import {
   resolveBindingOwner,
   validateBindingOwner,
   type BindingOwnerKind,
 } from './service-binding-owner.js';
-import { defineCatalog } from '../foundation/governed-catalog.js';
 import { pathResolver } from '../path-resolver.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import {
@@ -18,7 +29,6 @@ import { findMissionPath } from '../path-resolver.js';
 import { loadMissionStateAtPath } from '../mission/mission-state-reader.js';
 import { assertServiceCredentialAllocation } from '../governance/service-credential-allocation.js';
 import {
-  assertSafeRepositoryPath,
   safeExistsSync,
   safeMkdir,
   safeReaddir,
@@ -152,49 +162,6 @@ export function authorizeTenantServiceAction(input: {
   return { bindingId: binding.binding_id, approvalRequired: decision === 'approval_required' };
 }
 
-const BINDING_SCHEMA_PATH = pathResolver.knowledge(
-  'product/schemas/service-binding-record.schema.json'
-);
-const BINDING_DIR = pathResolver.shared('runtime/service-bindings');
-
-const serviceBindingRecordCatalog = defineCatalog<ServiceBindingRecord>({
-  id: 'service-binding-record',
-  path: BINDING_DIR,
-  schema: BINDING_SCHEMA_PATH,
-});
-
-export function serviceBindingRecordPath(bindingId: string): string {
-  const directory = path.resolve(BINDING_DIR);
-  const candidate = path.resolve(directory, `${bindingId}.json`);
-  const relative = path.relative(directory, candidate).replaceAll('\\', '/');
-  if (!relative || relative === '..' || relative.startsWith('../') || path.isAbsolute(relative)) {
-    throw new Error(
-      `[RESOURCE_PATH_SCOPE] service binding path escapes its directory: ${bindingId}`
-    );
-  }
-  return assertSafeRepositoryPath(candidate, {
-    allowMissingLeaf: true,
-  });
-}
-const bindingPath = serviceBindingRecordPath;
-
-function serviceBindingRecordCatalogAtPath(filePath: string) {
-  return defineCatalog<ServiceBindingRecord>({
-    id: 'service-binding-record',
-    path: filePath,
-    schema: BINDING_SCHEMA_PATH,
-  });
-}
-
-export function validateServiceBindingRecord(value: unknown): value is ServiceBindingRecord {
-  try {
-    serviceBindingRecordCatalog.validate(value);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 export function saveServiceBindingRecord(input: ServiceBindingRecord): string {
   const ownerProblems = validateBindingOwner(input);
   if (ownerProblems.length > 0) {
@@ -224,26 +191,6 @@ export function saveServiceBindingRecord(input: ServiceBindingRecord): string {
   if (!safeExistsSync(BINDING_DIR)) safeMkdir(BINDING_DIR, { recursive: true });
   safeWriteFile(filePath, JSON.stringify(validated, null, 2));
   return filePath;
-}
-
-export function loadServiceBindingRecord(bindingId: string): ServiceBindingRecord | null {
-  const filePath = bindingPath(bindingId);
-  if (!safeExistsSync(filePath)) return null;
-  try {
-    return serviceBindingRecordCatalogAtPath(filePath).load();
-  } catch (error) {
-    if (error instanceof Error && error.message.startsWith('Invalid catalog ')) return null;
-    throw error;
-  }
-}
-
-export function listServiceBindingRecords(): ServiceBindingRecord[] {
-  if (!safeExistsSync(BINDING_DIR)) return [];
-  return safeReaddir(BINDING_DIR)
-    .filter((entry) => entry.endsWith('.json'))
-    .map((entry) => loadServiceBindingRecord(entry.replace(/\.json$/, '')))
-    .filter((record): record is ServiceBindingRecord => Boolean(record))
-    .sort((a, b) => a.binding_id.localeCompare(b.binding_id));
 }
 
 // ---------------------------------------------------------------------------

@@ -54,7 +54,7 @@ vi.mock('../governance/service-credential-allocation.js', () => ({
     return { grant_id: 'GRT-personal' };
   },
 }));
-vi.mock('../service/service-binding-registry.js', () => ({
+vi.mock('../service/service-binding-reader.js', () => ({
   loadServiceBindingRecord: (id: string) =>
     mocks.binding?.binding_id === id ? mocks.binding : null,
 }));

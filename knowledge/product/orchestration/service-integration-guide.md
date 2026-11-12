@@ -453,3 +453,8 @@ per-binding provenance. An already configured broker must attest the exact sourc
 installed or configured automatically. Session/CLI credential provenance and local multi-account
 material storage are not covered by this API-token path. No real allocations or migrations are
 performed by installing this code.
+
+The normal grant-aware runtime bootstrap installs the read-only allocation verifier even
+when an external credential resolver is already configured; it never replaces that resolver.
+Low-level embedders must initialize the same runtime before using personal allocations.
+Without the verifier, allocation fails closed rather than treating a broker assertion as consent.
