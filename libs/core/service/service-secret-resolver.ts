@@ -1,3 +1,4 @@
+import { resolveTaskServiceCredential } from '../foundation/credential-binding.js';
 import { secretGuard } from '../secret/secret-guard.js';
 import type { SecretReference } from '../secret/secret-resolver.js';
 import { getServiceEndpointRecord, type CredentialSuffixMap } from './service-endpoint-registry.js';
@@ -9,6 +10,33 @@ export function resolveServiceSecret(serviceId: string, suffixes: string[]): str
     // Discovery must handle optional absence at its boundary, never here.
     const secret = secretGuard.getSecret(`${upper}_${suffix}`, serviceId, 'service.resolve');
     if (secret) return secret;
+  }
+  return null;
+}
+
+/** Selected tenant binding references are the complete allowlist, not fallback suggestions. */
+export function resolveSelectedServiceSecret(
+  serviceId: string,
+  suffixes: readonly string[],
+  selection: {
+    bindingId: string;
+    ownerRef: string;
+    secretRefs: readonly string[];
+    allocationGrantId?: string;
+  }
+): string | null {
+  for (const suffix of suffixes) {
+    const key = buildServiceSecretReference(serviceId, suffix).env;
+    if (!selection.secretRefs.includes(key)) continue;
+    const value = resolveTaskServiceCredential(key, {
+      serviceId,
+      serviceBindingId: selection.bindingId,
+      sourceOwnerRef: selection.ownerRef,
+      allocationGrantId: selection.allocationGrantId,
+    });
+    if (!value)
+      throw new Error('[CREDENTIAL_PROVENANCE_DENIED] Selected credential is unavailable');
+    return value;
   }
   return null;
 }

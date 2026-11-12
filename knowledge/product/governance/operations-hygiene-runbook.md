@@ -7,6 +7,30 @@ last_updated: 2026-11-12
 
 # Operations Hygiene Runbook
 
+## Personal and tenant connection boundaries
+
+Connection visibility and execution authorization are different checks. Keep personal
+connections restricted to their explicit member owner on both remote and loopback
+surfaces. An ownerless legacy record is a migration decision, not evidence that the
+next person to log in owns it. Use the existing owner migration's dry-run and explicit
+assignment; never infer an owner from machine proximity or a tenant-wide viewer role.
+
+Tenant service execution must carry a matching trusted execution identity and an
+admitted tenant binding even when the service preset omits `tenant_binding_required`.
+Recheck this at direct and cached engine entry points before reading credentials,
+returning cached results, or calling a provider. Do not load personal connection
+documents in tenant work. The selected binding's action policy still does not prove
+which credential material was used; retain the task credential broker's independent
+identity and freshness checks.
+
+Regression coverage belongs in `service-binding-owner.test.ts`,
+`service-binding-registry.owner.test.ts`, the Concierge `connection-view.test.ts`,
+Presence Studio `service-bindings-route.test.ts`, `service-actuator-tenant-binding.test.ts`,
+and `service-engine.test.ts`. Include unknown-owner migration/rollback, loopback,
+tenant context without trusted runtime, direct/cache denial, personal compatibility,
+and zero personal connection fallback. Run delegated execution and scoped capture
+tests as well; their distinct authority paths must not be silently combined.
+
 ## Checkout relocation preserves resource tiers
 
 Classify logical repository paths through the shared policy-relative authority
