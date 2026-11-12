@@ -1,4 +1,5 @@
 import path from 'node:path';
+import type { CredentialIdentity } from '@agent/core/foundation/credential-binding';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import AjvModule from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
@@ -7,6 +8,7 @@ import * as pathResolver from '@agent/core/path-resolver';
 import { registerOpPreflightListener, resetOpPreflight } from '@agent/core/pipeline/op-preflight';
 
 const mocks = vi.hoisted(() => ({
+  identity: vi.fn((): CredentialIdentity => ({})),
   safeExec: vi.fn(),
   safeReadFile: vi.fn(),
   executeServicePreset: vi.fn(),
@@ -26,6 +28,21 @@ const mocks = vi.hoisted(() => ({
 }));
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
+
+// These transport/observation tests use admitted synthetic tenant work. Binding
+// scope/policy failures are exercised in service-actuator-tenant-binding.test.ts.
+vi.mock('@agent/core/foundation/credential-binding', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/foundation/credential-binding')>()),
+  credentialExecutionIdentity: mocks.identity,
+}));
+
+vi.mock('@agent/core/service/service-binding-registry', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/service/service-binding-registry')>()),
+  authorizeTenantServiceAction: vi.fn(() => ({
+    bindingId: 'binding-test',
+    approvalRequired: false,
+  })),
+}));
 
 vi.mock('@agent/core/governance/external-operation', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@agent/core/governance/external-operation')>()),
@@ -108,6 +125,7 @@ vi.mock('@agent/core/async-utils', async (importOriginal) => {
 describe('service-actuator handleAction', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.identity.mockReturnValue({});
     mocks.controlPlane.enforceIntroduction.mockReset();
     mocks.controlPlane.recordObservation.mockReset();
     mocks.controlPlane.projectTaint.mockReset();
@@ -290,6 +308,7 @@ describe('service-actuator handleAction', () => {
   });
 
   it('enforces an explicitly requested resource introduction before service execution', async () => {
+    mocks.identity.mockReturnValue({ tenantSlug: 'tenant-a' });
     process.env.MISSION_ID = 'mission-introduction-test';
     mocks.controlPlane.enforceIntroduction.mockImplementation(() => {
       throw new Error('[POLICY_VIOLATION] Resource introduction required');
@@ -397,6 +416,7 @@ describe('service-actuator handleAction', () => {
   });
 
   it('records an explicitly described service observation after a read', async () => {
+    mocks.identity.mockReturnValue({ tenantSlug: 'tenant-a' });
     process.env.MISSION_ID = 'mission-observation-test';
     mocks.executeServicePreset.mockResolvedValue({ issues: [] });
     const { handleAction } = await import('./index.js');
@@ -435,6 +455,7 @@ describe('service-actuator handleAction', () => {
   });
 
   it('records the canonical tenant_slug when the scope has no tenant_id alias', async () => {
+    mocks.identity.mockReturnValue({ tenantSlug: 'tenant-a' });
     process.env.MISSION_ID = 'mission-observation-tenant-slug-test';
     mocks.executeServicePreset.mockResolvedValue({ issues: [] });
     const { handleAction } = await import('./index.js');
@@ -464,6 +485,7 @@ describe('service-actuator handleAction', () => {
   });
 
   it('derives observation sensitivity from the security scope, not caller claims', async () => {
+    mocks.identity.mockReturnValue({ tenantSlug: 'tenant-a' });
     process.env.MISSION_ID = 'mission-observation-taint-test';
     mocks.executeServicePreset.mockResolvedValue({ issues: [] });
     const { handleAction } = await import('./index.js');
@@ -499,6 +521,7 @@ describe('service-actuator handleAction', () => {
   });
 
   it('does not turn observation persistence failure into a side-effect retry', async () => {
+    mocks.identity.mockReturnValue({ tenantSlug: 'tenant-a' });
     process.env.MISSION_ID = 'mission-observation-retry-test';
     mocks.executeServicePreset.mockResolvedValue({ ok: true });
     mocks.controlPlane.recordObservation.mockImplementation(() => {

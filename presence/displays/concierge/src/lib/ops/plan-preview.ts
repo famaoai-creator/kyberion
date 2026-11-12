@@ -14,7 +14,7 @@ export interface PlanPreviewRequestContext {
   projectName?: string;
   trackId?: string;
   trackName?: string;
-  assignedPersona?: string;
+  orgRole?: string;
   organizationProfile?: Parameters<typeof composeMissionTeamPlan>[0]['organizationProfile'];
 }
 
@@ -61,16 +61,28 @@ export interface PlanPreviewResponse {
   team: MissionTeamPlan;
 }
 
+/**
+ * The Org Role of a `POST /api/ops/plan-preview` body. `assignedPersona` is the
+ * pre-S4 name, read for one release only when `orgRole` is absent; a present
+ * `orgRole` wins.
+ */
+export function planPreviewOrgRole(body: unknown): string | undefined {
+  if (!body || typeof body !== 'object') return undefined;
+  const record = body as { orgRole?: unknown; assignedPersona?: unknown };
+  const value = record.orgRole !== undefined ? record.orgRole : record.assignedPersona;
+  return typeof value === 'string' ? value : undefined;
+}
+
 export function buildPlanPreviewSignature(input: {
   requestText: string;
   missionType: string;
-  assignedPersona: string;
+  orgRole: string;
   tier: 'personal' | 'confidential' | 'public';
 }): string {
   return JSON.stringify({
     requestText: input.requestText.trim(),
     missionType: input.missionType.trim(),
-    assignedPersona: input.assignedPersona.trim(),
+    orgRole: input.orgRole.trim(),
     tier: input.tier,
   });
 }
@@ -92,7 +104,7 @@ export function buildPlanPreview(
     missionId: input.missionId,
     missionType: input.missionType || flow.intentContract.intent_id,
     tier: input.tier,
-    assignedPersona: input.assignedPersona,
+    orgRole: input.orgRole,
     organizationProfile: input.organizationProfile || undefined,
   });
 

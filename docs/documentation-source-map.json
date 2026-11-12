@@ -27,6 +27,7 @@
       "supporting": [
         "knowledge/product/architecture/enterprise-operating-kernel.md",
         "knowledge/product/architecture/decisions/2026-11-10-concept-model-v2.md",
+        "knowledge/product/architecture/decisions/2026-11-12-outcome-result-model.md",
         "knowledge/product/architecture/kyberion-concept-map.md",
         "docs/WHY.md",
         "docs/INTENT_LOOP_CONCEPT.md"

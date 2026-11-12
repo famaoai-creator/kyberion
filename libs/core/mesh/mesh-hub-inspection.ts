@@ -4,13 +4,40 @@ import {
   type MeshPeerDirectoryEntry,
 } from './mesh-peer-directory.js';
 import {
-  listMeshDeadLetters,
-  listMeshDeliveries,
-  type MeshDeadLetterRecord,
-} from './mesh-message-broker.js';
-import { type MeshDeliveryRecord, type MeshTargetSelector } from './mesh-hub-contract.js';
+  type MeshDeliveryRecord,
+  type MeshDeliveryStatus,
+  type MeshFailureClass,
+  type MeshPayloadReference,
+  type MeshRequest,
+  type MeshRequestKind,
+  type MeshTargetSelector,
+} from './mesh-hub-contract.js';
+import { logger } from '../core.js';
 import { isValidTenantSlug } from '../entity-scope.js';
+import { isRecord, sanitizeIdSegment } from '../foundation/text.js';
 import { normalizeIso, nowIso } from '../foundation/time.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '../secure-io.js';
+import { streamJsonLinesAcrossCompaction } from '../storage/jsonl-parked-read.js';
+
+export interface MeshDeadLetterRecord {
+  kind: 'mesh-dead-letter-record';
+  dead_letter_id: string;
+  delivery_id: string;
+  request_id: string;
+  tenant_scope: MeshRequest['tenant_scope'];
+  request_kind: MeshRequestKind;
+  target: {
+    selector: MeshTargetSelector;
+  };
+  payload: MeshPayloadReference & {
+    classification: MeshRequest['payload']['classification'];
+  };
+  attempt_count: number;
+  status: MeshDeliveryStatus;
+  failure_class: MeshFailureClass;
+  redacted_reason: string;
+  created_at: string;
+}
 
 export interface MeshHubPeerInspection {
   peer_id: string;
@@ -51,6 +78,46 @@ export interface MeshHubInspectionOptions {
   tenantId?: string;
   now?: string | Date;
   namespace?: string;
+}
+
+/**
+ * Read side of the mesh delivery ledger (`deliveries.jsonl` / `dead-letter.jsonl`
+ * under `active/shared/runtime/mesh-hub[/<ns>]/tenants/<t>/`). The broker and
+ * delivery driver that wrote these stores were retired on 2026-11-12
+ * (`retired/libs-core/mesh/mesh-message-broker.ts`); nothing appends to them
+ * any more. The reader stays so a runtime root that still holds earlier rows
+ * keeps reporting them: one snapshot row per state change, latest row per key.
+ */
+function meshLedgerPath(namespace: string | undefined, tenantId: string, file: string): string {
+  const suffix = sanitizeIdSegment(namespace || '', { maxLength: 64 });
+  const root = suffix
+    ? `active/shared/runtime/mesh-hub/${suffix}`
+    : 'active/shared/runtime/mesh-hub';
+  return `${root}/tenants/${tenantId}/${file}`;
+}
+
+function latestLedgerRows<T>(logicalPath: string, key: string): T[] {
+  const safePath = assertSafeRepositoryPath(logicalPath, { allowMissingLeaf: true });
+  if (safeExistsSync(safePath) && !safeLstat(safePath).isFile()) {
+    throw new Error(`mesh-hub persisted JSONL must be a regular file: ${safePath}`);
+  }
+  const index = new Map<string, T>();
+  let malformed = 0;
+  for (const row of streamJsonLinesAcrossCompaction<unknown>(safePath, {
+    onMalformed: () => {
+      malformed += 1;
+    },
+  })) {
+    if (!isRecord(row)) continue;
+    const value = row[key];
+    if (typeof value === 'string' && value) index.set(value, row as unknown as T);
+  }
+  if (malformed > 0) {
+    logger.warn(
+      `[mesh-hub] skipped ${malformed} malformed line(s) in ${logicalPath} — torn append or corrupted row | next: inspect the store if this repeats | evidence: remaining rows were read`
+    );
+  }
+  return Array.from(index.values());
 }
 
 function heartbeatAgeMs(record: { heartbeat_at: string }, now: string): number {
@@ -101,12 +168,13 @@ function buildPeerInspection(
 }
 
 /**
- * Read-only operator view over the live mesh-hub stores: the peer directory
- * (written by `peer_conversation_server`), and broker deliveries / dead
- * letters (written through the mesh-hub peer-messaging adapter and the
- * delivery driver). Topic subscriptions are no longer reported: their writer
- * and router were retired on 2026-10-01 and the read side followed on
- * 2026-10-31 (`retired/libs-core/mesh/mesh-topic-registry.ts`).
+ * Read-only operator view over the mesh-hub stores: the peer directory
+ * (written by `peer_conversation_server`), and the delivery / dead-letter
+ * ledger, which has had no writer since the broker and delivery driver were
+ * retired on 2026-11-12 (rows from before that are still reported). Topic
+ * subscriptions are no longer reported: their writer and router were retired
+ * on 2026-10-01 and the read side followed on 2026-10-31
+ * (`retired/libs-core/mesh/mesh-topic-registry.ts`).
  */
 export async function inspectMeshHub(
   options: MeshHubInspectionOptions = {}
@@ -119,8 +187,14 @@ export async function inspectMeshHub(
   const namespace = options.namespace || undefined;
   const directories = listMeshPeerDirectoryEntries(tenantId, now);
   const presences = listMeshPeerPresenceRecords(tenantId);
-  const deliveryRecords = await listMeshDeliveries(namespace, tenantId);
-  const deadLetters = await listMeshDeadLetters({ tenant_id: tenantId }, { namespace });
+  const deliveryRecords = latestLedgerRows<MeshDeliveryRecord & { expires_at: string }>(
+    meshLedgerPath(namespace, tenantId, 'deliveries.jsonl'),
+    'delivery_id'
+  );
+  const deadLetters = latestLedgerRows<MeshDeadLetterRecord>(
+    meshLedgerPath(namespace, tenantId, 'dead-letter.jsonl'),
+    'dead_letter_id'
+  ).filter((record) => record.tenant_scope.tenant_id === tenantId);
   const presenceByPeer = new Map(presences.map((record) => [record.peer_id, record] as const));
   const peerInspections = directories.map((peer) =>
     buildPeerInspection(now, peer, presenceByPeer.get(peer.peer_id) || null)

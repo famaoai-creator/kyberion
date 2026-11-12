@@ -205,7 +205,7 @@ describe('DOT lifecycle store purpose boundaries under registered policy', () =>
       assume(
         'dot_lifecycle_runtime_store',
         () => {
-          expect(currentExecutionScope()?.assumedPersona).toBe('worker');
+          expect(currentExecutionScope()?.assumedBaseRole).toBe('worker');
           expect(safeExistsSync(at(target))).toBe(false);
           const content = JSON.stringify({ event_id: 'synthetic-cold-event', payload: {} }) + '\n';
           safeWriteFile(at(target), content, { encoding: 'utf8' });

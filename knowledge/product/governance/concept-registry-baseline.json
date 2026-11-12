@@ -6,7 +6,6 @@
     "knowledge/product/architecture/decisions/2026-06-22-knowledge-lifecycle-taxonomy-decision.md",
     "knowledge/product/architecture/decisions/2026-06-24-mesh-hub-v1-boundaries.md",
     "knowledge/product/architecture/agent-collaboration-view.md",
-    "knowledge/product/architecture/agent-communication-layer-model.md",
     "knowledge/product/architecture/agent-pane-runtime-backend-poc.md",
     "knowledge/product/architecture/agent-prompt-handling.md",
     "knowledge/product/architecture/agent-runtime-dispatch-observability-findings.md",

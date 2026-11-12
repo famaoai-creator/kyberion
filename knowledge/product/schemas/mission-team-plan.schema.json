@@ -15,8 +15,13 @@
     "template": {
       "type": "string"
     },
+    "org_role": {
+      "type": "string",
+      "description": "Org Role the mission is assigned (knowledge/product/roles/). Descriptive team metadata; never an authority source."
+    },
     "assigned_persona": {
-      "type": "string"
+      "type": "string",
+      "description": "Deprecated legacy name of org_role. Accepted on read for one release and normalised to org_role at the team plan load boundary; writers never emit it."
     },
     "mission_classification": {
       "$ref": "./mission-classification.schema.json"

@@ -51,6 +51,7 @@ export interface CompletionGoal {
 
 export interface CompletionReconciliation {
   satisfied: boolean;
+  /** Legacy matched goal/evidence items; not transport delivery receipts. */
   delivered: string[];
   gaps: string[];
   confidence: number;

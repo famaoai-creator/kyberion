@@ -21,7 +21,9 @@ vi.mock('@agent/core/governance/audit-chain', () => ({
 vi.mock('../../../../lib/api-guard', () => ({
   requireConciergeMutationAccess: () => null,
 }));
-vi.mock('../../../../lib/viewer-context', () => ({
+vi.mock('../../../../lib/viewer-context', async (original) => ({
+  // The candidate visibility rule projects the viewer through the real module.
+  ...(await original<typeof import('../../../../lib/viewer-context')>()),
   resolveConciergeViewer: mocks.viewer,
 }));
 vi.mock('../../../../lib/front-desk-member', () => ({

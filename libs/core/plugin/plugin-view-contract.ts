@@ -28,6 +28,7 @@
  * `isPluginViewVisible`; a client filter can only narrow it.
  */
 import type { StorageDataTier } from '../storage-layout.js';
+import type { SurfaceViewerRole } from '../foundation/surface-viewer-role.js';
 import * as path from 'node:path';
 import type { ValidateFunction } from 'ajv';
 import { compileSchema, createAjv2020 } from '../foundation/ajv.js';
@@ -62,7 +63,8 @@ export { pluginViewMaySendActions };
 // ---------------------------------------------------------------------------
 
 export type PluginViewIsolation = 'in-process-a2ui' | 'sandboxed-iframe';
-export type PluginViewRole = 'readonly' | 'localadmin';
+/** @deprecated Use `SurfaceViewerRole` (`libs/core/surface/surface-authorization.ts`). */
+export type PluginViewRole = SurfaceViewerRole;
 export type PluginViewTier = StorageDataTier;
 export type PluginViewActionAuthority = 'agent' | 'human';
 

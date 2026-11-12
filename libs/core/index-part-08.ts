@@ -219,7 +219,7 @@ export * from './mission/delegation-preflight.js';
 
 export * from './mission/mission-orchestration-evaluator.js';
 
-export * from './mission/mission-coordination-bus.js';
+export * from './mission/mission-coordination-record.js';
 
 export * from './mission/mission-team-plan-composer.js';
 

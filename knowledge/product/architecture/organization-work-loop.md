@@ -4,9 +4,10 @@ category: Architecture
 tags: [architecture, organization, intent, outcome, execution, evidence, learning]
 importance: 10
 author: Ecosystem Architect
-last_updated: 2026-10-20
+last_updated: 2026-11-12
 kind: evergreen
-concepts: [organization-work-loop, mission, work-item]
+concepts:
+  [organization-work-loop, mission, work-item, outcome, artifact, evidence, delivery, result]
 ---
 
 # Organization Work Loop
@@ -156,7 +157,7 @@ This stage defines the light-weight execution primitives beneath the governed co
 
 - owner model
 - worker assignment policy
-- coordination bus
+- coordination record (owner-to-worker handoff/review log)
 - transient working memory
 
 This is where Kyberion may borrow runtime mechanics from simpler multi-agent frameworks without giving up planning or governance authority.
@@ -296,6 +297,72 @@ Chronos Knowledge is the preparation and publication surface: select an exact ca
 The canonical request freezes the reviewed payload and destination. Every queue writer and publication retry must preserve that binding; a changed proposal needs a new candidate. Candidate keys are selectors, not authority. Server-resolved tenant, organization and project visibility is applied before candidate or approval details, counts, decisions and passkey operations. Owner/audience and unsupported scope restrictions remain review-only. Scoped details are not broadcast through shared notifications or the legacy knowledge-preview route.
 
 A lost response is an unknown result, not permission to resend. Refresh the exact candidate/review first. Publication reconciles canonical artifact hashes and approval consumption before marking the queue promoted; a retry after final queue persistence fails must retain identical artifact bytes and receipt. The publisher's existing scoped service authority may read only the fixed proof artifacts after binding and current-approver checks, never an arbitrary viewer-supplied path. A verified receipt makes the SOP eligible for existing same-scope retrieval; it does not grant execution authority or relax the autonomous shadow mandate.
+
+### 9.2 Outcome, Artifact, Evidence, Delivery and Result
+
+**Outcome is what we intend to achieve. Artifact is what we produce. Evidence supports what
+we claim. Delivery records where it was sent. Result tells the user what is known and what
+remains.** These are responsibilities in the existing work loop, not five new stores or a
+second completion state machine.
+
+| Concept  | Question                                                             | Existing owner                                                                       |
+| -------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| Outcome  | What result and success criteria did we agree on?                    | `task/outcome-contract.ts` `OutcomeContract`                                         |
+| Artifact | What output is referenced, of which kind?                            | `workforce/artifact-record.ts` `ArtifactRecord` and scoped artifact storage          |
+| Evidence | What supports this criterion or claim, and who reported/verified it? | `TaskResultBlock.acceptance_evidence`, mission evidence and existing review receipts |
+| Delivery | Which destination reports pending, delivered or failed?              | `ArtifactRecord.delivered_to` and Surface Outbox receipts                            |
+| Result   | What can we tell the user, including gaps and next needs?            | `task/outcome-result.ts` `projectOutcomeResult`                                      |
+
+An Artifact is an output; Evidence is the role a record plays in supporting a claim. The
+same screenshot can be an Artifact and Evidence. Approval and review receipts retain their
+existing owners. An Outcome catalog entry is a reusable output pattern, not proof that its
+success conditions have been met. A Delivery Pack groups outputs, not delivery receipts.
+
+Example: for a weekly report, the Outcome is "totals match the source and sources are
+cited". The DOCX is the Artifact. A comparison log and review receipt support the criteria.
+The report can already be sent while its review is outstanding, or be reviewed before it
+is sent. Result must expose these states separately.
+
+#### Implemented contract and integration
+
+`projectOutcomeResult` is a pure, versioned projection. It consumes an existing OutcomeContract,
+and is exported through the existing `@agent/core` API. Its remaining inputs are
+an optional validated TaskResultBlock, output references and already scope-authorized
+ArtifactRecords. It performs no lookup, grants no access and creates no Result ledger.
+Callers remain responsible for authorization, scope and current-record selection.
+
+- References do not assert file existence, revision identity or byte verification.
+- Criterion evidence matches the trimmed criterion exactly. A pass without nonblank evidence remains
+  `unassessed`; some supported criteria are `partial`. An explicit failed report is retained even
+  with blank evidence and wins over a duplicate
+  pass. All passed reports yield `reported_passed`, even when the requested method is
+  `review_gate`. `verification_done` stays a separate list of reported checks.
+- This projection reports worker evidence; it does not authenticate or accept independent
+  verification. Existing mission review, artifact-quality and human-acceptance gates keep
+  their authority. A verification receipt is not inferred from prose or an output path.
+- Delivery is `unknown` without a recorded binding; otherwise current binding states are
+  retained. Output references without a corresponding receipt remain in `untracked_artifact_refs`;
+  a mixture of delivered and untracked outputs is `partial`. Any failure yields `failed`,
+  mixed delivered/pending is `partial`. A send receipt
+  does not assert human readership or acceptance and never changes verification state.
+- Task Session completion saves a regenerable `completion_summary.outcome_result`, built
+  from that session's output references. It does not load another artifact by ID or invent
+  delivery/verification evidence. Re-saving rebuilds it; reopening removes it.
+
+#### Compatibility and remaining migration
+
+Existing mission and Task Session completion gates remain unchanged. In particular,
+`validateOutcomeContractAtCompletion` still checks legacy reference presence when evidence is
+required; it does not verify a criterion. Legacy `CompletionReconciliation.delivered` and
+`completion_summary.delivered` describe matched goal/evidence items, not transport delivery.
+New consumers use the explicitly named `verification` and `delivery` axes. Older saved sessions
+may lack `outcome_result`; absence must not be displayed as verified or delivered.
+
+The generic projection and Task Session snapshot are implemented here. Mission summaries,
+provider replies and individual surfaces still use their existing formats; migration should
+adapt their authorized records into this same projection rather than create a competing Result.
+Binding verification to immutable artifact versions remains the responsibility of existing
+review receipts; this projection alone does not establish that binding.
 
 ## 10. Companion Documents
 

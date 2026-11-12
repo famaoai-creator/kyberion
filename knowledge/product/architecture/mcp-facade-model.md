@@ -98,6 +98,19 @@ MCP サーバーの identity は **サーバー自身の環境変数だけ** で
 
 ドリフトはテストで検出する。
 
+### 7.1 呼び出し主体はサーバーが決める
+
+tool の実行主体（principal）・caller role・tenant は、MCP サーバーのプロセスに束縛した値
+（`KYBERION_MCP_PRINCIPAL` / `KYBERION_MCP_CALLER_ROLE` / `KYBERION_MCP_TENANT`）から
+`resolveMcpRequestContext` が解決する。tool の引数は主体を名乗れない。
+
+- `kyberion.approval.decide` の決定者は、サーバー束縛の principal として記録する。引数 `decided_by` は
+  wire 互換のために残すが、監査記録の `caller_label` にしか残らない。プロセス単位の束縛であり要求ごとの
+  認証ではないため、決定は引き続き `deciderIdentitySource: 'caller_supplied'` として記録され、
+  separation of duties が ON のときは承認できない（[`approval-gate-design.md`](../governance/approval-gate-design.md)）。
+- `kyberion.audit.export` / `kyberion.audit.verify` の `requested_by` も同じ扱いで、監査の依頼者は
+  サーバー束縛の principal、引数は `caller_label` になる。
+
 ## 8. 既知の乖離（2026-11-12 時点の事実）
 
 コードと意図したモデルが食い違っている箇所。ここは現状の記録であり、どちらに揃えるかは未決定。

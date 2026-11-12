@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { guardOpsRequest, requireOpsAccess } from '../../../../lib/ops/ops-request-guard';
 import { compileUserIntentFlow } from '@agent/core/intent/intent-contract';
 import { loadOrganizationProfile } from '@agent/core/organization/organization-profile';
-import { buildPlanPreview } from '../../../../lib/ops/plan-preview';
+import { buildPlanPreview, planPreviewOrgRole } from '../../../../lib/ops/plan-preview';
 import { readChronosJsonObject } from '../../../../lib/ops/request-input';
 import {
   resolveOpsViewerForRequest,
@@ -79,8 +79,7 @@ export async function POST(req: NextRequest) {
           projectName: typeof body?.projectName === 'string' ? body.projectName : undefined,
           trackId: typeof body?.trackId === 'string' ? body.trackId : undefined,
           trackName: typeof body?.trackName === 'string' ? body.trackName : undefined,
-          assignedPersona:
-            typeof body?.assignedPersona === 'string' ? body.assignedPersona : undefined,
+          orgRole: planPreviewOrgRole(body),
           organizationProfile: loadOrganizationProfile() || undefined,
         },
         flow

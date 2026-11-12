@@ -1398,7 +1398,7 @@ export async function resolveMissionContextPack(
         missionId: input.missionId,
         missionType: missionState.mission_type,
         tier,
-        assignedPersona: missionState.org_role,
+        orgRole: missionState.org_role,
         ...(missionState.tenant_slug ? { tenantSlug: missionState.tenant_slug } : {}),
       })
     : null;

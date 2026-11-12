@@ -34,6 +34,7 @@ import {
   validateOutcomeContractAtCompletion,
   type OutcomeContract,
 } from './outcome-contract.js';
+import { projectOutcomeResult } from './outcome-result.js';
 import { buildCompletionNextAction, type CompletionNextAction } from '../surface/next-action.js';
 import { recordIntentContractOutcome } from '../intent/intent-contract-learning.js';
 import { currentScope } from '../scope-context.js';
@@ -140,6 +141,8 @@ export interface TaskSession {
   };
   outcome_contract: OutcomeContract;
   completion_summary?: {
+    /** Derived from current session outputs; independent of legacy goal matching below. */
+    outcome_result?: import('./outcome-result.js').OutcomeResult;
     requested_result: string;
     satisfied: boolean;
     delivered: string[];
@@ -1201,6 +1204,11 @@ export function saveTaskSession(session: TaskSession, options: { rootDir?: strin
       reconciliation: completionReconciliation,
     });
     session.completion_summary = {
+      outcome_result: projectOutcomeResult({
+        contract: session.outcome_contract,
+        artifactRefs: evidenceRefs,
+        summary: session.artifact?.preview_text,
+      }),
       requested_result: session.outcome_contract.requested_result,
       satisfied: completionReconciliation.satisfied,
       delivered: completionReconciliation.delivered,
@@ -1215,6 +1223,9 @@ export function saveTaskSession(session: TaskSession, options: { rootDir?: strin
     if (!completionValidation.ok) {
       throw new Error(`Cannot complete task session: ${completionValidation.reason}`);
     }
+  } else if (session.completion_summary?.outcome_result) {
+    // A reopened/revised session must not retain a current Result from the old completion.
+    delete session.completion_summary.outcome_result;
   }
   let canonicalSession: TaskSession;
   try {

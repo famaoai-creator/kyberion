@@ -1,13 +1,8 @@
 import * as path from 'node:path';
 
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import {
-  clearPeerRuntime,
-  createPeerMessagingServer,
-  listPeerInboxRecords,
-  buildPeerMessageEnvelope,
-} from './peer-messaging.js';
+import { clearPeerRuntime } from './peer-messaging.js';
 import { pathResolver, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '../index.js';
 import {
   clearMeshHubPeerMessagingAdapterNamespace,
@@ -72,7 +67,6 @@ describe('mesh-hub-peer-messaging-adapter', () => {
     clearPeerRuntime(TENANT_ID, 'peer-recipient');
     safeRmSync(TEST_RUNTIME_ROOT_ABS, { recursive: true, force: true });
     clearMeshHubPeerMessagingAdapterNamespace();
-    vi.unstubAllGlobals();
   });
 
   it('rejects malformed persisted proposal and decision shapes before projection', () => {
@@ -184,109 +178,26 @@ describe('mesh-hub-peer-messaging-adapter', () => {
     ).toThrow('mesh-hub persisted JSONL must be a regular file');
   });
 
-  it('dispatches a signed mesh request through peer-messaging', async () => {
+  it('stores validated review requests as A2A proposals without mission mutation', () => {
     const adapter = createMeshHubPeerMessagingAdapter({
       peerId: 'peer-recipient',
       tenantId: TENANT_ID,
       sharedSecret: 'recipient-secret',
       namespace: 'mesh-hub-adapter-tests',
     });
-    let capturedEnvelope: any = null;
-    vi.stubGlobal('fetch', async (_url: string, init: any) => {
-      capturedEnvelope = JSON.parse(String(init.body || '{}'));
-      return {
-        ok: true,
-        status: 200,
-        text: async () =>
-          JSON.stringify({
-            ok: true,
-            accepted: true,
-            processing_mode: 'synchronous_on_receive',
-            response: {
-              accepted: true,
-              proposal: {
-                proposal_kind: 'a2a',
-                mission_controller_mutation: 'deny',
-              },
-            },
-          }),
-      } as any;
+    const request = buildRequest('meshreq-review', 'review.request', {
+      kind: 'peer',
+      peer_id: 'peer-recipient',
     });
+    request.created_at = new Date(Date.now() - 1_000).toISOString();
 
-    const receipt = await adapter.dispatchToPeer({
-      recipient: {
-        peer_id: 'peer-recipient',
-        base_url: 'http://127.0.0.1:9999',
-        shared_secret: 'recipient-secret',
-        allow_local_network: true,
-      },
-      request: buildRequest('meshreq-review', 'review.request', {
-        kind: 'peer',
-        peer_id: 'peer-recipient',
-      }),
-      messageId: 'mhm-persisted-delivery-1',
-    });
+    const proposal = adapter.proposeLocalRequest(request, 'message-review');
 
-    expect(receipt.ok).toBe(true);
-    expect(receipt.accepted).toBe(true);
-    expect(capturedEnvelope).toMatchObject({
-      message_id: 'mhm-persisted-delivery-1',
-      recipient_peer_id: 'peer-recipient',
-      sender_peer_id: 'peer-recipient',
-      type: 'request',
-      payload: {
-        request_id: 'meshreq-review',
-      },
-      signature: expect.any(String),
+    expect(proposal).toMatchObject({
+      proposal_kind: 'a2a',
+      proposal_ref: { type: 'a2a-message' },
+      mission_controller_mutation: 'deny',
     });
-  });
-
-  it('stores validated review requests as A2A proposals without mission mutation', async () => {
-    const adapter = createMeshHubPeerMessagingAdapter({
-      peerId: 'peer-recipient',
-      tenantId: TENANT_ID,
-      sharedSecret: 'recipient-secret',
-      namespace: 'mesh-hub-adapter-tests',
-    });
-    const server = createPeerMessagingServer({
-      peerId: 'peer-recipient',
-      tenantId: TENANT_ID,
-      sharedSecret: 'recipient-secret',
-      responder: adapter.createResponder(),
-    });
-    const envelope = buildPeerMessageEnvelope({
-      senderPeerId: 'peer-recipient',
-      recipientPeerId: 'peer-recipient',
-      tenantId: TENANT_ID,
-      subject: 'mesh.review.request',
-      type: 'request',
-      payload: buildRequest('meshreq-review', 'review.request', {
-        kind: 'peer',
-        peer_id: 'peer-recipient',
-      }),
-      sharedSecret: 'recipient-secret',
-      conversationId: 'corr-meshreq-review',
-      correlationId: 'corr-meshreq-review',
-      ttlMs: 60_000,
-    });
-
-    const result = await server.processEnvelope(envelope);
-
-    expect(result.status).toBe(200);
-    expect(result.body).toMatchObject({
-      ok: true,
-      accepted: true,
-      response: {
-        accepted: true,
-        proposal: {
-          proposal_kind: 'a2a',
-          mission_controller_mutation: 'deny',
-        },
-      },
-    });
-
-    const inbox = listPeerInboxRecords(TENANT_ID, 'peer-recipient');
-    expect(inbox).toHaveLength(1);
 
     const proposalsPath = path.join(
       ROOT,
@@ -312,50 +223,45 @@ describe('mesh-hub-peer-messaging-adapter', () => {
     });
   });
 
-  it('turns workitem requests into stored WorkItem proposals and never auto-executes missions', async () => {
+  it('turns workitem requests into stored WorkItem proposals and never auto-executes missions', () => {
     const adapter = createMeshHubPeerMessagingAdapter({
       peerId: 'peer-recipient',
       tenantId: TENANT_ID,
       sharedSecret: 'recipient-secret',
       namespace: 'mesh-hub-adapter-tests',
     });
-    const server = createPeerMessagingServer({
-      peerId: 'peer-recipient',
-      tenantId: TENANT_ID,
-      sharedSecret: 'recipient-secret',
-      responder: adapter.createResponder(),
+    const request = buildRequest('meshreq-workitem', 'workitem.claim', {
+      kind: 'peer',
+      peer_id: 'peer-recipient',
     });
-    const envelope = buildPeerMessageEnvelope({
-      senderPeerId: 'peer-recipient',
-      recipientPeerId: 'peer-recipient',
-      tenantId: TENANT_ID,
-      subject: 'mesh.workitem.claim',
-      type: 'request',
-      payload: buildRequest('meshreq-workitem', 'workitem.claim', {
-        kind: 'peer',
-        peer_id: 'peer-recipient',
-      }),
-      sharedSecret: 'recipient-secret',
-      conversationId: 'corr-meshreq-workitem',
-      correlationId: 'corr-meshreq-workitem',
-      ttlMs: 60_000,
-    });
+    request.created_at = new Date(Date.now() - 1_000).toISOString();
 
-    const result = await server.processEnvelope(envelope);
+    const proposal = adapter.proposeLocalRequest(request, 'message-workitem');
 
-    expect(result.status).toBe(200);
-    expect(result.body).toMatchObject({
-      ok: true,
-      accepted: true,
-      response: {
-        accepted: true,
-        proposal: {
-          proposal_kind: 'workitem',
-          mission_controller_mutation: 'deny',
+    expect(proposal).toMatchObject({
+      proposal_kind: 'workitem',
+      mission_controller_mutation: 'deny',
+      proposal_ref: {
+        type: 'workitem-command',
+        payload: {
+          subject: 'coordination.claim_request',
+          type: 'request',
+          sender_peer_id: 'peer-recipient',
+          recipient_peer_id: 'peer-recipient',
+          correlation_id: 'corr-meshreq-workitem',
+          signature: expect.any(String),
+          payload: {
+            command_type: 'claim_request',
+            command_id: 'meshreq-workitem',
+            item_id: 'meshreq-workitem',
+            actor_peer_id: 'peer-sender',
+            purpose: 'workitem.claim',
+            payload: { reference: request.payload.reference },
+          },
         },
       },
     });
-    expect(JSON.stringify(result.body)).not.toContain('dist/scripts/mission_controller.js');
+    expect(JSON.stringify(proposal)).not.toContain('dist/scripts/mission_controller.js');
   });
 
   it('creates a pending conversation proposal and records exactly one local acceptance decision', async () => {

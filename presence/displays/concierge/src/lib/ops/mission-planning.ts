@@ -18,7 +18,7 @@ export type PlanTier = 'personal' | 'confidential' | 'public';
 export interface PlanDraft {
   requestText: string;
   missionType: string;
-  assignedPersona: string;
+  orgRole: string;
   tier: PlanTier;
 }
 

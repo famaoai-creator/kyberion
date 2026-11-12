@@ -224,7 +224,7 @@ export function resumePipelineRunAfterApproval(
     originalAuthority.system_role,
     {
       missionRole: originalAuthority.mission_role,
-      persona: originalAuthority.persona,
+      persona: originalAuthority.base_role,
     }
   );
   if (missionId) env.MISSION_ID = missionId;

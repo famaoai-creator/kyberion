@@ -74,7 +74,7 @@ export function MissionPlanPanel({
   const [notice, setNotice] = React.useState<string | null>(null);
   const [started, setStarted] = React.useState<string | null>(null);
 
-  const draft = { requestText, missionType, assignedPersona: persona, tier };
+  const draft = { requestText, missionType, orgRole: persona, tier };
   const signature = buildPlanPreviewSignature(draft);
   const stale = isPlanPreviewStale(previewSignature, signature);
 

@@ -334,6 +334,8 @@ Files:
 - `libs/core/workforce/work-coordination-peer.ts`
 - `libs/core/workforce/work-coordination-peer.test.ts`
 
+2026-11-12 追記: この responder は本番経路から一度も呼ばれず、受信側のローカル承認なしに WorkItem を直接変更できたため `retired/libs-core/workforce/` に退役しました。peer から WorkItem への経路は typed peer task（`libs/core/mesh/peer-task-exchange.ts`: 受信 → ローカル accept → `source: peer` WorkItem）です。
+
 Required behavior:
 
 - Validate command payload.
@@ -472,7 +474,7 @@ pnpm build
 After peer command integration:
 
 ```bash
-pnpm exec vitest run libs/core/mesh/peer-messaging.test.ts libs/core/workforce/work-coordination-peer.test.ts
+pnpm exec vitest run libs/core/mesh/peer-messaging.test.ts libs/core/mesh/peer-task-exchange.test.ts
 ```
 
 ## Open Decisions

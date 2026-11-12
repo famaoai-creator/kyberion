@@ -1,5 +1,6 @@
 import { aroundEach, beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { randomUUID } from 'node:crypto';
+import type { CredentialIdentity } from '@agent/core/foundation/credential-binding';
 import { resetOpPreflight } from '@agent/core/pipeline/op-preflight';
 import type { ExternalOperationAuthority } from '@agent/core/governance/external-operation';
 import {
@@ -10,10 +11,17 @@ import { computeApprovalPayloadHash } from '@agent/core/governance/approval-pres
 import { externalApprovalFixture } from '../../../../tests/helpers/external-approval-fixture.js';
 
 const mocks = vi.hoisted(() => ({
+  identity: vi.fn((): CredentialIdentity => ({})),
   gate: vi.fn(),
   execute: vi.fn(),
   audit: vi.fn(),
   binding: vi.fn(),
+}));
+// Approval and tenant dispatch are separate proofs. These unit fixtures supply
+// trusted runtime identity explicitly only for the tenant-bound test cases.
+vi.mock('@agent/core/foundation/credential-binding', async (original) => ({
+  ...(await original<typeof import('@agent/core/foundation/credential-binding')>()),
+  credentialExecutionIdentity: mocks.identity,
 }));
 vi.mock('@agent/core/governance/approval-gate', () => ({ enforceApprovalGate: mocks.gate }));
 vi.mock('@agent/core/governance/approval-store', async (original) => ({
@@ -136,7 +144,8 @@ describe('service shared external admission', () => {
     vi.clearAllMocks();
     vi.stubEnv('KYBERION_ALLOW_UNSAFE_CLI', 'false');
     authority.invocationId = randomUUID();
-    delete process.env.MISSION_ID;
+    vi.stubEnv('MISSION_ID', '');
+    mocks.identity.mockReturnValue({});
     mocks.gate.mockReturnValue({ allowed: false, status: 'human_required' });
     mocks.execute.mockResolvedValue({ ok: true });
     mocks.binding.mockReset();
@@ -263,8 +272,19 @@ describe('service shared external admission', () => {
     },
   });
 
+  it('does not turn tenant-shaped input or external authority into runtime identity', async () => {
+    vi.stubEnv('MISSION_ID', 'mission-binding');
+    await expect(
+      handleAction(boundAction(), undefined, { externalAuthority: () => authority })
+    ).rejects.toThrow('security_scope does not match execution identity');
+    expect(mocks.binding).not.toHaveBeenCalled();
+    expect(mocks.gate).not.toHaveBeenCalled();
+    expect(mocks.execute).not.toHaveBeenCalled();
+  });
+
   it('uses common admission to satisfy binding approval and issues an opaque engine capability', async () => {
-    process.env.MISSION_ID = 'mission-binding';
+    vi.stubEnv('MISSION_ID', 'mission-binding');
+    mocks.identity.mockReturnValue({ tenantSlug: 'acme', missionId: 'mission-binding' });
     mocks.gate.mockReturnValue({
       allowed: true,
       status: 'approved',
@@ -284,7 +304,8 @@ describe('service shared external admission', () => {
   });
 
   it('keeps binding whitelist denial ahead of charter admission', async () => {
-    process.env.MISSION_ID = 'mission-binding';
+    vi.stubEnv('MISSION_ID', 'mission-binding');
+    mocks.identity.mockReturnValue({ tenantSlug: 'acme', missionId: 'mission-binding' });
     mocks.binding.mockImplementation(() => {
       throw new Error('operation not in binding whitelist');
     });
@@ -296,7 +317,8 @@ describe('service shared external admission', () => {
   });
 
   it('rejects forged binding approval when the common gate denies', async () => {
-    process.env.MISSION_ID = 'mission-binding';
+    vi.stubEnv('MISSION_ID', 'mission-binding');
+    mocks.identity.mockReturnValue({ tenantSlug: 'acme', missionId: 'mission-binding' });
     const input = boundAction();
     await expect(
       handleAction({
@@ -308,7 +330,8 @@ describe('service shared external admission', () => {
   });
 
   it('rejects authority for another tenant before consuming approval', async () => {
-    process.env.MISSION_ID = 'mission-binding';
+    vi.stubEnv('MISSION_ID', 'mission-binding');
+    mocks.identity.mockReturnValue({ tenantSlug: 'acme', missionId: 'mission-binding' });
     await expect(
       handleAction(boundAction(), undefined, {
         externalAuthority: () => ({ ...authority, tenantSlug: 'other' }),
@@ -319,7 +342,8 @@ describe('service shared external admission', () => {
   });
 
   it('keeps explicit mandatory preflight approval ahead of charter consumption', async () => {
-    process.env.MISSION_ID = 'mission-binding';
+    vi.stubEnv('MISSION_ID', 'mission-binding');
+    mocks.identity.mockReturnValue({ tenantSlug: 'acme', missionId: 'mission-binding' });
     await expect(
       handleAction({ ...boundAction(), params: { _approval_required: true } }, undefined, {
         externalAuthority: () => authority,

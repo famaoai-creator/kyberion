@@ -27,6 +27,7 @@ import {
   grantStatusAt,
   listGrants,
   requestGrantApproval,
+  normalizeGrantDraft,
   revokeGrant,
   type GrantActor,
   type GrantDraft,
@@ -64,6 +65,7 @@ export const GRANTS_USAGE = `Usage: pnpm kyberion grants <list|check|status|upco
                                   and list the grants each one still needs
   grant  --capability <c> --tenant <slug> [--meeting-url <url>]... [--meeting-series <id>]...
          --purpose <text> [--days N] (--request-approval | --approval-request-id <id>)
+         [--service-allocation '<non-secret JSON>']
                                   Create a standing grant. Series ids take the provider form
                                   (google-workspace:<id> | m365:<id>) shown by \`grants upcoming\`. Capabilities that exchange data with
                                   an external service need a human approval first:
@@ -139,6 +141,7 @@ const VALUE_FLAGS = new Set([
   '--from-min',
   '--to-min',
   '--calendar',
+  '--service-allocation',
 ]);
 const REPEATABLE_FLAGS = new Set(['--meeting-url', '--meeting-series', '--calendar']);
 const BOOLEAN_FLAGS = new Set(['--json', '--request-approval', '--verbose']);
@@ -171,6 +174,7 @@ const ALLOWED_FLAGS: Record<string, Set<string>> = {
     '--json',
   ]),
   grant: new Set([
+    '--service-allocation',
     '--capability',
     '--tenant',
     '--meeting-url',
@@ -387,7 +391,7 @@ export function grantDraftFromArgs(parsed: ParsedGrantsArgs): GrantDraft {
       );
     }
   }
-  return {
+  const draft: GrantDraft = {
     capability: required(parsed, '--capability'),
     tenant_slug: required(parsed, '--tenant'),
     meeting_urls: parsed.lists['--meeting-url'] ?? [],
@@ -395,6 +399,15 @@ export function grantDraftFromArgs(parsed: ParsedGrantsArgs): GrantDraft {
     purpose: required(parsed, '--purpose'),
     ...(days !== undefined ? { ttl_days: days } : {}),
   };
+  if (parsed.values['--service-allocation']) {
+    try {
+      draft.service_allocation = JSON.parse(parsed.values['--service-allocation']);
+      return normalizeGrantDraft(draft);
+    } catch {
+      throw new ScriptExitError(1, '--service-allocation must be valid non-secret allocation JSON');
+    }
+  }
+  return draft;
 }
 
 function resolveContextFromArgs(
