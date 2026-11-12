@@ -4,7 +4,7 @@ category: Architecture
 tags: [architecture, peer, messaging, discovery, routing, coordination, gpt-5.4-mini]
 importance: 9
 author: Ecosystem Architect
-last_updated: 2026-10-31
+last_updated: 2026-11-12
 ---
 
 # Kyberion Mesh Hub Implementation Instructions for GPT-5.4 mini
@@ -219,6 +219,12 @@ Every task is one patch. Read the listed current code and tests before editing. 
 - `libs/core/mesh/mesh-message-broker.ts`
 - `libs/core/mesh/mesh-message-broker.test.ts`
 
+> **Status (2026-11-12):** the broker, its delivery driver (`mesh-delivery-driver.ts`,
+> `scripts/mesh_delivery_driver.ts`, the `mesh deliver` CLI command, `pipelines/mesh-delivery.json`)
+> and the adapter's `dispatchToPeer` / `createResponder` were retired: no production code called
+> `acceptMeshRequest` / `enqueueMeshDelivery`, so the queue was always empty. `inspectMeshHub`
+> keeps reading the delivery ledger. See [`retired/README.md`](../../../retired/README.md).
+
 **Required APIs:**
 
 - `acceptMeshRequest(request)`
@@ -290,7 +296,7 @@ Every task is one patch. Read the listed current code and tests before editing. 
 
 - Implement `MeshHubPeerMessagingAdapter` as a new decorator/adapter around the public `peer-messaging` APIs.
 - Do not change `PeerMessagingServer`, its synchronous responder behavior, or default endpoints in v1.
-- Do not modify `work-coordination-peer.ts` or `a2a-bridge.ts` to accept Hub traffic. Use new recipient-side proposal adapters that call their existing public contracts after Hub acceptance.
+- Do not modify `work-coordination-peer.ts` (retired 2026-11-12, see `retired/README.md`) or `a2a-bridge.ts` to accept Hub traffic. Use new recipient-side proposal adapters that call their existing public contracts after Hub acceptance.
 - A change to an existing subsystem requires a coordinator-approved compatibility rationale and a regression test proving existing behavior is unchanged.
 
 **Required behavior:**

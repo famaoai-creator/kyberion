@@ -84,13 +84,54 @@ side stayed so `inspectMeshHub` could list `subscriptions.jsonl`. Nothing writes
 `pnpm mesh-hub:inspect`, and the documentation-only routing policy followed. The rest of the mesh
 hub — peer directory, broker, delivery driver, peer-messaging adapter and `inspectMeshHub` for
 peers / deliveries / dead letters — is live and stays. Decision record:
-[agent-communication-layer-model.md §9](../knowledge/product/architecture/agent-communication-layer-model.md#9-messaging-layer-map-2026-10-31).
+[agent-communication-layer-model.md §9](../knowledge/product/architecture/agent-communication-layer-model.md#9-messaging-layer-map-2026-11-12).
 Restore the policy with a router, never alone.
 
 | Retired path                                                                                | Original path                                   | Reason                                                                                                                                      |
 | ------------------------------------------------------------------------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
 | `libs-core/mesh/mesh-topic-registry.ts` (already the full module; live copy deleted)        | `libs/core/mesh/mesh-topic-registry.ts` (+test) | Read side over a store with no writer; barrel exports, `concept-consolidation-baseline.json` entry and the inspection `topics` view removed |
 | `knowledge/product/governance/mesh-hub-policy.json` + `schemas/mesh-hub-policy.schema.json` | same paths under `knowledge/product/`           | `documentation_only` policy of the retired router; removed from `governance-catalog-contracts.json` and `tests/mesh-hub-contract.test.ts`   |
+
+## Mesh message broker, delivery driver and peer coordination responder (2026-11-12)
+
+The two retirements have different reasons. Keep them apart when you consider restoring either.
+
+**Peer coordination responder: retired by design.** It let a signed peer envelope run
+`claimWorkItem` / `handoffWorkItem` / `updateWorkItem` with no local acceptance. A valid
+signature proves possession of a peer secret; it is not the recipient's acceptance and not
+execution authority (`agent-communication-layer-model.md` §5). The responder would be wrong even
+with traffic. That no listener ever installed it only made the removal safe. The governed route
+from a peer to a WorkItem is the typed peer task (`libs/core/mesh/peer-task-exchange.ts`:
+receipt → local accept → `source: peer` WorkItem). Do not restore the responder; extend the peer
+task catalog instead.
+
+**Mesh broker and delivery driver: the implementation is retired, the need is not.** The broker
+kept a delivery ledger with retry, backoff and dead-lettering, and the driver claimed due
+deliveries. Cross-runtime messages need exactly that: a peer on another host is sometimes
+unreachable, and a sent message must end in a recorded outcome. But the broker was a second
+ledger beside the peer-messaging outbox, and no production code called `acceptMeshRequest` /
+`enqueueMeshDelivery`, so no real message ever passed through it (recorded as half-retired on
+2026-10-31). The live send path (`sendPeerMessage`) still posts once and records a failure in
+`outbox.jsonl` without retrying; only auto replies retry by themselves, and a peer task proposal
+is resent by hand. This is an open design gap, listed in `agent-communication-layer-model.md`
+§9. Close it in the peer-messaging outbox, where message ids are stable and the receiver already
+deduplicates, not by restoring a second ledger.
+
+What stays is the read side: `inspectMeshHub` still reads `deliveries.jsonl` /
+`dead-letter.jsonl` (the reader now lives in `mesh-hub-inspection.ts`), so `mesh-hub inspect`
+and the doctor "Mesh delivery" line report rows an older runtime root may hold.
+`MeshDeliveryRecord`, `MESH_DELIVERY_STATUSES` and `mesh-delivery-record.schema.json` stay as
+mesh contract vocabulary.
+
+| Retired path                                            | Original path                                                    | Reason                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ------------------------------------------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `libs-core/mesh/mesh-message-broker.ts` (+test)         | `libs/core/mesh/mesh-message-broker.ts`                          | Delivery ledger writer with no producer. Its `listMeshDeadLetters` scanned every `tenants/*/dead-letter.jsonl` and then filtered by tenant; the reader kept in `mesh-hub-inspection.ts` opens only the requested tenant's file, so a row filed under another tenant's directory is no longer read; barrel exports, `@agent/core/mesh/mesh-message-broker` subpath and the `concept-consolidation-baseline.json` entry removed |
+| `libs-core/mesh/mesh-delivery-driver.ts` (+test)        | `libs/core/mesh/mesh-delivery-driver.ts`                         | Claimed due deliveries from the broker; barrel exports and both `mesh-delivery-driver` subpaths removed                                                                                                                                                                                                                                                                                                                       |
+| `scripts/mesh_delivery_driver.ts` (+test)               | `scripts/mesh_delivery_driver.ts`                                | `pnpm kyberion mesh deliver` entry point; removed from `cli-commands.json` with its `cli_cmd_script_mesh_deliver` vocabulary key                                                                                                                                                                                                                                                                                              |
+| `pipelines/mesh-delivery.json`                          | `pipelines/mesh-delivery.json`                                   | Scheduled wrapper (`mesh-delivery-5min`, already disabled) around the pipeline op `core:run_mesh_delivery`, which is deleted from `scripts/pipeline-domain-ops.ts` / `pipeline-execution-part-control.ts`; `pipeline-scope-registry.json` entry removed                                                                                                                                                                       |
+| `tests/mesh-two-peer-e2e.test.ts`                       | `tests/mesh-two-peer-e2e.test.ts`                                | AA-02 acceptance for broker → driver → HTTP dispatch; every production piece it exercised is retired                                                                                                                                                                                                                                                                                                                          |
+| `libs-core/workforce/work-coordination-peer.ts` (+test) | `libs/core/workforce/work-coordination-peer.ts`                  | Peer envelope → direct WorkItem mutation with no local acceptance and no installed listener; barrel exports and both `work-coordination-peer` subpaths removed                                                                                                                                                                                                                                                                |
+| (deleted, not moved)                                    | `MeshHubPeerMessagingAdapter.dispatchToPeer` / `createResponder` | `dispatchToPeer` was called only by the delivery driver; `createResponder` only by tests. Recipient proposals are created by `proposeLocalRequest` (conversation server); the stored `workitem-command` reference payload is built in the adapter itself                                                                                                                                                                      |
 
 ## Conversation learning consolidation (2026-10-05)
 
