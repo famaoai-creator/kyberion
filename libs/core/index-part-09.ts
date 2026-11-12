@@ -176,6 +176,7 @@ export * from './intent/intent-track-resolver.js';
 export * from './plugin/capability-bundle-registry.js';
 
 export * from './task/outcome-contract.js';
+export * from './task/outcome-result.js';
 
 export * from './analysis/analysis-contract.js';
 
