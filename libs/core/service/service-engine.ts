@@ -1,3 +1,5 @@
+import { credentialExecutionIdentity } from '../foundation/credential-binding.js';
+import { resolveTenantAlias } from '../governance/context-security-scope.js';
 import type { StorageDataTier } from '../storage-layout.js';
 import { consumeScopedServiceCaptureAdmission } from './service-capture-admission.js';
 import { createLogger } from '../logger.js';
@@ -60,8 +62,11 @@ function enforceTenantBindingContract(
 ): void {
   const operation = preset.operations[action];
   if (!operation) throw new Error(`Operation "${action}" not found in presets for ${serviceId}`);
+  const identity = credentialExecutionIdentity();
   const operationBindingRequired =
-    preset.tenant_binding_required === true || operation.tenant_binding_required === true;
+    Boolean(identity.tenantSlug || tenantBindingCapability) ||
+    preset.tenant_binding_required === true ||
+    operation.tenant_binding_required === true;
   if (!operationBindingRequired) return;
   if (!tenantBindingCapability) {
     throw new Error(
@@ -71,6 +76,17 @@ function enforceTenantBindingContract(
   const tenantBindingContext = resolveTenantServiceEngineAdmission(tenantBindingCapability);
   if (!tenantBindingContext) {
     throw new Error('[POLICY_VIOLATION] Invalid tenant service actuator admission capability');
+  }
+  const admittedScope = tenantBindingContext.securityScope;
+  if (
+    !identity.tenantSlug ||
+    identity.tenantSlug !== resolveTenantAlias(admittedScope) ||
+    (identity.missionId && identity.missionId !== admittedScope.mission_id) ||
+    (identity.taskId && identity.taskId !== admittedScope.task_id)
+  ) {
+    throw new Error(
+      '[POLICY_VIOLATION] Tenant service admission does not match execution identity'
+    );
   }
   const authorization = authorizeTenantServiceAction({
     serviceId,
@@ -183,8 +199,11 @@ export async function executeServicePreset(
   const alternatives = op.alternatives || [{ ...op, type: op.type || 'api' }];
   const envelope = resolveRequestEnvelope(params);
   // A probe must not load or template the rest of a global connection document.
+  // Tenant admission uses governed endpoint config, request params and scoped
+  // credentials only; a personal connection document is never a tenant default.
   const connection =
-    captureTransport?.connection ?? (probe ? {} : loadConnectionWithFallback(serviceId));
+    captureTransport?.connection ??
+    (probe || tenantBindingCapability ? {} : loadConnectionWithFallback(serviceId));
   const mergedParams = {
     ...mergeParamsWithConnection(
       {
@@ -298,7 +317,8 @@ export async function executeServicePresetCached(
   tenantBindingCapability?: object
 ): Promise<{ result: any; fromCache: boolean }> {
   const preset = getServicePresetRecord(serviceId);
-  if (preset) enforceTenantBindingContract(serviceId, action, preset, tenantBindingCapability);
+  if (!preset) throw new Error(`No service preset found for: ${serviceId}`);
+  enforceTenantBindingContract(serviceId, action, preset, tenantBindingCapability);
   const admission = tenantBindingCapability
     ? resolveTenantServiceEngineAdmission(tenantBindingCapability)
     : undefined;

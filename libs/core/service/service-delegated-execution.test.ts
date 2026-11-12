@@ -14,6 +14,7 @@ import {
   type DelegatedExecutionPolicy,
   type DelegatedExecutionTarget,
   delegatedExecutionBindingHash,
+  delegatedExecutionEffectConfigurationHash,
 } from '../governance/delegated-execution.js';
 import {
   currentHumanExecutionAuthorization,
@@ -27,7 +28,14 @@ import {
   approvalStoreRoots,
 } from '../governance/approval-store.js';
 import { issueTenantServiceEngineAdmission } from './service-engine-admission.js';
-import { executeServicePreset } from './service-engine.js';
+import { executeServicePreset as executeServicePresetInternal } from './service-engine.js';
+import { runInExecutionScope } from '../foundation/execution-scope.js';
+
+// Delegation/human approval is distinct from the trusted tenant execution context.
+const executeServicePreset = (...args: Parameters<typeof executeServicePresetInternal>) =>
+  runInExecutionScope({ tenantBound: true, tenantSlug: 'service-delegation' }, () =>
+    executeServicePresetInternal(...args)
+  );
 
 const mock = vi.hoisted(() => ({
   config: { preset_path: 'fixture', base_url: 'https://provider.example' },
@@ -69,7 +77,9 @@ vi.mock('./service-binding-registry.js', () => ({
 }));
 vi.mock('./service-engine-helpers.js', async (original) => ({
   ...(await original<typeof import('./service-engine-helpers.js')>()),
-  loadConnectionWithFallback: () => ({ account: mock.account }),
+  loadConnectionWithFallback: () => {
+    throw new Error('tenant work must not load a personal connection');
+  },
 }));
 vi.mock('./service-engine-execution.js', () => ({ executeServicePresetAlternative: mock.execute }));
 vi.mock('../governance/approval-policy.js', async (original) => ({
@@ -175,6 +185,15 @@ describe('real service engine delegated admission', () => {
     else process.env.KYBERION_BASE_ROLE = savedPersona;
     if (savedRole === undefined) delete process.env.MISSION_ROLE;
     else process.env.MISSION_ROLE = savedRole;
+  });
+
+  it('does not fingerprint operator credentials for a claimed tenant target', () => {
+    expect(() =>
+      delegatedExecutionEffectConfigurationHash({
+        ...target,
+        params: { ...target.params, auth: 'secret-guard' },
+      })
+    ).toThrow(/credentials require matching execution identity/);
   });
 
   it('admits an exact operation without inventing a human approval and executes once', async () => {
