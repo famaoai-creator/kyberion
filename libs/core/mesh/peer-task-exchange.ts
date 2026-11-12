@@ -236,7 +236,7 @@ function catalogEntryFor(
 
 export type PeerTaskDirection = 'inbound' | 'outbound';
 /** Recorded task states (not messages); `coordination-act-map.ts` marks each as not an act. */
-export const PEER_TASK_STATES = [
+export const PEER_TASK_STATES = Object.freeze([
   'pending',
   'accepted',
   'running',
@@ -244,7 +244,7 @@ export const PEER_TASK_STATES = [
   'failed',
   'rejected',
   'expired',
-] as const;
+] as const);
 export type PeerTaskState = (typeof PEER_TASK_STATES)[number];
 
 export interface PeerTaskRecord {
