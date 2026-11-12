@@ -2,6 +2,7 @@ import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 
 import { isValidTenantSlug } from '../entity-scope.js';
 import { isValidChronosScopeId } from '../foundation/scope.js';
+import type { SurfaceViewerRole } from '../foundation/surface-viewer-role.js';
 import type { OsKnowledgeTier } from '../governance/cloudflare-os-control-plane.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeExistsSync, withSensitivePathMediation } from '../secure-io.js';
@@ -17,7 +18,8 @@ const TOKEN_HASH_PATTERN = /^[0-9a-f]{64}$/u;
 const MEMBER_ID_PATTERN = /^[a-z][a-z0-9-]{1,30}$/u;
 const REGISTRY_PATH = pathResolver.knowledge('personal/connections/chronos-access.json');
 
-export type ChronosAccessRole = 'readonly' | 'localadmin';
+/** @deprecated Use `SurfaceViewerRole` (`libs/core/surface/surface-authorization.ts`). */
+export type ChronosAccessRole = SurfaceViewerRole;
 
 /**
  * TR-01: the least-privilege authority role for reading this registry. Its

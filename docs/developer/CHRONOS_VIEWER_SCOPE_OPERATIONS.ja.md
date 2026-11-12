@@ -1,7 +1,7 @@
 ---
 title: Chronos viewer scope 運用手順
 tags: [chronos, security, authorization, multi-tenant]
-last_updated: 2026-10-26
+last_updated: 2026-11-12
 ---
 
 # Chronos viewer scope 運用手順
@@ -50,6 +50,28 @@ last_updated: 2026-10-26
 `case` は台帳の案件 id の形、`date` は `YYYY-MM-DD` でなければ 400 で、子プロセスは動きません。Chronos は決定の置き場を読みません。governed facade(`dist/scripts/customer_decision.js overview`)を、そのテナントに結び付けたシステム役割なしの子プロセスとして、種類ごとに決まった引数で動かします(同時に 4 つまで、種類・テナント・引数ごとに 15 秒の控え)。応答は版・テナント・案件・日付を確かめた形に組み直し、値・選択肢・理由・コメント・名前は入りません。案件やレポートがなければ 404、facade が未ビルドなら 503、時間切れは 504、ほかは 502 で、どれも決まった文面だけを返します。
 
 middleware は edge で secret-guard のファイル読み取りを行わない設計です。したがって middleware は credential/loopback の早期境界、token registry を伴う viewer 解決は route 側、という二段構成を維持します。
+
+## 実装の持ち主（Concierge に統合後）
+
+操作コンソールは Concierge の `/api/ops/*` に移りました。viewer に関する定義は、次のとおり一か所ずつです（パスは `presence/displays/concierge/` から）。
+
+| 概念                                                                              | 持ち主                                                                                                                                | 委譲する側                                                                                                       |
+| --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| viewer role の型（`readonly` / `localadmin`）                                     | `SurfaceViewerRole`（`libs/core/foundation/surface-viewer-role.ts`。`libs/core/surface/surface-authorization.ts` から再エクスポート） | `ChronosAccessRole`・`SurfaceAuthorizationRole`・`HeadlessViewerRole`・`PluginViewRole` は非推奨の別名           |
+| viewer → `SurfaceAuthorizationContext` の投影、tier の解決、エラー応答            | `src/lib/viewer-context.ts`                                                                                                           | `src/lib/ops/ops-viewer.ts`（`toSurfaceAuthorizationContext`・`resolveViewerTierAccess`・`viewerErrorResponse`） |
+| 省略された organization / project / tier の既定値（コンソールの `ViewerContext`） | `src/lib/ops/ops-viewer.ts` の `withOpsViewerDefaults`                                                                                | 同ファイルの各ヘルパー、`distill-candidate-scope.ts`                                                             |
+| 1 リクエスト 1 回の viewer 解決                                                   | `src/lib/viewer-context.ts` の `resolveConciergeViewerContextOnce`                                                                    | `src/lib/ops/ops-request-guard.ts` の二つのゲート。続く `resolveOpsViewerForRequest` は同じ結果を使います        |
+| cookie の cross-origin 検査                                                       | `src/lib/cross-origin-cookie.ts`                                                                                                      | `src/lib/api-guard.ts`、`src/lib/ops/ops-request-guard.ts`                                                       |
+| memory candidate の可視判定                                                       | `src/lib/memory-candidate-visibility.ts`                                                                                              | `src/lib/ops/knowledge-scope.ts`（scope のない行の出どころを mission / artifact から引くところだけを足します）   |
+| scoped learning 承認の可視判定                                                    | `src/lib/scoped-learning-approval-visibility.ts`                                                                                      | `src/lib/ops/scoped-learning-approval-visibility.ts`                                                             |
+
+決まりは次のとおりです。
+
+- 個人 tier は、コンソールの経路でも投影の時点で外します。viewer の `tierAccess` に `personal` が入っていても、`viewerCanReadTier` と `strictViewerTier` は `personal` を通しません。
+- 個人 tier の memory candidate は、この判定では誰にも見せません（持ち主にも見せません）。Concierge の viewer は個人 tier を持たないためです。
+- エラー応答の状態コードは、指定があればその値、認可の失敗（`ConciergeViewerError`・`SurfaceViewerScopeError`・`SurfaceAuthorizationError`）ならその失敗の 401 / 403、それ以外は Concierge のルートで 500、コンソールのルートで 403 です。応答の `error_code` は、Concierge のルートでは応答の状態コードとメッセージから、コンソールのルートでは例外そのもの（例外の `code`・`status`・メッセージ）から決めます。この違いは統合前のままで、呼び出し側が `conciergeErrorResponse` の第 3 引数で指定します。組み合わせごとの結果は `src/lib/viewer-error-response.test.ts` の表にあります。
+- viewer role の型が一つであることを検査するのは `libs/core` の中だけです（`tests/tier-member-role-type-boundary.test.ts`）。Concierge の応答の型（`src/lib/ops/*-response.ts`）とコンポーネント（`src/components/ops/`）には、`'readonly' | 'localadmin'` をそのまま書いた箇所が残っています。
+- 実行ロールは二系統あります。Concierge のルートは `concierge_localadmin` / `concierge_operator`、コンソールのルートは `chronos_localadmin` / `chronos_operator` です。ロールカードが許すパスが違うので、まとめていません。対応表は `src/lib/viewer-execution-role.ts` にあります。ルートをどちらで動かすかを変えるのは権限の判断で、リファクタリングでは変えません。
 
 ## headless / A2UI operation 認可
 
