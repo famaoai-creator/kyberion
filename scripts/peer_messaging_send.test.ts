@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   buildPeerMessageEnvelope: vi.fn(),
   loadPeerNetworkCatalog: vi.fn(),
+  loadTenantPeerCatalog: vi.fn(),
   resolvePeerDispatchTarget: vi.fn(),
   sendPeerMessage: vi.fn(),
   logger: { debug: vi.fn(), success: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
@@ -14,6 +15,11 @@ vi.mock('@agent/core/mesh/peer-messaging', async (importOriginal) => ({
   loadPeerNetworkCatalog: mocks.loadPeerNetworkCatalog,
   resolvePeerDispatchTarget: mocks.resolvePeerDispatchTarget,
   sendPeerMessage: mocks.sendPeerMessage,
+}));
+
+vi.mock('@agent/core/mesh/peer-conversation', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/mesh/peer-conversation')>()),
+  loadTenantPeerCatalog: mocks.loadTenantPeerCatalog,
 }));
 
 vi.mock('@agent/core/core', async () => {
@@ -28,6 +34,7 @@ describe('peer_messaging_send', () => {
     vi.clearAllMocks();
     process.env.KYBERION_TENANT_ID = 'tenant-a';
     mocks.loadPeerNetworkCatalog.mockReturnValue({ tenant_id: 'tenant-a' });
+    mocks.loadTenantPeerCatalog.mockReturnValue({ tenant_id: 'tenant-a', peers: [] });
     mocks.resolvePeerDispatchTarget.mockReturnValue({
       peer: { peer_id: 'peer-b' },
       sharedSecret: 'secret',
@@ -70,6 +77,15 @@ describe('peer_messaging_send', () => {
       })
     );
     expect(print).toHaveBeenCalledWith({ ok: true, message_id: 'msg-1' });
+    // The tenant's confidential catalog is read under the tenant-bound reader,
+    // never as the caller's own role.
+    expect(mocks.loadTenantPeerCatalog).toHaveBeenCalledWith('tenant-a');
+    expect(mocks.loadPeerNetworkCatalog).not.toHaveBeenCalled();
+    expect(mocks.resolvePeerDispatchTarget).toHaveBeenCalledWith('peer-b', {
+      tenant_id: 'tenant-a',
+      peers: [],
+    });
+    expect(mocks.sendPeerMessage.mock.calls[0][1].recovery).toBeUndefined();
   });
 
   const args = ['--from-peer-id', 'peer-a', '--to-peer-id', 'peer-b', '--subject', 'hello'];
@@ -118,6 +134,11 @@ describe('peer_messaging_send', () => {
     const print = vi.fn();
     await main([...args, '--catalog', 'active/shared/tmp/other-catalog.json'], print);
     expect(mocks.sendPeerMessage.mock.calls[0][1].recovery).toBe('caller');
+    expect(mocks.loadTenantPeerCatalog).not.toHaveBeenCalled();
+    expect(mocks.loadPeerNetworkCatalog).toHaveBeenCalledWith({
+      catalogPath: 'active/shared/tmp/other-catalog.json',
+      tenantId: 'tenant-a',
+    });
     expect(print.mock.calls[0][0].next).toContain('it will not be retried automatically');
   });
 });

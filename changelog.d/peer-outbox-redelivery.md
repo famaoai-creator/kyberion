@@ -7,3 +7,5 @@ category: Added
 - Outbox rows gain `http_status`, `disposition`, `reason`, `retry_after_ms`, `redelivery` and `recovery`, and a new row status `given_up`; readers of `GET /v1/peer/messages/outbox` that assumed only `sent` / `failed` need to accept it.
 - **Changed:** a peer listener now refuses an envelope more than 5 minutes past its signed `expires_at` (HTTP 410 `envelope_expired`) instead of processing it.
 - **Fixed:** a peer task proposal or result answered with a non-2xx status was recorded as `sent`; it is now recorded as failed.
+- **Fixed:** `pnpm kyberion peer send` could not read the tenant's peer catalog under an operator role (`peer_not_found` unless `--catalog` was passed, which also excluded the message from redelivery). It now reads the tenant catalog under the tenant-bound `peer_catalog_reader` role, like the conversation and task senders.
+- The redelivery timer is idle when nothing is due: a tick reads only what was appended to the outbox (one file stat when nothing was) and takes no lock, writes nothing and sends nothing unless a message needs work.
