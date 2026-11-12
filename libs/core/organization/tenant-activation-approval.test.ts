@@ -600,8 +600,8 @@ describe('exact human tenant activation approval', () => {
     const record = await request();
     decide(record);
     vi.stubEnv('KYBERION_VIEWER_SCOPE', 'off');
-    await expect(apply(record)).rejects.toThrow(/Viewer scope/);
-    await expect(request()).rejects.toThrow(/Viewer scope/);
+    await expect(apply(record)).rejects.toThrow(/Viewer scope mode must be warn or enforce/);
+    await expect(request()).rejects.toThrow(/Viewer scope mode must be warn or enforce/);
     vi.stubEnv('KYBERION_VIEWER_SCOPE', 'enforce');
     await expect(apply(record)).rejects.toThrow(/state changed/);
     expect(

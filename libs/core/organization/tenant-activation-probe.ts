@@ -153,7 +153,8 @@ function viewerScopeProbe(
   if (mode === 'off') {
     return {
       passed: false,
-      detail: 'KYBERION_VIEWER_SCOPE=off: viewer tenant scope is not audited or enforced',
+      detail:
+        'KYBERION_VIEWER_SCOPE=off is not an accepted activation mode (out-of-scope tenant reads are still denied); set warn or enforce',
     };
   }
   try {
@@ -164,7 +165,7 @@ function viewerScopeProbe(
   }
   return {
     passed: true,
-    detail: `tenant is registered and active, so viewer narrowing resolves it; KYBERION_VIEWER_SCOPE=${mode} (${mode === 'enforce' ? 'out-of-scope reads are denied' : 'out-of-scope reads are audited; set enforce to deny'})`,
+    detail: `tenant is registered and active, so viewer narrowing resolves it; KYBERION_VIEWER_SCOPE=${mode} (${mode === 'warn' ? 'out-of-scope tenant reads are audited, then denied' : 'out-of-scope tenant reads are denied'})`,
   };
 }
 
