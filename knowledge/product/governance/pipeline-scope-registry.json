@@ -400,11 +400,6 @@
       "reason": "User-facing calendar auto-join workflow."
     },
     {
-      "pipeline": "pipelines/mesh-delivery.json",
-      "audience": "system",
-      "placement": "canonical"
-    },
-    {
       "pipeline": "pipelines/mission-hygiene-weekly.json",
       "audience": "system",
       "placement": "canonical"
