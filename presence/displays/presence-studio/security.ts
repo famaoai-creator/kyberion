@@ -18,6 +18,8 @@ import {
 import { resolveAuthnSurfaceViewerScope } from '@agent/core/surface/surface-authn';
 import type { ResolvedPrincipal } from '@agent/core/authn-principal-resolver';
 import { getRegisteredEnvText } from '@agent/core/foundation';
+import { withExecutionContext } from '@agent/core/authority';
+import { listTenantProfileSlugs } from '@agent/core/organization/tenant-registry';
 import {
   extractSurfaceCredential,
   isSameOriginMutation,
@@ -284,6 +286,37 @@ function requestedTenantHint(
   return slug && isValidTenantSlug(slug) ? slug : undefined;
 }
 
+/**
+ * A hint selects among tenants that exist; it never creates scope for a slug
+ * the tenant registry does not know. Profiles live under the personal tier, so
+ * the read runs in the same `ecosystem_architect` context `/api/me` uses. An
+ * unreadable registry registers nothing (fail closed).
+ */
+function tenantHintIsRegistered(slug: string): boolean {
+  try {
+    return withExecutionContext('ecosystem_architect', () => listTenantProfileSlugs()).includes(
+      slug
+    );
+  } catch (error) {
+    logger.warn(
+      `[presence-studio][viewer] tenant registry unreadable — the requested tenant cannot be confirmed, so it is refused | next: check the tenant registry (knowledge/personal/tenants) | evidence: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
+    return false;
+  }
+}
+
+export interface PresenceStudioViewerResolutionOptions {
+  /**
+   * What to do with a loopback tenant hint that names no registered tenant.
+   * `refuse` (default) answers 403. `ignore` drops the hint and resolves the
+   * no-hint viewer — only for `/api/me`, the read a page uses to replace a
+   * stale stored tenant with one that exists.
+   */
+  unregisteredTenantHint?: 'refuse' | 'ignore';
+}
+
 /** Held-action mutations are human operator actions, never readonly token actions. */
 export function requirePresenceStudioLocalAdmin(viewer: PresenceStudioViewerContext): void {
   if (viewer.source !== 'loopback') {
@@ -294,32 +327,54 @@ export function requirePresenceStudioLocalAdmin(viewer: PresenceStudioViewerCont
   }
 }
 
-export function presenceStudioHeadlessScope(viewer: PresenceStudioViewerContext) {
+/**
+ * The one derivation every Presence Studio projection below shares: a
+ * loopback session is the local operator (localadmin, all tiers); a token
+ * viewer is readonly and never reaches the personal tier.
+ */
+function presenceStudioRoleAndTiers(
+  viewer: PresenceStudioViewerContext
+): Pick<SurfaceViewerScope, 'role' | 'tierAccess'> {
+  return viewer.source === 'loopback'
+    ? { role: 'localadmin', tierAccess: ['personal', 'confidential', 'public'] }
+    : { role: 'readonly', tierAccess: ['confidential', 'public'] };
+}
+
+/** Organization / project lists: the viewer's own, else the principal's, else unrestricted. */
+function presenceStudioScopeLists(
+  viewer: PresenceStudioViewerContext
+): Pick<SurfaceViewerScope, 'organizationIds' | 'projectIds'> {
   return {
-    role: viewer.source === 'loopback' ? ('localadmin' as const) : ('readonly' as const),
+    organizationIds: viewer.organizationIds ?? viewer.principal?.organizationIds ?? 'all',
+    projectIds: viewer.projectIds ?? viewer.principal?.projectIds ?? 'all',
+  };
+}
+
+/**
+ * The headless scope does not carry the viewer's organization / project
+ * lists (always `'all'`), unlike the two projections below.
+ */
+export function presenceStudioHeadlessScope(viewer: PresenceStudioViewerContext) {
+  const { role, tierAccess } = presenceStudioRoleAndTiers(viewer);
+  return {
+    role,
     principal_id: viewer.principalId,
     tenant_slugs: viewer.tenantSlugs,
     organization_ids: 'all' as const,
     project_ids: 'all' as const,
-    tier_access:
-      viewer.source === 'loopback'
-        ? ['personal', 'confidential', 'public']
-        : ['confidential', 'public'],
+    tier_access: tierAccess,
   };
 }
 
 export function toSurfaceAuthorizationContext(
   viewer: PresenceStudioViewerContext
 ): SurfaceAuthorizationContext {
+  const { role, tierAccess } = presenceStudioRoleAndTiers(viewer);
   return {
-    role: viewer.source === 'loopback' ? 'localadmin' : 'readonly',
+    role,
     tenantSlugs: viewer.tenantSlugs,
-    organizationIds: viewer.organizationIds ?? viewer.principal?.organizationIds ?? 'all',
-    projectIds: viewer.projectIds ?? viewer.principal?.projectIds ?? 'all',
-    tierAccess:
-      viewer.source === 'loopback'
-        ? ['personal', 'confidential', 'public']
-        : ['confidential', 'public'],
+    ...presenceStudioScopeLists(viewer),
+    tierAccess,
     principalId: viewer.principalId,
     source: viewer.source,
     ...(viewer.principal ? { principal: viewer.principal } : {}),
@@ -337,15 +392,12 @@ export function toSurfaceAuthorizationContext(
 export function toFrontDeskViewerScope(
   viewer: PresenceStudioViewerContext
 ): SurfaceViewerScope & { principal?: ResolvedPrincipal } {
+  const { role, tierAccess } = presenceStudioRoleAndTiers(viewer);
   return {
-    role: viewer.source === 'loopback' ? 'localadmin' : 'readonly',
+    role,
     tenantSlugs: viewer.tenantSlugs,
-    organizationIds: viewer.organizationIds ?? viewer.principal?.organizationIds ?? 'all',
-    projectIds: viewer.projectIds ?? viewer.principal?.projectIds ?? 'all',
-    tierAccess:
-      viewer.source === 'loopback'
-        ? ['personal', 'confidential', 'public']
-        : ['confidential', 'public'],
+    ...presenceStudioScopeLists(viewer),
+    tierAccess,
     source: viewer.source,
     principalId: viewer.principalId,
     ...(viewer.principal ? { principal: viewer.principal } : {}),
@@ -468,7 +520,8 @@ export class PresenceStudioViewerError extends Error {
  * bearer token and an active server tenant.
  */
 export function resolvePresenceStudioViewerContext(
-  req: Pick<Request, 'headers' | 'socket'> & { method?: string; query?: unknown }
+  req: Pick<Request, 'headers' | 'socket'> & { method?: string; query?: unknown },
+  options: PresenceStudioViewerResolutionOptions = {}
 ): PresenceStudioViewerContext {
   const auth = authorizePresenceStudioRequest(req);
   if (!auth.ok) throw new PresenceStudioViewerError(auth.status as 401 | 403, auth.reason);
@@ -502,7 +555,16 @@ export function resolvePresenceStudioViewerContext(
     });
     const source = scope.source === 'loopback' ? 'loopback' : 'token';
     if (source === 'loopback' && scope.tenantSlugs === 'all') {
-      const effective = requestedTenantHint(req) ?? (tenant || undefined);
+      let hint = requestedTenantHint(req);
+      // The server's own default tenant is the no-hint view, so naming it adds
+      // nothing; any other slug must exist in the tenant registry.
+      if (hint && hint !== tenant && !tenantHintIsRegistered(hint)) {
+        if (options.unregisteredTenantHint !== 'ignore') {
+          throw new PresenceStudioViewerError(403, `Tenant '${hint}' is not a registered tenant.`);
+        }
+        hint = undefined;
+      }
+      const effective = hint ?? (tenant || undefined);
       return {
         principalId: scope.principalId || 'human:presence-studio-localadmin',
         tenantSlugs: effective ? [effective] : 'all',

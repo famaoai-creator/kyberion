@@ -11,6 +11,7 @@
  * manifest read in `readFrontDeskSurfacePorts()`, which never throws.
  */
 import type { MemberRole } from '../organization/member-registry.js';
+import type { SurfaceViewerRole } from '../foundation/surface-viewer-role.js';
 import { loadSurfaceManifest } from './surface-runtime.js';
 import { resolveSurfaceBrowserUrl } from './surface-url.js';
 
@@ -214,7 +215,7 @@ export function frontDeskRoleAllows(role: FrontDeskRole, min: FrontDeskRole): bo
  * localadmin/readonly mapping applies unchanged.
  */
 export function frontDeskRoleFromViewer(input: {
-  role: 'readonly' | 'localadmin';
+  role: SurfaceViewerRole;
   memberRole?: FrontDeskRole | null;
 }): FrontDeskRole {
   if (input.memberRole) return input.memberRole;

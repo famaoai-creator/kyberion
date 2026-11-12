@@ -239,6 +239,10 @@ The operations console does not directly own mission state. It delegates to:
 ### 5. Service binding and channel delivery
 
 - `libs/core/service/service-binding.ts`
+- `libs/core/service/service-binding-reader.ts` (governed connection reads; no execution authorization)
+- `libs/core/service/service-binding-registry.ts` (writes and tenant/project/action authorization)
+- `libs/core/governance/service-credential-allocation.ts` (fail-closed allocation port)
+- `libs/core/governance/service-credential-allocation-verifier.ts` (owner-approved grant verification, installed by grant-aware bootstrap)
 - `libs/core/service/service-preset-registry.ts`
 - `libs/actuators/service-actuator/`
 - `libs/actuators/presence-actuator/`

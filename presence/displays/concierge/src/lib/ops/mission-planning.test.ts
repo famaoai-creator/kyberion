@@ -11,7 +11,7 @@ import { planErrorKey } from '../../components/mission-plan/MissionPlanPanel';
 const draft = {
   requestText: 'Draft the weekly report',
   missionType: 'proposal-brief',
-  assignedPersona: 'operator',
+  orgRole: 'operator',
   tier: 'confidential' as const,
 };
 const preview = { missionId: 'MSN-PLAN-1' } as never;

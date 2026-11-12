@@ -55,10 +55,10 @@ export interface ExecutionScope {
   /** Role assumed in-process by withExecutionContext* (already normalized). */
   readonly assumedRole?: string;
   /**
-   * Persona bound with the assumed role. `null` means the assumption cleared
-   * the persona; `undefined` means the assumption left it to the environment.
+   * Base role bound with the assumed role. `null` means the assumption cleared
+   * the base role; `undefined` means the assumption left it to the environment.
    */
-  readonly assumedPersona?: string | null;
+  readonly assumedBaseRole?: string | null;
   /**
    * Opaque token of the declared store grant this scope was opened for
    * (authority.ts `withStoreGrant`, foundation/declared-store-grant.ts). Only
@@ -135,7 +135,7 @@ function acceptedRootScope(): ExecutionScope | undefined {
 }
 
 /**
- * The innermost scope. Its `assumedRole` / `assumedPersona` are removed when
+ * The innermost scope. Its `assumedRole` / `assumedBaseRole` are removed when
  * the role fails the read-time policy check, so callers can use the fields
  * directly. Outside any in-process assumption (or when the innermost one is
  * rejected) a delegated child's root scope (DR-01) supplies the role and
@@ -157,7 +157,7 @@ export function currentExecutionScope(): ExecutionScope | undefined {
     tenantBound: scope.tenantBound,
     ...(scope.tenantSlug ? { tenantSlug: scope.tenantSlug } : {}),
     ...(root?.assumedRole
-      ? { assumedRole: root.assumedRole, assumedPersona: root.assumedPersona }
+      ? { assumedRole: root.assumedRole, assumedBaseRole: root.assumedBaseRole }
       : {}),
   });
 }
@@ -184,20 +184,20 @@ export function scopedAssumedRole(): string | undefined {
  */
 export function scopedPersona(): { bound: boolean; persona?: string } {
   const scope = currentExecutionScope();
-  if (!scope?.assumedRole || scope.assumedPersona === undefined) return { bound: false };
-  return scope.assumedPersona === null
+  if (!scope?.assumedRole || scope.assumedBaseRole === undefined) return { bound: false };
+  return scope.assumedBaseRole === null
     ? { bound: true }
-    : { bound: true, persona: scope.assumedPersona };
+    : { bound: true, persona: scope.assumedBaseRole };
 }
 
 /**
- * The persona of the current execution (B2): the persona bound by the
+ * The base role of the current execution (B2): the base role bound by the
  * innermost withExecutionContext* when it decided one, else
- * `KYBERION_BASE_ROLE`. Authorization inputs (policy-engine agentId, persona
+ * `KYBERION_BASE_ROLE`. Authorization inputs (policy-engine agentId, base-role
  * gates) must use this rather than the raw env var, which the async helper
  * never mirrors and which is shared by every async context in the process.
  */
-export function executionPersonaText(): string | undefined {
+export function executionBaseRoleText(): string | undefined {
   const scoped = scopedPersona();
   return scoped.bound ? scoped.persona : baseRoleEnvText();
 }

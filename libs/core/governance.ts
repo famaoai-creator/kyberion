@@ -1,6 +1,8 @@
 export {
   resolveIdentityContext,
   hasAuthority,
+  inferBaseRoleFromRole,
+  // @deprecated alias of inferBaseRoleFromRole, kept for one release (S4).
   inferPersonaFromRole,
   buildExecutionEnv,
   withExecutionContext,

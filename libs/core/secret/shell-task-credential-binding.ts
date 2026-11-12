@@ -5,6 +5,10 @@ import { currentActor } from '../authn/actor-context.js';
 import { assertScopeContext, type ScopeContext } from '../foundation/scope-context-validation.js';
 import { getWorkItem, listActiveWorkLeases } from '../workforce/work-coordination.js';
 import { assertIsolatedProviderHome } from '../provider/provider-auth-home.js';
+import { loadServiceBindingRecord } from '../service/service-binding-reader.js';
+import { validateBindingOwner } from '../service/service-binding-owner.js';
+import type { TaskCredentialProvenance } from '../foundation/credential-binding.js';
+import { assertServiceCredentialAllocation } from '../governance/service-credential-allocation.js';
 
 export const TASK_BINDING_SECRET_KEY = '__KYBERION_TASK_BINDING__';
 type BindingInput = Readonly<{ scope: Readonly<ScopeContext>; workItemId: string }>;
@@ -109,11 +113,91 @@ export async function bindShellTaskCredentials(
   }
   if (
     !record(value) ||
-    value.version !== 1 ||
-    Object.keys(value).some((key) => !['version', 'secrets', 'providerEnvironments'].includes(key))
+    ![1, 2].includes(Number(value.version)) ||
+    (value.version !== 1 && value.version !== 2) ||
+    Object.keys(value).some(
+      (key) =>
+        ![
+          'version',
+          'secrets',
+          'providerEnvironments',
+          ...(value.version === 2 ? ['secretProvenance'] : []),
+        ].includes(key)
+    )
   )
     throw denied();
   const secrets = strings(value.secrets);
+  let secretProvenance: Record<string, TaskCredentialProvenance> | undefined;
+  const selectedSnapshots = new Map<string, string>();
+  const allocationChecks: Array<() => void> = [];
+  if (value.version === 2) {
+    if (!record(value.secretProvenance) || !Object.keys(value.secretProvenance).length)
+      throw denied();
+    secretProvenance = {};
+    for (const [key, source] of Object.entries(value.secretProvenance)) {
+      if (
+        !Object.hasOwn(secrets, key) ||
+        !record(source) ||
+        Object.keys(source).some(
+          (field) =>
+            !['serviceBindingId', 'serviceId', 'sourceOwnerRef', 'allocationGrantId'].includes(
+              field
+            )
+        ) ||
+        typeof source.serviceBindingId !== 'string' ||
+        typeof source.serviceId !== 'string' ||
+        typeof source.sourceOwnerRef !== 'string' ||
+        (source.allocationGrantId !== undefined && typeof source.allocationGrantId !== 'string')
+      )
+        throw denied();
+      const selected = loadServiceBindingRecord(source.serviceBindingId);
+      // A configured broker proves material provenance, not personal-owner consent.
+      // Personal allocations require their separate verified grant consumer.
+      if (
+        !selected ||
+        validateBindingOwner(selected).length ||
+        selected.owner_ref !== source.sourceOwnerRef ||
+        (selected.service_id || selected.service_type) !== source.serviceId ||
+        selected.auth_mode !== 'secret-guard' ||
+        !selected.secret_refs.includes(key) ||
+        (selected.project_id && selected.project_id !== input.scope.project_id)
+      )
+        throw denied();
+      if (selected.owner_kind === 'person') {
+        if (typeof source.allocationGrantId !== 'string' || !source.allocationGrantId)
+          throw denied();
+        const grantId = source.allocationGrantId;
+        const check = () => {
+          assertServiceCredentialAllocation(
+            selected,
+            {
+              tenant_slug: input.scope.tenant_slug!,
+              project_id: input.scope.project_id,
+              mission_id: input.scope.mission_id,
+              task_id: input.scope.task_id,
+            },
+            { grantId }
+          );
+        };
+        check();
+        allocationChecks.push(check);
+      } else if (
+        selected.owner_kind !== 'organization' ||
+        selected.tenant_slug !== input.scope.tenant_slug ||
+        source.allocationGrantId !== undefined
+      )
+        throw denied();
+      secretProvenance[key] = {
+        serviceBindingId: source.serviceBindingId,
+        serviceId: source.serviceId,
+        sourceOwnerRef: source.sourceOwnerRef,
+        ...(typeof source.allocationGrantId === 'string'
+          ? { allocationGrantId: source.allocationGrantId }
+          : {}),
+      };
+      selectedSnapshots.set(selected.binding_id, JSON.stringify(selected));
+    }
+  }
   let providerEnvironments: Record<string, NodeJS.ProcessEnv> | undefined;
   if (value.providerEnvironments !== undefined) {
     if (!record(value.providerEnvironments) || Object.keys(value.providerEnvironments).length > 16)
@@ -135,6 +219,23 @@ export async function bindShellTaskCredentials(
     missionId: input.scope.mission_id,
     taskId: input.scope.task_id,
     secrets,
+    ...(secretProvenance ? { secretProvenance } : {}),
+    validate: () => {
+      if (claim !== assertTaskCredentialClaim(input)) throw denied();
+      for (const [bindingId, snapshot] of selectedSnapshots) {
+        if (JSON.stringify(loadServiceBindingRecord(bindingId)) !== snapshot) throw denied();
+      }
+      for (const check of allocationChecks) check();
+      // v2 issuers must re-attest the same credential source and value at use time.
+      // A miss or rotation invalidates this task; never fall back to operator material.
+      if (
+        secretProvenance &&
+        resolve(Object.freeze({ version: 1, scope: input.scope, workItemId: input.workItemId })) !==
+          raw
+      )
+        throw denied();
+      if (claim !== assertTaskCredentialClaim(input)) throw denied();
+    },
     ...(providerEnvironments ? { providerEnvironments } : {}),
   };
 }

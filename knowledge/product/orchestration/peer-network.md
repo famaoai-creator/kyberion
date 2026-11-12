@@ -30,11 +30,11 @@ Use this catalog to exchange messages between Kyberion instances.
 - `kyberion peer collaboration` lists and explicitly accepts or rejects governed proposals created from conversation handoffs.
 - Messages are stored as inbox / outbox / event JSONL records under `active/shared/runtime/peer-messaging/tenants/{tenant}/peers/{peer}/` and `active/shared/observability/peer-messaging/tenants/{tenant}/peers/{peer}/`.
 - Conversation sessions are stored under `active/shared/runtime/peer-conversations/tenants/{tenant}/peers/{peer}/` and `active/shared/observability/peer-conversations/tenants/{tenant}/peers/{peer}/`.
-- Mesh Hub registrations, presence, capabilities, delivery ledger, proposals, and events use `.../mesh-hub/{namespace}/tenants/{tenant}/...`; a namespace may be empty.
+- Mesh Hub registrations, presence, capabilities, proposals, and events use `.../mesh-hub/{namespace}/tenants/{tenant}/...`; a namespace may be empty.
 - Direct Peer Messaging handles a received envelope synchronously and returns its success receipt after the responder finishes. Completed message IDs are deduplicated at the receiver; a concurrent duplicate receives retryable HTTP 425.
-- The listener bounds responder concurrency and the number of requests waiting for a slot. Defaults are --max-inflight 8 and --max-queued 64; saturation returns retryable HTTP 503. Mesh presence publishes the listener's live capacity, which ranks eligible peers. An explicitly selected busy peer remains routable so the durable Mesh ledger can retry its retryable overload response.
-- Governed Mesh requests use the persistent Mesh delivery ledger and mesh-delivery-driver: accepted deliveries survive driver restarts, retry with bounded exponential backoff, honor expiry, and move exhausted failures to dead-letter storage. The driver treats non-2xx transport receipts as retryable failures and preserves the broker's stable message ID across attempts.
-- A successful Mesh delivery ACK means the receiver completed its synchronous handler. Explicit proposal acceptance and subsequent work execution remain separate states.
+- The listener bounds responder concurrency and the number of requests waiting for a slot. Defaults are --max-inflight 8 and --max-queued 64; saturation returns retryable HTTP 503. Mesh presence publishes the listener's live capacity, which ranks eligible peers. An explicitly selected busy peer remains routable and answers with the retryable overload response.
+- Governed Mesh collaboration requests travel inside a conversation `handoff` message and become a pending proposal on the recipient. There is no separate delivery queue: the Mesh message broker, its delivery driver and the `mesh deliver` CLI command were retired on 2026-11-12 because nothing enqueued deliveries. `mesh-hub inspect` still lists delivery and dead-letter rows an older runtime root may hold.
+- A transport receipt means the receiver completed its synchronous handler. Explicit proposal acceptance and subsequent work execution remain separate states.
 
 ## Same-host workflow
 

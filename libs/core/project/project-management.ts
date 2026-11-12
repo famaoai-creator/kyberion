@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import { executionAgentId } from '../governance/execution-agent-id.js';
 import { getRegisteredEnvText, isVitestProcess } from '../foundation/env.js';
-import { executionPersonaText } from '../foundation/execution-scope.js';
+import { executionBaseRoleText } from '../foundation/execution-scope.js';
 import { currentResourceAccessScope } from '../foundation/resource-access-scope.js';
 import { conciergeManagementGrantKind } from '../foundation/concierge-management-capability.js';
 import { listTenantProfileSlugs } from '../organization/tenant-registry.js';
@@ -870,7 +870,7 @@ export function reconcileProjectOperationalState(
   };
   const includeCrossScopeDiagnostics = options.includeCrossScopeDiagnostics === true;
   if (includeCrossScopeDiagnostics) {
-    const persona = executionPersonaText();
+    const persona = executionBaseRoleText();
     if (persona !== 'sovereign') {
       throw new Error(
         `[POLICY_VIOLATION] Cross-scope project reconciliation requires the sovereign persona (got ${persona || 'unset'}).`

@@ -1,0 +1,83 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/outcome-result.schema.json",
+  "title": "Outcome Result",
+  "description": "Derived facts, worker-reported verification and current delivery states; never a new completion gate.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "model_version",
+    "outcome_id",
+    "requested_result",
+    "summary",
+    "artifacts",
+    "verification",
+    "delivery",
+    "gaps",
+    "needs"
+  ],
+  "properties": {
+    "model_version": { "const": 1 },
+    "outcome_id": { "type": "string" },
+    "requested_result": { "type": "string" },
+    "summary": { "type": "string" },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["ref"],
+        "properties": { "ref": { "type": "string", "minLength": 1 }, "kind": { "type": "string" } }
+      }
+    },
+    "verification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "method", "criteria", "reported_checks"],
+      "properties": {
+        "status": { "enum": ["unassessed", "partial", "reported_passed", "reported_failed"] },
+        "method": { "enum": ["self_check", "review_gate", "human_acceptance", "test"] },
+        "reported_checks": { "$ref": "#/definitions/texts" },
+        "criteria": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["criterion", "status", "evidence"],
+            "properties": {
+              "criterion": { "type": "string", "minLength": 1 },
+              "status": { "enum": ["unassessed", "reported_passed", "reported_failed"] },
+              "evidence": { "$ref": "#/definitions/texts" }
+            }
+          }
+        }
+      }
+    },
+    "delivery": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "bindings", "untracked_artifact_refs"],
+      "properties": {
+        "untracked_artifact_refs": { "$ref": "#/definitions/texts" },
+        "status": { "enum": ["unknown", "pending", "delivered", "failed", "partial"] },
+        "bindings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["artifact_ref", "binding_id", "status"],
+            "properties": {
+              "artifact_ref": { "type": "string", "minLength": 1 },
+              "binding_id": { "type": "string" },
+              "status": { "enum": ["pending", "delivered", "failed"] },
+              "external_url": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "gaps": { "$ref": "#/definitions/texts" },
+    "needs": { "$ref": "#/definitions/texts" }
+  },
+  "definitions": { "texts": { "type": "array", "items": { "type": "string", "minLength": 1 } } }
+}

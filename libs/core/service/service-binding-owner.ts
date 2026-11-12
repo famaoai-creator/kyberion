@@ -89,13 +89,15 @@ export function isBindingVisibleTo(
   record: BindingOwnerFields,
   viewer: { memberId?: string; tenantSlugs: readonly string[] | 'all' }
 ): boolean {
+  // A malformed owner must not become visible merely because a viewer has broad tenant scope.
+  if (validateBindingOwner(record).length > 0) return false;
   const owner = resolveBindingOwner(record);
   if (owner.owner_kind === 'operator') return false;
   if (owner.owner_kind === 'person') {
     if (!viewer.memberId) return false;
-    // A derived person owner has no ref (legacy record): visible to any identified member of the
-    // single-operator deployments that predate ownership, never to an unidentified viewer.
-    return owner.owner_ref ? owner.owner_ref === `user:${viewer.memberId}` : true;
+    // Legacy single-operator records do not prove which member owns the connection.
+    // The existing explicit owner migration restores visibility without guessing from login.
+    return owner.owner_ref === `user:${viewer.memberId}`;
   }
   return viewer.tenantSlugs === 'all' || viewer.tenantSlugs.includes(owner.owner_ref ?? '');
 }

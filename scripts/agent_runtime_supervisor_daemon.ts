@@ -752,9 +752,14 @@ function writeResponse(socket: net.Socket, response: SupervisorResponse): void {
   socket.end(`${JSON.stringify(response)}\n`);
 }
 
-function supervisorTokenValid(candidate: string | undefined): boolean {
+/**
+ * The local IPC transport (Unix socket / named pipe) is bounded by filesystem
+ * permissions, so a token is optional there. A TCP listener has no such
+ * boundary — any local process can connect — so it never serves without one.
+ */
+function supervisorTokenValid(candidate: string | undefined, transport: 'unix' | 'tcp'): boolean {
   const configured = registeredEnv('KYBERION_AGENT_RUNTIME_SUPERVISOR_TOKEN');
-  if (!configured) return true;
+  if (!configured) return transport !== 'tcp';
   if (!candidate) return false;
   const left = Buffer.from(candidate);
   const right = Buffer.from(configured);
@@ -1248,11 +1253,27 @@ export async function startAgentRuntimeSupervisorDaemon(
   if (!getRegisteredEnvText('MISSION_ROLE')) {
     setRegisteredEnv('MISSION_ROLE', 'surface_runtime');
   }
+  const transport = resolveTransport(options);
+  if (transport === 'tcp' && !registeredEnv('KYBERION_AGENT_RUNTIME_SUPERVISOR_TOKEN')) {
+    throw new Error(
+      'agent runtime supervisor refused to start on TCP — a TCP listener is reachable by every local process and no shared token is configured' +
+        ' | next: set KYBERION_AGENT_RUNTIME_SUPERVISOR_TOKEN for the daemon and its clients, or unset KYBERION_AGENT_RUNTIME_SUPERVISOR_TRANSPORT to use the default local IPC socket' +
+        ' | evidence: transport=tcp KYBERION_AGENT_RUNTIME_SUPERVISOR_TOKEN=(unset)'
+    );
+  }
+  const socketPath = resolveSocketPath(options);
+  // Node's `listen(<string>)` binds a TCP port on every interface when the
+  // string reads as a number, so such a socket identity is not local IPC.
+  if (transport === 'unix' && Number(socketPath) >= 0) {
+    throw new Error(
+      'agent runtime supervisor refused to start — the socket path reads as a number, which Node would bind as a TCP port on every interface instead of a local socket' +
+        ' | next: set KYBERION_AGENT_RUNTIME_SUPERVISOR_SOCKET_PATH to a filesystem path, or unset it to use the default' +
+        ` | evidence: transport=unix socket_path=${JSON.stringify(socketPath)}`
+    );
+  }
   recordDaemonHeartbeat('agent-runtime-supervisor-daemon', {
     status: 'starting',
   });
-  const transport = resolveTransport(options);
-  const socketPath = resolveSocketPath(options);
   const lockPath = resolveLockPath(options);
   ensureSocketDir(socketPath, transport, lockPath);
   const listenTarget = resolveListenTarget(options, socketPath);
@@ -1379,7 +1400,7 @@ export async function startAgentRuntimeSupervisorDaemon(
         );
         if (
           (transport === 'tcp' && !socketIsLoopback(socket)) ||
-          !supervisorTokenValid(request.auth_token)
+          !supervisorTokenValid(request.auth_token, transport)
         ) {
           return writeResponse(socket, {
             id: request.id || 'unknown',

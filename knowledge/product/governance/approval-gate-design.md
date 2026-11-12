@@ -1,7 +1,7 @@
 ---
 title: 'Approval Gate Design: Store First, Surface as Renderer'
 tags: [governance, approval, mission, gate, human-in-the-loop]
-last_updated: 2026-10-19
+last_updated: 2026-11-12
 ---
 
 # Approval Gate Design
@@ -106,7 +106,9 @@ human_only の依頼は `accountability.min_assurance`（A0〜A3）を持ち、�
     `APPROVAL_PLACEHOLDER_DECIDERS`（`concierge`、`chronos-localadmin`、`sovereign-user` など）の 1 か所にある。
   - 決定者の identity を呼び出し側が自由文字列で渡す surface（`unverified_decider`）。決定に
     `deciderIdentitySource: 'caller_supplied'` を記録する surface は次の 2 つだけで、ON ではここから承認できない。
-    - `libs/core/governance/approval-cowork-adapter.ts`（MCP の `kyberion.approval.decide`）
+    - `libs/core/governance/approval-cowork-adapter.ts`（MCP の `kyberion.approval.decide`。決定者には
+      サーバー束縛の MCP principal を記録し、引数 `decided_by` は監査の `caller_label` にだけ残す。
+      principal はプロセス単位の束縛で、要求ごとに認証した identity ではないため、扱いは変わらない）
     - `libs/actuators/approval-actuator/src/approval-actuator-helpers.ts`（approval-actuator の `decide` op）
   - mission brief の承認ページ（`scripts/mission-alignment-gate/serve-brief.ts`）は、ページの token が
     所持しか証明しないため、決定者をページから受け取らない。CLI と同じ `resolveCliOperatorIdentity()`

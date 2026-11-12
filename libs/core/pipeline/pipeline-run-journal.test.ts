@@ -35,7 +35,7 @@ describe('pipeline run journal', () => {
         execution_authority: {
           system_role: 'forged',
           mission_role: 'forged',
-          persona: 'forged',
+          base_role: 'forged',
           scope: { tier: 'personal' },
           nhi_id: 'forged',
           agent_id: 'forged',

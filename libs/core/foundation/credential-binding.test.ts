@@ -6,6 +6,8 @@ import {
   isCredentialBindingRequired,
   withTaskCredentialBinding,
   resolveTaskCredential,
+  resolveTaskServiceCredential,
+  selectProviderCredential,
 } from './credential-binding.js';
 import {
   getSecret,
@@ -545,4 +547,97 @@ describe('task-local credential binding', () => {
       )
     );
   });
+});
+
+describe('task service credential provenance', () => {
+  const source = { serviceBindingId: 'binding-a', serviceId: 'slack', sourceOwnerRef: 'alpha' };
+  it('requires exact binding and owner even for identical credential names', () =>
+    tenant('alpha', () => {
+      withTaskCredentialBinding(
+        {
+          tenantSlug: 'alpha',
+          secrets: { SLACK_TOKEN: 'synthetic' },
+          secretProvenance: { SLACK_TOKEN: source },
+        },
+        () => {
+          expect(resolveTaskServiceCredential('SLACK_TOKEN', source)).toBe('synthetic');
+          expect(() =>
+            resolveTaskServiceCredential('SLACK_TOKEN', {
+              ...source,
+              serviceBindingId: 'binding-b',
+            })
+          ).toThrow('CREDENTIAL_PROVENANCE_DENIED');
+          expect(() =>
+            resolveTaskServiceCredential('SLACK_TOKEN', { ...source, sourceOwnerRef: 'user:alice' })
+          ).toThrow('CREDENTIAL_PROVENANCE_DENIED');
+        }
+      );
+      withTaskCredentialBinding(
+        { tenantSlug: 'alpha', secrets: { SLACK_TOKEN: 'synthetic' } },
+        () => {
+          expect(() => resolveTaskServiceCredential('SLACK_TOKEN', source)).toThrow(
+            'CREDENTIAL_PROVENANCE_DENIED'
+          );
+        }
+      );
+    }));
+  it('keeps personally allocated secrets out of generic and provider consumption', () =>
+    tenant('alpha', () => {
+      const allocated = { ...source, sourceOwnerRef: 'user:alice', allocationGrantId: 'grant-1' };
+      const binding = {
+        tenantSlug: 'alpha',
+        secrets: { SLACK_TOKEN: 'allocated' },
+        secretProvenance: { SLACK_TOKEN: allocated },
+      };
+      withTaskCredentialBinding(binding, () => {
+        expect(resolveTaskCredential('SLACK_TOKEN')).toBeNull();
+        expect(selectProviderCredential(['SLACK_TOKEN'], 'operator-fallback')).toBeUndefined();
+        expect(() => resolveTaskServiceCredential('SLACK_TOKEN', source)).toThrow(
+          'CREDENTIAL_PROVENANCE_DENIED'
+        );
+        expect(resolveTaskServiceCredential('SLACK_TOKEN', allocated)).toBe('allocated');
+      });
+      expect(() =>
+        withTaskCredentialBinding(
+          { ...binding, secrets: { SLACK_TOKEN: 'allocated', OTHER_TOKEN: 'allocated' } },
+          () => {}
+        )
+      ).toThrow('unscoped alias');
+      expect(() =>
+        withTaskCredentialBinding(
+          {
+            ...binding,
+            providerEnvironments: { provider: { HOME: providerHome, TOKEN: 'allocated' } },
+          },
+          () => {}
+        )
+      ).toThrow('provider environment');
+    }));
+
+  it('snapshots provenance, checks freshness, and forbids nested source reassignment', () =>
+    tenant('alpha', () => {
+      let valid = true;
+      const evidence = { ...source };
+      const validate = () => {
+        if (!valid) throw new Error('revoked');
+      };
+      const binding = {
+        tenantSlug: 'alpha',
+        secrets: { SLACK_TOKEN: 'synthetic' },
+        secretProvenance: { SLACK_TOKEN: evidence },
+        validate,
+      };
+      withTaskCredentialBinding(binding, () => {
+        evidence.serviceBindingId = 'changed';
+        expect(resolveTaskServiceCredential('SLACK_TOKEN', source)).toBe('synthetic');
+        expect(() => withTaskCredentialBinding(binding, () => {})).toThrow('may only narrow');
+        withTaskCredentialBinding({ ...binding, secrets: {}, secretProvenance: {} }, () => {
+          expect(() => resolveTaskServiceCredential('SLACK_TOKEN', source)).toThrow(
+            'CREDENTIAL_PROVENANCE_DENIED'
+          );
+        });
+        valid = false;
+        expect(() => resolveTaskServiceCredential('SLACK_TOKEN', source)).toThrow('revoked');
+      });
+    }));
 });

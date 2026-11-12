@@ -242,8 +242,8 @@ describe('authority branch coverage', () => {
       return '{}';
     });
 
-    const { inferPersonaFromRole } = await import('./authority.js');
-    expect(inferPersonaFromRole('mission_controller')).toBe('analyst');
+    const { inferBaseRoleFromRole } = await import('./authority.js');
+    expect(inferBaseRoleFromRole('mission_controller')).toBe('analyst');
   });
 
   it('handles malformed grants file without throwing', async () => {
@@ -269,9 +269,9 @@ describe('authority branch coverage', () => {
       p.endsWith('/missions/MSN-MALFORMED/mission-state.json') ? '[]' : '[]'
     );
 
-    const { inferPersonaFromRole, resolveIdentityContext } = await import('./authority.js');
+    const { inferBaseRoleFromRole, resolveIdentityContext } = await import('./authority.js');
     expect(resolveIdentityContext().baseRole).toBe('unknown');
-    expect(inferPersonaFromRole('unmapped_role')).toBe('unknown');
+    expect(inferBaseRoleFromRole('unmapped_role')).toBe('unknown');
   });
 
   it('does not accept arbitrary personas or authorities from malformed records', async () => {
@@ -295,9 +295,9 @@ describe('authority branch coverage', () => {
       return JSON.stringify({ authority_roles: { malformed_role: { default_persona: [] } } });
     });
 
-    const { inferPersonaFromRole, resolveIdentityContext } = await import('./authority.js');
+    const { inferBaseRoleFromRole, resolveIdentityContext } = await import('./authority.js');
     expect(resolveIdentityContext().authorities).toEqual([]);
-    expect(inferPersonaFromRole('malformed_role')).toBe('unknown');
+    expect(inferBaseRoleFromRole('malformed_role')).toBe('unknown');
   });
 
   it('buildExecutionEnv keeps existing persona when explicit persona is unknown', async () => {
