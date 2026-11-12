@@ -471,6 +471,20 @@
       "not_to_confuse_with": ["outcome", "artifact", "delivery"]
     },
     {
+      "id": "coordination-act",
+      "term": "Coordination Act",
+      "aliases": ["speech act", "performative"],
+      "category": "execution",
+      "definition": "One of the eight speech acts agents and runtimes exchange (request, propose, accept, reject, inform, query, result, handoff); each layer's own message kinds map onto them, and no act carries execution authority.",
+      "glossary_anchor": "coordination-act",
+      "canonical_doc": "knowledge/product/architecture/agent-communication-layer-model.md#11-coordination-acts",
+      "owner_modules": [
+        "libs/core/foundation/coordination-act.ts",
+        "libs/core/mesh/coordination-act-map.ts"
+      ],
+      "not_to_confuse_with": ["result", "delivery", "task-contract"]
+    },
+    {
       "id": "memory-candidate",
       "term": "Memory Candidate",
       "category": "governance",
