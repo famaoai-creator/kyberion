@@ -5,6 +5,8 @@ import {
   type ApprovalRequestRecord,
 } from '@agent/core/governance/approval-store';
 import { withAuthenticatedPersonalApprovals } from '@agent/core/governance/authenticated-personal-approvals';
+import { inspectInstalledOnboardingRuntime } from '@agent/core/organization/onboarding-runtime-identity';
+import { viewerPersonIds } from '@agent/core/surface/surface-authorization';
 import { asOnboardingOwner, onboardingAuthorityPrincipal } from './onboarding-authority-server';
 import type { ConciergeViewerContext } from './viewer-context';
 
@@ -52,4 +54,22 @@ export function conciergeApprovalSnapshot(viewer: ConciergeViewerContext): Appro
   for (const record of [...ordinary, ...personal])
     unique.set(`${record.storageChannel ?? record.channel}/${record.id}`, record);
   return [...unique.values()];
+}
+
+/**
+ * The viewer's person ids for row-custody admission. Person-scope records in
+ * the personal partition name the installed agent's NHI (`scope.nhi_id`), so
+ * the proven installation owner's id set additionally binds that NHI —
+ * without it the owner's own personal approvals read as another person's
+ * records and every viewer-scoped summary drops them. The NHI is added only
+ * when the full owner proof (`withConciergePersonalApprovals`) passes, so a
+ * foreign viewer never gains custody of the installation's records.
+ */
+export function conciergeViewerPersonIds(viewer: ConciergeViewerContext): readonly string[] {
+  const ids = new Set(viewerPersonIds(viewer));
+  const installed = withConciergePersonalApprovals(viewer, () =>
+    inspectInstalledOnboardingRuntime({ kind: 'person' })
+  );
+  if (installed?.ready && installed.agentId) ids.add(installed.agentId);
+  return [...ids];
 }
