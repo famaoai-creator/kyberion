@@ -94,20 +94,34 @@ Restore the policy with a router, never alone.
 
 ## Mesh message broker, delivery driver and peer coordination responder (2026-11-12)
 
-`agent-communication-layer-model.md` §9 recorded the broker as half-retired on 2026-10-31: a
-durable delivery journal and a driver that claimed due deliveries, with no production caller of
-`acceptMeshRequest` / `enqueueMeshDelivery`, so the queue was always empty. The producer and
-driver path is retired here. What stays is the read side: `inspectMeshHub` still reads
-`deliveries.jsonl` / `dead-letter.jsonl` (the reader now lives in `mesh-hub-inspection.ts`), so
-`mesh-hub inspect` and the doctor "Mesh delivery" line report rows an older runtime root may
-hold. `MeshDeliveryRecord`, `MESH_DELIVERY_STATUSES` and `mesh-delivery-record.schema.json` stay
-as mesh contract vocabulary. Restore the broker together with a producer, never alone.
+The two retirements have different reasons. Keep them apart when you consider restoring either.
 
-The peer coordination responder let a signed peer envelope run `claimWorkItem` /
-`handoffWorkItem` / `updateWorkItem` with no local acceptance. No listener ever installed it.
-The governed route from a peer to a WorkItem is the typed peer task
-(`libs/core/mesh/peer-task-exchange.ts`: receipt → local accept → `source: peer` WorkItem). Do
-not restore the responder; extend the peer task catalog instead.
+**Peer coordination responder: retired by design.** It let a signed peer envelope run
+`claimWorkItem` / `handoffWorkItem` / `updateWorkItem` with no local acceptance. A valid
+signature proves possession of a peer secret; it is not the recipient's acceptance and not
+execution authority (`agent-communication-layer-model.md` §5). The responder would be wrong even
+with traffic. That no listener ever installed it only made the removal safe. The governed route
+from a peer to a WorkItem is the typed peer task (`libs/core/mesh/peer-task-exchange.ts`:
+receipt → local accept → `source: peer` WorkItem). Do not restore the responder; extend the peer
+task catalog instead.
+
+**Mesh broker and delivery driver: the implementation is retired, the need is not.** The broker
+kept a delivery ledger with retry, backoff and dead-lettering, and the driver claimed due
+deliveries. Cross-runtime messages need exactly that: a peer on another host is sometimes
+unreachable, and a sent message must end in a recorded outcome. But the broker was a second
+ledger beside the peer-messaging outbox, and no production code called `acceptMeshRequest` /
+`enqueueMeshDelivery`, so no real message ever passed through it (recorded as half-retired on
+2026-10-31). The live send path (`sendPeerMessage`) still posts once and records a failure in
+`outbox.jsonl` without retrying; only auto replies retry by themselves, and a peer task proposal
+is resent by hand. This is an open design gap, listed in `agent-communication-layer-model.md`
+§9. Close it in the peer-messaging outbox, where message ids are stable and the receiver already
+deduplicates, not by restoring a second ledger.
+
+What stays is the read side: `inspectMeshHub` still reads `deliveries.jsonl` /
+`dead-letter.jsonl` (the reader now lives in `mesh-hub-inspection.ts`), so `mesh-hub inspect`
+and the doctor "Mesh delivery" line report rows an older runtime root may hold.
+`MeshDeliveryRecord`, `MESH_DELIVERY_STATUSES` and `mesh-delivery-record.schema.json` stay as
+mesh contract vocabulary.
 
 | Retired path                                            | Original path                                                    | Reason                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | ------------------------------------------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

@@ -193,14 +193,27 @@ Runtime stores are relative to the runtime root and partitioned by tenant where 
 - **A2A bridge vs agent execution port**: both reach a provider agent through the supervisor. The bridge carries signed envelopes and a conversation transcript; the port carries a typed task with a receipt and WorkItem lease authority. Choose the port for a delegated task that has a WorkItem, the bridge for a conversational ask. Do not add a third path.
 - **A2A bridge vs peer messaging**: A2A stays inside one runtime (orchestrator ↔ spawned agents); peer messaging crosses runtimes. The names suggest overlap; the trust boundary does not. Keep them separate.
 - **A2A bridge vs network actuator A2A file drop**: the same name for two unconnected mechanisms. The file drop needs a decision: connect it to a consumer or retire the ops through the actuator contract ceremony.
-- **Mission coordination bus**: either give it a reader (worker inbox, review projection) or stop writing it. Until then do not build on `getInbox` as if messages were delivered.
+- **Mission coordination bus**: a record, not a delivery path; see the open design gaps below. Do not build on `getInbox` as if messages were delivered.
 - **ACP mediator** is a provider transport, not a coordination layer; list it under agent lifecycle rather than messaging in future maps.
 
 ### Mesh broker and peer coordination responder (retired 2026-11-12)
 
-The 2026-10-31 map recorded the Mesh message broker as half-retired: readers and a delivery driver were wired, and no production code called `acceptMeshRequest` / `enqueueMeshDelivery`. The producer and driver path is now retired: `mesh-message-broker.ts`, `mesh-delivery-driver.ts`, `scripts/mesh_delivery_driver.ts` (the `mesh deliver` CLI command), `pipelines/mesh-delivery.json` with its op `core:run_mesh_delivery`, and two adapter methods with no production caller left: `dispatchToPeer` (called only by the delivery driver) and `createResponder` (test callers only). `inspectMeshHub` keeps the ledger reader so existing rows stay visible. `MeshDeliveryRecord` and `mesh-delivery-record.schema.json` stay as mesh contract vocabulary.
+The two retirements have different reasons.
 
-`workforce/work-coordination-peer.ts` was retired in the same change. Its responder let a signed peer envelope claim, hand off or update a WorkItem directly, with no local acceptance, which contradicts §5; no listener ever installed it. Peer-requested work goes through typed peer tasks. See [`retired/README.md`](../../../retired/README.md#mesh-message-broker-delivery-driver-and-peer-coordination-responder-2026-11-12) before restoring any of it.
+`workforce/work-coordination-peer.ts` is retired by design. Its responder let a signed peer envelope claim, hand off or update a WorkItem directly, with no local acceptance. That contradicts §5: authentication is not recipient acceptance and not execution authority. It would be wrong even with traffic; that no listener ever installed it only made the removal safe. Peer-requested work goes through typed peer tasks.
+
+The Mesh message broker is retired as an implementation; the capability it was built for is still required. The 2026-10-31 map recorded it as half-retired: readers and a delivery driver were wired, and no production code called `acceptMeshRequest` / `enqueueMeshDelivery`. It was a second delivery ledger beside the peer-messaging outbox, and no real message ever passed through it. Retired with it: `mesh-message-broker.ts`, `mesh-delivery-driver.ts`, `scripts/mesh_delivery_driver.ts` (the `mesh deliver` CLI command), `pipelines/mesh-delivery.json` with its op `core:run_mesh_delivery`, and two adapter methods with no production caller left: `dispatchToPeer` (called only by the delivery driver) and `createResponder` (test callers only). `inspectMeshHub` keeps the ledger reader so existing rows stay visible. `MeshDeliveryRecord` and `mesh-delivery-record.schema.json` stay as mesh contract vocabulary.
+
+See [`retired/README.md`](../../../retired/README.md#mesh-message-broker-delivery-driver-and-peer-coordination-responder-2026-11-12) before restoring any of it.
+
+### Open design gaps (2026-11-12)
+
+Judged against §5 and §7 rather than against current usage, the layers above leave these gaps. Each needs a decision or an implementation; none is closed by a retirement.
+
+- **Peer delivery has no retry.** §7 asks every transport for acknowledgement, idempotency, expiry and failure recovery. `sendPeerMessage` posts once with a timeout and records a failed row in `outbox.jsonl`. The receiver answers `retryable` with a wait time; the sender does not act on it. Only auto replies retry by themselves; a peer task proposal is resent by hand. A message to an unreachable peer therefore ends as a failed row nobody acts on. Retry, backoff and a terminal state belong in the peer-messaging outbox: message ids are stable and the receiver already deduplicates.
+- **The mission coordination bus is written and never read.** Workers receive their task through the agent execution port, and the owner dispatches and reviews directly, which matches the rule that workers act through task contracts. The bus should be named and typed as the record it is, without an inbox and acknowledgement API that suggests delivery.
+- **One speech act, several vocabularies.** Request, proposal, acceptance, rejection, result and handoff are declared separately by the A2A `performative`, the peer message `type`, the Mesh request kind, the Co-Session handoff kind, the mission bus channel and the agent task envelope. §7 asks new transports to reuse typed vocabulary; nothing maps or checks the existing ones.
+- **"A2A" names three unconnected things**: the in-runtime bridge between a parent and its provider agents (§3 D), the network actuator file drop, and the `a2a-message` payload stored with a Mesh proposal. Only the first carries traffic.
 
 ### Mesh-hub topic residue (decided 2026-10-31)
 
