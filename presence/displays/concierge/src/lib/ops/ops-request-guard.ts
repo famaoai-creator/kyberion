@@ -11,31 +11,30 @@
  */
 import { NextResponse, type NextRequest } from 'next/server';
 import { consumeTenantBudget } from '@agent/core/organization/tenant-rate-limiter';
-import type { ChronosAccessRole } from '@agent/core/chronos-access-registry';
-import { isSameOriginMutation } from '@agent/core/surface/surface-session-cookie';
+import type { SurfaceViewerRole } from '@agent/core/surface/surface-authorization';
 import { requireConciergeMutationAccess } from '../api-guard';
+import { crossOriginCookieMutation } from '../cross-origin-cookie';
 import {
-  conciergeCredential,
   guardConciergeRequest,
-  resolveConciergeViewerContext,
+  resolveConciergeViewerContextOnce,
   type ConciergeViewerContext,
 } from '../viewer-context';
 
-export type OpsAccessRole = ChronosAccessRole;
+export type OpsAccessRole = SurfaceViewerRole;
 
 const UNAUTHORIZED_MESSAGE = 'Unauthorized. Sign in to Concierge or present a viewer token.';
-const resolvedViewers = new WeakMap<object, ConciergeViewerContext | null>();
 
+/**
+ * One viewer resolution per request, shared by both gates here and by the
+ * route's later `resolveOpsViewerForRequest` (the memo lives in
+ * `viewer-context`). A request without an admissible viewer reads as null.
+ */
 function resolveOpsViewerOnce(req: NextRequest): ConciergeViewerContext | null {
-  if (resolvedViewers.has(req)) return resolvedViewers.get(req) ?? null;
-  let viewer: ConciergeViewerContext | null = null;
   try {
-    viewer = resolveConciergeViewerContext(req);
+    return resolveConciergeViewerContextOnce(req);
   } catch {
-    viewer = null;
+    return null;
   }
-  resolvedViewers.set(req, viewer);
-  return viewer;
 }
 
 /** The viewer's access role, or null when the request carries no admissible viewer. */
@@ -57,28 +56,6 @@ function unauthorized(): NextResponse {
 function isUnsafeMethod(req: NextRequest): boolean {
   const method = (req.method || 'GET').toUpperCase();
   return method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS';
-}
-
-/**
- * A cookie rides along on cross-site requests, so a cookie-borne unsafe
- * request must be same-origin. Header credentials skip the check.
- */
-function crossOriginCookieMutation(req: NextRequest): NextResponse | null {
-  if (!isUnsafeMethod(req)) return null;
-  if (conciergeCredential(req).source !== 'session-cookie') return null;
-  if (
-    isSameOriginMutation({
-      method: req.method,
-      headers: req.headers,
-      expectedHost: req.headers.get('host') ?? new URL(req.url).host,
-    })
-  ) {
-    return null;
-  }
-  return NextResponse.json(
-    { ok: false, error: 'Forbidden. Cross-origin session request.' },
-    { status: 403 }
-  );
 }
 
 /**

@@ -9,9 +9,12 @@ const mocks = vi.hoisted(() => ({
   consumeTenantBudget: vi.fn(() => ({ allowed: true })),
 }));
 
+// The gates resolve through the per-request memo in viewer-context
+// (`resolveConciergeViewerContextOnce`); the memo itself is covered in
+// viewer-context.test.ts.
 vi.mock('../viewer-context', () => ({
   guardConciergeRequest: mocks.guardConciergeRequest,
-  resolveConciergeViewerContext: mocks.resolveConciergeViewerContext,
+  resolveConciergeViewerContextOnce: mocks.resolveConciergeViewerContext,
   conciergeCredential: mocks.conciergeCredential,
 }));
 vi.mock('../api-guard', () => ({
@@ -130,12 +133,13 @@ describe('operations request gates (Concierge viewer model)', () => {
     expect(guardOpsRequest(crossOrigin)?.status).toBe(403);
   });
 
-  it('resolves the viewer once per request', () => {
+  it('sends every gate of one request through the per-request viewer memo', () => {
     mocks.resolveConciergeViewerContext.mockReturnValue(viewer('localadmin'));
     const req = request();
     guardOpsRequest(req);
     requireOpsAccess(req, 'readonly');
     getOpsAccessRole(req);
-    expect(mocks.resolveConciergeViewerContext).toHaveBeenCalledTimes(1);
+    expect(mocks.resolveConciergeViewerContext.mock.calls.every(([arg]) => arg === req)).toBe(true);
+    expect(mocks.resolveConciergeViewerContext).toHaveBeenCalledTimes(3);
   });
 });

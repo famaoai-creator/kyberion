@@ -327,32 +327,54 @@ export function requirePresenceStudioLocalAdmin(viewer: PresenceStudioViewerCont
   }
 }
 
-export function presenceStudioHeadlessScope(viewer: PresenceStudioViewerContext) {
+/**
+ * The one derivation every Presence Studio projection below shares: a
+ * loopback session is the local operator (localadmin, all tiers); a token
+ * viewer is readonly and never reaches the personal tier.
+ */
+function presenceStudioRoleAndTiers(
+  viewer: PresenceStudioViewerContext
+): Pick<SurfaceViewerScope, 'role' | 'tierAccess'> {
+  return viewer.source === 'loopback'
+    ? { role: 'localadmin', tierAccess: ['personal', 'confidential', 'public'] }
+    : { role: 'readonly', tierAccess: ['confidential', 'public'] };
+}
+
+/** Organization / project lists: the viewer's own, else the principal's, else unrestricted. */
+function presenceStudioScopeLists(
+  viewer: PresenceStudioViewerContext
+): Pick<SurfaceViewerScope, 'organizationIds' | 'projectIds'> {
   return {
-    role: viewer.source === 'loopback' ? ('localadmin' as const) : ('readonly' as const),
+    organizationIds: viewer.organizationIds ?? viewer.principal?.organizationIds ?? 'all',
+    projectIds: viewer.projectIds ?? viewer.principal?.projectIds ?? 'all',
+  };
+}
+
+/**
+ * The headless scope does not carry the viewer's organization / project
+ * lists (always `'all'`), unlike the two projections below.
+ */
+export function presenceStudioHeadlessScope(viewer: PresenceStudioViewerContext) {
+  const { role, tierAccess } = presenceStudioRoleAndTiers(viewer);
+  return {
+    role,
     principal_id: viewer.principalId,
     tenant_slugs: viewer.tenantSlugs,
     organization_ids: 'all' as const,
     project_ids: 'all' as const,
-    tier_access:
-      viewer.source === 'loopback'
-        ? ['personal', 'confidential', 'public']
-        : ['confidential', 'public'],
+    tier_access: tierAccess,
   };
 }
 
 export function toSurfaceAuthorizationContext(
   viewer: PresenceStudioViewerContext
 ): SurfaceAuthorizationContext {
+  const { role, tierAccess } = presenceStudioRoleAndTiers(viewer);
   return {
-    role: viewer.source === 'loopback' ? 'localadmin' : 'readonly',
+    role,
     tenantSlugs: viewer.tenantSlugs,
-    organizationIds: viewer.organizationIds ?? viewer.principal?.organizationIds ?? 'all',
-    projectIds: viewer.projectIds ?? viewer.principal?.projectIds ?? 'all',
-    tierAccess:
-      viewer.source === 'loopback'
-        ? ['personal', 'confidential', 'public']
-        : ['confidential', 'public'],
+    ...presenceStudioScopeLists(viewer),
+    tierAccess,
     principalId: viewer.principalId,
     source: viewer.source,
     ...(viewer.principal ? { principal: viewer.principal } : {}),
@@ -370,15 +392,12 @@ export function toSurfaceAuthorizationContext(
 export function toFrontDeskViewerScope(
   viewer: PresenceStudioViewerContext
 ): SurfaceViewerScope & { principal?: ResolvedPrincipal } {
+  const { role, tierAccess } = presenceStudioRoleAndTiers(viewer);
   return {
-    role: viewer.source === 'loopback' ? 'localadmin' : 'readonly',
+    role,
     tenantSlugs: viewer.tenantSlugs,
-    organizationIds: viewer.organizationIds ?? viewer.principal?.organizationIds ?? 'all',
-    projectIds: viewer.projectIds ?? viewer.principal?.projectIds ?? 'all',
-    tierAccess:
-      viewer.source === 'loopback'
-        ? ['personal', 'confidential', 'public']
-        : ['confidential', 'public'],
+    ...presenceStudioScopeLists(viewer),
+    tierAccess,
     source: viewer.source,
     principalId: viewer.principalId,
     ...(viewer.principal ? { principal: viewer.principal } : {}),

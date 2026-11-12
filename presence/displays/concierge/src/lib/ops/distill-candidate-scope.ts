@@ -20,7 +20,7 @@ import { memoryCandidateVisibleToViewer } from './knowledge-scope';
 import { admitsScopeAudience, viewerPersonIds } from '@agent/core/surface/surface-authorization';
 import {
   viewerCanReadTier,
-  defaultTierAccess,
+  withOpsViewerDefaults,
   strictViewerScopeOrganizationIds,
   strictViewerScopeProjectIds,
   strictViewerScopeTenantSlugs,
@@ -68,7 +68,7 @@ export function distillCandidateVisibleToViewer(
   const scope = candidate.scope ?? legacyScope(candidate);
   if (!viewerCanReadTier(viewer, scope.tier)) return false;
   if (requestedTenant && scope.tenant_slug !== requestedTenant) return false;
-  const tiers = viewer.tierAccess ?? defaultTierAccess(viewer.role);
+  const tiers = withOpsViewerDefaults(viewer).tierAccess;
   if (scope.tier === 'personal' || !tiers.includes(scope.tier)) return false;
   if (candidate.tier && candidate.tier !== scope.tier) return false;
   // Custody admission plus the record's own audience grant: person custody
@@ -115,9 +115,7 @@ export function listDistillCandidatesForViewer(
     tenantSlugs,
     organizationIds: strictViewerScopeOrganizationIds(viewer),
     projectIds: strictViewerScopeProjectIds(viewer),
-    tierAccess: (viewer.tierAccess ?? defaultTierAccess(viewer.role)).filter(
-      (tier) => tier !== 'personal'
-    ),
+    tierAccess: withOpsViewerDefaults(viewer).tierAccess.filter((tier) => tier !== 'personal'),
   });
   return [...listDistillCandidateRecords(), ...scoped].filter((candidate) =>
     distillCandidateVisibleToViewer(candidate, viewer, requestedTenant)

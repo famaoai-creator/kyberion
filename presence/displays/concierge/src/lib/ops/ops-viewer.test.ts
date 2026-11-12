@@ -19,11 +19,17 @@ import {
   strictViewerScopeTenantSlugs,
   strictViewerTier,
   toSurfaceAuthorizationContext,
+  viewerCanReadTier,
+  viewerErrorResponse,
   viewerScopeTenantSlugs,
+  withOpsViewerDefaults,
   withViewerExecutionContext,
   type ViewerContext,
 } from './ops-viewer';
-import { ConciergeViewerError } from '../viewer-context';
+import {
+  ConciergeViewerError,
+  toSurfaceAuthorizationContext as toConciergeAuthorizationContext,
+} from '../viewer-context';
 
 const scoped: ViewerContext = {
   role: 'readonly',
@@ -83,6 +89,48 @@ describe('operations viewer helpers (one viewer model)', () => {
     expect(
       toSurfaceAuthorizationContext({ ...scoped, tierAccess: undefined }).tierAccess
     ).not.toContain('personal');
+  });
+
+  it('projects through the Concierge projection: personal masked, defaults stated once', () => {
+    // The console projection used to pass an explicit `personal` through; it
+    // now masks it like every other Concierge route.
+    const personal: ViewerContext = {
+      ...scoped,
+      role: 'localadmin',
+      tierAccess: ['personal', 'confidential', 'public'],
+    };
+    expect(toSurfaceAuthorizationContext(personal).tierAccess).toEqual(['confidential', 'public']);
+    expect(viewerCanReadTier(personal, 'personal')).toBe(false);
+    expect(viewerCanReadTier(personal, 'confidential')).toBe(true);
+    expect(() => strictViewerTier(personal, 'personal')).toThrow(ConciergeViewerError);
+    expect(toSurfaceAuthorizationContext(personal)).toEqual(
+      toConciergeAuthorizationContext(withOpsViewerDefaults(personal))
+    );
+    // Omitted lists: unrestricted within the tenant set, role-default tiers.
+    const bare: ViewerContext = { role: 'readonly', tenantSlugs: ['acme'], source: 'token' };
+    expect(withOpsViewerDefaults(bare)).toMatchObject({
+      organizationIds: 'all',
+      projectIds: 'all',
+      tierAccess: ['public', 'confidential'],
+    });
+    // A stated list is never replaced by a default.
+    expect(toSurfaceAuthorizationContext(scoped)).toMatchObject({
+      tenantSlugs: ['acme'],
+      organizationIds: ['org-a'],
+      projectIds: 'all',
+      tierAccess: ['public'],
+    });
+  });
+
+  it('answers with the Concierge error body and the console fallback status', async () => {
+    expect(viewerErrorResponse(new ConciergeViewerError(401, 'unknown')).status).toBe(401);
+    expect(viewerErrorResponse(new ConciergeViewerError(403, 'denied'), 404).status).toBe(404);
+    // No authorization status on the error: the console answers 403, not 500,
+    // and the body's code is the error's own (full table: viewer-error-response.test.ts).
+    const fallback = viewerErrorResponse(new Error('boom'));
+    expect(fallback.status).toBe(403);
+    expect(await fallback.json()).toMatchObject({ ok: false, error_code: 'internal' });
+    expect(viewerErrorResponse(new Error('boom'), 500).status).toBe(500);
   });
 
   it('carries the server-resolved system selection into the authorization context', () => {

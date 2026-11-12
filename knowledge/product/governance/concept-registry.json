@@ -512,6 +512,22 @@
       "canonical_doc": "knowledge/product/architecture/decisions/2026-11-10-concept-model-v2.md",
       "owner_modules": ["libs/core/knowledge/memory-promotion-queue.ts"],
       "not_to_confuse_with": []
+    },
+    {
+      "id": "viewer-context",
+      "term": "Viewer Context",
+      "aliases": ["ViewerContext", "Viewer Scope"],
+      "category": "scope",
+      "definition": "The server-resolved principal and allowed tenant scope.",
+      "glossary_anchor": "viewercontext--viewer-scope",
+      "canonical_doc": "docs/developer/CHRONOS_VIEWER_SCOPE_OPERATIONS.ja.md",
+      "owner_modules": [
+        "libs/core/foundation/surface-viewer-role.ts",
+        "libs/core/surface/surface-viewer-scope-contract.ts",
+        "libs/core/surface/surface-authorization.ts",
+        "presence/displays/concierge/src/lib/viewer-context.ts"
+      ],
+      "not_to_confuse_with": ["member-role", "authority-role", "entity-scope"]
     }
   ]
 }
