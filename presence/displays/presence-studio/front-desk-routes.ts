@@ -22,7 +22,6 @@ import {
 } from '@agent/core/organization/member-registry';
 import {
   FRONT_DESK_HELP_LINK,
-  readAvailableFrontDeskSurfaces,
   frontDeskRoleFromViewer,
   readFrontDeskSurfacePorts,
   readFrontDeskSurfaceUrls,
@@ -150,7 +149,7 @@ export function registerFrontDeskRoutes(app: express.Express): void {
   // FD-00 / FD-01: the shared front-desk rail reads its menu + labels from
   // here so presence-studio and concierge never drift (libs/core/surface/front-desk-nav.ts
   // is the shared existing-feature catalog).
-  app.get('/api/front-desk/nav', async (req, res) => {
+  app.get('/api/front-desk/nav', (req, res) => {
     try {
       const resolved = resolvePresenceStudioViewerContext(req);
       const requestedTenant = readSurfaceStringParam(req.query.tenant) || undefined;
@@ -163,7 +162,6 @@ export function registerFrontDeskRoutes(app: express.Express): void {
       const role = resolvePresenceStudioNavRole(viewer);
       const items = resolveFrontDeskMenu({
         currentSurface: 'presence-studio',
-        availableSurfaces: await readAvailableFrontDeskSurfaces(),
         ports: readFrontDeskSurfacePorts(),
         urls: readFrontDeskSurfaceUrls(),
         role,
