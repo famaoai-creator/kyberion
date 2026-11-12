@@ -24,7 +24,7 @@ Intent, Plan, Result, Mission, Task Session, and Artifact are the words the firs
 | Intent               | The human request expressed in natural language.                                                                                                                           |
 | Resolution           | The structured interpretation of an intent.                                                                                                                                |
 | Plan                 | A human-readable execution summary.                                                                                                                                        |
-| Result               | The user-facing outcome of execution.                                                                                                                                      |
+| Result               | The user-facing account of an outcome, outputs, verification evidence, delivery state and remaining work.                                                                  |
 | Mission              | A bounded unit of work with lifecycle state and evidence.                                                                                                                  |
 | Task Session         | A lighter-weight durable work record for conversational work that does not need a mission.                                                                                 |
 | Artifact             | The concrete output of work.                                                                                                                                               |
@@ -211,7 +211,7 @@ A short human-readable execution summary such as `PDF を解析 -> レイアウ�
 
 ### Result
 
-The user-facing outcome of execution: an answer, artifact, approval request, or concrete next step.
+The user-facing account of an outcome, outputs, verification evidence, delivery state and remaining work. A Result can be an answer, an incomplete report or a request for a decision; it does not itself claim successful completion. See the [outcome model](../knowledge/product/architecture/organization-work-loop.md#92-outcome-artifact-evidence-delivery-and-result).
 
 ### Operator Interaction Packet
 
@@ -235,11 +235,15 @@ The long-lived container of meaning around a body of work. A project can own rep
 
 ### Outcome
 
-The structured result Kyberion is trying to return for a request, such as `artifact:pptx`, `service_summary`, `browser_navigation`, or `knowledge_answer`.
+The intended result of work, expressed as a requested result and success criteria. `outcome-catalog.json` names reusable output patterns; `OutcomeContract` specializes a pattern for a request. An output kind such as `pptx` is not the success criterion.
 
 ### Artifact
 
-The concrete output of work: a file, summary, delivery record, approval record, or other governed result object.
+The concrete output of work. It can be a file, structured object or external reference. Its role can be primary output, specification or evidence: a screenshot is an Artifact and may support an Evidence claim. Having an artifact reference alone proves neither verification nor delivery.
+
+### Delivery
+
+The transport of an artifact or response to a named destination, with a separately recorded delivery state. A Delivery Pack groups material for delivery; creating the pack is not a delivery receipt. A successful send does not prove human readership or acceptance.
 
 ### Project Operating System
 
@@ -541,7 +545,7 @@ Two distinct, non-interchangeable role concepts that are easy to conflate (the o
 
 ### Evidence
 
-The accountability substrate that links results back to source context, execution path, artifacts, approvals, and policy-relevant decisions.
+Recorded support for a claim about work, linked to its context, source and verification method. Verification evidence names the success criterion it supports; worker-reported checks remain reports until the existing verification/review gate accepts them. Evidence can refer to an Artifact, execution trace, review or approval record.
 
 ### Delivery Actuator
 

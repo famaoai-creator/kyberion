@@ -1,7 +1,7 @@
 {
   "$schema": "../schemas/concept-registry.schema.json",
   "manifest_version": 1,
-  "last_reviewed": "2026-11-10",
+  "last_reviewed": "2026-11-12",
   "purpose": "One registered definition, canonical document, glossary entry and owner per high-confusion Kyberion term. A term or alias may belong to exactly one entry; a homonym is declared through `senses`. The concept-registry gate (scripts/check_concept_registry.ts) enforces this file against docs/GLOSSARY.md, docs/documentation-source-map.json and doc_status frontmatter. Workflow: knowledge/product/governance/concept-registry-workflow.md.",
   "terms": [
     {
@@ -416,6 +416,59 @@
         "libs/core/intent/intent-resolver-entry.ts"
       ],
       "not_to_confuse_with": ["execution-shape"]
+    },
+    {
+      "id": "outcome",
+      "term": "Outcome",
+      "category": "execution",
+      "definition": "The intended result of work, expressed as a requested result and success criteria.",
+      "glossary_anchor": "outcome",
+      "canonical_doc": "knowledge/product/architecture/organization-work-loop.md#92-outcome-artifact-evidence-delivery-and-result",
+      "owner_modules": ["libs/core/task/outcome-contract.ts"],
+      "not_to_confuse_with": ["result", "artifact"]
+    },
+    {
+      "id": "artifact",
+      "term": "Artifact",
+      "category": "execution",
+      "definition": "The concrete output of work.",
+      "glossary_anchor": "artifact",
+      "canonical_doc": "knowledge/product/architecture/organization-work-loop.md#92-outcome-artifact-evidence-delivery-and-result",
+      "owner_modules": ["libs/core/workforce/artifact-record.ts"],
+      "not_to_confuse_with": ["outcome", "evidence", "delivery"]
+    },
+    {
+      "id": "evidence",
+      "term": "Evidence",
+      "category": "execution",
+      "definition": "Recorded support for a claim about work, linked to its context, source and verification method.",
+      "glossary_anchor": "evidence",
+      "canonical_doc": "knowledge/product/architecture/organization-work-loop.md#92-outcome-artifact-evidence-delivery-and-result",
+      "owner_modules": ["libs/core/task/outcome-result.ts"],
+      "not_to_confuse_with": ["artifact", "result"]
+    },
+    {
+      "id": "delivery",
+      "term": "Delivery",
+      "category": "execution",
+      "definition": "The transport of an artifact or response to a named destination, with a separately recorded delivery state.",
+      "glossary_anchor": "delivery",
+      "canonical_doc": "knowledge/product/architecture/organization-work-loop.md#92-outcome-artifact-evidence-delivery-and-result",
+      "owner_modules": [
+        "libs/core/surface/surface-delivery.ts",
+        "libs/core/workforce/artifact-record.ts"
+      ],
+      "not_to_confuse_with": ["artifact", "result"]
+    },
+    {
+      "id": "result",
+      "term": "Result",
+      "category": "execution",
+      "definition": "The user-facing account of an outcome, outputs, verification evidence, delivery state and remaining work.",
+      "glossary_anchor": "result",
+      "canonical_doc": "knowledge/product/architecture/organization-work-loop.md#92-outcome-artifact-evidence-delivery-and-result",
+      "owner_modules": ["libs/core/task/outcome-result.ts", "libs/core/task/task-session.ts"],
+      "not_to_confuse_with": ["outcome", "artifact", "delivery"]
     },
     {
       "id": "memory-candidate",
