@@ -39,14 +39,14 @@ import {
 } from '../secure-io.js';
 
 /** Peer envelope types; each maps to a coordination act in `coordination-act-map.ts`. */
-export const PEER_MESSAGE_TYPES = [
+export const PEER_MESSAGE_TYPES = Object.freeze([
   'request',
   'reply',
   'notification',
   'handoff',
   'capability_query',
   'capability_response',
-] as const;
+] as const);
 export type PeerMessageType = (typeof PEER_MESSAGE_TYPES)[number];
 
 export interface PeerMessageEnvelope<TPayload = unknown> {

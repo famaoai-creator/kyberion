@@ -3,12 +3,18 @@
  * coordination acts (`libs/core/foundation/coordination-act.ts`).
  *
  * This is a mapping, not a wire format: no layer's members, envelopes, stored
- * rows, schemas or signed payloads change. Each table is a
- * `Record<LayerKind, CoordinationActMapping>`, so the compiler rejects a table
- * that misses a kind or names one the layer does not have; for layers that
- * export a const array, `tests/coordination-act-boundary.test.ts` repeats the
- * check at runtime and also fails when a communication module declares a new
- * act-like union without registering here.
+ * rows, schemas or signed payloads change. Each table is built from a
+ * `Record<LayerKind, CoordinationActMapping>` literal, so `tsc` rejects a table
+ * that misses a kind of its key type, adds a kind, or targets a non-act. The
+ * key type is the layer's own union, except for the two hand-written key sets
+ * noted below. `tests/coordination-act-boundary.test.ts` adds runtime checks
+ * for the layers that export a const array, and scans the communication
+ * directories for unregistered act-like declarations. Agent-communication
+ * model §11.2 lists exactly what is and is not covered.
+ *
+ * Tables follow rule A (`propose` only where a separate recipient decision is
+ * recorded) and rule B (the innermost typed layer names the act; outer
+ * envelope kinds are carriers); see `coordination-act.ts`.
  *
  * Only type imports from the layers, so this module adds no runtime edge and
  * no import cycle. Its only consumer today is the gate; nothing routes on it.
@@ -50,18 +56,36 @@ function actTable<K extends string>(table: Record<K, CoordinationActMapping>): A
   return Object.freeze(table);
 }
 
-/** In-runtime A2A bridge envelope `header.performative` (the A2A mechanism that carries traffic). */
+const SENDER_LABEL = notACoordinationAct(
+  'sender-chosen label: the bridge does not interpret the performative and runs every verified envelope as an ask'
+);
+
+/**
+ * In-runtime A2A bridge envelope `header.performative` (the A2A mechanism that
+ * carries traffic). `A2ABridge.route()` never branches on the performative:
+ * every envelope that passes the sender, signature and delegation-chain checks
+ * becomes a prompt and runs under the sender's authority. The mapped members
+ * therefore name what the sender meant; the bridge treats all of them the same
+ * on receipt. `propose`, `accept` and `reject` would claim a recipient
+ * decision that does not exist here, so they are labels, not acts.
+ */
 export const A2A_PERFORMATIVE_ACTS = actTable<A2APerformative>({
   request: 'request',
-  propose: 'propose',
+  propose: SENDER_LABEL,
   inform: 'inform',
-  accept: 'accept',
-  reject: 'reject',
+  accept: SENDER_LABEL,
+  reject: SENDER_LABEL,
   query: 'query',
   result: 'result',
 });
 
-/** Runtime ↔ runtime signed peer envelope `type`. */
+/**
+ * Runtime ↔ runtime signed peer envelope `type`. This mapping applies only
+ * when the peer envelope is the innermost typed layer (a direct `peer send`).
+ * Otherwise the envelope is a carrier (rule B): peer conversation sends every
+ * message as `type: 'request'` (replies and status included), and the Mesh
+ * workitem command is built as `type: 'request'` too.
+ */
 export const PEER_MESSAGE_TYPE_ACTS = actTable<PeerMessageType>({
   request: 'request',
   reply: 'result',
@@ -72,20 +96,52 @@ export const PEER_MESSAGE_TYPE_ACTS = actTable<PeerMessageType>({
 });
 
 /**
- * Peer conversation transcript `kind`. A typed peer task rides on `handoff`
- * (request) and `status` (result); the task layer below names those acts.
+ * Peer conversation transcript `kind`. By rule B a kind that carries a typed
+ * record is a carrier: `handoff` carries a peer task proposal
+ * (`peer-task-exchange.ts`) or a Mesh collaboration request
+ * (`scripts/peer_conversation_server.ts`), and those records name the act. A
+ * `status` that carries a `peer-task-result` likewise defers to the task layer;
+ * a plain `status` (auto-reply acknowledgement) is `inform`. The listener also
+ * answers a carried proposal with a `reply` / `status` transport receipt
+ * ("pending local acceptance"); that receipt is stage 1–3 evidence, not the
+ * recipient's decision.
  */
 export const PEER_CONVERSATION_MESSAGE_KIND_ACTS = actTable<PeerConversationMessageKind>({
   open: notACoordinationAct('session control: opens a conversation session'),
   message: 'inform',
   reply: 'result',
-  handoff: 'handoff',
+  handoff: notACoordinationAct(
+    'carrier: holds a peer task proposal or a Mesh collaboration request, whose record names the act; not a transfer of responsibility'
+  ),
   close: notACoordinationAct('session control: closes a conversation session'),
   status: 'inform',
 });
 
-/** Mesh Hub allowlisted collaboration request kinds (`MESH_REQUEST_KINDS`). */
-export const MESH_REQUEST_KIND_ACTS = actTable<MeshRequestKind>({
+/**
+ * Mesh Hub recipient records. In v1 every allowlisted collaboration request
+ * travels as a recipient proposal: the adapter stores each kind as a pending
+ * proposal (for non-`workitem.*` kinds `buildA2AProposal` labels the stored
+ * payload `propose`), and only the
+ * recipient's local decision record moves it on. The proposal record is
+ * therefore the `propose`; the decision record carries the `accept` /
+ * `reject` named by `MESH_PROPOSAL_DECISION_ACTS`.
+ */
+export const MESH_RECIPIENT_RECORD_ACTS = actTable<
+  MeshHubRecipientProposalRecord['kind'] | MeshHubRecipientProposalDecision['kind']
+>({
+  'mesh-hub-recipient-proposal': 'propose',
+  'mesh-hub-recipient-proposal-decision': notACoordinationAct(
+    'carrier of the recipient decision; its decision field names accept / reject'
+  ),
+});
+
+/**
+ * Content acts of the Mesh Hub allowlisted request kinds (`MESH_REQUEST_KINDS`):
+ * WHAT a proposal asks for, not how it is delivered. The delivered message is
+ * always the `propose` of `MESH_RECIPIENT_RECORD_ACTS`, so `workitem.claim →
+ * request` does not mean the claim runs without acceptance.
+ */
+export const MESH_REQUEST_KIND_CONTENT_ACTS = actTable<MeshRequestKind>({
   'review.request': 'request',
   'workitem.claim': 'request',
   'workitem.handoff': 'handoff',
@@ -128,7 +184,11 @@ export const MESH_PROPOSAL_DECISION_ACTS = actTable<MeshHubRecipientProposalDeci
   rejected: 'reject',
 });
 
-/** Typed peer task message kinds. */
+/**
+ * Typed peer task message kinds. Hand-written key set: the two kind constants
+ * are separate exports, so a third task message kind would not reach this
+ * table's key type. Compile-time only.
+ */
 export const PEER_TASK_MESSAGE_KIND_ACTS = actTable<
   typeof PEER_TASK_REQUEST_KIND | typeof PEER_TASK_RESULT_KIND
 >({
@@ -171,17 +231,25 @@ export const PEER_TASK_RESULT_STATUS_ACTS = actTable<(typeof PEER_TASK_RESULT_ST
 });
 
 /**
- * `command_type` of the `workitem-command` payload stored with a Mesh Hub
- * recipient proposal: a record of what a `workitem.*` request asked for.
- * Nothing executes it; each command maps like its request kind.
+ * Content acts of the `command_type` in the `workitem-command` payload stored
+ * with a Mesh Hub recipient proposal: a record of what a `workitem.*` request
+ * asked for. Nothing executes it; each command maps like its request kind.
  */
-export const MESH_WORKITEM_COMMAND_ACTS = actTable<MeshHubWorkitemCommandPayload['command_type']>({
+export const MESH_WORKITEM_COMMAND_CONTENT_ACTS = actTable<
+  MeshHubWorkitemCommandPayload['command_type']
+>({
   claim_request: 'request',
   handoff_request: 'handoff',
   status_update: 'inform',
 });
 
-/** Co-Session handoff `kind` (a subset of the Mesh request kinds; the shared members map alike). */
+/**
+ * Co-Session handoff `kind` (a subset of the Mesh request kinds; the shared
+ * members map alike). Here the kind is the delivered act: there is no
+ * proposal record, and `acked_at` is a read receipt, not a recipient
+ * decision, so asks are `request` (rule A). A Co-Session handoff is
+ * cooperative; ownership still moves only through a WorkItem claim.
+ */
 export const CO_SESSION_HANDOFF_KIND_ACTS = actTable<CoSessionHandoffKind>({
   'review.request': 'request',
   'workitem.claim': 'request',
@@ -191,9 +259,11 @@ export const CO_SESSION_HANDOFF_KIND_ACTS = actTable<CoSessionHandoffKind>({
 });
 
 /**
- * Mission coordination bus `channel`. The bus is a visibility record of acts
- * performed elsewhere (dispatch, rework handoff); each channel maps to the act
- * its rows describe. No recipient decides anything from a bus row.
+ * Mission coordination record `channel`. The record lists acts performed
+ * elsewhere (dispatch, rework handoff) for visibility; each channel maps to
+ * the act its rows describe. No recipient decides anything from a row: inside
+ * one runtime the owner's dispatch runs on receipt. Neither `task_contract`
+ * nor `runtime_notice` has a producer today.
  */
 export const MISSION_COORDINATION_CHANNEL_ACTS = actTable<MissionCoordinationChannel>({
   task_contract: 'request',
@@ -203,8 +273,11 @@ export const MISSION_COORDINATION_CHANNEL_ACTS = actTable<MissionCoordinationCha
 });
 
 /**
- * Agent execution port messages. The port has no kind union; its two message
- * shapes are a typed task request (`AgentTaskEnvelope`) and its receipt.
+ * Agent execution port messages. Hand-written key set: the port has no kind
+ * union, so its two message shapes are named here and a third shape would not
+ * be detected. Compile-time only. `delegate()` runs the task on receipt under
+ * the sender's authority; it checks the WorkItem lease only when the envelope
+ * names a WorkItem.
  */
 export const AGENT_EXECUTION_PORT_MESSAGE_ACTS = actTable<
   'AgentTaskEnvelope' | 'AgentExecutionReceipt'

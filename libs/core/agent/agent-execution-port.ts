@@ -37,13 +37,13 @@ export interface AgentTaskEnvelope {
 }
 
 /** Execution states of a receipt (not messages); see `coordination-act-map.ts`. */
-export const AGENT_EXECUTION_RECEIPT_STATUSES = [
+export const AGENT_EXECUTION_RECEIPT_STATUSES = Object.freeze([
   'submitted',
   'running',
   'succeeded',
   'failed',
   'canceled',
-] as const;
+] as const);
 export type AgentExecutionReceiptStatus = (typeof AGENT_EXECUTION_RECEIPT_STATUSES)[number];
 
 export interface AgentExecutionReceipt {

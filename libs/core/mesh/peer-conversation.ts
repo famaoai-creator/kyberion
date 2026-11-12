@@ -34,14 +34,14 @@ import {
 
 export type PeerConversationStatus = 'open' | 'active' | 'closed' | 'blocked' | 'failed';
 /** Conversation transcript kinds; each maps to a coordination act in `coordination-act-map.ts`. */
-export const PEER_CONVERSATION_MESSAGE_KINDS = [
+export const PEER_CONVERSATION_MESSAGE_KINDS = Object.freeze([
   'open',
   'message',
   'reply',
   'handoff',
   'close',
   'status',
-] as const;
+] as const);
 export type PeerConversationMessageKind = (typeof PEER_CONVERSATION_MESSAGE_KINDS)[number];
 export type PeerConversationDirection = 'inbound' | 'outbound';
 

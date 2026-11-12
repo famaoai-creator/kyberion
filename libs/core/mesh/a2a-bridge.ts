@@ -91,7 +91,7 @@ import {
  * A2A envelope speech acts. Same members as `a2a-envelope.schema.json`; each
  * maps to a coordination act in `coordination-act-map.ts`.
  */
-export const A2A_PERFORMATIVES = [
+export const A2A_PERFORMATIVES = Object.freeze([
   'request',
   'propose',
   'inform',
@@ -99,7 +99,7 @@ export const A2A_PERFORMATIVES = [
   'reject',
   'query',
   'result',
-] as const;
+] as const);
 export type A2APerformative = (typeof A2A_PERFORMATIVES)[number];
 
 export interface A2AMessage {

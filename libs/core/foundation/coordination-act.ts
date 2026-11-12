@@ -7,37 +7,58 @@
  * …). Those members are stored, signed and validated as they are, so they are
  * never renamed to these acts. Instead each layer kind maps to one act, or to
  * an explicit "not an act" with a reason, in
- * `libs/core/mesh/coordination-act-map.ts`; `tests/coordination-act-boundary.test.ts`
- * fails when a layer gains a kind without a mapping.
+ * `libs/core/mesh/coordination-act-map.ts`. `tests/coordination-act-boundary.test.ts`
+ * and `tsc` check those tables; what each one covers is listed in
+ * agent-communication-layer-model.md §11.2.
  *
  * The stages named below are the ordered checks of the communication model
  * (knowledge/product/architecture/agent-communication-layer-model.md §5:
  * reachability → authentication → scope authorization → recipient acceptance →
- * execution authority). **No act carries execution authority.** Execution is
- * decided at stage 5 by a local WorkItem claim or the mission owner; a message
- * of any act can at most ask for it, decide on it (accept / reject) or report it.
+ * execution authority). **No act carries execution authority.** Across
+ * runtimes, execution is decided at stage 5 by the recipient's local WorkItem
+ * claim. Inside one runtime (§3 D), delegated work runs on receipt under the
+ * sender's own authority (mission owner or lease holder), which is established
+ * outside the message. Either way, a message can at most ask for work, decide
+ * on it (accept / reject) or report it.
+ *
+ * Two rules decide which act a layer kind maps to:
+ *
+ * - **Rule A (which act).** `propose` is work offered that stays pending until
+ *   the recipient's own decision is recorded as a separate state (typed peer
+ *   task, Mesh Hub recipient proposal). `request` is an ask for which the layer
+ *   records no separate acceptance.
+ * - **Rule B (nesting).** The innermost typed layer names the act. An outer
+ *   envelope type is a carrier: a peer conversation message always travels as
+ *   peer envelope `type: 'request'`, and a conversation `handoff` carries a peer
+ *   task proposal or a Mesh collaboration request.
  *
  * Today the only consumer is the gate test. Nothing routes on these acts at
- * runtime; a layer that wants to (for example a projection that compares
- * kinds across layers) reads the mapping instead of declaring its own.
+ * runtime. A reader comparing kinds across layers gets a consistent answer
+ * only after applying rule B: find the innermost typed record of a message and
+ * read that layer's table, treating every outer kind as a carrier.
  *
  * Dependency-free leaf: keep this file free of imports.
  */
 export const COORDINATION_ACTS = Object.freeze([
   /**
-   * Ask the recipient to do something. Sent once stages 1–3 pass; whether the
-   * work happens is the recipient's stage-4 decision and a stage-5 claim.
+   * Ask the recipient to do something; the layer records no separate
+   * acceptance (rule A). Across runtimes the ask waits for the recipient's own
+   * decision and a local claim before work runs. Inside one runtime (A2A
+   * bridge, agent execution port, mission coordination record) delegation
+   * runs on receipt under the sender's authority; there is no recipient
+   * decision.
    */
   'request',
   /**
-   * Offer work or a side effect for the recipient to decide on (stage 4).
-   * A proposal is inert until a local accept; it names work, it does not run it.
+   * Offer work or a side effect that stays pending until the recipient's own
+   * decision is recorded as a separate state (stage 4). It names work; it does
+   * not run it.
    */
   'propose',
   /**
-   * The recipient's own stage-4 decision to take on a request, proposal or
-   * handoff. Acceptance does not execute anything: execution still needs the
-   * stage-5 WorkItem claim or mission owner on the recipient side.
+   * The recipient's own stage-4 decision to take on a proposal. Acceptance does
+   * not execute anything: execution still needs the stage-5 WorkItem claim on
+   * the recipient side.
    */
   'accept',
   /** The recipient's own stage-4 decision to decline. Terminal for that proposal. */
@@ -60,14 +81,15 @@ export const COORDINATION_ACTS = Object.freeze([
   'result',
   /**
    * Transfer responsibility for a piece of work to the recipient. Ownership
-   * moves only when the recipient accepts (stage 4) and claims it (stage 5).
+   * moves only when the recipient claims it (stage 5); across runtimes it also
+   * waits for the recipient's decision (stage 4).
    */
   'handoff',
 ] as const);
 
 export type CoordinationAct = (typeof COORDINATION_ACTS)[number];
 
-/** A layer kind that is deliberately not a speech act (a state, a category of record, session control). */
+/** A layer kind that is deliberately not a speech act (a state, a carrier, a category of record, session control). */
 export interface NotACoordinationAct {
   readonly act: null;
   readonly reason: string;
