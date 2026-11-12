@@ -1,7 +1,7 @@
 ---
 title: Chronos viewer scope 運用手順
 tags: [chronos, security, authorization, multi-tenant]
-last_updated: 2026-10-26
+last_updated: 2026-11-12
 ---
 
 # Chronos viewer scope 運用手順
@@ -12,11 +12,13 @@ last_updated: 2026-10-26
 
 `KYBERION_VIEWER_SCOPE` は `off` / `warn` / `enforce` を取ります。既定値は `warn` です。
 
-- `off`: 既存互換の選択を許可し、監査記録もしません。
-- `warn`: 既存互換の選択を許可しますが、許可外 tenant の指定を audit chain に記録します。
-- `enforce`: viewer の許可集合外の tenant 指定を HTTP 403 にします。
+どのモードでも、viewer の許可集合外の tenant 指定は HTTP 403 で拒否します。モードが変えるのは監査記録だけです。
 
-監査 chain で `action=viewer_scope` の warn 記録が一定期間 0 件であることを確認してから、運用環境ごとに `enforce` へ切り替えます。切り替えは単独コミットで行い、表示の欠落があれば直ちに `warn` へ戻せます。
+- `off`: 拒否します。監査記録はしません。
+- `warn`: audit chain に `action=viewer_scope` を記録してから拒否します。
+- `enforce`: 拒否します。監査記録はしません。
+
+`warn` の記録は、許可外 tenant を指定しているクライアントを見つけるための観測です。`action=viewer_scope` の記録が一定期間 0 件であることを確認してから、運用環境ごとに `enforce` へ切り替えます。tenant 有効化（`pnpm tenant:activation` の probe と承認）は `warn` か `enforce` を要求し、`off` では通りません。
 
 ## API ルート契約
 

@@ -328,7 +328,6 @@ export * as xlsxUtils from './media/xlsx-utils.js';
 
 export * as docxUtils from './media/docx-utils.js';
 // export * as finance from './finance.js';
-// export * as mcpClient from './mcp-client-engine.js';
 
 // Voice & Presentation
 
