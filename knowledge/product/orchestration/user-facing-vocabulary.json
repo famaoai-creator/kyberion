@@ -10270,6 +10270,11 @@
         "ja": "ピアへの型付き作業依頼を提案・受理・追跡",
         "qps-ploc": "⟦Ṗřőṗőşė, ȧƈƈėṗŧ ȧñḓ ŧřȧƈķ ŧẏṗėḓ ṗėėř ŧȧşķş ŀőřėɱ ïṗşůɱ ḓő⟧"
       },
+      "cli_cmd_script_peer_outbox": {
+        "en": "Show sent peer message delivery state and re-send retryable failures",
+        "ja": "送信済みピアメッセージの配送状態を表示し、再試行可能な失敗を再送",
+        "qps-ploc": "⟦Şħőẇ şėñŧ ṗėėř ɱėşşȧɠė ḓėŀïṽėřẏ şŧȧŧė ȧñḓ řė-şėñḓ řėŧřẏȧƀŀė ƒȧïŀůřėş ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
+      },
       "cli_cmd_script_peer_send": {
         "en": "Send a peer message",
         "ja": "ピアにメッセージを送信",

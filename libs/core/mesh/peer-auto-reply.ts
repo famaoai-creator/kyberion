@@ -473,6 +473,8 @@ export async function deliverPeerAutoReply(
     messageId: input.messageId,
     metadata: input.metadata,
     timeoutMs: DELIVERY_TIMEOUT_MS,
+    // The job's own bounded loop and ledger own delivery; outbox redelivery skips it.
+    deliveryRecovery: 'caller',
   });
   if (!receipt.ok) {
     throw new Error(

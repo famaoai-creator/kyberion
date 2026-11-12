@@ -33,6 +33,7 @@ Use this catalog to exchange messages between Kyberion instances.
 - Mesh Hub registrations, presence, capabilities, delivery ledger, proposals, and events use `.../mesh-hub/{namespace}/tenants/{tenant}/...`; a namespace may be empty.
 - Direct Peer Messaging handles a received envelope synchronously and returns its success receipt after the responder finishes. Completed message IDs are deduplicated at the receiver; a concurrent duplicate receives retryable HTTP 425.
 - The listener bounds responder concurrency and the number of requests waiting for a slot. Defaults are --max-inflight 8 and --max-queued 64; saturation returns retryable HTTP 503. Mesh presence publishes the listener's live capacity, which ranks eligible peers. An explicitly selected busy peer remains routable so the durable Mesh ledger can retry its retryable overload response.
+- A send that fails is recovered from the sender's outbox: retryable failures are re-sent with the same signed envelope by the conversation server or `pnpm kyberion peer outbox redeliver`, and every message ends as delivered, refused or given up. See [Outbox redelivery](#outbox-redelivery).
 - Governed Mesh requests use the persistent Mesh delivery ledger and mesh-delivery-driver: accepted deliveries survive driver restarts, retry with bounded exponential backoff, honor expiry, and move exhausted failures to dead-letter storage. The driver treats non-2xx transport receipts as retryable failures and preserves the broker's stable message ID across attempts.
 - A successful Mesh delivery ACK means the receiver completed its synchronous handler. Explicit proposal acceptance and subsequent work execution remain separate states.
 
@@ -189,12 +190,37 @@ Flow (`pnpm kyberion peer task`, all commands take `--peer-id <this peer> --tena
 
 Both sides keep the state in `active/shared/runtime/peer-messaging/tenants/<tenant>/peers/<local>/task-exchange.jsonl` (latest row per `<direction>:<task_id>`); `show --task-id` prints both directions and `offered` prints the local catalog. Auto replies never see or act on tasks: task messages are routed before the auto-reply worker, and `status` entries are excluded from reply history.
 
+## Outbox redelivery
+
+`sendPeerMessage` makes one attempt and records it in the sender's `outbox.jsonl`. Recovery works from those rows; nothing is rewritten and there is no separate delivery ledger. Redelivery is recovery of a send: it never does what the original sender would not have done.
+
+| Failed attempt                                                                                    | Classification | What happens next                                |
+| ------------------------------------------------------------------------------------------------- | -------------- | ------------------------------------------------ |
+| No response at all (connection error, timeout)                                                    | retryable      | re-sent after the backoff                        |
+| Receiver answered `retryable: true` (HTTP 425 in progress, 503 overloaded)                        | retryable      | re-sent, no sooner than its `retry_after_ms`     |
+| HTTP 408 / 425 / 429 / 502 / 503 / 504                                                            | retryable      | re-sent; a `Retry-After` header is honoured      |
+| Any other 5xx (`receiver_error`: the receiver's handler failed)                                   | terminal       | recorded as refused, never re-sent automatically |
+| 4xx (invalid envelope, signature, tenant or recipient mismatch, expired envelope, body too large) | terminal       | recorded as refused, never re-sent               |
+
+- **Why a receiver error is terminal.** A handler that threw may have run partway and the message was not marked handled, so a re-send would run it again and record a second inbox row. Only an operator decides to send it again.
+- **What is re-sent.** The stored envelope, byte for byte: same message id, same signature. The receiver deduplicates completed messages on `sender:message_id` (kept in its event log across restarts), so a re-send of a message it already handled returns `duplicate: true` and is not processed again.
+- **Backoff and bounds.** The wait is 5 s after the first failure and doubles per failure up to 5 min, or the receiver's `retry_after_ms` when that is longer. A message gets at most 8 attempts including the original send. An envelope with `expires_at` is never sent after it; one without is re-sent for at most 1 h after `created_at`.
+- **Terminal outcomes.** When redelivery stops, a `given_up` row is appended with the reason: `attempts_exhausted`, `envelope_expired`, `retry_window_elapsed`, `peer_not_enrolled` (the recipient left the tenant peer catalog) or `destination_not_allowed`. The destination is resolved from the current catalog on every attempt, so a moved endpoint is followed and a removed peer is not contacted. A rotated secret makes the stored signature invalid; the receiver refuses it and the message ends as refused.
+- **What is never re-sent.**
+  - Rows written before redelivery existed (no `disposition` field). They show as `legacy_failed` and get no further rows: upgrading causes no sends, because the operator may already have re-sent those messages under new ids.
+  - Messages whose sender manages its own retries (outbox row `recovery: "caller"`), shown as `caller_managed`. Auto replies are sent this way: the reply job makes its own bounded attempts and its `delivery_failed` is final. The Mesh delivery driver's dispatch is marked the same way.
+- **Sender-side bookkeeping.** A redelivered message is completed like a first-try delivery, by the same functions: the reply the receiver returned is appended to the sender's conversation transcript, an outbound peer task gets `proposal_delivery: sent` (and `rejected` when the receiver refused it on receipt), an inbound task's result gets `result_delivery: sent`. The bookkeeping is idempotent and is replayed from the outbox row on later passes for 24 h, so a crash between the `sent` row and the bookkeeping is repaired by the next pass; a failure is reported as `bookkeeping_failed` and in the log.
+- **Where it runs.** `peer:conversation-server` runs a pass every 5 seconds by default; no flag is needed to turn it on. `--redelivery-interval-ms <n>` changes the interval, and `--redelivery-interval-ms 0` turns the timer off, so that server never re-sends anything by itself. The server waits for the pass in flight on shutdown. `pnpm kyberion peer outbox redeliver --peer-id <local>` runs one pass by hand, for a peer with no running server or with the timer off. Passes take a per-peer lock, so a second pass over the same outbox returns `skipped` instead of sending twice. Each give-up, and each refusal met during a pass, is also a warning in the log of the process that ran the pass.
+- **Operator view.** `pnpm kyberion peer outbox status --peer-id <local>` prints counts per state, the messages waiting for a retry with their next attempt time, and everything that was not delivered and will not be re-sent (`refused`, `given_up`, `legacy_failed`, `caller_managed`) with reason and last error. To send one of those again, send it anew (a conversation or task resend with its stable id is still deduplicated by the receiver).
+- **Limit.** When the receiver had already handled the message and only its receipt was lost, the re-send is answered `duplicate: true` without the original response. The sender then records the delivery but cannot recover the reply text or an on-receipt task rejection; they exist only on the receiver.
+
 ## Envelope rules
 
 - Every message is HMAC-signed with the recipient server's shared secret (one secret per listening server; see Sender identity under Typed peer tasks).
 - `tenant_id` is part of the signed envelope. The recipient rejects missing or mismatched tenant IDs, peer IDs, and invalid signatures.
+- `expires_at` is part of the signed envelope. The recipient refuses an envelope more than 5 minutes (clock-skew tolerance) past its `expires_at` with HTTP 410 `envelope_expired` and does not process it; a message it had already handled is still answered as a duplicate. An envelope without `expires_at` does not expire on receive.
 - The peer catalog must declare the same tenant selected by the sender; a caller-supplied tenant never broadens access.
-- Peer Messaging inbox/outbox JSONL files are durable audit records; they are not a deferred receiver queue. The HTTP success receipt includes processing_mode and processed_at after synchronous handling.
+- Peer Messaging inbox/outbox JSONL files are durable audit records; they are not a deferred receiver queue. The outbox is also the sender's retry state (see [Outbox redelivery](#outbox-redelivery)). The HTTP success receipt includes processing_mode and processed_at after synchronous handling.
 - Governed Mesh uses the separate tenant-scoped delivery ledger as its durable sender queue; its driver retries transport failures and the receiver deduplicates stable delivery message IDs.
 
 ## Tenant backup and restore

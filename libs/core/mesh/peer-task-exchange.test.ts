@@ -22,6 +22,7 @@ import {
   type PeerTaskArtifactWriter,
   type PeerTaskExecutorRunner,
 } from './peer-task-exchange.js';
+import { runPeerOutboxRedeliveryPass } from './peer-outbox-redelivery.js';
 import {
   clearWorkCoordinationStore,
   getWorkItem,
@@ -527,6 +528,84 @@ describe('peer task exchange', () => {
     });
     expect(getPeerTask(TENANT, RECIPIENT, 'inbound', pending.task_id)!.state).toBe('pending');
     expect(sent.map((envelope) => envelope.message_id)).toEqual([pending.request_message_id]);
+  });
+
+  it('completes the task bookkeeping when outbox redelivery delivers a proposal or a result', async () => {
+    wirePeers();
+    const fetchSpy = vi.mocked(globalThis.fetch);
+    const route = fetchSpy.getMockImplementation()!;
+    const offline = async () => {
+      throw new TypeError('fetch failed');
+    };
+    const redeliver = (peerId: string) =>
+      runPeerOutboxRedeliveryPass({
+        tenantId: TENANT,
+        peerId,
+        catalogPath: PEER_CATALOG,
+        policy: { baseBackoffMs: 0 },
+      });
+
+    // A proposal that could not be delivered, and one the recipient will reject on receipt.
+    fetchSpy.mockImplementation(offline);
+    await expect(propose()).rejects.toThrow(/peer_task_proposal_not_delivered/);
+    await expect(propose('shell.anything')).rejects.toThrow(/peer_task_proposal_not_delivered/);
+    const [pending, refused] = listPeerTasks(TENANT, PROPOSER, { direction: 'outbound' });
+    fetchSpy.mockImplementation(route);
+
+    const pass = await redeliver(PROPOSER);
+    expect(pass.delivered).toHaveLength(2);
+    expect(pass.bookkeeping_failed).toEqual([]);
+    // Same record state as a first-try delivery.
+    expect(getPeerTask(TENANT, PROPOSER, 'outbound', pending.task_id)).toMatchObject({
+      state: 'pending',
+      proposal_delivery: { status: 'sent' },
+    });
+    expect(getPeerTask(TENANT, PROPOSER, 'outbound', refused.task_id)).toMatchObject({
+      state: 'rejected',
+      proposal_delivery: { status: 'sent' },
+    });
+    expect(getPeerTask(TENANT, RECIPIENT, 'inbound', pending.task_id)!.state).toBe('pending');
+    const session = loadPeerConversationSession(TENANT, PROPOSER, pending.session_id)!;
+    const replies = () =>
+      loadPeerConversationSession(TENANT, PROPOSER, pending.session_id)!.transcript.filter(
+        (entry) => entry.direction === 'inbound'
+      );
+    expect(session.transcript.some((entry) => entry.direction === 'inbound')).toBe(true);
+    // A later pass replays the bookkeeping from the outbox row; it changes nothing.
+    const before = replies().length;
+    const rows = listPeerTasks(TENANT, PROPOSER, { direction: 'outbound' }).map(
+      (record) => record.updated_at
+    );
+    expect((await redeliver(PROPOSER)).bookkeeping_failed).toEqual([]);
+    expect(replies()).toHaveLength(before);
+    expect(
+      listPeerTasks(TENANT, PROPOSER, { direction: 'outbound' }).map((record) => record.updated_at)
+    ).toEqual(rows);
+
+    // The result of the accepted task cannot be delivered either, then is redelivered.
+    fetchSpy.mockImplementation(offline);
+    const done = await decidePeerTask({
+      tenantId: TENANT,
+      localPeerId: RECIPIENT,
+      taskId: pending.task_id,
+      decision: 'accepted',
+      actorId: 'operator:test',
+      reason: 'routine health check',
+      taskCatalogPath: TASK_CATALOG,
+      peerCatalogPath: PEER_CATALOG,
+      runner: okRunner,
+      writeArtifact,
+    });
+    expect(done.result_delivery).toMatchObject({ status: 'failed' });
+    fetchSpy.mockImplementation(route);
+    expect((await redeliver(RECIPIENT)).delivered).toEqual([
+      peerTaskResultMessageId(pending.task_id),
+    ]);
+    expect(getPeerTask(TENANT, RECIPIENT, 'inbound', pending.task_id)).toMatchObject({
+      state: 'completed',
+      result_delivery: { status: 'sent' },
+    });
+    expect(getPeerTask(TENANT, PROPOSER, 'outbound', pending.task_id)!.state).toBe('completed');
   });
 
   it('rejects task types the recipient does not offer, and peers it does not allow, on receipt', async () => {

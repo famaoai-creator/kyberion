@@ -22,6 +22,7 @@ import {
   type PeerMessageEnvelope,
   type PeerMessageResponder,
   type PeerMessageResponderContext,
+  type PeerOutboxDelivery,
 } from './peer-messaging.js';
 import {
   assertSafeRepositoryPath,
@@ -130,6 +131,8 @@ export interface SendPeerConversationMessageInput {
   ttlMs?: number;
   catalogPath?: string;
   timeoutMs?: number;
+  /** `'caller'`: the caller retries delivery itself; outbox redelivery skips this message. */
+  deliveryRecovery?: 'caller';
   /**
    * Stable message id for idempotent resends: used for both the outbound
    * transcript entry and the peer envelope, so a retry is deduped by the
@@ -805,7 +808,9 @@ export function buildPeerConversationEnvelope(input: {
  */
 export const PEER_CATALOG_READER_ROLE = 'peer_catalog_reader';
 
-function loadSenderPeerCatalog(input: SendPeerConversationMessageInput) {
+export function loadSenderPeerCatalog(
+  input: Pick<SendPeerConversationMessageInput, 'catalogPath' | 'tenantId'>
+) {
   const options = {
     ...(input.catalogPath ? { catalogPath: input.catalogPath } : {}),
     ...(input.tenantId ? { tenantId: input.tenantId } : {}),
@@ -818,6 +823,60 @@ function loadSenderPeerCatalog(input: SendPeerConversationMessageInput) {
   return withStoreGrant(PEER_CATALOG_READER_ROLE, () => loadPeerNetworkCatalog(options), {
     tenantSlug: input.tenantId,
   });
+}
+
+/**
+ * Sender-side bookkeeping of a delivered conversation message: the reply the
+ * receiver's responder returned is appended to the sender's transcript. Called
+ * on a first-try delivery and by outbox redelivery, so both leave the same
+ * transcript. Idempotent: a reply already in the transcript is not appended
+ * again. Returns false when the envelope is not a conversation message. A
+ * `duplicate` receipt carries no response, so there is nothing to record.
+ */
+export function applyPeerConversationDelivery(delivery: PeerOutboxDelivery): boolean {
+  const { envelope } = delivery;
+  const payload = validatePeerConversationMessage(envelope.payload);
+  if (!payload.valid || !payload.value) return false;
+  const message = payload.value;
+  if (delivery.response !== undefined && !isRecord(delivery.response)) {
+    throw new Error('invalid_peer_conversation_response');
+  }
+  const response = delivery.response as Record<string, unknown> | undefined;
+  if (response?.reply === undefined) return true;
+  const reply = parsePeerConversationTranscriptEntry(response.reply);
+  if (
+    reply.sender_peer_id !== envelope.recipient_peer_id ||
+    reply.recipient_peer_id !== envelope.sender_peer_id
+  ) {
+    throw new Error('peer_conversation_reply_identity_mismatch');
+  }
+  const session = loadPeerConversationSession(
+    envelope.tenant_id,
+    envelope.sender_peer_id,
+    message.session_id
+  );
+  const recorded = session?.transcript.some(
+    (entry) => entry.message_id === reply.message_id && entry.direction === 'inbound'
+  );
+  if (recorded) return true;
+  appendPeerConversationTranscript({
+    tenantId: envelope.tenant_id,
+    sessionId: message.session_id,
+    localPeerId: envelope.sender_peer_id,
+    remotePeerId: envelope.recipient_peer_id,
+    kind: reply.kind,
+    direction: 'inbound',
+    text: reply.text,
+    replyToMessageId: reply.reply_to_message_id || envelope.message_id,
+    relatedWorkItemIds: reply.related_work_item_ids || message.related_work_item_ids,
+    metadata: reply.metadata,
+    payload: {
+      ...(reply.payload || {}),
+      reply_from_peer_id: envelope.recipient_peer_id,
+    },
+    messageId: reply.message_id,
+  });
+  return true;
 }
 
 export async function sendPeerConversationMessageToPeer(
@@ -880,40 +939,14 @@ export async function sendPeerConversationMessageToPeer(
     destinationUrl: target.destinationUrl,
     allowLocalNetwork: target.allowLocalNetwork,
     timeoutMs: input.timeoutMs,
+    ...(input.deliveryRecovery ? { recovery: input.deliveryRecovery } : {}),
   });
 
-  const response = receipt.response;
-  let responseRecord: Record<string, unknown> | undefined;
-  if (response !== undefined && !isRecord(response)) {
-    throw new Error('invalid_peer_conversation_response');
-  }
-  if (response !== undefined) responseRecord = response as Record<string, unknown>;
-  if (responseRecord?.reply !== undefined) {
-    const reply = parsePeerConversationTranscriptEntry(responseRecord.reply);
-    if (
-      reply.sender_peer_id !== input.recipientPeerId ||
-      reply.recipient_peer_id !== input.senderPeerId
-    ) {
-      throw new Error('peer_conversation_reply_identity_mismatch');
-    }
-    appendPeerConversationTranscript({
-      tenantId: input.tenantId,
-      sessionId,
-      localPeerId: input.senderPeerId,
-      remotePeerId: input.recipientPeerId,
-      kind: reply.kind,
-      direction: 'inbound',
-      text: reply.text,
-      replyToMessageId: reply.reply_to_message_id || envelope.message_id,
-      relatedWorkItemIds: reply.related_work_item_ids || input.relatedWorkItemIds,
-      metadata: reply.metadata,
-      payload: {
-        ...(reply.payload || {}),
-        reply_from_peer_id: input.recipientPeerId,
-      },
-      messageId: reply.message_id,
-    });
-  }
+  applyPeerConversationDelivery({
+    envelope,
+    response: receipt.response,
+    duplicate: receipt.duplicate === true,
+  });
 
   return {
     session:

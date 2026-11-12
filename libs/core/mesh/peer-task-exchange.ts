@@ -43,6 +43,7 @@ import {
   peerRuntimeLogicalPath,
   streamPeerStoreRecords,
   type PeerMessageEnvelope,
+  type PeerOutboxDelivery,
 } from './peer-messaging.js';
 import {
   PEER_CATALOG_READER_ROLE,
@@ -457,13 +458,71 @@ async function sendPeerTaskProposal(
     );
   }
   const reply = extractReply(sent.receipt);
+  const record = recordProposalDelivered(outbound, reply);
+  return { request, record, ...(reply?.text ? { reply_text: reply.text } : {}) };
+}
+
+/** A delivered proposal: the receiver's immediate rejection, if any, settles the task. */
+function recordProposalDelivered(
+  outbound: PeerTaskRecord,
+  reply: PeerConversationTranscriptEntry | undefined
+): PeerTaskRecord {
   const rejection = reply?.payload?.peer_task_status === 'rejected';
-  const record = appendRecord({
+  return appendRecord({
     ...outbound,
     state: rejection ? 'rejected' : outbound.state,
     proposal_delivery: { status: 'sent', at: nowIso() },
   });
-  return { request, record, ...(reply?.text ? { reply_text: reply.text } : {}) };
+}
+
+function recordResultDelivered(record: PeerTaskRecord, messageId: string): PeerTaskRecord {
+  return appendRecord({
+    ...record,
+    result_message_id: messageId,
+    result_delivery: { status: 'sent', at: nowIso() },
+  });
+}
+
+/**
+ * Sender-side task bookkeeping of a message that outbox redelivery delivered:
+ * the same record update a first-try delivery makes (`proposal_delivery` /
+ * `result_delivery` = sent, and a proposal the receiver rejected on receipt
+ * becomes `rejected`). Idempotent: a record already marked sent is left
+ * alone. Returns false when the envelope is not a task message.
+ */
+export async function applyPeerTaskDelivery(delivery: PeerOutboxDelivery): Promise<boolean> {
+  const { envelope } = delivery;
+  const metadata =
+    isRecord(envelope.payload) && isRecord(envelope.payload.metadata)
+      ? envelope.payload.metadata
+      : undefined;
+  const direction: PeerTaskDirection | undefined = isRecord(metadata?.peer_task_request)
+    ? 'outbound'
+    : isRecord(metadata?.peer_task_result)
+      ? 'inbound'
+      : undefined;
+  if (!metadata || !direction) return false;
+  const body = (
+    direction === 'outbound' ? metadata.peer_task_request : metadata.peer_task_result
+  ) as {
+    task_id?: unknown;
+  };
+  const taskId = typeof body.task_id === 'string' ? body.task_id : '';
+  if (!taskId) return false;
+  const scope = { tenantId: envelope.tenant_id, localPeerId: envelope.sender_peer_id, taskId };
+  await withTaskLock(scope, async () => {
+    const record = getPeerTask(scope.tenantId, scope.localPeerId, direction, taskId);
+    if (!record) return;
+    if (direction === 'outbound') {
+      if (record.proposal_delivery?.status === 'sent') return;
+      // Only a proposal still waiting for the peer may be settled by its reply.
+      const reply = record.state === 'pending' ? extractReply(delivery) : undefined;
+      recordProposalDelivered(record, reply);
+    } else if (record.result_delivery?.status !== 'sent') {
+      recordResultDelivered(record, envelope.message_id);
+    }
+  });
+  return true;
 }
 
 /** Resend a recorded proposal with its original task id and message id. Idempotent. */
@@ -1083,11 +1142,7 @@ export async function deliverPeerTaskResult(input: {
       ...(input.peerCatalogPath ? { catalogPath: input.peerCatalogPath } : {}),
       timeoutMs: DELIVERY_TIMEOUT_MS,
     });
-    return appendRecord({
-      ...record,
-      result_message_id: messageId,
-      result_delivery: { status: 'sent', at: nowIso() },
-    });
+    return recordResultDelivered(record, messageId);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     log.warn(
