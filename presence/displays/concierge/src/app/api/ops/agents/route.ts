@@ -504,7 +504,7 @@ export async function POST(req: NextRequest) {
             return NextResponse.json(
               {
                 error:
-                  'A tenant-scoped viewer may route only an A2A envelope whose security scope names a tenant inside the viewer scope.',
+                  'A tenant-scoped viewer may route only an A2A envelope whose security scope names one tenant inside the viewer scope and whose context mission id matches the scope.',
               },
               { status: 403 }
             );

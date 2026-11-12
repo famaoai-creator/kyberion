@@ -552,7 +552,7 @@ export function assertScheduledContextAdmissible(
   if (reserved.length === 0) return;
   throw new Error(
     `[SCHEDULE_CONTEXT_RESERVED] schedule '${scheduleId}' was not run — its stored context sets keys the pipeline runner derives itself` +
-      ` | next: remove them from the schedule (Concierge › Automation, or active/shared/runtime/pipeline-schedules.json)` +
+      ` | next: delete the schedule and register it again without those keys (Concierge › Automation), or remove them in active/shared/runtime/pipeline-schedules.json` +
       ` | evidence: keys=${reserved.join(',')}`
   );
 }

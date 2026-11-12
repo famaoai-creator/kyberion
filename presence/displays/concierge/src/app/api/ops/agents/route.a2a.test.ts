@@ -124,7 +124,7 @@ describe('agents route a2a action', () => {
     expect(response.status).toBe(403);
     expect(await response.json()).toEqual({
       error:
-        'A tenant-scoped viewer may route only an A2A envelope whose security scope names a tenant inside the viewer scope.',
+        'A tenant-scoped viewer may route only an A2A envelope whose security scope names one tenant inside the viewer scope and whose context mission id matches the scope.',
     });
     expect(f.route).not.toHaveBeenCalled();
   });
