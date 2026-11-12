@@ -1,7 +1,7 @@
 ---
 title: Actor identity and responsibility model
 tags: [architecture, governance, identity, nhi, tenant, organization, delegation, review]
-last_updated: 2026-11-04
+last_updated: 2026-11-12
 concepts: [nhi, conversational-persona, execution-persona, org-role, team-role]
 ---
 
@@ -49,6 +49,41 @@ hold several organization responsibilities without becoming several people or
 receiving wider access. Conversely, similar organization names or duties in two
 companies do not merge their tenants. Reuse organization participant records and
 the identity directory rather than creating a second personnel registry.
+
+## Solo and organization work use the same model
+
+For each unit of work, keep five questions distinct:
+
+1. **Whose work is this?** Personal work or a tenant's work, with organization
+   and project context where relevant.
+2. **Who acts?** The authenticated Member or admitted NHI, with a separately
+   identified accountable human.
+3. **What was delegated?** The objective, permitted operations and resources,
+   scope, expiry, and required human decisions, using existing grants/contracts.
+4. **Whose resources are used?** Information and connections retain their own
+   owners; a work owner does not acquire them by selecting a stance.
+5. **Where do results and learning go?** Evidence, artifacts, and learning keep
+   their custody and disclosure boundaries; recipients need authorization.
+
+These are questions answered by existing records, not a new work, identity,
+grant, or credential store. A single-person installation may resolve the same
+known person for several responsibilities without displaying every choice.
+It must not infer ownership from the current login, loopback access, or the
+absence of another registered person.
+
+The accepted [Concept Model v2 decision](decisions/2026-11-10-concept-model-v2.md)
+remains authoritative: Tenant is the contract/isolation boundary, Company its
+alias, and Organization a structure within it. Stance selects the acting-for
+context without creating authority. Personal work remains personal; it need
+not be forced into a synthetic tenant or a new Workspace authority layer.
+
+An explicitly authorized personal resource could serve company work without
+changing its owner, but that requires a separate, bounded allocation. This is
+not permission to fall back to personal credentials when a tenant binding is
+missing. The current service-binding path does not implement general
+personal-to-company connection allocation. Its enforcement, migration, and
+remaining work are tracked in the existing
+[service integration guide](../orchestration/service-integration-guide.md#solo-and-organization-rollout).
 
 ## Expertise, execution, and independent review
 

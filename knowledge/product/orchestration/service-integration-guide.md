@@ -1,7 +1,7 @@
 ---
 title: 'Service Integration and Connection Guide'
 tags: [service, integration, connection, onboarding, security]
-last_updated: 2026-10-05
+last_updated: 2026-11-12
 runtime_stages: [alignment, contract_authoring, execution]
 ---
 
@@ -72,8 +72,9 @@ Check [`service-endpoints/README.md`](service-endpoints/README.md), existing
    is present, the project must reference that binding. If any operation on a
    service requires a binding, undeclared/raw service actions are rejected so
    they cannot bypass the preset contract. In a mixed preset, declared
-   operations without the binding flag can still run through PRESET without a
-   tenant binding; the service cannot fall back to raw API/CLI/SDK/MCP modes.
+   operations without the binding flag can run without a tenant binding only
+   outside tenant execution. Trusted tenant execution requires a binding even
+   when the preset did not opt in; raw modes are not an escape hatch.
 4. **Keep credentials out of catalog files.** Presets may refer to a governed
    credential field, but never contain real tokens, passwords, or
    customer-specific connection data. Use placeholders and existing
@@ -281,8 +282,11 @@ service-binding model, declare the connection as organization-owned
 limit `allowed_actions`, and set per-action `approval_policy` in accordance
 with [`service-binding-record.schema.json`](../schemas/service-binding-record.schema.json).
 Projects reference the applicable binding IDs through the governed project
-facade. A personal connection must stay person-owned and must not be assigned
-to an organization or tenant.
+facade. The historical `owner_kind: "organization"` denotes ownership by the
+tenant, not by a department (Organization in Concept Model v2). A personal
+connection must stay person-owned. A future explicit allocation could permit
+its use for tenant work without transferring ownership; the current tenant
+service-binding path does not implement that allocation.
 
 ### Create and attach a tenant binding
 
@@ -303,8 +307,8 @@ pnpm service:setup binding list --tenant <tenant-slug>
 The controller verifies that the tenant is active, the service preset exists,
 and each action is declared by that preset. It writes an organization-owned
 record with matching `tenant_slug`/`owner_ref`; it never accepts secret values.
-For operations marked `tenant_binding_required` (directly or by the preset's
-top-level setting), service-actuator enforces the binding's tenant, optional
+For trusted tenant execution, or operations marked `tenant_binding_required`
+(directly or by the preset's top-level setting), service-actuator enforces the binding's tenant, optional
 project attachment, allowed action, and `approval_policy` before execution.
 The active mission must carry the same `tenant_slug`, or reference the scoped
 project that does; a caller-supplied tenant slug by itself is not authority.
@@ -320,26 +324,74 @@ resulting binding ID to a project through
 flow). Do not edit
 `active/shared/runtime/service-bindings/` directly.
 
-The binding registry enforces action policy only for operations explicitly
-marked `tenant_binding_required`; it does not change older service contracts.
-Credential resolution still uses the service-level secret guard. `pnpm
+Direct and cached service-engine entry points also require an admitted binding
+for tenant execution, independently of preset opt-in. The admission's tenant
+must match the trusted runtime credential identity; an unbound/operator runtime
+cannot consume tenant admission. Tenant execution does not load a personal
+connection document. The separate information-asset capture capability retains
+its own scoped admission and does not become a general bypass.
+
+Credential resolution still uses the service-level secret guard and trusted
+task credential binding. Validating the service binding does **not** establish
+that its `secret_refs` selected the credential actually used. `pnpm
 kyberion secret introduce <service-id> <secret-key>` stores credentials for the
 active service profile/customer stance; it does not put a value into a tenant
 binding. It is suitable for a shared runtime credential, not for isolating
-different organization tokens. For services whose provider accounts or tokens
-differ by tenant, the current secret resolver needs a tenant-aware credential
-backend before those connections can be treated as operational and
-credential-isolated. Run `pnpm service:setup` and
+different organization tokens. Tenant tasks need the existing trusted credential
+broker to bind their allowed secrets to the exact tenant/mission/task; a scoped
+miss must not fall back to an operator token. Whether a particular provider's
+connection references are provisioned by that broker still needs provider-specific
+verification. Run `pnpm service:setup` and
 `pnpm service:preflight -- --service <service-id>` for credential readiness.
 
 Separately, if the tenant will send confidential or personal data to the
 service, the destination domain must be approved in the tenant-specific egress
 policy. Registering a service globally or selecting a `KYBERION_STANCE`
-stance does not grant that tenant data-egress permission. Some direct
-older integrations that do not opt into `tenant_binding_required` continue
-using their existing service-level credential and authority paths. Do not
-treat those legacy paths as tenant-isolated connections. Do not invent a
+stance does not grant that tenant data-egress permission. Integrations outside
+these service-actuator/service-engine entry points still require their own
+boundary audit; this change is not universal SaaS credential provisioning.
+Do not invent a
 second tenant copy of the endpoint catalog.
+
+### Solo and organization rollout
+
+This rollout extends existing owners, service bindings, task credentials, and
+approval mechanisms. It creates no new store or Workspace authority layer and
+does not modify live grants, connection ownership, or deployment settings.
+
+1. **Implemented boundary:** person-owned bindings are visible only to their
+   server-resolved owner. Ownerless legacy personal records and malformed owner
+   declarations fail closed. Concierge's loopback view uses the same personal
+   ownership rule as remote viewers; localhost does not prove ownership.
+   Tenant execution requires the binding and matching trusted runtime identity
+   described above. Personal execution without a tenant remains supported.
+2. **Deliberate migration:** inspect existing records before rollout using
+   `node dist/scripts/migrate_binding_owners.js` (dry-run). For a verified
+   single-owner legacy installation, preview with
+   `--assign-person user:<member-id>`, then apply the reviewed assignment with
+   `--apply --assign-person user:<member-id>`. This option assigns all eligible
+   ownerless personal records to that member; do not use it when ownership is
+   mixed or unknown. Do not guess the owner from whoever logged in or is using
+   the machine. Apply backs up records; use the returned backup directory with
+   `--rollback <backup_dir>` if restoration is required. Restoring an ownerless
+   record does not restore the old permissive visibility behavior. Existing
+   explicit owners are not reassigned by this migration.
+3. **Acceptance checks:** exercise personal owner/non-owner/anonymous viewers,
+   local and remote views, malformed/unknown owners, migration preview/apply/
+   rollback, and valid tenant bindings. Missing, ambiguous, wrong-tenant, or
+   wrong-project bindings must fail before provider effects. Check unflagged
+   presets, direct and cached execution, missing or mismatched runtime identity,
+   revocation, and scoped credential misses without personal/operator fallback.
+   Preserve the separately admitted capture path and personal no-tenant mode.
+4. **Remaining implementation:** bind selected connection references to actual
+   provider credential provenance, with revocation and freshness evidence;
+   design bounded cross-owner allocation without relabeling the owner; then
+   expose acting-for context and setup/readiness clearly in the UI. Each stage
+   needs tests at its real execution boundary before being called enforced.
+   Existing source-of-truth records must be extended rather than duplicated.
+
+Ownership migration makes a connection visible to its owner; it does not grant
+an operation, provision OAuth, admit a tenant task, or approve an external effect.
 
 ### Local service and bridge readiness
 

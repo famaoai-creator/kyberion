@@ -1,3 +1,6 @@
+import { runInExecutionScope } from '../foundation/execution-scope.js';
+import type { CredentialIdentity } from '../foundation/credential-binding.js';
+import { issueTenantServiceEngineAdmission } from './service-engine-admission.js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -21,6 +24,8 @@ const PRESENT_OVERLAY_FIXTURE = vi.hoisted(
 );
 
 const mocks = vi.hoisted(() => ({
+  authorizeTenant: vi.fn(() => ({ bindingId: 'binding-a', approvalRequired: false })),
+  identity: vi.fn((): CredentialIdentity => ({})),
   safeReadFile: vi.fn(),
   safeExec: vi.fn(),
   resolveServiceBinding: vi.fn(() => ({ accessToken: 'test-token' })),
@@ -42,6 +47,16 @@ const mocks = vi.hoisted(() => ({
   mcpTransportCtor: vi.fn(),
   mcpHttpClose: vi.fn().mockResolvedValue(undefined),
   mcpHttpTransportCtor: vi.fn(),
+}));
+
+vi.mock('./service-binding-registry.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./service-binding-registry.js')>()),
+  authorizeTenantServiceAction: mocks.authorizeTenant,
+}));
+
+vi.mock('../foundation/credential-binding.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../foundation/credential-binding.js')>()),
+  credentialExecutionIdentity: mocks.identity,
 }));
 
 vi.mock('../index.js', async () => {
@@ -99,9 +114,14 @@ vi.mock('./service-binding.js', async () => {
 
 vi.mock('./service-preset-registry.js', () => ({
   getServicePresetRecord: (serviceId: string, presetPathHint?: string) => {
-    const raw = mocks.safeReadFile(presetPathHint || `${serviceId}.json`, {
-      encoding: 'utf8',
-    });
+    const raw = mocks.safeReadFile(
+      presetPathHint ||
+        mocks.loadServiceEndpointsCatalog()?.services[serviceId]?.preset_path ||
+        `${serviceId}.json`,
+      {
+        encoding: 'utf8',
+      }
+    );
     if (raw === undefined || raw === '') return null;
     const parsed = JSON.parse(String(raw)) as Record<string, unknown>;
     return {
@@ -262,6 +282,10 @@ const screenCaptureOutputPath = pathResolver.sharedTmp(
 describe('executeServicePreset', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.identity.mockReturnValue({});
+    mocks.authorizeTenant
+      .mockReset()
+      .mockReturnValue({ bindingId: 'binding-a', approvalRequired: false });
     process.env.KYBERION_ALLOW_UNSAFE_CLI = 'true';
     delete process.env.KYBERION_STANCE;
     mocks.resolveServiceBinding.mockReturnValue({ accessToken: 'test-token' });
@@ -482,6 +506,207 @@ describe('executeServicePreset', () => {
     await expect(
       executeServicePresetCached('test-service', 'read', {}, 'none', { cache_ttl_ms: 1000 })
     ).rejects.toThrow(/requires an admitted tenant service binding/);
+    expect(mocks.secureFetch).not.toHaveBeenCalled();
+  });
+
+  it('requires admission for ordinary tenant presets on direct and cached entry points', async () => {
+    const { executeServicePreset, executeServicePresetCached } =
+      await import('./service-engine.js');
+    mocks.safeReadFile.mockImplementation((filePath: string) =>
+      filePath.includes('mock/path.json')
+        ? JSON.stringify({ operations: { read: { type: 'api', risk: 'read', method: 'GET' } } })
+        : ''
+    );
+    mocks.identity.mockReturnValue({ tenantSlug: 'acme' });
+    await runInExecutionScope({ tenantBound: true, tenantSlug: 'acme' }, async () => {
+      await expect(executeServicePreset('test-service', 'read', {}, 'none')).rejects.toThrow(
+        /requires an admitted tenant service binding/
+      );
+      await expect(
+        executeServicePresetCached('test-service', 'read', {}, 'none', { cache_ttl_ms: 1000 })
+      ).rejects.toThrow(/requires an admitted tenant service binding/);
+    });
+    expect(mocks.secureFetch).not.toHaveBeenCalled();
+    expect(mocks.resolveServiceBinding).not.toHaveBeenCalled();
+  });
+
+  it.each([{ tenant_slug: 'other' }, { mission_id: 'other' }, { task_id: 'other' }])(
+    'rejects admission for a different execution identity: %j',
+    async (override) => {
+      const { executeServicePreset, executeServicePresetCached } =
+        await import('./service-engine.js');
+      mocks.safeReadFile.mockImplementation((filePath: string) =>
+        filePath.includes('mock/path.json')
+          ? JSON.stringify({ operations: { read: { type: 'api', risk: 'read', method: 'GET' } } })
+          : ''
+      );
+      const admission = issueTenantServiceEngineAdmission({
+        bindingId: 'binding-a',
+        approvalGranted: true,
+        securityScope: {
+          tenant_slug: 'acme',
+          mission_id: 'mission-a',
+          task_id: 'task-a',
+          read_tiers: ['confidential'],
+          write_tier: 'confidential',
+          purpose: 'test',
+          ...override,
+        },
+      });
+      mocks.identity.mockReturnValue({
+        tenantSlug: 'acme',
+        missionId: 'mission-a',
+        taskId: 'task-a',
+      });
+      await runInExecutionScope(
+        {
+          tenantBound: true,
+          tenantSlug: 'acme',
+          executionIdentity: { missionId: 'mission-a', taskId: 'task-a' },
+        },
+        async () => {
+          await expect(
+            executeServicePreset('test-service', 'read', {}, 'none', undefined, admission)
+          ).rejects.toThrow(/does not match execution identity/);
+          await expect(
+            executeServicePresetCached(
+              'test-service',
+              'read',
+              {},
+              'none',
+              { cache_ttl_ms: 1000 },
+              admission
+            )
+          ).rejects.toThrow(/does not match execution identity/);
+        }
+      );
+      expect(mocks.secureFetch).not.toHaveBeenCalled();
+      expect(mocks.resolveServiceBinding).not.toHaveBeenCalled();
+    }
+  );
+
+  it('revalidates ordinary preset admissions before execution and cache lookup', async () => {
+    mocks.identity.mockReturnValue({ tenantSlug: 'acme' });
+    const { executeServicePreset, executeServicePresetCached } =
+      await import('./service-engine.js');
+    mocks.safeReadFile.mockImplementation((filePath: string) =>
+      filePath.includes('mock/path.json')
+        ? JSON.stringify({ operations: { read: { type: 'api', risk: 'read', method: 'GET' } } })
+        : ''
+    );
+    const admission = issueTenantServiceEngineAdmission({
+      bindingId: 'binding-a',
+      approvalGranted: false,
+      securityScope: {
+        tenant_slug: 'acme',
+        mission_id: 'mission-a',
+        read_tiers: ['confidential'],
+        write_tier: 'confidential',
+        purpose: 'test',
+      },
+    });
+    mocks.authorizeTenant.mockImplementation(() => {
+      throw new Error('binding revoked');
+    });
+    await expect(
+      executeServicePreset('test-service', 'read', {}, 'none', undefined, admission)
+    ).rejects.toThrow('binding revoked');
+    await expect(
+      executeServicePresetCached(
+        'test-service',
+        'read',
+        {},
+        'none',
+        { cache_ttl_ms: 1000 },
+        admission
+      )
+    ).rejects.toThrow('binding revoked');
+    expect(mocks.authorizeTenant).toHaveBeenCalledTimes(2);
+    expect(mocks.secureFetch).not.toHaveBeenCalled();
+    expect(mocks.resolveServiceBinding).not.toHaveBeenCalled();
+  });
+
+  it('executes admitted tenant work without consulting a personal connection document', async () => {
+    const { executeServicePreset } = await import('./service-engine.js');
+    const helpers = await import('./service-engine-helpers.js');
+    const connection = vi.spyOn(helpers, 'loadConnectionWithFallback').mockImplementation(() => {
+      throw new Error('personal connection must not be read');
+    });
+    mocks.identity.mockReturnValue({ tenantSlug: 'acme' });
+    mocks.safeReadFile.mockImplementation((filePath: string) =>
+      filePath.includes('mock/path.json')
+        ? JSON.stringify({
+            operations: { read: { type: 'api', risk: 'read', method: 'GET', path: 'items' } },
+          })
+        : ''
+    );
+    mocks.secureFetch.mockResolvedValue({ ok: true });
+    const admission = issueTenantServiceEngineAdmission({
+      bindingId: 'binding-a',
+      approvalGranted: false,
+      securityScope: {
+        tenant_slug: 'acme',
+        mission_id: 'mission-a',
+        read_tiers: ['confidential'],
+        write_tier: 'confidential',
+        purpose: 'test',
+      },
+    });
+    try {
+      await expect(
+        executeServicePreset('test-service', 'read', {}, 'none', undefined, admission)
+      ).resolves.toEqual({ ok: true });
+      expect(connection).not.toHaveBeenCalled();
+      expect(mocks.authorizeTenant).toHaveBeenCalledOnce();
+      expect(mocks.secureFetch).toHaveBeenCalledOnce();
+    } finally {
+      connection.mockRestore();
+    }
+  });
+
+  it('cannot use a tenant admission under an operator or unbound runtime', async () => {
+    const { executeServicePreset, executeServicePresetCached } =
+      await import('./service-engine.js');
+    mocks.safeReadFile.mockImplementation((filePath: string) =>
+      filePath.includes('mock/path.json')
+        ? JSON.stringify({ operations: { read: { type: 'api', risk: 'read', method: 'GET' } } })
+        : ''
+    );
+    const admission = issueTenantServiceEngineAdmission({
+      bindingId: 'binding-a',
+      approvalGranted: true,
+      securityScope: {
+        tenant_slug: 'acme',
+        mission_id: 'mission-a',
+        read_tiers: ['confidential'],
+        write_tier: 'confidential',
+        purpose: 'test',
+      },
+    });
+    await expect(
+      executeServicePreset('test-service', 'read', {}, 'none', undefined, admission)
+    ).rejects.toThrow(/does not match execution identity/);
+    await expect(
+      executeServicePresetCached(
+        'test-service',
+        'read',
+        {},
+        'none',
+        { cache_ttl_ms: 1000 },
+        admission
+      )
+    ).rejects.toThrow(/does not match execution identity/);
+    expect(mocks.authorizeTenant).not.toHaveBeenCalled();
+    expect(mocks.resolveServiceBinding).not.toHaveBeenCalled();
+    expect(mocks.secureFetch).not.toHaveBeenCalled();
+  });
+
+  it('does not serve cached output after the service preset disappears', async () => {
+    const { executeServicePresetCached } = await import('./service-engine.js');
+    mocks.safeReadFile.mockReturnValue('');
+    await expect(
+      executeServicePresetCached('test-service', 'read', {}, 'none', { cache_ttl_ms: 1000 })
+    ).rejects.toThrow(/No service preset found/);
     expect(mocks.secureFetch).not.toHaveBeenCalled();
   });
 

@@ -1,3 +1,4 @@
+import { credentialExecutionIdentity } from '../foundation/credential-binding.js';
 import { assertNoHumanClaim, withExecutionIdentityLock } from './execution-claim-fence.js';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { currentOperationInterface, operationInterfaceResolver } from './operation-protection.js';
@@ -297,12 +298,18 @@ export function delegatedExecutionEffectConfigurationHash(input: DelegatedExecut
     const auth = target.params.auth;
     if (auth !== 'none' && auth !== 'secret-guard')
       throw new Error('unsupported delegated authentication mode');
+    if (auth === 'secret-guard' && target.tenantSlug !== credentialExecutionIdentity().tenantSlug) {
+      throw new Error(
+        '[POLICY_VIOLATION] Tenant service credentials require matching execution identity'
+      );
+    }
     // Only the digest is persisted. Endpoint, preset template, selected
     // account/connection and credential rotations invalidate issued permits.
     effectConfiguration = {
       config,
       preset,
-      connection: loadConnectionWithFallback(serviceId!),
+      // Match the engine: tenant work never inherits a personal connection document.
+      connection: target.tenantSlug ? {} : loadConnectionWithFallback(serviceId!),
       binding: resolveServiceBinding(serviceId!, auth),
       tenantBindings: listServiceBindingRecords()
         .filter(
