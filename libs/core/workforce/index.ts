@@ -12,7 +12,6 @@ export * from './background-review-policy.js';
 export * from './background-review-runner.js';
 export * from './work-coordination-error.js';
 export * from './work-coordination-import-catalog.js';
-export * from './work-coordination-peer.js';
 export * from './work-coordination-types.js';
 export type { ReapWorkLeasesOptions, ReapWorkLeasesResult } from './work-coordination.js';
 export {

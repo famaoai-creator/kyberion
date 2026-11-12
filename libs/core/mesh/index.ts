@@ -9,11 +9,9 @@ export * from './acp-mediator-entry.js';
 // skipped './acp-mediator.js' (all exports shadowed)
 export * from './handoff-history.js';
 export * from './handoff-packet.js';
-export * from './mesh-delivery-driver.js';
 export * from './mesh-hub-contract.js';
 export * from './mesh-hub-inspection.js';
 export * from './mesh-hub-peer-messaging-adapter.js';
-export * from './mesh-message-broker.js';
 export * from './mesh-peer-directory.js';
 export * from './peer-auto-reply.js';
 export * from './peer-conversation.js';
