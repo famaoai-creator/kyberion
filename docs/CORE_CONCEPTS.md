@@ -68,7 +68,7 @@ allocation, and approval of its effect are separate checks. Unknown personal
 ownership is not permission for every logged-in member, even on localhost.
 The [service integration guide](../knowledge/product/orchestration/service-integration-guide.md#solo-and-organization-rollout)
 describes the implemented boundary, deliberate legacy migration, and remaining
-credential-provenance and cross-owner allocation work.
+session/CLI provenance, local multi-account storage and acting-for UI work.
 
 ## 5. Surface
 

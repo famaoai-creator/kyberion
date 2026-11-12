@@ -284,9 +284,9 @@ with [`service-binding-record.schema.json`](../schemas/service-binding-record.sc
 Projects reference the applicable binding IDs through the governed project
 facade. The historical `owner_kind: "organization"` denotes ownership by the
 tenant, not by a department (Organization in Concept Model v2). A personal
-connection must stay person-owned. A future explicit allocation could permit
-its use for tenant work without transferring ownership; the current tenant
-service-binding path does not implement that allocation.
+connection must stay person-owned. Explicit owner-approved allocation can permit
+its use for tenant work through a provenance-aware broker without transferring ownership;
+see Selected credentials and explicit personal allocation below.
 
 ### Create and attach a tenant binding
 
@@ -331,17 +331,11 @@ cannot consume tenant admission. Tenant execution does not load a personal
 connection document. The separate information-asset capture capability retains
 its own scoped admission and does not become a general bypass.
 
-Credential resolution still uses the service-level secret guard and trusted
-task credential binding. Validating the service binding does **not** establish
-that its `secret_refs` selected the credential actually used. `pnpm
-kyberion secret introduce <service-id> <secret-key>` stores credentials for the
-active service profile/customer stance; it does not put a value into a tenant
-binding. It is suitable for a shared runtime credential, not for isolating
-different organization tokens. Tenant tasks need the existing trusted credential
-broker to bind their allowed secrets to the exact tenant/mission/task; a scoped
-miss must not fall back to an operator token. Whether a particular provider's
-connection references are provisioned by that broker still needs provider-specific
-verification. Run `pnpm service:setup` and
+Tenant credential resolution uses the selected binding's exact `secret_refs` and a trusted
+task credential envelope proving binding, service and owner. `pnpm kyberion secret introduce`
+is not tenant allocation: it stores service-level local material and does not establish
+per-connection provenance. Tenant tasks need a configured provenance-aware broker; scoped
+misses never fall back to operator material. Provider-specific provisioning remains required. Run `pnpm service:setup` and
 `pnpm service:preflight -- --service <service-id>` for credential readiness.
 
 Separately, if the tenant will send confidential or personal data to the
@@ -383,10 +377,10 @@ does not modify live grants, connection ownership, or deployment settings.
    presets, direct and cached execution, missing or mismatched runtime identity,
    revocation, and scoped credential misses without personal/operator fallback.
    Preserve the separately admitted capture path and personal no-tenant mode.
-4. **Remaining implementation:** bind selected connection references to actual
-   provider credential provenance, with revocation and freshness evidence;
-   design bounded cross-owner allocation without relabeling the owner; then
-   expose acting-for context and setup/readiness clearly in the UI. Each stage
+4. **Provenance and allocation:** the API-token broker path below binds selected
+   references and owner-approved allocation with freshness checks. Remaining work is
+   session/CLI provenance, local multi-account material storage, and clear acting-for
+   context and setup/readiness in the UI. Each stage
    needs tests at its real execution boundary before being called enforced.
    Existing source-of-truth records must be extended rather than duplicated.
 
@@ -417,3 +411,45 @@ setup.
 - [Secret Introduction Model](../architecture/secret-introduction-model.md)
 - [Initialization: external service setup](../../../docs/INITIALIZATION.md#4b-external-service-setup-and-preflight)
 - [Service capability inventory](../../../CAPABILITIES_GUIDE.md)
+
+### Selected credentials and explicit personal allocation
+
+Tenant PRESET execution now requires broker-issued per-secret provenance matching the selected
+service binding, service ID, and current owner. A matching environment-variable name alone is
+not evidence of which connection supplied it. No undeclared suffix fallback is permitted.
+Cached getters revalidate the task and selected connection; delegated effect fingerprints include
+the selected binding ID. Personal/operator execution remains unchanged.
+
+Configured shell brokers may return a version 2 task-binding response with `secrets` and
+`secretProvenance`, keyed by the same environment names. Each provenance entry contains
+`serviceBindingId`, `serviceId`, and `sourceOwnerRef`. Identity still comes from the current claim,
+not the response. Version 1 remains supported for reasoning credentials but cannot authorize the
+new selected-service path. Version 2 responses are re-attested at use time: return stable serialized
+content for an unchanged claim; rotation, withdrawal, or changed connection records invalidate the
+current binding. No credential values belong in logs, grant drafts, or approval descriptions.
+
+A personal connection remains `owner_kind: person`, with no tenant slug. Tenant use must select
+its binding ID explicitly and carry an active `credential.use` standing grant with a
+`service_allocation` scope. The source owner must be the authenticated human who actually approved
+it, checked both before grant creation and during use; a tenant role or editable `granted_by`
+label is insufficient. The allocation binds owner, binding, declared target, service, exact secret-reference set,
+actions, recipient tenant, purpose and expiry, optionally narrowed by project, mission and task.
+Existing project binding admission and per-action effect approvals remain additional checks.
+
+Prepare the allocation through the existing grant workflow, for example (references only):
+
+```sh
+pnpm kyberion grants grant --capability credential.use --tenant acme --purpose 'Read work messages' --days 1 --service-allocation '{"binding_id":"personal-slack","target":"work-channel","owner_ref":"user:owner","service_id":"slack","secret_refs":["SLACK_TOKEN"],"allowed_actions":["read"]}' --request-approval
+```
+
+After the source owner approves, repeat the same draft using `--approval-request-id <id>`.
+The configured broker's matching personal-source provenance must also name `allocationGrantId`.
+Every use checks the current claim, connection, grant, approval basis and broker response. Ordinary
+revocation uses the existing `grants revoke` flow. Ambiguous grants, changed owners, withdrawn
+approval, other actions/scopes, and missing provenance fail closed.
+
+This path intentionally does **not** read a service-wide local personal connection file to infer
+per-binding provenance. An already configured broker must attest the exact source; no broker is
+installed or configured automatically. Session/CLI credential provenance and local multi-account
+material storage are not covered by this API-token path. No real allocations or migrations are
+performed by installing this code.
