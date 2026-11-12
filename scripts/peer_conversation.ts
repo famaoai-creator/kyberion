@@ -4,6 +4,8 @@ import {
   createPeerConversationSession,
   listPeerConversationSessions,
   loadPeerConversationSession,
+  PeerConversationBookkeepingError,
+  resolvesThroughTenantPeerCatalog,
   savePeerConversationSession,
   sendPeerConversationMessageToPeer,
 } from '@agent/core/mesh/peer-conversation';
@@ -28,7 +30,7 @@ function normalizePeerConversationArguments(args: string[]): string[] {
   return stripSharedScriptFlags(args);
 }
 
-async function main(
+export async function main(
   args: string[] = [],
   options: { dryRun?: boolean; check?: boolean } = {}
 ): Promise<unknown> {
@@ -110,7 +112,12 @@ async function main(
       }
       const senderPeerId = String(argv['local-peer-id'] || argv['peer-id'] || '');
       // A send through an explicit catalog is never re-sent by outbox redelivery.
-      const recovery = argv.catalog ? ('caller' as const) : undefined;
+      const recovery = resolvesThroughTenantPeerCatalog({
+        tenantId,
+        ...(argv.catalog ? { catalogPath: String(argv.catalog) } : {}),
+      })
+        ? undefined
+        : ('caller' as const);
       const outcome = await sendPeerConversationMessageToPeer({
         tenantId,
         senderPeerId,
@@ -125,6 +132,12 @@ async function main(
         timeoutMs: Number(argv['timeout-ms']),
         catalogPath: argv.catalog ? String(argv.catalog) : undefined,
       }).catch((error: unknown) => {
+        if (error instanceof PeerConversationBookkeepingError) {
+          throw new Error(
+            `peer_conversation_message_delivered_but_not_recorded:${error.receipt.message_id} — the peer accepted the message, but its reply was not recorded in the local transcript: ${error.cause instanceof Error ? error.cause.message : String(error.cause)} | next: do not send it again; the outbox redelivery pass retries the transcript record for 24 h`,
+            { cause: error }
+          );
+        }
         const failure = peerDeliveryFailureOf(error);
         if (!failure) throw error;
         const message = error instanceof Error ? error.message : String(error);

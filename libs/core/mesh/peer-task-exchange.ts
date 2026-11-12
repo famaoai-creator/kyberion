@@ -51,6 +51,8 @@ import {
 } from './peer-messaging.js';
 import {
   PEER_CATALOG_READER_ROLE,
+  PeerConversationBookkeepingError,
+  resolvesThroughTenantPeerCatalog,
   sendPeerConversationMessageToPeer,
   type PeerConversationTranscriptEntry,
 } from './peer-conversation.js';
@@ -456,6 +458,16 @@ async function sendPeerTaskProposal(
     if (!sent.receipt.ok) throw new PeerTaskMessageNotDelivered(sent.receipt);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    if (error instanceof PeerConversationBookkeepingError) {
+      // The receiver has the proposal: it is delivered. Only the local
+      // transcript record of its reply failed (the redelivery pass replays it).
+      const reply = extractReply(error.receipt);
+      const record = recordProposalDelivered(outbound, reply);
+      log.warn(
+        `proposal ${outbound.task_id} was delivered, but the peer's reply was not recorded in the local conversation transcript — ${message} | next: do not propose again; the outbox redelivery pass retries the transcript record for 24 h | session=${outbound.session_id}`
+      );
+      return { request, record, ...(reply?.text ? { reply_text: reply.text } : {}) };
+    }
     appendRecord({
       ...outbound,
       proposal_delivery: { status: 'failed', at: nowIso(), error: message.slice(0, 500) },
@@ -489,12 +501,17 @@ function notDeliveredNextStep(
 ): string {
   const failure =
     error instanceof PeerTaskMessageNotDelivered ? error.failure : peerDeliveryFailureOf(error);
+  // Same rule as the send: only the tenant's own catalog file is redelivered.
+  const callerManaged = !resolvesThroughTenantPeerCatalog({
+    tenantId: record.tenant_id,
+    ...(peerCatalogPath ? { catalogPath: peerCatalogPath } : {}),
+  });
   const outcome = describePeerDeliveryFailureNextStep({
     failure,
     senderPeerId: record.local_peer_id,
-    ...(peerCatalogPath ? { recovery: 'caller' as const } : {}),
+    ...(callerManaged ? { recovery: 'caller' as const } : {}),
   });
-  const willRetry = failure?.disposition === 'retryable' && !peerCatalogPath;
+  const willRetry = failure?.disposition === 'retryable' && !callerManaged;
   return willRetry
     ? outcome
     : `${outcome} | next: pnpm kyberion peer task ${resendCommand} --peer-id ${record.local_peer_id} --task-id ${record.task_id}`;
@@ -1184,6 +1201,12 @@ export async function deliverPeerTaskResult(input: {
     return recordResultDelivered(record, messageId);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    if (error instanceof PeerConversationBookkeepingError) {
+      log.warn(
+        `result for ${record.task_id} was delivered, but the peer's reply was not recorded in the local conversation transcript — ${message} | next: do not resend; the outbox redelivery pass retries the transcript record for 24 h | session=${record.session_id}`
+      );
+      return recordResultDelivered(record, messageId);
+    }
     log.warn(
       `result for ${record.task_id} not delivered — ${message} | ${notDeliveredNextStep(error, record, input.peerCatalogPath, 'resend-result')}`
     );

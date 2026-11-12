@@ -109,6 +109,7 @@ describe('run_doctor peer outbox lines', () => {
     counts: {
       delivered: 0,
       refused: 0,
+      unconfirmed: 0,
       given_up: 0,
       retrying: 0,
       caller_managed: 0,
@@ -138,9 +139,23 @@ describe('run_doctor peer outbox lines', () => {
     );
     const { collectPeerOutboxDoctorLines } = await import('./run_doctor.js');
     expect(collectPeerOutboxDoctorLines()).toEqual([
-      'Peer outbox (peer-a): delivered=4; retrying=2; refused=0; given_up=1; caller_managed=0; legacy_failed=0',
+      'Peer outbox (peer-a): delivered=4; retrying=2; refused=0; unconfirmed=0; given_up=1; caller_managed=0; legacy_failed=0',
       '  - inspect via `pnpm kyberion peer outbox status --peer-id peer-a --tenant-id acme`',
-      'Peer outbox (peer-b): delivered=3; retrying=0; refused=0; given_up=0; caller_managed=0; legacy_failed=0',
+      'Peer outbox (peer-b): delivered=3; retrying=0; refused=0; unconfirmed=0; given_up=0; caller_managed=0; legacy_failed=0',
+    ]);
+  });
+
+  it('keeps the other peers when one outbox cannot be read', async () => {
+    vi.stubEnv('KYBERION_TENANT', 'acme');
+    mocks.listPeerOutboxPeerIds.mockReturnValue(['peer-a', 'peer-b']);
+    mocks.summarizePeerOutbox.mockImplementation((_tenant: string, peerId: string) => {
+      if (peerId === 'peer-a') throw new Error('EACCES');
+      return counts({ delivered: 3 });
+    });
+    const { collectPeerOutboxDoctorLines } = await import('./run_doctor.js');
+    expect(collectPeerOutboxDoctorLines()).toEqual([
+      'Peer outbox (peer-a): inspection unavailable (EACCES)',
+      'Peer outbox (peer-b): delivered=3; retrying=0; refused=0; unconfirmed=0; given_up=0; caller_managed=0; legacy_failed=0',
     ]);
   });
 

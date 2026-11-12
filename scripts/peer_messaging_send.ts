@@ -5,6 +5,8 @@ import {
   peerDeliveryFailureOf,
   buildPeerMessageEnvelope,
   loadPeerNetworkCatalog,
+  peerNetworkCatalogPath,
+  resolvePeerNetworkCatalogPath,
   resolvePeerDispatchTarget,
   sendPeerMessage,
 } from '@agent/core/mesh/peer-messaging';
@@ -104,7 +106,11 @@ export async function main(
 
   // Outbox redelivery resolves the recipient through the tenant catalog, so a
   // send addressed through an explicit catalog is never re-sent automatically.
-  const recovery = argv.catalog ? ('caller' as const) : undefined;
+  const recovery =
+    !argv.catalog &&
+    resolvePeerNetworkCatalogPath({ tenantId }) === peerNetworkCatalogPath(tenantId)
+      ? undefined
+      : ('caller' as const);
   const senderPeerId = String(argv['from-peer-id']);
   let receipt: Awaited<ReturnType<typeof sendPeerMessage>>;
   try {

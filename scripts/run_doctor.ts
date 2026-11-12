@@ -307,12 +307,21 @@ export function collectPeerOutboxDoctorLines(): string[] {
     if (!tenantId) return [];
     const lines: string[] = [];
     for (const peerId of listPeerOutboxPeerIds(tenantId)) {
-      const { counts } = summarizePeerOutbox(tenantId, peerId);
+      let counts: ReturnType<typeof summarizePeerOutbox>['counts'];
+      try {
+        counts = summarizePeerOutbox(tenantId, peerId).counts;
+      } catch (err) {
+        // One unreadable outbox must not hide the other peers' lines.
+        lines.push(
+          `Peer outbox (${peerId}): inspection unavailable (${err instanceof Error ? err.message : String(err)})`
+        );
+        continue;
+      }
       if (Object.values(counts).every((count) => count === 0)) continue;
       lines.push(
-        `Peer outbox (${peerId}): delivered=${counts.delivered}; retrying=${counts.retrying}; refused=${counts.refused}; given_up=${counts.given_up}; caller_managed=${counts.caller_managed}; legacy_failed=${counts.legacy_failed}`
+        `Peer outbox (${peerId}): delivered=${counts.delivered}; retrying=${counts.retrying}; refused=${counts.refused}; unconfirmed=${counts.unconfirmed}; given_up=${counts.given_up}; caller_managed=${counts.caller_managed}; legacy_failed=${counts.legacy_failed}`
       );
-      if (counts.retrying + counts.refused + counts.given_up > 0) {
+      if (counts.retrying + counts.refused + counts.unconfirmed + counts.given_up > 0) {
         lines.push(
           `  - inspect via \`pnpm kyberion peer outbox status --peer-id ${peerId} --tenant-id ${tenantId}\``
         );

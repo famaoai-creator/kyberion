@@ -26,13 +26,17 @@ import {
   PEER_RETRY_AFTER_MAX_MS,
   peerDeliveryFailureOf,
   peerRuntimeLogicalPath,
+  registerPeerNetworkPeer,
   sendPeerMessage,
+  sendPeerMessageToPeer,
   type PeerMessageEnvelope,
   type PeerNetworkCatalog,
 } from './peer-messaging.js';
 import {
   appendPeerConversationTranscript,
+  buildPeerConversationEnvelope,
   clearPeerConversationRuntime,
+  PeerConversationBookkeepingError,
   createPeerConversationResponder,
   loadPeerConversationSession,
   sendPeerConversationMessageToPeer,
@@ -40,6 +44,7 @@ import {
 import { deliverPeerAutoReply } from './peer-auto-reply.js';
 import { appendGovernedArtifactJsonl } from '../workforce/artifact-store.js';
 import { pathResolver } from '../path-resolver.js';
+import { withExecutionContext } from '../authority.js';
 import { safeRmSync, safeWriteFile } from '../secure-io.js';
 import {
   applyPeerDeliveryBookkeeping,
@@ -66,6 +71,19 @@ const CATALOG: PeerNetworkCatalog = {
     { peer_id: RECIPIENT, base_url: DESTINATION, shared_secret: SECRET, exposure: 'same_host' },
   ],
 };
+
+/** Registers the recipient in the tenant's own catalog file (removed after each test). */
+function useTenantCatalog(): void {
+  withExecutionContext('sovereign_concierge', () =>
+    registerPeerNetworkPeer({
+      tenantId: TENANT,
+      peerId: RECIPIENT,
+      baseUrl: DESTINATION,
+      sharedSecret: SECRET,
+      exposure: 'same_host',
+    })
+  );
+}
 
 function envelopeFor(messageId: string, ttlMs?: number): PeerMessageEnvelope {
   return buildPeerMessageEnvelope({
@@ -120,6 +138,12 @@ describe('peer outbox redelivery', () => {
 
   afterEach(() => {
     vi.unstubAllEnvs();
+    withExecutionContext('ecosystem_architect', () =>
+      safeRmSync(pathResolver.resolve(`knowledge/confidential/${TENANT}`), {
+        recursive: true,
+        force: true,
+      })
+    );
     fetchSpy.mockRestore();
     vi.useRealTimers();
     clearPeerRuntime(TENANT, SENDER);
@@ -273,9 +297,8 @@ describe('peer outbox redelivery', () => {
   });
 
   it('records the reply of a redelivered conversation message in the sender transcript, once', async () => {
-    safeWriteFile(CATALOG_PATH, JSON.stringify(CATALOG));
-    // Configured catalog, not an explicit --catalog path (those sends are caller-managed).
-    vi.stubEnv('KYBERION_PEER_NETWORK_CATALOG', CATALOG_PATH);
+    // The tenant's own catalog file: sends through any other catalog are caller-managed.
+    useTenantCatalog();
     const receiver = createPeerMessagingServer({
       peerId: RECIPIENT,
       tenantId: TENANT,
@@ -406,6 +429,7 @@ describe('peer outbox redelivery', () => {
     expect(summarizePeerOutbox(TENANT, SENDER).counts).toEqual({
       delivered: 1,
       refused: 0,
+      unconfirmed: 0,
       given_up: 0,
       retrying: 0,
       caller_managed: 0,
@@ -799,7 +823,13 @@ describe('peer outbox redelivery', () => {
       reason: 'transport_error',
     });
     expect(outboxRows().at(-1)!.http_status).toBeUndefined();
-    expect(summarizePeerOutbox(TENANT, SENDER).counts).toMatchObject({ retrying: 3, refused: 4 });
+    // The unreadable 2xx is not labelled as a refusal: the receiver may have handled it.
+    const summary = summarizePeerOutbox(TENANT, SENDER);
+    expect(summary.counts).toMatchObject({ retrying: 3, refused: 3, unconfirmed: 1 });
+    expect(summary.undelivered.find((entry) => entry.message_id === 'PM-HTML-200')).toMatchObject({
+      state: 'unconfirmed',
+      reason: 'invalid_response',
+    });
   });
 
   it('treats a message as delivered when a later send succeeds after it was given up', async () => {
@@ -933,8 +963,7 @@ describe('peer outbox redelivery', () => {
   });
 
   it('records an inbound conversation message once when the receiver died mid-handler', async () => {
-    safeWriteFile(CATALOG_PATH, JSON.stringify(CATALOG));
-    vi.stubEnv('KYBERION_PEER_NETWORK_CATALOG', CATALOG_PATH);
+    useTenantCatalog();
     const onMessage = vi.fn();
     const newReceiver = () =>
       createPeerMessagingServer({
@@ -987,6 +1016,139 @@ describe('peer outbox redelivery', () => {
       safeRmSync(CATALOG_PATH, { force: true });
       clearPeerConversationRuntime(TENANT, SENDER);
       clearPeerConversationRuntime(TENANT, RECIPIENT);
+    }
+  });
+
+  it('marks sends that resolve through a catalog override as caller-managed', async () => {
+    safeWriteFile(CATALOG_PATH, JSON.stringify(CATALOG));
+    try {
+      // KYBERION_PEER_NETWORK_CATALOG: the pass would read the tenant file instead.
+      vi.stubEnv('KYBERION_PEER_NETWORK_CATALOG', CATALOG_PATH);
+      fetchSpy.mockRejectedValue(new Error('connect ECONNREFUSED'));
+      await expect(
+        sendPeerConversationMessageToPeer({
+          tenantId: TENANT,
+          senderPeerId: SENDER,
+          recipientPeerId: RECIPIENT,
+          sessionId: 'PCS-OUTBOX-ENV',
+          topic: 'outbox',
+          text: 'through the env catalog',
+        })
+      ).rejects.toThrow();
+      // An explicit catalog object.
+      await expect(
+        sendPeerMessageToPeer(RECIPIENT, envelopeFor('PM-CATALOG-OBJECT'), { catalog: CATALOG })
+      ).rejects.toThrow();
+      expect(outboxRows().map((row) => row.recovery)).toEqual(['caller', 'caller']);
+      vi.unstubAllEnvs();
+      advance(600_000);
+      expect(await pass()).toMatchObject({ delivered: [], given_up: [], waiting: 0 });
+      expect(fetchSpy).toHaveBeenCalledTimes(2);
+    } finally {
+      safeRmSync(CATALOG_PATH, { force: true });
+      clearPeerConversationRuntime(TENANT, SENDER);
+    }
+  });
+
+  it('reports a delivered message whose reply could not be recorded as delivered, and the pass repairs a first-try row', async () => {
+    useTenantCatalog();
+    const receiver = createPeerMessagingServer({
+      peerId: RECIPIENT,
+      tenantId: TENANT,
+      sharedSecret: SECRET,
+      responder: createPeerConversationResponder({ peerId: RECIPIENT, tenantId: TENANT }),
+    });
+    const inbound = (sessionId: string) =>
+      (loadPeerConversationSession(TENANT, SENDER, sessionId)?.transcript ?? []).filter(
+        (entry) => entry.direction === 'inbound'
+      );
+    try {
+      // The receiver accepts, but its reply names the wrong peer: local bookkeeping fails.
+      fetchSpy.mockImplementationOnce(async (_url, init) => {
+        const result = await receiver.processEnvelope(JSON.parse(String(init?.body)));
+        const body = result.body as { response: { reply: Record<string, unknown> } };
+        body.response.reply.sender_peer_id = 'someone-else';
+        return jsonResponse(result.status, body);
+      });
+      const error = await sendPeerConversationMessageToPeer({
+        tenantId: TENANT,
+        senderPeerId: SENDER,
+        recipientPeerId: RECIPIENT,
+        sessionId: 'PCS-OUTBOX-BOOKKEEPING',
+        topic: 'outbox',
+        text: 'accepted, reply unusable',
+      }).catch((caught: unknown) => caught);
+      expect(error).toBeInstanceOf(PeerConversationBookkeepingError);
+      expect((error as PeerConversationBookkeepingError).receipt.ok).toBe(true);
+      // Not a delivery failure: the outbox says sent and nothing is re-sent.
+      expect(outboxRows().map((row) => row.status)).toEqual(['sent']);
+
+      // A first-try `sent` row whose bookkeeping never ran (crash right after
+      // the row): the next pass records the reply from the row.
+      const envelope = buildPeerConversationEnvelope({
+        tenantId: TENANT,
+        senderPeerId: SENDER,
+        recipientPeerId: RECIPIENT,
+        sharedSecret: SECRET,
+        sessionId: 'PCS-OUTBOX-FIRST-TRY',
+        topic: 'outbox',
+        text: 'crashed before bookkeeping',
+      });
+      appendPeerConversationTranscript({
+        tenantId: TENANT,
+        sessionId: 'PCS-OUTBOX-FIRST-TRY',
+        localPeerId: SENDER,
+        remotePeerId: RECIPIENT,
+        kind: 'message',
+        direction: 'outbound',
+        text: 'crashed before bookkeeping',
+      });
+      fetchSpy.mockImplementationOnce(async (_url, init) => {
+        const result = await receiver.processEnvelope(JSON.parse(String(init?.body)));
+        return jsonResponse(result.status, result.body);
+      });
+      await sendPeerMessage(envelope, { destinationUrl: DESTINATION, allowLocalNetwork: true });
+      expect(inbound('PCS-OUTBOX-FIRST-TRY')).toEqual([]);
+      advance(1_000);
+      const repaired = await pass();
+      // The unusable reply stays reported; the repairable one is recorded.
+      expect(repaired.bookkeeping_failed).toHaveLength(1);
+      expect(inbound('PCS-OUTBOX-FIRST-TRY').map((entry) => entry.text)).toEqual([
+        `Received by ${RECIPIENT}: crashed before bookkeeping`,
+      ]);
+      expect(fetchSpy).toHaveBeenCalledTimes(2);
+    } finally {
+      clearPeerConversationRuntime(TENANT, SENDER);
+      clearPeerConversationRuntime(TENANT, RECIPIENT);
+    }
+  });
+
+  it('does not throw on a hand-edited row whose time is at the edge of the date range', async () => {
+    appendGovernedArtifactJsonl(
+      'surface_runtime',
+      peerRuntimeLogicalPath(TENANT, SENDER, 'outbox.jsonl'),
+      {
+        sent_at: '+275760-09-13T00:00:00.000Z',
+        destination_url: DESTINATION,
+        status: 'failed',
+        envelope: envelopeFor('PM-FAR-FUTURE'),
+        response: null,
+        disposition: 'retryable',
+        reason: 'transport_error',
+      }
+    );
+    const summary = summarizePeerOutbox(TENANT, SENDER);
+    expect(summary.retrying).toHaveLength(1);
+    expect(summary.retrying[0].next_attempt_at).toBe('+275760-09-13T00:00:00.000Z');
+    const result = await pass({ policy: { retryWindowMs: Number.MAX_SAFE_INTEGER } });
+    expect(result).toMatchObject({ waiting: 1, next_attempt_at: '+275760-09-13T00:00:00.000Z' });
+  });
+
+  it('rejects a timer interval that would spin', () => {
+    for (const intervalMs of [0, -1, 1, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(() =>
+        createPeerOutboxRedelivery({ tenantId: TENANT, peerId: SENDER, intervalMs })
+      ).toThrow(/invalid_peer_outbox_redelivery_interval/);
     }
   });
 
