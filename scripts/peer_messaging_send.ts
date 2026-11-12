@@ -10,6 +10,7 @@ import {
   resolvePeerDispatchTarget,
   sendPeerMessage,
 } from '@agent/core/mesh/peer-messaging';
+import { loadTenantPeerCatalog } from '@agent/core/mesh/peer-conversation';
 import { getRegisteredEnvText } from '@agent/core/foundation';
 import { defineScript, isDirectScript, stripSharedScriptFlags } from './lib/harness.js';
 import { parseSafeJsonInput } from './lib/json-input.js';
@@ -82,11 +83,21 @@ export async function main(
     })
     .parseSync();
 
-  const catalog = loadPeerNetworkCatalog({
-    ...(argv.catalog ? { catalogPath: String(argv.catalog) } : {}),
-    ...(argv['tenant-id'] ? { tenantId: String(argv['tenant-id']) } : {}),
-  });
   const tenantId = String(argv['tenant-id']);
+  // The tenant's own catalog is confidential-tier: read it under the
+  // tenant-bound catalog reader, like every other peer sender, so the command
+  // works for an operator role that cannot read that tier. Only such a send is
+  // re-sent by outbox redelivery; an explicit catalog or the
+  // KYBERION_PEER_NETWORK_CATALOG override is read as the caller and is not.
+  const throughTenantCatalog =
+    !argv.catalog &&
+    resolvePeerNetworkCatalogPath({ tenantId }) === peerNetworkCatalogPath(tenantId);
+  const catalog = throughTenantCatalog
+    ? loadTenantPeerCatalog(tenantId)
+    : loadPeerNetworkCatalog({
+        ...(argv.catalog ? { catalogPath: String(argv.catalog) } : {}),
+        tenantId,
+      });
   const target = resolvePeerDispatchTarget(String(argv['to-peer-id']), catalog);
   const payload = parseSafeJsonInput(String(argv.payload || '{}'), 'peer message payload');
   const envelope = buildPeerMessageEnvelope({
@@ -104,13 +115,7 @@ export async function main(
     ...(argv['correlation-id'] ? { correlationId: String(argv['correlation-id']) } : {}),
   });
 
-  // Outbox redelivery resolves the recipient through the tenant catalog, so a
-  // send addressed through an explicit catalog is never re-sent automatically.
-  const recovery =
-    !argv.catalog &&
-    resolvePeerNetworkCatalogPath({ tenantId }) === peerNetworkCatalogPath(tenantId)
-      ? undefined
-      : ('caller' as const);
+  const recovery = throughTenantCatalog ? undefined : ('caller' as const);
   const senderPeerId = String(argv['from-peer-id']);
   let receipt: Awaited<ReturnType<typeof sendPeerMessage>>;
   try {

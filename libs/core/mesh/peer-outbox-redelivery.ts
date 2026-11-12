@@ -620,6 +620,42 @@ export interface PeerOutboxRedeliveryConfig extends Omit<
   intervalMs?: number;
 }
 
+/**
+ * The result of a tick with nothing to do, or `undefined` when at least one
+ * tracked message needs the pass: a retry that is due, expired or exhausted,
+ * or a redelivered message whose bookkeeping is not confirmed yet.
+ */
+function idlePassResult(
+  states: Map<string, PeerOutboxMessageState>,
+  policy: PeerOutboxRedeliveryPolicy,
+  at: number
+): PeerOutboxRedeliveryPassResult | undefined {
+  let nextAttemptAt = Number.POSITIVE_INFINITY;
+  let waiting = 0;
+  for (const state of states.values()) {
+    if (state.state !== 'retrying') return undefined;
+    // A row without its envelope cannot be re-sent; the pass skips it too.
+    if (!state.envelope || !state.destination_url) continue;
+    const deadline = state.expires_at
+      ? Date.parse(state.expires_at)
+      : Date.parse(state.created_at) + policy.retryWindowMs;
+    const next = peerOutboxNextAttemptAt(state, policy);
+    if (state.attempts >= policy.maxAttempts || !(at < deadline) || !(at < next)) return undefined;
+    waiting += 1;
+    nextAttemptAt = Math.min(nextAttemptAt, next);
+  }
+  return {
+    status: 'completed',
+    delivered: [],
+    refused: [],
+    given_up: [],
+    retry_scheduled: [],
+    bookkeeping_failed: [],
+    waiting,
+    ...(Number.isFinite(nextAttemptAt) ? { next_attempt_at: toIso(nextAttemptAt) } : {}),
+  };
+}
+
 export interface PeerOutboxRedelivery {
   /** One pass; a call made while a pass runs returns that pass. */
   runOnce(): Promise<PeerOutboxRedeliveryPassResult>;
@@ -649,6 +685,17 @@ export function createPeerOutboxRedelivery(
 
   const runOnce = (): Promise<PeerOutboxRedeliveryPassResult> => {
     if (running) return running;
+    // Idle tick: read what was appended since the last tick (a stat when
+    // nothing was) and stop there unless a message needs work now. No lock is
+    // taken and nothing is written, so a server with an empty or fully
+    // delivered outbox costs one stat per interval. Anything due is decided
+    // again under the lock by the pass itself.
+    const idle = idlePassResult(
+      tracker.refresh(),
+      resolvePolicy(config.policy),
+      (config.now ?? Date.now)()
+    );
+    if (idle) return Promise.resolve(idle);
     running = runPass(
       { ...config, shouldStop: () => stopRequested },
       () => tracker.refresh(),

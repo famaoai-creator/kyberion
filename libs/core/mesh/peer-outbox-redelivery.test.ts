@@ -44,6 +44,7 @@ import {
 import { deliverPeerAutoReply } from './peer-auto-reply.js';
 import { appendGovernedArtifactJsonl } from '../workforce/artifact-store.js';
 import { pathResolver } from '../path-resolver.js';
+import { acquireLock, releaseLock } from '../foundation/lock-utils.js';
 import { withExecutionContext } from '../authority.js';
 import { safeRmSync, safeWriteFile } from '../secure-io.js';
 import {
@@ -938,6 +939,45 @@ describe('peer outbox redelivery', () => {
     });
     await pass({ shouldStop: () => stop, onDelivered });
     expect(onDelivered).toHaveBeenCalledTimes(1);
+  });
+
+  it('takes no lock and sends nothing on a tick with no message due', async () => {
+    const lockId = `peer-outbox-redelivery:${TENANT}/${SENDER}`;
+    const worker = createPeerOutboxRedelivery({
+      tenantId: TENANT,
+      peerId: SENDER,
+      catalog: CATALOG,
+    });
+    // A delivered message is confirmed by one pass (bookkeeping), then leaves nothing to do.
+    fetchSpy.mockImplementation(async () => accepted('any'));
+    await send(envelopeFor('PM-IDLE-DELIVERED'));
+    expect((await worker.runOnce()).bookkeeping_failed).toEqual([]);
+
+    // Another process holds the outbox lock: an idle tick must not even ask for it.
+    expect(await acquireLock(lockId, 0)).toBe(true);
+    try {
+      expect(await worker.runOnce()).toMatchObject({ status: 'completed', waiting: 0 });
+
+      // A failed message that is not due yet is counted, with its next attempt time.
+      fetchSpy.mockRejectedValue(new Error('timeout'));
+      await send(envelopeFor('PM-IDLE-WAITING'));
+      const callsBefore = fetchSpy.mock.calls.length;
+      const waiting = await worker.runOnce();
+      expect(waiting).toMatchObject({ status: 'completed', waiting: 1 });
+      expect(waiting.next_attempt_at).toBeDefined();
+      expect(fetchSpy.mock.calls.length).toBe(callsBefore);
+
+      // Once it is due the tick becomes a real pass, which needs the lock.
+      advance(5_000);
+      expect(await worker.runOnce()).toMatchObject({
+        status: 'skipped',
+        reason: 'pass_in_progress',
+      });
+    } finally {
+      releaseLock(lockId);
+    }
+    fetchSpy.mockImplementation(async () => accepted('any'));
+    expect((await worker.runOnce()).delivered).toEqual(['PM-IDLE-WAITING']);
   });
 
   it('starts over when the outbox file is replaced under a running worker', async () => {
