@@ -1098,11 +1098,6 @@ const INLINE_OP_HANDLERS: Record<string, InlineOpHandler> = {
 
     return (await domainOps()).runInlineComplianceScan(step, params, ctx);
   },
-  'core:run_mesh_delivery': async (dctx) => {
-    const { step, params, ctx } = dctx;
-
-    return (await domainOps()).runInlineMeshDelivery(step, params, ctx);
-  },
   'core:run_promote_procedure': async (dctx) => {
     const { step, params, ctx } = dctx;
 

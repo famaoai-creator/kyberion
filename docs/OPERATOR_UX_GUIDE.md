@@ -172,7 +172,6 @@ Kyberion doctor is **`pnpm kyberion doctor`** (`pnpm run doctor` is equivalent).
 | `volatile-index-daily`  |  Daily 05:00 JST | Rebuild the volatile knowledge index.                                                                                      |
 | `daily-routine`         |  Daily 06:00 JST | Open daily journal/TODO and roll over pending items.                                                                       |
 | `weekly-review`         | Monday 07:00 JST | Open weekly review, nominate promotion candidates, write task-model routing stats, and summarize queued memory candidates. |
-| `mesh-delivery-5min`    |  Every 5 minutes | Drive queued Mesh Hub deliveries (claim → dispatch → ack/retry/dead-letter). Requires `KYBERION_MESH_PEER_ID`.             |
 
 Typical managed entries include:
 
