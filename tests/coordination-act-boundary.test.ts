@@ -120,7 +120,8 @@ const REGISTERED_DECLARATIONS: Readonly<Record<string, string>> = {
     'MESH_REQUEST_KIND_ACTS (MESH_RECEIVE_MODES is receive-side configuration, not a message kind)',
   'libs/core/mesh/peer-conversation.ts': 'PEER_CONVERSATION_MESSAGE_KIND_ACTS',
   'libs/core/workforce/co-session.ts': 'CO_SESSION_HANDOFF_KIND_ACTS',
-  'libs/core/workforce/work-coordination-peer.ts': 'WORK_COORDINATION_PEER_COMMAND_ACTS',
+  'libs/core/mesh/mesh-hub-peer-messaging-adapter.ts':
+    'MESH_WORKITEM_COMMAND_ACTS (command_type of the stored workitem-command payload)',
   'libs/core/discussion/discussion-types.ts': 'DISCUSSION_PERFORMATIVE_ACTS',
   'libs/core/discussion/discussion-speaker.ts':
     'DISCUSSION_PERFORMATIVE_ACTS (zod enum copy of DiscussionPerformative)',
@@ -227,14 +228,14 @@ describe('coordination-act gate', () => {
     }
   });
 
-  it('maps a Mesh workitem request kind and the peer command it becomes the same way', () => {
+  it('maps a Mesh workitem request kind and the stored command it records the same way', () => {
     const commandFor = {
       'workitem.claim': 'claim_request',
       'workitem.handoff': 'handoff_request',
       'workitem.status_update': 'status_update',
     } as const;
     for (const [kind, command] of Object.entries(commandFor)) {
-      expect(actMap.WORK_COORDINATION_PEER_COMMAND_ACTS[command], command).toEqual(
+      expect(actMap.MESH_WORKITEM_COMMAND_ACTS[command], command).toEqual(
         actMap.MESH_REQUEST_KIND_ACTS[kind as keyof typeof commandFor]
       );
     }
