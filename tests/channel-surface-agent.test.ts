@@ -542,6 +542,46 @@ describe('Channel surface agents', { concurrent: false }, () => {
     routeSpy.mockRestore();
   });
 
+  it('answers an a2a block with a non-routable performative itself, without calling the bridge', async () => {
+    process.env.KYBERION_DISABLE_AGENT_RUNTIME_SUPERVISOR_DAEMON = '1';
+    const ask = vi
+      .fn()
+      .mockResolvedValueOnce(
+        'I proposed it.\n```a2a\n{"header":{"receiver":"nerve-agent","performative":"propose"},"payload":{"text":"help"}}\n```'
+      );
+    const spawnSpy = vi.spyOn(core.agentLifecycle, 'spawn').mockResolvedValue({
+      agentId: 'slack-surface-agent',
+      ask,
+      shutdown: async () => {},
+      getRecord: () => ({ status: 'ready' }) as any,
+    } as any);
+    const routeSpy = vi.spyOn(core.a2aBridge, 'route');
+    const auditSpy = vi.spyOn(core.auditChain, 'record');
+
+    const result = await runSurfaceConversation({
+      agentId: 'slack-surface-agent',
+      query: 'xyz123',
+      senderAgentId: 'kyberion:slack-bridge',
+    });
+
+    expect(routeSpy).not.toHaveBeenCalled();
+    expect(auditSpy).not.toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'a2a_performative_not_routable' })
+    );
+    expect(result.delegationResults).toEqual([
+      {
+        receiver: 'nerve-agent',
+        error: expect.stringMatching(
+          /^\[A2A_PERFORMATIVE_NOT_ROUTABLE\].*"propose".*Use "request"/
+        ),
+      },
+    ]);
+
+    spawnSpy.mockRestore();
+    routeSpy.mockRestore();
+    auditSpy.mockRestore();
+  });
+
   it('fills missing slack a2a payload text from the original surface prompt', async () => {
     const spawnSpy = vi.spyOn(core.agentLifecycle, 'spawn').mockResolvedValue({
       agentId: 'slack-surface-agent',

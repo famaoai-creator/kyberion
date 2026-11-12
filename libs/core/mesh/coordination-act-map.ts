@@ -56,25 +56,28 @@ function actTable<K extends string>(table: Record<K, CoordinationActMapping>): A
   return Object.freeze(table);
 }
 
-const SENDER_LABEL = notACoordinationAct(
-  'sender-chosen label: the bridge does not interpret the performative and runs every verified envelope as an ask'
+const REFUSED_BY_BRIDGE = notACoordinationAct(
+  'refused by the bridge: it has no proposal store and records no recipient decision, so it cannot honour this performative'
 );
 
 /**
  * In-runtime A2A bridge envelope `header.performative` (the A2A mechanism that
- * carries traffic). `A2ABridge.route()` never branches on the performative:
- * every envelope that passes the sender, signature and delegation-chain checks
- * becomes a prompt and runs under the sender's authority. The mapped members
- * therefore name what the sender meant; the bridge treats all of them the same
- * on receipt. `propose`, `accept` and `reject` would claim a recipient
- * decision that does not exist here, so they are labels, not acts.
+ * carries traffic). `A2ABridge.route()` delivers only
+ * `A2A_ROUTABLE_PERFORMATIVES` (`request`, `query`, `inform`) to an agent, as
+ * a prompt. All three run exactly like `request`: this table names what the
+ * sender says, and `query` / `inform` are not a no-side-effect guarantee on
+ * the bridge. It refuses every other value with `A2APerformativeNotRoutableError`
+ * after the sender and signature checks and before any spawn. `propose`,
+ * `accept` and `reject` would claim a recipient decision the bridge does not
+ * record, so they are not acts here. `result` is the act of the envelope the
+ * bridge returns; an inbound `result` is refused like the others.
  */
 export const A2A_PERFORMATIVE_ACTS = actTable<A2APerformative>({
   request: 'request',
-  propose: SENDER_LABEL,
+  propose: REFUSED_BY_BRIDGE,
   inform: 'inform',
-  accept: SENDER_LABEL,
-  reject: SENDER_LABEL,
+  accept: REFUSED_BY_BRIDGE,
+  reject: REFUSED_BY_BRIDGE,
   query: 'query',
   result: 'result',
 });
@@ -275,9 +278,12 @@ export const MISSION_COORDINATION_CHANNEL_ACTS = actTable<MissionCoordinationCha
 /**
  * Agent execution port messages. Hand-written key set: the port has no kind
  * union, so its two message shapes are named here and a third shape would not
- * be detected. Compile-time only. `delegate()` runs the task on receipt under
- * the sender's authority; it checks the WorkItem lease only when the envelope
- * names a WorkItem.
+ * be detected. Compile-time only. With a `work_item_id`, `delegate()` re-derives
+ * the lease and capability profile from the claimed WorkItem. Without one the
+ * task is unclaimed: no lease, work item or profile reaches the runtime, the
+ * request mission must equal the scope mission, and the run is recorded as
+ * `agent_delegation_unclaimed`. The unclaimed runtime's own tools are not yet
+ * narrowed (agent-communication-layer-model.md §9).
  */
 export const AGENT_EXECUTION_PORT_MESSAGE_ACTS = actTable<
   'AgentTaskEnvelope' | 'AgentExecutionReceipt'

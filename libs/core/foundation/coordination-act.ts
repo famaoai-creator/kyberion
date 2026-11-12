@@ -16,10 +16,11 @@
  * reachability → authentication → scope authorization → recipient acceptance →
  * execution authority). **No act carries execution authority.** Across
  * runtimes, execution is decided at stage 5 by the recipient's local WorkItem
- * claim. Inside one runtime (§3 D), delegated work runs on receipt under the
- * sender's own authority (mission owner or lease holder), which is established
- * outside the message. Either way, a message can at most ask for work, decide
- * on it (accept / reject) or report it.
+ * claim. Inside one runtime (§3 D), a delegated ask runs on receipt and no
+ * recipient decision exists; a task binding (lease, capability profile, task
+ * tools) comes from a WorkItem claim, never from the message. Either way, a
+ * message can at most ask for work, decide on it (accept / reject) or report
+ * it.
  *
  * Two rules decide which act a layer kind maps to:
  *
@@ -44,9 +45,9 @@ export const COORDINATION_ACTS = Object.freeze([
    * Ask the recipient to do something; the layer records no separate
    * acceptance (rule A). Across runtimes the ask waits for the recipient's own
    * decision and a local claim before work runs. Inside one runtime (A2A
-   * bridge, agent execution port, mission coordination record) delegation
-   * runs on receipt under the sender's authority; there is no recipient
-   * decision.
+   * bridge, agent execution port, mission coordination record) the ask runs
+   * on receipt; there is no recipient decision, and a task binding comes
+   * only from a WorkItem claim.
    */
   'request',
   /**

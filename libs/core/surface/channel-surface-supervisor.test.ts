@@ -24,7 +24,10 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock('../mesh/a2a-bridge.js', () => ({
+// Keep the real performative vocabulary: the orchestrator decides with it
+// which a2a blocks reach the (mocked) bridge.
+vi.mock('../mesh/a2a-bridge.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../mesh/a2a-bridge.js')>()),
   a2aBridge: {
     route: mocks.a2aRoute,
   },

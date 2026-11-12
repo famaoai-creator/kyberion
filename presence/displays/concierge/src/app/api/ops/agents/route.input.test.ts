@@ -33,6 +33,14 @@ vi.mock('../../../../lib/ops/ops-viewer', () => ({
 
 vi.mock('@agent/core/agent/agent-runtime-manual-drive', () => manualDriveMock);
 
+const a2aRoute = vi.hoisted(() => vi.fn());
+vi.mock('@agent/core/mesh/a2a-bridge', async () => {
+  const actual = await vi.importActual<typeof import('@agent/core/mesh/a2a-bridge')>(
+    '@agent/core/mesh/a2a-bridge'
+  );
+  return { ...actual, a2aBridge: { route: a2aRoute } };
+});
+
 import { DELETE, POST } from './route';
 
 function requestWithJson(value: unknown | (() => unknown)): NextRequest {
@@ -66,6 +74,75 @@ describe('chronos agents route input boundary', () => {
     const response = await DELETE(requestWithJson({ agentId: { value: 'agent-1' } }));
     expect(response.status).toBe(400);
   });
+
+  it.each(['propose', 'accept', 'reject', 'result', 'handoff', undefined])(
+    'returns 400 for a2a performative %j without calling the bridge',
+    async (performative) => {
+      a2aRoute.mockClear();
+      const response = await POST(
+        requestWithJson({
+          action: 'a2a',
+          envelope: {
+            a2a_version: '1.0',
+            header: { msg_id: 'M-1', sender: 'kyberion:ops', receiver: 'agent-1', performative },
+            payload: { text: 'hello' },
+          },
+        })
+      );
+      expect(response.status).toBe(400);
+      expect(await response.json()).toMatchObject({ errorCode: 'A2A_PERFORMATIVE_NOT_ROUTABLE' });
+      expect(a2aRoute).not.toHaveBeenCalled();
+    }
+  );
+
+  it('answers 403 before judging the performative when the caller lacks ops access', async () => {
+    a2aRoute.mockClear();
+    const { requireOpsAccess } = await import('../../../../lib/ops/ops-request-guard');
+    vi.mocked(requireOpsAccess).mockReturnValue(
+      Response.json({ error: 'forbidden' }, { status: 403 }) as never
+    );
+    try {
+      const response = await POST(
+        requestWithJson({
+          action: 'a2a',
+          envelope: {
+            a2a_version: '1.0',
+            header: {
+              msg_id: 'M-1',
+              sender: 'kyberion:ops',
+              receiver: 'agent-1',
+              performative: 'propose',
+            },
+            payload: { text: 'hello' },
+          },
+        })
+      );
+      expect(response.status).toBe(403);
+      expect(a2aRoute).not.toHaveBeenCalled();
+    } finally {
+      vi.mocked(requireOpsAccess).mockReturnValue(null as never);
+    }
+  });
+
+  it.each(['request', 'query', 'inform'])(
+    'passes a2a performative %j to the bridge',
+    async (performative) => {
+      a2aRoute.mockReset();
+      a2aRoute.mockResolvedValue({ header: { performative: 'result' }, payload: { text: 'ok' } });
+      const response = await POST(
+        requestWithJson({
+          action: 'a2a',
+          envelope: {
+            a2a_version: '1.0',
+            header: { msg_id: 'M-1', sender: 'kyberion:ops', receiver: 'agent-1', performative },
+            payload: { text: 'hello' },
+          },
+        })
+      );
+      expect(response.status).toBe(200);
+      expect(a2aRoute).toHaveBeenCalledTimes(1);
+    }
+  );
 
   it('fails closed when the requested runtime has no local manual-drive provider', async () => {
     manualDriveMock.getAgentRuntimeManualDriverRegistration.mockReturnValue(undefined);

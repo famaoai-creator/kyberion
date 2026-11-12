@@ -488,7 +488,17 @@ export async function POST(req: NextRequest) {
           if (forbidden) return forbidden;
           if (!body.envelope?.header)
             return NextResponse.json({ error: 'Invalid A2A envelope' }, { status: 400 });
-          const { a2aBridge } = await import('@agent/core/mesh/a2a-bridge');
+          const { a2aBridge, isA2ARoutablePerformative, A2A_ROUTABLE_PERFORMATIVES } =
+            await import('@agent/core/mesh/a2a-bridge');
+          // The bridge refuses these too; here it is the caller's input error.
+          if (!isA2ARoutablePerformative(body.envelope.header.performative))
+            return NextResponse.json(
+              {
+                error: `A2A performative is not routable; use one of: ${A2A_ROUTABLE_PERFORMATIVES.join(', ')}`,
+                errorCode: 'A2A_PERFORMATIVE_NOT_ROUTABLE',
+              },
+              { status: 400 }
+            );
           const response = await a2aBridge.route(
             body.envelope as unknown as import('@agent/core/mesh/a2a-bridge').A2AMessage
           );
