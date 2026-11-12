@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { pathResolver } from '../path-resolver.js';
+import { isBindingVisibleTo } from './service-binding-owner.js';
 import { safeReaddir, safeExistsSync, safeRmSync, safeWriteFile, safeMkdir } from '../secure-io.js';
 import {
   loadServiceBindingRecord,
@@ -92,6 +93,12 @@ describe('service binding owners', () => {
       [ID('ORG')]: 'already_explicit',
     });
     expect(loadServiceBindingRecord(ID('OLDORG'))?.owner_kind).toBeUndefined();
+    expect(
+      isBindingVisibleTo(loadServiceBindingRecord(ID('LEGACY'))!, {
+        memberId: 'alice',
+        tenantSlugs: 'all',
+      })
+    ).toBe(false);
 
     const applied = migrateBindingOwners({ apply: true, assignPerson: 'user:alice' });
     if (applied.backup_dir) backups.push(applied.backup_dir);
@@ -106,10 +113,28 @@ describe('service binding owners', () => {
       owner_kind: 'person',
       owner_ref: 'user:alice',
     });
+    expect(
+      isBindingVisibleTo(loadServiceBindingRecord(ID('LEGACY'))!, {
+        memberId: 'alice',
+        tenantSlugs: [],
+      })
+    ).toBe(true);
+    expect(
+      isBindingVisibleTo(loadServiceBindingRecord(ID('LEGACY'))!, {
+        memberId: 'bob',
+        tenantSlugs: 'all',
+      })
+    ).toBe(false);
 
     expect(rollbackBindingOwners(applied.backup_dir!)).toBeGreaterThan(0);
     expect(loadServiceBindingRecord(ID('OLDORG'))?.owner_kind).toBeUndefined();
     expect(loadServiceBindingRecord(ID('LEGACY'))?.owner_kind).toBeUndefined();
+    expect(
+      isBindingVisibleTo(loadServiceBindingRecord(ID('LEGACY'))!, {
+        memberId: 'alice',
+        tenantSlugs: 'all',
+      })
+    ).toBe(false);
     expect(() => rollbackBindingOwners(BIND_DIR)).toThrow(/backup/);
     expect(safeExistsSync(BACKUP_ROOT)).toBe(true);
   });

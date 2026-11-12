@@ -712,10 +712,21 @@ function delegatedServiceTarget(input: ServiceAction) {
     request: input.params,
     auth: input.auth === 'secret-guard' ? 'secret-guard' : 'none',
   };
-  return (
+  const active =
     currentHumanExecutionAuthorization(operationId, params)?.target ??
-    currentDelegatedExecution(operationId, params)?.target ??
-    runtimeDelegatedTarget(operationId, params, `${input.service_id}:${input.action}`)
+    currentDelegatedExecution(operationId, params)?.target;
+  const serviceBindingId = input.context?.service_binding_id;
+  if (active) {
+    if (input.auth === 'secret-guard' && active.serviceBindingId !== serviceBindingId) {
+      throw new Error(
+        '[CREDENTIAL_PROVENANCE_DENIED] Service selection differs from authorized effect'
+      );
+    }
+    return active;
+  }
+  const target = runtimeDelegatedTarget(operationId, params, `${input.service_id}:${input.action}`);
+  return (
+    target && { ...target, ...(typeof serviceBindingId === 'string' ? { serviceBindingId } : {}) }
   );
 }
 
