@@ -23,7 +23,7 @@ import {
 } from '@agent/core/mesh/mesh-peer-directory';
 import { assertProtocolServiceRegistered } from '@agent/core/protocol-service-registry';
 import { recordProtocolServiceLifecycle } from '@agent/core/protocol-service-lifecycle';
-import type { MeshRequest } from '@agent/core/mesh/mesh-hub-contract';
+import { MESH_REQUEST_KINDS, type MeshRequest } from '@agent/core/mesh/mesh-hub-contract';
 import { getRegisteredEnvText, nowIso } from '@agent/core/foundation';
 import { defineScript, isDirectScript, stripSharedScriptFlags } from './lib/harness.js';
 
@@ -292,7 +292,6 @@ async function main(
         }
         const candidate = message.metadata?.collaboration_request as MeshRequest | undefined;
         if (!candidate || message.kind !== 'handoff') return autoReply.handleInbound(context);
-        if (!tenantId) throw new Error('mesh_collaboration_requires_tenant_id');
         if (candidate.sender_peer_id !== envelope.sender_peer_id) {
           throw new Error(`mesh_collaboration_sender_mismatch:${candidate.request_id}`);
         }
@@ -324,7 +323,6 @@ async function main(
 
   let heartbeatTimer: ReturnType<typeof setInterval> | undefined;
   const heartbeat = (health: 'healthy' | 'maintenance' = 'healthy') => {
-    if (!tenantId) return;
     const now = Date.now();
     const capacity = server.getCapacity();
     recordMeshHeartbeat({
@@ -355,35 +353,25 @@ async function main(
     });
     lifecycleStarted = true;
 
-    if (tenantId) {
-      const endpointHost = host === '0.0.0.0' ? '127.0.0.1' : host;
-      const allowedRequestKinds = [
-        'review.request',
-        'workitem.claim',
-        'workitem.handoff',
-        'workitem.status_update',
-        'capability.query',
-        'notification.publish',
-      ] as const;
-      registerMeshPeer({
-        peer_id: peerId,
-        tenant_id: tenantId,
-        endpoint_ref: `http://${endpointHost}:${port}`,
-        key_ref: String(argv['key-ref']),
-        allowed_request_kinds: [...allowedRequestKinds],
-        authority_role: 'infrastructure_sentinel',
-      });
-      advertiseMeshCapabilities({
-        peer_id: peerId,
-        tenant_id: tenantId,
-        capability_id: 'peer.collaboration',
-        version: '1.0.0',
-        roles: ['collaboration-peer'],
-        request_kinds: [...allowedRequestKinds],
-      });
-      heartbeat();
-      heartbeatTimer = setInterval(() => heartbeat(), Number(argv['heartbeat-ms']));
-    }
+    const endpointHost = host === '0.0.0.0' ? '127.0.0.1' : host;
+    registerMeshPeer({
+      peer_id: peerId,
+      tenant_id: tenantId,
+      endpoint_ref: `http://${endpointHost}:${port}`,
+      key_ref: String(argv['key-ref']),
+      allowed_request_kinds: [...MESH_REQUEST_KINDS],
+      authority_role: 'infrastructure_sentinel',
+    });
+    advertiseMeshCapabilities({
+      peer_id: peerId,
+      tenant_id: tenantId,
+      capability_id: 'peer.collaboration',
+      version: '1.0.0',
+      roles: ['collaboration-peer'],
+      request_kinds: [...MESH_REQUEST_KINDS],
+    });
+    heartbeat();
+    heartbeatTimer = setInterval(() => heartbeat(), Number(argv['heartbeat-ms']));
   } catch (error) {
     if (heartbeatTimer) clearInterval(heartbeatTimer);
     if (lifecycleStarted) {

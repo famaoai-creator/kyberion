@@ -7,7 +7,8 @@ import { nowIso } from '../foundation/time.js';
  * into **state reconstruction**. The KC-02 stream answers "what happened"; this
  * module answers "what state am I in after a process restart", reconstructed
  * *purely* from an append-only journal. It is the worker-granularity precedent
- * for MO-06 (durable resume of the in-memory `MissionCoordinationBus`); that bus
+ * for MO-06 (durable resume of `MissionCoordinationBus`, which since persists
+ * its own messages and acks to `<mission dir>/coordination/bus.jsonl`); that bus
  * stays untouched here.
  *
  * Modeled on kimi-code `wire/` (op/model + restore + versioned migration), with
