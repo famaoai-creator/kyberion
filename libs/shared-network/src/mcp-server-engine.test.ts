@@ -1007,6 +1007,29 @@ describe('createKyberionMcpServer()', () => {
       expect(parsed.decision).toBe('approved');
     });
 
+    it('attributes the decision to the server-bound principal, never to decided_by', async () => {
+      vi.stubEnv('KYBERION_MCP_CALLER_ROLE', 'operator');
+      vi.stubEnv('KYBERION_MCP_PRINCIPAL', 'mcp-operator-console');
+      mockDecideApproval.mockReturnValue({ request_id: 'req-001', decision: 'approved' });
+
+      createKyberionMcpServer();
+      const handler = registeredTools.get('kyberion.approval.decide')!.handler;
+      const result = await handler({
+        request_id: 'req-001',
+        decision: 'approved',
+        decided_by: 'user:someone-else',
+      });
+
+      expect(result.isError).toBeFalsy();
+      expect(mockDecideApproval).toHaveBeenCalledWith(
+        expect.objectContaining({
+          requestId: 'req-001',
+          decidedBy: 'mcp-operator-console',
+          callerLabel: 'user:someone-else',
+        })
+      );
+    });
+
     it('decideApprovalFromCowork がエラーをスローした場合はエラーを返す', async () => {
       vi.stubEnv('KYBERION_MCP_CALLER_ROLE', 'operator');
       mockDecideApproval.mockImplementation(() => {
@@ -1064,6 +1087,27 @@ describe('createKyberionMcpServer()', () => {
       expect(mockRecordAuditExport).toHaveBeenCalledWith(
         expect.objectContaining({ verifyOnly: false })
       );
+    });
+
+    it('attributes export and verify to the server-bound principal, never to requested_by', async () => {
+      vi.stubEnv('KYBERION_MCP_PRINCIPAL', 'mcp-operator-console');
+      mockSafeExec.mockReturnValue('ok');
+
+      createKyberionMcpServer();
+      await registeredTools.get('kyberion.audit.export')!.handler({ requested_by: 'auditor' });
+      await registeredTools.get('kyberion.audit.verify')!.handler({});
+
+      expect(mockRecordAuditExport).toHaveBeenNthCalledWith(1, {
+        requestedBy: 'mcp-operator-console',
+        callerLabel: 'auditor',
+        from: undefined,
+        to: undefined,
+        verifyOnly: false,
+      });
+      expect(mockRecordAuditExport).toHaveBeenNthCalledWith(2, {
+        requestedBy: 'mcp-operator-console',
+        verifyOnly: true,
+      });
     });
 
     it('スクリプトが存在しない場合はエラーを返す', async () => {

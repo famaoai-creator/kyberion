@@ -6,6 +6,7 @@ import {
   withViewerExecutionContext,
 } from '../../../../lib/ops/ops-viewer';
 import { listPipelineCatalog } from '../../../../lib/ops/pipeline-catalog';
+import { opsViewerMayActRepositoryWide } from '../../../../lib/ops/repository-wide-access';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -20,5 +21,10 @@ export async function GET(req: NextRequest) {
   if (resolvedViewer.response) return resolvedViewer.response;
 
   const pipelines = withViewerExecutionContext(resolvedViewer.context, () => listPipelineCatalog());
-  return NextResponse.json({ pipelines, accessRole: resolvedViewer.context.role });
+  // `canRun` mirrors the run route's gate so the page offers no control the
+  // server would refuse.
+  const canRun =
+    resolvedViewer.context.role === 'localadmin' &&
+    opsViewerMayActRepositoryWide(resolvedViewer.context, req);
+  return NextResponse.json({ pipelines, accessRole: resolvedViewer.context.role, canRun });
 }

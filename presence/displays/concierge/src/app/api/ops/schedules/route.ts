@@ -13,6 +13,10 @@ import {
   ScheduleInputError,
 } from '../../../../lib/ops/pipeline-schedules';
 import { auditOpsMutation } from '../../../../lib/ops/ops-audit';
+import {
+  opsViewerMayActRepositoryWide,
+  REPOSITORY_WIDE_REFUSAL,
+} from '../../../../lib/ops/repository-wide-access';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -39,6 +43,14 @@ export async function POST(req: NextRequest) {
   if (requiresAccess) return requiresAccess;
   const resolvedViewer = resolveOpsViewerForRequest(req);
   if (resolvedViewer.response) return resolvedViewer.response;
+
+  // A schedule registered here always points at a catalog pipeline.
+  if (!opsViewerMayActRepositoryWide(resolvedViewer.context, req)) {
+    auditOpsMutation(resolvedViewer.context, 'concierge.schedule.register', 'failed', {
+      refused: 'tenant_confined_viewer',
+    });
+    return NextResponse.json({ ok: false, error: REPOSITORY_WIDE_REFUSAL }, { status: 403 });
+  }
 
   let body: unknown;
   try {
