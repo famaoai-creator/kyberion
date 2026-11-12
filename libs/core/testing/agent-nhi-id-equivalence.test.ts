@@ -6,7 +6,7 @@
  * their buckets on it — so the decisions must not change.
  *
  * The "before" decision sequences were recorded while every gate still used
- * `executionPersonaText() || 'unknown'` (tests/fixtures/agent-nhi-id-equivalence.json).
+ * `executionBaseRoleText() || 'unknown'` (tests/fixtures/agent-nhi-id-equivalence.json).
  * The suite replays the same call sequences with the production resolver.
  *
  * A world is one process: its tenant, organization and claimed NHI id are
@@ -24,7 +24,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as path from 'node:path';
 import { withExecutionContext } from '../authority.js';
-import { executionPersonaText } from '../foundation/execution-scope.js';
+import { executionBaseRoleText } from '../foundation/execution-scope.js';
 import { executionAgentId } from '../governance/execution-agent-id.js';
 import { policyEngine, type PolicyContext } from '../governance/policy-engine.js';
 import { pathResolver } from '../path-resolver.js';
@@ -35,7 +35,7 @@ const recording = process.env.KYBERION_RECORD_AGENT_NHI_EQUIVALENCE === '1';
 
 /** The agentId every gate computed before the change. */
 function legacyAgentId(): string {
-  return executionPersonaText() || 'unknown';
+  return executionBaseRoleText() || 'unknown';
 }
 
 interface Principal {

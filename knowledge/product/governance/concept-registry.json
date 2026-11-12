@@ -374,6 +374,39 @@
       "not_to_confuse_with": ["runtime-supervisor"]
     },
     {
+      "id": "co-session",
+      "term": "Co-Session",
+      "aliases": ["co session"],
+      "category": "execution",
+      "definition": "The mission-optional coordination layer for provider CLI processes sharing one checkout: presence, cooperative path leases, blackboard notes and handoffs; never an authorization boundary.",
+      "glossary_anchor": "co-session",
+      "canonical_doc": "knowledge/product/architecture/agent-communication-layer-model.md",
+      "owner_modules": ["libs/core/workforce/co-session.ts", "scripts/co_session.ts"],
+      "not_to_confuse_with": ["peer-messaging", "lease", "work-item"]
+    },
+    {
+      "id": "peer-messaging",
+      "term": "Peer Messaging",
+      "aliases": ["Tenant Peer Mesh", "peer mesh"],
+      "category": "execution",
+      "definition": "Signed, tenant-scoped message transport between distinct enrolled Kyberion runtimes; a transport receipt is not work acceptance.",
+      "glossary_anchor": "peer-messaging",
+      "canonical_doc": "knowledge/product/architecture/agent-communication-layer-model.md",
+      "owner_modules": ["libs/core/mesh/peer-messaging.ts", "scripts/peer_conversation_server.ts"],
+      "not_to_confuse_with": ["co-session", "a2a"]
+    },
+    {
+      "id": "a2a",
+      "term": "A2A",
+      "aliases": ["A2A bridge", "agent-to-agent"],
+      "category": "execution",
+      "definition": "In-runtime agent-to-agent envelopes between an orchestrator and the provider agents it spawns, routed by the A2A bridge through the agent runtime supervisor.",
+      "glossary_anchor": "a2a",
+      "canonical_doc": "knowledge/product/architecture/agent-communication-layer-model.md",
+      "owner_modules": ["libs/core/mesh/a2a-bridge.ts"],
+      "not_to_confuse_with": ["peer-messaging", "agent-runtime-supervisor"]
+    },
+    {
       "id": "organization-work-loop",
       "term": "Organization Work Loop",
       "category": "governance",
@@ -453,6 +486,59 @@
       "not_to_confuse_with": ["execution-shape"]
     },
     {
+      "id": "outcome",
+      "term": "Outcome",
+      "category": "execution",
+      "definition": "The intended result of work, expressed as a requested result and success criteria.",
+      "glossary_anchor": "outcome",
+      "canonical_doc": "knowledge/product/architecture/organization-work-loop.md#92-outcome-artifact-evidence-delivery-and-result",
+      "owner_modules": ["libs/core/task/outcome-contract.ts"],
+      "not_to_confuse_with": ["result", "artifact"]
+    },
+    {
+      "id": "artifact",
+      "term": "Artifact",
+      "category": "execution",
+      "definition": "The concrete output of work.",
+      "glossary_anchor": "artifact",
+      "canonical_doc": "knowledge/product/architecture/organization-work-loop.md#92-outcome-artifact-evidence-delivery-and-result",
+      "owner_modules": ["libs/core/workforce/artifact-record.ts"],
+      "not_to_confuse_with": ["outcome", "evidence", "delivery"]
+    },
+    {
+      "id": "evidence",
+      "term": "Evidence",
+      "category": "execution",
+      "definition": "Recorded support for a claim about work, linked to its context, source and verification method.",
+      "glossary_anchor": "evidence",
+      "canonical_doc": "knowledge/product/architecture/organization-work-loop.md#92-outcome-artifact-evidence-delivery-and-result",
+      "owner_modules": ["libs/core/task/outcome-result.ts"],
+      "not_to_confuse_with": ["artifact", "result"]
+    },
+    {
+      "id": "delivery",
+      "term": "Delivery",
+      "category": "execution",
+      "definition": "The transport of an artifact or response to a named destination, with a separately recorded delivery state.",
+      "glossary_anchor": "delivery",
+      "canonical_doc": "knowledge/product/architecture/organization-work-loop.md#92-outcome-artifact-evidence-delivery-and-result",
+      "owner_modules": [
+        "libs/core/surface/surface-delivery.ts",
+        "libs/core/workforce/artifact-record.ts"
+      ],
+      "not_to_confuse_with": ["artifact", "result"]
+    },
+    {
+      "id": "result",
+      "term": "Result",
+      "category": "execution",
+      "definition": "The user-facing account of an outcome, outputs, verification evidence, delivery state and remaining work.",
+      "glossary_anchor": "result",
+      "canonical_doc": "knowledge/product/architecture/organization-work-loop.md#92-outcome-artifact-evidence-delivery-and-result",
+      "owner_modules": ["libs/core/task/outcome-result.ts", "libs/core/task/task-session.ts"],
+      "not_to_confuse_with": ["outcome", "artifact", "delivery"]
+    },
+    {
       "id": "memory-candidate",
       "term": "Memory Candidate",
       "category": "governance",
@@ -461,6 +547,22 @@
       "canonical_doc": "knowledge/product/architecture/decisions/2026-11-10-concept-model-v2.md",
       "owner_modules": ["libs/core/knowledge/memory-promotion-queue.ts"],
       "not_to_confuse_with": []
+    },
+    {
+      "id": "viewer-context",
+      "term": "Viewer Context",
+      "aliases": ["ViewerContext", "Viewer Scope"],
+      "category": "scope",
+      "definition": "The server-resolved principal and allowed tenant scope.",
+      "glossary_anchor": "viewercontext--viewer-scope",
+      "canonical_doc": "docs/developer/CHRONOS_VIEWER_SCOPE_OPERATIONS.ja.md",
+      "owner_modules": [
+        "libs/core/foundation/surface-viewer-role.ts",
+        "libs/core/surface/surface-viewer-scope-contract.ts",
+        "libs/core/surface/surface-authorization.ts",
+        "presence/displays/concierge/src/lib/viewer-context.ts"
+      ],
+      "not_to_confuse_with": ["member-role", "authority-role", "entity-scope"]
     }
   ]
 }

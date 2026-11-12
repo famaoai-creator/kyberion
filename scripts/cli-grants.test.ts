@@ -22,6 +22,48 @@ import type { GrantRecord } from '@agent/core/governance/grant-store';
 
 const NOW = new Date('2026-10-19T00:00:00.000Z');
 
+it('normalizes explicit personal service allocation without creating a grant', () => {
+  const allocation = {
+    binding_id: 'personal-slack',
+    target: 'work-channel',
+    owner_ref: 'user:owner',
+    service_id: 'slack',
+    secret_refs: ['SLACK_TOKEN'],
+    allowed_actions: ['read'],
+  };
+  const draft = grantDraftFromArgs(
+    parseGrantsArgs([
+      'grant',
+      '--capability',
+      'credential.use',
+      '--tenant',
+      'acme',
+      '--purpose',
+      'work',
+      '--service-allocation',
+      JSON.stringify(allocation),
+      '--request-approval',
+    ])
+  );
+  expect(draft.service_allocation).toEqual(allocation);
+  expect(() =>
+    grantDraftFromArgs(
+      parseGrantsArgs([
+        'grant',
+        '--capability',
+        'credential.use',
+        '--tenant',
+        'acme',
+        '--purpose',
+        'work',
+        '--service-allocation',
+        '{invalid',
+        '--request-approval',
+      ])
+    )
+  ).toThrow('non-secret allocation JSON');
+});
+
 const record: GrantRecord = {
   schema_version: 'grant-record.v1',
   grant_id: 'GRT-20261019-aaaaaaaaaaaa',

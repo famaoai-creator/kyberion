@@ -24,7 +24,7 @@ Intent, Plan, Result, Mission, Task Session, and Artifact are the words the firs
 | Intent               | The human request expressed in natural language.                                                                                                                           |
 | Resolution           | The structured interpretation of an intent.                                                                                                                                |
 | Plan                 | A human-readable execution summary.                                                                                                                                        |
-| Result               | The user-facing outcome of execution.                                                                                                                                      |
+| Result               | The user-facing account of an outcome, outputs, verification evidence, delivery state and remaining work.                                                                  |
 | Mission              | A bounded unit of work with lifecycle state and evidence.                                                                                                                  |
 | Task Session         | A lighter-weight durable work record for conversational work that does not need a mission.                                                                                 |
 | Artifact             | The concrete output of work.                                                                                                                                               |
@@ -107,7 +107,7 @@ Role words sit on separate axes, one type each ([Concept Model v2 D5–D6](../kn
 | Place in the org chart     | Org Role                                            | a role directory under `knowledge/product/roles/`; see [Team Role vs. Org Role](#team-role-vs-org-role)                      |
 | Role in this piece of work | Team Role                                           | `owner`, `planner`, `implementer`, `reviewer`, …; see [Team Role vs. Org Role](#team-role-vs-org-role)                       |
 
-**Execution Persona** (legacy API `Persona` — now the type `BaseRole` and `IdentityContext.baseRole` —, env `KYBERION_PERSONA` — now `KYBERION_BASE_ROLE`, the base Authority Role the process runs on; the old name is read for one release with a warning only when the new one is absent: `sovereign`, `ecosystem_architect`, `mission_owner`, `worker`, `analyst`, `unknown` in `libs/core/types.ts` / `libs/core/authority.ts`) is **deprecated**. It began as prompt framing and accreted authority. Its authority purpose moves to Authority Role / Grant, and its framing moves to the Team Role addendum. Do not add new uses. The `--persona` flag selects an **Org Role**, not a `Persona`; the flag name is historical, and the mission-state field is `org_role` (renamed from `assigned_persona`, which is still read for one release; [Scope, identity and Grant plan](./developer/improvement-plans-2026-11/SCOPE_IDENTITY_GRANT_CONSOLIDATION_PLAN_2026-11-10.ja.md)).
+**Execution Persona** (legacy API `Persona` — now the type `BaseRole` and `IdentityContext.baseRole` —, env `KYBERION_PERSONA` — now `KYBERION_BASE_ROLE`, the base Authority Role the process runs on; the old name is read for one release with a warning only when the new one is absent: `sovereign`, `ecosystem_architect`, `mission_owner`, `worker`, `analyst`, `unknown` in `libs/core/types.ts` / `libs/core/authority.ts`) is **deprecated**. It began as prompt framing and accreted authority. Its authority purpose moves to Authority Role / Grant, and its framing moves to the Team Role addendum. Do not add new uses. The `--persona` flag of `mission_controller start` selects an **Org Role**, not a `Persona`; the flag name is historical (`compose_mission_team` takes `--org-role`, with `--persona` read as a deprecated alias for one release). The mission-state and team-plan field is `org_role` (renamed from `assigned_persona`, which is still read for one release). Stored records and inputs name the base role directly: pipeline run journals store `execution_authority.base_role` / `library_execution.identity.base_role` and the authn agent-context input is `executionContext.baseRole` (the old `persona` names are read for one release); the helpers are `inferBaseRoleFromRole`, `resolveExecutionBaseRole` and `executionBaseRoleText` ([Scope, identity and Grant plan](./developer/improvement-plans-2026-11/SCOPE_IDENTITY_GRANT_CONSOLIDATION_PLAN_2026-11-10.ja.md)).
 
 ### Member Role
 
@@ -211,7 +211,7 @@ A short human-readable execution summary such as `PDF を解析 -> レイアウ�
 
 ### Result
 
-The user-facing outcome of execution: an answer, artifact, approval request, or concrete next step.
+The user-facing account of an outcome, outputs, verification evidence, delivery state and remaining work. A Result can be an answer, an incomplete report or a request for a decision; it does not itself claim successful completion. See the [outcome model](../knowledge/product/architecture/organization-work-loop.md#92-outcome-artifact-evidence-delivery-and-result).
 
 ### Operator Interaction Packet
 
@@ -235,11 +235,15 @@ The long-lived container of meaning around a body of work. A project can own rep
 
 ### Outcome
 
-The structured result Kyberion is trying to return for a request, such as `artifact:pptx`, `service_summary`, `browser_navigation`, or `knowledge_answer`.
+The intended result of work, expressed as a requested result and success criteria. `outcome-catalog.json` names reusable output patterns; `OutcomeContract` specializes a pattern for a request. An output kind such as `pptx` is not the success criterion.
 
 ### Artifact
 
-The concrete output of work: a file, summary, delivery record, approval record, or other governed result object.
+The concrete output of work. It can be a file, structured object or external reference. Its role can be primary output, specification or evidence: a screenshot is an Artifact and may support an Evidence claim. Having an artifact reference alone proves neither verification nor delivery.
+
+### Delivery
+
+The transport of an artifact or response to a named destination, with a separately recorded delivery state. A Delivery Pack groups material for delivery; creating the pack is not a delivery receipt. A successful send does not prove human readership or acceptance.
 
 ### Project Operating System
 
@@ -472,7 +476,7 @@ A shared runtime health/state signal, surfaced through per-daemon heartbeat file
 
 ### Coordination Store
 
-The mission-local and global storage model for task claims, handoffs, reviews, mailboxes, leases, and event streams.
+The mission-local and global storage model for task claims, handoffs, reviews, mailboxes, leases, and event streams. The mission-local `coordination/bus.jsonl` is the owner's append-only _record_ of the handoffs and review requests it sent to workers (`mission-coordination-record.ts`), not a delivery path: workers receive tasks through the agent execution port.
 
 ### Control Plane
 
@@ -549,11 +553,11 @@ The internal set of specialists Kyberion assigns to a request, such as a browser
 Two distinct, non-interchangeable role concepts that are easy to conflate (the other role words — Member Role, Authority Role and the deprecated Execution Persona — are in [Role terms](#role-terms)):
 
 - **Team Role** (`teamRole`): the per-task execution role assigned by `mission-team-plan-composer.ts` from a mission's team template (`knowledge/product/orchestration/mission-team-templates.json`, e.g. `owner`/`planner`/`implementer`/`reviewer`/`tester`/`experience_designer`). It selects the working-principles addendum (`libs/core/workforce/working-principles.ts`) and gates artifact-review behavior in `mission-orchestration-worker.ts`. Team-template role names are not always the canonical addendum key (e.g. `tester` canonicalizes to `qa`, `experience_designer` to `designer`) — any code branching on team-role identity must compare `canonicalizeTeamRole(teamRole)`, never the raw string, or aliased roles silently miss the behavior their canonical role is supposed to get.
-- **Org Role** (mission-state field `org_role`, historically "Assigned Persona" / `assigned_persona`; selected with `--persona`): the one org-chart role assigned to a whole mission at activation (e.g. `product_manager`, `qa_lead`, `solution_architect` — the role directories under `knowledge/product/roles/{persona}/`). `syncRoleProcedure` mirrors that persona's `PROCEDURE.md` into the mission directory once at activation; it is then injected into the first task prompt as a one-shot dynamic injection (see `buildRolePersonaProcedureInjectionProvider` in `mission-orchestration-worker.ts`). A mission started without an explicit `--persona` defaults to `worker`, which has no corresponding role directory — no procedure gets injected in that case. Each role directory holds the Org Role card `role.json`: its `role_class` (`system`, `mission`, `context`) and its `default_grant` — `authority_role` (an Authority Role card, or `null`), `base_role` (the base Authority Role short name) and `execution_mode`. The card only points at registry entries and grants nothing by itself; `knowledge/product/governance/role-authority-map.json` is generated from the cards by `pnpm kyberion sync org-role-grants`, and the `org-role-grants` gate fails on drift or on a pointer the registry does not have.
+- **Org Role** (mission-state and team-plan field `org_role`, historically "Assigned Persona" / `assigned_persona`; selected with `--persona` on `mission_controller start` and `--org-role` on `compose_mission_team`): the one org-chart role assigned to a whole mission at activation (e.g. `product_manager`, `qa_lead`, `solution_architect` — the role directories under `knowledge/product/roles/{persona}/`). `syncRoleProcedure` mirrors that persona's `PROCEDURE.md` into the mission directory once at activation; it is then injected into the first task prompt as a one-shot dynamic injection (see `buildRolePersonaProcedureInjectionProvider` in `mission-orchestration-worker.ts`). A mission started without an explicit `--persona` defaults to `worker`, which has no corresponding role directory — no procedure gets injected in that case. Each role directory holds the Org Role card `role.json`: its `role_class` (`system`, `mission`, `context`) and its `default_grant` — `authority_role` (an Authority Role card, or `null`), `base_role` (the base Authority Role short name) and `execution_mode`. The card only points at registry entries and grants nothing by itself; `knowledge/product/governance/role-authority-map.json` is generated from the cards by `pnpm kyberion sync org-role-grants`, and the `org-role-grants` gate fails on drift or on a pointer the registry does not have.
 
 ### Evidence
 
-The accountability substrate that links results back to source context, execution path, artifacts, approvals, and policy-relevant decisions.
+Recorded support for a claim about work, linked to its context, source and verification method. Verification evidence names the success criterion it supports; worker-reported checks remain reports until the existing verification/review gate accepts them. Evidence can refer to an Artifact, execution trace, review or approval record.
 
 ### Delivery Actuator
 
@@ -585,7 +589,7 @@ The bounded local control-plane access level mapped to `chronos_localadmin`. It 
 
 ### ViewerContext / Viewer Scope
 
-The request-scoped principal resolved server-side by a surface adapter: a viewer role (`readonly` | `localadmin`), operation permissions, and allowed tenant, organization, project, and tier sets (`tenant_slugs`, `organization_ids`, `project_ids`, `tier_access`). Headless operations declare `required_permissions` and are evaluated through the shared `SurfaceAuthorizationContext`; query parameters may only narrow the viewer's allowed set, never widen it. This is the internal authorization boundary for OSS/self-hosted/FDE surfaces, not hosted SaaS user management. Chronos keeps `KYBERION_VIEWER_SCOPE=off|warn|enforce` as a migration/telemetry setting, but every mode denies an unregistered tenant; `warn` records the attempted expansion before denying it. Operations guide: `docs/developer/CHRONOS_VIEWER_SCOPE_OPERATIONS.ja.md`.
+The request-scoped principal resolved server-side by a surface adapter: a viewer role (`readonly` | `localadmin`), operation permissions, and allowed tenant, organization, project, and tier sets (`tenant_slugs`, `organization_ids`, `project_ids`, `tier_access`). Headless operations declare `required_permissions` and are evaluated through the shared `SurfaceAuthorizationContext`; query parameters may only narrow the viewer's allowed set, never widen it. This is the internal authorization boundary for OSS/self-hosted/FDE surfaces, not hosted SaaS user management. Chronos keeps `KYBERION_VIEWER_SCOPE=off|warn|enforce` as a migration/telemetry setting, but every mode denies an unregistered tenant; `warn` records the attempted expansion before denying it. The viewer role is one type, `SurfaceViewerRole` (`libs/core/foundation/surface-viewer-role.ts`, re-exported from `libs/core/surface/surface-authorization.ts`); `ChronosAccessRole`, `SurfaceAuthorizationRole`, `HeadlessViewerRole` and `PluginViewRole` are deprecated aliases of it (it is planned to fold into [Member Role](#member-role)). In Concierge, `src/lib/viewer-context.ts` owns the projection to `SurfaceAuthorizationContext` (personal tier masked), the tier resolution and the viewer error response for every route, the operations console (`/api/ops/*`, `src/lib/ops/ops-viewer.ts`) included; the authority role a request executes under differs per route family and is listed in `src/lib/viewer-execution-role.ts`. Operations guide: `docs/developer/CHRONOS_VIEWER_SCOPE_OPERATIONS.ja.md`.
 
 ### Channel (interaction context)
 
@@ -702,13 +706,17 @@ The single source of tenant definitions (`libs/core/organization/tenant-registry
 
 A named set of tenants sharing a `knowledge/confidential/tenant-groups/{group}/` prefix for deliberately shared knowledge, without weakening per-tenant isolation.
 
-### Peer Messaging vs Co-Session
+### Co-Session
 
-Two different coordination surfaces — choose by participant type, shared state and trust boundary, not by `localhost`. **Co-Session** (`knowledge/product/architecture/co-session-coordination.md`) is the thin, mission-optional layer (presence, path leases, blackboard, handoff) for provider CLIs (`claude` / `codex` / `agy` / …) sharing one checkout. **Peer Messaging** (see Tenant Peer Mesh below) is signed transport between distinct Kyberion runtimes. Durable ownership stays with WorkItems and `mission_controller`. → [agent-communication-layer-model](../knowledge/product/architecture/agent-communication-layer-model.md)
+The mission-optional coordination layer for provider CLI processes sharing one checkout: presence, cooperative path leases, blackboard notes and handoffs; never an authorization boundary. The participants are provider CLIs (`claude` / `codex` / `agy` / …) on one working tree, so no peer listener is involved. Choose it over Peer Messaging by participant type, shared state and trust boundary, not by `localhost`. Durable ownership stays with WorkItems and `mission_controller`. → [co-session-coordination](../knowledge/product/architecture/co-session-coordination.md) · [agent-communication-layer-model](../knowledge/product/architecture/agent-communication-layer-model.md)
 
-### Tenant Peer Mesh
+### Peer Messaging
 
-HMAC-signed peer-to-peer messaging between tenant instances. Peers are registered via `pnpm peer:register` with exposure classes (`same_host` / `same_lan` / `private_network` / `public_network`); shared secrets live in the tenant's confidential connection catalog and never in public metadata.
+Signed, tenant-scoped message transport between distinct enrolled Kyberion runtimes; a transport receipt is not work acceptance. Also called the Tenant Peer Mesh. Envelopes are HMAC-signed; peers are registered via `pnpm peer:register` with exposure classes (`same_host` / `same_lan` / `private_network` / `public_network`); shared secrets live in the tenant's confidential connection catalog and never in public metadata. Peer conversations, opt-in auto replies, typed peer tasks and Mesh Hub recipient proposals all travel over it. → [agent-communication-layer-model](../knowledge/product/architecture/agent-communication-layer-model.md) · [peer-network](../knowledge/product/orchestration/peer-network.md)
+
+### A2A
+
+In-runtime agent-to-agent envelopes between an orchestrator and the provider agents it spawns, routed by the A2A bridge through the agent runtime supervisor. It stays inside one Kyberion runtime; crossing to another runtime is Peer Messaging. The network actuator's `a2a_send` / `a2a_poll` ops are a separate file-drop transport and do not feed the bridge. → [agent-communication-layer-model](../knowledge/product/architecture/agent-communication-layer-model.md)
 
 ### Stance
 

@@ -1,7 +1,7 @@
 {
   "version": 1,
   "generated_at": "2026-11-01T14:37:50.033Z",
-  "total": 131,
+  "total": 130,
   "files": {
     "libs/actuators/blockchain-actuator/src/index.ts": 1,
     "libs/core/meeting/action-item-store.ts": 1,
@@ -46,7 +46,6 @@
     "libs/core/mesh/peer-conversation.ts": 1,
     "libs/core/mission/delegation-notifications.ts": 1,
     "libs/core/mission/mission-artifact-closure.ts": 1,
-    "libs/core/mission/mission-coordination-bus.ts": 1,
     "libs/core/mission/mission-graph-run-journal.ts": 2,
     "libs/core/mission/mission-maintenance.ts": 1,
     "libs/core/mission/mission-orchestration-journal.ts": 4,

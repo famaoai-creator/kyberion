@@ -42,7 +42,7 @@ export function connectionReadiness(record: {
 }
 
 export interface ConnectionViewer {
-  /** The local operator on this machine (loopback): sees everything that is not environment-owned. */
+  /** Transport context only; being on the same machine does not establish connection ownership. */
   loopback: boolean;
   memberId?: string;
   tenantSlugs: readonly string[] | 'all';
@@ -58,9 +58,8 @@ type RawBinding = BindingOwnerFields & {
 /**
  * Operator-owned connections (reasoning backend, local media services) never
  * appear on day-to-day surfaces. A person's connections are visible to their
- * owner only; an organization's to members of that tenant. The local operator on
- * loopback owns the machine, so legacy connections that predate ownership stay
- * visible to them rather than vanishing.
+ * owner only; an organization's to members of that tenant. Loopback is not a
+ * member identity. Legacy personal records need an explicit owner migration.
  */
 export function visibleConnections(
   records: readonly unknown[],
@@ -73,14 +72,10 @@ export function visibleConnections(
     if (typeof record.binding_id !== 'string' || typeof record.service_id !== 'string') continue;
     const owner = resolveBindingOwner(record);
     if (owner.owner_kind === 'operator') continue;
-    const visible = viewer.loopback
-      ? owner.owner_kind === 'person' ||
-        viewer.tenantSlugs === 'all' ||
-        viewer.tenantSlugs.includes(owner.owner_ref ?? '')
-      : isBindingVisibleTo(record, {
-          ...(viewer.memberId ? { memberId: viewer.memberId } : {}),
-          tenantSlugs: viewer.tenantSlugs,
-        });
+    const visible = isBindingVisibleTo(record, {
+      ...(viewer.memberId ? { memberId: viewer.memberId } : {}),
+      tenantSlugs: viewer.tenantSlugs,
+    });
     if (!visible) continue;
     out.push({
       binding_id: record.binding_id,

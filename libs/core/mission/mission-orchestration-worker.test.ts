@@ -2313,8 +2313,14 @@ describe('mission-orchestration-worker', { timeout: 60_000 }, () => {
     });
     expect(receipt.artifact.sha256).toMatch(/^[a-f0-9]{64}$/u);
 
-    const { missionCoordinationBus } = await import('./mission-coordination-bus.js');
-    const busMessages = missionCoordinationBus.listMissionMessages('MSN-FOLLOWUP');
+    const { parseMissionCoordinationRecordRow } = await import('./mission-coordination-record.js');
+    const busMessages = (
+      safeReadFile(`${missionPath}/coordination/bus.jsonl`, { encoding: 'utf8' }) as string
+    )
+      .split(/\r?\n/u)
+      .filter(Boolean)
+      .map((line) => parseMissionCoordinationRecordRow(JSON.parse(line)))
+      .filter((row) => row !== undefined);
     expect(busMessages).toEqual(
       expect.arrayContaining([
         expect.objectContaining({

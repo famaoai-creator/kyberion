@@ -1437,13 +1437,16 @@ export function createKyberionMcpServer(): McpServer {
       'IMPORTANT: You MUST call kyberion.approval.list_pending first to obtain a valid request_id.',
       'This is a two-step operation — blind approval without listing first will be rejected.',
       'Human-only requests are refused with [APPROVAL_HUMAN_PROOF_REQUIRED]; other decisions are recorded as an agent decision.',
+      'The decision is attributed to the server-bound MCP principal; decided_by is recorded only as a caller-supplied label.',
     ].join(' '),
     {
       request_id: z
         .string()
         .describe('The request_id obtained from kyberion.approval.list_pending'),
       decision: z.enum(['approved', 'rejected']).describe('The decision to apply'),
-      decided_by: z.string().describe('Identity of the operator submitting the decision'),
+      decided_by: z
+        .string()
+        .describe('Caller-supplied label for the audit record; it does not name the decider'),
       note: z.string().optional().describe('Optional rationale or note for the decision'),
     },
     async ({ request_id, decision, decided_by, note }) => {
@@ -1455,7 +1458,9 @@ export function createKyberionMcpServer(): McpServer {
         const result = decideApprovalFromCowork({
           requestId: request_id,
           decision,
-          decidedBy: decided_by,
+          // The acting identity is the server-bound principal, never an argument.
+          decidedBy: context.principal,
+          callerLabel: decided_by,
           note,
           scope,
         });
@@ -1485,7 +1490,7 @@ export function createKyberionMcpServer(): McpServer {
     server,
     catalog,
     'kyberion.audit.export',
-    'Export the Kyberion audit chain log. Returns a path to the exported NDJSON bundle.',
+    'Export the Kyberion audit chain log. Returns a path to the exported NDJSON bundle. The request is attributed to the server-bound MCP principal; requested_by is recorded only as a caller-supplied label.',
     {
       from: z.string().optional().describe('Start date filter YYYY-MM-DD'),
       to: z.string().optional().describe('End date filter YYYY-MM-DD'),
@@ -1493,15 +1498,15 @@ export function createKyberionMcpServer(): McpServer {
       requested_by: z
         .string()
         .optional()
-        .default('cowork-operator')
-        .describe('Identity requesting the export'),
+        .describe('Caller-supplied label for the audit record; it does not name the requester'),
     },
     async ({ from, to, tenant, requested_by }) => {
       try {
         const context = resolveMcpRequestContext({ requested_tenant: tenant });
         const effectiveTenant = context.scope.tenant_slug;
         recordAuditExportRequest({
-          requestedBy: requested_by ?? 'cowork-operator',
+          requestedBy: context.principal,
+          ...(requested_by ? { callerLabel: requested_by } : {}),
           from,
           to,
           verifyOnly: false,
@@ -1532,21 +1537,21 @@ export function createKyberionMcpServer(): McpServer {
     server,
     catalog,
     'kyberion.audit.verify',
-    'Verify the integrity of the Kyberion audit chain (hash chain validation). Returns pass/fail.',
+    'Verify the integrity of the Kyberion audit chain (hash chain validation). Returns pass/fail. The request is attributed to the server-bound MCP principal; requested_by is recorded only as a caller-supplied label.',
     {
       tenant: z.string().optional().describe('Scope verification to a specific tenant slug'),
       requested_by: z
         .string()
         .optional()
-        .default('cowork-operator')
-        .describe('Identity requesting verification'),
+        .describe('Caller-supplied label for the audit record; it does not name the requester'),
     },
     async ({ tenant, requested_by }) => {
       try {
         const context = resolveMcpRequestContext({ requested_tenant: tenant });
         const effectiveTenant = context.scope.tenant_slug;
         recordAuditExportRequest({
-          requestedBy: requested_by ?? 'cowork-operator',
+          requestedBy: context.principal,
+          ...(requested_by ? { callerLabel: requested_by } : {}),
           verifyOnly: true,
         });
         const auditExportScript = tryResolveRegularRepositoryFile(AUDIT_EXPORT_SCRIPT);

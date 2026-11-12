@@ -1,3 +1,5 @@
+import { assertServiceCredentialAllocation } from '../governance/service-credential-allocation.js';
+import type { ServiceBindingRecord } from '../service/service-binding-registry.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { GrantRecord } from '../governance/grant-store.js';
 import { runInExecutionScope } from '../foundation/execution-scope.js';
@@ -19,6 +21,7 @@ const state = vi.hoisted(() => ({
   read: vi.fn(),
   admitted: vi.fn(),
   extraProvider: false,
+  serviceVerify: vi.fn(),
 }));
 const grant = (): GrantRecord => ({
   schema_version: 'grant-record.v1',
@@ -38,6 +41,9 @@ const grant = (): GrantRecord => ({
     ? { revoked: { at: new Date().toISOString(), by: 'user:owner', audit_event_id: 'revoked' } }
     : {}),
 });
+vi.mock('../governance/service-credential-allocation-verifier.js', () => ({
+  verifyServiceCredentialAllocation: state.serviceVerify,
+}));
 vi.mock('../governance/grant-store.js', () => ({
   listGrants: () => [
     grant(),
@@ -151,7 +157,16 @@ describe('local credential allocation broker', () => {
       bindTask: async () => null,
     });
     expect(getSecretResolver()?.name).toBe('external-test');
+    const configuredResolver = getSecretResolver();
     expect(installLocalCredentialAllocations()).toBe(false);
+    expect(getSecretResolver()).toBe(configuredResolver);
+    const selected = { binding_id: 'test-binding' } as ServiceBindingRecord;
+    state.serviceVerify.mockReturnValue(grant());
+    expect(assertServiceCredentialAllocation(selected, scope, { action: 'read' })).toMatchObject({
+      capability: 'credential.use',
+    });
+    expect(state.serviceVerify).toHaveBeenCalledWith(selected, scope, { action: 'read' });
+    expect(getSecretResolver()?.name).toBe('external-test');
   });
   it('binds only the declared provider key and keeps claim checks live', async () =>
     tenant(async () => {
