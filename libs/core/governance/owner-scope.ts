@@ -339,7 +339,7 @@ function locateMission(candidate: MissionCandidate): MissionLocation | undefined
 
 /**
  * Per-process memo of mission locations. Hot paths (task events, the
- * coordination bus, dispatch loops) resolve the same mission many times; a
+ * coordination record, dispatch loops) resolve the same mission many times; a
  * short-lived entry whose directories still hold their state skips the scan.
  * Visibility and hints are applied per call (the bound tenant can change per
  * execution scope), never cached.
