@@ -13,6 +13,7 @@ import {
 import { authorizeSurfaceContextOperation } from '@agent/core/surface/surface-authn';
 import { subjectAuthorization } from '@agent/core/foundation/authorization-registry';
 import type { WorkspaceSelection } from '@agent/core/surface/workspace-scope';
+import { opsExecutionRole } from '../viewer-execution-role';
 import { resolveChronosWorkspace } from './workspace-scope';
 import {
   ViewerContextError,
@@ -57,7 +58,7 @@ export function collectInformationAssets(viewer: ViewerContext, requested: Works
   });
   if (!allowed.allowed) throw new ViewerContextError(403, allowed.reason);
   const snapshot = withExecutionContext(
-    viewer.role === 'localadmin' ? 'chronos_localadmin' : 'chronos_operator',
+    opsExecutionRole(viewer.role),
     () => {
       const catalog = readInformationAssetCatalog({
         tenant_slug: s.tenant_slug!,

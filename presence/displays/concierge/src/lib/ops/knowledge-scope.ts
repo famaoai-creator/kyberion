@@ -4,20 +4,13 @@ import { loadState } from '@agent/core/mission/mission-state';
 import { loadArtifactRecord } from '@agent/core/workforce/artifact-record';
 import { assertMemoryScope, type MemoryScopeEnvelope } from '@agent/core/knowledge/memory-scope';
 import type { MemoryCandidate } from '@agent/core/knowledge/memory-promotion-queue';
-import { admitsScopeAudience, viewerPersonIds } from '@agent/core/surface/surface-authorization';
 import {
   workspaceScopeMatchesResource,
   type ResolvedWorkspaceScope,
   type WorkspaceSelection,
 } from '@agent/core/surface/workspace-scope';
-import {
-  viewerCanReadTier,
-  defaultTierAccess,
-  strictViewerScopeTenantSlugs,
-  strictViewerScopeOrganizationIds,
-  strictViewerScopeProjectIds,
-  type ViewerContext,
-} from './ops-viewer';
+import { memoryCandidateVisibleToViewer as memoryCandidateVisibleToViewerRule } from '../memory-candidate-visibility';
+import type { ViewerContext } from './ops-viewer';
 
 function sourceScope(candidate: MemoryCandidate): MemoryScopeEnvelope | null {
   try {
@@ -57,58 +50,20 @@ export function resolveMemoryCandidateTenant(candidate: MemoryCandidate): string
   return sourceScope(candidate)?.tenant_slug;
 }
 
+/**
+ * The shared visibility rule (`../memory-candidate-visibility`) with the
+ * console's source scope: a row recorded without a scope takes it from its
+ * mission / artifact record, and an unresolvable source hides the row.
+ */
 export function memoryCandidateVisibleToViewer(
   candidate: MemoryCandidate,
   viewer: ViewerContext,
   requestedTenant?: string
 ): boolean {
-  const tenants = strictViewerScopeTenantSlugs(viewer, requestedTenant);
-  const organizations = strictViewerScopeOrganizationIds(viewer);
-  const projects = strictViewerScopeProjectIds(viewer);
-  const scope = sourceScope(candidate);
-  if (
-    !viewerCanReadTier(viewer, scope?.tier) ||
-    !viewerCanReadTier(viewer, candidate.sensitivity_tier)
-  )
-    return false;
-  if (requestedTenant && scope?.tenant_slug !== requestedTenant) return false;
-  const tiers = viewer.tierAccess ?? defaultTierAccess(viewer.role);
-  // Destination sensitivity is not authority to read the source material.
-  if (
-    !scope ||
-    scope.tier === 'personal' ||
-    candidate.sensitivity_tier === 'personal' ||
-    !tiers.includes(scope.tier) ||
-    !tiers.includes(candidate.sensitivity_tier)
-  )
-    return false;
-  // Custody admission plus the record's own audience grant: person custody
-  // stays identity-bound for every viewer, 'all' included; a listed audience
-  // member is admitted by identity — never by scope.
-  if (
-    !admitsScopeAudience(
-      {
-        tenantSlugs: tenants,
-        includeUntenanted: viewer.includeUntenanted,
-        personIds: viewerPersonIds(viewer),
-      },
-      scope
-    )
-  )
-    return false;
-  if (
-    organizations !== 'all' &&
-    (!scope.organization_id || !organizations.includes(scope.organization_id))
-  )
-    return false;
-  if (projects !== 'all' && (!scope.project_id || !projects.includes(scope.project_id)))
-    return false;
-  const principals = viewerPersonIds(viewer);
-  const audience = scope.allowed_audience ?? [];
-  const audienceMatch = audience.some((id) => principals.includes(id));
-  if (audience.length && !audienceMatch) return false;
-  if (scope.owner_nhi && !principals.includes(scope.owner_nhi) && !audienceMatch) return false;
-  return true;
+  return memoryCandidateVisibleToViewerRule(candidate, viewer, {
+    requestedTenant,
+    sourceScope: sourceScope(candidate),
+  });
 }
 
 /** Canonical knowledge path namespaces carry storage scope, not URL selectors. */

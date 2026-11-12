@@ -33,6 +33,7 @@ import {
   type webcrypto,
 } from 'node:crypto';
 import { baseRoleEnvText } from '../foundation/base-role-env.js';
+import type { SurfaceViewerRole } from '../foundation/surface-viewer-role.js';
 
 import { agentActor, humanActor, parseActorRef, serviceActor } from '../contracts/actor.js';
 import { browserSessionKey } from './authn-browser-session-key.js';
@@ -121,7 +122,7 @@ function scopedTenants(request: AuthnRequest): string[] | 'all' {
   return serverTenant ? [serverTenant] : 'all';
 }
 
-function baseClaims(request: AuthnRequest, role: 'readonly' | 'localadmin') {
+function baseClaims(request: AuthnRequest, role: SurfaceViewerRole) {
   return {
     role,
     tenantSlugs: scopedTenants(request),
@@ -1048,7 +1049,7 @@ function claimsToPrincipal(
   }
 
   const roleClaim = claims.kyberion_role ?? claims.role;
-  let role: 'readonly' | 'localadmin';
+  let role: SurfaceViewerRole;
   let memberTenants: string[] | null = null;
   if (mappedMember) {
     // The flat server role is the member's WEAKEST membership across the

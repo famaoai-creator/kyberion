@@ -1,7 +1,7 @@
 {
   "$schema": "../schemas/concept-registry.schema.json",
   "manifest_version": 1,
-  "last_reviewed": "2026-11-10",
+  "last_reviewed": "2026-11-12",
   "purpose": "One registered definition, canonical document, glossary entry and owner per high-confusion Kyberion term. A term or alias may belong to exactly one entry; a homonym is declared through `senses`. The concept-registry gate (scripts/check_concept_registry.ts) enforces this file against docs/GLOSSARY.md, docs/documentation-source-map.json and doc_status frontmatter. Workflow: knowledge/product/governance/concept-registry-workflow.md.",
   "terms": [
     {
@@ -426,6 +426,22 @@
       "canonical_doc": "knowledge/product/architecture/decisions/2026-11-10-concept-model-v2.md",
       "owner_modules": ["libs/core/knowledge/memory-promotion-queue.ts"],
       "not_to_confuse_with": []
+    },
+    {
+      "id": "viewer-context",
+      "term": "Viewer Context",
+      "aliases": ["ViewerContext", "Viewer Scope"],
+      "category": "scope",
+      "definition": "The server-resolved principal and allowed tenant scope.",
+      "glossary_anchor": "viewercontext--viewer-scope",
+      "canonical_doc": "docs/developer/CHRONOS_VIEWER_SCOPE_OPERATIONS.ja.md",
+      "owner_modules": [
+        "libs/core/foundation/surface-viewer-role.ts",
+        "libs/core/surface/surface-viewer-scope-contract.ts",
+        "libs/core/surface/surface-authorization.ts",
+        "presence/displays/concierge/src/lib/viewer-context.ts"
+      ],
+      "not_to_confuse_with": ["member-role", "authority-role", "entity-scope"]
     }
   ]
 }
