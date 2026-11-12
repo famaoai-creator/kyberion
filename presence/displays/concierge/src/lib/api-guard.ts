@@ -3,7 +3,7 @@ import {
   authorizeSurfaceMutation,
   surfaceMutationRequestUrl,
 } from '@agent/core/surface/surface-mutation-guard';
-import { isSameOriginMutation } from '@agent/core/surface/surface-session-cookie';
+import { crossOriginCookieMutation } from './cross-origin-cookie';
 import {
   checkConciergeRateLimit,
   conciergeCredential,
@@ -22,21 +22,8 @@ export function requireConciergeMutationAccess(req: NextRequest): NextResponse |
   const rateLimitResponse = guardConciergeRequest(req);
   if (rateLimitResponse) return rateLimitResponse;
   const credential = conciergeCredential(req);
-  // A cookie rides along on cross-site requests, so a cookie-borne unsafe
-  // request must be same-origin. Header-authenticated requests skip this.
-  if (
-    credential.source === 'session-cookie' &&
-    !isSameOriginMutation({
-      method: req.method,
-      headers: req.headers,
-      expectedHost: req.headers.get('host') ?? new URL(req.url).host,
-    })
-  ) {
-    return NextResponse.json(
-      { ok: false, error: 'Forbidden. Cross-origin session request.' },
-      { status: 403 }
-    );
-  }
+  const crossOrigin = crossOriginCookieMutation(req, credential);
+  if (crossOrigin) return crossOrigin;
   // The internal listener URL (127.0.0.1) need not match the host alias the
   // browser used (localhost): the browser-facing origin is the Host header,
   // which isSameOriginMutation already checked against Origin for cookie
@@ -97,20 +84,5 @@ export function requireConciergeJoinAccess(req: NextRequest): NextResponse | nul
       }
     );
   }
-  const credential = conciergeCredential(req);
-  if (
-    credential.source === 'session-cookie' &&
-    req.method !== 'GET' &&
-    !isSameOriginMutation({
-      method: req.method,
-      headers: req.headers,
-      expectedHost: req.headers.get('host') ?? new URL(req.url).host,
-    })
-  ) {
-    return NextResponse.json(
-      { ok: false, error: 'Forbidden. Cross-origin session request.' },
-      { status: 403 }
-    );
-  }
-  return null;
+  return crossOriginCookieMutation(req);
 }
