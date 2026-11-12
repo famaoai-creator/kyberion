@@ -123,7 +123,12 @@ export function registerFrontDeskRoutes(app: express.Express): void {
   // `sovereign_concierge`; presence-studio keeps its own established persona).
   app.get('/api/me', (req, res) => {
     try {
-      const viewer = resolvePresenceStudioViewerContext(req);
+      // A page asks `/api/me` which tenant it is viewing before anything else
+      // and stores the answer; a stale stored tenant must get that answer, not
+      // a refusal, or the page could never replace it.
+      const viewer = resolvePresenceStudioViewerContext(req, {
+        unregisteredTenantHint: 'ignore',
+      });
       // FD-01: the loopback owner's tenant list is their memberships (all
       // tenants), with the request's effective tenant as the one being viewed.
       const scope = toFrontDeskViewerScope(
