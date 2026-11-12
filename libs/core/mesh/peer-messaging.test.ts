@@ -10,6 +10,7 @@ import {
   listPeerInboxRecords,
   listPeerOutboxRecords,
   parsePeerMessageEnvelope,
+  PEER_ENVELOPE_CLOCK_SKEW_MS,
   registerPeerNetworkPeer,
   peerNetworkCatalogPath,
   resolvePeerRecord,
@@ -102,6 +103,72 @@ describe('peer messaging', () => {
     expect(
       verifyPeerMessage({ ...envelope, payload: { summary: 'tampered' } }, SHARED_SECRET)
     ).toBe(false);
+  });
+
+  it('refuses an expired envelope on receive and accepts one just inside the skew tolerance', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      const sentAt = Date.parse('2026-11-12T00:00:00.000Z');
+      vi.setSystemTime(sentAt);
+      const responder = vi.fn(async () => ({ handled: true }));
+      const server = createPeerMessagingServer({
+        peerId: 'peer-b-test',
+        tenantId: TENANT_ID,
+        sharedSecret: SHARED_SECRET,
+        responder,
+      });
+      const build = (messageId: string) =>
+        buildPeerMessageEnvelope({
+          senderPeerId: 'peer-a-test',
+          recipientPeerId: 'peer-b-test',
+          tenantId: TENANT_ID,
+          messageId,
+          subject: 'status_request',
+          type: 'request',
+          payload: {},
+          sharedSecret: SHARED_SECRET,
+          ttlMs: 60_000,
+        });
+      const inside = build('PM-EXPIRY-INSIDE');
+      const outside = build('PM-EXPIRY-OUTSIDE');
+      const expiresAt = sentAt + 60_000;
+
+      vi.setSystemTime(expiresAt + PEER_ENVELOPE_CLOCK_SKEW_MS - 1);
+      expect(await server.processEnvelope(inside)).toMatchObject({
+        status: 200,
+        body: { ok: true, accepted: true },
+      });
+      expect(responder).toHaveBeenCalledTimes(1);
+
+      vi.setSystemTime(expiresAt + PEER_ENVELOPE_CLOCK_SKEW_MS);
+      expect(await server.processEnvelope(outside)).toEqual({
+        status: 410,
+        body: { ok: false, error: 'envelope_expired', retryable: false },
+      });
+      expect(responder).toHaveBeenCalledTimes(1);
+      expect(listPeerInboxRecords(TENANT_ID, 'peer-b-test')).toHaveLength(1);
+      expect(
+        listPeerEvents(TENANT_ID, 'peer-b-test').filter(
+          (event) => event.type === 'message_rejected'
+        )
+      ).toEqual([
+        expect.objectContaining({ message_id: 'PM-EXPIRY-OUTSIDE', reason: 'envelope_expired' }),
+      ]);
+      // expires_at is signed: moving it is a signature failure, not an extension.
+      expect(
+        await server.processEnvelope({
+          ...outside,
+          expires_at: new Date(expiresAt + 3_600_000).toISOString(),
+        })
+      ).toMatchObject({ status: 401 });
+      // A message handled before it expired is still answered as a duplicate.
+      expect(await server.processEnvelope(inside)).toMatchObject({
+        status: 200,
+        body: { duplicate: true },
+      });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('rejects traversal-shaped peer identifiers before building an envelope', () => {
