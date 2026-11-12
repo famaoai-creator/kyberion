@@ -490,7 +490,7 @@ A shared runtime health/state signal, surfaced through per-daemon heartbeat file
 
 ### Coordination Store
 
-The mission-local and global storage model for task claims, handoffs, reviews, mailboxes, leases, and event streams.
+The mission-local and global storage model for task claims, handoffs, reviews, mailboxes, leases, and event streams. The mission-local `coordination/bus.jsonl` is the owner's append-only _record_ of the handoffs and review requests it sent to workers (`mission-coordination-record.ts`), not a delivery path: workers receive tasks through the agent execution port.
 
 ### Control Plane
 

@@ -25,6 +25,7 @@ import type { MeshDeliveryStatus, MeshRequestKind } from './mesh-hub-contract.js
 import type {
   MeshHubRecipientProposalDecision,
   MeshHubRecipientProposalRecord,
+  MeshHubWorkitemCommandPayload,
 } from './mesh-hub-peer-messaging-adapter.js';
 import type {
   PEER_TASK_REQUEST_KIND,
@@ -34,8 +35,7 @@ import type {
   PeerTaskState,
 } from './peer-task-exchange.js';
 import type { CoSessionHandoffKind } from '../workforce/co-session.js';
-import type { WorkCoordinationPeerCommandType } from '../workforce/work-coordination-peer.js';
-import type { MissionCoordinationChannel } from '../mission/mission-coordination-bus.js';
+import type { MissionCoordinationChannel } from '../mission/mission-coordination-record.js';
 import type { AgentExecutionReceiptStatus } from '../agent/agent-execution-port.js';
 import type { DiscussionPerformative } from '../discussion/discussion-types.js';
 
@@ -171,11 +171,11 @@ export const PEER_TASK_RESULT_STATUS_ACTS = actTable<(typeof PEER_TASK_RESULT_ST
 });
 
 /**
- * Work coordination peer command `command_type`: what a Mesh Hub `workitem.*`
- * proposal carries once accepted (`buildWorkitemCommand` maps the request kind
- * onto it), so each command maps like its request kind.
+ * `command_type` of the `workitem-command` payload stored with a Mesh Hub
+ * recipient proposal: a record of what a `workitem.*` request asked for.
+ * Nothing executes it; each command maps like its request kind.
  */
-export const WORK_COORDINATION_PEER_COMMAND_ACTS = actTable<WorkCoordinationPeerCommandType>({
+export const MESH_WORKITEM_COMMAND_ACTS = actTable<MeshHubWorkitemCommandPayload['command_type']>({
   claim_request: 'request',
   handoff_request: 'handoff',
   status_update: 'inform',
