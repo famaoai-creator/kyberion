@@ -1,12 +1,6 @@
 /** Generated public API barrel part. Keep exports in source order. */
 
 export {
-  buildWorkCoordinationPeerCommandEnvelope,
-  createWorkCoordinationPeerResponder,
-  processWorkCoordinationPeerCommand,
-} from './workforce/work-coordination-peer.js';
-
-export {
   importGitHubIssue,
   importGitHubIssueWithEvent,
   normalizeGitHubIssue,
@@ -308,10 +302,6 @@ export * from './daemon/report-ops.js';
 export * from './contracts/execution-bounds.js';
 
 export * from './intent/intent-handoff.js';
-
-export * from './mesh/mesh-message-broker.js';
-
-export * from './mesh/mesh-delivery-driver.js';
 
 export * from './governance/egress-policy.js';
 

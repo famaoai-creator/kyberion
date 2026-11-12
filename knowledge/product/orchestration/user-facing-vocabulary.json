@@ -9940,11 +9940,6 @@
         "ja": "常駐デーモンを確認",
         "qps-ploc": "⟦Ƈħėƈķ ŀőñɠ-ŀïṽėḓ ḓȧėɱőñş ŀőřėɱ ï⟧"
       },
-      "cli_cmd_script_mesh_deliver": {
-        "en": "Drive Mesh Hub delivery",
-        "ja": "Mesh Hub の配送を実行",
-        "qps-ploc": "⟦Ḓřïṽė Ɱėşħ Ħůƀ ḓėŀïṽėřẏ ŀőřėɱ ï⟧"
-      },
       "cli_cmd_script_campaign_suite": {
         "en": "Run the campaign suite",
         "ja": "キャンペーンスイートを実行",

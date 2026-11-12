@@ -3011,17 +3011,6 @@
       "native_help": true
     },
     {
-      "id": "script.mesh.deliver",
-      "module": "scripts/mesh_delivery_driver.ts",
-      "command": "mesh deliver",
-      "noun": "mesh",
-      "verb": "deliver",
-      "audience": "operator",
-      "description": "cli_cmd_script_mesh_deliver",
-      "group": "operate",
-      "native_help": true
-    },
-    {
       "id": "script.migration",
       "script": "migration",
       "command": "migration default",

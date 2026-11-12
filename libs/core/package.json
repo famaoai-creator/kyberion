@@ -2944,10 +2944,6 @@
       "types": "./dist/mesh/index.d.ts",
       "default": "./dist/mesh/index.js"
     },
-    "./mesh-delivery-driver": {
-      "types": "./dist/mesh/mesh-delivery-driver.d.ts",
-      "default": "./dist/mesh/mesh-delivery-driver.js"
-    },
     "./mesh-hub-contract": {
       "types": "./dist/mesh/mesh-hub-contract.d.ts",
       "default": "./dist/mesh/mesh-hub-contract.js"
@@ -3004,10 +3000,6 @@
       "types": "./dist/mesh/handoff-packet.d.ts",
       "default": "./dist/mesh/handoff-packet.js"
     },
-    "./mesh/mesh-delivery-driver": {
-      "types": "./dist/mesh/mesh-delivery-driver.d.ts",
-      "default": "./dist/mesh/mesh-delivery-driver.js"
-    },
     "./mesh/mesh-hub-contract": {
       "types": "./dist/mesh/mesh-hub-contract.d.ts",
       "default": "./dist/mesh/mesh-hub-contract.js"
@@ -3019,10 +3011,6 @@
     "./mesh/mesh-hub-peer-messaging-adapter": {
       "types": "./dist/mesh/mesh-hub-peer-messaging-adapter.d.ts",
       "default": "./dist/mesh/mesh-hub-peer-messaging-adapter.js"
-    },
-    "./mesh/mesh-message-broker": {
-      "types": "./dist/mesh/mesh-message-broker.d.ts",
-      "default": "./dist/mesh/mesh-message-broker.js"
     },
     "./mesh/mesh-peer-directory": {
       "types": "./dist/mesh/mesh-peer-directory.d.ts",
@@ -7500,10 +7488,6 @@
       "types": "./dist/workforce/work-coordination-import-catalog.d.ts",
       "default": "./dist/workforce/work-coordination-import-catalog.js"
     },
-    "./work-coordination-peer": {
-      "types": "./dist/workforce/work-coordination-peer.d.ts",
-      "default": "./dist/workforce/work-coordination-peer.js"
-    },
     "./work-design": {
       "types": "./dist/workforce/work-design.d.ts",
       "default": "./dist/workforce/work-design.js"
@@ -7643,10 +7627,6 @@
     "./workforce/work-coordination-import-catalog": {
       "types": "./dist/workforce/work-coordination-import-catalog.d.ts",
       "default": "./dist/workforce/work-coordination-import-catalog.js"
-    },
-    "./workforce/work-coordination-peer": {
-      "types": "./dist/workforce/work-coordination-peer.d.ts",
-      "default": "./dist/workforce/work-coordination-peer.js"
     },
     "./workforce/work-coordination-types": {
       "types": "./dist/workforce/work-coordination-types.d.ts",
