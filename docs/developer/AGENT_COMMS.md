@@ -7,15 +7,17 @@ Kyberion has two distinct message planes:
   - `libs/core/agent/agent-runtime-supervisor.ts`
   - `scripts/agent_runtime_supervisor_daemon.ts`
   - `libs/core/mesh/peer-messaging.ts` for peer-level envelopes
-- **Plane 2: mesh delivery**
-  - `libs/core/mesh/mesh-message-broker.ts`
-  - `libs/core/mesh/mesh-hub-peer-messaging-adapter.ts`
-  - `libs/core/mesh/peer-messaging.ts`
+- **Plane 2: cross-peer messaging**
+  - `libs/core/mesh/peer-messaging.ts` (signed envelopes between enrolled peers)
+  - `libs/core/mesh/mesh-hub-peer-messaging-adapter.ts` (recipient proposals for allowlisted collaboration requests)
+
+The Mesh message broker and its delivery driver were retired on 2026-11-12 (nothing enqueued deliveries); see
+[`retired/README.md`](../../retired/README.md).
 
 The important rule is simple:
 
 - `a2aBridge.route` is the synchronous host-local dispatch path.
-- `mesh-hub` is the cross-peer delivery path.
+- Peer messaging is the cross-peer path; Mesh Hub adds discovery and recipient proposals on top of it.
 - The file-backed network transport in `libs/actuators/network-actuator/src/` is a separate envelope-drop transport, not the same thing as `a2aBridge`.
 
 ## Correlation flow
@@ -41,7 +43,6 @@ The system writes the same trace across several append-only stores:
 - `active/shared/observability/mission-control/orchestration-events.jsonl`
 - `active/shared/observability/mission-control/agent-runtime-supervisor-events.jsonl`
 - `active/shared/observability/mesh-hub/**/events.jsonl`
-- `active/shared/runtime/mesh-hub/**/deliveries.jsonl`
 - `active/shared/runtime/peer-messaging/**`
 
 For a single operator view, join those records on `mission_id`, `conversation_id`, and `correlation_id`.
