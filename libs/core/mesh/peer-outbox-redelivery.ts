@@ -26,15 +26,18 @@
  * re-sends a message some caller already sent: it selects no peer and
  * creates no work.
  */
+import * as path from 'node:path';
+
 import { createLogger } from '../logger.js';
 import { acquireLock, releaseLock } from '../foundation/lock-utils.js';
 import { pathResolver } from '../path-resolver.js';
-import { validateUrl } from '../secure-io.js';
+import { safeExistsSync, safeReaddir, validateUrl } from '../secure-io.js';
 import { isRecord } from '../foundation/text.js';
 import { createJsonlTail, type JsonlTail } from '../storage/jsonl-tail.js';
 import { applyPeerConversationDelivery, loadSenderPeerCatalog } from './peer-conversation.js';
 import { applyPeerTaskDelivery } from './peer-task-exchange.js';
 import {
+  boundedPeerRetryAfterMs,
   classifyPeerDeliveryFailure,
   parsePeerOutboxRecord,
   peerRuntimeLogicalPath,
@@ -51,6 +54,8 @@ import {
 const log = createLogger('peer-outbox-redelivery');
 /** One warning per message per process for a failing bookkeeping replay. */
 const bookkeepingWarned = new Set<string>();
+/** Outboxes (`tenant/peer`) whose catalog could not be loaded; warned once until it loads again. */
+const catalogUnavailable = new Set<string>();
 
 export interface PeerOutboxRedeliveryPolicy {
   /** Delivery attempts per message, counting the original send. */
@@ -82,8 +87,16 @@ export type PeerOutboxDeliveryState =
  * record. Idempotent.
  */
 export async function applyPeerDeliveryBookkeeping(delivery: PeerOutboxDelivery): Promise<void> {
-  if (!applyPeerConversationDelivery(delivery)) return;
+  // A reply the transcript cannot take must not keep the task record from
+  // being settled: both run, and the first failure is reported afterwards.
+  let transcriptError: unknown;
+  try {
+    applyPeerConversationDelivery(delivery);
+  } catch (error) {
+    transcriptError = error;
+  }
   await applyPeerTaskDelivery(delivery);
+  if (transcriptError) throw transcriptError;
 }
 
 export interface PeerOutboxMessageState {
@@ -143,6 +156,7 @@ export function foldPeerOutboxRecord(
               envelope,
               ...(body.response !== undefined ? { response: body.response } : {}),
               duplicate: body.duplicate === true,
+              replayed_from: row.sent_at,
             },
           }
         : {}),
@@ -179,7 +193,10 @@ export function foldPeerOutboxRecord(
     attempts: priorAttempts + 1,
     reason: row.reason || 'unclassified',
     ...(row.error ? { last_error: row.error } : {}),
-    ...(retrying && row.retry_after_ms ? { retry_after_ms: row.retry_after_ms } : {}),
+    // Rows come from disk: the delay is bounded again here.
+    ...(retrying && boundedPeerRetryAfterMs(row.retry_after_ms)
+      ? { retry_after_ms: boundedPeerRetryAfterMs(row.retry_after_ms) }
+      : {}),
     ...(retrying ? { envelope, destination_url: row.destination_url } : {}),
   });
 }
@@ -205,7 +222,8 @@ export function peerOutboxNextAttemptAt(
 ): number {
   const { baseBackoffMs, maxBackoffMs } = resolvePolicy(policy);
   const backoff = Math.min(maxBackoffMs, baseBackoffMs * 2 ** Math.max(0, state.attempts - 1));
-  return Date.parse(state.updated_at) + Math.max(backoff, state.retry_after_ms ?? 0);
+  const retryAfter = Math.min(boundedPeerRetryAfterMs(state.retry_after_ms) ?? 0, maxBackoffMs);
+  return Date.parse(state.updated_at) + Math.max(backoff, retryAfter);
 }
 
 export interface PeerOutboxSummary {
@@ -222,6 +240,19 @@ export interface PeerOutboxSummary {
    * (the sending caller retries and records the outcome itself).
    */
   undelivered: Array<Omit<PeerOutboxMessageState, 'envelope' | 'redelivered'>>;
+}
+
+/** Local peers of a tenant that have a runtime directory (and so may have an outbox). */
+export function listPeerOutboxPeerIds(tenantId: string): string[] {
+  // Derived from the runtime path contract (which validates the tenant): the
+  // parent of any peer's directory is the tenant's peers directory.
+  const peersDir = path.dirname(
+    path.dirname(pathResolver.resolve(peerRuntimeLogicalPath(tenantId, 'peer-x', 'outbox.jsonl')))
+  );
+  if (!safeExistsSync(peersDir)) return [];
+  return safeReaddir(peersDir)
+    .filter((name) => /^[a-z][a-z0-9-]{1,63}$/u.test(name))
+    .sort();
 }
 
 /** Operator view of a peer's outbox: counts, pending retries and terminal failures. */
@@ -305,9 +336,12 @@ export interface PeerOutboxRedeliveryPassOptions {
   tenantId: string;
   peerId: string;
   policy?: Partial<PeerOutboxRedeliveryPolicy>;
-  /** Peer catalog override (tests); defaults to the tenant peer catalog. */
+  /**
+   * Peer catalog override (tests). Production always resolves through the
+   * tenant peer catalog: a send made with an explicit catalog is recorded
+   * caller-managed and is never re-sent here.
+   */
   catalog?: PeerNetworkCatalog | null;
-  catalogPath?: string;
   /** Per-attempt HTTP timeout. */
   timeoutMs?: number;
   now?: () => number;
@@ -338,7 +372,9 @@ export interface PeerOutboxRedeliveryPassResult {
 }
 
 function redeliveryLockId(tenantId: string, peerId: string): string {
-  return `peer-outbox-redelivery-${tenantId}-${peerId}`;
+  // '/' and ':' are outside the tenant and peer slug alphabets, so two
+  // (tenant, peer) pairs can never spell the same lock id.
+  return `peer-outbox-redelivery:${tenantId}/${peerId}`;
 }
 
 async function runPass(
@@ -387,14 +423,12 @@ async function runPass(
       );
     };
     let catalog: PeerNetworkCatalog | null | undefined = options.catalog;
-    let catalogWarned = false;
+    const outboxKey = `${tenantId}/${peerId}`;
     const loadCatalog = () => {
       if (catalog === undefined) {
-        catalog = loadSenderPeerCatalog({
-          tenantId,
-          ...(options.catalogPath ? { catalogPath: options.catalogPath } : {}),
-        });
+        catalog = loadSenderPeerCatalog({ tenantId });
       }
+      if (catalog) catalogUnavailable.delete(outboxKey);
       return catalog;
     };
 
@@ -403,6 +437,7 @@ async function runPass(
       const messageId = delivery.envelope.message_id;
       try {
         await onDelivered(delivery);
+        bookkeepingWarned.delete(messageId);
         onSettled(messageId);
       } catch (error) {
         result.bookkeeping_failed.push(messageId);
@@ -419,8 +454,10 @@ async function runPass(
     // Repair: a redelivery whose bookkeeping may not have run (crash after the
     // `sent` row) is replayed from the row; the bookkeeping is idempotent.
     for (const state of states) {
+      if (options.shouldStop?.()) break;
       if (state.state !== 'delivered' || !state.redelivered) continue;
       if (Date.parse(state.updated_at) + PEER_OUTBOX_BOOKKEEPING_REPAIR_WINDOW_MS <= now()) {
+        bookkeepingWarned.delete(state.message_id);
         onSettled(state.message_id);
         continue;
       }
@@ -453,8 +490,8 @@ async function runPass(
       }
       const peers = loadCatalog();
       if (!peers) {
-        if (!catalogWarned) {
-          catalogWarned = true;
+        if (!catalogUnavailable.has(outboxKey)) {
+          catalogUnavailable.add(outboxKey);
           log.warn(
             `redelivery paused — peer catalog for tenant ${tenantId} could not be loaded | next: check the tenant peer catalog; retries resume on a later pass | peer=${peerId}`
           );
@@ -527,7 +564,7 @@ async function runPass(
         reason: failure.reason,
         updated_at: new Date(now()).toISOString(),
         ...(failure.error ? { last_error: failure.error } : {}),
-        retry_after_ms: retryAfterMs,
+        retry_after_ms: boundedPeerRetryAfterMs(retryAfterMs),
       };
       if (after.attempts >= policy.maxAttempts) {
         giveUp(after, 'attempts_exhausted');

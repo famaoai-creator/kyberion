@@ -1,6 +1,8 @@
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { logger } from '@agent/core/core';
 import {
+  describePeerDeliveryFailureNextStep,
+  peerDeliveryFailureOf,
   buildPeerMessageEnvelope,
   loadPeerNetworkCatalog,
   resolvePeerDispatchTarget,
@@ -100,16 +102,42 @@ export async function main(
     ...(argv['correlation-id'] ? { correlationId: String(argv['correlation-id']) } : {}),
   });
 
-  const receipt = await sendPeerMessage(envelope, {
-    destinationUrl: target.destinationUrl,
-    allowLocalNetwork: target.allowLocalNetwork,
-    timeoutMs: Number(argv['timeout-ms']),
-  });
+  // Outbox redelivery resolves the recipient through the tenant catalog, so a
+  // send addressed through an explicit catalog is never re-sent automatically.
+  const recovery = argv.catalog ? ('caller' as const) : undefined;
+  const senderPeerId = String(argv['from-peer-id']);
+  let receipt: Awaited<ReturnType<typeof sendPeerMessage>>;
+  try {
+    receipt = await sendPeerMessage(envelope, {
+      destinationUrl: target.destinationUrl,
+      allowLocalNetwork: target.allowLocalNetwork,
+      timeoutMs: Number(argv['timeout-ms']),
+      ...(recovery ? { recovery } : {}),
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `peer_message_not_delivered:${envelope.message_id} — ${message} | ${describePeerDeliveryFailureNextStep({ failure: peerDeliveryFailureOf(error), senderPeerId, recovery })}`,
+      { cause: error }
+    );
+  }
 
-  logger.success(
-    `[peer-messaging-send] ${receipt.ok ? 'delivered' : 'failed'} ${envelope.message_id} -> ${target.peer.peer_id} (${target.destinationUrl})`
+  if (receipt.ok) {
+    logger.success(
+      `[peer-messaging-send] delivered ${envelope.message_id} -> ${target.peer.peer_id} (${target.destinationUrl})`
+    );
+    print(receipt);
+    return;
+  }
+  const nextStep = describePeerDeliveryFailureNextStep({
+    failure: receipt.failure,
+    senderPeerId,
+    recovery,
+  });
+  logger.warn(
+    `[peer-messaging-send] not delivered ${envelope.message_id} -> ${target.peer.peer_id} — ${receipt.error || `http_${receipt.status}`} | ${nextStep} | destination=${target.destinationUrl}`
   );
-  print(receipt);
+  print({ ...receipt, next: nextStep });
 }
 
 const runPeerMessagingSend = defineScript({

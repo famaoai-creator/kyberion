@@ -42,6 +42,10 @@ import {
   compactPeerLedgerAfterAppend,
   peerRuntimeLogicalPath,
   streamPeerStoreRecords,
+  describePeerDeliveryFailureNextStep,
+  peerDeliveryFailureOf,
+  type PeerDeliveryFailureClass,
+  type PeerMessageDispatchReceipt,
   type PeerMessageEnvelope,
   type PeerOutboxDelivery,
 } from './peer-messaging.js';
@@ -447,6 +451,9 @@ async function sendPeerTaskProposal(
       ...(options.peerCatalogPath ? { catalogPath: options.peerCatalogPath } : {}),
       timeoutMs: options.timeoutMs ?? DELIVERY_TIMEOUT_MS,
     });
+    // A non-2xx receipt is not a delivery (the transport only throws when no
+    // response arrived).
+    if (!sent.receipt.ok) throw new PeerTaskMessageNotDelivered(sent.receipt);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     appendRecord({
@@ -454,12 +461,43 @@ async function sendPeerTaskProposal(
       proposal_delivery: { status: 'failed', at: nowIso(), error: message.slice(0, 500) },
     });
     throw new Error(
-      `peer_task_proposal_not_delivered:${outbound.task_id} — ${message} | next: pnpm kyberion peer task resend-proposal --task-id ${outbound.task_id}`
+      `peer_task_proposal_not_delivered:${outbound.task_id} — ${message} | ${notDeliveredNextStep(error, outbound, options.peerCatalogPath, 'resend-proposal')}`
     );
   }
   const reply = extractReply(sent.receipt);
   const record = recordProposalDelivered(outbound, reply);
   return { request, record, ...(reply?.text ? { reply_text: reply.text } : {}) };
+}
+
+class PeerTaskMessageNotDelivered extends Error {
+  readonly failure: PeerDeliveryFailureClass | undefined;
+  constructor(receipt: PeerMessageDispatchReceipt) {
+    super(`peer_delivery_http_${receipt.status}${receipt.error ? `:${receipt.error}` : ''}`);
+    this.failure = receipt.failure;
+  }
+}
+
+/**
+ * What the operator should do after a task message was not delivered: wait
+ * when outbox redelivery will re-send it, otherwise the manual resend command.
+ */
+function notDeliveredNextStep(
+  error: unknown,
+  record: PeerTaskRecord,
+  peerCatalogPath: string | undefined,
+  resendCommand: 'resend-proposal' | 'resend-result'
+): string {
+  const failure =
+    error instanceof PeerTaskMessageNotDelivered ? error.failure : peerDeliveryFailureOf(error);
+  const outcome = describePeerDeliveryFailureNextStep({
+    failure,
+    senderPeerId: record.local_peer_id,
+    ...(peerCatalogPath ? { recovery: 'caller' as const } : {}),
+  });
+  const willRetry = failure?.disposition === 'retryable' && !peerCatalogPath;
+  return willRetry
+    ? outcome
+    : `${outcome} | next: pnpm kyberion peer task ${resendCommand} --peer-id ${record.local_peer_id} --task-id ${record.task_id}`;
 }
 
 /** A delivered proposal: the receiver's immediate rejection, if any, settles the task. */
@@ -1128,7 +1166,7 @@ export async function deliverPeerTaskResult(input: {
   if (!record.result) throw new Error(`peer_task_has_no_result:${record.task_id}`);
   const messageId = peerTaskResultMessageId(record.task_id);
   try {
-    await sendPeerConversationMessageToPeer({
+    const sent = await sendPeerConversationMessageToPeer({
       tenantId: record.tenant_id,
       senderPeerId: record.local_peer_id,
       recipientPeerId: record.remote_peer_id,
@@ -1142,11 +1180,12 @@ export async function deliverPeerTaskResult(input: {
       ...(input.peerCatalogPath ? { catalogPath: input.peerCatalogPath } : {}),
       timeoutMs: DELIVERY_TIMEOUT_MS,
     });
+    if (!sent.receipt.ok) throw new PeerTaskMessageNotDelivered(sent.receipt);
     return recordResultDelivered(record, messageId);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     log.warn(
-      `result for ${record.task_id} not delivered — ${message} | next: pnpm kyberion peer task resend-result --task-id ${record.task_id}`
+      `result for ${record.task_id} not delivered — ${message} | ${notDeliveredNextStep(error, record, input.peerCatalogPath, 'resend-result')}`
     );
     return appendRecord({
       ...record,

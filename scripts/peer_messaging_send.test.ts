@@ -8,7 +8,8 @@ const mocks = vi.hoisted(() => ({
   logger: { debug: vi.fn(), success: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
-vi.mock('@agent/core/mesh/peer-messaging', () => ({
+vi.mock('@agent/core/mesh/peer-messaging', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/mesh/peer-messaging')>()),
   buildPeerMessageEnvelope: mocks.buildPeerMessageEnvelope,
   loadPeerNetworkCatalog: mocks.loadPeerNetworkCatalog,
   resolvePeerDispatchTarget: mocks.resolvePeerDispatchTarget,
@@ -69,5 +70,54 @@ describe('peer_messaging_send', () => {
       })
     );
     expect(print).toHaveBeenCalledWith({ ok: true, message_id: 'msg-1' });
+  });
+
+  const args = ['--from-peer-id', 'peer-a', '--to-peer-id', 'peer-b', '--subject', 'hello'];
+
+  it('tells the operator a retryable failure is scheduled for retry, not to send again', async () => {
+    const { main } = await import('./peer_messaging_send.js');
+    const failure = { disposition: 'retryable', reason: 'receiver_retryable' };
+    mocks.sendPeerMessage.mockResolvedValue({
+      ok: false,
+      status: 503,
+      message_id: 'msg-1',
+      failure,
+    });
+    const print = vi.fn();
+    await main(args, print);
+    expect(mocks.sendPeerMessage.mock.calls[0][1].recovery).toBeUndefined();
+    const printed = print.mock.calls[0][0];
+    expect(printed.next).toContain('a retry is scheduled; do not send it again');
+    expect(printed.next).toContain('pnpm kyberion peer outbox status --peer-id peer-a');
+    expect(mocks.logger.success).not.toHaveBeenCalled();
+    expect(mocks.logger.warn).toHaveBeenCalledWith(expect.stringContaining('not delivered msg-1'));
+  });
+
+  it('says a terminal failure will not be retried', async () => {
+    const { main } = await import('./peer_messaging_send.js');
+    mocks.sendPeerMessage.mockResolvedValue({
+      ok: false,
+      status: 401,
+      message_id: 'msg-1',
+      error: 'invalid_signature',
+      failure: { disposition: 'terminal', reason: 'http_401' },
+    });
+    const print = vi.fn();
+    await main(args, print);
+    expect(print.mock.calls[0][0].next).toBe('it will not be retried (http_401)');
+  });
+
+  it('marks a send through an explicit catalog as caller-managed and says so', async () => {
+    const { main } = await import('./peer_messaging_send.js');
+    mocks.sendPeerMessage.mockResolvedValue({
+      ok: false,
+      status: 503,
+      message_id: 'msg-1',
+      failure: { disposition: 'retryable', reason: 'http_503' },
+    });
+    const print = vi.fn();
+    await main([...args, '--catalog', 'active/shared/tmp/other-catalog.json'], print);
+    expect(mocks.sendPeerMessage.mock.calls[0][1].recovery).toBe('caller');
+    expect(print.mock.calls[0][0].next).toContain('it will not be retried automatically');
   });
 });

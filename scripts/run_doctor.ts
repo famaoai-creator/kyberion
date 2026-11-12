@@ -8,6 +8,10 @@ import {
 import { installBaselineBuildReadinessInspector } from './baseline_build_readiness.js';
 import { readJanitorLastRunMs, readJanitorLastSubmissionMs } from '@agent/core/storage-janitor';
 import { inspectMeshHub } from '@agent/core/mesh/mesh-hub-inspection';
+import {
+  listPeerOutboxPeerIds,
+  summarizePeerOutbox,
+} from '@agent/core/mesh/peer-outbox-redelivery';
 import { getGovernanceControlSummary } from '@agent/core/governance/governance-status';
 import {
   BACKUP_ARCHIVE_MAX_AGE_HOURS,
@@ -241,15 +245,20 @@ export async function collectPipelineScheduleDoctorLines(): Promise<string[]> {
   }
 }
 
+/** Tenant the peer / Mesh doctor lines inspect, with the deprecated-alias notice. */
+function doctorPeerTenantScope(): { tenantId: string; aliasNotice: string } {
+  const tenant = getRegisteredEnvText('KYBERION_TENANT');
+  const alias = getRegisteredEnvText('KYBERION_TENANT_ID');
+  return {
+    tenantId: String(tenant || alias || '').trim(),
+    aliasNotice:
+      !tenant && alias ? ' (deprecated KYBERION_TENANT_ID alias; prefer KYBERION_TENANT)' : '',
+  };
+}
+
 export async function collectMeshDeliveryDoctorLines(): Promise<string[]> {
   try {
-    const tenantId = String(
-      getRegisteredEnvText('KYBERION_TENANT') || getRegisteredEnvText('KYBERION_TENANT_ID') || ''
-    ).trim();
-    const aliasNotice =
-      !getRegisteredEnvText('KYBERION_TENANT') && getRegisteredEnvText('KYBERION_TENANT_ID')
-        ? ' (deprecated KYBERION_TENANT_ID alias; prefer KYBERION_TENANT)'
-        : '';
+    const { tenantId, aliasNotice } = doctorPeerTenantScope();
     // Mesh state is tenant-scoped; without a tenant there is nothing to inspect,
     // which is the normal single-operator state rather than a failure.
     if (!tenantId) {
@@ -284,6 +293,35 @@ export async function collectMeshDeliveryDoctorLines(): Promise<string[]> {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return [`Mesh delivery: inspection unavailable (${message})`];
+  }
+}
+
+/**
+ * Sent peer messages that were not delivered, per local peer (read-only). The
+ * detail view is `pnpm kyberion peer outbox status`.
+ */
+export function collectPeerOutboxDoctorLines(): string[] {
+  try {
+    const { tenantId } = doctorPeerTenantScope();
+    // Without a tenant the Mesh line above already says nothing was inspected.
+    if (!tenantId) return [];
+    const lines: string[] = [];
+    for (const peerId of listPeerOutboxPeerIds(tenantId)) {
+      const { counts } = summarizePeerOutbox(tenantId, peerId);
+      if (Object.values(counts).every((count) => count === 0)) continue;
+      lines.push(
+        `Peer outbox (${peerId}): delivered=${counts.delivered}; retrying=${counts.retrying}; refused=${counts.refused}; given_up=${counts.given_up}; caller_managed=${counts.caller_managed}; legacy_failed=${counts.legacy_failed}`
+      );
+      if (counts.retrying + counts.refused + counts.given_up > 0) {
+        lines.push(
+          `  - inspect via \`pnpm kyberion peer outbox status --peer-id ${peerId} --tenant-id ${tenantId}\``
+        );
+      }
+    }
+    return lines.length > 0 ? lines : ['Peer outbox: idle; no sent peer messages recorded'];
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return [`Peer outbox: inspection unavailable (${message})`];
   }
 }
 
@@ -532,7 +570,10 @@ export async function collectDoctorReport(argv: {
     maintenanceLines: collectMaintenanceDoctorLines(),
     governanceLines,
     backupLines: collectBackupDoctorLines(),
-    meshDeliveryLines: await collectMeshDeliveryDoctorLines(),
+    meshDeliveryLines: [
+      ...(await collectMeshDeliveryDoctorLines()),
+      ...collectPeerOutboxDoctorLines(),
+    ],
     surfaceDeliveryLines: collectSurfaceDeliveryDoctorLines(),
     localCapabilityLines: await collectLocalCapabilityDoctorLines(),
     desktopObservationLines: await collectDesktopObservationDoctorLines(),

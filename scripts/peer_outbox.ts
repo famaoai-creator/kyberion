@@ -27,7 +27,6 @@ export async function main(
       default: getRegisteredEnvText('KYBERION_TENANT_ID') || '',
       description: 'Tenant of the peer runtime',
     })
-    .option('catalog', { type: 'string', description: 'Optional peer catalog path' })
     .demandCommand(1)
     .parseSync();
 
@@ -45,11 +44,7 @@ export async function main(
       ...summarizePeerOutbox(tenantId, peerId),
     };
   }
-  const pass = await runPeerOutboxRedeliveryPass({
-    tenantId,
-    peerId,
-    ...(argv.catalog ? { catalogPath: String(argv.catalog) } : {}),
-  });
+  const pass = await runPeerOutboxRedeliveryPass({ tenantId, peerId });
   return { pass, outbox: summarizePeerOutbox(tenantId, peerId) };
 }
 
