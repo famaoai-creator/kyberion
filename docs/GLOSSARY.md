@@ -524,6 +524,18 @@ Service bindings should be read together with:
 - `Vault`
   - where the secret material is actually governed
 
+### MCP Facade
+
+The governed inbound MCP server (`mcp-server-cowork`, `pnpm mcp:server`) that exposes `kyberion.*` tools to LLM clients. It is not a pass-through of the HTTP API or of every actuator op: the MCP tool catalog (`knowledge/product/governance/mcp-tool-catalog.json`) lists each tool with its band (discover / act / govern), allowed caller roles, allowed tiers and whether it needs human approval, and a tool without a catalog entry is refused. The HTTP `kyberion.request.*` tools belong to a separate, default-off server. Model: `knowledge/product/architecture/mcp-facade-model.md`.
+
+### MCP Caller Identity
+
+The tenant, principal, caller role and NHI an MCP server process runs as. It is resolved in one place (`resolveMcpServerIdentity` in `libs/shared-network/src/mcp-request-context.ts`) from the server's own environment, never from tool arguments; a tenant passed by a client can only match the bound tenant. The caller role (`operator` / `agent` / `cowork` / `service`) decides which MCP tools may be called. It is separate from the process's Authority Role, which decides what the process may read and write.
+
+### MCP Client
+
+Kyberion's one outbound client for external MCP servers: `executeMcp` (stdio) and `executeRemoteMcp` (HTTP) in `libs/core/service/service-engine-execution.ts`, reached through service-actuator `mode: mcp` and run as a governed external operation. The opposite direction is the MCP Facade.
+
 ### Credential Reference
 
 A non-secret name resolving an API key, token, or session credential through the

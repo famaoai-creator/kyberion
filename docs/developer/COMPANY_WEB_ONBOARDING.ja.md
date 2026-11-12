@@ -11,7 +11,7 @@ Concierge の /setup/company は、本人認証済みの active owner が、既�
 
 1. 既存 tenant の名称と company template、最初の依頼を確認する。
 2. 登録予定をレビューして会社を登録する。owner は認証済み member から導出し、入力で指定しない。
-3. readiness の四つの probe を実行する。Web の整合性確認は、許可された tenant の registry / binding / organization / accountable human / memory policy に限定する。全 tenant の index・project の整合性監査は CLI の operator 検査として維持し、Web で実施済みとは表示しない。viewer scope が warn の場合は監査のみであり、アクセス拒否が enforce されているという意味ではない。
+3. readiness の四つの probe を実行する。Web の整合性確認は、許可された tenant の registry / binding / organization / accountable human / memory policy に限定する。全 tenant の index・project の整合性監査は CLI の operator 検査として維持し、Web で実施済みとは表示しない。viewer scope は warn でも enforce でも許可外 tenant の読み取りを拒否する。warn はその試行を監査にも記録する。
 4. activation の承認申請を作り、本人が既存の承認一覧で内容を見て承認する。
 5. 設定画面を更新し、承認済みの activation を適用する。
 6. 最初の仕事の計画をレビューして project / work item を準備する。
