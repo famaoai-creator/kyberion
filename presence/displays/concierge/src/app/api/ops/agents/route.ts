@@ -9,6 +9,7 @@ import {
 import { readChronosJsonObject, readChronosStringParam } from '../../../../lib/ops/request-input';
 import {
   chronosViewerCanAccessAgentScope,
+  chronosViewerCanRouteA2aEnvelope,
   parseChronosAgentsBody,
 } from '../agent/agent-route-helpers';
 
@@ -488,10 +489,27 @@ export async function POST(req: NextRequest) {
           if (forbidden) return forbidden;
           if (!body.envelope?.header)
             return NextResponse.json({ error: 'Invalid A2A envelope' }, { status: 400 });
-          const { a2aBridge } = await import('@agent/core/mesh/a2a-bridge');
-          const response = await a2aBridge.route(
-            body.envelope as unknown as import('@agent/core/mesh/a2a-bridge').A2AMessage
-          );
+          const [{ a2aBridge }, { validateA2AEnvelope }] = await Promise.all([
+            import('@agent/core/mesh/a2a-bridge'),
+            import('@agent/core/mesh/a2a-envelope'),
+          ]);
+          // Only an envelope that passes the canonical schema reaches the bridge.
+          let envelope: import('@agent/core/mesh/a2a-bridge').A2AMessage;
+          try {
+            envelope = validateA2AEnvelope(body.envelope, 'Concierge A2A envelope');
+          } catch {
+            return NextResponse.json({ error: 'Invalid A2A envelope' }, { status: 400 });
+          }
+          if (!chronosViewerCanRouteA2aEnvelope(resolvedViewer.context, envelope)) {
+            return NextResponse.json(
+              {
+                error:
+                  'A tenant-scoped viewer may route only an A2A envelope whose security scope names a tenant inside the viewer scope.',
+              },
+              { status: 403 }
+            );
+          }
+          const response = await a2aBridge.route(envelope);
           return NextResponse.json({ status: 'ok', response });
         }
         default:

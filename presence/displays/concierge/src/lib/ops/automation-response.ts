@@ -53,6 +53,8 @@ export interface SchedulesResponse {
 export interface PipelinesResponse {
   pipelines: ClientPipeline[];
   accessRole: OpsAccessRole;
+  /** The server would accept a run from this viewer; false unless it says so. */
+  canRun: boolean;
 }
 
 export interface RunDispatch {
@@ -189,7 +191,7 @@ export function parsePipelinesResponse(value: unknown): PipelinesResponse | unde
   if (pipelines.some((entry) => !entry)) return undefined;
   const accessRole = parseAccessRole(value.accessRole);
   if (!accessRole) return undefined;
-  return { pipelines: pipelines as ClientPipeline[], accessRole };
+  return { pipelines: pipelines as ClientPipeline[], accessRole, canRun: value.canRun === true };
 }
 
 export function parseRunDispatchResponse(value: unknown): RunDispatch | undefined {

@@ -542,6 +542,7 @@ function PipelinesPanel({ t }: { t: T }) {
   const [contextText, setContextText] = React.useState('');
   const [contextInvalid, setContextInvalid] = React.useState(false);
   const [runBusy, setRunBusy] = React.useState(false);
+  const [canRun, setCanRun] = React.useState(false);
   const [notice, setNotice] = React.useState<{ resourceId: string; pipelinePath: string } | null>(
     null
   );
@@ -561,6 +562,7 @@ function PipelinesPanel({ t }: { t: T }) {
         }
         setPipelines(parsed.pipelines);
         setAccessRole(parsed.accessRole);
+        setCanRun(parsed.canRun);
         setLoading(false);
       })
       .catch(() => {
@@ -574,7 +576,8 @@ function PipelinesPanel({ t }: { t: T }) {
     };
   }, []);
 
-  const localAdmin = accessRole === 'localadmin';
+  // The run controls show only when the server says it would accept the run.
+  const localAdmin = accessRole === 'localadmin' && canRun;
   const runnable = React.useMemo(
     () => pipelines.filter((pipeline) => !pipeline.notPipeline && !pipeline.parseError),
     [pipelines]

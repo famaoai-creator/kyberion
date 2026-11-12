@@ -4,6 +4,7 @@ import {
   listScheduledPipelines,
   normalizeScheduledPipelinePath,
   registerScheduledPipeline,
+  runnerDerivedContextKeys,
   unregisterScheduledPipeline,
   type ScheduledPipeline,
 } from '@agent/core/pipeline/pipeline-scheduler';
@@ -121,6 +122,19 @@ export function scheduleAdmitsTenantScope(
   return tenantSlugs === 'all' || tenantSlugs.includes(slug);
 }
 
+/**
+ * A schedule of a catalog pipeline (`pipelines/…`) runs repository-wide ADF
+ * whatever its id says: only a schedule whose pipeline lives under a tenant
+ * knowledge floor is confined to that tenant. Registering, changing or running
+ * a catalog schedule therefore needs repository-wide access
+ * (`opsViewerMayActRepositoryWide`), not just a tenant scope that admits it.
+ */
+export function scheduleRunsCatalogPipeline(
+  schedule: Pick<ScheduledPipeline, 'pipelinePath'>
+): boolean {
+  return !TENANT_PATH_PATTERN.test(schedule.pipelinePath.replace(/\\/g, '/'));
+}
+
 export function parseScheduleTrigger(raw: unknown): ScheduledPipeline['trigger'] {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
     throw new ScheduleInputError('trigger must be an object');
@@ -174,6 +188,12 @@ function parseContext(raw: unknown): Record<string, unknown> | undefined {
   if (raw === undefined || raw === null) return undefined;
   if (typeof raw !== 'object' || Array.isArray(raw)) {
     throw new ScheduleInputError('context must be an object');
+  }
+  const reserved = runnerDerivedContextKeys(raw as Record<string, unknown>);
+  if (reserved.length > 0) {
+    throw new ScheduleInputError(
+      `context must not set runner-derived keys: ${reserved.join(', ')}`
+    );
   }
   return raw as Record<string, unknown>;
 }

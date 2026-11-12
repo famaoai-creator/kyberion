@@ -494,3 +494,65 @@ export function completeScheduledPipelineRun(
   saveScheduleRegistry(registry, options);
   return schedule;
 }
+
+/**
+ * Context keys the pipeline runner derives for itself: mission paths and tier,
+ * knowledge scope, trust resolution and engine options. A caller that starts
+ * a pipeline — an HTTP route, a stored schedule — supplies parameters only and
+ * must not set them: the CLI runner merges `--context` over its derived
+ * values, and the scheduler tick passes a schedule's context straight to the
+ * steps. The list mirrors `ENGINE_INTERNAL_CONTEXT_KEYS` in
+ * scripts/pipeline-execution-part-control.ts plus the trust keys of
+ * `executePipelineFile`; the `__` prefix is the engine's private namespace.
+ * `mission_id` is user-level identity and stays allowed.
+ */
+export const RUNNER_DERIVED_CONTEXT_KEYS: ReadonlySet<string> = new Set([
+  '__pipeline_options',
+  '_knowledge_scope',
+  'repo_root',
+  'platform_name',
+  'node_options',
+  'run_utc_now',
+  'browser_session_id',
+  'mission_dir',
+  'mission_tier',
+  'mission_evidence_dir',
+  'trace_summary',
+  'trace_persisted_path',
+  'trust_resolved',
+  'project_trust_approval_id',
+]);
+
+/**
+ * The runner-derived keys a caller context sets, sorted. A key the pipeline
+ * itself declares in `declared` (its own `context` block) is the author's
+ * value, which wins over the caller's where the two are merged, so it is not
+ * counted.
+ */
+export function runnerDerivedContextKeys(
+  context: Record<string, unknown> | undefined | null,
+  declared: Record<string, unknown> = {}
+): string[] {
+  return Object.keys(context ?? {})
+    .filter((key) => key.startsWith('__') || RUNNER_DERIVED_CONTEXT_KEYS.has(key))
+    .filter((key) => !Object.prototype.hasOwnProperty.call(declared, key))
+    .sort();
+}
+
+/**
+ * Refuse a stored schedule whose context sets runner-derived keys. Called by
+ * the scheduler tick before the steps run.
+ */
+export function assertScheduledContextAdmissible(
+  scheduleId: string,
+  scheduledContext: Record<string, unknown> | undefined | null,
+  pipelineContext: Record<string, unknown> = {}
+): void {
+  const reserved = runnerDerivedContextKeys(scheduledContext, pipelineContext);
+  if (reserved.length === 0) return;
+  throw new Error(
+    `[SCHEDULE_CONTEXT_RESERVED] schedule '${scheduleId}' was not run — its stored context sets keys the pipeline runner derives itself` +
+      ` | next: remove them from the schedule (Concierge › Automation, or active/shared/runtime/pipeline-schedules.json)` +
+      ` | evidence: keys=${reserved.join(',')}`
+  );
+}
