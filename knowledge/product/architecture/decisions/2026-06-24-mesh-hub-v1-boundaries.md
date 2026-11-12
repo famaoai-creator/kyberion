@@ -4,7 +4,7 @@ category: Architecture
 tags: [adr, mesh-hub, peer, messaging, routing, tenancy, security]
 importance: 10
 author: Ecosystem Architect
-last_updated: 2026-10-18
+last_updated: 2026-11-13
 ---
 
 # Constrain Mesh Hub v1 to a Same-Tenant Single-Writer Control Plane
@@ -55,6 +55,8 @@ v1 routes on deterministic eligibility only: enrollment, tenant, presence freshn
 Hub delivery is transport acceptance only. A recipient may convert a request into a WorkItem proposal or an A2A task proposal after local schema, tenant, and policy validation. It must require explicit recipient acceptance for `review.request`, `workitem.handoff`, and every request that could cause external side effects. No Hub message may create, start, resume, alter, or approve a mission.
 
 **Amendment (2026-10-18) — opt-in conversation auto replies.** A peer conversation server may answer inbound `message` / `reply` conversation messages with an LLM-generated text reply only for remote peers the recipient operator listed explicitly (`--auto-reply-peers`). That operator opt-in is the recipient's explicit acceptance of this one behaviour: it is recipient-local, runs outside the HTTP receive path, sends a text reply back to the same peer, and has no tool, actuator, WorkItem, or mission effect. `handoff` messages and collaboration requests keep the proposal-and-accept path above. The LLM call itself is an external egress and stays subject to the tenant's provider attestation and egress policy.
+
+**Amendment (2026-11-13) — outbox redelivery of peer messages.** A sender may re-send a peer message whose delivery failed without a decision by the receiver (no response, receiver `retryable`, HTTP 408 / 425 / 429 / 502 / 503 / 504). This is recovery of a send that was already addressed and already signed: the stored envelope is re-sent unchanged to the same recipient, under bounded attempts, backoff and the envelope's expiry. It selects no peer, uses no load signal, creates no request, and accepts nothing on the receiver's behalf — the receiver validates, deduplicates and decides exactly as on a first delivery, so it is not the automatic scheduling this ADR reserves for a superseding decision. It runs by default in the peer conversation server (every 5 s) and is turned off with `--redelivery-interval-ms 0`; `pnpm kyberion peer outbox redeliver` runs one pass by hand. Receiver handler errors, refusals, sends made before the feature existed, and sends whose caller retries itself or used an explicit catalog are never re-sent. See [Outbox redelivery](../../orchestration/peer-network.md#outbox-redelivery).
 
 ## Rationale
 

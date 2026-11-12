@@ -4,6 +4,8 @@ const mocks = vi.hoisted(() => ({
   readJanitorLastRunMs: vi.fn(),
   readJanitorLastSubmissionMs: vi.fn(),
   inspectMeshHub: vi.fn(),
+  listPeerOutboxPeerIds: vi.fn(),
+  summarizePeerOutbox: vi.fn(),
   readJanitorFailureMarker: vi.fn(() => null),
 }));
 
@@ -16,6 +18,11 @@ vi.mock('@agent/core/storage-janitor', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@agent/core/storage-janitor')>()),
   readJanitorLastRunMs: mocks.readJanitorLastRunMs,
   readJanitorLastSubmissionMs: mocks.readJanitorLastSubmissionMs,
+}));
+
+vi.mock('@agent/core/mesh/peer-outbox-redelivery', () => ({
+  listPeerOutboxPeerIds: mocks.listPeerOutboxPeerIds,
+  summarizePeerOutbox: mocks.summarizePeerOutbox,
 }));
 
 vi.mock('@agent/core/mesh/mesh-hub-inspection', () => ({
@@ -94,6 +101,62 @@ describe('run_doctor mesh delivery line', () => {
     expect(lines).toContain(
       '  - inspect dead letters via `pnpm kyberion mesh-hub inspect dead-letters --tenant-id acme`'
     );
+  });
+});
+
+describe('run_doctor peer outbox lines', () => {
+  const counts = (overrides: Record<string, number>) => ({
+    counts: {
+      delivered: 0,
+      refused: 0,
+      given_up: 0,
+      retrying: 0,
+      caller_managed: 0,
+      legacy_failed: 0,
+      ...overrides,
+    },
+  });
+
+  it('prints nothing without a tenant scope and reads no outbox', async () => {
+    vi.stubEnv('KYBERION_TENANT', '');
+    vi.stubEnv('KYBERION_TENANT_ID', '');
+    mocks.listPeerOutboxPeerIds.mockClear();
+    const { collectPeerOutboxDoctorLines } = await import('./run_doctor.js');
+    expect(collectPeerOutboxDoctorLines()).toEqual([]);
+    expect(mocks.listPeerOutboxPeerIds).not.toHaveBeenCalled();
+  });
+
+  it('shows undelivered counts per local peer with the command that lists them', async () => {
+    vi.stubEnv('KYBERION_TENANT', 'acme');
+    mocks.listPeerOutboxPeerIds.mockReturnValue(['peer-a', 'peer-b', 'peer-idle']);
+    mocks.summarizePeerOutbox.mockImplementation((_tenant: string, peerId: string) =>
+      peerId === 'peer-a'
+        ? counts({ delivered: 4, given_up: 1, retrying: 2 })
+        : peerId === 'peer-b'
+          ? counts({ delivered: 3 })
+          : counts({})
+    );
+    const { collectPeerOutboxDoctorLines } = await import('./run_doctor.js');
+    expect(collectPeerOutboxDoctorLines()).toEqual([
+      'Peer outbox (peer-a): delivered=4; retrying=2; refused=0; given_up=1; caller_managed=0; legacy_failed=0',
+      '  - inspect via `pnpm kyberion peer outbox status --peer-id peer-a --tenant-id acme`',
+      'Peer outbox (peer-b): delivered=3; retrying=0; refused=0; given_up=0; caller_managed=0; legacy_failed=0',
+    ]);
+  });
+
+  it('reports idle and survives an unreadable outbox', async () => {
+    vi.stubEnv('KYBERION_TENANT', 'acme');
+    mocks.listPeerOutboxPeerIds.mockReturnValue([]);
+    const { collectPeerOutboxDoctorLines } = await import('./run_doctor.js');
+    expect(collectPeerOutboxDoctorLines()).toEqual([
+      'Peer outbox: idle; no sent peer messages recorded',
+    ]);
+    mocks.listPeerOutboxPeerIds.mockImplementation(() => {
+      throw new Error('EACCES');
+    });
+    expect(collectPeerOutboxDoctorLines()).toEqual([
+      'Peer outbox: inspection unavailable (EACCES)',
+    ]);
   });
 });
 

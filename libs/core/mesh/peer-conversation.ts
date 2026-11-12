@@ -131,7 +131,10 @@ export interface SendPeerConversationMessageInput {
   ttlMs?: number;
   catalogPath?: string;
   timeoutMs?: number;
-  /** `'caller'`: the caller retries delivery itself; outbox redelivery skips this message. */
+  /**
+   * `'caller'`: the caller retries delivery itself; outbox redelivery skips
+   * this message. Implied by `catalogPath`.
+   */
   deliveryRecovery?: 'caller';
   /**
    * Stable message id for idempotent resends: used for both the outbound
@@ -859,6 +862,15 @@ export function applyPeerConversationDelivery(delivery: PeerOutboxDelivery): boo
     (entry) => entry.message_id === reply.message_id && entry.direction === 'inbound'
   );
   if (recorded) return true;
+  if (delivery.replayed_from) {
+    // Replay from an outbox row (crash repair). The transcript keeps its last
+    // 200 entries: once everything from the time of the delivery has been
+    // trimmed, a reply recorded back then is gone too, and appending it again
+    // would duplicate it (and reopen a closed session). A missing session is
+    // never recreated by a replay.
+    const oldest = session?.transcript[0]?.created_at;
+    if (!oldest || Date.parse(oldest) > Date.parse(delivery.replayed_from)) return true;
+  }
   appendPeerConversationTranscript({
     tenantId: envelope.tenant_id,
     sessionId: message.session_id,
@@ -935,11 +947,15 @@ export async function sendPeerConversationMessageToPeer(
     ...(messageId ? { messageId } : {}),
   });
 
+  // Outbox redelivery resolves the recipient through the tenant catalog. A
+  // send addressed through another catalog could be re-sent somewhere else,
+  // so it is left to its caller.
+  const recovery = input.deliveryRecovery ?? (input.catalogPath ? 'caller' : undefined);
   const receipt = await sendPeerMessage(envelope, {
     destinationUrl: target.destinationUrl,
     allowLocalNetwork: target.allowLocalNetwork,
     timeoutMs: input.timeoutMs,
-    ...(input.deliveryRecovery ? { recovery: input.deliveryRecovery } : {}),
+    ...(recovery ? { recovery } : {}),
   });
 
   applyPeerConversationDelivery({
@@ -1005,28 +1021,35 @@ export function createPeerConversationResponder(
       });
       throw new Error(`peer_conversation_session_peer_mismatch:${existingSession.session_id}`);
     }
-    const session = appendPeerConversationTranscript({
-      tenantId: responderTenantId,
-      sessionId: message.session_id,
-      localPeerId: responderPeerId,
-      remotePeerId: context.envelope.sender_peer_id,
-      kind: message.message_kind,
-      direction: 'inbound',
-      text: message.text,
-      replyToMessageId: message.reply_to_message_id,
-      relatedWorkItemIds: message.related_work_item_ids,
-      metadata: message.metadata,
-      payload: {
-        topic: message.topic,
-        kind: message.kind,
-        tenant_id: message.tenant_id,
-      },
-      messageId: context.envelope.message_id,
-    });
+    // A resend after this process died mid-handler (the message was recorded
+    // but never marked handled) must not record the inbound message twice.
+    const alreadyRecorded = existingSession?.transcript.find(
+      (entry) => entry.message_id === context.envelope.message_id && entry.direction === 'inbound'
+    );
+    const session = alreadyRecorded
+      ? existingSession!
+      : appendPeerConversationTranscript({
+          tenantId: responderTenantId,
+          sessionId: message.session_id,
+          localPeerId: responderPeerId,
+          remotePeerId: context.envelope.sender_peer_id,
+          kind: message.message_kind,
+          direction: 'inbound',
+          text: message.text,
+          replyToMessageId: message.reply_to_message_id,
+          relatedWorkItemIds: message.related_work_item_ids,
+          metadata: message.metadata,
+          payload: {
+            topic: message.topic,
+            kind: message.kind,
+            tenant_id: message.tenant_id,
+          },
+          messageId: context.envelope.message_id,
+        });
 
     const maybeReply = (await options.onMessage?.({
       session,
-      message: session.transcript[session.transcript.length - 1],
+      message: alreadyRecorded ?? session.transcript[session.transcript.length - 1],
       envelope: context.envelope,
     })) as Partial<PeerConversationResponderResult> | void;
 

@@ -1,5 +1,21 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+const redeliveryLog = vi.hoisted(() => ({ warn: vi.fn(), error: vi.fn() }));
+
+vi.mock('../logger.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../logger.js')>();
+  return {
+    ...actual,
+    createLogger: (name: string, ...rest: unknown[]) => {
+      const logger = (actual.createLogger as (...args: unknown[]) => Record<string, unknown>)(
+        name,
+        ...rest
+      );
+      return name === 'peer-outbox-redelivery' ? { ...logger, ...redeliveryLog } : logger;
+    },
+  };
+});
+
 import {
   buildPeerMessageEnvelope,
   classifyPeerDeliveryFailure,
@@ -7,12 +23,15 @@ import {
   createPeerMessagingServer,
   listPeerInboxRecords,
   listPeerOutboxRecords,
+  PEER_RETRY_AFTER_MAX_MS,
+  peerDeliveryFailureOf,
   peerRuntimeLogicalPath,
   sendPeerMessage,
   type PeerMessageEnvelope,
   type PeerNetworkCatalog,
 } from './peer-messaging.js';
 import {
+  appendPeerConversationTranscript,
   clearPeerConversationRuntime,
   createPeerConversationResponder,
   loadPeerConversationSession,
@@ -93,12 +112,14 @@ describe('peer outbox redelivery', () => {
   let fetchSpy: ReturnType<typeof vi.spyOn<typeof globalThis, 'fetch'>>;
 
   beforeEach(() => {
+    redeliveryLog.warn.mockClear();
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(T0);
     fetchSpy = vi.spyOn(globalThis, 'fetch');
   });
 
   afterEach(() => {
+    vi.unstubAllEnvs();
     fetchSpy.mockRestore();
     vi.useRealTimers();
     clearPeerRuntime(TENANT, SENDER);
@@ -253,6 +274,8 @@ describe('peer outbox redelivery', () => {
 
   it('records the reply of a redelivered conversation message in the sender transcript, once', async () => {
     safeWriteFile(CATALOG_PATH, JSON.stringify(CATALOG));
+    // Configured catalog, not an explicit --catalog path (those sends are caller-managed).
+    vi.stubEnv('KYBERION_PEER_NETWORK_CATALOG', CATALOG_PATH);
     const receiver = createPeerMessagingServer({
       peerId: RECIPIENT,
       tenantId: TENANT,
@@ -277,7 +300,6 @@ describe('peer outbox redelivery', () => {
           sessionId: 'PCS-OUTBOX-REDELIVERY',
           topic: 'outbox',
           text: 'are you there?',
-          catalogPath: CATALOG_PATH,
         })
       ).rejects.toThrow();
       expect(inbound()).toEqual([]);
@@ -297,10 +319,30 @@ describe('peer outbox redelivery', () => {
       await pass({ onDelivered });
       expect(onDelivered).toHaveBeenCalledTimes(1);
       expect(inbound()).toHaveLength(1);
+
+      // Once the transcript (last 200 entries) no longer reaches back to the
+      // delivery, a replay must not append the trimmed reply a second time.
+      advance(1_000);
+      for (let index = 0; index < 200; index += 1) {
+        appendPeerConversationTranscript({
+          tenantId: TENANT,
+          sessionId: 'PCS-OUTBOX-REDELIVERY',
+          localPeerId: SENDER,
+          remotePeerId: RECIPIENT,
+          kind: 'message',
+          direction: 'outbound',
+          text: `later ${index}`,
+        });
+      }
+      expect(inbound()).toEqual([]);
+      await pass({ onDelivered });
+      expect(onDelivered).toHaveBeenCalledTimes(2);
+      expect(inbound()).toEqual([]);
+
       // Outside the repair window nothing is replayed.
       advance(PEER_OUTBOX_BOOKKEEPING_REPAIR_WINDOW_MS);
       await pass({ onDelivered });
-      expect(onDelivered).toHaveBeenCalledTimes(1);
+      expect(onDelivered).toHaveBeenCalledTimes(2);
     } finally {
       safeRmSync(CATALOG_PATH, { force: true });
       clearPeerConversationRuntime(TENANT, SENDER);
@@ -632,6 +674,320 @@ describe('peer outbox redelivery', () => {
     await afterRestart.runOnce();
     await createPeerOutboxRedelivery(config).runOnce();
     expect(fetchSpy).toHaveBeenCalledTimes(3);
+  });
+
+  it('marks a send through an explicit catalog as caller-managed', async () => {
+    safeWriteFile(CATALOG_PATH, JSON.stringify(CATALOG));
+    try {
+      fetchSpy.mockRejectedValueOnce(new Error('connect ECONNREFUSED'));
+      await expect(
+        sendPeerConversationMessageToPeer({
+          tenantId: TENANT,
+          senderPeerId: SENDER,
+          recipientPeerId: RECIPIENT,
+          sessionId: 'PCS-OUTBOX-EXPLICIT',
+          topic: 'outbox',
+          text: 'through another catalog',
+          catalogPath: CATALOG_PATH,
+        })
+      ).rejects.toThrow();
+      expect(outboxRows()[0]).toMatchObject({ disposition: 'retryable', recovery: 'caller' });
+      advance(600_000);
+      await pass();
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      safeRmSync(CATALOG_PATH, { force: true });
+      clearPeerConversationRuntime(TENANT, SENDER);
+    }
+  });
+
+  it('bounds a receiver-requested delay wherever it is read', async () => {
+    const bounded = (value: unknown) =>
+      classifyPeerDeliveryFailure({
+        httpStatus: 503,
+        response: { retryable: true, retry_after_ms: value },
+      }).retry_after_ms;
+    expect(bounded(1e300)).toBe(PEER_RETRY_AFTER_MAX_MS);
+    expect(bounded(86_400_000)).toBe(PEER_RETRY_AFTER_MAX_MS);
+    expect(bounded(30_000)).toBe(30_000);
+    for (const value of [-1, 0, Number.NaN, Number.POSITIVE_INFINITY, '30000', null, {}]) {
+      expect(bounded(value)).toBeUndefined();
+    }
+    expect(classifyPeerDeliveryFailure({ httpStatus: 429, retryAfterMs: 1e300 })).toMatchObject({
+      retry_after_ms: PEER_RETRY_AFTER_MAX_MS,
+    });
+
+    // Over the wire: the row and the receipt carry the bounded value.
+    const wire = envelopeFor('PM-RETRY-AFTER-HUGE');
+    fetchSpy.mockResolvedValueOnce(
+      new Response(
+        '{"ok":false,"error":"receiver_overloaded","retryable":true,"retry_after_ms":1e300}',
+        {
+          status: 503,
+        }
+      )
+    );
+    await send(wire);
+    expect(outboxRows()[0].retry_after_ms).toBe(PEER_RETRY_AFTER_MAX_MS);
+
+    // From disk: a row that already holds an absurd value neither breaks the
+    // views nor parks the message.
+    const disk = envelopeFor('PM-RETRY-AFTER-ON-DISK');
+    for (const value of [1e300, -5, 'soon']) {
+      appendGovernedArtifactJsonl(
+        'surface_runtime',
+        peerRuntimeLogicalPath(TENANT, SENDER, 'outbox.jsonl'),
+        {
+          sent_at: new Date(T0).toISOString(),
+          destination_url: DESTINATION,
+          status: 'failed',
+          envelope: disk,
+          response: null,
+          disposition: 'retryable',
+          reason: 'receiver_retryable',
+          retry_after_ms: value,
+        }
+      );
+    }
+    const summary = summarizePeerOutbox(TENANT, SENDER);
+    expect(summary.retrying.map((entry) => entry.message_id).sort()).toEqual(
+      [disk.message_id, wire.message_id].sort()
+    );
+    for (const entry of summary.retrying) {
+      expect(Date.parse(entry.next_attempt_at)).toBeLessThanOrEqual(T0 + PEER_RETRY_AFTER_MAX_MS);
+    }
+    advance(PEER_RETRY_AFTER_MAX_MS);
+    fetchSpy.mockImplementation(async () => accepted('any'));
+    const result = await pass();
+    expect(result.delivered.sort()).toEqual([disk.message_id, wire.message_id].sort());
+    await createPeerOutboxRedelivery({
+      tenantId: TENANT,
+      peerId: SENDER,
+      catalog: CATALOG,
+    }).runOnce();
+  });
+
+  it('classifies an unparsable response by its HTTP status', async () => {
+    const html = (status: number) =>
+      new Response('<html><body>proxy</body></html>', {
+        status,
+        headers: { 'Content-Type': 'text/html' },
+      });
+    const cases = [
+      ['PM-HTML-502', 502, { disposition: 'retryable', reason: 'http_502' }],
+      ['PM-HTML-503', 503, { disposition: 'retryable', reason: 'http_503' }],
+      ['PM-HTML-500', 500, { disposition: 'terminal', reason: 'receiver_error' }],
+      ['PM-HTML-404', 404, { disposition: 'terminal', reason: 'http_404' }],
+      ['PM-HTML-403', 403, { disposition: 'terminal', reason: 'http_403' }],
+      // A 2xx that is not a peer listener's answer is neither a delivery nor retried.
+      ['PM-HTML-200', 200, { disposition: 'terminal', reason: 'invalid_response' }],
+    ] as const;
+    for (const [messageId, status, expected] of cases) {
+      fetchSpy.mockResolvedValueOnce(html(status));
+      const error = await send(envelopeFor(messageId));
+      expect(error).toBeInstanceOf(Error);
+      expect(peerDeliveryFailureOf(error)).toEqual(expected);
+    }
+    expect(outboxRows().map((row) => [row.http_status, row.disposition, row.reason])).toEqual(
+      cases.map(([, status, expected]) => [status, expected.disposition, expected.reason])
+    );
+    // Only "no response at all" is a transport error.
+    fetchSpy.mockRejectedValueOnce(new Error('connect ECONNREFUSED'));
+    const offline = await send(envelopeFor('PM-NO-RESPONSE'));
+    expect(peerDeliveryFailureOf(offline)).toEqual({
+      disposition: 'retryable',
+      reason: 'transport_error',
+    });
+    expect(outboxRows().at(-1)!.http_status).toBeUndefined();
+    expect(summarizePeerOutbox(TENANT, SENDER).counts).toMatchObject({ retrying: 3, refused: 4 });
+  });
+
+  it('treats a message as delivered when a later send succeeds after it was given up', async () => {
+    const envelope = envelopeFor('PM-SENT-AFTER-GIVE-UP');
+    fetchSpy.mockRejectedValueOnce(new Error('timeout'));
+    await send(envelope);
+    advance(5_000);
+    expect((await pass({ policy: { maxAttempts: 1 } })).given_up).toHaveLength(1);
+    // The operator sends it again by hand; the receiver accepts.
+    fetchSpy.mockResolvedValueOnce(accepted(envelope.message_id));
+    await send(envelope);
+    expect(outboxRows().map((row) => row.status)).toEqual(['failed', 'given_up', 'sent']);
+    expect(summarizePeerOutbox(TENANT, SENDER)).toMatchObject({
+      counts: { delivered: 1, given_up: 0 },
+      undelivered: [],
+    });
+    advance(600_000);
+    await pass();
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it('schedules another attempt when the receiver answers 425 during redelivery', async () => {
+    const envelope = envelopeFor('PM-425');
+    fetchSpy.mockRejectedValueOnce(new Error('timeout'));
+    await send(envelope);
+    advance(5_000);
+    fetchSpy.mockResolvedValueOnce(
+      jsonResponse(425, {
+        ok: false,
+        error: 'message_processing',
+        retryable: true,
+        retry_after_ms: 250,
+      })
+    );
+    const result = await pass();
+    expect(result).toMatchObject({ retry_scheduled: [envelope.message_id], waiting: 1 });
+    // Second failure: the 10 s backoff outweighs the receiver's 250 ms.
+    expect(result.next_attempt_at).toBe(new Date(T0 + 5_000 + 10_000).toISOString());
+    expect(outboxRows()[1]).toMatchObject({ http_status: 425, redelivery: true });
+  });
+
+  it('gives up when the current catalog endpoint is not an allowed destination', async () => {
+    const envelope = envelopeFor('PM-DESTINATION');
+    fetchSpy.mockRejectedValueOnce(new Error('timeout'));
+    await send(envelope);
+    advance(5_000);
+    const result = await pass({
+      catalog: {
+        ...CATALOG,
+        peers: [{ ...CATALOG.peers[0], exposure: 'public_network', allow_local_network: false }],
+      },
+    });
+    expect(result.given_up).toEqual([
+      { message_id: envelope.message_id, reason: 'destination_not_allowed' },
+    ]);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('pauses while the catalog cannot be loaded and warns once until it loads again', async () => {
+    const envelope = envelopeFor('PM-NO-CATALOG');
+    fetchSpy.mockRejectedValueOnce(new Error('timeout'));
+    await send(envelope);
+    advance(5_000);
+    const paused = () =>
+      redeliveryLog.warn.mock.calls.filter(([line]) => String(line).includes('redelivery paused'));
+    for (let tick = 0; tick < 3; tick += 1) {
+      expect(await pass({ catalog: null })).toMatchObject({ waiting: 1, given_up: [] });
+    }
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(outboxRows()).toHaveLength(1);
+    expect(paused()).toHaveLength(1);
+
+    fetchSpy.mockRejectedValueOnce(new Error('timeout'));
+    await pass();
+    advance(60_000);
+    await pass({ catalog: null });
+    expect(paused()).toHaveLength(2);
+  });
+
+  it('stops sending and stops replaying bookkeeping once asked to stop', async () => {
+    const first = envelopeFor('PM-STOP-1');
+    const second = envelopeFor('PM-STOP-2');
+    fetchSpy.mockRejectedValue(new Error('timeout'));
+    await send(first);
+    await send(second);
+    advance(5_000);
+
+    // Mid-pass: the stop arrives while the first message is being sent.
+    let stop = false;
+    fetchSpy.mockImplementation(async () => {
+      stop = true;
+      return accepted('any');
+    });
+    const onDelivered = vi.fn();
+    const interrupted = await pass({ shouldStop: () => stop, onDelivered });
+    expect(interrupted).toMatchObject({ delivered: [first.message_id], waiting: 1 });
+    expect(fetchSpy).toHaveBeenCalledTimes(3);
+
+    stop = false;
+    expect((await pass({ onDelivered })).delivered).toEqual([second.message_id]);
+    // Mid-repair: two redelivered rows are due for replay; the stop arrives after one.
+    stop = false;
+    onDelivered.mockClear();
+    onDelivered.mockImplementation(() => {
+      stop = true;
+    });
+    await pass({ shouldStop: () => stop, onDelivered });
+    expect(onDelivered).toHaveBeenCalledTimes(1);
+  });
+
+  it('starts over when the outbox file is replaced under a running worker', async () => {
+    const before = envelopeFor('PM-ROTATED-AWAY');
+    fetchSpy.mockRejectedValue(new Error('timeout'));
+    await send(before);
+    const worker = createPeerOutboxRedelivery({
+      tenantId: TENANT,
+      peerId: SENDER,
+      catalog: CATALOG,
+    });
+    expect((await worker.runOnce()).waiting).toBe(1);
+
+    // The runtime directory is cleared and a new outbox begins.
+    clearPeerRuntime(TENANT, SENDER);
+    const after = envelopeFor('PM-AFTER-ROTATION');
+    await send(after);
+    advance(5_000);
+    fetchSpy.mockImplementation(async () => accepted('any'));
+    const result = await worker.runOnce();
+    expect(result.delivered).toEqual([after.message_id]);
+    expect(sentBodies(fetchSpy).filter((body) => body.includes(before.message_id))).toHaveLength(1);
+  });
+
+  it('records an inbound conversation message once when the receiver died mid-handler', async () => {
+    safeWriteFile(CATALOG_PATH, JSON.stringify(CATALOG));
+    vi.stubEnv('KYBERION_PEER_NETWORK_CATALOG', CATALOG_PATH);
+    const onMessage = vi.fn();
+    const newReceiver = () =>
+      createPeerMessagingServer({
+        peerId: RECIPIENT,
+        tenantId: TENANT,
+        sharedSecret: SECRET,
+        responder: createPeerConversationResponder({
+          peerId: RECIPIENT,
+          tenantId: TENANT,
+          onMessage,
+        }),
+      });
+    const receivedInbound = () =>
+      loadPeerConversationSession(TENANT, RECIPIENT, 'PCS-OUTBOX-CRASH')!.transcript.filter(
+        (entry) => entry.direction === 'inbound'
+      );
+    try {
+      // The handler recorded the message, then the process died: no receipt,
+      // no `message_handled` event.
+      onMessage.mockImplementationOnce(() => {
+        throw new Error('process died');
+      });
+      const dying = newReceiver();
+      fetchSpy.mockImplementationOnce(async (_url, init) => {
+        await dying.processEnvelope(JSON.parse(String(init?.body)));
+        throw new Error('socket hang up');
+      });
+      await expect(
+        sendPeerConversationMessageToPeer({
+          tenantId: TENANT,
+          senderPeerId: SENDER,
+          recipientPeerId: RECIPIENT,
+          sessionId: 'PCS-OUTBOX-CRASH',
+          topic: 'outbox',
+          text: 'only once',
+        })
+      ).rejects.toThrow();
+      expect(receivedInbound()).toHaveLength(1);
+
+      advance(5_000);
+      const restarted = newReceiver();
+      fetchSpy.mockImplementationOnce(async (_url, init) => {
+        const result = await restarted.processEnvelope(JSON.parse(String(init?.body)));
+        return jsonResponse(result.status, result.body);
+      });
+      expect((await pass()).delivered).toHaveLength(1);
+      expect(receivedInbound()).toHaveLength(1);
+      expect(onMessage).toHaveBeenCalledTimes(2);
+    } finally {
+      safeRmSync(CATALOG_PATH, { force: true });
+      clearPeerConversationRuntime(TENANT, SENDER);
+      clearPeerConversationRuntime(TENANT, RECIPIENT);
+    }
   });
 
   it('runs passes on a timer while started and sends nothing after stop', async () => {

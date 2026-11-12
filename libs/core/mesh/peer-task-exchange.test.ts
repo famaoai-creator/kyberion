@@ -530,82 +530,144 @@ describe('peer task exchange', () => {
     expect(sent.map((envelope) => envelope.message_id)).toEqual([pending.request_message_id]);
   });
 
-  it('completes the task bookkeeping when outbox redelivery delivers a proposal or a result', async () => {
+  it.each([
+    ['no response', () => Promise.reject(new TypeError('fetch failed'))],
+    [
+      'HTTP 503',
+      () =>
+        Promise.resolve(
+          new Response(
+            JSON.stringify({ ok: false, error: 'receiver_overloaded', retryable: true }),
+            { status: 503, headers: { 'Content-Type': 'application/json' } }
+          )
+        ),
+    ],
+  ] as const)(
+    'completes the task bookkeeping when outbox redelivery delivers a proposal or a result (first failure: %s)',
+    async (_label, unavailable) => {
+      // Redelivery resolves through the configured catalog; a send with an
+      // explicit catalog path is caller-managed and would not be re-sent.
+      vi.stubEnv('KYBERION_PEER_NETWORK_CATALOG', PEER_CATALOG);
+      wirePeers();
+      const fetchSpy = vi.mocked(globalThis.fetch);
+      const route = fetchSpy.getMockImplementation()!;
+      const redeliver = (peerId: string) =>
+        runPeerOutboxRedeliveryPass({ tenantId: TENANT, peerId, policy: { baseBackoffMs: 0 } });
+      const proposeViaTenantCatalog = (taskType: string) =>
+        proposePeerTask({
+          tenantId: TENANT,
+          senderPeerId: PROPOSER,
+          recipientPeerId: RECIPIENT,
+          taskType,
+          summary: 'Is your checkout healthy before I hand off?',
+        });
+
+      // A proposal that could not be delivered, and one the recipient will reject on receipt.
+      fetchSpy.mockImplementation(unavailable);
+      const notDelivered = await proposeViaTenantCatalog('baseline.check').catch(
+        (error: Error) => error.message
+      );
+      expect(notDelivered).toContain('peer_task_proposal_not_delivered');
+      // The operator is told a retry is scheduled, not to run the command again.
+      expect(notDelivered).toContain('a retry is scheduled; do not send it again');
+      expect(notDelivered).toContain(`peer outbox status --peer-id ${PROPOSER}`);
+      expect(notDelivered).not.toContain('resend-proposal');
+      await expect(proposeViaTenantCatalog('shell.anything')).rejects.toThrow(
+        /peer_task_proposal_not_delivered/
+      );
+      const [pending, refused] = listPeerTasks(TENANT, PROPOSER, { direction: 'outbound' });
+      // A non-2xx receipt is not a delivery.
+      expect(pending).toMatchObject({ state: 'pending', proposal_delivery: { status: 'failed' } });
+      expect(refused).toMatchObject({ state: 'pending', proposal_delivery: { status: 'failed' } });
+      fetchSpy.mockImplementation(route);
+
+      const pass = await redeliver(PROPOSER);
+      expect(pass.delivered).toHaveLength(2);
+      expect(pass.bookkeeping_failed).toEqual([]);
+      // Same record state as a first-try delivery.
+      expect(getPeerTask(TENANT, PROPOSER, 'outbound', pending.task_id)).toMatchObject({
+        state: 'pending',
+        proposal_delivery: { status: 'sent' },
+      });
+      expect(getPeerTask(TENANT, PROPOSER, 'outbound', refused.task_id)).toMatchObject({
+        state: 'rejected',
+        proposal_delivery: { status: 'sent' },
+      });
+      expect(getPeerTask(TENANT, RECIPIENT, 'inbound', pending.task_id)!.state).toBe('pending');
+      const replies = () =>
+        loadPeerConversationSession(TENANT, PROPOSER, pending.session_id)!.transcript.filter(
+          (entry) => entry.direction === 'inbound'
+        );
+      expect(replies().length).toBeGreaterThan(0);
+      // A later pass replays the bookkeeping from the outbox row; it changes nothing.
+      const before = replies().length;
+      const rows = listPeerTasks(TENANT, PROPOSER, { direction: 'outbound' }).map(
+        (record) => record.updated_at
+      );
+      expect((await redeliver(PROPOSER)).bookkeeping_failed).toEqual([]);
+      expect(replies()).toHaveLength(before);
+      expect(
+        listPeerTasks(TENANT, PROPOSER, { direction: 'outbound' }).map(
+          (record) => record.updated_at
+        )
+      ).toEqual(rows);
+
+      // The result of the accepted task cannot be delivered either, then is redelivered.
+      fetchSpy.mockImplementation(unavailable);
+      const done = await decidePeerTask({
+        tenantId: TENANT,
+        localPeerId: RECIPIENT,
+        taskId: pending.task_id,
+        decision: 'accepted',
+        actorId: 'operator:test',
+        reason: 'routine health check',
+        taskCatalogPath: TASK_CATALOG,
+        runner: okRunner,
+        writeArtifact,
+      });
+      expect(done.result_delivery).toMatchObject({ status: 'failed' });
+      fetchSpy.mockImplementation(route);
+      expect((await redeliver(RECIPIENT)).delivered).toEqual([
+        peerTaskResultMessageId(pending.task_id),
+      ]);
+      expect(getPeerTask(TENANT, RECIPIENT, 'inbound', pending.task_id)).toMatchObject({
+        state: 'completed',
+        result_delivery: { status: 'sent' },
+      });
+      expect(getPeerTask(TENANT, PROPOSER, 'outbound', pending.task_id)!.state).toBe('completed');
+    }
+  );
+
+  it('does not treat a terminal refusal as delivered, and leaves explicit-catalog sends to the caller', async () => {
     wirePeers();
     const fetchSpy = vi.mocked(globalThis.fetch);
     const route = fetchSpy.getMockImplementation()!;
-    const offline = async () => {
-      throw new TypeError('fetch failed');
-    };
-    const redeliver = (peerId: string) =>
-      runPeerOutboxRedeliveryPass({
-        tenantId: TENANT,
-        peerId,
-        catalogPath: PEER_CATALOG,
-        policy: { baseBackoffMs: 0 },
-      });
-
-    // A proposal that could not be delivered, and one the recipient will reject on receipt.
-    fetchSpy.mockImplementation(offline);
-    await expect(propose()).rejects.toThrow(/peer_task_proposal_not_delivered/);
-    await expect(propose('shell.anything')).rejects.toThrow(/peer_task_proposal_not_delivered/);
-    const [pending, refused] = listPeerTasks(TENANT, PROPOSER, { direction: 'outbound' });
-    fetchSpy.mockImplementation(route);
-
-    const pass = await redeliver(PROPOSER);
-    expect(pass.delivered).toHaveLength(2);
-    expect(pass.bookkeeping_failed).toEqual([]);
-    // Same record state as a first-try delivery.
-    expect(getPeerTask(TENANT, PROPOSER, 'outbound', pending.task_id)).toMatchObject({
-      state: 'pending',
-      proposal_delivery: { status: 'sent' },
-    });
-    expect(getPeerTask(TENANT, PROPOSER, 'outbound', refused.task_id)).toMatchObject({
-      state: 'rejected',
-      proposal_delivery: { status: 'sent' },
-    });
-    expect(getPeerTask(TENANT, RECIPIENT, 'inbound', pending.task_id)!.state).toBe('pending');
-    const session = loadPeerConversationSession(TENANT, PROPOSER, pending.session_id)!;
-    const replies = () =>
-      loadPeerConversationSession(TENANT, PROPOSER, pending.session_id)!.transcript.filter(
-        (entry) => entry.direction === 'inbound'
-      );
-    expect(session.transcript.some((entry) => entry.direction === 'inbound')).toBe(true);
-    // A later pass replays the bookkeeping from the outbox row; it changes nothing.
-    const before = replies().length;
-    const rows = listPeerTasks(TENANT, PROPOSER, { direction: 'outbound' }).map(
-      (record) => record.updated_at
+    fetchSpy.mockImplementation(
+      async () =>
+        new Response(JSON.stringify({ ok: false, error: 'invalid_signature' }), { status: 401 })
     );
-    expect((await redeliver(PROPOSER)).bookkeeping_failed).toEqual([]);
-    expect(replies()).toHaveLength(before);
-    expect(
-      listPeerTasks(TENANT, PROPOSER, { direction: 'outbound' }).map((record) => record.updated_at)
-    ).toEqual(rows);
+    const refusedMessage = await propose().catch((error: Error) => error.message);
+    expect(refusedMessage).toContain('it will not be retried (http_401)');
+    expect(refusedMessage).toContain('resend-proposal');
 
-    // The result of the accepted task cannot be delivered either, then is redelivered.
-    fetchSpy.mockImplementation(offline);
-    const done = await decidePeerTask({
-      tenantId: TENANT,
-      localPeerId: RECIPIENT,
-      taskId: pending.task_id,
-      decision: 'accepted',
-      actorId: 'operator:test',
-      reason: 'routine health check',
-      taskCatalogPath: TASK_CATALOG,
-      peerCatalogPath: PEER_CATALOG,
-      runner: okRunner,
-      writeArtifact,
+    // propose() passes an explicit catalog path: redelivery never re-sends it.
+    fetchSpy.mockImplementation(async () => {
+      throw new TypeError('fetch failed');
     });
-    expect(done.result_delivery).toMatchObject({ status: 'failed' });
+    const offlineMessage = await propose().catch((error: Error) => error.message);
+    expect(offlineMessage).toContain('it will not be retried automatically');
+    expect(offlineMessage).toContain('resend-proposal');
     fetchSpy.mockImplementation(route);
-    expect((await redeliver(RECIPIENT)).delivered).toEqual([
-      peerTaskResultMessageId(pending.task_id),
-    ]);
-    expect(getPeerTask(TENANT, RECIPIENT, 'inbound', pending.task_id)).toMatchObject({
-      state: 'completed',
-      result_delivery: { status: 'sent' },
+    vi.stubEnv('KYBERION_PEER_NETWORK_CATALOG', PEER_CATALOG);
+    const pass = await runPeerOutboxRedeliveryPass({
+      tenantId: TENANT,
+      peerId: PROPOSER,
+      policy: { baseBackoffMs: 0 },
     });
-    expect(getPeerTask(TENANT, PROPOSER, 'outbound', pending.task_id)!.state).toBe('completed');
+    expect(pass).toMatchObject({ delivered: [], given_up: [], waiting: 0 });
+    for (const record of listPeerTasks(TENANT, PROPOSER, { direction: 'outbound' })) {
+      expect(record).toMatchObject({ state: 'pending', proposal_delivery: { status: 'failed' } });
+    }
   });
 
   it('rejects task types the recipient does not offer, and peers it does not allow, on receipt', async () => {
