@@ -14,6 +14,8 @@ import {
   type DelegatedExecutionPolicy,
   type DelegatedExecutionTarget,
   delegatedExecutionBindingHash,
+  delegatedExecutionIdentity,
+  normalizeDelegatedTarget,
   delegatedExecutionEffectConfigurationHash,
 } from '../governance/delegated-execution.js';
 import {
@@ -185,6 +187,25 @@ describe('real service engine delegated admission', () => {
     else process.env.KYBERION_BASE_ROLE = savedPersona;
     if (savedRole === undefined) delete process.env.MISSION_ROLE;
     else process.env.MISSION_ROLE = savedRole;
+  });
+
+  it('fingerprints selected connection identity without changing the effect replay slot', () => {
+    const first = { ...target, serviceBindingId: 'binding-1' };
+    const second = { ...target, serviceBindingId: 'binding-2' };
+    expect(delegatedExecutionBindingHash(first)).not.toBe(delegatedExecutionBindingHash(second));
+    expect(delegatedExecutionIdentity(first)).toBe(delegatedExecutionIdentity(second));
+    expect(
+      normalizeDelegatedTarget({
+        ...target,
+        operationId: 'service:preset',
+        params: {
+          service_id: 'test-service',
+          action: 'assign',
+          params: target.params.request,
+          context: { service_binding_id: 'binding-1' },
+        },
+      }).serviceBindingId
+    ).toBe('binding-1');
   });
 
   it('does not fingerprint operator credentials for a claimed tenant target', () => {

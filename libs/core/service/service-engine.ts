@@ -36,6 +36,7 @@ import {
 import {
   authorizeTenantServiceAction,
   listServiceBindingRecords,
+  loadServiceBindingRecord,
 } from './service-binding-registry.js';
 import { resolveTenantServiceEngineAdmission } from './service-engine-admission.js';
 
@@ -216,9 +217,46 @@ export async function executeServicePreset(
     ...envelope.templateVars,
   };
 
+  // Tenant credentials must come from the exact admitted connection, never the service default.
+  const selectedAdmission = tenantBindingCapability
+    ? resolveTenantServiceEngineAdmission(tenantBindingCapability)
+    : undefined;
+  if (
+    selectedAdmission &&
+    auth === 'secret-guard' &&
+    ((activeDelegation &&
+      activeDelegation.target.serviceBindingId !== selectedAdmission.bindingId) ||
+      (activeHuman && activeHuman.target.serviceBindingId !== selectedAdmission.bindingId))
+  )
+    throw new Error(
+      '[CREDENTIAL_PROVENANCE_DENIED] Service selection differs from authorized effect'
+    );
+  const selectedBinding =
+    selectedAdmission && auth === 'secret-guard'
+      ? loadServiceBindingRecord(selectedAdmission.bindingId)
+      : undefined;
+  if (selectedAdmission && auth === 'secret-guard' && !selectedBinding) {
+    throw new Error('[CREDENTIAL_PROVENANCE_DENIED] Selected service binding is unavailable');
+  }
   // Auth resolution
   const binding =
-    captureTransport?.binding ?? probe?.binding ?? resolveServiceBinding(serviceId, auth);
+    captureTransport?.binding ??
+    probe?.binding ??
+    resolveServiceBinding(
+      serviceId,
+      auth,
+      undefined,
+      selectedBinding ?? undefined,
+      selectedAdmission
+        ? {
+            tenant_slug: resolveTenantAlias(selectedAdmission.securityScope)!,
+            project_id: selectedAdmission.securityScope.project_id,
+            mission_id: selectedAdmission.securityScope.mission_id,
+            task_id: selectedAdmission.securityScope.task_id,
+            action,
+          }
+        : undefined
+    );
   const executionTenant = activeDelegation?.target.tenantSlug ?? activeHuman?.target.tenantSlug;
   const effectConfigurationHash = executionTenant
     ? hashDelegatedServiceConfiguration({
@@ -228,7 +266,8 @@ export async function executeServicePreset(
         binding,
         tenantBindings: listServiceBindingRecords().filter(
           (record) =>
-            record.tenant_slug === executionTenant &&
+            (record.tenant_slug === executionTenant ||
+              record.binding_id === selectedAdmission?.bindingId) &&
             (record.service_id === serviceId || record.service_type === serviceId)
         ),
       })

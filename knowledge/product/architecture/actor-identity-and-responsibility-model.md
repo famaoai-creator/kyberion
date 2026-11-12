@@ -80,8 +80,9 @@ not be forced into a synthetic tenant or a new Workspace authority layer.
 An explicitly authorized personal resource could serve company work without
 changing its owner, but that requires a separate, bounded allocation. This is
 not permission to fall back to personal credentials when a tenant binding is
-missing. The current service-binding path does not implement general
-personal-to-company connection allocation. Its enforcement, migration, and
+missing. The service-binding API-token path supports explicit owner-approved allocation
+through a configured provenance-aware broker; it does not infer ownership from
+service-wide local files or cover session/CLI credentials. Its enforcement, migration, and
 remaining work are tracked in the existing
 [service integration guide](../orchestration/service-integration-guide.md#solo-and-organization-rollout).
 

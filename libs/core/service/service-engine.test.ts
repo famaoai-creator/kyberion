@@ -664,6 +664,66 @@ describe('executeServicePreset', () => {
     }
   });
 
+  it('passes the exact admitted binding to tenant credential resolution', async () => {
+    const { executeServicePreset } = await import('./service-engine.js');
+    const registry = await import('./service-binding-registry.js');
+    const selected = {
+      binding_id: 'binding-a',
+      tenant_slug: 'acme',
+      owner_kind: 'organization' as const,
+      owner_ref: 'acme',
+      service_id: 'test-service',
+      service_type: 'chat',
+      scope: 'tenant',
+      target: 'workspace',
+      auth_mode: 'secret-guard' as const,
+      secret_refs: ['TEST_SERVICE_TOKEN'],
+      allowed_actions: ['read'],
+      approval_policy: { read: 'allowed' as const },
+    };
+    const load = vi.spyOn(registry, 'loadServiceBindingRecord').mockReturnValue(selected);
+    mocks.identity.mockReturnValue({ tenantSlug: 'acme' });
+    mocks.safeReadFile.mockImplementation((filePath: string) =>
+      filePath.includes('mock/path.json')
+        ? JSON.stringify({
+            operations: { read: { type: 'api', risk: 'read', method: 'GET', path: 'items' } },
+          })
+        : ''
+    );
+    mocks.secureFetch.mockResolvedValue({ ok: true });
+    const admission = issueTenantServiceEngineAdmission({
+      bindingId: 'binding-a',
+      approvalGranted: false,
+      securityScope: {
+        tenant_slug: 'acme',
+        mission_id: 'mission-a',
+        read_tiers: ['confidential'],
+        write_tier: 'confidential',
+        purpose: 'test',
+      },
+    });
+    try {
+      await expect(
+        executeServicePreset('test-service', 'read', {}, 'secret-guard', undefined, admission)
+      ).resolves.toEqual({ ok: true });
+      expect(load).toHaveBeenCalledWith('binding-a');
+      expect(mocks.resolveServiceBinding).toHaveBeenCalledWith(
+        'test-service',
+        'secret-guard',
+        undefined,
+        selected,
+        expect.objectContaining({ tenant_slug: 'acme', action: 'read' })
+      );
+      load.mockReturnValue(null);
+      await expect(
+        executeServicePreset('test-service', 'read', {}, 'secret-guard', undefined, admission)
+      ).rejects.toThrow('Selected service binding is unavailable');
+      expect(mocks.secureFetch).toHaveBeenCalledOnce();
+    } finally {
+      load.mockRestore();
+    }
+  });
+
   it('cannot use a tenant admission under an operator or unbound runtime', async () => {
     const { executeServicePreset, executeServicePresetCached } =
       await import('./service-engine.js');

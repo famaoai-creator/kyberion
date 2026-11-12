@@ -16,6 +16,7 @@ import { loadProjectRecord } from '../project/project-registry.js';
 import { resolveTenant } from '../organization/tenant-registry.js';
 import { findMissionPath } from '../path-resolver.js';
 import { loadMissionStateAtPath } from '../mission/mission-state-reader.js';
+import { assertServiceCredentialAllocation } from '../governance/service-credential-allocation.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -101,7 +102,31 @@ export function authorizeTenantServiceAction(input: {
   }
 
   const records = listServiceBindingRecords().filter((record) => {
-    if (record.owner_kind !== 'organization' || record.tenant_slug !== tenantSlug) return false;
+    if (record.owner_kind === 'person') {
+      // Personal connections are never discovered as tenant defaults. Selection and
+      // owner-approved allocation are both explicit; ownership itself is unchanged.
+      if (
+        !requestedBindingId ||
+        record.binding_id !== requestedBindingId ||
+        record.auth_mode !== 'secret-guard'
+      )
+        return false;
+      try {
+        assertServiceCredentialAllocation(
+          record,
+          {
+            tenant_slug: tenantSlug,
+            project_id: projectId || undefined,
+            mission_id: input.securityScope.mission_id,
+            task_id: input.securityScope.task_id,
+          },
+          { action: input.action }
+        );
+      } catch {
+        return false;
+      }
+    } else if (record.owner_kind !== 'organization' || record.tenant_slug !== tenantSlug)
+      return false;
     if ((record.service_id || record.service_type) !== input.serviceId) return false;
     if (!record.allowed_actions.includes(input.action)) return false;
     if (record.project_id && record.project_id !== projectId) return false;

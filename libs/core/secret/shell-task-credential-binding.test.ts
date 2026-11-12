@@ -8,6 +8,7 @@ import {
 import {
   withTaskCredentialBinding,
   resolveTaskCredential,
+  resolveTaskServiceCredential,
 } from '../foundation/credential-binding.js';
 import { safeMkdir, safeRmSync } from '../secure-io.js';
 import { pathResolver } from '../path-resolver.js';
@@ -44,6 +45,18 @@ const mocks = vi.hoisted(() => ({
   item: {} as FixtureItem,
   leases: [] as Array<{ lease_id: string; item_id: string; holder_peer_id: string }>,
   actor: {} as FixtureActor,
+  binding: null as null | Record<string, unknown>,
+  allocationAllowed: false,
+}));
+vi.mock('../governance/service-credential-allocation.js', () => ({
+  assertServiceCredentialAllocation: () => {
+    if (!mocks.allocationAllowed) throw new Error('SERVICE_CREDENTIAL_ALLOCATION_DENIED');
+    return { grant_id: 'GRT-personal' };
+  },
+}));
+vi.mock('../service/service-binding-registry.js', () => ({
+  loadServiceBindingRecord: (id: string) =>
+    mocks.binding?.binding_id === id ? mocks.binding : null,
 }));
 vi.mock('node:child_process', async (original) => {
   const actual = await original<typeof import('node:child_process')>();
@@ -93,6 +106,8 @@ const scoped = <T>(run: () => T) =>
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.binding = null;
+  mocks.allocationAllowed = false;
   vi.stubEnv('KYBERION_TIER', 'confidential');
   mocks.item = {
     item_id: input.workItemId,
@@ -122,6 +137,109 @@ afterEach(() => {
 });
 
 describe('ShellSecretResolver task credential adapter', () => {
+  it('requires current owner allocation for personal v2 material and hides it from generic credentials', async () => {
+    mocks.binding = {
+      binding_id: 'personal-slack',
+      service_id: 'slack',
+      owner_kind: 'person',
+      owner_ref: 'user:owner',
+      auth_mode: 'secret-guard',
+      secret_refs: ['SLACK_TOKEN'],
+    };
+    const source = {
+      serviceBindingId: 'personal-slack',
+      serviceId: 'slack',
+      sourceOwnerRef: 'user:owner',
+      allocationGrantId: 'GRT-personal',
+    };
+    const resolve = () =>
+      JSON.stringify({
+        version: 2,
+        secrets: { SLACK_TOKEN: 'synthetic-personal' },
+        secretProvenance: { SLACK_TOKEN: source },
+      });
+    await expect(scoped(() => bindShellTaskCredentials(input, resolve))).rejects.toThrow(
+      'SERVICE_CREDENTIAL_ALLOCATION_DENIED'
+    );
+    mocks.allocationAllowed = true;
+    await scoped(async () => {
+      const binding = await bindShellTaskCredentials(input, resolve);
+      withTaskCredentialBinding(binding!, () => {
+        expect(resolveTaskCredential('SLACK_TOKEN')).toBeNull();
+        expect(resolveTaskServiceCredential('SLACK_TOKEN', source)).toBe('synthetic-personal');
+        mocks.allocationAllowed = false;
+        expect(() => resolveTaskServiceCredential('SLACK_TOKEN', source)).toThrow(
+          'SERVICE_CREDENTIAL_ALLOCATION_DENIED'
+        );
+      });
+    });
+  });
+  it('binds v2 service provenance and denies broker rotation or owner drift at use time', async () => {
+    mocks.binding = {
+      binding_id: 'slack-team',
+      service_id: 'slack',
+      service_type: 'slack',
+      owner_kind: 'organization',
+      owner_ref: scope.tenant_slug,
+      tenant_slug: scope.tenant_slug,
+      auth_mode: 'secret-guard',
+      secret_refs: ['SLACK_TOKEN'],
+    };
+    const source = {
+      serviceBindingId: 'slack-team',
+      serviceId: 'slack',
+      sourceOwnerRef: scope.tenant_slug,
+    };
+    let raw = JSON.stringify({
+      version: 2,
+      secrets: { SLACK_TOKEN: 'synthetic' },
+      secretProvenance: { SLACK_TOKEN: source },
+    });
+    await scoped(async () => {
+      const binding = await bindShellTaskCredentials(input, () => raw);
+      withTaskCredentialBinding(binding!, () => {
+        expect(resolveTaskServiceCredential('SLACK_TOKEN', source)).toBe('synthetic');
+        raw = raw.replace('synthetic', 'rotated');
+        expect(() => resolveTaskServiceCredential('SLACK_TOKEN', source)).toThrow(
+          'CREDENTIAL_BINDING_UNAVAILABLE'
+        );
+        raw = raw.replace('rotated', 'synthetic');
+        mocks.binding!.owner_ref = 'other-tenant';
+        expect(() => resolveTaskServiceCredential('SLACK_TOKEN', source)).toThrow(
+          'CREDENTIAL_BINDING_UNAVAILABLE'
+        );
+      });
+    });
+  });
+
+  it('does not turn a broker assertion into permission to allocate a personal connection', async () => {
+    mocks.binding = {
+      binding_id: 'personal-slack',
+      service_id: 'slack',
+      owner_kind: 'person',
+      owner_ref: 'user:owner',
+      auth_mode: 'secret-guard',
+      secret_refs: ['SLACK_TOKEN'],
+    };
+    await expect(
+      scoped(() =>
+        bindShellTaskCredentials(input, () =>
+          JSON.stringify({
+            version: 2,
+            secrets: { SLACK_TOKEN: 'synthetic' },
+            secretProvenance: {
+              SLACK_TOKEN: {
+                serviceBindingId: 'personal-slack',
+                serviceId: 'slack',
+                sourceOwnerRef: 'user:owner',
+              },
+            },
+          })
+        )
+      )
+    ).rejects.toThrow('CREDENTIAL_BINDING_UNAVAILABLE');
+  });
+
   it('passes versioned claim metadata on stdin and binds only explicit tenant credentials', async () => {
     vi.stubEnv('ANTHROPIC_API_KEY', 'operator-secret-never-inherited');
     mocks.exec.mockReturnValue(
