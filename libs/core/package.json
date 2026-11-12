@@ -3340,9 +3340,9 @@
       "types": "./dist/mission/mission-context-pack-types.d.ts",
       "default": "./dist/mission/mission-context-pack-types.js"
     },
-    "./mission/mission-coordination-bus": {
-      "types": "./dist/mission/mission-coordination-bus.d.ts",
-      "default": "./dist/mission/mission-coordination-bus.js"
+    "./mission/mission-coordination-record": {
+      "types": "./dist/mission/mission-coordination-record.d.ts",
+      "default": "./dist/mission/mission-coordination-record.js"
     },
     "./mission/mission-creation": {
       "types": "./dist/mission/mission-creation.d.ts",

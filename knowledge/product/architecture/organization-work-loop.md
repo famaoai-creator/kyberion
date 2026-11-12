@@ -157,7 +157,7 @@ This stage defines the light-weight execution primitives beneath the governed co
 
 - owner model
 - worker assignment policy
-- coordination bus
+- coordination record (owner-to-worker handoff/review log)
 - transient working memory
 
 This is where Kyberion may borrow runtime mechanics from simpler multi-agent frameworks without giving up planning or governance authority.
