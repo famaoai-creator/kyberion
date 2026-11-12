@@ -4,6 +4,14 @@
   "description": "Error classification rules for classifyError(). Rules are evaluated in order; first match wins. Add new entries here rather than editing error-classifier.ts. Pattern strings are applied as case-insensitive RegExp. Code strings are matched as exact equality against the Node.js error code.",
   "rules": [
     {
+      "id": "a2a.performative-not-routable",
+      "category": "invalid_input",
+      "label": "A2A performative is not routable",
+      "remediation": "The A2A bridge delivers only request, query and inform. Send the envelope with performative request; do not retry it unchanged.",
+      "patterns": ["\\[A2A_PERFORMATIVE_NOT_ROUTABLE\\]"],
+      "repairAction": "Change the envelope header performative to request (or query / inform) and send it again."
+    },
+    {
       "id": "credential.scope-denied",
       "category": "governance_block",
       "label": "Credential execution scope is inconsistent",

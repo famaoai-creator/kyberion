@@ -27,7 +27,7 @@
         "receiver": { "type": "string", "description": "Target identity (e.g., kyberion:nerve)" },
         "performative": {
           "enum": ["request", "propose", "inform", "accept", "reject", "query", "result"],
-          "description": "The speech act of this message"
+          "description": "The speech act of this message. The A2A bridge delivers only request, query and inform to an agent; it returns result and refuses propose, accept, reject and an inbound result."
         },
         "timestamp": { "type": "string", "format": "date-time" },
         "signature": {
