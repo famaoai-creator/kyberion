@@ -9,19 +9,7 @@ import {
   type GovernedArtifactRole,
 } from '../workforce/artifact-store.js';
 import { withExecutionContext } from '../authority.js';
-import {
-  buildPeerMessageEnvelope,
-  sendPeerMessage,
-  type PeerMessageDispatchReceipt,
-  type PeerMessageEnvelope,
-  type PeerMessageResponder,
-  type PeerNetworkPeerRecord,
-  verifyPeerMessage,
-} from './peer-messaging.js';
-import {
-  buildWorkCoordinationPeerCommandEnvelope,
-  type WorkCoordinationPeerCommandEnvelope,
-} from '../workforce/work-coordination-peer.js';
+import { buildPeerMessageEnvelope, type PeerMessageEnvelope } from './peer-messaging.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeRmSync } from '../secure-io.js';
 import { withLock } from '../foundation/lock-utils.js';
 import type { A2AMessage } from './a2a-bridge.js';
@@ -46,6 +34,23 @@ export interface MeshHubPeerMessagingAdapterOptions {
   namespace?: string;
 }
 
+/**
+ * Reference payload stored on a `workitem.*` proposal. It records what the
+ * sender asked for; nothing executes it. A WorkItem changes only through the
+ * recipient's own claim or through a typed peer task (`peer-task-exchange.ts`)
+ * after local acceptance.
+ */
+export interface MeshHubWorkitemCommandPayload {
+  command_type: 'claim_request' | 'handoff_request' | 'status_update';
+  command_id: string;
+  item_id: string;
+  actor_peer_id: string;
+  purpose: string;
+  payload: { reference: MeshRequest['payload']['reference'] };
+}
+
+export type MeshHubWorkitemCommandEnvelope = PeerMessageEnvelope<MeshHubWorkitemCommandPayload>;
+
 export interface MeshHubRecipientProposalRecord {
   kind: 'mesh-hub-recipient-proposal';
   tenant_id: string;
@@ -58,7 +63,7 @@ export interface MeshHubRecipientProposalRecord {
   proposal_kind: 'a2a' | 'workitem';
   proposal_ref: {
     type: 'a2a-message' | 'workitem-command';
-    payload: A2AMessage | WorkCoordinationPeerCommandEnvelope;
+    payload: A2AMessage | MeshHubWorkitemCommandEnvelope;
   };
   mission_controller_mutation: 'deny';
   created_at: string;
@@ -79,13 +84,6 @@ export interface MeshHubRecipientProposalDecision {
 export interface MeshHubRecipientProposalView extends MeshHubRecipientProposalRecord {
   status: 'pending' | 'accepted' | 'rejected';
   decision?: MeshHubRecipientProposalDecision;
-}
-
-export interface MeshHubDispatchInput {
-  recipient: PeerNetworkPeerRecord;
-  request: MeshRequest;
-  messageId?: string;
-  timeoutMs?: number;
 }
 
 function normalizeNamespace(namespace?: string): string {
@@ -269,19 +267,21 @@ function buildWorkitemCommand(
   request: MeshRequest,
   peerId: string,
   sharedSecret: string
-): WorkCoordinationPeerCommandEnvelope {
-  const commandType =
+): MeshHubWorkitemCommandEnvelope {
+  const commandType: MeshHubWorkitemCommandPayload['command_type'] =
     request.request_kind === 'workitem.handoff'
       ? 'handoff_request'
       : request.request_kind === 'workitem.status_update'
         ? 'status_update'
         : 'claim_request';
-  return buildWorkCoordinationPeerCommandEnvelope({
+  return buildPeerMessageEnvelope({
     tenantId: request.tenant_scope.tenant_id,
     senderPeerId: peerId,
     recipientPeerId: peerId,
+    subject: `coordination.${commandType}`,
+    type: 'request',
     sharedSecret,
-    command: {
+    payload: {
       command_type: commandType,
       command_id: request.request_id,
       item_id: request.request_id,
@@ -353,43 +353,6 @@ function buildProposalRecord(
     mission_controller_mutation: 'deny',
     created_at: nowIso(),
   };
-}
-
-function validateRequestEnvelope(
-  envelope: PeerMessageEnvelope,
-  peerId: string,
-  tenantId: string,
-  sharedSecret: string
-): MeshRequest {
-  if (envelope.type !== 'request') {
-    throw new Error(`mesh_hub_request_type_denied:${envelope.message_id}`);
-  }
-  if (envelope.recipient_peer_id !== peerId) {
-    throw new Error(`mesh_hub_recipient_mismatch:${envelope.message_id}`);
-  }
-  if (!envelope.signature || !verifyPeerMessage(envelope, sharedSecret)) {
-    throw new Error(`mesh_hub_signature_invalid:${envelope.message_id}`);
-  }
-  const request = envelope.payload as MeshRequest;
-  if (!request || request.kind !== 'mesh-request') {
-    throw new Error(`mesh_hub_invalid_payload:${envelope.message_id}`);
-  }
-  if (request.tenant_scope.tenant_id !== tenantId || envelope.tenant_id !== tenantId) {
-    throw new Error(`mesh_hub_tenant_mismatch:${request.request_id}`);
-  }
-  if (!request.tenant_scope?.tenant_id || !isValidTenantSlug(request.tenant_scope.tenant_id)) {
-    throw new Error(`mesh_hub_invalid_tenant_id:${String(request.tenant_scope?.tenant_id || '')}`);
-  }
-  if (request.tenant_scope.scope !== 'same_tenant') {
-    throw new Error(`mesh_hub_invalid_scope:${String(request.tenant_scope?.scope || '')}`);
-  }
-  if (
-    request.target.selector.kind === 'topic' &&
-    request.request_kind === 'workitem.status_update'
-  ) {
-    throw new Error(`mesh_hub_topic_status_update_denied:${request.request_id}`);
-  }
-  return request;
 }
 
 function validateLocalRequest(request: MeshRequest, peerId: string, tenantId: string): MeshRequest {
@@ -467,71 +430,6 @@ export class MeshHubPeerMessagingAdapter {
       mission_controller_mutation: 'deny',
     });
     return proposal;
-  }
-
-  public createResponder(): PeerMessageResponder {
-    return async ({ peerId, envelope }) => {
-      const request = validateRequestEnvelope(
-        envelope,
-        peerId,
-        this.options.tenantId,
-        this.options.sharedSecret
-      );
-      const proposal = buildProposalRecord(
-        peerId,
-        envelope.message_id,
-        request,
-        this.options.sharedSecret
-      );
-      appendRecord(
-        DEFAULT_WRITER_ROLE,
-        proposalsPath(this.options.namespace, this.options.tenantId, peerId),
-        proposal
-      );
-      recordEvent(this.options.namespace, this.options.tenantId, peerId, {
-        type: 'mesh_hub_request_proposed',
-        request_id: request.request_id,
-        message_id: envelope.message_id,
-        request_kind: request.request_kind,
-        proposal_kind: proposal.proposal_kind,
-        mission_controller_mutation: 'deny',
-      });
-      return {
-        accepted: true,
-        proposal,
-      };
-    };
-  }
-
-  public async dispatchToPeer(input: MeshHubDispatchInput): Promise<PeerMessageDispatchReceipt> {
-    if (input.request.tenant_scope.tenant_id !== this.options.tenantId) {
-      throw new Error(`mesh_hub_tenant_mismatch:${input.request.request_id}`);
-    }
-    const envelope = buildPeerMessageEnvelope({
-      tenantId: input.request.tenant_scope.tenant_id,
-      messageId: input.messageId || `mesh-${input.request.request_id}`,
-      senderPeerId: this.options.peerId,
-      recipientPeerId: input.recipient.peer_id,
-      subject: `mesh.${input.request.request_kind}`,
-      type: 'request',
-      payload: input.request,
-      sharedSecret: input.recipient.shared_secret || this.options.sharedSecret,
-      conversationId: input.request.correlation_id,
-      correlationId: input.request.correlation_id,
-      ttlMs: input.request.ttl_ms,
-    });
-    recordEvent(this.options.namespace, this.options.tenantId, input.recipient.peer_id, {
-      type: 'mesh_hub_request_dispatched',
-      request_id: input.request.request_id,
-      message_id: envelope.message_id,
-      request_kind: input.request.request_kind,
-      destination_url: input.recipient.base_url,
-    });
-    return sendPeerMessage(envelope, {
-      destinationUrl: input.recipient.base_url,
-      allowLocalNetwork: input.recipient.allow_local_network !== false,
-      timeoutMs: input.timeoutMs,
-    });
   }
 }
 
