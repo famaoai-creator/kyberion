@@ -18,8 +18,8 @@
  * A redelivered message gets the same sender-side bookkeeping as a first-try
  * delivery (conversation reply into the transcript, peer task delivery state)
  * through `onDelivered`. That bookkeeping is idempotent and is replayed from
- * the outbox row on later passes for a while, so a crash between the `sent`
- * row and the bookkeeping is repaired.
+ * every `sent` row (first-try or redelivered) on later passes for a while, so
+ * a crash or error between the `sent` row and the bookkeeping is repaired.
  *
  * A pass holds a per-(tenant, peer) inter-process lock, so the CLI and the
  * conversation server never run two passes over one outbox. It only ever
@@ -34,7 +34,7 @@ import { pathResolver } from '../path-resolver.js';
 import { safeExistsSync, safeReaddir, validateUrl } from '../secure-io.js';
 import { isRecord } from '../foundation/text.js';
 import { createJsonlTail, type JsonlTail } from '../storage/jsonl-tail.js';
-import { applyPeerConversationDelivery, loadSenderPeerCatalog } from './peer-conversation.js';
+import { applyPeerConversationDelivery, loadTenantPeerCatalog } from './peer-conversation.js';
 import { applyPeerTaskDelivery } from './peer-task-exchange.js';
 import {
   boundedPeerRetryAfterMs,
@@ -79,7 +79,14 @@ export const DEFAULT_PEER_OUTBOX_REDELIVERY_POLICY: Readonly<PeerOutboxRedeliver
 export const PEER_OUTBOX_BOOKKEEPING_REPAIR_WINDOW_MS = 24 * 60 * 60_000;
 
 export type PeerOutboxDeliveryState =
-  'delivered' | 'refused' | 'given_up' | 'retrying' | 'caller_managed' | 'legacy_failed';
+  | 'delivered'
+  | 'refused'
+  /** A 2xx answer the sender could not read: the receiver may have handled the message. */
+  | 'unconfirmed'
+  | 'given_up'
+  | 'retrying'
+  | 'caller_managed'
+  | 'legacy_failed';
 
 /**
  * Sender-side bookkeeping of a delivered message, as the owning layers apply
@@ -117,7 +124,7 @@ export interface PeerOutboxMessageState {
   /** Only while `retrying`: what the next attempt re-sends, and where it last went. */
   envelope?: PeerMessageEnvelope;
   destination_url?: string;
-  /** Only when a redelivery delivered it: the input of the sender-side bookkeeping. */
+  /** Only while `delivered`: the input of the sender-side bookkeeping replay. */
   redelivered?: PeerOutboxDelivery;
 }
 
@@ -150,16 +157,14 @@ export function foldPeerOutboxRecord(
       ...base,
       state: 'delivered',
       attempts: priorAttempts + 1,
-      ...(row.redelivery
-        ? {
-            redelivered: {
-              envelope,
-              ...(body.response !== undefined ? { response: body.response } : {}),
-              duplicate: body.duplicate === true,
-              replayed_from: row.sent_at,
-            },
-          }
-        : {}),
+      // Kept for the bookkeeping replay: a first-try delivery whose local
+      // bookkeeping failed is repaired the same way as a redelivered one.
+      redelivered: {
+        envelope,
+        ...(body.response !== undefined ? { response: body.response } : {}),
+        duplicate: body.duplicate === true,
+        replayed_from: row.sent_at,
+      },
     });
     return;
   }
@@ -189,7 +194,13 @@ export function foldPeerOutboxRecord(
   const retrying = retryable && row.recovery !== 'caller';
   states.set(envelope.message_id, {
     ...base,
-    state: retrying ? 'retrying' : retryable ? 'caller_managed' : 'refused',
+    state: retrying
+      ? 'retrying'
+      : retryable
+        ? 'caller_managed'
+        : row.reason === 'invalid_response'
+          ? 'unconfirmed'
+          : 'refused',
     attempts: priorAttempts + 1,
     reason: row.reason || 'unclassified',
     ...(row.error ? { last_error: row.error } : {}),
@@ -209,6 +220,11 @@ export function derivePeerOutboxStates(
   const states = new Map<string, PeerOutboxMessageState>();
   for (const row of streamPeerOutboxRecords(tenantId, peerId)) foldPeerOutboxRecord(states, row);
   return states;
+}
+
+/** ISO time of an epoch value from a row; a hand-edited row must not throw here. */
+function toIso(epochMs: number): string {
+  return new Date(Math.min(Math.max(epochMs, 0), 8.64e15)).toISOString();
 }
 
 function resolvePolicy(policy: Partial<PeerOutboxRedeliveryPolicy> = {}) {
@@ -267,6 +283,7 @@ export function summarizePeerOutbox(
     counts: {
       delivered: 0,
       refused: 0,
+      unconfirmed: 0,
       given_up: 0,
       retrying: 0,
       caller_managed: 0,
@@ -281,7 +298,7 @@ export function summarizePeerOutbox(
     if (state.state === 'retrying') {
       summary.retrying.push({
         ...view,
-        next_attempt_at: new Date(peerOutboxNextAttemptAt(state, policy)).toISOString(),
+        next_attempt_at: toIso(peerOutboxNextAttemptAt(state, policy)),
       });
     } else if (state.state !== 'delivered') {
       summary.undelivered.push(view);
@@ -337,8 +354,9 @@ export interface PeerOutboxRedeliveryPassOptions {
   peerId: string;
   policy?: Partial<PeerOutboxRedeliveryPolicy>;
   /**
-   * Peer catalog override (tests). Production always resolves through the
-   * tenant peer catalog: a send made with an explicit catalog is recorded
+   * Peer catalog override (tests). Production always reads the tenant's own
+   * catalog file (never an explicit path or the KYBERION_PEER_NETWORK_CATALOG
+   * override): a send that resolved through any other catalog is recorded
    * caller-managed and is never re-sent here.
    */
   catalog?: PeerNetworkCatalog | null;
@@ -426,7 +444,7 @@ async function runPass(
     const outboxKey = `${tenantId}/${peerId}`;
     const loadCatalog = () => {
       if (catalog === undefined) {
-        catalog = loadSenderPeerCatalog({ tenantId });
+        catalog = loadTenantPeerCatalog(tenantId);
       }
       if (catalog) catalogUnavailable.delete(outboxKey);
       return catalog;
@@ -574,7 +592,7 @@ async function runPass(
       stillRetrying(after);
     }
     if (Number.isFinite(nextAttemptAt)) {
-      result.next_attempt_at = new Date(nextAttemptAt).toISOString();
+      result.next_attempt_at = toIso(nextAttemptAt);
     }
     return result;
   } finally {
@@ -618,7 +636,11 @@ export interface PeerOutboxRedelivery {
 export function createPeerOutboxRedelivery(
   config: PeerOutboxRedeliveryConfig
 ): PeerOutboxRedelivery {
-  const intervalMs = Math.max(1, Math.floor(config.intervalMs ?? 5_000));
+  const intervalMs = config.intervalMs ?? 5_000;
+  if (!Number.isFinite(intervalMs) || intervalMs < 100) {
+    // A caller that wants no timer does not call start(); 0 or NaN here would spin.
+    throw new Error(`invalid_peer_outbox_redelivery_interval:${String(config.intervalMs)}`);
+  }
   const tracker = new PeerOutboxRetryTracker(config.tenantId, config.peerId);
   let timer: ReturnType<typeof setTimeout> | undefined;
   let running: Promise<PeerOutboxRedeliveryPassResult> | undefined;

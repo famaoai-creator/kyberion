@@ -100,7 +100,7 @@ async function main(
       type: 'number',
       default: 5_000,
       description:
-        'Interval of the outbox redelivery pass that re-sends retryable failed messages (0 = disabled)',
+        'Interval of the outbox redelivery pass that re-sends retryable failed messages (0 = disabled, otherwise at least 100)',
     })
     .option('auto-reply-peers', {
       type: 'string',
@@ -178,7 +178,11 @@ async function main(
     throw new Error('invalid_peer_receive_capacity');
   }
   const redeliveryIntervalMs = Number(argv['redelivery-interval-ms']);
-  if (!Number.isInteger(redeliveryIntervalMs) || redeliveryIntervalMs < 0) {
+  if (
+    !Number.isInteger(redeliveryIntervalMs) ||
+    redeliveryIntervalMs < 0 ||
+    (redeliveryIntervalMs > 0 && redeliveryIntervalMs < 100)
+  ) {
     throw new Error('invalid_peer_redelivery_interval');
   }
   const autoReplyPeers = String(argv['auto-reply-peers'] || '')

@@ -1674,10 +1674,15 @@ export async function sendPeerMessageToPeer<TPayload>(
   } = {}
 ): Promise<PeerMessageDispatchReceipt> {
   const target = resolvePeerDispatchTarget(peerId, options.catalog);
+  // Redelivery reads only the tenant's own catalog file; anything else is the caller's.
+  const tenantCatalog =
+    options.catalog === undefined &&
+    resolvePeerNetworkCatalogPath() === peerNetworkCatalogPath(envelope.tenant_id);
   return sendPeerMessage(envelope, {
     destinationUrl: target.destinationUrl,
     allowLocalNetwork: target.allowLocalNetwork,
     timeoutMs: options.timeoutMs,
+    ...(tenantCatalog ? {} : { recovery: 'caller' as const }),
   });
 }
 

@@ -811,6 +811,48 @@ export function buildPeerConversationEnvelope(input: {
  */
 export const PEER_CATALOG_READER_ROLE = 'peer_catalog_reader';
 
+/**
+ * True when a send resolves its recipient through the tenant's own catalog
+ * file: no explicit catalog path and no `KYBERION_PEER_NETWORK_CATALOG`
+ * override. Only such sends may be re-sent by outbox redelivery, which reads
+ * that file and nothing else.
+ */
+export function resolvesThroughTenantPeerCatalog(
+  input: Pick<SendPeerConversationMessageInput, 'catalogPath' | 'tenantId'>
+): boolean {
+  return (
+    !input.catalogPath &&
+    Boolean(input.tenantId) &&
+    resolvePeerNetworkCatalogPath({ tenantId: input.tenantId }) ===
+      peerNetworkCatalogPath(input.tenantId)
+  );
+}
+
+/** The tenant's own catalog file, whatever catalog override the environment carries. */
+export function loadTenantPeerCatalog(tenantId: string) {
+  return withStoreGrant(
+    PEER_CATALOG_READER_ROLE,
+    () => loadPeerNetworkCatalog({ tenantId, catalogPath: peerNetworkCatalogPath(tenantId) }),
+    { tenantSlug: tenantId }
+  );
+}
+
+/**
+ * The message reached the receiver (the outbox has its `sent` row) but the
+ * sender-side bookkeeping after it failed. Not a delivery failure.
+ */
+export class PeerConversationBookkeepingError extends Error {
+  constructor(
+    readonly receipt: PeerMessageDispatchReceipt,
+    cause: unknown
+  ) {
+    super(
+      `peer_conversation_bookkeeping_failed:${receipt.message_id} — ${cause instanceof Error ? cause.message : String(cause)}`,
+      { cause }
+    );
+  }
+}
+
 export function loadSenderPeerCatalog(
   input: Pick<SendPeerConversationMessageInput, 'catalogPath' | 'tenantId'>
 ) {
@@ -818,10 +860,7 @@ export function loadSenderPeerCatalog(
     ...(input.catalogPath ? { catalogPath: input.catalogPath } : {}),
     ...(input.tenantId ? { tenantId: input.tenantId } : {}),
   };
-  const tenantCatalog =
-    !input.catalogPath &&
-    input.tenantId &&
-    resolvePeerNetworkCatalogPath(options) === peerNetworkCatalogPath(input.tenantId);
+  const tenantCatalog = resolvesThroughTenantPeerCatalog(input);
   if (!tenantCatalog) return loadPeerNetworkCatalog(options);
   return withStoreGrant(PEER_CATALOG_READER_ROLE, () => loadPeerNetworkCatalog(options), {
     tenantSlug: input.tenantId,
@@ -947,10 +986,12 @@ export async function sendPeerConversationMessageToPeer(
     ...(messageId ? { messageId } : {}),
   });
 
-  // Outbox redelivery resolves the recipient through the tenant catalog. A
-  // send addressed through another catalog could be re-sent somewhere else,
+  // Outbox redelivery resolves the recipient through the tenant's own catalog
+  // file. A send addressed through another catalog (explicit path or the
+  // KYBERION_PEER_NETWORK_CATALOG override) could be re-sent somewhere else,
   // so it is left to its caller.
-  const recovery = input.deliveryRecovery ?? (input.catalogPath ? 'caller' : undefined);
+  const recovery =
+    input.deliveryRecovery ?? (resolvesThroughTenantPeerCatalog(input) ? undefined : 'caller');
   const receipt = await sendPeerMessage(envelope, {
     destinationUrl: target.destinationUrl,
     allowLocalNetwork: target.allowLocalNetwork,
@@ -958,17 +999,22 @@ export async function sendPeerConversationMessageToPeer(
     ...(recovery ? { recovery } : {}),
   });
 
-  applyPeerConversationDelivery({
-    envelope,
-    response: receipt.response,
-    duplicate: receipt.duplicate === true,
-  });
-
-  return {
-    session:
-      loadPeerConversationSession(input.tenantId, input.senderPeerId, sessionId) || localSession,
-    receipt,
-  };
+  if (!receipt.ok) return { session: localSession, receipt };
+  try {
+    applyPeerConversationDelivery({
+      envelope,
+      response: receipt.response,
+      duplicate: receipt.duplicate === true,
+    });
+    return {
+      session:
+        loadPeerConversationSession(input.tenantId, input.senderPeerId, sessionId) || localSession,
+      receipt,
+    };
+  } catch (error) {
+    // The receiver has the message; only the local record of its reply failed.
+    throw new PeerConversationBookkeepingError(receipt, error);
+  }
 }
 
 export function clearPeerConversationRuntime(tenantId: string, peerId: string): void {

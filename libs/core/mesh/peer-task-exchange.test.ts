@@ -1,6 +1,10 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { clearPeerRuntime, createPeerMessagingServer } from './peer-messaging.js';
+import {
+  clearPeerRuntime,
+  createPeerMessagingServer,
+  registerPeerNetworkPeer,
+} from './peer-messaging.js';
 import {
   clearPeerConversationRuntime,
   createPeerConversationResponder,
@@ -169,6 +173,12 @@ afterEach(() => {
   }
   clearWorkCoordinationStore();
   setWorkCoordinationNamespace(null);
+  withExecutionContext('ecosystem_architect', () =>
+    safeRmSync(pathResolver.resolve(`knowledge/confidential/${TENANT}`), {
+      recursive: true,
+      force: true,
+    })
+  );
 });
 
 afterAll(() => {
@@ -182,6 +192,24 @@ afterAll(() => {
   });
   if (safeExistsSync(ARTIFACT_ROOT)) safeRmSync(ARTIFACT_ROOT, { recursive: true, force: true });
 });
+
+/** Registers both peers in the tenant's own catalog file (removed after each test). */
+function useTenantCatalog(): void {
+  withExecutionContext('sovereign_concierge', () => {
+    for (const [peerId, port] of [
+      [PROPOSER, 4660],
+      [RECIPIENT, 4661],
+    ] as const) {
+      registerPeerNetworkPeer({
+        tenantId: TENANT,
+        peerId,
+        baseUrl: `http://127.0.0.1:${port}`,
+        sharedSecret: SECRET,
+        exposure: 'same_host',
+      });
+    }
+  });
+}
 
 async function propose(taskType = 'baseline.check', from = PROPOSER) {
   return proposePeerTask({
@@ -545,9 +573,9 @@ describe('peer task exchange', () => {
   ] as const)(
     'completes the task bookkeeping when outbox redelivery delivers a proposal or a result (first failure: %s)',
     async (_label, unavailable) => {
-      // Redelivery resolves through the configured catalog; a send with an
-      // explicit catalog path is caller-managed and would not be re-sent.
-      vi.stubEnv('KYBERION_PEER_NETWORK_CATALOG', PEER_CATALOG);
+      // Redelivery reads the tenant's own catalog file; a send through any
+      // other catalog is caller-managed and would not be re-sent.
+      useTenantCatalog();
       wirePeers();
       const fetchSpy = vi.mocked(globalThis.fetch);
       const route = fetchSpy.getMockImplementation()!;
@@ -638,6 +666,28 @@ describe('peer task exchange', () => {
     }
   );
 
+  it('records a proposal as delivered when only the local record of the reply failed', async () => {
+    wirePeers();
+    const fetchSpy = vi.mocked(globalThis.fetch);
+    const route = fetchSpy.getMockImplementation()!;
+    // The recipient accepts the proposal; its reply names the wrong peer.
+    fetchSpy.mockImplementation(async (input, init) => {
+      const response = await route(input, init);
+      const body = (await response.json()) as { response: { reply: Record<string, unknown> } };
+      body.response.reply.sender_peer_id = STRANGER;
+      return new Response(JSON.stringify(body), { status: response.status });
+    });
+    const proposed = await propose();
+    // Delivered: the recipient holds the task and the proposer does not say "failed".
+    expect(proposed.record).toMatchObject({
+      state: 'pending',
+      proposal_delivery: { status: 'sent' },
+    });
+    expect(getPeerTask(TENANT, RECIPIENT, 'inbound', proposed.request.task_id)!.state).toBe(
+      'pending'
+    );
+  });
+
   it('does not treat a terminal refusal as delivered, and leaves explicit-catalog sends to the caller', async () => {
     wirePeers();
     const fetchSpy = vi.mocked(globalThis.fetch);
@@ -657,8 +707,20 @@ describe('peer task exchange', () => {
     const offlineMessage = await propose().catch((error: Error) => error.message);
     expect(offlineMessage).toContain('it will not be retried automatically');
     expect(offlineMessage).toContain('resend-proposal');
-    fetchSpy.mockImplementation(route);
+    // The catalog override is another catalog than the tenant file: also left to the caller.
     vi.stubEnv('KYBERION_PEER_NETWORK_CATALOG', PEER_CATALOG);
+    const viaEnv = await proposePeerTask({
+      tenantId: TENANT,
+      senderPeerId: PROPOSER,
+      recipientPeerId: RECIPIENT,
+      taskType: 'baseline.check',
+      summary: 'through the catalog override',
+    }).catch((error: Error) => error.message);
+    expect(viaEnv).toContain('it will not be retried automatically');
+    vi.unstubAllEnvs();
+    vi.stubEnv('KYBERION_TENANT', TENANT);
+    fetchSpy.mockImplementation(route);
+    useTenantCatalog();
     const pass = await runPeerOutboxRedeliveryPass({
       tenantId: TENANT,
       peerId: PROPOSER,
