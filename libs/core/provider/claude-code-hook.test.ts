@@ -62,6 +62,8 @@ import {
   recordPostToolUse,
   resolveHookHostProvider,
 } from './claude-code-hook.js';
+import { ALL_TEST_RUN_MARKER_ENV_KEYS } from '../foundation/env.js';
+import { isSessionHookAuditRow } from './session-hook-provenance.js';
 
 // Hermeticity: the co-session bridge joins/drains/releases against the real
 // store — keep every case in a throwaway namespace. Devin host markers are
@@ -160,6 +162,40 @@ describe('claude-code-hook — PostToolUse audit', () => {
     const res = recordPostToolUse({ tool_name: 'Read', tool_input: { file_path: 'x' } });
     expect(res.recorded).toBe(false);
     expect(recordSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe('claude-code-hook — session-hook provenance stamp', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('stamps rows a hook process records for a host session (leak-guard attribution)', () => {
+    // A real hook process runs outside Vitest. Only store-free paths run while
+    // VITEST is cleared (the audit chain is mocked; the UserPromptSubmit path
+    // also drains the co-session store, which would then resolve to live state).
+    for (const key of ALL_TEST_RUN_MARKER_ENV_KEYS) vi.stubEnv(key, '');
+    recordSpy.mockClear();
+    recordPostToolUse({ tool_name: 'Bash', tool_input: { command: 'ls' }, session_id: 'sess-1' });
+    buildStopContext({ reason: 'done', session_id: 'sess-1' });
+    vi.unstubAllEnvs();
+    const rows = recordSpy.mock.calls.map((call) => call[0]);
+    expect(rows.map((row) => [row.action, row.metadata.session_hook])).toEqual([
+      ['claude_code_tool', { host: 'claude', event: 'PostToolUse', session_id: 'sess-1' }],
+      ['claude_code_stop', { host: 'claude', event: 'Stop', session_id: 'sess-1' }],
+    ]);
+    expect(rows.every((row) => isSessionHookAuditRow(row))).toBe(true);
+  });
+
+  it('never stamps from a Vitest process or without a host session id', () => {
+    recordSpy.mockClear();
+    recordPostToolUse({ tool_name: 'Bash', tool_input: { command: 'ls' }, session_id: 'sess-1' });
+    for (const key of ALL_TEST_RUN_MARKER_ENV_KEYS) vi.stubEnv(key, '');
+    recordPostToolUse({ tool_name: 'Bash', tool_input: { command: 'ls' } });
+    for (const [row] of recordSpy.mock.calls) {
+      expect(row.metadata).not.toHaveProperty('session_hook');
+      expect(isSessionHookAuditRow(row)).toBe(false);
+    }
   });
 });
 

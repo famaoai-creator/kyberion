@@ -1058,6 +1058,32 @@ the catalog`, 2026-10). Every `createSeam({ catalog: coreSeamCatalog })` declare
 6. **A suite must write a live registry** (tenant index, trust ledger, design index): snapshot it in
    `beforeAll` and restore it in `afterAll` through one fixture helper, so a failing test cannot
    leave the registry changed for the next suite.
+7. **A file grew during a run an agent session started:** the session's hooks write to live state
+   while the run is in progress, for example after the agent starts a background run and ends its
+   turn. You do not need to run from another cwd. The guard attributes three kinds of hook rows
+   when every appended row in a file is one of them (`libs/core/provider/session-hook-provenance.ts`):
+   - audit rows with `metadata.session_hook` and the hook's `agentId` and `action`;
+   - the same rows in the tenant audit mirror;
+   - the Stop hook's `claude-code-cli` usage row in `work/metrics/execution-metrics.jsonl`, with a
+     top-level `session_hook` whose event is `Stop`.
+
+   It also drops locks under `active/shared/runtime/locks/` that are gone when the report is written.
+   Attributed files are listed under `session_hook_appends`.
+
+   For a file the guard still reports, read `grown_unattributed`, which gives the first
+   unattributed line's number and row kind. Known hook writes that stay reported are:
+   - tier-guard denial rows from a PreToolUse evaluation (`agentId: tier-guard`);
+   - hook rows without a session id;
+   - co-session presence, events, leases and receipts;
+   - regions above 8 MiB;
+   - files replaced during the run (inode changed).
+
+   Any other row is a real leak, so fix it at the writer. A hook runtime built before the stamp
+   existed also writes unstamped rows: rebuild the checkout the plugin's hooks run from. Created
+   files are always reported. A created audit or audit-mirror file that holds only stamped rows is
+   named in `created_session_hook_only`. That is likely a UTC rollover, or the first audit file of a
+   fresh checkout, so rerun the tests. Never exempt a directory, and never add a switch that turns
+   the guard off.
 
 **Procedure when a test times out only under load or in a shuffled order:**
 
