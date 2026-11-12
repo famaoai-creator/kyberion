@@ -213,6 +213,36 @@ describe('decideApprovalFromCowork()', () => {
     }
   });
 
+  it('records a caller label in the audit metadata only, never as the decider', () => {
+    const record = makePendingRecord();
+    mockListApprovalRequests.mockReturnValue([record]);
+    mockDecideApprovalRequest.mockReturnValue({ ...record, status: 'approved' });
+
+    const result = decideApprovalFromCowork({
+      requestId: 'req-uuid-001',
+      decision: 'approved',
+      decidedBy: 'mcp-operator-console',
+      callerLabel: 'user:someone-else',
+    });
+
+    expect(mockDecideApprovalRequest.mock.calls[0][1]).toMatchObject({
+      decidedBy: 'mcp-operator-console',
+    });
+    expect(JSON.stringify(mockDecideApprovalRequest.mock.calls[0][1])).not.toContain(
+      'someone-else'
+    );
+    expect(result.decided_by).toBe('mcp-operator-console');
+    expect(mockAuditRecord).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        result: 'completed',
+        metadata: expect.objectContaining({
+          decided_by: 'mcp-operator-console',
+          caller_label: 'user:someone-else',
+        }),
+      })
+    );
+  });
+
   it('decision が approved/rejected 以外はアダプタ自体では弾かない（zod バリデーションは MCP 層）', () => {
     const record = makePendingRecord();
     mockListApprovalRequests.mockReturnValue([record]);
@@ -238,6 +268,22 @@ describe('recordAuditExportRequest()', () => {
       expect.objectContaining({
         action: 'cowork.audit.export',
         metadata: expect.objectContaining({ verify_only: true }),
+      })
+    );
+  });
+
+  it('records a caller label beside, not instead of, the requester', () => {
+    recordAuditExportRequest({
+      requestedBy: 'mcp-operator-console',
+      callerLabel: 'auditor',
+      verifyOnly: false,
+    });
+    expect(mockAuditRecord).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: expect.objectContaining({
+          requested_by: 'mcp-operator-console',
+          caller_label: 'auditor',
+        }),
       })
     );
   });

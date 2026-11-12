@@ -7,9 +7,16 @@ import {
   viewerErrorResponse,
   withViewerExecutionContext,
 } from '../../../../../../lib/ops/ops-viewer';
-import { findOpsSchedule } from '../../../../../../lib/ops/pipeline-schedules';
+import {
+  findOpsSchedule,
+  scheduleRunsCatalogPipeline,
+} from '../../../../../../lib/ops/pipeline-schedules';
 import { dispatchPipelineRun, PipelineRunError } from '../../../../../../lib/ops/pipeline-run';
 import { auditOpsMutation } from '../../../../../../lib/ops/ops-audit';
+import {
+  opsViewerMayActRepositoryWide,
+  REPOSITORY_WIDE_REFUSAL,
+} from '../../../../../../lib/ops/repository-wide-access';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -27,9 +34,11 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
   const scheduleId = decodeURIComponent(id);
   try {
     const tenantSlugs = strictViewerScopeTenantSlugs(resolvedViewer.context);
+    const mayActRepositoryWide = opsViewerMayActRepositoryWide(resolvedViewer.context, req);
     const dispatch = withViewerExecutionContext(resolvedViewer.context, () => {
       const schedule = findOpsSchedule(scheduleId, tenantSlugs);
       if (!schedule) return null;
+      if (!mayActRepositoryWide && scheduleRunsCatalogPipeline(schedule)) return 'refused' as const;
       return dispatchPipelineRun({
         pipelinePath: schedule.pipelinePath,
         ...(schedule.context ? { context: schedule.context } : {}),
@@ -41,6 +50,13 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
         { ok: false, error: `Schedule not found: ${scheduleId}` },
         { status: 404 }
       );
+    }
+    if (dispatch === 'refused') {
+      auditOpsMutation(resolvedViewer.context, 'concierge.schedule.run_now', 'failed', {
+        schedule_id: scheduleId,
+        refused: 'tenant_confined_viewer',
+      });
+      return NextResponse.json({ ok: false, error: REPOSITORY_WIDE_REFUSAL }, { status: 403 });
     }
     auditOpsMutation(resolvedViewer.context, 'concierge.schedule.run_now', 'completed', {
       schedule_id: scheduleId,
