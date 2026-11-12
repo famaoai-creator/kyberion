@@ -1,3 +1,4 @@
+import { credentialExecutionIdentity } from '../foundation/credential-binding.js';
 import { assertNoHumanClaim, withExecutionIdentityLock } from './execution-claim-fence.js';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { currentOperationInterface, operationInterfaceResolver } from './operation-protection.js';
@@ -11,7 +12,10 @@ import { loadServiceEndpointsCatalog } from '../service/service-endpoint-registr
 import { getServicePresetRecord } from '../service/service-preset-registry.js';
 import { loadConnectionWithFallback } from '../service/service-engine-helpers.js';
 import { resolveServiceBinding } from '../service/service-binding.js';
-import { listServiceBindingRecords } from '../service/service-binding-registry.js';
+import {
+  listServiceBindingRecords,
+  loadServiceBindingRecord,
+} from '../service/service-binding-registry.js';
 import {
   evaluateDecisionRights,
   resolveDecisionRightsMatrix,
@@ -72,6 +76,8 @@ const catalog = defineCatalog<DelegatedExecutionPolicy>({
 });
 
 export interface DelegatedExecutionTarget {
+  /** Exact admitted connection; part of the effect fingerprint, not the retry slot. */
+  serviceBindingId?: string;
   operationId: string;
   params: Record<string, unknown>;
   tenantSlug: string;
@@ -230,6 +236,11 @@ export function normalizeDelegatedTarget(
     ) {
       return {
         ...target,
+        ...(p.context &&
+        typeof p.context === 'object' &&
+        typeof (p.context as Record<string, unknown>).service_binding_id === 'string'
+          ? { serviceBindingId: (p.context as Record<string, string>).service_binding_id }
+          : {}),
         operationId: `service:preset:${p.service_id}:${p.action}`,
         params: {
           request: p.params,
@@ -297,17 +308,39 @@ export function delegatedExecutionEffectConfigurationHash(input: DelegatedExecut
     const auth = target.params.auth;
     if (auth !== 'none' && auth !== 'secret-guard')
       throw new Error('unsupported delegated authentication mode');
+    if (auth === 'secret-guard' && target.tenantSlug !== credentialExecutionIdentity().tenantSlug) {
+      throw new Error(
+        '[POLICY_VIOLATION] Tenant service credentials require matching execution identity'
+      );
+    }
+    const selectedBinding =
+      auth === 'secret-guard' && target.serviceBindingId
+        ? loadServiceBindingRecord(target.serviceBindingId)
+        : undefined;
+    if (auth === 'secret-guard' && !selectedBinding) {
+      throw new Error(
+        '[CREDENTIAL_PROVENANCE_DENIED] Delegated service requires an exact selected binding'
+      );
+    }
     // Only the digest is persisted. Endpoint, preset template, selected
     // account/connection and credential rotations invalidate issued permits.
     effectConfiguration = {
       config,
       preset,
-      connection: loadConnectionWithFallback(serviceId!),
-      binding: resolveServiceBinding(serviceId!, auth),
+      // Match the engine: tenant work never inherits a personal connection document.
+      connection: target.tenantSlug ? {} : loadConnectionWithFallback(serviceId!),
+      binding: resolveServiceBinding(serviceId!, auth, undefined, selectedBinding ?? undefined, {
+        tenant_slug: target.tenantSlug,
+        project_id: target.source.projectId,
+        mission_id: target.source.missionId,
+        task_id: target.source.taskId,
+        action: action!,
+      }),
       tenantBindings: listServiceBindingRecords()
         .filter(
           (record) =>
-            record.tenant_slug === target.tenantSlug &&
+            (record.tenant_slug === target.tenantSlug ||
+              record.binding_id === target.serviceBindingId) &&
             (record.service_id === serviceId || record.service_type === serviceId)
         )
         .sort((a, b) => a.binding_id.localeCompare(b.binding_id)),

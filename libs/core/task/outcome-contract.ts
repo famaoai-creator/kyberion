@@ -36,6 +36,7 @@ export interface OutcomeContract {
 }
 
 export interface OutcomeCompletionInput {
+  /** Legacy presence gate only: a reference is not criterion verification or delivery. */
   artifactRefs?: Array<string | undefined | null>;
 }
 

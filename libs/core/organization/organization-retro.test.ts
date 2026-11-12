@@ -213,7 +213,7 @@ describe('runOrganizationRetro scoped mode', () => {
         tenantBound: true,
         tenantSlug,
         assumedRole: 'organization_operator',
-        assumedPersona: null,
+        assumedBaseRole: null,
       },
       fn
     );

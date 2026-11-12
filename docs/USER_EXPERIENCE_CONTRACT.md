@@ -257,4 +257,6 @@ Human-directed alignment retains the original WorkItem through preparation, the 
 
 ## Evidence language
 
+Use the [outcome model](../knowledge/product/architecture/organization-work-loop.md#92-outcome-artifact-evidence-delivery-and-result): Outcome states the goal, Artifact names the output, Evidence supports a claim, Delivery records transport, and Result presents these facts with remaining work. Present verification and delivery separately. `reported_passed` means a worker reported passing evidence; `unknown` delivery means no delivery state is available. Neither is independently verified acceptance.
+
 Say what was actually verified: prepared, tested with fixtures, executed with a real provider, delivered, or confirmed by the user. Do not call worker completion verified delivery or promotion proven improvement. When an integration cannot preserve scope, explain the supported next step rather than silently dropping context.

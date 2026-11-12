@@ -4,7 +4,7 @@ import { pathResolver } from '@agent/core/path-resolver';
 import { resolveVars } from '@agent/core/pipeline/logic-utils';
 import { safeExecResult, safeMkdir, safeRmSync } from '@agent/core/secure-io';
 import { resolveActiveProfileRoot } from '@agent/core/profile-root';
-import { getRegisteredEnvText, nowIso, parseSafeJsonInput } from '@agent/core/foundation';
+import { nowIso, parseSafeJsonInput } from '@agent/core/foundation';
 import type { PipelineAdfStep } from '@agent/core/pipeline/pipeline-contract';
 import { validateProductivityTaskPlan } from '@agent/core/productivity-task-plan';
 import { parseSafeJsonObjectInput, parseSafeJsonObjectValue } from './lib/json-input.js';
@@ -33,7 +33,6 @@ import { runSoakEnduranceHarness } from './soak_endurance.js';
 import { runSoakRestartE2E } from './soak_restart_e2e.js';
 import { runMarketingVideoDryRun } from './marketing_video_dry_run.js';
 import { runComplianceScan } from './compliance_checker.js';
-import { runMeshDeliveryDriverOnce } from './mesh_delivery_driver.js';
 import { main as promoteProcedure } from './promote_procedure.js';
 import { checkI18nHardcoding } from './check_i18n_hardcoding.js';
 import { runCatalogIntegrityCheck } from './check_catalog_integrity.js';
@@ -617,27 +616,6 @@ export async function runInlineComplianceScan(
   const tier = String(resolveVars(params.target_tier ?? ctx.target_tier ?? 'public', ctx));
   const result = await runComplianceScan(['--dir', dir, '--tier', tier]);
   return exportValue(params, step, result, ctx);
-}
-
-export async function runInlineMeshDelivery(
-  step: PipelineAdfStep,
-  params: Record<string, unknown>,
-  ctx: Record<string, unknown>
-): Promise<Record<string, unknown>> {
-  const senderPeerId =
-    String(resolveVars(params.sender_peer_id ?? '', ctx)).trim() ||
-    String(getRegisteredEnvText('KYBERION_MESH_PEER_ID') || '').trim();
-  if (!senderPeerId) throw new Error('core:run_mesh_delivery requires sender_peer_id');
-  const report = await runMeshDeliveryDriverOnce({
-    senderPeerId,
-    sharedSecret:
-      String(resolveVars(params.shared_secret ?? '', ctx)).trim() ||
-      getRegisteredEnvText('KYBERION_MESH_SHARED_SECRET') ||
-      undefined,
-    batchLimit: Number(resolveVars(params.limit ?? 10, ctx)) || 10,
-    json: false,
-  });
-  return exportValue(params, step, report, ctx);
 }
 
 export function runInlinePromoteProcedure(

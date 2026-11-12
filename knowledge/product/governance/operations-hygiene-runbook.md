@@ -2,10 +2,34 @@
 title: 'Operations Hygiene Runbook: keeping fixed operational gaps fixed'
 tags:
   [governance, operations, ci, retention, daemons, tests, recurrence-prevention, secure-io, symlink]
-last_updated: 2026-11-10
+last_updated: 2026-11-12
 ---
 
 # Operations Hygiene Runbook
+
+## Personal and tenant connection boundaries
+
+Connection visibility and execution authorization are different checks. Keep personal
+connections restricted to their explicit member owner on both remote and loopback
+surfaces. An ownerless legacy record is a migration decision, not evidence that the
+next person to log in owns it. Use the existing owner migration's dry-run and explicit
+assignment; never infer an owner from machine proximity or a tenant-wide viewer role.
+
+Tenant service execution must carry a matching trusted execution identity and an
+admitted tenant binding even when the service preset omits `tenant_binding_required`.
+Recheck this at direct and cached engine entry points before reading credentials,
+returning cached results, or calling a provider. Do not load personal connection
+documents in tenant work. The selected binding's action policy still does not prove
+which credential material was used; retain the task credential broker's independent
+identity and freshness checks.
+
+Regression coverage belongs in `service-binding-owner.test.ts`,
+`service-binding-registry.owner.test.ts`, the Concierge `connection-view.test.ts`,
+Presence Studio `service-bindings-route.test.ts`, `service-actuator-tenant-binding.test.ts`,
+and `service-engine.test.ts`. Include unknown-owner migration/rollback, loopback,
+tenant context without trusted runtime, direct/cache denial, personal compatibility,
+and zero personal connection fallback. Run delegated execution and scoped capture
+tests as well; their distinct authority paths must not be silently combined.
 
 ## Checkout relocation preserves resource tiers
 
@@ -3368,3 +3392,58 @@ limits or delete live workspaces to make that fixture pass.
 Caller-owned objects can contain getters, toJSON methods or Proxy traps. Materialize a callback-free, independently owned JSON snapshot in the original caller context at intake, before any audit-store authority or deferred queue. Capture caller tenant and fallback tier before evaluating callbacks, then validate the serialized scope against that captured caller. Correlation lookup, hashing and persistence must use only the snapshot; assertRecordable follows the same validation. Reject invalid or cyclic input synchronously without appending. Keep resource ceilings, original attribution and forwarders outside the persistence authority. Gate: libs/core/governance/audit-chain-policy-denial.test.ts uses production adapters across direct, held, deferred and preflight entrypoints, observes callback roles without reading secrets, verifies mutation independence, and refuses toJSON scope substitution and cyclic data.
 
 Empty canonical tenant values cannot clear an active caller tenant: treat empty/null/omitted optional tenant fields as absent and use the captured caller tenant. Reject non-string JSON tenant values and retain the existing validation of nonempty IDs and aliases. Actual global audit events still require a genuinely unbound or trusted tenantCleared context. The production regression covers all four intake paths, tenant mirrors, explicit system-scope refusal and both legitimate global cases.
+
+## Surface authorization: server-derived actor, scope and transport
+
+A localadmin role, a loopback address and a well-formed argument are each not authorization by
+themselves. When a surface route, MCP tool or local daemon accepts a caller-supplied actor,
+tenant, envelope or context, the server resolves the acting identity and scope first; the
+caller's value may narrow or be recorded as a label, and an unknown or out-of-scope value is
+refused rather than adopted.
+
+- **Acting identity**: MCP tools attribute decisions and audit requests to the server-bound
+  principal; `decided_by` / `requested_by` arguments are audited as `caller_label` only. Gate:
+  `libs/shared-network/src/mcp-server-engine.test.ts`,
+  `libs/core/governance/approval-cowork-adapter.test.ts`.
+- **Repository-wide operations**: launching a catalog pipeline (`pipelines/…`), and registering,
+  changing, removing or running a schedule of one, has no tenant-aware projection. Concierge
+  admits (`opsViewerMayActRepositoryWide`) an all-tenant localadmin; the signed-in installation
+  owner, whose tenant set is their memberships narrowed by the server binding (`KYBERION_TENANT`
+  or the persisted `pnpm scope use` scope) — a default view of their own machine, not a
+  credential boundary; and a credential-less loopback request only while the installation-owner
+  model admits one (first-run bootstrap open, or the default-off
+  `KYBERION_CONCIERGE_ALLOW_ANONYMOUS_LOOPBACK` hatch). It refuses a registry token (a
+  registration always carries its own tenant list, even when bound to the owner member), the
+  env localadmin token on a tenant-bound server and every other member, whatever id the
+  schedule carries. Only a schedule whose pipeline lives under a tenant knowledge floor stays
+  inside the tenant scope. The pre-existing `/api/ops/agent` console gates still use the plain
+  all-tenant test and were not changed.
+- **Caller context**: a caller supplies pipeline parameters, never the keys the runner derives
+  (`RUNNER_DERIVED_CONTEXT_KEYS` in `libs/core/pipeline/pipeline-scheduler.ts`). The guard runs
+  in `dispatchPipelineRun` (run route, run-now of a stored schedule), at schedule registration
+  and update, and in the scheduler tick (`assertScheduledContextAdmissible`; a key the pipeline
+  declares in its own `context` is the author's and is admitted). When the engine gains a
+  derived key, add it to the list; a test compares it with the engine's. Gates:
+  `libs/core/pipeline/pipeline-scheduler.caller-context.test.ts`,
+  `presence/displays/concierge/src/lib/ops/pipeline-run.test.ts`,
+  `presence/displays/concierge/src/lib/ops/repository-wide-access.test.ts`,
+  `presence/displays/concierge/src/app/api/ops/pipelines/run/route.test.ts`,
+  `presence/displays/concierge/src/app/api/ops/schedules/route.scope.test.ts`.
+- **Relayed envelopes**: validate with the canonical validator before the dispatcher. A
+  tenant-scoped viewer may relay only an envelope whose security scope names exactly one
+  tenant inside its set; an envelope with no scope would run unscoped and is refused, as is
+  a `context.mission_id` that differs from the scope's. Gate:
+  `presence/displays/concierge/src/app/api/ops/agents/route.a2a.test.ts`.
+- **Tenant hints**: a hint selects among registered tenants; an unregistered slug is refused,
+  not adopted as scope. The one read a page uses to replace a stale stored tenant (`/api/me`)
+  drops the hint instead, so the refusal cannot lock the page out. Gate:
+  `presence/displays/presence-studio/security.test.ts`,
+  `presence/displays/presence-studio/front-desk-me-route.test.ts`.
+- **Lists**: a list route filters by the resolved viewer. The Presence Studio approval inbox
+  is a view filter (the decision route looks a request up by id): a loopback owner narrowed to
+  a tenant sees that tenant's requests plus tenant-less ones, a remote token viewer only its
+  tenant's. Gate: `presence/displays/presence-studio/approval-inbox-routes.test.ts`.
+- **Local daemons**: filesystem permissions bound a Unix socket or named pipe; a TCP listener
+  has no such boundary and must not serve without a configured token. A socket path that reads
+  as a number is refused, because Node binds it as a TCP port on every interface. Gate:
+  `scripts/agent_runtime_supervisor_daemon.test.ts`.

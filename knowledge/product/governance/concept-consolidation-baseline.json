@@ -548,10 +548,10 @@
     "libs/core/mesh/acp-mediator.ts": {
       "env_direct_read_budget": 1
     },
-    "libs/core/mesh/mesh-hub-peer-messaging-adapter.ts": {
+    "libs/core/mesh/mesh-hub-inspection.ts": {
       "runtime_path_literal_budget": 1
     },
-    "libs/core/mesh/mesh-message-broker.ts": {
+    "libs/core/mesh/mesh-hub-peer-messaging-adapter.ts": {
       "runtime_path_literal_budget": 1
     },
     "libs/core/mesh/mesh-peer-directory.ts": {

@@ -10,12 +10,17 @@ import {
 import {
   findOpsSchedule,
   registerOpsSchedule,
+  scheduleRunsCatalogPipeline,
   ScheduleInputError,
   toOpsScheduleView,
   unregisterOpsSchedule,
 } from '../../../../../lib/ops/pipeline-schedules';
 import { listOperatorExcludedSchedules } from '@agent/core/pipeline/pipeline-scheduler';
 import { auditOpsMutation } from '../../../../../lib/ops/ops-audit';
+import {
+  opsViewerMayActRepositoryWide,
+  REPOSITORY_WIDE_REFUSAL,
+} from '../../../../../lib/ops/repository-wide-access';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -48,13 +53,31 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
 
   try {
     const tenantSlugs = strictViewerScopeTenantSlugs(resolvedViewer.context);
+    const patch = body as Record<string, unknown>;
+    const mayActRepositoryWide = opsViewerMayActRepositoryWide(resolvedViewer.context, req);
     const updated = withViewerExecutionContext(resolvedViewer.context, () => {
       const existing = findOpsSchedule(id, tenantSlugs);
       if (!existing) return null;
-      return registerOpsSchedule({ ...(body as Record<string, unknown>), id }, existing);
+      // A catalog schedule — or a patch that points the schedule at a catalog
+      // pipeline — is repository-wide; a tenant-floor schedule stays inside
+      // the tenant scope that already admitted it.
+      if (
+        !mayActRepositoryWide &&
+        (scheduleRunsCatalogPipeline(existing) || patch.pipelinePath !== undefined)
+      ) {
+        return 'refused' as const;
+      }
+      return registerOpsSchedule({ ...patch, id }, existing);
     });
     if (!updated) {
       return NextResponse.json({ ok: false, error: `Schedule not found: ${id}` }, { status: 404 });
+    }
+    if (updated === 'refused') {
+      auditOpsMutation(resolvedViewer.context, 'concierge.schedule.update', 'failed', {
+        schedule_id: id,
+        refused: 'tenant_confined_viewer',
+      });
+      return NextResponse.json({ ok: false, error: REPOSITORY_WIDE_REFUSAL }, { status: 403 });
     }
     auditOpsMutation(resolvedViewer.context, 'concierge.schedule.update', 'completed', {
       schedule_id: id,
@@ -86,9 +109,21 @@ export async function DELETE(req: NextRequest, context: RouteContext) {
 
   const id = await scheduleId(context);
   const tenantSlugs = strictViewerScopeTenantSlugs(resolvedViewer.context);
-  const removed = withViewerExecutionContext(resolvedViewer.context, () =>
-    unregisterOpsSchedule(id, tenantSlugs)
-  );
+  const mayActRepositoryWide = opsViewerMayActRepositoryWide(resolvedViewer.context, req);
+  const removed = withViewerExecutionContext(resolvedViewer.context, () => {
+    const existing = findOpsSchedule(id, tenantSlugs);
+    if (!existing) return false;
+    // Removing a catalog schedule is as repository-wide as changing it.
+    if (!mayActRepositoryWide && scheduleRunsCatalogPipeline(existing)) return 'refused' as const;
+    return unregisterOpsSchedule(id, tenantSlugs);
+  });
+  if (removed === 'refused') {
+    auditOpsMutation(resolvedViewer.context, 'concierge.schedule.unregister', 'failed', {
+      schedule_id: id,
+      refused: 'tenant_confined_viewer',
+    });
+    return NextResponse.json({ ok: false, error: REPOSITORY_WIDE_REFUSAL }, { status: 403 });
+  }
   if (!removed) {
     return NextResponse.json({ ok: false, error: `Schedule not found: ${id}` }, { status: 404 });
   }

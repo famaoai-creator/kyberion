@@ -245,7 +245,6 @@ export {
 } from './mesh/mesh-hub-peer-messaging-adapter.js';
 
 export type {
-  MeshHubDispatchInput,
   MeshHubPeerMessagingAdapterOptions,
   MeshHubRecipientProposalDecision,
   MeshHubRecipientProposalRecord,
@@ -257,6 +256,7 @@ export type { MeshRequest } from './mesh/mesh-hub-contract.js';
 export { formatMeshHubInspectionReport, inspectMeshHub } from './mesh/mesh-hub-inspection.js';
 
 export type {
+  MeshDeadLetterRecord,
   MeshHubDeliveryInspection,
   MeshHubInspectionOptions,
   MeshHubInspectionReport,
@@ -328,10 +328,3 @@ export type {
   WorkLease,
   WorkLeaseStatus,
 } from './workforce/work-coordination.js';
-
-export type {
-  WorkCoordinationPeerCommandEnvelope,
-  WorkCoordinationPeerCommandPayload,
-  WorkCoordinationPeerCommandResult,
-  WorkCoordinationPeerCommandType,
-} from './workforce/work-coordination-peer.js';

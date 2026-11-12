@@ -39,7 +39,7 @@ describe('visibleConnections', () => {
       memberId: 'alice',
       tenantSlugs: ['acme'],
     });
-    expect(alice.map((c) => c.binding_id)).toEqual(['b-legacy', 'b-mail', 'b-slack-a']);
+    expect(alice.map((c) => c.binding_id)).toEqual(['b-mail', 'b-slack-a']);
     expect(alice.find((c) => c.binding_id === 'b-slack-a')).toMatchObject({
       group: 'organization',
       owner_ref: 'acme',
@@ -49,10 +49,15 @@ describe('visibleConnections', () => {
     const anon = visibleConnections(records, { loopback: false, tenantSlugs: ['acme'] });
     expect(anon.map((c) => c.binding_id)).toEqual(['b-slack-a']);
   });
-  it('the local operator keeps legacy and personal connections but still never sees operator-owned ones', () => {
+  it('loopback alone does not grant personal connection ownership', () => {
     const local = visibleConnections(records, { loopback: true, tenantSlugs: ['acme'] });
-    expect(local.map((c) => c.binding_id)).toEqual(['b-legacy', 'b-mail', 'b-bob', 'b-slack-a']);
+    expect(local.map((c) => c.binding_id)).toEqual(['b-slack-a']);
     expect(local.some((c) => c.owner_kind === 'operator')).toBe(false);
+    expect(
+      visibleConnections(records, { loopback: true, memberId: 'alice', tenantSlugs: ['acme'] }).map(
+        (c) => c.binding_id
+      )
+    ).toEqual(['b-mail', 'b-slack-a']);
   });
   it('an all-tenants viewer sees every organization', () => {
     const all = visibleConnections(records, {
@@ -75,7 +80,7 @@ describe('groupConnections', () => {
       tenantSlugs: 'all',
     });
     const grouped = groupConnections(items);
-    expect(grouped.mine.map((c) => c.binding_id)).toEqual(['b-legacy', 'b-mail']);
+    expect(grouped.mine.map((c) => c.binding_id)).toEqual(['b-mail']);
     expect(grouped.organizations.map((o) => o.tenant_slug)).toEqual(['acme', 'beta']);
   });
 });

@@ -1,0 +1,23 @@
+{
+  "record_id": "mem-MSN-SURFACE-CONCEPT-ALIGN-20261112-2026_11_12",
+  "kind": "pattern",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "Retiring duplicate concepts across surfaces: what the reviews caught",
+  "summary": "Seven lessons from a five-pull-request concept alignment: audit deleted tests for live coverage, guard the shared function rather than one route, require scope presence, do not enforce an undefined field, pin disagreeing rows when merging rules, declare mission knowledge on one pull request, and give parallel worktree agents an explicit working directory.",
+  "candidate_id": "mem-MSN-SURFACE-CONCEPT-ALIGN-20261112-2026_11_12",
+  "evidence_refs": [
+    "active/missions/public/MSN-SURFACE-CONCEPT-ALIGN-20261112/evidence/REVIEW-execution-implement.md",
+    "active/missions/public/MSN-SURFACE-CONCEPT-ALIGN-20261112/evidence/REVIEW-contract_authoring-ux-contract.md",
+    "active/missions/public/MSN-SURFACE-CONCEPT-ALIGN-20261112/evidence/implementation-report.md",
+    "active/missions/public/MSN-SURFACE-CONCEPT-ALIGN-20261112/evidence/test-report.md"
+  ],
+  "created_at": "2026-11-12T08:35:06.327Z",
+  "applicability": ["mission", "mission:MSN-SURFACE-CONCEPT-ALIGN-20261112"],
+  "reusable_steps": [
+    "Seven lessons from a five-pull-request concept alignment: audit deleted tests for live coverage, guard the shared function rather than one route, require scope presence, do not enforce an undefined field, pin disagreeing rows when merging rules, declare mission knowledge on one pull request, and give parallel worktree agents an explicit working directory"
+  ],
+  "expected_outcome": "## What this is\n\nLessons from a refactoring mission that retired duplicate concepts across the Concierge surface, the MCP layer and agent-to-agent communication, delivered as five pull requests from five worktrees worked on by parallel subagents.\n\n## Lessons\n\n1. **A deleted test may be the only coverage of code that stays.** A test file named after a dead component also tested the live page configuration and a live helper. Before deleting a test with its component, list the symbols it imports from modules that still exist and move those cases into a kept test file. Searching for importers of the component does not find this.\n\n2. **A gate on one route is not a gate on the capability.** Closing the pipeline-run route left the same pipelines launchable through the schedule routes and the scheduler tick. Put the guard in the shared function every caller reaches (here `dispatchPipelineRun`) and then enumerate the callers that do not go through it.\n\n3. **Allow-on-absence is the default bug in a scope check.** A check written as \"refuse when the envelope names a tenant outside the viewer's set\" passes an envelope that names no tenant. For a scoped viewer, require the scope to be present and inside the set.\n\n4. **Do not enforce a field whose meaning is not defined.** The MCP catalog's `allowed_tiers` is read as \"which explicit tier argument a tool accepts\" by the code and as \"which session tier may call it\" by its name. Enforcing the second reading would have refused most tools on every tenant-bound server. Establish the meaning from the schema and the handlers first; when it cannot be established, report instead of changing the check.\n\n5. **When two implementations of one rule disagree, pin the row where they disagreed.** Merging the two viewer error helpers silently changed how about 35 call sites classified their error body. A table test of (error, override) to (status, code), with each row marked as equal to or different from the base, made the intended differences the only ones.\n\n6. **A mission that ships several pull requests declares its knowledge in one of them.** The Knowledge check needs the promoted record in the diff of every pull request that names the mission. Name the mission on the last pull request and leave the Mission ID field empty on the others, saying so in the body.\n\n7. **Parallel worktree agents need an explicit working directory on every command.** Two gate results named files that exist only in another worktree. Start each shell command with `cd <own worktree> &&`, write check output to a uniquely named file inside that worktree, and treat the owner's `pr preflight` run as the result of record.",
+  "source_branch": "refactor/authz-failclosed-20261112",
+  "source_commit": "c214f132f1e2e5f8428a98fc53227ed3fea18ede"
+}

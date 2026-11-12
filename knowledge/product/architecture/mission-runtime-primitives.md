@@ -19,7 +19,7 @@ It should selectively adopt the lower-layer runtime primitives that help owner a
 The adopted primitives are:
 
 - `WorkerAssignmentPolicy`
-- `MissionCoordinationBus`
+- `MissionCoordinationRecord`
 - `MissionWorkingMemory`
 
 ## 2. Design Rule
@@ -48,25 +48,22 @@ Kyberion use:
 - review/remediation verification splits
 - dependency-first dispatch for blocked mission work
 
-## 4. MissionCoordinationBus
+## 4. MissionCoordinationRecord
 
 Purpose:
 
-- exchange explicit messages between owner and workers
-- separate transient coordination from durable mission state
-- keep handoff/review/runtime notice traffic attributable
+- record what the mission owner told its workers (rework handoffs, review requests)
+- keep owner-to-worker traffic attributable after the fact
+- stay separate from durable mission state
 
-Kyberion channels:
+It is a **record, not a delivery path**. Workers receive their task through the agent execution port; the owner dispatches and reviews directly. Nothing reads the record back at runtime and nothing acknowledges rows in it (the inbox / acknowledgement API of the former `MissionCoordinationBus` was retired 2026-11-12 — see `retired/README.md`). Code: `libs/core/mission/mission-coordination-record.ts` (`recordMissionCoordinationMessage`), stored append-only at `<mission dir>/coordination/bus.jsonl` (file name kept so existing missions stay readable).
 
-- `task_contract`
-- `handoff`
-- `review`
-- `runtime_notice`
+Channels written today: `handoff`, `review`. `task_contract` and `runtime_notice` remain in the stored vocabulary only so ledgers written by earlier versions still parse.
 
 This aligns with the single-owner, multi-worker model:
 
-- workers communicate progress and handoffs
-- owners accept or reject durable progress
+- the owner records the handoffs and review requests it sends
+- the owner alone accepts or rejects durable progress
 
 ## 5. MissionWorkingMemory
 
@@ -90,7 +87,7 @@ It is only for short-lived coordination context.
 
 - `owner_model`
 - `assignment_policy`
-- `coordination.bus`
+- `coordination.bus` (the declared record store; see §4). The value `mission_coordination_bus` and the four declared channels are the historical routing token and vocabulary; only `handoff` and `review` are written
 - `coordination.channels`
 - `memory.store`
 - `memory.scope`

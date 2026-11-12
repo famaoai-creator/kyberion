@@ -123,7 +123,7 @@ const AUTHORITY_FUNCTIONS = new Set([
   'currentExecutionScope',
   'scopedAssumedRole',
   'scopedPersona',
-  'executionPersonaText',
+  'executionBaseRoleText',
   'prepareExecutionContext',
   'withExecutionContext',
   'withExecutionContextAsync',

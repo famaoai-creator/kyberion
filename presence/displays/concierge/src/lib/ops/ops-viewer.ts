@@ -6,18 +6,19 @@
  * server-side). These helpers only narrow that viewer — a request-supplied
  * tenant / organization / project / tier can select inside the allowed set,
  * never widen it.
+ *
+ * `../viewer-context` owns the viewer → authorization-context projection, the
+ * tier resolution and the error response; the names exported here delegate to
+ * it so the console's call sites keep their imports.
  */
 import { NextResponse, type NextRequest } from 'next/server';
 import { auditChain } from '@agent/core/governance/audit-chain';
 import { isValidTenantSlug } from '@agent/core/entity-scope';
-import type { ChronosAccessRole } from '@agent/core/chronos-access-registry';
 import {
   narrowSurfaceViewerScope,
   narrowSurfaceViewerTenant,
   narrowSurfaceViewerTier,
-  resolveSurfaceViewerTierAccess,
 } from '@agent/core/surface/surface-mutation-guard';
-import { toWireError } from '@agent/core/contracts/wire-error';
 import { withExecutionContext, withExecutionContextAsync } from '@agent/core/authority';
 import { getRegisteredEnvText } from '@agent/core/foundation';
 import type { OsKnowledgeTier } from '@agent/core/cloudflare-os-control-plane';
@@ -27,10 +28,16 @@ import {
 } from '@agent/core/surface/surface-authorization';
 import {
   ConciergeViewerError,
-  defaultTierAccess as conciergeDefaultTierAccess,
+  conciergeErrorResponse,
+  defaultTierAccess,
+  maskPersonalTier,
   resolveConciergeViewer,
+  resolveTierAccess,
+  toSurfaceAuthorizationContext as toConciergeAuthorizationContext,
+  viewerErrorStatus,
   type ConciergeViewerContext,
 } from '../viewer-context';
+import { VIEWER_EXECUTION_ROLES, opsExecutionRole } from '../viewer-execution-role';
 
 /**
  * The Concierge viewer, with the scope lists optional so a narrowed copy (or
@@ -49,10 +56,12 @@ export type ViewerContext = Omit<
 /** The operations console raises the same error type as every Concierge route. */
 export { ConciergeViewerError as ViewerContextError };
 
-/** Execution roles of the operations console reads (security-policy grants). */
-export const OPS_LOCALADMIN_EXECUTION_ROLE = 'chronos_localadmin' as const;
-export const OPS_OPERATOR_EXECUTION_ROLE = 'chronos_operator' as const;
-type OpsExecutionRole = typeof OPS_LOCALADMIN_EXECUTION_ROLE | typeof OPS_OPERATOR_EXECUTION_ROLE;
+/**
+ * Execution roles of the operations console reads (security-policy grants).
+ * Declared next to the Concierge pair in `../viewer-execution-role`.
+ */
+export const OPS_LOCALADMIN_EXECUTION_ROLE = VIEWER_EXECUTION_ROLES.ops.localadmin;
+export const OPS_OPERATOR_EXECUTION_ROLE = VIEWER_EXECUTION_ROLES.ops.readonly;
 
 /**
  * Resolve the viewer of an operations request through the Concierge viewer
@@ -66,26 +75,30 @@ export function resolveOpsViewerForRequest(
 }
 
 /** Personal stays masked; public/confidential follow the role default. */
-export function defaultTierAccess(role: ChronosAccessRole): OsKnowledgeTier[] {
-  return conciergeDefaultTierAccess(role);
-}
+export { defaultTierAccess };
 
-export function toSurfaceAuthorizationContext(viewer: ViewerContext): SurfaceAuthorizationContext {
+/**
+ * The one place the console's optional scope lists get their value: an
+ * omitted organization / project list means unrestricted within the tenant
+ * set, an omitted tier list means the (personal-masked) role default. The
+ * helpers in this module, the candidate visibility rules and
+ * `distill-candidate-scope` read those fields through here. Not yet moved:
+ * `workspace-scope.ts`, `headless-projections.ts` and
+ * `api/ops/intelligence/actions.ts` state their own fallback, each with a
+ * different tier default.
+ */
+export function withOpsViewerDefaults(viewer: ViewerContext): ConciergeViewerContext {
   return {
-    ...(viewer.permissions !== undefined ? { permissions: viewer.permissions } : {}),
-    role: viewer.role,
-    tenantSlugs: viewer.tenantSlugs,
+    ...viewer,
     organizationIds: viewer.organizationIds ?? 'all',
     projectIds: viewer.projectIds ?? 'all',
     tierAccess: viewer.tierAccess ?? defaultTierAccess(viewer.role),
-    principalId: viewer.principalId,
-    source: viewer.source,
-    ...(viewer.principal ? { principal: viewer.principal } : {}),
-    ...(viewer.memberId ? { memberId: viewer.memberId } : {}),
-    // A projection never drops a scope field: without it the system selection
-    // loses its company-less records in every reader of this context.
-    ...(viewer.includeUntenanted ? { includeUntenanted: true } : {}),
   };
+}
+
+/** The Concierge projection (personal tier masked, no scope field dropped). */
+export function toSurfaceAuthorizationContext(viewer: ViewerContext): SurfaceAuthorizationContext {
+  return toConciergeAuthorizationContext(withOpsViewerDefaults(viewer));
 }
 
 /** Tier and effective read permissions are independent of row custody admission. */
@@ -102,26 +115,8 @@ export function viewerCanReadTier(viewer: ViewerContext, tier: unknown): boolean
   }).allowed;
 }
 
-export function resolveViewerTierAccess(
-  role: ChronosAccessRole,
-  requested?: readonly OsKnowledgeTier[]
-): OsKnowledgeTier[] {
-  try {
-    // A viewer without an explicit tier set receives the masked role default
-    // (personal is never exposed here); only an explicit request for a tier
-    // outside the masked policy is rejected.
-    if (!requested) return defaultTierAccess(role);
-    if (requested.includes('personal')) {
-      throw new Error(`viewer tier access exceeds the ${role} role policy.`);
-    }
-    return resolveSurfaceViewerTierAccess(role, requested);
-  } catch (error) {
-    throw new ConciergeViewerError(
-      error instanceof Error && 'status' in error && error.status === 401 ? 401 : 403,
-      `Operations viewer tier access exceeds the ${role} role policy.`
-    );
-  }
-}
+/** A registration may narrow the role's tiers, never widen them or reach `personal`. */
+export { resolveTierAccess as resolveViewerTierAccess };
 
 /** Enforce the resolved viewer tier set for data-bearing routes. */
 export function strictViewerTier(
@@ -130,7 +125,7 @@ export function strictViewerTier(
 ): OsKnowledgeTier {
   try {
     return narrowSurfaceViewerTier(
-      { role: viewer.role, tierAccess: viewer.tierAccess ?? defaultTierAccess(viewer.role) },
+      { role: viewer.role, tierAccess: maskPersonalTier(withOpsViewerDefaults(viewer).tierAccess) },
       requested
     );
   } catch (error) {
@@ -226,18 +221,18 @@ export function strictViewerScopeOrganizationIds(
   viewer: ViewerContext,
   requested?: string
 ): string[] | 'all' {
-  return strictViewerScopeIds('organization', viewer.organizationIds ?? 'all', requested);
+  return strictViewerScopeIds(
+    'organization',
+    withOpsViewerDefaults(viewer).organizationIds,
+    requested
+  );
 }
 
 export function strictViewerScopeProjectIds(
   viewer: ViewerContext,
   requested?: string
 ): string[] | 'all' {
-  return strictViewerScopeIds('project', viewer.projectIds ?? 'all', requested);
-}
-
-function viewerExecutionRole(viewer: ViewerContext): OpsExecutionRole {
-  return viewer.role === 'localadmin' ? OPS_LOCALADMIN_EXECUTION_ROLE : OPS_OPERATOR_EXECUTION_ROLE;
+  return strictViewerScopeIds('project', withOpsViewerDefaults(viewer).projectIds, requested);
 }
 
 function viewerExecutionTenant(viewer: ViewerContext): string | undefined {
@@ -249,7 +244,7 @@ function viewerExecutionTenant(viewer: ViewerContext): string | undefined {
 /** Propagate the request-derived tenant into tier-guard identity resolution. */
 export function withViewerExecutionContext<T>(viewer: ViewerContext, fn: () => T): T {
   return withExecutionContext(
-    viewerExecutionRole(viewer),
+    opsExecutionRole(viewer.role),
     fn,
     undefined,
     viewerExecutionTenant(viewer)
@@ -261,23 +256,23 @@ export async function withViewerExecutionContextAsync<T>(
   fn: () => Promise<T> | T
 ): Promise<T> {
   return withExecutionContextAsync(
-    viewerExecutionRole(viewer),
+    opsExecutionRole(viewer.role),
     fn,
     undefined,
     viewerExecutionTenant(viewer)
   );
 }
 
+/**
+ * The Concierge error response with the console's two differences: an error
+ * that carries no authorization status answers 403 here (500 on other
+ * Concierge routes), and the wire code is classified from the error object
+ * itself, not from the response status — both as the console always did.
+ */
 export function viewerErrorResponse(error: unknown, statusOverride?: number): NextResponse {
-  const status = statusOverride ?? (error instanceof ConciergeViewerError ? error.status : 403);
-  const safe = toWireError(error);
-  return NextResponse.json(
-    {
-      ok: false,
-      error: safe.message,
-      error_code: safe.code,
-      correlation_id: safe.correlation_id,
-    },
-    { status }
+  return conciergeErrorResponse(
+    error,
+    statusOverride ?? viewerErrorStatus(error) ?? 403,
+    'error-object'
   );
 }

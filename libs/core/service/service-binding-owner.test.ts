@@ -67,6 +67,31 @@ describe('isBindingVisibleTo', () => {
     expect(isBindingVisibleTo({ tenant_slug: 'beta' }, viewer)).toBe(false);
     expect(isBindingVisibleTo({ tenant_slug: 'beta' }, { tenantSlugs: 'all' })).toBe(true);
   });
+  it('does not infer personal ownership from login or unrestricted tenant visibility', () => {
+    for (const memberId of ['alice', 'bob', undefined]) {
+      expect(isBindingVisibleTo({}, { memberId, tenantSlugs: 'all' })).toBe(false);
+      expect(isBindingVisibleTo({ owner_kind: 'person' }, { memberId, tenantSlugs: 'all' })).toBe(
+        false
+      );
+    }
+  });
+  it('rejects contradictory ownership even for an unrestricted viewer', () => {
+    expect(
+      isBindingVisibleTo(
+        { owner_kind: 'person', owner_ref: 'user:alice', tenant_slug: 'acme' },
+        { ...viewer, tenantSlugs: 'all' }
+      )
+    ).toBe(false);
+    expect(
+      isBindingVisibleTo(
+        { owner_kind: 'organization', owner_ref: 'beta', tenant_slug: 'acme' },
+        { ...viewer, tenantSlugs: 'all' }
+      )
+    ).toBe(false);
+    expect(
+      isBindingVisibleTo({ owner_kind: 'organization' }, { ...viewer, tenantSlugs: 'all' })
+    ).toBe(false);
+  });
   it('operator connections are never on day-to-day surfaces', () => {
     expect(isBindingVisibleTo({ owner_kind: 'operator' }, { tenantSlugs: 'all' })).toBe(false);
   });

@@ -188,6 +188,8 @@ Recommended subdirectories:
 - `reviews/`
 - `events/`
 
+`coordination/bus.jsonl` (file name historical) is the owner's append-only record of the handoffs and review requests it sent to workers (`mission-coordination-record.ts`). It is a record, not a delivery path: workers receive tasks through the agent execution port and nothing reads or acknowledges the file at runtime.
+
 ### 7.2 Global Coordination
 
 Path:

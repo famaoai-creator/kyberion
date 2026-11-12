@@ -1,7 +1,7 @@
 ---
 title: Chronos viewer scope 運用手順
 tags: [chronos, security, authorization, multi-tenant]
-last_updated: 2026-10-26
+last_updated: 2026-11-12
 ---
 
 # Chronos viewer scope 運用手順
@@ -24,6 +24,20 @@ last_updated: 2026-10-26
 
 ファイル・成果物・runtime の読み取りは、可能な範囲で `withViewerExecutionContext` の内側で行い、単一 tenant viewer の境界を tier guard へ伝播します。tenant を選択できる可視化ルートは、viewer の許可集合を先に解決した後で query を交差させます。回帰防止として `src/app/api/route-contract.test.ts` が route module の viewer 契約を走査します。
 
+### tenant の投影を持たない操作
+
+次の操作は repository 全体に作用し、tenant ごとの投影を持ちません。role が `localadmin` であっても、次のように扱います。
+
+- catalog pipeline（`pipelines/…`）の起動（`POST /api/ops/pipelines/run`）と、その schedule の登録・変更・削除・即時実行（`POST /api/ops/schedules`、`PATCH` / `DELETE /api/ops/schedules/<id>`、`POST /api/ops/schedules/<id>/run`）は、次の viewer だけが使えます（`src/lib/ops/repository-wide-access.ts` の `opsViewerMayActRepositoryWide`）。
+  - 全 tenant の `localadmin`。
+  - browser session で sign in した installation owner（loopback、または別の端末から直近の passkey step-up 付き）。owner の tenant 集合は membership を server の束縛（env の `KYBERION_TENANT`、または `pnpm scope use` で保存した scope）で絞ったもので、credential が持つ境界ではなく自分のマシンの既定の表示なので、束縛があっても使えます。
+  - credential のない loopback。ただし installation-owner model が認める間だけです（first-run が未 claim の間、または既定で off の `KYBERION_CONCIERGE_ALLOW_ANONYMOUS_LOOPBACK` が on のとき）。owner を登録した後は viewer の解決そのものが 401 になります。
+  - 403 で拒否するもの: registry token（registration が必ず自分の `tenant_slugs` を持つため。owner member に紐づいていても同じ）、tenant 束縛 server 上の env `localadmin` token、owner 以外の member。
+  - schedule の id が `tenant-<slug>-…` であっても、pipeline が catalog にあれば同じ扱いです。pipeline が tenant の knowledge floor の下にある schedule だけが、その tenant の scope の中で変更・削除できます。`GET /api/ops/pipelines` は同じ判定を `canRun` として返し、自動化の画面は server が拒否する起動ボタンを出しません。
+- pipeline に渡す `context` は引数であり、runner が自分で導出する key（`_knowledge_scope`、`mission_dir` / `mission_tier` / `mission_evidence_dir`、`trust_resolved`、`project_trust_approval_id`、`repo_root`、`__` で始まる key など。一覧は `libs/core/pipeline/pipeline-scheduler.ts` の `RUNNER_DERIVED_CONTEXT_KEYS`）を含むと 400 で拒否します。起動 route、schedule の登録・変更、保存済み schedule の即時実行（`dispatchPipelineRun`）で確かめ、scheduler の tick もそのような schedule を実行せず失敗として記録します。
+- `/api/ops/agent` の console（pipeline shortcut、quick action、mission proposal）は従来どおり全 tenant の viewer だけを通し、tenant に束縛した server では installation owner にも 403 を返します。この既存の判定は変えていません。
+- `POST /api/ops/agents` の `action: 'a2a'` は、envelope を正本の schema（`validateA2AEnvelope`）で検証してから bridge に渡し、不正な envelope は 400 で拒否します。A2A envelope 自体に tenant の欄はなく、tenant は任意の `payload.context.security_scope`（`tenant_slug`、互換 alias の `tenant_id`）にだけ現れます。tenant に絞られた viewer は、security scope が自分の集合の中の tenant をちょうど一つ名指す envelope だけを送れます。security scope のない envelope（bridge は scope なしで実行します）、集合の外の tenant、食い違う alias、security scope の `mission_id` と異なる `context.mission_id` は 403 で拒否します。全 tenant の viewer には制限がありません。
+
 ### 顧客の決定のルート（CD-12）
 
 `GET /api/customer-decisions/overview`・`/case?tenant=&case=`・`/learning?tenant=[&date=]` は、ひとつのテナントの顧客の決定を読むだけのルートです。三つとも `src/lib/customer-decision-viewer-scope.ts` の `resolveCustomerDecisionTenant` で、次の順に確かめてから子プロセスを動かします(控えを返す前にも毎回確かめます)。
@@ -36,6 +50,28 @@ last_updated: 2026-10-26
 `case` は台帳の案件 id の形、`date` は `YYYY-MM-DD` でなければ 400 で、子プロセスは動きません。Chronos は決定の置き場を読みません。governed facade(`dist/scripts/customer_decision.js overview`)を、そのテナントに結び付けたシステム役割なしの子プロセスとして、種類ごとに決まった引数で動かします(同時に 4 つまで、種類・テナント・引数ごとに 15 秒の控え)。応答は版・テナント・案件・日付を確かめた形に組み直し、値・選択肢・理由・コメント・名前は入りません。案件やレポートがなければ 404、facade が未ビルドなら 503、時間切れは 504、ほかは 502 で、どれも決まった文面だけを返します。
 
 middleware は edge で secret-guard のファイル読み取りを行わない設計です。したがって middleware は credential/loopback の早期境界、token registry を伴う viewer 解決は route 側、という二段構成を維持します。
+
+## 実装の持ち主（Concierge に統合後）
+
+操作コンソールは Concierge の `/api/ops/*` に移りました。viewer に関する定義は、次のとおり一か所ずつです（パスは `presence/displays/concierge/` から）。
+
+| 概念                                                                              | 持ち主                                                                                                                                | 委譲する側                                                                                                       |
+| --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| viewer role の型（`readonly` / `localadmin`）                                     | `SurfaceViewerRole`（`libs/core/foundation/surface-viewer-role.ts`。`libs/core/surface/surface-authorization.ts` から再エクスポート） | `ChronosAccessRole`・`SurfaceAuthorizationRole`・`HeadlessViewerRole`・`PluginViewRole` は非推奨の別名           |
+| viewer → `SurfaceAuthorizationContext` の投影、tier の解決、エラー応答            | `src/lib/viewer-context.ts`                                                                                                           | `src/lib/ops/ops-viewer.ts`（`toSurfaceAuthorizationContext`・`resolveViewerTierAccess`・`viewerErrorResponse`） |
+| 省略された organization / project / tier の既定値（コンソールの `ViewerContext`） | `src/lib/ops/ops-viewer.ts` の `withOpsViewerDefaults`                                                                                | 同ファイルの各ヘルパー、`distill-candidate-scope.ts`                                                             |
+| 1 リクエスト 1 回の viewer 解決                                                   | `src/lib/viewer-context.ts` の `resolveConciergeViewerContextOnce`                                                                    | `src/lib/ops/ops-request-guard.ts` の二つのゲート。続く `resolveOpsViewerForRequest` は同じ結果を使います        |
+| cookie の cross-origin 検査                                                       | `src/lib/cross-origin-cookie.ts`                                                                                                      | `src/lib/api-guard.ts`、`src/lib/ops/ops-request-guard.ts`                                                       |
+| memory candidate の可視判定                                                       | `src/lib/memory-candidate-visibility.ts`                                                                                              | `src/lib/ops/knowledge-scope.ts`（scope のない行の出どころを mission / artifact から引くところだけを足します）   |
+| scoped learning 承認の可視判定                                                    | `src/lib/scoped-learning-approval-visibility.ts`                                                                                      | `src/lib/ops/scoped-learning-approval-visibility.ts`                                                             |
+
+決まりは次のとおりです。
+
+- 個人 tier は、コンソールの経路でも投影の時点で外します。viewer の `tierAccess` に `personal` が入っていても、`viewerCanReadTier` と `strictViewerTier` は `personal` を通しません。
+- 個人 tier の memory candidate は、この判定では誰にも見せません（持ち主にも見せません）。Concierge の viewer は個人 tier を持たないためです。
+- エラー応答の状態コードは、指定があればその値、認可の失敗（`ConciergeViewerError`・`SurfaceViewerScopeError`・`SurfaceAuthorizationError`）ならその失敗の 401 / 403、それ以外は Concierge のルートで 500、コンソールのルートで 403 です。応答の `error_code` は、Concierge のルートでは応答の状態コードとメッセージから、コンソールのルートでは例外そのもの（例外の `code`・`status`・メッセージ）から決めます。この違いは統合前のままで、呼び出し側が `conciergeErrorResponse` の第 3 引数で指定します。組み合わせごとの結果は `src/lib/viewer-error-response.test.ts` の表にあります。
+- viewer role の型が一つであることを検査するのは `libs/core` の中だけです（`tests/tier-member-role-type-boundary.test.ts`）。Concierge の応答の型（`src/lib/ops/*-response.ts`）とコンポーネント（`src/components/ops/`）には、`'readonly' | 'localadmin'` をそのまま書いた箇所が残っています。
+- 実行ロールは二系統あります。Concierge のルートは `concierge_localadmin` / `concierge_operator`、コンソールのルートは `chronos_localadmin` / `chronos_operator` です。ロールカードが許すパスが違うので、まとめていません。対応表は `src/lib/viewer-execution-role.ts` にあります。ルートをどちらで動かすかを変えるのは権限の判断で、リファクタリングでは変えません。
 
 ## headless / A2UI operation 認可
 

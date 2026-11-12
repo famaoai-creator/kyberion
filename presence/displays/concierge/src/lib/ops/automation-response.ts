@@ -1,4 +1,5 @@
 import { isRecord } from '@agent/core/foundation/primitives';
+import type { SurfaceViewerRole } from '@agent/core/surface/surface-authorization';
 
 /**
  * Client-side mirrors of the /api/ops/schedules + /api/ops/pipelines payloads
@@ -8,7 +9,8 @@ import { isRecord } from '@agent/core/foundation/primitives';
  * degrades to `undefined`, never to a partially-typed object.
  */
 
-export type OpsAccessRole = 'readonly' | 'localadmin';
+/** The viewer role (same type as `OpsAccessRole` in `ops-request-guard.ts`; no server import here). */
+export type OpsAccessRole = SurfaceViewerRole;
 
 export type ClientScheduleTrigger =
   | { type: 'cron'; cron: string; timezone?: string }
@@ -53,6 +55,8 @@ export interface SchedulesResponse {
 export interface PipelinesResponse {
   pipelines: ClientPipeline[];
   accessRole: OpsAccessRole;
+  /** The server would accept a run from this viewer; false unless it says so. */
+  canRun: boolean;
 }
 
 export interface RunDispatch {
@@ -189,7 +193,7 @@ export function parsePipelinesResponse(value: unknown): PipelinesResponse | unde
   if (pipelines.some((entry) => !entry)) return undefined;
   const accessRole = parseAccessRole(value.accessRole);
   if (!accessRole) return undefined;
-  return { pipelines: pipelines as ClientPipeline[], accessRole };
+  return { pipelines: pipelines as ClientPipeline[], accessRole, canRun: value.canRun === true };
 }
 
 export function parseRunDispatchResponse(value: unknown): RunDispatch | undefined {

@@ -209,7 +209,7 @@ describe('Mission team composition contract', () => {
       missionId: 'MSN-TEAM-COMPOSE',
       missionType: 'development',
       tier: 'public',
-      assignedPersona: 'Ecosystem Architect',
+      orgRole: 'Ecosystem Architect',
     });
 
     expect(plan.template).toBe('development');
@@ -263,7 +263,7 @@ describe('Mission team composition contract', () => {
       missionId: 'MSN-TEAM-PLAN',
       missionType: 'operations',
       tier: 'confidential',
-      assignedPersona: 'Reliability Engineer',
+      orgRole: 'Reliability Engineer',
     });
 
     const valid = validate(plan);
@@ -276,7 +276,7 @@ describe('Mission team composition contract', () => {
       missionId: 'MSN-PRODUCT-TEAM',
       missionType: 'product_development',
       tier: 'public',
-      assignedPersona: 'Product Architect',
+      orgRole: 'Product Architect',
     });
 
     expect(plan.template).toBe('product_development');
@@ -299,7 +299,7 @@ describe('Mission team composition contract', () => {
       missionId: 'MSN-MEETING-TEAM',
       missionType: 'meeting_operations',
       tier: 'public',
-      assignedPersona: 'Meeting Facilitator',
+      orgRole: 'Meeting Facilitator',
     });
 
     const facilitator = plan.assignments.find((entry) => entry.team_role === 'facilitator');
@@ -327,7 +327,7 @@ describe('Mission team composition contract', () => {
       missionId,
       missionType: 'development',
       tier: 'public',
-      assignedPersona: 'Ecosystem Architect',
+      orgRole: 'Ecosystem Architect',
     });
 
     expect(getMissionTeamAssignment(plan, 'owner')?.agent_id).toBe('nerve-agent');
