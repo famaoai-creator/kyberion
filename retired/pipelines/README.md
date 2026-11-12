@@ -85,3 +85,9 @@ Decision table: [`ORPHAN_DECISIONS_2026-10-01.md`](../../docs/developer/improvem
 | File                               | Reason                                                                                                                                                                                                     |
 | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `kyberion-config-provisioner.json` | Its only input, `knowledge/public/tmp-profile.md`, does not exist, so the first step fails; the README described it as "provision operator config from canonical defaults", which it never did. No caller. |
+
+## Mesh delivery (2026-11-12)
+
+| File                 | Reason                                                                                                                                                                                                                   |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `mesh-delivery.json` | Scheduled wrapper around `core:run_mesh_delivery`. The Mesh message broker had no producer, so every pass claimed nothing; the op, the driver and the broker were retired together (see [`../README.md`](../README.md)). |

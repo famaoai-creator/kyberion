@@ -1,7 +1,7 @@
 {
   "$schema": "../schemas/concept-registry.schema.json",
   "manifest_version": 1,
-  "last_reviewed": "2026-11-10",
+  "last_reviewed": "2026-11-12",
   "purpose": "One registered definition, canonical document, glossary entry and owner per high-confusion Kyberion term. A term or alias may belong to exactly one entry; a homonym is declared through `senses`. The concept-registry gate (scripts/check_concept_registry.ts) enforces this file against docs/GLOSSARY.md, docs/documentation-source-map.json and doc_status frontmatter. Workflow: knowledge/product/governance/concept-registry-workflow.md.",
   "terms": [
     {
@@ -337,6 +337,39 @@
       "canonical_doc": "knowledge/product/architecture/agent-runtime-supervisor-daemon.md",
       "owner_modules": [],
       "not_to_confuse_with": ["runtime-supervisor"]
+    },
+    {
+      "id": "co-session",
+      "term": "Co-Session",
+      "aliases": ["co session"],
+      "category": "execution",
+      "definition": "The mission-optional coordination layer for provider CLI processes sharing one checkout: presence, cooperative path leases, blackboard notes and handoffs; never an authorization boundary.",
+      "glossary_anchor": "co-session",
+      "canonical_doc": "knowledge/product/architecture/agent-communication-layer-model.md",
+      "owner_modules": ["libs/core/workforce/co-session.ts", "scripts/co_session.ts"],
+      "not_to_confuse_with": ["peer-messaging", "lease", "work-item"]
+    },
+    {
+      "id": "peer-messaging",
+      "term": "Peer Messaging",
+      "aliases": ["Tenant Peer Mesh", "peer mesh"],
+      "category": "execution",
+      "definition": "Signed, tenant-scoped message transport between distinct enrolled Kyberion runtimes; a transport receipt is not work acceptance.",
+      "glossary_anchor": "peer-messaging",
+      "canonical_doc": "knowledge/product/architecture/agent-communication-layer-model.md",
+      "owner_modules": ["libs/core/mesh/peer-messaging.ts", "scripts/peer_conversation_server.ts"],
+      "not_to_confuse_with": ["co-session", "a2a"]
+    },
+    {
+      "id": "a2a",
+      "term": "A2A",
+      "aliases": ["A2A bridge", "agent-to-agent"],
+      "category": "execution",
+      "definition": "In-runtime agent-to-agent envelopes between an orchestrator and the provider agents it spawns, routed by the A2A bridge through the agent runtime supervisor.",
+      "glossary_anchor": "a2a",
+      "canonical_doc": "knowledge/product/architecture/agent-communication-layer-model.md",
+      "owner_modules": ["libs/core/mesh/a2a-bridge.ts"],
+      "not_to_confuse_with": ["peer-messaging", "agent-runtime-supervisor"]
     },
     {
       "id": "organization-work-loop",

@@ -690,13 +690,17 @@ The single source of tenant definitions (`libs/core/organization/tenant-registry
 
 A named set of tenants sharing a `knowledge/confidential/tenant-groups/{group}/` prefix for deliberately shared knowledge, without weakening per-tenant isolation.
 
-### Peer Messaging vs Co-Session
+### Co-Session
 
-Two different coordination surfaces — choose by participant type, shared state and trust boundary, not by `localhost`. **Co-Session** (`knowledge/product/architecture/co-session-coordination.md`) is the thin, mission-optional layer (presence, path leases, blackboard, handoff) for provider CLIs (`claude` / `codex` / `agy` / …) sharing one checkout. **Peer Messaging** (see Tenant Peer Mesh below) is signed transport between distinct Kyberion runtimes. Durable ownership stays with WorkItems and `mission_controller`. → [agent-communication-layer-model](../knowledge/product/architecture/agent-communication-layer-model.md)
+The mission-optional coordination layer for provider CLI processes sharing one checkout: presence, cooperative path leases, blackboard notes and handoffs; never an authorization boundary. The participants are provider CLIs (`claude` / `codex` / `agy` / …) on one working tree, so no peer listener is involved. Choose it over Peer Messaging by participant type, shared state and trust boundary, not by `localhost`. Durable ownership stays with WorkItems and `mission_controller`. → [co-session-coordination](../knowledge/product/architecture/co-session-coordination.md) · [agent-communication-layer-model](../knowledge/product/architecture/agent-communication-layer-model.md)
 
-### Tenant Peer Mesh
+### Peer Messaging
 
-HMAC-signed peer-to-peer messaging between tenant instances. Peers are registered via `pnpm peer:register` with exposure classes (`same_host` / `same_lan` / `private_network` / `public_network`); shared secrets live in the tenant's confidential connection catalog and never in public metadata.
+Signed, tenant-scoped message transport between distinct enrolled Kyberion runtimes; a transport receipt is not work acceptance. Also called the Tenant Peer Mesh. Envelopes are HMAC-signed; peers are registered via `pnpm peer:register` with exposure classes (`same_host` / `same_lan` / `private_network` / `public_network`); shared secrets live in the tenant's confidential connection catalog and never in public metadata. Peer conversations, opt-in auto replies, typed peer tasks and Mesh Hub recipient proposals all travel over it. → [agent-communication-layer-model](../knowledge/product/architecture/agent-communication-layer-model.md) · [peer-network](../knowledge/product/orchestration/peer-network.md)
+
+### A2A
+
+In-runtime agent-to-agent envelopes between an orchestrator and the provider agents it spawns, routed by the A2A bridge through the agent runtime supervisor. It stays inside one Kyberion runtime; crossing to another runtime is Peer Messaging. The network actuator's `a2a_send` / `a2a_poll` ops are a separate file-drop transport and do not feed the bridge. → [agent-communication-layer-model](../knowledge/product/architecture/agent-communication-layer-model.md)
 
 ### Stance
 
