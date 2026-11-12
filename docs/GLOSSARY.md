@@ -161,6 +161,19 @@ A standing grant that itself needs human approval references the approval as its
 | Process Template  | A mission process (phases and tasks) that `mission create` expands into `NEXT_TASKS.json` — not an ADF.                                                                                                                       |
 | Fragment          | A reusable ADF piece included by pipelines, never run on its own.                                                                                                                                                             |
 
+### Concierge names
+
+"Concierge" alone means the app. Five other identifiers carry the word; they are different things and none of them is renamed.
+
+| Identifier                                                 | What it is                                                                                                                                                                                                                           | Where it lives                                                                                                          |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| **Concierge** (秘書室; "Kyberion server" in code comments) | The surface and shared shell on port 3050, including the operations console at `/ops`                                                                                                                                                | `presence/displays/concierge/` — see [Concierge](#concierge)                                                            |
+| "conversational concierge surface"                         | A description of Presence Studio (the companion surface), not the Concierge app                                                                                                                                                      | [surface-responsibility-model](../knowledge/product/architecture/surface-responsibility-model.md) §3.1                  |
+| `mcp-server-cowork`                                        | The MCP server facade for Claude Cowork and other MCP clients; older docs called it "the concierge for Claude"                                                                                                                       | `scripts/mcp_server.ts`, `knowledge/product/governance/surfaces/mcp-server-cowork.json`                                 |
+| `sovereign_concierge`                                      | An [Authority Role](#authority-role) ("personal onboarding and identity synchronization authority") that surface code assumes for governed reads and writes on the sovereign's behalf; it has an Org Role directory of the same name | `knowledge/product/governance/authority-roles/sovereign_concierge.json`, `knowledge/product/roles/sovereign_concierge/` |
+| `surface-concierge`                                        | A specialist in the specialist catalog: receives natural-language requests, fills missing slots and keeps the conversation smooth on any surface                                                                                     | `knowledge/product/orchestration/specialists/surface-concierge.json`                                                    |
+| `starter-concierge`                                        | A dot team starter template (a draft dot charter that owns one conversation and tracks its commitments)                                                                                                                              | `knowledge/product/orchestration/dot-team-templates/starter-concierge.json`                                             |
+
 ### FDE full glossary
 
 ## Core concepts
@@ -323,18 +336,18 @@ One canonical term per layer; the aliases are names you will meet in code, docs,
 | The delivery/ingress contract bridges implement | **Gateway**    | surface gateway, channel gateway                        | advanced  |
 | A named conversation/delivery route             | **Channel**    | surface channel, outbox channel                         | advanced  |
 | A local capture screen                          | **Pad**        | capture pad, Capture desk                               | first-win |
-| The CEO-secretary surface                       | **Concierge**  | 秘書室                                                  | first-win |
-| The shared menu rail (5 core verbs + groups)    | **Front Desk** | フロントデスク, front-desk nav                          | first-win |
+| The CEO-secretary surface and shared shell      | **Concierge**  | 秘書室, Kyberion server                                 | first-win |
+| The shared menu rail (seven destinations)       | **Front Desk** | フロントデスク, front-desk nav                          | first-win |
 
 A **Stance** is not a surface layer; it is the acting-for selection — see [Stance](#stance).
 
 ### Surface
 
-**(first-win)** A human-facing entrance to Kyberion, each with exactly one role: Chronos Mirror (control tower), Concierge (decide), Presence Studio (companion), Operator Surface (audit monitor), Computer Surface (hands-on mirror), the terminal home / HUD, the chat bridges, and the local capture pads. Surfaces never own missions; they read and write through governed APIs and the Surface Outbox. Role badges and the map live in [SURFACES](./SURFACES.md).
+**(first-win)** A human-facing entrance to Kyberion, each with exactly one role: Concierge (decide; it also hosts the operations console that used to be the Chronos Mirror surface), Presence Studio (companion), Operator Surface (audit monitor), Computer Surface (hands-on mirror), Customer Room (a customer decides through an invite link), the terminal home / HUD, the chat bridges, and the local capture pads. Surfaces never own missions; they read and write through governed APIs and the Surface Outbox. Role badges and the map live in [SURFACES](./SURFACES.md).
 
 ### Display
 
-**(advanced)** A surface that is a web UI served from `presence/displays/<name>/` (concierge, presence-studio, chronos-mirror-v2, operator-surface, computer-surface, terminal-hud). All displays render through the shared `kyberion-base` A2UI catalog. "Display" names the implementation form; "surface" names the role it plays.
+**(advanced)** A surface that is a web UI served from `presence/displays/<name>/`: concierge, presence-studio, operator-surface, computer-surface, customer-room and the developer A2UI viewer a2ui-host. Two more directories live there without being a web UI of their own: chronos-mirror-v2 is now only a redirect app (pages → Concierge `/ops`, API → Concierge `/api/ops`), and terminal-hud is a terminal TUI. The role-bearing displays render through the shared `kyberion-base` A2UI catalog. "Display" names the implementation form; "surface" names the role it plays.
 
 ### Presence
 
@@ -358,11 +371,11 @@ A **Stance** is not a surface layer; it is the acting-for selection — see [Sta
 
 ### Concierge
 
-**(first-win)** The CEO-secretary surface (秘書室, `presence/displays/concierge`, port 3050): requests, approvals, outcomes, exceptions, plus `/setup` onboarding (first-run code, SSO), `/management` (organizations and projects) and `/ingest`. A company switcher in the rail narrows 決める, settings and the conversation to the selected tenant. It answers "what do I need to decide now?" and hosts the 決める, 設定, 組織 and 資料の取込 items of the Front Desk.
+**(first-win)** The CEO-secretary surface (秘書室, `presence/displays/concierge`, port 3050) and the one shell a person works in. It answers "what do I need to decide now?" and hosts all seven [Front Desk](#front-desk) destinations: ホーム `/`, あなた待ち `/inbox` (approvals, decisions, reviews), 仕事 `/work` (missions, work items, requests), 組織 `/org`, 資料 `/library` (deliverables, knowledge, minutes, intake), 運用 `/ops` and 設定 `/settings`; plus `/first-job`, `/help`, first-run setup (`/setup/first-run`) and `/management`. A company switcher in the rail narrows what is shown to the selected tenant. 運用 (`/ops`, API under `/api/ops`) is the **operations console** — the screens and API that used to be the separate Chronos Mirror surface (agent operations, surface control, diagnostics, Discussion / Dialogue Room, automation). The rail enables it for an owner only; the API authorizes each request from the Concierge viewer: `readonly` to read, `localadmin` plus the mutation gate to intervene, except that `POST /api/ops/knowledge-feedback` and `POST /api/ops/plan-preview` accept a `readonly` viewer and `/api/ops/healthz` is unauthenticated. Code comments and changelog fragments call this Concierge-hosted shell the **Kyberion server** ("Kyberion server phase 2" names the move of Home, Progress, first-job, hearing and conversation from Presence Studio); it is the same thing, not a separate component. For the other uses of the word, see [Concierge names](#concierge-names).
 
 ### Front Desk
 
-**(first-win)** The shared menu rail rendered by both Concierge and Presence Studio, built from `libs/core/surface/front-desk-nav.ts`: five core human verbs — ホーム (home), 頼む (ask), 決める (decide), 進み具合 (progress), 設定 (settings) — plus role-gated destinations grouped as 仕事 / 資料・学習 / 管理 (missions, work items, deliverables, knowledge, discussion, organization, operations, diagnostics, …; some hosted on Chronos). One implementation, two hosting surfaces, so a person sees one menu.
+**(first-win)** The shared menu rail rendered by both Concierge and Presence Studio, built from `libs/core/surface/front-desk-nav.ts`: seven top-level destinations — ホーム (home), あなた待ち (needs you), 仕事 (work), 組織 (organization), 資料 (library), 運用 (operations), 設定 (settings) — each role-gated by Member Role, and all hosted by Concierge. Destinations that left the rail (頼む `/ask` and the Studio home on Presence Studio; first-job, help and progress on Concierge) are still resolved from the same file as links. One implementation, two rendering surfaces, so a person sees one menu.
 
 ## Lifecycle terms
 
@@ -488,7 +501,7 @@ The deterministic event worker that reacts to mission control-plane events, prew
 
 ### Gateway
 
-A channel-facing ingress component that receives external events and normalizes them into governed internal artifacts. Examples include the Slack bridge and the Chronos API surface.
+A channel-facing ingress component that receives external events and normalizes them into governed internal artifacts. Examples include the Slack bridge and the operations-console API (Concierge `/api/ops`, formerly the Chronos API).
 
 ### Channel Outbox
 
@@ -561,11 +574,11 @@ A narrow actuator for creating, loading, deciding, and listing human approval re
 
 ### Chronos Gateway
 
-The authenticated interactive control surface behind Chronos Mirror v2. Every API route except `/api/healthz` resolves a ViewerContext fail-closed before serving data. It can manage runtime sessions and summarize delegations, but it is not the authoritative mission owner.
+The authenticated interactive control API of the operations console. It is served by Concierge under `/api/ops` (pages under `/ops`); `presence/displays/chronos-mirror-v2` only redirects old URLs there and authorizes nothing. Every `/api/ops` route except `/api/ops/healthz` resolves the Concierge ViewerContext fail-closed before serving data (`presence/displays/concierge/src/lib/ops/ops-request-guard.ts`). It can manage runtime sessions and summarize delegations, but it is not the authoritative mission owner. The `chronos` names that remain (`chronos_gateway`, `chronos.*` operation ids, `ChronosAccessRole`) are historical identifiers of this console.
 
 ### Chronos Operator
 
-The read-only Chronos access level mapped to `chronos_operator`. It can inspect mission state, recent control-plane activity, runtime leases, and delivery backlogs without mutating system state. At the HTTP layer this corresponds to the `readonly` viewer role.
+The read-only operations-console access level mapped to `chronos_operator`. It can inspect mission state, recent control-plane activity, runtime leases, and delivery backlogs without mutating system state. At the HTTP layer this corresponds to the `readonly` viewer role.
 
 ### Chronos Local Admin
 
@@ -573,7 +586,7 @@ The bounded local control-plane access level mapped to `chronos_localadmin`. It 
 
 ### ViewerContext / Viewer Scope
 
-The request-scoped principal resolved server-side by a surface adapter: a viewer role (`readonly` | `localadmin`), operation permissions, and allowed tenant, organization, project, and tier sets (`tenant_slugs`, `organization_ids`, `project_ids`, `tier_access`). Headless operations declare `required_permissions` and are evaluated through the shared `SurfaceAuthorizationContext`; query parameters may only narrow the viewer's allowed set, never widen it. This is the internal authorization boundary for OSS/self-hosted/FDE surfaces, not hosted SaaS user management. Chronos keeps `KYBERION_VIEWER_SCOPE=off|warn|enforce` as a migration/telemetry setting, but every mode denies an unregistered tenant; `warn` records the attempted expansion before denying it. Operations guide: `docs/developer/CHRONOS_VIEWER_SCOPE_OPERATIONS.ja.md`.
+The request-scoped principal resolved server-side by a surface adapter: a viewer role (`readonly` | `localadmin`), operation permissions, and allowed tenant, organization, project, and tier sets (`tenant_slugs`, `organization_ids`, `project_ids`, `tier_access`). Headless operations declare `required_permissions` and are evaluated through the shared `SurfaceAuthorizationContext`; query parameters may only narrow the viewer's allowed set, never widen it. This is the internal authorization boundary for OSS/self-hosted/FDE surfaces, not hosted SaaS user management. The operations console (Concierge `/api/ops`, formerly Chronos) keeps `KYBERION_VIEWER_SCOPE=off|warn|enforce` as a migration/telemetry setting, but every mode denies an unregistered tenant; `warn` records the attempted expansion before denying it. Operations guide: `docs/developer/CHRONOS_VIEWER_SCOPE_OPERATIONS.ja.md`.
 
 ### Channel (interaction context)
 
@@ -627,7 +640,7 @@ The plain-language card on an approval request: the question, recommendation, wh
 
 ### Discussion Room / Dialogue Room
 
-A Chronos surface (`/?section=discussion`) where a goal is worked out with a facilitated team of agents drawn from the organization's agent pool (Discussion Room), or with a facilitator that keeps a live goal card with a readiness score (Dialogue Room). Conclusions become a decision brief; kept next steps become WorkItem proposals and mission-start requests only after a human approves. → [discussion-room](../knowledge/product/architecture/discussion-room.md) · Dialogue Room: `presence/displays/chronos-mirror-v2/src/components/DialogueRoom.tsx`
+A section of the operations console in Concierge (`/ops?section=discussion`; `/ops/discussion` redirects to it) where a goal is worked out with a facilitated team of agents drawn from the organization's agent pool (Discussion Room), or with a facilitator that keeps a live goal card with a readiness score (Dialogue Room). Conclusions become a decision brief; kept next steps become WorkItem proposals and mission-start requests only after a human approves. → [discussion-room](../knowledge/product/architecture/discussion-room.md) · Dialogue Room: `presence/displays/concierge/src/components/ops/DialogueRoom.tsx`
 
 ### Team Channel
 

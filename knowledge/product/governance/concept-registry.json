@@ -1,7 +1,7 @@
 {
   "$schema": "../schemas/concept-registry.schema.json",
   "manifest_version": 1,
-  "last_reviewed": "2026-11-10",
+  "last_reviewed": "2026-11-12",
   "purpose": "One registered definition, canonical document, glossary entry and owner per high-confusion Kyberion term. A term or alias may belong to exactly one entry; a homonym is declared through `senses`. The concept-registry gate (scripts/check_concept_registry.ts) enforces this file against docs/GLOSSARY.md, docs/documentation-source-map.json and doc_status frontmatter. Workflow: knowledge/product/governance/concept-registry-workflow.md.",
   "terms": [
     {
@@ -272,7 +272,10 @@
       "definition": "A surface implemented as a web UI under presence/displays/<name>/; Display names the implementation form, Surface the role.",
       "glossary_anchor": "display",
       "canonical_doc": "docs/SURFACES.md",
-      "owner_modules": [],
+      "owner_modules": [
+        "libs/core/surface/surface-runtime.ts",
+        "knowledge/product/governance/active-surfaces.json"
+      ],
       "not_to_confuse_with": ["surface"]
     },
     {
@@ -310,12 +313,16 @@
     {
       "id": "concierge",
       "term": "Concierge",
-      "aliases": ["秘書室"],
+      "aliases": ["秘書室", "Kyberion server"],
       "category": "surface",
-      "definition": "The CEO-secretary surface that answers what do I need to decide now.",
+      "definition": "The CEO-secretary surface that answers what do I need to decide now; its shell hosts every Front Desk destination, including the operations console at /ops.",
       "glossary_anchor": "concierge",
       "canonical_doc": "docs/SURFACES.md",
-      "owner_modules": [],
+      "owner_modules": [
+        "knowledge/product/governance/surfaces/concierge.json",
+        "presence/displays/concierge/src/app/concierge-shell.tsx",
+        "presence/displays/concierge/src/lib/ia-routes.ts"
+      ],
       "not_to_confuse_with": ["front-desk"]
     },
     {

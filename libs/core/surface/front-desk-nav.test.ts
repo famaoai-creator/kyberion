@@ -1,7 +1,6 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const loadSurfaceManifestMock = vi.hoisted(() => vi.fn());
-const healthFetchMock = vi.hoisted(() => vi.fn());
 const resolveBrowserUrlMock = vi.hoisted(() => vi.fn());
 vi.mock('./surface-url.js', () => ({ resolveSurfaceBrowserUrl: resolveBrowserUrlMock }));
 
@@ -17,7 +16,6 @@ import {
   frontDeskRoleAllows,
   frontDeskRoleFromViewer,
   readFrontDeskSurfacePorts,
-  readAvailableFrontDeskSurfaces,
   resolveFrontDeskDestination,
   resolveFrontDeskMenu,
   type FrontDeskRole,
@@ -26,12 +24,8 @@ import { t, type VocabularyKey } from '../localization/t.js';
 
 beforeEach(() => {
   loadSurfaceManifestMock.mockReset();
-  healthFetchMock.mockReset();
-  vi.stubGlobal('fetch', healthFetchMock);
   resolveBrowserUrlMock.mockReset();
 });
-
-afterEach(() => vi.unstubAllGlobals());
 
 describe('FRONT_DESK_MENU', () => {
   it('lists exactly the seven top-level destinations (MSN-SHELL-IA §1)', () => {
@@ -214,99 +208,28 @@ describe('optional destinations', () => {
       'ops',
       'settings',
     ]);
-    expect(
-      menu.some(
-        (item) => item.surface === 'chronos-mirror-v2' || item.surface === 'operator-surface'
-      )
-    ).toBe(false);
+    expect(menu.every((item) => item.surface === 'concierge')).toBe(true);
   });
   it('keeps /ops section links same-origin with the snake_case scope query', () => {
     const menu = resolveFrontDeskMenu({
       currentSurface: 'concierge',
       role: 'owner',
-      availableSurfaces: {
-        'chronos-mirror-v2': 'http://localhost:4300/',
-        'operator-surface': 'http://localhost:4331',
-      },
     });
     expect(menu).toHaveLength(FRONT_DESK_MENU.length);
-    // The former Chronos destinations are same-origin /ops sections now, even
-    // while a Chronos process is still reachable during the migration.
+    // The former Chronos destinations are same-origin /ops sections now.
     expect(menu.find((item) => item.id === 'ops')?.href).toBe('/ops');
     expect(menu.find((item) => item.id === 'ops')?.external).toBe(false);
     expect(menu.some((item) => item.id === 'monitor')).toBe(false);
     expect(menu.find((item) => item.id === 'ops')?.scope_query_style).toBe('snake');
   });
   it.each(['viewer', 'operator', 'approver', 'owner'] as const)(
-    'keeps role gates for %s with all surfaces available',
+    'keeps role gates for %s',
     (role) => {
-      const menu = resolveFrontDeskMenu({
-        currentSurface: 'presence-studio',
-        role,
-        availableSurfaces: {
-          'chronos-mirror-v2': 'http://localhost:4300',
-          'operator-surface': 'http://localhost:4331',
-        },
-      });
+      const menu = resolveFrontDeskMenu({ currentSurface: 'presence-studio', role });
       for (const item of menu) expect(item.allowed).toBe(frontDeskRoleAllows(role, item.min_role));
       expect(menu.find((item) => item.id === 'settings')?.allowed).toBe(role === 'owner');
     }
   );
-});
-
-describe('readAvailableFrontDeskSurfaces', () => {
-  const enabled = () =>
-    loadSurfaceManifestMock.mockReturnValue({
-      surfaces: [
-        { id: 'chronos-mirror-v2', enabled: true, port: 3000, healthPath: '/api/healthz' },
-        { id: 'operator-surface', enabled: true, port: 3331, healthPath: '/' },
-      ],
-    });
-  it.each(['http://127.0.0.1:3000', 'http://localhost:3000', 'http://[::1]:3000'])(
-    'probes the exact configured origin %s',
-    async (base) => {
-      enabled();
-      resolveBrowserUrlMock.mockReturnValue(base);
-      healthFetchMock.mockResolvedValue({ ok: true });
-      expect(await readAvailableFrontDeskSurfaces()).toEqual({ 'chronos-mirror-v2': base });
-      expect(String(healthFetchMock.mock.calls[0][0])).toBe(base + '/api/healthz');
-      expect(healthFetchMock.mock.calls[0][1]).toMatchObject({ redirect: 'error' });
-      expect(healthFetchMock.mock.calls[0][1].signal).toBeInstanceOf(AbortSignal);
-      expect(healthFetchMock).toHaveBeenCalledTimes(1);
-    }
-  );
-  it.each([
-    'http://remote.example:3000',
-    'https://localhost:3000',
-    'http://localhost:4000',
-    'http://localhost:3000/unknown',
-  ])('omits unverified target %s', async (base) => {
-    enabled();
-    resolveBrowserUrlMock.mockReturnValue(base);
-    expect(await readAvailableFrontDeskSurfaces()).toEqual({});
-    expect(healthFetchMock).not.toHaveBeenCalled();
-  });
-  it('omits disabled, unhealthy, missing and invalid configurations', async () => {
-    loadSurfaceManifestMock.mockReturnValueOnce({
-      surfaces: [
-        { id: 'chronos-mirror-v2', enabled: false, port: 3000, healthPath: '/api/healthz' },
-      ],
-    });
-    expect(await readAvailableFrontDeskSurfaces()).toEqual({});
-    expect(healthFetchMock).not.toHaveBeenCalled();
-    enabled();
-    resolveBrowserUrlMock.mockReturnValue('http://localhost:3000');
-    healthFetchMock.mockResolvedValue({ ok: false });
-    expect(await readAvailableFrontDeskSurfaces()).toEqual({});
-    healthFetchMock.mockRejectedValue(new Error('connect failed or timeout'));
-    expect(await readAvailableFrontDeskSurfaces()).toEqual({});
-    resolveBrowserUrlMock.mockReturnValue('invalid');
-    expect(await readAvailableFrontDeskSurfaces()).toEqual({});
-    loadSurfaceManifestMock.mockImplementation(() => {
-      throw new Error('missing');
-    });
-    expect(await readAvailableFrontDeskSurfaces()).toEqual({});
-  });
 });
 
 describe('rail placement and destinations', () => {
@@ -331,7 +254,7 @@ describe('rail placement and destinations', () => {
       min_role: 'owner',
     });
     expect(menu.find((entry) => entry.id === 'org')?.scope_query_style).toBe('camel');
-    expect(FRONT_DESK_MENU.some((item) => item.surface === 'chronos-mirror-v2')).toBe(false);
+    expect(FRONT_DESK_MENU.every((item) => item.surface === 'concierge')).toBe(true);
   });
 
   it('still resolves Studio destinations that left the rail', () => {

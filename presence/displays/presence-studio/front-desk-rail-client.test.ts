@@ -40,10 +40,6 @@ function harness(
   const menu = resolveFrontDeskMenu({
     currentSurface: 'presence-studio',
     role: 'owner',
-    availableSurfaces: {
-      'chronos-mirror-v2': 'http://localhost:3000',
-      'operator-surface': 'http://localhost:3331',
-    },
   }).map((item) => ({ ...item, label: item.id, sublabel: item.id, group_label: item.group_key }));
   const me = (slug = 'alpha') => ({
     ok: true,
