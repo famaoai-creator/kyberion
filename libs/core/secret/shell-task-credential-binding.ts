@@ -5,7 +5,7 @@ import { currentActor } from '../authn/actor-context.js';
 import { assertScopeContext, type ScopeContext } from '../foundation/scope-context-validation.js';
 import { getWorkItem, listActiveWorkLeases } from '../workforce/work-coordination.js';
 import { assertIsolatedProviderHome } from '../provider/provider-auth-home.js';
-import { loadServiceBindingRecord } from '../service/service-binding-registry.js';
+import { loadServiceBindingRecord } from '../service/service-binding-reader.js';
 import { validateBindingOwner } from '../service/service-binding-owner.js';
 import type { TaskCredentialProvenance } from '../foundation/credential-binding.js';
 import { assertServiceCredentialAllocation } from '../governance/service-credential-allocation.js';

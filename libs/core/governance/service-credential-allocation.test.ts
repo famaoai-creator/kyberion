@@ -19,7 +19,7 @@ vi.mock('./grant-store.js', () => ({
   grantStatusAt: mocks.status,
   verifyGrantBasis: mocks.verify,
 }));
-import { assertServiceCredentialAllocation } from './service-credential-allocation.js';
+import { verifyServiceCredentialAllocation as assertServiceCredentialAllocation } from './service-credential-allocation-verifier.js';
 const scope = {
   tenant_slug: 'acme',
   project_id: 'project-a',
