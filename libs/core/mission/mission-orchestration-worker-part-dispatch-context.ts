@@ -5,7 +5,7 @@ import type { MissionTeamAssignment } from './mission-team-plan-composer.js';
  * This module deliberately has no dependency on the dispatch wrapper, so the
  * worker core can depend on it without recreating a static/dynamic cycle.
  */
-import { missionCoordinationBus } from './mission-coordination-bus.js';
+import { recordMissionCoordinationMessage } from './mission-coordination-record.js';
 import { logger } from '../core.js';
 import {
   buildWorkingPrinciplesLines,
@@ -277,7 +277,7 @@ export async function buildTaskDispatchContext(input: {
       tasks: input.allTasks,
     });
     try {
-      missionCoordinationBus.send({
+      recordMissionCoordinationMessage({
         mission_id: input.missionId,
         channel: 'review',
         from_agent: 'mission_orchestration_worker',
@@ -287,7 +287,7 @@ export async function buildTaskDispatchContext(input: {
         content: `Artifact review requested for task ${input.task.task_id}.`,
       });
     } catch {
-      // Coordination-bus visibility is best-effort; never block dispatch on it.
+      // Coordination-record visibility is best-effort; never block dispatch on it.
     }
   }
   const artifactReviewLines = buildArtifactReviewLines(input.task);
