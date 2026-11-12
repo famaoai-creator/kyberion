@@ -36,6 +36,16 @@ export interface AgentTaskEnvelope {
   model_id?: string;
 }
 
+/** Execution states of a receipt (not messages); see `coordination-act-map.ts`. */
+export const AGENT_EXECUTION_RECEIPT_STATUSES = [
+  'submitted',
+  'running',
+  'succeeded',
+  'failed',
+  'canceled',
+] as const;
+export type AgentExecutionReceiptStatus = (typeof AGENT_EXECUTION_RECEIPT_STATUSES)[number];
+
 export interface AgentExecutionReceipt {
   execution_kind: 'agent_delegation';
   task_id: string;
@@ -45,7 +55,7 @@ export interface AgentExecutionReceipt {
   model_id?: string;
   /** Provider-native execution proof, when the task used a native subagent surface. */
   native_subagent?: Record<string, unknown>;
-  status: 'submitted' | 'running' | 'succeeded' | 'failed' | 'canceled';
+  status: AgentExecutionReceiptStatus;
   started_at?: string;
   completed_at?: string;
   output_ref?: string;

@@ -1572,6 +1572,10 @@
       "types": "./dist/foundation/config.d.ts",
       "default": "./dist/foundation/config.js"
     },
+    "./foundation/coordination-act": {
+      "types": "./dist/foundation/coordination-act.d.ts",
+      "default": "./dist/foundation/coordination-act.js"
+    },
     "./foundation/credential-binding": {
       "types": "./dist/foundation/credential-binding.d.ts",
       "default": "./dist/foundation/credential-binding.js"
@@ -2995,6 +2999,10 @@
     "./mesh/acp-mediator-entry": {
       "types": "./dist/mesh/acp-mediator-entry.d.ts",
       "default": "./dist/mesh/acp-mediator-entry.js"
+    },
+    "./mesh/coordination-act-map": {
+      "types": "./dist/mesh/coordination-act-map.d.ts",
+      "default": "./dist/mesh/coordination-act-map.js"
     },
     "./mesh/handoff-history": {
       "types": "./dist/mesh/handoff-history.d.ts",

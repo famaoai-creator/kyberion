@@ -161,6 +161,20 @@ A standing grant that itself needs human approval references the approval as its
 | Process Template  | A mission process (phases and tasks) that `mission create` expands into `NEXT_TASKS.json` — not an ADF.                                                                                                                       |
 | Fragment          | A reusable ADF piece included by pipelines, never run on its own.                                                                                                                                                             |
 
+### Coordination Act
+
+One of the eight speech acts agents and runtimes exchange (request, propose, accept, reject, inform, query, result, handoff); each layer's own message kinds map onto them, and no act carries execution authority. The acts are declared once in `libs/core/foundation/coordination-act.ts`. Each layer keeps its own wire words: A2A `performative`, peer `PeerMessageType`, Mesh Hub request kinds, Co-Session handoff kinds, the mission coordination bus channel, the agent execution port and discussion performatives. `libs/core/mesh/coordination-act-map.ts` maps each of those words to one act, or to "not an act" with a reason (delivery and task states, session control, categories of stored record). `accept` / `reject` are the recipient's own decision (stage 4 of the [communication model](../knowledge/product/architecture/agent-communication-layer-model.md#5-identity-authentication-authorization-and-acceptance)). Work still runs only under a local WorkItem claim or the mission owner. A `result` act answers a request; it is not the user-facing [Result](#result). `tests/coordination-act-boundary.test.ts` fails when a layer gains a kind with no mapping.
+
+"A2A" names three unrelated mechanisms. Say which one you mean:
+
+| Name                                               | What it is                                                                       | Traffic           |
+| -------------------------------------------------- | -------------------------------------------------------------------------------- | ----------------- |
+| A2A bridge (`libs/core/mesh/a2a-bridge.ts`)        | In-runtime envelopes between the orchestrator and the provider agents it spawns  | yes, the only one |
+| `network:a2a_send` / `a2a_poll` (network-actuator) | A file-drop seam under `active/shared/runtime/a2a/{inbox,outbox}`                | none (no caller)  |
+| `a2a-message` in a Mesh Hub recipient proposal     | A record stored with the proposal. Nothing executes it or sends it to the bridge | stored only       |
+
+"A2A" alone means the bridge. → [agent-communication-layer-model §11](../knowledge/product/architecture/agent-communication-layer-model.md#11-coordination-acts)
+
 ### FDE full glossary
 
 ## Core concepts
