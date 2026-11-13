@@ -9,7 +9,6 @@
  */
 import { ResourceTemplate, type McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { resolveMcpRequestContext } from './mcp-request-context.js';
 import { resolveScopeResolution } from '@agent/core/scope-context';
 import { formatWireError } from '@agent/core/contracts/wire-error';
 import {
@@ -35,8 +34,7 @@ export function registerMcpFacadeDiscoverTools(params: {
     'kyberion.scope.current',
     'Resolve the effective Kyberion scope, its provenance, and the positive knowledge roots available to this process.',
     {},
-    async () => {
-      const context = resolveMcpRequestContext();
+    async (_args, context) => {
       const scopeInput = {
         tier: context.scope.tier,
         ...(context.scope.tenant_slug ? { tenant_slug: context.scope.tenant_slug } : {}),

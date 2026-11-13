@@ -34,21 +34,16 @@ describe('concierge memory source visibility', () => {
       )
     ).toBe(false);
   });
-  it('requires both source personal grant and authenticated owner or audience', () => {
-    const personal = { ...viewer, tierAccess: ['personal' as const, 'confidential' as const] };
-    expect(memoryCandidateVisibleToViewer(candidate, personal)).toBe(true);
-    expect(
-      memoryCandidateVisibleToViewer(candidate, { ...personal, principalId: 'user:other' })
-    ).toBe(false);
-    expect(
-      memoryCandidateVisibleToViewer({ ...candidate, scope: { tier: 'personal' } }, personal)
-    ).toBe(false);
-    expect(
-      memoryCandidateVisibleToViewer(
-        { ...candidate, scope: undefined, sensitivity_tier: 'personal' },
-        personal
-      )
-    ).toBe(false);
+  it('never shows a personal-tier candidate, not even to its owner or a listed audience', () => {
+    // The inbox rule once admitted these rows on an owner / audience match and
+    // the console rule rejected them; the stricter one is the single rule now.
+    // No resolved Concierge viewer holds `personal`, so this viewer is one a
+    // route can never produce — the rule must not depend on that.
+    const personal = {
+      ...viewer,
+      tierAccess: ['personal' as const, 'confidential' as const, 'public' as const],
+    };
+    expect(memoryCandidateVisibleToViewer(candidate, personal)).toBe(false);
     expect(
       memoryCandidateVisibleToViewer(
         {
@@ -57,10 +52,52 @@ describe('concierge memory source visibility', () => {
         },
         personal
       )
+    ).toBe(false);
+    expect(
+      memoryCandidateVisibleToViewer(
+        { ...candidate, scope: undefined, sensitivity_tier: 'personal' },
+        personal
+      )
+    ).toBe(false);
+    // The same owner still sees and acts on their non-personal candidate.
+    const owned = {
+      ...candidate,
+      scope: { tier: 'public' as const, owner_nhi: 'user:owner' },
+    };
+    expect(memoryCandidateVisibleToViewer(owned, personal)).toBe(true);
+    expect(memoryCandidateVisibleToViewer(owned, { ...personal, principalId: 'user:other' })).toBe(
+      false
+    );
+  });
+  it('hides every candidate from a viewer whose permission set carries no read', () => {
+    const row = { ...candidate, scope: { tier: 'confidential' as const, tenant_slug: 'acme' } };
+    expect(memoryCandidateVisibleToViewer(row, viewer)).toBe(true);
+    expect(memoryCandidateVisibleToViewer(row, { ...viewer, permissions: [] })).toBe(false);
+  });
+  it('narrows to a requested tenant and uses a caller-resolved source scope', () => {
+    const row = { ...candidate, scope: undefined };
+    const resolved = { tier: 'confidential' as const, tenant_slug: 'acme' };
+    expect(memoryCandidateVisibleToViewer(row, viewer, { sourceScope: resolved })).toBe(true);
+    expect(
+      memoryCandidateVisibleToViewer(row, viewer, {
+        sourceScope: resolved,
+        requestedTenant: 'acme',
+      })
     ).toBe(true);
     expect(
-      memoryCandidateVisibleToViewer(candidate, { ...personal, tierAccess: ['personal'] })
+      memoryCandidateVisibleToViewer(row, viewer, {
+        sourceScope: resolved,
+        requestedTenant: 'other',
+      })
     ).toBe(false);
+    expect(memoryCandidateVisibleToViewer(row, viewer, { sourceScope: null })).toBe(false);
+    expect(() =>
+      memoryCandidateVisibleToViewer(
+        row,
+        { ...viewer, tenantSlugs: ['acme'] },
+        { requestedTenant: 'other' }
+      )
+    ).toThrow();
   });
   it('does not let allowed-audience or owner be bypassed by all tenants', () => {
     const scope = { tier: 'confidential' as const, tenant_slug: 'acme' };

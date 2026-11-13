@@ -10,7 +10,15 @@ import {
   surfaceDecisionAuthMethod,
   surfaceDecisionBinding,
 } from '@agent/core/governance/approval-store';
-import { presenceStudioApprovalDecisionSchema, readPresenceStudioStringParam } from './security.js';
+import {
+  PresenceStudioViewerError,
+  presenceStudioApprovalDecisionSchema,
+  readPresenceStudioStringParam,
+  resolvePresenceStudioViewerContext,
+  toFrontDeskViewerScope,
+} from './security.js';
+import { workHomeRecordInScope } from './work-home-source.js';
+import type { SurfaceViewerScope } from '@agent/core/surface/surface-mutation-guard';
 import { presenceStudioAuthRateLimiter } from './surface-auth.js';
 import * as presenceStudioData from './presence-studio-runtime-data.js';
 
@@ -22,13 +30,32 @@ export function registerApprovalInboxRoutes(
   app: express.Express,
   resolveLoopbackDecisionActor: LoopbackDecisionActorResolver
 ): void {
-  app.get('/api/approvals', (_req, res) => {
-    res.json({
-      ok: true,
-      items: listApprovalRequests({ status: 'pending' })
-        .slice(0, 10)
-        .map(presenceStudioData.buildApprovalInboxItem),
-    });
+  // What the inbox lists (a view filter — the decision route below looks a
+  // request up by id): an all-tenant loopback owner sees every pending
+  // request. A loopback owner narrowed to a tenant sees that tenant's requests
+  // plus the ones that carry no tenant, which belong to the installation they
+  // own and would otherwise be listed nowhere on this surface. A remote token
+  // viewer sees only its tenant's requests.
+  app.get('/api/approvals', (req, res) => {
+    try {
+      const viewer = resolvePresenceStudioViewerContext(req);
+      const pending = listApprovalRequests({ status: 'pending' });
+      const scope: SurfaceViewerScope & { includeUntenanted?: true } = {
+        ...toFrontDeskViewerScope(viewer),
+        ...(viewer.source === 'loopback' ? { includeUntenanted: true as const } : {}),
+      };
+      const visible =
+        viewer.tenantSlugs === 'all'
+          ? pending
+          : pending.filter((record) => workHomeRecordInScope(scope, record));
+      res.json({
+        ok: true,
+        items: visible.slice(0, 10).map(presenceStudioData.buildApprovalInboxItem),
+      });
+    } catch (error) {
+      const status = error instanceof PresenceStudioViewerError ? error.status : 500;
+      res.status(status).json(presenceStudioData.presenceStudioWireError(error, status));
+    }
   });
 
   app.post('/api/approvals/:requestId/decision', presenceStudioAuthRateLimiter, (req, res) => {

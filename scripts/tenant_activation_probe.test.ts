@@ -241,6 +241,21 @@ describe('tenant activation probe', () => {
     expect(persisted).not.toContain('confidential diagnostics');
   });
 
+  it('states that every viewer scope mode denies out-of-scope tenant reads', async () => {
+    seed();
+    const input = { ...scope, nhiIds: [nhiId], serviceIds: ['slack'], rootDir };
+    const enforce = await runTenantActivationProbes(input, deps());
+    expect(enforce.results.viewer_scope).toMatchObject({ passed: true });
+    expect(enforce.results.viewer_scope.detail).toContain(
+      'KYBERION_VIEWER_SCOPE=enforce (out-of-scope tenant reads are denied)'
+    );
+    const warn = await runTenantActivationProbes(input, deps({ viewerScopeMode: () => 'warn' }));
+    expect(warn.results.viewer_scope).toMatchObject({ passed: true });
+    expect(warn.results.viewer_scope.detail).toContain(
+      'KYBERION_VIEWER_SCOPE=warn (out-of-scope tenant reads are audited, then denied)'
+    );
+  });
+
   it('fails each probe with the reason an operator can act on', async () => {
     seed(false);
     const result = await runTenantActivationProbes(
@@ -254,7 +269,9 @@ describe('tenant activation probe', () => {
     expect(result.passed).toBe(false);
     expect(result.activate_command).toBeNull();
     expect(result.results.isolation_probe.detail).toContain('isolation_policy is not strict');
-    expect(result.results.viewer_scope.detail).toContain('KYBERION_VIEWER_SCOPE=off');
+    expect(result.results.viewer_scope.detail).toBe(
+      'KYBERION_VIEWER_SCOPE=off is not an accepted activation mode (out-of-scope tenant reads are still denied); set warn or enforce'
+    );
     expect(result.results.nhi_provisioned.detail).toContain('is not in the NHI ledger');
     expect(result.results.service_readiness.detail).toContain('slack (auth missing)');
   });

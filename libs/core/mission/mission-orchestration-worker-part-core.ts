@@ -2,7 +2,7 @@ import { AgentBusyError } from '../mesh/a2a-bridge.js';
 import * as path from 'node:path';
 import { notifyOperator } from '../surface/operator-notifications.js';
 import { type DelegationChain } from './delegation-chain.js';
-import { missionCoordinationBus } from './mission-coordination-bus.js';
+import { recordMissionCoordinationMessage } from './mission-coordination-record.js';
 import {
   claimWorkItem,
   importExternalWorkItem,
@@ -1057,7 +1057,7 @@ export async function dispatchPlannedMissionTaskCore(
         },
       });
       try {
-        missionCoordinationBus.send({
+        recordMissionCoordinationMessage({
           mission_id: input.missionId,
           channel: 'handoff',
           from_agent: input.assignment.agent_id,
@@ -1068,7 +1068,7 @@ export async function dispatchPlannedMissionTaskCore(
           content: `Review round ${nextReviewRound} sent ${reviewFindings.length} finding(s) back to ${targetTask.task_id} for rework.`,
         });
       } catch {
-        // Coordination-bus visibility is best-effort; never block the rework handoff on it.
+        // Coordination-record visibility is best-effort; never block the rework handoff on it.
       }
       emitMissionTaskEvent({
         event_type: 'task_reviewed',

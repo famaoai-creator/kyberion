@@ -22,6 +22,8 @@
 | G3  | knowledge 同期スクリプト（`pnpm knowledge:sync`）は内部向けで、Cowork 作業フォルダとの双方向ブリッジは未整備。                               | 軸(A) に専用ブリッジが必要。                                                                                                                                          |
 | G4  | audit chain / approval gate は CLI/Slack 前提で、Cowork の `AskUserQuestion` / scheduled task と接続していない。                             | 軸(B) に承認サーフェスのアダプタが必要。                                                                                                                              |
 
+> **2026-11-12 追記**: G1 は解消済み（MCP サーバーは `libs/shared-network/src/mcp-server-engine.ts`）。本文が参照する `libs/shared-network/src/mcp-client-engine.ts` は利用箇所が無く削除した。外部 MCP へのクライアントは `libs/core/service/service-engine-execution.ts` の `executeMcp` / `executeRemoteMcp` だけ。→ [mcp-facade-model](../knowledge/product/architecture/mcp-facade-model.md)
+
 > **既に動く土台（Layer 0）**: Cowork の作業フォルダに Kyberion リポジトリがマウントされていれば、サンドボックスシェルから `pnpm pipeline --input ...` / `pnpm mission ...` を実行でき、`knowledge/public/` をファイルとして読める。本計画はこの「素の連携」を、ガバナンスを保ったまま製品レベルの密連携へ引き上げるもの。
 
 ---

@@ -326,7 +326,12 @@ describe('front-desk-routes.ts route wiring (Deliverables 1-2)', () => {
     expect(routeStart).toBeGreaterThan(-1);
     const route = source.slice(routeStart, routeEnd === -1 ? undefined : routeEnd);
 
-    expect(route).toContain('resolvePresenceStudioViewerContext(req)');
+    // `/api/me` is the one read that tolerates a stale stored tenant, so a
+    // page can replace it; every other route refuses an unregistered hint.
+    expect(route).toMatch(
+      /resolvePresenceStudioViewerContext\(req, \{\s*unregisteredTenantHint: 'ignore',\s*\}\)/u
+    );
+    expect(source.match(/unregisteredTenantHint/gu)).toHaveLength(1);
     expect(route).toContain('toFrontDeskViewerScope(');
     expect(route).toContain('readFrontDeskMe(scope');
     expect(route).toContain('presenceAvailableOperations(viewer)');
