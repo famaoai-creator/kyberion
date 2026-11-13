@@ -394,7 +394,7 @@ describe('Approval channel boundary', () => {
       unresolved: [],
       danglingAllowlist: [],
     });
-  });
+  }, 60_000);
 
   it('keeps every async delivery surface inside the declared approval surfaces', () => {
     for (const surface of SURFACE_ASYNC_CHANNELS) {

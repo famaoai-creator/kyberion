@@ -219,6 +219,7 @@ describe('agent_runtime_supervisor_daemon', () => {
       fs.rmSync(rootDir, { recursive: true, force: true });
     }
     vi.clearAllMocks();
+    vi.unstubAllEnvs();
   });
 
   describe('recordInflightMetricSample (AC-10 throttle)', () => {
@@ -545,6 +546,69 @@ describe('agent_runtime_supervisor_daemon', () => {
     } else {
       expect(fs.statSync(socketPath).mode & 0o777).toBe(0o600);
     }
+  });
+
+  it('refuses to start on TCP without a configured supervisor token', async () => {
+    vi.stubEnv('KYBERION_AGENT_RUNTIME_SUPERVISOR_TOKEN', '');
+    await expect(
+      startAgentRuntimeSupervisorDaemon({
+        transport: 'tcp',
+        port: 0,
+        lockPath,
+        exitOnFatalError: false,
+        exitOnExistingHealthyDaemon: false,
+      })
+    ).rejects.toThrow(/refused to start on TCP — .* \| next: .* \| evidence: transport=tcp/u);
+    expect(fs.existsSync(lockPath)).toBe(false);
+  });
+
+  it.each(['7777', '0', ' 8080 ', '0x1f90', '1e4'])(
+    'refuses a numeric socket path %j, which Node would bind as a TCP port',
+    async (numeric) => {
+      await expect(
+        startAgentRuntimeSupervisorDaemon({
+          transport: 'unix',
+          socketPath: numeric,
+          lockPath,
+          exitOnFatalError: false,
+          exitOnExistingHealthyDaemon: false,
+        })
+      ).rejects.toThrow(/socket path reads as a number.* \| next: .* \| evidence: transport=unix/u);
+      expect(fs.existsSync(lockPath)).toBe(false);
+    }
+  );
+
+  it('serves TCP requests only with the configured supervisor token', async () => {
+    vi.stubEnv('KYBERION_AGENT_RUNTIME_SUPERVISOR_TOKEN', 'test-supervisor-token');
+    instance = await startAgentRuntimeSupervisorDaemon({
+      transport: 'tcp',
+      port: 0,
+      lockPath,
+      exitOnFatalError: false,
+      exitOnExistingHealthyDaemon: false,
+    });
+    const send = (payload: Record<string, unknown>): Promise<Record<string, unknown>> =>
+      new Promise((resolve, reject) => {
+        const socket = net.createConnection({ host: instance!.host!, port: instance!.port! });
+        let buffer = '';
+        socket.once('connect', () => socket.write(`${JSON.stringify(payload)}\n`));
+        socket.on('data', (chunk) => {
+          buffer += String(chunk);
+          const newlineIndex = buffer.indexOf('\n');
+          if (newlineIndex < 0) return;
+          resolve(JSON.parse(buffer.slice(0, newlineIndex)));
+          socket.destroy();
+        });
+        socket.once('error', reject);
+      });
+
+    await expect(send({ id: 'no-token', method: 'health' })).resolves.toMatchObject({
+      ok: false,
+      error: 'unauthorized',
+    });
+    await expect(
+      send({ id: 'with-token', method: 'health', auth_token: 'test-supervisor-token' })
+    ).resolves.toMatchObject({ ok: true });
   });
 
   it('does not replace an existing healthy daemon when a lock is ambiguous', async () => {

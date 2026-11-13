@@ -1,3 +1,8 @@
+import {
+  assertServiceCredentialAllocation,
+  type ServiceAllocationUseScope,
+} from '../governance/service-credential-allocation.js';
+import { loadServiceBindingRecord, type ServiceBindingRecord } from './service-binding-registry.js';
 import type { ServiceAuthMode, CredentialSuffixKey } from './service-endpoint-registry.js';
 export {
   getServiceEndpointRecord,
@@ -8,6 +13,7 @@ export {
 import {
   getServiceCredentialSuffixes,
   resolveServiceSecret,
+  resolveSelectedServiceSecret,
   resolveServiceSecretReferences,
 } from './service-secret-resolver.js';
 import type { SecretReference } from '../secret/secret-resolver.js';
@@ -33,7 +39,9 @@ export interface ServiceBinding {
 export function resolveServiceBinding(
   serviceId: string,
   authMode: 'none' | 'secret-guard' | 'session' = 'none',
-  credentialKeys?: readonly CredentialSuffixKey[]
+  credentialKeys?: readonly CredentialSuffixKey[],
+  selectedBinding?: ServiceBindingRecord,
+  allocationUse?: ServiceAllocationUseScope & { action: string }
 ): ServiceBinding {
   if (authMode === 'none') {
     return { serviceId, authMode };
@@ -52,8 +60,61 @@ export function resolveServiceBinding(
   // Suffixes are catalog-governed (service-endpoints.schema.json defaults applied
   // on load); no hardcoded fallback literals live here.
   const suffixes = getServiceCredentialSuffixes(serviceId);
-  const selected = (key: CredentialSuffixKey): string[] =>
-    !credentialKeys || credentialKeys.includes(key) ? suffixes[key] || [] : [];
+  const selection = selectedBinding ? structuredClone(selectedBinding) : undefined;
+  if (
+    selection &&
+    (selection.auth_mode !== 'secret-guard' ||
+      (selection.service_id || selection.service_type) !== serviceId ||
+      !selection.owner_ref ||
+      selection.secret_refs.length === 0 ||
+      credentialExecutionIdentity().tenantSlug !==
+        (selection.owner_kind === 'person' ? allocationUse?.tenant_slug : selection.tenant_slug))
+  )
+    throw new Error('[CREDENTIAL_PROVENANCE_DENIED] Selected service binding is incompatible');
+  const knownRefs = new Set(
+    Object.values(suffixes)
+      .flat()
+      .map((suffix) => resolveServiceSecretReferences(serviceId, [suffix])[0]!.env)
+  );
+  if (
+    selection &&
+    (new Set(selection.secret_refs).size !== selection.secret_refs.length ||
+      selection.secret_refs.some((ref) => !knownRefs.has(ref)))
+  ) {
+    throw new Error(
+      '[CREDENTIAL_PROVENANCE_DENIED] Selected binding has undeclared credential references'
+    );
+  }
+  const selected = (key: CredentialSuffixKey): string[] => {
+    const candidates = !credentialKeys || credentialKeys.includes(key) ? suffixes[key] || [] : [];
+    return selection
+      ? candidates.filter((suffix) =>
+          selection.secret_refs.includes(
+            resolveServiceSecretReferences(serviceId, [suffix])[0]!.env
+          )
+        )
+      : candidates;
+  };
+  const read = (key: CredentialSuffixKey): string | null => {
+    if (!selection) return resolveServiceSecret(serviceId, selected(key));
+    if (
+      JSON.stringify(loadServiceBindingRecord(selection.binding_id)) !== JSON.stringify(selection)
+    ) {
+      throw new Error('[CREDENTIAL_PROVENANCE_DENIED] Selected service binding changed');
+    }
+    const grant =
+      selection.owner_kind === 'person'
+        ? assertServiceCredentialAllocation(selection, allocationUse!, {
+            action: allocationUse!.action,
+          })
+        : undefined;
+    return resolveSelectedServiceSecret(serviceId, selected(key), {
+      bindingId: selection.binding_id,
+      ownerRef: selection.owner_ref!,
+      secretRefs: selection.secret_refs,
+      allocationGrantId: grant?.grant_id,
+    });
+  };
   const referenceOperation = 'service.binding';
   const referenceEntry = (key: string, candidates: string[]) => {
     const references = resolveServiceSecretReferences(serviceId, candidates, referenceOperation);
@@ -67,12 +128,12 @@ export function resolveServiceBinding(
     ...referenceEntry('clientSecret', selected('clientSecret')),
     ...referenceEntry('redirectUri', selected('redirectUri')),
   };
-  const accessToken = resolveServiceSecret(serviceId, selected('accessToken'));
-  const appToken = resolveServiceSecret(serviceId, selected('appToken'));
-  const refreshToken = resolveServiceSecret(serviceId, selected('refreshToken'));
-  const clientId = resolveServiceSecret(serviceId, selected('clientId'));
-  const clientSecret = resolveServiceSecret(serviceId, selected('clientSecret'));
-  const redirectUri = resolveServiceSecret(serviceId, selected('redirectUri'));
+  const accessToken = read('accessToken');
+  const appToken = read('appToken');
+  const refreshToken = read('refreshToken');
+  const clientId = read('clientId');
+  const clientSecret = read('clientSecret');
+  const redirectUri = read('redirectUri');
 
   if (!accessToken && !appToken && !refreshToken && !clientId && !clientSecret && !redirectUri) {
     throw new Error(`Access denied: no service binding secret found for "${serviceId}"`);
@@ -115,10 +176,7 @@ export function resolveServiceBinding(
       configurable: false,
       get: () => {
         assertCredentialOwner(owner);
-        return (
-          (owner.tenantSlug ? resolveServiceSecret(serviceId, selected(key)) : captured[key]) ??
-          undefined
-        );
+        return (owner.tenantSlug ? read(key) : captured[key]) ?? undefined;
       },
     });
   }

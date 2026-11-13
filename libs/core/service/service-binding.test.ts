@@ -1,6 +1,10 @@
+import * as allocations from '../governance/service-credential-allocation.js';
+import { runInExecutionScope } from '../foundation/execution-scope.js';
+import { withTaskCredentialBinding } from '../foundation/credential-binding.js';
+import * as registry from './service-binding-registry.js';
 import path from 'node:path';
 import AjvModule from 'ajv';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { pathResolver } from '../path-resolver.js';
 import { compileSchemaFromPath } from '../schema-loader.js';
 import {
@@ -192,4 +196,149 @@ describe('service-binding', () => {
       intent_aliases: expect.arrayContaining(['generate-video']),
     });
   });
+});
+
+describe('selected tenant service credentials', () => {
+  const selected: registry.ServiceBindingRecord = {
+    binding_id: 'binding-a',
+    service_id: 'slack',
+    service_type: 'chat',
+    scope: 'tenant',
+    target: 'workspace',
+    owner_kind: 'organization',
+    owner_ref: 'alpha',
+    tenant_slug: 'alpha',
+    auth_mode: 'secret-guard',
+    secret_refs: ['SLACK_BOT_TOKEN'],
+    allowed_actions: ['read'],
+    approval_policy: { read: 'allowed' },
+  };
+  const provenance = { serviceBindingId: 'binding-a', serviceId: 'slack', sourceOwnerRef: 'alpha' };
+  afterEach(() => vi.restoreAllMocks());
+  const tenant = <T>(run: () => T): T =>
+    runInExecutionScope({ tenantBound: true, tenantSlug: 'alpha' }, run);
+  it('selects declared refs only and rechecks record, source and execution on cached getters', () => {
+    const load = vi.spyOn(registry, 'loadServiceBindingRecord').mockReturnValue(selected);
+    tenant(() =>
+      withTaskCredentialBinding(
+        {
+          tenantSlug: 'alpha',
+          secrets: { SLACK_BOT_TOKEN: 'chosen', SLACK_ACCESS_TOKEN: 'not-chosen' },
+          secretProvenance: { SLACK_BOT_TOKEN: provenance },
+        },
+        () => {
+          const result = resolveServiceBinding('slack', 'secret-guard', undefined, selected);
+          expect(result.accessToken).toBe('chosen');
+          expect(result.secretReferences?.accessToken?.map((ref) => ref.env)).toEqual([
+            'SLACK_BOT_TOKEN',
+          ]);
+          load.mockReturnValue({ ...selected, target: 'changed' });
+          expect(() => result.accessToken).toThrow('Selected service binding changed');
+          load.mockReturnValue(selected);
+          runInExecutionScope({ tenantBound: true, tenantSlug: 'beta' }, () => {
+            expect(() => result.accessToken).toThrow('CREDENTIAL_OWNER_DENIED');
+          });
+        }
+      )
+    );
+  });
+  it('denies missing or another connection provenance without ambient fallback', () => {
+    vi.spyOn(registry, 'loadServiceBindingRecord').mockReturnValue(selected);
+    for (const secretProvenance of [
+      undefined,
+      { SLACK_BOT_TOKEN: { ...provenance, serviceBindingId: 'binding-b' } },
+    ]) {
+      tenant(() =>
+        withTaskCredentialBinding(
+          { tenantSlug: 'alpha', secrets: { SLACK_BOT_TOKEN: 'other' }, secretProvenance },
+          () => {
+            expect(() =>
+              resolveServiceBinding('slack', 'secret-guard', undefined, selected)
+            ).toThrow('CREDENTIAL_PROVENANCE_DENIED');
+          }
+        )
+      );
+    }
+  });
+  it('uses personal source only with a verified action allocation and matching grant provenance', () => {
+    const personal = {
+      ...selected,
+      owner_kind: 'person' as const,
+      owner_ref: 'user:alice',
+      tenant_slug: undefined,
+    };
+    vi.spyOn(registry, 'loadServiceBindingRecord').mockReturnValue(personal);
+    const check = vi
+      .spyOn(allocations, 'assertServiceCredentialAllocation')
+      .mockReturnValue({ grant_id: 'grant-1' } as ReturnType<
+        typeof allocations.assertServiceCredentialAllocation
+      >);
+    tenant(() =>
+      withTaskCredentialBinding(
+        {
+          tenantSlug: 'alpha',
+          secrets: { SLACK_BOT_TOKEN: 'allocated' },
+          secretProvenance: {
+            SLACK_BOT_TOKEN: {
+              ...provenance,
+              sourceOwnerRef: 'user:alice',
+              allocationGrantId: 'grant-1',
+            },
+          },
+        },
+        () => {
+          const result = resolveServiceBinding('slack', 'secret-guard', undefined, personal, {
+            tenant_slug: 'alpha',
+            action: 'read',
+          });
+          expect(result.accessToken).toBe('allocated');
+          expect(check).toHaveBeenCalledWith(
+            personal,
+            { tenant_slug: 'alpha', action: 'read' },
+            { action: 'read' }
+          );
+          check.mockImplementation(() => {
+            throw new Error('allocation revoked');
+          });
+          expect(() => result.accessToken).toThrow('allocation revoked');
+        }
+      )
+    );
+    check.mockReturnValue({ grant_id: 'grant-1' } as ReturnType<
+      typeof allocations.assertServiceCredentialAllocation
+    >);
+    tenant(() =>
+      withTaskCredentialBinding(
+        {
+          tenantSlug: 'alpha',
+          secrets: { SLACK_BOT_TOKEN: 'allocated' },
+          secretProvenance: { SLACK_BOT_TOKEN: { ...provenance, sourceOwnerRef: 'user:alice' } },
+        },
+        () => {
+          expect(() =>
+            resolveServiceBinding('slack', 'secret-guard', undefined, personal, {
+              tenant_slug: 'alpha',
+              action: 'read',
+            })
+          ).toThrow('CREDENTIAL_PROVENANCE_DENIED');
+        }
+      )
+    );
+  });
+
+  it('denies undeclared refs and a binding for a different service before secret resolution', () =>
+    tenant(() => {
+      expect(() =>
+        resolveServiceBinding('slack', 'secret-guard', undefined, {
+          ...selected,
+          secret_refs: ['GITHUB_TOKEN'],
+        })
+      ).toThrow('undeclared credential references');
+      expect(() =>
+        resolveServiceBinding('slack', 'secret-guard', undefined, {
+          ...selected,
+          service_id: 'github',
+        })
+      ).toThrow('incompatible');
+    }));
 });

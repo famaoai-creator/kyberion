@@ -1,4 +1,16 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+
+const registry = vi.hoisted(() => ({
+  slugs: ['tenant-other'] as string[],
+  unreadable: false,
+}));
+vi.mock('@agent/core/organization/tenant-registry', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/organization/tenant-registry')>()),
+  listTenantProfileSlugs: () => {
+    if (registry.unreadable) throw new Error('registry unreadable');
+    return registry.slugs;
+  },
+}));
 import {
   PresenceStudioViewerError,
   parsePresenceStudioAgentIdentity,
@@ -55,6 +67,8 @@ describe('Presence Studio OS viewer scope', () => {
     ).toBe(false);
   });
   afterEach(() => {
+    registry.slugs = ['tenant-other'];
+    registry.unreadable = false;
     vi.unstubAllEnvs();
   });
 
@@ -81,6 +95,67 @@ describe('Presence Studio OS viewer scope', () => {
     });
     req.query = { tenant: '../escape' };
     expect(resolvePresenceStudioViewerContext(req as never).tenantSlugs).toEqual(['tenant-local']);
+  });
+
+  it('refuses a loopback tenant hint that names no registered tenant', () => {
+    const req = request('127.0.0.1') as unknown as {
+      query?: Record<string, string>;
+      headers: Record<string, string>;
+    };
+    const refusal = (): PresenceStudioViewerError => {
+      try {
+        resolvePresenceStudioViewerContext(req as never);
+      } catch (error) {
+        return error as PresenceStudioViewerError;
+      }
+      throw new Error('expected the viewer to be refused');
+    };
+
+    // No server tenant: an unregistered slug would otherwise become the scope.
+    req.query = { tenant: 'tenant-ghost' };
+    expect(refusal()).toBeInstanceOf(PresenceStudioViewerError);
+    expect(refusal()).toMatchObject({
+      status: 403,
+      message: "Tenant 'tenant-ghost' is not a registered tenant.",
+    });
+    req.query = {};
+    req.headers = { 'x-kyberion-tenant': 'tenant-ghost' };
+    expect(refusal().status).toBe(403);
+
+    // An unreadable registry confirms nothing.
+    req.headers = {};
+    req.query = { tenant: 'tenant-other' };
+    registry.unreadable = true;
+    expect(refusal().status).toBe(403);
+  });
+
+  it('keeps registered hints, the server default tenant and the no-hint view working', () => {
+    const req = request('127.0.0.1') as unknown as { query?: Record<string, string> };
+
+    // No hint, no server tenant: the all-tenant owner, without a registry read.
+    registry.unreadable = true;
+    expect(resolvePresenceStudioViewerContext(req as never).tenantSlugs).toBe('all');
+    registry.unreadable = false;
+
+    req.query = { tenant: 'tenant-other' };
+    expect(resolvePresenceStudioViewerContext(req as never).tenantSlugs).toEqual(['tenant-other']);
+
+    // The server's default tenant is the no-hint view even when unregistered.
+    vi.stubEnv('KYBERION_TENANT', 'tenant-local');
+    req.query = { tenant: 'tenant-local' };
+    expect(resolvePresenceStudioViewerContext(req as never).tenantSlugs).toEqual(['tenant-local']);
+  });
+
+  it('lets /api/me drop an unregistered hint instead of refusing, never adopting it', () => {
+    const req = request('127.0.0.1') as unknown as { query?: Record<string, string> };
+    req.query = { tenant: 'tenant-ghost' };
+    const ignore = { unregisteredTenantHint: 'ignore' } as const;
+
+    expect(resolvePresenceStudioViewerContext(req as never, ignore).tenantSlugs).toBe('all');
+    vi.stubEnv('KYBERION_TENANT', 'tenant-local');
+    expect(resolvePresenceStudioViewerContext(req as never, ignore).tenantSlugs).toEqual([
+      'tenant-local',
+    ]);
   });
 
   it('requires a bearer token and server tenant scope for remote access', () => {
