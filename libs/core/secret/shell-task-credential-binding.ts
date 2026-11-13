@@ -7,7 +7,10 @@ import { getWorkItem, listActiveWorkLeases } from '../workforce/work-coordinatio
 import { assertIsolatedProviderHome } from '../provider/provider-auth-home.js';
 import { loadServiceBindingRecord } from '../service/service-binding-reader.js';
 import { validateBindingOwner } from '../service/service-binding-owner.js';
-import type { TaskCredentialProvenance } from '../foundation/credential-binding.js';
+import type {
+  TaskCredentialProvenance,
+  TaskProviderProvenance,
+} from '../foundation/credential-binding.js';
 import { assertServiceCredentialAllocation } from '../governance/service-credential-allocation.js';
 
 export const TASK_BINDING_SECRET_KEY = '__KYBERION_TASK_BINDING__';
@@ -113,15 +116,16 @@ export async function bindShellTaskCredentials(
   }
   if (
     !record(value) ||
-    ![1, 2].includes(Number(value.version)) ||
-    (value.version !== 1 && value.version !== 2) ||
+    ![1, 2, 3].includes(Number(value.version)) ||
+    (value.version !== 1 && value.version !== 2 && value.version !== 3) ||
     Object.keys(value).some(
       (key) =>
         ![
           'version',
           'secrets',
           'providerEnvironments',
-          ...(value.version === 2 ? ['secretProvenance'] : []),
+          ...(value.version !== 1 ? ['secretProvenance'] : []),
+          ...(value.version === 3 ? ['providerProvenance'] : []),
         ].includes(key)
     )
   )
@@ -130,7 +134,7 @@ export async function bindShellTaskCredentials(
   let secretProvenance: Record<string, TaskCredentialProvenance> | undefined;
   const selectedSnapshots = new Map<string, string>();
   const allocationChecks: Array<() => void> = [];
-  if (value.version === 2) {
+  if (value.version === 2 || (value.version === 3 && value.secretProvenance !== undefined)) {
     if (!record(value.secretProvenance) || !Object.keys(value.secretProvenance).length)
       throw denied();
     secretProvenance = {};
@@ -214,6 +218,41 @@ export async function bindShellTaskCredentials(
       providerEnvironments[provider] = configured;
     }
   }
+  let providerProvenance: Record<string, TaskProviderProvenance> | undefined;
+  if (value.version === 3) {
+    if (!record(value.providerProvenance) || !Object.keys(value.providerProvenance).length)
+      throw denied();
+    providerProvenance = {};
+    for (const [provider, source] of Object.entries(value.providerProvenance)) {
+      if (
+        provider !== 'gws' ||
+        !providerEnvironments?.[provider] ||
+        !record(source) ||
+        Object.keys(source).sort().join(',') !==
+          'actorId,generation,serviceBindingId,serviceId,sourceOwnerRef' ||
+        !Object.values(source).every(
+          (entry) => typeof entry === 'string' && entry.trim().length > 0 && entry.length <= 512
+        ) ||
+        source.actorId !== currentActor()?.actor.id ||
+        source.serviceId !== 'google-workspace'
+      )
+        throw denied();
+      const selected = loadServiceBindingRecord(String(source.serviceBindingId));
+      if (
+        !selected ||
+        validateBindingOwner(selected).length ||
+        selected.owner_kind !== 'organization' ||
+        selected.tenant_slug !== input.scope.tenant_slug ||
+        selected.owner_ref !== source.sourceOwnerRef ||
+        (selected.service_id || selected.service_type) !== source.serviceId ||
+        selected.auth_mode !== 'session' ||
+        (selected.project_id && selected.project_id !== input.scope.project_id)
+      )
+        throw denied();
+      providerProvenance[provider] = { ...source } as unknown as TaskProviderProvenance;
+      selectedSnapshots.set(selected.binding_id, JSON.stringify(selected));
+    }
+  }
   return {
     tenantSlug: input.scope.tenant_slug!,
     missionId: input.scope.mission_id,
@@ -229,7 +268,7 @@ export async function bindShellTaskCredentials(
       // v2 issuers must re-attest the same credential source and value at use time.
       // A miss or rotation invalidates this task; never fall back to operator material.
       if (
-        secretProvenance &&
+        (secretProvenance || providerProvenance) &&
         resolve(Object.freeze({ version: 1, scope: input.scope, workItemId: input.workItemId })) !==
           raw
       )
@@ -237,5 +276,6 @@ export async function bindShellTaskCredentials(
       if (claim !== assertTaskCredentialClaim(input)) throw denied();
     },
     ...(providerEnvironments ? { providerEnvironments } : {}),
+    ...(providerProvenance ? { providerProvenance } : {}),
   };
 }

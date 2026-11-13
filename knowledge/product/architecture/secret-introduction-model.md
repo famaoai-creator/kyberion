@@ -4,7 +4,7 @@ category: Architecture
 tags: [architecture, secrets, approvals, surfaces, governance]
 importance: 8
 author: Ecosystem Architect
-last_updated: 2026-11-02
+last_updated: 2026-11-12
 ---
 
 # Secret Introduction Model
@@ -68,6 +68,35 @@ Concierge / CLI collect value  →  dual-write  →  status=applied
 ```
 
 Low-risk local sessions (`risk=low`, terminal/concierge surface) may auto-approve the request while still emitting an audit record, then proceed immediately to collect.
+
+## Internal multi-account material storage
+
+`secret-guard.ts` provides internal `storeLocalAccountMaterial` and
+`loadLocalAccountMaterial` primitives. The address contains service, binding,
+explicit person/tenant owner, and an immutable random generation. Bytes live
+under `knowledge/personal/connections/accounts/<identity-hash>/<generation>.json`;
+the reserved directory is excluded from ambient service-secret discovery.
+Each write is AES-256-GCM encrypted with the **existing** connection-encryption
+key, even when legacy connection encryption is disabled. A missing, refused,
+or unsupported key fails before writing; this path never creates a key. Reads
+require the exact address and verify its encrypted identity and generation;
+there is no default account, latest-generation pointer, or plaintext fallback.
+The existing production encryption-key backend is macOS Keychain only. Linux
+and Windows account-material writes fail closed; tests inject a synthetic key.
+This change does not add another key backend or provision cross-platform keys.
+
+This is material storage, not an authority store. Tenant execution and plugin
+callers cannot invoke it; the local caller still needs existing secure-io file
+permissions. Declaring an owner in a material address proves no ownership and
+grants no credential use. Writing a new generation does not revoke old ones;
+a future admitted broker must pin and revalidate the selected current generation,
+binding, owner, task identity, allocation and approval before every use.
+
+**Not connected yet:** the CLI/UI introduction workflow and the credential broker
+do not call these primitives. The existing service-wide introduction flow above
+is unchanged. Exposing account introduction requires an approval-bound collector;
+exposing broker reads requires a reviewed exact-material capability. No real keys,
+secrets, grants, ownership records or migrations are changed by installing this code.
 
 ## Prohibitions
 

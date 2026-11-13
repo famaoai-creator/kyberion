@@ -1,3 +1,5 @@
+import { credentialExecutionIdentity } from '../foundation/credential-binding.js';
+import type { ServiceBindingRecord } from './service-binding-registry.js';
 import { createLogger } from '../logger.js';
 import {
   connectGovernedMcpServer,
@@ -25,7 +27,7 @@ import {
   isCliAllowedForOperation,
   stripUnresolvedTemplateValues,
 } from './service-engine-helpers.js';
-import { resolveServiceBinding } from './service-binding.js';
+import { resolveServiceBinding, resolveSelectedGwsSessionEnvironment } from './service-binding.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import { stripAuthorityEnvOverrides } from '../authority.js';
 import {
@@ -189,6 +191,8 @@ export interface ServicePresetAlternativeExecutionContext {
   binding: ReturnType<typeof resolveServiceBinding>;
   /** Set only by the admitted, fixed authentication probe. */
   operatorProbe?: boolean;
+  /** Snapshot of the connection admitted by service-engine, never request data. */
+  selectedBinding?: ServiceBindingRecord;
   /** Broker-issued isolated environment for a scoped session capture. */
   captureProviderEnvironment?: Record<string, string>;
   captureAuthority?: () => void;
@@ -234,6 +238,21 @@ function assertTransportAuthority(input: ServicePresetAlternativeExecutionContex
     );
 }
 
+/** No ambient CLI login, template env, or another connection may serve tenant GWS work. */
+function selectedGwsEnvironment(
+  input: ServicePresetAlternativeExecutionContext,
+  bin: string
+): Record<string, string> | undefined {
+  const tenant = credentialExecutionIdentity().tenantSlug;
+  if (!tenant || input.serviceId !== 'google-workspace') return undefined;
+  // The separate, exact-read capture admission already checks its isolated transport.
+  if (input.captureProviderEnvironment && input.captureAuthority)
+    return input.captureProviderEnvironment;
+  if (bin !== 'gws' || input.binding.authMode !== 'session')
+    throw new Error('[CREDENTIAL_PROVENANCE_DENIED] Tenant GWS requires a session transport');
+  return resolveSelectedGwsSessionEnvironment(input.selectedBinding);
+}
+
 /** Only reviewed read operations with exclusively read-only HTTP routes may replay. */
 export function isReplaySafeServiceOperation(operation: Record<string, unknown>): boolean {
   if (operation.risk !== undefined && operation.risk !== 'read') return false;
@@ -256,10 +275,10 @@ function alternativeRetryOptions(input: ServicePresetAlternativeExecutionContext
   const options = buildRetryOptions(input.serviceConfig, input.preset, input.alt, {
     // Authenticated provider failures may echo credentials. Classify for retry
     // in memory only; never feed raw text to the unclassified-error registry.
-    recordUnclassifiedErrors: input.binding.authMode !== 'secret-guard',
+    recordUnclassifiedErrors: input.binding.authMode === 'none',
     retrySafe: isRetrySafeServiceOperation(input.preset, input.action, input.alt),
   });
-  return input.binding.authMode === 'secret-guard'
+  return input.binding.authMode !== 'none'
     ? {
         ...options,
         onRetry: (_error: Error, attempt: number) => {
@@ -313,6 +332,7 @@ async function executeServicePresetAlternativeOnce(
         return typeof resolved === 'string' ? resolved : JSON.stringify(resolved);
       });
       const execEnv =
+        selectedGwsEnvironment(input, bin) ??
         input.captureProviderEnvironment ??
         buildPresetProcessEnv(
           stripUnresolvedTemplateValues(

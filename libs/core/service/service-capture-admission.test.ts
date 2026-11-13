@@ -1,3 +1,5 @@
+import { withActorContext } from '../authn/actor-context.js';
+import { pathResolver } from '../path-resolver.js';
 import {
   setAuthorizationOverlayProvider,
   type AuthorizationOverlay,
@@ -6,7 +8,7 @@ import {
   buildReviewThreadsCaptureParams,
   assertReadOnlyServiceCapture,
 } from './service-capture-admission.js';
-import { safeRmSync } from '../secure-io.js';
+import { safeMkdir, safeRmSync } from '../secure-io.js';
 import { registerSecretResolver, resetSecretResolver } from '../secret/secret-resolver.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { withExecutionContextAsync } from '../authority.js';
@@ -100,7 +102,10 @@ vi.mock('./service-endpoint-registry.js', () => ({
   }),
 }));
 vi.mock('./service-preset-registry.js', () => ({ getServicePresetRecord: () => fixture.preset }));
-vi.mock('./service-binding.js', () => ({ resolveServiceBinding: fixture.ambientBinding }));
+vi.mock('./service-binding.js', async (original) => ({
+  ...(await original<typeof import('./service-binding.js')>()),
+  resolveServiceBinding: fixture.ambientBinding,
+}));
 vi.mock('./service-binding-registry.js', () => ({
   authorizeTenantServiceAction: fixture.missionGuard,
   listServiceBindingRecords: () => [],
@@ -239,6 +244,98 @@ describe('exact-request catalog capture admission at the real service engine bou
     expect(fixture.ambientConnection).not.toHaveBeenCalled();
     expect(fixture.ambientBinding).not.toHaveBeenCalled();
   });
+  it('requires selected session provenance for capture and rechecks it before transport', async () => {
+    const mailLocation = {
+      ...location,
+      service_id: 'google-workspace',
+      collector_id: 'gmail.history',
+      selectors: {},
+      asset_type: 'customer.request',
+    };
+    fixture.location = structuredClone(mailLocation);
+    Object.assign(fixture.selected, {
+      service_id: 'google-workspace',
+      auth_mode: 'session',
+      target: 'me',
+      allowed_actions: ['gmail_profile_get'],
+      secret_refs: [],
+      approval_policy: { gmail_profile_get: 'allowed' },
+    });
+    fixture.preset.operations.gmail_profile_get = {
+      type: 'cli',
+      command: 'gws',
+      args: ['gmail', 'users', 'getProfile', '--params', '{{params}}'],
+      kind: 'capture',
+      risk: 'read',
+      approval_required: false,
+    };
+    const sessionRequest = {
+      service_id: 'google-workspace',
+      action: 'gmail_profile_get',
+      params: { params: { userId: 'me' } },
+    };
+    const home = pathResolver.rootResolve(
+      'active/shared/tmp/confidential/acme/capture-session-test'
+    );
+    const actorId = 'kyberion://agent/acme/worker';
+    await scoped(async () => {
+      safeMkdir(home, { recursive: true });
+      try {
+        await withActorContext(
+          {
+            actor: { kind: 'agent', id: actorId },
+            scope: { ...mailLocation.scope, tier: 'confidential' },
+            provenance: 'claim',
+          },
+          async () => {
+            const base = {
+              tenantSlug: 'acme',
+              secrets: {},
+              providerEnvironments: { gws: { HOME: home, GOOGLE_WORKSPACE_CLI_CONFIG_DIR: home } },
+            };
+            await expect(
+              withTaskCredentialBinding(base, () =>
+                executeInformationAssetCapture(mailLocation, sessionRequest)
+              )
+            ).rejects.toThrow('CREDENTIAL_PROVENANCE_DENIED');
+            let fresh = true;
+            await withTaskCredentialBinding(
+              {
+                ...base,
+                providerProvenance: {
+                  gws: {
+                    serviceBindingId: fixture.selected.binding_id,
+                    serviceId: 'google-workspace',
+                    sourceOwnerRef: 'acme',
+                    actorId,
+                    generation: 'one',
+                  },
+                },
+                validate: () => {
+                  if (!fresh) throw new Error('CREDENTIAL_BINDING_UNAVAILABLE');
+                },
+              },
+              async () => {
+                fixture.execute.mockImplementationOnce(async (context) => {
+                  const transport = context as { captureAuthority: () => void };
+                  transport.captureAuthority();
+                  fresh = false;
+                  expect(() => transport.captureAuthority()).toThrow(
+                    'CREDENTIAL_BINDING_UNAVAILABLE'
+                  );
+                  return { result: [{ number: 1 }] };
+                });
+                await executeInformationAssetCapture(mailLocation, sessionRequest);
+              }
+            );
+          }
+        );
+      } finally {
+        safeRmSync(home, { recursive: true, force: true });
+      }
+    });
+  });
+
   it('uses a scoped GWS broker token in an isolated disposable HOME without operator credentials', async () => {
     const mailLocation = {
       ...location,
