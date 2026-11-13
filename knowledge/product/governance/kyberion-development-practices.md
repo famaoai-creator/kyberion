@@ -167,6 +167,16 @@ dist/scripts/check_golden_output.js --rebaseline`); `vital-check` is
   breaks Linux.
 - **Heavy suites need explicit timeouts.** Shared runners are ~3-8× slower
   than a dev Mac; anything over ~3s locally gets `{ timeout: 60_000 }`.
+  Separate large ledger discovery/retention coverage from per-event durable
+  effects: exercise the full horizon through existing dependency ports with
+  explicitly labelled terminal-receipt fixtures, and keep a real cross-process
+  claim/effect/receipt test large enough to cross the pending-window boundary.
+  Assert exact discovered/effect keys, bounded pending state and EOF in both;
+  synthetic receipts do not prove real dispatch or effect persistence.
+  Give each case a fresh resource path when lock identity includes that path:
+  deleting the data directory alone does not isolate locks stored elsewhere.
+  Do not weaken production lock recovery or simply raise deadlines to hide a
+  timeout cascade. Compare the same baseline shard before calling it pre-existing.
 - **Platform-specific behavior is declared, not discovered**:
   `it.skipIf(process.platform !== 'darwin')` for say/mlx/BlackHole-class
   tests, with a comment saying why.
