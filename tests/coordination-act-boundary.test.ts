@@ -8,7 +8,7 @@ import {
   type CoordinationActMapping,
 } from '@agent/core/foundation/coordination-act';
 import * as actMap from '@agent/core/mesh/coordination-act-map';
-import { A2A_PERFORMATIVES } from '@agent/core/mesh/a2a-bridge';
+import { A2A_PERFORMATIVES, A2A_ROUTABLE_PERFORMATIVES } from '@agent/core/mesh/a2a-bridge';
 import { PEER_MESSAGE_TYPES } from '@agent/core/mesh/peer-messaging';
 import { PEER_CONVERSATION_MESSAGE_KINDS } from '@agent/core/mesh/peer-conversation';
 import { MESH_DELIVERY_STATUSES, MESH_REQUEST_KINDS } from '@agent/core/mesh/mesh-hub-contract';
@@ -256,6 +256,18 @@ describe('coordination-act gate', () => {
     }
   });
 
+  it('keeps the A2A table in step with what the bridge routes', () => {
+    expect(Object.isFrozen(A2A_ROUTABLE_PERFORMATIVES)).toBe(true);
+    // What the bridge delivers is an act; `result` is the act of its reply and
+    // is refused inbound; every other performative is refused and not an act.
+    const mappedToAnAct = A2A_PERFORMATIVES.filter((performative) =>
+      isCoordinationAct(actMap.A2A_PERFORMATIVE_ACTS[performative])
+    );
+    expect(sorted(mappedToAnAct)).toEqual(sorted([...A2A_ROUTABLE_PERFORMATIVES, 'result']));
+    for (const performative of A2A_ROUTABLE_PERFORMATIVES)
+      expect(A2A_PERFORMATIVES as readonly string[], performative).toContain(performative);
+  });
+
   it('maps every kind to a canonical act or to a non-act with a reason', () => {
     expect(ALL_TABLES.length).toBeGreaterThanOrEqual(ARRAY_LAYERS.length);
     for (const [name, table] of ALL_TABLES) {
@@ -273,9 +285,10 @@ describe('coordination-act gate', () => {
   it('follows rule A: only layers that record a separate recipient decision propose', () => {
     expect(actMap.MESH_RECIPIENT_RECORD_ACTS['mesh-hub-recipient-proposal']).toBe('propose');
     expect(actMap.PEER_TASK_MESSAGE_KIND_ACTS['peer-task-request']).toBe('propose');
-    // The A2A bridge runs every verified envelope; it records no recipient decision.
+    // The A2A bridge records no recipient decision, so it refuses these three.
     for (const label of ['propose', 'accept', 'reject'] as const) {
       expect(isCoordinationAct(actMap.A2A_PERFORMATIVE_ACTS[label]), label).toBe(false);
+      expect(A2A_ROUTABLE_PERFORMATIVES as readonly string[], label).not.toContain(label);
     }
     const proposing = ALL_TABLES.flatMap(([name, table]) =>
       Object.entries(table)

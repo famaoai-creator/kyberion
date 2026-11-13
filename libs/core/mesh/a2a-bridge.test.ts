@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { A2AMessage } from './a2a-bridge.js';
 import AjvModule from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
 import { compileSchemaFromPath } from '../schema-loader.js';
@@ -1026,6 +1027,186 @@ describe('a2a-bridge', () => {
     ).resolves.toMatchObject({
       payload: { text: 'ok' },
     });
+  });
+
+  describe('performative handling', () => {
+    function armRoutableAgent() {
+      mocks.getAgentManifest.mockReturnValue({
+        provider: 'gemini',
+        modelId: 'gemini-1.5-pro',
+        systemPrompt: 'agent',
+        capabilities: [],
+      });
+      const handle = { ask: vi.fn(async () => 'ok') };
+      mocks.ensureAgentRuntime.mockResolvedValue(handle);
+      mocks.ensureAgentRuntimeViaDaemon.mockRejectedValue(new Error('offline'));
+      mocks.getAgentRuntimeHandle.mockImplementation((agentId: string) =>
+        agentId === 'agent-y' ? handle : null
+      );
+      mocks.askAgentRuntime.mockResolvedValue('ok');
+      mocks.askAgentRuntimeViaDaemon.mockRejectedValue(
+        new Error('[SUPERVISOR_PREASK_FAILED] method=health ECONNREFUSED')
+      );
+    }
+    function envelopeWith(performative: string) {
+      const envelope = {
+        a2a_version: '1.0',
+        header: {
+          msg_id: 'MSG-PERF',
+          sender: 'kyberion:gateway',
+          receiver: 'agent-y',
+          conversation_id: 'CONV-PERF',
+          correlation_id: 'CORR-PERF',
+          performative,
+        },
+        payload: { text: 'do the thing' },
+      } as unknown as A2AMessage;
+      return envelope;
+    }
+    function expectNothingRan() {
+      expect(mocks.ensureAgentRuntime).not.toHaveBeenCalled();
+      expect(mocks.ensureAgentRuntimeViaDaemon).not.toHaveBeenCalled();
+      expect(mocks.askAgentRuntime).not.toHaveBeenCalled();
+      expect(mocks.askAgentRuntimeViaDaemon).not.toHaveBeenCalled();
+      expect(mocks.appendConversationTurn).not.toHaveBeenCalled();
+      expect(mocks.record).not.toHaveBeenCalledWith(
+        expect.objectContaining({ action: 'a2a_route' })
+      );
+    }
+
+    it('declares the routable set as a subset of A2A_PERFORMATIVES', async () => {
+      const { A2A_PERFORMATIVES, A2A_ROUTABLE_PERFORMATIVES } = await import('./a2a-bridge.js');
+      expect([...A2A_ROUTABLE_PERFORMATIVES]).toEqual(['request', 'query', 'inform']);
+      expect(Object.isFrozen(A2A_ROUTABLE_PERFORMATIVES)).toBe(true);
+      for (const performative of A2A_ROUTABLE_PERFORMATIVES)
+        expect(A2A_PERFORMATIVES).toContain(performative);
+    });
+
+    it.each([
+      ['propose', 'propose'],
+      ['accept', 'accept'],
+      ['reject', 'reject'],
+      ['result', 'result'],
+      ['handoff', 'unknown'],
+      ['REQUEST', 'unknown'],
+      ['', 'unknown'],
+      ['ECONNRESET', 'unknown'],
+      ['socket hang up', 'unknown'],
+    ])(
+      'refuses performative %j before any spawn, turn or ask and audits it as %j',
+      async (performative, recorded) => {
+        const { a2aBridge, A2APerformativeNotRoutableError } = await import('./a2a-bridge.js');
+        armRoutableAgent();
+
+        const refusal = await a2aBridge.route(envelopeWith(performative)).then(
+          () => undefined,
+          (error: unknown) => error
+        );
+
+        expect(refusal).toBeInstanceOf(A2APerformativeNotRoutableError);
+        expect((refusal as Error).message).toContain('[A2A_PERFORMATIVE_NOT_ROUTABLE]');
+        expect((refusal as { code: string }).code).toBe('A2A_PERFORMATIVE_NOT_ROUTABLE');
+        expect((refusal as { performative: string }).performative).toBe(recorded);
+        expectNothingRan();
+        expect(mocks.record).toHaveBeenCalledWith(
+          expect.objectContaining({
+            agentId: 'kyberion:gateway',
+            action: 'a2a_performative_not_routable',
+            operation: 'route',
+            result: 'denied',
+            correlationId: 'CORR-PERF',
+            metadata: { receiver: 'agent-y', performative: recorded, signed: false },
+          })
+        );
+        if (recorded === 'unknown') {
+          // The caller's raw value reaches neither the error nor the audit record.
+          const written = JSON.stringify([(refusal as Error).message, mocks.record.mock.calls]);
+          if (performative) expect(written).not.toContain(performative);
+        }
+      }
+    );
+
+    it('does not count an unsigned refusal as a governance violation', async () => {
+      const { a2aBridge } = await import('./a2a-bridge.js');
+      armRoutableAgent();
+
+      await expect(a2aBridge.route(envelopeWith('propose'))).rejects.toThrow(
+        '[A2A_PERFORMATIVE_NOT_ROUTABLE]'
+      );
+
+      expect(mocks.record).toHaveBeenCalledWith(
+        expect.objectContaining({ action: 'a2a_performative_not_routable', result: 'denied' })
+      );
+      expect(mocks.logAction).not.toHaveBeenCalled();
+    });
+
+    it('counts a signed refusal as a governance violation of its sender', async () => {
+      const { a2aBridge, signA2AMessage } = await import('./a2a-bridge.js');
+      armRoutableAgent();
+      const envelope = envelopeWith('propose');
+      envelope.header.signature = signA2AMessage(envelope);
+
+      await expect(a2aBridge.route(envelope)).rejects.toThrow('[A2A_PERFORMATIVE_NOT_ROUTABLE]');
+
+      expectNothingRan();
+      expect(mocks.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'a2a_performative_not_routable',
+          result: 'denied',
+          metadata: { receiver: 'agent-y', performative: 'propose', signed: true },
+        })
+      );
+      expect(mocks.logAction).toHaveBeenCalledWith(
+        'kyberion:gateway',
+        'a2a_performative_not_routable:system',
+        true
+      );
+    });
+
+    it('refuses a missing or non-string performative', async () => {
+      const { a2aBridge } = await import('./a2a-bridge.js');
+      armRoutableAgent();
+      for (const value of [undefined, 7]) {
+        const envelope = envelopeWith('request');
+        (envelope.header as { performative: unknown }).performative = value;
+        await expect(a2aBridge.route(envelope)).rejects.toThrow('[A2A_PERFORMATIVE_NOT_ROUTABLE]');
+      }
+      expectNothingRan();
+    });
+
+    it('checks the signature before the performative, so a refusal is attributable', async () => {
+      const { a2aBridge } = await import('./a2a-bridge.js');
+      armRoutableAgent();
+      const envelope = envelopeWith('propose');
+      envelope.header.signature = 'deadbeef';
+      await expect(a2aBridge.route(envelope)).rejects.toThrow(/signature/);
+      expect(mocks.record).not.toHaveBeenCalledWith(
+        expect.objectContaining({ action: 'a2a_performative_not_routable' })
+      );
+    });
+
+    it.each(['request', 'query', 'inform'])(
+      'still routes performative %j',
+      async (performative) => {
+        const { a2aBridge } = await import('./a2a-bridge.js');
+        armRoutableAgent();
+
+        const result = await a2aBridge.route(envelopeWith(performative));
+
+        expect(result.header.performative).toBe('result');
+        expect(result.payload).toEqual({ text: 'ok' });
+        expect(mocks.askAgentRuntime).toHaveBeenCalledTimes(1);
+        expect(mocks.record).toHaveBeenCalledWith(
+          expect.objectContaining({
+            action: 'a2a_route',
+            metadata: expect.objectContaining({ performative }),
+          })
+        );
+        expect(mocks.record).not.toHaveBeenCalledWith(
+          expect.objectContaining({ action: 'a2a_performative_not_routable' })
+        );
+      }
+    );
   });
 
   it('prefers supervisor daemon for ensure and ask when available', async () => {

@@ -26,7 +26,11 @@ vi.mock('../../../../lib/ops/ops-viewer', () => ({
   ),
 }));
 
-vi.mock('@agent/core/mesh/a2a-bridge', () => ({ a2aBridge: { route: f.route } }));
+// Keep the real routable-performative predicate; only the bridge itself is doubled.
+vi.mock('@agent/core/mesh/a2a-bridge', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/mesh/a2a-bridge')>()),
+  a2aBridge: { route: f.route },
+}));
 
 import { POST } from './route';
 
