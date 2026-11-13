@@ -8,8 +8,12 @@
 
 import type { ResolvedPrincipal } from '../authn/authn-principal-resolver.js';
 import { isValidTenantSlug } from '../foundation/scope.js';
+import type { SurfaceViewerRole } from '../foundation/surface-viewer-role.js';
 
-export type SurfaceAuthorizationRole = 'readonly' | 'localadmin';
+/** The canonical viewer role union (declared once in the foundation leaf). */
+export { SURFACE_VIEWER_ROLES, type SurfaceViewerRole } from '../foundation/surface-viewer-role.js';
+/** @deprecated Use `SurfaceViewerRole`. */
+export type SurfaceAuthorizationRole = SurfaceViewerRole;
 export type SurfaceAuthorizationEffect = 'read' | 'write';
 export type SurfacePermission =
   | 'surface.headless.read'

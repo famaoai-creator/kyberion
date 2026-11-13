@@ -382,13 +382,9 @@ export async function executeCompanySetup(
             probePassed: result.passed,
             probeCheckedAt: new Date().toISOString(),
             probeSummary: Object.entries(result.results).map(
-              ([key, value]) =>
-                key +
-                ': ' +
-                (value.passed ? 'passed' : 'needs attention') +
-                (key === 'viewer_scope' && value.detail.includes('=warn')
-                  ? ' (audit-only; access denial is not enforced)'
-                  : '')
+              // No per-mode note on viewer_scope: every KYBERION_VIEWER_SCOPE mode
+              // denies out-of-scope tenant reads (warn also audits them).
+              ([key, value]) => key + ': ' + (value.passed ? 'passed' : 'needs attention')
             ),
           };
           const priorApproval = approvalSummary(receipt, auth);

@@ -34,8 +34,9 @@ function loadRoles(): SurfaceRole[] {
 const IDENTITY_SOURCES: Record<string, string> = {
   concierge: 'presence/displays/concierge/src/app/layout.tsx',
   'presence-studio': 'presence/displays/presence-studio/static/index.html',
-  // chronos declares its identity in the page-config module page.tsx imports
-  // from (SURFACE_TAGLINE_KEY), not inline in the page component.
+  // chronos-mirror-v2 is a redirect app: its tagline key is rendered by the
+  // operations console it redirects to (Concierge /ops), which declares it in
+  // the page-config module page.tsx imports from (SURFACE_TAGLINE_KEY).
   'chronos-mirror-v2': 'presence/displays/concierge/src/app/ops/chronos-page-config.ts',
   'operator-surface': 'presence/displays/operator-surface/src/app/layout.tsx',
   'computer-surface': 'presence/displays/computer-surface/static/index.html',
@@ -44,11 +45,12 @@ const IDENTITY_SOURCES: Record<string, string> = {
 describe('surface roles contract', () => {
   const roles = loadRoles();
 
-  it('defines exactly the five UI surfaces with unique ports', () => {
+  it('defines exactly the registered UI surfaces with unique ports', () => {
     expect(roles.map((role) => role.id).sort()).toEqual([
       'chronos-mirror-v2',
       'computer-surface',
       'concierge',
+      'customer-room',
       'operator-surface',
       'presence-studio',
     ]);

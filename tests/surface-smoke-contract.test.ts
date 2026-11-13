@@ -16,10 +16,10 @@ describe('surface smoke contract', () => {
     // module; each label/route is asserted against the file that owns it.
     const shell = read('presence/displays/concierge/src/app/ops/ChronosMirrorShell.tsx');
     const pageConfig = read('presence/displays/concierge/src/app/ops/chronos-page-config.ts');
-    const banner = read('presence/displays/concierge/src/components/ops/FirstRunBanner.tsx');
 
     // MSN-SHELL-IA: first-run guidance moved from /ops to the home setup
     // checklist (one place per concern); /ops keeps the identity badge via its shell.
+    // The unused FirstRunBanner component was removed with that move.
     const home = read('presence/displays/concierge/src/app/page.tsx');
     expect(page).not.toContain('FirstRunBanner');
     expect(home).toMatch(/SetupChecklist|setup-checklist/);
@@ -37,16 +37,8 @@ describe('surface smoke contract', () => {
     expect(pageConfig).toContain('chronos://quick-action/schedule-tick');
     expect(pageConfig).toContain('chronos://quick-action/schedule-list');
     expect(pageConfig).toContain('chronos://quick-action/vital-check');
-    expect(banner).toContain('chronos_first_run_eyebrow');
-    expect(banner).toContain('chronos_first_run_welcome');
-    expect(banner).toContain('chronos_first_run_step_prereq');
-    expect(banner).toContain('chronos_first_run_step_agent');
-    expect(banner).toContain('chronos_first_run_step_diagnostics');
-    expect(banner).toContain('chronos_first_run_step_tutorial');
-    // UI-07 wave 3b: the steps render from the vocabulary in every locale
-    // (the English JSX branch is gone); the quick-action names live there.
+    // UI-07 wave 3b: the quick-action names live in the vocabulary catalog.
     const vocabulary = read('knowledge/product/orchestration/user-facing-vocabulary.json');
-    expect(banner).not.toContain("locale === 'ja'");
     expect(vocabulary).toContain('Run Prereq Check and Setup Report');
   });
 

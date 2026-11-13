@@ -106,6 +106,8 @@ export function decideApprovalFromCowork(params: {
   requestId: string;
   decision: 'approved' | 'rejected';
   decidedBy: string;
+  /** Free text the caller supplied about who decided; audited as a label, never the decider. */
+  callerLabel?: string;
   note?: string;
   scope?: EventScopeInput;
 }): CoworkApprovalDecision {
@@ -145,8 +147,8 @@ export function decideApprovalFromCowork(params: {
     throw error;
   }
 
-  // Step 2: apply the decision — recorded as an agent decision, whatever the
-  // caller claims.
+  // Step 2: apply the decision — recorded as an agent decision by
+  // `params.decidedBy`, which the MCP tool sets to its server-bound principal.
   const agentSession = detectAgentExecutionContext().principal;
   const updated = decideApprovalRequest(GOVERNED_ROLE, {
     channel: target.channel,
@@ -154,8 +156,9 @@ export function decideApprovalFromCowork(params: {
     requestId: params.requestId,
     decision: params.decision,
     decidedBy: params.decidedBy,
-    // `decided_by` is free text from the MCP caller, not resolved here: with
-    // separation of duties on, the store refuses such approvals.
+    // The decider is the MCP server's process-bound principal, not an identity
+    // authenticated for this request, so it stays marked `caller_supplied`:
+    // with separation of duties on, the store refuses such approvals.
     deciderIdentitySource: 'caller_supplied',
     ...(agentSession ? { decidedInAgentSession: agentSession } : {}),
     decidedByType: 'ai_agent',
@@ -175,6 +178,7 @@ export function decideApprovalFromCowork(params: {
       request_id: updated.id,
       decision: params.decision,
       decided_by: params.decidedBy,
+      ...(params.callerLabel ? { caller_label: params.callerLabel } : {}),
       channel: updated.channel,
       title: updated.title,
     },
@@ -198,6 +202,8 @@ export function decideApprovalFromCowork(params: {
  */
 export function recordAuditExportRequest(params: {
   requestedBy: string;
+  /** Free text the caller supplied about who asked; audited as a label, never the requester. */
+  callerLabel?: string;
   missionId?: string;
   from?: string;
   to?: string;
@@ -210,6 +216,7 @@ export function recordAuditExportRequest(params: {
     result: 'completed',
     metadata: {
       requested_by: params.requestedBy,
+      ...(params.callerLabel ? { caller_label: params.callerLabel } : {}),
       mission_id: params.missionId,
       from: params.from,
       to: params.to,

@@ -4,7 +4,7 @@ category: Tech-stack
 tags: [tech-stack, mcp, integration, guide, protocol]
 importance: 5
 author: Ecosystem Architect
-last_updated: 2026-09-13
+last_updated: 2026-11-12
 ---
 
 # MCP (Model Context Protocol) Integration Guide
@@ -46,13 +46,13 @@ Do **not** promote every plugin skill to an MCP tool. Expose skill bodies as Res
 
 ### Pattern D: MCP Connector Wrapper
 
-For high-demand public MCP servers, connector capabilities wrap MCP server execution with schema validation. Shared client logic lives in the shared-network MCP client engine.
+For high-demand public MCP servers, connector capabilities wrap MCP server execution with schema validation. Kyberion has one outbound MCP client: `executeMcp` (stdio) and `executeRemoteMcp` (HTTP) in `libs/core/service/service-engine-execution.ts`, reached through service-actuator `mode: mcp`. Starting a stdio server needs approval, and every tool call is checked against the server's discovered interface and run as a governed external operation. Do not call the MCP SDK client directly.
 
 ## 4. Benefits
 
 - **Governance**: Allowlists, caller roles, and approval gates stay on the facade.
 - **Discoverability**: LLMs browse tools via `list_tools` and skills via Resources / `skill.list`.
-- **Bounded actuation**: `actuator.invoke` is allowlist-only; live mode requires operator role.
+- **Bounded actuation**: `actuator.invoke` is allowlist-only; live mode requires the operator caller role, a server-bound tenant and, where the allowlist says so, human approval.
 
 ## 5. Roadmap notes
 

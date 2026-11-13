@@ -15,6 +15,7 @@ import { nowIso } from '../foundation/time.js';
 export const HEADLESS_API_VERSION = '1' as const;
 
 export type HeadlessSurfaceId = 'chronos' | 'concierge' | 'presence-studio' | 'computer-surface';
+/** @deprecated Use `SurfaceViewerRole` (`./surface-authorization.ts`). */
 export type HeadlessViewerRole = SurfaceAuthorizationRole;
 export type HeadlessOperationPermission = SurfacePermission;
 export type HeadlessOperationEffect = 'read' | 'write';

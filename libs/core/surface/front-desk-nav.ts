@@ -11,15 +11,15 @@
  * manifest read in `readFrontDeskSurfacePorts()`, which never throws.
  */
 import type { MemberRole } from '../organization/member-registry.js';
+import type { SurfaceViewerRole } from '../foundation/surface-viewer-role.js';
 import { loadSurfaceManifest } from './surface-runtime.js';
 import { resolveSurfaceBrowserUrl } from './surface-url.js';
 
 export type FrontDeskRole = MemberRole;
 
 export type FrontDeskPrimarySurfaceId = 'presence-studio' | 'concierge';
-export type FrontDeskOptionalSurfaceId = 'chronos-mirror-v2' | 'operator-surface';
-export type FrontDeskSurfaceId = FrontDeskPrimarySurfaceId | FrontDeskOptionalSurfaceId;
-export type FrontDeskAvailableSurfaces = Partial<Record<FrontDeskOptionalSurfaceId, string>>;
+/** Every rail destination is hosted by one of the two front-desk surfaces. */
+export type FrontDeskSurfaceId = FrontDeskPrimarySurfaceId;
 
 /**
  * Where an item renders on the rail: `main` (top, in catalog order) or
@@ -215,7 +215,7 @@ export function frontDeskRoleAllows(role: FrontDeskRole, min: FrontDeskRole): bo
  * localadmin/readonly mapping applies unchanged.
  */
 export function frontDeskRoleFromViewer(input: {
-  role: 'readonly' | 'localadmin';
+  role: SurfaceViewerRole;
   memberRole?: FrontDeskRole | null;
 }): FrontDeskRole {
   if (input.memberRole) return input.memberRole;
@@ -234,7 +234,6 @@ export function frontDeskRoleFromViewer(input: {
 export interface FrontDeskMenuResolveInput {
   /** The surface rendering the rail; its own items get same-origin relative paths. */
   currentSurface: FrontDeskSurfaceId;
-  availableSurfaces?: FrontDeskAvailableSurfaces;
   ports?: Partial<FrontDeskSurfacePorts>;
   urls?: Partial<Record<FrontDeskSurfaceId, string>>;
   role?: FrontDeskRole;
@@ -272,31 +271,22 @@ function resolveItems(
 ): ResolvedFrontDeskMenuItem[] {
   const ports: FrontDeskSurfacePorts = { ...DEFAULT_FRONT_DESK_PORTS, ...input.ports };
   const role = input.role ?? 'viewer';
-  return catalog
-    .filter(
-      (item) =>
-        !isOptionalSurface(item.surface) ||
-        item.surface === input.currentSurface ||
-        Boolean(input.availableSurfaces?.[item.surface])
-    )
-    .map((item) => {
-      const external = item.surface !== input.currentSurface;
-      const base = !external
-        ? ''
-        : isOptionalSurface(item.surface)
-          ? input.availableSurfaces![item.surface]!
-          : (input.urls?.[item.surface] ?? `http://127.0.0.1:${ports[item.surface]}`);
-      const href = external ? base.replace(/\/+$/, '') + item.path : item.path;
-      return {
-        ...item,
-        // The operations console (Concierge `/ops`, formerly Chronos) reads
-        // snake_case scope queries (`tenant_slug`, `organization_id`, …).
-        scope_query_style: usesSnakeScopeQuery(item) ? ('snake' as const) : ('camel' as const),
-        href,
-        external,
-        allowed: frontDeskRoleAllows(role, item.min_role),
-      };
-    });
+  return catalog.map((item) => {
+    const external = item.surface !== input.currentSurface;
+    const base = !external
+      ? ''
+      : (input.urls?.[item.surface] ?? `http://127.0.0.1:${ports[item.surface]}`);
+    const href = external ? base.replace(/\/+$/, '') + item.path : item.path;
+    return {
+      ...item,
+      // The operations console (Concierge `/ops`, formerly Chronos) reads
+      // snake_case scope queries (`tenant_slug`, `organization_id`, …).
+      scope_query_style: usesSnakeScopeQuery(item) ? ('snake' as const) : ('camel' as const),
+      href,
+      external,
+      allowed: frontDeskRoleAllows(role, item.min_role),
+    };
+  });
 }
 
 /**
@@ -348,54 +338,8 @@ export const FRONT_DESK_OPS_CONSOLE_PATH = '/ops';
 
 function usesSnakeScopeQuery(item: FrontDeskMenuItem): boolean {
   return (
-    item.surface === 'chronos-mirror-v2' ||
     item.path === FRONT_DESK_OPS_CONSOLE_PATH ||
     item.path.startsWith(FRONT_DESK_OPS_CONSOLE_PATH + '?') ||
     item.path.startsWith(FRONT_DESK_OPS_CONSOLE_PATH + '/')
   );
-}
-
-function isOptionalSurface(id: FrontDeskSurfaceId): id is FrontDeskOptionalSurfaceId {
-  return id === 'chronos-mirror-v2' || id === 'operator-surface';
-}
-
-/** Read-only conservative availability: never start a surface or probe a remote
- * deployment using a misleading localhost health result. Unknown means omitted. */
-export async function readAvailableFrontDeskSurfaces(): Promise<FrontDeskAvailableSurfaces> {
-  const available: FrontDeskAvailableSurfaces = {};
-  try {
-    const manifest = loadSurfaceManifest();
-    await Promise.all(
-      manifest.surfaces
-        .filter((surface) => surface.id === 'chronos-mirror-v2' && surface.enabled === true)
-        .map(async (surface) => {
-          try {
-            const browserUrl = resolveSurfaceBrowserUrl(surface.id);
-            const url = new URL(browserUrl);
-            if (!['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname)) return;
-            if (
-              url.protocol !== 'http:' ||
-              Number(url.port || 80) !== surface.port ||
-              !surface.healthPath ||
-              url.pathname !== '/' ||
-              url.search ||
-              url.hash
-            )
-              return;
-            const healthUrl = new URL(surface.healthPath, url);
-            if (healthUrl.origin !== url.origin) return;
-            const response = await fetch(healthUrl, {
-              signal: AbortSignal.timeout(1500),
-              redirect: 'error',
-            });
-            if (response.ok) available[surface.id as FrontDeskOptionalSurfaceId] = browserUrl;
-          } catch {
-            /* A broken optional destination must not break the primary menu. */
-          }
-        })
-    );
-  } catch {
-    /* First boot or unavailable manifest: primary destinations still work. */
-  }
-  return available;
 }

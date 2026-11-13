@@ -71,6 +71,8 @@ vi.mock('../../lib/headless-projections', async (importOriginal) => ({
 }));
 vi.mock('../../lib/personal-approval-server', () => ({
   conciergeApprovalSnapshot: () => [],
+  conciergeViewerPersonIds: (viewer: { principalId?: string }) =>
+    viewer?.principalId ? [viewer.principalId] : [],
 }));
 vi.mock('@agent/core/delegated-task-observability', () => ({
   listActiveDelegatedTaskRecords: () =>

@@ -1,6 +1,5 @@
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, createElement } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
 import {
   fireEvent,
   installFakeDom,
@@ -10,9 +9,17 @@ import { conciergeText } from '../src/lib/i18n';
 
 const { fetchCatalog } = vi.hoisted(() => ({ fetchCatalog: vi.fn() }));
 vi.mock('../src/lib/front-desk-fetch', () => ({ frontDeskFetch: fetchCatalog }));
-const dom = installFakeDom();
-let root: Root;
+// react-dom's `isInputEventSupported` is decided once at module init — the
+// fake DOM must exist before the client module evaluates (same convention as
+// settings-exit-guard.test.ts and libs/shared-ui tests).
+let client: typeof import('react-dom/client');
+let dom: ReturnType<typeof installFakeDom>;
+let root: import('react-dom/client').Root;
 let container: ReturnType<typeof dom.document.createElement>;
+beforeAll(async () => {
+  dom = installFakeDom();
+  client = await import('react-dom/client');
+});
 const t = (key: Parameters<typeof conciergeText>[0], params?: Record<string, string | number>) =>
   conciergeText(key, 'en', params);
 const entries = [
@@ -41,7 +48,7 @@ beforeEach(() => {
   fetchCatalog.mockReset();
   container = dom.document.createElement('div');
   dom.document.body.appendChild(container);
-  root = createRoot(container as unknown as Element);
+  root = client.createRoot(container as unknown as Element);
 });
 afterEach(async () => {
   await act(async () => root.unmount());

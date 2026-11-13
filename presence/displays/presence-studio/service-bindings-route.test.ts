@@ -28,6 +28,13 @@ function setup(resolveViewer: () => unknown) {
         { binding_id: 'person-alice', owner_kind: 'person', owner_ref: 'user:alice' },
         { binding_id: 'person-bob', owner_kind: 'person', owner_ref: 'user:bob' },
         { binding_id: 'operator', owner_kind: 'operator' },
+        { binding_id: 'legacy-person' },
+        {
+          binding_id: 'inconsistent',
+          owner_kind: 'organization',
+          owner_ref: 'beta',
+          tenant_slug: 'acme',
+        },
       ] as never,
     resolveViewer: resolveViewer as never,
     wireError,
