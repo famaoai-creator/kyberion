@@ -40134,6 +40134,16 @@
         "ja": "回答の目安: {date}",
         "qps-ploc": "⟦Ṗŀėȧşė ȧñşẇėř ƀẏ {date} ïƒ ẏőů ƈȧñ. ŀőřėɱ ïṗşůɱ⟧"
       },
+      "objective_heading": {
+        "en": "What this hearing is for",
+        "ja": "このヒアリングの目的",
+        "qps-ploc": "⟦Ẇħȧŧ ŧħïş ħėȧřïñɠ ïş ƒőř ŀőřėɱ ï⟧"
+      },
+      "objective_criteria_heading": {
+        "en": "We will consider it complete when",
+        "ja": "完了の目安",
+        "qps-ploc": "⟦Ẇė ẇïŀŀ ƈőñşïḓėř ïŧ ƈőɱṗŀėŧė ẇħėñ ŀőřėɱ ïṗşůɱ⟧"
+      },
       "respond_by_past": {
         "en": "The target date was {date}. You can still answer.",
         "ja": "回答の目安は {date} でした。今からでも回答できます。",

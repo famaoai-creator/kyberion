@@ -1,7 +1,7 @@
 {
   "$schema": "../schemas/concept-registry.schema.json",
   "manifest_version": 1,
-  "last_reviewed": "2026-11-12",
+  "last_reviewed": "2026-11-13",
   "purpose": "One registered definition, canonical document, glossary entry and owner per high-confusion Kyberion term. A term or alias may belong to exactly one entry; a homonym is declared through `senses`. The concept-registry gate (scripts/check_concept_registry.ts) enforces this file against docs/GLOSSARY.md, docs/documentation-source-map.json and doc_status frontmatter. Workflow: knowledge/product/governance/concept-registry-workflow.md.",
   "terms": [
     {
@@ -193,6 +193,21 @@
       "canonical_doc": "knowledge/product/architecture/stance-tenant-customer-model.md",
       "owner_modules": [],
       "not_to_confuse_with": ["tenant", "stance"]
+    },
+    {
+      "id": "hearing",
+      "term": "Hearing",
+      "aliases": ["ヒアリング", "customer decision hearing"],
+      "category": "governance",
+      "definition": "A governed elicitation that pursues a tenant-set objective by collecting structured answers from a person into the decision ledger; its definition (template), presentation (form, conversation, avatar) and answer record are kept separate.",
+      "glossary_anchor": "hearing",
+      "canonical_doc": "knowledge/product/architecture/hearing-model.md",
+      "owner_modules": [
+        "libs/core/customer-decision/template.ts",
+        "libs/core/customer-decision/model.ts",
+        "scripts/customer-decision/templates.ts"
+      ],
+      "not_to_confuse_with": ["front-desk", "tenants-customers"]
     },
     {
       "id": "organization",
