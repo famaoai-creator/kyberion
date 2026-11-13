@@ -5,7 +5,7 @@ tags: [architecture, agents, prompt, subagent, a2a, bridge, protocol, coordinati
 importance: 9
 author: Ecosystem Architect
 last_updated: 2026-11-12
-concepts: [co-session, peer-messaging, a2a]
+concepts: [co-session, peer-messaging, a2a, coordination-act]
 ---
 
 # Agent Communication and Coordination Model
@@ -136,7 +136,7 @@ For peer operations, use [Same-Tenant Peer Quickstart](../orchestration/same-ten
 A new communication pattern or transport must:
 
 - Fill the dimensions in §1 and map to a governed coordination owner.
-- Reuse typed request and handoff vocabulary where work semantics match.
+- Reuse typed request and handoff vocabulary where work semantics match. Map every new message kind to a [coordination act](#11-coordination-acts) in `libs/core/mesh/coordination-act-map.ts`. Apply rules A and B of §11, and see §11.2 for what `tests/coordination-act-boundary.test.ts` and `tsc` check and what they do not.
 - Define stable participant identity, tenant and classification checks, capability and authority limits, correlation, acknowledgement, idempotency, expiry, and failure recovery.
 - Define concurrency and single-writer behavior for every shared mutable store.
 - Keep delivery receipt, recipient acceptance, work execution, and mission completion as distinct states.
@@ -193,8 +193,8 @@ Runtime stores are relative to the runtime root and partitioned by tenant where 
 - **A2A bridge vs agent execution port**: both reach a provider agent through the supervisor. The bridge carries signed envelopes and a conversation transcript; the port carries a typed task with a receipt and WorkItem lease authority. Choose the port for a delegated task that has a WorkItem, the bridge for a conversational ask. Do not add a third path.
 - **A2A bridge vs peer messaging**: A2A stays inside one runtime (orchestrator ↔ spawned agents); peer messaging crosses runtimes. The names suggest overlap; the trust boundary does not. Keep them separate.
 - **A2A bridge vs network actuator A2A file drop**: the same name for two unconnected mechanisms. The file drop needs a decision: connect it to a consumer or retire the ops through the actuator contract ceremony.
-- **Mission coordination record** looked like a fifth message bus (it was named `MissionCoordinationBus` with an inbox and acknowledgements) but nothing ever delivered through it: workers get tasks through the agent execution port and the owner dispatches and reviews directly. It is now named and shaped as a record of owner-to-worker messages. Do not build delivery on it; use the agent execution port (in-runtime), Co-Session (same checkout) or Peer Messaging (distinct runtimes).
 - **ACP mediator** is a provider transport, not a coordination layer; list it under agent lifecycle rather than messaging in future maps.
+- **Mission coordination record** looked like a fifth message bus (it was named `MissionCoordinationBus` with an inbox and acknowledgements) but nothing ever delivered through it: workers get tasks through the agent execution port and the owner dispatches and reviews directly. It is now named and shaped as a record of owner-to-worker messages. Do not build delivery on it; use the agent execution port (in-runtime), Co-Session (same checkout) or Peer Messaging (distinct runtimes).
 
 ### Mesh broker and peer coordination responder (retired 2026-11-12)
 
@@ -212,8 +212,10 @@ Judged against §5 and §7 rather than against current usage, the layers above l
 
 - **Peer delivery has no retry.** §7 asks every transport for acknowledgement, idempotency, expiry and failure recovery. `sendPeerMessage` posts once with a timeout and records a failed row in `outbox.jsonl`. The receiver answers `retryable` with a wait time; the sender does not act on it. Only auto replies retry by themselves; a peer task proposal is resent by hand. A message to an unreachable peer therefore ends as a failed row nobody acts on. Retry, backoff and a terminal state belong in the peer-messaging outbox: message ids are stable and the receiver already deduplicates.
 - **Closed: the mission coordination store is named as a record.** It was written and never read while exposing an inbox and acknowledgement API. It is now `mission-coordination-record.ts`, write-only; workers receive their task through the agent execution port and the owner dispatches and reviews directly.
-- **One speech act, several vocabularies.** Request, proposal, acceptance, rejection, result and handoff are declared separately by the A2A `performative`, the peer message `type`, the Mesh request kind, the Co-Session handoff kind, the mission bus channel and the agent task envelope. §7 asks new transports to reuse typed vocabulary; nothing maps or checks the existing ones.
-- **"A2A" names three unconnected things**: the in-runtime bridge between a parent and its provider agents (§3 D), the network actuator file drop, and the `a2a-message` payload stored with a Mesh proposal. Only the first carries traffic.
+- **The A2A performative is not interpreted by the bridge.** `A2ABridge.route()` (`libs/core/mesh/a2a-bridge.ts`) never branches on `header.performative`: every envelope that passes the sender, signature and delegation-chain checks becomes a prompt and runs. A `propose` therefore executes like a `request`, and an `accept` or `reject` is a label the sender chose, not a recipient decision. §11 maps those three to "not an act" until the bridge either acts on them or rejects them.
+- **The agent execution port checks the WorkItem lease only when the envelope names a WorkItem.** `SupervisorAgentExecutionPort.delegate()` (`libs/core/agent/agent-execution-port.ts`) runs the task on receipt and verifies the lease only `if (request.work_item_id)`. A task without `work_item_id` runs under the caller's authority alone.
+- **Closed: one speech act, several vocabularies.** Request, proposal, acceptance, rejection, result and handoff were declared separately by each layer with no mapping. §11 defines the canonical coordination acts and two rules for choosing one (A: which act; B: nesting), and maps the layer kinds listed in §11.1. Wire formats are unchanged. The gate's coverage is partial and listed in §11.2: runtime key checks for layers with an exported array, `tsc` only for type unions, nothing for the two hand-written key sets, and a per-file word scan for new declarations.
+- **Disambiguated: "A2A" names three unconnected things**: the in-runtime bridge between a parent and its provider agents (§3 D), the network actuator file drop, and the `a2a-message` payload stored with a Mesh proposal. Only the first carries traffic; see §11.3. The modules are not renamed.
 
 ### Mesh-hub topic residue (decided 2026-10-31)
 
@@ -231,3 +233,89 @@ Recommendation, for a follow-up that may change the schema:
 2. Mark these modes `experimental`: `ollama`, `vllm`, `lmstudio`, `llamacpp`, `mlx`, `localai`, `nemotron-api`, `openrouter`. Evidence: no operator session selected them. Their descriptors have not changed since the 2026-10-09 merge of #1014. Coverage is unit tests over the shared OpenAI-compatible adapter (between 2 and 12 test files mention each mode); there is no live conformance run against a real server.
 3. Surface `experimental` in `pnpm kyberion doctor` / route doctor output and in auto-discovery logs, and never pick an `experimental` mode by auto-selection without an explicit env opt-in. Today the `KYBERION_*_URL` entries in `auto_select_env_priority` select these modes silently.
 4. `gemini-cli`, `gemini-api`, `anthropic`, `grok-api`, `copilot`, `cursor-cli`, `opencode-cli`, `local` and `stub` are also unused in the recorded sessions, but each has its own adapter or a documented role (`stub` for hermetic tests, `anthropic` as the API-key fallback in AGENTS.md). Review them with operator input before marking them.
+
+## 11. Coordination acts
+
+Every layer in §9 names its messages in its own words: the A2A bridge has `performative`, peer messaging has `PeerMessageType`, Mesh Hub has request kinds, Co-Session has handoff kinds. Those words stay as they are, because envelopes are signed and ledgers store them. What is shared is the act behind each word. There are eight **coordination acts**, declared once in `libs/core/foundation/coordination-act.ts` (`COORDINATION_ACTS`):
+
+| Act       | Meaning                                                                                          | §5 stage                                                                                                                                 |
+| --------- | ------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `request` | Ask the recipient to do something; the layer records no separate acceptance                      | across runtimes: sent after 1–3, the work waits for the recipient's own decision and a claim (4, 5); inside one runtime: runs on receipt |
+| `propose` | Offer work that stays pending until the recipient's own decision is recorded as a separate state | waits for 4; inert until a local accept                                                                                                  |
+| `accept`  | The recipient's own decision to take on a proposal                                               | 4; executes nothing — execution is a stage-5 claim                                                                                       |
+| `reject`  | The recipient's own decision to decline                                                          | 4                                                                                                                                        |
+| `inform`  | Tell something (notification, status, note, conversational turn); no decision expected           | 1–3 only                                                                                                                                 |
+| `query`   | Ask for information, not for work (capability query)                                             | 3; no acceptance, no side effect                                                                                                         |
+| `result`  | Answer an earlier request or query: reply, capability answer, outcome of executed work           | after 5; not mission completion, not the user-facing [Result](../../../docs/GLOSSARY.md#result)                                          |
+| `handoff` | Transfer responsibility for a piece of work                                                      | ownership moves only with a stage-5 claim; across runtimes also after 4                                                                  |
+
+No act carries execution authority. A message can ask for work, decide on it, or report it. Across runtimes (§3 A–C), work runs only under the recipient's local WorkItem claim. Inside one runtime (§3 D: A2A bridge, agent execution port, mission coordination record), delegation runs on receipt under the sender's own authority — the mission owner or lease holder — which is established outside the message; no recipient decision exists there.
+
+Two rules decide which act a kind maps to:
+
+- **Rule A (which act).** `propose` is work offered that stays pending until the recipient's own decision is recorded as a separate state. Today that is the typed peer task and the Mesh Hub recipient proposal. `request` is an ask for which the layer records no separate acceptance.
+- **Rule B (nesting).** The innermost typed layer names the act. An outer envelope type is a carrier. Peer conversation sends every message, replies and status included, as peer envelope `type: 'request'` (`peer-conversation.ts`). A conversation `handoff` carries a peer task proposal or a Mesh collaboration request; it is not a transfer of responsibility. A `status` that carries a `peer-task-result` defers to the task layer.
+
+To compare kinds across layers, apply rule B first: find the innermost typed record of a message and read that layer's table.
+
+### 11.1 Per-layer mapping
+
+`libs/core/mesh/coordination-act-map.ts` maps the kinds of the layers below to one act, or to "not an act" with a reason. A kind that is a state, a carrier, a sender's label, a category of stored record, or session control is not an act. Delivery receipt, recipient acceptance, execution and completion stay separate states (§7).
+
+| Layer (declaration)                                                                                                           | Kind → act                                                                                                                                                                                                                        |
+| ----------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A2A bridge `A2A_PERFORMATIVES` (`a2a-bridge.ts`, same set as `a2a-envelope.schema.json`)                                      | `request`→request · `query`→query · `inform`→inform · `result`→result · `propose`, `accept`, `reject`→not an act (sender-chosen label: the bridge does not interpret the performative and runs every verified envelope as an ask) |
+| Peer messaging `PEER_MESSAGE_TYPES` — only when the envelope is the innermost layer (direct `peer send`); otherwise a carrier | `request`→request · `reply`→result · `notification`→inform · `handoff`→handoff · `capability_query`→query · `capability_response`→result                                                                                          |
+| Peer conversation `PEER_CONVERSATION_MESSAGE_KINDS`                                                                           | `message`→inform · `reply`→result · `status`→inform · `handoff`→not an act (carrier) · `open`, `close`→not an act (session control)                                                                                               |
+| Typed peer task (`peer-task-exchange.ts`)                                                                                     | `peer-task-request`→propose · `peer-task-result`→result · decision `accepted`→accept, `rejected`→reject · `PEER_TASK_STATES` and result `status`→not an act (recorded state, outcome field)                                       |
+| Mesh Hub recipient records (`mesh-hub-peer-messaging-adapter.ts`)                                                             | proposal record→**propose** · decision record→not an act (carrier); its decision `accepted`→accept, `rejected`→reject · `proposal_kind` `a2a`, `workitem`→not an act (category of stored record)                                  |
+| Mesh Hub `MESH_REQUEST_KINDS` — content of the proposal                                                                       | `review.request`→request · `workitem.claim`→request · `workitem.handoff`→handoff · `workitem.status_update`→inform · `capability.query`→query · `notification.publish`→inform                                                     |
+| Mesh Hub stored workitem command — content of the proposal                                                                    | `claim_request`→request · `handoff_request`→handoff · `status_update`→inform (nothing executes it)                                                                                                                                |
+| Mesh Hub `MESH_DELIVERY_STATUSES`                                                                                             | all → not an act (delivery-journal state; its `accepted` is broker acceptance, not the recipient decision)                                                                                                                        |
+| Co-Session `CO_SESSION_HANDOFF_KINDS`                                                                                         | same as the Mesh Hub kinds it shares; here the kind is the delivered act (`acked_at` is a read receipt, not a decision)                                                                                                           |
+| Mission coordination record `MissionCoordinationChannel`                                                                      | `task_contract`→request · `handoff`→handoff · `review`→request · `runtime_notice`→inform (the record lists acts performed elsewhere; neither `task_contract` nor `runtime_notice` has a producer)                                 |
+| Agent execution port                                                                                                          | `AgentTaskEnvelope`→request · `AgentExecutionReceipt`→result · `AGENT_EXECUTION_RECEIPT_STATUSES`→not an act (execution state)                                                                                                    |
+| Discussion room `DiscussionPerformative`                                                                                      | `inform`, `summarize`→inform · `propose`, `challenge`, `agree`→not an act (a deliberation move about a position; a discussion `propose` is not a stage-4 proposal)                                                                |
+
+How to read the Mesh rows: a `MESH_REQUEST_KINDS` member names WHAT is asked. In v1 every such request travels as a recipient proposal — the adapter stores every kind as a pending proposal, and for non-`workitem.*` kinds `buildA2AProposal` labels the stored payload `propose`. The delivered message is therefore a `propose` whose content is that kind. `workitem.claim → request` does not mean the claim runs without acceptance.
+
+Placements a reader may question: a conversation `message` is free text and is treated as `inform` even when it asks something, because nothing but the opt-in auto reply acts on it. The listener also answers a carried proposal with a conversation `reply` / `status` transport receipt ("pending local acceptance"); that receipt is stage 1–3 evidence, not the recipient's decision. `workitem.claim` is a request to claim, though Co-Session also uses it to record an intent.
+
+### 11.2 The gate
+
+`tests/coordination-act-boundary.test.ts` is the only consumer of the mapping today. Nothing routes on acts at runtime. Coverage differs by layer:
+
+- **Checked at runtime and by `tsc`** (exported const array; table keys must equal it): A2A performative, peer message type, peer conversation kind, Mesh request kind, Mesh delivery status, peer task state, peer task result status, Co-Session handoff kind, agent execution receipt status.
+- **Checked by `tsc` only** (type union, no array): mission coordination record channel, Mesh proposal kind, decision and record kinds, Mesh stored workitem command, peer task decision, discussion performative. `tsc` rejects a missing kind, an extra kind and a target outside `COORDINATION_ACTS`.
+- **Not checked** (hand-written key sets): `AGENT_EXECUTION_PORT_MESSAGE_ACTS` and `PEER_TASK_MESSAGE_KIND_ACTS`. A new message shape or a new task kind constant reaches neither table.
+
+The gate also fails when:
+
+- a value is outside `COORDINATION_ACTS`, or a "not an act" entry has no reason;
+- rule A or B is broken: anything other than the two recorded-decision layers maps to `propose`, an A2A `propose`/`accept`/`reject` maps to an act, or a conversation `handoff` maps to an act;
+- the Co-Session kinds and the Mesh kinds they share map differently, or a `workitem.*` kind and the stored command that records it map differently;
+- a known copy drifts: the A2A schema enum, the re-declared `A2AMessage` in `orchestrator-actuator/src/super-nerve/index.ts` and the `performatives` set in `surface/surface-response-blocks.ts` against `A2A_PERFORMATIVES`; the peer conversation schema enum against `PEER_CONVERSATION_MESSAGE_KINDS`; the discussion zod enum and type union against the discussion table. The CLI `choices` of `peer_messaging_send.ts` and `peer_conversation.ts` import the arrays instead of copying them;
+- a module in `libs/core/{mesh,workforce,mission,agent,discussion}` or the network / orchestrator actuators declares a literal union or string array with two or more act-like members and is not registered (registration names its table or says why the set is not a coordination vocabulary), or a scanned directory yields no file.
+
+What the scan does not catch: a vocabulary made of words outside its act-word list, one declared in another directory, a second act-like set in an already registered file (registration is per file), and past-tense members (`accepted`, `rejected`), which are not act words, so decision and state unions are never scanned. Comment stripping copies string literals but does not recognise regex literals.
+
+### 11.3 Three things called "A2A"
+
+The name covers three separate mechanisms. Nothing connects them.
+
+| Name in code                                                              | What it is                                                                                                | Traffic                                                               |
+| ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| A2A bridge (`libs/core/mesh/a2a-bridge.ts`)                               | In-runtime envelopes between the orchestrator and the provider agents it spawns (§3 D)                    | **yes, the only one**                                                 |
+| `network:a2a_send` / `a2a_poll` (`network-actuator/src/a2a-transport.ts`) | A file-drop seam: writes and reads serialized envelopes under `active/shared/runtime/a2a/{inbox,outbox}`  | none: no pipeline, script or core module calls these ops (2026-11-12) |
+| `a2a-message` in a Mesh Hub recipient proposal                            | A record stored with the proposal (`proposal_ref.payload`). Nothing executes it or sends it to the bridge | stored only                                                           |
+
+Say which one you mean. "A2A" alone means the bridge.
+
+### 11.4 Out of scope
+
+These vocabularies look act-like but are transports or ingress, not agent coordination, so they have no table. The supervisor client and the ACP mediator sit in scanned directories but declare no act-like literal set today; if they ever do, register them as "not a vocabulary" with this reason. The others are outside the scanned directories.
+
+- surface coordination store (`libs/core/surface/surface-coordination-store.ts`: `async-request` / `notification` records of surface channels);
+- ingress nerve bridge (`libs/core/ingress/nerve-bridge.ts`: `request` / `response` / `event` from external surfaces) and the stimuli journal (`libs/core/event/stimuli-journal.ts`) that records them;
+- agent runtime supervisor IPC methods (`libs/core/agent/agent-runtime-supervisor-client.ts`: `SupervisorMethod` daemon IPC: `health`, `ensure`, `ask`, …);
+- ACP protocol messages (`libs/core/mesh/acp-mediator.ts`: the Agent Client Protocol session with ACP agent CLIs, including `session/request_permission`).
