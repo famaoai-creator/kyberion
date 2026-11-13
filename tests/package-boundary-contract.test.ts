@@ -27,6 +27,17 @@ const RUNTIME_ROOTS = [
 ];
 const TEST_ROOTS = ['tests'];
 const ALLOWED_TEST_SOURCE_IMPORTS = new Map<string, string[]>([
+  // The live-state leak guard is a Vitest globalSetup: it classifies appended
+  // audit rows with the dependency-free hook-provenance source module, so it
+  // works before (and independently of) a libs/core dist build.
+  [
+    'tests/vitest-active-leak-guard.ts',
+    [
+      '../libs/core/provider/session-hook-provenance.js',
+      '../libs/core/foundation/runtime-state-roots.js',
+    ],
+  ],
+  ['tests/vitest-active-leak-guard.test.ts', ['../libs/core/provider/session-hook-provenance.js']],
   // Cross-boundary provenance probe must share source-module ALS and the mocked
   // approval store with the real retrieval/commit implementations under test.
   [
