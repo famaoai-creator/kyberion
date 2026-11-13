@@ -1,7 +1,7 @@
 ---
 title: オンボーディング標準フロー — 環境 / Identity / Tenant / Activation / First Work
 tags: [governance, onboarding, identity, tenant, organization, activation, first-work]
-last_updated: 2026-11-05
+last_updated: 2026-11-12
 kind: governance
 scope: repository
 authority: standard
@@ -493,12 +493,12 @@ pnpm tenant:activation probe --customer-slug <customer-slug> --tenant-slug <tena
   [--service <service-id>]...
 ```
 
-| probe               | probe が確かめること                                                                                                              |
-| ------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `isolation_probe`   | tenant が strict isolation を宣言し、`check:tenant-registry` が通る                                                               |
-| `viewer_scope`      | tenant が登録済み・active で viewer の絞り込みが解決でき、`KYBERION_VIEWER_SCOPE` が `off` でない（`enforce` で拒否まで行う）     |
-| `service_readiness` | binding の `default_service_ids` と `--service` の各サービスが `service:preflight` で ready（無ければ「外部サービスなし」で通る） |
-| `nhi_provisioned`   | 各 `--nhi-id` が NHI ledger にあり、retired / suspended でない                                                                    |
+| probe               | probe が確かめること                                                                                                                                                       |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `isolation_probe`   | tenant が strict isolation を宣言し、`check:tenant-registry` が通る                                                                                                        |
+| `viewer_scope`      | tenant が登録済み・active で viewer の絞り込みが解決でき、`KYBERION_VIEWER_SCOPE` が `off` でない（許可外 tenant の読み取りはどのモードでも拒否。`warn` は監査記録も残す） |
+| `service_readiness` | binding の `default_service_ids` と `--service` の各サービスが `service:preflight` で ready（無ければ「外部サービスなし」で通る）                                          |
+| `nhi_provisioned`   | 各 `--nhi-id` が NHI ledger にあり、retired / suspended でない                                                                                                             |
 
 `activate` / `plan` は ref を次の規則で検証する。
 

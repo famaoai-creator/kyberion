@@ -3,7 +3,7 @@ title: Multi-Tenant Operations
 category: Architecture
 tags: [multi-tenant, isolation, tier, governance, audit, operations]
 importance: 8
-last_updated: 2026-11-05
+last_updated: 2026-11-12
 concepts: [tenant, tier]
 ---
 
@@ -465,7 +465,8 @@ When introducing the second tenant:
 
 - HTTP viewer scope is same-host logical isolation. It does not replace OS
   user separation, host hardening, or an IdP-backed session.
-- `KYBERION_VIEWER_SCOPE=warn` is the migration default; switch to `enforce`
+- `KYBERION_VIEWER_SCOPE=warn` is the migration default. Every mode denies an
+  out-of-scope tenant; `warn` also records the attempt. Switch to `enforce`
   only after the audit-chain observation window is clean.
 - Per-tenant rate limiting (e.g. one tenant exhausting reasoning quota)
   is not implemented; treat as future work.
