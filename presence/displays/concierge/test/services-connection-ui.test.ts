@@ -52,8 +52,28 @@ describe('service authentication controls', () => {
       root.render(
         createElement(ServicesSection, {
           locale: 'en',
-          t: (key) => conciergeText(key, 'en'),
-          setup,
+          t: (key, params) => conciergeText(key, 'en', params),
+          setup: {
+            ...setup,
+            connections: [
+              {
+                binding_id: 'personal-github',
+                service_id: 'github',
+                owner_kind: 'person',
+                owner_ref: 'user:alice',
+                group: 'mine',
+                readiness: 'ready',
+              },
+              {
+                binding_id: 'company-github',
+                service_id: 'github',
+                owner_kind: 'organization',
+                owner_ref: 'alpha',
+                group: 'organization',
+                readiness: 'needs_credential',
+              },
+            ],
+          },
           services: [],
           setServices: vi.fn(),
           busy: false,
@@ -77,6 +97,11 @@ describe('service authentication controls', () => {
     expect(container.querySelector('[role="alert"]')?.textContent).toBe(
       'Authorization unavailable'
     );
+    expect(container.textContent).toContain('Your connections');
+    expect(container.textContent).toContain('Organization: alpha');
+    expect(container.textContent).toContain('Credential not set');
+    expect(container.textContent).toContain('does not authorize execution');
+    expect(container.textContent).toContain("requires its owner's approval");
     await act(async () => root.unmount());
   });
 });

@@ -1,7 +1,8 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import type { ManagedProcessHandle } from '../tool/managed-process.js';
+import type { DotWakeLedgerEntry } from './dot-runtime.js';
 import type { DotCharter } from './dot-charter.js';
 import type { EventIntakePolicy } from './dot-event-intake.js';
 import type { DotWakeTool } from './dot-extensions.js';
@@ -19,6 +20,8 @@ let evaluateDotEventTriggers: typeof import('./dot-event-intake.js').evaluateDot
 let ingestLocalEvent: typeof import('./dot-event-intake.js').ingestLocalEvent;
 let readDotInboundEvents: typeof import('./dot-event-intake.js').readDotInboundEvents;
 let inspectDotEventIntake: typeof import('./dot-event-intake-diagnostics.js').inspectDotEventIntake;
+let evaluateEventContinuation: typeof import('./dot-event-continuation.js').evaluateEventContinuation;
+let eventContinuationKey: typeof import('./dot-event-continuation.js').eventContinuationKey;
 let claimEventContinuation: typeof import('./dot-event-continuation.js').claimEventContinuation;
 let eventContinuationPath: typeof import('./dot-event-continuation.js').eventContinuationPath;
 let readEventContinuation: typeof import('./dot-event-continuation.js').readEventContinuation;
@@ -32,7 +35,11 @@ let runDotWake: typeof import('./dot-runtime.js').runDotWake;
 
 const sourceRoot = process.cwd();
 const fixtureRoot = path.join(sourceRoot, 'active/shared/tmp', `continuation-root-${randomUUID()}`);
-const ROOT = path.join(fixtureRoot, 'active/shared/tmp/events');
+let ROOT: string;
+beforeEach(() => {
+  // Lock files live outside ROOT. A terminated child's lock must never contaminate another test.
+  ROOT = path.join(fixtureRoot, 'active/shared/tmp', `events-${randomUUID()}`);
+});
 const auditKey = Symbol.for('@kyberion/audit-chain');
 let sourceAudit: PropertyDescriptor | undefined;
 let sourceIo: typeof import('../secure-io.js');
@@ -57,6 +64,8 @@ beforeAll(async () => {
     await import('./dot-event-intake.js'));
   ({ inspectDotEventIntake } = await import('./dot-event-intake-diagnostics.js'));
   ({
+    evaluateEventContinuation,
+    eventContinuationKey,
     claimEventContinuation,
     eventContinuationPath,
     readEventContinuation,
@@ -82,7 +91,12 @@ afterAll(() => {
 });
 
 const NOW = new Date('2026-10-12T12:00:00Z');
-const deps = { rootDir: ROOT, now: () => NOW };
+const deps = {
+  get rootDir() {
+    return ROOT;
+  },
+  now: () => NOW,
+};
 const policy: EventIntakePolicy = {
   version: '1.0.0',
   sources: {
@@ -239,14 +253,74 @@ describe('forward-only event continuation', () => {
     });
   }, 120000);
 
-  it('retains all 2001 accepted new rows, bounds pending, and resumes in a new process without duplicate simulated effects', async () => {
+  it('discovers all 2001 matching accepted rows with bounded pending and synthetic terminal receipts', () => {
     const c = initialize();
-    for (let i = 0; i < 2001; i++) ingest(i);
+    const events = Array.from({ length: 2001 }, (_, i) => ingest(i));
+    const activation = c.attention.event_delivery!.activation_id;
+    const expectedIds = events.map((event) => event.event_id);
+    const expectedKeys = expectedIds.map((id) => eventContinuationKey(c, activation, id));
+    const matchedIds: string[] = [];
+    const discoveredIds: string[] = [];
+    const discoveredKeys: string[] = [];
+    const syntheticReceipts: DotWakeLedgerEntry[] = [];
+    const ports = {
+      matches: (
+        event: (typeof events)[number],
+        trigger: Extract<DotCharter['attention']['triggers'][number], { kind: 'event' }>
+      ) => {
+        matchedIds.push(event.event_id);
+        return trigger.sources?.includes(event.source) === true;
+      },
+      receipts: () => syntheticReceipts,
+      isDue: () => true,
+    };
+    // This tests ledger discovery, not dispatch. Explicit terminal rejections drain
+    // each discovered batch through the existing receipt port without simulated effects.
+    const pages = Math.ceil(events.length / EVENT_CONTINUATION_PENDING);
+    for (let page = 0; page < pages; page++) {
+      const due = evaluateEventContinuation(c, deps, ports)!;
+      const pending = readEventContinuation(c, deps)!.pending;
+      expect(pending.length).toBeGreaterThan(0);
+      expect(pending.length).toBeLessThanOrEqual(EVENT_CONTINUATION_PENDING);
+      expect(due.map((offer) => offer.key)).toEqual(pending.slice(0, 5).map((item) => item.key));
+      for (const item of pending) {
+        discoveredIds.push(item.event_id);
+        discoveredKeys.push(item.key);
+        syntheticReceipts.push({
+          dot_id: c.dot_id,
+          trigger_key: item.key,
+          kind: 'event',
+          fired_at: NOW.toISOString(),
+          outcome: 'rejected',
+          reason: 'Synthetic terminal receipt for discovery-only fixture; no dispatch',
+        });
+      }
+    }
+    expect(matchedIds).toEqual(expectedIds);
+    expect(discoveredIds).toEqual(expectedIds);
+    expect(discoveredKeys).toEqual(expectedKeys);
+    expect(evaluateEventContinuation(c, deps, ports)).toEqual([]);
+    const final = readEventContinuation(c, deps)!;
+    expect(final.pending).toEqual([]);
+    expect(final.source.offset).toBe(
+      Buffer.byteLength(
+        safeReadFile(ROOT + '/active/shared/runtime/dot/public/shared/events.jsonl')
+      )
+    );
+  }, 120000);
+
+  it('claims and records 133 accepted rows across process restart without duplicate simulated effects', async () => {
+    const c = initialize();
+    const events = Array.from({ length: EVENT_CONTINUATION_PENDING + 5 }, (_, i) => ingest(i));
+    const expectedKeys = events.map((event) =>
+      eventContinuationKey(c, c.attention.event_delivery!.activation_id, event.event_id)
+    );
     const due = evaluateDotEventTriggers(c, deps);
     expect(due).toHaveLength(5);
     expect(readEventContinuation(c, deps)?.pending).toHaveLength(EVENT_CONTINUATION_PENDING);
     for (const offer of due) {
       const id = claimEventContinuation(c, offer, deps)!;
+      expect(id).toBeTruthy();
       safeAppendFileSync(ROOT + '/effects.jsonl', JSON.stringify(offer.key) + '\n');
       recordDotWakeOutcome(c, offer, 'delivered', { ...deps, eventAttemptId: id });
     }
@@ -258,21 +332,26 @@ describe('forward-only event continuation', () => {
       ";const c=JSON.parse(safeReadFile(root+'/dots/fixture.json',{encoding:'utf8'}));" +
       "const deps={rootDir:root,now:()=>new Date('2026-10-12T12:00:00Z')};" +
       'let count=0;for(let sweep=0;sweep<500;sweep++){const due=evaluateDotEventTriggers(c,deps);if(!due.length)break;' +
-      "for(const d of due){const id=claimEventContinuation(c,d,deps);safeAppendFileSync(root+'/effects.jsonl',JSON.stringify(d.key)+'\\n');recordDotWakeOutcome(c,d,'delivered',{...deps,eventAttemptId:id});count++;}}" +
+      "for(const d of due){const id=claimEventContinuation(c,d,deps);if(!id)throw new Error('Missing child claim');safeAppendFileSync(root+'/effects.jsonl',JSON.stringify(d.key)+'\\n');recordDotWakeOutcome(c,d,'delivered',{...deps,eventAttemptId:id});count++;}}" +
       "console.log('resumed='+count);},'mission_owner');";
-    // This process persists 1996 separate effects; allow the IO-heavy fixture
-    // its own bounded deadline when the full suite shares the host.
-    const resumed = await child(code, 180_000);
+    // 133 exceeds the 128-entry pending window; the child must discover the remaining tail.
+    const resumed = await child(code);
     expect(resumed, resumed.output).toMatchObject({ code: 0 });
-    expect(resumed.output).toContain('resumed=1996');
+    expect(resumed.output).toContain('resumed=128');
     const effects = String(safeReadFile(ROOT + '/effects.jsonl', { encoding: 'utf8' }))
       .trim()
       .split('\n');
-    expect(effects).toHaveLength(2001);
-    expect(new Set(effects).size).toBe(2001);
+    expect(effects.map((row) => JSON.parse(row))).toEqual(expectedKeys);
+    expect(new Set(effects).size).toBe(events.length);
     expect(evaluateDotEventTriggers(c, deps)).toEqual([]);
-    expect(readEventContinuation(c, deps)?.pending).toEqual([]);
-  }, 240000);
+    const final = readEventContinuation(c, deps)!;
+    expect(final.pending).toEqual([]);
+    expect(final.source.offset).toBe(
+      Buffer.byteLength(
+        safeReadFile(ROOT + '/active/shared/runtime/dot/public/shared/events.jsonl')
+      )
+    );
+  }, 120000);
 
   it('does not replay historical rows, acknowledge offers, or age pending work out', () => {
     ingest(0);

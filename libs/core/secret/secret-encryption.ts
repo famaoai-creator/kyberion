@@ -139,9 +139,10 @@ function getEncryptionKey(createIfMissing = false): Buffer {
 // ─── Envelope codec ──────────────────────────────────────────────────────────
 
 export function encryptConnectionDocument(
-  document: Record<string, unknown>
+  document: Record<string, unknown>,
+  options: { createKeyIfMissing?: boolean } = {}
 ): EncryptedConnectionEnvelope {
-  const key = getEncryptionKey(true);
+  const key = getEncryptionKey(options.createKeyIfMissing ?? true);
   const iv = randomBytes(12);
   const cipher = createCipheriv('aes-256-gcm', key, iv);
   const plaintext = Buffer.from(JSON.stringify(document), 'utf8');
@@ -159,6 +160,8 @@ export function encryptConnectionDocument(
 export function decryptConnectionDocument(
   envelope: EncryptedConnectionEnvelope
 ): Record<string, unknown> {
+  if (envelope.version !== ENVELOPE_VERSION)
+    throw new Error('[secret-encryption] unsupported envelope version');
   if (envelope.algorithm !== 'aes-256-gcm') {
     throw new Error(`[secret-encryption] unsupported algorithm '${envelope.algorithm}'`);
   }

@@ -26,7 +26,10 @@ import {
 import { assertIsolatedProviderHome } from '../provider/provider-auth-home.js';
 import { buildSafeExecEnv } from '../secure-io.js';
 import { parseSafeJsonObjectInput } from '../foundation/json.js';
-import type { ServiceBinding } from '../service/service-binding.js';
+import {
+  resolveSelectedGwsSessionEnvironment,
+  type ServiceBinding,
+} from '../service/service-binding.js';
 import type { InformationAssetLocation, InformationAssetServiceRequest } from './types.js';
 
 function assertCredentialCaptureAuthority(): void {
@@ -178,7 +181,7 @@ async function captureTransport(
   } else if (selected.auth_mode === 'session') {
     if (!hasTaskCredentialBinding())
       throw new Error('information_asset_capture_session_binding_required');
-    const env = resolveTaskProviderEnvironment('gws');
+    const env = resolveSelectedGwsSessionEnvironment(selected);
     if (location.service_id !== 'google-workspace' || !env)
       throw new Error('information_asset_capture_session_unsupported');
     assertIsolatedProviderHome(env, location.scope.tenant_slug);
@@ -211,7 +214,10 @@ async function captureTransport(
       )
         throw new Error('information_asset_capture_binding_revoked');
       if (providerEnvironment) {
-        const currentEnv = resolveTaskProviderEnvironment('gws');
+        const currentEnv =
+          selected.auth_mode === 'session'
+            ? resolveSelectedGwsSessionEnvironment(selected)
+            : resolveTaskProviderEnvironment('gws');
         if (!currentEnv) throw new Error('information_asset_capture_session_revoked');
         assertIsolatedProviderHome(currentEnv, location.scope.tenant_slug);
         for (const [key, value] of Object.entries(currentEnv))
