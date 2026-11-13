@@ -38,8 +38,16 @@ import {
   validateUrl,
 } from '../secure-io.js';
 
-export type PeerMessageType =
-  'request' | 'reply' | 'notification' | 'handoff' | 'capability_query' | 'capability_response';
+/** Peer envelope types; each maps to a coordination act in `coordination-act-map.ts`. */
+export const PEER_MESSAGE_TYPES = Object.freeze([
+  'request',
+  'reply',
+  'notification',
+  'handoff',
+  'capability_query',
+  'capability_response',
+] as const);
+export type PeerMessageType = (typeof PEER_MESSAGE_TYPES)[number];
 
 export interface PeerMessageEnvelope<TPayload = unknown> {
   version: '1';
@@ -210,15 +218,6 @@ function normalizeEnvelope<TPayload>(
     ...(envelope.approval_ref ? { approval_ref: envelope.approval_ref } : {}),
   };
 }
-
-const PEER_MESSAGE_TYPES: readonly PeerMessageType[] = [
-  'request',
-  'reply',
-  'notification',
-  'handoff',
-  'capability_query',
-  'capability_response',
-];
 
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0;

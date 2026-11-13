@@ -33,8 +33,16 @@ import {
 } from '../secure-io.js';
 
 export type PeerConversationStatus = 'open' | 'active' | 'closed' | 'blocked' | 'failed';
-export type PeerConversationMessageKind =
-  'open' | 'message' | 'reply' | 'handoff' | 'close' | 'status';
+/** Conversation transcript kinds; each maps to a coordination act in `coordination-act-map.ts`. */
+export const PEER_CONVERSATION_MESSAGE_KINDS = Object.freeze([
+  'open',
+  'message',
+  'reply',
+  'handoff',
+  'close',
+  'status',
+] as const);
+export type PeerConversationMessageKind = (typeof PEER_CONVERSATION_MESSAGE_KINDS)[number];
 export type PeerConversationDirection = 'inbound' | 'outbound';
 
 export interface PeerConversationTranscriptEntry {
@@ -343,14 +351,6 @@ function validatePeerConversationMessage(message: unknown): {
   };
 }
 
-const PEER_CONVERSATION_MESSAGE_KINDS: readonly PeerConversationMessageKind[] = [
-  'open',
-  'message',
-  'reply',
-  'handoff',
-  'close',
-  'status',
-];
 const PEER_CONVERSATION_DIRECTIONS: readonly PeerConversationDirection[] = ['inbound', 'outbound'];
 
 function isNonEmptyString(value: unknown): value is string {

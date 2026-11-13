@@ -8,7 +8,9 @@ const mocks = vi.hoisted(() => ({
   logger: { debug: vi.fn(), success: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
-vi.mock('@agent/core/mesh/peer-messaging', () => ({
+vi.mock('@agent/core/mesh/peer-messaging', async (importOriginal) => ({
+  PEER_MESSAGE_TYPES: (await importOriginal<typeof import('@agent/core/mesh/peer-messaging')>())
+    .PEER_MESSAGE_TYPES,
   buildPeerMessageEnvelope: mocks.buildPeerMessageEnvelope,
   loadPeerNetworkCatalog: mocks.loadPeerNetworkCatalog,
   resolvePeerDispatchTarget: mocks.resolvePeerDispatchTarget,

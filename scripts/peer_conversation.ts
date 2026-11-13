@@ -4,6 +4,7 @@ import {
   createPeerConversationSession,
   listPeerConversationSessions,
   loadPeerConversationSession,
+  PEER_CONVERSATION_MESSAGE_KINDS,
   savePeerConversationSession,
   sendPeerConversationMessageToPeer,
 } from '@agent/core/mesh/peer-conversation';
@@ -47,7 +48,7 @@ async function main(
     .option('text', { type: 'string' })
     .option('kind', {
       type: 'string',
-      choices: ['open', 'message', 'reply', 'handoff', 'close', 'status'],
+      choices: PEER_CONVERSATION_MESSAGE_KINDS,
       default: 'message',
     })
     .option('related-work-item-id', { type: 'array' })

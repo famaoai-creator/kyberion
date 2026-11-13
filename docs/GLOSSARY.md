@@ -174,6 +174,22 @@ A standing grant that itself needs human approval references the approval as its
 | `surface-concierge`                                        | A specialist in the specialist catalog: receives natural-language requests, fills missing slots and keeps the conversation smooth on any surface                                                                                     | `knowledge/product/orchestration/specialists/surface-concierge.json`                                                    |
 | `starter-concierge`                                        | A dot team starter template (a draft dot charter that owns one conversation and tracks its commitments)                                                                                                                              | `knowledge/product/orchestration/dot-team-templates/starter-concierge.json`                                             |
 
+### Coordination Act
+
+One of the eight speech acts agents and runtimes exchange (request, propose, accept, reject, inform, query, result, handoff); each layer's own message kinds map onto them, and no act carries execution authority. The acts are declared once in `libs/core/foundation/coordination-act.ts`. Each layer keeps its own wire words: A2A `performative`, peer `PeerMessageType`, peer conversation kinds, Mesh Hub records and request kinds, Co-Session handoff kinds, the mission coordination record channel, the agent execution port and discussion performatives. `libs/core/mesh/coordination-act-map.ts` maps those words to one act, or to "not an act" with a reason (states, carriers, sender labels, session control, categories of stored record).
+
+Two rules pick the act. **Rule A:** `propose` is work that stays pending until the recipient's own decision is recorded as a separate state (typed peer task, Mesh Hub recipient proposal); `request` is an ask for which the layer records no separate acceptance. **Rule B:** the innermost typed layer names the act, and outer envelope types are carriers. For example, every peer conversation message travels as peer envelope `request`, and a conversation `handoff` only carries a proposal. `accept` / `reject` are the recipient's own decision (stage 4 of the [communication model](../knowledge/product/architecture/agent-communication-layer-model.md#5-identity-authentication-authorization-and-acceptance)). Across runtimes, work runs only under the recipient's WorkItem claim. Inside one runtime (A2A bridge, agent execution port) delegation runs on receipt under the sender's own authority, so the bridge's `propose` / `accept` / `reject` are sender labels, not acts. A `result` act answers a request; it is not the user-facing [Result](#result). Not to be confused with `CollaborationKind` (`libs/core/agent/agent-collaboration-events.ts`), which classifies observed events (dispatch, claim, handoff, review, …) for the collaboration view rather than messages. `tests/coordination-act-boundary.test.ts` and `tsc` check the tables; coverage is partial (runtime for layers with an exported array, `tsc` only for type unions, none for two hand-written key sets) and is listed in the model's §11.2.
+
+"A2A" names three unrelated mechanisms. Say which one you mean:
+
+| Name                                               | What it is                                                                       | Traffic           |
+| -------------------------------------------------- | -------------------------------------------------------------------------------- | ----------------- |
+| A2A bridge (`libs/core/mesh/a2a-bridge.ts`)        | In-runtime envelopes between the orchestrator and the provider agents it spawns  | yes, the only one |
+| `network:a2a_send` / `a2a_poll` (network-actuator) | A file-drop seam under `active/shared/runtime/a2a/{inbox,outbox}`                | none (no caller)  |
+| `a2a-message` in a Mesh Hub recipient proposal     | A record stored with the proposal. Nothing executes it or sends it to the bridge | stored only       |
+
+"A2A" alone means the bridge. → [agent-communication-layer-model §11](../knowledge/product/architecture/agent-communication-layer-model.md#11-coordination-acts)
+
 ### FDE full glossary
 
 ## Core concepts

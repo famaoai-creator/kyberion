@@ -87,6 +87,21 @@ import {
  * - All routing decisions are audit-logged
  */
 
+/**
+ * A2A envelope speech acts. Same members as `a2a-envelope.schema.json`; each
+ * maps to a coordination act in `coordination-act-map.ts`.
+ */
+export const A2A_PERFORMATIVES = Object.freeze([
+  'request',
+  'propose',
+  'inform',
+  'accept',
+  'reject',
+  'query',
+  'result',
+] as const);
+export type A2APerformative = (typeof A2A_PERFORMATIVES)[number];
+
 export interface A2AMessage {
   a2a_version: string;
   header: {
@@ -96,7 +111,7 @@ export interface A2AMessage {
     receiver?: string;
     conversation_id?: string;
     correlation_id?: string;
-    performative: 'request' | 'propose' | 'inform' | 'accept' | 'reject' | 'query' | 'result';
+    performative: A2APerformative;
     timestamp?: string;
     signature?: string;
     sig_alg?: string;

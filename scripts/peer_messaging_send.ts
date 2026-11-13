@@ -3,6 +3,7 @@ import { logger } from '@agent/core/core';
 import {
   buildPeerMessageEnvelope,
   loadPeerNetworkCatalog,
+  PEER_MESSAGE_TYPES,
   resolvePeerDispatchTarget,
   sendPeerMessage,
 } from '@agent/core/mesh/peer-messaging';
@@ -33,14 +34,7 @@ export async function main(
     .option('type', {
       type: 'string',
       default: 'request',
-      choices: [
-        'request',
-        'reply',
-        'notification',
-        'handoff',
-        'capability_query',
-        'capability_response',
-      ],
+      choices: PEER_MESSAGE_TYPES,
       description: 'Message type',
     })
     .option('payload', {

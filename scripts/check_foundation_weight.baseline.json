@@ -71,6 +71,7 @@
     "foundation/concierge-management-capability": 8,
     "foundation/config.generated": 0,
     "foundation/config": 1,
+    "foundation/coordination-act": 0,
     "foundation/credential-binding": 16,
     "foundation/credential-material-capability": 3,
     "foundation/customer-channel-binding-store-capability": 0,
