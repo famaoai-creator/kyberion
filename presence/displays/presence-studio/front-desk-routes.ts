@@ -22,7 +22,6 @@ import {
 } from '@agent/core/organization/member-registry';
 import {
   FRONT_DESK_HELP_LINK,
-  readAvailableFrontDeskSurfaces,
   frontDeskRoleFromViewer,
   readFrontDeskSurfacePorts,
   readFrontDeskSurfaceUrls,
@@ -123,7 +122,12 @@ export function registerFrontDeskRoutes(app: express.Express): void {
   // `sovereign_concierge`; presence-studio keeps its own established persona).
   app.get('/api/me', (req, res) => {
     try {
-      const viewer = resolvePresenceStudioViewerContext(req);
+      // A page asks `/api/me` which tenant it is viewing before anything else
+      // and stores the answer; a stale stored tenant must get that answer, not
+      // a refusal, or the page could never replace it.
+      const viewer = resolvePresenceStudioViewerContext(req, {
+        unregisteredTenantHint: 'ignore',
+      });
       // FD-01: the loopback owner's tenant list is their memberships (all
       // tenants), with the request's effective tenant as the one being viewed.
       const scope = toFrontDeskViewerScope(
@@ -150,7 +154,7 @@ export function registerFrontDeskRoutes(app: express.Express): void {
   // FD-00 / FD-01: the shared front-desk rail reads its menu + labels from
   // here so presence-studio and concierge never drift (libs/core/surface/front-desk-nav.ts
   // is the shared existing-feature catalog).
-  app.get('/api/front-desk/nav', async (req, res) => {
+  app.get('/api/front-desk/nav', (req, res) => {
     try {
       const resolved = resolvePresenceStudioViewerContext(req);
       const requestedTenant = readSurfaceStringParam(req.query.tenant) || undefined;
@@ -163,7 +167,6 @@ export function registerFrontDeskRoutes(app: express.Express): void {
       const role = resolvePresenceStudioNavRole(viewer);
       const items = resolveFrontDeskMenu({
         currentSurface: 'presence-studio',
-        availableSurfaces: await readAvailableFrontDeskSurfaces(),
         ports: readFrontDeskSurfacePorts(),
         urls: readFrontDeskSurfaceUrls(),
         role,

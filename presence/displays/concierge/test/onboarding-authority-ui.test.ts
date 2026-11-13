@@ -116,12 +116,12 @@ describe('onboarding authority review and resumption', () => {
             base_hash: 'base',
           })
     );
-    await m.change('select', 'vcs:pr_merge', 1);
+    await m.change('select', 'vcs:pr_merge', 0);
     await m.change('input[type="text"]', 'release/custom');
     const genericBranch = m.container.querySelector('input[type="text"]')!;
     expect(Reflect.get(genericBranch, 'value')).toBe('release/custom');
     expect(genericBranch.hasAttribute('readOnly')).toBe(false);
-    await m.change('select', 'vcs:development', 1);
+    await m.change('select', 'vcs:development', 0);
     const fixedBranches = [...m.container.querySelectorAll('input[type="text"]')];
     expect(fixedBranches.map((input) => Reflect.get(input, 'value'))).toEqual([
       'agent/kyberion-development',
@@ -129,7 +129,8 @@ describe('onboarding authority review and resumption', () => {
     ]);
     expect(fixedBranches.every((input) => input.hasAttribute('readOnly'))).toBe(true);
     await m.change('input[type="url"]', 'https://github.com/owner/repo');
-    await m.change('input[type="datetime-local"]', '2099-10-21T12:00');
+    await m.check('Pick a date', true);
+    await m.change('input[name="authority.expiry_custom"]', '2099-10-21T12:00');
     await m.check('Require a verified private repository', true);
     await m.check('Set delegated data tiers', true);
     await m.check('Personal', true);
@@ -167,7 +168,7 @@ describe('onboarding authority review and resumption', () => {
         id: 'charter',
         expires_at: '2099-10-21T12:00:00.000Z',
         stopped: false,
-        delegated_decisions: {meeting_scheduling:'allow_with_review'},
+        delegated_decisions: { meeting_scheduling: 'allow_with_review' },
         data_tier: { read: ['public', 'personal'], write: [] },
         grants: [
           {
@@ -181,10 +182,18 @@ describe('onboarding authority review and resumption', () => {
     };
     const m = await mount(async (body) =>
       !body
-        ? json({...granted,delegable_decisions:[{decision_type:'meeting_scheduling',label:{en:'Meeting scheduling',ja:'会議調整'}}]})
+        ? json({
+            ...granted,
+            delegable_decisions: [
+              {
+                decision_type: 'meeting_scheduling',
+                label: { en: 'Meeting scheduling', ja: '会議調整' },
+              },
+            ],
+          })
         : json({ ok: true, statement: 'Reviewed revocation', digest: 'digest', base_hash: 'base' })
     );
-    await m.change('select','allow',2);
+    await m.change('select', 'allow', 1);
     await m.click('Review revocation');
     await m.click('Preview exact authority');
     expect(m.posts[0]).toMatchObject({
@@ -222,9 +231,10 @@ describe('onboarding authority review and resumption', () => {
     expect(m.container.textContent).toContain('https://existing.test');
     const checkbox = m.container.querySelector('input[type="checkbox"]')!;
     expect(Reflect.get(checkbox, 'checked')).toBe(false);
-    await m.change('select', 'vcs:pr_create', 1);
+    await m.change('select', 'vcs:pr_create', 0);
     await m.change('input[type="url"]', 'https://github.com/fixture/repo');
-    await m.change('input[type="datetime-local"]', '2099-10-21T12:00');
+    await m.check('Pick a date', true);
+    await m.change('input[name="authority.expiry_custom"]', '2099-10-21T12:00');
     const preview = [...m.container.querySelectorAll('button')].find(
       (button) => button.textContent === 'Preview exact authority'
     )!;
@@ -386,10 +396,11 @@ describe('onboarding authority review and resumption', () => {
             base_hash: 'base',
           })
     );
-    expect(Reflect.get(m.container.querySelectorAll('select')[1], 'value')).toBe('');
-    await m.change('select', 'vcs:pr_create', 1);
+    expect(Reflect.get(m.container.querySelectorAll('select')[0], 'value')).toBe('');
+    await m.change('select', 'vcs:pr_create', 0);
     await m.change('input[type="url"]', 'https://github.com/owner/repo');
-    await m.change('input[type="datetime-local"]', '2099-10-21T12:00');
+    await m.check('Pick a date', true);
+    await m.change('input[name="authority.expiry_custom"]', '2099-10-21T12:00');
     await m.click('Preview exact authority');
     expect(m.posts[0]).toMatchObject({
       scope_kind: 'person',

@@ -88,6 +88,41 @@
       "not_to_confuse_with": ["work-shape"]
     },
     {
+      "id": "mcp-facade",
+      "term": "MCP Facade",
+      "aliases": ["inbound MCP server"],
+      "category": "surface",
+      "definition": "The governed inbound MCP server that exposes `kyberion.*` tools to LLM clients; the MCP tool catalog lists each tool with its band, caller roles, tiers and approval requirement.",
+      "glossary_anchor": "mcp-facade",
+      "canonical_doc": "knowledge/product/architecture/mcp-facade-model.md",
+      "owner_modules": [
+        "libs/shared-network/src/mcp-server-engine.ts",
+        "knowledge/product/governance/mcp-tool-catalog.json"
+      ],
+      "not_to_confuse_with": ["surface", "mcp-client", "actuator-op"]
+    },
+    {
+      "id": "mcp-caller-identity",
+      "term": "MCP Caller Identity",
+      "category": "identity",
+      "definition": "The tenant, principal, caller role and NHI an MCP server process runs as, resolved from the server's own environment and never from tool arguments.",
+      "glossary_anchor": "mcp-caller-identity",
+      "canonical_doc": "knowledge/product/architecture/mcp-facade-model.md",
+      "owner_modules": ["libs/shared-network/src/mcp-request-context.ts"],
+      "not_to_confuse_with": ["authority-role", "member-role"]
+    },
+    {
+      "id": "mcp-client",
+      "term": "MCP Client",
+      "aliases": ["outbound MCP client"],
+      "category": "execution",
+      "definition": "Kyberion's one outbound client for external MCP servers, reached through service-actuator and run as a governed external operation.",
+      "glossary_anchor": "mcp-client",
+      "canonical_doc": "knowledge/product/architecture/mcp-facade-model.md",
+      "owner_modules": ["libs/core/service/service-engine-execution.ts"],
+      "not_to_confuse_with": ["mcp-facade"]
+    },
+    {
       "id": "execution-shape",
       "term": "Execution Shape",
       "category": "execution",
@@ -272,7 +307,10 @@
       "definition": "A surface implemented as a web UI under presence/displays/<name>/; Display names the implementation form, Surface the role.",
       "glossary_anchor": "display",
       "canonical_doc": "docs/SURFACES.md",
-      "owner_modules": [],
+      "owner_modules": [
+        "libs/core/surface/surface-runtime.ts",
+        "knowledge/product/governance/active-surfaces.json"
+      ],
       "not_to_confuse_with": ["surface"]
     },
     {
@@ -310,12 +348,16 @@
     {
       "id": "concierge",
       "term": "Concierge",
-      "aliases": ["秘書室"],
+      "aliases": ["秘書室", "Kyberion server"],
       "category": "surface",
-      "definition": "The CEO-secretary surface that answers what do I need to decide now.",
+      "definition": "The CEO-secretary surface that answers what do I need to decide now; its shell hosts every Front Desk destination, including the operations console at /ops.",
       "glossary_anchor": "concierge",
       "canonical_doc": "docs/SURFACES.md",
-      "owner_modules": [],
+      "owner_modules": [
+        "knowledge/product/governance/surfaces/concierge.json",
+        "presence/displays/concierge/src/app/concierge-shell.tsx",
+        "presence/displays/concierge/src/lib/ia-routes.ts"
+      ],
       "not_to_confuse_with": ["front-desk"]
     },
     {
@@ -526,6 +568,22 @@
       "canonical_doc": "knowledge/product/architecture/decisions/2026-11-10-concept-model-v2.md",
       "owner_modules": ["libs/core/knowledge/memory-promotion-queue.ts"],
       "not_to_confuse_with": []
+    },
+    {
+      "id": "viewer-context",
+      "term": "Viewer Context",
+      "aliases": ["ViewerContext", "Viewer Scope"],
+      "category": "scope",
+      "definition": "The server-resolved principal and allowed tenant scope.",
+      "glossary_anchor": "viewercontext--viewer-scope",
+      "canonical_doc": "docs/developer/CHRONOS_VIEWER_SCOPE_OPERATIONS.ja.md",
+      "owner_modules": [
+        "libs/core/foundation/surface-viewer-role.ts",
+        "libs/core/surface/surface-viewer-scope-contract.ts",
+        "libs/core/surface/surface-authorization.ts",
+        "presence/displays/concierge/src/lib/viewer-context.ts"
+      ],
+      "not_to_confuse_with": ["member-role", "authority-role", "entity-scope"]
     }
   ]
 }

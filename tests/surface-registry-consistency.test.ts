@@ -29,11 +29,28 @@ describe('RS-04 surface registry consistency', () => {
     expect([...snapshot.surfaces].sort(byId)).toEqual([...manifest.surfaces].sort(byId));
   });
 
-  it('registers every surface-roles entry with the same port', () => {
+  it('registers every surface-roles entry with the same port and enabled state', () => {
     for (const role of roles) {
       const def = manifest.surfaces.find((s) => s.id === role.id);
       expect(def, `${role.id} missing from the surface registry`).toBeDefined();
       expect(def?.port, `${role.id} port`).toBe(role.port);
+      // The manifests are what `surface_runtime` launches from; the role
+      // catalog must not claim a different auto-start state.
+      expect(typeof role.enabled, `${role.id} declares enabled`).toBe('boolean');
+      expect(role.enabled, `${role.id} enabled`).toBe(def?.enabled !== false);
+    }
+  });
+
+  it('gives every manifest UI surface under presence/displays a role entry', () => {
+    const roleIds = new Set(roles.map((role) => role.id));
+    const displays = manifest.surfaces.filter(
+      (s) =>
+        s.kind === 'ui' &&
+        [s.cwd ?? '', ...(s.args ?? [])].some((part) => part.includes('presence/displays/'))
+    );
+    expect(displays.length).toBeGreaterThan(0);
+    for (const surface of displays) {
+      expect(roleIds.has(surface.id), `${surface.id} missing from surface-roles.json`).toBe(true);
     }
   });
 
