@@ -1,7 +1,7 @@
 ---
 title: Default-disabled HTTP MCP human request resource server
 tags: [architecture, mcp, authorization, identity, front-desk]
-last_updated: 2026-10-11
+last_updated: 2026-11-12
 ---
 
 # HTTP MCP human request resource server
@@ -18,12 +18,14 @@ check-only validation never listen. Deployment, authorization-server setup,
 credential introduction, and real-provider interoperability remain separate work.
 See [runtime operations](../../../docs/developer/HUMAN_REQUEST_RUNTIME_OPERATIONS.ja.md).
 
-The existing stdio MCP catalog and identities are unchanged. The new factory
+The existing stdio MCP catalog and identities are unchanged
+([facade model](./mcp-facade-model.md)). The new factory
 exposes only `kyberion.request.receive`, `kyberion.request.status`, and
 `kyberion.request.result`. It cannot expose pipeline, actuator, approval, member
 management, or administrative tools through a generic catalog fallback.
 
-The installed SDK remains 1.31.0, protocol 2025-11-25. Authorization design uses
+The installed SDK is the one pinned in `libs/shared-network/package.json`
+(1.32.1 on 2026-11-12), protocol 2025-11-25. Authorization design uses
 the 2026-07-28 MCP authorization guidance; this is **not** a claim of full
 2026-07-28 protocol support. No SDK upgrade is included.
 
@@ -137,6 +139,12 @@ cover identity/scope denial, same-request-ID replay, cross-entry uncertainty,
 concurrent users, metadata/challenges, parser errors and Host/Origin checks.
 No test uses a real provider, credential, public listener, or production registry.
 Repository browser regression checks do not verify this new login/OAuth path.
+
+The entrypoint (`scripts/mcp_http_server.ts`, CLI `mcp http`) is listed in
+`cli-commands.json` only. It has no row in `docs/SURFACES.md` and no entry in
+`protocol-service-registry.json`, whose only MCP entry is the stdio
+`mcp-server-cowork`. Whether a default-off service belongs in the registry is
+undecided; the request tools are not in `mcp-tool-catalog.json` either.
 
 References: [MCP authorization](https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization),
 [MCP transports](https://modelcontextprotocol.io/specification/2026-07-28/basic/transports),

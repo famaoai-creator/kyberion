@@ -88,6 +88,41 @@
       "not_to_confuse_with": ["work-shape"]
     },
     {
+      "id": "mcp-facade",
+      "term": "MCP Facade",
+      "aliases": ["inbound MCP server"],
+      "category": "surface",
+      "definition": "The governed inbound MCP server that exposes `kyberion.*` tools to LLM clients; the MCP tool catalog lists each tool with its band, caller roles, tiers and approval requirement.",
+      "glossary_anchor": "mcp-facade",
+      "canonical_doc": "knowledge/product/architecture/mcp-facade-model.md",
+      "owner_modules": [
+        "libs/shared-network/src/mcp-server-engine.ts",
+        "knowledge/product/governance/mcp-tool-catalog.json"
+      ],
+      "not_to_confuse_with": ["surface", "mcp-client", "actuator-op"]
+    },
+    {
+      "id": "mcp-caller-identity",
+      "term": "MCP Caller Identity",
+      "category": "identity",
+      "definition": "The tenant, principal, caller role and NHI an MCP server process runs as, resolved from the server's own environment and never from tool arguments.",
+      "glossary_anchor": "mcp-caller-identity",
+      "canonical_doc": "knowledge/product/architecture/mcp-facade-model.md",
+      "owner_modules": ["libs/shared-network/src/mcp-request-context.ts"],
+      "not_to_confuse_with": ["authority-role", "member-role"]
+    },
+    {
+      "id": "mcp-client",
+      "term": "MCP Client",
+      "aliases": ["outbound MCP client"],
+      "category": "execution",
+      "definition": "Kyberion's one outbound client for external MCP servers, reached through service-actuator and run as a governed external operation.",
+      "glossary_anchor": "mcp-client",
+      "canonical_doc": "knowledge/product/architecture/mcp-facade-model.md",
+      "owner_modules": ["libs/core/service/service-engine-execution.ts"],
+      "not_to_confuse_with": ["mcp-facade"]
+    },
+    {
       "id": "execution-shape",
       "term": "Execution Shape",
       "category": "execution",
