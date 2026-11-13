@@ -17,6 +17,7 @@ import { pathResolver } from '@agent/core/path-resolver';
 import { authorizeSurfaceContextOperation } from '@agent/core/surface/surface-authn';
 import * as io from '@agent/core/secure-io';
 import { toSurfaceAuthorizationContext, type ConciergeViewerContext } from './viewer-context';
+import { conciergeExecutionRole } from './viewer-execution-role';
 import {
   OUTCOME_FILE_PAGE_SIZE,
   OUTCOME_FILE_LIMIT,
@@ -165,7 +166,7 @@ function authorize(viewer: ConciergeViewerContext, entryId: string): Snapshot {
 }
 function readAsViewer<T>(viewer: ConciergeViewerContext, owner: OwnerScope, fn: () => T): T {
   return withExecutionContext(
-    viewer.role === 'localadmin' ? 'concierge_localadmin' : 'concierge_operator',
+    conciergeExecutionRole(viewer.role),
     fn,
     undefined,
     owner.tenant,

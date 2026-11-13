@@ -199,6 +199,73 @@ describe('concierge viewer-context tier masking', () => {
     expect(resolveConciergeViewer(request()).response?.status).toBe(403);
   });
 
+  it('reuses one resolution per request only for a caller that opted into the memo', async () => {
+    let reads = 0;
+    mockRegistryModule(async () => ({
+      ...(await vi.importActual<typeof import('@agent/core/chronos-access-registry')>(
+        '@agent/core/chronos-access-registry'
+      )),
+      readChronosTokenRegistrations: () => {
+        reads += 1;
+        return [
+          { token_hash: tokenHash(REGISTERED_TOKEN), role: 'readonly', tenant_slugs: ['tenant-a'] },
+        ];
+      },
+    }));
+    const { resolveConciergeViewer, resolveConciergeViewerContextOnce } =
+      await import('./viewer-context.js');
+    const request = () =>
+      new NextRequest('https://concierge.example/api/ops/workitems', {
+        headers: { authorization: `Bearer ${REGISTERED_TOKEN}` },
+      });
+
+    // Without the memo every call resolves again (unchanged Concierge behaviour).
+    const plain = request();
+    resolveConciergeViewer(plain);
+    resolveConciergeViewer(plain);
+    expect(reads).toBe(2);
+
+    // The operations gates opt in; the route's later resolution reuses it.
+    reads = 0;
+    const memoized = request();
+    const first = resolveConciergeViewerContextOnce(memoized);
+    expect(resolveConciergeViewerContextOnce(memoized)).toBe(first);
+    expect(resolveConciergeViewer(memoized).context).toBe(first);
+    expect(reads).toBe(1);
+
+    // A failed resolution is remembered and answered the same way.
+    const unknown = new NextRequest('https://concierge.example/api/ops/workitems', {
+      headers: { authorization: 'Bearer not-registered' },
+    });
+    expect(() => resolveConciergeViewerContextOnce(unknown)).toThrow(/Unknown Concierge viewer/);
+    const readsAfterFailure = reads;
+    expect(() => resolveConciergeViewerContextOnce(unknown)).toThrow(/Unknown Concierge viewer/);
+    expect(resolveConciergeViewer(unknown).response?.status).toBe(401);
+    expect(reads).toBe(readsAfterFailure);
+  });
+
+  it('answers an authorization failure with its own status and anything else with 500', async () => {
+    const { ConciergeViewerError, conciergeErrorResponse } = await import('./viewer-context.js');
+    const { SurfaceViewerScopeError } = await import('@agent/core/surface/surface-mutation-guard');
+    const { SurfaceAuthorizationError } = await import('@agent/core/surface/surface-authorization');
+    expect(conciergeErrorResponse(new ConciergeViewerError(403, 'denied')).status).toBe(403);
+    expect(conciergeErrorResponse(new SurfaceViewerScopeError(403, 'denied')).status).toBe(403);
+    expect(conciergeErrorResponse(new SurfaceViewerScopeError(401, 'unknown')).status).toBe(401);
+    expect(
+      conciergeErrorResponse(
+        new SurfaceAuthorizationError({
+          allowed: false,
+          operationId: 'x.read',
+          reasonCode: 'tier_scope_denied',
+          reason: 'tier scope denied for x.read',
+          policyId: 'surface:x.read',
+        })
+      ).status
+    ).toBe(403);
+    expect(conciergeErrorResponse(new Error('boom')).status).toBe(500);
+    expect(conciergeErrorResponse(new Error('boom'), 400).status).toBe(400);
+  });
+
   it('denies an explicit personal tier request and masks the role default', async () => {
     const { defaultTierAccess, resolveTierAccess } = await import('./viewer-context.js');
     expect(defaultTierAccess('localadmin')).toEqual(['confidential', 'public']);

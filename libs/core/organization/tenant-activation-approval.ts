@@ -255,7 +255,7 @@ function snapshotState(
 ) {
   const viewerScopeMode = getRegisteredEnvText('KYBERION_VIEWER_SCOPE') || 'warn';
   if (!['warn', 'enforce'].includes(viewerScopeMode))
-    refuse('Viewer scope must currently be audited or enforced.');
+    refuse('Viewer scope mode must be warn or enforce for activation (KYBERION_VIEWER_SCOPE).');
   const binding = loadOnboardingContextBinding(command.customerSlug, rootDir);
   if (
     !binding ||

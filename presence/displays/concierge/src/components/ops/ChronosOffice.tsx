@@ -117,7 +117,7 @@ export interface ChronosOfficeState {
 }
 
 /** Agent activity (rooms = missions) for the viewer's tenant scope, refreshed every 30s. */
-export function useChronosOffice(tenant = ''): ChronosOfficeState {
+function useChronosOffice(tenant = ''): ChronosOfficeState {
   const [office, setOffice] = React.useState<Office | null>(null);
   const [trackRecords, setTrackRecords] = React.useState<TrackRecord[]>([]);
   const [error, setError] = React.useState<string | null>(null);
@@ -249,7 +249,7 @@ export function ChronosMissionTable({
 
 /**
  * Operations view of the office: the mission table plus each agent's track
- * record. The home view renders the table itself (see ChronosHome).
+ * record.
  */
 export function ChronosOffice({
   tenant = '',

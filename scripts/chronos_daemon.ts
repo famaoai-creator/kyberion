@@ -28,6 +28,7 @@ import { safeExistsSync, safeLstat, safeReaddir } from '@agent/core/secure-io';
 import { parseSafeJsonInput } from '@agent/core/foundation/safe-json';
 import { sendOpsAlert } from '@agent/core/ops-alert';
 import {
+  assertScheduledContextAdmissible,
   resolveScheduledPipelinePath,
   getSchedulesDueNow,
   claimScheduledPipelineRun,
@@ -716,6 +717,8 @@ async function tickAsLeader(): Promise<void> {
           const adf = readValidatedPipelineAdf(resolvedPipelinePath, {
             trustResolved: true,
           });
+          // A schedule supplies parameters; it never sets what the runner derives.
+          assertScheduledContextAdmissible(scheduled.id, scheduled.context, adf.context ?? {});
           // WI-13: traces built during this run are tagged origin `scheduled`
           // through the trigger runner's async-scoped cron correlation
           // (`withTriggerCorrelation`, read by `deriveTraceOrigin`), not via a

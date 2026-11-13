@@ -4,13 +4,11 @@
  * only combines a server-resolved viewer scope with caller-loaded tenant
  * profiles. `readFrontDeskMe` is the thin I/O wrapper around it.
  *
- * Local role/type copies on purpose: FD-00a defines the same `FrontDeskRole`
- * union in the shared nav module, which a sibling task is authoring
- * concurrently. Duplicating the tiny union here avoids a cross-task import
- * race; a follow-up can consolidate once both land.
+ * `FrontDeskRole` and the viewer-role -> human-role mapping are owned by
+ * front-desk-nav.ts; this module re-exports the type and delegates the mapping.
  */
 
-import type { MemberRole } from '../organization/member-registry.js';
+import { frontDeskRoleFromViewer, type FrontDeskRole } from './front-desk-nav.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { currentScope } from '../scope-context.js';
 import { resolveOperatorDisplayName } from './operator-identity.js';
@@ -27,8 +25,8 @@ import {
 } from '../organization/member-registry.js';
 import { narrowSurfaceViewerTenant, type SurfaceViewerScope } from './surface-mutation-guard.js';
 
-/** Human-facing role union (plan §2.3). `approver` arrives with FD-07. */
-export type FrontDeskRole = MemberRole;
+/** Human-facing role union (plan §2.3); declared once in front-desk-nav.ts. */
+export type { FrontDeskRole };
 
 /**
  * FD-07: a member resolved by `resolveMemberByPrincipal`, projected to the
@@ -100,8 +98,7 @@ export function frontDeskRoleFromViewerScope(
   scope: Pick<SurfaceViewerScope, 'role'>,
   memberRole?: FrontDeskRole | null
 ): FrontDeskRole {
-  if (memberRole) return memberRole;
-  return scope.role === 'localadmin' ? 'owner' : 'viewer';
+  return frontDeskRoleFromViewer({ role: scope.role, memberRole });
 }
 
 function toTenantView(profile: TenantProfile, role: FrontDeskRole): FrontDeskTenantView {

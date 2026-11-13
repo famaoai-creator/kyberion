@@ -75,7 +75,9 @@ describe('chronos agents route input boundary', () => {
     expect(response.status).toBe(400);
   });
 
-  it.each(['propose', 'accept', 'reject', 'result', 'handoff', undefined])(
+  // Values outside the envelope schema (unknown or missing) are refused earlier, by
+  // envelope validation; see route.a2a.test.ts.
+  it.each(['propose', 'accept', 'reject', 'result'])(
     'returns 400 for a2a performative %j without calling the bridge',
     async (performative) => {
       a2aRoute.mockClear();

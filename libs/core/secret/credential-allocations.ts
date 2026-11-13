@@ -1,3 +1,5 @@
+import { registerServiceCredentialAllocationVerifier } from '../governance/service-credential-allocation.js';
+import { verifyServiceCredentialAllocation } from '../governance/service-credential-allocation-verifier.js';
 /** Local credential allocations reuse standing grants; material stays in the secret store. */
 import { timingSafeEqual } from 'node:crypto';
 import { assertStoreGrantIssuanceAllowed, withStoreGrant } from '../authority.js';
@@ -36,6 +38,8 @@ import { currentScopeEnvelope } from '../scope-envelope.js';
 
 export const CREDENTIAL_USE_CAPABILITY = 'credential.use';
 export function installLocalCredentialAllocations(): boolean {
+  // The source verifier is required for external brokers too; never replace their resolver.
+  registerServiceCredentialAllocationVerifier(verifyServiceCredentialAllocation);
   if (getSecretResolver()) return false;
   registerSecretResolver(
     {

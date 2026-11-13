@@ -11,7 +11,10 @@ import { getAllFiles } from '@agent/core/fs-utils';
  * `StorageDataTier` from libs/core/storage-layout.ts for libs/core modules. No
  * module spells the literal union `'personal' | 'confidential' | 'public'`. The Member Role
  * union `'owner' | 'approver' | 'operator' | 'viewer'` has exactly one
- * declaration: `MemberRole` in libs/core/organization/member-registry.ts.
+ * declaration: `MemberRole` in libs/core/organization/member-registry.ts. The
+ * surface viewer role union `'readonly' | 'localadmin'` has exactly one
+ * declaration: `SurfaceViewerRole` in libs/core/foundation/surface-viewer-role.ts
+ * (re-exported from libs/core/surface/surface-authorization.ts).
  * Every other libs/core module imports the canonical type (`import type`, so
  * the foundation weight is unchanged) and expresses aliases as
  * `export type X = StorageDataTier`, subsets as `Exclude<>` / `Extract<>`, and
@@ -31,6 +34,11 @@ const UNIONS = [
     name: 'Member Role',
     canonical: 'libs/core/organization/member-registry.ts',
     members: ['owner', 'approver', 'operator', 'viewer'],
+  },
+  {
+    name: 'surface viewer role',
+    canonical: 'libs/core/foundation/surface-viewer-role.ts',
+    members: ['readonly', 'localadmin'],
   },
 ] as const;
 

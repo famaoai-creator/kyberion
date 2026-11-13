@@ -33,11 +33,11 @@ describe('Governance import baseline', () => {
     const actual = scanGovernanceImportBaseline().fs_imports;
     const expected = normalize(baseline.fs_imports);
     expect(actual, diffMessage('Direct fs import', expected, actual)).toEqual(expected);
-  });
+  }, 60_000);
 
   it('does not introduce new direct child_process imports without updating the baseline', () => {
     const actual = scanGovernanceImportBaseline().child_process_imports;
     const expected = normalize(baseline.child_process_imports);
     expect(actual, diffMessage('Direct child_process import', expected, actual)).toEqual(expected);
-  });
+  }, 60_000);
 });

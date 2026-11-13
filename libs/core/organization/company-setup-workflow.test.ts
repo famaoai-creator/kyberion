@@ -121,7 +121,13 @@ vi.mock('./tenant-activation-probe.js', () => ({
     return {
       passed: true,
       evidence_ref: 'server-probe',
-      results: { viewer_scope: { passed: true, detail: 'audit-only' } },
+      results: {
+        viewer_scope: {
+          passed: true,
+          detail:
+            'tenant is registered and active, so viewer narrowing resolves it; KYBERION_VIEWER_SCOPE=warn (out-of-scope tenant reads are audited, then denied)',
+        },
+      },
     };
   }),
 }));
@@ -322,6 +328,11 @@ describe('company setup workflow mediation', () => {
     await executeCompanySetup(auth, { action: 'request_activation' }, principal);
     expect(st.requests).toBe(1);
     expect(st.applies).toBe(0);
+  });
+  it('summarizes the viewer scope probe without claiming warn mode leaves access open', async () => {
+    await register();
+    const probed = await executeCompanySetup(auth, { action: 'probe' }, principal);
+    expect(probed.setup.probeSummary).toEqual(['viewer_scope: passed']);
   });
   it('does not apply another company approval ID', async () => {
     await register();

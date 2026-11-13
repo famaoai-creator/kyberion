@@ -1,7 +1,7 @@
 {
   "$schema": "../schemas/surface-roles.schema.json",
   "version": "1.0.0",
-  "description": "UI サーフェスの役割定義。各サーフェスは1つの明確な役割を持ち、ヘッダに tagline_ja を表示する。surface-responsibility-model.md / docs/SURFACES.md と対応。writes は 'full'|'scoped'|'none'|'orchestrator' のいずれか。'orchestrator' は SO-03 で追加した語彙で、OrchestratorSession + mission-ownership work-item claim を経由してミッション所有者権限を持てるサーフェスを表す(multi-provider-coexecution-contract.md の「Surface orchestrator sessions」節を参照)。この時点ではどの既存ロールの値も変更しない — 語彙のみを追加し、各サーフェスの opt-in は今後の変更で行う。",
+  "description": "UI サーフェスの役割定義。各サーフェスは1つの明確な役割を持ち、ヘッダに tagline_ja を表示する。surface-responsibility-model.md / docs/SURFACES.md と対応。writes は 'full'|'scoped'|'none'|'orchestrator' のいずれか。'orchestrator' は SO-03 で追加した語彙で、OrchestratorSession + mission-ownership work-item claim を経由してミッション所有者権限を持てるサーフェスを表す(multi-provider-coexecution-contract.md の「Surface orchestrator sessions」節を参照)。この時点ではどの既存ロールの値も変更しない — 語彙のみを追加し、各サーフェスの opt-in は今後の変更で行う。port と enabled はサーフェス manifest(surfaces/*.json。ランタイムが読む正本)と一致させる(tests/surface-registry-consistency.test.ts が検査)。chronos-mirror-v2 は転送アプリで、その tagline_key は移設先の運用コンソール(concierge /ops)が描画する tagline を指す。",
   "roles": [
     {
       "id": "concierge",
@@ -31,15 +31,15 @@
     },
     {
       "id": "chronos-mirror-v2",
-      "name_ja": "運用画面",
-      "name_en": "Chronos Mirror",
-      "role_ja": "ミッション運用",
-      "tagline_ja": "ミッションの状況を確認し、必要なときだけ対応します。",
+      "name_ja": "旧運用画面(転送)",
+      "name_en": "Chronos Mirror (redirect)",
+      "role_ja": "互換リダイレクト",
+      "tagline_ja": "運用コンソールは秘書室の /ops へ移りました。旧 URL を転送します。",
       "tagline_key": "surface:chronos_surface_tagline",
-      "metaphor": "control tower",
+      "metaphor": "compatibility redirect",
       "dir": "presence/displays/chronos-mirror-v2",
       "port": 3000,
-      "writes": "scoped",
+      "writes": "none",
       "enabled": true
     },
     {
@@ -53,7 +53,7 @@
       "port": 3331,
       "writes": "none",
       "tagline_key": "surface:operator_surface_tagline",
-      "enabled": true
+      "enabled": false
     },
     {
       "id": "computer-surface",
@@ -67,6 +67,18 @@
       "writes": "none",
       "tagline_key": "surface:computer_surface_tagline",
       "enabled": true
+    },
+    {
+      "id": "customer-room",
+      "name_ja": "お客様ルーム",
+      "name_en": "Customer Room",
+      "role_ja": "お客様向けの決定画面",
+      "tagline_ja": "お客様への確認・ご決定のお願い",
+      "metaphor": "customer decision room",
+      "dir": "presence/displays/customer-room",
+      "port": 3046,
+      "writes": "scoped",
+      "enabled": false
     }
   ]
 }

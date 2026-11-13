@@ -1,30 +1,39 @@
 /**
- * Kyberion MCP Server Engine (Phase 0/1 — G1/G2)
+ * Kyberion MCP Server Engine — the governed inbound MCP facade (stdio).
  *
- * Exposes Kyberion capabilities as an MCP server so that Cowork (and other
- * MCP clients) can call them via stdio transport.
+ * Exposes Kyberion to MCP clients (Cowork, Claude Code, other LLM clients) as
+ * `kyberion.*` tools over stdio, as protocol service `mcp-server-cowork`.
  *
- * Tools implemented in this facade:
- *   kyberion.pipeline.list          — enumerate pipelines/
- *   kyberion.pipeline.run           — execute a pipeline via run_pipeline.js
- *   kyberion.pipeline.job_status    — poll a background pipeline job
- *   kyberion.knowledge.search       — search public knowledge tier
- *   kyberion.mission.create         — create a new mission
- *   kyberion.mission.status         — query mission status
- *   kyberion.mission.journal        — read mission journal
- *   kyberion.capability.list        — list actuator capabilities
- *   kyberion.capability.search      — search actuator capabilities
- *   kyberion.skill.list / .get      — transferable SKILL.md guides
- *   kyberion.actuator.invoke        — allowlisted actuator op (default dry_run)
- *   kyberion.surface.cowork.deliver — deliver artifact to Cowork outbox (Phase 1)
- *   kyberion.surface.cowork.list    — list pending Cowork outbox deliveries (Phase 1)
+ * The list of tools is knowledge/product/governance/mcp-tool-catalog.json: one
+ * entry per tool with its band (discover / act / govern), allowed caller
+ * roles, allowed tiers and whether it needs human approval. A tool without a
+ * catalog entry is refused when called. Read the catalog for the list; this
+ * comment names groups only, so it cannot go stale by a count.
  *
- * See knowledge/product/architecture/mcp-facade-model.md for bands and relationships.
+ * Where each group is registered:
+ *   scope.current, skill.list / skill.get, skill resource   mcp-facade-discover.ts
+ *   workspace.*, setup.checklist, needs-you.*               mcp-facade-workspace.ts
+ *                                                           (the surface operation registry)
+ *   mission record_evidence / review_task / verify /
+ *   distill / finish                                        mcp-mission-lifecycle.ts
+ *   service.capture                                         mcp-service-capture-tool.ts
+ *   actuator.invoke                                         mcp-facade-act.ts
+ *   pipeline.*, knowledge.*, capability.*,
+ *   mission create / status / journal, service.actuate,
+ *   approval.*, audit.*, surface.cowork.*                   this file
  *
- * The discover-band tools (scope.current, skill.list/.get, skill resource)
- * and the act-band actuator.invoke tool live in mcp-facade-discover.ts /
- * mcp-facade-act.ts; this file wires them in via registerGovernedTool /
- * ensureMcpApproval injection.
+ * This file owns the plumbing those modules receive by injection:
+ * registerGovernedTool (catalog entry, caller role, tier, op preflight) and
+ * ensureMcpApproval (payload- and scope-bound human approval).
+ *
+ * Caller identity (tenant, principal, caller role, NHI) comes from the server's
+ * own environment through mcp-request-context.ts — never from tool arguments.
+ *
+ * The HTTP `kyberion.request.*` tools are a separate, default-off server
+ * (mcp-http-resource-server.ts) with its own token identity; they are not
+ * registered here and are not in the tool catalog.
+ *
+ * Model: knowledge/product/architecture/mcp-facade-model.md
  *
  * Architecture rules (AGENTS.md):
  *   - All file I/O via secure-io (@agent/core)
@@ -48,7 +57,11 @@ import {
 import { pathResolver } from '@agent/core/path-resolver';
 import { discoveryOpsByActuator, loadMcpActuatorOpDiscovery } from './mcp-actuator-discovery.js';
 import { spawnManagedProcess, stopManagedProcess } from '@agent/core/managed-process';
-import { assertMcpCallerRole, resolveMcpRequestContext } from './mcp-request-context.js';
+import {
+  assertMcpCallerRole,
+  resolveMcpRequestContext,
+  resolveMcpServerIdentity,
+} from './mcp-request-context.js';
 import { assertProtocolServiceRegistered } from '@agent/core/protocol-service-registry';
 import { normalizeEventScope } from '@agent/core/event-scope';
 import { recordProtocolServiceLifecycle } from '@agent/core/protocol-service-lifecycle';
@@ -325,7 +338,12 @@ function registerGovernedTool(
   name: string,
   description: string,
   schema: Record<string, unknown>,
-  handler: (args: any) => Promise<any>
+  // `context` is the request context this wrapper already resolved and checked.
+  // Invariant: the SDK strips keys a tool's input schema does not declare. For a
+  // tool that declares none of tenant / tier / mission_id / task_id, `context`
+  // therefore equals a no-argument resolveMcpRequestContext(); a tool that
+  // declares any of them receives the context narrowed by those arguments.
+  handler: (args: any, context: McpRequestContext) => Promise<any>
 ): void {
   server.registerTool(
     name,
@@ -380,7 +398,7 @@ function registerGovernedTool(
             isError: true,
           });
         }
-        return withMcpStructuredContent(await handler(preflight.input));
+        return withMcpStructuredContent(await handler(preflight.input, context));
       } catch (err) {
         return withMcpStructuredContent({
           content: [
@@ -717,10 +735,12 @@ export function createKyberionMcpServer(): McpServer {
     {
       capabilities: { tools: {} },
       instructions: [
-        'This is the Kyberion MCP server. It exposes Kyberion pipeline, mission,',
-        'knowledge, and capability tools. All operations are governed by the',
-        'Kyberion security model (3-tier knowledge isolation, audit chain).',
-        'Use kyberion.pipeline.list to discover available pipelines before running one.',
+        'This is the Kyberion MCP server. Its kyberion.* tools fall into three bands.',
+        'Discover: current scope, workspace and needs-you views, setup checklist, capabilities, skills, knowledge search, pipeline list, mission status and journal, pending approvals, audit.',
+        'Act: allowlisted pipeline runs, service capture, bounded actuator invoke (dry_run by default), knowledge feedback, Cowork delivery and knowledge sync.',
+        'Govern: mission creation and lifecycle, service actuation, approval decisions.',
+        'Every call is checked against the server-side caller role, tenant binding and tier; some tools return approval_required until a human approves.',
+        'Start with kyberion.scope.current and kyberion.capability.search; use kyberion.pipeline.list before running a pipeline.',
       ].join(' '),
     }
   );
@@ -746,8 +766,7 @@ export function createKyberionMcpServer(): McpServer {
       verdict: z.enum(['useful', 'stale', 'wrong', 'not_useful']),
       reason: z.string().optional(),
     },
-    async ({ document_path, verdict, reason }) => {
-      const context = resolveMcpRequestContext();
+    async ({ document_path, verdict, reason }, context) => {
       const feedbackPath = recordHumanKnowledgeFeedback({
         document_path,
         verdict,
@@ -1418,13 +1437,16 @@ export function createKyberionMcpServer(): McpServer {
       'IMPORTANT: You MUST call kyberion.approval.list_pending first to obtain a valid request_id.',
       'This is a two-step operation — blind approval without listing first will be rejected.',
       'Human-only requests are refused with [APPROVAL_HUMAN_PROOF_REQUIRED]; other decisions are recorded as an agent decision.',
+      'The decision is attributed to the server-bound MCP principal; decided_by is recorded only as a caller-supplied label.',
     ].join(' '),
     {
       request_id: z
         .string()
         .describe('The request_id obtained from kyberion.approval.list_pending'),
       decision: z.enum(['approved', 'rejected']).describe('The decision to apply'),
-      decided_by: z.string().describe('Identity of the operator submitting the decision'),
+      decided_by: z
+        .string()
+        .describe('Caller-supplied label for the audit record; it does not name the decider'),
       note: z.string().optional().describe('Optional rationale or note for the decision'),
     },
     async ({ request_id, decision, decided_by, note }) => {
@@ -1436,7 +1458,9 @@ export function createKyberionMcpServer(): McpServer {
         const result = decideApprovalFromCowork({
           requestId: request_id,
           decision,
-          decidedBy: decided_by,
+          // The acting identity is the server-bound principal, never an argument.
+          decidedBy: context.principal,
+          callerLabel: decided_by,
           note,
           scope,
         });
@@ -1466,7 +1490,7 @@ export function createKyberionMcpServer(): McpServer {
     server,
     catalog,
     'kyberion.audit.export',
-    'Export the Kyberion audit chain log. Returns a path to the exported NDJSON bundle.',
+    'Export the Kyberion audit chain log. Returns a path to the exported NDJSON bundle. The request is attributed to the server-bound MCP principal; requested_by is recorded only as a caller-supplied label.',
     {
       from: z.string().optional().describe('Start date filter YYYY-MM-DD'),
       to: z.string().optional().describe('End date filter YYYY-MM-DD'),
@@ -1474,15 +1498,15 @@ export function createKyberionMcpServer(): McpServer {
       requested_by: z
         .string()
         .optional()
-        .default('cowork-operator')
-        .describe('Identity requesting the export'),
+        .describe('Caller-supplied label for the audit record; it does not name the requester'),
     },
     async ({ from, to, tenant, requested_by }) => {
       try {
         const context = resolveMcpRequestContext({ requested_tenant: tenant });
         const effectiveTenant = context.scope.tenant_slug;
         recordAuditExportRequest({
-          requestedBy: requested_by ?? 'cowork-operator',
+          requestedBy: context.principal,
+          ...(requested_by ? { callerLabel: requested_by } : {}),
           from,
           to,
           verifyOnly: false,
@@ -1513,21 +1537,21 @@ export function createKyberionMcpServer(): McpServer {
     server,
     catalog,
     'kyberion.audit.verify',
-    'Verify the integrity of the Kyberion audit chain (hash chain validation). Returns pass/fail.',
+    'Verify the integrity of the Kyberion audit chain (hash chain validation). Returns pass/fail. The request is attributed to the server-bound MCP principal; requested_by is recorded only as a caller-supplied label.',
     {
       tenant: z.string().optional().describe('Scope verification to a specific tenant slug'),
       requested_by: z
         .string()
         .optional()
-        .default('cowork-operator')
-        .describe('Identity requesting verification'),
+        .describe('Caller-supplied label for the audit record; it does not name the requester'),
     },
     async ({ tenant, requested_by }) => {
       try {
         const context = resolveMcpRequestContext({ requested_tenant: tenant });
         const effectiveTenant = context.scope.tenant_slug;
         recordAuditExportRequest({
-          requestedBy: requested_by ?? 'cowork-operator',
+          requestedBy: context.principal,
+          ...(requested_by ? { callerLabel: requested_by } : {}),
           verifyOnly: true,
         });
         const auditExportScript = tryResolveRegularRepositoryFile(AUDIT_EXPORT_SCRIPT);
@@ -1567,20 +1591,15 @@ export async function startMcpServerStdio(): Promise<void> {
   const server = createKyberionMcpServer();
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  const tenant = String(
-    getRegisteredEnvText('KYBERION_TENANT') || getRegisteredEnvText('KYBERION_TENANT_ID') || ''
-  ).trim();
+  // Same identity owner as every request context — see resolveMcpServerIdentity.
+  const identity = resolveMcpServerIdentity();
+  const tenant = identity.lifecycle_tenant;
   const scope = normalizeEventScope(
     tenant
       ? { scope_kind: 'tenant', tier: 'confidential', tenant_slug: tenant }
       : { scope_kind: 'system', tier: 'public' }
   );
-  const principalId =
-    String(
-      getRegisteredEnvText('KYBERION_MCP_NHI') ||
-        getRegisteredEnvText('KYBERION_MCP_PRINCIPAL') ||
-        ''
-    ).trim() || 'mcp-server-cowork';
+  const principalId = identity.service_principal_id;
   try {
     recordProtocolServiceLifecycle({
       serviceId: 'mcp-server-cowork',

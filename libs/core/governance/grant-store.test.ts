@@ -244,6 +244,38 @@ describe('grant store', () => {
 });
 
 describe('grant approval flow', () => {
+  it('requires the personal owner before consuming a service allocation approval', () => {
+    const serviceDraft: GrantDraft = {
+      capability: 'credential.use',
+      tenant_slug: 'acme',
+      purpose: 'Synthetic service allocation',
+      ttl_days: 1,
+      service_allocation: {
+        binding_id: 'binding-test',
+        target: 'workspace:acme',
+        owner_ref: 'user:someone-else',
+        service_id: 'slack',
+        secret_refs: ['SLACK_TOKEN'],
+        allowed_actions: ['read'],
+      },
+    };
+    const request = requestGrantApproval(serviceDraft, {
+      requester: { requestedBy: 'agent:requester' },
+    });
+    approvalIds.push(request.id);
+    approve(request);
+    expect(() => grantStanding(serviceDraft, { approvalRequestId: request.id })).toThrow(
+      /personal owner/
+    );
+    expect(loadApprovalRequest(GRANT_APPROVAL_CHANNEL, request.id)?.consumption).toBeUndefined();
+    const ownedDraft = {
+      ...serviceDraft,
+      service_allocation: { ...serviceDraft.service_allocation!, owner_ref: HUMAN },
+    };
+    const owned = approvedGrant(ownedDraft);
+    expect(owned.scope.service_allocation).toEqual(ownedDraft.service_allocation);
+    expect(owned.granted_by.actor_id).toBe(HUMAN);
+  });
   it('rejects an unapproved request', () => {
     const request = requestGrantApproval(draft, { requester: { requestedBy: 'agent:requester' } });
     approvalIds.push(request.id);

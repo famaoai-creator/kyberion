@@ -128,6 +128,7 @@
     "foundation/semaphore": 2,
     "foundation/service-endpoints": 58,
     "foundation/store-grant-registry": 0,
+    "foundation/surface-viewer-role": 0,
     "foundation/task-source-workspace-capability": 3,
     "foundation/task-tool-grant-validation": 2,
     "foundation/text-escaping": 0,
