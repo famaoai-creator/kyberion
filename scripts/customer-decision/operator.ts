@@ -33,8 +33,8 @@ import {
   generateAgendaDraft,
   instantiateTemplate,
   issueInvite,
-  loadDecisionTemplate,
   newAgendaId,
+  resolveDecisionTemplate,
   withCustomerActorsLock,
   writeAgenda,
   type AgendaEntry,
@@ -62,6 +62,7 @@ import {
   editableEntry,
   assertUniqueEntries,
   assertNoOpenAgendaOverlap,
+  parseObjective,
   parseRespondBy,
   tenantApprovalScope,
   statusCommand,
@@ -96,9 +97,10 @@ function draftLocked(
       throw new ScriptExitError(2, `agenda ${current.agenda_id} is ${current.status}`);
     }
     const respondByOpt = parseRespondBy(opts['respond-by'], now);
-    // `--respond-by` alone edits only the date; anything else comes from --file.
+    const objectiveOpt = parseObjective(opts.objective);
+    // `--respond-by` / `--objective` alone edit only those; anything else comes from --file.
     const incoming =
-      opts.file !== undefined || respondByOpt === undefined
+      opts.file !== undefined || (respondByOpt === undefined && objectiveOpt === undefined)
         ? readJson<Partial<DecisionAgenda>>(assertSafeRepositoryPath(requireOpt(opts, 'file')))
         : {};
     if (!incoming || typeof incoming !== 'object')
@@ -130,7 +132,12 @@ function draftLocked(
             pinned_ids: [...approvedOurDecisionIds(current)],
           }
         : current.in_force;
-    const { from: currentFrom, respond_by: currentRespondBy, ...restWithoutFrom } = rest;
+    const {
+      from: currentFrom,
+      respond_by: currentRespondBy,
+      objective: currentObjective,
+      ...restWithoutFrom
+    } = rest;
     const from = typeof incoming.from === 'string' ? incoming.from.trim() : currentFrom;
     const respondBy =
       respondByOpt !== undefined
@@ -138,11 +145,19 @@ function draftLocked(
         : incomingRespondBy !== undefined
           ? incomingRespondBy
           : (currentRespondBy ?? null);
+    // HR-01: --objective wins, then the file's `objective` (null clears), then the current one.
+    const objective =
+      objectiveOpt !== undefined
+        ? objectiveOpt
+        : 'objective' in incoming
+          ? (incoming.objective ?? null)
+          : (currentObjective ?? null);
     const next: DecisionAgenda = {
       ...restWithoutFrom,
       ...(inForce ? { in_force: inForce } : {}),
       ...(from ? { from } : {}),
       ...(respondBy ? { respond_by: respondBy } : {}),
+      ...(objective ? { objective } : {}),
       title: typeof incoming.title === 'string' ? incoming.title : current.title,
       entries,
       revision: frozen ? current.revision + 1 : current.revision,
@@ -164,7 +179,11 @@ function draftLocked(
   // i18n-exempt: validates the --locale flag against the agenda schema's ja|en enum, not a UI branch
   const locale = opts.locale === 'en' ? 'en' : 'ja';
   const respondBy = parseRespondBy(opts['respond-by'], now);
-  const template = loadDecisionTemplate(opts.template ?? DEFAULT_TEMPLATE);
+  const objective = parseObjective(opts.objective);
+  // HR-01: the tenant's own template of this id first, then the product one.
+  const { template, origin } = asLedgerWriter(tenant, () =>
+    resolveDecisionTemplate(opts.template ?? DEFAULT_TEMPLATE, { tenantSlug: tenant })
+  );
   const instantiated = instantiateTemplate(template, {
     agendaId: newAgendaId(),
     tenantSlug: tenant,
@@ -177,9 +196,14 @@ function draftLocked(
     ...(opts.deal ? { dealId: opts.deal } : {}),
     ...(opts.project ? { projectId: opts.project } : {}),
   });
-  const agenda: DecisionAgenda = respondBy
-    ? { ...instantiated, respond_by: respondBy }
-    : instantiated;
+  // `--objective` replaces the template's objective; `--objective none` drops it.
+  const { objective: templateObjective, ...withoutObjective } = instantiated;
+  const finalObjective = objective === undefined ? templateObjective : objective;
+  const agenda: DecisionAgenda = {
+    ...withoutObjective,
+    ...(respondBy ? { respond_by: respondBy } : {}),
+    ...(finalObjective ? { objective: finalObjective } : {}),
+  };
   assertUniqueEntries(agenda.entries);
   assertNoOpenAgendaOverlap(location, tenant, agenda.agenda_id, agenda.entries);
   const written = asLedgerWriter(tenant, () => writeAgenda(location, agenda));
@@ -187,6 +211,7 @@ function draftLocked(
     agenda_id: written.agenda_id,
     case_id: caseId,
     template: template.template_id,
+    template_origin: origin,
     content_hash: agendaContentHash(written),
   });
   return agendaSummary(written);

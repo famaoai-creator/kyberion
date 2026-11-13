@@ -359,6 +359,67 @@ describe('customer-decision facade', () => {
     ).rejects.toThrow(/YYYY-MM-DD/u);
   });
 
+  it('sets, shows and clears the objective; on a sent agenda it is a new revision (HR-01)', async () => {
+    const { agendaId, token } = await approvedAndSent();
+    const sentHash = agendaContentHash(agendaOf(agendaId));
+    // The customer sees no objective until one is set and approved.
+    const before = (await customerRun('view', { token })).out as {
+      agenda: Record<string, unknown>;
+    };
+    expect(before.agenda).not.toHaveProperty('objective');
+    const edited = (await run([
+      'draft',
+      ...base(),
+      '--agenda',
+      agendaId,
+      '--objective',
+      'Confirm the release scope',
+    ])) as Record<string, unknown>;
+    expect(edited).toMatchObject({ has_objective: true, revision: 2, status: 'draft' });
+    expect(edited.content_hash).not.toBe(sentHash);
+    expect((await customerRun('view', { token })).out).toMatchObject({ state: 'updating' });
+    approveNext('apr-2');
+    await run(['submit', ...base(), '--agenda', agendaId, '--by', 'user:alice']);
+    expect((await customerRun('view', { token })).out).toMatchObject({
+      state: 'open',
+      agenda: { objective: { statement: 'Confirm the release scope' } },
+    });
+    // --file keeps the objective unless the file names one; none clears it.
+    const file = path.join(dir, 'keep.json');
+    safeWriteFile(file, JSON.stringify({ title: 'Inception v2' }), { encoding: 'utf8' });
+    await run(['draft', ...base(), '--agenda', agendaId, '--file', file]);
+    expect(agendaOf(agendaId).objective).toEqual({ statement: 'Confirm the release scope' });
+    await run(['draft', ...base(), '--agenda', agendaId, '--objective', 'none']);
+    expect(agendaOf(agendaId)).not.toHaveProperty('objective');
+    await expect(
+      run(['draft', ...base(), '--agenda', agendaId, '--objective', 'x'.repeat(2001)])
+    ).rejects.toThrow(/--objective/u);
+  });
+
+  it('sets the objective on a new draft (HR-01)', async () => {
+    const drafted = (await run([
+      'draft',
+      ...base(),
+      '--customer',
+      'acme',
+      '--objective',
+      'Agree the MVP',
+    ])) as { agenda_id: string; has_objective?: boolean };
+    expect(drafted.has_objective).toBe(true);
+    expect(agendaOf(drafted.agenda_id).objective).toEqual({ statement: 'Agree the MVP' });
+    // `none` drops it; the product template sets none, so the draft has none.
+    await run(['withdraw', ...base(), '--agenda', drafted.agenda_id, '--by', 'user:alice']);
+    const plain = (await run([
+      'draft',
+      ...base(),
+      '--customer',
+      'acme',
+      '--objective',
+      'none',
+    ])) as { agenda_id: string };
+    expect(agendaOf(plain.agenda_id)).not.toHaveProperty('objective');
+  });
+
   it('drafts from the template, then edits the draft in place', async () => {
     const drafted = (await run(['draft', ...base(), '--customer', 'acme'])) as {
       agenda_id: string;

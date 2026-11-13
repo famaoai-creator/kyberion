@@ -70,6 +70,12 @@ export interface AgendaLink {
   url: string;
 }
 
+/** HR-01: what the hearing must establish, and how the tenant judges it done. */
+export interface AgendaObjective {
+  statement: string;
+  success_criteria?: string[];
+}
+
 export interface AgendaEntry {
   entry_id: string;
   item: string;
@@ -121,6 +127,12 @@ export interface DecisionAgenda {
    * Reminders go out the day before and on the day.
    */
   respond_by?: string;
+  /**
+   * HR-01: the hearing goal (from the template, or set with `draft
+   * --objective`). Shown to the customer at the top of the agenda, so in the
+   * content hash when set. Concept: knowledge/product/architecture/hearing-model.md.
+   */
+  objective?: AgendaObjective;
   entries: AgendaEntry[];
   status: AgendaStatus;
   approval?: {

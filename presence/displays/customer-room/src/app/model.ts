@@ -75,6 +75,8 @@ export interface ViewOpen {
     from?: string;
     /** UTC calendar date (YYYY-MM-DD) our team would like the answers by; only when set. */
     respond_by?: string;
+    /** HR-01: the hearing goal; only when set. */
+    objective?: { statement: string; success_criteria?: string[] };
   };
   participant: ViewParticipant;
   content_hash: string;
