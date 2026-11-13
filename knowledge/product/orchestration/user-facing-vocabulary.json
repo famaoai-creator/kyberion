@@ -9851,9 +9851,9 @@
         "qps-ploc": "⟦Ƀïñḓ, ůñƀïñḓ ȧñḓ ŀïşŧ ȧ ŧėñȧñŧ'ş ƈůşŧőɱėř ƈħȧññėŀş, ȧñḓ řėȧḓ ȧ ƈůşŧőɱėř ɱėşşȧɠė ŧħȧŧ ẇȧïŧş ƒőř ȧṗṗřőṽȧŀ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧė⟧"
       },
       "cli_cmd_script_customer_decision": {
-        "en": "Prepare, approve and send customer decision agendas, and track the answers",
-        "ja": "顧客との調整セットを作成・承認・送付し、回答を確認",
-        "qps-ploc": "⟦Ṗřėṗȧřė, ȧṗṗřőṽė ȧñḓ şėñḓ ƈůşŧőɱėř ḓėƈïşïőñ ȧɠėñḓȧş, ȧñḓ ŧřȧƈķ ŧħė ȧñşẇėřş ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+        "en": "Keep a tenant's own hearing templates, prepare, approve and send customer decision agendas, and track the answers",
+        "ja": "テナント独自のヒアリングテンプレートを管理し、顧客との調整セットを作成・承認・送付し、回答を確認",
+        "qps-ploc": "⟦Ķėėṗ ȧ ŧėñȧñŧ'ş őẇñ ħėȧřïñɠ ŧėɱṗŀȧŧėş, ṗřėṗȧřė, ȧṗṗřőṽė ȧñḓ şėñḓ ƈůşŧőɱėř ḓėƈïşïőñ ȧɠėñḓȧş, ȧñḓ ŧřȧƈķ ŧħė ȧñşẇėřş ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ⟧"
       },
       "cli_cmd_script_pipeline_promote": {
         "en": "Promote a successful one-off run into the public pipeline catalog, or a tenant catalog with --tenant",
