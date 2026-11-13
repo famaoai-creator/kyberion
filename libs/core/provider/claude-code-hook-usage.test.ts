@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const recordMock = vi.fn();
 vi.mock('../analysis/metrics.js', () => ({
@@ -13,6 +13,8 @@ vi.mock('../tier-guard.js', () => ({
 }));
 
 import { recordCliUsage, summarizeTranscriptUsage } from './claude-code-hook.js';
+import { ALL_TEST_RUN_MARKER_ENV_KEYS } from '../foundation/env.js';
+import { isSessionHookMetricsRow } from './session-hook-provenance.js';
 
 const transcript = [
   JSON.stringify({ type: 'user', message: { role: 'user', content: 'hi' } }),
@@ -78,5 +80,39 @@ describe('recordCliUsage', () => {
         usage: { prompt_tokens: 310, completion_tokens: 130 },
       })
     );
+  });
+
+  describe('session-hook provenance stamp', () => {
+    afterEach(() => vi.unstubAllEnvs());
+    const summary = { model: 'claude-opus-4-8', inputTokens: 1, outputTokens: 1, turns: 1 };
+    // The row metrics.record persists: { component, duration_ms, status, ...extra }.
+    const persisted = () => {
+      const [component, duration_ms, status, extra] = recordMock.mock.calls[0]!;
+      return { component, duration_ms, status, ...extra };
+    };
+
+    it('stamps the Stop hook usage row of a host session outside Vitest', () => {
+      for (const key of ALL_TEST_RUN_MARKER_ENV_KEYS) vi.stubEnv(key, ''); // metrics is mocked: nothing reaches a live ledger
+      for (const key of ['DEVIN_PROJECT_DIR', 'CHISEL_SESSION_DB', 'AI_AGENT']) vi.stubEnv(key, '');
+      expect(recordCliUsage(summary, 'sess-9')).toBe(true);
+      vi.unstubAllEnvs();
+      expect(persisted().session_hook).toEqual({
+        host: 'claude',
+        event: 'Stop',
+        session_id: 'sess-9',
+      });
+      expect(isSessionHookMetricsRow(persisted())).toBe(true);
+    });
+
+    it('never stamps under Vitest or without a session id', () => {
+      recordCliUsage(summary, 'sess-9');
+      expect(persisted()).not.toHaveProperty('session_hook');
+      recordMock.mockClear();
+      for (const key of ALL_TEST_RUN_MARKER_ENV_KEYS) vi.stubEnv(key, '');
+      recordCliUsage(summary);
+      vi.unstubAllEnvs();
+      expect(persisted()).not.toHaveProperty('session_hook');
+      expect(isSessionHookMetricsRow(persisted())).toBe(false);
+    });
   });
 });
