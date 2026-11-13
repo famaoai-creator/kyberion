@@ -38,10 +38,13 @@ export const APPROVAL_PLACEHOLDER_DECIDERS: ReadonlySet<string> = new Set([
 
 /**
  * How the surface obtained the decider identity it records. `caller_supplied`
- * marks a surface that takes the decider as free text from its caller (the
- * MCP `kyberion.approval.decide` tool, the approval-actuator `decide` op), so
- * the identity is a claim, not something the server resolved. Unmarked
- * decisions come from surfaces that resolve the decider themselves.
+ * marks a surface whose decider is not an identity the server authenticated
+ * for this request: the approval-actuator `decide` op takes it as free text
+ * from its caller, and the MCP `kyberion.approval.decide` tool records the MCP
+ * server's process-bound principal (its `decided_by` argument is only an
+ * audit label). Either way the identity is a claim, not something the server
+ * resolved. Unmarked decisions come from surfaces that resolve the decider
+ * themselves.
  */
 export type ApprovalDeciderIdentitySource = 'server_resolved' | 'caller_supplied';
 

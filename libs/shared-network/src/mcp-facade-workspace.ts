@@ -11,7 +11,7 @@
  * (confidential + public); without a binding it sees public records only.
  */
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { resolveMcpRequestContext } from './mcp-request-context.js';
+import { resolveMcpRequestContext, type McpRequestContext } from './mcp-request-context.js';
 import type { SurfaceAuthorizationContext } from '@agent/core/surface/surface-authorization';
 import {
   invokeSurfaceOperation,
@@ -20,8 +20,9 @@ import {
 } from '@agent/core/surface/surface-operation-registry';
 import type { RegisterGovernedTool, ToolCatalog } from './mcp-server-engine.js';
 
-export function mcpWorkspaceViewer(): SurfaceAuthorizationContext {
-  const context = resolveMcpRequestContext();
+export function mcpWorkspaceViewer(
+  context: McpRequestContext = resolveMcpRequestContext()
+): SurfaceAuthorizationContext {
   const tenant = context.scope.tenant_slug;
   return {
     role: 'readonly',
@@ -46,8 +47,10 @@ export function registerMcpFacadeWorkspaceTools(params: {
       `kyberion.${op.id}`,
       op.description,
       surfaceOperationInputShape(op.id),
-      async (args: Record<string, unknown>) => {
-        const result = invokeSurfaceOperation(op.id, args ?? {}, { viewer: mcpWorkspaceViewer() });
+      async (args: Record<string, unknown>, context) => {
+        const result = invokeSurfaceOperation(op.id, args ?? {}, {
+          viewer: mcpWorkspaceViewer(context),
+        });
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
           ...(result.ok ? {} : { isError: true }),

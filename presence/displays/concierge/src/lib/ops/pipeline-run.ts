@@ -2,6 +2,7 @@ import path from 'node:path';
 
 import { spawnManagedProcess } from '@agent/core/managed-process';
 import { pathResolver, toRepoRelative } from '@agent/core/path-resolver';
+import { runnerDerivedContextKeys } from '@agent/core/pipeline/pipeline-scheduler';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import { serverChildEnv } from '../server-child-env';
 
@@ -40,6 +41,20 @@ export function resolveRunnablePipelineFile(rawPath: string): string {
   return absolute;
 }
 
+/**
+ * Refuse a caller-supplied context (request body or stored schedule) that
+ * names a key the pipeline runner derives itself — `run_pipeline --context`
+ * merges caller context over those values.
+ */
+export function assertClientPipelineContext(context: Record<string, unknown>): void {
+  const reserved = runnerDerivedContextKeys(context);
+  if (reserved.length > 0) {
+    throw new PipelineRunError(
+      `pipeline context must not set runner-derived keys: ${reserved.join(', ')}`
+    );
+  }
+}
+
 export interface PipelineRunDispatch {
   resourceId: string;
   pipelinePath: string;
@@ -50,6 +65,8 @@ export function dispatchPipelineRun(input: {
   context?: Record<string, unknown>;
   label?: string;
 }): PipelineRunDispatch {
+  // Every caller is covered here: the run route, run-now of a stored schedule.
+  if (input.context) assertClientPipelineContext(input.context);
   const pipelineFile = resolveRunnablePipelineFile(input.pipelinePath);
   const relative = toRepoRelative(pipelineFile);
   const args = [pathResolver.rootResolve(RUN_PIPELINE_ENTRY), '--input', pipelineFile, '--quiet'];

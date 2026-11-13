@@ -2,8 +2,21 @@
 // `hearing-routes.test.ts`; the governed facade subprocess is never spawned
 // here — the pure seams (`resolveLedgerScenarioRef`, `buildLedgerImportLines`) and
 // the refusal paths that stop before any write are what this file proves.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type express from 'express';
+
+// The SD-07 case below passes `?tenant=other-tenant`: it must name a tenant
+// that exists, or the viewer is refused before the route can ignore it.
+vi.mock('@agent/core/organization/tenant-registry', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/organization/tenant-registry')>();
+  return {
+    ...actual,
+    listTenantProfileSlugs: (...args: Parameters<typeof actual.listTenantProfileSlugs>) => [
+      ...actual.listTenantProfileSlugs(...args),
+      'other-tenant',
+    ],
+  };
+});
 import { createHearingRecord, applyHearingTurn } from '@agent/core/surface/hearing';
 import {
   buildLedgerImportLines,

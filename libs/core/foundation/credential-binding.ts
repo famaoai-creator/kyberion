@@ -6,12 +6,21 @@ import { getRegisteredEnvText } from './env.js';
 import { isBoundTenantInvalid, resolveProjectScope } from './project-scope-env.js';
 import { isValidTenantSlug } from './scope.js';
 
+/** Non-secret source evidence issued only by a trusted credential broker. */
+export interface TaskCredentialProvenance {
+  readonly serviceBindingId: string;
+  readonly serviceId: string;
+  readonly sourceOwnerRef: string;
+  readonly allocationGrantId?: string;
+}
+
 /** Trusted dispatch input. These values are never accepted from a model or HTTP payload. */
 export interface TaskCredentialBinding {
   readonly tenantSlug: string;
   readonly missionId?: string;
   readonly taskId?: string;
   readonly secrets: Readonly<Record<string, string>>;
+  readonly secretProvenance?: Readonly<Record<string, TaskCredentialProvenance>>;
   /** Trusted broker freshness check, run before every credential consumption. */
   readonly validate?: () => void;
   /** Complete provider env, including an isolated HOME. Never merged with operator env. */
@@ -147,6 +156,13 @@ export function withTaskCredentialBinding<T>(binding: TaskCredentialBinding, run
       parent.missionId !== missionId ||
       parent.taskId !== taskId ||
       Object.entries(binding.secrets).some(([key, value]) => parent.secrets[key] !== value) ||
+      Object.keys(binding.secrets).some((key) =>
+        ['serviceBindingId', 'serviceId', 'sourceOwnerRef', 'allocationGrantId'].some(
+          (field) =>
+            binding.secretProvenance?.[key]?.[field as keyof TaskCredentialProvenance] !==
+            parent.secretProvenance?.[key]?.[field as keyof TaskCredentialProvenance]
+        )
+      ) ||
       binding.providerEnvironments !== parent.providerEnvironments ||
       binding.validate !== parent.validate)
   ) {
@@ -162,6 +178,65 @@ export function withTaskCredentialBinding<T>(binding: TaskCredentialBinding, run
   const secrets = Object.freeze(
     Object.assign(Object.create(null) as Record<string, string>, binding.secrets)
   );
+  const secretProvenance =
+    binding.secretProvenance &&
+    Object.freeze(
+      Object.fromEntries(
+        Object.entries(binding.secretProvenance).map(([key, provenance]) => {
+          if (
+            !Object.hasOwn(secrets, key) ||
+            !provenance ||
+            ![provenance.serviceBindingId, provenance.serviceId, provenance.sourceOwnerRef].every(
+              (value) => typeof value === 'string' && value.trim().length > 0
+            ) ||
+            (provenance.allocationGrantId !== undefined &&
+              (typeof provenance.allocationGrantId !== 'string' ||
+                !provenance.allocationGrantId.trim()))
+          ) {
+            throw new Error('[CREDENTIAL_PROVENANCE_INVALID] Invalid credential source evidence');
+          }
+          return [
+            key,
+            Object.freeze({
+              serviceBindingId: provenance.serviceBindingId,
+              serviceId: provenance.serviceId,
+              sourceOwnerRef: provenance.sourceOwnerRef,
+              ...(provenance.allocationGrantId
+                ? { allocationGrantId: provenance.allocationGrantId }
+                : {}),
+            }),
+          ];
+        })
+      )
+    );
+  // Personal allocations authorize only the selected service path, not generic
+  // provider/CLI consumption or an unlabelled alias of the same material.
+  const allocated = Object.entries(secretProvenance ?? {}).filter(
+    ([, source]) => source.allocationGrantId
+  );
+  for (const [allocatedKey, source] of allocated) {
+    for (const [key, value] of Object.entries(secrets)) {
+      const other = secretProvenance?.[key];
+      if (
+        value === secrets[allocatedKey] &&
+        (other?.allocationGrantId !== source.allocationGrantId ||
+          other?.serviceBindingId !== source.serviceBindingId ||
+          other?.serviceId !== source.serviceId ||
+          other?.sourceOwnerRef !== source.sourceOwnerRef)
+      )
+        throw new Error(
+          '[CREDENTIAL_PROVENANCE_DENIED] Allocated credential cannot have an unscoped alias'
+        );
+    }
+    if (
+      Object.values(binding.providerEnvironments ?? {}).some((env) =>
+        Object.values(env).some((value) => value === secrets[allocatedKey])
+      )
+    )
+      throw new Error(
+        '[CREDENTIAL_PROVENANCE_DENIED] Allocated credential cannot enter a provider environment'
+      );
+  }
   const providerEnvironments =
     binding.providerEnvironments &&
     Object.freeze(
@@ -200,7 +275,14 @@ export function withTaskCredentialBinding<T>(binding: TaskCredentialBinding, run
       )
     );
   return storage.run(
-    Object.freeze({ ...binding, missionId, taskId, secrets, providerEnvironments }),
+    Object.freeze({
+      ...binding,
+      missionId,
+      taskId,
+      secrets,
+      secretProvenance,
+      providerEnvironments,
+    }),
     run
   );
 }
@@ -208,7 +290,37 @@ export function withTaskCredentialBinding<T>(binding: TaskCredentialBinding, run
 /** undefined = operator flow; null = scoped miss, which must never fall back. */
 export function resolveTaskCredential(key: string): string | null | undefined {
   const binding = checkedBinding();
-  return binding ? binding.secrets[key] || null : undefined;
+  return binding
+    ? binding.secretProvenance?.[key]?.allocationGrantId
+      ? null
+      : binding.secrets[key] || null
+    : undefined;
+}
+
+/** Exact selected-connection consumption; never consult operator or ambient credentials. */
+export function resolveTaskServiceCredential(
+  key: string,
+  expected: Pick<TaskCredentialProvenance, 'serviceBindingId' | 'serviceId'> & {
+    allocationGrantId?: string;
+    sourceOwnerRef?: string;
+  }
+): string | null {
+  const binding = checkedBinding();
+  const provenance = binding?.secretProvenance?.[key];
+  if (
+    !binding ||
+    !provenance ||
+    provenance.serviceBindingId !== expected.serviceBindingId ||
+    provenance.serviceId !== expected.serviceId ||
+    (expected.sourceOwnerRef !== undefined &&
+      provenance.sourceOwnerRef !== expected.sourceOwnerRef) ||
+    provenance.allocationGrantId !== expected.allocationGrantId
+  ) {
+    throw new Error(
+      '[CREDENTIAL_PROVENANCE_DENIED] Credential does not belong to selected service binding'
+    );
+  }
+  return binding.secrets[key] || null;
 }
 
 /** undefined = trusted operator flow; tenant diagnostics never expose another binding's values. */
@@ -246,6 +358,7 @@ export function selectProviderCredential(
   const binding = checkedBinding();
   if (!binding) return operatorValue || undefined;
   for (const key of keys) {
+    if (binding.secretProvenance?.[key]?.allocationGrantId) continue;
     const value = binding.secrets[key];
     if (value) return value;
   }

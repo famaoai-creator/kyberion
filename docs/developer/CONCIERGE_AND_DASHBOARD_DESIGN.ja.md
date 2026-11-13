@@ -1,14 +1,14 @@
-# 秘書コンシェルジェ surface とダッシュボード視覚化 — 設計と実装
+# 秘書コンシェルジュ surface とダッシュボード視覚化 — 設計と実装
 
 > **作成日**: 2026-07-03
-> **依頼**: presence surface の一つとして秘書(コンシェルジェ)を。アバターがいて音声/テキストの会話ベース、軽量なものは direct_reply。軽量なら 3D モデル。ダッシュボードもより視覚的に(グラフ)。**ドキュメント作成の上で実装まで実施。**
+> **依頼**: presence surface の一つとして秘書(コンシェルジュ)を。アバターがいて音声/テキストの会話ベース、軽量なものは direct_reply。軽量なら 3D モデル。ダッシュボードもより視覚的に(グラフ)。**ドキュメント作成の上で実装まで実施。**
 > **位置づけ**: 設計 + 実装記録。関連: [COMPANY_OS_CONCEPT](./COMPANY_OS_CONCEPT.ja.md)、UX-01/02(体裁)、DS-01(トークン)、SU 系(UI 機能)。
 
-> **⚠️ 現況(2026-08-02 更新)**: 本文書が記述する Express 版 concierge(port 3033、`server.ts` + `static/index.html`)は [CONCIERGE_SECRETARY_UX_PLAN_2026-08-02](./improvement-plans-2026-08/CONCIERGE_SECRETARY_UX_PLAN_2026-08-02.ja.md) の CS-01/CS-02 で会話(2経路フェイルオーバー)・音声(Web Speech Tier 0 / voice-hub Tier 1)を Next.js 版へ移植のうえ、**CS-05 で削除済み**。現行の唯一の concierge は **Next.js 版(port 3050、healthPath `/api/summary`)** で、`knowledge/product/governance/surfaces/concierge.json` が正。本文書は歴史記録+設計資産(§1 の二経路設計、§4 の 3D アバター設計)として保存されている。2.5D アバターの再導入は §4 とともに将来オプション。
+> **⚠️ 現況(2026-08-02 更新)**: 本文書が記述する Express 版 concierge(port 3033、`server.ts` + `static/index.html`)は [CONCIERGE_SECRETARY_UX_PLAN_2026-08-02](./improvement-plans-2026-08/CONCIERGE_SECRETARY_UX_PLAN_2026-08-02.ja.md) の CS-01/CS-02 で会話(2経路フェイルオーバー)・音声(Web Speech Tier 0 / voice-hub Tier 1)を Next.js 版へ移植のうえ、**CS-05 で削除済み**。現行の唯一の concierge は **Next.js 版(port 3050、healthPath `/api/healthz`)** で、`knowledge/product/governance/surfaces/concierge.json` が正。§2 が参照する chronos-mirror-v2 の画面とコンポーネント(`KyberionCharts.tsx` など)は concierge の運用コンソール(`/ops`、`presence/displays/concierge/src/components/ops/`)へ移設済みで、chronos-mirror-v2 は転送のみ、`SovereignChat` は削除済み。本文書は歴史記録+設計資産(§1 の二経路設計、§4 の 3D アバター設計)として保存されている。2.5D アバターの再導入は §4 とともに将来オプション。
 
 ---
 
-## 1. 秘書コンシェルジェ surface
+## 1. 秘書コンシェルジュ surface
 
 ### コンセプト
 
@@ -36,19 +36,19 @@
 
 ### バックエンド接続(既存受け皿を再利用)
 
-- **主経路**: コンシェルジェの Express server が voice-hub(:3032)の `POST /api/ingest-text`(`{text, intent, source_id, speaker, reflect_to_surface, auto_reply}`)へプロキシ。voice-hub が `generateReply` で応答を生成し、軽い依頼は `buildVoiceFallbackReply`(挨拶・能力・礼)or `runSurfaceMessageConversation` → `handleSurfaceQueryRoute`(direct_reply)で即答、重い依頼は task_session/mission へ昇格 + `buildAsyncAcceptedReply`。presence 反映と TTS も voice-hub が担う。
-- **音声入力**: ブラウザネイティブの Web Speech API(chronos SovereignChat と同方式、サーバ STT 不要で軽量)。より高品質が必要なら voice-hub `/api/listen-once`(ネイティブ STT)へ切替可能。
+- **主経路**: コンシェルジュの Express server が voice-hub(:3032)の `POST /api/ingest-text`(`{text, intent, source_id, speaker, reflect_to_surface, auto_reply}`)へプロキシ。voice-hub が `generateReply` で応答を生成し、軽い依頼は `buildVoiceFallbackReply`(挨拶・能力・礼)or `runSurfaceMessageConversation` → `handleSurfaceQueryRoute`(direct_reply)で即答、重い依頼は task_session/mission へ昇格 + `buildAsyncAcceptedReply`。presence 反映と TTS も voice-hub が担う。
+- **音声入力**: ブラウザネイティブの Web Speech API(当時の chronos SovereignChat(削除済み)と同方式、サーバ STT 不要で軽量)。より高品質が必要なら voice-hub `/api/listen-once`(ネイティブ STT)へ切替可能。
 - **フォールバック**: voice-hub 不在時は server が「秘書が今応答できません」を返す(無音の失敗を作らない、UX-01 原則)。
 
 ### direct_reply の判定(再確認)
 
-`runSurfaceMessageConversation` → `resolveSurfaceIntent().routeFamily`。`direct_reply` かつ receiver 無し → `handleSurfaceQueryRoute`(knowledge_search/location/weather/web_search)。重い依頼は `shouldPromoteToMission` で mission へ。**コンシェルジェは判定ロジックを持たず、既存 orchestrator に委ねる**(型が実行の形を決める、ORCHESTRATION_HARNESS_MODEL §1)。
+`runSurfaceMessageConversation` → `resolveSurfaceIntent().routeFamily`。`direct_reply` かつ receiver 無し → `handleSurfaceQueryRoute`(knowledge_search/location/weather/web_search)。重い依頼は `shouldPromoteToMission` で mission へ。**コンシェルジュは判定ロジックを持たず、既存 orchestrator に委ねる**(型が実行の形を決める、ORCHESTRATION_HARNESS_MODEL §1)。
 
 ### 実装ファイル
 
 - `presence/displays/concierge/server.ts` — Express: `/health`、static 配信、`POST /api/message`(voice-hub プロキシ)、`GET /api/state`(状態)。presence-studio と同構造(package.json 不要、ルート tsc でコンパイル → `dist/presence/displays/concierge/server.js`)。
 - `presence/displays/concierge/static/index.html` — 2.5D アバター(インライン SVG + CSS アニメ)+ 音声/テキスト会話 UI(vanilla JS、Web Speech API、`/api/message` へ fetch)。self-contained。
-- `knowledge/product/governance/surfaces/concierge.json` — surface manifest(**当時** kind `ui`, port 3033, healthPath `/health`。現行 manifest は Next.js 版 port 3050 / `/api/summary`)。
+- `knowledge/product/governance/surfaces/concierge.json` — surface manifest(**当時** kind `ui`, port 3033, healthPath `/health`。現行 manifest は Next.js 版 port 3050 / `/api/healthz`)。
 - 起動(旧): `pnpm build && pnpm surfaces reconcile`(または `PRESENCE_CONCIERGE_PORT=3033 node dist/presence/displays/concierge/server.js`)。
 
 ---
@@ -105,7 +105,7 @@ chronos にはチャートライブラリが無く CSP も無い。既存 `Focus
 
 ### 実装したファイル
 
-**秘書コンシェルジェ surface**
+**秘書コンシェルジュ surface**
 
 - `presence/displays/concierge/server.ts` — Express。**再実装(2026-07-03, Fable 5): SPOF 除去の二経路 + 優雅な縮退**。(1) 主経路 = voice-hub `/api/ingest-text`(挨拶/能力Q&A + orchestrator + server-side TTS + presence 反映)、(2) 不達時 = **`@agent/core` を lazy import して `runSurfaceMessageConversation` を直接呼ぶ縮退経路**(chronos と同パターン。知識検索・ミッション化を voice-hub 無しで維持。happy path では orchestrator を読み込まず軽量)、(3) 両方失敗で実行可能な 503。`/health` は **voice-hub 到達性を probe** し `conversationMode`(voice-hub / orchestrator-fallback)を返す。エラーは実内容をログ(無音の失敗なし)。static は `pathResolver.rootDir()` 解決、127.0.0.1 バインド、ルート tsc でコンパイル。
 - `presence/displays/concierge/static/index.html` — self-contained。2.5D SVG アバター(呼吸・瞬き・パルスリング・思考ドット・口パクを CSS keyframe で表現、5状態: idle/listening/thinking/speaking/error)+ 会話 UI(vanilla JS)+ Web Speech API 音声入力 + SpeechSynthesis 読み上げ + `/api/message` fetch。dark KDS テーマ(cyan accent)、日本語 UI、`prefers-reduced-motion` 対応。

@@ -62,7 +62,7 @@ export {
   saveMissionContextPack,
   renderMissionContextPack,
 } from './mission-context-pack.js';
-export * from './mission-coordination-bus.js';
+export * from './mission-coordination-record.js';
 export * from './mission-creation.js';
 export * from './mission-dispatch-io.js';
 export * from './mission-dispatch-lifecycle.js';

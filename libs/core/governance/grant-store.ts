@@ -1,3 +1,9 @@
+import {
+  normalizeServiceCredentialAllocation,
+  serviceAllocationApprovedByOwner,
+  type ServiceCredentialAllocationScope,
+} from './service-credential-grant-scope.js';
+export type { ServiceCredentialAllocationScope } from './service-credential-grant-scope.js';
 /**
  * PG-03: standing grants — scoped, time-bounded permissions that are decided
  * ahead of time instead of right before the work
@@ -79,6 +85,7 @@ export interface GrantScope {
   tenant_slug?: string;
   credential_provider?: string;
   credential_ref?: string;
+  service_allocation?: ServiceCredentialAllocationScope;
   /** Calendar series ids of the meetings this grant covers. */
   meeting_series_ids?: string[];
   /** Normalized meeting URLs (see {@link normalizeMeetingUrl}). */
@@ -119,6 +126,7 @@ export interface GrantDraft {
   tenant_slug: string;
   credential_provider?: string;
   credential_ref?: string;
+  service_allocation?: ServiceCredentialAllocationScope;
   meeting_series_ids?: string[];
   meeting_urls?: string[];
   purpose: string;
@@ -132,6 +140,7 @@ export interface NormalizedGrantDraft {
   tenant_slug: string;
   credential_provider?: string;
   credential_ref?: string;
+  service_allocation?: ServiceCredentialAllocationScope;
   meeting_series_ids: string[];
   meeting_urls: string[];
   purpose: string;
@@ -235,9 +244,22 @@ export function normalizeGrantDraft(draft: GrantDraft): NormalizedGrantDraft {
     throw new GrantError('invalid_input', 'invalid credential reference');
   const capability = String(draft?.capability ?? '').trim();
   const policy = requireStandingGrantPolicy(capability);
-  if (policy.scope_keys.includes('credential_provider') && !provider)
+  let serviceAllocation: ServiceCredentialAllocationScope | undefined;
+  if (draft.service_allocation !== undefined) {
+    if (capability !== 'credential.use' || provider !== undefined || reference !== undefined)
+      throw new GrantError(
+        'invalid_input',
+        'service_allocation is exclusive to service credential.use grants'
+      );
+    try {
+      serviceAllocation = normalizeServiceCredentialAllocation(draft.service_allocation);
+    } catch (error) {
+      throw new GrantError('invalid_input', String(error));
+    }
+  }
+  if (!serviceAllocation && policy.scope_keys.includes('credential_provider') && !provider)
     throw new GrantError('invalid_input', 'credential_provider is required');
-  if (policy.scope_keys.includes('credential_ref') && !reference)
+  if (!serviceAllocation && policy.scope_keys.includes('credential_ref') && !reference)
     throw new GrantError('invalid_input', 'credential_ref is required');
   const tenant = String(draft.tenant_slug ?? '').trim();
   if (!isValidTenantSlug(tenant)) {
@@ -277,6 +299,7 @@ export function normalizeGrantDraft(draft: GrantDraft): NormalizedGrantDraft {
   }
   return {
     capability,
+    ...(serviceAllocation ? { service_allocation: serviceAllocation } : {}),
     ...(provider ? { credential_provider: provider } : {}),
     ...(reference ? { credential_ref: reference } : {}),
     tenant_slug: tenant,
@@ -326,9 +349,35 @@ export function validateGrantRecord(input: unknown): { valid: boolean; errors: s
     if (normalizeMeetingUrl(url) !== url) errors.push(`meeting URL is not normalized: ${url}`);
   }
   if (policy) {
-    if (policy.scope_keys.includes('credential_provider') && !record.scope.credential_provider)
+    const allocation = record.scope.service_allocation;
+    if (allocation) {
+      try {
+        if (
+          record.capability !== 'credential.use' ||
+          record.scope.credential_provider !== undefined ||
+          record.scope.credential_ref !== undefined
+        )
+          throw new Error('service allocation must be exclusive');
+        const normalized = normalizeServiceCredentialAllocation(allocation);
+        if (
+          Object.entries(normalized).some(
+            ([key, value]) =>
+              JSON.stringify(value) !==
+              JSON.stringify(allocation[key as keyof ServiceCredentialAllocationScope])
+          )
+        )
+          throw new Error('service allocation must be normalized');
+      } catch (error) {
+        errors.push(String(error));
+      }
+    }
+    if (
+      !allocation &&
+      policy.scope_keys.includes('credential_provider') &&
+      !record.scope.credential_provider
+    )
       errors.push('scope.credential_provider is required');
-    if (policy.scope_keys.includes('credential_ref') && !record.scope.credential_ref)
+    if (!allocation && policy.scope_keys.includes('credential_ref') && !record.scope.credential_ref)
       errors.push('scope.credential_ref is required');
     if (policy.scope_keys.includes('tenant_slug') && !tenant) {
       errors.push('scope.tenant_slug is required');
@@ -540,6 +589,7 @@ function writeNewGrant(
     capability: draft.capability,
     scope: {
       tenant_slug: draft.tenant_slug,
+      ...(draft.service_allocation ? { service_allocation: draft.service_allocation } : {}),
       ...(draft.credential_provider ? { credential_provider: draft.credential_provider } : {}),
       ...(draft.credential_ref ? { credential_ref: draft.credential_ref } : {}),
       ...(draft.meeting_series_ids.length ? { meeting_series_ids: draft.meeting_series_ids } : {}),
@@ -574,6 +624,7 @@ export function grantApprovalEffectBinding(draft: NormalizedGrantDraft): string 
 /** Canonical payload hashed into the approval: every field the human approved. */
 export function grantApprovalPayload(draft: NormalizedGrantDraft): Record<string, unknown> {
   return {
+    ...(draft.service_allocation ? { service_allocation: draft.service_allocation } : {}),
     ...(draft.credential_provider ? { credential_provider: draft.credential_provider } : {}),
     ...(draft.credential_ref ? { credential_ref: draft.credential_ref } : {}),
     action: 'grant_standing',
@@ -593,6 +644,8 @@ export function buildGrantApprovalDetails(
   requestedBy: string
 ): string {
   const lines = [`Capability: ${draft.capability}`, `Tenant: ${draft.tenant_slug}`];
+  if (draft.service_allocation)
+    lines.push(`Service allocation: ${JSON.stringify(draft.service_allocation)}`);
   if (draft.credential_provider) lines.push(`Credential provider: ${draft.credential_provider}`);
   if (draft.credential_ref) lines.push(`Credential reference: ${draft.credential_ref}`);
   if (draft.meeting_series_ids.length) {
@@ -603,7 +656,7 @@ export function buildGrantApprovalDetails(
     `Purpose: ${draft.purpose}`,
     `Expires: ${draft.ttl_days} day(s) after the grant is applied`,
     `Requested by: ${requestedBy}`,
-    draft.credential_provider
+    draft.credential_provider || draft.service_allocation
       ? 'Effect if approved: matching tenant tasks may resolve the named provider credential until expiry or revocation. Tool authority, egress and budgets remain separate.'
       : 'Effect if approved: a standing grant is created; matching meetings may be recorded without a per-mission consent until it expires or is revoked (`pnpm kyberion grants revoke <grant_id>`).'
   );
@@ -757,6 +810,14 @@ export function assertGrantApproval(
   if (!humanDecider) {
     throw new GrantError('approval_invalid', 'grant approval does not name its human decider');
   }
+  if (
+    draft.service_allocation &&
+    !serviceAllocationApprovedByOwner(approval, draft.service_allocation.owner_ref)
+  )
+    throw new GrantError(
+      'approval_invalid',
+      'service allocation requires its authenticated personal owner decision'
+    );
   return {
     approval,
     humanDecider,
@@ -786,6 +847,13 @@ export function verifyGrantBasis(record: GrantRecord): boolean {
   try {
     const approval = loadApprovalRequest(GRANT_APPROVAL_CHANNEL, basis.approval_request_id);
     if (!approval || approval.status !== 'approved' || approval.revocation) return false;
+    if (
+      record.scope.service_allocation &&
+      (!validateGrantRecord(record).valid ||
+        !serviceAllocationApprovedByOwner(approval, record.scope.service_allocation.owner_ref) ||
+        record.granted_by.actor_id !== record.scope.service_allocation.owner_ref)
+    )
+      return false;
     const consumption = approval.consumption;
     if (consumption?.consumer !== GRANT_APPROVAL_CONSUMER) return false;
     // Bound to the record this approval created: same grant id, and the grant
@@ -798,6 +866,9 @@ export function verifyGrantBasis(record: GrantRecord): boolean {
     if (!Number.isInteger(ttlDays) || ttlDays < 1) return false;
     const draft: NormalizedGrantDraft = {
       capability: record.capability,
+      ...(record.scope.service_allocation
+        ? { service_allocation: record.scope.service_allocation }
+        : {}),
       ...(record.scope.credential_provider
         ? { credential_provider: record.scope.credential_provider }
         : {}),

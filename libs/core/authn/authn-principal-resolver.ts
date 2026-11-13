@@ -30,6 +30,7 @@ import { auditChain } from '../governance/audit-chain.js';
 import { isVitestProcess, getRegisteredEnvText } from '../foundation/env.js';
 import { createLogger } from '../logger.js';
 import type { ActorRef, ActorKind } from '../contracts/actor.js';
+import type { SurfaceViewerRole } from '../foundation/surface-viewer-role.js';
 import type { ChronosAccessRole, ChronosTokenRegistration } from './chronos-access-registry.js';
 import type { OsKnowledgeTier } from '../governance/cloudflare-os-control-plane.js';
 import type { MemberRegistryPathOptions } from '../organization/member-registry.js';
@@ -82,7 +83,7 @@ export interface AuthnRequest {
    * Adapter-declared cap on the loopback grant: 'readonly' narrows the
    * local-dev owner role to a viewer (default 'localadmin').
    */
-  loopbackRole?: 'readonly' | 'localadmin';
+  loopbackRole?: SurfaceViewerRole;
   /** Server-owned tenant binding for unregistered remote credentials. */
   serverTenant?: string;
   /**

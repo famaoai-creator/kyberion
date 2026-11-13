@@ -92,6 +92,38 @@ export function chronosViewerCanAccessAgentScope(
 }
 
 /**
+ * An A2A envelope has no tenant field of its own; a tenant appears only in the
+ * optional `payload.context.security_scope` (`tenant_slug`, or its
+ * compatibility alias `tenant_id`) — the place the bridge reads it from.
+ * Without one the bridge runs the request unscoped, so a tenant-scoped viewer
+ * may route an envelope only when its security scope names exactly one tenant
+ * and that tenant is inside the viewer's set. Absent, malformed or conflicting
+ * claims are refused, and so is a `context.mission_id` that differs from the
+ * scope's own. An all-tenant viewer is not restricted here.
+ */
+export function chronosViewerCanRouteA2aEnvelope(
+  viewer: { tenantSlugs: string[] | 'all' },
+  envelope: { payload?: unknown }
+): boolean {
+  if (viewer.tenantSlugs === 'all') return true;
+  const context =
+    isRecord(envelope.payload) && isRecord(envelope.payload.context)
+      ? envelope.payload.context
+      : undefined;
+  const scope = context?.security_scope;
+  if (!isRecord(scope)) return false;
+  const claims = [scope.tenant_slug, scope.tenant_id].filter((claim) => claim !== undefined);
+  if (claims.length === 0) return false;
+  const [tenant] = claims;
+  if (typeof tenant !== 'string' || !tenant) return false;
+  if (claims.some((claim) => claim !== tenant)) return false;
+  // The bridge scopes the runtime by `security_scope.mission_id` but reads
+  // `context.mission_id` for team selection and attribution: they must agree.
+  if (context?.mission_id !== undefined && context.mission_id !== scope.mission_id) return false;
+  return viewer.tenantSlugs.includes(tenant);
+}
+
+/**
  * The only pipelines the console's deterministic `node dist/scripts/run_pipeline.js
  * --input <pipeline>` shortcut may run: read-only readiness / inventory checks
  * the console offers itself. Anything else (writers, actuators with side

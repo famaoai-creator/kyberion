@@ -5,7 +5,6 @@ import { currentScope } from '@agent/core/scope-context';
 import {
   CHRONOS_TOKEN_REGISTRY_READER_ROLE,
   readChronosTokenRegistrations,
-  type ChronosAccessRole,
   type ChronosTokenRegistration,
 } from '@agent/core/chronos-access-registry';
 import {
@@ -26,9 +25,14 @@ import type { EventScopeInput } from '@agent/core/event-scope';
 import { withExecutionContext, withStoreGrant } from '@agent/core/authority';
 import { getRegisteredEnvBool, getRegisteredEnvText } from '@agent/core/foundation';
 import type { HeadlessViewerScope } from '@agent/core/headless-surface-contract';
-import type { SurfaceAuthorizationContext } from '@agent/core/surface/surface-authorization';
+import {
+  SurfaceAuthorizationError,
+  type SurfaceAuthorizationContext,
+  type SurfaceViewerRole,
+} from '@agent/core/surface/surface-authorization';
 import { toWireError } from '@agent/core/contracts/wire-error';
 import { conciergePeerAddress, isLoopbackPeer } from './loopback-peer';
+import { conciergeExecutionRole } from './viewer-execution-role';
 
 let conciergeRateLimiter: ReturnType<typeof fixedWindowLimiter> | undefined;
 const conciergeRateLimitedRequests = new WeakSet<object>();
@@ -36,7 +40,7 @@ const conciergeRateLimitedRequests = new WeakSet<object>();
 export interface ConciergeViewerContext {
   /** Optional server-resolved replacement set; an empty set grants no read. */
   permissions?: SurfaceAuthorizationContext['permissions'];
-  role: ChronosAccessRole;
+  role: SurfaceViewerRole;
   tenantSlugs: string[] | 'all';
   organizationIds: string[] | 'all';
   projectIds: string[] | 'all';
@@ -179,12 +183,14 @@ function registrations(): ChronosTokenRegistration[] | null {
 type ConciergeTier = ConciergeViewerContext['tierAccess'][number];
 
 /** Concierge roles currently expose public/confidential; personal remains masked. */
-function maskPersonalTier(tiers: readonly ConciergeTier[]): ConciergeViewerContext['tierAccess'] {
+export function maskPersonalTier(
+  tiers: readonly ConciergeTier[]
+): ConciergeViewerContext['tierAccess'] {
   return tiers.filter((tier) => tier !== 'personal');
 }
 
 /** Concierge roles currently expose public/confidential; personal remains masked. */
-export function defaultTierAccess(role: ChronosAccessRole): ConciergeViewerContext['tierAccess'] {
+export function defaultTierAccess(role: SurfaceViewerRole): ConciergeViewerContext['tierAccess'] {
   return maskPersonalTier(defaultSurfaceViewerTierAccess(role));
 }
 
@@ -205,7 +211,7 @@ export function serverTenant(): string {
  * an explicit request for it is denied, and the role default is masked down.
  */
 export function resolveTierAccess(
-  role: ChronosAccessRole,
+  role: SurfaceViewerRole,
   requested?: readonly ConciergeTier[]
 ): ConciergeViewerContext['tierAccess'] {
   try {
@@ -274,6 +280,31 @@ export function resolveConciergeViewerContext(req: NextRequest): ConciergeViewer
   }
 }
 
+type ViewerResolution = { context: ConciergeViewerContext } | { error: unknown };
+const resolvedViewers = new WeakMap<object, ViewerResolution>();
+
+/**
+ * Resolve the viewer once per request object and remember the outcome (a
+ * failure is remembered too and thrown again). Opt-in: only a caller that
+ * runs several gates over one request uses it (the operations gates do).
+ * `resolveConciergeViewer` then reuses that outcome instead of resolving the
+ * same request again; a request that never came through here is resolved
+ * fresh on every call, as before.
+ */
+export function resolveConciergeViewerContextOnce(req: NextRequest): ConciergeViewerContext {
+  let resolution = resolvedViewers.get(req);
+  if (!resolution) {
+    try {
+      resolution = { context: resolveConciergeViewerContext(req) };
+    } catch (error) {
+      resolution = { error };
+    }
+    resolvedViewers.set(req, resolution);
+  }
+  if ('error' in resolution) throw resolution.error;
+  return resolution.context;
+}
+
 export function resolveConciergeViewer(
   req: NextRequest
 ):
@@ -282,7 +313,11 @@ export function resolveConciergeViewer(
   const rateLimitResponse = guardConciergeRequest(req);
   if (rateLimitResponse) return { response: rateLimitResponse };
   try {
-    return { context: resolveConciergeViewerContext(req) };
+    return {
+      context: resolvedViewers.has(req)
+        ? resolveConciergeViewerContextOnce(req)
+        : resolveConciergeViewerContext(req),
+    };
   } catch (error) {
     return {
       response: conciergeErrorResponse(
@@ -318,6 +353,13 @@ export function conciergeHeadlessScope(viewer: ConciergeViewerContext): Headless
   };
 }
 
+/**
+ * The one projection from a viewer to the shared authorization context, for
+ * every Concierge route including the operations console (`ops-viewer.ts`
+ * delegates here). It never widens and never drops a scope field: the
+ * personal tier is masked, and `includeUntenanted` is carried so the system
+ * selection keeps its company-less records in every reader of the context.
+ */
 export function toSurfaceAuthorizationContext(
   viewer: ConciergeViewerContext
 ): SurfaceAuthorizationContext {
@@ -362,27 +404,55 @@ export function withConciergeViewerContext<T>(viewer: ConciergeViewerContext, fn
     viewer.tenantSlugs !== 'all' && viewer.tenantSlugs.length === 1
       ? viewer.tenantSlugs[0]
       : undefined;
-  return withExecutionContext(
-    viewer.role === 'localadmin' ? 'concierge_localadmin' : 'concierge_operator',
-    fn,
-    undefined,
-    tenant
-  );
+  return withExecutionContext(conciergeExecutionRole(viewer.role), fn, undefined, tenant);
 }
 
-/** The wire body `conciergeErrorResponse` sends (so a caller can log its correlation id). */
+/**
+ * The status an error carries when it is an authorization failure: the viewer
+ * error itself, or one of the shared scope / operation denials it wraps.
+ */
+export function viewerErrorStatus(error: unknown): 401 | 403 | undefined {
+  return error instanceof ConciergeViewerError ||
+    error instanceof SurfaceViewerScopeError ||
+    error instanceof SurfaceAuthorizationError
+    ? error.status
+    : undefined;
+}
+
+/**
+ * What the wire code / message of an error response is classified from:
+ * - `response-status` — the response status plus the error message. Every
+ *   Concierge route outside the operations console.
+ * - `error-object` — the error itself: its own `code` / `status` / message,
+ *   whatever status the route answers with. The operations console, so an
+ *   errno (`EBUSY`), a `session_locked` code or a lifecycle conflict answered
+ *   409 keeps the code its error carries.
+ * The two paths classified this way before they shared this helper; the
+ * choice is stated by the caller, not inferred.
+ */
+export type ViewerErrorClassification = 'response-status' | 'error-object';
+
+/**
+ * The wire body `conciergeErrorResponse` sends (so a caller can log its
+ * correlation id). Status: the override, else the status of an authorization
+ * failure, else 500. This is the one viewer error response; the operations
+ * console's `viewerErrorResponse` calls it with its own fallback status and
+ * the `error-object` classification.
+ */
 export function conciergeErrorBody(
   error: unknown,
-  statusOverride?: number
+  statusOverride?: number,
+  classification: ViewerErrorClassification = 'response-status'
 ): {
   status: number;
   body: { ok: false; error: string; error_code: string; correlation_id: string };
 } {
-  const status = statusOverride || (error instanceof ConciergeViewerError ? error.status : 500);
-  const safe = toWireError({
-    status,
-    message: error instanceof Error ? error.message : String(error),
-  });
+  const status = statusOverride || viewerErrorStatus(error) || 500;
+  const safe = toWireError(
+    classification === 'error-object'
+      ? error
+      : { status, message: error instanceof Error ? error.message : String(error) }
+  );
   return {
     status,
     body: {
@@ -394,7 +464,11 @@ export function conciergeErrorBody(
   };
 }
 
-export function conciergeErrorResponse(error: unknown, statusOverride?: number): NextResponse {
-  const { status, body } = conciergeErrorBody(error, statusOverride);
+export function conciergeErrorResponse(
+  error: unknown,
+  statusOverride?: number,
+  classification: ViewerErrorClassification = 'response-status'
+): NextResponse {
+  const { status, body } = conciergeErrorBody(error, statusOverride, classification);
   return NextResponse.json(body, { status });
 }

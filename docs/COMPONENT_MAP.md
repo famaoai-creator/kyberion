@@ -79,7 +79,7 @@ The concept map explains how those ideas fit together logically.
 | `dots/`                                                         | Resident-agent charters: standing responsibilities (goal, attention triggers, authority role, notification routing) for always-on agents (catalog: `dots/README.md`, model: `knowledge/product/architecture/resident-dot-model.md`)                                                                | Declare or inspect resident agents                                                                  |
 | `plugins/`                                                      | Runtime guardrails and telemetry; skill plugins install via `pnpm plugin:install`                                                                                                                                                                                                                  | Inspect policy enforcement and instrumentation                                                      |
 | `satellites/`                                                   | External bridges and native helpers: chat bridges (`slack-bridge`, `telegram-bridge`, `discord-bridge`, `imessage-bridge`), `voice-hub`, `fluid-audio-cli` (Swift FluidAudio STT bridge), `macos-camera` (Swift camera-capture helper), `shared/` (bridge poll loop and child supervision helpers) | Connect Kyberion to Slack, Telegram, Discord, iMessage, voice, or macOS hardware                    |
-| `presence/`                                                     | Background sensing and control surfaces: `bridge/` (nexus daemon, channel registry), `sensors/`, `displays/` (concierge, presence-studio, chronos-mirror-v2, operator-surface, computer-surface, terminal-hud)                                                                                     | Inspect pulse, sensors, bridges, and the UI surfaces (map: `docs/SURFACES.md`)                      |
+| `presence/`                                                     | Background sensing and control surfaces: `bridge/` (nexus daemon, channel registry), `sensors/`, `displays/` (concierge, presence-studio, operator-surface, computer-surface, customer-room, a2ui-host, terminal-hud, and the chronos-mirror-v2 redirect app)                                      | Inspect pulse, sensors, bridges, and the UI surfaces (map: `docs/SURFACES.md`)                      |
 | `customer/`                                                     | Stance overlay (historical name)                                                                                                                                                                                                                                                                   | Layer one stance's identity/config over `knowledge/personal/` — not where a tenant's customers live |
 | `templates/`                                                    | Reusable scaffolds and document templates                                                                                                                                                                                                                                                          | Start a new skill, pipeline, onboarding profile, or document from a template                        |
 | `tests/`                                                        | Cross-cutting tests (unit tests are colocated with their source)                                                                                                                                                                                                                                   | Run smoke and integration coverage                                                                  |
@@ -194,11 +194,13 @@ Runtime/package hygiene for this layer is enforced by `pnpm run check -- --scope
 - `satellites/voice-hub/`
 - `presence/bridge/nexus-daemon.ts`
 - `presence/bridge/terminal/` (terminal bridge)
-- `presence/displays/chronos-mirror-v2/` (control tower, port 3000)
-- `presence/displays/concierge/` (CEO secretary, port 3050)
+- `presence/displays/concierge/` (CEO secretary and shared shell, port 3050; hosts the operations console at `/ops` + `/api/ops`)
+- `presence/displays/chronos-mirror-v2/` (compatibility redirects to Concierge `/ops` and `/api/ops`, port 3000; no screens of its own)
 - `presence/displays/presence-studio/` (companion workbench, port 3031)
 - `presence/displays/computer-surface/` (local mirror, port 3040)
 - `presence/displays/operator-surface/` (read-only audit monitor, port 3331)
+- `presence/displays/customer-room/` (customer-facing decision room opened through an invite link, port 3046, operator-launched)
+- `presence/displays/a2ui-host/` (developer A2UI viewer, loopback port 3036, operator-launched)
 - `presence/displays/terminal-hud/` (Ink TUI, `pnpm tui`)
 - `knowledge/product/architecture/slack-chronos-control-model.md`
 - `docs/SURFACES.md` (role map for all of the above)
@@ -212,23 +214,23 @@ Current delivery model:
 - channel bridges or control surfaces deliver/render those updates
 - delivery observability lives under `active/shared/observability/channels/`
 
-Chronos access modes:
+Operations console access modes (Concierge `/ops` + `/api/ops`; the role type is still named `ChronosAccessRole`):
 
 - `readonly`
   - observer mode for health, missions, runtimes, outbox, and diagnostics
 - `localadmin`
   - operator mode for deterministic mission/runtime/surface control actions
 
-Every route except `/api/healthz` resolves a `ViewerContext` fail-closed (viewer role + allowed tenant set; `src/lib/viewer-context.ts` + `src/middleware.ts`). Headless operation manifests also declare `required_permissions` and are evaluated through the shared `SurfaceAuthorizationContext`; client-supplied `tenant` parameters can only narrow the viewer's allowed set. `KYBERION_VIEWER_SCOPE=off|warn|enforce` is retained for migration telemetry, but unregistered tenant expansion is denied in every mode(`warn` audits before denial); see `docs/developer/CHRONOS_VIEWER_SCOPE_OPERATIONS.ja.md`, including how to set `KYBERION_LOCALHOST_AUTOADMIN=false` to require tokens even on loopback. This is a self-hosted/FDE internal authorization boundary, not hosted SaaS account management.
+Every `/api/ops` route except `/api/ops/healthz` resolves the Concierge `ViewerContext` fail-closed (viewer role + allowed tenant set; `presence/displays/concierge/src/lib/viewer-context.ts` + `src/lib/ops/ops-request-guard.ts`; `src/proxy.ts` only bounces unauthenticated page navigations to `/login` and is not an authorization decision). Headless operation manifests also declare `required_permissions` and are evaluated through the shared `SurfaceAuthorizationContext`; client-supplied `tenant` parameters can only narrow the viewer's allowed set. `KYBERION_VIEWER_SCOPE=off|warn|enforce` is retained for migration telemetry, but unregistered tenant expansion is denied in every mode(`warn` audits before denial); see `docs/developer/CHRONOS_VIEWER_SCOPE_OPERATIONS.ja.md`. A credential-less loopback request is the local operator (`localadmin`) only while first-run bootstrap is open (or with the default-off `KYBERION_CONCIERGE_ALLOW_ANONYMOUS_LOOPBACK`); after an owner is bound, loopback requests sign in or present a token like any other. `KYBERION_LOCALHOST_AUTOADMIN` is read by computer-surface, not by Concierge. This is a self-hosted/FDE internal authorization boundary, not hosted SaaS account management.
 
-Local Chronos boot:
+Local boot:
 
 ```bash
-export KYBERION_LOCALHOST_AUTOADMIN=true   # loopback auto-admin; set false to require tokens
-pnpm chronos:dev
+pnpm surfaces reconcile   # starts the enabled surfaces, including Concierge (3050) and the redirect app (3000)
+pnpm chronos:dev          # dev server of the chronos-mirror-v2 redirect app only; the console itself is Concierge /ops
 ```
 
-Chronos does not directly own mission state. It delegates to:
+The operations console does not directly own mission state. It delegates to:
 
 - `mission_controller`
 - `agent-runtime-supervisor`
@@ -237,6 +239,10 @@ Chronos does not directly own mission state. It delegates to:
 ### 5. Service binding and channel delivery
 
 - `libs/core/service/service-binding.ts`
+- `libs/core/service/service-binding-reader.ts` (governed connection reads; no execution authorization)
+- `libs/core/service/service-binding-registry.ts` (writes and tenant/project/action authorization)
+- `libs/core/governance/service-credential-allocation.ts` (fail-closed allocation port)
+- `libs/core/governance/service-credential-allocation-verifier.ts` (owner-approved grant verification, installed by grant-aware bootstrap)
 - `libs/core/service/service-preset-registry.ts`
 - `libs/actuators/service-actuator/`
 - `libs/actuators/presence-actuator/`
@@ -326,7 +332,7 @@ Kyberion uses four separate concepts here:
 
 - `gateway`
   - receives external events
-  - examples: `satellites/slack-bridge`, `satellites/imessage-bridge`, `satellites/telegram-bridge`, `chronos-mirror-v2` API routes
+  - examples: `satellites/slack-bridge`, `satellites/imessage-bridge`, `satellites/telegram-bridge`, the operations-console API routes (`presence/displays/concierge/src/app/api/ops/`, formerly the `chronos-mirror-v2` API)
 - `service binding`
   - resolves authenticated service access from governed secrets
   - examples: `libs/core/service/service-binding.ts`, `service-actuator`
@@ -337,7 +343,7 @@ Kyberion uses four separate concepts here:
   - performs local short-lived shell/OS/file control
   - example: `system-actuator`
 
-This means Slack and Chronos are not part of `system-actuator`.
+This means Slack and the operations console (formerly Chronos) are not part of `system-actuator`.
 They are human-facing gateways. Delivery belongs to `presence-actuator`, and authentication belongs to service binding.
 
 Background surfaces and bridges are not started ad hoc. Their canonical startup manifests are `knowledge/product/governance/surfaces/*.json`, with `knowledge/product/governance/active-surfaces.json` as the generated compatibility snapshot. Lifecycle coordination runs through `scripts/surface_runtime.ts` plus `runtime-supervisor`.

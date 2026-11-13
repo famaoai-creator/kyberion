@@ -10,7 +10,7 @@ import {
 import { buildCeoSurfaceSummary, type CeoSurfaceSummary } from '@agent/core/ceo-surface-summary';
 import { withExecutionContext } from '@agent/core/authority';
 import { readApprovalPublicationPreview } from '@agent/core/surface/approval-publication-preview';
-import { conciergeApprovalSnapshot } from './personal-approval-server';
+import { conciergeApprovalSnapshot, conciergeViewerPersonIds } from './personal-approval-server';
 import type { OperatorHomeScopeFilter } from '@agent/core/surface/operator-home-summary';
 import type { A2UIMessage } from '@agent/core/a2ui';
 import {
@@ -203,17 +203,20 @@ export function readConciergeHome(
   }
 ): CeoSurfaceSummary {
   const narrowed = narrowConciergeScope(viewer, query);
+  const includePersonal =
+    Array.isArray(narrowed.tenantSlugs) &&
+    narrowed.tenantSlugs.length === 0 &&
+    !viewer.includeUntenanted;
   const scope: OperatorHomeScopeFilter = {
     tiers: viewer.tierAccess,
-    includePersonalApprovals:
-      Array.isArray(narrowed.tenantSlugs) &&
-      narrowed.tenantSlugs.length === 0 &&
-      !viewer.includeUntenanted,
+    includePersonalApprovals: includePersonal,
     tenantSlugs: narrowed.tenantSlugs,
     organizationIds: narrowed.organizationIds,
     projectIds: narrowed.projectIds,
     // The viewer's person ids admit person-custody records to their owner.
-    personIds: viewerPersonIds(viewer),
+    // Records bound to the installation owner's agent NHI belong to the
+    // personal selection only — a company or system view keeps them out.
+    personIds: includePersonal ? conciergeViewerPersonIds(viewer) : viewerPersonIds(viewer),
     ...(viewer.includeUntenanted ? { includeUntenanted: true } : {}),
   };
   return withConciergeViewerContext(viewer, () => {

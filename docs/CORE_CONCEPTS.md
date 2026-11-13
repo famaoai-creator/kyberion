@@ -4,6 +4,13 @@ You can run Kyberion's first win without learning its whole vocabulary. These fi
 
 The loop they all serve: **Intent → Plan → Result** (see [QUICKSTART](./QUICKSTART.md)).
 
+Kyberion lets a person or company delegate work, use permitted information and
+services, and receive verifiable outcomes and learning. Solo and organization
+use share one engine: a solo experience can hide unnecessary choices, but must
+not remove ownership or authorization boundaries. The requester, accountable
+human, executing identity, information owner, connection owner, and approver
+may coincide for one person; they are not the same concept.
+
 ## 1. Mission
 
 A bounded unit of work with a lifecycle (`planned → active → validating → distilling → completed`, plus `paused` / `failed` / `archived`), its own git history, state, and evidence. Missions are started, checkpointed, and finished only through the mission controller (`pnpm mission …`), so work is resumable and auditable (`pnpm mission finish` moves it to `completed`). Lighter, conversational work is a **Task Session**; a mission is for work that needs evidence and rollback. How Mission, Task, Task Contract, Task Session and WorkItem relate: [Units of work](./GLOSSARY.md#units-of-work).
@@ -48,6 +55,20 @@ approval. Independent review requires a genuinely separate reviewer, not an alia
 or session change. The common window never permits cross-tenant sharing or a
 public downgrade. See the [actor identity and responsibility model](../knowledge/product/architecture/actor-identity-and-responsibility-model.md)
 for the additive implementation and remaining migration work.
+
+Changing whom the work is for does not transfer information, credentials, or
+authority. A **Tenant** is the contract and isolation boundary (Company is its
+alias); an **Organization** is a responsibility structure inside that tenant.
+A **Stance** selects whom to act for, not permission to act. No additional
+Workspace authority layer is needed. See the accepted
+[Concept Model v2 decision](../knowledge/product/architecture/decisions/2026-11-10-concept-model-v2.md).
+
+For external connections, ownership, permission to use an operation, credential
+allocation, and approval of its effect are separate checks. Unknown personal
+ownership is not permission for every logged-in member, even on localhost.
+The [service integration guide](../knowledge/product/orchestration/service-integration-guide.md#solo-and-organization-rollout)
+describes the implemented boundary, deliberate legacy migration, and remaining
+session/CLI provenance, local multi-account storage and acting-for UI work.
 
 ## 5. Surface
 
