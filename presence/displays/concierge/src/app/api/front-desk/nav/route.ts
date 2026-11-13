@@ -1,4 +1,3 @@
-import { readAvailableFrontDeskSurfaces } from '@agent/core/front-desk-nav';
 import { NextRequest, NextResponse } from 'next/server';
 import {
   buildFrontDeskNavPayload,
@@ -21,7 +20,7 @@ import {
  */
 export const dynamic = 'force-dynamic';
 
-export async function GET(req: NextRequest) {
+export function GET(req: NextRequest) {
   const resolved = resolveConciergeViewer(req);
   if (resolved.response) return resolved.response;
   try {
@@ -34,11 +33,7 @@ export async function GET(req: NextRequest) {
       ...narrowConciergeScope(resolved.context, { tenant: req.nextUrl.searchParams.get('tenant') }),
     };
     const role = resolveConciergeFrontDeskRole(viewer);
-    const payload = buildFrontDeskNavPayload({
-      locale,
-      role,
-      availableSurfaces: await readAvailableFrontDeskSurfaces(),
-    });
+    const payload = buildFrontDeskNavPayload({ locale, role });
     return NextResponse.json(payload, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
     return conciergeErrorResponse(error, 500);

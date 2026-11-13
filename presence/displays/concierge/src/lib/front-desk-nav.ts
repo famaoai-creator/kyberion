@@ -17,7 +17,6 @@ import {
   readFrontDeskSurfaceUrls,
   resolveFrontDeskMenu,
   type FrontDeskRole,
-  type FrontDeskAvailableSurfaces,
   type FrontDeskMenuPlacement,
   type FrontDeskSurfacePorts,
 } from '@agent/core/front-desk-nav';
@@ -63,7 +62,6 @@ export interface BuildFrontDeskNavPayloadInput {
   role: FrontDeskRole;
   /** Injectable for tests; defaults to the real manifest-backed reader. */
   ports?: Partial<FrontDeskSurfacePorts>;
-  availableSurfaces?: FrontDeskAvailableSurfaces;
 }
 
 export function buildFrontDeskNavPayload(
@@ -80,7 +78,6 @@ export function buildFrontDeskNavPayload(
     ports,
     urls,
     role,
-    availableSurfaces: input.availableSurfaces,
   });
   const tr = (key: string) => t(key as VocabularyKey, undefined, locale);
   // 使い方 is served by Concierge itself today; this stays a runtime string

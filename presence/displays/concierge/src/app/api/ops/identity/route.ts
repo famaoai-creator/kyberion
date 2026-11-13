@@ -41,7 +41,7 @@ export async function GET(req: NextRequest) {
   return withViewerExecutionContext(resolvedViewer.context, () => {
     // ONB-03 Task 5: prefer the active customer overlay (KYBERION_STANCE)
     // over knowledge/personal/, matching operator-identity.ts's resolution
-    // order, so vital-check and FirstRunBanner don't misreport identity as
+    // order, so vital-check and the identity badge don't misreport identity as
     // missing under a tenant overlay.
     const sovereign = parsePersonalSovereignIdentitySummary(
       loadPersonalIdentityAtPath(customerResolver.resolveOverlay('my-identity.json'))
