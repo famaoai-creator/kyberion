@@ -168,7 +168,7 @@ describe('default coordinated API task tools', () => {
     expect(result.error).toContain('TASK_TOOL_BINDING');
     expect(bridge.createAgentExecAdapter).not.toHaveBeenCalled();
   });
-  it('keeps a legacy unclaimed read-only delegation without manufacturing a task-tool binding', async () => {
+  it('runs a delegation without a WorkItem unclaimed, without manufacturing a task-tool binding', async () => {
     const result = await new SupervisorAgentExecutionPort().delegate(request());
     expect(result.status, result.error).toBe('succeeded');
     expect(runtime).toBeUndefined();
