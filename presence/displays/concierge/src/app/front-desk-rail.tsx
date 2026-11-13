@@ -246,6 +246,7 @@ function FrontDeskRailContent() {
   // Management changes hierarchy with native replaceState on the same path.
   // Subscribe to Next's query context so rail hrefs follow those selections.
   const searchParams = useSearchParams();
+  const selectionQuery = searchParams?.get('tenant');
   const [nav, setNav] = React.useState<FrontDeskNavResponse | null>(null);
   const [me, setMe] = React.useState<FrontDeskMeResponse | null>(null);
   const selectionGeneration = React.useRef(0);
@@ -256,12 +257,17 @@ function FrontDeskRailContent() {
 
   const fetchMe = React.useCallback(() => {
     const generation = ++selectionGeneration.current;
+    const selectionHint = readTenantSelection();
+    const current = () =>
+      generation === selectionGeneration.current && readTenantSelection() === selectionHint;
     setDestinationId(null);
     setNavigationUnavailable(false);
     setNav(null);
     setMe(null);
-    return fetch('/api/me', { cache: 'no-store' })
+    const query = selectionHint ? `?tenant=${encodeURIComponent(selectionHint)}` : '';
+    return fetch(`/api/me${query}`, { cache: 'no-store' })
       .then((res) => {
+        if (!current()) return null;
         // A rejected bearer requires sign-in even on loopback. Never discard it
         // and retry as the anonymous local operator.
         if (
@@ -282,7 +288,7 @@ function FrontDeskRailContent() {
         return res.ok ? res.json() : null;
       })
       .then((data: FrontDeskMeResponse | null) => {
-        if (generation !== selectionGeneration.current) return;
+        if (!current()) return;
         if (data?.ok) {
           setMe(data);
           // Show what the server actually resolved; a refused hint is replaced.
@@ -290,7 +296,7 @@ function FrontDeskRailContent() {
         } else setNavigationUnavailable(true);
       })
       .catch(() => {
-        if (generation === selectionGeneration.current) setNavigationUnavailable(true);
+        if (current()) setNavigationUnavailable(true);
       });
   }, []);
 
@@ -326,10 +332,11 @@ function FrontDeskRailContent() {
     window.addEventListener('popstate', refresh);
     window.addEventListener(TENANT_CHANGED_EVENT, refresh);
     return () => {
+      ++selectionGeneration.current;
       window.removeEventListener('popstate', refresh);
       window.removeEventListener(TENANT_CHANGED_EVENT, refresh);
     };
-  }, [fetchMe]);
+  }, [fetchMe, selectionQuery]);
 
   React.useEffect(() => {
     const request = (event: Event) => {
@@ -428,6 +435,7 @@ function FrontDeskRailContent() {
         setDestinationId(null);
         const value = payload.value;
         const sourceSelection = readTenantSelection();
+        if (sourceSelection === value) return;
         const intentGeneration = selectionGeneration.current;
         requestLeave(selectionSwitchHref(window.location.href, value), () => {
           const latest = latestScope.current.me;
@@ -554,15 +562,21 @@ function FrontDeskRailContent() {
         : renderMessage(nav.tenant_viewing_single, { role: roleLabel(me.viewing.role) });
     }
     if (me.selection?.mode === 'personal') {
-      return frontDeskText('tenant_personal_detail', locale, {
-        count: me.switcher?.companies.length ?? me.tenants.length,
-      });
+      return frontDeskText(
+        me.selection.aggregate && (me.switcher?.companies.length ?? me.tenants.length) > 0
+          ? 'tenant_personal_detail'
+          : 'tenant_personal_only_detail',
+        locale,
+        {
+          count: me.switcher?.companies.length ?? me.tenants.length,
+        }
+      );
     }
     if (me.selection?.mode === 'system') return frontDeskText('tenant_system_detail', locale);
     return undefined;
   };
   const context =
-    nav && me && (me.viewing || options.length > 1)
+    nav && me && (me.viewing || me.selection)
       ? {
           label: me.viewing
             ? me.viewing.display_name || me.viewing.tenant_slug
@@ -614,6 +628,11 @@ function FrontDeskRailContent() {
         {...(footerItems.length ? { footer_items: footerItems } : {})}
       >
         {projectContext ? <NavRailContext context={projectContext} /> : null}
+        {context ? (
+          <p className="kb-text kb-text--caption" data-selection-authority-notice>
+            {frontDeskText('tenant_selection_authority_notice', locale)}
+          </p>
+        ) : null}
       </NavRail>
       <Dialog
         id="workspace-destination"

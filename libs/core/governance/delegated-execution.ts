@@ -11,7 +11,7 @@ import { resolveRole } from '../authority.js';
 import { loadServiceEndpointsCatalog } from '../service/service-endpoint-registry.js';
 import { getServicePresetRecord } from '../service/service-preset-registry.js';
 import { loadConnectionWithFallback } from '../service/service-engine-helpers.js';
-import { resolveServiceBinding } from '../service/service-binding.js';
+import { resolveServiceBinding, resolveServiceTransportAuth } from '../service/service-binding.js';
 import {
   listServiceBindingRecords,
   loadServiceBindingRecord,
@@ -314,7 +314,7 @@ export function delegatedExecutionEffectConfigurationHash(input: DelegatedExecut
       );
     }
     const selectedBinding =
-      auth === 'secret-guard' && target.serviceBindingId
+      (auth === 'secret-guard' || serviceId === 'google-workspace') && target.serviceBindingId
         ? loadServiceBindingRecord(target.serviceBindingId)
         : undefined;
     if (auth === 'secret-guard' && !selectedBinding) {
@@ -322,20 +322,36 @@ export function delegatedExecutionEffectConfigurationHash(input: DelegatedExecut
         '[CREDENTIAL_PROVENANCE_DENIED] Delegated service requires an exact selected binding'
       );
     }
+    const transportAuth = selectedBinding
+      ? resolveServiceTransportAuth(serviceId!, auth, selectedBinding)
+      : auth;
+    if (
+      transportAuth === 'session' &&
+      target.tenantSlug !== credentialExecutionIdentity().tenantSlug
+    ) {
+      throw new Error('[POLICY_VIOLATION] Tenant session requires matching execution identity');
+    }
     // Only the digest is persisted. Endpoint, preset template, selected
     // account/connection and credential rotations invalidate issued permits.
+    // GWS session metadata includes the nonsecret actor/connection/generation proof.
     effectConfiguration = {
       config,
       preset,
       // Match the engine: tenant work never inherits a personal connection document.
       connection: target.tenantSlug ? {} : loadConnectionWithFallback(serviceId!),
-      binding: resolveServiceBinding(serviceId!, auth, undefined, selectedBinding ?? undefined, {
-        tenant_slug: target.tenantSlug,
-        project_id: target.source.projectId,
-        mission_id: target.source.missionId,
-        task_id: target.source.taskId,
-        action: action!,
-      }),
+      binding: resolveServiceBinding(
+        serviceId!,
+        transportAuth,
+        undefined,
+        selectedBinding ?? undefined,
+        {
+          tenant_slug: target.tenantSlug,
+          project_id: target.source.projectId,
+          mission_id: target.source.missionId,
+          task_id: target.source.taskId,
+          action: action!,
+        }
+      ),
       tenantBindings: listServiceBindingRecords()
         .filter(
           (record) =>

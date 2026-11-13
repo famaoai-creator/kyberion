@@ -21,6 +21,14 @@ afterEach(() => {
   overrideSecretEncryptionKeyForTests(null);
 });
 describe('encryption master Keychain admission', () => {
+  it('never creates a master for existing-key-only account storage', () => {
+    mocks.exec.mockReturnValue({ status: 44, stdout: '', stderr: 'not found' });
+    expect(() =>
+      encryptConnectionDocument({ material: {} }, { createKeyIfMissing: false })
+    ).toThrow('No replacement key');
+    expect(mocks.exec).toHaveBeenCalledOnce();
+    expect(mocks.exec.mock.calls[0][0]).toBe('security');
+  });
   it('does not turn a refusal into creation or repeat the read within the operation', () => {
     mocks.exec.mockReturnValue({ status: 51, stdout: '', stderr: 'refused' });
     withSecretResolutionSession(() => {

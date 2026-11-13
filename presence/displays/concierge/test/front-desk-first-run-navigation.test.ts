@@ -42,6 +42,8 @@ beforeAll(async () => {
 afterEach(() => {
   unmount?.();
   unmount = undefined;
+  // frontDeskFetch persists the URL tenant hint; each mount starts a fresh browser.
+  dom.document.cookie = '';
   vi.unstubAllGlobals();
 });
 afterAll(() => dom.restore());

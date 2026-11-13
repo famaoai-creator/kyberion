@@ -188,6 +188,7 @@ function ConnectionsByOwner({ t, setup }: { t: SettingsTranslate; setup: Setup }
     ));
   return (
     <>
+      <p className="kb-text kb-text--caption">{t('setup.connection_authority_notice')}</p>
       {grouped.mine.length > 0 ? (
         <div className="settings-row-block">
           <h4>{t('setup.connections_mine')}</h4>

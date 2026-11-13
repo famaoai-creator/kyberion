@@ -378,11 +378,14 @@ does not modify live grants, connection ownership, or deployment settings.
    revocation, and scoped credential misses without personal/operator fallback.
    Preserve the separately admitted capture path and personal no-tenant mode.
 4. **Provenance and allocation:** the API-token broker path below binds selected
-   references and owner-approved allocation with freshness checks. Remaining work is
-   session/CLI provenance, local multi-account material storage, and clear acting-for
-   context and setup/readiness in the UI. Each stage
-   needs tests at its real execution boundary before being called enforced.
-   Existing source-of-truth records must be extended rather than duplicated.
+   references and owner-approved allocation with freshness checks. Tenant GWS CLI
+   execution additionally requires the selected session provenance described below.
+   The local account material API stores encrypted, exact generations but is not
+   wired to account introduction or a broker. Concierge displays personal/company
+   context and connection ownership, and explains that display selection is not
+   execution authorization. These are distinct readiness states, not a single
+   completed connection-setup flow. Existing source-of-truth records are extended
+   rather than duplicated.
 
 Ownership migration makes a connection visible to its owner; it does not grant
 an operation, provision OAuth, admit a tenant task, or approve an external effect.
@@ -451,10 +454,60 @@ approval, other actions/scopes, and missing provenance fail closed.
 This path intentionally does **not** read a service-wide local personal connection file to infer
 per-binding provenance. An already configured broker must attest the exact source; no broker is
 installed or configured automatically. Session/CLI credential provenance and local multi-account
-material storage are not covered by this API-token path. No real allocations or migrations are
+material storage use the separate boundaries below. No real allocations or migrations are
 performed by installing this code.
 
 The normal grant-aware runtime bootstrap installs the read-only allocation verifier even
 when an external credential resolver is already configured; it never replaces that resolver.
 Low-level embedders must initialize the same runtime before using personal allocations.
 Without the verifier, allocation fails closed rather than treating a broker assertion as consent.
+
+### Tenant GWS sessions and local account material
+
+Tenant Google Workspace CLI execution requires an organization-owned `session`
+binding and a broker response with `version: 3`. In addition to `secrets` (which
+may be empty), the response supplies `providerEnvironments.gws` and
+`providerProvenance.gws`. The latter contains exactly `serviceBindingId`,
+`serviceId` (`google-workspace`), `sourceOwnerRef` (the tenant), `actorId`
+(the current claim actor), and a nonempty opaque `generation`. The broker must
+advance or withdraw this generation whenever its session material changes or is
+revoked. A generation is the configured broker's attestation, not a file-content
+fingerprint or proof that the external provider has accepted the session.
+
+The runtime revalidates the current claim, selected connection snapshot, actor,
+and exact serialized broker response before consumption. The selected record
+supplies the session transport while the existing request auth selector remains
+unchanged. Session provenance, including generation, enters the existing effect
+fingerprint, so rotation also invalidates an old execution authorization.
+GWS gets an isolated
+`HOME` with `GOOGLE_WORKSPACE_CLI_CONFIG_DIR` equal to that home; only these keys,
+`GOOGLE_WORKSPACE_CLI_TOKEN`, and `GOOGLE_APPLICATION_CREDENTIALS` are accepted.
+Auth paths must remain inside the isolated tenant home. Personal HOME, global
+login, templated environment overrides, generic provider environments without
+selected-session provenance, and another binding's session cannot serve this
+tenant execution. The separate information-asset capture admission uses the same
+selected-session check for its session transport; its API-token capture path
+retains its existing scoped token boundary. The generic provider accessor cannot consume a selected
+service session. Existing action admission, approval, project restrictions and
+egress checks remain required; provenance is not permission to execute.
+
+Personal no-tenant CLI use retains its existing operator behavior. Personal
+session allocation into a tenant is not implemented; the explicit personal
+allocation above remains the API-token path. Version 1 reasoning environments
+and version 2 API-token responses retain their existing contracts.
+
+The internal `storeLocalAccountMaterial` / `loadLocalAccountMaterial` API in
+`secret-guard.ts` stores exact account generations encrypted with an existing
+key. It never creates a missing key or falls back to plaintext. Stored identity
+metadata and possession of a reference grant no authority, create no service
+binding, and issue no broker provenance. The reserved account directory is not
+part of ambient service credential discovery. See the
+[secret introduction model](../architecture/secret-introduction-model.md) for
+storage placement and retention limits.
+
+This API is not connected to the UI/CLI introduction collector or shell broker.
+An integration must preserve introduction approval, exact account selection,
+owner-approved allocation where applicable, and current-generation revocation.
+Concierge's context and owner explanations do not claim these setup steps have
+run. Installing this change performs no live login, key creation, allocation,
+ownership migration, or security-setting change.
