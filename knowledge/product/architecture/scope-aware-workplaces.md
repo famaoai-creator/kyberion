@@ -1,7 +1,7 @@
 ---
 title: 'Scope-aware continuous workplaces'
 tags: [architecture, workspace, project, organization, autonomy, scope]
-last_updated: 2026-10-27
+last_updated: 2026-11-12
 ---
 
 # スコープを共有する継続的な仕事場
@@ -40,25 +40,31 @@ API は取得失敗を `unavailable` で表し、画面は件数を `—` にす
 
 ## 組織ダッシュボード
 
-Chronos Home上部の仕事サマリーは「組織全体・担当範囲・自分」の3入口を持つ。
-切替対象はこのサマリーであり、下部の仕事場や他の画面の選択を暗黙に変えない。
-`/api/organization-dashboard` は既存workspace resolverと実ownerに基づくWorkItem visibilityを
-使い、tenant・organization・project・tierを確認してから件数を集計する。
-組織全体は明示した組織の選択が必要で、project限定viewerからは拒否する。
+「組織全体・担当範囲・自分」の3入口を持つ仕事サマリーは、旧 Chronos Home(`/ops?section=home`)上部の
+画面だった。MSN-SHELL-IA で `/ops?section=home` は Concierge のホーム `/` へ 308 で転送され、
+この3入口の画面部品は 2026-11 に削除した。**現在この切替を描画する画面はない。**
+
+残っているのは集計APIである。`GET /api/ops/organization-dashboard`(`mode=organization|scope|mine`)は
+既存workspace resolverと実ownerに基づくWorkItem visibilityを使い、tenant・organization・project・tierを
+確認してから件数を集計する。組織全体は明示した組織の選択が必要で、project限定viewerからは拒否する。
 「自分」は認証に紐付いた`memberId`と`assignee_user_id`の完全一致のみを数える。
 本人の紐付けがない場合は利用不可とし、principal IDやクライアント指定のユーザーIDで補わない。
-
-停滞・確認待ち・着手可能の順、次に優先度の順で先頭10件を表示し、件数は全件から計算する。
+停滞・確認待ち・着手可能の順、次に優先度の順で先頭10件を返し、件数は全件から計算する。
 ここでの確認待ちはWorkItemの`review`であり、approval-storeの未決承認数とは区別する。
-閲覧者・閲覧ロール・許可された選択範囲・取得時刻を表示する。取得失敗時は古い行や件数を外し、
-不明であることと更新方法を示す。自動更新や元データの最終同期時刻を保証する表示ではない。
-「自分」から仕事一覧へ移動した場合、一覧は既存の閲覧範囲を開くため他の担当者も含む。
-成果物・承認・顧客共有の権限は各既存APIが引き続き判定し、このサマリーは共有許可を発行しない。
+このAPIを呼ぶ画面は現在なく、外部・自動化クライアント向けの読み取りとして残している。
+成果物・承認・顧客共有の権限は各既存APIが引き続き判定し、このAPIは共有許可を発行しない。
 
-実ブラウザー検証は、Chronosをビルドした後に
-`KYBERION_TEST_CHRONOS_BROWSER=1 pnpm exec vitest run scripts/organization_dashboard.browser.integration.test.ts --maxWorkers 1`
-で実行する。合成組織の隔離rootと実際の認証・API・Chromiumを使い、本人・組織切替、表示件数、
-権限外の403、取得失敗時の表示撤去、390px幅への収まりを確認する。実テナントの閲覧許可とは区別する。
+いま人が見る全体像は Concierge のホーム `/` で、`GET /api/v1/home` が1回のサーバー読み取り
+(`presence/displays/concierge/src/lib/home-dashboard.ts` の `collectHomeDashboard`)から全タイルを返す。
+選択した会社・organization・project は許可範囲を狭めるだけで、会社を選んでいない個人ビューは件数だけを
+示す。取得できないタイルは `unavailable` とし、正常な 0 として見せない。あなた待ちの件数は
+`/api/v1/needs-you/summary` だけが出す。WorkItem の一覧は 仕事 `/work?tab=items` にある。
+
+検証: 集計APIは `presence/displays/concierge/src/lib/ops/organization-dashboard.test.ts` と
+`src/app/api/ops/organization-dashboard/route.test.ts`、ホームは `src/lib/home-dashboard.test.ts` と
+`src/app/home-parts.test.ts`。旧画面を実ブラウザーで操作していた
+`organization_dashboard.browser.integration.test.ts` は対象画面がなくなったため
+`retired/scripts/` へ移した。
 
 ## 継続的な責任と有限の実行
 

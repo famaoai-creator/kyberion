@@ -10486,9 +10486,9 @@
         "qps-ploc": "⟦Ḓřïṽė ṗėřşïşŧėñŧ ṖŦẎ şėşşïőñş ŧħřőůɠħ ŧħė ŧėřɱïñȧŀ ḓȧėɱőñ ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
       },
       "cli_cmd_script_chronos_dev": {
-        "en": "Run the Chronos UI dev server",
-        "ja": "Chronos UI の開発サーバーを実行",
-        "qps-ploc": "⟦Řůñ ŧħė Ƈħřőñőş ŮÏ ḓėṽ şėřṽėř ŀőřėɱ ïṗş⟧"
+        "en": "Run the dev server of the Chronos redirect app (the operations console is Concierge /ops)",
+        "ja": "Chronos 転送アプリの開発サーバーを実行(運用コンソールは秘書室の /ops)",
+        "qps-ploc": "⟦Řůñ ŧħė ḓėṽ şėřṽėř őƒ ŧħė Ƈħřőñőş řėḓïřėƈŧ ȧṗṗ (ŧħė őṗėřȧŧïőñş ƈőñşőŀė ïş Ƈőñƈïėřɠė /őṗş) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñ⟧"
       },
       "cli_cmd_script_capabilities": {
         "en": "Discover actuators without a build",
