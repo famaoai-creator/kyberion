@@ -43,17 +43,20 @@ Node selection order: a Node `>=24` already on `PATH` → the container's `nvm` 
 
 ### Recovering when `dist/` is missing (hook deadlock)
 
-Every Claude `PreToolUse` event goes through `scripts/provider_hook_entry.mjs`, which loads the built policy runtime from `dist/scripts/claude_code_hook.js`. When that file is missing the hook stays **fail-closed**: Edit/Write and shell calls are denied with `Kyberion hook runtime unavailable …`. So that the agent can still repair the build itself, the shell event (`PreToolUseShellDeny`) lets through a minimal, exact-shape bootstrap allowlist — one command per Bash call:
+Every Claude `PreToolUse` event goes through `scripts/provider_hook_entry.mjs`, which loads the built policy runtime from `dist/scripts/claude_code_hook.js`. When that file is missing the hook stays **fail-closed**: shell calls are denied with `Kyberion hook runtime unavailable …` unless they hit a minimal, exact-shape bootstrap allowlist — one command per Bash call. File-mutation tools (Edit/Write/MultiEdit and the Gemini `write_file|replace` matchers) stay **allowed** while the runtime is missing: a dirty tree that fails to compile can only be repaired by editing, never by building, so denying edits deadlocks the session.
 
 | Allowed while the runtime is missing                                      | Notes                                                                          |
 | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| Edit/Write/MultiEdit/NotebookEdit (`write_file`, `replace` on Gemini)     | the recovery path itself: fix the tree, then rebuild                           |
 | `pnpm install` (optionally `--frozen-lockfile` and/or `--prefer-offline`) | no package names, no other flags                                               |
 | `pnpm build`, `pnpm --filter @agent/core build`                           | no extra arguments                                                             |
 | `bash .claude/hooks/session-start.sh`                                     | re-runs the cloud bootstrap (a no-op outside cloud sessions)                   |
-| `git status`, `git log`, `git fetch`                                      | only short read-only flags (`--short`, `--oneline`, `-5`, `--prune`, …)        |
+| `git status`, `git log`, `git fetch`, `git diff`                          | read-only; only short flags (`--short`, `--oneline`, `-5`, `--prune`, …)       |
+| `git restore [--staged] [--worktree] [--source=<ref>] <paths>`            | roll back a broken dirty file before rebuilding                                |
+| `git stash` / `git stash -u` / `push` / `pop` / `apply` / `list` / `show` | save → rebuild clean → pop; `drop` and `clear` stay denied                     |
 | `git switch <branch>`, `git switch -c <new> [<start>]`, `git checkout -b` | branch moves only; bare `git checkout <x>` stays denied (it can restore paths) |
 
-Any shell metacharacter (`;`, `&&`, `||`, `|`, `` ` ``, `$(`, `>`, `<`, quotes, newlines) disqualifies a command, so the allowlist cannot be chained into anything else. An allowlisted command gets **no** decision from the hook — the normal permission flow still applies. Edit/Write stay denied until `pnpm build` restores `dist/`. Codex and Gemini are unaffected: their fallback never denies shell commands (Codex has no fallback deny; Gemini's `BeforeTool` hook only matches `write_file|replace`).
+Any shell metacharacter (`;`, `&&`, `||`, `|`, `` ` ``, `$(`, `>`, `<`, quotes, newlines) disqualifies a command, so the allowlist cannot be chained into anything else. An allowlisted command or file edit gets **no** decision from the hook — the normal permission flow still applies. Codex is unaffected: its fallback never denies shell commands.
 
 Recovery sequence from inside the agent, as separate Bash calls: `pnpm install --prefer-offline`, then `pnpm build` (or `bash .claude/hooks/session-start.sh` in a cloud session). The deny reason names these commands.
 
