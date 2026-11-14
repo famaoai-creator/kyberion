@@ -5,7 +5,7 @@ import {
   probeReasoningBackendAuth,
   type ReasoningAuthProbeResult,
 } from '@agent/core/reasoning/reasoning-auth-preflight';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from '../lib/harness.js';
 
 function option(argv: string[], name: string): string | undefined {
   const index = argv.indexOf(name);

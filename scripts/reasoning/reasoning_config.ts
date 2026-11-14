@@ -7,7 +7,7 @@ import {
   type ReasoningRouteUserConfig,
 } from '@agent/core/reasoning/reasoning-route-resolver';
 import { inspectReasoningRoutes } from '@agent/core/reasoning/reasoning-route-doctor';
-import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
 import { readTextFile } from '@agent/core/foundation';
 import {
   commitReasoningRouteConfig,

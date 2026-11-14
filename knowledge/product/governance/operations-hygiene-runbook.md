@@ -603,7 +603,7 @@ This covers directories and top-level `*.jsonl` / `*.json` files.
 - Migrating a legacy `tenants/<slug>` store: register the root, write only the partitioned path,
   keep a read fallback to the legacy copy while it may still hold live data (remove the legacy copy
   on the next write — `generation-cost-settlement.ts`), or skip the fallback when the data is
-  short-lived (`scripts/reasoning_credentials.ts` proofs expire in 15 minutes). Add the old base to
+  short-lived (`scripts/reasoning/reasoning_credentials.ts` proofs expire in 15 minutes). Add the old base to
   `PHYSICAL_LEGACY_TENANT_STATE_ROOTS` so offboarding still removes leftovers — also when the live
   migration stays operator-reviewed: `dot-state-paths.ts` keeps `pnpm kyberion dot migrate-state`
   for a live tenant, but an offboarded tenant's `dot/tenants/<slug>/` copy is exported and

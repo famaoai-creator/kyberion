@@ -33,7 +33,7 @@ describe('scope governance invariants', () => {
           // tenant mission and its organization/project chain, then creates a
           // real WorkItem claimed through coordinated dispatch. Mission/link
           // and nested-envelope refusal are exercised by its probe tests.
-          !line.startsWith('scripts/reasoning_credential_probe.ts:') &&
+          !line.startsWith('scripts/reasoning/reasoning_credential_probe.ts:') &&
           // Approval-driven resume is the same boundary in a child process: it
           // mints from the journal's original execution authority with an empty
           // env, never from the approver's process.

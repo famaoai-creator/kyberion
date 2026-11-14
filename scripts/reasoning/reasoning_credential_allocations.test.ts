@@ -26,7 +26,7 @@ vi.mock('@agent/core/organization/tenant-registry', () => ({
 vi.mock('@agent/core/governance/cli-operator-principal', () => ({
   resolveCliApprovalRequester: () => ({ requestedBy: 'user:test' }),
 }));
-vi.mock('./cli-grants.js', () => ({ resolveRevoker: () => ({ kind: 'human', id: 'user:test' }) }));
+vi.mock('../cli-grants.js', () => ({ resolveRevoker: () => ({ kind: 'human', id: 'user:test' }) }));
 import { runCredentialAllocationCommand } from './reasoning_credential_allocations.js';
 const assign = [
   'assign',
