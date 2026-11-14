@@ -10,7 +10,7 @@ function read(relPath: string): string {
 
 describe('Customer onboarding contract', () => {
   it('offers customer overlay setup in the onboarding wizard and docs', () => {
-    const wizard = read('scripts/onboarding_wizard.ts');
+    const wizard = read('scripts/onboarding/onboarding_wizard.ts');
     const readme = read('templates/stance/README.md');
     const operator = read('docs/operator/DEPLOYMENT.md');
     const init = read('docs/INITIALIZATION.md');

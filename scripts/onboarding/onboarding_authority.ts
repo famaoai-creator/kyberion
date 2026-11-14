@@ -20,9 +20,9 @@ import {
   applyOnboardingAuthority,
   type OnboardingAuthorityPrincipal,
 } from '@agent/core/organization/onboarding-authority';
-import { defineScript, isDirectScript } from './lib/harness.js';
-import { readSafeJsonFile } from './lib/json-input.js';
-import { inspectInstalledIdentity, canonicalAuthorityCommand } from './lib/installed-identity.js';
+import { defineScript, isDirectScript } from '../lib/harness.js';
+import { readSafeJsonFile } from '../lib/json-input.js';
+import { inspectInstalledIdentity, canonicalAuthorityCommand } from '../lib/installed-identity.js';
 
 export async function main(
   argv: string[],

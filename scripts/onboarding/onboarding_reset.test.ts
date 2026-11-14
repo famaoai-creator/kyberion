@@ -95,7 +95,7 @@ describe('onboarding_reset', () => {
 
   it('keeps reset output on the injected printer boundary', () => {
     const source = String(
-      safeReadFile(path.join(pathResolver.rootDir(), 'scripts/onboarding_reset.ts'), {
+      safeReadFile(path.join(pathResolver.rootDir(), 'scripts/onboarding/onboarding_reset.ts'), {
         encoding: 'utf8',
       }) || ''
     );

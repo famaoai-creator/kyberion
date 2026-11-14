@@ -68,7 +68,7 @@ let runDotExecutorStep: typeof import('./dot/dot_executor_step.js').runDotExecut
 let buildDotExecutorPorts: typeof import('./dot/dot_executor_step.js').buildDotExecutorPorts;
 let FRONT_DESK_EXECUTION_SUPERVISOR_STEP: typeof import('./front_desk_execution_step.js').FRONT_DESK_EXECUTION_SUPERVISOR_STEP;
 let DOT_SUPERVISOR_STEPS: typeof import('./dot/dot_supervisor_extensions.js').DOT_SUPERVISOR_STEPS;
-let createFirstJobTenantStatusAssertion: typeof import('./onboarding_first_job_tenant_status.js').createFirstJobTenantStatusAssertion;
+let createFirstJobTenantStatusAssertion: typeof import('./onboarding/onboarding_first_job_tenant_status.js').createFirstJobTenantStatusAssertion;
 let status: typeof import('@agent/core/surface/front-desk-execution-status');
 let originalProjection: typeof import('@agent/core/surface/front-desk-execution-status').projectFrontDeskExecution;
 let tenant: string;
@@ -161,7 +161,7 @@ beforeAll(async () => {
   ({ FRONT_DESK_EXECUTION_SUPERVISOR_STEP } = await import('./front_desk_execution_step.js'));
   ({ DOT_SUPERVISOR_STEPS } = await import('./dot/dot_supervisor_extensions.js'));
   ({ createFirstJobTenantStatusAssertion } =
-    await import('./onboarding_first_job_tenant_status.js'));
+    await import('./onboarding/onboarding_first_job_tenant_status.js'));
   status = await import('@agent/core/surface/front-desk-execution-status');
   originalProjection = status.projectFrontDeskExecution;
 }, 60000);
@@ -295,7 +295,9 @@ async function resumeInFreshProcess(): Promise<Array<{ status: string }>> {
       JSON.stringify(path.join(sourceRoot, 'dist/scripts/dot/dot_executor_step.js')) +
       ';',
     'import { createFirstJobTenantStatusAssertion } from ' +
-      JSON.stringify(path.join(sourceRoot, 'dist/scripts/onboarding_first_job_tenant_status.js')) +
+      JSON.stringify(
+        path.join(sourceRoot, 'dist/scripts/onboarding/onboarding_first_job_tenant_status.js')
+      ) +
       ';',
     'const active = ' + JSON.stringify(fixture.charters) + ';',
     'const mapping = ' + JSON.stringify(fixture.policy.mappings[0]) + ';',

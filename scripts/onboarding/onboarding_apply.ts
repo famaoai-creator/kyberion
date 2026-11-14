@@ -72,8 +72,8 @@ import {
   persistReasoningBackend,
   persistPersona,
   readPersistedPersona,
-} from './reasoning/reasoning_backend_selection.js';
-import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+} from '../reasoning/reasoning_backend_selection.js';
+import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
 
 type Print = (value: unknown) => void;
 

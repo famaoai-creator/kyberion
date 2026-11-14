@@ -22,7 +22,7 @@ function getFlag(argv: string[], name: string): string | undefined {
 
 export function main(argv: string[], print: (value: unknown) => void = () => undefined): number {
   // Operator-run scaffolding CLI: same execution context as the onboarding
-  // wizard, which also writes under customer/ (see scripts/onboarding_wizard.ts).
+  // wizard, which also writes under customer/ (see scripts/onboarding/onboarding_wizard.ts).
   if (!getRegisteredEnvText('MISSION_ROLE')) {
     setRegisteredEnv('MISSION_ROLE', 'mission_controller');
   }

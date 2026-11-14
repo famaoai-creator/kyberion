@@ -413,7 +413,13 @@ export function runFirstWinLifecycleDryRun(): FirstWinLifecycleReport {
     runCommand(
       'onboard',
       'node',
-      ['dist/scripts/onboarding_apply.js', '--identity', IDENTITY_FIXTURE, '--dry-run', '--json'],
+      [
+        'dist/scripts/onboarding/onboarding_apply.js',
+        '--identity',
+        IDENTITY_FIXTURE,
+        '--dry-run',
+        '--json',
+      ],
       (payload) =>
         payload?.status === 'validated' &&
         typeof payload.identity === 'object' &&
@@ -596,7 +602,7 @@ export function runFirstWinLifecycleLive(
       runLiveCommand(
         'onboard',
         'node',
-        ['dist/scripts/onboarding_apply.js', '--identity', safeIdentityFile, '--json'],
+        ['dist/scripts/onboarding/onboarding_apply.js', '--identity', safeIdentityFile, '--json'],
         (payload) =>
           payload?.status === 'complete' &&
           (!expectedAgentId || payload.agent_id === expectedAgentId),

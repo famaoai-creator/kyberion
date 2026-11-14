@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { useOnboardingAuthorityFixture } from '../tests/helpers/onboarding-authority-fixture.js';
+import { useOnboardingAuthorityFixture } from '../../tests/helpers/onboarding-authority-fixture.js';
 const f = useOnboardingAuthorityFixture();
 
 it('CLI re-onboarding preserves the existing persona mapping without rewriting its NHI', async () => {

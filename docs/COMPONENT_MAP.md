@@ -111,7 +111,7 @@ The concept map explains how those ideas fit together logically.
 
 - `docs/INITIALIZATION.md`
 - `docs/QUICKSTART.md`
-- `scripts/onboarding_wizard.ts`
+- `scripts/onboarding/onboarding_wizard.ts`
 
 This path establishes identity files under `knowledge/personal/` and prepares the environment for mission work.
 

@@ -16,7 +16,7 @@ import {
   FIRST_JOB_TEST_SESSION_KEY,
   FIRST_JOB_TEST_ISSUER,
   FIRST_JOB_TEST_SUBJECT,
-} from './fixtures/first-job-approval-fixture.js';
+} from '../fixtures/first-job-approval-fixture.js';
 
 const sourceRoot = process.cwd();
 const root = path.join(sourceRoot, 'active/shared/tmp', 'first-job-request-status-' + process.pid);
@@ -29,7 +29,7 @@ let store: typeof import('@agent/core/surface/front-desk-conversation-store');
 let work: typeof import('@agent/core/workforce/work-coordination');
 let dispatch: typeof import('@agent/core/dot/dot-dispatch');
 let execution: typeof import('@agent/core/surface/front-desk-execution');
-let executor: typeof import('./dot/dot_executor_step.js');
+let executor: typeof import('../dot/dot_executor_step.js');
 let approval: typeof import('@agent/core/surface/first-job-approval');
 let approvalStore: typeof import('@agent/core/governance/approval-store');
 /** Where a stored autonomy request lives (system tree or its tenant approval partition). */
@@ -181,7 +181,7 @@ beforeAll(async () => {
   work = await import('@agent/core/workforce/work-coordination');
   dispatch = await import('@agent/core/dot/dot-dispatch');
   execution = await import('@agent/core/surface/front-desk-execution');
-  executor = await import('./dot/dot_executor_step.js');
+  executor = await import('../dot/dot_executor_step.js');
   approval = await import('@agent/core/surface/first-job-approval');
   approvalStore = await import('@agent/core/governance/approval-store');
   browser = await import('@agent/core/authn/authn-providers');
@@ -213,8 +213,8 @@ afterAll(() => {
 describe('request-bound first-job status with real governed stores', { timeout: 60_000 }, () => {
   it('keeps the actual onboarding harness status path read-only and its failures identical', async () => {
     configure();
-    const { runOnboarding } = await import('./onboarding.js');
-    const harness = await import('./lib/harness.js');
+    const { runOnboarding } = await import('../onboarding.js');
+    const harness = await import('../lib/harness.js');
     const stdout: unknown[][] = [],
       stderr: unknown[][] = [];
     vi.spyOn(console, 'log').mockImplementation((...args: unknown[]) => {

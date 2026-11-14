@@ -871,7 +871,7 @@ A `*.volatile.json` file co-located with each volatile Markdown surface. Holds m
 
 ### Onboarding Wizard
 
-`scripts/onboarding_wizard.ts`, the interactive setup for identity and initial user configuration.
+`scripts/onboarding/onboarding_wizard.ts`, the interactive setup for identity and initial user configuration.
 
 ### Capability Discovery
 

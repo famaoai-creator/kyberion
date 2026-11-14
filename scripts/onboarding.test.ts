@@ -74,7 +74,7 @@ describe('onboarding facade', () => {
 
   it('keeps the wizard on the shared printer boundary', () => {
     const source = String(
-      safeReadFile(path.join(pathResolver.rootDir(), 'scripts/onboarding_wizard.ts'), {
+      safeReadFile(path.join(pathResolver.rootDir(), 'scripts/onboarding/onboarding_wizard.ts'), {
         encoding: 'utf8',
       }) || ''
     );

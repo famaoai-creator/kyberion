@@ -8,7 +8,7 @@ import { nowIso, parseSafeJsonInput } from '@agent/core/foundation';
 import type { PipelineAdfStep } from '@agent/core/pipeline/pipeline-contract';
 import { validateProductivityTaskPlan } from '@agent/core/productivity-task-plan';
 import { parseSafeJsonObjectInput, parseSafeJsonObjectValue } from './lib/json-input.js';
-import { applyOnboardingInput } from './onboarding_apply.js';
+import { applyOnboardingInput } from './onboarding/onboarding_apply.js';
 import { runCampaignSuite } from './campaign_suite.js';
 import { runAiAudit } from './run_ai_audit.js';
 import { main as runFirstWinLifecycle } from './first_win_lifecycle_smoke.js';

@@ -54,14 +54,16 @@ const FIXTURE_REASONING = {
 describe('onboarding_apply', () => {
   it('all onboarding entrypoints use the shared governed agent profile writer', () => {
     for (const file of [
-      'scripts/onboarding_apply.ts',
-      'scripts/onboarding_wizard.ts',
+      'scripts/onboarding/onboarding_apply.ts',
+      'scripts/onboarding/onboarding_wizard.ts',
       'libs/shared-vision/src/browser-onboarding.ts',
       'libs/core/integrations/slack-onboarding.ts',
     ]) {
       expect(read(file)).toContain('writePersonalAgentIdentityAtPath(');
     }
-    expect(read('scripts/onboarding_wizard.ts')).toContain('personalAgentIdentityRevision(');
+    expect(read('scripts/onboarding/onboarding_wizard.ts')).toContain(
+      'personalAgentIdentityRevision('
+    );
     expect(read('libs/core/integrations/slack-onboarding.ts')).not.toMatch(
       /safeWriteFile\(\s*path\.join\(root, 'agent-identity\.json'/
     );
@@ -289,7 +291,7 @@ describe('onboarding_apply', () => {
   });
 
   it('uses the active customer root for onboarding artifacts', () => {
-    const script = read('scripts/onboarding_apply.ts');
+    const script = read('scripts/onboarding/onboarding_apply.ts');
     expect(script).toContain('resolveActiveProfileRoot');
     expect(script).toContain('function profileRoot()');
     expect(script).toContain("path.join(profileDir, 'my-identity.json')");

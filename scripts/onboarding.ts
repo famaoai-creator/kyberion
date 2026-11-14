@@ -1,10 +1,10 @@
 import { main as bootstrapCompanyMain } from './company_bootstrap.js';
 import { main as onboardCompanyMain } from './company_onboarding.js';
-import { main as applyOnboardingMain } from './onboarding_apply.js';
-import { main as resetOnboardingMain } from './onboarding_reset.js';
+import { main as applyOnboardingMain } from './onboarding/onboarding_apply.js';
+import { main as resetOnboardingMain } from './onboarding/onboarding_reset.js';
 import { currentProcessArgv, defineScript, isDirectScript } from './lib/harness.js';
 import { guardCliArgs } from './lib/cli-guard.js';
-import { ONBOARD_CLI } from './onboarding_mode.js';
+import { ONBOARD_CLI } from './onboarding/onboarding_mode.js';
 
 /**
  * Single onboarding facade. The legacy implementations remain focused and
@@ -20,22 +20,22 @@ export async function main(
     return;
   }
   if (args[0] === 'first-job') {
-    const { main: firstJobMain } = await import('./onboarding_first_job.js');
+    const { main: firstJobMain } = await import('./onboarding/onboarding_first_job.js');
     await firstJobMain(args.slice(1), print);
     return;
   }
   if (args[0] === 'llm') {
-    const { main: llmMain } = await import('./onboarding_llm.js');
+    const { main: llmMain } = await import('./onboarding/onboarding_llm.js');
     llmMain(args.slice(1), print);
     return;
   }
   if (args[0] === 'authority') {
-    const { main: authorityMain } = await import('./onboarding_authority.js');
+    const { main: authorityMain } = await import('./onboarding/onboarding_authority.js');
     await authorityMain(args.slice(1), print);
     return;
   }
   if (args[0] === 'nhi-session') {
-    const { main: nhiSessionMain } = await import('./onboarding_nhi_session.js');
+    const { main: nhiSessionMain } = await import('./onboarding/onboarding_nhi_session.js');
     await nhiSessionMain(args.slice(1), print);
     return;
   }
@@ -57,7 +57,7 @@ export async function main(
     if (status !== 0) throw new Error(`onboard company failed with exit code ${status}`);
     return;
   }
-  const { runOnboarding: runOnboardingWizard } = await import('./onboarding_wizard.js');
+  const { runOnboarding: runOnboardingWizard } = await import('./onboarding/onboarding_wizard.js');
   await runOnboardingWizard(args, print);
 }
 

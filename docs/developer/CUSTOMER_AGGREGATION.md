@@ -220,7 +220,7 @@ The 3-tier system continues to govern **tier hygiene** (no leaks from confidenti
   - [x] Voice profile registry consumer (`libs/core/voice/voice-profile-registry.ts`)
   - [x] Vital check consumer (`scripts/vital_check.ts`)
   - [x] Baseline check consumer (`scripts/run_baseline_check.ts`)
-- [x] Onboarding apply consumer (`scripts/onboarding_apply.ts`)
+- [x] Onboarding apply consumer (`scripts/onboarding/onboarding_apply.ts`)
 - [x] Slack onboarding consumer (`libs/core/integrations/slack-onboarding.ts`)
   - [x] Mission prerequisites / creation consumer (`libs/core/mission/mission-state.ts`, `libs/core/mission/mission-creation.ts`, `libs/core/mission/mission-llm.ts`)
 
