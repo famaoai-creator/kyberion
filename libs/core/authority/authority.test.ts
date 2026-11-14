@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { resolveProjectScope } from './foundation/project-scope-env.js';
-import { pathResolver } from './path-resolver.js';
-import { safeReadFile } from './secure-io.js';
+import { resolveProjectScope } from '../foundation/project-scope-env.js';
+import { pathResolver } from '../path-resolver.js';
+import { safeReadFile } from '../secure-io.js';
 import {
   buildExecutionEnv,
   inferBaseRoleFromRole,
@@ -9,7 +9,7 @@ import {
   resolveRole,
   withExecutionContext,
   withExecutionContextAsync,
-} from './authority.js';
+} from '../authority.js';
 
 describe('resolveIdentityContext', () => {
   const originalPersona = process.env.KYBERION_BASE_ROLE;

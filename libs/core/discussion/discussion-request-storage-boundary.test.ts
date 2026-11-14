@@ -11,8 +11,8 @@ const policyState = vi.hoisted(() => ({
     | 'shadowed_discussion-create-requests'
     | 'shared_discussion-create-requests',
 }));
-vi.mock('./fs-primitives.js', async (importOriginal) => {
-  const real = await importOriginal<typeof import('./fs-primitives.js')>();
+vi.mock('../fs-primitives.js', async (importOriginal) => {
+  const real = await importOriginal<typeof import('../fs-primitives.js')>();
   return {
     ...real,
     rawExistsSync: (file: string) =>
@@ -43,9 +43,9 @@ vi.mock('./fs-primitives.js', async (importOriginal) => {
   };
 });
 
-import { withExecutionContext as initialContext } from './authority.js';
-import { rootDir } from './path-resolver.js';
-import * as initialIO from './secure-io.js';
+import { withExecutionContext as initialContext } from '../authority.js';
+import { rootDir } from '../path-resolver.js';
+import * as initialIO from '../secure-io.js';
 
 const SOURCE_ROOT = rootDir();
 const ROOT = path.join(
@@ -54,8 +54,8 @@ const ROOT = path.join(
 );
 let withExecutionContext = initialContext;
 let { safeReadFile, safeRmSync, safeWriteFile, safeSymlinkSync, safeLinkExclusiveSync } = initialIO;
-let guard: typeof import('./tier-guard.js');
-let retention: typeof import('./storage/storage-retention-catalog.js');
+let guard: typeof import('../tier-guard.js');
+let retention: typeof import('../storage/storage-retention-catalog.js');
 const savedRoot = process.env.KYBERION_ROOT;
 
 // A fresh root preserves the real logical tier paths. The ordinary Vitest
@@ -87,11 +87,11 @@ beforeAll(async () => {
   process.env.KYBERION_ROOT = ROOT;
   vi.resetModules();
   ({ safeReadFile, safeRmSync, safeWriteFile, safeSymlinkSync, safeLinkExclusiveSync } =
-    await import('./secure-io.js'));
-  ({ withExecutionContext } = await import('./authority.js'));
-  guard = await import('./tier-guard.js');
-  retention = await import('./storage/storage-retention-catalog.js');
-  expect((await import('./path-resolver.js')).rootDir()).toBe(ROOT);
+    await import('../secure-io.js'));
+  ({ withExecutionContext } = await import('../authority.js'));
+  guard = await import('../tier-guard.js');
+  retention = await import('../storage/storage-retention-catalog.js');
+  expect((await import('../path-resolver.js')).rootDir()).toBe(ROOT);
 }, 30_000);
 
 const STORE = 'active/shared/runtime/discussion-create-requests';
@@ -330,7 +330,7 @@ describe('durable discussion-create-requests storage uses real secureIO tier and
   });
 
   it('keeps durable discussion-create-requests receipts out of automatic tenant offboarding targets', async () => {
-    const { collectScopeTargets } = await import('./storage/scope-offboarding.js');
+    const { collectScopeTargets } = await import('../storage/scope-offboarding.js');
     privileged(() => {
       const targets = collectScopeTargets('tenant', TENANT);
       expect(
@@ -370,7 +370,7 @@ const directory = () =>
   );
 async function receiptAccess<T>(write: boolean, fn: () => T) {
   const { withDiscussionRequestReceiptAccess } =
-    await import('./discussion/discussion-request-storage-scope.js');
+    await import('../discussion/discussion-request-storage-scope.js');
   return withDiscussionRequestReceiptAccess(
     { directory: directory(), scope: { tier: 'confidential', tenant_slug: TENANT }, write },
     fn
@@ -412,7 +412,7 @@ it('does not permit the former role name or a forged broad capability', async ()
     expect(guard.validateReadPermission(session()).allowed).toBe(false);
     expect(guard.validateWritePermission(reservation).allowed).toBe(false);
   });
-  const { runInResourceAccessScope } = await import('./foundation/resource-access-scope.js');
+  const { runInResourceAccessScope } = await import('../foundation/resource-access-scope.js');
   runInResourceAccessScope(
     {
       tenantSlug: TENANT,
@@ -437,7 +437,7 @@ it('does not permit the former role name or a forged broad capability', async ()
 });
 it('requires an exact selected tenant and rejects other surfaces', async () => {
   const { withDiscussionRequestReceiptAccess } =
-    await import('./discussion/discussion-request-storage-scope.js');
+    await import('../discussion/discussion-request-storage-scope.js');
   expect(() =>
     withDiscussionRequestReceiptAccess(
       { directory: directory(), scope: { tier: 'confidential' }, write: false },
@@ -480,8 +480,8 @@ it('requires an exact selected tenant and rejects other surfaces', async () => {
   }
 });
 it('binds the I/O to the grant tenant, keeps the caller role and refuses another tenant', async () => {
-  const { currentExecutionScope } = await import('./foundation/execution-scope.js');
-  const { resolvePolicyIdentityContext } = await import('./identity-context-bridge.js');
+  const { currentExecutionScope } = await import('../foundation/execution-scope.js');
+  const { resolvePolicyIdentityContext } = await import('../identity-context-bridge.js');
   await withExecutionContext(
     'chronos_tenant_runner',
     () =>
@@ -526,7 +526,7 @@ it('cannot follow symlink or hard-link receipt aliases outside its exact capabil
 });
 
 it('read-only recovery cannot create directories and missing/corrupt policy remains closed', async () => {
-  const { safeMkdir } = await import('./secure-io.js');
+  const { safeMkdir } = await import('../secure-io.js');
   await receiptAccess(false, () =>
     expect(() => safeMkdir(directory(), { recursive: true })).toThrow(/RESOURCE_SCOPE_DENIED/)
   );
@@ -585,8 +585,8 @@ describe('the Discussion request grant is opaque and live-only', () => {
     guard.validateWritePermission(reservation()).allowed ||
     guard.validateReadPermission(reservation()).allowed;
   async function grantModules() {
-    const capability = await import('./foundation/discussion-request-capability.js');
-    const scope = await import('./foundation/resource-access-scope.js');
+    const capability = await import('../foundation/discussion-request-capability.js');
+    const scope = await import('../foundation/resource-access-scope.js');
     return { ...capability, ...scope };
   }
 
@@ -610,7 +610,7 @@ describe('the Discussion request grant is opaque and live-only', () => {
       runInResourceAccessScope,
       currentResourceAccessScope,
     } = await grantModules();
-    let ceiling!: import('./foundation/resource-access-scope.js').ResourceAccessScope;
+    let ceiling!: import('../foundation/resource-access-scope.js').ResourceAccessScope;
     withDiscussionRequestCapability(binding(), () => {
       ceiling = { ...currentResourceAccessScope()! };
     });
@@ -675,7 +675,7 @@ describe('the Discussion request grant is opaque and live-only', () => {
       createSynchronousResourceGrantIssuer,
       currentResourceAccessScope,
     } = await grantModules();
-    let ceiling!: import('./foundation/resource-access-scope.js').ResourceAccessScope;
+    let ceiling!: import('../foundation/resource-access-scope.js').ResourceAccessScope;
     withDiscussionRequestCapability(binding(), () => {
       ceiling = { ...currentResourceAccessScope()! };
     });

@@ -68,7 +68,7 @@
     "libs/core/organization/relationship-graph-store.test.ts",
     "libs/core/organization/tenant-design-resolver.test.ts",
     "libs/core/organization/tenant-registry.test.ts",
-    "libs/core/path-resolver-authority-store.test.ts",
+    "libs/core/path-resolver/path-resolver-authority-store.test.ts",
     "libs/core/pfc/PfcController.test.ts",
     "libs/core/pfc/SovereignSentinel.test.ts",
     "libs/core/pipeline/pipeline-engine.test.ts",

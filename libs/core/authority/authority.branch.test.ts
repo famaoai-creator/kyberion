@@ -10,14 +10,14 @@ const mocks = vi.hoisted(() => ({
   findMissionPath: vi.fn((_id: string) => null as string | null),
 }));
 
-vi.mock('./fs-primitives.js', () => ({
+vi.mock('../fs-primitives.js', () => ({
   rawExistsSync: mocks.rawExistsSync,
   rawLstatSync: mocks.rawLstatSync,
   rawReaddir: mocks.rawReaddir,
   rawReadTextFile: mocks.rawReadTextFile,
 }));
 
-vi.mock('./secure-io.js', () => ({
+vi.mock('../secure-io.js', () => ({
   safeExistsSync: mocks.rawExistsSync,
   safeReadFile: mocks.rawReadTextFile,
   assertSafeRepositoryPath: (filePath: string) => filePath,
@@ -30,7 +30,7 @@ vi.mock('./secure-io.js', () => ({
   },
 }));
 
-vi.mock('./path-resolver.js', () => ({
+vi.mock('../path-resolver.js', () => ({
   active: mocks.active,
   knowledge: mocks.knowledge,
   shared: vi.fn((p: string) => `/repo/active/shared/${p}`),
@@ -103,7 +103,7 @@ describe('authority branch coverage', () => {
             })
           : '{}'
       );
-      const { isRoleAssumptionAllowed } = await import('./authority.js');
+      const { isRoleAssumptionAllowed } = await import('../authority.js');
 
       expect(isRoleAssumptionAllowed('chronos_mirror_v2', 'chronos_localadmin')).toBe(false);
       expect(stderr).toHaveBeenCalledWith(
@@ -136,7 +136,7 @@ describe('authority branch coverage', () => {
       return '[]';
     });
 
-    const { resolveIdentityContext } = await import('./authority.js');
+    const { resolveIdentityContext } = await import('../authority.js');
     const ctx = resolveIdentityContext();
     // Concept model v2 D5: the Org Role is descriptive metadata. Before S1 an
     // org role spelled like a persona ("Ecosystem Architect") escalated the
@@ -156,7 +156,7 @@ describe('authority branch coverage', () => {
       });
     });
 
-    const { resolveIdentityContext } = await import('./authority.js');
+    const { resolveIdentityContext } = await import('../authority.js');
     const ctx = resolveIdentityContext();
     // No mission state is consulted: the persona is not taken from either twin
     // (an unrecognized env persona keeps the default, as with no mission state).
@@ -176,7 +176,7 @@ describe('authority branch coverage', () => {
         : '{}'
     );
 
-    const { resolveIdentityContext } = await import('./authority.js');
+    const { resolveIdentityContext } = await import('../authority.js');
     const ctx = resolveIdentityContext();
     expect(ctx.baseRole).toBe('unknown');
     expect(ctx.authorities).not.toContain('SYSTEM_EXEC');
@@ -184,7 +184,7 @@ describe('authority branch coverage', () => {
 
   it('falls back to process name heuristic when role/persona are unknown', async () => {
     process.argv[1] = '/tmp/my-controller.ts';
-    const { resolveIdentityContext } = await import('./authority.js');
+    const { resolveIdentityContext } = await import('../authority.js');
     const ctx = resolveIdentityContext();
     expect(ctx.baseRole).toBe('ecosystem_architect');
     expect(ctx.role).toBe('my_controller');
@@ -208,7 +208,7 @@ describe('authority branch coverage', () => {
       return '{}';
     });
 
-    const { resolveIdentityContext } = await import('./authority.js');
+    const { resolveIdentityContext } = await import('../authority.js');
     const ctx = resolveIdentityContext();
     expect(ctx.authorities).toContain('GIT_WRITE');
     expect(ctx.authorities).toContain('NETWORK_FETCH');
@@ -242,7 +242,7 @@ describe('authority branch coverage', () => {
       return '{}';
     });
 
-    const { inferBaseRoleFromRole } = await import('./authority.js');
+    const { inferBaseRoleFromRole } = await import('../authority.js');
     expect(inferBaseRoleFromRole('mission_controller')).toBe('analyst');
   });
 
@@ -254,7 +254,7 @@ describe('authority branch coverage', () => {
     );
     mocks.rawReadTextFile.mockReturnValue('{bad json');
 
-    const { resolveIdentityContext } = await import('./authority.js');
+    const { resolveIdentityContext } = await import('../authority.js');
     const ctx = resolveIdentityContext();
     expect(ctx.authorities).toEqual([]);
   });
@@ -269,7 +269,7 @@ describe('authority branch coverage', () => {
       p.endsWith('/missions/MSN-MALFORMED/mission-state.json') ? '[]' : '[]'
     );
 
-    const { inferBaseRoleFromRole, resolveIdentityContext } = await import('./authority.js');
+    const { inferBaseRoleFromRole, resolveIdentityContext } = await import('../authority.js');
     expect(resolveIdentityContext().baseRole).toBe('unknown');
     expect(inferBaseRoleFromRole('unmapped_role')).toBe('unknown');
   });
@@ -295,13 +295,13 @@ describe('authority branch coverage', () => {
       return JSON.stringify({ authority_roles: { malformed_role: { default_persona: [] } } });
     });
 
-    const { inferBaseRoleFromRole, resolveIdentityContext } = await import('./authority.js');
+    const { inferBaseRoleFromRole, resolveIdentityContext } = await import('../authority.js');
     expect(resolveIdentityContext().authorities).toEqual([]);
     expect(inferBaseRoleFromRole('malformed_role')).toBe('unknown');
   });
 
   it('buildExecutionEnv keeps existing persona when explicit persona is unknown', async () => {
-    const { buildExecutionEnv } = await import('./authority.js');
+    const { buildExecutionEnv } = await import('../authority.js');
     const env = buildExecutionEnv({ KYBERION_BASE_ROLE: 'worker' }, 'unmapped_role');
     expect(env.MISSION_ROLE).toBe('unmapped_role');
     expect(env.KYBERION_BASE_ROLE).toBe('worker');
@@ -310,7 +310,7 @@ describe('authority branch coverage', () => {
   it('withExecutionContext deletes temporary persona when role has no inferred persona', async () => {
     process.env.MISSION_ROLE = 'software_developer';
     process.env.KYBERION_BASE_ROLE = 'analyst';
-    const { withExecutionContext } = await import('./authority.js');
+    const { withExecutionContext } = await import('../authority.js');
     const inside = withExecutionContext('unmapped_role', () => ({
       role: process.env.MISSION_ROLE,
       persona: process.env.KYBERION_BASE_ROLE,
@@ -323,7 +323,7 @@ describe('authority branch coverage', () => {
   });
 
   it('hasAuthority respects SUDO override and direct authority match', async () => {
-    const mod = await import('./authority.js');
+    const mod = await import('../authority.js');
 
     process.env.KYBERION_BASE_ROLE = 'worker';
     process.env.MISSION_ID = 'MSN-SUDO';

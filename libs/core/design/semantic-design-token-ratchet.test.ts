@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { pathResolver } from './path-resolver.js';
-import { safeReadFile } from './secure-io.js';
+import { pathResolver } from '../path-resolver.js';
+import { safeReadFile } from '../secure-io.js';
 
 /**
  * IT-04 ratchet: artifact engines read colours through semantic design tokens

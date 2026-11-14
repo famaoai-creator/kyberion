@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { coreSeamCatalog } from './seam.js';
+import { coreSeamCatalog } from '../seam.js';
 import {
   registerIdentityContextResolver,
   resolvePolicyIdentityContext,
-} from './identity-context-bridge.js';
-import { registerPolicyIdentityResolver } from './foundation/identity-context.js';
+} from '../identity-context-bridge.js';
+import { registerPolicyIdentityResolver } from '../foundation/identity-context.js';
 
 const resolver = () => ({
   baseRole: 'worker' as const,

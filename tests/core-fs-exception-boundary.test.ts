@@ -68,7 +68,7 @@ const allowedCoreFsImports = [
   'libs/core/workforce/output-artifacts.test.ts',
   // Linked-worktree fixture: builds synthetic .git/commondir entries so the
   // authority-store primary-root remap can be exercised hermetically.
-  'libs/core/path-resolver-authority-store.test.ts',
+  'libs/core/path-resolver/path-resolver-authority-store.test.ts',
   // AL-01 hermetic purge test: raw fs to seed/inspect a temp KYBERION_ROOT.
   'libs/core/mission/mission-maintenance.purge.test.ts',
   // AL-03 hermetic closure test: raw fs to seed/inspect a temp KYBERION_ROOT.

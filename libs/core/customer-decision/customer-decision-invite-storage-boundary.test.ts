@@ -1,8 +1,8 @@
 import * as path from 'node:path';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { withExecutionContext as initialContext } from './authority.js';
-import { rootDir } from './path-resolver.js';
-import * as initialIO from './secure-io.js';
+import { withExecutionContext as initialContext } from '../authority.js';
+import { rootDir } from '../path-resolver.js';
+import * as initialIO from '../secure-io.js';
 
 /**
  * The invite store on a fresh root: the ordinary Vitest live-store remap
@@ -30,12 +30,12 @@ const keys = [
 ] as const;
 const saved = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
 
-let invite: typeof import('./customer-decision/invite.js');
-let io: typeof import('./secure-io.js');
-let authority: typeof import('./authority.js');
-let capabilityModule: typeof import('./foundation/customer-decision-invite-capability.js');
-let resourceScope: typeof import('./foundation/resource-access-scope.js');
-let guard: typeof import('./tier-guard.js');
+let invite: typeof import('../customer-decision/invite.js');
+let io: typeof import('../secure-io.js');
+let authority: typeof import('../authority.js');
+let capabilityModule: typeof import('../foundation/customer-decision-invite-capability.js');
+let resourceScope: typeof import('../foundation/resource-access-scope.js');
+let guard: typeof import('../tier-guard.js');
 
 const base = (tenantSlug = TENANT) => ({
   tenantSlug,
@@ -68,13 +68,13 @@ beforeAll(async () => {
   });
   process.env.KYBERION_ROOT = ROOT;
   vi.resetModules();
-  io = await import('./secure-io.js');
-  authority = await import('./authority.js');
-  invite = await import('./customer-decision/invite.js');
-  capabilityModule = await import('./foundation/customer-decision-invite-capability.js');
-  resourceScope = await import('./foundation/resource-access-scope.js');
-  guard = await import('./tier-guard.js');
-  expect((await import('./path-resolver.js')).rootDir()).toBe(ROOT);
+  io = await import('../secure-io.js');
+  authority = await import('../authority.js');
+  invite = await import('../customer-decision/invite.js');
+  capabilityModule = await import('../foundation/customer-decision-invite-capability.js');
+  resourceScope = await import('../foundation/resource-access-scope.js');
+  guard = await import('../tier-guard.js');
+  expect((await import('../path-resolver.js')).rootDir()).toBe(ROOT);
 }, 120_000);
 
 /** Write (or, with `null`, remove) one tenant registry profile on the fixture root. */

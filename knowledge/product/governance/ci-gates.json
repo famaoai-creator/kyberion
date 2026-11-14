@@ -1148,7 +1148,7 @@
         "libs/core/seam/seam.test.ts",
         "libs/core/seam/seam-lifecycle-contract.test.ts",
         "libs/core/foundation/provider-module-boundaries.test.ts",
-        "libs/core/ocr-bridge.test.ts",
+        "libs/core/ocr/ocr-bridge.test.ts",
         "libs/actuators/voice-actuator/src/voice-external-governance.test.ts",
         "libs/actuators/network-actuator/src/network-external-governance.test.ts"
       ],

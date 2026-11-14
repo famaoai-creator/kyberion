@@ -1,36 +1,36 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as path from 'node:path';
 
-vi.mock('./path-resolver.js', async () => {
-  const actual = await vi.importActual<typeof import('./path-resolver.js')>('./path-resolver.js');
+vi.mock('../path-resolver.js', async () => {
+  const actual = await vi.importActual<typeof import('../path-resolver.js')>('../path-resolver.js');
   return { ...actual, rootResolve: vi.fn() };
 });
 
-vi.mock('./tier-guard.js', () => ({
+vi.mock('../tier-guard.js', () => ({
   validateWritePermission: () => ({ allowed: true }),
   validateReadPermission: () => ({ allowed: true }),
   detectTier: () => 'confidential',
 }));
 
-vi.mock('./governance/policy-engine.js', () => ({
+vi.mock('../governance/policy-engine.js', () => ({
   policyEngine: { evaluate: () => ({ allowed: true, action: 'allow' }) },
 }));
 
 const enqueue = vi.hoisted(() => vi.fn());
-vi.mock('./knowledge/memory-promotion-queue.js', async () => {
-  const actual = await vi.importActual<typeof import('./knowledge/memory-promotion-queue.js')>(
-    './knowledge/memory-promotion-queue.js'
+vi.mock('../knowledge/memory-promotion-queue.js', async () => {
+  const actual = await vi.importActual<typeof import('../knowledge/memory-promotion-queue.js')>(
+    '../knowledge/memory-promotion-queue.js'
   );
   return { ...actual, enqueueMemoryPromotionCandidate: enqueue };
 });
 
-import { pathResolver, rootResolve } from './path-resolver.js';
-import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
+import { pathResolver, rootResolve } from '../path-resolver.js';
+import { safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
 import {
   deriveMissionOutcome,
   readHeuristic,
   validateMissionHeuristics,
-} from './knowledge/heuristic-feedback.js';
+} from '../knowledge/heuristic-feedback.js';
 
 describe('heuristic mission validation', () => {
   let tmpDir = '';

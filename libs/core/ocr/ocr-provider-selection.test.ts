@@ -1,21 +1,21 @@
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { pathResolver } from './path-resolver.js';
-import { safeRmSync } from './secure-io.js';
-import { setSeamSelectionRule } from './provider/seam-selection-rules.js';
-import { ocrTrainingUse } from './ocr/router.js';
+import { pathResolver } from '../path-resolver.js';
+import { safeRmSync } from '../secure-io.js';
+import { setSeamSelectionRule } from '../provider/seam-selection-rules.js';
+import { ocrTrainingUse } from '../ocr/router.js';
 
 // Mirrors libs/actuators/browser-actuator/src/browser-runtime-selection.test.ts:
 // exercise the real seam-provider-selection engine and the real ocr-provider
 // policy file, mocking only the audit chain so tests stay hermetic. MISSION_ID
 // is kept unset so no pin file is ever written.
 const record = vi.fn();
-vi.mock('./governance/audit-chain.js', () => ({
+vi.mock('../governance/audit-chain.js', () => ({
   auditChain: { record: (...args: unknown[]) => record(...args) },
 }));
 
-const { AdaptivePolicyRouter } = await import('./ocr-bridge.js');
-import type { OcrProvider, OcrDataEgress } from './contracts/ocr-types.js';
+const { AdaptivePolicyRouter } = await import('../ocr-bridge.js');
+import type { OcrProvider, OcrDataEgress } from '../contracts/ocr-types.js';
 
 const rulesDir = pathResolver.sharedTmp('ocr-provider-selection-test');
 const rulesFile = path.join(rulesDir, 'rules.json');

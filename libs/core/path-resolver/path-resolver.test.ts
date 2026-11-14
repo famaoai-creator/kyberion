@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import * as path from 'node:path';
-import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
-import { withExecutionContext } from './authority.js';
+import { safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
+import { withExecutionContext } from '../authority.js';
 import {
   rootDir,
   capabilityEntry,
@@ -22,7 +22,7 @@ import {
   rootResolve,
   vitestLivePath,
   VITEST_LIVE_SANDBOX_ROOT,
-} from './path-resolver.js';
+} from '../path-resolver.js';
 
 describe('path-resolver core', () => {
   it('should find the project root', () => {
