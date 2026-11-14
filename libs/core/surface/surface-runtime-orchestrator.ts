@@ -69,6 +69,10 @@ import {
 } from './surface-provider-policy.js';
 import { extractSurfaceBlocks } from './surface-response-blocks.js';
 import {
+  normalizeDelegationPayload,
+  resolveSurfaceDelegationPerformative,
+} from './surface-delegation-block.js';
+import {
   buildDelegationFallbackText,
   deriveSurfaceDelegationReceiver,
   normalizeSurfaceDelegationReceiver,
@@ -752,21 +756,6 @@ export function buildSlackSurfacePrompt(input: SlackSurfaceInput): string {
   ].join('\n');
 }
 
-function normalizeDelegationPayload(payload: any, fallbackText: string): any {
-  if (!payload || typeof payload !== 'object') return payload;
-  const currentText = typeof payload.text === 'string' ? payload.text.trim() : '';
-  const looksPlaceholder =
-    currentText === '' ||
-    currentText === 'original request and relevant Slack context' ||
-    currentText === 'original request';
-
-  if (!looksPlaceholder) return payload;
-  return {
-    ...payload,
-    text: fallbackText,
-  };
-}
-
 async function processDelegations(
   a2aMessages: A2AMessage[],
   senderAgentId: string,
@@ -777,13 +766,18 @@ async function processDelegations(
 
   for (const msg of a2aMessages) {
     try {
+      const delegation = resolveSurfaceDelegationPerformative(msg, senderAgentId);
+      if ('refused' in delegation) {
+        delegationResults.push(delegation.refused);
+        continue;
+      }
       const envelope = {
         a2a_version: '1.0',
         header: {
           msg_id: `REQ-${Date.now().toString(36).toUpperCase()}-${randomUUID().slice(0, 6)}`,
           sender: senderAgentId,
           receiver: msg.header?.receiver,
-          performative: msg.header?.performative || 'request',
+          performative: delegation.performative,
           conversation_id: msg.header?.conversation_id,
           timestamp: nowIso(),
         },

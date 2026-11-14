@@ -1,6 +1,7 @@
 import type { AgentProvider } from './agent-registry.js';
 import type { AgentContextMode } from '../contracts/context-boundary.js';
 import {
+  appendSupervisorEvent,
   askAgentRuntime,
   ensureAgentRuntime,
   getAgentRuntimeSnapshot,
@@ -12,12 +13,18 @@ import {
 } from '../governance/context-security-scope.js';
 import type { EventScopeInput } from '../event/event-scope.js';
 import { nowIso } from '../foundation/time.js';
+import { auditChain } from '../governance/audit-chain.js';
 import { coreSeamCatalog, createSeam, createSeamLifecycle } from '../seam.js';
 import { getWorkItem, listActiveWorkLeases } from '../workforce/work-coordination.js';
 import { resolveDelegationCapabilityProfile } from '../workforce/subagent-capability-profiles.js';
 
 export interface AgentTaskEnvelope {
-  /** Optional canonical WorkItem; lease/profile authority is always re-derived server-side. */
+  /**
+   * Optional canonical WorkItem; lease/profile authority is always re-derived
+   * server-side. Without it the delegation is unclaimed: it gets no task tool
+   * binding, lease or capability profile, and is recorded as
+   * `agent_delegation_unclaimed`.
+   */
   work_item_id?: string;
   task_id: string;
   mission_id?: string;
@@ -36,6 +43,16 @@ export interface AgentTaskEnvelope {
   model_id?: string;
 }
 
+/** Execution states of a receipt (not messages); see `coordination-act-map.ts`. */
+export const AGENT_EXECUTION_RECEIPT_STATUSES = Object.freeze([
+  'submitted',
+  'running',
+  'succeeded',
+  'failed',
+  'canceled',
+] as const);
+export type AgentExecutionReceiptStatus = (typeof AGENT_EXECUTION_RECEIPT_STATUSES)[number];
+
 export interface AgentExecutionReceipt {
   execution_kind: 'agent_delegation';
   task_id: string;
@@ -45,7 +62,7 @@ export interface AgentExecutionReceipt {
   model_id?: string;
   /** Provider-native execution proof, when the task used a native subagent surface. */
   native_subagent?: Record<string, unknown>;
-  status: 'submitted' | 'running' | 'succeeded' | 'failed' | 'canceled';
+  status: AgentExecutionReceiptStatus;
   started_at?: string;
   completed_at?: string;
   output_ref?: string;
@@ -70,6 +87,28 @@ export class SupervisorAgentExecutionPort implements AgentExecutionPort {
     validateEnvelope(request);
     const startedAt = nowIso();
     const agentId = request.agent_id || `task-agent-${request.task_id}`;
+    // Audit trail of a delegation that has no WorkItem claim: the decision
+    // (allowed / denied) and, once it ran, the outcome (completed / failed).
+    const recordUnclaimed = (
+      result: 'allowed' | 'denied' | 'completed' | 'failed',
+      reason: string,
+      errorCode?: string
+    ) =>
+      auditChain.record({
+        agentId,
+        action: 'agent_delegation_unclaimed',
+        operation: 'delegate',
+        result,
+        reason,
+        correlationId: request.idempotency_key,
+        metadata: {
+          task_id: request.task_id,
+          mission_id: request.mission_id,
+          provider: request.provider || 'claude',
+          ...(errorCode ? { error_code: errorCode } : {}),
+        },
+      });
+    let unclaimedAllowed = false;
     try {
       let taskBinding: Record<string, unknown> | undefined;
       if (request.work_item_id) {
@@ -107,6 +146,33 @@ export class SupervisorAgentExecutionPort implements AgentExecutionPort {
             : 'explorer',
           ...(role ? { team_role: role } : {}),
         };
+      } else {
+        // Unclaimed: nothing in the envelope can stand in for a claim, so no
+        // work item, lease, capability profile or caller-asserted role label
+        // reaches the runtime record. The mission the caller names must be
+        // the mission its scope names (a valid security scope always names
+        // one).
+        if (request.mission_id !== request.security_scope.mission_id) {
+          recordUnclaimed(
+            'denied',
+            `Task ${request.task_id} names a mission its security scope does not`,
+            'AGENT_TASK_MISSION_MISMATCH'
+          );
+          throw new Error(
+            `[AGENT_TASK_MISSION_MISMATCH] Unclaimed delegation names mission ${request.mission_id ?? 'none'} but its security scope names ${request.security_scope.mission_id}`
+          );
+        }
+        recordUnclaimed('allowed', `Task ${request.task_id} delegated without a WorkItem claim`);
+        unclaimedAllowed = true;
+        appendSupervisorEvent({
+          decision: 'agent_delegation_unclaimed',
+          agent_id: agentId,
+          task_id: request.task_id,
+          mission_id: request.mission_id,
+          requested_by: 'agent_execution_port',
+          provider: request.provider || 'claude',
+          idempotency_key: request.idempotency_key,
+        });
       }
       const handle = await ensureAgentRuntime({
         agentId,
@@ -127,9 +193,14 @@ export class SupervisorAgentExecutionPort implements AgentExecutionPort {
           execution_kind: 'agent_delegation',
           idempotency_key: request.idempotency_key,
           security_scope: request.security_scope,
-          agent_profile_id: request.agent_profile_id,
-          team_role_id: request.team_role_id,
-          authority_role_id: request.authority_role_id,
+          // Role labels are the caller's claims; only a claimed task keeps them.
+          ...(taskBinding
+            ? {
+                agent_profile_id: request.agent_profile_id,
+                team_role_id: request.team_role_id,
+                authority_role_id: request.authority_role_id,
+              }
+            : {}),
           ...taskBinding,
         },
       });
@@ -150,6 +221,8 @@ export class SupervisorAgentExecutionPort implements AgentExecutionPort {
         },
       });
       const snapshot = getAgentRuntimeSnapshot(agentId);
+      if (unclaimedAllowed)
+        recordUnclaimed('completed', `Unclaimed delegation of task ${request.task_id} completed`);
       return {
         execution_kind: 'agent_delegation',
         task_id: request.task_id,
@@ -164,6 +237,15 @@ export class SupervisorAgentExecutionPort implements AgentExecutionPort {
         output: response,
       };
     } catch (error) {
+      if (unclaimedAllowed) {
+        // Only a leading `[CODE]` is recorded: provider error text stays out.
+        const message = error instanceof Error ? error.message : String(error);
+        recordUnclaimed(
+          'failed',
+          `Unclaimed delegation of task ${request.task_id} failed`,
+          message.match(/^\[([A-Z][A-Z0-9_]*)\]/u)?.[1]
+        );
+      }
       return {
         execution_kind: 'agent_delegation',
         task_id: request.task_id,

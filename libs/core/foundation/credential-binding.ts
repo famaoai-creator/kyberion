@@ -14,6 +14,15 @@ export interface TaskCredentialProvenance {
   readonly allocationGrantId?: string;
 }
 
+/** Broker-attested session source; generation is opaque and re-attested on every use. */
+export interface TaskProviderProvenance {
+  readonly serviceBindingId: string;
+  readonly serviceId: string;
+  readonly sourceOwnerRef: string;
+  readonly actorId: string;
+  readonly generation: string;
+}
+
 /** Trusted dispatch input. These values are never accepted from a model or HTTP payload. */
 export interface TaskCredentialBinding {
   readonly tenantSlug: string;
@@ -24,6 +33,7 @@ export interface TaskCredentialBinding {
   /** Trusted broker freshness check, run before every credential consumption. */
   readonly validate?: () => void;
   /** Complete provider env, including an isolated HOME. Never merged with operator env. */
+  readonly providerProvenance?: Readonly<Record<string, TaskProviderProvenance>>;
   readonly providerEnvironments?: Readonly<Record<string, Readonly<NodeJS.ProcessEnv>>>;
 }
 
@@ -164,6 +174,7 @@ export function withTaskCredentialBinding<T>(binding: TaskCredentialBinding, run
         )
       ) ||
       binding.providerEnvironments !== parent.providerEnvironments ||
+      binding.providerProvenance !== parent.providerProvenance ||
       binding.validate !== parent.validate)
   ) {
     throw new Error('[CREDENTIAL_SCOPE_DENIED] Nested credential bindings may only narrow');
@@ -274,6 +285,29 @@ export function withTaskCredentialBinding<T>(binding: TaskCredentialBinding, run
         })
       )
     );
+  const providerProvenance =
+    binding.providerProvenance &&
+    Object.freeze(
+      Object.fromEntries(
+        Object.entries(binding.providerProvenance).map(([provider, source]) => {
+          if (
+            !providerEnvironments?.[provider] ||
+            !binding.validate ||
+            !source ||
+            ![
+              source.serviceBindingId,
+              source.serviceId,
+              source.sourceOwnerRef,
+              source.actorId,
+              source.generation,
+            ].every((value) => typeof value === 'string' && value.trim().length > 0)
+          ) {
+            throw new Error('[CREDENTIAL_PROVENANCE_INVALID] Invalid session source evidence');
+          }
+          return [provider, Object.freeze({ ...source })];
+        })
+      )
+    );
   return storage.run(
     Object.freeze({
       ...binding,
@@ -282,6 +316,7 @@ export function withTaskCredentialBinding<T>(binding: TaskCredentialBinding, run
       secrets,
       secretProvenance,
       providerEnvironments,
+      providerProvenance,
     }),
     run
   );
@@ -332,6 +367,8 @@ export function isCurrentTaskCredentialValue(value: string): boolean | undefined
 export function resolveTaskProviderEnvironment(provider: string): NodeJS.ProcessEnv | undefined {
   const binding = checkedBinding();
   if (!binding) return undefined;
+  if (binding.providerProvenance?.[provider])
+    throw new Error('[CREDENTIAL_PROVENANCE_DENIED] Selected session requires service consumption');
   const env =
     binding.providerEnvironments && Object.hasOwn(binding.providerEnvironments, provider)
       ? binding.providerEnvironments[provider]
@@ -339,6 +376,30 @@ export function resolveTaskProviderEnvironment(provider: string): NodeJS.Process
   if (!env)
     throw new Error('[CREDENTIAL_PROVIDER_DENIED] No isolated provider environment is bound');
   return { ...env };
+}
+
+/** Selected service sessions never fall back to generic provider or operator credentials. */
+export function resolveTaskServiceProviderBinding(
+  provider: string,
+  expected: Omit<TaskProviderProvenance, 'generation'>
+): { environment: NodeJS.ProcessEnv; provenance: Readonly<TaskProviderProvenance> } {
+  const binding = checkedBinding();
+  const source = binding?.providerProvenance?.[provider];
+  if (
+    !binding?.validate ||
+    !source ||
+    !source.generation ||
+    Object.entries(expected).some(
+      ([key, value]) => source[key as keyof TaskProviderProvenance] !== value
+    )
+  ) {
+    throw new Error(
+      '[CREDENTIAL_PROVENANCE_DENIED] Session does not belong to selected connection and actor'
+    );
+  }
+  const env = binding.providerEnvironments?.[provider];
+  if (!env) throw new Error('[CREDENTIAL_PROVIDER_DENIED] Selected session environment missing');
+  return { environment: { ...env }, provenance: source };
 }
 
 export function resolveProviderApiCredential(

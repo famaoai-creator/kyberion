@@ -1,7 +1,7 @@
 ---
 title: Stance / Tenant / Customer — three layers that all get called "customer"
 tags: [architecture, governance, tenant, customer, stance, affiliation, multi-tenant, channel]
-last_updated: 2026-11-10
+last_updated: 2026-11-12
 concepts: [stance, tenant, tenants-customers]
 ---
 
@@ -68,6 +68,29 @@ seeds and onboarding state — which overlays `knowledge/personal/`
 is the operator's configuration (custody `person`), so it lives in the personal
 space; its run traces go to `active/shared/logs/stances/{slug}/traces/`. A
 stance without `acting_for` keeps only this overlay and binds no tenant.
+
+## Concierge display selection and execution authority
+
+The Concierge rail selects the work being viewed with a server-validated
+`?tenant=` hint. It does not write a CLI stance, issue a grant, allocate a
+connection, or change the executing agent. Personal-only users see their
+personal context without creating a tenant; the personal aggregate remains
+labelled as a summary when the server reports `aggregate: true`.
+
+The rail describes this distinction beside the current context. Settings
+groups connections by their existing owner and explains that an organization's
+use of a personal connection requires owner-approved, purpose- and time-bounded
+allocation. A listed connection or configured metadata is not execution
+authorization or evidence that its transport is ready.
+
+The rail pins its selection request to the current URL hint, ignores responses
+from an older selection or an unmounted rail, and revalidates Back/Forward
+navigation. Selecting the current context is a no-op. The destination still
+validates the viewer on each request, and service execution independently checks
+its actor, selected binding, delegation, and required approval.
+
+No local account introduction or credential broker flow is added by this UI.
+The display selector is not a server-side acting-for execution API.
 
 ## Customer communication belongs to the tenant
 

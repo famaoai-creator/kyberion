@@ -174,6 +174,22 @@ A standing grant that itself needs human approval references the approval as its
 | `surface-concierge`                                        | A specialist in the specialist catalog: receives natural-language requests, fills missing slots and keeps the conversation smooth on any surface                                                                                     | `knowledge/product/orchestration/specialists/surface-concierge.json`                                                    |
 | `starter-concierge`                                        | A dot team starter template (a draft dot charter that owns one conversation and tracks its commitments)                                                                                                                              | `knowledge/product/orchestration/dot-team-templates/starter-concierge.json`                                             |
 
+### Coordination Act
+
+One of the eight speech acts agents and runtimes exchange (request, propose, accept, reject, inform, query, result, handoff); each layer's own message kinds map onto them, and no act carries execution authority. The acts are declared once in `libs/core/foundation/coordination-act.ts`. Each layer keeps its own wire words: A2A `performative`, peer `PeerMessageType`, peer conversation kinds, Mesh Hub records and request kinds, Co-Session handoff kinds, the mission coordination record channel, the agent execution port and discussion performatives. `libs/core/mesh/coordination-act-map.ts` maps those words to one act, or to "not an act" with a reason (states, carriers, words a layer refuses, session control, categories of stored record).
+
+Two rules pick the act. **Rule A:** `propose` is work that stays pending until the recipient's own decision is recorded as a separate state (typed peer task, Mesh Hub recipient proposal); `request` is an ask for which the layer records no separate acceptance. **Rule B:** the innermost typed layer names the act, and outer envelope types are carriers. For example, every peer conversation message travels as peer envelope `request`, and a conversation `handoff` only carries a proposal. `accept` / `reject` are the recipient's own decision (stage 4 of the [communication model](../knowledge/product/architecture/agent-communication-layer-model.md#5-identity-authentication-authorization-and-acceptance)). Across runtimes, work runs only under the recipient's WorkItem claim. Inside one runtime (A2A bridge, agent execution port) an ask runs on receipt and no recipient decision exists, so the bridge delivers only `request` / `query` / `inform` (all three as a prompt the agent runs; `query` and `inform` are not guaranteed free of side effects there) and refuses `propose` / `accept` / `reject` / `result` (`[A2A_PERFORMATIVE_NOT_ROUTABLE]`); on the port, a task binding comes from the WorkItem claim, never from the envelope. A `result` act answers a request; it is not the user-facing [Result](#result). Not to be confused with `CollaborationKind` (`libs/core/agent/agent-collaboration-events.ts`), which classifies observed events (dispatch, claim, handoff, review, …) for the collaboration view rather than messages. `tests/coordination-act-boundary.test.ts` and `tsc` check the tables; coverage is partial (runtime for layers with an exported array, `tsc` only for type unions, none for two hand-written key sets) and is listed in the model's §11.2.
+
+"A2A" names three unrelated mechanisms. Say which one you mean:
+
+| Name                                               | What it is                                                                       | Traffic           |
+| -------------------------------------------------- | -------------------------------------------------------------------------------- | ----------------- |
+| A2A bridge (`libs/core/mesh/a2a-bridge.ts`)        | In-runtime envelopes between the orchestrator and the provider agents it spawns  | yes, the only one |
+| `network:a2a_send` / `a2a_poll` (network-actuator) | A file-drop seam under `active/shared/runtime/a2a/{inbox,outbox}`                | none (no caller)  |
+| `a2a-message` in a Mesh Hub recipient proposal     | A record stored with the proposal. Nothing executes it or sends it to the bridge | stored only       |
+
+"A2A" alone means the bridge. → [agent-communication-layer-model §11](../knowledge/product/architecture/agent-communication-layer-model.md#11-coordination-acts)
+
 ### FDE full glossary
 
 ## Core concepts
@@ -729,7 +745,7 @@ Signed, tenant-scoped message transport between distinct enrolled Kyberion runti
 
 ### A2A
 
-In-runtime agent-to-agent envelopes between an orchestrator and the provider agents it spawns, routed by the A2A bridge through the agent runtime supervisor. It stays inside one Kyberion runtime; crossing to another runtime is Peer Messaging. The network actuator's `a2a_send` / `a2a_poll` ops are a separate file-drop transport and do not feed the bridge. → [agent-communication-layer-model](../knowledge/product/architecture/agent-communication-layer-model.md)
+In-runtime agent-to-agent envelopes between an orchestrator and the provider agents it spawns, routed by the A2A bridge through the agent runtime supervisor. The bridge delivers only the performatives `request`, `query` and `inform` and refuses the others. It stays inside one Kyberion runtime; crossing to another runtime is Peer Messaging. The network actuator's `a2a_send` / `a2a_poll` ops are a separate file-drop transport and do not feed the bridge. → [agent-communication-layer-model](../knowledge/product/architecture/agent-communication-layer-model.md)
 
 ### Stance
 
@@ -738,6 +754,10 @@ In-runtime agent-to-agent envelopes between an orchestrator and the provider age
 ### Tenant's Customers
 
 The end customers a tenant delivers to, stored inside that tenant's own boundary at `knowledge/confidential/{tenant-slug}/customers/`. Deliberately not deduplicated across tenants: when two tenants serve the same end customer, each holds its own contract and obligations under its own compliance posture, and merging them would be exactly the leak the tenant boundary prevents. Distinct from both **Tenant** and **Stance** above, all three of which get called "customer" in conversation.
+
+### Hearing
+
+**(advanced)** A governed elicitation that pursues a tenant-set objective by collecting structured answers from a person into the decision ledger; its definition (template), presentation (form, conversation, avatar) and answer record are kept separate. Also ヒアリング. The definition is a hearing template: the product ones under `knowledge/product/orchestration/customer-decision-templates/`, or a tenant's own under `knowledge/confidential/{tenant-slug}/decisions/_templates/` (written with `pnpm kyberion customer-decision template put`, used before a product template of the same id), carrying an `objective` that is shown to the person answering and bound into the approved content hash. The customer-room web form is today's presentation for external customers; the Front Desk hearing sheet and the `requirements_hearing` channel mode are older entry points that the [plan](./developer/improvement-plans-2026-11/HEARING_UNIFICATION_PLAN_2026-11-12.ja.md) converges onto the same definition. Not a Front Desk destination and not a Tenant's Customer record. → [hearing-model](../knowledge/product/architecture/hearing-model.md)
 
 ### History Search
 

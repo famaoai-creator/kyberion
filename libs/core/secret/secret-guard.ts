@@ -10,6 +10,7 @@ import { ledger } from '../governance/ledger.js';
 import * as pathResolver from '../path-resolver.js';
 import * as path from 'node:path';
 import { createRequire } from 'node:module';
+import { createHash, randomUUID } from 'node:crypto';
 import { resolveSecretSync } from './secret-resolver.js';
 import {
   resolveTaskCredential,
@@ -24,7 +25,7 @@ import {
 } from './secret-encryption.js';
 import { requireRiskyApproval } from '../governance/risky-op-approval-port.js';
 import { RISKY_OPS } from '../contracts/risky-op-ids.js';
-import { readJson } from '../foundation/json.js';
+import { readJson, writeJson } from '../foundation/json.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { parseSafeJsonObjectValue } from '../foundation/safe-json.js';
 import { withSecretResolutionSession } from '../foundation/secret-resolution-session.js';
@@ -126,6 +127,8 @@ const _loadPersonalSecrets = () => {
     if (!safeExistsSync(connectionsDir)) return;
     const items = safeReaddir(connectionsDir);
     for (const item of items) {
+      // Per-account generations are never service-wide ambient credentials.
+      if (item === 'accounts') continue;
       const fullPath = safeSecretPath(path.join(connectionsDir, item));
       const stat = safeLstat(fullPath);
       if (stat.isSymbolicLink()) continue;
@@ -512,6 +515,142 @@ export const storeConnectionDocument = (
   };
 };
 
+/** Internal material address, not an allocation, admission, or execution credential. */
+export interface LocalAccountMaterialIdentity {
+  serviceId: string;
+  bindingId: string;
+  ownerKind: 'person' | 'organization';
+  ownerRef: string;
+  tenantSlug?: string;
+}
+
+export interface LocalAccountMaterialReference extends LocalAccountMaterialIdentity {
+  generation: string;
+}
+
+function localAccountMaterialIdentity(identity: LocalAccountMaterialIdentity): string {
+  const slug = /^[a-z0-9][a-z0-9._-]{0,63}$/;
+  if (
+    typeof identity.serviceId !== 'string' ||
+    typeof identity.bindingId !== 'string' ||
+    typeof identity.ownerRef !== 'string' ||
+    !slug.test(identity.serviceId) ||
+    !slug.test(identity.bindingId) ||
+    (identity.ownerKind !== 'person' && identity.ownerKind !== 'organization') ||
+    (identity.ownerKind === 'person'
+      ? !/^user:[A-Za-z0-9._-]{1,128}$/.test(identity.ownerRef) || identity.tenantSlug !== undefined
+      : typeof identity.tenantSlug !== 'string' ||
+        !slug.test(identity.tenantSlug) ||
+        identity.ownerRef !== identity.tenantSlug)
+  )
+    throw new Error('[ACCOUNT_MATERIAL_INVALID] Exact service, binding and owner required');
+  return JSON.stringify([
+    identity.serviceId,
+    identity.bindingId,
+    identity.ownerKind,
+    identity.ownerRef,
+    identity.tenantSlug ?? null,
+  ]);
+}
+
+function assertLocalAccountMaterialAccess(): void {
+  // This internal storage API does not issue store grants or bypass secure-io.
+  // A future broker must supply its own reviewed, exact-material admission.
+  if (getPluginExecutionContext() || credentialExecutionIdentity().tenantSlug)
+    throw new Error('[ACCOUNT_MATERIAL_DENIED] Local operator storage only');
+}
+
+function localAccountMaterialPath(reference: LocalAccountMaterialReference): string {
+  const identity = localAccountMaterialIdentity(reference);
+  if (
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(
+      reference.generation
+    )
+  )
+    throw new Error('[ACCOUNT_MATERIAL_INVALID] Exact generation required');
+  const account = createHash('sha256').update(identity).digest('hex');
+  return safeSecretPath(
+    path.join(PERSONAL_CONNECTIONS_DIR, 'accounts', account, `${reference.generation}.json`)
+  );
+}
+
+function validateLocalAccountMaterial(material: unknown): Record<string, string> {
+  const values = parseSafeJsonObjectValue(material, 'local account material');
+  const entries = Object.entries(values);
+  if (
+    entries.length === 0 ||
+    entries.length > 64 ||
+    entries.some(
+      ([key, value]) =>
+        !/^[A-Z][A-Z0-9_]{0,127}$/.test(key) ||
+        typeof value !== 'string' ||
+        value.length === 0 ||
+        value.length > 1_048_576
+    )
+  )
+    throw new Error('[ACCOUNT_MATERIAL_INVALID] Nonempty exact secret-reference values required');
+  return { ...values } as Record<string, string>;
+}
+
+/**
+ * Internal storage primitive. Always encrypted with the existing key, regardless
+ * of the legacy plaintext setting. Creates an immutable generation, no latest
+ * pointer, ambient alias, binding, owner approval, or credential provenance.
+ * The caller must already have secure-io write authority and introduction approval.
+ */
+export function storeLocalAccountMaterial(
+  identity: LocalAccountMaterialIdentity,
+  material: Record<string, string>
+): LocalAccountMaterialReference {
+  assertLocalAccountMaterialAccess();
+  const account = localAccountMaterialIdentity(identity);
+  const values = validateLocalAccountMaterial(material);
+  const reference: LocalAccountMaterialReference = {
+    serviceId: identity.serviceId,
+    bindingId: identity.bindingId,
+    ownerKind: identity.ownerKind,
+    ownerRef: identity.ownerRef,
+    ...(identity.tenantSlug === undefined ? {} : { tenantSlug: identity.tenantSlug }),
+    generation: randomUUID(),
+  };
+  const fullPath = localAccountMaterialPath(reference);
+  const envelope = encryptConnectionDocument(
+    {
+      kind: 'local-account-material',
+      version: 1,
+      account,
+      generation: reference.generation,
+      material: values,
+    },
+    { createKeyIfMissing: false }
+  );
+  safeWriteFile(fullPath, JSON.stringify(envelope) + '\n', { mode: 0o600, createOnly: true });
+  for (const [key, value] of Object.entries(values)) _rememberActiveSecret(key, value);
+  return reference;
+}
+
+/** Exact-generation read only; no service-wide/default account fallback. */
+export function loadLocalAccountMaterial(
+  reference: LocalAccountMaterialReference
+): Record<string, string> {
+  assertLocalAccountMaterialAccess();
+  const fullPath = localAccountMaterialPath(reference);
+  const raw = readSensitiveJson<unknown>(fullPath);
+  if (!isEncryptedConnectionEnvelope(raw))
+    throw new Error('[ACCOUNT_MATERIAL_INVALID] Encrypted material required');
+  const document = decryptConnectionDocument(raw);
+  if (
+    document.kind !== 'local-account-material' ||
+    document.version !== 1 ||
+    document.account !== localAccountMaterialIdentity(reference) ||
+    document.generation !== reference.generation
+  )
+    throw new Error('[ACCOUNT_MATERIAL_INVALID] Account or generation mismatch');
+  const material = validateLocalAccountMaterial(document.material);
+  for (const [key, value] of Object.entries(material)) _rememberActiveSecret(key, value);
+  return material;
+}
+
 function _loadGrants(): AuthGrant[] {
   const grantsPath = safeSecretPath(GRANTS_FILE);
   if (!safeExistsSync(grantsPath)) return [];
@@ -526,7 +665,7 @@ function _loadGrants(): AuthGrant[] {
 function _saveGrants(grants: AuthGrant[]) {
   const freshGrants = grants.filter((g) => g.expiresAt > Date.now());
   const grantsPath = safeSecretPath(GRANTS_FILE);
-  safeWriteFile(grantsPath, JSON.stringify(freshGrants, null, 2));
+  secureIo.withSensitivePathMediation(() => writeJson(grantsPath, freshGrants));
   try {
     safeFsyncFile(grantsPath);
   } catch (_) {

@@ -128,7 +128,10 @@ async function main(args: string[] = currentProcessArgv()): Promise<void> {
         const transcriptPath =
           typeof payload.transcript_path === 'string' ? payload.transcript_path : '';
         if (transcriptPath && safeExistsSync(transcriptPath)) {
-          recordCliUsage(summarizeTranscriptUsage(readClaudeCodeHookTranscript(transcriptPath)));
+          recordCliUsage(
+            summarizeTranscriptUsage(readClaudeCodeHookTranscript(transcriptPath)),
+            payload.session_id
+          );
         }
       } catch {
         // usage capture is best-effort; never block session close

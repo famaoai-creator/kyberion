@@ -288,6 +288,7 @@ The kernel of the ecosystem. Important responsibilities:
 - mission orchestration worker and event contracts
 - agent collaboration observability: worker-event + mission-control JSONL projected into a nodes/edges/attention graph (`agent/agent-collaboration-projection.ts`, `agent/agent-collaboration-events.ts`) and folded into a `mission -> task -> agent -> child agent` wait-tree (`agent/agent-collaboration-tree.ts`, `composeCollaborationTree`)
 - generic surface outbox and delivery helpers
+- coordination acts: `foundation/coordination-act.ts` (the eight canonical acts) and `mesh/coordination-act-map.ts` (each communication layer's kinds → act, gated by `tests/coordination-act-boundary.test.ts`; see [agent-communication-layer-model §11](../knowledge/product/architecture/agent-communication-layer-model.md#11-coordination-acts))
 - organization and tenancy: `organization/organization-operating-model.ts`, `project/project-management.ts`, `workforce/work-coordination.ts` + `workforce/work-visibility.ts` (work-item context chain and visibility projections) + `workforce/work-item-hierarchy.ts` / `workforce/work-item-parent-status.ts` (Issue and step links, parent status from steps), `organization/tenant-registry.ts`, `organization/tenant-knowledge-retrieval.ts`, `mesh/peer-messaging.ts` (tenant peer mesh)
 - identity and authorization: `agent/agent-identity.ts` (NHI), `authority.ts`, `tier-guard.ts`, `mission/delegation-chain.ts`
 - history search: `history-search-index.ts` (SQLite FTS5, tier-isolated)

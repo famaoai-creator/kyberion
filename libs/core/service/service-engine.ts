@@ -20,7 +20,7 @@ import {
 import { SecureFetchError } from '../network.js';
 import { loadServiceEndpointsCatalog } from './service-endpoint-registry.js';
 import { fetchWithVaultCache } from '../storage/data-vault.js';
-import { resolveServiceBinding } from './service-binding.js';
+import { resolveServiceBinding, resolveServiceTransportAuth } from './service-binding.js';
 import { getServicePresetRecord } from './service-preset-registry.js';
 import {
   loadConnectionWithFallback,
@@ -221,9 +221,19 @@ export async function executeServicePreset(
   const selectedAdmission = tenantBindingCapability
     ? resolveTenantServiceEngineAdmission(tenantBindingCapability)
     : undefined;
+  const selectedBinding =
+    selectedAdmission && (auth !== 'none' || serviceId === 'google-workspace')
+      ? loadServiceBindingRecord(selectedAdmission.bindingId)
+      : undefined;
+  if (selectedAdmission && auth !== 'none' && !selectedBinding) {
+    throw new Error('[CREDENTIAL_PROVENANCE_DENIED] Selected service binding is unavailable');
+  }
+  const transportAuth = selectedBinding
+    ? resolveServiceTransportAuth(serviceId, auth, selectedBinding)
+    : auth;
   if (
     selectedAdmission &&
-    auth === 'secret-guard' &&
+    transportAuth !== 'none' &&
     ((activeDelegation &&
       activeDelegation.target.serviceBindingId !== selectedAdmission.bindingId) ||
       (activeHuman && activeHuman.target.serviceBindingId !== selectedAdmission.bindingId))
@@ -231,20 +241,13 @@ export async function executeServicePreset(
     throw new Error(
       '[CREDENTIAL_PROVENANCE_DENIED] Service selection differs from authorized effect'
     );
-  const selectedBinding =
-    selectedAdmission && auth === 'secret-guard'
-      ? loadServiceBindingRecord(selectedAdmission.bindingId)
-      : undefined;
-  if (selectedAdmission && auth === 'secret-guard' && !selectedBinding) {
-    throw new Error('[CREDENTIAL_PROVENANCE_DENIED] Selected service binding is unavailable');
-  }
   // Auth resolution
   const binding =
     captureTransport?.binding ??
     probe?.binding ??
     resolveServiceBinding(
       serviceId,
-      auth,
+      transportAuth,
       undefined,
       selectedBinding ?? undefined,
       selectedAdmission
@@ -284,6 +287,7 @@ export async function executeServicePreset(
         envelope,
         mergedParams,
         binding,
+        selectedBinding: selectedBinding ?? undefined,
         authSelector: auth,
         effectConfigurationHash,
         operatorProbe: Boolean(probe),
@@ -325,7 +329,7 @@ export async function executeServicePreset(
       // An attempted mutation may already have completed remotely. Switching
       // transports would repeat the same effect under one admission.
       if (!isReplaySafeServiceOperation(op)) {
-        if (binding.authMode === 'secret-guard') {
+        if (binding.authMode !== 'none') {
           throw new Error(
             `Service execution outcome unknown for ${serviceId}:${action}; provider diagnostics withheld`
           );
@@ -333,7 +337,7 @@ export async function executeServicePreset(
         throw err;
       }
       logger.error(
-        binding.authMode === 'secret-guard'
+        binding.authMode !== 'none'
           ? '[ENGINE] Authenticated service alternative failed; provider diagnostics withheld.'
           : `  [ENGINE] Alternative failed: ${err.message}`
       );
