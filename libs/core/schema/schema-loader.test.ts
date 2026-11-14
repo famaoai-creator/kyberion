@@ -2,8 +2,8 @@ import AjvModule from 'ajv';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { compileSchema } from './foundation/ajv.js';
-import { compileSchemaFromPath } from './schema-loader.js';
+import { compileSchema } from '../foundation/ajv.js';
+import { compileSchemaFromPath } from '../schema-loader.js';
 
 const Ajv = (AjvModule as unknown as { default?: typeof AjvModule }).default ?? AjvModule;
 

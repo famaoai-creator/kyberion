@@ -1999,7 +1999,7 @@ needs copies, not links, of catalogs from the real checkout.
 
 CLI daemons use the same secure-io boundary for runtime files. Borrow log descriptors through
 `withSafeAppendFile` so spawn failures also close them; redirect detached stderr to that descriptor
-instead of appending the same log line again. Run `libs/core/security-boundary.contract.test.ts`
+instead of appending the same log line again. Run `libs/core/secure-io/security-boundary.contract.test.ts`
 alongside the CLI tests: adding a raw-fs exception to an import baseline does not satisfy this gate.
 
 **Cost.** realpath(3) walks every component: about 30 µs per call at depth 15. Measured on an idle
@@ -2023,7 +2023,7 @@ swap between check and temp open, single probe registration, `node_modules` read
 legitimate links in scope, Vitest remap, vault reads), `libs/core/secure-io.symlink-root-alias.test.ts`
 (checkout behind a linked prefix), `libs/core/foundation/lock-utils.tomb-release.test.ts` (release
 during the put-back window and with leftover tombs, against the real secure-io lock IO) and the import boundary in
-`libs/core/security-boundary.contract.test.ts`. Each attack case fails on the pre-fix code.
+`libs/core/secure-io/security-boundary.contract.test.ts`. Each attack case fails on the pre-fix code.
 
 ---
 

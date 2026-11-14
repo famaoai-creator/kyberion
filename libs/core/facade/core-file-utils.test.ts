@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { pathResolver } from './path-resolver.js';
-import { fileUtils } from './core.js';
-import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
+import { pathResolver } from '../path-resolver.js';
+import { fileUtils } from '../core.js';
+import { safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
 
 describe('fileUtils.readJson resource boundary', () => {
   it('reads and parses a regular JSON file', () => {

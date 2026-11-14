@@ -9,7 +9,7 @@ import {
   resolveLogThreshold,
   setLogFileSink,
   type LogRecord,
-} from './logger.js';
+} from '../logger.js';
 
 describe('logger', () => {
   let stderr: string[];
@@ -169,7 +169,7 @@ describe('logger', () => {
     const baseline = process.listenerCount('exit');
     for (let i = 0; i < 12; i += 1) {
       vi.resetModules();
-      const reloaded = await import('./logger.js');
+      const reloaded = await import('../logger.js');
       reloaded.emitConsoleLine('stdout', 'reloaded', { key: 'reloaded' });
       reloaded.flushRepeatMarkers();
     }

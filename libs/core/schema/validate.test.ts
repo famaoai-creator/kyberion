@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { loadSchema, validateCapabilityInput } from './validate.js';
+import { loadSchema, validateCapabilityInput } from '../validate.js';
 
 describe('schema validation loader', () => {
   it('loads a governed capability schema and keeps validation behavior', () => {

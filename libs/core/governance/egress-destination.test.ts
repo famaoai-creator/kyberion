@@ -1,11 +1,11 @@
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { pathResolver } from './path-resolver.js';
-import { safeMkdir, safeWriteFile } from './secure-io.js';
+import { pathResolver } from '../path-resolver.js';
+import { safeMkdir, safeWriteFile } from '../secure-io.js';
 import {
   classifyEgressDestination,
   _resetEgressPolicyCacheForTests,
-} from './governance/egress-policy.js';
+} from '../governance/egress-policy.js';
 
 const DIR = pathResolver.sharedTmp('egress-destination-tests');
 

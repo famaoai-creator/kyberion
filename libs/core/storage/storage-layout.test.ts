@@ -1,14 +1,14 @@
 import * as path from 'node:path';
-import { PARTITIONED_RUNTIME_STATE_ROOTS as FOUNDATION_STATE_ROOTS } from './foundation/runtime-state-roots.js';
+import { PARTITIONED_RUNTIME_STATE_ROOTS as FOUNDATION_STATE_ROOTS } from '../foundation/runtime-state-roots.js';
 import { describe, expect, it } from 'vitest';
-import { rootDir } from './path-resolver.js';
-import { currentResourceAccessScope } from './foundation/resource-access-scope.js';
-import { safeReadFile } from './secure-io.js';
+import { rootDir } from '../path-resolver.js';
+import { currentResourceAccessScope } from '../foundation/resource-access-scope.js';
+import { safeReadFile } from '../secure-io.js';
 import {
   autonomyLearningCapability,
   isAutonomyLearningCapability,
   withAutonomyLearningCapability,
-} from './foundation/autonomy-learning-capability.js';
+} from '../foundation/autonomy-learning-capability.js';
 import {
   SYSTEM_PARTITION,
   PARTITIONED_RUNTIME_LEDGER_ROOTS,
@@ -27,7 +27,7 @@ import {
   TENANT_STORE_LEDGER_ROOTS,
   tenantRuntimePartitionOf,
   tenantRuntimePartitionPaths,
-} from './storage-layout.js';
+} from '../storage-layout.js';
 
 describe('storage-layout floors', () => {
   it('re-exports the single foundation state-root registry used by secure I/O', () => {

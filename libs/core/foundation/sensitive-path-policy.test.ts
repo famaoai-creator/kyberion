@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { getRegisteredEnvText, setRegisteredEnv } from './foundation/env.js';
+import { getRegisteredEnvText, setRegisteredEnv } from '../foundation/env.js';
 import {
   assertSensitiveMetadataAllowed,
   assertSensitivePathAllowed,
@@ -9,9 +9,9 @@ import {
   findSensitivePathMatch,
   getSensitivePathRuleIds,
   withBackupCredentialReadAdmission,
-} from './sensitive-path-policy.js';
-import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeLstat, safeReadFile, safeReaddir } from './secure-io.js';
+} from '../sensitive-path-policy.js';
+import { pathResolver } from '../path-resolver.js';
+import { safeExistsSync, safeLstat, safeReadFile, safeReaddir } from '../secure-io.js';
 
 describe('sensitive-path-policy', () => {
   it('keeps the OH-02 credential registry explicit and unique', () => {
