@@ -14,7 +14,7 @@ function readJson<T>(filePath: string): T {
 describe('sync_team_roles', () => {
   it('uses the governed team-role loaders', () => {
     const source = String(
-      safeReadFile(pathResolver.rootResolve('scripts/sync_team_roles.ts'), {
+      safeReadFile(pathResolver.rootResolve('scripts/sync/sync_team_roles.ts'), {
         encoding: 'utf8',
       })
     );

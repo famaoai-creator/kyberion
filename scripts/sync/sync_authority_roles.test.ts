@@ -14,7 +14,7 @@ function readJson<T>(filePath: string): T {
 describe('sync_authority_roles', () => {
   it('uses the governed authority-role loader', () => {
     const source = String(
-      safeReadFile(pathResolver.rootResolve('scripts/sync_authority_roles.ts'), {
+      safeReadFile(pathResolver.rootResolve('scripts/sync/sync_authority_roles.ts'), {
         encoding: 'utf8',
       })
     );

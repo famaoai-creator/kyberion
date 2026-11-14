@@ -9,7 +9,7 @@ import {
   projectAuthorityRolePermissions,
   type AuthorityRoleCard,
 } from '@agent/core/organization/authority-role-registry';
-import { defineGenerator, isDirectScript, type GeneratedFile } from './lib/harness.js';
+import { defineGenerator, isDirectScript, type GeneratedFile } from '../lib/harness.js';
 
 /**
  * The Authority Role registry (concept model v2 D6) is the card directory

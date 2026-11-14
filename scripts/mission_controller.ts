@@ -414,7 +414,7 @@ function syncIntentContractMemorySnapshot(id: string, stage: 'verify' | 'finish'
     safeExec(
       process.execPath,
       [
-        'dist/scripts/sync_intent_contract_memory.js',
+        'dist/scripts/sync/sync_intent_contract_memory.js',
         '--report',
         reportPath,
         '--mission-id',

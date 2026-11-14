@@ -12,6 +12,7 @@ scripts/
   *.ts            ← repo-wide operations (one file per entry point)
   check/          ← all `check_*` / `check-*` governance gates + baselines
   generate/       ← all `generate_*` catalog/index generators + their helpers
+  sync/           ← all `sync_*` code→knowledge reconciliation syncers
   lib/            ← shared helpers imported by scripts; no entry points
   <domain>/       ← grouped script sets for one bounded area
                     (personal-pads/, meeting-notepad/, daily-desk/,
@@ -23,7 +24,8 @@ Historically every entry point landed flat in the root. Bounded domains are
 being grouped into `<domain>/` subdirectories — the `check_*` governance gate
 family moved first (all gates, their tests and `*.baseline.json` files now
 live in `check/`; new checkers go there, never in the root), followed by the
-`generate_*` catalog/index generators in `generate/`. Prefer a
+`generate_*` catalog/index generators in `generate/`, and the `sync_*`
+code→knowledge syncers in `sync/`. Prefer a
 subdirectory for new domain-scoped scripts and keep the root for operations
 that genuinely span the repository. (Direction set by
 [SIMPLICITY_ABSTRACTION_PLAN](../docs/developer/improvement-plans-2026-08/SIMPLICITY_ABSTRACTION_PLAN_2026-08-25.ja.md)

@@ -1838,7 +1838,7 @@
     "scripts/surface_runtime.ts": {
       "env_direct_read_budget": 4
     },
-    "scripts/sync_intent_contract_memory.ts": {
+    "scripts/sync/sync_intent_contract_memory.ts": {
       "json_state_write_budget": 3
     },
     "scripts/task_init.ts": {

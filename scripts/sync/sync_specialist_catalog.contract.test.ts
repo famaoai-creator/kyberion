@@ -4,7 +4,7 @@ import { pathResolver, safeReadFile } from '@agent/core';
 describe('sync_specialist_catalog catalog boundary', () => {
   it('uses the governed catalog reader instead of an ad hoc Ajv reader', () => {
     const source = String(
-      safeReadFile(pathResolver.rootResolve('scripts/sync_specialist_catalog.ts'), {
+      safeReadFile(pathResolver.rootResolve('scripts/sync/sync_specialist_catalog.ts'), {
         encoding: 'utf8',
       })
     );

@@ -4,7 +4,7 @@ import { pathResolver, safeReadFile } from '@agent/core';
 describe('sync_service_endpoints catalog boundary', () => {
   it('uses defineCatalog instead of an ad hoc Ajv reader', () => {
     const source = String(
-      safeReadFile(pathResolver.rootResolve('scripts/sync_service_endpoints.ts'), {
+      safeReadFile(pathResolver.rootResolve('scripts/sync/sync_service_endpoints.ts'), {
         encoding: 'utf8',
       })
     );
