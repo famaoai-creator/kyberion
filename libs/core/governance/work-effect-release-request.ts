@@ -7,6 +7,7 @@ import { normalizeEventScope } from '../event/event-scope.js';
 import { createApprovalRequest } from './approval-request-create.js';
 import { AUTONOMY_APPROVAL_CHANNEL } from './approval-store-paths.js';
 import { workEffectReleaseProofBinding } from './work-effect-release.js';
+import { STORAGE_DATA_TIERS } from '../storage-layout.js';
 
 export function requestWorkEffectReleaseApproval(input: {
   itemId: string;
@@ -29,7 +30,7 @@ export function requestWorkEffectReleaseApproval(input: {
     );
   const security = item.metadata?.security_scope as { write_tier?: unknown } | undefined;
   const tier =
-    security && ['public', 'confidential', 'personal'].includes(String(security.write_tier))
+    security && (STORAGE_DATA_TIERS as readonly string[]).includes(String(security.write_tier))
       ? (security.write_tier as StorageDataTier)
       : item.context?.tenant_slug
         ? 'confidential'

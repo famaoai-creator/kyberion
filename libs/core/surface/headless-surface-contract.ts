@@ -4,6 +4,7 @@ import {
   type SurfacePermission,
 } from './surface-authorization.js';
 import { nowIso } from '../foundation/time.js';
+import { KNOWLEDGE_TIERS } from '../foundation/knowledge-tier.js';
 
 /**
  * Framework-neutral contracts for surface APIs.
@@ -421,7 +422,7 @@ export function availableHeadlessOperationIds(
           tenantSlugs: 'all',
           organizationIds: 'all',
           projectIds: 'all',
-          tierAccess: ['personal', 'confidential', 'public'],
+          tierAccess: [...KNOWLEDGE_TIERS],
         }
       : viewer;
   return manifest.operations
@@ -452,7 +453,7 @@ export function filterHeadlessManifestForViewer(
           tenantSlugs: 'all',
           organizationIds: 'all',
           projectIds: 'all',
-          tierAccess: ['personal', 'confidential', 'public'],
+          tierAccess: [...KNOWLEDGE_TIERS],
         }
       : viewer;
   return {

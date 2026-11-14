@@ -85,6 +85,7 @@ import { loadLayoutTemplateCatalogFromPath } from './media-layout-catalog.js';
 import type { ProposalStorylineADF } from '@agent/core/contracts/proposal-storyline-adf';
 import { loadDesignPattern } from './media-catalog-loaders.js';
 import { opCapture, PDF_PYPDF_OPS } from './media-action-capture.js';
+import { STORAGE_DATA_TIERS } from '@agent/core/storage-layout';
 
 function resolveMediaRepositoryPath(rootDir: string, value: unknown, label: string): string {
   const requested = String(value ?? '').trim();
@@ -733,7 +734,7 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
       const lockedBrief = ctx[String(resolve(params.brief_from) || 'locked_media_brief')];
       const runShape = lockedBrief?.run_shape;
       const tier = String(resolve(params.tier) || 'public');
-      if (!['public', 'confidential', 'personal'].includes(tier)) {
+      if (!(STORAGE_DATA_TIERS as readonly string[]).includes(tier)) {
         throw new Error(
           '[VISUAL_REVIEW_TIER_INVALID] tier must be public, confidential, or personal'
         );

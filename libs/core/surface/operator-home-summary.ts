@@ -30,6 +30,7 @@ import {
   type ViewerRecordCustody,
 } from './surface-authorization.js';
 import { t } from '../localization/t.js';
+import { STORAGE_DATA_TIERS } from '../storage-layout.js';
 
 export interface OperatorHomeMissionItem {
   missionId: string;
@@ -339,7 +340,7 @@ function safeOptionalRepositoryPath(filePath: string): string | undefined {
 function readMissionManagementDirs(): string[] {
   const config = loadMissionManagementConfig();
   if (config) {
-    return ['personal', 'confidential', 'public']
+    return (STORAGE_DATA_TIERS as readonly string[])
       .map((tier) => config.directories[tier])
       .filter((value): value is string => Boolean(value))
       .map((value) => safeOptionalRepositoryPath(pathResolver.rootResolve(value)))

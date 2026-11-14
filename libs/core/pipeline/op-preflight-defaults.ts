@@ -40,8 +40,9 @@ import {
 import type { TierLevel } from '../types.js';
 import { introductionResult, provenanceEgressResult, taintResult } from './op-preflight-stages.js';
 import { charterDecisionFactGuard } from './op-preflight-charter.js';
+import { STORAGE_DATA_TIERS } from '../storage-layout.js';
 
-const TIER_VALUES = new Set<TierLevel>(['public', 'confidential', 'personal']);
+const TIER_VALUES = new Set<TierLevel>(STORAGE_DATA_TIERS);
 
 const DEFAULT_LISTENER_IDS = [
   'core:scope',

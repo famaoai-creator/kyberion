@@ -38,6 +38,7 @@ import * as pathResolver from '../path-resolver.js';
 import { findMissionPath } from '../path-resolver.js';
 import { missionScopeMissing } from '../mission/mission-lookup.js';
 import { boundTenant } from '../governance/owner-scope.js';
+import { STORAGE_DATA_TIERS } from '../storage-layout.js';
 import { safeExistsSync } from '../secure-io.js';
 import { readTenantProfile } from '../organization/tenant-registry.js';
 import { HUMAN_ACTOR_PREFIX } from '../contracts/actor.js';
@@ -230,7 +231,7 @@ export interface NhiOrphanIdentity {
   missing_scope_id: string;
 }
 
-const SCOPE_TIERS = ['personal', 'confidential', 'public'] as const;
+const SCOPE_TIERS = STORAGE_DATA_TIERS;
 
 function projectScopeExists(projectId: string): boolean {
   return SCOPE_TIERS.some((tier) =>

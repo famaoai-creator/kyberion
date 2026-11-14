@@ -4,7 +4,7 @@
  */
 
 import type { MemberRole } from '../organization/member-registry.js';
-import type { StorageDataTier } from '../storage-layout.js';
+import { STORAGE_DATA_TIERS, type StorageDataTier } from '../storage-layout.js';
 import type { HandoffPacket } from '../mesh/handoff-packet.js';
 import type { ArtifactKind } from '../workforce/artifact-registry.js';
 import type { MissionClassification } from './mission-classification.js';
@@ -420,4 +420,4 @@ export const VALUE_FLAGS = new Set([
   '--requested-by',
 ]);
 
-export const ACTIVE_TIERS: readonly string[] = ['personal', 'confidential', 'public'];
+export const ACTIVE_TIERS: readonly string[] = STORAGE_DATA_TIERS;

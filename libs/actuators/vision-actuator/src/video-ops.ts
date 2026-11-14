@@ -7,6 +7,7 @@ import {
   type VideoTier,
   type VideoTranscriptPreference,
 } from '@agent/shared-video/ingest';
+import { KNOWLEDGE_TIERS } from '@agent/core/foundation/knowledge-tier';
 
 /**
  * vision:fetch_video / vision:build_video_brief — thin op facades over the
@@ -34,7 +35,7 @@ export interface VideoOpDeps {
 }
 
 const PREFERENCES: readonly VideoTranscriptPreference[] = ['auto', 'subtitles_only', 'stt_only'];
-const TIERS: readonly VideoTier[] = ['public', 'confidential', 'personal'];
+const TIERS: readonly VideoTier[] = [...KNOWLEDGE_TIERS];
 
 function text(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';

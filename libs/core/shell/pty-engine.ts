@@ -8,6 +8,7 @@ import { runtimeSupervisor } from '../tool/runtime-supervisor.js';
 import { pathResolver } from '../path-resolver.js';
 import { getRegisteredEnvText, withoutRelayManagedCredentials } from '../foundation/env.js';
 import { parseSafeJsonObjectInput } from '../foundation/safe-json.js';
+import { RUNTIME_SWEEP_INTERVAL_MS_DEFAULT } from '../foundation/runtime-tuning-defaults.js';
 
 /**
  * Kyberion PTY Engine (Logical Kernel) v2.1
@@ -429,7 +430,10 @@ if (!(globalThis as any)[GLOBAL_PTY_KEY]) {
   // so module init order can never crash the process.
   queueMicrotask(() => {
     runtimeSupervisor?.startSweep(
-      Number(getRegisteredEnvText('KYBERION_RUNTIME_SWEEP_INTERVAL_MS') || 30_000)
+      Number(
+        getRegisteredEnvText('KYBERION_RUNTIME_SWEEP_INTERVAL_MS') ||
+          RUNTIME_SWEEP_INTERVAL_MS_DEFAULT
+      )
     );
   });
 }

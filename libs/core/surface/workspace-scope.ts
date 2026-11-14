@@ -14,6 +14,7 @@ import type {
 } from '../organization/organization-operating-model.js';
 import { narrowSurfaceViewerScope } from './surface-mutation-guard.js';
 import type { SurfaceViewerScope } from './surface-viewer-scope-contract.js';
+import { STORAGE_DATA_TIERS } from '../storage-layout.js';
 
 export type WorkspaceSelection = {
   tenant_slug?: string;
@@ -127,7 +128,7 @@ export function resolveWorkspaceScope(
     if (typeof value !== 'string' || !value.trim() || value !== value.trim()) deny();
     if (key === 'tier') {
       if (
-        !['public', 'confidential', 'personal'].includes(value) ||
+        !(STORAGE_DATA_TIERS as readonly string[]).includes(value) ||
         !viewer.tierAccess.includes(value as OsKnowledgeTier)
       )
         deny();

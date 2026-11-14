@@ -17,6 +17,7 @@ export type {
   PromotedReportTemplateRecord,
 } from './promoted-memory-builder.js';
 import { withLockSync } from '../foundation/lock-utils.js';
+import { STORAGE_DATA_TIERS } from '../storage-layout.js';
 import type { ValidateFunction } from 'ajv';
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
@@ -411,7 +412,7 @@ function resolvePromotedRecordPath(ref: string): string | null {
     return existingRegularPromotedMemoryFile(abs, 'promoted record');
   }
   const kinds = ['pattern', 'sop_candidate', 'knowledge_hint', 'report_template'] as const;
-  const tiers = ['personal', 'confidential', 'public'] as const;
+  const tiers = STORAGE_DATA_TIERS;
   for (const tier of tiers) {
     for (const kind of kinds) {
       const dir =

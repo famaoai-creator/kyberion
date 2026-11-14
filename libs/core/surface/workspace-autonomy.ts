@@ -12,6 +12,7 @@ import { SurfaceViewerScopeError } from './surface-viewer-scope-contract.js';
 import type { ResolvedWorkspaceSelection } from './workspace-scope.js';
 import type { WorkspaceDotSummary, WorkspaceOverview } from './workspace.js';
 import { dotAdmissionScopeHash } from '../dot/dot-admission-identity.js';
+import { STORAGE_DATA_TIERS } from '../storage-layout.js';
 
 export function workspaceOwnsDot(
   selection: ResolvedWorkspaceSelection,
@@ -69,7 +70,7 @@ export function readWorkspaceAutonomy(
     const readiness = (deps.readiness ?? checkDotActivationReadiness)(charter, deps);
     // A project-limited viewer cannot inspect aggregate sibling spending.
     const canReadBudget =
-      ['public', 'confidential', 'personal'].every((tier) =>
+      (STORAGE_DATA_TIERS as readonly string[]).every((tier) =>
         viewer.tierAccess.includes(tier as StorageDataTier)
       ) &&
       viewer.projectIds === 'all' &&

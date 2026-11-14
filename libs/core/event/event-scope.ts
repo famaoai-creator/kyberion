@@ -5,6 +5,7 @@ import {
 } from '../foundation/scope-context-validation.js';
 import { isValidTenantSlug } from '../entity-scope.js';
 import type { TierLevel } from '../types.js';
+import { STORAGE_DATA_TIERS } from '../storage-layout.js';
 
 /** The deepest entity boundary carried by an event or ledger record. */
 export type EventScopeKind =
@@ -108,7 +109,7 @@ export function parseEventScopeInput(input: unknown): EventScopeInput {
 
   if (
     parsed.tier !== undefined &&
-    !['personal', 'confidential', 'public'].includes(String(parsed.tier))
+    !(STORAGE_DATA_TIERS as readonly string[]).includes(String(parsed.tier))
   ) {
     throw new Error(`[EVENT_SCOPE_INPUT_INVALID] invalid tier '${String(parsed.tier)}'`);
   }

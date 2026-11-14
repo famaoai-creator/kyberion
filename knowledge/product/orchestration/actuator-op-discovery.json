@@ -41215,7 +41215,7 @@
               },
               "tier": {
                 "type": "string",
-                "enum": ["public", "confidential", "personal"]
+                "enum": ["personal", "confidential", "public"]
               },
               "mission_id": {
                 "type": "string"
@@ -41402,7 +41402,7 @@
               },
               "tier": {
                 "type": "string",
-                "enum": ["public", "confidential", "personal"]
+                "enum": ["personal", "confidential", "public"]
               },
               "mission_id": {
                 "type": "string"
@@ -41492,7 +41492,7 @@
               },
               "tier": {
                 "type": "string",
-                "enum": ["public", "confidential", "personal"]
+                "enum": ["personal", "confidential", "public"]
               },
               "tenant_slug": {
                 "type": "string"
@@ -41590,7 +41590,7 @@
               },
               "input_tier": {
                 "type": "string",
-                "enum": ["public", "confidential", "personal"]
+                "enum": ["personal", "confidential", "public"]
               }
             },
             "additionalProperties": false,

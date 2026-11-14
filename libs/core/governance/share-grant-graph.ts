@@ -35,7 +35,7 @@ import type { ProvenanceTaint } from './cloudflare-os-control-plane.js';
  * resurrecting a revoked record.
  */
 
-export const SHARE_GRANT_TAINTS = ['personal', 'confidential', 'public'] as const;
+export const SHARE_GRANT_TAINTS = STORAGE_DATA_TIERS;
 export type ShareGrantTaint = (typeof SHARE_GRANT_TAINTS)[number];
 
 export const SHARE_GRANT_ROLES = ['view', 'operate'] as const;
@@ -52,6 +52,7 @@ const SHARE_LINK_PREFIX = 'share-link:';
 
 const ROLE_RANK: Record<ShareGrantRole, number> = { view: 1, operate: 2 };
 import { KNOWLEDGE_TIER_RANK as TAINT_RANK } from '../foundation/knowledge-tier.js';
+import { STORAGE_DATA_TIERS } from '../storage-layout.js';
 
 export interface ShareEdge {
   edgeId: string;

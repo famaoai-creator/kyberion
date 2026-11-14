@@ -1,5 +1,6 @@
 /** Observation is evidence, never permission to execute or publish. Browser-safe. */
 import type { ScopeContext } from '../scope-context.js';
+import { KNOWLEDGE_TIERS } from '../foundation/knowledge-tier.js';
 
 export interface KnowledgeReuseReceipt {
   receipt_id: string;
@@ -88,7 +89,7 @@ export function validKnowledgeReuseReceipt(value: unknown): value is KnowledgeRe
     (row.scope === undefined ||
       (!!row.scope &&
         typeof row.scope === 'object' &&
-        ['public', 'confidential', 'personal'].includes(row.scope.tier)))
+        (KNOWLEDGE_TIERS as readonly string[]).includes(row.scope.tier)))
   );
 }
 
