@@ -245,16 +245,16 @@ async function opControl(
     return res.context;
   };
 
-  switch (op) {
-    case 'if':
+  const handlers: Record<string, () => Promise<any>> = {
+    if: async () => {
       if (evaluateCondition(params.condition, ctx)) {
         return await runNested(params.then, ctx);
       } else if (params.else) {
         return await runNested(params.else, ctx);
       }
       return ctx;
-
-    case 'while': {
+    },
+    while: async () => {
       let iterations = 0;
       const maxIter = readNumberParam(params, 'max_iterations', 100);
       while (evaluateCondition(params.condition, ctx) && iterations < maxIter) {
@@ -262,17 +262,17 @@ async function opControl(
         iterations++;
       }
       return ctx;
-    }
-
-    default:
-      throw buildUnknownNetworkOpError(op);
-  }
+    },
+  };
+  const handler = handlers[op];
+  if (!handler) throw buildUnknownNetworkOpError(op);
+  return handler();
 }
 
 async function opCapture(op: string, rawParams: unknown, ctx: NetworkPipelineContext) {
   const params = requireParams(rawParams, `network:${op}`);
-  switch (op) {
-    case 'fetch': {
+  const handlers: Record<string, () => Promise<any>> = {
+    fetch: async () => {
       const method = readStringParam(params, 'method', 'GET').trim().toUpperCase();
       const request = {
         method,
@@ -301,9 +301,8 @@ async function opCapture(op: string, rawParams: unknown, ctx: NetworkPipelineCon
             : 'succeeded'
       );
       return { ...ctx, [exportKey(params, 'last_capture')]: response };
-    }
-
-    case 'exposure_check': {
+    },
+    exposure_check: async () => {
       // Batch reachability probe (external-asset inventory Phase 3): each item
       // is {service_id, endpoint}; per-item try/catch keeps one dead endpoint
       // from aborting the run — the failure IS the check result.
@@ -378,9 +377,8 @@ async function opCapture(op: string, rawParams: unknown, ctx: NetworkPipelineCon
           skipped_malformed: malformed,
         },
       };
-    }
-
-    case 'shell': {
+    },
+    shell: async () => {
       assertUnsafeShellAllowed();
       const cmd = String(resolveVars(params.cmd, ctx) ?? '');
       const output = await runExternalOperation(
@@ -394,26 +392,26 @@ async function opCapture(op: string, rawParams: unknown, ctx: NetworkPipelineCon
         () => 'succeeded'
       );
       return { ...ctx, [exportKey(params, 'last_capture')]: output };
-    }
-
-    case 'a2a_poll':
+    },
+    a2a_poll: async () => {
       const messages = await pollA2AInbox(readStringParam(params, 'method', 'local'));
       return { ...ctx, [exportKey(params, 'inbox_messages')]: messages };
-
-    default:
-      throw buildUnknownNetworkOpError(op);
-  }
+    },
+  };
+  const handler = handlers[op];
+  if (!handler) throw buildUnknownNetworkOpError(op);
+  return handler();
 }
 
 async function opTransform(op: string, rawParams: unknown, ctx: NetworkPipelineContext) {
   const params = requireParams(rawParams, `network:${op}`);
-  switch (op) {
-    case 'json_query':
+  const handlers: Record<string, () => Promise<any>> = {
+    json_query: async () => {
       const data = ctx[contextKey(params, 'last_capture')];
       const result = getPathValue(data, readStringParam(params, 'path'));
       return { ...ctx, [exportKey(params, 'last_capture')]: result };
-
-    case 'distill_response': {
+    },
+    distill_response: async () => {
       // AR-07: deterministic distillation of a fetched response (JSON shape /
       // HTML title+links / text preview, bounded) so llm_decide never sees
       // the raw body.
@@ -424,9 +422,8 @@ async function opTransform(op: string, rawParams: unknown, ctx: NetworkPipelineC
         maxLinks: readNumberParam(params, 'max_links', 15),
       });
       return { ...ctx, [exportKey(params, 'response_distillate')]: distillate };
-    }
-
-    case 'llm_decide': {
+    },
+    llm_decide: async () => {
       // AR-07: one in-loop decision about the distilled response.
       return executeLlmDecideOp({
         params,
@@ -434,23 +431,23 @@ async function opTransform(op: string, rawParams: unknown, ctx: NetworkPipelineC
         resolve: (value: unknown) => (typeof value === 'string' ? resolveVars(value, ctx) : value),
         defaultFromKey: 'response_distillate',
       });
-    }
-
-    case 'regex_extract':
+    },
+    regex_extract: async () => {
       const input = String(ctx[contextKey(params, 'last_capture')] || '');
       const match = input.match(new RegExp(readStringParam(params, 'pattern'), 'm'));
       return { ...ctx, [exportKey(params, 'last_capture')]: match ? match[1] || match[0] : null };
-
-    default:
-      throw buildUnknownNetworkOpError(op);
-  }
+    },
+  };
+  const handler = handlers[op];
+  if (!handler) throw buildUnknownNetworkOpError(op);
+  return handler();
 }
 
 async function opApply(op: string, rawParams: unknown, ctx: NetworkPipelineContext) {
   const params = requireParams(rawParams, `network:${op}`);
-  switch (op) {
-    case 'write_file':
-    case 'write_artifact':
+  const handlers: Record<string, () => Promise<any>> = {
+    write_file: async () => handlers['write_artifact']!(),
+    write_artifact: async () => {
       const spec = resolveWriteArtifactSpec(params, ctx, (value) => resolveVars(value, ctx));
       const outPath = resolveNetworkPath(String(spec.path));
       const content =
@@ -462,9 +459,8 @@ async function opApply(op: string, rawParams: unknown, ctx: NetworkPipelineConte
       if (!safeExistsSync(path.dirname(outPath)))
         safeMkdir(path.dirname(outPath), { recursive: true });
       safeWriteFile(outPath, content);
-      break;
-
-    case 'a2a_send':
+    },
+    a2a_send: async () => {
       const message = resolveVars(params.message, ctx);
       await sendA2AMessage(message, {
         method: readStringParam(params, 'method', 'local'),
@@ -473,10 +469,11 @@ async function opApply(op: string, rawParams: unknown, ctx: NetworkPipelineConte
           ? resolveNetworkPath(String(resolveVars(params.target_public_key, ctx)))
           : undefined,
       });
-      break;
-
-    case 'log':
+    },
+    log: async () => {
       logger.info(`[NETWORK_LOG] ${resolveVars(params.message || 'Action completed', ctx)}`);
-      break;
-  }
+    },
+  };
+  const handler = handlers[op];
+  if (handler) await handler();
 }

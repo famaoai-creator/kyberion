@@ -133,8 +133,8 @@ export async function handleAction(input: TerminalAction): Promise<TerminalResul
   const params = preflight.input as TerminalAction['params'];
   const rootDir = pathResolver.rootDir();
 
-  switch (action) {
-    case 'spawn': {
+  const handlers: Record<string, () => Promise<any>> = {
+    spawn: async () => {
       const shell = params.shell || resolveShellAdapter().shell;
       const args = params.args || [];
       const cwd = resolveTerminalCwd(rootDir, params.cwd);
@@ -142,9 +142,9 @@ export async function handleAction(input: TerminalAction): Promise<TerminalResul
       const env = stripAuthorityEnvOverrides(params.env) as Record<string, string>;
       const sessionId = ptyEngine.spawn(shell, args, cwd, env, params.threadId);
       return { status: 'created', sessionId };
-    }
+    },
 
-    case 'poll': {
+    poll: async () => {
       if (!params.sessionId) throw new Error('sessionId is required for poll action');
       if (!ptyEngine.get(params.sessionId)) {
         return {
@@ -167,9 +167,9 @@ export async function handleAction(input: TerminalAction): Promise<TerminalResul
         messages,
         exitCode: session?.exitCode,
       };
-    }
+    },
 
-    case 'llm_decide': {
+    llm_decide: async () => {
       // AR-07 rollout: one in-loop decision about a distilled terminal
       // observation. The terminal actuator is action-based (no pipeline ctx),
       // so the caller passes the observation explicitly — poll first, decide
@@ -190,10 +190,10 @@ export async function handleAction(input: TerminalAction): Promise<TerminalResul
         decision: decided[exportAs],
         degraded_reason: decided[`${exportAs}_degraded`],
       };
-    }
+    },
 
-    case 'shell_command':
-      return await handleComputerInteraction({
+    shell_command: async () =>
+      handleComputerInteraction({
         version: '0.1',
         kind: 'computer_interaction',
         action: {
@@ -203,9 +203,9 @@ export async function handleAction(input: TerminalAction): Promise<TerminalResul
           cwd: params.cwd,
           thread_id: params.threadId,
         },
-      });
+      }),
 
-    case 'write': {
+    write: async () => {
       if (!params.sessionId) throw new Error('sessionId is required for write action');
 
       let dataToWrite = '';
@@ -225,9 +225,9 @@ export async function handleAction(input: TerminalAction): Promise<TerminalResul
             status: 'failed',
             error: `Terminal session ${params.sessionId} is missing or exited; spawn a new terminal before writing.`,
           };
-    }
+    },
 
-    case 'resize': {
+    resize: async () => {
       if (!params.sessionId) throw new Error('sessionId is required for resize action');
       if (params.cols === undefined || params.rows === undefined) {
         throw new Error('cols and rows are required for resize action');
@@ -244,9 +244,9 @@ export async function handleAction(input: TerminalAction): Promise<TerminalResul
                 ? `Terminal session ${params.sessionId} uses a pipe fallback that cannot resize; use a native PTY environment for terminal dimensions.`
                 : `Terminal session ${params.sessionId} is missing or exited; spawn a new terminal before resizing.`,
           };
-    }
+    },
 
-    case 'kill': {
+    kill: async () => {
       if (!params.sessionId) throw new Error('sessionId is required for kill action');
       const success = ptyEngine.kill(params.sessionId);
       return success
@@ -256,15 +256,13 @@ export async function handleAction(input: TerminalAction): Promise<TerminalResul
             status: 'failed',
             error: `Terminal session ${params.sessionId} does not exist; list sessions to select an active terminal.`,
           };
-    }
+    },
 
-    case 'list': {
-      return await retry(async () => ({ sessions: ptyEngine.list() }), buildRetryOptions());
-    }
-
-    default:
-      throw new Error(`Unsupported terminal action: ${action}`);
-  }
+    list: async () => retry(async () => ({ sessions: ptyEngine.list() }), buildRetryOptions()),
+  };
+  const handler = handlers[action];
+  if (!handler) throw new Error(`Unsupported terminal action: ${action}`);
+  return handler();
 }
 
 async function handleComputerInteraction(
@@ -273,16 +271,17 @@ async function handleComputerInteraction(
   const action = input.action;
   const sessionId = input.target?.terminal_session_id || input.session_id;
 
-  switch (action.type) {
-    case 'spawn_terminal':
-      return await handleAction({
+  const a = action as any;
+  const handlers: Record<string, () => Promise<TerminalResult>> = {
+    spawn_terminal: async () =>
+      handleAction({
         action: 'spawn',
         params: {
           sessionId,
-          threadId: action.thread_id,
-          shell: action.shell,
-          args: action.args,
-          cwd: action.cwd,
+          threadId: a.thread_id,
+          shell: a.shell,
+          args: a.args,
+          cwd: a.cwd,
         },
       } as TerminalAction).then((result) => {
         emitComputerSurfacePatch({
@@ -290,14 +289,14 @@ async function handleComputerInteraction(
           executor: 'terminal',
           status: String(result.status || 'created'),
           latestAction: action.type,
-          detail: action.cwd || action.text || '',
+          detail: a.cwd || a.text || '',
         });
         return result;
-      });
-    case 'poll_terminal':
+      }),
+    poll_terminal: async () => {
       if (!sessionId)
         throw new Error('session_id or target.terminal_session_id is required for poll_terminal');
-      return await handleAction({
+      return handleAction({
         action: 'poll',
         params: {
           sessionId,
@@ -313,15 +312,16 @@ async function handleComputerInteraction(
         });
         return result;
       });
-    case 'write_terminal':
+    },
+    write_terminal: async () => {
       if (!sessionId)
         throw new Error('session_id or target.terminal_session_id is required for write_terminal');
-      return await handleAction({
+      return handleAction({
         action: 'write',
         params: {
           sessionId,
-          data: action.text,
-          keys: action.keys?.length ? action.keys : action.key ? [action.key] : undefined,
+          data: a.text,
+          keys: a.keys?.length ? a.keys : a.key ? [a.key] : undefined,
         },
       } as TerminalAction).then((result) => {
         emitComputerSurfacePatch({
@@ -329,14 +329,15 @@ async function handleComputerInteraction(
           executor: 'terminal',
           status: result.success ? 'running' : 'error',
           latestAction: action.type,
-          detail: action.text || action.keys?.join(' ') || action.key || '',
+          detail: a.text || a.keys?.join(' ') || a.key || '',
         });
         return result;
       });
-    case 'kill_terminal':
+    },
+    kill_terminal: async () => {
       if (!sessionId)
         throw new Error('session_id or target.terminal_session_id is required for kill_terminal');
-      return await handleAction({
+      return handleAction({
         action: 'kill',
         params: {
           sessionId,
@@ -350,8 +351,9 @@ async function handleComputerInteraction(
         });
         return result;
       });
-    case 'list_terminal_sessions':
-      return await retry(
+    },
+    list_terminal_sessions: async () =>
+      retry(
         async () => ({
           status: 'listed',
           sessions: ptyEngine.list().map((id) => {
@@ -365,21 +367,18 @@ async function handleComputerInteraction(
           }),
         }),
         buildRetryOptions()
-      );
-    case 'shell_command': {
+      ),
+    shell_command: async () => {
       const shellAdapter = resolveShellAdapter();
-      const shell = action.shell || shellAdapter.shell;
-      const args =
-        action.args && action.args.length > 0
-          ? action.args
-          : [...shellAdapter.args, action.text || ''];
-      return await handleAction({
+      const shell = a.shell || shellAdapter.shell;
+      const args = a.args && a.args.length > 0 ? a.args : [...shellAdapter.args, a.text || ''];
+      return handleAction({
         action: 'spawn',
         params: {
-          threadId: action.thread_id,
+          threadId: a.thread_id,
           shell,
           args,
-          cwd: action.cwd,
+          cwd: a.cwd,
         },
       } as TerminalAction).then((result) => {
         emitComputerSurfacePatch({
@@ -387,14 +386,17 @@ async function handleComputerInteraction(
           executor: 'terminal',
           status: String(result.status || 'created'),
           latestAction: action.type,
-          detail: action.text || '',
+          detail: a.text || '',
         });
         return result;
       });
-    }
-    default:
-      throw new Error(
-        `Unsupported computer interaction action for terminal-actuator: ${action.type}`
-      );
+    },
+  };
+  const handler = handlers[action.type];
+  if (!handler) {
+    throw new Error(
+      `Unsupported computer interaction action for terminal-actuator: ${action.type}`
+    );
   }
+  return handler();
 }

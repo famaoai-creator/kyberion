@@ -291,48 +291,46 @@ function describeGrantTarget(grant: ExternalOperationGrant): string {
           : '';
     return `${grant.repository}${branch}`;
   }
-  switch (grant.operation_id) {
-    case 'browser:goto':
-    case 'browser:open_tab':
-      return grant.origin ?? 'ANY origin (isolated navigation only)';
-    case 'tenant:attest_provider':
-      return `${grant.tenant_slug}/${grant.provider}`;
-    case 'service:slack:preset:post_message':
-      return grant.channel ? `channel: ${grant.channel}` : 'ANY channel';
-    case 'meeting:join':
-    case 'meeting:listen':
-    case 'meeting:speak':
-    case 'meeting:chat':
-      return `platform: ${grant.platform}; ${
-        'series_id' in grant ? `meeting series: ${grant.series_id}` : `meeting: ${grant.meeting_id}`
-      }`;
-    case 'voice:playback':
-      return `platform: ${grant.platform ?? 'ANY'}${
-        grant.format ? `; format: ${grant.format}` : ''
-      }${grant.content_hash ? `; artifact: ${grant.content_hash}` : ''}`;
-    case 'voice:speak':
-      return `platform: ${grant.platform ?? 'ANY'}`;
-    case 'network:fetch':
-      return `${grant.method ?? 'ANY method'} ${grant.origin ?? 'ANY https origin'}`;
-    case 'network:exposure_check':
-      return grant.origin ?? 'ANY https origin';
-    case 'network:shell':
-      return grant.cmd ? `command: ${grant.cmd}` : 'ANY command';
-    case 'network:a2a_send':
-      return `transport: ${grant.method ?? 'ANY'}; peer: ${grant.peer_id ?? 'ANY'}`;
-    case 'calendar:create_event':
-    case 'calendar:update_event':
-    case 'calendar:delete_event':
-      return `backend: ${grant.backend ?? 'ANY'}${
-        grant.calendar_id ? `; calendar: ${grant.calendar_id}` : ''
-      }${'event_id' in grant && grant.event_id ? `; event: ${grant.event_id}` : ''}`;
-    case 'deployment:deploy_release':
-      return `adapter: ${grant.adapter ?? 'ANY'}; environment: ${grant.environment ?? 'ANY'}${
-        grant.project_name ? `; project: ${grant.project_name}` : ''
-      }`;
-    default:
-      return `backend: ${'backend' in grant && grant.backend ? grant.backend : 'ANY'}`;
-  }
+  const navLabel = (g: any) => g.origin ?? 'ANY origin (isolated navigation only)';
+  const meetingLabel = (g: any) =>
+    `platform: ${g.platform}; ${
+      'series_id' in g ? `meeting series: ${g.series_id}` : `meeting: ${g.meeting_id}`
+    }`;
+  const calendarLabel = (g: any) =>
+    `backend: ${g.backend ?? 'ANY'}${
+      g.calendar_id ? `; calendar: ${g.calendar_id}` : ''
+    }${'event_id' in g && g.event_id ? `; event: ${g.event_id}` : ''}`;
+  const describers: Record<string, (g: any) => string> = {
+    'browser:goto': navLabel,
+    'browser:open_tab': navLabel,
+    'tenant:attest_provider': (g) => `${g.tenant_slug}/${g.provider}`,
+    'service:slack:preset:post_message': (g) =>
+      g.channel ? `channel: ${g.channel}` : 'ANY channel',
+    'meeting:join': meetingLabel,
+    'meeting:listen': meetingLabel,
+    'meeting:speak': meetingLabel,
+    'meeting:chat': meetingLabel,
+    'voice:playback': (g) =>
+      `platform: ${g.platform ?? 'ANY'}${g.format ? `; format: ${g.format}` : ''}${
+        g.content_hash ? `; artifact: ${g.content_hash}` : ''
+      }`,
+    'voice:speak': (g) => `platform: ${g.platform ?? 'ANY'}`,
+    'network:fetch': (g) => `${g.method ?? 'ANY method'} ${g.origin ?? 'ANY https origin'}`,
+    'network:exposure_check': (g) => g.origin ?? 'ANY https origin',
+    'network:shell': (g) => (g.cmd ? `command: ${g.cmd}` : 'ANY command'),
+    'network:a2a_send': (g) => `transport: ${g.method ?? 'ANY'}; peer: ${g.peer_id ?? 'ANY'}`,
+    'calendar:create_event': calendarLabel,
+    'calendar:update_event': calendarLabel,
+    'calendar:delete_event': calendarLabel,
+    'deployment:deploy_release': (g) =>
+      `adapter: ${g.adapter ?? 'ANY'}; environment: ${g.environment ?? 'ANY'}${
+        g.project_name ? `; project: ${g.project_name}` : ''
+      }`,
+  };
+  const describer = describers[grant.operation_id];
+  return describer
+    ? describer(grant)
+    : `backend: ${'backend' in grant && grant.backend ? grant.backend : 'ANY'}`;
 }
 
 function yen(n: number): string {

@@ -90,8 +90,8 @@ async function executeEmailOp(
     throw new Error('email-actuator send_from_file: body_file is required and could not be read');
   }
 
-  switch (op) {
-    case 'create_draft': {
+  const handlers: Record<string, () => Promise<any>> = {
+    create_draft: async () => {
       logger.info(`[EMAIL] Creating draft → To: ${params.to}, Subject: ${params.subject}`);
       const result = await createDraft(params);
       if (result.status !== 'succeeded')
@@ -100,22 +100,22 @@ async function executeEmailOp(
         );
       logger.success(`[EMAIL] Draft created`);
       if (params.export_as) ctx = { ...ctx, [params.export_as]: result.message || 'success' };
-      break;
-    }
-    case 'send':
-    case 'send_from_file': {
+      return ctx;
+    },
+    send: async () => handlers['send_from_file']!(),
+    send_from_file: async () => {
       logger.info(`[EMAIL] Sending → To: ${params.to ?? ''}, Subject: ${params.subject ?? ''}`);
       const result = await sendEmail(params);
       if (result.status !== 'succeeded')
         throw new Error(result.error || '[EMAIL_SEND_UNVERIFIED] Send needs verification');
       logger.success(`[EMAIL] Sent → To: ${params.to}, Subject: ${params.subject}`);
       if (params.export_as) ctx = { ...ctx, [params.export_as]: result.message || 'success' };
-      break;
-    }
-    default:
-      throw new Error(`email-actuator: unknown op: ${op}`);
-  }
-  return ctx;
+      return ctx;
+    },
+  };
+  const handler = handlers[op];
+  if (!handler) throw new Error(`email-actuator: unknown op: ${op}`);
+  return handler();
 }
 
 export async function handleAction(input: {

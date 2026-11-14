@@ -62,8 +62,8 @@ async function executeControl(
     return res.context;
   };
 
-  switch (op) {
-    case 'open_tab': {
+  const handlers: Record<string, () => Promise<any>> = {
+    open_tab: async () => {
       const page = await runtime.context.newPage();
       const tabId =
         typeof params.tab_id === 'string' && params.tab_id.trim()
@@ -100,8 +100,8 @@ async function executeControl(
           url: typeof resolvedUrl === 'string' ? resolvedUrl : undefined,
         }
       );
-    }
-    case 'select_tab': {
+    },
+    select_tab: async () => {
       const tabId = resolve(params.tab_id);
       if (typeof tabId !== 'string' || !runtime.tabs.has(tabId)) {
         throw new Error(`Unknown browser tab: ${String(tabId)}`);
@@ -119,8 +119,8 @@ async function executeControl(
           tab_id: tabId,
         }
       );
-    }
-    case 'select_tab_matching': {
+    },
+    select_tab_matching: async () => {
       const urlIncludes = params.url_includes ? String(resolve(params.url_includes)) : undefined;
       const titleIncludes = params.title_includes
         ? String(resolve(params.title_includes))
@@ -163,8 +163,8 @@ async function executeControl(
           url: selected.url,
         }
       );
-    }
-    case 'close_session':
+    },
+    close_session: async () => {
       return browserRuntimeHelpers.recordBrowserAction(
         {
           ...ctx,
@@ -176,7 +176,8 @@ async function executeControl(
           tab_id: runtime.activeTabId,
         }
       );
-    case 'pause_for_operator': {
+    },
+    pause_for_operator: async () => {
       const sessionId = typeof ctx.session_id === 'string' ? ctx.session_id : 'default';
       const message = String(
         resolve(params.message || 'Operator input required. Press Enter to continue.')
@@ -215,15 +216,16 @@ async function executeControl(
         browserRuntimeHelpers.completeOperatorApproval(sessionId, 'expired');
         throw error;
       }
-    }
-    case 'if':
+    },
+    if: async () => {
       if (evaluateCondition(params.condition, ctx)) {
         return await runNested(params.then, ctx);
       } else if (params.else) {
         return await runNested(params.else, ctx);
       }
       return ctx;
-    case 'while': {
+    },
+    while: async () => {
       let iterations = 0;
       const maxIter =
         typeof params.max_iterations === 'number' && params.max_iterations >= 0
@@ -234,8 +236,8 @@ async function executeControl(
         iterations++;
       }
       return ctx;
-    }
-    case 'setup_passkey_authenticator': {
+    },
+    setup_passkey_authenticator: async () => {
       const page = browserRuntimeHelpers.getActivePage(runtime);
       const setup = await setupVirtualPasskeyAuthenticator(runtime, page, {
         enableUI: params.enable_ui === true,
@@ -262,8 +264,8 @@ async function executeControl(
           tab_id: runtime.activeTabId,
         }
       );
-    }
-    case 'remove_passkey_authenticator': {
+    },
+    remove_passkey_authenticator: async () => {
       const page = browserRuntimeHelpers.getActivePage(runtime);
       await removeVirtualPasskeyAuthenticator(runtime, page);
       return browserRuntimeHelpers.recordBrowserAction(ctx, {
@@ -271,8 +273,8 @@ async function executeControl(
         op: 'remove_passkey_authenticator',
         tab_id: runtime.activeTabId,
       });
-    }
-    case 'ref': {
+    },
+    ref: async () => {
       const { resolveRef } = await import('@agent/core/pipeline/pipeline-engine');
       const resolvedPath = resolve(params.path);
       if (typeof resolvedPath !== 'string' || !resolvedPath.trim()) {
@@ -297,10 +299,11 @@ async function executeControl(
         op: 'ref',
         tab_id: runtime.activeTabId,
       });
-    }
-    default:
-      throw new Error(`Unsupported control operator in Browser-Actuator: ${op}`);
-  }
+    },
+  };
+  const handler = handlers[op];
+  if (!handler) throw new Error(`Unsupported control operator in Browser-Actuator: ${op}`);
+  return handler();
 }
 
 function asAdfSteps(value: unknown, op: string): AdfStep[] {

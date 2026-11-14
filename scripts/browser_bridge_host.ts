@@ -1402,50 +1402,32 @@ function handleSubmitInspection(message: any): HostResponse {
 }
 
 export function handle(message: any): HostResponse | Promise<HostResponse> {
-  switch (message?.type) {
-    case 'ping':
-      return { ok: true, pong: true, host_version: HOST_VERSION };
-    case 'preflight':
-      return handlePreflight(message);
-    case 'request_execution':
-      return handleRequestExecution(message);
-    case 'compile_pipeline':
-      return handleCompilePipeline(message);
-    case 'extend_lease':
-      return handleExtendLease(message);
-    case 'submit_receipt':
-      return handleSubmitReceipt(message);
-    case 'dispatch_procedure':
-      return handleDispatchProcedure(message);
-    case 'prepare_procedure':
-      return handlePrepareProcedure(message);
-    case 'save_recording':
-      return handleSaveRecording(message);
-    case 'promote_procedure':
-      return handlePromoteProcedure(message);
-    case 'apply_procedure_delta':
-      return handleApplyProcedureDelta(message);
-    case 'save_procedure_delta':
-      return handleSaveProcedureDelta(message);
-    case 'resolve_intent':
-      return handleResolveIntent(message);
-    case 'submit_observation':
-      return handleSubmitObservation(message);
-    case 'analyze_observation':
-      return handleAnalyzeObservation(message);
-    case 'submit_golden_evidence':
-      return handleSubmitGoldenEvidence(message);
-    case 'poll_requests':
-      return handlePollRequests();
-    case 'respond_request':
-      return handleRespondRequest(message);
-    case 'send_page':
-      return handleSendPage(message);
-    case 'submit_inspection':
-      return handleSubmitInspection(message);
-    default:
-      return { ok: false, error: `Unsupported message type: ${String(message?.type)}` };
-  }
+  const handlers: Record<string, () => HostResponse | Promise<HostResponse>> = {
+    ping: () => ({ ok: true, pong: true, host_version: HOST_VERSION }),
+    preflight: () => handlePreflight(message),
+    request_execution: () => handleRequestExecution(message),
+    compile_pipeline: () => handleCompilePipeline(message),
+    extend_lease: () => handleExtendLease(message),
+    submit_receipt: () => handleSubmitReceipt(message),
+    dispatch_procedure: () => handleDispatchProcedure(message),
+    prepare_procedure: () => handlePrepareProcedure(message),
+    save_recording: () => handleSaveRecording(message),
+    promote_procedure: () => handlePromoteProcedure(message),
+    apply_procedure_delta: () => handleApplyProcedureDelta(message),
+    save_procedure_delta: () => handleSaveProcedureDelta(message),
+    resolve_intent: () => handleResolveIntent(message),
+    submit_observation: () => handleSubmitObservation(message),
+    analyze_observation: () => handleAnalyzeObservation(message),
+    submit_golden_evidence: () => handleSubmitGoldenEvidence(message),
+    poll_requests: () => handlePollRequests(),
+    respond_request: () => handleRespondRequest(message),
+    send_page: () => handleSendPage(message),
+    submit_inspection: () => handleSubmitInspection(message),
+  };
+  const handler =
+    handlers[message?.type] ??
+    (() => ({ ok: false, error: `Unsupported message type: ${String(message?.type)}` }));
+  return handler();
 }
 
 function writeFrame(payload: HostResponse): Promise<void> {

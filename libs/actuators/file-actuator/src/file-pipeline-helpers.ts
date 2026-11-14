@@ -29,7 +29,7 @@ import {
 } from '@agent/core/pipeline/logic-utils';
 import { validateOpInput } from '@agent/core/pipeline/op-input-contracts';
 import { processUntrustedContent } from '@agent/core/untrusted-content';
-import { skipAdfStep } from '@agent/core/pipeline/adf-engine';
+import { skipAdfStep, type AdfSkippedStep } from '@agent/core/pipeline/adf-engine';
 import { buildUnknownActuatorOpError } from '@agent/core/actuator/actuator-op-registry';
 import {
   runAdfActuatorPipeline,
@@ -225,8 +225,8 @@ async function opControl(
   _resolve: (value: unknown) => unknown
 ) {
   const params = requireParams(rawParams, `file:${op}`);
-  switch (op) {
-    case 'if':
+  const handlers: Record<string, () => Promise<FilePipelineContext | AdfSkippedStep>> = {
+    if: async () => {
       if (evaluateCondition(params.condition, ctx)) {
         const res = await runSteps(readNestedSteps(params.then, 'file:if then'), ctx);
         if (res.status === 'failed') {
@@ -244,8 +244,8 @@ async function opControl(
         ctx,
         'core:if condition evaluated to false and no else branch was provided'
       );
-
-    case 'while':
+    },
+    while: async () => {
       let iterations = 0;
       const maxIter = readNumberParam(params, 'max_iterations', 100);
       let executed = false;
@@ -261,10 +261,11 @@ async function opControl(
       return executed
         ? ctx
         : skipAdfStep(ctx, 'core:while condition evaluated to false before execution');
-
-    default:
-      throw new Error(buildUnknownFileOpMessage(op));
-  }
+    },
+  };
+  const handler = handlers[op];
+  if (!handler) throw new Error(buildUnknownFileOpMessage(op));
+  return handler();
 }
 
 async function opCapture(
@@ -280,24 +281,25 @@ async function opCapture(
       `[INVALID_OP_INPUT] ${op}: ${'errors' in validation ? validation.errors.join('; ') : ''}`
     );
   }
-  switch (op) {
-    case 'read':
-    case 'read_file': {
-      const filePath = resolvedString(params.path, resolve);
-      const rawText = await retry(
-        async () => safeReadFile(resolveFilePath(String(filePath)), { encoding: 'utf8' }),
-        buildRetryOptions()
-      );
-      const wrappedText =
-        typeof rawText === 'string'
-          ? processUntrustedContent(rawText, `file:${filePath}`).wrapped
-          : rawText;
-      return {
-        ...ctx,
-        [exportKey(params, 'last_capture')]: wrappedText,
-      };
-    }
-    case 'read_json': {
+  const readFile = async () => {
+    const filePath = resolvedString(params.path, resolve);
+    const rawText = await retry(
+      async () => safeReadFile(resolveFilePath(String(filePath)), { encoding: 'utf8' }),
+      buildRetryOptions()
+    );
+    const wrappedText =
+      typeof rawText === 'string'
+        ? processUntrustedContent(rawText, `file:${filePath}`).wrapped
+        : rawText;
+    return {
+      ...ctx,
+      [exportKey(params, 'last_capture')]: wrappedText,
+    };
+  };
+  const handlers: Record<string, () => Promise<FilePipelineContext>> = {
+    read: readFile,
+    read_file: readFile,
+    read_json: async () => {
       const filePath = resolvedString(params.path, resolve);
       const parsed = await retry(
         async () => readJson<unknown>(resolveFilePath(String(filePath))),
@@ -307,16 +309,15 @@ async function opCapture(
         ...ctx,
         [exportKey(params, 'last_capture_data')]: parsed,
       };
-    }
-    case 'list':
-      return {
-        ...ctx,
-        [exportKey(params, 'file_list')]: await retry(
-          async () => safeReaddir(resolveFilePath(resolvedString(params.path, resolve))),
-          buildRetryOptions()
-        ),
-      };
-    case 'stat':
+    },
+    list: async () => ({
+      ...ctx,
+      [exportKey(params, 'file_list')]: await retry(
+        async () => safeReaddir(resolveFilePath(resolvedString(params.path, resolve))),
+        buildRetryOptions()
+      ),
+    }),
+    stat: async () => {
       const s = await retry(
         async () => safeStat(resolveFilePath(resolvedString(params.path, resolve))),
         buildRetryOptions()
@@ -330,15 +331,15 @@ async function opCapture(
           isDirectory: s.isDirectory(),
         },
       };
-    case 'exists':
-      return {
-        ...ctx,
-        [exportKey(params, 'exists')]: await retry(
-          async () => safeExistsSync(resolveFilePath(resolvedString(params.path, resolve), true)),
-          buildRetryOptions()
-        ),
-      };
-    case 'search': {
+    },
+    exists: async () => ({
+      ...ctx,
+      [exportKey(params, 'exists')]: await retry(
+        async () => safeExistsSync(resolveFilePath(resolvedString(params.path, resolve), true)),
+        buildRetryOptions()
+      ),
+    }),
+    search: async () => {
       const pattern = resolvedString(params.pattern, resolve);
       const targetPath = resolveFilePath(resolvedString(params.path, resolve));
       const rgOutput = await retry(
@@ -351,8 +352,8 @@ async function opCapture(
         .filter(Boolean)
         .map((line) => parseSafeJsonInput(line, 'file search result'));
       return { ...ctx, [exportKey(params, 'search_results')]: results };
-    }
-    case 'tail': {
+    },
+    tail: async () => {
       const filePath = resolvedString(params.path, resolve);
       const tailPath = resolveFilePath(String(filePath));
       const stats = await retry(async () => safeStat(tailPath), buildRetryOptions());
@@ -372,10 +373,11 @@ async function opCapture(
           ? processUntrustedContent(newText, `file:${filePath}`).wrapped
           : newText;
       return { ...ctx, [exportKey(params, 'last_capture')]: wrappedText, [posKey]: stats.size };
-    }
-    default:
-      throw new Error(buildUnknownFileOpMessage(op));
-  }
+    },
+  };
+  const handler = handlers[op];
+  if (!handler) throw new Error(buildUnknownFileOpMessage(op));
+  return handler();
 }
 
 async function opTransform(
@@ -385,37 +387,35 @@ async function opTransform(
   resolve: (value: unknown) => unknown
 ) {
   const params = requireParams(rawParams, `file:${op}`);
-  switch (op) {
-    case 'regex_replace':
-      return {
-        ...ctx,
-        [exportKey(params, 'last_transform')]: String(
-          ctx[contextKey(params, 'last_capture')] || ''
-        ).replace(
-          new RegExp(readStringParam(params, 'pattern')),
-          resolvedString(params.template, resolve)
-        ),
-      };
-    case 'json_parse':
-      return {
-        ...ctx,
-        [exportKey(params, 'last_capture_data')]: parseSafeJsonInput(
-          String(ctx[contextKey(params, 'last_capture')]),
-          'file json_parse input'
-        ),
-      };
-    case 'path_join':
-      return {
-        ...ctx,
-        [exportKey(params, 'last_transform')]: path.join(
-          ...(Array.isArray(params.parts) ? params.parts : []).map((part) =>
-            resolvedString(part, resolve)
-          )
-        ),
-      };
-    default:
-      throw new Error(buildUnknownFileOpMessage(op));
-  }
+  const handlers: Record<string, () => FilePipelineContext> = {
+    regex_replace: () => ({
+      ...ctx,
+      [exportKey(params, 'last_transform')]: String(
+        ctx[contextKey(params, 'last_capture')] || ''
+      ).replace(
+        new RegExp(readStringParam(params, 'pattern')),
+        resolvedString(params.template, resolve)
+      ),
+    }),
+    json_parse: () => ({
+      ...ctx,
+      [exportKey(params, 'last_capture_data')]: parseSafeJsonInput(
+        String(ctx[contextKey(params, 'last_capture')]),
+        'file json_parse input'
+      ),
+    }),
+    path_join: () => ({
+      ...ctx,
+      [exportKey(params, 'last_transform')]: path.join(
+        ...(Array.isArray(params.parts) ? params.parts : []).map((part) =>
+          resolvedString(part, resolve)
+        )
+      ),
+    }),
+  };
+  const handler = handlers[op];
+  if (!handler) throw new Error(buildUnknownFileOpMessage(op));
+  return handler();
 }
 
 async function opApply(
@@ -431,8 +431,23 @@ async function opApply(
       `[INVALID_OP_INPUT] ${op}: ${'errors' in validation ? validation.errors.join('; ') : ''}`
     );
   }
-  switch (op) {
-    case 'write': {
+  const writeArtifact = async () => {
+    const spec = resolveWriteArtifactSpec(params, ctx, resolve);
+    const out = resolveFilePath(String(spec.path), true);
+    const content =
+      typeof spec.content === 'string'
+        ? spec.content
+        : spec.content === undefined
+          ? ''
+          : JSON.stringify(spec.content, null, 2);
+    if (!safeExistsSync(path.dirname(out))) safeMkdir(path.dirname(out), { recursive: true });
+    await retry(async () => {
+      safeWriteFile(out, toFileData(content));
+      return undefined;
+    }, buildRetryOptions());
+  };
+  const handlers: Record<string, () => Promise<void>> = {
+    write: async () => {
       const out = resolveFilePath(
         resolveRequiredStringParam(params, ['path'], resolve, 'write'),
         true
@@ -445,26 +460,10 @@ async function opApply(
         safeWriteFile(out, toFileData(content));
         return undefined;
       }, buildRetryOptions());
-      break;
-    }
-    case 'write_file':
-    case 'write_artifact': {
-      const spec = resolveWriteArtifactSpec(params, ctx, resolve);
-      const out = resolveFilePath(String(spec.path), true);
-      const content =
-        typeof spec.content === 'string'
-          ? spec.content
-          : spec.content === undefined
-            ? ''
-            : JSON.stringify(spec.content, null, 2);
-      if (!safeExistsSync(path.dirname(out))) safeMkdir(path.dirname(out), { recursive: true });
-      await retry(async () => {
-        safeWriteFile(out, toFileData(content));
-        return undefined;
-      }, buildRetryOptions());
-      break;
-    }
-    case 'append': {
+    },
+    write_file: writeArtifact,
+    write_artifact: writeArtifact,
+    append: async () => {
       const out = resolveFilePath(
         resolveRequiredStringParam(params, ['path'], resolve, 'append'),
         true
@@ -478,9 +477,8 @@ async function opApply(
         safeAppendFileSync(out, payload);
         return undefined;
       }, buildRetryOptions());
-      break;
-    }
-    case 'delete': {
+    },
+    delete: async () => {
       const target = resolveFilePath(
         resolveRequiredStringParam(params, ['path'], resolve, 'delete'),
         true
@@ -489,9 +487,8 @@ async function opApply(
         safeRmSync(target, { recursive: true, force: true });
         return undefined;
       }, buildRetryOptions());
-      break;
-    }
-    case 'mkdir':
+    },
+    mkdir: async () => {
       await retry(async () => {
         safeMkdir(
           resolveFilePath(resolveRequiredStringParam(params, ['path'], resolve, 'mkdir'), true),
@@ -499,8 +496,8 @@ async function opApply(
         );
         return undefined;
       }, buildRetryOptions());
-      break;
-    case 'copy': {
+    },
+    copy: async () => {
       const src = resolveFilePath(resolveRequiredStringParam(params, ['from'], resolve, 'copy'));
       const dest = resolveFilePath(
         resolveRequiredStringParam(params, ['to'], resolve, 'copy'),
@@ -511,9 +508,8 @@ async function opApply(
         safeCopyFileSync(src, dest);
         return undefined;
       }, buildRetryOptions());
-      break;
-    }
-    case 'move': {
+    },
+    move: async () => {
       const src = resolveFilePath(resolveRequiredStringParam(params, ['from'], resolve, 'move'));
       const dest = resolveFilePath(
         resolveRequiredStringParam(params, ['to'], resolve, 'move'),
@@ -524,11 +520,11 @@ async function opApply(
         safeMoveSync(src, dest);
         return undefined;
       }, buildRetryOptions());
-      break;
-    }
-    default:
-      throw new Error(buildUnknownFileOpMessage(op));
-  }
+    },
+  };
+  const handler = handlers[op];
+  if (!handler) throw new Error(buildUnknownFileOpMessage(op));
+  return handler();
 }
 
 const main = async () => {
