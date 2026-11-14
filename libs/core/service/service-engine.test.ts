@@ -716,7 +716,8 @@ describe('executeServicePreset', () => {
         'secret-guard',
         undefined,
         selected,
-        expect.objectContaining({ tenant_slug: 'acme', action: 'read' })
+        expect.objectContaining({ tenant_slug: 'acme', action: 'read' }),
+        undefined // Tenant admission must not carry a personal credential capability.
       );
       load.mockReturnValue(null);
       await expect(

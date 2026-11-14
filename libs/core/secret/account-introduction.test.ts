@@ -25,6 +25,18 @@ const m = vi.hoisted(() => ({
   writer: 'broker-config',
   saveState: vi.fn(),
   checkHuman: vi.fn(),
+  gwsPrepare: vi.fn(),
+  gwsCommit: vi.fn(),
+  gwsAbort: vi.fn(),
+}));
+vi.mock('./gws-session-store.js', () => ({
+  loadGwsSessionRegistration: () => ({ generation: m.state.generation }),
+  prepareGwsSessionRegistration: (...args: unknown[]) => m.gwsPrepare(...args),
+  commitGwsSessionRegistration: (stage: unknown, validate: () => void) => {
+    m.gwsCommit(stage);
+    validate();
+  },
+  abortGwsSessionRegistration: (...args: unknown[]) => m.gwsAbort(...args),
 }));
 vi.mock('../authority.js', () => ({ resolveAssumedRole: () => m.role }));
 vi.mock('../shell/sandbox-policy.js', () => ({ getPluginExecutionContext: () => undefined }));
@@ -173,6 +185,108 @@ beforeEach(() => {
   m.saveState.mockReset();
   m.result.mockReset();
   m.checkHuman.mockReset();
+  m.gwsPrepare.mockReset();
+  m.gwsCommit.mockReset();
+  m.gwsAbort.mockReset();
+});
+describe('approved GWS session introduction', () => {
+  const session = {
+    type: 'authorized_user',
+    client_id: 'synthetic-client',
+    client_secret: 'synthetic-secret',
+    refresh_token: 'synthetic-refresh',
+  };
+  function setup() {
+    m.binding = {
+      ...m.binding,
+      service_id: 'google-workspace',
+      service_type: 'google-workspace',
+      auth_mode: 'session',
+      owner_kind: 'organization',
+      owner_ref: 'acme',
+      tenant_slug: 'acme',
+      secret_refs: [],
+    };
+    m.writer = '';
+    approve();
+  }
+  it('activates encrypted registration without token provisioning or runtime authority', async () => {
+    setup();
+    expect(JSON.parse(m.record!.sourceText!)).toMatchObject({
+      version: 2,
+      material_kind: 'gws-authorized-user-v1',
+      runtimeAvailable: false,
+    });
+    const result = await applyAccountIntroduction(principal, 'slack-work', {
+      approval_id: 'approval-1',
+      material: session,
+    });
+    expect(result).toMatchObject({ status: 'applied', runtimeAvailable: false });
+    expect(m.gwsPrepare).toHaveBeenCalledOnce();
+    expect(m.gwsCommit).toHaveBeenCalledOnce();
+    expect(m.provision).not.toHaveBeenCalled();
+    expect(m.store).not.toHaveBeenCalled();
+    expect(JSON.stringify(result)).not.toContain('synthetic-secret');
+  });
+  it('rejects malformed session material before durable claim or staging', async () => {
+    setup();
+    await expect(
+      applyAccountIntroduction(principal, 'slack-work', {
+        approval_id: 'approval-1',
+        material: token,
+      })
+    ).rejects.toThrow('GWS_SESSION_MATERIAL_INVALID');
+    expect(m.claim).not.toHaveBeenCalled();
+    expect(m.gwsPrepare).not.toHaveBeenCalled();
+  });
+  it('revalidates approval before commit and aborts only its stage without replay', async () => {
+    setup();
+    m.gwsPrepare.mockImplementation(() => {
+      m.record!.status = 'rejected';
+    });
+    await expect(
+      applyAccountIntroduction(principal, 'slack-work', {
+        approval_id: 'approval-1',
+        material: session,
+      })
+    ).rejects.toThrow('recovery_required');
+    expect(m.gwsAbort).toHaveBeenCalledWith(m.gwsPrepare.mock.calls[0]![0]);
+    expect(m.result).not.toHaveBeenCalled();
+    expect(accountIntroductionStatus(principal, 'slack-work', 'approval-1').recovery_required).toBe(
+      true
+    );
+  });
+  it('preserves recovery after committed storage but failed apply result', async () => {
+    setup();
+    m.result.mockImplementationOnce(() => {
+      throw new Error('synthetic failure');
+    });
+    await expect(
+      applyAccountIntroduction(principal, 'slack-work', {
+        approval_id: 'approval-1',
+        material: session,
+      })
+    ).rejects.toThrow('recovery_required');
+    await expect(
+      applyAccountIntroduction(principal, 'slack-work', {
+        approval_id: 'approval-1',
+        material: session,
+      })
+    ).rejects.toThrow('recovery_required');
+    expect(m.gwsPrepare).toHaveBeenCalledOnce();
+  });
+  it('rejects personal session and mixed token references', () => {
+    setup();
+    m.binding.owner_kind = 'person';
+    m.binding.owner_ref = 'user:owner';
+    expect(() => previewAccountIntroduction(principal, 'slack-work')).toThrow(
+      'ACCOUNT_INTRODUCTION'
+    );
+    m.binding.owner_kind = 'organization';
+    m.binding.owner_ref = 'acme';
+    m.binding.secret_refs = ['SLACK_TOKEN'];
+    expect(() => previewAccountIntroduction(principal, 'slack-work')).toThrow('session references');
+  });
 });
 describe('approved exact-account introduction', () => {
   it('rejects a personal claim despite the installed owner and concierge role', () => {

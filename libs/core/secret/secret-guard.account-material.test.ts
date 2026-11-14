@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+import { withPersonalCredentialUseCapability } from '../foundation/personal-credential-use-capability.js';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -31,6 +33,7 @@ vi.mock('../foundation/json.js', () => ({
   },
 }));
 vi.mock('../foundation/credential-binding.js', () => ({
+  hasTaskCredentialBinding: () => Boolean(mocks.personalClaim),
   credentialExecutionIdentity: () => ({
     tenantSlug: mocks.tenant,
     personalClaim: mocks.personalClaim,
@@ -53,6 +56,8 @@ import {
   localAccountMaterialAccountId,
   loadAllocatedLocalAccountRegistration,
   loadAllocatedLocalAccountMaterial,
+  loadPersonalRuntimeAccountRegistration,
+  loadPersonalRuntimeAccountMaterial,
 } from './secret-guard.js';
 import {
   withAccountCredentialMaterialCapability,
@@ -78,6 +83,40 @@ beforeEach(() => {
 afterEach(() => overrideSecretEncryptionKeyForTests(null));
 
 describe('internal local account material storage', () => {
+  it('allows only exact claimed-person account windows and rejects changed registration', () => {
+    const ref = storeLocalAccountMaterial(alice, { SLACK_TOKEN: 'personal-fixture' });
+    storeLocalAccountRegistration(alice, { generation: ref.generation });
+    const actorId = 'kyberion://agent/_/_/personal';
+    mocks.personalClaim = { ownerId: alice.ownerRef, actorId };
+    const approvalId = 'APR-personal';
+    const admission = {
+      ownerId: alice.ownerRef,
+      actorId,
+      grantId: 'GRT-20261114-123456789abc',
+      approvalId,
+      approvalPath: `active/shared/runtime/tenant-approvals/personal/shared/owners/${createHash('sha256').update(actorId).digest('hex')}/grant-standing/requests/${approvalId}.json`,
+      accountId: localAccountMaterialAccountId(alice),
+    };
+    expect(() => loadPersonalRuntimeAccountMaterial(ref)).toThrow();
+    withPersonalCredentialUseCapability(admission, () => {
+      expect(loadPersonalRuntimeAccountRegistration(alice).generation).toBe(ref.generation);
+      expect(() => loadPersonalRuntimeAccountMaterial(ref)).toThrow();
+    });
+    withPersonalCredentialUseCapability({ ...admission, generation: ref.generation }, () => {
+      expect(loadPersonalRuntimeAccountMaterial(ref)).toEqual({ SLACK_TOKEN: 'personal-fixture' });
+      expect(() => loadLocalAccountMaterial(ref)).toThrow();
+      expect(() => loadPersonalRuntimeAccountMaterial({ ...ref, ownerRef: 'user:bob' })).toThrow();
+    });
+    mocks.personalClaim = undefined;
+    storeLocalAccountRegistration(alice, {
+      generation: ref.generation,
+      pendingApprovalId: 'pending',
+    });
+    mocks.personalClaim = { ownerId: alice.ownerRef, actorId };
+    withPersonalCredentialUseCapability({ ...admission, generation: ref.generation }, () =>
+      expect(() => loadPersonalRuntimeAccountMaterial(ref)).toThrow('incomplete')
+    );
+  });
   it('denies operator account reads and writes inside a personal claim', () => {
     const ref = storeLocalAccountMaterial(alice, { SLACK_TOKEN: 'operator-fixture' });
     mocks.write.mockClear();

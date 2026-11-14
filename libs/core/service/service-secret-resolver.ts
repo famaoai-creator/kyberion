@@ -23,6 +23,8 @@ export function resolveSelectedServiceSecret(
     ownerRef: string;
     secretRefs: readonly string[];
     allocationGrantId?: string;
+    personalGrantId?: string;
+    generation?: string;
   }
 ): string | null {
   for (const suffix of suffixes) {
@@ -33,6 +35,8 @@ export function resolveSelectedServiceSecret(
       serviceBindingId: selection.bindingId,
       sourceOwnerRef: selection.ownerRef,
       allocationGrantId: selection.allocationGrantId,
+      personalGrantId: selection.personalGrantId,
+      generation: selection.generation,
     });
     if (!value)
       throw new Error('[CREDENTIAL_PROVENANCE_DENIED] Selected credential is unavailable');

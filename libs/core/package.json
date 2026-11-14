@@ -5716,6 +5716,14 @@
       "types": "./dist/secret/external-secret-providers.d.ts",
       "default": "./dist/secret/external-secret-providers.js"
     },
+    "./secret/gws-session-registration-contract": {
+      "types": "./dist/secret/gws-session-registration-contract.d.ts",
+      "default": "./dist/secret/gws-session-registration-contract.js"
+    },
+    "./secret/personal-service-credential-broker": {
+      "types": "./dist/secret/personal-service-credential-broker.d.ts",
+      "default": "./dist/secret/personal-service-credential-broker.js"
+    },
     "./secret/provider-registry": {
       "types": "./dist/secret/provider-registry.d.ts",
       "default": "./dist/secret/provider-registry.js"

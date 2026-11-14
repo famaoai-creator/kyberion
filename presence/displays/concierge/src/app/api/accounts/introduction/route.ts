@@ -1,3 +1,4 @@
+import { validateGwsSessionMaterial } from '@agent/core/secret/gws-session-registration-contract';
 import { NextRequest, NextResponse } from 'next/server';
 import {
   previewAccountIntroduction,
@@ -76,7 +77,22 @@ export async function POST(req: NextRequest) {
         return accountIntroductionStatus(principal, bindingId, body.approval_id);
       const material = body.material;
       if (!material || typeof material !== 'object' || Array.isArray(material)) return null;
+      // Select the material schema from the authorized server plan, never a client mode.
+      const plan = previewAccountIntroduction(principal, bindingId);
+      const gws = 'material_kind' in plan && plan.material_kind === 'gws-authorized-user-v1';
       const entries = Object.entries(material);
+      if (gws) {
+        let validated;
+        try {
+          validated = validateGwsSessionMaterial(material);
+        } catch {
+          return null;
+        }
+        return applyAccountIntroduction(principal, bindingId, {
+          approval_id: body.approval_id,
+          material: validated,
+        });
+      }
       if (
         !entries.length ||
         entries.length > 64 ||

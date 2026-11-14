@@ -36,7 +36,11 @@ import {
   withCredentialMaterialCapability,
   withAccountCredentialMaterialCapability,
 } from '../foundation/credential-material-capability.js';
-import { getSecretResolver, registerSecretResolver } from './secret-resolver.js';
+import {
+  getSecretResolver,
+  registerSecretResolver,
+  type SecretResolver,
+} from './secret-resolver.js';
 import { currentScopeEnvelope } from '../scope-envelope.js';
 import { loadServiceBindingRecord } from '../service/service-binding-reader.js';
 import { getServiceEndpointRecord } from '../service/service-endpoint-registry.js';
@@ -121,18 +125,25 @@ function readAllocatedServiceMaterial(
 }
 
 export const CREDENTIAL_USE_CAPABILITY = 'credential.use';
+let installedLocalResolver: SecretResolver | undefined;
+/** Exact installed default, never a caller-supplied resolver name. Reset/reinstall changes identity. */
+export function isLocalCredentialAllocationResolver(resolver: SecretResolver | null): boolean {
+  return !!resolver && resolver === installedLocalResolver && resolver === getSecretResolver();
+}
 export function installLocalCredentialAllocations(): boolean {
   // The source verifier is required for external brokers too; never replace their resolver.
   registerServiceCredentialAllocationVerifier(verifyServiceCredentialAllocation);
   if (getSecretResolver()) return false;
-  registerSecretResolver(
-    {
-      name: 'local-credential-allocations',
-      resolve: () => null,
-      bindTask: bindAllocatedTaskCredentials,
-    },
-    { provenance: 'generated', source: 'local-credential-allocation-default' }
-  );
+  const resolver: SecretResolver = {
+    name: 'local-credential-allocations',
+    resolve: () => null,
+    bindTask: bindAllocatedTaskCredentials,
+  };
+  registerSecretResolver(resolver, {
+    provenance: 'generated',
+    source: 'local-credential-allocation-default',
+  });
+  installedLocalResolver = resolver;
   return true;
 }
 const denied = () =>

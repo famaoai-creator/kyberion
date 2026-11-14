@@ -15,6 +15,7 @@ type ServiceBindingInput = {
   service_id?: string;
   mode: string;
   action: string;
+  auth?: string;
   context?: Record<string, any>;
 };
 
@@ -30,6 +31,26 @@ export function authorizeTenantServiceBinding(input: ServiceBindingInput): {
   const identity = credentialExecutionIdentity();
   const raw = input.context?.security_scope;
   const declaredScope = raw && typeof raw === 'object' ? (raw as ContextSecurityScope) : undefined;
+  if (identity.personalClaim && executesOperation) {
+    if (
+      input.mode !== 'PRESET' ||
+      input.auth !== 'secret-guard' ||
+      typeof input.context?.service_binding_id !== 'string' ||
+      !input.context.service_binding_id ||
+      typeof input.context?.personal_credential_grant_id !== 'string' ||
+      !input.context.personal_credential_grant_id ||
+      (declaredScope && resolveTenantAlias(declaredScope))
+    )
+      throw new Error(
+        '[CREDENTIAL_PROVENANCE_DENIED] Personal service operation requires exact selection'
+      );
+    // Selectors nominate the broker lookup; they confer no authority here.
+    return { approvalRequired: false };
+  }
+  if (input.context?.personal_credential_grant_id !== undefined)
+    throw new Error(
+      '[CREDENTIAL_PROVENANCE_DENIED] Personal selection requires a current personal claim'
+    );
   const tenantExecution =
     executesOperation &&
     Boolean(identity.tenantSlug || (declaredScope && resolveTenantAlias(declaredScope)));
