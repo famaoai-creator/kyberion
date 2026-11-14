@@ -40,7 +40,7 @@ import {
   safeReadFile,
   safeStat,
 } from '@agent/core/secure-io';
-import { ScriptExitError } from './lib/harness.js';
+import { ScriptExitError } from '../lib/harness.js';
 import {
   assertExtension,
   assertPerceptionOutput,
@@ -54,7 +54,7 @@ import {
   withPerceptionMediaRole,
   type CommonArgs,
   type MediaTool,
-} from './lib/perception.js';
+} from '../lib/perception.js';
 
 /** Hard cap on spoken text; longer scripts should be split (or rendered via a pipeline). */
 export const MAX_SPEAK_CHARS = 10_000;
@@ -89,7 +89,7 @@ export interface SpeakDeps {
 
 export const defaultSpeakDeps: SpeakDeps = {
   async voice(input) {
-    const { handleAction } = await import('../libs/actuators/voice-actuator/src/index.js');
+    const { handleAction } = await import('../../libs/actuators/voice-actuator/src/index.js');
     return (await handleAction(input as never)) as Record<string, unknown>;
   },
   runMedia: (tool, args) => defaultPerceptionDeps.runMedia(tool, args),

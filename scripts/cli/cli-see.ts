@@ -5,7 +5,7 @@ import {
   validatePerceptionOptions,
   enhancementDeps,
   renderObservations,
-} from './lib/perception-enhancements.js';
+} from '../lib/perception-enhancements.js';
 /**
  * `pnpm kyberion see <image> [--describe] [--lang <bcp47>] [--json] [--out <file>]`
  *
@@ -20,7 +20,7 @@ import {
 import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeReadFile } from '@agent/core/secure-io';
-import { ScriptExitError } from './lib/harness.js';
+import { ScriptExitError } from '../lib/harness.js';
 import {
   assertExtension,
   assertPerceptionInput,
@@ -33,7 +33,7 @@ import {
   withPerceptionMediaRole,
   type CommonArgs,
   type PerceptionDeps,
-} from './lib/perception.js';
+} from '../lib/perception.js';
 
 export const SEE_USAGE = `Usage: pnpm kyberion see <image> [--describe] [--no-ocr] [--provider <id>] [--lang <bcp47>] [--json] [--out <file>]
 

@@ -45,8 +45,8 @@ import {
   resolveCliOperatorIdentity,
 } from '@agent/core/governance/cli-operator-principal';
 import type { ApprovalRequestRecord } from '@agent/core/governance/approval-store';
-import { cliApprovalRequester } from './lib/cli-approval-requester.js';
-import { ScriptExitError } from './lib/harness.js';
+import { cliApprovalRequester } from '../lib/cli-approval-requester.js';
+import { ScriptExitError } from '../lib/harness.js';
 
 export const GRANTS_USAGE = `Usage: pnpm kyberion grants <list|check|status|upcoming|grant|revoke> [options]
 
@@ -113,7 +113,7 @@ const defaultDeps: GrantsDeps = {
   profiles: listGrantReadinessProfiles,
   upcoming: async (argv) => {
     const { parseMeetingReadinessArgs, renderMeetingReadiness, runMeetingReadinessCheck } =
-      await import('./meeting/meeting_readiness_check.js');
+      await import('../meeting/meeting_readiness_check.js');
     const report = await runMeetingReadinessCheck(parseMeetingReadinessArgs(argv));
     return { report, text: renderMeetingReadiness(report) };
   },

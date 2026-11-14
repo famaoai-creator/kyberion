@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { pathResolver, safeReadFile } from '@agent/core';
-import { main } from './cli.js';
+import { main } from '../cli.js';
 
 describe('CLI output boundary', () => {
   it('keeps CLI command output away from direct process streams', () => {

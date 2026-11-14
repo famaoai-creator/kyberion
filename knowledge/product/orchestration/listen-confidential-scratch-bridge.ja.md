@@ -20,7 +20,7 @@ permission_denied 分類は正しい fail-closed であり、本書で扱った�
 
 ### 1.1 中間ファイルは誰がどこへ書くか
 
-1. `kyberion listen` → `runListenCommand` (`scripts/cli-listen.ts:187`) →
+1. `kyberion listen` → `runListenCommand` (`scripts/cli/cli-listen.ts:187`) →
    `createPerceptionWorkDir('listen', absolute)` (`scripts/lib/perception.ts:236-246`)。
 2. `resolvePerceptionScope(sourceFile)` (`libs/shared-perception/src/observation.ts:47-60`) は
    **active scope と入力推定 tier の高い方**を採る。永続 scope.env

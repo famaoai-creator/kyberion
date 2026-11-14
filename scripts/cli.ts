@@ -38,15 +38,15 @@ import {
 } from '@agent/core/foundation/command-credential-policy';
 import { DiagnosticError } from '@agent/core/logger';
 import { defineScript, isDirectScript } from './lib/harness.js';
-import { createCliCommandHandlers, type CliCommandHandler } from './cli-command-handlers.js';
-export { parseOffboardArgs } from './cli-offboard-args.js';
+import { createCliCommandHandlers, type CliCommandHandler } from './cli/cli-command-handlers.js';
+export { parseOffboardArgs } from './cli/cli-offboard-args.js';
 import {
   printBranchBanner,
   printHeader,
   withPresentationOutputPrinter,
-} from './cli-presentation.js';
-import { parseInteractionPacket } from './cli-packet-parser.js';
-export { parseInteractionPacket } from './cli-packet-parser.js';
+} from './cli/cli-presentation.js';
+import { parseInteractionPacket } from './cli/cli-packet-parser.js';
+export { parseInteractionPacket } from './cli/cli-packet-parser.js';
 
 type Print = (value: unknown) => void;
 

@@ -33,7 +33,7 @@ import type {
   ImageReference,
 } from '@agent/shared-media/image-generation-types';
 import type { SeamProviderCandidate } from '@agent/core/seam-provider-selection';
-import { ScriptExitError } from './lib/harness.js';
+import { ScriptExitError } from '../lib/harness.js';
 import {
   assertExtension,
   createPerceptionWorkDir,
@@ -46,7 +46,7 @@ import {
   sniffImageDimensions,
   type CommonArgs,
   type MediaTool,
-} from './lib/perception.js';
+} from '../lib/perception.js';
 
 export const MAX_DRAW_PROMPT_CHARS = 4_000;
 export const DRAW_OUT_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.webp'] as const;

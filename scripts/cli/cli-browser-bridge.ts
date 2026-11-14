@@ -39,7 +39,7 @@ import {
   partitionedRuntimeStateKnowledgePath,
   type StorageDataTier,
 } from '@agent/core/storage-layout';
-import { ScriptExitError } from './lib/harness.js';
+import { ScriptExitError } from '../lib/harness.js';
 
 export const BROWSER_BRIDGE_USAGE = `Usage: pnpm kyberion browser-bridge <request|status|wait> [options]
 

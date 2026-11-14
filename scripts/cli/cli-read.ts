@@ -21,7 +21,7 @@ import {
   type ReadDocumentResult,
 } from '@agent/core/media/document-reader';
 import { safeExistsSync, safeWriteFile } from '@agent/core/secure-io';
-import { ScriptExitError, type ScriptErrorDetails } from './lib/harness.js';
+import { ScriptExitError, type ScriptErrorDetails } from '../lib/harness.js';
 
 export const READ_USAGE = `Usage: pnpm kyberion read <file> [--ocr] [--tier <tier>] [--training-use <policy>] [--tenant <slug>] [--json] [--out <file>] [--images <dir>]
 

@@ -5,7 +5,9 @@ import { printHeader, withPresentationOutputPrinter } from './cli-presentation.j
 describe('CLI presentation output boundary', () => {
   it('keeps presentation rendering free of direct process output', () => {
     const source = String(
-      safeReadFile(pathResolver.rootResolve('scripts/cli-presentation.ts'), { encoding: 'utf8' })
+      safeReadFile(pathResolver.rootResolve('scripts/cli/cli-presentation.ts'), {
+        encoding: 'utf8',
+      })
     );
 
     expect(source).not.toContain('console.log');

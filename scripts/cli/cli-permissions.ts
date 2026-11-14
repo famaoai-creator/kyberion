@@ -17,7 +17,7 @@ import {
   type PermissionWarmupKind,
   type PermissionWarmupResult,
 } from '@agent/core/macos-permission-warmup';
-import { ScriptExitError } from './lib/harness.js';
+import { ScriptExitError } from '../lib/harness.js';
 
 export const PERMISSIONS_USAGE = `Usage: pnpm kyberion permissions <status|warmup> [options]
 

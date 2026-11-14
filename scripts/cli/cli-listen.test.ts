@@ -12,7 +12,7 @@ import {
 } from '@agent/core';
 import { stubSpeechToTextBridge } from '@agent/core/voice/speech-to-text-bridge';
 import { LISTEN_USAGE, runListenCommand } from './cli-listen.js';
-import { createFakeDeps, fakeBridge } from './lib/perception.test-support.js';
+import { createFakeDeps, fakeBridge } from '../lib/perception.test-support.js';
 
 describe('pnpm kyberion listen', () => {
   let workDir = '';

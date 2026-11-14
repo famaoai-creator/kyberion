@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-import { handleAction } from '../libs/actuators/working-memory-actuator/src/index.js';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { handleAction } from '../../libs/actuators/working-memory-actuator/src/index.js';
+import { defineScript, isDirectScript } from '../lib/harness.js';
 
 function flag(args: string[], name: string): string | undefined {
   const index = args.indexOf(name);
