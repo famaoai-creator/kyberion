@@ -12,7 +12,7 @@ import {
   platformFacts,
   venvPythonCandidates,
   type PlatformFacts,
-} from './platform-facts.js';
+} from '../platform-facts.js';
 
 const PLATFORMS = ['darwin', 'win32', 'linux', 'unknown'] as const;
 

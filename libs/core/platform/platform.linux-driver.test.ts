@@ -5,12 +5,12 @@ const mocks = vi.hoisted(() => ({
   safeExecShellScript: vi.fn(() => '0x4a00007\n'),
 }));
 
-vi.mock('./secure-io.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('./secure-io.js')>();
+vi.mock('../secure-io.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../secure-io.js')>();
   return { ...actual, safeExec: mocks.safeExec, safeExecShellScript: mocks.safeExecShellScript };
 });
 
-import { __test__ } from './platform.js';
+import { __test__ } from '../platform.js';
 
 describe('LinuxDriver.captureFocusedWindow', () => {
   it('reads the active window id through the dedicated sh script helper', async () => {
