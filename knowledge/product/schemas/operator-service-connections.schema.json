@@ -96,14 +96,18 @@
                   "not": {
                     "enum": [
                       "access_token",
-                      "bot_token",
-                      "token",
                       "api_key",
                       "api_token",
-                      "refresh_token",
-                      "client_secret",
                       "app_token",
-                      "developer_token"
+                      "basic_auth_token",
+                      "bot_token",
+                      "client_id",
+                      "client_secret",
+                      "developer_token",
+                      "email",
+                      "redirect_uri",
+                      "refresh_token",
+                      "token"
                     ]
                   }
                 },

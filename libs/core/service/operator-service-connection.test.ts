@@ -45,6 +45,7 @@ import { registerSecretResolver, resetSecretResolver } from '../secret/secret-re
 import { withPluginExecutionFrame } from '../shell/sandbox-policy.js';
 import { executeServicePreset } from './service-engine.js';
 import { getServiceEndpointRecord } from './service-endpoint-registry.js';
+import { secretKeyToConnectionField } from '../secret/secret-identity.js';
 import {
   listOperatorServiceConnections,
   probeOperatorServiceConnection,
@@ -147,6 +148,21 @@ describe('local operator service connection capability', () => {
     const catalog = loadOperatorServiceConnectionCatalog();
     catalog[0].serviceId = 'mutated';
     expect(loadOperatorServiceConnectionCatalog()[0].serviceId).toBe('github');
+  });
+
+  it('never declares a credential-derived document field as a probe connectionField', () => {
+    for (const entry of loadOperatorServiceConnectionCatalog()) {
+      const suffixes = getServiceEndpointRecord(entry.serviceId)?.credential_suffixes ?? {};
+      const credentialFields = new Set(
+        Object.values(suffixes)
+          .flat()
+          .map((suffix) => secretKeyToConnectionField(suffix))
+      );
+      for (const field of entry.probe.connectionFields ?? []) {
+        expect(credentialFields.has(field), `${entry.serviceId}: ${field}`).toBe(false);
+      }
+      expect(credentialFields.has(entry.secretKey.toLowerCase())).toBe(true);
+    }
   });
 
   it.each([
