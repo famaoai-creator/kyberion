@@ -248,6 +248,7 @@ The operations console does not directly own mission state. It delegates to:
 - `libs/core/governance/service-credential-allocation-verifier.ts` (owner-approved grant verification, installed by grant-aware bootstrap)
 - `libs/core/service/service-preset-registry.ts`
 - `libs/core/service/operator-service-connection.ts` (local operator credential probes; admit-one read-only op)
+- `libs/core/service/operator-service-connection-admission.ts` (internal one-shot probe admission; ALS-scoped secret allowlist, single-consume engine capability)
 - `libs/core/service/operator-service-connection-catalog.ts` (governed probe catalog)
 - `libs/actuators/service-actuator/`
 - `libs/actuators/presence-actuator/`
