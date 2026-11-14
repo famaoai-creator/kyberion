@@ -123,7 +123,11 @@
     },
     "moltbook": {
       "base_url": "https://www.moltbook.com/api/v1",
-      "auth_strategy": "none"
+      "preset_path": "knowledge/product/orchestration/service-presets/moltbook.json",
+      "credential_suffixes": {
+        "accessToken": ["API_KEY"]
+      },
+      "auth_strategy": "bearer"
     },
     "notion": {
       "base_url": "https://api.notion.com/v1",
@@ -139,14 +143,9 @@
       "auth_strategy": "none"
     },
     "rustxng": {
-      "base_url": "http://127.0.0.1:8888",
       "preset_path": "knowledge/product/orchestration/service-presets/rustxng.json",
-      "auth_strategy": "none"
-    },
-    "speech_cpp": {
-      "base_url": "http://127.0.0.1:8095",
-      "preset_path": "knowledge/product/orchestration/service-presets/speech_cpp.json",
-      "auth_strategy": "none"
+      "auth_strategy": "none",
+      "base_url": "http://127.0.0.1:8888"
     },
     "slack": {
       "base_url": "https://slack.com/api",
@@ -162,6 +161,11 @@
       "base_url": "https://postman-echo.com",
       "preset_path": "knowledge/product/orchestration/service-presets/smoke-test.json",
       "auth_strategy": "none"
+    },
+    "speech_cpp": {
+      "preset_path": "knowledge/product/orchestration/service-presets/speech_cpp.json",
+      "auth_strategy": "none",
+      "base_url": "http://127.0.0.1:8095"
     },
     "sqlite": {
       "preset_path": "knowledge/product/orchestration/service-presets/sqlite.json",

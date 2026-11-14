@@ -46,8 +46,12 @@
       "description": "List users."
     },
     "get_myself": {
+      "type": "api",
       "path": "users/me.json",
       "method": "GET",
+      "kind": "capture",
+      "risk": "read",
+      "approval_required": false,
       "description": "Get current user profile."
     }
   }

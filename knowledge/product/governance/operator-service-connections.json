@@ -127,6 +127,257 @@
           }
         ]
       }
+    },
+    {
+      "serviceId": "asana",
+      "label": "Asana",
+      "secretKey": "ACCESS_TOKEN",
+      "authOperation": "get_current_user",
+      "setupUrl": "https://app.asana.com/0/my-apps",
+      "scopeNotice": "Authentication confirms this token only. Workspace, project and task visibility still depend on the token owner's memberships.",
+      "probe": {
+        "baseUrl": "https://app.asana.com/api/1.0",
+        "path": "users/me",
+        "method": "GET",
+        "successRules": [
+          {
+            "field": "data.gid",
+            "kind": "non_empty_string"
+          }
+        ]
+      }
+    },
+    {
+      "serviceId": "backlog",
+      "label": "Backlog",
+      "secretKey": "API_KEY",
+      "authOperation": "get_myself",
+      "setupUrl": "https://backlog.com/app/",
+      "scopeNotice": "Authentication confirms this API key for the configured space only. Space, project and issue visibility still depend on the key owner's memberships.",
+      "probe": {
+        "baseUrl": "https://{{space}}.backlog.com/api/v2",
+        "path": "users/myself",
+        "method": "GET",
+        "connectionFields": ["space"],
+        "successRules": [
+          {
+            "field": "userId",
+            "kind": "non_empty_string"
+          }
+        ]
+      }
+    },
+    {
+      "serviceId": "canva",
+      "label": "Canva",
+      "secretKey": "ACCESS_TOKEN",
+      "authOperation": "get_current_user",
+      "setupUrl": "https://www.canva.dev/docs/connect/",
+      "scopeNotice": "Authentication confirms this token only. Design, folder and asset access still depend on the integration's scopes.",
+      "probe": {
+        "baseUrl": "https://api.canva.com/rest/v1",
+        "path": "users/me",
+        "method": "GET",
+        "successRules": [
+          {
+            "field": "user.id",
+            "kind": "non_empty_string"
+          }
+        ]
+      }
+    },
+    {
+      "serviceId": "confluence",
+      "label": "Confluence",
+      "secretKey": "ACCESS_TOKEN",
+      "authOperation": "get_spaces",
+      "setupUrl": "https://id.atlassian.com/manage-profile/security/api-tokens",
+      "scopeNotice": "Authentication confirms a pre-encoded Basic credential (base64 of email:api-token) for the configured site only. Space visibility still depends on the account's permissions.",
+      "probe": {
+        "baseUrl": "https://{{domain}}.atlassian.net/wiki/api/v2",
+        "path": "spaces",
+        "method": "GET",
+        "connectionFields": ["domain"],
+        "successRules": [
+          {
+            "field": "results",
+            "kind": "present"
+          }
+        ]
+      }
+    },
+    {
+      "serviceId": "discord",
+      "label": "Discord",
+      "secretKey": "ACCESS_TOKEN",
+      "authOperation": "get_current_user",
+      "setupUrl": "https://discord.com/developers/applications",
+      "scopeNotice": "Authentication confirms this bot token only. Guild and channel access still depend on the bot's invites and intents.",
+      "probe": {
+        "baseUrl": "https://discord.com/api/v10",
+        "path": "users/@me",
+        "method": "GET",
+        "successRules": [
+          {
+            "field": "id",
+            "kind": "non_empty_string"
+          },
+          {
+            "field": "username",
+            "kind": "non_empty_string"
+          }
+        ]
+      }
+    },
+    {
+      "serviceId": "gemini",
+      "label": "Google AI Studio (Gemini)",
+      "secretKey": "API_KEY",
+      "authOperation": "list_models",
+      "setupUrl": "https://aistudio.google.com/app/apikey",
+      "scopeNotice": "Authentication confirms this API key only. Model access and quota still depend on the key's project tier.",
+      "probe": {
+        "baseUrl": "https://generativelanguage.googleapis.com/v1beta",
+        "path": "models",
+        "method": "GET",
+        "successRules": [
+          {
+            "field": "models",
+            "kind": "non_empty_array"
+          }
+        ]
+      }
+    },
+    {
+      "serviceId": "gitlab",
+      "label": "GitLab",
+      "secretKey": "ACCESS_TOKEN",
+      "authOperation": "get_current_user",
+      "setupUrl": "https://gitlab.com/-/user_settings/personal_access_tokens",
+      "scopeNotice": "Authentication confirms this token on gitlab.com (or the host in the connection file) only. Project and group access still depend on the token's scopes.",
+      "probe": {
+        "baseUrl": "https://{{host}}.com/api/v4",
+        "path": "user",
+        "method": "GET",
+        "params": { "host": "gitlab" },
+        "connectionFields": ["host"],
+        "successRules": [
+          {
+            "field": "id",
+            "kind": "positive_integer"
+          },
+          {
+            "field": "username",
+            "kind": "non_empty_string"
+          }
+        ]
+      }
+    },
+    {
+      "serviceId": "jira",
+      "label": "Jira",
+      "secretKey": "ACCESS_TOKEN",
+      "authOperation": "get_myself",
+      "setupUrl": "https://id.atlassian.com/manage-profile/security/api-tokens",
+      "scopeNotice": "Authentication confirms a pre-encoded Basic credential (base64 of email:api-token) for the configured site only. Project and issue visibility still depend on the account's permissions.",
+      "probe": {
+        "baseUrl": "https://{{domain}}.atlassian.net/rest/api/3",
+        "path": "myself",
+        "method": "GET",
+        "connectionFields": ["domain"],
+        "successRules": [
+          {
+            "field": "accountId",
+            "kind": "non_empty_string"
+          }
+        ]
+      }
+    },
+    {
+      "serviceId": "linear",
+      "label": "Linear",
+      "secretKey": "ACCESS_TOKEN",
+      "authOperation": "get_viewer",
+      "setupUrl": "https://linear.app/settings/api",
+      "scopeNotice": "Authentication confirms this API key only. Team and issue visibility still depend on the key owner's memberships.",
+      "probe": {
+        "baseUrl": "https://api.linear.app/graphql",
+        "path": "",
+        "method": "POST",
+        "payload": { "query": "{viewer{id}}" },
+        "successRules": [
+          {
+            "field": "data.viewer.id",
+            "kind": "non_empty_string"
+          }
+        ]
+      }
+    },
+    {
+      "serviceId": "notion",
+      "label": "Notion",
+      "secretKey": "ACCESS_TOKEN",
+      "authOperation": "get_current_user",
+      "setupUrl": "https://www.notion.so/profile/integrations",
+      "scopeNotice": "Authentication confirms this integration token only. Page and database access still depend on which content was shared with the integration.",
+      "probe": {
+        "baseUrl": "https://api.notion.com/v1",
+        "path": "users/me",
+        "method": "GET",
+        "successRules": [
+          {
+            "field": "id",
+            "kind": "non_empty_string"
+          }
+        ]
+      }
+    },
+    {
+      "serviceId": "telegram",
+      "label": "Telegram",
+      "secretKey": "ACCESS_TOKEN",
+      "authOperation": "get_me",
+      "setupUrl": "https://t.me/BotFather",
+      "scopeNotice": "Authentication confirms this bot token only. Chat and channel access still depend on where the bot was added.",
+      "probe": {
+        "baseUrl": "https://api.telegram.org",
+        "path": "bot{{accessToken}}/getMe",
+        "method": "GET",
+        "successRules": [
+          {
+            "field": "ok",
+            "kind": "true"
+          },
+          {
+            "field": "result.id",
+            "kind": "positive_integer"
+          }
+        ]
+      }
+    },
+    {
+      "serviceId": "zendesk",
+      "label": "Zendesk",
+      "secretKey": "ACCESS_TOKEN",
+      "authOperation": "get_myself",
+      "setupUrl": "https://support.zendesk.com/hc/en-us/articles/4408889192858",
+      "scopeNotice": "Authentication confirms a pre-encoded Basic credential (base64 of email:api-token) for the configured subdomain only. Ticket and user visibility still depend on the account's role.",
+      "probe": {
+        "baseUrl": "https://{{subdomain}}.zendesk.com/api/v2",
+        "path": "users/me.json",
+        "method": "GET",
+        "connectionFields": ["subdomain"],
+        "successRules": [
+          {
+            "field": "user.id",
+            "kind": "positive_integer"
+          },
+          {
+            "field": "user.name",
+            "kind": "non_empty_string"
+          }
+        ]
+      }
     }
   ]
 }

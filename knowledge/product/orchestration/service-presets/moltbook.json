@@ -1,0 +1,60 @@
+{
+  "service_id": "moltbook",
+  "name": "Moltbook Agent Protocol Presets",
+  "base_url": "https://www.moltbook.com/api/v1",
+  "auth_strategy": "Bearer",
+  "operations": {
+    "get_home": {
+      "type": "api",
+      "kind": "capture",
+      "risk": "read",
+      "approval_required": false,
+      "path": "home",
+      "method": "GET",
+      "description": "Fetch the agent home feed: notifications, mentions and followed posts."
+    },
+    "verify_challenge": {
+      "type": "api",
+      "kind": "apply",
+      "risk": "write",
+      "approval_required": true,
+      "path": "verify",
+      "method": "POST",
+      "payload_template": {
+        "verification_code": "{{verification_code}}",
+        "answer": "{{answer}}"
+      },
+      "description": "Solve the math-based anti-spam challenge required before posting.",
+      "parameters": {
+        "verification_code": { "required": true, "type": "string" },
+        "answer": { "required": true, "type": "string" }
+      }
+    },
+    "create_post": {
+      "type": "api",
+      "kind": "apply",
+      "risk": "write",
+      "approval_required": true,
+      "path": "posts",
+      "method": "POST",
+      "payload_template": {
+        "title": "{{title}}",
+        "content": "{{content}}"
+      },
+      "description": "Publish a new post to the Moltbook network.",
+      "parameters": {
+        "title": { "required": true, "type": "string" },
+        "content": { "required": true, "type": "string" }
+      }
+    },
+    "mark_notifications_read": {
+      "type": "api",
+      "kind": "apply",
+      "risk": "write",
+      "approval_required": true,
+      "path": "notifications/read-all",
+      "method": "POST",
+      "description": "Mark every processed notification as read."
+    }
+  }
+}

@@ -122,6 +122,18 @@ describe('local operator service connection capability', () => {
       { serviceId: 'cloudflare', secretKey: 'ACCESS_TOKEN', credential_present: false },
       { serviceId: 'figma', secretKey: 'ACCESS_TOKEN', credential_present: false },
       { serviceId: 'stripe', secretKey: 'ACCESS_TOKEN', credential_present: false },
+      { serviceId: 'asana', secretKey: 'ACCESS_TOKEN', credential_present: false },
+      { serviceId: 'backlog', secretKey: 'API_KEY', credential_present: false },
+      { serviceId: 'canva', secretKey: 'ACCESS_TOKEN', credential_present: false },
+      { serviceId: 'confluence', secretKey: 'ACCESS_TOKEN', credential_present: false },
+      { serviceId: 'discord', secretKey: 'ACCESS_TOKEN', credential_present: false },
+      { serviceId: 'gemini', secretKey: 'API_KEY', credential_present: false },
+      { serviceId: 'gitlab', secretKey: 'ACCESS_TOKEN', credential_present: false },
+      { serviceId: 'jira', secretKey: 'ACCESS_TOKEN', credential_present: false },
+      { serviceId: 'linear', secretKey: 'ACCESS_TOKEN', credential_present: false },
+      { serviceId: 'notion', secretKey: 'ACCESS_TOKEN', credential_present: false },
+      { serviceId: 'telegram', secretKey: 'ACCESS_TOKEN', credential_present: false },
+      { serviceId: 'zendesk', secretKey: 'ACCESS_TOKEN', credential_present: false },
     ]);
     expect(JSON.stringify(descriptors)).not.toContain('synthetic-');
     expect(JSON.stringify(descriptors)).not.toContain('unrelated-private-field');
@@ -167,7 +179,7 @@ describe('local operator service connection capability', () => {
         loopback: false,
         installationGrant: grant,
       }) as OperatorServiceConnectionPrincipal;
-    expect(listOperatorServiceConnections(remote(read))).toHaveLength(6);
+    expect(listOperatorServiceConnections(remote(read))).toHaveLength(18);
     // A read grant never admits the probe; a copied grant never admits anything.
     await expect(
       probeOperatorServiceConnection({ principal: remote(read), serviceId: 'evil' })
@@ -301,6 +313,7 @@ describe('local operator service connection capability', () => {
     { base_url: 'https://attacker.invalid' },
     { output_mapping: { id: 'other' } },
     { headers: { Authorization: 'unexpected' } },
+    { headers: { 'X-Custom': '{{client_secret}}' } },
     { parameters: { url: { type: 'string' } } },
     { allow_local_network: true },
   ])('rejects drift from the allowlisted fixed read-only runtime operation: %o', async (patch) => {
