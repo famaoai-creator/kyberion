@@ -948,13 +948,11 @@
 ## 📁 public/pmo/hall-of-fame
 - [Hall of Fame: Ecosystem Viability Marathon](./public/pmo/hall-of-fame/mission-marathon-proof.md) (public | Ecosystem Architect)
 
-## 📁 public/pmo/standard
-- [PMBOK v7 Project Management Principles](./public/pmo/standard/pmbok_v7.md) (public | Ecosystem Architect)
-- [PMO Bridge to IPA Non-Functional Grade](./public/pmo/standard/ipa_nfr_bridge.md) (public | Ecosystem Architect)
-- [Stakeholder Management Framework](./public/pmo/standard/stakeholder_management.md) (public | Ecosystem Architect)
-
 ## 📁 public/pmo/standards
+- [PMBOK v7 Project Management Principles](./public/pmo/standards/pmbok_v7.md) (public | Ecosystem Architect)
+- [PMO Bridge to IPA Non-Functional Grade](./public/pmo/standards/ipa_nfr_bridge.md) (public | Ecosystem Architect)
 - [PMO ガバナンス標準基準 (Governance Standard)](./public/pmo/standards/governance.md) (public | Ecosystem Architect)
+- [Stakeholder Management Framework](./public/pmo/standards/stakeholder_management.md) (public | Ecosystem Architect)
 
 ## 📁 public/pmo/templates
 - [対外報告用ステータスレポート・テンプレート](./public/pmo/templates/external_status_report.md) (public | Ecosystem Architect)
