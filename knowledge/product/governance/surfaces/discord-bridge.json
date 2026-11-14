@@ -5,6 +5,8 @@
       "id": "discord-bridge",
       "kind": "gateway",
       "description": "Discord Bot ingress gateway and surface-agent host",
+      "service_id": "discord",
+      "preset_path": "knowledge/product/orchestration/service-presets/discord.json",
       "command": "node",
       "args": ["dist/satellites/discord-bridge/src/index.js"],
       "env": {

@@ -16,6 +16,15 @@
     "retryable_categories": ["network", "rate_limit", "timeout", "resource_unavailable"]
   },
   "operations": {
+    "get_current_user": {
+      "type": "api",
+      "kind": "capture",
+      "risk": "read",
+      "approval_required": false,
+      "path": "users/me",
+      "method": "GET",
+      "description": "Fetch the authenticated Box user; serves as the identity probe."
+    },
     "get_folder_items": {
       "type": "api",
       "path": "folders/{{folder_id}}/items",

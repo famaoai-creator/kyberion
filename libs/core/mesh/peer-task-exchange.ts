@@ -42,10 +42,17 @@ import {
   compactPeerLedgerAfterAppend,
   peerRuntimeLogicalPath,
   streamPeerStoreRecords,
+  describePeerDeliveryFailureNextStep,
+  peerDeliveryFailureOf,
+  type PeerDeliveryFailureClass,
+  type PeerMessageDispatchReceipt,
   type PeerMessageEnvelope,
+  type PeerOutboxDelivery,
 } from './peer-messaging.js';
 import {
   PEER_CATALOG_READER_ROLE,
+  PeerConversationBookkeepingError,
+  resolvesThroughTenantPeerCatalog,
   sendPeerConversationMessageToPeer,
   type PeerConversationTranscriptEntry,
 } from './peer-conversation.js';
@@ -455,24 +462,131 @@ async function sendPeerTaskProposal(
       ...(options.peerCatalogPath ? { catalogPath: options.peerCatalogPath } : {}),
       timeoutMs: options.timeoutMs ?? DELIVERY_TIMEOUT_MS,
     });
+    // A non-2xx receipt is not a delivery (the transport only throws when no
+    // response arrived).
+    if (!sent.receipt.ok) throw new PeerTaskMessageNotDelivered(sent.receipt);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    if (error instanceof PeerConversationBookkeepingError) {
+      // The receiver has the proposal: it is delivered. Only the local
+      // transcript record of its reply failed (the redelivery pass replays it).
+      const reply = extractReply(error.receipt);
+      const record = recordProposalDelivered(outbound, reply);
+      log.warn(
+        `proposal ${outbound.task_id} was delivered, but the peer's reply was not recorded in the local conversation transcript — ${message} | next: do not propose again; the outbox redelivery pass retries the transcript record for 24 h | session=${outbound.session_id}`
+      );
+      return { request, record, ...(reply?.text ? { reply_text: reply.text } : {}) };
+    }
     appendRecord({
       ...outbound,
       proposal_delivery: { status: 'failed', at: nowIso(), error: message.slice(0, 500) },
     });
     throw new Error(
-      `peer_task_proposal_not_delivered:${outbound.task_id} — ${message} | next: pnpm kyberion peer task resend-proposal --task-id ${outbound.task_id}`
+      `peer_task_proposal_not_delivered:${outbound.task_id} — ${message} | ${notDeliveredNextStep(error, outbound, options.peerCatalogPath, 'resend-proposal')}`
     );
   }
   const reply = extractReply(sent.receipt);
+  const record = recordProposalDelivered(outbound, reply);
+  return { request, record, ...(reply?.text ? { reply_text: reply.text } : {}) };
+}
+
+class PeerTaskMessageNotDelivered extends Error {
+  readonly failure: PeerDeliveryFailureClass | undefined;
+  constructor(receipt: PeerMessageDispatchReceipt) {
+    super(`peer_delivery_http_${receipt.status}${receipt.error ? `:${receipt.error}` : ''}`);
+    this.failure = receipt.failure;
+  }
+}
+
+/**
+ * What the operator should do after a task message was not delivered: wait
+ * when outbox redelivery will re-send it, otherwise the manual resend command.
+ */
+function notDeliveredNextStep(
+  error: unknown,
+  record: PeerTaskRecord,
+  peerCatalogPath: string | undefined,
+  resendCommand: 'resend-proposal' | 'resend-result'
+): string {
+  const failure =
+    error instanceof PeerTaskMessageNotDelivered ? error.failure : peerDeliveryFailureOf(error);
+  // Same rule as the send: only the tenant's own catalog file is redelivered.
+  const callerManaged = !resolvesThroughTenantPeerCatalog({
+    tenantId: record.tenant_id,
+    ...(peerCatalogPath ? { catalogPath: peerCatalogPath } : {}),
+  });
+  const outcome = describePeerDeliveryFailureNextStep({
+    failure,
+    senderPeerId: record.local_peer_id,
+    ...(callerManaged ? { recovery: 'caller' as const } : {}),
+  });
+  const willRetry = failure?.disposition === 'retryable' && !callerManaged;
+  return willRetry
+    ? outcome
+    : `${outcome} | next: pnpm kyberion peer task ${resendCommand} --peer-id ${record.local_peer_id} --task-id ${record.task_id}`;
+}
+
+/** A delivered proposal: the receiver's immediate rejection, if any, settles the task. */
+function recordProposalDelivered(
+  outbound: PeerTaskRecord,
+  reply: PeerConversationTranscriptEntry | undefined
+): PeerTaskRecord {
   const rejection = reply?.payload?.peer_task_status === 'rejected';
-  const record = appendRecord({
+  return appendRecord({
     ...outbound,
     state: rejection ? 'rejected' : outbound.state,
     proposal_delivery: { status: 'sent', at: nowIso() },
   });
-  return { request, record, ...(reply?.text ? { reply_text: reply.text } : {}) };
+}
+
+function recordResultDelivered(record: PeerTaskRecord, messageId: string): PeerTaskRecord {
+  return appendRecord({
+    ...record,
+    result_message_id: messageId,
+    result_delivery: { status: 'sent', at: nowIso() },
+  });
+}
+
+/**
+ * Sender-side task bookkeeping of a message that outbox redelivery delivered:
+ * the same record update a first-try delivery makes (`proposal_delivery` /
+ * `result_delivery` = sent, and a proposal the receiver rejected on receipt
+ * becomes `rejected`). Idempotent: a record already marked sent is left
+ * alone. Returns false when the envelope is not a task message.
+ */
+export async function applyPeerTaskDelivery(delivery: PeerOutboxDelivery): Promise<boolean> {
+  const { envelope } = delivery;
+  const metadata =
+    isRecord(envelope.payload) && isRecord(envelope.payload.metadata)
+      ? envelope.payload.metadata
+      : undefined;
+  const direction: PeerTaskDirection | undefined = isRecord(metadata?.peer_task_request)
+    ? 'outbound'
+    : isRecord(metadata?.peer_task_result)
+      ? 'inbound'
+      : undefined;
+  if (!metadata || !direction) return false;
+  const body = (
+    direction === 'outbound' ? metadata.peer_task_request : metadata.peer_task_result
+  ) as {
+    task_id?: unknown;
+  };
+  const taskId = typeof body.task_id === 'string' ? body.task_id : '';
+  if (!taskId) return false;
+  const scope = { tenantId: envelope.tenant_id, localPeerId: envelope.sender_peer_id, taskId };
+  await withTaskLock(scope, async () => {
+    const record = getPeerTask(scope.tenantId, scope.localPeerId, direction, taskId);
+    if (!record) return;
+    if (direction === 'outbound') {
+      if (record.proposal_delivery?.status === 'sent') return;
+      // Only a proposal still waiting for the peer may be settled by its reply.
+      const reply = record.state === 'pending' ? extractReply(delivery) : undefined;
+      recordProposalDelivered(record, reply);
+    } else if (record.result_delivery?.status !== 'sent') {
+      recordResultDelivered(record, envelope.message_id);
+    }
+  });
+  return true;
 }
 
 /** Resend a recorded proposal with its original task id and message id. Idempotent. */
@@ -1078,7 +1192,7 @@ export async function deliverPeerTaskResult(input: {
   if (!record.result) throw new Error(`peer_task_has_no_result:${record.task_id}`);
   const messageId = peerTaskResultMessageId(record.task_id);
   try {
-    await sendPeerConversationMessageToPeer({
+    const sent = await sendPeerConversationMessageToPeer({
       tenantId: record.tenant_id,
       senderPeerId: record.local_peer_id,
       recipientPeerId: record.remote_peer_id,
@@ -1092,15 +1206,18 @@ export async function deliverPeerTaskResult(input: {
       ...(input.peerCatalogPath ? { catalogPath: input.peerCatalogPath } : {}),
       timeoutMs: DELIVERY_TIMEOUT_MS,
     });
-    return appendRecord({
-      ...record,
-      result_message_id: messageId,
-      result_delivery: { status: 'sent', at: nowIso() },
-    });
+    if (!sent.receipt.ok) throw new PeerTaskMessageNotDelivered(sent.receipt);
+    return recordResultDelivered(record, messageId);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    if (error instanceof PeerConversationBookkeepingError) {
+      log.warn(
+        `result for ${record.task_id} was delivered, but the peer's reply was not recorded in the local conversation transcript — ${message} | next: do not resend; the outbox redelivery pass retries the transcript record for 24 h | session=${record.session_id}`
+      );
+      return recordResultDelivered(record, messageId);
+    }
     log.warn(
-      `result for ${record.task_id} not delivered — ${message} | next: pnpm kyberion peer task resend-result --task-id ${record.task_id}`
+      `result for ${record.task_id} not delivered — ${message} | ${notDeliveredNextStep(error, record, input.peerCatalogPath, 'resend-result')}`
     );
     return appendRecord({
       ...record,

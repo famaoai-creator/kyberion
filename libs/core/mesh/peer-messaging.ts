@@ -118,6 +118,71 @@ export interface PeerMessageDispatchOptions {
   destinationUrl: string;
   allowLocalNetwork?: boolean;
   timeoutMs?: number;
+  /** Set by the outbox redelivery pass: marks the outbox row as an automatic resend. */
+  redelivery?: boolean;
+  /**
+   * `'caller'`: the caller runs its own bounded retry and records the outcome
+   * in its own state (peer auto reply), so the outbox redelivery pass never
+   * re-sends this message. Recorded on the outbox row.
+   */
+  recovery?: 'caller';
+}
+
+/**
+ * A completed delivery as the layers above the transport see it: what was
+ * sent and what the receiver's responder answered. Built from a first-try
+ * receipt or from the outbox row of a redelivered message, so the sender-side
+ * bookkeeping has one input shape.
+ */
+export interface PeerOutboxDelivery {
+  envelope: PeerMessageEnvelope;
+  /** The responder's response; absent when the receiver answered `duplicate`. */
+  response?: unknown;
+  duplicate: boolean;
+  /**
+   * Set when the bookkeeping is replayed from an outbox row (crash repair):
+   * when that row was written. Absent on a delivery that just happened.
+   */
+  replayed_from?: string;
+}
+
+/** Whether a failed delivery attempt may be resent with the same envelope. */
+export type PeerOutboxFailureDisposition = 'retryable' | 'terminal';
+
+export interface PeerDeliveryFailureClass {
+  disposition: PeerOutboxFailureDisposition;
+  /** Stable classification code (`transport_error`, `receiver_retryable`, `http_403`, ...). */
+  reason: string;
+  /** Minimum wait the receiver asked for before the next attempt. */
+  retry_after_ms?: number;
+}
+
+/**
+ * One outbox.jsonl row. `sent` / `failed` rows record one delivery attempt;
+ * a `given_up` row records that redelivery stopped (`reason` says why). Rows
+ * are never rewritten: the state of a message is derived from its rows (see
+ * peer-outbox-redelivery.ts).
+ */
+export interface PeerOutboxRecord {
+  sent_at: string;
+  destination_url: string;
+  status: 'sent' | 'failed' | 'given_up';
+  envelope: PeerMessageEnvelope;
+  response?: unknown;
+  error?: string;
+  /** HTTP status of the attempt; absent when no response arrived (and on rows written before it was recorded). */
+  http_status?: number;
+  /** `failed` rows: whether the attempt may be resent. Absent on rows written before it was recorded. */
+  disposition?: PeerOutboxFailureDisposition;
+  /** `failed` rows: classification code. `given_up` rows: why redelivery stopped. */
+  reason?: string;
+  retry_after_ms?: number;
+  /** True when the outbox redelivery pass made this attempt. */
+  redelivery?: boolean;
+  /** `'caller'`: the sender's caller owns retries; the redelivery pass skips the message. */
+  recovery?: 'caller';
+  /** `given_up` rows: delivery attempts made before giving up. */
+  attempts?: number;
 }
 
 export interface ResolvedPeerDispatchTarget {
@@ -138,6 +203,8 @@ export interface PeerMessageDispatchReceipt {
   processed_at?: string;
   response?: unknown;
   error?: string;
+  /** Non-2xx receipts: whether the same envelope may be re-sent, and when. */
+  failure?: PeerDeliveryFailureClass;
 }
 
 export interface PeerMessageResponderContext {
@@ -173,6 +240,11 @@ const DEFAULT_INBOX_ROLE: GovernedArtifactRole = 'surface_runtime';
 const DEFAULT_EVENT_ROLE: GovernedArtifactRole = 'infrastructure_sentinel';
 const MAX_REQUEST_BODY_BYTES = 1024 * 1024;
 const REQUEST_SIGNATURE_HEADER = 'x-kyberion-peer-signature';
+/**
+ * Clock skew tolerated when the receiver checks an envelope's `expires_at`
+ * (the same tolerance peer-task-exchange applies to a peer's timestamps).
+ */
+export const PEER_ENVELOPE_CLOCK_SKEW_MS = 5 * 60 * 1000;
 const PEER_ID_PATTERN = /^[a-z][a-z0-9-]{1,63}$/;
 const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '0.0.0.0', '::', '::1']);
 const peerNetworkCatalogs = new Map<string, GovernedCatalog<PeerNetworkCatalog>>();
@@ -317,7 +389,7 @@ function parsePeerInboxRecord(
   return value;
 }
 
-function parsePeerOutboxRecord(
+export function parsePeerOutboxRecord(
   value: unknown,
   tenantId: string,
   peerId: string
@@ -326,7 +398,7 @@ function parsePeerOutboxRecord(
     !isRecord(value) ||
     !isTimestamp(value.sent_at) ||
     !isNonEmptyString(value.destination_url) ||
-    (value.status !== 'sent' && value.status !== 'failed')
+    (value.status !== 'sent' && value.status !== 'failed' && value.status !== 'given_up')
   ) {
     throw new Error('invalid_peer_outbox_record');
   }
@@ -700,8 +772,9 @@ function appendObservabilityJsonl(
  * folded-away transitions are not archived.
  *
  * inbox.jsonl / outbox.jsonl are NOT compacted or windowed: rows are message
- * records (an undelivered or unread message is load-bearing and has no
- * superseding row), so only their readers stream.
+ * records (an undelivered or unread message is load-bearing; an outbox
+ * message's delivery state and attempt count are derived from all of its
+ * attempt rows, see peer-outbox-redelivery.ts), so only their readers stream.
  */
 export const PEER_LEDGER_COMPACT_MIN_BYTES = 4 * 1024 * 1024;
 
@@ -792,6 +865,24 @@ export function listPeerOutboxRecords(
   );
 }
 
+/** Constant-memory forward stream of a peer's outbox rows (oldest first). */
+export function streamPeerOutboxRecords(
+  tenantId: string,
+  peerId: string
+): Generator<PeerOutboxRecord> {
+  const normalizedTenantId = normalizeTenantId(tenantId);
+  const normalizedPeerId = normalizePeerId(peerId);
+  return streamPeerStoreRecords(
+    runtimeLogicalPath(normalizedTenantId, normalizedPeerId, 'outbox.jsonl'),
+    (value) =>
+      parsePeerOutboxRecord(
+        value,
+        normalizedTenantId,
+        normalizedPeerId
+      ) as unknown as PeerOutboxRecord
+  );
+}
+
 export function listPeerEvents(tenantId: string, peerId: string): Array<Record<string, unknown>> {
   const normalizedPeerId = normalizePeerId(peerId);
   return readJsonlRecords(
@@ -848,9 +939,21 @@ function recordOutbox(
   peerId: string,
   envelope: PeerMessageEnvelope,
   destinationUrl: string,
-  status: 'sent' | 'failed',
+  status: PeerOutboxRecord['status'],
   response?: unknown,
   error?: string,
+  detail: Partial<
+    Pick<
+      PeerOutboxRecord,
+      | 'http_status'
+      | 'disposition'
+      | 'reason'
+      | 'retry_after_ms'
+      | 'redelivery'
+      | 'recovery'
+      | 'attempts'
+    >
+  > = {},
   role: GovernedArtifactRole = DEFAULT_INBOX_ROLE
 ): string {
   return appendRuntimeJsonl(role, tenantId, peerId, 'outbox.jsonl', {
@@ -860,7 +963,110 @@ function recordOutbox(
     envelope,
     ...(response !== undefined ? { response } : {}),
     ...(error ? { error } : {}),
+    ...detail,
+  } satisfies PeerOutboxRecord);
+}
+
+/**
+ * Append the terminal `given_up` row of a message whose redelivery stopped
+ * (attempts exhausted, envelope expired, peer no longer enrolled, ...).
+ */
+export function recordPeerOutboxGiveUp(input: {
+  envelope: PeerMessageEnvelope;
+  destinationUrl: string;
+  reason: string;
+  attempts: number;
+  lastError?: string;
+}): string {
+  return recordOutbox(
+    input.envelope.tenant_id,
+    input.envelope.sender_peer_id,
+    input.envelope,
+    input.destinationUrl,
+    'given_up',
+    undefined,
+    input.lastError,
+    { reason: input.reason, attempts: input.attempts }
+  );
+}
+
+/**
+ * Upper bound on a receiver-requested retry delay. The value comes from the
+ * network and from rows on disk, so it is bounded wherever it is read: an
+ * absurd value must neither park a message until it is given up nor reach
+ * date arithmetic.
+ */
+export const PEER_RETRY_AFTER_MAX_MS = 5 * 60_000;
+
+/** A usable retry delay (finite, positive, capped), or undefined. */
+export function boundedPeerRetryAfterMs(value: unknown): number | undefined {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) return undefined;
+  return Math.min(Math.ceil(value), PEER_RETRY_AFTER_MAX_MS);
+}
+
+/** Statuses that say the message was not handled: timeout, in progress, throttled, gateway. */
+const RETRYABLE_HTTP_STATUSES = new Set([408, 425, 429, 502, 503, 504]);
+
+/**
+ * Classify a failed delivery attempt. Retryable: no response at all (connect
+ * error, timeout), the receiver said `retryable: true`, or HTTP 408 / 425 /
+ * 429 / 502 / 503 / 504. Everything else is terminal. In particular any other
+ * 5xx (`receiver_error`): a responder that threw may have run partway and the
+ * message was not marked handled, so a resend would run it again — only an
+ * operator decides to do that.
+ */
+export function classifyPeerDeliveryFailure(input: {
+  httpStatus?: number;
+  response?: unknown;
+  retryAfterMs?: number;
+}): PeerDeliveryFailureClass {
+  const body = isRecord(input.response) ? input.response : undefined;
+  const retryAfterMs =
+    boundedPeerRetryAfterMs(body?.retry_after_ms) ?? boundedPeerRetryAfterMs(input.retryAfterMs);
+  const retryable = (reason: string): PeerDeliveryFailureClass => ({
+    disposition: 'retryable',
+    reason,
+    ...(retryAfterMs !== undefined ? { retry_after_ms: retryAfterMs } : {}),
   });
+  const status = input.httpStatus;
+  if (status === undefined) return retryable('transport_error');
+  if (body?.retryable === true) return retryable('receiver_retryable');
+  if (body?.retryable === false) return { disposition: 'terminal', reason: 'receiver_refused' };
+  if (RETRYABLE_HTTP_STATUSES.has(status)) return retryable(`http_${status}`);
+  if (status >= 500) return { disposition: 'terminal', reason: 'receiver_error' };
+  return { disposition: 'terminal', reason: `http_${status}` };
+}
+
+function retryAfterHeaderMs(response: Response): number | undefined {
+  const seconds = Number(response.headers?.get('retry-after'));
+  return Number.isFinite(seconds) && seconds > 0 ? Math.ceil(seconds * 1000) : undefined;
+}
+
+/** How a failed send was classified, for errors `sendPeerMessage` throws after recording it. */
+const thrownDeliveryFailures = new WeakMap<object, PeerDeliveryFailureClass>();
+
+/** The classification of a failure `sendPeerMessage` threw; undefined when nothing was sent. */
+export function peerDeliveryFailureOf(error: unknown): PeerDeliveryFailureClass | undefined {
+  return error && typeof error === 'object' ? thrownDeliveryFailures.get(error) : undefined;
+}
+
+/**
+ * What happens next to a send that failed, in operator words: whether outbox
+ * redelivery will re-send it (so the command must not be repeated) or not.
+ */
+export function describePeerDeliveryFailureNextStep(input: {
+  failure: PeerDeliveryFailureClass | undefined;
+  senderPeerId: string;
+  recovery?: 'caller';
+}): string {
+  if (!input.failure) return 'nothing was sent';
+  if (input.failure.disposition === 'terminal') {
+    return `it will not be retried (${input.failure.reason})`;
+  }
+  if (input.recovery === 'caller') {
+    return 'it will not be retried automatically (sent with an explicit catalog or by a caller that retries itself)';
+  }
+  return `a retry is scheduled; do not send it again — the conversation server of ${input.senderPeerId} re-sends it, or run \`pnpm kyberion peer outbox redeliver --peer-id ${input.senderPeerId}\`; see \`pnpm kyberion peer outbox status --peer-id ${input.senderPeerId}\``;
 }
 
 export function signPeerHttpRequest(
@@ -1109,6 +1315,21 @@ export class PeerMessagingServer {
         },
       };
     }
+    // `expires_at` is covered by the signature. An expired envelope is refused
+    // and never reaches the responder (a completed one is answered above).
+    if (
+      normalized.expires_at &&
+      Date.parse(normalized.expires_at) + PEER_ENVELOPE_CLOCK_SKEW_MS <= Date.now()
+    ) {
+      recordPeerEvent(this.options.tenantId, this.options.peerId, {
+        type: 'message_rejected',
+        message_id: normalized.message_id,
+        reason: 'envelope_expired',
+        sender_peer_id: normalized.sender_peer_id,
+        expires_at: normalized.expires_at,
+      });
+      return { status: 410, body: { ok: false, error: 'envelope_expired', retryable: false } };
+    }
     if (this.activeMessageIds.has(deliveryKey)) {
       return {
         status: 425,
@@ -1326,40 +1547,15 @@ export async function sendPeerMessage<TPayload>(
   });
 
   const outboxPeerId = envelope.sender_peer_id;
-  try {
-    const response = await request;
-    const text = await response.text();
-    const payload = parsePeerDispatchResponse(
-      text ? parseSafeJsonInput(text, 'peer dispatch response') : {}
-    );
-    if (response.ok) {
-      recordOutbox(envelope.tenant_id, outboxPeerId, envelope, destinationUrl, 'sent', payload);
-    } else {
-      recordOutbox(
-        envelope.tenant_id,
-        outboxPeerId,
-        envelope,
-        destinationUrl,
-        'failed',
-        payload,
-        payload?.error ? String(payload.error) : `http_${response.status}`
-      );
-    }
-    return {
-      ok: response.ok,
-      status: response.status,
-      accepted: Boolean(payload?.accepted),
-      ...(payload?.duplicate === true ? { duplicate: true } : {}),
-      message_id: envelope.message_id,
-      processing_mode:
-        payload?.processing_mode === 'synchronous_on_receive'
-          ? 'synchronous_on_receive'
-          : undefined,
-      processed_at: typeof payload?.processed_at === 'string' ? payload.processed_at : undefined,
-      response: payload?.response,
-      error: payload?.error ? String(payload.error) : undefined,
-    };
-  } catch (error: any) {
+  const redelivery = {
+    ...(options.redelivery ? { redelivery: true } : {}),
+    ...(options.recovery ? { recovery: options.recovery } : {}),
+  };
+  const recordFailure = (
+    error: unknown,
+    failure: PeerDeliveryFailureClass,
+    httpStatus?: number
+  ): void => {
     recordOutbox(
       envelope.tenant_id,
       outboxPeerId,
@@ -1367,10 +1563,105 @@ export async function sendPeerMessage<TPayload>(
       destinationUrl,
       'failed',
       null,
-      error?.message || String(error)
+      (error as Error | undefined)?.message || String(error),
+      {
+        ...(httpStatus !== undefined ? { http_status: httpStatus } : {}),
+        ...failure,
+        ...redelivery,
+      }
+    );
+    if (error && typeof error === 'object') thrownDeliveryFailures.set(error, failure);
+  };
+
+  let response: Response;
+  try {
+    response = await request;
+  } catch (error) {
+    // No response at all: nothing says the receiver saw the message.
+    recordFailure(error, classifyPeerDeliveryFailure({}));
+    throw error;
+  }
+  let text: string;
+  try {
+    text = await response.text();
+  } catch (error) {
+    // The body was cut off. A non-2xx is classified by its status; a 2xx may
+    // have been handled, and a re-send of a handled message is deduplicated.
+    recordFailure(
+      error,
+      response.ok
+        ? classifyPeerDeliveryFailure({})
+        : classifyPeerDeliveryFailure({
+            httpStatus: response.status,
+            retryAfterMs: retryAfterHeaderMs(response),
+          }),
+      response.status
     );
     throw error;
   }
+  let payload: Record<string, unknown>;
+  try {
+    payload = parsePeerDispatchResponse(
+      text ? parseSafeJsonInput(text, 'peer dispatch response') : {}
+    );
+  } catch (error) {
+    // Not a peer listener's answer (a proxy page, a wrong endpoint): the
+    // status decides. An unreadable 2xx is not a delivery and not retried.
+    recordFailure(
+      error,
+      response.ok
+        ? { disposition: 'terminal', reason: 'invalid_response' }
+        : classifyPeerDeliveryFailure({
+            httpStatus: response.status,
+            retryAfterMs: retryAfterHeaderMs(response),
+          }),
+      response.status
+    );
+    throw error;
+  }
+  const failure = response.ok
+    ? undefined
+    : classifyPeerDeliveryFailure({
+        httpStatus: response.status,
+        response: payload,
+        retryAfterMs: retryAfterHeaderMs(response),
+      });
+  if (!failure) {
+    recordOutbox(
+      envelope.tenant_id,
+      outboxPeerId,
+      envelope,
+      destinationUrl,
+      'sent',
+      payload,
+      undefined,
+      { http_status: response.status, ...redelivery }
+    );
+  } else {
+    recordOutbox(
+      envelope.tenant_id,
+      outboxPeerId,
+      envelope,
+      destinationUrl,
+      'failed',
+      payload,
+      payload?.error ? String(payload.error) : `http_${response.status}`,
+      { http_status: response.status, ...failure, ...redelivery }
+    );
+  }
+  return {
+    ok: response.ok,
+    status: response.status,
+    accepted: Boolean(payload?.accepted),
+    ...(payload?.duplicate === true ? { duplicate: true } : {}),
+    message_id: envelope.message_id,
+    processing_mode:
+      payload?.processing_mode === 'synchronous_on_receive' ? 'synchronous_on_receive' : undefined,
+    processed_at: typeof payload?.processed_at === 'string' ? payload.processed_at : undefined,
+    response: payload?.response,
+    error: payload?.error ? String(payload.error) : undefined,
+    ...(failure ? { failure } : {}),
+  };
 }
 
 export async function sendPeerMessageToPeer<TPayload>(
@@ -1382,10 +1673,15 @@ export async function sendPeerMessageToPeer<TPayload>(
   } = {}
 ): Promise<PeerMessageDispatchReceipt> {
   const target = resolvePeerDispatchTarget(peerId, options.catalog);
+  // Redelivery reads only the tenant's own catalog file; anything else is the caller's.
+  const tenantCatalog =
+    options.catalog === undefined &&
+    resolvePeerNetworkCatalogPath() === peerNetworkCatalogPath(envelope.tenant_id);
   return sendPeerMessage(envelope, {
     destinationUrl: target.destinationUrl,
     allowLocalNetwork: target.allowLocalNetwork,
     timeoutMs: options.timeoutMs,
+    ...(tenantCatalog ? {} : { recovery: 'caller' as const }),
   });
 }
 

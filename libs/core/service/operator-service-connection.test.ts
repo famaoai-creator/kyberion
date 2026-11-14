@@ -118,6 +118,10 @@ describe('local operator service connection capability', () => {
     ).toEqual([
       { serviceId: 'github', secretKey: 'ACCESS_TOKEN', credential_present: true },
       { serviceId: 'slack', secretKey: 'ACCESS_TOKEN', credential_present: true },
+      { serviceId: 'box', secretKey: 'ACCESS_TOKEN', credential_present: false },
+      { serviceId: 'cloudflare', secretKey: 'ACCESS_TOKEN', credential_present: false },
+      { serviceId: 'figma', secretKey: 'ACCESS_TOKEN', credential_present: false },
+      { serviceId: 'stripe', secretKey: 'ACCESS_TOKEN', credential_present: false },
     ]);
     expect(JSON.stringify(descriptors)).not.toContain('synthetic-');
     expect(JSON.stringify(descriptors)).not.toContain('unrelated-private-field');
@@ -163,7 +167,7 @@ describe('local operator service connection capability', () => {
         loopback: false,
         installationGrant: grant,
       }) as OperatorServiceConnectionPrincipal;
-    expect(listOperatorServiceConnections(remote(read))).toHaveLength(2);
+    expect(listOperatorServiceConnections(remote(read))).toHaveLength(6);
     // A read grant never admits the probe; a copied grant never admits anything.
     await expect(
       probeOperatorServiceConnection({ principal: remote(read), serviceId: 'evil' })

@@ -75,6 +75,14 @@
       "note": "script entrypoints that are CLI-registered land in the CLI reference"
     },
     {
+      "change": "presence/displays/concierge/src/app/api/service-catalog/route.ts",
+      "docs": [
+        "knowledge/public/connections/setup_guide.md",
+        "knowledge/public/connections/supported-integrations.md"
+      ],
+      "note": "the concierge service catalog emits per-service setup guidance; the connections docs describe the same onboarding flow"
+    },
+    {
       "change": "libs/core/**/*.ts",
       "docs": ["docs/COMPONENT_MAP.md"],
       "note": "module additions/moves can shift the layer map"
