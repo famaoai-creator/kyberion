@@ -19,7 +19,7 @@ afterEach(() => {
 describe('voice_upgrade resource boundary', () => {
   it('uses the governed existing profile JSON loader', () => {
     const source = String(
-      safeReadFile(pathResolver.rootResolve('scripts/voice_upgrade.ts'), { encoding: 'utf8' })
+      safeReadFile(pathResolver.rootResolve('scripts/voice/voice_upgrade.ts'), { encoding: 'utf8' })
     );
     expect(source).toContain('readSafeJsonFile');
     expect(source).not.toContain('readJson<Record<string, unknown>>(out)');

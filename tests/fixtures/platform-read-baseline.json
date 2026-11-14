@@ -87,6 +87,6 @@
     "scripts/run_baseline_check.ts",
     "scripts/run_realtime_voice_conversation.ts",
     "scripts/screenshot-annotate/server.ts",
-    "scripts/voice_setup.ts"
+    "scripts/voice/voice_setup.ts"
   ]
 }

@@ -41,7 +41,7 @@
       "op": "system:shell",
       "produces": { "channel": "voice_gen_result", "type": "ShellResult" },
       "params": {
-        "cmd": "if [ -n '{{intro_text}}' ]; then {{python_bin}} libs/actuators/voice-actuator/scripts/voice_learning_bridge.py '{\"action\":\"generate\",\"params\":{\"text\":\"{{intro_text}}\",\"profile_id\":\"{{profile_id}}\",\"output_path\":\"{{voice_out_path}}\",\"language\":\"{{language}}\",\"preferred_engine\":\"{{preferred_engine}}\"}}'  ; else echo '{\"status\":\"skipped\"}'; fi"
+        "cmd": "if [ -n '{{intro_text}}' ]; then {{python_bin}} libs/actuators/voice-actuator/scripts/voice/voice_learning_bridge.py '{\"action\":\"generate\",\"params\":{\"text\":\"{{intro_text}}\",\"profile_id\":\"{{profile_id}}\",\"output_path\":\"{{voice_out_path}}\",\"language\":\"{{language}}\",\"preferred_engine\":\"{{preferred_engine}}\"}}'  ; else echo '{\"status\":\"skipped\"}'; fi"
       }
     },
     {

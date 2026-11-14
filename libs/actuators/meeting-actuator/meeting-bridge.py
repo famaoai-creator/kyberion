@@ -46,7 +46,7 @@ from json_boundary import JsonInputError, parse_json_object
 
 PLAYWRIGHT_JOIN = ROOT / "libs/actuators/meeting-browser-driver/scripts/playwright-meet-join.mjs"
 MEETING_JOIN_BACKEND = "meeting-browser-driver"
-VOICE_BRIDGE    = ROOT / "libs/actuators/voice-actuator/scripts/voice_learning_bridge.py"
+VOICE_BRIDGE    = ROOT / "libs/actuators/voice-actuator/scripts/voice/voice_learning_bridge.py"
 BLACKHOLE       = ROOT / "libs/actuators/voice-actuator/scripts/blackhole_audio_router.py"
 
 ALLOWED_HOSTS = {

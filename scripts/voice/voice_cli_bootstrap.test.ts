@@ -46,8 +46,8 @@ vi.mock('@agent/core/presence-bridge', async (original) => ({
   reflectPresenceAgentReply: setup.presence,
 }));
 
-import { main as runVoiceCli } from './run_realtime_voice_conversation.js';
-import { main as runLiveCli } from './aituber_live_session.js';
+import { main as runVoiceCli } from '../run_realtime_voice_conversation.js';
+import { main as runLiveCli } from '../aituber_live_session.js';
 
 const tmp = resolveStorageFloor(
   'scratch',

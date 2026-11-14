@@ -1,12 +1,12 @@
 #!/usr/bin/env node
-import { handleAction } from '../libs/actuators/voice-actuator/src/index.js';
+import { handleAction } from '../../libs/actuators/voice-actuator/src/index.js';
 import { getRegisteredEnvText } from '@agent/core/foundation';
 import {
   defineScript,
   isDirectScript,
   ScriptExitError,
   stripSharedScriptFlags,
-} from './lib/harness.js';
+} from '../lib/harness.js';
 
 type Command = 'list' | 'probe' | 'test' | 'help';
 

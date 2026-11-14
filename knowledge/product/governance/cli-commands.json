@@ -1225,7 +1225,7 @@
     },
     {
       "id": "operator-voice",
-      "module": "scripts/voice_setup.ts",
+      "module": "scripts/voice/voice_setup.ts",
       "commands": ["voice setup"]
     }
   ],

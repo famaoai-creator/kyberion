@@ -42,7 +42,8 @@
       "op": "system:shell",
       "produces": { "channel": "learning_result", "type": "LearningResult" },
       "params": {
-        "cmd": "{{python_bin}} libs/actuators/voice-actuator/scripts/voice_learning_bridge.py '{\"action\": \"learn\", \"params\": {\"profile_id\": \"{{profile_id}}\", \"sample_dir\": \"knowledge/personal/voice/samples/{{profile_id}}\", \"provider\": \"{{provider}}\"}}'"}
+        "cmd": "{{python_bin}} libs/actuators/voice-actuator/scripts/voice/voice_learning_bridge.py '{\"action\": \"learn\", \"params\": {\"profile_id\": \"{{profile_id}}\", \"sample_dir\": \"knowledge/personal/voice/samples/{{profile_id}}\", \"provider\": \"{{provider}}\"}}'"
+      }
     },
     {
       "role": "sink",
@@ -55,7 +56,7 @@
       "op": "system:shell",
       "produces": { "channel": "test_synthesis_result", "type": "SynthesisResult" },
       "params": {
-        "cmd": "{{python_bin}} libs/actuators/voice-actuator/scripts/voice_learning_bridge.py '{\"action\": \"generate\", \"params\": {\"text\": \"{{test_text}}\", \"profile_id\": \"{{profile_id}}\", \"provider\": \"{{provider}}\"}}'"
+        "cmd": "{{python_bin}} libs/actuators/voice-actuator/scripts/voice/voice_learning_bridge.py '{\"action\": \"generate\", \"params\": {\"text\": \"{{test_text}}\", \"profile_id\": \"{{profile_id}}\", \"provider\": \"{{provider}}\"}}'"
       }
     },
     {
