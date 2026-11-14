@@ -4292,7 +4292,7 @@
     },
     {
       "id": "script.task.smoke",
-      "module": "scripts/task_smoke.ts",
+      "module": "scripts/task/task_smoke.ts",
       "command": "task smoke",
       "noun": "task",
       "verb": "smoke",

@@ -1841,10 +1841,10 @@
     "scripts/sync/sync_intent_contract_memory.ts": {
       "json_state_write_budget": 3
     },
-    "scripts/task_init.ts": {
+    "scripts/task/task_init.ts": {
       "json_state_write_budget": 1
     },
-    "scripts/task_smoke.ts": {
+    "scripts/task/task_smoke.ts": {
       "json_state_write_budget": 1
     },
     "scripts/tenant_activation.ts": {

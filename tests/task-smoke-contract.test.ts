@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { pathResolver, safeExistsSync, safeReadFile, safeRmSync } from '@agent/core';
-import { main } from '../scripts/task_smoke.js';
+import { main } from '../scripts/task/task_smoke.js';
 
 const PROFILE_PATH = pathResolver.rootResolve(
   'active/shared/tmp/task-smoke/daily-email-triage.json'

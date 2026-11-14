@@ -7,7 +7,7 @@ import {
   loadTaskScenario,
   parseTaskRecord,
   validateTaskScenario,
-} from './lib/task-scenario.js';
+} from '../lib/task-scenario.js';
 
 const validScenario = {
   id: 'daily-report',

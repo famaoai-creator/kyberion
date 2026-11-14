@@ -11,14 +11,14 @@ import {
   safeReaddir,
   safeWriteFile,
 } from '@agent/core/secure-io';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from '../lib/harness.js';
 import {
   loadTaskRecord,
   loadTaskScenario,
   parseTaskRecord,
   type TaskScenario,
-} from './lib/task-scenario.js';
-import { parseSafeJsonInput } from './lib/json-input.js';
+} from '../lib/task-scenario.js';
+import { parseSafeJsonInput } from '../lib/json-input.js';
 
 const DEFAULT_SCENARIO_DIR = pathResolver.rootResolve('knowledge/product/task-scenarios');
 type Print = (value: unknown) => void;

@@ -1,5 +1,5 @@
 import * as net from 'node:net';
-import './task_pipeline_executor.js';
+import './task/task_pipeline_executor.js';
 import '@agent/core/workforce/worker-goal-driver';
 import { timingSafeEqual } from 'node:crypto';
 import { resolveLocalIpcAddress } from '@agent/core/local-ipc';
