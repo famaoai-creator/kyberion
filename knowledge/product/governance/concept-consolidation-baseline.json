@@ -1263,7 +1263,7 @@
     "scripts/approval_store_hygiene.ts": {
       "bespoke_cli_parser_budget": 2
     },
-    "scripts/audit_mirror_reconcile.ts": {
+    "scripts/audit/audit_mirror_reconcile.ts": {
       "json_state_write_budget": 3,
       "bespoke_cli_parser_budget": 6
     },
@@ -1578,15 +1578,15 @@
       "env_direct_read_budget": 1,
       "json_state_write_budget": 4
     },
-    "scripts/migrate_binding_owners.ts": {
+    "scripts/migrate/migrate_binding_owners.ts": {
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/migrate_peer_tenant_runtime.ts": {
+    "scripts/migrate/migrate_peer_tenant_runtime.ts": {
       "json_state_write_budget": 1,
       "runtime_path_literal_budget": 4,
       "bespoke_cli_parser_budget": 4
     },
-    "scripts/migrate_physical_namespaces.ts": {
+    "scripts/migrate/migrate_physical_namespaces.ts": {
       "json_state_write_budget": 1,
       "runtime_path_literal_budget": 6,
       "bespoke_cli_parser_budget": 2
@@ -1731,11 +1731,11 @@
     "scripts/registry_manager.ts": {
       "json_state_write_budget": 2
     },
-    "scripts/report_i18n_translation_coverage.ts": {
+    "scripts/report/report_i18n_translation_coverage.ts": {
       "runtime_path_literal_budget": 1,
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/report_team_decision_support.ts": {
+    "scripts/report/report_team_decision_support.ts": {
       "bespoke_cli_parser_budget": 1
     },
     "scripts/report-review/server.ts": {
@@ -1770,7 +1770,7 @@
     "scripts/run_service_procedure.ts": {
       "env_direct_read_budget": 1
     },
-    "scripts/scan_provider_cli_capabilities.ts": {
+    "scripts/scan/scan_provider_cli_capabilities.ts": {
       "json_state_write_budget": 1,
       "runtime_path_literal_budget": 1,
       "bespoke_cli_parser_budget": 3
@@ -1828,14 +1828,14 @@
       "json_state_write_budget": 1,
       "runtime_path_literal_budget": 1
     },
-    "scripts/summarize_memory_promotion_queue.ts": {
+    "scripts/summarize/summarize_memory_promotion_queue.ts": {
       "json_state_write_budget": 1,
       "bespoke_cli_parser_budget": 4
     },
-    "scripts/summarize_task_model_routing.ts": {
+    "scripts/summarize/summarize_task_model_routing.ts": {
       "bespoke_cli_parser_budget": 2
     },
-    "scripts/surface_runtime.ts": {
+    "scripts/surface/surface_runtime.ts": {
       "env_direct_read_budget": 4
     },
     "scripts/sync/sync_intent_contract_memory.ts": {
@@ -1869,11 +1869,11 @@
     "scripts/voice/voice_upgrade.ts": {
       "json_state_write_budget": 1
     },
-    "scripts/watch_knowledge_scope_health.ts": {
+    "scripts/watch/watch_knowledge_scope_health.ts": {
       "runtime_path_literal_budget": 1,
       "bespoke_cli_parser_budget": 4
     },
-    "scripts/watch_tenant_drift.ts": {
+    "scripts/watch/watch_tenant_drift.ts": {
       "bespoke_cli_parser_budget": 2
     },
     "scripts/work_inventory.ts": {

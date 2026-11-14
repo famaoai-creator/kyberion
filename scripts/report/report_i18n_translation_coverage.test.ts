@@ -250,7 +250,7 @@ describe('shared report output boundary', () => {
 
   it('uses the canonical coverage history loader and writer', () => {
     const source = String(
-      safeReadFile(pathResolver.rootResolve('scripts/report_i18n_translation_coverage.ts'), {
+      safeReadFile(pathResolver.rootResolve('scripts/report/report_i18n_translation_coverage.ts'), {
         encoding: 'utf8',
       })
     );

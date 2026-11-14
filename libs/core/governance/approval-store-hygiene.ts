@@ -47,7 +47,7 @@ import { validateWritePermission } from '../tier-guard.js';
 /**
  * Autonomous-operation P1-2 / P1-4: keep the live approval store limited to
  * real, still-actionable decisions. Two sweeps share one fixture vocabulary
- * with the human-intervention census (scripts/report_human_interventions.ts):
+ * with the human-intervention census (scripts/report/report_human_interventions.ts):
  *
  *  - pending requests past `expiresAt`, or pending with no expiry for longer
  *    than the stale threshold, move to `expired` through the store's own

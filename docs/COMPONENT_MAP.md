@@ -343,7 +343,7 @@ Actuators are the execution layer. Current major groups include:
 - `meeting-actuator` / `voice-actuator` / `media-generation-actuator`: online-meeting bridge, local voice generation, generative image/video/music and screen capture
 - `working-memory-actuator`: volatile knowledge layer (journal, TODO, weekly review) CRUD, GC and index
 
-This list is the major groups only — the full, generated catalog of all actuators and their ops is [`CAPABILITIES_GUIDE.md`](../CAPABILITIES_GUIDE.md) (generated from the actuator manifests and op discovery by `pnpm kyberion sync component-inventory`; the op catalog itself is checked by `pnpm check -- --only op-registry`). Specialist personas live in `knowledge/product/orchestration/specialists/` (snapshot: `specialist-catalog.json`); surface lifecycle control is `scripts/surface_runtime.ts`.
+This list is the major groups only — the full, generated catalog of all actuators and their ops is [`CAPABILITIES_GUIDE.md`](../CAPABILITIES_GUIDE.md) (generated from the actuator manifests and op discovery by `pnpm kyberion sync component-inventory`; the op catalog itself is checked by `pnpm check -- --only op-registry`). Specialist personas live in `knowledge/product/orchestration/specialists/` (snapshot: `specialist-catalog.json`); surface lifecycle control is `scripts/surface/surface_runtime.ts`.
 
 ### `libs/shared-*`
 
@@ -369,7 +369,7 @@ Kyberion uses four separate concepts here:
 This means Slack and the operations console (formerly Chronos) are not part of `system-actuator`.
 They are human-facing gateways. Delivery belongs to `presence-actuator`, and authentication belongs to service binding.
 
-Background surfaces and bridges are not started ad hoc. Their canonical startup manifests are `knowledge/product/governance/surfaces/*.json`, with `knowledge/product/governance/active-surfaces.json` as the generated compatibility snapshot. Lifecycle coordination runs through `scripts/surface_runtime.ts` plus `runtime-supervisor`.
+Background surfaces and bridges are not started ad hoc. Their canonical startup manifests are `knowledge/product/governance/surfaces/*.json`, with `knowledge/product/governance/active-surfaces.json` as the generated compatibility snapshot. Lifecycle coordination runs through `scripts/surface/surface_runtime.ts` plus `runtime-supervisor`.
 
 ## Mission control model
 

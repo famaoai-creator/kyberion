@@ -50,7 +50,7 @@ const SOD_CONSUMERS: ReadonlyArray<{ file: string; consumer: string }> = [
     file: 'libs/actuators/approval-actuator/src/approval-ops.ts',
     consumer: 'approval_actuator_request_review',
   },
-  { file: 'scripts/audit_mirror_reconcile.ts', consumer: 'audit_mirror_reconcile' },
+  { file: 'scripts/audit/audit_mirror_reconcile.ts', consumer: 'audit_mirror_reconcile' },
   { file: 'scripts/entity_governance_cleanup.ts', consumer: 'entity_governance_cleanup' },
   { file: 'scripts/mission/mission_alignment_decision.ts', consumer: 'mission_alignment_gate' },
   { file: 'scripts/lib/video-production-evidence.ts', consumer: 'video_production' },

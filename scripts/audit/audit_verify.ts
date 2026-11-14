@@ -9,7 +9,7 @@ import {
   type AuditVerifyCliReport,
 } from '@agent/core/report-ops';
 import { getRegisteredEnvText } from '@agent/core/foundation';
-import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
 
 export { collectAuditVerifyReport, formatAuditVerifyReport, type AuditVerifyCliReport };
 

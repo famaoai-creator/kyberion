@@ -644,7 +644,7 @@ export async function handleSurfaceControlRequested(
   const operation = event.payload.operation;
   const surfaceId = event.payload.surfaceId;
   const env = buildExecutionEnv(process.env, 'surface_runtime');
-  const args = ['dist/scripts/surface_runtime.js', '--action'];
+  const args = ['dist/scripts/surface/surface_runtime.js', '--action'];
 
   if (operation === 'reconcile' || operation === 'status') {
     args.push(operation);

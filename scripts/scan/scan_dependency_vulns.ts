@@ -14,7 +14,7 @@ import {
   readTextFile,
 } from '@agent/core/foundation';
 import { withExecutionContext } from '@agent/core/governance';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from '../lib/harness.js';
 
 type AuditVulnEntry = {
   name?: string;

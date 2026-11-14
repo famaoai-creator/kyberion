@@ -155,7 +155,7 @@ report changes, and left alone when it is unchanged.
 3. `pnpm lint`
 4. `pnpm typecheck`
 5. capability discovery validation via `node dist/scripts/capability_discovery.js`
-6. runtime surface manifest/status validation via `node dist/scripts/surface_runtime.js --action status`
+6. runtime surface manifest/status validation via `node dist/scripts/surface/surface_runtime.js --action status`
 7. smoke/unit/integration tests
 8. security audit
 9. vital check audit via `node dist/scripts/vital_check.js --format json --exit-on-missing=false`
@@ -218,4 +218,4 @@ When investigating local residue:
 ### Surface validation failed
 
 - Confirm `knowledge/product/governance/active-surfaces.json` is valid
-- Confirm `node dist/scripts/surface_runtime.js --action status` succeeds locally
+- Confirm `node dist/scripts/surface/surface_runtime.js --action status` succeeds locally

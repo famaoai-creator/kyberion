@@ -89,7 +89,9 @@ describe('physical namespace migration CLI', () => {
   });
 
   it('routes migration plans through the shared script printer', () => {
-    const source = readTextFile(pathResolver.rootResolve('scripts/migrate_physical_namespaces.ts'));
+    const source = readTextFile(
+      pathResolver.rootResolve('scripts/migrate/migrate_physical_namespaces.ts')
+    );
 
     expect(source).not.toContain('console.log');
     expect(source).not.toContain('console.error');

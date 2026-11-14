@@ -14,7 +14,7 @@ describe('Runtime surface operations contract', () => {
     expect(pkg.scripts.surfaces).toContain('scripts/run_with_env.ts');
     expect(pkg.scripts.surfaces).toContain('KYBERION_BASE_ROLE=worker');
     expect(pkg.scripts.surfaces).toContain('SYSTEM_ROLE=surface_runtime');
-    expect(pkg.scripts.surfaces).toContain('dist/scripts/surface_runtime.bundle.js');
+    expect(pkg.scripts.surfaces).toContain('dist/scripts/surface/surface_runtime.bundle.js');
     for (const action of ['setup', 'reconcile', 'status', 'repair', 'start', 'stop'])
       expect(pkg.scripts[`surfaces:${action}`]).toBeUndefined();
     expect(pkg.scripts['channels:list']).toBe(
@@ -64,7 +64,7 @@ describe('Runtime surface operations contract', () => {
   });
 
   it('includes troubleshooting diagnostics in surface runtime status', () => {
-    const surfaceRuntime = read('scripts/surface_runtime.ts');
+    const surfaceRuntime = read('scripts/surface/surface_runtime.ts');
     const lifecycleModel = read(
       'knowledge/product/architecture/runtime-surface-lifecycle-model.md'
     );

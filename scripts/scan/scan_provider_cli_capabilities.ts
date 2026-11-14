@@ -16,7 +16,7 @@ import {
 import { probeProviderCapabilities } from '@agent/core/provider/provider-capability-registry';
 import { pathResolver } from '@agent/core/path-resolver';
 import { assertSafeRepositoryPath, safeMkdir, safeWriteFile } from '@agent/core/secure-io';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from '../lib/harness.js';
 
 export const PROVIDER_CAPABILITY_SCAN_USAGE =
   'Usage: pnpm scan:provider-cli-capabilities [--out <path>] [--write-knowledge]';

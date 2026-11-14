@@ -163,7 +163,7 @@ function startService(serviceName: string) {
   try {
     const resultText = safeExec(
       'node',
-      ['dist/scripts/surface_runtime.js', '--action', 'start', '--surface', surfaceId],
+      ['dist/scripts/surface/surface_runtime.js', '--action', 'start', '--surface', surfaceId],
       {
         cwd: pathResolver.rootDir(),
       }

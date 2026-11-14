@@ -5,13 +5,13 @@ import { auditAction, type ActionResult } from './dispatch.js';
 export type SurfaceActionKind = 'start' | 'stop' | 'repair';
 
 /**
- * Surfaces are driven through scripts/surface_runtime.ts with the same env
+ * Surfaces are driven through scripts/surface/surface_runtime.ts with the same env
  * contract as the pnpm surfaces:* scripts (stopSurfaceById is not exported).
  */
 export function runSurfaceAction(kind: SurfaceActionKind, surfaceId: string): ActionResult {
   const result = hudExec(
     'node',
-    [distScript('surface_runtime.js'), '--action', kind, '--surface', surfaceId],
+    [distScript('surface/surface_runtime.js'), '--action', kind, '--surface', surfaceId],
     {
       env: buildSystemRoleLaunchEnv({}, 'surface_runtime', { persona: 'worker' }) as Record<
         string,

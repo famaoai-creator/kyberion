@@ -330,7 +330,7 @@ the operator CLI, and starts `next start` on a free loopback port with
 `KYBERION_CHRONOS_PLUGIN_HOST` enabled for that one tenant and a random
 localadmin token. By default it runs the scenario twice, each with its own
 hermetic root: once with Chronos started directly and once with the
-environment `scripts/surface_runtime.ts` gives every surface
+environment `scripts/surface/surface_runtime.ts` gives every surface
 (`SYSTEM_ROLE=chronos_mirror_v2`, `AUTHORIZED_SCOPE`, `KYBERION_BASE_ROLE=worker`),
 so role assumptions are proven under both launches
 (`--launch-mode direct|surface-runtime|both`). Playwright Chromium then lists the plugin views, opens the

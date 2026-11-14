@@ -6,7 +6,7 @@ import { main } from './summarize_task_model_routing.js';
 describe('task model routing summary entrypoint', () => {
   it('keeps report output behind the shared harness', () => {
     const source = String(
-      safeReadFile(pathResolver.rootResolve('scripts/summarize_task_model_routing.ts'), {
+      safeReadFile(pathResolver.rootResolve('scripts/summarize/summarize_task_model_routing.ts'), {
         encoding: 'utf8',
       })
     );

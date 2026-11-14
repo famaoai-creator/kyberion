@@ -349,11 +349,17 @@ function attemptSurfaceFix(surface: SurfaceKind): string {
   const runtimeId = getControlPlaneRemediationPlan(surface).runtimeId;
   const actions: Array<{ args: string[]; fallback: string }> = [
     {
-      args: ['dist/scripts/surface_runtime.js', '--action', 'stop', '--surface', runtimeId],
+      args: ['dist/scripts/surface/surface_runtime.js', '--action', 'stop', '--surface', runtimeId],
       fallback: `stop ${runtimeId} completed`,
     },
     {
-      args: ['dist/scripts/surface_runtime.js', '--action', 'start', '--surface', runtimeId],
+      args: [
+        'dist/scripts/surface/surface_runtime.js',
+        '--action',
+        'start',
+        '--surface',
+        runtimeId,
+      ],
       fallback: `start ${runtimeId} completed`,
     },
   ];

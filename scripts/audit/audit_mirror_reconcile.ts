@@ -12,7 +12,7 @@ import {
   resolveApprovalRequesterInput,
   type ApprovalRequesterInput,
 } from '@agent/core/governance/approval-requester';
-import { cliApprovalRequester } from './lib/cli-approval-requester.js';
+import { cliApprovalRequester } from '../lib/cli-approval-requester.js';
 import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 import {
@@ -56,7 +56,7 @@ import { withStoreGrant } from '@agent/core/authority';
 import { logger } from '@agent/core/core';
 import type { AuditEntry } from '@agent/core/governance/audit-chain';
 import { nowIso, readJsonLines } from '@agent/core/foundation';
-import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
 
 export const AUDIT_MIRROR_APPROVAL_CHANNEL = 'terminal';
 export const AUDIT_MIRROR_EFFECT_BINDING = 'sa-01:audit-mirror-reconcile';

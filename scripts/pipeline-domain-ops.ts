@@ -12,7 +12,7 @@ import { applyOnboardingInput } from './onboarding/onboarding_apply.js';
 import { runCampaignSuite } from './campaign_suite.js';
 import { runAiAudit } from './run_ai_audit.js';
 import { main as runFirstWinLifecycle } from './first_win_lifecycle_smoke.js';
-import { runDependencyVulnerabilityScanOnce } from './scan_dependency_vulns.js';
+import { runDependencyVulnerabilityScanOnce } from './scan/scan_dependency_vulns.js';
 import { runHealthDegradationWatch } from './health_degradation_watch.js';
 import {
   runMeetingReadinessCheck,
@@ -21,7 +21,7 @@ import {
 import { runKnowledgeHygieneProbe } from '@agent/core/knowledge/knowledge-hygiene-probe';
 import { runOpsHealthProbe } from '@agent/core/ops-health-probe';
 import { collectUiUxGovernanceReport } from './check/check_ui_ux_governance.js';
-import { runTenantDriftWatch } from './watch_tenant_drift.js';
+import { runTenantDriftWatch } from './watch/watch_tenant_drift.js';
 import { runDecisionDigest } from './approval_inbox.js';
 import { createGhPrPort } from './pr_shadow.js';
 import { observePullRequests, DEFAULT_IGNORED_CHECKS } from '@agent/core/governance/pr-shadow';
@@ -42,7 +42,7 @@ import { runCatalogIntegrityCheck } from './check/check_catalog_integrity.js';
 import {
   computeTranslationCoverageReport,
   runAlertOnRegression,
-} from './report_i18n_translation_coverage.js';
+} from './report/report_i18n_translation_coverage.js';
 import { runDocExamplesCheck } from './check/check_doc_examples.js';
 import { main as manageRegistry } from './registry_manager.js';
 import { main as missionController } from './mission_controller.js';

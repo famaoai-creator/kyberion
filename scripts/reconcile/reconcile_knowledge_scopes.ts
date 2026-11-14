@@ -9,8 +9,11 @@ import type { ScopeContext } from '@agent/core/scope-context';
 import { getRegisteredEnvText, nowIso } from '@agent/core/foundation';
 import { runKnowledgeValidationSweep } from '@agent/core/report-ops';
 import { proposeKnowledgeRankingWeightRecalculation } from '@agent/core/knowledge/knowledge-weight-recalculation';
-import { buildPlan } from '../migrate_physical_namespaces.js';
-import { scanKnowledgeScopeHealth, buildHealthAlert } from '../watch_knowledge_scope_health.js';
+import { buildPlan } from '../migrate/migrate_physical_namespaces.js';
+import {
+  scanKnowledgeScopeHealth,
+  buildHealthAlert,
+} from '../watch/watch_knowledge_scope_health.js';
 import { scan as scanKnowledgeScopeBoundaries } from '../check/check_knowledge_scope_boundaries.js';
 import {
   scan as scanTierHygiene,

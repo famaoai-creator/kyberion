@@ -6,9 +6,12 @@ import { main } from './summarize_memory_promotion_queue.js';
 describe('memory promotion queue summary entrypoint', () => {
   it('keeps report output behind the shared harness', () => {
     const source = String(
-      safeReadFile(pathResolver.rootResolve('scripts/summarize_memory_promotion_queue.ts'), {
-        encoding: 'utf8',
-      })
+      safeReadFile(
+        pathResolver.rootResolve('scripts/summarize/summarize_memory_promotion_queue.ts'),
+        {
+          encoding: 'utf8',
+        }
+      )
     );
 
     expect(source).toContain('print(result.output)');

@@ -30,13 +30,13 @@
  *     i18n-coverage-history.json`) and, if any *required*
  *     locale's coverage dropped since that snapshot, records/dispatches an
  *     ops alert through the repository-managed alert sink (mirrors
- *     `scripts/watch_tenant_drift.ts`'s `--alert` convention) before
+ *     `scripts/watch/watch_tenant_drift.ts`'s `--alert` convention) before
  *     recording the new snapshot. Intended for the scheduled
  *     `pipelines/i18n-drift-audit.json` run, not routine local use.
  */
 import * as path from 'node:path';
 import { withExecutionContext } from '@agent/core/governance';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from '../lib/harness.js';
 import {
   loadVocabularyCatalog,
   type VocabularyCatalogFile,

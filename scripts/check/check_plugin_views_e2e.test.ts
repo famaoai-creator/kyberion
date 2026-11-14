@@ -13,7 +13,7 @@ import {
   surfaceRuntimeLaunchEnv,
   TENANT_SLUG,
 } from './check_plugin_views_e2e.js';
-import { buildSurfaceLaunchEnv } from '../surface_runtime.js';
+import { buildSurfaceLaunchEnv } from '../surface/surface_runtime.js';
 
 describe('check_plugin_views_e2e helpers (PE-02)', () => {
   it('parses flags with a bounded overall timeout', () => {

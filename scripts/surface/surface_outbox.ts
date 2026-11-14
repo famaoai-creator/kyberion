@@ -6,7 +6,7 @@ import {
   listSurfaceDeadLetters,
   replaySurfaceDeadLetter,
 } from '@agent/core/surface/surface-coordination-store';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from '../lib/harness.js';
 
 type Print = (value: unknown) => void;
 

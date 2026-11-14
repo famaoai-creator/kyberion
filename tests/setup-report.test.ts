@@ -30,7 +30,7 @@ vi.mock('@agent/core/surface/surface-runtime', () => ({
   probeSurfaceHealth: mocks.probeSurfaceHealth,
 }));
 
-vi.mock('../scripts/surface_runtime.js', () => ({
+vi.mock('../scripts/surface/surface_runtime.js', () => ({
   setupSurfaces: mocks.setupSurfaces,
 }));
 

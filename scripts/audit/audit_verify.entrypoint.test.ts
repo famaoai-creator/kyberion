@@ -5,7 +5,7 @@ import { safeReadFile } from '@agent/core/secure-io';
 describe('audit verify entrypoint', () => {
   it('keeps report output and exit policy behind the shared harness', () => {
     const source = String(
-      safeReadFile(pathResolver.rootResolve('scripts/audit_verify.ts'), { encoding: 'utf8' })
+      safeReadFile(pathResolver.rootResolve('scripts/audit/audit_verify.ts'), { encoding: 'utf8' })
     );
 
     expect(source).toContain('context.print(');

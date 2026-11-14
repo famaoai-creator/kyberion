@@ -6,7 +6,7 @@ import { main } from './watch_tenant_drift.js';
 describe('tenant drift watchdog entrypoint', () => {
   it('keeps drift and alert output behind the shared harness', () => {
     const source = String(
-      safeReadFile(pathResolver.rootResolve('scripts/watch_tenant_drift.ts'), {
+      safeReadFile(pathResolver.rootResolve('scripts/watch/watch_tenant_drift.ts'), {
         encoding: 'utf8',
       })
     );
@@ -20,7 +20,7 @@ describe('tenant drift watchdog entrypoint', () => {
 
   it('uses the canonical schema-validated mission state loader', () => {
     const source = String(
-      safeReadFile(pathResolver.rootResolve('scripts/watch_tenant_drift.ts'), {
+      safeReadFile(pathResolver.rootResolve('scripts/watch/watch_tenant_drift.ts'), {
         encoding: 'utf8',
       })
     );

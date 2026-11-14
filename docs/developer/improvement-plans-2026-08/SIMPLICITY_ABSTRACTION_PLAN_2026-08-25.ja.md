@@ -5699,8 +5699,8 @@ watchdog を利用しながら、JSON／human 出力と終了コードを直接 
 
 検証:
 
-- `pnpm exec vitest run scripts/audit_verify.test.ts scripts/audit_verify.entrypoint.test.ts scripts/egress_warn_report.test.ts scripts/egress_warn_report.entrypoint.test.ts scripts/daemon_watchdog.test.ts scripts/daemon_watchdog.entrypoint.test.ts`: **6 files / 12 tests passed**。
-- `node --import ./scripts/ts-loader.mjs scripts/audit_verify.ts --json`: **実 CLI は既存 tenant mirror mismatch 8 件を検出し exit 1**（master／ledger integrity は OK。データ修復は行わず、監査の fail-closed 結果を確認）。
+- `pnpm exec vitest run scripts/audit/audit_verify.test.ts scripts/audit/audit_verify.entrypoint.test.ts scripts/egress_warn_report.test.ts scripts/egress_warn_report.entrypoint.test.ts scripts/daemon_watchdog.test.ts scripts/daemon_watchdog.entrypoint.test.ts`: **6 files / 12 tests passed**。
+- `node --import ./scripts/ts-loader.mjs scripts/audit/audit_verify.ts --json`: **実 CLI は既存 tenant mirror mismatch 8 件を検出し exit 1**（master／ledger integrity は OK。データ修復は行わず、監査の fail-closed 結果を確認）。
 - `node --import ./scripts/ts-loader.mjs scripts/egress_warn_report.ts --json`: **exit 0、warn mode の read-only report を確認**。
 - `node --import ./scripts/ts-loader.mjs scripts/daemon_watchdog.ts --help`: **exit 0、JSON option／usage を確認**。
 - `node --import ./scripts/ts-loader.mjs scripts/check_script_integrity.ts`: **OK**。
@@ -5715,8 +5715,8 @@ approval／dry-run／apply の authority gate と結果 schema は維持し、�
 
 検証:
 
-- `pnpm exec vitest run scripts/audit_mirror_reconcile.entrypoint.test.ts`: **1 file / 2 tests passed**。
-- `node --import ./scripts/ts-loader.mjs scripts/audit_mirror_reconcile.ts --help`: **exit 0、usage report を確認**。
+- `pnpm exec vitest run scripts/audit/audit_mirror_reconcile.entrypoint.test.ts`: **1 file / 2 tests passed**。
+- `node --import ./scripts/ts-loader.mjs scripts/audit/audit_mirror_reconcile.ts --help`: **exit 0、usage report を確認**。
 - 同 CLI の既定 dry-run write は authority gate によって拒否され、今回の確認で実データ変更がないことを確認。
 - `node --import ./scripts/ts-loader.mjs scripts/check_script_integrity.ts`: **OK**。
 - `pnpm run typecheck`、`git diff --check`: **passed**。
@@ -5747,8 +5747,8 @@ provider discovery／capability snapshot、mission team の organization context
 
 検証:
 
-- `pnpm exec vitest run scripts/scan_provider_cli_capabilities.entrypoint.test.ts scripts/compose_mission_team.entrypoint.test.ts libs/core/mission/mission-team-composer.test.ts`: **3 files / 16 tests passed**。
-- `node --import ./scripts/ts-loader.mjs scripts/scan_provider_cli_capabilities.ts --help`: **exit 0、probe／snapshot write なしで usage report を確認**。
+- `pnpm exec vitest run scripts/scan/scan_provider_cli_capabilities.entrypoint.test.ts scripts/compose_mission_team.entrypoint.test.ts libs/core/mission/mission-team-composer.test.ts`: **3 files / 16 tests passed**。
+- `node --import ./scripts/ts-loader.mjs scripts/scan/scan_provider_cli_capabilities.ts --help`: **exit 0、probe／snapshot write なしで usage report を確認**。
 - `node --import ./scripts/ts-loader.mjs scripts/compose_mission_team.ts --help`: **exit 0、mission 必須検証／binding write なしで usage report を確認**。
 - `node --import ./scripts/ts-loader.mjs scripts/check_script_integrity.ts`: **OK**。
 - `pnpm run typecheck`、`pnpm run lint`、`git diff --check`: **passed**。
@@ -5779,9 +5779,9 @@ history の `--alert` 保存、ops alert、`--fail` の fail-closed 終了は維
 
 検証:
 
-- `pnpm exec vitest run scripts/watch_knowledge_scope_health.entrypoint.test.ts`: **1 file / 2 tests passed**。
-- `node --import ./scripts/ts-loader.mjs scripts/watch_knowledge_scope_health.ts --help`: **exit 0、scan／write なしで usage を確認**。
-- `node --import ./scripts/ts-loader.mjs scripts/watch_knowledge_scope_health.ts --json --fail`: **exit 0、3 tenant healthy／legacy 0 の report を確認**。
+- `pnpm exec vitest run scripts/watch/watch_knowledge_scope_health.entrypoint.test.ts`: **1 file / 2 tests passed**。
+- `node --import ./scripts/ts-loader.mjs scripts/watch/watch_knowledge_scope_health.ts --help`: **exit 0、scan／write なしで usage を確認**。
+- `node --import ./scripts/ts-loader.mjs scripts/watch/watch_knowledge_scope_health.ts --json --fail`: **exit 0、3 tenant healthy／legacy 0 の report を確認**。
 - `node --import ./scripts/ts-loader.mjs scripts/check_script_integrity.ts`: **OK**。
 
 ## 362. 2026-08-30 SX-06 tenant drift watchdog の出力境界統一
@@ -5794,9 +5794,9 @@ history の `--alert` 保存、ops alert、`--fail` の fail-closed 終了は維
 
 検証:
 
-- `pnpm exec vitest run scripts/watch_tenant_drift.entrypoint.test.ts scripts/run_baseline_check.test.ts`: **2 files / 31 tests passed**。
-- `node --import ./scripts/ts-loader.mjs scripts/watch_tenant_drift.ts --help`: **exit 0、scan／audit／alert なしで usage を確認**。
-- `node --import ./scripts/ts-loader.mjs scripts/watch_tenant_drift.ts --json`: **exit 0、9 mission paths／drift 0 の report を確認**。
+- `pnpm exec vitest run scripts/watch/watch_tenant_drift.entrypoint.test.ts scripts/run_baseline_check.test.ts`: **2 files / 31 tests passed**。
+- `node --import ./scripts/ts-loader.mjs scripts/watch/watch_tenant_drift.ts --help`: **exit 0、scan／audit／alert なしで usage を確認**。
+- `node --import ./scripts/ts-loader.mjs scripts/watch/watch_tenant_drift.ts --json`: **exit 0、9 mission paths／drift 0 の report を確認**。
 - `node --import ./scripts/ts-loader.mjs scripts/check_script_integrity.ts`: **OK**。
 
 ## 363. 2026-08-30 SX-06 vital／dependency report の出力境界統一
@@ -5825,9 +5825,9 @@ report-ops を呼び出す薄い shell でありながら、JSON／Markdown／ta
 
 検証:
 
-- `pnpm exec vitest run scripts/summarize_memory_promotion_queue.entrypoint.test.ts scripts/summarize_task_model_routing.entrypoint.test.ts`: **2 files / 4 tests passed**。
-- `node --import ./scripts/ts-loader.mjs scripts/summarize_memory_promotion_queue.ts --help`: **exit 0、queue read／write なしで usage を確認**。
-- `node --import ./scripts/ts-loader.mjs scripts/summarize_task_model_routing.ts --help`: **exit 0、event read／write なしで usage を確認**。
+- `pnpm exec vitest run scripts/summarize/summarize_memory_promotion_queue.entrypoint.test.ts scripts/summarize/summarize_task_model_routing.entrypoint.test.ts`: **2 files / 4 tests passed**。
+- `node --import ./scripts/ts-loader.mjs scripts/summarize/summarize_memory_promotion_queue.ts --help`: **exit 0、queue read／write なしで usage を確認**。
+- `node --import ./scripts/ts-loader.mjs scripts/summarize/summarize_task_model_routing.ts --help`: **exit 0、event read／write なしで usage を確認**。
 - `node --import ./scripts/ts-loader.mjs scripts/check_script_integrity.ts`: **OK**。
 
 ## 365. 2026-08-30 SX-08 run_intent gateway の解釈・出力境界統一
@@ -6273,7 +6273,7 @@ artifact、dependency pair を検証し、map が壊れている場合は不完�
 
 ### 検証
 
-- `pnpm exec vitest run scripts/report_i18n_translation_coverage.test.ts` — 13 tests passed。
+- `pnpm exec vitest run scripts/report/report_i18n_translation_coverage.test.ts` — 13 tests passed。
 - `pnpm run i18n:report -- --json --dry-run` — structured report を出力。
 - `pnpm run i18n:report -- --json --dry-run --quiet` — 無出力で exit 0。
 - `pnpm run i18n:report -- --alert-on-regression --dry-run --quiet` — alert／history write なしで exit 0。
@@ -6415,11 +6415,11 @@ interactive dashboard、MCP／server の custom output、細粒度 command regis
 
 ### 検証
 
-- `pnpm exec vitest run scripts/surface_runtime.entrypoint.test.ts tests/surface-auth.test.ts tests/runtime-surface-operations-contract.test.ts --reporter=dot --pool=forks --maxWorkers=1` — 3 files / 8 tests passed。
+- `pnpm exec vitest run scripts/surface/surface_runtime.entrypoint.test.ts tests/surface-auth.test.ts tests/runtime-surface-operations-contract.test.ts --reporter=dot --pool=forks --maxWorkers=1` — 3 files / 8 tests passed。
 - `pnpm run build:repo` — green。
-- `node dist/scripts/surface_runtime.js --action setup --json` — structured setup report を出力。
-- `node dist/scripts/surface_runtime.js --action setup --json --quiet` — 無出力で exit 0。
-- `node dist/scripts/surface_runtime.js --action start --surface nonexistent --dry-run --json` — mutation なしの preview を出力。
+- `node dist/scripts/surface/surface_runtime.js --action setup --json` — structured setup report を出力。
+- `node dist/scripts/surface/surface_runtime.js --action setup --json --quiet` — 無出力で exit 0。
+- `node dist/scripts/surface/surface_runtime.js --action start --surface nonexistent --dry-run --json` — mutation なしの preview を出力。
 - `pnpm run typecheck`、`pnpm lint`、`git diff --check` — green。
 - `pnpm run check -- --scope full` — 67 gates / failed=0。
 
@@ -6598,7 +6598,7 @@ voice surface の end-to-end runtime switching、interactive dashboard、MCP／s
 
 ### 検証
 
-- `pnpm exec vitest run scripts/surface_runtime.entrypoint.test.ts tests/runtime-surface-operations-contract.test.ts tests/next-action.test.ts tests/setup-report.test.ts tests/workflow-operations-contract.test.ts --reporter=dot --pool=forks --maxWorkers=1` — 5 files / 21 tests passed。
+- `pnpm exec vitest run scripts/surface/surface_runtime.entrypoint.test.ts tests/runtime-surface-operations-contract.test.ts tests/next-action.test.ts tests/setup-report.test.ts tests/workflow-operations-contract.test.ts --reporter=dot --pool=forks --maxWorkers=1` — 5 files / 21 tests passed。
 - `pnpm run build:repo`、`pnpm run typecheck`、`pnpm lint`、`git diff --check` — green。
 - `pnpm surfaces status -- --json`、`pnpm surfaces reconcile -- --dry-run --json` — surface status と mutation-free preview を実機確認する。
 
@@ -22412,7 +22412,7 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-06 再レビュー修正 1535
 
-- **対象**: `scripts/scan_dependency_vulns.ts`、`scripts/run_ai_audit.ts`、`scripts/pipeline_promote.ts` と対象テスト
+- **対象**: `scripts/scan/scan_dependency_vulns.ts`、`scripts/run_ai_audit.ts`、`scripts/pipeline_promote.ts` と対象テスト
 - **変更**: dependency manifest、AI audit invariant/scope、pipeline catalog README の本文読込を foundation の `readTextFile` へ移行した。dependency parsing／vulnerability decision、AI audit scope boundary、pipeline ADF validation／promotion semanticsは変更せず、各境界テストに reader contract を追加した。
 - **検証**: 対象テスト **4 files／22 tests passed**、dependency scan は `0 package(s)`、AI audit の help 出力 passed、pipeline promote は不正な既存入力を governed ADF validation で拒否、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
 
@@ -22424,7 +22424,7 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-06 再レビュー修正 1537
 
-- **対象**: `scripts/report-review/server.ts`、`scripts/report-review/stamp.ts`、`scripts/audit_mirror_reconcile.ts`、`scripts/reasoning/reasoning_backend_selection.ts` と対象テスト
+- **対象**: `scripts/report-review/server.ts`、`scripts/report-review/stamp.ts`、`scripts/audit/audit_mirror_reconcile.ts`、`scripts/reasoning/reasoning_backend_selection.ts` と対象テスト
 - **変更**: report-review HTML、audit mirror JSONL、reasoning backend の `.env.local` 本文読込を foundation の `readTextFile` へ移行した。review injection／backup、audit reconcile、backend preference persistence semanticsは変更せず、reader contract を追加した。
 - **検証**: 対象テスト **4 files／17 tests passed**、audit mirror の `--help` プローブ passed、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
 
@@ -22448,7 +22448,7 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-06 再レビュー修正 1541
 
-- **対象**: `scripts/migrate_peer_tenant_runtime.ts`、`scripts/migrate_physical_namespaces.ts`、`scripts/marketing_video_dry_run.ts` と対象テスト
+- **対象**: `scripts/migrate/migrate_peer_tenant_runtime.ts`、`scripts/migrate/migrate_physical_namespaces.ts`、`scripts/marketing_video_dry_run.ts` と対象テスト
 - **変更**: peer tenant／physical namespace migration の入力・ハッシュ対象本文、marketing video の brief／brand／生成テキスト本文を foundation の `readTextFile` へ移行した。移行のtenant scope／quarantine、SHA-256・バイナリアーティファクト、marketing approval／media semanticsは変更せず、reader contract を追加した。
 - **検証**: 対象テスト **3 files／18 tests passed**、対象ESLint、Prettier、改善計画metadata（335 documents）、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
 
@@ -22790,7 +22790,7 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-06 再レビュー実装 1598
 
-- **対象**: `libs/core/provider/provider-capability-overview.ts`、`scripts/scan_provider_cli_capabilities.ts`、provider capability snapshot schema／tests、SX-08B
+- **対象**: `libs/core/provider/provider-capability-overview.ts`、`scripts/scan/scan_provider_cli_capabilities.ts`、provider capability snapshot schema／tests、SX-08B
 - **変更**: provider CLI受入の残差を、version／helpの静的検出だけでなく、既存のprovider capability registryが返すruntime probe（binary検出、認証状態、sandbox flag状態）まで governed snapshotへ投影するようにした。snapshot parser／JSON Schemaを拡張し、build済みcore package経由のscanでもruntime probeを保存する。probe error本文や実行引数はsnapshotへ持ち込まず、表示・監査用の最小証跡に限定した。
 - **検証**: build後の実scanで provider registry の registered／available capability／available provider／missing provider 集計を取得し、snapshotのruntime probe（認証 true／false／unknown、sandbox supported／unsupported）を確認。provider capability overview／scan entrypoint／report contract **3 files／6 tests passed**、root typecheck、Prettier、`git diff --check`。live model call とOS-level enforcementの実証は外部CLI・環境依存の継続課題とする。
 
@@ -23180,7 +23180,7 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-06 再レビュー実装 1663
 
-- **対象**: `scripts/migrate_peer_tenant_runtime.ts`、`scripts/migrate_peer_tenant_runtime.test.ts`、PI-03
+- **対象**: `scripts/migrate/migrate_peer_tenant_runtime.ts`、`scripts/migrate/migrate_peer_tenant_runtime.test.ts`、PI-03
 - **変更**: peer tenant migrationのplan生成／apply再検証本文readを`readMigrationTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをtenant分割・hash再検証へ到達させないようにした。既存のtenant split、quarantine、migration plan semanticsは維持した。
 - **検証**: peer tenant migration **2 files／6 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。scripts全体のneeds-review個別確認とprovider実機受入は継続する。
 
