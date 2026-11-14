@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { rootDir } from './path-resolver.js';
-import { safeExecResult, safeReadFile } from './secure-io.js';
-import { ensureDefaultOpPreflight } from './pipeline/op-preflight-defaults.js';
-import { listOpPreflightListeners, resetOpPreflight } from './pipeline/op-preflight.js';
+import { rootDir } from '../path-resolver.js';
+import { safeExecResult, safeReadFile } from '../secure-io.js';
+import { ensureDefaultOpPreflight } from '../pipeline/op-preflight-defaults.js';
+import { listOpPreflightListeners, resetOpPreflight } from '../pipeline/op-preflight.js';
 
 /**
  * SC-09: scope-governance invariants — the convergence contract that keeps

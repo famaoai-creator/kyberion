@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { pathResolver } from './path-resolver.js';
-import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
+import { pathResolver } from '../path-resolver.js';
+import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '../secure-io.js';
 import {
   assertScopeContext,
   currentScope,
@@ -15,7 +15,7 @@ import {
   pushScopeEnv,
   popScopeEnv,
   withScopeEnvOnly,
-} from './scope-context.js';
+} from '../scope-context.js';
 
 describe('scope-context', () => {
   it('separates the NHI selector from policy mode and respects explicit clearing', () => {
