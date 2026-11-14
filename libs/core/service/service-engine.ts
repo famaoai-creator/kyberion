@@ -1,3 +1,4 @@
+import { personalServiceEngineAdmission } from './personal-service-engine-admission.js';
 import { credentialExecutionIdentity } from '../foundation/credential-binding.js';
 import { resolveTenantAlias } from '../governance/context-security-scope.js';
 import type { StorageDataTier } from '../storage-layout.js';
@@ -134,8 +135,21 @@ export async function executeServicePreset(
   cacheOpts?: ServicePresetCacheOptions,
   tenantBindingCapability?: object,
   operatorProbeCapability?: object,
-  informationAssetCaptureCapability?: object
+  informationAssetCaptureCapability?: object,
+  personalCredentialCapability?: object
 ): Promise<any> {
+  const personal = personalCredentialCapability
+    ? personalServiceEngineAdmission(personalCredentialCapability, serviceId, action)
+    : undefined;
+  if (
+    personal &&
+    (tenantBindingCapability ||
+      operatorProbeCapability ||
+      informationAssetCaptureCapability ||
+      auth !== 'secret-guard' ||
+      cacheOpts)
+  )
+    throw new Error('[CREDENTIAL_PROVENANCE_DENIED] Personal service authority cannot be combined');
   const probe = operatorProbeCapability
     ? consumeOperatorServiceProbeAdmission(operatorProbeCapability, serviceId, action)
     : undefined;
@@ -166,7 +180,7 @@ export async function executeServicePreset(
       preset,
       serviceConfig
     );
-  } else {
+  } else if (!personal) {
     enforceTenantBindingContract(serviceId, action, preset, tenantBindingCapability);
   }
   const activeDelegation = currentDelegatedExecution(`service:preset:${serviceId}:${action}`, {
@@ -208,7 +222,7 @@ export async function executeServicePreset(
   // credentials only; a personal connection document is never a tenant default.
   const connection =
     captureTransport?.connection ??
-    (probe || tenantBindingCapability ? {} : loadConnectionWithFallback(serviceId));
+    (probe || tenantBindingCapability || personal ? {} : loadConnectionWithFallback(serviceId));
   const mergedParams = {
     ...mergeParamsWithConnection(
       {
@@ -226,9 +240,10 @@ export async function executeServicePreset(
     ? resolveTenantServiceEngineAdmission(tenantBindingCapability)
     : undefined;
   const selectedBinding =
-    selectedAdmission && (auth !== 'none' || serviceId === 'google-workspace')
+    personal?.binding ??
+    (selectedAdmission && (auth !== 'none' || serviceId === 'google-workspace')
       ? loadServiceBindingRecord(selectedAdmission.bindingId)
-      : undefined;
+      : undefined);
   if (selectedAdmission && auth !== 'none' && !selectedBinding) {
     throw new Error('[CREDENTIAL_PROVENANCE_DENIED] Selected service binding is unavailable');
   }
@@ -262,7 +277,8 @@ export async function executeServicePreset(
             task_id: selectedAdmission.securityScope.task_id,
             action,
           }
-        : undefined
+        : undefined,
+      personalCredentialCapability
     );
   const executionTenant = activeDelegation?.target.tenantSlug ?? activeHuman?.target.tenantSlug;
   const effectConfigurationHash = executionTenant
@@ -297,9 +313,13 @@ export async function executeServicePreset(
         operatorProbe: Boolean(probe),
         captureProviderEnvironment: captureTransport?.providerEnvironment,
         captureAuthority: captureTransport?.validate,
+        personalCredentialCapability,
       });
+      if (personal) personalServiceEngineAdmission(personalCredentialCapability, serviceId, action);
       if (resolved) return resolved.result;
     } catch (err: any) {
+      if (personal)
+        throw new Error('[CREDENTIAL_PROVENANCE_DENIED] Personal service operation failed');
       if (informationAssetCaptureCapability) {
         const candidate =
           err instanceof SecureFetchError

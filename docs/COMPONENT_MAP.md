@@ -244,8 +244,14 @@ The operations console does not directly own mission state. It delegates to:
 - `libs/core/secret/account-introduction.ts` (owner-approved registration of exact account generations)
 - `libs/core/secret/account-broker.ts` (explicit organization account provisioning and receipt validation)
 - `libs/core/secret/personal-task-credential-claim.ts` (read-only installed personal owner/NHI, runtime envelope and current WorkItem run/lease proof)
-- `libs/core/governance/personal-credential-grant.ts` (authenticated owner consent in the canonical standing-grant store; no runtime token consumption)
-- `libs/core/secret/gws-session-registration-contract.ts` (strict portable GWS material validation and inactive registration preflight; no login or storage)
+- `libs/core/governance/personal-credential-grant.ts` (authenticated owner consent in the canonical standing-grant store)
+- `libs/core/secret/personal-service-credential-broker.ts` (current-claim, exact-consent personal token reads; operation-scoped service credentials only)
+- `libs/core/foundation/personal-credential-use-capability.ts` (synchronous exact-file person-custody proof/material reads without envelope elevation)
+- `libs/core/secret/personal-service-credential-admission.ts` (broker-only opaque callback admission; service consumers only resolve live proof)
+- `libs/core/service/personal-service-engine-admission.ts` (header-only, fixed-path HTTPS GET/HEAD service admission)
+- `libs/core/secret/gws-session-store.ts` (encrypted inactive staging and generation-CAS registration commit)
+- `libs/core/foundation/gws-session-registration-admission.ts` (exact operator registration ceremony, separate from runtime)
+- `libs/core/secret/gws-session-registration-contract.ts` (strict portable GWS material validation; structural preflight alone grants no registration authority)
 - `libs/core/organization/personal-runtime-identity.ts` (canonical installed person identity reader, shared with onboarding without importing organization session admission)
 - `libs/core/secret/task-credential-dispatch.ts` and `libs/core/foundation/credential-binding.ts` (tenant broker composition and empty-only tenantless personal bindings; no operator fallback or credential grants)
 - `libs/core/secret/credential-allocations.ts` (local task broker: reasoning grants and explicit owner-approved personal service allocations into tenant work)
@@ -259,11 +265,12 @@ The operations console does not directly own mission state. It delegates to:
 - `libs/core/service/operator-service-connection.ts` (local operator credential probes; admit-one read-only op)
 - `libs/core/service/operator-service-connection-admission.ts` (internal one-shot probe admission; ALS-scoped secret allowlist, single-consume engine capability)
 
-Tenantless personal dispatch currently admits only credential-free work with a matching
-public standalone project and mission/task lineage. Account/operator APIs, ambient provider
-HOME, persistent native transports, selected services and PRESET/GWS execution reject that
-context. Provider caches compare personal owner, actor, WorkItem, run and lease as well as
-task lineage; per-use validation refreshes the live claim. See the
+Tenantless personal dispatch retains an empty generic credential binding. A local broker
+may overlay one explicitly selected, owner-consented token for a fixed-path, header-authenticated
+HTTPS GET/HEAD PRESET operation. Generic secret/provider/session lookup remains denied.
+The owner/NHI, exact WorkItem run/lease, consent, binding and account generation are rechecked
+on every selected getter; a cached getter cannot outlive the operation. GWS registration is
+operator-only and does not enable session execution. See the
 [personal execution roadmap](../knowledge/product/architecture/api-credential-proof-boundary.md#tenantless-personal-execution-dependency-roadmap)
 for legacy dispatch migration and the separate selected-account/session admission stages.
 

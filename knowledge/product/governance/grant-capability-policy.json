@@ -41,7 +41,7 @@
     },
     "credential.personal_use": {
       "kind": "standing_grant",
-      "description": "Exact owner-approved personal account generation consent. Runtime use remains denied until personal broker admission is implemented. Never grants organization allocation or effect authority.",
+      "description": "Exact owner-approved personal account generation consent. Runtime use requires explicit selected-read-api-v1 consent and live selected-service broker admission; legacy grants remain runtime-inactive. Never grants organization allocation or effect authority.",
       "scope_keys": ["personal_credential_use"],
       "external_io": true,
       "max_ttl_days": 30,

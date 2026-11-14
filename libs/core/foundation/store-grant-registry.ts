@@ -37,6 +37,7 @@ export const STORE_GRANT_IDS = [
   'autonomy-learning',
   'pipeline-journal',
   'credential-material',
+  'personal-credential-use',
   'concierge-management',
 ] as const;
 export type StoreGrantId = (typeof STORE_GRANT_IDS)[number];

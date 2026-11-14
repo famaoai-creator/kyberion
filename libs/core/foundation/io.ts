@@ -26,7 +26,7 @@ export interface FoundationIo {
    * path mid-scan cannot tear the scan. Throws `ENOENT` when missing.
    */
   openRangeReader?(filePath: string): FoundationRangeReader;
-  writeFile(filePath: string, content: string): void;
+  writeFile(filePath: string, content: string, options?: { mode?: number }): void;
 }
 
 /** One open file for repeated range reads; the caller must `close()` it. */

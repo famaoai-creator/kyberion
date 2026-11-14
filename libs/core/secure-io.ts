@@ -1801,7 +1801,8 @@ registerFoundationIo({
   stat: safeStat,
   readRange: safeReadFileRange,
   openRangeReader: openSafeRangeReader,
-  writeFile: (filePath, content) => safeWriteFile(filePath, content),
+  writeFile: (filePath, content, options) =>
+    options ? safeWriteFile(filePath, content, options) : safeWriteFile(filePath, content),
 });
 
 // Test and plugin adapters may expose a deliberately reduced audit-chain

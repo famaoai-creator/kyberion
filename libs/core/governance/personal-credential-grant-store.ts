@@ -8,6 +8,7 @@ import { assertSafeRepositoryPath, safeMkdir } from '../secure-io.js';
 import { PARTITIONED_RUNTIME_STATE_ROOTS, storagePartitionSegments } from '../storage-layout.js';
 import { GrantError, validatePersonalCredentialGrantRecord } from './grant-store.js';
 import type { PersonalCredentialGrantRecord } from './personal-credential-grant-scope.js';
+import { assertPersonalCredentialUseRead } from '../foundation/personal-credential-use-capability.js';
 
 /** Same registered grants root, personal/shared partition; no directory discovery API. */
 export function personalCredentialGrantRecordPath(grantId: string): string {
@@ -70,6 +71,22 @@ export function loadPersonalCredentialGrantRecord(
   } catch {
     return null;
   }
+}
+
+/** Broker-only exact read: do not shadow the live opaque authority with an operator ceiling. */
+export function loadPersonalCredentialGrantRecordForRuntime(
+  ownerRef: string,
+  grantId: string
+): PersonalCredentialGrantRecord | null {
+  assertPersonalCredentialUseRead('grant', grantId);
+  const raw = readJsonIfPresent<unknown>(personalCredentialGrantRecordPath(grantId));
+  if (!validatePersonalCredentialGrantRecord(raw).valid) return null;
+  const record = raw as PersonalCredentialGrantRecord;
+  return record.grant_id === grantId &&
+    record.scope.owner_ref === ownerRef &&
+    record.custody.ref === ownerRef.slice(5)
+    ? record
+    : null;
 }
 
 /** Canonical serializer used only after the personal facade's approval checks. */

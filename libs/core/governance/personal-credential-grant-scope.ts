@@ -4,6 +4,7 @@ import { normalizeServiceCredentialAllocation } from './service-credential-grant
 import type { GrantRecord } from './grant-store.js';
 
 export const PERSONAL_CREDENTIAL_CAPABILITY = 'credential.personal_use';
+export const PERSONAL_CREDENTIAL_RUNTIME_USE = 'selected-read-api-v1';
 export interface PersonalCredentialGrantScope {
   owner_ref: string;
   nhi_id: string;
@@ -16,6 +17,8 @@ export interface PersonalCredentialGrantScope {
   project_id: string;
   mission_id: string;
   task_id: string;
+  /** Legacy consent remains readable/revocable, but never silently gains runtime use. */
+  runtime_use?: typeof PERSONAL_CREDENTIAL_RUNTIME_USE;
 }
 export interface PersonalCredentialGrantDraft {
   scope: PersonalCredentialGrantScope;
@@ -48,11 +51,13 @@ export function normalizePersonalCredentialGrantScope(
     !value ||
     typeof value !== 'object' ||
     Array.isArray(value) ||
-    Object.keys(value).length !== fields.length ||
-    Object.keys(value).some((key) => !fields.includes(key))
+    fields.some((key) => !Object.hasOwn(value, key)) ||
+    Object.keys(value).some((key) => !fields.includes(key) && key !== 'runtime_use')
   )
     throw new Error('[PERSONAL_CREDENTIAL_GRANT_DENIED] Exact personal scope required');
-  const { nhi_id, generation, ...allocation } = value;
+  const { nhi_id, generation, runtime_use, ...allocation } = value;
+  if (runtime_use !== undefined && runtime_use !== PERSONAL_CREDENTIAL_RUNTIME_USE)
+    throw new Error('[PERSONAL_CREDENTIAL_GRANT_DENIED] Unknown runtime consent version');
   const nhi = typeof nhi_id === 'string' ? parseNhiId(nhi_id) : null;
   if (
     !nhi ||
@@ -75,11 +80,12 @@ export function normalizePersonalCredentialGrantScope(
     task_id: normalized.task_id,
     nhi_id,
     generation,
+    ...(runtime_use ? { runtime_use } : {}),
   };
 }
 
 export function personalCredentialGrantEffect(draft: PersonalCredentialGrantDraft): string {
-  return `grant-standing:${PERSONAL_CREDENTIAL_CAPABILITY}:${draft.scope.owner_ref}:${draft.scope.binding_id}:${draft.scope.generation}`;
+  return `grant-standing:${PERSONAL_CREDENTIAL_CAPABILITY}:${draft.scope.owner_ref}:${draft.scope.binding_id}:${draft.scope.generation}${draft.scope.runtime_use ? `:${draft.scope.runtime_use}` : ''}`;
 }
 export function personalCredentialGrantPayload(
   draft: PersonalCredentialGrantDraft

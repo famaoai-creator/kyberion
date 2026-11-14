@@ -559,12 +559,18 @@ records remain excluded from ambient discovery.
 
 Personal API-token accounts can be consumed by explicitly allocated tenant tasks as described
 above. Registration itself still grants no runtime use. Tenantless claimed dispatch now
-has an owner/NHI/claim/lease-verified empty-binding stage; it cannot consume registered
-accounts, operator credentials, PRESET operations or sessions. Personal credential
-admission and GWS session collection remain separate follow-up work. Installing this change
+keeps its generic binding empty, while the local broker can admit an explicitly selected
+personal token for one owner-consented fixed-path HTTPS GET/HEAD PRESET with Bearer/Bot
+headers. Pass service_binding_id and personal_credential_grant_id in context; they are
+selectors, not proof. This requires new `selected-read-api-v1` runtime consent; legacy
+grants remain manageable but cannot authorize execution. Owner consent issuance still
+uses the governed facade; its UI/CLI entrypoints remain unwired. Provider/native/session
+credentials remain denied. GWS registration
+now uses the existing approved account introduction flow, separately from runtime use. Installing this change
 performs no live login, key creation, allocation, ownership migration or security-setting
 change. An existing encryption key is required for every account registration;
-an explicitly configured writer is additionally required for organization accounts.
+an explicitly configured writer is additionally required for organization API-token accounts.
+Organization GWS session registration uses the separate local encrypted session store.
 The UI creates neither prerequisite.
 
 ### Register an existing account from the terminal
@@ -591,27 +597,30 @@ encryption backend remains macOS Keychain with an existing key. See the
 [tenantless execution dependency roadmap](../architecture/api-credential-proof-boundary.md#tenantless-personal-execution-dependency-roadmap)
 for the separate steps required to execute claimed personal work without a tenant.
 
-### GWS session registration prerequisites
+### GWS session registration and remaining runtime work
 
-Session collection is not API-token introduction. The existing GWS consumer accepts only
-an organization-owned selected session with exact binding, actor and generation provenance
-from a configured broker. Neither `account apply` nor `secret introduce ... ACCESS_TOKEN`
-registers a GWS session. A catalog setup hint or an AUTH-ready status does not change that.
+For an exact organization-owned `google-workspace` / `session` binding, the existing
+account introduction UI/API derives a version-2 GWS plan on the server. The installed
+requester and authenticated human approval bind owner, connection snapshot and expected
+generation. Only after usable approval does the form collect client_id, client_secret and
+refresh_token; it never logs in, exports credentials, or accepts a client-selected material
+kind. Token-v1 plans remain unchanged. The current terminal collector still supports API
+tokens only; use the approved GWS form for this registration path.
 
-The next session-registration stage must define a bounded, typed session material contract,
-owner-approved generation replacement, isolated private HOME materialization and cleanup,
-and a separately typed broker provisioner. Cancellation, incomplete persistence, revoked
-approval and stale generation must leave no usable unapproved session. Personal sessions
-also require personal selected-account and operation admission; the empty-binding stage
-does not provide it. Existing encryption-key backends remain unchanged.
+The registration store persists one encrypted bounded aggregate under the existing
+ambient-excluded account namespace. Prepare stores one inactive stage; commit revalidates
+the exact live approval/apply claim and atomically compares generation under a lock before
+publishing the new generation. Abort removes only that inactive stage. No pending or
+partially persisted stage is runtime authority. An interrupted apply retains a durable
+recovery fence, and cannot be silently replayed; a governed reconciliation flow remains
+future work. Existing keys are required for encryption and decryption.
 
-The inactive preflight in `libs/core/secret/gws-session-registration-contract.ts`
-now validates an organization-owned `google-workspace` / `session` target and a
-separate, strict portable-material shape. It always returns
-`registrationAvailable: false`, `runtimeAvailable: false`, and
-`activation_not_implemented`. It does not authenticate ownership, approve a request,
-collect credentials, write storage, register a broker or import a usable session.
-Caller readiness flags cannot enable it.
+Successful registration explicitly reports `runtimeAvailable: false`. The existing GWS
+consumer still requires organization-owned selected session provenance from a configured
+broker. Local registration does not provision that broker, allocate a runtime session, or
+perform live account verification. The structural-only preflight in
+`gws-session-registration-contract.ts` remains unavailable by itself: it does not carry
+owner authentication or an approval. Authenticated readiness comes from account preview.
 
 The supported candidate material is exactly `type: authorized_user`, `client_id`,
 `client_secret`, and `refresh_token`. The
@@ -631,16 +640,10 @@ values, service-account keys, paths and arbitrary environment maps. Limits are
 64 KiB for serialized material. Errors and preflight output contain no supplied
 material. Format acceptance proves neither provider validity nor consented scopes.
 
-The separate staging interface specifies `prepare`, `commit`, and `abort` without
-installing an adapter. Prepare must keep material encrypted and inactive using an
-existing key. Commit must independently authenticate the registration requester/actor
-and human approver/owner scope, revalidate the exact approval payload, connection
-snapshot and broker destination, and atomically compare the expected generation.
-Stage requester metadata supplies no authority. Claim/lease proof belongs at runtime
-binding, which must also require the committed registration and still-current approval
-and generation. Abort removes only its inactive stage; it cannot revoke another
-or a committed generation. Uncertain timeouts require reconciliation rather than
-automatic retry. Per-execution private HOME materialization, cleanup on every exit,
-crash expiry, encrypted session storage, authenticated approval wiring and the
-credentials-file transport remain implementation prerequisites. No successful
-prepare/commit receipt is simulated, and the macOS key backend is unchanged.
+The broker staging interface remains a future external-adapter contract. Local storage is
+implemented by `gws-session-store.ts` through sealed registration admission, not by the
+API-token provisioner. Runtime integration still needs committed-approval/generation
+revalidation, a credential-file transport, per-execution isolated HOME materialization,
+cleanup on success/failure/cancellation, and crash expiry. Personal GWS sessions remain
+unsupported. Neither a successful format check nor a local registration proves provider
+validity, approved scopes, allocation, or successful live authentication.
