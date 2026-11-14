@@ -68,7 +68,7 @@ pnpm kyberion secret introduce <serviceId> <secretKey>
 }
 ```
 
-`domain` は `your-domain.atlassian.net` のサブドメイン部分だけを書きます（`https://` やドメイン全体は不要）。Atlassian の Basic 認証は `email:api_token` ペアなので `email` も必須です。`api_token` は `pnpm kyberion secret introduce jira API_TOKEN` での登録が正規ルートです（接続ファイルへの直書きはフォールバックとして機能します）。
+`domain` は Atlassian サイト URL のサブドメイン部分だけを書きます（例: サイトが `https://<subdomain>.atlassian.net` なら `<subdomain>` のみ。`https://` やドメイン全体は不要）。Atlassian の Basic 認証は `email:api_token` ペアなので `email` も必須です。`api_token` は `pnpm kyberion secret introduce jira API_TOKEN` での登録が正規ルートです（接続ファイルへの直書きはフォールバックとして機能します）。
 
 ### Confluence (`confluence.json`)
 
@@ -80,7 +80,7 @@ pnpm kyberion secret introduce <serviceId> <secretKey>
 }
 ```
 
-`domain` は `your-domain.atlassian.net` のサブドメイン部分。トークンは `pnpm kyberion secret introduce confluence TOKEN` が正規ルートです。
+`domain` は Atlassian サイト URL のサブドメイン部分だけを書きます（`https://` やドメイン全体は不要）。トークンは `pnpm kyberion secret introduce confluence TOKEN` が正規ルートです。
 
 ### Zendesk (`zendesk.json`)
 
