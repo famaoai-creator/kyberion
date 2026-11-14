@@ -22,7 +22,7 @@ describe('reasoning_backend_selection', () => {
     const source = readTextFile(pathResolver.rootResolve('libs/core/foundation/env-dotenv.ts'));
     expect(source).toContain("import { readTextFile } from './text.js'");
     const scriptSource = readTextFile(
-      pathResolver.rootResolve('scripts/reasoning_backend_selection.ts')
+      pathResolver.rootResolve('scripts/reasoning/reasoning_backend_selection.ts')
     );
     expect(scriptSource).not.toContain('node:fs');
   });

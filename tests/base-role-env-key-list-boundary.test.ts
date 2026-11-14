@@ -31,7 +31,7 @@ const LEGACY_NAME_ALLOWED = new Set([
   // generated from env-registry.json (the deprecated entry)
   'libs/core/foundation/config.generated.ts',
   // `.env.local` written by an earlier onboarding is still read for one release
-  'scripts/reasoning_backend_selection.ts',
+  'scripts/reasoning/reasoning_backend_selection.ts',
 ]);
 
 function relative(file: string): string {

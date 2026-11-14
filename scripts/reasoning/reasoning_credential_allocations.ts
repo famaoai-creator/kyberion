@@ -14,9 +14,9 @@ import {
   assertCredentialAllocation,
   CREDENTIAL_USE_CAPABILITY,
 } from '@agent/core/secret/credential-allocations';
-import { resolveRevoker } from './cli-grants.js';
+import { resolveRevoker } from '../cli-grants.js';
 import { readTenantProfile } from '@agent/core/organization/tenant-registry';
-import { ScriptExitError } from './lib/harness.js';
+import { ScriptExitError } from '../lib/harness.js';
 
 export const ALLOCATION_ACTIONS = new Set(['assign', 'allocations', 'revoke', 'check', 'probe']);
 export async function runCredentialAllocationCommand(

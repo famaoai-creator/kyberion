@@ -2,9 +2,9 @@ import { loadEnvironmentManifest, probeManifest } from '@agent/core/environment-
 import { logger } from '@agent/core/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { getRegisteredEnvText } from '@agent/core/foundation';
-import { formatDoctorSummary, summarizeManifestDoctor } from './environment-doctor.js';
-import { formatSetupSummaryLine } from './setup-report-format.js';
-import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { formatDoctorSummary, summarizeManifestDoctor } from '../environment-doctor.js';
+import { formatSetupSummaryLine } from '../setup-report-format.js';
+import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
 
 import '@agent/core/environment-capability-probes';
 import {

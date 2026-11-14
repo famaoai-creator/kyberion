@@ -1383,7 +1383,7 @@
     },
     {
       "id": "script.auth.check",
-      "module": "scripts/reasoning_auth_check.ts",
+      "module": "scripts/reasoning/reasoning_auth_check.ts",
       "command": "auth check",
       "noun": "auth",
       "verb": "check",
@@ -3530,7 +3530,7 @@
     },
     {
       "id": "script.reasoning.credentials",
-      "module": "scripts/reasoning_credentials.ts",
+      "module": "scripts/reasoning/reasoning_credentials.ts",
       "command": "reasoning credentials",
       "noun": "reasoning",
       "verb": "credentials",

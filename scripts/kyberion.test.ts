@@ -163,7 +163,7 @@ describe('kyberion command router', () => {
 
   it('keeps verification and authentication tools module-backed', () => {
     expect(resolveScriptCommand('auth check')).toMatchObject({
-      module: 'scripts/reasoning_auth_check.ts',
+      module: 'scripts/reasoning/reasoning_auth_check.ts',
       command: 'auth check',
     });
     expect(resolveScriptCommand('check backend-conformance')).toMatchObject({

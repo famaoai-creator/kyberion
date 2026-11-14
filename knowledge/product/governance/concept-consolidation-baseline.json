@@ -1695,10 +1695,10 @@
     "scripts/realtime_voice_config.ts": {
       "bespoke_cli_parser_budget": 2
     },
-    "scripts/reasoning_auth_check.ts": {
+    "scripts/reasoning/reasoning_auth_check.ts": {
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/reasoning_setup.ts": {
+    "scripts/reasoning/reasoning_setup.ts": {
       "bespoke_cli_parser_budget": 1
     },
     "scripts/reconcile/reconcile_knowledge_scopes.ts": {

@@ -19,7 +19,7 @@ vi.mock('@agent/core/foundation/json', async (importOriginal) => ({
   writeJson: mocks.write,
   readJsonIfPresent: mocks.proof,
 }));
-vi.mock('./secret_introduce.js', () => ({ runSecretCli: mocks.introduce }));
+vi.mock('../secret_introduce.js', () => ({ runSecretCli: mocks.introduce }));
 vi.mock('./reasoning_backend_selection.js', () => ({
   persistReasoningBackend: mocks.persist,
   persistEnvValue: mocks.persistEnv,

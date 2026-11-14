@@ -3,7 +3,7 @@
  * reasoning providers. Default is a dry plan. Live fan-out requires
  * `--live` and KYBERION_BEST_OF_PROVIDERS_LIVE=1.
  */
-import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
 import { runRoutingCompare, type BestOfProviderCandidate } from '@agent/core';
 import { resolveRoutingOptimizeMode } from '@agent/core';
 import { getRegisteredEnvText } from '@agent/core/foundation';

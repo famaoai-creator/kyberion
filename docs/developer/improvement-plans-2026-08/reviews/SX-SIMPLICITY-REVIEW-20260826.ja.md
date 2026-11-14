@@ -194,7 +194,7 @@ git diff --check
 - `check_script_integrity` は pipeline JSON 内の `pnpm run <script>` も package script registry と突合するようにし、削除済み script の回帰テストを追加した。現行 pipeline の `chronos-dom-contrast` は `ci-gates.json` の gate として解決されることを確認した。
 - アーカイブ文書の切れた相対リンク 2 件を修正し、レビュー文書に必須 frontmatter を付与した。plan metadata、source map、documentation-links は green である。
 - full check runner は 64 gate の無制限同時起動で既定 30 秒 timeout を消費していたため、6 worker の bounded concurrency と gate ごとの既定 120 秒 timeout に変更した。これにより sandbox 外の実行で 64/64 gate が通過した。
-- `scripts/reasoning_setup.ts`・`services_setup.ts`・`setup_report.ts` の相互 import cycle は、表示 formatter を `setup-report-format.ts` へ分離して 1 件削減した。boundary 実測は 6/84 から 5/84 になった。
+- `scripts/reasoning/reasoning_setup.ts`・`services_setup.ts`・`setup_report.ts` の相互 import cycle は、表示 formatter を `setup-report-format.ts` へ分離して 1 件削減した。boundary 実測は 6/84 から 5/84 になった。
 - `mission-orchestration-events` と `mission-orchestration-journal` の相互依存は、イベント契約と scope/payload loader を `mission-orchestration-event-contract.ts` / `mission-orchestration-event-loader.ts` へ分離して解消した。契約の型 import は runtime graph に混入しない形にし、boundary 実測は 5/84 から 4/84、イベント・journal 回帰テスト 14 件を通過した。
 - media actuator の設計プロトコルとレイアウト runtime の循環は、カタログ loader と layout design-token を独立した低層モジュールへ移して解消した。`media-design-protocol → media-layout-runtime` の一方向を保ち、boundary 実測は 4/84 から 3/84 に改善した。
 - `libs/core/agent/agent-adapter.ts` の Codex App Server transport / lifecycle / approval / native-subagent 実装を `agent-codex-app-server-adapter.ts` へ責務単位で移し、行数を 2,038→1,305、最大行数例外を 15→14 とした。adapter API の canonical export は維持し、対象 25 テストを通過した。

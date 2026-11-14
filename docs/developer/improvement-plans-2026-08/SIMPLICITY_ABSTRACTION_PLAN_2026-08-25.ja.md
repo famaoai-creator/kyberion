@@ -22400,7 +22400,7 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-06 再レビュー修正 1533
 
-- **対象**: `scripts/reasoning_config.ts`、`scripts/reasoning_config.entrypoint.test.ts`
+- **対象**: `scripts/reasoning/reasoning_config.ts`、`scripts/reasoning/reasoning_config.entrypoint.test.ts`
 - **変更**: reasoning route config の previous snapshot 本文読込を foundation の `readTextFile` へ移行した。route validation、backup/history write、dry-run／governance action semanticsは変更せず、entrypoint contract に reader assertion を追加した。
 - **検証**: reasoning-config **entrypoint contract passed**（1 test）、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
 
@@ -22424,7 +22424,7 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-06 再レビュー修正 1537
 
-- **対象**: `scripts/report-review/server.ts`、`scripts/report-review/stamp.ts`、`scripts/audit_mirror_reconcile.ts`、`scripts/reasoning_backend_selection.ts` と対象テスト
+- **対象**: `scripts/report-review/server.ts`、`scripts/report-review/stamp.ts`、`scripts/audit_mirror_reconcile.ts`、`scripts/reasoning/reasoning_backend_selection.ts` と対象テスト
 - **変更**: report-review HTML、audit mirror JSONL、reasoning backend の `.env.local` 本文読込を foundation の `readTextFile` へ移行した。review injection／backup、audit reconcile、backend preference persistence semanticsは変更せず、reader contract を追加した。
 - **検証**: 対象テスト **4 files／17 tests passed**、audit mirror の `--help` プローブ passed、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
 
@@ -23060,7 +23060,7 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-06 再レビュー実装 1643
 
-- **対象**: `package.json`、`scripts/reasoning_auth_check.ts`、entrypoint test、PI-11
+- **対象**: `package.json`、`scripts/reasoning/reasoning_auth_check.ts`、entrypoint test、PI-11
 - **変更**: 既存のcredential shape／provider probe実装を重複させず、利用者向けのcanonical `pnpm kyberion auth check` を `reasoning_auth_check.ts` の module-backed command へ接続した。`--backend`、`--json`、`--probe`、`--quiet` は既存のshared harness経路を維持する。
 - **検証**: entrypoint **1 file／2 tests passed**、stub実行、Prettier、`git diff --check`、隔離環境root typecheck **exit 0**。通常auth checkは資格情報を出力せず、実provider検証は明示的な`--probe`経路に限定する。
 
@@ -23186,7 +23186,7 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-06 再レビュー実装 1664
 
-- **対象**: `scripts/reasoning_backend_selection.ts`、`scripts/reasoning_backend_selection.test.ts`、PI-03
+- **対象**: `scripts/reasoning/reasoning_backend_selection.ts`、`scripts/reasoning/reasoning_backend_selection.test.ts`、PI-03
 - **変更**: reasoning backend selectionの`.env.local` preference readを`readReasoningSelectionTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをbackend／persona preference解析へ到達させないようにした。既存のpolicy-derived choicesとdotenv upsert semanticsは維持した。
 - **検証**: reasoning backend selection **2 files／8 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。scripts全体のneeds-review個別確認とprovider実機受入は継続する。
 
@@ -23438,7 +23438,7 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-06 再レビュー実装 1706
 
-- **対象**: `scripts/reasoning_config.ts`、`scripts/reasoning_config.entrypoint.test.ts`、PI-03
+- **対象**: `scripts/reasoning/reasoning_config.ts`、`scripts/reasoning/reasoning_config.entrypoint.test.ts`、PI-03
 - **変更**: reasoning configのprevious route config本文readを`readReasoningConfigTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをbackup／history mutation判定へ到達させないようにした。既存のdry-run、revision、governance action semanticsは維持した。
 - **検証**: reasoning config **2 files／2 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。
 

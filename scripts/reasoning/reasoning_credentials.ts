@@ -13,12 +13,12 @@ import { withExecutionContextAsync } from '@agent/core/authority';
 import { withSecretResolutionSession } from '@agent/core/foundation/secret-resolution-session';
 import { credentialExecutionIdentity } from '@agent/core/foundation/credential-binding';
 import { readJsonIfPresent, writeJson } from '@agent/core/foundation/json';
-import { hasHelpFlag } from './lib/cli-guard.js';
+import { hasHelpFlag } from '../lib/cli-guard.js';
 import { partitionedScopedPath } from '@agent/core/physical-namespace';
 import { PARTITIONED_RUNTIME_STATE_ROOTS } from '@agent/core/storage-layout';
 import { currentScope } from '@agent/core/scope-context';
-import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
-import { runSecretCli } from './secret_introduce.js';
+import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
+import { runSecretCli } from '../secret_introduce.js';
 import {
   ALLOCATION_ACTIONS,
   runCredentialAllocationCommand,

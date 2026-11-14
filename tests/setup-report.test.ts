@@ -38,7 +38,7 @@ vi.mock('../scripts/services_setup.js', () => ({
   setupServices: mocks.setupServices,
 }));
 
-vi.mock('../scripts/reasoning_setup.js', () => ({
+vi.mock('../scripts/reasoning/reasoning_setup.js', () => ({
   runReasoningSetup: mocks.runReasoningSetup,
 }));
 

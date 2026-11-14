@@ -58,7 +58,7 @@ describe('reasoning config entrypoint', () => {
   });
 
   it('keeps route output and mutation policy behind the shared script harness', () => {
-    const source = readTextFile(pathResolver.rootResolve('scripts/reasoning_config.ts'));
+    const source = readTextFile(pathResolver.rootResolve('scripts/reasoning/reasoning_config.ts'));
 
     expect(source).toContain("flags: ['json', 'dry-run', 'check', 'quiet']");
     expect(source).toContain('run: async ({ argv, print, json, dryRun, check })');
