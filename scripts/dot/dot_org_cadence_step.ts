@@ -160,7 +160,7 @@ export function tickIntervalMs(c: DotCharter): number {
 
 async function defaultTick(options: OrganizationOperationTickRunOptions): Promise<TickReport> {
   const { executeScheduledOrganizationOperation } =
-    await import('../organization_operation_execute.js');
+    await import('../organization/organization_operation_execute.js');
   return runOrganizationOperationTick(options, {
     executeOperation: executeScheduledOrganizationOperation,
   });

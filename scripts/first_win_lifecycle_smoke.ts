@@ -429,7 +429,7 @@ export function runFirstWinLifecycleDryRun(): FirstWinLifecycleReport {
       'organization',
       'node',
       [
-        'dist/scripts/organization_operating_model.js',
+        'dist/scripts/organization/organization_operating_model.js',
         'init',
         '--organization-id',
         ORGANIZATION_ID,
@@ -617,7 +617,7 @@ export function runFirstWinLifecycleLive(
         'organization',
         'node',
         [
-          'dist/scripts/organization_operating_model.js',
+          'dist/scripts/organization/organization_operating_model.js',
           'init',
           '--organization-id',
           plan.organizationId,
@@ -670,7 +670,7 @@ export function runFirstWinLifecycleLive(
         'project',
         'node',
         [
-          'dist/scripts/organization_operating_model.js',
+          'dist/scripts/organization/organization_operating_model.js',
           'project',
           'attach',
           '--organization-id',

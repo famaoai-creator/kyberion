@@ -1640,13 +1640,13 @@
     "scripts/ops_alerts.ts": {
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/organization_member.ts": {
+    "scripts/organization/organization_member.ts": {
       "env_direct_read_budget": 2
     },
-    "scripts/organization_objective_measure.ts": {
+    "scripts/organization/organization_objective_measure.ts": {
       "bespoke_cli_parser_budget": 9
     },
-    "scripts/organization_operating_model.ts": {
+    "scripts/organization/organization_operating_model.ts": {
       "env_direct_read_budget": 3
     },
     "scripts/personal-pads/migrate.ts": {

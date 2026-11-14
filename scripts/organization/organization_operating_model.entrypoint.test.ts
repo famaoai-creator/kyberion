@@ -5,9 +5,12 @@ import { runOrganizationOperatingModelCli } from './organization_operating_model
 describe('organization operating model output boundary', () => {
   it('routes CLI output through the harness printer', () => {
     const source = String(
-      safeReadFile(pathResolver.rootResolve('scripts/organization_operating_model.ts'), {
-        encoding: 'utf8',
-      })
+      safeReadFile(
+        pathResolver.rootResolve('scripts/organization/organization_operating_model.ts'),
+        {
+          encoding: 'utf8',
+        }
+      )
     );
     expect(source).not.toContain('console.log');
     expect(source).not.toContain('console.error');
