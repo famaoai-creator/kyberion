@@ -22,6 +22,7 @@ import {
   type PeerMessageEnvelope,
   type PeerMessageResponder,
   type PeerMessageResponderContext,
+  type PeerOutboxDelivery,
 } from './peer-messaging.js';
 import {
   assertSafeRepositoryPath,
@@ -138,6 +139,11 @@ export interface SendPeerConversationMessageInput {
   ttlMs?: number;
   catalogPath?: string;
   timeoutMs?: number;
+  /**
+   * `'caller'`: the caller retries delivery itself; outbox redelivery skips
+   * this message. Implied by `catalogPath`.
+   */
+  deliveryRecovery?: 'caller';
   /**
    * Stable message id for idempotent resends: used for both the outbound
    * transcript entry and the peer envelope, so a retry is deduped by the
@@ -805,19 +811,123 @@ export function buildPeerConversationEnvelope(input: {
  */
 export const PEER_CATALOG_READER_ROLE = 'peer_catalog_reader';
 
-function loadSenderPeerCatalog(input: SendPeerConversationMessageInput) {
+/**
+ * True when a send resolves its recipient through the tenant's own catalog
+ * file: no explicit catalog path and no `KYBERION_PEER_NETWORK_CATALOG`
+ * override. Only such sends may be re-sent by outbox redelivery, which reads
+ * that file and nothing else.
+ */
+export function resolvesThroughTenantPeerCatalog(
+  input: Pick<SendPeerConversationMessageInput, 'catalogPath' | 'tenantId'>
+): boolean {
+  return (
+    !input.catalogPath &&
+    Boolean(input.tenantId) &&
+    resolvePeerNetworkCatalogPath({ tenantId: input.tenantId }) ===
+      peerNetworkCatalogPath(input.tenantId)
+  );
+}
+
+/** The tenant's own catalog file, whatever catalog override the environment carries. */
+export function loadTenantPeerCatalog(tenantId: string) {
+  return withStoreGrant(
+    PEER_CATALOG_READER_ROLE,
+    () => loadPeerNetworkCatalog({ tenantId, catalogPath: peerNetworkCatalogPath(tenantId) }),
+    { tenantSlug: tenantId }
+  );
+}
+
+/**
+ * The message reached the receiver (the outbox has its `sent` row) but the
+ * sender-side bookkeeping after it failed. Not a delivery failure.
+ */
+export class PeerConversationBookkeepingError extends Error {
+  constructor(
+    readonly receipt: PeerMessageDispatchReceipt,
+    cause: unknown
+  ) {
+    super(
+      `peer_conversation_bookkeeping_failed:${receipt.message_id} — ${cause instanceof Error ? cause.message : String(cause)}`,
+      { cause }
+    );
+  }
+}
+
+export function loadSenderPeerCatalog(
+  input: Pick<SendPeerConversationMessageInput, 'catalogPath' | 'tenantId'>
+) {
   const options = {
     ...(input.catalogPath ? { catalogPath: input.catalogPath } : {}),
     ...(input.tenantId ? { tenantId: input.tenantId } : {}),
   };
-  const tenantCatalog =
-    !input.catalogPath &&
-    input.tenantId &&
-    resolvePeerNetworkCatalogPath(options) === peerNetworkCatalogPath(input.tenantId);
+  const tenantCatalog = resolvesThroughTenantPeerCatalog(input);
   if (!tenantCatalog) return loadPeerNetworkCatalog(options);
   return withStoreGrant(PEER_CATALOG_READER_ROLE, () => loadPeerNetworkCatalog(options), {
     tenantSlug: input.tenantId,
   });
+}
+
+/**
+ * Sender-side bookkeeping of a delivered conversation message: the reply the
+ * receiver's responder returned is appended to the sender's transcript. Called
+ * on a first-try delivery and by outbox redelivery, so both leave the same
+ * transcript. Idempotent: a reply already in the transcript is not appended
+ * again. Returns false when the envelope is not a conversation message. A
+ * `duplicate` receipt carries no response, so there is nothing to record.
+ */
+export function applyPeerConversationDelivery(delivery: PeerOutboxDelivery): boolean {
+  const { envelope } = delivery;
+  const payload = validatePeerConversationMessage(envelope.payload);
+  if (!payload.valid || !payload.value) return false;
+  const message = payload.value;
+  if (delivery.response !== undefined && !isRecord(delivery.response)) {
+    throw new Error('invalid_peer_conversation_response');
+  }
+  const response = delivery.response as Record<string, unknown> | undefined;
+  if (response?.reply === undefined) return true;
+  const reply = parsePeerConversationTranscriptEntry(response.reply);
+  if (
+    reply.sender_peer_id !== envelope.recipient_peer_id ||
+    reply.recipient_peer_id !== envelope.sender_peer_id
+  ) {
+    throw new Error('peer_conversation_reply_identity_mismatch');
+  }
+  const session = loadPeerConversationSession(
+    envelope.tenant_id,
+    envelope.sender_peer_id,
+    message.session_id
+  );
+  const recorded = session?.transcript.some(
+    (entry) => entry.message_id === reply.message_id && entry.direction === 'inbound'
+  );
+  if (recorded) return true;
+  if (delivery.replayed_from) {
+    // Replay from an outbox row (crash repair). The transcript keeps its last
+    // 200 entries: once everything from the time of the delivery has been
+    // trimmed, a reply recorded back then is gone too, and appending it again
+    // would duplicate it (and reopen a closed session). A missing session is
+    // never recreated by a replay.
+    const oldest = session?.transcript[0]?.created_at;
+    if (!oldest || Date.parse(oldest) > Date.parse(delivery.replayed_from)) return true;
+  }
+  appendPeerConversationTranscript({
+    tenantId: envelope.tenant_id,
+    sessionId: message.session_id,
+    localPeerId: envelope.sender_peer_id,
+    remotePeerId: envelope.recipient_peer_id,
+    kind: reply.kind,
+    direction: 'inbound',
+    text: reply.text,
+    replyToMessageId: reply.reply_to_message_id || envelope.message_id,
+    relatedWorkItemIds: reply.related_work_item_ids || message.related_work_item_ids,
+    metadata: reply.metadata,
+    payload: {
+      ...(reply.payload || {}),
+      reply_from_peer_id: envelope.recipient_peer_id,
+    },
+    messageId: reply.message_id,
+  });
+  return true;
 }
 
 export async function sendPeerConversationMessageToPeer(
@@ -876,50 +986,35 @@ export async function sendPeerConversationMessageToPeer(
     ...(messageId ? { messageId } : {}),
   });
 
+  // Outbox redelivery resolves the recipient through the tenant's own catalog
+  // file. A send addressed through another catalog (explicit path or the
+  // KYBERION_PEER_NETWORK_CATALOG override) could be re-sent somewhere else,
+  // so it is left to its caller.
+  const recovery =
+    input.deliveryRecovery ?? (resolvesThroughTenantPeerCatalog(input) ? undefined : 'caller');
   const receipt = await sendPeerMessage(envelope, {
     destinationUrl: target.destinationUrl,
     allowLocalNetwork: target.allowLocalNetwork,
     timeoutMs: input.timeoutMs,
+    ...(recovery ? { recovery } : {}),
   });
 
-  const response = receipt.response;
-  let responseRecord: Record<string, unknown> | undefined;
-  if (response !== undefined && !isRecord(response)) {
-    throw new Error('invalid_peer_conversation_response');
-  }
-  if (response !== undefined) responseRecord = response as Record<string, unknown>;
-  if (responseRecord?.reply !== undefined) {
-    const reply = parsePeerConversationTranscriptEntry(responseRecord.reply);
-    if (
-      reply.sender_peer_id !== input.recipientPeerId ||
-      reply.recipient_peer_id !== input.senderPeerId
-    ) {
-      throw new Error('peer_conversation_reply_identity_mismatch');
-    }
-    appendPeerConversationTranscript({
-      tenantId: input.tenantId,
-      sessionId,
-      localPeerId: input.senderPeerId,
-      remotePeerId: input.recipientPeerId,
-      kind: reply.kind,
-      direction: 'inbound',
-      text: reply.text,
-      replyToMessageId: reply.reply_to_message_id || envelope.message_id,
-      relatedWorkItemIds: reply.related_work_item_ids || input.relatedWorkItemIds,
-      metadata: reply.metadata,
-      payload: {
-        ...(reply.payload || {}),
-        reply_from_peer_id: input.recipientPeerId,
-      },
-      messageId: reply.message_id,
+  if (!receipt.ok) return { session: localSession, receipt };
+  try {
+    applyPeerConversationDelivery({
+      envelope,
+      response: receipt.response,
+      duplicate: receipt.duplicate === true,
     });
+    return {
+      session:
+        loadPeerConversationSession(input.tenantId, input.senderPeerId, sessionId) || localSession,
+      receipt,
+    };
+  } catch (error) {
+    // The receiver has the message; only the local record of its reply failed.
+    throw new PeerConversationBookkeepingError(receipt, error);
   }
-
-  return {
-    session:
-      loadPeerConversationSession(input.tenantId, input.senderPeerId, sessionId) || localSession,
-    receipt,
-  };
 }
 
 export function clearPeerConversationRuntime(tenantId: string, peerId: string): void {
@@ -972,28 +1067,35 @@ export function createPeerConversationResponder(
       });
       throw new Error(`peer_conversation_session_peer_mismatch:${existingSession.session_id}`);
     }
-    const session = appendPeerConversationTranscript({
-      tenantId: responderTenantId,
-      sessionId: message.session_id,
-      localPeerId: responderPeerId,
-      remotePeerId: context.envelope.sender_peer_id,
-      kind: message.message_kind,
-      direction: 'inbound',
-      text: message.text,
-      replyToMessageId: message.reply_to_message_id,
-      relatedWorkItemIds: message.related_work_item_ids,
-      metadata: message.metadata,
-      payload: {
-        topic: message.topic,
-        kind: message.kind,
-        tenant_id: message.tenant_id,
-      },
-      messageId: context.envelope.message_id,
-    });
+    // A resend after this process died mid-handler (the message was recorded
+    // but never marked handled) must not record the inbound message twice.
+    const alreadyRecorded = existingSession?.transcript.find(
+      (entry) => entry.message_id === context.envelope.message_id && entry.direction === 'inbound'
+    );
+    const session = alreadyRecorded
+      ? existingSession!
+      : appendPeerConversationTranscript({
+          tenantId: responderTenantId,
+          sessionId: message.session_id,
+          localPeerId: responderPeerId,
+          remotePeerId: context.envelope.sender_peer_id,
+          kind: message.message_kind,
+          direction: 'inbound',
+          text: message.text,
+          replyToMessageId: message.reply_to_message_id,
+          relatedWorkItemIds: message.related_work_item_ids,
+          metadata: message.metadata,
+          payload: {
+            topic: message.topic,
+            kind: message.kind,
+            tenant_id: message.tenant_id,
+          },
+          messageId: context.envelope.message_id,
+        });
 
     const maybeReply = (await options.onMessage?.({
       session,
-      message: session.transcript[session.transcript.length - 1],
+      message: alreadyRecorded ?? session.transcript[session.transcript.length - 1],
       envelope: context.envelope,
     })) as Partial<PeerConversationResponderResult> | void;
 

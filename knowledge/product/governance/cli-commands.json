@@ -3260,6 +3260,17 @@
       "native_help": true
     },
     {
+      "id": "script.peer.outbox",
+      "module": "scripts/peer_outbox.ts",
+      "command": "peer outbox",
+      "noun": "peer",
+      "verb": "outbox",
+      "audience": "operator",
+      "description": "cli_cmd_script_peer_outbox",
+      "group": "operate",
+      "native_help": true
+    },
+    {
       "id": "script.peer.register",
       "script": "peer:register",
       "command": "peer register",
