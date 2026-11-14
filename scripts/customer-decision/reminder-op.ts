@@ -2,7 +2,7 @@
  * CD-11: the tenant pipeline op `core:customer_decision_reminders` (hourly, 09:30–18:30 Asia/Tokyo).
  *
  * The op never runs the sweep in the pipeline process. It runs the built
- * governed facade (`dist/scripts/customer_decision.js remind`) as a child
+ * governed facade (`dist/scripts/customer/customer_decision.js remind`) as a child
  * process, the same way the customer room does: an explicit env without
  * SYSTEM_ROLE and without the ambient role / persona / sudo / mission keys,
  * bound to the tenant the run is bound to. The facade then assumes its own
@@ -21,7 +21,7 @@ import { getRegisteredEnvText } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExecResultAsync } from '@agent/core/secure-io';
 
-export const REMINDER_FACADE_SCRIPT = 'dist/scripts/customer_decision.js';
+export const REMINDER_FACADE_SCRIPT = 'dist/scripts/customer/customer_decision.js';
 /** One tenant's sweep: every sent agenda, each send through the gate. */
 export const REMINDER_FACADE_TIMEOUT_MS = 10 * 60 * 1000;
 

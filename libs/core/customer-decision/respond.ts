@@ -2,7 +2,7 @@
  * CD-08: plan a customer's response to one approved agenda revision
  * (docs/developer/improvement-plans-2026-10/CUSTOMER_DECISION_HEARING_PLAN_2026-10-24.ja.md).
  *
- * Pure: no I/O, no clock — the facade (`scripts/customer_decision.ts respond`)
+ * Pure: no I/O, no clock — the facade (`scripts/customer/customer_decision.ts respond`)
  * passes the agenda, the ledger, the verified invite, the registered customer
  * actors, a pre-generated receipt id and `now`, then performs the writes in
  * order (ledger append all-or-nothing → receipt → switches → reflection).

@@ -1,8 +1,8 @@
 /**
- * scripts/customer_decision_overview.ts — read-only customer-decision facade
+ * scripts/customer/customer_decision_overview.ts — read-only customer-decision facade
  * for the Kyberion server (CD-12, MSN-SHELL-UX-20261104).
  *
- *   node dist/scripts/customer_decision_overview.js overview --tenant <t> \
+ *   node dist/scripts/customer/customer_decision_overview.js overview --tenant <t> \
  *     [--summary | --case <id> --detail | --learning [--date <YYYY-MM-DD>]] --json
  *
  * Concierge's `/api/ops/customer-decisions` routes (overview, case, learning)
@@ -10,7 +10,7 @@
  * grants only `decision_ledger`. It dispatches the `overview` verb of
  * `pnpm customer-decision` and nothing else, so the reachability analysis
  * bounds the role by the read path alone; every writer verb (draft, respond,
- * learning, …) stays in `scripts/customer_decision.ts`, which this process
+ * learning, …) stays in `scripts/customer/customer_decision.ts`, which this process
  * cannot reach.
  */
 import { nowIso } from '@agent/core/foundation';
@@ -19,9 +19,9 @@ import {
   defineScript,
   isDirectScript,
   ScriptExitError,
-} from './lib/harness.js';
-import { parseCustomerDecisionArgs, usageError } from './customer-decision/common.js';
-import { runOverview } from './customer-decision/overview.js';
+} from '../lib/harness.js';
+import { parseCustomerDecisionArgs, usageError } from '../customer-decision/common.js';
+import { runOverview } from '../customer-decision/overview.js';
 
 export function runCustomerDecisionOverview(
   argv: readonly string[],

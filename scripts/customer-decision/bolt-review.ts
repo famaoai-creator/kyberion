@@ -1,7 +1,7 @@
 /**
  * CD-10 bolt review: `bolt-review` (draft the review agenda of a finished
  * mission) and the routing of the customer's answer after respond / status.
- * Part of scripts/customer_decision.ts (the entry point); see its header.
+ * Part of scripts/customer/customer_decision.ts (the entry point); see its header.
  *
  * The operator chooses what the customer sees (the summary, the screenshots,
  * a public preview URL); nothing is taken from mission evidence, which mixes

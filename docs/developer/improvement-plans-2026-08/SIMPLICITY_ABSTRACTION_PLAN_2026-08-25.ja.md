@@ -5928,12 +5928,12 @@ reply も文字列だけを成功とするよう揃えた。
 
 ## 371. 2026-08-30 SX-06 customer:list の結果出力境界統一
 
-再レビューで `scripts/customer_list.ts` が `defineScript` を使っている一方、テキスト結果だけを
+再レビューで `scripts/customer/customer_list.ts` が `defineScript` を使っている一方、テキスト結果だけを
 `console.log` から直接出力していた。これを `printText` が行配列を返し、script harness の
 `context.print` が最終出力を担当する形へ揃えた。これにより import／テスト時の副作用を除き、JSON
 出力とテキスト出力の責務を同じ実行境界へ集約した。
 
-検証: `pnpm exec vitest run scripts/customer_list.test.ts`: **1 file / 3 tests passed**、
+検証: `pnpm exec vitest run scripts/customer/customer_list.test.ts`: **1 file / 3 tests passed**、
 `node --import ./scripts/ts-loader.mjs scripts/check_script_integrity.ts`、`git diff --check` が OK。
 
 ## 372. 2026-08-30 SX-06 customer overlay CLI 群の結果出力境界統一

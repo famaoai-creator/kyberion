@@ -4682,7 +4682,7 @@
     },
     {
       "id": "script.customer-decision",
-      "module": "scripts/customer_decision.ts",
+      "module": "scripts/customer/customer_decision.ts",
       "command": "customer-decision default",
       "noun": "customer-decision",
       "verb": "default",
@@ -4693,7 +4693,7 @@
     },
     {
       "id": "script.customer-channel",
-      "module": "scripts/customer_channel.ts",
+      "module": "scripts/customer/customer_channel.ts",
       "command": "customer-channel default",
       "noun": "customer-channel",
       "verb": "default",

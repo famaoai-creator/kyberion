@@ -1,6 +1,6 @@
 /**
  * Operator verbs that build and send an agenda: draft, generate, submit, actor-add, send.
- * Part of scripts/customer_decision.ts (the entry point); see its header.
+ * Part of scripts/customer/customer_decision.ts (the entry point); see its header.
  */
 import { humanActor } from '@agent/core/actor';
 import { withExecutionContextAsync } from '@agent/core/authority';

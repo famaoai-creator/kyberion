@@ -1,6 +1,6 @@
 /**
  * CD-09 "実装中の判断を顧客に回す": the operator's side of task proposals.
- * Part of scripts/customer_decision.ts (the entry point); see its header.
+ * Part of scripts/customer/customer_decision.ts (the entry point); see its header.
  *
  *   draft --from-tasks   collect the customer-judgment questions mission tasks
  *                        recorded on their consumer locks into a draft agenda

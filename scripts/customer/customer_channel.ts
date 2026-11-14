@@ -26,7 +26,7 @@ import {
   bindCustomerChannel,
   unbindCustomerChannel,
   type CustomerChannelBindingChange,
-} from './customer-channel/bindings.js';
+} from '../customer-channel/bindings.js';
 import {
   readCustomerOutboundContent,
   readCustomerQuestion,
@@ -37,7 +37,7 @@ import {
   defineScript,
   isDirectScript,
   ScriptExitError,
-} from './lib/harness.js';
+} from '../lib/harness.js';
 
 const USAGE = [
   'customer-channel bind --tenant <slug> --surface <s> --channel <id> [--name <text>] [--org <text>] [--language <tag>] [--mode sales|support|requirements_hearing]',

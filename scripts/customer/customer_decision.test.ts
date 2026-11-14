@@ -101,8 +101,8 @@ vi.mock('@agent/core/deal-store', async (importOriginal) => ({
 }));
 
 import { parseCustomerDecisionArgs, runCustomerDecision } from './customer_decision.js';
-import { tenantOf } from './customer-decision/common.js';
-import { frozenLockStatus } from './customer-decision/task-proposals.js';
+import { tenantOf } from '../customer-decision/common.js';
+import { frozenLockStatus } from '../customer-decision/task-proposals.js';
 import { withExecutionContext } from '@agent/core/authority';
 
 const TENANT = 'cd-facade-test';
