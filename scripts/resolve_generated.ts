@@ -74,9 +74,10 @@ export const GENERATED_ARTIFACT_STEPS: readonly GeneratedArtifactStep[] = [
   {
     // role-authority-map.json is the projection of the Org Role cards (D6).
     id: 'org-role-grants',
-    script: 'scripts/sync_org_role_grants.ts',
+    script: 'scripts/sync/sync_org_role_grants.ts',
     tracked: ['knowledge/product/governance/role-authority-map.json'],
-    run: async (argv) => (await import('./sync_org_role_grants.js')).runSyncOrgRoleGrants(argv),
+    run: async (argv) =>
+      (await import('./sync/sync_org_role_grants.js')).runSyncOrgRoleGrants(argv),
   },
   {
     id: 'op-registry',

@@ -2,7 +2,7 @@ import { format as prettierFormat, resolveConfig as resolvePrettierConfig } from
 import { pathResolver } from '@agent/core/path-resolver';
 import { parseSafeJsonObjectInput } from '@agent/core/foundation';
 import { loadAgentProfileDirectory } from '@agent/core/mission/mission-team-index';
-import { defineGenerator, isDirectScript, type GeneratedFile } from './lib/harness.js';
+import { defineGenerator, isDirectScript, type GeneratedFile } from '../lib/harness.js';
 
 /**
  * Regenerate `agent-profile-index.json` from the canonical agent-profiles

@@ -8,7 +8,7 @@
           "type": "capture",
           "op": "shell",
           "params": {
-            "cmd": "pnpm exec tsx scripts/sync_component_inventory.ts",
+            "cmd": "pnpm exec tsx scripts/sync/sync_component_inventory.ts",
             "export_as": "sync_output"
           }
         },

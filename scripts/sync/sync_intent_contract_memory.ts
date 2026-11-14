@@ -6,7 +6,7 @@ import { resolveIntentContractMemoryPaths } from '@agent/core/intent/intent-cont
 import { assertSafeRepositoryPath, safeExistsSync, safeWriteFile } from '@agent/core/secure-io';
 import { defineCatalog, nowIso } from '@agent/core/foundation';
 import { getRegisteredEnvText } from '@agent/core/foundation/env';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from '../lib/harness.js';
 
 const MEMORY_SCHEMA_PATH =
   getRegisteredEnvText('KYBERION_INTENT_CONTRACT_MEMORY_SCHEMA_PATH') ||

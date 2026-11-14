@@ -4159,7 +4159,7 @@
     },
     {
       "id": "script.sync.agent-profiles",
-      "module": "scripts/sync_agent_profiles.ts",
+      "module": "scripts/sync/sync_agent_profiles.ts",
       "command": "sync agent-profiles",
       "noun": "sync",
       "verb": "agent-profiles",
@@ -4170,7 +4170,7 @@
     },
     {
       "id": "script.sync.authority-roles",
-      "module": "scripts/sync_authority_roles.ts",
+      "module": "scripts/sync/sync_authority_roles.ts",
       "command": "sync authority-roles",
       "noun": "sync",
       "verb": "authority-roles",
@@ -4181,7 +4181,7 @@
     },
     {
       "id": "script.sync.component-inventory",
-      "module": "scripts/sync_component_inventory.ts",
+      "module": "scripts/sync/sync_component_inventory.ts",
       "command": "sync component-inventory",
       "noun": "sync",
       "verb": "component-inventory",
@@ -4192,7 +4192,7 @@
     },
     {
       "id": "script.sync.model-registry",
-      "module": "scripts/sync_model_registry.ts",
+      "module": "scripts/sync/sync_model_registry.ts",
       "command": "sync model-registry",
       "noun": "sync",
       "verb": "model-registry",
@@ -4202,7 +4202,7 @@
     },
     {
       "id": "script.sync.org-role-grants",
-      "module": "scripts/sync_org_role_grants.ts",
+      "module": "scripts/sync/sync_org_role_grants.ts",
       "command": "sync org-role-grants",
       "noun": "sync",
       "verb": "org-role-grants",
@@ -4213,7 +4213,7 @@
     },
     {
       "id": "script.sync.service-endpoints",
-      "module": "scripts/sync_service_endpoints.ts",
+      "module": "scripts/sync/sync_service_endpoints.ts",
       "command": "sync service-endpoints",
       "noun": "sync",
       "verb": "service-endpoints",
@@ -4224,7 +4224,7 @@
     },
     {
       "id": "script.sync.specialist-catalog",
-      "module": "scripts/sync_specialist_catalog.ts",
+      "module": "scripts/sync/sync_specialist_catalog.ts",
       "command": "sync specialist-catalog",
       "noun": "sync",
       "verb": "specialist-catalog",
@@ -4235,7 +4235,7 @@
     },
     {
       "id": "script.sync.team-roles",
-      "module": "scripts/sync_team_roles.ts",
+      "module": "scripts/sync/sync_team_roles.ts",
       "command": "sync team-roles",
       "noun": "sync",
       "verb": "team-roles",

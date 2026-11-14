@@ -126,7 +126,7 @@ P0–P2 は実装済み(§7)。P2-4 は docs-only / deferred product。
 ```text
 libs/actuators/*/manifest.json          ← 正本(スキャン: libs/core の actuator-manifest-index)
         │
-        ├─ scripts/sync_component_inventory.ts → global_actuator_index.json + CAPABILITIES_GUIDE.md
+        ├─ scripts/sync/sync_component_inventory.ts → global_actuator_index.json + CAPABILITIES_GUIDE.md
         └─ describeOps() in src/op-catalog.ts
                 │
                 └─ pnpm generate:op-registry

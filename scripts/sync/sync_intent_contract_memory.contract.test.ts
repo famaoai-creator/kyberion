@@ -4,7 +4,7 @@ import { pathResolver, safeReadFile } from '@agent/core';
 describe('sync_intent_contract_memory catalog boundary', () => {
   it('uses the governed catalog boundary for memory files', () => {
     const source = String(
-      safeReadFile(pathResolver.rootResolve('scripts/sync_intent_contract_memory.ts'), {
+      safeReadFile(pathResolver.rootResolve('scripts/sync/sync_intent_contract_memory.ts'), {
         encoding: 'utf8',
       })
     );

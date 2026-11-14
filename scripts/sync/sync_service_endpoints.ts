@@ -2,7 +2,7 @@ import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync, safeReaddir } from '@agent/core/secure-io';
 import { defineCatalog } from '@agent/core/foundation';
-import { defineGenerator, isDirectScript, type GeneratedFile } from './lib/harness.js';
+import { defineGenerator, isDirectScript, type GeneratedFile } from '../lib/harness.js';
 
 const SCHEMA_PATH = pathResolver.rootResolve(
   'knowledge/product/schemas/service-endpoints.schema.json'

@@ -7,7 +7,7 @@ import {
   loadTeamRoleDirectory,
   loadTeamRoleSnapshot,
 } from '@agent/core/mission/mission-team-index';
-import { defineGenerator, isDirectScript, type GeneratedFile } from './lib/harness.js';
+import { defineGenerator, isDirectScript, type GeneratedFile } from '../lib/harness.js';
 
 type TeamRoleRecord = {
   description: string;

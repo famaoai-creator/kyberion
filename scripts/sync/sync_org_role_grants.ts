@@ -10,7 +10,7 @@ import {
   validateOrgRoleCards,
   type RoleAuthorityMapGroups,
 } from '@agent/core/organization/authority-role-registry';
-import { defineGenerator, isDirectScript, type GeneratedFile } from './lib/harness.js';
+import { defineGenerator, isDirectScript, type GeneratedFile } from '../lib/harness.js';
 
 /**
  * Concept model v2 D6: an Org Role carries no permissions of its own; its card

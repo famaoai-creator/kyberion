@@ -19,7 +19,7 @@ describe('component inventory generator boundary', () => {
   });
   it('uses the shared generator harness for every declared artifact', () => {
     const source = String(
-      safeReadFile(pathResolver.rootResolve('scripts/sync_component_inventory.ts'), {
+      safeReadFile(pathResolver.rootResolve('scripts/sync/sync_component_inventory.ts'), {
         encoding: 'utf8',
       })
     );

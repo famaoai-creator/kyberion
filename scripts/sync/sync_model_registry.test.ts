@@ -4,7 +4,7 @@ import { pathResolver, safeReadFile } from '@agent/core';
 describe('sync_model_registry', () => {
   it('uses the canonical model registry loader for bootstrap input', () => {
     const source = String(
-      safeReadFile(pathResolver.rootResolve('scripts/sync_model_registry.ts'), {
+      safeReadFile(pathResolver.rootResolve('scripts/sync/sync_model_registry.ts'), {
         encoding: 'utf8',
       })
     );

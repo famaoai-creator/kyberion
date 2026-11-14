@@ -15,7 +15,7 @@ import { validateModelRegistrySnapshot } from '@agent/core/reasoning/model-regis
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync, safeReaddir } from '@agent/core/secure-io';
 import { parseSafeJsonObjectInput } from '@agent/core/foundation';
-import { defineGenerator, isDirectScript, type GeneratedFile } from './lib/harness.js';
+import { defineGenerator, isDirectScript, type GeneratedFile } from '../lib/harness.js';
 
 const DIRECTORY = pathResolver.rootResolve('knowledge/product/governance/model-registry');
 const INDEX_PATH = path.join(DIRECTORY, 'index.json');
