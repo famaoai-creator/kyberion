@@ -129,7 +129,7 @@ const PIPELINE_JOB_TIMEOUT_MS = 30 * 60_000;
 const PIPELINE_JOB_OUTPUT_TAIL_LIMIT = 64_000;
 
 /** Path to the compiled audit export script. */
-const AUDIT_EXPORT_SCRIPT = nodePath.join(REPO_ROOT, 'dist/scripts/export_audit.js');
+const AUDIT_EXPORT_SCRIPT = nodePath.join(REPO_ROOT, 'dist/scripts/audit/export_audit.js');
 
 // ─── Catalog helpers ──────────────────────────────────────────────────────────
 
