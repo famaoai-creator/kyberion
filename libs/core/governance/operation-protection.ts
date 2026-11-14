@@ -180,8 +180,14 @@ export const PROTECTED_ARGUMENTS: Readonly<Record<string, readonly string[][]>> 
     ['params', 'cc'],
     ['params', 'from'],
   ],
-  'meeting:chat': [['params', 'meeting_id']],
-  'meeting:speak': [['params', 'meeting_id']],
+  'meeting:chat': [
+    ['params', 'meeting_id'],
+    ['params', 'series_id'],
+  ],
+  'meeting:speak': [
+    ['params', 'meeting_id'],
+    ['params', 'series_id'],
+  ],
 };
 
 function at(effect: unknown, segments: readonly string[]): unknown {
