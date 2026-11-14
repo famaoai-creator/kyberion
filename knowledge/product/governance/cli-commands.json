@@ -2291,7 +2291,7 @@
     },
     {
       "id": "script.eval.harness",
-      "module": "scripts/eval_harness.ts",
+      "module": "scripts/eval/eval_harness.ts",
       "command": "eval harness",
       "noun": "eval",
       "verb": "harness",
@@ -2312,7 +2312,7 @@
     },
     {
       "id": "script.eval.japanese-intent",
-      "module": "scripts/eval_japanese_contextual_intent.ts",
+      "module": "scripts/eval/eval_japanese_contextual_intent.ts",
       "command": "eval japanese-intent",
       "noun": "eval",
       "verb": "japanese-intent",

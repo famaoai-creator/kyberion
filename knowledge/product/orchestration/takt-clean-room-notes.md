@@ -36,7 +36,7 @@ Source repository reviewed: `nrslib/takt` (v0.59.1). This note records implement
 - `libs/core/task/report-contract.ts` — post-perform report validation against registered contracts or product JSON Schemas (TK-07).
 - `libs/core/plugin/facet-registry.ts` — approved managed plugin facet declarations are resolved after product facets (TK-09).
 - `libs/core/analysis/trace.ts` — opt-in OTLP/HTTP projection while preserving stable JSONL Trace (TK-10).
-- `scripts/eval_facets.ts` + `eval/facets/` — deterministic facet-content contract checks, separate from engine tests (TK-11).
+- `scripts/eval/eval_facets.ts` + `eval/facets/` — deterministic facet-content contract checks, separate from engine tests (TK-11).
 - `libs/core/workforce/background-review-runner.ts` — already equivalent to advisory companion review; keep the "advice never changes routing" line.
 
 ## Not adopted

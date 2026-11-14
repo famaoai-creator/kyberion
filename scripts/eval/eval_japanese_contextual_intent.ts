@@ -3,7 +3,7 @@ import { defineCatalog } from '@agent/core/foundation';
 import { buildContextualIntentFrame } from '@agent/core/contextual-intent-frame';
 import { compileUserIntentFlow } from '@agent/core/intent/intent-contract';
 import { resolveRoutingPacket } from '@agent/core/intent';
-import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
 
 type CorpusItem = {
   id: string;

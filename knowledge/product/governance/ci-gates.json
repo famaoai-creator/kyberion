@@ -779,8 +779,8 @@
       "id": "eval-distill",
       "scope": "full",
       "executable": "node",
-      "args": ["--import", "./scripts/ts-loader.mjs", "scripts/eval_distill.ts"],
-      "paths": ["libs/core/**", "eval/**", "scripts/eval_distill.ts"],
+      "args": ["--import", "./scripts/ts-loader.mjs", "scripts/eval/eval_distill.ts"],
+      "paths": ["libs/core/**", "eval/**", "scripts/eval/eval_distill.ts"],
       "owner": "quality",
       "rationale": "Runs the deterministic distill evaluation."
     },

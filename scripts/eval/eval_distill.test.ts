@@ -5,7 +5,7 @@ import { safeReadFile } from '@agent/core/secure-io';
 describe('distill evaluation entrypoint', () => {
   it('keeps deterministic evaluation behind the shared harness boundary', () => {
     const source = String(
-      safeReadFile(pathResolver.rootResolve('scripts/eval_distill.ts'), { encoding: 'utf8' })
+      safeReadFile(pathResolver.rootResolve('scripts/eval/eval_distill.ts'), { encoding: 'utf8' })
     );
 
     expect(source).toContain('context.print(report)');

@@ -57,7 +57,7 @@ describe('PI-18 named eval harness table', () => {
 
   it('keeps the eval table reader on the canonical catalog boundary', () => {
     const source = String(
-      safeReadFile(pathResolver.rootResolve('scripts/eval_harness.ts'), { encoding: 'utf8' })
+      safeReadFile(pathResolver.rootResolve('scripts/eval/eval_harness.ts'), { encoding: 'utf8' })
     );
     expect(source).toContain('evalHarnessTableCatalogAtPath(safePath).load()');
     expect(source).not.toContain('readJson<unknown>(safePath)');

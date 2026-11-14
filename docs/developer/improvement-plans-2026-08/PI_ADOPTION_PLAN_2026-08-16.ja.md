@@ -212,7 +212,7 @@ pi は Node/Bun/Deno/ブラウザで動く「最小コア + 攻撃的に拡張�
 
 **pi の設計**: `createPiCodingAgentHarness({name, model, noTools, transformSystemPrompt})` を「名前付き構成」とし `evalHarnessTable` + `describe.for` で同一入力を構成違いで比較、`run([{prompt},{reload},{prompt}])` で再起動を跨ぐ resource 取込を検証、session 付き receipt を保存する。
 
-**実装**: `eval/harnesses.json` に名前付き構成 table (persona/policy/model/knowledge slice の組)を追加し、`scripts/eval_harness.ts` の `runEvalHarnessTable` が同一 brief を横断比較する。`reload` step では同一 session 内で facet を再解決し、`prompt → reload → prompt` の順序と構成別の hash-only receipt を secure-io が許可する `active/shared/tmp/eval/runs.jsonl` に追記する。provider executor は注入可能で、CI では stub のまま契約を検証できる。TK-11 との評価 receipt 統合、実 provider の quality judge、tenant overlay の hot-apply 実測は未完了。
+**実装**: `eval/harnesses.json` に名前付き構成 table (persona/policy/model/knowledge slice の組)を追加し、`scripts/eval/eval_harness.ts` の `runEvalHarnessTable` が同一 brief を横断比較する。`reload` step では同一 session 内で facet を再解決し、`prompt → reload → prompt` の順序と構成別の hash-only receipt を secure-io が許可する `active/shared/tmp/eval/runs.jsonl` に追記する。provider executor は注入可能で、CI では stub のまま契約を検証できる。TK-11 との評価 receipt 統合、実 provider の quality judge、tenant overlay の hot-apply 実測は未完了。
 
 ### PI-19: 並走セッションの git 禁止動詞を guardrail へ(P2 / S)
 
