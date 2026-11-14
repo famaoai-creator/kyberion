@@ -61,6 +61,10 @@ export function resolveServiceBinding(
   selectedBinding?: ServiceBindingRecord,
   allocationUse?: ServiceAllocationUseScope & { action: string }
 ): ServiceBinding {
+  if (credentialExecutionIdentity().personalClaim && authMode !== 'none')
+    throw new Error(
+      '[CREDENTIAL_PROVENANCE_DENIED] Personal claimed service credentials are not admitted'
+    );
   if (authMode === 'none') {
     return { serviceId, authMode };
   }

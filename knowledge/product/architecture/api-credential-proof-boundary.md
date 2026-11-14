@@ -225,20 +225,37 @@ operator fallback, honest revocation behavior, and separate operator/tenant evid
 
 ## Tenantless personal execution dependency roadmap
 
-The current personal-account broker path serves **claimed tenant work with an explicit
-owner-approved allocation**. It does not implement a no-tenant task binder. A missing
-tenant must never be interpreted as an operator credential context or permission to
-read every local account. Registration, personal ownership and installed-owner access
-remain separate from authority for a particular execution.
+The personal-account broker path serves **claimed tenant work with an explicit
+owner-approved allocation**. A separate tenantless dispatch stage now admits only an
+**empty credential binding**. It proves the installed personal owner and active canonical
+tenantless NHI, exact runtime-minted mission/task envelope, current WorkItem run and live
+lease. Those proofs are read again on consumption. It does not load personal accounts,
+call a configured tenant credential broker, or authorize a service operation.
 
-Implement the remaining dependency chain in this order, with boundary tests at each step:
+The absence of a tenant never promotes claimed dispatch into operator credential access.
+The claimed-dispatch entry point rejects missing envelopes, legacy peer labels, and actors
+other than the installation's admitted personal NHI. Direct operator setup outside that
+entry point remains separate. Existing delegations using free-form peer labels must migrate
+to canonical NHI attribution and a matching mission/task envelope; a synthetic tenant or
+an invented owner is not a migration. The current WorkItem project model permits this
+tenantless path with a public standalone project; it does not yet establish personal-tier
+project/mission admission or missionless personal work.
 
-1. Establish a canonical claimed personal execution identity: personal owner and NHI,
+Empty personal bindings reject API keys, provider environments, selected service/PRESET
+operations and GWS session reuse. Operator account registration, provisioning, key access,
+connection-document reads, operator probes and ambient CLI credentials are unavailable in
+that execution. Cached clients are bound to owner, actor, WorkItem, run, lease and task
+lineage. Registration and installed-owner access remain separate from execution authority.
+
+Continue the dependency chain in this order, with boundary tests at each step:
+
+1. Preserve the implemented canonical claimed personal execution identity: personal owner and NHI,
    WorkItem claim, current attempt and live lease. Derive these from trusted dispatch,
    never a supplied owner ID or the absence of a tenant. Preserve the separate operator
    context used for setup and registration.
-2. Install an explicit task binding even when its credential set is empty. Bind it to
-   that personal owner/NHI/claim/lease and exact selected account generation. Missing
+2. Extend the current empty task binding only after defining explicit personal-use
+   admission for an exact selected account generation. Bind it to
+   that personal owner/NHI/claim/lease. Missing
    keys stay final denials; no environment, service-wide connection, global login or
    ambient client cache fallback. Nested scopes and reused clients must reject a new
    task or owner, and rotation/revocation must invalidate subsequent consumption.
@@ -251,7 +268,8 @@ Implement the remaining dependency chain in this order, with boundary tests at e
    session execution as another later step with isolated homes and exact session
    provenance; API-token registration must not silently enable either.
 
-These are future requirements, not permissions issued by this release. Existing-key
+Only the empty-binding identity stage is implemented; selected credentials, read-only
+PRESET admission, effects and sessions above remain future requirements. Existing-key
 macOS account encryption remains unchanged; no new key backend, identity repair or
 automatic personal-to-organization sharing is included.
 

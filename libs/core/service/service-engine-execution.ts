@@ -293,6 +293,10 @@ function alternativeRetryOptions(input: ServicePresetAlternativeExecutionContext
 export async function executeServicePresetAlternative(
   input: ServicePresetAlternativeExecutionContext
 ): Promise<{ result: unknown } | null> {
+  if (credentialExecutionIdentity().personalClaim)
+    throw new Error(
+      '[CREDENTIAL_PROVENANCE_DENIED] Personal claimed service transports require separate admission'
+    );
   let attempted = false;
   try {
     return await executeServicePresetAlternativeOnce(input, () => {

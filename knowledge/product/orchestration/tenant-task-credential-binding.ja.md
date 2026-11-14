@@ -1,7 +1,7 @@
 ---
 title: テナント資格情報のタスク束縛
 tags: [security, credentials, tenant, workitem, providers]
-last_updated: 2026-11-01
+last_updated: 2026-11-14
 runtime_stages: [execution]
 ---
 
@@ -100,3 +100,21 @@ organization/projectを持つ実行では、WorkItemのtyped contextとdispatch�
 `shell-task-credential-dispatch.integration.test.ts` / `provider-auth-home.test.ts` /
 `credential-binding.test.ts`。実portとの統合テストでは、Work Coordinationが
 `current_attempt_id`に保持する`run_id`と、別の`attempt_id`を区別して照合する。
+
+## tenantless 個人 dispatch の段階的導入
+
+tenantless の claimed dispatch は、インストール済みの個人所有者・active な canonical
+NHI、runtime が mint した mission/task envelope、同じ WorkItem の現在の run と生存 lease
+を照合して、資格情報が空の binding 内で実行する。owner と NHI は入力値から選ばず、
+既存の read-only identity resolver で毎回確認する。別 owner、actor、task、run、lease の
+キャッシュ済み client を流用できない。
+
+この段階では tenant 用の configured broker を呼ばず、token、provider HOME、GWS session、
+PRESET 操作を許可しない。operator の account 登録・provisioning・鍵アクセス・接続設定読取も
+拒否する。直接 operator として行うセットアップは claimed dispatch の外で扱う。
+
+scope envelope のない claimed dispatch、自由形式の peer label、未登録・停止済み NHI は拒否する。
+既存呼出元は canonical NHI と一致する typed mission/task/project context に移行する必要がある。
+現行の WorkItem project モデルに合わせた public standalone project の credential-free 実行までが
+対象であり、personal tier の project、missionless 実行、個人 account の利用許可は後続段階である。
+詳細は [依存関係と未実装範囲](../architecture/api-credential-proof-boundary.md#tenantless-personal-execution-dependency-roadmap) を参照。

@@ -28,10 +28,21 @@ import {
   type ScopeEnvelope,
 } from '../scope-envelope.js';
 
+// Lifecycle fixtures use a synthetic tenant mission process so production
+// dispatch mints a real envelope and an empty credential binding. Personal
+// claim admission is exercised separately; these tests retain real coordination.
+function bindLifecycleMissionProcess(missionId: string): void {
+  vi.stubEnv('MISSION_ID', missionId);
+  vi.stubEnv('KYBERION_TENANT', 'default');
+  vi.stubEnv('KYBERION_TIER', 'public');
+  vi.stubEnv('KYBERION_SCOPE_ENV_PATH', 'active/shared/tmp/coordinated-missing-scope.env');
+}
+
 describe('CoordinatedAgentExecutionPort', () => {
   it.each(['throw', 'receipt'] as const)(
     'retains uncertain transport ownership across lease expiry: %s',
     async (mode) => {
+      bindLifecycleMissionProcess('MSN-UNCERTAIN');
       const item = createWorkItem({
         itemId: 'WI-UNCERTAIN',
         title: 'Uncertain remote effect',
@@ -96,6 +107,7 @@ describe('CoordinatedAgentExecutionPort', () => {
   });
 
   afterEach(() => {
+    vi.unstubAllEnvs();
     resetSecretResolver();
     clearWorkCoordinationStore();
     setWorkCoordinationNamespace(null);
@@ -210,6 +222,7 @@ describe('CoordinatedAgentExecutionPort', () => {
   });
 
   it('claims and closes a work item around agent-runtime execution', async () => {
+    bindLifecycleMissionProcess('MSN-COORDINATED-001');
     clearWorkCoordinationStore();
     const item = createWorkItem({
       itemId: 'WI-COORDINATED-001',
@@ -388,27 +401,31 @@ describe('CoordinatedAgentExecutionPort', () => {
         status: 'ready',
       });
       let seen: ScopeEnvelope | undefined;
-      const port = new CoordinatedAgentExecutionPort({
-        delegate: vi.fn(async () => {
-          seen = currentScopeEnvelope();
-          return {
-            execution_kind: 'agent_delegation' as const,
-            task_id: 't',
-            agent_id: 'a',
-            status: 'succeeded' as const,
-            output: 'done',
-          };
-        }),
+      const delegate = vi.fn(async () => {
+        seen = currentScopeEnvelope();
+        return {
+          execution_kind: 'agent_delegation' as const,
+          task_id: 't',
+          agent_id: 'a',
+          status: 'succeeded' as const,
+          output: 'done',
+        };
       });
-      await port.delegate({
-        work_item_id: itemId,
-        task_id: 't',
-        mission_id: 'MSN-C',
-        agent_id: 'a',
-        security_scope: scope as never,
-        instruction: 'go',
-        idempotency_key: `idem-${itemId}`,
-      });
+      const port = new CoordinatedAgentExecutionPort({ delegate });
+      try {
+        await port.delegate({
+          work_item_id: itemId,
+          task_id: 't',
+          mission_id: 'MSN-C',
+          agent_id: 'a',
+          security_scope: scope as never,
+          instruction: 'go',
+          idempotency_key: `idem-${itemId}`,
+        });
+      } catch (error) {
+        expect(delegate).not.toHaveBeenCalled();
+        throw error;
+      }
       return seen;
     };
     const requested = {
@@ -422,11 +439,17 @@ describe('CoordinatedAgentExecutionPort', () => {
 
     afterEach(() => vi.unstubAllEnvs());
 
-    it('runs unenveloped when the process is not bound to the requested mission', async () => {
+    it('denies legacy unenveloped dispatch when the process is not bound to the requested mission', async () => {
       vi.stubEnv('MISSION_ID', '');
-      expect(await delegateAndObserve(requested, 'WI-MINT-001')).toBeUndefined();
+      await expect(delegateAndObserve(requested, 'WI-MINT-001')).rejects.toThrow(
+        'Claimed dispatch requires a scope envelope'
+      );
+      expect(getWorkItem('WI-MINT-001')?.status).toBe('blocked');
       vi.stubEnv('MISSION_ID', 'MSN-OTHER');
-      expect(await delegateAndObserve(requested, 'WI-MINT-002')).toBeUndefined();
+      await expect(delegateAndObserve(requested, 'WI-MINT-002')).rejects.toThrow(
+        'Claimed dispatch requires a scope envelope'
+      );
+      expect(getWorkItem('WI-MINT-002')?.status).toBe('blocked');
     });
 
     it('clamps a minted policy to the process tier and ignores request tenant and egress', async () => {
@@ -443,6 +466,7 @@ describe('CoordinatedAgentExecutionPort', () => {
   });
 
   it('offers a convenience entry point that keeps WorkItem coordination enabled', async () => {
+    bindLifecycleMissionProcess('MSN-COORDINATED-002');
     clearWorkCoordinationStore();
     const item = createWorkItem({
       itemId: 'WI-COORDINATED-002',
@@ -482,6 +506,7 @@ describe('CoordinatedAgentExecutionPort', () => {
   });
 
   it('keeps CLI subagent execution on the shared attempt and lease boundary', async () => {
+    bindLifecycleMissionProcess('MSN-COORDINATED-CLI');
     clearWorkCoordinationStore();
     const item = createWorkItem({
       itemId: 'WI-COORDINATED-CLI',
@@ -538,6 +563,7 @@ describe('CoordinatedAgentExecutionPort', () => {
   });
 
   it('closes against the latest leased version after an observability metadata bump', async () => {
+    bindLifecycleMissionProcess('MSN-COORDINATED-VERSION-BUMP');
     const item = createWorkItem({
       itemId: 'WI-COORDINATED-VERSION-BUMP',
       title: 'version bump task',
@@ -589,6 +615,7 @@ describe('CoordinatedAgentExecutionPort', () => {
   });
 
   it('fails closed when the lease is transferred before the original worker closes the item', async () => {
+    bindLifecycleMissionProcess('MSN-COORDINATED-LEASE-TRANSFER');
     const item = createWorkItem({
       itemId: 'WI-COORDINATED-LEASE-TRANSFER',
       title: 'lease transfer task',
@@ -656,6 +683,7 @@ describe('CoordinatedAgentExecutionPort', () => {
   });
 
   it('keeps review-required work items in review after successful execution', async () => {
+    bindLifecycleMissionProcess('MSN-COORDINATED-REVIEW');
     clearWorkCoordinationStore();
     const item = createWorkItem({
       itemId: 'WI-COORDINATED-REVIEW',
@@ -695,6 +723,7 @@ describe('CoordinatedAgentExecutionPort', () => {
   });
 
   it('logs a structured error and blocks the work item when the delegate throws (e.g. sandbox failure)', async () => {
+    bindLifecycleMissionProcess('MSN-COORDINATED-SANDBOX-THROW');
     clearWorkCoordinationStore();
     const item = createWorkItem({
       itemId: 'WI-COORDINATED-SANDBOX-THROW',
@@ -742,6 +771,7 @@ describe('CoordinatedAgentExecutionPort', () => {
   });
 
   it('logs a structured error when the delegate returns a failed receipt without throwing', async () => {
+    bindLifecycleMissionProcess('MSN-COORDINATED-SANDBOX-RECEIPT');
     clearWorkCoordinationStore();
     const item = createWorkItem({
       itemId: 'WI-COORDINATED-SANDBOX-RECEIPT',
@@ -785,6 +815,7 @@ describe('CoordinatedAgentExecutionPort', () => {
   });
 
   it('never stores customer_decisions from a delegation output, and returns the reply as is (CD-09)', async () => {
+    bindLifecycleMissionProcess('MSN-COORDINATED-CD09');
     const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
     const item = createWorkItem({
       itemId: 'WI-COORDINATED-CD09',
@@ -850,6 +881,7 @@ describe('CoordinatedAgentExecutionPort', () => {
   });
 
   it('the reasoning-backend adapter chain hands the caller its reply with customer_decisions intact (CD-09)', async () => {
+    bindLifecycleMissionProcess('MSN-COORDINATED-CD09');
     const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
     const { delegateWorkItemWithReasoningBackend } =
       await import('../reasoning/reasoning-backend-execution-adapter.js');

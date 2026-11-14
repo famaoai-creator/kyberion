@@ -77,6 +77,24 @@ function createWorkItem(input: Parameters<typeof createCanonicalWorkItem>[0]) {
   });
 }
 
+// This suite isolates routing, review and artifact lifecycle from credential
+// composition: its legacy peer labels and injected native sessions are not
+// installed personal identities. WorkItem claims, leases and scope construction
+// remain real. The explicit opt-out regression below exercises production denial;
+// real admitted credential execution lives in personal-task-credential-dispatch
+// and credential-account-dispatch integration suites.
+const credentialComposition = vi.hoisted(() => ({ useRealAdmission: false }));
+vi.mock('../secret/task-credential-dispatch.js', async (original) => {
+  const actual = await original<typeof import('../secret/task-credential-dispatch.js')>();
+  return {
+    ...actual,
+    withConfiguredTaskCredentials: <T>(workItemId: string, run: () => Promise<T>): Promise<T> =>
+      credentialComposition.useRealAdmission
+        ? actual.withConfiguredTaskCredentials(workItemId, run)
+        : run(),
+  };
+});
+
 // Artifact ownership lives in ONE process-global JSONL file
 // (`active/shared/runtime/artifacts/registry.jsonl`). CI runs this directory
 // with file parallelism (`vitest run libs/core/ --coverage`, maxWorkers=4),
@@ -278,6 +296,7 @@ function makeTaskResultText(input: {
 }
 
 beforeEach(() => {
+  credentialComposition.useRealAdmission = false;
   process.env.MISSION_ROLE = 'mission_controller';
   process.env.KYBERION_BASE_ROLE = 'worker';
   artifactRegistryStore.records.length = 0;
@@ -303,6 +322,51 @@ afterEach(() => {
 });
 
 describe('mission work item dispatch', () => {
+  it('denies legacy unenveloped dispatch before provider invocation with real credential composition', async () => {
+    credentialComposition.useRealAdmission = true;
+    vi.stubEnv('MISSION_ID', '');
+    vi.stubEnv('KYBERION_TENANT', '');
+    const item = createWorkItem({
+      title: `${missionId}: Unenveloped admission denial`,
+      description: 'A routing fixture cannot acquire operator credentials through dispatch.',
+      status: 'ready',
+      projectId: missionId,
+      assigneePeerId: 'sovereign-brain',
+      labels: [`mission:${missionId}`, 'team_role:product_strategist'],
+      context: { mission_id: missionId, task_id: 'credential-denied' },
+      metadata: {
+        team_role: 'product_strategist',
+        deliverable: 'deliverables/credential-denied.md',
+        risk: 'low',
+        estimated_scope: 'S',
+      },
+    });
+    const delegateTask = vi.fn();
+    try {
+      const manifest = await dispatchMissionWorkItems(
+        makeMissionState(),
+        { mode: 'subagent', statuses: ['ready'] },
+        { delegateTask }
+      );
+      expect(delegateTask).not.toHaveBeenCalled();
+      expect(manifest.records[0]).toMatchObject({
+        status: 'failed',
+        work_item_status_after: 'blocked',
+      });
+      expect(getWorkItem(item.item_id)).toMatchObject({
+        status: 'blocked',
+        metadata: {
+          last_dispatch_error: expect.stringContaining(
+            'Claimed dispatch requires a scope envelope'
+          ),
+        },
+      });
+    } finally {
+      credentialComposition.useRealAdmission = false;
+      vi.unstubAllEnvs();
+    }
+  });
+
   it.each([
     'A2A task contract validation failed: /context Unrecognized keys lease_id',
     '[EVENT_SCOPE_LINEAGE_CONFLICT] project_id differs from authoritative mission',

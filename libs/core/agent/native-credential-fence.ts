@@ -10,7 +10,7 @@ export function assertOperatorNativeCredentialOwner(
   owner: ReturnType<typeof credentialExecutionIdentity>
 ): void {
   assertCredentialOwner(owner);
-  if (credentialExecutionIdentity().tenantSlug) {
+  if (credentialExecutionIdentity().tenantSlug || credentialExecutionIdentity().personalClaim) {
     throw new Error(
       '[CREDENTIAL_NATIVE_UNSUPPORTED] Persistent native transport is unavailable for tenant execution'
     );
