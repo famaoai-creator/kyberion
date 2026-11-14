@@ -53,6 +53,7 @@ import type {
   ResolveOrganizationWorkInput,
 } from './organization-operating-model.js';
 import { matchesIntentPhrase } from '../intent/intent-phrase-lexicon.js';
+import { STORAGE_DATA_TIERS } from '../storage-layout.js';
 
 const ORGANIZATION_ID_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 const CATALOG_PATH = pathResolver.knowledge(
@@ -251,7 +252,7 @@ export function recordPath(
 }
 
 export function recordQueryTiers(tier?: OrganizationTier): OrganizationTier[] {
-  return tier ? [tier] : ['personal', 'confidential', 'public'];
+  return tier ? [tier] : [...STORAGE_DATA_TIERS];
 }
 
 /** The tenant an organization record query reads: explicit, else the process tenant. */
@@ -594,9 +595,7 @@ export function loadOrganizationPurpose(
   query: { tier?: OrganizationTier; tenantSlug?: string; rootDir?: string } = {}
 ): OrganizationPurposeRecord | null {
   assertOrganizationId(organizationId);
-  const tiers: OrganizationTier[] = query.tier
-    ? [query.tier]
-    : ['personal', 'confidential', 'public'];
+  const tiers: OrganizationTier[] = query.tier ? [query.tier] : [...STORAGE_DATA_TIERS];
   const tenantSlug = query.tenantSlug || 'shared';
   assertTenantSlug(tenantSlug);
   for (const tier of tiers) {
@@ -755,9 +754,7 @@ export function loadOrganizationOperationalState(
   query: { tier?: OrganizationTier; tenantSlug?: string; rootDir?: string } = {}
 ): OrganizationOperationalState | null {
   assertOrganizationId(organizationId);
-  const tiers: OrganizationTier[] = query.tier
-    ? [query.tier]
-    : ['personal', 'confidential', 'public'];
+  const tiers: OrganizationTier[] = query.tier ? [query.tier] : [...STORAGE_DATA_TIERS];
   const tenantSlug = query.tenantSlug || 'shared';
   assertTenantSlug(tenantSlug);
   for (const tier of tiers) {

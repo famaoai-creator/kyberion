@@ -11,7 +11,7 @@
  * admission as the Concierge reader.
  */
 
-import type { StorageDataTier } from '../storage-layout.js';
+import { STORAGE_DATA_TIERS, type StorageDataTier } from '../storage-layout.js';
 import { createHash } from 'node:crypto';
 import { withExecutionContext } from '../authority.js';
 import {
@@ -53,7 +53,7 @@ export const NEEDS_YOU_READ_LIMIT = 1000;
 const SUMMARY_MAX_CHARS = 400;
 
 type Tier = StorageDataTier;
-const TIERS: readonly Tier[] = ['personal', 'confidential', 'public'];
+const TIERS: readonly Tier[] = STORAGE_DATA_TIERS;
 
 function tiersOf(viewer: SurfaceAuthorizationContext): Tier[] {
   return TIERS.filter((tier) => tier !== 'personal' && viewer.tierAccess.includes(tier));

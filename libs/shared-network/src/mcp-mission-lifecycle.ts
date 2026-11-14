@@ -22,6 +22,7 @@ import {
 import { nowIso } from '@agent/core/foundation';
 import { formatWireError } from '@agent/core/contracts/wire-error';
 import type { RegisterGovernedTool, ToolCatalog } from './mcp-server-engine.js';
+import { KNOWLEDGE_TIERS } from '@agent/core/foundation/knowledge-tier';
 
 export const MCP_MISSION_LIFECYCLE_OPERATIONS = [
   'record_evidence',
@@ -292,7 +293,7 @@ export function registerMcpMissionLifecycleTools(params: {
   const common = {
     mission_id: z.string().min(1),
     tenant: z.string().optional(),
-    tier: z.enum(['public', 'confidential', 'personal']).optional(),
+    tier: z.enum(KNOWLEDGE_TIERS).optional(),
     approval_ref: z.string().optional(),
   };
   for (const operation of MCP_MISSION_LIFECYCLE_OPERATIONS) {

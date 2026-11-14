@@ -32,7 +32,10 @@
 import { STANCES_DIR } from '../authn/stance-resolver.js';
 import * as path from 'node:path';
 import { listTenantProfileSlugs, readTenantProfile, resolveTenant } from './tenant-registry.js';
-import { loadTenantDesignOverrideIndex } from './tenant-design-resolver.js';
+import {
+  loadTenantDesignOverrideIndex,
+  TENANT_DESIGN_INDEX_RELATIVE_PATH,
+} from './tenant-design-resolver.js';
 import { isValidTenantSlug, TENANT_SLUG_PATTERN } from '../foundation/scope.js';
 import { listProjectRecords } from '../project/project-registry.js';
 import { pathResolver } from '../path-resolver.js';
@@ -45,7 +48,7 @@ import {
 
 export const EXCEPTIONS_RELATIVE_PATH =
   'knowledge/product/governance/tenant-registry-exceptions.json';
-const CONFIDENTIAL_INDEX_RELATIVE_PATH = 'knowledge/confidential/tenants/index.json';
+const CONFIDENTIAL_INDEX_RELATIVE_PATH = TENANT_DESIGN_INDEX_RELATIVE_PATH;
 /** Holds the read grant on the index (security-policy.json authority_role_permissions). */
 const REGISTRY_READER_ROLE = 'check_tenant_registry_consistency';
 

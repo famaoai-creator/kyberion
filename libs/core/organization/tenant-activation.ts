@@ -16,6 +16,7 @@ import {
 import { revokeGrantsForTenantBestEffort } from '../task/task-scoped-grants.js';
 import { isRecord, readTextFile } from '../foundation/text.js';
 import { nhiIdBelongsToOrganization } from '../contracts/nhi-id.js';
+import { STORAGE_DATA_TIERS } from '../storage-layout.js';
 
 export const TENANT_ACTIVATION_CHECKS = [
   'registry',
@@ -219,7 +220,7 @@ function isTenantActivationRecord(value: unknown): value is TenantActivationReco
     !nonEmpty(value.customer_slug) ||
     !nonEmpty(value.tenant_slug) ||
     !nonEmpty(value.organization_id) ||
-    !['personal', 'confidential', 'public'].includes(String(value.tier)) ||
+    !(STORAGE_DATA_TIERS as readonly string[]).includes(String(value.tier)) ||
     typeof value.owner_id !== 'string' ||
     !nonEmpty(value.customer_stance) ||
     !Array.isArray(value.nhi_ids) ||

@@ -1,4 +1,4 @@
-import type { StorageDataTier } from '../storage-layout.js';
+import { STORAGE_DATA_TIERS, type StorageDataTier } from '../storage-layout.js';
 import * as path from 'node:path';
 import { defineCatalog, type GovernedCatalog } from '../foundation/governed-catalog.js';
 import { nowIso } from '../foundation/time.js';
@@ -278,7 +278,7 @@ function projectStateFilesForQuery(query: ProjectOperationalStateQuery = {}): st
     return safeExistsSync(pathHint) ? [pathHint] : [];
   }
   if (query.projectId && query.tenantSlug && !query.tier) {
-    const tiers: Array<ProjectOperationalState['tier']> = ['personal', 'confidential', 'public'];
+    const tiers: ProjectOperationalState['tier'][] = [...STORAGE_DATA_TIERS];
     const direct = tiers
       .map((tier) =>
         projectOperationalStatePath(query.projectId!, tier, query.tenantSlug, query.rootDir)

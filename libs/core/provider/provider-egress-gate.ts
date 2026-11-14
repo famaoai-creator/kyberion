@@ -60,6 +60,7 @@ import {
   readCustodyProviderAttestationEntry,
   type NonTenantCustodyOwner,
 } from './custody-provider-attestation-store.js';
+import { KNOWLEDGE_TIERS } from '../foundation/knowledge-tier.js';
 
 const logger = createLogger('provider-egress-gate');
 
@@ -789,7 +790,7 @@ export interface ProviderTierAvailabilityReport {
   tiers: ProviderTierAvailability[];
 }
 
-const AVAILABILITY_TIERS: TierLevel[] = ['public', 'confidential', 'personal'];
+const AVAILABILITY_TIERS: TierLevel[] = [...KNOWLEDGE_TIERS];
 
 /**
  * Per data tier, which declared providers may receive material of that tier

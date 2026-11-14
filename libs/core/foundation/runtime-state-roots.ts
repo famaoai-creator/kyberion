@@ -1,4 +1,4 @@
-import type { KnowledgeTier } from './knowledge-tier.js';
+import { KNOWLEDGE_TIERS, type KnowledgeTier } from './knowledge-tier.js';
 import { createHash } from 'node:crypto';
 import { isValidTenantSlug } from './scope.js';
 
@@ -176,7 +176,7 @@ export function runtimeStatePath(
     throw new Error(`[RUNTIME_STATE_KEY_INVALID] ${String(key)}`);
   }
   const logicalPath = RUNTIME_STATE_PATHS[key];
-  if (scope?.tier !== undefined && !['public', 'confidential', 'personal'].includes(scope.tier)) {
+  if (scope?.tier !== undefined && !KNOWLEDGE_TIERS.includes(scope.tier)) {
     throw new Error('[RUNTIME_STATE_TIER_INVALID]');
   }
   if (scope?.tenant_slug !== undefined && !isValidTenantSlug(scope.tenant_slug)) {

@@ -835,3 +835,365 @@ describe('tenant:attest_provider delegation grants', () => {
     ).toBeUndefined();
   });
 });
+
+describe('HOTL delegation surface (all external ops)', () => {
+  it('network:fetch grant pins method + https origin and rejects method mismatches', () => {
+    const effect = { params: { url: 'https://api.example.com/v1/x?q=1', method: 'post' } };
+    expect(buildExternalOperationTarget('network:fetch', effect)).toEqual({
+      operation_id: 'network:fetch',
+      method: 'POST',
+      origin: 'https://api.example.com',
+    });
+    const grant = parseExternalOperationGrant({
+      operation_id: 'network:fetch',
+      method: 'POST',
+      origin: 'https://api.example.com',
+    });
+    expect(grant).toBeDefined();
+    expect(
+      externalOperationGrantMatches(
+        grant!,
+        buildExternalOperationTarget('network:fetch', effect) as never
+      )
+    ).toBe(true);
+    const put = parseExternalOperationGrant({
+      operation_id: 'network:fetch',
+      method: 'PUT',
+      origin: 'https://api.example.com',
+    });
+    expect(
+      externalOperationGrantMatches(
+        put!,
+        buildExternalOperationTarget('network:fetch', effect) as never
+      )
+    ).toBe(false);
+    // http or credentialed URLs are not delegable — they fall back to approval.
+    expect(
+      buildExternalOperationTarget('network:fetch', { params: { url: 'http://internal/x' } })
+    ).toBeUndefined();
+    expect(
+      buildExternalOperationTarget('network:fetch', {
+        params: { url: 'https://u:p@example.com/x' },
+      })
+    ).toBeUndefined();
+  });
+
+  it('network:shell grant binds the exact command string', () => {
+    const target = buildExternalOperationTarget('network:shell', { params: { cmd: 'df -h' } });
+    expect(target).toEqual({ operation_id: 'network:shell', cmd: 'df -h' });
+    const grant = parseExternalOperationGrant({ operation_id: 'network:shell', cmd: 'df -h' });
+    expect(externalOperationGrantMatches(grant!, target as never)).toBe(true);
+    const other = parseExternalOperationGrant({ operation_id: 'network:shell', cmd: 'df -i' });
+    expect(externalOperationGrantMatches(other!, target as never)).toBe(false);
+    expect(
+      parseExternalOperationGrant({ operation_id: 'network:shell', cmd: 'df *' })
+    ).toBeUndefined();
+  });
+
+  it('network:a2a_send grant pins transport method + recipient peer', () => {
+    const effect = {
+      params: {
+        method: 'local',
+        message: { header: { msg_id: 'm1' }, recipient_peer_id: 'peer-b' },
+      },
+    };
+    expect(buildExternalOperationTarget('network:a2a_send', effect)).toEqual({
+      operation_id: 'network:a2a_send',
+      method: 'local',
+      peer_id: 'peer-b',
+    });
+    const grant = parseExternalOperationGrant({
+      operation_id: 'network:a2a_send',
+      method: 'local',
+      peer_id: 'peer-b',
+    });
+    expect(
+      externalOperationGrantMatches(
+        grant!,
+        buildExternalOperationTarget('network:a2a_send', effect) as never
+      )
+    ).toBe(true);
+    // An envelope without a recipient identity cannot build a delegation target.
+    expect(
+      buildExternalOperationTarget('network:a2a_send', {
+        params: { method: 'local', message: { header: { msg_id: 'm1' } } },
+      })
+    ).toBeUndefined();
+  });
+
+  it('meeting session grants must name exactly one meeting or series scope', () => {
+    const effect = { params: { platform: 'zoom', series_id: 'cal-9' } };
+    expect(buildExternalOperationTarget('meeting:join', effect)).toEqual({
+      operation_id: 'meeting:join',
+      platform: 'zoom',
+      series_id: 'cal-9',
+    });
+    // A bare platform grant is invalid — delegation always names its scope.
+    expect(
+      parseExternalOperationGrant({ operation_id: 'meeting:join', platform: 'zoom' })
+    ).toBeUndefined();
+    expect(
+      parseExternalOperationGrant({
+        operation_id: 'meeting:join',
+        platform: 'zoom',
+        meeting_id: 'm1',
+        series_id: 's1',
+      })
+    ).toBeUndefined();
+    const grant = parseExternalOperationGrant({
+      operation_id: 'meeting:join',
+      platform: 'zoom',
+      series_id: 'cal-9',
+    });
+    expect(
+      externalOperationGrantMatches(
+        grant!,
+        buildExternalOperationTarget('meeting:join', effect) as never
+      )
+    ).toBe(true);
+    // Series id wins over meeting id in the emitted target.
+    expect(
+      buildExternalOperationTarget('meeting:chat', {
+        params: { platform: 'zoom', meeting_id: 'm1', series_id: 's1' },
+      })
+    ).toEqual({ operation_id: 'meeting:chat', platform: 'zoom', series_id: 's1' });
+    // Joining a meeting with no stable scope stays on per-action approval.
+    expect(
+      buildExternalOperationTarget('meeting:join', { params: { platform: 'zoom' } })
+    ).toBeUndefined();
+  });
+
+  it('voice grants pin platform (+optional artifact hash for playback)', () => {
+    expect(
+      buildExternalOperationTarget('voice:playback', {
+        params: { platform: 'macos', format: 'wav', content_hash: 'abc' },
+      })
+    ).toEqual({
+      operation_id: 'voice:playback',
+      platform: 'macos',
+      format: 'wav',
+      content_hash: 'abc',
+    });
+    expect(buildExternalOperationTarget('voice:speak', { params: { platform: 'macos' } })).toEqual({
+      operation_id: 'voice:speak',
+      platform: 'macos',
+    });
+    const artifact = parseExternalOperationGrant({
+      operation_id: 'voice:playback',
+      platform: 'macos',
+      content_hash: 'abc',
+    });
+    const target = buildExternalOperationTarget('voice:playback', {
+      params: { platform: 'macos', format: 'wav', content_hash: 'abc' },
+    });
+    expect(externalOperationGrantMatches(artifact!, target as never)).toBe(true);
+  });
+
+  it('calendar grants pin backend + optional calendar/event scope', () => {
+    const effect = {
+      op: 'delete_event',
+      backend: 'google',
+      params: { calendar_id: 'primary', event_id: 'ev-1' },
+    };
+    expect(buildExternalOperationTarget('calendar:delete_event', effect)).toEqual({
+      operation_id: 'calendar:delete_event',
+      backend: 'google',
+      calendar_id: 'primary',
+      event_id: 'ev-1',
+    });
+    const eventGrant = parseExternalOperationGrant({
+      operation_id: 'calendar:delete_event',
+      backend: 'google',
+      event_id: 'ev-1',
+    });
+    expect(
+      externalOperationGrantMatches(
+        eventGrant!,
+        buildExternalOperationTarget('calendar:delete_event', effect) as never
+      )
+    ).toBe(true);
+    const otherEvent = parseExternalOperationGrant({
+      operation_id: 'calendar:delete_event',
+      backend: 'google',
+      event_id: 'ev-2',
+    });
+    expect(
+      externalOperationGrantMatches(
+        otherEvent!,
+        buildExternalOperationTarget('calendar:delete_event', effect) as never
+      )
+    ).toBe(false);
+  });
+
+  it('deployment grant pins adapter + environment (+optional project)', () => {
+    const effect = {
+      adapter: 'vercel',
+      params: { environment: 'staging', project_name: 'web', version: '1.2.3', mission_id: 'M1' },
+    };
+    expect(buildExternalOperationTarget('deployment:deploy_release', effect)).toEqual({
+      operation_id: 'deployment:deploy_release',
+      adapter: 'vercel',
+      environment: 'staging',
+      project_name: 'web',
+    });
+    const staging = parseExternalOperationGrant({
+      operation_id: 'deployment:deploy_release',
+      adapter: 'vercel',
+      environment: 'staging',
+    });
+    expect(
+      externalOperationGrantMatches(
+        staging!,
+        buildExternalOperationTarget('deployment:deploy_release', effect) as never
+      )
+    ).toBe(true);
+    const prod = parseExternalOperationGrant({
+      operation_id: 'deployment:deploy_release',
+      adapter: 'vercel',
+      environment: 'production',
+    });
+    expect(
+      externalOperationGrantMatches(
+        prod!,
+        buildExternalOperationTarget('deployment:deploy_release', effect) as never
+      )
+    ).toBe(false);
+  });
+
+  it('media generation grants pin the resolved backend_id', () => {
+    const effect = { backend: { backend_id: 'comfyui.local' }, params: { prompt: 'x' } };
+    expect(buildExternalOperationTarget('media:generation:generate_image', effect)).toEqual({
+      operation_id: 'media:generation:generate_image',
+      backend: 'comfyui.local',
+    });
+    const grant = parseExternalOperationGrant({
+      operation_id: 'media:generation:generate_image',
+      backend: 'comfyui.local',
+    });
+    expect(
+      externalOperationGrantMatches(
+        grant!,
+        buildExternalOperationTarget('media:generation:generate_image', effect) as never
+      )
+    ).toBe(true);
+    // A grant for a different media action never covers another operation id.
+    const video = parseExternalOperationGrant({
+      operation_id: 'media:generation:generate_video',
+      backend: 'comfyui.local',
+    });
+    expect(
+      externalOperationGrantMatches(
+        video!,
+        buildExternalOperationTarget('media:generation:generate_image', effect) as never
+      )
+    ).toBe(false);
+  });
+
+  it('slack post_message grants pin the channel', () => {
+    const effect = { params: { channel: '#alerts', text: 'hi' } };
+    expect(buildExternalOperationTarget('service:slack:preset:post_message', effect)).toEqual({
+      operation_id: 'service:slack:preset:post_message',
+      channel: '#alerts',
+    });
+    const grant = parseExternalOperationGrant({
+      operation_id: 'service:slack:preset:post_message',
+      channel: '#alerts',
+    });
+    expect(
+      externalOperationGrantMatches(
+        grant!,
+        buildExternalOperationTarget('service:slack:preset:post_message', effect) as never
+      )
+    ).toBe(true);
+  });
+});
+
+describe('bare operation grants', () => {
+  it('a bare grant delegates the whole operation — all declared fields optional', () => {
+    const bare = parseExternalOperationGrant({ operation_id: 'network:fetch' });
+    expect(bare).toEqual({ operation_id: 'network:fetch' });
+    const target = buildExternalOperationTarget('network:fetch', {
+      params: { url: 'https://api.example.com/data', method: 'POST' },
+    }) as never;
+    expect(externalOperationGrantMatches(bare!, target)).toBe(true);
+    // Other loose operations parse bare too.
+    for (const op of [
+      'network:shell',
+      'network:exposure_check',
+      'network:a2a_send',
+      'voice:speak',
+      'voice:playback',
+      'calendar:create_event',
+      'deployment:deploy_release',
+      'media:generation:generate_image',
+      'service:slack:preset:post_message',
+      'browser:goto',
+    ]) {
+      expect(parseExternalOperationGrant({ operation_id: op }), op).toBeDefined();
+    }
+  });
+
+  it('a scoped grant still narrows a bare-delegable operation', () => {
+    const scoped = parseExternalOperationGrant({
+      operation_id: 'network:fetch',
+      method: 'GET',
+      origin: 'https://api.example.com',
+    });
+    const getTarget = buildExternalOperationTarget('network:fetch', {
+      params: { url: 'https://api.example.com/x', method: 'GET' },
+    }) as never;
+    const postTarget = buildExternalOperationTarget('network:fetch', {
+      params: { url: 'https://api.example.com/x', method: 'POST' },
+    }) as never;
+    const otherOrigin = buildExternalOperationTarget('network:fetch', {
+      params: { url: 'https://evil.example.com/x', method: 'GET' },
+    }) as never;
+    expect(externalOperationGrantMatches(scoped!, getTarget)).toBe(true);
+    expect(externalOperationGrantMatches(scoped!, postTarget)).toBe(false);
+    expect(externalOperationGrantMatches(scoped!, otherOrigin)).toBe(false);
+    // A grant never widens: unknown keys and malformed origins stay rejected.
+    expect(
+      parseExternalOperationGrant({ operation_id: 'network:fetch', unknown: 'x' })
+    ).toBeUndefined();
+    expect(
+      parseExternalOperationGrant({
+        operation_id: 'network:fetch',
+        origin: 'http://insecure.example.com',
+      })
+    ).toBeUndefined();
+    expect(
+      parseExternalOperationGrant({ operation_id: 'network:fetch', method: 'GET*' })
+    ).toBeUndefined();
+  });
+
+  it('scope-essential grants keep their mandatory fields', () => {
+    // VCS repository pinning is the semantic meaning of the grant.
+    expect(parseExternalOperationGrant({ operation_id: 'vcs:push' })).toBeUndefined();
+    expect(parseExternalOperationGrant({ operation_id: 'vcs:pr_create' })).toBeUndefined();
+    // Tenant attestation binds the whole claim — nothing may be dropped.
+    expect(parseExternalOperationGrant({ operation_id: 'tenant:attest_provider' })).toBeUndefined();
+    expect(
+      parseExternalOperationGrant({ operation_id: 'tenant:attest_provider', tenant_slug: 'acme' })
+    ).toBeUndefined();
+    // Meetings keep platform + exactly one of meeting_id/series_id.
+    expect(
+      parseExternalOperationGrant({ operation_id: 'meeting:join', platform: 'zoom' })
+    ).toBeUndefined();
+    expect(parseExternalOperationGrant({ operation_id: 'meeting:join' })).toBeUndefined();
+    expect(
+      parseExternalOperationGrant({
+        operation_id: 'meeting:join',
+        platform: 'zoom',
+        meeting_id: 'm-1',
+        series_id: 's-1',
+      })
+    ).toBeUndefined();
+    expect(
+      parseExternalOperationGrant({
+        operation_id: 'meeting:join',
+        platform: 'zoom',
+        series_id: 's-1',
+      })
+    ).toBeDefined();
+  });
+});

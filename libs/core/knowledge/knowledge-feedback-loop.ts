@@ -53,6 +53,10 @@ import type { TaskResultKnowledgeFeedback } from '../surface/channel-surface-typ
 import { assertMemoryScope, type MemoryScopeEnvelope } from './memory-scope.js';
 import { physicalScopedPath } from '../storage/physical-namespace.js';
 import {
+  isSharedConfidentialOwner,
+  KNOWLEDGE_CONFIDENTIAL_PREFIX,
+} from '../governance/shared-scope-prefixes.js';
+import {
   recordKnowledgeProblem,
   recordKnowledgeReuseObservation,
 } from './knowledge-verification.js';
@@ -330,16 +334,14 @@ export function recordHumanKnowledgeFeedback(input: HumanKnowledgeFeedback): str
   if (logicalPath.startsWith('/') || logicalPath.split('/').includes('..')) {
     throw new Error('[KNOWLEDGE_FEEDBACK_INVALID] document_path must be repository-relative');
   }
-  const confidentialPrefix = 'knowledge/confidential/';
-  if (logicalPath.startsWith(confidentialPrefix)) {
-    const owner = logicalPath.slice(confidentialPrefix.length).split('/')[0];
-    const sharedOwners = new Set(['common', 'tenant-groups']);
+  if (logicalPath.startsWith(KNOWLEDGE_CONFIDENTIAL_PREFIX)) {
+    const owner = logicalPath.slice(KNOWLEDGE_CONFIDENTIAL_PREFIX.length).split('/')[0];
     if (!input.scope?.tenant_slug) {
       throw new Error(
         '[SCOPE_CONTEXT_INVALID] Confidential knowledge feedback requires a resolved tenant scope'
       );
     }
-    if (owner !== input.scope.tenant_slug && !sharedOwners.has(owner)) {
+    if (owner !== input.scope.tenant_slug && !isSharedConfidentialOwner(owner)) {
       throw new Error(
         `[SCOPE_CONTEXT_INVALID] Knowledge feedback path belongs to tenant '${owner}', not '${input.scope.tenant_slug}'`
       );

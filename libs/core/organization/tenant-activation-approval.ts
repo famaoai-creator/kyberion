@@ -2,6 +2,7 @@
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
+import { KNOWLEDGE_TIERS } from '../foundation/knowledge-tier.js';
 import type { ResolvedPrincipal } from '../authn/authn-principal-resolver.js';
 import { humanActor } from '../contracts/actor.js';
 import { getAgentIdentity } from '../agent/agent-identity.js';
@@ -79,7 +80,7 @@ const commandSchema = z
     customerSlug: z.string().regex(/^[a-z0-9][a-z0-9_-]*$/),
     tenantSlug: z.string().min(1),
     organizationId: z.string().min(1),
-    tier: z.enum(['personal', 'confidential', 'public']),
+    tier: z.enum(KNOWLEDGE_TIERS),
     ownerId: z.string().min(1),
     nhiIds: z.array(z.string().min(1)).min(1),
     serviceIds: z.array(z.string().min(1)),

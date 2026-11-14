@@ -279,6 +279,62 @@ export function parseCharterForm(
   };
 }
 
+/** Human-readable scope line for one signed grant — the text the accountable
+ * owner actually signs, so every grant shape names exactly what it opens. */
+function describeGrantTarget(grant: ExternalOperationGrant): string {
+  if ('repository' in grant) {
+    const branch =
+      'branch' in grant
+        ? `; branch: ${grant.branch}`
+        : 'branch_pattern' in grant
+          ? `; branches matching pattern: ${grant.branch_pattern}`
+          : '';
+    return `${grant.repository}${branch}`;
+  }
+  switch (grant.operation_id) {
+    case 'browser:goto':
+    case 'browser:open_tab':
+      return grant.origin ?? 'ANY origin (isolated navigation only)';
+    case 'tenant:attest_provider':
+      return `${grant.tenant_slug}/${grant.provider}`;
+    case 'service:slack:preset:post_message':
+      return grant.channel ? `channel: ${grant.channel}` : 'ANY channel';
+    case 'meeting:join':
+    case 'meeting:listen':
+    case 'meeting:speak':
+    case 'meeting:chat':
+      return `platform: ${grant.platform}; ${
+        'series_id' in grant ? `meeting series: ${grant.series_id}` : `meeting: ${grant.meeting_id}`
+      }`;
+    case 'voice:playback':
+      return `platform: ${grant.platform ?? 'ANY'}${
+        grant.format ? `; format: ${grant.format}` : ''
+      }${grant.content_hash ? `; artifact: ${grant.content_hash}` : ''}`;
+    case 'voice:speak':
+      return `platform: ${grant.platform ?? 'ANY'}`;
+    case 'network:fetch':
+      return `${grant.method ?? 'ANY method'} ${grant.origin ?? 'ANY https origin'}`;
+    case 'network:exposure_check':
+      return grant.origin ?? 'ANY https origin';
+    case 'network:shell':
+      return grant.cmd ? `command: ${grant.cmd}` : 'ANY command';
+    case 'network:a2a_send':
+      return `transport: ${grant.method ?? 'ANY'}; peer: ${grant.peer_id ?? 'ANY'}`;
+    case 'calendar:create_event':
+    case 'calendar:update_event':
+    case 'calendar:delete_event':
+      return `backend: ${grant.backend ?? 'ANY'}${
+        grant.calendar_id ? `; calendar: ${grant.calendar_id}` : ''
+      }${'event_id' in grant && grant.event_id ? `; event: ${grant.event_id}` : ''}`;
+    case 'deployment:deploy_release':
+      return `adapter: ${grant.adapter ?? 'ANY'}; environment: ${grant.environment ?? 'ANY'}${
+        grant.project_name ? `; project: ${grant.project_name}` : ''
+      }`;
+    default:
+      return `backend: ${'backend' in grant && grant.backend ? grant.backend : 'ANY'}`;
+  }
+}
+
 function yen(n: number): string {
   return `${CURRENCY} ${n.toLocaleString('en-US')}`;
 }
@@ -343,23 +399,10 @@ export function renderAcceptanceStatement(input: {
         ? 'Unattended delivery is limited to a routine greeting for a bound customer. Attachments, personal or sensitive data, and all other content require human approval.'
         : 'Customer outbound automation is disabled.',
       recipientLine,
-      ...(form.external_operations ?? []).map((grant) => {
-        const base =
-          'repository' in grant
-            ? grant.repository
-            : 'origin' in grant
-              ? grant.origin
-              : `${grant.tenant_slug}/${grant.provider}`;
-        // The signed text must show the branch scope the human is actually
-        // granting — an exact ref or a tree pattern read very differently.
-        const branch =
-          'branch' in grant
-            ? `; branch: ${grant.branch}`
-            : 'branch_pattern' in grant
-              ? `; branches matching pattern: ${grant.branch_pattern}`
-              : '';
-        return `External operation: ${grant.operation_id}; target: ${base}${branch}; accountable owner: ${accountableId}; expires: ${expires}. Public execution context and public content only; protected or unknown source data requires individual approval. Browser URL queries, fragments, form submission and scripts are not delegated.`;
-      }),
+      ...(form.external_operations ?? []).map(
+        (grant) =>
+          `External operation: ${grant.operation_id}; target: ${describeGrantTarget(grant)}; accountable owner: ${accountableId}; expires: ${expires}. Public execution context and public content only; protected or unknown source data requires individual approval. Browser URL queries, fragments, form submission and scripts are not delegated.`
+      ),
       `Approved inference processors: ${form.approved_processors.length ? form.approved_processors.join(', ') : 'none'}. Purposes: ${form.processing_purposes.join(', ') || 'none'}. Categories: ${form.processing_categories.join(', ') || 'none'}. Training and retention remain governed by separate provider evidence.`,
       form.delegated_decisions.length > 0
         ? say('decisions_on', { decisions: decisionLabels(locale) })

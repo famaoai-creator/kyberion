@@ -14,6 +14,7 @@ import { getRegisteredEnvText, isVitestProcess } from '../foundation/env.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import { isRecord, readTextFile } from '../foundation/text.js';
 import { assertCapabilityAllowed } from '../governance/capability-restriction-policy.js';
+import { STORAGE_DATA_TIERS } from '../storage-layout.js';
 
 /**
  * Creates a pre-configured yargs instance with common options.
@@ -32,7 +33,7 @@ export function createStandardYargs(args: string[]) {
     })
     .option('tier', {
       type: 'string',
-      choices: ['personal', 'confidential', 'public'],
+      choices: [...STORAGE_DATA_TIERS],
       default: 'public',
       description: 'Knowledge tier for the operation',
     })

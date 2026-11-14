@@ -1127,6 +1127,96 @@
       "status": "active",
       "grants": ["scope_locale_reader"],
       "sources": ["role-policy"]
+    },
+    {
+      "id": "runtime.mesh-hub",
+      "path": "active/shared/runtime/mesh-hub",
+      "custody": {
+        "kind": "unscoped-legacy"
+      },
+      "status": "active",
+      "sources": ["scope-model"]
+    },
+    {
+      "id": "runtime.feedback-loop",
+      "path": "active/shared/runtime/feedback-loop",
+      "custody": {
+        "kind": "unscoped-legacy"
+      },
+      "status": "active",
+      "sources": ["scope-model"]
+    },
+    {
+      "id": "runtime.presence",
+      "path": "active/shared/runtime/presence",
+      "custody": {
+        "kind": "unscoped-legacy"
+      },
+      "status": "active",
+      "sources": ["scope-model"]
+    },
+    {
+      "id": "runtime.delivery-packs",
+      "path": "active/shared/runtime/delivery-packs",
+      "custody": {
+        "kind": "unscoped-legacy"
+      },
+      "status": "active",
+      "sources": ["scope-model"]
+    },
+    {
+      "id": "runtime.peer-messaging",
+      "path": "active/shared/runtime/peer-messaging",
+      "custody": {
+        "kind": "unscoped-legacy"
+      },
+      "status": "active",
+      "sources": ["scope-model"]
+    },
+    {
+      "id": "runtime.peer-conversations",
+      "path": "active/shared/runtime/peer-conversations",
+      "custody": {
+        "kind": "unscoped-legacy"
+      },
+      "status": "active",
+      "sources": ["scope-model"]
+    },
+    {
+      "id": "runtime.a2a",
+      "path": "active/shared/runtime/a2a",
+      "custody": {
+        "kind": "unscoped-legacy"
+      },
+      "status": "active",
+      "sources": ["scope-model"]
+    },
+    {
+      "id": "runtime.role-assumption-trace",
+      "path": "active/shared/runtime/role-assumption-trace",
+      "custody": {
+        "kind": "unscoped-legacy"
+      },
+      "status": "active",
+      "sources": ["scope-model"]
+    },
+    {
+      "id": "runtime.data-vault",
+      "path": "active/shared/data-vault",
+      "custody": {
+        "kind": "unscoped-legacy"
+      },
+      "status": "active",
+      "sources": ["scope-model"]
+    },
+    {
+      "id": "runtime.service-bindings-backup",
+      "path": "active/shared/runtime/service-bindings-backup",
+      "custody": {
+        "kind": "unscoped-legacy"
+      },
+      "status": "active",
+      "sources": ["scope-model"]
     }
   ]
 }

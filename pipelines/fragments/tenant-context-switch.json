@@ -11,12 +11,10 @@
     {
       "id": "validate_tenant",
       "role": "source",
-      "op": "system:exec",
-      "produces": { "channel": "tenant_dir_check", "type": "ShellResult" },
+      "op": "file:exists",
+      "produces": { "channel": "tenant_dir_check", "type": "FileExistsResult" },
       "params": {
-        "command": "ls",
-        "args": ["knowledge/confidential/{{tenant_slug}}"],
-        "allow_error": true
+        "path": "knowledge/confidential/{{tenant_slug}}"
       }
     },
     {

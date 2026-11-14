@@ -47,6 +47,7 @@ import {
 import { isValidTenantSlug, isValidMemberId } from '../foundation/scope.js';
 import { COMMON_TENANT_SLUG } from './ingest-asset-ledger.js';
 import { tenantOfPath } from '../governance/path-tenant-attribution.js';
+import { isSharedConfidentialOwner } from '../governance/shared-scope-prefixes.js';
 import {
   PARTITIONED_RUNTIME_LEDGER_ROOTS,
   PARTITIONED_RUNTIME_STATE_ROOTS,
@@ -169,8 +170,8 @@ const TENANT_TREE_PREFIXES = [
   'active/projects/',
   'active/organizations/',
 ];
-/** `knowledge/confidential/` segments that are shared prefixes, never tenants. */
-const KNOWLEDGE_CONFIDENTIAL_SHARED = new Set(['tenant-groups', 'heuristics', 'relationships']);
+/** Shared `knowledge/confidential/` owner segments resolve from the policy via
+ * shared-scope-prefixes.ts — never redeclared here (includes `common`). */
 
 /**
  * Tenant owning a repo-relative path, inferred from ANCHORED partition
@@ -188,7 +189,7 @@ export function tenantFromRepoPath(
     const attributed = tenantOfPath(path.join(rootDir, relativePath));
     // The policy's shared prefixes are shared for EVERY lookup path — never
     // tenants, whatever the attribution layer knows about them.
-    if (attributed && !KNOWLEDGE_CONFIDENTIAL_SHARED.has(attributed)) return attributed;
+    if (attributed && !isSharedConfidentialOwner(attributed)) return attributed;
     if (attributed) return undefined;
   } catch {
     // Missing file or unresolvable — anchored matching below still applies.
@@ -205,7 +206,7 @@ export function tenantFromRepoPath(
     seg && (isValidTenantSlug(seg) || seg === COMMON_TENANT_SLUG) ? seg : undefined;
   const knowledge = segmentAfter('knowledge/confidential/');
   if (knowledge !== undefined) {
-    if (KNOWLEDGE_CONFIDENTIAL_SHARED.has(knowledge)) return undefined;
+    if (isSharedConfidentialOwner(knowledge)) return undefined;
     return scopeSegment(knowledge);
   }
   for (const tree of TENANT_TREE_PREFIXES) {
@@ -368,7 +369,7 @@ function directVerifiedRecordSources(
     // claimed `asset:heuristics:…` confers nothing, matching path custody.
     if (
       (!isValidTenantSlug(ref.tenant) && ref.tenant !== COMMON_TENANT_SLUG) ||
-      KNOWLEDGE_CONFIDENTIAL_SHARED.has(ref.tenant)
+      isSharedConfidentialOwner(ref.tenant)
     )
       continue;
     const binding = record.proof?.sources.find((proof) => proof.ref === source);

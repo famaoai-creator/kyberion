@@ -12,6 +12,7 @@ import {
   type DotProposal,
   type DotExpectedEffect,
 } from '../dot/dot-proposals.js';
+import { STORAGE_DATA_TIERS } from '../storage-layout.js';
 
 export interface ContinuousOperationsScope {
   tier: StorageDataTier;
@@ -151,7 +152,7 @@ export function parseContinuousOperationsConfig(value: unknown): ContinuousOpera
   ]);
   const s = record(r.scope, ['tier', 'tenant_slug', 'organization_id', 'project_id']);
   const scope: ContinuousOperationsScope = {
-    tier: choice(s.tier, ['public', 'confidential', 'personal']),
+    tier: choice(s.tier, [...STORAGE_DATA_TIERS]),
     organization_id: id(s.organization_id),
   };
   if (s.tenant_slug !== undefined) {

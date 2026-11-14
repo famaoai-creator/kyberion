@@ -50,6 +50,7 @@ import {
 import { listTenantProfileSlugs } from '../organization/tenant-registry.js';
 import type { ScopeContext } from '../scope-context.js';
 import { physicalScopedPath } from '../storage/physical-namespace.js';
+import { isSharedConfidentialOwner } from '../governance/shared-scope-prefixes.js';
 import {
   createMemoryPromotionCandidate,
   enqueueMemoryPromotionCandidate,
@@ -120,7 +121,7 @@ function workedRecently(documentPath: string, windowDays: number, now: Date): bo
   try {
     const tenant = documentPath.match(/^knowledge\/confidential\/([^/]+)\//)?.[1];
     const scope =
-      tenant && tenant !== 'common' && tenant !== 'tenant-groups'
+      tenant && !isSharedConfidentialOwner(tenant)
         ? { tier: 'confidential' as const, tenant_slug: tenant }
         : undefined;
     const verification = resolveKnowledgeVerification([documentPath], scope).get(documentPath);

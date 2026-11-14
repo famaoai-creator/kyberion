@@ -1,3 +1,4 @@
+import { KNOWLEDGE_TIERS } from './foundation/knowledge-tier.js';
 import type { StorageDataTier } from './storage-layout.js';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -982,7 +983,7 @@ export function findMissionPath(missionId: string): string | null {
     if (!rawExistsSync(path.join(candidate, 'mission-state.json'))) return true;
     throw missionNotVisibleError(missionId);
   };
-  const tiers: MissionTier[] = ['personal', 'confidential', 'public'];
+  const tiers: MissionTier[] = [...KNOWLEDGE_TIERS];
 
   for (const tier of tiers) {
     const subPath = readConfiguredMissionSubPath(tier);

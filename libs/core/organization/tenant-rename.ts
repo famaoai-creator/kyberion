@@ -27,6 +27,7 @@ import {
   safeWriteFile,
 } from '../secure-io.js';
 import { isValidTenantSlug } from '../entity-scope.js';
+import { STORAGE_DATA_TIERS } from '../storage-layout.js';
 
 export type TenantLifecycleVerb = 'create' | 'update' | 'suspend' | 'resume' | 'archive';
 
@@ -278,7 +279,7 @@ export function renameTenantWithPlan(input: TenantRenameInput): TenantRenameResu
 
   // 2. Organization state. The tenant directory always moves; the organization
   //    id only changes when it was named after the slug.
-  for (const tier of ['confidential', 'personal', 'public']) {
+  for (const tier of [...STORAGE_DATA_TIERS]) {
     const fromOrgDir = organizationTenantDir(rootDir, tier, fromSlug);
     if (!safeExistsSync(fromOrgDir)) continue;
     const toOrgDir = organizationTenantDir(rootDir, tier, toSlug);

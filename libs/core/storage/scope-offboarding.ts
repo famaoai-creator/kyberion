@@ -55,6 +55,7 @@ import { RETENTION_CATALOG_REPO_PATH } from './storage-retention-catalog.js';
 import {
   PARTITIONED_RUNTIME_LEDGER_ROOTS,
   PARTITIONED_RUNTIME_STATE_ROOTS,
+  STORAGE_DATA_TIERS,
   metricsLedgerLockId,
   metricsRowTenant,
   tenantRuntimePartitionOf,
@@ -463,8 +464,6 @@ const METRICS_LEDGERS: readonly MetricsLedgerOffboarding[] = [
   },
 ];
 
-const SCOPE_TIERS = ['personal', 'confidential', 'public'] as const;
-
 /**
  * Offboarding disposition of every tenant-partitioned runtime root. `null`
  * leaves the partition in place. The `satisfies` clause makes a newly
@@ -620,7 +619,7 @@ function collectProjectWorkspaceTargets(
     target: OffboardTarget;
     lineage: { tenantSlug?: string; organizationId?: string };
   }> = [];
-  for (const tier of SCOPE_TIERS) {
+  for (const tier of STORAGE_DATA_TIERS) {
     const tierDir = path.join(pathResolver.rootDir(), 'active', 'projects', tier);
     for (const owner of listDirEntries(tierDir)) {
       const ownerDir = safeOptionalRepositoryPath(path.join(tierDir, owner));
@@ -887,7 +886,7 @@ function tenantMissionIds(tenantSlug: string, targets: readonly OffboardTarget[]
     ['active', 'missions'],
     ['active', 'archive', 'missions'],
   ]) {
-    for (const tier of SCOPE_TIERS) {
+    for (const tier of STORAGE_DATA_TIERS) {
       const dir = safeOptionalRepositoryPath(
         path.join(pathResolver.rootDir(), ...base, tier, tenantSlug)
       );
@@ -932,7 +931,7 @@ function legacyDelegationBelongsTo(
  */
 function tenantDelegationIds(tenantSlug: string, missionIds: ReadonlySet<string>): Set<string> {
   const ids = new Set<string>();
-  for (const tier of SCOPE_TIERS) {
+  for (const tier of STORAGE_DATA_TIERS) {
     const dir = safeOptionalRepositoryPath(
       path.join(
         pathResolver.rootDir(),
@@ -1116,7 +1115,7 @@ export function collectScopeTargets(
   // tenant offboarding claims the tenant root, while project offboarding
   // selects only the exact project directory after lineage matching.
   if (scopeType === 'tenant') {
-    for (const tier of SCOPE_TIERS) {
+    for (const tier of STORAGE_DATA_TIERS) {
       const dir = safeOptionalRepositoryPath(
         path.join(pathResolver.rootDir(), 'active', 'projects', tier, id)
       );
@@ -1141,7 +1140,7 @@ export function collectScopeTargets(
 
   // Mission trees declaring the scope in their state.
   const missionsRoot = path.join(pathResolver.rootDir(), 'active', 'missions');
-  for (const tier of SCOPE_TIERS) {
+  for (const tier of STORAGE_DATA_TIERS) {
     const tierDir = path.join(missionsRoot, tier);
     for (const name of listDirEntries(tierDir)) {
       const missionDir = safeOptionalRepositoryPath(path.join(tierDir, name));

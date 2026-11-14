@@ -289,7 +289,7 @@ async function opCapture(op: string, rawParams: unknown, ctx: NetworkPipelineCon
           operationId: 'network:fetch',
           effect: { params: request },
           requiresApproval: !readOnly,
-          delegable: false,
+          delegable: true,
         },
         () => (readOnly ? retry(fetch, buildRetryOptions(params)) : fetch()),
         (result) =>
@@ -335,7 +335,7 @@ async function opCapture(op: string, rawParams: unknown, ctx: NetworkPipelineCon
               operationId: 'network:exposure_check',
               effect: { params: { url: endpoint, method, timeout } },
               requiresApproval: false,
-              delegable: false,
+              delegable: true,
             },
             () => secureFetch({ url: endpoint, method, timeout }),
             () => 'succeeded'
@@ -388,7 +388,7 @@ async function opCapture(op: string, rawParams: unknown, ctx: NetworkPipelineCon
           operationId: 'network:shell',
           effect: { params: { cmd } },
           requiresApproval: true,
-          delegable: false,
+          delegable: true,
         },
         async () => safeExec(cmd).trim(),
         () => 'succeeded'

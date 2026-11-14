@@ -9,6 +9,7 @@ import {
   safeWriteFile,
 } from '../secure-io.js';
 import type { VolatileCadence, VolatileScope } from '../path-resolver.js';
+import { STORAGE_DATA_TIERS } from '../storage-layout.js';
 
 export type { VolatileCadence, VolatileScope } from '../path-resolver.js';
 
@@ -57,7 +58,7 @@ const VOLATILE_SCOPES = new Set<VolatileScope>([
   'global',
 ]);
 const VOLATILE_CADENCES = new Set<VolatileCadence>(['resident', 'daily', 'weekly', 'adhoc-ttl']);
-const VOLATILE_TIERS = new Set<VolatileTier>(['personal', 'confidential', 'public']);
+const VOLATILE_TIERS = new Set<VolatileTier>(STORAGE_DATA_TIERS);
 const VOLATILE_LIFETIMES = new Set<VolatileLifetime>([
   'session',
   'mission',
