@@ -18,7 +18,7 @@ import {
   type ResolvedStance,
 } from '@agent/core/stance-resolver';
 import { listTenantProfileSlugs, readTenantProfile } from '@agent/core/tenant-registry';
-import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
 
 type Print = (value: unknown) => void;
 

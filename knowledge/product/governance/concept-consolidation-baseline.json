@@ -1430,7 +1430,7 @@
     "scripts/cowork_knowledge_bridge.ts": {
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/stance_migrate_from_personal.ts": {
+    "scripts/stance/stance_migrate_from_personal.ts": {
       "json_state_write_budget": 1
     },
     "scripts/daily-desk/server.ts": {
