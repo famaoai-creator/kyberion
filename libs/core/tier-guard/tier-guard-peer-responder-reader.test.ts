@@ -1,14 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as path from 'node:path';
-import { validateReadPermission, validateWritePermission } from './tier-guard.js';
-import * as pathResolver from './path-resolver.js';
+import { validateReadPermission, validateWritePermission } from '../tier-guard.js';
+import * as pathResolver from '../path-resolver.js';
 // Install the full identity resolver (MISSION_ROLE / tenant resolution) the
 // production read path uses, instead of the bootstrap fallback.
-import { withStoreGrant } from './authority.js';
+import { withStoreGrant } from '../authority.js';
 
 // The tier guard emits best-effort audit events on denial; keep them off the
 // real audit chain so the suite stays hermetic.
-vi.mock('./governance/audit-chain.js', () => ({
+vi.mock('../governance/audit-chain.js', () => ({
   auditChain: {
     record: vi.fn(),
     recordDurable: vi.fn(),

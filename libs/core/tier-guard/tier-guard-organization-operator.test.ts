@@ -1,22 +1,22 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as path from 'node:path';
-import { validateReadPermission, validateWritePermission } from './tier-guard.js';
-import * as pathResolver from './path-resolver.js';
-import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
-import { buildOrganizationOperationRecord } from './organization/organization-operating-model-management.js';
+import { validateReadPermission, validateWritePermission } from '../tier-guard.js';
+import * as pathResolver from '../path-resolver.js';
+import { safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
+import { buildOrganizationOperationRecord } from '../organization/organization-operating-model-management.js';
 import {
   buildOrganizationScaffold,
   saveOrganizationOperation,
-} from './organization/organization-operating-model-operations.js';
-import { saveOrganizationOperationalState } from './organization/organization-operating-model-persistence.js';
-import { recordOrganizationOperationRun } from './organization/organization-operation-run-recording.js';
+} from '../organization/organization-operating-model-operations.js';
+import { saveOrganizationOperationalState } from '../organization/organization-operating-model-persistence.js';
+import { recordOrganizationOperationRun } from '../organization/organization-operation-run-recording.js';
 // Install the full identity resolver (MISSION_ROLE / tenant resolution) the
 // production write path uses, instead of the bootstrap fallback.
-import './authority.js';
+import '../authority.js';
 
 // The tier guard emits best-effort audit events on denial; keep them off the
 // real audit chain so the suite stays hermetic.
-vi.mock('./governance/audit-chain.js', () => ({
+vi.mock('../governance/audit-chain.js', () => ({
   auditChain: {
     record: vi.fn(),
   },

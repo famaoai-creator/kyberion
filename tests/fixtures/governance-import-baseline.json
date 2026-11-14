@@ -111,7 +111,7 @@
     "libs/core/surface/operator-notifications.test.ts",
     "libs/core/task/deliverable-inbox.test.ts",
     "libs/core/testing/chronos-token-registry-reader.test.ts",
-    "libs/core/tier-guard-tenant.test.ts",
+    "libs/core/tier-guard/tier-guard-tenant.test.ts",
     "libs/core/tool/runtime-health-history.test.ts",
     "libs/core/virtual/virtual-audio-input-recording-bridge.test.ts",
     "libs/core/virtual/virtual-audio-output-playback-bridge.test.ts",

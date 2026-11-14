@@ -4,7 +4,7 @@ import {
   normalizeRegisteredTenantProfile,
   isValidTenantGroupProfile,
   extractTenantGroupFromSharedPath,
-} from './tier-guard-tenant-store-partitions.js';
+} from '../tier-guard-tenant-store-partitions.js';
 
 describe('tenant store policy normalization', () => {
   it('keeps default registry roles, broker requirements and caller-resolved tenant binding', () => {

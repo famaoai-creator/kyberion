@@ -1,11 +1,11 @@
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { pathResolver } from './path-resolver.js';
-import * as paths from './path-resolver.js';
-import { resetRoleAssumptionPolicyCache, withExecutionContext } from './authority.js';
-import { currentExecutionScope } from './foundation/execution-scope.js';
-import { validateReadPermission, validateWritePermission } from './tier-guard.js';
+import { pathResolver } from '../path-resolver.js';
+import * as paths from '../path-resolver.js';
+import { resetRoleAssumptionPolicyCache, withExecutionContext } from '../authority.js';
+import { currentExecutionScope } from '../foundation/execution-scope.js';
+import { validateReadPermission, validateWritePermission } from '../tier-guard.js';
 import {
   safeExistsSync,
   safeMkdir,
@@ -13,14 +13,14 @@ import {
   safeRmSync,
   safeSymlinkSync,
   safeWriteFile,
-} from './secure-io.js';
-import { dotStatePath } from './dot/dot-state-paths.js';
-import { eventContinuationPath } from './dot/dot-event-continuation.js';
-import type { DotCharter } from './dot/dot-charter.js';
-import { asRoleOrGrant } from './testing/role-or-store-grant.js';
+} from '../secure-io.js';
+import { dotStatePath } from '../dot/dot-state-paths.js';
+import { eventContinuationPath } from '../dot/dot-event-continuation.js';
+import type { DotCharter } from '../dot/dot-charter.js';
+import { asRoleOrGrant } from '../testing/role-or-store-grant.js';
 
-vi.mock('./governance/audit-chain.js', () => ({ auditChain: { record: vi.fn() } }));
-vi.mock('./governance/policy-engine.js', () => ({
+vi.mock('../governance/audit-chain.js', () => ({ auditChain: { record: vi.fn() } }));
+vi.mock('../governance/policy-engine.js', () => ({
   policyEngine: { evaluate: () => ({ allowed: true }) },
 }));
 

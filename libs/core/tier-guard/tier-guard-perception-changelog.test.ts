@@ -1,7 +1,7 @@
 import { afterEach, describe, it, expect, vi } from 'vitest';
-import { withExecutionContext } from './authority.js';
-import { pathResolver } from './path-resolver.js';
-import { validateWritePermission } from './tier-guard.js';
+import { withExecutionContext } from '../authority.js';
+import { pathResolver } from '../path-resolver.js';
+import { validateWritePermission } from '../tier-guard.js';
 afterEach(() => vi.unstubAllEnvs());
 describe('governed perception changelog authoring', () => {
   it('keeps developer writes denied and permits the existing changelog owner', () => {

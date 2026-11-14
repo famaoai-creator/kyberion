@@ -1,11 +1,11 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as path from 'node:path';
-import * as pathResolver from './path-resolver.js';
-import { safeReadFile } from './secure-io.js';
+import * as pathResolver from '../path-resolver.js';
+import { safeReadFile } from '../secure-io.js';
 
 // The tier guard emits best-effort audit events on denial; keep them off the
 // real audit chain so the suite stays hermetic.
-vi.mock('./governance/audit-chain.js', () => ({
+vi.mock('../governance/audit-chain.js', () => ({
   auditChain: { record: vi.fn() },
 }));
 
@@ -42,8 +42,8 @@ let validateWritePermission: (filePath: string) => { allowed: boolean; reason?: 
 let policy: Policy;
 
 beforeAll(async () => {
-  await import('./authority.js');
-  ({ validateWritePermission } = await import('./tier-guard.js'));
+  await import('../authority.js');
+  ({ validateWritePermission } = await import('../tier-guard.js'));
   policy = JSON.parse(
     String(
       safeReadFile(pathResolver.rootResolve('knowledge/product/governance/security-policy.json'), {

@@ -3,11 +3,11 @@
 // — never another tenant's, never unbound.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as path from 'node:path';
-import { validateReadPermission } from './tier-guard.js';
-import * as pathResolver from './path-resolver.js';
-import { withExecutionContextAsync } from './authority.js';
+import { validateReadPermission } from '../tier-guard.js';
+import * as pathResolver from '../path-resolver.js';
+import { withExecutionContextAsync } from '../authority.js';
 
-vi.mock('./governance/audit-chain.js', () => ({
+vi.mock('../governance/audit-chain.js', () => ({
   auditChain: {
     record: vi.fn(),
   },

@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { withExecutionContext } from './authority.js';
-import { pathResolver } from './path-resolver.js';
-import { runInResourceAccessScope } from './foundation/resource-access-scope.js';
-import { inspectReadPermission, validateReadPermission } from './tier-guard.js';
+import { withExecutionContext } from '../authority.js';
+import { pathResolver } from '../path-resolver.js';
+import { runInResourceAccessScope } from '../foundation/resource-access-scope.js';
+import { inspectReadPermission, validateReadPermission } from '../tier-guard.js';
 
 const file = pathResolver.knowledge('personal/onboarding/engine-runtime.json');
 beforeEach(() => {

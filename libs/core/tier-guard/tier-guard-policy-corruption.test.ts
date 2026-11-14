@@ -13,7 +13,7 @@ const state = {
   policyReads: 0,
 };
 
-vi.mock('./fs-primitives.js', () => ({
+vi.mock('../fs-primitives.js', () => ({
   rawExistsSync: (p: string) => {
     if (p.includes('security-policy.json')) return state.policyExists;
     return false;
@@ -29,7 +29,7 @@ vi.mock('./fs-primitives.js', () => ({
   },
 }));
 
-vi.mock('./authority.js', () => ({
+vi.mock('../authority.js', () => ({
   resolveIdentityContext: () => ({
     baseRole: 'test-persona',
     role: null,
@@ -41,9 +41,9 @@ vi.mock('./authority.js', () => ({
   }),
 }));
 
-import { validateReadPermission, validateWritePermission } from './tier-guard.js';
-import { pathResolver } from './path-resolver.js';
-import { runInResourceAccessScope } from './foundation/resource-access-scope.js';
+import { validateReadPermission, validateWritePermission } from '../tier-guard.js';
+import { pathResolver } from '../path-resolver.js';
+import { runInResourceAccessScope } from '../foundation/resource-access-scope.js';
 
 const ROOT = pathResolver.rootDir();
 

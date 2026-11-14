@@ -12,8 +12,8 @@ const state = vi.hoisted(() => ({
   extraDenyRead: [] as string[],
 }));
 
-vi.mock('./fs-primitives.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('./fs-primitives.js')>();
+vi.mock('../fs-primitives.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../fs-primitives.js')>();
   return {
     ...actual,
     rawRealpathSync: (target: string) => {
@@ -34,13 +34,13 @@ vi.mock('./fs-primitives.js', async (importOriginal) => {
   };
 });
 
-vi.mock('./governance/audit-chain.js', () => ({
+vi.mock('../governance/audit-chain.js', () => ({
   auditChain: { record: vi.fn(), recordDurable: vi.fn() },
 }));
 
-import { validateReadPermission } from './tier-guard.js';
-import * as pathResolver from './path-resolver.js';
-import { withStoreGrant } from './authority.js';
+import { validateReadPermission } from '../tier-guard.js';
+import * as pathResolver from '../path-resolver.js';
+import { withStoreGrant } from '../authority.js';
 
 const ROOT = pathResolver.rootDir();
 const at = (relative: string): string => path.join(ROOT, relative);

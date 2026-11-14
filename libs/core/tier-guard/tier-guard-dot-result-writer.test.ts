@@ -1,21 +1,21 @@
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { pathResolver } from './path-resolver.js';
-import * as paths from './path-resolver.js';
-import { resetRoleAssumptionPolicyCache, withExecutionContext } from './authority.js';
-import { validateReadPermission, validateWritePermission } from './tier-guard.js';
+import { pathResolver } from '../path-resolver.js';
+import * as paths from '../path-resolver.js';
+import { resetRoleAssumptionPolicyCache, withExecutionContext } from '../authority.js';
+import { validateReadPermission, validateWritePermission } from '../tier-guard.js';
 import {
   createSynchronousResourceGrantIssuer,
   currentResourceAccessScope,
   runInResourceAccessScope,
   type ResourceAccessScope,
-} from './foundation/resource-access-scope.js';
+} from '../foundation/resource-access-scope.js';
 import {
   withDotResultStoreCapability,
   isDotResultStoreCapability,
   type DotResultStoreBinding,
   type DotResultStoreOperation,
-} from './foundation/dot-result-store-capability.js';
+} from '../foundation/dot-result-store-capability.js';
 import {
   safeMkdir,
   safeWriteFile,
@@ -29,9 +29,9 @@ import {
   withSafeAppendFile,
   safeSymlinkSync,
   safeLinkExclusiveSync,
-} from './secure-io.js';
-vi.mock('./governance/audit-chain.js', () => ({ auditChain: { record: vi.fn() } }));
-vi.mock('./governance/policy-engine.js', () => ({
+} from '../secure-io.js';
+vi.mock('../governance/audit-chain.js', () => ({ auditChain: { record: vi.fn() } }));
+vi.mock('../governance/policy-engine.js', () => ({
   policyEngine: { evaluate: () => ({ allowed: true }) },
 }));
 const sourceRoot = pathResolver.rootDir();
