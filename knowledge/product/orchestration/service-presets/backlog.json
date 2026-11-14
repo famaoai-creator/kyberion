@@ -5,7 +5,7 @@
   "auth_strategy": "api_key_query",
   "auth_params": {
     "key": "apiKey",
-    "value": "{{backlog_api_key}}"
+    "value": "{{accessToken}}"
   },
   "operations": {
     "get_projects": {
@@ -13,8 +13,16 @@
       "method": "GET",
       "description": "プロジェクト一覧を取得する",
       "parameters": {
-        "archived": { "required": false, "type": "boolean", "description": "アーカイブ済みを含むか" },
-        "all": { "required": false, "type": "boolean", "description": "全プロジェクトを取得（管理者のみ）" }
+        "archived": {
+          "required": false,
+          "type": "boolean",
+          "description": "アーカイブ済みを含むか"
+        },
+        "all": {
+          "required": false,
+          "type": "boolean",
+          "description": "全プロジェクトを取得（管理者のみ）"
+        }
       }
     },
     "get_project": {
@@ -27,11 +35,20 @@
       "method": "GET",
       "description": "課題一覧を取得する",
       "parameters": {
-        "projectId[]": { "required": false, "type": "array", "description": "プロジェクトIDの配列" },
+        "projectId[]": {
+          "required": false,
+          "type": "array",
+          "description": "プロジェクトIDの配列"
+        },
         "statusId[]": { "required": false, "type": "array", "description": "状態IDの配列" },
         "assigneeId[]": { "required": false, "type": "array", "description": "担当者IDの配列" },
         "keyword": { "required": false, "type": "string", "description": "検索キーワード" },
-        "count": { "required": false, "type": "number", "default": 20, "description": "取得件数（最大100）" },
+        "count": {
+          "required": false,
+          "type": "number",
+          "default": 20,
+          "description": "取得件数（最大100）"
+        },
         "offset": { "required": false, "type": "number", "default": 0 },
         "sort": { "required": false, "type": "string", "default": "updated" },
         "order": { "required": false, "type": "string", "default": "desc" }
@@ -50,7 +67,12 @@
         "projectId": { "required": true, "type": "number" },
         "summary": { "required": true, "type": "string" },
         "issueTypeId": { "required": true, "type": "number" },
-        "priorityId": { "required": true, "type": "number", "default": 3, "description": "2=高, 3=中, 4=低" },
+        "priorityId": {
+          "required": true,
+          "type": "number",
+          "default": 3,
+          "description": "2=高, 3=中, 4=低"
+        },
         "description": { "required": false, "type": "string" },
         "assigneeId": { "required": false, "type": "number" },
         "dueDate": { "required": false, "type": "string", "description": "YYYY-MM-DD" }
@@ -63,7 +85,11 @@
       "parameters": {
         "summary": { "required": false, "type": "string" },
         "description": { "required": false, "type": "string" },
-        "statusId": { "required": false, "type": "number", "description": "1=未対応, 2=処理中, 3=処理済み, 4=完了" },
+        "statusId": {
+          "required": false,
+          "type": "number",
+          "description": "1=未対応, 2=処理中, 3=処理済み, 4=完了"
+        },
         "assigneeId": { "required": false, "type": "number" },
         "comment": { "required": false, "type": "string", "description": "更新時のコメント" }
       }
@@ -106,8 +132,12 @@
       "description": "プロジェクトのメンバー一覧を取得する"
     },
     "get_myself": {
+      "type": "api",
       "path": "users/myself",
       "method": "GET",
+      "kind": "capture",
+      "risk": "read",
+      "approval_required": false,
       "description": "認証中のユーザー情報を取得する"
     },
     "get_notifications": {

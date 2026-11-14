@@ -14,7 +14,19 @@ export interface OperatorServiceConnectionCatalogEntry {
     baseUrl: string;
     path: string;
     method: 'GET' | 'POST';
-    successRules: Array<{ field: string; kind: 'positive_integer' | 'non_empty_string' | 'true' }>;
+    /** Pinned defaults substituted into preset base_url/path placeholders before execution. */
+    params?: Record<string, string>;
+    /** Pinned static request body; must match the preset operation's resolved payload_template. */
+    payload?: Record<string, unknown>;
+    /**
+     * Non-secret connection document keys (host, domain, subdomain, space)
+     * allowed into base_url/path template resolution; they override params.
+     */
+    connectionFields?: string[];
+    successRules: Array<{
+      field: string;
+      kind: 'positive_integer' | 'non_empty_string' | 'non_empty_array' | 'present' | 'true';
+    }>;
   };
 }
 
@@ -37,7 +49,7 @@ export function loadOperatorServiceConnectionCatalog(): OperatorServiceConnectio
 }
 
 /**
- * Discovery only: a registered bearer runtime has an access credential.
+ * Discovery only: a registered token-authenticated runtime has an access credential.
  * This neither authenticates the token nor grants a mission permission to use it.
  * Undefined preserves unrelated, non-registered service requirement semantics.
  */
@@ -46,7 +58,9 @@ export function registeredServiceAccessCredentialPresent(serviceId: string): boo
   if (!entry) return undefined;
   try {
     const endpoint = getServiceEndpointRecord(serviceId);
-    if (!endpoint || String(endpoint.auth_strategy).toLowerCase() !== 'bearer') return false;
+    // Every cataloged service authenticates with a single access credential
+    // (header, query, basic or path injection), so presence is strategy-agnostic.
+    if (!endpoint) return false;
     return endpoint.credential_suffixes.accessToken.some((suffix) => {
       try {
         return Boolean(

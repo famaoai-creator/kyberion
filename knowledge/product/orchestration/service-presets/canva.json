@@ -14,6 +14,15 @@
     "Content-Type": "application/json"
   },
   "operations": {
+    "get_current_user": {
+      "type": "api",
+      "kind": "capture",
+      "risk": "read",
+      "approval_required": false,
+      "path": "users/me",
+      "method": "GET",
+      "description": "Fetch the authenticated Canva user; serves as the identity probe."
+    },
     "exchange_oauth_code": {
       "type": "api",
       "path": "oauth/token",

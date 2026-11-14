@@ -404,6 +404,13 @@ export function buildAuthHeaders(
     return { Authorization: `Bearer ${binding.accessToken}` };
   }
 
+  if (authStrategy.toLowerCase() === 'bot') {
+    if (!binding.accessToken) {
+      throw new Error(`Bot auth requires an access token for service "${binding.serviceId}"`);
+    }
+    return { Authorization: `Bot ${binding.accessToken}` };
+  }
+
   if (authStrategy.toLowerCase() === 'basic') {
     if (binding.clientId && binding.clientSecret) {
       const credentials = Buffer.from(

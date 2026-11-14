@@ -16,8 +16,12 @@
   },
   "operations": {
     "get_myself": {
+      "type": "api",
       "path": "myself",
       "method": "GET",
+      "kind": "capture",
+      "risk": "read",
+      "approval_required": false,
       "description": "Get current user profile."
     },
     "get_projects": {
