@@ -1583,6 +1583,14 @@
       "default": "0"
     },
     {
+      "name": "KYBERION_ESPEAK_NG_BIN",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "Optional path override for espeak ng bin; keep it inside governed repository or runtime storage.",
+      "documented": true
+    },
+    {
       "name": "KYBERION_EVENT_INTAKE_HOST",
       "category": "provider",
       "type": "string",

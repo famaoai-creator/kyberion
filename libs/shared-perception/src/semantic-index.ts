@@ -17,6 +17,7 @@ import {
   safeReadFileRange,
   safeReaddir,
 } from '@agent/core/secure-io';
+import { resolveManagedToolPythonBin } from '@agent/core/tool/tool-runtime-registry';
 
 export interface SemanticScope {
   tier: 'public' | 'confidential' | 'personal';
@@ -300,7 +301,7 @@ export function createLocalMultimodalEmbeddingProvider(
         return { imagePath: sourcePath(input.imagePath, runtimeScope) };
       });
       const result = await safeExecResultAsync(
-        options.python ?? 'python3',
+        options.python ?? resolveManagedToolPythonBin('semantic_embeddings') ?? 'python3',
         [pathResolver.rootResolve('libs/shared-perception/src/semantic-embedding.py')],
         {
           timeoutMs: timeout,
