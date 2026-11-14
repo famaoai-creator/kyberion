@@ -1,6 +1,10 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { clearPeerRuntime, createPeerMessagingServer } from './peer-messaging.js';
+import {
+  clearPeerRuntime,
+  createPeerMessagingServer,
+  registerPeerNetworkPeer,
+} from './peer-messaging.js';
 import {
   clearPeerConversationRuntime,
   createPeerConversationResponder,
@@ -22,6 +26,7 @@ import {
   type PeerTaskArtifactWriter,
   type PeerTaskExecutorRunner,
 } from './peer-task-exchange.js';
+import { runPeerOutboxRedeliveryPass } from './peer-outbox-redelivery.js';
 import {
   clearWorkCoordinationStore,
   getWorkItem,
@@ -168,6 +173,12 @@ afterEach(() => {
   }
   clearWorkCoordinationStore();
   setWorkCoordinationNamespace(null);
+  withExecutionContext('ecosystem_architect', () =>
+    safeRmSync(pathResolver.resolve(`knowledge/confidential/${TENANT}`), {
+      recursive: true,
+      force: true,
+    })
+  );
 });
 
 afterAll(() => {
@@ -181,6 +192,24 @@ afterAll(() => {
   });
   if (safeExistsSync(ARTIFACT_ROOT)) safeRmSync(ARTIFACT_ROOT, { recursive: true, force: true });
 });
+
+/** Registers both peers in the tenant's own catalog file (removed after each test). */
+function useTenantCatalog(): void {
+  withExecutionContext('sovereign_concierge', () => {
+    for (const [peerId, port] of [
+      [PROPOSER, 4660],
+      [RECIPIENT, 4661],
+    ] as const) {
+      registerPeerNetworkPeer({
+        tenantId: TENANT,
+        peerId,
+        baseUrl: `http://127.0.0.1:${port}`,
+        sharedSecret: SECRET,
+        exposure: 'same_host',
+      });
+    }
+  });
+}
 
 async function propose(taskType = 'baseline.check', from = PROPOSER) {
   return proposePeerTask({
@@ -527,6 +556,180 @@ describe('peer task exchange', () => {
     });
     expect(getPeerTask(TENANT, RECIPIENT, 'inbound', pending.task_id)!.state).toBe('pending');
     expect(sent.map((envelope) => envelope.message_id)).toEqual([pending.request_message_id]);
+  });
+
+  it.each([
+    ['no response', () => Promise.reject(new TypeError('fetch failed'))],
+    [
+      'HTTP 503',
+      () =>
+        Promise.resolve(
+          new Response(
+            JSON.stringify({ ok: false, error: 'receiver_overloaded', retryable: true }),
+            { status: 503, headers: { 'Content-Type': 'application/json' } }
+          )
+        ),
+    ],
+  ] as const)(
+    'completes the task bookkeeping when outbox redelivery delivers a proposal or a result (first failure: %s)',
+    async (_label, unavailable) => {
+      // Redelivery reads the tenant's own catalog file; a send through any
+      // other catalog is caller-managed and would not be re-sent.
+      useTenantCatalog();
+      wirePeers();
+      const fetchSpy = vi.mocked(globalThis.fetch);
+      const route = fetchSpy.getMockImplementation()!;
+      const redeliver = (peerId: string) =>
+        runPeerOutboxRedeliveryPass({ tenantId: TENANT, peerId, policy: { baseBackoffMs: 0 } });
+      const proposeViaTenantCatalog = (taskType: string) =>
+        proposePeerTask({
+          tenantId: TENANT,
+          senderPeerId: PROPOSER,
+          recipientPeerId: RECIPIENT,
+          taskType,
+          summary: 'Is your checkout healthy before I hand off?',
+        });
+
+      // A proposal that could not be delivered, and one the recipient will reject on receipt.
+      fetchSpy.mockImplementation(unavailable);
+      const notDelivered = await proposeViaTenantCatalog('baseline.check').catch(
+        (error: Error) => error.message
+      );
+      expect(notDelivered).toContain('peer_task_proposal_not_delivered');
+      // The operator is told a retry is scheduled, not to run the command again.
+      expect(notDelivered).toContain('a retry is scheduled; do not send it again');
+      expect(notDelivered).toContain(`peer outbox status --peer-id ${PROPOSER}`);
+      expect(notDelivered).not.toContain('resend-proposal');
+      await expect(proposeViaTenantCatalog('shell.anything')).rejects.toThrow(
+        /peer_task_proposal_not_delivered/
+      );
+      const [pending, refused] = listPeerTasks(TENANT, PROPOSER, { direction: 'outbound' });
+      // A non-2xx receipt is not a delivery.
+      expect(pending).toMatchObject({ state: 'pending', proposal_delivery: { status: 'failed' } });
+      expect(refused).toMatchObject({ state: 'pending', proposal_delivery: { status: 'failed' } });
+      fetchSpy.mockImplementation(route);
+
+      const pass = await redeliver(PROPOSER);
+      expect(pass.delivered).toHaveLength(2);
+      expect(pass.bookkeeping_failed).toEqual([]);
+      // Same record state as a first-try delivery.
+      expect(getPeerTask(TENANT, PROPOSER, 'outbound', pending.task_id)).toMatchObject({
+        state: 'pending',
+        proposal_delivery: { status: 'sent' },
+      });
+      expect(getPeerTask(TENANT, PROPOSER, 'outbound', refused.task_id)).toMatchObject({
+        state: 'rejected',
+        proposal_delivery: { status: 'sent' },
+      });
+      expect(getPeerTask(TENANT, RECIPIENT, 'inbound', pending.task_id)!.state).toBe('pending');
+      const replies = () =>
+        loadPeerConversationSession(TENANT, PROPOSER, pending.session_id)!.transcript.filter(
+          (entry) => entry.direction === 'inbound'
+        );
+      expect(replies().length).toBeGreaterThan(0);
+      // A later pass replays the bookkeeping from the outbox row; it changes nothing.
+      const before = replies().length;
+      const rows = listPeerTasks(TENANT, PROPOSER, { direction: 'outbound' }).map(
+        (record) => record.updated_at
+      );
+      expect((await redeliver(PROPOSER)).bookkeeping_failed).toEqual([]);
+      expect(replies()).toHaveLength(before);
+      expect(
+        listPeerTasks(TENANT, PROPOSER, { direction: 'outbound' }).map(
+          (record) => record.updated_at
+        )
+      ).toEqual(rows);
+
+      // The result of the accepted task cannot be delivered either, then is redelivered.
+      fetchSpy.mockImplementation(unavailable);
+      const done = await decidePeerTask({
+        tenantId: TENANT,
+        localPeerId: RECIPIENT,
+        taskId: pending.task_id,
+        decision: 'accepted',
+        actorId: 'operator:test',
+        reason: 'routine health check',
+        taskCatalogPath: TASK_CATALOG,
+        runner: okRunner,
+        writeArtifact,
+      });
+      expect(done.result_delivery).toMatchObject({ status: 'failed' });
+      fetchSpy.mockImplementation(route);
+      expect((await redeliver(RECIPIENT)).delivered).toEqual([
+        peerTaskResultMessageId(pending.task_id),
+      ]);
+      expect(getPeerTask(TENANT, RECIPIENT, 'inbound', pending.task_id)).toMatchObject({
+        state: 'completed',
+        result_delivery: { status: 'sent' },
+      });
+      expect(getPeerTask(TENANT, PROPOSER, 'outbound', pending.task_id)!.state).toBe('completed');
+    }
+  );
+
+  it('records a proposal as delivered when only the local record of the reply failed', async () => {
+    wirePeers();
+    const fetchSpy = vi.mocked(globalThis.fetch);
+    const route = fetchSpy.getMockImplementation()!;
+    // The recipient accepts the proposal; its reply names the wrong peer.
+    fetchSpy.mockImplementation(async (input, init) => {
+      const response = await route(input, init);
+      const body = (await response.json()) as { response: { reply: Record<string, unknown> } };
+      body.response.reply.sender_peer_id = STRANGER;
+      return new Response(JSON.stringify(body), { status: response.status });
+    });
+    const proposed = await propose();
+    // Delivered: the recipient holds the task and the proposer does not say "failed".
+    expect(proposed.record).toMatchObject({
+      state: 'pending',
+      proposal_delivery: { status: 'sent' },
+    });
+    expect(getPeerTask(TENANT, RECIPIENT, 'inbound', proposed.request.task_id)!.state).toBe(
+      'pending'
+    );
+  });
+
+  it('does not treat a terminal refusal as delivered, and leaves explicit-catalog sends to the caller', async () => {
+    wirePeers();
+    const fetchSpy = vi.mocked(globalThis.fetch);
+    const route = fetchSpy.getMockImplementation()!;
+    fetchSpy.mockImplementation(
+      async () =>
+        new Response(JSON.stringify({ ok: false, error: 'invalid_signature' }), { status: 401 })
+    );
+    const refusedMessage = await propose().catch((error: Error) => error.message);
+    expect(refusedMessage).toContain('it will not be retried (http_401)');
+    expect(refusedMessage).toContain('resend-proposal');
+
+    // propose() passes an explicit catalog path: redelivery never re-sends it.
+    fetchSpy.mockImplementation(async () => {
+      throw new TypeError('fetch failed');
+    });
+    const offlineMessage = await propose().catch((error: Error) => error.message);
+    expect(offlineMessage).toContain('it will not be retried automatically');
+    expect(offlineMessage).toContain('resend-proposal');
+    // The catalog override is another catalog than the tenant file: also left to the caller.
+    vi.stubEnv('KYBERION_PEER_NETWORK_CATALOG', PEER_CATALOG);
+    const viaEnv = await proposePeerTask({
+      tenantId: TENANT,
+      senderPeerId: PROPOSER,
+      recipientPeerId: RECIPIENT,
+      taskType: 'baseline.check',
+      summary: 'through the catalog override',
+    }).catch((error: Error) => error.message);
+    expect(viaEnv).toContain('it will not be retried automatically');
+    vi.unstubAllEnvs();
+    vi.stubEnv('KYBERION_TENANT', TENANT);
+    fetchSpy.mockImplementation(route);
+    useTenantCatalog();
+    const pass = await runPeerOutboxRedeliveryPass({
+      tenantId: TENANT,
+      peerId: PROPOSER,
+      policy: { baseBackoffMs: 0 },
+    });
+    expect(pass).toMatchObject({ delivered: [], given_up: [], waiting: 0 });
+    for (const record of listPeerTasks(TENANT, PROPOSER, { direction: 'outbound' })) {
+      expect(record).toMatchObject({ state: 'pending', proposal_delivery: { status: 'failed' } });
+    }
   });
 
   it('rejects task types the recipient does not offer, and peers it does not allow, on receipt', async () => {

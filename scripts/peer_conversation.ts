@@ -4,10 +4,16 @@ import {
   createPeerConversationSession,
   listPeerConversationSessions,
   loadPeerConversationSession,
+  PeerConversationBookkeepingError,
+  resolvesThroughTenantPeerCatalog,
   PEER_CONVERSATION_MESSAGE_KINDS,
   savePeerConversationSession,
   sendPeerConversationMessageToPeer,
 } from '@agent/core/mesh/peer-conversation';
+import {
+  describePeerDeliveryFailureNextStep,
+  peerDeliveryFailureOf,
+} from '@agent/core/mesh/peer-messaging';
 import { getRegisteredEnvText } from '@agent/core/foundation';
 import { defineScript, isDirectScript, stripSharedScriptFlags } from './lib/harness.js';
 import { parseSafeJsonObjectInput } from './lib/json-input.js';
@@ -25,7 +31,7 @@ function normalizePeerConversationArguments(args: string[]): string[] {
   return stripSharedScriptFlags(args);
 }
 
-async function main(
+export async function main(
   args: string[] = [],
   options: { dryRun?: boolean; check?: boolean } = {}
 ): Promise<unknown> {
@@ -105,9 +111,17 @@ async function main(
           text: String(argv.text || ''),
         };
       }
+      const senderPeerId = String(argv['local-peer-id'] || argv['peer-id'] || '');
+      // A send through an explicit catalog is never re-sent by outbox redelivery.
+      const recovery = resolvesThroughTenantPeerCatalog({
+        tenantId,
+        ...(argv.catalog ? { catalogPath: String(argv.catalog) } : {}),
+      })
+        ? undefined
+        : ('caller' as const);
       const outcome = await sendPeerConversationMessageToPeer({
         tenantId,
-        senderPeerId: String(argv['local-peer-id'] || argv['peer-id'] || ''),
+        senderPeerId,
         recipientPeerId: String(argv['remote-peer-id'] || ''),
         sessionId: argv['session-id'] ? String(argv['session-id']) : undefined,
         topic: String(argv.topic || ''),
@@ -118,8 +132,30 @@ async function main(
         metadata: parseSafeJsonObjectInput(argv.metadata, 'peer conversation metadata'),
         timeoutMs: Number(argv['timeout-ms']),
         catalogPath: argv.catalog ? String(argv.catalog) : undefined,
+      }).catch((error: unknown) => {
+        if (error instanceof PeerConversationBookkeepingError) {
+          throw new Error(
+            `peer_conversation_message_delivered_but_not_recorded:${error.receipt.message_id} — the peer accepted the message, but its reply was not recorded in the local transcript: ${error.cause instanceof Error ? error.cause.message : String(error.cause)} | next: do not send it again; the outbox redelivery pass retries the transcript record for 24 h`,
+            { cause: error }
+          );
+        }
+        const failure = peerDeliveryFailureOf(error);
+        if (!failure) throw error;
+        const message = error instanceof Error ? error.message : String(error);
+        throw new Error(
+          `peer_conversation_message_not_delivered — ${message} | ${describePeerDeliveryFailureNextStep({ failure, senderPeerId, recovery })}`,
+          { cause: error }
+        );
       });
-      return outcome;
+      if (outcome.receipt.ok) return outcome;
+      return {
+        ...outcome,
+        next: describePeerDeliveryFailureNextStep({
+          failure: outcome.receipt.failure,
+          senderPeerId,
+          recovery,
+        }),
+      };
     }
     case 'list-sessions': {
       const peerId = String(argv['peer-id'] || argv['local-peer-id'] || '');

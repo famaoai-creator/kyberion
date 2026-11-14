@@ -213,9 +213,18 @@
       "service_id": "box",
       "display_name": "Box Content API v2 Presets (read-only ingestion)",
       "auth_strategy": "Bearer",
-      "operation_count": 4,
+      "operation_count": 5,
       "detail_ref": "knowledge/product/orchestration/service-presets/box.json",
       "operations": [
+        {
+          "action": "get_current_user",
+          "description": "Fetch the authenticated Box user; serves as the identity probe.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "tenant_binding_required": false,
+          "idempotency": "not_applicable"
+        },
         {
           "action": "get_folder_items",
           "description": "List items in a Box folder. Marker-based pagination: pass usemarker=true and the marker cursor from the previous response's next_marker so incremental sync (DA-03) can resume where it left off.",
@@ -364,9 +373,18 @@
       "service_id": "cloudflare",
       "display_name": "Cloudflare API Presets",
       "auth_strategy": "Bearer",
-      "operation_count": 4,
+      "operation_count": 5,
       "detail_ref": "knowledge/product/orchestration/service-presets/cloudflare.json",
       "operations": [
+        {
+          "action": "verify_token",
+          "description": "Verify this API token; serves as the identity probe.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "tenant_binding_required": false,
+          "idempotency": "not_applicable"
+        },
         {
           "action": "list_zones",
           "description": "Lists Cloudflare zones.",
@@ -579,9 +597,18 @@
       "service_id": "discord",
       "display_name": "Discord API Presets",
       "auth_strategy": "Bot",
-      "operation_count": 2,
+      "operation_count": 3,
       "detail_ref": "knowledge/product/orchestration/service-presets/discord.json",
       "operations": [
+        {
+          "action": "get_current_user",
+          "description": "Fetch the bot's user object; serves as the identity probe.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "tenant_binding_required": false,
+          "idempotency": "not_applicable"
+        },
         {
           "action": "post_message",
           "description": "Sends a message to a Discord channel.",
@@ -606,9 +633,18 @@
       "service_id": "figma",
       "display_name": "Figma API Presets",
       "auth_strategy": "Bearer",
-      "operation_count": 4,
+      "operation_count": 5,
       "detail_ref": "knowledge/product/orchestration/service-presets/figma.json",
       "operations": [
+        {
+          "action": "get_me",
+          "description": "Fetch the authenticated Figma user; serves as the identity probe.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "tenant_binding_required": false,
+          "idempotency": "not_applicable"
+        },
         {
           "action": "get_file",
           "description": "Fetches a Figma file.",
@@ -708,9 +744,18 @@
       "service_id": "github",
       "display_name": "GitHub REST API Presets",
       "auth_strategy": "Bearer",
-      "operation_count": 19,
+      "operation_count": 23,
       "detail_ref": "knowledge/product/orchestration/service-presets/github.json",
       "operations": [
+        {
+          "action": "authenticated_user",
+          "description": "Read-only authentication check for the currently bound token.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "tenant_binding_required": false,
+          "idempotency": "not_applicable"
+        },
         {
           "action": "create_issue",
           "description": "Creates a new issue in a repository.",
@@ -881,6 +926,33 @@
           "approval_required": true,
           "tenant_binding_required": false,
           "idempotency": "recommended"
+        },
+        {
+          "action": "get_commit_check_runs",
+          "description": "Read latest check runs for an exact commit.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "tenant_binding_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "get_review_threads",
+          "description": "Fixed bounded read-only review thread query; request compiler and capture admission reject mutations or arbitrary GraphQL.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "tenant_binding_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "resolve_review_thread",
+          "description": "Resolve the exact verified pull-request review thread.",
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
+          "tenant_binding_required": false,
+          "idempotency": "recommended"
         }
       ]
     },
@@ -1000,7 +1072,7 @@
       "service_id": "google-workspace",
       "display_name": "Google Workspace CLI Presets",
       "auth_strategy": "session",
-      "operation_count": 31,
+      "operation_count": 34,
       "detail_ref": "knowledge/product/orchestration/service-presets/google-workspace.json",
       "operations": [
         {
@@ -1132,11 +1204,11 @@
         {
           "action": "gmail_reply",
           "description": "Reply to a Gmail message.",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
           "tenant_binding_required": false,
-          "idempotency": "not_applicable"
+          "idempotency": "recommended"
         },
         {
           "action": "gmail_reply_draft",
@@ -1281,6 +1353,33 @@
           "approval_required": false,
           "tenant_binding_required": false,
           "idempotency": "not_applicable"
+        },
+        {
+          "action": "gmail_history_list",
+          "description": "Read Gmail incremental history; an expired startHistoryId requires explicit full synchronization.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "tenant_binding_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "gmail_profile_get",
+          "description": "Read mailbox profile and its current opaque historyId.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "tenant_binding_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "gmail_thread_get",
+          "description": "Read a Gmail thread for independent sent-reply verification.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "tenant_binding_required": false,
+          "idempotency": "not_applicable"
         }
       ]
     },
@@ -1288,7 +1387,7 @@
       "service_id": "jira",
       "display_name": "Jira Cloud REST API v3 Presets",
       "auth_strategy": "basic",
-      "operation_count": 10,
+      "operation_count": 15,
       "detail_ref": "knowledge/product/orchestration/service-presets/jira.json",
       "operations": [
         {
@@ -1380,6 +1479,51 @@
           "approval_required": true,
           "tenant_binding_required": false,
           "idempotency": "recommended"
+        },
+        {
+          "action": "search_issues_enhanced",
+          "description": "Search issues with enhanced JQL and opaque nextPageToken pagination.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "tenant_binding_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "get_request_approvals",
+          "description": "Read Jira Service Management request approvals using the dedicated service desk API.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "tenant_binding_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "get_request_approval",
+          "description": "Read a specific Jira Service Management approval for independent completion verification.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "tenant_binding_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "answer_request_approval",
+          "description": "Answer the exact captured JSM request approval after governed approval.",
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
+          "tenant_binding_required": false,
+          "idempotency": "recommended"
+        },
+        {
+          "action": "get_issue_comments",
+          "description": "Read issue comments for independent expected-content verification.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "tenant_binding_required": false,
+          "idempotency": "not_applicable"
         }
       ]
     },
@@ -1802,12 +1946,57 @@
       ]
     },
     {
+      "service_id": "rustxng",
+      "display_name": "RustXNG Local Search Presets",
+      "description": "Self-hosted AGPL search/grounding engine (HTTP on 127.0.0.1). Install with `pnpm tool:setup -- --tool rustxng --apply`. search-actuator provider=rustxng auto-starts a detached loopback sidecar when /healthz is down (idle timeout via KYBERION_RUSTXNG_IDLE_TIMEOUT).",
+      "operation_count": 2,
+      "detail_ref": "knowledge/product/orchestration/service-presets/rustxng.json",
+      "operations": [
+        {
+          "action": "healthz",
+          "description": "RustXNG liveness probe",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "tenant_binding_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "web_search",
+          "description": "SearXNG-compatible JSON search; pass q, format=json, optional include_raw_content=1 and max_results",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "tenant_binding_required": false,
+          "idempotency": "not_applicable"
+        }
+      ]
+    },
+    {
       "service_id": "slack",
       "display_name": "Slack Web API Presets",
       "auth_strategy": "Bearer",
-      "operation_count": 4,
+      "operation_count": 6,
       "detail_ref": "knowledge/product/orchestration/service-presets/slack.json",
       "operations": [
+        {
+          "action": "auth_test",
+          "description": "Read-only identity check. Slack documents POST auth.test; ok must be true.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "tenant_binding_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "search_messages",
+          "description": "Keyword search over messages the authed token can see, bounded by that token's own visibility. Requires a user token with search:read; bot tokens cannot search. Read-only, safe to poll.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "tenant_binding_required": false,
+          "idempotency": "not_applicable"
+        },
         {
           "action": "post_message",
           "description": "Sends a message to a channel.",
@@ -1863,6 +2052,42 @@
       ]
     },
     {
+      "service_id": "speech_cpp",
+      "display_name": "speech.cpp Local Speech Presets",
+      "description": "MIT local speech runtime (OpenAI-compatible audio API on 127.0.0.1). Install with `pnpm tool:setup -- --tool speech_cpp --apply`. Start `speech serve [models...] --host 127.0.0.1 --port 8095`. Batch TTS/ASR prefer the CLI; HTTP is for voice-hub / OpenAI clients.",
+      "operation_count": 3,
+      "detail_ref": "knowledge/product/orchestration/service-presets/speech_cpp.json",
+      "operations": [
+        {
+          "action": "health",
+          "description": "speech.cpp liveness probe",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "tenant_binding_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "speech",
+          "description": "OpenAI-compatible TTS; JSON body with input and voice",
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
+          "tenant_binding_required": false,
+          "idempotency": "recommended"
+        },
+        {
+          "action": "transcriptions",
+          "description": "OpenAI-compatible ASR; multipart file upload",
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
+          "tenant_binding_required": false,
+          "idempotency": "recommended"
+        }
+      ]
+    },
+    {
       "service_id": "sqlite",
       "display_name": "SQLite MCP Server",
       "description": "MCP-based SQLite database interactions",
@@ -1891,9 +2116,18 @@
       "service_id": "stripe",
       "display_name": "Stripe API Presets",
       "auth_strategy": "Bearer",
-      "operation_count": 4,
+      "operation_count": 5,
       "detail_ref": "knowledge/product/orchestration/service-presets/stripe.json",
       "operations": [
+        {
+          "action": "get_account",
+          "description": "Fetch the Stripe account bound to this key; serves as the identity probe.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "tenant_binding_required": false,
+          "idempotency": "not_applicable"
+        },
         {
           "action": "list_customers",
           "description": "Lists Stripe customers.",
@@ -1936,9 +2170,18 @@
       "service_id": "telegram",
       "display_name": "Telegram Bot API Presets",
       "auth_strategy": "none",
-      "operation_count": 2,
+      "operation_count": 3,
       "detail_ref": "knowledge/product/orchestration/service-presets/telegram.json",
       "operations": [
+        {
+          "action": "get_me",
+          "description": "Fetch the bot's identity; serves as the identity probe.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "tenant_binding_required": false,
+          "idempotency": "not_applicable"
+        },
         {
           "action": "post_message",
           "description": "Sends a message to a Telegram chat/channel.",

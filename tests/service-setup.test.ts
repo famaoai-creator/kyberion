@@ -81,6 +81,27 @@ vi.mock('@agent/core/stance-resolver', async (importOriginal) => {
   };
 });
 
+vi.mock('@agent/core/service/service-connection-readiness', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@agent/core/service/service-connection-readiness')>();
+  return {
+    ...actual,
+    requiredServiceConnectionKeys: (serviceId: string) =>
+      serviceId === 'voice' ? ['voice_python_bin', 'voice_name'] : [],
+    isServiceConnectionReady: () => true,
+  };
+});
+
+vi.mock('@agent/core/service/service-onboarding-catalog', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@agent/core/service/service-onboarding-catalog')>();
+  return {
+    ...actual,
+    getServiceOnboardingCatalogEntry: (serviceId: string) =>
+      serviceId === 'voice' ? { service_id: 'voice', prompt_kind: 'generic', label: 'TTS' } : null,
+  };
+});
+
 describe('services_setup', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -101,6 +122,10 @@ describe('services_setup', () => {
           preset_path: 'knowledge/product/orchestration/service-presets/github.json',
           auth_strategy: 'basic',
         },
+        voice: {
+          preset_path: 'knowledge/product/orchestration/service-presets/voice.json',
+          auth_strategy: 'none',
+        },
       },
     });
     mocks.inspectServiceAuth.mockImplementation((serviceId: string) => {
@@ -118,16 +143,29 @@ describe('services_setup', () => {
           setupHint: 'Set one of: SLACK_ACCESS_TOKEN',
         };
       }
+      if (serviceId === 'github') {
+        return {
+          serviceId,
+          presetPath: 'knowledge/product/orchestration/service-presets/github.json',
+          authStrategy: 'basic',
+          valid: true,
+          requiredSecrets: ['GITHUB_CLIENT_ID'],
+          foundSecrets: ['GITHUB_CLIENT_ID'],
+          missingSecrets: [],
+          cliFallbacks: [],
+          setupHint: 'Ready. Detected secrets: GITHUB_CLIENT_ID',
+        };
+      }
       return {
         serviceId,
-        presetPath: 'knowledge/product/orchestration/service-presets/github.json',
-        authStrategy: 'basic',
+        presetPath: 'knowledge/product/orchestration/service-presets/voice.json',
+        authStrategy: 'none',
         valid: true,
-        requiredSecrets: ['GITHUB_CLIENT_ID'],
-        foundSecrets: ['GITHUB_CLIENT_ID'],
+        requiredSecrets: [],
+        foundSecrets: [],
         missingSecrets: [],
         cliFallbacks: [],
-        setupHint: 'Ready. Detected secrets: GITHUB_CLIENT_ID',
+        setupHint: 'No secrets needed for this preset.',
       };
     });
     mocks.overlayCandidates.mockImplementation((subPath: string) => {
@@ -157,10 +195,11 @@ describe('services_setup', () => {
 
     expect(result.status).toBe('ok');
     expect(result.summary).toMatchObject({
-      total: 2,
+      total: 3,
       authMissing: 1,
       connectionMissing: 1,
-      ready: 1,
+      connectionOptional: 1,
+      ready: 2,
     });
     expect(result.rows[0]).toMatchObject({
       service: 'slack',
@@ -169,13 +208,22 @@ describe('services_setup', () => {
     });
     expect(result.rows[0].nextAction?.suggested_command).toBeUndefined();
     expect(result.rows[0].nextAction?.suggested_followup_request).toContain('SLACK_ACCESS_TOKEN');
-    expect(result.rows[1]).toMatchObject({
-      service: 'github',
+
+    // Services that declare no connection keys are informational, not missing.
+    const github = result.rows.find((row) => row.service === 'github');
+    expect(github).toMatchObject({ auth: 'ready', connection: 'optional' });
+    expect(github?.nextAction).toBeUndefined();
+
+    // Only services whose connection file declares required keys are reported
+    // missing, and only onboarding-catalog services get the wizard command.
+    const voice = result.rows.find((row) => row.service === 'voice');
+    expect(voice).toMatchObject({
       auth: 'ready',
       connection: 'missing',
+      connectionReady: false,
     });
-    expect(result.rows[1].nextAction?.suggested_command).toBe(
-      'pnpm onboarding -- --services-only --service github'
+    expect(voice?.nextAction?.suggested_command).toBe(
+      'pnpm onboarding -- --services-only --service voice'
     );
   });
 });
