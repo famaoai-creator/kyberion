@@ -11,6 +11,26 @@ last_updated: 2026-03-06
 
 本エコシステムが外部ツールと連携するための認証情報は、**Personal Tier (`knowledge/personal/connections/`)** で一元管理します。
 
+## 0. クレデンシャルの登録 (canonical)
+
+トークンや API キーなどの**シークレット本体**は Secret Guard 経由で登録するのが正規ルートです。
+
+```bash
+pnpm kyberion secret introduce <serviceId> <secretKey>
+# 例: pnpm kyberion secret introduce slack ACCESS_TOKEN   # xoxb-... を貼る
+#     pnpm kyberion secret introduce slack APP_TOKEN      # xapp-... を貼る
+```
+
+`<secretKey>` はサービスごとのサフィックスです（`<SERVICE_ID>_<SUFFIX>` という環境変数名に対応）。主要なサフィックスは `ACCESS_TOKEN` / `BOT_TOKEN` / `TOKEN`（同じものを指す別名）と `APP_TOKEN`、`REFRESH_TOKEN`、`CLIENT_ID`、`CLIENT_SECRET`、`REDIRECT_URI` で、各サービスで受理される名称は `pnpm service:setup` の `SECRETS` 列に表示されます。
+
+シークレットの解決順は次の通りです。上位で見つかったものが優先されます。
+
+1. 実行コンテキストの環境変数 (`SLACK_BOT_TOKEN` など)
+2. Secret Guard vault (`vault/secrets/secrets.json`) + OS keychain（`secret introduce` の書き込み先）
+3. 接続ファイル (`connections/<service>.json`) 内の同名キー — 後方互換のフォールバックとして残っています
+
+`knowledge/personal/connections/<service>.json` の接続ファイルは、**非シークレットの既定パラメータ**（ホスト名・既定チャネル・既定ディレクトリなど）を与えるもので、プリセット操作の実行時にパラメータへマージされます。シークレットを直接書くことも解決上は機能しますが、新規セットアップでは `secret introduce` に寄せてください。
+
 ## 1. 設定ファイルの配置
 
 以下のテンプレートを参考に、必要なサービスの JSON ファイルを作成し、`knowledge/personal/connections/` に配置してください。
@@ -28,15 +48,15 @@ last_updated: 2026-03-06
 
 ### Slack (`slack.json`)
 
+トークンは `secret introduce` で登録します（`SLACK_BOT_TOKEN`/`SLACK_ACCESS_TOKEN` に `xoxb-`、`SLACK_APP_TOKEN` に `xapp-` の Socket Mode トークン）。接続ファイルには既定値だけを置きます。
+
 ```json
 {
-  "bot_token": "xoxb-your-token",
-  "app_token": "xapp-your-socket-mode-token",
   "default_channel": "#general"
 }
 ```
 
-`slack-bridge` is Socket Mode based, so both `bot_token` and `app_token` are required for the managed surface to start successfully.
+`slack-bridge` is Socket Mode based, so both the bot token and the app token are required for the managed surface to start successfully. `default_channel` はプリセット操作の送信先の既定値です。オペレーターへの通知ルーティング（承認依頼やアラートの届け先）は別設定で、`knowledge/personal/notification-preferences.json` の `default_channel: { "surface": "slack", "target": "<channel-id>" }` または `KYBERION_OPERATOR_SLACK_DM` を使います。
 
 ### Jira (`jira.json`)
 
@@ -95,6 +115,18 @@ X ドキュメント用 MCP は `https://docs.x.com/mcp` へ Kyberion から直�
 - ガイド / チュートリアル参照
 - 利用可能な docs-side MCP tools / resources の列挙
 
-## 2. 安全性の保証
+## 2. 検証
+
+登録が済んだら次で確認します。
+
+```bash
+pnpm service:setup        # auth / connection / secrets の一覧
+pnpm service:preflight    # 実行時の readiness ゲート
+pnpm surfaces             # 管理対象サーフェス（slack-bridge 等）の状態
+```
+
+`AUTH` が `ready` なら Secret Guard 経由でトークンが解決できています。`CONNECTION` は接続キーを宣言しているサービス（comfyui / whisper / voice / meeting）だけが `missing` になり、`optional` は接続ファイルが任意であることを示します。
+
+## 3. 安全性の保証
 
 `knowledge/personal/` は `.gitignore` により Git 管理から除外されています。ここに置かれた情報は外部に流出しません。

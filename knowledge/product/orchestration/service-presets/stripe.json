@@ -4,6 +4,15 @@
   "base_url": "https://api.stripe.com/v1",
   "auth_strategy": "Bearer",
   "operations": {
+    "get_account": {
+      "type": "api",
+      "kind": "capture",
+      "risk": "read",
+      "approval_required": false,
+      "path": "account",
+      "method": "GET",
+      "description": "Fetch the Stripe account bound to this key; serves as the identity probe."
+    },
     "list_customers": {
       "type": "api",
       "path": "customers",

@@ -4,6 +4,15 @@
   "base_url": "https://api.cloudflare.com/client/v4",
   "auth_strategy": "Bearer",
   "operations": {
+    "verify_token": {
+      "type": "api",
+      "kind": "capture",
+      "risk": "read",
+      "approval_required": false,
+      "path": "user/tokens/verify",
+      "method": "GET",
+      "description": "Verify this API token; serves as the identity probe."
+    },
     "list_zones": {
       "type": "api",
       "path": "zones",
