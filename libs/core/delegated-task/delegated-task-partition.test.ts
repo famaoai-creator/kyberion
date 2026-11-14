@@ -10,11 +10,17 @@
  */
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as path from 'node:path';
-import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
-import { withExecutionContext } from './authority.js';
-import { validateReadPermission, validateWritePermission } from './tier-guard.js';
-import { tenantRuntimePartitionOf, tenantStoreLedgerPartitionOf } from './storage-layout.js';
+import { pathResolver } from '../path-resolver.js';
+import {
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeRmSync,
+  safeWriteFile,
+} from '../secure-io.js';
+import { withExecutionContext } from '../authority.js';
+import { validateReadPermission, validateWritePermission } from '../tier-guard.js';
+import { tenantRuntimePartitionOf, tenantStoreLedgerPartitionOf } from '../storage-layout.js';
 import {
   buildDelegatedTaskWorkerProcessSpec,
   claimDelegatedTaskActivation,
@@ -26,14 +32,14 @@ import {
   loadDelegatedTaskRecord,
   startDelegatedTaskTrace,
   systemDelegationTracePaths,
-} from './workforce/delegated-task-observability.js';
+} from '../workforce/delegated-task-observability.js';
 import {
   claimPendingDelegationNotifications,
   delegationNotificationsPath,
   enqueueDelegationNotification,
   listDelegationNotifications,
-} from './mission/delegation-notifications.js';
-import { asRoleOrGrant } from './testing/role-or-store-grant.js';
+} from '../mission/delegation-notifications.js';
+import { asRoleOrGrant } from '../testing/role-or-store-grant.js';
 
 const STORE = `active/shared/tmp/delegation-partition-tests/store-${process.pid}`;
 const ENV_KEYS = [

@@ -3,9 +3,9 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 import {
   withExecutionContext as initialContext,
   withStoreGrant as initialGrant,
-} from './authority.js';
-import { rootDir } from './path-resolver.js';
-import * as initialIO from './secure-io.js';
+} from '../authority.js';
+import { rootDir } from '../path-resolver.js';
+import * as initialIO from '../secure-io.js';
 
 /**
  * The delegation trace/record partitions against the real secure-io tier and
@@ -34,9 +34,9 @@ const keys = [
 const saved = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
 const savedRoot = process.env.KYBERION_ROOT;
 
-let io: typeof import('./secure-io.js');
-let delegations: typeof import('./workforce/delegated-task-observability.js');
-let notifications: typeof import('./mission/delegation-notifications.js');
+let io: typeof import('../secure-io.js');
+let delegations: typeof import('../workforce/delegated-task-observability.js');
+let notifications: typeof import('../mission/delegation-notifications.js');
 let withExecutionContext = initialContext;
 let withStoreGrant = initialGrant;
 
@@ -67,11 +67,11 @@ beforeAll(async () => {
   });
   process.env.KYBERION_ROOT = ROOT;
   vi.resetModules();
-  io = await import('./secure-io.js');
-  ({ withExecutionContext, withStoreGrant } = await import('./authority.js'));
-  delegations = await import('./workforce/delegated-task-observability.js');
-  notifications = await import('./mission/delegation-notifications.js');
-  expect((await import('./path-resolver.js')).rootDir()).toBe(ROOT);
+  io = await import('../secure-io.js');
+  ({ withExecutionContext, withStoreGrant } = await import('../authority.js'));
+  delegations = await import('../workforce/delegated-task-observability.js');
+  notifications = await import('../mission/delegation-notifications.js');
+  expect((await import('../path-resolver.js')).rootDir()).toBe(ROOT);
 }, 120_000);
 
 beforeEach(() => {
