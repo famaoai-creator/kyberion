@@ -1,6 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 const executePipelineFile = vi.hoisted(() => vi.fn());
-vi.mock('./lib/pipeline-file-runner.js', () => ({ pipelineFileRunner: () => executePipelineFile }));
+vi.mock('../lib/pipeline-file-runner.js', () => ({
+  pipelineFileRunner: () => executePipelineFile,
+}));
 import { runContinuousOperationsCycle } from './continuous_operations_cycle.js';
 import type { ContinuousOperationsConfig } from '@agent/core/organization/continuous-operations-policy';
 import type { DotCharter } from '@agent/core/dot/dot-charter';

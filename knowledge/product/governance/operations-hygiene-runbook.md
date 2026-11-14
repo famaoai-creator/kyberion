@@ -2838,7 +2838,7 @@ the work or its approved contract and explicitly returns both the child and its
 blocked continuous-owner WorkItem to `ready`. Skip native ticket creation when
 no planned tasks remain, so existing WorkItems can still advance or reach the
 rework/intervention check.
-Gate: `scripts/continuous_work_owner.test.ts` (limit, invalid counter, scope,
+Gate: `scripts/continuous/continuous_work_owner.test.ts` (limit, invalid counter, scope,
 ordinary retry and existing blocker cases).
 
 **Learning registration must survive completion and restart.** Persist a scoped,
@@ -2848,7 +2848,7 @@ replays only that candidate, without another model call or resetting a reviewed
 candidate. Continuous owners reconcile pending delivery before accepting child
 completion; ratification and promotion still use their governed approval path.
 Gate: `libs/core/mission/mission-distill.test.ts` and
-`scripts/continuous_work_owner.test.ts` (delivery failure, replay and approval
+`scripts/continuous/continuous_work_owner.test.ts` (delivery failure, replay and approval
 preservation).
 
 **Process source schemas belong in governed descriptors.** JSON sources declare

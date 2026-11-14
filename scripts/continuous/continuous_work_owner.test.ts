@@ -11,7 +11,7 @@ import {
   type ContinuousOwnerAdapterDeps,
 } from './continuous_work_owner.js';
 import type { ContinuousOwnerProcessOptions } from './continuous_owner_process.js';
-import type { AlignmentDecisionReport } from './mission_alignment_decision.js';
+import type { AlignmentDecisionReport } from '../mission_alignment_decision.js';
 import type { WorkItem } from '@agent/core/workforce/work-coordination-types';
 import { continuousDevelopmentAlignmentScope } from '@agent/core/organization/continuous-development-consent';
 

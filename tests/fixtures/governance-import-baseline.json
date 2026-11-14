@@ -262,7 +262,7 @@
     "scripts/check/check_contract_schemas.test.ts",
     "scripts/check/check_doc_examples.ts",
     "scripts/codex_profile_controller.ts",
-    "scripts/continuous_owner_process.test.ts",
+    "scripts/continuous/continuous_owner_process.test.ts",
     "scripts/dependency_resolver.ts",
     "scripts/eslint-import-cycle.test.ts",
     "scripts/generate/generate_changelog.test.ts",
