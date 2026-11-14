@@ -13,8 +13,8 @@ import {
 } from '@agent/core/secure-io';
 import chalk from 'chalk';
 import { isRecord } from '@agent/core/foundation';
-import { defineScript, isDirectScript } from './lib/harness.js';
-import { readSafeJsonValueFile } from './lib/json-input.js';
+import { defineScript, isDirectScript } from '../lib/harness.js';
+import { readSafeJsonValueFile } from '../lib/json-input.js';
 
 type Print = (value: unknown) => void;
 

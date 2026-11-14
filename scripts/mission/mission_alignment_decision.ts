@@ -7,7 +7,7 @@
  * check can consume it:
  *
  *   { "kind": "command_succeeds", "params": { "command": "node", "args": [
- *       "dist/scripts/mission_alignment_decision.js", "--mission", "<ID>", "--strict" ] } }
+ *       "dist/scripts/mission/mission_alignment_decision.js", "--mission", "<ID>", "--strict" ] } }
  *
  * Two invariants this enforces, and why:
  *
@@ -33,7 +33,7 @@ import {
   defineScript,
   isDirectScript,
   ScriptExitError,
-} from './lib/harness.js';
+} from '../lib/harness.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import {
   approvalUsabilityRefusal,
@@ -42,7 +42,7 @@ import {
   type ApprovalRequestRecord,
 } from '@agent/core/governance/approval-store';
 import { findMissionPath } from '@agent/core/path-resolver';
-import { loadMissionBriefAtPath } from './mission-alignment-gate/mission-brief.js';
+import { loadMissionBriefAtPath } from '../mission-alignment-gate/mission-brief.js';
 
 export const ALIGNMENT_BRIEF_RELATIVE_PATH = path.join('evidence', 'mission-brief.json');
 export const ALIGNMENT_APPROVAL_CHANNEL = 'brief';

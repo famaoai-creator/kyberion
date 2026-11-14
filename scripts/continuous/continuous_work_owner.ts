@@ -28,8 +28,8 @@ import {
 } from '@agent/core/organization/continuous-work-owner';
 import { CONTINUOUS_MANAGED_WORK_PIPELINE } from '@agent/core/organization/continuous-work-plan';
 import type { DotCharter } from '@agent/core/dot/dot-charter';
-import { openAlignmentApproval } from '../mission_alignment_request.js';
-import { assessAlignmentDecision } from '../mission_alignment_decision.js';
+import { openAlignmentApproval } from '../mission/mission_alignment_request.js';
+import { assessAlignmentDecision } from '../mission/mission_alignment_decision.js';
 import { loadMissionBriefAtPath } from '../mission-alignment-gate/mission-brief.js';
 
 import {

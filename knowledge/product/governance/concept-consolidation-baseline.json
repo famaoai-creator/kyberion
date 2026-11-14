@@ -1598,7 +1598,7 @@
       "env_direct_read_budget": 1,
       "bespoke_cli_parser_budget": 3
     },
-    "scripts/mission_journal.ts": {
+    "scripts/mission/mission_journal.ts": {
       "bespoke_cli_parser_budget": 1
     },
     "scripts/oauth_callback_surface.ts": {

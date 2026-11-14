@@ -3048,7 +3048,7 @@
     },
     {
       "id": "script.mission.journal",
-      "module": "scripts/mission_journal.ts",
+      "module": "scripts/mission/mission_journal.ts",
       "command": "mission journal",
       "noun": "mission",
       "verb": "journal",

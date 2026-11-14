@@ -25,7 +25,7 @@ import { revokeApprovalRequest } from '@agent/core/governance/approval-revocatio
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeMkdir, safeWriteFile, safeRmSync } from '@agent/core/secure-io';
 import { continueHumanMissionAdmission } from './mission_admission_continuation.js';
-import { sweepMissionStartCandidates } from './daemon_watchdog.js';
+import { sweepMissionStartCandidates } from '../daemon_watchdog.js';
 import * as mandates from '@agent/core/governance/mandate-shadow';
 import * as autonomyGate from '@agent/core/governance/autonomous-ops-gate';
 import * as operationsHalt from '@agent/core/governance/operations-halt';
@@ -81,7 +81,7 @@ vi.mock('@agent/core/mission/mission-admission', async (original) => {
   };
 });
 // Preserve real decision/claim/receipt storage; avoid unrelated notification/mandate observation effects.
-vi.mock('./mission-alignment-gate/alignment-approval.js', () => ({
+vi.mock('../mission-alignment-gate/alignment-approval.js', () => ({
   openAlignmentApproval: (
     missionId: string,
     options: {
@@ -122,7 +122,7 @@ vi.mock('./mission-alignment-gate/alignment-approval.js', () => ({
   },
 }));
 // R5 watchdog sweeps reach the controller only through the governed continuation.
-vi.mock('./mission_controller.js', () => ({ main: (args: string[]) => run(args) }));
+vi.mock('../mission_controller.js', () => ({ main: (args: string[]) => run(args) }));
 // Human authentication is explicit; this test is not an agent pretending to be a decider.
 vi.mock('@agent/core/agent-execution-context', async (original) => ({
   ...(await original<typeof import('@agent/core/agent-execution-context')>()),

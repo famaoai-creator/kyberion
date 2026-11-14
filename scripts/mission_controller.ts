@@ -1189,7 +1189,7 @@ async function gatePass(missionId: string, gateFile?: string, note?: string): Pr
     markPhaseTasksCompleted,
   } = await import('@agent/core/mission/mission-process-planning');
   if (activeMissionControllerArgs.includes('--machine-only')) {
-    const { runMachineOnlyMissionGate } = await import('./mission_machine_gate.js');
+    const { runMachineOnlyMissionGate } = await import('./mission/mission_machine_gate.js');
     await runMachineOnlyMissionGate(
       { missionId: missionId || '', gateId: gateFile },
       {

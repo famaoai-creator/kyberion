@@ -35,7 +35,7 @@
 | `libs/core/knowledge/promoted-memory.ts`                               | 昇格済みレコードの永続化（pattern/sop_candidate/knowledge_hint/report_template）                                                   | secure-io 経由で実装済み                                     |
 | `libs/core/contextual-intent-memory.ts`                                | personal の文脈メモリを `knowledge/personal/contextual-intent-memory.json` に永続化                                                | **personal 永続メモリの既存前例**                            |
 | `schemas/memory-candidate.schema.json`                                 | 昇格候補スキーマ                                                                                                                   | 流用                                                         |
-| `scripts/mission_journal.ts`                                           | ミッション履歴の人間可読ビュー（読み取り専用）                                                                                     | 揮発面の journal 表示に拡張可                                |
+| `scripts/mission/mission_journal.ts`                                   | ミッション履歴の人間可読ビュー（読み取り専用）                                                                                     | 揮発面の journal 表示に拡張可                                |
 | `pipelines/fragments/memory-distillation.json`                         | 最近のミッション trace → `knowledge/product/governance/HINTS.md` へ distill                                                        | 出力先 HINTS.md は**未生成**。Phase 4 で接続                 |
 
 **「削除」ではなく `public/` → `product/` へ移設されていた（仕様・思想は健在）** — commit `cda1b0f5 "import claude update patch"` は `knowledge/public/` を `knowledge/product/` へ棚卸しする変更で、メモリ機構の仕様・思想ドキュメントは**今も `product/` 配下に生存**している:
@@ -358,7 +358,7 @@ Phase 0 (監査・生存資産確認)
 - `libs/core/knowledge/memory-promotion-queue.ts` / `memory-promotion-workflow.ts` / `promoted-memory.ts`
 - `libs/core/contextual-intent-memory.ts`（personal 永続メモリ前例）
 - `schemas/memory-candidate.schema.json`
-- `scripts/mission_journal.ts`
+- `scripts/mission/mission_journal.ts`
 - `pipelines/fragments/memory-distillation.json`（出力先 `knowledge/product/governance/HINTS.md` は未生成）
 
 **移設先で生存（§1.0、`product/` 配下・そのまま参照可）**

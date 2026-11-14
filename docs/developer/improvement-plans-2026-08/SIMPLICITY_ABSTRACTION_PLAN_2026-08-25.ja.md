@@ -5638,8 +5638,8 @@ brief drift 防止、`human_only` accountability、approval を自動決定し�
 
 検証:
 
-- `pnpm exec vitest run scripts/mission_alignment_request.test.ts scripts/mission_alignment_e2e.test.ts`: **2 files / 5 tests passed**。
-- `node --import ./scripts/ts-loader.mjs scripts/mission_alignment_request.ts --mission missing-review-probe --json`: **fail-closed JSON と exit 1 を確認**。
+- `pnpm exec vitest run scripts/mission/mission_alignment_request.test.ts scripts/mission/mission_alignment_e2e.test.ts`: **2 files / 5 tests passed**。
+- `node --import ./scripts/ts-loader.mjs scripts/mission/mission_alignment_request.ts --mission missing-review-probe --json`: **fail-closed JSON と exit 1 を確認**。
 - `node --import ./scripts/ts-loader.mjs scripts/check_script_integrity.ts`: **OK**。
 - `pnpm run typecheck`: **passed**。
 
@@ -5652,8 +5652,8 @@ brief drift 防止、`human_only` accountability、approval を自動決定し�
 
 検証:
 
-- `pnpm exec vitest run scripts/mission_alignment_decision.test.ts scripts/mission_alignment_decision.entrypoint.test.ts scripts/mission_alignment_e2e.test.ts`: **3 files / 17 tests passed**。
-- `node --import ./scripts/ts-loader.mjs scripts/mission_alignment_decision.ts --mission missing-review-probe --strict --json`: **fail-closed report と exit 1 を確認**。
+- `pnpm exec vitest run scripts/mission/mission_alignment_decision.test.ts scripts/mission/mission_alignment_decision.entrypoint.test.ts scripts/mission/mission_alignment_e2e.test.ts`: **3 files / 17 tests passed**。
+- `node --import ./scripts/ts-loader.mjs scripts/mission/mission_alignment_decision.ts --mission missing-review-probe --strict --json`: **fail-closed report と exit 1 を確認**。
 - `node --import ./scripts/ts-loader.mjs scripts/check_script_integrity.ts`: **OK**。
 
 ## 354. 2026-08-30 SX-10 super pipeline の結果・失敗境界統一

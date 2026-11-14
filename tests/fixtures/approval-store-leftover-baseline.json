@@ -28,7 +28,7 @@
     "libs/core/workforce/background-review-patch.test.ts",
     "libs/core/workforce/background-review-runner.test.ts",
     "scripts/entity_governance_cleanup.test.ts",
-    "scripts/mission_alignment_e2e.test.ts",
+    "scripts/mission/mission_alignment_e2e.test.ts",
     "scripts/personal-pads/actions.test.ts",
     "scripts/personal-pads/plugin-views.test.ts",
     "scripts/personal-workbench/server.test.ts",

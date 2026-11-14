@@ -127,7 +127,7 @@ describe('mission-workflow-catalog', () => {
             params: expect.objectContaining({
               command: 'node',
               args: [
-                'dist/scripts/mission_alignment_decision.js',
+                'dist/scripts/mission/mission_alignment_decision.js',
                 '--mission',
                 '{MISSION_ID}',
                 '--strict',
