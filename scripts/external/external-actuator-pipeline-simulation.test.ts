@@ -33,8 +33,8 @@ import { resetCurrentScope } from '@agent/core/scope-context';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
 import { withExecutionContext } from '@agent/core/authority';
-import { PipelineSuspendedError } from '../pipeline-execution-part-bootstrap.js';
-import { runValidatedSteps } from '../pipeline-execution-part-results.js';
+import { PipelineSuspendedError } from '../pipeline/pipeline-execution-part-bootstrap.js';
+import { runValidatedSteps } from '../pipeline/pipeline-execution-part-results.js';
 import { cleanupSimulationApprovals } from '../../tests/helpers/external-actuator-simulation.js';
 
 let tenant: string;

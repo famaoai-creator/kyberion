@@ -82,7 +82,7 @@
     "scripts/meeting/meeting_preflight.ts",
     "scripts/minutes_record.ts",
     "scripts/personal-pads/actions.ts",
-    "scripts/pipeline-execution-part-results.ts",
+    "scripts/pipeline/pipeline-execution-part-results.ts",
     "scripts/reconcile/reconcile_resident_services.ts",
     "scripts/run_baseline_check.ts",
     "scripts/run_realtime_voice_conversation.ts",

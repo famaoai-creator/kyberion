@@ -88,7 +88,7 @@ import { sendToCustomer } from '@agent/core/customer-conversation';
 import { renderCustomerRoutineTemplate } from '@agent/core/customer-outbound-templates';
 import { enqueueSurfaceOutboxMessage } from '@agent/core/surface/surface-coordination-store';
 import { SWEEP_LOCK_TIMEOUT_MS } from '@agent/core/mission/mission-decision-lock';
-import { installRepositoryPipelineTemplate } from '../pipeline_promote.js';
+import { installRepositoryPipelineTemplate } from '../pipeline/pipeline_promote.js';
 import {
   LEDGER_ROLE,
   asLedgerWriter,

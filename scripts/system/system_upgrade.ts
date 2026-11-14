@@ -8,7 +8,7 @@ import {
   isDirectScript,
   ScriptExitError,
 } from '../lib/harness.js';
-import { main as runPipelineMain } from '../pipeline-execution-part-results.js';
+import { main as runPipelineMain } from '../pipeline/pipeline-execution-part-results.js';
 
 export const SYSTEM_UPGRADE_PIPELINES = {
   check: 'pipelines/system-upgrade-check.json',

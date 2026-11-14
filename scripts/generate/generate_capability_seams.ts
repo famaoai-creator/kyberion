@@ -153,7 +153,7 @@ const SEAM_ROLES: Record<string, SeamRoleEntry> = {
     declaration: 'libs/core/actuator/actuator-op-registry.ts',
     consumers: [
       'libs/core/actuator/actuator-op-registry.ts',
-      'scripts/pipeline-execution-part-control.ts',
+      'scripts/pipeline/pipeline-execution-part-control.ts',
     ],
   },
   'virtual-camera-capture': {

@@ -502,7 +502,7 @@ export function completeScheduledPipelineRun(
  * must not set them: the CLI runner merges `--context` over its derived
  * values, and the scheduler tick passes a schedule's context straight to the
  * steps. The list mirrors `ENGINE_INTERNAL_CONTEXT_KEYS` in
- * scripts/pipeline-execution-part-control.ts plus the trust keys of
+ * scripts/pipeline/pipeline-execution-part-control.ts plus the trust keys of
  * `executePipelineFile`; the `__` prefix is the engine's private namespace.
  * `mission_id` is user-level identity and stays allowed.
  */

@@ -135,7 +135,7 @@ export async function runDotContinuousOperationsStep(
   const cycle =
     deps.runCycle ??
     (async (ref, options) => {
-      await import('../pipeline-execution-part-results.js');
+      await import('../pipeline/pipeline-execution-part-results.js');
       return (
         await import('../organization/organization_continuous_operations.js')
       ).runContinuousOperationsCycleFromRef(ref, options);

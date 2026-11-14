@@ -5,7 +5,7 @@ import type { AdfSkippedStep } from '@agent/core/pipeline/adf-engine';
 import type { PipelineAdfStep } from '@agent/core/pipeline/pipeline-contract';
 import type { RunStepsOptions, ReasoningStepPolicy } from './pipeline-execution-part-bootstrap.js';
 import { DIAGNOSTIC_OPERATOR_GUIDANCE } from './pipeline-diagnostic-profile.js';
-import { readValidatedWorkflowAdf } from './refactor/adf-input.js';
+import { readValidatedWorkflowAdf } from '../refactor/adf-input.js';
 import { findStepByIdRecursive } from './pipeline-execution-part-control.js';
 
 /**

@@ -30,7 +30,7 @@ last_updated: 2026-10-08
 
 - **Lazy Loading**: `libs/core/plugin/skill-wrapper.ts` で扱うような、ライブラリ（Ajv等）の遅延読み込み。
 - **Cache Strategy**: `libs/core/core.ts` の `Cache` クラスを用いたファイル/データのキャッシュ。
-- **Parallel Execution**: `scripts/pipeline-execution-part-bootstrap.ts` の `runParallelBatches()` を利用したIO待ちの解消。
+- **Parallel Execution**: `scripts/pipeline/pipeline-execution-part-bootstrap.ts` の `runParallelBatches()` を利用したIO待ちの解消。
 
 ## 4. 評価基準 (Baseline & Thresholds)
 

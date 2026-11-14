@@ -13,7 +13,7 @@ import { safeRmSync } from '@agent/core/secure-io';
 
 // Load through the same specifier the pipeline entry uses so the test shares
 // one instance of the engine module graph.
-const { runValidatedSteps } = await import(new URL('./run_pipeline.js', import.meta.url).href);
+const { runValidatedSteps } = await import(new URL('../run_pipeline.js', import.meta.url).href);
 
 function scenario(overrides: Partial<ScenarioDefinition> = {}): ScenarioDefinition {
   return parseScenarioDefinition({

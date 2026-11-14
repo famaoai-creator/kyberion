@@ -61,7 +61,7 @@ import {
 
 import { derivePipelineStatus, type PipelineAdfStep } from '@agent/core/pipeline/pipeline-contract';
 import { formatPipelineFailure } from './pipeline-result-reporting.js';
-import { runStepHooks } from './refactor/step-hooks.js';
+import { runStepHooks } from '../refactor/step-hooks.js';
 
 import {
   registeredEnv,

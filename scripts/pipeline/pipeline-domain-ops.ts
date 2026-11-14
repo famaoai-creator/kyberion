@@ -7,49 +7,49 @@ import { resolveActiveProfileRoot } from '@agent/core/profile-root';
 import { nowIso, parseSafeJsonInput } from '@agent/core/foundation';
 import type { PipelineAdfStep } from '@agent/core/pipeline/pipeline-contract';
 import { validateProductivityTaskPlan } from '@agent/core/productivity-task-plan';
-import { parseSafeJsonObjectInput, parseSafeJsonObjectValue } from './lib/json-input.js';
-import { applyOnboardingInput } from './onboarding/onboarding_apply.js';
-import { runCampaignSuite } from './campaign_suite.js';
-import { runAiAudit } from './run_ai_audit.js';
-import { main as runFirstWinLifecycle } from './onboarding/first_win_lifecycle_smoke.js';
-import { runDependencyVulnerabilityScanOnce } from './scan/scan_dependency_vulns.js';
-import { runHealthDegradationWatch } from './health_degradation_watch.js';
+import { parseSafeJsonObjectInput, parseSafeJsonObjectValue } from '../lib/json-input.js';
+import { applyOnboardingInput } from '../onboarding/onboarding_apply.js';
+import { runCampaignSuite } from '../campaign_suite.js';
+import { runAiAudit } from '../run_ai_audit.js';
+import { main as runFirstWinLifecycle } from '../onboarding/first_win_lifecycle_smoke.js';
+import { runDependencyVulnerabilityScanOnce } from '../scan/scan_dependency_vulns.js';
+import { runHealthDegradationWatch } from '../health_degradation_watch.js';
 import {
   runMeetingReadinessCheck,
   type MeetingReadinessStage,
-} from './meeting/meeting_readiness_check.js';
+} from '../meeting/meeting_readiness_check.js';
 import { runKnowledgeHygieneProbe } from '@agent/core/knowledge/knowledge-hygiene-probe';
 import { runOpsHealthProbe } from '@agent/core/ops-health-probe';
-import { collectUiUxGovernanceReport } from './check/check_ui_ux_governance.js';
-import { runTenantDriftWatch } from './watch/watch_tenant_drift.js';
-import { runDecisionDigest } from './approval/approval_inbox.js';
-import { createGhPrPort } from './pr/pr_shadow.js';
+import { collectUiUxGovernanceReport } from '../check/check_ui_ux_governance.js';
+import { runTenantDriftWatch } from '../watch/watch_tenant_drift.js';
+import { runDecisionDigest } from '../approval/approval_inbox.js';
+import { createGhPrPort } from '../pr/pr_shadow.js';
 import { observePullRequests, DEFAULT_IGNORED_CHECKS } from '@agent/core/governance/pr-shadow';
-import { runApprovalStoreHygieneSweeps } from './approval/approval_store_hygiene.js';
-import { runAutoCheckpoint } from './auto_checkpoint.js';
-import { createBackup, listBackups, runRestoreDrill } from './backup.js';
+import { runApprovalStoreHygieneSweeps } from '../approval/approval_store_hygiene.js';
+import { runAutoCheckpoint } from '../auto_checkpoint.js';
+import { createBackup, listBackups, runRestoreDrill } from '../backup.js';
 import { writeBackupDrillReceipt } from '@agent/core/ops-health-state';
 import type { BackupDrillReceipt } from '@agent/core/ops-health';
 import { logger } from '@agent/core/core';
-import { generateSoftwareQualityArtifacts } from './software/software_quality_report.js';
-import { runSoakEnduranceHarness } from './soak/soak_endurance.js';
-import { runSoakRestartE2E } from './soak/soak_restart_e2e.js';
-import { runMarketingVideoDryRun } from './marketing/marketing_video_dry_run.js';
-import { runComplianceScan } from './compliance_checker.js';
-import { main as promoteProcedure } from './promote/promote_procedure.js';
-import { checkI18nHardcoding } from './check/check_i18n_hardcoding.js';
-import { runCatalogIntegrityCheck } from './check/check_catalog_integrity.js';
+import { generateSoftwareQualityArtifacts } from '../software/software_quality_report.js';
+import { runSoakEnduranceHarness } from '../soak/soak_endurance.js';
+import { runSoakRestartE2E } from '../soak/soak_restart_e2e.js';
+import { runMarketingVideoDryRun } from '../marketing/marketing_video_dry_run.js';
+import { runComplianceScan } from '../compliance_checker.js';
+import { main as promoteProcedure } from '../promote/promote_procedure.js';
+import { checkI18nHardcoding } from '../check/check_i18n_hardcoding.js';
+import { runCatalogIntegrityCheck } from '../check/check_catalog_integrity.js';
 import {
   computeTranslationCoverageReport,
   runAlertOnRegression,
-} from './report/report_i18n_translation_coverage.js';
-import { runDocExamplesCheck } from './check/check_doc_examples.js';
-import { main as manageRegistry } from './registry_manager.js';
-import { main as missionController } from './mission_controller.js';
-import { runCapturePhoto } from './capture/capture_photo.js';
-import { runGenerateAvatar } from './generate/generate_avatar.js';
-import { runRegisterAvatar } from './register/register_avatar.js';
-import { runOAuthSetupForService } from './setup/setup_oauth.js';
+} from '../report/report_i18n_translation_coverage.js';
+import { runDocExamplesCheck } from '../check/check_doc_examples.js';
+import { main as manageRegistry } from '../registry_manager.js';
+import { main as missionController } from '../mission_controller.js';
+import { runCapturePhoto } from '../capture/capture_photo.js';
+import { runGenerateAvatar } from '../generate/generate_avatar.js';
+import { runRegisterAvatar } from '../register/register_avatar.js';
+import { runOAuthSetupForService } from '../setup/setup_oauth.js';
 import { runOrganizationDigest } from '@agent/core/organization/organization-digest';
 import { persistOrganizationDigest } from '@agent/core/organization/organization-digest-artifacts';
 import {
@@ -1034,7 +1034,7 @@ export async function runInlineOrganizationOperationTick(
 ): Promise<Record<string, unknown>> {
   const apply = resolveVars(params.apply ?? false, ctx) === true;
   const { executeScheduledOrganizationOperation } =
-    await import('./organization/organization_operation_execute.js');
+    await import('../organization/organization_operation_execute.js');
   const report = await runOrganizationOperationTick(
     { apply },
     { executeOperation: executeScheduledOrganizationOperation }
@@ -1153,7 +1153,7 @@ export async function runInlineCustomerDecisionReminders(
   ctx: Record<string, unknown>
 ): Promise<Record<string, unknown>> {
   const requested = String(resolveVars(params.tenant ?? '', ctx)).trim();
-  const { runCustomerDecisionReminderOp } = await import('./customer-decision/reminder-op.js');
+  const { runCustomerDecisionReminderOp } = await import('../customer-decision/reminder-op.js');
   const result = await runCustomerDecisionReminderOp({
     ...(requested ? { tenant: requested } : {}),
     dryRun: resolveVars(params.dry_run ?? false, ctx) === true,
@@ -1176,7 +1176,7 @@ export async function runInlineCustomerDecisionLearning(
   ctx: Record<string, unknown>
 ): Promise<Record<string, unknown>> {
   const requested = String(resolveVars(params.tenant ?? '', ctx)).trim();
-  const { runCustomerDecisionLearningOp } = await import('./customer-decision/learning-op.js');
+  const { runCustomerDecisionLearningOp } = await import('../customer-decision/learning-op.js');
   const windowDays = Number(resolveVars(params.window_days ?? 0, ctx));
   const result = await runCustomerDecisionLearningOp({
     ...(requested ? { tenant: requested } : {}),

@@ -5,7 +5,7 @@ import { pathResolver } from '@agent/core/path-resolver';
 // Both modules are loaded through the same URL specifier the pipeline entry
 // uses, so the test shares one instance of the engine module graph.
 const { runValidatedSteps, executePipelineFile } = await import(
-  new URL('./run_pipeline.js', import.meta.url).href
+  new URL('../run_pipeline.js', import.meta.url).href
 );
 const {
   MAX_PIPELINE_NESTING_DEPTH,

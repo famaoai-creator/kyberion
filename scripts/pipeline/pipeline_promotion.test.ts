@@ -6,7 +6,7 @@ import { readTextFile } from '@agent/core/foundation';
 import { safeMkdir, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
 import { loadPipelineRunJournal } from '@agent/core/pipeline/pipeline-run-journal';
 import { validatePipelineAdf } from '@agent/core/pipeline/pipeline-contract';
-import { executePipelineFile } from './run_pipeline.js';
+import { executePipelineFile } from '../run_pipeline.js';
 import { promotePipelineAdf, installRepositoryPipelineTemplate } from './pipeline_promote.js';
 
 const cleanup: string[] = [];

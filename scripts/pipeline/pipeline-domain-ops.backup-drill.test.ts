@@ -6,8 +6,8 @@ const mocks = vi.hoisted(() => ({
   writeBackupDrillReceipt: vi.fn(),
 }));
 
-vi.mock('./backup.js', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('./backup.js')>()),
+vi.mock('../backup.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../backup.js')>()),
   listBackups: mocks.listBackups,
   runRestoreDrill: mocks.runRestoreDrill,
 }));

@@ -802,7 +802,7 @@
       "scope": "full",
       "executable": "node",
       "args": ["dist/scripts/check/check_pipeline_shell_independence.js"],
-      "baseline": "scripts/pipeline-shell-independence.baseline.json",
+      "baseline": "scripts/pipeline/pipeline-shell-independence.baseline.json",
       "paths": ["pipelines/**", "scripts/**", "libs/actuators/**"],
       "owner": "operations",
       "rationale": "Checks portable pipeline shell usage."

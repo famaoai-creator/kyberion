@@ -962,14 +962,14 @@ const INLINE_OP_HANDLERS: Record<string, InlineOpHandler> = {
   },
   'core:continuous_operations_report': async ({ step, params, ctx }) => {
     const { runContinuousOperationsReport } =
-      await import('./continuous/continuous_operations_report.js');
+      await import('../continuous/continuous_operations_report.js');
     const ref = String(resolveVars(params.config_ref, ctx));
     const report = await runContinuousOperationsReport(ref, ctx);
     return { ...ctx, [resolveExportKey(step, 'continuous_operations_report')]: report };
   },
   'core:continuous_operations': async ({ step, params, ctx }) => {
     const { runContinuousOperationsCycleFromRef } =
-      await import('./continuous/continuous_operations_cycle.js');
+      await import('../continuous/continuous_operations_cycle.js');
     const apply = resolveVars(params.apply ?? false, ctx);
     if (typeof apply !== 'boolean')
       throw new Error('core:continuous_operations apply must be boolean');
@@ -1001,7 +1001,7 @@ const INLINE_OP_HANDLERS: Record<string, InlineOpHandler> = {
   },
   'core:organization_improvement_scan': async ({ step, params, ctx }) => {
     const { runOrganizationImprovementScanOp } =
-      await import('./organization/organization_improvement_scan.js');
+      await import('../organization/organization_improvement_scan.js');
     const tier = String(resolveVars(params.tier ?? 'confidential', ctx));
     const organizationId = String(resolveVars(params.organization_id ?? '', ctx));
     if (!organizationId)

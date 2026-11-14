@@ -14,7 +14,8 @@ describe('run_pipeline fallback contract', () => {
     // The fallback implementation lives in the execution bootstrap module;
     // run_pipeline.ts is only the public entrypoint after the refactor.
     const source = String(
-      safeReadFile('scripts/pipeline-execution-part-bootstrap.ts', { encoding: 'utf8' }) || ''
+      safeReadFile('scripts/pipeline/pipeline-execution-part-bootstrap.ts', { encoding: 'utf8' }) ||
+        ''
     );
 
     expect(source).toContain(

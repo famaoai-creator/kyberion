@@ -2,13 +2,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({ runSteps: vi.fn() }));
 
-vi.mock('./pipeline-execution-part-execution.js', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('./pipeline-execution-part-execution.js')>()),
+vi.mock('./pipeline/pipeline-execution-part-execution.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./pipeline/pipeline-execution-part-execution.js')>()),
   runSteps: mocks.runSteps,
 }));
 
 import * as killSwitch from '@agent/core/governance/kill-switch';
-import { main as runPipelineMain } from './pipeline-execution-part-results.js';
+import { main as runPipelineMain } from './pipeline/pipeline-execution-part-results.js';
 
 describe('pipeline --json run summary', () => {
   afterEach(() => {

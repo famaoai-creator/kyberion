@@ -3,7 +3,7 @@ import * as path from 'node:path';
 import { loadActuatorOpRegistry } from '@agent/core/actuator/actuator-op-registry';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeReadFile } from '@agent/core';
-import { normalizePipelineOp } from './pipeline-execution-part-bootstrap.js';
+import { normalizePipelineOp } from './pipeline/pipeline-execution-part-bootstrap.js';
 
 // REQ-8 (MSN-UCDOC-ALIGN-20261026): every op used inside templates/verticals
 // (and the fragments they include) must resolve to a real actuator op or a
