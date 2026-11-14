@@ -11,6 +11,26 @@ import {
   setWorkCoordinationNamespace,
 } from '@agent/core/workforce/work-coordination';
 import {
+  mintScopeEnvelope,
+  withScopeEnvelope,
+  resetScopeEnvelopeState,
+} from '@agent/core/scope-envelope';
+
+// Claimed dispatch requires a scope envelope: mint the tenant scope the
+// WorkItem context declares (tenant-meeting / M-MEETING / extract-actions).
+const meetingEnvelope = () =>
+  mintScopeEnvelope({
+    env: {
+      KYBERION_TIER: 'confidential',
+      MISSION_ID: 'M-MEETING',
+      KYBERION_TENANT: 'tenant-meeting',
+      KYBERION_TASK_ID: 'extract-actions',
+      KYBERION_ORGANIZATION_ID: 'org-meeting',
+      KYBERION_PROJECT_ID: 'M-MEETING',
+    },
+    policy: { purpose: 'meeting intelligence delegation test' },
+  });
+import {
   delegateMeetingReasoning,
   parseMeetingModelObject,
   parseMeetingModelObjectArray,
@@ -36,6 +56,7 @@ describe('meeting intelligence governed delegation', () => {
   afterEach(() => {
     clearWorkCoordinationStore();
     setWorkCoordinationNamespace(null);
+    resetScopeEnvelopeState();
   });
 
   it('records successful work-item execution and native subagent proof', async () => {
@@ -53,24 +74,26 @@ describe('meeting intelligence governed delegation', () => {
         task_id: 'extract-actions',
       },
     });
-    const output = await delegateMeetingReasoning({
-      backend: {
-        name: 'native-test',
-        delegateTask: async () => {
-          throw new Error('legacy path used');
-        },
-        getNativeSubagentAdopter: () => ({
-          id: 'native-adopter',
-          dispatch: async () => '[{"title":"Send notes"}]',
-          getInfo: () => ({ provider: 'native', model: 'test-model', threadId: 'thread-1' }),
-        }),
-      } as never,
-      prompt: 'extract actions',
-      context: 'meeting',
-      mission_id: 'M-MEETING',
-      work_item_id: item.item_id,
-      task_id: 'extract-actions',
-    });
+    const output = await withScopeEnvelope(meetingEnvelope(), () =>
+      delegateMeetingReasoning({
+        backend: {
+          name: 'native-test',
+          delegateTask: async () => {
+            throw new Error('legacy path used');
+          },
+          getNativeSubagentAdopter: () => ({
+            id: 'native-adopter',
+            dispatch: async () => '[{"title":"Send notes"}]',
+            getInfo: () => ({ provider: 'native', model: 'test-model', threadId: 'thread-1' }),
+          }),
+        } as never,
+        prompt: 'extract actions',
+        context: 'meeting',
+        mission_id: 'M-MEETING',
+        work_item_id: item.item_id,
+        task_id: 'extract-actions',
+      })
+    );
     expect(output).toContain('Send notes');
     expect(getWorkItem(item.item_id)?.status).toBe('done');
     expect(getWorkItem(item.item_id)?.attempts?.[0]?.metadata).toMatchObject({
@@ -102,19 +125,21 @@ describe('meeting intelligence governed delegation', () => {
       },
     });
     await expect(
-      delegateMeetingReasoning({
-        backend: {
-          name: 'blocked-test',
-          delegateTask: async () => {
-            throw new Error('blocked by backend');
-          },
-        } as never,
-        prompt: 'extract actions',
-        context: 'meeting',
-        mission_id: 'M-MEETING',
-        work_item_id: item.item_id,
-        task_id: 'extract-actions',
-      })
+      withScopeEnvelope(meetingEnvelope(), () =>
+        delegateMeetingReasoning({
+          backend: {
+            name: 'blocked-test',
+            delegateTask: async () => {
+              throw new Error('blocked by backend');
+            },
+          } as never,
+          prompt: 'extract actions',
+          context: 'meeting',
+          mission_id: 'M-MEETING',
+          work_item_id: item.item_id,
+          task_id: 'extract-actions',
+        })
+      )
     ).rejects.toThrow('blocked by backend');
     expect(getWorkItem(item.item_id)?.status).toBe('blocked');
     expect(getWorkItem(item.item_id)?.attempts?.[0]?.metadata).toMatchObject({

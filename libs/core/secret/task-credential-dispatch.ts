@@ -44,6 +44,12 @@ export async function withConfiguredTaskCredentials<T>(
     throw new Error('[CREDENTIAL_BINDING_UNAVAILABLE] Claimed dispatch requires a scope envelope');
   const identity = credentialExecutionIdentity();
   if (!identity.tenantSlug) {
+    if (envelope.identity.tenant_slug !== undefined) {
+      // Tenant-scoped delegation without configured credentials runs unbound —
+      // credential use stays fail-closed at point of use. The personal-claim
+      // proof exists only for unscoped (personal-runtime) envelopes.
+      return run();
+    }
     const claim = assertPersonalTaskCredentialClaim(workItemId);
     const snapshot = JSON.stringify(claim);
     return withPersonalTaskCredentialBinding(
