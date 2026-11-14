@@ -6,9 +6,18 @@
       "service_id": "asana",
       "display_name": "Asana API Presets",
       "auth_strategy": "Bearer",
-      "operation_count": 4,
+      "operation_count": 5,
       "detail_ref": "knowledge/product/orchestration/service-presets/asana.json",
       "operations": [
+        {
+          "action": "get_current_user",
+          "description": "Fetch the authenticated Asana user; serves as the identity probe.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "tenant_binding_required": false,
+          "idempotency": "not_applicable"
+        },
         {
           "action": "list_projects",
           "description": "Lists Asana projects.",
@@ -292,9 +301,18 @@
       "service_id": "canva",
       "display_name": "Canva Connect API Presets",
       "auth_strategy": "Bearer",
-      "operation_count": 8,
+      "operation_count": 9,
       "detail_ref": "knowledge/product/orchestration/service-presets/canva.json",
       "operations": [
+        {
+          "action": "get_current_user",
+          "description": "Fetch the authenticated Canva user; serves as the identity probe.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "tenant_binding_required": false,
+          "idempotency": "not_applicable"
+        },
         {
           "action": "exchange_oauth_code",
           "description": "Exchanges an OAuth authorization code for Canva access and refresh tokens.",
@@ -687,9 +705,18 @@
       "service_id": "gemini",
       "display_name": "Google AI Studio Gemini API presets",
       "auth_strategy": "api_key_query",
-      "operation_count": 6,
+      "operation_count": 7,
       "detail_ref": "knowledge/product/orchestration/service-presets/gemini.json",
       "operations": [
+        {
+          "action": "list_models",
+          "description": "List available Gemini models; serves as the identity probe.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "tenant_binding_required": false,
+          "idempotency": "not_applicable"
+        },
         {
           "action": "generate_image",
           "kind": "apply",
@@ -993,9 +1020,18 @@
       "service_id": "gitlab",
       "display_name": "GitLab REST API v4 Presets",
       "auth_strategy": "bearer",
-      "operation_count": 5,
+      "operation_count": 6,
       "detail_ref": "knowledge/product/orchestration/service-presets/gitlab.json",
       "operations": [
+        {
+          "action": "get_current_user",
+          "description": "Fetch the authenticated GitLab user; serves as the identity probe.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "tenant_binding_required": false,
+          "idempotency": "not_applicable"
+        },
         {
           "action": "get_projects",
           "description": "List projects.",
@@ -1531,9 +1567,18 @@
       "service_id": "linear",
       "display_name": "Linear API Presets",
       "auth_strategy": "Bearer",
-      "operation_count": 2,
+      "operation_count": 3,
       "detail_ref": "knowledge/product/orchestration/service-presets/linear.json",
       "operations": [
+        {
+          "action": "get_viewer",
+          "description": "Fetch the authenticated Linear viewer; serves as the identity probe.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "tenant_binding_required": false,
+          "idempotency": "not_applicable"
+        },
         {
           "action": "query",
           "description": "Executes a raw GraphQL query against the Linear API.",
@@ -1837,12 +1882,66 @@
       ]
     },
     {
+      "service_id": "moltbook",
+      "display_name": "Moltbook Agent Protocol Presets",
+      "auth_strategy": "Bearer",
+      "operation_count": 4,
+      "detail_ref": "knowledge/product/orchestration/service-presets/moltbook.json",
+      "operations": [
+        {
+          "action": "get_home",
+          "description": "Fetch the agent home feed: notifications, mentions and followed posts.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "tenant_binding_required": false,
+          "idempotency": "not_applicable"
+        },
+        {
+          "action": "verify_challenge",
+          "description": "Solve the math-based anti-spam challenge required before posting.",
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
+          "tenant_binding_required": false,
+          "idempotency": "recommended"
+        },
+        {
+          "action": "create_post",
+          "description": "Publish a new post to the Moltbook network.",
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
+          "tenant_binding_required": false,
+          "idempotency": "recommended"
+        },
+        {
+          "action": "mark_notifications_read",
+          "description": "Mark every processed notification as read.",
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
+          "tenant_binding_required": false,
+          "idempotency": "recommended"
+        }
+      ]
+    },
+    {
       "service_id": "notion",
       "display_name": "Notion API Presets",
       "auth_strategy": "Bearer",
-      "operation_count": 3,
+      "operation_count": 4,
       "detail_ref": "knowledge/product/orchestration/service-presets/notion.json",
       "operations": [
+        {
+          "action": "get_current_user",
+          "description": "Fetch the bot's own user object; serves as the identity probe.",
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
+          "tenant_binding_required": false,
+          "idempotency": "not_applicable"
+        },
         {
           "action": "exchange_oauth_code",
           "description": "Exchanges an OAuth authorization code for Notion access tokens.",

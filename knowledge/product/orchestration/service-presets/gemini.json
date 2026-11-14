@@ -19,6 +19,15 @@
     "value": "{{accessToken}}"
   },
   "operations": {
+    "list_models": {
+      "type": "api",
+      "kind": "capture",
+      "risk": "read",
+      "approval_required": false,
+      "path": "models",
+      "method": "GET",
+      "description": "List available Gemini models; serves as the identity probe."
+    },
     "generate_image": {
       "type": "api",
       "path": "models/imagen-3.0-generate-002:generateImages",

@@ -8,8 +8,8 @@ describe('surface auth readiness', () => {
     expect(endpoint).toBeDefined();
 
     expect(resolveSurfaceRequiredSecrets('jira', 'basic', endpoint!.credential_suffixes)).toEqual([
-      'JIRA_CLIENT_ID',
-      'JIRA_CLIENT_SECRET',
+      'JIRA_EMAIL',
+      'JIRA_API_TOKEN',
       'JIRA_ACCESS_TOKEN',
     ]);
   });

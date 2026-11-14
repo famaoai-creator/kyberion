@@ -15,6 +15,15 @@
     "retryable_categories": ["network", "rate_limit", "timeout", "resource_unavailable"]
   },
   "operations": {
+    "get_current_user": {
+      "type": "api",
+      "kind": "capture",
+      "risk": "read",
+      "approval_required": false,
+      "path": "user",
+      "method": "GET",
+      "description": "Fetch the authenticated GitLab user; serves as the identity probe."
+    },
     "get_projects": {
       "path": "projects",
       "method": "GET",

