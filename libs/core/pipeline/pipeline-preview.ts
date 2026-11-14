@@ -327,64 +327,56 @@ function previewStep(step: any, index: number, ctx: Record<string, any>): Previe
   return ps;
 }
 
+const judgeRoute = (step: any): string =>
+  `Judge route (${Array.isArray(step.params?.routes) ? step.params.routes.length : 0} routes; unmatched=${step.params?.on_no_match || 'abort'})`;
+const awaitDecision = (step: any): string =>
+  `Await human decision: ${step.params?.approval?.summary || step.params?.summary || '?'}`;
+const awaitState = (step: any): string =>
+  `Await external state (${(step.params?.probe as { type?: string } | undefined)?.type || '?'} probe)`;
+const condExpr = (step: any): string =>
+  `${step.params?.condition?.from || '?'} ${step.params?.condition?.operator || '?'} ${step.params?.condition?.value || '?'}`;
+
+/** op → human-readable step summary. Adding an op = one entry. */
+const STEP_DESCRIBERS: Record<string, (step: any) => string> = {
+  judge_route: judgeRoute,
+  'core:judge_route': judgeRoute,
+  await_decision: awaitDecision,
+  'core:await_decision': awaitDecision,
+  await_state: awaitState,
+  'core:await_state': awaitState,
+  goto: (step) => `Navigate to ${step.params?.url || '?'}`,
+  click: (step) => `Click ${step.params?.selector || '?'}`,
+  fill: (step) => `Fill ${step.params?.selector || '?'}`,
+  evaluate: () => `Execute JavaScript`,
+  screenshot: (step) => `Take screenshot → ${step.params?.path || '?'}`,
+  wait: (step) =>
+    step.params?.duration
+      ? `Wait ${step.params.duration}ms`
+      : `Wait for ${step.params?.selector || '?'}`,
+  log: (step) => `Log: ${step.params?.message || '?'}`,
+  ref: (step) => `Execute sub-pipeline: ${step.params?.path || '?'}`,
+  if: (step) => `Condition: ${condExpr(step)}`,
+  while: (step) => `Loop while ${condExpr(step)}`,
+  loop_until: (step) => `Loop until ${condExpr(step)}`,
+  retry_until_quality: (step) =>
+    `Retry until quality ${step.params?.condition?.from || step.params?.quality_condition?.from || '?'} ${step.params?.condition?.operator || step.params?.quality_condition?.operator || '?'} ${step.params?.condition?.value || step.params?.quality_condition?.value || '?'}`,
+  parallel_foreach: (step) =>
+    `Parallel foreach over ${Array.isArray(step.params?.items) ? step.params.items.length : '?'} item(s)`,
+  accumulate: (step) =>
+    `Accumulate ${Array.isArray(step.params?.items) ? step.params.items.length : '?'} item(s) toward ${step.params?.target_count || step.params?.targetCount || '?'} target`,
+  pptx_extract: (step) => `Extract PPTX design from ${step.params?.path || '?'} (raw-preserving)`,
+  xlsx_extract: (step) => `Extract XLSX design from ${step.params?.path || '?'} (raw-preserving)`,
+  pdf_to_pptx_design: () => `Convert PDF design to PPTX design`,
+  pdf_to_xlsx_design: () => `Convert PDF design to XLSX design`,
+  pptx_render: (step) => `Render PPTX to ${step.params?.path || '?'}`,
+  xlsx_render: (step) => `Render XLSX to ${step.params?.path || '?'}`,
+  pptx_patch: (step) =>
+    `Patch PPTX text in ${step.params?.source || '?'} → ${step.params?.path || '?'}`,
+};
+
 function describeStep(step: any): string {
   const op = step.op || '?';
   const type = step.type || '?';
-  switch (op) {
-    case 'judge_route':
-    case 'core:judge_route':
-      return `Judge route (${Array.isArray(step.params?.routes) ? step.params.routes.length : 0} routes; unmatched=${step.params?.on_no_match || 'abort'})`;
-    case 'await_decision':
-    case 'core:await_decision':
-      return `Await human decision: ${step.params?.approval?.summary || step.params?.summary || '?'}`;
-    case 'await_state':
-    case 'core:await_state':
-      return `Await external state (${(step.params?.probe as { type?: string } | undefined)?.type || '?'} probe)`;
-    case 'goto':
-      return `Navigate to ${step.params?.url || '?'}`;
-    case 'click':
-      return `Click ${step.params?.selector || '?'}`;
-    case 'fill':
-      return `Fill ${step.params?.selector || '?'}`;
-    case 'evaluate':
-      return `Execute JavaScript`;
-    case 'screenshot':
-      return `Take screenshot \u2192 ${step.params?.path || '?'}`;
-    case 'wait':
-      return step.params?.duration
-        ? `Wait ${step.params.duration}ms`
-        : `Wait for ${step.params?.selector || '?'}`;
-    case 'log':
-      return `Log: ${step.params?.message || '?'}`;
-    case 'ref':
-      return `Execute sub-pipeline: ${step.params?.path || '?'}`;
-    case 'if':
-      return `Condition: ${step.params?.condition?.from || '?'} ${step.params?.condition?.operator || '?'} ${step.params?.condition?.value || '?'}`;
-    case 'while':
-      return `Loop while ${step.params?.condition?.from || '?'} ${step.params?.condition?.operator || '?'} ${step.params?.condition?.value || '?'}`;
-    case 'loop_until':
-      return `Loop until ${step.params?.condition?.from || '?'} ${step.params?.condition?.operator || '?'} ${step.params?.condition?.value || '?'}`;
-    case 'retry_until_quality':
-      return `Retry until quality ${step.params?.condition?.from || step.params?.quality_condition?.from || '?'} ${step.params?.condition?.operator || step.params?.quality_condition?.operator || '?'} ${step.params?.condition?.value || step.params?.quality_condition?.value || '?'}`;
-    case 'parallel_foreach':
-      return `Parallel foreach over ${Array.isArray(step.params?.items) ? step.params.items.length : '?'} item(s)`;
-    case 'accumulate':
-      return `Accumulate ${Array.isArray(step.params?.items) ? step.params.items.length : '?'} item(s) toward ${step.params?.target_count || step.params?.targetCount || '?'} target`;
-    case 'pptx_extract':
-      return `Extract PPTX design from ${step.params?.path || '?'} (raw-preserving)`;
-    case 'xlsx_extract':
-      return `Extract XLSX design from ${step.params?.path || '?'} (raw-preserving)`;
-    case 'pdf_to_pptx_design':
-      return `Convert PDF design to PPTX design`;
-    case 'pdf_to_xlsx_design':
-      return `Convert PDF design to XLSX design`;
-    case 'pptx_render':
-      return `Render PPTX to ${step.params?.path || '?'}`;
-    case 'xlsx_render':
-      return `Render XLSX to ${step.params?.path || '?'}`;
-    case 'pptx_patch':
-      return `Patch PPTX text in ${step.params?.source || '?'} \u2192 ${step.params?.path || '?'}`;
-    default:
-      return `${type}:${op}`;
-  }
+  const describe = STEP_DESCRIBERS[op];
+  return describe ? describe(step) : `${type}:${op}`;
 }

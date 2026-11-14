@@ -326,8 +326,8 @@ export function resolveExecutionBriefReference(ctx: any, explicitKey?: string): 
 }
 
 export function buildPipelineBundleJobs(archetypeId: string): PipelineBundleJob[] {
-  switch (archetypeId) {
-    case 'status-inquiry':
+  const handlers: Record<string, () => PipelineBundleJob[]> = {
+    'status-inquiry': () => {
       return [
         {
           id: 'collect-system-status',
@@ -342,7 +342,8 @@ export function buildPipelineBundleJobs(archetypeId: string): PipelineBundleJob[
           outputs: ['active/shared/tmp/orchestrator/system-status-report.json'],
         },
       ];
-    case 'web-design-clone-delivery':
+    },
+    'web-design-clone-delivery': () => {
       return [
         {
           id: 'observe-reference',
@@ -399,7 +400,8 @@ export function buildPipelineBundleJobs(archetypeId: string): PipelineBundleJob[
           ],
         },
       ];
-    case 'mobile-design-clone-delivery':
+    },
+    'mobile-design-clone-delivery': () => {
       return [
         {
           id: 'capture-mobile-ui',
@@ -438,7 +440,8 @@ export function buildPipelineBundleJobs(archetypeId: string): PipelineBundleJob[
           ],
         },
       ];
-    case 'proposal-storyline-delivery':
+    },
+    'proposal-storyline-delivery': () => {
       return [
         {
           id: 'render-proposal-deck',
@@ -475,7 +478,8 @@ export function buildPipelineBundleJobs(archetypeId: string): PipelineBundleJob[
           ],
         },
       ];
-    case 'project-document-pack':
+    },
+    'project-document-pack': () => {
       return [
         {
           id: 'instantiate-project-os',
@@ -506,26 +510,29 @@ export function buildPipelineBundleJobs(archetypeId: string): PipelineBundleJob[
           ],
         },
       ];
-    default:
-      return [
-        {
-          id: 'normalize-request',
-          title: 'Normalize request and prepare governed delivery pack',
-          actuator: 'artifact-actuator',
-          template_path: 'libs/actuators/artifact-actuator/examples/write-delivery-pack.json',
-          recommended_procedure: 'knowledge/product/orchestration/actuator-intent-normalization.md',
-          parameter_overrides: {
-            'params.packId': '{{delivery_pack_id}}',
-            'params.logicalDir': 'active/shared/runtime/delivery-packs/{{delivery_pack_id}}',
-            'params.summary': '{{delivery_summary}}',
-            'params.requestText': '{{request_text}}',
-          },
-          outputs: [
-            'active/shared/runtime/delivery-packs/{{delivery_pack_id}}/{{delivery_pack_id}}.json',
-          ],
+    },
+  };
+  const fallback = () => {
+    return [
+      {
+        id: 'normalize-request',
+        title: 'Normalize request and prepare governed delivery pack',
+        actuator: 'artifact-actuator',
+        template_path: 'libs/actuators/artifact-actuator/examples/write-delivery-pack.json',
+        recommended_procedure: 'knowledge/product/orchestration/actuator-intent-normalization.md',
+        parameter_overrides: {
+          'params.packId': '{{delivery_pack_id}}',
+          'params.logicalDir': 'active/shared/runtime/delivery-packs/{{delivery_pack_id}}',
+          'params.summary': '{{delivery_summary}}',
+          'params.requestText': '{{request_text}}',
         },
-      ];
-  }
+        outputs: [
+          'active/shared/runtime/delivery-packs/{{delivery_pack_id}}/{{delivery_pack_id}}.json',
+        ],
+      },
+    ];
+  };
+  return (handlers[archetypeId] ?? fallback)();
 }
 
 export function renderPipelineBundleJob(
@@ -815,36 +822,23 @@ export function parseJsonCommandOutput(output: string): unknown {
 }
 
 export function buildClarificationQuestion(inputName: string): string {
-  switch (inputName) {
-    case 'reference source':
-      return t('question:orch_brief_q_reference_source');
-    case 'preserved elements':
-      return t('question:orch_brief_q_preserved_elements');
-    case 'new concept':
-      return t('question:orch_brief_q_new_concept');
-    case 'target environment':
-      return t('question:orch_brief_q_target_environment');
-    case 'execution environment':
-      return t('question:orch_brief_q_execution_environment');
-    case 'source materials':
-      return t('question:orch_brief_q_source_materials');
-    case 'target audience':
-      return t('question:orch_brief_q_target_audience');
-    case 'storyline':
-      return t('question:orch_brief_q_storyline');
-    case 'required output format':
-      return t('question:orch_brief_q_required_output_format');
-    case 'project name':
-      return t('question:orch_brief_q_project_name');
-    case 'delivery scope':
-      return t('question:orch_brief_q_delivery_scope');
-    case 'phase or gate':
-      return t('question:orch_brief_q_phase_or_gate');
-    case 'related missions':
-      return t('question:orch_brief_q_related_missions');
-    default:
-      return t('question:orch_brief_q_default', { name: inputName });
-  }
+  const handlers: Record<string, () => string> = {
+    'reference source': () => t('question:orch_brief_q_reference_source'),
+    'preserved elements': () => t('question:orch_brief_q_preserved_elements'),
+    'new concept': () => t('question:orch_brief_q_new_concept'),
+    'target environment': () => t('question:orch_brief_q_target_environment'),
+    'execution environment': () => t('question:orch_brief_q_execution_environment'),
+    'source materials': () => t('question:orch_brief_q_source_materials'),
+    'target audience': () => t('question:orch_brief_q_target_audience'),
+    storyline: () => t('question:orch_brief_q_storyline'),
+    'required output format': () => t('question:orch_brief_q_required_output_format'),
+    'project name': () => t('question:orch_brief_q_project_name'),
+    'delivery scope': () => t('question:orch_brief_q_delivery_scope'),
+    'phase or gate': () => t('question:orch_brief_q_phase_or_gate'),
+    'related missions': () => t('question:orch_brief_q_related_missions'),
+  };
+  const fallback = () => t('question:orch_brief_q_default', { name: inputName });
+  return (handlers[inputName] ?? fallback)();
 }
 
 export function deriveExecutionBriefReadiness(missingInputs: string[], requestText: string) {

@@ -112,16 +112,16 @@ function getValidator(): ValidateFunction {
 
 function missingRequiredFields(action: VcsAction): string[] {
   const params = action.params || {};
-  switch (action.op) {
-    case 'commit': {
+  const handlers: Partial<Record<VcsOp, () => string[]>> = {
+    commit: () => {
       if (!params.message?.trim()) return ['params.message (e.g. "Checkpoint mission progress")'];
       return [];
-    }
-    case 'pr_create': {
+    },
+    pr_create: () => {
       if (!params.title?.trim()) return ['params.title (e.g. "Add vcs-actuator")'];
       return [];
-    }
-    case 'branch': {
+    },
+    branch: () => {
       const missing: string[] = [];
       if (!params.action) {
         missing.push('params.action ("list" | "create" | "delete")');
@@ -134,8 +134,8 @@ function missingRequiredFields(action: VcsAction): string[] {
         missing.push('params.name (required for branch create/delete)');
       }
       return missing;
-    }
-    case 'worktree': {
+    },
+    worktree: () => {
       const missing: string[] = [];
       if (!params.action || !['list', 'add', 'remove', 'prune'].includes(params.action)) {
         missing.push('params.action ("list" | "add" | "remove" | "prune")');
@@ -143,22 +143,27 @@ function missingRequiredFields(action: VcsAction): string[] {
         missing.push('params.path (required for worktree add/remove)');
       }
       return missing;
-    }
-    case 'checkout':
+    },
+    checkout: () => {
       return params.ref?.trim() ? [] : ['params.ref (checkout target)'];
-    case 'pr_view':
+    },
+    pr_view: () => {
       return params.ref?.trim() ? [] : ['params.ref (PR number, URL, or branch)'];
-    case 'pr_checks':
+    },
+    pr_checks: () => {
       return params.ref?.trim() ? [] : ['params.ref (PR number, URL, or branch)'];
-    case 'pr_merge':
+    },
+    pr_merge: () => {
       return params.ref?.trim() ? [] : ['params.ref (PR number, URL, or branch)'];
-    case 'development_loop':
+    },
+    development_loop: () => {
       return ['ref', 'work_item_id', 'review_task_id'].filter(
         (key) => !String(params[key as keyof VcsParams] ?? '').trim()
       );
-    default:
-      return [];
-  }
+    },
+  };
+  const handler = handlers[action.op] ?? (() => []);
+  return handler();
 }
 
 function validateAction(input: unknown): VcsAction {
@@ -233,8 +238,8 @@ export async function handleAction(
   const cwd = resolveCwd(params);
   logger.info(`[vcs-actuator] ${valid.op} (cwd: ${cwd})`);
 
-  switch (valid.op) {
-    case 'development_loop':
+  const handlers: Record<VcsOp, () => Promise<any>> = {
+    development_loop: async () => {
       return runPreparedVcsDevelopment(
         {
           cwd,
@@ -246,35 +251,36 @@ export async function handleAction(
         publicationHost,
         runGhResult
       );
-    case 'status': {
+    },
+    status: async () => {
       const result = gitStatus(cwd, { short: params.short });
       assertOk(result, 'git status');
       return { op: valid.op, cwd, output: result.stdout };
-    }
-    case 'diff': {
+    },
+    diff: async () => {
       const result = gitDiff(cwd, { stat: params.stat, ref: params.ref });
       assertOk(result, 'git diff');
       return { op: valid.op, cwd, output: result.stdout };
-    }
-    case 'log': {
+    },
+    log: async () => {
       const result = gitLog(cwd, { limit: params.limit, oneline: params.oneline });
       assertOk(result, 'git log');
       return { op: valid.op, cwd, output: result.stdout };
-    }
-    case 'branch': {
+    },
+    branch: async () => {
       const result = gitBranch(cwd, params.action as 'list' | 'create' | 'delete', params.name);
       assertOk(result, 'git branch');
       return { op: valid.op, cwd, output: result.stdout };
-    }
-    case 'commit': {
+    },
+    commit: async () => {
       if (params.add) {
         assertOk(gitAddAll(cwd), 'git add -A');
       }
       const result = gitCommit(cwd, (params.message as string).trim());
       assertOk(result, 'git commit');
       return { op: valid.op, cwd, output: result.stdout };
-    }
-    case 'pr_create': {
+    },
+    pr_create: async () => {
       const publication = {
         title: (params.title as string).trim(),
         body: params.body,
@@ -293,8 +299,8 @@ export async function handleAction(
         );
       }
       return { op: valid.op, cwd, output: result.stdout };
-    }
-    case 'push': {
+    },
+    push: async () => {
       const publication = {
         cwd,
         remote: params.remote,
@@ -304,29 +310,29 @@ export async function handleAction(
       const result = await publicationHost({ operation: 'push', params: publication });
       assertOk(result, 'git push');
       return { op: valid.op, cwd, output: result.stdout };
-    }
-    case 'fetch': {
+    },
+    fetch: async () => {
       const result = gitFetch(cwd, { remote: params.remote, ref: params.ref });
       assertOk(result, 'git fetch');
       return { op: valid.op, cwd, output: result.stdout };
-    }
-    case 'pull': {
+    },
+    pull: async () => {
       const result = gitPull(cwd, { remote: params.remote, ref: params.ref });
       assertOk(result, 'git pull');
       return { op: valid.op, cwd, output: result.stdout };
-    }
-    case 'checkout': {
+    },
+    checkout: async () => {
       const result = gitCheckout(cwd, params.ref, { createBranch: params.create_branch === true });
       assertOk(result, 'git checkout');
       return { op: valid.op, cwd, output: result.stdout };
-    }
-    case 'worktree': {
+    },
+    worktree: async () => {
       const action = params.action as 'list' | 'add' | 'remove' | 'prune';
       const result = gitWorktree(cwd, action, { path: params.path, ref: params.ref });
       assertOk(result, 'git worktree');
       return { op: valid.op, cwd, output: result.stdout };
-    }
-    case 'pr_view': {
+    },
+    pr_view: async () => {
       return {
         op: valid.op,
         cwd,
@@ -336,16 +342,16 @@ export async function handleAction(
           cwd,
         }),
       };
-    }
-    case 'pr_list': {
+    },
+    pr_list: async () => {
       return {
         op: valid.op,
         cwd,
         // vcs-host seam: gh-cli by default, github-rest where gh is absent.
         result: await vcsHostPrList({ state: params.state, limit: params.limit, cwd }),
       };
-    }
-    case 'pr_checks': {
+    },
+    pr_checks: async () => {
       const shared = { ref: params.ref, cwd, ignore: params.ignore_checks };
       const result = params.watch
         ? await vcsHostPrChecksWait({
@@ -355,8 +361,8 @@ export async function handleAction(
           })
         : await vcsHostPrChecks(shared);
       return { op: valid.op, cwd, result };
-    }
-    case 'pr_merge': {
+    },
+    pr_merge: async () => {
       const publication = {
         ref: params.ref!,
         method: params.method,
@@ -366,15 +372,15 @@ export async function handleAction(
       const result = await publicationHost({ operation: 'pr_merge', params: publication });
       assertOk(result, 'gh pr merge');
       return { op: valid.op, cwd, output: result.stdout };
-    }
-    case 'repo_view': {
+    },
+    repo_view: async () => {
       return {
         op: valid.op,
         cwd,
         result: { default_branch: await vcsHostDefaultBranch({ cwd }) },
       };
-    }
-    case 'gh_status': {
+    },
+    gh_status: async () => {
       const version = ghVersion({ cwd }, runGhResult);
       const auth = ghAuthStatus({ cwd }, runGhResult);
       return {
@@ -389,12 +395,11 @@ export async function handleAction(
           }),
         },
       };
-    }
-    default: {
-      const _exhaustive: never = valid.op;
-      throw new Error(`Unsupported operation: ${String(_exhaustive)}`);
-    }
-  }
+    },
+  };
+  const handler = handlers[valid.op];
+  if (!handler) throw new Error(`Unsupported operation: ${String(valid.op)}`);
+  return handler();
 }
 
 /** Explicit direct CLI host. Embedded/pipeline/serve dispatch retains its own authority. */

@@ -273,21 +273,21 @@ async function evaluateGateCheck(
     const value = params.contract ?? params.quality_contract;
     return parseSoftwareQualityContract(value);
   };
-  switch (check.kind) {
-    case 'development_reviews_verified':
-    case 'development_ci_verified':
-    case 'development_publication_verified': {
+  const handlers: Record<string, () => Promise<{ passed: boolean; reason?: string }>> = {
+    development_reviews_verified: () => handlers['development_ci_verified']!(),
+    development_ci_verified: () => handlers['development_publication_verified']!(),
+    development_publication_verified: async () => {
       if (!context?.missionId || !context.gateId)
         return { passed: false, reason: 'Development gate requires canonical mission context' };
       const { evaluateMissionDevelopmentGate } = await import('./mission-development-gates.js');
       return evaluateMissionDevelopmentGate({
         missionId: context.missionId,
         gateId: context.gateId,
-        kind: check.kind,
+        kind: check.kind as import('./mission-development-gates.js').MissionDevelopmentGateKind,
         developmentHash: check.params?.development_hash,
       });
-    }
-    case 'evidence_exists': {
+    },
+    evidence_exists: async () => {
       const params = check.params || {};
       const evidencePaths = toStringList(
         params.paths ?? params.path ?? params.evidence_paths ?? params.evidencePath
@@ -302,8 +302,8 @@ async function evaluateGateCheck(
       return missing.length === 0
         ? { passed: true }
         : { passed: false, reason: `Missing evidence: ${missing.join(', ')}` };
-    }
-    case 'schema_valid': {
+    },
+    schema_valid: async () => {
       const params = check.params || {};
       const schemaName = firstString(params.schema, params.schema_name, params.schemaName) as
         StructuredOutputSchemaName | undefined;
@@ -331,8 +331,8 @@ async function evaluateGateCheck(
             passed: false,
             reason: result.error.issues.map((issue) => issue.message).join('; '),
           };
-    }
-    case 'command_succeeds': {
+    },
+    command_succeeds: async () => {
       const params = check.params || {};
       const command = firstString(params.command, params.bin);
       if (!command) {
@@ -358,8 +358,8 @@ async function evaluateGateCheck(
       } catch (error: any) {
         return { passed: false, reason: error?.message ?? String(error) };
       }
-    }
-    case 'reviewer_approved': {
+    },
+    reviewer_approved: async () => {
       const params = check.params || {};
       const approved =
         params.approved === true ||
@@ -372,8 +372,8 @@ async function evaluateGateCheck(
             passed: false,
             reason: firstString(params.reason, params.message) ?? 'Reviewer rejected.',
           };
-    }
-    case 'human_override': {
+    },
+    human_override: async () => {
       const params = check.params || {};
       const allowed = params.allow !== false;
       if (!allowed) {
@@ -406,8 +406,8 @@ async function evaluateGateCheck(
         gateLogger.warn(`${problem} — passing in warn mode (gate ${gateId})`);
       }
       return { passed: true };
-    }
-    case 'deliverable_quality': {
+    },
+    deliverable_quality: async () => {
       // Deterministic per-kind rubric gate (MO-01/MO-07 seam): reads the
       // deliverable from disk and scores it via evaluateDeliverableQuality.
       // `min_score` is on a 0..1 scale (ok=1.0, warn=0.5, poor=0).
@@ -451,8 +451,8 @@ async function evaluateGateCheck(
             passed: false,
             reason: `Deliverable quality ${score.toFixed(2)} below ${minScore} — ${report.reason}`,
           };
-    }
-    case 'llm_review': {
+    },
+    llm_review: async () => {
       // ②LLMゲート: semantic quality judgment on top of the mechanical
       // checks. Reads the deliverable and asks the reasoning backend to
       // verdict it against the criteria. Fails closed on a stub backend
@@ -537,11 +537,11 @@ async function evaluateGateCheck(
       } catch (error: any) {
         return { passed: false, reason: `llm_review failed: ${error?.message ?? String(error)}` };
       }
-    }
-    case 'quality_contract_valid':
-    case 'dor_satisfied':
-    case 'acceptance_criteria_verified':
-    case 'dod_satisfied': {
+    },
+    quality_contract_valid: () => handlers['dor_satisfied']!(),
+    dor_satisfied: () => handlers['dod_satisfied']!(),
+    acceptance_criteria_verified: () => handlers['dod_satisfied']!(),
+    dod_satisfied: async () => {
       const params = check.params || {};
       const contract = qualityContractFrom(params);
       if (!contract) return { passed: false, reason: 'No software quality contract was provided.' };
@@ -559,8 +559,8 @@ async function evaluateGateCheck(
       return result.passed
         ? { passed: true }
         : { passed: false, reason: result.reasons.join('; ') };
-    }
-    case 'test_traceability': {
+    },
+    test_traceability: async () => {
       const params = check.params || {};
       const contract = qualityContractFrom(params);
       const inventoryValue = params.inventory ?? params.test_inventory;
@@ -575,8 +575,8 @@ async function evaluateGateCheck(
       return result.passed
         ? { passed: true }
         : { passed: false, reason: result.reasons.join('; ') };
-    }
-    case 'quality_release_allowed': {
+    },
+    quality_release_allowed: async () => {
       const params = check.params || {};
       const reportValue = params.report ?? params.quality_report;
       if (!reportValue || typeof reportValue !== 'object') {
@@ -602,8 +602,8 @@ async function evaluateGateCheck(
             passed: false,
             reason: `Quality enforcement blocked release: ${result.reasons.join('; ') || 'release is not recommended'}`,
           };
-    }
-    case 'custom': {
+    },
+    custom: async () => {
       const params = check.params || {};
       const evaluate = params.evaluate as
         ((input: { params: Record<string, unknown> }) => unknown | Promise<unknown>) | undefined;
@@ -623,10 +623,11 @@ async function evaluateGateCheck(
           : { passed: false, reason: reason ?? 'Custom gate failed.' };
       }
       return result ? { passed: true } : { passed: false, reason: 'Custom gate failed.' };
-    }
-    default:
-      return { passed: false, reason: `Unsupported gate check: ${String(check.kind)}` };
-  }
+    },
+  };
+  const handler = handlers[check.kind];
+  if (!handler) return { passed: false, reason: `Unsupported gate check: ${String(check.kind)}` };
+  return handler();
 }
 
 export async function evaluateMissionGate(input: {

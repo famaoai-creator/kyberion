@@ -41,6 +41,7 @@ import { validateReadPermission } from '@agent/core/tier-guard';
 import { safeExistsSync, safeLstat, safeReaddir } from '@agent/core/secure-io';
 import { getRegisteredEnvText, nowIso } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
+import { parseCliFlags } from './lib/cli-flag-parser.js';
 import {
   commitIngest,
   normalizeCard,
@@ -140,94 +141,54 @@ function parseArgs(argv: string[]): CliArgs {
     ocr: false,
     sourcePublic: false,
   };
-  const takeValue = (flag: string, index: number): string => {
-    const value = argv[index + 1];
-    if (value === undefined || value.startsWith('--')) {
-      throw new Error(`${flag} requires a value`);
-    }
-    return value;
+  const setTo =
+    <K extends keyof CliArgs>(key: K) =>
+    (o: CliArgs, v: string | undefined) => {
+      (o as unknown as Record<string, unknown>)[key] = v;
+    };
+  const setTrue =
+    <K extends keyof CliArgs>(key: K) =>
+    (o: CliArgs) => {
+      (o as unknown as Record<string, unknown>)[key] = true;
+    };
+  const throwUnknown = (_o: CliArgs, arg: string): never => {
+    throw new Error(`unknown argument '${arg}' (see --help)`);
   };
-  for (let i = 0; i < argv.length; i += 1) {
-    switch (argv[i]) {
-      case '--tenant':
-        args.tenant = takeValue('--tenant', i);
-        i += 1;
-        break;
-      case '--file':
-        args.file = takeValue('--file', i);
-        i += 1;
-        break;
-      case '--format':
-        args.format = takeValue('--format', i);
-        i += 1;
-        break;
-      case '--source-system':
-        args.sourceSystem = takeValue('--source-system', i);
-        i += 1;
-        break;
-      case '--source-id':
-        args.sourceId = takeValue('--source-id', i);
-        i += 1;
-        break;
-      case '--target':
-        args.target = takeValue('--target', i);
-        i += 1;
-        break;
-      case '--kind':
-        args.kind = takeValue('--kind', i);
-        i += 1;
-        break;
-      case '--approval-id':
-        args.approvalId = takeValue('--approval-id', i);
-        i += 1;
-        break;
-      case '--ingested-by':
-        args.ingestedBy = takeValue('--ingested-by', i);
-        i += 1;
-        break;
-      case '--ocr':
-        args.ocr = true;
-        break;
-      case '--propose-tier':
-        args.proposeTier = true;
-        break;
-      case '--source-public':
-        args.sourcePublic = true;
-        break;
-      case '--steward-approval-id':
-        args.stewardApprovalId = takeValue('--steward-approval-id', i);
-        i += 1;
-        break;
-      case '--override-rules':
-        args.overrideRules = takeValue('--override-rules', i);
-        i += 1;
-        break;
-      case '--override-reason':
-        args.overrideReason = takeValue('--override-reason', i);
-        i += 1;
-        break;
-      case '--override-approved-by':
-        args.overrideApprovedBy = takeValue('--override-approved-by', i);
-        i += 1;
-        break;
-      case '--reparse':
-        args.reparse = true;
-        break;
-      case '--dry-run':
-        args.dryRun = true;
-        break;
-      case '--root-dir':
-        args.rootDir = takeValue('--root-dir', i);
-        i += 1;
-        break;
-      case '--help':
-      case '-h':
-        args.help = true;
-        break;
-      default:
-        throw new Error(`unknown argument '${argv[i]}' (see --help)`);
-    }
-  }
+  parseCliFlags(
+    argv,
+    args,
+    [
+      { flags: ['--tenant'], takesValue: 'required', apply: setTo('tenant') },
+      { flags: ['--file'], takesValue: 'required', apply: setTo('file') },
+      { flags: ['--format'], takesValue: 'required', apply: setTo('format') },
+      { flags: ['--source-system'], takesValue: 'required', apply: setTo('sourceSystem') },
+      { flags: ['--source-id'], takesValue: 'required', apply: setTo('sourceId') },
+      { flags: ['--target'], takesValue: 'required', apply: setTo('target') },
+      { flags: ['--kind'], takesValue: 'required', apply: setTo('kind') },
+      { flags: ['--approval-id'], takesValue: 'required', apply: setTo('approvalId') },
+      { flags: ['--ingested-by'], takesValue: 'required', apply: setTo('ingestedBy') },
+      { flags: ['--ocr'], apply: setTrue('ocr') },
+      { flags: ['--propose-tier'], apply: setTrue('proposeTier') },
+      { flags: ['--source-public'], apply: setTrue('sourcePublic') },
+      {
+        flags: ['--steward-approval-id'],
+        takesValue: 'required',
+        apply: setTo('stewardApprovalId'),
+      },
+      { flags: ['--override-rules'], takesValue: 'required', apply: setTo('overrideRules') },
+      { flags: ['--override-reason'], takesValue: 'required', apply: setTo('overrideReason') },
+      {
+        flags: ['--override-approved-by'],
+        takesValue: 'required',
+        apply: setTo('overrideApprovedBy'),
+      },
+      { flags: ['--reparse'], apply: setTrue('reparse') },
+      { flags: ['--dry-run'], apply: setTrue('dryRun') },
+      { flags: ['--root-dir'], takesValue: 'required', apply: setTo('rootDir') },
+      { flags: ['--help', '-h'], apply: setTrue('help') },
+    ],
+    { onUnknown: throwUnknown, onBare: throwUnknown }
+  );
   return args;
 }
 

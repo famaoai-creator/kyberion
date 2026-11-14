@@ -111,22 +111,17 @@ function runPropertiesXml(rPr: DocxRunProperties | undefined): string {
 }
 
 function runContentXml(content: DocxRunContent): string {
-  switch (content.type) {
-    case 'text':
-      // Split tabs / breaks / soft hyphens into dedicated elements (WordCraft pieces).
-      return splitDocxTextToXml(content.text);
-    case 'break':
-      return content.breakType ? `<w:br w:type="${content.breakType}"/>` : '<w:br/>';
-    case 'tab':
-      return '<w:tab/>';
-    case 'cr':
-      return '<w:cr/>';
-    case 'softHyphen':
-      return '<w:softHyphen/>';
-    case 'noBreakHyphen':
-      return '<w:noBreakHyphen/>';
-    case 'drawing': {
-      const drawing = content.drawing;
+  const c = content as any;
+  const renderers: Record<string, () => string> = {
+    // Split tabs / breaks / soft hyphens into dedicated elements (WordCraft pieces).
+    text: () => splitDocxTextToXml(c.text),
+    break: () => (c.breakType ? `<w:br w:type="${c.breakType}"/>` : '<w:br/>'),
+    tab: () => '<w:tab/>',
+    cr: () => '<w:cr/>',
+    softHyphen: () => '<w:softHyphen/>',
+    noBreakHyphen: () => '<w:noBreakHyphen/>',
+    drawing: () => {
+      const drawing = c.drawing;
       if (drawing.rawXml) return `<w:drawing>${drawing.rawXml}</w:drawing>`;
       // Structured inline image: callers supply an rId (registered in
       // document.xml.rels) plus an extent in EMUs — the engine builds the
@@ -155,20 +150,16 @@ function runContentXml(content: DocxRunContent): string {
         );
       }
       return '';
-    }
-    case 'fieldChar':
-      return `<w:fldChar w:fldCharType="${content.fldCharType}"/>`;
-    case 'instrText':
-      return `<w:instrText xml:space="preserve">${escXml(content.text)}</w:instrText>`;
-    case 'sym': {
-      const char = normalizeSymChar(content.char);
-      return char ? `<w:sym w:font="${escXml(content.font)}" w:char="${char}"/>` : '';
-    }
-    case 'rawXml':
-      return content.xml;
-    default:
-      return '';
-  }
+    },
+    fieldChar: () => `<w:fldChar w:fldCharType="${c.fldCharType}"/>`,
+    instrText: () => `<w:instrText xml:space="preserve">${escXml(c.text)}</w:instrText>`,
+    sym: () => {
+      const char = normalizeSymChar(c.char);
+      return char ? `<w:sym w:font="${escXml(c.font)}" w:char="${char}"/>` : '';
+    },
+    rawXml: () => c.xml,
+  };
+  return renderers[content.type]?.() ?? '';
 }
 
 function runXml(run: DocxRun): string {
@@ -236,27 +227,24 @@ function paragraphPropertiesXml(pPr: DocxParagraphProperties | undefined): strin
 }
 
 function paragraphContentXml(pc: DocxParagraphContent): string {
-  switch (pc.type) {
-    case 'run':
-      return runXml(pc.run);
-    case 'hyperlink': {
+  const p = pc as any;
+  const renderers: Record<string, () => string> = {
+    run: () => runXml(p.run),
+    hyperlink: () => {
       let xml = '<w:hyperlink';
-      if (pc.hyperlink.rId) xml += ` r:id="${pc.hyperlink.rId}"`;
-      if (pc.hyperlink.anchor) xml += ` w:anchor="${escXml(pc.hyperlink.anchor)}"`;
+      if (p.hyperlink.rId) xml += ` r:id="${p.hyperlink.rId}"`;
+      if (p.hyperlink.anchor) xml += ` w:anchor="${escXml(p.hyperlink.anchor)}"`;
       xml += '>';
-      for (const r of pc.hyperlink.runs) xml += runXml(r);
+      for (const r of p.hyperlink.runs) xml += runXml(r);
       xml += '</w:hyperlink>';
       return xml;
-    }
-    case 'bookmarkStart':
-      return `<w:bookmarkStart w:id="${pc.bookmark.id}" w:name="${escXml(pc.bookmark.name)}"/>`;
-    case 'bookmarkEnd':
-      return `<w:bookmarkEnd w:id="${pc.id}"/>`;
-    case 'rawXml':
-      return pc.xml;
-    default:
-      return '';
-  }
+    },
+    bookmarkStart: () =>
+      `<w:bookmarkStart w:id="${p.bookmark.id}" w:name="${escXml(p.bookmark.name)}"/>`,
+    bookmarkEnd: () => `<w:bookmarkEnd w:id="${p.id}"/>`,
+    rawXml: () => p.xml,
+  };
+  return renderers[pc.type]?.() ?? '';
 }
 
 function paragraphXml(p: DocxParagraph): string {
@@ -381,23 +369,20 @@ function tableXml(table: DocxTable): string {
 }
 
 function blockContentXml(block: DocxBlockContent): string {
-  switch (block.type) {
-    case 'paragraph':
-      return paragraphXml(block.paragraph);
-    case 'table':
-      return tableXml(block.table);
-    case 'sdt': {
+  const b = block as any;
+  const renderers: Record<string, () => string> = {
+    paragraph: () => paragraphXml(b.paragraph),
+    table: () => tableXml(b.table),
+    sdt: () => {
       let xml = '<w:sdt>';
-      if (block.rawXml) return block.rawXml;
-      for (const c of block.content) xml += blockContentXml(c);
+      if (b.rawXml) return b.rawXml;
+      for (const c of b.content) xml += blockContentXml(c);
       xml += '</w:sdt>';
       return xml;
-    }
-    case 'rawXml':
-      return block.xml;
-    default:
-      return '';
-  }
+    },
+    rawXml: () => b.xml,
+  };
+  return renderers[block.type]?.() ?? '';
 }
 
 function sectionPropertiesXml(sect: DocxSectionProperties): string {

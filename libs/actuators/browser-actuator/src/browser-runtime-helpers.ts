@@ -676,7 +676,6 @@ function harvestDomElementsInPage(max: number) {
         const htmlEl = current as HTMLElement;
         if (htmlEl.id) {
           segments.unshift(`${tag}#${CSS.escape(htmlEl.id)}`);
-          break;
         }
         let elementIndex = 1;
         let sibling = current.previousElementSibling;
@@ -756,7 +755,6 @@ function frameElementSelectorInParent(el: Element): string {
     const htmlEl = current as HTMLElement;
     if (htmlEl.id) {
       segments.unshift(`${tag}#${CSS.escape(htmlEl.id)}`);
-      break;
     }
     let elementIndex = 1;
     let sibling = current.previousElementSibling;
@@ -1076,9 +1074,9 @@ function renderPlaywrightSkeleton(
         `[INVALID_OP_INPUT] browser:${op}: ${'errors' in validation ? validation.errors.join('; ') : ''}`
       );
     }
-    switch (op) {
-      case 'goto':
-      case 'open_tab':
+    const handlers: Record<string, () => void> = {
+      goto: () => handlers['open_tab']!(),
+      open_tab: () => {
         if (action.url) {
           addAction(`await page.goto(${JSON.stringify(action.url)});`, `navigate to ${action.url}`);
           addAssertion(
@@ -1086,8 +1084,8 @@ function renderPlaywrightSkeleton(
             'navigation assertion'
           );
         }
-        break;
-      case 'snapshot':
+      },
+      snapshot: () => {
         if (action.url)
           addAssertion(
             `await expect(page).toHaveURL(${JSON.stringify(action.url)});`,
@@ -1095,8 +1093,8 @@ function renderPlaywrightSkeleton(
           );
         if (action.title)
           addAssertion(`await expect(page).toHaveTitle(${JSON.stringify(action.title)});`);
-        break;
-      case 'click':
+      },
+      click: () => {
         if (action.selector) {
           addAssertion(
             `await expect(page.locator(${JSON.stringify(action.selector)})).toBeVisible();`,
@@ -1107,8 +1105,8 @@ function renderPlaywrightSkeleton(
             `click ${action.ref || action.selector}`
           );
         }
-        break;
-      case 'fill':
+      },
+      fill: () => {
         if (action.selector) {
           addAssertion(
             `await expect(page.locator(${JSON.stringify(action.selector)})).toBeVisible();`,
@@ -1135,8 +1133,8 @@ function renderPlaywrightSkeleton(
             );
           }
         }
-        break;
-      case 'fill_secret_ref':
+      },
+      fill_secret_ref: () => {
         if (action.selector && action.secret_ref) {
           addAssertion(
             `await expect(page.locator(${JSON.stringify(action.selector)})).toBeVisible();`,
@@ -1147,8 +1145,8 @@ function renderPlaywrightSkeleton(
             `fill secret ${action.ref || action.selector}`
           );
         }
-        break;
-      case 'press':
+      },
+      press: () => {
         if (action.selector) {
           addAssertion(
             `await expect(page.locator(${JSON.stringify(action.selector)})).toBeVisible();`,
@@ -1159,8 +1157,8 @@ function renderPlaywrightSkeleton(
             `press ${action.key || 'Enter'}`
           );
         }
-        break;
-      case 'wait':
+      },
+      wait: () => {
         if (action.selector) {
           addAction(
             `await page.waitForSelector(${JSON.stringify(action.selector)});`,
@@ -1171,18 +1169,17 @@ function renderPlaywrightSkeleton(
             'wait assertion'
           );
         }
-        break;
-      case 'content':
+      },
+      content: () => {
         if (action.selector && action.content_excerpt) {
           addAssertion(
             `await expect(page.locator(${JSON.stringify(action.selector)})).toContainText(${JSON.stringify(action.content_excerpt)});`,
             'content assertion'
           );
         }
-        break;
-      default:
-        break;
-    }
+      },
+    };
+    handlers[op]?.();
   }
 
   if (setupLines.length > 0) {

@@ -226,24 +226,24 @@ async function opCapture(
   options?: AndroidAction['options']
 ) {
   const rootDir = pathResolver.rootDir();
-  switch (op) {
-    case 'read_text_file': {
+  const handlers: Record<string, () => Promise<any>> = {
+    read_text_file: async () => {
       const sourcePath = resolveAndroidRepositoryPath(rootDir, resolve(params.path));
       const content = await retry(
         async () => safeReadFile(sourcePath, { encoding: 'utf8' }) as string,
         buildRetryOptions()
       );
       return { ...ctx, [String(params.export_as ?? 'last_text')]: content };
-    }
-    case 'read_json': {
+    },
+    read_json: async () => {
       const sourcePath = resolveAndroidRepositoryPath(rootDir, resolve(params.path));
       const parsed = await retry(async () => readJson<unknown>(sourcePath), buildRetryOptions());
       if (params.validate_as === 'mobile-app-profile') {
         assertValidMobileAppProfile(parsed, sourcePath);
       }
       return { ...ctx, [String(params.export_as ?? 'last_json')]: parsed };
-    }
-    case 'adb_health_check': {
+    },
+    adb_health_check: async () => {
       const health = await retry(async () => collectAdbHealth(ctx, options), buildRetryOptions());
       return {
         ...ctx,
@@ -251,8 +251,8 @@ async function opCapture(
         adb_available: health.available,
         android_serial: health.selected_serial || ctx.android_serial,
       };
-    }
-    case 'capture_foreground_activity': {
+    },
+    capture_foreground_activity: async () => {
       ensureAdbAvailable(ctx, options);
       const serial = resolveSerial(ctx, options, params);
       const output = await retry(
@@ -269,8 +269,8 @@ async function opCapture(
           raw_excerpt: output.slice(0, 4000),
         },
       };
-    }
-    case 'capture_runtime_session_handoff': {
+    },
+    capture_runtime_session_handoff: async () => {
       ensureAdbAvailable(ctx, options);
       const serial = resolveSerial(ctx, options, params);
       const profile = resolveAppProfile(params, ctx);
@@ -302,8 +302,8 @@ async function opCapture(
         [String(params.export_as ?? 'runtime_session_handoff')]: parsed,
         runtime_session_handoff_path: outPath,
       };
-    }
-    case 'extract_ui_tree': {
+    },
+    extract_ui_tree: async () => {
       ensureAdbAvailable(ctx, options);
       const outPath = resolveAndroidRepositoryPath(
         rootDir,
@@ -333,8 +333,8 @@ async function opCapture(
         [String(params.export_as ?? 'last_ui_tree')]: xml,
         last_ui_tree_path: outPath,
       };
-    }
-    case 'describe_ui': {
+    },
+    describe_ui: async () => {
       ensureAdbAvailable(ctx, options);
       const serial = resolveSerial(ctx, options, params);
       const remotePath = `/sdcard/kyberion-ui-${Date.now()}.xml`;
@@ -359,16 +359,16 @@ async function opCapture(
         [String(params.export_as ?? 'ui_tree')]: parseUiAutomatorNodes(xml),
         android_serial: serial,
       };
-    }
-    case 'android_cli_health_check': {
+    },
+    android_cli_health_check: async () => {
       const health = collectAndroidCliHealth(options);
       return {
         ...ctx,
         [String(params.export_as ?? 'android_cli_health')]: health,
         android_cli_available: health.available,
       };
-    }
-    case 'android_cli_layout': {
+    },
+    android_cli_layout: async () => {
       ensureAndroidCliAvailable(options);
       const cliArgs: string[] = ['layout'];
       const serial = resolveSerial(ctx, options, params);
@@ -394,8 +394,8 @@ async function opCapture(
         [String(params.export_as ?? 'last_cli_layout')]: layout,
         last_cli_layout_path: outPath,
       };
-    }
-    case 'android_cli_screen_resolve': {
+    },
+    android_cli_screen_resolve: async () => {
       ensureAndroidCliAvailable(options);
       const screenshotPath = String(
         resolve(params.screenshot_path || ctx.last_screenshot_path || '')
@@ -418,8 +418,8 @@ async function opCapture(
         ...ctx,
         [String(params.export_as ?? 'last_screen_resolve')]: resolved,
       };
-    }
-    case 'android_cli_describe': {
+    },
+    android_cli_describe: async () => {
       ensureAndroidCliAvailable(options);
       const cliArgs: string[] = ['describe'];
       const serial = resolveSerial(ctx, options, params);
@@ -437,8 +437,8 @@ async function opCapture(
         ...ctx,
         [String(params.export_as ?? 'last_cli_description')]: description,
       };
-    }
-    case 'android_cli_docs_search': {
+    },
+    android_cli_docs_search: async () => {
       ensureAndroidCliAvailable(options);
       const query = String(resolve(params.query || ''));
       if (!query) throw new Error('android_cli_docs_search requires params.query');
@@ -455,10 +455,11 @@ async function opCapture(
         ...ctx,
         [String(params.export_as ?? 'last_docs_results')]: results,
       };
-    }
-    default:
-      throw new Error(`[UNKNOWN_OP] Unknown op: ${op}`);
-  }
+    },
+  };
+  const handler = handlers[op];
+  if (!handler) throw new Error(`[UNKNOWN_OP] Unknown op: ${op}`);
+  return handler();
 }
 
 async function opTransform(
@@ -467,13 +468,13 @@ async function opTransform(
   ctx: Record<string, any>,
   resolve: (val: unknown) => unknown
 ) {
-  switch (op) {
-    case 'set': {
+  const handlers: Record<string, () => Promise<any>> = {
+    set: async () => {
       const key = resolve(params.key);
       if (!key) return ctx;
       return { ...ctx, [String(key)]: resolve(params.value) };
-    }
-    case 'summarize_ui_tree': {
+    },
+    summarize_ui_tree: async () => {
       const xml = resolveUiTreeSource(params, ctx, resolve);
       const nodes = parseUiTreeNodes(xml);
       const summary = {
@@ -492,21 +493,22 @@ async function opTransform(
           .slice(0, Number(params.max_resource_ids) || 20),
       };
       return { ...ctx, [String(params.export_as ?? 'ui_tree_summary')]: summary };
-    }
-    case 'find_ui_nodes': {
+    },
+    find_ui_nodes: async () => {
       const xml = resolveUiTreeSource(params, ctx, resolve);
       const matches = matchUiNodes(parseUiTreeNodes(xml), params, resolve);
       return { ...ctx, [String(params.export_as ?? 'ui_node_matches')]: matches };
-    }
-    case 'llm_decide': {
+    },
+    llm_decide: async () => {
       // AR-07 rollout: one in-loop decision about a distilled UI observation
       // (summarize_ui_tree / find_ui_nodes output). Selection over generation;
       // a null decision exports null + reason and never throws by default.
       return executeLlmDecideOp({ params, ctx, resolve, defaultFromKey: 'ui_tree_summary' });
-    }
-    default:
-      throw new Error(`[UNKNOWN_OP] Unknown op: ${op}`);
-  }
+    },
+  };
+  const handler = handlers[op];
+  if (!handler) throw new Error(`[UNKNOWN_OP] Unknown op: ${op}`);
+  return handler();
 }
 
 async function opApply(
@@ -517,8 +519,8 @@ async function opApply(
   options?: AndroidAction['options']
 ) {
   const rootDir = pathResolver.rootDir();
-  switch (op) {
-    case 'launch_app': {
+  const handlers: Record<string, () => Promise<any>> = {
+    launch_app: async () => {
       ensureAdbAvailable(ctx, options);
       const serial = resolveSerial(ctx, options, params);
       const component = resolve(params.component);
@@ -526,8 +528,8 @@ async function opApply(
         throw new Error('launch_app requires params.component, e.g. com.example/.MainActivity');
       const output = runAdb(['shell', 'am', 'start', '-n', String(component)], serial, options);
       return { ...ctx, last_launch_output: output, android_serial: serial || ctx.android_serial };
-    }
-    case 'open_deep_link': {
+    },
+    open_deep_link: async () => {
       ensureAdbAvailable(ctx, options);
       const serial = resolveSerial(ctx, options, params);
       const url = resolve(params.url);
@@ -536,8 +538,8 @@ async function opApply(
       if (params.package) args.push(String(resolve(params.package)));
       const output = runAdb((args as unknown[]).map(String), serial, options);
       return { ...ctx, last_deep_link_output: output };
-    }
-    case 'tap': {
+    },
+    tap: async () => {
       ensureAdbAvailable(ctx, options);
       const serial = resolveSerial(ctx, options, params);
       runAdb(
@@ -546,8 +548,8 @@ async function opApply(
         options
       );
       return ctx;
-    }
-    case 'tap_ui_node': {
+    },
+    tap_ui_node: async () => {
       const target = resolveTapTarget(params, ctx, resolve);
       const tapResult = {
         index: target.index,
@@ -571,8 +573,8 @@ async function opApply(
         options
       );
       return { ...ctx, [String(params.export_as ?? 'last_tap_target')]: tapResult };
-    }
-    case 'input_text_into_ui_node': {
+    },
+    input_text_into_ui_node: async () => {
       const target = resolveTapTarget(selectorParamsFromInput(params), ctx, resolve);
       const text = String(resolve(params.text || ''));
       if (!text.trim()) throw new Error('input_text_into_ui_node requires params.text');
@@ -603,8 +605,8 @@ async function opApply(
       if (preDelayMs > 0) await sleep(preDelayMs);
       runAdb(['shell', 'input', 'text', normalizeAdbInputText(text)], serial, options);
       return { ...ctx, [String(params.export_as ?? 'last_input_target')]: inputResult };
-    }
-    case 'fill_login_form': {
+    },
+    fill_login_form: async () => {
       const formPlan = buildLoginFormPlan(params, ctx, resolve);
 
       if (params.dry_run === true) {
@@ -647,8 +649,8 @@ async function opApply(
         );
       }
       return { ...ctx, [String(params.export_as ?? 'last_login_form_plan')]: formPlan };
-    }
-    case 'swipe': {
+    },
+    swipe: async () => {
       ensureAdbAvailable(ctx, options);
       const serial = resolveSerial(ctx, options, params);
       runAdb(
@@ -666,15 +668,15 @@ async function opApply(
         options
       );
       return ctx;
-    }
-    case 'input_text': {
+    },
+    input_text: async () => {
       ensureAdbAvailable(ctx, options);
       const serial = resolveSerial(ctx, options, params);
       const text = normalizeAdbInputText(String(resolve(params.text || '')));
       runAdb(['shell', 'input', 'text', text], serial, options);
       return ctx;
-    }
-    case 'capture_screen': {
+    },
+    capture_screen: async () => {
       ensureAdbAvailable(ctx, options);
       const serial = resolveSerial(ctx, options, params);
       const outPath = resolveAndroidRepositoryPath(
@@ -687,8 +689,8 @@ async function opApply(
       runAdb(['pull', remotePath, outPath], serial, options);
       safeCleanupRemote(serial, remotePath, options);
       return { ...ctx, last_screenshot_path: outPath };
-    }
-    case 'android_cli_screen_capture': {
+    },
+    android_cli_screen_capture: async () => {
       ensureAndroidCliAvailable(options);
       const outPath = path.resolve(
         rootDir,
@@ -706,8 +708,8 @@ async function opApply(
         [String(params.export_as ?? 'last_cli_screenshot_path')]: outPath,
         last_cli_screenshot_annotated: Boolean(params.annotate),
       };
-    }
-    case 'wait_for_ui_text': {
+    },
+    wait_for_ui_text: async () => {
       ensureAdbAvailable(ctx, options);
       const serial = resolveSerial(ctx, options, params);
       const target = String(resolve(params.text || ''))
@@ -739,8 +741,8 @@ async function opApply(
       }
 
       throw new Error(`Timed out waiting for UI text: ${resolve(params.text)}`);
-    }
-    case 'wait_for_ui_node': {
+    },
+    wait_for_ui_node: async () => {
       ensureAdbAvailable(ctx, options);
       const serial = resolveSerial(ctx, options, params);
       const timeoutMs = Number(resolve(params.timeout_ms || options?.timeout_ms || 15000));
@@ -763,8 +765,8 @@ async function opApply(
       }
 
       throw new Error(`Timed out waiting for UI node: ${describeUiSelector(params, resolve)}`);
-    }
-    case 'authenticate_with_passkey': {
+    },
+    authenticate_with_passkey: async () => {
       const profile = resolveAppProfile(params, ctx);
       const defaults = loadAndroidUiDefaults();
       const selector = {
@@ -810,8 +812,8 @@ async function opApply(
         options
       );
       return { ...ctx, [String(params.export_as ?? 'last_passkey_plan')]: passkeyPlan };
-    }
-    case 'emit_session_handoff': {
+    },
+    emit_session_handoff: async () => {
       const handoff = buildSessionHandoffArtifact(params, ctx, resolve, 'android');
       const outPath = path.resolve(
         rootDir,
@@ -829,8 +831,8 @@ async function opApply(
         [String(params.export_as ?? 'session_handoff')]: handoff,
         session_handoff_path: outPath,
       };
-    }
-    case 'start_screen_stream': {
+    },
+    start_screen_stream: async () => {
       ensureAdbAvailable(ctx, options);
       const serial = resolveSerial(ctx, options, params);
       const session = await startMirrorDaemonSession({
@@ -848,23 +850,25 @@ async function opApply(
         [String(params.export_as ?? 'screen_stream')]: session,
         android_serial: serial,
       };
-    }
-    case 'stop_screen_stream': {
+    },
+    stop_screen_stream: async () => {
       const serial = resolveSerial(ctx, options, params);
       const result = await stopMirrorDaemonSession(mirrorStateFilePath('android', serial));
       return { ...ctx, [String(params.export_as ?? 'screen_stream_stop')]: result };
-    }
-    case 'stream_status': {
+    },
+    stream_status: async () => {
       const serial = resolveSerial(ctx, options, params);
       const state = readMirrorSession(mirrorStateFilePath('android', serial));
       return { ...ctx, [String(params.export_as ?? 'screen_stream_status')]: state };
-    }
-    case 'log':
+    },
+    log: async () => {
       logger.info(`[ANDROID_LOG] ${resolve(params.message)}`);
       return ctx;
-    default:
-      throw new Error(`[UNKNOWN_OP] Unknown op: ${op}`);
-  }
+    },
+  };
+  const handler = handlers[op];
+  if (!handler) throw new Error(`[UNKNOWN_OP] Unknown op: ${op}`);
+  return handler();
 }
 
 /**

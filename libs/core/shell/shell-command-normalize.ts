@@ -326,6 +326,22 @@ const TIME_VALUE_OPTIONS = new Set(['-o', '--output', '-f', '--format']);
 const STDBUF_VALUE_OPTIONS = new Set(['-i', '--input', '-o', '--output', '-e', '--error']);
 const SHELL_EXECUTABLES = ['bash', 'sh', 'dash', 'zsh', 'ksh'];
 
+const WRAPPER_RESOLVERS: Record<string, (args: string[]) => number> = {
+  command: (a) => optionCommand(a, 0, new Set()),
+  nohup: (a) => optionCommand(a, 0, new Set()),
+  exec: (a) => optionCommand(a, 0, new Set(['-a'])),
+  env: (a) => {
+    let n = optionCommand(a, 0, ENV_VALUE_OPTIONS);
+    while (n < a.length && /^[A-Za-z_]\w*=/.test(a[n]!)) n++;
+    return n;
+  },
+  sudo: (a) => optionCommand(a, 0, SUDO_VALUE_OPTIONS),
+  nice: (a) => optionCommand(a, 0, new Set(['-n', '--adjustment'])),
+  timeout: (a) => optionCommand(a, 0, TIMEOUT_VALUE_OPTIONS) + 1,
+  time: (a) => optionCommand(a, 0, TIME_VALUE_OPTIONS),
+  stdbuf: (a) => optionCommand(a, 0, STDBUF_VALUE_OPTIONS),
+};
+
 function splitStringPayload(
   args: string[],
   split: number
@@ -589,20 +605,8 @@ function simpleVariablePayloads(input: string): string[] {
     const executableWord = words[start]!;
     const executable = executableWord.split('/').pop() ?? executableWord;
     const args = words.slice(start + 1);
-    let next: number | undefined;
-    if (executable === 'command' || executable === 'nohup')
-      next = optionCommand(args, 0, new Set());
-    else if (executable === 'exec') next = optionCommand(args, 0, new Set(['-a']));
-    else if (executable === 'env') {
-      next = optionCommand(args, 0, ENV_VALUE_OPTIONS);
-      while (next < args.length && /^[A-Za-z_]\w*=/.test(args[next]!)) next++;
-    } else if (executable === 'sudo') {
-      next = optionCommand(args, 0, SUDO_VALUE_OPTIONS);
-    } else if (executable === 'nice')
-      next = optionCommand(args, 0, new Set(['-n', '--adjustment']));
-    else if (executable === 'timeout') next = optionCommand(args, 0, TIMEOUT_VALUE_OPTIONS) + 1;
-    else if (executable === 'time') next = optionCommand(args, 0, TIME_VALUE_OPTIONS);
-    else if (executable === 'stdbuf') next = optionCommand(args, 0, STDBUF_VALUE_OPTIONS);
+    const resolver = WRAPPER_RESOLVERS[executable];
+    const next = resolver ? resolver(args) : undefined;
     if (next === undefined) return offset + start;
     return executableIndex(args.slice(next), offset + start + 1 + next);
   };
@@ -940,18 +944,8 @@ function resolveCoreCommand(words: string[]): SimpleCommand | undefined {
   const executableWord = words[start]!;
   const executable = executableWord.split('/').pop() ?? executableWord;
   const args = words.slice(start + 1);
-  let next: number | undefined;
-  if (executable === 'command' || executable === 'nohup') next = optionCommand(args, 0, new Set());
-  else if (executable === 'exec') next = optionCommand(args, 0, new Set(['-a']));
-  else if (executable === 'env') {
-    next = optionCommand(args, 0, ENV_VALUE_OPTIONS);
-    while (next < args.length && /^[A-Za-z_]\w*=/.test(args[next]!)) next++;
-  } else if (executable === 'sudo') next = optionCommand(args, 0, SUDO_VALUE_OPTIONS);
-  else if (executable === 'nice') next = optionCommand(args, 0, new Set(['-n', '--adjustment']));
-  else if (executable === 'timeout') next = optionCommand(args, 0, TIMEOUT_VALUE_OPTIONS) + 1;
-  else if (executable === 'time') next = optionCommand(args, 0, TIME_VALUE_OPTIONS);
-  else if (executable === 'stdbuf') next = optionCommand(args, 0, STDBUF_VALUE_OPTIONS);
-  else if (executable === 'coproc') next = 0;
+  const resolver = WRAPPER_RESOLVERS[executable];
+  const next = resolver ? resolver(args) : executable === 'coproc' ? 0 : undefined;
   if (next === undefined || next >= args.length) return { executable, args };
   return resolveCoreCommand(args.slice(next)) ?? { executable, args };
 }

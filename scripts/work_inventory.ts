@@ -115,8 +115,8 @@ export async function run(argv: string[], options: WorkInventoryRunOptions = {})
   const positionals = extractPositionals(argv);
   const [command, sub] = positionals;
 
-  switch (command) {
-    case 'add': {
+  const handlers: Record<string, () => Promise<void>> = {
+    add: async () => {
       const result = await runAdd(argv, { ...coreOptions, now });
       emit(
         result,
@@ -129,19 +129,19 @@ export async function run(argv: string[], options: WorkInventoryRunOptions = {})
         ].join('\n')
       );
       return;
-    }
-    case 'list': {
+    },
+    list: async () => {
       const entries = governed(() => runList(argv, coreOptions));
       emit({ entries }, formatEntryList(entries));
       return;
-    }
-    case 'show': {
+    },
+    show: async () => {
       const entryId = requirePositional(sub, 'Usage: inventory show <entry_id>');
       const result = governed(() => runShow(entryId, argv, coreOptions));
       emit(result, formatShow(result));
       return;
-    }
-    case 'classify': {
+    },
+    classify: async () => {
       const entryId = requirePositional(
         sub,
         'Usage: inventory classify <entry_id> [--api-systems a,b]'
@@ -149,8 +149,8 @@ export async function run(argv: string[], options: WorkInventoryRunOptions = {})
       const entry = governed(() => runClassify(entryId, argv, coreOptions));
       emit(entry, [`${entry.entry_id} reclassified`, formatStepsTable(entry.steps)].join('\n'));
       return;
-    }
-    case 'override': {
+    },
+    override: async () => {
       const entryId = requirePositional(
         sub,
         'Usage: inventory override <entry_id> --step S1 --method human --reason "..." --decided-by user:<id>'
@@ -158,8 +158,8 @@ export async function run(argv: string[], options: WorkInventoryRunOptions = {})
       const entry = governed(() => runOverride(entryId, argv, coreOptions));
       emit(entry, [`${entry.entry_id} overridden`, formatStepsTable(entry.steps, true)].join('\n'));
       return;
-    }
-    case 'status': {
+    },
+    status: async () => {
       const entryId = requirePositional(
         sub,
         'Usage: inventory status <entry_id> --to confirmed|candidate|retired --decided-by user:<id>'
@@ -167,13 +167,13 @@ export async function run(argv: string[], options: WorkInventoryRunOptions = {})
       const entry = governed(() => runStatus(entryId, argv, coreOptions));
       emit(entry, `${entry.entry_id} -> ${entry.status}`);
       return;
-    }
-    case 'harvest': {
+    },
+    harvest: async () => {
       const result = governed(() => runHarvest(argv, { ...coreOptions, dryRun, now }));
       emit(result, formatHarvest(result));
       return;
-    }
-    case 'consent': {
+    },
+    consent: async () => {
       switch (sub) {
         case 'grant': {
           const consent = governed(() => runConsentGrant(argv, { ...coreOptions, now }));
@@ -193,8 +193,8 @@ export async function run(argv: string[], options: WorkInventoryRunOptions = {})
         default:
           throw new WorkInventoryCliUsageError('Usage: inventory consent grant|revoke|list ...');
       }
-    }
-    case 'observe': {
+    },
+    observe: async () => {
       switch (sub) {
         case 'summarize': {
           const summary = governed(() => runObserveSummarize(argv, { ...coreOptions, now }));
@@ -226,13 +226,13 @@ export async function run(argv: string[], options: WorkInventoryRunOptions = {})
             'Usage: inventory observe summarize|confirm|discard|list|attach ...'
           );
       }
-    }
-    case 'candidates': {
+    },
+    candidates: async () => {
       const results = governed(() => runCandidates(argv, coreOptions));
       emit({ candidates: results }, formatCandidates(results));
       return;
-    }
-    case 'promote': {
+    },
+    promote: async () => {
       const entryId = requirePositional(
         sub,
         'Usage: inventory promote <entry_id> --kind mission|pipeline --decided-by user:<id> [--execute]'
@@ -249,8 +249,8 @@ export async function run(argv: string[], options: WorkInventoryRunOptions = {})
             ].join('\n');
       emit(result, human);
       return;
-    }
-    case 'learn': {
+    },
+    learn: async () => {
       const scope = resolveScope(argv);
       if (scope.tenant_slug && coreOptions.rootDir) {
         throw new WorkInventoryCliUsageError(
@@ -274,17 +274,19 @@ export async function run(argv: string[], options: WorkInventoryRunOptions = {})
         ].join('\n')
       );
       return;
-    }
-    case 'migrate': {
+    },
+    migrate: async () => {
       const result = governed(() => runMigrate(argv, { ...coreOptions, dryRun }));
       emit(result, formatMigrate(result));
       return;
-    }
-    default:
-      throw new WorkInventoryCliUsageError(
-        'Usage: inventory <add|list|show|classify|override|status|harvest|consent|observe|candidates|promote|learn|migrate> ...'
-      );
-  }
+    },
+  };
+  const handler = handlers[command];
+  if (!handler)
+    throw new WorkInventoryCliUsageError(
+      'Usage: inventory <add|list|show|classify|override|status|harvest|consent|observe|candidates|promote|learn|migrate> ...'
+    );
+  return handler();
 }
 
 export const runWorkInventory = defineScript({

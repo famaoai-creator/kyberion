@@ -671,7 +671,7 @@ describe('wisdom public contract boundaries', () => {
       pathResolver.rootResolve('libs/actuators/wisdom-actuator/src/decision-ops.ts'),
       { encoding: 'utf8' }
     ) as string;
-    expect(source).toContain("case 'perspective_fanout'");
+    expect(source).toContain('perspective_fanout:');
     expect(source).not.toContain('ensureAgentRuntime');
     expect(source).not.toContain('getAgentExecutionPort');
   });

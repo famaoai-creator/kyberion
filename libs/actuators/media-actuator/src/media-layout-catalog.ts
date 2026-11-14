@@ -377,42 +377,29 @@ function getPngDisplaySize(
  * by design rather than by omission.
  */
 function resolveBodyZoneLayout(semanticType: string): string {
-  switch (semanticType) {
-    case 'problem':
-    case 'evidence':
-      return 'two-column-callout';
-    case 'roi':
-      // Numbers-forward: a metric band reads better than a prose callout.
-      return 'metrics-band';
-    case 'signals':
-      return 'metrics-band';
-    case 'control':
-      return 'two-column-risk';
-    case 'plan':
-    case 'roadmap':
-      return 'timeline';
-    case 'solution':
-    case 'architecture':
-      return 'architecture-panel';
-    case 'decision':
-    case 'cta':
-      return 'decision-cta';
-    case 'contents':
-      return 'contents-index';
-    case 'summary':
-      // The headline message of a deck deserves to be held, not listed.
-      return 'statement';
-    case 'comparison':
-    case 'options':
-      return 'comparison-two-col';
-    case 'execution':
-    case 'table':
-      return 'table-feature';
-    case 'appendix':
-      return 'checklist-grid';
-    default:
-      return 'single-column';
-  }
+  const BODY_ZONE_LAYOUTS: Record<string, string> = {
+    problem: 'two-column-callout',
+    evidence: 'two-column-callout',
+    // Numbers-forward: a metric band reads better than a prose callout.
+    roi: 'metrics-band',
+    signals: 'metrics-band',
+    control: 'two-column-risk',
+    plan: 'timeline',
+    roadmap: 'timeline',
+    solution: 'architecture-panel',
+    architecture: 'architecture-panel',
+    decision: 'decision-cta',
+    cta: 'decision-cta',
+    contents: 'contents-index',
+    // The headline message of a deck deserves to be held, not listed.
+    summary: 'statement',
+    comparison: 'comparison-two-col',
+    options: 'comparison-two-col',
+    execution: 'table-feature',
+    table: 'table-feature',
+    appendix: 'checklist-grid',
+  };
+  return BODY_ZONE_LAYOUTS[semanticType] ?? 'single-column';
 }
 
 /**
@@ -739,39 +726,28 @@ function resolveZoneRegionText(
 ): string {
   const [kind, arg] = String(source || '').split(':');
   const count = Number(arg);
-  switch (kind) {
-    case 'literal':
-      return context.literal ?? '';
-    case 'body_all':
-      return context.bodyLines.join('\n');
-    case 'body_head':
-      return context.bodyLines.slice(0, Math.max(1, count || 1)).join('\n');
-    case 'body_tail':
-      // A negative count drops that many leading lines instead of taking a tail.
-      return (
-        count < 0 ? context.bodyLines.slice(-count) : context.bodyLines.slice(-(count || 1))
-      ).join('\n');
-    case 'body_balanced_left':
-      return context.balanced.left.join('\n');
-    case 'body_balanced_right':
-      return context.balanced.right.join('\n');
-    case 'body_line':
-      // 1-based single line (KDS compositions assign one line per tile).
-      return context.bodyLines[Math.max(0, count - 1)] ?? '';
-    case 'body_rest':
-      // Everything after the first N lines already assigned to tiles.
-      return context.bodyLines.slice(Math.max(0, count)).join('\n');
-    case 'body_last':
-      return context.bodyLines[context.bodyLines.length - 1] ?? '';
-    case 'objective':
-      return context.objective;
-    case 'cta':
-      return context.cta;
-    case 'title':
-      return context.title;
-    default:
-      return context.bodyLines.join('\n');
-  }
+  const resolvers: Record<string, () => string> = {
+    literal: () => context.literal ?? '',
+    body_all: () => context.bodyLines.join('\n'),
+    body_head: () => context.bodyLines.slice(0, Math.max(1, count || 1)).join('\n'),
+    // A negative count drops that many leading lines instead of taking a tail.
+    body_tail: () =>
+      (count < 0 ? context.bodyLines.slice(-count) : context.bodyLines.slice(-(count || 1))).join(
+        '\n'
+      ),
+    body_balanced_left: () => context.balanced.left.join('\n'),
+    body_balanced_right: () => context.balanced.right.join('\n'),
+    // 1-based single line (KDS compositions assign one line per tile).
+    body_line: () => context.bodyLines[Math.max(0, count - 1)] ?? '',
+    // Everything after the first N lines already assigned to tiles.
+    body_rest: () => context.bodyLines.slice(Math.max(0, count)).join('\n'),
+    body_last: () => context.bodyLines[context.bodyLines.length - 1] ?? '',
+    objective: () => context.objective,
+    cta: () => context.cta,
+    title: () => context.title,
+  };
+  const resolver = resolvers[kind];
+  return resolver ? resolver() : context.bodyLines.join('\n');
 }
 
 /**

@@ -150,8 +150,8 @@ function resolveMediaRepositoryPath(rootDir: string, value: unknown, resolve: Fu
 async function opApply(op: string, params: any, ctx: any, resolve: Function) {
   const rootDir = pathResolver.rootDir();
   if (PDF_PYPDF_OPS.has(op)) return opCapture(op, params, ctx, resolve);
-  switch (op) {
-    case 'register_presentation_preference_profile': {
+  const handlers: Record<string, () => Promise<any>> = {
+    register_presentation_preference_profile: async () => {
       const result = registerPresentationPreferenceProfileOp({
         profile: params.profile !== undefined ? resolve(params.profile) : undefined,
         profile_path: params.profile_path ? resolve(params.profile_path) : undefined,
@@ -161,8 +161,8 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
         ...ctx,
         [params.export_as || 'presentation_preference_profile_registered']: result,
       };
-    }
-    case 'mermaid_render': {
+    },
+    mermaid_render: async () => {
       const outPath = resolveMediaRepositoryPath(rootDir, params.path, resolve);
       const source = resolveDiagramSource(rootDir, params, ctx, resolve);
       ensureParentDir(outPath);
@@ -194,9 +194,9 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
 
       const stats = safeStat(outPath);
       logger.info(`✅ [MEDIA] Mermaid rendered at: ${outPath} (${stats.size} bytes).`);
-      break;
-    }
-    case 'd2_render': {
+      return ctx;
+    },
+    d2_render: async () => {
       const outPath = resolveMediaRepositoryPath(rootDir, params.path, resolve);
       const source = resolveDiagramSource(rootDir, params, ctx, resolve);
       ensureParentDir(outPath);
@@ -220,9 +220,9 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
 
       const stats = safeStat(outPath);
       logger.info(`✅ [MEDIA] D2 rendered at: ${outPath} (${stats.size} bytes).`);
-      break;
-    }
-    case 'document_diagram_render_from_brief': {
+      return ctx;
+    },
+    document_diagram_render_from_brief: async () => {
       warnLegacyMediaOp(op);
       const rawBrief = resolveObjectInput(ctx, params, resolve, {
         paramKey: 'brief',
@@ -238,9 +238,9 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
       await renderDiagramDocumentBrief(rootDir, brief, outPath, params, ctx, resolve);
       const stats = safeStat(outPath);
       logger.info(`✅ [MEDIA] Diagram rendered from brief at: ${outPath} (${stats.size} bytes).`);
-      break;
-    }
-    case 'pptx_render': {
+      return ctx;
+    },
+    pptx_render: async () => {
       const baseProtocol = ctx[params.design_from || 'last_pptx_design'];
       // LE-01: a pipeline can opt the protocol into the engine design cascade
       // (or override per-key defaults) without editing the protocol JSON.
@@ -279,8 +279,8 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
         [params.export_as || 'media_render_diagnostics']:
           protocol?.metadata?.layoutDiagnostics || summarizeMediaPptxLayout(protocol),
       };
-    }
-    case 'pptx_patch': {
+    },
+    pptx_patch: async () => {
       const sourcePath = resolveMediaRepositoryPath(rootDir, params.source, resolve);
       const outPath = resolveMediaRepositoryPath(rootDir, params.path, resolve);
       const replacements =
@@ -298,9 +298,9 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
 
       const stats = safeStat(outPath);
       logger.info(`✅ [MEDIA] PPTX patched at: ${outPath} (${stats.size} bytes).`);
-      break;
-    }
-    case 'pptx_filter_slides': {
+      return ctx;
+    },
+    pptx_filter_slides: async () => {
       const sourcePath = resolveMediaRepositoryPath(rootDir, params.source, resolve);
       const outPath = resolveMediaRepositoryPath(rootDir, params.path, resolve);
       const keepIndices: number[] =
@@ -325,9 +325,9 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
       logger.info(
         `✅ [MEDIA] PPTX filtered to slides [${keepIndices.join(',')}] at: ${outPath} (${stats.size} bytes).`
       );
-      break;
-    }
-    case 'pptx_patch_paragraphs': {
+      return ctx;
+    },
+    pptx_patch_paragraphs: async () => {
       const sourcePath = resolveMediaRepositoryPath(rootDir, params.source, resolve);
       const outPath = resolveMediaRepositoryPath(rootDir, params.path, resolve);
       const replacements =
@@ -353,9 +353,9 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
       logger.info(
         `✅ [MEDIA] PPTX paragraph-patched (${result.match_count} matches across ${result.modified_slides.length} slide(s)) at: ${outPath} (${stats.size} bytes).`
       );
-      break;
-    }
-    case 'pptx_replace_slides': {
+      return ctx;
+    },
+    pptx_replace_slides: async () => {
       const sourcePath = resolveMediaRepositoryPath(rootDir, params.path, resolve);
       const outPath = resolveMediaRepositoryPath(rootDir, params.out, resolve);
       const catalog = loadThemeCatalog(rootDir);
@@ -388,8 +388,8 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
           body_zone: result.body_zone,
         },
       };
-    }
-    case 'xlsx_render': {
+    },
+    xlsx_render: async () => {
       const xlsxProtocol = normalizeXlsxDesignProtocol(
         ctx[params.design_from || 'last_xlsx_design']
       );
@@ -403,9 +403,9 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
       await retry(async () => generateNativeXlsx(xlsxProtocol, xlsxOutPath), buildRetryOptions());
       const xlsxStats = safeStat(xlsxOutPath);
       logger.info(`✅ [MEDIA] XLSX rendered at: ${xlsxOutPath} (${xlsxStats.size} bytes).`);
-      break;
-    }
-    case 'docx_render': {
+      return ctx;
+    },
+    docx_render: async () => {
       const docxProtocol = ctx[params.design_from || 'last_docx_design'];
       const docxOutPath = resolveMediaRepositoryPath(
         rootDir,
@@ -417,9 +417,9 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
       await retry(async () => generateNativeDocx(docxProtocol, docxOutPath), buildRetryOptions());
       const docxStats = safeStat(docxOutPath);
       logger.info(`✅ [MEDIA] DOCX rendered at: ${docxOutPath} (${docxStats.size} bytes).`);
-      break;
-    }
-    case 'pdf_render': {
+      return ctx;
+    },
+    pdf_render: async () => {
       const pdfProtocol = ctx[params.design_from || 'last_pdf_design'];
       const pdfOutPath = resolveMediaRepositoryPath(
         rootDir,
@@ -434,9 +434,9 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
       );
       const pdfStats = safeStat(pdfOutPath);
       logger.info(`✅ [MEDIA] PDF rendered at: ${pdfOutPath} (${pdfStats.size} bytes).`);
-      break;
-    }
-    case 'generate_document': {
+      return ctx;
+    },
+    generate_document: async () => {
       const fromKey = resolve(params.from) || 'last_json';
       const inlineData = params.data && typeof params.data === 'object' ? params.data : {};
       const source =
@@ -481,14 +481,15 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
           compiled.protocol?.metadata?.layoutDiagnostics ||
           summarizeMediaPptxLayout(compiled.protocol),
       };
-    }
-    case 'write_file':
+    },
+    write_file: async () => {
       safeWriteFile(
         resolveMediaRepositoryPath(rootDir, params.path, resolve),
         ctx[params.from] || params.content
       );
-      break;
-    case 'drawio_write': {
+      return ctx;
+    },
+    drawio_write: async () => {
       const outPath = resolveMediaRepositoryPath(rootDir, params.path, resolve);
       const content = ctx[params.from || 'last_drawio_document'] || resolve(params.content);
       if (typeof content !== 'string' || !content.trim()) {
@@ -498,9 +499,9 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
       safeWriteFile(outPath, content);
       const stats = safeStat(outPath);
       logger.info(`✅ [MEDIA] Draw.io document written at: ${outPath} (${stats.size} bytes).`);
-      break;
-    }
-    case 'save_brand_to_confidential': {
+      return ctx;
+    },
+    save_brand_to_confidential: async () => {
       // Writes tenant-override.json + layout-templates.json to confidential tier,
       // then registers the tenant in knowledge/confidential/tenants/index.json.
       const tenantSlug: string = resolve(params.tenant_slug) || ctx.tenant_slug;
@@ -724,13 +725,15 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
       logger.info(`[BRAND_IMPORT] Updated confidential tenant registry for ${tenantSlug}`);
 
       logger.info(`✅ [BRAND_IMPORT] Brand saved to confidential tier → ${confDir}`);
-      break;
-    }
-    case 'log':
+      return ctx;
+    },
+    log: async () => {
       logger.info(`[MEDIA_LOG] ${resolve(params.message)}`);
-      break;
-  }
-  return ctx;
+      return ctx;
+    },
+  };
+  const handler = handlers[op];
+  return handler ? handler() : ctx;
 }
 
 export { opApply };

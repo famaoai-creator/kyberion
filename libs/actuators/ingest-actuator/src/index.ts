@@ -111,8 +111,8 @@ async function executeOp(
   params: IngestParams,
   ctx: Record<string, unknown>
 ): Promise<Record<string, unknown>> {
-  switch (op) {
-    case 'sync_source': {
+  const handlers: Record<string, () => Promise<any>> = {
+    sync_source: async () => {
       logger.info(
         `[INGEST] Sync source ${String(params.source_system)} for tenant ${String(params.tenant_slug)} (DA-03)`
       );
@@ -121,28 +121,28 @@ async function executeOp(
       // run_pipeline's capture safety gate reads that channel.
       const exportAs = typeof params.export_as === 'string' ? params.export_as : 'last_capture';
       return { ...ctx, [exportAs]: result };
-    }
-    case 'parse_document': {
+    },
+    parse_document: async () => {
       logger.info(`[INGEST] Parsing document (format: ${String(params.format)})`);
       const ir = await parseDocument(params as unknown as ParseDocumentInput);
       // Capture ops must land on 'last_capture' when no export_as is given —
       // run_pipeline's capture safety gate reads that channel.
       const exportAs = typeof params.export_as === 'string' ? params.export_as : 'last_capture';
       return { ...ctx, [exportAs]: ir };
-    }
-    case 'normalize_card': {
+    },
+    normalize_card: async () => {
       logger.info('[INGEST] Normalizing IR into knowledge card candidate');
       const card = normalizeCard(params as unknown as NormalizeCardInput);
       const exportAs = typeof params.export_as === 'string' ? params.export_as : 'card';
       return { ...ctx, [exportAs]: card };
-    }
-    case 'dedup': {
+    },
+    dedup: async () => {
       logger.info('[INGEST] Checking content-hash registry');
       const result = dedupContent(params as unknown as DedupInput);
       const exportAs = typeof params.export_as === 'string' ? params.export_as : 'dedup';
       return { ...ctx, [exportAs]: result };
-    }
-    case 'staleness_report': {
+    },
+    staleness_report: async () => {
       logger.info('[INGEST] Comparing asset ledger against current sources');
       const input = params as unknown as {
         tenant_slug: string;
@@ -156,22 +156,23 @@ async function executeOp(
       );
       const exportAs = typeof params.export_as === 'string' ? params.export_as : 'staleness';
       return { ...ctx, [exportAs]: report };
-    }
-    case 'commit': {
+    },
+    commit: async () => {
       logger.info('[INGEST] Executing explicit ingest ceremony (DA-05)');
       const result = await commitIngest(params as unknown as IngestCommitInput);
       const exportAs = typeof params.export_as === 'string' ? params.export_as : 'commit';
       return { ...ctx, [exportAs]: result };
-    }
-    case 'meeting_digest': {
+    },
+    meeting_digest: async () => {
       logger.info(`[INGEST] Running meeting digest job for tenant ${String(params.tenant_slug)}`);
       const result = await runMeetingDigest(params as unknown as MeetingDigestInput);
       const exportAs = typeof params.export_as === 'string' ? params.export_as : 'meeting_digest';
       return { ...ctx, [exportAs]: result };
-    }
-    default:
-      throw new Error(`ingest-actuator: unknown op: ${String(op)}`);
-  }
+    },
+  };
+  const handler = handlers[op];
+  if (!handler) throw new Error(`ingest-actuator: unknown op: ${String(op)}`);
+  return handler();
 }
 
 export async function handleAction(input: {
