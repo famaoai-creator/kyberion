@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 
 describe('knowledge scope reconciliation entrypoint', () => {
   it('uses the shared harness output flags and printer', () => {
-    const source = readFileSync(resolve('scripts/reconcile_knowledge_scopes.ts'), 'utf8');
+    const source = readFileSync(resolve('scripts/reconcile/reconcile_knowledge_scopes.ts'), 'utf8');
 
     expect(source).toContain("flags: ['json', 'quiet']");
     expect(source).toContain('json, quiet, print');

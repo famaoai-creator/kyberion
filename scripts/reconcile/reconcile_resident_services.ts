@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * scripts/reconcile_resident_services.ts — `pnpm kyberion scheduler reconcile`.
+ * scripts/reconcile/reconcile_resident_services.ts — `pnpm kyberion scheduler reconcile`.
  *
  * Brings this checkout's resident services in line with
  * knowledge/product/governance/resident-services.json:
@@ -60,8 +60,8 @@ import {
   type ResidentServicesState,
 } from '@agent/core/daemon/resident-services';
 import { loadSurfaceManifest } from '@agent/core/surface/surface-runtime';
-import { buildDaemonRenderContext, CHRONOS_FORWARDABLE_ENV } from './install_chronos_launchd.js';
-import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { buildDaemonRenderContext, CHRONOS_FORWARDABLE_ENV } from '../install_chronos_launchd.js';
+import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
 
 export interface ScheduleSyncSummary {
   added: number;
@@ -128,7 +128,7 @@ function defaultEnabledSurfaces(): ReadonlySet<string> {
 
 async function defaultSyncSchedules(options: { dryRun: boolean }): Promise<ScheduleSyncSummary> {
   // Lazy: chronos_daemon owns the tenant gates; importing it never starts the daemon.
-  const chronos = await import('./chronos_daemon.js');
+  const chronos = await import('../chronos_daemon.js');
   return chronos.syncSchedulesFromAdf({ dryRun: options.dryRun });
 }
 

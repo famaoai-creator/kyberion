@@ -83,7 +83,7 @@
     "scripts/minutes_record.ts",
     "scripts/personal-pads/actions.ts",
     "scripts/pipeline-execution-part-results.ts",
-    "scripts/reconcile_resident_services.ts",
+    "scripts/reconcile/reconcile_resident_services.ts",
     "scripts/run_baseline_check.ts",
     "scripts/run_realtime_voice_conversation.ts",
     "scripts/screenshot-annotate/server.ts",

@@ -11,7 +11,7 @@
  */
 
 import { reconcileConfigFallbacks } from '@agent/core/reconcile-ops';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from '../lib/harness.js';
 
 export const runReconcileConfigFallbacks = defineScript({
   name: 'reconcile:config-fallbacks',

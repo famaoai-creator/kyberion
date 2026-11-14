@@ -88,7 +88,7 @@
     "knowledge:cowork-sync": "node scripts/run_built.mjs dist/scripts/cowork_knowledge_bridge.js",
     "knowledge:feedback": "node --import ./scripts/ts-loader.mjs scripts/knowledge_feedback.ts",
     "knowledge:ingest": "node scripts/run_built.mjs dist/scripts/ingest.js",
-    "knowledge:scope-reconcile": "node --import ./scripts/ts-loader.mjs scripts/reconcile_knowledge_scopes.ts",
+    "knowledge:scope-reconcile": "node --import ./scripts/ts-loader.mjs scripts/reconcile/reconcile_knowledge_scopes.ts",
     "knowledge:sync": "node scripts/run_built.mjs dist/scripts/run_pipeline.js --input pipelines/knowledge-sync.json",
     "kyberion": "node scripts/kyberion_cli_entry.mjs",
     "license:audit": "node scripts/run_built.mjs dist/scripts/license_audit.js",
