@@ -19,8 +19,11 @@ import {
 export interface StandingGrantCapabilityPolicy {
   kind: 'standing_grant';
   description?: string;
-  /** `meeting` = at least one of `meeting_series_ids` / `meeting_urls`. */
-  scope_keys: Array<'tenant_slug' | 'meeting' | 'credential_provider' | 'credential_ref'>;
+  /** `meeting` groups meeting selectors; `personal_credential_use` requires the complete
+   * discriminated personal scope, checked only by validatePersonalCredentialGrantRecord. */
+  scope_keys: Array<
+    'tenant_slug' | 'meeting' | 'credential_provider' | 'credential_ref' | 'personal_credential_use'
+  >;
   external_io: boolean;
   max_ttl_days: number;
   mission_binding: 'auto' | 'none';
