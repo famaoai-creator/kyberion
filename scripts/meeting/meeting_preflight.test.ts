@@ -58,11 +58,11 @@ vi.mock('@agent/core/governance/grant-readiness', () => ({
   evaluateGrantReadiness: mocks.evaluateGrantReadiness,
 }));
 
-vi.mock('./run_doctor.js', () => ({
+vi.mock('../run_doctor.js', () => ({
   collectDoctorReport: mocks.collectDoctorReport,
 }));
 
-vi.mock('../libs/actuators/meeting-actuator/src/meeting-actuator-helpers.js', () => ({
+vi.mock('../../libs/actuators/meeting-actuator/src/meeting-actuator-helpers.js', () => ({
   checkSpeakConsent: mocks.checkSpeakConsent,
 }));
 

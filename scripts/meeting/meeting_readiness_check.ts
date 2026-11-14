@@ -29,13 +29,13 @@ import {
   evaluateGrantReadiness,
   type GrantReadinessItem,
 } from '@agent/core/governance/grant-readiness';
-import { handleAction as handleCalendarAction } from '../libs/actuators/calendar-actuator/src/calendar-actuator-helpers.js';
+import { handleAction as handleCalendarAction } from '../../libs/actuators/calendar-actuator/src/calendar-actuator-helpers.js';
 import {
   listUpcomingMeetings,
   type CalendarLikeEvent,
   type UpcomingMeeting,
-} from '../libs/actuators/meeting-actuator/src/meeting-target-resolve.js';
-import { defineScript, isDirectScript } from './lib/harness.js';
+} from '../../libs/actuators/meeting-actuator/src/meeting-target-resolve.js';
+import { defineScript, isDirectScript } from '../lib/harness.js';
 
 export type MeetingReadinessStage = 'next_day' | 'soon';
 

@@ -113,7 +113,7 @@ const defaultDeps: GrantsDeps = {
   profiles: listGrantReadinessProfiles,
   upcoming: async (argv) => {
     const { parseMeetingReadinessArgs, renderMeetingReadiness, runMeetingReadinessCheck } =
-      await import('./meeting_readiness_check.js');
+      await import('./meeting/meeting_readiness_check.js');
     const report = await runMeetingReadinessCheck(parseMeetingReadinessArgs(argv));
     return { report, text: renderMeetingReadiness(report) };
   },

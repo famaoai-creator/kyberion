@@ -65,7 +65,7 @@ After every run, a summary is printed:
 ## 2. Architecture
 
 ```
-┌─ scripts/meeting_orchestrator.ts ─────────────────────────────────┐
+┌─ scripts/meeting/meeting_orchestrator.ts ─────────────────────────────────┐
 │                                                                  │
 │   Stage 1: Facilitate                                            │
 │   ─────────────────────                                          │
@@ -106,7 +106,7 @@ After every run, a summary is printed:
 | `knowledge/product/pipeline-templates/meeting-facilitation-workflow.json` | Stage 1 wiring                                                                                                                                                                                                                    |
 | `knowledge/product/pipeline-templates/action-item-execute-self.json`      | Stage 2 wiring                                                                                                                                                                                                                    |
 | `knowledge/product/pipeline-templates/action-item-tracking.json`          | Stage 3 wiring (cron-able)                                                                                                                                                                                                        |
-| `scripts/meeting_orchestrator.ts`                                         | Stage runner + summary                                                                                                                                                                                                            |
+| `scripts/meeting/meeting_orchestrator.ts`                                 | Stage runner + summary                                                                                                                                                                                                            |
 
 ## 3. Guardrails
 
@@ -269,7 +269,7 @@ Guardrails:
 - Interactive mid-meeting verbs: `meeting:participate` reads
   `status | raise-hand | admit [name] | chat <text> | leave | help`
   from stdin while the coordinator owns the session
-  (`scripts/meeting_commands.ts`; TTY by default,
+  (`scripts/meeting/meeting_commands.ts`; TTY by default,
   `--interactive-commands=false` to disable). `admit` additionally
   requires `--allow-admit` per run and every verb lands in the
   trace (`meeting_participation.*`). Coordinator exposes the live
@@ -326,6 +326,6 @@ Camera output (`voice:output_to_virtual_camera`):
 - [`knowledge/product/pipeline-templates/meeting-facilitation-workflow.json`](../pipeline-templates/meeting-facilitation-workflow.json)
 - [`knowledge/product/pipeline-templates/action-item-execute-self.json`](../pipeline-templates/action-item-execute-self.json)
 - [`knowledge/product/pipeline-templates/action-item-tracking.json`](../pipeline-templates/action-item-tracking.json)
-- [`scripts/meeting_orchestrator.ts`](../../../scripts/meeting_orchestrator.ts)
+- [`scripts/meeting/meeting_orchestrator.ts`](../../../scripts/meeting/meeting_orchestrator.ts)
 - [`knowledge/product/agents/meeting-proxy.agent.md`](../agents/meeting-proxy.agent.md) — agent template
 - [`kyberion-intent-catalog.md`](kyberion-intent-catalog.md) §3.6 — adjacent platform-extension intents

@@ -14,7 +14,10 @@ import { runAiAudit } from './run_ai_audit.js';
 import { main as runFirstWinLifecycle } from './first_win_lifecycle_smoke.js';
 import { runDependencyVulnerabilityScanOnce } from './scan_dependency_vulns.js';
 import { runHealthDegradationWatch } from './health_degradation_watch.js';
-import { runMeetingReadinessCheck, type MeetingReadinessStage } from './meeting_readiness_check.js';
+import {
+  runMeetingReadinessCheck,
+  type MeetingReadinessStage,
+} from './meeting/meeting_readiness_check.js';
 import { runKnowledgeHygieneProbe } from '@agent/core/knowledge/knowledge-hygiene-probe';
 import { runOpsHealthProbe } from '@agent/core/ops-health-probe';
 import { collectUiUxGovernanceReport } from './check/check_ui_ux_governance.js';
