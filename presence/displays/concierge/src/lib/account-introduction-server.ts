@@ -3,7 +3,7 @@ import { loadServiceBindingRecord } from '@agent/core/service/service-binding-re
 import {
   ACCOUNT_INTRODUCTION_CHANNEL,
   accountIntroductionApprovalBindingId,
-  accountIntroductionStatus,
+  reviewAccountIntroductionApproval,
 } from '@agent/core/secret/account-introduction';
 import type { ApprovalRequestRecord } from '@agent/core/governance/approval-store';
 import { asOnboardingOwner, onboardingAuthorityPrincipal } from './onboarding-authority-server';
@@ -37,7 +37,7 @@ export function accountIntroductionApprovalMember(
     if (!bindingId) return null;
     const { principal } = accountIntroductionAccess(viewer, bindingId);
     const status = asOnboardingOwner(() =>
-      accountIntroductionStatus(principal, bindingId, record.id)
+      reviewAccountIntroductionApproval(principal, bindingId, record.id)
     );
     if (!status.ok) return null;
     return {

@@ -5,6 +5,7 @@ export {
   type CredentialBindingReadiness,
 } from '../foundation/credential-binding.js';
 import * as secureIo from '../secure-io.js';
+import { assertAccountCredentialMaterialRead } from '../foundation/credential-material-capability.js';
 import { operatorProbeSecretAccess } from '../service/operator-service-connection-admission.js';
 import { ledger } from '../governance/ledger.js';
 import * as pathResolver from '../path-resolver.js';
@@ -553,6 +554,11 @@ function localAccountMaterialIdentity(identity: LocalAccountMaterialIdentity): s
   ]);
 }
 
+/** Non-secret exact address; shared by operator storage and the admitted allocation reader. */
+export function localAccountMaterialAccountId(identity: LocalAccountMaterialIdentity): string {
+  return createHash('sha256').update(localAccountMaterialIdentity(identity)).digest('hex');
+}
+
 function assertLocalAccountMaterialAccess(): void {
   // This internal storage API does not issue store grants or bypass secure-io.
   // A future broker must supply its own reviewed, exact-material admission.
@@ -561,14 +567,13 @@ function assertLocalAccountMaterialAccess(): void {
 }
 
 function localAccountMaterialPath(reference: LocalAccountMaterialReference): string {
-  const identity = localAccountMaterialIdentity(reference);
   if (
     !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(
       reference.generation
     )
   )
     throw new Error('[ACCOUNT_MATERIAL_INVALID] Exact generation required');
-  const account = createHash('sha256').update(identity).digest('hex');
+  const account = localAccountMaterialAccountId(reference);
   return safeSecretPath(
     path.join(PERSONAL_CONNECTIONS_DIR, 'accounts', account, `${reference.generation}.json`)
   );
@@ -645,6 +650,12 @@ export function loadLocalAccountMaterial(
   reference: LocalAccountMaterialReference
 ): Record<string, string> {
   assertLocalAccountMaterialAccess();
+  return readLocalAccountMaterial(reference);
+}
+
+function readLocalAccountMaterial(
+  reference: LocalAccountMaterialReference
+): Record<string, string> {
   const fullPath = localAccountMaterialPath(reference);
   const raw = readSensitiveJson<unknown>(fullPath);
   if (!isEncryptedConnectionEnvelope(raw))
@@ -669,7 +680,7 @@ export interface LocalAccountRegistrationState {
 }
 
 function localAccountRegistrationPath(identity: LocalAccountMaterialIdentity): string {
-  const account = createHash('sha256').update(localAccountMaterialIdentity(identity)).digest('hex');
+  const account = localAccountMaterialAccountId(identity);
   return safeSecretPath(
     path.join(PERSONAL_CONNECTIONS_DIR, 'accounts', account, 'registration.json')
   );
@@ -696,6 +707,12 @@ export function loadLocalAccountRegistration(
   identity: LocalAccountMaterialIdentity
 ): LocalAccountRegistrationState {
   assertLocalAccountMaterialAccess();
+  return readLocalAccountRegistration(identity);
+}
+
+function readLocalAccountRegistration(
+  identity: LocalAccountMaterialIdentity
+): LocalAccountRegistrationState {
   const file = localAccountRegistrationPath(identity);
   if (!safeExistsSync(file)) return { generation: null };
   const raw = readSensitiveJson<unknown>(file);
@@ -709,6 +726,43 @@ export function loadLocalAccountRegistration(
   )
     throw new Error('[ACCOUNT_MATERIAL_INVALID] Registration identity mismatch');
   return validateLocalAccountRegistration(document.state);
+}
+
+function assertAllocatedAccountRead(
+  identity: LocalAccountMaterialIdentity,
+  generation: string | null
+): void {
+  const tenant = credentialExecutionIdentity().tenantSlug;
+  if (
+    !tenant ||
+    identity.ownerKind !== 'person' ||
+    identity.tenantSlug ||
+    getPluginExecutionContext()
+  )
+    throw new Error('[ACCOUNT_MATERIAL_DENIED] Claimed tenant allocation required');
+  assertAccountCredentialMaterialRead(tenant, localAccountMaterialAccountId(identity), generation);
+}
+
+/** Internal allocation broker only: no ambient discovery and no operator API scope relaxation. */
+export function loadAllocatedLocalAccountRegistration(
+  identity: LocalAccountMaterialIdentity
+): LocalAccountRegistrationState {
+  assertAllocatedAccountRead(identity, null);
+  return readLocalAccountRegistration(identity);
+}
+
+export function loadAllocatedLocalAccountMaterial(
+  reference: LocalAccountMaterialReference
+): Record<string, string> {
+  assertAllocatedAccountRead(reference, reference.generation);
+  const before = readLocalAccountRegistration(reference);
+  if (before.pendingApprovalId || before.generation !== reference.generation)
+    throw new Error('[ACCOUNT_MATERIAL_DENIED] Account registration incomplete or changed');
+  const material = readLocalAccountMaterial(reference);
+  const after = readLocalAccountRegistration(reference);
+  if (after.pendingApprovalId || after.generation !== reference.generation)
+    throw new Error('[ACCOUNT_MATERIAL_DENIED] Account registration incomplete or changed');
+  return material;
 }
 
 /** Caller holds the binding lock. A persisted pending id fences incomplete external writes. */

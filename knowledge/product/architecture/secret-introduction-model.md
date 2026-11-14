@@ -4,7 +4,7 @@ category: Architecture
 tags: [architecture, secrets, approvals, surfaces, governance]
 importance: 8
 author: Ecosystem Architect
-last_updated: 2026-11-13
+last_updated: 2026-11-14
 ---
 
 # Secret Introduction Model
@@ -88,13 +88,13 @@ and Windows account-material writes fail closed; tests inject a synthetic key.
 This change does not add another key backend or provision cross-platform keys.
 
 This is material storage, not an authority store. Tenant execution and plugin
-callers cannot invoke it; the local caller still needs existing secure-io file
+callers cannot invoke the operator APIs; the local caller still needs existing secure-io file
 permissions. Declaring an owner in a material address proves no ownership and
 grants no credential use. Writing a new generation does not revoke old ones;
-a future admitted broker must pin and revalidate the selected current generation,
-binding, owner, task identity, allocation and approval before every use.
+the admitted local allocation broker pins and revalidates the selected current
+generation, binding, owner, task identity, allocation and approval before every use.
 
-**Account introduction:** the Concierge account collector uses these primitives
+**Account introduction:** the Concierge and `kyberion account` collectors use these primitives
 after an exact owner-approved review. The review binds the existing connection,
 its service token references, owner, current generation and broker configuration.
 Values are collected after approval and never appear in the review. A durable
@@ -103,9 +103,25 @@ provisioning outcomes. Organization accounts use an explicitly configured writer
 with compare-and-swap generation semantics; personal accounts remain local.
 The service-wide introduction flow above remains separate.
 
-Runtime reads of local personal account generations are not wired to credential
-allocation. No new exact-material read capability, tenantless execution, session
-collector or CLI account collector is introduced. No real keys, secrets, grants,
+An agent may initiate the registration request while its accountable human reviews
+and decides it through the authenticated approval surface. That metadata-only
+owner review does not transfer continuation authority: status and apply remain
+bound to the original initiating identity, and the human cannot apply an agent's
+request by substituting their own requester identity.
+
+For an explicit owner-approved `credential.use` service allocation to a tenant,
+the local allocation broker can now read the registered personal account. Its
+internal synchronous capability permits only the exact registration and generation
+files, with no writes or account enumeration. This does not relax operator storage
+APIs or turn registration into allocation. Incomplete registration, rotation,
+changed binding, expired/revoked grants or lost claims invalidate consumption.
+
+The CLI previews metadata, requests approval from an unchanged review JSON under
+the active personal profile, and checks status before collecting tokens at a hidden
+TTY prompt. It uses the same introduction facade and installed owner checks as the
+web flow. Tokens are never accepted from argv, environment variables, files or pipes.
+It neither decides approval nor creates or repairs an identity. Tenantless claimed
+execution and GWS session collection remain deferred. No real keys, secrets, grants,
 ownership records or migrations are changed by installing this code. The
 [service integration guide](../orchestration/service-integration-guide.md#register-a-token-for-an-existing-account)
 describes the setup prerequisites and recovery limits.

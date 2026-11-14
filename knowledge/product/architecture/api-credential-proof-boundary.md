@@ -1,7 +1,7 @@
 ---
 title: Credential lifecycle, allocation, and execution boundaries
 tags: [reasoning, credentials, tenant, architecture, extensibility, verification]
-last_updated: 2026-11-05
+last_updated: 2026-11-14
 ---
 
 # Credential lifecycle, allocation, and execution boundaries
@@ -88,8 +88,13 @@ the service responds. Binding inherits tenant/mission/task identity; nested bind
 cannot widen its parent, and cached clients reject another execution identity.
 
 Without an external task binder, dispatch resolves approved local standing grants.
-The broker checks the canonical reference and current claim before reading exactly
-one connection document under a temporary read-only capability. This is explicitly
+For reasoning credentials, the broker checks the canonical reference and current
+claim before reading exactly one connection document under a temporary read-only
+capability. For registered personal service accounts, an explicit owner-approved
+`service_allocation` grant admits only the exact encrypted account registration and
+current generation. That capability cannot write or enumerate accounts. Binding,
+owner, service, references, tenant and optional project/mission/task restrictions
+remain part of admission; duplicate token names fail closed. This is explicitly
 allocated consumption, not fallback from a missing tenant key. An external binder's
 miss/failure never falls through to the local broker.
 
@@ -200,21 +205,55 @@ Use only synthetic public input for credential proofs, require explicit acceptan
 
 ## Integration status and next implementation
 
-| Area                                           | State                                                                                                                            |
-| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| Operator registration, presence, bounded proof | Implemented; recent lazy-resolution/role fixes are local changes in this checkout                                                |
-| Trusted per-task tenant binding                | Implemented through resolver, shell protocol, and coordinated dispatch                                                           |
-| External allocation decisions                  | Configured external task binders remain authoritative; no fallback on miss                                                       |
-| Local allocation management                    | CLI `assign`, `allocations`, `check`, `revoke`; existing standing Grant schema/store and human approval                          |
-| Task-path verification                         | `probe` creates a diagnostic WorkItem under an active organization/project-linked mission                                        |
-| Versioned proofs and revocation                | Key/context-attributed proofs and per-consumption local checks; no in-flight cancellation                                        |
-| Remaining scope                                | Graphical management, narrower model/organization/project limits, account-owner attestations and external/CLI session revocation |
+| Area                                           | State                                                                                                                                                          |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Operator registration, presence, bounded proof | Implemented; recent lazy-resolution/role fixes are local changes in this checkout                                                                              |
+| Trusted per-task tenant binding                | Implemented through resolver, shell protocol, and coordinated dispatch                                                                                         |
+| External allocation decisions                  | Configured external task binders remain authoritative; no fallback on miss                                                                                     |
+| Local allocation management                    | CLI `assign`, `allocations`, `check`, `revoke`; existing standing Grant schema/store and human approval                                                        |
+| Registered personal service accounts           | Local broker consumes exact encrypted API-token generations for owner-approved tenant service allocations; per-use claim, grant, binding and generation checks |
+| Account registration CLI                       | `account preview/request/status/apply` reuses the owner-approved facade; metadata review under the active profile, hidden TTY token collection only            |
+| Task-path verification                         | `probe` creates a diagnostic WorkItem under an active organization/project-linked mission                                                                      |
+| Versioned proofs and revocation                | Key/context-attributed proofs and per-consumption local checks; no in-flight cancellation                                                                      |
+| Remaining scope                                | Graphical management, narrower model/organization/project limits, account-owner attestations and external/CLI session revocation                               |
 
 Management integrates with secret references, existing approvals, and
 dispatch. Backend activation, scope selection, env copies, and provider registration
 cannot stand in for allocation. Acceptance requires consumer-specific approval
 without secret-bearing metadata, rejection of unallocated/cross-tenant work, no
 operator fallback, honest revocation behavior, and separate operator/tenant evidence.
+
+## Tenantless personal execution dependency roadmap
+
+The current personal-account broker path serves **claimed tenant work with an explicit
+owner-approved allocation**. It does not implement a no-tenant task binder. A missing
+tenant must never be interpreted as an operator credential context or permission to
+read every local account. Registration, personal ownership and installed-owner access
+remain separate from authority for a particular execution.
+
+Implement the remaining dependency chain in this order, with boundary tests at each step:
+
+1. Establish a canonical claimed personal execution identity: personal owner and NHI,
+   WorkItem claim, current attempt and live lease. Derive these from trusted dispatch,
+   never a supplied owner ID or the absence of a tenant. Preserve the separate operator
+   context used for setup and registration.
+2. Install an explicit task binding even when its credential set is empty. Bind it to
+   that personal owner/NHI/claim/lease and exact selected account generation. Missing
+   keys stay final denials; no environment, service-wide connection, global login or
+   ambient client cache fallback. Nested scopes and reused clients must reject a new
+   task or owner, and rotation/revocation must invalidate subsequent consumption.
+3. Add selected-binding admission for read-only PRESET operations first, retaining
+   operation restrictions, egress checks and per-use provenance. Prove cross-owner,
+   cross-task, expired-lease, empty-binding and stale-generation denial before enabling
+   effects. Operator success is not evidence for claimed personal execution.
+4. Add effect authorization and human approval as a separate step, bound to the exact
+   operation, actor, account and generation. Treat GWS session collection and personal
+   session execution as another later step with isolated homes and exact session
+   provenance; API-token registration must not silently enable either.
+
+These are future requirements, not permissions issued by this release. Existing-key
+macOS account encryption remains unchanged; no new key backend, identity repair or
+automatic personal-to-organization sharing is included.
 
 ## Related contracts
 

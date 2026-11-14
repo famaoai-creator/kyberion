@@ -28,6 +28,64 @@ const grants =
   createSynchronousResourceGrantIssuer<Readonly<{ tenant: string; file: string }>>(
     'CREDENTIAL_CAPABILITY'
   );
+const accountGrants = createSynchronousResourceGrantIssuer<
+  Readonly<{ tenant: string; account: string; generation: string | null }>
+>('ACCOUNT_CREDENTIAL_CAPABILITY');
+
+/** Internal broker-only read ceiling: one account registration and optionally its exact generation. */
+export function withAccountCredentialMaterialCapability<T>(
+  tenant: string,
+  account: string,
+  generation: string | null,
+  run: () => T
+): T {
+  if (
+    !/^[0-9a-f]{64}$/.test(account) ||
+    (generation !== null &&
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(generation))
+  )
+    throw new Error('[CREDENTIAL_CAPABILITY_INVALID] Exact account generation required');
+  const directory = `${CONNECTIONS}/accounts/${account}`;
+  const files = [
+    `${directory}/registration.json`,
+    ...(generation ? [`${directory}/${generation}.json`] : []),
+  ];
+  return accountGrants.run(
+    Object.freeze({ tenant, account, generation }),
+    {
+      tenantSlug: tenant,
+      readExact: files,
+      writeExact: [],
+      mkdirExact: [],
+      metadataExact: [
+        ...files,
+        directory,
+        `${CONNECTIONS}/accounts`,
+        CONNECTIONS,
+        'knowledge/personal',
+        'knowledge',
+      ],
+      allowProductKnowledgeRead: true,
+    },
+    run
+  );
+}
+
+/** Storage consumers cannot turn an operator read into a tenant bypass without this exact live grant. */
+export function assertAccountCredentialMaterialRead(
+  tenant: string,
+  account: string,
+  generation: string | null
+): void {
+  const grant = accountGrants.resolve(currentResourceAccessScope());
+  if (
+    !grant ||
+    grant.binding.tenant !== tenant ||
+    grant.binding.account !== account ||
+    grant.binding.generation !== generation
+  )
+    throw new Error('[ACCOUNT_MATERIAL_DENIED] Exact allocated account admission required');
+}
 export function withCredentialMaterialCapability<T>(tenant: string, file: string, run: () => T): T {
   if (!/^knowledge\/personal\/connections\/[a-z0-9][a-z0-9._-]{0,63}\.json$/.test(file))
     throw new Error('[CREDENTIAL_CAPABILITY_INVALID] Exact canonical connection path required');
@@ -46,7 +104,7 @@ export function withCredentialMaterialCapability<T>(tenant: string, file: string
 }
 
 export function isCredentialMaterialCapability(scope: ResourceAccessScope | undefined): boolean {
-  return Boolean(grants.resolve(scope));
+  return Boolean(grants.resolve(scope) || accountGrants.resolve(scope));
 }
 
 /**
