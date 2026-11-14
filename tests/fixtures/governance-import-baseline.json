@@ -284,6 +284,7 @@
     "tests/knowledge-taxonomy-contract.test.ts",
     "tests/managed-process.test.ts",
     "tests/support/cli-reliability-harness.ts",
+    "tests/tier-literal-boundary.test.ts",
     "tests/utils/assertion-extensions.ts",
     "tests/utils/test-utilities.test.ts"
   ]
