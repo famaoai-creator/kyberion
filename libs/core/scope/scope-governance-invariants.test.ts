@@ -43,6 +43,11 @@ describe('scope governance invariants', () => {
           // enclosed operation; callers cannot provide an arbitrary envelope.
           !line.startsWith('libs/core/dot/resident-dot-scope.ts:') &&
           !line.startsWith('libs/core/governance/authenticated-personal-approvals.ts:') &&
+          // Personal credential withdrawal authenticates the active owner and
+          // historical NHI accountability before entering an exact-grant,
+          // no-egress ceremony. No callback or reusable scope escapes; missing
+          // history fails closed. Issuance/execution minting needs new review.
+          !line.startsWith('libs/core/governance/personal-credential-grant.ts:') &&
           !line.startsWith('libs/core/organization/continuous-mission-scope.ts:')
       );
     expect(offenders).toEqual([]);

@@ -244,6 +244,8 @@ The operations console does not directly own mission state. It delegates to:
 - `libs/core/secret/account-introduction.ts` (owner-approved registration of exact account generations)
 - `libs/core/secret/account-broker.ts` (explicit organization account provisioning and receipt validation)
 - `libs/core/secret/personal-task-credential-claim.ts` (read-only installed personal owner/NHI, runtime envelope and current WorkItem run/lease proof)
+- `libs/core/governance/personal-credential-grant.ts` (authenticated owner consent in the canonical standing-grant store; no runtime token consumption)
+- `libs/core/secret/gws-session-registration-contract.ts` (strict portable GWS material validation and inactive registration preflight; no login or storage)
 - `libs/core/organization/personal-runtime-identity.ts` (canonical installed person identity reader, shared with onboarding without importing organization session admission)
 - `libs/core/secret/task-credential-dispatch.ts` and `libs/core/foundation/credential-binding.ts` (tenant broker composition and empty-only tenantless personal bindings; no operator fallback or credential grants)
 - `libs/core/secret/credential-allocations.ts` (local task broker: reasoning grants and explicit owner-approved personal service allocations into tenant work)

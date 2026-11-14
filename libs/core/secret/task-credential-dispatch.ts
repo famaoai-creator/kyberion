@@ -43,13 +43,11 @@ export async function withConfiguredTaskCredentials<T>(
   if (!envelope)
     throw new Error('[CREDENTIAL_BINDING_UNAVAILABLE] Claimed dispatch requires a scope envelope');
   const identity = credentialExecutionIdentity();
+  // Missing scope projection is a contradiction, not an operator credential
+  // context. A valid tenant without a resolver receives an empty binding below.
+  if (envelope.identity.tenant_slug !== identity.tenantSlug)
+    throw new Error('[CREDENTIAL_SCOPE_DENIED] Dispatch envelope contradicts runtime credentials');
   if (!identity.tenantSlug) {
-    if (envelope.identity.tenant_slug !== undefined) {
-      // Tenant-scoped delegation without configured credentials runs unbound —
-      // credential use stays fail-closed at point of use. The personal-claim
-      // proof exists only for unscoped (personal-runtime) envelopes.
-      return run();
-    }
     const claim = assertPersonalTaskCredentialClaim(workItemId);
     const snapshot = JSON.stringify(claim);
     return withPersonalTaskCredentialBinding(
@@ -61,8 +59,6 @@ export async function withConfiguredTaskCredentials<T>(
       run
     );
   }
-  if (envelope.identity.tenant_slug !== identity.tenantSlug)
-    throw new Error('[CREDENTIAL_SCOPE_DENIED] Dispatch envelope contradicts runtime credentials');
   const resolver = getSecretResolver();
   const binder = resolver?.bindTask;
   let binding: TaskCredentialBinding | null = null;

@@ -3,6 +3,11 @@ import {
   serviceAllocationApprovedByOwner,
   type ServiceCredentialAllocationScope,
 } from './service-credential-grant-scope.js';
+import {
+  PERSONAL_CREDENTIAL_CAPABILITY,
+  normalizePersonalCredentialGrantScope,
+  type PersonalCredentialGrantRecord,
+} from './personal-credential-grant-scope.js';
 export type { ServiceCredentialAllocationScope } from './service-credential-grant-scope.js';
 /**
  * PG-03: standing grants — scoped, time-bounded permissions that are decided
@@ -233,6 +238,16 @@ function uniqueSorted(values: string[]): string[] {
 
 /** Validate and canonicalize a draft against its capability policy. */
 export function normalizeGrantDraft(draft: GrantDraft): NormalizedGrantDraft {
+  if (
+    draft.capability === PERSONAL_CREDENTIAL_CAPABILITY ||
+    'custody' in draft ||
+    'personal_credential_use' in draft ||
+    'scope' in draft
+  )
+    throw new GrantError(
+      'invalid_input',
+      'personal grants require the authenticated personal facade'
+    );
   const provider = draft.credential_provider?.trim();
   if (provider !== undefined && !/^[a-z][a-z0-9-]{0,63}$/.test(provider))
     throw new GrantError('invalid_input', 'invalid credential provider');
@@ -315,15 +330,23 @@ export function normalizeGrantDraft(draft: GrantDraft): NormalizedGrantDraft {
 // ---------------------------------------------------------------------------
 
 const GRANT_SCHEMA_PATH = pathResolver.knowledge('product/schemas/grant-record.schema.json');
-let grantValidator: ValidateFunction<GrantRecord> | undefined;
+type StoredGrantRecord = GrantRecord | PersonalCredentialGrantRecord;
+let grantValidator: ValidateFunction<StoredGrantRecord> | undefined;
 
-function getGrantValidator(): ValidateFunction<GrantRecord> {
-  grantValidator ||= compileSchema<GrantRecord>(GRANT_SCHEMA_PATH);
+function getGrantValidator(): ValidateFunction<StoredGrantRecord> {
+  grantValidator ||= compileSchema<StoredGrantRecord>(GRANT_SCHEMA_PATH);
   return grantValidator;
 }
 
 /** Schema + semantic validation; a stored record failing either grants nothing. */
 export function validateGrantRecord(input: unknown): { valid: boolean; errors: string[] } {
+  if (
+    input &&
+    typeof input === 'object' &&
+    ('custody' in input ||
+      ('capability' in input && input.capability === PERSONAL_CREDENTIAL_CAPABILITY))
+  )
+    return { valid: false, errors: ['personal grants are not tenant grant records'] };
   const validate = getGrantValidator();
   if (!validate(input)) {
     return {
@@ -572,6 +595,45 @@ function recordGrantAudit(
 function generateGrantId(now: Date): string {
   const datePart = now.toISOString().slice(0, 10).replaceAll('-', '');
   return `GRT-${datePart}-${randomBytes(6).toString('hex')}`;
+}
+
+/** Personal variant of the same standing-grant schema; never accepted by tenant APIs. */
+export function validatePersonalCredentialGrantRecord(input: unknown): {
+  valid: boolean;
+  errors: string[];
+} {
+  const validate = getGrantValidator();
+  if (!validate(input)) return { valid: false, errors: ['invalid personal standing-grant schema'] };
+  const record = input as PersonalCredentialGrantRecord;
+  const errors: string[] = [];
+  try {
+    const normalized = normalizePersonalCredentialGrantScope(record.scope);
+    if (
+      record.capability !== PERSONAL_CREDENTIAL_CAPABILITY ||
+      record.custody?.kind !== 'person' ||
+      record.custody.ref !== normalized.owner_ref.slice(5) ||
+      record.granted_by.actor_id !== normalized.owner_ref ||
+      Object.entries(normalized).some(
+        ([key, value]) =>
+          JSON.stringify(value) !== JSON.stringify(record.scope[key as keyof typeof normalized])
+      )
+    )
+      errors.push('personal custody and normalized owner scope must agree');
+    const policy = requireStandingGrantPolicy(PERSONAL_CREDENTIAL_CAPABILITY);
+    const ttl = (Date.parse(record.expires_at) - Date.parse(record.granted_at)) / DAY_MS;
+    if (!Number.isInteger(ttl) || ttl < 1 || ttl > policy.max_ttl_days)
+      errors.push('invalid personal grant lifetime');
+    if (
+      !record.basis?.approval_request_id ||
+      record.basis.approval_channel !== GRANT_APPROVAL_CHANNEL
+    )
+      errors.push('personal grant requires canonical approval basis');
+    if (record.revoked && Date.parse(record.revoked.at) < Date.parse(record.granted_at))
+      errors.push('revocation precedes grant');
+  } catch {
+    errors.push('invalid personal grant scope');
+  }
+  return { valid: errors.length === 0, errors };
 }
 
 function writeNewGrant(
@@ -835,6 +897,7 @@ export function assertGrantApproval(
  * nothing.
  */
 export function verifyGrantBasis(record: GrantRecord): boolean {
+  if ('custody' in record || record.capability === PERSONAL_CREDENTIAL_CAPABILITY) return false;
   let policy: StandingGrantCapabilityPolicy;
   try {
     policy = requireStandingGrantPolicy(record.capability);
