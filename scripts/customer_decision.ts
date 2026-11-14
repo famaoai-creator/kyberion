@@ -146,52 +146,37 @@ export async function runCustomerDecision(
 ): Promise<unknown> {
   const { verb, opts, flags, lists } = parseCustomerDecisionArgs(argv);
   const now = io.now ? io.now() : nowIso();
-  switch (verb) {
-    case 'help':
-    case '--help':
-    case '-h':
-      return usage();
-    case 'template':
-      // HR-01: `template put|list|show` — the action is the first positional argument.
-      return runTemplate(argv[1]?.startsWith('--') ? undefined : argv[1], opts);
-    case 'draft':
-      return flags.has('from-tasks') ? runCollectTaskProposals(opts, now) : runDraft(opts, now);
-    case 'generate':
-      return runGenerate(opts, now);
-    case 'submit':
-      return runSubmit(opts, now);
-    case 'actor-add':
-      return runActorAdd(opts);
-    case 'send':
-      return runSend(opts, now);
-    case 'bolt-review':
-      return runBoltReview(opts, lists, io, now);
-    case 'status':
-      return runStatus(opts, now);
-    case 'remind':
-      return runRemind(opts, flags, now);
-    case 'reminders':
-      return runRemindersInstall(opts, flags);
-    case 'overview':
-      return runOverview(opts, flags, now);
-    case 'learning':
-      return flags.has('install') ? runLearningInstall(opts, flags) : runLearning(opts, flags, now);
-    case 'task-decisions':
-      return runTaskDecisions(opts, io, now);
-    case 'confirm':
-      return runConfirm(opts, now);
-    case 'close':
-    case 'withdraw':
-      return runEnd(verb, opts, now);
-    case 'revoke':
-      return runRevoke(opts, now);
-    case 'view':
-    case 'respond':
-    case 'attachment':
-      return runCustomerFacing(verb, opts, io, now);
-    default:
-      throw usageError(`unknown verb '${verb}'`);
-  }
+  const runners: Record<string, () => unknown> = {
+    help: () => usage(),
+    '--help': () => usage(),
+    '-h': () => usage(),
+    // HR-01: `template put|list|show` — the action is the first positional argument.
+    template: () => runTemplate(argv[1]?.startsWith('--') ? undefined : argv[1], opts),
+    draft: () =>
+      flags.has('from-tasks') ? runCollectTaskProposals(opts, now) : runDraft(opts, now),
+    generate: () => runGenerate(opts, now),
+    submit: () => runSubmit(opts, now),
+    'actor-add': () => runActorAdd(opts),
+    send: () => runSend(opts, now),
+    'bolt-review': () => runBoltReview(opts, lists, io, now),
+    status: () => runStatus(opts, now),
+    remind: () => runRemind(opts, flags, now),
+    reminders: () => runRemindersInstall(opts, flags),
+    overview: () => runOverview(opts, flags, now),
+    learning: () =>
+      flags.has('install') ? runLearningInstall(opts, flags) : runLearning(opts, flags, now),
+    'task-decisions': () => runTaskDecisions(opts, io, now),
+    confirm: () => runConfirm(opts, now),
+    close: () => runEnd('close', opts, now),
+    withdraw: () => runEnd('withdraw', opts, now),
+    revoke: () => runRevoke(opts, now),
+    view: () => runCustomerFacing('view', opts, io, now),
+    respond: () => runCustomerFacing('respond', opts, io, now),
+    attachment: () => runCustomerFacing('attachment', opts, io, now),
+  };
+  const runner = runners[verb];
+  if (!runner) throw usageError(`unknown verb '${verb}'`);
+  return runner();
 }
 
 export const runCustomerDecisionScript = defineScript({

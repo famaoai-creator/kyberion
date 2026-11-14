@@ -128,38 +128,39 @@ function parseProposal(value: unknown): ProposedAction {
     throw new Error('computer_assist proposed an invalid wait duration');
   }
 
-  switch (proposal.type) {
-    case 'activate_application':
-    case 'app_launch':
+  const validators: Record<string, () => void> = {
+    activate_application: () => {
       proposal.application = boundedString(record.application, 'application', 200);
-      break;
-    case 'window_focus':
-    case 'window_maximize':
+    },
+    app_launch: () => validators['activate_application']!(),
+    window_focus: () => {
       proposal.application = boundedString(record.application, 'application', 200);
       proposal.window_title = boundedString(record.window_title, 'window title', 300);
-      break;
-    case 'left_click':
-    case 'double_click':
-    case 'mouse_move':
+    },
+    window_maximize: () => validators['window_focus']!(),
+    left_click: () => {
       if (typeof record.x !== 'number' || typeof record.y !== 'number') {
         throw new Error('computer_assist pointer action requires x and y');
       }
-      break;
-    case 'type':
+    },
+    double_click: () => validators['left_click']!(),
+    mouse_move: () => validators['left_click']!(),
+    type: () => {
       proposal.text = boundedString(record.text, 'text', 1_000);
-      break;
-    case 'key':
+    },
+    key: () => {
       proposal.key = boundedString(record.key, 'key', 40);
-      break;
-    case 'wait':
+    },
+    wait: () => {
       if (typeof record.timeout_ms !== 'number')
         throw new Error('computer_assist wait requires timeout_ms');
-      break;
-    case 'complete':
-    case 'clarify':
+    },
+    complete: () => {
       proposal.reason = boundedString(record.reason, 'reason', 500);
-      break;
-  }
+    },
+    clarify: () => validators['complete']!(),
+  };
+  validators[proposal.type]?.();
   return proposal;
 }
 
@@ -237,22 +238,25 @@ export async function executeComputerAssist(
   }
 
   const action: ComputerInteractionAction['action'] = (() => {
-    switch (proposal.type) {
-      case 'activate_application':
-        return { type: 'activate_application', application: proposal.application };
-      case 'left_click':
-      case 'double_click':
-      case 'mouse_move':
-        return { type: proposal.type, coordinate: { x: proposal.x!, y: proposal.y! } };
-      case 'type':
-        return { type: 'type', text: proposal.text };
-      case 'key':
-        return { type: 'key', key: proposal.key };
-      case 'wait':
-        return { type: 'wait', timeout_ms: proposal.timeout_ms };
-      default:
-        throw new Error('computer_assist proposed an unsupported action');
-    }
+    const pointer = () => ({
+      type: proposal.type as 'left_click' | 'double_click' | 'mouse_move',
+      coordinate: { x: proposal.x!, y: proposal.y! },
+    });
+    const builders: Record<string, () => ComputerInteractionAction['action']> = {
+      activate_application: () => ({
+        type: 'activate_application',
+        application: proposal.application,
+      }),
+      left_click: pointer,
+      double_click: pointer,
+      mouse_move: pointer,
+      type: () => ({ type: 'type', text: proposal.text }),
+      key: () => ({ type: 'key', key: proposal.key }),
+      wait: () => ({ type: 'wait', timeout_ms: proposal.timeout_ms }),
+    };
+    const builder = builders[proposal.type];
+    if (!builder) throw new Error('computer_assist proposed an unsupported action');
+    return builder();
   })();
   const result = await execute({
     version: '0.1',

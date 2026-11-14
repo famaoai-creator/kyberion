@@ -1419,6 +1419,16 @@ export async function runOnboarding(
     }
   }
 
+  const phaseRunners: Partial<
+    Record<(typeof PHASES)[number], (s: OnboardingState, p: Print) => Promise<void>>
+  > = {
+    identity: runIdentityPhase,
+    reasoning: runReasoningPhase,
+    services: (s, p) => runServicesPhase(s, undefined, p),
+    tenants: runTenantsPhase,
+    tutorial: runTutorialPhase,
+    summary: runSummaryPhase,
+  };
   for (const phase of PHASES) {
     if (state.completed_phases.includes(phase) && phase !== 'summary') {
       if (onboardingArtifactsMissing(state, phase)) {
@@ -1428,19 +1438,7 @@ export async function runOnboarding(
         continue;
       }
     }
-    if (phase === 'identity') {
-      await runIdentityPhase(state, print);
-    } else if (phase === 'reasoning') {
-      await runReasoningPhase(state, print);
-    } else if (phase === 'services') {
-      await runServicesPhase(state, undefined, print);
-    } else if (phase === 'tenants') {
-      await runTenantsPhase(state, print);
-    } else if (phase === 'tutorial') {
-      await runTutorialPhase(state, print);
-    } else if (phase === 'summary') {
-      await runSummaryPhase(state, print);
-    }
+    await phaseRunners[phase]?.(state, print);
   }
 
   // i18n-exempt: bilingual prompt pair (JA side intentional)

@@ -249,343 +249,361 @@ function scopeArgs(interaction: AxInteraction, application?: string): string[] {
   return args;
 }
 
+type AxArgs = string[] | { error: string };
+type AxArgsBuilder = (interaction: AxInteraction, application?: string) => AxArgs;
+
+// --timeout-ms exists only on snapshot/find/list-windows/list-apps/ref
+// actions; window/lifecycle/notification/clipboard commands take no
+// deadline flag (launch and wait use --timeout). Verified against the
+// upstream --help surface.
+function timeoutArgs(interaction: AxInteraction): string[] {
+  return ['--timeout-ms', String(interaction.timeout_ms ?? AX_DEFAULT_TIMEOUT_MS)];
+}
+
+function appScopeArgs(
+  interaction: AxInteraction,
+  application: string | undefined,
+  allowTitle = false
+): string[] {
+  const args = scopeArgs(interaction, application);
+  if (allowTitle && interaction.title) args.push('--title', interaction.title);
+  return args;
+}
+
+const axGetOrIs: AxArgsBuilder = (interaction) => {
+  const ref = refArgs(interaction);
+  if ('error' in ref) return ref;
+  const command = interaction.type === 'ax_get' ? 'get' : 'is';
+  const property = interaction.property || (interaction.type === 'ax_get' ? 'text' : 'visible');
+  // get/is are live reads with no wait loop — upstream rejects --timeout-ms here.
+  return [command, ...ref, '--property', property];
+};
+
+const axClickOrRightClick: AxArgsBuilder = (interaction) => {
+  const ref = refArgs(interaction);
+  if ('error' in ref) return ref;
+  const command = interaction.type === 'ax_click' ? 'click' : 'right-click';
+  return [command, ...ref, ...timeoutArgs(interaction)];
+};
+
+const axSimpleRefAction: AxArgsBuilder = (interaction) => {
+  const ref = refArgs(interaction);
+  if ('error' in ref) return ref;
+  return [interaction.type.slice(3), ...ref, ...timeoutArgs(interaction)];
+};
+
+const axAppScopedList = (command: string) => {
+  return (interaction: AxInteraction, application?: string): string[] => {
+    const args = [command];
+    if (interaction.application || application) {
+      args.push('--app', interaction.application ?? application ?? '');
+    }
+    return args;
+  };
+};
+
+const AX_ARG_BUILDERS: Record<string, AxArgsBuilder> = {
+  ax_snapshot: (interaction, application) => {
+    const args = ['snapshot', ...scopeArgs(interaction, application)];
+    if (interaction.surface) args.push('--surface', interaction.surface);
+    if (interaction.wait_for) args.push('--wait-for', interaction.wait_for);
+    if (interaction.wait_for_gone) args.push('--wait-for-gone', interaction.wait_for_gone);
+    args.push(...timeoutArgs(interaction));
+    return args;
+  },
+  ax_list_windows: (interaction) => ['list-windows', ...timeoutArgs(interaction)],
+  // list-apps honors --timeout-ms; the other inventory commands do not.
+  ax_list_apps: (interaction, application) => [
+    ...axAppScopedList('list-apps')(interaction, application),
+    ...timeoutArgs(interaction),
+  ],
+  ax_list_displays: () => ['list-displays'],
+  ax_list_surfaces: axAppScopedList('list-surfaces'),
+  ax_list_notifications: (interaction, application) => {
+    const args = axAppScopedList('list-notifications')(interaction, application);
+    if (interaction.text) args.push('--text', interaction.text);
+    if (interaction.limit) args.push('--limit', String(interaction.limit));
+    return args;
+  },
+  ax_find: (interaction, application) => {
+    const args = ['find', ...scopeArgs(interaction, application)];
+    if (interaction.surface) args.push('--surface', interaction.surface);
+    if (interaction.wait_for) args.push('--wait-for', interaction.wait_for);
+    if (interaction.wait_for_gone) args.push('--wait-for-gone', interaction.wait_for_gone);
+    if (interaction.role) args.push('--role', interaction.role);
+    if (interaction.name) args.push('--name', interaction.name);
+    if (interaction.text) args.push('--text', interaction.text);
+    if (interaction.native_id) args.push('--native-id', interaction.native_id);
+    if (interaction.qualified_ref) {
+      if (!QUALIFIED_REF.test(interaction.qualified_ref)) {
+        return { error: 'ax_find --root requires a snapshot-qualified ref' };
+      }
+      args.push('--root', interaction.qualified_ref);
+    }
+    args.push(...timeoutArgs(interaction));
+    return args;
+  },
+  ax_get: axGetOrIs,
+  ax_is: axGetOrIs,
+  ax_click: axClickOrRightClick,
+  ax_right_click: axClickOrRightClick,
+  ax_scroll_to: axSimpleRefAction,
+  ax_focus: axSimpleRefAction,
+  ax_clear: axSimpleRefAction,
+  ax_toggle: axSimpleRefAction,
+  ax_check: axSimpleRefAction,
+  ax_uncheck: axSimpleRefAction,
+  ax_expand: axSimpleRefAction,
+  ax_collapse: axSimpleRefAction,
+  ax_type: (interaction) => {
+    const ref = refArgs(interaction);
+    if ('error' in ref) return ref;
+    if (typeof interaction.text !== 'string') return { error: 'ax_type requires action.text' };
+    return ['type', ...ref, interaction.text, ...timeoutArgs(interaction)];
+  },
+  // Upstream press is app-scoped, not ref-scoped: `press <COMBO>` sends
+  // keys to the app's focused element (optionally --app/--window-id).
+  // It takes no --timeout-ms (no wait loop).
+  ax_press: (interaction, application) => {
+    if (!interaction.key) return { error: 'ax_press requires action.key' };
+    return ['press', interaction.key, ...scopeArgs(interaction, application)];
+  },
+  ax_scroll: (interaction) => {
+    const ref = refArgs(interaction);
+    if ('error' in ref) return ref;
+    const direction = interaction.direction || 'down';
+    if (!['up', 'down', 'left', 'right'].includes(direction)) {
+      return { error: `ax_scroll direction must be up/down/left/right, got ${direction}` };
+    }
+    return ['scroll', ...ref, '--direction', direction, ...timeoutArgs(interaction)];
+  },
+  ax_set_value: (interaction) => {
+    const ref = refArgs(interaction);
+    if ('error' in ref) return ref;
+    if (typeof interaction.value !== 'string')
+      return { error: 'ax_set_value requires action.value' };
+    return ['set-value', ...ref, interaction.value, ...timeoutArgs(interaction)];
+  },
+  ax_select: (interaction) => {
+    const ref = refArgs(interaction);
+    if ('error' in ref) return ref;
+    if (!interaction.value) return { error: 'ax_select requires action.value' };
+    return ['select', ...ref, interaction.value, ...timeoutArgs(interaction)];
+  },
+  ax_focus_window: (interaction, application) => [
+    'focus-window',
+    ...appScopeArgs(interaction, application, true),
+  ],
+  ax_minimize_window: (interaction, application) => [
+    'minimize',
+    ...appScopeArgs(interaction, application),
+  ],
+  ax_maximize_window: (interaction, application) => [
+    'maximize',
+    ...appScopeArgs(interaction, application),
+  ],
+  ax_restore_window: (interaction, application) => [
+    'restore',
+    ...appScopeArgs(interaction, application),
+  ],
+  ax_move_window: (interaction, application) => {
+    if (typeof interaction.x !== 'number' || typeof interaction.y !== 'number') {
+      return { error: 'ax_move_window requires numeric action.x and action.y' };
+    }
+    // --x=N form is required for negative values upstream.
+    return [
+      'move-window',
+      `--x=${interaction.x}`,
+      `--y=${interaction.y}`,
+      ...appScopeArgs(interaction, application),
+    ];
+  },
+  ax_resize_window: (interaction, application) => {
+    if (typeof interaction.width !== 'number' || typeof interaction.height !== 'number') {
+      return { error: 'ax_resize_window requires numeric action.width and action.height' };
+    }
+    if (interaction.width <= 0 || interaction.height <= 0) {
+      return { error: 'ax_resize_window width/height must be positive' };
+    }
+    return [
+      'resize-window',
+      `--width=${interaction.width}`,
+      `--height=${interaction.height}`,
+      ...appScopeArgs(interaction, application),
+    ];
+  },
+  ax_open_system_surface: (interaction) => {
+    if (!interaction.surface || !SYSTEM_SURFACES.has(interaction.surface)) {
+      return {
+        error: `ax_open_system_surface requires action.surface in ${[...SYSTEM_SURFACES].join('|')}`,
+      };
+    }
+    return ['open-system-surface', '--surface', interaction.surface];
+  },
+  ax_permissions: () => ['permissions'],
+  ax_wait: (interaction, application) => {
+    const args = ['wait'];
+    const conditionFlags: string[] = [];
+    if (typeof interaction.ms === 'number') args.push(String(interaction.ms));
+    if (interaction.qualified_ref) {
+      if (!QUALIFIED_REF.test(interaction.qualified_ref)) {
+        return { error: 'ax_wait element wait requires a snapshot-qualified ref' };
+      }
+      conditionFlags.push('--element', interaction.qualified_ref);
+    }
+    if (interaction.title) conditionFlags.push('--window', interaction.title);
+    if (interaction.text) conditionFlags.push('--text', interaction.text);
+    if (interaction.menu) conditionFlags.push('--menu');
+    if (interaction.menu_closed) conditionFlags.push('--menu-closed');
+    if (interaction.notification) conditionFlags.push('--notification');
+    if (interaction.event) {
+      if (!WAIT_EVENTS.has(interaction.event)) {
+        return {
+          error: `ax_wait event must be one of ${[...WAIT_EVENTS].join('|')}`,
+        };
+      }
+      conditionFlags.push('--event', interaction.event);
+    }
+    if (interaction.predicate) {
+      if (!WAIT_PREDICATES.has(interaction.predicate)) {
+        return {
+          error: `ax_wait predicate must be one of ${[...WAIT_PREDICATES].join('|')}`,
+        };
+      }
+      conditionFlags.push('--predicate', interaction.predicate);
+    }
+    if (interaction.value !== undefined) conditionFlags.push('--value', interaction.value);
+    if (interaction.action) conditionFlags.push('--action', interaction.action);
+    if (typeof interaction.count === 'number') {
+      conditionFlags.push('--count', String(interaction.count));
+    }
+    if (conditionFlags.length === 0 && typeof interaction.ms !== 'number') {
+      return {
+        error:
+          'ax_wait requires a condition: ms, qualified_ref (element), title (window), ' +
+          'text, menu, menu_closed, notification, or event',
+      };
+    }
+    args.push(...conditionFlags);
+    if (interaction.application || application) {
+      args.push('--app', interaction.application ?? application ?? '');
+    }
+    if (interaction.window_id) args.push('--window-id', interaction.window_id);
+    args.push('--timeout', String(interaction.timeout_ms ?? AX_DEFAULT_TIMEOUT_MS));
+    return args;
+  },
+  ax_launch: (interaction, application) => {
+    const app = interaction.application ?? application;
+    if (!app) return { error: 'ax_launch requires action.application' };
+    const args = ['launch', app];
+    args.push('--timeout', String(interaction.timeout_ms ?? AX_DEFAULT_TIMEOUT_MS));
+    for (const arg of interaction.app_args ?? []) args.push(`--arg=${arg}`);
+    for (const [key, value] of Object.entries(interaction.app_env ?? {})) {
+      args.push('--env', `${key}=${value}`);
+    }
+    if (interaction.cwd) args.push('--cwd', interaction.cwd);
+    if (interaction.activate) args.push('--activate');
+    if (interaction.no_attach) args.push('--no-attach');
+    if (interaction.cdp === true) args.push('--cdp');
+    else if (typeof interaction.cdp === 'number') args.push(`--cdp=${interaction.cdp}`);
+    return args;
+  },
+  ax_close_app: (interaction, application) => {
+    const app = interaction.application ?? application;
+    if (!app) return { error: 'ax_close_app requires action.application' };
+    const args = ['close-app', app];
+    if (interaction.force) args.push('--force');
+    return args;
+  },
+  ax_dismiss_notification: (interaction, application) => {
+    if (!Number.isInteger(interaction.index) || (interaction.index ?? 0) < 1) {
+      return { error: 'ax_dismiss_notification requires integer action.index >= 1' };
+    }
+    // Upstream refuses an unverified positional dismiss: one identity
+    // field (--app counts) must pin which notification index N is.
+    const args = ['dismiss-notification', String(interaction.index)];
+    if (interaction.application || application) {
+      args.push('--app', interaction.application ?? application ?? '');
+    }
+    if (interaction.expected_app) args.push('--expected-app', interaction.expected_app);
+    if (interaction.expected_title) {
+      args.push('--expected-title', interaction.expected_title);
+    }
+    if (args.length === 2) {
+      return {
+        error:
+          'ax_dismiss_notification requires an identity check: application, ' +
+          'expected_app, or expected_title',
+      };
+    }
+    return args;
+  },
+  ax_dismiss_all_notifications: axAppScopedList('dismiss-all-notifications'),
+  ax_notification_action: (interaction) => {
+    if (!Number.isInteger(interaction.index) || (interaction.index ?? 0) < 1) {
+      return { error: 'ax_notification_action requires integer action.index >= 1' };
+    }
+    if (!interaction.action) {
+      return { error: 'ax_notification_action requires action.action (button name)' };
+    }
+    const args = ['notification-action', String(interaction.index), interaction.action];
+    if (interaction.expected_app) args.push('--expected-app', interaction.expected_app);
+    if (interaction.expected_title) {
+      args.push('--expected-title', interaction.expected_title);
+    }
+    if (!interaction.expected_app && !interaction.expected_title) {
+      return {
+        error: 'ax_notification_action requires an identity check: expected_app or expected_title',
+      };
+    }
+    return args;
+  },
+  ax_clipboard_get: (interaction) => {
+    const args = ['clipboard-get'];
+    if (interaction.format) {
+      if (!CLIPBOARD_FORMATS.has(interaction.format)) {
+        return {
+          error: `ax_clipboard_get format must be one of ${[...CLIPBOARD_FORMATS].join('|')}`,
+        };
+      }
+      args.push('--format', interaction.format);
+    }
+    // --out deliberately unexposed: upstream writes image payloads to a
+    // private temp under the governed session dir by default.
+    return args;
+  },
+  ax_clipboard_set: (interaction) => {
+    const args = ['clipboard-set'];
+    let payload = 0;
+    if (typeof interaction.text === 'string') {
+      args.push(interaction.text);
+      payload += 1;
+    }
+    if (interaction.image) {
+      args.push('--image', interaction.image);
+      payload += 1;
+    }
+    for (const fileUrl of interaction.file_urls ?? []) {
+      args.push('--file-url', fileUrl);
+      payload += 1;
+    }
+    if (payload === 0) {
+      return {
+        error: 'ax_clipboard_set requires a payload: text, image, or file_urls',
+      };
+    }
+    return args;
+  },
+  ax_clipboard_clear: () => ['clipboard-clear'],
+};
+
 function buildArgs(interaction: AxInteraction, application?: string): string[] | { error: string } {
-  const timeout = ['--timeout-ms', String(interaction.timeout_ms ?? AX_DEFAULT_TIMEOUT_MS)];
-  // --timeout-ms exists only on snapshot/find/list-windows/list-apps/ref
-  // actions; window/lifecycle/notification/clipboard commands take no
-  // deadline flag (launch and wait use --timeout). Verified against the
-  // upstream --help surface.
   if (interaction.agent_id !== undefined && !AGENT_ID.test(interaction.agent_id)) {
     return { error: 'agent_id must match /^[A-Za-z0-9_-]{1,64}$/ (upstream --agent-id)' };
   }
-  const appScope = (allowTitle = false): string[] => {
-    const args = scopeArgs(interaction, application);
-    if (allowTitle && interaction.title) args.push('--title', interaction.title);
-    return args;
-  };
-  switch (interaction.type) {
-    case 'ax_snapshot': {
-      const args = ['snapshot', ...scopeArgs(interaction, application)];
-      if (interaction.surface) args.push('--surface', interaction.surface);
-      if (interaction.wait_for) args.push('--wait-for', interaction.wait_for);
-      if (interaction.wait_for_gone) args.push('--wait-for-gone', interaction.wait_for_gone);
-      args.push(...timeout);
-      return args;
-    }
-    case 'ax_list_windows':
-      return ['list-windows', ...timeout];
-    case 'ax_list_apps': {
-      // list-apps honors --timeout-ms; the other inventory commands do not.
-      const args = ['list-apps'];
-      if (interaction.application || application) {
-        args.push('--app', interaction.application ?? application ?? '');
-      }
-      args.push(...timeout);
-      return args;
-    }
-    case 'ax_list_displays':
-      return ['list-displays'];
-    case 'ax_list_surfaces': {
-      const args = ['list-surfaces'];
-      if (interaction.application || application) {
-        args.push('--app', interaction.application ?? application ?? '');
-      }
-      return args;
-    }
-    case 'ax_list_notifications': {
-      const args = ['list-notifications'];
-      if (interaction.application || application) {
-        args.push('--app', interaction.application ?? application ?? '');
-      }
-      if (interaction.text) args.push('--text', interaction.text);
-      if (interaction.limit) args.push('--limit', String(interaction.limit));
-      return args;
-    }
-    case 'ax_find': {
-      const args = ['find', ...scopeArgs(interaction, application)];
-      if (interaction.surface) args.push('--surface', interaction.surface);
-      if (interaction.wait_for) args.push('--wait-for', interaction.wait_for);
-      if (interaction.wait_for_gone) args.push('--wait-for-gone', interaction.wait_for_gone);
-      if (interaction.role) args.push('--role', interaction.role);
-      if (interaction.name) args.push('--name', interaction.name);
-      if (interaction.text) args.push('--text', interaction.text);
-      if (interaction.native_id) args.push('--native-id', interaction.native_id);
-      if (interaction.qualified_ref) {
-        if (!QUALIFIED_REF.test(interaction.qualified_ref)) {
-          return { error: 'ax_find --root requires a snapshot-qualified ref' };
-        }
-        args.push('--root', interaction.qualified_ref);
-      }
-      args.push(...timeout);
-      return args;
-    }
-    case 'ax_get':
-    case 'ax_is': {
-      const ref = refArgs(interaction);
-      if ('error' in ref) return ref;
-      const command = interaction.type === 'ax_get' ? 'get' : 'is';
-      const property = interaction.property || (interaction.type === 'ax_get' ? 'text' : 'visible');
-      // get/is are live reads with no wait loop — upstream rejects --timeout-ms here.
-      return [command, ...ref, '--property', property];
-    }
-    case 'ax_click':
-    case 'ax_right_click': {
-      const ref = refArgs(interaction);
-      if ('error' in ref) return ref;
-      const command = interaction.type === 'ax_click' ? 'click' : 'right-click';
-      return [command, ...ref, ...timeout];
-    }
-    case 'ax_scroll_to':
-    case 'ax_focus':
-    case 'ax_clear':
-    case 'ax_toggle':
-    case 'ax_check':
-    case 'ax_uncheck':
-    case 'ax_expand':
-    case 'ax_collapse': {
-      const ref = refArgs(interaction);
-      if ('error' in ref) return ref;
-      return [interaction.type.slice(3), ...ref, ...timeout];
-    }
-    case 'ax_type': {
-      const ref = refArgs(interaction);
-      if ('error' in ref) return ref;
-      if (typeof interaction.text !== 'string') return { error: 'ax_type requires action.text' };
-      return ['type', ...ref, interaction.text, ...timeout];
-    }
-    case 'ax_press': {
-      // Upstream press is app-scoped, not ref-scoped: `press <COMBO>` sends
-      // keys to the app's focused element (optionally --app/--window-id).
-      // It takes no --timeout-ms (no wait loop).
-      if (!interaction.key) return { error: 'ax_press requires action.key' };
-      return ['press', interaction.key, ...scopeArgs(interaction, application)];
-    }
-    case 'ax_scroll': {
-      const ref = refArgs(interaction);
-      if ('error' in ref) return ref;
-      const direction = interaction.direction || 'down';
-      if (!['up', 'down', 'left', 'right'].includes(direction)) {
-        return { error: `ax_scroll direction must be up/down/left/right, got ${direction}` };
-      }
-      return ['scroll', ...ref, '--direction', direction, ...timeout];
-    }
-    case 'ax_set_value': {
-      const ref = refArgs(interaction);
-      if ('error' in ref) return ref;
-      if (typeof interaction.value !== 'string')
-        return { error: 'ax_set_value requires action.value' };
-      return ['set-value', ...ref, interaction.value, ...timeout];
-    }
-    case 'ax_select': {
-      const ref = refArgs(interaction);
-      if ('error' in ref) return ref;
-      if (!interaction.value) return { error: 'ax_select requires action.value' };
-      return ['select', ...ref, interaction.value, ...timeout];
-    }
-    case 'ax_focus_window':
-      return ['focus-window', ...appScope(true)];
-    case 'ax_minimize_window':
-      return ['minimize', ...appScope()];
-    case 'ax_maximize_window':
-      return ['maximize', ...appScope()];
-    case 'ax_restore_window':
-      return ['restore', ...appScope()];
-    case 'ax_move_window': {
-      if (typeof interaction.x !== 'number' || typeof interaction.y !== 'number') {
-        return { error: 'ax_move_window requires numeric action.x and action.y' };
-      }
-      // --x=N form is required for negative values upstream.
-      return ['move-window', `--x=${interaction.x}`, `--y=${interaction.y}`, ...appScope()];
-    }
-    case 'ax_resize_window': {
-      if (typeof interaction.width !== 'number' || typeof interaction.height !== 'number') {
-        return { error: 'ax_resize_window requires numeric action.width and action.height' };
-      }
-      if (interaction.width <= 0 || interaction.height <= 0) {
-        return { error: 'ax_resize_window width/height must be positive' };
-      }
-      return [
-        'resize-window',
-        `--width=${interaction.width}`,
-        `--height=${interaction.height}`,
-        ...appScope(),
-      ];
-    }
-    case 'ax_open_system_surface': {
-      if (!interaction.surface || !SYSTEM_SURFACES.has(interaction.surface)) {
-        return {
-          error: `ax_open_system_surface requires action.surface in ${[...SYSTEM_SURFACES].join('|')}`,
-        };
-      }
-      return ['open-system-surface', '--surface', interaction.surface];
-    }
-    case 'ax_permissions':
-      return ['permissions'];
-    case 'ax_wait': {
-      const args = ['wait'];
-      const conditionFlags: string[] = [];
-      if (typeof interaction.ms === 'number') args.push(String(interaction.ms));
-      if (interaction.qualified_ref) {
-        if (!QUALIFIED_REF.test(interaction.qualified_ref)) {
-          return { error: 'ax_wait element wait requires a snapshot-qualified ref' };
-        }
-        conditionFlags.push('--element', interaction.qualified_ref);
-      }
-      if (interaction.title) conditionFlags.push('--window', interaction.title);
-      if (interaction.text) conditionFlags.push('--text', interaction.text);
-      if (interaction.menu) conditionFlags.push('--menu');
-      if (interaction.menu_closed) conditionFlags.push('--menu-closed');
-      if (interaction.notification) conditionFlags.push('--notification');
-      if (interaction.event) {
-        if (!WAIT_EVENTS.has(interaction.event)) {
-          return {
-            error: `ax_wait event must be one of ${[...WAIT_EVENTS].join('|')}`,
-          };
-        }
-        conditionFlags.push('--event', interaction.event);
-      }
-      if (interaction.predicate) {
-        if (!WAIT_PREDICATES.has(interaction.predicate)) {
-          return {
-            error: `ax_wait predicate must be one of ${[...WAIT_PREDICATES].join('|')}`,
-          };
-        }
-        conditionFlags.push('--predicate', interaction.predicate);
-      }
-      if (interaction.value !== undefined) conditionFlags.push('--value', interaction.value);
-      if (interaction.action) conditionFlags.push('--action', interaction.action);
-      if (typeof interaction.count === 'number') {
-        conditionFlags.push('--count', String(interaction.count));
-      }
-      if (conditionFlags.length === 0 && typeof interaction.ms !== 'number') {
-        return {
-          error:
-            'ax_wait requires a condition: ms, qualified_ref (element), title (window), ' +
-            'text, menu, menu_closed, notification, or event',
-        };
-      }
-      args.push(...conditionFlags);
-      if (interaction.application || application) {
-        args.push('--app', interaction.application ?? application ?? '');
-      }
-      if (interaction.window_id) args.push('--window-id', interaction.window_id);
-      args.push('--timeout', String(interaction.timeout_ms ?? AX_DEFAULT_TIMEOUT_MS));
-      return args;
-    }
-    case 'ax_launch': {
-      const app = interaction.application ?? application;
-      if (!app) return { error: 'ax_launch requires action.application' };
-      const args = ['launch', app];
-      args.push('--timeout', String(interaction.timeout_ms ?? AX_DEFAULT_TIMEOUT_MS));
-      for (const arg of interaction.app_args ?? []) args.push(`--arg=${arg}`);
-      for (const [key, value] of Object.entries(interaction.app_env ?? {})) {
-        args.push('--env', `${key}=${value}`);
-      }
-      if (interaction.cwd) args.push('--cwd', interaction.cwd);
-      if (interaction.activate) args.push('--activate');
-      if (interaction.no_attach) args.push('--no-attach');
-      if (interaction.cdp === true) args.push('--cdp');
-      else if (typeof interaction.cdp === 'number') args.push(`--cdp=${interaction.cdp}`);
-      return args;
-    }
-    case 'ax_close_app': {
-      const app = interaction.application ?? application;
-      if (!app) return { error: 'ax_close_app requires action.application' };
-      const args = ['close-app', app];
-      if (interaction.force) args.push('--force');
-      return args;
-    }
-    case 'ax_dismiss_notification': {
-      if (!Number.isInteger(interaction.index) || (interaction.index ?? 0) < 1) {
-        return { error: 'ax_dismiss_notification requires integer action.index >= 1' };
-      }
-      // Upstream refuses an unverified positional dismiss: one identity
-      // field (--app counts) must pin which notification index N is.
-      const args = ['dismiss-notification', String(interaction.index)];
-      if (interaction.application || application) {
-        args.push('--app', interaction.application ?? application ?? '');
-      }
-      if (interaction.expected_app) args.push('--expected-app', interaction.expected_app);
-      if (interaction.expected_title) {
-        args.push('--expected-title', interaction.expected_title);
-      }
-      if (args.length === 2) {
-        return {
-          error:
-            'ax_dismiss_notification requires an identity check: application, ' +
-            'expected_app, or expected_title',
-        };
-      }
-      return args;
-    }
-    case 'ax_dismiss_all_notifications': {
-      const args = ['dismiss-all-notifications'];
-      if (interaction.application || application) {
-        args.push('--app', interaction.application ?? application ?? '');
-      }
-      return args;
-    }
-    case 'ax_notification_action': {
-      if (!Number.isInteger(interaction.index) || (interaction.index ?? 0) < 1) {
-        return { error: 'ax_notification_action requires integer action.index >= 1' };
-      }
-      if (!interaction.action) {
-        return { error: 'ax_notification_action requires action.action (button name)' };
-      }
-      const args = ['notification-action', String(interaction.index), interaction.action];
-      if (interaction.expected_app) args.push('--expected-app', interaction.expected_app);
-      if (interaction.expected_title) {
-        args.push('--expected-title', interaction.expected_title);
-      }
-      if (!interaction.expected_app && !interaction.expected_title) {
-        return {
-          error:
-            'ax_notification_action requires an identity check: expected_app or expected_title',
-        };
-      }
-      return args;
-    }
-    case 'ax_clipboard_get': {
-      const args = ['clipboard-get'];
-      if (interaction.format) {
-        if (!CLIPBOARD_FORMATS.has(interaction.format)) {
-          return {
-            error: `ax_clipboard_get format must be one of ${[...CLIPBOARD_FORMATS].join('|')}`,
-          };
-        }
-        args.push('--format', interaction.format);
-      }
-      // --out deliberately unexposed: upstream writes image payloads to a
-      // private temp under the governed session dir by default.
-      return args;
-    }
-    case 'ax_clipboard_set': {
-      const args = ['clipboard-set'];
-      let payload = 0;
-      if (typeof interaction.text === 'string') {
-        args.push(interaction.text);
-        payload += 1;
-      }
-      if (interaction.image) {
-        args.push('--image', interaction.image);
-        payload += 1;
-      }
-      for (const fileUrl of interaction.file_urls ?? []) {
-        args.push('--file-url', fileUrl);
-        payload += 1;
-      }
-      if (payload === 0) {
-        return {
-          error: 'ax_clipboard_set requires a payload: text, image, or file_urls',
-        };
-      }
-      return args;
-    }
-    case 'ax_clipboard_clear':
-      return ['clipboard-clear'];
-    default:
-      return { error: `Unsupported ax interaction: ${interaction.type}` };
-  }
+  const builder = AX_ARG_BUILDERS[interaction.type];
+  if (!builder) return { error: `Unsupported ax interaction: ${interaction.type}` };
+  return builder(interaction, application);
 }
 
 /**

@@ -147,8 +147,8 @@ export async function handleAction(input: AgentAction | AgentPipelineDispatch) {
   }
   params = preflight.input as AgentAction['params'];
 
-  switch (action) {
-    case 'spawn': {
+  const handlers: Record<string, () => Promise<any>> = {
+    spawn: async () => {
       if (!params.provider) throw new Error('provider is required for spawn');
       const spawnPayload = {
         agentId: params.agentId,
@@ -182,9 +182,8 @@ export async function handleAction(input: AgentAction | AgentPipelineDispatch) {
         );
         return { status: 'spawned', agent: record };
       }
-    }
-
-    case 'ask': {
+    },
+    ask: async () => {
       if (!params.agentId) throw new Error('agentId is required for ask');
       if (!params.query) throw new Error('query is required for ask');
 
@@ -222,9 +221,8 @@ export async function handleAction(input: AgentAction | AgentPipelineDispatch) {
         agentRegistry.updateStatus(params.agentId, 'error');
         throw e;
       }
-    }
-
-    case 'delegate': {
+    },
+    delegate: async () => {
       if (!params.task) throw new Error('task envelope is required for delegate');
       if (
         'work_item_id' in params.task &&
@@ -239,9 +237,8 @@ export async function handleAction(input: AgentAction | AgentPipelineDispatch) {
             })
           : await getAgentExecutionPort().delegate(params.task);
       return { status: receipt.status, execution_kind: 'agent_delegation', receipt };
-    }
-
-    case 'shutdown': {
+    },
+    shutdown: async () => {
       if (!params.agentId) throw new Error('agentId is required for shutdown');
       try {
         await retry(
@@ -255,26 +252,22 @@ export async function handleAction(input: AgentAction | AgentPipelineDispatch) {
         );
       }
       return { status: 'shutdown', agentId: params.agentId };
-    }
-
-    case 'shutdown_all': {
+    },
+    shutdown_all: async () => {
       await shutdownAllAgentRuntimes('agent_actuator');
       return { status: 'all_shutdown' };
-    }
-
-    case 'list': {
+    },
+    list: async () => {
       const agents = agentRegistry.list(params.filter);
       return { status: 'ok', agents, count: agents.length };
-    }
-
-    case 'list_manifests': {
+    },
+    list_manifests: async () => {
       const { loadAgentManifests } = await import('@agent/core/agent/agent-manifest');
       const manifests = loadAgentManifests();
       const data = { status: 'ok', manifests, count: manifests.length };
       return params.export_as ? { ...data, context: { ...ctx, [params.export_as]: data } } : data;
-    }
-
-    case 'list_runtimes': {
+    },
+    list_runtimes: async () => {
       let runtimes;
       try {
         runtimes = await retry(async () => listAgentRuntimesViaDaemon(), buildRetryOptions());
@@ -283,9 +276,8 @@ export async function handleAction(input: AgentAction | AgentPipelineDispatch) {
       }
       const data = { status: 'ok', runtimes, count: runtimes.length };
       return params.export_as ? { ...data, context: { ...ctx, [params.export_as]: data } } : data;
-    }
-
-    case 'health': {
+    },
+    health: async () => {
       const snapshot = agentRegistry.getHealthSnapshot();
       let agents;
       try {
@@ -329,9 +321,8 @@ export async function handleAction(input: AgentAction | AgentPipelineDispatch) {
         }));
       }
       return { status: 'ok', ...snapshot, agents };
-    }
-
-    case 'snapshot': {
+    },
+    snapshot: async () => {
       if (!params.agentId) throw new Error('agentId is required for snapshot');
       try {
         const snapshot = await retry(
@@ -345,9 +336,8 @@ export async function handleAction(input: AgentAction | AgentPipelineDispatch) {
         if (!snapshot) throw new Error(`Agent ${params.agentId} not found`);
         return { status: 'ok', snapshot };
       }
-    }
-
-    case 'refresh': {
+    },
+    refresh: async () => {
       if (!params.agentId) throw new Error('agentId is required for refresh');
       try {
         const result = await retry(
@@ -362,9 +352,8 @@ export async function handleAction(input: AgentAction | AgentPipelineDispatch) {
         );
         return { status: 'ok', agentId: params.agentId, ...result };
       }
-    }
-
-    case 'restart': {
+    },
+    restart: async () => {
       if (!params.agentId) throw new Error('agentId is required for restart');
       try {
         const snapshot = await retry(
@@ -392,26 +381,23 @@ export async function handleAction(input: AgentAction | AgentPipelineDispatch) {
           snapshot: getAgentRuntimeSnapshot(params.agentId),
         };
       }
-    }
-
-    case 'a2a': {
+    },
+    a2a: async () => {
       if (!params.envelope) throw new Error('envelope is required for a2a');
       const response = await retry(
         async () => a2aBridge.route(params.envelope),
         buildA2ARouteRetryOptions()
       );
       return { status: 'ok', response };
-    }
-
-    case 'team_plan': {
+    },
+    team_plan: async () => {
       if (!params.missionId) throw new Error('missionId is required for team_plan');
       const plan = resolveMissionTeamPlan({
         missionId: params.missionId,
       });
       return { status: 'ok', missionId: params.missionId, plan };
-    }
-
-    case 'team_role': {
+    },
+    team_role: async () => {
       if (!params.missionId) throw new Error('missionId is required for team_role');
       if (!params.teamRole) throw new Error('teamRole is required for team_role');
       const plan = resolveMissionTeamPlan({
@@ -422,9 +408,8 @@ export async function handleAction(input: AgentAction | AgentPipelineDispatch) {
         throw new Error(`Team role ${params.teamRole} not found for mission ${params.missionId}`);
       }
       return { status: 'ok', missionId: params.missionId, assignment };
-    }
-
-    case 'staff_mission': {
+    },
+    staff_mission: async () => {
       if (!params.missionId) throw new Error('missionId is required for staff_mission');
       const runtimePlan = await ensureMissionTeamRuntimeViaSupervisor({
         missionId: params.missionId,
@@ -433,9 +418,8 @@ export async function handleAction(input: AgentAction | AgentPipelineDispatch) {
         timeoutMs: 600_000,
       });
       return { status: 'ok', missionId: params.missionId, runtimePlan: runtimePlan.runtime_plan };
-    }
-
-    case 'prewarm_mission': {
+    },
+    prewarm_mission: async () => {
       if (!params.missionId) throw new Error('missionId is required for prewarm_mission');
       const request = enqueueMissionTeamPrewarmRequest({
         missionId: params.missionId,
@@ -449,9 +433,9 @@ export async function handleAction(input: AgentAction | AgentPipelineDispatch) {
         requestId: request.request_id,
         teamRoles: request.team_roles || [],
       };
-    }
-
-    default:
-      throw new Error(`Unsupported agent action: ${action}`);
-  }
+    },
+  };
+  const handler = handlers[action];
+  if (!handler) throw new Error(`Unsupported agent action: ${action}`);
+  return handler();
 }

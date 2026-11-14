@@ -59,6 +59,7 @@ import {
   writePersonaIdentityBindingsAtPath,
 } from '@agent/core/persona-identity';
 import { defineScript, isDirectScript } from './lib/harness.js';
+import { parseCliFlags } from './lib/cli-flag-parser.js';
 
 type Args = {
   command:
@@ -110,30 +111,54 @@ function parseArgs(argv: string[]): Args {
     apply: false,
     json: false,
   };
-  for (let i = 0; i < rest.length; i += 1) {
-    const arg = rest[i];
-    if (arg === '--apply') result.apply = true;
-    else if (arg === '--bindings') result.bindingsFile = rest[++i];
-    else if (arg === '--expected-revision') result.expectedRevision = rest[++i];
-    else if (arg === '--json') result.json = true;
-    else if (arg === '--organization-id' || arg === '--org') result.organizationId = rest[++i];
-    else if (arg === '--tenant-slug' || arg === '--tenant') result.tenantSlug = rest[++i];
-    else if (arg === '--person-scope') result.personScope = true;
-    else if (arg === '--accountable-human' || arg === '--owner-id') {
-      result.accountableHuman = rest[++i];
-    } else if (arg === '--slug') result.slug = rest[++i];
-    else if (arg === '--kind') result.kind = rest[++i];
-    else if (arg === '--status') result.status = rest[++i];
-    else if (arg === '--display-name') result.displayName = rest[++i];
-    else if (arg === '--provider-hint') result.providerHint = rest[++i];
-    else if (arg === '--model-hint') result.modelHint = rest[++i];
-    else if (arg === '--trust-ref') result.trustRef = rest[++i];
-    else if (arg === '--reason') result.reason = rest[++i];
-    else if (!arg.startsWith('--') && !result.nhiId && !result.slug) {
-      if (arg.startsWith('kyberion://')) result.nhiId = arg;
-      else result.slug = arg;
+  const setTo =
+    <K extends keyof Args>(key: K) =>
+    (o: Args, v: string | undefined) => {
+      (o as Record<string, unknown>)[key] = v;
+    };
+  const setTrue =
+    <K extends keyof Args>(key: K) =>
+    (o: Args) => {
+      (o as Record<string, unknown>)[key] = true;
+    };
+  parseCliFlags(
+    rest,
+    result,
+    [
+      { flags: ['--apply'], apply: setTrue('apply') },
+      { flags: ['--bindings'], takesValue: 'next', apply: setTo('bindingsFile') },
+      { flags: ['--expected-revision'], takesValue: 'next', apply: setTo('expectedRevision') },
+      { flags: ['--json'], apply: setTrue('json') },
+      {
+        flags: ['--organization-id', '--org'],
+        takesValue: 'next',
+        apply: setTo('organizationId'),
+      },
+      { flags: ['--tenant-slug', '--tenant'], takesValue: 'next', apply: setTo('tenantSlug') },
+      { flags: ['--person-scope'], apply: setTrue('personScope') },
+      {
+        flags: ['--accountable-human', '--owner-id'],
+        takesValue: 'next',
+        apply: setTo('accountableHuman'),
+      },
+      { flags: ['--slug'], takesValue: 'next', apply: setTo('slug') },
+      { flags: ['--kind'], takesValue: 'next', apply: setTo('kind') },
+      { flags: ['--status'], takesValue: 'next', apply: setTo('status') },
+      { flags: ['--display-name'], takesValue: 'next', apply: setTo('displayName') },
+      { flags: ['--provider-hint'], takesValue: 'next', apply: setTo('providerHint') },
+      { flags: ['--model-hint'], takesValue: 'next', apply: setTo('modelHint') },
+      { flags: ['--trust-ref'], takesValue: 'next', apply: setTo('trustRef') },
+      { flags: ['--reason'], takesValue: 'next', apply: setTo('reason') },
+    ],
+    {
+      onBare: (o, arg) => {
+        if (!o.nhiId && !o.slug) {
+          if (arg.startsWith('kyberion://')) o.nhiId = arg;
+          else o.slug = arg;
+        }
+      },
     }
-  }
+  );
   return result;
 }
 

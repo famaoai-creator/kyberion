@@ -272,16 +272,16 @@ async function opControl(
     return res.context;
   };
 
-  switch (op) {
-    case 'if':
+  const handlers: Record<string, () => Promise<any>> = {
+    if: async () => {
       if (evaluateCondition(params.condition, ctx)) {
         return await runNested(params.then, ctx);
       } else if (params.else) {
         return await runNested(params.else, ctx);
       }
       return ctx;
-
-    case 'while': {
+    },
+    while: async () => {
       let iterations = 0;
       const maxIter = params.max_iterations || 100;
       while (evaluateCondition(params.condition, ctx) && iterations < maxIter) {
@@ -289,17 +289,17 @@ async function opControl(
         iterations++;
       }
       return ctx;
-    }
-
-    default:
-      throw new Error(`[UNKNOWN_OP] Unknown op: ${op}`);
-  }
+    },
+  };
+  const handler = handlers[op];
+  if (!handler) throw new Error(`[UNKNOWN_OP] Unknown op: ${op}`);
+  return handler();
 }
 
 async function opCapture(op: string, params: any, ctx: any, resolve: (value: any) => any) {
   const rootDir = pathResolver.rootDir();
-  switch (op) {
-    case 'read_file':
+  const handlers: Record<string, () => Promise<any>> = {
+    read_file: async () => {
       return {
         ...ctx,
         [params.export_as || 'last_capture']: await retry(
@@ -310,7 +310,8 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
           buildRetryOptions()
         ),
       };
-    case 'glob_files':
+    },
+    glob_files: async () => {
       return {
         ...ctx,
         [params.export_as || 'file_list']: retainOversizedResult(
@@ -324,7 +325,8 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
           'code-op-results'
         ),
       };
-    case 'shell':
+    },
+    shell: async () => {
       assertUnsafeShellAllowed();
       return {
         ...ctx,
@@ -339,7 +341,8 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
           return String(result.stdout || '').trim();
         }, buildRetryOptions()),
       };
-    case 'discover_capabilities':
+    },
+    discover_capabilities: async () => {
       const actuatorsRootDir = path.join(rootDir, 'libs/actuators');
       const capabilities: any[] = [];
       if (safeExistsSync(actuatorsRootDir)) {
@@ -360,7 +363,8 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
       }
       capabilities.push(...discoverProviderCliCapabilities());
       return { ...ctx, [params.export_as || 'capabilities_list']: capabilities };
-    case 'semgrep_scan':
+    },
+    semgrep_scan: async () => {
       return {
         ...ctx,
         [params.export_as || 'semgrep_findings']: retainOversizedResult(
@@ -425,7 +429,8 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
           'code-op-results'
         ),
       };
-    case 'run_tests': {
+    },
+    run_tests: async () => {
       const testPath = String(resolve(params.test_path || '')).trim();
       const framework = String(resolve(params.framework || ''))
         .trim()
@@ -475,12 +480,14 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
           'code-op-results'
         ),
       };
-    }
-    case 'discover_skills':
+    },
+    discover_skills: async () => {
       return { ...ctx, [params.export_as || 'skills_list']: discoverGovernedSkills() };
-    default:
-      throw new Error(`[UNKNOWN_OP] Unknown op: ${op}`);
-  }
+    },
+  };
+  const handler = handlers[op];
+  if (!handler) throw new Error(`[UNKNOWN_OP] Unknown op: ${op}`);
+  return handler();
 }
 
 function discoverProviderCliCapabilities(): any[] {
@@ -529,15 +536,16 @@ function discoverGovernedSkills(): any[] {
 }
 
 async function opTransform(op: string, params: any, ctx: any, resolve: (value: any) => any) {
-  switch (op) {
-    case 'regex_replace':
+  const handlers: Record<string, () => Promise<any>> = {
+    regex_replace: async () => {
       return {
         ...ctx,
         [params.export_as || 'last_transform']: String(
           ctx[params.from || 'last_capture'] || ''
         ).replace(new RegExp(params.pattern, 'g'), resolve(params.template)),
       };
-    case 'json_update':
+    },
+    json_update: async () => {
       const json = parseSafeJsonObjectValue(
         parseSafeJsonInput(
           String(ctx[params.from || 'last_capture'] ?? ''),
@@ -552,13 +560,15 @@ async function opTransform(op: string, params: any, ctx: any, resolve: (value: a
         ...ctx,
         [params.export_as || 'last_transform']: JSON.stringify(json, null, 2) + '\n',
       };
-    case 'run_js':
+    },
+    run_js: async () => {
       assertUnsafeJsAllowed();
       const sandbox = { Buffer, process: { env: { ...process.env } }, console, ctx: { ...ctx } };
       vm.createContext(sandbox);
       await new vm.Script(resolve(params.code)).runInContext(sandbox);
       return { ...sandbox.ctx };
-    case 'impact_analysis':
+    },
+    impact_analysis: async () => {
       return {
         ...ctx,
         [params.export_as || 'impact_analysis']: await impactAnalysisOp({
@@ -572,9 +582,11 @@ async function opTransform(op: string, params: any, ctx: any, resolve: (value: a
           output_path: resolve(params.output_path),
         }),
       };
-    default:
-      throw new Error(`[UNKNOWN_OP] Unknown op: ${op}`);
-  }
+    },
+  };
+  const handler = handlers[op];
+  if (!handler) throw new Error(`[UNKNOWN_OP] Unknown op: ${op}`);
+  return handler();
 }
 
 // ---------------------------------------------------------------------------
@@ -714,9 +726,9 @@ export async function impactAnalysisOp(input: {
 
 async function opApply(op: string, params: any, ctx: any, resolve: (value: any) => any) {
   const rootDir = pathResolver.rootDir();
-  switch (op) {
-    case 'write_file':
-    case 'write_artifact':
+  const handlers: Record<string, () => Promise<any>> = {
+    write_file: async () => handlers['write_artifact']!(),
+    write_artifact: async () => {
       const spec = resolveWriteArtifactSpec(params, ctx, resolve);
       const out = resolveCodeRepositoryPath(rootDir, spec.path, 'write_file');
       const content =
@@ -730,11 +742,13 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
         safeWriteFile(out, content);
         return undefined;
       }, buildRetryOptions());
-      break;
-    case 'log':
+    },
+    log: async () => {
       logger.info(`[CODE_LOG] ${resolve(params.message || 'Action completed')}`);
-      break;
-  }
+    },
+  };
+  const handler = handlers[op];
+  if (handler) await handler();
 }
 
 async function performReconcile(input: CodeAction) {

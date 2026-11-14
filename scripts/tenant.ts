@@ -17,6 +17,7 @@ import { withExecutionContext } from '@agent/core/authority';
 import { setRegisteredEnv } from '@agent/core/foundation/env';
 import { pathResolver } from '@agent/core/path-resolver';
 import { defineScript, isDirectScript } from './lib/harness.js';
+import { parseCliFlags } from './lib/cli-flag-parser.js';
 
 /**
  * Run `fn` with no tenant binding. rename/delete touch the registry AND a
@@ -102,29 +103,52 @@ function parseArgs(argv: string[]): Args {
     requestApproval: false,
     json: false,
   };
-  for (let i = 0; i < rest.length; i += 1) {
-    const arg = rest[i];
-    if (arg === '--apply') result.apply = true;
-    else if (arg === '--accept') result.accept = true;
-    else if (arg === '--request-approval') result.requestApproval = true;
-    else if (arg === '--approval-request-id') result.approvalRequestId = rest[++i];
-    else if (arg === '--json') result.json = true;
-    else if (arg === '--slug' || arg === '--tenant') result.slug = rest[++i];
-    else if (arg === '--to') result.to = rest[++i];
-    else if (arg === '--purge-data') result.purgeData = true;
-    else if (arg === '--display-name') result.displayName = rest[++i];
-    else if (arg === '--keep-organization-id') result.keepOrganizationId = true;
-    else if (arg === '--no-scan') result.noScan = true;
-    else if (arg === '--assigned-role') result.assignedRole = rest[++i];
-    else if (arg === '--knowledge-root') result.knowledgeRoot = rest[++i];
-    else if (arg === '--provider') result.provider = rest[++i];
-    else if (arg === '--training-use') result.trainingUse = rest[++i];
-    else if (arg === '--plan') result.plan = rest[++i];
-    else if (arg === '--basis') result.basis = rest[++i];
-    else if (arg === '--attested-by') result.attestedBy = rest[++i];
-    else if (arg === '--valid-for-days') result.validForDays = Number(rest[++i]);
-    else if (!arg.startsWith('--') && !result.slug) result.slug = arg;
-  }
+  const setTo =
+    <K extends keyof Args>(key: K) =>
+    (o: Args, v: string | undefined) => {
+      (o as Record<string, unknown>)[key] = v;
+    };
+  const setTrue =
+    <K extends keyof Args>(key: K) =>
+    (o: Args) => {
+      (o as Record<string, unknown>)[key] = true;
+    };
+  parseCliFlags(
+    rest,
+    result,
+    [
+      { flags: ['--apply'], apply: setTrue('apply') },
+      { flags: ['--accept'], apply: setTrue('accept') },
+      { flags: ['--request-approval'], apply: setTrue('requestApproval') },
+      { flags: ['--approval-request-id'], takesValue: 'next', apply: setTo('approvalRequestId') },
+      { flags: ['--json'], apply: setTrue('json') },
+      { flags: ['--slug', '--tenant'], takesValue: 'next', apply: setTo('slug') },
+      { flags: ['--to'], takesValue: 'next', apply: setTo('to') },
+      { flags: ['--purge-data'], apply: setTrue('purgeData') },
+      { flags: ['--display-name'], takesValue: 'next', apply: setTo('displayName') },
+      { flags: ['--keep-organization-id'], apply: setTrue('keepOrganizationId') },
+      { flags: ['--no-scan'], apply: setTrue('noScan') },
+      { flags: ['--assigned-role'], takesValue: 'next', apply: setTo('assignedRole') },
+      { flags: ['--knowledge-root'], takesValue: 'next', apply: setTo('knowledgeRoot') },
+      { flags: ['--provider'], takesValue: 'next', apply: setTo('provider') },
+      { flags: ['--training-use'], takesValue: 'next', apply: setTo('trainingUse') },
+      { flags: ['--plan'], takesValue: 'next', apply: setTo('plan') },
+      { flags: ['--basis'], takesValue: 'next', apply: setTo('basis') },
+      { flags: ['--attested-by'], takesValue: 'next', apply: setTo('attestedBy') },
+      {
+        flags: ['--valid-for-days'],
+        takesValue: 'next',
+        apply: (o, v) => {
+          o.validForDays = Number(v);
+        },
+      },
+    ],
+    {
+      onBare: (o, arg) => {
+        if (!o.slug) o.slug = arg;
+      },
+    }
+  );
   return result;
 }
 

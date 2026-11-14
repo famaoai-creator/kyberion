@@ -1011,562 +1011,575 @@ export async function dispatchWisdomOperation(
     }
   }
 
-  switch (op) {
-    case 'document_review': {
-      const input = Object.fromEntries(Object.keys(params).map((key) => [key, resolved(key)]));
-      const validate = createAjv().compile(DOCUMENT_REVIEW_INPUT_SCHEMA);
-      if (!validate(input)) {
-        throw new Error('[DOCUMENT_REVIEW_INPUT_INVALID] ' + JSON.stringify(validate.errors));
-      }
-      const result = await runDocumentReview({
-        target: input.target as string,
-        ...(input.references !== undefined ? { references: input.references as string[] } : {}),
-        ...(input.sources !== undefined ? { sources: input.sources as string[] } : {}),
-        ...(input.preset !== undefined
-          ? { preset: input.preset as 'comprehension' | 'design' }
-          : {}),
-        ...(input.generator !== undefined ? { generator: input.generator as string } : {}),
-        ...(input.timeout_ms !== undefined ? { timeout_ms: input.timeout_ms as number } : {}),
-      });
-      return { handled: true, ctx: assign(result) };
-    }
-
-    case 'stakeholder_grid_sort': {
-      const nodes = Array.isArray(params.nodes)
-        ? params.nodes
-        : ctx[params.from || 'stakeholder_nodes'] || [];
-      const sorted = stakeholderGridSort(nodes);
-      return { handled: true, ctx: assign(sorted) };
-    }
-
-    case 'emit_dissent_log': {
-      const result = emitDissentLog({
-        source_path: resolved('source') || resolved('source_path'),
-        output_path: resolved('output_path') || resolved('append_to'),
-        append: Boolean(params.append_to),
-        mission_id: resolved('mission_id'),
-        topic: resolved('topic'),
-      });
-      return { handled: true, ctx: assign(result) };
-    }
-
-    case 'render_hypothesis_report': {
-      const result = renderHypothesisReport({
-        source_path: resolved('source') || resolved('source_path'),
-        output_path: resolved('output_path'),
-        title: resolved('title'),
-      });
-      return { handled: true, ctx: assign(result) };
-    }
-
-    case 'curate_background_review': {
-      const maxAgeDays = Number(resolved('max_age_days'));
-      const rawDryRun = resolved('dry_run');
-      const result = curateBackgroundReviewProposals({
-        maxAgeMs:
-          Number.isFinite(maxAgeDays) && maxAgeDays >= 0
-            ? maxAgeDays * 24 * 60 * 60 * 1000
-            : undefined,
-        limit: Number(resolved('limit')) || undefined,
-        dryRun: rawDryRun === true || String(rawDryRun).toLowerCase() === 'true',
-      });
-      return { handled: true, ctx: assign(result) };
-    }
-
-    case 'curation_report': {
-      // KP-06: effectiveness-driven curation + freshness SLO reporting.
-      // Deterministic, no reasoning backend — computes from the KP-05
-      // delivery/usage aggregate + corpus frontmatter and overwrites
-      // CURATION_REPORT.md. Candidates only (KM-03 guardrail): no file is
-      // deleted, archived, or demoted here.
-      const { report, reportPath } = await generateKnowledgeCurationReport();
-      // Procedure success checks ride the same weekly run but land in a
-      // personal-tier report, never in the public CURATION_REPORT.md. Fail
-      // open: a broken procedure catalog must not cost the curation report.
-      let procedureChecks: ReturnType<typeof writeProcedureCheckReport> | { error: string };
-      try {
-        procedureChecks = writeProcedureCheckReport();
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        logger.warn(
-          `[wisdom:curation_report] procedure check report skipped — ${message} | next: the personal tier is written only by the operator's persona (personal/sovereign); run the weekly pipeline as the operator, or use \`pnpm kyberion procedure golden status\``
-        );
-        procedureChecks = { error: message };
-      }
-      return {
-        handled: true,
-        ctx: assign({ ...report, report_path: reportPath, procedure_checks: procedureChecks }),
-      };
-    }
-
-    case 'knowledge_validation_sweep': {
-      // KO-17/19: read-only validation of feedback-derived heuristics and
-      // promotion candidates. Scope filtering is resolved in @agent/core;
-      // this op never changes queue status or knowledge tier.
-      const result = runKnowledgeValidationSweep();
-      return { handled: true, ctx: assign(result) };
-    }
-
-    case 'distill': {
-      // Memory distillation (intent-loop ⑤→⑥): summarize recently distilled
-      // knowledge into operational lessons. Used by
-      // pipelines/fragments/memory-distillation.json, whose sinks write the
-      // result (channel "lessons_learned") to a scratch summary and nominate it
-      // as a MemoryCandidate.
-      const scope = resolved('scope') || 'recent_missions';
-      const limit = Number(resolved('limit')) || 20;
-      // D8: source the newest captured learnings from the single MemoryCandidate
-      // queue (DistillCandidateRecord is a promotion receipt only). The summary
-      // lands in a shared scratch file and is nominated as a public candidate,
-      // so only public rows are read — never a tenant's or owner's learning.
-      // Topic-relevance search is the wrong tool for a "recent" scope — it
-      // needs a query and returns nothing for the empty topic this op uses.
-      const seenLesson = new Set<string>();
-      const records = listMemoryPromotionCandidates()
-        .filter(
-          (row) =>
-            row.sensitivity_tier === 'public' &&
-            (!row.scope || row.scope.tier === 'public') &&
-            row.status !== 'rejected' &&
-            row.kind !== 'asset_promotion' &&
-            // Never re-read this op's own nominated summaries.
-            row.source_ref !== 'pipeline:memory-distillation'
-        )
-        .sort((a, b) => String(b.queued_at || '').localeCompare(String(a.queued_at || '')))
-        .map((row) => ({
-          id: row.candidate_id,
-          title: row.curation?.title || row.origin?.title || '',
-          summary: row.curation?.summary || row.summary || '',
-          kind: row.kind || 'lesson',
-          status: row.status,
-        }))
-        .filter((r) => {
-          const key = `${r.title}|${r.summary}`;
-          if (seenLesson.has(key)) return false;
-          seenLesson.add(key);
-          return true;
-        })
-        .slice(0, limit);
-      const body =
-        records.length === 0
-          ? '_(no captured lessons available yet — run missions and `mission_controller distill` to populate)_'
-          : records
-              .map((r) => `- **${r.title || r.id}** (${r.kind}, ${r.status}) — ${r.summary}`)
-              .join('\n');
-      const markdown = `_Distilled from ${records.length} recent lesson(s) (scope: ${scope}), generated ${nowIso()}._\n\n${body}`;
-      // run_pipeline bridges produces.channel → params.export_as, so `assign`
-      // lands this markdown at the declared channel (e.g. "lessons_learned").
-      return { handled: true, ctx: assign(markdown) };
-    }
-
-    case 'inject_prior_knowledge': {
-      const topic = resolved('topic') || '';
-      const tagsParam = resolved('tags');
-      const tags = Array.isArray(tagsParam) ? tagsParam : [];
-      const limit = Number(resolved('limit')) || 5;
-      const minScore = params.min_score !== undefined ? Number(resolved('min_score')) : 0.0001;
-      // D8: prior knowledge is the promoted corpus, ranked by the knowledge
-      // index; tags join the query so tag-only callers still match.
-      const entries = await findRelevantPromotedKnowledge({
-        topic: [topic, ...tags].filter(Boolean).join(' '),
-        limit,
-        minScore,
-      });
-      const summary =
-        entries.length === 0
-          ? '(no relevant prior promoted knowledge found)'
-          : entries.map((e) => formatPromotedKnowledgeSummary(e)).join('\n');
-      const outputPath = resolved('output_path');
-      if (outputPath) {
-        writeJSON(outputPath, {
-          topic,
-          tags,
-          limit,
-          entries,
-          summary,
-          generated_at: nowIso(),
-        });
-      }
-      return {
-        handled: true,
-        ctx: assign({
-          prior_knowledge_entries: entries,
-          prior_knowledge_summary: summary,
-          prior_knowledge_count: entries.length,
-          ...(outputPath ? { written_to: outputPath } : {}),
-        }),
-      };
-    }
-
-    case 'evaluate_simulation_quality': {
-      const sourcePath = resolved('source') || resolved('source_path');
-      const outputPath = resolved('output_path');
-      const summary = readJSON<any>(sourcePath);
-      const report = evaluateSimulationQuality(summary);
-      writeJSON(outputPath, report);
-      return { handled: true, ctx: assign({ written_to: outputPath, severity: report.severity }) };
-    }
-
-    case 'simulate_all_ensemble': {
-      const result = await simulateAllEnsemble({
-        ...(resolved('manifest_path') ? { manifest_path: resolved('manifest_path') } : {}),
-        goal: resolved('goal'),
-        output_dir: resolved('output_dir'),
-        runs: Number(resolved('runs')) || Number(params.runs) || 3,
-        ...(params.convergence_threshold !== undefined
-          ? { convergence_threshold: Number(resolved('convergence_threshold')) }
-          : {}),
-      });
-      return { handled: true, ctx: assign(result) };
-    }
-
-    case 'evaluate_ensemble_convergence': {
-      const sourcePaths: string[] = Array.isArray(params.sources)
-        ? params.sources.map((p: string) => resolveVars(p, ctx))
-        : [];
-      const runs = sourcePaths.map((p) => readJSON<any>(p));
-      const threshold = params.threshold !== undefined ? Number(resolved('threshold')) : undefined;
-      const report = evaluateEnsembleConvergence({
-        runs,
-        ...(threshold !== undefined ? { threshold } : {}),
-      });
-      const outputPath = resolved('output_path');
-      if (outputPath) writeJSON(outputPath, report);
-      return {
-        handled: true,
-        ctx: assign({
-          ...(outputPath ? { written_to: outputPath } : {}),
-          severity: report.severity,
-          mean_convergence: report.mean_convergence,
-          divergent_outcomes_warning: report.divergent_outcomes_warning,
-        }),
-      };
-    }
-
-    case 'compute_readiness_matrix': {
-      const result = computeReadinessMatrix({
-        visits_dir: resolved('visits_dir'),
-        proposal_ref: resolved('proposal_ref'),
-        deadline: resolved('deadline'),
-        output_path: resolved('output_path'),
-      });
-      return { handled: true, ctx: assign(result) };
-    }
-
-    case 'recommend': {
-      const result = recommend({
-        readiness_ref: resolved('readiness_ref'),
-        options: params.options,
-      });
-      return { handled: true, ctx: assign(result) };
-    }
-
-    case 'resolve_hypothesis_conflict': {
-      const result = resolveHypothesisConflict({
-        source_path: resolved('source_path'),
-        tenant_slug: params.tenant_slug ? resolved('tenant_slug') : null,
-        output_path: resolved('output_path'),
-      });
-      return { handled: true, ctx: assign(result) };
-    }
-
-    case 'adjust_proposal': {
-      const result = adjustProposalAppend({
-        proposal_path: resolved('proposal') || resolved('proposal_path'),
-        signals: params.new_signals || ctx[params.signals_from || 'new_signals'],
-        output_path: resolved('output_path'),
-      });
-      return { handled: true, ctx: assign(result) };
-    }
-
-    case 'a2a_fanout': {
-      const personasResolved =
-        resolved('personas') || ctx[params.personas_from || 'personas'] || [];
-      const minResolved = resolved('min_hypotheses_per_persona') || 2;
-      const result = await a2aFanout({
-        personas: Array.isArray(personasResolved) ? personasResolved : [],
-        min_hypotheses_per_persona: Number(minResolved) || 2,
-        topic: resolved('topic'),
-        output_path: resolved('output_path'),
-      });
-      return { handled: true, ctx: assign(result) };
-    }
-
-    case 'perspective_fanout': {
-      const participantsResolved =
-        resolved('participants') || ctx[params.participants_from || 'participants'] || [];
-      const fragmentsResolved =
-        resolved('context_fragments') ||
-        ctx[params.context_fragments_from || 'context_fragments'] ||
-        [];
-      const result = await perspectiveFanout({
-        participants: Array.isArray(participantsResolved) ? participantsResolved : [],
-        candidate_fragments: Array.isArray(fragmentsResolved) ? fragmentsResolved : [],
-        min_hypotheses_per_participant: Number(resolved('min_hypotheses_per_participant')) || 2,
-        topic: resolved('topic'),
-        output_path: resolved('output_path'),
-        output_tier: resolved('output_tier') || 'public',
-      });
-      return { handled: true, ctx: assign(result) };
-    }
-
-    case 'cross_critique': {
-      const personasResolved =
-        resolved('personas') || ctx[params.personas_from || 'personas'] || [];
-      const result = await crossCritique({
-        source_path: resolved('input') || resolved('source_path'),
-        personas: Array.isArray(personasResolved) ? personasResolved : [],
-        output_path: resolved('output_path'),
-      });
-      return { handled: true, ctx: assign(result) };
-    }
-
-    case 'typed_cross_critique': {
-      const participantsResolved =
-        resolved('participants') || ctx[params.participants_from || 'participants'] || [];
-      const result = await typedCrossCritique({
-        source_path: resolved('input') || resolved('source_path'),
-        participants: Array.isArray(participantsResolved) ? participantsResolved : [],
-        output_path: resolved('output_path'),
-        output_tier: resolved('output_tier') || 'public',
-      });
-      return { handled: true, ctx: assign(result) };
-    }
-
-    case 'synthesize_counterparty_persona': {
-      const result = await synthesizeCounterpartyPersona({
-        source_path: resolved('source'),
-        fidelity: resolved('fidelity'),
-      });
-      return { handled: true, ctx: assign(result.persona_spec) };
-    }
-
-    case 'a2a_roleplay':
-    case 'counterparty_roleplay': {
-      const result = await a2aRoleplay({
-        persona: params.persona || ctx[params.persona_from || 'persona_spec'],
-        objective: resolved('objective'),
-        time_budget_minutes: params.time_budget_minutes || 15,
-        output_path: resolved('output_path'),
-      });
-      return { handled: true, ctx: assign(result) };
-    }
-
-    case 'extract_dissent_signals': {
-      const result = extractDissentSignals({
-        session_log_path: resolved('session_log') || resolved('session_log_path'),
-        output_path: resolved('output_path'),
-      });
-      return { handled: true, ctx: assign(result) };
-    }
-
-    case 'fork_branches': {
-      const result = await forkBranches({
-        source: resolved('source'),
-        execution_profile: resolved('execution_profile') || 'counterfactual',
-        cost_cap_tokens: params.cost_cap_tokens || 20000,
-        max_steps_per_branch: params.max_steps_per_branch || 10,
-        output_dir: resolved('output_dir') || 'active/shared/tmp/counterfactual/',
-      });
-      return { handled: true, ctx: assign(result) };
-    }
-
-    case 'simulate_all': {
-      const result = await simulateAll({
-        manifest_path: resolved('manifest_path'),
-        goal: resolved('goal'),
-        output_dir: resolved('output_dir'),
-        max_steps_per_branch: params.max_steps_per_branch || 10,
-      });
-      return { handled: true, ctx: assign(result) };
-    }
-
-    case 'capture_intuition': {
-      const result = captureIntuition({
-        decision: resolved('decision'),
-        anchor: resolved('anchor'),
-        analogy: resolved('analogy'),
-        vetoed_options:
-          params.vetoed_options || ctx[params.vetoed_options_from || 'vetoed_options'],
-        mission_id: resolved('mission_id'),
-        trigger: resolved('trigger') as CaptureIntuitionInput['trigger'],
-        tags: params.tags || ctx[params.tags_from || 'tags'],
-      });
-      return { handled: true, ctx: assign(result) };
-    }
-
-    // ── Adaptive Prompting: wisdom:reasoning ─────────────────────────────
-    // Routes through the active reasoning backend. Fixes the previous no-op
-    // where wisdom:reasoning fell through to default with handled=false.
-    case 'reasoning': {
-      const instruction =
-        typeof params.instruction === 'string'
-          ? resolveVars(params.instruction, ctx)
-          : 'Analyze the context.';
-      const contextRaw =
-        typeof params.context === 'string'
-          ? resolveVars(params.context, ctx)
-          : JSON.stringify(params.context ?? ctx);
-      // Adaptive Prompting: optional system_prompt param overrides default framing
-      const systemPrompt =
-        typeof params.system_prompt === 'string'
-          ? resolveVars(params.system_prompt, ctx)
-          : undefined;
-      const allowBackendDelegation =
-        params.use_subagent === true ||
-        String(params.execution_mode ?? params.mode ?? '') === 'subagent' ||
-        String(params.execution_mode ?? params.mode ?? '') === 'delegate';
-      const response = await runPureReasoning({
-        instruction,
-        context: contextRaw,
-        systemPrompt,
-        allowBackendDelegation,
-      });
-      return { handled: true, ctx: assign(response) };
-    }
-
-    case 'peer_advice': {
-      const question =
-        typeof params.question === 'string'
-          ? resolveVars(params.question, ctx)
-          : typeof params.instruction === 'string'
-            ? resolveVars(params.instruction, ctx)
-            : '';
-      const contextRaw =
-        typeof params.context === 'string'
-          ? resolveVars(params.context, ctx)
-          : JSON.stringify(params.context ?? ctx);
-      const result = await runPeerAdvice({
-        question,
-        context: contextRaw,
-        tone: params.tone === 'concise' || params.tone === 'adversarial' ? params.tone : 'careful',
-        preferredProvider:
-          typeof params.preferred_provider === 'string'
-            ? resolveVars(params.preferred_provider, ctx)
-            : undefined,
-        preferredLabel:
-          typeof params.preferred_label === 'string'
-            ? resolveVars(params.preferred_label, ctx)
-            : undefined,
-        modelTier: params.model_tier,
-        contextLabel: String(params.context_label || 'wisdom:peer_advice'),
-      });
-      const outputPath = resolved('output_path');
-      if (outputPath) writeJSON(outputPath, result);
-      return { handled: true, ctx: assign(result) };
-    }
-
-    // ── Mixture of Experts: wisdom:tool_use ──────────────────────────────
-    // Invokes the reasoning backend's Function Calling interface.
-    // Tools are defined inline in the pipeline step params.
-    case 'tool_use':
-    case 'propose_tool_calls': {
-      const prompt = resolveVars(String(params.prompt ?? params.instruction ?? ''), ctx);
-      const tools = Array.isArray(params.tools) ? params.tools : [];
-      const reasoningOptions =
-        params.options && typeof params.options === 'object' && !Array.isArray(params.options)
-          ? (params.options as ReasoningCallOptions)
-          : undefined;
-      const deferredTools = Array.isArray(params.deferred_tools)
-        ? (params.deferred_tools as ToolDefinition[])
-        : undefined;
-      const result = await proposeToolCalls({
-        prompt,
-        tools,
-        deferredTools,
-        options: reasoningOptions,
-      });
-      return {
-        handled: true,
-        ctx:
-          op === 'propose_tool_calls'
-            ? assign(result)
-            : assign({ text: result.text, toolCalls: result.toolCalls }),
-      };
-    }
-
-    // ── ReAct: wisdom:react_loop ──────────────────────────────────────────
-    // Thought → Action → Observation loop with configurable max_steps.
-    // Emits { goal, steps: [{role,content}], final_answer }.
-    case 'react_loop':
-    case 'reasoning_loop': {
-      const goal = resolveVars(String(params.goal ?? params.instruction ?? ''), ctx);
-      const maxSteps = Number(params.max_steps ?? 5);
-      const tools = Array.isArray(params.tools) ? params.tools : [];
-      const reasoningOptions =
-        params.options && typeof params.options === 'object' && !Array.isArray(params.options)
-          ? (params.options as ReasoningCallOptions)
-          : undefined;
-      const deferredTools = Array.isArray(params.deferred_tools)
-        ? (params.deferred_tools as ToolDefinition[])
-        : undefined;
-      const reactResult = await runReasoningLoop({
-        goal,
-        maxSteps,
-        tools,
-        deferredTools,
-        options: reasoningOptions,
-        toolRole: reasoningOptions?.role,
-      });
-      return { handled: true, ctx: assign(reactResult) };
-    }
-
-    // ── Uncertainty Quantification → Gate: wisdom:uncertainty_gate ───────
-    // Reads ensemble convergence score and emits a gate verdict:
-    //   mean_convergence >= threshold → ready
-    //   mean_convergence >= yellow_threshold → concerns (YELLOW-CARD)
-    //   mean_convergence <  yellow_threshold → blocked
-    case 'uncertainty_gate': {
-      const convergenceKey = String(params.from ?? 'mean_convergence');
-      const severityKey = String(params.severity_from ?? 'convergence_severity');
-      const rawScore = ctx[convergenceKey] ?? params.mean_convergence;
-      const rawSeverity = ctx[severityKey] ?? params.convergence_severity;
-      const score = typeof rawScore === 'number' ? rawScore : parseFloat(String(rawScore ?? '1'));
-      const threshold = typeof params.threshold === 'number' ? params.threshold : 0.7;
-      const yellowThreshold =
-        typeof params.yellow_threshold === 'number' ? params.yellow_threshold : 0.5;
-
-      let verdict: 'ready' | 'concerns' | 'blocked';
-      if (!isNaN(score)) {
-        if (score >= threshold) verdict = 'ready';
-        else if (score >= yellowThreshold) verdict = 'concerns';
-        else verdict = 'blocked';
-      } else {
-        // Fall back to severity string when score unavailable
-        const sev = String(rawSeverity ?? 'ok');
-        verdict = sev === 'ok' ? 'ready' : sev === 'warn' ? 'concerns' : 'blocked';
-      }
-
-      const gateResult = {
-        verdict,
-        mean_convergence: isNaN(score) ? null : score,
-        convergence_severity: rawSeverity ?? null,
-        threshold,
-        yellow_threshold: yellowThreshold,
-        timestamp: nowIso(),
-      };
-
-      const outputPath = resolved('output_path');
-      if (outputPath) writeJSON(outputPath, gateResult);
-
-      if (verdict === 'blocked') {
-        logger.warn(
-          `[uncertainty_gate] BLOCKED: mean_convergence=${score.toFixed?.(3) ?? score} < yellow_threshold=${yellowThreshold}`
-        );
-      } else if (verdict === 'concerns') {
-        logger.warn(
-          `[uncertainty_gate] YELLOW-CARD: mean_convergence=${score.toFixed?.(3) ?? score} < threshold=${threshold}`
-        );
-      } else {
-        logger.success(
-          `[uncertainty_gate] READY: mean_convergence=${score.toFixed?.(3) ?? score} ≥ threshold=${threshold}`
-        );
-      }
-
-      return { handled: true, ctx: assign(gateResult) };
-    }
-
-    default:
-      return { handled: false, ctx };
-  }
+  const handler = WISDOM_OP_HANDLERS[op];
+  if (!handler) return { handled: false, ctx };
+  return handler({ op, params, ctx, resolved, assign });
 }
+
+type WisdomDispatchResult = { handled: boolean; ctx: Ctx };
+type WisdomOpDispatch = {
+  op: string;
+  params: any;
+  ctx: Ctx;
+  resolved: (key: string) => any;
+  assign: (value: any) => Ctx;
+};
+type WisdomOpHandler = (
+  d: WisdomOpDispatch
+) => WisdomDispatchResult | Promise<WisdomDispatchResult>;
+
+const wisdomRoleplayHandler: WisdomOpHandler = async ({ params, ctx, resolved, assign }) => {
+  const result = await a2aRoleplay({
+    persona: params.persona || ctx[params.persona_from || 'persona_spec'],
+    objective: resolved('objective'),
+    time_budget_minutes: params.time_budget_minutes || 15,
+    output_path: resolved('output_path'),
+  });
+  return { handled: true, ctx: assign(result) };
+};
+
+// ── Mixture of Experts: wisdom:tool_use ──────────────────────────────
+// Invokes the reasoning backend's Function Calling interface.
+// Tools are defined inline in the pipeline step params.
+const wisdomToolUseHandler: WisdomOpHandler = async ({ op, params, ctx, assign }) => {
+  const prompt = resolveVars(String(params.prompt ?? params.instruction ?? ''), ctx);
+  const tools = Array.isArray(params.tools) ? params.tools : [];
+  const reasoningOptions =
+    params.options && typeof params.options === 'object' && !Array.isArray(params.options)
+      ? (params.options as ReasoningCallOptions)
+      : undefined;
+  const deferredTools = Array.isArray(params.deferred_tools)
+    ? (params.deferred_tools as ToolDefinition[])
+    : undefined;
+  const result = await proposeToolCalls({
+    prompt,
+    tools,
+    deferredTools,
+    options: reasoningOptions,
+  });
+  return {
+    handled: true,
+    ctx:
+      op === 'propose_tool_calls'
+        ? assign(result)
+        : assign({ text: result.text, toolCalls: result.toolCalls }),
+  };
+};
+
+// ── ReAct: wisdom:react_loop ──────────────────────────────────────────
+// Thought → Action → Observation loop with configurable max_steps.
+// Emits { goal, steps: [{role,content}], final_answer }.
+const wisdomReactLoopHandler: WisdomOpHandler = async ({ params, ctx, assign }) => {
+  const goal = resolveVars(String(params.goal ?? params.instruction ?? ''), ctx);
+  const maxSteps = Number(params.max_steps ?? 5);
+  const tools = Array.isArray(params.tools) ? params.tools : [];
+  const reasoningOptions =
+    params.options && typeof params.options === 'object' && !Array.isArray(params.options)
+      ? (params.options as ReasoningCallOptions)
+      : undefined;
+  const deferredTools = Array.isArray(params.deferred_tools)
+    ? (params.deferred_tools as ToolDefinition[])
+    : undefined;
+  const reactResult = await runReasoningLoop({
+    goal,
+    maxSteps,
+    tools,
+    deferredTools,
+    options: reasoningOptions,
+    toolRole: reasoningOptions?.role,
+  });
+  return { handled: true, ctx: assign(reactResult) };
+};
+
+/** op → handler table; adding a wisdom op is one entry here. */
+const WISDOM_OP_HANDLERS: Record<string, WisdomOpHandler> = {
+  document_review: async ({ params, resolved, assign }) => {
+    const input = Object.fromEntries(Object.keys(params).map((key) => [key, resolved(key)]));
+    const validate = createAjv().compile(DOCUMENT_REVIEW_INPUT_SCHEMA);
+    if (!validate(input)) {
+      throw new Error('[DOCUMENT_REVIEW_INPUT_INVALID] ' + JSON.stringify(validate.errors));
+    }
+    const result = await runDocumentReview({
+      target: input.target as string,
+      ...(input.references !== undefined ? { references: input.references as string[] } : {}),
+      ...(input.sources !== undefined ? { sources: input.sources as string[] } : {}),
+      ...(input.preset !== undefined ? { preset: input.preset as 'comprehension' | 'design' } : {}),
+      ...(input.generator !== undefined ? { generator: input.generator as string } : {}),
+      ...(input.timeout_ms !== undefined ? { timeout_ms: input.timeout_ms as number } : {}),
+    });
+    return { handled: true, ctx: assign(result) };
+  },
+
+  stakeholder_grid_sort: ({ params, ctx, assign }) => {
+    const nodes = Array.isArray(params.nodes)
+      ? params.nodes
+      : ctx[params.from || 'stakeholder_nodes'] || [];
+    const sorted = stakeholderGridSort(nodes);
+    return { handled: true, ctx: assign(sorted) };
+  },
+
+  emit_dissent_log: ({ params, resolved, assign }) => {
+    const result = emitDissentLog({
+      source_path: resolved('source') || resolved('source_path'),
+      output_path: resolved('output_path') || resolved('append_to'),
+      append: Boolean(params.append_to),
+      mission_id: resolved('mission_id'),
+      topic: resolved('topic'),
+    });
+    return { handled: true, ctx: assign(result) };
+  },
+
+  render_hypothesis_report: ({ resolved, assign }) => {
+    const result = renderHypothesisReport({
+      source_path: resolved('source') || resolved('source_path'),
+      output_path: resolved('output_path'),
+      title: resolved('title'),
+    });
+    return { handled: true, ctx: assign(result) };
+  },
+
+  curate_background_review: ({ resolved, assign }) => {
+    const maxAgeDays = Number(resolved('max_age_days'));
+    const rawDryRun = resolved('dry_run');
+    const result = curateBackgroundReviewProposals({
+      maxAgeMs:
+        Number.isFinite(maxAgeDays) && maxAgeDays >= 0
+          ? maxAgeDays * 24 * 60 * 60 * 1000
+          : undefined,
+      limit: Number(resolved('limit')) || undefined,
+      dryRun: rawDryRun === true || String(rawDryRun).toLowerCase() === 'true',
+    });
+    return { handled: true, ctx: assign(result) };
+  },
+
+  curation_report: async ({ assign }) => {
+    // KP-06: effectiveness-driven curation + freshness SLO reporting.
+    // Deterministic, no reasoning backend — computes from the KP-05
+    // delivery/usage aggregate + corpus frontmatter and overwrites
+    // CURATION_REPORT.md. Candidates only (KM-03 guardrail): no file is
+    // deleted, archived, or demoted here.
+    const { report, reportPath } = await generateKnowledgeCurationReport();
+    // Procedure success checks ride the same weekly run but land in a
+    // personal-tier report, never in the public CURATION_REPORT.md. Fail
+    // open: a broken procedure catalog must not cost the curation report.
+    let procedureChecks: ReturnType<typeof writeProcedureCheckReport> | { error: string };
+    try {
+      procedureChecks = writeProcedureCheckReport();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      logger.warn(
+        `[wisdom:curation_report] procedure check report skipped — ${message} | next: the personal tier is written only by the operator's persona (personal/sovereign); run the weekly pipeline as the operator, or use \`pnpm kyberion procedure golden status\``
+      );
+      procedureChecks = { error: message };
+    }
+    return {
+      handled: true,
+      ctx: assign({ ...report, report_path: reportPath, procedure_checks: procedureChecks }),
+    };
+  },
+
+  knowledge_validation_sweep: ({ assign }) => {
+    // KO-17/19: read-only validation of feedback-derived heuristics and
+    // promotion candidates. Scope filtering is resolved in @agent/core;
+    // this op never changes queue status or knowledge tier.
+    const result = runKnowledgeValidationSweep();
+    return { handled: true, ctx: assign(result) };
+  },
+
+  distill: ({ resolved, assign }) => {
+    // Memory distillation (intent-loop ⑤→⑥): summarize recently distilled
+    // knowledge into operational lessons. Used by
+    // pipelines/fragments/memory-distillation.json, whose sinks write the
+    // result (channel "lessons_learned") to a scratch summary and nominate it
+    // as a MemoryCandidate.
+    const scope = resolved('scope') || 'recent_missions';
+    const limit = Number(resolved('limit')) || 20;
+    // D8: source the newest captured learnings from the single MemoryCandidate
+    // queue (DistillCandidateRecord is a promotion receipt only). The summary
+    // lands in a shared scratch file and is nominated as a public candidate,
+    // so only public rows are read — never a tenant's or owner's learning.
+    // Topic-relevance search is the wrong tool for a "recent" scope — it
+    // needs a query and returns nothing for the empty topic this op uses.
+    const seenLesson = new Set<string>();
+    const records = listMemoryPromotionCandidates()
+      .filter(
+        (row) =>
+          row.sensitivity_tier === 'public' &&
+          (!row.scope || row.scope.tier === 'public') &&
+          row.status !== 'rejected' &&
+          row.kind !== 'asset_promotion' &&
+          // Never re-read this op's own nominated summaries.
+          row.source_ref !== 'pipeline:memory-distillation'
+      )
+      .sort((a, b) => String(b.queued_at || '').localeCompare(String(a.queued_at || '')))
+      .map((row) => ({
+        id: row.candidate_id,
+        title: row.curation?.title || row.origin?.title || '',
+        summary: row.curation?.summary || row.summary || '',
+        kind: row.kind || 'lesson',
+        status: row.status,
+      }))
+      .filter((r) => {
+        const key = `${r.title}|${r.summary}`;
+        if (seenLesson.has(key)) return false;
+        seenLesson.add(key);
+        return true;
+      })
+      .slice(0, limit);
+    const body =
+      records.length === 0
+        ? '_(no captured lessons available yet — run missions and `mission_controller distill` to populate)_'
+        : records
+            .map((r) => `- **${r.title || r.id}** (${r.kind}, ${r.status}) — ${r.summary}`)
+            .join('\n');
+    const markdown = `_Distilled from ${records.length} recent lesson(s) (scope: ${scope}), generated ${nowIso()}._\n\n${body}`;
+    // run_pipeline bridges produces.channel → params.export_as, so `assign`
+    // lands this markdown at the declared channel (e.g. "lessons_learned").
+    return { handled: true, ctx: assign(markdown) };
+  },
+
+  inject_prior_knowledge: async ({ params, resolved, assign }) => {
+    const topic = resolved('topic') || '';
+    const tagsParam = resolved('tags');
+    const tags = Array.isArray(tagsParam) ? tagsParam : [];
+    const limit = Number(resolved('limit')) || 5;
+    const minScore = params.min_score !== undefined ? Number(resolved('min_score')) : 0.0001;
+    // D8: prior knowledge is the promoted corpus, ranked by the knowledge
+    // index; tags join the query so tag-only callers still match.
+    const entries = await findRelevantPromotedKnowledge({
+      topic: [topic, ...tags].filter(Boolean).join(' '),
+      limit,
+      minScore,
+    });
+    const summary =
+      entries.length === 0
+        ? '(no relevant prior promoted knowledge found)'
+        : entries.map((e) => formatPromotedKnowledgeSummary(e)).join('\n');
+    const outputPath = resolved('output_path');
+    if (outputPath) {
+      writeJSON(outputPath, {
+        topic,
+        tags,
+        limit,
+        entries,
+        summary,
+        generated_at: nowIso(),
+      });
+    }
+    return {
+      handled: true,
+      ctx: assign({
+        prior_knowledge_entries: entries,
+        prior_knowledge_summary: summary,
+        prior_knowledge_count: entries.length,
+        ...(outputPath ? { written_to: outputPath } : {}),
+      }),
+    };
+  },
+
+  evaluate_simulation_quality: ({ resolved, assign }) => {
+    const sourcePath = resolved('source') || resolved('source_path');
+    const outputPath = resolved('output_path');
+    const summary = readJSON<any>(sourcePath);
+    const report = evaluateSimulationQuality(summary);
+    writeJSON(outputPath, report);
+    return { handled: true, ctx: assign({ written_to: outputPath, severity: report.severity }) };
+  },
+
+  simulate_all_ensemble: async ({ params, resolved, assign }) => {
+    const result = await simulateAllEnsemble({
+      ...(resolved('manifest_path') ? { manifest_path: resolved('manifest_path') } : {}),
+      goal: resolved('goal'),
+      output_dir: resolved('output_dir'),
+      runs: Number(resolved('runs')) || Number(params.runs) || 3,
+      ...(params.convergence_threshold !== undefined
+        ? { convergence_threshold: Number(resolved('convergence_threshold')) }
+        : {}),
+    });
+    return { handled: true, ctx: assign(result) };
+  },
+
+  evaluate_ensemble_convergence: ({ params, ctx, resolved, assign }) => {
+    const sourcePaths: string[] = Array.isArray(params.sources)
+      ? params.sources.map((p: string) => resolveVars(p, ctx))
+      : [];
+    const runs = sourcePaths.map((p) => readJSON<any>(p));
+    const threshold = params.threshold !== undefined ? Number(resolved('threshold')) : undefined;
+    const report = evaluateEnsembleConvergence({
+      runs,
+      ...(threshold !== undefined ? { threshold } : {}),
+    });
+    const outputPath = resolved('output_path');
+    if (outputPath) writeJSON(outputPath, report);
+    return {
+      handled: true,
+      ctx: assign({
+        ...(outputPath ? { written_to: outputPath } : {}),
+        severity: report.severity,
+        mean_convergence: report.mean_convergence,
+        divergent_outcomes_warning: report.divergent_outcomes_warning,
+      }),
+    };
+  },
+
+  compute_readiness_matrix: ({ resolved, assign }) => {
+    const result = computeReadinessMatrix({
+      visits_dir: resolved('visits_dir'),
+      proposal_ref: resolved('proposal_ref'),
+      deadline: resolved('deadline'),
+      output_path: resolved('output_path'),
+    });
+    return { handled: true, ctx: assign(result) };
+  },
+
+  recommend: ({ params, resolved, assign }) => {
+    const result = recommend({
+      readiness_ref: resolved('readiness_ref'),
+      options: params.options,
+    });
+    return { handled: true, ctx: assign(result) };
+  },
+
+  resolve_hypothesis_conflict: ({ params, resolved, assign }) => {
+    const result = resolveHypothesisConflict({
+      source_path: resolved('source_path'),
+      tenant_slug: params.tenant_slug ? resolved('tenant_slug') : null,
+      output_path: resolved('output_path'),
+    });
+    return { handled: true, ctx: assign(result) };
+  },
+
+  adjust_proposal: ({ params, ctx, resolved, assign }) => {
+    const result = adjustProposalAppend({
+      proposal_path: resolved('proposal') || resolved('proposal_path'),
+      signals: params.new_signals || ctx[params.signals_from || 'new_signals'],
+      output_path: resolved('output_path'),
+    });
+    return { handled: true, ctx: assign(result) };
+  },
+
+  a2a_fanout: async ({ params, ctx, resolved, assign }) => {
+    const personasResolved = resolved('personas') || ctx[params.personas_from || 'personas'] || [];
+    const minResolved = resolved('min_hypotheses_per_persona') || 2;
+    const result = await a2aFanout({
+      personas: Array.isArray(personasResolved) ? personasResolved : [],
+      min_hypotheses_per_persona: Number(minResolved) || 2,
+      topic: resolved('topic'),
+      output_path: resolved('output_path'),
+    });
+    return { handled: true, ctx: assign(result) };
+  },
+
+  perspective_fanout: async ({ params, ctx, resolved, assign }) => {
+    const participantsResolved =
+      resolved('participants') || ctx[params.participants_from || 'participants'] || [];
+    const fragmentsResolved =
+      resolved('context_fragments') ||
+      ctx[params.context_fragments_from || 'context_fragments'] ||
+      [];
+    const result = await perspectiveFanout({
+      participants: Array.isArray(participantsResolved) ? participantsResolved : [],
+      candidate_fragments: Array.isArray(fragmentsResolved) ? fragmentsResolved : [],
+      min_hypotheses_per_participant: Number(resolved('min_hypotheses_per_participant')) || 2,
+      topic: resolved('topic'),
+      output_path: resolved('output_path'),
+      output_tier: resolved('output_tier') || 'public',
+    });
+    return { handled: true, ctx: assign(result) };
+  },
+
+  cross_critique: async ({ params, ctx, resolved, assign }) => {
+    const personasResolved = resolved('personas') || ctx[params.personas_from || 'personas'] || [];
+    const result = await crossCritique({
+      source_path: resolved('input') || resolved('source_path'),
+      personas: Array.isArray(personasResolved) ? personasResolved : [],
+      output_path: resolved('output_path'),
+    });
+    return { handled: true, ctx: assign(result) };
+  },
+
+  typed_cross_critique: async ({ params, ctx, resolved, assign }) => {
+    const participantsResolved =
+      resolved('participants') || ctx[params.participants_from || 'participants'] || [];
+    const result = await typedCrossCritique({
+      source_path: resolved('input') || resolved('source_path'),
+      participants: Array.isArray(participantsResolved) ? participantsResolved : [],
+      output_path: resolved('output_path'),
+      output_tier: resolved('output_tier') || 'public',
+    });
+    return { handled: true, ctx: assign(result) };
+  },
+
+  synthesize_counterparty_persona: async ({ resolved, assign }) => {
+    const result = await synthesizeCounterpartyPersona({
+      source_path: resolved('source'),
+      fidelity: resolved('fidelity'),
+    });
+    return { handled: true, ctx: assign(result.persona_spec) };
+  },
+
+  a2a_roleplay: wisdomRoleplayHandler,
+  counterparty_roleplay: wisdomRoleplayHandler,
+
+  extract_dissent_signals: ({ resolved, assign }) => {
+    const result = extractDissentSignals({
+      session_log_path: resolved('session_log') || resolved('session_log_path'),
+      output_path: resolved('output_path'),
+    });
+    return { handled: true, ctx: assign(result) };
+  },
+
+  fork_branches: async ({ params, resolved, assign }) => {
+    const result = await forkBranches({
+      source: resolved('source'),
+      execution_profile: resolved('execution_profile') || 'counterfactual',
+      cost_cap_tokens: params.cost_cap_tokens || 20000,
+      max_steps_per_branch: params.max_steps_per_branch || 10,
+      output_dir: resolved('output_dir') || 'active/shared/tmp/counterfactual/',
+    });
+    return { handled: true, ctx: assign(result) };
+  },
+
+  simulate_all: async ({ params, resolved, assign }) => {
+    const result = await simulateAll({
+      manifest_path: resolved('manifest_path'),
+      goal: resolved('goal'),
+      output_dir: resolved('output_dir'),
+      max_steps_per_branch: params.max_steps_per_branch || 10,
+    });
+    return { handled: true, ctx: assign(result) };
+  },
+
+  capture_intuition: ({ params, ctx, resolved, assign }) => {
+    const result = captureIntuition({
+      decision: resolved('decision'),
+      anchor: resolved('anchor'),
+      analogy: resolved('analogy'),
+      vetoed_options: params.vetoed_options || ctx[params.vetoed_options_from || 'vetoed_options'],
+      mission_id: resolved('mission_id'),
+      trigger: resolved('trigger') as CaptureIntuitionInput['trigger'],
+      tags: params.tags || ctx[params.tags_from || 'tags'],
+    });
+    return { handled: true, ctx: assign(result) };
+  },
+
+  // ── Adaptive Prompting: wisdom:reasoning ─────────────────────────────
+  // Routes through the active reasoning backend. Fixes the previous no-op
+  // where wisdom:reasoning fell through to default with handled=false.
+  reasoning: async ({ params, ctx, assign }) => {
+    const instruction =
+      typeof params.instruction === 'string'
+        ? resolveVars(params.instruction, ctx)
+        : 'Analyze the context.';
+    const contextRaw =
+      typeof params.context === 'string'
+        ? resolveVars(params.context, ctx)
+        : JSON.stringify(params.context ?? ctx);
+    // Adaptive Prompting: optional system_prompt param overrides default framing
+    const systemPrompt =
+      typeof params.system_prompt === 'string' ? resolveVars(params.system_prompt, ctx) : undefined;
+    const allowBackendDelegation =
+      params.use_subagent === true ||
+      String(params.execution_mode ?? params.mode ?? '') === 'subagent' ||
+      String(params.execution_mode ?? params.mode ?? '') === 'delegate';
+    const response = await runPureReasoning({
+      instruction,
+      context: contextRaw,
+      systemPrompt,
+      allowBackendDelegation,
+    });
+    return { handled: true, ctx: assign(response) };
+  },
+
+  peer_advice: async ({ params, ctx, resolved, assign }) => {
+    const question =
+      typeof params.question === 'string'
+        ? resolveVars(params.question, ctx)
+        : typeof params.instruction === 'string'
+          ? resolveVars(params.instruction, ctx)
+          : '';
+    const contextRaw =
+      typeof params.context === 'string'
+        ? resolveVars(params.context, ctx)
+        : JSON.stringify(params.context ?? ctx);
+    const result = await runPeerAdvice({
+      question,
+      context: contextRaw,
+      tone: params.tone === 'concise' || params.tone === 'adversarial' ? params.tone : 'careful',
+      preferredProvider:
+        typeof params.preferred_provider === 'string'
+          ? resolveVars(params.preferred_provider, ctx)
+          : undefined,
+      preferredLabel:
+        typeof params.preferred_label === 'string'
+          ? resolveVars(params.preferred_label, ctx)
+          : undefined,
+      modelTier: params.model_tier,
+      contextLabel: String(params.context_label || 'wisdom:peer_advice'),
+    });
+    const outputPath = resolved('output_path');
+    if (outputPath) writeJSON(outputPath, result);
+    return { handled: true, ctx: assign(result) };
+  },
+
+  tool_use: wisdomToolUseHandler,
+  propose_tool_calls: wisdomToolUseHandler,
+
+  react_loop: wisdomReactLoopHandler,
+  reasoning_loop: wisdomReactLoopHandler,
+
+  // ── Uncertainty Quantification → Gate: wisdom:uncertainty_gate ───────
+  // Reads ensemble convergence score and emits a gate verdict:
+  //   mean_convergence >= threshold → ready
+  //   mean_convergence >= yellow_threshold → concerns (YELLOW-CARD)
+  //   mean_convergence <  yellow_threshold → blocked
+  uncertainty_gate: ({ params, ctx, resolved, assign }) => {
+    const convergenceKey = String(params.from ?? 'mean_convergence');
+    const severityKey = String(params.severity_from ?? 'convergence_severity');
+    const rawScore = ctx[convergenceKey] ?? params.mean_convergence;
+    const rawSeverity = ctx[severityKey] ?? params.convergence_severity;
+    const score = typeof rawScore === 'number' ? rawScore : parseFloat(String(rawScore ?? '1'));
+    const threshold = typeof params.threshold === 'number' ? params.threshold : 0.7;
+    const yellowThreshold =
+      typeof params.yellow_threshold === 'number' ? params.yellow_threshold : 0.5;
+
+    let verdict: 'ready' | 'concerns' | 'blocked';
+    if (!isNaN(score)) {
+      if (score >= threshold) verdict = 'ready';
+      else if (score >= yellowThreshold) verdict = 'concerns';
+      else verdict = 'blocked';
+    } else {
+      // Fall back to severity string when score unavailable
+      const sev = String(rawSeverity ?? 'ok');
+      verdict = sev === 'ok' ? 'ready' : sev === 'warn' ? 'concerns' : 'blocked';
+    }
+
+    const gateResult = {
+      verdict,
+      mean_convergence: isNaN(score) ? null : score,
+      convergence_severity: rawSeverity ?? null,
+      threshold,
+      yellow_threshold: yellowThreshold,
+      timestamp: nowIso(),
+    };
+
+    const outputPath = resolved('output_path');
+    if (outputPath) writeJSON(outputPath, gateResult);
+
+    if (verdict === 'blocked') {
+      logger.warn(
+        `[uncertainty_gate] BLOCKED: mean_convergence=${score.toFixed?.(3) ?? score} < yellow_threshold=${yellowThreshold}`
+      );
+    } else if (verdict === 'concerns') {
+      logger.warn(
+        `[uncertainty_gate] YELLOW-CARD: mean_convergence=${score.toFixed?.(3) ?? score} < threshold=${threshold}`
+      );
+    } else {
+      logger.success(
+        `[uncertainty_gate] READY: mean_convergence=${score.toFixed?.(3) ?? score} ≥ threshold=${threshold}`
+      );
+    }
+
+    return { handled: true, ctx: assign(gateResult) };
+  },
+};

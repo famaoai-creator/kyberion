@@ -286,24 +286,24 @@ export function renderBrowserAdf(trail: BrowserRecordedAction[], sessionId: stri
       );
       continue;
     }
-    switch (op) {
-      case 'goto':
-      case 'open_tab':
+    const handlers: Record<string, () => void> = {
+      goto: () => {
         if (action.url) {
           steps.push({ type: 'capture', op: 'goto', params: { url: action.url } });
           refsEstablished = false;
         }
-        break;
-      case 'snapshot':
+      },
+      open_tab: () => handlers['goto']!(),
+      snapshot: () => {
         steps.push({ type: 'capture', op: 'snapshot', params: {} });
         refsEstablished = true;
-        break;
-      case 'screenshot':
+      },
+      screenshot: () => {
         // Keep the visual-evidence step so replay retains its shape. The trail
         // records no output path, so replay takes a fresh screenshot.
         steps.push({ type: 'capture', op: 'screenshot', params: {} });
-        break;
-      case 'scroll':
+      },
+      scroll: () => {
         // The scroll executor only honors wheel delta (params.x/y/delta), not a
         // selector, and the recorded trail stores only content_excerpt=delta(x,y).
         // Emitting a selector-based scroll would replay as a (0,0) no-op, so the
@@ -312,8 +312,8 @@ export function renderBrowserAdf(trail: BrowserRecordedAction[], sessionId: stri
         logger.warn(
           '[BROWSER] renderBrowserAdf drops scroll: wheel-delta replay is timing-dependent; re-add a wait/snapshot anchor instead'
         );
-        break;
-      case 'select_tab':
+      },
+      select_tab: () => {
         // tab_id (e.g. tab-1) is ephemeral and not durable across sessions.
         // The trail carries no url/title to synthesize select_tab_matching, so
         // drop with a hint instead of emitting a replay that mis-selects.
@@ -321,8 +321,8 @@ export function renderBrowserAdf(trail: BrowserRecordedAction[], sessionId: stri
         logger.warn(
           '[BROWSER] renderBrowserAdf drops select_tab: ephemeral tab_id is not replayable; record url/title and use select_tab_matching'
         );
-        break;
-      case 'select_tab_matching': {
+      },
+      select_tab_matching: () => {
         const rec = action as unknown as Record<string, string | undefined>;
         const urlIncludes = rec.url_includes ?? rec.url;
         const titleIncludes = rec.title_includes ?? rec.title;
@@ -333,30 +333,28 @@ export function renderBrowserAdf(trail: BrowserRecordedAction[], sessionId: stri
           params.title_includes = titleIncludes.trim();
         if (Object.keys(params).length > 0)
           steps.push({ type: 'control', op: 'select_tab_matching', params });
-        break;
-      }
-      case 'click':
+      },
+      click: () => {
         pushApply(renderDurableApplyStep('click', action));
-        break;
-      case 'fill':
+      },
+      fill: () => {
         if (action.secret_ref || action.classification === 'secret_ref') {
           pushApply(renderSecretFillStep(action));
         } else {
           pushApply(renderDurableApplyStep('fill', action, { text: action.text || '' }));
         }
-        break;
-      case 'press':
+      },
+      press: () => {
         pushApply(renderDurableApplyStep('press', action, { key: action.key || 'Enter' }));
-        break;
-      case 'wait':
+      },
+      wait: () => {
         pushApply(renderDurableApplyStep('wait', action));
-        break;
-      case 'fill_secret_ref':
+      },
+      fill_secret_ref: () => {
         pushApply(renderSecretFillStep(action));
-        break;
-      default:
-        break;
-    }
+      },
+    };
+    handlers[op]?.();
   }
 
   if (skipped.length > 0) {

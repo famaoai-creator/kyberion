@@ -431,30 +431,25 @@ function reportView(
   const { charter } = findDot(dotId);
   const deps = { now: () => new Date() };
   const data = asCharter(charter, (): Record<string, unknown> => {
-    switch (view) {
-      case 'memory':
-        return { ...readDotMemory(charter, deps) };
-      case 'followups':
-        return { pending: listPendingDotFollowups(charter, deps) };
-      case 'kr':
-        return {
-          latest: [...readLatestDotKeyResults(charter, {}).values()],
-          gaps: dotGoalGaps(charter, deps),
-        };
-      case 'autonomy':
-        return {
-          state: readDotAutonomyState(charter, deps),
-          metrics: dotAutonomyMetrics(charter, deps),
-          shadow: readDotAutonomyShadow(charter, {}).slice(-VIEW_LIMIT),
-        };
-      case 'outcomes':
-        return {
-          stats: dotOutcomeStats(charter),
-          recent: readDotOutcomes(charter, { limit: VIEW_LIMIT }),
-        };
-      case 'work':
-        return { recent: readDotWorkResults(charter, deps).slice(-VIEW_LIMIT) };
-    }
+    const viewReaders: Record<string, () => Record<string, unknown>> = {
+      memory: () => ({ ...readDotMemory(charter, deps) }),
+      followups: () => ({ pending: listPendingDotFollowups(charter, deps) }),
+      kr: () => ({
+        latest: [...readLatestDotKeyResults(charter, {}).values()],
+        gaps: dotGoalGaps(charter, deps),
+      }),
+      autonomy: () => ({
+        state: readDotAutonomyState(charter, deps),
+        metrics: dotAutonomyMetrics(charter, deps),
+        shadow: readDotAutonomyShadow(charter, {}).slice(-VIEW_LIMIT),
+      }),
+      outcomes: () => ({
+        stats: dotOutcomeStats(charter),
+        recent: readDotOutcomes(charter, { limit: VIEW_LIMIT }),
+      }),
+      work: () => ({ recent: readDotWorkResults(charter, deps).slice(-VIEW_LIMIT) }),
+    };
+    return viewReaders[view]?.() as Record<string, unknown>;
   });
   return { ok: true, view: { dot_id: dotId, kind: view, ...data } };
 }
@@ -557,8 +552,8 @@ async function main(argv: string[]): Promise<Record<string, unknown>> {
     ? (sub as Subcommand)
     : 'list';
   const args = subcommand === sub ? rest : argv;
-  switch (subcommand) {
-    case 'migrate-state': {
+  const reporters: Partial<Record<Subcommand, (args: string[]) => unknown>> = {
+    'migrate-state': (args) => {
       const dotId = cliPositionals(args, ['--legacy-tier'])[0];
       const legacyTier = cliOptionValue(args, '--legacy-tier');
       if (
@@ -582,8 +577,8 @@ async function main(argv: string[]): Promise<Record<string, unknown>> {
         }),
         actions_migrated: migrateLegacyDotActions(charter),
       };
-    }
-    case 'capacity': {
+    },
+    capacity: (args) => {
       const [dotId, ...options] = stripSharedScriptFlags(args);
       const limitIndex = options.indexOf('--limit');
       const inherit = options.includes('--inherit');
@@ -612,38 +607,27 @@ async function main(argv: string[]): Promise<Record<string, unknown>> {
           ? 'Capacity saved. Review dot status, then activate separately.'
           : 'Review this capacity and rerun with --apply. The dot remains draft/paused.',
       };
-    }
-    case 'create':
-      return reportCreate(args);
-    case 'validate':
-      return reportValidate(args);
-    case 'activate':
-    case 'pause':
-    case 'retire':
-      return reportTransition(subcommand, args);
-    case 'wake':
-      return reportWake(args);
-    case 'inbox':
-      return reportInbox(args);
-    case 'status':
-      return reportStatus(args);
-    case 'memory':
-    case 'followups':
-    case 'kr':
-    case 'autonomy':
-    case 'outcomes':
-    case 'work':
-      return reportView(subcommand, args);
-    case 'event':
-      return reportEvent(args);
-    case 'intake':
-      return reportIntake();
-    case 'release':
-      return reportRelease(args);
-    case 'list':
-    default:
-      return reportList(args);
-  }
+    },
+    create: reportCreate,
+    validate: reportValidate,
+    activate: (args) => reportTransition('activate', args),
+    pause: (args) => reportTransition('pause', args),
+    retire: (args) => reportTransition('retire', args),
+    wake: reportWake,
+    inbox: reportInbox,
+    status: reportStatus,
+    memory: (args) => reportView('memory', args),
+    followups: (args) => reportView('followups', args),
+    kr: (args) => reportView('kr', args),
+    autonomy: (args) => reportView('autonomy', args),
+    outcomes: (args) => reportView('outcomes', args),
+    work: (args) => reportView('work', args),
+    event: reportEvent,
+    intake: () => reportIntake(),
+    release: reportRelease,
+    list: reportList,
+  };
+  return (reporters[subcommand] ?? reportList)(args) as Record<string, unknown>;
 }
 
 function compact(value: unknown, max = 240): string {

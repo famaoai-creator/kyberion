@@ -384,16 +384,16 @@ async function opControl(
     return res.context;
   };
 
-  switch (op) {
-    case 'if':
+  const handlers: Record<string, () => Promise<any>> = {
+    if: async () => {
       if (evaluateCondition(params.condition, ctx)) {
         return await runNested(params.then, ctx);
       } else if (params.else) {
         return await runNested(params.else, ctx);
       }
       return ctx;
-
-    case 'while': {
+    },
+    while: async () => {
       let iterations = 0;
       const maxIter =
         typeof params.max_iterations === 'number' && params.max_iterations >= 0
@@ -404,13 +404,12 @@ async function opControl(
         iterations++;
       }
       return ctx;
-    }
-
-    default:
-      throw (
-        buildRetiredActuatorOpError('wisdom', op) ?? new Error(`[UNKNOWN_OP] Unknown op: ${op}`)
-      );
-  }
+    },
+  };
+  const handler = handlers[op];
+  if (!handler)
+    throw buildRetiredActuatorOpError('wisdom', op) ?? new Error(`[UNKNOWN_OP] Unknown op: ${op}`);
+  return handler();
 }
 
 function asAdfSteps(value: unknown, op: string): AdfStep[] {
@@ -443,8 +442,8 @@ async function opCapture(
   });
   if (forwarded) return forwarded;
 
-  switch (op) {
-    case 'history_search': {
+  const handlers: Record<string, () => Promise<any>> = {
+    history_search: async () => {
       if (params.refresh_public_index === true) {
         rebuildPublicHistorySearchIndexFromLocalSources();
       }
@@ -463,8 +462,8 @@ async function opCapture(
         includeSubagent: false,
       });
       return { ...ctx, [params.export_as || 'history_search_results']: report };
-    }
-    case 'knowledge_search': {
+    },
+    knowledge_search: async () => {
       const { buildScopedIndex, queryKnowledgeHybrid, DEFAULT_SCOPE } =
         await import('@agent/core/knowledge-index');
       const securityScope =
@@ -556,8 +555,8 @@ async function opCapture(
         _knowledgeIndexScopeKey: scopeKey,
         [params.export_as || 'found_knowledge']: normalized,
       };
-    }
-    case 'knowledge_read': {
+    },
+    knowledge_read: async () => {
       const rawPath = params.path ?? params.skill_path;
       if (typeof rawPath !== 'string' || !rawPath.trim()) {
         throw new Error('[INVALID_PARAMS] knowledge_read requires params.path');
@@ -641,8 +640,8 @@ async function opCapture(
         [`${exportAs}_receipt`]: visibleReceipt,
         [`${exportAs}_provenance`]: visibleProvenance,
       };
-    }
-    case 'query': {
+    },
+    query: async () => {
       const { buildScopedIndex, queryKnowledgeHybrid, DEFAULT_SCOPE } =
         await import('@agent/core/knowledge-index');
       const scope = ctx._knowledge_scope ?? DEFAULT_SCOPE;
@@ -662,10 +661,11 @@ async function opCapture(
       );
       ctx = { ...ctx, [params.export_as || 'last_hints']: hints };
       return ctx;
-    }
-    default:
-      return undefined;
-  }
+    },
+  };
+  const handler = handlers[op];
+  if (!handler) return undefined;
+  return handler();
 }
 
 async function opTransform(
@@ -674,8 +674,8 @@ async function opTransform(
   ctx: any,
   compatibilityMode = false
 ): Promise<WisdomContext> {
-  switch (op) {
-    case 'regex_extract': {
+  const handlers: Record<string, () => Promise<any>> = {
+    regex_extract: async () => {
       const input = String(ctx[params.from || 'last_capture'] || '');
       const regex = new RegExp(params.pattern, params.count_all ? 'gm' : 'm');
       if (params.count_all) {
@@ -683,8 +683,8 @@ async function opTransform(
       }
       const match = input.match(regex);
       return { ...ctx, [params.export_as]: match ? match[1] || match[0] : null };
-    }
-    case 'regex_replace': {
+    },
+    regex_replace: async () => {
       const input = String(ctx[params.from || 'last_capture'] || '');
       return {
         ...ctx,
@@ -693,8 +693,8 @@ async function opTransform(
           resolveVars(params.template, ctx)
         ),
       };
-    }
-    case 'yaml_update': {
+    },
+    yaml_update: async () => {
       const content = String(ctx[params.from || 'last_capture'] || '');
       const fmMatch = content.match(/^---\n([\s\S]*?)\n---/m);
       if (!fmMatch) return ctx;
@@ -712,22 +712,23 @@ async function opTransform(
           `---\n${newFm}\n---`
         ),
       };
-    }
-    case 'json_query': {
+    },
+    json_query: async () => {
       const data = ctx[params.from || 'last_capture_data'];
       const result = getPathValue(data, params.path);
       return { ...ctx, [params.export_as]: result };
-    }
-    case 'array_count': {
+    },
+    array_count: async () => {
       const list = ctx[params.from] || [];
       const count = list.filter((item: any) => {
         return !params.where || Object.entries(params.where).every(([k, v]) => item[k] === v);
       }).length;
       return { ...ctx, [params.export_as]: count };
-    }
-    default:
-      return undefined;
-  }
+    },
+  };
+  const handler = handlers[op];
+  if (!handler) return undefined;
+  return handler();
 }
 
 async function opApply(
@@ -742,8 +743,8 @@ async function opApply(
   });
   if (forwarded) return forwarded;
 
-  switch (op) {
-    case 'knowledge_inject':
+  const handlers: Record<string, () => Promise<any>> = {
+    knowledge_inject: async () => {
       await runWithOperationRetry('knowledge_inject', async () => {
         const kPath = resolveVars(params.knowledge_path, ctx);
         const missionId = resolveVars(params.mission_id, ctx);
@@ -768,11 +769,11 @@ async function opApply(
           throw new Error(`Knowledge source not found: ${sourcePath}`);
         }
       });
-      break;
-    case 'log':
+    },
+    log: async () => {
       logger.info(`[WISDOM_LOG] ${resolveVars(params.message || 'Action completed', ctx)}`);
-      break;
-    case 'knowledge_export':
+    },
+    knowledge_export: async () => {
       await runWithOperationRetry('knowledge_export', async () => {
         const sourceFile = assertSafeRepositoryPath(
           pathResolver.knowledge(resolveVars(params.path, ctx)),
@@ -872,9 +873,8 @@ async function opApply(
         safeWriteFile(outPath, JSON.stringify(kkp, null, 2));
         logger.success(`📦 [Wisdom] Knowledge exported to ${outPath}`);
       });
-      break;
-
-    case 'knowledge_import':
+    },
+    knowledge_import: async () => {
       await runWithOperationRetry('knowledge_import', async () => {
         const packageSource = params.package_path || params.source_path;
         const pkgPath = assertSafeRepositoryPath(
@@ -947,11 +947,11 @@ async function opApply(
 
         logger.success(`📥 [Wisdom] Imported knowledge from ${originAgentId} to ${targetFile}`);
       });
-      break;
-
-    default:
-      return undefined;
-  }
+    },
+  };
+  const handler = handlers[op];
+  if (!handler) return undefined;
+  return handler();
 }
 
 export async function performReconcile(input: WisdomAction) {

@@ -364,60 +364,43 @@ function extractRunContent(runXml: string): DocxRunContent[] {
   // Text / breaks / tabs / hyphens / drawings (WordCraft runs.rs specials)
   const re =
     /<w:(t|br|cr|tab|softHyphen|noBreakHyphen|drawing|fldChar|instrText|sym)(\s[^>]*)?\/?>([\s\S]*?<\/w:\1>)?/gi;
+  const runTagHandlers: Record<string, (fullMatch: string, attrs: string) => void> = {
+    t: (fullMatch) => {
+      const textMatch = fullMatch.match(/<w:t[^>]*>([\s\S]*?)<\/w:t>/i);
+      content.push({ type: 'text', text: cleanDocxText(textMatch ? textMatch[1] : '') });
+    },
+    br: (_fullMatch, attrs) => {
+      const brType = getAttrExact(attrs, 'w', 'type');
+      content.push({ type: 'break', breakType: brType as any });
+    },
+    cr: () => content.push({ type: 'cr' }),
+    tab: () => content.push({ type: 'tab' }),
+    softhyphen: () => content.push({ type: 'softHyphen' }),
+    nobreakhyphen: () => content.push({ type: 'noBreakHyphen' }),
+    drawing: (fullMatch) => {
+      const drawingContent = fullMatch.match(/<w:drawing>([\s\S]*?)<\/w:drawing>/i);
+      if (drawingContent) {
+        content.push({ type: 'drawing', drawing: extractDrawing(drawingContent[1]) });
+      }
+    },
+    fldchar: (fullMatch) => {
+      const fldCharType = getAttrExact(fullMatch, 'w', 'fldCharType');
+      if (fldCharType) content.push({ type: 'fieldChar', fldCharType: fldCharType as any });
+    },
+    instrtext: (fullMatch) => {
+      const instrMatch = fullMatch.match(/<w:instrText[^>]*>([\s\S]*?)<\/w:instrText>/i);
+      if (instrMatch)
+        content.push({ type: 'instrText', text: cleanDocxText(instrMatch[1]).trim() });
+    },
+    sym: (fullMatch) => {
+      const font = getAttrExact(fullMatch, 'w', 'font') || '';
+      const char = normalizeSymChar(getAttrExact(fullMatch, 'w', 'char') || '');
+      if (font && char) content.push({ type: 'sym', font, char });
+    },
+  };
   let m;
   while ((m = re.exec(bodyXml)) !== null) {
-    const tagName = m[1].toLowerCase();
-    const attrs = m[2] || '';
-    const fullMatch = m[0];
-
-    switch (tagName) {
-      case 't': {
-        const textMatch = fullMatch.match(/<w:t[^>]*>([\s\S]*?)<\/w:t>/i);
-        content.push({ type: 'text', text: cleanDocxText(textMatch ? textMatch[1] : '') });
-        break;
-      }
-      case 'br': {
-        const brType = getAttrExact(attrs, 'w', 'type');
-        content.push({ type: 'break', breakType: brType as any });
-        break;
-      }
-      case 'cr':
-        content.push({ type: 'cr' });
-        break;
-      case 'tab':
-        content.push({ type: 'tab' });
-        break;
-      case 'softhyphen':
-        content.push({ type: 'softHyphen' });
-        break;
-      case 'nobreakhyphen':
-        content.push({ type: 'noBreakHyphen' });
-        break;
-      case 'drawing': {
-        const drawingContent = fullMatch.match(/<w:drawing>([\s\S]*?)<\/w:drawing>/i);
-        if (drawingContent) {
-          content.push({ type: 'drawing', drawing: extractDrawing(drawingContent[1]) });
-        }
-        break;
-      }
-      case 'fldchar': {
-        const fldCharType = getAttrExact(fullMatch, 'w', 'fldCharType');
-        if (fldCharType) content.push({ type: 'fieldChar', fldCharType: fldCharType as any });
-        break;
-      }
-      case 'instrtext': {
-        const instrMatch = fullMatch.match(/<w:instrText[^>]*>([\s\S]*?)<\/w:instrText>/i);
-        if (instrMatch)
-          content.push({ type: 'instrText', text: cleanDocxText(instrMatch[1]).trim() });
-        break;
-      }
-      case 'sym': {
-        const font = getAttrExact(fullMatch, 'w', 'font') || '';
-        const char = normalizeSymChar(getAttrExact(fullMatch, 'w', 'char') || '');
-        if (font && char) content.push({ type: 'sym', font, char });
-        break;
-      }
-    }
+    runTagHandlers[m[1].toLowerCase()]?.(m[0], m[2] || '');
   }
 
   // Fallback: if no content found, try plain text extraction
@@ -454,48 +437,42 @@ function extractParagraph(pXml: string): DocxParagraph {
   const re =
     /<((?:w:(?:r|hyperlink|bookmarkStart|bookmarkEnd|br|cr)|m:oMath))(\s[^>]*)?\/?>([\s\S]*?<\/\1>)?/gi;
   let m;
+  const paraChildHandlers: Record<string, (fullMatch: string) => void> = {
+    'w:r': (fullMatch) => {
+      content.push({ type: 'run', run: extractRun(fullMatch) });
+    },
+    'w:br': (fullMatch) => {
+      const brType = getAttrExact(fullMatch, 'w', 'type');
+      content.push({
+        type: 'run',
+        run: { content: [{ type: 'break', breakType: brType as any }] },
+      });
+    },
+    'w:cr': () => {
+      content.push({ type: 'run', run: { content: [{ type: 'cr' }] } });
+    },
+    // Keep full OMML for round-trip; markdown scrapes m:t separately.
+    'm:oMath': (fullMatch) => {
+      content.push({ type: 'rawXml', xml: fullMatch });
+    },
+    'w:hyperlink': (fullMatch) => {
+      const rId = getAttrExact(fullMatch, 'r', 'id');
+      const anchor = getAttrExact(fullMatch, 'w', 'anchor');
+      const hlRuns = getAllTagsNS(fullMatch, 'w', 'r').map((r) => extractRun(r));
+      content.push({ type: 'hyperlink', hyperlink: { rId, anchor, runs: hlRuns } });
+    },
+    'w:bookmarkStart': (fullMatch) => {
+      const id = parseInt(getAttrExact(fullMatch, 'w', 'id') || '0', 10);
+      const name = getAttrExact(fullMatch, 'w', 'name') || '';
+      content.push({ type: 'bookmarkStart', bookmark: { id, name } });
+    },
+    'w:bookmarkEnd': (fullMatch) => {
+      const id = parseInt(getAttrExact(fullMatch, 'w', 'id') || '0', 10);
+      content.push({ type: 'bookmarkEnd', id });
+    },
+  };
   while ((m = re.exec(bodyXml)) !== null) {
-    const tagName = m[1];
-    const fullMatch = m[0];
-
-    switch (tagName) {
-      case 'w:r':
-        content.push({ type: 'run', run: extractRun(fullMatch) });
-        break;
-      case 'w:br': {
-        const brType = getAttrExact(fullMatch, 'w', 'type');
-        content.push({
-          type: 'run',
-          run: { content: [{ type: 'break', breakType: brType as any }] },
-        });
-        break;
-      }
-      case 'w:cr':
-        content.push({ type: 'run', run: { content: [{ type: 'cr' }] } });
-        break;
-      case 'm:oMath':
-        // Keep full OMML for round-trip; markdown scrapes m:t separately.
-        content.push({ type: 'rawXml', xml: fullMatch });
-        break;
-      case 'w:hyperlink': {
-        const rId = getAttrExact(fullMatch, 'r', 'id');
-        const anchor = getAttrExact(fullMatch, 'w', 'anchor');
-        const hlRuns = getAllTagsNS(fullMatch, 'w', 'r').map((r) => extractRun(r));
-        content.push({ type: 'hyperlink', hyperlink: { rId, anchor, runs: hlRuns } });
-        break;
-      }
-      case 'w:bookmarkStart': {
-        const id = parseInt(getAttrExact(fullMatch, 'w', 'id') || '0', 10);
-        const name = getAttrExact(fullMatch, 'w', 'name') || '';
-        content.push({ type: 'bookmarkStart', bookmark: { id, name } });
-        break;
-      }
-      case 'w:bookmarkEnd': {
-        const id = parseInt(getAttrExact(fullMatch, 'w', 'id') || '0', 10);
-        content.push({ type: 'bookmarkEnd', id });
-        break;
-      }
-    }
+    paraChildHandlers[m[1]]?.(m[0]);
   }
 
   return { pPr, content };
@@ -634,22 +611,20 @@ function extractBlockContent(xml: string): DocxBlockContent[] {
 
   // Top-level paragraphs, tables, and display OMML (`m:oMathPara`)
   const re = /<((?:w:(?:p|tbl)|m:oMathPara))(\s[^>]*)?\/?>([\s\S]*?<\/\1>)?/gi;
+  const bodyChildHandlers: Record<string, (fullMatch: string) => void> = {
+    'w:p': (fullMatch) => {
+      content.push({ type: 'paragraph', paragraph: extractParagraph(fullMatch) });
+    },
+    'w:tbl': (fullMatch) => {
+      content.push({ type: 'table', table: extractTable(fullMatch) });
+    },
+    'm:oMathPara': (fullMatch) => {
+      content.push({ type: 'rawXml', xml: fullMatch });
+    },
+  };
   let m;
   while ((m = re.exec(xml)) !== null) {
-    const tagName = m[1];
-    const fullMatch = m[0];
-
-    switch (tagName) {
-      case 'w:p':
-        content.push({ type: 'paragraph', paragraph: extractParagraph(fullMatch) });
-        break;
-      case 'w:tbl':
-        content.push({ type: 'table', table: extractTable(fullMatch) });
-        break;
-      case 'm:oMathPara':
-        content.push({ type: 'rawXml', xml: fullMatch });
-        break;
-    }
+    bodyChildHandlers[m[1]]?.(m[0]);
   }
 
   return content;

@@ -93,14 +93,15 @@ function schemaFor(op: string): Record<string, unknown> {
     >;
     return Object.fromEntries(keys.filter((k) => k in all).map((k) => [k, all[k]]));
   };
-  switch (op) {
-    case 'check_consent':
+  const handlers: Record<string, () => unknown> = {
+    check_consent: () => {
       return {
         type: 'object',
         properties: { export_as: { type: 'string' } },
         additionalProperties: false,
       };
-    case 'join':
+    },
+    join: () => {
       return {
         type: 'object',
         properties: pick(
@@ -132,7 +133,8 @@ function schemaFor(op: string): Record<string, unknown> {
         ),
         additionalProperties: false,
       };
-    case 'listen':
+    },
+    listen: () => {
       return {
         type: 'object',
         properties: pick(
@@ -154,7 +156,8 @@ function schemaFor(op: string): Record<string, unknown> {
         ),
         additionalProperties: false,
       };
-    case 'status':
+    },
+    status: () => {
       return {
         type: 'object',
         properties: pick(
@@ -174,21 +177,24 @@ function schemaFor(op: string): Record<string, unknown> {
         ),
         additionalProperties: false,
       };
-    case 'speak':
+    },
+    speak: () => {
       return {
         type: 'object',
         properties: pick('platform', 'provider', 'text', 'mission_id', 'export_as'),
         required: ['text'],
         additionalProperties: false,
       };
-    case 'chat':
+    },
+    chat: () => {
       return {
         type: 'object',
         properties: pick('platform', 'text', 'mission_id', 'export_as'),
         required: ['text'],
         additionalProperties: false,
       };
-    case 'leave':
+    },
+    leave: () => {
       return {
         type: 'object',
         properties: pick(
@@ -204,7 +210,8 @@ function schemaFor(op: string): Record<string, unknown> {
         ),
         additionalProperties: false,
       };
-    case 'resolve_next_target':
+    },
+    resolve_next_target: () => {
       return {
         type: 'object',
         properties: pick(
@@ -218,7 +225,8 @@ function schemaFor(op: string): Record<string, unknown> {
         ),
         additionalProperties: false,
       };
-    case 'normalize_transcript':
+    },
+    normalize_transcript: () => {
       return {
         type: 'object',
         properties: pick(
@@ -232,7 +240,8 @@ function schemaFor(op: string): Record<string, unknown> {
         ),
         additionalProperties: false,
       };
-    case 'extract_action_items':
+    },
+    extract_action_items: () => {
       return {
         type: 'object',
         properties: pick(
@@ -253,17 +262,21 @@ function schemaFor(op: string): Record<string, unknown> {
         ),
         additionalProperties: false,
       };
-    default:
-      return {
-        type: 'object',
-        properties: {
-          ...BASE_PROPERTIES,
-          ...SESSION_PROPERTIES,
-          ...INTELLIGENCE_PROPERTIES,
-        },
-        additionalProperties: false,
-      };
-  }
+    },
+  };
+  const handler = handlers[op] as (() => Record<string, unknown>) | undefined;
+  const run =
+    handler ??
+    (() => ({
+      type: 'object',
+      properties: {
+        ...BASE_PROPERTIES,
+        ...SESSION_PROPERTIES,
+        ...INTELLIGENCE_PROPERTIES,
+      },
+      additionalProperties: false,
+    }));
+  return run();
 }
 
 const MEETING_EXAMPLES: Record<string, Array<Record<string, unknown>>> = {

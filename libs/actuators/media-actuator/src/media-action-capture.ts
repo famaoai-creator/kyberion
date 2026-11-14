@@ -267,13 +267,13 @@ function pdfOcrOptions(params: any): (DocumentOcrOptions & { min_area_ratio?: nu
 
 async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
   const rootDir = pathResolver.rootDir();
-  switch (op) {
-    case 'json_read': {
+  const handlers: Record<string, () => Promise<any>> = {
+    json_read: async () => {
       const sourcePath = resolveMediaInputPath(params.path, resolve, 'json_read');
       const parsed = loadJsonValue(sourcePath);
       return { ...ctx, [params.export_as || 'last_json']: parsed };
-    }
-    case 'pptx_extract': {
+    },
+    pptx_extract: async () => {
       const sourcePath = resolveMediaInputPath(params.path, resolve, 'pptx_extract');
       const assetsDir = pathResolver.sharedTmp(`actuators/media-actuator/assets_${Date.now()}`);
       const design = await pptxUtils.distillPptxDesign(sourcePath, assetsDir);
@@ -289,8 +289,8 @@ async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
         [params.export_as || 'last_pptx_design']: output,
         last_assets_dir: assetsDir,
       };
-    }
-    case 'pptx_slide_text': {
+    },
+    pptx_slide_text: async () => {
       const sourcePath = resolveMediaInputPath(params.path, resolve, 'pptx_slide_text');
       let slides: any[] = extractPptxSlides(sourcePath);
       if (params.ocr === true || params.ocr?.enabled === true) {
@@ -310,8 +310,8 @@ async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
         }));
       }
       return { ...ctx, [params.export_as || 'last_pptx_slides']: slides };
-    }
-    case 'pptx_package_check': {
+    },
+    pptx_package_check: async () => {
       const sourcePath = resolveMediaInputPath(params.path, resolve, 'pptx_package_check');
       const report = inspectPptxPackage(safeReadFile(sourcePath, { encoding: null }) as Buffer);
       const failOn = String(params.fail_on ?? 'error');
@@ -335,8 +335,8 @@ async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
         ...ctx,
         [params.export_as || 'pptx_package_check']: { path: sourcePath, ...report },
       };
-    }
-    case 'pptx_package_diff': {
+    },
+    pptx_package_diff: async () => {
       const beforePath = resolveMediaInputPath(params.before, resolve, 'pptx_package_diff before');
       const afterPath = resolveMediaInputPath(params.after, resolve, 'pptx_package_diff after');
       const diff = diffPptxPackages(
@@ -345,8 +345,8 @@ async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
         { parts: params.parts !== undefined ? resolve(params.parts) : undefined }
       );
       return { ...ctx, [params.export_as || 'pptx_package_diff']: diff };
-    }
-    case 'xlsx_extract': {
+    },
+    xlsx_extract: async () => {
       const xlsxPath = resolveMediaInputPath(params.path, resolve, 'xlsx_extract');
       const xlsxDesign = await xlsxUtils.distillXlsxDesign(xlsxPath);
       // Token-efficient projection: when a sheet/range/values_only filter is given,
@@ -363,8 +363,8 @@ async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
           })
         : xlsxDesign;
       return { ...ctx, [params.export_as || 'last_xlsx_design']: output };
-    }
-    case 'docx_extract': {
+    },
+    docx_extract: async () => {
       const docxPath = resolveMediaInputPath(params.path, resolve, 'docx_extract');
       // Pictures are written as files (imagePath) unless embed_images asks
       // for a self-contained design with inline base64.
@@ -373,8 +373,8 @@ async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
         ...(params.image_dir ? { imageDir: String(resolve(params.image_dir)) } : {}),
       });
       return { ...ctx, [params.export_as || 'last_docx_design']: docxDesign };
-    }
-    case 'pdf_extract': {
+    },
+    pdf_extract: async () => {
       const pdfPath = resolveMediaInputPath(params.path, resolve, 'pdf_extract');
       let pdfDesign = await distillPdfDesign(pdfPath, { aesthetic: params.aesthetic !== false });
       try {
@@ -388,8 +388,8 @@ async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
       const ocrOptions = pdfOcrOptions(params);
       if (ocrOptions) pdfDesign = await augmentPdfDesignWithImageOcr(pdfDesign, ocrOptions);
       return { ...ctx, [params.export_as || 'last_pdf_design']: pdfDesign };
-    }
-    case 'pdf_split': {
+    },
+    pdf_split: async () => {
       // Split a (optionally password-protected) PDF into one file per page.
       // Backed by the pypdf bridge: it decrypts with the supplied password and
       // copies each page losslessly (object graph preserved). The password is
@@ -465,8 +465,8 @@ async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
           pages,
         },
       };
-    }
-    case 'pdf_merge': {
+    },
+    pdf_merge: async () => {
       const inputs = (Array.isArray(params.inputs) ? params.inputs : []).map((p: any) =>
         resolvePdfPath(p, resolve, 'pdf_merge input')
       );
@@ -487,8 +487,8 @@ async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
           out: pathResolver.toRepoRelative(result.out || outAbs),
         },
       };
-    }
-    case 'pdf_extract_range': {
+    },
+    pdf_extract_range: async () => {
       const inputAbs = resolvePdfPath(params.path, resolve, 'pdf_extract_range path');
       if (!safeExistsSync(inputAbs))
         throw new Error(`pdf_extract_range: input not found: ${resolve(params.path)}`);
@@ -507,8 +507,8 @@ async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
           pages: result.pages,
         },
       };
-    }
-    case 'pdf_delete_pages': {
+    },
+    pdf_delete_pages: async () => {
       const inputAbs = resolvePdfPath(params.path, resolve, 'pdf_delete_pages path');
       if (!safeExistsSync(inputAbs))
         throw new Error(`pdf_delete_pages: input not found: ${resolve(params.path)}`);
@@ -527,8 +527,8 @@ async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
           deleted: result.deleted,
         },
       };
-    }
-    case 'pdf_reorder': {
+    },
+    pdf_reorder: async () => {
       const inputAbs = resolvePdfPath(params.path, resolve, 'pdf_reorder path');
       if (!safeExistsSync(inputAbs))
         throw new Error(`pdf_reorder: input not found: ${resolve(params.path)}`);
@@ -547,8 +547,8 @@ async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
           order: result.order,
         },
       };
-    }
-    case 'pdf_rotate': {
+    },
+    pdf_rotate: async () => {
       const inputAbs = resolvePdfPath(params.path, resolve, 'pdf_rotate path');
       if (!safeExistsSync(inputAbs))
         throw new Error(`pdf_rotate: input not found: ${resolve(params.path)}`);
@@ -578,8 +578,8 @@ async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
           angle: result.angle,
         },
       };
-    }
-    case 'pdf_remove_password': {
+    },
+    pdf_remove_password: async () => {
       const inputAbs = resolvePdfPath(params.path, resolve, 'pdf_remove_password path');
       if (!safeExistsSync(inputAbs))
         throw new Error(`pdf_remove_password: input not found: ${resolve(params.path)}`);
@@ -597,8 +597,8 @@ async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
           out: pathResolver.toRepoRelative(result.out || outAbs),
         },
       };
-    }
-    case 'pdf_encrypt': {
+    },
+    pdf_encrypt: async () => {
       const inputAbs = resolvePdfPath(params.path, resolve, 'pdf_encrypt path');
       if (!safeExistsSync(inputAbs))
         throw new Error(`pdf_encrypt: input not found: ${resolve(params.path)}`);
@@ -622,8 +622,8 @@ async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
           out: pathResolver.toRepoRelative(result.out || outAbs),
         },
       };
-    }
-    case 'pdf_metadata': {
+    },
+    pdf_metadata: async () => {
       const inputAbs = resolvePdfPath(params.path, resolve, 'pdf_metadata path');
       if (!safeExistsSync(inputAbs))
         throw new Error(`pdf_metadata: input not found: ${resolve(params.path)}`);
@@ -657,8 +657,8 @@ async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
           ...(result.count !== undefined ? { count: result.count } : {}),
         },
       };
-    }
-    case 'pdf_stamp': {
+    },
+    pdf_stamp: async () => {
       const inputAbs = resolvePdfPath(params.path, resolve, 'pdf_stamp path');
       if (!safeExistsSync(inputAbs))
         throw new Error(`pdf_stamp: input not found: ${resolve(params.path)}`);
@@ -689,8 +689,8 @@ async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
           stamped: result.stamped,
         },
       };
-    }
-    case 'document_digest': {
+    },
+    document_digest: async () => {
       // Extract a document and return concise LLM-friendly Markdown.
       // Supports: pdf, pptx, xlsx, docx, html/htm, txt/md/markdown (auto-detected from extension).
       // params: { path: string, export_as?: string }
@@ -721,10 +721,11 @@ async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
         [exportKey]: result.markdown,
         ...(result.warnings.length ? { [`${exportKey}_warnings`]: result.warnings } : {}),
       };
-    }
-    default:
-      throw new Error(`[UNKNOWN_OP] Unknown op: ${op}`);
-  }
+    },
+  };
+  const handler = handlers[op];
+  if (!handler) throw new Error(`[UNKNOWN_OP] Unknown op: ${op}`);
+  return handler();
 }
 
 export {

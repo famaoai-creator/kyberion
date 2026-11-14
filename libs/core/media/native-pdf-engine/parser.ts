@@ -21,6 +21,27 @@ import * as pdfStructure from './structure.js';
  * Streams (including /Index), object streams, filter chains, and XMP metadata.
  * Xref / stream-bound behaviour informed by PdfCraft `pdfcraft-cos` (MIT OR Apache-2.0).
  */
+/** PDF literal-string escapes emitted as raw bytes (line-continuation `\n`/`\r` handled at the call site). */
+const ESCAPE_BYTES: Record<string, number> = {
+  n: 0x0a,
+  r: 0x0d,
+  t: 0x09,
+  b: 0x08,
+  f: 0x0c,
+};
+
+/** PDF literal-string escapes emitted as characters. */
+const LITERAL_ESCAPES: Record<string, string> = {
+  '\\': '\\',
+  '(': '(',
+  ')': ')',
+  n: '\n',
+  r: '\r',
+  t: '\t',
+  b: '\b',
+  f: '\f',
+};
+
 export class NativePdfParser {
   private buffer: Buffer;
   private str: string;
@@ -1563,29 +1584,9 @@ export class NativePdfParser {
         i += advance;
         continue;
       }
-      switch (next) {
-        case 'n':
-          pushByte(0x0a);
-          break;
-        case 'r':
-          pushByte(0x0d);
-          break;
-        case 't':
-          pushByte(0x09);
-          break;
-        case 'b':
-          pushByte(0x08);
-          break;
-        case 'f':
-          pushByte(0x0c);
-          break;
-        case '\n':
-        case '\r':
-          break;
-        default:
-          pushByte(next.charCodeAt(0));
-          break;
-      }
+      const esc = ESCAPE_BYTES[next];
+      if (esc !== undefined) pushByte(esc);
+      else if (next !== '\n' && next !== '\r') pushByte(next.charCodeAt(0));
       i += 1;
     }
     return bytes.map((b) => b.toString(16).padStart(2, '0')).join('');
@@ -1621,38 +1622,9 @@ export class NativePdfParser {
         continue;
       }
 
-      switch (next) {
-        case '\\':
-          normalized += '\\';
-          break;
-        case '(':
-          normalized += '(';
-          break;
-        case ')':
-          normalized += ')';
-          break;
-        case 'n':
-          normalized += '\n';
-          break;
-        case 'r':
-          normalized += '\r';
-          break;
-        case 't':
-          normalized += '\t';
-          break;
-        case 'b':
-          normalized += '\b';
-          break;
-        case 'f':
-          normalized += '\f';
-          break;
-        case '\n':
-        case '\r':
-          break;
-        default:
-          normalized += next;
-          break;
-      }
+      const esc = LITERAL_ESCAPES[next];
+      if (esc !== undefined) normalized += esc;
+      else if (next !== '\n' && next !== '\r') normalized += next;
       i += 1;
     }
     return normalized;

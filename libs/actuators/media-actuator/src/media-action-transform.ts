@@ -159,8 +159,8 @@ async function maybeAugmentPdfDesignWithImageOcr(
 async function opTransform(op: string, params: any, ctx: any, resolve: Function) {
   const rootDir = pathResolver.rootDir();
   if (PDF_PYPDF_OPS.has(op)) return opCapture(op, params, ctx, resolve);
-  switch (op) {
-    case 'find_slides_by_owner': {
+  const handlers: Record<string, () => Promise<any>> = {
+    find_slides_by_owner: async () => {
       const slides = (params.slides ||
         ctx[params.from || 'last_pptx_slides'] ||
         []) as MediaSlideText[];
@@ -178,8 +178,8 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
         ...ctx,
         [params.export_as || 'slide_owner_matches']: result,
       };
-    }
-    case 'pptx_diff': {
+    },
+    pptx_diff: async () => {
       const before = (params.before ||
         ctx[params.before_from || 'before_slides'] ||
         []) as MediaSlideText[];
@@ -187,8 +187,8 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
         ctx[params.after_from || 'after_slides'] ||
         []) as MediaSlideText[];
       return { ...ctx, [params.export_as || 'pptx_diff']: pptxDiff({ before, after }) };
-    }
-    case 'pdf_to_pptx_design': {
+    },
+    pdf_to_pptx_design: async () => {
       const pdfDesign = ctx[params.from || 'last_pdf_design'];
       if (!pdfDesign || typeof pdfDesign !== 'object') {
         throw new Error(
@@ -207,8 +207,8 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
         ),
         merged_output_format: 'pptx',
       };
-    }
-    case 'pdf_to_xlsx_design': {
+    },
+    pdf_to_xlsx_design: async () => {
       const pdfDesign = ctx[params.from || 'last_pdf_design'];
       if (!pdfDesign || typeof pdfDesign !== 'object') {
         throw new Error(
@@ -223,8 +223,8 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
         ),
         merged_output_format: 'xlsx',
       };
-    }
-    case 'apply_theme': {
+    },
+    apply_theme: async () => {
       const themes = loadThemeCatalog(rootDir);
       if (!themes || typeof themes !== 'object' || !themes.themes) {
         logger.warn('[MEDIA_TRANSFORM] theme catalog not found, skipping theme application');
@@ -288,8 +288,8 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
             }
           : ctx.active_web_theme,
       };
-    }
-    case 'apply_pattern': {
+    },
+    apply_pattern: async () => {
       const patternPath = resolveMediaRepositoryPath(
         rootDir,
         resolve(params.pattern_path),
@@ -300,8 +300,8 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
       }
       const pattern = loadDesignPattern(rootDir, patternPath);
       return { ...ctx, active_pattern: pattern, pattern_id: pattern.pattern_id };
-    }
-    case 'merge_content': {
+    },
+    merge_content: async () => {
       const pattern = ctx.active_pattern;
       const theme = ctx.active_theme;
       const contentData = resolve(params.content_data) || pattern?.content_data || [];
@@ -343,14 +343,14 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
 
       // For non-pptx formats, store the merged data for downstream processing
       return { ...ctx, merged_content: contentData, merged_output_format: outputFormat };
-    }
-    case 'set': {
+    },
+    set: async () => {
       const key = resolve(params.key);
       const value = resolve(params.value);
       if (key) return { ...ctx, [key]: value };
       return ctx;
-    }
-    case 'layout_template_from_pptx_design': {
+    },
+    layout_template_from_pptx_design: async () => {
       const fromKey = resolve(params.from) || 'last_pptx_design';
       const design = ctx[fromKey];
       if (!design)
@@ -397,8 +397,8 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
         template,
       };
       return { ...ctx, [params.export_as || 'last_layout_geometry']: result };
-    }
-    case 'theme_from_pptx_design': {
+    },
+    theme_from_pptx_design: async () => {
       const fromKey = resolve(params.from) || 'last_pptx_design';
       const design = ctx[fromKey];
       if (!design) {
@@ -423,8 +423,8 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
         nextCtx[params.export_master_as] = design.master;
       }
       return nextCtx;
-    }
-    case 'proposal_storyline_from_brief': {
+    },
+    proposal_storyline_from_brief: async () => {
       const fromKey = resolve(params.from) || 'last_json';
       const rawBrief = ctx[fromKey];
       if (!rawBrief || typeof rawBrief !== 'object') {
@@ -467,8 +467,8 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
           slides,
         } satisfies ProposalStorylineADF,
       };
-    }
-    case 'document_outline_from_brief': {
+    },
+    document_outline_from_brief: async () => {
       const fromKey = resolve(params.from) || 'last_json';
       const rawBrief = ctx[fromKey];
       if (!rawBrief || typeof rawBrief !== 'object') {
@@ -550,8 +550,8 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
         ...ctx,
         [params.export_as || 'document_outline']: outline,
       };
-    }
-    case 'brief_to_design_protocol': {
+    },
+    brief_to_design_protocol: async () => {
       const fromKey = resolve(params.from) || 'last_json';
       const rawBrief =
         params.brief && typeof params.brief === 'object' ? params.brief : ctx[fromKey];
@@ -575,8 +575,8 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
         last_design_protocol: compiled.protocol,
         last_design_protocol_kind: compiled.protocolKind,
       };
-    }
-    case 'deck_from_html': {
+    },
+    deck_from_html: async () => {
       // Convention-based HTML → editable PptxDesignProtocol. Source is an HTML
       // string from a ctx channel (`from`), an inline `html` param, or a file
       // (`path`). Produces `last_pptx_design` for a downstream pptx_render.
@@ -614,8 +614,8 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
         last_design_protocol_kind: 'pptx',
         deck_from_html_slide_count: slideCount,
       };
-    }
-    case 'deck_measurement_script': {
+    },
+    deck_measurement_script: async () => {
       // ブラウザ内で走らせる計測スクリプトを出す。`browser:evaluate` の params.script に渡す。
       // 計測スクリプトと deck_from_geometry は同じ幾何スキーマの対なので、
       // スクリプトをパイプラインに手書きさせず、この actuator が版管理する。
@@ -627,8 +627,8 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
         deckCss: resolve(params.deck_css),
       });
       return { ...ctx, [params.export_as || 'last_deck_measurement_script']: script };
-    }
-    case 'deck_from_geometry': {
+    },
+    deck_from_geometry: async () => {
       // ブラウザが確定させた幾何を PptxDesignProtocol へ転写する（純変換）。
       // 推定でなく実測なので、列幅・折返し位置がレポート HTML と一致する。
       const fromKey = resolve(params.from) || 'last_capture';
@@ -653,8 +653,8 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
         last_design_protocol_kind: 'pptx',
         deck_from_geometry_slide_count: slideCount,
       };
-    }
-    case 'pptx_layout_preflight': {
+    },
+    pptx_layout_preflight: async () => {
       const fromKey = resolve(params.from) || 'last_pptx_design';
       const protocol = ctx[fromKey];
       if (!protocol || typeof protocol !== 'object') {
@@ -669,8 +669,8 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
         ...ctx,
         [params.export_as || 'media_layout_diagnostics']: diagnostics,
       };
-    }
-    case 'lock_media_brief': {
+    },
+    lock_media_brief: async () => {
       // MP-05: fix the brief before anything is produced, and record which
       // parts the operator actually decided. An inference nobody can see is
       // how a deck ends up written for the wrong reader.
@@ -728,8 +728,8 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
       }
 
       return { ...ctx, [params.export_as || 'locked_media_brief']: locked };
-    }
-    case 'visual_review': {
+    },
+    visual_review: async () => {
       const capabilities = detectRasterCapabilities({ refresh: true });
       const lockedBrief = ctx[String(resolve(params.brief_from) || 'locked_media_brief')];
       const runShape = lockedBrief?.run_shape;
@@ -962,8 +962,8 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
           },
         },
       };
-    }
-    case 'visual_review_delivery_gate': {
+    },
+    visual_review_delivery_gate: async () => {
       const fromKey = String(resolve(params.from) || 'media_visual_review');
       const report = ctx[fromKey];
       if (!report || typeof report !== 'object') {
@@ -994,8 +994,8 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
           delivery_status: deliveryStatus,
         },
       };
-    }
-    case 'proposal_content_from_storyline': {
+    },
+    proposal_content_from_storyline: async () => {
       const fromKey = resolve(params.from) || 'proposal_storyline';
       const storyline = ctx[fromKey];
       if (!storyline || typeof storyline !== 'object' || !Array.isArray(storyline.slides)) {
@@ -1024,8 +1024,8 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
         active_theme_name: ctx.active_theme_name || storyline.recommended_theme,
         [params.export_as || 'proposal_content_data']: contentData,
       };
-    }
-    case 'document_pdf_from_brief': {
+    },
+    document_pdf_from_brief: async () => {
       const fromKey = resolve(params.from) || 'last_json';
       const brief = ctx[fromKey];
       if (!brief || typeof brief !== 'object') {
@@ -1037,8 +1037,8 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
         ...ctx,
         [params.export_as || 'last_pdf_design']: invoiceProtocol,
       };
-    }
-    case 'document_diagram_asset_from_brief': {
+    },
+    document_diagram_asset_from_brief: async () => {
       const fromKey = resolve(params.from) || 'last_json';
       const rawBrief = ctx[fromKey];
       if (!rawBrief || typeof rawBrief !== 'object') {
@@ -1072,8 +1072,8 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
       }
 
       return nextCtx;
-    }
-    case 'document_spreadsheet_design_from_brief': {
+    },
+    document_spreadsheet_design_from_brief: async () => {
       warnLegacyMediaOp(op);
       const rawBrief = resolveObjectInput(ctx, params, resolve, {
         fromKey: params.from,
@@ -1086,8 +1086,8 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
         exportAs: params.export_as || 'last_xlsx_design',
         briefContextKey: 'document_spreadsheet_brief',
       });
-    }
-    case 'document_report_design_from_brief': {
+    },
+    document_report_design_from_brief: async () => {
       warnLegacyMediaOp(op);
       const rawBrief = resolveObjectInput(ctx, params, resolve, {
         fromKey: params.from,
@@ -1100,8 +1100,8 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
         exportAs: params.export_as,
         briefContextKey: 'document_report_brief',
       });
-    }
-    case 'drawio_from_graph': {
+    },
+    drawio_from_graph: async () => {
       const graph = resolveGraphDefinition(rootDir, params, ctx, resolve);
       const iconMap = resolveDrawioIconMap(rootDir, params, resolve);
       const preferredTheme = resolve(params.theme) || graph?.render_hints?.theme;
@@ -1120,10 +1120,11 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
         [params.export_as || 'last_drawio_document']: document,
         last_drawio_graph: graph,
       };
-    }
-    default:
-      throw new Error(`[UNKNOWN_OP] Unknown op: ${op}`);
-  }
+    },
+  };
+  const handler = handlers[op];
+  if (!handler) throw new Error(`[UNKNOWN_OP] Unknown op: ${op}`);
+  return handler();
 }
 
 // Warn once per palette: runtime/personal/tenant themes bypass the CI
