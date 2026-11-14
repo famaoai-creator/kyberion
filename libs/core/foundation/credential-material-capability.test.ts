@@ -4,6 +4,8 @@ import { validateReadPermission } from '../tier-guard.js';
 import {
   withCredentialMaterialCapability,
   isCredentialMaterialCapability,
+  withAccountCredentialMaterialCapability,
+  assertAccountCredentialMaterialRead,
 } from './credential-material-capability.js';
 import {
   createSynchronousResourceGrantIssuer,
@@ -20,6 +22,36 @@ const asCaller = <T>(fn: () => T): T =>
 const file = 'knowledge/personal/connections/anthropic.json';
 
 describe('allocated material read ceiling', () => {
+  it('bounds account reads to registration and one generation and revokes captured continuations', async () => {
+    const account = 'a'.repeat(64);
+    const generation = '11111111-1111-4111-8111-111111111111';
+    const directory = `knowledge/personal/connections/accounts/${account}`;
+    let queued: Promise<void> | undefined;
+    asCaller(() =>
+      withAccountCredentialMaterialCapability('alpha', account, generation, () => {
+        assertAccountCredentialMaterialRead('alpha', account, generation);
+        expect(validateReadPermission(`${directory}/registration.json`).allowed).toBe(true);
+        expect(validateReadPermission(`${directory}/${generation}.json`).allowed).toBe(true);
+        expect(
+          validateReadPermission(`${directory}/22222222-2222-4222-8222-222222222222.json`).allowed
+        ).toBe(false);
+        expect(validateReadPermission(file).allowed).toBe(false);
+        expect(() => assertAccountCredentialMaterialRead('beta', account, generation)).toThrow();
+        const scope = currentResourceAccessScope()!;
+        runInResourceAccessScope({ ...scope, opaqueStoreToken: scope.opaqueStoreToken }, () => {
+          expect(() => assertAccountCredentialMaterialRead('alpha', account, generation)).toThrow();
+        });
+        queued = Promise.resolve().then(() => {
+          expect(() => assertAccountCredentialMaterialRead('alpha', account, generation)).toThrow();
+          expect(validateReadPermission(`${directory}/${generation}.json`).allowed).toBe(false);
+        });
+      })
+    );
+    await queued;
+    expect(() =>
+      withAccountCredentialMaterialCapability('alpha', account, generation, () => Promise.resolve())
+    ).toThrow('ASYNC');
+  });
   it('revokes queued reads even when the synchronous callback returns undefined', async () => {
     let queued: Promise<void> | undefined;
     asCaller(() =>

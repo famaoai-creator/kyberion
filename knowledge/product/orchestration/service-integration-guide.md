@@ -1,7 +1,7 @@
 ---
 title: 'Service Integration and Connection Guide'
 tags: [service, integration, connection, onboarding, security]
-last_updated: 2026-11-13
+last_updated: 2026-11-14
 runtime_stages: [alignment, contract_authoring, execution]
 ---
 
@@ -334,9 +334,15 @@ its own scoped admission and does not become a general bypass.
 Tenant credential resolution uses the selected binding's exact `secret_refs` and a trusted
 task credential envelope proving binding, service and owner. `pnpm kyberion secret introduce`
 is not tenant allocation: it stores service-level local material and does not establish
-per-connection provenance. Tenant tasks need a configured provenance-aware broker; scoped
-misses never fall back to operator material. Provider-specific provisioning remains required. Run `pnpm service:setup` and
-`pnpm service:preflight -- --service <service-id>` for credential readiness.
+per-connection provenance. Tenant tasks need an admitted provenance-aware broker:
+the local allocation broker for explicitly allocated registered personal API tokens,
+or a configured external broker for its supported accounts. Scoped misses never
+fall back to operator material; organization accounts still require their configured
+provisioning path. `pnpm service:setup` and
+`pnpm service:preflight -- --service <service-id>` report service-level readiness;
+they do not prove that a selected account generation is registered, allocated or
+admitted for a particular task. An optional service connection file is not an
+optional account ownership or task-admission check.
 
 Separately, if the tenant will send confidential or personal data to the
 service, the destination domain must be approved in the tenant-specific egress
@@ -447,16 +453,25 @@ pnpm kyberion grants grant --capability credential.use --tenant acme --purpose '
 ```
 
 After the source owner approves, repeat the same draft using `--approval-request-id <id>`.
-The configured broker's matching personal-source provenance must also name `allocationGrantId`.
-Every use checks the current claim, connection, grant, approval basis and broker response. Ordinary
+The broker's matching personal-source provenance must also name `allocationGrantId`.
+Every use checks the current claim, connection, grant, approval basis and material generation
+(or the external broker response). Ordinary
 revocation uses the existing `grants revoke` flow. Ambiguous grants, changed owners, withdrawn
 approval, other actions/scopes, and missing provenance fail closed.
 
 This path intentionally does **not** read a service-wide local personal connection file to infer
-per-binding provenance. An already configured broker must attest the exact source; no broker is
-installed or configured automatically. Session/CLI credential provenance and local multi-account
-material storage use the separate boundaries below. No real allocations or migrations are
-performed by installing this code.
+per-binding provenance. When no external resolver is configured, the existing local allocation
+broker reads an explicitly allocated, registered personal API-token account through an internal
+read-only capability for its exact registration and generation files. The grant must match the
+owner, service, binding and token references, as well as the current tenant/mission/task and any
+project restriction. Conflicting token names are refused before account material is read.
+The current claim and lease, grant/approval, binding snapshot and generation are revalidated on
+every managed consumption; incomplete registration and rotation fail closed. This does not grant
+additional service actions or approve their effects.
+
+An already configured external resolver remains authoritative and must attest the exact source;
+its miss or failure never falls through to local material. Session credentials use the separate
+boundaries below. No real allocations or migrations are performed by installing this code.
 
 The normal grant-aware runtime bootstrap installs the read-only allocation verifier even
 when an external credential resolver is already configured; it never replaces that resolver.
@@ -542,8 +557,34 @@ must establish whether the external write occurred before any manual reconciliat
 there is no automatic recovery command in this phase. Account material and registration
 records remain excluded from ambient discovery.
 
-Personal account runtime brokerage, tenantless task execution, GWS session collection
-and CLI account registration remain separate follow-up work. Installing this change
+Personal API-token accounts can be consumed by explicitly allocated tenant tasks as described
+above. Registration itself still grants no runtime use. Tenantless task execution and GWS
+session collection remain separate follow-up work. Installing this change
 performs no live login, key creation, allocation, ownership migration or security-setting
-change. A configured writer and an existing encryption key are prerequisites, not
-resources this UI creates.
+change. An existing encryption key is required for every account registration;
+an explicitly configured writer is additionally required for organization accounts.
+The UI creates neither prerequisite.
+
+### Register an existing account from the terminal
+
+`pnpm kyberion account preview <binding-id> --json` prints review metadata, never tokens.
+Save that exact JSON under the active personal profile and inspect it, then run
+`pnpm kyberion account request <binding-id> --review <path> --json`. The command
+compares the complete review with a fresh preview, including its initiating identity
+and generation. A changed review must be prepared again. The returned approval URL
+opens the human decision surface; this CLI does not approve requests.
+
+Use `pnpm kyberion account status <binding-id> --approval-id <id> --json` to check
+the request, then `pnpm kyberion account apply <binding-id> --approval-id <id>`.
+Only after approval is usable does apply prompt for each selected token in a hidden
+interactive terminal. Each prompt is bounded to two minutes and 16 KiB; cancellation,
+EOF, invalid input and terminal failure abort collection. Approval is rechecked after
+entry and again by the shared facade under its binding lock. No token value is
+accepted through arguments, environment, a file or piped stdin. The review file is
+metadata only and cannot supply credentials.
+
+Run this in the installed owner's checkout with its existing local identity; the
+command does not repair identity or create encryption keys. The current account
+encryption backend remains macOS Keychain with an existing key. See the
+[tenantless execution dependency roadmap](../architecture/api-credential-proof-boundary.md#tenantless-personal-execution-dependency-roadmap)
+for the separate steps required to execute claimed personal work without a tenant.

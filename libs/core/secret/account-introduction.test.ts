@@ -115,6 +115,7 @@ import {
   previewAccountIntroduction,
   proposeAccountIntroduction,
   accountIntroductionStatus,
+  reviewAccountIntroductionApproval,
   applyAccountIntroduction,
 } from './account-introduction.js';
 const principal = {
@@ -172,6 +173,61 @@ beforeEach(() => {
   m.checkHuman.mockReset();
 });
 describe('approved exact-account introduction', () => {
+  it('lets the accountable human review an agent request without taking over its apply', async () => {
+    const agent = { ...principal, requesterId: 'agent:cli-requester' };
+    const preview = previewAccountIntroduction(agent, 'slack-work');
+    proposeAccountIntroduction(agent, 'slack-work', preview);
+    expect(reviewAccountIntroductionApproval(principal, 'slack-work', 'approval-1')).toMatchObject({
+      ok: true,
+      approval_id: 'approval-1',
+      status: 'pending',
+      presented_digest: 'presented',
+    });
+    expect(() => reviewAccountIntroductionApproval(agent, 'slack-work', 'approval-1')).toThrow(
+      'human review'
+    );
+    expect(() => accountIntroductionStatus(principal, 'slack-work', 'approval-1')).toThrow(
+      'ACCOUNT_INTRODUCTION'
+    );
+    Object.assign(m.record!, {
+      status: 'approved',
+      decidedBy: 'user:owner',
+      verifiedPresentedDigest: 'presented',
+    });
+    await expect(apply()).rejects.toThrow('ACCOUNT_INTRODUCTION');
+    expect(m.store).not.toHaveBeenCalled();
+    expect(accountIntroductionStatus(agent, 'slack-work', 'approval-1').can_apply).toBe(true);
+    expect(
+      await applyAccountIntroduction(agent, 'slack-work', {
+        approval_id: 'approval-1',
+        material: token,
+      })
+    ).toMatchObject({ status: 'applied' });
+  });
+  it('keeps owner review bound to the real owner, partition and unchanged stored plan', () => {
+    const agent = { ...principal, requesterId: 'agent:cli-requester' };
+    proposeAccountIntroduction(
+      agent,
+      'slack-work',
+      previewAccountIntroduction(agent, 'slack-work')
+    );
+    const other = { ...principal, accountableId: 'user:other', requesterId: 'user:other' };
+    expect(() => reviewAccountIntroductionApproval(other, 'slack-work', 'approval-1')).toThrow(
+      'ACCOUNT_INTRODUCTION'
+    );
+    m.personal = false;
+    expect(() => reviewAccountIntroductionApproval(principal, 'slack-work', 'approval-1')).toThrow(
+      'personal approval scope'
+    );
+    m.personal = true;
+    m.record!.sourceText = m.record!.sourceText!.replace(
+      'agent:cli-requester',
+      'agent:substituted'
+    );
+    expect(() => reviewAccountIntroductionApproval(principal, 'slack-work', 'approval-1')).toThrow(
+      'ACCOUNT_INTRODUCTION'
+    );
+  });
   it('keeps personal requests in their partition with separate human and NHI identities', () => {
     propose();
     expect(m.create.mock.calls[0]![1]).toBe(true);

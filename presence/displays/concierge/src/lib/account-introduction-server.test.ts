@@ -13,7 +13,7 @@ vi.mock('@agent/core/service/service-binding-registry', () => ({
 vi.mock('@agent/core/secret/account-introduction', () => ({
   ACCOUNT_INTRODUCTION_CHANNEL: 'account-introduction',
   accountIntroductionApprovalBindingId: mocks.bindingId,
-  accountIntroductionStatus: mocks.status,
+  reviewAccountIntroductionApproval: mocks.status,
 }));
 vi.mock('./onboarding-authority-server', () => ({
   asOnboardingOwner: (run: () => unknown) => run(),
