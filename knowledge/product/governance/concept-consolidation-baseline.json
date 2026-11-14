@@ -1378,19 +1378,19 @@
     "scripts/ci_failure_triage.ts": {
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/cli-capture.ts": {
+    "scripts/cli/cli-capture.ts": {
       "runtime_path_literal_budget": 1
     },
-    "scripts/cli-memory.ts": {
+    "scripts/cli/cli-memory.ts": {
       "bespoke_cli_parser_budget": 3
     },
-    "scripts/cli-record.ts": {
+    "scripts/cli/cli-record.ts": {
       "runtime_path_literal_budget": 2
     },
-    "scripts/cli-speak.ts": {
+    "scripts/cli/cli-speak.ts": {
       "exported_type_name_duplication_budget": 1
     },
-    "scripts/cli-workflow-handlers.ts": {
+    "scripts/cli/cli-workflow-handlers.ts": {
       "json_state_write_budget": 2,
       "runtime_path_literal_budget": 2
     },
@@ -1939,7 +1939,7 @@
     "SpeakResult": [
       "libs/core/discussion/discussion-speaker.ts",
       "libs/shared-voice/src/native-tts.ts",
-      "scripts/cli-speak.ts"
+      "scripts/cli/cli-speak.ts"
     ]
   }
 }

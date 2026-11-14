@@ -5,7 +5,7 @@ import {
   validatePerceptionOptions,
   enhancementDeps,
   renderObservations,
-} from './lib/perception-enhancements.js';
+} from '../lib/perception-enhancements.js';
 /**
  * `pnpm kyberion watch <video> [--every <sec>] [--max-frames <n>] [--no-ocr]
  *   [--no-audio] [--ocr-provider <id>] [--frames <dir>] [--lang <bcp47>] [--json] [--out <file>]`
@@ -21,7 +21,7 @@ import { pathResolver } from '@agent/core/path-resolver';
 import { resolvePerceptionScope } from '@agent/shared-perception/observation';
 import { safeMkdir, safeReaddir, safeReadFile, safeWriteFile } from '@agent/core/secure-io';
 import type { TranscriptSegment } from '@agent/core/voice/speech-to-text-bridge';
-import { ScriptExitError } from './lib/harness.js';
+import { ScriptExitError } from '../lib/harness.js';
 import { transcribeMediaFile } from './cli-listen.js';
 import {
   assertExtension,
@@ -44,7 +44,7 @@ import {
   withPerceptionMediaRole,
   type CommonArgs,
   type PerceptionDeps,
-} from './lib/perception.js';
+} from '../lib/perception.js';
 
 const DEFAULT_MAX_FRAMES = 24;
 

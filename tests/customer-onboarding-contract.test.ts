@@ -18,8 +18,8 @@ describe('Customer onboarding contract', () => {
     const ux = read('docs/OPERATOR_UX_GUIDE.md');
     const cli = read('scripts/cli.ts');
     // SX: the help renderer was split out of scripts/cli.ts into
-    // scripts/cli-presentation.ts; the cli still owns the entrypoint.
-    const cliPresentation = read('scripts/cli-presentation.ts');
+    // scripts/cli/cli-presentation.ts; the cli still owns the entrypoint.
+    const cliPresentation = read('scripts/cli/cli-presentation.ts');
     const dashboard = read('scripts/sovereign/sovereign_dashboard.ts');
     const localDev = read('docs/developer/LOCAL_DEV.md');
 
@@ -49,7 +49,7 @@ describe('Customer onboarding contract', () => {
     );
     // DS-08: help dispatch moved from cli.ts into cli-command-handlers.ts;
     // the contract is that the CLI still renders help via printHelp.
-    const cliCommandHandlers = read('scripts/cli-command-handlers.ts');
+    const cliCommandHandlers = read('scripts/cli/cli-command-handlers.ts');
     expect(cli).toContain("from './cli-command-handlers.js'");
     expect(cliCommandHandlers).toContain("from './cli-presentation.js'");
     expect(cliCommandHandlers).toContain('printHelp');

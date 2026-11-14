@@ -2,10 +2,10 @@ import { parseSafeJsonInput } from '@agent/core/foundation/safe-json';
 import { setRegisteredEnv } from '@agent/core/foundation/env';
 import { pathResolver } from '@agent/core/path-resolver';
 import { printHelp } from './cli-presentation.js';
-import { formatCliManifestHelp } from './lib/cli-help.js';
-import { ScriptExitError } from './lib/harness.js';
+import { formatCliManifestHelp } from '../lib/cli-help.js';
+import { ScriptExitError } from '../lib/harness.js';
 import type { SupportedLocale } from '@agent/core/locale';
-import type { ActuatorRecord } from './cli.js';
+import type { ActuatorRecord } from '../cli.js';
 
 function workflowHandlers() {
   return import('./cli-workflow-handlers.js');
@@ -17,7 +17,7 @@ export type CliCommandContext = {
   restArgs: string[];
   normalizedArgs: string[];
   args: string[];
-  actuators: ReturnType<typeof import('./cli.js').loadActuators>;
+  actuators: ReturnType<typeof import('../cli.js').loadActuators>;
   locale: SupportedLocale;
   print: (value: unknown) => void;
   missionId: string | undefined;
@@ -30,7 +30,7 @@ export interface CliCommandDeps {
   searchActuators: (actuators: ActuatorRecord[], query: string) => ActuatorRecord[];
   findActuator: (actuators: ActuatorRecord[], name: string) => ActuatorRecord | undefined;
   readCliTextFile: (filePath: string, label: string) => string;
-  routeLegacyIntentToAsk: typeof import('./cli.js').routeLegacyIntentToAsk;
+  routeLegacyIntentToAsk: typeof import('../cli.js').routeLegacyIntentToAsk;
   applyApprovalDecision: (
     verb: 'approve' | 'reject',
     firstArg: string | undefined,

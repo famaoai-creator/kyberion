@@ -4,7 +4,7 @@ import {
   validatePerceptionOptions,
   enhancementDeps,
   renderObservations,
-} from './lib/perception-enhancements.js';
+} from '../lib/perception-enhancements.js';
 /**
  * `pnpm kyberion listen <audio> [--lang <bcp47>] [--timestamps] [--json] [--out <file>]`
  *
@@ -20,7 +20,7 @@ import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
 import { resolvePerceptionScope } from '@agent/shared-perception/observation';
 import type { TranscriptSegment } from '@agent/core/voice/speech-to-text-bridge';
-import { ScriptExitError } from './lib/harness.js';
+import { ScriptExitError } from '../lib/harness.js';
 import {
   assertExtension,
   assertPerceptionInput,
@@ -42,7 +42,7 @@ import {
   withPerceptionMediaRole,
   type CommonArgs,
   type PerceptionDeps,
-} from './lib/perception.js';
+} from '../lib/perception.js';
 
 export const LISTEN_USAGE = `Usage: pnpm kyberion listen <audio> [--lang <bcp47>] [--timestamps] [--json] [--out <file>]
 

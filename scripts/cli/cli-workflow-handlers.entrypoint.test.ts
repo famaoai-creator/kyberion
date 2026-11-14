@@ -5,7 +5,7 @@ import { readWorkflowTextFile } from './cli-workflow-handlers.js';
 describe('CLI workflow handler output boundary', () => {
   it('routes handler output through the injected workflow printer', () => {
     const source = String(
-      safeReadFile(pathResolver.rootResolve('scripts/cli-workflow-handlers.ts'), {
+      safeReadFile(pathResolver.rootResolve('scripts/cli/cli-workflow-handlers.ts'), {
         encoding: 'utf8',
       }) || ''
     );

@@ -14,8 +14,8 @@
 import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeReadFile, safeStat } from '@agent/core/secure-io';
-import { ScriptExitError } from './lib/harness.js';
-import { isInsideRepository, parseCommonOption, sniffImageDimensions } from './lib/perception.js';
+import { ScriptExitError } from '../lib/harness.js';
+import { isInsideRepository, parseCommonOption, sniffImageDimensions } from '../lib/perception.js';
 
 export const CAPTURE_USAGE = `Usage: pnpm kyberion capture [--screen | --window | --camera] [--out <image>] [--json]
 
@@ -86,7 +86,7 @@ export function buildPhotoPipelineInput(target: string): Record<string, unknown>
 
 export const defaultCaptureDeps: CaptureDeps = {
   async capture(input) {
-    const { handleAction } = await import('../libs/actuators/system-actuator/src/index.js');
+    const { handleAction } = await import('../../libs/actuators/system-actuator/src/index.js');
     return (await handleAction(input as never)) as Record<string, unknown>;
   },
 };

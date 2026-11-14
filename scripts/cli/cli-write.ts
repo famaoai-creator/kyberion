@@ -14,8 +14,8 @@
 import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
 import { assertSafeRepositoryPath, safeStat } from '@agent/core/secure-io';
-import { ScriptExitError } from './lib/harness.js';
-import { readSafeJsonFile } from './lib/json-input.js';
+import { ScriptExitError } from '../lib/harness.js';
+import { readSafeJsonFile } from '../lib/json-input.js';
 
 /** Render targets `media:generate_document` dispatches on, mapped to their extension. */
 export const WRITABLE_RENDER_TARGETS = {
@@ -172,9 +172,9 @@ export async function runWriteCommand(
 
   // Imported lazily so `--help` and argument errors cost no catalog loading.
   const { buildUnifiedDocumentBrief } =
-    await import('../libs/actuators/media-actuator/src/media-document-helpers.js');
+    await import('../../libs/actuators/media-actuator/src/media-document-helpers.js');
   const { compileBriefToDesignProtocol, renderCompiledProtocol, loadDocumentCompositionCatalog } =
-    await import('../libs/actuators/media-actuator/src/media-design-protocol.js');
+    await import('../../libs/actuators/media-actuator/src/media-design-protocol.js');
 
   const rootDir = pathResolver.rootDir();
   const unified = buildUnifiedDocumentBrief(

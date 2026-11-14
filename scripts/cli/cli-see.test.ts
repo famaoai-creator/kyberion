@@ -19,7 +19,7 @@ import {
   type SemanticSearchOptions,
 } from '@agent/shared-perception/semantic-index';
 import { renderSeeResult, runSeeCommand, SEE_USAGE } from './cli-see.js';
-import { createFakeDeps } from './lib/perception.test-support.js';
+import { createFakeDeps } from '../lib/perception.test-support.js';
 
 // Tier-guard denials emit best-effort audit events; keep them off the real
 // audit chain so the suite stays hermetic. Partial mock: the @agent/core

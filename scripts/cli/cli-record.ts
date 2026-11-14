@@ -12,8 +12,8 @@
 import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeStat } from '@agent/core/secure-io';
-import { ScriptExitError } from './lib/harness.js';
-import { isInsideRepository, parseCommonOption } from './lib/perception.js';
+import { ScriptExitError } from '../lib/harness.js';
+import { isInsideRepository, parseCommonOption } from '../lib/perception.js';
 
 export const RECORD_USAGE = `Usage: pnpm kyberion record screen|audio|camera [--duration <seconds>] [--fps <n>] [--out <file>] [--device <name>] [--json]
 
@@ -135,7 +135,7 @@ export function buildRecordCameraPipelineInput(
 
 export const defaultRecordDeps: RecordDeps = {
   async record(input) {
-    const { handleAction } = await import('../libs/actuators/system-actuator/src/index.js');
+    const { handleAction } = await import('../../libs/actuators/system-actuator/src/index.js');
     return (await handleAction(input as never)) as Record<string, unknown>;
   },
 };

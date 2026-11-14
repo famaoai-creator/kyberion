@@ -10,7 +10,7 @@ import {
   sniffMediaSignature,
   withPerceptionMediaRole,
 } from './perception.js';
-import { runListenCommand, transcribeMediaFile } from '../cli-listen.js';
+import { runListenCommand, transcribeMediaFile } from '../cli/cli-listen.js';
 import { createFakeDeps, fakeBridge, guardedReadBridge } from './perception.test-support.js';
 
 // Tier-guard denials emit best-effort audit events; keep them off the real

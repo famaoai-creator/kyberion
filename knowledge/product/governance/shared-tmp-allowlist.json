@@ -516,7 +516,7 @@
       "note": "legacy local-pad root scan and safety boundary; reads shared tmp handoffs until migration cutover"
     },
     {
-      "file": "scripts/cli-draw.ts",
+      "file": "scripts/cli/cli-draw.ts",
       "count": 1,
       "classification": "legit-tmp",
       "note": "`kyberion draw` tmp-root check that limits which provider byproducts are removed"
