@@ -51,7 +51,8 @@ Every Claude `PreToolUse` event goes through `scripts/provider_hook_entry.mjs`, 
 | `pnpm install` (optionally `--frozen-lockfile` and/or `--prefer-offline`) | no package names, no other flags                                               |
 | `pnpm build`, `pnpm --filter @agent/core build`                           | no extra arguments                                                             |
 | `bash .claude/hooks/session-start.sh`                                     | re-runs the cloud bootstrap (a no-op outside cloud sessions)                   |
-| `git status`, `git log`, `git fetch`, `git diff`                          | read-only; only short flags (`--short`, `--oneline`, `-5`, `--prune`, …)       |
+| `git status`, `git log`, `git fetch`                                      | read-only; only short flags (`--short`, `--oneline`, `-5`, `--prune`, …)       |
+| `git diff [<ref>] [<path>]`                                               | read-only; bounded refs (`HEAD~N`, branch names) and `.`; `..` stays denied    |
 | `git restore [--staged] [--worktree] [--source=<ref>] <paths>`            | roll back a broken dirty file before rebuilding                                |
 | `git stash` / `git stash -u` / `push` / `pop` / `apply` / `list` / `show` | save → rebuild clean → pop; `drop` and `clear` stay denied                     |
 | `git switch <branch>`, `git switch -c <new> [<start>]`, `git checkout -b` | branch moves only; bare `git checkout <x>` stays denied (it can restore paths) |

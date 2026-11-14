@@ -29,12 +29,15 @@ const BOOTSTRAP_HINT =
 const MAX_PAYLOAD_BYTES = 64 * 1024;
 
 // Plain words only: no quotes, globs, `$`, `;`, `&`, `|`, backticks, redirects,
-// parentheses, backslashes or newlines can survive this, so nothing can be chained.
-const SAFE_COMMAND = /^[A-Za-z0-9_@./=+-]+(?: [A-Za-z0-9_@./=+-]+)*$/;
+// parentheses, backslashes, carets or newlines can survive this, so nothing can
+// be chained. `~` is not a shell metachar and stays for HEAD~N revision forms.
+const SAFE_COMMAND = /^[A-Za-z0-9_@./=+~-]+(?: [A-Za-z0-9_@./=+~-]+)*$/;
 // A git ref / remote name: never an option (leading `-`), never a refspec (`:`)
-// or a path-like `.`/`..`.
-const GIT_REF = /^[A-Za-z0-9][A-Za-z0-9._/-]*$/;
+// or a path-like `.`/`..`. `~` suffixes bound history walks (HEAD~2).
+const GIT_REF = /^[A-Za-z0-9][A-Za-z0-9._/~-]*$/;
 const isRef = (token) => GIT_REF.test(token) && !token.includes('..');
+// The bare worktree path for `diff`/`restore` recovery; `..` stays denied.
+const isPathToken = (token) => token === '.' || isRef(token);
 
 /** Every token may appear at most once and must come from `allowed`. */
 function onlyFlags(tokens, allowed) {
@@ -109,7 +112,7 @@ function isAllowedGit(args) {
         '--shortstat',
         '--',
       ];
-      return rest.length <= 16 && rest.every((t) => flags.includes(t) || isRef(t));
+      return rest.length <= 16 && rest.every((t) => flags.includes(t) || isPathToken(t));
     }
     case 'restore': {
       // Recovery verb: restores index/worktree files so a broken dirty tree can
@@ -121,7 +124,7 @@ function isAllowedGit(args) {
         rest.every(
           (t) =>
             flags.includes(t) ||
-            isRef(t) ||
+            isPathToken(t) ||
             (t.startsWith('--source=') && isRef(t.slice('--source='.length)))
         )
       );
