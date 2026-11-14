@@ -84,7 +84,7 @@ describe('installed-units (darwin)', () => {
         [`${agents}/com.kyberion.agent-runtime-supervisor.plist`]: plist(
           'com.kyberion.agent-runtime-supervisor',
           OTHER,
-          'dist/scripts/agent_runtime_supervisor_daemon.js'
+          'dist/scripts/agent/agent_runtime_supervisor_daemon.js'
         ),
         [`${agents}/com.kyberion.daemon-watchdog.plist`]: LEGACY_TEMPLATE,
         [`${agents}/com.example.unrelated.plist`]: plist('com.example.unrelated', MINE),

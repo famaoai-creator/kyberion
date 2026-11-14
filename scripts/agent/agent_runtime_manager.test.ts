@@ -148,7 +148,7 @@ describe('agent_runtime_manager', () => {
 
   it('delegates command failures to the shared script harness', () => {
     const source = String(
-      safeReadFile(pathResolver.rootResolve('scripts/agent_runtime_manager.ts'), {
+      safeReadFile(pathResolver.rootResolve('scripts/agent/agent_runtime_manager.ts'), {
         encoding: 'utf8',
       })
     );

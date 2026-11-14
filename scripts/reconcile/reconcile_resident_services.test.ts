@@ -184,7 +184,7 @@ describe('scheduler reconcile', () => {
       [foreignSupervisor]: legacyPlist(
         'com.kyberion.agent-runtime-supervisor',
         '/Volumes/elsewhere/kyberion',
-        'dist/scripts/agent_runtime_supervisor_daemon.js'
+        'dist/scripts/agent/agent_runtime_supervisor_daemon.js'
       ),
     });
     host.loaded.add('com.kyberion.chronos');

@@ -3359,7 +3359,7 @@
         {
           "op": "system:shell",
           "params": {
-            "cmd": "node dist/scripts/agent_runtime_supervisor_status.js"
+            "cmd": "node dist/scripts/agent/agent_runtime_supervisor_status.js"
           }
         }
       ]

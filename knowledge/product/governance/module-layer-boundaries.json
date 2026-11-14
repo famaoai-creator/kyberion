@@ -277,7 +277,7 @@
     },
     {
       "layer": "orchestration",
-      "pattern": "scripts/agent_runtime_supervisor_daemon.ts"
+      "pattern": "scripts/agent/agent_runtime_supervisor_daemon.ts"
     },
     {
       "layer": "orchestration",

@@ -9,7 +9,7 @@ import {
   safeRmSync,
   safeWriteFile,
 } from '@agent/core/secure-io';
-import { ScriptExitError } from './lib/harness.js';
+import { ScriptExitError } from '../lib/harness.js';
 import {
   runAgentWorktreeCli,
   type AgentWorktreeCliOptions,

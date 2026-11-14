@@ -6,7 +6,7 @@ import { logger } from '@agent/core/core';
 import { auditChain } from '@agent/core/governance/audit-chain';
 import { executionAgentId } from '@agent/core/governance/execution-agent-id';
 import { classifyError } from '@agent/core/error-classifier';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from '../lib/harness.js';
 
 type AgentAction = 'ps' | 'spawn' | 'shutdown' | 'list-manifests' | 'inspect';
 type Print = (value: unknown) => void;

@@ -1253,7 +1253,7 @@
     },
     {
       "id": "script.agent-runtime.daemon",
-      "module": "scripts/agent_runtime_supervisor_daemon.ts",
+      "module": "scripts/agent/agent_runtime_supervisor_daemon.ts",
       "command": "agent-runtime daemon",
       "noun": "agent-runtime",
       "verb": "daemon",
@@ -1264,7 +1264,7 @@
     },
     {
       "id": "script.agent-runtime.manage",
-      "module": "scripts/agent_runtime_manager.ts",
+      "module": "scripts/agent/agent_runtime_manager.ts",
       "command": "agent-runtime manage",
       "noun": "agent-runtime",
       "verb": "manage",
@@ -4704,7 +4704,7 @@
     },
     {
       "id": "script.worktree.create",
-      "module": "scripts/agent_worktree.ts",
+      "module": "scripts/agent/agent_worktree.ts",
       "command": "worktree create",
       "noun": "worktree",
       "verb": "create",
@@ -4716,7 +4716,7 @@
     },
     {
       "id": "script.worktree.list",
-      "module": "scripts/agent_worktree.ts",
+      "module": "scripts/agent/agent_worktree.ts",
       "command": "worktree list",
       "noun": "worktree",
       "verb": "list",
@@ -4727,7 +4727,7 @@
     },
     {
       "id": "script.worktree.remove",
-      "module": "scripts/agent_worktree.ts",
+      "module": "scripts/agent/agent_worktree.ts",
       "command": "worktree remove",
       "noun": "worktree",
       "verb": "remove",

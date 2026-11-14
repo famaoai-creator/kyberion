@@ -101,7 +101,7 @@ export const DAEMON_SPECS: Record<string, DaemonServiceSpec> = {
   'agent-runtime-supervisor': {
     id: 'agent-runtime-supervisor',
     label: 'com.kyberion.agent-runtime-supervisor',
-    daemonScript: 'dist/scripts/agent_runtime_supervisor_daemon.js',
+    daemonScript: 'dist/scripts/agent/agent_runtime_supervisor_daemon.js',
     logBaseName: 'kyberion-agent-runtime-supervisor',
     keepAliveOnCrashOnly: true,
     verificationHint:

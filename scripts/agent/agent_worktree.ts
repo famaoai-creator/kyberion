@@ -28,7 +28,7 @@ import {
   type RemoveAgentWorktreeResult,
 } from '@agent/core/workforce/agent-worktree';
 import { resolveChangeRequestOwner } from '@agent/core/workforce/work-item-change-request';
-import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
 
 const USAGE =
   'Usage: kyberion worktree <create|list|remove> …\n' +

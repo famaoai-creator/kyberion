@@ -1242,13 +1242,13 @@
     "scripts/actuator_playground.ts": {
       "json_state_write_budget": 1
     },
-    "scripts/agent_runtime_manager.ts": {
+    "scripts/agent/agent_runtime_manager.ts": {
       "env_direct_read_budget": 3
     },
-    "scripts/agent_runtime_supervisor_daemon.ts": {
+    "scripts/agent/agent_runtime_supervisor_daemon.ts": {
       "env_direct_read_budget": 1
     },
-    "scripts/agent_worktree.ts": {
+    "scripts/agent/agent_worktree.ts": {
       "env_direct_read_budget": 1
     },
     "scripts/app_preflight.ts": {
