@@ -250,11 +250,11 @@ Hermes agent の `MemoryManager` / `MemoryProvider` は、ここで参考にす�
 
 目的: 失敗理由を見えるようにし、改善が数値で確認できるようにする。
 
-| ID           | タスク                                                     | 対象                                         | 受入条件                                                   |
-| ------------ | ---------------------------------------------------------- | -------------------------------------------- | ---------------------------------------------------------- |
-| JA-INTENT-60 | frame / assumption / clarification outcome を trace に出す | trace / surface artifact store               | raw personal data を出さず、decision metadata だけを残す   |
-| JA-INTENT-61 | Japanese contextual intent eval runner を追加              | `scripts/eval_japanese_contextual_intent.ts` | corpus を読み、route accuracy / ask-vs-act accuracy を出す |
-| JA-INTENT-62 | CI の lightweight contract に追加                          | package script / test                        | network や real calendar なしで deterministic に通る       |
+| ID           | タスク                                                     | 対象                                              | 受入条件                                                   |
+| ------------ | ---------------------------------------------------------- | ------------------------------------------------- | ---------------------------------------------------------- |
+| JA-INTENT-60 | frame / assumption / clarification outcome を trace に出す | trace / surface artifact store                    | raw personal data を出さず、decision metadata だけを残す   |
+| JA-INTENT-61 | Japanese contextual intent eval runner を追加              | `scripts/eval/eval_japanese_contextual_intent.ts` | corpus を読み、route accuracy / ask-vs-act accuracy を出す |
+| JA-INTENT-62 | CI の lightweight contract に追加                          | package script / test                             | network や real calendar なしで deterministic に通る       |
 
 ## 5. `来週の予定教えて` の期待フロー
 

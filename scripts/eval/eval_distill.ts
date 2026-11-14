@@ -8,7 +8,7 @@ import {
   reconstructDesktopIntent,
   validateDesktopIntentDraft,
 } from '@agent/core/virtual/desktop-intent-reconstruction';
-import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
 
 interface EvalResult {
   id: string;

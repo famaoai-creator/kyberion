@@ -468,7 +468,7 @@
       "note": "dry-run receipt before an approved governed cleanup; apply receipts are mission evidence"
     },
     {
-      "file": "scripts/eval_harness.ts",
+      "file": "scripts/eval/eval_harness.ts",
       "count": 1,
       "classification": "legit-tmp",
       "note": "deterministic evaluation receipt stream"

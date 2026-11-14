@@ -2496,7 +2496,7 @@ packaging contract、Prettier（変更コード）を確認した。Presence の
 - `pnpm run typecheck`: passed。
 - `pnpm check -- --scope pr --only script-integrity`: passed。
 - 実CLI `--help`: marketing review／agy SDK setup の2 entrypoint が exit code 0 で help を表示した。
-- `node --import ./scripts/ts-loader.mjs scripts/eval_japanese_contextual_intent.ts`: **50/50**、全指標 **1.0**、failures **0**、exit code 0。
+- `node --import ./scripts/ts-loader.mjs scripts/eval/eval_japanese_contextual_intent.ts`: **50/50**、全指標 **1.0**、failures **0**、exit code 0。
 - 現行 source 集計: `defineScript` **206 files**、`main().catch` **29 files**。直接 `process.argv` は harness／テスト／refactor utility に限定される。
 - `git diff --check`: passed。
 
@@ -5558,8 +5558,8 @@ frame／route／clarification の比較、成功時の report と OK 表示は�
 
 検証:
 
-- `pnpm exec vitest run scripts/eval_japanese_contextual_intent.test.ts`: **1 file / 1 test passed**。
-- `node --import ./scripts/ts-loader.mjs scripts/eval_japanese_contextual_intent.ts`: **50 items / frame 1.0 / route 1.0 / ask-vs-act 1.0 / OK**。
+- `pnpm exec vitest run scripts/eval/eval_japanese_contextual_intent.test.ts`: **1 file / 1 test passed**。
+- `node --import ./scripts/ts-loader.mjs scripts/eval/eval_japanese_contextual_intent.ts`: **50 items / frame 1.0 / route 1.0 / ask-vs-act 1.0 / OK**。
 - `pnpm run typecheck`、`git diff --check`: **passed**。
 
 ## 347. 2026-08-30 SX-06 distill evaluation の import-safe harness 化
@@ -5571,8 +5571,8 @@ frame／route／clarification の比較、成功時の report と OK 表示は�
 
 検証:
 
-- `pnpm exec vitest run scripts/eval_distill.test.ts`: **1 file / 1 test passed**。
-- `node --import ./scripts/ts-loader.mjs scripts/eval_distill.ts`: **score 1.0 / hard_failures 0 / exit 0**。
+- `pnpm exec vitest run scripts/eval/eval_distill.test.ts`: **1 file / 1 test passed**。
+- `node --import ./scripts/ts-loader.mjs scripts/eval/eval_distill.ts`: **score 1.0 / hard_failures 0 / exit 0**。
 - `node --import ./scripts/ts-loader.mjs scripts/check_script_integrity.ts`: **OK**。
 
 ## 348. 2026-08-30 SX-06 intent smoke の結果境界統一

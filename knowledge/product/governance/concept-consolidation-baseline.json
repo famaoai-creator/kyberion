@@ -1474,10 +1474,10 @@
     "scripts/env_config_report.ts": {
       "bespoke_cli_parser_budget": 3
     },
-    "scripts/eval_facets.ts": {
+    "scripts/eval/eval_facets.ts": {
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/eval_harness.ts": {
+    "scripts/eval/eval_harness.ts": {
       "bespoke_cli_parser_budget": 2
     },
     "scripts/evaluate_mission_orchestration.ts": {

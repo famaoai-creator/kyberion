@@ -20,8 +20,8 @@ import {
   safeLstat,
   safeReaddir,
 } from '@agent/core/secure-io';
-import { defineScript, isDirectScript } from './lib/harness.js';
-import { readSafeJsonFile } from './lib/json-input.js';
+import { defineScript, isDirectScript } from '../lib/harness.js';
+import { readSafeJsonFile } from '../lib/json-input.js';
 
 export interface FacetEvalFixture {
   kind: FacetKind;

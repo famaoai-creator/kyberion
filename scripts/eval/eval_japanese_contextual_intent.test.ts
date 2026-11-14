@@ -5,7 +5,7 @@ import { safeReadFile } from '@agent/core/secure-io';
 describe('Japanese contextual intent evaluation', () => {
   it('keeps corpus execution behind the shared output and failure boundaries', () => {
     const source = String(
-      safeReadFile(pathResolver.rootResolve('scripts/eval_japanese_contextual_intent.ts'), {
+      safeReadFile(pathResolver.rootResolve('scripts/eval/eval_japanese_contextual_intent.ts'), {
         encoding: 'utf8',
       })
     );

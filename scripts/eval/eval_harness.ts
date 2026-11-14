@@ -30,7 +30,7 @@ import {
   createScenarioSideEffectLog,
   type ScenarioSideEffectLog,
 } from '@agent/core/scenario/scenario-side-effect-log';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from '../lib/harness.js';
 import { evaluateResolvedFacetFixtures } from './eval_facets.js';
 
 export interface EvalHarnessConfiguration {
