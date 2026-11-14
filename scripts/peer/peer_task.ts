@@ -12,7 +12,7 @@ import {
   type PeerTaskState,
 } from '@agent/core/mesh/peer-task-exchange';
 import { getRegisteredEnvText } from '@agent/core/foundation';
-import { defineScript, isDirectScript, stripSharedScriptFlags } from './lib/harness.js';
+import { defineScript, isDirectScript, stripSharedScriptFlags } from '../lib/harness.js';
 
 function required(value: unknown, flag: string, command: string): string {
   const text = String(value || '').trim();

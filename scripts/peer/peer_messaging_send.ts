@@ -13,8 +13,8 @@ import {
 } from '@agent/core/mesh/peer-messaging';
 import { loadTenantPeerCatalog } from '@agent/core/mesh/peer-conversation';
 import { getRegisteredEnvText } from '@agent/core/foundation';
-import { defineScript, isDirectScript, stripSharedScriptFlags } from './lib/harness.js';
-import { parseSafeJsonInput } from './lib/json-input.js';
+import { defineScript, isDirectScript, stripSharedScriptFlags } from '../lib/harness.js';
+import { parseSafeJsonInput } from '../lib/json-input.js';
 
 export async function main(
   args: string[] = [],

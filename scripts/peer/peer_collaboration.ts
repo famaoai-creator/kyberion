@@ -4,7 +4,7 @@ import {
   decideMeshHubRecipientProposal,
   listMeshHubRecipientProposals,
 } from '@agent/core/mesh/mesh-hub-peer-messaging-adapter';
-import { defineScript, isDirectScript, stripSharedScriptFlags } from './lib/harness.js';
+import { defineScript, isDirectScript, stripSharedScriptFlags } from '../lib/harness.js';
 
 function normalizePeerCollaborationArguments(args: string[]): string[] {
   return stripSharedScriptFlags(args);

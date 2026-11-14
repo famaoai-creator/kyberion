@@ -414,7 +414,10 @@
       "definition": "Signed, tenant-scoped message transport between distinct enrolled Kyberion runtimes; a transport receipt is not work acceptance.",
       "glossary_anchor": "peer-messaging",
       "canonical_doc": "knowledge/product/architecture/agent-communication-layer-model.md",
-      "owner_modules": ["libs/core/mesh/peer-messaging.ts", "scripts/peer_conversation_server.ts"],
+      "owner_modules": [
+        "libs/core/mesh/peer-messaging.ts",
+        "scripts/peer/peer_conversation_server.ts"
+      ],
       "not_to_confuse_with": ["co-session", "a2a"]
     },
     {

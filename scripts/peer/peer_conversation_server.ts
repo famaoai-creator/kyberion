@@ -25,7 +25,7 @@ import { assertProtocolServiceRegistered } from '@agent/core/protocol-service-re
 import { recordProtocolServiceLifecycle } from '@agent/core/protocol-service-lifecycle';
 import { MESH_REQUEST_KINDS, type MeshRequest } from '@agent/core/mesh/mesh-hub-contract';
 import { getRegisteredEnvText, nowIso } from '@agent/core/foundation';
-import { defineScript, isDirectScript, stripSharedScriptFlags } from './lib/harness.js';
+import { defineScript, isDirectScript, stripSharedScriptFlags } from '../lib/harness.js';
 
 function normalizePeerServerArguments(args: string[]): string[] {
   return stripSharedScriptFlags(args);

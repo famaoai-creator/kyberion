@@ -15,8 +15,8 @@ import {
   peerDeliveryFailureOf,
 } from '@agent/core/mesh/peer-messaging';
 import { getRegisteredEnvText } from '@agent/core/foundation';
-import { defineScript, isDirectScript, stripSharedScriptFlags } from './lib/harness.js';
-import { parseSafeJsonObjectInput } from './lib/json-input.js';
+import { defineScript, isDirectScript, stripSharedScriptFlags } from '../lib/harness.js';
+import { parseSafeJsonObjectInput } from '../lib/json-input.js';
 
 function csv(value: unknown): string[] {
   if (Array.isArray(value)) return value.map((entry) => String(entry)).filter(Boolean);

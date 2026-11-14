@@ -4,7 +4,7 @@ import { safeReadFile } from '@agent/core/secure-io';
 
 function readScript(name: string): string {
   return String(
-    safeReadFile(pathResolver.rootResolve(`scripts/${name}`), {
+    safeReadFile(pathResolver.rootResolve(`scripts/peer/${name}`), {
       encoding: 'utf8',
     })
   );
