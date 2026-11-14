@@ -104,7 +104,7 @@ const MISSION_ID_PREFIX_PATTERN = /^[A-Z0-9][A-Z0-9_-]{1,23}$/;
 const MISSION_ID_MAX_LENGTH = 64;
 
 const CONTROLLER_RELATIVE = 'dist/scripts/mission_controller.js';
-const ALIGNMENT_REQUEST_RELATIVE = 'dist/scripts/mission_alignment_request.js';
+const ALIGNMENT_REQUEST_RELATIVE = 'dist/scripts/mission/mission_alignment_request.js';
 
 const AUTOMATED_METHODS: WorkMethod[] = ['api', 'program', 'ai_reasoning', 'computer_operation'];
 const RISK_EFFECTS = new Set(['money', 'irreversible', 'approval']);

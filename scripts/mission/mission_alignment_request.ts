@@ -15,7 +15,7 @@
  * approval to the exact brief that was approved, so editing the brief
  * afterwards invalidates the gate instead of silently inheriting the verdict.
  *
- *   node dist/scripts/mission_alignment_request.js --mission <ID> [--json]
+ *   node dist/scripts/mission/mission_alignment_request.js --mission <ID> [--json]
  */
 
 import * as path from 'node:path';
@@ -25,7 +25,7 @@ import {
   defineScript,
   isDirectScript,
   ScriptExitError,
-} from './lib/harness.js';
+} from '../lib/harness.js';
 import { loadApprovalRequest } from '@agent/core/governance/approval-store';
 import { findMissionPath as resolveMissionPath } from '@agent/core/path-resolver';
 import { ALIGNMENT_BRIEF_RELATIVE_PATH } from './mission_alignment_decision.js';
@@ -33,14 +33,14 @@ import {
   openAlignmentApproval,
   formatAlignmentRequest,
   type OpenAlignmentApprovalResult,
-} from './mission-alignment-gate/alignment-approval.js';
+} from '../mission-alignment-gate/alignment-approval.js';
 // Compatibility for existing integrations; shared implementation has no CLI dependency.
 export {
   ALIGNMENT_APPROVAL_CHANNEL,
   openAlignmentApproval,
   formatAlignmentRequest,
   type OpenAlignmentApprovalResult,
-} from './mission-alignment-gate/alignment-approval.js';
+} from '../mission-alignment-gate/alignment-approval.js';
 
 export async function main(args = currentProcessArgv()): Promise<OpenAlignmentApprovalResult> {
   const argv = await createStandardYargs(['node', 'mission_alignment_request', ...args])

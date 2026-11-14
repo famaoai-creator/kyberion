@@ -18,7 +18,7 @@ describe('mission alignment request entrypoint', () => {
   });
   it('keeps approval output and failure handling behind the shared harness', () => {
     const source = String(
-      safeReadFile(pathResolver.rootResolve('scripts/mission_alignment_request.ts'), {
+      safeReadFile(pathResolver.rootResolve('scripts/mission/mission_alignment_request.ts'), {
         encoding: 'utf8',
       })
     );

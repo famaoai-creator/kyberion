@@ -118,7 +118,7 @@ This path establishes identity files under `knowledge/personal/` and prepares th
 ### 2. Mission orchestration
 
 - `scripts/mission_controller.ts`
-- `scripts/mission_journal.ts`
+- `scripts/mission/mission_journal.ts`
 - `scripts/run_mission_orchestration_event_worker.ts`
 - `scripts/run_agent_runtime_supervisor.ts`
 - `libs/core/mission/mission-orchestration-events.ts`

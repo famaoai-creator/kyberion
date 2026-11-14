@@ -215,7 +215,7 @@ export async function applyApprovedMissionAdmissionConfirmation(
   // refuse on every sweep, so settle it once and ask for a fresh request.
   if (isApprovalRequestExpired(record)) {
     logger.warn(
-      `[CONFIRM] mission admission card ${record.id} expired before it could be applied | next: node dist/scripts/mission_alignment_request.js --work-item ${item.item_id} | evidence: ${item.item_id}`
+      `[CONFIRM] mission admission card ${record.id} expired before it could be applied | next: node dist/scripts/mission/mission_alignment_request.js --work-item ${item.item_id} | evidence: ${item.item_id}`
     );
     recordConfirmationFailure(record, deps);
     return { status: 'refused', reason: 'card expired before it could be applied' };

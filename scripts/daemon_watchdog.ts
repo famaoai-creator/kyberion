@@ -49,11 +49,11 @@ import {
   resolveDotMissionAdmission,
   resolveDotMissionAdmissionScope,
 } from '@agent/core/mission/mission-admission';
-import { continueHumanMissionAdmission } from './mission_admission_continuation.js';
+import { continueHumanMissionAdmission } from './mission/mission_admission_continuation.js';
 import {
   applyApprovedMissionAdmissionConfirmation,
   openMissionAdmissionConfirmation,
-} from './mission_admission_confirmation.js';
+} from './mission/mission_admission_confirmation.js';
 import * as nodePath from 'node:path';
 import * as os from 'node:os';
 

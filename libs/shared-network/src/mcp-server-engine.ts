@@ -689,7 +689,7 @@ function getMissionJournal(missionId: string, tenant: string): string {
   return safeExec(
     'node',
     [
-      nodePath.join(REPO_ROOT, 'dist/scripts/mission_journal.js'),
+      nodePath.join(REPO_ROOT, 'dist/scripts/mission/mission_journal.js'),
       '--mission-id',
       missionId,
       '--tenant-slug',

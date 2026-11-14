@@ -879,7 +879,7 @@ A `*.volatile.json` file co-located with each volatile Markdown surface. Holds m
 
 ### Mission Journal
 
-`scripts/mission_journal.ts`, the human-readable view over recorded mission history.
+`scripts/mission/mission_journal.ts`, the human-readable view over recorded mission history.
 
 ### Global Actuator Index
 

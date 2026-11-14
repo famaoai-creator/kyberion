@@ -35,7 +35,7 @@ import {
 } from '@agent/core/governance/approval-store';
 import { resolveAccountableHuman } from '@agent/core/organization/member-registry';
 import { isOperationsHalted } from '@agent/core/governance/operations-halt';
-import { openAlignmentApproval } from './mission-alignment-gate/alignment-approval.js';
+import { openAlignmentApproval } from '../mission-alignment-gate/alignment-approval.js';
 import type { WorkItem } from '@agent/core/workforce/work-coordination-types';
 
 export type AdmissionContinuationResult = {
@@ -175,7 +175,7 @@ export async function continueHumanMissionAdmission(
       };
       const run = async (verb: 'create' | 'start') => {
         refresh();
-        const invoke = deps.runController ?? (await import('./mission_controller.js')).main;
+        const invoke = deps.runController ?? (await import('../mission_controller.js')).main;
         refresh();
         const args = [
           verb,

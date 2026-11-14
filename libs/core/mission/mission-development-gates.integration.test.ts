@@ -25,7 +25,7 @@ const development = {
 let authority: typeof import('../authority.js');
 let io: typeof import('../secure-io.js');
 let planner: typeof import('./mission-process-planning.js');
-let machine: typeof import('../../../scripts/mission_machine_gate.js');
+let machine: typeof import('../../../scripts/mission/mission_machine_gate.js');
 let resolver: typeof import('../path-resolver.js');
 let workflow: typeof import('./mission-workflow-catalog.js');
 let directory: string;
@@ -47,7 +47,7 @@ beforeAll(async () => {
   io = await import('../secure-io.js');
   authority = await import('../authority.js');
   planner = await import('./mission-process-planning.js');
-  machine = await import('../../../scripts/mission_machine_gate.js');
+  machine = await import('../../../scripts/mission/mission_machine_gate.js');
   resolver = await import('../path-resolver.js');
   workflow = await import('./mission-workflow-catalog.js');
 }, 60000);
