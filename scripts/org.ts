@@ -32,6 +32,7 @@ import {
   isDirectScript,
   ScriptExitError,
 } from './lib/harness.js';
+import { parseCliFlags } from './lib/cli-flag-parser.js';
 
 type Print = (value: unknown) => void;
 
@@ -265,27 +266,62 @@ function parseArgs(argv: string[]): OrgCommand {
   }
 
   if (args[0] === 'role' && args[1] === 'draft') {
-    let intent: string | undefined;
-    let tenantSlug: string | undefined;
-    let json = false;
+    const draft: { intent?: string; tenantSlug?: string; json: boolean; help: boolean } = {
+      json: false,
+      help: false,
+    };
     const valueOf = (flag: string, value: string | undefined): string => {
       if (value === undefined || value.startsWith('--')) {
         throw new Error(`${flag} requires a value, e.g. ${flag} "<sentence>"`);
       }
       return value;
     };
-    for (let i = 2; i < args.length; i++) {
-      const arg = args[i];
-      if (arg === '--from-intent') intent = valueOf(arg, args[++i]);
-      else if (arg === '--tenant') tenantSlug = valueOf(arg, args[++i]);
-      else if (arg === '--json') json = true;
-      else if (arg === '--help' || arg === '-h') return { kind: 'help' };
-      else if (arg.startsWith('--')) throw new Error(`Unknown option: ${arg}`);
-    }
-    if (intent === undefined) throw new Error('--from-intent "<sentence>" is required');
+    parseCliFlags(
+      args.slice(2),
+      draft,
+      [
+        {
+          flags: ['--from-intent'],
+          takesValue: 'next',
+          apply: (o, v) => {
+            o.intent = valueOf('--from-intent', v);
+          },
+        },
+        {
+          flags: ['--tenant'],
+          takesValue: 'next',
+          apply: (o, v) => {
+            o.tenantSlug = valueOf('--tenant', v);
+          },
+        },
+        {
+          flags: ['--json'],
+          apply: (o) => {
+            o.json = true;
+          },
+        },
+        {
+          flags: ['--help', '-h'],
+          apply: (o) => {
+            o.help = true;
+          },
+        },
+      ],
+      {
+        onUnknown: (o, arg) => {
+          if (!o.help) throw new Error(`Unknown option: ${arg}`);
+        },
+      }
+    );
+    if (draft.help) return { kind: 'help' };
+    if (draft.intent === undefined) throw new Error('--from-intent "<sentence>" is required');
     return {
       kind: 'role-draft',
-      options: { intent, json, ...(tenantSlug ? { tenantSlug } : {}) },
+      options: {
+        intent: draft.intent,
+        json: draft.json,
+        ...(draft.tenantSlug ? { tenantSlug: draft.tenantSlug } : {}),
+      },
     };
   }
 
@@ -297,22 +333,48 @@ function parseArgs(argv: string[]): OrgCommand {
         allowedActuators: [],
         tierAccess: [],
       };
-      for (let i = 2; i < args.length; i++) {
-        const arg = args[i];
-        if (arg === '--role') options.roleId = args[++i];
-        else if (arg === '--authority' || arg === '--authority-role')
-          options.authorityRoleId = args[++i];
-        else if (arg === '--persona') options.persona = args[++i];
-        else if (arg === '--description') options.description = args[++i];
-        else if (arg === '--write-scope') (options.writeScopes as string[]).push(args[++i]);
-        else if (arg === '--scope-class') (options.scopeClasses as string[]).push(args[++i]);
-        else if (arg === '--actuator') (options.allowedActuators as string[]).push(args[++i]);
-        else if (arg === '--tier') (options.tierAccess as string[]).push(args[++i]);
-        else if (arg === '--approval-id') options.approvalId = args[++i];
-        else if (arg === '--dry-run') options.dryRun = true;
-        else if (arg === '--help' || arg === '-h') return { kind: 'help' };
-        else if (arg.startsWith('--')) throw new Error(`Unknown option: ${arg}`);
-      }
+      const pushTo = (key: string) => (o: Record<string, unknown>, v: string | undefined) =>
+        (o[key] as string[]).push(v as string);
+      const setTo = (key: string) => (o: Record<string, unknown>, v: string | undefined) => {
+        o[key] = v;
+      };
+      parseCliFlags(
+        args.slice(2),
+        options,
+        [
+          { flags: ['--role'], takesValue: 'next', apply: setTo('roleId') },
+          {
+            flags: ['--authority', '--authority-role'],
+            takesValue: 'next',
+            apply: setTo('authorityRoleId'),
+          },
+          { flags: ['--persona'], takesValue: 'next', apply: setTo('persona') },
+          { flags: ['--description'], takesValue: 'next', apply: setTo('description') },
+          { flags: ['--write-scope'], takesValue: 'next', apply: pushTo('writeScopes') },
+          { flags: ['--scope-class'], takesValue: 'next', apply: pushTo('scopeClasses') },
+          { flags: ['--actuator'], takesValue: 'next', apply: pushTo('allowedActuators') },
+          { flags: ['--tier'], takesValue: 'next', apply: pushTo('tierAccess') },
+          { flags: ['--approval-id'], takesValue: 'next', apply: setTo('approvalId') },
+          {
+            flags: ['--dry-run'],
+            apply: (o) => {
+              o.dryRun = true;
+            },
+          },
+          {
+            flags: ['--help', '-h'],
+            apply: (o) => {
+              o.help = true;
+            },
+          },
+        ],
+        {
+          onUnknown: (o, arg) => {
+            if (!o.help) throw new Error(`Unknown option: ${arg}`);
+          },
+        }
+      );
+      if (options.help) return { kind: 'help' };
 
       if (!options.roleId || !options.authorityRoleId) {
         throw new Error('Both --role and --authority are required');
@@ -337,31 +399,53 @@ function parseArgs(argv: string[]): OrgCommand {
     tierAccess: [],
     allowedDelegateTeamRoles: [],
   };
-  for (let i = 2; i < args.length; i++) {
-    const arg = args[i];
-    if (arg === '--name') options.name = args[++i];
-    else if (arg === '--domain') options.domain = args[++i];
-    else if (arg === '--team-role-id') options.teamRoleId = args[++i];
-    else if (arg === '--update') options.update = true;
-    else if (arg === '--authority' || arg === '--authority-role')
-      options.authorityRoleId = args[++i];
-    else if (arg === '--persona') options.persona = args[++i];
-    else if (arg === '--description') options.description = args[++i];
-    else if (arg === '--ownership-scope') options.ownershipScope = args[++i];
-    else if (arg === '--autonomy') options.autonomyLevel = args[++i];
-    else if (arg === '--parent-team-role') options.escalationParentTeamRole = args[++i];
-    else if (arg === '--capability') (options.requiredCapabilities as string[]).push(args[++i]);
-    else if (arg === '--scope-class') (options.scopeClasses as string[]).push(args[++i]);
-    else if (arg === '--write-scope') (options.writeScopes as string[]).push(args[++i]);
-    else if (arg === '--actuator') (options.allowedActuators as string[]).push(args[++i]);
-    else if (arg === '--tier') (options.tierAccess as string[]).push(args[++i]);
-    else if (arg === '--approval-id') options.approvalId = args[++i];
-    else if (arg === '--delegate-role')
-      (options.allowedDelegateTeamRoles as string[]).push(args[++i]);
-    else if (arg === '--dry-run') options.dryRun = true;
-    else if (arg === '--help' || arg === '-h') return { kind: 'help' };
-    else if (arg.startsWith('--')) throw new Error(`Unknown option: ${arg}`);
-  }
+  const pushTo = (key: string) => (o: Record<string, unknown>, v: string | undefined) =>
+    (o[key] as string[]).push(v as string);
+  const setTo = (key: string) => (o: Record<string, unknown>, v: string | undefined) => {
+    o[key] = v;
+  };
+  const setTrue = (key: string) => (o: Record<string, unknown>) => {
+    o[key] = true;
+  };
+  parseCliFlags(
+    args.slice(2),
+    options,
+    [
+      { flags: ['--name'], takesValue: 'next', apply: setTo('name') },
+      { flags: ['--domain'], takesValue: 'next', apply: setTo('domain') },
+      { flags: ['--team-role-id'], takesValue: 'next', apply: setTo('teamRoleId') },
+      { flags: ['--update'], apply: setTrue('update') },
+      {
+        flags: ['--authority', '--authority-role'],
+        takesValue: 'next',
+        apply: setTo('authorityRoleId'),
+      },
+      { flags: ['--persona'], takesValue: 'next', apply: setTo('persona') },
+      { flags: ['--description'], takesValue: 'next', apply: setTo('description') },
+      { flags: ['--ownership-scope'], takesValue: 'next', apply: setTo('ownershipScope') },
+      { flags: ['--autonomy'], takesValue: 'next', apply: setTo('autonomyLevel') },
+      {
+        flags: ['--parent-team-role'],
+        takesValue: 'next',
+        apply: setTo('escalationParentTeamRole'),
+      },
+      { flags: ['--capability'], takesValue: 'next', apply: pushTo('requiredCapabilities') },
+      { flags: ['--scope-class'], takesValue: 'next', apply: pushTo('scopeClasses') },
+      { flags: ['--write-scope'], takesValue: 'next', apply: pushTo('writeScopes') },
+      { flags: ['--actuator'], takesValue: 'next', apply: pushTo('allowedActuators') },
+      { flags: ['--tier'], takesValue: 'next', apply: pushTo('tierAccess') },
+      { flags: ['--approval-id'], takesValue: 'next', apply: setTo('approvalId') },
+      { flags: ['--delegate-role'], takesValue: 'next', apply: pushTo('allowedDelegateTeamRoles') },
+      { flags: ['--dry-run'], apply: setTrue('dryRun') },
+      { flags: ['--help', '-h'], apply: setTrue('help') },
+    ],
+    {
+      onUnknown: (o, arg) => {
+        if (!o.help) throw new Error(`Unknown option: ${arg}`);
+      },
+    }
+  );
+  if (options.help) return { kind: 'help' };
 
   if (!options.name || !options.domain) {
     throw new Error('Both --name and --domain are required');

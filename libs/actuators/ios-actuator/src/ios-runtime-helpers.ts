@@ -176,24 +176,24 @@ async function opCapture(
   options?: IOSAction['options']
 ) {
   const rootDir = pathResolver.rootDir();
-  switch (op) {
-    case 'read_json': {
+  const handlers: Record<string, () => Promise<any>> = {
+    read_json: async () => {
       const sourcePath = resolveIosRepositoryPath(rootDir, resolve(params.path));
       const parsed = await retry(async () => readJson<unknown>(sourcePath), buildRetryOptions());
       if (params.validate_as === 'mobile-app-profile') {
         assertValidMobileAppProfile(parsed, sourcePath);
       }
       return { ...ctx, [params.export_as || 'last_json']: parsed };
-    }
-    case 'read_text_file': {
+    },
+    read_text_file: async () => {
       const sourcePath = resolveIosRepositoryPath(rootDir, resolve(params.path));
       const content = await retry(
         async () => safeReadFile(sourcePath, { encoding: 'utf8' }) as string,
         buildRetryOptions()
       );
       return { ...ctx, [params.export_as || 'last_text']: content };
-    }
-    case 'simctl_health_check': {
+    },
+    simctl_health_check: async () => {
       const health = await retry(
         async () => collectSimctlHealth(ctx, options),
         buildRetryOptions()
@@ -204,8 +204,8 @@ async function opCapture(
         ios_available: health.available,
         ios_device_udid: health.selected_udid || ctx.ios_device_udid,
       };
-    }
-    case 'capture_runtime_session_handoff': {
+    },
+    capture_runtime_session_handoff: async () => {
       ensureSimctlAvailable(ctx, options);
       const device = resolveDeviceUdid(ctx, options, params);
       const bundleId = resolveBundleId(params, ctx, resolve);
@@ -256,8 +256,8 @@ async function opCapture(
         ),
         runtime_session_handoff_path: outPath,
       };
-    }
-    case 'describe_ui': {
+    },
+    describe_ui: async () => {
       ensureSimctlAvailable(ctx, options);
       const device = resolveDeviceUdid(ctx, options, params);
       const injector = new AxeInjector({ udid: device, timeoutMs: options?.timeout_ms });
@@ -267,10 +267,11 @@ async function opCapture(
         [params.export_as || 'ui_tree']: tree,
         ios_device_udid: device,
       };
-    }
-    default:
-      throw new Error(`[UNKNOWN_OP] Unknown op: ${op}`);
-  }
+    },
+  };
+  const handler = handlers[op];
+  if (!handler) throw new Error(`[UNKNOWN_OP] Unknown op: ${op}`);
+  return handler();
 }
 
 async function opTransform(
@@ -279,15 +280,16 @@ async function opTransform(
   ctx: Record<string, any>,
   resolve: (val: any) => any
 ) {
-  switch (op) {
-    case 'set': {
+  const handlers: Record<string, () => Promise<any>> = {
+    set: async () => {
       const key = resolve(params.key);
       if (!key) return ctx;
       return { ...ctx, [key]: resolve(params.value) };
-    }
-    default:
-      throw new Error(`[UNKNOWN_OP] Unknown op: ${op}`);
-  }
+    },
+  };
+  const handler = handlers[op];
+  if (!handler) throw new Error(`[UNKNOWN_OP] Unknown op: ${op}`);
+  return handler();
 }
 
 async function opApply(
@@ -298,8 +300,8 @@ async function opApply(
   options?: IOSAction['options']
 ) {
   const rootDir = pathResolver.rootDir();
-  switch (op) {
-    case 'launch_app': {
+  const handlers: Record<string, () => Promise<any>> = {
+    launch_app: async () => {
       ensureSimctlAvailable(ctx, options);
       const device = resolveDeviceUdid(ctx, options, params);
       const bundleId = resolveBundleId(params, ctx, resolve);
@@ -317,8 +319,8 @@ async function opApply(
         ios_device_udid: device,
         ios_bundle_id: bundleId,
       };
-    }
-    case 'install_app': {
+    },
+    install_app: async () => {
       ensureSimctlAvailable(ctx, options);
       const device = resolveDeviceUdid(ctx, options, params, { allowShutdownMatch: true });
       const appPath = resolveAppPath(params, ctx, resolve, rootDir);
@@ -338,8 +340,8 @@ async function opApply(
         last_installed_app_path: appPath,
         ios_device_udid: device,
       };
-    }
-    case 'boot_simulator': {
+    },
+    boot_simulator: async () => {
       ensureSimctlAvailable(ctx, options);
       const device = resolveDeviceUdid(ctx, options, params, { allowShutdownMatch: true });
       try {
@@ -355,8 +357,8 @@ async function opApply(
         }
         throw error;
       }
-    }
-    case 'shutdown_simulator': {
+    },
+    shutdown_simulator: async () => {
       ensureSimctlAvailable(ctx, options);
       const device = resolveDeviceUdid(ctx, options, params, { allowShutdownMatch: true });
       const output = await retry(
@@ -364,8 +366,8 @@ async function opApply(
         buildRetryOptions()
       );
       return { ...ctx, last_shutdown_output: output, ios_device_udid: device };
-    }
-    case 'uninstall_app': {
+    },
+    uninstall_app: async () => {
       ensureSimctlAvailable(ctx, options);
       const device = resolveDeviceUdid(ctx, options, params, { allowShutdownMatch: true });
       const bundleId = resolveBundleId(params, ctx, resolve);
@@ -383,8 +385,8 @@ async function opApply(
         ios_device_udid: device,
         ios_bundle_id: bundleId,
       };
-    }
-    case 'open_deep_link': {
+    },
+    open_deep_link: async () => {
       ensureSimctlAvailable(ctx, options);
       const device = resolveDeviceUdid(ctx, options, params);
       const url = String(resolve(params.url || '')).trim();
@@ -394,8 +396,8 @@ async function opApply(
         buildRetryOptions()
       );
       return { ...ctx, last_deep_link_output: output, ios_device_udid: device };
-    }
-    case 'capture_screen': {
+    },
+    capture_screen: async () => {
       ensureSimctlAvailable(ctx, options);
       const device = resolveDeviceUdid(ctx, options, params);
       const outPath = resolveIosRepositoryPath(
@@ -417,8 +419,8 @@ async function opApply(
         return undefined;
       }, buildRetryOptions());
       return { ...ctx, last_screenshot_path: outPath, ios_device_udid: device };
-    }
-    case 'emit_session_handoff': {
+    },
+    emit_session_handoff: async () => {
       const handoff = buildSessionHandoffArtifact(params, ctx, resolve, 'ios');
       const outPath = resolveIosRepositoryPath(
         rootDir,
@@ -436,15 +438,15 @@ async function opApply(
         [params.export_as || 'session_handoff']: handoff,
         session_handoff_path: outPath,
       };
-    }
-    case 'tap': {
+    },
+    tap: async () => {
       const injector = iosInjector(ctx, options, params);
       const x = iosFiniteNumber(resolve(params.x), 'x');
       const y = iosFiniteNumber(resolve(params.y), 'y');
       await retry(async () => injector.tap(x, y), buildRetryOptions());
       return ctx;
-    }
-    case 'tap_ui_node': {
+    },
+    tap_ui_node: async () => {
       const injector = iosInjector(ctx, options, params);
       const target = await retry(
         async () => resolveIosTapTarget(params, injector),
@@ -455,8 +457,8 @@ async function opApply(
       }
       await retry(async () => injector.tap(target.center.x, target.center.y), buildRetryOptions());
       return { ...ctx, [String(params.export_as ?? 'last_tap_target')]: target };
-    }
-    case 'swipe': {
+    },
+    swipe: async () => {
       const injector = iosInjector(ctx, options, params);
       await retry(
         async () =>
@@ -470,21 +472,21 @@ async function opApply(
         buildRetryOptions()
       );
       return ctx;
-    }
-    case 'input_text': {
+    },
+    input_text: async () => {
       const injector = iosInjector(ctx, options, params);
       const text = String(resolve(params.text || ''));
       if (!text.trim()) throw new Error('input_text requires params.text');
       await retry(async () => injector.inputText(text), buildRetryOptions());
       return ctx;
-    }
-    case 'press_button': {
+    },
+    press_button: async () => {
       const injector = iosInjector(ctx, options, params);
       const button = String(resolve(params.name || params.button || 'home'));
       await retry(async () => injector.pressButton(button), buildRetryOptions());
       return ctx;
-    }
-    case 'start_screen_stream': {
+    },
+    start_screen_stream: async () => {
       ensureSimctlAvailable(ctx, options);
       const device = resolveDeviceUdid(ctx, options, params);
       if (params.no_input !== true && !AxeInjector.availability().available) {
@@ -507,24 +509,25 @@ async function opApply(
         [String(params.export_as ?? 'screen_stream')]: session,
         ios_device_udid: device,
       };
-    }
-    case 'stop_screen_stream': {
+    },
+    stop_screen_stream: async () => {
       const device = resolveDeviceUdid(ctx, options, params);
       const result = await stopMirrorDaemonSession(mirrorStateFilePath('ios', device));
       return { ...ctx, [String(params.export_as ?? 'screen_stream_stop')]: result };
-    }
-    case 'stream_status': {
+    },
+    stream_status: async () => {
       const device = resolveDeviceUdid(ctx, options, params);
       const state = readMirrorSession(mirrorStateFilePath('ios', device));
       return { ...ctx, [String(params.export_as ?? 'screen_stream_status')]: state };
-    }
-    case 'log': {
+    },
+    log: async () => {
       logger.info(`[IOS_LOG] ${resolve(params.message)}`);
       return ctx;
-    }
-    default:
-      throw new Error(`[UNKNOWN_OP] Unknown op: ${op}`);
-  }
+    },
+  };
+  const handler = handlers[op];
+  if (!handler) throw new Error(`[UNKNOWN_OP] Unknown op: ${op}`);
+  return handler();
 }
 
 function iosFiniteNumber(value: unknown, name: string): number {

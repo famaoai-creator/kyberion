@@ -314,27 +314,24 @@ function clusterByAxis(
 // ─── DOCX Helpers ───────────────────────────────────────────
 
 function renderDocxBlock(block: DocxBlockContent, lines: string[], protocol: DocxDesignProtocol) {
-  switch (block.type) {
-    case 'paragraph':
-      renderDocxParagraph(block.paragraph, lines, protocol);
-      break;
-    case 'table':
-      renderDocxTable(block.table, lines, protocol);
-      break;
-    case 'sdt':
-      for (const child of block.content) {
+  const b = block as any;
+  const renderers: Record<string, () => void> = {
+    paragraph: () => renderDocxParagraph(b.paragraph, lines, protocol),
+    table: () => renderDocxTable(b.table, lines, protocol),
+    sdt: () => {
+      for (const child of b.content) {
         renderDocxBlock(child, lines, protocol);
       }
-      break;
-    case 'rawXml': {
+    },
+    rawXml: () => {
       // Display OMML (`m:oMathPara`) — scrape visible math text.
-      if (/oMath/i.test(block.xml)) {
-        const math = scrapeOmmlText(block.xml);
+      if (/oMath/i.test(b.xml)) {
+        const math = scrapeOmmlText(b.xml);
         if (math) lines.push(`$${math}$`, '');
       }
-      break;
-    }
-  }
+    },
+  };
+  renderers[block.type]?.();
 }
 
 function renderDocxParagraph(para: DocxParagraph, lines: string[], protocol: DocxDesignProtocol) {
@@ -410,42 +407,34 @@ function docxDrawingMarker(
 function extractDocxRunText(run: DocxRun, protocol?: DocxDesignProtocol): string {
   const parts: string[] = [];
   for (const c of run.content) {
-    switch (c.type) {
-      case 'text':
-        parts.push(c.text);
-        break;
-      case 'tab':
-        parts.push('\t');
-        break;
-      case 'cr':
-        parts.push('\n');
-        break;
-      case 'softHyphen':
-        parts.push('\u00ad');
-        break;
-      case 'noBreakHyphen':
-        parts.push('\u2011');
-        break;
-      case 'sym':
+    const cc = c as any;
+    const pushers: Record<string, () => void> = {
+      text: () => parts.push(cc.text),
+      tab: () => parts.push('\t'),
+      cr: () => parts.push('\n'),
+      softHyphen: () => parts.push('­'),
+      noBreakHyphen: () => parts.push('‑'),
+      sym: () => {
         // Surface as a Unicode char when the code point is valid.
         try {
-          const cp = Number.parseInt(c.char, 16);
+          const cp = Number.parseInt(cc.char, 16);
           if (Number.isFinite(cp) && cp >= 0x20) parts.push(String.fromCodePoint(cp));
         } catch {
           /* ignore bad sym */
         }
-        break;
-      case 'break':
+      },
+      break: () => {
         // <w:br/> without a type is an ordinary line break (textWrapping is
         // the default per ECMA-376); page/column breaks carry no text.
-        if (!c.breakType || c.breakType === 'textWrapping') parts.push('\n');
-        break;
-      case 'drawing':
-        if (c.drawing?.imageRId || c.drawing?.imageData) {
-          parts.push(docxDrawingMarker(c.drawing, protocol));
+        if (!cc.breakType || cc.breakType === 'textWrapping') parts.push('\n');
+      },
+      drawing: () => {
+        if (cc.drawing?.imageRId || cc.drawing?.imageData) {
+          parts.push(docxDrawingMarker(cc.drawing, protocol));
         }
-        break;
-    }
+      },
+    };
+    pushers[c.type]?.();
   }
   let text = parts.join('');
   // Apply inline formatting
@@ -622,11 +611,10 @@ function renderPptxSlide(slide: PptxSlide, lines: string[]) {
 }
 
 function renderPptxElement(el: PptxElement, lines: string[]) {
-  switch (el.type) {
-    case 'text':
-    case 'shape': {
+  const renderers: Record<string, () => void> = {
+    text: () => {
       const text = extractPptxElementText(el);
-      if (!text.trim()) break;
+      if (!text.trim()) return;
       // Title placeholders become headings
       if (el.placeholderType === 'title' || el.placeholderType === 'ctrTitle') {
         lines.push(`### ${text.trim()}`, '');
@@ -635,11 +623,11 @@ function renderPptxElement(el: PptxElement, lines: string[]) {
       } else {
         lines.push(text.trim(), '');
       }
-      break;
-    }
-    case 'table': {
+    },
+    shape: () => renderers['text']!(),
+    table: () => {
       const data = el.tableData ?? el.rows;
-      if (!data?.length) break;
+      if (!data?.length) return;
       for (let i = 0; i < data.length; i++) {
         const cells = (data[i] as (string | number | boolean | null)[]).map((c) => String(c ?? ''));
         lines.push(`| ${cells.join(' | ')} |`);
@@ -648,22 +636,19 @@ function renderPptxElement(el: PptxElement, lines: string[]) {
         }
       }
       lines.push('');
-      break;
-    }
-    case 'image': {
+    },
+    image: () => {
       const alt = el.altText ?? el.name ?? 'image';
       lines.push(`[Image: ${alt}]`, '');
-      break;
-    }
-    case 'chart': {
+    },
+    chart: () => {
       lines.push(`[Chart: ${el.name ?? 'chart'}]`, '');
-      break;
-    }
-    case 'smartart': {
+    },
+    smartart: () => {
       lines.push(`[SmartArt: ${el.name ?? 'diagram'}]`, '');
-      break;
-    }
-  }
+    },
+  };
+  renderers[el.type]?.();
 }
 
 function extractPptxElementText(el: PptxElement): string {

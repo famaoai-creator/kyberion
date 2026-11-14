@@ -101,15 +101,16 @@ export async function dispatchMeetingIntelligenceOp(
 ): Promise<unknown> {
   const params = rawParams;
   const { missionId, workItemId } = meetingContextIds(params, context);
-  switch (op) {
-    case 'conduct_1on_1':
+  const handlers: Record<string, () => Promise<any>> = {
+    conduct_1on_1: async () => {
       return conduct1on1({
         counterparty_ref: String(params.counterparty_ref || ''),
         proposal_draft_ref: String(params.proposal_draft_ref || ''),
         structure: Array.isArray(params.structure) ? params.structure.map(String) : [],
         output_path: String(params.output_path || ''),
       });
-    case 'hearing_session': {
+    },
+    hearing_session: async () => {
       return hearingSessionOp({
         topic: String(params.topic || ''),
         ...(params.counterparty_label
@@ -122,8 +123,8 @@ export async function dispatchMeetingIntelligenceOp(
         ...(params.output_path ? { output_path: String(params.output_path) } : {}),
         ...(params.language ? { language: String(params.language) } : {}),
       });
-    }
-    case 'tutor_session': {
+    },
+    tutor_session: async () => {
       const materialPath = params.material_path ? String(params.material_path) : '';
       const material = materialPath
         ? String(
@@ -142,8 +143,8 @@ export async function dispatchMeetingIntelligenceOp(
         ...(params.output_path ? { output_path: String(params.output_path) } : {}),
         ...(params.language ? { language: String(params.language) } : {}),
       });
-    }
-    case 'extract_action_items': {
+    },
+    extract_action_items: async () => {
       const transcriptPath = params.transcript_path ? String(params.transcript_path) : '';
       const transcript = transcriptPath
         ? String(
@@ -199,8 +200,8 @@ export async function dispatchMeetingIntelligenceOp(
       // pipelines pass that same file as `output_path`, so writing the result
       // there would clobber the store.
       return result;
-    }
-    case 'normalize_transcript': {
+    },
+    normalize_transcript: async () => {
       const transcriptPath = params.transcript_path ? String(params.transcript_path) : '';
       const raw = transcriptPath
         ? String(
@@ -221,8 +222,8 @@ export async function dispatchMeetingIntelligenceOp(
           ? (params.speaker_aliases as Record<string, string>)
           : {};
       return normalizeTranscriptText(raw, { attendees, speakerAliases }, transcriptPath);
-    }
-    case 'resolve_next_target': {
+    },
+    resolve_next_target: async () => {
       const events = (
         Array.isArray(params.events)
           ? params.events
@@ -242,8 +243,8 @@ export async function dispatchMeetingIntelligenceOp(
           ? { max_duration_sec: Number(params.max_duration_sec) }
           : {}),
       });
-    }
-    case 'generate_facilitation_script':
+    },
+    generate_facilitation_script: async () => {
       return generateFacilitationScriptOp({
         ...(missionId ? { mission_id: missionId } : {}),
         ...(workItemId ? { work_item_id: workItemId } : {}),
@@ -260,7 +261,8 @@ export async function dispatchMeetingIntelligenceOp(
           : {}),
         ...(params.language ? { language: String(params.language) } : {}),
       });
-    case 'generate_reminder_message': {
+    },
+    generate_reminder_message: async () => {
       const item = params.item || context[String(params.item_from || 'item')];
       if (!item || typeof item !== 'object') {
         throw new Error('generate_reminder_message: missing params.item (ActionItem)');
@@ -273,8 +275,8 @@ export async function dispatchMeetingIntelligenceOp(
         ...(params.tone ? { tone: params.tone as 'friendly' | 'formal' | 'urgent' } : {}),
         ...(params.language ? { language: String(params.language) } : {}),
       });
-    }
-    case 'run_action_item_reminder_sweep':
+    },
+    run_action_item_reminder_sweep: async () => {
       return runActionItemReminderSweepOp({
         ...(Array.isArray(params.mission_ids)
           ? { mission_ids: params.mission_ids.map(String) }
@@ -284,7 +286,8 @@ export async function dispatchMeetingIntelligenceOp(
         max_items_per_mission: Number(params.max_items || 20),
         ...(params.report_path ? { report_path: String(params.report_path) } : {}),
       });
-    case 'execute_self_action_items': {
+    },
+    execute_self_action_items: async () => {
       if (!missionId) throw new Error('execute_self_action_items: mission_id is required');
       const result = await executeSelfActionItemsOp({
         mission_id: missionId,
@@ -298,8 +301,8 @@ export async function dispatchMeetingIntelligenceOp(
         );
       }
       return result;
-    }
-    case 'track_pending_action_items': {
+    },
+    track_pending_action_items: async () => {
       if (!missionId) throw new Error('track_pending_action_items: mission_id is required');
       return trackPendingActionItemsOp({
         mission_id: missionId,
@@ -308,8 +311,8 @@ export async function dispatchMeetingIntelligenceOp(
         language: String(params.language || 'ja'),
         max_items: Number(params.max_items || 20),
       });
-    }
-    case 'audit_speaker_fairness': {
+    },
+    audit_speaker_fairness: async () => {
       if (!missionId) throw new Error('audit_speaker_fairness: mission_id is required');
       const report = auditSpeakerFairnessOp({ mission_id: missionId });
       if (params.output_path) {
@@ -319,10 +322,11 @@ export async function dispatchMeetingIntelligenceOp(
         );
       }
       return report;
-    }
-    default:
-      throw new Error(`[UNKNOWN_OP] Unknown meeting op: ${op}`);
-  }
+    },
+  };
+  const handler = handlers[op];
+  if (!handler) throw new Error(`[UNKNOWN_OP] Unknown meeting op: ${op}`);
+  return handler();
 }
 
 export function isMeetingIntelligenceOp(op: string): boolean {

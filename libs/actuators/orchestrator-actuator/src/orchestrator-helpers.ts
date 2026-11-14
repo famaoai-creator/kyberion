@@ -230,16 +230,16 @@ async function opControl(
     return result.context;
   };
 
-  switch (op) {
-    case 'if':
+  const handlers: Record<string, () => Promise<any>> = {
+    if: async () => {
       if (evaluateCondition(params.condition, ctx)) {
         return runNested(params.then, ctx);
       } else if (params.else) {
         return runNested(params.else, ctx);
       }
       return ctx;
-
-    case 'while':
+    },
+    while: async () => {
       let iterations = 0;
       const maxIter =
         typeof params.max_iterations === 'number' && params.max_iterations >= 0
@@ -250,10 +250,11 @@ async function opControl(
         iterations++;
       }
       return ctx;
-
-    default:
-      throw buildUnknownOrchestratorOpError(op);
-  }
+    },
+  };
+  const handler = handlers[op];
+  if (!handler) throw buildUnknownOrchestratorOpError(op);
+  return handler();
 }
 
 function asAdfSteps(value: unknown, op: string): AdfStep[] {
@@ -276,8 +277,8 @@ function asAdfSteps(value: unknown, op: string): AdfStep[] {
 
 async function opCapture(op: string, params: any, ctx: any) {
   const rootDir = pathResolver.rootDir();
-  switch (op) {
-    case 'read_json':
+  const handlers: Record<string, () => Promise<any>> = {
+    read_json: async () => {
       const inputPath = resolveOrchestratorRepositoryPath(rootDir, resolveVars(params.path, ctx));
       return {
         ...ctx,
@@ -286,7 +287,8 @@ async function opCapture(op: string, params: any, ctx: any) {
           'orchestrator read_json'
         ),
       };
-    case 'read_file':
+    },
+    read_file: async () => {
       return {
         ...ctx,
         [params.export_as || 'last_capture']: safeReadFile(
@@ -294,11 +296,13 @@ async function opCapture(op: string, params: any, ctx: any) {
           { encoding: 'utf8' }
         ),
       };
-    case 'shell':
+    },
+    shell: async () => {
       const cmd = resolveVars(params.cmd, ctx);
       const shellResult = await retry(async () => safeExec(cmd), buildRetryOptions(params.retry));
       return { ...ctx, [params.export_as || 'last_capture']: shellResult.trim() };
-    case 'intent_detect':
+    },
+    intent_detect: async () => {
       const mapping = parseIntentMapping(
         yaml.load(
           safeReadFile(
@@ -315,18 +319,21 @@ async function opCapture(op: string, params: any, ctx: any) {
         intent.trigger_phrases.some((phrase) => query.includes(phrase.toLowerCase()))
       );
       return { ...ctx, [params.export_as || 'detected_intent']: detected };
-    default:
-      throw buildUnknownOrchestratorOpError(op);
-  }
+    },
+  };
+  const handler = handlers[op];
+  if (!handler) throw buildUnknownOrchestratorOpError(op);
+  return handler();
 }
 
 async function opTransform(op: string, params: any, ctx: any) {
-  switch (op) {
-    case 'json_query':
+  const handlers: Record<string, () => Promise<any>> = {
+    json_query: async () => {
       const data = ctx[params.from || 'last_capture_data'];
       const result = params.path.split('.').reduce((o: any, i: string) => o?.[i], data);
       return { ...ctx, [params.export_as]: result };
-    case 'variable_hydrate':
+    },
+    variable_hydrate: async () => {
       const input =
         typeof ctx[params.from] === 'object'
           ? JSON.stringify(ctx[params.from])
@@ -338,7 +345,8 @@ async function opTransform(op: string, params: any, ctx: any) {
           ? parseSafeJsonInput(hydrated, 'variable_hydrate JSON')
           : hydrated,
       };
-    case 'request_to_execution_brief': {
+    },
+    request_to_execution_brief: async () => {
       const catalog = loadActuatorRequestArchetypes();
       const requestText = String(
         resolveVars(params.request_text || ctx.request_text || '', ctx)
@@ -403,8 +411,8 @@ async function opTransform(op: string, params: any, ctx: any) {
             missingInputs.length > 0 ? 'clarify_missing_inputs' : 'build_resolution_plan',
         },
       };
-    }
-    case 'execution_brief_to_operator_packet': {
+    },
+    execution_brief_to_operator_packet: async () => {
       const brief = ctx[params.from || 'execution_brief'];
       if (!brief || typeof brief !== 'object')
         throw new Error('execution_brief_to_operator_packet requires actuator-execution-brief');
@@ -451,8 +459,8 @@ async function opTransform(op: string, params: any, ctx: any) {
           llm_touchpoints: brief.llm_touchpoints || [],
         },
       };
-    }
-    case 'request_to_status_brief': {
+    },
+    request_to_status_brief: async () => {
       const requestText = String(
         resolveVars(params.request_text || ctx.request_text || '', ctx)
       ).trim();
@@ -493,8 +501,8 @@ async function opTransform(op: string, params: any, ctx: any) {
           ],
         } satisfies SystemStatusBrief,
       };
-    }
-    case 'execution_brief_to_resolution_plan': {
+    },
+    execution_brief_to_resolution_plan: async () => {
       const brief = ctx[params.from || 'execution_brief'];
       if (!brief || typeof brief !== 'object')
         throw new Error('execution_brief_to_resolution_plan requires actuator-execution-brief');
@@ -536,8 +544,8 @@ async function opTransform(op: string, params: any, ctx: any) {
           phases,
         } satisfies ActuatorResolutionPlan,
       };
-    }
-    case 'collect_system_status_snapshot': {
+    },
+    collect_system_status_snapshot: async () => {
       const brief = ctx[params.from || 'status_brief'];
       if (!brief || typeof brief !== 'object')
         throw new Error('collect_system_status_snapshot requires system-status-brief');
@@ -588,8 +596,8 @@ async function opTransform(op: string, params: any, ctx: any) {
           project_status: projectStatus,
         },
       };
-    }
-    case 'status_snapshot_to_report': {
+    },
+    status_snapshot_to_report: async () => {
       const snapshot = ctx[params.from || 'system_status_snapshot'];
       if (!snapshot || typeof snapshot !== 'object')
         throw new Error('status_snapshot_to_report requires system_status_snapshot');
@@ -773,8 +781,8 @@ async function opTransform(op: string, params: any, ctx: any) {
           ],
         },
       };
-    }
-    case 'status_report_to_operator_packet': {
+    },
+    status_report_to_operator_packet: async () => {
       const report = ctx[params.from || 'system_status_report'];
       if (!report || typeof report !== 'object')
         throw new Error('status_report_to_operator_packet requires system-status-report');
@@ -808,8 +816,8 @@ async function opTransform(op: string, params: any, ctx: any) {
           ],
         },
       };
-    }
-    case 'operator_packet_to_response_preview': {
+    },
+    operator_packet_to_response_preview: async () => {
       const packet = ctx[params.from || 'operator_packet'];
       if (!packet || typeof packet !== 'object')
         throw new Error('operator_packet_to_response_preview requires operator-interaction-packet');
@@ -848,8 +856,8 @@ async function opTransform(op: string, params: any, ctx: any) {
           text: lines.join('\n').trim(),
         },
       };
-    }
-    case 'delivery_pack_to_operator_packet': {
+    },
+    delivery_pack_to_operator_packet: async () => {
       const pack = ctx[params.from || 'delivery_pack'];
       if (!pack || typeof pack !== 'object')
         throw new Error('delivery_pack_to_operator_packet requires delivery-pack');
@@ -935,8 +943,8 @@ async function opTransform(op: string, params: any, ctx: any) {
           ],
         },
       };
-    }
-    case 'resolution_plan_to_pipeline_bundle': {
+    },
+    resolution_plan_to_pipeline_bundle: async () => {
       const plan = ctx[params.from || 'resolution_plan'];
       const brief = resolveExecutionBriefReference(ctx, params.brief_from) as
         Record<string, unknown> | undefined;
@@ -965,8 +973,8 @@ async function opTransform(op: string, params: any, ctx: any) {
           jobs,
         } satisfies ActuatorPipelineBundle,
       };
-    }
-    case 'pipeline_bundle_to_execution_plan_set': {
+    },
+    pipeline_bundle_to_execution_plan_set: async () => {
       const bundle = ctx[params.from || 'pipeline_bundle'];
       if (!bundle || typeof bundle !== 'object')
         throw new Error('pipeline_bundle_to_execution_plan_set requires actuator-pipeline-bundle');
@@ -992,8 +1000,8 @@ async function opTransform(op: string, params: any, ctx: any) {
           jobs,
         },
       };
-    }
-    case 'run_execution_plan_set': {
+    },
+    run_execution_plan_set: async () => {
       const planSet = ctx[params.from || 'execution_plan_set'];
       if (!planSet || typeof planSet !== 'object')
         throw new Error('run_execution_plan_set requires execution_plan_set');
@@ -1014,8 +1022,8 @@ async function opTransform(op: string, params: any, ctx: any) {
         validated_execution_plan_set: validatedPlanSet,
         [params.export_as || 'execution_run_report']: runReport,
       };
-    }
-    case 'preflight_execution_plan_set': {
+    },
+    preflight_execution_plan_set: async () => {
       const planSet = ctx[params.from || 'execution_plan_set'];
       if (!planSet || typeof planSet !== 'object')
         throw new Error('preflight_execution_plan_set requires execution_plan_set');
@@ -1025,16 +1033,17 @@ async function opTransform(op: string, params: any, ctx: any) {
         validated_execution_plan_set: validatedPlanSet,
         [params.export_as || 'execution_plan_preflight']: report,
       };
-    }
-    default:
-      throw buildUnknownOrchestratorOpError(op);
-  }
+    },
+  };
+  const handler = handlers[op];
+  if (!handler) throw buildUnknownOrchestratorOpError(op);
+  return handler();
 }
 
 async function opApply(op: string, params: any, ctx: any) {
   const rootDir = pathResolver.rootDir();
-  switch (op) {
-    case 'write_file':
+  const handlers: Record<string, () => Promise<any>> = {
+    write_file: async () => {
       const out = resolveOrchestratorRepositoryPath(rootDir, resolveVars(params.path, ctx));
       const content = params.from ? ctx[params.from] : (ctx.last_transform ?? ctx.last_capture);
       if (!safeExistsSync(path.dirname(out))) safeMkdir(path.dirname(out), { recursive: true });
@@ -1044,13 +1053,15 @@ async function opApply(op: string, params: any, ctx: any) {
           typeof content === 'string' ? content : JSON.stringify(content, null, 2)
         );
       }, buildRetryOptions(params.retry));
-      break;
-    case 'mkdir':
+      return ctx;
+    },
+    mkdir: async () => {
       safeMkdir(resolveOrchestratorRepositoryPath(rootDir, resolveVars(params.path, ctx)), {
         recursive: true,
       });
-      break;
-    case 'symlink':
+      return ctx;
+    },
+    symlink: async () => {
       const target = resolveOrchestratorRepositoryPath(rootDir, resolveVars(params.target, ctx));
       const source = resolveOrchestratorRepositoryPath(rootDir, resolveVars(params.source, ctx));
       if (safeExistsSync(target)) safeUnlinkSync(target);
@@ -1066,8 +1077,9 @@ async function opApply(op: string, params: any, ctx: any) {
         );
       }
       safeSymlinkSync(source, target, linkType);
-      break;
-    case 'git_checkpoint':
+      return ctx;
+    },
+    git_checkpoint: async () => {
       await retry(
         async () => {
           safeExec('git', ['add', '.'], { cwd: rootDir });
@@ -1077,11 +1089,13 @@ async function opApply(op: string, params: any, ctx: any) {
         },
         buildRetryOptions({ maxRetries: 2, initialDelayMs: 1000 })
       );
-      break;
-    case 'log':
+      return ctx;
+    },
+    log: async () => {
       logger.info(`[ORCH_LOG] ${resolveVars(params.message || 'Action completed', ctx)}`);
-      break;
-    case 'decompose_into_tasks': {
+      return ctx;
+    },
+    decompose_into_tasks: async () => {
       const result = await decomposeIntoTasks({
         mission_id: String(resolveVars(params.mission_id || ctx.mission_id || '', ctx)),
         project_name: String(resolveVars(params.project_name || ctx.project_name || '', ctx)),
@@ -1093,21 +1107,22 @@ async function opApply(op: string, params: any, ctx: any) {
           : undefined,
       });
       return { ...ctx, [params.export_as || 'task_plan_result']: result };
-    }
-    case 'evaluate_task_plan_ready':
+    },
+    evaluate_task_plan_ready: async () => {
       return {
         ...ctx,
         [params.export_as || 'task_plan_ready']: evaluateTaskPlanReadyGate(
           String(resolveVars(params.mission_id || ctx.mission_id || '', ctx))
         ),
       };
-    case 'task_plan_to_next_tasks': {
+    },
+    task_plan_to_next_tasks: async () => {
       const result = taskPlanToNextTasks({
         mission_id: String(resolveVars(params.mission_id || ctx.mission_id || '', ctx)),
       });
       return { ...ctx, [params.export_as || 'next_tasks_result']: result };
-    }
-    case 'write_execution_plan_set': {
+    },
+    write_execution_plan_set: async () => {
       const planSet =
         ctx[params.from || 'validated_execution_plan_set'] ||
         ctx[params.from || 'execution_plan_set'];
@@ -1127,12 +1142,12 @@ async function opApply(op: string, params: any, ctx: any) {
         if (!safeExistsSync(logicalOutputDir)) safeMkdir(logicalOutputDir, { recursive: true });
         safeWriteFile(requestedOutputPath, JSON.stringify(job.rendered_pipeline, null, 2));
       }
-      break;
-    }
-    default:
-      throw buildUnknownOrchestratorOpError(op);
-  }
-  return ctx;
+      return ctx;
+    },
+  };
+  const handler = handlers[op];
+  if (!handler) throw buildUnknownOrchestratorOpError(op);
+  return handler();
 }
 
 export {

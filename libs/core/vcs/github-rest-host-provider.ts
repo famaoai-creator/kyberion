@@ -45,25 +45,18 @@ function apiBase(host: string): { rest: string; graphql: string } {
   return { rest: `https://${host}/api/v3`, graphql: `https://${host}/api/graphql` };
 }
 
+const STATUS_ERROR_CODES: Record<number, VcsHostErrorCode> = {
+  401: 'auth',
+  403: 'forbidden',
+  404: 'not_found',
+  405: 'conflict',
+  422: 'invalid',
+  429: 'rate_limited',
+};
+
 function codeForStatus(status: number | undefined, path: string): VcsHostErrorCode {
-  switch (status) {
-    case 401:
-      return 'auth';
-    case 403:
-      return 'forbidden';
-    case 404:
-      return 'not_found';
-    case 409:
-      return path.endsWith('/merge') ? 'stale_head' : 'conflict';
-    case 405:
-      return 'conflict';
-    case 422:
-      return 'invalid';
-    case 429:
-      return 'rate_limited';
-    default:
-      return 'unavailable';
-  }
+  if (status === 409) return path.endsWith('/merge') ? 'stale_head' : 'conflict';
+  return (status !== undefined && STATUS_ERROR_CODES[status]) || 'unavailable';
 }
 
 /** Parse an origin remote (https, ssh, scp-like) into the canonical ref. */
@@ -127,53 +120,34 @@ interface RestPull {
 
 /** Project a REST pull onto gh `--json` field names and shapes. */
 export function restPullField(pull: RestPull, field: string): unknown {
-  switch (field) {
-    case 'number':
-      return pull.number;
-    case 'url':
-      return pull.html_url;
-    case 'title':
-      return pull.title;
-    case 'body':
-      return pull.body ?? '';
-    case 'state':
-      return pullState(pull);
-    case 'isDraft':
-      return pull.draft === true;
-    case 'headRefOid':
-      return pull.head.sha;
-    case 'baseRefOid':
-      return pull.base.sha;
-    case 'headRefName':
-      return pull.head.ref;
-    case 'baseRefName':
-      return pull.base.ref;
-    case 'author':
-      return { login: pull.user?.login ?? '' };
-    case 'createdAt':
-      return pull.created_at ?? null;
-    case 'updatedAt':
-      return pull.updated_at ?? null;
-    case 'closedAt':
-      return pull.closed_at ?? null;
-    case 'mergedAt':
-      return pull.merged_at ?? null;
+  const handlers: Record<string, (pull: RestPull) => unknown> = {
+    number: (pull) => pull.number,
+    url: (pull) => pull.html_url,
+    title: (pull) => pull.title,
+    body: (pull) => pull.body ?? '',
+    state: (pull) => pullState(pull),
+    isDraft: (pull) => pull.draft === true,
+    headRefOid: (pull) => pull.head.sha,
+    baseRefOid: (pull) => pull.base.sha,
+    headRefName: (pull) => pull.head.ref,
+    baseRefName: (pull) => pull.base.ref,
+    author: (pull) => ({ login: pull.user?.login ?? '' }),
+    createdAt: (pull) => pull.created_at ?? null,
+    updatedAt: (pull) => pull.updated_at ?? null,
+    closedAt: (pull) => pull.closed_at ?? null,
+    mergedAt: (pull) => pull.merged_at ?? null,
     // REST reports a test-merge sha on open PRs; gh exposes a merge commit only once merged.
-    case 'mergeCommit':
-      return pull.merged_at && pull.merge_commit_sha ? { oid: pull.merge_commit_sha } : null;
-    case 'autoMergeRequest':
-      return pull.auto_merge ?? null;
-    case 'additions':
-      return pull.additions ?? 0;
-    case 'deletions':
-      return pull.deletions ?? 0;
-    case 'changedFiles':
-      return pull.changed_files ?? 0;
-    case 'labels':
-      return (pull.labels ?? []).map((label) => ({ name: label.name ?? '' }));
-    default:
-      throw new VcsHostError('invalid', `github-rest cannot serve PR field ${field}`);
-  }
+    mergeCommit: (pull) =>
+      pull.merged_at && pull.merge_commit_sha ? { oid: pull.merge_commit_sha } : null,
+    autoMergeRequest: (pull) => pull.auto_merge ?? null,
+    additions: (pull) => pull.additions ?? 0,
+    deletions: (pull) => pull.deletions ?? 0,
+    changedFiles: (pull) => pull.changed_files ?? 0,
+    labels: (pull) => (pull.labels ?? []).map((label) => ({ name: label.name ?? '' })),
+  };
+  const handler = handlers[field];
+  if (!handler) throw new VcsHostError('invalid', `github-rest cannot serve PR field ${field}`);
+  return handler(pull);
 }
 
 function pullState(pull: RestPull): string {
@@ -184,17 +158,13 @@ function pullState(pull: RestPull): string {
 /** Map a check-run conclusion/status onto the gh bucket vocabulary. */
 export function checkRunBucket(status: string, conclusion: string | null | undefined): string {
   if (status !== 'completed') return 'pending';
-  switch (conclusion) {
-    case 'success':
-    case 'neutral':
-      return 'pass';
-    case 'skipped':
-      return 'skipping';
-    case 'cancelled':
-      return 'cancel';
-    default:
-      return 'fail';
-  }
+  const buckets: Record<string, string> = {
+    success: 'pass',
+    neutral: 'pass',
+    skipped: 'skipping',
+    cancelled: 'cancel',
+  };
+  return buckets[conclusion ?? ''] ?? 'fail';
 }
 
 function statusBucket(state: string): string {

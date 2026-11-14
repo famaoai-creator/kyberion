@@ -341,24 +341,22 @@ async function runMain(args: string[] = []): Promise<void> {
 
   const command = String(argv._[0]);
 
-  switch (command) {
-    case 'migrate-context': {
+  const handlers: Record<string, () => unknown> = {
+    'migrate-context': async () => {
       print({
         quality: migrateLegacyWorkItemContexts({ apply: Boolean(argv.apply) }),
         applied: Boolean(argv.apply),
       });
-      break;
-    }
-    case 'migrate-parents': {
+    },
+    'migrate-parents': async () => {
       // Loaded on demand: the mission layer is not needed by the other commands.
       const { migrateMissionTaskWorkItemParents } = await import('@agent/core');
       print({
         quality: migrateMissionTaskWorkItemParents({ apply: Boolean(argv.apply) }),
         applied: Boolean(argv.apply),
       });
-      break;
-    }
-    case 'create-item': {
+    },
+    'create-item': async () => {
       const item = createWorkItem({
         itemId: argv['item-id'] ? String(argv['item-id']) : undefined,
         title: String(argv.title || ''),
@@ -376,9 +374,8 @@ async function runMain(args: string[] = []): Promise<void> {
         metadata: parseWorkCoordinationJson(argv.metadata),
       });
       print(item);
-      break;
-    }
-    case 'create-board': {
+    },
+    'create-board': async () => {
       const board = createBoard({
         boardId: argv['board-id'] ? String(argv['board-id']) : undefined,
         name: String(argv['board-name'] || argv.title || argv['board-id'] || ''),
@@ -389,9 +386,8 @@ async function runMain(args: string[] = []): Promise<void> {
         description: argv.description ? String(argv.description) : undefined,
       });
       print(board);
-      break;
-    }
-    case 'list-board': {
+    },
+    'list-board': async () => {
       if (argv['board-id']) {
         print({
           board: argv['board-id'],
@@ -404,9 +400,8 @@ async function runMain(args: string[] = []): Promise<void> {
           boards: listBoards(),
         });
       }
-      break;
-    }
-    case 'list-items':
+    },
+    'list-items': async () => {
       print({
         items: listWorkItems({
           ...(argv['project-id'] ? { projectId: String(argv['project-id']) } : {}),
@@ -420,8 +415,8 @@ async function runMain(args: string[] = []): Promise<void> {
           ...(argv['parent-id'] ? { parentItemId: String(argv['parent-id']) } : {}),
         }),
       });
-      break;
-    case 'project-next-tasks': {
+    },
+    'project-next-tasks': async () => {
       const missionId = String(argv['mission-id'] || argv['project-id'] || '').trim();
       if (!missionId) throw new Error('project-next-tasks requires --mission-id');
       print(
@@ -432,9 +427,8 @@ async function runMain(args: string[] = []): Promise<void> {
           apply: argv.apply === true,
         })
       );
-      break;
-    }
-    case 'claim-item': {
+    },
+    'claim-item': async () => {
       const result = claimWorkItem({
         itemId: String(argv['item-id'] || ''),
         actorPeerId: String(argv['actor-peer-id'] || ''),
@@ -445,9 +439,8 @@ async function runMain(args: string[] = []): Promise<void> {
         idempotencyKey: argv['idempotency-key'] ? String(argv['idempotency-key']) : undefined,
       });
       print(result);
-      break;
-    }
-    case 'release-item': {
+    },
+    'release-item': async () => {
       const result = releaseWorkItem({
         itemId: String(argv['item-id'] || ''),
         leaseId: String(argv['lease-id'] || ''),
@@ -457,9 +450,8 @@ async function runMain(args: string[] = []): Promise<void> {
         nextStatus: argv.status ? (String(argv.status) as WorkItemStatus) : undefined,
       });
       print(result);
-      break;
-    }
-    case 'release-effect': {
+    },
+    'release-effect': async () => {
       if (argv['request-approval']) {
         if (argv['approval-request-id'])
           throw new Error('Choose request-approval or approval-request-id, not both');
@@ -478,7 +470,7 @@ async function runMain(args: string[] = []): Promise<void> {
           approve_command: `pnpm kyberion approvals --approve ${approval.id}`,
           apply_command: `pnpm work release-effect --item-id ${shellQuoteArg(itemId)} --expected-version ${version} --approval-request-id ${approval.id}`,
         });
-        break;
+        return;
       }
       print(
         releaseWorkItemEffectOwnership({
@@ -487,9 +479,8 @@ async function runMain(args: string[] = []): Promise<void> {
           approvalRequestId: String(argv['approval-request-id'] || ''),
         })
       );
-      break;
-    }
-    case 'handoff-item': {
+    },
+    'handoff-item': async () => {
       const result = handoffWorkItem({
         itemId: String(argv['item-id'] || ''),
         fromLeaseId: String(argv['from-lease-id'] || ''),
@@ -502,18 +493,16 @@ async function runMain(args: string[] = []): Promise<void> {
         idempotencyKey: argv['idempotency-key'] ? String(argv['idempotency-key']) : undefined,
       });
       print(result);
-      break;
-    }
-    case 'renew-lease': {
+    },
+    'renew-lease': async () => {
       const lease = renewWorkItemLease({
         leaseId: String(argv['lease-id'] || ''),
         ttlMs: argv['ttl-ms'] ? Number(argv['ttl-ms']) : undefined,
         expectedVersion: argv['expected-version'] ? Number(argv['expected-version']) : undefined,
       });
       print(lease);
-      break;
-    }
-    case 'update-status': {
+    },
+    'update-status': async () => {
       const item = updateWorkItem({
         itemId: String(argv['item-id'] || ''),
         expectedVersion: argv['expected-version'] ? Number(argv['expected-version']) : undefined,
@@ -531,9 +520,8 @@ async function runMain(args: string[] = []): Promise<void> {
         ...(argv['status-from-children'] ? { statusFromChildren: true } : {}),
       });
       print(item);
-      break;
-    }
-    case 'record-event': {
+    },
+    'record-event': async () => {
       const event = appendCoordinationEvent({
         eventType: String(argv['event-type'] || 'item_updated') as any,
         itemId: argv['item-id'] ? String(argv['item-id']) : undefined,
@@ -548,9 +536,8 @@ async function runMain(args: string[] = []): Promise<void> {
         payload: parseWorkCoordinationJson(argv.payload),
       });
       print(event);
-      break;
-    }
-    case 'link-change': {
+    },
+    'link-change': async () => {
       print(
         linkWorkItemChangeRequest({
           itemId: String(argv['item-id'] || ''),
@@ -563,9 +550,8 @@ async function runMain(args: string[] = []): Promise<void> {
           headSha: optionalArg(argv['head-sha']),
         })
       );
-      break;
-    }
-    case 'update-change': {
+    },
+    'update-change': async () => {
       print(
         updateWorkItemChangeRequest({
           itemId: String(argv['item-id'] || ''),
@@ -576,9 +562,8 @@ async function runMain(args: string[] = []): Promise<void> {
           url: optionalArg(argv.url),
         })
       );
-      break;
-    }
-    case 'change-owner': {
+    },
+    'change-owner': async () => {
       const ref = optionalArg(argv.ref);
       print(
         resolveChangeRequestOwner({
@@ -587,22 +572,21 @@ async function runMain(args: string[] = []): Promise<void> {
           ref,
         })
       );
-      break;
-    }
-    case 'list-changes':
+    },
+    'list-changes': async () => {
       print({
         changes: listChangeRequestLinks({
           state: optionalArg(argv['change-state']) as ChangeRequestState | undefined,
         }),
       });
-      break;
-    case 'list-events':
+    },
+    'list-events': async () => {
       print({ events: listCoordinationEvents() });
-      break;
-    case 'list-leases':
+    },
+    'list-leases': async () => {
       print({ leases: listActiveWorkLeases() });
-      break;
-    case 'history': {
+    },
+    history: async () => {
       const correlationId = String(argv.correlationId || '').trim();
       if (!correlationId) throw new Error('Missing correlation id');
       const missions = discoverReadableMissionStates().flatMap(({ missionId, state }) => {
@@ -628,26 +612,25 @@ async function runMain(args: string[] = []): Promise<void> {
       });
       if (argv.json) print({ correlationId, rows });
       else printText(formatIntegratedHandoffHistory(correlationId, rows));
-      break;
+    },
+  };
+  const fallback = () => {
+    const importEntry = getWorkCoordinationImportCatalogEntryByCommand(command);
+    if (!importEntry) {
+      throw new Error(`unknown command '${command}'`);
     }
-    default: {
-      const importEntry = getWorkCoordinationImportCatalogEntryByCommand(command);
-      if (!importEntry) {
-        throw new Error(`unknown command '${command}'`);
-      }
-      if (!argv.input) throw new Error('Missing --input issue JSON file');
-      const issue = loadWorkCoordinationIssue(String(argv.input));
-      const projectId = argv.project
-        ? String(argv.project)
-        : importEntry.default_project_id || undefined;
-      const result =
-        importEntry.source === 'github'
-          ? importGitHubIssueWithEvent(issue as GitHubIssueLike, projectId || 'github')
-          : importJiraIssueWithEvent(issue as JiraIssueLike, projectId);
-      print(result);
-      break;
-    }
-  }
+    if (!argv.input) throw new Error('Missing --input issue JSON file');
+    const issue = loadWorkCoordinationIssue(String(argv.input));
+    const projectId = argv.project
+      ? String(argv.project)
+      : importEntry.default_project_id || undefined;
+    const result =
+      importEntry.source === 'github'
+        ? importGitHubIssueWithEvent(issue as GitHubIssueLike, projectId || 'github')
+        : importJiraIssueWithEvent(issue as JiraIssueLike, projectId);
+    print(result);
+  };
+  await (handlers[command] ?? fallback)();
 }
 
 export async function main(args: string[] = [], output: Print = () => undefined): Promise<void> {
