@@ -2,6 +2,7 @@ import { createStandardYargs } from '@agent/core/cli-utils';
 import { buildNextAction, formatNextAction } from '@agent/core/next-action';
 import * as customerResolver from '@agent/core/stance-resolver';
 import { inspectServiceAuth } from '@agent/core/service/service-validator';
+import { getServiceOnboardingCatalogEntry } from '@agent/core/service/service-onboarding-catalog';
 import { loadServiceConnectionAtPath } from '@agent/core/service/service-engine-helpers';
 import {
   loadNotificationPreferences,
@@ -27,7 +28,7 @@ export type ServiceSetupRow = {
   auth: 'ready' | 'missing' | 'n/a';
   strategy: string;
   preset: string;
-  connection: 'customer' | 'personal' | 'missing';
+  connection: 'customer' | 'personal' | 'optional' | 'missing';
   connectionPath: string;
   connectionReady: boolean;
   connectionRequiredKeys: string[];
@@ -47,6 +48,7 @@ export type ServiceSetupSummary = {
   ready: number;
   authMissing: number;
   connectionMissing: number;
+  connectionOptional: number;
   customerConnections: number;
   personalConnections: number;
 };
@@ -66,7 +68,7 @@ function sortServiceSetupRows(rows: ServiceSetupRow[]): ServiceSetupRow[] {
 }
 
 function inspectConnection(serviceId: string): {
-  connection: 'customer' | 'personal' | 'missing';
+  connection: 'customer' | 'personal' | 'optional' | 'missing';
   connectionPath: string;
   connectionReady: boolean;
   connectionRequiredKeys: string[];
@@ -109,10 +111,14 @@ function inspectConnection(serviceId: string): {
       connectionRequiredKeys: requiredKeys,
     };
   }
+  // A connection file is only "missing" when the service declares connection
+  // keys; for every other catalog service the JSON is an optional param-merger
+  // and its absence is informational, not a defect to repair.
+  const needed = requiredKeys.length > 0;
   return {
-    connection: 'missing',
+    connection: needed ? 'missing' : 'optional',
     connectionPath: candidates.overlay ?? candidates.base,
-    connectionReady: false,
+    connectionReady: !needed,
     connectionRequiredKeys: requiredKeys,
   };
 }
@@ -128,8 +134,12 @@ function inspectOpsAlertChannel(): ReturnType<typeof resolveOpsAlertChannelStatu
   });
 }
 
-export function buildServiceConnectionSetupCommand(serviceId: string): string {
-  return `pnpm onboarding -- --services-only --service ${serviceId}`;
+export function buildServiceConnectionSetupCommand(serviceId: string): string | null {
+  // The services-only onboarding phase only knows the catalog entries; for
+  // every other service the command would die with "Unknown onboarding service".
+  return getServiceOnboardingCatalogEntry(serviceId)
+    ? `pnpm onboarding -- --services-only --service ${serviceId}`
+    : null;
 }
 
 export function buildServiceAuthNextAction(
@@ -161,6 +171,7 @@ export function printServiceSetupReport(
     formatSetupSummaryLine([
       ['auth missing', summary.authMissing],
       ['connections missing', summary.connectionMissing],
+      ['connections optional', summary.connectionOptional],
       ['auth ready', summary.ready],
       ['total', summary.total],
     ])
@@ -171,7 +182,13 @@ export function printServiceSetupReport(
   for (const row of rows) {
     const authSymbol = row.auth === 'ready' ? '✅' : row.auth === 'missing' ? '⚠️' : '—';
     const connectionSymbol =
-      row.connection === 'customer' ? '🟢' : row.connection === 'personal' ? '🟡' : '⚠️';
+      row.connection === 'customer'
+        ? '🟢'
+        : row.connection === 'personal'
+          ? '🟡'
+          : row.connection === 'optional'
+            ? '·'
+            : '⚠️';
     print(
       `${row.service.padEnd(20)} ${authSymbol} ${row.auth.padEnd(8)} ${connectionSymbol} ${row.connection.padEnd(10)} ${row.strategy.padEnd(12)} ${row.secrets.slice(0, 36).padEnd(36)} ${row.cli}`
     );
@@ -180,7 +197,7 @@ export function printServiceSetupReport(
       if (row.service === 'whisper' && row.localSttDetected?.length) {
         print(
           formatSetupHintLine(
-            `Local STT detected (${row.localSttDetected.join(', ')}); register it with ${buildServiceConnectionSetupCommand('whisper')}`
+            `Local STT detected (${row.localSttDetected.join(', ')}); register it with ${buildServiceConnectionSetupCommand('whisper') ?? 'pnpm onboarding'}`
           )
         );
       }
@@ -218,6 +235,7 @@ export async function setupServices(options: { quiet?: boolean; print?: Print } 
       Object.entries(catalog.services).map(([serviceId, record]) => {
         const auth = record.preset_path ? inspectServiceAuth(serviceId, record.preset_path) : null;
         const connection = inspectConnection(serviceId);
+        const setupCommand = buildServiceConnectionSetupCommand(serviceId);
         return {
           service: serviceId,
           auth: auth ? (auth.valid ? 'ready' : 'missing') : 'n/a',
@@ -245,7 +263,11 @@ export async function setupServices(options: { quiet?: boolean; print?: Print } 
                         ? `Missing connection file at ${connection.connectionPath}.`
                         : `Connection is missing one of: ${connection.connectionRequiredKeys.join(', ')}.`,
                     next_action_type: 'inspect_artifact',
-                    suggested_command: buildServiceConnectionSetupCommand(serviceId),
+                    ...(setupCommand
+                      ? { suggested_command: setupCommand }
+                      : {
+                          suggested_followup_request: `Create ${connection.connectionPath} providing one of: ${connection.connectionRequiredKeys.join(', ')}.`,
+                        }),
                   })
                 : undefined,
         };
@@ -259,6 +281,7 @@ export async function setupServices(options: { quiet?: boolean; print?: Print } 
       if (row.auth === 'ready') acc.ready += 1;
       if (row.auth === 'missing') acc.authMissing += 1;
       if (row.connection === 'missing') acc.connectionMissing += 1;
+      if (row.connection === 'optional') acc.connectionOptional += 1;
       if (row.connection === 'customer') acc.customerConnections += 1;
       if (row.connection === 'personal') acc.personalConnections += 1;
       return acc;
@@ -268,6 +291,7 @@ export async function setupServices(options: { quiet?: boolean; print?: Print } 
       ready: 0,
       authMissing: 0,
       connectionMissing: 0,
+      connectionOptional: 0,
       customerConnections: 0,
       personalConnections: 0,
     }
