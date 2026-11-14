@@ -292,7 +292,8 @@ export class CodexCliReasoningBackend implements ReasoningBackend {
   }
 
   getNativeSubagentAdopter(): NativeSubagentAdopter | null {
-    if (credentialExecutionIdentity().tenantSlug) return null;
+    if (credentialExecutionIdentity().tenantSlug || credentialExecutionIdentity().personalClaim)
+      return null;
     assertOperatorNativeCredentialOwner(this.nativeCredentialOwner);
     return this.nativeSubagentAdopter;
   }

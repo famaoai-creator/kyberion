@@ -28,6 +28,23 @@ import {
   setWorkCoordinationNamespace,
 } from '../workforce/work-coordination.js';
 
+const routingFixture = vi.hoisted(() => ({ isolateCredentials: false }));
+vi.mock('../secret/task-credential-dispatch.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../secret/task-credential-dispatch.js')>();
+  return {
+    ...actual,
+    // These routing fixtures use fake text/native backends with no credentials
+    // or external effects. Keep real WorkItem lifecycle and legacy scope
+    // metadata assertions, while isolating credential admission composition.
+    // The explicit rejection test below restores the real boundary; real
+    // personal claim composition is covered by its dedicated integration suite.
+    withConfiguredTaskCredentials: <T>(workItemId: string, run: () => Promise<T>) =>
+      routingFixture.isolateCredentials
+        ? run()
+        : actual.withConfiguredTaskCredentials(workItemId, run),
+  };
+});
+
 vi.mock('../workforce/delegated-task-observability.js', () => ({
   startDelegatedTaskTrace: vi.fn(() => ({ traceId: 'test-trace' })),
   completeDelegatedTaskTrace: vi.fn(),
@@ -103,6 +120,7 @@ function registerNativeWorkItemBackend(delegateTask: ReasoningBackend['delegateT
 
 describe('validateAndRepairAdf', () => {
   beforeEach(() => {
+    routingFixture.isolateCredentials = true;
     safeMkdir(tmpRoot, { recursive: true });
     resetReasoningBackend();
     vi.mocked(findRelevantPromotedKnowledge).mockReset();
@@ -114,6 +132,8 @@ describe('validateAndRepairAdf', () => {
   });
 
   afterEach(() => {
+    routingFixture.isolateCredentials = false;
+    vi.unstubAllEnvs();
     clearWorkCoordinationStore();
     setWorkCoordinationNamespace(null);
     resetReasoningBackend();
@@ -166,6 +186,32 @@ describe('validateAndRepairAdf', () => {
     } finally {
       safeRmSync(schemaPath, { recursive: true, force: true });
     }
+  });
+
+  it('rejects work-item repair without dispatch proof before calling the fake provider', async () => {
+    routingFixture.isolateCredentials = false;
+    vi.stubEnv('MISSION_ID', '');
+    const delegateTask = vi.fn(async () => JSON.stringify({ capability: 'demo', action: 'run' }));
+    registerFakeRepairBackend(delegateTask);
+    const item = createWorkItem({
+      title: 'Unbound ADF repair',
+      description: 'A claim must not inherit operator provider credentials',
+      projectId: 'PROJECT-CALLER',
+      status: 'ready',
+      context: { tenant_slug: 'tenant-canonical', mission_id: 'mission-canonical' },
+    });
+    const original = JSON.stringify({ capability: 'demo' });
+    const filePath = writeFixture('unbound-work-item-adf.json', original);
+    const result = await validateAndRepairAdf(filePath, 'capability-input', {
+      workItemId: item.item_id,
+    });
+    expect(result).toMatchObject({
+      repaired: false,
+      errors: ['[CREDENTIAL_BINDING_UNAVAILABLE] Claimed dispatch requires a scope envelope'],
+    });
+    expect(delegateTask).not.toHaveBeenCalled();
+    expect(readFixture(filePath)).toBe(original);
+    expect(getWorkItem(item.item_id)?.status).toBe('blocked');
   });
 
   it('routes work-item ADF repair through coordinated advisory candidate generation', async () => {

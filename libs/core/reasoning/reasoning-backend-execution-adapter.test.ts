@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   delegateWorkItemWithReasoningBackend,
   ReasoningBackendExecutionAdapter,
@@ -17,6 +17,7 @@ describe('ReasoningBackendExecutionAdapter', () => {
   });
 
   afterEach(() => {
+    vi.unstubAllEnvs();
     clearWorkCoordinationStore();
     setWorkCoordinationNamespace(null);
   });
@@ -131,12 +132,23 @@ describe('ReasoningBackendExecutionAdapter', () => {
   });
 
   it('combines the adapter with WorkItem lifecycle management', async () => {
+    // Bind a synthetic tenant mission process; production dispatch mints the
+    // scope envelope and empty credential binding instead of operator fallback.
+    vi.stubEnv('MISSION_ID', 'M-REASONING-ADAPTER');
+    vi.stubEnv('KYBERION_TENANT', 'reasoning-adapter-test');
+    vi.stubEnv('KYBERION_TIER', 'public');
+    vi.stubEnv('KYBERION_SCOPE_ENV_PATH', 'active/shared/tmp/adapter-missing-scope.env');
     clearWorkCoordinationStore();
     const item = createWorkItem({
       itemId: 'WI-REASONING-ADAPTER',
       title: 'reasoning task',
       description: 'execute reasoning through the shared lifecycle',
       projectId: 'M-REASONING-ADAPTER',
+      context: {
+        tenant_slug: 'reasoning-adapter-test',
+        mission_id: 'M-REASONING-ADAPTER',
+        task_id: 'task-reasoning',
+      },
       status: 'ready',
     });
     const receipt = await delegateWorkItemWithReasoningBackend(
@@ -146,7 +158,7 @@ describe('ReasoningBackendExecutionAdapter', () => {
         task_id: 'task-reasoning',
         mission_id: 'M-REASONING-ADAPTER',
         security_scope: {
-          tenant_id: 'default',
+          tenant_id: 'reasoning-adapter-test',
           mission_id: 'M-REASONING-ADAPTER',
           read_tiers: ['public'],
           write_tier: 'public',

@@ -3,6 +3,7 @@ import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   files: new Map<string, string>(),
   tenant: undefined as string | undefined,
+  personalClaim: undefined as object | undefined,
   plugin: undefined as object | undefined,
   write: vi.fn(),
   onRead: undefined as undefined | ((file: string) => void),
@@ -30,7 +31,10 @@ vi.mock('../foundation/json.js', () => ({
   },
 }));
 vi.mock('../foundation/credential-binding.js', () => ({
-  credentialExecutionIdentity: () => ({ tenantSlug: mocks.tenant }),
+  credentialExecutionIdentity: () => ({
+    tenantSlug: mocks.tenant,
+    personalClaim: mocks.personalClaim,
+  }),
 }));
 vi.mock('../shell/sandbox-policy.js', () => ({
   getPluginExecutionContext: () => mocks.plugin,
@@ -66,6 +70,7 @@ beforeEach(() => {
   mocks.files.clear();
   mocks.write.mockClear();
   mocks.tenant = undefined;
+  mocks.personalClaim = undefined;
   mocks.plugin = undefined;
   mocks.onRead = undefined;
   overrideSecretEncryptionKeyForTests(Buffer.alloc(32, 7));
@@ -73,6 +78,20 @@ beforeEach(() => {
 afterEach(() => overrideSecretEncryptionKeyForTests(null));
 
 describe('internal local account material storage', () => {
+  it('denies operator account reads and writes inside a personal claim', () => {
+    const ref = storeLocalAccountMaterial(alice, { SLACK_TOKEN: 'operator-fixture' });
+    mocks.write.mockClear();
+    mocks.personalClaim = { ownerId: 'user:alice' };
+    expect(() => loadLocalAccountMaterial(ref)).toThrow('ACCOUNT_MATERIAL_DENIED');
+    expect(() => loadLocalAccountRegistration(alice)).toThrow('ACCOUNT_MATERIAL_DENIED');
+    expect(() => storeLocalAccountMaterial(alice, { SLACK_TOKEN: 'forbidden' })).toThrow(
+      'ACCOUNT_MATERIAL_DENIED'
+    );
+    expect(() => storeLocalAccountRegistration(alice, { generation: ref.generation })).toThrow(
+      'ACCOUNT_MATERIAL_DENIED'
+    );
+    expect(mocks.write).not.toHaveBeenCalled();
+  });
   it('reads only an allocated completed exact account while operator APIs remain denied', () => {
     const ref = storeLocalAccountMaterial(alice, { SLACK_TOKEN: 'allocated-fixture' });
     storeLocalAccountRegistration(alice, { generation: ref.generation });

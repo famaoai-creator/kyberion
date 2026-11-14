@@ -55,7 +55,7 @@ describe('configured task credential dispatch', () => {
     expect(results).toEqual(['WI-alpha', 'WI-beta']);
     expect(resolveTaskCredential('TEST_BOUND_KEY')).toBeUndefined();
   });
-  it('keeps empty bindings final, avoids duplicate binding and leaves operator delegation unchanged', async () => {
+  it('keeps empty bindings final, avoids duplicate binding and rejects unproved personal dispatch', async () => {
     vi.stubEnv('TEST_BOUND_KEY', 'operator-key');
     const bindTask = vi.fn(async ({ scope }: { scope: { tenant_slug?: string } }) => ({
       tenantSlug: scope.tenant_slug!,
@@ -74,9 +74,11 @@ describe('configured task credential dispatch', () => {
       )
     );
     expect(bindTask).toHaveBeenCalledTimes(1);
-    await withScopeEnvelope(envelope(), () =>
-      withConfiguredTaskCredentials('WI-operator', async () => 'operator')
-    );
+    await expect(
+      withScopeEnvelope(envelope(), () =>
+        withConfiguredTaskCredentials('WI-operator', async () => 'operator')
+      )
+    ).rejects.toThrow('CREDENTIAL_PERSONAL_CLAIM_DENIED');
     expect(bindTask).toHaveBeenCalledTimes(1);
   });
 
@@ -130,16 +132,16 @@ describe('configured task credential dispatch', () => {
     );
   });
 
-  it('leaves operator dispatch and missing envelopes unbound', async () => {
-    await withScopeEnvelope(envelope(), () =>
-      withConfiguredTaskCredentials('WI-operator', async () => {
-        expect(hasTaskCredentialBinding()).toBe(false);
-        expect(resolveTaskCredential('TEST_BOUND_KEY')).toBeUndefined();
-      })
-    );
-    // Outside any scope envelope there is no claimed-task context.
+  it('refuses unproved and unenveloped claimed dispatch without entering the callback', async () => {
+    const run = vi.fn(async () => {});
     await expect(
-      withConfiguredTaskCredentials('WI-no-envelope', async () => hasTaskCredentialBinding())
-    ).resolves.toBe(false);
+      withScopeEnvelope(envelope(), () => withConfiguredTaskCredentials('WI-operator', run))
+    ).rejects.toThrow('CREDENTIAL_PERSONAL_CLAIM_DENIED');
+    await expect(withConfiguredTaskCredentials('WI-no-envelope', run)).rejects.toThrow(
+      'CREDENTIAL_BINDING_UNAVAILABLE'
+    );
+    expect(run).not.toHaveBeenCalled();
+    // Direct operator setup remains separate from the claimed dispatch helper.
+    expect(resolveTaskCredential('TEST_BOUND_KEY')).toBeUndefined();
   });
 });

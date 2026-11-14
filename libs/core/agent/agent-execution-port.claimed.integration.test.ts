@@ -18,8 +18,10 @@ import type { TaskToolRuntime } from '../workforce/task-tool-runtime.js';
 
 const missionId = `MSN-API-PORT-TEST-${process.pid}`;
 const projectId = `PRJ-API-PORT-TEST-${process.pid}`;
+const organizationId = 'api-port-org';
 const actor = 'control-plane-agent';
-const missionDir = pathResolver.missionDir(missionId, 'public');
+const tenant = `api-port-test-${process.pid}`;
+const missionDir = pathResolver.missionDir(missionId, 'public', tenant);
 let runtime: TaskToolRuntime | undefined;
 let readResult: unknown;
 beforeEach(() => {
@@ -27,9 +29,9 @@ beforeEach(() => {
   vi.stubEnv('KYBERION_BASE_ROLE', 'worker');
   vi.stubEnv('MISSION_ID', missionId);
   vi.stubEnv('KYBERION_TIER', 'public');
-  vi.stubEnv('KYBERION_TENANT', '');
-  vi.stubEnv('KYBERION_ORGANIZATION_ID', '');
-  vi.stubEnv('KYBERION_PROJECT_ID', '');
+  vi.stubEnv('KYBERION_TENANT', tenant);
+  vi.stubEnv('KYBERION_ORGANIZATION_ID', organizationId);
+  vi.stubEnv('KYBERION_PROJECT_ID', projectId);
   vi.stubEnv('KYBERION_TASK_ID', '');
   resetAgentExecutionPort();
   setWorkCoordinationNamespace('api-default-port-test');
@@ -37,6 +39,8 @@ beforeEach(() => {
   safeMkdir(missionDir, { recursive: true });
   writeMissionStateAtPath(path.join(missionDir, 'mission-state.json'), {
     mission_id: missionId,
+    tenant_slug: tenant,
+    organization_id: organizationId,
     mission_type: 'development',
     tier: 'public',
     status: 'active',
@@ -49,7 +53,7 @@ beforeEach(() => {
     relationships: {
       project: {
         project_id: projectId,
-        project_path: `active/projects/public/shared/${projectId}/project-os`,
+        project_path: `active/projects/public/${tenant}/${projectId}/project-os`,
         relationship_type: 'supports',
         affected_artifacts: [],
         gate_impact: 'informational',
@@ -107,6 +111,8 @@ const request = () => ({
   instruction: 'Read the public working philosophy',
   idempotency_key: 'default-api',
   security_scope: {
+    tenant_slug: tenant,
+    organization_id: organizationId,
     mission_id: missionId,
     write_tier: 'public' as const,
     read_tiers: ['public' as const],
@@ -123,7 +129,13 @@ describe('default coordinated API task tools', () => {
       description: 'Native default API tool binding',
       status: 'ready',
       projectId,
-      context: { project_id: projectId, mission_id: missionId, task_id: 'review-task' },
+      context: {
+        tenant_slug: tenant,
+        organization_id: organizationId,
+        project_id: projectId,
+        mission_id: missionId,
+        task_id: 'review-task',
+      },
       metadata: { team_role: 'reviewer' },
     });
     const result = await getCoordinatedAgentExecutionPort().delegate({
@@ -158,7 +170,13 @@ describe('default coordinated API task tools', () => {
       description: 'No implied grant',
       status: 'ready',
       projectId,
-      context: { project_id: projectId, mission_id: missionId, task_id: 'review-task' },
+      context: {
+        tenant_slug: tenant,
+        organization_id: organizationId,
+        project_id: projectId,
+        mission_id: missionId,
+        task_id: 'review-task',
+      },
     });
     const result = await new SupervisorAgentExecutionPort().delegate({
       ...request(),

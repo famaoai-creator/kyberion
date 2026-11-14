@@ -39,7 +39,12 @@ const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{1
 const object = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === 'object' && !Array.isArray(value);
 function active() {
-  if (getPluginExecutionContext() || credentialExecutionIdentity().tenantSlug) throw unavailable();
+  if (
+    getPluginExecutionContext() ||
+    credentialExecutionIdentity().tenantSlug ||
+    credentialExecutionIdentity().personalClaim
+  )
+    throw unavailable();
   const resolver = getSecretResolver();
   const writer = resolver?.accountProvisioner;
   if (!resolver || !writer || !writer.id || typeof writer.provision !== 'function')

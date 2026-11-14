@@ -39,6 +39,10 @@ export function createAnthropicCredentialClient(
   options: { client?: Anthropic; operatorApiKey?: string } = {}
 ) {
   const owner = credentialExecutionIdentity();
+  if (owner.personalClaim)
+    throw new Error(
+      '[CREDENTIAL_OWNER_DENIED] Personal claimed provider credentials are not admitted'
+    );
   if (owner.tenantSlug && options.client) {
     throw new Error(
       '[CREDENTIAL_OWNER_DENIED] Tenant Anthropic clients must be built from bound credentials'

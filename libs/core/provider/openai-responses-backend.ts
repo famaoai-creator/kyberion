@@ -67,6 +67,10 @@ export class OpenAiResponsesBackend extends OpenAiCompatibleBackend {
     if (opts.signal?.aborted) throw new Error('[DELEGATION_CANCELLED] OpenAI API request aborted');
     const endpoint = this.config.endpoint ?? OPENAI_RESPONSES_ENDPOINT;
     assertCredentialOwner(this.owner);
+    if (this.owner.personalClaim)
+      throw new Error(
+        '[CREDENTIAL_OWNER_DENIED] Personal claimed provider credentials are not admitted'
+      );
     if (this.owner.tenantSlug && (endpoint !== OPENAI_RESPONSES_ENDPOINT || this.config.request))
       throw new Error(
         '[CREDENTIAL_OWNER_DENIED] Tenant Responses transport must use the official endpoint'
