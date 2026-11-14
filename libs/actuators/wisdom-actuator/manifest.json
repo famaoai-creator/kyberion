@@ -1,6 +1,6 @@
 {
   "actuator_id": "wisdom-actuator",
-  "version": "1.8.0",
+  "version": "2.0.0",
   "description": "Knowledge-tier search, injection, import/export, and decision-support operations",
   "contract_schema": "knowledge/product/schemas/wisdom-action.schema.json",
   "resilience_tier": "adaptive_retry",
@@ -468,13 +468,6 @@
       "implementation": "full",
       "note": "Drives the SpeechToTextBridge. Stub falls back to a <audio>.transcript.txt sidecar; register ShellSpeechToTextBridge (via KYBERION_STT_COMMAND) for real decoding.",
       "effect": "read"
-    },
-    {
-      "op": "execute_task_plan",
-      "platforms": ["darwin", "linux", "win32"],
-      "implementation": "full",
-      "note": "Compatibility forwarder for the orchestrator-owned task-plan coordinator. The orchestrator validates and orders the DAG; each runnable task is delegated through the AgentExecutionPort and recorded to task-execution-log.jsonl.",
-      "effect": "write"
     },
     {
       "op": "deploy_release",

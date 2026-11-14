@@ -340,6 +340,13 @@ export interface CodexAppServerAdapterOptions {
   writableRoots?: string[];
   codexProfile?: string;
   taskToolRuntime?: TaskToolRuntime;
+  /**
+   * Unclaimed delegation: read-only sandbox without network, the same
+   * isolation as a task runtime (no inherited MCP server, web search or
+   * tool-bearing feature; verified Codex versions only) and every escalation
+   * request declined. `sandboxMode` and `networkAccess` cannot widen it.
+   */
+  readOnly?: boolean;
   requestApproval?: (method: string, params: Record<string, unknown>) => Promise<boolean>;
 }
 
@@ -420,7 +427,13 @@ export class CodexAppServerAdapter implements AgentAdapter {
     return this.logBuffer.slice(-limit);
   }
 
+  /** A task runtime or a read-only runtime: no native escape hatch, no escalation. */
+  private isConfined(): boolean {
+    return Boolean(this.options.taskToolRuntime || this.options.readOnly);
+  }
+
   private getSandboxMode(): 'workspace-write' | 'read-only' | 'danger-full-access' {
+    if (this.options.readOnly) return 'read-only';
     return this.options.sandboxMode || 'workspace-write';
   }
 
@@ -438,7 +451,7 @@ export class CodexAppServerAdapter implements AgentAdapter {
       resolveSandboxPolicy({
         provider: 'codex',
         mode: this.getSandboxMode(),
-        networkAccess: this.options.networkAccess ?? true,
+        networkAccess: this.options.readOnly ? false : (this.options.networkAccess ?? true),
         writableRoots: this.options.writableRoots,
       })
     ) as ReturnType<CodexAppServerAdapter['buildSandboxPolicy']>;
@@ -462,8 +475,8 @@ export class CodexAppServerAdapter implements AgentAdapter {
     this.codexVersion =
       (versionResult.stdout || versionResult.stderr).trim().split(/\r?\n/u)[0] || 'unknown';
     const isolatedArgs: string[] = [];
-    if (this.options.taskToolRuntime) {
-      this.options.taskToolRuntime.assertCurrent();
+    if (this.isConfined()) {
+      this.options.taskToolRuntime?.assertCurrent();
       if (
         !CODEX_GOVERNED_TOOL_PROTOCOL_VERSIONS.some((version) =>
           this.codexVersion.includes(`${version}.`)
@@ -532,7 +545,7 @@ export class CodexAppServerAdapter implements AgentAdapter {
       },
       bootTimeoutMs
     );
-    if (this.options.taskToolRuntime)
+    if (this.isConfined())
       assertCodexTaskIsolationConfig(
         await this.sendRequest('config/read', { cwd, includeLayers: false }, bootTimeoutMs)
       );
@@ -950,7 +963,7 @@ export class CodexAppServerAdapter implements AgentAdapter {
     switch (method) {
       case 'item/commandExecution/requestApproval': {
         const allow =
-          !this.options.taskToolRuntime &&
+          !this.isConfined() &&
           (relaxed ||
             this.isReadOnlyCommand(params) ||
             (await this.options.requestApproval?.(method, params ?? {})));
@@ -959,7 +972,7 @@ export class CodexAppServerAdapter implements AgentAdapter {
       }
       case 'item/fileChange/requestApproval': {
         const allow =
-          !this.options.taskToolRuntime &&
+          !this.isConfined() &&
           (relaxed || (await this.options.requestApproval?.(method, params ?? {})));
         this.sendResponse(id, { decision: allow ? 'accept' : 'decline' });
         return;
@@ -967,10 +980,10 @@ export class CodexAppServerAdapter implements AgentAdapter {
       case 'item/permissions/requestApproval': {
         this.sendResponse(id, {
           permissions:
-            !this.options.taskToolRuntime && relaxed && isRecord(params?.permissions)
+            !this.isConfined() && relaxed && isRecord(params?.permissions)
               ? params.permissions
               : {},
-          scope: !this.options.taskToolRuntime && relaxed ? 'session' : 'turn',
+          scope: !this.isConfined() && relaxed ? 'session' : 'turn',
         });
         return;
       }
@@ -1033,14 +1046,14 @@ export class CodexAppServerAdapter implements AgentAdapter {
       }
       case 'applyPatchApproval': {
         const allow =
-          !this.options.taskToolRuntime &&
+          !this.isConfined() &&
           (relaxed || (await this.options.requestApproval?.(method, params ?? {})));
         this.sendResponse(id, { decision: allow ? 'approved' : 'denied' });
         return;
       }
       case 'execCommandApproval': {
         const allow =
-          !this.options.taskToolRuntime &&
+          !this.isConfined() &&
           (relaxed ||
             this.isReadOnlyParsedCommand(params) ||
             (await this.options.requestApproval?.(method, params ?? {})));

@@ -19,7 +19,10 @@ import * as path from 'node:path';
 import { getRegisteredEnvText, safeChildEnv } from '../foundation/env.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import { isRecord, readTextFile } from '../foundation/text.js';
-import { resolveActiveProviderPermissionArgs } from '../provider/provider-permission-profiles.js';
+import {
+  resolveActiveProviderPermissionArgs,
+  resolveReadOnlyProviderPermissionArgs,
+} from '../provider/provider-permission-profiles.js';
 import { assertReasoningEgressAllowed } from '../reasoning/reasoning-egress-scope.js';
 import { buildKyberionMcpServerConfig } from '../provider/claude-mcp-server-config.js';
 import {
@@ -1245,6 +1248,15 @@ export interface ClaudeAdapterOptions {
    * model can only answer from the prompt it is given.
    */
   toolsDisabled?: boolean;
+  /**
+   * Unclaimed delegation: {@link buildClaudeReadOnlyArgs} — the KD-05
+   * `explorer` projection, availability limited to the approved read tools,
+   * write/shell/subagent tools denied, no MCP server and no setting source.
+   * Manifest tool lists and `permissionMode` are ignored, an ambient policy
+   * can only narrow it, boot fails when it cannot be built, and a failed
+   * turn throws instead of returning an empty result.
+   */
+  readOnly?: boolean;
   /** Explicit Kyberion MCP composition; ignore ambient user/project servers. */
   governedMcp?: boolean;
 }
@@ -1257,6 +1269,65 @@ const ACTUATOR_TO_CLAUDE_TOOLS: Record<string, string[]> = {
   'code-actuator': ['Bash', 'Read', 'Write', 'Edit', 'Grep', 'Glob'],
   'network-actuator': ['WebFetch', 'WebSearch'],
 };
+
+/** Tools a read-only Claude runtime must never get, whatever the profile says. */
+const CLAUDE_READ_ONLY_DENIED_TOOLS = [
+  'Write',
+  'Edit',
+  'MultiEdit',
+  'NotebookEdit',
+  'Bash',
+  'KillShell',
+  'PowerShell',
+  // A subagent could carry write tools of its own definition.
+  'Task',
+  'Agent',
+  'Skill',
+] as const;
+
+function readFlagValues(args: readonly string[], flag: string): string[] {
+  const at = args.indexOf(flag);
+  if (at < 0) return [];
+  const values: string[] = [];
+  for (const value of args.slice(at + 1)) {
+    if (value.startsWith('--')) break;
+    values.push(value);
+  }
+  return values;
+}
+
+/**
+ * Claude argv for a read-only runtime: the descriptor's read-only profile
+ * (approval) plus availability limited to the tools it approves (`--tools`),
+ * an explicit deny of every write, shell and subagent tool, and no setting
+ * source (no user/project permission rules, hooks, plugins or subagent
+ * definitions). Throws when the provider refuses the read-only profile.
+ */
+export function buildClaudeReadOnlyArgs(): string[] {
+  const profileArgs = resolveReadOnlyProviderPermissionArgs('claude');
+  const approved = readFlagValues(profileArgs, '--allowedTools').filter(
+    (tool) => !(CLAUDE_READ_ONLY_DENIED_TOOLS as readonly string[]).includes(tool)
+  );
+  const denied = [
+    ...new Set([
+      ...readFlagValues(profileArgs, '--disallowedTools'),
+      ...CLAUDE_READ_ONLY_DENIED_TOOLS,
+    ]),
+  ];
+  const mode = readFlagValues(profileArgs, '--permission-mode')[0] ?? 'default';
+  return [
+    '--permission-mode',
+    mode,
+    '--tools',
+    approved.join(','),
+    ...(approved.length > 0 ? ['--allowedTools', ...approved] : []),
+    '--disallowedTools',
+    ...denied,
+    '--strict-mcp-config',
+    '--setting-sources=',
+    '--disable-slash-commands',
+  ];
+}
 
 export class ClaudeAdapter implements AgentAdapter {
   protected readonly credentialOwner = credentialExecutionIdentity();
@@ -1275,12 +1346,22 @@ export class ClaudeAdapter implements AgentAdapter {
 
   public async boot(): Promise<void> {
     assertOperatorNativeCredentialOwner(this.credentialOwner);
+    // A read-only runtime that cannot get its read-only argv fails to spawn.
+    if (this.options.readOnly) buildClaudeReadOnlyArgs();
     logger.info(
       `[UAA] Claude Code ready (model: ${this.options.model || 'default'}, session: ${this.options.sessionId || 'new'})`
     );
   }
 
   public async ask(text: string): Promise<AgentResponse> {
+    const response = await this.askOnce(text);
+    // An unclaimed (read-only) turn that failed must not read as a result.
+    if (this.options.readOnly && response.stopReason === 'error')
+      throw new Error('[AGENT_READ_ONLY_TURN_FAILED] Claude read-only turn did not complete');
+    return response;
+  }
+
+  private async askOnce(text: string): Promise<AgentResponse> {
     assertOperatorNativeCredentialOwner(this.credentialOwner);
     logger.debug(`[UAA] Claude asking (${text.length} chars)`);
     this.logBuffer.push({ ts: Date.now(), type: 'prompt', content: text });
@@ -1303,13 +1384,15 @@ export class ClaudeAdapter implements AgentAdapter {
       if (this.options.sessionId) {
         args.push('--session-id', this.options.sessionId);
       }
-      const activePermissionArgs = resolveActiveProviderPermissionArgs('claude');
+      const activePermissionArgs = this.options.readOnly
+        ? buildClaudeReadOnlyArgs()
+        : resolveActiveProviderPermissionArgs('claude');
       if (activePermissionArgs) {
         args.push(...activePermissionArgs);
       } else if (this.options.permissionMode) {
         args.push('--permission-mode', this.options.permissionMode);
       }
-      if (!this.options.toolsDisabled && this.options.governedMcp) {
+      if (!this.options.readOnly && !this.options.toolsDisabled && this.options.governedMcp) {
         args.push(
           '--strict-mcp-config',
           '--mcp-config',

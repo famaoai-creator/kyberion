@@ -1,15 +1,15 @@
 {
   "action": "pipeline",
   "name": "faas-add-api",
-  "version": "2.0.0",
-  "description": "Conversational API authoring for projects/faas-platform. Takes a natural-language description plus mission metadata, produces a requirements draft, a design spec, and a task plan, then executes it through the orchestrator and registered AgentExecutionPort before reporting gate-check results. Deploy + approval are run as separate downstream pipelines (release-package → deploy-release) so the human approval moment stays explicit.",
+  "version": "3.0.0",
+  "description": "Conversational API authoring for projects/faas-platform. Takes a natural-language description plus mission metadata, produces a requirements draft, a design spec, and a task plan, then writes the task plan to the mission board (NEXT_TASKS.json) through orchestrator:task_plan_to_next_tasks and reports gate-check results. Implementation runs through normal mission dispatch, one claimed WorkItem per task, not inside this pipeline; the target directory reaches each task through the design spec. Run it in a mission whose board the plan may own: task_plan_to_next_tasks replaces NEXT_TASKS.json and refuses ([TASK_PLAN_BOARD_CONFLICT]) when the board holds tasks it did not produce, such as a workflow template's default tasks. Deploy + approval are run as separate downstream pipelines (release-package → deploy-release) so the human approval moment stays explicit.",
   "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
   "context": {
     "mission_id": "",
     "api_description": "",
     "api_name_hint": "",
     "project_name": "FaaS Platform API",
-    "cwd": "projects/faas-platform",
+    "target_project": "projects/faas-platform",
     "transcript_path": "active/missions/{{mission_id}}/evidence/faas-api-request.txt",
     "language": "ja",
     "customer_name": "platform-operator",
@@ -48,7 +48,7 @@
       "params": {
         "mission_id": "{{mission_id}}",
         "project_name": "{{project_name}}",
-        "additional_context": "Target project: FaaS platform (projects/faas-platform). Every API is a Lambda (Node.js 22) behind API Gateway HTTP API, with Aurora Global MySQL for state and the faas-runtime layer for shared concerns. Produce a design that names exactly one Lambda handler, at most one migration file (additive-only), and the CDK binding update. Respect the api-spec.schema.json contract. Components should include COMP-HANDLER, COMP-MIGRATION (if needed), COMP-REGISTRY_WRITE (always), COMP-CDK_BINDING. Open decisions must flag blocking=true when the request is ambiguous about auth_policy, data mode (read/write), or rate limits."
+        "additional_context": "Target project: FaaS platform ({{target_project}}); every task works in that directory. Every API is a Lambda (Node.js 22) behind API Gateway HTTP API, with Aurora Global MySQL for state and the faas-runtime layer for shared concerns. Produce a design that names exactly one Lambda handler, at most one migration file (additive-only), and the CDK binding update. Respect the api-spec.schema.json contract. Components should include COMP-HANDLER, COMP-MIGRATION (if needed), COMP-REGISTRY_WRITE (always), COMP-CDK_BINDING. Open decisions must flag blocking=true when the request is ambiguous about auth_policy, data mode (read/write), or rate limits."
       }
     },
     {
@@ -62,23 +62,22 @@
       }
     },
     {
-      "id": "execute",
+      "id": "task_plan_to_next_tasks",
       "role": "sink",
-      "op": "orchestrator:execute_task_plan",
-      "produces": { "channel": "execution", "type": "ExecutionResult" },
+      "op": "orchestrator:task_plan_to_next_tasks",
+      "consumes": "task_plan",
+      "produces": { "channel": "next_tasks", "type": "NextTasksRef" },
       "params": {
-        "mission_id": "{{mission_id}}",
-        "cwd": "{{cwd}}",
-        "halt_on_failure": true
+        "mission_id": "{{mission_id}}"
       }
     },
     {
       "id": "gate_summary",
       "role": "sink",
       "op": "system:log",
-      "consumes": ["requirements", "design", "task_plan", "execution"],
+      "consumes": ["requirements", "design", "task_plan", "next_tasks"],
       "params": {
-        "message": "faas-add-api done: requirements v{{requirements.version}} / design v{{design.version}} (architecture_ready={{design.architecture_ready.passed}}) / task plan v{{task_plan.version}} ({{task_plan.task_count}} tasks, ready={{task_plan.task_plan_ready.passed}}) / execution succeeded={{execution.succeeded}}/{{execution.total_tasks}}. Next: knowledge/product/pipeline-templates/code-review-cycle.json → knowledge/product/pipeline-templates/release-package.json → knowledge/product/pipeline-templates/deploy-release.json."
+        "message": "faas-add-api done: requirements v{{requirements.version}} / design v{{design.version}} (architecture_ready={{design.architecture_ready.passed}}) / task plan v{{task_plan.version}} ({{task_plan.task_count}} tasks, ready={{task_plan.task_plan_ready.passed}}) / target {{target_project}} / mission board {{next_tasks.next_tasks_path}} ({{next_tasks.task_count}} tasks). Next: the mission owner dispatches the board (pnpm mission dispatch-workitems {{mission_id}}); each task runs under a claimed WorkItem. Then knowledge/product/pipeline-templates/code-review-cycle.json → knowledge/product/pipeline-templates/release-package.json → knowledge/product/pipeline-templates/deploy-release.json."
       }
     }
   ]

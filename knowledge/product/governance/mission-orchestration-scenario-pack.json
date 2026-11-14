@@ -179,7 +179,7 @@
         "security_ready",
         "release_ready"
       ],
-      "notes": "CI/CD + STT + approval channel + audit forwarder + secret resolver の統合。execute_task_plan で adapter 実装を自動生成し、本番デプロイは config:update approval-gate を経由。Organization-specific values（vendor 契約名・内部 URL・承認者リスト・GitHub org slug）は confidential tier で上書き。"
+      "notes": "CI/CD + STT + approval channel + audit forwarder + secret resolver の統合。task_plan_to_next_tasks で adapter 実装タスクをミッションボードに載せ、claim 付き WorkItem として dispatch し、本番デプロイは config:update approval-gate を経由。Organization-specific values（vendor 契約名・内部 URL・承認者リスト・GitHub org slug）は confidential tier で上書き。"
     },
     {
       "scenario_id": "failure-platform-onboarding-skip-security-review",

@@ -42,7 +42,7 @@ Internally, Kyberion maps each Request through:
 
 | Use case                          | Mission class                              | Primary pipeline(s)                                                                                                            |
 | --------------------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
-| Implement feature / fix bug       | `code_change`                              | `code-change-aidlc` (`implementation-plan` → `execute-task-plan` → `code-review-cycle`)                                        |
+| Implement feature / fix bug       | `code_change`                              | `code-change-aidlc` (`implementation-plan` → mission dispatch → `code-review-cycle`)                                           |
 | Structure-only refactor           | `code_change` + mission type `refactoring` | `code-refactoring-aidlc` (audit → behavior pin → atomic reshape → equivalence); playbook `engineering-refactoring-playbook.md` |
 | Cut a release                     | `operations_and_release`                   | `release-package` → `deploy-release`                                                                                           |
 | Review a contract / spec          | `research_and_absorption`                  | `contract-review`                                                                                                              |
@@ -50,13 +50,13 @@ Internally, Kyberion maps each Request through:
 
 ### 3.2 Customer-facing requirements to delivery
 
-| Use case                                        | Mission class         | Pipeline                      |
-| ----------------------------------------------- | --------------------- | ----------------------------- |
-| Customer interview → requirements draft (text)  | `customer_engagement` | `requirements-elicitation`    |
-| Customer interview → requirements draft (audio) | `customer_engagement` | `audio-to-requirements`       |
-| Requirements → design spec                      | `customer_engagement` | `design-from-requirements`    |
-| Requirements + design → test plan               | `customer_engagement` | `test-plan-from-requirements` |
-| Plan → tasks → execution                        | `customer_engagement` | `execute-task-plan`           |
+| Use case                                        | Mission class         | Pipeline                                                    |
+| ----------------------------------------------- | --------------------- | ----------------------------------------------------------- |
+| Customer interview → requirements draft (text)  | `customer_engagement` | `requirements-elicitation`                                  |
+| Customer interview → requirements draft (audio) | `customer_engagement` | `audio-to-requirements`                                     |
+| Requirements → design spec                      | `customer_engagement` | `design-from-requirements`                                  |
+| Requirements + design → test plan               | `customer_engagement` | `test-plan-from-requirements`                               |
+| Plan → tasks → execution                        | `customer_engagement` | `sdlc-cycle` (`task_plan_to_next_tasks`) → mission dispatch |
 
 Review gates fire at each transition (`REQUIREMENTS_COMPLETENESS`,
 `ARCHITECTURE_READY`, `QA_READY`, `CUSTOMER_SIGNOFF`, etc.).

@@ -28,18 +28,6 @@ const ORCHESTRATOR_CONTRACTS: Record<string, InputSchema> = {
     properties: { export_as: { type: 'string' }, mission_id: { type: 'string' } },
     additionalProperties: false,
   },
-  execute_task_plan: {
-    type: 'object',
-    properties: {
-      cwd: { type: 'string' },
-      export_as: { type: 'string' },
-      halt_on_failure: { type: 'boolean' },
-      max_tasks: { type: 'number' },
-      mission_id: { type: 'string' },
-      model: { type: 'string' },
-    },
-    additionalProperties: false,
-  },
   deploy: {
     type: 'object',
     properties: {
@@ -71,7 +59,6 @@ const ORCHESTRATOR_CONTRACTS: Record<string, InputSchema> = {
 const ORCHESTRATOR_EXAMPLES: Record<string, Array<Record<string, unknown>>> = {
   decompose_into_tasks: [{ mission_id: 'MSN-20260826-001', project_name: 'kyberion' }],
   evaluate_task_plan_ready: [{ mission_id: 'MSN-20260826-001' }],
-  execute_task_plan: [{ mission_id: 'MSN-20260826-001', max_tasks: 10 }],
   deploy: [{ environment: 'staging', target: 'preview' }],
   run_execution_plan_set: [{ from: 'execution_plan_set' }],
   task_plan_to_next_tasks: [{ mission_id: 'MSN-20260826-001' }],
@@ -87,7 +74,6 @@ export const ORCHESTRATOR_ACTUATOR_APPLY_OPS = [
   'decompose_into_tasks',
   'deploy',
   'evaluate_task_plan_ready',
-  'execute_task_plan',
   'run_execution_plan_set',
   'task_plan_to_next_tasks',
 ] as const;

@@ -4,6 +4,7 @@ import {
   appendSupervisorEvent,
   askAgentRuntime,
   ensureAgentRuntime,
+  getAgentRuntimeHandle,
   getAgentRuntimeSnapshot,
   refreshAgentRuntime,
 } from './agent-runtime-supervisor.js';
@@ -22,8 +23,8 @@ export interface AgentTaskEnvelope {
   /**
    * Optional canonical WorkItem; lease/profile authority is always re-derived
    * server-side. Without it the delegation is unclaimed: it gets no task tool
-   * binding, lease or capability profile, and is recorded as
-   * `agent_delegation_unclaimed`.
+   * binding, lease or capability profile, runs read-only (a provider that
+   * cannot is refused) and is recorded as `agent_delegation_unclaimed`.
    */
   work_item_id?: string;
   task_id: string;
@@ -42,6 +43,12 @@ export interface AgentTaskEnvelope {
   provider?: AgentProvider;
   model_id?: string;
 }
+
+/**
+ * Tool mode of an unclaimed delegation: anything that writes goes through a
+ * WorkItem claim, whose runtime gets governed task tools instead.
+ */
+export const UNCLAIMED_DELEGATION_TOOL_ACCESS = 'read-only' as const;
 
 /** Execution states of a receipt (not messages); see `coordination-act-map.ts`. */
 export const AGENT_EXECUTION_RECEIPT_STATUSES = Object.freeze([
@@ -105,6 +112,7 @@ export class SupervisorAgentExecutionPort implements AgentExecutionPort {
           task_id: request.task_id,
           mission_id: request.mission_id,
           provider: request.provider || 'claude',
+          tool_access: UNCLAIMED_DELEGATION_TOOL_ACCESS,
           ...(errorCode ? { error_code: errorCode } : {}),
         },
       });
@@ -171,6 +179,7 @@ export class SupervisorAgentExecutionPort implements AgentExecutionPort {
           mission_id: request.mission_id,
           requested_by: 'agent_execution_port',
           provider: request.provider || 'claude',
+          tool_access: UNCLAIMED_DELEGATION_TOOL_ACCESS,
           idempotency_key: request.idempotency_key,
         });
       }
@@ -180,6 +189,9 @@ export class SupervisorAgentExecutionPort implements AgentExecutionPort {
         modelId: request.model_id,
         missionId: request.mission_id,
         capabilities: request.capabilities,
+        // Without a claim no task tool runtime exists; the provider's own
+        // tools are confined to read-only or the spawn is refused.
+        ...(taskBinding ? {} : { toolAccess: UNCLAIMED_DELEGATION_TOOL_ACCESS }),
         scope: {
           scope_kind: 'mission',
           tier: request.security_scope.write_tier,
@@ -206,6 +218,21 @@ export class SupervisorAgentExecutionPort implements AgentExecutionPort {
       });
       if (request.context_mode === 'fresh') {
         await refreshAgentRuntime(agentId, 'agent_execution_port');
+      }
+      // The ask looks the runtime up by id. An unclaimed instruction runs only
+      // on the read-only runtime ensured above (a fresh-context restart keeps
+      // its options), never on one respawned writable in between. No await
+      // separates this check from the ask's synchronous lookup.
+      if (!taskBinding) {
+        const current = getAgentRuntimeHandle(agentId);
+        if (
+          !current ||
+          (request.context_mode !== 'fresh' && current !== handle) ||
+          current.getRecord()?.metadata?.tool_access !== UNCLAIMED_DELEGATION_TOOL_ACCESS
+        )
+          throw new Error(
+            `[AGENT_RUNTIME_TOOL_MODE_CHANGED] Runtime ${agentId} is no longer the read-only runtime this unclaimed delegation was ensured on`
+          );
       }
       const response = await askAgentRuntime(agentId, request.instruction, 'agent_execution_port', {
         timeoutMs: request.timeout_ms,

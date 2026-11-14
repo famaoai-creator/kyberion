@@ -74,7 +74,6 @@ import '@agent/core/actuator/actuator-capability';
 import '@agent/core/authn-principal-resolver';
 import '@agent/core/authz-policy-engine';
 import '@agent/core/surface/surface-interaction-model';
-import '@agent/core/task/task-plan-coordinator-port';
 import '@agent/core/task/task-session';
 import '@agent/core/surface/ui-element-detector';
 import '@agent/core/virtual/virtual-camera-bridge';

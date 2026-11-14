@@ -557,8 +557,8 @@
       "path": "libs/actuators/wisdom-actuator",
       "d": "Knowledge-tier search, injection, import/export, and decision-support operations",
       "s": "implemented",
-      "version": "1.8.0",
-      "capability_count": 82,
+      "version": "2.0.0",
+      "capability_count": 81,
       "ops": [
         "a2a_fanout",
         "a2a_roleplay",
@@ -589,7 +589,6 @@
         "evaluate_simulation_quality",
         "evaluate_task_plan_ready",
         "execute_self_action_items",
-        "execute_task_plan",
         "extract_action_items",
         "extract_design_spec",
         "extract_dissent_signals",

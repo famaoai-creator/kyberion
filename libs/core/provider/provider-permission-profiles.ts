@@ -136,6 +136,23 @@ export function resolveActiveProviderPermissionArgs(
   return resolution.args;
 }
 
+/**
+ * Provider argv for a runtime that must stay read-only (an unclaimed agent
+ * delegation). The `explorer` projection, narrowed further by an ambient
+ * policy (planner stays planner) and never widened by one. A provider whose
+ * descriptor refuses the projection throws instead of starting writable.
+ */
+export function resolveReadOnlyProviderPermissionArgs(provider: ProviderId): readonly string[] {
+  const profile = resolveEffectiveProviderPermissionProfile(provider, 'explorer') ?? 'explorer';
+  const resolution = resolveProviderPermissionArgs(profile, provider);
+  if (resolution.kind === 'refused') {
+    throw new Error(
+      `[TOOL_READ_ONLY_UNSUPPORTED] ${provider}: read-only permission profile "${profile}" refused: ${resolution.reason}`
+    );
+  }
+  return resolution.args;
+}
+
 /** KD-05 tier names this module has a permission projection for. */
 export type ProviderPermissionProfileName = 'implementer' | 'explorer' | 'planner';
 

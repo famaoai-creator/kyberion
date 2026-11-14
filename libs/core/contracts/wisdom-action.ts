@@ -126,7 +126,6 @@ export type PipelineStep =
         | 'evaluate_simulation_quality'
         | 'evaluate_task_plan_ready'
         | 'execute_self_action_items'
-        | 'execute_task_plan'
         | 'extract_action_items'
         | 'extract_design_spec'
         | 'extract_dissent_signals'

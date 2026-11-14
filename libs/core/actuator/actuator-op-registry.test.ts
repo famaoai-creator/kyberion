@@ -7,6 +7,7 @@ import {
   isScenarioApprovalGranted,
   listKnownActuatorOps,
   listRegisteredDomainOps,
+  registerPluginActuatorOperation,
   registerScenarioOpOverride,
   resolveActuatorOperation,
   resolveScenarioOpOverride,
@@ -143,6 +144,30 @@ describe('actuator-op-registry', () => {
     expect(message).toContain('[UNKNOWN_OP]');
     expect(message).toContain('Did you mean: fetch');
     expect(listKnownActuatorOps('network')).toContain('fetch');
+  });
+
+  it('names the replacement when a retired op is called', () => {
+    for (const domain of ['orchestrator', 'wisdom']) {
+      expect(() => determineActuatorStepType(domain, 'execute_task_plan')).toThrow(
+        /\[UNKNOWN_OP\] Op "execute_task_plan" .* retired on 2026-11-14\. Use orchestrator:task_plan_to_next_tasks/
+      );
+    }
+  });
+
+  it('refuses a plugin that registers a retired op under its old name', () => {
+    expect(() =>
+      registerPluginActuatorOperation({
+        domain: 'orchestrator',
+        action: 'execute_task_plan',
+        stepType: 'apply',
+        pluginId: 'revenant-plugin',
+        modulePath: 'plugins/revenant/index.js',
+        handler: async (_params, ctx) => ctx,
+      })
+    ).toThrow(/retired operation/);
+    expect(() => determineActuatorStepType('orchestrator', 'execute_task_plan')).toThrow(
+      /retired on 2026-11-14/
+    );
   });
 
   it('resolves a registered operation with actuator provenance', () => {

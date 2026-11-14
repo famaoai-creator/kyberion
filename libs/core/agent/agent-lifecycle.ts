@@ -40,6 +40,7 @@ import {
   createAgentExecAdapter,
   hasAgentExecAdapter,
   canProvideGovernedTaskTools,
+  canProvideReadOnlyTools,
 } from './agent-exec-adapter-bridge.js';
 import './agent-exec-adapter-providers.js';
 import './agent-pane-runtime-herdr.js';
@@ -155,8 +156,12 @@ export interface SpawnOptions {
    * Team Channel E: `none` launches the provider with every tool disabled
    * (no file, shell, web or MCP access). Only providers that can enforce it
    * may be used; any other provider or a pane backend fails closed.
+   * `read-only` (unclaimed agent delegation) launches the provider unable to
+   * write files, run a writable shell or reach a write-capable tool server;
+   * only exec bridges that declare `readOnlyTools` may be used, anything else
+   * fails closed with `[TOOL_READ_ONLY_UNSUPPORTED]`.
    */
-  toolAccess?: 'default' | 'none';
+  toolAccess?: 'default' | 'none' | 'read-only';
 }
 
 /** A policy alias is only valid for a new, principal-bound surface turn instance. */
@@ -568,6 +573,25 @@ class AgentLifecycleManagerImpl {
       task: spawnTaskBindingKey(options.runtimeMetadata),
     };
     const heldBinding = this.spawnBindings.get(agentId);
+    const heldToolAccess = this.spawnOptions.get(agentId)?.toolAccess;
+    // The same task delegated unclaimed (read-only) and then claimed, or the
+    // reverse: only the tool mode differs, so recreate an idle runtime
+    // rather than refuse until it idles out. A busy one is never replaced.
+    if (
+      existingHandle &&
+      heldBinding &&
+      heldBinding.authority !== binding.authority &&
+      (heldToolAccess === 'read-only') !== (options.toolAccess === 'read-only') &&
+      spawnAuthorityKey({ ...options, toolAccess: heldToolAccess }, manifestAgentId) ===
+        heldBinding.authority
+    ) {
+      if (existingRecord?.status === 'busy' || existingRecord?.status === 'booting')
+        throw new Error(
+          '[AGENT_TASK_RUNTIME_BUSY] Cannot change a runtime tool mode during an active turn'
+        );
+      await this.shutdown(agentId);
+      return this.spawn(options);
+    }
     if (existingHandle && heldBinding?.authority !== binding.authority)
       throw new Error(
         '[AGENT_RUNTIME_BINDING_CONFLICT] A live runtime belongs to a different scope, owner or launch contract'
@@ -767,6 +791,16 @@ class AgentLifecycleManagerImpl {
         `[TOOL_LOCKDOWN_UNSUPPORTED] ${agentId}: provider '${resolvedOptions.provider}' (${runtimeBackend}) cannot run with tools disabled`
       );
     }
+    if (
+      resolvedOptions.toolAccess === 'read-only' &&
+      (runtimeBackend === 'pane' ||
+        !canProvideReadOnlyTools(resolvedOptions.provider) ||
+        !(await hasAgentExecAdapter(resolvedOptions.provider)))
+    ) {
+      throw new Error(
+        `[TOOL_READ_ONLY_UNSUPPORTED] ${agentId}: provider '${resolvedOptions.provider}' (${runtimeBackend}) cannot run read-only; an unclaimed delegation needs a read-only provider (claude, codex) or a WorkItem claim`
+      );
+    }
 
     this.spawnOptions.set(agentId, resolvedOptions);
     this.ensureMetrics(agentId);
@@ -803,6 +837,7 @@ class AgentLifecycleManagerImpl {
     if (
       taskToolRuntime &&
       (resolvedOptions.toolAccess === 'none' ||
+        resolvedOptions.toolAccess === 'read-only' ||
         runtimeBackend === 'pane' ||
         !canProvideGovernedTaskTools(resolvedOptions.provider))
     )
@@ -851,7 +886,9 @@ class AgentLifecycleManagerImpl {
           : {}),
         task_model_hint: runtimeMetadata.task_model_hint,
         scope: resolvedScope,
-        ...(resolvedOptions.toolAccess === 'none' ? { tool_access: 'none' } : {}),
+        ...(resolvedOptions.toolAccess && resolvedOptions.toolAccess !== 'default'
+          ? { tool_access: resolvedOptions.toolAccess }
+          : {}),
       },
     });
 
@@ -973,6 +1010,7 @@ class AgentLifecycleManagerImpl {
         missionId: resolvedOptions.missionId,
         scope: resolvedScope,
         ...(resolvedOptions.toolAccess === 'none' ? { toolsDisabled: true } : {}),
+        ...(resolvedOptions.toolAccess === 'read-only' ? { readOnly: true } : {}),
       });
 
       // A failed/slow boot still belongs to the scoped stop request. Keep the
@@ -1099,6 +1137,12 @@ class AgentLifecycleManagerImpl {
       agentRegistry.updateStatus(agentId, 'error');
       throw new Error(
         `[TOOL_LOCKDOWN_UNSUPPORTED] ${agentId}: no exec adapter for '${resolvedOptions.provider}' to run with tools disabled`
+      );
+    }
+    if (resolvedOptions.toolAccess === 'read-only') {
+      agentRegistry.updateStatus(agentId, 'error');
+      throw new Error(
+        `[TOOL_READ_ONLY_UNSUPPORTED] ${agentId}: no exec adapter for '${resolvedOptions.provider}' to run read-only`
       );
     }
 

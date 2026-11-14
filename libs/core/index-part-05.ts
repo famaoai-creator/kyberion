@@ -120,22 +120,6 @@ export {
   saveTestPlan,
 } from './mission/sdlc-artifact-store.js';
 
-export { executeTaskPlan } from './task/task-executor.js';
-
-export {
-  getTaskPlanCoordinator,
-  registerTaskPlanCoordinator,
-  resetTaskPlanCoordinator,
-} from './task/task-plan-coordinator-port.js';
-
-export type {
-  ExecuteTaskPlanParams,
-  ExecuteTaskPlanResult,
-  TaskExecutionRecord,
-  TaskExecutionStatus,
-  TaskPlanCoordinatorPort,
-} from './task/task-plan-coordinator-port.js';
-
 export {
   getAgentExecutionPort,
   registerAgentExecutionPort,

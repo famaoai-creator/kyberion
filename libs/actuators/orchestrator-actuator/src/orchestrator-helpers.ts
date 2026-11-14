@@ -23,7 +23,6 @@ import { retry, getRetryDefaults } from '@agent/core/async-utils';
 
 import { pathResolver } from '@agent/core/path-resolver';
 import { buildUnknownActuatorOpError } from '@agent/core/actuator/actuator-op-registry';
-import { registerTaskPlanCoordinator } from '@agent/core/task/task-plan-coordinator-port';
 import { evaluateTaskPlanReadyGate } from '@agent/core/sdlc-artifact-store';
 import { buildCostReportFromHistory } from '@agent/core/cost-report';
 import { summarizeSemanticDegradations } from '@agent/core/semantic-degradation-log';
@@ -40,7 +39,6 @@ import {
 } from '@agent/core/contracts/execution-bounds';
 import * as path from 'node:path';
 import * as yaml from 'js-yaml';
-import { executeTaskPlanFromOrchestrator, taskPlanCoordinator } from './task-plan-coordinator.js';
 import { decomposeIntoTasks, taskPlanToNextTasks } from './task-plan-ops.js';
 import {
   loadActuatorRequestArchetypes,
@@ -60,10 +58,6 @@ import {
   collectProjectStatusSnapshot,
 } from './orchestrator-execution-brief-helpers.js';
 import { parseIntentMapping } from './orchestrator-intent-mapping.js';
-
-// Legacy core callers are still supported, but the coordinator is owned and
-// registered by the orchestrator actuator rather than by Wisdom or core.
-registerTaskPlanCoordinator(taskPlanCoordinator);
 
 export interface PipelineStep {
   type: 'capture' | 'transform' | 'apply' | 'control';
@@ -1021,21 +1015,6 @@ async function opTransform(op: string, params: any, ctx: any) {
         [params.export_as || 'execution_run_report']: runReport,
       };
     }
-    case 'execute_task_plan': {
-      const missionId = String(resolveVars(params.mission_id || ctx.mission_id || '', ctx));
-      if (!missionId) throw new Error('execute_task_plan requires mission_id');
-      const result = await executeTaskPlanFromOrchestrator({
-        missionId,
-        maxTasks: typeof params.max_tasks === 'number' ? params.max_tasks : undefined,
-        haltOnFailure: Boolean(params.halt_on_failure),
-        model: params.model ? String(resolveVars(params.model, ctx)) : undefined,
-        cwd: params.cwd ? String(resolveVars(params.cwd, ctx)) : undefined,
-      });
-      return {
-        ...ctx,
-        [params.export_as || 'task_execution_report']: result,
-      };
-    }
     case 'preflight_execution_plan_set': {
       const planSet = ctx[params.from || 'execution_plan_set'];
       if (!planSet || typeof planSet !== 'object')
@@ -1048,7 +1027,7 @@ async function opTransform(op: string, params: any, ctx: any) {
       };
     }
     default:
-      throw new Error(`[UNKNOWN_OP] Unknown op: ${op}`);
+      throw buildUnknownOrchestratorOpError(op);
   }
 }
 
