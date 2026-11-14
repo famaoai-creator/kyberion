@@ -7,7 +7,7 @@ import {
   safeMkdir,
   safeRmSync,
   safeWriteFile,
-} from './index.js';
+} from '../index.js';
 
 const roots: string[] = [];
 const originalMissionRole = process.env.MISSION_ROLE;

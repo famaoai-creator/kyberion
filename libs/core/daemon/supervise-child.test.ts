@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { ChildProcess } from './secure-io.js';
+import type { ChildProcess } from '../secure-io.js';
 import {
   spawnSupervisedChild,
   stopSupervisedChild,
-} from '../../satellites/shared/supervise-child.js';
+} from '../../../satellites/shared/supervise-child.js';
 describe('supervised stop result', () => {
   it('reports failure when killing throws and preserves SIGTERM', () => {
     const kill = vi.fn(() => {

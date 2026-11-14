@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import path from 'node:path';
-import { pathResolver } from './path-resolver.js';
-import { safeReadFile } from './secure-io.js';
-import { ui, fileUtils } from './core.js';
+import { pathResolver } from '../path-resolver.js';
+import { safeReadFile } from '../secure-io.js';
+import { ui, fileUtils } from '../core.js';
 import {
   detectTier,
   scanForConfidentialMarkers,
@@ -13,7 +13,7 @@ import {
   requireArgs,
   Cache,
   rootDir,
-} from './index.js';
+} from '../index.js';
 
 const originalArgv = process.argv.slice();
 const readlineMock = vi.hoisted(() => ({
@@ -31,8 +31,8 @@ const visionResolverMock = vi.hoisted(() => ({
   resolveVision: vi.fn(),
 }));
 
-vi.mock('./organization/vision-resolver.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('./organization/vision-resolver.js')>();
+vi.mock('../organization/vision-resolver.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../organization/vision-resolver.js')>();
   return {
     ...actual,
     resolveVision: visionResolverMock.resolveVision,

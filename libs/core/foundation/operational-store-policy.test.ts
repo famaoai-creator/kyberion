@@ -1,16 +1,16 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 const resolveTenant = vi.hoisted(() => vi.fn());
-vi.mock('./organization/tenant-registry.js', async (original) => ({
-  ...(await original<typeof import('./organization/tenant-registry.js')>()),
+vi.mock('../organization/tenant-registry.js', async (original) => ({
+  ...(await original<typeof import('../organization/tenant-registry.js')>()),
   resolveTenant,
 }));
-import { resolveIdentityContext, withExecutionContext } from './authority.js';
-import { isRegisteredOperationalTenant } from './foundation/operational-store-policy.js';
-import { assertRecordIdentity } from './organization/organization-operating-model-persistence.js';
-import { withOpsAlertFileStore } from './daemon/ops-alert-log.js';
-import { defaultOpsAlertLogPath } from './daemon/ops-alert.js';
-import { pathResolver } from './path-resolver.js';
-import { asRoleOrGrant } from './testing/role-or-store-grant.js';
+import { resolveIdentityContext, withExecutionContext } from '../authority.js';
+import { isRegisteredOperationalTenant } from '../foundation/operational-store-policy.js';
+import { assertRecordIdentity } from '../organization/organization-operating-model-persistence.js';
+import { withOpsAlertFileStore } from '../daemon/ops-alert-log.js';
+import { defaultOpsAlertLogPath } from '../daemon/ops-alert.js';
+import { pathResolver } from '../path-resolver.js';
+import { asRoleOrGrant } from '../testing/role-or-store-grant.js';
 
 afterEach(() => {
   vi.unstubAllEnvs();

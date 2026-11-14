@@ -4,9 +4,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   _resetEgressPolicyCacheForTests,
   withEgressPayloadContext,
-} from './governance/egress-policy.js';
-import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
+} from '../governance/egress-policy.js';
+import { pathResolver } from '../path-resolver.js';
+import {
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeRmSync,
+  safeWriteFile,
+} from '../secure-io.js';
 
 const mocks = vi.hoisted(() => ({
   axios: vi.fn(),
@@ -17,8 +23,8 @@ vi.mock('axios', () => ({
   default: mocks.axios,
 }));
 
-vi.mock('./core.js', async () => {
-  const actual = (await vi.importActual('./core.js')) as any;
+vi.mock('../core.js', async () => {
+  const actual = (await vi.importActual('../core.js')) as any;
   return {
     ...actual,
     logger: {
@@ -44,7 +50,7 @@ describe('secureFetch', () => {
   });
 
   it('retains a safe HTTP status without retaining the provider response or request', async () => {
-    const { secureFetch, SecureFetchError } = await import('./network.js');
+    const { secureFetch, SecureFetchError } = await import('../network.js');
     mocks.axios.mockRejectedValue(
       Object.assign(new Error('Request failed'), {
         response: {
@@ -96,7 +102,7 @@ describe('secureFetch', () => {
     );
     process.env.KYBERION_EGRESS_POLICY_PATH = policyPath;
 
-    const { secureFetch } = await import('./network.js');
+    const { secureFetch } = await import('../network.js');
 
     await expect(
       secureFetch({
@@ -111,7 +117,7 @@ describe('secureFetch', () => {
 
   it('allows non-allowlisted hosts when egress policy is warn', async () => {
     mocks.axios.mockResolvedValue({ data: { ok: true } });
-    const { secureFetch } = await import('./network.js');
+    const { secureFetch } = await import('../network.js');
 
     await secureFetch({
       url: 'https://unknown.example.com/test',
@@ -123,7 +129,7 @@ describe('secureFetch', () => {
   });
 
   it('applies ambient provenance to secureFetch calls without explicit context', async () => {
-    const { secureFetch } = await import('./network.js');
+    const { secureFetch } = await import('../network.js');
 
     await expect(
       withEgressPayloadContext(
@@ -146,7 +152,7 @@ describe('secureFetch', () => {
   });
 
   it('does not let an inner public context weaken an ambient personal scope', async () => {
-    const { secureFetch } = await import('./network.js');
+    const { secureFetch } = await import('../network.js');
 
     await expect(
       withEgressPayloadContext({ tier: 'personal', tenant_slug: 'tenant-a' }, () =>
@@ -161,7 +167,7 @@ describe('secureFetch', () => {
   });
 
   it('rejects conflicting ambient and explicit tenant scopes before network I/O', async () => {
-    const { secureFetch } = await import('./network.js');
+    const { secureFetch } = await import('../network.js');
 
     await expect(
       withEgressPayloadContext({ tier: 'confidential', tenant_slug: 'tenant-a' }, () =>
@@ -177,7 +183,7 @@ describe('secureFetch', () => {
 
   it('redacts sensitive payload fields and headers before dispatching', async () => {
     mocks.axios.mockResolvedValue({ data: { ok: true } });
-    const { secureFetch } = await import('./network.js');
+    const { secureFetch } = await import('../network.js');
 
     await secureFetch({
       url: 'https://api.github.com/test',
@@ -222,7 +228,7 @@ describe('secureFetch', () => {
   });
 
   it('redacts unknown values without assuming an object response shape', async () => {
-    const { redactSensitiveObject } = await import('./network.js');
+    const { redactSensitiveObject } = await import('../network.js');
 
     expect(redactSensitiveObject({ token: 'secret', nested: [{ value: 'safe' }] })).toEqual({
       token: '[REDACTED_SECRET]',

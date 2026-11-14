@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { errorHandler, fileUtils } from './core.js';
+import { errorHandler, fileUtils } from '../core.js';
 
 // IP-08 Task 5: errorHandler used to process.exit(1) — a failed
 // fileUtils.writeJson inside a bridge daemon killed the whole process.

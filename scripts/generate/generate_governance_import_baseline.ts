@@ -14,7 +14,7 @@
  * the governed read boundary (tier roots such as knowledge/personal and
  * knowledge/confidential, and runtime roots such as active/ and vault/, are
  * skipped below), so it needs no raw-fs exemption from
- * libs/core/security-boundary.contract.test.ts.
+ * libs/core/secure-io/security-boundary.contract.test.ts.
  */
 import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';

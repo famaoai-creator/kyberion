@@ -105,7 +105,7 @@ const allowedCoreFsImports = [
   'libs/core/secure-io/secure-io.symlink-root-alias.test.ts',
   'libs/core/secure-io/secure-io.test.ts',
   'libs/core/secure-io.ts',
-  'libs/core/security-boundary.contract.test.ts',
+  'libs/core/secure-io/security-boundary.contract.test.ts',
   'libs/core/voice/speech-to-text-bridge.test.ts',
   'libs/core/actuator/actuator-capability.test.ts',
   'libs/core/knowledge/feedback-loop.test.ts',

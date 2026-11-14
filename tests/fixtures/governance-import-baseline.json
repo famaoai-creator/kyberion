@@ -99,7 +99,7 @@
     "libs/core/secure-io/secure-io.symlink-root-alias.test.ts",
     "libs/core/secure-io/secure-io.test.ts",
     "libs/core/secure-io.ts",
-    "libs/core/security-boundary.contract.test.ts",
+    "libs/core/secure-io/security-boundary.contract.test.ts",
     "libs/core/service/service-connection-readiness.test.ts",
     "libs/core/shell/git-probe-hardening.test.ts",
     "libs/core/storage/data-vault.test.ts",

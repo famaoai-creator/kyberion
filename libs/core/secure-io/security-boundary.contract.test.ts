@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { pathResolver } from './path-resolver.js';
-import { safeLstat, safeReadFile, safeReaddir } from './secure-io.js';
+import { pathResolver } from '../path-resolver.js';
+import { safeLstat, safeReadFile, safeReaddir } from '../secure-io.js';
 import ts from 'typescript';
 
 // Exact reviewed boundaries; bootstrap modules run before secure-io can load.
