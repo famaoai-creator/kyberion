@@ -5,7 +5,7 @@ import { safeReadFile } from '@agent/core/secure-io';
 const ENTRYPOINTS = [
   'scripts/agent/agent_runtime_supervisor_daemon.ts',
   'scripts/bootstrap_environment.ts',
-  'scripts/company_bootstrap.ts',
+  'scripts/company/company_bootstrap.ts',
   'scripts/compose_mission_team.ts',
   'scripts/kyberion_home.ts',
   'scripts/meeting/meeting_orchestrator.ts',

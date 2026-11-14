@@ -3,7 +3,7 @@
 import * as path from 'node:path';
 import { onboardAiCompany } from '@agent/core/organization/company-onboarding';
 import { listCompanyVerticals } from '@agent/core/organization/company-bootstrap';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from '../lib/harness.js';
 
 export { onboardAiCompany } from '@agent/core/organization/company-onboarding';
 export type {

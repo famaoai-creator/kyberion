@@ -22430,7 +22430,7 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-06 再レビュー修正 1538
 
-- **対象**: `scripts/company_onboarding.ts`、`scripts/company_bootstrap.ts`、`scripts/encrypt_connection_documents.ts` と対象テスト
+- **対象**: `scripts/company/company_onboarding.ts`、`scripts/company/company_bootstrap.ts`、`scripts/encrypt_connection_documents.ts` と対象テスト
 - **変更**: onboarding snapshot、company template、connection document の本文読込を foundation の `readTextFile` へ移行した。tenant／customer path boundary、template substitution、encryption/decryption と backup semanticsは変更せず、reader contract を追加した。
 - **検証**: 対象テスト **3 files／13 tests passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
 

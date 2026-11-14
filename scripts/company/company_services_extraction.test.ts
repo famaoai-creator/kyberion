@@ -9,9 +9,9 @@ import * as registryCore from '@agent/core/organization/tenant-registry-consiste
 import { parseJsonProbeOutput, runServicePreflight } from '@agent/core/service/service-preflight';
 import * as bootstrapCli from './company_bootstrap.js';
 import * as onboardingCli from './company_onboarding.js';
-import * as probeCli from './tenant_activation_probe.js';
-import * as registryCli from './check/check_tenant_registry_consistency.js';
-import * as serviceCli from './service/service_preflight.js';
+import * as probeCli from '../tenant/tenant_activation_probe.js';
+import * as registryCli from '../check/check_tenant_registry_consistency.js';
+import * as serviceCli from '../service/service_preflight.js';
 
 const CORE_SERVICES = [
   'organization/company-bootstrap',

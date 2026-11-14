@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-import { main as backupMain } from './backup.js';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { main as backupMain } from '../backup.js';
+import { defineScript, isDirectScript } from '../lib/harness.js';
 
 function translateArgs(argv: string[]): string[] {
   const translated = ['create', '--scope', 'tenant'];

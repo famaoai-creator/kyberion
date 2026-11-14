@@ -29,7 +29,7 @@ describe('tenant activation output boundary', () => {
 
   it('does not keep a direct console output fallback', () => {
     const source = String(
-      safeReadFile(pathResolver.rootResolve('scripts/tenant_activation.ts'), {
+      safeReadFile(pathResolver.rootResolve('scripts/tenant/tenant_activation.ts'), {
         encoding: 'utf8',
       })
     );
