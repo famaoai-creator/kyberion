@@ -24,7 +24,7 @@ import {
 } from '@agent/core/voice/voice-consent';
 import { logger } from '@agent/core/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from '../lib/harness.js';
 
 function grant(
   missionId: string,

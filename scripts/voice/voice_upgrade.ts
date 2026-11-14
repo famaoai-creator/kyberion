@@ -43,8 +43,8 @@ import {
   isDirectScript,
   ScriptExitError,
   stripSharedScriptFlags,
-} from './lib/harness.js';
-import { readSafeJsonFile } from './lib/json-input.js';
+} from '../lib/harness.js';
+import { readSafeJsonFile } from '../lib/json-input.js';
 
 type Tier = 0 | 1 | 2;
 

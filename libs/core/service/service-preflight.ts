@@ -31,7 +31,7 @@ function getDirectProbe(serviceId: string): DirectProbe | null {
     return {
       label: 'voice bridge health',
       command: 'python3',
-      args: ['libs/actuators/voice-actuator/scripts/voice_learning_bridge.py'],
+      args: ['libs/actuators/voice-actuator/scripts/voice/voice_learning_bridge.py'],
       input: JSON.stringify({ action: 'health' }),
     };
   }

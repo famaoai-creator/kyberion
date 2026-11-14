@@ -109,7 +109,7 @@ export class PythonVoiceBridge implements VoiceBridge {
 }
 
 const DEFAULT_VOICE_BRIDGE_SCRIPT = pathResolver.rootResolve(
-  'libs/actuators/voice-actuator/scripts/voice_learning_bridge.py'
+  'libs/actuators/voice-actuator/scripts/voice/voice_learning_bridge.py'
 );
 
 export function installPythonVoiceBridgeIfAvailable(

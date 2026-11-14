@@ -462,7 +462,7 @@ export async function main(
       return;
     }
     case 'operator-voice': {
-      const { runVoiceSetupScript } = await import('./voice_setup.js');
+      const { runVoiceSetupScript } = await import('./voice/voice_setup.js');
       await runVoiceSetupScript(normalizedArgs.slice(2));
       return;
     }

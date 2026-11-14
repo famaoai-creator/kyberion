@@ -12,7 +12,7 @@ import { pathResolver } from '@agent/core/path-resolver';
 import { safeExecResult, safeExistsSync, safeMkdir } from '@agent/core/secure-io';
 import { getRegisteredEnvText } from '@agent/core/foundation';
 import { isWindows } from '@agent/core/platform';
-import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
 import {
   discoverLocalSttBackends,
   resetLocalSttDiscoveryCache,

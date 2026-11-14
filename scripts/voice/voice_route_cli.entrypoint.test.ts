@@ -5,7 +5,7 @@ import { safeReadFile } from '@agent/core/secure-io';
 describe('voice route CLI entrypoint', () => {
   it('uses the shared command and output boundary', () => {
     const source = String(
-      safeReadFile(pathResolver.rootResolve('scripts/voice_route_cli.ts'), {
+      safeReadFile(pathResolver.rootResolve('scripts/voice/voice_route_cli.ts'), {
         encoding: 'utf8',
       })
     );

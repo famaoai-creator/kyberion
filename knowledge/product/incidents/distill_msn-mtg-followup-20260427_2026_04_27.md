@@ -30,7 +30,7 @@ remaining four findings + two UX gaps in one wave.
 
 | Item                      | Mechanism                                                                                                                                                                                                                                                                                                                  |
 | ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Voice consent capture CLI | `pnpm meeting:consent grant                                                                                                                                                                                                                                                                                                | revoke | status --mission MSN-…`. Writes `evidence/voice-consent.json`and emits a`voice_consent.<verb>`audit event. Refuses overwrite of an existing grant unless`--force`. Source: `scripts/voice_consent.ts`. |
+| Voice consent capture CLI | `pnpm meeting:consent grant                                                                                                                                                                                                                                                                                                | revoke | status --mission MSN-…`. Writes `evidence/voice-consent.json`and emits a`voice_consent.<verb>`audit event. Refuses overwrite of an existing grant unless`--force`. Source: `scripts/voice/voice_consent.ts`. |
 | Bridge driver hardening   | `meeting-bridge.py` rewritten: per-platform host allow-list, `zoommtg://` / `msteams:/` schemes when possible, structured error envelopes, partial-state detection on `listen` (elapsed-time + empty-transcript checks), `chat`/`status` actions, cross-platform speech (macOS `say`, Linux `espeak`, Windows PowerShell). |
 
 ## Why these matter in this order
@@ -65,6 +65,6 @@ operator inspection.
   `execute_self_action_items` (approval gate), `track_pending_action_items`
   (CC), `audit_speaker_fairness`
 - `libs/actuators/meeting-actuator/meeting-bridge.py` — driver rewrite
-- `scripts/voice_consent.ts` — consent CLI
+- `scripts/voice/voice_consent.ts` — consent CLI
 - `knowledge/product/governance/restricted-action-kinds-policy.json` — policy
 - `pipelines/meeting-facilitation-workflow.json` — wired fairness audit
