@@ -2,8 +2,12 @@
   "default_pattern": "https://api.{service_id}.com/v1",
   "services": {
     "jira": {
-      "base_url": "https://atlassian.net/rest/api/3",
+      "base_url": "https://{{domain}}.atlassian.net/rest/api/3",
       "preset_path": "knowledge/product/orchestration/service-presets/jira.json",
+      "credential_suffixes": {
+        "clientId": ["EMAIL"],
+        "clientSecret": ["API_TOKEN"]
+      },
       "auth_strategy": "basic"
     }
   }

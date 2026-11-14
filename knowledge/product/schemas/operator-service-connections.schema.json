@@ -36,8 +36,8 @@
             "maxLength": 80
           },
           "secretKey": {
-            "enum": ["ACCESS_TOKEN", "API_KEY", "BOT_TOKEN", "TOKEN"],
-            "description": "Which catalog accessToken suffix holds the credential; the resolved env/document name is still verified against the endpoint's credential_suffixes."
+            "enum": ["ACCESS_TOKEN", "API_KEY", "API_TOKEN", "BOT_TOKEN", "TOKEN"],
+            "description": "Document field name (upper-cased) holding the registered credential; must map to a bindable suffix in the endpoint's credential_suffixes — e.g. clientSecret for basic-auth services, accessToken for bearer/bot/api_key_query."
           },
           "authOperation": {
             "type": "string",
@@ -99,6 +99,7 @@
                       "bot_token",
                       "token",
                       "api_key",
+                      "api_token",
                       "refresh_token",
                       "client_secret",
                       "app_token",

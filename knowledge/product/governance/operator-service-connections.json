@@ -189,10 +189,10 @@
     {
       "serviceId": "confluence",
       "label": "Confluence",
-      "secretKey": "ACCESS_TOKEN",
+      "secretKey": "TOKEN",
       "authOperation": "get_spaces",
       "setupUrl": "https://id.atlassian.com/manage-profile/security/api-tokens",
-      "scopeNotice": "Authentication confirms a pre-encoded Basic credential (base64 of email:api-token) for the configured site only. Space visibility still depends on the account's permissions.",
+      "scopeNotice": "Authentication confirms the account's email and API token for the configured site only. Space visibility still depends on the account's permissions.",
       "probe": {
         "baseUrl": "https://{{domain}}.atlassian.net/wiki/api/v2",
         "path": "spaces",
@@ -259,7 +259,9 @@
         "baseUrl": "https://{{host}}.com/api/v4",
         "path": "user",
         "method": "GET",
-        "params": { "host": "gitlab" },
+        "params": {
+          "host": "gitlab"
+        },
         "connectionFields": ["host"],
         "successRules": [
           {
@@ -276,10 +278,10 @@
     {
       "serviceId": "jira",
       "label": "Jira",
-      "secretKey": "ACCESS_TOKEN",
+      "secretKey": "API_TOKEN",
       "authOperation": "get_myself",
       "setupUrl": "https://id.atlassian.com/manage-profile/security/api-tokens",
-      "scopeNotice": "Authentication confirms a pre-encoded Basic credential (base64 of email:api-token) for the configured site only. Project and issue visibility still depend on the account's permissions.",
+      "scopeNotice": "Authentication confirms the account's email and API token for the configured site only. Project and issue visibility still depend on the account's permissions.",
       "probe": {
         "baseUrl": "https://{{domain}}.atlassian.net/rest/api/3",
         "path": "myself",
@@ -304,7 +306,9 @@
         "baseUrl": "https://api.linear.app/graphql",
         "path": "",
         "method": "POST",
-        "payload": { "query": "{viewer{id}}" },
+        "payload": {
+          "query": "{viewer{id}}"
+        },
         "successRules": [
           {
             "field": "data.viewer.id",
@@ -358,10 +362,10 @@
     {
       "serviceId": "zendesk",
       "label": "Zendesk",
-      "secretKey": "ACCESS_TOKEN",
+      "secretKey": "TOKEN",
       "authOperation": "get_myself",
       "setupUrl": "https://support.zendesk.com/hc/en-us/articles/4408889192858",
-      "scopeNotice": "Authentication confirms a pre-encoded Basic credential (base64 of email:api-token) for the configured subdomain only. Ticket and user visibility still depend on the account's role.",
+      "scopeNotice": "Authentication confirms the account's email and API token for the configured subdomain only (Zendesk's API-token user form is 'email/token'). Ticket and user visibility still depend on the account's role.",
       "probe": {
         "baseUrl": "https://{{subdomain}}.zendesk.com/api/v2",
         "path": "users/me.json",

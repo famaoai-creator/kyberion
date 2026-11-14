@@ -6,7 +6,7 @@
 import { timingSafeEqual } from 'node:crypto';
 import { getPluginExecutionContext } from '../shell/sandbox-policy.js';
 import { loadConnectionDocument } from '../secret/secret-guard.js';
-import { getServiceEndpointRecord } from './service-endpoint-registry.js';
+import { getServiceEndpointRecord, type CredentialSuffixKey } from './service-endpoint-registry.js';
 import { getServicePresetRecord } from './service-preset-registry.js';
 import { resolveServiceBinding } from './service-binding.js';
 import { executeServicePreset } from './service-engine.js';
@@ -163,6 +163,31 @@ function pathUsesOnlyAccessToken(path: string): boolean {
   return !TEMPLATE_TOKEN_TEST.test(path.replaceAll(ACCESS_TOKEN_PLACEHOLDER, ''));
 }
 
+/** A base URL may never carry the admitted credential; only paths may (Telegram). */
+function baseUrlCarriesNoCredential(url: string): boolean {
+  return !url.includes(ACCESS_TOKEN_PLACEHOLDER);
+}
+
+/**
+ * Binding fields the probe may read. `basicAuthToken` is a schema-level suffix
+ * class with no binding slot, so a secretKey mapped there can never resolve.
+ */
+const BINDABLE_SUFFIX_KEYS = [
+  'accessToken',
+  'appToken',
+  'refreshToken',
+  'clientId',
+  'clientSecret',
+  'redirectUri',
+] as const;
+type BindableSuffixKey = (typeof BINDABLE_SUFFIX_KEYS)[number];
+
+/** Keys the binding must resolve for a strategy: basic also needs the user part. */
+function probeBindingKeys(strategy: string, secretField: BindableSuffixKey): CredentialSuffixKey[] {
+  if (strategy !== 'basic') return [secretField];
+  return ['accessToken', 'clientId', 'clientSecret'];
+}
+
 /**
  * Headers that carry credentials or otherwise decide authentication. The probe
  * engine injects the admitted token itself, so a preset may never set these.
@@ -228,7 +253,8 @@ function prepareProbe(
     (serviceConfig.base_url !== undefined && resolvedConfigBaseUrl !== resolvedBaseUrl) ||
     resolvedPath === undefined ||
     resolvedPath !== entry.probe.path ||
-    !pathUsesOnlyAccessToken(resolvedPath)
+    !pathUsesOnlyAccessToken(resolvedPath) ||
+    !baseUrlCarriesNoCredential(resolvedBaseUrl)
   )
     return null;
 
@@ -236,6 +262,13 @@ function prepareProbe(
   const pathEmbeddedCredential =
     strategy === 'none' && resolvedPath.includes(ACCESS_TOKEN_PLACEHOLDER);
   if (!PROBE_AUTH_STRATEGIES.has(strategy) && !pathEmbeddedCredential) return null;
+  // auth_params only takes effect under api_key_query; elsewhere it is dead
+  // configuration that would smuggle the token into an unreviewed channel.
+  if (
+    strategy !== 'api_key_query' &&
+    (preset.auth_params !== undefined || operation.auth_params !== undefined)
+  )
+    return null;
 
   const resolvedPayload = operation.payload_template
     ? substituteOperationPayload(operation.payload_template)
@@ -279,14 +312,25 @@ function prepareProbe(
   admittedPreset.base_url = resolvedBaseUrl;
   admittedPreset.operations[entry.authOperation].path = resolvedPath;
 
-  const credentialNames = serviceConfig.credential_suffixes.accessToken.map(
-    (suffix) => entry.serviceId.toUpperCase() + '_' + suffix
+  // The catalog's secretKey must map to a bindable suffix class so the
+  // registered credential can be compared with what the binding resolved.
+  const secretField = BINDABLE_SUFFIX_KEYS.find((key) =>
+    serviceConfig.credential_suffixes[key]?.includes(entry.secretKey)
   );
-  if (!credentialNames.includes(entry.serviceId.toUpperCase() + '_' + entry.secretKey)) return null;
+  if (!secretField) return null;
+  const bindingKeys = probeBindingKeys(strategy, secretField);
+  const credentialNames = bindingKeys.flatMap((key) =>
+    serviceConfig.credential_suffixes[key].map(
+      (suffix) => entry.serviceId.toUpperCase() + '_' + suffix
+    )
+  );
   return {
     serviceConfig: structuredClone(serviceConfig),
     preset: admittedPreset,
     credentialNames,
+    bindingKeys,
+    secretField,
+    strategy,
   };
 }
 
@@ -301,7 +345,8 @@ function authParamsReferenceOnlyAccessToken(
   probeParams: Record<string, string>
 ): boolean {
   if (!authParams || typeof authParams !== 'object') return false;
-  const value = (authParams as { value?: unknown }).value;
+  const { key, value } = authParams as { key?: unknown; value?: unknown };
+  if (typeof key !== 'string' || !key.trim() || TEMPLATE_TOKEN_TEST.test(key)) return false;
   if (typeof value !== 'string') return false;
   const resolved = substituteProbeDefaults(value, probeParams);
   return resolved === ACCESS_TOKEN_PLACEHOLDER;
@@ -311,6 +356,7 @@ function responseFieldAtPath(record: Record<string, unknown>, dottedPath: string
   let value: unknown = record;
   for (const segment of dottedPath.split('.')) {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+    if (!Object.prototype.hasOwnProperty.call(value, segment)) return undefined;
     value = (value as Record<string, unknown>)[segment];
   }
   return value;
@@ -351,23 +397,36 @@ export async function probeOperatorServiceConnection(input: {
       (item) => item.serviceId === input.serviceId
     );
     if (!entry) return response('unsupported');
-    const prepared = prepareProbe(entry, readConnectionFields(entry));
+    // Registration gates admission: a missing document (or secret field) is a
+    // credential problem, not a contract failure — and placeholder resolution
+    // depends on the document's connection fields.
+    const candidate = registrationCandidate(entry);
+    if (!candidate) return response('credential_missing');
+    const connectionFields = readConnectionFields(entry);
+    const declaredFields = entry.probe.connectionFields ?? [];
+    if (declaredFields.some((name) => connectionFields[name] === undefined))
+      return response('credential_missing');
+    const prepared = prepareProbe(entry, connectionFields);
     if (!prepared) return response('unsupported');
     return await runOperatorServiceProbeScope(
       entry.serviceId,
       entry.authOperation,
       prepared.credentialNames,
       async () => {
-        const candidate = registrationCandidate(entry);
-        if (!candidate) return response('credential_missing');
         let binding;
         try {
-          binding = resolveServiceBinding(entry.serviceId, 'secret-guard', ['accessToken']);
+          binding = resolveServiceBinding(entry.serviceId, 'secret-guard', prepared.bindingKeys);
         } catch {
           return response('unavailable');
         }
-        if (!binding.accessToken) return response('credential_missing');
-        if (!sameSecret(candidate, binding.accessToken)) return response('credential_shadowed');
+        const boundSecret = binding[prepared.secretField];
+        if (!boundSecret)
+          return response(
+            prepared.strategy === 'basic' && binding.accessToken
+              ? 'credential_shadowed'
+              : 'credential_missing'
+          );
+        if (!sameSecret(candidate, boundSecret)) return response('credential_shadowed');
         const capability = issueOperatorServiceProbeAdmission({
           serviceId: entry.serviceId,
           action: entry.authOperation,
