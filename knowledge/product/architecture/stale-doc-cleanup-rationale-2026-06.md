@@ -21,7 +21,7 @@ Its stable guidance is now reflected in the current intent stack:
 
 If the seed cache evolves again, the canonical place to update is the catalog and its schema checks, not the old migration note.
 
-> **Update (2026-11-15):** the plan doc is retained deliberately — `tests/intent-learning-seed-cache-plan-contract.test.ts` pins its content as a contract surface for the migration boundary, so the cleanup rule does not apply to it.
+> **Update (2026-11-15):** the marker doc moved to `docs/archive/intent-learning-seed-cache-plan.md`. The old contract test pinned its prose terms (`source: seed`, `tier: public` — vocabulary the current schema no longer expresses); `tests/intent-learning-seed-cache-contract.test.ts` now asserts the boundary directly — governed seed path, writable runtime path, stable-scope files — so the doc follows the normal archive lifecycle.
 
 ## Codex App integration
 
