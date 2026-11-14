@@ -72,6 +72,7 @@ import type { MemoryScopeEnvelope } from '../knowledge/memory-scope.js';
 import { missionMemoryCaptureScope } from '../knowledge/memory-capture-scope.js';
 import { isValidTenantSlug } from '../entity-scope.js';
 import { findReusableLearningAssets } from '../knowledge/reusable-learning.js';
+import { KNOWLEDGE_TIERS } from '../foundation/knowledge-tier.js';
 
 const ProposalActionSchema = z.preprocess(
   (value) =>
@@ -96,7 +97,7 @@ const BackgroundReviewProposalSchema = z
     proposed_memory_kind: z
       .enum(['sop', 'template', 'heuristic', 'risk_rule', 'clarification_prompt'])
       .optional(),
-    sensitivity_tier: z.enum(['public', 'confidential', 'personal']).optional(),
+    sensitivity_tier: z.enum(KNOWLEDGE_TIERS).optional(),
     patch: z
       .object({
         operation: z.enum(['append_step', 'append_section', 'apply_consolidation']),

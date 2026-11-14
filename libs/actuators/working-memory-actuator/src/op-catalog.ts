@@ -4,6 +4,7 @@
 
 import type { PipelineStepType } from '@agent/core/actuator/actuator-op-registry';
 import type { ActuatorOpDescription } from '@agent/core/actuator/actuator-sdk';
+import { STORAGE_DATA_TIERS } from '@agent/core/storage-layout';
 
 const WORKING_MEMORY_INPUT_SCHEMA = {
   type: 'object',
@@ -13,7 +14,7 @@ const WORKING_MEMORY_INPUT_SCHEMA = {
       enum: ['session', 'mission', 'project', 'personal', 'tenant', 'global'],
     },
     scope_ref: { type: 'string', minLength: 1 },
-    tier: { type: 'string', enum: ['personal', 'confidential', 'public'] },
+    tier: { type: 'string', enum: [...STORAGE_DATA_TIERS] },
     section: { type: 'string', minLength: 1 },
     content: { type: 'string' },
     focus: { type: 'string' },
@@ -30,7 +31,7 @@ const WORKING_MEMORY_INPUT_SCHEMA = {
       type: 'string',
       enum: ['sop', 'template', 'heuristic', 'risk_rule', 'clarification_prompt'],
     },
-    sensitivity_tier: { type: 'string', enum: ['personal', 'confidential', 'public'] },
+    sensitivity_tier: { type: 'string', enum: [...STORAGE_DATA_TIERS] },
     evidence_refs: { type: 'array', items: { type: 'string' } },
     trusted: { type: 'boolean' },
     export_as: { type: 'string', minLength: 1 },

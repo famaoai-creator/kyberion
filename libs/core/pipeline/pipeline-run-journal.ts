@@ -42,6 +42,7 @@ import {
   runInRestoreMode,
 } from '../workforce/worker-state-journal.js';
 import { z } from 'zod';
+import { KNOWLEDGE_TIERS } from '../foundation/knowledge-tier.js';
 
 export const PIPELINE_RUN_JOURNAL_VERSION = 3;
 
@@ -288,7 +289,7 @@ const pipelineStartedFieldsSchema = z.object({
       mission_role: z.string(),
       base_role: z.string(),
       scope: z.object({
-        tier: z.enum(['public', 'confidential', 'personal']),
+        tier: z.enum(KNOWLEDGE_TIERS),
         tenant_slug: z.string().optional(),
         organization_id: z.string().optional(),
         project_id: z.string().optional(),
@@ -305,8 +306,8 @@ const pipelineStartedFieldsSchema = z.object({
       task_grants_path: z.string(),
       scope_policy: z
         .object({
-          read_tiers: z.array(z.enum(['public', 'confidential', 'personal'])),
-          write_tier: z.enum(['public', 'confidential', 'personal']),
+          read_tiers: z.array(z.enum(KNOWLEDGE_TIERS)),
+          write_tier: z.enum(KNOWLEDGE_TIERS),
           purpose: z.string(),
           external_egress: z.enum(['allow', 'deny']).optional(),
           allowed_reasoning_backends: z.array(z.string()).optional(),
@@ -322,7 +323,7 @@ const pipelineStartedFieldsSchema = z.object({
       source_sha256: z.string().regex(/^[a-f0-9]{64}$/),
       initial_context: z.record(z.string(), z.unknown()),
       payload_scope: z.object({
-        tier: z.enum(['public', 'confidential', 'personal']),
+        tier: z.enum(KNOWLEDGE_TIERS),
         tenant_slug: z.string().optional(),
         purpose: z.string().optional(),
         training_use: z
@@ -339,7 +340,7 @@ const pipelineStartedFieldsSchema = z.object({
       }),
       scope_identity: z
         .object({
-          tier: z.enum(['public', 'confidential', 'personal']),
+          tier: z.enum(KNOWLEDGE_TIERS),
           tenant_slug: z.string().optional(),
           organization_id: z.string().optional(),
           project_id: z.string().optional(),

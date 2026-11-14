@@ -16,6 +16,7 @@ import type { TierLevel } from '../types.js';
 import { isValidTenantSlug } from '../entity-scope.js';
 import { currentScopeEnvelope, type ScopeEnvelope } from '../scope-envelope.js';
 import type { ObservationRecord } from './cloudflare-os-control-plane.js';
+import { STORAGE_DATA_TIERS } from '../storage-layout.js';
 
 /**
  * SC-03: append-only journal for the cloudflare-os control plane.
@@ -82,7 +83,7 @@ export const CONTROL_PLANE_SNAPSHOT_FILE = 'snapshot.json';
 export const CONTROL_PLANE_AGGREGATES_FILE = 'observation-aggregates.json';
 
 const QUARANTINE_KEY = 'system/quarantine';
-const TIER_VALUES = new Set<TierLevel>(['public', 'confidential', 'personal']);
+const TIER_VALUES = new Set<TierLevel>(STORAGE_DATA_TIERS);
 
 let runtimeRootOverride: string | undefined;
 
@@ -307,7 +308,7 @@ export function listControlPlaneNamespaceDirs(runtimeRoot?: string): string[] {
   const root = runtimeRoot ?? controlPlaneRuntimeRoot();
   const dirs: string[] = [];
   const candidates: string[][] = [];
-  for (const tier of ['public', 'confidential', 'personal']) {
+  for (const tier of [...STORAGE_DATA_TIERS]) {
     const tierDir = path.join(root, tier);
     if (!safeExistsSync(tierDir)) continue;
     for (const tenant of readdirEntries(tierDir)) {

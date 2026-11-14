@@ -24,6 +24,7 @@ import { defineCatalog, type GovernedCatalog } from '../foundation/governed-cata
 import { isValidTenantSlug } from '../foundation/scope.js';
 import { pathResolver } from '../path-resolver.js';
 import type { PluginTrustLabel } from './plugin-source-trust.js';
+import { STORAGE_DATA_TIERS } from '../storage-layout.js';
 
 /**
  * Seams a plugin may never provide: binding any of them would let plugin code
@@ -133,7 +134,7 @@ export const PLUGIN_PERMISSION_POLICY_RELATIVE_PATH =
 const CRITICAL_CAPABILITIES: PluginPermissionCapability[] = ['fs', 'network', 'secrets'];
 const NETWORK_MODES: PluginNetworkMode[] = ['none', 'loopback', 'allowlist'];
 const FS_MODES: PluginFsMode[] = ['none', 'readonly', 'readwrite'];
-const TIERS: PluginPermissionTier[] = ['public', 'confidential', 'personal'];
+const TIERS: PluginPermissionTier[] = [...STORAGE_DATA_TIERS];
 const NAME_PATTERN = /^[A-Za-z0-9_.:/-]+\*?$|^\*$/;
 const HOST_LABEL_PATTERN = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
 

@@ -60,6 +60,7 @@ import {
   readCustodyProviderAttestationEntry,
   type NonTenantCustodyOwner,
 } from './custody-provider-attestation-store.js';
+import { STORAGE_DATA_TIERS } from '../storage-layout.js';
 
 const logger = createLogger('provider-egress-gate');
 
@@ -789,7 +790,7 @@ export interface ProviderTierAvailabilityReport {
   tiers: ProviderTierAvailability[];
 }
 
-const AVAILABILITY_TIERS: TierLevel[] = ['public', 'confidential', 'personal'];
+const AVAILABILITY_TIERS: TierLevel[] = [...STORAGE_DATA_TIERS];
 
 /**
  * Per data tier, which declared providers may receive material of that tier

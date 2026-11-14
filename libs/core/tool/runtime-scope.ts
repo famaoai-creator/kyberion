@@ -11,6 +11,7 @@ import { assertSafeRepositoryPath, safeExistsSync } from '../secure-io.js';
 import { loadProjectRecord } from '../project/project-registry.js';
 import { loadMissionStateAtPath } from '../mission/mission-state-reader.js';
 import type { TierLevel } from '../types.js';
+import { STORAGE_DATA_TIERS } from '../storage-layout.js';
 
 export type RuntimeProcessScope = 'system' | 'tenant-service';
 
@@ -20,7 +21,7 @@ export interface RuntimeScopeResolutionInput {
   authorityScope?: EventScopeInput;
 }
 
-const TIERS: readonly TierLevel[] = ['personal', 'confidential', 'public'];
+const TIERS: readonly TierLevel[] = STORAGE_DATA_TIERS;
 
 function normalizeMissionId(missionId?: string): string | undefined {
   const value = missionId?.trim();

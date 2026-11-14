@@ -731,73 +731,11 @@ export async function runMissionControllerAction(
   // supersede-task, …) file a human approval request instead of applying.
   const requestApproval = context.argv.includes('--request-approval');
 
-  switch (action) {
-    case 'create': {
-      const positionalTier = parseAllowedValue(context.arg2, 'mission tier', MISSION_TIERS);
-      let createInput = context.validateMissionStartCreateInput('create', arg1, context.argv);
-      const intentTrack = await applyIntentTrackGate(context, createInput, arg1);
-      createInput = intentTrack.input;
-      const visionRefSummary = buildVisionRefRoutingSummary(
-        createInput?.visionRef,
-        createInput?.tenantSlug || createInput?.tenantId
-      );
-      const routingDecision = {
-        ...(parseRoutingDecision(createInput?.routingDecision) || {}),
-        ...(visionRefSummary ? { vision_ref_summary: visionRefSummary } : {}),
-      };
-      if (hasDryRun) {
-        context.print?.(
-          JSON.stringify(
-            {
-              action: 'create',
-              mission_id: arg1,
-              input: createInput,
-              routingDecision,
-              intentTrackGate: summarizeIntentTrackGate(intentTrack.intentTrackGate),
-            },
-            null,
-            2
-          )
-        );
-        break;
-      }
-      await context.createMission(
-        arg1!,
-        (createInput?.tier || positionalTier || 'confidential') as
-          'personal' | 'confidential' | 'public',
-        createInput?.tenantId,
-        createInput?.missionType,
-        createInput?.visionRef,
-        createInput?.persona,
-        createInput?.relationships,
-        createInput?.tenantSlug,
-        createInput?.organizationId,
-        {
-          ephemeral: context.argv.includes('--ephemeral'),
-          intentGoal: await resolveIntentGoalHandoffPath(context, arg1),
-        }
-      );
-      await persistIntentTrackGate(intentTrack.intentTrackGate);
-      await syncRoutingDecisionSummary(context, arg1!, routingDecision, 'CREATE');
-      if (Object.keys(routingDecision).length > 0) {
-        auditChain.record({
-          agentId: executionAgentId('mission_controller'),
-          action: 'mission.routing_decision_recorded',
-          operation: `create:${arg1}`,
-          result: 'completed',
-          metadata: {
-            mission_id: arg1?.toUpperCase(),
-            routing_decision: routingDecision,
-          },
-        });
-      }
-      break;
-    }
-    // 'kickoff' deliberately shares the start path: startMission already
-    // creates the mission when no state exists, so the verb is a one-step
-    // create+start alias that keeps --goal/--success-condition semantics.
-    case 'kickoff':
-    case 'start': {
+  {
+    // Action dispatch: governed handler map — one entry per verb; shared
+    // bodies hoist to named functions. New verbs register here instead of
+    // extending a switch. See canonical-registry-consolidation.md.
+    const handle_start = async (): Promise<void> => {
       let input = context.validateMissionStartCreateInput(
         action as 'start' | 'kickoff',
         arg1,
@@ -827,7 +765,7 @@ export async function runMissionControllerAction(
             2
           )
         );
-        break;
+        return;
       }
       await context.startMission(
         arg1!,
@@ -863,699 +801,786 @@ export async function runMissionControllerAction(
           },
         });
       }
-      break;
-    }
-    case 'grant':
-      await context.grantMissionAccess(arg1!, arg2!, arg3 ? parseInt(arg3) : undefined);
-      break;
-    case 'sudo':
-      await context.grantMissionSudo(arg1!, arg2 !== 'OFF', arg3 ? parseInt(arg3) : undefined);
-      break;
-    case 'checkpoint':
-      if (getValue('--mission-id', context.argv) || getValue('--mission', context.argv)) {
-        await context.createCheckpoint(
-          arg1 || 'manual',
-          arg2 || 'progress update',
-          getValue('--mission-id', context.argv) || getValue('--mission', context.argv)
-        );
-      } else if (arg3) {
-        await context.createCheckpoint(arg2 || 'manual', arg3 || 'progress update', arg1);
-      } else {
-        await context.createCheckpoint(arg1 || 'manual', arg2 || 'progress update');
-      }
-      break;
-    case 'scope-approve':
-      if (requestApproval) {
-        // Positional order matches the apply half below (arg2=reason,
-        // arg3=goal, arg4=success-condition) so both sides bind identically.
-        await context.requestMissionScopeApproval(arg1!, {
+      return;
+    };
+    const handle__h = async (): Promise<void> => {
+      context.showHelp();
+    };
+    const ACTION_HANDLERS: Record<string, () => Promise<void>> = {
+      create: async () => {
+        {
+          const positionalTier = parseAllowedValue(context.arg2, 'mission tier', MISSION_TIERS);
+          let createInput = context.validateMissionStartCreateInput('create', arg1, context.argv);
+          const intentTrack = await applyIntentTrackGate(context, createInput, arg1);
+          createInput = intentTrack.input;
+          const visionRefSummary = buildVisionRefRoutingSummary(
+            createInput?.visionRef,
+            createInput?.tenantSlug || createInput?.tenantId
+          );
+          const routingDecision = {
+            ...(parseRoutingDecision(createInput?.routingDecision) || {}),
+            ...(visionRefSummary ? { vision_ref_summary: visionRefSummary } : {}),
+          };
+          if (hasDryRun) {
+            context.print?.(
+              JSON.stringify(
+                {
+                  action: 'create',
+                  mission_id: arg1,
+                  input: createInput,
+                  routingDecision,
+                  intentTrackGate: summarizeIntentTrackGate(intentTrack.intentTrackGate),
+                },
+                null,
+                2
+              )
+            );
+            return;
+          }
+          await context.createMission(
+            arg1!,
+            (createInput?.tier || positionalTier || 'confidential') as
+              'personal' | 'confidential' | 'public',
+            createInput?.tenantId,
+            createInput?.missionType,
+            createInput?.visionRef,
+            createInput?.persona,
+            createInput?.relationships,
+            createInput?.tenantSlug,
+            createInput?.organizationId,
+            {
+              ephemeral: context.argv.includes('--ephemeral'),
+              intentGoal: await resolveIntentGoalHandoffPath(context, arg1),
+            }
+          );
+          await persistIntentTrackGate(intentTrack.intentTrackGate);
+          await syncRoutingDecisionSummary(context, arg1!, routingDecision, 'CREATE');
+          if (Object.keys(routingDecision).length > 0) {
+            auditChain.record({
+              agentId: executionAgentId('mission_controller'),
+              action: 'mission.routing_decision_recorded',
+              operation: `create:${arg1}`,
+              result: 'completed',
+              metadata: {
+                mission_id: arg1?.toUpperCase(),
+                routing_decision: routingDecision,
+              },
+            });
+          }
+          return;
+        }
+        // 'kickoff' deliberately shares the start path: startMission already
+        // creates the mission when no state exists, so the verb is a one-step
+        // create+start alias that keeps --goal/--success-condition semantics.
+      },
+      kickoff: handle_start,
+      start: handle_start,
+      grant: async () => {
+        await context.grantMissionAccess(arg1!, arg2!, arg3 ? parseInt(arg3) : undefined);
+      },
+      sudo: async () => {
+        await context.grantMissionSudo(arg1!, arg2 !== 'OFF', arg3 ? parseInt(arg3) : undefined);
+      },
+      checkpoint: async () => {
+        if (getValue('--mission-id', context.argv) || getValue('--mission', context.argv)) {
+          await context.createCheckpoint(
+            arg1 || 'manual',
+            arg2 || 'progress update',
+            getValue('--mission-id', context.argv) || getValue('--mission', context.argv)
+          );
+        } else if (arg3) {
+          await context.createCheckpoint(arg2 || 'manual', arg3 || 'progress update', arg1);
+        } else {
+          await context.createCheckpoint(arg1 || 'manual', arg2 || 'progress update');
+        }
+      },
+      'scope-approve': async () => {
+        if (requestApproval) {
+          // Positional order matches the apply half below (arg2=reason,
+          // arg3=goal, arg4=success-condition) so both sides bind identically.
+          await context.requestMissionScopeApproval(arg1!, {
+            reason: getValue('--reason', context.argv) || arg2 || 'Approved scope adjustment.',
+            goalSummary: getValue('--goal', context.argv) || arg3 || '',
+            successCondition: getValue('--success-condition', context.argv) || arg4,
+            requestedBy: getValue('--requested-by', context.argv),
+          });
+          return;
+        }
+        await context.approveScopeChange(arg1!, {
+          approvedBy: getValue('--approved-by', context.argv) || getValue('--by', context.argv),
           reason: getValue('--reason', context.argv) || arg2 || 'Approved scope adjustment.',
           goalSummary: getValue('--goal', context.argv) || arg3 || '',
           successCondition: getValue('--success-condition', context.argv) || arg4,
+          approvalRequestId: getValue('--approval-request-id', context.argv),
+        });
+      },
+      triage: async () => {
+        await context.triageMission(arg1!, {
+          json: context.argv.includes('--json'),
+          requestApproval,
+          goal: getValue('--goal', context.argv),
+          reason: getValue('--reason', context.argv),
+          successCondition: getValue('--success-condition', context.argv),
           requestedBy: getValue('--requested-by', context.argv),
         });
-        break;
-      }
-      await context.approveScopeChange(arg1!, {
-        approvedBy: getValue('--approved-by', context.argv) || getValue('--by', context.argv),
-        reason: getValue('--reason', context.argv) || arg2 || 'Approved scope adjustment.',
-        goalSummary: getValue('--goal', context.argv) || arg3 || '',
-        successCondition: getValue('--success-condition', context.argv) || arg4,
-        approvalRequestId: getValue('--approval-request-id', context.argv),
-      });
-      break;
-    case 'triage':
-      await context.triageMission(arg1!, {
-        json: context.argv.includes('--json'),
-        requestApproval,
-        goal: getValue('--goal', context.argv),
-        reason: getValue('--reason', context.argv),
-        successCondition: getValue('--success-condition', context.argv),
-        requestedBy: getValue('--requested-by', context.argv),
-      });
-      break;
-    case 'delegate':
-      await context.delegateMission(arg1!, arg2!, arg3!);
-      break;
-    case 'import':
-      await context.importMission(arg1!, arg2!);
-      break;
-    case 'verify':
-      await context.verifyMission(
-        arg1!,
-        (arg2 as 'verified' | 'rejected') || 'verified',
-        arg3 || ''
-      );
-      break;
-    case 'distill':
-      await context.distillMission(arg1!);
-      break;
-    case 'dispatch-tickets':
-      await context.dispatchMissionTickets(arg1!);
-      break;
-    case 'dispatch-workitems':
-      await context.dispatchMissionWorkItems(arg1!);
-      break;
-    case 'suggestions': {
-      const { collectMissionReviewSuggestions } =
-        await import('@agent/core/mission/mission-review-suggestions');
-      const suggestions = collectMissionReviewSuggestions({
-        includeBlocking: context.argv.includes('--include-blocking'),
-      });
-      if (context.argv.includes('--json')) {
-        context.print?.(JSON.stringify(suggestions, null, 2));
-        break;
-      }
-      if (suggestions.length === 0) {
-        context.print?.('No non-blocking review findings recorded across missions.');
-        break;
-      }
-      let currentMission = '';
-      for (const finding of suggestions) {
-        if (finding.mission_id !== currentMission) {
-          currentMission = finding.mission_id;
-          context.print?.(`${finding.mission_id}${finding.archived ? ' (archived)' : ''}`);
+      },
+      delegate: async () => {
+        await context.delegateMission(arg1!, arg2!, arg3!);
+      },
+      import: async () => {
+        await context.importMission(arg1!, arg2!);
+      },
+      verify: async () => {
+        await context.verifyMission(
+          arg1!,
+          (arg2 as 'verified' | 'rejected') || 'verified',
+          arg3 || ''
+        );
+      },
+      distill: async () => {
+        await context.distillMission(arg1!);
+      },
+      'dispatch-tickets': async () => {
+        await context.dispatchMissionTickets(arg1!);
+      },
+      'dispatch-workitems': async () => {
+        await context.dispatchMissionWorkItems(arg1!);
+      },
+      suggestions: async () => {
+        const { collectMissionReviewSuggestions } =
+          await import('@agent/core/mission/mission-review-suggestions');
+        const suggestions = collectMissionReviewSuggestions({
+          includeBlocking: context.argv.includes('--include-blocking'),
+        });
+        if (context.argv.includes('--json')) {
+          context.print?.(JSON.stringify(suggestions, null, 2));
+          return;
         }
-        context.print?.(
-          `  [${finding.severity}] ${finding.review_task_id}: ${finding.description}${finding.location ? ` (${finding.location})` : ''}`
-        );
-      }
-      break;
-    }
-    case 'hygiene': {
-      const staleDaysRaw = getValue('--stale-days', context.argv);
-      const abandonedDaysRaw = getValue('--abandoned-days', context.argv);
-      const { collectMissionHygieneReport, formatMissionHygieneLine, notifyMissionHygiene } =
-        await import('@agent/core/mission/mission-hygiene');
-      const report = collectMissionHygieneReport({
-        ...(staleDaysRaw ? { staleDays: Number(staleDaysRaw) } : {}),
-        ...(abandonedDaysRaw ? { abandonedDays: Number(abandonedDaysRaw) } : {}),
-      });
-      context.print?.(formatMissionHygieneLine(report));
-      for (const finding of [
-        ...report.abandoned,
-        ...report.stale,
-        ...(report.active_stale || []),
-        ...(report.distilling_stale || []),
-      ]) {
-        context.print?.(
-          `  [${finding.age_days ?? '?'}d] ${finding.mission_id} (${finding.reason}, tasks=${finding.task_count})`
-        );
-        context.print?.(`      → ${finding.recommendation.replaceAll('<ID>', finding.mission_id)}`);
-      }
-      if (context.argv.includes('--notify')) {
-        const sent = await notifyMissionHygiene(report);
-        // i18n-exempt: JA operator output
-        context.print?.(sent ? '通知を送信しました。' : '要対応のミッションはありません。');
-      }
-      break;
-    }
-    case 'improvements': {
-      const approveId = getValue('--approve', context.argv);
-      const rejectId = getValue('--reject', context.argv);
-      const applyId = getValue('--apply', context.argv);
-      const {
-        applyProcessImprovementProposal,
-        decideProcessImprovementProposal,
-        listProcessImprovementProposals,
-        migrateLegacyProcessImprovementProposals,
-      } = await import('@agent/core/mission/mission-retrospective');
-      if (context.argv.includes('--migrate')) {
-        // D8 one-release migration of the legacy shared proposal queue.
+        if (suggestions.length === 0) {
+          context.print?.('No non-blocking review findings recorded across missions.');
+          return;
+        }
+        let currentMission = '';
+        for (const finding of suggestions) {
+          if (finding.mission_id !== currentMission) {
+            currentMission = finding.mission_id;
+            context.print?.(`${finding.mission_id}${finding.archived ? ' (archived)' : ''}`);
+          }
+          context.print?.(
+            `  [${finding.severity}] ${finding.review_task_id}: ${finding.description}${finding.location ? ` (${finding.location})` : ''}`
+          );
+        }
+        return;
+      },
+      hygiene: async () => {
+        const staleDaysRaw = getValue('--stale-days', context.argv);
+        const abandonedDaysRaw = getValue('--abandoned-days', context.argv);
+        const { collectMissionHygieneReport, formatMissionHygieneLine, notifyMissionHygiene } =
+          await import('@agent/core/mission/mission-hygiene');
+        const report = collectMissionHygieneReport({
+          ...(staleDaysRaw ? { staleDays: Number(staleDaysRaw) } : {}),
+          ...(abandonedDaysRaw ? { abandonedDays: Number(abandonedDaysRaw) } : {}),
+        });
+        context.print?.(formatMissionHygieneLine(report));
+        for (const finding of [
+          ...report.abandoned,
+          ...report.stale,
+          ...(report.active_stale || []),
+          ...(report.distilling_stale || []),
+        ]) {
+          context.print?.(
+            `  [${finding.age_days ?? '?'}d] ${finding.mission_id} (${finding.reason}, tasks=${finding.task_count})`
+          );
+          context.print?.(
+            `      → ${finding.recommendation.replaceAll('<ID>', finding.mission_id)}`
+          );
+        }
+        if (context.argv.includes('--notify')) {
+          const sent = await notifyMissionHygiene(report);
+          // i18n-exempt: JA operator output
+          context.print?.(sent ? '通知を送信しました。' : '要対応のミッションはありません。');
+        }
+        return;
+      },
+      improvements: async () => {
+        const approveId = getValue('--approve', context.argv);
+        const rejectId = getValue('--reject', context.argv);
+        const applyId = getValue('--apply', context.argv);
+        const {
+          applyProcessImprovementProposal,
+          decideProcessImprovementProposal,
+          listProcessImprovementProposals,
+          migrateLegacyProcessImprovementProposals,
+        } = await import('@agent/core/mission/mission-retrospective');
+        if (context.argv.includes('--migrate')) {
+          // D8 one-release migration of the legacy shared proposal queue.
+          context.print?.(
+            JSON.stringify(
+              migrateLegacyProcessImprovementProposals({ apply: context.argv.includes('--write') }),
+              null,
+              2
+            )
+          );
+        } else if (approveId) {
+          context.print?.(
+            JSON.stringify(decideProcessImprovementProposal(approveId, 'approved'), null, 2)
+          );
+        } else if (rejectId) {
+          context.print?.(
+            JSON.stringify(decideProcessImprovementProposal(rejectId, 'rejected'), null, 2)
+          );
+        } else if (applyId) {
+          context.print?.(JSON.stringify(applyProcessImprovementProposal(applyId), null, 2));
+        } else {
+          const proposals = listProcessImprovementProposals();
+          if (proposals.length === 0) {
+            // i18n-exempt: JA operator output
+            context.print?.('プロセス改善提案はありません。');
+          }
+          for (const proposal of proposals) {
+            context.print?.(
+              `[${proposal.status}] ${proposal.proposal_id} (${proposal.kind}) ${proposal.target} — ${proposal.proposal.slice(0, 100)}`
+            );
+          }
+        }
+        return;
+      },
+      retrospective: async () => {
+        const { runMissionRetrospective } =
+          await import('@agent/core/mission/mission-retrospective');
+        const result = await runMissionRetrospective(arg1!);
         context.print?.(
           JSON.stringify(
-            migrateLegacyProcessImprovementProposals({ apply: context.argv.includes('--write') }),
+            {
+              report_path: result.report_path,
+              proposals: result.proposals.length,
+              stats: result.stats,
+            },
             null,
             2
           )
         );
-      } else if (approveId) {
-        context.print?.(
-          JSON.stringify(decideProcessImprovementProposal(approveId, 'approved'), null, 2)
+        return;
+      },
+      seal: async () => {
+        await context.sealMission(arg1!);
+      },
+      enqueue: async () => {
+        await context.enqueueMission(
+          arg1!,
+          requireAllowedValue(arg2, 'mission tier', MISSION_TIERS),
+          parseIntegerArgument(arg3, 5, 'enqueue priority'),
+          arg4 ? arg4.split(',') : []
         );
-      } else if (rejectId) {
-        context.print?.(
-          JSON.stringify(decideProcessImprovementProposal(rejectId, 'rejected'), null, 2)
+      },
+      dispatch: async () => {
+        await context.dispatchNextMission();
+      },
+      'accept-with-override': async () => {
+        await context.acceptRubricOverride(
+          arg1!,
+          getValue('--reason', context.argv),
+          getValue('--severity', context.argv),
+          context.print
         );
-      } else if (applyId) {
-        context.print?.(JSON.stringify(applyProcessImprovementProposal(applyId), null, 2));
-      } else {
-        const proposals = listProcessImprovementProposals();
-        if (proposals.length === 0) {
-          // i18n-exempt: JA operator output
-          context.print?.('プロセス改善提案はありません。');
-        }
-        for (const proposal of proposals) {
-          context.print?.(
-            `[${proposal.status}] ${proposal.proposal_id} (${proposal.kind}) ${proposal.target} — ${proposal.proposal.slice(0, 100)}`
-          );
-        }
-      }
-      break;
-    }
-    case 'retrospective': {
-      const { runMissionRetrospective } = await import('@agent/core/mission/mission-retrospective');
-      const result = await runMissionRetrospective(arg1!);
-      context.print?.(
-        JSON.stringify(
+      },
+      'memory-queue': async () => {
+        await context.listMemoryQueue(
+          parseAllowedValue(arg1, 'memory-queue status', MEMORY_QUEUE_STATUSES),
+          context.print
+        );
+      },
+      'memory-review': async () => {
+        await context.showMemoryReview(
+          arg1!,
+          getValue('--tenant-slug', context.argv),
+          context.argv.includes('--json'),
+          context.print
+        );
+      },
+      'memory-approve': async () => {
+        await context.approveMemoryCandidate(
+          arg1!,
+          getValue('--note', context.argv),
+          getValue('--tenant-slug', context.argv),
+          getValue('--knowledge-domain', context.argv) as
+            | import('@agent/core/knowledge/memory-promotion-queue').MemoryKnowledgeDomain
+            | undefined,
+          getValue('--owner-nhi', context.argv),
+          getValue('--curation-json', context.argv),
+          decidedBy,
+          parseAllowedValue(
+            getValue('--approval-channel', context.argv),
+            '--approval-channel',
+            MEMORY_APPROVAL_CHANNELS
+          ),
+          context.print,
           {
-            report_path: result.report_path,
-            proposals: result.proposals.length,
-            stats: result.stats,
-          },
-          null,
-          2
-        )
-      );
-      break;
-    }
-    case 'seal':
-      await context.sealMission(arg1!);
-      break;
-    case 'enqueue':
-      await context.enqueueMission(
-        arg1!,
-        requireAllowedValue(arg2, 'mission tier', MISSION_TIERS),
-        parseIntegerArgument(arg3, 5, 'enqueue priority'),
-        arg4 ? arg4.split(',') : []
-      );
-      break;
-    case 'dispatch':
-      await context.dispatchNextMission();
-      break;
-    case 'accept-with-override':
-      await context.acceptRubricOverride(
-        arg1!,
-        getValue('--reason', context.argv),
-        getValue('--severity', context.argv),
-        context.print
-      );
-      break;
-    case 'memory-queue':
-      await context.listMemoryQueue(
-        parseAllowedValue(arg1, 'memory-queue status', MEMORY_QUEUE_STATUSES),
-        context.print
-      );
-      break;
-    case 'memory-review':
-      await context.showMemoryReview(
-        arg1!,
-        getValue('--tenant-slug', context.argv),
-        context.argv.includes('--json'),
-        context.print
-      );
-      break;
-    case 'memory-approve':
-      await context.approveMemoryCandidate(
-        arg1!,
-        getValue('--note', context.argv),
-        getValue('--tenant-slug', context.argv),
-        getValue('--knowledge-domain', context.argv) as
-          import('@agent/core/knowledge/memory-promotion-queue').MemoryKnowledgeDomain | undefined,
-        getValue('--owner-nhi', context.argv),
-        getValue('--curation-json', context.argv),
-        decidedBy,
-        parseAllowedValue(
-          getValue('--approval-channel', context.argv),
-          '--approval-channel',
-          MEMORY_APPROVAL_CHANNELS
-        ),
-        context.print,
-        {
-          requestApproval,
-          approvalRef: getValue('--approval-ref', context.argv),
-        }
-      );
-      break;
-    case 'memory-reject':
-      await context.rejectMemoryCandidate(
-        arg1!,
-        getValue('--note', context.argv),
-        getValue('--tenant-slug', context.argv),
-        context.argv.includes('--all-duplicates'),
-        decidedBy,
-        context.print
-      );
-      break;
-    case 'memory-promote':
-      await context.promoteMemoryCandidate(
-        arg1!,
-        parseAllowedValue(
-          getValue('--execution-role', context.argv),
-          '--execution-role',
-          MEMORY_EXECUTION_ROLES
-        ) || 'mission_controller',
-        getValue('--note', context.argv),
-        getValue('--supersedes', context.argv),
-        getValue('--tenant-slug', context.argv),
-        getValue('--target-root', context.argv),
-        context.print
-      );
-      break;
-    case 'memory-promote-pending':
-      await context.promotePendingMemoryCandidates(
-        {
-          executionRole:
-            parseAllowedValue(
-              getValue('--execution-role', context.argv),
-              '--execution-role',
-              MEMORY_EXECUTION_ROLES
-            ) || 'mission_controller',
-          note: getValue('--note', context.argv),
-          supersedes: getValue('--supersedes', context.argv),
-          targetRoot: getValue('--target-root', context.argv),
-          missionId: getValue('--mission', context.argv),
-          dryRun: context.argv.includes('--dry-run'),
-        },
-        context.print
-      );
-      break;
-    case 'finish':
-      await context.finishMission(arg1!, context.argv.includes('--seal'));
-      break;
-    case 'resume':
-      await context.resumeMission(arg1);
-      break;
-    case 'pause':
-      await context.pauseMission(arg1!, getValue('--note', context.argv), decidedBy);
-      break;
-    case 'cancel':
-      await context.cancelMission(arg1!, getValue('--note', context.argv), decidedBy);
-      break;
-    case 'repair':
-      await context.repairLegacyMissionState(arg1!, getValue('--note', context.argv));
-      break;
-    case 'record-task':
-      await context.recordTask(arg1!, arg2!, parseJsonRecord(context.arg3, 'record-task details'));
-      break;
-    case 'prepare-source-workspace': {
-      const baseline = getValue('--baseline-commit', context.argv);
-      if (!arg1 || !arg2 || !baseline)
-        throw new Error(
-          'prepare-source-workspace requires <mission> <task> --baseline-commit <full SHA>'
+            requestApproval,
+            approvalRef: getValue('--approval-ref', context.argv),
+          }
         );
-      // The canonical CLI role is inferred from its entrypoint, not assumed here.
-      const prepare =
-        context.prepareSourceWorkspace ??
-        (await import('@agent/core/mission/mission-task-source-workspace'))
-          .prepareMissionTaskSourceWorkspace;
-      const result = await prepare(arg1, arg2, baseline);
-      context.print?.(result);
-      break;
-    }
-    case 'record-evidence':
-      await context.recordEvidence(
-        arg1!,
-        arg2 || 'manual',
-        arg3 || 'evidence recorded',
-        parseCsvOption('--evidence', context.argv),
-        getValue('--team-role', context.argv),
-        getValue('--actor-id', context.argv),
-        parseAllowedValue(getValue('--actor-type', context.argv), '--actor-type', ACTOR_TYPES),
-        getValue('--provider', context.argv),
-        getValue('--task-binding', context.argv)
-          ? parseTaskEvidenceBinding(
-              parseSafeJsonInput(getValue('--task-binding', context.argv)!, '--task-binding')
-            )
-          : undefined
-      );
-      break;
-    case 'review-task': {
-      const findingsRaw = getValue('--findings', context.argv);
-      const findings = parseJsonArray(findingsRaw, '--findings');
-      const reviewerTeamRole = parseAllowedValue(
-        getValue('--reviewer-team-role', context.argv),
-        '--reviewer-team-role',
-        REVIEWER_TEAM_ROLES
-      );
-      const specialistRoles = parseCsvOption('--specialist-roles', context.argv);
-      await context.recordArtifactReview(
-        arg1!,
-        arg2!,
-        arg3!,
-        findings,
-        reviewerTeamRole,
-        specialistRoles,
-        getValue('--provider', context.argv)
-      );
-      break;
-    }
-    case 'reconcile-work': {
-      if (context.argv.includes('--generate')) {
-        const { generateMissionWorkReconciliationScaffold } =
-          await import('@agent/core/mission/mission-work-reconciliation');
-        const scaffold = generateMissionWorkReconciliationScaffold({
-          missionId: arg1!,
-          outputPath: getValue('--output', context.argv),
-          reason: getValue('--reason', context.argv),
-        });
-        context.print?.(JSON.stringify(scaffold, null, 2));
-        break;
-      }
-      const manifestPath = getValue('--manifest', context.argv);
-      if (!manifestPath) throw new Error('reconcile-work requires --manifest <PATH>');
-      if (requestApproval) {
-        await context.requestMissionWorkReconciliationApproval(
+      },
+      'memory-reject': async () => {
+        await context.rejectMemoryCandidate(
+          arg1!,
+          getValue('--note', context.argv),
+          getValue('--tenant-slug', context.argv),
+          context.argv.includes('--all-duplicates'),
+          decidedBy,
+          context.print
+        );
+      },
+      'memory-promote': async () => {
+        await context.promoteMemoryCandidate(
+          arg1!,
+          parseAllowedValue(
+            getValue('--execution-role', context.argv),
+            '--execution-role',
+            MEMORY_EXECUTION_ROLES
+          ) || 'mission_controller',
+          getValue('--note', context.argv),
+          getValue('--supersedes', context.argv),
+          getValue('--tenant-slug', context.argv),
+          getValue('--target-root', context.argv),
+          context.print
+        );
+      },
+      'memory-promote-pending': async () => {
+        await context.promotePendingMemoryCandidates(
+          {
+            executionRole:
+              parseAllowedValue(
+                getValue('--execution-role', context.argv),
+                '--execution-role',
+                MEMORY_EXECUTION_ROLES
+              ) || 'mission_controller',
+            note: getValue('--note', context.argv),
+            supersedes: getValue('--supersedes', context.argv),
+            targetRoot: getValue('--target-root', context.argv),
+            missionId: getValue('--mission', context.argv),
+            dryRun: context.argv.includes('--dry-run'),
+          },
+          context.print
+        );
+      },
+      finish: async () => {
+        await context.finishMission(arg1!, context.argv.includes('--seal'));
+      },
+      resume: async () => {
+        await context.resumeMission(arg1);
+      },
+      pause: async () => {
+        await context.pauseMission(arg1!, getValue('--note', context.argv), decidedBy);
+      },
+      cancel: async () => {
+        await context.cancelMission(arg1!, getValue('--note', context.argv), decidedBy);
+      },
+      repair: async () => {
+        await context.repairLegacyMissionState(arg1!, getValue('--note', context.argv));
+      },
+      'record-task': async () => {
+        await context.recordTask(
+          arg1!,
+          arg2!,
+          parseJsonRecord(context.arg3, 'record-task details')
+        );
+      },
+      'prepare-source-workspace': async () => {
+        const baseline = getValue('--baseline-commit', context.argv);
+        if (!arg1 || !arg2 || !baseline)
+          throw new Error(
+            'prepare-source-workspace requires <mission> <task> --baseline-commit <full SHA>'
+          );
+        // The canonical CLI role is inferred from its entrypoint, not assumed here.
+        const prepare =
+          context.prepareSourceWorkspace ??
+          (await import('@agent/core/mission/mission-task-source-workspace'))
+            .prepareMissionTaskSourceWorkspace;
+        const result = await prepare(arg1, arg2, baseline);
+        context.print?.(result);
+        return;
+      },
+      'record-evidence': async () => {
+        await context.recordEvidence(
+          arg1!,
+          arg2 || 'manual',
+          arg3 || 'evidence recorded',
+          parseCsvOption('--evidence', context.argv),
+          getValue('--team-role', context.argv),
+          getValue('--actor-id', context.argv),
+          parseAllowedValue(getValue('--actor-type', context.argv), '--actor-type', ACTOR_TYPES),
+          getValue('--provider', context.argv),
+          getValue('--task-binding', context.argv)
+            ? parseTaskEvidenceBinding(
+                parseSafeJsonInput(getValue('--task-binding', context.argv)!, '--task-binding')
+              )
+            : undefined
+        );
+      },
+      'review-task': async () => {
+        const findingsRaw = getValue('--findings', context.argv);
+        const findings = parseJsonArray(findingsRaw, '--findings');
+        const reviewerTeamRole = parseAllowedValue(
+          getValue('--reviewer-team-role', context.argv),
+          '--reviewer-team-role',
+          REVIEWER_TEAM_ROLES
+        );
+        const specialistRoles = parseCsvOption('--specialist-roles', context.argv);
+        await context.recordArtifactReview(
+          arg1!,
+          arg2!,
+          arg3!,
+          findings,
+          reviewerTeamRole,
+          specialistRoles,
+          getValue('--provider', context.argv)
+        );
+        return;
+      },
+      'reconcile-work': async () => {
+        if (context.argv.includes('--generate')) {
+          const { generateMissionWorkReconciliationScaffold } =
+            await import('@agent/core/mission/mission-work-reconciliation');
+          const scaffold = generateMissionWorkReconciliationScaffold({
+            missionId: arg1!,
+            outputPath: getValue('--output', context.argv),
+            reason: getValue('--reason', context.argv),
+          });
+          context.print?.(JSON.stringify(scaffold, null, 2));
+          return;
+        }
+        const manifestPath = getValue('--manifest', context.argv);
+        if (!manifestPath) throw new Error('reconcile-work requires --manifest <PATH>');
+        if (requestApproval) {
+          await context.requestMissionWorkReconciliationApproval(
+            arg1!,
+            manifestPath,
+            getValue('--requested-by', context.argv)
+          );
+          return;
+        }
+        await context.reconcileExistingWork(
           arg1!,
           manifestPath,
-          getValue('--requested-by', context.argv)
+          context.hasDryRun,
+          getValue('--approval-request-id', context.argv)
         );
-        break;
-      }
-      await context.reconcileExistingWork(
-        arg1!,
-        manifestPath,
-        context.hasDryRun,
-        getValue('--approval-request-id', context.argv)
-      );
-      break;
-    }
-    case 'supersede-task': {
-      // Always human-approved (PI-05): --request-approval opens the hash-bound
-      // request; the apply run needs --approval-request-id; --dry-run checks.
-      const taskId = arg2;
-      const byTaskId = getValue('--by', context.argv);
-      const reason = getValue('--reason', context.argv);
-      if (!taskId || !byTaskId || !reason) {
-        throw new Error(
-          'supersede-task requires: supersede-task <MISSION_ID> <task_id> --by <new_task_id> --reason <text> (--request-approval | --approval-request-id <id> | --dry-run)'
-        );
-      }
-      if (requestApproval) {
-        await context.requestMissionTaskSupersedeApproval({
+        return;
+      },
+      'supersede-task': async () => {
+        // Always human-approved (PI-05): --request-approval opens the hash-bound
+        // request; the apply run needs --approval-request-id; --dry-run checks.
+        const taskId = arg2;
+        const byTaskId = getValue('--by', context.argv);
+        const reason = getValue('--reason', context.argv);
+        if (!taskId || !byTaskId || !reason) {
+          throw new Error(
+            'supersede-task requires: supersede-task <MISSION_ID> <task_id> --by <new_task_id> --reason <text> (--request-approval | --approval-request-id <id> | --dry-run)'
+          );
+        }
+        if (requestApproval) {
+          await context.requestMissionTaskSupersedeApproval({
+            missionId: arg1!,
+            taskId,
+            byTaskId,
+            reason,
+            requestedBy: getValue('--requested-by', context.argv),
+          });
+          return;
+        }
+        await context.supersedeMissionTask({
           missionId: arg1!,
           taskId,
           byTaskId,
           reason,
-          requestedBy: getValue('--requested-by', context.argv),
+          dryRun: hasDryRun,
+          approvalRequestId: getValue('--approval-request-id', context.argv),
         });
-        break;
-      }
-      await context.supersedeMissionTask({
-        missionId: arg1!,
-        taskId,
-        byTaskId,
-        reason,
-        dryRun: hasDryRun,
-        approvalRequestId: getValue('--approval-request-id', context.argv),
-      });
-      break;
-    }
-    case 'review-reenter':
-      await context.reenterMissionFromReview(arg1!);
-      break;
-    case 'sweep-empty-dirs': {
-      // Ledger-free directory debris under active/missions/: removes only
-      // dirs whose whole subtree holds no real file (dry-run by default).
-      const { sweepEmptyMissionDirs } = await import('@agent/core/storage-janitor');
-      const execute = context.argv.includes('--execute');
-      const result = sweepEmptyMissionDirs({ dryRun: !execute });
-      context.print?.(
-        execute
-          ? `sweep-empty-dirs: removed ${result.removed.length} dirs (${result.candidates.length} candidates, ${result.errors.length} errors)`
-          : `sweep-empty-dirs (dry-run): ${result.candidates.length} candidates — rerun with --execute to remove`
-      );
-      const shown = (execute ? result.removed : result.candidates).slice(0, 50);
-      for (const dir of shown) context.print?.(`  ${dir}`);
-      if ((execute ? result.removed : result.candidates).length > shown.length) {
-        context.print?.('  … (truncated; re-run for full list)');
-      }
-      for (const error of result.errors.slice(0, 20)) context.print?.(`  ERROR: ${error}`);
-      break;
-    }
-    case 'purge':
-      await context.purgeMissions(!context.argv.includes('--execute'));
-      break;
-    case 'archive':
-      // AL-03: governed archive verb. `purge` above keeps its exact argv
-      // contract; `archive` routes through the mission-lifecycle-service
-      // facade, optionally targeting one mission via --mission <ID>.
-      await context.archiveMissions({
-        missionId: getValue('--mission', context.argv),
-        execute: context.argv.includes('--execute'),
-      });
-      break;
-    case 'list':
-      await context.listMissions(arg1, context.argv.includes('--json'));
-      break;
-    case 'organization-catalogs':
-      await context.listOrganizationCatalogs(
-        getValue('--organization-id', context.argv) || getValue('--org', context.argv),
-        context.argv.includes('--json'),
-        context.print
-      );
-      break;
-    case 'organization-profiles':
-      await context.listOrganizationProfiles(
-        getValue('--organization-id', context.argv) || getValue('--org', context.argv),
-        context.print
-      );
-      break;
-    case 'organization-profile':
-      await context.showOrganizationProfile(
-        getValue('--organization-id', context.argv) || getValue('--org', context.argv),
-        context.argv.includes('--summary') || context.argv.includes('--compact'),
-        context.argv.includes('--json'),
-        context.print
-      );
-      break;
-    case 'organization-discovery':
-      await context.showOrganizationDiscovery(
-        context.argv.includes('--json'),
-        context.argv.includes('--summary') || context.argv.includes('--compact'),
-        context.print
-      );
-      break;
-    case 'status':
-      await context.showMissionStatus(arg1!, context.argv.includes('--follow'));
-      await context.showReasoningBackendStatus();
-      await showTerminalOutboxHint();
-      break;
-    case 'outbox':
-      await showTerminalOutbox(
-        {
-          ack: context.argv.includes('--ack'),
-          missionId: arg1 && !arg1.startsWith('--') ? arg1 : undefined,
-        },
-        context.print ?? (() => undefined)
-      );
-      break;
-    case 'sync-project-ledger':
-      await context.syncProjectLedger(arg1!);
-      break;
-    case 'reassign-project':
-      await context.reassignMissionProject(arg1!, {
-        projectId: getValue('--project-id', context.argv),
-        projectPath: getValue('--project-path', context.argv),
-        tier: getValue('--tier', context.argv) as
-          'personal' | 'confidential' | 'public' | undefined,
-        trackId: getValue('--track-id', context.argv),
-        trackName: getValue('--track-name', context.argv),
-        relationshipType: getValue('--project-relationship', context.argv) as
-          'belongs_to' | 'supports' | 'governs' | 'independent' | undefined,
-        note: getValue('--project-note', context.argv) || getValue('--note', context.argv),
-        force: context.argv.includes('--force'),
-        dryRun: context.hasDryRun,
-      });
-      break;
-    case 'team': {
-      if (getValue('--model', context.argv) && !getValue('--provider', context.argv)) {
-        throw new Error('[TEAM_PROVIDER_REQUIRED] --model requires --provider.');
-      }
-      const teamPlan = await context.showMissionTeam(
-        arg1!,
-        context.hasRefresh,
-        getValue('--organization-id', context.argv) || getValue('--org', context.argv),
-        getValue('--provider', context.argv)
-          ? {
-              provider: getValue('--provider', context.argv)!,
-              ...(getValue('--model', context.argv)
-                ? { modelId: getValue('--model', context.argv)! }
-                : {}),
-            }
-          : undefined
-      );
-      if (teamPlan !== undefined) {
-        // TC-05: the roster / staffed / standby / unfilled distinction is the
-        // thing an operator is asking about, and it disappears into the raw
-        // plan JSON. `--summary` reads it out; JSON stays the default so
-        // existing consumers are untouched.
+        return;
+      },
+      'review-reenter': async () => {
+        await context.reenterMissionFromReview(arg1!);
+      },
+      'sweep-empty-dirs': async () => {
+        // Ledger-free directory debris under active/missions/: removes only
+        // dirs whose whole subtree holds no real file (dry-run by default).
+        const { sweepEmptyMissionDirs } = await import('@agent/core/storage-janitor');
+        const execute = context.argv.includes('--execute');
+        const result = sweepEmptyMissionDirs({ dryRun: !execute });
         context.print?.(
-          context.argv.includes('--summary')
-            ? formatMissionTeamPlanView(teamPlan as Parameters<typeof formatMissionTeamPlanView>[0])
-            : JSON.stringify(teamPlan, null, 2)
+          execute
+            ? `sweep-empty-dirs: removed ${result.removed.length} dirs (${result.candidates.length} candidates, ${result.errors.length} errors)`
+            : `sweep-empty-dirs (dry-run): ${result.candidates.length} candidates — rerun with --execute to remove`
         );
-      }
-      break;
-    }
-    case 'staff': {
-      if (getValue('--model', context.argv) && !getValue('--provider', context.argv)) {
-        throw new Error('[TEAM_PROVIDER_REQUIRED] --model requires --provider.');
-      }
-      const runtimePlan = await context.staffMissionTeam(
-        arg1!,
-        getValue('--organization-id', context.argv) || getValue('--org', context.argv),
-        getValue('--provider', context.argv)
-          ? {
-              provider: getValue('--provider', context.argv)!,
-              ...(getValue('--model', context.argv)
-                ? { modelId: getValue('--model', context.argv)! }
-                : {}),
-            }
-          : undefined
-      );
-      if (runtimePlan !== undefined) {
-        context.print?.(JSON.stringify(runtimePlan, null, 2));
-      }
-      break;
-    }
-    case 'prewarm': {
-      const prewarmSummary = await context.prewarmMissionTeam(
-        arg1!,
-        arg2,
-        getValue('--organization-id', context.argv) || getValue('--org', context.argv)
-      );
-      if (prewarmSummary !== undefined) {
-        context.print?.(JSON.stringify(prewarmSummary, null, 2));
-      }
-      break;
-    }
-    case 'advise': {
-      const question = getValue('--question', context.argv);
-      if (!question) {
-        throw new Error('[ADVISE_QUESTION_REQUIRED] Usage: advise <MISSION_ID> --question <TEXT>');
-      }
-      const rolesValue = getValue('--roles', context.argv);
-      const consultation = await context.adviseMission(
-        arg1!,
-        {
-          question,
-          topic: getValue('--topic', context.argv) || question.slice(0, 80),
-          ...(getValue('--context', context.argv)
-            ? { context: getValue('--context', context.argv)! }
-            : {}),
-          ...(rolesValue
+        const shown = (execute ? result.removed : result.candidates).slice(0, 50);
+        for (const dir of shown) context.print?.(`  ${dir}`);
+        if ((execute ? result.removed : result.candidates).length > shown.length) {
+          context.print?.('  … (truncated; re-run for full list)');
+        }
+        for (const error of result.errors.slice(0, 20)) context.print?.(`  ERROR: ${error}`);
+        return;
+      },
+      purge: async () => {
+        await context.purgeMissions(!context.argv.includes('--execute'));
+      },
+      archive: async () => {
+        // AL-03: governed archive verb. `purge` above keeps its exact argv
+        // contract; `archive` routes through the mission-lifecycle-service
+        // facade, optionally targeting one mission via --mission <ID>.
+        await context.archiveMissions({
+          missionId: getValue('--mission', context.argv),
+          execute: context.argv.includes('--execute'),
+        });
+      },
+      list: async () => {
+        await context.listMissions(arg1, context.argv.includes('--json'));
+      },
+      'organization-catalogs': async () => {
+        await context.listOrganizationCatalogs(
+          getValue('--organization-id', context.argv) || getValue('--org', context.argv),
+          context.argv.includes('--json'),
+          context.print
+        );
+      },
+      'organization-profiles': async () => {
+        await context.listOrganizationProfiles(
+          getValue('--organization-id', context.argv) || getValue('--org', context.argv),
+          context.print
+        );
+      },
+      'organization-profile': async () => {
+        await context.showOrganizationProfile(
+          getValue('--organization-id', context.argv) || getValue('--org', context.argv),
+          context.argv.includes('--summary') || context.argv.includes('--compact'),
+          context.argv.includes('--json'),
+          context.print
+        );
+      },
+      'organization-discovery': async () => {
+        await context.showOrganizationDiscovery(
+          context.argv.includes('--json'),
+          context.argv.includes('--summary') || context.argv.includes('--compact'),
+          context.print
+        );
+      },
+      status: async () => {
+        await context.showMissionStatus(arg1!, context.argv.includes('--follow'));
+        await context.showReasoningBackendStatus();
+        await showTerminalOutboxHint();
+      },
+      outbox: async () => {
+        await showTerminalOutbox(
+          {
+            ack: context.argv.includes('--ack'),
+            missionId: arg1 && !arg1.startsWith('--') ? arg1 : undefined,
+          },
+          context.print ?? (() => undefined)
+        );
+      },
+      'sync-project-ledger': async () => {
+        await context.syncProjectLedger(arg1!);
+      },
+      'reassign-project': async () => {
+        await context.reassignMissionProject(arg1!, {
+          projectId: getValue('--project-id', context.argv),
+          projectPath: getValue('--project-path', context.argv),
+          tier: getValue('--tier', context.argv) as
+            'personal' | 'confidential' | 'public' | undefined,
+          trackId: getValue('--track-id', context.argv),
+          trackName: getValue('--track-name', context.argv),
+          relationshipType: getValue('--project-relationship', context.argv) as
+            'belongs_to' | 'supports' | 'governs' | 'independent' | undefined,
+          note: getValue('--project-note', context.argv) || getValue('--note', context.argv),
+          force: context.argv.includes('--force'),
+          dryRun: context.hasDryRun,
+        });
+      },
+      team: async () => {
+        if (getValue('--model', context.argv) && !getValue('--provider', context.argv)) {
+          throw new Error('[TEAM_PROVIDER_REQUIRED] --model requires --provider.');
+        }
+        const teamPlan = await context.showMissionTeam(
+          arg1!,
+          context.hasRefresh,
+          getValue('--organization-id', context.argv) || getValue('--org', context.argv),
+          getValue('--provider', context.argv)
             ? {
-                roles: rolesValue
-                  .split(',')
-                  .map((entry) => entry.trim())
-                  .filter(Boolean),
+                provider: getValue('--provider', context.argv)!,
+                ...(getValue('--model', context.argv)
+                  ? { modelId: getValue('--model', context.argv)! }
+                  : {}),
               }
-            : {}),
-        },
-        getValue('--organization-id', context.argv) || getValue('--org', context.argv)
-      );
-      if (consultation !== undefined) {
-        context.print?.(JSON.stringify(consultation, null, 2));
-      }
-      break;
-    }
-    case 'propose-roster': {
-      const proposalView = await context.proposeMissionRoster(
-        arg1!,
-        {
-          ...(getValue('--context', context.argv)
-            ? { missionContext: getValue('--context', context.argv)! }
-            : {}),
-          ...(context.argv.includes('--force') ? { force: true } : {}),
-        },
-        getValue('--organization-id', context.argv) || getValue('--org', context.argv)
-      );
-      if (proposalView !== undefined) {
-        context.print?.(JSON.stringify(proposalView, null, 2));
-      }
-      break;
-    }
-    case 'restaff': {
-      if (!arg2) {
-        throw new Error('[RESTAFF_ROLE_REQUIRED] Usage: restaff <MISSION_ID> <TEAM_ROLE>');
-      }
-      const csv = (value?: string) =>
-        value
-          ? value
-              .split(',')
-              .map((entry) => entry.trim())
-              .filter(Boolean)
-          : undefined;
-      const restaffSummary = await context.restaffMissionTeam(
-        arg1!,
-        arg2,
-        {
-          ...(csv(getValue('--capabilities', context.argv))
-            ? { requiredCapabilities: csv(getValue('--capabilities', context.argv))! }
-            : {}),
-          ...(csv(getValue('--exclude', context.argv))
-            ? { excludeAgentIds: csv(getValue('--exclude', context.argv))! }
-            : {}),
-          ...(getValue('--reason', context.argv)
-            ? { reason: getValue('--reason', context.argv)! }
-            : {}),
-        },
-        getValue('--organization-id', context.argv) || getValue('--org', context.argv)
-      );
-      if (restaffSummary !== undefined) {
-        context.print?.(JSON.stringify(restaffSummary, null, 2));
-      }
-      break;
-    }
-    case 'classify':
-      await context.classifyMission(arg1!, arg2, arg3);
-      break;
-    case 'workflow-select':
-      await context.selectMissionWorkflow(arg1!, arg2, arg3);
-      break;
-    case 'plan-tasks':
-      await context.planProcessTemplateTasks({
-        id: arg1!,
-        force: context.argv.includes('--force'),
-        refreshCatalog: context.argv.includes('--refresh-catalog'),
-      });
-      break;
-    case 'review-worker-output':
-      await context.reviewWorkerOutput(
-        arg1!,
-        (arg2 as 'verified' | 'rejected') || 'verified',
-        arg3
-      );
-      break;
-    case 'handoff':
-      await context.handoffMission(arg1!, arg2!, arg3);
-      break;
-    case 'gate-pass':
-      await context.gatePass(arg1!, arg2!, getValue('--note', context.argv));
-      break;
-    case 'gate-fail':
-      await context.gateFail(arg1!, arg2!, getValue('--note', context.argv));
-      break;
-    case 'sync':
-      logger.info('Syncing mission registry...');
-      break;
-    case 'help':
-    case '--help':
-    case '-h':
+            : undefined
+        );
+        if (teamPlan !== undefined) {
+          // TC-05: the roster / staffed / standby / unfilled distinction is the
+          // thing an operator is asking about, and it disappears into the raw
+          // plan JSON. `--summary` reads it out; JSON stays the default so
+          // existing consumers are untouched.
+          context.print?.(
+            context.argv.includes('--summary')
+              ? formatMissionTeamPlanView(
+                  teamPlan as Parameters<typeof formatMissionTeamPlanView>[0]
+                )
+              : JSON.stringify(teamPlan, null, 2)
+          );
+        }
+        return;
+      },
+      staff: async () => {
+        if (getValue('--model', context.argv) && !getValue('--provider', context.argv)) {
+          throw new Error('[TEAM_PROVIDER_REQUIRED] --model requires --provider.');
+        }
+        const runtimePlan = await context.staffMissionTeam(
+          arg1!,
+          getValue('--organization-id', context.argv) || getValue('--org', context.argv),
+          getValue('--provider', context.argv)
+            ? {
+                provider: getValue('--provider', context.argv)!,
+                ...(getValue('--model', context.argv)
+                  ? { modelId: getValue('--model', context.argv)! }
+                  : {}),
+              }
+            : undefined
+        );
+        if (runtimePlan !== undefined) {
+          context.print?.(JSON.stringify(runtimePlan, null, 2));
+        }
+        return;
+      },
+      prewarm: async () => {
+        const prewarmSummary = await context.prewarmMissionTeam(
+          arg1!,
+          arg2,
+          getValue('--organization-id', context.argv) || getValue('--org', context.argv)
+        );
+        if (prewarmSummary !== undefined) {
+          context.print?.(JSON.stringify(prewarmSummary, null, 2));
+        }
+        return;
+      },
+      advise: async () => {
+        const question = getValue('--question', context.argv);
+        if (!question) {
+          throw new Error(
+            '[ADVISE_QUESTION_REQUIRED] Usage: advise <MISSION_ID> --question <TEXT>'
+          );
+        }
+        const rolesValue = getValue('--roles', context.argv);
+        const consultation = await context.adviseMission(
+          arg1!,
+          {
+            question,
+            topic: getValue('--topic', context.argv) || question.slice(0, 80),
+            ...(getValue('--context', context.argv)
+              ? { context: getValue('--context', context.argv)! }
+              : {}),
+            ...(rolesValue
+              ? {
+                  roles: rolesValue
+                    .split(',')
+                    .map((entry) => entry.trim())
+                    .filter(Boolean),
+                }
+              : {}),
+          },
+          getValue('--organization-id', context.argv) || getValue('--org', context.argv)
+        );
+        if (consultation !== undefined) {
+          context.print?.(JSON.stringify(consultation, null, 2));
+        }
+        return;
+      },
+      'propose-roster': async () => {
+        const proposalView = await context.proposeMissionRoster(
+          arg1!,
+          {
+            ...(getValue('--context', context.argv)
+              ? { missionContext: getValue('--context', context.argv)! }
+              : {}),
+            ...(context.argv.includes('--force') ? { force: true } : {}),
+          },
+          getValue('--organization-id', context.argv) || getValue('--org', context.argv)
+        );
+        if (proposalView !== undefined) {
+          context.print?.(JSON.stringify(proposalView, null, 2));
+        }
+        return;
+      },
+      restaff: async () => {
+        if (!arg2) {
+          throw new Error('[RESTAFF_ROLE_REQUIRED] Usage: restaff <MISSION_ID> <TEAM_ROLE>');
+        }
+        const csv = (value?: string) =>
+          value
+            ? value
+                .split(',')
+                .map((entry) => entry.trim())
+                .filter(Boolean)
+            : undefined;
+        const restaffSummary = await context.restaffMissionTeam(
+          arg1!,
+          arg2,
+          {
+            ...(csv(getValue('--capabilities', context.argv))
+              ? { requiredCapabilities: csv(getValue('--capabilities', context.argv))! }
+              : {}),
+            ...(csv(getValue('--exclude', context.argv))
+              ? { excludeAgentIds: csv(getValue('--exclude', context.argv))! }
+              : {}),
+            ...(getValue('--reason', context.argv)
+              ? { reason: getValue('--reason', context.argv)! }
+              : {}),
+          },
+          getValue('--organization-id', context.argv) || getValue('--org', context.argv)
+        );
+        if (restaffSummary !== undefined) {
+          context.print?.(JSON.stringify(restaffSummary, null, 2));
+        }
+        return;
+      },
+      classify: async () => {
+        await context.classifyMission(arg1!, arg2, arg3);
+      },
+      'workflow-select': async () => {
+        await context.selectMissionWorkflow(arg1!, arg2, arg3);
+      },
+      'plan-tasks': async () => {
+        await context.planProcessTemplateTasks({
+          id: arg1!,
+          force: context.argv.includes('--force'),
+          refreshCatalog: context.argv.includes('--refresh-catalog'),
+        });
+      },
+      'review-worker-output': async () => {
+        await context.reviewWorkerOutput(
+          arg1!,
+          (arg2 as 'verified' | 'rejected') || 'verified',
+          arg3
+        );
+      },
+      handoff: async () => {
+        await context.handoffMission(arg1!, arg2!, arg3);
+      },
+      'gate-pass': async () => {
+        await context.gatePass(arg1!, arg2!, getValue('--note', context.argv));
+      },
+      'gate-fail': async () => {
+        await context.gateFail(arg1!, arg2!, getValue('--note', context.argv));
+      },
+      sync: async () => {
+        logger.info('Syncing mission registry...');
+      },
+      help: handle__h,
+      '--help': handle__h,
+      '-h': handle__h,
+    };
+    const actionHandler = ACTION_HANDLERS[action];
+    if (actionHandler) {
+      await actionHandler();
+    } else {
       context.showHelp();
-      break;
-    default:
-      context.showHelp();
+    }
   }
 }

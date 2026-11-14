@@ -27,6 +27,7 @@ import {
 import { isValidTenantSlug } from '../entity-scope.js';
 import type { OsKnowledgeTier } from '../governance/cloudflare-os-control-plane.js';
 import { isScimProvisioningTokenFormat } from '../organization/scim-protocol.js';
+import { STORAGE_DATA_TIERS } from '../storage-layout.js';
 
 export interface SurfaceMutationRequest {
   url: string;
@@ -160,7 +161,7 @@ export function resolveSurfaceViewerToken(
 
 const ROLE_TIER_ACCESS: Record<ChronosAccessRole, readonly OsKnowledgeTier[]> = {
   readonly: ['public', 'confidential'],
-  localadmin: ['personal', 'confidential', 'public'],
+  localadmin: [...STORAGE_DATA_TIERS],
 };
 
 export function defaultSurfaceViewerTierAccess(role: ChronosAccessRole): OsKnowledgeTier[] {

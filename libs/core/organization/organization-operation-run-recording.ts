@@ -26,6 +26,7 @@ import type {
   OrganizationOperationState,
   OrganizationTier,
 } from './organization-operating-model.js';
+import { STORAGE_DATA_TIERS } from '../storage-layout.js';
 
 const MISSION_ID_REF = /^[A-Za-z][A-Za-z0-9_-]{1,63}$/;
 
@@ -356,7 +357,7 @@ export interface OrganizationRecordRunParams {
 }
 
 const RUN_OUTCOMES = new Set<string>(['succeeded', 'failed', 'blocked', 'cancelled']);
-const TIERS = new Set<string>(['personal', 'confidential', 'public']);
+const TIERS = new Set<string>(STORAGE_DATA_TIERS);
 
 function requiredText(params: Record<string, unknown>, key: string): string {
   const value = typeof params[key] === 'string' ? (params[key] as string).trim() : '';

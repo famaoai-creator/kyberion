@@ -16,6 +16,7 @@ import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '../secure-i
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { nowIso } from '../foundation/time.js';
 import type { HealthAwareResolution } from './provider-health-registry.js';
+import { STORAGE_DATA_TIERS } from '../storage-layout.js';
 
 export interface PinnedEntry {
   provider: string;
@@ -58,7 +59,7 @@ export function pinActorId(): string {
 function pinFilePath(): string {
   const missionId = getRegisteredEnvText('MISSION_ID');
   if (missionId) {
-    for (const tier of ['personal', 'confidential', 'public']) {
+    for (const tier of [...STORAGE_DATA_TIERS]) {
       const missionDir = pathResolver.rootResolve(path.join('active/missions', tier, missionId));
       const missionStatePath = assertSafeRepositoryPath(
         path.join(missionDir, 'mission-state.json'),

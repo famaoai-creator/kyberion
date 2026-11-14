@@ -36,6 +36,7 @@ import {
   withExternalOperationPipelineRun,
   type ExternalOperationAuthorityResolver,
 } from './external-operation.js';
+import { STORAGE_DATA_TIERS } from '../storage-layout.js';
 
 export interface ExternalOperationRuntimeOptions {
   runId?: string;
@@ -108,7 +109,7 @@ export function createOnboardingExternalOperationAuthority(options: {
       const push = facts.operationId === 'vcs:push';
       const bodyTier = push ? effect.publication_source_tier : effect.body_source_tier;
       const sourceTenant = push ? effect.publication_source_tenant : effect.body_source_tenant;
-      if (push && !['public', 'confidential', 'personal'].includes(String(bodyTier)))
+      if (push && !(STORAGE_DATA_TIERS as readonly string[]).includes(String(bodyTier)))
         return authority;
       if (bodyTier === 'confidential') {
         if (typeof sourceTenant !== 'string') return authority;

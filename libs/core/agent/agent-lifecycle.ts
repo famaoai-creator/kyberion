@@ -53,6 +53,7 @@ import {
   withReasoningPayloadScope,
   assertReasoningEgressAllowed,
 } from '../reasoning/reasoning-egress-scope.js';
+import { RUNTIME_SWEEP_INTERVAL_MS_DEFAULT } from '../foundation/runtime-tuning-defaults.js';
 
 export type { AgentRuntimeLaunchMode as AgentRuntimeBackend };
 
@@ -1495,7 +1496,10 @@ if (!(existingLifecycle instanceof AgentLifecycleManagerImpl)) {
   // start one tick so module init order can never crash the process.
   queueMicrotask(() => {
     runtimeSupervisor?.startSweep(
-      Number(getRegisteredEnvText('KYBERION_RUNTIME_SWEEP_INTERVAL_MS') || 30_000)
+      Number(
+        getRegisteredEnvText('KYBERION_RUNTIME_SWEEP_INTERVAL_MS') ||
+          RUNTIME_SWEEP_INTERVAL_MS_DEFAULT
+      )
     );
   });
 }

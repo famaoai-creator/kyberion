@@ -19,6 +19,7 @@ import type {
   ResourceScope,
   ResourceIntroduction,
 } from './cloudflare-os-control-plane.js';
+import { STORAGE_DATA_TIERS } from '../storage-layout.js';
 
 export interface PersistedControlPlaneState {
   version: 1;
@@ -512,7 +513,7 @@ function parsePersistedOperation(
   const observation = persistedRecord(record.observation, `${label}.observation`);
   assertPersistedFields(observation, ['tier', 'purpose', 'summary'], `${label}.observation`);
   const tier = persistedString(observation, 'tier', `${label}.observation`) as OsKnowledgeTier;
-  if (!['personal', 'confidential', 'public'].includes(tier))
+  if (!(STORAGE_DATA_TIERS as readonly string[]).includes(tier))
     throw new Error(`${label}.observation.tier is invalid`);
   const inputSchema = persistedRecord(record.inputSchema, `${label}.inputSchema`);
   const outputSchema = persistedRecord(record.outputSchema, `${label}.outputSchema`);

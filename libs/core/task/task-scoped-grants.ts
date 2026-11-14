@@ -1,5 +1,6 @@
 import { appendJsonLine, readJsonLines } from '../foundation/json.js';
 import { nowIso } from '../foundation/time.js';
+import { STORAGE_DATA_TIERS } from '../storage-layout.js';
 /**
  * NI-04: task-scoped short-lived grants — audience-bound authority.
  *
@@ -69,7 +70,7 @@ import { isValidTenantSlug } from '../entity-scope.js';
 // Record shape
 // ---------------------------------------------------------------------------
 
-export const TASK_GRANT_TIER_ACCESS = ['public', 'confidential', 'personal'] as const;
+export const TASK_GRANT_TIER_ACCESS = STORAGE_DATA_TIERS;
 export type TaskGrantTierAccess = (typeof TASK_GRANT_TIER_ACCESS)[number];
 
 export const taskGrantScopeSchema = z

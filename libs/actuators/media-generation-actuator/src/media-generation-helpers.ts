@@ -862,7 +862,8 @@ async function executePreparedGeneration(
       operationId: `media:generation:${action}`,
       effect: { backend: resolveGenerationBackend(action, prepared.params), params },
       requiresApproval: true,
-      delegable: false,
+      // Grants pin the resolved backend_id — 'may generate on backend X'.
+      delegable: true,
     },
     () => executeServicePreset('media-generation', action, params),
     (receipt) =>

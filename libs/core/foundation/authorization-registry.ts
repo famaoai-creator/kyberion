@@ -90,6 +90,15 @@ export interface OperationAuthorization {
 export type AuthorizationRegistryEntry = Omit<OperationAuthorization, 'declared' | 'source'>;
 type RegistryEntry = AuthorizationRegistryEntry;
 
+/** Meeting session grants pin one meeting or one calendar series — a bare
+ * platform grant is rejected by `requiredOneOf`. */
+const MEETING_SESSION_DELEGATION: DelegationSpec = {
+  fields: ['platform'],
+  optionalFields: ['meeting_id', 'series_id'],
+  requiredOneOf: ['meeting_id', 'series_id'],
+  reputational_class: 'B',
+};
+
 /** Exact-match declarations. */
 const OPERATIONS: Readonly<Record<string, RegistryEntry>> = {
   // Information asset metadata surfaces retain owner/viewer/scope checks in their detail layers.
@@ -153,13 +162,21 @@ const OPERATIONS: Readonly<Record<string, RegistryEntry>> = {
   'browser:goto': {
     effectClass: 'external_read',
     authority: { kind: 'admission', boundary: 'external' },
-    delegable: { fields: ['origin'], reputational_class: 'B' },
+    delegable: {
+      fields: [],
+      optionalFields: ['origin'],
+      reputational_class: 'B',
+    },
     protectedPaths: [['params', 'url']],
   },
   'browser:open_tab': {
     effectClass: 'external_read',
     authority: { kind: 'admission', boundary: 'external' },
-    delegable: { fields: ['origin'], reputational_class: 'B' },
+    delegable: {
+      fields: [],
+      optionalFields: ['origin'],
+      reputational_class: 'B',
+    },
     protectedPaths: [['params', 'url']],
   },
   // --- External messaging / meetings ---
@@ -167,19 +184,63 @@ const OPERATIONS: Readonly<Record<string, RegistryEntry>> = {
     effectClass: 'external_mutation',
     authority: { kind: 'admission', boundary: 'external' },
     actionClass: 'send_message_external',
+    delegable: {
+      fields: [],
+      optionalFields: ['channel'],
+      reputational_class: 'B',
+    },
     protectedPaths: [['params', 'channel']],
+  },
+  'meeting:join': {
+    effectClass: 'external_mutation',
+    authority: { kind: 'admission', boundary: 'external' },
+    delegable: MEETING_SESSION_DELEGATION,
+    protectedPaths: [
+      ['params', 'url'],
+      ['params', 'meeting_id'],
+      ['params', 'series_id'],
+    ],
+  },
+  'meeting:listen': {
+    effectClass: 'external_mutation',
+    authority: { kind: 'admission', boundary: 'external' },
+    delegable: MEETING_SESSION_DELEGATION,
+    protectedPaths: [
+      ['params', 'meeting_id'],
+      ['params', 'series_id'],
+    ],
   },
   'meeting:chat': {
     effectClass: 'external_mutation',
     authority: { kind: 'admission', boundary: 'external' },
     actionClass: 'send_message_external',
-    protectedPaths: [['params', 'meeting_id']],
+    delegable: MEETING_SESSION_DELEGATION,
+    protectedPaths: [
+      ['params', 'meeting_id'],
+      ['params', 'series_id'],
+    ],
   },
   'meeting:speak': {
     effectClass: 'external_mutation',
     authority: { kind: 'admission', boundary: 'external' },
     actionClass: 'send_message_external',
-    protectedPaths: [['params', 'meeting_id']],
+    delegable: MEETING_SESSION_DELEGATION,
+    protectedPaths: [
+      ['params', 'meeting_id'],
+      ['params', 'series_id'],
+    ],
+  },
+  'meeting:leave': {
+    effectClass: 'external_mutation',
+    authority: { kind: 'admission', boundary: 'external' },
+  },
+  'meeting:status': {
+    effectClass: 'external_mutation',
+    authority: { kind: 'admission', boundary: 'external' },
+  },
+  'meeting:check_consent': {
+    effectClass: 'external_mutation',
+    authority: { kind: 'admission', boundary: 'external' },
   },
   // --- Email ops with reviewed protected paths (narrower than the email: prefix union) ---
   'email:send': {
@@ -260,14 +321,140 @@ const OPERATIONS: Readonly<Record<string, RegistryEntry>> = {
   'voice:playback': {
     effectClass: 'external_mutation',
     authority: { kind: 'admission', boundary: 'external' },
+    delegable: {
+      fields: [],
+      optionalFields: ['platform', 'format', 'content_hash'],
+      reputational_class: 'B',
+    },
   },
   'voice:speak': {
     effectClass: 'external_mutation',
     authority: { kind: 'admission', boundary: 'external' },
+    delegable: {
+      fields: [],
+      optionalFields: ['platform'],
+      reputational_class: 'B',
+    },
   },
   'video:filter_apply': {
     effectClass: 'external_mutation',
     authority: { kind: 'admission', boundary: 'external' },
+  },
+  // --- Network actuator boundary ops (charter-delegable by exact target) ---
+  'network:fetch': {
+    effectClass: 'external_mutation',
+    authority: { kind: 'admission', boundary: 'external' },
+    delegable: {
+      fields: [],
+      optionalFields: ['method', 'origin'],
+      reputational_class: 'A',
+    },
+    protectedPaths: [['params', 'url']],
+  },
+  'network:exposure_check': {
+    effectClass: 'external_read',
+    authority: { kind: 'admission', boundary: 'external' },
+    delegable: {
+      fields: [],
+      optionalFields: ['origin'],
+      reputational_class: 'B',
+    },
+  },
+  // Grants pin the full command string — 'df -h' yes, anything else no.
+  'network:shell': {
+    effectClass: 'external_mutation',
+    authority: { kind: 'admission', boundary: 'external' },
+    delegable: {
+      fields: [],
+      optionalFields: ['cmd'],
+      reputational_class: 'A',
+    },
+    protectedPaths: [['params', 'cmd']],
+  },
+  'network:a2a_send': {
+    effectClass: 'external_mutation',
+    authority: { kind: 'admission', boundary: 'external' },
+    actionClass: 'send_message_external',
+    delegable: {
+      fields: [],
+      optionalFields: ['method', 'peer_id'],
+      reputational_class: 'A',
+    },
+  },
+  // --- Calendar mutations (exact entries extend the calendar: prefix family) ---
+  'calendar:create_event': {
+    effectClass: 'external_mutation',
+    authority: { kind: 'admission', boundary: 'external' },
+    delegable: {
+      fields: [],
+      optionalFields: ['backend', 'calendar_id'],
+      reputational_class: 'A',
+    },
+  },
+  'calendar:update_event': {
+    effectClass: 'external_mutation',
+    authority: { kind: 'admission', boundary: 'external' },
+    delegable: {
+      fields: [],
+      optionalFields: ['backend', 'calendar_id', 'event_id'],
+      reputational_class: 'A',
+    },
+  },
+  'calendar:delete_event': {
+    effectClass: 'external_mutation',
+    authority: { kind: 'admission', boundary: 'external' },
+    delegable: {
+      fields: [],
+      optionalFields: ['backend', 'calendar_id', 'event_id'],
+      reputational_class: 'A',
+    },
+  },
+  // --- Deployment (grant pins adapter + environment, project optional) ---
+  'deployment:deploy_release': {
+    effectClass: 'external_mutation',
+    authority: { kind: 'admission', boundary: 'external' },
+    delegable: {
+      fields: [],
+      optionalFields: ['adapter', 'environment', 'project_name'],
+      reputational_class: 'A',
+    },
+  },
+  // --- Media generation (grant pins the paid backend) ---
+  'media:generation:generate_image': {
+    effectClass: 'external_mutation',
+    authority: { kind: 'admission', boundary: 'external' },
+    delegable: {
+      fields: [],
+      optionalFields: ['backend'],
+      reputational_class: 'A',
+    },
+  },
+  'media:generation:generate_video': {
+    effectClass: 'external_mutation',
+    authority: { kind: 'admission', boundary: 'external' },
+    delegable: {
+      fields: [],
+      optionalFields: ['backend'],
+      reputational_class: 'A',
+    },
+  },
+  'media:generation:generate_music': {
+    effectClass: 'external_mutation',
+    authority: { kind: 'admission', boundary: 'external' },
+    delegable: {
+      fields: [],
+      optionalFields: ['backend'],
+      reputational_class: 'A',
+    },
+  },
+  'media:generation:run_workflow': {
+    effectClass: 'external_mutation',
+    authority: { kind: 'admission', boundary: 'external' },
+    delegable: {
+      fields: [],
+      optionalFields: ['backend'],
+      reputational_class: 'A',
+    },
   },
   // --- Tenant attestation (delegable via ExternalOperationGrant) ---
   'tenant:attest_provider': {

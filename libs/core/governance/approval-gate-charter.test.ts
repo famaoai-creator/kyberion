@@ -75,7 +75,7 @@ describe('isCharterEligiblePolicy', () => {
       true
     );
   });
-  it('never carries hardened or hard-coded dangerous policies', () => {
+  it('never carries runtime-floor or mandatory policies', () => {
     expect(
       isCharterEligiblePolicy({
         requiresApproval: true,
@@ -84,18 +84,43 @@ describe('isCharterEligiblePolicy', () => {
         mandatoryApproval: true,
       })
     ).toBe(false);
-    for (const matchedRuleId of [
-      'injection-suspected-override',
-      'strict-posture-floor',
-      'fallback-dangerous-shell',
-      'fallback-dangerous-egress',
-      'fallback-dangerous-secret',
-      'fallback-dangerous-deploy',
-    ]) {
+    for (const matchedRuleId of ['injection-suspected-override', 'strict-posture-floor']) {
       expect(
         isCharterEligiblePolicy({ requiresApproval: true, missingRequirements: [], matchedRuleId })
       ).toBe(false);
     }
+  });
+  it('honours governed charterEligible from the matched rule', () => {
+    // Danger-pattern rules ship charter_eligible:false in approval-policy.json —
+    // the resolution carries that decision; the gate no longer hard-codes ids.
+    for (const matchedRuleId of [
+      'fallback-dangerous-shell',
+      'fallback-dangerous-egress',
+      'fallback-dangerous-secret',
+      'fallback-dangerous-deploy',
+      'secret-grant-access',
+    ]) {
+      expect(
+        isCharterEligiblePolicy({
+          requiresApproval: true,
+          missingRequirements: [],
+          matchedRuleId,
+          charterEligible: false,
+        })
+      ).toBe(false);
+    }
+    // The same determination is adjustable via policy data: an explicit
+    // charter_eligible:true rule wins even over a dual_key requirement.
+    expect(
+      isCharterEligiblePolicy({
+        requiresApproval: true,
+        missingRequirements: ['dual_key_confirmation'],
+        matchedRuleId: 'org-delegated-secret',
+        charterEligible: true,
+      })
+    ).toBe(true);
+  });
+  it('falls back conservatively when the resolution carries no policy decision', () => {
     expect(
       isCharterEligiblePolicy({
         requiresApproval: true,
@@ -103,6 +128,13 @@ describe('isCharterEligiblePolicy', () => {
         matchedRuleId: 'x',
       })
     ).toBe(false);
+    expect(
+      isCharterEligiblePolicy({
+        requiresApproval: true,
+        missingRequirements: [],
+        matchedRuleId: 'x',
+      })
+    ).toBe(true);
   });
 });
 

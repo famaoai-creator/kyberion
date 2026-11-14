@@ -25,6 +25,10 @@
           },
           "requires_approval": { "type": "boolean" },
           "missing_requirements": { "type": "array", "items": { "type": "string" } },
+          "charter_eligible": {
+            "type": "boolean",
+            "description": "HOTL: whether a signed charter grant may satisfy this rule's approval. Absent = derived (dual_key_confirmation rules default false). Runtime floors (mandatoryApproval, injection-suspected-override, strict-posture-floor) are never charter-eligible regardless of this flag."
+          },
           "min_assurance": {
             "type": "string",
             "enum": ["A0", "A1", "A2", "A3"],
@@ -32,6 +36,41 @@
           }
         },
         "required": ["id", "requires_approval", "missing_requirements"]
+      }
+    },
+    "fallback_rules": {
+      "type": "array",
+      "description": "Danger-pattern rules applied to intentIds that matched no declared rule. Each rule is an OR over intent_id_pattern / payload_present_fields / payload_patterns. Determination is governed data — not a fixed code list.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "intent_id_pattern": { "type": "string", "minLength": 1 },
+          "payload_present_fields": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "payload_patterns": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "fields": {
+                  "type": "array",
+                  "items": { "type": "string", "minLength": 1 },
+                  "minItems": 1
+                },
+                "pattern": { "type": "string", "minLength": 1 }
+              },
+              "required": ["fields", "pattern"]
+            }
+          },
+          "missing_requirements": { "type": "array", "items": { "type": "string" } },
+          "charter_eligible": { "type": "boolean" }
+        },
+        "required": ["id"]
       }
     },
     "separation_of_duties": {

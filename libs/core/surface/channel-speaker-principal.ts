@@ -7,6 +7,7 @@ import {
 } from '../organization/member-registry.js';
 import type { TierLevel } from '../types.js';
 import type { ChannelModePolicy } from './channel-mode-policy.js';
+import { STORAGE_DATA_TIERS } from '../storage-layout.js';
 
 /**
  * Team Channel P1: who is speaking in a channel.
@@ -51,7 +52,7 @@ export interface ChannelSpeakerPrincipal {
 const TIERS_UP_TO: Record<TierLevel, TierLevel[]> = {
   public: ['public'],
   confidential: ['public', 'confidential'],
-  personal: ['public', 'confidential', 'personal'],
+  personal: [...STORAGE_DATA_TIERS],
 };
 
 function capabilitiesForRole(role: MemberRole | undefined): ChannelSpeakerCapability[] {

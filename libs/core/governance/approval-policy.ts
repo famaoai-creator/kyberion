@@ -24,8 +24,31 @@ export interface ApprovalPolicyRule {
   };
   requires_approval: boolean;
   missing_requirements?: string[];
+  /**
+   * HOTL: whether a signed charter grant may satisfy this rule's approval.
+   * Absent = derived (rules requiring `dual_key_confirmation` default to
+   * ineligible). Runtime floors (`mandatoryApproval`, posture overrides)
+   * stay ineligible regardless of this flag.
+   */
+  charter_eligible?: boolean;
   /** HA-07: the weakest decider proof a human-only request created by this rule accepts. */
   min_assurance?: ApprovalAssuranceLevel;
+}
+
+/**
+ * Danger-pattern rule for intentIds that matched no declared rule — the
+ * governed-data replacement for what used to be hard-coded regexes. A rule
+ * matches when ANY of: `intent_id_pattern` (case-insensitive regex over the
+ * intent id), `payload_present_fields` (truthy payload field), or
+ * `payload_patterns` (case-insensitive regex over one of the named fields).
+ */
+interface ApprovalPolicyFallbackRule {
+  id: string;
+  intent_id_pattern?: string;
+  payload_present_fields?: string[];
+  payload_patterns?: Array<{ fields: string[]; pattern: string }>;
+  missing_requirements?: string[];
+  charter_eligible?: boolean;
 }
 
 interface ApprovalPolicyFile {
@@ -39,6 +62,12 @@ interface ApprovalPolicyFile {
   /** See {@link resolvePasskeyEnrollmentCooldownHours}. */
   passkey_enrollment_cooldown_hours?: number;
   rules?: ApprovalPolicyRule[];
+  /**
+   * Governed danger-pattern rules for intentIds that matched no declared
+   * rule. When absent (e.g. a customer overlay predating the section) the
+   * built-in {@link HARD_CODED_DANGEROUS_RULES} apply — fail-closed.
+   */
+  fallback_rules?: ApprovalPolicyFallbackRule[];
   defaults?: {
     requires_approval?: boolean;
   };
@@ -50,6 +79,14 @@ export interface ApprovalPolicyResolution {
   matchedRuleId?: string;
   /** A runtime security floor that delegated authority or session grants cannot waive. */
   mandatoryApproval?: boolean;
+  /**
+   * HOTL: whether the matched policy admits charter-grant satisfaction.
+   * Derived from the rule's `charter_eligible`, defaulting to
+   * `!missingRequirements.includes('dual_key_confirmation')`. Undefined means
+   * the resolution carried no policy decision (defaults path) — the caller
+   * applies its own floor.
+   */
+  charterEligible?: boolean;
   /** The matched rule's `min_assurance` (HA-07). */
   minAssurance?: ApprovalAssuranceLevel;
 }
@@ -70,46 +107,82 @@ const approvalPolicyCatalog = defineCatalog<ApprovalPolicyFile>({
   schema: pathResolver.knowledge('product/schemas/approval-policy.schema.json'),
 });
 
-const HARD_CODED_DANGEROUS_RULES: Array<{
-  id: string;
-  matches: (input: { intentId?: string; payload?: Record<string, unknown> }) => boolean;
-  missingRequirements: string[];
-}> = [
+/**
+ * Built-in danger-pattern rules — used only when the loaded policy file does
+ * not declare `fallback_rules` (e.g. a customer overlay predating the
+ * section). They intentionally ship `charter_eligible: false`, matching the
+ * governed default in `approval-policy.json`.
+ */
+const HARD_CODED_DANGEROUS_RULES: ApprovalPolicyFallbackRule[] = [
   {
     id: 'fallback-dangerous-shell',
-    matches: ({ intentId, payload }) =>
-      /shell|command|exec|run_shell|bash/i.test(intentId || '') ||
-      /(?:rm\s+-rf|curl\s+.*\|\s*(?:sh|bash|zsh|fish)|wget\s+.*\|\s*(?:sh|bash|zsh|fish)|base64\s+-(?:d|decode)|eval\s|\bexec\s*\()/i.test(
-        String(payload?.command ?? payload?.cmd ?? payload?.script ?? '')
-      ),
-    missingRequirements: ['approval_confirmation'],
+    intent_id_pattern: 'shell|command|exec|run_shell|bash',
+    payload_patterns: [
+      {
+        fields: ['command', 'cmd', 'script'],
+        pattern:
+          '(?:rm\\s+-rf|curl\\s+.*\\|\\s*(?:sh|bash|zsh|fish)|wget\\s+.*\\|\\s*(?:sh|bash|zsh|fish)|base64\\s+-(?:d|decode)|eval\\s|\\bexec\\s*\\()',
+      },
+    ],
+    missing_requirements: ['approval_confirmation'],
+    charter_eligible: false,
   },
   {
     id: 'fallback-dangerous-egress',
-    matches: ({ intentId, payload }) =>
-      /egress|network|http|https|fetch|request/i.test(intentId || '') ||
-      Boolean(payload?.url) ||
-      Boolean(payload?.base_url),
-    missingRequirements: ['approval_confirmation'],
+    intent_id_pattern: 'egress|network|http|https|fetch|request',
+    payload_present_fields: ['url', 'base_url'],
+    missing_requirements: ['approval_confirmation'],
+    charter_eligible: false,
   },
   {
     id: 'fallback-dangerous-secret',
-    matches: ({ intentId }) =>
-      /secret|vault:write|auth:grant|credential|token|password/i.test(intentId || ''),
-    missingRequirements: ['dual_key_confirmation'],
+    intent_id_pattern: 'secret|vault:write|auth:grant|credential|token|password',
+    missing_requirements: ['dual_key_confirmation'],
+    charter_eligible: false,
   },
   {
     id: 'fallback-dangerous-deploy',
-    matches: ({ intentId, payload }) =>
-      /deploy|release|publish|production|restart|stop|start|delete|destroy|remove/i.test(
-        intentId || ''
-      ) ||
-      /(?:restart|stop|start|delete|destroy|remove|wipe|purge)/i.test(
-        String(payload?.operation ?? payload?.action ?? '')
-      ),
-    missingRequirements: ['approval_confirmation'],
+    intent_id_pattern: 'deploy|release|publish|production|restart|stop|start|delete|destroy|remove',
+    payload_patterns: [
+      {
+        fields: ['operation', 'action'],
+        pattern: '(?:restart|stop|start|delete|destroy|remove|wipe|purge)',
+      },
+    ],
+    missing_requirements: ['approval_confirmation'],
+    charter_eligible: false,
   },
 ];
+
+function compileFallbackMatcher(
+  rule: ApprovalPolicyFallbackRule
+): (input: { intentId?: string; payload?: Record<string, unknown> }) => boolean {
+  // A pattern that fails to compile degrades to "always match" — a malformed
+  // policy must fail closed (require approval), never silently widen.
+  const safeRegex = (source?: string): RegExp | null => {
+    if (!source) return null;
+    try {
+      return new RegExp(source, 'i');
+    } catch {
+      return /.*/;
+    }
+  };
+  const intentRe = safeRegex(rule.intent_id_pattern);
+  const presentFields = rule.payload_present_fields || [];
+  const payloadMatchers = (rule.payload_patterns || []).map((pp) => ({
+    fields: pp.fields || [],
+    re: safeRegex(pp.pattern),
+  }));
+  return ({ intentId, payload }) => {
+    if (intentRe && intentRe.test(intentId || '')) return true;
+    if (presentFields.some((field) => Boolean(payload?.[field]))) return true;
+    return payloadMatchers.some(
+      (matcher) =>
+        matcher.re &&
+        matcher.fields.some((field) => matcher.re.test(String(payload?.[field] ?? '')))
+    );
+  };
+}
 
 export function loadApprovalPolicy(): ApprovalPolicyFile {
   return approvalPolicyCatalog.load();
@@ -249,8 +322,13 @@ export function resolvePolicyAssuranceFloor(input: {
   if (!input.ruleId && !input.effectBinding) return undefined;
   if (!approvalPolicyFilePresent()) return undefined;
   let rules: ApprovalPolicyRule[];
+  let fallbackRules: ApprovalPolicyFallbackRule[];
   try {
-    rules = loadApprovalPolicy().rules ?? [];
+    const policy = loadApprovalPolicy();
+    rules = policy.rules ?? [];
+    fallbackRules = Array.isArray(policy.fallback_rules)
+      ? policy.fallback_rules
+      : HARD_CODED_DANGEROUS_RULES;
   } catch (error) {
     warnUnreadablePolicy('decision-time assurance floor treated as A3', error);
     return 'A3';
@@ -269,11 +347,12 @@ export function resolvePolicyAssuranceFloor(input: {
       Boolean(input.effectBinding) && rule.intent_ids?.includes(input.effectBinding!);
     if (byId || byEffect) consider(rule.min_assurance, rule.missing_requirements);
   }
-  for (const rule of HARD_CODED_DANGEROUS_RULES) {
+  for (const rule of fallbackRules) {
     const byId = Boolean(input.ruleId) && rule.id === input.ruleId;
     const byEffect =
-      Boolean(input.effectBinding) && rule.matches({ intentId: input.effectBinding });
-    if (byId || byEffect) consider(undefined, rule.missingRequirements);
+      Boolean(input.effectBinding) &&
+      compileFallbackMatcher(rule)({ intentId: input.effectBinding });
+    if (byId || byEffect) consider(undefined, rule.missing_requirements);
   }
   return floor;
 }
@@ -294,6 +373,7 @@ export function resolveApprovalPolicy(input: {
       return {
         ...base,
         mandatoryApproval: true,
+        charterEligible: false,
         missingRequirements: Array.from(
           new Set([...base.missingRequirements, 'approval_confirmation'])
         ),
@@ -304,6 +384,7 @@ export function resolveApprovalPolicy(input: {
       missingRequirements: ['approval_confirmation'],
       matchedRuleId: 'strict-posture-floor',
       mandatoryApproval: true,
+      charterEligible: false,
     };
   }
   return base;
@@ -355,6 +436,7 @@ function applyInjectionFloor(
         ),
         matchedRuleId: 'injection-suspected-override',
         mandatoryApproval: true,
+        charterEligible: false,
         ...(base.minAssurance ? { minAssurance: base.minAssurance } : {}),
       };
     }
@@ -376,22 +458,31 @@ function resolveBaseApprovalPolicy(input: {
       const acceptedValues = rule.when?.any_of || [];
       if (!acceptedValues.some((value) => value === candidate)) continue;
     }
+    const missingRequirements = Array.isArray(rule.missing_requirements)
+      ? [...rule.missing_requirements]
+      : [];
     return {
       requiresApproval: rule.requires_approval,
-      missingRequirements: Array.isArray(rule.missing_requirements)
-        ? [...rule.missing_requirements]
-        : [],
+      missingRequirements,
       matchedRuleId: rule.id,
+      charterEligible:
+        rule.charter_eligible ?? !missingRequirements.includes('dual_key_confirmation'),
       ...(rule.min_assurance ? { minAssurance: rule.min_assurance } : {}),
     };
   }
 
-  const fallback = HARD_CODED_DANGEROUS_RULES.find((rule) => rule.matches(input));
+  const fallbackRules = Array.isArray(policy.fallback_rules)
+    ? policy.fallback_rules
+    : HARD_CODED_DANGEROUS_RULES;
+  const fallback = fallbackRules.find((rule) => compileFallbackMatcher(rule)(input));
   if (fallback) {
+    const missingRequirements = [...(fallback.missing_requirements || [])];
     return {
       requiresApproval: true,
-      missingRequirements: [...fallback.missingRequirements],
+      missingRequirements,
       matchedRuleId: fallback.id,
+      charterEligible:
+        fallback.charter_eligible ?? !missingRequirements.includes('dual_key_confirmation'),
     };
   }
 

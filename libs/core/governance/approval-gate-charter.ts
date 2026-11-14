@@ -56,7 +56,13 @@ export type CharterGateOutcome =
   | { kind: 'allow'; message: string; acceptedCharter?: Charter }
   | { kind: 'require_approval'; reason: string };
 
-const HARDENED_RULES = new Set(['injection-suspected-override', 'strict-posture-floor']);
+/**
+ * Runtime floor rules: these matchedRuleIds are produced by live posture
+ * detection (strict posture, suspected injection) rather than by governed
+ * policy data, so they can never be charter-delegated — a signed envelope
+ * cannot waive a floor that exists because the runtime itself is degraded.
+ */
+const RUNTIME_FLOOR_RULES = new Set(['injection-suspected-override', 'strict-posture-floor']);
 
 /** Share of autonomous external actions echoed to the operator for sampling audit. */
 export const CHARTER_AUDIT_SAMPLE_RATE = 0.05;
@@ -76,11 +82,21 @@ export function shouldSampleCharterAudit(
   return digest.readUInt32BE(0) / 0x1_0000_0000 < rate;
 }
 
-/** Policies whose reason for a human lies outside what an envelope can express. */
+/**
+ * Policies whose reason for a human lies outside what an envelope can express.
+ *
+ * Eligibility is governed data, not a fixed list: `resolveApprovalPolicy`
+ * derives `charterEligible` from the matched rule's `charter_eligible`
+ * (defaulting to ineligible for `dual_key_confirmation`). This function only
+ * enforces the two non-overridable floors — `mandatoryApproval` and runtime
+ * posture rules — plus a conservative fallback for resolutions that carry no
+ * policy decision.
+ */
 export function isCharterEligiblePolicy(policy: ApprovalPolicyResolution): boolean {
   if (policy.mandatoryApproval) return false;
   const rule = policy.matchedRuleId;
-  if (rule && (HARDENED_RULES.has(rule) || rule.startsWith('fallback-dangerous-'))) return false;
+  if (rule && RUNTIME_FLOOR_RULES.has(rule)) return false;
+  if (policy.charterEligible !== undefined) return policy.charterEligible;
   return !policy.missingRequirements.includes('dual_key_confirmation');
 }
 

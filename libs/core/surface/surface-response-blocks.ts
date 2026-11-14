@@ -11,6 +11,7 @@ import { extractPlanningPacketBlocks } from './planning-packet-contract.js';
 import { extractTaskResultBlocks } from '../task/task-result-contract.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import { isRecord } from '../foundation/text.js';
+import { STORAGE_DATA_TIERS } from '../storage-layout.js';
 
 const REASONING_TAG_NAMES = [
   'think',
@@ -381,7 +382,7 @@ function normalizeMissionProposal(value: unknown): MissionProposal | null {
   }
   if (
     Object.hasOwn(value, 'tier') &&
-    !['personal', 'confidential', 'public'].includes(String(value.tier))
+    !(STORAGE_DATA_TIERS as readonly string[]).includes(String(value.tier))
   )
     return null;
   return {
