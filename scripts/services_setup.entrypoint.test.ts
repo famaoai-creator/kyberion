@@ -25,6 +25,7 @@ describe('services setup output boundary', () => {
         ready: 0,
         authMissing: 0,
         connectionMissing: 0,
+        connectionOptional: 0,
         customerConnections: 0,
         personalConnections: 0,
       },
