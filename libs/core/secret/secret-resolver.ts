@@ -20,6 +20,9 @@
  */
 
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import type { AccountProvisioner, AccountProvisionRequest } from './account-broker.js';
+import { assertAccountProvisionRequest } from '../foundation/account-provision-admission.js';
 import { logger } from '../core.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { resolveTaskCredential } from '../foundation/credential-binding.js';
@@ -58,6 +61,8 @@ export interface SecretResolverDescription {
 
 export interface SecretResolver {
   name: string;
+  /** Explicit opt-in destination for approved organization account introduction. */
+  readonly accountProvisioner?: AccountProvisioner;
   resolve(input: ResolveSecretInput): Promise<string | null> | string | null;
   describe?: () => SecretResolverDescription;
   /** Trusted, current-claim dispatch only. Returning credentials never grants service/tool authority. */
@@ -246,14 +251,69 @@ export interface ShellSecretResolverOptions {
   command: string;
   shell?: string;
   timeoutMs?: number;
+  /** Separate operator-configured writer. Values are sent on stdin, never substituted in argv. */
+  accountProvisionCommand?: string;
 }
 
 export class ShellSecretResolver implements SecretResolver {
   readonly name = 'shell';
-  constructor(private readonly options: ShellSecretResolverOptions) {}
+  private readonly options: Readonly<ShellSecretResolverOptions>;
+  readonly accountProvisioner?: AccountProvisioner;
+  constructor(options: ShellSecretResolverOptions) {
+    this.options = Object.freeze({ ...options });
+    const command = options.accountProvisionCommand?.trim();
+    if (command) {
+      const shell = options.shell ?? getRegisteredEnvText('SHELL') ?? '/bin/sh';
+      const timeout = Number.isFinite(options.timeoutMs)
+        ? Math.max(1, Math.min(options.timeoutMs!, 10_000))
+        : 5_000;
+      const id = createHash('sha256')
+        .update(JSON.stringify([this.options.command, command, shell, timeout]))
+        .digest('hex');
+      this.accountProvisioner = Object.freeze({
+        id,
+        provision: (input: AccountProvisionRequest) => {
+          try {
+            assertAccountProvisionRequest(input);
+            const stdout = execFileSync(shell, ['-c', command], {
+              encoding: 'utf8',
+              timeout,
+              // This configured external writer receives material, not the
+              // caller's Kyberion role, delegation or unrelated credentials.
+              // Broker authentication must come from its own configured store.
+              env: {
+                PATH: getRegisteredEnvText('PATH'),
+                HOME: getRegisteredEnvText('HOME'),
+                LANG: getRegisteredEnvText('LANG'),
+                LC_ALL: getRegisteredEnvText('LC_ALL'),
+                TMPDIR: getRegisteredEnvText('TMPDIR'),
+                TMP: getRegisteredEnvText('TMP'),
+                TEMP: getRegisteredEnvText('TEMP'),
+                SHELL: shell,
+                SYSTEM_ROLE: '',
+                MISSION_ROLE: '',
+                KYBERION_DELEGATED_ROLE: '',
+                KYBERION_BASE_ROLE: '',
+                KYBERION_PERSONA: '',
+              } as NodeJS.ProcessEnv,
+              stdio: ['pipe', 'pipe', 'pipe'],
+              input: JSON.stringify(input),
+              maxBuffer: 16 * 1024,
+            });
+            return JSON.parse(stdout) as unknown;
+          } catch {
+            throw new Error('[ACCOUNT_BROKER_UNAVAILABLE] Account provisioning unavailable');
+          }
+        },
+      });
+    }
+  }
 
   describe(): SecretResolverDescription {
-    return { configured: this.options.command.trim().length > 0, writable: false };
+    return {
+      configured: this.options.command.trim().length > 0,
+      writable: !!this.accountProvisioner,
+    };
   }
 
   resolve(input: ResolveSecretInput): string | null {
@@ -310,10 +370,14 @@ export function installSecretResolverIfAvailable(env: NodeJS.ProcessEnv = proces
   const command = getRegisteredEnvText('KYBERION_SECRET_RESOLVER_COMMAND', { env })?.trim();
   if (!command) return false;
   const timeoutRaw = getRegisteredEnvText('KYBERION_SECRET_RESOLVER_TIMEOUT_MS', { env })?.trim();
+  const accountProvisionCommand = getRegisteredEnvText('KYBERION_ACCOUNT_PROVISION_COMMAND', {
+    env,
+  })?.trim();
   resetSecretResolver();
   registerSecretResolver(
     new ShellSecretResolver({
       command,
+      ...(accountProvisionCommand ? { accountProvisionCommand } : {}),
       ...(timeoutRaw ? { timeoutMs: parseInt(timeoutRaw, 10) } : {}),
     }),
     { provenance: 'generated', source: 'secret-resolver-environment-config' }

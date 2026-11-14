@@ -56,6 +56,7 @@
     "contracts/wisdom-action": 0,
     "contracts/xlsx-protocol": 0,
     "entity-scope": 1,
+    "foundation/account-provision-admission": 0,
     "foundation/ajv": 56,
     "foundation/ansi-utils": 0,
     "foundation/approval-domains": 0,

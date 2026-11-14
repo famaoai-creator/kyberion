@@ -136,6 +136,14 @@ The rail's company switcher narrows 決める, settings and the conversation to 
 selected tenant; it can only narrow what the server already allows the viewer to
 see.
 
+Connection rows let the owner review account token registration, approve it, and
+then enter the required values. Registration is bound to that existing connection;
+changing the selection clears pending token entry. Saving a personal token does
+not share it with a company. Organization registration additionally requires an
+explicitly configured provisioning broker. See the
+[service integration guide](../knowledge/product/orchestration/service-integration-guide.md#register-a-token-for-an-existing-account)
+for prerequisites, incomplete-save recovery and the remaining runtime limitations.
+
 ### Presence Studio
 
 Use when you want:
