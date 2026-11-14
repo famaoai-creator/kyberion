@@ -38,7 +38,7 @@ async function loadResolver(root: string) {
   vi.stubEnv('KYBERION_ROOT', root);
   // The production remap must be observable: neutralize the Vitest short-circuits.
   vi.stubEnv('VITEST', '');
-  return import('./path-resolver.js');
+  return import('../path-resolver.js');
 }
 
 let tmp: string;
@@ -235,7 +235,7 @@ describe('primary-checkout authority store resolution', () => {
     // used to refuse the existence probe of coordination/ as outside the repo.
     mkdirSync(path.join(primary, 'active', 'shared', 'coordination'), { recursive: true });
     await loadResolver(worktree);
-    const guard = await import('./secure-io-path-guard.js');
+    const guard = await import('../secure-io-path-guard.js');
     const requests = path.join(
       primary,
       'active/shared/coordination/channels/external-operation/approvals/requests'
@@ -271,7 +271,7 @@ describe('primary-checkout authority store resolution', () => {
 
     const resolver = await loadResolver(linkedWorktree);
     expect(resolver.primaryCheckoutRootDir()).toBe(linkedPrimary);
-    const guard = await import('./secure-io-path-guard.js');
+    const guard = await import('../secure-io-path-guard.js');
     const requests = path.join(
       linkedPrimary,
       'active/shared/coordination/channels/external-operation/approvals/requests'
@@ -300,7 +300,7 @@ describe('primary-checkout authority store resolution', () => {
     writeFileSync(path.join(linkedWorktree, '.git'), `gitdir: ${gitDir}\n`);
 
     await loadResolver(linkedWorktree);
-    const guard = await import('./secure-io-path-guard.js');
+    const guard = await import('../secure-io-path-guard.js');
     const { toLogicalRoot, toPhysicalRoot } = guard.rootTranslationForTesting;
     const realPrimary = realpathSync.native(primary);
     for (const rel of [
@@ -329,7 +329,7 @@ describe('primary-checkout authority store resolution', () => {
     // primary. When coordination/ itself is missing, nothing is created.
     mkdirSync(path.join(primary, 'active', 'shared'), { recursive: true });
     await loadResolver(worktree);
-    const guard = await import('./secure-io-path-guard.js');
+    const guard = await import('../secure-io-path-guard.js');
     const requests = path.join(
       primary,
       'active/shared/coordination/channels/external-operation/approvals/requests'
@@ -342,7 +342,7 @@ describe('primary-checkout authority store resolution', () => {
     mkdirSync(path.join(primary, 'active', 'shared'), { recursive: true });
     symlinkSync(path.join(tmp, 'nowhere'), path.join(primary, 'active/shared/coordination'));
     await loadResolver(worktree);
-    const guard = await import('./secure-io-path-guard.js');
+    const guard = await import('../secure-io-path-guard.js');
     expect(() =>
       guard.canonicalGuardPath(
         path.join(primary, 'active/shared/coordination/channels/external-operation/approvals'),

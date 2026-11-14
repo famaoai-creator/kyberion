@@ -1,8 +1,8 @@
 import * as path from 'node:path';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { withExecutionContext as initialContext } from './authority.js';
-import { rootDir } from './path-resolver.js';
-import * as initialIO from './secure-io.js';
+import { withExecutionContext as initialContext } from '../authority.js';
+import { rootDir } from '../path-resolver.js';
+import * as initialIO from '../secure-io.js';
 
 const SOURCE = rootDir();
 const ROOT = path.join(SOURCE, 'active/shared/tmp/hearing-aggregate-' + process.pid);
@@ -60,9 +60,9 @@ beforeAll(async () => {
   provision();
   process.env.KYBERION_ROOT = ROOT;
   vi.resetModules();
-  io = await import('./secure-io.js');
-  ({ withExecutionContext: context } = await import('./authority.js'));
-  expect((await import('./path-resolver.js')).shared('runtime/hearing')).toBe(
+  io = await import('../secure-io.js');
+  ({ withExecutionContext: context } = await import('../authority.js'));
+  expect((await import('../path-resolver.js')).shared('runtime/hearing')).toBe(
     path.join(ROOT, STORE)
   );
 }, 30_000);

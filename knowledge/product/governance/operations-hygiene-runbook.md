@@ -2713,7 +2713,7 @@ whether the child inherits its parent's system role.
 
 Projection refreshes used by observation writers must not reconcile or enact
 unrelated approval decisions. Keep reconciliation on explicit approval-owner
-operations; `libs/core/cloudflare-os-held-reconcile.test.ts` must prove that
+operations; `libs/core/governance/cloudflare-os-held-reconcile.test.ts` must prove that
 refresh alone retains a pending held action and explicit reconciliation recovers
 the decision. Service lifecycle receipt attribution must remain data: write
 through the shared `infrastructure_sentinel` store authority instead of assuming

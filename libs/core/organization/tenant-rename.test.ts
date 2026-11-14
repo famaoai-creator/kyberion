@@ -10,15 +10,15 @@ import {
   safeRmSync,
   safeWriteFile,
   tenantProfilePath,
-} from './index.js';
+} from '../index.js';
 import {
   previousSlugs,
   renameTenantWithPlan,
   TENANT_AUDIT_MIRROR_MOVED_ACTION,
-} from './organization/tenant-rename.js';
-import { auditChain, holdsAuditChainLock } from './governance/audit-chain.js';
-import { withExecutionContext } from './authority.js';
-import { asRoleOrGrant } from './testing/role-or-store-grant.js';
+} from '../organization/tenant-rename.js';
+import { auditChain, holdsAuditChainLock } from '../governance/audit-chain.js';
+import { withExecutionContext } from '../authority.js';
+import { asRoleOrGrant } from '../testing/role-or-store-grant.js';
 
 const ROOT = pathResolver.rootDir();
 const FROM = 'zz-rename-src';

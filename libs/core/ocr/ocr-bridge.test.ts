@@ -18,8 +18,8 @@ import {
   listOcrProviders,
   resetOcrProviders,
   ensureBuiltinOcrProviders,
-} from './ocr-bridge.js';
-import { OcrProvider } from './contracts/ocr-types.js';
+} from '../ocr-bridge.js';
+import { OcrProvider } from '../contracts/ocr-types.js';
 
 describe('OCR execution budget', () => {
   it('cancels a pending provider at the shared deadline without starting a fallback', async () => {
@@ -57,7 +57,7 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock('./provider/apple-intelligence-bridge.js', () => ({
+vi.mock('../provider/apple-intelligence-bridge.js', () => ({
   recognizeImageLocallyWithAppleVision: mocks.appleVision,
 }));
 
@@ -79,13 +79,13 @@ vi.mock('tesseract.js', () => ({
   createWorker: tesseractMocks.createWorker,
 }));
 
-vi.mock('./network.js', () => ({
+vi.mock('../network.js', () => ({
   secureFetch: networkMocks.secureFetch,
 }));
 
 // Mock secure-io dynamically so we don't hit the filesystem during test execution
-vi.mock('./secure-io.js', async () => {
-  const actual = (await vi.importActual('./secure-io.js')) as any;
+vi.mock('../secure-io.js', async () => {
+  const actual = (await vi.importActual('../secure-io.js')) as any;
   return {
     ...actual,
     safeLstat: mocks.safeLstat,
@@ -861,7 +861,7 @@ describe('OCR egress capability routing', () => {
 
 describe('OCR input path boundary', () => {
   it('rejects an external image path before any provider reads or executes it', async () => {
-    const native = await import('./ocr/windows-native-image-recognition-bridge.js');
+    const native = await import('../ocr/windows-native-image-recognition-bridge.js');
     expect(() => native.recognizeTextWithWindowsNativeApi('/tmp/outside-ocr.png')).toThrow(
       '[RESOURCE_PATH_SCOPE]'
     );

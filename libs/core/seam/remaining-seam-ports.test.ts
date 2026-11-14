@@ -1,24 +1,24 @@
 import { describe, expect, it, vi } from 'vitest';
-import { logger } from './core.js';
-import { ensureAgentRuntime, registerAgentRuntimeEnsurer } from './agent/agent-runtime-port.js';
-import { coreSeamCatalog } from './seam.js';
+import { logger } from '../core.js';
+import { ensureAgentRuntime, registerAgentRuntimeEnsurer } from '../agent/agent-runtime-port.js';
+import { coreSeamCatalog } from '../seam.js';
 import {
   executeRegisteredSuperPipeline,
   registerSuperNerveExecutor,
-} from './pipeline/super-nerve-execution-port.js';
+} from '../pipeline/super-nerve-execution-port.js';
 import {
   listDemotedProviders,
   registerHealthyInstancesResolver,
-} from './provider/provider-health-view.js';
+} from '../provider/provider-health-view.js';
 import {
   registerIdentityContextResolver,
   readConfiguredActorIdentity,
   resolvePolicyIdentityContext,
-} from './identity-context-bridge.js';
+} from '../identity-context-bridge.js';
 import {
   dispatchThroughMissionWorkerCore,
   registerMissionWorkerCoreDispatcher,
-} from './mission/mission-orchestration-worker-dispatch-port.js';
+} from '../mission/mission-orchestration-worker-dispatch-port.js';
 
 describe('remaining sole seam ports', () => {
   it('reads configured actor identity through one explicit boundary', () => {

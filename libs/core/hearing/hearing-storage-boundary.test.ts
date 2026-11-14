@@ -7,8 +7,8 @@ const policyState = vi.hoisted(() => ({
   incomplete: '' as
     '' | 'empty' | 'missing_hearing_prefixes' | 'shadowed_hearing' | 'shared_hearing',
 }));
-vi.mock('./fs-primitives.js', async (importOriginal) => {
-  const real = await importOriginal<typeof import('./fs-primitives.js')>();
+vi.mock('../fs-primitives.js', async (importOriginal) => {
+  const real = await importOriginal<typeof import('../fs-primitives.js')>();
   return {
     ...real,
     rawExistsSync: (file: string) =>
@@ -36,16 +36,16 @@ vi.mock('./fs-primitives.js', async (importOriginal) => {
   };
 });
 
-import { withExecutionContext as initialContext } from './authority.js';
-import { rootDir } from './path-resolver.js';
-import * as initialIO from './secure-io.js';
+import { withExecutionContext as initialContext } from '../authority.js';
+import { rootDir } from '../path-resolver.js';
+import * as initialIO from '../secure-io.js';
 
 const SOURCE_ROOT = rootDir();
 const ROOT = path.join(SOURCE_ROOT, 'active/shared/tmp/hearing-boundary-' + process.pid);
 let withExecutionContext = initialContext;
 let { safeReadFile, safeRmSync, safeWriteFile, safeSymlinkSync, safeLinkExclusiveSync } = initialIO;
-let guard: typeof import('./tier-guard.js');
-let retention: typeof import('./storage/storage-retention-catalog.js');
+let guard: typeof import('../tier-guard.js');
+let retention: typeof import('../storage/storage-retention-catalog.js');
 const savedRoot = process.env.KYBERION_ROOT;
 
 // A fresh root preserves the real logical tier paths. The ordinary Vitest
@@ -74,11 +74,11 @@ beforeAll(async () => {
   process.env.KYBERION_ROOT = ROOT;
   vi.resetModules();
   ({ safeReadFile, safeRmSync, safeWriteFile, safeSymlinkSync, safeLinkExclusiveSync } =
-    await import('./secure-io.js'));
-  ({ withExecutionContext } = await import('./authority.js'));
-  guard = await import('./tier-guard.js');
-  retention = await import('./storage/storage-retention-catalog.js');
-  expect((await import('./path-resolver.js')).rootDir()).toBe(ROOT);
+    await import('../secure-io.js'));
+  ({ withExecutionContext } = await import('../authority.js'));
+  guard = await import('../tier-guard.js');
+  retention = await import('../storage/storage-retention-catalog.js');
+  expect((await import('../path-resolver.js')).rootDir()).toBe(ROOT);
 }, 30_000);
 
 const STORE = 'active/shared/runtime/hearing';
@@ -333,7 +333,7 @@ describe('durable hearing storage uses real secureIO tier and tenant boundaries'
   });
 
   it('keeps durable hearing receipts out of automatic tenant offboarding targets', async () => {
-    const { collectScopeTargets } = await import('./storage/scope-offboarding.js');
+    const { collectScopeTargets } = await import('../storage/scope-offboarding.js');
     privileged(() => {
       const targets = collectScopeTargets('tenant', TENANT);
       expect(

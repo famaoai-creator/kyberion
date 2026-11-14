@@ -3,14 +3,14 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   collectEntityGovernanceReport,
   shouldFailEntityGovernance,
-} from '../../scripts/check/check_entity_governance.js';
-import { ENTITY_SCOPE_HIERARCHY } from './entity-scope.js';
-import { createMission } from './mission/mission-creation.js';
-import { createManagedProject } from './project/project-management.js';
-import { createWorkItem } from './workforce/work-coordination.js';
-import { saveOrganizationOperationalState } from './organization/organization-operating-model-persistence.js';
-import { withExecutionContext } from './authority.js';
-import { tenantProfilePath, writeTenantProfile } from './organization/tenant-registry.js';
+} from '../../../scripts/check/check_entity_governance.js';
+import { ENTITY_SCOPE_HIERARCHY } from '../entity-scope.js';
+import { createMission } from '../mission/mission-creation.js';
+import { createManagedProject } from '../project/project-management.js';
+import { createWorkItem } from '../workforce/work-coordination.js';
+import { saveOrganizationOperationalState } from '../organization/organization-operating-model-persistence.js';
+import { withExecutionContext } from '../authority.js';
+import { tenantProfilePath, writeTenantProfile } from '../organization/tenant-registry.js';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
   safeMkdir,

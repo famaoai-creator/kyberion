@@ -1,36 +1,36 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-vi.mock('./authn/stance-resolver.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('./authn/stance-resolver.js')>();
+vi.mock('../authn/stance-resolver.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../authn/stance-resolver.js')>();
   const { customerRootWithSodOverlay } =
-    await import('./governance/__tests__/sod-overlay-state.js');
+    await import('../governance/__tests__/sod-overlay-state.js');
   return { ...actual, stanceRoot: customerRootWithSodOverlay(actual.stanceRoot) };
 });
 import {
   clearSeparationOfDuties,
   setSeparationOfDuties,
   useSeparationOfDutiesOverlay,
-} from './governance/__tests__/sod-overlay.js';
+} from '../governance/__tests__/sod-overlay.js';
 
-import { pathResolver } from './path-resolver.js';
-import { safeAppendFileSync, safeMkdir, safeRmSync } from './secure-io.js';
-import { auditChain } from './governance/audit-chain.js';
-import { CloudflareOsControlPlane } from './governance/cloudflare-os-control-plane.js';
+import { pathResolver } from '../path-resolver.js';
+import { safeAppendFileSync, safeMkdir, safeRmSync } from '../secure-io.js';
+import { auditChain } from '../governance/audit-chain.js';
+import { CloudflareOsControlPlane } from '../governance/cloudflare-os-control-plane.js';
 import {
   CloudflareOsReadOnlySurface,
   CloudflareOsSurface,
-} from './governance/cloudflare-os-surface.js';
-import { setControlPlaneRuntimeRootForTests } from './governance/cloudflare-os-journal.js';
+} from '../governance/cloudflare-os-surface.js';
+import { setControlPlaneRuntimeRootForTests } from '../governance/cloudflare-os-journal.js';
 import {
   cancelApprovalRequest,
   decideApprovalRequest,
   drainPendingSteeringApprovalExecutions,
   expireApprovalRequest,
-} from './governance/approval-store.js';
+} from '../governance/approval-store.js';
 
 // The process that decided the approval request died (or its bridge failed)
 // before the decision reached the control plane.
-vi.mock('./governance/held-effect-bridge.js', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('./governance/held-effect-bridge.js')>()),
+vi.mock('../governance/held-effect-bridge.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../governance/held-effect-bridge.js')>()),
   settleHeldEffectDecision: async () => {
     throw new Error('bridge down');
   },

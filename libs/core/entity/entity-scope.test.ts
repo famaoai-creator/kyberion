@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isReservedScopeName, isValidTenantSlug } from './entity-scope.js';
+import { isReservedScopeName, isValidTenantSlug } from '../entity-scope.js';
 
 describe('entity scope tenant names', () => {
   it.each(['public', 'confidential', 'personal', 'shared', 'PUBLIC'])(

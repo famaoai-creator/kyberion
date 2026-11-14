@@ -1,8 +1,8 @@
 import * as path from 'node:path';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { withExecutionContext as initialContext } from './authority.js';
-import { rootDir } from './path-resolver.js';
-import * as initialIO from './secure-io.js';
+import { withExecutionContext as initialContext } from '../authority.js';
+import { rootDir } from '../path-resolver.js';
+import * as initialIO from '../secure-io.js';
 
 /**
  * CD-09 consumer locks on a fresh root with the real tier/tenant guard: the
@@ -34,17 +34,17 @@ const keys = [
 ] as const;
 const saved = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
 
-let io: typeof import('./secure-io.js');
-let authority: typeof import('./authority.js');
-let core: typeof import('./core.js');
-let store: typeof import('./customer-decision/store.js');
-let consumption: typeof import('./customer-decision/consumption.js');
-let ledger: typeof import('./decision-ledger/ledger.js');
-let lockModule: typeof import('./mission/mission-decision-lock.js');
-let capability: typeof import('./foundation/customer-decision-consumer-capability.js');
-let resourceScope: typeof import('./foundation/resource-access-scope.js');
-let grantAccess: typeof import('./customer-decision/consumer-grant-access.js');
-let coordination: typeof import('./workforce/work-coordination.js');
+let io: typeof import('../secure-io.js');
+let authority: typeof import('../authority.js');
+let core: typeof import('../core.js');
+let store: typeof import('../customer-decision/store.js');
+let consumption: typeof import('../customer-decision/consumption.js');
+let ledger: typeof import('../decision-ledger/ledger.js');
+let lockModule: typeof import('../mission/mission-decision-lock.js');
+let capability: typeof import('../foundation/customer-decision-consumer-capability.js');
+let resourceScope: typeof import('../foundation/resource-access-scope.js');
+let grantAccess: typeof import('../customer-decision/consumer-grant-access.js');
+let coordination: typeof import('../workforce/work-coordination.js');
 
 const profile = (tenant: string) => ({
   tenant_slug: tenant,
@@ -171,18 +171,18 @@ beforeAll(async () => {
   });
   process.env.KYBERION_ROOT = ROOT;
   vi.resetModules();
-  io = await import('./secure-io.js');
-  authority = await import('./authority.js');
-  core = await import('./core.js');
-  store = await import('./customer-decision/store.js');
-  consumption = await import('./customer-decision/consumption.js');
-  ledger = await import('./decision-ledger/ledger.js');
-  lockModule = await import('./mission/mission-decision-lock.js');
-  capability = await import('./foundation/customer-decision-consumer-capability.js');
-  resourceScope = await import('./foundation/resource-access-scope.js');
-  grantAccess = await import('./customer-decision/consumer-grant-access.js');
-  coordination = await import('./workforce/work-coordination.js');
-  expect((await import('./path-resolver.js')).rootDir()).toBe(ROOT);
+  io = await import('../secure-io.js');
+  authority = await import('../authority.js');
+  core = await import('../core.js');
+  store = await import('../customer-decision/store.js');
+  consumption = await import('../customer-decision/consumption.js');
+  ledger = await import('../decision-ledger/ledger.js');
+  lockModule = await import('../mission/mission-decision-lock.js');
+  capability = await import('../foundation/customer-decision-consumer-capability.js');
+  resourceScope = await import('../foundation/resource-access-scope.js');
+  grantAccess = await import('../customer-decision/consumer-grant-access.js');
+  coordination = await import('../workforce/work-coordination.js');
+  expect((await import('../path-resolver.js')).rootDir()).toBe(ROOT);
   process.env.KYBERION_BASE_ROLE = 'sovereign';
   for (const tenant of [TENANT, OTHER])
     io.safeWriteFile(
@@ -1052,7 +1052,7 @@ describe('customer decision consumer locks on the real tier/tenant guard', () =>
 
     it('the milestone store may only append to milestones_passed', async () => {
       seedCase(TENANT);
-      const milestone = await import('./foundation/customer-decision-milestone-capability.js');
+      const milestone = await import('../foundation/customer-decision-milestone-capability.js');
       const agendaFile = 'agendas/agd-boundary01.json';
       const asMilestone = (fn: () => unknown) =>
         milestone.withCustomerDecisionMilestoneCapability(
