@@ -144,6 +144,20 @@ explicitly configured provisioning broker. See the
 [service integration guide](../knowledge/product/orchestration/service-integration-guide.md#register-a-token-for-an-existing-account)
 for prerequisites, incomplete-save recovery and the remaining runtime limitations.
 
+The installed owner can also use `pnpm kyberion account preview`,
+`pnpm kyberion account request`, `pnpm kyberion account status`, and
+`pnpm kyberion account apply`.
+Review metadata stays under the active personal profile; token entry is a hidden
+terminal prompt available only after approval. There is no token argument, file or
+environment input, and the command does not create or repair identity. Follow the
+[terminal registration steps](../knowledge/product/orchestration/service-integration-guide.md#register-an-existing-account-from-the-terminal).
+
+An explicitly owner-approved service allocation can allow a tenant task to use a
+registered personal API-token account through the local broker. Ownership stays
+personal; the current claim, allocation, connection and generation are checked on
+use. Saving a token alone grants nothing. Claimed personal execution without a tenant
+and GWS session collection are still separate follow-up work.
+
 ### Presence Studio
 
 Use when you want:

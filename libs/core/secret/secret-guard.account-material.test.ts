@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   tenant: undefined as string | undefined,
   plugin: undefined as object | undefined,
   write: vi.fn(),
+  onRead: undefined as undefined | ((file: string) => void),
 }));
 vi.mock('../core.js', () => ({
   logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
@@ -14,6 +15,7 @@ vi.mock('../secure-io.js', () => ({
   assertSafeRepositoryPath: (file: string) => file,
   safeExistsSync: (file: string) => mocks.files.has(file),
   safeReaddir: () => [],
+  safeFsyncFile: vi.fn(),
   safeWriteFile: (file: string, data: string, options: unknown) => {
     mocks.write(file, data, options);
     mocks.files.set(file, data);
@@ -21,6 +23,7 @@ vi.mock('../secure-io.js', () => ({
 }));
 vi.mock('../foundation/json.js', () => ({
   readJson: (file: string) => {
+    mocks.onRead?.(file);
     const data = mocks.files.get(file);
     if (!data) throw new Error('ENOENT');
     return JSON.parse(data);
@@ -33,9 +36,24 @@ vi.mock('../shell/sandbox-policy.js', () => ({
   getPluginExecutionContext: () => mocks.plugin,
 }));
 vi.mock('../governance/ledger.js', () => ({ ledger: { record: vi.fn() } }));
-vi.mock('../path-resolver.js', () => ({ resolve: (file: string) => `/repo/${file}` }));
+vi.mock('../path-resolver.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../path-resolver.js')>()),
+  resolve: (file: string) => `/repo/${file}`,
+}));
 
-import { loadLocalAccountMaterial, storeLocalAccountMaterial } from './secret-guard.js';
+import {
+  loadLocalAccountMaterial,
+  storeLocalAccountMaterial,
+  storeLocalAccountRegistration,
+  loadLocalAccountRegistration,
+  localAccountMaterialAccountId,
+  loadAllocatedLocalAccountRegistration,
+  loadAllocatedLocalAccountMaterial,
+} from './secret-guard.js';
+import {
+  withAccountCredentialMaterialCapability,
+  withCredentialMaterialCapability,
+} from '../foundation/credential-material-capability.js';
 import { overrideSecretEncryptionKeyForTests } from './secret-encryption.js';
 
 const alice = {
@@ -49,11 +67,73 @@ beforeEach(() => {
   mocks.write.mockClear();
   mocks.tenant = undefined;
   mocks.plugin = undefined;
+  mocks.onRead = undefined;
   overrideSecretEncryptionKeyForTests(Buffer.alloc(32, 7));
 });
 afterEach(() => overrideSecretEncryptionKeyForTests(null));
 
 describe('internal local account material storage', () => {
+  it('reads only an allocated completed exact account while operator APIs remain denied', () => {
+    const ref = storeLocalAccountMaterial(alice, { SLACK_TOKEN: 'allocated-fixture' });
+    storeLocalAccountRegistration(alice, { generation: ref.generation });
+    const id = localAccountMaterialAccountId(alice);
+    mocks.tenant = 'acme';
+    expect(() => loadAllocatedLocalAccountRegistration(alice)).toThrow('admission');
+    expect(() =>
+      withCredentialMaterialCapability('acme', 'knowledge/personal/connections/slack.json', () =>
+        loadAllocatedLocalAccountRegistration(alice)
+      )
+    ).toThrow('admission');
+    withAccountCredentialMaterialCapability('acme', id, null, () => {
+      expect(loadAllocatedLocalAccountRegistration(alice).generation).toBe(ref.generation);
+      expect(() => loadAllocatedLocalAccountMaterial(ref)).toThrow('admission');
+      expect(() => loadLocalAccountRegistration(alice)).toThrow('Local operator');
+    });
+    withAccountCredentialMaterialCapability('acme', id, ref.generation, () => {
+      expect(loadAllocatedLocalAccountMaterial(ref)).toEqual({ SLACK_TOKEN: 'allocated-fixture' });
+      expect(() => loadLocalAccountMaterial(ref)).toThrow('Local operator');
+      expect(() => storeLocalAccountMaterial(alice, { SLACK_TOKEN: 'forbidden' })).toThrow(
+        'Local operator'
+      );
+      expect(() => loadAllocatedLocalAccountMaterial({ ...ref, ownerRef: 'user:bob' })).toThrow(
+        'admission'
+      );
+      mocks.tenant = 'other';
+      expect(() => loadAllocatedLocalAccountMaterial(ref)).toThrow('admission');
+    });
+  });
+  it('refuses incomplete registration and rotation during an allocated read', () => {
+    const ref = storeLocalAccountMaterial(alice, { SLACK_TOKEN: 'fixture' });
+    const next = storeLocalAccountMaterial(alice, { SLACK_TOKEN: 'fixture' });
+    const id = localAccountMaterialAccountId(alice);
+    storeLocalAccountRegistration(alice, {
+      generation: ref.generation,
+      pendingApprovalId: 'pending',
+    });
+    mocks.tenant = 'acme';
+    expect(() =>
+      withAccountCredentialMaterialCapability('acme', id, ref.generation, () =>
+        loadAllocatedLocalAccountMaterial(ref)
+      )
+    ).toThrow('incomplete or changed');
+    mocks.tenant = undefined;
+    storeLocalAccountRegistration(alice, { generation: ref.generation });
+    const oldRegistration = [...mocks.files.entries()].find(([file]) =>
+      file.endsWith('/registration.json')
+    )!;
+    storeLocalAccountRegistration(alice, { generation: next.generation });
+    const newBytes = mocks.files.get(oldRegistration[0])!;
+    mocks.files.set(oldRegistration[0], oldRegistration[1]);
+    mocks.tenant = 'acme';
+    mocks.onRead = (file) => {
+      if (file.endsWith(`/${ref.generation}.json`)) mocks.files.set(oldRegistration[0], newBytes);
+    };
+    expect(() =>
+      withAccountCredentialMaterialCapability('acme', id, ref.generation, () =>
+        loadAllocatedLocalAccountMaterial(ref)
+      )
+    ).toThrow('incomplete or changed');
+  });
   it('isolates accounts of the same service and generations without an ambient default', () => {
     const a = storeLocalAccountMaterial(alice, { SLACK_TOKEN: 'alice-secret' });
     const b = storeLocalAccountMaterial(

@@ -3871,6 +3871,53 @@
       "native_help": true
     },
     {
+      "id": "script.account.preview",
+      "module": "scripts/account_introduction.ts",
+      "command": "account preview",
+      "noun": "account",
+      "verb": "preview",
+      "audience": "operator",
+      "args": ["preview"],
+      "description": "cli_cmd_script_account_preview",
+      "group": "inspect",
+      "effect": "readiness"
+    },
+    {
+      "id": "script.account.request",
+      "module": "scripts/account_introduction.ts",
+      "command": "account request",
+      "noun": "account",
+      "verb": "request",
+      "audience": "operator",
+      "args": ["request"],
+      "description": "cli_cmd_script_account_request",
+      "group": "operate"
+    },
+    {
+      "id": "script.account.status",
+      "module": "scripts/account_introduction.ts",
+      "command": "account status",
+      "noun": "account",
+      "verb": "status",
+      "audience": "operator",
+      "args": ["status"],
+      "description": "cli_cmd_script_account_status",
+      "group": "inspect",
+      "effect": "readiness"
+    },
+    {
+      "id": "script.account.apply",
+      "module": "scripts/account_introduction.ts",
+      "command": "account apply",
+      "noun": "account",
+      "verb": "apply",
+      "audience": "operator",
+      "args": ["apply"],
+      "description": "cli_cmd_script_account_apply",
+      "group": "operate",
+      "interactive": true
+    },
+    {
       "id": "script.secret.apply",
       "module": "scripts/secret_introduce.ts",
       "command": "secret apply",
