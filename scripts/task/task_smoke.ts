@@ -10,8 +10,8 @@ import {
 } from '@agent/core/secure-io';
 import { nowIso } from '@agent/core/foundation';
 import { describeTaskRun } from './task_run.js';
-import { defineScript, isDirectScript } from './lib/harness.js';
-import { loadTaskScenario, type TaskScenario } from './lib/task-scenario.js';
+import { defineScript, isDirectScript } from '../lib/harness.js';
+import { loadTaskScenario, type TaskScenario } from '../lib/task-scenario.js';
 
 type SmokeAnswers = Record<string, Record<string, string>>;
 

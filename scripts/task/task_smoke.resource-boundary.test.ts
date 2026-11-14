@@ -6,7 +6,7 @@ import { safeReadFile } from '@agent/core/secure-io';
 describe('task smoke resource boundary', () => {
   it('validates scenario and generated profile paths', () => {
     const source = String(
-      safeReadFile(pathResolver.rootResolve('scripts/task_smoke.ts'), { encoding: 'utf8' })
+      safeReadFile(pathResolver.rootResolve('scripts/task/task_smoke.ts'), { encoding: 'utf8' })
     );
 
     expect(source).toContain('assertSafeRepositoryPath(path.join(SCENARIO_DIR');

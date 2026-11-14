@@ -9,7 +9,7 @@ export function installTaskPipelineExecutor(): void {
   if (installed) return;
   registerTaskPipelineExecutor(async (request) => {
     request.assertCurrent();
-    const engine = await import('./pipeline-execution-part-results.js');
+    const engine = await import('../pipeline-execution-part-results.js');
     request.assertCurrent();
     const scope = request.binding.scope;
     const validateSource = (source: string): void => {

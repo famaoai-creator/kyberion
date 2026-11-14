@@ -8,8 +8,8 @@ import {
   safeLstat,
   safeReaddir,
 } from '@agent/core/secure-io';
-import { defineScript, isDirectScript } from './lib/harness.js';
-import { loadTaskScenario, type TaskScenario } from './lib/task-scenario.js';
+import { defineScript, isDirectScript } from '../lib/harness.js';
+import { loadTaskScenario, type TaskScenario } from '../lib/task-scenario.js';
 
 const DEFAULT_SCENARIO_DIR = pathResolver.rootResolve('knowledge/product/task-scenarios');
 

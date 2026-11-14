@@ -8,8 +8,8 @@ import {
   safeReaddir,
 } from '@agent/core/secure-io';
 import { getRegisteredEnvText } from '@agent/core/foundation';
-import { defineScript, isDirectScript } from './lib/harness.js';
-import { loadTaskRecord, loadTaskScenario, type TaskScenario } from './lib/task-scenario.js';
+import { defineScript, isDirectScript } from '../lib/harness.js';
+import { loadTaskRecord, loadTaskScenario, type TaskScenario } from '../lib/task-scenario.js';
 
 type TaskRunArgs = {
   scenarioId?: string;
