@@ -151,10 +151,10 @@ async function defaultExecutePipeline(
   assertExecutionCurrent?: () => void
 ): ReturnType<DotExecutorPorts['runPipeline']> {
   const { executePipelineFile, isPipelineNotStartedError } =
-    await import('./pipeline-execution-part-results.js');
+    await import('../pipeline-execution-part-results.js');
   try {
     // Preflight: a missing or invalid pipeline fails before any step runs.
-    const { readValidatedWorkflowAdf } = await import('./refactor/adf-input.js');
+    const { readValidatedWorkflowAdf } = await import('../refactor/adf-input.js');
     await readValidatedWorkflowAdf(ref);
   } catch (error) {
     throw new DotExecutorPreEffectError(

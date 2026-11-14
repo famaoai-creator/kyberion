@@ -135,15 +135,15 @@ export async function runDotContinuousOperationsStep(
   const cycle =
     deps.runCycle ??
     (async (ref, options) => {
-      await import('./pipeline-execution-part-results.js');
+      await import('../pipeline-execution-part-results.js');
       return (
-        await import('./organization_continuous_operations.js')
+        await import('../organization_continuous_operations.js')
       ).runContinuousOperationsCycleFromRef(ref, options);
     });
   const owner =
     deps.owner ??
     (async (charter, options) =>
-      (await import('./organization_continuous_operations.js')).runContinuousManagedOwner(
+      (await import('../organization_continuous_operations.js')).runContinuousManagedOwner(
         charter,
         options
       ));

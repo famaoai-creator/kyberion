@@ -20,7 +20,7 @@ import {
 import { DOT_STATE_ROOT } from '@agent/core/dot/dot-state-paths';
 import { runDotExecutorSweep, dotExecutorStatusSection } from '@agent/core/dot/dot-executor';
 import { stubReasoningBackend } from '@agent/core/reasoning-backend';
-import { buildDotExecutorPorts } from '../../dist/scripts/dot_executor_step.js';
+import { buildDotExecutorPorts } from '../../dist/scripts/dot/dot_executor_step.js';
 import { runValidatedSteps } from '../../dist/scripts/pipeline-execution-part-results.js';
 const mode = process.argv[2];
 const fair = mode.startsWith('fair');

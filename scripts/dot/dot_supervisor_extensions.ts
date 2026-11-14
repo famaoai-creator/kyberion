@@ -20,7 +20,7 @@ import { evaluateDueDotOutcomes, scheduleDotOutcomeChecks } from '@agent/core/do
 import { settleDotArbitration } from '@agent/core/dot/dot-arbitration';
 import { runDotAutonomyStep } from '@agent/core/dot/dot-autonomy';
 import '@agent/core/dot/dot-extension-bootstrap';
-import { FRONT_DESK_EXECUTION_SUPERVISOR_STEP } from './front_desk_execution_step.js';
+import { FRONT_DESK_EXECUTION_SUPERVISOR_STEP } from '../front_desk_execution_step.js';
 import { DOT_EXECUTOR_SUPERVISOR_STEP } from './dot_executor_step.js';
 import { DOT_CONTINUOUS_OPERATIONS_SUPERVISOR_STEP } from './dot_continuous_operations_step.js';
 import { DOT_ORG_CADENCE_SUPERVISOR_STEP } from './dot_org_cadence_step.js';
@@ -47,7 +47,7 @@ export async function runDotSupervisorExtensions(
     } catch (error) {
       failed.push(step.id);
       logger.warn(
-        `supervisor step '${step.id}' failed — ${error instanceof Error ? error.message : String(error)} | next: the sweep continues; the step retries next sweep | evidence: scripts/dot_supervisor_extensions.ts`
+        `supervisor step '${step.id}' failed — ${error instanceof Error ? error.message : String(error)} | next: the sweep continues; the step retries next sweep | evidence: scripts/dot/dot_supervisor_extensions.ts`
       );
     }
   }

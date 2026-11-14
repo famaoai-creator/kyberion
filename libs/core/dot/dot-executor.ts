@@ -51,7 +51,7 @@ import {
  * chain and inbox get status and ids only.
  *
  * Domain module: the goal driver, delegated turn and pipeline engine arrive
- * as {@link DotExecutorPorts} (wired in `scripts/dot_executor_step.ts`).
+ * as {@link DotExecutorPorts} (wired in `scripts/dot/dot_executor_step.ts`).
  */
 
 import { randomUUID } from 'node:crypto';

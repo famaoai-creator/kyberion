@@ -1,8 +1,8 @@
 /**
- * scripts/dot_lifecycle_worker.ts — governed dot lifecycle worker (D3,
+ * scripts/dot/dot_lifecycle_worker.ts — governed dot lifecycle worker (D3,
  * MSN-KYBERION-SERVER-20261104).
  *
- *   node dist/scripts/dot_lifecycle_worker.js <pause|resume|activate> <dot_id> \
+ *   node dist/scripts/dot/dot_lifecycle_worker.js <pause|resume|activate> <dot_id> \
  *     --expect-status <status> --expect-admission-hash <hash> \
  *     --expect-scope-json '<scope>' [--actor <principal>] --json
  *
@@ -17,12 +17,12 @@
 import { cliOptionValue, cliPositionals } from '@agent/core/cli-guard';
 import { transitionDotCharterStatus } from '@agent/core/dot/dot-lifecycle';
 import type { DotCharterStatus } from '@agent/core/dot/dot-charter';
-import { DEFAULT_DAEMONS } from './daemon_watchdog.js';
-import { defineScript, isDirectScript, stripSharedScriptFlags } from './lib/harness.js';
+import { DEFAULT_DAEMONS } from '../daemon_watchdog.js';
+import { defineScript, isDirectScript, stripSharedScriptFlags } from '../lib/harness.js';
 import {
   DOT_TRANSITION_EXPECT_FLAGS,
   parseTransitionExpectations,
-} from './lib/dot-transition-expectations.js';
+} from '../lib/dot-transition-expectations.js';
 
 const ACTIONS: Record<string, DotCharterStatus> = {
   pause: 'paused',

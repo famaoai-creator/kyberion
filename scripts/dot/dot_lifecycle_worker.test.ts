@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-vi.mock('./daemon_watchdog.js', () => ({ DEFAULT_DAEMONS: ['watchdog-daemon'] }));
+vi.mock('../daemon_watchdog.js', () => ({ DEFAULT_DAEMONS: ['watchdog-daemon'] }));
 
 import { runDotLifecycleWorker } from './dot_lifecycle_worker.js';
 

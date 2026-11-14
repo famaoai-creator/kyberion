@@ -53,7 +53,7 @@ function treeSnapshot(directory = root): Array<[string, string]> {
 let store: typeof import('@agent/core/surface/front-desk-conversation-store');
 let work: typeof import('@agent/core/workforce/work-coordination');
 let dispatch: typeof import('@agent/core/dot/dot-dispatch');
-let executor: typeof import('./dot_executor_step.js');
+let executor: typeof import('./dot/dot_executor_step.js');
 let execution: typeof import('@agent/core/surface/front-desk-execution');
 let browser: typeof import('@agent/core/authn/authn-providers');
 let approvals: typeof import('@agent/core/surface/first-job-approval');
@@ -143,7 +143,7 @@ beforeAll(async () => {
   store = await import('@agent/core/surface/front-desk-conversation-store');
   work = await import('@agent/core/workforce/work-coordination');
   dispatch = await import('@agent/core/dot/dot-dispatch');
-  executor = await import('./dot_executor_step.js');
+  executor = await import('./dot/dot_executor_step.js');
   execution = await import('@agent/core/surface/front-desk-execution');
   browser = await import('@agent/core/authn/authn-providers');
   approvals = await import('@agent/core/surface/first-job-approval');

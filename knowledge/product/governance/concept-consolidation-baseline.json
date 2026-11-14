@@ -1454,10 +1454,10 @@
       "json_state_write_budget": 1,
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/dot_charters.ts": {
+    "scripts/dot/dot_charters.ts": {
       "bespoke_cli_parser_budget": 3
     },
-    "scripts/dot_continuous_operations_step.ts": {
+    "scripts/dot/dot_continuous_operations_step.ts": {
       "json_state_write_budget": 1
     },
     "scripts/email-workflow.ts": {

@@ -812,7 +812,7 @@ revision changes, unchanged summary refreshes and timeout recovery in
 unbounded. When a child needs a role the server itself must not hold (a writer, or a ledger role
 such as `decision_ledger`), do not add that role to the server's `may_assume` and do not clear
 `SYSTEM_ROLE`. Give the child its own one-purpose entry script that dispatches only the verbs the
-server calls (e.g. `scripts/customer_decision_overview.ts`, `scripts/dot_lifecycle_worker.ts`), a
+server calls (e.g. `scripts/customer_decision_overview.ts`, `scripts/dot/dot_lifecycle_worker.ts`), a
 narrow system role granting just the roles that entry reaches, a reachability workspace entry in
 `scripts/lib/role-assumption-workspace.ts`, and a regenerated
 `role-assumption-unresolved-baseline.json` (`--print-unresolved-baseline`, never hand edits). Pin

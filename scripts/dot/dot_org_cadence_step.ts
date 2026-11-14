@@ -160,7 +160,7 @@ export function tickIntervalMs(c: DotCharter): number {
 
 async function defaultTick(options: OrganizationOperationTickRunOptions): Promise<TickReport> {
   const { executeScheduledOrganizationOperation } =
-    await import('./organization_operation_execute.js');
+    await import('../organization_operation_execute.js');
   return runOrganizationOperationTick(options, {
     executeOperation: executeScheduledOrganizationOperation,
   });
@@ -294,7 +294,7 @@ export async function runDotOrgCadenceStep(
           `org cadence failed for ${loaded.charter.dot_id}`,
           error,
           'retried next sweep',
-          'scripts/dot_org_cadence_step.ts'
+          'scripts/dot/dot_org_cadence_step.ts'
         )
       );
     }
