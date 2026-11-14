@@ -1,3 +1,4 @@
+import { buildRetiredActuatorOpError } from '@agent/core/actuator/actuator-op-registry';
 import { isRecord, nowIso } from '@agent/core/foundation';
 import { KNOWLEDGE_TIER_RANK } from '@agent/core/foundation/knowledge-tier';
 import type { AdfRunResult, AdfStep } from '@agent/core/pipeline/adf-engine';
@@ -239,7 +240,11 @@ export async function handleAction(input: WisdomAction) {
     return await executePipeline(input.steps || [], input.context || {}, input.options);
   }
   const spec = getWisdomOperationSpec(input.action);
-  if (!spec) throw new Error(`[UNKNOWN_OP] Unknown direct wisdom action: ${input.action}`);
+  if (!spec)
+    throw (
+      buildRetiredActuatorOpError('wisdom', String(input.action)) ??
+      new Error(`[UNKNOWN_OP] Unknown direct wisdom action: ${input.action}`)
+    );
   return await executePipeline(
     [{ type: spec.kind, op: input.action, params: input.params || {} }],
     input.context || {},
@@ -279,7 +284,11 @@ export async function executePipeline(
         const decision = await dispatchWisdomOperation(op, params, currentCtx, {
           compatibilityMode: options.compatibility_mode,
         });
-        if (!decision.handled) throw new Error(`[UNKNOWN_OP] Unknown wisdom operation: ${op}`);
+        if (!decision.handled)
+          throw (
+            buildRetiredActuatorOpError('wisdom', op) ??
+            new Error(`[UNKNOWN_OP] Unknown wisdom operation: ${op}`)
+          );
         return decision.ctx;
       },
     }
@@ -398,7 +407,9 @@ async function opControl(
     }
 
     default:
-      throw new Error(`[UNKNOWN_OP] Unknown op: ${op}`);
+      throw (
+        buildRetiredActuatorOpError('wisdom', op) ?? new Error(`[UNKNOWN_OP] Unknown op: ${op}`)
+      );
   }
 }
 

@@ -58,7 +58,7 @@ workflow_ids: [feature-expansion-delivery, incident-response, gate-review-sessio
 | リリース (G6)      | approval      | `RELEASE_READINESS`     | リリース判定会議   | ✅ Go/No-Go |
 | 振り返り (G7)      | judgment      | `CLOSURE_REVIEW`        | クローズレビュー   | —           |
 
-判断フェーズは semantic brief、ヒアリング/設計/実装/検証/リリースは既存パイプライン(`requirements-elicitation` / `design-from-requirements` / `execute-task-plan` / `test-plan-from-requirements` / `deploy-release` / `post-release-retrospective`)を再利用する。`mission_class: product_delivery` + `risk_profile: approval_required` で strict レビューモード。チームは `product_development`。
+判断フェーズは semantic brief、ヒアリング/設計/検証/リリースは既存パイプライン(`requirements-elicitation` / `design-from-requirements` / `test-plan-from-requirements` / `deploy-release` / `post-release-retrospective`)を再利用し、実装はタスク計画を `orchestrator:task_plan_to_next_tasks` でミッションボード(`NEXT_TASKS.json`)に載せ、通常の mission dispatch で claim 付き WorkItem として実行する。`mission_class: product_delivery` + `risk_profile: approval_required` で strict レビューモード。チームは `product_development`。
 
 ---
 

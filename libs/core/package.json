@@ -6760,10 +6760,6 @@
       "types": "./dist/task/index.d.ts",
       "default": "./dist/task/index.js"
     },
-    "./task-plan-coordinator-port": {
-      "types": "./dist/task/task-plan-coordinator-port.d.ts",
-      "default": "./dist/task/task-plan-coordinator-port.js"
-    },
     "./task-routing-judgment": {
       "types": "./dist/task/task-routing-judgment.d.ts",
       "default": "./dist/task/task-routing-judgment.js"
@@ -6772,17 +6768,9 @@
       "types": "./dist/task/task-session.d.ts",
       "default": "./dist/task/task-session.js"
     },
-    "./task/task-executor": {
-      "types": "./dist/task/task-executor.d.ts",
-      "default": "./dist/task/task-executor.js"
-    },
     "./task/task-knowledge-provisioning": {
       "types": "./dist/task/task-knowledge-provisioning.d.ts",
       "default": "./dist/task/task-knowledge-provisioning.js"
-    },
-    "./task/task-plan-coordinator-port": {
-      "types": "./dist/task/task-plan-coordinator-port.d.ts",
-      "default": "./dist/task/task-plan-coordinator-port.js"
     },
     "./task/task-result-contract": {
       "types": "./dist/task/task-result-contract.d.ts",

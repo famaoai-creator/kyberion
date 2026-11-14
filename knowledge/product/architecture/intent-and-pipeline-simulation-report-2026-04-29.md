@@ -10,6 +10,8 @@ last_updated: 2026-04-29
 
 # Intent / Pipeline シミュレーション報告
 
+> **2026-11-14 注記:** 本報告は 2026-04-29 時点の記録である。ここに出てくる `execute-task-plan` テンプレートと `orchestrator:execute_task_plan` は廃止された。現在、タスク計画は `orchestrator:task_plan_to_next_tasks` でミッションボード(`NEXT_TASKS.json`)に載せ、通常の mission dispatch で claim 付き WorkItem として実行する([agent-communication-layer-model §9](./agent-communication-layer-model.md#open-design-gaps-2026-11-12))。
+
 ## 1. 目的
 
 この文書は、Kyberion に既存の `intent` と `pipeline` が

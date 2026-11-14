@@ -1,6 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
+import {
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeRmSync,
+  safeWriteFile,
+} from '@agent/core/secure-io';
 import {
   registerActuatorForwardingPort,
   resetActuatorForwardingPort,
@@ -9,7 +15,11 @@ import { describeOps } from './op-catalog.js';
 import { dispatchWisdomOperation } from './decision-ops.js';
 
 const dispatchDecisionOp = dispatchWisdomOperation;
-import { handleAction, runWithOperationRetry } from './wisdom-pipeline-helpers.js';
+import {
+  handleAction,
+  runWithOperationRetry,
+  type WisdomAction,
+} from './wisdom-pipeline-helpers.js';
 import { createWisdomDispatcher } from './wisdom-dispatcher.js';
 import { writeMissionStateAtPath } from '@agent/core/mission/mission-state-reader';
 
@@ -413,32 +423,18 @@ describe('wisdom public contract boundaries', () => {
     });
   });
 
-  it('keeps Agent runtime SDK ownership outside Wisdom and task-executor', () => {
+  it('keeps Agent runtime SDK ownership outside Wisdom', () => {
     const wisdomSource = safeReadFile(
       pathResolver.rootResolve('libs/actuators/wisdom-actuator/src/decision-ops.ts'),
       { encoding: 'utf8' }
     ) as string;
-    const executorSource = safeReadFile(
-      pathResolver.rootResolve('libs/core/task/task-executor.ts'),
-      {
-        encoding: 'utf8',
-      }
-    ) as string;
 
     expect(wisdomSource).not.toContain('@anthropic-ai/claude-agent-sdk');
     expect(wisdomSource).not.toContain('executeTaskPlan');
-    expect(executorSource).not.toContain('@anthropic-ai/claude-agent-sdk');
   });
 
   it('exposes moved boundary operations as compatibility forwarders', () => {
-    for (const op of [
-      'shell',
-      'read_file',
-      'write_file',
-      'pptx_diff',
-      'transcribe_audio',
-      'execute_task_plan',
-    ]) {
+    for (const op of ['shell', 'read_file', 'write_file', 'pptx_diff', 'transcribe_audio']) {
       expect(describeOps().find((entry) => entry.op === op)).toMatchObject({
         forward_to: expect.any(Object),
       });
@@ -693,38 +689,40 @@ describe('wisdom public contract boundaries', () => {
     );
   });
 
-  it('keeps task-plan DAG coordination in Orchestrator and core as a port facade', () => {
-    const coreExecutor = safeReadFile(pathResolver.rootResolve('libs/core/task/task-executor.ts'), {
-      encoding: 'utf8',
-    }) as string;
-    const coordinatorSource = safeReadFile(
-      pathResolver.rootResolve('libs/actuators/orchestrator-actuator/src/task-plan-coordinator.ts'),
-      { encoding: 'utf8' }
-    ) as string;
+  it('retires execute_task_plan: task plans reach the mission board, not an unclaimed runner', async () => {
+    // 2026-11-14: task plans run only through task_plan_to_next_tasks
+    // (NEXT_TASKS.json) plus mission dispatch. Neither catalog may bring the
+    // unclaimed DAG runner back as an op or a forwarding alias.
+    expect(describeOps().find((entry) => entry.op === 'execute_task_plan')).toBeUndefined();
+    const retired =
+      /Op "execute_task_plan" for domain "wisdom" was retired on 2026-11-14\. Use orchestrator:task_plan_to_next_tasks/;
+    await expect(
+      handleAction({ action: 'execute_task_plan', params: {} } as unknown as WisdomAction)
+    ).rejects.toThrow(retired);
+    const piped = (await handleAction({
+      action: 'pipeline',
+      steps: [{ type: 'apply', op: 'execute_task_plan', params: {} }],
+    } as unknown as WisdomAction)) as {
+      status: string;
+      receipts: Array<{ error?: { message?: string } }>;
+    };
+    expect(piped.status).toBe('failed');
+    expect(piped.receipts[0]?.error?.message).toMatch(retired);
+    expect(describeOps().find((entry) => entry.op === 'task_plan_to_next_tasks')).toMatchObject({
+      forward_to: { actuator: 'orchestrator', op: 'task_plan_to_next_tasks' },
+    });
     const orchestratorSource = safeReadFile(
       pathResolver.rootResolve('libs/actuators/orchestrator-actuator/src/orchestrator-helpers.ts'),
       { encoding: 'utf8' }
     ) as string;
-
-    expect(coreExecutor).toContain('getTaskPlanCoordinator');
-    expect(coreExecutor).not.toContain('topologicalOrder');
-    expect(orchestratorSource).toContain('executeTaskPlanFromOrchestrator');
+    expect(orchestratorSource).not.toContain("case 'execute_task_plan'");
     expect(orchestratorSource).not.toContain(`import('@agent/${'core'}')`);
-    expect(coordinatorSource).toContain('executionPort.delegate');
-    expect(coordinatorSource).not.toContain('getReasoningBackend');
-    expect(coordinatorSource).not.toContain('@anthropic-ai/claude-agent-sdk');
-  });
-
-  it('describes execute_task_plan as orchestrator coordination plus Agent delegation', () => {
-    const manifest = JSON.parse(
-      safeReadFile(pathResolver.rootResolve('libs/actuators/wisdom-actuator/manifest.json'), {
-        encoding: 'utf8',
-      }) as string
-    ) as { capabilities?: Array<{ op?: string; note?: string }> };
-    const executeTaskPlan = manifest.capabilities?.find(
-      (entry) => entry.op === 'execute_task_plan'
-    );
-    expect(executeTaskPlan?.note).toContain('AgentExecutionPort');
-    expect(executeTaskPlan?.note).not.toContain('Claude Code sub-agent');
+    for (const retired of [
+      'libs/actuators/orchestrator-actuator/src/task-plan-coordinator.ts',
+      'libs/core/task/task-executor.ts',
+      'libs/core/task/task-plan-coordinator-port.ts',
+    ]) {
+      expect(safeExistsSync(pathResolver.rootResolve(retired))).toBe(false);
+    }
   });
 });

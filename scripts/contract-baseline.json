@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-08T17:12:42.736Z",
+  "generated_at": "2026-11-14T03:37:53.430Z",
   "generator_note": "Baseline of actuator extension-point surfaces for semver enforcement. See docs/developer/EXTENSION_POINTS.md. Update via `pnpm check:contract-semver -- --rebaseline`.",
   "actuators": [
     {
@@ -418,7 +418,7 @@
     },
     {
       "actuator_id": "wisdom-actuator",
-      "version": "1.8.0",
+      "version": "2.0.0",
       "ops": [
         "a2a_fanout",
         "a2a_roleplay",
@@ -449,7 +449,6 @@
         "evaluate_simulation_quality",
         "evaluate_task_plan_ready",
         "execute_self_action_items",
-        "execute_task_plan",
         "extract_action_items",
         "extract_design_spec",
         "extract_dissent_signals",
@@ -504,7 +503,7 @@
         "yaml_update"
       ],
       "contract_schema": "knowledge/product/schemas/wisdom-action.schema.json",
-      "contract_schema_sha256": "9a631eccc4966c8136629b706456a2382476bc25b7d424e8d04e491e9503bd75"
+      "contract_schema_sha256": "7aa630fa1d4a990b0e4d704243d183ca2e3f6881ebd563a9d7ea2d0927633a34"
     },
     {
       "actuator_id": "working-memory-actuator",

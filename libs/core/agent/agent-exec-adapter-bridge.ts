@@ -28,6 +28,13 @@ export interface AgentExecAdapterRequest {
   deniedActuators?: string[];
   /** Team Channel E: launch with every tool disabled (adapters that cannot must not be used). */
   toolsDisabled?: boolean;
+  /**
+   * Unclaimed delegation: launch so the provider can read but cannot write
+   * files, run a writable shell or reach a write-capable tool server. Only a
+   * bridge that declares `readOnlyTools` receives it; lifecycle refuses the
+   * rest before an adapter exists.
+   */
+  readOnly?: boolean;
   /** Resolved from the claimed WorkItem, never from provider text. */
   taskToolRuntime?: TaskToolRuntime;
   capabilityProfile?: string;
@@ -40,6 +47,8 @@ export interface AgentExecAdapterBridge {
   readonly bridge_id: string;
   /** The adapter disables native escape hatches and executes only live task-bound tools. */
   readonly governedTaskTools?: boolean;
+  /** `createAdapter` honours `readOnly`: the adapter it returns cannot write. */
+  readonly readOnlyTools?: boolean;
   createAdapter(request: AgentExecAdapterRequest): AgentAdapter;
 }
 
@@ -78,6 +87,16 @@ export function canProvideGovernedTaskTools(provider: string | undefined): boole
     listAgentExecAdapterBridges().some(
       (bridge) =>
         bridge.bridge_id === provider.trim().toLowerCase() && bridge.governedTaskTools === true
+    )
+  );
+}
+
+export function canProvideReadOnlyTools(provider: string | undefined): boolean {
+  return Boolean(
+    provider &&
+    listAgentExecAdapterBridges().some(
+      (bridge) =>
+        bridge.bridge_id === provider.trim().toLowerCase() && bridge.readOnlyTools === true
     )
   );
 }

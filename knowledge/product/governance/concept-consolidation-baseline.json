@@ -115,9 +115,6 @@
     "libs/actuators/orchestrator-actuator/src/super-nerve/index.ts": {
       "env_direct_read_budget": 1
     },
-    "libs/actuators/orchestrator-actuator/src/task-plan-coordinator.ts": {
-      "json_state_write_budget": 1
-    },
     "libs/actuators/orchestrator-actuator/src/task-plan-ops.ts": {
       "json_state_write_budget": 1
     },
