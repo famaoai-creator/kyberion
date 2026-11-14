@@ -2373,7 +2373,7 @@
     },
     {
       "id": "script.generate.artifact-kinds",
-      "module": "scripts/generate_artifact_kinds.ts",
+      "module": "scripts/generate/generate_artifact_kinds.ts",
       "command": "generate artifact-kinds",
       "noun": "generate",
       "verb": "artifact-kinds",
@@ -2383,7 +2383,7 @@
     },
     {
       "id": "script.generate.capability-seams",
-      "module": "scripts/generate_capability_seams.ts",
+      "module": "scripts/generate/generate_capability_seams.ts",
       "command": "generate capability-seams",
       "noun": "generate",
       "verb": "capability-seams",
@@ -2473,7 +2473,7 @@
     },
     {
       "id": "script.generate.service-harness-registry",
-      "module": "scripts/generate_service_harness_registry.ts",
+      "module": "scripts/generate/generate_service_harness_registry.ts",
       "command": "generate service-harness-registry",
       "noun": "generate",
       "verb": "service-harness-registry",
@@ -2484,7 +2484,7 @@
     },
     {
       "id": "script.generate.trace-docs",
-      "module": "scripts/generate_trace_docs.ts",
+      "module": "scripts/generate/generate_trace_docs.ts",
       "command": "generate trace-docs",
       "noun": "generate",
       "verb": "trace-docs",
@@ -3485,7 +3485,7 @@
     },
     {
       "id": "script.provider-capabilities.report",
-      "module": "scripts/generate_provider_cli_capability_report.ts",
+      "module": "scripts/generate/generate_provider_cli_capability_report.ts",
       "command": "provider-capabilities report",
       "noun": "provider-capabilities",
       "verb": "report",
@@ -3587,7 +3587,7 @@
     },
     {
       "id": "script.release.changelog-draft",
-      "module": "scripts/generate_changelog.ts",
+      "module": "scripts/generate/generate_changelog.ts",
       "command": "release changelog-draft",
       "noun": "release",
       "verb": "changelog-draft",

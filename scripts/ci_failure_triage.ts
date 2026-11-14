@@ -41,7 +41,7 @@ interface GateManifestLike {
 }
 
 /**
- * Map each freshness gate (`scripts/generate_*.ts --check`,
+ * Map each freshness gate (`scripts/generate/generate_*.ts --check`,
  * `scripts/analyze_*.ts --check`) to the command that rewrites its output: the
  * package script that runs the same file without `--check` when one exists,
  * otherwise the gate's own command minus `--check`.

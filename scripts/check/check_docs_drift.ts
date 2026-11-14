@@ -24,7 +24,7 @@ import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js
 import { loadCliManifest, type CliManifest } from './check_cli_manifest.js';
 import { checkDocumentationLinks } from './check_documentation_links.js';
 import { readSafeJsonFile } from '../lib/json-input.js';
-import { renderCliReference } from '../generate_cli_reference.js';
+import { renderCliReference } from '../generate/generate_cli_reference.js';
 import { format as prettierFormat } from 'prettier';
 
 const CLI_REFERENCE_FILE = 'docs/CLI_REFERENCE.md';

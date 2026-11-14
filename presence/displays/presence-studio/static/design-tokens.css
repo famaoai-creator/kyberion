@@ -16,9 +16,11 @@
   --kb-border: #e2e8f0;
   --kb-success: #15803d;
   --kb-danger: #b91c1c;
-  --kb-font-sans: "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI", Meiryo, system-ui, sans-serif;
+  --kb-font-sans: 'Hiragino Sans', 'Noto Sans JP', 'Yu Gothic UI', Meiryo, system-ui, sans-serif;
   --kb-font-mono: 'JetBrains Mono', monospace;
-  --kb-font-campaign-display: 'Helvetica Neue', Arial, 'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', 'Yu Gothic UI', Meiryo, system-ui, sans-serif;
+  --kb-font-campaign-display:
+    'Helvetica Neue', Arial, 'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP',
+    'Yu Gothic UI', Meiryo, system-ui, sans-serif;
   --kb-blur: blur(12px);
   --kb-glow-cyan: 0 0 15px rgba(0, 242, 255, 0.4);
 }
@@ -26,17 +28,17 @@
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #020617;
-    --foreground: #F8FAFC;
+    --foreground: #f8fafc;
     --kb-bg-main: #020617;
     --kb-panel-bg: rgba(10, 25, 47, 0.82);
-    --kb-primary: #0A192F;
-    --kb-secondary: #31415B;
-    --kb-accent: #00F2FF;
+    --kb-primary: #0a192f;
+    --kb-secondary: #31415b;
+    --kb-accent: #00f2ff;
     --kb-accent-on: #02121a;
     --kb-warning: #f59e0b;
-    --kb-text-primary: #F8FAFC;
+    --kb-text-primary: #f8fafc;
     --kb-text-secondary: rgba(248, 250, 252, 0.62);
-    --kb-accent-text: #00F2FF;
+    --kb-accent-text: #00f2ff;
     --kb-surface: #0f172a;
     --kb-muted-text: #94a3b8;
     --kb-border: #1e293b;
@@ -69,17 +71,17 @@
 [data-theme='dark'] {
   color-scheme: dark;
   --background: #020617;
-  --foreground: #F8FAFC;
+  --foreground: #f8fafc;
   --kb-bg-main: #020617;
   --kb-panel-bg: rgba(10, 25, 47, 0.82);
-  --kb-primary: #0A192F;
-  --kb-secondary: #31415B;
-  --kb-accent: #00F2FF;
+  --kb-primary: #0a192f;
+  --kb-secondary: #31415b;
+  --kb-accent: #00f2ff;
   --kb-accent-on: #02121a;
   --kb-warning: #f59e0b;
-  --kb-text-primary: #F8FAFC;
+  --kb-text-primary: #f8fafc;
   --kb-text-secondary: rgba(248, 250, 252, 0.62);
-  --kb-accent-text: #00F2FF;
+  --kb-accent-text: #00f2ff;
   --kb-surface: #0f172a;
   --kb-muted-text: #94a3b8;
   --kb-border: #1e293b;
@@ -87,7 +89,7 @@
   --kb-danger: #f87171;
 }
 
-/* kyberion-ui tokens: generated from tokens.ui by scripts/generate_design_tokens.ts - do not edit */
+/* kyberion-ui tokens: generated from tokens.ui by scripts/generate/generate_design_tokens.ts - do not edit */
 :root {
   --kb-ui-color-scheme: light;
   --kb-ui-canvas: #f5f7fa;
@@ -163,7 +165,7 @@
   --kb-ui-space-6: 32px;
   --kb-ui-space-7: 48px;
   --kb-ui-space-8: 64px;
-  --kb-ui-font-sans: "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI", Meiryo, system-ui, sans-serif;
+  --kb-ui-font-sans: 'Hiragino Sans', 'Noto Sans JP', 'Yu Gothic UI', Meiryo, system-ui, sans-serif;
   --kb-ui-font-mono: 'JetBrains Mono', monospace;
   --kb-ui-font-size-xs: 12px;
   --kb-ui-font-size-sm: 13px;
@@ -173,7 +175,7 @@
   --kb-ui-font-size-xxl: 28px;
 }
 
-[data-density="comfortable"] {
+[data-density='comfortable'] {
   --kb-ui-font-size-xs: 12px;
   --kb-ui-font-size-sm: 13px;
   --kb-ui-font-size-md: 15px;
@@ -182,7 +184,7 @@
   --kb-ui-font-size-xxl: 28px;
 }
 
-[data-density="compact"] {
+[data-density='compact'] {
   --kb-ui-font-size-xs: 11px;
   --kb-ui-font-size-sm: 12px;
   --kb-ui-font-size-md: 13px;
@@ -192,7 +194,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
+  :root:not([data-theme='light']) {
     --kb-ui-color-scheme: dark;
     --kb-ui-canvas: #0d131e;
     --kb-ui-surface: #141b29;
@@ -259,7 +261,7 @@
   }
 }
 
-:root[data-theme="dark"] {
+:root[data-theme='dark'] {
   --kb-ui-color-scheme: dark;
   --kb-ui-canvas: #0d131e;
   --kb-ui-surface: #141b29;
@@ -326,7 +328,7 @@
 }
 
 /* kds style: editorial */
-:root[data-kds-style="editorial"] {
+:root[data-kds-style='editorial'] {
   --kb-ui-color-scheme: light;
   --kb-ui-canvas: #fafaf9;
   --kb-ui-surface: #f5f5f4;
@@ -398,7 +400,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"])[data-kds-style="editorial"] {
+  :root:not([data-theme='light'])[data-kds-style='editorial'] {
     --kb-ui-color-scheme: dark;
     --kb-ui-canvas: #0c0a09;
     --kb-ui-surface: #1c1917;
@@ -432,8 +434,8 @@
     --kb-ui-role-chronos-mirror-v2: #aab6ff;
     --kb-ui-role-operator-surface: #f19ac0;
     --kb-ui-role-computer-surface: #a9cb72;
-    --kb-ui-shadow-sm: 0 1px 1px rgba(0, 0, 0, 0.30);
-    --kb-ui-shadow-md: 0 1px 1px rgba(0, 0, 0, 0.30);
+    --kb-ui-shadow-sm: 0 1px 1px rgba(0, 0, 0, 0.3);
+    --kb-ui-shadow-md: 0 1px 1px rgba(0, 0, 0, 0.3);
     --kb-ui-viz-cat-1: #3987e5;
     --kb-ui-viz-cat-2: #d95926;
     --kb-ui-viz-cat-3: #199e70;
@@ -470,7 +472,7 @@
   }
 }
 
-:root[data-theme="dark"][data-kds-style="editorial"] {
+:root[data-theme='dark'][data-kds-style='editorial'] {
   --kb-ui-color-scheme: dark;
   --kb-ui-canvas: #0c0a09;
   --kb-ui-surface: #1c1917;
@@ -504,8 +506,8 @@
   --kb-ui-role-chronos-mirror-v2: #aab6ff;
   --kb-ui-role-operator-surface: #f19ac0;
   --kb-ui-role-computer-surface: #a9cb72;
-  --kb-ui-shadow-sm: 0 1px 1px rgba(0, 0, 0, 0.30);
-  --kb-ui-shadow-md: 0 1px 1px rgba(0, 0, 0, 0.30);
+  --kb-ui-shadow-sm: 0 1px 1px rgba(0, 0, 0, 0.3);
+  --kb-ui-shadow-md: 0 1px 1px rgba(0, 0, 0, 0.3);
   --kb-ui-viz-cat-1: #3987e5;
   --kb-ui-viz-cat-2: #d95926;
   --kb-ui-viz-cat-3: #199e70;
@@ -542,7 +544,7 @@
 }
 
 /* kds style: midnight-signal */
-:root[data-kds-style="midnight-signal"] {
+:root[data-kds-style='midnight-signal'] {
   --kb-ui-color-scheme: light;
   --kb-ui-canvas: #f8fafc;
   --kb-ui-surface: #eef2f7;
@@ -577,7 +579,7 @@
   --kb-ui-role-operator-surface: #a3305f;
   --kb-ui-role-computer-surface: #4d6a16;
   --kb-ui-shadow-sm: 0 2px 6px rgba(15, 23, 42, 0.08), 0 1px 2px rgba(15, 23, 42, 0.06);
-  --kb-ui-shadow-md: 0 8px 20px rgba(15, 23, 42, 0.10), 0 2px 6px rgba(15, 23, 42, 0.06);
+  --kb-ui-shadow-md: 0 8px 20px rgba(15, 23, 42, 0.1), 0 2px 6px rgba(15, 23, 42, 0.06);
   --kb-ui-viz-cat-1: #2a78d6;
   --kb-ui-viz-cat-2: #dc5d28;
   --kb-ui-viz-cat-3: #189564;
@@ -609,12 +611,14 @@
   --kb-ui-radius-sm: 8px;
   --kb-ui-radius-md: 12px;
   --kb-ui-radius-lg: 16px;
-  --kb-ui-font-heading: 'Helvetica Neue', Arial, 'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', 'Yu Gothic UI', Meiryo, system-ui, sans-serif;
+  --kb-ui-font-heading:
+    'Helvetica Neue', Arial, 'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP',
+    'Yu Gothic UI', Meiryo, system-ui, sans-serif;
   --kb-ui-gradient-accent: none;
 }
 
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"])[data-kds-style="midnight-signal"] {
+  :root:not([data-theme='light'])[data-kds-style='midnight-signal'] {
     --kb-ui-color-scheme: dark;
     --kb-ui-canvas: #060b16;
     --kb-ui-surface: #0f172a;
@@ -648,8 +652,8 @@
     --kb-ui-role-chronos-mirror-v2: #aab6ff;
     --kb-ui-role-operator-surface: #f19ac0;
     --kb-ui-role-computer-surface: #a9cb72;
-    --kb-ui-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.45), 0 1px 2px rgba(0, 0, 0, 0.30);
-    --kb-ui-shadow-md: 0 8px 24px rgba(0, 0, 0, 0.50), 0 2px 6px rgba(0, 0, 0, 0.30);
+    --kb-ui-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.45), 0 1px 2px rgba(0, 0, 0, 0.3);
+    --kb-ui-shadow-md: 0 8px 24px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.3);
     --kb-ui-viz-cat-1: #3987e5;
     --kb-ui-viz-cat-2: #d95926;
     --kb-ui-viz-cat-3: #199e70;
@@ -681,12 +685,14 @@
     --kb-ui-radius-sm: 8px;
     --kb-ui-radius-md: 12px;
     --kb-ui-radius-lg: 16px;
-    --kb-ui-font-heading: 'Helvetica Neue', Arial, 'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', 'Yu Gothic UI', Meiryo, system-ui, sans-serif;
+    --kb-ui-font-heading:
+      'Helvetica Neue', Arial, 'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP',
+      'Yu Gothic UI', Meiryo, system-ui, sans-serif;
     --kb-ui-gradient-accent: none;
   }
 }
 
-:root[data-theme="dark"][data-kds-style="midnight-signal"] {
+:root[data-theme='dark'][data-kds-style='midnight-signal'] {
   --kb-ui-color-scheme: dark;
   --kb-ui-canvas: #060b16;
   --kb-ui-surface: #0f172a;
@@ -720,8 +726,8 @@
   --kb-ui-role-chronos-mirror-v2: #aab6ff;
   --kb-ui-role-operator-surface: #f19ac0;
   --kb-ui-role-computer-surface: #a9cb72;
-  --kb-ui-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.45), 0 1px 2px rgba(0, 0, 0, 0.30);
-  --kb-ui-shadow-md: 0 8px 24px rgba(0, 0, 0, 0.50), 0 2px 6px rgba(0, 0, 0, 0.30);
+  --kb-ui-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.45), 0 1px 2px rgba(0, 0, 0, 0.3);
+  --kb-ui-shadow-md: 0 8px 24px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.3);
   --kb-ui-viz-cat-1: #3987e5;
   --kb-ui-viz-cat-2: #d95926;
   --kb-ui-viz-cat-3: #199e70;
@@ -753,12 +759,14 @@
   --kb-ui-radius-sm: 8px;
   --kb-ui-radius-md: 12px;
   --kb-ui-radius-lg: 16px;
-  --kb-ui-font-heading: 'Helvetica Neue', Arial, 'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', 'Yu Gothic UI', Meiryo, system-ui, sans-serif;
+  --kb-ui-font-heading:
+    'Helvetica Neue', Arial, 'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP',
+    'Yu Gothic UI', Meiryo, system-ui, sans-serif;
   --kb-ui-gradient-accent: none;
 }
 
 /* kds style: graphite-executive */
-:root[data-kds-style="graphite-executive"] {
+:root[data-kds-style='graphite-executive'] {
   --kb-ui-color-scheme: light;
   --kb-ui-canvas: #ffffff;
   --kb-ui-surface: #f3f4f6;
@@ -825,12 +833,14 @@
   --kb-ui-radius-sm: 0px;
   --kb-ui-radius-md: 2px;
   --kb-ui-radius-lg: 4px;
-  --kb-ui-font-heading: 'Helvetica Neue', Arial, 'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', 'Yu Gothic UI', Meiryo, system-ui, sans-serif;
+  --kb-ui-font-heading:
+    'Helvetica Neue', Arial, 'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP',
+    'Yu Gothic UI', Meiryo, system-ui, sans-serif;
   --kb-ui-gradient-accent: none;
 }
 
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"])[data-kds-style="graphite-executive"] {
+  :root:not([data-theme='light'])[data-kds-style='graphite-executive'] {
     --kb-ui-color-scheme: dark;
     --kb-ui-canvas: #0b0f17;
     --kb-ui-surface: #111827;
@@ -864,8 +874,8 @@
     --kb-ui-role-chronos-mirror-v2: #aab6ff;
     --kb-ui-role-operator-surface: #f19ac0;
     --kb-ui-role-computer-surface: #a9cb72;
-    --kb-ui-shadow-sm: 0 1px 1px rgba(0, 0, 0, 0.30);
-    --kb-ui-shadow-md: 0 1px 1px rgba(0, 0, 0, 0.30);
+    --kb-ui-shadow-sm: 0 1px 1px rgba(0, 0, 0, 0.3);
+    --kb-ui-shadow-md: 0 1px 1px rgba(0, 0, 0, 0.3);
     --kb-ui-viz-cat-1: #3987e5;
     --kb-ui-viz-cat-2: #d95926;
     --kb-ui-viz-cat-3: #199e70;
@@ -897,12 +907,14 @@
     --kb-ui-radius-sm: 0px;
     --kb-ui-radius-md: 2px;
     --kb-ui-radius-lg: 4px;
-    --kb-ui-font-heading: 'Helvetica Neue', Arial, 'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', 'Yu Gothic UI', Meiryo, system-ui, sans-serif;
+    --kb-ui-font-heading:
+      'Helvetica Neue', Arial, 'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP',
+      'Yu Gothic UI', Meiryo, system-ui, sans-serif;
     --kb-ui-gradient-accent: none;
   }
 }
 
-:root[data-theme="dark"][data-kds-style="graphite-executive"] {
+:root[data-theme='dark'][data-kds-style='graphite-executive'] {
   --kb-ui-color-scheme: dark;
   --kb-ui-canvas: #0b0f17;
   --kb-ui-surface: #111827;
@@ -936,8 +948,8 @@
   --kb-ui-role-chronos-mirror-v2: #aab6ff;
   --kb-ui-role-operator-surface: #f19ac0;
   --kb-ui-role-computer-surface: #a9cb72;
-  --kb-ui-shadow-sm: 0 1px 1px rgba(0, 0, 0, 0.30);
-  --kb-ui-shadow-md: 0 1px 1px rgba(0, 0, 0, 0.30);
+  --kb-ui-shadow-sm: 0 1px 1px rgba(0, 0, 0, 0.3);
+  --kb-ui-shadow-md: 0 1px 1px rgba(0, 0, 0, 0.3);
   --kb-ui-viz-cat-1: #3987e5;
   --kb-ui-viz-cat-2: #d95926;
   --kb-ui-viz-cat-3: #199e70;
@@ -969,12 +981,14 @@
   --kb-ui-radius-sm: 0px;
   --kb-ui-radius-md: 2px;
   --kb-ui-radius-lg: 4px;
-  --kb-ui-font-heading: 'Helvetica Neue', Arial, 'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', 'Yu Gothic UI', Meiryo, system-ui, sans-serif;
+  --kb-ui-font-heading:
+    'Helvetica Neue', Arial, 'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP',
+    'Yu Gothic UI', Meiryo, system-ui, sans-serif;
   --kb-ui-gradient-accent: none;
 }
 
 /* kds style: aurora */
-:root[data-kds-style="aurora"] {
+:root[data-kds-style='aurora'] {
   --kb-ui-color-scheme: light;
   --kb-ui-canvas: #ffffff;
   --kb-ui-surface: #f5f3ff;
@@ -1009,7 +1023,7 @@
   --kb-ui-role-operator-surface: #a3305f;
   --kb-ui-role-computer-surface: #4d6a16;
   --kb-ui-shadow-sm: 0 2px 6px rgba(15, 23, 42, 0.08), 0 1px 2px rgba(15, 23, 42, 0.06);
-  --kb-ui-shadow-md: 0 8px 20px rgba(15, 23, 42, 0.10), 0 2px 6px rgba(15, 23, 42, 0.06);
+  --kb-ui-shadow-md: 0 8px 20px rgba(15, 23, 42, 0.1), 0 2px 6px rgba(15, 23, 42, 0.06);
   --kb-ui-viz-cat-1: #2a78d6;
   --kb-ui-viz-cat-2: #dc5d28;
   --kb-ui-viz-cat-3: #189866;
@@ -1041,12 +1055,14 @@
   --kb-ui-radius-sm: 16px;
   --kb-ui-radius-md: 24px;
   --kb-ui-radius-lg: 24px;
-  --kb-ui-font-heading: 'Helvetica Neue', Arial, 'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', 'Yu Gothic UI', Meiryo, system-ui, sans-serif;
+  --kb-ui-font-heading:
+    'Helvetica Neue', Arial, 'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP',
+    'Yu Gothic UI', Meiryo, system-ui, sans-serif;
   --kb-ui-gradient-accent: linear-gradient(135deg, #6d28d9, #2563eb, #07809d);
 }
 
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"])[data-kds-style="aurora"] {
+  :root:not([data-theme='light'])[data-kds-style='aurora'] {
     --kb-ui-color-scheme: dark;
     --kb-ui-canvas: #0b0a1f;
     --kb-ui-surface: #15132e;
@@ -1080,8 +1096,8 @@
     --kb-ui-role-chronos-mirror-v2: #aab6ff;
     --kb-ui-role-operator-surface: #f19ac0;
     --kb-ui-role-computer-surface: #a9cb72;
-    --kb-ui-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.45), 0 1px 2px rgba(0, 0, 0, 0.30);
-    --kb-ui-shadow-md: 0 8px 24px rgba(0, 0, 0, 0.50), 0 2px 6px rgba(0, 0, 0, 0.30);
+    --kb-ui-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.45), 0 1px 2px rgba(0, 0, 0, 0.3);
+    --kb-ui-shadow-md: 0 8px 24px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.3);
     --kb-ui-viz-cat-1: #3987e5;
     --kb-ui-viz-cat-2: #d95926;
     --kb-ui-viz-cat-3: #199e70;
@@ -1113,12 +1129,14 @@
     --kb-ui-radius-sm: 16px;
     --kb-ui-radius-md: 24px;
     --kb-ui-radius-lg: 24px;
-    --kb-ui-font-heading: 'Helvetica Neue', Arial, 'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', 'Yu Gothic UI', Meiryo, system-ui, sans-serif;
+    --kb-ui-font-heading:
+      'Helvetica Neue', Arial, 'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP',
+      'Yu Gothic UI', Meiryo, system-ui, sans-serif;
     --kb-ui-gradient-accent: linear-gradient(135deg, #a78bfa, #3b82f6, #22d3ee);
   }
 }
 
-:root[data-theme="dark"][data-kds-style="aurora"] {
+:root[data-theme='dark'][data-kds-style='aurora'] {
   --kb-ui-color-scheme: dark;
   --kb-ui-canvas: #0b0a1f;
   --kb-ui-surface: #15132e;
@@ -1152,8 +1170,8 @@
   --kb-ui-role-chronos-mirror-v2: #aab6ff;
   --kb-ui-role-operator-surface: #f19ac0;
   --kb-ui-role-computer-surface: #a9cb72;
-  --kb-ui-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.45), 0 1px 2px rgba(0, 0, 0, 0.30);
-  --kb-ui-shadow-md: 0 8px 24px rgba(0, 0, 0, 0.50), 0 2px 6px rgba(0, 0, 0, 0.30);
+  --kb-ui-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.45), 0 1px 2px rgba(0, 0, 0, 0.3);
+  --kb-ui-shadow-md: 0 8px 24px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.3);
   --kb-ui-viz-cat-1: #3987e5;
   --kb-ui-viz-cat-2: #d95926;
   --kb-ui-viz-cat-3: #199e70;
@@ -1185,12 +1203,14 @@
   --kb-ui-radius-sm: 16px;
   --kb-ui-radius-md: 24px;
   --kb-ui-radius-lg: 24px;
-  --kb-ui-font-heading: 'Helvetica Neue', Arial, 'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', 'Yu Gothic UI', Meiryo, system-ui, sans-serif;
+  --kb-ui-font-heading:
+    'Helvetica Neue', Arial, 'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP',
+    'Yu Gothic UI', Meiryo, system-ui, sans-serif;
   --kb-ui-gradient-accent: linear-gradient(135deg, #a78bfa, #3b82f6, #22d3ee);
 }
 
 /* kds style: paper-minimal */
-:root[data-kds-style="paper-minimal"] {
+:root[data-kds-style='paper-minimal'] {
   --kb-ui-color-scheme: light;
   --kb-ui-canvas: #ffffff;
   --kb-ui-surface: #f5f5f5;
@@ -1257,12 +1277,14 @@
   --kb-ui-radius-sm: 0px;
   --kb-ui-radius-md: 2px;
   --kb-ui-radius-lg: 4px;
-  --kb-ui-font-heading: 'Helvetica Neue', Arial, 'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', 'Yu Gothic UI', Meiryo, system-ui, sans-serif;
+  --kb-ui-font-heading:
+    'Helvetica Neue', Arial, 'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP',
+    'Yu Gothic UI', Meiryo, system-ui, sans-serif;
   --kb-ui-gradient-accent: none;
 }
 
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"])[data-kds-style="paper-minimal"] {
+  :root:not([data-theme='light'])[data-kds-style='paper-minimal'] {
     --kb-ui-color-scheme: dark;
     --kb-ui-canvas: #0a0a0a;
     --kb-ui-surface: #171717;
@@ -1296,8 +1318,8 @@
     --kb-ui-role-chronos-mirror-v2: #aab6ff;
     --kb-ui-role-operator-surface: #f19ac0;
     --kb-ui-role-computer-surface: #a9cb72;
-    --kb-ui-shadow-sm: 0 1px 1px rgba(0, 0, 0, 0.30);
-    --kb-ui-shadow-md: 0 1px 1px rgba(0, 0, 0, 0.30);
+    --kb-ui-shadow-sm: 0 1px 1px rgba(0, 0, 0, 0.3);
+    --kb-ui-shadow-md: 0 1px 1px rgba(0, 0, 0, 0.3);
     --kb-ui-viz-cat-1: #3987e5;
     --kb-ui-viz-cat-2: #d95926;
     --kb-ui-viz-cat-3: #199e70;
@@ -1329,12 +1351,14 @@
     --kb-ui-radius-sm: 0px;
     --kb-ui-radius-md: 2px;
     --kb-ui-radius-lg: 4px;
-    --kb-ui-font-heading: 'Helvetica Neue', Arial, 'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', 'Yu Gothic UI', Meiryo, system-ui, sans-serif;
+    --kb-ui-font-heading:
+      'Helvetica Neue', Arial, 'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP',
+      'Yu Gothic UI', Meiryo, system-ui, sans-serif;
     --kb-ui-gradient-accent: none;
   }
 }
 
-:root[data-theme="dark"][data-kds-style="paper-minimal"] {
+:root[data-theme='dark'][data-kds-style='paper-minimal'] {
   --kb-ui-color-scheme: dark;
   --kb-ui-canvas: #0a0a0a;
   --kb-ui-surface: #171717;
@@ -1368,8 +1392,8 @@
   --kb-ui-role-chronos-mirror-v2: #aab6ff;
   --kb-ui-role-operator-surface: #f19ac0;
   --kb-ui-role-computer-surface: #a9cb72;
-  --kb-ui-shadow-sm: 0 1px 1px rgba(0, 0, 0, 0.30);
-  --kb-ui-shadow-md: 0 1px 1px rgba(0, 0, 0, 0.30);
+  --kb-ui-shadow-sm: 0 1px 1px rgba(0, 0, 0, 0.3);
+  --kb-ui-shadow-md: 0 1px 1px rgba(0, 0, 0, 0.3);
   --kb-ui-viz-cat-1: #3987e5;
   --kb-ui-viz-cat-2: #d95926;
   --kb-ui-viz-cat-3: #199e70;
@@ -1401,7 +1425,9 @@
   --kb-ui-radius-sm: 0px;
   --kb-ui-radius-md: 2px;
   --kb-ui-radius-lg: 4px;
-  --kb-ui-font-heading: 'Helvetica Neue', Arial, 'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', 'Yu Gothic UI', Meiryo, system-ui, sans-serif;
+  --kb-ui-font-heading:
+    'Helvetica Neue', Arial, 'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP',
+    'Yu Gothic UI', Meiryo, system-ui, sans-serif;
   --kb-ui-gradient-accent: none;
 }
 /* end kyberion-ui tokens */

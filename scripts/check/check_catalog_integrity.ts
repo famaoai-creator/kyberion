@@ -6,7 +6,7 @@ import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync, safeLstat, safeReaddir, safeStat } from '@agent/core/secure-io';
 import { compileSchema, readTextFile } from '@agent/core/foundation';
 import { getAllFiles } from '@agent/core/fs-utils';
-import { generateIndex } from '../generate_knowledge_index.js';
+import { generateIndex } from '../generate/generate_knowledge_index.js';
 import {
   expectedKyberionThemeEntries,
   extractKyberionTokenBlock,
@@ -977,7 +977,7 @@ function validateDesignTokenCatalog(violations: string[]) {
     );
     if (JSON.stringify(flat.themes || {}) !== JSON.stringify(nested.themes || {})) {
       violations.push(
-        'design-tokens: themes.json and themes/themes.json theme maps diverged. Run pnpm tsx scripts/generate_design_tokens.ts and align manual edits.'
+        'design-tokens: themes.json and themes/themes.json theme maps diverged. Run pnpm tsx scripts/generate/generate_design_tokens.ts and align manual edits.'
       );
     }
   } catch {

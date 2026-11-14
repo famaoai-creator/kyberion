@@ -54,7 +54,7 @@ last_updated: 2026-05-30
 | P1-3 | Action item lifecycle の整合性         | meeting 後の follow-up を実用にする            | `libs/core/meeting/action-item-store.ts`, `knowledge/product/pipeline-templates/action-item-*.json` | duplicate reminder、status transition、blocked reason、owner kind がテストされる    |
 | P1-4 | Browser participation runtime の安全性 | Zoom/browser 操作を誤作動させない              | `libs/actuators/meeting-browser-driver`, `scripts/meeting_participate.ts`                           | join target redaction、domain allowlist、recording/voice の consent gate がある     |
 | P1-5 | Cross-OS CI の代表シナリオ化           | Mac 固有の成功を防ぐ                           | `.github/workflows/cross-os.yml`, `tests/golden/`                                                   | Ubuntu / macOS で schema、core test、pipeline preview、meeting dry-run が通る       |
-| P1-6 | Release / migration workflow           | OSS で破壊的変更を追えるようにする             | `CHANGELOG.md`, `migration/`, `scripts/generate_changelog.ts`                                       | release prep 手順で contract baseline と migration note が更新される                |
+| P1-6 | Release / migration workflow           | OSS で破壊的変更を追えるようにする             | `CHANGELOG.md`, `migration/`, `scripts/generate/generate_changelog.ts`                              | release prep 手順で contract baseline と migration note が更新される                |
 
 ### P2: Adoption readiness
 

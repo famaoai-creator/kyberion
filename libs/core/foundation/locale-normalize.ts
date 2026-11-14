@@ -20,7 +20,7 @@
  * statically imported catalog to the shared resolver below.
  *
  * I18N-02: `SUPPORTED_LOCALES` below is generated from the vocabulary
- * catalog's `required_locales` field by `scripts/generate_vocabulary_types.ts`
+ * catalog's `required_locales` field by `scripts/generate/generate_vocabulary_types.ts`
  * (`pnpm generate:vocabulary-types`, checked by `pnpm check:vocabulary-types`).
  * Adding a locale is a one-line data edit to the catalog plus a
  * regeneration — never a hand-edit of the array below. Do not add an import

@@ -157,7 +157,12 @@
       "id": "store-roots",
       "scope": "pr",
       "executable": "node",
-      "args": ["--import", "./scripts/ts-loader.mjs", "scripts/generate_store_roots.ts", "--check"],
+      "args": [
+        "--import",
+        "./scripts/ts-loader.mjs",
+        "scripts/generate/generate_store_roots.ts",
+        "--check"
+      ],
       "owner": "architecture",
       "rationale": "Keeps static foundation state/ledger/floor roots projected from validated catalog registrations without runtime catalog I/O."
     },
@@ -176,7 +181,7 @@
       "args": [
         "--import",
         "./scripts/ts-loader.mjs",
-        "scripts/generate_package_dependency_graph.ts",
+        "scripts/generate/generate_package_dependency_graph.ts",
         "--check"
       ],
       "owner": "architecture",
@@ -364,7 +369,7 @@
       "args": [
         "--import",
         "./scripts/ts-loader.mjs",
-        "scripts/generate_capability_seams.ts",
+        "scripts/generate/generate_capability_seams.ts",
         "--check"
       ],
       "owner": "architecture",
@@ -469,7 +474,7 @@
         "scripts/lib/pad-ui/**",
         "scripts/cli.ts",
         "scripts/check/check_catalog_integrity.ts",
-        "scripts/generate_knowledge_index.ts",
+        "scripts/generate/generate_knowledge_index.ts",
         "scripts/design-token-utils.ts"
       ],
       "owner": "governance",
@@ -492,7 +497,12 @@
       "id": "op-registry",
       "scope": "full",
       "executable": "node",
-      "args": ["--import", "./scripts/ts-loader.mjs", "scripts/generate_op_registry.ts", "--check"],
+      "args": [
+        "--import",
+        "./scripts/ts-loader.mjs",
+        "scripts/generate/generate_op_registry.ts",
+        "--check"
+      ],
       "paths": [
         "libs/actuators/**",
         "libs/core/actuator/**",
@@ -503,7 +513,7 @@
         "knowledge/product/orchestration/actuator-op-discovery.json",
         "knowledge/product/schemas/actuator-manifest.schema.json",
         "knowledge/product/schemas/actuator-op-registry.schema.json",
-        "scripts/generate_op_registry.ts",
+        "scripts/generate/generate_op_registry.ts",
         ".prettierrc*"
       ],
       "owner": "operations",
@@ -516,7 +526,7 @@
       "args": [
         "--import",
         "./scripts/ts-loader.mjs",
-        "scripts/generate_vocabulary_types.ts",
+        "scripts/generate/generate_vocabulary_types.ts",
         "--check"
       ],
       "paths": [
@@ -525,7 +535,7 @@
         "libs/core/foundation/locale-normalize.ts",
         "libs/core/knowledge/vocabulary-*",
         "libs/shared-ui/vanilla/kyberion-ui-vocabulary.js",
-        "scripts/generate_vocabulary_types.ts",
+        "scripts/generate/generate_vocabulary_types.ts",
         ".prettierrc*"
       ],
       "owner": "experience",
@@ -538,7 +548,7 @@
       "args": [
         "--import",
         "./scripts/ts-loader.mjs",
-        "scripts/generate_pseudo_locale.ts",
+        "scripts/generate/generate_pseudo_locale.ts",
         "--check"
       ],
       "paths": [
@@ -546,7 +556,7 @@
         "knowledge/product/schemas/user-facing-vocabulary.schema.json",
         "libs/core/foundation/message-format.ts",
         "libs/core/knowledge/vocabulary-*",
-        "scripts/generate_pseudo_locale.ts"
+        "scripts/generate/generate_pseudo_locale.ts"
       ],
       "owner": "experience",
       "rationale": "Checks generated pseudo-locale output."
@@ -599,7 +609,7 @@
       "args": [
         "--import",
         "./scripts/ts-loader.mjs",
-        "scripts/generate_env_registry.ts",
+        "scripts/generate/generate_env_registry.ts",
         "--check"
       ],
       "owner": "operations",
@@ -744,13 +754,18 @@
       "id": "pii-rules",
       "scope": "full",
       "executable": "node",
-      "args": ["--import", "./scripts/ts-loader.mjs", "scripts/generate_pii_rules.ts", "--check"],
+      "args": [
+        "--import",
+        "./scripts/ts-loader.mjs",
+        "scripts/generate/generate_pii_rules.ts",
+        "--check"
+      ],
       "paths": [
         "knowledge/product/governance/knowledge-sync-rules.json",
         "knowledge/product/schemas/knowledge-sync-rules.schema.json",
         "libs/core/governance/pii-scrubber.ts",
         "tools/*/pii-rules.generated.js",
-        "scripts/generate_pii_rules.ts"
+        "scripts/generate/generate_pii_rules.ts"
       ],
       "owner": "security",
       "rationale": "Checks generated PII rules."
@@ -1091,7 +1106,7 @@
         "libs/core/dot/dot-execution-policy.test.ts",
         "libs/core/reasoning/model-role-fitness.test.ts",
         "scripts/check/check_store_catalog.test.ts",
-        "scripts/generate_store_roots.test.ts",
+        "scripts/generate/generate_store_roots.test.ts",
         "libs/core/foundation/runtime-state-roots.test.ts",
         "libs/core/provider/custody-provider-attestation-governance.test.ts",
         "libs/core/mission/mission-orchestration-worker.cd09-decision-lock.test.ts",

@@ -116,7 +116,7 @@ and dispatches the replacement). Both lists live in
 `knowledge/product/governance/cli-commands.json`.
 
 When adding operations, update the authored discovery count ratchet in
-`scripts/generate_op_registry.test.ts` together with the registry and examples.
+`scripts/generate/generate_op_registry.test.ts` together with the registry and examples.
 When production gains content authorization, facade tests must use a real
 repository fixture for the input file even when the OCR/model provider is mocked;
 a mock provider must not make a nonexistent file a valid authorized input.

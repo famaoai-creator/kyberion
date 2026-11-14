@@ -51,7 +51,7 @@ This plan tracks catalog/index splits that should move from centralized JSON blo
 ## Non-targets
 
 - `service-harness-registry.json` is a **generated artifact** (built by
-  `scripts/generate_service_harness_registry.ts` from the already-split
+  `scripts/generate/generate_service_harness_registry.ts` from the already-split
   `service-presets/*.json` source directory) — splitting the generated file
   would be wrong; the source is already per-item.
 - Policy-like single files (`env-registry.json`, `approval-policy.json`,

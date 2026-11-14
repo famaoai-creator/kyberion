@@ -413,7 +413,7 @@ The charter assumes strict isolation between these tiers. Within the confidentia
 - `knowledge/product/architecture/slack-chronos-control-model.md`: Slack ingress, Chronos control surfaces, channel outboxes, and observability boundaries; also defines gateway, service binding, delivery actuator, and system actuator boundaries
 - `knowledge/product/architecture/channel-port-surface-model.md`: channels, ports, Surface Agents, and transport/directionality taxonomy
 - `knowledge/product/architecture/browser-actuator-v3.md`: Playwright engine, `snapshot + ref` interaction model, browser session leases, and test-export direction
-- `docs/developer/architecture/dependency-graph.mmd`: workspace package dependency graph, generated from package manifests by `scripts/generate_package_dependency_graph.ts` (CI gate `package-dependency-graph`)
+- `docs/developer/architecture/dependency-graph.mmd`: workspace package dependency graph, generated from package manifests by `scripts/generate/generate_package_dependency_graph.ts` (CI gate `package-dependency-graph`)
 
 ## Recommended reading order for new contributors
 

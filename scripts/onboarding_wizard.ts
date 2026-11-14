@@ -1350,7 +1350,9 @@ export async function runOnboarding(
     } else if (choice === '4') {
       print(`\n${mt('onboarding_menu_running_knowledge')}`);
       try {
-        await runManagedMenuTask('knowledge-index', ['dist/scripts/generate_knowledge_index.js']);
+        await runManagedMenuTask('knowledge-index', [
+          'dist/scripts/generate/generate_knowledge_index.js',
+        ]);
       } catch (e) {
         print(`${mt('onboarding_menu_error_knowledge')}: ${formatMenuTaskError(e)}`);
       }

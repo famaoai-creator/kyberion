@@ -67,7 +67,12 @@ const REMEDIES = deriveGateRemedies(
       {
         id: 'op-registry',
         executable: 'node',
-        args: ['--import', './scripts/ts-loader.mjs', 'scripts/generate_op_registry.ts', '--check'],
+        args: [
+          '--import',
+          './scripts/ts-loader.mjs',
+          'scripts/generate/generate_op_registry.ts',
+          '--check',
+        ],
       },
       {
         id: 'capability-seams',
@@ -75,7 +80,7 @@ const REMEDIES = deriveGateRemedies(
         args: [
           '--import',
           './scripts/ts-loader.mjs',
-          'scripts/generate_capability_seams.ts',
+          'scripts/generate/generate_capability_seams.ts',
           '--check',
         ],
       },
@@ -87,7 +92,8 @@ const REMEDIES = deriveGateRemedies(
     ],
   },
   {
-    'generate:op-registry': 'node --import ./scripts/ts-loader.mjs scripts/generate_op_registry.ts',
+    'generate:op-registry':
+      'node --import ./scripts/ts-loader.mjs scripts/generate/generate_op_registry.ts',
   }
 );
 
@@ -102,7 +108,7 @@ describe('ci failure triage', () => {
       generator: 'pnpm generate:op-registry',
     });
     expect(REMEDIES['capability-seams']?.generator).toBe(
-      'node --import ./scripts/ts-loader.mjs scripts/generate_capability_seams.ts'
+      'node --import ./scripts/ts-loader.mjs scripts/generate/generate_capability_seams.ts'
     );
     expect(RESOLVE_GENERATED_GATE_IDS).toContain('store-roots');
     expect(REMEDIES['type-ratchet']?.generator).toBeUndefined();

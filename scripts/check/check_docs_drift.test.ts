@@ -13,7 +13,7 @@ import {
   findingKey,
   isExcludedDocsDriftPath,
 } from './check_docs_drift.js';
-import { buildCliReferenceRows, renderCliReference } from '../generate_cli_reference.js';
+import { buildCliReferenceRows, renderCliReference } from '../generate/generate_cli_reference.js';
 
 describe('portable documentation paths', () => {
   it.each([

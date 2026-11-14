@@ -93,7 +93,7 @@
   --kb-danger: #f87171;
 }
 
-/* kyberion-ui tokens: generated from tokens.ui by scripts/generate_design_tokens.ts - do not edit */
+/* kyberion-ui tokens: generated from tokens.ui by scripts/generate/generate_design_tokens.ts - do not edit */
 :root {
   --kb-ui-color-scheme: light;
   --kb-ui-canvas: #f5f7fa;
