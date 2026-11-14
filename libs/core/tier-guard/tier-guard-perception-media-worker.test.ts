@@ -1,16 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as path from 'node:path';
-import { validateReadPermission, validateWritePermission } from './tier-guard.js';
-import { safeLstat, safeMkdir, safeWriteFile } from './secure-io.js';
-import { withExecutionContextAsync } from './authority.js';
-import * as pathResolver from './path-resolver.js';
+import { validateReadPermission, validateWritePermission } from '../tier-guard.js';
+import { safeLstat, safeMkdir, safeWriteFile } from '../secure-io.js';
+import { withExecutionContextAsync } from '../authority.js';
+import * as pathResolver from '../path-resolver.js';
 // Install the full identity resolver (MISSION_ROLE / tenant resolution) the
 // production read path uses, instead of the bootstrap fallback.
-import './authority.js';
+import '../authority.js';
 
 // The tier guard emits best-effort audit events on denial; keep them off the
 // real audit chain so the suite stays hermetic.
-vi.mock('./governance/audit-chain.js', () => ({
+vi.mock('../governance/audit-chain.js', () => ({
   auditChain: {
     record: vi.fn(),
   },
@@ -102,7 +102,7 @@ describe('tier-guard perception_media_worker authority role', () => {
     } finally {
       // Cleanup runs outside the assumed context — the tmp floor stays
       // removable under the default_allow write grant either way.
-      const { safeRmSync } = await import('./secure-io.js');
+      const { safeRmSync } = await import('../secure-io.js');
       safeRmSync(at(SCRATCH), { recursive: true, force: true });
     }
   });

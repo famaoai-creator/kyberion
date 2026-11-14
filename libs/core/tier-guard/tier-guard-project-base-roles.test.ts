@@ -8,8 +8,8 @@ import * as path from 'node:path';
 
 const state = { mode: 'current' as 'current' | 'legacy' | 'both' };
 
-vi.mock('./fs-primitives.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('./fs-primitives.js')>();
+vi.mock('../fs-primitives.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../fs-primitives.js')>();
   return {
     ...actual,
     rawReadTextFile: (p: string, ...rest: unknown[]) => {
@@ -48,8 +48,8 @@ const PATHS = [
 
 async function decisions(): Promise<string[]> {
   vi.resetModules();
-  const { validateReadPermission, validateWritePermission } = await import('./tier-guard.js');
-  const { pathResolver } = await import('./path-resolver.js');
+  const { validateReadPermission, validateWritePermission } = await import('../tier-guard.js');
+  const { pathResolver } = await import('../path-resolver.js');
   const root = pathResolver.rootDir();
   const out: string[] = [];
   for (const baseRole of BASE_ROLES) {

@@ -1,13 +1,13 @@
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { pathResolver } from './path-resolver.js';
-import * as paths from './path-resolver.js';
-import { withExecutionContext, resetRoleAssumptionPolicyCache } from './authority.js';
+import { pathResolver } from '../path-resolver.js';
+import * as paths from '../path-resolver.js';
+import { withExecutionContext, resetRoleAssumptionPolicyCache } from '../authority.js';
 import {
   runInResourceAccessScope,
   type ResourceAccessScope,
-} from './foundation/resource-access-scope.js';
-import { validateReadPermission, validateWritePermission } from './tier-guard.js';
+} from '../foundation/resource-access-scope.js';
+import { validateReadPermission, validateWritePermission } from '../tier-guard.js';
 import {
   safeExistsSync,
   safeMkdir,
@@ -16,17 +16,17 @@ import {
   safeRmSync,
   safeSymlinkSync,
   safeWriteFile,
-} from './secure-io.js';
-import { executeSurfaceManagementMutation } from './surface/surface-management-mutations.js';
-import { asRoleOrGrant } from './testing/role-or-store-grant.js';
+} from '../secure-io.js';
+import { executeSurfaceManagementMutation } from '../surface/surface-management-mutations.js';
+import { asRoleOrGrant } from '../testing/role-or-store-grant.js';
 
-vi.mock('./governance/audit-chain.js', () => ({
+vi.mock('../governance/audit-chain.js', () => ({
   auditChain: { record: vi.fn(), recordDurable: vi.fn() },
 }));
-vi.mock('./governance/policy-engine.js', () => ({
+vi.mock('../governance/policy-engine.js', () => ({
   policyEngine: { evaluate: () => ({ allowed: true }) },
 }));
-vi.mock('./foundation/lock-utils.js', () => ({
+vi.mock('../foundation/lock-utils.js', () => ({
   acquireLock: vi.fn(async () => true),
   releaseLock: vi.fn(),
   registerLockIo: vi.fn(),

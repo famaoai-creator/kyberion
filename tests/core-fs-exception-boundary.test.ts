@@ -126,7 +126,7 @@ const allowedCoreFsImports = [
   // AL-01 catalog loader test: raw fs for temp catalog fixtures.
   'libs/core/storage/storage-retention-catalog.test.ts',
   'libs/core/organization/tenant-registry.test.ts',
-  'libs/core/tier-guard-tenant.test.ts',
+  'libs/core/tier-guard/tier-guard-tenant.test.ts',
   'libs/core/governance/trust-engine.test.ts',
   'libs/core/foundation/validators.test.ts',
   'libs/core/workforce/worker-event-stream.test.ts',

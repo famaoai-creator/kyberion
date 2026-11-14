@@ -1,16 +1,16 @@
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import * as pathResolver from './path-resolver.js';
-import { resetRoleAssumptionPolicyCache, resolveRole, withExecutionContext } from './authority.js';
-import { currentExecutionScope } from './foundation/execution-scope.js';
-import { inspectReadPermission, validateWritePermission } from './tier-guard.js';
+import * as pathResolver from '../path-resolver.js';
+import { resetRoleAssumptionPolicyCache, resolveRole, withExecutionContext } from '../authority.js';
+import { currentExecutionScope } from '../foundation/execution-scope.js';
+import { inspectReadPermission, validateWritePermission } from '../tier-guard.js';
 import {
   withPrPublicationRuntime,
   withPrPublicationStoreAccess,
-} from './governance/pr-publication-runtime.js';
+} from '../governance/pr-publication-runtime.js';
 
 // G2: the live PR publication grant is the authority; there is no store role.
-vi.mock('./governance/audit-chain.js', () => ({ auditChain: { record: vi.fn() } }));
+vi.mock('../governance/audit-chain.js', () => ({ auditChain: { record: vi.fn() } }));
 
 const ROOT = pathResolver.rootDir();
 const ENV_KEYS = [

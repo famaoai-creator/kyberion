@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as path from 'node:path';
-import { withExecutionContext } from './authority.js';
-import { pathResolver } from './path-resolver.js';
-import { validateWritePermission } from './tier-guard.js';
+import { withExecutionContext } from '../authority.js';
+import { pathResolver } from '../path-resolver.js';
+import { validateWritePermission } from '../tier-guard.js';
 
 const fragment = 'changelog.d/faster-whisper-config-forwarding.md';
 afterEach(() => vi.unstubAllEnvs());

@@ -1,9 +1,9 @@
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { pathResolver } from './path-resolver.js';
-import { detectTier } from './tier-guard.js';
-import { checkFiniteStateSafety, type SafetyModel } from './testing/finite-state-checker.js';
-import type { TierLevel } from './types.js';
+import { pathResolver } from '../path-resolver.js';
+import { detectTier } from '../tier-guard.js';
+import { checkFiniteStateSafety, type SafetyModel } from '../testing/finite-state-checker.js';
+import type { TierLevel } from '../types.js';
 
 const tiers = ['public', 'confidential', 'personal'] as const;
 const actualRoot = pathResolver.rootDir();

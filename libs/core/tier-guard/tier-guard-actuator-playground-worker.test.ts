@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as path from 'node:path';
-import { validateReadPermission, validateWritePermission } from './tier-guard.js';
-import { safeLstat, safeMkdir, safeWriteFile } from './secure-io.js';
-import { withExecutionContextAsync } from './authority.js';
-import * as pathResolver from './path-resolver.js';
-import './authority.js';
+import { validateReadPermission, validateWritePermission } from '../tier-guard.js';
+import { safeLstat, safeMkdir, safeWriteFile } from '../secure-io.js';
+import { withExecutionContextAsync } from '../authority.js';
+import * as pathResolver from '../path-resolver.js';
+import '../authority.js';
 
-vi.mock('./governance/audit-chain.js', () => ({
+vi.mock('../governance/audit-chain.js', () => ({
   auditChain: {
     record: vi.fn(),
   },
@@ -76,7 +76,7 @@ describe('tier-guard actuator_playground_worker authority role', () => {
         TENANT
       );
     } finally {
-      const { safeRmSync } = await import('./secure-io.js');
+      const { safeRmSync } = await import('../secure-io.js');
       safeRmSync(at(SCRATCH), { recursive: true, force: true });
     }
   });

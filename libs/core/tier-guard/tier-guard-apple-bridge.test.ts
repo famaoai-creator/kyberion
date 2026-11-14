@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { withExecutionContext } from './authority.js';
-import { pathResolver } from './path-resolver.js';
-import { validateWritePermission } from './tier-guard.js';
+import { withExecutionContext } from '../authority.js';
+import { pathResolver } from '../path-resolver.js';
+import { validateWritePermission } from '../tier-guard.js';
 
 afterEach(() => vi.unstubAllEnvs());
 describe('Apple native bridge source authoring scope', () => {

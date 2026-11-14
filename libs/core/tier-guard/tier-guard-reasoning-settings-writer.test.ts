@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { pathResolver } from './path-resolver.js';
+import { pathResolver } from '../path-resolver.js';
 import {
   loadJson,
   safeExecResultAsync,
@@ -12,7 +12,7 @@ import {
   safeSymlinkSync,
   safeWriteFile,
   safeCopyFileSync,
-} from './secure-io.js';
+} from '../secure-io.js';
 
 const ROLE = 'reasoning_settings_writer';
 const CONFIG = 'active/shared/state/reasoning-route-user-config.json';
