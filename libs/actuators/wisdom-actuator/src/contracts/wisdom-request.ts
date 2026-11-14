@@ -1,3 +1,4 @@
+import { buildRetiredActuatorOpError } from '@agent/core/actuator/actuator-op-registry';
 import type { WisdomAction, WisdomDirectAction, PipelineStep } from '../wisdom-pipeline-helpers.js';
 import { isRecord } from '@agent/core/foundation';
 
@@ -88,5 +89,8 @@ export function validateWisdomRequest(input: unknown): asserts input is WisdomAc
     return;
   }
   if (input.action === 'reconcile') return;
-  throw new Error(`[UNKNOWN_OP] Unknown wisdom action: ${input.action}`);
+  throw (
+    buildRetiredActuatorOpError('wisdom', String(input.action)) ??
+    new Error(`[UNKNOWN_OP] Unknown wisdom action: ${input.action}`)
+  );
 }

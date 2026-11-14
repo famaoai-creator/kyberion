@@ -659,4 +659,74 @@ describe('agent-lifecycle NI-01 identity wiring', () => {
     ).rejects.toThrow(/TOOL_LOCKDOWN_UNSUPPORTED/);
     expect(agentRegistry.get('lockdown-pane-agent')).toBeUndefined();
   });
+
+  it.each([
+    ['agy (no verified read-only mode)', { provider: 'agy' }],
+    ['the pane backend', { provider: 'claude', runtimeBackend: 'pane' as const }],
+  ])('refuses a read-only runtime on %s instead of starting it writable', async (_label, extra) => {
+    const create = vi.spyOn(execAdapterBridge, 'createAgentExecAdapter');
+    const agentId = `read-only-refused-${extra.provider}`;
+    await expect(
+      agentLifecycle.spawn({
+        agentId,
+        toolAccess: 'read-only',
+        runtimeMetadata: { skip_provider_resolution: true },
+        ...extra,
+      })
+    ).rejects.toThrow(/TOOL_READ_ONLY_UNSUPPORTED/);
+    expect(create).not.toHaveBeenCalled();
+    expect(ACPMediator.prototype.boot).not.toHaveBeenCalled();
+    expect(agentRegistry.get(agentId)).toBeUndefined();
+  });
+
+  it('launches a read-only runtime through an exec bridge with readOnly set', async () => {
+    const create = vi.spyOn(execAdapterBridge, 'createAgentExecAdapter').mockResolvedValue({
+      boot: vi.fn(async () => undefined),
+      ask: vi.fn(async () => ({ text: 'ok', stopReason: 'completed' })),
+      shutdown: vi.fn(async () => undefined),
+    });
+    await agentLifecycle.spawn({
+      agentId: 'read-only-claude-agent',
+      provider: 'claude',
+      toolAccess: 'read-only',
+      runtimeMetadata: { skip_provider_resolution: true },
+    });
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({ provider: 'claude', readOnly: true })
+    );
+    expect(create.mock.calls[0]![0].taskToolRuntime).toBeUndefined();
+    expect(agentRegistry.get('read-only-claude-agent')?.metadata?.tool_access).toBe('read-only');
+  });
+
+  it('recreates an idle runtime when only its read-only tool mode changes, in either direction', async () => {
+    const shutdowns: string[] = [];
+    const create = vi
+      .spyOn(execAdapterBridge, 'createAgentExecAdapter')
+      .mockImplementation(async (request) => ({
+        boot: vi.fn(async () => undefined),
+        ask: vi.fn(async () => ({ text: 'ok', stopReason: 'completed' })),
+        shutdown: vi.fn(async () => {
+          shutdowns.push(request.readOnly ? 'read-only' : 'default');
+        }),
+      }));
+    const agentId = 'tool-mode-swap-agent';
+    const spawnAs = (toolAccess?: 'read-only') =>
+      agentLifecycle.spawn({
+        agentId,
+        provider: 'claude',
+        ...(toolAccess ? { toolAccess } : {}),
+        runtimeMetadata: { skip_provider_resolution: true },
+      });
+    await spawnAs('read-only');
+    await spawnAs();
+    await spawnAs('read-only');
+    expect(create.mock.calls.map(([request]) => Boolean(request.readOnly))).toEqual([
+      true,
+      false,
+      true,
+    ]);
+    expect(shutdowns).toEqual(['read-only', 'default']);
+    expect(agentRegistry.get(agentId)?.metadata?.tool_access).toBe('read-only');
+    await agentLifecycle.shutdown(agentId);
+  });
 });

@@ -391,6 +391,195 @@ describe('ClaudeAdapter sandbox context', () => {
   });
 });
 
+describe('read-only runtimes (unclaimed delegation)', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  const harnessOf = (adapter: CodexAppServerAdapter) =>
+    adapter as unknown as {
+      child: unknown;
+      buildSandboxPolicy(): Record<string, unknown>;
+      handleServerRequest(request: {
+        id: number;
+        method: string;
+        params: Record<string, unknown>;
+      }): Promise<void>;
+    };
+
+  it('declares read-only support only for bridges that can enforce it', async () => {
+    await import('./agent-exec-adapter-providers.js');
+    const { canProvideReadOnlyTools } = await import('./agent-exec-adapter-bridge.js');
+    expect(canProvideReadOnlyTools('claude')).toBe(true);
+    expect(canProvideReadOnlyTools('codex')).toBe(true);
+    expect(canProvideReadOnlyTools('agy')).toBe(false);
+  });
+
+  it('launches claude with the explorer projection and no MCP server, ignoring manifest tools', async () => {
+    await import('./agent-exec-adapter-providers.js');
+    const { createAgentExecAdapter } = await import('./agent-exec-adapter-bridge.js');
+    mockSpawnedCli(JSON.stringify({ result: 'read-only answer' }));
+    const adapter = await createAgentExecAdapter({
+      provider: 'claude',
+      readOnly: true,
+      // A manifest that would grant writes must not widen a read-only runtime.
+      allowedActuators: ['code-actuator'],
+      allowedTools: ['Bash', 'Write'],
+    });
+    await adapter.boot();
+    await adapter.ask('inspect this');
+
+    const args = vi.mocked(spawn).mock.calls.at(-1)?.[1] as string[];
+    expect(args).toEqual(expect.arrayContaining(['--permission-mode', 'default']));
+    expect(args).not.toContain('auto');
+    // Availability, not only approval: only the approved read tools exist.
+    expect(args.filter((arg) => arg === '--tools')).toHaveLength(1);
+    expect(args[args.indexOf('--tools') + 1]).toBe('Read,Glob,Grep,LS,WebFetch,WebSearch');
+    const denied = args.slice(args.indexOf('--disallowedTools') + 1);
+    expect(denied).toEqual(
+      expect.arrayContaining([
+        'Write',
+        'Edit',
+        'MultiEdit',
+        'NotebookEdit',
+        'Bash',
+        'PowerShell',
+        'Task',
+        'Agent',
+        'Skill',
+      ])
+    );
+    const approved = args.slice(
+      args.indexOf('--allowedTools') + 1,
+      args.indexOf('--disallowedTools')
+    );
+    expect(approved).toEqual(['Read', 'Glob', 'Grep', 'LS', 'WebFetch', 'WebSearch']);
+    expect(args).toContain('--strict-mcp-config');
+    expect(args).not.toContain('--mcp-config');
+    // No user/project permission rules, hooks, plugins or subagent definitions.
+    expect(args).toContain('--setting-sources=');
+    expect(args).toContain('--disable-slash-commands');
+  });
+
+  it('fails a read-only claude turn instead of reporting an empty result', async () => {
+    mockSpawnedCli('', 1, 'provider failure');
+    await expect(new ClaudeAdapter({ readOnly: true }).ask('inspect this')).rejects.toThrow(
+      '[AGENT_READ_ONLY_TURN_FAILED]'
+    );
+  });
+
+  it('fails a read-only claude boot when the read-only profile cannot be built', async () => {
+    const profiles = await import('../provider/provider-permission-profiles.js');
+    const refuse = vi
+      .spyOn(profiles, 'resolveReadOnlyProviderPermissionArgs')
+      .mockImplementation(() => {
+        throw new Error('[TOOL_READ_ONLY_UNSUPPORTED] claude: refused');
+      });
+    try {
+      await expect(new ClaudeAdapter({ readOnly: true }).boot()).rejects.toThrow(
+        '[TOOL_READ_ONLY_UNSUPPORTED]'
+      );
+      await expect(new ClaudeAdapter({ readOnly: true }).ask('inspect this')).rejects.toThrow(
+        '[AGENT_READ_ONLY_TURN_FAILED]'
+      );
+      expect(spawn).not.toHaveBeenCalled();
+    } finally {
+      refuse.mockRestore();
+    }
+  });
+
+  it('keeps claude read-only under an ambient workspace-write policy', async () => {
+    mockSpawnedCli(JSON.stringify({ result: 'ok' }));
+    const policy = resolveSandboxPolicy({
+      provider: 'claude',
+      mode: 'workspace-write',
+      networkAccess: true,
+    });
+    await withSandboxPolicy(policy, () =>
+      new ClaudeAdapter({ readOnly: true }).ask('inspect this')
+    );
+    const args = vi.mocked(spawn).mock.calls.at(-1)?.[1] as string[];
+    expect(args.slice(args.indexOf('--disallowedTools') + 1)).toEqual(
+      expect.arrayContaining(['Write', 'Edit', 'Bash'])
+    );
+  });
+
+  it.each(['exec', 'legacy', 'app-server'])(
+    'routes a read-only codex runtime in %s mode to the confined app-server',
+    async (mode) => {
+      vi.stubEnv('KYBERION_CODEX_MODE', mode);
+      try {
+        await import('./agent-exec-adapter-providers.js');
+        const { createAgentExecAdapter } = await import('./agent-exec-adapter-bridge.js');
+        const adapter = await createAgentExecAdapter({ provider: 'codex', readOnly: true });
+        expect(adapter).toBeInstanceOf(CodexAppServerAdapter);
+        expect(harnessOf(adapter as CodexAppServerAdapter).buildSandboxPolicy()).toEqual({
+          type: 'readOnly',
+          networkAccess: false,
+        });
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    }
+  );
+
+  it('keeps a read-only codex app-server confined: sandbox cannot widen, escalation is declined', async () => {
+    const adapter = new CodexAppServerAdapter({
+      readOnly: true,
+      sandboxMode: 'workspace-write',
+      networkAccess: true,
+      approvalMode: 'relaxed',
+      requestApproval: async () => true,
+    });
+    const harness = harnessOf(adapter);
+    expect(harness.buildSandboxPolicy()).toEqual({ type: 'readOnly', networkAccess: false });
+    const responses: Array<{ result: Record<string, unknown> }> = [];
+    harness.child = {
+      stdin: { writable: true, write: (line: string) => responses.push(JSON.parse(line)) },
+    };
+    await harness.handleServerRequest({
+      id: 1,
+      method: 'item/commandExecution/requestApproval',
+      params: { command: 'ls' },
+    });
+    await harness.handleServerRequest({
+      id: 2,
+      method: 'item/fileChange/requestApproval',
+      params: {},
+    });
+    await harness.handleServerRequest({
+      id: 3,
+      method: 'item/permissions/requestApproval',
+      params: { permissions: { network: true } },
+    });
+    await harness.handleServerRequest({ id: 4, method: 'applyPatchApproval', params: {} });
+    expect(responses[0].result.decision).toBe('decline');
+    expect(responses[1].result.decision).toBe('decline');
+    expect(responses[2].result).toEqual({ permissions: {}, scope: 'turn' });
+    expect(responses[3].result.decision).toBe('denied');
+  });
+
+  it('refuses to boot a read-only codex app-server on an unverified Codex version', async () => {
+    codexMocks.resolveCodexBinary.mockReturnValue('codex-fixture');
+    codexMocks.safeExecResult.mockReturnValue({
+      stdout: 'codex-cli 0.150.0',
+      stderr: '',
+      status: 0,
+    });
+    await expect(
+      new CodexAppServerAdapter({ readOnly: true, timeoutMs: 1000 }).boot()
+    ).rejects.toThrow('[AGENT_TOOLS_UNAVAILABLE]');
+    expect(codexMocks.spawnManagedProcess).not.toHaveBeenCalled();
+    vi.clearAllMocks();
+  });
+
+  it('refuses a read-only agy runtime instead of starting it writable', async () => {
+    await import('./agent-exec-adapter-providers.js');
+    const { createAgentExecAdapter } = await import('./agent-exec-adapter-bridge.js');
+    await expect(createAgentExecAdapter({ provider: 'agy', readOnly: true })).rejects.toThrow(
+      '[TOOL_READ_ONLY_UNSUPPORTED]'
+    );
+  });
+});
+
 describe('ClaudeAdapter tool restrictions', () => {
   it('keeps Bash available when code-actuator is allowed but system-actuator is denied', () => {
     const restrictions = ClaudeAdapter.resolveToolRestrictions(

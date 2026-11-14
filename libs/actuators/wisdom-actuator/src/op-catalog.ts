@@ -254,7 +254,6 @@ export const WISDOM_ACTUATOR_APPLY_OPS = [
   'evaluate_simulation_quality',
   'evaluate_task_plan_ready',
   'execute_self_action_items',
-  'execute_task_plan',
   'extract_action_items',
   'extract_design_spec',
   'extract_dissent_signals',
@@ -316,7 +315,6 @@ const FORWARD_TARGETS: Record<string, { actuator: string; op: string }> = {
   execute_self_action_items: { actuator: 'meeting', op: 'execute_self_action_items' },
   track_pending_action_items: { actuator: 'meeting', op: 'track_pending_action_items' },
   audit_speaker_fairness: { actuator: 'meeting', op: 'audit_speaker_fairness' },
-  execute_task_plan: { actuator: 'orchestrator', op: 'execute_task_plan' },
   deploy_release: { actuator: 'deployment', op: 'deploy_release' },
   extract_requirements: { actuator: 'modeling', op: 'extract_requirements' },
   extract_design_spec: { actuator: 'modeling', op: 'extract_design_spec' },
@@ -378,7 +376,6 @@ const IDEMPOTENCY_BY_OP: Record<string, WisdomOperationSpec['idempotency']> = {
   // the KP-05 usage aggregate + corpus frontmatter — safe to retry.
   curation_report: 'idempotent_write',
   knowledge_validation_sweep: 'read',
-  execute_task_plan: 'external_effect',
   execute_self_action_items: 'external_effect',
   track_pending_action_items: 'external_effect',
   escalate_for_review: 'external_effect',

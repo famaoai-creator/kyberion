@@ -591,7 +591,6 @@
         "decompose_into_tasks",
         "deploy",
         "evaluate_task_plan_ready",
-        "execute_task_plan",
         "run_execution_plan_set",
         "task_plan_to_next_tasks"
       ]
@@ -870,7 +869,6 @@
         "evaluate_simulation_quality",
         "evaluate_task_plan_ready",
         "execute_self_action_items",
-        "execute_task_plan",
         "extract_action_items",
         "extract_design_spec",
         "extract_dissent_signals",

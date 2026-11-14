@@ -135,6 +135,30 @@ describe('orchestrator task plan to NEXT_TASKS', () => {
     });
   });
 
+  it('refuses to drop board tasks the plan did not produce, and replaces its own rows', () => {
+    boardWithSupersedeAndPlan();
+    // First write: every plan row is marked as plan-derived.
+    taskPlanToNextTasks({ mission_id: missionId });
+    expect(
+      readBoard()
+        .filter((task) => task.status !== 'superseded')
+        .every((task) => task.source === 'task_plan')
+    ).toBe(true);
+    // A rerun of the plan replaces its own rows.
+    expect(() => taskPlanToNextTasks({ mission_id: missionId })).not.toThrow();
+
+    // A workflow-template task on the board blocks the write.
+    writeMissionNextTasks(missionDir, (tasks) => [
+      ...tasks,
+      { task_id: 'MSN-TEMPLATE-build', status: 'completed' },
+    ]);
+    const before = readBoard();
+    expect(() => taskPlanToNextTasks({ mission_id: missionId })).toThrow(
+      /\[TASK_PLAN_BOARD_CONFLICT\].*MSN-TEMPLATE-build/
+    );
+    expect(readBoard()).toEqual(before);
+  });
+
   it('does not follow a supersede the mission does not prove', () => {
     proof.proven = false;
     boardWithSupersedeAndPlan();

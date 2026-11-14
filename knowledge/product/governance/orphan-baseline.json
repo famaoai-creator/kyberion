@@ -48,10 +48,6 @@
       "reason": "QM-10 test harness: exerciseJsonRecordStoreContract is the reusable JSON-store contract that libs/core/testing/store-contract.test.ts runs against the approval store and the surface outbox store. Tests are its intended consumers."
     },
     {
-      "id": "libs/core/task/task-executor.ts",
-      "reason": "Deprecated facade by design: returns an explicit routing error to legacy callers; declared seam consumer in scripts/generate_capability_seams.ts and asserted by the wisdom contract-boundary test (ORPHAN_DECISIONS OW-02: keep)."
-    },
-    {
       "id": "libs/core/testing/test-governance-payload.ts",
       "reason": "Test helper (withoutSchemaMetadata) shared by the governance contract tests; tests are its only intended consumers (ORPHAN_DECISIONS OW-02: keep)."
     },
@@ -182,7 +178,7 @@
     },
     {
       "id": "pipelines/platform-onboarding.json",
-      "reason": "Organization-integration artifact flow (discovery transcript → requirements → design → test plan → task plan) documented in pipelines/README.md and the SDLC loop fragment spec; run by hand during onboarding, then knowledge/product/pipeline-templates/execute-task-plan.json executes the plan."
+      "reason": "Organization-integration artifact flow (discovery transcript → requirements → design → test plan → task plan) documented in pipelines/README.md and the SDLC loop fragment spec; run by hand during onboarding; the plan then reaches the mission board through orchestrator:task_plan_to_next_tasks and runs through mission dispatch (execute_task_plan retired 2026-11-14)."
     },
     {
       "id": "pipelines/project-management-validation.json",
@@ -383,10 +379,6 @@
       "reason": "Forwarding alias wisdom → orchestrator:evaluate_task_plan_ready (FORWARD_TARGETS in the wisdom op-catalog), kept so ADFs written against the pre-split wisdom catalog keep running; new callers use orchestrator:evaluate_task_plan_ready. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
     },
     {
-      "id": "wisdom:execute_task_plan",
-      "reason": "Forwarding alias wisdom → orchestrator:execute_task_plan (FORWARD_TARGETS in the wisdom op-catalog), kept so ADFs written against the pre-split wisdom catalog keep running; new callers use orchestrator:execute_task_plan. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
-    },
-    {
       "id": "wisdom:extract_action_items",
       "reason": "Forwarding alias wisdom → meeting:extract_action_items (FORWARD_TARGETS in the wisdom op-catalog), kept so ADFs written against the pre-split wisdom catalog keep running; new callers use meeting:extract_action_items. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
     },
@@ -425,10 +417,6 @@
     {
       "id": "wisdom:regex_extract",
       "reason": "Generic pipeline step `regex_extract` (also registered by browser, network and system) that the wisdom runner accepts inside actuator-scoped ADFs; no ADF or wisdom test addresses this domain's copy, and the shared bare name cannot be attributed. Kept: dropping it would make wisdom ADFs reject a standard step. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
-    },
-    {
-      "id": "wisdom:task_plan_to_next_tasks",
-      "reason": "Forwarding alias wisdom → orchestrator:task_plan_to_next_tasks (FORWARD_TARGETS in the wisdom op-catalog), kept so ADFs written against the pre-split wisdom catalog keep running; new callers use orchestrator:task_plan_to_next_tasks. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
     },
     {
       "id": "wisdom:write_artifact",

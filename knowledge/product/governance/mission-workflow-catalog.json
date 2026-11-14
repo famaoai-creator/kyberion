@@ -10211,7 +10211,6 @@
           "id": "build",
           "title": "実装 (G4 Build Readiness)",
           "kind": "judgment",
-          "pipeline_ref": "knowledge/product/pipeline-templates/execute-task-plan.json",
           "default_tasks": [
             {
               "task_id_suffix": "build",
@@ -12240,7 +12239,6 @@
           "id": "execution",
           "title": "実装",
           "kind": "judgment",
-          "pipeline_ref": "knowledge/product/pipeline-templates/execute-task-plan.json",
           "default_tasks": [
             {
               "task_id_suffix": "implement",

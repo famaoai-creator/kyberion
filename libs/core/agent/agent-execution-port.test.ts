@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   askAgentRuntime: vi.fn(),
   refreshAgentRuntime: vi.fn(),
   getAgentRuntimeSnapshot: vi.fn(),
+  getAgentRuntimeHandle: vi.fn(),
   appendSupervisorEvent: vi.fn(),
   getWorkItem: vi.fn(),
   listActiveWorkLeases: vi.fn(),
@@ -20,6 +21,7 @@ vi.mock('./agent-runtime-supervisor.js', () => ({
   askAgentRuntime: mocks.askAgentRuntime,
   refreshAgentRuntime: mocks.refreshAgentRuntime,
   getAgentRuntimeSnapshot: mocks.getAgentRuntimeSnapshot,
+  getAgentRuntimeHandle: mocks.getAgentRuntimeHandle,
   appendSupervisorEvent: mocks.appendSupervisorEvent,
 }));
 
@@ -58,10 +60,16 @@ function runtimeMetadata(): Record<string, unknown> {
   return mocks.ensureAgentRuntime.mock.calls[0]![0].runtimeMetadata;
 }
 
+const readOnlyHandle = {
+  agentId: 'worker-1',
+  getRecord: () => ({ metadata: { tool_access: 'read-only' } }),
+};
+
 describe('SupervisorAgentExecutionPort.delegate', () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    mocks.ensureAgentRuntime.mockResolvedValue({ agentId: 'worker-1', getRecord: () => undefined });
+    mocks.ensureAgentRuntime.mockResolvedValue(readOnlyHandle);
+    mocks.getAgentRuntimeHandle.mockReturnValue(readOnlyHandle);
     mocks.askAgentRuntime.mockResolvedValue('done');
     mocks.listActiveWorkLeases.mockReturnValue([]);
   });
@@ -73,7 +81,13 @@ describe('SupervisorAgentExecutionPort.delegate', () => {
       operation: 'delegate',
       result,
       correlationId: 'idem-1',
-      metadata: { task_id: 'T-1', mission_id: 'MSN-PORT-1', provider: 'claude', ...extra },
+      metadata: {
+        task_id: 'T-1',
+        mission_id: 'MSN-PORT-1',
+        provider: 'claude',
+        tool_access: 'read-only',
+        ...extra,
+      },
     });
   const auditResults = () => mocks.auditRecord.mock.calls.map(([entry]) => entry.result);
 
@@ -112,9 +126,34 @@ describe('SupervisorAgentExecutionPort.delegate', () => {
       mission_id: 'MSN-PORT-1',
       requested_by: 'agent_execution_port',
       provider: 'claude',
+      tool_access: 'read-only',
       idempotency_key: 'idem-1',
     });
+    // No claim, so the runtime is launched read-only (the lifecycle refuses a
+    // provider that cannot be).
+    expect(mocks.ensureAgentRuntime.mock.calls[0]![0].toolAccess).toBe('read-only');
   });
+
+  it.each([
+    ['a different runtime instance', { agentId: 'worker-1', getRecord: readOnlyHandle.getRecord }],
+    [
+      'a runtime that is not read-only',
+      { agentId: 'worker-1', getRecord: () => ({ metadata: {} }) },
+    ],
+    ['no runtime', null],
+  ])(
+    'refuses to send an unclaimed instruction to %s found at ask time',
+    async (_label, current) => {
+      mocks.getAgentRuntimeHandle.mockReturnValue(current);
+
+      const receipt = await new SupervisorAgentExecutionPort().delegate(envelope());
+
+      expect(receipt.status).toBe('failed');
+      expect(receipt.error).toContain('[AGENT_RUNTIME_TOOL_MODE_CHANGED]');
+      expect(mocks.askAgentRuntime).not.toHaveBeenCalled();
+      expect(auditResults()).toEqual(['allowed', 'failed']);
+    }
+  );
 
   it('records a failed outcome with the error code only when the unclaimed run fails', async () => {
     mocks.askAgentRuntime.mockRejectedValue(
@@ -154,6 +193,7 @@ describe('SupervisorAgentExecutionPort.delegate', () => {
             task_id: 'T-1',
             mission_id: overrides.mission_id,
             provider: 'claude',
+            tool_access: 'read-only',
             error_code: 'AGENT_TASK_MISSION_MISMATCH',
           },
         })
@@ -188,6 +228,8 @@ describe('SupervisorAgentExecutionPort.delegate', () => {
       // A claimed task keeps the role labels its envelope names.
       team_role_id: 'implementer',
     });
+    // A claimed runtime gets governed task tools, not the read-only mode.
+    expect(mocks.ensureAgentRuntime.mock.calls[0]![0].toolAccess).toBeUndefined();
     expect(mocks.appendSupervisorEvent).not.toHaveBeenCalled();
     expect(mocks.auditRecord).not.toHaveBeenCalled();
   });
