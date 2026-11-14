@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { coreSeamCatalog } from './seam.js';
+import { coreSeamCatalog } from '../seam.js';
 import {
   listWebSearchRuntimeBridges,
   registerWebSearchRuntimeBridge,
   resetWebSearchRuntimeBridges,
   resolveWebSearchRuntime,
-} from './search/web-search-runtime-bridge.js';
+} from '../search/web-search-runtime-bridge.js';
 import {
   listBrowserAutomationRuntimeBridges,
   registerBrowserAutomationRuntimeBridge,
@@ -17,7 +17,7 @@ import {
   listStreamingSttBridges,
   registerStreamingSttBridge,
   resetStreamingSttBridges,
-} from './voice/streaming-stt-bridge.js';
+} from '../voice/streaming-stt-bridge.js';
 
 interface LifecycleTarget {
   seam: string;

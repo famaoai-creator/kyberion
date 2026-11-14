@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { pathResolver } from './path-resolver.js';
-import { safeReadFile } from './secure-io.js';
+import { pathResolver } from '../path-resolver.js';
+import { safeReadFile } from '../secure-io.js';
 import {
   listSeamSelectionPolicies,
   seamPolicyDefaultChain,
-} from './provider/seam-provider-selection.js';
+} from '../provider/seam-provider-selection.js';
 
 /**
  * One source for a seam's default: the governed policy file. These checks

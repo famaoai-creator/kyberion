@@ -6,7 +6,7 @@ import {
   defineSeam,
   resolveSeamAutoProvider,
   SeamError,
-} from './seam.js';
+} from '../seam.js';
 
 describe('seam lifecycle contract', () => {
   it('honors reset requested by a synchronous registration observer', () => {

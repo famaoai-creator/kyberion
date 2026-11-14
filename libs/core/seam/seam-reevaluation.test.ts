@@ -1,9 +1,9 @@
 import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { getAllFiles } from './storage/fs-utils.js';
-import { pathResolver } from './path-resolver.js';
-import { safeReadFile } from './secure-io.js';
-import { coreSeamCatalog } from './seam.js';
+import { getAllFiles } from '../storage/fs-utils.js';
+import { pathResolver } from '../path-resolver.js';
+import { safeReadFile } from '../secure-io.js';
+import { coreSeamCatalog } from '../seam.js';
 
 /**
  * A module that creates a seam at load time can be evaluated twice against one
@@ -23,14 +23,14 @@ async function evaluateAgain(specifier: string, generation: string): Promise<unk
 describe('module-level seam creation under re-evaluation', () => {
   it('a re-evaluated defining module replaces its own catalog entry', async () => {
     const first =
-      (await import('./pipeline/super-nerve-execution-port.js')) as typeof import('./pipeline/super-nerve-execution-port.js');
+      (await import('../pipeline/super-nerve-execution-port.js')) as typeof import('../pipeline/super-nerve-execution-port.js');
     const before = coreSeamCatalog.get('super-nerve-executor');
     expect(before).toBeDefined();
 
     const second = (await evaluateAgain(
-      './pipeline/super-nerve-execution-port.ts',
+      '../pipeline/super-nerve-execution-port.ts',
       'a'
-    )) as typeof import('./pipeline/super-nerve-execution-port.js');
+    )) as typeof import('../pipeline/super-nerve-execution-port.js');
     expect(second).not.toBe(first);
 
     const after = coreSeamCatalog.get('super-nerve-executor');
@@ -49,14 +49,14 @@ describe('module-level seam creation under re-evaluation', () => {
   });
 
   it('task-session survives a second evaluation (the round-4 symptom)', async () => {
-    await import('./task/task-session.js');
+    await import('../task/task-session.js');
     const builtins = coreSeamCatalog
       .list()
       .find((binding) => binding.key === 'task-intent-builder')!
       .providers.map((provider) => provider.id);
     expect(builtins.length).toBeGreaterThan(0);
 
-    await expect(evaluateAgain('./task/task-session.ts', 'b')).resolves.toBeDefined();
+    await expect(evaluateAgain('../task/task-session.ts', 'b')).resolves.toBeDefined();
     const rebound = coreSeamCatalog
       .list()
       .find((binding) => binding.key === 'task-intent-builder')!
