@@ -4,7 +4,7 @@ This note preserves the old migration boundary for the intent learning seed cach
 
 Canonical rationale:
 
-- [knowledge/product/architecture/stale-doc-cleanup-rationale-2026-06.md](../knowledge/product/architecture/stale-doc-cleanup-rationale-2026-06.md)
+- [knowledge/product/architecture/stale-doc-cleanup-rationale-2026-06.md](../../knowledge/product/architecture/stale-doc-cleanup-rationale-2026-06.md)
 
 Stable scope:
 
