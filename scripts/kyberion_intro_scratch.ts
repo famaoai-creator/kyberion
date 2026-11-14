@@ -19,6 +19,7 @@ import { chromium } from 'playwright';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync, safeExec, safeMkdir, safeWriteFile } from '@agent/core/secure-io';
 import { defineScript, isDirectScript } from './lib/harness.js';
+import { resolveFfmpegBin } from '@agent/core/tool/tool-binary-resolvers';
 
 const OUT = 'active/shared/tmp/kyberion-intro-scratch';
 const WIDTH = 1920;
@@ -236,7 +237,7 @@ function synthesizeNarration(rootAbs: string): {
       cwd: pathResolver.rootDir(),
       timeoutMs: 60_000,
     });
-    safeExec('ffmpeg', ['-y', '-i', aiff, '-ar', '44100', '-ac', '1', wav], {
+    safeExec(resolveFfmpegBin(), ['-y', '-i', aiff, '-ar', '44100', '-ac', '1', wav], {
       cwd: pathResolver.rootDir(),
       timeoutMs: 60_000,
     });
@@ -282,10 +283,14 @@ function synthesizeNarration(rootAbs: string): {
   }
   safeWriteFile(listFile, `${listBody.join('\n')}\n`, { encoding: 'utf8' });
   const outWav = path.join(audioDir, 'narration.wav');
-  safeExec('ffmpeg', ['-y', '-f', 'concat', '-safe', '0', '-i', listFile, '-c', 'copy', outWav], {
-    cwd: pathResolver.rootDir(),
-    timeoutMs: 60_000,
-  });
+  safeExec(
+    resolveFfmpegBin(),
+    ['-y', '-f', 'concat', '-safe', '0', '-i', listFile, '-c', 'copy', outWav],
+    {
+      cwd: pathResolver.rootDir(),
+      timeoutMs: 60_000,
+    }
+  );
   return { wavPath: `${OUT}/audio/narration.wav`, segments };
 }
 
@@ -338,10 +343,14 @@ function assembleVideo(
     { encoding: 'utf8' }
   );
   const silent = pathResolver.rootResolve(`${OUT}/video-silent.mp4`);
-  safeExec('ffmpeg', ['-y', '-f', 'concat', '-safe', '0', '-i', videoList, '-c', 'copy', silent], {
-    cwd: pathResolver.rootDir(),
-    timeoutMs: 120_000,
-  });
+  safeExec(
+    resolveFfmpegBin(),
+    ['-y', '-f', 'concat', '-safe', '0', '-i', videoList, '-c', 'copy', silent],
+    {
+      cwd: pathResolver.rootDir(),
+      timeoutMs: 120_000,
+    }
+  );
 
   const finalMp4 = pathResolver.rootResolve(`${OUT}/kyberion-intro-scratch.mp4`);
   safeExec(

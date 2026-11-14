@@ -6,6 +6,7 @@ import {
   safeExecResult,
 } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
+import { resolveManagedToolPythonBin } from '@agent/core/tool/tool-runtime-registry';
 import * as pptxUtils from '@agent/core/media/pptx-utils';
 import * as xlsxUtils from '@agent/core/media/xlsx-utils';
 import * as docxUtils from '@agent/core/media/docx-utils';
@@ -139,6 +140,8 @@ function resolvePdfBridgePythonBin(): string {
   if (configuredPythonBin) return configuredPythonBin;
   const configuredPython = getRegisteredEnvText('KYBERION_PYTHON');
   if (configuredPython) return configuredPython;
+  const managedPython = resolveManagedToolPythonBin('pypdf');
+  if (managedPython) return managedPython;
   const legacyVenvPython = pathResolver.rootResolve('.venv/bin/python3');
   if (safeExistsSync(legacyVenvPython)) return legacyVenvPython;
   return 'python3';

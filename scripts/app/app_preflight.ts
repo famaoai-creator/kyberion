@@ -9,6 +9,7 @@ import { secretGuard } from '@agent/core/secret/secret-guard';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { getRegisteredEnvText } from '@agent/core/foundation/env';
 import { isMacOS } from '@agent/core/platform';
+import { resolveAdbBin, resolveXcrunBin } from '@agent/core/tool/tool-binary-resolvers';
 import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
 
 export type AppPreflightStatus = 'pass' | 'fail' | 'warn';
@@ -55,7 +56,9 @@ function probeIosRuntimes(): AppPreflightItem {
       'none'
     );
   }
-  const result = safeExecResult('xcrun', ['simctl', 'list', 'runtimes'], { timeoutMs: 30_000 });
+  const result = safeExecResult(resolveXcrunBin(), ['simctl', 'list', 'runtimes'], {
+    timeoutMs: 30_000,
+  });
   const output = String(result.stdout || '');
   if (result.status === 0 && /iOS [\d.]+/.test(output)) {
     const count = (output.match(/iOS [\d.]+/g) || []).length;
@@ -86,7 +89,7 @@ function probeAndroidEnv(): AppPreflightItem {
 }
 
 function probeAndroidDevices(): AppPreflightItem {
-  const devices = safeExecResult('adb', ['devices'], { timeoutMs: 20_000 });
+  const devices = safeExecResult(resolveAdbBin(), ['devices'], { timeoutMs: 20_000 });
   const attached = String(devices.stdout || '')
     .split('\n')
     .slice(1)
