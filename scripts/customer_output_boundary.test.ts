@@ -4,7 +4,7 @@ import { pathResolver } from '@agent/core/path-resolver';
 
 describe('customer script output boundary', () => {
   it('keeps customer create and switch free of direct console output', () => {
-    for (const file of ['scripts/stance_create.ts', 'scripts/stance_switch.ts']) {
+    for (const file of ['scripts/stance/stance_create.ts', 'scripts/stance/stance_switch.ts']) {
       const source = String(safeReadFile(pathResolver.rootResolve(file)));
       expect(source).not.toContain('console.log');
       expect(source).not.toContain('console.error');

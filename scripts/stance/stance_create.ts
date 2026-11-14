@@ -11,7 +11,7 @@ import {
   safeReaddir,
 } from '@agent/core/secure-io';
 import { stanceDirForSlug } from '@agent/core/stance-resolver';
-import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
 
 type Print = (value: unknown) => void;
 

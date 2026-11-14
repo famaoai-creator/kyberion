@@ -9,7 +9,7 @@ import {
   safeLstat,
   safeReaddir,
 } from '@agent/core/secure-io';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from '../lib/harness.js';
 import { STANCE_REQUIRED_FILES } from './stance_switch.js';
 
 interface StanceEntry {

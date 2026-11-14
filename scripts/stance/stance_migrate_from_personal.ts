@@ -12,8 +12,8 @@ import {
   safeWriteFile,
 } from '@agent/core/secure-io';
 import { createStance } from './stance_create.js';
-import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
-import { readSafeJsonFile } from './lib/json-input.js';
+import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
+import { readSafeJsonFile } from '../lib/json-input.js';
 
 type Print = (value: unknown) => void;
 

@@ -51,8 +51,8 @@ import {
   type OnboardingTutorial as TutorialDraft,
 } from '@agent/core/organization/onboarding-state';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
-import { createStance } from './stance_create.js';
-import { switchStance } from './stance_switch.js';
+import { createStance } from './stance/stance_create.js';
+import { switchStance } from './stance/stance_switch.js';
 import {
   isExpressOnboarding,
   ONBOARD_CLI,
