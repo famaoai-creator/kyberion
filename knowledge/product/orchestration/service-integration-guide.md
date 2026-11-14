@@ -1,7 +1,7 @@
 ---
 title: 'Service Integration and Connection Guide'
 tags: [service, integration, connection, onboarding, security]
-last_updated: 2026-11-12
+last_updated: 2026-11-13
 runtime_stages: [alignment, contract_authoring, execution]
 ---
 
@@ -380,8 +380,9 @@ does not modify live grants, connection ownership, or deployment settings.
 4. **Provenance and allocation:** the API-token broker path below binds selected
    references and owner-approved allocation with freshness checks. Tenant GWS CLI
    execution additionally requires the selected session provenance described below.
-   The local account material API stores encrypted, exact generations but is not
-   wired to account introduction or a broker. Concierge displays personal/company
+   Concierge account registration collects tokens for an existing connection after
+   owner approval, stores encrypted exact generations, and provisions organization
+   credentials only through an explicitly configured account writer. It displays personal/company
    context and connection ownership, and explains that display selection is not
    execution authorization. These are distinct readiness states, not a single
    completed connection-setup flow. Existing source-of-truth records are extended
@@ -505,9 +506,44 @@ part of ambient service credential discovery. See the
 [secret introduction model](../architecture/secret-introduction-model.md) for
 storage placement and retention limits.
 
-This API is not connected to the UI/CLI introduction collector or shell broker.
-An integration must preserve introduction approval, exact account selection,
-owner-approved allocation where applicable, and current-generation revocation.
-Concierge's context and owner explanations do not claim these setup steps have
-run. Installing this change performs no live login, key creation, allocation,
-ownership migration, or security-setting change.
+### Register a token for an existing account
+
+Concierge connection rows offer an account registration review. The server resolves
+the connection's explicit owner and requires the authenticated installed owner for
+a personal connection, or the tenant owner for an organization connection. The
+review binds the service, connection snapshot, token reference names, current
+generation and configured broker destination. It contains no token values. The
+installed personal NHI requests registration; the authenticated installed human
+must additionally be an owner of the selected tenant for an organization account.
+This registration requester does not acquire tenant execution authority.
+
+Approve the review, then return to the connection, check its approval status and
+enter the requested tokens. Only access-token references belonging to the selected
+service are accepted. Registration creates an encrypted immutable generation using
+the existing key; it does not update service-wide credentials or change ownership,
+allowed actions, grants or execution approval policy. Personal registrations remain
+local and do not allocate credentials to organizations.
+
+Organization registration also requires a configured account provisioning writer.
+`KYBERION_ACCOUNT_PROVISION_COMMAND` is separate from the resolver's read command;
+an existing read-only broker never receives registration values. The writer receives
+the versioned request on stdin and must atomically compare `expectedGeneration`
+before publishing the exact account generation. The child receives only basic
+path, home, locale, temporary-directory and shell variables; Kyberion roles and
+delegation are cleared, and unrelated provider tokens are not inherited. Broker
+authentication must use its own operator-managed store. Its response must echo the request
+identity and generation without secret values. Runtime execution must continue to
+enforce the existing selected-binding provenance contract above. A provisioning
+receipt does not grant permission to execute any service operation.
+
+A changed connection, destination or generation requires a new review. An interrupted
+or incomplete apply is fenced for recovery and is never silently retried. Operators
+must establish whether the external write occurred before any manual reconciliation;
+there is no automatic recovery command in this phase. Account material and registration
+records remain excluded from ambient discovery.
+
+Personal account runtime brokerage, tenantless task execution, GWS session collection
+and CLI account registration remain separate follow-up work. Installing this change
+performs no live login, key creation, allocation, ownership migration or security-setting
+change. A configured writer and an existing encryption key are prerequisites, not
+resources this UI creates.
