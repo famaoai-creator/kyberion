@@ -9,7 +9,8 @@ import {
   captureRuntimeBindingReference,
   type RuntimeBindingReference,
 } from '../agent/agent-identity.js';
-import { buildTenantlessNhiId, NHI_SLUG_PATTERN, parseNhiId } from '../contracts/nhi-id.js';
+import { parseNhiId } from '../contracts/nhi-id.js';
+import { inspectInstalledPersonalRuntime } from './personal-runtime-identity.js';
 import {
   resolvePersonaIdentity,
   personaIdentityBindingsSchema,
@@ -93,6 +94,7 @@ export type InstalledOnboardingRuntime =
   | { ready: false; reason: string };
 
 export function inspectInstalledOnboardingRuntime(scope: CharterScope): InstalledOnboardingRuntime {
+  if (scope.kind === 'person') return inspectInstalledPersonalRuntime();
   if (getPluginExecutionContext()) return { ready: false, reason: 'host_runtime_required' };
   try {
     // This callback only reads canonical identity records. The worker body is
@@ -101,102 +103,62 @@ export function inspectInstalledOnboardingRuntime(scope: CharterScope): Installe
       const owner = resolveMemberByPrincipal({ source: 'loopback' });
       if (!owner || owner.status !== 'active')
         return { ready: false, reason: 'operator_identity_required' };
-      if (
-        scope.kind === 'organization' &&
-        !owner.memberships.some((m) => m.tenant_slug === scope.tenant_slug && m.role === 'owner')
-      )
+      if (!owner.memberships.some((m) => m.tenant_slug === scope.tenant_slug && m.role === 'owner'))
         return { ready: false, reason: 'operator_tenant_owner_required' };
-      if (scope.kind === 'organization') {
-        // Org-scoped delegated operations run under an admitted session, never
-        // the ambient personal profile: the process must claim an nhi_id that
-        // carries a live, governed runtime-instance binding for the claimed
-        // session token (issued by the nhi-session admission ceremony).
-        const claimedNhi = claimedNhiIdentity();
-        const sessionId = claimedSessionId();
-        if (!claimedNhi || !parseNhiId(claimedNhi) || !sessionId)
-          return { ready: false, reason: 'session_admission_required' };
-        const admitted = getAgentIdentity(claimedNhi);
-        if (!admitted || !['active', 'provisioned'].includes(admitted.lifecycle_status))
-          return { ready: false, reason: 'registered_non_suspended_agent_required' };
-        const binding = findLiveSessionAdmission(claimedNhi, sessionId, scope.tenant_slug);
-        if (!binding) return { ready: false, reason: 'session_admission_required' };
-        const ownerId = `user:${owner.member_id}`;
-        if (admitted.accountable_human_id !== ownerId)
-          return { ready: false, reason: 'agent_accountability_mismatch' };
-        // A profile mapping is optional for old installations, but when present
-        // it must agree with the admitted actor. It can never create admission.
-        const profile = loadPersonalAgentIdentityAtPath(
-          path.join(resolveActiveProfileRoot(), 'agent-identity.json')
-        );
-        if (
-          profile?.persona_identity_bindings !== undefined &&
-          resolvePersonaIdentity(profile, {
-            kind: 'tenant',
-            accountableHumanId: ownerId,
-            tenantSlug: scope.tenant_slug,
-          })?.nhi_id !== admitted.nhi_id
-        )
-          return { ready: false, reason: 'persona_identity_mismatch' };
-        // Diagnostic only: strict history failure must not change legacy admission.
-        let runtimeBindingHistory: Extract<
-          InstalledOnboardingRuntime,
-          { ready: true }
-        >['runtimeBindingHistory'] = { status: 'unavailable' };
-        try {
-          const reference = captureRuntimeBindingReference({
-            nhiId: admitted.nhi_id,
-            instanceId: binding.instance_id,
-            sessionId,
-            tenantSlug: scope.tenant_slug,
-          });
-          if (reference)
-            runtimeBindingHistory = { status: 'available', assurance: 'metadata_only', reference };
-        } catch {
-          /* Explicitly unavailable; never promote a tolerant replay into proof. */
-        }
-        return {
-          ready: true,
-          ownerId,
-          agentId: admitted.nhi_id,
-          agentActive: admitted.lifecycle_status === 'active',
-          scope: structuredClone(scope),
-          runtimeBindingHistory,
-        };
-      }
+      // Org-scoped delegated operations run under an admitted session, never
+      // the ambient personal profile: the process must claim an nhi_id that
+      // carries a live, governed runtime-instance binding for the claimed
+      // session token (issued by the nhi-session admission ceremony).
+      const claimedNhi = claimedNhiIdentity();
+      const sessionId = claimedSessionId();
+      if (!claimedNhi || !parseNhiId(claimedNhi) || !sessionId)
+        return { ready: false, reason: 'session_admission_required' };
+      const admitted = getAgentIdentity(claimedNhi);
+      if (!admitted || !['active', 'provisioned'].includes(admitted.lifecycle_status))
+        return { ready: false, reason: 'registered_non_suspended_agent_required' };
+      const binding = findLiveSessionAdmission(claimedNhi, sessionId, scope.tenant_slug);
+      if (!binding) return { ready: false, reason: 'session_admission_required' };
+      const ownerId = `user:${owner.member_id}`;
+      if (admitted.accountable_human_id !== ownerId)
+        return { ready: false, reason: 'agent_accountability_mismatch' };
+      // A profile mapping is optional for old installations, but when present
+      // it must agree with the admitted actor. It can never create admission.
       const profile = loadPersonalAgentIdentityAtPath(
         path.join(resolveActiveProfileRoot(), 'agent-identity.json')
       );
-      if (!profile) return { ready: false, reason: 'onboarding_agent_identity_required' };
-      const profileId =
-        profile.persona_identity_bindings !== undefined
-          ? resolvePersonaIdentity(profile, {
-              kind: 'person',
-              accountableHumanId: `user:${owner.member_id}`,
-            })?.nhi_id
-          : typeof profile.nhi_id === 'string'
-            ? profile.nhi_id
-            : typeof profile.agent_id === 'string' && parseNhiId(profile.agent_id)
-              ? profile.agent_id
-              : typeof profile.agent_id === 'string'
-                ? // Person scope: tenantless, never the ambient tenant.
-                  NHI_SLUG_PATTERN.test(profile.agent_id)
-                  ? buildTenantlessNhiId(profile.agent_id)
-                  : null
-                : null;
-      const agent = profileId ? getAgentIdentity(profileId) : null;
-      if (!agent || !['active', 'provisioned'].includes(agent.lifecycle_status))
-        return { ready: false, reason: 'registered_non_suspended_agent_required' };
-      const ownerId = `user:${owner.member_id}`;
-      if (agent.accountable_human_id !== ownerId)
-        return { ready: false, reason: 'agent_accountability_mismatch' };
-      // Person scope admits only agents without a tenant affiliation.
-      if (agent.affiliation.tenant_slug) return { ready: false, reason: 'agent_tenant_mismatch' };
+      if (
+        profile?.persona_identity_bindings !== undefined &&
+        resolvePersonaIdentity(profile, {
+          kind: 'tenant',
+          accountableHumanId: ownerId,
+          tenantSlug: scope.tenant_slug,
+        })?.nhi_id !== admitted.nhi_id
+      )
+        return { ready: false, reason: 'persona_identity_mismatch' };
+      // Diagnostic only: strict history failure must not change legacy admission.
+      let runtimeBindingHistory: Extract<
+        InstalledOnboardingRuntime,
+        { ready: true }
+      >['runtimeBindingHistory'] = { status: 'unavailable' };
+      try {
+        const reference = captureRuntimeBindingReference({
+          nhiId: admitted.nhi_id,
+          instanceId: binding.instance_id,
+          sessionId,
+          tenantSlug: scope.tenant_slug,
+        });
+        if (reference)
+          runtimeBindingHistory = { status: 'available', assurance: 'metadata_only', reference };
+      } catch {
+        /* Explicitly unavailable; never promote a tolerant replay into proof. */
+      }
       return {
         ready: true,
         ownerId,
-        agentId: agent.nhi_id,
-        agentActive: agent.lifecycle_status === 'active',
+        agentId: admitted.nhi_id,
+        agentActive: admitted.lifecycle_status === 'active',
         scope: structuredClone(scope),
+        runtimeBindingHistory,
       };
     });
   } catch {

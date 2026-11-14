@@ -527,6 +527,10 @@ export function buildProviderChildEnv({
   provider,
   baseEnv = process.env,
 }: BuildProviderChildEnvInput): NodeJS.ProcessEnv {
+  if (credentialExecutionIdentity().personalClaim)
+    throw new Error(
+      '[CREDENTIAL_HOME_INVALID] Personal claimed provider environments are not admitted'
+    );
   const bound = resolveTaskProviderEnvironment(provider);
   if (bound) {
     const tenant = credentialExecutionIdentity().tenantSlug;

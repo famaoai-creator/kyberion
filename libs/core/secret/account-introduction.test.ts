@@ -12,6 +12,7 @@ const m = vi.hoisted(() => ({
   installed: { ready: true, ownerId: 'user:owner', agentId: 'agent:installed' },
   role: 'sovereign_concierge',
   tenant: undefined as string | undefined,
+  personalClaim: undefined as object | undefined,
   state: { generation: null as string | null, pendingApprovalId: undefined as string | undefined },
   record: null as ApprovalRequestRecord | null,
   personal: true,
@@ -28,7 +29,7 @@ const m = vi.hoisted(() => ({
 vi.mock('../authority.js', () => ({ resolveAssumedRole: () => m.role }));
 vi.mock('../shell/sandbox-policy.js', () => ({ getPluginExecutionContext: () => undefined }));
 vi.mock('../foundation/credential-binding.js', () => ({
-  credentialExecutionIdentity: () => ({ tenantSlug: m.tenant }),
+  credentialExecutionIdentity: () => ({ tenantSlug: m.tenant, personalClaim: m.personalClaim }),
 }));
 vi.mock('../organization/member-registry.js', () => ({
   readMemberProfile: () => m.member,
@@ -162,6 +163,7 @@ beforeEach(() => {
   m.installed = { ready: true, ownerId: 'user:owner', agentId: 'agent:installed' };
   m.role = 'sovereign_concierge';
   m.tenant = undefined;
+  m.personalClaim = undefined;
   m.state = { generation: null, pendingApprovalId: undefined };
   m.record = null;
   m.personal = true;
@@ -173,6 +175,14 @@ beforeEach(() => {
   m.checkHuman.mockReset();
 });
 describe('approved exact-account introduction', () => {
+  it('rejects a personal claim despite the installed owner and concierge role', () => {
+    m.personalClaim = { ownerId: 'user:owner' };
+    expect(() => previewAccountIntroduction(principal, 'slack-work')).toThrow(
+      'ACCOUNT_INTRODUCTION'
+    );
+    expect(m.create).not.toHaveBeenCalled();
+    expect(m.store).not.toHaveBeenCalled();
+  });
   it('lets the accountable human review an agent request without taking over its apply', async () => {
     const agent = { ...principal, requesterId: 'agent:cli-requester' };
     const preview = previewAccountIntroduction(agent, 'slack-work');

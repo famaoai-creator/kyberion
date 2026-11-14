@@ -558,8 +558,10 @@ there is no automatic recovery command in this phase. Account material and regis
 records remain excluded from ambient discovery.
 
 Personal API-token accounts can be consumed by explicitly allocated tenant tasks as described
-above. Registration itself still grants no runtime use. Tenantless task execution and GWS
-session collection remain separate follow-up work. Installing this change
+above. Registration itself still grants no runtime use. Tenantless claimed dispatch now
+has an owner/NHI/claim/lease-verified empty-binding stage; it cannot consume registered
+accounts, operator credentials, PRESET operations or sessions. Personal credential
+admission and GWS session collection remain separate follow-up work. Installing this change
 performs no live login, key creation, allocation, ownership migration or security-setting
 change. An existing encryption key is required for every account registration;
 an explicitly configured writer is additionally required for organization accounts.
@@ -588,3 +590,17 @@ command does not repair identity or create encryption keys. The current account
 encryption backend remains macOS Keychain with an existing key. See the
 [tenantless execution dependency roadmap](../architecture/api-credential-proof-boundary.md#tenantless-personal-execution-dependency-roadmap)
 for the separate steps required to execute claimed personal work without a tenant.
+
+### GWS session registration prerequisites
+
+Session collection is not API-token introduction. The existing GWS consumer accepts only
+an organization-owned selected session with exact binding, actor and generation provenance
+from a configured broker. Neither `account apply` nor `secret introduce ... ACCESS_TOKEN`
+registers a GWS session. A catalog setup hint or an AUTH-ready status does not change that.
+
+The next session-registration stage must define a bounded, typed session material contract,
+owner-approved generation replacement, isolated private HOME materialization and cleanup,
+and a separately typed broker provisioner. Cancellation, incomplete persistence, revoked
+approval and stale generation must leave no usable unapproved session. Personal sessions
+also require personal selected-account and operation admission; the empty-binding stage
+does not provide it. Existing encryption-key backends remain unchanged.

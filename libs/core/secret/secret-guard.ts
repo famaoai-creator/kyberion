@@ -451,7 +451,7 @@ export function getSecretForIdentity(
 
 export const loadConnectionDocument = (serviceId: string): Record<string, any> => {
   assertPluginGrantAllows('secrets', `connection:${serviceId}`);
-  if (credentialExecutionIdentity().tenantSlug)
+  if (credentialExecutionIdentity().tenantSlug || credentialExecutionIdentity().personalClaim)
     throw new Error(
       '[CREDENTIAL_CONNECTION_DENIED] Tenant execution cannot read personal connection documents'
     );
@@ -464,7 +464,7 @@ export const storeConnectionDocument = (
   options: { backup?: boolean; missionId?: string; actor?: string } = {}
 ): { path: string; changedKeys: string[] } => {
   assertPluginGrantAllows('secrets', `connection:${serviceId}`);
-  if (credentialExecutionIdentity().tenantSlug)
+  if (credentialExecutionIdentity().tenantSlug || credentialExecutionIdentity().personalClaim)
     throw new Error(
       '[CREDENTIAL_CONNECTION_DENIED] Tenant execution cannot mutate personal connection documents'
     );
@@ -562,7 +562,11 @@ export function localAccountMaterialAccountId(identity: LocalAccountMaterialIden
 function assertLocalAccountMaterialAccess(): void {
   // This internal storage API does not issue store grants or bypass secure-io.
   // A future broker must supply its own reviewed, exact-material admission.
-  if (getPluginExecutionContext() || credentialExecutionIdentity().tenantSlug)
+  if (
+    getPluginExecutionContext() ||
+    credentialExecutionIdentity().tenantSlug ||
+    credentialExecutionIdentity().personalClaim
+  )
     throw new Error('[ACCOUNT_MATERIAL_DENIED] Local operator storage only');
 }
 

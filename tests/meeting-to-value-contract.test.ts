@@ -1,3 +1,10 @@
+import {
+  getSecretResolver,
+  registerSecretResolver,
+  resetSecretResolver,
+  type SecretResolver,
+} from '@agent/core/secret/secret-resolver';
+import { credentialBindingReadiness } from '@agent/core/foundation/credential-binding';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as path from 'node:path';
 import {
@@ -20,7 +27,8 @@ import { runActionItemReminderSweep } from '../scripts/action_item_reminders.js'
 
 const MISSION_ID = 'MSN-MEETING-FOLLOWUP-001';
 const WORK_ITEM_ID = 'WITEM-MEETING-FOLLOWUP-001';
-const MISSION_DIR = path.join(pathResolver.rootDir(), 'active/missions/confidential', MISSION_ID);
+// Tenant-scoped sweeps enumerate only the bound tenant's mission partition.
+const MISSION_DIR = pathResolver.missionDir(MISSION_ID, 'confidential', 'meeting-followup');
 const TRANSCRIPT_PATH = pathResolver.rootResolve('tests/fixtures/meeting-transcript-sample.md');
 const REPORT_PATH = pathResolver.rootResolve(
   'active/shared/tmp/test-action-item-reminders-report.json'
@@ -41,12 +49,24 @@ function readPipeline(): {
 }
 
 describe('meeting-to-value contract', () => {
+  let previousResolver: SecretResolver | null = null;
   const originalMissionId = process.env.MISSION_ID;
   const originalMissionRole = process.env.MISSION_ROLE;
   const originalPersona = process.env.KYBERION_BASE_ROLE;
 
   beforeEach(() => {
+    // The core barrel installs the local account resolver. This credential-free
+    // stub fixture has no installed NHI/account grants; retain the real dispatch
+    // boundary and its empty-binding fallback instead of invoking that broker.
+    previousResolver = getSecretResolver();
+    resetSecretResolver();
     process.env.MISSION_ID = MISSION_ID;
+    // Match canonical WorkItem ownership so real dispatch mints tenant scope.
+    vi.stubEnv('KYBERION_TIER', 'confidential');
+    vi.stubEnv('KYBERION_TENANT', 'meeting-followup');
+    vi.stubEnv('KYBERION_ORGANIZATION_ID', 'meeting-followup');
+    vi.stubEnv('KYBERION_PROJECT_ID', MISSION_ID);
+    vi.stubEnv('KYBERION_TASK_ID', '');
     process.env.MISSION_ROLE = 'mission_controller';
     process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
     setWorkCoordinationNamespace(`meeting-to-value-contract-${process.pid}`);
@@ -71,6 +91,19 @@ describe('meeting-to-value contract', () => {
       JSON.stringify(
         {
           mission_id: MISSION_ID,
+          tenant_slug: 'meeting-followup',
+          organization_id: 'meeting-followup',
+          relationships: {
+            project: {
+              project_id: MISSION_ID,
+              project_path: `active/projects/confidential/meeting-followup/${MISSION_ID}/project-os`,
+              relationship_type: 'supports',
+              affected_artifacts: [],
+              gate_impact: 'informational',
+              traceability_refs: [],
+              note: 'Synthetic meeting-to-value fixture',
+            },
+          },
           tier: 'confidential',
           status: 'active',
           org_role: 'operator',
@@ -109,6 +142,10 @@ describe('meeting-to-value contract', () => {
         clearSlackOutboxMessage(message.message_id);
       }
     }
+    vi.unstubAllEnvs();
+    resetSecretResolver();
+    if (previousResolver) registerSecretResolver(previousResolver);
+    previousResolver = null;
     if (originalMissionId === undefined) delete process.env.MISSION_ID;
     else process.env.MISSION_ID = originalMissionId;
     if (originalMissionRole === undefined) delete process.env.MISSION_ROLE;
@@ -165,6 +202,7 @@ describe('meeting-to-value contract', () => {
             'You analyze a meeting transcript and produce a JSON array of action items.'
           )
         ) {
+          expect(credentialBindingReadiness().status).toBe('bound');
           return JSON.stringify([
             {
               title: 'Prepare the proposal outline',
