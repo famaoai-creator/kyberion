@@ -233,6 +233,10 @@ lease. Those proofs are read again on consumption. It does not load personal acc
 call a configured tenant credential broker, or authorize a service operation.
 
 The absence of a tenant never promotes claimed dispatch into operator credential access.
+An envelope tenant and its credential identity projection must agree before either
+dispatch path starts. A missing or stale projection is a denial, even when a tenant
+envelope exists. Normal tenant dispatch without a configured resolver receives an
+explicit empty lineage binding; it never runs as an unbound operator.
 The claimed-dispatch entry point rejects missing envelopes, legacy peer labels, and actors
 other than the installation's admitted personal NHI. Direct operator setup outside that
 entry point remains separate. Existing delegations using free-form peer labels must migrate
@@ -268,8 +272,19 @@ Continue the dependency chain in this order, with boundary tests at each step:
    session execution as another later step with isolated homes and exact session
    provenance; API-token registration must not silently enable either.
 
-Only the empty-binding identity stage is implemented; selected credentials, read-only
-PRESET admission, effects and sessions above remain future requirements. Existing-key
+The owner-consent prerequisite now has a distinct `credential.personal_use` standing
+grant variant in the existing grant store. Its person custody and authenticated owner
+approval bind the exact NHI, account binding, service, target, secret references,
+allowed actions, generation and project/mission/task. Tenant grant APIs reject this
+variant. Registration consent does not create this grant, and the grant does not by
+itself authorize a service operation. The authenticated owner facade can request,
+issue and revoke consent; it is not a worker credential reader or runtime broker.
+
+Only the empty-binding identity stage and owner-consent prerequisite are implemented;
+selected credentials, read-only PRESET admission, effects and sessions above remain
+future requirements. GWS has a strict portable-material validator and inactive
+registration preflight; a structurally valid export is not registered or runnable.
+Existing-key
 macOS account encryption remains unchanged; no new key backend, identity repair or
 automatic personal-to-organization sharing is included.
 

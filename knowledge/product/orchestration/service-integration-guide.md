@@ -604,3 +604,43 @@ and a separately typed broker provisioner. Cancellation, incomplete persistence,
 approval and stale generation must leave no usable unapproved session. Personal sessions
 also require personal selected-account and operation admission; the empty-binding stage
 does not provide it. Existing encryption-key backends remain unchanged.
+
+The inactive preflight in `libs/core/secret/gws-session-registration-contract.ts`
+now validates an organization-owned `google-workspace` / `session` target and a
+separate, strict portable-material shape. It always returns
+`registrationAvailable: false`, `runtimeAvailable: false`, and
+`activation_not_implemented`. It does not authenticate ownership, approve a request,
+collect credentials, write storage, register a broker or import a usable session.
+Caller readiness flags cannot enable it.
+
+The supported candidate material is exactly `type: authorized_user`, `client_id`,
+`client_secret`, and `refresh_token`. The
+[upstream GWS login/export implementation, pinned to cd3697e](https://github.com/googleworkspace/cli/blob/cd3697e07eb520056dcf142d0c7439bbb9ba32e9/crates/google-workspace-cli/src/auth_commands.rs#L629)
+produces this JSON and exports its decrypted form with `auth export --unmasked`.
+Its default export masks secrets; those values are rejected. Copying
+`credentials.enc`, the token cache or the host keyring is not a portable import.
+The [upstream importer](https://github.com/googleworkspace/cli/blob/cd3697e07eb520056dcf142d0c7439bbb9ba32e9/crates/google-workspace-cli/src/auth.rs#L203)
+accepts `GOOGLE_WORKSPACE_CLI_CREDENTIALS_FILE`; Kyberion's current selected-session
+environment allowlist does not yet admit that transport. These source references
+describe compatibility, not instructions to export real credentials for this phase.
+
+Validation accepts a plain data object, returns a detached frozen copy, and rejects
+unknown fields, accessors, masked values, whitespace/control characters, non-ASCII
+values, service-account keys, paths and arbitrary environment maps. Limits are
+4 KiB for the client ID, 16 KiB each for client secret and refresh token, and
+64 KiB for serialized material. Errors and preflight output contain no supplied
+material. Format acceptance proves neither provider validity nor consented scopes.
+
+The separate staging interface specifies `prepare`, `commit`, and `abort` without
+installing an adapter. Prepare must keep material encrypted and inactive using an
+existing key. Commit must independently authenticate the registration requester/actor
+and human approver/owner scope, revalidate the exact approval payload, connection
+snapshot and broker destination, and atomically compare the expected generation.
+Stage requester metadata supplies no authority. Claim/lease proof belongs at runtime
+binding, which must also require the committed registration and still-current approval
+and generation. Abort removes only its inactive stage; it cannot revoke another
+or a committed generation. Uncertain timeouts require reconciliation rather than
+automatic retry. Per-execution private HOME materialization, cleanup on every exit,
+crash expiry, encrypted session storage, authenticated approval wiring and the
+credentials-file transport remain implementation prerequisites. No successful
+prepare/commit receipt is simulated, and the macOS key backend is unchanged.

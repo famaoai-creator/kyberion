@@ -3,6 +3,7 @@ import {
   mintScopeEnvelope,
   withScopeEnvelope,
   resetScopeEnvelopeState,
+  currentScopeEnvelope,
 } from '../scope-envelope.js';
 import { registerSecretResolver, resetSecretResolver } from './secret-resolver.js';
 import {
@@ -11,6 +12,8 @@ import {
   resolveTaskCredential,
   resolveTaskProviderEnvironment,
   withTaskCredentialBinding,
+  registerCredentialScopeReader,
+  selectProviderCredential,
 } from '../foundation/credential-binding.js';
 import { withConfiguredTaskCredentials } from './task-credential-dispatch.js';
 const envelope = (tenantSlug?: string) =>
@@ -23,11 +26,46 @@ const envelope = (tenantSlug?: string) =>
     policy: { purpose: 'trusted credential test' },
   });
 afterEach(() => {
+  // Restore the actual envelope projection after fault-injection cases.
+  registerCredentialScopeReader(() => {
+    const identity = currentScopeEnvelope()?.identity;
+    return (
+      identity && {
+        tenantSlug: identity.tenant_slug,
+        missionId: identity.mission_id,
+        taskId: identity.task_id,
+      }
+    );
+  });
   resetSecretResolver();
   resetScopeEnvelopeState();
   vi.unstubAllEnvs();
 });
 describe('configured task credential dispatch', () => {
+  it.each([undefined, 'beta'])(
+    'rejects a missing or stale tenant projection (%s) before selecting operator credentials',
+    async (projectedTenant) => {
+      vi.stubEnv('KYBERION_TENANT', '');
+      vi.stubEnv('MISSION_ID', '');
+      vi.stubEnv('KYBERION_TASK_ID', '');
+      vi.stubEnv('KYBERION_SCOPE_ENV_PATH', 'active/shared/tmp/absent-dispatch-scope.env');
+      resetSecretResolver();
+      const active = envelope('alpha');
+      registerCredentialScopeReader(() =>
+        projectedTenant ? { tenantSlug: projectedTenant } : undefined
+      );
+      const provider = vi.fn();
+      const run = vi.fn(async () =>
+        provider(selectProviderCredential(['TEST_BOUND_KEY'], 'synthetic-operator-key'))
+      );
+      await expect(
+        withScopeEnvelope(active, () => withConfiguredTaskCredentials('WI-alpha', run))
+      ).rejects.toThrow('CREDENTIAL_SCOPE_DENIED');
+      expect(run).not.toHaveBeenCalled();
+      expect(provider).not.toHaveBeenCalled();
+    }
+  );
+
   it('isolates concurrent tenant bindings after asynchronous resolution', async () => {
     registerSecretResolver({
       name: 'scoped-resolver',
@@ -116,10 +154,13 @@ describe('configured task credential dispatch', () => {
 
   it('keeps every credential consumption fail-closed inside the lineage binding', async () => {
     vi.stubEnv('TEST_BOUND_KEY', 'operator-key');
+    resetSecretResolver();
     await withScopeEnvelope(envelope('alpha'), () =>
       withConfiguredTaskCredentials('WI-alpha', async () => {
+        expect(hasTaskCredentialBinding()).toBe(true);
         // Scoped miss, never an operator-env fallback.
         expect(resolveTaskCredential('TEST_BOUND_KEY')).toBeNull();
+        expect(selectProviderCredential(['TEST_BOUND_KEY'], 'operator-key')).toBeUndefined();
         // Provider env access is denied outright — no isolated env is bound.
         expect(() => resolveTaskProviderEnvironment('claude-cli')).toThrow(
           '[CREDENTIAL_PROVIDER_DENIED]'

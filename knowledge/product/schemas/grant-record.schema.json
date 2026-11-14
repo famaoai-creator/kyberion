@@ -17,39 +17,133 @@
     "audit_event_id"
   ],
   "properties": {
-    "schema_version": { "const": "grant-record.v1" },
-    "grant_id": { "type": "string", "pattern": "^GRT-[0-9]{8}-[a-f0-9]{12}$" },
-    "capability": { "type": "string", "minLength": 1 },
+    "schema_version": {
+      "const": "grant-record.v1"
+    },
+    "grant_id": {
+      "type": "string",
+      "pattern": "^GRT-[0-9]{8}-[a-f0-9]{12}$"
+    },
+    "capability": {
+      "type": "string",
+      "minLength": 1
+    },
     "scope": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "credential_provider": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" },
-        "credential_ref": {
-          "type": "string",
-          "pattern": "^[a-z0-9][a-z0-9._-]{0,63}/[A-Z][A-Z0-9_]{0,63}$"
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "credential_provider": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{0,63}$"
+            },
+            "credential_ref": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9._-]{0,63}/[A-Z][A-Z0-9_]{0,63}$"
+            },
+            "tenant_slug": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{1,30}$"
+            },
+            "meeting_series_ids": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              }
+            },
+            "meeting_urls": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2048
+              }
+            },
+            "service_allocation": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "binding_id",
+                "owner_ref",
+                "service_id",
+                "secret_refs",
+                "allowed_actions",
+                "target"
+              ],
+              "properties": {
+                "binding_id": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+                },
+                "owner_ref": {
+                  "type": "string",
+                  "pattern": "^user:[a-z][a-z0-9-]*$"
+                },
+                "service_id": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9-]{0,63}$"
+                },
+                "secret_refs": {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 64,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "pattern": "^[A-Z][A-Z0-9_]{0,127}$"
+                  }
+                },
+                "allowed_actions": {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 64,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+                  }
+                },
+                "project_id": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+                },
+                "mission_id": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+                },
+                "task_id": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+                },
+                "target": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 2048
+                }
+              }
+            }
+          }
         },
-        "tenant_slug": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,30}$" },
-        "meeting_series_ids": {
-          "type": "array",
-          "uniqueItems": true,
-          "items": { "type": "string", "minLength": 1, "maxLength": 512 }
-        },
-        "meeting_urls": {
-          "type": "array",
-          "uniqueItems": true,
-          "items": { "type": "string", "minLength": 1, "maxLength": 2048 }
-        },
-        "service_allocation": {
+        {
           "type": "object",
           "additionalProperties": false,
           "required": [
-            "binding_id",
             "owner_ref",
+            "nhi_id",
+            "binding_id",
             "service_id",
+            "target",
             "secret_refs",
             "allowed_actions",
-            "target"
+            "generation",
+            "project_id",
+            "mission_id",
+            "task_id"
           ],
           "properties": {
             "binding_id": {
@@ -100,20 +194,41 @@
               "type": "string",
               "minLength": 1,
               "maxLength": 2048
+            },
+            "nhi_id": {
+              "type": "string",
+              "pattern": "^kyberion://agent/_/_/[a-z][a-z0-9-]*$"
+            },
+            "generation": {
+              "type": "string",
+              "format": "uuid"
             }
           }
         }
-      }
+      ]
     },
-    "purpose": { "type": "string", "minLength": 1, "maxLength": 500 },
+    "purpose": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
+    },
     "granted_by": {
       "type": "object",
       "additionalProperties": false,
       "required": ["actor_id", "role", "assurance"],
       "properties": {
-        "actor_id": { "type": "string", "minLength": 1 },
-        "role": { "type": "string", "enum": ["operator", "member_self", "sovereign"] },
-        "assurance": { "type": "string", "enum": ["A0", "A1", "A2", "A3"] }
+        "actor_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "role": {
+          "type": "string",
+          "enum": ["operator", "member_self", "sovereign"]
+        },
+        "assurance": {
+          "type": "string",
+          "enum": ["A0", "A1", "A2", "A3"]
+        }
       }
     },
     "basis": {
@@ -121,24 +236,101 @@
       "additionalProperties": false,
       "required": ["approval_request_id", "approval_channel"],
       "properties": {
-        "approval_request_id": { "type": "string", "minLength": 1 },
-        "approval_channel": { "type": "string", "minLength": 1 }
+        "approval_request_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "approval_channel": {
+          "type": "string",
+          "minLength": 1
+        }
       }
     },
-    "granted_at": { "type": "string", "format": "date-time" },
-    "expires_at": { "type": "string", "format": "date-time" },
+    "granted_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time"
+    },
     "revoked": {
       "type": "object",
       "additionalProperties": false,
       "required": ["at", "by", "audit_event_id"],
       "properties": {
-        "at": { "type": "string", "format": "date-time" },
-        "by": { "type": "string", "minLength": 1 },
-        "by_kind": { "type": "string", "enum": ["human", "agent"] },
-        "reason": { "type": "string", "maxLength": 500 },
-        "audit_event_id": { "type": "string", "minLength": 1 }
+        "at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "by": {
+          "type": "string",
+          "minLength": 1
+        },
+        "by_kind": {
+          "type": "string",
+          "enum": ["human", "agent"]
+        },
+        "reason": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "audit_event_id": {
+          "type": "string",
+          "minLength": 1
+        }
       }
     },
-    "audit_event_id": { "type": "string", "minLength": 1 }
-  }
+    "audit_event_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "custody": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "ref"],
+      "properties": {
+        "kind": {
+          "const": "person"
+        },
+        "ref": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$"
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": ["custody"]
+      },
+      "then": {
+        "properties": {
+          "capability": {
+            "const": "credential.personal_use"
+          },
+          "scope": {
+            "required": ["owner_ref"],
+            "type": "object"
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "capability": {
+            "not": {
+              "const": "credential.personal_use"
+            }
+          },
+          "scope": {
+            "not": {
+              "required": ["owner_ref"]
+            },
+            "type": "object"
+          }
+        }
+      }
+    }
+  ]
 }
