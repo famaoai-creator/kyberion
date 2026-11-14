@@ -52,7 +52,7 @@ HTTP ランタイムの構成時に追加検証する。動的 JWKS 更新、opa
 pnpm kyberion mcp http --check --config <reviewed-server-config.json>
 pnpm kyberion mcp http --start --config <reviewed-server-config.json>
 # 同じ専用エントリポイントを直接実行する場合
-node dist/scripts/mcp_http_server.js --check --config <reviewed-server-config.json>
+node dist/scripts/mcp/mcp_http_server.js --check --config <reviewed-server-config.json>
 ```
 
 --check / --dry-run はポートを開かない。--start と同時指定しても検証が優先する。

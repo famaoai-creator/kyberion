@@ -1511,7 +1511,7 @@
     "scripts/install_git_merge_driver.mjs": {
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/intent_smoke.ts": {
+    "scripts/intent/intent_smoke.ts": {
       "json_state_write_budget": 1
     },
     "scripts/intent.ts": {
@@ -1551,13 +1551,13 @@
       "json_state_write_budget": 1,
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/marketing_publish_dry_run.ts": {
+    "scripts/marketing/marketing_publish_dry_run.ts": {
       "json_state_write_budget": 1
     },
-    "scripts/marketing_review_aggregate.ts": {
+    "scripts/marketing/marketing_review_aggregate.ts": {
       "json_state_write_budget": 1
     },
-    "scripts/marketing_video_dry_run.ts": {
+    "scripts/marketing/marketing_video_dry_run.ts": {
       "json_state_write_budget": 4
     },
     "scripts/meeting/meeting_orchestrator.ts": {
@@ -1601,7 +1601,7 @@
     "scripts/mission/mission_journal.ts": {
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/oauth_callback_surface.ts": {
+    "scripts/oauth/oauth_callback_surface.ts": {
       "json_state_write_budget": 2
     },
     "scripts/onboarding/onboarding_apply.ts": {
@@ -1685,7 +1685,7 @@
     "scripts/presence-controller.ts": {
       "json_state_write_budget": 2
     },
-    "scripts/promote_procedure.ts": {
+    "scripts/promote/promote_procedure.ts": {
       "env_direct_read_budget": 1,
       "json_state_write_budget": 1
     },
@@ -1775,7 +1775,7 @@
       "runtime_path_literal_budget": 1,
       "bespoke_cli_parser_budget": 3
     },
-    "scripts/scenario_runner.ts": {
+    "scripts/scenario/scenario_runner.ts": {
       "json_state_write_budget": 1
     },
     "scripts/screenshot-annotate/server.ts": {
@@ -1810,10 +1810,10 @@
     "scripts/smoke_capability_seams_live.ts": {
       "json_state_write_budget": 1
     },
-    "scripts/soak_endurance.ts": {
+    "scripts/soak/soak_endurance.ts": {
       "json_state_write_budget": 2
     },
-    "scripts/soak_restart_e2e.ts": {
+    "scripts/soak/soak_restart_e2e.ts": {
       "json_state_write_budget": 6,
       "bespoke_cli_parser_budget": 1
     },

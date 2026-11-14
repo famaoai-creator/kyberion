@@ -46,7 +46,7 @@ Kyberion は「外部エージェント CLI 群を reasoning backend として�
 | completion token 動的予算 | `_compute_completion_overrides`: `max_completion = window − 入力見積 − margin` | 無し(固定 max_tokens) | **欠落 → KC-09** |
 | Flow スキル(図式ワークフロー) | Mermaid/D2 フローチャートを SKILL.md に埋め、decision ノードは `<choice>` で分岐、Ralph loop 合成 | `pipelines/` + `core:if`/`core:while` + `semantic-decide.ts`(selection mode)で機能同等。著述 UX(図 → 実行)のみ差 | 既に同等 → **KC-10(条件付き)** |
 | Skills 階層探索(brand 互換 `.kimi    | .claude                                                                                                             | .codex                                                                                                                                | .agents`) | klip-8: project > user > extra > builtin、scope 標示 | `skill_installer.ts` + plugins(Beta) | 既に同等 |
-| MCP(background 読込・OAuth) | fastmcp、起動非ブロック読込 | `scripts/mcp_server.ts`(Phase 0) | OH-05 の管轄 |
+| MCP(background 読込・OAuth) | fastmcp、起動非ブロック読込 | `scripts/mcp/mcp_server.ts`(Phase 0) | OH-05 の管轄 |
 | ACP | `acp/server.py` + **ACPKaos**(exec/fs だけ OS 抽象層で IDE へリダイレクト) | `acp-mediator.ts`(client 側、Copilot 用) | 不採用表参照(seam 原則のみ学ぶ) |
 | KLIP プロセス | 「本質的修正」限定の設計提案 + プロトタイプ同時育成 | improvement-plans + STATUS 運用で同等 | §4 にプロセス上の学びのみ記載 |
 

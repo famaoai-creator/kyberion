@@ -41,7 +41,7 @@ const SEAM_ROLES: Record<string, SeamRoleEntry> = {
   },
   'video-filter-provider': {
     declaration: 'libs/shared-video/src/video-filter.ts',
-    consumers: ['scripts/video_filter.ts'],
+    consumers: ['scripts/video/video_filter.ts'],
   },
   'cli-provider-bundle': {
     declaration: 'libs/core/provider/cli-provider-bundle.ts',

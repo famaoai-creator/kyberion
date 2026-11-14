@@ -95,8 +95,8 @@ import {
   handleFeedbackSubcommand,
   handleImprovements,
   improvementsArgsFromArgv,
-} from './operator-home-secondary-actions.js';
-import { printCommands, showHome, type HomePrint } from './operator-home-view.js';
+} from './operator/operator-home-secondary-actions.js';
+import { printCommands, showHome, type HomePrint } from './operator/operator-home-view.js';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import path from 'node:path';
 import {

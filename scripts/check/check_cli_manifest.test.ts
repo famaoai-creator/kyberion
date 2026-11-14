@@ -26,11 +26,11 @@ describe('CLI manifest', () => {
 
   it('keeps operator home command rendering on the governed manifest loader', () => {
     const source = String(
-      safeReadFile(pathResolver.rootResolve('scripts/operator-home-view.ts'), {
+      safeReadFile(pathResolver.rootResolve('scripts/operator/operator-home-view.ts'), {
         encoding: 'utf8',
       })
     );
-    expect(source).toContain("import { loadCliManifest } from './check_cli_manifest.js'");
+    expect(source).toContain("import { loadCliManifest } from '../check/check_cli_manifest.js'");
     expect(source).toContain('const registry = loadCliManifest()');
     expect(source).not.toContain('readJson<{');
   });

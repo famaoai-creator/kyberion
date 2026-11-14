@@ -30,7 +30,7 @@ Claude Code 型のエージェントハーネスの OSS 再実装(agent loop / 4
 | 機密パス常時 deny        | `permissions/checker.py` `SENSITIVE_PATH_PATTERNS`(上書き不可)       | `tier-guard.ts` / `shell-command-policy.ts` は tier 境界が主で、資格情報パスの無条件 deny 層は無し       | **部分 → OH-02**           |
 | API リトライ             | `api/client.py:87-201`(指数 backoff + jitter + Retry-After 尊重)     | failover/demotion で代替(その場リトライ無し)                                                             | **部分 → OH-03**           |
 | ツール出力退避           | `engine/query.py:524-553`(上限超過分をファイル退避 + inline preview) | 無し(巨大出力がそのまま文脈に載る)                                                                       | **欠落 → OH-04**           |
-| MCP クライアント         | `mcp/client.py`(stdio + streamable HTTP、schema inference、失敗隔離) | `scripts/mcp_server.ts`(Phase 0)+ `claude-agent-query.ts` の passthrough                                 | **部分 → OH-05**           |
+| MCP クライアント         | `mcp/client.py`(stdio + streamable HTTP、schema inference、失敗隔離) | `scripts/mcp/mcp_server.ts`(Phase 0)+ `claude-agent-query.ts` の passthrough                             | **部分 → OH-05**           |
 | 実行前 dry-run 判定      | `cli.py:333-597`(ready/warning/blocked + next_actions)               | baseline-check(セッション級)と ADF preflight(契約級)はあるが「この実行は通るか」のリクエスト級判定は無し | **部分 → OH-06**           |
 | チーム内承認同期         | `swarm/permission_sync.py`(1,168 LOC)                                | `approval-policy.ts` + Slack 承認は単発。委譲先への承認伝播は無し                                        | **部分 → OH-07**           |
 | チャネル gateway         | `channels/impl/` 10 種(feishu/dingtalk/matrix/whatsapp 等)           | `satellites/`(slack/telegram/discord/imessage)+ `channel-surface.ts` 抽象                                | **部分 → OH-08(条件付き)** |

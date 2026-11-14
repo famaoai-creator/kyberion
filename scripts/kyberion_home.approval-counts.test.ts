@@ -143,7 +143,7 @@ describe('home view approval count', () => {
   });
 
   it('renders the home snapshot count, not a second wider ledger read', async () => {
-    const { showHome } = await import('./operator-home-view.js');
+    const { showHome } = await import('./operator/operator-home-view.js');
     const lines: string[] = [];
     await showHome(
       (key, params) => `${key} ${JSON.stringify(params ?? {})}`,

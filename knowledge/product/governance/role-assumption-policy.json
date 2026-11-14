@@ -143,7 +143,7 @@
     },
     "oauth_callback_surface": {
       "may_assume": ["sovereign_concierge"],
-      "rationale": "scripts/oauth_callback_surface.ts. sovereign_concierge: completeOAuthCallback resolves tool binaries through libs/core tool-runtime-policy (getToolRuntimePolicy). RN-03 removed ecosystem_architect and mission_controller: the RN-02 analysis proves neither reachable (no unresolved sites, no child processes that inherit SYSTEM_ROLE) and RN-01 traces (hermetic smoke of the built surface, oauth_callback_surface vitest suites under SYSTEM_ROLE) only observed surface_runtime (the surface's own callback write, a shared core role)."
+      "rationale": "scripts/oauth/oauth_callback_surface.ts. sovereign_concierge: completeOAuthCallback resolves tool binaries through libs/core tool-runtime-policy (getToolRuntimePolicy). RN-03 removed ecosystem_architect and mission_controller: the RN-02 analysis proves neither reachable (no unresolved sites, no child processes that inherit SYSTEM_ROLE) and RN-01 traces (hermetic smoke of the built surface, oauth_callback_surface vitest suites under SYSTEM_ROLE) only observed surface_runtime (the surface's own callback write, a shared core role)."
     },
     "operator_surface": {
       "may_assume": [

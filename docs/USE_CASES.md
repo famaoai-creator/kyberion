@@ -1166,11 +1166,11 @@ pnpm pipeline --input knowledge/product/pipeline-templates/publish-youtube-dry-r
 
 The last command creates only a local preview and verification record. It does not call YouTube and cannot satisfy a public Mission completion gate.
 
-For an approval-bound local publication dry-run, execute `scripts/marketing_publish_dry_run.ts --approval <publication-approval.json> --output-root <mission-evidence-path>`. The approval must contain authenticated human decisions and exact SHA-256 bindings. The script re-hashes artifacts before rendering and refuses changed, expired, or insufficient approvals.
+For an approval-bound local publication dry-run, execute `scripts/marketing/marketing_publish_dry_run.ts --approval <publication-approval.json> --output-root <mission-evidence-path>`. The approval must contain authenticated human decisions and exact SHA-256 bindings. The script re-hashes artifacts before rendering and refuses changed, expired, or insufficient approvals.
 
 The publication approval JSON must also reference a shared approval-store request. The request is loaded by storage channel and request ID, and its human-only accountability payload hash, effect binding, and authenticated workflow decisions must match the publication record exactly.
 
-For executable independent review aggregation, run `scripts/marketing_review_aggregate.ts --review-package <review-package.json> --reviews <review-a.json,review-b.json> --output <mission-evidence-path>/publication-review.json`. Required reviewer roles come from the resolved Risk Level policy. The command does not approve or publish content.
+For executable independent review aggregation, run `scripts/marketing/marketing_review_aggregate.ts --review-package <review-package.json> --reviews <review-a.json,review-b.json> --output <mission-evidence-path>/publication-review.json`. Required reviewer roles come from the resolved Risk Level policy. The command does not approve or publish content.
 
 ---
 

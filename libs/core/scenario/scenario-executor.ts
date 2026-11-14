@@ -8,7 +8,7 @@
  * order, then final checks — and everything torn down in `finally`.
  *
  * Pipeline execution lives in `scripts/` (the engine is not part of
- * libs/core), so it is injected as `runPipeline`; `scripts/scenario_runner.ts`
+ * libs/core), so it is injected as `runPipeline`; `scripts/scenario/scenario_runner.ts`
  * provides the in-process implementation.
  */
 

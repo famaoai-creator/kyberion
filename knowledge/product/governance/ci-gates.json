@@ -62,7 +62,7 @@
       "args": [
         "--import",
         "./scripts/ts-loader.mjs",
-        "scripts/scenario_runner.ts",
+        "scripts/scenario/scenario_runner.ts",
         "run",
         "eval/scenarios",
         "--lane",

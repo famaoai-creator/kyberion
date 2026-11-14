@@ -5583,7 +5583,7 @@ frame／route／clarification の比較、成功時の report と OK 表示は�
 
 検証:
 
-- `pnpm exec vitest run scripts/intent_smoke.test.ts`: **1 file / 1 test passed**。
+- `pnpm exec vitest run scripts/intent/intent_smoke.test.ts`: **1 file / 1 test passed**。
 - `node --import ./scripts/ts-loader.mjs scripts/check_script_integrity.ts`: **OK**。
 - `pnpm check -- --scope full`: **67/67 gates passed**（Chronos を含む承認付き実行）。
 
@@ -5610,7 +5610,7 @@ managed runtime の probe、`--apply` の install 操作、既存の人間向け
 
 検証:
 
-- `pnpm exec vitest run scripts/marketing_review_aggregate.test.ts`: **1 file / 5 tests passed**。
+- `pnpm exec vitest run scripts/marketing/marketing_review_aggregate.test.ts`: **1 file / 5 tests passed**。
 - `node --import ./scripts/ts-loader.mjs scripts/check_script_integrity.ts`: **OK**。
 - `pnpm run typecheck`: **passed**。
 
@@ -5681,7 +5681,7 @@ source boundary test を追加し、将来の direct output 再導入を検知�
 
 検証:
 
-- `pnpm exec vitest run scripts/action_item_reminders.test.ts scripts/agent/agent_runtime_supervisor_status.test.ts scripts/model_feedback.entrypoint.test.ts scripts/promote_voice_profile.test.ts scripts/peer_runtime_recovery.test.ts`: **5 files / 5 tests passed**。
+- `pnpm exec vitest run scripts/action_item_reminders.test.ts scripts/agent/agent_runtime_supervisor_status.test.ts scripts/model_feedback.entrypoint.test.ts scripts/promote/promote_voice_profile.test.ts scripts/peer_runtime_recovery.test.ts`: **5 files / 5 tests passed**。
 - 各 3 CLI の `--help` を実行し、**exit 0 と usage 出力**を確認（昇格／復旧／feedback の write 操作は実行せず）。
 - `node --import ./scripts/ts-loader.mjs scripts/check_script_integrity.ts`: **OK**。
 
@@ -6479,7 +6479,7 @@ interactive dashboard、MCP／server の custom output、細粒度 command regis
 
 ### 検証
 
-- `pnpm exec vitest run scripts/peer_server.entrypoint.test.ts scripts/mcp_server.entrypoint.test.ts libs/shared-network/src/mcp-server-engine.test.ts --reporter=dot --pool=forks --maxWorkers=1` — 3 files / 35 tests passed。
+- `pnpm exec vitest run scripts/peer_server.entrypoint.test.ts scripts/mcp/mcp_server.entrypoint.test.ts libs/shared-network/src/mcp-server-engine.test.ts --reporter=dot --pool=forks --maxWorkers=1` — 3 files / 35 tests passed。
 - `pnpm --filter @agent/shared-network run build`、`pnpm run build:repo` — green。
 - `pnpm run typecheck`、`pnpm lint`、`git diff --check` — green。
 - `pnpm run check -- --scope full` — 67 gates / failed=0（Chronos の localhost bind を許可した実環境再検証）。
@@ -6499,7 +6499,7 @@ interactive dashboard、MCP tool catalog／server の custom protocol output、�
 
 ### 検証
 
-- `pnpm exec vitest run scripts/peer_cli.entrypoint.test.ts scripts/peer_server.entrypoint.test.ts scripts/mcp_server.entrypoint.test.ts libs/shared-network/src/mcp-server-engine.test.ts --reporter=dot --pool=forks --maxWorkers=1` — 4 files / 36 tests passed。
+- `pnpm exec vitest run scripts/peer_cli.entrypoint.test.ts scripts/peer_server.entrypoint.test.ts scripts/mcp/mcp_server.entrypoint.test.ts libs/shared-network/src/mcp-server-engine.test.ts --reporter=dot --pool=forks --maxWorkers=1` — 4 files / 36 tests passed。
 - `pnpm --filter @agent/shared-network run build`、`pnpm run build:repo`、`pnpm run typecheck`、`pnpm lint`、`git diff --check` — green。
 - `pnpm run check -- --scope full` — 67 gates / failed=0（Chronos の localhost bind を許可した実環境再検証）。
 
@@ -6519,10 +6519,10 @@ interactive dashboard、MCP tool catalog／server の custom protocol output、�
 
 ### 検証
 
-- `pnpm exec vitest run scripts/lib/harness.test.ts scripts/kyberion.test.ts scripts/check_cli_manifest.test.ts scripts/peer_cli.entrypoint.test.ts scripts/peer_server.entrypoint.test.ts scripts/mcp_server.entrypoint.test.ts libs/core/mesh/peer-conversation.test.ts libs/shared-network/src/mcp-server-engine.test.ts --reporter=dot --pool=forks --maxWorkers=1` — 8 files / 67 tests passed。
+- `pnpm exec vitest run scripts/lib/harness.test.ts scripts/kyberion.test.ts scripts/check_cli_manifest.test.ts scripts/peer_cli.entrypoint.test.ts scripts/peer_server.entrypoint.test.ts scripts/mcp/mcp_server.entrypoint.test.ts libs/core/mesh/peer-conversation.test.ts libs/shared-network/src/mcp-server-engine.test.ts --reporter=dot --pool=forks --maxWorkers=1` — 8 files / 67 tests passed。
 - `pnpm run build:repo`、`pnpm run typecheck`、`pnpm lint`、`git diff --check` — green。
 - `pnpm pipeline --input pipelines/baseline-check.json` — baseline check success。
-- `node dist/scripts/peer_conversation.js --json --dry-run open-session --tenant-id tenant-check --local-peer-id peer-a --remote-peer-id peer-b --topic review`、`node dist/scripts/peer_collaboration.js --json --dry-run accept --peer-id peer-a --tenant-id tenant-check --proposal-id proposal-1 --actor-id operator --reason review`、`node dist/scripts/peer_conversation_server.js --json --dry-run --peer-id peer-a --shared-secret check-secret --tenant-id tenant-check --port 49998`、`node dist/scripts/peer_messaging_server.js --json --dry-run --peer-id peer-a --shared-secret check-secret --tenant-id tenant-check --port 49999`、`node dist/scripts/mcp_server.js --json --dry-run` — いずれも JSON を出力し、外部送信／proposal decision／session 保存／listener bind／stdio 接続なし。
+- `node dist/scripts/peer_conversation.js --json --dry-run open-session --tenant-id tenant-check --local-peer-id peer-a --remote-peer-id peer-b --topic review`、`node dist/scripts/peer_collaboration.js --json --dry-run accept --peer-id peer-a --tenant-id tenant-check --proposal-id proposal-1 --actor-id operator --reason review`、`node dist/scripts/peer_conversation_server.js --json --dry-run --peer-id peer-a --shared-secret check-secret --tenant-id tenant-check --port 49998`、`node dist/scripts/peer_messaging_server.js --json --dry-run --peer-id peer-a --shared-secret check-secret --tenant-id tenant-check --port 49999`、`node dist/scripts/mcp/mcp_server.js --json --dry-run` — いずれも JSON を出力し、外部送信／proposal decision／session 保存／listener bind／stdio 接続なし。
 - `pnpm run check -- --scope full` — 67 gates / failed=0（Chronos の localhost bind を許可した実環境再検証）。
 
 ### 残存
@@ -20799,7 +20799,7 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-05 再レビュー修正 1267
 
-- **対象**: `scripts/promote_procedure.ts`
+- **対象**: `scripts/promote/promote_procedure.ts`
 - **変更**: procedure promotion CLIのmission attributionに残っていた `MISSION_ID` の環境直読を、登録済み `getRegisteredEnvText` へ移行した。明示 `--mission-id` 優先、未指定時の警告、catalog／recording検証、audit記録の既存 semanticsは変更していない。
 - **検証**: promote procedure resource boundary **1 file / 1 test passed**、対象ESLint、Prettier、`git diff --check`、typecheck。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。
 
@@ -22136,7 +22136,7 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-06 再レビュー修正 1489
 
-- **対象**: `scripts/intent_trace.ts`、`scripts/intent_trace.test.ts`
+- **対象**: `scripts/intent/intent_trace.ts`、`scripts/intent/intent_trace.test.ts`
 - **変更**: intent trace JSONL の本文読込を foundation の `readTextFile` へ移行した。既存の repository／regular-file 境界、malformed行のskip、trace／snapshot／auditの正規化 semanticsは変更せず、intent trace CLIに残っていた旧 `safeReadFile` 直読を削減した。
 - **検証**: intent-trace **既存テスト**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、残る production loader の全件codemod、全script harness／generator移行は継続課題とする。
 
@@ -22418,7 +22418,7 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-06 再レビュー修正 1536
 
-- **対象**: `scripts/marketing_publish_dry_run.ts`、`scripts/export_validation_bundle.ts`、`scripts/apply_dependency_patch.ts` と対象テスト
+- **対象**: `scripts/marketing/marketing_publish_dry_run.ts`、`scripts/export_validation_bundle.ts`、`scripts/apply_dependency_patch.ts` と対象テスト
 - **変更**: marketing text artifact、validation bundle audit JSONL、dependency patch package manifest の本文読込を foundation の `readTextFile` へ移行した。artifact SHA-256／bundle binary copy、approval／audit projection、dependency patch proposal/apply semanticsは変更せず、reader contract を追加した。
 - **検証**: 対象テスト **3 files／24 tests passed**、対象ESLint、Prettier、改善計画metadata（335 documents）、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
 
@@ -22436,19 +22436,19 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-06 再レビュー修正 1539
 
-- **対象**: `scripts/scenario_storage_governance.ts`、`scripts/source_archive.ts`、`scripts/claude_code_hook.ts`、`scripts/mission-alignment-gate/read-decision.ts` と対象テスト
+- **対象**: `scripts/scenario/scenario_storage_governance.ts`、`scripts/source_archive.ts`、`scripts/claude_code_hook.ts`、`scripts/mission-alignment-gate/read-decision.ts` と対象テスト
 - **変更**: scenario log、source archive checksum manifest、Claude hook transcript、mission alignment HTML の本文読込を foundation の `readTextFile` へ移行した。archive／screen recordingのバイナリ読込、scenario／hook／alignmentの既存境界・出力 semanticsは変更せず、reader contract を追加した。
 - **検証**: 対象テスト **4 files／12 tests passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1540
 
-- **対象**: `scripts/run_baseline_check.ts`、`scripts/soak_endurance.ts`、`scripts/pipeline-execution-part-execution.ts` と対象テスト
+- **対象**: `scripts/run_baseline_check.ts`、`scripts/soak/soak_endurance.ts`、`scripts/pipeline-execution-part-execution.ts` と対象テスト
 - **変更**: baseline config、soak evidence、pipeline fragment の本文読込を foundation の `readTextFile` へ移行した。baseline／soak／pipelineの既存実行・環境境界・evidence semanticsは変更せず、reader contract を追加した。
 - **検証**: 対象テスト **3 files／40 tests passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1541
 
-- **対象**: `scripts/migrate/migrate_peer_tenant_runtime.ts`、`scripts/migrate/migrate_physical_namespaces.ts`、`scripts/marketing_video_dry_run.ts` と対象テスト
+- **対象**: `scripts/migrate/migrate_peer_tenant_runtime.ts`、`scripts/migrate/migrate_physical_namespaces.ts`、`scripts/marketing/marketing_video_dry_run.ts` と対象テスト
 - **変更**: peer tenant／physical namespace migration の入力・ハッシュ対象本文、marketing video の brief／brand／生成テキスト本文を foundation の `readTextFile` へ移行した。移行のtenant scope／quarantine、SHA-256・バイナリアーティファクト、marketing approval／media semanticsは変更せず、reader contract を追加した。
 - **検証**: 対象テスト **3 files／18 tests passed**、対象ESLint、Prettier、改善計画metadata（335 documents）、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
 
@@ -23132,7 +23132,7 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-06 再レビュー実装 1655
 
-- **対象**: `scripts/marketing_video_dry_run.ts`、`scripts/marketing_video_dry_run.path.test.ts`、PI-03
+- **対象**: `scripts/marketing/marketing_video_dry_run.ts`、`scripts/marketing/marketing_video_dry_run.path.test.ts`、PI-03
 - **変更**: marketing video dry-runのcampaign brief／brand profile／生成artifact本文readを`readMarketingTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをmarketing validation／sensitive-data scanへ到達させないようにした。既存のpath scope、validation、dry-run semanticsは維持した。
 - **検証**: marketing dry-run path **2 files／5 tests passed**、対象ESLint、Prettier、`git diff --check`。scripts全体のneeds-review個別確認とprovider実機受入は継続する。
 
@@ -23204,7 +23204,7 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-06 再レビュー実装 1667
 
-- **対象**: `scripts/scenario_storage_governance.ts`、`scripts/scenario_storage_governance.resource-boundary.test.ts`、PI-03
+- **対象**: `scripts/scenario/scenario_storage_governance.ts`、`scripts/scenario/scenario_storage_governance.resource-boundary.test.ts`、PI-03
 - **変更**: storage governance scenarioのtenant mirror／process log本文readを`readScenarioTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをscenarioの監査・process log解析へ到達させないようにした。既存のaudit-chain、vault、process logger semanticsは維持した。
 - **検証**: storage governance scenario **2 files／4 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。scripts全体のneeds-review個別確認とprovider実機受入は継続する。
 
@@ -23420,7 +23420,7 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-06 再レビュー実装 1703
 
-- **対象**: `scripts/intent_smoke.ts`、`scripts/intent_smoke.test.ts`、PI-03
+- **対象**: `scripts/intent/intent_smoke.ts`、`scripts/intent/intent_smoke.test.ts`、PI-03
 - **変更**: intent smokeのsummary本文readを`readIntentSmokeTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをsmoke report outputへ到達させないようにした。既存のintent execution、governed output path、failure aggregation semanticsは維持した。
 - **検証**: intent smoke **2 files／2 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。
 

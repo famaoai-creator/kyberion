@@ -66,7 +66,7 @@
 **成果物**
 
 - `libs/shared-network/src/mcp-server-engine.ts`（新規, `@modelcontextprotocol/sdk/server` 使用）
-- `scripts/mcp_server.ts`（stdio 起動エントリ。`pnpm mcp:server` を package.json に追加）
+- `scripts/mcp/mcp_server.ts`（stdio 起動エントリ。`pnpm mcp:server` を package.json に追加）
 - `knowledge/product/governance/mcp-tool-catalog.json`（公開ツールの allowlist + スキーマ）
 
 **主要タスク**
@@ -238,4 +238,4 @@ Phase 1,2,3 ──> Phase 4 (プラグイン化) ──> Phase 5 (Review/フィ�
 2. 疎通したら Phase 1 で「ミッション結果が Cowork フォルダに出る」体験を最短達成。
 3. その上で軸 B（承認）→ 軸 A（知識同期）へ拡張。
 
-> ご要望があれば、Phase 0 の MCP サーバ雛形（`mcp-server-engine.ts` / `scripts/mcp_server.ts`）と `mcp-tool-catalog.json` のスケルトンまで生成します。
+> ご要望があれば、Phase 0 の MCP サーバ雛形（`mcp-server-engine.ts` / `scripts/mcp/mcp_server.ts`）と `mcp-tool-catalog.json` のスケルトンまで生成します。
