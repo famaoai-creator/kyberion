@@ -9,12 +9,12 @@
       "kind": "capture",
       "risk": "read",
       "approval_required": false,
-      "path": "bot{{token}}/getMe",
+      "path": "bot{{accessToken}}/getMe",
       "method": "GET",
       "description": "Fetch the bot's identity; serves as the identity probe."
     },
     "post_message": {
-      "path": "bot{{token}}/sendMessage",
+      "path": "bot{{accessToken}}/sendMessage",
       "method": "POST",
       "description": "Sends a message to a Telegram chat/channel.",
       "parameters": {
@@ -27,7 +27,7 @@
       }
     },
     "get_updates": {
-      "path": "bot{{token}}/getUpdates",
+      "path": "bot{{accessToken}}/getUpdates",
       "method": "GET",
       "description": "Gets incoming updates/messages for the bot."
     }

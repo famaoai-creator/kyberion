@@ -45,6 +45,7 @@ import { registerSecretResolver, resetSecretResolver } from '../secret/secret-re
 import { withPluginExecutionFrame } from '../shell/sandbox-policy.js';
 import { executeServicePreset } from './service-engine.js';
 import { getServiceEndpointRecord } from './service-endpoint-registry.js';
+import { secretKeyToConnectionField } from '../secret/secret-identity.js';
 import {
   listOperatorServiceConnections,
   probeOperatorServiceConnection,
@@ -89,11 +90,17 @@ beforeEach(() => {
   vi.stubEnv('AUTHORIZED_SCOPE', '');
   vi.stubEnv('GITHUB_ACCESS_TOKEN', tokens.github);
   vi.stubEnv('SLACK_ACCESS_TOKEN', tokens.slack);
-  mocks.loadConnectionDocument.mockImplementation((serviceId: string) => ({
-    access_token: tokens[serviceId],
-    client_secret: 'unrelated-private-field',
-    base_url: 'https://attacker.invalid',
-  }));
+  mocks.loadConnectionDocument.mockImplementation((serviceId: string) => {
+    const entry = loadOperatorServiceConnectionCatalog().find(
+      (item) => item.serviceId === serviceId
+    );
+    const document: Record<string, unknown> = {
+      client_secret: 'unrelated-private-field',
+      base_url: 'https://attacker.invalid',
+    };
+    if (entry) document[entry.secretKey.toLowerCase()] = tokens[serviceId];
+    return document;
+  });
   mocks.secureFetch.mockImplementation(async ({ url }: { url: string }) =>
     url === 'https://api.github.com/user'
       ? { id: 123, login: 'synthetic', private: tokens.github }
@@ -122,6 +129,18 @@ describe('local operator service connection capability', () => {
       { serviceId: 'cloudflare', secretKey: 'ACCESS_TOKEN', credential_present: false },
       { serviceId: 'figma', secretKey: 'ACCESS_TOKEN', credential_present: false },
       { serviceId: 'stripe', secretKey: 'ACCESS_TOKEN', credential_present: false },
+      { serviceId: 'asana', secretKey: 'ACCESS_TOKEN', credential_present: false },
+      { serviceId: 'backlog', secretKey: 'API_KEY', credential_present: false },
+      { serviceId: 'canva', secretKey: 'ACCESS_TOKEN', credential_present: false },
+      { serviceId: 'confluence', secretKey: 'TOKEN', credential_present: false },
+      { serviceId: 'discord', secretKey: 'ACCESS_TOKEN', credential_present: false },
+      { serviceId: 'gemini', secretKey: 'API_KEY', credential_present: false },
+      { serviceId: 'gitlab', secretKey: 'ACCESS_TOKEN', credential_present: false },
+      { serviceId: 'jira', secretKey: 'API_TOKEN', credential_present: false },
+      { serviceId: 'linear', secretKey: 'ACCESS_TOKEN', credential_present: false },
+      { serviceId: 'notion', secretKey: 'ACCESS_TOKEN', credential_present: false },
+      { serviceId: 'telegram', secretKey: 'ACCESS_TOKEN', credential_present: false },
+      { serviceId: 'zendesk', secretKey: 'TOKEN', credential_present: false },
     ]);
     expect(JSON.stringify(descriptors)).not.toContain('synthetic-');
     expect(JSON.stringify(descriptors)).not.toContain('unrelated-private-field');
@@ -129,6 +148,21 @@ describe('local operator service connection capability', () => {
     const catalog = loadOperatorServiceConnectionCatalog();
     catalog[0].serviceId = 'mutated';
     expect(loadOperatorServiceConnectionCatalog()[0].serviceId).toBe('github');
+  });
+
+  it('never declares a credential-derived document field as a probe connectionField', () => {
+    for (const entry of loadOperatorServiceConnectionCatalog()) {
+      const suffixes = getServiceEndpointRecord(entry.serviceId)?.credential_suffixes ?? {};
+      const credentialFields = new Set(
+        Object.values(suffixes)
+          .flat()
+          .map((suffix) => secretKeyToConnectionField(suffix))
+      );
+      for (const field of entry.probe.connectionFields ?? []) {
+        expect(credentialFields.has(field), `${entry.serviceId}: ${field}`).toBe(false);
+      }
+      expect(credentialFields.has(entry.secretKey.toLowerCase())).toBe(true);
+    }
   });
 
   it.each([
@@ -167,7 +201,7 @@ describe('local operator service connection capability', () => {
         loopback: false,
         installationGrant: grant,
       }) as OperatorServiceConnectionPrincipal;
-    expect(listOperatorServiceConnections(remote(read))).toHaveLength(6);
+    expect(listOperatorServiceConnections(remote(read))).toHaveLength(18);
     // A read grant never admits the probe; a copied grant never admits anything.
     await expect(
       probeOperatorServiceConnection({ principal: remote(read), serviceId: 'evil' })
@@ -301,6 +335,7 @@ describe('local operator service connection capability', () => {
     { base_url: 'https://attacker.invalid' },
     { output_mapping: { id: 'other' } },
     { headers: { Authorization: 'unexpected' } },
+    { headers: { 'X-Custom': '{{client_secret}}' } },
     { parameters: { url: { type: 'string' } } },
     { allow_local_network: true },
   ])('rejects drift from the allowlisted fixed read-only runtime operation: %o', async (patch) => {
@@ -312,6 +347,73 @@ describe('local operator service connection capability', () => {
       },
     });
     expect(await probe()).toMatchObject({ status: 'unsupported' });
+    expect(mocks.secureFetch).not.toHaveBeenCalled();
+  });
+
+  it('rejects auth_params under a strategy where the engine ignores them', async () => {
+    mocks.transformPreset = (preset) => ({
+      ...preset,
+      auth_params: { key: 'key', value: '{{accessToken}}' },
+    });
+    expect(await probe()).toMatchObject({ status: 'unsupported' });
+    expect(mocks.secureFetch).not.toHaveBeenCalled();
+  });
+
+  it('reports credential_missing when a declared connection field is absent', async () => {
+    mocks.loadConnectionDocument.mockReturnValue({ api_token: 'synthetic-jira-token' });
+    expect(await probe('jira')).toMatchObject({ status: 'credential_missing' });
+    expect(mocks.secureFetch).not.toHaveBeenCalled();
+  });
+
+  it('resolves Jira basic auth from documented email and API token fields', async () => {
+    vi.stubEnv('JIRA_API_TOKEN', 'synthetic-jira-token');
+    vi.stubEnv('JIRA_EMAIL', 'ops@example.com');
+    mocks.loadConnectionDocument.mockReturnValue({
+      api_token: 'synthetic-jira-token',
+      domain: 'example',
+    });
+    mocks.secureFetch.mockImplementation(async ({ url }: { url: string }) =>
+      url === 'https://example.atlassian.net/rest/api/3/myself'
+        ? { accountId: 'abc123' }
+        : Promise.reject(new Error('unexpected url ' + url))
+    );
+    expect(await probe('jira')).toMatchObject({ status: 'authenticated' });
+    const expected = Buffer.from('ops@example.com:synthetic-jira-token', 'utf8').toString('base64');
+    expect(mocks.secureFetch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: 'https://example.atlassian.net/rest/api/3/myself',
+        headers: expect.objectContaining({ Authorization: 'Basic ' + expected }),
+      })
+    );
+  });
+
+  it('marks a registered Jira token shadowed when only a service-global bearer exists', async () => {
+    vi.stubEnv('JIRA_ACCESS_TOKEN', 'synthetic-shadow');
+    mocks.loadConnectionDocument.mockReturnValue({
+      api_token: 'synthetic-jira-token',
+      domain: 'example',
+    });
+    expect(await probe('jira')).toMatchObject({ status: 'credential_shadowed' });
+    expect(mocks.secureFetch).not.toHaveBeenCalled();
+  });
+
+  it('reports an incomplete basic pair as credential_missing, never an engine failure', async () => {
+    vi.stubEnv('JIRA_API_TOKEN', 'synthetic-jira-token');
+    mocks.loadConnectionDocument.mockReturnValue({
+      api_token: 'synthetic-jira-token',
+      domain: 'example',
+    });
+    expect(await probe('jira')).toMatchObject({ status: 'credential_missing' });
+    expect(mocks.secureFetch).not.toHaveBeenCalled();
+  });
+
+  it('verifies the credential the request sends, never a resolved sibling', async () => {
+    vi.stubEnv('JIRA_TOKEN', 'ambient-preencoded');
+    mocks.loadConnectionDocument.mockReturnValue({
+      api_token: 'synthetic-jira-token',
+      domain: 'example',
+    });
+    expect(await probe('jira')).toMatchObject({ status: 'credential_shadowed' });
     expect(mocks.secureFetch).not.toHaveBeenCalled();
   });
 

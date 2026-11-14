@@ -4,6 +4,15 @@
   "base_url": "https://app.asana.com/api/1.0",
   "auth_strategy": "Bearer",
   "operations": {
+    "get_current_user": {
+      "type": "api",
+      "kind": "capture",
+      "risk": "read",
+      "approval_required": false,
+      "path": "users/me",
+      "method": "GET",
+      "description": "Fetch the authenticated Asana user; serves as the identity probe."
+    },
     "list_projects": {
       "type": "api",
       "path": "projects",

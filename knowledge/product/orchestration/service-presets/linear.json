@@ -7,6 +7,16 @@
     "Content-Type": "application/json"
   },
   "operations": {
+    "get_viewer": {
+      "type": "api",
+      "kind": "capture",
+      "risk": "read",
+      "approval_required": false,
+      "path": "",
+      "method": "POST",
+      "payload_template": { "query": "{viewer{id}}" },
+      "description": "Fetch the authenticated Linear viewer; serves as the identity probe."
+    },
     "query": {
       "path": "",
       "method": "POST",

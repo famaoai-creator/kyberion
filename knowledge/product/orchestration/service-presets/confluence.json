@@ -29,7 +29,11 @@
       "method": "GET",
       "description": "Get a specific page by ID.",
       "parameters": {
-        "body_format": { "type": "string", "default": "storage", "description": "Format of the body: storage, atlas_doc_format, view" }
+        "body_format": {
+          "type": "string",
+          "default": "storage",
+          "description": "Format of the body: storage, atlas_doc_format, view"
+        }
       }
     },
     "create_page": {
@@ -61,7 +65,11 @@
       "parameters": {
         "title": { "type": "string" },
         "body": { "type": "string" },
-        "version": { "required": true, "type": "number", "description": "The new version number (current + 1)" }
+        "version": {
+          "required": true,
+          "type": "number",
+          "description": "The new version number (current + 1)"
+        }
       },
       "payload_template": {
         "id": "{{page_id}}",
@@ -80,8 +88,12 @@
       "description": "Get all pages in a specific space."
     },
     "get_spaces": {
+      "type": "api",
       "path": "spaces",
       "method": "GET",
+      "kind": "capture",
+      "risk": "read",
+      "approval_required": false,
       "description": "Get all spaces."
     },
     "get_space": {

@@ -36,7 +36,8 @@
             "maxLength": 80
           },
           "secretKey": {
-            "const": "ACCESS_TOKEN"
+            "enum": ["ACCESS_TOKEN", "API_KEY", "API_TOKEN", "BOT_TOKEN", "TOKEN"],
+            "description": "Document field name (upper-cased) holding the registered credential; must map to a bindable suffix in the endpoint's credential_suffixes — e.g. clientSecret for basic-auth services, accessToken for bearer/bot/api_key_query."
           },
           "authOperation": {
             "type": "string",
@@ -59,16 +60,59 @@
             "properties": {
               "baseUrl": {
                 "type": "string",
-                "pattern": "^https://[a-zA-Z0-9.-]+(?:/[a-zA-Z0-9._/-]+)?$",
-                "maxLength": 250
+                "pattern": "^https://([a-zA-Z0-9.-]|\\{\\{[a-z][a-z0-9_]{0,63}\\}\\})+(?:/[a-zA-Z0-9._/-]+)?$",
+                "maxLength": 250,
+                "description": "Request base URL; {{field}} placeholders resolve from pinned params or declared connectionFields only."
               },
               "path": {
                 "type": "string",
-                "pattern": "^[a-zA-Z0-9._/-]+$",
-                "maxLength": 150
+                "pattern": "^$|^([a-zA-Z0-9._/@-]|\\{\\{accessToken\\}\\})+$",
+                "maxLength": 150,
+                "description": "Static request path; {{accessToken}} is the only permitted placeholder and resolves from the admitted service binding, never from request input."
               },
               "method": {
                 "enum": ["GET", "POST"]
+              },
+              "params": {
+                "type": "object",
+                "description": "Pinned template defaults used only to resolve placeholders in the preset base_url/path (e.g. a provider's canonical hostname). Substituted into the admitted preset snapshot before execution; never sent as request data.",
+                "propertyNames": { "pattern": "^[a-z][a-z0-9_]{0,63}$" },
+                "additionalProperties": {
+                  "type": "string",
+                  "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$"
+                },
+                "maxProperties": 4
+              },
+              "payload": {
+                "type": "object",
+                "description": "Pinned static request body for POST probes; must deep-equal the preset operation's resolved payload_template."
+              },
+              "connectionFields": {
+                "type": "array",
+                "description": "Non-secret connection document keys (host, domain, subdomain, space) allowed into base_url/path template resolution. Secret keys are never read as template values.",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                  "not": {
+                    "enum": [
+                      "access_token",
+                      "api_key",
+                      "api_token",
+                      "app_token",
+                      "basic_auth_token",
+                      "bot_token",
+                      "client_id",
+                      "client_secret",
+                      "developer_token",
+                      "email",
+                      "redirect_uri",
+                      "refresh_token",
+                      "token"
+                    ]
+                  }
+                },
+                "maxItems": 4,
+                "uniqueItems": true
               },
               "successRules": {
                 "type": "array",
@@ -81,10 +125,17 @@
                   "properties": {
                     "field": {
                       "type": "string",
-                      "pattern": "^[a-z][a-z0-9_]{0,63}$"
+                      "pattern": "^[a-z][a-zA-Z0-9_]{0,63}(\\.[a-z][a-zA-Z0-9_]{0,63}){0,3}$",
+                      "description": "Top-level or dotted response field path (up to 4 segments deep)."
                     },
                     "kind": {
-                      "enum": ["positive_integer", "non_empty_string", "true"]
+                      "enum": [
+                        "positive_integer",
+                        "non_empty_string",
+                        "non_empty_array",
+                        "present",
+                        "true"
+                      ]
                     }
                   }
                 }

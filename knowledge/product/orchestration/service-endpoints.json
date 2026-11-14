@@ -52,6 +52,10 @@
     "confluence": {
       "base_url": "https://{{domain}}.atlassian.net/wiki/api/v2",
       "preset_path": "knowledge/product/orchestration/service-presets/confluence.json",
+      "credential_suffixes": {
+        "clientId": ["EMAIL"],
+        "clientSecret": ["TOKEN", "API_TOKEN"]
+      },
       "auth_strategy": "basic"
     },
     "discord": {
@@ -96,8 +100,12 @@
       "auth_strategy": "session"
     },
     "jira": {
-      "base_url": "https://atlassian.net/rest/api/3",
+      "base_url": "https://{{domain}}.atlassian.net/rest/api/3",
       "preset_path": "knowledge/product/orchestration/service-presets/jira.json",
+      "credential_suffixes": {
+        "clientId": ["EMAIL"],
+        "clientSecret": ["API_TOKEN"]
+      },
       "auth_strategy": "basic"
     },
     "linear": {
@@ -123,7 +131,11 @@
     },
     "moltbook": {
       "base_url": "https://www.moltbook.com/api/v1",
-      "auth_strategy": "none"
+      "preset_path": "knowledge/product/orchestration/service-presets/moltbook.json",
+      "credential_suffixes": {
+        "accessToken": ["API_KEY"]
+      },
+      "auth_strategy": "Bearer"
     },
     "notion": {
       "base_url": "https://api.notion.com/v1",
@@ -139,14 +151,9 @@
       "auth_strategy": "none"
     },
     "rustxng": {
-      "base_url": "http://127.0.0.1:8888",
       "preset_path": "knowledge/product/orchestration/service-presets/rustxng.json",
-      "auth_strategy": "none"
-    },
-    "speech_cpp": {
-      "base_url": "http://127.0.0.1:8095",
-      "preset_path": "knowledge/product/orchestration/service-presets/speech_cpp.json",
-      "auth_strategy": "none"
+      "auth_strategy": "none",
+      "base_url": "http://127.0.0.1:8888"
     },
     "slack": {
       "base_url": "https://slack.com/api",
@@ -162,6 +169,11 @@
       "base_url": "https://postman-echo.com",
       "preset_path": "knowledge/product/orchestration/service-presets/smoke-test.json",
       "auth_strategy": "none"
+    },
+    "speech_cpp": {
+      "preset_path": "knowledge/product/orchestration/service-presets/speech_cpp.json",
+      "auth_strategy": "none",
+      "base_url": "http://127.0.0.1:8095"
     },
     "sqlite": {
       "preset_path": "knowledge/product/orchestration/service-presets/sqlite.json",
@@ -228,6 +240,10 @@
     "zendesk": {
       "base_url": "https://{{subdomain}}.zendesk.com/api/v2",
       "preset_path": "knowledge/product/orchestration/service-presets/zendesk.json",
+      "credential_suffixes": {
+        "clientId": ["EMAIL"],
+        "clientSecret": ["TOKEN", "API_TOKEN"]
+      },
       "auth_strategy": "basic"
     }
   }

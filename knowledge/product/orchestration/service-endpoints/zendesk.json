@@ -4,6 +4,10 @@
     "zendesk": {
       "base_url": "https://{{subdomain}}.zendesk.com/api/v2",
       "preset_path": "knowledge/product/orchestration/service-presets/zendesk.json",
+      "credential_suffixes": {
+        "clientId": ["EMAIL"],
+        "clientSecret": ["TOKEN", "API_TOKEN"]
+      },
       "auth_strategy": "basic"
     }
   }
