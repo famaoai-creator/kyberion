@@ -1,5 +1,5 @@
 /**
- * scripts/dot_charters.ts — resident-agent ('dot') charter commands.
+ * scripts/dot/dot_charters.ts — resident-agent ('dot') charter commands.
  *
  * Usage:
  *   pnpm kyberion dot list [--all|--status=<s>] [--json]
@@ -68,11 +68,11 @@ import { dotDelegationCapacity } from '@agent/core/dot/dot-dispatch';
 import { dotFeedbackPromptLines, latestDotSignals } from '@agent/core/dot/dot-feedback';
 import { runDotWakeWithGoalDriver } from '@agent/core/dot/dot-wake-orchestration';
 import { installReasoningBackends } from '@agent/core/reasoning/reasoning-bootstrap';
-import { DEFAULT_DAEMONS } from './daemon_watchdog.js';
+import { DEFAULT_DAEMONS } from '../daemon_watchdog.js';
 import {
   DOT_TRANSITION_EXPECT_FLAGS,
   parseTransitionExpectations,
-} from './lib/dot-transition-expectations.js';
+} from '../lib/dot-transition-expectations.js';
 
 export { parseTransitionExpectations };
 import {
@@ -80,7 +80,7 @@ import {
   isDirectScript,
   ScriptExitError,
   stripSharedScriptFlags,
-} from './lib/harness.js';
+} from '../lib/harness.js';
 
 const STATUSES: DotCharterStatus[] = ['draft', 'active', 'paused', 'retired'];
 const SUBCOMMANDS = [

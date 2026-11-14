@@ -16,7 +16,7 @@ import {
 } from './fixtures/first-job-approval-fixture.js';
 import type { FrontDeskExecutionPolicy } from '@agent/core/surface/front-desk-execution-contract';
 import type { DotCharter, LoadedDotCharter } from '@agent/core/dot/dot-charter';
-import type { DotExecutorStepDeps } from './dot_executor_step.js';
+import type { DotExecutorStepDeps } from './dot/dot_executor_step.js';
 const sourceRoot = process.cwd();
 const root = path.join(
   sourceRoot,
@@ -64,10 +64,10 @@ let withStoreGrant: typeof import('@agent/core/authority').withStoreGrant;
 let mintBrowserSessionToken: typeof import('@agent/core/authn/authn-providers').mintBrowserSessionToken;
 let readFirstJobApprovals: typeof import('@agent/core/surface/first-job-approval').readFirstJobApprovals;
 let decideFirstJobApproval: typeof import('@agent/core/surface/first-job-approval').decideFirstJobApproval;
-let runDotExecutorStep: typeof import('./dot_executor_step.js').runDotExecutorStep;
-let buildDotExecutorPorts: typeof import('./dot_executor_step.js').buildDotExecutorPorts;
+let runDotExecutorStep: typeof import('./dot/dot_executor_step.js').runDotExecutorStep;
+let buildDotExecutorPorts: typeof import('./dot/dot_executor_step.js').buildDotExecutorPorts;
 let FRONT_DESK_EXECUTION_SUPERVISOR_STEP: typeof import('./front_desk_execution_step.js').FRONT_DESK_EXECUTION_SUPERVISOR_STEP;
-let DOT_SUPERVISOR_STEPS: typeof import('./dot_supervisor_extensions.js').DOT_SUPERVISOR_STEPS;
+let DOT_SUPERVISOR_STEPS: typeof import('./dot/dot_supervisor_extensions.js').DOT_SUPERVISOR_STEPS;
 let createFirstJobTenantStatusAssertion: typeof import('./onboarding_first_job_tenant_status.js').createFirstJobTenantStatusAssertion;
 let status: typeof import('@agent/core/surface/front-desk-execution-status');
 let originalProjection: typeof import('@agent/core/surface/front-desk-execution-status').projectFrontDeskExecution;
@@ -157,9 +157,9 @@ beforeAll(async () => {
   ({ mintBrowserSessionToken } = await import('@agent/core/authn/authn-providers'));
   ({ readFirstJobApprovals, decideFirstJobApproval } =
     await import('@agent/core/surface/first-job-approval'));
-  ({ runDotExecutorStep, buildDotExecutorPorts } = await import('./dot_executor_step.js'));
+  ({ runDotExecutorStep, buildDotExecutorPorts } = await import('./dot/dot_executor_step.js'));
   ({ FRONT_DESK_EXECUTION_SUPERVISOR_STEP } = await import('./front_desk_execution_step.js'));
-  ({ DOT_SUPERVISOR_STEPS } = await import('./dot_supervisor_extensions.js'));
+  ({ DOT_SUPERVISOR_STEPS } = await import('./dot/dot_supervisor_extensions.js'));
   ({ createFirstJobTenantStatusAssertion } =
     await import('./onboarding_first_job_tenant_status.js'));
   status = await import('@agent/core/surface/front-desk-execution-status');
@@ -292,7 +292,7 @@ async function resumeInFreshProcess(): Promise<Array<{ status: string }>> {
     "import { setWorkCoordinationNamespace } from '@agent/core/workforce/work-coordination';",
     "import { withExecutionContextAsync } from '@agent/core/authority';",
     'import { runDotExecutorStep } from ' +
-      JSON.stringify(path.join(sourceRoot, 'dist/scripts/dot_executor_step.js')) +
+      JSON.stringify(path.join(sourceRoot, 'dist/scripts/dot/dot_executor_step.js')) +
       ';',
     'import { createFirstJobTenantStatusAssertion } from ' +
       JSON.stringify(path.join(sourceRoot, 'dist/scripts/onboarding_first_job_tenant_status.js')) +

@@ -80,7 +80,7 @@ vi.mock('@agent/core/dot/dot-dispatch', async (importOriginal) => {
     ) => actual.dotDelegationCapacity(charter, { ...deps, rootDir: mocks.rootDir }),
   };
 });
-vi.mock('./daemon_watchdog.js', () => ({ DEFAULT_DAEMONS: [] }));
+vi.mock('../daemon_watchdog.js', () => ({ DEFAULT_DAEMONS: [] }));
 
 import { parseTransitionExpectations, runDotCharters } from './dot_charters.js';
 import { dotAdmissionScopeHash } from '@agent/core/dot/dot-admission-identity';

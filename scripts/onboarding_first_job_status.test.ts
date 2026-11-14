@@ -29,7 +29,7 @@ let store: typeof import('@agent/core/surface/front-desk-conversation-store');
 let work: typeof import('@agent/core/workforce/work-coordination');
 let dispatch: typeof import('@agent/core/dot/dot-dispatch');
 let execution: typeof import('@agent/core/surface/front-desk-execution');
-let executor: typeof import('./dot_executor_step.js');
+let executor: typeof import('./dot/dot_executor_step.js');
 let approval: typeof import('@agent/core/surface/first-job-approval');
 let approvalStore: typeof import('@agent/core/governance/approval-store');
 /** Where a stored autonomy request lives (system tree or its tenant approval partition). */
@@ -181,7 +181,7 @@ beforeAll(async () => {
   work = await import('@agent/core/workforce/work-coordination');
   dispatch = await import('@agent/core/dot/dot-dispatch');
   execution = await import('@agent/core/surface/front-desk-execution');
-  executor = await import('./dot_executor_step.js');
+  executor = await import('./dot/dot_executor_step.js');
   approval = await import('@agent/core/surface/first-job-approval');
   approvalStore = await import('@agent/core/governance/approval-store');
   browser = await import('@agent/core/authn/authn-providers');

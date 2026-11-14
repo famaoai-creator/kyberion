@@ -2030,7 +2030,7 @@
     },
     {
       "id": "script.dot.capacity",
-      "module": "scripts/dot_charters.ts",
+      "module": "scripts/dot/dot_charters.ts",
       "command": "dot capacity",
       "args": ["capacity"],
       "noun": "dot",
@@ -2041,7 +2041,7 @@
     },
     {
       "id": "script.dot.create",
-      "module": "scripts/dot_charters.ts",
+      "module": "scripts/dot/dot_charters.ts",
       "command": "dot create",
       "args": ["create"],
       "noun": "dot",
@@ -2052,7 +2052,7 @@
     },
     {
       "id": "script.dot.migrate-state",
-      "module": "scripts/dot_charters.ts",
+      "module": "scripts/dot/dot_charters.ts",
       "command": "dot migrate-state",
       "args": ["migrate-state"],
       "noun": "dot",
@@ -2063,7 +2063,7 @@
     },
     {
       "id": "script.dot.activate",
-      "module": "scripts/dot_charters.ts",
+      "module": "scripts/dot/dot_charters.ts",
       "command": "dot activate",
       "args": ["activate"],
       "noun": "dot",
@@ -2074,7 +2074,7 @@
     },
     {
       "id": "script.dot.autonomy",
-      "module": "scripts/dot_charters.ts",
+      "module": "scripts/dot/dot_charters.ts",
       "command": "dot autonomy",
       "args": ["autonomy"],
       "noun": "dot",
@@ -2085,7 +2085,7 @@
     },
     {
       "id": "script.dot.event",
-      "module": "scripts/dot_charters.ts",
+      "module": "scripts/dot/dot_charters.ts",
       "command": "dot event",
       "args": ["event"],
       "noun": "dot",
@@ -2096,7 +2096,7 @@
     },
     {
       "id": "script.dot.followups",
-      "module": "scripts/dot_charters.ts",
+      "module": "scripts/dot/dot_charters.ts",
       "command": "dot followups",
       "args": ["followups"],
       "noun": "dot",
@@ -2107,7 +2107,7 @@
     },
     {
       "id": "script.dot.inbox",
-      "module": "scripts/dot_charters.ts",
+      "module": "scripts/dot/dot_charters.ts",
       "command": "dot inbox",
       "args": ["inbox"],
       "noun": "dot",
@@ -2118,7 +2118,7 @@
     },
     {
       "id": "script.dot.intake",
-      "module": "scripts/dot_charters.ts",
+      "module": "scripts/dot/dot_charters.ts",
       "command": "dot intake",
       "args": ["intake"],
       "noun": "dot",
@@ -2129,7 +2129,7 @@
     },
     {
       "id": "script.dot.kr",
-      "module": "scripts/dot_charters.ts",
+      "module": "scripts/dot/dot_charters.ts",
       "command": "dot kr",
       "args": ["kr"],
       "noun": "dot",
@@ -2140,7 +2140,7 @@
     },
     {
       "id": "script.dot.list",
-      "module": "scripts/dot_charters.ts",
+      "module": "scripts/dot/dot_charters.ts",
       "command": "dot list",
       "args": ["list"],
       "noun": "dot",
@@ -2151,7 +2151,7 @@
     },
     {
       "id": "script.dot.memory",
-      "module": "scripts/dot_charters.ts",
+      "module": "scripts/dot/dot_charters.ts",
       "command": "dot memory",
       "args": ["memory"],
       "noun": "dot",
@@ -2162,7 +2162,7 @@
     },
     {
       "id": "script.dot.outcomes",
-      "module": "scripts/dot_charters.ts",
+      "module": "scripts/dot/dot_charters.ts",
       "command": "dot outcomes",
       "args": ["outcomes"],
       "noun": "dot",
@@ -2173,7 +2173,7 @@
     },
     {
       "id": "script.dot.pause",
-      "module": "scripts/dot_charters.ts",
+      "module": "scripts/dot/dot_charters.ts",
       "command": "dot pause",
       "args": ["pause"],
       "noun": "dot",
@@ -2184,7 +2184,7 @@
     },
     {
       "id": "script.dot.release",
-      "module": "scripts/dot_charters.ts",
+      "module": "scripts/dot/dot_charters.ts",
       "command": "dot release",
       "args": ["release"],
       "noun": "dot",
@@ -2195,7 +2195,7 @@
     },
     {
       "id": "script.dot.retire",
-      "module": "scripts/dot_charters.ts",
+      "module": "scripts/dot/dot_charters.ts",
       "command": "dot retire",
       "args": ["retire"],
       "noun": "dot",
@@ -2206,7 +2206,7 @@
     },
     {
       "id": "script.dot.status",
-      "module": "scripts/dot_charters.ts",
+      "module": "scripts/dot/dot_charters.ts",
       "command": "dot status",
       "args": ["status"],
       "noun": "dot",
@@ -2218,7 +2218,7 @@
     },
     {
       "id": "script.dot.validate",
-      "module": "scripts/dot_charters.ts",
+      "module": "scripts/dot/dot_charters.ts",
       "command": "dot validate",
       "args": ["validate"],
       "noun": "dot",
@@ -2229,7 +2229,7 @@
     },
     {
       "id": "script.dot.wake",
-      "module": "scripts/dot_charters.ts",
+      "module": "scripts/dot/dot_charters.ts",
       "command": "dot wake",
       "args": ["wake"],
       "noun": "dot",
@@ -2241,7 +2241,7 @@
     },
     {
       "id": "script.dot.work",
-      "module": "scripts/dot_charters.ts",
+      "module": "scripts/dot/dot_charters.ts",
       "command": "dot work",
       "args": ["work"],
       "noun": "dot",

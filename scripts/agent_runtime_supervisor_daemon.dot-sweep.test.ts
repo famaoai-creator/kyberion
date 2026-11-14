@@ -86,7 +86,7 @@ import {
   resetDotSweepStateForTests,
   runDotSweepOnce,
 } from './agent_runtime_supervisor_daemon.js';
-import { DOT_SUPERVISOR_STEPS } from './dot_supervisor_extensions.js';
+import { DOT_SUPERVISOR_STEPS } from './dot/dot_supervisor_extensions.js';
 
 function charter(dotId: string): DotCharter {
   return {

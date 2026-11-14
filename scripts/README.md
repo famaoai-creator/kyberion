@@ -18,6 +18,7 @@ scripts/
   continuous/     ← `continuous_*` continuous-operations cycle entry points
   task/           ← `task_*` work-item operations (init/list/run/scenario/smoke)
   reconcile/      ← `reconcile_*` config/scope/intent reconciliation sweeps
+  dot/            ← `dot_*` Dot charter lifecycle/executor/cadence steps
   lib/            ← shared helpers imported by scripts; no entry points
   <domain>/       ← grouped script sets for one bounded area
                     (personal-pads/, meeting-notepad/, daily-desk/,
@@ -31,7 +32,7 @@ family moved first (all gates, their tests and `*.baseline.json` files now
 live in `check/`; new checkers go there, never in the root), followed by the
 `generate_*` catalog/index generators in `generate/`, the `sync_*`
 code→knowledge syncers in `sync/`, and the domain entry-point families
-`meeting/`, `peer/`, `continuous/`, `task/` and `reconcile/`. Prefer a
+`meeting/`, `peer/`, `continuous/`, `task/`, `reconcile/` and `dot/`. Prefer a
 subdirectory for new domain-scoped scripts and keep the root for operations
 that genuinely span the repository. (Direction set by
 [SIMPLICITY_ABSTRACTION_PLAN](../docs/developer/improvement-plans-2026-08/SIMPLICITY_ABSTRACTION_PLAN_2026-08-25.ja.md)
