@@ -22,6 +22,9 @@ scripts/
                     soak/ video/ setup/ work/ pr/ publish/ benchmark/ approval/
                     chronos/ codex/ agy/ control/ vital/ virtual/ terminal/
                     services/ register/ realtime/ presence/ external/
+  cli/            ← `cli-*` kyberion CLI internals (cli.ts entry stays root)
+  pipeline/       ← `pipeline-*` engine internals + pipeline_accept/promote
+                    (run_pipeline* stays root as the canonical runner)
   lib/            ← shared helpers imported by scripts; no entry points
   <domain>/       ← grouped script sets for one bounded area
                     (personal-pads/, meeting-notepad/, daily-desk/,
