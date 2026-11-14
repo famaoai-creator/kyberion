@@ -1,25 +1,25 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { withExecutionContextAsync } from './authority.js';
-import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
+import { withExecutionContextAsync } from '../authority.js';
+import { pathResolver } from '../path-resolver.js';
+import { safeExistsSync, safeReadFile, safeRmSync, safeWriteFile } from '../secure-io.js';
 import {
   createDelegationHandle,
   loadDelegatedTaskRecord,
   startDelegatedTaskTrace,
-} from './workforce/delegated-task-observability.js';
+} from '../workforce/delegated-task-observability.js';
 import {
   buildRoleAwareReasoningBackend,
   getReasoningBackend,
   registerReasoningBackend,
   resetReasoningBackend,
   stubReasoningBackend,
-} from './reasoning/reasoning-backend.js';
+} from '../reasoning/reasoning-backend.js';
 import {
   getActiveSandboxPolicy,
   withSandboxPolicy,
   type SandboxPolicy,
-} from './shell/sandbox-policy.js';
-import { runInResourceAccessScope } from './foundation/resource-access-scope.js';
+} from '../shell/sandbox-policy.js';
+import { runInResourceAccessScope } from '../foundation/resource-access-scope.js';
 
 const relativeRoot = `active/shared/tmp/delegation-host-io-${process.pid}`;
 const root = pathResolver.rootResolve(relativeRoot);
