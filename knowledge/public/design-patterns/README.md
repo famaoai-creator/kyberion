@@ -31,20 +31,9 @@
 
 パターンからの資料生成は `transform` ステップを経由して行う。
 
-### CLI からの生成
-
-```bash
-# デフォルト（Marketing Deck）
-node dist/scripts/generate_marketing_deck.js
-
-# カスタムパターン + テーマ指定
-node dist/scripts/generate_marketing_deck.js \
-  --pattern knowledge/public/design-patterns/presentation/executive-summary.json \
-  --theme kyberion-standard \
-  --output active/shared/exports/exec-summary.pptx
-```
-
 ### ADF Pipeline (JSON)
+
+下記の ADF pipeline を `pnpm pipeline` で実行する。
 
 ```json
 {
