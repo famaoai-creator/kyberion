@@ -64,6 +64,10 @@ function enforceTenantBindingContract(
   const operation = preset.operations[action];
   if (!operation) throw new Error(`Operation "${action}" not found in presets for ${serviceId}`);
   const identity = credentialExecutionIdentity();
+  if (identity.personalClaim)
+    throw new Error(
+      '[POLICY_VIOLATION] Personal claimed PRESET execution requires separate admission'
+    );
   const operationBindingRequired =
     Boolean(identity.tenantSlug || tenantBindingCapability) ||
     preset.tenant_binding_required === true ||

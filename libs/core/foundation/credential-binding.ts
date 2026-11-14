@@ -25,7 +25,8 @@ export interface TaskProviderProvenance {
 
 /** Trusted dispatch input. These values are never accepted from a model or HTTP payload. */
 export interface TaskCredentialBinding {
-  readonly tenantSlug: string;
+  readonly tenantSlug?: string;
+  readonly personalClaim?: PersonalCredentialClaim;
   readonly missionId?: string;
   readonly taskId?: string;
   readonly secrets: Readonly<Record<string, string>>;
@@ -42,7 +43,72 @@ const host = globalThis as typeof globalThis & {
   [KEY]?: AsyncLocalStorage<TaskCredentialBinding>;
 };
 const storage = host[KEY] ?? (host[KEY] = new AsyncLocalStorage<TaskCredentialBinding>());
-export type CredentialIdentity = { tenantSlug?: string; missionId?: string; taskId?: string };
+export interface PersonalCredentialClaim {
+  readonly ownerId: string;
+  readonly actorId: string;
+  readonly workItemId: string;
+  readonly attemptId: string;
+  readonly leaseId: string;
+}
+export type CredentialIdentity = {
+  tenantSlug?: string;
+  missionId?: string;
+  taskId?: string;
+  personalClaim?: PersonalCredentialClaim;
+};
+type PersonalExecution = {
+  claim: Readonly<PersonalCredentialClaim>;
+  missionId: string;
+  taskId: string;
+};
+const PERSONAL_KEY = Symbol.for('kyberion.core.personal-credential-execution.v1');
+const personalHost = globalThis as typeof globalThis & {
+  [PERSONAL_KEY]?: AsyncLocalStorage<PersonalExecution>;
+};
+const personalStorage =
+  personalHost[PERSONAL_KEY] ??
+  (personalHost[PERSONAL_KEY] = new AsyncLocalStorage<PersonalExecution>());
+function samePersonalClaim(a?: PersonalCredentialClaim, b?: PersonalCredentialClaim): boolean {
+  return (
+    a === b ||
+    Boolean(
+      a &&
+      b &&
+      a.ownerId === b.ownerId &&
+      a.actorId === b.actorId &&
+      a.workItemId === b.workItemId &&
+      a.attemptId === b.attemptId &&
+      a.leaseId === b.leaseId
+    )
+  );
+}
+
+/** Trusted dispatch only. This stage admits no personal credential or provider environment. */
+export function withPersonalTaskCredentialBinding<T>(
+  claim: PersonalCredentialClaim,
+  validate: () => void,
+  run: () => T
+): T {
+  const identity = credentialExecutionIdentity();
+  if (
+    identity.tenantSlug ||
+    !identity.missionId ||
+    !identity.taskId ||
+    Object.keys(claim).sort().join(',') !== 'actorId,attemptId,leaseId,ownerId,workItemId' ||
+    ['ownerId', 'actorId', 'workItemId', 'attemptId', 'leaseId'].some((key) => {
+      const value = claim[key as keyof PersonalCredentialClaim];
+      return typeof value !== 'string' || !value.trim();
+    }) ||
+    (identity.personalClaim && !samePersonalClaim(identity.personalClaim, claim))
+  )
+    throw new Error('[CREDENTIAL_SCOPE_DENIED] Exact personal task lineage is required');
+  validate();
+  const personalClaim = Object.freeze({ ...claim });
+  return personalStorage.run(
+    Object.freeze({ claim: personalClaim, missionId: identity.missionId, taskId: identity.taskId }),
+    () => withTaskCredentialBinding({ personalClaim, secrets: {}, validate }, run)
+  );
+}
 
 export interface CredentialBindingReadiness {
   status: 'operator' | 'bound' | 'binding_required';
@@ -94,10 +160,19 @@ export function credentialExecutionIdentity(): CredentialIdentity {
   ) {
     throw new Error('[CREDENTIAL_SCOPE_DENIED] Execution lineage contradicts its envelope');
   }
+  const personal = personalStorage.getStore();
+  const resolvedMissionId = missionId || envelope?.missionId || undefined;
+  const resolvedTaskId = taskId || envelope?.taskId || undefined;
+  if (
+    personal &&
+    (tenantSlug || personal.missionId !== resolvedMissionId || personal.taskId !== resolvedTaskId)
+  )
+    throw new Error('[CREDENTIAL_SCOPE_DENIED] Personal execution lineage changed');
   return {
     tenantSlug: tenantSlug || undefined,
-    missionId: missionId || envelope?.missionId || undefined,
-    taskId: taskId || envelope?.taskId || undefined,
+    missionId: resolvedMissionId,
+    taskId: resolvedTaskId,
+    ...(personal ? { personalClaim: personal.claim } : {}),
   };
 }
 
@@ -107,12 +182,13 @@ function checkedBinding(): TaskCredentialBinding | undefined {
   if (
     binding &&
     (binding.tenantSlug !== identity.tenantSlug ||
+      !samePersonalClaim(binding.personalClaim, identity.personalClaim) ||
       binding.missionId !== identity.missionId ||
       binding.taskId !== identity.taskId)
   ) {
     throw new Error('[CREDENTIAL_SCOPE_DENIED] Credential binding does not match execution');
   }
-  if (identity.tenantSlug && !binding) {
+  if ((identity.tenantSlug || identity.personalClaim) && !binding) {
     throw new Error('[CREDENTIAL_BINDING_REQUIRED] Tenant credentials require a trusted binding');
   }
   binding?.validate?.();
@@ -130,7 +206,10 @@ export function credentialBindingReadiness(): CredentialBindingReadiness {
     checkedBinding();
     return { status: 'bound', identity };
   }
-  return { status: identity.tenantSlug ? 'binding_required' : 'operator', identity };
+  return {
+    status: identity.tenantSlug || identity.personalClaim ? 'binding_required' : 'operator',
+    identity,
+  };
 }
 
 /** Only a missing trusted binding can be treated as optional discovery absence. */
@@ -150,19 +229,30 @@ export function withTaskCredentialBinding<T>(binding: TaskCredentialBinding, run
     throw new Error('[CREDENTIAL_BINDING_INVALID] Expected a trusted freshness check');
   const identity = credentialExecutionIdentity();
   if (
-    !identity.tenantSlug ||
+    (!identity.tenantSlug && !identity.personalClaim) ||
+    !samePersonalClaim(binding.personalClaim, identity.personalClaim) ||
     binding.tenantSlug !== identity.tenantSlug ||
     (binding.missionId !== undefined && binding.missionId !== identity.missionId) ||
     (binding.taskId !== undefined && binding.taskId !== identity.taskId)
   ) {
     throw new Error('[CREDENTIAL_SCOPE_DENIED] A runtime tenant binding is required');
   }
+  if (
+    identity.personalClaim &&
+    (!binding.validate ||
+      Object.keys(binding.secrets).length ||
+      binding.secretProvenance ||
+      binding.providerEnvironments ||
+      binding.providerProvenance)
+  )
+    throw new Error('[CREDENTIAL_SCOPE_DENIED] Personal dispatch admits an empty binding only');
   const parent = storage.getStore();
   const taskId = binding.taskId ?? identity.taskId;
   const missionId = binding.missionId ?? identity.missionId;
   if (
     parent &&
     (parent.tenantSlug !== binding.tenantSlug ||
+      !samePersonalClaim(parent.personalClaim, binding.personalClaim) ||
       parent.missionId !== missionId ||
       parent.taskId !== taskId ||
       Object.entries(binding.secrets).some(([key, value]) => parent.secrets[key] !== value) ||
@@ -429,9 +519,12 @@ export function selectProviderCredential(
 /** Cached API clients are scoped to their creator, including the operator (unbound) identity. */
 export function assertCredentialOwner(owner: ReturnType<typeof credentialExecutionIdentity>): void {
   const current = credentialExecutionIdentity();
+  if (current.personalClaim) checkedBinding();
   if (
     owner.tenantSlug !== current.tenantSlug ||
-    (owner.tenantSlug && (owner.missionId !== current.missionId || owner.taskId !== current.taskId))
+    !samePersonalClaim(owner.personalClaim, current.personalClaim) ||
+    ((owner.tenantSlug || owner.personalClaim) &&
+      (owner.missionId !== current.missionId || owner.taskId !== current.taskId))
   ) {
     throw new Error('[CREDENTIAL_OWNER_DENIED] Cached provider belongs to another execution');
   }

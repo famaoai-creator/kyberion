@@ -1,3 +1,4 @@
+import { credentialExecutionIdentity } from '../foundation/credential-binding.js';
 /**
  * Internal, revocable request authority for the fixed local-operator probe.
  * Never export these helpers from the core barrel or expose them over RPC.
@@ -44,6 +45,7 @@ export function operatorProbeSecretAccess(
   return (
     current.active &&
     !getPluginExecutionContext() &&
+    !credentialExecutionIdentity().personalClaim &&
     current.serviceId === serviceId &&
     operation === 'service.resolve' &&
     current.credentialNames.has(key)
@@ -56,7 +58,11 @@ export async function runOperatorServiceProbeScope<T>(
   credentialNames: readonly string[],
   callback: () => Promise<T>
 ): Promise<T> {
-  if (getPluginExecutionContext() || scope.getStore()) {
+  if (
+    getPluginExecutionContext() ||
+    credentialExecutionIdentity().personalClaim ||
+    scope.getStore()
+  ) {
     throw new Error('[OPERATOR_SERVICE_PROBE_DENIED]');
   }
   const current: ProbeScope = {
@@ -80,6 +86,7 @@ export function issueOperatorServiceProbeAdmission(data: OperatorProbeEngineAdmi
   if (
     !current?.active ||
     getPluginExecutionContext() ||
+    credentialExecutionIdentity().personalClaim ||
     current.serviceId !== data.serviceId ||
     current.action !== data.action ||
     data.binding.serviceId !== data.serviceId
@@ -103,6 +110,7 @@ export function consumeOperatorServiceProbeAdmission(
     !entry.scope.active ||
     entry.scope !== scope.getStore() ||
     getPluginExecutionContext() ||
+    credentialExecutionIdentity().personalClaim ||
     entry.data.serviceId !== serviceId ||
     entry.data.action !== action
   ) {

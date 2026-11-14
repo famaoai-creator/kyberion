@@ -140,7 +140,8 @@ const denied = () =>
 
 function reader<T>(tenant: string, run: () => T): T {
   const identity = credentialExecutionIdentity();
-  if (identity.tenantSlug && identity.tenantSlug !== tenant) throw denied();
+  if (identity.personalClaim || (identity.tenantSlug && identity.tenantSlug !== tenant))
+    throw denied();
   return withStoreGrant('credential_allocation_reader', run, {
     tenantSlug: tenant,
     identity: {

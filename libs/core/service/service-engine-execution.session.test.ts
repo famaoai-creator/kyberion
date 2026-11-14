@@ -1,3 +1,4 @@
+import { resolveServiceBinding } from './service-binding.js';
 import { executeServicePreset } from './service-engine.js';
 import { issueTenantServiceEngineAdmission } from './service-engine-admission.js';
 import { buildSafeExecEnv } from '../secure-io.js';
@@ -9,6 +10,7 @@ import {
 
 const mocks = vi.hoisted(() => ({
   tenant: 'alpha' as string | undefined,
+  personalClaim: undefined as object | undefined,
   actor: 'worker-a',
   source: 'binding-a',
   selected: {} as Record<string, unknown>,
@@ -27,7 +29,10 @@ vi.mock('../governance/chain-integrity.js', async (original) => ({
 }));
 vi.mock('../foundation/credential-binding.js', async (original) => ({
   ...(await original<typeof import('../foundation/credential-binding.js')>()),
-  credentialExecutionIdentity: () => ({ tenantSlug: mocks.tenant }),
+  credentialExecutionIdentity: () => ({
+    tenantSlug: mocks.tenant,
+    personalClaim: mocks.personalClaim,
+  }),
   resolveTaskServiceProviderBinding: (
     _provider: string,
     expected: { serviceBindingId: string; actorId: string }
@@ -142,6 +147,7 @@ function context(): ServicePresetAlternativeExecutionContext {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.tenant = 'alpha';
+  mocks.personalClaim = undefined;
   mocks.actor = 'worker-a';
   mocks.source = 'binding-a';
   mocks.fresh = true;
@@ -290,6 +296,20 @@ describe('tenant GWS session transport', () => {
     await executeServicePresetAlternative(input);
     expect(input.captureAuthority).toHaveBeenCalled();
     expect(mocks.exec).toHaveBeenCalledWith('gws', expect.any(Array), { env: mocks.env });
+  });
+  it('rejects claimed personal GWS instead of inheriting the operator session', async () => {
+    mocks.tenant = undefined;
+    mocks.personalClaim = { ownerId: 'user:owner' };
+    expect(() => resolveServiceBinding('google-workspace', 'session')).toThrow(
+      'CREDENTIAL_PROVENANCE_DENIED'
+    );
+    await expect(executeServicePresetAlternative(context())).rejects.toThrow(
+      'CREDENTIAL_PROVENANCE_DENIED'
+    );
+    await expect(executeServicePreset('google-workspace', 'read', {}, 'none')).rejects.toThrow(
+      'Personal claimed PRESET'
+    );
+    expect(mocks.exec).not.toHaveBeenCalled();
   });
   it('retains personal execution without a tenant', async () => {
     mocks.tenant = undefined;

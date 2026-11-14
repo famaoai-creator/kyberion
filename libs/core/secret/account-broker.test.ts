@@ -14,6 +14,7 @@ import {
 
 const fixture = vi.hoisted(() => ({
   tenant: undefined as string | undefined,
+  personalClaim: undefined as object | undefined,
   plugin: false,
   binding: {
     binding_id: 'org-github',
@@ -34,7 +35,10 @@ const fixture = vi.hoisted(() => ({
 vi.mock('node:child_process', () => ({ execFileSync: fixture.exec }));
 vi.mock('../foundation/credential-binding.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../foundation/credential-binding.js')>()),
-  credentialExecutionIdentity: () => ({ tenantSlug: fixture.tenant }),
+  credentialExecutionIdentity: () => ({
+    tenantSlug: fixture.tenant,
+    personalClaim: fixture.personalClaim,
+  }),
 }));
 vi.mock('../shell/sandbox-policy.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../shell/sandbox-policy.js')>()),
@@ -82,6 +86,7 @@ function admittedProvision(input: Parameters<typeof provisionAccountMaterial>[0]
 describe('account broker provisioning', () => {
   beforeEach(() => {
     fixture.tenant = undefined;
+    fixture.personalClaim = undefined;
     fixture.plugin = false;
     fixture.binding.owner_ref = 'acme';
     fixture.binding.secret_refs = ['GITHUB_TOKEN'];
@@ -90,6 +95,12 @@ describe('account broker provisioning', () => {
     resetSecretResolver();
     vi.unstubAllEnvs();
     vi.clearAllMocks();
+  });
+  it('does not expose an organization writer to a personal claim', () => {
+    const writer = install();
+    fixture.personalClaim = { ownerId: 'user:owner' };
+    expect(describeAccountBroker()).toBeNull();
+    expect(writer.provision).not.toHaveBeenCalled();
   });
   it('does not infer a writer from ordinary secret resolution', () => {
     registerSecretResolver({ name: 'readonly', resolve: () => 'token' });

@@ -71,6 +71,7 @@ function selected(principal: OnboardingAuthorityPrincipal, bindingId: string) {
     getPluginExecutionContext() ||
     resolveAssumedRole() !== 'sovereign_concierge' ||
     credentialExecutionIdentity().tenantSlug ||
+    credentialExecutionIdentity().personalClaim ||
     !/^[a-z0-9][a-z0-9._-]{0,63}$/.test(bindingId) ||
     !principal.requesterId?.trim() ||
     !principal.accountableId?.startsWith('user:') ||

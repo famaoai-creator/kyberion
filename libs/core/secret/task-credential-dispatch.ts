@@ -4,9 +4,11 @@ import {
   credentialExecutionIdentity,
   hasTaskCredentialBinding,
   withTaskCredentialBinding,
+  withPersonalTaskCredentialBinding,
   type TaskCredentialBinding,
 } from '../foundation/credential-binding.js';
 import { assertScopeContext, type ScopeContext } from '../foundation/scope-context-validation.js';
+import { assertPersonalTaskCredentialClaim } from './personal-task-credential-claim.js';
 
 /**
  * Attests claimed-task lineage while granting zero credentials. Fresh tenants
@@ -29,13 +31,30 @@ export async function withConfiguredTaskCredentials<T>(
   workItemId: string,
   run: () => Promise<T>
 ): Promise<T> {
-  if (hasTaskCredentialBinding()) return run();
+  if (hasTaskCredentialBinding()) {
+    const personal = credentialExecutionIdentity().personalClaim;
+    if (personal && personal.workItemId !== workItemId)
+      throw new Error('[CREDENTIAL_SCOPE_DENIED] Nested dispatch changed the personal WorkItem');
+    return run();
+  }
   const envelope = currentScopeEnvelope();
-  // No dispatch envelope means no claimed-task context: run unbound. Provider
-  // access itself is fail-closed at point of use.
-  if (!envelope) return run();
+  // This entry point runs only after a WorkItem claim. Missing dispatch proof
+  // cannot turn that work into an operator credential context.
+  if (!envelope)
+    throw new Error('[CREDENTIAL_BINDING_UNAVAILABLE] Claimed dispatch requires a scope envelope');
   const identity = credentialExecutionIdentity();
-  if (!identity.tenantSlug) return run();
+  if (!identity.tenantSlug) {
+    const claim = assertPersonalTaskCredentialClaim(workItemId);
+    const snapshot = JSON.stringify(claim);
+    return withPersonalTaskCredentialBinding(
+      claim,
+      () => {
+        if (JSON.stringify(assertPersonalTaskCredentialClaim(workItemId)) !== snapshot)
+          throw new Error('[CREDENTIAL_BINDING_UNAVAILABLE] Personal claim changed');
+      },
+      run
+    );
+  }
   if (envelope.identity.tenant_slug !== identity.tenantSlug)
     throw new Error('[CREDENTIAL_SCOPE_DENIED] Dispatch envelope contradicts runtime credentials');
   const resolver = getSecretResolver();

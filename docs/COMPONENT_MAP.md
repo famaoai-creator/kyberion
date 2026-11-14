@@ -243,6 +243,9 @@ The operations console does not directly own mission state. It delegates to:
 - `libs/core/service/service-binding-registry.ts` (writes and tenant/project/action authorization)
 - `libs/core/secret/account-introduction.ts` (owner-approved registration of exact account generations)
 - `libs/core/secret/account-broker.ts` (explicit organization account provisioning and receipt validation)
+- `libs/core/secret/personal-task-credential-claim.ts` (read-only installed personal owner/NHI, runtime envelope and current WorkItem run/lease proof)
+- `libs/core/organization/personal-runtime-identity.ts` (canonical installed person identity reader, shared with onboarding without importing organization session admission)
+- `libs/core/secret/task-credential-dispatch.ts` and `libs/core/foundation/credential-binding.ts` (tenant broker composition and empty-only tenantless personal bindings; no operator fallback or credential grants)
 - `libs/core/secret/credential-allocations.ts` (local task broker: reasoning grants and explicit owner-approved personal service allocations into tenant work)
 - `libs/core/foundation/credential-material-capability.ts` (internal exact-file read ceilings for allocated connection documents and account generations)
 - `libs/core/foundation/account-provision-admission.ts` (internal, bounded apply/write admission; issuer imports are checked by a boundary test)
@@ -253,6 +256,15 @@ The operations console does not directly own mission state. It delegates to:
 - `libs/core/service/service-preset-registry.ts`
 - `libs/core/service/operator-service-connection.ts` (local operator credential probes; admit-one read-only op)
 - `libs/core/service/operator-service-connection-admission.ts` (internal one-shot probe admission; ALS-scoped secret allowlist, single-consume engine capability)
+
+Tenantless personal dispatch currently admits only credential-free work with a matching
+public standalone project and mission/task lineage. Account/operator APIs, ambient provider
+HOME, persistent native transports, selected services and PRESET/GWS execution reject that
+context. Provider caches compare personal owner, actor, WorkItem, run and lease as well as
+task lineage; per-use validation refreshes the live claim. See the
+[personal execution roadmap](../knowledge/product/architecture/api-credential-proof-boundary.md#tenantless-personal-execution-dependency-roadmap)
+for legacy dispatch migration and the separate selected-account/session admission stages.
+
 - `libs/core/service/operator-service-connection-catalog.ts` (governed probe catalog)
 - `libs/actuators/service-actuator/`
 - `libs/actuators/presence-actuator/`

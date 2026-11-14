@@ -1,3 +1,4 @@
+import { credentialExecutionIdentity } from '../foundation/credential-binding.js';
 /**
  * Personal-machine operator service registration and authentication status.
  * HTTP adapters MUST construct the principal from verified server-side evidence.
@@ -69,7 +70,7 @@ function assertLocalOperator(
   principal: OperatorServiceConnectionPrincipal,
   mode: InstallationAccessMode = 'read'
 ): void {
-  if (getPluginExecutionContext() || !principal) {
+  if (getPluginExecutionContext() || credentialExecutionIdentity().personalClaim || !principal) {
     throw new Error('[OPERATOR_SERVICE_CONNECTION_DENIED]');
   }
   if (principal.installationGrant !== undefined) {
