@@ -3203,7 +3203,7 @@
     },
     {
       "id": "script.peer.collaboration",
-      "module": "scripts/peer_collaboration.ts",
+      "module": "scripts/peer/peer_collaboration.ts",
       "command": "peer collaboration",
       "noun": "peer",
       "verb": "collaboration",
@@ -3239,7 +3239,7 @@
     },
     {
       "id": "script.peer.task",
-      "module": "scripts/peer_task.ts",
+      "module": "scripts/peer/peer_task.ts",
       "command": "peer task",
       "noun": "peer",
       "verb": "task",
@@ -3261,7 +3261,7 @@
     },
     {
       "id": "script.peer.outbox",
-      "module": "scripts/peer_outbox.ts",
+      "module": "scripts/peer/peer_outbox.ts",
       "command": "peer outbox",
       "noun": "peer",
       "verb": "outbox",
@@ -3294,7 +3294,7 @@
     },
     {
       "id": "script.peer.send",
-      "module": "scripts/peer_messaging_send.ts",
+      "module": "scripts/peer/peer_messaging_send.ts",
       "command": "peer send",
       "noun": "peer",
       "verb": "send",

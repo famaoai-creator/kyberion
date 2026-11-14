@@ -4,7 +4,7 @@ import {
   createPeerRuntimeRecoveryApprovalRequest,
   resumePeerRuntimeFromQuarantine,
 } from '@agent/core/mesh/peer-runtime-recovery';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from '../lib/harness.js';
 
 async function main(args: string[] = []) {
   const argv = await createStandardYargs(['node', 'peer_runtime_recovery', ...args])

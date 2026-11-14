@@ -33,7 +33,7 @@ const SOURCES = [
   ['libs/core/finance/spend-guard.ts', /process\.env\.VITEST/u],
   ['libs/core/surface/operator-notifications.ts', /process\.env\.VITEST/u],
   ['scripts/run_baseline_check.ts', /process\.env\.VITEST/u],
-  ['scripts/peer_network_register.ts', /process\.env\[secretEnv\]/u],
+  ['scripts/peer/peer_network_register.ts', /process\.env\[secretEnv\]/u],
   ['scripts/backup.ts', /process\.env\[(?:envName|options\.passphraseEnv)\]/u],
   [
     'libs/core/mission/mission-work-reconciliation.ts',

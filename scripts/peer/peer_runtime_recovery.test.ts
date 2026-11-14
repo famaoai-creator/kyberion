@@ -5,7 +5,7 @@ import { safeReadFile } from '@agent/core/secure-io';
 describe('peer runtime recovery entrypoint', () => {
   it('keeps recovery output behind the shared harness boundary', () => {
     const source = String(
-      safeReadFile(pathResolver.rootResolve('scripts/peer_runtime_recovery.ts'), {
+      safeReadFile(pathResolver.rootResolve('scripts/peer/peer_runtime_recovery.ts'), {
         encoding: 'utf8',
       })
     );

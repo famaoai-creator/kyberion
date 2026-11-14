@@ -3,7 +3,7 @@ import {
   parseSafeJsonInput,
   parseSafeJsonObjectInput,
   parseSafeJsonObjectValue,
-} from './lib/json-input.js';
+} from '../lib/json-input.js';
 
 describe('peer CLI JSON input boundary', () => {
   it('accepts nested JSON values without coercing their types', () => {

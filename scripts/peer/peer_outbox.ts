@@ -4,7 +4,7 @@ import {
   summarizePeerOutbox,
 } from '@agent/core/mesh/peer-outbox-redelivery';
 import { getRegisteredEnvText } from '@agent/core/foundation';
-import { defineScript, isDirectScript, stripSharedScriptFlags } from './lib/harness.js';
+import { defineScript, isDirectScript, stripSharedScriptFlags } from '../lib/harness.js';
 
 export async function main(
   args: string[] = [],
