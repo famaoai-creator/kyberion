@@ -8,7 +8,7 @@ import { listHumanChatChannels } from '@agent/core/surface/channel-adapter-regis
 import { listMissionsInSearchDirs, loadStateAtPath } from '@agent/core/mission/mission-state';
 import { safeExecResult } from '@agent/core/secure-io';
 import * as path from 'node:path';
-import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
 
 /**
  * Autonomous-operation P0: count where a human is still needed — planning,

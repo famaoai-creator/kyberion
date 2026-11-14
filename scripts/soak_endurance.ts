@@ -17,7 +17,7 @@ import {
   type SoakEvidenceManifest as CoreSoakEvidenceManifest,
 } from '@agent/core/soak-evidence-manifest';
 import { runAutoCheckpoint } from './auto_checkpoint.js';
-import { scanTenantDrift } from './watch_tenant_drift.js';
+import { scanTenantDrift } from './watch/watch_tenant_drift.js';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 type Print = (value: unknown) => void;

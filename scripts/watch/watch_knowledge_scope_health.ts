@@ -14,7 +14,7 @@ import { sendOpsAlert, type OpsAlertInput } from '@agent/core/ops-alert';
 import { withExecutionContext } from '@agent/core/authority';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { getRegisteredEnvText, nowIso } from '@agent/core/foundation';
-import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
 
 type HealthRow = {
   tenant_slug: string;

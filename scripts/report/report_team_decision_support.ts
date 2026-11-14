@@ -3,7 +3,7 @@ import {
   formatTeamDecisionSupportReport,
 } from '@agent/core/organization/team-decision-support-metrics';
 import { withExecutionContext } from '@agent/core/authority';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from '../lib/harness.js';
 
 /**
  * TC-19: report how the roster proposer and the advisory panel are actually

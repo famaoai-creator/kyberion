@@ -25,9 +25,9 @@ import {
 import { withExecutionContext } from '@agent/core/authority';
 import { isRecord, nowIso, parseSafeJsonInput, readTextFile } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
-import { defineScript, isDirectScript } from './lib/harness.js';
-import { guardCliArgsNormalized, type CliGuardSpec } from './lib/cli-guard.js';
-import { readSafeJsonValueFile } from './lib/json-input.js';
+import { defineScript, isDirectScript } from '../lib/harness.js';
+import { guardCliArgsNormalized, type CliGuardSpec } from '../lib/cli-guard.js';
+import { readSafeJsonValueFile } from '../lib/json-input.js';
 
 const AUTHORITY_ROLE = 'physical_namespace_migration';
 const DEFAULT_MIGRATION_ROOT = 'active/shared/runtime/migrations/peer-tenant';

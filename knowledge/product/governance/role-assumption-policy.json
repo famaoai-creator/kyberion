@@ -189,7 +189,7 @@
     },
     "surface_runtime": {
       "may_assume": ["mission_controller", "sovereign_concierge"],
-      "rationale": "`pnpm surfaces` and the terminal HUD run scripts/surface_runtime.ts with SYSTEM_ROLE=surface_runtime; the surfaces it starts get their own SYSTEM_ROLE. mission_controller and sovereign_concierge: startSurfaceById records protocol service lifecycle events through libs/core protocol-service-lifecycle (GovernedArtifactRole from the surface coordination role map). RN-03 removed ecosystem_architect: the RN-02 analysis proves it unreachable (no unresolved sites, no child processes that inherit SYSTEM_ROLE) and RN-01 traces (hermetic status / list-units / start / stop runs of the built runtime, surface_runtime vitest suites) observed no assumption at all."
+      "rationale": "`pnpm surfaces` and the terminal HUD run scripts/surface/surface_runtime.ts with SYSTEM_ROLE=surface_runtime; the surfaces it starts get their own SYSTEM_ROLE. mission_controller and sovereign_concierge: startSurfaceById records protocol service lifecycle events through libs/core protocol-service-lifecycle (GovernedArtifactRole from the surface coordination role map). RN-03 removed ecosystem_architect: the RN-02 analysis proves it unreachable (no unresolved sites, no child processes that inherit SYSTEM_ROLE) and RN-01 traces (hermetic status / list-units / start / stop runs of the built runtime, surface_runtime vitest suites) observed no assumption at all."
     },
     "system_configurator": {
       "may_assume": [

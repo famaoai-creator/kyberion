@@ -103,7 +103,7 @@ Authority role definitions: `knowledge/product/governance/authority-roles/*.json
 
 1. **プロセス内で引き受けたロール** — `withExecutionContext` / `withExecutionContextAsync` が `AsyncLocalStorage`（`libs/core/foundation/execution-scope.ts`）に載せたロール。非同期コンテキストごとに独立し、`await` をまたいでも入れ子でも正しく戻ります。**プロセス内でしか設定できず、親プロセスから継承した環境変数からは決して来ません。**
 2. **委譲されたロール（DR-01）** — 親が `buildExecutionEnv(env, role)` で起動した子プロセスのロール（`KYBERION_DELEGATED_ROLE`、下の「子プロセスへのロール委譲」）。1 のどの引き受けよりも下、`SYSTEM_ROLE` より上です。
-3. `SYSTEM_ROLE` — `scripts/surface_runtime.ts` が各サーフェスを `SYSTEM_ROLE=<surface id の - を _ にしたもの>`（例: Chronos → `chronos_mirror_v2`）で起動し、`pnpm surfaces` / `pnpm config-mission` も自身に設定します。
+3. `SYSTEM_ROLE` — `scripts/surface/surface_runtime.ts` が各サーフェスを `SYSTEM_ROLE=<surface id の - を _ にしたもの>`（例: Chronos → `chronos_mirror_v2`）で起動し、`pnpm surfaces` / `pnpm config-mission` も自身に設定します。
 4. `MISSION_ROLE`
 5. `process.argv[1]` のファイル名からの推定
 

@@ -5,7 +5,7 @@ import { safeReadFile } from '@agent/core/secure-io';
 describe('knowledge scope health entrypoint', () => {
   it('keeps health and alert output behind the shared harness', () => {
     const source = String(
-      safeReadFile(pathResolver.rootResolve('scripts/watch_knowledge_scope_health.ts'), {
+      safeReadFile(pathResolver.rootResolve('scripts/watch/watch_knowledge_scope_health.ts'), {
         encoding: 'utf8',
       })
     );
@@ -18,7 +18,7 @@ describe('knowledge scope health entrypoint', () => {
 
   it('contains a side-effect-free help path', () => {
     expect(
-      safeReadFile(pathResolver.rootResolve('scripts/watch_knowledge_scope_health.ts'), {
+      safeReadFile(pathResolver.rootResolve('scripts/watch/watch_knowledge_scope_health.ts'), {
         encoding: 'utf8',
       })
     ).toContain('KNOWLEDGE_SCOPE_HEALTH_USAGE');

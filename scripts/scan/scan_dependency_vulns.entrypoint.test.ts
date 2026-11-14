@@ -4,7 +4,7 @@ import { pathResolver } from '@agent/core/path-resolver';
 
 describe('dependency vulnerability scan entrypoint', () => {
   it('keeps scan output behind the shared script harness', () => {
-    const source = readTextFile(pathResolver.rootResolve('scripts/scan_dependency_vulns.ts'));
+    const source = readTextFile(pathResolver.rootResolve('scripts/scan/scan_dependency_vulns.ts'));
 
     expect(source).toContain('runDependencyVulnerabilityScan = defineScript');
     expect(source).toContain('print(json ? result : formatDependencyVulnerabilityScanSummary');

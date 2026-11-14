@@ -9,10 +9,10 @@ last_updated: 2026-09-28
 
 # Human Intervention Census
 
-Use `scripts/report_human_interventions.ts` before changing decision rights or autonomy levels. It counts, per category, how often a human decided, how often an agent decided, and what is still waiting.
+Use `scripts/report/report_human_interventions.ts` before changing decision rights or autonomy levels. It counts, per category, how often a human decided, how often an agent decided, and what is still waiting.
 
 ```bash
-node dist/scripts/report_human_interventions.js --since 2026-08-28 [--json] [--main-ref origin/main]
+node dist/scripts/report/report_human_interventions.js --since 2026-08-28 [--json] [--main-ref origin/main]
 ```
 
 ## Where human decisions actually live

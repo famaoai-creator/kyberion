@@ -3,15 +3,15 @@ import {
   migrateBindingOwners,
   rollbackBindingOwners,
 } from '@agent/core/service/service-binding-registry';
-import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
 
 /**
  * Make every connection's owner explicit (person / organization / operator).
  *
- *   node dist/scripts/migrate_binding_owners.js                      # dry-run: what would change
- *   node dist/scripts/migrate_binding_owners.js --apply              # back up, then write
- *   node dist/scripts/migrate_binding_owners.js --apply --assign-person user:alice
- *   node dist/scripts/migrate_binding_owners.js --rollback <backup_dir>
+ *   node dist/scripts/migrate/migrate_binding_owners.js                      # dry-run: what would change
+ *   node dist/scripts/migrate/migrate_binding_owners.js --apply              # back up, then write
+ *   node dist/scripts/migrate/migrate_binding_owners.js --apply --assign-person user:alice
+ *   node dist/scripts/migrate/migrate_binding_owners.js --rollback <backup_dir>
  *
  * Organization connections (they carry a tenant) are backfilled automatically. A person
  * connection has no member to name, so it is reported as `needs_decision` until you claim it

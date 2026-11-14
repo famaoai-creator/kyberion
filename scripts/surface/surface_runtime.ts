@@ -47,7 +47,7 @@ import { getRegisteredEnvText } from '@agent/core/foundation/env';
 import { nowIso } from '@agent/core/foundation/time';
 import { parseSafeJsonInput } from '@agent/core/foundation/safe-json';
 import { t } from '@agent/core/t';
-import { defineScript, isDirectScript, stripSharedScriptFlags } from './lib/harness.js';
+import { defineScript, isDirectScript, stripSharedScriptFlags } from '../lib/harness.js';
 
 type SurfaceAction =
   | 'reconcile'

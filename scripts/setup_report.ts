@@ -6,7 +6,7 @@ import {
   type SurfaceHealthStatus,
   type SurfaceRuntimeDefinition,
 } from '@agent/core/surface/surface-runtime';
-import { setupSurfaces } from './surface_runtime.js';
+import { setupSurfaces } from './surface/surface_runtime.js';
 import { setupServices } from './services_setup.js';
 import { runReasoningSetup } from './reasoning/reasoning_setup.js';
 import { collectDoctorReport } from './run_doctor.js';

@@ -102,7 +102,7 @@ The former `presence/sensors/visual-sensor.js` driver and the
 
 ## 6. 🛡️ Service Management & Watchdog
 
-Background presence services are managed by `scripts/surface_runtime.ts` and per-surface manifests under `knowledge/product/governance/surfaces/` with a compatibility snapshot in `active-surfaces.json`.
+Background presence services are managed by `scripts/surface/surface_runtime.ts` and per-surface manifests under `knowledge/product/governance/surfaces/` with a compatibility snapshot in `active-surfaces.json`.
 
 - **Watchdog Mode**: A dedicated background process that monitors other services every 30 seconds.
 - **Auto-Healing**: Automatically restarts crashed sensors or daemons.

@@ -168,7 +168,9 @@ describe('peer tenant runtime migration', () => {
   });
 
   it('routes the migration plan through the shared script printer', () => {
-    const source = readTextFile(pathResolver.rootResolve('scripts/migrate_peer_tenant_runtime.ts'));
+    const source = readTextFile(
+      pathResolver.rootResolve('scripts/migrate/migrate_peer_tenant_runtime.ts')
+    );
 
     expect(source).not.toContain('console.log');
     expect(source).not.toContain('console.error');

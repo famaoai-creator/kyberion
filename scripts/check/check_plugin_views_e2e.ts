@@ -86,7 +86,7 @@ export interface E2eStepTiming {
 
 /**
  * How Chronos is launched. `direct` is a plain `next start`; `surface-runtime`
- * adds the environment scripts/surface_runtime.ts injects for every surface
+ * adds the environment scripts/surface/surface_runtime.ts injects for every surface
  * (see {@link surfaceRuntimeLaunchEnv}).
  */
 export type ChronosLaunchMode = 'direct' | 'surface-runtime';

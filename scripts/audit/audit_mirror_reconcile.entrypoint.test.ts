@@ -5,7 +5,9 @@ import { main } from './audit_mirror_reconcile.js';
 
 describe('audit mirror reconcile entrypoint', () => {
   it('keeps reconcile results and approval failures behind the shared harness', () => {
-    const source = readTextFile(pathResolver.rootResolve('scripts/audit_mirror_reconcile.ts'));
+    const source = readTextFile(
+      pathResolver.rootResolve('scripts/audit/audit_mirror_reconcile.ts')
+    );
 
     expect(source).toContain('context.print(outcome.result)');
     expect(source).toContain('new ScriptExitError(');

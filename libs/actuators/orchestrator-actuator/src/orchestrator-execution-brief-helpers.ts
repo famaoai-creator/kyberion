@@ -884,7 +884,7 @@ export function deriveStatusNextActions(
         next_action_type: 'execute_now',
         action: `Investigate logs and restart ${surfaceId}`,
         reason: finding.detail || finding.message,
-        suggested_command: `node dist/scripts/surface_runtime.js --action reconcile --surface ${surfaceId}`,
+        suggested_command: `node dist/scripts/surface/surface_runtime.js --action reconcile --surface ${surfaceId}`,
         suggested_followup_request: t('next_action:followup_reconcile_surface', {
           surface: surfaceId,
         }),

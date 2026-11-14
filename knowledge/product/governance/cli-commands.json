@@ -1361,7 +1361,7 @@
     },
     {
       "id": "script.audit.mirror-reconcile",
-      "module": "scripts/audit_mirror_reconcile.ts",
+      "module": "scripts/audit/audit_mirror_reconcile.ts",
       "command": "audit mirror-reconcile",
       "noun": "audit",
       "verb": "mirror-reconcile",
@@ -2743,7 +2743,7 @@
     },
     {
       "id": "script.knowledge.scope-health",
-      "module": "scripts/watch_knowledge_scope_health.ts",
+      "module": "scripts/watch/watch_knowledge_scope_health.ts",
       "command": "knowledge scope-health",
       "noun": "knowledge",
       "verb": "scope-health",
@@ -2990,7 +2990,7 @@
     },
     {
       "id": "script.memory.promotion-queue",
-      "module": "scripts/summarize_memory_promotion_queue.ts",
+      "module": "scripts/summarize/summarize_memory_promotion_queue.ts",
       "command": "memory promotion-queue",
       "noun": "memory",
       "verb": "promotion-queue",
@@ -3632,7 +3632,7 @@
     },
     {
       "id": "script.report.team-decision-support",
-      "module": "scripts/report_team_decision_support.ts",
+      "module": "scripts/report/report_team_decision_support.ts",
       "command": "report team-decision-support",
       "noun": "report",
       "verb": "team-decision-support",
@@ -4125,7 +4125,7 @@
     },
     {
       "id": "script.surface.outbox",
-      "module": "scripts/surface_outbox.ts",
+      "module": "scripts/surface/surface_outbox.ts",
       "command": "surface outbox",
       "noun": "surface",
       "verb": "outbox",

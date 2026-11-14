@@ -4,7 +4,7 @@ import { pathResolver, safeReadFile } from '@agent/core';
 describe('surface outbox script boundary', () => {
   it('routes list and replay output through the shared script printer', () => {
     const source = String(
-      safeReadFile(pathResolver.rootResolve('scripts/surface_outbox.ts'), {
+      safeReadFile(pathResolver.rootResolve('scripts/surface/surface_outbox.ts'), {
         encoding: 'utf8',
       }) || ''
     );

@@ -181,7 +181,7 @@ jobs:
 
       - name: Validate surface runtime contract
         if: ${{ !cancelled() && steps.workspace.outcome == 'success' }}
-        run: node dist/scripts/surface_runtime.js --action status > /dev/null
+        run: node dist/scripts/surface/surface_runtime.js --action status > /dev/null
 
       - name: Verify no build artifacts shadow source
         if: ${{ !cancelled() && steps.workspace.outcome == 'success' }}

@@ -1343,7 +1343,7 @@ Legacy unscoped candidates retain their existing storage compatibility; this doe
   quieter symptom: post-partition layouts (`<tier>/<tenant>/<id>`) made flat enumerations
   report tenant directories as missions. Coverage:
   `libs/core/mission/mission-tier-scan.test.ts`,
-  `scripts/watch_tenant_drift.test.ts` (bound-partition probe),
+  `scripts/watch/watch_tenant_drift.test.ts` (bound-partition probe),
   `libs/actuators/system-actuator/src/system-pipeline-path.test.ts` (bound `list_missions`).
 - **Owner-partition IO resolves scope from the env only.** A persisted `pnpm scope use <tenant>`
   (`active/shared/runtime/scope.env`, read by `resolveProjectScope`) binds every process on the

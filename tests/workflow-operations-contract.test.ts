@@ -106,7 +106,7 @@ describe('Workflow operations contract', () => {
     expect(setupAction).toContain('pnpm install --frozen-lockfile');
     expect(ci).toContain('pnpm run check:commit-subject');
     expect(ci).toContain('node dist/scripts/capability_discovery.js');
-    expect(ci).toContain('node dist/scripts/surface_runtime.js --action status');
+    expect(ci).toContain('node dist/scripts/surface/surface_runtime.js --action status');
     expect(ci).toContain('node dist/scripts/vital_check.js --format json --exit-on-missing=false');
   });
 
@@ -126,7 +126,7 @@ describe('Workflow operations contract', () => {
     const ci = read('.github/workflows/ci.yml');
     expect(ci).not.toContain('dist/scripts/bootstrap.js');
     expect(ci).not.toContain('dist/scripts/validate_skills.js');
-    expect(ci).not.toContain('dist/scripts/audit_skills.js');
+    expect(ci).not.toContain('dist/scripts/audit/audit_skills.js');
     expect(ci).not.toContain('dist/scripts/validate_schemas.js');
     expect(ci).not.toContain('npx tsc -p libs/core/tsconfig.json');
   });

@@ -6,7 +6,7 @@ import { main } from './scan_provider_cli_capabilities.js';
 describe('provider capability scan entrypoint', () => {
   it('keeps scan output and help behind the shared harness', () => {
     const source = String(
-      safeReadFile(pathResolver.rootResolve('scripts/scan_provider_cli_capabilities.ts'), {
+      safeReadFile(pathResolver.rootResolve('scripts/scan/scan_provider_cli_capabilities.ts'), {
         encoding: 'utf8',
       })
     );

@@ -103,7 +103,7 @@ const allowedManagedProcessConsumers = [
   // Exercises baseline maintenance ownership with a mock and finite timer-only children.
   'scripts/run_baseline_check.maintenance-submission.test.ts',
   'scripts/soak_restart_e2e.ts',
-  'scripts/surface_runtime.ts',
+  'scripts/surface/surface_runtime.ts',
   'tests/managed-process.test.ts',
   'tests/surface-auth.test.ts',
 ].sort((a, b) => a.localeCompare(b));

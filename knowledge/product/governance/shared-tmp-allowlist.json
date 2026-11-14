@@ -594,7 +594,7 @@
       "note": "clean-install smoke test staging root; wiped before use and disposable"
     },
     {
-      "file": "scripts/summarize_task_model_routing.ts",
+      "file": "scripts/summarize/summarize_task_model_routing.ts",
       "count": 1,
       "classification": "migrate-candidate",
       "note": "routing summary fallback; report-class artifact"

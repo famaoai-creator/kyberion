@@ -12,7 +12,7 @@ import {
   formatMemoryPromotionQueueMarkdown,
   summarizeMemoryPromotionQueue,
 } from '@agent/core/report-ops';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from '../lib/harness.js';
 
 export { summarizeMemoryPromotionQueue };
 

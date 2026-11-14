@@ -21,7 +21,7 @@ re-enqueue, not force-approve.
 
 ```
 pnpm mission memory-queue                 # status table (queued/approved/promoted/rejected)
-node --import ./scripts/ts-loader.mjs scripts/summarize_memory_promotion_queue.ts
+node --import ./scripts/ts-loader.mjs scripts/summarize/summarize_memory_promotion_queue.ts
 pnpm mission memory-review <CANDIDATE_ID>   # per-candidate blockers + evidence presence
 pnpm pipeline --input pipelines/knowledge-curation-weekly.json   # weekly report
 ```

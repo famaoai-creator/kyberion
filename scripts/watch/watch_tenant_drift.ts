@@ -9,13 +9,13 @@
  * repository-managed alert sink.
  *
  * Usage:
- *   node dist/scripts/watch_tenant_drift.js
- *   node dist/scripts/watch_tenant_drift.js --json
- *   node dist/scripts/watch_tenant_drift.js --quiet  # exit 1 only on drift
- *   node dist/scripts/watch_tenant_drift.js --quiet --alert
+ *   node dist/scripts/watch/watch_tenant_drift.js
+ *   node dist/scripts/watch/watch_tenant_drift.js --json
+ *   node dist/scripts/watch/watch_tenant_drift.js --quiet  # exit 1 only on drift
+ *   node dist/scripts/watch/watch_tenant_drift.js --quiet --alert
  *
  * Cron example:
- *   *\/15 * * * * cd /opt/kyberion && node dist/scripts/watch_tenant_drift.js --quiet --alert
+ *   *\/15 * * * * cd /opt/kyberion && node dist/scripts/watch/watch_tenant_drift.js --quiet --alert
  *
  * The watchdog is intentionally read-only and never mutates anything.
  */
@@ -30,7 +30,7 @@ import { missionTierScanDirs } from '@agent/core/owner-scope';
 import { auditChain } from '@agent/core/governance/audit-chain';
 import { nowIso } from '@agent/core/foundation/time';
 import { loadStateAtPath } from '@agent/core/mission/mission-state';
-import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
 
 export const TENANT_DRIFT_USAGE = 'Usage: pnpm tenant:watch-drift [--json] [--quiet] [--alert]';
 
