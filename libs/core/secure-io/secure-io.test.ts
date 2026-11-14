@@ -42,7 +42,7 @@ import {
   safeReaddir,
   sanitizePath,
   validateUrl,
-} from './secure-io.js';
+} from '../secure-io.js';
 
 describe('secure-io core', () => {
   let tmpDir: string;
@@ -684,7 +684,7 @@ describe('secure-io core', () => {
       safeWriteFile(testFile, 'first', { createOnly: true });
       expect(() => safeWriteFile(testFile, 'second', { createOnly: true })).toThrow(/EEXIST/);
       expect(safeReadFile(testFile)).toBe('first');
-      const { policyEngine } = await import('./governance/policy-engine.js');
+      const { policyEngine } = await import('../governance/policy-engine.js');
       const spy = vi.spyOn(policyEngine, 'evaluate').mockImplementation(() => {
         throw new Error('policy file parse failure');
       });
@@ -738,7 +738,7 @@ describe('secure-io core', () => {
     });
 
     it('fails closed when policy evaluation itself throws (SA-05)', async () => {
-      const { policyEngine } = await import('./governance/policy-engine.js');
+      const { policyEngine } = await import('../governance/policy-engine.js');
       const spy = vi.spyOn(policyEngine, 'evaluate').mockImplementation(() => {
         throw new Error('policy file parse failure');
       });

@@ -30,7 +30,7 @@ function insideAlias(p: string): boolean {
   return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel));
 }
 
-vi.mock('./tier-guard.js', () => ({
+vi.mock('../tier-guard.js', () => ({
   validateWritePermission: (p: string) => {
     guard.seen.push(p);
     return insideAlias(p)
@@ -46,8 +46,8 @@ vi.mock('./tier-guard.js', () => ({
   detectTier: () => 'public',
 }));
 
-vi.mock('./path-resolver.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('./path-resolver.js')>();
+vi.mock('../path-resolver.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../path-resolver.js')>();
   return {
     ...actual,
     rootDir: () => guard.root || actual.rootDir(),
@@ -56,16 +56,16 @@ vi.mock('./path-resolver.js', async (importOriginal) => {
   };
 });
 
-vi.mock('./governance/policy-engine.js', () => ({
+vi.mock('../governance/policy-engine.js', () => ({
   policyEngine: { evaluate: () => ({ allowed: true, action: 'allow' }) },
 }));
 
 describe('secure-io canonicalization under a symlinked checkout prefix', () => {
-  let io: typeof import('./secure-io.js');
+  let io: typeof import('../secure-io.js');
 
   beforeAll(async () => {
     // Import first: module bootstrap reads catalogs under the real root.
-    io = await import('./secure-io.js');
+    io = await import('../secure-io.js');
     fs.mkdirSync(path.join(realRoot, 'data'), { recursive: true });
     fs.mkdirSync(path.join(realRoot, 'other'), { recursive: true });
     fs.symlinkSync(realRoot, aliasRoot, 'dir');
@@ -100,7 +100,7 @@ describe('secure-io canonicalization under a symlinked checkout prefix', () => {
   });
 
   it('lists and stats a symlinked checkout root without /proc/self/fd', async () => {
-    const pathGuard = await import('./secure-io-path-guard.js');
+    const pathGuard = await import('../secure-io-path-guard.js');
     const previous = pathGuard.setProcFdLookupDisabledForTesting(true);
     try {
       expect(io.safeReaddir(aliasRoot).sort()).toEqual(expect.arrayContaining(['data', 'other']));

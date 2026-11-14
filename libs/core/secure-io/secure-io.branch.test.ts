@@ -8,14 +8,14 @@ const guardMocks = vi.hoisted(() => ({
   detectTier: vi.fn(() => 'confidential'),
 }));
 
-vi.mock('./tier-guard.js', () => ({
+vi.mock('../tier-guard.js', () => ({
   validateWritePermission: guardMocks.validateWritePermission,
   validateReadPermission: guardMocks.validateReadPermission,
   detectTier: guardMocks.detectTier,
 }));
 
-vi.mock('./path-resolver.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('./path-resolver.js')>();
+vi.mock('../path-resolver.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../path-resolver.js')>();
   return {
     ...actual,
     pathResolver: {
@@ -31,7 +31,7 @@ vi.mock('./path-resolver.js', async (importOriginal) => {
   };
 });
 
-vi.mock('./governance/policy-engine.js', () => ({
+vi.mock('../governance/policy-engine.js', () => ({
   policyEngine: { evaluate: () => ({ allowed: true, action: 'allow' }) },
 }));
 
@@ -58,7 +58,7 @@ describe('secure-io branch coverage', () => {
   });
 
   it('closes borrowed append descriptors after success and failure and enforces write guards', async () => {
-    const io = await import('./secure-io.js');
+    const io = await import('../secure-io.js');
     const file = path.join(tmpDir, 'borrowed.log');
     let borrowed = -1;
     expect(
@@ -84,7 +84,7 @@ describe('secure-io branch coverage', () => {
   });
 
   it('covers file io wrappers and guard-denied branches', async () => {
-    const io = await import('./secure-io.js');
+    const io = await import('../secure-io.js');
     const file = path.join(tmpDir, 'a.txt');
     const dir = path.join(tmpDir, 'd');
     const moved = path.join(tmpDir, 'moved.txt');
@@ -156,7 +156,7 @@ describe('secure-io branch coverage', () => {
   });
 
   it('covers read/write denial errors', async () => {
-    const io = await import('./secure-io.js');
+    const io = await import('../secure-io.js');
     const file = path.join(tmpDir, 'denied.txt');
     fs.writeFileSync(file, 'x');
 
@@ -174,7 +174,7 @@ describe('secure-io branch coverage', () => {
   });
 
   it('covers read/copy/move/symlink/listing guard failures', async () => {
-    const io = await import('./secure-io.js');
+    const io = await import('../secure-io.js');
     const src = path.join(tmpDir, 'src.txt');
     const dst = path.join(tmpDir, 'dst.txt');
     const link = path.join(tmpDir, 'x', 'link.txt');
@@ -224,7 +224,7 @@ describe('secure-io branch coverage', () => {
   });
 
   it('covers safeWriteFile error cleanup branches', async () => {
-    const io = await import('./secure-io.js');
+    const io = await import('../secure-io.js');
     const file = path.join(tmpDir, 'cleanup.txt');
 
     expect(() => io.safeWriteFile(file, { bad: true } as any)).toThrow();
@@ -237,7 +237,7 @@ describe('secure-io branch coverage', () => {
   });
 
   it('covers role-violation branches when reason is empty', async () => {
-    const io = await import('./secure-io.js');
+    const io = await import('../secure-io.js');
     const file = path.join(tmpDir, 'plain.txt');
     fs.writeFileSync(file, 'x');
 
@@ -249,7 +249,7 @@ describe('secure-io branch coverage', () => {
   });
 
   it('covers write-guard denial branches for unlink/mkdir/open-append/fsync', async () => {
-    const io = await import('./secure-io.js');
+    const io = await import('../secure-io.js');
     const file = path.join(tmpDir, 'guard.txt');
     fs.writeFileSync(file, 'x');
 
@@ -276,7 +276,7 @@ describe('secure-io branch coverage', () => {
   });
 
   it('covers buildSafeExecEnv fallback/default branches and existing mkdir branch', async () => {
-    const io = await import('./secure-io.js');
+    const io = await import('../secure-io.js');
     const prevTerm = process.env.TERM;
     delete process.env.TERM;
     const env = io.buildSafeExecEnv({ OPTIONAL_EMPTY: undefined, EXPLICIT: 'ok' } as any);

@@ -34,7 +34,7 @@ import {
   safeExecShellScript,
   safeExecShellScriptResult,
   safeSpawn,
-} from './secure-io.js';
+} from '../secure-io.js';
 
 describe('safeExecResult / safeExec — shell option hardening (CodeQL js/shell-command-constructed-from-input)', () => {
   it('safeExecResult invokes spawnSync with an explicit shell: false', () => {
