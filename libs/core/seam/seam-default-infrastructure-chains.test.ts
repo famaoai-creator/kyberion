@@ -8,34 +8,34 @@ import {
   LOCAL_LEASE_BACKEND_ID,
   registerLeaseBackend,
   resolveLeaseBackend,
-} from './lease/lease-backend.js';
-import './lease/local-lease-backend.js';
-import { MEMORY_LEASE_BACKEND_ID } from './lease/memory-lease-backend.js';
-import { LOCAL_EVENT_BUS_ID, resolveEventBus } from './event/event-bus.js';
-import './event/local-event-bus.js';
-import { MEMORY_EVENT_BUS_ID } from './event/memory-event-bus.js';
-import { LOCAL_GIT_BACKEND_ID, resolveVcsBackend } from './vcs/vcs-backend.js';
-import './vcs/local-git-backend.js';
-import { MEMORY_VCS_BACKEND_ID } from './vcs/memory-vcs-backend.js';
+} from '../lease/lease-backend.js';
+import '../lease/local-lease-backend.js';
+import { MEMORY_LEASE_BACKEND_ID } from '../lease/memory-lease-backend.js';
+import { LOCAL_EVENT_BUS_ID, resolveEventBus } from '../event/event-bus.js';
+import '../event/local-event-bus.js';
+import { MEMORY_EVENT_BUS_ID } from '../event/memory-event-bus.js';
+import { LOCAL_GIT_BACKEND_ID, resolveVcsBackend } from '../vcs/vcs-backend.js';
+import '../vcs/local-git-backend.js';
+import { MEMORY_VCS_BACKEND_ID } from '../vcs/memory-vcs-backend.js';
 import {
   LOOPBACK_TRANSPORT_ID,
   registerProviderTransport,
   resolveProviderTransport,
   type ProviderTransport,
-} from './provider/provider-transport.js';
-import './provider/loopback-transport.js';
+} from '../provider/provider-transport.js';
+import '../provider/loopback-transport.js';
 import {
   OTLP_HTTP_TRACE_EXPORTER_ID,
   createMemoryTraceExporter,
   orderedTraceExporters,
   registerTraceExporter,
-} from './analysis/trace-exporter.js';
+} from '../analysis/trace-exporter.js';
 import {
   LOCAL_STORAGE_BACKEND_ID,
   getStorageBackend,
   resolveStorageBackend,
-} from './storage/storage-backend.js';
-import './storage/local-storage-backend.js';
+} from '../storage/storage-backend.js';
+import '../storage/local-storage-backend.js';
 import { MEMORY_STORAGE_BACKEND_ID } from '@agent/kernel/storage/memory-storage-backend';
 
 afterEach(() => {
