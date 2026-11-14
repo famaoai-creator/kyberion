@@ -255,7 +255,9 @@ Rule of thumb:
 - `quick conversational work` -> answer or task session
 - `larger durable work` -> mission
 
-All of this sits inside one containment chain, widest first: a **tenant** (a confidentiality boundary) contains an **organization** (how that entity runs), which contains a **project** (a long-lived container of meaning), which contains **missions** and their tasks. Every work item carries that chain as typed context (`tenant_slug → organization_id → project_id → mission_id → task_id` plus a `work_shape`), so the same work shows up consistently in the Organization, Home, Work Items, Operations, Missions, and Governance views. Routine operations, incidents, and cadences — work that is not a solution project — are tracked by the organization operating model (`pnpm organization`).
+Two questions are separate: **whose work is this?** and **how should it run?** For tenant work, scope references follow `tenant → organization → project → mission → task`, where those entities apply. Personal work needs no tenant; a Task Session or standalone mission does not require every level. See [scope references and execution choice](../knowledge/product/architecture/entity-scope-hierarchy.md#scope-references-and-execution-choice) for the optional references and authorization rules.
+
+A **WorkItem** tracks the work; a **Mission**, **Task Session**, or **Pipeline** is a way to execute it. A project can group missions and task sessions. A Task Session is not the parent of a mission task. Typed work-item `context` carries applicable scope references plus `work_shape` (the kind of work), so the same work can appear consistently across the views. Routine operations, incidents, and cadences are tracked by the organization operating model (`pnpm organization`).
 
 ## 6. The Smallest Mental Model
 

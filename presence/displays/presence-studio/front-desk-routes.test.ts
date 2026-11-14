@@ -655,14 +655,13 @@ describe('FD-03 ask page static contract', () => {
     }
   });
 
-  it('FD-09: renders resolution_shape and the turn shape chip through vocabulary lookups, never the raw enum', () => {
+  it('FD-09: renders the execution choice and turn shape chip through vocabulary lookups, never the raw enum', () => {
     const askJs = readRepoFile('presence/displays/presence-studio/static/ask.js');
 
-    // The "Current state" block looks `resolution_shape` up in a
-    // vocabulary-key map instead of writing the raw enum value.
+    // The "Current state" block prefers the unfolded execution shape and
+    // keeps the lossy legacy classification distinct (DOM coverage in ask-client).
     expect(askJs).toContain('function shapeLabelKey');
-    expect(askJs).toContain('shapeLabelKey(contract.resolution_shape)');
-    expect(askJs).not.toMatch(/:\s*contract\.resolution_shape\s*[;\n]/);
+    expect(askJs).toContain('executionLabelKey(contract)');
 
     // The conversation-turn shape chip does the same for the UX-contract
     // shape id instead of `escapeHtml(turn.shape)` verbatim.

@@ -423,6 +423,18 @@
   function shapeLabelKey(value) {
     return value ? 'front_desk:shape_' + String(value) : '';
   }
+  function executionLabelKey(contract) {
+    if (contract.execution_shape) {
+      return shapeLabelKey(
+        contract.execution_shape === 'direct_reply' ? 'direct_answer' : contract.execution_shape
+      );
+    }
+    return shapeLabelKey(
+      contract.resolution_shape === 'task_session'
+        ? 'legacy_task_session'
+        : contract.resolution_shape
+    );
+  }
   function turnShapeLabelKey(value) {
     return value ? 'front_desk:shape_chip_' + String(value) : '';
   }
@@ -472,8 +484,7 @@
       : state.listening
         ? vt(state.vocab, 'front_desk:ask_listening')
         : contract
-          ? vt(state.vocab, shapeLabelKey(contract.resolution_shape)) ||
-            humanizeSlug(contract.resolution_shape)
+          ? vt(state.vocab, executionLabelKey(contract))
           : '';
     setBlockText('about-state', vt(state.vocab, 'front_desk:ask_state'), stateText);
 
