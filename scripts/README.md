@@ -68,6 +68,13 @@ SX-06; not yet enforced by a gate.)
     `new URL('../x', import.meta.url)` literals (including backtick template
     URLs) break on any depth change — `../` becomes `../../`; prefer
     `pathResolver` for new code;
+  - path-shape regexes and validators can assume flat layout long after a
+    move (`/^scripts\/(?:generate|analyze)_\w+\.ts$/` stopped matching
+    `scripts/generate/generate_op_registry.ts` and silently dropped a
+    remedy) — grep for `scripts/` inside regex/test patterns too;
+  - path-like **fixture strings** inside tests are not imports — a
+    `resolve('./x', base)` or changed-file list argument must keep its
+    literal form; restrict depth rewrites to real module specifiers;
   - `vi.mock` specifiers can silently go stale long after a move (the mock
     stops intercepting; tests then run the real module and fail with
     unrelated-looking errors) — check every `vi.mock('./x')` in files that

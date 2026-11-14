@@ -16,8 +16,8 @@
  */
 
 import * as path from 'node:path';
-import type { GitRunner } from '../run_checks.js';
-import { TEST_SUITES } from '../test_suite.js';
+import type { GitRunner } from '../../run_checks.js';
+import { TEST_SUITES } from '../../test_suite.js';
 
 /** Extensions vitest follows through the import graph. */
 const CODE_EXTENSIONS = new Set(['.ts', '.tsx', '.mts', '.cts', '.js', '.mjs', '.cjs', '.jsx']);

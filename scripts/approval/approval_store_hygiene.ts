@@ -14,7 +14,7 @@ import {
 } from '@agent/core/governance/approval-store-hygiene';
 import { listApprovalRequests } from '@agent/core/governance/approval-store';
 import { withExecutionContext } from '@agent/core/authority';
-import { cliOptionValue, hasCliFlag } from '../lib/cli-guard.js';
+import { cliOptionValue, hasCliFlag } from '../lib/cli/cli-guard.js';
 import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
 
 /**

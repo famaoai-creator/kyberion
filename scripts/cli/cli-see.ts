@@ -5,7 +5,7 @@ import {
   validatePerceptionOptions,
   enhancementDeps,
   renderObservations,
-} from '../lib/perception-enhancements.js';
+} from '../lib/perception/perception-enhancements.js';
 /**
  * `pnpm kyberion see <image> [--describe] [--lang <bcp47>] [--json] [--out <file>]`
  *
@@ -33,7 +33,7 @@ import {
   withPerceptionMediaRole,
   type CommonArgs,
   type PerceptionDeps,
-} from '../lib/perception.js';
+} from '../lib/perception/perception.js';
 
 export const SEE_USAGE = `Usage: pnpm kyberion see <image> [--describe] [--no-ocr] [--provider <id>] [--lang <bcp47>] [--json] [--out <file>]
 

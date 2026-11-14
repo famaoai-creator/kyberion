@@ -1,5 +1,5 @@
 import type { CommonArgs, PerceptionDeps } from './perception.js';
-import { ScriptExitError } from './harness.js';
+import { ScriptExitError } from '../harness.js';
 import type { Observation, PerceptionSource } from '@agent/shared-perception/observation';
 import type * as Audio from '@agent/shared-perception/audio-analysis';
 import type * as Tracking from '@agent/shared-perception/tracking';

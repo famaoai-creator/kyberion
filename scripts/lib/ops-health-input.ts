@@ -30,7 +30,7 @@ import {
 } from '@agent/core/ops-health';
 import { readBackupDrillReceipt, readJanitorFailureMarker } from '@agent/core/ops-health-state';
 import { summarizeBackupStatus } from '../backup.js';
-import { describeBackupPassphraseAvailability } from './backup-passphrase.js';
+import { describeBackupPassphraseAvailability } from './backup/backup-passphrase.js';
 import { loadBaselineCache, storeBaselineCache } from '@agent/core/baseline-check-cache';
 import { TRIGGER_STORE_GROWTH_WARN_BYTES } from '@agent/core/trigger-runner';
 

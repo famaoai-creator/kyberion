@@ -420,7 +420,7 @@
       "note": "backup/restore staging dirs"
     },
     {
-      "file": "scripts/lib/backup-tenant-partitions.ts",
+      "file": "scripts/lib/backup/backup-tenant-partitions.ts",
       "count": 1,
       "classification": "legit-tmp",
       "note": "backup/restore plaintext temp dirs (decrypted payload, staged partitions, mission bundles), removed on every path by withPlaintextTempDir"

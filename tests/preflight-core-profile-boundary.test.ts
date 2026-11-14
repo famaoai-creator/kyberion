@@ -8,8 +8,8 @@ import {
   CORE_AFFECTED_TEST_SHARDS,
   isCoreAffectedTest,
 } from '../scripts/pr/pr_preflight.js';
-import { ciTestPaths, isCiTest } from '../scripts/lib/affected-tests.js';
-import { matchesGatePath } from '../scripts/lib/changed-gate-selection.js';
+import { ciTestPaths, isCiTest } from '../scripts/lib/ci/affected-tests.js';
+import { matchesGatePath } from '../scripts/lib/ci/changed-gate-selection.js';
 import { TEST_SUITES } from '../scripts/test_suite.js';
 
 describe('affected core profile inventory', () => {

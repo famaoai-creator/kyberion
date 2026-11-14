@@ -172,7 +172,7 @@ export interface RetentionCatalogEntry {
   code_grace_days?: number;
   /**
    * Backup opt-out: `exclude` leaves this fully regenerable directory out of
-   * `--scope all|mission|tenant` backups (scripts/lib/backup-file-selection.ts).
+   * `--scope all|mission|tenant` backups (scripts/lib/backup/backup-file-selection.ts).
    * The cache/tmp class alone never excludes — staging stores hold pending state.
    */
   backup?: 'exclude';

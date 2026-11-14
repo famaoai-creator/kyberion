@@ -1,4 +1,4 @@
-import { hasCliFlag } from '../lib/cli-guard.js';
+import { hasCliFlag } from '../lib/cli/cli-guard.js';
 /** Governed controller adapters for the continuous mission-owner execution surface. */
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';

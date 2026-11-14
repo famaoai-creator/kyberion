@@ -61,14 +61,14 @@ import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js
 import {
   syncScheduleRegistry,
   type ScheduleRegistrySyncResult,
-} from '../lib/schedule-registry-sync.js';
+} from '../lib/daemon/schedule-registry-sync.js';
 import {
   installGracefulShutdown,
   startSerialTickLoop,
   type ImmediateExitRequest,
   type SerialTickStopOutcome,
   type ShutdownSignal,
-} from '../lib/daemon-loop.js';
+} from '../lib/daemon/daemon-loop.js';
 
 const TICK_INTERVAL_MS = 60_000;
 /** Bound on waiting for an in-flight tick during SIGTERM/SIGINT shutdown. */

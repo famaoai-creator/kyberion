@@ -23,7 +23,11 @@ import {
   runWatchCommand,
   WATCH_USAGE,
 } from './cli-watch.js';
-import { createFakeDeps, fakeBridge, guardedReadBridge } from '../lib/perception.test-support.js';
+import {
+  createFakeDeps,
+  fakeBridge,
+  guardedReadBridge,
+} from '../lib/perception/perception.test-support.js';
 
 // Tier-guard denials emit best-effort audit events; keep them off the real
 // audit chain so the suite stays hermetic. Partial mock: the @agent/core

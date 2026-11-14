@@ -20,7 +20,7 @@ import {
   type Violation as TierHygieneViolation,
 } from '../check/check_tier_hygiene.js';
 import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
-import { guardCliArgs, type CliGuardSpec } from '../lib/cli-guard.js';
+import { guardCliArgs, type CliGuardSpec } from '../lib/cli/cli-guard.js';
 
 export interface KnowledgeScopeReconciliationReport {
   generated_at: string;

@@ -14,7 +14,7 @@ import {
 } from '@agent/core/secure-io';
 import { readTextFile } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from '../lib/harness.js';
-import { guardCliArgs, type CliGuardSpec } from '../lib/cli-guard.js';
+import { guardCliArgs, type CliGuardSpec } from '../lib/cli/cli-guard.js';
 
 const DEFAULT_OUTPUT = pathResolver.rootResolve(
   'active/shared/exports/source-archives/kyberion-source.tar.gz'

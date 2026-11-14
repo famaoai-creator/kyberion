@@ -32,7 +32,7 @@ import {
   isDirectScript,
   ScriptExitError,
 } from './lib/harness.js';
-import { guardCliArgs, type CliGuardSpec } from './lib/cli-guard.js';
+import { guardCliArgs, type CliGuardSpec } from './lib/cli/cli-guard.js';
 
 /** The one command that regenerates (or, with --check, verifies) every generated file. */
 export const RESOLVE_GENERATED_COMMAND = 'pnpm kyberion resolve generated';

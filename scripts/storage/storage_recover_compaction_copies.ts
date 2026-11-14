@@ -44,7 +44,7 @@ import {
   type CompactionCopyStorePlan,
 } from '@agent/core/compaction-copy-recovery';
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { cliApprovalRequester } from '../lib/cli-approval-requester.js';
+import { cliApprovalRequester } from '../lib/cli/cli-approval-requester.js';
 import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
 
 export const RECOVER_COPIES_APPROVAL_CHANNEL = 'terminal';

@@ -19,22 +19,22 @@ import { resolveLocale, type SupportedLocale } from '@agent/core/locale';
 import { t } from '@agent/core/t';
 import { DiagnosticError } from '@agent/core/logger';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
-import { hasHelpFlag } from './lib/cli-guard.js';
+import { hasHelpFlag } from './lib/cli/cli-guard.js';
 import {
   describeRegisteredCommand,
   formatCliManifestHelp,
   formatUnknownCommand,
   routedCommandName,
-} from './lib/cli-help.js';
+} from './lib/cli/cli-help.js';
 import {
   findDeprecatedCommandAlias,
   formatScopeHelp,
   formatUnknownScope,
   rewriteDeprecatedCommand,
   routeScopedCommand,
-} from './lib/cli-scopes.js';
+} from './lib/cli/cli-scopes.js';
 
-export { formatCliManifestHelp, formatUnknownCommand } from './lib/cli-help.js';
+export { formatCliManifestHelp, formatUnknownCommand } from './lib/cli/cli-help.js';
 
 interface CliEntrypoint {
   id: string;

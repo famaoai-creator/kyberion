@@ -1,5 +1,5 @@
 /**
- * scripts/lib/schedule-registry-sync.ts — ADF `schedule` fields → schedule registry.
+ * scripts/lib/daemon/schedule-registry-sync.ts — ADF `schedule` fields → schedule registry.
  *
  * Extracted from chronos_daemon.ts so the registry can be synced without the
  * daemon running (`pnpm kyberion scheduler reconcile`). Chronos still calls it

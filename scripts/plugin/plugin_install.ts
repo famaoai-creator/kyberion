@@ -32,7 +32,7 @@
  *   pnpm plugin:install --reload my-plugin [--managed-root <dir>] [--json]
  *   pnpm plugin:install --deactivate my-plugin [--json]
  */
-import { cliApprovalRequester } from '../lib/cli-approval-requester.js';
+import { cliApprovalRequester } from '../lib/cli/cli-approval-requester.js';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { importPluginPack } from '@agent/core/plugin/plugin-pack';
 import {

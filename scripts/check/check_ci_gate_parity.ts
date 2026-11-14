@@ -2,7 +2,7 @@ import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import { readTextFile } from '@agent/core/foundation';
 import { loadGateManifest } from '../run_checks.js';
-import { resolveDeclaredBaselinePath } from '../lib/ci-gate-baseline.js';
+import { resolveDeclaredBaselinePath } from '../lib/ci/ci-gate-baseline.js';
 import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
 import { readSafeJsonFile } from '../lib/json-input.js';
 

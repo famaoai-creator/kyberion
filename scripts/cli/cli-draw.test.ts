@@ -18,7 +18,7 @@ import {
   type DrawDeps,
   type DrawProviderInfo,
 } from './cli-draw.js';
-import type { MediaTool } from '../lib/perception.js';
+import type { MediaTool } from '../lib/perception/perception.js';
 
 function pngBytes(width: number, height: number): Buffer {
   const buffer = Buffer.alloc(33);

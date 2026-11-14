@@ -8,7 +8,7 @@ import * as path from 'node:path';
 import * as ts from 'typescript';
 import { readTextFile } from '@agent/core/foundation';
 import { safeExistsSync, safeReaddir, safeStat } from '@agent/core/secure-io';
-import { readSafeJsonFile } from './json-input.js';
+import { readSafeJsonFile } from '../json-input.js';
 
 const SURFACE_MANIFEST_DIR = 'knowledge/product/governance/surfaces';
 

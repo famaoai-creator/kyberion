@@ -45,7 +45,7 @@ import {
 import * as path from 'node:path';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { pathResolver } from '@agent/core/path-resolver';
-import { cliApprovalRequester } from '../lib/cli-approval-requester.js';
+import { cliApprovalRequester } from '../lib/cli/cli-approval-requester.js';
 import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
 
 export const TRIGGER_STORE_ROTATE_APPROVAL_CHANNEL = 'terminal';

@@ -5,7 +5,7 @@ import {
   validatePerceptionOptions,
   enhancementDeps,
   renderObservations,
-} from '../lib/perception-enhancements.js';
+} from '../lib/perception/perception-enhancements.js';
 /**
  * `pnpm kyberion watch <video> [--every <sec>] [--max-frames <n>] [--no-ocr]
  *   [--no-audio] [--ocr-provider <id>] [--frames <dir>] [--lang <bcp47>] [--json] [--out <file>]`
@@ -44,7 +44,7 @@ import {
   withPerceptionMediaRole,
   type CommonArgs,
   type PerceptionDeps,
-} from '../lib/perception.js';
+} from '../lib/perception/perception.js';
 
 const DEFAULT_MAX_FRAMES = 24;
 

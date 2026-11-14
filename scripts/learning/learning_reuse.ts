@@ -7,7 +7,7 @@ import { inspectPipelineReuse } from '@agent/core/pipeline/pipeline-reuse';
 import { validatePipelineAdf } from '@agent/core/pipeline/pipeline-contract';
 import { createHash } from 'node:crypto';
 import { defineScript, isDirectScript } from '../lib/harness.js';
-import { parseGuardedCliArgs } from '../lib/cli-guard.js';
+import { parseGuardedCliArgs } from '../lib/cli/cli-guard.js';
 
 export const runLearningReuse = defineScript({
   name: 'learning-reuse',

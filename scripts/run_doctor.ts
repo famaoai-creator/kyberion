@@ -64,7 +64,7 @@ import {
   type ScriptContext,
 } from './lib/harness.js';
 import { safeExecResultAsync } from '@agent/core/secure-io';
-import { formatCliUsage, hasHelpFlag, type CliGuardSpec } from './lib/cli-guard.js';
+import { formatCliUsage, hasHelpFlag, type CliGuardSpec } from './lib/cli/cli-guard.js';
 import { getRegisteredEnvText, isVitestProcess, setRegisteredEnv } from '@agent/core/foundation';
 import {
   formatAppPreflightReport,

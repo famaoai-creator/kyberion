@@ -5,7 +5,7 @@ import {
   splitCiLog,
   triageCiLog,
   RESOLVE_GENERATED_GATE_IDS,
-} from './lib/ci-failure-triage.js';
+} from './lib/ci/ci-failure-triage.js';
 import { deriveGateRemedies, loadGateRemedies, main } from './ci_failure_triage.js';
 import { GENERATED_ARTIFACT_STEPS } from './resolve_generated.js';
 

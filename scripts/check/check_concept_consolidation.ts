@@ -6,7 +6,7 @@ import { safeReadFile, safeReaddir, safeLstat } from '@agent/core/secure-io';
 import { isDirectScript, ScriptExitError } from '../lib/harness.js';
 import { defineCheck } from '@agent/core/check-harness';
 import { readSafeJsonFile } from '../lib/json-input.js';
-import { resolveCiGateBaselinePath } from '../lib/ci-gate-baseline.js';
+import { resolveCiGateBaselinePath } from '../lib/ci/ci-gate-baseline.js';
 
 export const METRICS = [
   'env_direct_read_budget',

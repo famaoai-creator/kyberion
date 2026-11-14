@@ -40,8 +40,8 @@ import {
   type InventoryRecording,
   type WorkInventoryObservationSummary,
 } from '@agent/core/workforce/work-inventory-observation';
-import { readSafeJsonValueFile } from './json-input.js';
-import { resolveDecidedByFromArgv } from './decided-by-args.js';
+import { readSafeJsonValueFile } from '../json-input.js';
+import { resolveDecidedByFromArgv } from '../decided-by-args.js';
 import {
   csv,
   formatTable,

@@ -58,7 +58,7 @@ import {
   ONBOARD_CLI,
   shouldRefuseNonInteractiveOnboarding,
 } from './onboarding_mode.js';
-import { guardCliArgs } from '../lib/cli-guard.js';
+import { guardCliArgs } from '../lib/cli/cli-guard.js';
 import {
   evaluateReasoningBackend,
   formatReasoningSummary,

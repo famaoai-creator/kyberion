@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
-import { loadGateManifest } from '../run_checks.js';
+import { loadGateManifest } from '../../run_checks.js';
 
 const ROOT = path.resolve(pathResolver.rootDir());
 

@@ -15,7 +15,7 @@ import type {
   CliCommand,
   CliDeprecatedCommandAlias,
   CliManifest,
-} from '../check/check_cli_manifest.js';
+} from '../../check/check_cli_manifest.js';
 
 export const SCOPE_FLAG = '--scope';
 

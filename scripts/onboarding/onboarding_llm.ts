@@ -22,7 +22,7 @@
  *
  * The exported helpers are shared with the interactive onboarding wizard.
  */
-import { captureCliAttestationInvoker } from '../lib/cli-attestation-invoker.js';
+import { captureCliAttestationInvoker } from '../lib/cli/cli-attestation-invoker.js';
 import { resolveIdentityContext, withExecutionContext } from '@agent/core/authority';
 import { getRegisteredEnvText } from '@agent/core/foundation/env';
 import { auditChain } from '@agent/core/governance/audit-chain';
@@ -59,7 +59,7 @@ import {
 } from '@agent/core/provider/provider-egress-gate';
 import { loadReasoningRoutePolicy } from '@agent/core/reasoning/reasoning-route-resolver';
 import { isValidTenantSlug } from '@agent/core/foundation/scope';
-import { guardCliArgsNormalized, type CliGuardSpec } from '../lib/cli-guard.js';
+import { guardCliArgsNormalized, type CliGuardSpec } from '../lib/cli/cli-guard.js';
 import {
   defaultEnvLocalPath,
   listReasoningBackendChoices,

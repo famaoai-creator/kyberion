@@ -166,6 +166,6 @@ describe('security boundary contract', () => {
         )
       )
       .map((filePath) => filePath.slice(repoRoot.length + 1));
-    expect(users).toEqual(['scripts/lib/backup-file-selection.ts']);
+    expect(users).toEqual(['scripts/lib/backup/backup-file-selection.ts']);
   });
 });

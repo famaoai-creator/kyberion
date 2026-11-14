@@ -4,7 +4,7 @@ import {
   validatePerceptionOptions,
   enhancementDeps,
   renderObservations,
-} from '../lib/perception-enhancements.js';
+} from '../lib/perception/perception-enhancements.js';
 /**
  * `pnpm kyberion listen <audio> [--lang <bcp47>] [--timestamps] [--json] [--out <file>]`
  *
@@ -42,7 +42,7 @@ import {
   withPerceptionMediaRole,
   type CommonArgs,
   type PerceptionDeps,
-} from '../lib/perception.js';
+} from '../lib/perception/perception.js';
 
 export const LISTEN_USAGE = `Usage: pnpm kyberion listen <audio> [--lang <bcp47>] [--timestamps] [--json] [--out <file>]
 

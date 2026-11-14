@@ -30,7 +30,7 @@ import {
 import { withExecutionContext } from '@agent/core/authority';
 import { isRecord, nowIso, readTextFile } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from '../lib/harness.js';
-import { guardCliArgsNormalized, type CliGuardSpec } from '../lib/cli-guard.js';
+import { guardCliArgsNormalized, type CliGuardSpec } from '../lib/cli/cli-guard.js';
 import { parseSafeJsonInput, parseSafeJsonObjectValue } from '../lib/json-input.js';
 
 type Print = (value: unknown) => void;

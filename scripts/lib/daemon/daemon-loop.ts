@@ -11,7 +11,7 @@
  *   stray handles keep the event loop alive.
  */
 import { logger } from '@agent/core/core';
-import { setProcessExitCode } from './harness.js';
+import { setProcessExitCode } from '../harness.js';
 
 export type SerialTickStopOutcome = 'idle' | 'drained' | 'timed_out';
 

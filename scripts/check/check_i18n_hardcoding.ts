@@ -29,7 +29,7 @@ import {
   type LocaleTokenRule,
 } from '../lib/locale-token-scan.js';
 import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
-import { resolveCiGateBaselinePath } from '../lib/ci-gate-baseline.js';
+import { resolveCiGateBaselinePath } from '../lib/ci/ci-gate-baseline.js';
 
 const ROOT = pathResolver.rootDir();
 const DEFAULT_BASELINE_PATH = resolveCiGateBaselinePath('i18n');

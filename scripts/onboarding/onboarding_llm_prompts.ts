@@ -6,7 +6,7 @@
  * only orchestrate prompts — validation, persistence, approval and audit are
  * the same helpers `pnpm onboarding llm` uses.
  */
-import { captureCliAttestationInvoker } from '../lib/cli-attestation-invoker.js';
+import { captureCliAttestationInvoker } from '../lib/cli/cli-attestation-invoker.js';
 import { loadProviderEgressPolicy } from '@agent/core/provider/provider-egress-gate';
 import {
   captureAttestationInvoker,

@@ -21,7 +21,7 @@ import {
   readPipelinePromotionTextFile,
   resolvePromotionInputPath,
 } from './pipeline_promote.js';
-import { assertPromotionSourceScope } from '../lib/promotion-scope.js';
+import { assertPromotionSourceScope } from '../lib/promotion/promotion-scope.js';
 
 // Tenants named vitestledger* resolve to a knowledge root inside a tmp
 // fixture, so tenant promotions (pipeline + README + asset ledger) stay hermetic.

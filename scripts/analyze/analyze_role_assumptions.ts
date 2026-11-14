@@ -48,15 +48,15 @@ import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync, safeMkdir, safeWriteFile } from '@agent/core/secure-io';
 import { resolveStorageFloor, SYSTEM_PARTITION } from '@agent/core/storage-layout';
 import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
-import { guardCliArgs, hasCliFlag, type CliGuardSpec } from '../lib/cli-guard.js';
+import { guardCliArgs, hasCliFlag, type CliGuardSpec } from '../lib/cli/cli-guard.js';
 import { readSafeJsonFile } from '../lib/json-input.js';
 import {
   Analyzer,
   type RoleRecord,
   type SpawnRecord,
   type Unit,
-} from '../lib/role-assumption-graph.js';
-import { REVIEWED_INFEASIBLE_ASSUMPTIONS } from '../lib/role-assumption-reviews.js';
+} from '../lib/role-assumption/role-assumption-graph.js';
+import { REVIEWED_INFEASIBLE_ASSUMPTIONS } from '../lib/role-assumption/role-assumption-reviews.js';
 import {
   collectSources,
   collectSystemRoleEntries,
@@ -65,7 +65,7 @@ import {
   createResolver,
   createWorkspace,
   type Workspace,
-} from '../lib/role-assumption-workspace.js';
+} from '../lib/role-assumption/role-assumption-workspace.js';
 
 /** Where `--write-report` puts the report: re-generable, so the system cache floor; never committed. */
 export function reachabilityReportPath(): string {
@@ -479,7 +479,7 @@ export function checkReachabilityInvariants(
     violations.push({
       rule: 'launched-role-not-analysed',
       system_role: systemRole,
-      message: `a package.json script launches SYSTEM_ROLE=${systemRole} but the analysis has no entry point for it | next: add it to ${POLICY_PATH} and make its entry discoverable (scripts/lib/role-assumption-workspace.ts)`,
+      message: `a package.json script launches SYSTEM_ROLE=${systemRole} but the analysis has no entry point for it | next: add it to ${POLICY_PATH} and make its entry discoverable (scripts/lib/role-assumption/role-assumption-workspace.ts)`,
     });
   }
   for (const systemRole of NARROWED_SYSTEM_ROLES) {

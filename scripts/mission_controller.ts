@@ -574,7 +574,7 @@ async function requestMissionWorkReconciliationApproval(
 ) {
   const { createMissionWorkReconciliationApprovalRequest } =
     await import('@agent/core/mission/mission-work-reconciliation');
-  const { missionControllerRequester } = await import('./lib/cli-approval-requester.js');
+  const { missionControllerRequester } = await import('./lib/cli/cli-approval-requester.js');
   const result = createMissionWorkReconciliationApprovalRequest({
     missionId,
     manifestPath,
@@ -593,7 +593,7 @@ async function requestMissionTaskSupersedeApproval(input: {
 }) {
   const { createMissionTaskSupersedeApprovalRequest } =
     await import('@agent/core/mission/mission-task-supersede');
-  const { missionControllerRequester } = await import('./lib/cli-approval-requester.js');
+  const { missionControllerRequester } = await import('./lib/cli/cli-approval-requester.js');
   const result = createMissionTaskSupersedeApprovalRequest({
     missionId: input.missionId,
     taskId: input.taskId,

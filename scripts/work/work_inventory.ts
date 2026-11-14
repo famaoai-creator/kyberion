@@ -11,7 +11,7 @@
  * outside the caller's tenant/personal scope (WI-07 acceptance §6).
  *
  * Kept intentionally thin: argv parsing lives in
- * `scripts/lib/work-inventory-cli-shared.ts`, and each command area's logic
+ * `scripts/lib/work-inventory/work-inventory-cli-shared.ts`, and each command area's logic
  * lives in its own `scripts/lib/work-inventory-cli-*.ts` module so no file
  * here grows past the ~600 line guideline.
  */
@@ -31,8 +31,8 @@ import {
   runShow,
   runStatus,
   type WorkInventoryCliOptions,
-} from '../lib/work-inventory-cli-entries.js';
-import { formatHarvest, runHarvest } from '../lib/work-inventory-cli-harvest.js';
+} from '../lib/work-inventory/work-inventory-cli-entries.js';
+import { formatHarvest, runHarvest } from '../lib/work-inventory/work-inventory-cli-harvest.js';
 import {
   formatConsent,
   formatConsentList,
@@ -46,8 +46,8 @@ import {
   runObserveDiscard,
   runObserveList,
   runObserveSummarize,
-} from '../lib/work-inventory-cli-consent.js';
-import { runLearn, runPromote } from '../lib/work-inventory-cli-promotion.js';
+} from '../lib/work-inventory/work-inventory-cli-consent.js';
+import { runLearn, runPromote } from '../lib/work-inventory/work-inventory-cli-promotion.js';
 import {
   governed,
   governedTenant,
@@ -55,7 +55,7 @@ import {
   resolveScope,
   resolveRootDir,
   WorkInventoryCliUsageError,
-} from '../lib/work-inventory-cli-shared.js';
+} from '../lib/work-inventory/work-inventory-cli-shared.js';
 
 export type WorkInventoryPrint = (value: unknown) => void;
 

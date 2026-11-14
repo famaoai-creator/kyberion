@@ -1,4 +1,4 @@
-import { assertPerceptionOutput } from './lib/perception.js';
+import { assertPerceptionOutput } from './lib/perception/perception.js';
 import { beforeAll, afterAll, describe, it, expect, vi } from 'vitest';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -6,7 +6,7 @@ import { pathResolver, safeMkdir, safeWriteFile, safeRmSync } from '@agent/core'
 import { runSeeCommand } from './cli/cli-see.js';
 import { runListenCommand } from './cli/cli-listen.js';
 import { runWatchCommand } from './cli/cli-watch.js';
-import { createFakeDeps, fakeBridge } from './lib/perception.test-support.js';
+import { createFakeDeps, fakeBridge } from './lib/perception/perception.test-support.js';
 import { compareFingerprints } from '@agent/shared-perception/visual-change';
 let dir: string, image: string, audio: string, video: string;
 beforeAll(() => {

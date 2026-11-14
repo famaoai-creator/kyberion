@@ -395,7 +395,7 @@ raw log, and act on it in one round:
 | `test-failure`         | A Vitest test failed. The triage prints the assertion and a targeted rerun command.                                        | PR author. If the test is marked `suspected flake` (timers, TTLs, timeouts), reproduce it with the loop command. Fix it with fake timers or an explicit clock. Never just retry. See [WRITING_TESTS](../../../docs/developer/WRITING_TESTS.md). |
 | `platform`             | The test failed only in a macOS / Windows job.                                                                             | PR author. Apply §2 of [kyberion-development-practices](./kyberion-development-practices.md) (cross-platform determinism). A test that fails only on slow hosted runners is also a flake candidate.                                             |
 | `infra`                | Install, checkout, network, artifact or runner trouble before the tests ran.                                               | Anyone. Re-run the failed jobs (`gh run rerun <id> --failed`). If it repeats, treat it as a workflow defect and fix it under this section.                                                                                                      |
-| `unknown`              | Nothing matched. The triage attaches the first error block.                                                                | PR author. Read the failed step log. If the shape will recur, add a pattern and a fixture to `scripts/lib/ci-failure-triage.ts` / `scripts/ci_failure_triage.test.ts`.                                                                          |
+| `unknown`              | Nothing matched. The triage attaches the first error block.                                                                | PR author. Read the failed step log. If the shape will recur, add a pattern and a fixture to `scripts/lib/ci/ci-failure-triage.ts` / `scripts/ci_failure_triage.test.ts`.                                                                       |
 
 **Red CI on your own PR.** Read the job-summary triage (or run `pnpm kyberion ci triage` on the
 log), fix every listed failure in one push, and re-run the printed commands locally first. Pending
@@ -489,7 +489,7 @@ Credential Manager through a mocked PowerShell boundary; a live probe may use
 only a fresh, non-secret lookup identity. Regression gates:
 `secret-bridge.os-keychain.test.ts`,
 `foundation/secret-resolution-session.test.ts`, and
-`scripts/lib/backup-passphrase.test.ts`.
+`scripts/lib/backup/backup-passphrase.test.ts`.
 
 ### VCS publication across Git worktrees
 
@@ -814,7 +814,7 @@ such as `decision_ledger`), do not add that role to the server's `may_assume` an
 `SYSTEM_ROLE`. Give the child its own one-purpose entry script that dispatches only the verbs the
 server calls (e.g. `scripts/customer/customer_decision_overview.ts`, `scripts/dot/dot_lifecycle_worker.ts`), a
 narrow system role granting just the roles that entry reaches, a reachability workspace entry in
-`scripts/lib/role-assumption-workspace.ts`, and a regenerated
+`scripts/lib/role-assumption/role-assumption-workspace.ts`, and a regenerated
 `role-assumption-unresolved-baseline.json` (`--print-unresolved-baseline`, never hand edits). Pin
 it with a test that the server role is refused the role and the child role is allowed it
 (`isRoleAssumptionAllowed`), and one that the entry cannot import the writer CLI. A child
@@ -1586,7 +1586,7 @@ isolation and parent-capability denial with an ordinary organization operator.
    `requestedBy` (and `requestedByContext.actorId`), never an empty string: with separation of
    duties on, a request without a requester cannot be approved (gate:
    `libs/core/governance/approval-separation-of-duties.test.ts`). A creator that runs in a CLI or
-   script resolves its requester at the CLI entry point (`scripts/lib/cli-approval-requester.ts`,
+   script resolves its requester at the CLI entry point (`scripts/lib/cli/cli-approval-requester.ts`,
    `resolveCliApprovalRequester({ explicit, legacy })`) and passes it to the library as a lazily
    resolved `ApprovalRequesterInput` — never from the persona, a component name or
    `resolveOperatorDisplayName()`, and never read from the environment inside `libs/`. Record

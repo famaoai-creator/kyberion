@@ -22,7 +22,7 @@ import path from 'node:path';
 import { safeExistsSync, safeReadFile, safeWriteFile } from '@agent/core/secure-io';
 import { t } from '@agent/core/t';
 import { defineScript, isDirectScript } from '../lib/harness.js';
-import { cliOptionValue } from '../lib/cli-guard.js';
+import { cliOptionValue } from '../lib/cli/cli-guard.js';
 
 const USAGE = 'usage: append-slides.ts <target.pptx> <source.pptx> <out.pptx> [--at N]';
 

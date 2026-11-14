@@ -63,7 +63,7 @@ const SAMPLE_LIMIT = 5;
  * The connection document (and its rotation backup) that
  * `pnpm kyberion secret introduce kyberion-backup PASSPHRASE` dual-writes next
  * to the keychain entry: never archived, so the backup passphrase can never
- * ride inside the archive it encrypts (scripts/lib/backup-passphrase.ts).
+ * ride inside the archive it encrypts (scripts/lib/backup/backup-passphrase.ts).
  */
 export const BACKUP_PASSPHRASE_CONNECTION_FILES = [
   'knowledge/personal/connections/kyberion-backup.json',

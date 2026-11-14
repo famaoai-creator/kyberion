@@ -20,7 +20,7 @@ import type {
   AddResult,
   ShowResult,
   WorkInventoryCliOptions,
-} from '../lib/work-inventory-cli-entries.js';
+} from '../lib/work-inventory/work-inventory-cli-entries.js';
 import {
   runAdd,
   runCandidates,
@@ -30,8 +30,8 @@ import {
   runOverride,
   runShow,
   runStatus,
-} from '../lib/work-inventory-cli-entries.js';
-import { runHarvest } from '../lib/work-inventory-cli-harvest.js';
+} from '../lib/work-inventory/work-inventory-cli-entries.js';
+import { runHarvest } from '../lib/work-inventory/work-inventory-cli-harvest.js';
 import {
   runConsentGrant,
   runConsentList,
@@ -40,8 +40,8 @@ import {
   runObserveList,
   runObserveSummarize,
   resolveRecordingPath,
-} from '../lib/work-inventory-cli-consent.js';
-import { runLearn, runPromote, type PromoteResult } from '../lib/work-inventory-cli-promotion.js';
+} from '../lib/work-inventory/work-inventory-cli-consent.js';
+import { runLearn, runPromote, type PromoteResult } from '../lib/work-inventory/work-inventory-cli-promotion.js';
 import {
   parseDaysFlag,
   parseEffortMinutesFlag,
@@ -50,7 +50,7 @@ import {
   requireDecidedBy,
   resolveScope,
   WorkInventoryCliUsageError,
-} from '../lib/work-inventory-cli-shared.js';
+} from '../lib/work-inventory/work-inventory-cli-shared.js';
 
 const NOW = new Date('2026-09-22T09:00:00.000Z');
 

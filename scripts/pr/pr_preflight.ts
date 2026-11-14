@@ -23,10 +23,10 @@ import {
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExecResult, safeExistsSync } from '@agent/core/secure-io';
 import { collectChangedFiles, type GitRunner } from '../run_checks.js';
-import { describeAffectedTestPlan, planAffectedTests } from '../lib/affected-tests.js';
+import { describeAffectedTestPlan, planAffectedTests } from '../lib/ci/affected-tests.js';
 import { TEST_SUITES } from '../test_suite.js';
 import { defineScript, isDirectScript } from '../lib/harness.js';
-import { guardCliArgsNormalized, type CliGuardSpec } from '../lib/cli-guard.js';
+import { guardCliArgsNormalized, type CliGuardSpec } from '../lib/cli/cli-guard.js';
 
 type Print = (value: unknown) => void;
 

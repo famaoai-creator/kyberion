@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ScriptExitError } from './harness.js';
+import { ScriptExitError } from '../harness.js';
 import {
   guardCliArgs,
   guardCliArgsNormalized,
