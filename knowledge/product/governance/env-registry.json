@@ -58,6 +58,14 @@
       "documented": true
     },
     {
+      "name": "KYBERION_ACCOUNT_PROVISION_COMMAND",
+      "category": "provider",
+      "type": "string",
+      "required": false,
+      "description": "Optional separate broker writer for human-approved organization account registration. Receives a versioned exact-generation CAS request with secret material on stdin and must return the exact non-secret receipt. Unset is read-only; never falls back to KYBERION_SECRET_RESOLVER_COMMAND.",
+      "documented": true
+    },
+    {
       "name": "KYBERION_ACTUATOR_TEST",
       "category": "runtime",
       "type": "string",
