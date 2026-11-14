@@ -24,7 +24,7 @@
       "note": "Read-only canonical boundary checks for user-supplied consumable local video/VTT inputs and explicitly requested scratch previews. Default output uses the governed runtime workspace; durable delivery is promoted separately."
     },
     {
-      "file": "scripts/video_recut.ts",
+      "file": "scripts/video/video_recut.ts",
       "count": 1,
       "classification": "legit-tmp",
       "note": "Read-only validation of the user-supplied consumable JSON request location before invoking the local recut preparer."
@@ -576,13 +576,13 @@
       "note": "disposable camera capture and JSON report produced by the live capability-seam smoke"
     },
     {
-      "file": "scripts/soak_endurance.ts",
+      "file": "scripts/soak/soak_endurance.ts",
       "count": 3,
       "classification": "legit-tmp",
       "note": "soak harness reports/evidence (test-harness output)"
     },
     {
-      "file": "scripts/soak_restart_e2e.ts",
+      "file": "scripts/soak/soak_restart_e2e.ts",
       "count": 1,
       "classification": "legit-tmp",
       "note": "soak harness root"
@@ -606,7 +606,7 @@
       "note": "per-run scenario sandbox root (seed files, fixture writes); disposed after each run unless --keep"
     },
     {
-      "file": "scripts/scenario_runner.ts",
+      "file": "scripts/scenario/scenario_runner.ts",
       "count": 1,
       "classification": "legit-tmp",
       "note": "scenario run reports/trajectories for the developer running `pnpm scenario`; regenerated per run"

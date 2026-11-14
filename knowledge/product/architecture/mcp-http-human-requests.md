@@ -140,7 +140,7 @@ concurrent users, metadata/challenges, parser errors and Host/Origin checks.
 No test uses a real provider, credential, public listener, or production registry.
 Repository browser regression checks do not verify this new login/OAuth path.
 
-The entrypoint (`scripts/mcp_http_server.ts`, CLI `mcp http`) is listed in
+The entrypoint (`scripts/mcp/mcp_http_server.ts`, CLI `mcp http`) is listed in
 `cli-commands.json` only. It has no row in `docs/SURFACES.md` and no entry in
 `protocol-service-registry.json`, whose only MCP entry is the stdio
 `mcp-server-cowork`. Whether a default-off service belongs in the registry is

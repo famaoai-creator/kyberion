@@ -38,7 +38,7 @@
     "presence/displays/terminal-hud/src/voice/voice-capture.test.ts": 1,
     "scripts/agent/agent_runtime_supervisor_daemon.test.ts": 1,
     "scripts/continuous/continuous_owner_process.test.ts": 4,
-    "scripts/oauth_callback_surface.test.ts": 1,
+    "scripts/oauth/oauth_callback_surface.test.ts": 1,
     "scripts/run_checks.concurrency.test.ts": 1,
     "tests/best-of-n-judge.test.ts": 1,
     "tests/resource-arbitration.test.ts": 2

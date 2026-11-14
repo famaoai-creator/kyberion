@@ -34,7 +34,7 @@ export async function main(args: string[] = [], print: Print = defaultPrint): Pr
   if (!safeExistsSync(runtimeDir)) safeMkdir(runtimeDir, { recursive: true });
   const server = spawn(
     'node',
-    ['--import', './scripts/ts-loader.mjs', 'scripts/oauth_callback_surface.ts'],
+    ['--import', './scripts/ts-loader.mjs', 'scripts/oauth/oauth_callback_surface.ts'],
     {
       cwd: pathResolver.rootDir(),
       env: {

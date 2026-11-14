@@ -6,7 +6,7 @@
       "kind": "gateway",
       "description": "Kyberion MCP Server facade — exposes Kyberion capabilities to Claude Cowork and other MCP clients via stdio transport.",
       "command": "node",
-      "args": ["dist/scripts/mcp_server.js"],
+      "args": ["dist/scripts/mcp/mcp_server.js"],
       "env": {
         "KYBERION_BASE_ROLE": "sovereign",
         "MISSION_ROLE": "mcp_server",

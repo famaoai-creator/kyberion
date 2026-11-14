@@ -102,7 +102,7 @@ const allowedManagedProcessConsumers = [
   'scripts/run_baseline_check.ts',
   // Exercises baseline maintenance ownership with a mock and finite timer-only children.
   'scripts/run_baseline_check.maintenance-submission.test.ts',
-  'scripts/soak_restart_e2e.ts',
+  'scripts/soak/soak_restart_e2e.ts',
   'scripts/surface/surface_runtime.ts',
   'tests/managed-process.test.ts',
   'tests/surface-auth.test.ts',

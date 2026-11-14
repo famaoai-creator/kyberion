@@ -51,12 +51,12 @@ export const RUNTIME_STORE_EXEMPTIONS: readonly RuntimeStoreExemption[] = [
   },
   {
     name: 'auto-checkpoint.jsonl',
-    files: ['scripts/soak_endurance.ts'],
+    files: ['scripts/soak/soak_endurance.ts'],
     reason: 'soak probe only samples the size of this path when present; no writer exists',
   },
   {
     name: 'mission-journal.jsonl',
-    files: ['scripts/soak_endurance.ts'],
+    files: ['scripts/soak/soak_endurance.ts'],
     reason: 'soak probe only samples the size of this path when present; no writer exists',
   },
 ];

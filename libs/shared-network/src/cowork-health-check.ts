@@ -51,12 +51,12 @@ export interface CoworkHealthCheck {
 // ── Check definitions ─────────────────────────────────────────────────────────
 
 function checkMcpServerBuilt(): CoworkHealthCheck {
-  const scriptPath = pathResolver.rootResolve('dist/scripts/mcp_server.js');
+  const scriptPath = pathResolver.rootResolve('dist/scripts/mcp/mcp_server.js');
   const exists = safeExistsSync(scriptPath);
   return {
     name: 'mcp_server_built',
     passed: exists,
-    detail: exists ? scriptPath : 'dist/scripts/mcp_server.js not found — run pnpm build',
+    detail: exists ? scriptPath : 'dist/scripts/mcp/mcp_server.js not found — run pnpm build',
   };
 }
 

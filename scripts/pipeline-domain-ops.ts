@@ -32,11 +32,11 @@ import { writeBackupDrillReceipt } from '@agent/core/ops-health-state';
 import type { BackupDrillReceipt } from '@agent/core/ops-health';
 import { logger } from '@agent/core/core';
 import { generateSoftwareQualityArtifacts } from './software_quality_report.js';
-import { runSoakEnduranceHarness } from './soak_endurance.js';
-import { runSoakRestartE2E } from './soak_restart_e2e.js';
-import { runMarketingVideoDryRun } from './marketing_video_dry_run.js';
+import { runSoakEnduranceHarness } from './soak/soak_endurance.js';
+import { runSoakRestartE2E } from './soak/soak_restart_e2e.js';
+import { runMarketingVideoDryRun } from './marketing/marketing_video_dry_run.js';
 import { runComplianceScan } from './compliance_checker.js';
-import { main as promoteProcedure } from './promote_procedure.js';
+import { main as promoteProcedure } from './promote/promote_procedure.js';
 import { checkI18nHardcoding } from './check/check_i18n_hardcoding.js';
 import { runCatalogIntegrityCheck } from './check/check_catalog_integrity.js';
 import {

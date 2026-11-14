@@ -2301,7 +2301,7 @@
     },
     {
       "id": "script.eval.intent-trace",
-      "module": "scripts/intent_trace.ts",
+      "module": "scripts/intent/intent_trace.ts",
       "command": "eval intent-trace",
       "noun": "eval",
       "verb": "intent-trace",
@@ -2581,7 +2581,7 @@
     },
     {
       "id": "script.hooks.discover",
-      "module": "scripts/external_hooks.ts",
+      "module": "scripts/external/external_hooks.ts",
       "args": ["discover"],
       "command": "hooks discover",
       "noun": "hooks",
@@ -2592,7 +2592,7 @@
     },
     {
       "id": "script.hooks.trust",
-      "module": "scripts/external_hooks.ts",
+      "module": "scripts/external/external_hooks.ts",
       "args": ["trust"],
       "command": "hooks trust",
       "noun": "hooks",
@@ -2787,7 +2787,7 @@
     },
     {
       "id": "script.learning.harvest",
-      "module": "scripts/learning_signals.ts",
+      "module": "scripts/learning/learning_signals.ts",
       "command": "learning harvest",
       "noun": "learning",
       "verb": "harvest",
@@ -2797,7 +2797,7 @@
     },
     {
       "id": "script.learning.prepare",
-      "module": "scripts/learning_prepare.ts",
+      "module": "scripts/learning/learning_prepare.ts",
       "command": "learning prepare",
       "noun": "learning",
       "verb": "prepare",
@@ -2808,7 +2808,7 @@
     },
     {
       "id": "script.learning.reuse",
-      "module": "scripts/learning_reuse.ts",
+      "module": "scripts/learning/learning_reuse.ts",
       "command": "learning reuse",
       "noun": "learning",
       "verb": "reuse",
@@ -2852,7 +2852,7 @@
     },
     {
       "id": "script.marketing.publish-dry-run",
-      "module": "scripts/marketing_publish_dry_run.ts",
+      "module": "scripts/marketing/marketing_publish_dry_run.ts",
       "command": "marketing publish-dry-run",
       "noun": "marketing",
       "verb": "publish-dry-run",
@@ -2863,7 +2863,7 @@
     },
     {
       "id": "script.marketing.review-aggregate",
-      "module": "scripts/marketing_review_aggregate.ts",
+      "module": "scripts/marketing/marketing_review_aggregate.ts",
       "command": "marketing review-aggregate",
       "noun": "marketing",
       "verb": "review-aggregate",
@@ -2874,7 +2874,7 @@
     },
     {
       "id": "script.mcp.http",
-      "module": "scripts/mcp_http_server.ts",
+      "module": "scripts/mcp/mcp_http_server.ts",
       "command": "mcp http",
       "noun": "mcp",
       "verb": "http",
@@ -3685,7 +3685,7 @@
     },
     {
       "id": "script.scenario.storage-governance",
-      "module": "scripts/scenario_storage_governance.ts",
+      "module": "scripts/scenario/scenario_storage_governance.ts",
       "command": "scenario storage-governance",
       "noun": "scenario",
       "verb": "storage-governance",
@@ -3807,7 +3807,7 @@
     },
     {
       "id": "script.video.filter.inspect",
-      "module": "scripts/video_filter.ts",
+      "module": "scripts/video/video_filter.ts",
       "args": ["inspect"],
       "command": "video filter inspect",
       "noun": "video",
@@ -3818,7 +3818,7 @@
     },
     {
       "id": "script.video.filter.apply",
-      "module": "scripts/video_filter.ts",
+      "module": "scripts/video/video_filter.ts",
       "args": ["apply"],
       "command": "video filter apply",
       "noun": "video",
@@ -4070,7 +4070,7 @@
     },
     {
       "id": "script.smoke.intent",
-      "module": "scripts/intent_smoke.ts",
+      "module": "scripts/intent/intent_smoke.ts",
       "command": "smoke intent",
       "noun": "smoke",
       "verb": "intent",
@@ -4555,7 +4555,7 @@
     },
     {
       "id": "script.voice.profile.promote",
-      "module": "scripts/promote_voice_profile.ts",
+      "module": "scripts/promote/promote_voice_profile.ts",
       "command": "voice profile-promote",
       "noun": "voice",
       "verb": "profile-promote",

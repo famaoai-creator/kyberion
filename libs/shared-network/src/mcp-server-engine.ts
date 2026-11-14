@@ -1585,7 +1585,7 @@ export function createKyberionMcpServer(): McpServer {
 
 /**
  * Connect the server to a stdio transport and begin listening.
- * Called by scripts/mcp_server.ts.
+ * Called by scripts/mcp/mcp_server.ts.
  */
 export async function startMcpServerStdio(): Promise<void> {
   const server = createKyberionMcpServer();
