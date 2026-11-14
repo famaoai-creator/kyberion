@@ -1,8 +1,8 @@
 ---
 title: Canonical Entity Scope Hierarchy
 tags: [architecture, governance, tenant, organization, project, mission, task, session]
-last_updated: 2026-11-10
-concepts: [entity-scope, tenant, organization, project, work-shape]
+last_updated: 2026-11-14
+concepts: [entity-scope, tenant, organization, project, work-shape, execution-shape, task-session]
 ---
 
 # Canonical Entity Scope Hierarchy
@@ -19,15 +19,58 @@ storage mapping. The chain is the identity layer of the runtime scope
 envelope — see [scope-governance-plane](./scope-governance-plane.md) for how
 workspace isolation and the control plane project onto it.
 
-`organization_id` may be omitted for shared/public records, but when it is
-present it is always inside the tenant boundary. A `WorkItemContext` carries
-the same references and the writer normalizes their serialized order to this
+Required references depend on the record's contract; the chain does not make
+every reference mandatory. When `organization_id` is present it is always inside
+the tenant boundary. A `WorkItemContext` carries the applicable references
+through `task_id`, and the writer normalizes their serialized order to this
 hierarchy; JSON key order is not an authorization mechanism.
 
 The `knowledge/personal/stances/{slug}/` overlay selected by `KYBERION_STANCE` is **not** a level
 in this hierarchy. It is a stance — runtime configuration for which entity
 Kyberion is acting as — and is deliberately orthogonal to scope
 ([stance-tenant-customer-model](./stance-tenant-customer-model.md)).
+
+## Scope references and execution choice
+
+The chain orders references from the widest boundary to the narrowest execution
+context. It is not a requirement to create every level for each request. Scope
+answers whose work and information are involved; Execution Shape answers how the
+request runs. Work Shape classifies the work itself (for example,
+`routine_operation`); it is not an Execution Shape.
+
+| Case                         | Applicable references and execution                                                                                                                      |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Personal conversational work | A Task Session can run without a tenant or project. Its `project_context` is optional. Personal custody and authorization still apply.                   |
+| Standalone repository work   | A public-tier mission can run without a tenant or managed project. Its Tasks belong to that mission.                                                     |
+| Project work                 | A project can group missions and task sessions; a Task Session is not a mandatory parent of a mission Task.                                              |
+| Tenant organization work     | References, when present, belong within the authorized tenant. A routine operation does not become a mission merely because it has organization context. |
+
+The executable boundaries are distinct:
+
+- `ENTITY_SCOPE_HIERARCHY` declares the full ordering, including `session`.
+- `WorkItemContext` (`libs/core/workforce/work-coordination-types.ts`) has optional
+  references through `task_id` and an optional `work_shape`; it has no `session`
+  field. `normalizeWorkItemContext` supplies `project_id: 'default'` and
+  `work_shape: 'routine_operation'` when absent. The default project bucket is
+  not evidence of a governed managed Project record.
+  New WorkItems store `context_origin` beside `context`: each default-bearing
+  field is `explicit` (supplied by the facade caller) or `default`. This does
+  not establish that a human chose it or that a referenced entity was verified.
+  Unchanged fields retain their origin on
+  update; changed values are explicit. Readers expose these as `field_sources`;
+  a missing origin is `unknown`. Legacy migration preserves known origins and
+  leaves restored fields unknown, rather than reconstructing intent from values.
+  Provenance is descriptive metadata and grants no access.
+- `TaskSession` (`libs/core/task/task-session.ts`) is the lighter durable work
+  record, with its own `session_id` and optional `project_context`. The chain's
+  `session` key names execution lineage, not a required Task Session parent.
+
+Optional references do not authorize omitted scope. Confidential work still
+requires its real tenant; a supplied organization, project or mission reference
+must satisfy the owning facade's scope checks. Neither a `default` project
+bucket nor missing tenant metadata permits cross-tenant access. See
+[Units of work](../../../docs/GLOSSARY.md#units-of-work) for WorkItem ownership
+and the mission/task relationship.
 
 ## Consumers
 

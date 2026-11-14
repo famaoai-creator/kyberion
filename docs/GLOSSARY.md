@@ -256,7 +256,7 @@ The bounded, role-scoped context assembled for a mission task: governed instruct
 
 ### Task Session
 
-A lighter-weight durable work record for conversational work that does not need a mission, such as document generation, service inspection, capture flows, and interactive browser assistance. It is not a [Task Contract](#task-contract).
+A lighter-weight durable work record for conversational work that does not need a mission, such as document generation, service inspection, capture flows, and interactive browser assistance. Its optional `project_context` can associate it with a project. It is neither the required parent of a mission Task nor a [Task Contract](#task-contract). The `session` key at the end of the entity scope chain describes execution lineage; it does not mean that every Task belongs to a Task Session.
 
 ### Project
 
@@ -688,6 +688,8 @@ The `execution_shape` field in the intent-coverage matrix describing the selecte
 
 These are orthogonal axes: changing the operating mode does not by itself choose the execution rung, and choosing a rung does not redefine the operating mode.
 
+The legacy `resolution_shape: task_session` also represents `pipeline`, `browser_session` and `actuator_action`. It cannot be inverted into a specific Execution Shape or used as proof that a Task Session record exists. Display the canonical `execution_shape` when present; when it is absent, the legacy task classification means that the execution method was not recorded. Ask displays use this distinction without changing execution or approval decisions.
+
 ### RoutingDecision
 
 The one decision the intent resolver emits per request: intent id, Execution Shape, authority level, delivery mode and promotion verdict. Only the intent resolver reads utterance text; surfaces are adapters that consume this decision, and the promotion verdict comes from `work-scope-policy.json` alone. The contract is `libs/core/contracts/routing-decision.ts`; `resolveRoutingDecision` (`libs/core/intent/routing-decision.ts`) resolves once and the intent gateway carries the decision downstream as `routing_decision`. Utterance text is read only through the resolver entry, `libs/core/intent/intent-resolver-entry.ts` (enforced by `tests/intent-resolver-entry-boundary.test.ts`); the shared surface conversation (Slack, voice, terminal), the front desk and discussion outcomes consume what it returns, and per-surface routing rules are resolver input facts. Resident dots are adapters too: a dot never reads utterances, so dispatch and the executor build the decision for its charter-bounded shape (`libs/core/dot/dot-routing-decision.ts`) and refuse work the policy would route to another shape.
@@ -713,7 +715,9 @@ See [Units of work](#units-of-work) for the transition.
 
 ### WorkItem Context
 
-The typed identity chain on a work item: `tenant_slug → organization_id → project_id → mission_id → task_id`, plus `work_shape` (`session` is the innermost key of `ENTITY_SCOPE_HIERARCHY`). This is the canonical containment order — the same one `ENTITY_SCOPE_HIERARCHY` declares and `normalizeWorkItemContext` serializes ([entity-scope-hierarchy](../knowledge/product/architecture/entity-scope-hierarchy.md)). Context is identity; `labels` are search facets only. Legacy items without typed context are resolved from metadata/labels with a `quality` warning until backfilled.
+The typed identity chain on a work item: applicable references from `tenant_slug → organization_id → project_id → mission_id → task_id`, plus `work_shape`. The fields are optional in `WorkItemContext`; `normalizeWorkItemContext` supplies the project bucket `default` and Work Shape `routine_operation` when absent. That bucket does not prove that a managed Project exists. `session` is the innermost key of `ENTITY_SCOPE_HIERARCHY`, but is not a field of `WorkItemContext`. This is the canonical containment order — the same one `ENTITY_SCOPE_HIERARCHY` declares and `normalizeWorkItemContext` serializes ([entity-scope-hierarchy](../knowledge/product/architecture/entity-scope-hierarchy.md)). Context is identity; `labels` are search facets only. Legacy items without typed context are resolved from metadata/labels with a `quality` warning until backfilled.
+
+For the default-bearing WorkItem context fields, `context_origin` records `explicit` or `default` on new records. Unchanged values preserve their origin on update; changed values are explicit. A missing origin on an older record remains `unknown`, including after legacy migration. Visibility projections expose the distinction in `field_sources`; the existing aggregate `source` describes where the context was read, not whether each value was deliberately supplied. None of these fields proves a managed Project exists or grants authority.
 
 ### Work Visibility Scope
 

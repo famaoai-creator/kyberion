@@ -10,6 +10,7 @@ import {
 import { z } from 'zod';
 import type { VocabularyKey } from '../localization/t.js';
 import type { ConversationHistory } from './front-desk-conversation-history.js';
+import type { ExecutionShape } from '../contracts/execution-shape.js';
 
 export type AskConversationShape =
   'clarification' | 'execution_preview' | 'status_summary' | 'delivery_summary' | 'reply';
@@ -26,12 +27,25 @@ export type AskConversationShape =
  * `presence/displays/presence-studio/static/ask.js`). Declared as an exhaustive
  * `Record` over `IntentResolutionShape` so a new enum member fails `tsc` here
  * before it can render as a raw internal id in that `static/ask.js`, which
- * mirrors this exact map as `SHAPE_LABEL_KEY` (a plain browser script cannot
- * import this module — see its own module doc). Used by: Studio, Concierge.
+ * derives the matching vocabulary key in `executionLabelKey` (a plain browser
+ * script cannot import this module). Canonical execution_shape uses the separate
+ * exhaustive map below; the legacy task_session projection remains ambiguous.
+ * Used by: Studio, Concierge.
  */
 export const ASK_SHAPE_LABEL_KEY: Record<IntentResolutionShape, VocabularyKey> = {
   direct_answer: 'front_desk:shape_direct_answer',
+  task_session: 'front_desk:shape_legacy_task_session',
+  mission: 'front_desk:shape_mission',
+  project_bootstrap: 'front_desk:shape_project_bootstrap',
+};
+
+/** The unfolded execution choice; the legacy task_session projection is ambiguous. */
+export const ASK_EXECUTION_SHAPE_LABEL_KEY: Record<ExecutionShape, VocabularyKey> = {
+  direct_reply: 'front_desk:shape_direct_answer',
+  actuator_action: 'front_desk:shape_actuator_action',
+  browser_session: 'front_desk:shape_browser_session',
   task_session: 'front_desk:shape_task_session',
+  pipeline: 'front_desk:shape_pipeline',
   mission: 'front_desk:shape_mission',
   project_bootstrap: 'front_desk:shape_project_bootstrap',
 };
@@ -275,6 +289,10 @@ export const ASK_VOCABULARY_KEYS = [
   // `tui:tui_cockpit_shape_*` keys).
   'front_desk:shape_direct_answer',
   'front_desk:shape_task_session',
+  'front_desk:shape_legacy_task_session',
+  'front_desk:shape_actuator_action',
+  'front_desk:shape_browser_session',
+  'front_desk:shape_pipeline',
   'front_desk:shape_mission',
   'front_desk:shape_project_bootstrap',
   // FD-09: the UX-contract conversation-turn shape chip (`AskConversationShape`

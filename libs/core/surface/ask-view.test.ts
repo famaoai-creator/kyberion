@@ -8,6 +8,7 @@ import {
 } from '@agent/core/intent/intent-resolution-contract-parser';
 import {
   ASK_SHAPE_LABEL_KEY,
+  ASK_EXECUTION_SHAPE_LABEL_KEY,
   humanizeSlug,
   parseAskVoiceHubReply,
   resolveIntentLabel,
@@ -83,6 +84,13 @@ describe('resolveIntentLabel', () => {
 });
 
 describe('ASK_SHAPE_LABEL_KEY', () => {
+  it('keeps the legacy many-to-one task classification distinct from the canonical execution choice', () => {
+    expect(ASK_SHAPE_LABEL_KEY.task_session).toBe('front_desk:shape_legacy_task_session');
+    expect(ASK_EXECUTION_SHAPE_LABEL_KEY.task_session).toBe('front_desk:shape_task_session');
+    expect(ASK_EXECUTION_SHAPE_LABEL_KEY.pipeline).toBe('front_desk:shape_pipeline');
+    expect(ASK_EXECUTION_SHAPE_LABEL_KEY.browser_session).toBe('front_desk:shape_browser_session');
+  });
+
   // Every `resolution_shape` the parser accepts must have a label key here
   // (see `ASK_SHAPE_LABEL_KEY`'s module doc — the exhaustive `Record` type
   // already fails `tsc` on a new `IntentResolutionShape` member; this test

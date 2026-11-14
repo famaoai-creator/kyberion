@@ -56,6 +56,9 @@ export interface WorkItem {
   current_attempt_id?: string;
   attempts?: WorkItemAttempt[];
   context?: WorkItemContext;
+  /** Value provenance only; never an authorization or managed-project existence claim.
+   * Absent on older records, whose origin cannot be reconstructed from the value. */
+  context_origin?: Partial<Record<'project_id' | 'work_shape', 'explicit' | 'default'>>;
   /**
    * D1 (concept model v2): a top-level WorkItem is the Issue; a step that
    * needs its own ownership (mission task, dot action on an existing item) is

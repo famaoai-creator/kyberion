@@ -30853,6 +30853,26 @@
         "ja": "作業として進行",
         "qps-ploc": "⟦Ẇőřķïñɠ őñ ïŧ ȧş ȧ ŧȧşķ ŀőřėɱ ï⟧"
       },
+      "shape_legacy_task_session": {
+        "en": "Execution method not recorded",
+        "ja": "実行方法の記録なし",
+        "qps-ploc": "⟦Ėẋėƈůŧïőñ ɱėŧħőḓ ñőŧ řėƈőřḓėḓ ŀőřėɱ ïṗş⟧"
+      },
+      "shape_actuator_action": {
+        "en": "Run an operation",
+        "ja": "操作を実行",
+        "qps-ploc": "⟦Řůñ ȧñ őṗėřȧŧïőñ ŀőřėɱ⟧"
+      },
+      "shape_browser_session": {
+        "en": "Work in a browser",
+        "ja": "ブラウザーで作業",
+        "qps-ploc": "⟦Ẇőřķ ïñ ȧ ƀřőẇşėř ŀőřėɱ⟧"
+      },
+      "shape_pipeline": {
+        "en": "Follow a defined procedure",
+        "ja": "定義済みの手順で実行",
+        "qps-ploc": "⟦Ƒőŀŀőẇ ȧ ḓėƒïñėḓ ṗřőƈėḓůřė ŀőřėɱ ïṗ⟧"
+      },
       "shape_mission": {
         "en": "Set up as a larger job",
         "ja": "大きな仕事として編成",

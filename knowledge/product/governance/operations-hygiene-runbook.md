@@ -634,6 +634,11 @@ This covers directories and top-level `*.jsonl` / `*.json` files.
 
 ### Tenant data migration preflight
 
+- Preserve value provenance separately from restored values. Filling a default
+  during legacy migration does not establish that the original author supplied
+  it. WorkItem migrations keep unknown context origins unknown; test a real
+  old-format record without `context` / `context_origin`, not only a record
+  created by the new writer (`work-coordination.test.ts`).
 - Plan and validate every tenant before the first copy or deletion, including in
   dry-run. Reject symlinks and unsupported file types; a README exemption applies
   only to a regular file, never a directory or link that recursive cleanup would
