@@ -138,6 +138,8 @@ const REGISTERED_DECLARATIONS: Readonly<Record<string, string>> = {
   // Not coordination vocabularies:
   'libs/actuators/network-actuator/src/op-catalog.ts':
     'not a vocabulary: network op names (json_query, distill_response)',
+  'libs/core/mesh/peer-task-exchange.ts':
+    'not a vocabulary: CLI subcommand names (resend-proposal, resend-result) printed in the not-delivered next step; the peer task acts are the conversation message kinds',
   'libs/core/workforce/review-reentry.ts':
     'not a vocabulary: a human review verdict on a deliverable, recorded for re-entry, not an inter-agent message',
   'libs/core/workforce/work-coordination-evidence.ts':
