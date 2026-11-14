@@ -4,6 +4,15 @@
   "base_url": "https://api.telegram.org",
   "auth_strategy": "none",
   "operations": {
+    "get_me": {
+      "type": "api",
+      "kind": "capture",
+      "risk": "read",
+      "approval_required": false,
+      "path": "bot{{token}}/getMe",
+      "method": "GET",
+      "description": "Fetch the bot's identity; serves as the identity probe."
+    },
     "post_message": {
       "path": "bot{{token}}/sendMessage",
       "method": "POST",

@@ -4,6 +4,15 @@
   "base_url": "https://api.figma.com/v1",
   "auth_strategy": "Bearer",
   "operations": {
+    "get_me": {
+      "type": "api",
+      "kind": "capture",
+      "risk": "read",
+      "approval_required": false,
+      "path": "me",
+      "method": "GET",
+      "description": "Fetch the authenticated Figma user; serves as the identity probe."
+    },
     "get_file": {
       "type": "api",
       "path": "files/{{file_key}}",
