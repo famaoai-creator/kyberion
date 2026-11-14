@@ -126,7 +126,7 @@ export function buildChronosLaunchdPlist(options: ChronosLaunchdPlistOptions): s
   }
   return buildLaunchdPlist(options, {
     label: CHRONOS_DAEMON_LABEL,
-    daemonScript: 'dist/scripts/chronos_daemon.js',
+    daemonScript: 'dist/scripts/chronos/chronos_daemon.js',
     logBaseName: 'kyberion-chronos',
   });
 }

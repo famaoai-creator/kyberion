@@ -22,7 +22,7 @@ describe('Work Graph i18n boundary', () => {
   });
 
   it('does not increase the pre-existing virtual-office localization baseline', () => {
-    const relativePath = 'scripts/virtual_office.ts';
+    const relativePath = 'scripts/virtual/virtual_office.ts';
     const report = scanFileForKanaLiterals(
       String(safeReadFile(pathResolver.rootResolve(relativePath), { encoding: 'utf8' })),
       relativePath

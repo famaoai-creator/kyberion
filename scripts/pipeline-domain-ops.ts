@@ -22,10 +22,10 @@ import { runKnowledgeHygieneProbe } from '@agent/core/knowledge/knowledge-hygien
 import { runOpsHealthProbe } from '@agent/core/ops-health-probe';
 import { collectUiUxGovernanceReport } from './check/check_ui_ux_governance.js';
 import { runTenantDriftWatch } from './watch/watch_tenant_drift.js';
-import { runDecisionDigest } from './approval_inbox.js';
-import { createGhPrPort } from './pr_shadow.js';
+import { runDecisionDigest } from './approval/approval_inbox.js';
+import { createGhPrPort } from './pr/pr_shadow.js';
 import { observePullRequests, DEFAULT_IGNORED_CHECKS } from '@agent/core/governance/pr-shadow';
-import { runApprovalStoreHygieneSweeps } from './approval_store_hygiene.js';
+import { runApprovalStoreHygieneSweeps } from './approval/approval_store_hygiene.js';
 import { runAutoCheckpoint } from './auto_checkpoint.js';
 import { createBackup, listBackups, runRestoreDrill } from './backup.js';
 import { writeBackupDrillReceipt } from '@agent/core/ops-health-state';
@@ -48,8 +48,8 @@ import { main as manageRegistry } from './registry_manager.js';
 import { main as missionController } from './mission_controller.js';
 import { runCapturePhoto } from './capture_photo.js';
 import { runGenerateAvatar } from './generate/generate_avatar.js';
-import { runRegisterAvatar } from './register_avatar.js';
-import { runOAuthSetupForService } from './setup_oauth.js';
+import { runRegisterAvatar } from './register/register_avatar.js';
+import { runOAuthSetupForService } from './setup/setup_oauth.js';
 import { runOrganizationDigest } from '@agent/core/organization/organization-digest';
 import { persistOrganizationDigest } from '@agent/core/organization/organization-digest-artifacts';
 import {

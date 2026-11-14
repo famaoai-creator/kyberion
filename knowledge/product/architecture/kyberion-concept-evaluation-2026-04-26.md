@@ -380,7 +380,7 @@ interface MemoryCandidate {
 実装候補:
 
 - 新規: `libs/core/contracts/next-action-contract.ts`
-- 更新: `scripts/control_plane_cli.ts`
+- 更新: `scripts/control/control_plane_cli.ts`
 - 更新: Chronos route または presenter 層
 
 next action 種別:

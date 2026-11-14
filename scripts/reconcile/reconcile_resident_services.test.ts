@@ -176,7 +176,7 @@ describe('scheduler reconcile', () => {
       [legacyChronos]: legacyPlist(
         'com.kyberion.chronos',
         instance.repoRoot,
-        'dist/scripts/chronos_daemon.js',
+        'dist/scripts/chronos/chronos_daemon.js',
         {
           KYBERION_BASE_ROLE: 'sovereign',
         }

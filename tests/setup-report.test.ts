@@ -34,7 +34,7 @@ vi.mock('../scripts/surface/surface_runtime.js', () => ({
   setupSurfaces: mocks.setupSurfaces,
 }));
 
-vi.mock('../scripts/services_setup.js', () => ({
+vi.mock('../scripts/services/services_setup.js', () => ({
   setupServices: mocks.setupServices,
 }));
 
@@ -46,7 +46,7 @@ vi.mock('../scripts/run_doctor.js', () => ({
   collectDoctorReport: mocks.collectDoctorReport,
 }));
 
-vi.mock('../scripts/vital_check.js', () => ({
+vi.mock('../scripts/vital/vital_check.js', () => ({
   buildVitalReport: mocks.buildVitalReport,
 }));
 
@@ -88,7 +88,7 @@ describe('setup report', () => {
 
     mocks.buildVitalReport.mockReturnValue({ checks: [] });
 
-    const { runSetupReport } = await import('../scripts/setup_report.js');
+    const { runSetupReport } = await import('../scripts/setup/setup_report.js');
     const report = await runSetupReport();
 
     expect(mocks.setupSurfaces).toHaveBeenCalledTimes(1);
@@ -193,7 +193,7 @@ describe('setup report', () => {
       ],
     });
 
-    const { runSetupReportWithPersona } = await import('../scripts/setup_report.js');
+    const { runSetupReportWithPersona } = await import('../scripts/setup/setup_report.js');
     const report = await runSetupReportWithPersona({ persona: 'first-time-user', quiet });
 
     expect(mocks.setupSurfaces).toHaveBeenCalledWith({ quiet: true });

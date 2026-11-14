@@ -24,12 +24,12 @@ IT企業として重要性が増している(1)ソフトウェア資材管理(SB
 
 ## 対象と実体
 
-| #   | 対象                 | 実体                                                                                                     |
-| --- | -------------------- | -------------------------------------------------------------------------------------------------------- |
-| 1   | ソフトウェア資材管理 | ワークフロー `software-asset-management`（intent 同名）                                                  |
-| 2   | IT運用自動化         | ワークフロー `it-operations-automation`（intent 同名）                                                   |
-| 3   | AWSシミュレーション  | パイプライン `pipelines/aws-operations-simulation.json`（IT運用の simulate フェーズが参照）              |
-| 4   | 動的ワークフロー登録 | スクリプト `scripts/register_workflow.ts` + スキーマ `schemas/workflow-registration-request.schema.json` |
+| #   | 対象                 | 実体                                                                                                              |
+| --- | -------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| 1   | ソフトウェア資材管理 | ワークフロー `software-asset-management`（intent 同名）                                                           |
+| 2   | IT運用自動化         | ワークフロー `it-operations-automation`（intent 同名）                                                            |
+| 3   | AWSシミュレーション  | パイプライン `pipelines/aws-operations-simulation.json`（IT運用の simulate フェーズが参照）                       |
+| 4   | 動的ワークフロー登録 | スクリプト `scripts/register/register_workflow.ts` + スキーマ `schemas/workflow-registration-request.schema.json` |
 
 ---
 
@@ -82,7 +82,7 @@ pnpm pipeline --input pipelines/aws-operations-simulation.json \
   --context '{"change_plan_path":"active/shared/tmp/change-plan.json","output_path":"active/shared/tmp/aws-simulation-report.json"}'
 ```
 
-## 4. 動的ワークフロー登録 (`scripts/register_workflow.ts`)
+## 4. 動的ワークフロー登録 (`scripts/register/register_workflow.ts`)
 
 **設計思想**: kyberion のカタログはすべて手編集JSON + `pnpm validate` 検証。ランタイム自己書き換えはガバナンスモデルに反するため、本ツールは「コンパクトな登録リクエスト → スキーマ検証 → カタログ準拠エントリへ展開 →（提案 or 適用）→ バリデータでゲート」という、確立された _提案→検証マージ_ パターンを自動化する。
 
@@ -94,8 +94,8 @@ pnpm pipeline --input pipelines/aws-operations-simulation.json \
 
 ```bash
 # 提案(安全) → レビュー → マージ or 適用
-node dist/scripts/register_workflow.js --request active/shared/tmp/my-workflow.json --propose
-node dist/scripts/register_workflow.js --request active/shared/tmp/my-workflow.json --apply
+node dist/scripts/register/register_workflow.js --request active/shared/tmp/my-workflow.json --propose
+node dist/scripts/register/register_workflow.js --request active/shared/tmp/my-workflow.json --apply
 # 適用後は必ず検証
 pnpm run build && node dist/scripts/check/check_workflow_catalog_refs.js \
   && node dist/scripts/check/check_governance_rules.js \

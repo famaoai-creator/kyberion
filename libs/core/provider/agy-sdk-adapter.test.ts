@@ -87,7 +87,7 @@ describe('AgySdkAdapter', () => {
 
     expect(spawnProcess).toHaveBeenCalledWith(
       expect.stringMatching(/(?:agy-sdk\/bin\/python|python3)$/u),
-      [expect.stringContaining('scripts/agy_sdk_subagent_bridge.py')],
+      [expect.stringContaining('scripts/agy/agy_sdk_subagent_bridge.py')],
       expect.objectContaining({ cwd: '/workspace', stdio: 'pipe' })
     );
     expect(response.text).toBe('delegated result');

@@ -159,7 +159,8 @@ export class AgySdkAdapter {
         getRegisteredEnvText('KYBERION_AGY_SDK_PYTHON') ??
         resolveManagedToolPythonBin('agy_sdk') ??
         'python3';
-      const script = this.options.scriptPath ?? pathResolver.scripts('agy_sdk_subagent_bridge.py');
+      const script =
+        this.options.scriptPath ?? pathResolver.scripts('agy/agy_sdk_subagent_bridge.py');
       const sdkApiKey = resolveGeminiApiKey();
       // No profile: one bridge serves requests of every profile, so it never
       // gets a private git index.

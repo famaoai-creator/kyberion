@@ -60,7 +60,7 @@ status: active
 | 業務                                     | 現行手段(CLI/手編集)                             | 方式   | 裏で使う既存資産                                                                                                        |
 | ---------------------------------------- | ------------------------------------------------ | ------ | ----------------------------------------------------------------------------------------------------------------------- |
 | **初期セットアップ**                     |                                                  |        |                                                                                                                         |
-| 環境・前提チェック                       | `pnpm doctor` / `pnpm kyberion setup report`     | 状況+B | `scripts/setup_report.ts` の集約結果を API 化                                                                           |
+| 環境・前提チェック                       | `pnpm doctor` / `pnpm kyberion setup report`     | 状況+B | `scripts/setup/setup_report.ts` の集約結果を API 化                                                                     |
 | アイデンティティ設定(自分・エージェント) | `pnpm onboard`(TTY 必須)/ `onboard apply`        | **B**  | `onboard apply` 相当の非対話パス+`writeTenantProfile`(pr653 実装を回収)                                                 |
 | アバター登録・音声プロファイル登録       | `onboard:avatar` / `onboard:voice`               | **B**  | pr653 の `getUserMedia`/`MediaRecorder` 実装、`saveBrowserOnboardingVoiceSample`                                        |
 | 顧客オーバーレイ作成・切替               | `customer:create/switch` + 手編集                | B      | `scripts/company/company_onboarding.ts` プリセット                                                                      |

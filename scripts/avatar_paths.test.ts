@@ -2,12 +2,17 @@ import { describe, expect, it } from 'vitest';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeReadFile } from '@agent/core/secure-io';
 import { resolveAvatarGenerationPaths } from './generate/generate_avatar.js';
-import { normalizeIdentityRecord, resolveAvatarRegistrationPaths } from './register_avatar.js';
+import {
+  normalizeIdentityRecord,
+  resolveAvatarRegistrationPaths,
+} from './register/register_avatar.js';
 
 describe('avatar script path boundaries', () => {
   it('uses the canonical personal identity loader for updates', () => {
     const source = String(
-      safeReadFile(pathResolver.rootResolve('scripts/register_avatar.ts'), { encoding: 'utf8' })
+      safeReadFile(pathResolver.rootResolve('scripts/register/register_avatar.ts'), {
+        encoding: 'utf8',
+      })
     );
     expect(source).toContain('loadPersonalIdentityAtPath(identityJsonPath)');
     expect(source).not.toContain('readJson');
@@ -15,7 +20,9 @@ describe('avatar script path boundaries', () => {
 
   it('routes avatar registration progress through the shared printer', () => {
     const source = String(
-      safeReadFile(pathResolver.rootResolve('scripts/register_avatar.ts'), { encoding: 'utf8' })
+      safeReadFile(pathResolver.rootResolve('scripts/register/register_avatar.ts'), {
+        encoding: 'utf8',
+      })
     );
     expect(source).not.toContain('console.log');
     expect(source).not.toContain('console.warn');

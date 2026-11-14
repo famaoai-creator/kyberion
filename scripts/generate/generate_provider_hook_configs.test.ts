@@ -122,7 +122,7 @@ describe('buildCodexHooks', () => {
             hooks: [
               {
                 type: 'command',
-                command: "node '/old/dist/scripts/codex_cli_hook.js' PostToolUse",
+                command: "node '/old/dist/scripts/codex/codex_cli_hook.js' PostToolUse",
               },
               { type: 'command', command: 'custom-tool' },
             ],

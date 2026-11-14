@@ -161,7 +161,7 @@ participant_id は `<provider>-<session_id>`（hook payload の `session_id`）�
 
 - Core: `libs/core/workforce/co-session.ts`（lease 直列化は lease-backend seam の `withLockSync`、期限と保持者は `libs/core/lease/lease-terms.ts`）
 - Hook bridge core: `libs/core/provider/co-session-hook.ts`
-- Hook entries: `scripts/claude_code_hook.ts`（Claude: 同 `libs/core/provider/claude-code-hook.ts`）、`scripts/gemini_cli_hook.ts`（Gemini）、`scripts/codex_cli_hook.ts`（Codex）
+- Hook entries: `scripts/claude_code_hook.ts`（Claude: 同 `libs/core/provider/claude-code-hook.ts`）、`scripts/gemini_cli_hook.ts`（Gemini）、`scripts/codex/codex_cli_hook.ts`（Codex）
 - 配線: `.claude/settings.json`（tracked・直接配線）、`pnpm generate:provider-hooks` → `.gemini/settings.json` / `.codex/hooks.json`（gitignore・生成物）
 - CLI: `scripts/co_session.ts`、`scripts/co-session-monitor/poll.ts`（`--provider`/`--participant-id` 汎用）
 - 契約参照: 本ファイル + multi-provider coexecution + work-coordination platform + peer-network

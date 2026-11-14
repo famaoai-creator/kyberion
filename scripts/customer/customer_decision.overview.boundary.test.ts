@@ -672,7 +672,7 @@ describe('customer-decision overview and learning (CD-12, real paths)', () => {
     `the weekly op runs the facade as a child bound to its tenant, and refuses another tenant${STALE_DIST ? ` (skipped: ${STALE_DIST} — run pnpm -s build)` : ''}`,
     async () => {
       const { runCustomerDecisionLearningOp } = await import('../customer-decision/learning-op.js');
-      const { buildTenantRunEnv } = await import('../chronos_daemon.js');
+      const { buildTenantRunEnv } = await import('../chronos/chronos_daemon.js');
       const env = buildTenantRunEnv(TENANT);
       for (const key of [
         'KYBERION_TENANT',

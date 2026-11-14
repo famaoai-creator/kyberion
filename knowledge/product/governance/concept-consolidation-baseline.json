@@ -1257,10 +1257,10 @@
     "scripts/apply_dependency_patch.ts": {
       "json_state_write_budget": 1
     },
-    "scripts/approval_inbox.ts": {
+    "scripts/approval/approval_inbox.ts": {
       "bespoke_cli_parser_budget": 2
     },
-    "scripts/approval_store_hygiene.ts": {
+    "scripts/approval/approval_store_hygiene.ts": {
       "bespoke_cli_parser_budget": 2
     },
     "scripts/audit/audit_mirror_reconcile.ts": {
@@ -1371,7 +1371,7 @@
       "json_state_write_budget": 1,
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/chronos_daemon.ts": {
+    "scripts/chronos/chronos_daemon.ts": {
       "runtime_path_literal_budget": 2,
       "bespoke_cli_parser_budget": 1
     },
@@ -1682,17 +1682,17 @@
     "scripts/pipeline-reasoning-visibility.ts": {
       "env_direct_read_budget": 1
     },
-    "scripts/presence-controller.ts": {
+    "scripts/presence/presence-controller.ts": {
       "json_state_write_budget": 2
     },
     "scripts/promote/promote_procedure.ts": {
       "env_direct_read_budget": 1,
       "json_state_write_budget": 1
     },
-    "scripts/publish_pull_request.ts": {
+    "scripts/publish/publish_pull_request.ts": {
       "bespoke_cli_parser_budget": 3
     },
-    "scripts/realtime_voice_config.ts": {
+    "scripts/realtime/realtime_voice_config.ts": {
       "bespoke_cli_parser_budget": 2
     },
     "scripts/reasoning/reasoning_auth_check.ts": {
@@ -1722,10 +1722,10 @@
     "scripts/refactor/mission-queue.ts": {
       "json_state_write_budget": 2
     },
-    "scripts/register_avatar.ts": {
+    "scripts/register/register_avatar.ts": {
       "json_state_write_budget": 2
     },
-    "scripts/register_workflow.ts": {
+    "scripts/register/register_workflow.ts": {
       "json_state_write_budget": 2
     },
     "scripts/registry_manager.ts": {
@@ -1795,7 +1795,7 @@
       "json_state_write_budget": 2,
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/setup_oauth.ts": {
+    "scripts/setup/setup_oauth.ts": {
       "json_state_write_budget": 1,
       "bespoke_cli_parser_budget": 1
     },
@@ -1850,19 +1850,19 @@
     "scripts/tenant/tenant_activation.ts": {
       "bespoke_cli_parser_budget": 12
     },
-    "scripts/terminal_actuator_usability_probe.ts": {
+    "scripts/terminal/terminal_actuator_usability_probe.ts": {
       "json_state_write_budget": 1
     },
-    "scripts/terminal_session_cli.ts": {
+    "scripts/terminal/terminal_session_cli.ts": {
       "runtime_path_literal_budget": 1
     },
     "scripts/tui.ts": {
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/virtual_office.ts": {
+    "scripts/virtual/virtual_office.ts": {
       "env_direct_read_budget": 1
     },
-    "scripts/vital_check.ts": {
+    "scripts/vital/vital_check.ts": {
       "runtime_path_literal_budget": 1,
       "bespoke_cli_parser_budget": 1
     },
@@ -1876,7 +1876,7 @@
     "scripts/watch/watch_tenant_drift.ts": {
       "bespoke_cli_parser_budget": 2
     },
-    "scripts/work_inventory.ts": {
+    "scripts/work/work_inventory.ts": {
       "bespoke_cli_parser_budget": 2
     },
     "scripts/write_core_dist_scope.mjs": {

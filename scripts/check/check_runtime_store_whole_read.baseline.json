@@ -101,7 +101,7 @@
     "scripts/lib/backup-tenant-partitions.ts": 1,
     "scripts/migrate/migrate_physical_namespaces.ts": 3,
     "scripts/onboarding/onboarding_first_job_status.ts": 1,
-    "scripts/presence-controller.ts": 1,
+    "scripts/presence/presence-controller.ts": 1,
     "scripts/run_baseline_check.ts": 1,
     "scripts/soak/soak_endurance.ts": 1
   }

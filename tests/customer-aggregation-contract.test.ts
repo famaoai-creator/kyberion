@@ -26,7 +26,7 @@ describe('Customer aggregation contract', () => {
     expect(doc).toContain(
       '[x] Voice profile registry consumer (`libs/core/voice/voice-profile-registry.ts`)'
     );
-    expect(doc).toContain('[x] Vital check consumer (`scripts/vital_check.ts`)');
+    expect(doc).toContain('[x] Vital check consumer (`scripts/vital/vital_check.ts`)');
     expect(doc).toContain('[x] Baseline check consumer (`scripts/run_baseline_check.ts`)');
     expect(doc).toContain(
       '[x] Onboarding apply consumer (`scripts/onboarding/onboarding_apply.ts`)'

@@ -36,7 +36,7 @@
       "note": "Re-generable isolated Chromium probe scratch: per-run screenshots and diagnostic results are consumed by usability verification; durable conclusions are recorded separately in mission evidence."
     },
     {
-      "file": "scripts/terminal_actuator_usability_probe.ts",
+      "file": "scripts/terminal/terminal_actuator_usability_probe.ts",
       "count": 1,
       "classification": "legit-tmp",
       "note": "Re-generable isolated terminal probe scratch: transient session diagnostics are consumed by capability/recovery verification; durable conclusions are recorded separately in mission evidence."
@@ -558,7 +558,7 @@
       "note": "restricts --from-file secret material to active/shared/tmp/ so values never appear on argv"
     },
     {
-      "file": "scripts/setup_oauth.ts",
+      "file": "scripts/setup/setup_oauth.ts",
       "count": 1,
       "classification": "legit-tmp",
       "note": "OAuth setup runtime scratch"

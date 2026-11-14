@@ -179,7 +179,7 @@ async function runScriptCommand(
   const childCommand = scriptCommand.module ? process.execPath : pnpmExecutable();
   const credentialEnv =
     scriptCommand.id === 'script.pr.create' &&
-    scriptCommand.module === 'scripts/publish_pull_request.ts'
+    scriptCommand.module === 'scripts/publish/publish_pull_request.ts'
       ? {
           GH_TOKEN: getRegisteredEnvText('GH_TOKEN'),
           GITHUB_TOKEN: getRegisteredEnvText('GITHUB_TOKEN'),
@@ -437,7 +437,7 @@ export async function main(
       return;
     }
     case 'operator-readiness': {
-      const { main: vitalMain } = await import('./vital_check.js');
+      const { main: vitalMain } = await import('./vital/vital_check.js');
       const result = await vitalMain(normalizedArgs.slice(1));
       if (result.help) print(result.help);
       else if (result.report) {
@@ -457,7 +457,7 @@ export async function main(
         if (registered) print(formatScopeHelp(registered, helpLocale(normalizedArgs)));
         return;
       }
-      const { runSetupReportCli } = await import('./setup_report.js');
+      const { runSetupReportCli } = await import('./setup/setup_report.js');
       await runSetupReportCli(normalizedArgs.slice(2));
       return;
     }

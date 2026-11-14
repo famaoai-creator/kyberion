@@ -13,16 +13,15 @@ scripts/
   check/          ← all `check_*` / `check-*` governance gates + baselines
   generate/       ← all `generate_*` catalog/index generators + their helpers
   sync/           ← all `sync_*` code→knowledge reconciliation syncers
-  meeting/        ← `meeting_*` meeting operations entry points
-  peer/           ← `peer_*` peer messaging/collaboration entry points
-  continuous/     ← `continuous_*` continuous-operations cycle entry points
-  task/           ← `task_*` work-item operations (init/list/run/scenario/smoke)
-  reconcile/      ← `reconcile_*` config/scope/intent reconciliation sweeps
-  dot/            ← `dot_*` Dot charter lifecycle/executor/cadence steps
-  browser/        ← `browser_*` + `browser-bridge-*` bridge/executor/profile ops
-  stance/         ← `stance_*` stance create/list/switch/migrate ops
-  voice/          ← `voice_*` voice setup/consent/route/upgrade CLIs
-  service/        ← `service_*` service lifecycle/preflight/recording/harness
+  <prefix>/       ← grouped `prefix_*` script families, one bounded area each:
+                    meeting/ peer/ continuous/ task/ reconcile/ dot/ browser/
+                    stance/ voice/ service/ agent/ reasoning/ customer/ mission/
+                    onboarding/ organization/ tenant/ company/ eval/ watch/
+                    surface/ summarize/ operator/ marketing/ audit/ scan/
+                    report/ intent/ learning/ mcp/ oauth/ promote/ scenario/
+                    soak/ video/ setup/ work/ pr/ publish/ benchmark/ approval/
+                    chronos/ codex/ agy/ control/ vital/ virtual/ terminal/
+                    services/ register/ realtime/ presence/ external/
   lib/            ← shared helpers imported by scripts; no entry points
   <domain>/       ← grouped script sets for one bounded area
                     (personal-pads/, meeting-notepad/, daily-desk/,
@@ -31,14 +30,16 @@ scripts/
 ```
 
 Historically every entry point landed flat in the root. Bounded domains are
-being grouped into `<domain>/` subdirectories — the `check_*` governance gate
-family moved first (all gates, their tests and `*.baseline.json` files now
-live in `check/`; new checkers go there, never in the root), followed by the
-`generate_*` catalog/index generators in `generate/`, the `sync_*`
-code→knowledge syncers in `sync/`, and the domain entry-point families
-`meeting/`, `peer/`, `continuous/`, `task/`, `reconcile/`, `dot/`, `browser/`, `stance/`, `voice/` and `service/`. Prefer a
-subdirectory for new domain-scoped scripts and keep the root for operations
-that genuinely span the repository. (Direction set by
+being grouped into `<prefix>/` and `<domain>/` subdirectories — the `check_*`
+governance gate family moved first (all gates, their tests and
+`*.baseline.json` files now live in `check/`; new checkers go there, never in
+the root), followed by the `generate_*` catalog/index generators, the `sync_*`
+code→knowledge syncers, and the `prefix_*` domain families listed above.
+Canonical facades stay at the root (`mission_controller.ts`, `onboarding.ts`,
+`organization.ts`, `kyberion.ts`, the `run_*` repo-wide runners, and the
+`cli_*` / `pipeline_*` machinery). Prefer a subdirectory for new domain-scoped
+scripts and keep the root for operations that genuinely span the repository.
+(Direction set by
 [SIMPLICITY_ABSTRACTION_PLAN](../docs/developer/improvement-plans-2026-08/SIMPLICITY_ABSTRACTION_PLAN_2026-08-25.ja.md)
 SX-06; not yet enforced by a gate.)
 
@@ -60,8 +61,14 @@ SX-06; not yet enforced by a gate.)
   `package.json` `scripts`.
 - **Moving a script family** (learned from the check/generate/sync/task
   regroups — each of these bit at least once):
-  - self-locating `dirname(fileURLToPath(import.meta.url))` arithmetic breaks
-    on any depth change — use `pathResolver.rootDir()` instead;
+  - self-locating `dirname(fileURLToPath(import.meta.url))` arithmetic AND
+    `new URL('../x', import.meta.url)` literals (including backtick template
+    URLs) break on any depth change — `../` becomes `../../`; prefer
+    `pathResolver` for new code;
+  - `vi.mock` specifiers can silently go stale long after a move (the mock
+    stops intercepting; tests then run the real module and fail with
+    unrelated-looking errors) — check every `vi.mock('./x')` in files that
+    were not moved too;
   - `vi.mock('./lib/x.js')`, dynamic `import('./x.js')`, AND bare side-effect
     `import './x.js'` (registration imports with no `from`) are NOT caught by
     `from './x'` greps — sweep all three forms;

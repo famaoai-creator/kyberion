@@ -34,7 +34,7 @@ describe('install_chronos_launchd plist generation', () => {
   it('runs node against the built chronos daemon, in order', () => {
     const nodeIndex = plist.indexOf('<string>/usr/local/bin/node</string>');
     const scriptIndex = plist.indexOf(
-      '<string>/repo/kyberion/dist/scripts/chronos_daemon.js</string>'
+      '<string>/repo/kyberion/dist/scripts/chronos/chronos_daemon.js</string>'
     );
     expect(nodeIndex).toBeGreaterThan(-1);
     expect(scriptIndex).toBeGreaterThan(nodeIndex);

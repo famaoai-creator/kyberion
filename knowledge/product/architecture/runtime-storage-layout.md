@@ -420,7 +420,7 @@ the record is stored follows its scope
   found, never to a caller-derived location.
 - **Legacy records**: tenant records written to the system tree before the
   partitions existed stay readable and writable in place.
-  `node dist/scripts/approval_store_hygiene.js --migrate-tenant-partitions`
+  `node dist/scripts/approval/approval_store_hygiene.js --migrate-tenant-partitions`
   lists them (dry run); add `--apply` to move each one under its record lock
   (write + fsync + read-back, move the request's passkey challenges the same
   way, remove the system copy, audit-chain entry `migrate_tenant_partition`).

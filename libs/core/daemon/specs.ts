@@ -79,7 +79,7 @@ export const DAEMON_SPECS: Record<string, DaemonServiceSpec> = {
   chronos: {
     id: 'chronos',
     label: CHRONOS_DAEMON_LABEL,
-    daemonScript: 'dist/scripts/chronos_daemon.js',
+    daemonScript: 'dist/scripts/chronos/chronos_daemon.js',
     logBaseName: 'kyberion-chronos',
     verificationHint: 'heartbeat: active/shared/runtime/heartbeats/chronos-daemon.json',
   },

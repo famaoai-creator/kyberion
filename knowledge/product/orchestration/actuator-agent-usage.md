@@ -142,7 +142,7 @@ actuators:
 
 ```sh
 node --import ./scripts/ts-loader.mjs scripts/browser/browser_actuator_usability_probe.ts --json
-node --import ./scripts/ts-loader.mjs scripts/terminal_actuator_usability_probe.ts --json
+node --import ./scripts/ts-loader.mjs scripts/terminal/terminal_actuator_usability_probe.ts --json
 ```
 
 The browser probe checks 15 patterns including Unicode, keyboard input, omitted fill values,

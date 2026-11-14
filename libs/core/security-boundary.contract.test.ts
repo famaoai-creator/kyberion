@@ -18,9 +18,9 @@ const ALLOWLIST: Record<string, string> = {
   'scripts/bundle_entrypoints.mjs': 'Compiler bundling bootstrap',
   'scripts/write_core_dist_scope.mjs': 'Compiler output package-scope bootstrap',
   'scripts/git_merge_regenerate.mjs': 'Git merge-driver bootstrap before compiled artifacts exist',
-  'scripts/agy_profile_controller.ts':
+  'scripts/agy/agy_profile_controller.ts':
     'Existing host profile manager outside governed repository storage',
-  'scripts/codex_profile_controller.ts':
+  'scripts/codex/codex_profile_controller.ts':
     'Existing host profile manager outside governed repository storage',
 };
 

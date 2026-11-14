@@ -19,7 +19,7 @@ const HOME = '/Users/op';
 const mine = daemonInstanceFromCanonicalRoot(MINE, 'darwin');
 const other = daemonInstanceFromCanonicalRoot(OTHER, 'darwin');
 
-function plist(label: string, repoRoot: string, script = 'dist/scripts/chronos_daemon.js') {
+function plist(label: string, repoRoot: string, script = 'dist/scripts/chronos/chronos_daemon.js') {
   return buildLaunchdPlist(
     { nodePath: '/opt/homebrew/opt/node/bin/node', repoRoot, logDir: `${HOME}/Library/Logs` },
     { label, daemonScript: script, logBaseName: 'kyberion-test' }

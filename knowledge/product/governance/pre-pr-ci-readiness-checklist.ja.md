@@ -258,7 +258,7 @@ PR 本文の Test plan に明記する。
 5. push 後は `gh pr checks <number>` で確認し、**pending を pass と数えない**。
 6. 未実行 suite・環境依存・既知 failure は PR 本文の Test plan / Evidence に明記する。
 
-`pnpm kyberion pr create`（`scripts/publish_pull_request.ts`）と `pnpm kyberion pr preflight`（`scripts/pr_preflight.ts`）は
+`pnpm kyberion pr create`（`scripts/publish/publish_pull_request.ts`）と `pnpm kyberion pr preflight`（`scripts/pr/pr_preflight.ts`）は
 デフォルトで手順 3 の `pnpm check -- --changed` を実行する（`--base <branch>` を渡すと `origin/<branch>` を base にする）。
 `pr preflight` は PR title 検査と、`--body-file` を渡した場合の Knowledge 検査も行うが、gh には触れない。
 実装エージェント（または専用の preflight エージェント）は push 前に `pr preflight` を通して自分の push を gate する。
