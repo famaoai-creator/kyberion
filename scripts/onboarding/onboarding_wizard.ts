@@ -50,15 +50,15 @@ import {
   type OnboardingTenant as TenantDraft,
   type OnboardingTutorial as TutorialDraft,
 } from '@agent/core/organization/onboarding-state';
-import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
-import { createStance } from './stance/stance_create.js';
-import { switchStance } from './stance/stance_switch.js';
+import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
+import { createStance } from '../stance/stance_create.js';
+import { switchStance } from '../stance/stance_switch.js';
 import {
   isExpressOnboarding,
   ONBOARD_CLI,
   shouldRefuseNonInteractiveOnboarding,
 } from './onboarding_mode.js';
-import { guardCliArgs } from './lib/cli-guard.js';
+import { guardCliArgs } from '../lib/cli-guard.js';
 import {
   evaluateReasoningBackend,
   formatReasoningSummary,
@@ -77,7 +77,7 @@ import {
   persistPersona,
   readPersistedPersona,
   resolveReasoningBackendMenuSelection,
-} from './reasoning/reasoning_backend_selection.js';
+} from '../reasoning/reasoning_backend_selection.js';
 
 type Print = (value: unknown) => void;
 

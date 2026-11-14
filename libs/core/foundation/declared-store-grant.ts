@@ -53,7 +53,7 @@ export const DECLARED_STORE_GRANTS: Readonly<Record<string, DeclaredStoreGrantDe
     peer_catalog_reader: Object.freeze({ baseRole: 'base_worker', tenantBound: true }),
     // mesh/peer-task-exchange.ts: an accepted peer task's report and the tenant artifact index.
     peer_task_artifact_writer: Object.freeze({ baseRole: 'base_worker', tenantBound: true }),
-    // scripts/onboarding_first_job_tenant_status.ts: one tenant profile.
+    // scripts/onboarding/onboarding_first_job_tenant_status.ts: one tenant profile.
     first_job_tenant_status_reader: Object.freeze({ baseRole: 'base_worker', tenantBound: false }),
     // authn/authn-providers.ts, concierge viewer-context.ts: the viewer token registry.
     chronos_token_registry_reader: Object.freeze({ baseRole: 'base_worker', tenantBound: false }),

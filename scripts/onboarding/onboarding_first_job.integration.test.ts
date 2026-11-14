@@ -16,7 +16,7 @@ import {
   FIRST_JOB_TEST_SESSION_KEY,
   FIRST_JOB_TEST_ISSUER,
   FIRST_JOB_TEST_SUBJECT,
-} from './fixtures/first-job-approval-fixture.js';
+} from '../fixtures/first-job-approval-fixture.js';
 
 // No facade, authority, lock, registry, or IO mocks. Only the root and standalone
 // operator environment are isolated. Tick tests seed only synthetic browser identity.
@@ -53,7 +53,7 @@ function treeSnapshot(directory = root): Array<[string, string]> {
 let store: typeof import('@agent/core/surface/front-desk-conversation-store');
 let work: typeof import('@agent/core/workforce/work-coordination');
 let dispatch: typeof import('@agent/core/dot/dot-dispatch');
-let executor: typeof import('./dot/dot_executor_step.js');
+let executor: typeof import('../dot/dot_executor_step.js');
 let execution: typeof import('@agent/core/surface/front-desk-execution');
 let browser: typeof import('@agent/core/authn/authn-providers');
 let approvals: typeof import('@agent/core/surface/first-job-approval');
@@ -143,7 +143,7 @@ beforeAll(async () => {
   store = await import('@agent/core/surface/front-desk-conversation-store');
   work = await import('@agent/core/workforce/work-coordination');
   dispatch = await import('@agent/core/dot/dot-dispatch');
-  executor = await import('./dot/dot_executor_step.js');
+  executor = await import('../dot/dot_executor_step.js');
   execution = await import('@agent/core/surface/front-desk-execution');
   browser = await import('@agent/core/authn/authn-providers');
   approvals = await import('@agent/core/surface/first-job-approval');
@@ -563,9 +563,9 @@ describe('first-job CLI tick exit status', { timeout: 60_000 }, () => {
           new Error('PRIVATE_FAILURE /private/path')
         );
       }
-      const { runOnboarding } = await import('./onboarding.js');
+      const { runOnboarding } = await import('../onboarding.js');
       const { getProcessExitCode, setProcessExitCode, clearProcessExitCode } =
-        await import('./lib/harness.js');
+        await import('../lib/harness.js');
       const previousExitCode = getProcessExitCode();
       const output = vi.spyOn(console, 'log').mockImplementation(() => undefined);
       const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
@@ -599,9 +599,9 @@ describe('first-job CLI tick exit status', { timeout: 60_000 }, () => {
           randomUUID()
         );
       }
-      const { runOnboarding } = await import('./onboarding.js');
+      const { runOnboarding } = await import('../onboarding.js');
       const { getProcessExitCode, setProcessExitCode, clearProcessExitCode } =
-        await import('./lib/harness.js');
+        await import('../lib/harness.js');
       const previousExitCode = getProcessExitCode();
       const output = vi.spyOn(console, 'log').mockImplementation(() => undefined);
       const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);

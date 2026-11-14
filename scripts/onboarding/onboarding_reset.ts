@@ -3,7 +3,7 @@ import * as path from 'node:path';
 import * as readline from 'node:readline';
 import { resolveActiveProfileRoot } from '@agent/core/profile-root';
 import { safeExistsSync, safeRmSync } from '@agent/core/secure-io';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from '../lib/harness.js';
 
 export interface OnboardingResetOptions {
   force?: boolean;

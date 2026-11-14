@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import * as path from 'node:path';
-import { useOnboardingAuthorityFixture } from '../tests/helpers/onboarding-authority-fixture.js';
+import { useOnboardingAuthorityFixture } from '../../tests/helpers/onboarding-authority-fixture.js';
 import { safeReadFile, safeWriteFile } from '@agent/core/secure-io';
 const f = useOnboardingAuthorityFixture();
 let onboarding: typeof import('./onboarding_apply.js');

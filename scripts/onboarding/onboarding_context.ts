@@ -11,7 +11,7 @@ import {
 import * as customerResolver from '@agent/core/stance-resolver';
 import type { OrganizationTier } from '@agent/core/organization/organization-operating-model';
 import { withExecutionContext } from '@agent/core/authority';
-import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
 
 type Print = (value: unknown) => void;
 

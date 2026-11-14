@@ -1,5 +1,5 @@
-import { currentProcessArgv } from './lib/harness.js';
-import type { CliGuardSpec } from './lib/cli-guard.js';
+import { currentProcessArgv } from '../lib/harness.js';
+import type { CliGuardSpec } from '../lib/cli-guard.js';
 
 /** CU-01: wizard flags; `--help` / typos exit before the wizard opens a prompt or writes state. */
 export const ONBOARD_CLI: CliGuardSpec = {

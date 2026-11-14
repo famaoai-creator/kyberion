@@ -281,7 +281,7 @@
     },
     {
       "layer": "orchestration",
-      "pattern": "scripts/onboarding_first_job.ts"
+      "pattern": "scripts/onboarding/onboarding_first_job.ts"
     },
     {
       "layer": "orchestration",

@@ -1604,33 +1604,33 @@
     "scripts/oauth_callback_surface.ts": {
       "json_state_write_budget": 2
     },
-    "scripts/onboarding_apply.ts": {
+    "scripts/onboarding/onboarding_apply.ts": {
       "json_state_write_budget": 1
     },
-    "scripts/onboarding_context.ts": {
+    "scripts/onboarding/onboarding_context.ts": {
       "bespoke_cli_parser_budget": 4
     },
-    "scripts/onboarding_first_job_status.ts": {
+    "scripts/onboarding/onboarding_first_job_status.ts": {
       "env_direct_read_budget": 3
     },
-    "scripts/onboarding_first_job.ts": {
+    "scripts/onboarding/onboarding_first_job.ts": {
       "env_direct_read_budget": 2,
       "json_state_write_budget": 1,
       "bespoke_cli_parser_budget": 3
     },
-    "scripts/onboarding_llm.ts": {
+    "scripts/onboarding/onboarding_llm.ts": {
       "bespoke_cli_parser_budget": 8
     },
-    "scripts/onboarding_mode.ts": {
+    "scripts/onboarding/onboarding_mode.ts": {
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/onboarding_reset.ts": {
+    "scripts/onboarding/onboarding_reset.ts": {
       "bespoke_cli_parser_budget": 5
     },
-    "scripts/onboarding_runbook_skill.ts": {
+    "scripts/onboarding/onboarding_runbook_skill.ts": {
       "json_state_write_budget": 1
     },
-    "scripts/onboarding_wizard.ts": {
+    "scripts/onboarding/onboarding_wizard.ts": {
       "json_state_write_budget": 1,
       "bespoke_cli_parser_budget": 4
     },

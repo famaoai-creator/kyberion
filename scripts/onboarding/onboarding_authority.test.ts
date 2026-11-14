@@ -33,10 +33,10 @@ vi.mock('@agent/core/secure-io', () => ({
   safeExistsSync: () => state.exists,
   safeWriteFile: (...args: unknown[]) => state.writes.push(args),
 }));
-vi.mock('./lib/json-input.js', () => ({
+vi.mock('../lib/json-input.js', () => ({
   readSafeJsonFile: () => ({ input: { action: 'activation' } }),
 }));
-vi.mock('./lib/installed-identity.js', () => ({
+vi.mock('../lib/installed-identity.js', () => ({
   inspectInstalledIdentity: () => ({
     ready: true,
     governance_root: '/canonical',

@@ -28,8 +28,8 @@ import {
   revokeNhiSessionAdmission,
   type NhiSessionAdmissionPrincipal,
 } from '@agent/core/organization/nhi-session-admission';
-import { defineScript, isDirectScript } from './lib/harness.js';
-import { inspectInstalledIdentity, canonicalAuthorityCommand } from './lib/installed-identity.js';
+import { defineScript, isDirectScript } from '../lib/harness.js';
+import { inspectInstalledIdentity, canonicalAuthorityCommand } from '../lib/installed-identity.js';
 
 export async function main(
   argv: string[],

@@ -4,7 +4,7 @@ import {
   FIRST_JOB_TEST_SESSION_KEY,
   FIRST_JOB_TEST_ISSUER,
   FIRST_JOB_TEST_SUBJECT,
-} from './fixtures/first-job-approval-fixture.js';
+} from '../fixtures/first-job-approval-fixture.js';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as path from 'node:path';
 import { safeMkdir, safeReadFile, safeWriteFile, safeRmSync } from '@agent/core/secure-io';

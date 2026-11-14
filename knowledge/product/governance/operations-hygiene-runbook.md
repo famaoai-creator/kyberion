@@ -1581,7 +1581,7 @@ isolation and parent-capability denial with an ordinary organization operator.
    and no prompt text, and that the child's cwd is not the repository root.
 4. When a CLI prints a follow-up command for a hash-bound approval, test that the printed text,
    split as a POSIX shell would, applies successfully once the request is approved (gate:
-   `scripts/onboarding_llm.test.ts` and `scripts/tenant.entrypoint.test.ts`).
+   `scripts/onboarding/onboarding_llm.test.ts` and `scripts/tenant.entrypoint.test.ts`).
 5. When you add an approval request creator, record the real requester identity in
    `requestedBy` (and `requestedByContext.actorId`), never an empty string: with separation of
    duties on, a request without a requester cannot be approved (gate:
@@ -2757,7 +2757,7 @@ When adopting `defineCheck`, remove obsolete caller flags such as `--fail` from 
 
 Keep the declared data tier separate from the tenant ownership boundary. Confidential drafts remain under `knowledge/confidential/<tenant>/dots/`; verified public organization/project drafts use `dots/`. Tenant-only public diagnostic drafts must pass `assertFrontDeskDiagnosticDotCharter` and registered-tenant resolution before creation: an arbitrary public label does not grant the diagnostic capability. Never repair a first-job setup failure by changing its public-only input protocol to confidential or relaxing its no-downgrade checks.
 
-Runtime operation-binding validation is read-only: use the existing tenant-bound `workspace_tenant_registry_reader`, not the dot lifecycle store roles (`dot_charter_store` / `dot_lifecycle_runtime_store`; formerly `dot_lifecycle_writer`). Regression checks are `libs/core/dot/dot-lifecycle.test.ts`, the real-store `scripts/onboarding_first_job*.test.ts` suites, and `libs/core/surface/front-desk-recovery.engine.integration.test.ts`. Recovery fixtures must create their actual synthetic tenant via the governed facade before creating a tenant-owned charter.
+Runtime operation-binding validation is read-only: use the existing tenant-bound `workspace_tenant_registry_reader`, not the dot lifecycle store roles (`dot_charter_store` / `dot_lifecycle_runtime_store`; formerly `dot_lifecycle_writer`). Regression checks are `libs/core/dot/dot-lifecycle.test.ts`, the real-store `scripts/onboarding/onboarding_first_job*.test.ts` suites, and `libs/core/surface/front-desk-recovery.engine.integration.test.ts`. Recovery fixtures must create their actual synthetic tenant via the governed facade before creating a tenant-owned charter.
 
 When splitting internal store roles, forbid them at every runtime binding entrance: schema, charter validation and typed programmatic execution. Test the legitimate worker role alongside denial cases. Protected runtime stores are also checked through their projected knowledge tier; preserve the required projection grant while restricting every raw read/metadata/write/mkdir operation to the store's physical purpose. Add cold confidential/personal secure-I/O writes, direct-knowledge denial and symlink escape regressions (`tier-guard-dot-lifecycle-stores.test.ts`). Prove claimed lock or tenant failures through the real guard before adding roles or generic matcher features; retain withdrawn hypotheses in review evidence.
 
@@ -2773,7 +2773,7 @@ The organization dashboard browser probe (`organization_dashboard.browser.integr
 
 Next-based surface adapters pass `surfaceMutationRequestUrl(req)` to the shared mutation guard. Next normalizes numeric loopback hosts in its public URL getter; use the native branded Request URL to preserve the server-bound origin. Never repair this by accepting loopback aliases or trusting Host/forwarded headers. The actual NextRequest regression gate is `presence/displays/concierge/src/lib/native-request-origin.test.ts`, including IPv4/IPv6, cross-port, cross-origin, and spoofed-header refusals.
 
-Reviewed onboarding plans are immutable inputs to human consent. Publish JSON through foundation `writeJson` with `{ createOnly: true }`, which uses secure IO's exclusive-file operation; an existence check alone cannot prevent a concurrent overwrite. Reruns retain the reviewed bytes and expiry, and a changed plan requires a new filename. Regression gates are `libs/core/foundation/json.test.ts`, `scripts/onboarding_authority.test.ts`, and `scripts/onboarding_apply.identity.integration.test.ts`.
+Reviewed onboarding plans are immutable inputs to human consent. Publish JSON through foundation `writeJson` with `{ createOnly: true }`, which uses secure IO's exclusive-file operation; an existence check alone cannot prevent a concurrent overwrite. Reruns retain the reviewed bytes and expiry, and a changed plan requires a new filename. Regression gates are `libs/core/foundation/json.test.ts`, `scripts/onboarding/onboarding_authority.test.ts`, and `scripts/onboarding/onboarding_apply.identity.integration.test.ts`.
 
 ## Provenance, consent and repair recurrence checks
 

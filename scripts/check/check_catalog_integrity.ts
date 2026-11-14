@@ -597,7 +597,7 @@ function collectSourceFiles(rootRelativeDirs: string[]): string[] {
 // Forward direction: a `t`, `uxText`, `uxLabel`, or `renderVocabularyText`
 // call whose literal key argument does not resolve against the catalog.
 // Restricted to these named call patterns (not a bare `t(` scan across every
-// directory) because `scripts/onboarding_wizard.ts` defines its own
+// directory) because `scripts/onboarding/onboarding_wizard.ts` defines its own
 // unrelated two-argument `t(en, ja)` helper — a bare-`t(` scan would
 // misidentify its calls as vocabulary-key references and fail on every one
 // of them. `scripts/cli.ts` is the one script-level exception: its local

@@ -4960,7 +4960,7 @@ schema の format 対応、既存の CLI／exit semantics は維持した。foun
 
 検証:
 
-- `pnpm exec vitest run libs/core/testing/foundation-adoption.contract.test.ts scripts/onboarding_apply.test.ts scripts/first_win_lifecycle_smoke.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 18 tests passed**。
+- `pnpm exec vitest run libs/core/testing/foundation-adoption.contract.test.ts scripts/onboarding/onboarding_apply.test.ts scripts/first_win_lifecycle_smoke.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 18 tests passed**。
 - `pnpm run typecheck`、`pnpm run lint`、`git diff --check`: passed。
 - `pnpm check -- --scope full`: **67/67 passed**。
 

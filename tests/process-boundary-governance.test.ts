@@ -90,7 +90,7 @@ const allowedManagedProcessConsumers = [
   // Onboarding re-configuration menu: short-lived `node dist/scripts/...`
   // menu actions run supervised (stdio inherit, awaited, unregistered on
   // completion) instead of via direct child_process.
-  'scripts/onboarding_wizard.ts',
+  'scripts/onboarding/onboarding_wizard.ts',
   // PE-02 plugin views E2E: the built Chronos server under test is a
   // supervised child, stopped (SIGTERM, then SIGKILL) even on failure.
   'scripts/check/check_plugin_views_e2e.ts',

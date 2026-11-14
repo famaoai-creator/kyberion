@@ -49,7 +49,7 @@ describe('Runtime surface operations contract', () => {
 
   it('mentions runtime surfaces in the operator dashboard and onboarding next steps', () => {
     const dashboard = read('scripts/sovereign_dashboard.ts');
-    const onboarding = read('scripts/onboarding_wizard.ts');
+    const onboarding = read('scripts/onboarding/onboarding_wizard.ts');
     const operatorGuide = read('docs/OPERATOR_UX_GUIDE.md');
     expect(dashboard).toContain('ONBOARDING HOME');
     expect(dashboard).toContain('Next:');

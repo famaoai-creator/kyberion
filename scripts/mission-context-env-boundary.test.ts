@@ -13,8 +13,8 @@ const ENTRYPOINTS = [
   'scripts/meeting/meeting_preflight.ts',
   'scripts/minutes_record.ts',
   'scripts/mission_controller.ts',
-  'scripts/onboarding_apply.ts',
-  'scripts/onboarding_wizard.ts',
+  'scripts/onboarding/onboarding_apply.ts',
+  'scripts/onboarding/onboarding_wizard.ts',
   'scripts/run_doctor.ts',
 ] as const;
 

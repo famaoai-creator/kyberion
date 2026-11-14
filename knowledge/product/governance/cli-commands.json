@@ -3128,7 +3128,7 @@
     },
     {
       "id": "script.onboarding.authority",
-      "module": "scripts/onboarding_authority.ts",
+      "module": "scripts/onboarding/onboarding_authority.ts",
       "command": "onboarding authority",
       "noun": "onboarding",
       "verb": "authority",
@@ -3138,7 +3138,7 @@
     },
     {
       "id": "script.onboarding.nhi-session",
-      "module": "scripts/onboarding_nhi_session.ts",
+      "module": "scripts/onboarding/onboarding_nhi_session.ts",
       "command": "onboarding nhi-session",
       "noun": "onboarding",
       "verb": "nhi-session",
