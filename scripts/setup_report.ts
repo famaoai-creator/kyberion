@@ -446,6 +446,7 @@ export function formatSetupReport(report: SetupReport, persona: SetupPersona): s
       ['surface auth gaps', report.surfaces.summary.missing],
       ['service auth missing', report.services.summary.authMissing],
       ['service connections missing', report.services.summary.connectionMissing],
+      ['service connections optional', report.services.summary.connectionOptional],
       ['reasoning must', report.reasoning.must],
       ['reasoning should', report.reasoning.should],
       ['doctor gaps', report.doctor.totalMissing],

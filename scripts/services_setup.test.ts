@@ -23,6 +23,13 @@ describe('services setup guidance', () => {
     expect(buildServiceConnectionSetupCommand('voice')).not.toBe('pnpm service:setup');
   });
 
+  it('declines the onboarding command for services outside the onboarding catalog', () => {
+    // The wizard throws "Unknown onboarding service" for non-catalog ids, so
+    // the suggested command must not be emitted for them.
+    expect(buildServiceConnectionSetupCommand('slack')).toBeNull();
+    expect(buildServiceConnectionSetupCommand('github')).toBeNull();
+  });
+
   it('routes OAuth-backed auth to the governed setup script', () => {
     const action = buildServiceAuthNextAction('notion', {
       setupHint: 'Missing credentials',
