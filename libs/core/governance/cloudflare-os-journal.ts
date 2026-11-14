@@ -16,6 +16,7 @@ import type { TierLevel } from '../types.js';
 import { isValidTenantSlug } from '../entity-scope.js';
 import { currentScopeEnvelope, type ScopeEnvelope } from '../scope-envelope.js';
 import type { ObservationRecord } from './cloudflare-os-control-plane.js';
+import { KNOWLEDGE_TIERS } from '../foundation/knowledge-tier.js';
 import { STORAGE_DATA_TIERS } from '../storage-layout.js';
 
 /**
@@ -308,7 +309,7 @@ export function listControlPlaneNamespaceDirs(runtimeRoot?: string): string[] {
   const root = runtimeRoot ?? controlPlaneRuntimeRoot();
   const dirs: string[] = [];
   const candidates: string[][] = [];
-  for (const tier of [...STORAGE_DATA_TIERS]) {
+  for (const tier of [...KNOWLEDGE_TIERS]) {
     const tierDir = path.join(root, tier);
     if (!safeExistsSync(tierDir)) continue;
     for (const tenant of readdirEntries(tierDir)) {
