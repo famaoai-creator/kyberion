@@ -36,6 +36,38 @@ export function normalizeWorkItemContext(
   return context;
 }
 
+/** Preserve provenance on unchanged fields; never infer an old record's origin. */
+export function workItemContextOrigin(
+  context: WorkItemContext,
+  previous?: Pick<WorkItem, 'context' | 'context_origin'>
+): NonNullable<WorkItem['context_origin']> {
+  const origin: NonNullable<WorkItem['context_origin']> = {};
+  for (const key of ['project_id', 'work_shape'] as const) {
+    if (previous && context[key] === previous.context?.[key]) {
+      if (previous.context_origin?.[key]) origin[key] = previous.context_origin[key];
+    } else if (context[key]) {
+      origin[key] = 'explicit';
+    }
+  }
+  return origin;
+}
+
+/** Context replacement and its descriptive provenance travel together. */
+export function workItemContextUpdate(
+  current: WorkItem,
+  context?: WorkItemContext,
+  keepOrigins = false
+): Partial<Pick<WorkItem, 'context' | 'context_origin'>> {
+  return context
+    ? {
+        context: { ...context },
+        context_origin: keepOrigins
+          ? { ...current.context_origin }
+          : workItemContextOrigin(context, current),
+      }
+    : {};
+}
+
 /**
  * Reject a work item whose tenant is not registered and active. Call it under
  * the CALLER's authority, before entering the store fence: the fence assumes
@@ -69,6 +101,9 @@ export function buildWorkItemCreation(input: CreateWorkItemInput): WorkItem {
   }
   const now = nowIso();
   const context = normalizeWorkItemContext(input.context || {}, input.projectId);
+  const contextOrigin = workItemContextOrigin(input.context || {});
+  contextOrigin.project_id = input.context?.project_id || input.projectId ? 'explicit' : 'default';
+  contextOrigin.work_shape = input.context?.work_shape ? 'explicit' : 'default';
   const item: WorkItem = {
     item_id: input.itemId || randomId('witem'),
     title,
@@ -88,6 +123,7 @@ export function buildWorkItemCreation(input: CreateWorkItemInput): WorkItem {
     ...(input.currentAttemptId ? { current_attempt_id: input.currentAttemptId } : {}),
     ...(input.attempts ? { attempts: input.attempts.map((attempt) => ({ ...attempt })) } : {}),
     context,
+    context_origin: contextOrigin,
     ...(input.parentItemId ? { parent_item_id: input.parentItemId } : {}),
     ...(input.metadata ? { metadata: input.metadata } : {}),
   };
@@ -98,12 +134,14 @@ export function buildWorkItemCreation(input: CreateWorkItemInput): WorkItem {
 function creationIdentity(item: WorkItem): unknown {
   // D1: the parent link is structure, not creation identity — a backfill may
   // attach a parent to an item created before parents existed, and a replay of
-  // that original creation must stay a replay.
+  // that original creation must stay a replay. Value provenance is additive
+  // metadata too: its introduction must not invalidate old creation replays.
   const {
     created_at: _created,
     updated_at: _updated,
     version: _version,
     parent_item_id: _parent,
+    context_origin: _contextOrigin,
     ...identity
   } = item;
   // Compare the persisted JSON representation (optional undefined values and
