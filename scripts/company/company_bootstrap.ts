@@ -5,7 +5,7 @@ import { baseRoleEnvText } from '@agent/core/foundation';
 import { logger } from '@agent/core/core';
 import { getRegisteredEnvText, setRegisteredEnv } from '@agent/core/foundation';
 import { bootstrapCompany, listCompanyVerticals } from '@agent/core/organization/company-bootstrap';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from '../lib/harness.js';
 
 export { bootstrapCompany, listCompanyVerticals } from '@agent/core/organization/company-bootstrap';
 export type {

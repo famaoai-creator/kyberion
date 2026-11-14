@@ -1,5 +1,5 @@
-import { main as bootstrapCompanyMain } from './company_bootstrap.js';
-import { main as onboardCompanyMain } from './company_onboarding.js';
+import { main as bootstrapCompanyMain } from './company/company_bootstrap.js';
+import { main as onboardCompanyMain } from './company/company_onboarding.js';
 import { main as applyOnboardingMain } from './onboarding/onboarding_apply.js';
 import { main as resetOnboardingMain } from './onboarding/onboarding_reset.js';
 import { currentProcessArgv, defineScript, isDirectScript } from './lib/harness.js';

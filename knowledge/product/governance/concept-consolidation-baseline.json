@@ -1403,11 +1403,11 @@
       "env_direct_read_budget": 1,
       "json_state_write_budget": 4
     },
-    "scripts/company_bootstrap.ts": {
+    "scripts/company/company_bootstrap.ts": {
       "env_direct_read_budget": 2,
       "bespoke_cli_parser_budget": 2
     },
-    "scripts/company_onboarding.ts": {
+    "scripts/company/company_onboarding.ts": {
       "bespoke_cli_parser_budget": 3
     },
     "scripts/compose_mission_team.ts": {
@@ -1847,7 +1847,7 @@
     "scripts/task/task_smoke.ts": {
       "json_state_write_budget": 1
     },
-    "scripts/tenant_activation.ts": {
+    "scripts/tenant/tenant_activation.ts": {
       "bespoke_cli_parser_budget": 12
     },
     "scripts/terminal_actuator_usability_probe.ts": {

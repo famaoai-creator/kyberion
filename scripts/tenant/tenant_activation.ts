@@ -15,7 +15,7 @@ import {
 import { withExecutionContext, withExecutionContextAsync } from '@agent/core/authority';
 import { isValidTenantSlug } from '@agent/core/foundation/scope';
 import { describeProviderTierAvailability } from '@agent/core/provider/provider-egress-gate';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from '../lib/harness.js';
 
 type Print = (value: unknown) => void;
 

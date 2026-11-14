@@ -152,7 +152,7 @@
     "task:run": "node --import ./scripts/ts-loader.mjs scripts/task/task_run.ts",
     "telegram:bridge": "node scripts/run_built.mjs dist/satellites/telegram-bridge/src/index.js",
     "tenant": "node --import ./scripts/ts-loader.mjs scripts/tenant.ts",
-    "tenant:activation": "node --import ./scripts/ts-loader.mjs scripts/tenant_activation.ts",
+    "tenant:activation": "node --import ./scripts/ts-loader.mjs scripts/tenant/tenant_activation.ts",
     "tenant:watch-drift": "node scripts/run_built.mjs dist/scripts/watch_tenant_drift.js",
     "test": "node --import ./scripts/ts-loader.mjs scripts/test_suite.ts",
     "test:unit": "node --import ./scripts/ts-loader.mjs scripts/test_suite.ts --suite unit",
