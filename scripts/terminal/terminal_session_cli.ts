@@ -38,7 +38,7 @@ import {
   setProcessExitCode,
 } from '../lib/harness.js';
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const RUNTIME_DIR = path.join(ROOT, 'active/shared/runtime/terminal-daemon');
 const SOCK = resolveLocalIpcAddress(path.join(RUNTIME_DIR, 'terminal-daemon.sock'));
 const FILESYSTEM_SOCKET = !isWindowsNamedPipeAddress(SOCK);

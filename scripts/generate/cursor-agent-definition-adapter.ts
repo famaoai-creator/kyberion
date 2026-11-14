@@ -55,7 +55,7 @@ export function buildCursorAgentDefinitionSource(input: CursorAgentDefinitionInp
     'Check drift with: pnpm agents:generate -- --check',
     'Projection: Cursor custom subagent (`.cursor/agents/<name>.md`)',
     'Source: Kyberion team-role, procedure, capability-profile, and working-principles SSoT',
-    'Adapter: scripts/cursor-agent-definition-adapter.ts',
+    'Adapter: scripts/generate/cursor-agent-definition-adapter.ts',
     'Note: Cursor has no per-tool allowlist; capability is enforced via readonly + prompt body.',
     '-->',
   ].join('\n');

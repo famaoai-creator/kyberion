@@ -10,7 +10,7 @@ Regenerate with: pnpm agents:generate
 Check drift with: pnpm agents:generate -- --check
 Projection: Devin CLI custom subagent (`.devin/agents/<name>.md`)
 Source: Kyberion team-role, procedure, capability-profile, and working-principles SSoT
-Adapter: scripts/devin-agent-definition-adapter.ts
+Adapter: scripts/generate/devin-agent-definition-adapter.ts
 -->
 
 <!--

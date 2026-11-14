@@ -35,10 +35,10 @@
 
 ```bash
 # デフォルト（Marketing Deck）
-node dist/scripts/generate/generate_marketing_deck.js
+node dist/scripts/generate_marketing_deck.js
 
 # カスタムパターン + テーマ指定
-node dist/scripts/generate/generate_marketing_deck.js \
+node dist/scripts/generate_marketing_deck.js \
   --pattern knowledge/public/design-patterns/presentation/executive-summary.json \
   --theme kyberion-standard \
   --output active/shared/exports/exec-summary.pptx

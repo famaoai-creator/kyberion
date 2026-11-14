@@ -115,7 +115,7 @@ export function buildAgyAgentDefinitionSource(input: AgyAgentDefinitionInput): s
     'Check drift with: pnpm agents:generate -- --check',
     'Projection: AGY CLI custom subagent (`.agents/agents/<name>/agent.md`)',
     'Source: Kyberion team-role, procedure, capability-profile, and working-principles SSoT',
-    'Adapter: scripts/agy-agent-definition-adapter.ts',
+    'Adapter: scripts/generate/agy-agent-definition-adapter.ts',
     '-->',
   ].join('\n');
 

@@ -13,7 +13,7 @@ import { readTierHygieneTextFile, scan } from './check_tier_hygiene.js';
  */
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const PROJECT_ROOT = path.resolve(HERE, '..');
+const PROJECT_ROOT = path.resolve(HERE, '..', '..');
 
 function writePublicFile(relPath: string, body: string): string {
   const abs = path.join(PROJECT_ROOT, relPath);
