@@ -1,0 +1,59 @@
+---
+record_id: mem-MSN-AGENT-COMM-AUTHORITY-20261113-2026_11_12
+kind: pattern
+tier: public
+knowledge_domain: product
+owner_nhi: ''
+candidate_id: mem-MSN-AGENT-COMM-AUTHORITY-20261113-2026_11_12
+supersedes: ''
+superseded_by: ''
+project_id: ''
+task_session_id: ''
+specialist_id: ''
+locale: ''
+created_at: 2026-11-12T23:42:08.379Z
+source_branch: fix/comm-authority-on-receipt-20261113
+source_commit: 7bffdbd08c4a77d65d2baee6557749ca20381fa2
+---
+
+# Refuse what a layer cannot honour, and review the refusal as an attack surface
+
+Seven lessons from closing authority gaps in agent communication and a test-guard false positive: refuse instead of run, never echo the refused value, count violations only against verified senders, do not weaken a claim check to close a gap, attribute by provenance not by exemption, check that each new test fails without its fix, and keep an idle poll to one stat.
+
+## Applicability
+
+- mission
+- mission:MSN-AGENT-COMM-AUTHORITY-20261113
+
+## Reusable Steps
+
+1. Seven lessons from closing authority gaps in agent communication and a test-guard false positive: refuse instead of run, never echo the refused value, count violations only against verified senders, do not weaken a claim check to close a gap, attribute by provenance not by exemption, check that each new test fails without its fix, and keep an idle poll to one stat
+
+## Expected Outcome
+
+## What this is
+
+Lessons from a mission that made the in-runtime A2A bridge refuse performatives it cannot honour, tightened delegations that carry no WorkItem, and taught the test leak guard to tell an agent session hook from a test write.
+
+## Lessons
+
+1. **A layer that cannot honour a message kind refuses it; it does not run it.** The bridge executed every verified envelope, so a `propose` ran like a `request`. The fix is a closed set of routable kinds checked after authentication and before any spawn, turn or prompt. State the remaining limitation next to the fix: on the bridge `query` and `inform` still run exactly like `request`, so those labels are not a no-side-effect guarantee. A document that says _closed_ for a filter is an overstatement a reviewer will catch.
+
+2. **A refusal is new attack surface; never echo the refused value.** The first version interpolated the caller string into the error message. A retry policy that classifies errors by regex then read a connection-error code in the message (the caller had put it there as the value), retried three times, and three recorded violations reached the kill-switch anomaly threshold against whichever sender the envelope named. Put only a declared member or a fixed token such as `unknown` into messages and audit fields, decide non-retry by error code rather than message text, and add a classifier rule so the refusal is not filed as unclassified.
+
+3. **Count a violation only against a verified sender, and reject at the edge where the rule is knowable.** An unsigned envelope names its sender by claim only. A surface agent whose model writes `propose` in three blocks would have tripped the anomaly check for a formatting choice. Record the denial always; count the violation only when the envelope was signed; let callers that can know the rule (surface orchestrator, HTTP route) reject with the same predicate before calling the bridge.
+
+4. **When closing a gap would require weakening the check it relies on, stop and record the decision.** Unclaimed delegations turned out to run with broader tools than claimed ones. Making them read-only needed the one legitimate writer (`execute_task_plan`) to move to the claimed path, which it cannot do without a fabricated task contract or source grants the owner never authored. The mission shipped the mission check, dropped caller-asserted labels, audited decision and outcome, and recorded the three blockers and the choice (retire the op or design an owner-authored grant) in the canonical document. Establish the facts with a scratch integration test before deciding; the same test showed the op already fails outside one tenant and tier.
+
+5. **Fix a false positive in a guard by attribution, not by exemption.** The leak guard failed runs started from a checkout an agent session writes audit rows into. Exempting the directory or adding a switch would hide the leak class the guard exists for. Instead the hook rows carry a provenance stamp (host, event, session id) written only with a real session id and never in a process with a test-run marker; the guard reads only the appended bytes and accepts a file only if every appended row is an attributed row of the matching kind and the file was not replaced. Check every test-run marker, not one: the repository already spawns children with `VITEST` blanked. Make the report name the first unattributed row so the reader can tell a leak from a known unattributed write.
+
+6. **Ask of every new test: does it fail without the fix?** Two independent reviews each found a test that passed at HEAD. Have the implementer remove each fix in turn and list which tests fail; label the ones that are coverage only.
+
+7. **An idle poll should cost a stat.** A timer that must poll because its producers are other processes can still be idle-cheap: read only what was appended, decide from memory whether anything is due, and take the lock only then.
+
+## Evidence
+
+- active/missions/public/MSN-AGENT-COMM-AUTHORITY-20261113/evidence/REVIEW-execution-implement.md
+- active/missions/public/MSN-AGENT-COMM-AUTHORITY-20261113/evidence/implementation-report.md
+
+## Artifacts

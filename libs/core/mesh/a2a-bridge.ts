@@ -87,6 +87,61 @@ import {
  * - All routing decisions are audit-logged
  */
 
+/**
+ * A2A envelope speech acts. Same members as `a2a-envelope.schema.json`; each
+ * maps to a coordination act in `coordination-act-map.ts`.
+ */
+export const A2A_PERFORMATIVES = Object.freeze([
+  'request',
+  'propose',
+  'inform',
+  'accept',
+  'reject',
+  'query',
+  'result',
+] as const);
+export type A2APerformative = (typeof A2A_PERFORMATIVES)[number];
+
+/**
+ * The performatives `A2ABridge.route()` delivers to an agent. All three are
+ * delivered as a prompt and run the same way: `query` and `inform` are the
+ * sender's label here, not a no-side-effect guarantee.
+ * Every other value is refused before any spawn. The bridge has no proposal
+ * store and records no recipient decision, so it cannot honour `propose`,
+ * `accept` or `reject`; `result` is what the bridge returns, not something it
+ * runs.
+ */
+export const A2A_ROUTABLE_PERFORMATIVES = Object.freeze([
+  'request',
+  'query',
+  'inform',
+] as const satisfies readonly A2APerformative[]);
+export type A2ARoutablePerformative = (typeof A2A_ROUTABLE_PERFORMATIVES)[number];
+
+export function isA2ARoutablePerformative(value: unknown): value is A2ARoutablePerformative {
+  return (A2A_ROUTABLE_PERFORMATIVES as readonly unknown[]).includes(value);
+}
+
+/**
+ * Thrown by `A2ABridge.route()` for an envelope whose performative it does not
+ * deliver. `performative` is a declared member of `A2A_PERFORMATIVES` or the
+ * fixed token `unknown`: the caller's raw value never reaches the message, so
+ * it cannot steer how the error is classified, retried or logged.
+ */
+export class A2APerformativeNotRoutableError extends Error {
+  public readonly code = 'A2A_PERFORMATIVE_NOT_ROUTABLE';
+  public readonly performative: A2APerformative | 'unknown';
+  constructor(performative: unknown) {
+    const label =
+      A2A_PERFORMATIVES.find((declared) => declared === performative) ?? ('unknown' as const);
+    super(
+      `[A2A_PERFORMATIVE_NOT_ROUTABLE] The A2A bridge does not route performative "${label}"; it routes only ${A2A_ROUTABLE_PERFORMATIVES.join(', ')}. Use "request" to ask the receiver to do or answer something`
+    );
+    this.name = 'A2APerformativeNotRoutableError';
+    this.performative = label;
+  }
+}
+
 export interface A2AMessage {
   a2a_version: string;
   header: {
@@ -96,7 +151,7 @@ export interface A2AMessage {
     receiver?: string;
     conversation_id?: string;
     correlation_id?: string;
-    performative: 'request' | 'propose' | 'inform' | 'accept' | 'reject' | 'query' | 'result';
+    performative: A2APerformative;
     timestamp?: string;
     signature?: string;
     sig_alg?: string;
@@ -364,6 +419,38 @@ class A2ABridgeImpl {
     const verifiedDelegationChain =
       routedDelegationChain && envelope.header.signature ? routedDelegationChain : undefined;
 
+    // Refuse a performative the bridge cannot honour before any spawn,
+    // conversation turn or prompt: running a `propose`, `accept`, `reject` or
+    // `result` as an ask would give it a meaning it does not have here. The
+    // refusal is attributable only when signed, so only a signed envelope
+    // counts as a governance violation against its sender.
+    const performative: unknown = envelope.header.performative;
+    if (!isA2ARoutablePerformative(performative)) {
+      const refusal = new A2APerformativeNotRoutableError(performative);
+      auditChain.record({
+        agentId: envelope.header.sender,
+        action: 'a2a_performative_not_routable',
+        operation: 'route',
+        result: 'denied',
+        reason: `Performative "${refusal.performative}" on message ${envelope.header.msg_id} is not routable`,
+        correlationId: envelope.header.correlation_id,
+        metadata: {
+          receiver,
+          performative: refusal.performative,
+          signed: Boolean(envelope.header.signature),
+        },
+      });
+      if (envelope.header.signature) {
+        recordGovernanceAction(
+          envelope.header.sender,
+          'a2a_performative_not_routable',
+          'system',
+          true
+        );
+      }
+      throw refusal;
+    }
+
     // Parse receiver
     const { agentId, provider: receiverProvider } = this.parseReceiver(receiver);
     const payloadProvider = this.extractProvider(envelope.payload);
@@ -446,7 +533,7 @@ class A2ABridgeImpl {
       await appendConversationTurn(storageConversationId, {
         sender: envelope.header.sender,
         receiver: agentId,
-        performative: envelope.header.performative,
+        performative,
         prompt: rawPrompt,
         missionId,
       });
@@ -467,7 +554,7 @@ class A2ABridgeImpl {
         channel: typeof payloadContext?.channel === 'string' ? payloadContext.channel : undefined,
         thread: typeof payloadContext?.thread === 'string' ? payloadContext.thread : undefined,
         correlation_id: correlationId,
-        performative: envelope.header.performative,
+        performative,
         intent: typeof payloadRecord?.intent === 'string' ? payloadRecord.intent : undefined,
         prompt_excerpt: runtimePrompt.slice(0, 240),
       });
@@ -485,7 +572,7 @@ class A2ABridgeImpl {
       result: 'completed',
       metadata: {
         receiver: agentId,
-        performative: envelope.header.performative,
+        performative,
         correlation_id: correlationId,
         // NI-02: durable identity attribution for the routed message, only
         // when the claim was covered by a valid signature.

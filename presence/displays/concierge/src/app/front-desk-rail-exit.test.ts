@@ -11,6 +11,7 @@ type ActionHandler = (action: string, payload?: Record<string, unknown>) => void
 const captured = vi.hoisted(() => ({
   onAction: null as ActionHandler | null,
   requestLeave: vi.fn<(target: string, navigate: () => void) => void>(),
+  context: null as { label: string; detail: string } | null,
 }));
 vi.mock('../lib/settings-exit-guard', () => ({
   useSettingsExitGuard: () => ({ requestLeave: captured.requestLeave }),
@@ -38,7 +39,10 @@ vi.mock('@agent/shared-ui', () => ({
     return children;
   },
   useA2UIActions: () => ({}),
-  NavRail: () => null,
+  NavRail: ({ context, children }: { context: typeof captured.context; children: ReactNode }) => {
+    captured.context = context;
+    return children;
+  },
   Dialog: () => null,
 }));
 
@@ -105,7 +109,7 @@ async function mount(selection = 'alpha') {
   vi.stubGlobal(
     'fetch',
     vi.fn(async (input: RequestInfo | URL) =>
-      json(String(input) === '/api/me' ? state.me : state.nav)
+      json(String(input).startsWith('/api/me') ? state.me : state.nav)
     )
   );
   const location = locationAt(
@@ -133,10 +137,88 @@ async function mount(selection = 'alpha') {
     expect(latest).toBeDefined();
     await act(async () => latest![1]());
   };
-  return { state, location, cookie, action, refresh, confirm };
+  return { state, location, cookie, action, refresh, confirm, container };
 }
 
 describe('front-desk rail guarded tenant transitions', () => {
+  it('does not navigate again when selecting the current context', async () => {
+    const m = await mount();
+    await m.action('tenant.switch', { value: 'alpha' });
+    await m.action('tenant.switch', { value: 'alpha' });
+    expect(captured.requestLeave).not.toHaveBeenCalled();
+    expect(m.location.assign).not.toHaveBeenCalled();
+  });
+
+  it('shows a personal-only context and makes the execution boundary visible', async () => {
+    const m = await mount('personal');
+    m.state.me.switcher.companies = [];
+    await m.refresh();
+    expect(captured.context?.label).toBe('tenant_personal_label');
+    expect(captured.context?.detail).toBe('tenant_personal_only_detail');
+    expect(m.container.querySelector('[data-selection-authority-notice]')?.textContent).toBe(
+      'tenant_selection_authority_notice'
+    );
+  });
+
+  it('pins the request selection instead of depending on a cookie shared with other tabs', async () => {
+    await mount('alpha');
+    expect(fetch).toHaveBeenCalledWith('/api/me?tenant=alpha', { cache: 'no-store' });
+  });
+
+  it('ignores an old response after the URL changes before the next refresh', async () => {
+    const m = await mount();
+    let resolve!: (response: Response) => void;
+    vi.mocked(fetch).mockImplementationOnce(
+      () =>
+        new Promise((settle) => {
+          resolve = settle;
+        })
+    );
+    await m.refresh();
+    m.location.search = '?tenant=beta';
+    const before = m.cookie();
+    await act(async () => resolve(json(viewer('alpha'))));
+    expect(m.cookie()).toBe(before);
+    expect(m.location.search).toBe('?tenant=beta');
+    expect(captured.context).toBeUndefined();
+  });
+
+  it('revalidates Back and Forward selections and ignores the older response', async () => {
+    const m = await mount();
+    let resolve!: (response: Response) => void;
+    vi.mocked(fetch).mockImplementationOnce(
+      () =>
+        new Promise((settle) => {
+          resolve = settle;
+        })
+    );
+    m.location.search = '?tenant=personal';
+    await m.refresh();
+    m.location.search = '?tenant=beta';
+    m.state.me = viewer('beta');
+    await m.refresh();
+    await act(async () => resolve(json(viewer('personal'))));
+    expect(captured.context?.label).toBe('beta');
+    expect(m.cookie()).toContain('kyberion_selected_tenant=beta');
+  });
+
+  it('does not reflect an interrupted request after unmount', async () => {
+    const m = await mount();
+    let resolve!: (response: Response) => void;
+    vi.mocked(fetch).mockImplementationOnce(
+      () =>
+        new Promise((settle) => {
+          resolve = settle;
+        })
+    );
+    await m.refresh();
+    const before = m.cookie();
+    unmount?.();
+    unmount = undefined;
+    await act(async () => resolve(json(viewer('beta'))));
+    expect(m.cookie()).toBe(before);
+  });
+
   it('does not mutate the tenant cookie or location until the guard permits a switch', async () => {
     const m = await mount();
     const before = m.cookie();

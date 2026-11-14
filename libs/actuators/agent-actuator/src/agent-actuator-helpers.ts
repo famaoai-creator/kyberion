@@ -97,6 +97,24 @@ const { buildRetryOptions: buildRetryOptions } = defineActuatorPipelineBase({
   retryFallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
 });
 
+/** `A2APerformativeNotRoutableError.code`; matched by code, never by message text. */
+const A2A_PERFORMATIVE_NOT_ROUTABLE_CODE = 'A2A_PERFORMATIVE_NOT_ROUTABLE';
+
+/**
+ * Retry policy of the `a2a` op. A performative the bridge refuses is the
+ * caller's input error: it is never retried, whatever its message classifies
+ * as, so one bad envelope cannot become several governance records.
+ */
+export function buildA2ARouteRetryOptions(): ReturnType<typeof buildRetryOptions> {
+  const base = buildRetryOptions();
+  return {
+    ...base,
+    shouldRetry: (error: Error) =>
+      (error as { code?: unknown }).code !== A2A_PERFORMATIVE_NOT_ROUTABLE_CODE &&
+      Boolean(base.shouldRetry?.(error)),
+  };
+}
+
 export async function handleAction(input: AgentAction | AgentPipelineDispatch) {
   const { action } = input;
   const ctx = input.context || {};
@@ -380,7 +398,7 @@ export async function handleAction(input: AgentAction | AgentPipelineDispatch) {
       if (!params.envelope) throw new Error('envelope is required for a2a');
       const response = await retry(
         async () => a2aBridge.route(params.envelope),
-        buildRetryOptions()
+        buildA2ARouteRetryOptions()
       );
       return { status: 'ok', response };
     }

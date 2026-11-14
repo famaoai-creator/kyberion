@@ -9,6 +9,8 @@ import {
   withTaskCredentialBinding,
   resolveTaskCredential,
   resolveTaskServiceCredential,
+  resolveTaskServiceProviderBinding,
+  resolveTaskProviderEnvironment,
 } from '../foundation/credential-binding.js';
 import { safeMkdir, safeRmSync } from '../secure-io.js';
 import { pathResolver } from '../path-resolver.js';
@@ -137,6 +139,86 @@ afterEach(() => {
 });
 
 describe('ShellSecretResolver task credential adapter', () => {
+  it('binds a v3 GWS session to connection, claim actor and generation; revokes at use time', async () => {
+    mocks.binding = {
+      binding_id: 'gws-team',
+      service_id: 'google-workspace',
+      service_type: 'google-workspace',
+      owner_kind: 'organization',
+      owner_ref: scope.tenant_slug,
+      tenant_slug: scope.tenant_slug,
+      auth_mode: 'session',
+      secret_refs: [],
+    };
+    const source = {
+      serviceBindingId: 'gws-team',
+      serviceId: 'google-workspace',
+      sourceOwnerRef: scope.tenant_slug,
+      actorId,
+      generation: 'generation-a',
+    };
+    let raw = JSON.stringify({
+      version: 3,
+      secrets: {},
+      providerEnvironments: { gws: { HOME: home, GOOGLE_WORKSPACE_CLI_CONFIG_DIR: home } },
+      providerProvenance: { gws: source },
+    });
+    await scoped(async () => {
+      const binding = await bindShellTaskCredentials(input, () => raw);
+      withTaskCredentialBinding(binding!, () => {
+        const { generation: _generation, ...expected } = source;
+        expect(resolveTaskServiceProviderBinding('gws', expected).environment.HOME).toBe(home);
+        expect(() =>
+          resolveTaskServiceProviderBinding('gws', { ...expected, serviceBindingId: 'other' })
+        ).toThrow('CREDENTIAL_PROVENANCE_DENIED');
+        expect(() =>
+          resolveTaskServiceProviderBinding('gws', { ...expected, actorId: 'other' })
+        ).toThrow('CREDENTIAL_PROVENANCE_DENIED');
+        expect(() => resolveTaskProviderEnvironment('gws')).toThrow('CREDENTIAL_PROVENANCE_DENIED');
+        raw = raw.replace('generation-a', 'generation-b');
+        expect(() => resolveTaskServiceProviderBinding('gws', expected)).toThrow(
+          'CREDENTIAL_BINDING_UNAVAILABLE'
+        );
+      });
+    });
+  });
+
+  it.each(['actor', 'owner', 'generation', 'personal'])(
+    'denies invalid v3 session provenance: %s',
+    async (invalid) => {
+      mocks.binding = {
+        binding_id: 'gws-team',
+        service_id: 'google-workspace',
+        service_type: 'google-workspace',
+        owner_kind: invalid === 'personal' ? 'person' : 'organization',
+        owner_ref: scope.tenant_slug,
+        tenant_slug: scope.tenant_slug,
+        auth_mode: 'session',
+        secret_refs: [],
+      };
+      await expect(
+        scoped(() =>
+          bindShellTaskCredentials(input, () =>
+            JSON.stringify({
+              version: 3,
+              secrets: {},
+              providerEnvironments: { gws: { HOME: home, GOOGLE_WORKSPACE_CLI_CONFIG_DIR: home } },
+              providerProvenance: {
+                gws: {
+                  serviceBindingId: 'gws-team',
+                  serviceId: 'google-workspace',
+                  sourceOwnerRef: invalid === 'owner' ? 'another' : scope.tenant_slug,
+                  actorId: invalid === 'actor' ? 'another' : actorId,
+                  generation: invalid === 'generation' ? '' : 'generation-a',
+                },
+              },
+            })
+          )
+        )
+      ).rejects.toThrow('CREDENTIAL_BINDING_UNAVAILABLE');
+    }
+  );
+
   it('requires current owner allocation for personal v2 material and hides it from generic credentials', async () => {
     mocks.binding = {
       binding_id: 'personal-slack',

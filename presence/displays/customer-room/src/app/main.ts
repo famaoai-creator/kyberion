@@ -690,6 +690,23 @@ function showForm(): void {
   header.append(titles);
   root.append(header);
 
+  const objective = view.agenda.objective;
+  if (objective) {
+    // HR-01: why we are asking, before the questions (text nodes only).
+    const section = el('section', 'kb-section cr-objective');
+    section.setAttribute('aria-label', t('objective_heading'));
+    section.append(el('h2', 'kb-section__title', t('objective_heading')));
+    section.append(el('p', 'kb-text', objective.statement));
+    if (objective.success_criteria?.length) {
+      section.append(el('p', 'kb-text kb-text--muted', t('objective_criteria_heading')));
+      const list = el('ul', 'kb-list cr-objective__criteria');
+      for (const criterion of objective.success_criteria)
+        list.append(el('li', 'kb-list__item', criterion));
+      section.append(list);
+    }
+    root.append(section);
+  }
+
   const { box: role, content: roleContent } = createCallout(document, 'div', '', 'info');
   roleContent.append(el('p', 'kb-text', t(roleBannerKey(view.participant.role, view.entries))));
   root.append(role);

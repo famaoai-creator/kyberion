@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   safeReadFile: vi.fn(),
   safeWriteFile: vi.fn(),
+  writeJson: vi.fn(),
   safeReaddir: vi.fn(),
   safeLstat: vi.fn(),
   safeFsyncFile: vi.fn(),
@@ -33,6 +34,7 @@ vi.mock('../foundation/json.js', async () => {
     await vi.importActual<typeof import('../foundation/json.js')>('../foundation/json.js');
   return {
     ...actual,
+    writeJson: mocks.writeJson,
     readJson: <T>(filePath: string): T =>
       actual.parseSafeJsonInput(
         mocks.safeReadFile(filePath, { encoding: 'utf8' }) as string,
@@ -88,6 +90,7 @@ describe('secret-guard branch coverage', () => {
 
     mocks.safeReadFile.mockReset();
     mocks.safeWriteFile.mockReset();
+    mocks.writeJson.mockReset();
     mocks.safeReaddir.mockReset();
     mocks.safeLstat.mockReset();
     mocks.safeFsyncFile.mockReset();
@@ -184,6 +187,16 @@ describe('secret-guard branch coverage', () => {
     expect(mod.getSecret('MISSING_VALUE')).toBeNull();
   });
 
+  it('does not discover or flatten reserved multi-account generations', async () => {
+    mocks.safeExistsSync.mockReturnValue(true);
+    mocks.safeReaddir.mockReturnValue(['accounts']);
+    const mod = await import('./secret-guard.js');
+    expect(mocks.safeReaddir).toHaveBeenCalledOnce();
+    expect(mocks.safeLstat).not.toHaveBeenCalled();
+    expect(mocks.safeReadFile).not.toHaveBeenCalled();
+    expect(mod.getActiveSecrets()).toEqual([]);
+  });
+
   it('does not flatten array-shaped connection or vault records into secrets', async () => {
     mocks.safeExistsSync.mockImplementation(
       (p: string) =>
@@ -228,15 +241,20 @@ describe('secret-guard branch coverage', () => {
     const mod = await import('./secret-guard.js');
 
     mod.grantAccess('MSN-B', 'slack', 1, false);
-    expect(mocks.safeWriteFile).toHaveBeenCalledWith(
+    expect(mocks.writeJson).toHaveBeenCalledWith(
       '/repo/active/shared/auth-grants.json',
-      expect.stringContaining('"serviceId": "slack"')
+      expect.arrayContaining([expect.objectContaining({ missionId: 'MSN-B', serviceId: 'slack' })])
+    );
+    expect(mocks.writeJson.mock.calls[0]![1]).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ missionId: 'OLD' })])
     );
 
     mod.grantAccess('MSN-C', 'secrets:admin', 1, true);
-    expect(mocks.safeWriteFile).toHaveBeenCalledWith(
+    expect(mocks.writeJson).toHaveBeenCalledWith(
       '/repo/active/shared/auth-grants.json',
-      expect.stringContaining('"authority": "secrets:admin"')
+      expect.arrayContaining([
+        expect.objectContaining({ missionId: 'MSN-C', authority: 'secrets:admin' }),
+      ])
     );
 
     expect(mod.checkAuthority('MSN-A', 'secrets:rotate')).toBe(true);

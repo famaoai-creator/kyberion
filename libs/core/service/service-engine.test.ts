@@ -412,6 +412,10 @@ describe('executeServicePreset', () => {
   });
 
   it('never retries an opaque CLI operation even with read metadata', async () => {
+    mocks.resolveServiceBinding.mockReturnValue({
+      accessToken: 'test-token',
+      authMode: 'none',
+    } as ReturnType<typeof mocks.resolveServiceBinding>);
     const { executeServicePreset } = await import('./service-engine.js');
     mocks.safeReadFile.mockImplementation((filePath: string) =>
       filePath.includes('mock/path.json')

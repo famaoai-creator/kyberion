@@ -16,7 +16,7 @@ The Mesh message broker and its delivery driver were retired on 2026-11-12 (noth
 
 The important rule is simple:
 
-- `a2aBridge.route` is the synchronous host-local dispatch path.
+- `a2aBridge.route` is the synchronous host-local dispatch path. It delivers only envelopes whose `performative` is `request`, `query` or `inform` (`A2A_ROUTABLE_PERFORMATIVES`). It refuses `propose`, `accept`, `reject`, `result` and unknown values with `A2APerformativeNotRoutableError` (`[A2A_PERFORMATIVE_NOT_ROUTABLE]`) before any agent is spawned, and writes an `a2a_performative_not_routable` audit record (a governance violation only when the envelope is signed). `query` and `inform` are delivered as a prompt exactly like `request`.
 - Peer messaging is the cross-peer path; Mesh Hub adds discovery and recipient proposals on top of it.
 - The file-backed network transport in `libs/actuators/network-actuator/src/` is a separate envelope-drop transport, not the same thing as `a2aBridge`.
 

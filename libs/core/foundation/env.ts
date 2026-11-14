@@ -137,6 +137,30 @@ export function setRegisteredEnv(
   else env[name] = value;
 }
 
+/**
+ * Test-run markers a Vitest run puts on its processes; children of a test keep
+ * them (CHILD_PROCESS_ENV_KEYS, SAFE_EXEC_ENV_ALLOWLIST) so they stay in its sandbox.
+ */
+export const TEST_RUN_MARKER_ENV_KEYS = [
+  'VITEST',
+  'VITEST_POOL_ID',
+  'KYBERION_VITEST_RUN_ID',
+] as const;
+
+/** Every test-run marker: the forwarded ones plus the worker-only `VITEST_WORKER_ID`. */
+export const ALL_TEST_RUN_MARKER_ENV_KEYS = [
+  ...TEST_RUN_MARKER_ENV_KEYS,
+  'VITEST_WORKER_ID',
+] as const;
+
+/**
+ * Whether ANY test-run marker is set — stricter than {@link isVitestProcess}:
+ * a test child spawned with `VITEST: ''` still carries the run id or pool id.
+ */
+export function hasTestRunMarker(env: Record<string, string | undefined> = process.env): boolean {
+  return ALL_TEST_RUN_MARKER_ENV_KEYS.some((key) => Boolean(env[key]));
+}
+
 const CHILD_PROCESS_ENV_KEYS = [
   'PATH',
   'HOME',
@@ -146,9 +170,7 @@ const CHILD_PROCESS_ENV_KEYS = [
   'TERM',
   'NODE_ENV',
   // Test-run markers (see SAFE_EXEC_ENV_ALLOWLIST): keep children of a test in its sandbox.
-  'VITEST',
-  'VITEST_POOL_ID',
-  'KYBERION_VITEST_RUN_ID',
+  ...TEST_RUN_MARKER_ENV_KEYS,
   'NVM_DIR',
   'NVM_BIN',
   'GOOGLE_API_KEY',

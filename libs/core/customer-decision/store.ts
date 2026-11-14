@@ -795,6 +795,56 @@ export function listTenantCaseIds(tenantSlug: string): string[] {
     .sort();
 }
 
+// ---------------------------------------------------------------------------
+// Tenant hearing templates (HR-01)
+// ---------------------------------------------------------------------------
+
+/**
+ * Tenant-owned hearing templates live beside the cases, under
+ * `decisions/_templates/<template_id>.json`. Like `_reports`, the leading
+ * underscore keeps the directory outside the case id grammar, so it is never
+ * listed or resolved as a case, and the location inherits the case data's
+ * tier, tenant scope, `decision_ledger` authority, backup and offboarding.
+ * The records are raw here; `template.ts` validates them against the template
+ * schema on read and write. Call as the tenant-bound ledger role.
+ */
+export const CUSTOMER_DECISION_TEMPLATES_DIR = '_templates';
+const TENANT_TEMPLATE_ID_PATTERN = /^[a-z][a-z0-9-]{0,80}$/u;
+
+export function tenantTemplatePath(tenantSlug: string, templateId: string): string {
+  if (!TENANT_TEMPLATE_ID_PATTERN.test(templateId))
+    throw new Error('[CUSTOMER_DECISION_TEMPLATE_ID_INVALID] invalid template id');
+  return path.join(
+    tenantDecisionsRoot(tenantSlug),
+    CUSTOMER_DECISION_TEMPLATES_DIR,
+    `${templateId}.json`
+  );
+}
+
+/** The raw tenant template, or undefined when the tenant has none of that id. */
+export function readTenantTemplateRecord(tenantSlug: string, templateId: string): unknown {
+  return readRecord(tenantTemplatePath(tenantSlug, templateId));
+}
+
+/** Write (or replace) a tenant template record; the caller has validated it. */
+export function writeTenantTemplateRecord(
+  tenantSlug: string,
+  templateId: string,
+  record: unknown
+): string {
+  const file = prepareWrite(tenantTemplatePath(tenantSlug, templateId));
+  writeJson(file, record);
+  return file;
+}
+
+/** The template ids the tenant owns, sorted. */
+export function listTenantTemplateIds(tenantSlug: string): string[] {
+  return listJsonIds(
+    path.join(tenantDecisionsRoot(tenantSlug), CUSTOMER_DECISION_TEMPLATES_DIR),
+    TENANT_TEMPLATE_ID_PATTERN
+  );
+}
+
 export function learningReportPath(tenantSlug: string, reportDate: string): string {
   if (!LEARNING_REPORT_DATE_PATTERN.test(reportDate))
     throw new Error('[CUSTOMER_DECISION_REPORT_DATE_INVALID] invalid report date');

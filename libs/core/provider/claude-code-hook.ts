@@ -4,6 +4,14 @@ import { evaluateShellCommandPolicy } from '../shell/shell-command-policy.js';
 import { detectTier, validateWritePermission } from '../tier-guard.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import {
+  SESSION_HOOK_AGENT_ID,
+  SESSION_HOOK_AUDIT_ACTION,
+  SESSION_HOOK_METRICS_COMPONENT,
+  SESSION_HOOK_PROVENANCE_KEY,
+  type SessionHookEvent,
+  sessionHookProvenance,
+} from './session-hook-provenance.js';
+import {
   coSessionHookDrain,
   coSessionHookEnd,
   coSessionHookJoin,
@@ -88,7 +96,7 @@ export function resolveHookHostProvider(): 'claude' | 'devin' {
 }
 
 function hookHostAgentId(): string {
-  return resolveHookHostProvider() === 'devin' ? 'devin-cli' : 'claude-code';
+  return SESSION_HOOK_AGENT_ID[resolveHookHostProvider()];
 }
 
 /**
@@ -267,14 +275,33 @@ export function evaluatePreToolUse(input: PreToolUseInput): PreToolUseHookOutput
   return pre('allow', 'Kyberion tier-guard: write permitted.');
 }
 
-function recordSessionSignal(action: string, metadata: Record<string, unknown>): void {
+/**
+ * Metadata plus the session-hook provenance stamp (session-hook-provenance.ts),
+ * which lets the Vitest leak guard attribute these live audit appends to the
+ * agent session instead of the test run it launched.
+ */
+function withSessionHookStamp(
+  event: SessionHookEvent,
+  sessionId: unknown,
+  metadata: Record<string, unknown>
+): Record<string, unknown> {
+  const stamp = sessionHookProvenance(resolveHookHostProvider(), event, sessionId);
+  return stamp ? { ...metadata, [SESSION_HOOK_PROVENANCE_KEY]: stamp } : metadata;
+}
+
+function recordSessionSignal(
+  action: string,
+  event: SessionHookEvent,
+  sessionId: unknown,
+  metadata: Record<string, unknown>
+): void {
   try {
     auditChain.record({
       agentId: hookHostAgentId(),
       action,
       operation: 'session_signal',
       result: 'completed',
-      metadata,
+      metadata: withSessionHookStamp(event, sessionId, metadata),
     });
   } catch {
     // best-effort; never fail the session on logging
@@ -285,7 +312,7 @@ export function buildUserPromptSubmitContext(input: Record<string, unknown> = {}
   const prompt = normalizePrompt(input.prompt);
   const summary = prompt ? truncate(prompt, 180) : 'No prompt text was provided.';
   const hints = prompt ? classifyPromptIntent(prompt) : [];
-  recordSessionSignal('claude_code_user_prompt', {
+  recordSessionSignal(SESSION_HOOK_AUDIT_ACTION.userPrompt, 'UserPromptSubmit', input.session_id, {
     cwd: input.cwd,
     prompt_summary: summary,
     hints,
@@ -314,7 +341,7 @@ export function buildStopContext(input: Record<string, unknown> = {}): string {
   if (input.stop_hook_active === true) return '';
   const reason = normalizePrompt(input.reason);
   const summary = reason ? truncate(reason, 180) : 'No stop reason was provided.';
-  recordSessionSignal('claude_code_stop', {
+  recordSessionSignal(SESSION_HOOK_AUDIT_ACTION.stop, 'Stop', input.session_id, {
     cwd: input.cwd,
     reason_summary: summary,
   });
@@ -410,16 +437,19 @@ export function summarizeTranscriptUsage(transcriptText: string): CliUsageSummar
 /**
  * Record front-CLI (Claude Code) token usage into the metrics collector under the
  * `claude-code-cli` component, attributed by model. Best-effort. Returns whether a
- * record was written.
+ * record was written. The Stop hook passes the host session id so the row carries
+ * the session-hook provenance stamp (session-hook-provenance.ts).
  */
-export function recordCliUsage(summary: CliUsageSummary | null): boolean {
+export function recordCliUsage(summary: CliUsageSummary | null, sessionId?: unknown): boolean {
   if (!summary) return false;
+  const stamp = sessionHookProvenance(resolveHookHostProvider(), 'Stop', sessionId);
   try {
-    metrics.record('claude-code-cli', 0, 'success', {
+    metrics.record(SESSION_HOOK_METRICS_COMPONENT, 0, 'success', {
       model: summary.model,
-      agent: 'claude-code-cli',
+      agent: SESSION_HOOK_METRICS_COMPONENT,
       turns: summary.turns,
       usage: { prompt_tokens: summary.inputTokens, completion_tokens: summary.outputTokens },
+      ...(stamp ? { [SESSION_HOOK_PROVENANCE_KEY]: stamp } : {}),
     });
     return true;
   } catch {
@@ -465,14 +495,14 @@ export function recordPostToolUse(input: PostToolUseInput): {
 
   const entry = auditChain.record({
     agentId: hookHostAgentId(),
-    action: 'claude_code_tool',
+    action: SESSION_HOOK_AUDIT_ACTION.tool,
     operation,
     result: 'completed',
-    metadata: {
+    metadata: withSessionHookStamp('PostToolUse', input.session_id, {
       tool: operation,
       ...describeToolInput(operation, input.tool_input),
       cwd: input.cwd,
-    },
+    }),
   });
   return { recorded: true, entryId: entry.id };
 }

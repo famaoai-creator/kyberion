@@ -167,6 +167,16 @@ dist/scripts/check_golden_output.js --rebaseline`); `vital-check` is
   breaks Linux.
 - **Heavy suites need explicit timeouts.** Shared runners are ~3-8× slower
   than a dev Mac; anything over ~3s locally gets `{ timeout: 60_000 }`.
+  Separate large ledger discovery/retention coverage from per-event durable
+  effects: exercise the full horizon through existing dependency ports with
+  explicitly labelled terminal-receipt fixtures, and keep a real cross-process
+  claim/effect/receipt test large enough to cross the pending-window boundary.
+  Assert exact discovered/effect keys, bounded pending state and EOF in both;
+  synthetic receipts do not prove real dispatch or effect persistence.
+  Give each case a fresh resource path when lock identity includes that path:
+  deleting the data directory alone does not isolate locks stored elsewhere.
+  Do not weaken production lock recovery or simply raise deadlines to hide a
+  timeout cascade. Compare the same baseline shard before calling it pre-existing.
 - **Platform-specific behavior is declared, not discovered**:
   `it.skipIf(process.platform !== 'darwin')` for say/mlx/BlackHole-class
   tests, with a comment saying why.
@@ -259,7 +269,13 @@ leftovers. A test may not depend on:
   `vitest-*` roots, and in the gitignored `knowledge/personal/`,
   `knowledge/confidential/` and `customer/` trees, in
   `active/shared/tmp/vitest-active-leaks.json`;
-  `KYBERION_TEST_LEAK_STRICT=1` fails the run. Check it after a full run;
+  `KYBERION_TEST_LEAK_STRICT=1` fails the run. Growth whose appended rows are
+  all stamped agent-session hook rows (audit rows, plus the Stop hook's
+  `claude-code-cli` metrics usage row) is listed as `session_hook_appends`
+  instead, so a run an agent starts in its own checkout passes. A released lock
+  under `active/shared/runtime/locks/` is dropped. Any other row, a replaced
+  file, co-session growth and every other created file still fail; the full
+  table is in WRITING_TESTS "Runs started by an agent session". Check it after a full run;
 - **the calendar** — absolute dates in fixtures rot; freeze
   `vi.useFakeTimers({ now, toFake: ['Date'] })` for the WHOLE flow, not
   just the assertion phase.

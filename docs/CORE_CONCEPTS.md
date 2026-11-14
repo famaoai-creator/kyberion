@@ -67,8 +67,10 @@ For external connections, ownership, permission to use an operation, credential
 allocation, and approval of its effect are separate checks. Unknown personal
 ownership is not permission for every logged-in member, even on localhost.
 The [service integration guide](../knowledge/product/orchestration/service-integration-guide.md#solo-and-organization-rollout)
-describes the implemented boundary, deliberate legacy migration, and remaining
-session/CLI provenance, local multi-account storage and acting-for UI work.
+describes the implemented boundary, deliberate legacy migration, selected GWS
+session provenance, internal encrypted account storage, and acting-for display.
+Local account introduction and automatic broker provisioning remain unconnected;
+storing material or changing the displayed context grants no execution authority.
 
 ## 5. Surface
 

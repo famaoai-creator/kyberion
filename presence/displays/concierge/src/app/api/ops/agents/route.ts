@@ -489,7 +489,10 @@ export async function POST(req: NextRequest) {
           if (forbidden) return forbidden;
           if (!body.envelope?.header)
             return NextResponse.json({ error: 'Invalid A2A envelope' }, { status: 400 });
-          const [{ a2aBridge }, { validateA2AEnvelope }] = await Promise.all([
+          const [
+            { a2aBridge, isA2ARoutablePerformative, A2A_ROUTABLE_PERFORMATIVES },
+            { validateA2AEnvelope },
+          ] = await Promise.all([
             import('@agent/core/mesh/a2a-bridge'),
             import('@agent/core/mesh/a2a-envelope'),
           ]);
@@ -509,6 +512,15 @@ export async function POST(req: NextRequest) {
               { status: 403 }
             );
           }
+          // The bridge refuses these too; here it is the caller's input error.
+          if (!isA2ARoutablePerformative(envelope.header.performative))
+            return NextResponse.json(
+              {
+                error: `A2A performative is not routable; use one of: ${A2A_ROUTABLE_PERFORMATIVES.join(', ')}`,
+                errorCode: 'A2A_PERFORMATIVE_NOT_ROUTABLE',
+              },
+              { status: 400 }
+            );
           const response = await a2aBridge.route(envelope);
           return NextResponse.json({ status: 'ok', response });
         }

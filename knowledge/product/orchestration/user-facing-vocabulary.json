@@ -9851,9 +9851,9 @@
         "qps-ploc": "⟦Ƀïñḓ, ůñƀïñḓ ȧñḓ ŀïşŧ ȧ ŧėñȧñŧ'ş ƈůşŧőɱėř ƈħȧññėŀş, ȧñḓ řėȧḓ ȧ ƈůşŧőɱėř ɱėşşȧɠė ŧħȧŧ ẇȧïŧş ƒőř ȧṗṗřőṽȧŀ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧė⟧"
       },
       "cli_cmd_script_customer_decision": {
-        "en": "Prepare, approve and send customer decision agendas, and track the answers",
-        "ja": "顧客との調整セットを作成・承認・送付し、回答を確認",
-        "qps-ploc": "⟦Ṗřėṗȧřė, ȧṗṗřőṽė ȧñḓ şėñḓ ƈůşŧőɱėř ḓėƈïşïőñ ȧɠėñḓȧş, ȧñḓ ŧřȧƈķ ŧħė ȧñşẇėřş ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+        "en": "Keep a tenant's own hearing templates, prepare, approve and send customer decision agendas, and track the answers",
+        "ja": "テナント独自のヒアリングテンプレートを管理し、顧客との調整セットを作成・承認・送付し、回答を確認",
+        "qps-ploc": "⟦Ķėėṗ ȧ ŧėñȧñŧ'ş őẇñ ħėȧřïñɠ ŧėɱṗŀȧŧėş, ṗřėṗȧřė, ȧṗṗřőṽė ȧñḓ şėñḓ ƈůşŧőɱėř ḓėƈïşïőñ ȧɠėñḓȧş, ȧñḓ ŧřȧƈķ ŧħė ȧñşẇėřş ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ⟧"
       },
       "cli_cmd_script_pipeline_promote": {
         "en": "Promote a successful one-off run into the public pipeline catalog, or a tenant catalog with --tenant",
@@ -18397,6 +18397,11 @@
         "en": "Your connections",
         "ja": "あなたの連携",
         "qps-ploc": "⟦Ẏőůř ƈőññėƈŧïőñş ŀőřėɱ⟧"
+      },
+      "setup.connection_authority_notice": {
+        "en": "Connection ownership stays with the person or organization shown. Listing or selecting a connection does not authorize execution. Organization use of a personal connection requires its owner's approval for a specific purpose and time period.",
+        "ja": "連携の所有者は表示された個人・組織のままです。表示や選択だけでは実行は許可されません。個人の連携を組織で使うには、用途と期限を定めた所有者の承認が必要です。",
+        "qps-ploc": "⟦Ƈőññėƈŧïőñ őẇñėřşħïṗ şŧȧẏş ẇïŧħ ŧħė ṗėřşőñ őř őřɠȧñïẑȧŧïőñ şħőẇñ. Ŀïşŧïñɠ őř şėŀėƈŧïñɠ ȧ ƈőññėƈŧïőñ ḓőėş ñőŧ ȧůŧħőřïẑė ėẋėƈůŧïőñ. Őřɠȧñïẑȧŧïőñ ůşė őƒ ȧ ṗėřşőñȧŀ ƈőññėƈŧïőñ řėɋůïřėş ïŧş őẇñėř'ş ȧṗṗřőṽȧŀ ƒőř ȧ şṗėƈïƒïƈ ṗůřṗőşė ȧñḓ ŧïɱė ṗėřïőḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈ⟧"
       },
       "setup.connections_organization": {
         "en": "{tenant} connections",
@@ -29953,6 +29958,16 @@
         "ja": "{count}テナントのまとめ",
         "qps-ploc": "⟦Şůɱɱȧřẏ őƒ {count} ŧėñȧñŧş ŀőřėɱ ïṗ⟧"
       },
+      "tenant_personal_only_detail": {
+        "en": "Personal work · no tenant required",
+        "ja": "個人の仕事 · テナントは不要です",
+        "qps-ploc": "⟦Ṗėřşőñȧŀ ẇőřķ · ñő ŧėñȧñŧ řėɋůïřėḓ ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "tenant_selection_authority_notice": {
+        "en": "This selects the work you view. Execution still checks the actor, connection owner, delegation and required approvals.",
+        "ja": "表示する仕事の選択です。実行時には、実行者・連携の所有者・委任・必要な承認を確認します。",
+        "qps-ploc": "⟦Ŧħïş şėŀėƈŧş ŧħė ẇőřķ ẏőů ṽïėẇ. Ėẋėƈůŧïőñ şŧïŀŀ ƈħėƈķş ŧħė ȧƈŧőř, ƈőññėƈŧïőñ őẇñėř, ḓėŀėɠȧŧïőñ ȧñḓ řėɋůïřėḓ ȧṗṗřőṽȧŀş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧ⟧"
+      },
       "tenant_system_label": {
         "en": "System (unassigned)",
         "ja": "システム（未割当）",
@@ -40123,6 +40138,16 @@
         "en": "Please answer by {date} if you can.",
         "ja": "回答の目安: {date}",
         "qps-ploc": "⟦Ṗŀėȧşė ȧñşẇėř ƀẏ {date} ïƒ ẏőů ƈȧñ. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "objective_heading": {
+        "en": "What this hearing is for",
+        "ja": "このヒアリングの目的",
+        "qps-ploc": "⟦Ẇħȧŧ ŧħïş ħėȧřïñɠ ïş ƒőř ŀőřėɱ ï⟧"
+      },
+      "objective_criteria_heading": {
+        "en": "We will consider it complete when",
+        "ja": "完了の目安",
+        "qps-ploc": "⟦Ẇė ẇïŀŀ ƈőñşïḓėř ïŧ ƈőɱṗŀėŧė ẇħėñ ŀőřėɱ ïṗşůɱ⟧"
       },
       "respond_by_past": {
         "en": "The target date was {date}. You can still answer.",
