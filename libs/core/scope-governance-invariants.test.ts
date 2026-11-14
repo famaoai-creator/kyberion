@@ -28,7 +28,7 @@ describe('scope governance invariants', () => {
           // from the immutable original scope snapshot, never approval input
           // or the resumed process environment. Exercised by the real library
           // approval continuation integration (including changed ambient task).
-          !line.startsWith('scripts/pipeline-execution-part-results.ts:') &&
+          !line.startsWith('scripts/pipeline/pipeline-execution-part-results.ts:') &&
           // The diagnostic CLI is a dispatch boundary: it validates an active
           // tenant mission and its organization/project chain, then creates a
           // real WorkItem claimed through coordinated dispatch. Mission/link

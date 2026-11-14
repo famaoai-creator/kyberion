@@ -7,7 +7,7 @@ const boundaries = [
   // The pipeline runner's preflight waterfall lives in the control stage
   // (`ensureDefaultOpPreflight()` is invoked there); `run_pipeline.ts` is only
   // the CLI facade and must not satisfy this gate with a dead import.
-  'scripts/pipeline-execution-part-control.ts',
+  'scripts/pipeline/pipeline-execution-part-control.ts',
   'libs/actuators/service-actuator/src/service-actuator-helpers.ts',
   'libs/core/agent/agent-dispatch.ts',
   'libs/shared-network/src/mcp-server-engine.ts',

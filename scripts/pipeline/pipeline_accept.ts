@@ -3,7 +3,7 @@ import {
   requestPipelineBindingApproval,
 } from '@agent/core/accepted-pipeline-bindings';
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from '../lib/harness.js';
 
 export async function acceptPipelineFromArgs(args: string[]) {
   const argv = await createStandardYargs(['node', 'pipeline_accept', ...args])

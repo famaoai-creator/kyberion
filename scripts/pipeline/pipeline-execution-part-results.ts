@@ -82,9 +82,9 @@ import {
 } from './pipeline-result-reporting.js';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
-import { currentProcessArgv, exitProcess, ScriptExitError } from './lib/harness.js';
-import { readValidatedWorkflowAdf } from './refactor/adf-input.js';
-import { withPlaygroundPathRole } from './actuator/actuator_playground.js';
+import { currentProcessArgv, exitProcess, ScriptExitError } from '../lib/harness.js';
+import { readValidatedWorkflowAdf } from '../refactor/adf-input.js';
+import { withPlaygroundPathRole } from '../actuator/actuator_playground.js';
 import { runSteps } from './pipeline-execution-part-execution.js';
 
 import {
@@ -103,7 +103,7 @@ import {
   withDelegatedExecutionFrame,
   withDelegatedExecutionOptions,
 } from '@agent/core/governance/delegated-execution';
-import { registerPipelineFileRunner } from './lib/pipeline-file-runner.js';
+import { registerPipelineFileRunner } from '../lib/pipeline-file-runner.js';
 import {
   assertDiagnosticPipelineProfile,
   assertDiagnosticHooksAbsent,
@@ -1124,7 +1124,7 @@ export async function main(args?: string[], print: Print = () => undefined) {
   // Without this, a user pressing Ctrl+C during a meeting join pipeline would
   // leave their system microphone locked to BlackHole.
   const cleanupAndExit = (code: number) => {
-    void import('./lib/blackhole-routing-guard.js')
+    void import('../lib/blackhole-routing-guard.js')
       .then(({ resetRouterSync }) => {
         resetRouterSync();
         exitProcess(code);

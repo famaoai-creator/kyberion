@@ -56,7 +56,7 @@ import {
   type LearningCaseInput,
   type LearningSuggestion,
 } from '@agent/core/customer-decision';
-import { installRepositoryPipelineTemplate } from '../pipeline_promote.js';
+import { installRepositoryPipelineTemplate } from '../pipeline/pipeline_promote.js';
 import {
   LEDGER_ROLE,
   asLedgerWriter,

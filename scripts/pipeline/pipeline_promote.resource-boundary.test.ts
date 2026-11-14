@@ -21,7 +21,7 @@ import {
   readPipelinePromotionTextFile,
   resolvePromotionInputPath,
 } from './pipeline_promote.js';
-import { assertPromotionSourceScope } from './lib/promotion-scope.js';
+import { assertPromotionSourceScope } from '../lib/promotion-scope.js';
 
 // Tenants named vitestledger* resolve to a knowledge root inside a tmp
 // fixture, so tenant promotions (pipeline + README + asset ledger) stay hermetic.
@@ -41,7 +41,7 @@ vi.mock('@agent/core/organization/tenant-registry', async (importOriginal) => {
 
 describe('pipeline promotion resource boundaries', () => {
   it('uses the governed parser for model promotion advice', () => {
-    const source = readTextFile(pathResolver.rootResolve('scripts/pipeline_promote.ts'));
+    const source = readTextFile(pathResolver.rootResolve('scripts/pipeline/pipeline_promote.ts'));
     expect(source).toContain("parseSafeJsonInput(jsonText, 'pipeline promotion advice')");
     expect(source).toContain("parseSafeJsonInput(sourceText, 'pipeline promotion source')");
     expect(source).not.toContain('readJson<unknown>(resolvedInput)');
@@ -163,7 +163,7 @@ describe('pipeline promotion resource boundaries', () => {
   });
 
   it('never writes the public pipelines/README.md on the tenant path', () => {
-    const source = readTextFile(pathResolver.rootResolve('scripts/pipeline_promote.ts'));
+    const source = readTextFile(pathResolver.rootResolve('scripts/pipeline/pipeline_promote.ts'));
     const tenantBranch = source.slice(
       source.indexOf('if (tenant && tenantKnowledgeRoot) {'),
       source.indexOf('fail(`[promote] pipelines/${slug}.json already exists')
@@ -182,7 +182,7 @@ describe('pipeline promotion resource boundaries', () => {
     ]);
     // The next step is emitted on every tenant promotion (dry run and --force
     // included), not only when a README row is added.
-    const source = readTextFile(pathResolver.rootResolve('scripts/pipeline_promote.ts'));
+    const source = readTextFile(pathResolver.rootResolve('scripts/pipeline/pipeline_promote.ts'));
     const rowFn = source.slice(source.indexOf('function appendTenantCatalogRow('));
     expect(rowFn.slice(0, rowFn.indexOf('\n}\n'))).not.toContain('project-trust');
     expect(source).toContain("${dryRun ? '(dry-run) ' : ''}next: ");
@@ -333,7 +333,7 @@ describe('pipeline promotion resource boundaries', () => {
     });
 
     it('never records public promotions (ledger code sits in the tenant branch only)', () => {
-      const source = readTextFile(pathResolver.rootResolve('scripts/pipeline_promote.ts'));
+      const source = readTextFile(pathResolver.rootResolve('scripts/pipeline/pipeline_promote.ts'));
       const tenantStart = source.indexOf('if (tenant && tenantKnowledgeRoot) {');
       const publicStart = source.indexOf('fail(`[promote] pipelines/${slug}.json already exists');
       const publicBranch = source.slice(publicStart, source.indexOf('function logPlaceholders('));

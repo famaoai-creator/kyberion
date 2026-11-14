@@ -28,7 +28,7 @@ import { resolveAndExecuteIntent } from '../libs/actuators/orchestrator-actuator
 import { readJsonInput, resolveAdfInputPath } from './refactor/adf-input.js';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import { executePipelineFile } from './run_pipeline.js';
-import { PipelineSuspendedError } from './pipeline-execution-part-bootstrap.js';
+import { PipelineSuspendedError } from './pipeline/pipeline-execution-part-bootstrap.js';
 const CLAUDE_TASK_SESSION_TYPES = new Set(['browser', 'report_document', 'document_generation']);
 
 export const RUN_INTENT_USAGE =

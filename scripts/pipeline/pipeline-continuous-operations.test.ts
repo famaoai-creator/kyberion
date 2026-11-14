@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({ run: vi.fn(), report: vi.fn() }));
-vi.mock('./continuous/continuous_operations_cycle.js', () => ({
+vi.mock('../continuous/continuous_operations_cycle.js', () => ({
   runContinuousOperationsCycleFromRef: mocks.run,
 }));
-vi.mock('./continuous/continuous_operations_report.js', () => ({
+vi.mock('../continuous/continuous_operations_report.js', () => ({
   runContinuousOperationsReport: mocks.report,
 }));
-const { runValidatedSteps } = await import(new URL('./run_pipeline.js', import.meta.url).href);
+const { runValidatedSteps } = await import(new URL('../run_pipeline.js', import.meta.url).href);
 const report = {
   loop_id: 'loop',
   scope: { tier: 'public', organization_id: 'org' },

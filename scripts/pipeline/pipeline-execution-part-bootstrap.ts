@@ -1166,7 +1166,7 @@ export async function runInlineSystemShell(
   // Track BlackHole mic routing state for SIGINT cleanup.
   if (cmd.includes('blackhole_audio_router.py')) {
     const { markRouterActive, markRouterInactive } =
-      await import('./lib/blackhole-routing-guard.js');
+      await import('../lib/blackhole-routing-guard.js');
     if (cmd.includes('setup_routing')) {
       const pythonBin = cmd.split(/\s+/)[0];
       const defaultMicDevice = String(ctx.default_mic_device || 'MacBook Pro Microphone');

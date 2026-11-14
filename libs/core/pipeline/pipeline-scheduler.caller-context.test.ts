@@ -49,9 +49,12 @@ describe('pipeline caller context', () => {
 
   it('covers every key the pipeline engine lists as engine-internal', () => {
     const source = String(
-      safeReadFile(pathResolver.rootResolve('scripts/pipeline-execution-part-control.ts'), {
-        encoding: 'utf8',
-      })
+      safeReadFile(
+        pathResolver.rootResolve('scripts/pipeline/pipeline-execution-part-control.ts'),
+        {
+          encoding: 'utf8',
+        }
+      )
     );
     const block = source.match(
       /ENGINE_INTERNAL_CONTEXT_KEYS: ReadonlySet<string> = new Set\(\[([^\]]+)\]\)/u

@@ -61,8 +61,8 @@ const DIRECT_CALLERS: Record<string, LookupCategory> = {
   'scripts/mission/mission_alignment_decision.ts': 'lifecycle',
   // Prepared admission must fail closed on hidden/ambiguous owners, never create another mission.
   'scripts/mission/mission_admission_continuation.ts': 'lifecycle',
-  'scripts/pipeline-execution-part-results.ts': 'lifecycle',
-  'scripts/pipeline-reasoning-visibility.ts': 'lifecycle',
+  'scripts/pipeline/pipeline-execution-part-results.ts': 'lifecycle',
+  'scripts/pipeline/pipeline-reasoning-visibility.ts': 'lifecycle',
   // scope-derivation
   // Production approvals derive their authorization scope from canonical mission state.
   'scripts/lib/video-production-evidence.ts': 'scope-derivation',

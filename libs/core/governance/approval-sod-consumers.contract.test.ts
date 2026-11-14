@@ -31,8 +31,14 @@ const SOD_CONSUMERS: ReadonlyArray<{ file: string; consumer: string }> = [
   { file: 'libs/core/plugin/plugin-view-actions.ts', consumer: 'plugin_view_action' },
   { file: 'libs/core/plugin/plugin-activation-status.ts', consumer: 'plugin_activation' },
   { file: 'libs/shared-network/src/mcp-server-engine.ts', consumer: 'mcp_governed_tool' },
-  { file: 'scripts/pipeline-execution-part-execution.ts', consumer: 'pipeline_await_decision' },
-  { file: 'scripts/pipeline-execution-part-control.ts', consumer: 'pipeline_bound_approval' },
+  {
+    file: 'scripts/pipeline/pipeline-execution-part-execution.ts',
+    consumer: 'pipeline_await_decision',
+  },
+  {
+    file: 'scripts/pipeline/pipeline-execution-part-control.ts',
+    consumer: 'pipeline_bound_approval',
+  },
   { file: 'libs/core/mission/mission-maintenance.ts', consumer: 'mission_scope_approve' },
   { file: 'libs/core/mission/mission-work-reconciliation.ts', consumer: 'mission_reconcile_work' },
   { file: 'libs/core/mission/mission-task-supersede.ts', consumer: 'mission_task_supersede' },

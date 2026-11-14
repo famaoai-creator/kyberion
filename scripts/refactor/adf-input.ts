@@ -31,7 +31,7 @@ export interface AdfInputOptions {
 }
 
 const SCRIPT_WRAPPER_BASELINE_PATH = rootResolve(
-  'scripts/pipeline-shell-independence.baseline.json'
+  'scripts/pipeline/pipeline-shell-independence.baseline.json'
 );
 
 export function readAdfInputTextFile(filePath: string): string {

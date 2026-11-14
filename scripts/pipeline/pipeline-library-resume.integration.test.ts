@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { seedFirstJobTestRoot } from './fixtures/first-job-approval-fixture.js';
+import { seedFirstJobTestRoot } from '../fixtures/first-job-approval-fixture.js';
 import { safeRmSync as removeFixture } from '@agent/core/secure-io';
 import { withExecutionContext as inSourceContext } from '@agent/core/authority';
 import path from 'node:path';

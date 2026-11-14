@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { pathResolver, safeReadFile } from '@agent/core';
-import { main as runPipelineMain } from './pipeline-execution-part-results.js';
+import { main as runPipelineMain } from './pipeline/pipeline-execution-part-results.js';
 import { formatPipelineDryRunReport, runPipelineDryRun } from './run_pipeline_dry_run.js';
 
 describe('pipeline dry-run entrypoint', () => {
@@ -39,9 +39,12 @@ describe('pipeline dry-run entrypoint', () => {
 
   it('keeps the dry-run CLI output and exit boundary in the shared harness', () => {
     const source = String(
-      safeReadFile(pathResolver.rootResolve('scripts/pipeline-execution-part-results.ts'), {
-        encoding: 'utf8',
-      }) || ''
+      safeReadFile(
+        pathResolver.rootResolve('scripts/pipeline/pipeline-execution-part-results.ts'),
+        {
+          encoding: 'utf8',
+        }
+      ) || ''
     );
 
     expect(source).not.toContain('process.stdout.write');

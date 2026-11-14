@@ -1669,17 +1669,17 @@
       "env_direct_read_budget": 1,
       "json_state_write_budget": 4
     },
-    "scripts/pipeline_promote.ts": {
+    "scripts/pipeline/pipeline_promote.ts": {
       "json_state_write_budget": 1,
       "bespoke_cli_parser_budget": 3
     },
-    "scripts/pipeline-execution-part-bootstrap.ts": {
+    "scripts/pipeline/pipeline-execution-part-bootstrap.ts": {
       "json_state_write_budget": 1
     },
-    "scripts/pipeline-execution-part-results.ts": {
+    "scripts/pipeline/pipeline-execution-part-results.ts": {
       "env_direct_read_budget": 7
     },
-    "scripts/pipeline-reasoning-visibility.ts": {
+    "scripts/pipeline/pipeline-reasoning-visibility.ts": {
       "env_direct_read_budget": 1
     },
     "scripts/presence/presence-controller.ts": {
