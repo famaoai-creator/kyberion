@@ -28,19 +28,19 @@ the canonical surface(s) involved.
 
 ## A. Outcome scenarios — intent → deliverable
 
-| #   | Scenario                                    | Entry                                                 | Flow                                                                                                                    | Status |
-| --- | ------------------------------------------- | ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ------ |
-| A1  | Code change (feature / fix / refactor)      | `mission_controller create` (`code_change`)           | `implementation-plan` → `execute-task-plan` → `code-review-cycle`                                                       | ✅     |
-| A2  | Customer requirement → working feature      | `requirements-elicitation` or `audio-to-requirements` | `design-from-requirements` → `test-plan-from-requirements` → `execute-task-plan` → `release-package` → `deploy-release` | ✅     |
-| A3  | Strategic decision support                  | `decision_support` mission                            | `hypothesis-tree` (with prior-knowledge injection) → `counterfactual-branch` (ensemble + UQ) → `dissent-log`            | ✅     |
-| A4  | Multi-perspective hypothesis tree           | `hypothesis-tree`                                     | divergePersonas + crossCritique + render report                                                                         | ✅     |
-| A5  | Counterfactual scenario simulation          | `counterfactual-branch`                               | fork → simulate (single or N-run ensemble) → quality rubric → convergence                                               | ✅     |
-| A6  | Stakeholder consensus / nemawashi           | `stakeholder-consensus-orchestrator`                  | relationship graph → readiness matrix → recommend                                                                       | ✅     |
-| A7  | Negotiation rehearsal                       | `negotiation-rehearsal`                               | counterparty persona → roleplay → debrief                                                                               | ✅     |
-| A8  | Marketing strategy / content                | `marketing-strategy` / `marketing-content`            | distill → render                                                                                                        | ✅     |
-| A9  | Add a FaaS API by conversation              | `add-api.sh` → `faas-add-api`                         | NL → schema → CDK → Lambda                                                                                              | ✅     |
-| A10 | GitHub issue → mission                      | `github-issue-ingest`                                 | issue text → mission scaffold                                                                                           | ✅     |
-| A11 | Calendar reschedule / schedule coordination | `schedule-coordination`                               | schedule brief → summary / handoff                                                                                      | ✅     |
+| #   | Scenario                                    | Entry                                                 | Flow                                                                                                                 | Status |
+| --- | ------------------------------------------- | ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- | ------ |
+| A1  | Code change (feature / fix / refactor)      | `mission_controller create` (`code_change`)           | `implementation-plan` → mission dispatch → `code-review-cycle`                                                       | ✅     |
+| A2  | Customer requirement → working feature      | `requirements-elicitation` or `audio-to-requirements` | `design-from-requirements` → `test-plan-from-requirements` → mission dispatch → `release-package` → `deploy-release` | ✅     |
+| A3  | Strategic decision support                  | `decision_support` mission                            | `hypothesis-tree` (with prior-knowledge injection) → `counterfactual-branch` (ensemble + UQ) → `dissent-log`         | ✅     |
+| A4  | Multi-perspective hypothesis tree           | `hypothesis-tree`                                     | divergePersonas + crossCritique + render report                                                                      | ✅     |
+| A5  | Counterfactual scenario simulation          | `counterfactual-branch`                               | fork → simulate (single or N-run ensemble) → quality rubric → convergence                                            | ✅     |
+| A6  | Stakeholder consensus / nemawashi           | `stakeholder-consensus-orchestrator`                  | relationship graph → readiness matrix → recommend                                                                    | ✅     |
+| A7  | Negotiation rehearsal                       | `negotiation-rehearsal`                               | counterparty persona → roleplay → debrief                                                                            | ✅     |
+| A8  | Marketing strategy / content                | `marketing-strategy` / `marketing-content`            | distill → render                                                                                                     | ✅     |
+| A9  | Add a FaaS API by conversation              | `add-api.sh` → `faas-add-api`                         | NL → schema → CDK → Lambda                                                                                           | ✅     |
+| A10 | GitHub issue → mission                      | `github-issue-ingest`                                 | issue text → mission scaffold                                                                                        | ✅     |
+| A11 | Calendar reschedule / schedule coordination | `schedule-coordination`                               | schedule brief → summary / handoff                                                                                   | ✅     |
 
 ## B. Operations / day-2
 

@@ -89,6 +89,11 @@ export function registerPluginActuatorOperation(input: {
     );
   }
   const key = `${domain}:${action}`;
+  // A retired op stays retired: a plugin cannot bring it back under its name.
+  if (buildRetiredActuatorOpError(domain, action))
+    throw new Error(
+      `[OP_REGISTRY_PLUGIN_CONFIG] ${key} is a retired operation and cannot be registered by a plugin`
+    );
   if (pluginOperations.has(key)) {
     throw new Error(`[OP_REGISTRY_PLUGIN_CONFIG] duplicate plugin operation: ${key}`);
   }
@@ -172,11 +177,37 @@ export function listKnownActuatorOps(domain: string, extraOps: string[] = []): s
   ]);
 }
 
+// Ops removed from the catalog, keyed `domain:op`, with what a caller uses
+// instead. A call still fails as an unknown op (nothing here executes), but the
+// error names the replacement rather than a look-alike suggestion.
+const TASK_PLAN_REPLACEMENT =
+  'orchestrator:task_plan_to_next_tasks to write the task plan to the mission board (NEXT_TASKS.json), then mission dispatch (pnpm mission dispatch-workitems <MISSION_ID>) so each task runs under a claimed WorkItem';
+const RETIRED_ACTUATOR_OPS: Readonly<Record<string, { retired_on: string; replacement: string }>> =
+  {
+    'orchestrator:execute_task_plan': {
+      retired_on: '2026-11-14',
+      replacement: TASK_PLAN_REPLACEMENT,
+    },
+    'wisdom:execute_task_plan': { retired_on: '2026-11-14', replacement: TASK_PLAN_REPLACEMENT },
+  };
+
+/** The unknown-op error for an op that was retired, naming its replacement; else undefined. */
+export function buildRetiredActuatorOpError(domain: string, action: string): Error | undefined {
+  const retired = RETIRED_ACTUATOR_OPS[`${domain}:${action}`];
+  return retired
+    ? new Error(
+        `[UNKNOWN_OP] Op "${action}" for domain "${domain}" was retired on ${retired.retired_on}. Use ${retired.replacement}.`
+      )
+    : undefined;
+}
+
 export function buildUnknownActuatorOpError(
   domain: string,
   action: string,
   extraOps: string[] = DEFAULT_CONTROL_OPS
 ): Error {
+  const retired = buildRetiredActuatorOpError(domain, action);
+  if (retired) return retired;
   const candidates = listKnownActuatorOps(domain, extraOps);
   const suggestions = suggestClosestStrings(action, candidates);
   return new Error(

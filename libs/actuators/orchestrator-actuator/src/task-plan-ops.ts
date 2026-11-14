@@ -72,6 +72,9 @@ export async function decomposeIntoTasks(input: {
   };
 }
 
+/** `source` of a NEXT_TASKS row written from a task plan. */
+export const TASK_PLAN_ROW_SOURCE = 'task_plan';
+
 export function taskPlanToNextTasks(input: { mission_id: string }) {
   if (!input.mission_id) throw new Error('[task_plan_to_next_tasks] requires mission_id');
   const plan = readTaskPlan(input.mission_id);
@@ -113,6 +116,8 @@ export function taskPlanToNextTasks(input: { mission_id: string }) {
       estimated_scope: scope,
       risk: scope === 'L' ? 'high' : scope === 'M' ? 'medium' : 'low',
       ...(reviewTarget ? { review_target: reviewTarget } : {}),
+      // Marks the row as plan-derived, so a later plan may replace it.
+      source: TASK_PLAN_ROW_SOURCE,
     };
   });
   // NEXT_TASKS.json belongs to the existing mission wherever it lives; an
@@ -143,6 +148,26 @@ export function taskPlanToNextTasks(input: { mission_id: string }) {
         }
       }
     }
+    // The plan replaces the board. A task the plan did not produce (a
+    // workflow template's default task, a hand-added one) would be dropped,
+    // so it blocks the write: still-open and finished work alike.
+    const planIds = new Set(nextTasks.map((task) => task.task_id));
+    const kept = new Set([...replacedBy.keys(), ...replacedBy.values()]);
+    const foreign = onDisk
+      .filter((task) => {
+        const taskId = String(task.task_id || '');
+        return (
+          task.source !== TASK_PLAN_ROW_SOURCE &&
+          String(task.status || '').toLowerCase() !== 'superseded' &&
+          !planIds.has(taskId) &&
+          !kept.has(taskId)
+        );
+      })
+      .map((task) => String(task.task_id || '(no id)'));
+    if (foreign.length > 0)
+      throw new Error(
+        `[TASK_PLAN_BOARD_CONFLICT] mission ${input.mission_id} board holds ${foreign.length} task(s) not produced from a task plan (${foreign.join(', ')}); writing the plan would drop them — use a mission whose board the plan owns, or supersede/finish those tasks first (pnpm mission supersede-task)`
+      );
     if (unproven.length > 0) {
       logger.warn(
         `[task_plan_to_next_tasks] superseded tasks ${unproven.join(', ')} are not proven — plan tasks that depend on them are not pointed at a replacement | repair the supersede (pnpm mission supersede-task) or restore the task | mission=${input.mission_id}`

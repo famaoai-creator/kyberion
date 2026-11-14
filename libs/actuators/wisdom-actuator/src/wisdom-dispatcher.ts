@@ -1,3 +1,4 @@
+import { buildRetiredActuatorOpError } from '@agent/core/actuator/actuator-op-registry';
 import { buildWisdomOperationRegistry, getWisdomOperationSpec } from './op-catalog.js';
 import type { WisdomContext } from './contracts/wisdom-context.js';
 import { makeWisdomReceipt, type WisdomReceipt } from './contracts/wisdom-result.js';
@@ -27,13 +28,20 @@ export interface WisdomDispatchResult {
   receipt: WisdomReceipt;
 }
 
+function unknownWisdomOperation(op: string): Error {
+  return (
+    buildRetiredActuatorOpError('wisdom', op) ??
+    new Error(`[UNKNOWN_OP] Unknown wisdom operation: ${op}`)
+  );
+}
+
 export interface WisdomDispatchOptions {
   compatibilityMode?: boolean;
 }
 
 function assertOperationKind(op: string, requestedKind: WisdomOperationKind): void {
   const spec = getWisdomOperationSpec(op);
-  if (!spec) throw new Error(`[UNKNOWN_OP] Unknown wisdom operation: ${op}`);
+  if (!spec) throw unknownWisdomOperation(op);
   if (spec.kind !== requestedKind) {
     throw new Error(
       `[OP_KIND_MISMATCH] ${op} is registered as ${spec.kind}, but was invoked as ${requestedKind}`
@@ -54,7 +62,7 @@ export function createWisdomDispatcher(
   ): Promise<WisdomDispatchResult> => {
     assertOperationKind(op, kind);
     const spec = getWisdomOperationSpec(op);
-    if (!spec) throw new Error(`[UNKNOWN_OP] Unknown wisdom operation: ${op}`);
+    if (!spec) throw unknownWisdomOperation(op);
 
     const handledContext = await handlers[kind](op, params, context);
     const nextContext =
@@ -105,7 +113,7 @@ export function createWisdomDispatcher(
     dispatch,
     registry: buildWisdomOperationRegistry(async (op, input, context) => {
       const spec = getWisdomOperationSpec(op);
-      if (!spec) throw new Error(`[UNKNOWN_OP] Unknown wisdom operation: ${op}`);
+      if (!spec) throw unknownWisdomOperation(op);
       return handlers[spec.kind](op, input, context);
     }),
   };

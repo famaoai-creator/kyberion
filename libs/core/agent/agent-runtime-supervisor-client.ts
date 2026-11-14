@@ -776,6 +776,11 @@ export function toSupervisorEnsurePayload(
       `[TOOL_LOCKDOWN_UNSUPPORTED] ${options.agentId}: the supervisor daemon cannot launch a tool-less runtime`
     );
   }
+  if (options.toolAccess === 'read-only') {
+    throw new Error(
+      `[TOOL_READ_ONLY_UNSUPPORTED] ${options.agentId}: the supervisor daemon cannot launch a read-only runtime`
+    );
+  }
   return {
     agentId: options.agentId!,
     manifestAgentId: options.manifestAgentId,
