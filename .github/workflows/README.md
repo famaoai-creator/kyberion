@@ -154,7 +154,7 @@ report changes, and left alone when it is unchanged.
 2. `pnpm build`
 3. `pnpm lint`
 4. `pnpm typecheck`
-5. capability discovery validation via `node dist/scripts/capability_discovery.js`
+5. capability discovery validation via `node dist/scripts/capability/capability_discovery.js`
 6. runtime surface manifest/status validation via `node dist/scripts/surface/surface_runtime.js --action status`
 7. smoke/unit/integration tests
 8. security audit

@@ -32,7 +32,7 @@ describe('Runtime surface operations contract', () => {
     expect(pkg.scripts['build:repo']).toContain('scripts/build_repository.ts repo');
     expect(read('docs/INITIALIZATION.md')).toContain('pnpm surfaces reconcile');
     expect(pkg.scripts.dashboard).toBe(
-      'node scripts/run_built.mjs dist/scripts/sovereign_dashboard.js'
+      'node scripts/run_built.mjs dist/scripts/sovereign/sovereign_dashboard.js'
     );
     expect(pkg.scripts['dashboard:onboarding']).toBeUndefined();
   });
@@ -48,7 +48,7 @@ describe('Runtime surface operations contract', () => {
   });
 
   it('mentions runtime surfaces in the operator dashboard and onboarding next steps', () => {
-    const dashboard = read('scripts/sovereign_dashboard.ts');
+    const dashboard = read('scripts/sovereign/sovereign_dashboard.ts');
     const onboarding = read('scripts/onboarding/onboarding_wizard.ts');
     const operatorGuide = read('docs/OPERATOR_UX_GUIDE.md');
     expect(dashboard).toContain('ONBOARDING HOME');

@@ -875,7 +875,7 @@ A `*.volatile.json` file co-located with each volatile Markdown surface. Holds m
 
 ### Capability Discovery
 
-`scripts/capability_discovery.ts`, which inspects actuator manifests and environment compatibility.
+`scripts/capability/capability_discovery.ts`, which inspects actuator manifests and environment compatibility.
 
 ### Mission Journal
 

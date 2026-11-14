@@ -93,7 +93,7 @@ export const DAEMON_SPECS: Record<string, DaemonServiceSpec> = {
   'daemon-watchdog': {
     id: 'daemon-watchdog',
     label: 'com.kyberion.daemon-watchdog',
-    daemonScript: 'dist/scripts/daemon_watchdog.js',
+    daemonScript: 'dist/scripts/daemon/daemon_watchdog.js',
     logBaseName: 'kyberion-daemon-watchdog',
     verificationHint: 'ops alerts: active/shared/observability/ops-alerts.jsonl',
     startIntervalSec: 300,

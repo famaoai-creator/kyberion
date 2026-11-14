@@ -1,6 +1,6 @@
 {
   "$schema": "../schemas/role-assumption-unresolved-baseline.schema.json",
-  "description": "Per-system-role ratchets checked by the role-assumption-reachability gate (scripts/analyze_role_assumptions.ts): reachable unresolved (\"any role\") role-assumption sites (unresolved_sites) and child-process entries that inherit SYSTEM_ROLE (child_process_entries). A role fails when its count rises above its number, and the gate warns when the count falls below it — lower it then. Regenerate with `node --import ./scripts/ts-loader.mjs scripts/analyze_role_assumptions.ts --print-unresolved-baseline > knowledge/product/governance/role-assumption-unresolved-baseline.json`.",
+  "description": "Per-system-role ratchets checked by the role-assumption-reachability gate (scripts/analyze/analyze_role_assumptions.ts): reachable unresolved (\"any role\") role-assumption sites (unresolved_sites) and child-process entries that inherit SYSTEM_ROLE (child_process_entries). A role fails when its count rises above its number, and the gate warns when the count falls below it — lower it then. Regenerate with `node --import ./scripts/ts-loader.mjs scripts/analyze/analyze_role_assumptions.ts --print-unresolved-baseline > knowledge/product/governance/role-assumption-unresolved-baseline.json`.",
   "unresolved_sites": {
     "chronos_mirror_v2": 0,
     "computer_surface": 50,

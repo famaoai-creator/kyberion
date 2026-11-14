@@ -38,7 +38,7 @@ branch `feat/cli-reliability-20261031` (base `bfefd82b5`)、計画
 
 `2321b0f9b` (R03) は他 ticket の成果物を取り込んでいる:
 
-- `scripts/context_ranker.ts` の実装 (`parseRankArgs`、positional alias、
+- `scripts/context/context_ranker.ts` の実装 (`parseRankArgs`、positional alias、
   `--limit`/usage 検証、harness `flags: ['json']` による stdout 単一 JSON) は
   **R09** の成果 — R09 自身の commit `055e6aa35` は test 整形のみを保持。
 - `tests/confidential-organization-lifecycle.test.ts` は **R01** の contract

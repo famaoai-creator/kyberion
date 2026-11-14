@@ -137,7 +137,7 @@ describe('check_event_wiring', () => {
     it('heartbeat を出すが監視対象でない daemon を検出する', () => {
       const violations = checkDaemonWatchdogCoverage(
         sources({
-          'scripts/daemon_watchdog.ts': "const DEFAULT_DAEMONS = ['a-daemon'];",
+          'scripts/daemon/daemon_watchdog.ts': "const DEFAULT_DAEMONS = ['a-daemon'];",
           'scripts/b_daemon.ts': "recordDaemonHeartbeat('b-daemon', { status: 'running' });",
         })
       );
@@ -147,7 +147,7 @@ describe('check_event_wiring', () => {
     it('heartbeat を全く出さない daemon スクリプトを検出する', () => {
       const violations = checkDaemonWatchdogCoverage(
         sources({
-          'scripts/daemon_watchdog.ts': 'const DEFAULT_DAEMONS = [];',
+          'scripts/daemon/daemon_watchdog.ts': 'const DEFAULT_DAEMONS = [];',
           'scripts/silent_daemon.ts': 'while (true) {}',
         })
       );

@@ -7,7 +7,7 @@ const graphConsumerPaths = [
   'libs/core/mission/mission-workitem-dispatch.ts',
   'libs/core/mission/mission-work-reconciliation.ts',
   'libs/core/agent/coordinated-agent-execution-port.ts',
-  'scripts/sovereign_dashboard.ts',
+  'scripts/sovereign/sovereign_dashboard.ts',
 ];
 
 describe('Work Graph i18n boundary', () => {

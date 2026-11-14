@@ -159,7 +159,7 @@ export function collectUiUxGovernanceReport(now = new Date()): UiUxGovernanceRep
     }
   }
 
-  const dashboardPath = 'scripts/sovereign_dashboard.ts';
+  const dashboardPath = 'scripts/sovereign/sovereign_dashboard.ts';
   const dashboardSource = readUiUxGovernanceTextFile(pathResolver.rootResolve(dashboardPath));
   const rendererUses = dashboardSource.match(/renderStatus\s*\(/gu)?.length ?? 0;
   if (rendererUses < 5) {

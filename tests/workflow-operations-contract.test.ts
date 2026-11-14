@@ -105,7 +105,7 @@ describe('Workflow operations contract', () => {
     expect(ci).toContain('uses: ./.github/actions/setup-kyberion');
     expect(setupAction).toContain('pnpm install --frozen-lockfile');
     expect(ci).toContain('pnpm run check:commit-subject');
-    expect(ci).toContain('node dist/scripts/capability_discovery.js');
+    expect(ci).toContain('node dist/scripts/capability/capability_discovery.js');
     expect(ci).toContain('node dist/scripts/surface/surface_runtime.js --action status');
     expect(ci).toContain(
       'node dist/scripts/vital/vital_check.js --format json --exit-on-missing=false'

@@ -98,7 +98,7 @@
   ],
   "scripts": [
     {
-      "id": "scripts/context_pack.ts",
+      "id": "scripts/context/context_pack.ts",
       "reason": "CLI entrypoint for agent fast-context provisioning (pnpm kyberion context pack)."
     },
     {

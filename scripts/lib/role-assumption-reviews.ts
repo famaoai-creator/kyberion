@@ -1,5 +1,5 @@
 /**
- * RN-02 hand-reviewed data-flow facts for scripts/analyze_role_assumptions.ts.
+ * RN-02 hand-reviewed data-flow facts for scripts/analyze/analyze_role_assumptions.ts.
  * Every entry names why the reference graph cannot see the fact and, for an
  * infeasibility, the test that pins it. A site missing here stays an
  * "any role" site in the report.

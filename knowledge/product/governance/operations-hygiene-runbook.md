@@ -249,7 +249,7 @@ availability must check the launcher and any declared healthcheck, rather than
 equating a registered launch plan with readiness.
 
 Procedure: follow [tool runtime registration](./tool-runtimes/README.md), then
-run `scripts/tool_runtime_setup.test.ts`,
+run `scripts/tool/tool_runtime_setup.test.ts`,
 `libs/core/tool/tool-runtime-registry.test.ts` and
 `libs/core/media/media-backend-registry.test.ts`. These gates cover scoped Python
 installation, platform refusal, failed-install evidence and unavailable media
@@ -2040,7 +2040,7 @@ empty string may clear a field. Re-observe after a rejected reference or timeout
 For terminal operations, retain the session ID and command exit code, and return
 missing-session or unsupported-capability diagnostics instead of false success.
 
-**Gate.** Run `scripts/actuator_playground.test.ts`, `libs/core/harnessing/cli-utils.test.ts`,
+**Gate.** Run `scripts/actuator/actuator_playground.test.ts`, `libs/core/harnessing/cli-utils.test.ts`,
 the browser and terminal actuator tests, and `libs/core/shell/pty-engine.resize.test.ts`.
 Replay `scripts/browser/browser_actuator_usability_probe.ts` and
 `scripts/terminal/terminal_actuator_usability_probe.ts` for live outcomes and recovery.
@@ -2706,8 +2706,8 @@ the entire system actuator into the scheduled generation path or add broad role
 grants to compensate. After changing imports or child environments, run the
 `role-assumption-reachability` gate (`pnpm check -- --only role-assumption-reachability`;
 it computes reachability in memory and fails on any reachable role the policy does not
-grant) and both `scripts/analyze_role_assumptions.test.ts` and
-`scripts/analyze_role_assumptions.contract.test.ts`. The analyzer must resolve
+grant) and both `scripts/analyze/analyze_role_assumptions.test.ts` and
+`scripts/analyze/analyze_role_assumptions.contract.test.ts`. The analyzer must resolve
 shorthand environment properties to their value declarations before deciding
 whether the child inherits its parent's system role.
 

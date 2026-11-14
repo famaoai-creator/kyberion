@@ -193,7 +193,7 @@ export function checkReflexDispatcherBinding(sources: EventWiringSources): strin
  * duration of the outage.
  */
 export function checkDaemonWatchdogCoverage(sources: EventWiringSources): string[] {
-  const watchdogFile = 'scripts/daemon_watchdog.ts';
+  const watchdogFile = 'scripts/daemon/daemon_watchdog.ts';
   const watchdog = sources.files[watchdogFile];
   if (!watchdog) return [`${watchdogFile}: missing — no daemon is being watched`];
 

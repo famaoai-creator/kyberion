@@ -20,7 +20,7 @@ describe('Customer onboarding contract', () => {
     // SX: the help renderer was split out of scripts/cli.ts into
     // scripts/cli-presentation.ts; the cli still owns the entrypoint.
     const cliPresentation = read('scripts/cli-presentation.ts');
-    const dashboard = read('scripts/sovereign_dashboard.ts');
+    const dashboard = read('scripts/sovereign/sovereign_dashboard.ts');
     const localDev = read('docs/developer/LOCAL_DEV.md');
 
     expect(wizard).toContain('Set up a stance (act as another entity) now?');

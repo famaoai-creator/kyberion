@@ -285,7 +285,7 @@ describe('cli-reliability smoke — fixture-free negatives and help', () => {
       const result = await runCliCase(
         root,
         'script-entry',
-        ['dist/scripts/context_ranker.js', '--bogus', '--json'],
+        ['dist/scripts/context/context_ranker.js', '--bogus', '--json'],
         { timeoutMs: 60_000 }
       ).finally(() => removeCaseRoot(root));
       expect(result.timedOut).toBe(false);

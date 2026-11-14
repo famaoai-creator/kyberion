@@ -32,7 +32,7 @@ describe('Release operations contract', () => {
       '"release:notes": "node scripts/run_built.mjs dist/scripts/extract_changelog_section.js"'
     );
     expect(packageJson).toContain(
-      '"release:source-archive": "node --import ./scripts/ts-loader.mjs scripts/source_archive.ts"'
+      '"release:source-archive": "node --import ./scripts/ts-loader.mjs scripts/source/source_archive.ts"'
     );
     expect(packageJson).not.toContain('"release:install-smoke"');
     // SX-05: the TypeScript entrypoint runner was unified on the ts-loader

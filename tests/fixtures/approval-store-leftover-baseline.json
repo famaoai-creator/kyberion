@@ -32,7 +32,7 @@
     "scripts/personal-pads/actions.test.ts",
     "scripts/personal-pads/plugin-views.test.ts",
     "scripts/personal-workbench/server.test.ts",
-    "scripts/plugin_install.test.ts",
+    "scripts/plugin/plugin_install.test.ts",
     "scripts/run_pipeline.test.ts",
     "tests/channel-surface-agent.test.ts"
   ]

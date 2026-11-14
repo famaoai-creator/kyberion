@@ -54,7 +54,7 @@ const DIRECT_CALLERS: Record<string, LookupCategory> = {
   // Gate proofs must refuse hidden/ambiguous missions rather than skip evidence.
   'libs/core/mission/refactoring-evidence.ts': 'lifecycle',
   'libs/core/workforce/work-inventory-promotion.ts': 'lifecycle',
-  'scripts/background_review_mission_e2e.ts': 'lifecycle',
+  'scripts/background/background_review_mission_e2e.ts': 'lifecycle',
   'scripts/backup.ts': 'lifecycle',
   'scripts/export_validation_bundle.ts': 'lifecycle',
   'scripts/mission-alignment-gate/serve-brief.ts': 'lifecycle',

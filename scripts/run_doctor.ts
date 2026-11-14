@@ -70,7 +70,7 @@ import {
   formatAppPreflightReport,
   runAppPreflight,
   type AppPreflightReport,
-} from './app_preflight.js';
+} from './app/app_preflight.js';
 
 // The repo-build probe must judge on the same input-set/emit basis as
 // `pnpm run check` — install the canonical compiler-outputs inspector.

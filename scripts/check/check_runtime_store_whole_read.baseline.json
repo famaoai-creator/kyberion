@@ -94,7 +94,7 @@
     "scripts/audit/audit_mirror_reconcile.ts": 1,
     "scripts/check/check_plugin_views_e2e.ts": 1,
     "scripts/decisions.ts": 1,
-    "scripts/egress_warn_report.ts": 1,
+    "scripts/egress/egress_warn_report.ts": 1,
     "scripts/export_validation_bundle.ts": 1,
     "scripts/intent.ts": 1,
     "scripts/intent/intent_trace.ts": 1,

@@ -650,7 +650,7 @@ async function scenario(
 
   for (const required of [
     `${CHRONOS_DIR}/.next/BUILD_ID`,
-    'dist/scripts/plugin_install.js',
+    'dist/scripts/plugin/plugin_install.js',
     'dist/scripts/kyberion_home.js',
   ]) {
     if (!safeExistsSync(pathResolver.rootResolve(required))) {

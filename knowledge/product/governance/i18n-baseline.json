@@ -103,7 +103,7 @@
       "libs/core/provider/apple-intelligence-bridge.ts": 1,
       "libs/core/surface/surface-auth-routes.ts": 2,
       "libs/core/surface/surface-login-pages.ts": 2,
-      "scripts/capture_surface_screenshots.ts": 2,
+      "scripts/capture/capture_surface_screenshots.ts": 2,
       "scripts/check/check_plugin_views_e2e.ts": 1,
       "satellites/voice-hub/reply-text.ts": 3,
       "satellites/voice-hub/speech-synthesis.ts": 2,

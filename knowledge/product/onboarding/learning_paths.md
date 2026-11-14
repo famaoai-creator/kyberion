@@ -31,7 +31,7 @@ Kyberion エコシステムへ参加するメンバーが、それぞれの役�
 
 - **Step 1: 観測**
   - `work/metrics/`（`execution-metrics.jsonl` / `resource-usage.jsonl`）のデータ構造理解。テナント／confidential の使用量と実行メトリクスは `active/shared/runtime/usage-ledger/<tier>/<tenant|shared>/` と `active/shared/runtime/execution-metrics/<tier>/<tenant|shared>/` に分割保存され、読み取りは knowledge 階層と同じペルソナ規則に従う（[runtime-storage-layout](../architecture/runtime-storage-layout.md)）
-  - `pnpm dashboard`（`scripts/sovereign_dashboard.ts`）の実行と分析
+  - `pnpm dashboard`（`scripts/sovereign/sovereign_dashboard.ts`）の実行と分析
 - **Step 2: 改善**
   - `pnpm check` の静的ゲートと TODO/FIXME スキャンによる技術負債の定量的評価
   - リバウンドレシピ (`knowledge/product/orchestration/remediation-recipes.json`) の更新

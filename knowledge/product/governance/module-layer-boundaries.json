@@ -253,7 +253,7 @@
     },
     {
       "layer": "orchestration",
-      "pattern": "scripts/background_review_mission_e2e.ts"
+      "pattern": "scripts/background/background_review_mission_e2e.ts"
     },
     {
       "layer": "orchestration",

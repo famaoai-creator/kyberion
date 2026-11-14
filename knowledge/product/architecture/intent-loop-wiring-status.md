@@ -92,7 +92,7 @@ Other `not implemented` markers are intentional/deferred, not this bug class: pl
 
 Integration was tool-level (MCP) plus soft-prompt. The stronger integration point is governance at the tool lifecycle via hooks. Added a Claude Code plugin under `plugins/kyberion-claude-code/` with plugin manifest, hooks, MCP config, and commands.
 
-Hook logic lives in `libs/core/provider/claude-code-hook.ts`, with `scripts/claude_code_hook.ts` as the stdin/stdout CLI:
+Hook logic lives in `libs/core/provider/claude-code-hook.ts`, with `scripts/claude/claude_code_hook.ts` as the stdin/stdout CLI:
 
 - **PreToolUse** gates protected-tier writes (`personal`/`confidential`) through `validateWritePermission`; public/source/tmp paths pass.
 - **PostToolUse** records Claude-Code-initiated tool activity into the audit chain.

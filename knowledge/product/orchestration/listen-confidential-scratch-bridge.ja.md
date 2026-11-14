@@ -125,7 +125,7 @@ bridge 内 guard) を `withExecutionContextAsync(<role>, fn, 'worker', tenantSlu
   `active/shared/staging/confidential/${KYBERION_TENANT}/` (必要なら personal 同型) の
   allow_read/allow_write + `role-assumption-policy.json shared_core_roles` への登録 +
   `role-assumption-reachability` gate の通過
-  (`scripts/analyze_role_assumptions.ts` がメモリ上で到達可能 role を計算し、未許可なら失敗)。
+  (`scripts/analyze/analyze_role_assumptions.ts` がメモリ上で到達可能 role を計算し、未許可なら失敗)。
   可能なら dedicated store role と同じ `currentResourceAccessScope` exact
   capability 縛りにすると grant の濫用面が最小。
 - **触る境界**: security-policy.json / role-assumption-policy.json / authority-roles/
