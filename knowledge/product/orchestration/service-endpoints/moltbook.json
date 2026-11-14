@@ -7,7 +7,7 @@
       "credential_suffixes": {
         "accessToken": ["API_KEY"]
       },
-      "auth_strategy": "bearer"
+      "auth_strategy": "Bearer"
     }
   }
 }

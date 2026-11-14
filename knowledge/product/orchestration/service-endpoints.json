@@ -52,6 +52,10 @@
     "confluence": {
       "base_url": "https://{{domain}}.atlassian.net/wiki/api/v2",
       "preset_path": "knowledge/product/orchestration/service-presets/confluence.json",
+      "credential_suffixes": {
+        "clientId": ["EMAIL"],
+        "clientSecret": ["TOKEN", "API_TOKEN"]
+      },
       "auth_strategy": "basic"
     },
     "discord": {
@@ -96,8 +100,12 @@
       "auth_strategy": "session"
     },
     "jira": {
-      "base_url": "https://atlassian.net/rest/api/3",
+      "base_url": "https://{{domain}}.atlassian.net/rest/api/3",
       "preset_path": "knowledge/product/orchestration/service-presets/jira.json",
+      "credential_suffixes": {
+        "clientId": ["EMAIL"],
+        "clientSecret": ["API_TOKEN"]
+      },
       "auth_strategy": "basic"
     },
     "linear": {
@@ -127,7 +135,7 @@
       "credential_suffixes": {
         "accessToken": ["API_KEY"]
       },
-      "auth_strategy": "bearer"
+      "auth_strategy": "Bearer"
     },
     "notion": {
       "base_url": "https://api.notion.com/v1",
@@ -232,6 +240,10 @@
     "zendesk": {
       "base_url": "https://{{subdomain}}.zendesk.com/api/v2",
       "preset_path": "knowledge/product/orchestration/service-presets/zendesk.json",
+      "credential_suffixes": {
+        "clientId": ["EMAIL"],
+        "clientSecret": ["TOKEN", "API_TOKEN"]
+      },
       "auth_strategy": "basic"
     }
   }

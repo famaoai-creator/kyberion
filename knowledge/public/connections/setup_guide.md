@@ -62,11 +62,47 @@ pnpm kyberion secret introduce <serviceId> <secretKey>
 
 ```json
 {
-  "host": "https://your-domain.atlassian.net",
+  "domain": "your-domain",
   "email": "user@example.com",
   "api_token": "your-api-token"
 }
 ```
+
+`domain` は `your-domain.atlassian.net` のサブドメイン部分だけを書きます（`https://` やドメイン全体は不要）。Atlassian の Basic 認証は `email:api_token` ペアなので `email` も必須です。`api_token` は `pnpm kyberion secret introduce jira API_TOKEN` での登録が正規ルートです（接続ファイルへの直書きはフォールバックとして機能します）。
+
+### Confluence (`confluence.json`)
+
+```json
+{
+  "domain": "your-domain",
+  "email": "user@example.com",
+  "token": "your-api-token"
+}
+```
+
+`domain` は `your-domain.atlassian.net` のサブドメイン部分。トークンは `pnpm kyberion secret introduce confluence TOKEN` が正規ルートです。
+
+### Zendesk (`zendesk.json`)
+
+```json
+{
+  "subdomain": "your-subdomain",
+  "email": "user@example.com/token",
+  "token": "your-api-token"
+}
+```
+
+Zendesk の API トークン Basic 認証はユーザー部が `email/token` 形式です（`email` フィールドに `/token` を付けてください）。トークンは `pnpm kyberion secret introduce zendesk TOKEN` が正規ルートです。
+
+### Backlog (`backlog.json`)
+
+```json
+{
+  "space": "your-space"
+}
+```
+
+`space` は `your-space.backlog.com` のスペース名。API キーは `pnpm kyberion secret introduce backlog API_KEY` で登録します。
 
 ### Box (`box.json`)
 
