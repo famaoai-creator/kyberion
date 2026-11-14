@@ -592,6 +592,17 @@ function validateLocalAccountMaterial(material: unknown): Record<string, string>
   return { ...values } as Record<string, string>;
 }
 
+function writeLocalAccountEnvelope(
+  file: string,
+  envelope: ReturnType<typeof encryptConnectionDocument>,
+  createOnly = false
+): void {
+  safeWriteFile(file, JSON.stringify(envelope) + '\n', {
+    mode: 0o600,
+    ...(createOnly ? { createOnly: true } : {}),
+  });
+}
+
 /**
  * Internal storage primitive. Always encrypted with the existing key, regardless
  * of the legacy plaintext setting. Creates an immutable generation, no latest
@@ -624,7 +635,7 @@ export function storeLocalAccountMaterial(
     },
     { createKeyIfMissing: false }
   );
-  safeWriteFile(fullPath, JSON.stringify(envelope) + '\n', { mode: 0o600, createOnly: true });
+  writeLocalAccountEnvelope(fullPath, envelope, true);
   for (const [key, value] of Object.entries(values)) _rememberActiveSecret(key, value);
   return reference;
 }
@@ -649,6 +660,74 @@ export function loadLocalAccountMaterial(
   const material = validateLocalAccountMaterial(document.material);
   for (const [key, value] of Object.entries(material)) _rememberActiveSecret(key, value);
   return material;
+}
+
+/** Registration progress is separate from material and never grants runtime use. */
+export interface LocalAccountRegistrationState {
+  generation: string | null;
+  pendingApprovalId?: string;
+}
+
+function localAccountRegistrationPath(identity: LocalAccountMaterialIdentity): string {
+  const account = createHash('sha256').update(localAccountMaterialIdentity(identity)).digest('hex');
+  return safeSecretPath(
+    path.join(PERSONAL_CONNECTIONS_DIR, 'accounts', account, 'registration.json')
+  );
+}
+
+function validateLocalAccountRegistration(value: unknown): LocalAccountRegistrationState {
+  const state = parseSafeJsonObjectValue(value, 'account registration');
+  if (
+    Object.keys(state).some((key) => !['generation', 'pendingApprovalId'].includes(key)) ||
+    (state.generation !== null &&
+      (typeof state.generation !== 'string' ||
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(
+          state.generation
+        ))) ||
+    (state.pendingApprovalId !== undefined &&
+      (typeof state.pendingApprovalId !== 'string' ||
+        !/^[A-Za-z0-9._-]{1,160}$/.test(state.pendingApprovalId)))
+  )
+    throw new Error('[ACCOUNT_MATERIAL_INVALID] Invalid registration state');
+  return state as unknown as LocalAccountRegistrationState;
+}
+
+export function loadLocalAccountRegistration(
+  identity: LocalAccountMaterialIdentity
+): LocalAccountRegistrationState {
+  assertLocalAccountMaterialAccess();
+  const file = localAccountRegistrationPath(identity);
+  if (!safeExistsSync(file)) return { generation: null };
+  const raw = readSensitiveJson<unknown>(file);
+  if (!isEncryptedConnectionEnvelope(raw))
+    throw new Error('[ACCOUNT_MATERIAL_INVALID] Encrypted registration required');
+  const document = decryptConnectionDocument(raw);
+  if (
+    document.kind !== 'local-account-registration' ||
+    document.version !== 1 ||
+    document.account !== localAccountMaterialIdentity(identity)
+  )
+    throw new Error('[ACCOUNT_MATERIAL_INVALID] Registration identity mismatch');
+  return validateLocalAccountRegistration(document.state);
+}
+
+/** Caller holds the binding lock. A persisted pending id fences incomplete external writes. */
+export function storeLocalAccountRegistration(
+  identity: LocalAccountMaterialIdentity,
+  state: LocalAccountRegistrationState
+): void {
+  assertLocalAccountMaterialAccess();
+  const envelope = encryptConnectionDocument(
+    {
+      kind: 'local-account-registration',
+      version: 1,
+      account: localAccountMaterialIdentity(identity),
+      state: validateLocalAccountRegistration(state),
+    },
+    { createKeyIfMissing: false }
+  );
+  writeLocalAccountEnvelope(localAccountRegistrationPath(identity), envelope);
+  safeFsyncFile(localAccountRegistrationPath(identity));
 }
 
 function _loadGrants(): AuthGrant[] {

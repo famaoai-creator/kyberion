@@ -9,6 +9,7 @@ import type { ConciergeLocale } from '../../../lib/i18n';
 import type { Setup } from '../../../lib/settings-types';
 import { groupConnections, type ConnectionViewItem } from '../../../lib/connection-view';
 import { OperatorServiceRegistrationPanel } from './OperatorServiceRegistrationPanel';
+import { AccountIntroductionPanel } from './AccountIntroductionPanel';
 import { ServiceCatalogPane } from './ServiceCatalogPane';
 import { FormScope, type SettingsTranslate } from './form-scope';
 
@@ -178,6 +179,7 @@ function ConnectionsByOwner({ t, setup }: { t: SettingsTranslate; setup: Setup }
             <Badge label={t('settings.operator_metadata_configured')} tone="neutral" />
           )}
         </p>
+        <AccountIntroductionPanel key={item.binding_id} bindingId={item.binding_id} t={t} />
         <details>
           <summary>{t('services.connection_details')}</summary>
           <p className="kb-text kb-text--caption">
