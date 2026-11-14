@@ -419,14 +419,17 @@ export async function probeOperatorServiceConnection(input: {
         } catch {
           return response('unavailable');
         }
-        const boundSecret = binding[prepared.secretField];
-        if (!boundSecret)
-          return response(
-            prepared.strategy === 'basic' && binding.accessToken
-              ? 'credential_shadowed'
-              : 'credential_missing'
-          );
-        if (!sameSecret(candidate, boundSecret)) return response('credential_shadowed');
+        // The probe must verify the credential the request actually sends:
+        // the engine injects accessToken for non-basic strategies and prefers
+        // the client pair for basic, falling back to a pre-encoded
+        // accessToken. Verifying a resolved sibling field instead would let an
+        // ambient credential answer for a different registered secret.
+        const sentSecret =
+          prepared.strategy === 'basic' && binding.clientId && binding.clientSecret
+            ? binding.clientSecret
+            : binding.accessToken;
+        if (!sentSecret) return response('credential_missing');
+        if (!sameSecret(candidate, sentSecret)) return response('credential_shadowed');
         const capability = issueOperatorServiceProbeAdmission({
           serviceId: entry.serviceId,
           action: entry.authOperation,

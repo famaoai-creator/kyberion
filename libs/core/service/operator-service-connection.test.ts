@@ -397,6 +397,26 @@ describe('local operator service connection capability', () => {
     expect(mocks.secureFetch).not.toHaveBeenCalled();
   });
 
+  it('reports an incomplete basic pair as credential_missing, never an engine failure', async () => {
+    vi.stubEnv('JIRA_API_TOKEN', 'synthetic-jira-token');
+    mocks.loadConnectionDocument.mockReturnValue({
+      api_token: 'synthetic-jira-token',
+      domain: 'example',
+    });
+    expect(await probe('jira')).toMatchObject({ status: 'credential_missing' });
+    expect(mocks.secureFetch).not.toHaveBeenCalled();
+  });
+
+  it('verifies the credential the request sends, never a resolved sibling', async () => {
+    vi.stubEnv('JIRA_TOKEN', 'ambient-preencoded');
+    mocks.loadConnectionDocument.mockReturnValue({
+      api_token: 'synthetic-jira-token',
+      domain: 'example',
+    });
+    expect(await probe('jira')).toMatchObject({ status: 'credential_shadowed' });
+    expect(mocks.secureFetch).not.toHaveBeenCalled();
+  });
+
   it('returns only a bounded failure status with no retries or raw provider error', async () => {
     const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
     const error = vi.spyOn(logger, 'error').mockImplementation(() => undefined);
