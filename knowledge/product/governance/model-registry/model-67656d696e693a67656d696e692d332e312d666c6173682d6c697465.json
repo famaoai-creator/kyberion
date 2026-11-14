@@ -1,0 +1,22 @@
+{
+  "model_id": "gemini:gemini-3.1-flash-lite",
+  "provider": "gemini",
+  "family": "gemini-3",
+  "status": "approved",
+  "tier": "small",
+  "execution_tier": "fast",
+  "role_fit": {
+    "intent_compiler": "not_recommended",
+    "surface_agent": "primary",
+    "analysis": "secondary",
+    "coding": "secondary"
+  },
+  "cost_band": "low",
+  "latency_band": "low",
+  "structured_output_confidence": "medium",
+  "tool_use_confidence": "medium",
+  "multilingual_confidence": "high",
+  "reasoning_confidence": "medium",
+  "capability_tags": ["fast_iteration", "surface_reply", "tool_first_execution"],
+  "notes": "Gemini 3.1 Flash Lite; listed by `gemini --list-models` and already wired as the gemini-fast runtime default in provider-config.json (verified 2026-11-14)."
+}
