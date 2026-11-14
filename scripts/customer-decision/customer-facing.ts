@@ -176,6 +176,8 @@ function runView(
         ...(agenda.from ? { from: agenda.from } : {}),
         // CD-11: the date the customer is asked to answer by (UTC calendar date).
         ...(agenda.respond_by ? { respond_by: agenda.respond_by } : {}),
+        // HR-01: the hearing goal (approved with the content hash).
+        ...(agenda.objective ? { objective: agenda.objective } : {}),
         locale: agenda.locale,
         revision: agenda.revision,
       },

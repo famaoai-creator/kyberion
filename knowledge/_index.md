@@ -87,6 +87,7 @@
 - [Google Drive Ingest & Storage Adapter Model](./product/architecture/google-drive-ingest-adapter.md) (public | Ecosystem Architect)
 - [Hardening Backlog](./product/architecture/hardening-backlog.md) (public | Ecosystem Architect)
 - [Harness Adoption Plan 2026-05](./product/architecture/harness-adoption-plan-2026-05.md) (public | Ecosystem Architect)
+- [Hearing — one model for asking a person what the work needs](./product/architecture/hearing-model.md) (public | Unknown)
 - [Hermes CLI cost accounting findings and Kyberion adoption](./product/architecture/hermes-cli-cost-accounting.md) (public | Unknown)
 - [Hermes UI and UX adoption into existing Kyberion facades](./product/architecture/hermes-ui-ux-adoption-2026-10.md) (public | Unknown)
 - [Hermes additional adoption deep dive after the October runtime integration](./product/architecture/hermes-additional-adoption-deep-dive-2026-10.md) (public | Unknown)

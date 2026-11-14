@@ -1,13 +1,14 @@
 ---
 title: '顧客との調整事項ヒアリングと決定の計画 (CD-01〜13)'
 tags: [customer, hearing, decision, ai-dlc, agile, deal, invitation, plan]
-last_updated: 2026-10-28
+last_updated: 2026-11-13
 status: active
 ---
 
 # 顧客との調整事項ヒアリングと決定の計画 (CD-01〜13)
 
 - 前提: [stance-tenant-customer-model](../../../knowledge/product/architecture/stance-tenant-customer-model.md)、E2E-06 の顧客モード（`libs/core/organization/customer-conversation.ts`、`customer-conversation-modes.ts`、`customer-channel-binding.ts`）、presence-studio の hearing（`hearing-scenario-catalog.ts`、`hearing-*.ts`）、MO-11 の alignment gate（PR #1223）、公開 ingress（PR #923）、決定台帳 SSOD（[SSOD_HEARING_INTEGRATION_PLAN](../improvement-plans-2026-09/SSOD_HEARING_INTEGRATION_PLAN_2026-09-14.ja.md)、`libs/core/decision-ledger/`、`pnpm decisions`）
+- 概念の正本（2026-11-13）: ヒアリングの定義・見せ方・回答の記録の分け方と、テナントのテンプレート・目的（HR-01）は [hearing-model](../../../knowledge/product/architecture/hearing-model.md) と [ヒアリングを 1 つの概念にまとめる計画](../improvement-plans-2026-11/HEARING_UNIFICATION_PLAN_2026-11-12.ja.md) を参照。
 - 関連: [AIDLC Integration Process](../../../knowledge/product/orchestration/aidlc-integration-process.md)、`mission-workflow-catalog.json` の `code-change-aidlc`、[Front desk 依頼キュー計画](./FRONT_DESK_INTAKE_QUEUE_PLAN_2026-10-05.ja.md)
 
 ## 背景
