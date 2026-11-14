@@ -141,8 +141,8 @@ one open file (inode) even if the store is rotated or compacted mid-read.
 
 ## Gate
 
-- `runtime-store-whole-read` (`scripts/check_runtime_store_whole_read.ts`, ratchet
-  baseline `scripts/check_runtime_store_whole_read.baseline.json`) fails when a file
+- `runtime-store-whole-read` (`scripts/check/check_runtime_store_whole_read.ts`, ratchet
+  baseline `scripts/check/check_runtime_store_whole_read.baseline.json`) fails when a file
   adds a whole-file read of a JSONL store (`readJsonLines`, `readJsonLinesCached`, or a
   read-then-split in a file naming `.jsonl`). Move the reader to `jsonl-read.ts`; when a
   count drops, lower the baseline with `--write-baseline`.
@@ -152,7 +152,7 @@ one open file (inode) even if the store is rotated or compacted mid-read.
   hour: a failed parked rewrite keeps it, parked-aware readers re-read it on every call
   and agent-input-queue compaction stays skipped until it is merged back with
   `pnpm kyberion storage recover-compaction-copies` (dry-run; approval-gated apply).
-- `scripts/check_runtime_store_retention.ts` fails when source introduces an
+- `scripts/check/check_runtime_store_retention.ts` fails when source introduces an
   undeclared `active/shared/runtime/<name>` store.
 - The janitor report surfaces `uncoveredRuntimeFiles` for top-level ledgers with no
   entry; rotated segments of a declared store are covered by their stem and never

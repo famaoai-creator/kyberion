@@ -257,7 +257,7 @@
     },
     {
       "layer": "orchestration",
-      "pattern": "scripts/browser_bridge_host.ts"
+      "pattern": "scripts/browser/browser_bridge_host.ts"
     },
     {
       "layer": "orchestration",
@@ -277,7 +277,7 @@
     },
     {
       "layer": "orchestration",
-      "pattern": "scripts/agent_runtime_supervisor_daemon.ts"
+      "pattern": "scripts/agent/agent_runtime_supervisor_daemon.ts"
     },
     {
       "layer": "orchestration",
@@ -289,27 +289,27 @@
     },
     {
       "layer": "orchestration",
-      "pattern": "scripts/dot_charters.ts"
+      "pattern": "scripts/dot/dot_charters.ts"
     },
     {
       "layer": "orchestration",
-      "pattern": "scripts/dot_executor_step.ts"
+      "pattern": "scripts/dot/dot_executor_step.ts"
     },
     {
       "layer": "orchestration",
-      "pattern": "scripts/dot_supervisor_extensions.ts"
+      "pattern": "scripts/dot/dot_supervisor_extensions.ts"
     },
     {
       "layer": "orchestration",
-      "pattern": "scripts/dot_org_cadence_step.ts"
+      "pattern": "scripts/dot/dot_org_cadence_step.ts"
     },
     {
       "layer": "orchestration",
-      "pattern": "scripts/check_seam_multiplicity.ts"
+      "pattern": "scripts/check/check_seam_multiplicity.ts"
     },
     {
       "layer": "orchestration",
-      "pattern": "scripts/generate_capability_seams.ts"
+      "pattern": "scripts/generate/generate_capability_seams.ts"
     },
     {
       "layer": "orchestration",

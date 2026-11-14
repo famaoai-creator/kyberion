@@ -8,12 +8,12 @@ import {
 } from '@agent/core/surface/surface-runtime';
 import { setupSurfaces } from './surface_runtime.js';
 import { setupServices } from './services_setup.js';
-import { runReasoningSetup } from './reasoning_setup.js';
+import { runReasoningSetup } from './reasoning/reasoning_setup.js';
 import { collectDoctorReport } from './run_doctor.js';
 import { buildVitalReport } from './vital_check.js';
 import { defineScript, isDirectScript } from './lib/harness.js';
 import { formatSetupSummaryLine } from './setup-report-format.js';
-import { inspectResidentServices } from './reconcile_resident_services.js';
+import { inspectResidentServices } from './reconcile/reconcile_resident_services.js';
 import type { ResidentServicesPlan } from '@agent/core/daemon/resident-services';
 export {
   formatSetupHintLine,

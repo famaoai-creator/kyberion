@@ -21,7 +21,7 @@ export const TEST_SUITES = {
   ],
   'ui-voice-browser-smoke': [
     'tests/voice-browser-smoke-contract.test.ts',
-    'scripts/check_first_win_smoke.test.ts',
+    'scripts/check/check_first_win_smoke.test.ts',
     'libs/actuators/meeting-actuator/src/index.test.ts',
   ],
   actuators: ['libs/actuators/'],

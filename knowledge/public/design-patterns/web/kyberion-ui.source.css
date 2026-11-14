@@ -1,6 +1,6 @@
 /* Kyberion UI component contract (A2UI catalog `kyberion-base`, UI-02).
  *
- * Authored source. `scripts/generate_design_tokens.ts` stamps it (plus the
+ * Authored source. `scripts/generate/generate_design_tokens.ts` stamps it (plus the
  * generated status-tone rules) into each surface as `kyberion-ui.css`.
  * Rules:
  *   - Colors, radii, spacing and type sizes come only from `--kb-ui-*`
@@ -8,7 +8,7 @@
  *   - No glass or blur; shadows stay subtle. Gradients are allowed only through
  *     `--kb-ui-gradient-accent` (primary controls), which is `none` unless a KDS v2
  *     style opts in (`surface_gradient`); its stops are derived so the button ink
- *     keeps 4.5:1 on every stop (scripts/check_design_contrast.ts).
+ *     keeps 4.5:1 on every stop (scripts/check/check_design_contrast.ts).
  *   - A KDS v2 style (`[data-kds-style]` on <html>, see the UI token block) may
  *     re-declare the same `--kb-ui-*` tokens and `--kb-ui-font-heading`;
  *     components never branch on the style itself.

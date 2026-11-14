@@ -8,7 +8,7 @@ import {
   safeWriteFile,
 } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
-import { findSourceShadows } from '../scripts/check_source_shadows.js';
+import { findSourceShadows } from '../scripts/check/check_source_shadows.js';
 import { runClean } from '../scripts/clean.js';
 import {
   OWNED_BUILD_DIRECTORIES,

@@ -10,8 +10,8 @@ import { parseJsonProbeOutput, runServicePreflight } from '@agent/core/service/s
 import * as bootstrapCli from './company_bootstrap.js';
 import * as onboardingCli from './company_onboarding.js';
 import * as probeCli from './tenant_activation_probe.js';
-import * as registryCli from './check_tenant_registry_consistency.js';
-import * as serviceCli from './service_preflight.js';
+import * as registryCli from './check/check_tenant_registry_consistency.js';
+import * as serviceCli from './service/service_preflight.js';
 
 const CORE_SERVICES = [
   'organization/company-bootstrap',

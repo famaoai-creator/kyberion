@@ -7,7 +7,7 @@ import {
   safeMkdir,
   safeWriteFile,
 } from '@agent/core';
-import { main } from '../scripts/task_init.js';
+import { main } from '../scripts/task/task_init.js';
 
 const PROFILE_PATH = pathResolver.rootResolve(
   'knowledge/personal/task-profiles/daily-email-triage.json'

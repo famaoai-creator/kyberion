@@ -18,7 +18,7 @@ const EXTRA_SYSTEM_ROLE_ENTRIES: Record<string, string[]> = {
   system_configurator: ['scripts/config_mission.ts', 'scripts/run_pipeline.ts'],
   // Governed dot lifecycle worker: Concierge's /api/ops/workspace/autonomy
   // dispatches pause / resume / activate to the dot CLI under this role (D3).
-  dot_lifecycle_worker: ['scripts/dot_lifecycle_worker.ts'],
+  dot_lifecycle_worker: ['scripts/dot/dot_lifecycle_worker.ts'],
   // Read-only customer-decision facade child of Concierge's /api/ops/customer-decisions
   // routes (overview | case | learning), spawned under its own role.
   customer_decision_reader: ['scripts/customer_decision_overview.ts'],

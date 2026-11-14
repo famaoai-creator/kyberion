@@ -144,7 +144,7 @@ local STT model.
 
 ```bash
 # Google Meet
-MISSION_ROLE=mission_controller node dist/scripts/meeting_participate.js \
+MISSION_ROLE=mission_controller node dist/scripts/meeting/meeting_participate.js \
   --mission MSN-MTG-LIVE-TEST --meeting-url https://meet.google.com/xxx-xxxx-xxx \
   --platform meet --driver chrome-extension --transport-mode transcribe_first \
   --display-name "Kyberion" --extension-join-timeout-sec 120 --skip-bootstrap-check

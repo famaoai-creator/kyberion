@@ -229,7 +229,7 @@ export async function tickFirstJob(tenant: string) {
   const { runFrontDeskExecutionIntake } = await import('@agent/core/surface/front-desk-execution');
   const { createFirstJobTenantStatusAssertion } =
     await import('./onboarding_first_job_tenant_status.js');
-  const { runDotExecutorStep } = await import('./dot_executor_step.js');
+  const { runDotExecutorStep } = await import('./dot/dot_executor_step.js');
   const { readFirstJobTickStatus, summarizeFirstJobTick } =
     await import('./onboarding_first_job_tick_status.js');
   const assertTenant = createFirstJobTenantStatusAssertion(loaded.charter, plan.mapping);

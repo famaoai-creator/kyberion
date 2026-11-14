@@ -267,7 +267,7 @@ Rules:
   AA-safe tone used whenever accent-colored text is rendered.
 - `kyberion-standard` / `kyberion-sovereign` entries are **generated** from
   `design-patterns/brand-tokens/kyberion.json` via
-  `scripts/generate_design_tokens.ts` — edit the brand tokens, not the theme
+  `scripts/generate/generate_design_tokens.ts` — edit the brand tokens, not the theme
   entries.
 
 ## Deterministic design QA

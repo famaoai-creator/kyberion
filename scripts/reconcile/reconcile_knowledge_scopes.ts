@@ -1,0 +1,139 @@
+#!/usr/bin/env node
+/** KO-19: weekly tenant-scope reconciliation and steward-facing report. */
+import { listTenantProfileSlugs } from '@agent/core/organization/tenant-registry';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeWriteFile } from '@agent/core/secure-io';
+import { sendOpsAlert } from '@agent/core/ops-alert';
+import { withExecutionContextAsync } from '@agent/core/authority';
+import type { ScopeContext } from '@agent/core/scope-context';
+import { getRegisteredEnvText, nowIso } from '@agent/core/foundation';
+import { runKnowledgeValidationSweep } from '@agent/core/report-ops';
+import { proposeKnowledgeRankingWeightRecalculation } from '@agent/core/knowledge/knowledge-weight-recalculation';
+import { buildPlan } from '../migrate_physical_namespaces.js';
+import { scanKnowledgeScopeHealth, buildHealthAlert } from '../watch_knowledge_scope_health.js';
+import { scan as scanKnowledgeScopeBoundaries } from '../check/check_knowledge_scope_boundaries.js';
+import {
+  scan as scanTierHygiene,
+  type Violation as TierHygieneViolation,
+} from '../check/check_tier_hygiene.js';
+import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
+import { guardCliArgs, type CliGuardSpec } from '../lib/cli-guard.js';
+
+export interface KnowledgeScopeReconciliationReport {
+  generated_at: string;
+  status: 'healthy' | 'attention';
+  health: ReturnType<typeof scanKnowledgeScopeHealth>;
+  migration_plans: Array<ReturnType<typeof buildPlan>>;
+  validation: ReturnType<typeof runKnowledgeValidationSweep>;
+  weight_proposals: Array<ReturnType<typeof proposeKnowledgeRankingWeightRecalculation>>;
+  semantic_findings: string[];
+  tier_hygiene_findings: TierHygieneViolation[];
+}
+
+function reportPath(): string {
+  return pathResolver.rootResolve(
+    getRegisteredEnvText('KYBERION_KNOWLEDGE_SCOPE_RECONCILIATION_PATH')?.trim() ||
+      'active/shared/runtime/reports/knowledge-scope-reconciliation-latest.json'
+  );
+}
+
+export async function reconcileKnowledgeScopes(): Promise<KnowledgeScopeReconciliationReport> {
+  return withExecutionContextAsync('ecosystem_architect', async () => {
+    const health = scanKnowledgeScopeHealth({ persistHistory: true });
+    const migrationPlans = (['feedback', 'intent', 'ledger', 'promotion'] as const).map((kind) =>
+      buildPlan(kind, false)
+    );
+    const validation = runKnowledgeValidationSweep();
+    const weightProposals = listTenantProfileSlugs().flatMap((tenant) => {
+      try {
+        return [
+          proposeKnowledgeRankingWeightRecalculation({
+            scope: { tier: 'confidential', tenant_slug: tenant } satisfies ScopeContext,
+            persist: false,
+          }),
+        ];
+      } catch {
+        return [];
+      }
+    });
+    const semanticFindings = scanKnowledgeScopeBoundaries();
+    const tierHygieneFindings = await scanTierHygiene();
+    const hasMigrationAttention = migrationPlans.some((plan) =>
+      ['quarantine', 'conflict'].some(
+        (disposition) => (plan.summary.by_disposition as Record<string, number>)[disposition] > 0
+      )
+    );
+    const report: KnowledgeScopeReconciliationReport = {
+      generated_at: nowIso(),
+      status:
+        health.status === 'attention' ||
+        validation.status === 'attention' ||
+        hasMigrationAttention ||
+        semanticFindings.length > 0 ||
+        tierHygieneFindings.length > 0
+          ? 'attention'
+          : 'healthy',
+      health,
+      migration_plans: migrationPlans,
+      validation,
+      weight_proposals: weightProposals,
+      semantic_findings: semanticFindings,
+      tier_hygiene_findings: tierHygieneFindings,
+    };
+    safeWriteFile(reportPath(), `${JSON.stringify(report, null, 2)}\n`, { mkdir: true });
+    return report;
+  });
+}
+
+/** CU-01: `--help` / typos exit before the reconciliation report or ops alert is written. */
+export const KNOWLEDGE_SCOPE_RECONCILE_CLI: CliGuardSpec = {
+  command: 'pnpm kyberion knowledge scope-reconcile',
+  manifestId: 'script.knowledge.scope-reconcile',
+  options: [{ flag: '--alert' }, { flag: '--fail' }, { flag: '--json' }, { flag: '--quiet' }],
+};
+
+export const runKnowledgeScopeReconciliation = defineScript({
+  name: 'knowledge:scope-reconcile',
+  flags: ['json', 'quiet'],
+  run: async ({ argv, json, quiet, print }) => {
+    if (guardCliArgs(argv, KNOWLEDGE_SCOPE_RECONCILE_CLI, print)) return;
+    try {
+      const report = await reconcileKnowledgeScopes();
+      if (json) print(report);
+      else {
+        print(
+          `${report.status}: ${report.migration_plans.length} migration plans; report=${reportPath()}`
+        );
+      }
+      if (argv.includes('--alert') && report.status === 'attention') {
+        const receipt = sendOpsAlert({
+          ...buildHealthAlert(report.health),
+          title: 'Weekly tenant knowledge scope reconciliation requires attention',
+          context: {
+            ...report.health.summary,
+            semantic_findings: report.semantic_findings,
+            tier_hygiene_findings: report.tier_hygiene_findings,
+            validation: report.validation,
+          },
+          dedupe_key: 'knowledge-scope-reconciliation',
+        });
+        if (!quiet) print(`ops alert: ${receipt.recorded_path}`);
+      }
+      if (argv.includes('--fail') && report.status !== 'healthy') {
+        throw new ScriptExitError(1, '', true);
+      }
+    } catch (error) {
+      if (error instanceof ScriptExitError) throw error;
+      throw new ScriptExitError(
+        2,
+        `[knowledge-scope-reconciliation] fatal: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  },
+});
+
+if (
+  isDirectScript(import.meta.url, 'reconcile_knowledge_scopes.ts') ||
+  isDirectScript(import.meta.url, 'reconcile_knowledge_scopes.js')
+)
+  void runKnowledgeScopeReconciliation();

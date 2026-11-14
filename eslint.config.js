@@ -352,7 +352,7 @@ export default [
       '**/*.test.tsx',
       '**/*.spec.ts',
       'libs/core/foundation/process-env.ts',
-      'scripts/check_foundation_adoption.ts',
+      'scripts/check/check_foundation_adoption.ts',
     ],
     rules: {
       'no-restricted-syntax': [

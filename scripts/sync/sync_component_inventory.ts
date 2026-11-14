@@ -1,0 +1,478 @@
+import { format as prettierFormat, resolveConfig as resolvePrettierConfig } from 'prettier';
+import * as path from 'node:path';
+import { loadActuatorOpDiscoveryAtPath } from '@agent/core/actuator/actuator-op-discovery';
+import {
+  loadActuatorManifest,
+  type ActuatorManifestFile,
+} from '@agent/core/actuator-manifest-index';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeLstat, safeReaddir } from '@agent/core/secure-io';
+import { nowIso, parseSafeJsonObjectInput } from '@agent/core/foundation';
+import { defineGenerator, isDirectScript, type GeneratedFile } from '../lib/harness.js';
+
+interface CurrentIndexRecord {
+  n: string;
+  path: string;
+  d: string;
+  s: 'implemented';
+  version: string;
+  capability_count: number;
+  ops: string[];
+  contract_schema?: string;
+  prerequisites_summary: string;
+}
+
+interface LegacyRecord {
+  name: string;
+  path: string;
+  status: 'legacy-review';
+  package_based: boolean;
+  rationale: string;
+}
+
+const ACTUATORS_DIR = pathResolver.rootResolve('libs/actuators');
+const CURRENT_INDEX_PATH = pathResolver.knowledge(
+  'product/orchestration/global_actuator_index.json'
+);
+const SKILL_INDEX_PATH = pathResolver.knowledge('product/orchestration/global_skill_index.json');
+const LEGACY_INDEX_PATH = pathResolver.knowledge(
+  'product/orchestration/legacy_component_index.json'
+);
+const REPORT_PATH = pathResolver.knowledge('product/architecture/component-lifecycle-inventory.md');
+
+function relativeLink(sourceFile: string, targetPath: string): string {
+  return path.relative(path.dirname(sourceFile), targetPath).replace(/\\/g, '/');
+}
+const CAPABILITIES_GUIDE_PATH = pathResolver.rootResolve('CAPABILITIES_GUIDE.md');
+
+const LEGACY_RATIONALES: Record<string, string> = {
+  'daemon-actuator':
+    'Launchd-era runtime management overlaps with surface-runtime and managed process supervision.',
+  'physical-bridge':
+    'Retired 2026-05-28 → retired/actuators/physical-bridge/. Was a thin wrapper that shelled into browser/system actuators via temp files. Replaced by direct ADF orchestration.',
+};
+
+function summarizePrerequisites(manifest: ActuatorManifestFile): string {
+  const parts = new Set<string>();
+  for (const capability of manifest.capabilities || []) {
+    for (const binary of capability.prerequisites?.binaries || capability.requirements?.bin || []) {
+      parts.add(`bin:${binary}`);
+    }
+    for (const envName of capability.prerequisites?.env || capability.requirements?.env || []) {
+      parts.add(`env:${envName}`);
+    }
+    for (const service of capability.prerequisites?.services || []) {
+      parts.add(`svc:${service}`);
+    }
+    for (const platformName of capability.prerequisites?.platforms || []) {
+      parts.add(`os:${platformName}`);
+    }
+  }
+  return parts.size > 0 ? Array.from(parts).sort().join(', ') : '-';
+}
+
+function listOps(manifest: ActuatorManifestFile): string[] {
+  return Array.from(
+    new Set(
+      (manifest.capabilities || []).map((capability) => String(capability.op || '')).filter(Boolean)
+    )
+  ).sort();
+}
+
+function loadManifest(manifestPath: string): ActuatorManifestFile {
+  return loadActuatorManifest(manifestPath);
+}
+
+function collectComponentInventory() {
+  const entries = safeReaddir(ACTUATORS_DIR).sort();
+  const current: CurrentIndexRecord[] = [];
+  const legacy: LegacyRecord[] = [];
+
+  for (const entry of entries) {
+    const actuatorPath = path.join(ACTUATORS_DIR, entry);
+    if (!safeLstat(actuatorPath).isDirectory()) {
+      continue;
+    }
+    const manifestPath = path.join(actuatorPath, 'manifest.json');
+    const packagePath = path.join(actuatorPath, 'package.json');
+
+    if (safeExistsSync(manifestPath)) {
+      const manifest = loadManifest(manifestPath);
+      current.push({
+        n: manifest.actuator_id,
+        path: path.posix.join('libs/actuators', entry),
+        d: manifest.description,
+        s: 'implemented',
+        version: manifest.version,
+        capability_count: manifest.capabilities?.length || 0,
+        ops: listOps(manifest),
+        contract_schema: manifest.contract_schema,
+        prerequisites_summary: summarizePrerequisites(manifest),
+      });
+      continue;
+    }
+
+    legacy.push({
+      name: entry,
+      path: path.posix.join('libs/actuators', entry),
+      status: 'legacy-review',
+      package_based: safeExistsSync(packagePath),
+      rationale:
+        LEGACY_RATIONALES[entry] ||
+        'Not manifest-backed, so it is invisible to runtime discovery and needs explicit retirement or migration review.',
+    });
+  }
+
+  return { current, legacy };
+}
+
+function renderJsonArtifacts(
+  current: CurrentIndexRecord[],
+  legacy: LegacyRecord[]
+): GeneratedFile[] {
+  return [
+    {
+      path: CURRENT_INDEX_PATH,
+      content:
+        JSON.stringify(
+          {
+            v: '2.0.0',
+            t: current.length,
+            actuators: current,
+          },
+          null,
+          2
+        ) + '\n',
+    },
+    {
+      path: LEGACY_INDEX_PATH,
+      content:
+        JSON.stringify(
+          {
+            v: '1.0.0',
+            t: legacy.length,
+            components: legacy,
+          },
+          null,
+          2
+        ) + '\n',
+    },
+    {
+      path: SKILL_INDEX_PATH,
+      content:
+        JSON.stringify(
+          {
+            v: '3.0.0',
+            t: current.length,
+            s: current.map((entry) => ({
+              n: entry.n,
+              path: entry.path,
+              d: entry.d,
+              s: entry.s,
+              version: entry.version,
+              capability_count: entry.capability_count,
+            })),
+          },
+          null,
+          2
+        ) + '\n',
+    },
+  ];
+}
+
+interface DiscoveryOpsRecord {
+  n: string;
+  ops: Array<{ op: string; kind: 'capture' | 'transform' | 'apply' | 'control' }>;
+}
+
+// AR-02: the op tables are generated from the self-described discovery index
+// (all actuators), not just the system actuator's exported constants.
+function loadDiscoveryOps(): DiscoveryOpsRecord[] {
+  try {
+    return loadActuatorOpDiscoveryAtPath().actuators;
+  } catch {
+    return [];
+  }
+}
+
+function buildOpKindTable(kind: 'capture' | 'transform' | 'apply' | 'control'): string[] {
+  const rows = new Map<string, string[]>();
+  for (const record of loadDiscoveryOps()) {
+    for (const item of record.ops) {
+      if (item.kind !== kind) continue;
+      const owners = rows.get(item.op) ?? [];
+      owners.push(record.n.replace(/-actuator$/, ''));
+      rows.set(item.op, owners);
+    }
+  }
+  const lines: string[] = ['| Op | Actuators |', '| :--- | :--- |'];
+  for (const [op, owners] of [...rows.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+    lines.push(`| \`${op}\` | ${[...new Set(owners)].sort().join(', ')} |`);
+  }
+  return lines;
+}
+
+function buildCapabilitiesGuide(current: CurrentIndexRecord[]): string {
+  const lines: string[] = [];
+  lines.push('# Kyberion Capabilities Guide');
+  lines.push('');
+  lines.push(`Total Actuators: ${current.length}`);
+  lines.push(`Last updated: ${nowIso().slice(0, 10)}`);
+  lines.push('');
+  lines.push(
+    'This guide is generated from `libs/actuators/*/manifest.json` (actuator table) and `knowledge/product/orchestration/actuator-op-discovery.json` (op tables, sourced from each actuator describeOps). Human-readable counterpart to `global_actuator_index.json`.'
+  );
+  lines.push('');
+  lines.push(
+    '> **Compatibility note:** Wisdom entries that forward to file, terminal, media, voice, meeting, modeling, approval, deployment, or orchestrator are retained for legacy pipelines. Use the canonical owner actuator for new work; the Wisdom entry is not an implementation grant.'
+  );
+  lines.push('');
+  lines.push(
+    'Legacy or conceptual capability names are intentionally excluded here. If a component is not manifest-backed, it is not part of the current runtime catalog.'
+  );
+  lines.push('');
+  lines.push(
+    '| Actuator | Description | Version | Ops Count | Ops | Prerequisites | Contract Schema | Path |'
+  );
+  lines.push('| :--- | :--- | :--- | :---: | :--- | :--- | :--- | :--- |');
+  for (const actuator of current) {
+    lines.push(
+      `| \`${actuator.n}\` | ${actuator.d} | ${actuator.version} | ${actuator.capability_count} | \`${actuator.ops.join(', ') || '-'}\` | \`${actuator.prerequisites_summary}\` | \`${actuator.contract_schema || '-'}\` | \`${actuator.path}\` |`
+    );
+  }
+  lines.push('');
+  lines.push('### Capture ops (type: capture)');
+  lines.push('');
+  lines.push(...buildOpKindTable('capture'));
+  lines.push('');
+  lines.push('### Transform ops (type: transform)');
+  lines.push('');
+  lines.push(...buildOpKindTable('transform'));
+  lines.push('');
+  lines.push('### Apply ops (type: apply)');
+  lines.push('');
+  lines.push(...buildOpKindTable('apply'));
+  lines.push('');
+  lines.push('### Control ops (type: control)');
+  lines.push('');
+  lines.push(...buildOpKindTable('control'));
+  lines.push('');
+  lines.push('## Capability Boundaries');
+  lines.push('');
+  lines.push(
+    'Several use cases map to more than one actuator by name alone. This table is the tie-breaker (AC-06).'
+  );
+  lines.push('');
+  lines.push('| Use case | Use this | Avoid / why |');
+  lines.push('| :--- | :--- | :--- |');
+  lines.push(
+    "| Screen capture and recording (general purpose) | `system-actuator` (`screenshot`, `record_screen`, `record_audio`, `capture_photo`, `test_screen_stream`, `test_screen_mp4_roundtrip`) | `media-generation-actuator`'s capture names are compatibility forwarders for generation workflows. |"
+  );
+  lines.push(
+    '| Document rendering from a template (pptx/docx/pdf, partial updates) | `media-actuator` | Deterministic rendering, not generative — use `media-generation-actuator` for content that has to be authored/synthesized. |'
+  );
+  lines.push(
+    '| Generative image, video, or music | `media-generation-actuator` | `media-actuator` only renders from existing templates/content; it does not generate. |'
+  );
+  lines.push(
+    "| Assembling a narrated video from scenes/briefs | `video-composition-actuator` | Distinct from `media-generation-actuator`'s `generate_video`, which produces a single generative video clip rather than composing a narrated sequence. |"
+  );
+  lines.push(
+    '| Image perception (OCR, layout/content inspection) | `vision-actuator` (`inspect_image`, `ocr_image`); CLI `pnpm kyberion see` (audio: `listen`, video: `watch` — see perception-playbook) | `vision-actuator` is perception-only; its generation-shaped ops are compatibility facades that forward to `media-generation-actuator`. |'
+  );
+  lines.push(
+    '| GUI action by target (`computer_interaction`) | web page: `browser-actuator`; desktop app / OS: `system-actuator`; PTY: `terminal-actuator`; device: `android-actuator` / `ios-actuator` | Split by target on purpose (same schema, non-overlapping action sets) — not duplicates. Navigation (`goto`, `activate_application`, `open_deep_link`) belongs to the same executors. See action-playbook. |'
+  );
+  lines.push(
+    '| Speech output (TTS: speak or write an audio file) | `voice-actuator` (`generate_voice`, `speak_local`); CLI `pnpm kyberion speak` (`--stream --segment` for incremental text; `--device` selects CoreAudio output) | Inverse of `pnpm kyberion listen`. The CLI streaming path currently uses the local Qwen engine; meeting / realtime voice bridges remain separate. |'
+  );
+  lines.push(
+    '| Image generation (prompt → image) | `media-generation-actuator` (`generate_image`); CLI `pnpm kyberion draw` | Inverse of `pnpm kyberion see`. Local, unattended providers by default; `--allow-cloud` / `--allow-handoff` opt in and `--ref` needs per-run consent for them. |'
+  );
+  lines.push(
+    '| One-shot OS command / shell | `system-actuator` (`pipeline` → `system:exec`, `system:shell`) | Use `process-actuator` instead if the command must be supervised or outlive the calling step. |'
+  );
+  lines.push(
+    '| Supervised, long-lived process (start/stop/status) | `process-actuator` | `system-actuator` and `terminal-actuator` do not track process lifecycle across steps. |'
+  );
+  lines.push(
+    "| Interactive terminal session (PTY, read/write a running shell) | `terminal-actuator` | `system-actuator`'s `pipeline` ops run a command to completion; they do not expose an interactive PTY. |"
+  );
+  lines.push(
+    '| Git status/diff/log/branch/commit, GitHub PR creation | `vcs-actuator` | Canonical git/gh owner. `code-actuator` analyzes code, `service-actuator` github presets are transport only, `system-actuator` PR lifecycle is the release gate — none own the working tree. |'
+  );
+  lines.push(
+    '| Tabular query/join/aggregate over local json/csv files | `data-actuator` | Offline deterministic set ops. `wisdom-actuator` `json_query` reads a single document; it does not join or aggregate across files. |'
+  );
+  lines.push(
+    '| Web search as a pipeline starting point | `search-actuator` (`web_search`, `fetch_reader`) | Owns the query origin with bounded reader semantics. `network-actuator` owns fetch/A2A transport; it does not rank or select sources. |'
+  );
+  lines.push(
+    '| Cron-style schedule declarations (register/list/cancel/fire) | `scheduler-actuator` | Declaration store only, no daemon. `process-actuator` supervises running processes; it does not own time-based triggers. |'
+  );
+  lines.push('');
+  lines.push('## Governed Core Workloads');
+  lines.push('');
+  lines.push(
+    '`@agent/core` also exposes the additive marketing workload contract for G0 intake, G1 data classification, G2 claims, G3 video/text/image validation, G4 independent review, G5 shared human approval binding, G6 publication verification, risk-policy resolution, and evidence-aware Mission completion.'
+  );
+  lines.push('');
+  lines.push(
+    'The workload composes the existing approval, artifact, media generation, video composition, browser, customer overlay, and Mission evidence capabilities. It does not register a marketing-specific Actuator or grant Strategy, Creative, or Review roles external publication authority.'
+  );
+  lines.push('');
+  lines.push(
+    'Canonical templates: `knowledge/product/pipeline-templates/video-production.json`, `publication-review.json`, and `publish-youtube-dry-run.json`.'
+  );
+  lines.push('');
+  lines.push('See also:');
+  lines.push('');
+  lines.push('- Source manifests: `libs/actuators/*/manifest.json`');
+  lines.push(
+    `- Compatibility snapshot: [global_actuator_index.json](${relativeLink(CAPABILITIES_GUIDE_PATH, CURRENT_INDEX_PATH)})`
+  );
+  lines.push(
+    `- [legacy_component_index.json](${relativeLink(CAPABILITIES_GUIDE_PATH, LEGACY_INDEX_PATH)})`
+  );
+  lines.push(
+    `- [component-lifecycle-inventory.md](${relativeLink(CAPABILITIES_GUIDE_PATH, REPORT_PATH)})`
+  );
+  lines.push('- Slack 3経路: [docs/SLACK_CHANNEL_ROUTES.ja.md](docs/SLACK_CHANNEL_ROUTES.ja.md)');
+  lines.push('- Email inbox vs send: [docs/EMAIL_OPERATOR.ja.md](docs/EMAIL_OPERATOR.ja.md)');
+  lines.push(
+    '- Linux secrets: opt-in file vault (`KYBERION_ALLOW_FILE_SECRETS=1`, `chmod 0600`). Darwin/win32 stay on OS keychain. Capabilities show red `[Missing env: KYBERION_ALLOW_FILE_SECRETS]` on Linux until opted in.'
+  );
+  lines.push(
+    '- Presence multi-channel: `presence:dispatch` stays Slack by default; prefix `telegram:` / `discord:` / `imessage:` to forward to the existing satellite outbox. No new actuator.'
+  );
+  lines.push(
+    '- Meeting daily path: `pnpm meeting:participate` (browser-playwright). `zoom-sdk` / `recall-ai` are **unimplemented seams** (docs-only / deferred). Do not call them.'
+  );
+  lines.push(
+    '- Actuator dry-run: capture always executes (side-effect-free); apply `--dry-run` validates contract/params only (`pnpm playground` and `createStandardYargs --dry-run` / `pnpm kyberion run … --dry-run`).'
+  );
+  lines.push(
+    "- Single-op dry-run: `pnpm playground -- --actuator <id> --op <op> --params '{…}' --dry-run --json`"
+  );
+  lines.push(
+    '- Agent discovery: `pnpm playground -- --list --search browser --json`; inspect arguments without execution with `--actuator <id> --op <op> --describe --json`. See [agent actuator usage](knowledge/product/orchestration/actuator-agent-usage.md) for checks, observation loops and the computer-use / Browser Use comparison.'
+  );
+  lines.push(
+    '- Discovery without build: `pnpm capabilities` (source entry). Execution still needs `pnpm build`. Doctor: `pnpm run doctor` (not bare `pnpm doctor`).'
+  );
+  lines.push(
+    '- Cloud Agent VM: [docs/developer/CLOUD_AGENT_ENVIRONMENT.md](docs/developer/CLOUD_AGENT_ENVIRONMENT.md) — Node `>=24`, `pnpm build` before pipeline / MCP / full doctor.'
+  );
+  return `${lines.join('\n')}\n`;
+}
+
+function buildReport(current: CurrentIndexRecord[], legacy: LegacyRecord[]): string {
+  const lines: string[] = [];
+  lines.push('---');
+  lines.push('title: Component Lifecycle Inventory');
+  lines.push('category: Architecture');
+  lines.push('tags: [architecture, actuators, cleanup, governance]');
+  lines.push('importance: 8');
+  lines.push('author: Ecosystem Architect');
+  lines.push('---');
+  lines.push('');
+  lines.push('# Component Lifecycle Inventory');
+  lines.push('');
+  lines.push(
+    'This inventory is generated from the filesystem. Manifest-backed actuators are treated as the current runtime surface. Directories without a manifest are treated as legacy-review components until they are either migrated or retired.'
+  );
+  lines.push('');
+  lines.push('## Current Runtime Surface');
+  lines.push('');
+  lines.push('- Source of truth: `libs/actuators/*/manifest.json`');
+  lines.push(`- Count: ${current.length}`);
+  lines.push(
+    '- Rule: If a component should be discoverable by the CLI or governance layer, it needs a `manifest.json`.'
+  );
+  lines.push('');
+  for (const actuator of current) {
+    lines.push(
+      `- \`${actuator.n}\`: ${actuator.d} (${actuator.capability_count} ops, v${actuator.version}${actuator.contract_schema ? `, schema ${actuator.contract_schema}` : ''})`
+    );
+  }
+  lines.push('');
+  lines.push('## Legacy Review Queue');
+  lines.push('');
+  lines.push(
+    `- Source of truth: [legacy_component_index.json](${relativeLink(REPORT_PATH, LEGACY_INDEX_PATH)})`
+  );
+  lines.push(`- Count: ${legacy.length}`);
+  lines.push('');
+  for (const component of legacy) {
+    lines.push(`- \`${component.name}\`: ${component.rationale}`);
+  }
+  lines.push('');
+  lines.push('## Consolidation Recommendations');
+  lines.push('');
+  lines.push(
+    '- `physical-bridge` has been retired to `retired/actuators/physical-bridge/` (2026-05-28). No action required.'
+  );
+  lines.push(
+    '- Review `daemon-actuator` against `surface-runtime` and `process-actuator`; keep only one long-lived process lifecycle model.'
+  );
+  lines.push(
+    '- Treat `vision-actuator` as compatibility-only and continue moving generation concerns into `media-generation-actuator` while keeping perception-oriented work elsewhere.'
+  );
+  lines.push(
+    '- Keep `approval-actuator`, `code-actuator`, `network-actuator`, and `process-actuator` manifest-backed because governance or runtime layers still reference them directly.'
+  );
+  lines.push(
+    '- Do not use `CAPABILITIES_GUIDE.md` as the source of truth for runtime discovery; it is broader and currently includes historical capability names that do not map 1:1 to actuator packages.'
+  );
+  return `${lines.join('\n')}\n`;
+}
+
+export async function renderComponentInventory(): Promise<GeneratedFile[]> {
+  const { current, legacy } = collectComponentInventory();
+  const markdown = [
+    { path: REPORT_PATH, content: buildReport(current, legacy) },
+    { path: CAPABILITIES_GUIDE_PATH, content: buildCapabilitiesGuide(current) },
+  ];
+  return [
+    ...renderJsonArtifacts(current, legacy),
+    ...(await Promise.all(
+      markdown.map(async (file) => ({
+        ...file,
+        content: await prettierFormat(file.content, {
+          ...((await resolvePrettierConfig(file.path)) ?? {}),
+          filepath: file.path,
+        }),
+      }))
+    )),
+  ];
+}
+
+function normalizeGeneratedContent(content: string): string {
+  const withoutGeneratedDate = content.replace(/^Last updated: .*$/mu, 'Last updated: <generated>');
+  try {
+    return JSON.stringify(
+      parseSafeJsonObjectInput(withoutGeneratedDate, 'component inventory generated output')
+    );
+  } catch {
+    return withoutGeneratedDate;
+  }
+}
+
+export const runSyncComponentInventory = defineGenerator({
+  id: 'component-inventory',
+  outputs: [
+    CURRENT_INDEX_PATH,
+    SKILL_INDEX_PATH,
+    LEGACY_INDEX_PATH,
+    REPORT_PATH,
+    CAPABILITIES_GUIDE_PATH,
+  ],
+  normalize: normalizeGeneratedContent,
+  render: renderComponentInventory,
+});
+
+if (
+  isDirectScript(import.meta.url, 'sync_component_inventory.ts') ||
+  isDirectScript(import.meta.url, 'sync_component_inventory.js')
+)
+  void runSyncComponentInventory();

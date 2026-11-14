@@ -32,7 +32,7 @@ Source repository reviewed: `nrslib/takt` (v0.59.1). This note records implement
 - `libs/core/governance/approval-gate.ts` + `pipeline-run-journal.ts` — suspend/resume human gate (`core:await_decision`) (TK-03).
 - `knowledge/product/roles/`, `libs/core/workforce/working-principles.ts`, `mission-context-pack.ts` — facet registry with tenant → product → managed-pack layering (TK-04/09).
 - `libs/core/reasoning/reasoning-backend.ts`, `provider-permission-profiles.ts`, `reasoning-route-policy.json` — step-level provider/model/permission/promotion and routing table (TK-05).
-- `libs/core/reasoning/reasoning-runtime-instructions.ts` + `scripts/generate_subagent_definitions.ts` — provider runtime-instructions hook and Claude/AGY generation ceremony (TK-06). Codex/Gemini provider state remains derived runtime state rather than an additional hand-maintained artifact.
+- `libs/core/reasoning/reasoning-runtime-instructions.ts` + `scripts/generate/generate_subagent_definitions.ts` — provider runtime-instructions hook and Claude/AGY generation ceremony (TK-06). Codex/Gemini provider state remains derived runtime state rather than an additional hand-maintained artifact.
 - `libs/core/task/report-contract.ts` — post-perform report validation against registered contracts or product JSON Schemas (TK-07).
 - `libs/core/plugin/facet-registry.ts` — approved managed plugin facet declarations are resolved after product facets (TK-09).
 - `libs/core/analysis/trace.ts` — opt-in OTLP/HTTP projection while preserving stable JSONL Trace (TK-10).

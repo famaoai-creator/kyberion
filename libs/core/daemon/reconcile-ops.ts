@@ -1,7 +1,7 @@
 /**
  * LE-03: reconcile registry sweeps as callable library functions.
  *
- * These used to live inline in scripts/reconcile_*.ts and were reachable only
+ * These used to live inline in scripts/reconcile/reconcile_*.ts and were reachable only
  * through `system:shell` wrapper steps (`node dist/scripts/...`), which hid
  * the logic from trace spans and let non-zero output vanish behind
  * `2>/dev/null || echo '{}'` fallbacks. The scripts are now thin CLI shells

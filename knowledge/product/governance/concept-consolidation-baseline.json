@@ -1242,13 +1242,13 @@
     "scripts/actuator_playground.ts": {
       "json_state_write_budget": 1
     },
-    "scripts/agent_runtime_manager.ts": {
+    "scripts/agent/agent_runtime_manager.ts": {
       "env_direct_read_budget": 3
     },
-    "scripts/agent_runtime_supervisor_daemon.ts": {
+    "scripts/agent/agent_runtime_supervisor_daemon.ts": {
       "env_direct_read_budget": 1
     },
-    "scripts/agent_worktree.ts": {
+    "scripts/agent/agent_worktree.ts": {
       "env_direct_read_budget": 1
     },
     "scripts/app_preflight.ts": {
@@ -1278,10 +1278,10 @@
     "scripts/bindings.ts": {
       "bespoke_cli_parser_budget": 2
     },
-    "scripts/browser_actuator_usability_probe.ts": {
+    "scripts/browser/browser_actuator_usability_probe.ts": {
       "json_state_write_budget": 1
     },
-    "scripts/browser_bridge_host.ts": {
+    "scripts/browser/browser_bridge_host.ts": {
       "json_state_write_budget": 2,
       "runtime_path_literal_budget": 1
     },
@@ -1297,77 +1297,77 @@
     "scripts/capability_discovery_entry.mjs": {
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/check_backend_conformance.ts": {
+    "scripts/check/check_backend_conformance.ts": {
       "json_state_write_budget": 1,
       "runtime_path_literal_budget": 1,
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/check_chronos_dom_contrast.ts": {
+    "scripts/check/check_chronos_dom_contrast.ts": {
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/check_chronos_perf_baseline.ts": {
+    "scripts/check/check_chronos_perf_baseline.ts": {
       "json_state_write_budget": 1,
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/check_contract_schemas_checks_1.ts": {
+    "scripts/check/check_contract_schemas_checks_1.ts": {
       "runtime_path_literal_budget": 1
     },
-    "scripts/check_contract_schemas_policy_checks.ts": {
+    "scripts/check/check_contract_schemas_policy_checks.ts": {
       "runtime_path_literal_budget": 2
     },
-    "scripts/check_contract_schemas.ts": {
+    "scripts/check/check_contract_schemas.ts": {
       "runtime_path_literal_budget": 3
     },
-    "scripts/check_contract_semver.ts": {
+    "scripts/check/check_contract_semver.ts": {
       "json_state_write_budget": 1,
       "bespoke_cli_parser_budget": 2
     },
-    "scripts/check_doc_examples.ts": {
+    "scripts/check/check_doc_examples.ts": {
       "bespoke_cli_parser_budget": 2
     },
-    "scripts/check_docs_drift.ts": {
+    "scripts/check/check_docs_drift.ts": {
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/check_entity_governance.ts": {
+    "scripts/check/check_entity_governance.ts": {
       "runtime_path_literal_budget": 3,
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/check_golden_output.ts": {
+    "scripts/check/check_golden_output.ts": {
       "json_state_write_budget": 1,
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/check_i18n_hardcoding.ts": {
+    "scripts/check/check_i18n_hardcoding.ts": {
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/check_improvement_plan_metadata.ts": {
+    "scripts/check/check_improvement_plan_metadata.ts": {
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/check_module_boundaries.ts": {
+    "scripts/check/check_module_boundaries.ts": {
       "json_state_write_budget": 1,
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/check_orphans.ts": {
+    "scripts/check/check_orphans.ts": {
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/check_pipeline_shell_independence.ts": {
+    "scripts/check/check_pipeline_shell_independence.ts": {
       "json_state_write_budget": 1,
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/check_plugin_views_e2e.ts": {
+    "scripts/check/check_plugin_views_e2e.ts": {
       "json_state_write_budget": 1
     },
-    "scripts/check_runtime_store_retention.ts": {
+    "scripts/check/check_runtime_store_retention.ts": {
       "runtime_path_literal_budget": 1
     },
-    "scripts/check_runtime_store_whole_read.ts": {
+    "scripts/check/check_runtime_store_whole_read.ts": {
       "json_state_write_budget": 1,
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/check_test_sleep_ratchet.ts": {
+    "scripts/check/check_test_sleep_ratchet.ts": {
       "json_state_write_budget": 1,
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/check_type_ratchet.ts": {
+    "scripts/check/check_type_ratchet.ts": {
       "json_state_write_budget": 1,
       "bespoke_cli_parser_budget": 1
     },
@@ -1421,7 +1421,7 @@
     "scripts/context_ranker.ts": {
       "bespoke_cli_parser_budget": 12
     },
-    "scripts/continuous_work_owner.ts": {
+    "scripts/continuous/continuous_work_owner.ts": {
       "json_state_write_budget": 1
     },
     "scripts/conversation_report.ts": {
@@ -1430,7 +1430,7 @@
     "scripts/cowork_knowledge_bridge.ts": {
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/stance_migrate_from_personal.ts": {
+    "scripts/stance/stance_migrate_from_personal.ts": {
       "json_state_write_budget": 1
     },
     "scripts/daily-desk/server.ts": {
@@ -1454,10 +1454,10 @@
       "json_state_write_budget": 1,
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/dot_charters.ts": {
+    "scripts/dot/dot_charters.ts": {
       "bespoke_cli_parser_budget": 3
     },
-    "scripts/dot_continuous_operations_step.ts": {
+    "scripts/dot/dot_continuous_operations_step.ts": {
       "json_state_write_budget": 1
     },
     "scripts/email-workflow.ts": {
@@ -1499,7 +1499,7 @@
     "scripts/first_win_lifecycle_smoke.ts": {
       "bespoke_cli_parser_budget": 5
     },
-    "scripts/generate_avatar.ts": {
+    "scripts/generate/generate_avatar.ts": {
       "json_state_write_budget": 2
     },
     "scripts/html-to-pptx/convert.ts": {
@@ -1560,14 +1560,14 @@
     "scripts/marketing_video_dry_run.ts": {
       "json_state_write_budget": 4
     },
-    "scripts/meeting_orchestrator.ts": {
+    "scripts/meeting/meeting_orchestrator.ts": {
       "json_state_write_budget": 1,
       "runtime_path_literal_budget": 1
     },
-    "scripts/meeting_preflight.ts": {
+    "scripts/meeting/meeting_preflight.ts": {
       "env_direct_read_budget": 1
     },
-    "scripts/meeting_readiness_check.ts": {
+    "scripts/meeting/meeting_readiness_check.ts": {
       "bespoke_cli_parser_budget": 1
     },
     "scripts/meeting-notepad/server.ts": {
@@ -1695,13 +1695,13 @@
     "scripts/realtime_voice_config.ts": {
       "bespoke_cli_parser_budget": 2
     },
-    "scripts/reasoning_auth_check.ts": {
+    "scripts/reasoning/reasoning_auth_check.ts": {
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/reasoning_setup.ts": {
+    "scripts/reasoning/reasoning_setup.ts": {
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/reconcile_knowledge_scopes.ts": {
+    "scripts/reconcile/reconcile_knowledge_scopes.ts": {
       "json_state_write_budget": 1,
       "runtime_path_literal_budget": 1,
       "bespoke_cli_parser_budget": 2
@@ -1785,13 +1785,13 @@
     "scripts/security-ledger.ts": {
       "env_direct_read_budget": 2
     },
-    "scripts/service_binding_controller.ts": {
+    "scripts/service/service_binding_controller.ts": {
       "bespoke_cli_parser_budget": 2
     },
-    "scripts/service_lifecycle_control.ts": {
+    "scripts/service/service_lifecycle_control.ts": {
       "json_state_write_budget": 1
     },
-    "scripts/service_recording.ts": {
+    "scripts/service/service_recording.ts": {
       "json_state_write_budget": 2,
       "bespoke_cli_parser_budget": 1
     },
@@ -1838,13 +1838,13 @@
     "scripts/surface_runtime.ts": {
       "env_direct_read_budget": 4
     },
-    "scripts/sync_intent_contract_memory.ts": {
+    "scripts/sync/sync_intent_contract_memory.ts": {
       "json_state_write_budget": 3
     },
-    "scripts/task_init.ts": {
+    "scripts/task/task_init.ts": {
       "json_state_write_budget": 1
     },
-    "scripts/task_smoke.ts": {
+    "scripts/task/task_smoke.ts": {
       "json_state_write_budget": 1
     },
     "scripts/tenant_activation.ts": {
@@ -1866,7 +1866,7 @@
       "runtime_path_literal_budget": 1,
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/voice_upgrade.ts": {
+    "scripts/voice/voice_upgrade.ts": {
       "json_state_write_budget": 1
     },
     "scripts/watch_knowledge_scope_health.ts": {

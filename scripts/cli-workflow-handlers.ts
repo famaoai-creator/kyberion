@@ -41,10 +41,10 @@ import {
   normalizeCalendarProviderId,
   readCalendarProviderAuthStatus,
 } from '@agent/core/meeting/calendar-workflow';
-import { main as taskInitMain } from './task_init.js';
-import { main as taskListMain } from './task_list.js';
-import { main as taskRunMain } from './task_run.js';
-import { main as taskSmokeMain } from './task_smoke.js';
+import { main as taskInitMain } from './task/task_init.js';
+import { main as taskListMain } from './task/task_list.js';
+import { main as taskRunMain } from './task/task_run.js';
+import { main as taskSmokeMain } from './task/task_smoke.js';
 import { ScriptExitError } from './lib/harness.js';
 import { credentialBindingReadiness } from '@agent/core/foundation/credential-binding';
 import { parseCliWorkflowOptions, parseOffboardArgs } from './cli-offboard-args.js';

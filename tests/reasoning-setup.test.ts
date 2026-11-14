@@ -16,7 +16,7 @@ vi.mock('@agent/core', async (importOriginal) => {
   };
 });
 
-// scripts/reasoning_setup.ts imports directly from these submodules (SX
+// scripts/reasoning/reasoning_setup.ts imports directly from these submodules (SX
 // simplicity abstraction pass, commit a877d9c12) rather than the aggregate
 // `@agent/core` entry point, so the mocks above never intercept its calls —
 // mock the actual import sites too.
@@ -43,7 +43,7 @@ describe('reasoning_setup', () => {
   });
 
   it('reports reasoning backend readiness without failing on nice-level preferences', async () => {
-    const { runReasoningSetup } = await import('../scripts/reasoning_setup');
+    const { runReasoningSetup } = await import('../scripts/reasoning/reasoning_setup');
 
     mocks.loadEnvironmentManifest.mockReturnValue({
       manifest_id: 'reasoning-backend',

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { pathResolver } from '@agent/core/path-resolver';
 import { resolveValidationBundleOutputBase } from './export_validation_bundle.js';
 import { resolveAvatarRegistrationPaths } from './register_avatar.js';
-import { resolveIntentContractMemoryPath } from './sync_intent_contract_memory.js';
+import { resolveIntentContractMemoryPath } from './sync/sync_intent_contract_memory.js';
 import { resolveCapturePhotoPath } from './capture_photo.js';
 import { resolveIntentSmokeOutputDir } from './intent_smoke.js';
 

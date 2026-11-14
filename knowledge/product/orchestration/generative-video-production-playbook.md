@@ -159,7 +159,7 @@ The canonical workflow now expands prototype_assets → prototype_acceptance bef
 asset_generation, and playback_review before promotion. Existing goal/spec/scene
 planning, independent artifact evaluation, partial repair, and publication approval
 remain in that workflow. Entry gates use the read-only
-scripts/check_video_production_evidence.ts checker; failed checks defer phase
+scripts/check/check_video_production_evidence.ts checker; failed checks defer phase
 dispatch even when mission exit-gate enforcement is set to warn.
 
 Author the existing mission artifacts using
@@ -195,9 +195,9 @@ scene_plan_sha256 is SHA-256 of the current scene-plan.json file bytes.
 The explicit request command opens or reuses shared human-only requests:
 
 ```bash
-node --import ./scripts/ts-loader.mjs scripts/check_video_production_evidence.ts \
+node --import ./scripts/ts-loader.mjs scripts/check/check_video_production_evidence.ts \
   --mission <ID> --request-approval prototypes
-node --import ./scripts/ts-loader.mjs scripts/check_video_production_evidence.ts \
+node --import ./scripts/ts-loader.mjs scripts/check/check_video_production_evidence.ts \
   --mission <ID> --request-approval playback
 ```
 

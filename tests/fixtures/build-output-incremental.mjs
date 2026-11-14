@@ -4,10 +4,10 @@ import { createHash } from 'node:crypto';
 await import(pathToFileURL(resolve('libs/core/dist/authority.js')).href);
 const io = await import(pathToFileURL(resolve('libs/core/dist/secure-io.js')).href);
 const { findStaleDistTargets } = await import(
-  pathToFileURL(resolve('scripts/check_stale_dist.ts')).href
+  pathToFileURL(resolve('scripts/check/check_stale_dist.ts')).href
 );
 const { findSourceShadows } = await import(
-  pathToFileURL(resolve('scripts/check_source_shadows.ts')).href
+  pathToFileURL(resolve('scripts/check/check_source_shadows.ts')).href
 );
 const { OWNED_BUILD_DIRECTORIES, OWNED_BUILD_METADATA } = await import(
   pathToFileURL(resolve('scripts/build-output-layout.ts')).href

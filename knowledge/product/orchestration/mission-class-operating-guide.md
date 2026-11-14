@@ -126,7 +126,7 @@ pnpm exec vitest run libs/core/mission/mission-class-eval.test.ts   # 床値(flo
 足す前に ADR(`knowledge/product/architecture/decisions/`)で、既存クラスと**統制・チーム・ゲート・AI の任せ方が実質的に違う**ことを示す(ラベルの違いだけなら足さない)。足す場合の登録先:
 
 1. スキーマ enum(`mission-classification*.schema.json`、`standard-intents.schema.json`、`intent-domain-ontology.schema.json`、`mission-task-classification-scenarios.schema.json`、`mission-class-eval-corpus.schema.json`、`mission-class-playbooks.schema.json`)と `MISSION_CLASS_VALUES` / `mapMissionClassToMissionTypeTemplate`
-2. 分類ポリシー(`class-*` ルール、配送形/リスクルール)、ontology と standard-intents の `mission_class`、`pnpm exec tsx scripts/generate_artifact_kinds.ts`
+2. 分類ポリシー(`class-*` ルール、配送形/リスクルール)、ontology と standard-intents の `mission_class`、`pnpm exec tsx scripts/generate/generate_artifact_kinds.ts`
 3. チームテンプレート、ワークフロー(専用+クラス単位のフォールバック)、レビューゲート(`mode_rules` 含む)
 4. `mission-class-playbooks.json` に全段階の進め方(契約テストが全クラス・全段階を要求)
 5. 評価コーパスに dev と holdout と `neg-*` を追加し、床値を満たすこと

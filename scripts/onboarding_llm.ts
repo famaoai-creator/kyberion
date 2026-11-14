@@ -66,7 +66,7 @@ import {
   normalizeReasoningBackendChoice,
   persistReasoningBackend,
   readPersistedReasoningBackend,
-} from './reasoning_backend_selection.js';
+} from './reasoning/reasoning_backend_selection.js';
 
 type Print = (value: unknown) => void;
 

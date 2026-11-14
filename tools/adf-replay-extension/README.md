@@ -51,7 +51,7 @@ Kyberion から拡張への連絡は、拡張が Native Messaging host に問い
 
 すでに拡張を読み込み済みの環境で、この版へ更新する手順です。
 
-1. Kyberion 側を更新したら `pnpm build`（または `pnpm build:actuators`）で `dist/scripts/browser_bridge_host.js` を作り直します。host スクリプトに `poll_requests` / `respond_request` / `send_page` / `submit_inspection` が加わったためです。
+1. Kyberion 側を更新したら `pnpm build`（または `pnpm build:actuators`）で `dist/scripts/browser/browser_bridge_host.js` を作り直します。host スクリプトに `poll_requests` / `respond_request` / `send_page` / `submit_inspection` が加わったためです。
 2. `chrome://extensions` で、読み込み済みの拡張（unpacked）の「再読み込み」を押します。
 3. Chrome が新しい権限 `alarms` / `contextMenus` / `notifications` の承認を求めるので受け入れます。拒否すると受信箱の定期問い合わせ、右クリック送信、通知が動きません。
 4. native host の再導入（`native-host/install.sh`）は、通常は不要です。host の manifest（`com.kyberion.browser_bridge.json`）は変わっておらず、Chrome が起動するのは同じ `launch.sh` です。拡張 ID を変えた、リポジトリの場所を移した、`node` を入れ替えたなど、manifest の `path` や `allowed_origins` が変わる場合だけ再実行し、Chrome を完全に終了して開き直します。

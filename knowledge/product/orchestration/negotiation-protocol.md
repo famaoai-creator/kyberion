@@ -71,7 +71,7 @@ mission-state.json 内に `negotiation` ブロックを追加し、以下を **�
 ## 6. 関連
 
 - 契約技法: [standards/contract/negotiation_guardrails.md](../../public/standards/contract/negotiation_guardrails.md)
-- ステークホルダー管理: [pmo/standard/stakeholder_management.md](../../public/pmo/standard/stakeholder_management.md)
+- ステークホルダー管理: [pmo/standards/stakeholder_management.md](../../public/pmo/standards/stakeholder_management.md)
 - 人格: `Strategic Deal-Maker` ([personalities/matrix.md](../personalities/matrix.md#8))
 
 ---

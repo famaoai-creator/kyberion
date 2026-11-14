@@ -3,14 +3,14 @@ import { pathResolver } from '@agent/core/path-resolver';
 import { safeReadFile } from '@agent/core/secure-io';
 
 const ENTRYPOINTS = [
-  'scripts/agent_runtime_supervisor_daemon.ts',
+  'scripts/agent/agent_runtime_supervisor_daemon.ts',
   'scripts/bootstrap_environment.ts',
   'scripts/company_bootstrap.ts',
   'scripts/compose_mission_team.ts',
   'scripts/kyberion_home.ts',
-  'scripts/meeting_orchestrator.ts',
-  'scripts/meeting_participate.ts',
-  'scripts/meeting_preflight.ts',
+  'scripts/meeting/meeting_orchestrator.ts',
+  'scripts/meeting/meeting_participate.ts',
+  'scripts/meeting/meeting_preflight.ts',
   'scripts/minutes_record.ts',
   'scripts/mission_controller.ts',
   'scripts/onboarding_apply.ts',

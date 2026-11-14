@@ -14,7 +14,7 @@ Sources (SSoT):
   - libs/core/workforce/subagent-capability-profiles.ts (KD-05 capability tiers)
   - libs/core/workforce/working-principles.ts (buildWorkingPrinciplesLines)
   - knowledge/product/governance/multi-provider-coexecution-contract.md (XP-04 read/write matrix)
-  Generator: scripts/generate_subagent_definitions.ts
+  Generator: scripts/generate/generate_subagent_definitions.ts
 -->
 
 # devils_advocate — CLI subagent (KD-05 "explorer" tier)

@@ -583,7 +583,7 @@ export async function ensureAgentRuntimeSupervisorDaemon(): Promise<AgentRuntime
       ownerId: 'agent-runtime-supervisor-daemon',
       ownerType: 'runtime-supervisor',
       command: process.execPath,
-      args: ['dist/scripts/agent_runtime_supervisor_daemon.js'],
+      args: ['dist/scripts/agent/agent_runtime_supervisor_daemon.js'],
       spawnOptions: {
         cwd: rootDir(),
         env: process.env,

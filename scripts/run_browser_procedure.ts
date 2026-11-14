@@ -36,7 +36,7 @@ import {
   loadBrowserActuator,
   type BrowserActuatorHandle,
   type ExecuteBrowserPipeline,
-} from './browser_playwright_executor.js';
+} from './browser/browser_playwright_executor.js';
 
 const USAGE = [
   '[run-browser-procedure] Usage:',

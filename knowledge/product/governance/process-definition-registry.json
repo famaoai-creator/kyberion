@@ -26,8 +26,8 @@
       "schema": "knowledge/product/schemas/mission-orchestration-scenario-pack.schema.json",
       "execution_role": "validation",
       "consumer_paths": [
-        "scripts/check_contract_schemas.ts",
-        "scripts/check_governance_rules.ts",
+        "scripts/check/check_contract_schemas.ts",
+        "scripts/check/check_governance_rules.ts",
         "tests/scenario-coverage-contract.test.ts"
       ],
       "expected_counts": {
@@ -41,8 +41,8 @@
       "schema": "knowledge/product/schemas/mission-task-classification-scenarios.schema.json",
       "execution_role": "validation",
       "consumer_paths": [
-        "scripts/check_contract_schemas.ts",
-        "scripts/check_governance_rules.ts",
+        "scripts/check/check_contract_schemas.ts",
+        "scripts/check/check_governance_rules.ts",
         "libs/core/mission/mission-task-classification-scenarios.test.ts"
       ],
       "expected_counts": {

@@ -1225,7 +1225,7 @@
     },
     {
       "id": "operator-voice",
-      "module": "scripts/voice_setup.ts",
+      "module": "scripts/voice/voice_setup.ts",
       "commands": ["voice setup"]
     }
   ],
@@ -1253,7 +1253,7 @@
     },
     {
       "id": "script.agent-runtime.daemon",
-      "module": "scripts/agent_runtime_supervisor_daemon.ts",
+      "module": "scripts/agent/agent_runtime_supervisor_daemon.ts",
       "command": "agent-runtime daemon",
       "noun": "agent-runtime",
       "verb": "daemon",
@@ -1264,7 +1264,7 @@
     },
     {
       "id": "script.agent-runtime.manage",
-      "module": "scripts/agent_runtime_manager.ts",
+      "module": "scripts/agent/agent_runtime_manager.ts",
       "command": "agent-runtime manage",
       "noun": "agent-runtime",
       "verb": "manage",
@@ -1383,7 +1383,7 @@
     },
     {
       "id": "script.auth.check",
-      "module": "scripts/reasoning_auth_check.ts",
+      "module": "scripts/reasoning/reasoning_auth_check.ts",
       "command": "auth check",
       "noun": "auth",
       "verb": "check",
@@ -1445,7 +1445,7 @@
     },
     {
       "id": "script.browser.create",
-      "module": "scripts/browser_profiles_cli.ts",
+      "module": "scripts/browser/browser_profiles_cli.ts",
       "args": ["create"],
       "command": "browser create",
       "noun": "browser",
@@ -1468,7 +1468,7 @@
     },
     {
       "id": "script.browser.open",
-      "module": "scripts/browser_profiles_cli.ts",
+      "module": "scripts/browser/browser_profiles_cli.ts",
       "args": ["open"],
       "command": "browser open",
       "noun": "browser",
@@ -1480,7 +1480,7 @@
     },
     {
       "id": "script.browser.profiles",
-      "module": "scripts/browser_profiles_cli.ts",
+      "module": "scripts/browser/browser_profiles_cli.ts",
       "args": ["profiles"],
       "command": "browser profiles",
       "noun": "browser",
@@ -1647,7 +1647,7 @@
     },
     {
       "id": "script.check.backend-conformance",
-      "module": "scripts/check_backend_conformance.ts",
+      "module": "scripts/check/check_backend_conformance.ts",
       "command": "check backend-conformance",
       "noun": "check",
       "verb": "backend-conformance",
@@ -1658,7 +1658,7 @@
     },
     {
       "id": "script.check.backend-live-scenarios",
-      "module": "scripts/check_backend_live_scenarios.ts",
+      "module": "scripts/check/check_backend_live_scenarios.ts",
       "command": "check backend-live-scenarios",
       "noun": "check",
       "verb": "backend-live-scenarios",
@@ -1669,7 +1669,7 @@
     },
     {
       "id": "script.check.chronos-perf",
-      "module": "scripts/check_chronos_perf_baseline.ts",
+      "module": "scripts/check/check_chronos_perf_baseline.ts",
       "command": "check chronos-perf",
       "noun": "check",
       "verb": "chronos-perf",
@@ -1732,7 +1732,7 @@
     },
     {
       "id": "script.check.improvement-plan-metadata",
-      "module": "scripts/check_improvement_plan_metadata.ts",
+      "module": "scripts/check/check_improvement_plan_metadata.ts",
       "command": "check improvement-plan-metadata",
       "noun": "check",
       "verb": "improvement-plan-metadata",
@@ -1742,7 +1742,7 @@
     },
     {
       "id": "script.check.plugin-views-e2e",
-      "module": "scripts/check_plugin_views_e2e.ts",
+      "module": "scripts/check/check_plugin_views_e2e.ts",
       "command": "check plugin-views-e2e",
       "noun": "check",
       "verb": "plugin-views-e2e",
@@ -1764,7 +1764,7 @@
     },
     {
       "id": "script.check.rt-mode",
-      "module": "scripts/check_rt_mode.ts",
+      "module": "scripts/check/check_rt_mode.ts",
       "command": "check rt-mode",
       "noun": "check",
       "verb": "rt-mode",
@@ -1774,7 +1774,7 @@
     },
     {
       "id": "script.check.script-integrity",
-      "module": "scripts/check_script_integrity.ts",
+      "module": "scripts/check/check_script_integrity.ts",
       "command": "check script-integrity",
       "noun": "check",
       "verb": "script-integrity",
@@ -2007,7 +2007,7 @@
     },
     {
       "id": "script.docs.check",
-      "module": "scripts/check_docs_drift.ts",
+      "module": "scripts/check/check_docs_drift.ts",
       "command": "docs check",
       "noun": "docs",
       "verb": "check",
@@ -2030,7 +2030,7 @@
     },
     {
       "id": "script.dot.capacity",
-      "module": "scripts/dot_charters.ts",
+      "module": "scripts/dot/dot_charters.ts",
       "command": "dot capacity",
       "args": ["capacity"],
       "noun": "dot",
@@ -2041,7 +2041,7 @@
     },
     {
       "id": "script.dot.create",
-      "module": "scripts/dot_charters.ts",
+      "module": "scripts/dot/dot_charters.ts",
       "command": "dot create",
       "args": ["create"],
       "noun": "dot",
@@ -2052,7 +2052,7 @@
     },
     {
       "id": "script.dot.migrate-state",
-      "module": "scripts/dot_charters.ts",
+      "module": "scripts/dot/dot_charters.ts",
       "command": "dot migrate-state",
       "args": ["migrate-state"],
       "noun": "dot",
@@ -2063,7 +2063,7 @@
     },
     {
       "id": "script.dot.activate",
-      "module": "scripts/dot_charters.ts",
+      "module": "scripts/dot/dot_charters.ts",
       "command": "dot activate",
       "args": ["activate"],
       "noun": "dot",
@@ -2074,7 +2074,7 @@
     },
     {
       "id": "script.dot.autonomy",
-      "module": "scripts/dot_charters.ts",
+      "module": "scripts/dot/dot_charters.ts",
       "command": "dot autonomy",
       "args": ["autonomy"],
       "noun": "dot",
@@ -2085,7 +2085,7 @@
     },
     {
       "id": "script.dot.event",
-      "module": "scripts/dot_charters.ts",
+      "module": "scripts/dot/dot_charters.ts",
       "command": "dot event",
       "args": ["event"],
       "noun": "dot",
@@ -2096,7 +2096,7 @@
     },
     {
       "id": "script.dot.followups",
-      "module": "scripts/dot_charters.ts",
+      "module": "scripts/dot/dot_charters.ts",
       "command": "dot followups",
       "args": ["followups"],
       "noun": "dot",
@@ -2107,7 +2107,7 @@
     },
     {
       "id": "script.dot.inbox",
-      "module": "scripts/dot_charters.ts",
+      "module": "scripts/dot/dot_charters.ts",
       "command": "dot inbox",
       "args": ["inbox"],
       "noun": "dot",
@@ -2118,7 +2118,7 @@
     },
     {
       "id": "script.dot.intake",
-      "module": "scripts/dot_charters.ts",
+      "module": "scripts/dot/dot_charters.ts",
       "command": "dot intake",
       "args": ["intake"],
       "noun": "dot",
@@ -2129,7 +2129,7 @@
     },
     {
       "id": "script.dot.kr",
-      "module": "scripts/dot_charters.ts",
+      "module": "scripts/dot/dot_charters.ts",
       "command": "dot kr",
       "args": ["kr"],
       "noun": "dot",
@@ -2140,7 +2140,7 @@
     },
     {
       "id": "script.dot.list",
-      "module": "scripts/dot_charters.ts",
+      "module": "scripts/dot/dot_charters.ts",
       "command": "dot list",
       "args": ["list"],
       "noun": "dot",
@@ -2151,7 +2151,7 @@
     },
     {
       "id": "script.dot.memory",
-      "module": "scripts/dot_charters.ts",
+      "module": "scripts/dot/dot_charters.ts",
       "command": "dot memory",
       "args": ["memory"],
       "noun": "dot",
@@ -2162,7 +2162,7 @@
     },
     {
       "id": "script.dot.outcomes",
-      "module": "scripts/dot_charters.ts",
+      "module": "scripts/dot/dot_charters.ts",
       "command": "dot outcomes",
       "args": ["outcomes"],
       "noun": "dot",
@@ -2173,7 +2173,7 @@
     },
     {
       "id": "script.dot.pause",
-      "module": "scripts/dot_charters.ts",
+      "module": "scripts/dot/dot_charters.ts",
       "command": "dot pause",
       "args": ["pause"],
       "noun": "dot",
@@ -2184,7 +2184,7 @@
     },
     {
       "id": "script.dot.release",
-      "module": "scripts/dot_charters.ts",
+      "module": "scripts/dot/dot_charters.ts",
       "command": "dot release",
       "args": ["release"],
       "noun": "dot",
@@ -2195,7 +2195,7 @@
     },
     {
       "id": "script.dot.retire",
-      "module": "scripts/dot_charters.ts",
+      "module": "scripts/dot/dot_charters.ts",
       "command": "dot retire",
       "args": ["retire"],
       "noun": "dot",
@@ -2206,7 +2206,7 @@
     },
     {
       "id": "script.dot.status",
-      "module": "scripts/dot_charters.ts",
+      "module": "scripts/dot/dot_charters.ts",
       "command": "dot status",
       "args": ["status"],
       "noun": "dot",
@@ -2218,7 +2218,7 @@
     },
     {
       "id": "script.dot.validate",
-      "module": "scripts/dot_charters.ts",
+      "module": "scripts/dot/dot_charters.ts",
       "command": "dot validate",
       "args": ["validate"],
       "noun": "dot",
@@ -2229,7 +2229,7 @@
     },
     {
       "id": "script.dot.wake",
-      "module": "scripts/dot_charters.ts",
+      "module": "scripts/dot/dot_charters.ts",
       "command": "dot wake",
       "args": ["wake"],
       "noun": "dot",
@@ -2241,7 +2241,7 @@
     },
     {
       "id": "script.dot.work",
-      "module": "scripts/dot_charters.ts",
+      "module": "scripts/dot/dot_charters.ts",
       "command": "dot work",
       "args": ["work"],
       "noun": "dot",
@@ -2373,7 +2373,7 @@
     },
     {
       "id": "script.generate.artifact-kinds",
-      "module": "scripts/generate_artifact_kinds.ts",
+      "module": "scripts/generate/generate_artifact_kinds.ts",
       "command": "generate artifact-kinds",
       "noun": "generate",
       "verb": "artifact-kinds",
@@ -2383,7 +2383,7 @@
     },
     {
       "id": "script.generate.capability-seams",
-      "module": "scripts/generate_capability_seams.ts",
+      "module": "scripts/generate/generate_capability_seams.ts",
       "command": "generate capability-seams",
       "noun": "generate",
       "verb": "capability-seams",
@@ -2473,7 +2473,7 @@
     },
     {
       "id": "script.generate.service-harness-registry",
-      "module": "scripts/generate_service_harness_registry.ts",
+      "module": "scripts/generate/generate_service_harness_registry.ts",
       "command": "generate service-harness-registry",
       "noun": "generate",
       "verb": "service-harness-registry",
@@ -2484,7 +2484,7 @@
     },
     {
       "id": "script.generate.trace-docs",
-      "module": "scripts/generate_trace_docs.ts",
+      "module": "scripts/generate/generate_trace_docs.ts",
       "command": "generate trace-docs",
       "noun": "generate",
       "verb": "trace-docs",
@@ -3203,7 +3203,7 @@
     },
     {
       "id": "script.peer.collaboration",
-      "module": "scripts/peer_collaboration.ts",
+      "module": "scripts/peer/peer_collaboration.ts",
       "command": "peer collaboration",
       "noun": "peer",
       "verb": "collaboration",
@@ -3239,7 +3239,7 @@
     },
     {
       "id": "script.peer.task",
-      "module": "scripts/peer_task.ts",
+      "module": "scripts/peer/peer_task.ts",
       "command": "peer task",
       "noun": "peer",
       "verb": "task",
@@ -3261,7 +3261,7 @@
     },
     {
       "id": "script.peer.outbox",
-      "module": "scripts/peer_outbox.ts",
+      "module": "scripts/peer/peer_outbox.ts",
       "command": "peer outbox",
       "noun": "peer",
       "verb": "outbox",
@@ -3294,7 +3294,7 @@
     },
     {
       "id": "script.peer.send",
-      "module": "scripts/peer_messaging_send.ts",
+      "module": "scripts/peer/peer_messaging_send.ts",
       "command": "peer send",
       "noun": "peer",
       "verb": "send",
@@ -3485,7 +3485,7 @@
     },
     {
       "id": "script.provider-capabilities.report",
-      "module": "scripts/generate_provider_cli_capability_report.ts",
+      "module": "scripts/generate/generate_provider_cli_capability_report.ts",
       "command": "provider-capabilities report",
       "noun": "provider-capabilities",
       "verb": "report",
@@ -3530,7 +3530,7 @@
     },
     {
       "id": "script.reasoning.credentials",
-      "module": "scripts/reasoning_credentials.ts",
+      "module": "scripts/reasoning/reasoning_credentials.ts",
       "command": "reasoning credentials",
       "noun": "reasoning",
       "verb": "credentials",
@@ -3557,7 +3557,7 @@
     },
     {
       "id": "script.reconcile.config-fallbacks",
-      "module": "scripts/reconcile_config_fallbacks.ts",
+      "module": "scripts/reconcile/reconcile_config_fallbacks.ts",
       "command": "reconcile config-fallbacks",
       "noun": "reconcile",
       "verb": "config-fallbacks",
@@ -3567,7 +3567,7 @@
     },
     {
       "id": "script.reconcile.unclassified-errors",
-      "module": "scripts/reconcile_unclassified_errors.ts",
+      "module": "scripts/reconcile/reconcile_unclassified_errors.ts",
       "command": "reconcile unclassified-errors",
       "noun": "reconcile",
       "verb": "unclassified-errors",
@@ -3577,7 +3577,7 @@
     },
     {
       "id": "script.reconcile.unhandled-intents",
-      "module": "scripts/reconcile_unhandled_intents.ts",
+      "module": "scripts/reconcile/reconcile_unhandled_intents.ts",
       "command": "reconcile unhandled-intents",
       "noun": "reconcile",
       "verb": "unhandled-intents",
@@ -3587,7 +3587,7 @@
     },
     {
       "id": "script.release.changelog-draft",
-      "module": "scripts/generate_changelog.ts",
+      "module": "scripts/generate/generate_changelog.ts",
       "command": "release changelog-draft",
       "noun": "release",
       "verb": "changelog-draft",
@@ -3765,7 +3765,7 @@
     },
     {
       "id": "script.scheduler.reconcile",
-      "module": "scripts/reconcile_resident_services.ts",
+      "module": "scripts/reconcile/reconcile_resident_services.ts",
       "command": "scheduler reconcile",
       "noun": "scheduler",
       "verb": "reconcile",
@@ -3991,7 +3991,7 @@
     },
     {
       "id": "script.service.harness",
-      "module": "scripts/service_harness.ts",
+      "module": "scripts/service/service_harness.ts",
       "command": "service harness",
       "noun": "service",
       "verb": "harness",
@@ -4013,7 +4013,7 @@
     },
     {
       "id": "script.service.recording",
-      "module": "scripts/service_recording.ts",
+      "module": "scripts/service/service_recording.ts",
       "command": "service recording",
       "noun": "service",
       "verb": "recording",
@@ -4159,7 +4159,7 @@
     },
     {
       "id": "script.sync.agent-profiles",
-      "module": "scripts/sync_agent_profiles.ts",
+      "module": "scripts/sync/sync_agent_profiles.ts",
       "command": "sync agent-profiles",
       "noun": "sync",
       "verb": "agent-profiles",
@@ -4170,7 +4170,7 @@
     },
     {
       "id": "script.sync.authority-roles",
-      "module": "scripts/sync_authority_roles.ts",
+      "module": "scripts/sync/sync_authority_roles.ts",
       "command": "sync authority-roles",
       "noun": "sync",
       "verb": "authority-roles",
@@ -4181,7 +4181,7 @@
     },
     {
       "id": "script.sync.component-inventory",
-      "module": "scripts/sync_component_inventory.ts",
+      "module": "scripts/sync/sync_component_inventory.ts",
       "command": "sync component-inventory",
       "noun": "sync",
       "verb": "component-inventory",
@@ -4192,7 +4192,7 @@
     },
     {
       "id": "script.sync.model-registry",
-      "module": "scripts/sync_model_registry.ts",
+      "module": "scripts/sync/sync_model_registry.ts",
       "command": "sync model-registry",
       "noun": "sync",
       "verb": "model-registry",
@@ -4202,7 +4202,7 @@
     },
     {
       "id": "script.sync.org-role-grants",
-      "module": "scripts/sync_org_role_grants.ts",
+      "module": "scripts/sync/sync_org_role_grants.ts",
       "command": "sync org-role-grants",
       "noun": "sync",
       "verb": "org-role-grants",
@@ -4213,7 +4213,7 @@
     },
     {
       "id": "script.sync.service-endpoints",
-      "module": "scripts/sync_service_endpoints.ts",
+      "module": "scripts/sync/sync_service_endpoints.ts",
       "command": "sync service-endpoints",
       "noun": "sync",
       "verb": "service-endpoints",
@@ -4224,7 +4224,7 @@
     },
     {
       "id": "script.sync.specialist-catalog",
-      "module": "scripts/sync_specialist_catalog.ts",
+      "module": "scripts/sync/sync_specialist_catalog.ts",
       "command": "sync specialist-catalog",
       "noun": "sync",
       "verb": "specialist-catalog",
@@ -4235,7 +4235,7 @@
     },
     {
       "id": "script.sync.team-roles",
-      "module": "scripts/sync_team_roles.ts",
+      "module": "scripts/sync/sync_team_roles.ts",
       "command": "sync team-roles",
       "noun": "sync",
       "verb": "team-roles",
@@ -4292,7 +4292,7 @@
     },
     {
       "id": "script.task.smoke",
-      "module": "scripts/task_smoke.ts",
+      "module": "scripts/task/task_smoke.ts",
       "command": "task smoke",
       "noun": "task",
       "verb": "smoke",
@@ -4704,7 +4704,7 @@
     },
     {
       "id": "script.worktree.create",
-      "module": "scripts/agent_worktree.ts",
+      "module": "scripts/agent/agent_worktree.ts",
       "command": "worktree create",
       "noun": "worktree",
       "verb": "create",
@@ -4716,7 +4716,7 @@
     },
     {
       "id": "script.worktree.list",
-      "module": "scripts/agent_worktree.ts",
+      "module": "scripts/agent/agent_worktree.ts",
       "command": "worktree list",
       "noun": "worktree",
       "verb": "list",
@@ -4727,7 +4727,7 @@
     },
     {
       "id": "script.worktree.remove",
-      "module": "scripts/agent_worktree.ts",
+      "module": "scripts/agent/agent_worktree.ts",
       "command": "worktree remove",
       "noun": "worktree",
       "verb": "remove",

@@ -20,7 +20,7 @@ describe('run browser procedure environment boundary', () => {
     );
     expect(source).not.toMatch(/from ['"]@agent\/browser-actuator['"]/);
     expect(source).not.toMatch(/from ['"].*browser-actuator\/src/);
-    expect(source).toContain("from './browser_playwright_executor.js'");
+    expect(source).toContain("from './browser/browser_playwright_executor.js'");
   });
 
   it('does not treat --tab-id alone as a CDP attach signal', () => {

@@ -1,7 +1,7 @@
 /* ----------------------------------------------------------- avatar ----
  * PA-09 (PADS_A2UI_AND_AVATAR_PLAN_2026-09-23 §6): ui:talking-avatar.
  * Stamped into kyberion-ui.css after the base sheet by
- * scripts/generate_design_tokens.ts.
+ * scripts/generate/generate_design_tokens.ts.
  *
  * Markup comes from libs/shared-ui/vanilla/avatar.js and
  * src/avatar/*.tsx (parity-tested). `--kb-ui-*` tokens only, `.kb-*`

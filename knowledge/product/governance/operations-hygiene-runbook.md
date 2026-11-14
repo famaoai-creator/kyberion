@@ -288,7 +288,7 @@ had regressed.
 
 ## §1 CI workflows
 
-Generated Markdown that a commit hook formats must use the same repository Prettier configuration in its canonical generator. Verify formatter idempotence and rerun the generator in check mode after formatting; do not bypass hooks or weaken byte-comparison gates to ship generated inventory. The component inventory generator enforces this with `scripts/sync_component_inventory.contract.test.ts`.
+Generated Markdown that a commit hook formats must use the same repository Prettier configuration in its canonical generator. Verify formatter idempotence and rerun the generator in check mode after formatting; do not bypass hooks or weaken byte-comparison gates to ship generated inventory. The component inventory generator enforces this with `scripts/sync/sync_component_inventory.contract.test.ts`.
 
 **Compiler readiness and recovery accounting.** `pnpm build`, `pnpm build:packages` and
 `pnpm build:repo` enter the source-only `scripts/build_repository.ts` bootstrap. The compiler
@@ -328,7 +328,7 @@ terminal. Shell and connected-app authentication are independent; a CLI probe le
 status `not_probed`. Never persist token values, change host DNS/hosts, or copy credentials as a
 diagnostic workaround. Gates: `github-diagnostics.test.ts` and `gh-status.test.ts`.
 
-**Rules** (enforced by `scripts/check_ci_workflow_contract.ts`):
+**Rules** (enforced by `scripts/check/check_ci_workflow_contract.ts`):
 
 - Every job declares `timeout-minutes`. The default of 360 minutes lets a hung worker hold a runner
   for six hours. Size the timeout at about 1.5–2× the job's observed duration.
@@ -425,7 +425,7 @@ or security paths. Source-specific failures name the actual scanned source and i
 expected emit, each with that file's own timestamp; absent emits have a null timestamp
 and orphan emits have no source provenance. Only mtime fallback uses target-wide newest
 files. Cover older changed inputs beside newer unchanged inputs and missing/orphan
-outputs in `scripts/check_stale_dist.test.ts`. Platform-specific fixtures must be
+outputs in `scripts/check/check_stale_dist.test.ts`. Platform-specific fixtures must be
 explicit skips elsewhere and included in the native platform's CI command;
 `tests/workflow-operations-contract.test.ts` pins the Windows invocation.
 
@@ -579,7 +579,7 @@ This covers directories and top-level `*.jsonl` / `*.json` files.
    dot wake ledger); pruning it re-fires old wakes.
 4. **Run `pnpm check -- --only runtime-store-retention`** (part of `--scope pr`). It fails with
    `file:line` for any literal runtime path that has no entry. Add a file-scoped exemption, with a
-   reason, in `scripts/check_runtime_store_retention.ts` only for strings that are not real stores.
+   reason, in `scripts/check/check_runtime_store_retention.ts` only for strings that are not real stores.
 5. **Check the janitor report.** `uncoveredRuntimeDirs` / `uncoveredRuntimeFiles` must not list the
    new name. A name there means a store was created through a dynamic path the gate cannot see; add
    its catalog entry by hand.
@@ -603,7 +603,7 @@ This covers directories and top-level `*.jsonl` / `*.json` files.
 - Migrating a legacy `tenants/<slug>` store: register the root, write only the partitioned path,
   keep a read fallback to the legacy copy while it may still hold live data (remove the legacy copy
   on the next write — `generation-cost-settlement.ts`), or skip the fallback when the data is
-  short-lived (`scripts/reasoning_credentials.ts` proofs expire in 15 minutes). Add the old base to
+  short-lived (`scripts/reasoning/reasoning_credentials.ts` proofs expire in 15 minutes). Add the old base to
   `PHYSICAL_LEGACY_TENANT_STATE_ROOTS` so offboarding still removes leftovers — also when the live
   migration stays operator-reviewed: `dot-state-paths.ts` keeps `pnpm kyberion dot migrate-state`
   for a live tenant, but an offboarded tenant's `dot/tenants/<slug>/` copy is exported and
@@ -722,7 +722,7 @@ supervisor and PTC IPC tests when changing a listener.
   async `setInterval`.
 - **Handle `SIGTERM` and `SIGINT`.** Stop the timer, wait for the in-flight tick (bounded), release
   any leader or lease lock, record a `stopped` heartbeat, and exit 0. The reference implementation
-  is `scripts/agent_runtime_supervisor_daemon.ts`.
+  is `scripts/agent/agent_runtime_supervisor_daemon.ts`.
 - **A shutdown is not a failure.** A child that exits because the daemon forwarded `SIGTERM` during
   shutdown must not raise an ops alert or an `error` heartbeat; mark the shutdown and report the
   tick as cancelled.
@@ -742,7 +742,7 @@ supervisor and PTC IPC tests when changing a listener.
   pipeline `system:shell` step, the child inherits the runner's role (`run_pipeline.bundle`).
   Prove it with a hermetic tier-guard test (copy of the governance policies under a temp
   `KYBERION_ROOT`; under the repo root Vitest does not load the policy) and by running the
-  schedule's pipeline once. Reference: `scripts/check_chronos_perf_baseline.test.ts`.
+  schedule's pipeline once. Reference: `scripts/check/check_chronos_perf_baseline.test.ts`.
 - **Give every child a deadline.** Kill the child when it expires, raise an ops alert via
   `sendOpsAlert`, and forward signals to the child on shutdown.
 
@@ -812,7 +812,7 @@ revision changes, unchanged summary refreshes and timeout recovery in
 unbounded. When a child needs a role the server itself must not hold (a writer, or a ledger role
 such as `decision_ledger`), do not add that role to the server's `may_assume` and do not clear
 `SYSTEM_ROLE`. Give the child its own one-purpose entry script that dispatches only the verbs the
-server calls (e.g. `scripts/customer_decision_overview.ts`, `scripts/dot_lifecycle_worker.ts`), a
+server calls (e.g. `scripts/customer_decision_overview.ts`, `scripts/dot/dot_lifecycle_worker.ts`), a
 narrow system role granting just the roles that entry reaches, a reachability workspace entry in
 `scripts/lib/role-assumption-workspace.ts`, and a regenerated
 `role-assumption-unresolved-baseline.json` (`--print-unresolved-baseline`, never hand edits). Pin
@@ -848,7 +848,7 @@ Production source inventories must exclude runtime storage roots before traversi
 them. The single-instance scan skips legacy root-level `work/` metrics, whose I/O is
 redirected into a per-test fixture; it still scans nested code directories named
 `work`. Do not suppress filesystem denials or missing-source errors to hide a scan
-failure. Gate: `scripts/check_core_single_instance.test.ts`, including the real
+failure. Gate: `scripts/check/check_core_single_instance.test.ts`, including the real
 production inventory and exact manifest-only import exception.
 
 When a store module also exports pure admission/security checks, partially mock the module
@@ -1157,7 +1157,7 @@ mechanism has an off switch and a test that compares its output with the switch 
 | `ts.transpileModule` for every TypeScript module, in every process                                                                                                                                                          | Transpile cache in `node_modules/.cache/kyberion-ts-loader/` (`scripts/ts-loader-cache.mjs`), outside every agent-writable tree: key = SHA-256 of the cache module's own text (it holds the options), TypeScript version, absolute path and source; 0700 dirs, 0600 entries, owner/mode checked on read; temp file + rename; TypeScript is required only on a miss | `KYBERION_TS_LOADER_CACHE=0`            | `scripts/ts-loader-cache.test.ts` (invalidation, poisoning, concurrency), `libs/core/tier-guard-ts-loader-cache.test.ts` |
 | Node's default resolver runs `getPackageScopeConfig` for each `.ts` URL (type stripping is on by default in Node 24), and that call re-parses the whole `exports` string of the nearest package.json: 290KB for `libs/core` | `scripts/ts-loader.mjs` answers workspace TypeScript resolutions itself (`resolveTsSourceDirectly`, realpath URL)                                                                                                                                                                                                                                                  | `KYBERION_TS_LOADER_FAST_RESOLVE=0`     | `scripts/ts-loader-resolve.test.ts` (differential)                                                                       |
 | The same re-parse for each `libs/core/dist/*.js` module                                                                                                                                                                     | The core build writes `libs/core/dist/package.json` (`type` + `#imports` only) and one-line shims re-exporting the real `.mjs` modules (`scripts/write_core_dist_scope.mjs --run`; `--check` drift runs in the packaging-contract gate). External consumers still resolve `@agent/core/*` through the full exports map                                             | `KYBERION_CORE_DIST_SCOPE=0` (build)    | `scripts/write_core_dist_scope.test.ts` (differential)                                                                   |
-| `local-stt-discovery` probed every `python3.x` once per bridge installer                                                                                                                                                    | Memo + private host cache `node_modules/.cache/kyberion-stt-discovery/candidates.json`, both for 10 minutes, keyed on platform, PATH, registry content and the managed runtimes' bin lstat and site-packages mtimes; managed installers reset it; a hit rebuilds candidates from the registry and accepts only binaries the probe could have found                 | `KYBERION_STT_DISCOVERY_CACHE_TTL_MS=0` | `libs/core/voice/local-stt-discovery.cache.test.ts`, `scripts/voice_setup.discovery-cache.test.ts`                       |
+| `local-stt-discovery` probed every `python3.x` once per bridge installer                                                                                                                                                    | Memo + private host cache `node_modules/.cache/kyberion-stt-discovery/candidates.json`, both for 10 minutes, keyed on platform, PATH, registry content and the managed runtimes' bin lstat and site-packages mtimes; managed installers reset it; a hit rebuilds candidates from the registry and accepts only binaries the probe could have found                 | `KYBERION_STT_DISCOVERY_CACHE_TTL_MS=0` | `libs/core/voice/local-stt-discovery.cache.test.ts`, `scripts/voice/voice_setup.discovery-cache.test.ts`                 |
 
 Rules:
 
@@ -2042,7 +2042,7 @@ missing-session or unsupported-capability diagnostics instead of false success.
 
 **Gate.** Run `scripts/actuator_playground.test.ts`, `libs/core/harnessing/cli-utils.test.ts`,
 the browser and terminal actuator tests, and `libs/core/shell/pty-engine.resize.test.ts`.
-Replay `scripts/browser_actuator_usability_probe.ts` and
+Replay `scripts/browser/browser_actuator_usability_probe.ts` and
 `scripts/terminal_actuator_usability_probe.ts` for live outcomes and recovery.
 Native PTY and desktop GUI checks require the corresponding host capabilities.
 A silent `PTY_ENGINE ... falling back to ChildProcess` warning means sessions
@@ -2278,7 +2278,7 @@ when regenerating wiring. Do not change hook trust records or invoke an LLM from
 separate CLI instances, bounded batches, Stop silence and SessionEnd release.
 `libs/core/provider/co-session-hook.test.ts` checks interleaved hook delivery;
 `libs/core/provider/claude-code-hook.test.ts` checks recursive Stop silence;
-`scripts/generate_provider_hook_configs.test.ts` checks idempotent generation and preservation.
+`scripts/generate/generate_provider_hook_configs.test.ts` checks idempotent generation and preservation.
 
 ## Hearing completion read recovery
 
@@ -2838,7 +2838,7 @@ the work or its approved contract and explicitly returns both the child and its
 blocked continuous-owner WorkItem to `ready`. Skip native ticket creation when
 no planned tasks remain, so existing WorkItems can still advance or reach the
 rework/intervention check.
-Gate: `scripts/continuous_work_owner.test.ts` (limit, invalid counter, scope,
+Gate: `scripts/continuous/continuous_work_owner.test.ts` (limit, invalid counter, scope,
 ordinary retry and existing blocker cases).
 
 **Learning registration must survive completion and restart.** Persist a scoped,
@@ -2848,7 +2848,7 @@ replays only that candidate, without another model call or resetting a reviewed
 candidate. Continuous owners reconcile pending delivery before accepting child
 completion; ratification and promotion still use their governed approval path.
 Gate: `libs/core/mission/mission-distill.test.ts` and
-`scripts/continuous_work_owner.test.ts` (delivery failure, replay and approval
+`scripts/continuous/continuous_work_owner.test.ts` (delivery failure, replay and approval
 preservation).
 
 **Process source schemas belong in governed descriptors.** JSON sources declare
@@ -3477,4 +3477,4 @@ refused rather than adopted.
 - **Local daemons**: filesystem permissions bound a Unix socket or named pipe; a TCP listener
   has no such boundary and must not serve without a configured token. A socket path that reads
   as a number is refused, because Node binds it as a TCP port on every interface. Gate:
-  `scripts/agent_runtime_supervisor_daemon.test.ts`.
+  `scripts/agent/agent_runtime_supervisor_daemon.test.ts`.

@@ -206,7 +206,7 @@ describe('install_chronos_launchd --daemon', () => {
   it('keeps the supervisor alive only after a crash — a clean exit means another instance owns the lock', async () => {
     const spec = LAUNCHD_DAEMON_SPECS['agent-runtime-supervisor'];
     expect(spec.label).toBe('com.kyberion.agent-runtime-supervisor');
-    expect(spec.daemonScript).toBe('dist/scripts/agent_runtime_supervisor_daemon.js');
+    expect(spec.daemonScript).toBe('dist/scripts/agent/agent_runtime_supervisor_daemon.js');
     expect(spec.keepAliveOnCrashOnly).toBe(true);
 
     const output: string[] = [];

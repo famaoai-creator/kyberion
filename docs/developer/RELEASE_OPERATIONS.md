@@ -78,14 +78,14 @@ pnpm run validate       # full validate including check:contract-semver
 
 # 2. Decide the new version.
 #    - patch / minor / major per the rules above.
-#    - For minor, scan unreleased commits with `pnpm tsx scripts/generate_changelog.ts`.
+#    - For minor, scan unreleased commits with `pnpm tsx scripts/generate/generate_changelog.ts`.
 NEW_VERSION="0.x.y"
 
 # 3. Fold the per-PR fragments (changelog.d/*.md) into [Unreleased], then
 #    generate changelog entries from commits since the last tag.
 #    `assemble` deletes the fragments it merged; commit both together.
 pnpm kyberion changelog assemble
-pnpm tsx scripts/generate_changelog.ts --prepend
+pnpm tsx scripts/generate/generate_changelog.ts --prepend
 
 # 4. Edit CHANGELOG.md:
 #    - Move the [Unreleased] additions to a new ## [<version>] - <YYYY-MM-DD> section.
@@ -170,7 +170,7 @@ We support the latest minor of the latest major + the latest minor of the previo
 ## Status
 
 - [x] CHANGELOG.md initialized
-- [x] `scripts/generate_changelog.ts`
+- [x] `scripts/generate/generate_changelog.ts`
 - [x] `migration/` directory + README
 - [x] PR title / commit message linter
 - [x] Automated release workflow (`.github/workflows/release.yml`)

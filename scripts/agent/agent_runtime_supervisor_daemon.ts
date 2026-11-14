@@ -1,0 +1,1668 @@
+import * as net from 'node:net';
+import '../task/task_pipeline_executor.js';
+import '@agent/core/workforce/worker-goal-driver';
+import { timingSafeEqual } from 'node:crypto';
+import { resolveLocalIpcAddress } from '@agent/core/local-ipc';
+import { tryInspectCompilerOutputs } from '@agent/core/build-coordination';
+import { restrictWindowsNamedPipeAcl } from '@agent/core/windows-named-pipe-security';
+import * as path from 'node:path';
+import { defineScript, isDirectScript, setProcessExitCode } from '../lib/harness.js';
+import {
+  askAgentRuntime,
+  ensureAgentRuntime,
+  getAgentRuntimeLog,
+  getAgentRuntimeSnapshot,
+  listAgentRuntimeLeaseSummaries,
+  listAgentRuntimeSnapshots,
+  refreshAgentRuntime,
+  restartAgentRuntime,
+  shutdownAllAgentRuntimes,
+  stopAgentRuntime,
+} from '@agent/core/agent/agent-runtime-supervisor';
+import {
+  enqueueDelegatedTaskInbox,
+  hasPendingDelegatedTaskInbox,
+  loadDelegatedTaskRecord,
+  recordDelegatedTaskActivationFailure,
+  spawnDelegatedTaskWorkerProcess,
+} from '@agent/core/delegated-task-observability';
+import { appendSupervisorEvent } from '@agent/core/agent/agent-runtime-events';
+import { recordDaemonHeartbeat } from '@agent/core/daemon-heartbeat';
+import { runtimeSupervisor } from '@agent/core/tool/runtime-supervisor';
+import { sendOpsAlert } from '@agent/core/ops-alert';
+import {
+  computeSupervisorCodeStamp,
+  normalizeSupervisorResponse,
+  normalizeSupervisorResult,
+} from '@agent/core/agent/agent-runtime-supervisor-client';
+import { getRegisteredEnvText, parseSafeJsonInput, setRegisteredEnv } from '@agent/core/foundation';
+import { withExecutionContext } from '@agent/core/authority';
+import { createTriggerRunner, resolveCurrentTriggerAuthority } from '@agent/core/trigger-runner';
+import {
+  listDotCharters,
+  type DotCharter,
+  type DotCharterLoadError,
+  type LoadedDotCharter,
+} from '@agent/core/dot/dot-charter';
+import {
+  applyDotWakeCircuit,
+  dotDailyTokenCapReached,
+  evaluateDotProbeTriggers,
+  evaluateDotTriggersDue,
+  recordDotWakeOutcome,
+  type DotWakeReceipt,
+  type DueDotTrigger,
+} from '@agent/core/dot/dot-runtime';
+import { evaluateDotCronCatchUp, evaluateDotFollowupsDue } from '@agent/core/dot/dot-followups';
+import { evaluateDotEventTriggers } from '@agent/core/dot/dot-event-intake';
+import { evaluateDotFeedTriggers } from '@agent/core/dot/dot-feed-source';
+import {
+  installReasoningBackends,
+  reselectReasoningBackends,
+  prepareReasoningExecutionHost,
+} from '@agent/core/reasoning/reasoning-bootstrap';
+import { credentialBindingReadiness } from '@agent/core/secret/secret-guard';
+import { createSupervisorReasoningRefresh } from '../lib/supervisor-reasoning-readiness.js';
+import {
+  runDotSupervisorExtensions,
+  triggerRunnerSource,
+  reconcileDotEventRunnerDuplicate,
+} from '../dot/dot_supervisor_extensions.js';
+import { executeServicePreset } from '@agent/core/service/service-engine';
+import { runDotWakeWithGoalDriver } from '@agent/core/dot/dot-wake-orchestration';
+import { runDotHousekeeping } from '@agent/core/dot/dot-dispatch';
+import '@agent/core/dot/dot-extension-bootstrap';
+import { dotBudgetThrottle, type DotBudgetThrottle } from '@agent/core/dot/dot-budget';
+import { runAsDotCharter } from '@agent/core/dot/dot-key-results';
+import { notifyDotBudgetStopOnce } from '../dot/dot_budget_alert.js';
+import { tickVetoWindows } from '@agent/core/governance/approval-veto-window';
+import { getOperationsHaltState } from '@agent/core/governance/operations-halt';
+import { AUTONOMY_APPROVAL_CHANNEL } from '@agent/core/governance/approval-decision-card';
+import { isRecord } from '@agent/core/foundation/text';
+import {
+  alertVetoWindowFailure,
+  readDaemonLockTextFile,
+  resolveInflightLimit,
+  startRuntimeHealthSampler,
+} from './agent_runtime_supervisor_daemon.capacity.js';
+export { resolveInflightLimit } from './agent_runtime_supervisor_daemon.capacity.js';
+export { readDaemonLockTextFile } from './agent_runtime_supervisor_daemon.capacity.js';
+import { logger } from '@agent/core/core';
+import { pathResolver, rootDir } from '@agent/core/path-resolver';
+import {
+  safeExistsSync,
+  safeMkdir,
+  safeUnlinkSync,
+  safeCreateExclusiveFileSync,
+} from '@agent/core/secure-io';
+import type { TaskModelHint } from '@agent/core/reasoning/reasoning-model-routing';
+import { installProcessGuards } from '@agent/core/process-guards';
+
+// IP-08 Task 6: record unhandled rejections/exceptions in this long-lived process.
+installProcessGuards('agent-runtime-supervisor');
+
+function registeredEnv(name: string): string | undefined {
+  return getRegisteredEnvText(name);
+}
+
+// OP-04: hourly RSS/heap samples feed the degradation watch's trend
+// evaluation (leak / restart-storm detection over a 24h window).
+startRuntimeHealthSampler('agent-runtime-supervisor');
+
+// Captured once at startup: the core build this daemon's behavior comes from.
+const DAEMON_CODE_STAMP = computeSupervisorCodeStamp();
+
+type SupervisorMethod =
+  | 'health'
+  | 'ensure'
+  | 'ask'
+  | 'status'
+  | 'list'
+  | 'touch'
+  | 'shutdown'
+  | 'refresh'
+  | 'restart'
+  | 'delegated_enqueue'
+  | 'terminate';
+
+interface SupervisorRequest {
+  id: string;
+  method: SupervisorMethod;
+  auth_token?: string;
+  payload?: Record<string, unknown>;
+}
+
+interface SupervisorResponse {
+  id: string;
+  ok: boolean;
+  result?: Record<string, unknown> | Array<Record<string, unknown>> | null;
+  error?: string;
+  errorDetail?: Record<string, unknown>;
+}
+
+const SUPERVISOR_METHODS = [
+  'health',
+  'ensure',
+  'ask',
+  'status',
+  'list',
+  'touch',
+  'shutdown',
+  'refresh',
+  'restart',
+  'delegated_enqueue',
+  'terminate',
+] as const satisfies readonly SupervisorMethod[];
+
+function normalizeSupervisorRequest(value: unknown): SupervisorRequest {
+  if (!isRecord(value)) throw new Error('supervisor request must be a JSON object');
+  if (typeof value.id !== 'string' || !value.id.trim()) {
+    throw new Error('supervisor request.id must be a non-empty string');
+  }
+  if (
+    typeof value.method !== 'string' ||
+    !(SUPERVISOR_METHODS as readonly string[]).includes(value.method)
+  ) {
+    throw new Error('supervisor request.method is unsupported');
+  }
+  if (value.auth_token !== undefined && typeof value.auth_token !== 'string') {
+    throw new Error('supervisor request.auth_token must be a string');
+  }
+  if (value.payload !== undefined && !isRecord(value.payload)) {
+    throw new Error('supervisor request.payload must be a JSON object');
+  }
+  return {
+    id: value.id,
+    method: value.method as SupervisorMethod,
+    ...(typeof value.auth_token === 'string' ? { auth_token: value.auth_token } : {}),
+    ...(isRecord(value.payload) ? { payload: value.payload } : {}),
+  };
+}
+
+const SOCKET_DIR = pathResolver.shared('runtime/agent-supervisor');
+const SOCKET_PATH = `${SOCKET_DIR}/sup.sock`;
+const DAEMON_LOCK_PATH = `${SOCKET_DIR}/agent-supervisor-daemon.lock`;
+
+const GLOBAL_LIMIT = resolveInflightLimit(
+  'KYBERION_GLOBAL_INFLIGHT_LIMIT',
+  registeredEnv('KYBERION_GLOBAL_INFLIGHT_LIMIT'),
+  8
+);
+const AGENT_LIMIT = resolveInflightLimit(
+  'KYBERION_AGENT_INFLIGHT_LIMIT',
+  registeredEnv('KYBERION_AGENT_INFLIGHT_LIMIT'),
+  2
+);
+
+let daemonGlobalInflight = 0;
+const daemonAgentInflightMap = new Map<string, number>();
+const delegatedWorkerStarts = new Map<string, Promise<{ resourceId: string; pid?: number }>>();
+const delegatedWorkerRestartCounts = new Map<string, number>();
+const MAX_DELEGATED_WORKER_RESTARTS = 3;
+let delegatedWorkerShutdown = false;
+let requestShutdown: ((exitCode: number) => void) | undefined;
+
+/**
+ * AC-10: throttle for the `a2a_inflight_metric` supervisor event.
+ *
+ * The sweep tick that samples inflight counts runs every
+ * `KYBERION_RUNTIME_SWEEP_INTERVAL_MS` (default 30s = 2,880 samples/day at
+ * steady state, dominating the supervisor event stream even after the AC-10
+ * daily rotation). Most ticks see no change in inflight load, so this only
+ * calls `appendSupervisorEvent` when the sample actually changed since the
+ * last emission, or at least `INFLIGHT_METRIC_MIN_INTERVAL_MS` elapsed —
+ * capping steady-state volume at 24h / 10min = 144 samples/day while still
+ * emitting immediately on every real change.
+ */
+const INFLIGHT_METRIC_MIN_INTERVAL_MS = 10 * 60 * 1000;
+let lastInflightMetricSampleKey: string | null = null;
+let lastInflightMetricEmittedAtMs = 0;
+
+/** Test-only: reset the module-local throttle state between test cases. */
+export function resetInflightMetricThrottleForTests(): void {
+  lastInflightMetricSampleKey = null;
+  lastInflightMetricEmittedAtMs = 0;
+}
+
+/**
+ * Emit an `a2a_inflight_metric` sample, subject to the AC-10 throttle above.
+ * Exported (rather than inlined in the sweep interval) so tests can call it
+ * directly without waiting on a real timer.
+ */
+export function recordInflightMetricSample(
+  inflightTotal: number,
+  inflightByAgent: Record<string, number>,
+  nowMs: number = Date.now()
+): void {
+  const sortedAgentEntries = Object.entries(inflightByAgent).sort(([a], [b]) =>
+    a < b ? -1 : a > b ? 1 : 0
+  );
+  const sampleKey = JSON.stringify([inflightTotal, sortedAgentEntries]);
+  const changed = sampleKey !== lastInflightMetricSampleKey;
+  const elapsedMs = nowMs - lastInflightMetricEmittedAtMs;
+  if (!changed && elapsedMs < INFLIGHT_METRIC_MIN_INTERVAL_MS) return;
+
+  lastInflightMetricSampleKey = sampleKey;
+  lastInflightMetricEmittedAtMs = nowMs;
+  appendSupervisorEvent({
+    decision: 'a2a_inflight_metric',
+    inflight_total: inflightTotal,
+    inflight_by_agent: inflightByAgent,
+  });
+}
+
+setInterval(
+  () => {
+    try {
+      const agentInflightObj: Record<string, number> = {};
+      for (const [k, v] of daemonAgentInflightMap.entries()) {
+        if (v > 0) agentInflightObj[k] = v;
+      }
+      recordInflightMetricSample(daemonGlobalInflight, agentInflightObj);
+    } catch (err) {
+      logger.warn(`[agent_runtime_supervisor_daemon] suppressed error in best-effort step: ${err}`);
+    }
+  },
+  Number(registeredEnv('KYBERION_RUNTIME_SWEEP_INTERVAL_MS') || 30_000)
+).unref?.();
+
+/**
+ * Resident-dot sweep: multiplexes active charters. Each tick evaluates every
+ * active charter's attention triggers and routes due wakes through the
+ * governed TriggerRunner (idempotency + audit + authority attribution), whose
+ * deliver handler runs one bounded goal turn via runDotWakeWithGoalDriver.
+ * Malformed charters warn+continue — a bad charter file must never kill the
+ * daemon (MSN-RESIDENT-DOT-20261002's alert-path lesson). Exported for hermetic
+ * tests.
+ */
+const dotTriggerRunner = createTriggerRunner();
+let dotSweepInFlight = false;
+
+/** Re-select reasoning backends this often in the long-lived daemon. */
+export const DOT_BACKEND_RESELECT_INTERVAL_MS = 30 * 60 * 1000;
+/** Minimum spacing of failure-driven reselects (all wakes failed on the backend). */
+const DOT_BACKEND_FAILURE_RESELECT_MIN_MS = 5 * 60 * 1000;
+/** Stale-code drift is warned at most this often. */
+const STALE_CODE_WARN_INTERVAL_MS = 60 * 60 * 1000;
+
+let lastDotCharterErrors: DotCharterLoadError[] = [];
+const warnedDotCharterErrors = new Set<string>();
+let lastFailureReselectAt = 0;
+let lastStaleCodeWarnAt = 0;
+const supervisorReasoningRefresh = createSupervisorReasoningRefresh({
+  inspect: credentialBindingReadiness,
+  install: installReasoningBackends,
+  reselect: reselectReasoningBackends,
+  logger,
+});
+
+/** Wake failures caused by the reasoning backend, not the dot (reselect may fix them). */
+export function isDotBackendFailure(reason: string | undefined): boolean {
+  return /no real reasoning backend|lacks generateWithTools|failed across \d+ candidate|has no tool-capable backend|Reasoning backend is not configured/i.test(
+    String(reason ?? '')
+  );
+}
+
+export interface DotSweepDeps {
+  /** Active charters (malformed ones pushed onto `errors`); defaults to listDotCharters. */
+  listCharters?: (errors: DotCharterLoadError[]) => LoadedDotCharter[];
+  /** Executes one wake; defaults to runDotWakeWithGoalDriver. */
+  wake?: (loaded: LoadedDotCharter, deps: { trigger: DueDotTrigger }) => Promise<DotWakeReceipt>;
+  /** Backend reselect port; defaults to reselectReasoningBackends. */
+  reselectBackends?: () => void;
+  /** Org budget throttle port; defaults to dotBudgetThrottle (DL-07). */
+  budgetThrottle?: (charter: DotCharter) => DotBudgetThrottle;
+}
+
+/** Heartbeat details for the daemon: charter load errors and code-stamp drift. */
+export function dotSupervisorHeartbeatDetails(nowMs: number = Date.now()): Record<string, unknown> {
+  const currentStamp = computeSupervisorCodeStamp();
+  const stale = currentStamp !== 0 && DAEMON_CODE_STAMP !== 0 && currentStamp !== DAEMON_CODE_STAMP;
+  if (stale && nowMs - lastStaleCodeWarnAt >= STALE_CODE_WARN_INTERVAL_MS) {
+    lastStaleCodeWarnAt = nowMs;
+    logger.warn(
+      `[dot-sweep] supervisor runs stale code — core dist changed since start (${DAEMON_CODE_STAMP} → ${currentStamp}) | next: restart the agent-runtime supervisor daemon to load the new build | evidence: libs/core/dist/index.js`
+    );
+  }
+  return {
+    reasoning_backend: supervisorReasoningRefresh.snapshot(),
+    ...(lastDotCharterErrors.length
+      ? {
+          charter_errors: lastDotCharterErrors.map((entry) => ({
+            path: entry.path,
+            error: entry.error.slice(0, 300),
+          })),
+        }
+      : {}),
+    ...(stale ? { stale_code: true, code_stamp: DAEMON_CODE_STAMP, dist_stamp: currentStamp } : {}),
+  };
+}
+
+/** Test-only: reset sweep-level module state. */
+export function resetDotSweepStateForTests(): void {
+  lastDotCharterErrors = [];
+  warnedDotCharterErrors.clear();
+  lastFailureReselectAt = 0;
+  lastStaleCodeWarnAt = 0;
+  dotSweepInFlight = false;
+  supervisorReasoningRefresh.reset();
+}
+
+export async function runDotSweepOnce(
+  now: Date = new Date(),
+  deps: DotSweepDeps = {}
+): Promise<number> {
+  const inspection = await tryInspectCompilerOutputs(() => runDotSweepWithStableOutputs(now, deps));
+  if (!('value' in inspection)) {
+    logger.debug(
+      '[dot-sweep] compiler outputs busy — sweep deferred until build completes | next: retry next sweep | evidence: compiler-outputs'
+    );
+    return 0;
+  }
+  return inspection.value;
+}
+
+async function runDotSweepWithStableOutputs(now: Date, deps: DotSweepDeps): Promise<number> {
+  // One sweep at a time: a slow wake (up to the charter's wall-clock budget)
+  // must not let the next tick pile a second sweep on top.
+  if (dotSweepInFlight) return 0;
+  dotSweepInFlight = true;
+  try {
+    const charterErrors: DotCharterLoadError[] = [];
+    const active = (
+      deps.listCharters ??
+      ((errors: DotCharterLoadError[]) => listDotCharters(undefined, { status: 'active', errors }))
+    )(charterErrors);
+    lastDotCharterErrors = charterErrors;
+    for (const error of charterErrors) {
+      // Warn once per distinct (path, error); the heartbeat carries the live list.
+      const key = `${error.path}\u0000${error.error}`;
+      if (warnedDotCharterErrors.has(key)) continue;
+      warnedDotCharterErrors.add(key);
+      logger.warn(
+        `[dot-sweep] charter skipped — ${error.error} | next: pnpm kyberion dot validate, then fix the file | evidence: ${error.path}`
+      );
+    }
+    let delivered = 0;
+    const wakeReasons: Array<string | undefined> = [];
+    // Veto windows on dot decision cards elapse here too, not only via
+    // `approval-inbox tick`, so a silent-consent action does not wait for a CLI.
+    try {
+      withExecutionContext('infrastructure_sentinel', () =>
+        tickVetoWindows('infrastructure_sentinel', {
+          now: now.getTime(),
+          storageChannels: [AUTONOMY_APPROVAL_CHANNEL],
+        })
+      );
+    } catch (error) {
+      logger.warn(
+        `[dot-sweep] veto-window tick failed: ${error instanceof Error ? error.message : error}`
+      );
+      alertVetoWindowFailure(now, error);
+    }
+    for (const loaded of active) {
+      const housekeeping = await runAsDotCharter(loaded.charter, () =>
+        runDotHousekeeping(loaded.charter, {
+          now: () => now,
+          serviceCall: (input) =>
+            executeServicePreset(
+              input.service_id,
+              input.action,
+              input.params ?? {},
+              'secret-guard'
+            ),
+        })
+      ).catch((error: unknown) => ({
+        settled: [],
+        signals: 0,
+        digest: false,
+        errors: [`housekeeping: ${error instanceof Error ? error.message : String(error)}`],
+      }));
+      for (const message of housekeeping.errors) {
+        logger.warn(`[dot-sweep] housekeeping for ${loaded.charter.dot_id} — ${message}`);
+      }
+    }
+    // P1-9: a halted system runs housekeeping only. Dots still heartbeat so the
+    // watchdog does not page a dot that is healthy-but-stopped.
+    const halt = getOperationsHaltState();
+    if (halt.halted) {
+      for (const loaded of active) {
+        recordDaemonHeartbeat(loaded.charter.runtime.heartbeat_id, {
+          status: 'running',
+          details: { dot_id: loaded.charter.dot_id, trigger: 'halted' },
+        });
+      }
+      return 0;
+    }
+    // Registered per-sweep steps (executor, KR measurement, …) run after
+    // housekeeping and before wakes; each step is isolated.
+    await runDotSupervisorExtensions(now, active);
+    for (const loaded of active) {
+      // Budget-capped dots skip before the runner layer so a pending trigger
+      // doesn't burn a warn + 'failed' receipt every tick — but they still
+      // heartbeat, or the watchdog would page a dot that is healthy-but-capped.
+      if (
+        await runAsDotCharter(loaded.charter, async () =>
+          dotDailyTokenCapReached(loaded.charter, { now: () => now })
+        )
+      ) {
+        notifyDotBudgetStopOnce(loaded.charter, 'token-cap', now);
+        recordDaemonHeartbeat(loaded.charter.runtime.heartbeat_id, {
+          status: 'running',
+          details: { dot_id: loaded.charter.dot_id, trigger: 'token-cap' },
+        });
+        continue;
+      }
+      // DL-07: a scope at the hard org budget limit gets no wakes (housekeeping
+      // above still ran; the executor step skips it too). Fails open.
+      let budgetThrottle: DotBudgetThrottle = 'normal';
+      try {
+        budgetThrottle = await runAsDotCharter(loaded.charter, async () =>
+          (
+            deps.budgetThrottle ??
+            ((charter: DotCharter) => dotBudgetThrottle(charter, { now: () => now }).throttle)
+          )(loaded.charter)
+        );
+      } catch (error) {
+        logger.warn(
+          `[dot-sweep] budget evaluation failed for ${loaded.charter.dot_id} — ${error instanceof Error ? error.message : error} | next: wakes held; repair spend-policy.json org_budget | evidence: libs/core/governance/org-budget-governor.ts`
+        );
+        budgetThrottle = 'hard';
+      }
+      if (budgetThrottle === 'hard') {
+        notifyDotBudgetStopOnce(loaded.charter, 'budget-hard', now);
+        recordDaemonHeartbeat(loaded.charter.runtime.heartbeat_id, {
+          status: 'running',
+          details: { dot_id: loaded.charter.dot_id, trigger: 'budget-hard' },
+        });
+        continue;
+      }
+      let due: DueDotTrigger[];
+      try {
+        due = await runAsDotCharter(loaded.charter, async () => {
+          let due: DueDotTrigger[];
+          const serviceCall = (input: {
+            service_id: string;
+            action: string;
+            params?: Record<string, unknown>;
+          }) =>
+            executeServicePreset(
+              input.service_id,
+              input.action,
+              input.params ?? {},
+              'secret-guard'
+            );
+          // Pull feeds first: a fresh item must be able to wake the dot in the
+          // same sweep through its ordinary event trigger.
+          const feedPolls = await evaluateDotFeedTriggers(loaded.charter, {
+            now: () => now,
+            serviceCall,
+          });
+          if (feedPolls.length > 0) {
+            recordDaemonHeartbeat(loaded.charter.runtime.heartbeat_id, {
+              status: 'running',
+              details: {
+                dot_id: loaded.charter.dot_id,
+                trigger: 'feed',
+                feeds: feedPolls.map((poll) => ({
+                  source: poll.source,
+                  status: poll.status,
+                  ingested: poll.ingested,
+                })),
+              },
+            });
+          }
+          due = evaluateDotTriggersDue(loaded.charter, { now: () => now });
+          due = due.concat(
+            await evaluateDotProbeTriggers(loaded.charter, {
+              now: () => now,
+              serviceCall,
+            })
+          );
+          due = due.concat(
+            evaluateDotFollowupsDue(loaded.charter, { now: () => now }),
+            evaluateDotCronCatchUp(loaded.charter, { now: () => now })
+          );
+          due = due.concat(evaluateDotEventTriggers(loaded.charter, { now: () => now }));
+          // Re-applied over the concatenated list: one half-open probe at most.
+          due = applyDotWakeCircuit(loaded.charter, due, { now: () => now });
+          return due;
+        });
+      } catch (error) {
+        logger.warn(
+          `[dot-sweep] trigger evaluation failed for ${loaded.charter.dot_id}: ${error instanceof Error ? error.message : error}`
+        );
+        continue;
+      }
+      for (const trigger of due) {
+        // runDotWake writes its own ledger row on internal failure; only a
+        // failure before the deliver callback (authority/policy) needs one
+        // written here.
+        let deliverRan = false;
+        try {
+          const receipt = await runAsDotCharter(loaded.charter, async () => {
+            const authority = resolveCurrentTriggerAuthority(loaded.charter.scope.tenant_slug);
+            return await dotTriggerRunner.run(
+              {
+                idempotencyKey: `dot:${loaded.charter.dot_id}:${trigger.key}`,
+                source: triggerRunnerSource(trigger),
+                createdBy: authority,
+                payload: { dot_id: loaded.charter.dot_id, trigger_key: trigger.key },
+              },
+              async () => {
+                deliverRan = true;
+                const wake = await (deps.wake ?? runDotWakeWithGoalDriver)(loaded, { trigger });
+                wakeReasons.push(wake.outcome === 'failed' ? (wake.reason ?? 'failed') : undefined);
+                // Only a real delivery may close the runner's idempotency
+                // key — 'delivered' is terminal there, so throwing on
+                // skipped/failed keeps the key retryable and lets the dot
+                // ledger's pending event survive the block (a content-
+                // addressed wake:<hash> key can never regenerate).
+                if (wake.outcome === 'failed' || wake.outcome === 'skipped') {
+                  throw new Error(wake.reason ?? `dot wake ${wake.outcome}`);
+                }
+                return `dot-wake:${wake.outcome}`;
+              }
+            );
+          });
+          reconcileDotEventRunnerDuplicate(loaded.charter, trigger.key, receipt, () =>
+            dotTriggerRunner.records()
+          );
+          if (receipt.status === 'delivered') {
+            delivered += 1;
+          } else if (receipt.status === 'rejected') {
+            // Terminal in the runner — mirror it into the dot ledger so
+            // due-ness and receipts converge instead of re-offering a wedged
+            // key every sweep.
+            recordDotWakeOutcome(loaded.charter, trigger, 'rejected', {
+              reason: receipt.reason ?? 'rejected by trigger-runner',
+            });
+            logger.warn(
+              `[dot-sweep] wake rejected for ${loaded.charter.dot_id} (${trigger.key}): ${receipt.reason ?? 'policy'}`
+            );
+          } else if (receipt.status === 'failed') {
+            if (!deliverRan) {
+              recordDotWakeOutcome(loaded.charter, trigger, 'failed', {
+                reason: receipt.reason ?? 'delivery failed',
+              });
+            }
+            logger.warn(
+              `[dot-sweep] wake failed for ${loaded.charter.dot_id} (${trigger.key}): ${receipt.reason ?? 'unknown'}`
+            );
+          }
+        } catch (error) {
+          logger.warn(
+            `[dot-sweep] wake delivery error for ${loaded.charter.dot_id} (${trigger.key}): ${error instanceof Error ? error.message : error}`
+          );
+        }
+      }
+    }
+    // Every wake this sweep failed on the reasoning backend: providers may
+    // have come back (or a login completed) since the last selection.
+    if (
+      wakeReasons.length > 0 &&
+      wakeReasons.every((reason) => reason !== undefined && isDotBackendFailure(reason)) &&
+      now.getTime() - lastFailureReselectAt >= DOT_BACKEND_FAILURE_RESELECT_MIN_MS
+    ) {
+      lastFailureReselectAt = now.getTime();
+      try {
+        const refreshed = deps.reselectBackends
+          ? (deps.reselectBackends(), true)
+          : supervisorReasoningRefresh.refresh();
+        if (refreshed)
+          logger.warn(
+            `[dot-sweep] all ${wakeReasons.length} wake(s) failed on the reasoning backend — re-selected backends | next: check \`pnpm reasoning:setup\` if the next sweep fails the same way | evidence: active/shared/runtime/dot-wake-ledger.jsonl`
+          );
+      } catch (error) {
+        logger.warn(
+          `[dot-sweep] backend reselect failed — ${error instanceof Error ? error.message : error} | next: repair policy/context failures before retrying; readiness is checked on the next refresh | evidence: reasoning-bootstrap`
+        );
+      }
+    }
+    return delivered;
+  } finally {
+    dotSweepInFlight = false;
+  }
+}
+
+export interface AgentRuntimeSupervisorDaemonOptions {
+  socketPath?: string;
+  lockPath?: string;
+  transport?: 'unix' | 'tcp';
+  host?: string;
+  port?: number;
+  exitOnFatalError?: boolean;
+  exitOnExistingHealthyDaemon?: boolean;
+  retryOnAddressInUse?: boolean;
+}
+
+export interface AgentRuntimeSupervisorDaemonInstance {
+  server: net.Server;
+  socketPath: string;
+  host?: string;
+  port?: number;
+  lockPath: string;
+  cleanup: () => void;
+}
+
+class DaemonExit extends Error {
+  constructor(public readonly code: number) {
+    super(`agent runtime supervisor exiting with code ${code}`);
+    this.name = 'DaemonExit';
+  }
+}
+
+type TcpListenTarget = { host: string; port: number };
+type ListenTarget = string | TcpListenTarget;
+
+function readTaskModelHint(value: unknown): TaskModelHint | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  const hint = value as Partial<TaskModelHint>;
+  if (
+    typeof hint.model_id !== 'string' ||
+    typeof hint.tier !== 'string' ||
+    typeof hint.effort !== 'string' ||
+    typeof hint.route_reason !== 'string'
+  ) {
+    return undefined;
+  }
+  if (hint.tier !== 'small' && hint.tier !== 'standard' && hint.tier !== 'large') return undefined;
+  if (hint.effort !== 'low' && hint.effort !== 'medium' && hint.effort !== 'high') return undefined;
+  return {
+    model_id: hint.model_id.trim(),
+    tier: hint.tier,
+    effort: hint.effort,
+    route_reason: hint.route_reason,
+  };
+}
+
+function resolveTransport(options: AgentRuntimeSupervisorDaemonOptions = {}): 'unix' | 'tcp' {
+  return (
+    options.transport ||
+    (registeredEnv('KYBERION_AGENT_RUNTIME_SUPERVISOR_TRANSPORT') as 'unix' | 'tcp' | undefined) ||
+    'unix'
+  );
+}
+
+function resolveSocketPath(options: AgentRuntimeSupervisorDaemonOptions = {}): string {
+  const identity =
+    options.socketPath ||
+    registeredEnv('KYBERION_AGENT_RUNTIME_SUPERVISOR_SOCKET_PATH') ||
+    SOCKET_PATH;
+  return resolveLocalIpcAddress(identity);
+}
+
+function resolveLockPath(options: AgentRuntimeSupervisorDaemonOptions = {}): string {
+  return (
+    options.lockPath ||
+    registeredEnv('KYBERION_AGENT_RUNTIME_SUPERVISOR_LOCK_PATH') ||
+    DAEMON_LOCK_PATH
+  );
+}
+
+function resolveListenTarget(
+  options: AgentRuntimeSupervisorDaemonOptions,
+  socketPath: string
+): ListenTarget {
+  if (resolveTransport(options) === 'tcp') {
+    return {
+      host: options.host || registeredEnv('KYBERION_AGENT_RUNTIME_SUPERVISOR_HOST') || '127.0.0.1',
+      port: options.port ?? Number(registeredEnv('KYBERION_AGENT_RUNTIME_SUPERVISOR_PORT') || 0),
+    };
+  }
+  return socketPath;
+}
+
+function toSnapshotResult(
+  agentId: string,
+  snapshot: ReturnType<typeof getAgentRuntimeSnapshot>,
+  lease?: {
+    owner_id?: string;
+    owner_type?: string;
+    metadata?: Record<string, unknown>;
+  }
+): Record<string, unknown> | null {
+  if (!snapshot) return null;
+  return {
+    agent_id: agentId,
+    provider: snapshot.agent.provider,
+    model_id: snapshot.agent.modelId,
+    status: snapshot.agent.status,
+    session_id: snapshot.agent.sessionId,
+    pid: snapshot.runtime?.pid,
+    owner_id: lease?.owner_id,
+    owner_type: lease?.owner_type,
+    metadata: lease?.metadata,
+    scope: snapshot.agent.scope,
+  };
+}
+
+function ensureSocketDir(socketPath: string, transport: 'unix' | 'tcp', lockPath: string): void {
+  if (transport === 'tcp') return;
+  const socketDir =
+    process.platform === 'win32' ? path.dirname(lockPath) : path.dirname(socketPath);
+  if (socketDir && !safeExistsSync(socketDir)) safeMkdir(socketDir, { recursive: true });
+}
+
+function writeResponse(socket: net.Socket, response: SupervisorResponse): void {
+  // A caller may time out while the provider is still working. The daemon
+  // must keep serving other requests when that caller has already closed its
+  // IPC socket; writing to it would otherwise surface an uncaught EPIPE.
+  if (socket.destroyed || socket.writableEnded || !socket.writable) return;
+  socket.end(`${JSON.stringify(response)}\n`);
+}
+
+/**
+ * The local IPC transport (Unix socket / named pipe) is bounded by filesystem
+ * permissions, so a token is optional there. A TCP listener has no such
+ * boundary — any local process can connect — so it never serves without one.
+ */
+function supervisorTokenValid(candidate: string | undefined, transport: 'unix' | 'tcp'): boolean {
+  const configured = registeredEnv('KYBERION_AGENT_RUNTIME_SUPERVISOR_TOKEN');
+  if (!configured) return transport !== 'tcp';
+  if (!candidate) return false;
+  const left = Buffer.from(candidate);
+  const right = Buffer.from(configured);
+  return left.length === right.length && timingSafeEqual(left, right);
+}
+
+function socketIsLoopback(socket: net.Socket): boolean {
+  return ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(socket.remoteAddress || '');
+}
+
+async function ensureDelegatedTaskWorkerProcess(
+  delegationId: string,
+  owner: string
+): Promise<{ resourceId: string; pid?: number }> {
+  const resourceId = `delegated-task-worker:${delegationId}`;
+  const existing = runtimeSupervisor.get(resourceId);
+  if (existing?.state === 'running') {
+    return { resourceId, ...(existing.pid !== undefined ? { pid: existing.pid } : {}) };
+  }
+  const inFlight = delegatedWorkerStarts.get(delegationId);
+  if (inFlight) return inFlight;
+
+  const start = Promise.resolve().then(() => {
+    const handle = spawnDelegatedTaskWorkerProcess(delegationId, owner);
+    watchDelegatedTaskWorkerProcess(delegationId, owner, handle.child);
+    return {
+      resourceId: handle.resourceId,
+      ...(handle.child.pid !== undefined ? { pid: handle.child.pid } : {}),
+    };
+  });
+  delegatedWorkerStarts.set(delegationId, start);
+  try {
+    return await start;
+  } finally {
+    if (delegatedWorkerStarts.get(delegationId) === start)
+      delegatedWorkerStarts.delete(delegationId);
+  }
+}
+
+function scheduleDelegatedTaskWorkerRestart(delegationId: string, owner: string): void {
+  if (delegatedWorkerShutdown) return;
+  const attempt = (delegatedWorkerRestartCounts.get(delegationId) || 0) + 1;
+  delegatedWorkerRestartCounts.set(delegationId, attempt);
+  if (attempt > MAX_DELEGATED_WORKER_RESTARTS) {
+    appendSupervisorEvent({
+      decision: 'delegated_task_worker_restart_exhausted',
+      delegation_id: delegationId,
+      owner,
+      attempts: MAX_DELEGATED_WORKER_RESTARTS,
+    });
+    return;
+  }
+  const delayMs = Math.min(1000, 100 * 2 ** (attempt - 1));
+  const timer = setTimeout(() => {
+    if (delegatedWorkerShutdown) return;
+    void ensureDelegatedTaskWorkerProcess(delegationId, owner).catch((error) => {
+      logger.warn(
+        `[agent_runtime_supervisor_daemon] delegated worker restart failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+      appendSupervisorEvent({
+        decision: 'delegated_task_worker_restart_failed',
+        delegation_id: delegationId,
+        owner,
+        attempt,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
+  }, delayMs);
+  timer.unref?.();
+  appendSupervisorEvent({
+    decision: 'delegated_task_worker_restart_scheduled',
+    delegation_id: delegationId,
+    owner,
+    attempt,
+    delay_ms: delayMs,
+  });
+}
+
+function watchDelegatedTaskWorkerProcess(
+  delegationId: string,
+  owner: string,
+  child: import('node:child_process').ChildProcess
+): void {
+  child.once('exit', (code, signal) => {
+    void (async () => {
+      if (delegatedWorkerShutdown) return;
+      const record = loadDelegatedTaskRecord(delegationId);
+      if (!record) return;
+
+      // A successful activation settles its parent snapshot before the worker
+      // exits. Never replay a completed child after a normal process exit.
+      if ((record.activation_count ?? 0) >= 1) {
+        delegatedWorkerRestartCounts.delete(delegationId);
+        if (record.activation_status === 'claimed' && record.activation_id) {
+          try {
+            recordDelegatedTaskActivationFailure(
+              delegationId,
+              record.activation_id,
+              `worker exited before activation settlement (code=${String(code)}, signal=${String(signal)})`
+            );
+          } catch (error) {
+            logger.warn(
+              `[agent_runtime_supervisor_daemon] failed to settle crashed delegated worker: ${
+                error instanceof Error ? error.message : String(error)
+              }`
+            );
+          }
+        }
+        return;
+      }
+
+      let pending = false;
+      try {
+        pending = await hasPendingDelegatedTaskInbox(delegationId, owner);
+      } catch (error) {
+        logger.warn(
+          `[agent_runtime_supervisor_daemon] delegated worker inbox inspection failed: ${
+            error instanceof Error ? error.message : String(error)
+          }`
+        );
+      }
+      if (!pending) {
+        delegatedWorkerRestartCounts.delete(delegationId);
+        return;
+      }
+      appendSupervisorEvent({
+        decision: 'delegated_task_worker_exited_with_pending_inbox',
+        delegation_id: delegationId,
+        owner,
+        code,
+        signal,
+      });
+      scheduleDelegatedTaskWorkerRestart(delegationId, owner);
+    })().catch((error) => {
+      logger.warn(
+        `[agent_runtime_supervisor_daemon] delegated worker exit recovery failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+    });
+  });
+}
+
+async function handleRequest(
+  request: SupervisorRequest,
+  socketLabel: string
+): Promise<SupervisorResponse> {
+  try {
+    switch (request.method) {
+      case 'health':
+        return {
+          id: request.id,
+          ok: true,
+          result: {
+            ok: true,
+            pid: process.pid,
+            socket_path: socketLabel,
+            code_stamp: DAEMON_CODE_STAMP,
+          },
+        };
+      case 'terminate': {
+        // Stale-code recycle: the client detected a newer core build than the
+        // one this daemon loaded. Drain runtimes and exit; the client spawns
+        // a fresh daemon against the current dist.
+        logger.info(
+          '[agent-runtime-supervisor-daemon] terminate requested (stale code stamp); shutting down.'
+        );
+        delegatedWorkerShutdown = true;
+        appendSupervisorEvent({
+          decision: 'agent_runtime_supervisor_daemon_stopping',
+          pid: process.pid,
+          reason: 'stale_code_recycle',
+        });
+        recordDaemonHeartbeat('agent-runtime-supervisor-daemon', {
+          status: 'stopping',
+          details: { reason: 'stale_code_recycle' },
+        });
+        setImmediate(async () => {
+          try {
+            await shutdownAllAgentRuntimes('supervisor_daemon_terminate');
+          } catch (_) {
+            /* best-effort drain */
+          }
+          requestShutdown?.(0);
+        });
+        return {
+          id: request.id,
+          ok: true,
+          result: { terminating: true },
+        };
+      }
+      case 'ensure': {
+        const payload = request.payload || {};
+        if (payload.manifestAgentId !== undefined && typeof payload.manifestAgentId !== 'string') {
+          throw new Error('[AGENT_MANIFEST_ALIAS_INVALID] manifestAgentId must be a string');
+        }
+        const agentId = String(payload.agentId || '');
+        const handle = await ensureAgentRuntime({
+          agentId,
+          manifestAgentId: payload.manifestAgentId as string | undefined,
+          provider: String(payload.provider || ''),
+          modelId: typeof payload.modelId === 'string' ? payload.modelId : undefined,
+          systemPrompt: typeof payload.systemPrompt === 'string' ? payload.systemPrompt : undefined,
+          capabilities: Array.isArray(payload.capabilities)
+            ? payload.capabilities.map(String)
+            : undefined,
+          cwd: typeof payload.cwd === 'string' ? payload.cwd : rootDir(),
+          parentAgentId:
+            typeof payload.parentAgentId === 'string' ? payload.parentAgentId : undefined,
+          missionId: typeof payload.missionId === 'string' ? payload.missionId : undefined,
+          scope:
+            payload.scope && typeof payload.scope === 'object'
+              ? (payload.scope as Record<string, unknown>)
+              : undefined,
+          trustRequired:
+            typeof payload.trustRequired === 'number' ? payload.trustRequired : undefined,
+          requestedBy: String(payload.requestedBy || 'supervisor_daemon'),
+          runtimeMetadata:
+            payload.runtimeMetadata && typeof payload.runtimeMetadata === 'object'
+              ? (payload.runtimeMetadata as Record<string, unknown>)
+              : undefined,
+          runtimeOwnerId:
+            typeof payload.runtimeOwnerId === 'string' ? payload.runtimeOwnerId : undefined,
+          runtimeOwnerType:
+            typeof payload.runtimeOwnerType === 'string' ? payload.runtimeOwnerType : undefined,
+        });
+        const snapshot = getAgentRuntimeSnapshot(handle.agentId, 20);
+        const lease = listAgentRuntimeLeaseSummaries().find(
+          (entry) => entry.agent_id === handle.agentId
+        );
+        return {
+          id: request.id,
+          ok: true,
+          result: toSnapshotResult(handle.agentId, snapshot, lease) || { agent_id: handle.agentId },
+        };
+      }
+      case 'ask': {
+        const payload = request.payload || {};
+        const agentId = String(payload.agentId || '');
+        const currentAgentInflight = daemonAgentInflightMap.get(agentId) || 0;
+
+        if (daemonGlobalInflight >= GLOBAL_LIMIT || currentAgentInflight >= AGENT_LIMIT) {
+          return {
+            id: request.id,
+            ok: false,
+            error: `Agent ${agentId} or global capacity is busy. Global: ${daemonGlobalInflight}/${GLOBAL_LIMIT}, Agent: ${currentAgentInflight}/${AGENT_LIMIT}`,
+            errorDetail: {
+              type: 'busy',
+              retry_after_ms: 1000,
+            },
+          };
+        }
+
+        daemonGlobalInflight++;
+        daemonAgentInflightMap.set(agentId, currentAgentInflight + 1);
+
+        try {
+          const text = await askAgentRuntime(
+            agentId,
+            String(payload.prompt || ''),
+            String(payload.requestedBy || 'supervisor_daemon'),
+            {
+              timeoutMs: typeof payload.timeoutMs === 'number' ? payload.timeoutMs : undefined,
+              correlationId:
+                typeof payload.correlationId === 'string' ? payload.correlationId : undefined,
+              missionId: typeof payload.missionId === 'string' ? payload.missionId : undefined,
+              scope:
+                payload.scope && typeof payload.scope === 'object'
+                  ? (payload.scope as Record<string, unknown>)
+                  : undefined,
+              taskModelHint: readTaskModelHint(payload.taskModelHint),
+              // SO-05: optional field — tolerant decoding. Older clients that
+              // omit model_tier simply get undefined here (no protocol break).
+              modelTier:
+                payload.model_tier === 'fast' ||
+                payload.model_tier === 'standard' ||
+                payload.model_tier === 'deep'
+                  ? payload.model_tier
+                  : undefined,
+            }
+          );
+          return {
+            id: request.id,
+            ok: true,
+            result: { text },
+          };
+        } finally {
+          daemonGlobalInflight = Math.max(0, daemonGlobalInflight - 1);
+          daemonAgentInflightMap.set(
+            agentId,
+            Math.max(0, (daemonAgentInflightMap.get(agentId) || 0) - 1)
+          );
+        }
+      }
+      case 'status': {
+        const payload = request.payload || {};
+        const agentId = String(payload.agentId || '');
+        const snapshot = getAgentRuntimeSnapshot(
+          agentId,
+          typeof payload.logLimit === 'number' ? payload.logLimit : 20
+        );
+        const lease = listAgentRuntimeLeaseSummaries().find((entry) => entry.agent_id === agentId);
+        return {
+          id: request.id,
+          ok: true,
+          result: snapshot
+            ? {
+                ...toSnapshotResult(agentId, snapshot, lease),
+                log: getAgentRuntimeLog(
+                  agentId,
+                  typeof payload.logLimit === 'number' ? payload.logLimit : 20
+                ),
+              }
+            : null,
+        };
+      }
+      case 'list': {
+        const snapshots = listAgentRuntimeSnapshots();
+        const leases = listAgentRuntimeLeaseSummaries();
+        return {
+          id: request.id,
+          ok: true,
+          result: snapshots.map((snapshot) => {
+            const lease = leases.find((entry) => entry.agent_id === snapshot.agent.agentId);
+            return (
+              toSnapshotResult(snapshot.agent.agentId, snapshot, lease) || {
+                agent_id: snapshot.agent.agentId,
+              }
+            );
+          }),
+        };
+      }
+      case 'touch': {
+        const payload = request.payload || {};
+        const agentId = String(payload.agentId || '');
+        runtimeSupervisor.touch(agentId);
+        return {
+          id: request.id,
+          ok: true,
+          result: { touched: true },
+        };
+      }
+      case 'shutdown': {
+        const payload = request.payload || {};
+        await stopAgentRuntime(
+          String(payload.agentId || ''),
+          String(payload.requestedBy || 'supervisor_daemon')
+        );
+        return {
+          id: request.id,
+          ok: true,
+          result: { stopped: true },
+        };
+      }
+      case 'refresh': {
+        const payload = request.payload || {};
+        const result = await refreshAgentRuntime(
+          String(payload.agentId || ''),
+          String(payload.requestedBy || 'supervisor_daemon')
+        );
+        return {
+          id: request.id,
+          ok: true,
+          result: { refreshed: true, reason: result.mode },
+        };
+      }
+      case 'restart': {
+        const payload = request.payload || {};
+        const handle = await restartAgentRuntime(
+          String(payload.agentId || ''),
+          String(payload.requestedBy || 'supervisor_daemon')
+        );
+        const snapshot = getAgentRuntimeSnapshot(handle.agentId, 20);
+        const lease = listAgentRuntimeLeaseSummaries().find(
+          (entry) => entry.agent_id === handle.agentId
+        );
+        return {
+          id: request.id,
+          ok: true,
+          result: toSnapshotResult(handle.agentId, snapshot, lease) || { agent_id: handle.agentId },
+        };
+      }
+      case 'delegated_enqueue': {
+        const payload = request.payload || {};
+        const delegationId = String(payload.delegationId || '').trim();
+        const owner = String(payload.owner || '').trim();
+        const text = String(payload.text || '');
+        if (!delegationId || !owner || !text.trim()) {
+          throw new Error('delegated_enqueue requires delegationId, owner, and text');
+        }
+        const metadata =
+          payload.metadata && typeof payload.metadata === 'object'
+            ? Object.fromEntries(
+                Object.entries(payload.metadata as Record<string, unknown>)
+                  .filter(([, value]) => ['string', 'number', 'boolean'].includes(typeof value))
+                  .map(([key, value]) => [key, value as string | number | boolean])
+              )
+            : undefined;
+        const entry = await enqueueDelegatedTaskInbox(delegationId, {
+          text,
+          requestedBy: owner,
+          ...(metadata && Object.keys(metadata).length > 0 ? { metadata } : {}),
+          wake: false,
+        });
+        const worker = await ensureDelegatedTaskWorkerProcess(delegationId, owner);
+        return {
+          id: request.id,
+          ok: true,
+          result: {
+            delegation_id: delegationId,
+            entry_id: entry.id,
+            resource_id: worker.resourceId,
+            ...(worker.pid !== undefined ? { pid: worker.pid } : {}),
+          },
+        };
+      }
+      default:
+        throw new Error(`unsupported_method:${request.method}`);
+    }
+  } catch (error: any) {
+    return {
+      id: request.id,
+      ok: false,
+      error: error?.message || String(error),
+      ...(error?.code === 'AGENT_APPROVAL_PENDING' && typeof error.approvalRequestId === 'string'
+        ? {
+            errorDetail: {
+              code: error.code,
+              approval_request_id: error.approvalRequestId,
+              approval_storage_channel: error.approvalStorageChannel,
+              approval_kind: error.approvalKind,
+              scope: error.scope,
+            },
+          }
+        : {}),
+    };
+  }
+}
+
+async function probeDaemonHealth(target: ListenTarget, timeoutMs = 1000): Promise<boolean> {
+  return new Promise((resolve) => {
+    const socket =
+      typeof target === 'string'
+        ? net.createConnection(target)
+        : net.createConnection({ host: target.host, port: target.port });
+    let settled = false;
+    const done = (value: boolean) => {
+      if (settled) return;
+      settled = true;
+      socket.destroy();
+      resolve(value);
+    };
+    socket.setTimeout(timeoutMs);
+    socket.once('connect', () => {
+      socket.write(
+        `${JSON.stringify({
+          id: 'health-probe',
+          method: 'health',
+          ...(registeredEnv('KYBERION_AGENT_RUNTIME_SUPERVISOR_TOKEN')
+            ? { auth_token: registeredEnv('KYBERION_AGENT_RUNTIME_SUPERVISOR_TOKEN') }
+            : {}),
+        })}\n`
+      );
+    });
+    socket.on('data', (chunk) => {
+      const line = String(chunk).trim();
+      if (!line) return done(false);
+      try {
+        const response = normalizeSupervisorResponse<unknown>(
+          parseSafeJsonInput(line, 'agent runtime supervisor response')
+        );
+        if (!response.ok) return done(false);
+        normalizeSupervisorResult('health', response.result);
+        done(true);
+      } catch {
+        done(false);
+      }
+    });
+    socket.once('timeout', () => done(false));
+    socket.once('error', () => done(false));
+  });
+}
+
+export async function startAgentRuntimeSupervisorDaemon(
+  options: AgentRuntimeSupervisorDaemonOptions = {}
+): Promise<AgentRuntimeSupervisorDaemonInstance> {
+  delegatedWorkerShutdown = false;
+  delegatedWorkerRestartCounts.clear();
+  if (!getRegisteredEnvText('MISSION_ROLE')) {
+    setRegisteredEnv('MISSION_ROLE', 'surface_runtime');
+  }
+  const transport = resolveTransport(options);
+  if (transport === 'tcp' && !registeredEnv('KYBERION_AGENT_RUNTIME_SUPERVISOR_TOKEN')) {
+    throw new Error(
+      'agent runtime supervisor refused to start on TCP — a TCP listener is reachable by every local process and no shared token is configured' +
+        ' | next: set KYBERION_AGENT_RUNTIME_SUPERVISOR_TOKEN for the daemon and its clients, or unset KYBERION_AGENT_RUNTIME_SUPERVISOR_TRANSPORT to use the default local IPC socket' +
+        ' | evidence: transport=tcp KYBERION_AGENT_RUNTIME_SUPERVISOR_TOKEN=(unset)'
+    );
+  }
+  const socketPath = resolveSocketPath(options);
+  // Node's `listen(<string>)` binds a TCP port on every interface when the
+  // string reads as a number, so such a socket identity is not local IPC.
+  if (transport === 'unix' && Number(socketPath) >= 0) {
+    throw new Error(
+      'agent runtime supervisor refused to start — the socket path reads as a number, which Node would bind as a TCP port on every interface instead of a local socket' +
+        ' | next: set KYBERION_AGENT_RUNTIME_SUPERVISOR_SOCKET_PATH to a filesystem path, or unset it to use the default' +
+        ` | evidence: transport=unix socket_path=${JSON.stringify(socketPath)}`
+    );
+  }
+  recordDaemonHeartbeat('agent-runtime-supervisor-daemon', {
+    status: 'starting',
+  });
+  const lockPath = resolveLockPath(options);
+  ensureSocketDir(socketPath, transport, lockPath);
+  const listenTarget = resolveListenTarget(options, socketPath);
+  let socketLabel = transport === 'tcp' ? '' : socketPath;
+
+  // Multi-instance guard: use a PID-based lock file for the daemon's lifetime
+  try {
+    safeCreateExclusiveFileSync(lockPath, process.pid.toString());
+  } catch (err: any) {
+    // If lock already exists, try to read the PID
+    let pid: number | undefined;
+    try {
+      const content = readDaemonLockTextFile(lockPath).trim();
+      if (content) {
+        pid = parseInt(content);
+      } else {
+        // Lock exists but empty? Wait and retry.
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        const retryContent = readDaemonLockTextFile(lockPath).trim();
+        if (retryContent) pid = parseInt(retryContent);
+      }
+    } catch (error: any) {
+      logger.warn(
+        `[agent-runtime-supervisor-daemon] failed to inspect daemon lock: ${error?.message || error}`
+      );
+    }
+
+    if (pid && pid !== process.pid) {
+      try {
+        process.kill(pid, 0); // Check if process exists
+        logger.info(
+          `[agent-runtime-supervisor-daemon] another instance (pid ${pid}) is already running. exiting.`
+        );
+        throw new DaemonExit(0);
+      } catch (killErr: any) {
+        // EPERM means the process exists but this launcher cannot inspect it
+        // (common under a sandbox or across users). Treating that as ESRCH
+        // would delete a live daemon's lock and socket, creating a split-brain
+        // supervisor whose heartbeat PID changes underneath clients.
+        if (killErr?.code === 'EPERM') {
+          const message = `daemon lock is held by an existing process (pid ${pid}) but its liveness cannot be inspected`;
+          logger.warn(`[agent-runtime-supervisor-daemon] ${message}`);
+          if (options.exitOnExistingHealthyDaemon !== false) throw new DaemonExit(0);
+          throw new Error(message);
+        }
+        // Process does not exist, stale lock
+        try {
+          safeUnlinkSync(lockPath);
+        } catch (error: any) {
+          logger.warn(
+            `[agent-runtime-supervisor-daemon] failed to remove stale lock: ${error?.message || error}`
+          );
+        }
+        try {
+          safeCreateExclusiveFileSync(lockPath, process.pid.toString());
+        } catch (error: any) {
+          logger.warn(
+            `[agent-runtime-supervisor-daemon] failed to recreate daemon lock: ${error?.message || error}`
+          );
+        }
+      }
+    } else {
+      // No valid PID found, assume stale/broken and try to overwrite
+      try {
+        safeUnlinkSync(lockPath);
+      } catch (error: any) {
+        logger.warn(
+          `[agent-runtime-supervisor-daemon] failed to remove broken lock: ${error?.message || error}`
+        );
+      }
+      try {
+        safeCreateExclusiveFileSync(lockPath, process.pid.toString());
+      } catch (error: any) {
+        logger.warn(
+          `[agent-runtime-supervisor-daemon] failed to recreate daemon lock: ${error?.message || error}`
+        );
+      }
+    }
+  }
+
+  const filesystemSocket = process.platform !== 'win32';
+  if (transport === 'unix' && (!filesystemSocket || safeExistsSync(socketPath))) {
+    const healthy = await probeDaemonHealth(listenTarget);
+    if (healthy) {
+      const message = `an existing healthy daemon is already bound at ${socketPath}`;
+      logger.info(`[agent-runtime-supervisor-daemon] ${message}`);
+      if (options.exitOnExistingHealthyDaemon !== false) throw new DaemonExit(0);
+      throw new Error(message);
+    }
+    if (filesystemSocket) {
+      try {
+        safeUnlinkSync(socketPath);
+      } catch (error: any) {
+        logger.warn(
+          `[agent-runtime-supervisor-daemon] failed to remove stale socket before listen: ${error?.message || error}`
+        );
+      }
+    }
+  }
+
+  let ipcReady = false;
+  const server = net.createServer((socket) => {
+    if (!ipcReady) {
+      socket.destroy();
+      return;
+    }
+    let buffer = '';
+    socket.on('error', (error: NodeJS.ErrnoException) => {
+      if (error.code !== 'EPIPE' && error.code !== 'ECONNRESET') {
+        logger.warn(`[agent-runtime-supervisor-daemon] client socket error: ${error.message}`);
+      }
+    });
+    socket.on('data', async (chunk) => {
+      buffer += String(chunk);
+      const newlineIndex = buffer.indexOf('\n');
+      if (newlineIndex < 0) return;
+      const line = buffer.slice(0, newlineIndex).trim();
+      if (!line) {
+        return writeResponse(socket, { id: 'invalid', ok: false, error: 'empty_request' });
+      }
+      try {
+        const request = normalizeSupervisorRequest(
+          parseSafeJsonInput(line, 'agent runtime supervisor request')
+        );
+        if (
+          (transport === 'tcp' && !socketIsLoopback(socket)) ||
+          !supervisorTokenValid(request.auth_token, transport)
+        ) {
+          return writeResponse(socket, {
+            id: request.id || 'unknown',
+            ok: false,
+            error: 'unauthorized',
+          });
+        }
+        const response = await handleRequest(request, socketLabel || socketPath);
+        writeResponse(socket, response);
+      } catch (error: any) {
+        writeResponse(socket, { id: 'invalid', ok: false, error: error?.message || String(error) });
+      }
+    });
+  });
+
+  let retriedListen = false;
+  server.on('error', (error: any) => {
+    if (!retriedListen && error?.code === 'EADDRINUSE') {
+      retriedListen = true;
+      void (async () => {
+        const healthy = await probeDaemonHealth(listenTarget);
+        if (healthy) {
+          logger.info(
+            `[agent-runtime-supervisor-daemon] existing healthy daemon already bound at ${transport === 'tcp' ? `${(listenTarget as net.ListenOptions).host}:${(listenTarget as net.ListenOptions).port}` : socketPath}`
+          );
+          if (options.exitOnExistingHealthyDaemon !== false) {
+            setProcessExitCode(0);
+            if (server.listening) server.close();
+          }
+          return;
+        }
+        logger.warn(
+          `[agent-runtime-supervisor-daemon] socket busy, retrying after stale socket cleanup: ${transport === 'tcp' ? `${(listenTarget as net.ListenOptions).host}:${(listenTarget as net.ListenOptions).port}` : socketPath}`
+        );
+        try {
+          if (transport === 'unix' && process.platform !== 'win32' && safeExistsSync(socketPath)) {
+            safeUnlinkSync(socketPath);
+          }
+          server.listen(listenTarget);
+          return;
+        } catch (retryError: any) {
+          logger.error(
+            `[agent-runtime-supervisor-daemon] retry after EADDRINUSE failed: ${retryError?.message || retryError}`
+          );
+        }
+        if (options.exitOnFatalError !== false) {
+          setProcessExitCode(1);
+          if (server.listening) server.close();
+        }
+      })();
+      return;
+    }
+    logger.error(`[agent-runtime-supervisor-daemon] ${error?.message || error}`);
+    recordDaemonHeartbeat('agent-runtime-supervisor-daemon', {
+      status: 'error',
+      details: { error: error?.message || String(error) },
+    });
+    try {
+      sendOpsAlert({
+        severity: 'critical',
+        title: 'Agent runtime supervisor daemon error',
+        context: {
+          daemon_id: 'agent-runtime-supervisor-daemon',
+          error: error?.message || String(error),
+        },
+        recommendation: 'Restart the supervisor daemon and inspect the runtime supervisor log.',
+        dedupe_key: 'agent-runtime-supervisor-daemon:error',
+      });
+    } catch (alertError: any) {
+      logger.warn(
+        `[agent-runtime-supervisor-daemon] failed to write ops alert: ${alertError?.message || alertError}`
+      );
+    }
+    if (options.exitOnFatalError !== false) {
+      setProcessExitCode(1);
+      if (server.listening) server.close();
+    }
+  });
+
+  await new Promise<void>((resolve, reject) => {
+    const timeout = setTimeout(
+      () => reject(new Error('agent_runtime_supervisor_daemon_start_timeout')),
+      60000
+    );
+    const finish = () => {
+      clearTimeout(timeout);
+      resolve();
+    };
+    const onListening = async () => {
+      try {
+        await restrictWindowsNamedPipeAcl(String(listenTarget));
+        ipcReady = true;
+        const address = server.address();
+        if (transport === 'tcp' && typeof address === 'object' && address) {
+          socketLabel = `${address.address}:${address.port}`;
+        }
+        appendSupervisorEvent({
+          decision: 'agent_runtime_supervisor_daemon_started',
+          pid: process.pid,
+          socket_path: socketLabel || socketPath,
+        });
+        recordDaemonHeartbeat('agent-runtime-supervisor-daemon', {
+          status: 'running',
+          details: { socket_path: socketLabel || socketPath, transport },
+        });
+        logger.info(`[agent-runtime-supervisor-daemon] listening on ${socketLabel || socketPath}`);
+      } catch (error) {
+        server.close();
+        reject(error);
+      } finally {
+        finish();
+      }
+    };
+    // Bind the socket 0600 (bind is synchronous in listen); the process-wide umask
+    // also hits threadpool fs work racing this startup-only call (runbook §10).
+    const previousUmask =
+      transport === 'unix' && process.platform !== 'win32' ? process.umask(0o177) : undefined;
+    try {
+      server.listen(listenTarget, onListening);
+    } finally {
+      if (previousUmask !== undefined) process.umask(previousUmask);
+    }
+    timeout.unref?.();
+  });
+
+  let cleanedUp = false;
+  const cleanup = () => {
+    if (cleanedUp) return;
+    cleanedUp = true;
+    delegatedWorkerShutdown = true;
+    appendSupervisorEvent({
+      decision: 'agent_runtime_supervisor_daemon_stopping',
+      pid: process.pid,
+      reason: 'process_exit',
+    });
+    recordDaemonHeartbeat('agent-runtime-supervisor-daemon', {
+      status: 'stopping',
+      details: { reason: 'process_exit' },
+    });
+    // Do not unlink the pathname here. A stale daemon can still receive a
+    // signal after a newer daemon has rebound the same path; unlinking from
+    // the old process would make the healthy daemon unreachable. Startup
+    // already probes health and removes only an unresponsive stale socket.
+    try {
+      if (safeExistsSync(lockPath)) {
+        const currentPid = readDaemonLockTextFile(lockPath).trim();
+        if (currentPid === process.pid.toString()) {
+          safeUnlinkSync(lockPath);
+        }
+      }
+    } catch (error: any) {
+      logger.warn(
+        `[agent-runtime-supervisor-daemon] failed to cleanup daemon lock: ${error?.message || error}`
+      );
+    }
+  };
+  const stopDaemon = (exitCode: number) => {
+    cleanup();
+    if (!server.listening) {
+      setProcessExitCode(exitCode);
+      return;
+    }
+    const forceExit = setTimeout(() => setProcessExitCode(exitCode), 1500);
+    forceExit.unref?.();
+    server.close(() => {
+      clearTimeout(forceExit);
+      setProcessExitCode(exitCode);
+    });
+  };
+  requestShutdown = stopDaemon;
+  process.once('SIGINT', () => stopDaemon(130));
+  process.once('SIGTERM', () => stopDaemon(143));
+  process.once('exit', cleanup);
+
+  const address = server.address();
+  return {
+    server,
+    socketPath: transport === 'tcp' ? '' : socketPath,
+    host:
+      transport === 'tcp' && typeof address === 'object' && address ? address.address : undefined,
+    port: transport === 'tcp' && typeof address === 'object' && address ? address.port : undefined,
+    lockPath,
+    cleanup,
+  };
+}
+
+async function main(_args: string[] = []) {
+  // Configure bindTask/factories without acquiring tenant provider credentials.
+  prepareReasoningExecutionHost();
+  await startAgentRuntimeSupervisorDaemon();
+  // Daemon liveness and credential-dependent reasoning readiness are separate.
+  // Missing task bindings are re-inspected, not repeatedly sent to providers.
+  supervisorReasoningRefresh.refresh();
+  setInterval(() => {
+    supervisorReasoningRefresh.refresh();
+  }, DOT_BACKEND_RESELECT_INTERVAL_MS).unref?.();
+  setInterval(() => {
+    recordDaemonHeartbeat('agent-runtime-supervisor-daemon', {
+      status: 'running',
+      details: dotSupervisorHeartbeatDetails(),
+    });
+  }, 30_000).unref?.();
+  // Resident-dot multiplex: evaluate active charters' triggers each sweep.
+  setInterval(
+    () => {
+      void runDotSweepOnce().catch((error) => {
+        logger.warn(
+          `[dot-sweep] suppressed sweep error: ${error instanceof Error ? error.message : error}`
+        );
+      });
+    },
+    Number(registeredEnv('KYBERION_DOT_SWEEP_INTERVAL_MS') || 30_000)
+  ).unref?.();
+}
+
+const isDirect =
+  isDirectScript(import.meta.url, 'agent_runtime_supervisor_daemon.ts') ||
+  isDirectScript(import.meta.url, 'agent_runtime_supervisor_daemon.js');
+
+const runAgentRuntimeSupervisorDaemon = defineScript({
+  name: 'agent-runtime:supervisor-daemon',
+  flags: [],
+  run: async ({ argv }) => {
+    try {
+      await main(argv);
+    } catch (error: any) {
+      if (error instanceof DaemonExit) {
+        setProcessExitCode(error.code);
+        return;
+      }
+      const message = error?.message || String(error);
+      logger.error(message);
+      recordDaemonHeartbeat('agent-runtime-supervisor-daemon', {
+        status: 'error',
+        details: { error: message },
+      });
+      appendSupervisorEvent({
+        decision: 'agent_runtime_supervisor_daemon_failed',
+        pid: process.pid,
+        error: message,
+      });
+      try {
+        sendOpsAlert({
+          severity: 'critical',
+          title: 'Agent runtime supervisor daemon fatal error',
+          context: {
+            daemon_id: 'agent-runtime-supervisor-daemon',
+            error: message,
+          },
+          recommendation: 'Restart the supervisor daemon and inspect startup configuration.',
+          dedupe_key: 'agent-runtime-supervisor-daemon:fatal',
+        });
+      } catch (alertError: any) {
+        logger.warn(
+          `[agent-runtime-supervisor-daemon] failed to write fatal ops alert: ${alertError?.message || alertError}`
+        );
+      }
+      setProcessExitCode(1);
+    }
+  },
+});
+
+if (isDirect) {
+  void runAgentRuntimeSupervisorDaemon();
+}

@@ -10,7 +10,7 @@ import {
 } from '@agent/core/build-readiness';
 import { readBuildGenerationIdentity } from '@agent/core/build-generation';
 import type { LayerObservation } from '@agent/core/pfc/PfcController';
-import type { StaleDistScan, StaleDistTarget } from './check_stale_dist.js';
+import type { StaleDistScan, StaleDistTarget } from './check/check_stale_dist.js';
 
 export interface BuildReadiness extends LayerObservation {
   import_violations: string[];
@@ -28,9 +28,9 @@ interface BuildReadinessPorts {
 const ports: BuildReadinessPorts = {
   exists: () => safeExistsSync(pathResolver.rootResolve('dist/scripts')),
   imports: async () =>
-    (await import('./check_dist_workspace_imports.js')).checkDistWorkspaceImports(),
-  stale: async () => (await import('./check_stale_dist.js')).findStaleDistTargets(),
-  fingerprint: async () => (await import('./check_stale_dist.js')).fingerprintBuildInputs(),
+    (await import('./check/check_dist_workspace_imports.js')).checkDistWorkspaceImports(),
+  stale: async () => (await import('./check/check_stale_dist.js')).findStaleDistTargets(),
+  fingerprint: async () => (await import('./check/check_stale_dist.js')).fingerprintBuildInputs(),
 };
 
 /**

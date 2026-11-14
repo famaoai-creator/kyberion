@@ -10,8 +10,8 @@ const allowedManagedProcessConsumers = [
   'libs/shared-perception/src/audio-analysis.test.ts',
   'libs/shared-perception/src/tracking.ts',
   // Continuous owner controllers are cancellable, supervised children.
-  'scripts/continuous_owner_process.ts',
-  'scripts/continuous_owner_process.test.ts',
+  'scripts/continuous/continuous_owner_process.ts',
+  'scripts/continuous/continuous_owner_process.test.ts',
   'libs/actuators/process-actuator/src/process-actuator-helpers.ts',
   'libs/actuators/process-actuator/src/process-actuator-relay-env.test.ts',
   'libs/actuators/video-composition-actuator/src/video-composition-action-helpers.ts',
@@ -93,7 +93,7 @@ const allowedManagedProcessConsumers = [
   'scripts/onboarding_wizard.ts',
   // PE-02 plugin views E2E: the built Chronos server under test is a
   // supervised child, stopped (SIGTERM, then SIGKILL) even on failure.
-  'scripts/check_plugin_views_e2e.ts',
+  'scripts/check/check_plugin_views_e2e.ts',
   // CU-02: the kyberion router runs interactive / long-running script
   // commands (tui, servers, daemons, onboard, build) supervised with inherited
   // stdio and no timeout, awaiting the child; the dispatch test mocks it.

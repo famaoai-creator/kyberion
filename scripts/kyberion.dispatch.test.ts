@@ -21,7 +21,7 @@ vi.mock('@agent/core/secure-io', async (importOriginal) => ({
 }));
 
 import { main, pnpmExecutable, runStreamingScriptCommand } from './kyberion.js';
-import { loadCliManifest } from './check_cli_manifest.js';
+import { loadCliManifest } from './check/check_cli_manifest.js';
 
 function fakeChild(exitCode: number | null, signal: NodeJS.Signals | null = null) {
   const child = Object.assign(new EventEmitter(), { kill: vi.fn() });

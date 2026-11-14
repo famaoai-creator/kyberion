@@ -51,8 +51,8 @@ import {
   type OnboardingTutorial as TutorialDraft,
 } from '@agent/core/organization/onboarding-state';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
-import { createStance } from './stance_create.js';
-import { switchStance } from './stance_switch.js';
+import { createStance } from './stance/stance_create.js';
+import { switchStance } from './stance/stance_switch.js';
 import {
   isExpressOnboarding,
   ONBOARD_CLI,
@@ -77,7 +77,7 @@ import {
   persistPersona,
   readPersistedPersona,
   resolveReasoningBackendMenuSelection,
-} from './reasoning_backend_selection.js';
+} from './reasoning/reasoning_backend_selection.js';
 
 type Print = (value: unknown) => void;
 
@@ -1350,7 +1350,9 @@ export async function runOnboarding(
     } else if (choice === '4') {
       print(`\n${mt('onboarding_menu_running_knowledge')}`);
       try {
-        await runManagedMenuTask('knowledge-index', ['dist/scripts/generate_knowledge_index.js']);
+        await runManagedMenuTask('knowledge-index', [
+          'dist/scripts/generate/generate_knowledge_index.js',
+        ]);
       } catch (e) {
         print(`${mt('onboarding_menu_error_knowledge')}: ${formatMenuTaskError(e)}`);
       }
@@ -1368,7 +1370,9 @@ export async function runOnboarding(
     } else if (choice === '6') {
       print(`\n${mt('onboarding_menu_running_guardrails')}`);
       try {
-        await runManagedMenuTask('governance-check', ['dist/scripts/check_governance_rules.js']);
+        await runManagedMenuTask('governance-check', [
+          'dist/scripts/check/check_governance_rules.js',
+        ]);
       } catch (e) {
         print(`${mt('onboarding_menu_error_guardrails')}: ${formatMenuTaskError(e)}`);
       }

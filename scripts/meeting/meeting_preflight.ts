@@ -1,0 +1,565 @@
+#!/usr/bin/env node
+import * as path from 'node:path';
+import { installCoreEnvironmentProbes } from '@agent/core/environment-capability-probes';
+import {
+  getToolRuntimeStatePath,
+  listToolRuntimeInventory,
+  locateManagedToolPythonBin,
+} from '@agent/core/tool/tool-runtime-registry';
+import { loadEnvironmentManifest, probeManifest } from '@agent/core/environment-capability';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExecResult, safeExistsSync, safeReaddir } from '@agent/core/secure-io';
+import {
+  createCoreAudioDeviceInventoryBridge,
+  resolveAudioDevice,
+  type CoreAudioDeviceInventoryBridge,
+} from '@agent/core/coreaudio-device-inventory';
+import { probeMacOSNativeAutomation } from '@agent/core/macos-native-automation';
+import { createStandardYargs } from '@agent/core/cli-utils';
+import { collectDoctorReport } from '../run_doctor.js';
+import { checkSpeakConsent } from '../../libs/actuators/meeting-actuator/src/meeting-actuator-helpers.js';
+import {
+  evaluateGrantReadiness,
+  type GrantReadinessReport,
+} from '@agent/core/governance/grant-readiness';
+import { getRegisteredEnvText, setRegisteredEnv } from '@agent/core/foundation';
+import { defineScript, isDirectScript } from '../lib/harness.js';
+
+type Print = (value: unknown) => void;
+
+export type MeetingPreflightStatus = 'pass' | 'fail' | 'warn' | 'operator_action_required';
+
+export interface MeetingPreflightItem {
+  id: string;
+  status: MeetingPreflightStatus;
+  detail: string;
+  fix: string;
+  automatic_fix_available: boolean;
+  reason_code?: string;
+  data?: Record<string, unknown>;
+}
+
+export interface MeetingPreflightReport {
+  items: MeetingPreflightItem[];
+  ready: boolean;
+}
+
+function formatCommand(command?: string, args?: readonly string[]): string {
+  const resolved = [command, ...(args ?? [])].filter((part): part is string => Boolean(part));
+  return resolved.join(' ').trim();
+}
+
+function item(
+  id: string,
+  status: MeetingPreflightStatus,
+  detail: string,
+  fix: string,
+  options: {
+    automaticFixAvailable?: boolean;
+    reasonCode?: string;
+    data?: Record<string, unknown>;
+  } = {}
+): MeetingPreflightItem {
+  return {
+    id,
+    status,
+    detail,
+    fix,
+    automatic_fix_available: options.automaticFixAvailable ?? false,
+    ...(options.reasonCode ? { reason_code: options.reasonCode } : {}),
+    ...(options.data ? { data: options.data } : {}),
+  };
+}
+
+function formatRates(rates?: readonly number[]): string {
+  return rates && rates.length > 0
+    ? rates.map((rate) => `${rate}Hz`).join(', ')
+    : 'unknown sample rates';
+}
+
+async function probeDoctorMeeting(missionId?: string): Promise<MeetingPreflightItem> {
+  const report = await collectDoctorReport({ runtime: 'meeting', mission: missionId });
+  const meetingSummary = report.summaries.find(
+    (summary) => summary.manifestId === 'meeting-participation-runtime'
+  );
+  const mustMissing = meetingSummary?.counts.must ?? 0;
+  if (mustMissing > 0) {
+    return item(
+      'doctor.meeting',
+      'fail',
+      `meeting runtime has ${mustMissing} must gap(s)`,
+      'pnpm env:bootstrap --manifest meeting-participation-runtime --apply'
+    );
+  }
+  return item('doctor.meeting', 'pass', 'meeting runtime ready', 'none');
+}
+
+async function probePlaywrightBrowser(): Promise<MeetingPreflightItem> {
+  const manifest = loadEnvironmentManifest('kyberion-toolchain');
+  const probeStatuses = await probeManifest(manifest);
+  const playwright = probeStatuses.find((status) => status.capability_id === 'playwright-chromium');
+  if (playwright?.satisfied) {
+    return item('playwright.browser', 'pass', 'Playwright Chromium cache is present', 'none');
+  }
+  return item(
+    'playwright.browser',
+    'fail',
+    playwright?.reason || 'Playwright Chromium cache is missing',
+    'pnpm exec playwright install chromium',
+    { automaticFixAvailable: false, reasonCode: 'BROWSER_RUNTIME_MISSING' }
+  );
+}
+
+async function probeBlackHoleDevice(
+  platform: NodeJS.Platform,
+  inventoryBridge: CoreAudioDeviceInventoryBridge = createCoreAudioDeviceInventoryBridge()
+): Promise<MeetingPreflightItem> {
+  if (platform !== 'darwin') {
+    return item(
+      'blackhole.device',
+      'warn',
+      `skipped on ${platform}; BlackHole is macOS-only`,
+      'none',
+      { reasonCode: 'BLACKHOLE_NOT_APPLICABLE' }
+    );
+  }
+  const result = safeExecResult('system_profiler', ['SPAudioDataType'], {
+    timeoutMs: 20_000,
+    maxOutputMB: 2,
+  });
+  const output = `${result.stdout}\n${result.stderr}`.trim();
+  if (result.status === 0 && /BlackHole/i.test(output)) {
+    const inventory = await inventoryBridge.probe();
+    const blackHoleDevices = inventory.devices.filter(
+      (device) => device.display_name === 'BlackHole 2ch'
+    );
+    const input = resolveAudioDevice(blackHoleDevices, {
+      expected_label: 'BlackHole 2ch',
+      direction: 'input',
+    });
+    const outputDevice = resolveAudioDevice(blackHoleDevices, {
+      expected_label: 'BlackHole 2ch',
+      direction: 'output',
+    });
+    if (!input.descriptor || !outputDevice.descriptor) {
+      const reason = input.reason || outputDevice.reason || 'BlackHole route is incomplete';
+      return item(
+        'blackhole.device',
+        'operator_action_required',
+        reason,
+        'Open Audio MIDI Setup and select an exact BlackHole 2ch input/output device; do not change the system default output',
+        {
+          reasonCode: 'BLACKHOLE_ROUTE_INCOMPLETE',
+          data: { devices: blackHoleDevices },
+        }
+      );
+    }
+    const inputDescriptor = input.descriptor;
+    const outputDescriptor = outputDevice.descriptor;
+    return item(
+      'blackhole.device',
+      'pass',
+      `BlackHole 2ch ready; input/output UID ${inputDescriptor.uid}, ${inputDescriptor.channel_count ?? '?'} channel(s), rates ${formatRates(inputDescriptor.supported_sample_rates)}`,
+      'pnpm voice:route probe -- --json',
+      {
+        data: {
+          input_device: inputDescriptor,
+          output_device: outputDescriptor,
+          uid_resolution: 'coreaudio_uid',
+        },
+      }
+    );
+  }
+  const reason =
+    result.status === 0
+      ? 'system_profiler did not list BlackHole'
+      : `system_profiler exited with code ${result.status}`;
+  return item('blackhole.device', 'fail', reason, 'brew install blackhole-2ch', {
+    reasonCode: 'BLACKHOLE_DRIVER_REQUIRED',
+  });
+}
+
+async function probeCoreAudioOutputBridge(
+  platform: NodeJS.Platform
+): Promise<MeetingPreflightItem> {
+  if (platform !== 'darwin') {
+    return item(
+      'coreaudio.output.bridge',
+      'warn',
+      `skipped on ${platform}; CoreAudio is macOS-only`,
+      'none',
+      {
+        reasonCode: 'COREAUDIO_NOT_APPLICABLE',
+      }
+    );
+  }
+  const script = pathResolver.rootResolve('libs/core/voice/coreaudio-output-bridge.swift');
+  const inventoryScript = pathResolver.rootResolve(
+    'libs/core/voice/coreaudio-device-inventory.swift'
+  );
+  if (safeExistsSync(script) && safeExistsSync(inventoryScript)) {
+    const inventory = await createCoreAudioDeviceInventoryBridge().probe();
+    if (inventory.available) {
+      const virtualDevices = inventory.devices.filter((device) => device.is_virtual);
+      return item(
+        'coreaudio.output.bridge',
+        'pass',
+        `CoreAudio bridge ready; ${virtualDevices.length} virtual device(s) discovered with stable UID metadata`,
+        'none'
+      );
+    }
+    return item(
+      'coreaudio.output.bridge',
+      'warn',
+      inventory.reason || 'CoreAudio inventory returned no devices',
+      'Open Audio MIDI Setup and confirm the target device; do not change the system default output',
+      { reasonCode: 'COREAUDIO_DEVICE_INVENTORY_EMPTY' }
+    );
+  }
+  return item(
+    'coreaudio.output.bridge',
+    'fail',
+    'CoreAudio output helper is missing from the repository',
+    'Rebuild Kyberion packages and restore libs/core/voice/coreaudio-output-bridge.swift',
+    { reasonCode: 'COREAUDIO_BRIDGE_MISSING' }
+  );
+}
+
+const MICROPHONE_WARMUP_COMMAND = 'pnpm kyberion permissions warmup';
+
+type MicrophoneProbe = () => {
+  microphone?: string;
+  host_app?: string;
+  available?: boolean;
+};
+
+function probeAudioPermission(
+  platform: NodeJS.Platform,
+  probeMicrophone: MicrophoneProbe = probeMacOSNativeAutomation
+): MeetingPreflightItem {
+  if (platform !== 'darwin') {
+    return item(
+      'audio.permission',
+      'warn',
+      `OS audio permission probe is not applicable on ${platform}`,
+      'none',
+      {
+        reasonCode: 'AUDIO_PERMISSION_NOT_APPLICABLE',
+      }
+    );
+  }
+  let native: ReturnType<MicrophoneProbe> | undefined;
+  try {
+    native = probeMicrophone();
+  } catch {
+    native = undefined;
+  }
+  const hostApp = native?.host_app;
+  const data = hostApp ? { host_app: hostApp } : undefined;
+  if (native?.microphone === 'granted') {
+    // The grant belongs to the probing host app; without it we cannot tell
+    // whether the capture process shares that grant.
+    return item(
+      'audio.permission',
+      hostApp ? 'pass' : 'warn',
+      `macOS microphone permission is granted${hostApp ? ` to ${hostApp}` : ''}`,
+      'none',
+      { data }
+    );
+  }
+  if (native?.microphone === 'not_determined') {
+    return item(
+      'audio.permission',
+      'operator_action_required',
+      `macOS microphone permission has not been requested yet${hostApp ? ` for ${hostApp}` : ''}`,
+      MICROPHONE_WARMUP_COMMAND,
+      { reasonCode: 'MICROPHONE_PERMISSION_NOT_DETERMINED', data }
+    );
+  }
+  if (native?.microphone === 'restricted') {
+    return item(
+      'audio.permission',
+      'operator_action_required',
+      `macOS microphone access is restricted by a device policy${hostApp ? ` for ${hostApp}` : ''}`,
+      'Ask the device administrator to allow microphone access (MDM profile or Screen Time); System Settings cannot change it',
+      { reasonCode: 'MICROPHONE_PERMISSION_RESTRICTED', data }
+    );
+  }
+  if (native?.microphone === 'denied') {
+    return item(
+      'audio.permission',
+      'operator_action_required',
+      `macOS microphone permission is denied${hostApp ? ` for ${hostApp}` : ''}`,
+      `System Settings > Privacy & Security > Microphone; enable ${hostApp ?? 'the terminal app running Kyberion'}, then restart it`,
+      { reasonCode: 'MICROPHONE_PERMISSION_DENIED', data }
+    );
+  }
+  // Probe unavailable or inconclusive: fall back to the operator's self-report.
+  if (getRegisteredEnvText('KYBERION_AUDIO_PERMISSION_CONFIRMED') === '1') {
+    return item(
+      'audio.permission',
+      'pass',
+      'operator confirmed macOS microphone/audio input permission',
+      'none'
+    );
+  }
+  return item(
+    'audio.permission',
+    'operator_action_required',
+    'macOS microphone permission state could not be probed; operator confirmation is required before a live capture',
+    'System Settings > Privacy & Security > Microphone; then set KYBERION_AUDIO_PERMISSION_CONFIRMED=1 for this session',
+    { reasonCode: 'MICROPHONE_PERMISSION_REQUIRED' }
+  );
+}
+
+function probeMlxAudioRuntime(platform: NodeJS.Platform): MeetingPreflightItem {
+  // The registry owns the managed root (canonical install root, with a read
+  // fallback for runtimes that exist only at the legacy cache-floor root).
+  const installedPython = locateManagedToolPythonBin('mlx_audio');
+  if (installedPython) {
+    return item(
+      'mlx.audio.runtime',
+      'pass',
+      `mlx-audio runtime is present at ${path.relative(pathResolver.rootDir(), installedPython)}`,
+      'none'
+    );
+  }
+  const pythonBin = path.join(path.dirname(getToolRuntimeStatePath('mlx_audio')), 'bin', 'python');
+
+  const inventory = listToolRuntimeInventory('trial', platform);
+  const mlxAudio = inventory.items.find((entry) => entry.tool.tool_id === 'mlx_audio');
+  const fix =
+    formatCommand(mlxAudio?.install_backend?.command, mlxAudio?.install_backend?.args) ||
+    'pnpm kyberion voice setup --apply';
+  return item(
+    'mlx.audio.runtime',
+    'fail',
+    `missing ${path.relative(pathResolver.rootDir(), pythonBin)}`,
+    fix,
+    { reasonCode: 'TTS_RUNTIME_MISSING' }
+  );
+}
+
+function probeVoiceProfileStore(): MeetingPreflightItem {
+  const storeDir = pathResolver.shared('runtime/voice-profiles');
+  if (!safeExistsSync(storeDir)) {
+    return item(
+      'voice.profile',
+      'fail',
+      `voice profile store missing at ${path.relative(pathResolver.rootDir(), storeDir)}`,
+      'Run Task 2: pnpm pipeline --input pipelines/voice-onboarding.json'
+    );
+  }
+
+  const profileDirs = safeReaddir(storeDir).filter((entry) =>
+    safeExistsSync(path.join(storeDir, entry, 'metadata.json'))
+  );
+  if (profileDirs.length > 0) {
+    return item(
+      'voice.profile',
+      'pass',
+      `voice profile store contains ${profileDirs.length} profile(s)`,
+      'none'
+    );
+  }
+
+  return item(
+    'voice.profile',
+    'fail',
+    `voice profile store has no metadata.json profiles under ${path.relative(pathResolver.rootDir(), storeDir)}`,
+    'Run Task 2: pnpm pipeline --input pipelines/voice-onboarding.json',
+    { reasonCode: 'VOICE_PROFILE_MISSING' }
+  );
+}
+
+function probeVoiceConsent(): MeetingPreflightItem {
+  const consent = checkSpeakConsent();
+  if (consent.allowed) {
+    return item('voice.consent', 'pass', 'voice consent is granted for the active mission', 'none');
+  }
+  return item(
+    'voice.consent',
+    'fail',
+    consent.reason || 'voice consent is not granted',
+    'pnpm meeting:consent grant --mission <MISSION_ID> --operator <handle>',
+    { reasonCode: 'VOICE_CONSENT_REQUIRED' }
+  );
+}
+
+// Capabilities the preflight already checks with its own items
+// (audio.permission, voice.consent); the readiness profile adds the rest.
+const PREFLIGHT_COVERED_CAPABILITIES = new Set(['os.microphone', 'meeting.voice']);
+
+export interface MeetingGrantContext {
+  profile?: string;
+  tenantSlug?: string;
+  meeting?: { url?: string; series_id?: string };
+}
+
+function probeGrantReadiness(
+  missionId: string | undefined,
+  grants: MeetingGrantContext,
+  evaluate: typeof evaluateGrantReadiness
+): MeetingPreflightItem[] {
+  const profile = grants.profile || 'meeting.online';
+  let report: GrantReadinessReport;
+  try {
+    report = evaluate({
+      profile,
+      context: {
+        ...(missionId ? { mission_id: missionId } : {}),
+        ...(grants.tenantSlug ? { tenant_slug: grants.tenantSlug } : {}),
+        ...(grants.meeting ? { meeting: grants.meeting } : {}),
+      },
+    });
+  } catch (err: unknown) {
+    return [
+      item(
+        'grant.readiness',
+        'fail',
+        `grant readiness unavailable: ${err instanceof Error ? err.message : String(err)}`,
+        'pnpm kyberion grants status',
+        { reasonCode: 'GRANT_READINESS_UNAVAILABLE' }
+      ),
+    ];
+  }
+  return report.items
+    .filter((entry) => !PREFLIGHT_COVERED_CAPABILITIES.has(entry.capability))
+    .map((entry) => {
+      const id = `grant.${entry.capability}`;
+      if (entry.allowed) {
+        const via = entry.grant_id
+          ? `standing grant ${entry.grant_id}`
+          : (entry.source ?? 'allowed');
+        return item(id, 'pass', `${entry.capability} is allowed (${via})`, 'none');
+      }
+      return item(
+        id,
+        entry.required ? 'operator_action_required' : 'warn',
+        entry.reason || `${entry.capability} is not allowed`,
+        entry.remedy || `pnpm kyberion grants status --profile ${profile}`,
+        { reasonCode: 'GRANT_REQUIRED' }
+      );
+    });
+}
+
+async function probeReasoningBackend(): Promise<MeetingPreflightItem> {
+  const manifest = loadEnvironmentManifest('reasoning-backend');
+  const probeStatuses = await probeManifest(manifest);
+  const backend = probeStatuses.find(
+    (status) => status.capability_id === 'reasoning-backend.any-real'
+  );
+  if (backend?.satisfied) {
+    return item('reasoning.backend', 'pass', 'a real reasoning backend is available', 'none');
+  }
+  return item(
+    'reasoning.backend',
+    'fail',
+    backend?.reason || 'no real reasoning backend reachable',
+    'pnpm reasoning:setup',
+    { reasonCode: 'REAL_REASONING_BACKEND_REQUIRED' }
+  );
+}
+
+export async function runMeetingPreflight(
+  options: {
+    missionId?: string;
+    platform?: NodeJS.Platform;
+    inventory_bridge?: CoreAudioDeviceInventoryBridge;
+    microphone_probe?: MicrophoneProbe;
+    grants?: MeetingGrantContext;
+    grant_readiness?: typeof evaluateGrantReadiness;
+  } = {}
+): Promise<MeetingPreflightReport> {
+  installCoreEnvironmentProbes();
+  const missionId =
+    options.missionId?.trim() || getRegisteredEnvText('MISSION_ID')?.trim() || undefined;
+  if (missionId) setRegisteredEnv('MISSION_ID', missionId);
+  const platform = options.platform || process.platform;
+
+  const items = [
+    await probeDoctorMeeting(missionId),
+    await probePlaywrightBrowser(),
+    await probeBlackHoleDevice(platform, options.inventory_bridge),
+    await probeCoreAudioOutputBridge(platform),
+    probeAudioPermission(platform, options.microphone_probe),
+    probeMlxAudioRuntime(platform),
+    probeVoiceProfileStore(),
+    probeVoiceConsent(),
+    ...probeGrantReadiness(
+      missionId,
+      options.grants ?? {},
+      options.grant_readiness ?? evaluateGrantReadiness
+    ),
+    await probeReasoningBackend(),
+  ];
+
+  return {
+    items,
+    ready: items.every(
+      (entry) => entry.status !== 'fail' && entry.status !== 'operator_action_required'
+    ),
+  };
+}
+
+function printMeetingPreflightReport(report: MeetingPreflightReport, print: Print): void {
+  for (const entry of report.items) {
+    print(`[meeting-preflight] ${entry.id}: ${entry.status}`);
+    print(`  detail: ${entry.detail}`);
+    print(`  fix: ${entry.fix}`);
+  }
+  print('');
+}
+
+export async function main(args: string[] = [], print: Print = () => undefined): Promise<number> {
+  const argv = await createStandardYargs(['node', 'meeting_preflight', ...args])
+    .option('mission', { type: 'string' })
+    .option('profile', {
+      type: 'string',
+      describe: 'Grant readiness profile (default meeting.online)',
+    })
+    .option('tenant', { type: 'string' })
+    .option('meeting-url', { type: 'string' })
+    .option('meeting-series', { type: 'string' })
+    .option('json', { type: 'boolean', default: false })
+    .parseSync();
+
+  const meetingUrl = String(argv['meeting-url'] ?? '').trim();
+  const meetingSeries = String(argv['meeting-series'] ?? '').trim();
+  const report = await runMeetingPreflight({
+    missionId: argv.mission ? String(argv.mission) : undefined,
+    grants: {
+      ...(argv.profile ? { profile: String(argv.profile) } : {}),
+      ...(argv.tenant ? { tenantSlug: String(argv.tenant) } : {}),
+      ...(meetingUrl || meetingSeries
+        ? {
+            meeting: {
+              ...(meetingUrl ? { url: meetingUrl } : {}),
+              ...(meetingSeries ? { series_id: meetingSeries } : {}),
+            },
+          }
+        : {}),
+    },
+  });
+
+  if (argv.json) {
+    print(JSON.stringify(report, null, 2));
+  } else {
+    printMeetingPreflightReport(report, print);
+  }
+
+  return report.ready ? 0 : 1;
+}
+
+if (
+  isDirectScript(import.meta.url, 'meeting_preflight.ts') ||
+  isDirectScript(import.meta.url, 'meeting_preflight.js')
+)
+  void defineScript({
+    name: 'meeting:preflight',
+    flags: [],
+    async run(context) {
+      const status = await main(context.argv, context.print);
+      if (status !== 0) throw new Error(`meeting:preflight failed with exit code ${status}`);
+    },
+  })();

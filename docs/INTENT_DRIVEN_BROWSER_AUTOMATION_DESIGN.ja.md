@@ -34,16 +34,16 @@ tags: [browser-bridge, intent-loop, capability, pipeline, approval, multi-agent]
 
 を滑らかに繋ぐのが目的。`feature/cowork-integration-phase0` 時点での充足状況：
 
-| 能力                                                        | 状態                            | 主な実体                                                                                                                           |
-| ----------------------------------------------------------- | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| DOM意味込みの実演レコーダー                                 | ✅ 完成                         | `tools/adf-replay-extension/content.js`, `background.js`, `sidepanel.js`                                                           |
-| 録画→draft pipeline コンパイル                              | 🟡 半分                         | `compileBrowserRecordingToPipeline()` @ `libs/core/browser/browser-extension-bridge.ts:490`                                        |
-| 承認 / lease / receipt / トラスト境界                       | ✅ 完成                         | `scripts/browser_bridge_host.ts`, `libs/core/governance/risky-op-registry.ts`, `knowledge/product/governance/approval-policy.json` |
-| 秘密入力の非記録（redaction）                               | ✅ 完成                         | `content.js`（password/OTP/token/WebAuthn を記録しない）                                                                           |
-| **① 手順レジストリ＆意図解決**                              | ❌ 欠落                         | —                                                                                                                                  |
-| **③' ref→堅牢セレクタ自動解決 / Golden Scenario / dry-run** | ❌ 欠落                         | —                                                                                                                                  |
-| **④ 自己修復・差分学習**                                    | ❌ 欠落（停止はするが直さない） | —                                                                                                                                  |
-| **⑤ MFA中継ゲート**                                         | ❌ 欠落（秘密の非記録のみ）     | —                                                                                                                                  |
+| 能力                                                        | 状態                            | 主な実体                                                                                                                                   |
+| ----------------------------------------------------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| DOM意味込みの実演レコーダー                                 | ✅ 完成                         | `tools/adf-replay-extension/content.js`, `background.js`, `sidepanel.js`                                                                   |
+| 録画→draft pipeline コンパイル                              | 🟡 半分                         | `compileBrowserRecordingToPipeline()` @ `libs/core/browser/browser-extension-bridge.ts:490`                                                |
+| 承認 / lease / receipt / トラスト境界                       | ✅ 完成                         | `scripts/browser/browser_bridge_host.ts`, `libs/core/governance/risky-op-registry.ts`, `knowledge/product/governance/approval-policy.json` |
+| 秘密入力の非記録（redaction）                               | ✅ 完成                         | `content.js`（password/OTP/token/WebAuthn を記録しない）                                                                                   |
+| **① 手順レジストリ＆意図解決**                              | ❌ 欠落                         | —                                                                                                                                          |
+| **③' ref→堅牢セレクタ自動解決 / Golden Scenario / dry-run** | ❌ 欠落                         | —                                                                                                                                          |
+| **④ 自己修復・差分学習**                                    | ❌ 欠落（停止はするが直さない） | —                                                                                                                                          |
+| **⑤ MFA中継ゲート**                                         | ❌ 欠落（秘密の非記録のみ）     | —                                                                                                                                          |
 
 **重要な事実（設計判断の前提）**
 
@@ -248,7 +248,7 @@ export interface ProcedureDelta {
   - `dispatch(resolution, inputs, ctx)`：`adapter.executor` で実行系を選ぶ。substrate=browser かつ `execution_substrate==='extension'` → 既存 `extension_session` 経路（lease発行→拡張実行）。`'playwright'` → `browser:pipeline`。他 substrate のアダプタは後続フェーズ（§13）で追加。
   - 高リスク step は既存 approval-gate を必ず通す（`risky-op-registry.ts`）。
   - 実行後 Golden Scenario と receipt を突合し、成功/失敗を判定。
-- **対象ファイル**: `libs/core/knowledge/procedure-dispatcher.ts`(新), `scripts/browser_bridge_host.ts`（lease に procedure_id/mission を載せる, 仕様§4.2 未配線分）
+- **対象ファイル**: `libs/core/knowledge/procedure-dispatcher.ts`(新), `scripts/browser/browser_bridge_host.ts`（lease に procedure_id/mission を載せる, 仕様§4.2 未配線分）
 - **受入条件**: extension 経路で承認→lease→実行→receipt→Golden検証が一気通貫。未承認の高リスクはブロック。lease 失効・origin不一致は拒否（既存回帰）。
 
 ### Layer④ 自己修復・差分学習
@@ -267,7 +267,7 @@ export interface ProcedureDelta {
   - MFA画面の検出（既知パターン or step メタの `mfa: true`）で `pause` し、UI/チャットへ「認証コードを入力」要求を中継。入力はエフェメラル（lease スコープ内のみ、storage/trace 非保存）。
   - Vault/Service preset から認証情報を解決（§Layer③ と同じ3点）。
   - **【追加要件 / agyレビュー B】MFA猶予 Lease 延長**: MFA中継でユーザ入力を待つ間に lease 失効タイマーが切れて自動失敗するのを防ぐ。`browser_bridge_host.ts` に `MFA_WAIT` 状態を設け、その間に限り失効タイマーを一時停止、または**最大3分の猶予 lease 延長**を自動発行する。延長は MFA_WAIT 中のみ・1回限り・origin/step 束縛を変えない（権限拡大に使わせない）。タイムアウト時は明示的 `aborted` で終了。
-- **対象ファイル**: `tools/adf-replay-extension/background.js`/`sidepanel.js`（pause/中継UI）, `scripts/browser_bridge_host.ts`（`MFA_WAIT` 状態＋猶予 lease 延長）, secret 境界
+- **対象ファイル**: `tools/adf-replay-extension/background.js`/`sidepanel.js`（pause/中継UI）, `scripts/browser/browser_bridge_host.ts`（`MFA_WAIT` 状態＋猶予 lease 延長）, secret 境界
 - **受入条件**: MFA要求で自動失敗せず一時停止し、ユーザ入力後に再開。**MFA待機が既定 lease TTL を超えても、猶予延長（最大3分）内なら失効せず再開できる。猶予超過時は `aborted` になる。** OTP/秘密が draft/storage/trace/receipt に残らない。
 
 ---

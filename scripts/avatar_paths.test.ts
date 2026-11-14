@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeReadFile } from '@agent/core/secure-io';
-import { resolveAvatarGenerationPaths } from './generate_avatar.js';
+import { resolveAvatarGenerationPaths } from './generate/generate_avatar.js';
 import { normalizeIdentityRecord, resolveAvatarRegistrationPaths } from './register_avatar.js';
 
 describe('avatar script path boundaries', () => {

@@ -5076,7 +5076,7 @@
       "category": "secret",
       "type": "string",
       "required": false,
-      "description": "VAPID private key for Web Push to the concierge PWA. Generate a pair with `pnpm tsx scripts/generate_web_push_keys.ts`; keep it in the deployment secret store. Without the key pair nothing is pushed and subscribing is refused.",
+      "description": "VAPID private key for Web Push to the concierge PWA. Generate a pair with `pnpm tsx scripts/generate/generate_web_push_keys.ts`; keep it in the deployment secret store. Without the key pair nothing is pushed and subscribing is refused.",
       "documented": true
     },
     {

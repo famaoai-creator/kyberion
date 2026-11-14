@@ -37,7 +37,7 @@
 /package.json                               @famaoai-creator
 /pnpm-workspace.yaml                        @famaoai-creator
 /.github/workflows/                         @famaoai-creator
-/scripts/check_*.ts                         @famaoai-creator
+/scripts/check/                             @famaoai-creator
 /migration/                                 @famaoai-creator
 /CHANGELOG.md                               @famaoai-creator
 

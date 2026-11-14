@@ -30,7 +30,7 @@
       "note": "Read-only validation of the user-supplied consumable JSON request location before invoking the local recut preparer."
     },
     {
-      "file": "scripts/browser_actuator_usability_probe.ts",
+      "file": "scripts/browser/browser_actuator_usability_probe.ts",
       "count": 1,
       "classification": "legit-tmp",
       "note": "Re-generable isolated Chromium probe scratch: per-run screenshots and diagnostic results are consumed by usability verification; durable conclusions are recorded separately in mission evidence."
@@ -426,7 +426,7 @@
       "note": "backup/restore plaintext temp dirs (decrypted payload, staged partitions, mission bundles), removed on every path by withPlaintextTempDir"
     },
     {
-      "file": "scripts/browser_live_demo.ts",
+      "file": "scripts/browser/browser_live_demo.ts",
       "count": 2,
       "classification": "legit-tmp",
       "note": "ephemeral before/after screenshots for the local browser demo"
@@ -438,7 +438,7 @@
       "note": "actuator input handoff file"
     },
     {
-      "file": "scripts/check_plugin_views_e2e.ts",
+      "file": "scripts/check/check_plugin_views_e2e.ts",
       "count": 1,
       "classification": "legit-tmp",
       "note": "PE-02 hermetic Kyberion root of one E2E run; removed when the run ends"
@@ -474,7 +474,7 @@
       "note": "deterministic evaluation receipt stream"
     },
     {
-      "file": "scripts/generate_project_os.ts",
+      "file": "scripts/generate/generate_project_os.ts",
       "count": 1,
       "classification": "migrate-candidate",
       "note": "project-os fallback output; project-scoped artifact"

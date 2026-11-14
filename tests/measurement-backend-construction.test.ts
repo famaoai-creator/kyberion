@@ -33,7 +33,7 @@ const MEASUREMENT_ENTRY_POINTS: Record<string, { construction: Construction; rea
     construction: 'receives',
     reason: 'drives the backend its caller built; defines runBackendLiveScenarios',
   },
-  'scripts/check_backend_live_scenarios.ts': {
+  'scripts/check/check_backend_live_scenarios.ts': {
     construction: 'caller-bounded',
     reason: 'operator entry point of the live scenarios',
   },

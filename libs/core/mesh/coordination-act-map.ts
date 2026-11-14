@@ -102,7 +102,7 @@ export const PEER_MESSAGE_TYPE_ACTS = actTable<PeerMessageType>({
  * Peer conversation transcript `kind`. By rule B a kind that carries a typed
  * record is a carrier: `handoff` carries a peer task proposal
  * (`peer-task-exchange.ts`) or a Mesh collaboration request
- * (`scripts/peer_conversation_server.ts`), and those records name the act. A
+ * (`scripts/peer/peer_conversation_server.ts`), and those records name the act. A
  * `status` that carries a `peer-task-result` likewise defers to the task layer;
  * a plain `status` (auto-reply acknowledgement) is `inform`. The listener also
  * answers a carried proposal with a `reply` / `status` transport receipt

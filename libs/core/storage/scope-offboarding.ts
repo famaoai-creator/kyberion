@@ -727,7 +727,7 @@ export const PHYSICAL_LEGACY_TENANT_STATE_ROOTS = [
   PARTITIONED_RUNTIME_STATE_ROOTS.dot,
   // generation-cost-settlement.ts: read fallback until the next write moves it.
   PARTITIONED_RUNTIME_STATE_ROOTS.generation_cost_settlements,
-  // scripts/reasoning_credentials.ts: proofs expire after 15 minutes; no read fallback.
+  // scripts/reasoning/reasoning_credentials.ts: proofs expire after 15 minutes; no read fallback.
   PARTITIONED_RUNTIME_STATE_ROOTS.api_verification,
 ] as const;
 

@@ -97,9 +97,9 @@ pnpm pipeline --input pipelines/aws-operations-simulation.json \
 node dist/scripts/register_workflow.js --request active/shared/tmp/my-workflow.json --propose
 node dist/scripts/register_workflow.js --request active/shared/tmp/my-workflow.json --apply
 # 適用後は必ず検証
-pnpm run build && node dist/scripts/check_workflow_catalog_refs.js \
-  && node dist/scripts/check_governance_rules.js \
-  && node dist/scripts/check_intent_domain_coverage.js \
+pnpm run build && node dist/scripts/check/check_workflow_catalog_refs.js \
+  && node dist/scripts/check/check_governance_rules.js \
+  && node dist/scripts/check/check_intent_domain_coverage.js \
   && pnpm generate:knowledge-index
 ```
 

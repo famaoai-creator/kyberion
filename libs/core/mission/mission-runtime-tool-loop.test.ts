@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import '../workforce/worker-goal-driver.js';
-import '../../../scripts/task_pipeline_executor.js';
+import '../../../scripts/task/task_pipeline_executor.js';
 import * as path from 'node:path';
 import { pathResolver } from '../path-resolver.js';
 import { safeExistsSync, safeReadFile, safeRmSync, safeWriteFile } from '../secure-io.js';

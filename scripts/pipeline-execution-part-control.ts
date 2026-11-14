@@ -961,14 +961,15 @@ const INLINE_OP_HANDLERS: Record<string, InlineOpHandler> = {
     return (await domainOps()).runInlineOrganizationDigest(step, params, ctx);
   },
   'core:continuous_operations_report': async ({ step, params, ctx }) => {
-    const { runContinuousOperationsReport } = await import('./continuous_operations_report.js');
+    const { runContinuousOperationsReport } =
+      await import('./continuous/continuous_operations_report.js');
     const ref = String(resolveVars(params.config_ref, ctx));
     const report = await runContinuousOperationsReport(ref, ctx);
     return { ...ctx, [resolveExportKey(step, 'continuous_operations_report')]: report };
   },
   'core:continuous_operations': async ({ step, params, ctx }) => {
     const { runContinuousOperationsCycleFromRef } =
-      await import('./continuous_operations_cycle.js');
+      await import('./continuous/continuous_operations_cycle.js');
     const apply = resolveVars(params.apply ?? false, ctx);
     if (typeof apply !== 'boolean')
       throw new Error('core:continuous_operations apply must be boolean');

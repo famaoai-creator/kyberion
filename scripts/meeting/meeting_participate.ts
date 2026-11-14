@@ -1,0 +1,653 @@
+/**
+ * Meeting Participation CLI.
+ *
+ * The "real" version of `meeting:run`: actually joins the meeting,
+ * captures audio, transcribes it, hands the transcript to the
+ * reasoning backend, and speaks the reply back via TTS.
+ *
+ * Wiring uses the small abstractions in `@agent/core`:
+ *
+ *   resolveAudioBus()                    → BlackHole / PulseAudio / stub
+ *   getMeetingJoinDriver(driver_id)      → --driver, else the saved seam
+ *                                          default, else browser-playwright
+ *   selectStreamingSttBridge()           → stub, or a real bridge when the
+ *                                          transport needs real STT (seam policy)
+ *   getStreamingTtsBridge()              → stub or KYBERION_TTS_COMMAND
+ *   EnergyVad                             → built-in VAD (seam-selected with
+ *                                          --vad-purpose or operator rules)
+ *   MeetingParticipationCoordinator      → owns the loop
+ *
+ * Usage:
+ *   pnpm meeting:participate \
+ *     --mission MSN-MTG-LIVE-001 \
+ *     --meeting-url https://meet.google.com/abc-defg-hij \
+ *     --platform meet \
+ *     --display-name "Kyberion (operator delegate)" \
+ *     --max-minutes 30
+ */
+
+import { EnergyVad } from '@agent/core/voice/voice-activity-detector';
+import { MeetingParticipationCoordinator } from '@agent/core/meeting/meeting-participation-coordinator';
+import {
+  StubMeetingJoinDriver,
+  getMeetingJoinDriver,
+  registerMeetingJoinDriver,
+  validateMeetingTarget,
+  type MeetingJoinDriver,
+  type MeetingJoinPlatform,
+} from '@agent/core/meeting/meeting-join-driver';
+import { savedSeamDefaultFor } from '@agent/core/seam-provider-selection';
+
+const MEETING_JOIN_DRIVER_SEAM = 'meeting-join-driver';
+/** This CLI's fallback when neither --driver nor a saved seam default is set. */
+const CLI_FALLBACK_DRIVER = 'browser-playwright';
+import { installMeetingParticipationDriver as installMeetingJoinDriverModule } from '@agent/core/meeting/meeting-driver-module-loader';
+import { selectStreamingSttBridge } from '@agent/core/voice/streaming-stt-bridge';
+import { getStreamingTtsBridge } from '@agent/core/voice/streaming-tts-bridge';
+import { getVoiceProfileRegistry } from '@agent/core/voice/voice-profile-registry';
+import { installShellStreamingSttBridgeFromEnv } from '@agent/core/shell/shell-streaming-stt-bridge';
+import { installSileroVadBackend } from '@agent/shared-voice/silero-vad-bridge';
+import { installTenVadBackend } from '@agent/shared-voice/ten-vad-bridge';
+import { resolveVadBackend, shouldSelectVadBackend } from '@agent/core/voice/vad-registry';
+import type { VoiceActivityDetector } from '@agent/core/voice/voice-activity-detector';
+import { installShellStreamingTtsBridgeFromEnv } from '@agent/core/shell/shell-streaming-tts-bridge';
+import { loadEnvironmentManifest, verifyReady } from '@agent/core/environment-capability';
+import { resolveAudioBus } from '@agent/core/voice/audio-bus-resolver';
+import { resolveMeetingParticipationRuntimePlan } from '@agent/core/meeting/meeting-participation-runtime-plan';
+import { TraceContext, finalizeAndPersist } from '@agent/core/analysis/trace';
+import { logger } from '@agent/core/core';
+import { getReasoningBackend } from '@agent/core/reasoning/reasoning-backend';
+import { setRegisteredEnv } from '@agent/core/foundation';
+import type {
+  AudioFormat,
+  MeetingSession,
+  MeetingTarget,
+  TranscriptChunk,
+} from '@agent/core/meeting/meeting-session-types';
+import { startMeetingCommandLoop } from './meeting_commands.js';
+import type { ConversationAgent } from '@agent/core/meeting/meeting-participation-coordinator';
+import { createStandardYargs } from '@agent/core/cli-utils';
+import { defineScript, isDirectScript, setProcessExitCode } from '../lib/harness.js';
+import { parseSafeJsonObjectInput } from '../lib/json-input.js';
+// Side-effect imports register the audio-bus capability probes so the
+// participation-runtime manifest can resolve `audio-bus.blackhole` etc.
+import '@agent/core/blackhole-audio-bus';
+import '@agent/core/pulse-audio-bus';
+
+const FORMAT: AudioFormat = {
+  encoding: 'pcm_s16le',
+  sample_rate_hz: 16000,
+  channels: 1,
+};
+
+class ReasoningBackendAgent implements ConversationAgent {
+  private readonly backend = getReasoningBackend();
+  private utterances: TranscriptChunk[] = [];
+  constructor(
+    private readonly missionId: string,
+    private readonly persona: string
+  ) {}
+
+  async onUtterance(utt: TranscriptChunk): Promise<{ speech?: string; leave?: boolean }> {
+    this.utterances.push(utt);
+    if (utt.text.trim().length === 0) return {};
+    const transcript = this.utterances
+      .map((u) => `- ${u.speaker_label ?? 'speaker'}: ${u.text}`)
+      .join('\n');
+    const prompt = [
+      `You are participating in a live meeting as ${this.persona}.`,
+      'Output ONLY a JSON object: { "speech": str (≤2 sentences), "leave": bool }.',
+      'No prose, no code fence. Reply only when you have something useful to add. Use empty speech to stay silent.',
+      'Recent transcript:',
+      transcript,
+    ].join('\n');
+    try {
+      const raw = await this.backend.delegateTask(prompt, `meeting:${this.missionId}`);
+      const json = extractFirstJson(raw);
+      const speech = typeof json?.speech === 'string' ? json.speech : '';
+      const leave = json?.leave === true;
+      return speech || leave ? { ...(speech ? { speech } : {}), leave } : {};
+    } catch (err: any) {
+      logger.warn(`[participate-cli] backend.delegateTask failed: ${err?.message ?? err}`);
+      return {};
+    }
+  }
+}
+
+export function extractFirstJson(text: string): Record<string, unknown> | null {
+  const trimmed = text.trim();
+  const fenced = trimmed.match(/```(?:json)?\s*\n([\s\S]*?)\n```/);
+  const raw = fenced ? fenced[1] : trimmed;
+  try {
+    return parseSafeJsonObjectInput(raw, 'meeting agent response') || null;
+  } catch {
+    return null;
+  }
+}
+
+export function prepareMeetingTarget(
+  target: MeetingTarget
+): MeetingTarget & { platform: MeetingJoinPlatform | 'in_room' } {
+  return validateMeetingTarget(target);
+}
+
+async function loadDriver(
+  driverId: string,
+  opts: {
+    headed?: boolean;
+    accountSlug?: string;
+    microphoneDevice?: string;
+    speakerDevice?: string;
+    cameraDevice?: string;
+    userDataDir?: string;
+    profileDirectory?: string;
+    connectOverCdp?: boolean;
+    cdpUrl?: string;
+    cdpPort?: number;
+    browserChannel?: 'chrome' | 'chromium';
+    extensionWsPort?: number;
+    extensionWsHost?: string;
+    extensionJoinTimeoutSec?: number;
+  } = {}
+): Promise<MeetingJoinDriver> {
+  if (!getMeetingJoinDriver(driverId)) {
+    try {
+      const loaded = await installMeetingJoinDriverModule(driverId, opts);
+      if (loaded.fallback_path) {
+        logger.info(`[participate-cli] driver module loaded from ${loaded.fallback_path}`);
+      }
+    } catch (err: any) {
+      logger.warn(
+        `[participate-cli] driver module '${driverId}' could not be loaded: ${err?.message ?? err}`
+      );
+    }
+  }
+  const driver = getMeetingJoinDriver(driverId);
+  if (driver) {
+    const probe = await driver.probe();
+    if (probe.available) return driver;
+    logger.warn(
+      `[participate-cli] driver '${driverId}' unavailable: ${probe.reason}; falling back to stub`
+    );
+  }
+  if (!getMeetingJoinDriver('stub')) registerMeetingJoinDriver(new StubMeetingJoinDriver());
+  return new StubMeetingJoinDriver();
+}
+
+export interface MeetingBootstrapGateResult {
+  ready: boolean;
+  skipped: boolean;
+}
+
+export async function evaluateMeetingBootstrapGate(
+  missionId: string,
+  trace: TraceContext,
+  opts: {
+    skipBootstrapCheck: boolean;
+    loadManifest?: typeof loadEnvironmentManifest;
+    readinessCheck?: typeof verifyReady;
+  }
+): Promise<MeetingBootstrapGateResult> {
+  const loadManifest = opts.loadManifest ?? loadEnvironmentManifest;
+  const readinessCheck = opts.readinessCheck ?? verifyReady;
+
+  trace.startSpan('meeting_participate.bootstrap_gate', {
+    skipped: opts.skipBootstrapCheck,
+  });
+
+  try {
+    if (opts.skipBootstrapCheck) {
+      trace.addEvent('meeting_participate.bootstrap_gate_skipped', {
+        mission_id: missionId,
+      });
+      trace.endSpan('ok');
+      return { ready: true, skipped: true };
+    }
+
+    const manifest = loadManifest('meeting-participation-runtime');
+    const ready = readinessCheck(manifest, { mission_id: missionId });
+    if (!ready.ready) {
+      trace.addEvent('meeting_participate.bootstrap_gate_failed', {
+        manifest_id: manifest.manifest_id,
+        missing: ready.missing.length,
+      });
+      for (const missing of ready.missing) {
+        trace.addEvent('meeting_participate.bootstrap_gate_missing', {
+          capability_id: missing.capability_id,
+        });
+      }
+      trace.endSpan('error', 'environment-capability gate is not satisfied');
+      return { ready: false, skipped: false };
+    }
+
+    trace.addEvent('meeting_participate.bootstrap_gate_ready', {
+      manifest_id: manifest.manifest_id,
+      missing: 0,
+    });
+    trace.endSpan('ok');
+    return { ready: true, skipped: false };
+  } catch (err: any) {
+    trace.addEvent('meeting_participate.bootstrap_gate_error', {
+      error: err?.message ?? String(err),
+    });
+    trace.endSpan('error', err?.message ?? String(err));
+    return { ready: false, skipped: false };
+  }
+}
+
+export function assertMeetingParticipationRuntime(input: {
+  runtimePlan: ReturnType<typeof resolveMeetingParticipationRuntimePlan>;
+  bus: { bus_id: string };
+  busProbe: { available: boolean; reason?: string };
+  stt: { bridge_id: string };
+  tts: { bridge_id: string };
+}): void {
+  const { runtimePlan, bus, busProbe, stt, tts } = input;
+  if (runtimePlan.require_real_audio_bus && (bus.bus_id === 'stub' || !busProbe.available)) {
+    throw new Error(
+      `[participate-cli] transport mode '${runtimePlan.transport_mode}' requires a real audio bus, but bus='${bus.bus_id}' probe='${busProbe.reason ?? 'unavailable'}'`
+    );
+  }
+  if (runtimePlan.require_streaming_stt && stt.bridge_id === 'stub') {
+    throw new Error(
+      `[participate-cli] transport mode '${runtimePlan.transport_mode}' requires streaming STT, but only the stub bridge is registered. Set KYBERION_STT_COMMAND or register a real bridge.`
+    );
+  }
+  if (runtimePlan.require_streaming_tts && tts.bridge_id === 'stub') {
+    throw new Error(
+      `[participate-cli] transport mode '${runtimePlan.transport_mode}' requires streaming TTS, but only the stub bridge is registered. Set KYBERION_TTS_COMMAND or register a real bridge.`
+    );
+  }
+}
+
+export function resolveMeetingParticipationVoiceProfile(
+  input: {
+    voiceProfileId?: string;
+    registry?: ReturnType<typeof getVoiceProfileRegistry>;
+  } = {}
+) {
+  const registry = input.registry ?? getVoiceProfileRegistry();
+  const requestedProfileId = input.voiceProfileId?.trim();
+
+  if (requestedProfileId) {
+    const explicit = registry.profiles.find((profile) => profile.profile_id === requestedProfileId);
+    if (!explicit) {
+      throw new Error(
+        `[participate-cli] requested voice profile '${requestedProfileId}' is not present in the active registry.`
+      );
+    }
+    return explicit;
+  }
+
+  const defaultProfile =
+    registry.profiles.find((profile) => profile.profile_id === registry.default_profile_id) ||
+    registry.profiles.find((profile) => profile.status === 'active');
+  if (!defaultProfile) {
+    throw new Error('[participate-cli] no active voice profile is available in the registry');
+  }
+  return defaultProfile;
+}
+
+export function shouldResolveMeetingParticipationVoiceProfile(input: {
+  runtimePlan: ReturnType<typeof resolveMeetingParticipationRuntimePlan>;
+  voiceProfileId?: string;
+}): boolean {
+  return input.runtimePlan.require_voice_profile || Boolean(input.voiceProfileId?.trim());
+}
+
+async function main(args: string[] = []): Promise<void> {
+  const argv = await createStandardYargs(['node', 'meeting_participate', ...args])
+    .option('mission', { type: 'string', demandOption: true })
+    .option('meeting-url', { type: 'string' })
+    .option('platform', { type: 'string', default: 'auto' })
+    .option('meeting-id', { type: 'string' })
+    .option('meeting-series', {
+      type: 'string',
+      describe: 'Calendar series id (matches a meeting.recording standing grant)',
+    })
+    .option('passcode', { type: 'string' })
+    .option('display-name', { type: 'string', default: 'Kyberion' })
+    .option('persona', { type: 'string', default: 'an attentive meeting participant' })
+    .option('voice-profile-id', { type: 'string' })
+    .option('driver', {
+      type: 'string',
+      describe:
+        'Meeting join driver (default: saved meeting-join-driver seam default, else browser-playwright)',
+    })
+    .option('audio-bus', { type: 'string' })
+    .option('transport-mode', {
+      type: 'string',
+      choices: ['transcribe_first', 'captions_first', 'realtime_voice'] as const,
+      default: 'transcribe_first',
+    })
+    .option('dry-run', { type: 'boolean', default: false })
+    .option('stt-purpose', {
+      type: 'string',
+      describe:
+        'Streaming STT selection purpose (streaming-stt-bridge policy: accuracy, latency, privacy)',
+    })
+    .option('vad-purpose', {
+      type: 'string',
+      describe: 'VAD backend selection purpose (voice.vad-backend policy: accuracy, light)',
+    })
+    .option('microphone-device', { type: 'string' })
+    .option('speaker-device', { type: 'string' })
+    .option('camera-device', { type: 'string' })
+    .option('user-data-dir', { type: 'string' })
+    .option('profile-directory', { type: 'string' })
+    .option('connect-over-cdp', { type: 'boolean', default: false })
+    .option('cdp-url', { type: 'string' })
+    .option('cdp-port', { type: 'number' })
+    .option('browser-channel', { type: 'string', choices: ['chrome', 'chromium'] as const })
+    .option('extension-ws-port', {
+      type: 'number',
+      describe: 'chrome-extension driver: local WS control port (default 8779)',
+    })
+    .option('extension-ws-host', {
+      type: 'string',
+      describe:
+        'chrome-extension driver: loopback WS host (default 127.0.0.1; non-loopback hosts are refused)',
+    })
+    .option('extension-join-timeout-sec', {
+      type: 'number',
+      describe: 'chrome-extension driver: seconds to wait for the extension to connect + join',
+    })
+    .option('max-minutes', { type: 'number', default: 30 })
+    .option('self-audio-suppression-ms', { type: 'number', default: 0 })
+    .option('post-playback-drain-ms', { type: 'number', default: 400 })
+    .option('barge-in-enabled', { type: 'boolean', default: false })
+    .option('barge-in-rms-multiplier', { type: 'number', default: 2.5 })
+    .option('barge-in-min-duration-ms', { type: 'number', default: 160 })
+    .option('headed', { type: 'boolean', default: false })
+    .option('interactive-commands', {
+      type: 'boolean',
+      describe:
+        'read mid-meeting verbs (status, raise-hand, admit, chat, leave) from stdin; defaults to on when stdin is a TTY',
+    })
+    .option('allow-admit', {
+      type: 'boolean',
+      default: false,
+      describe: 'grant host authority for the admit verb in this run (audited)',
+    })
+    .option('account-slug', { type: 'string', default: 'default' })
+    .option('skip-bootstrap-check', { type: 'boolean', default: false })
+    .parseSync();
+
+  const missionId = String(argv.mission);
+  setRegisteredEnv('MISSION_ID', missionId);
+  const trace = new TraceContext(`meeting_participate:${missionId}`, {
+    missionId,
+    actuator: 'meeting-participate',
+  });
+  let exitCode = 0;
+  let commandLoop: ReturnType<typeof startMeetingCommandLoop> | null = null;
+
+  try {
+    // Fail-closed on missing environment-capability receipt unless the
+    // operator explicitly opts out. Run `pnpm env:bootstrap --manifest
+    // meeting-participation-runtime --apply [--force]` to satisfy it.
+    const gate = await evaluateMeetingBootstrapGate(missionId, trace, {
+      skipBootstrapCheck: Boolean(argv['skip-bootstrap-check']),
+    });
+    if (!gate.ready) {
+      logger.error(
+        `[participate-cli] environment-capability gate is not satisfied for mission ${missionId}.`
+      );
+      logger.error(
+        'Run `pnpm env:bootstrap --manifest meeting-participation-runtime --apply [--force]` to install,'
+      );
+      logger.error(
+        'or pass --skip-bootstrap-check (only for incident response — every skip is audited downstream).'
+      );
+      exitCode = 2;
+      return;
+    }
+
+    // Try to register optional shell bridges from env. If they fail, the
+    // registry stays at stub.
+    installShellStreamingSttBridgeFromEnv();
+    installShellStreamingTtsBridgeFromEnv();
+
+    const runtimePlan = resolveMeetingParticipationRuntimePlan({
+      transport_mode: argv['transport-mode'] as
+        'transcribe_first' | 'captions_first' | 'realtime_voice' | undefined,
+      dry_run: Boolean(argv['dry-run']),
+    });
+    logger.info(
+      `[participate-cli] runtime plan transport=${runtimePlan.transport_mode} dry_run=${runtimePlan.dry_run} real_audio_bus=${runtimePlan.require_real_audio_bus} stt=${runtimePlan.require_streaming_stt} tts=${runtimePlan.require_streaming_tts} voice_profile=${runtimePlan.require_voice_profile}`
+    );
+    // 同席モード (--driver in-room): the meeting is in the physical room, so
+    // no meeting URL is required and the platform is forced to in_room.
+    // --driver, else a saved meeting-join-driver seam default, else this CLI's
+    // own fallback. The CLI keeps browser-playwright (not the runtime policy
+    // default chrome-extension): the extension driver probes unavailable
+    // without the installed extension, and loadDriver would then silently
+    // degrade a working Playwright session to the stub.
+    const driverId =
+      typeof argv.driver === 'string' && argv.driver.trim()
+        ? argv.driver.trim()
+        : (savedSeamDefaultFor(MEETING_JOIN_DRIVER_SEAM)?.provider ?? CLI_FALLBACK_DRIVER);
+    const inRoom = driverId === 'in-room' || argv.platform === 'in_room';
+    const meetingUrl =
+      typeof argv['meeting-url'] === 'string' && argv['meeting-url']
+        ? String(argv['meeting-url'])
+        : inRoom
+          ? 'room://local'
+          : '';
+    if (!meetingUrl) {
+      logger.error('[participate-cli] --meeting-url is required (except with --driver in-room).');
+      exitCode = 2;
+      return;
+    }
+    const target: MeetingTarget = {
+      url: meetingUrl,
+      platform: inRoom ? 'in_room' : ((argv.platform as MeetingTarget['platform']) ?? 'auto'),
+      meeting_id: typeof argv['meeting-id'] === 'string' ? String(argv['meeting-id']) : undefined,
+      ...(typeof argv['meeting-series'] === 'string' && argv['meeting-series'].trim()
+        ? { series_id: argv['meeting-series'].trim() }
+        : {}),
+      passcode: typeof argv.passcode === 'string' ? String(argv.passcode) : undefined,
+      display_name: String(argv['display-name']),
+    };
+    const validatedTarget = prepareMeetingTarget(target);
+    const requestedVoiceProfileId =
+      typeof argv['voice-profile-id'] === 'string' ? String(argv['voice-profile-id']) : undefined;
+    const voiceProfile = shouldResolveMeetingParticipationVoiceProfile({
+      runtimePlan,
+      voiceProfileId: requestedVoiceProfileId,
+    })
+      ? resolveMeetingParticipationVoiceProfile({ voiceProfileId: requestedVoiceProfileId })
+      : null;
+    if (runtimePlan.require_voice_profile && voiceProfile?.status !== 'active') {
+      throw new Error(
+        `[participate-cli] transport mode '${runtimePlan.transport_mode}' requires an active voice profile, but '${voiceProfile?.profile_id ?? 'none'}' is ${voiceProfile?.status ?? 'missing'}`
+      );
+    }
+
+    const driver = await loadDriver(driverId, {
+      headed: Boolean(argv.headed),
+      accountSlug: String(argv['account-slug']),
+      microphoneDevice:
+        typeof argv['microphone-device'] === 'string'
+          ? String(argv['microphone-device'])
+          : undefined,
+      speakerDevice:
+        typeof argv['speaker-device'] === 'string' ? String(argv['speaker-device']) : undefined,
+      cameraDevice:
+        typeof argv['camera-device'] === 'string' ? String(argv['camera-device']) : undefined,
+      userDataDir:
+        typeof argv['user-data-dir'] === 'string' ? String(argv['user-data-dir']) : undefined,
+      profileDirectory:
+        typeof argv['profile-directory'] === 'string'
+          ? String(argv['profile-directory'])
+          : undefined,
+      connectOverCdp: Boolean(argv['connect-over-cdp']),
+      cdpUrl: typeof argv['cdp-url'] === 'string' ? String(argv['cdp-url']) : undefined,
+      cdpPort: typeof argv['cdp-port'] === 'number' ? Number(argv['cdp-port']) : undefined,
+      browserChannel: (argv['browser-channel'] as 'chrome' | 'chromium' | undefined) ?? undefined,
+      extensionWsPort:
+        typeof argv['extension-ws-port'] === 'number'
+          ? Number(argv['extension-ws-port'])
+          : undefined,
+      extensionWsHost:
+        typeof argv['extension-ws-host'] === 'string'
+          ? String(argv['extension-ws-host'])
+          : undefined,
+      extensionJoinTimeoutSec:
+        typeof argv['extension-join-timeout-sec'] === 'number'
+          ? Number(argv['extension-join-timeout-sec'])
+          : undefined,
+    });
+    const selectedDevices = {
+      microphone:
+        typeof argv['microphone-device'] === 'string'
+          ? String(argv['microphone-device'])
+          : undefined,
+      speaker:
+        typeof argv['speaker-device'] === 'string' ? String(argv['speaker-device']) : undefined,
+      camera: typeof argv['camera-device'] === 'string' ? String(argv['camera-device']) : undefined,
+    };
+    if (selectedDevices.microphone || selectedDevices.speaker || selectedDevices.camera) {
+      logger.info(
+        `[participate-cli] device preferences microphone=${selectedDevices.microphone ?? 'default'} speaker=${selectedDevices.speaker ?? 'default'} camera=${selectedDevices.camera ?? 'default'}`
+      );
+    }
+    if (argv['connect-over-cdp'] || argv['user-data-dir']) {
+      logger.info(
+        `[participate-cli] browser mode ${argv['connect-over-cdp'] ? 'cdp-attach' : 'persistent-profile'}${argv['profile-directory'] ? ` profile=${argv['profile-directory']}` : ''}${argv['cdp-url'] ? ` cdp_url=${argv['cdp-url']}` : ''}${argv['cdp-port'] ? ` cdp_port=${argv['cdp-port']}` : ''}`
+      );
+    }
+    const bus = resolveAudioBus((argv['audio-bus'] as any) || undefined);
+    const busProbe = await bus.probe();
+    if (!busProbe.available) {
+      logger.warn(`[participate-cli] audio bus '${bus.bus_id}' unavailable: ${busProbe.reason}`);
+      trace.addEvent('meeting_participate.audio_bus_unavailable', {
+        bus_id: bus.bus_id,
+      });
+    }
+    const sttSelection = selectStreamingSttBridge({
+      ...(argv['stt-purpose'] ? { purpose: String(argv['stt-purpose']) } : {}),
+      requires: { allowSynthetic: !runtimePlan.require_streaming_stt },
+    });
+    if (sttSelection.decision) {
+      logger.info(
+        `[participate-cli] streaming STT ${sttSelection.bridge_id} (${sttSelection.decision.strategy}: ${sttSelection.decision.rationale})`
+      );
+    }
+    const stt = sttSelection.bridge;
+    const tts = getStreamingTtsBridge();
+    assertMeetingParticipationRuntime({ runtimePlan, bus, busProbe, stt, tts });
+    const vadPurpose = argv['vad-purpose'] ? String(argv['vad-purpose']) : undefined;
+    let vad: VoiceActivityDetector = new EnergyVad();
+    if (shouldSelectVadBackend(vadPurpose ? { purpose: vadPurpose } : {})) {
+      installSileroVadBackend();
+      installTenVadBackend();
+      const resolvedVad = resolveVadBackend(undefined, {
+        ...(vadPurpose ? { purpose: vadPurpose } : {}),
+      });
+      if (resolvedVad.degradedFrom) {
+        logger.warn(
+          `[participate-cli] VAD '${resolvedVad.degradedFrom}' unavailable (${resolvedVad.degradedReason}); using 'energy'`
+        );
+      }
+      logger.info(`[participate-cli] VAD backend ${resolvedVad.backend.backend_id}`);
+      vad = resolvedVad.backend.create({ rmsThreshold: null, endpointMs: 700 });
+    }
+
+    const coordinator = new MeetingParticipationCoordinator({
+      driver,
+      bus,
+      stt,
+      tts,
+      vad,
+      agent: new ReasoningBackendAgent(missionId, String(argv.persona)),
+      trace,
+    });
+
+    // Interactive verbs: the coordinator owns the session loop, so hold
+    // the live session here and let stdin drive declared gestures.
+    let liveSession: MeetingSession | null = null;
+    const interactiveOpt = argv['interactive-commands'];
+    const interactive =
+      typeof interactiveOpt === 'boolean' ? interactiveOpt : Boolean(process.stdin.isTTY);
+    const commandLoopInteractive = interactive
+      ? startMeetingCommandLoop({
+          context: {
+            getSession: () => liveSession,
+            allowAdmit: Boolean(argv['allow-admit']),
+            onOutput: (message: string) => logger.info(`[participate-cmd] ${message}`),
+            onTrace: (event: string, detail?: Record<string, unknown>) => {
+              trace.addEvent(event, (detail ?? {}) as Record<string, string | number | boolean>);
+            },
+          },
+        })
+      : null;
+    commandLoop = commandLoopInteractive;
+    if (commandLoop) {
+      logger.info(
+        '[participate-cli] interactive commands on (status, raise-hand, admit, chat, leave)'
+      );
+    }
+
+    logger.info(
+      `🎙️ meeting_participate (mission=${missionId} driver=${driver.driver_id} bus=${bus.bus_id} platform=${validatedTarget.platform} voice_profile=${voiceProfile?.profile_id ?? 'not_required'})`
+    );
+
+    const report = await coordinator.run(validatedTarget, {
+      mission_id: missionId,
+      max_minutes: Number(argv['max-minutes']),
+      voice_profile_id: voiceProfile?.profile_id ?? '',
+      audio_format: FORMAT,
+      require_recording_consent: runtimePlan.require_recording_consent,
+      require_voice_consent: runtimePlan.require_voice_consent,
+      self_audio_suppression_ms: Math.max(0, Number(argv['self-audio-suppression-ms'])),
+      post_playback_drain_ms: Math.max(0, Number(argv['post-playback-drain-ms'])),
+      barge_in_enabled: Boolean(argv['barge-in-enabled']),
+      barge_in_rms_multiplier: Math.max(1, Number(argv['barge-in-rms-multiplier'])),
+      barge_in_min_duration_ms: Math.max(20, Number(argv['barge-in-min-duration-ms'])),
+      transcript_source:
+        runtimePlan.transport_mode === 'captions_first' ? 'driver_captions' : 'stt',
+      onSession: (session) => {
+        liveSession = session;
+      },
+    });
+    commandLoop?.stop();
+    await commandLoop?.done.catch(() => undefined);
+    logger.info('');
+    logger.info(`📋 Participation report:`);
+    logger.info(`   session_id: ${report.session_id}`);
+    logger.info(`   joined_at:  ${report.joined_at}`);
+    logger.info(`   left_at:    ${report.left_at}`);
+    logger.info(`   utterances heard:  ${report.utterances_received}`);
+    logger.info(`   utterances spoken: ${report.utterances_spoken}`);
+    logger.info(`   ended_by_timeout:  ${report.ended_by_timeout}`);
+  } catch (err: any) {
+    trace.addEvent('meeting_participate.cli_error', {
+      error: err?.message ?? String(err),
+    });
+    logger.error(err?.message ?? String(err));
+    exitCode = 1;
+  } finally {
+    commandLoop?.stop();
+    const persisted = finalizeAndPersist(trace);
+    logger.info(`📋 meeting_participate trace: ${persisted.path}`);
+    if (exitCode !== 0) {
+      setProcessExitCode(exitCode);
+    }
+  }
+}
+
+const runMeetingParticipateScript = defineScript({
+  name: 'meeting:participate',
+  flags: [],
+  run: ({ argv }) => main(argv),
+});
+
+if (
+  isDirectScript(import.meta.url, 'meeting_participate.ts') ||
+  isDirectScript(import.meta.url, 'meeting_participate.js')
+) {
+  void runMeetingParticipateScript();
+}
+
+export { main as runMeetingParticipate };
