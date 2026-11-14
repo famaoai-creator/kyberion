@@ -9910,6 +9910,26 @@
         "ja": "エージェント worktree を削除 (ブランチは残す)",
         "qps-ploc": "⟦Řėɱőṽė ȧñ ȧɠėñŧ ẇőřķŧřėė (ķėėṗş ŧħė ƀřȧñƈħ) ŀőřėɱ ïṗşůɱ ḓő⟧"
       },
+      "cli_cmd_script_account_preview": {
+        "en": "Review registration metadata for an existing account",
+        "ja": "既存アカウントの登録メタデータを確認",
+        "qps-ploc": "⟦Řėṽïėẇ řėɠïşŧřȧŧïőñ ɱėŧȧḓȧŧȧ ƒőř ȧñ ėẋïşŧïñɠ ȧƈƈőůñŧ ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "cli_cmd_script_account_request": {
+        "en": "Request approval for reviewed account registration",
+        "ja": "確認済みアカウント登録の承認を依頼",
+        "qps-ploc": "⟦Řėɋůėşŧ ȧṗṗřőṽȧŀ ƒőř řėṽïėẇėḓ ȧƈƈőůñŧ řėɠïşŧřȧŧïőñ ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "cli_cmd_script_account_status": {
+        "en": "Show account registration approval status",
+        "ja": "アカウント登録の承認状態を表示",
+        "qps-ploc": "⟦Şħőẇ ȧƈƈőůñŧ řėɠïşŧřȧŧïőñ ȧṗṗřőṽȧŀ şŧȧŧůş ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "cli_cmd_script_account_apply": {
+        "en": "Register approved account tokens through hidden terminal input",
+        "ja": "承認済みアカウントのトークンを非表示の端末入力で登録",
+        "qps-ploc": "⟦Řėɠïşŧėř ȧṗṗřőṽėḓ ȧƈƈőůñŧ ŧőķėñş ŧħřőůɠħ ħïḓḓėñ ŧėřɱïñȧŀ ïñṗůŧ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
       "cli_cmd_script_secret_introduce": {
         "en": "Introduce a secret through a hidden prompt",
         "ja": "非表示入力でシークレットを登録",

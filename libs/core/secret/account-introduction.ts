@@ -242,7 +242,12 @@ export function accountIntroductionApprovalBindingId(record: ApprovalRequestReco
     return null;
   }
 }
-function readPlan(principal: OnboardingAuthorityPrincipal, bindingId: string, approvalId: string) {
+function readPlan(
+  principal: OnboardingAuthorityPrincipal,
+  bindingId: string,
+  approvalId: string,
+  mode: 'continuation' | 'owner-review' = 'continuation'
+) {
   const { binding, installed } = selected(principal, bindingId);
   // Scope derives from the existing authorized binding; an untrusted approval cannot select it.
   const scopePlan = { owner_kind: binding.owner_kind } as Plan;
@@ -260,7 +265,9 @@ function readPlan(principal: OnboardingAuthorityPrincipal, bindingId: string, ap
   if (
     plan.version !== 1 ||
     plan.accountable_id !== principal.accountableId ||
-    plan.initiated_by !== principal.requesterId ||
+    typeof plan.initiated_by !== 'string' ||
+    !plan.initiated_by.trim() ||
+    (mode === 'continuation' && plan.initiated_by !== principal.requesterId) ||
     plan.agent_id !== installed.agentId ||
     plan.owner_kind !== binding.owner_kind ||
     plan.owner_ref !== binding.owner_ref ||
@@ -279,6 +286,28 @@ function readPlan(principal: OnboardingAuthorityPrincipal, bindingId: string, ap
   )
     return denied();
   return { record, plan, binding };
+}
+
+/**
+ * Authenticated human approval surfaces only. The accountable human may review
+ * an agent-initiated request; this does not transfer its continuation or apply
+ * authority. Decision authentication and the presented digest remain enforced
+ * by the existing approval surface/store.
+ */
+export function reviewAccountIntroductionApproval(
+  principal: OnboardingAuthorityPrincipal,
+  bindingId: string,
+  approvalId: string
+) {
+  if (principal.requesterId !== principal.accountableId)
+    denied('accountable human review required');
+  const { record, plan } = readPlan(principal, bindingId, approvalId, 'owner-review');
+  return {
+    ok: true as const,
+    ...receipt(record),
+    statement: plan.statement,
+    presented_digest: computeApprovalPresentedDigest(record),
+  };
 }
 function approved(record: ApprovalRequestRecord, plan: Plan) {
   if (
