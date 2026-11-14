@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { __test__, isAppleSilicon, isLinux, isMacOS, isWindows } from './platform.js';
+import { __test__, isAppleSilicon, isLinux, isMacOS, isWindows } from '../platform.js';
 
 describe('platform', () => {
   describe('buildMacSpeakArgs', () => {
