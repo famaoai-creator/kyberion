@@ -1,5 +1,6 @@
 import { withCompanyFanoutInvalidation } from '../../../../../lib/company-fanout-cache';
 import { scopedLearningApprovalVisibleToViewer } from '../../../../../lib/scoped-learning-approval-visibility';
+import { accountIntroductionApprovalMember } from '../../../../../lib/account-introduction-server';
 import { onboardingApprovalMember } from '../../../../../lib/onboarding-authority-server';
 import {
   loadConciergeApproval,
@@ -86,7 +87,11 @@ async function handlePost(req: NextRequest, context: { params: Promise<{ id: str
     if (!scopedLearningApprovalVisibleToViewer(record, resolved.context))
       return NextResponse.json({ ok: false, error: 'approval request not found' }, { status: 404 });
     const resourceTenant = approvalResourceTenant(record);
-    const onboardingMember = onboardingApprovalMember(resolved.context, record);
+    const accountMember = accountIntroductionApprovalMember(resolved.context, record);
+    const onboardingMember =
+      accountMember === undefined
+        ? onboardingApprovalMember(resolved.context, record)
+        : accountMember;
     if (onboardingMember === null)
       return NextResponse.json({ ok: false, error: 'approval request not found' }, { status: 404 });
     const decisionDenied = onboardingMember

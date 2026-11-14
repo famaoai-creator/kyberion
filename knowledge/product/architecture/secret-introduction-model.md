@@ -4,7 +4,7 @@ category: Architecture
 tags: [architecture, secrets, approvals, surfaces, governance]
 importance: 8
 author: Ecosystem Architect
-last_updated: 2026-11-12
+last_updated: 2026-11-13
 ---
 
 # Secret Introduction Model
@@ -80,7 +80,9 @@ Each write is AES-256-GCM encrypted with the **existing** connection-encryption
 key, even when legacy connection encryption is disabled. A missing, refused,
 or unsupported key fails before writing; this path never creates a key. Reads
 require the exact address and verify its encrypted identity and generation;
-there is no default account, latest-generation pointer, or plaintext fallback.
+there is no default account or plaintext fallback. The separate encrypted
+`registration.json` records the approved current generation and any unfinished
+apply claim; it is not an ambient credential alias.
 The existing production encryption-key backend is macOS Keychain only. Linux
 and Windows account-material writes fail closed; tests inject a synthetic key.
 This change does not add another key backend or provision cross-platform keys.
@@ -92,11 +94,21 @@ grants no credential use. Writing a new generation does not revoke old ones;
 a future admitted broker must pin and revalidate the selected current generation,
 binding, owner, task identity, allocation and approval before every use.
 
-**Not connected yet:** the CLI/UI introduction workflow and the credential broker
-do not call these primitives. The existing service-wide introduction flow above
-is unchanged. Exposing account introduction requires an approval-bound collector;
-exposing broker reads requires a reviewed exact-material capability. No real keys,
-secrets, grants, ownership records or migrations are changed by installing this code.
+**Account introduction:** the Concierge account collector uses these primitives
+after an exact owner-approved review. The review binds the existing connection,
+its service token references, owner, current generation and broker configuration.
+Values are collected after approval and never appear in the review. A durable
+pending registration fences interrupted applies, including uncertain external
+provisioning outcomes. Organization accounts use an explicitly configured writer
+with compare-and-swap generation semantics; personal accounts remain local.
+The service-wide introduction flow above remains separate.
+
+Runtime reads of local personal account generations are not wired to credential
+allocation. No new exact-material read capability, tenantless execution, session
+collector or CLI account collector is introduced. No real keys, secrets, grants,
+ownership records or migrations are changed by installing this code. The
+[service integration guide](../orchestration/service-integration-guide.md#register-a-token-for-an-existing-account)
+describes the setup prerequisites and recovery limits.
 
 ## Prohibitions
 

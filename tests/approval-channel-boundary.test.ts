@@ -474,6 +474,7 @@ describe('Approval channel boundary', () => {
       'tenant-provider-attestation',
       'custody-provider-attestation',
       'nhi-session-admission',
+      'account-introduction',
       'onboarding-authority',
       'project-trust',
       'plugin-install',

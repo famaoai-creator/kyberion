@@ -1033,6 +1033,8 @@
         "tests/text-similarity-tokenization-boundary.test.ts",
         "tests/core-fs-exception-boundary.test.ts",
         "tests/foundation-io-boundary.test.ts",
+        "tests/account-provision-admission-boundary.test.ts",
+        "libs/core/foundation/account-provision-admission.test.ts",
         "libs/core/foundation/asset-address.test.ts",
         "libs/core/foundation/resource-access-grant.test.ts",
         "libs/core/foundation/credential-material-capability.test.ts",

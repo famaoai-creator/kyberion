@@ -15,6 +15,7 @@ const MEMBER_PATHS = [
   '/api/push',
   '/api/charters',
   '/api/onboarding-authority',
+  '/api/accounts/introduction',
   '/api/ingest',
   '/api/training',
   '/api/progress',
