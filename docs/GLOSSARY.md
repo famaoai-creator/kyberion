@@ -755,6 +755,10 @@ In-runtime agent-to-agent envelopes between an orchestrator and the provider age
 
 The end customers a tenant delivers to, stored inside that tenant's own boundary at `knowledge/confidential/{tenant-slug}/customers/`. Deliberately not deduplicated across tenants: when two tenants serve the same end customer, each holds its own contract and obligations under its own compliance posture, and merging them would be exactly the leak the tenant boundary prevents. Distinct from both **Tenant** and **Stance** above, all three of which get called "customer" in conversation.
 
+### Hearing
+
+**(advanced)** A governed elicitation that pursues a tenant-set objective by collecting structured answers from a person into the decision ledger; its definition (template), presentation (form, conversation, avatar) and answer record are kept separate. Also ヒアリング. The definition is a hearing template: the product ones under `knowledge/product/orchestration/customer-decision-templates/`, or a tenant's own under `knowledge/confidential/{tenant-slug}/decisions/_templates/` (written with `pnpm kyberion customer-decision template put`, used before a product template of the same id), carrying an `objective` that is shown to the person answering and bound into the approved content hash. The customer-room web form is today's presentation for external customers; the Front Desk hearing sheet and the `requirements_hearing` channel mode are older entry points that the [plan](./developer/improvement-plans-2026-11/HEARING_UNIFICATION_PLAN_2026-11-12.ja.md) converges onto the same definition. Not a Front Desk destination and not a Tenant's Customer record. → [hearing-model](../knowledge/product/architecture/hearing-model.md)
+
 ### History Search
 
 Zero-LLM full-text search over conversation, mission, and trace history on SQLite FTS5 (unicode61 + CJK trigram), tier-isolated with an explicit provenance gate before anything is indexed publicly (`libs/core/search/history-search-index.ts`, `pnpm history:search`).

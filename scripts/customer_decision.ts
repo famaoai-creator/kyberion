@@ -9,8 +9,13 @@
  * `view` / `respond` and never touches the stores itself.
  *
  * Operator verbs (all take --tenant <slug> --case <id>; --json for machine output):
- *   draft    --customer <slug> [--template aidlc-inception] [--title <t>] [--from <text>] [--locale ja|en] [--deal <id>] [--project <id>] [--respond-by <YYYY-MM-DD>]
- *   draft    --agenda <id> --file <agenda.json>        replace title/from/entries (an approved/sent agenda becomes a new revision)
+ *   template put --file <template.json> --by user:<member>   (no --case) write the tenant's own hearing template (HR-01,
+ *            decisions/_templates/<id>.json; inline ja/en text, optional objective); bolt-review is reserved
+ *   template list | show --template <id>              (no --case) the tenant's templates and the product ones it does not shadow
+ *   draft    --customer <slug> [--template aidlc-inception] [--title <t>] [--from <text>] [--locale ja|en] [--deal <id>] [--project <id>] [--respond-by <YYYY-MM-DD>] [--objective <text>|none]
+ *            the tenant's own template of that id is used before the product one
+ *   draft    --agenda <id> --file <agenda.json>        replace title/from/objective/entries (an approved/sent agenda becomes a new revision)
+ *   draft    --agenda <id> [--respond-by <date>|none] [--objective <text>|none]   edit only those fields
  *   draft    --from-tasks [--agenda <draft id>] [--customer <slug>]   collect mission tasks' customer-judgment proposals (CD-09) into a draft agenda
  *   draft    --from-tasks --reask <tp-id,...> --by user:<member> [--agenda <draft id>] [--customer <slug>]
  *            ask again a requires_customer question whose agenda was closed / withdrawn / lost with no
@@ -124,6 +129,7 @@ import { runBoltReview } from './customer-decision/bolt-review.js';
 import { runRemind, runRemindersInstall } from './customer-decision/reminders.js';
 import { runOverview } from './customer-decision/overview.js';
 import { runLearning, runLearningInstall } from './customer-decision/learning.js';
+import { runTemplate } from './customer-decision/templates.js';
 
 export {
   AGENDA_APPROVE_OPERATION,
@@ -145,6 +151,9 @@ export async function runCustomerDecision(
     case '--help':
     case '-h':
       return usage();
+    case 'template':
+      // HR-01: `template put|list|show` — the action is the first positional argument.
+      return runTemplate(argv[1]?.startsWith('--') ? undefined : argv[1], opts);
     case 'draft':
       return flags.has('from-tasks') ? runCollectTaskProposals(opts, now) : runDraft(opts, now);
     case 'generate':

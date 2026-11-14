@@ -26,6 +26,7 @@ import {
   withCustomerDecisionCaseLock,
   type AgendaEntry,
   type CustomerDecisionInvite,
+  type AgendaObjective,
   type DecisionAgenda,
   type DecisionSwitch,
 } from '@agent/core/customer-decision';
@@ -92,8 +93,11 @@ export function parseCustomerDecisionArgs(argv: readonly string[]): ParsedArgs {
 
 export function usage(): string {
   return [
-    'pnpm kyberion customer-decision draft     --tenant <slug> --case <id> --customer <slug> [--template aidlc-inception] [--title <t>] [--from <text>] [--locale ja|en] [--deal <id>] [--project <id>] [--respond-by <YYYY-MM-DD>]',
-    'pnpm kyberion customer-decision draft     --tenant <slug> --case <id> --agenda <id> [--file <agenda.json>] [--respond-by <YYYY-MM-DD>|none]',
+    'pnpm kyberion customer-decision template put  --tenant <slug> --file <template.json> --by user:<member>   (tenant hearing template)',
+    'pnpm kyberion customer-decision template list --tenant <slug> --json',
+    'pnpm kyberion customer-decision template show --tenant <slug> --template <id> --json',
+    'pnpm kyberion customer-decision draft     --tenant <slug> --case <id> --customer <slug> [--template aidlc-inception] [--title <t>] [--from <text>] [--locale ja|en] [--deal <id>] [--project <id>] [--respond-by <YYYY-MM-DD>] [--objective <text>|none]',
+    'pnpm kyberion customer-decision draft     --tenant <slug> --case <id> --agenda <id> [--file <agenda.json>] [--respond-by <YYYY-MM-DD>|none] [--objective <text>|none]',
     'pnpm kyberion customer-decision draft     --tenant <slug> --case <id> --from-tasks [--agenda <draft id>] [--customer <slug>] [--title <t>] [--locale ja|en]',
     'pnpm kyberion customer-decision draft     --tenant <slug> --case <id> --from-tasks --reask <tp-id,...> --by user:<member> [--agenda <draft id>] [--customer <slug>]',
     'pnpm kyberion customer-decision generate  --tenant <slug> --case <id> --agenda <id> --intent-file <path> [--grounding-file <path>]',
@@ -137,6 +141,19 @@ export function parseRespondBy(value: string | undefined, now: string): string |
   if (today && date < today)
     throw usageError(`--respond-by ${date} is in the past (today is ${today} UTC)`);
   return date;
+}
+
+/**
+ * HR-01 `--objective`: the hearing goal shown to the customer (one statement,
+ * up to 2000 characters); `none` clears it (null). Undefined when absent.
+ */
+export function parseObjective(value: string | undefined): AgendaObjective | null | undefined {
+  if (value === undefined) return undefined;
+  const statement = value.trim();
+  if (statement === 'none') return null;
+  if (!statement || statement.length > 2000)
+    throw usageError('--objective must be 1-2000 characters of text, or none');
+  return { statement };
 }
 
 export function usageError(message: string): ScriptExitError {
@@ -268,6 +285,7 @@ export function agendaSummary(agenda: DecisionAgenda): Record<string, unknown> {
     status: agenda.status,
     ...(agenda.from ? { from: agenda.from } : {}),
     ...(agenda.respond_by ? { respond_by: agenda.respond_by } : {}),
+    ...(agenda.objective ? { has_objective: true } : {}),
     content_hash: agendaContentHash(agenda),
     entries: agenda.entries.length,
   };

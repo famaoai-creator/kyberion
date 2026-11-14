@@ -183,15 +183,19 @@ function queueSuggestion(
 }
 
 /**
- * The organization default each template entry has now, from the product
- * template (`<template_id>#<entry_id>` → value). A template that cannot be
- * loaded is skipped: the agendas' default stands in.
+ * The organization default each template entry has now, from the template
+ * the tenant drafts from (its own template of that id first, else the product
+ * one; `<template_id>#<entry_id>` → value). A template that cannot be loaded
+ * is skipped: the agendas' default stands in.
  */
-function templateDefaults(templateIds: readonly string[]): Map<string, unknown> {
+function templateDefaults(tenant: string, templateIds: readonly string[]): Map<string, unknown> {
   const defaults = new Map<string, unknown>();
   for (const templateId of [...new Set(templateIds)]) {
     try {
-      for (const entry of loadDecisionTemplate(templateId).entries) {
+      const template = asLedgerWriter(tenant, () =>
+        loadDecisionTemplate(templateId, { tenantSlug: tenant })
+      );
+      for (const entry of template.entries) {
         if (entry.org_default)
           defaults.set(`${templateId}#${entry.entry_id}`, entry.org_default.value);
       }
@@ -239,6 +243,7 @@ export function runLearning(
   }
   const metrics = buildDecisionLearningMetrics(cases, since ? { since } : {});
   const currentDefaults = templateDefaults(
+    tenant,
     metrics.overturn_by_template_entry.flatMap((stat) =>
       stat.template_id ? [stat.template_id] : []
     )

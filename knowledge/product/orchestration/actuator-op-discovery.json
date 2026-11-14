@@ -30005,6 +30005,9 @@
               "answers": {
                 "type": "array"
               },
+              "context": {
+                "type": "string"
+              },
               "counterparty_label": {
                 "type": "string"
               },
@@ -30251,6 +30254,9 @@
               "answers": {
                 "type": "array"
               },
+              "context": {
+                "type": "string"
+              },
               "counterparty_label": {
                 "type": "string"
               },
@@ -30468,6 +30474,9 @@
               },
               "answers": {
                 "type": "array"
+              },
+              "context": {
+                "type": "string"
               },
               "counterparty_label": {
                 "type": "string"
@@ -30744,6 +30753,9 @@
               "answers": {
                 "type": "array"
               },
+              "context": {
+                "type": "string"
+              },
               "counterparty_label": {
                 "type": "string"
               },
@@ -30961,6 +30973,9 @@
               },
               "answers": {
                 "type": "array"
+              },
+              "context": {
+                "type": "string"
               },
               "counterparty_label": {
                 "type": "string"
@@ -31180,6 +31195,9 @@
               "answers": {
                 "type": "array"
               },
+              "context": {
+                "type": "string"
+              },
               "counterparty_label": {
                 "type": "string"
               },
@@ -31397,6 +31415,9 @@
               },
               "answers": {
                 "type": "array"
+              },
+              "context": {
+                "type": "string"
               },
               "counterparty_label": {
                 "type": "string"
@@ -31617,6 +31638,9 @@
               },
               "answers": {
                 "type": "array"
+              },
+              "context": {
+                "type": "string"
               },
               "counterparty_label": {
                 "type": "string"
@@ -31999,6 +32023,9 @@
               },
               "answers": {
                 "type": "array"
+              },
+              "context": {
+                "type": "string"
               },
               "counterparty_label": {
                 "type": "string"
