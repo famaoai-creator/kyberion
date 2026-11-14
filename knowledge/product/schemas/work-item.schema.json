@@ -91,6 +91,15 @@
       "enum": ["children", "manual"],
       "description": "W2: who set a parent Issue's status last — aggregated from its steps (children) or set directly while it had steps (manual, pinned)."
     },
+    "context_origin": {
+      "type": "object",
+      "description": "Provenance of default-bearing context fields. Absence means unknown, not explicit.",
+      "properties": {
+        "project_id": { "type": "string", "enum": ["explicit", "default"] },
+        "work_shape": { "type": "string", "enum": ["explicit", "default"] }
+      },
+      "additionalProperties": false
+    },
     "metadata": { "type": "object" }
   },
   "additionalProperties": true

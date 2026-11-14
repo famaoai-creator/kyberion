@@ -18,6 +18,8 @@ A bounded unit of work with a lifecycle (`planned → active → validating → 
 - Glossary: [Mission](./GLOSSARY.md#mission) · [Task Session](./GLOSSARY.md#task-session) · [Artifact](./GLOSSARY.md#artifact)
 - Try: `pnpm mission hygiene` (lists stalled missions)
 
+Scope and execution answer different questions: a project can group both missions and task sessions, while a standalone mission needs no project and personal work needs no tenant. The scope chain lists applicable references in containment order; it does not require every request to create every level. See [scope references and execution choice](../knowledge/product/architecture/entity-scope-hierarchy.md#scope-references-and-execution-choice).
+
 ## 2. Pipeline
 
 A declarative, schema-validated description of steps (ADF — Agentic Data Format) that Kyberion runs under governance: trace, budgets, guardrails, replay. Repeatable work is captured as a pipeline instead of being re-improvised. Ready-made system pipelines live in [`pipelines/`](../pipelines/README.md); user-facing patterns are templates under `knowledge/product/pipeline-templates/`.

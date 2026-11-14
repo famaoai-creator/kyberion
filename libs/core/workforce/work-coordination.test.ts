@@ -14,6 +14,7 @@ import {
   clearWorkCoordinationNamespace,
   createBoard,
   createWorkItem,
+  createWorkItemIfAbsent,
   getBoard,
   listBoardItems,
   listBoards,
@@ -32,6 +33,7 @@ import {
   withWorkItemInventorySnapshot,
 } from './work-coordination.js';
 import { buildHandoffPacket } from '../mesh/handoff-packet.js';
+import { itemsPath } from './work-coordination-ledger.js';
 
 beforeEach(() => {
   setWorkCoordinationNamespace('work-coordination-core-test');
@@ -44,6 +46,67 @@ afterEach(() => {
 });
 
 describe('work coordination', () => {
+  it('keeps migrated old-record context origins unknown', () => {
+    const created = createWorkItem({
+      itemId: 'old-origin',
+      title: 'Old',
+      description: 'Old fixture',
+      labels: ['mission:MSN-OLD'],
+    });
+    const { context_origin: _origin, context: _context, ...legacy } = created;
+    safeWriteFile(itemsPath(), JSON.stringify(legacy) + '\n');
+    expect(migrateLegacyWorkItemContexts({ apply: true }).migrated).toContain(legacy.item_id);
+    const migrated = getWorkItem(legacy.item_id)!;
+    expect(migrated.context).toMatchObject({
+      project_id: 'default',
+      work_shape: 'routine_operation',
+    });
+    expect(migrated.context_origin).toEqual({});
+    const updated = updateWorkItem({
+      itemId: legacy.item_id,
+      expectedVersion: migrated.version,
+      context: { ...migrated.context, work_shape: 'incident_response' },
+    });
+    expect(updated.context_origin).toEqual({ work_shape: 'explicit' });
+  });
+
+  it('replays records written before context provenance existed without inventing it', () => {
+    const input = { itemId: 'old-replay', title: 'Old replay', description: 'Same request' };
+    const created = createWorkItem(input);
+    const { context_origin: _origin, ...legacy } = created;
+    safeWriteFile(itemsPath(), JSON.stringify(legacy) + '\n');
+    expect(createWorkItemIfAbsent(input).context_origin).toBeUndefined();
+  });
+
+  it('distinguishes default context values from explicitly supplied equal values across updates', () => {
+    const defaults = createWorkItem({
+      itemId: 'context-defaults',
+      title: 'Defaults',
+      description: 'No supplied context',
+    });
+    const explicit = createWorkItem({
+      itemId: 'context-explicit',
+      title: 'Explicit',
+      description: 'Explicit values',
+      context: { project_id: 'default', work_shape: 'routine_operation' },
+    });
+    expect(defaults.context).toEqual(explicit.context);
+    expect(defaults.context_origin).toEqual({ project_id: 'default', work_shape: 'default' });
+    expect(explicit.context_origin).toEqual({ project_id: 'explicit', work_shape: 'explicit' });
+    const updated = updateWorkItem({
+      itemId: defaults.item_id,
+      expectedVersion: defaults.version,
+      context: { ...defaults.context, work_shape: 'incident_response' },
+    });
+    expect(updated.context_origin).toEqual({ project_id: 'default', work_shape: 'explicit' });
+    const renamed = updateWorkItem({
+      itemId: updated.item_id,
+      expectedVersion: updated.version,
+      title: 'Renamed',
+    });
+    expect(renamed.context_origin).toEqual(updated.context_origin);
+  });
+
   it('keeps immutable snapshot reads and callback under caller authority, not the lock sentinel', () => {
     createWorkItem({
       itemId: 'snapshot-authority',

@@ -120,6 +120,7 @@ function harness(
       'handsfree-toggle',
       'about-title',
       'about-empty',
+      'about-state-text',
       'ask-form',
       'ask-input',
       'ask-send',

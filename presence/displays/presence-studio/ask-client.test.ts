@@ -12,6 +12,48 @@ import {
 } from './ask-client-test-harness.js';
 
 describe('Ask durable browser behavior (DOM doubles, no visual claim)', () => {
+  it.each([
+    ['pipeline', 'front_desk:shape_pipeline'],
+    ['browser_session', 'front_desk:shape_browser_session'],
+    ['actuator_action', 'front_desk:shape_actuator_action'],
+    ['task_session', 'front_desk:shape_task_session'],
+    [undefined, 'front_desk:shape_legacy_task_session'],
+  ])(
+    'shows the actual execution choice %s rather than its lossy legacy projection',
+    async (executionShape, expected) => {
+      const h = harness({
+        post: async () =>
+          response({
+            ok: true,
+            reply: 'Prepared',
+            mode: 'orchestrator',
+            intent_resolution: {
+              request_id: 'ir-shape',
+              normalized_intent: 'Prepare a report',
+              missing_inputs: [],
+              resolution_shape: 'task_session',
+              ...(executionShape ? { execution_shape: executionShape } : {}),
+              outcome_kind: 'artifact',
+              authority_level: 'autonomous',
+              next_action: {
+                kind: 'continue',
+                label: 'Continue',
+                consequence: 'Prepare the report',
+              },
+              rationale: 'Fixture',
+            },
+          }),
+      });
+      await flush();
+      h.input.value = 'Prepare a report';
+      h.form.fire('submit');
+      await flush();
+      await vi.waitFor(() =>
+        expect(h.elements.get('about-state-text')?.textContent).toBe(expected)
+      );
+    }
+  );
+
   it('waits for scope readiness and restores display-only server history', async () => {
     const ready = deferred<void>();
     const h = harness({

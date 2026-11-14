@@ -7,6 +7,7 @@ export type WorkVisibilityView = 'all' | 'actionable' | 'active' | 'history';
 
 export interface ResolvedWorkItemContext extends WorkItemContext {
   source: 'explicit' | 'legacy' | 'inferred';
+  field_sources?: Record<'project_id' | 'work_shape', 'explicit' | 'default' | 'unknown'>;
   warnings: string[];
 }
 
@@ -235,6 +236,10 @@ export function resolveWorkItemContext(item: WorkItem): ResolvedWorkItemContext 
   return {
     ...context,
     source: hasExplicitContext ? 'explicit' : hasLegacyContext ? 'legacy' : 'inferred',
+    field_sources: {
+      project_id: explicit.project_id ? item.context_origin?.project_id || 'unknown' : 'unknown',
+      work_shape: explicit.work_shape ? item.context_origin?.work_shape || 'unknown' : 'unknown',
+    },
     warnings,
   };
 }

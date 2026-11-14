@@ -26,6 +26,24 @@ function item(partial: Partial<WorkItem>): WorkItem {
 }
 
 describe('work-visibility', () => {
+  it('does not invent provenance for old default-looking values', () => {
+    const context = { project_id: 'default', work_shape: 'routine_operation' as const };
+    expect(resolveWorkItemContext(item({ context })).field_sources).toEqual({
+      project_id: 'unknown',
+      work_shape: 'unknown',
+    });
+    expect(
+      resolveWorkItemContext(
+        item({ context, context_origin: { project_id: 'default', work_shape: 'explicit' } })
+      ).field_sources
+    ).toEqual({ project_id: 'default', work_shape: 'explicit' });
+    expect(
+      resolveWorkItemContext(
+        item({ project_id: 'PROJECT-A', context_origin: { project_id: 'explicit' } })
+      ).field_sources?.project_id
+    ).toBe('unknown');
+  });
+
   it('requires canonical mission context for membership and search', () => {
     const legacy = item({ labels: ['mission:MSN-A'], metadata: { mission_id: 'MSN-A' } });
     const canonical = item({ item_id: 'canonical', context: { mission_id: 'MSN-A' } });

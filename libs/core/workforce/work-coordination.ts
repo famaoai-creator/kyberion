@@ -45,6 +45,7 @@ import {
   canReplayWorkItemClaim,
   isTerminalStatus,
   normalizeWorkItemContext,
+  workItemContextUpdate,
 } from './work-coordination-identity.js';
 import {
   hasUndispatchedWorkItemEvidenceScope,
@@ -346,12 +347,14 @@ export function migrateLegacyWorkItemContexts(options: { apply?: boolean } = {})
       remaining.push(item.item_id);
       continue;
     }
-    updateWorkItem({
+    // Migration restores references, not the original author's input intent.
+    const update = {
       itemId: item.item_id,
       expectedVersion: item.version,
       context,
       metadata: metadataUpdate,
-    });
+    };
+    withCoordinationMutation(() => updateWorkItemInternal(update, true));
     migrated.push(item.item_id);
   }
   return { migrated, remaining, migrated_context: remaining.length };
@@ -473,7 +476,7 @@ export function updateWorkItem(input: UpdateWorkItemInput): WorkItem {
   );
 }
 
-function updateWorkItemInternal(input: UpdateWorkItemInput): WorkItem {
+function updateWorkItemInternal(input: UpdateWorkItemInput, keepOrigins = false): WorkItem {
   const current = currentWorkItem(input.itemId);
   if (!current) {
     throw new WorkCoordinationError('item_not_found', `item not found: ${input.itemId}`);
@@ -545,7 +548,7 @@ function updateWorkItemInternal(input: UpdateWorkItemInput): WorkItem {
       ...(input.assigneeUserId !== undefined ? { assignee_user_id: input.assigneeUserId } : {}),
       ...(input.labels ? { labels: [...input.labels] } : {}),
       ...(input.dependencies ? { dependencies: [...input.dependencies] } : {}),
-      ...(input.context ? { context: { ...input.context } } : {}),
+      ...workItemContextUpdate(current, input.context, keepOrigins),
       ...parentPatch,
       ...(statusOrigin ? { status_origin: statusOrigin } : {}),
       ...(input.metadata ? { metadata: input.metadata } : {}),
