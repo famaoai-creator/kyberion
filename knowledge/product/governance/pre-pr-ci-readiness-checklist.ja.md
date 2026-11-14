@@ -271,7 +271,7 @@ PR 本文の Test plan に明記する。
 `main` を取り込んだ（merge / rebase）あと、または freshness gate が drift を報告したときは `pnpm kyberion resolve generated` を実行する。
 **この 1 コマンドで、CI が drift を検査する生成物をすべて**（op-registry、pseudo-locale、vocabulary-types、pii-rules、CLI reference、capability seams、subagent 定義、provider hooks、env registry、knowledge index）依存順に再生成して stage し、changelog fragment を検証する。個別の `generate:*` を手で順に実行しない。
 `--check` は書き込まずに drift したファイルを全件列挙して非 0 で終了する。`.husky/pre-push` が `--check --fast`（`slow` 指定の step を省略。現在は該当なし）を実行し、失敗時は修正コマンドを表示する（1 回だけ飛ばすときは `KYBERION_SKIP_PRE_PUSH=1 git push`）。
-role-assumption reachability のレポートはコミットしない。`role-assumption-reachability` pr gate がメモリ上で到達可能性を計算し、到達可能なロールが `role-assumption-policy.json` で許可されていない場合などの不変条件違反だけで失敗する（違反ごとに経路と次の手順を表示）。レポートを読みたいときは `node --import ./scripts/ts-loader.mjs scripts/analyze_role_assumptions.ts --write-report`（出力先 `active/shared/cache/system/role-assumption/reachability.json`）。
+role-assumption reachability のレポートはコミットしない。`role-assumption-reachability` pr gate がメモリ上で到達可能性を計算し、到達可能なロールが `role-assumption-policy.json` で許可されていない場合などの不変条件違反だけで失敗する（違反ごとに経路と次の手順を表示）。レポートを読みたいときは `node --import ./scripts/ts-loader.mjs scripts/analyze/analyze_role_assumptions.ts --write-report`（出力先 `active/shared/cache/system/role-assumption/reachability.json`）。
 生成物（`_index.md`、`CONFIGURATION.md`、`env.example`、reachability report）の衝突は手で直さない。
 conflict marker が残っていても、このコマンドが index の conflict stage から組み直して再生成する（merge driver は不要）。
 `env-registry.json` で同じ entry が両側で別々に変更された場合だけ手で直してから再実行する。

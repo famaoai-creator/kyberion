@@ -68,7 +68,7 @@ import { dotDelegationCapacity } from '@agent/core/dot/dot-dispatch';
 import { dotFeedbackPromptLines, latestDotSignals } from '@agent/core/dot/dot-feedback';
 import { runDotWakeWithGoalDriver } from '@agent/core/dot/dot-wake-orchestration';
 import { installReasoningBackends } from '@agent/core/reasoning/reasoning-bootstrap';
-import { DEFAULT_DAEMONS } from '../daemon_watchdog.js';
+import { DEFAULT_DAEMONS } from '../daemon/daemon_watchdog.js';
 import {
   DOT_TRANSITION_EXPECT_FLAGS,
   parseTransitionExpectations,

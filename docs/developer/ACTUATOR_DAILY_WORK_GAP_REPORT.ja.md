@@ -29,12 +29,12 @@ status: p2-implemented
 
 ### P0 実装状況(2026-09-06)
 
-| ID   | 状態     | 入れたもの                                                                                                                                                                                                                                                                                                                         |
-| ---- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| P0-1 | **done** | `github.json` に `list_issues`, `get_issue`, `list_pulls`, `get_pull`, `list_reviews`, `list_review_comments`, `list_pr_files`。P1 で `create_review` / `create_review_comment`(apply/write/approval)を追加。harness registry 19 ops。                                                                                             |
-| P0-2 | **done** | MCP `kyberion.service.capture`(capture/read のみ、承認なし)。`pipelines/daily-routine.json` を pipeline allowlist へ。書き込みは従来の `service.actuate`                                                                                                                                                                           |
-| P0-3 | **done** | `pnpm capabilities` / `pnpm kyberion list` は `scripts/capability_discovery_entry.mjs` のマニフェスト走査(Node 22 でも可)。仮説「ts-loader だけで足りる」は破棄 — Node 22 に `registerHooks` が無く、`@agent/core` は dist export。実行系は引き続き `dist/` 必須。Doctor は `pnpm run doctor`(bare `pnpm doctor` は pnpm 組み込み) |
-| P0-4 | **done** | [`docs/SLACK_CHANNEL_ROUTES.ja.md`](../SLACK_CHANNEL_ROUTES.ja.md)。`docs/SURFACES.md` / `CAPABILITIES_GUIDE.md` / `libs/actuators/README.md` からリンク                                                                                                                                                                           |
+| ID   | 状態     | 入れたもの                                                                                                                                                                                                                                                                                                                                    |
+| ---- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P0-1 | **done** | `github.json` に `list_issues`, `get_issue`, `list_pulls`, `get_pull`, `list_reviews`, `list_review_comments`, `list_pr_files`。P1 で `create_review` / `create_review_comment`(apply/write/approval)を追加。harness registry 19 ops。                                                                                                        |
+| P0-2 | **done** | MCP `kyberion.service.capture`(capture/read のみ、承認なし)。`pipelines/daily-routine.json` を pipeline allowlist へ。書き込みは従来の `service.actuate`                                                                                                                                                                                      |
+| P0-3 | **done** | `pnpm capabilities` / `pnpm kyberion list` は `scripts/capability/capability_discovery_entry.mjs` のマニフェスト走査(Node 22 でも可)。仮説「ts-loader だけで足りる」は破棄 — Node 22 に `registerHooks` が無く、`@agent/core` は dist export。実行系は引き続き `dist/` 必須。Doctor は `pnpm run doctor`(bare `pnpm doctor` は pnpm 組み込み) |
+| P0-4 | **done** | [`docs/SLACK_CHANNEL_ROUTES.ja.md`](../SLACK_CHANNEL_ROUTES.ja.md)。`docs/SURFACES.md` / `CAPABILITIES_GUIDE.md` / `libs/actuators/README.md` からリンク                                                                                                                                                                                      |
 
 P0–P2 は実装済み(§7)。P2-4 は docs-only / deferred product。
 
@@ -56,14 +56,14 @@ P0–P2 は実装済み(§7)。P2-4 は docs-only / deferred product。
 
 ### 1.2 この環境で走らせた probe
 
-| 試行                                                              | 結果                                                         | 閉塞理由                                                                                                                                 |
-| ----------------------------------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| マニフェスト静的走査(Node 組み込み `fs`、Kyberion runtime 非依存) | **成功**。32 基、`actuator_id` / version / public ops を取得 | —                                                                                                                                        |
-| `pnpm capabilities`(`node dist/scripts/capability_discovery.js`)  | **失敗** `MODULE_NOT_FOUND`                                  | `dist/` が無い。加えて `engines.node >=24` vs 実行 Node **v22.14.0**                                                                     |
-| `pnpm pipeline --input pipelines/baseline-check.json`             | **失敗** 同上                                                | `dist/scripts/run_pipeline.js` 不在                                                                                                      |
-| `pnpm doctor`                                                     | **Kyberion の doctor ではない**                              | pnpm 組み込み `doctor`(registry/cache 診断)が script 名をシャドウする。正は `pnpm run doctor` → これも `dist/scripts/run_doctor.js` 依存 |
-| `pnpm kyberion list` / playground / MCP server                    | 未実行                                                       | 同上(`dist/scripts/kyberion.js` 不在)                                                                                                    |
-| 書き込み系 SaaS / ブラウザ実操作                                  | **意図的に未実施**                                           | 認証なし + 副作用回避                                                                                                                    |
+| 試行                                                                        | 結果                                                         | 閉塞理由                                                                                                                                 |
+| --------------------------------------------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| マニフェスト静的走査(Node 組み込み `fs`、Kyberion runtime 非依存)           | **成功**。32 基、`actuator_id` / version / public ops を取得 | —                                                                                                                                        |
+| `pnpm capabilities`(`node dist/scripts/capability/capability_discovery.js`) | **失敗** `MODULE_NOT_FOUND`                                  | `dist/` が無い。加えて `engines.node >=24` vs 実行 Node **v22.14.0**                                                                     |
+| `pnpm pipeline --input pipelines/baseline-check.json`                       | **失敗** 同上                                                | `dist/scripts/run_pipeline.js` 不在                                                                                                      |
+| `pnpm doctor`                                                               | **Kyberion の doctor ではない**                              | pnpm 組み込み `doctor`(registry/cache 診断)が script 名をシャドウする。正は `pnpm run doctor` → これも `dist/scripts/run_doctor.js` 依存 |
+| `pnpm kyberion list` / playground / MCP server                              | 未実行                                                       | 同上(`dist/scripts/kyberion.js` 不在)                                                                                                    |
+| 書き込み系 SaaS / ブラウザ実操作                                            | **意図的に未実施**                                           | 認証なし + 副作用回避                                                                                                                    |
 
 環境メモ(2026-09-06 Cloud Agent VM):
 
@@ -142,7 +142,7 @@ libs/actuators/*/manifest.json          ← 正本(スキャン: libs/core の a
 
 **ビルド必須。** `pnpm kyberion run` も `dist/` の entry を探す(`scripts/cli.ts` `resolveActuatorPath`)。無いと「Run `pnpm build` first」。
 
-単発 op 試験は `scripts/actuator_playground.ts`(`--dry-run` あり)だが **package.json script が無い**。
+単発 op 試験は `scripts/actuator/actuator_playground.ts`(`--dry-run` あり)だが **package.json script が無い**。
 
 ---
 
@@ -158,7 +158,7 @@ libs/actuators/*/manifest.json          ← 正本(スキャン: libs/core の a
 | **TUI**            | `pnpm tui`                                                         | 監視/操作。生 op REPL ではない                                      |
 | **Chronos**        | `pnpm scheduler` + `pnpm daemon:watchdog`                          | `schedule.cron` 付き pipeline を 60s tick                           |
 | **Satellite**      | Slack / Telegram / Discord / iMessage                              | 会話入口。アクチュエータ本体ではない                                |
-| **Playground**     | `pnpm exec tsx scripts/actuator_playground.ts`                     | 単発 op。未 script 化                                               |
+| **Playground**     | `pnpm exec tsx scripts/actuator/actuator_playground.ts`            | 単発 op。未 script 化                                               |
 
 MCP pipeline allowlist(`mcp-tool-catalog.json`):
 
@@ -402,7 +402,7 @@ P0 / P1 / P2 は実装済み(上表および下表)。P2-4 は docs-only / defer
 | P0 leftover / review write | **done** | REST `github.json` に `create_review`, `create_review_comment`。`kind=apply` / `risk=write` / `approval_required`。capture 面は拒否                                                                                                                           |
 | P1-1                       | **done** | `knowledge/product/pipeline-templates/daily-github-inbox.json`。`list_issues` / `list_pulls` / `actions_list_runs` でローカル digest。Slack `post_message` はテンプレに含めず(承認/write ゲートのまま)。`schedule.enabled=false` + README に Chronos 登録手順 |
 | P1-2                       | **done** | `docs/EMAIL_OPERATOR.ja.md`。`pnpm kyberion email` をオペレータ面、`email-actuator` は配送、Gmail/gws は読取と明記。CLI help / `email-workflow` usage を更新                                                                                                  |
-| P1-3                       | **done** | `package.json` に `playground` → `tsx scripts/actuator_playground.ts`（SX-05 ラチェットのため alias は増やさない）。`--dry-run --json` で単発発見                                                                                                             |
+| P1-3                       | **done** | `package.json` に `playground` → `tsx scripts/actuator/actuator_playground.ts`（SX-05 ラチェットのため alias は増やさない）。`--dry-run --json` で単発発見                                                                                                    |
 | P1-4                       | **done** | `schedule-summary-and-coordination.json` v3。`calendar:list_calendars` / `calendar:list_events`。`node dist/.../calendar-actuator` の shell を削除                                                                                                            |
 | P1-5                       | **done** | `github-mcp.json` を deprecated external-MCP example として残す。正本は REST `github`。MCP `create_issue` を apply/write に直し(以前は method 無しで capture と誤分類)。テスト用 3 op は維持                                                                  |
 | P1-6                       | **done** | `libs/actuators/README.md` の Core Nine を削除し CAPABILITIES_GUIDE / `pnpm capabilities` / `pnpm playground` へリダイレクト                                                                                                                                  |
@@ -478,7 +478,7 @@ P0 / P1 / P2 は実装済み(上表および下表)。P2-4 は docs-only / defer
 
 - カタログ: `libs/actuators/*/manifest.json`, `CAPABILITIES_GUIDE.md`, `libs/actuators/README.md`
 - 発見: `knowledge/product/orchestration/actuator-discovery-registry.md`, `scripts/generate/generate_op_registry.ts`, `libs/core/actuator/actuator-sdk.ts`, `libs/core/actuator/actuator-op-registry.ts`
-- 起動: `scripts/cli.ts`, `scripts/actuator_playground.ts`, `package.json`
+- 起動: `scripts/cli.ts`, `scripts/actuator/actuator_playground.ts`, `package.json`
 - MCP: `knowledge/product/governance/mcp-tool-catalog.json`
 - SaaS: `knowledge/product/orchestration/service-presets/github.json`, `github-mcp.json`, `slack.json`, `google-workspace.json`, `service-harness-registry.json`
 - 日常: `pipelines/daily-routine.json`, `knowledge/product/pipeline-templates/daily-summary.json`, `email-triage-workflow.json`, `github-issue-ingest.json`, `schedule-summary-and-coordination.json`, `weekly-executive-digest.json`

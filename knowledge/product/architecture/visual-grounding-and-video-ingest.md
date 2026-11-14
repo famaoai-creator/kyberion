@@ -89,7 +89,7 @@ dispatches.
 `knowledge/product/governance/tool-runtimes/yt_dlp.json` pins a managed
 `yt-dlp` binary for each platform (release 2026.08.19). The sha256 values are
 the digests from that release's `SHA2-256SUMS` (the macOS binary was downloaded
-and re-hashed to confirm on 2026-09-26), and `scripts/tool_runtime_setup.ts`
+and re-hashed to confirm on 2026-09-26), and `scripts/tool/tool_runtime_setup.ts`
 refuses the download on any mismatch. An all-zero or malformed digest is still
 treated as "not pinned": the managed binary is skipped with a warning and the
 brew/winget `install_backend` is used instead. When bumping the version, copy

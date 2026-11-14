@@ -182,7 +182,7 @@ describe('install_chronos_launchd --daemon', () => {
 
     expect(output).toHaveLength(1);
     expect(output[0]).toContain('com.kyberion.daemon-watchdog');
-    expect(output[0]).toContain('dist/scripts/daemon_watchdog.js');
+    expect(output[0]).toContain('dist/scripts/daemon/daemon_watchdog.js');
     expect(output[0]).toContain('<key>StartInterval</key>');
     // A one-shot checker must not be kept resident by launchd.
     expect(output[0]).not.toContain('<key>KeepAlive</key>');

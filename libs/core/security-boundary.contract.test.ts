@@ -14,7 +14,7 @@ const ALLOWLIST: Record<string, string> = {
   'scripts/ts-loader.mjs': 'TypeScript loader bootstraps secure-io itself',
   'scripts/ts-loader-cache.mjs': 'Private loader cache before TypeScript is available',
   'scripts/kyberion_cli_entry.mjs': 'Build-independent CLI bootstrap',
-  'scripts/capability_discovery_entry.mjs': 'Build-independent read-only discovery',
+  'scripts/capability/capability_discovery_entry.mjs': 'Build-independent read-only discovery',
   'scripts/bundle_entrypoints.mjs': 'Compiler bundling bootstrap',
   'scripts/write_core_dist_scope.mjs': 'Compiler output package-scope bootstrap',
   'scripts/git_merge_regenerate.mjs': 'Git merge-driver bootstrap before compiled artifacts exist',

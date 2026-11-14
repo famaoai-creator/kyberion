@@ -118,7 +118,7 @@ describe('Config mission contract', () => {
   });
 
   it('config_mission.ts CLI script exists and exports expected commands', () => {
-    const src = read('scripts/config_mission.ts');
+    const src = read('scripts/config/config_mission.ts');
     expect(src).toContain("case 'list'");
     expect(src).toContain("case 'create'");
     expect(src).toContain("case 'status'");

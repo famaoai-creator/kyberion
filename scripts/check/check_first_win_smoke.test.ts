@@ -164,7 +164,7 @@ describe('check_first_win_smoke', () => {
             id: 'lifecycle-dry-run',
             op: 'system:exec',
             params: {
-              args: ['dist/scripts/first_win_lifecycle_smoke.js', '--dry-run', '--json'],
+              args: ['dist/scripts/onboarding/first_win_lifecycle_smoke.js', '--dry-run', '--json'],
             },
           },
         ],

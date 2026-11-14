@@ -84,7 +84,7 @@ import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
 import { currentProcessArgv, exitProcess, ScriptExitError } from './lib/harness.js';
 import { readValidatedWorkflowAdf } from './refactor/adf-input.js';
-import { withPlaygroundPathRole } from './actuator_playground.js';
+import { withPlaygroundPathRole } from './actuator/actuator_playground.js';
 import { runSteps } from './pipeline-execution-part-execution.js';
 
 import {

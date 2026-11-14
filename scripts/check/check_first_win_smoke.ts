@@ -163,7 +163,7 @@ export function validateFirstWinLifecyclePipeline(pipeline: unknown): string[] {
   // The weekly lifecycle smoke runs through the typed engine op
   // `core:run_first_win_lifecycle`, which always executes the dry-run JSON
   // smoke (see runInlineFirstWinLifecycle). A shell wrapper around
-  // dist/scripts/first_win_lifecycle_smoke.js is no longer accepted.
+  // dist/scripts/onboarding/first_win_lifecycle_smoke.js is no longer accepted.
   if (dryRunStep?.op !== 'core:run_first_win_lifecycle') {
     violations.push(
       'pipelines/first-win-lifecycle-weekly.json: lifecycle-dry-run must execute the explicit dry-run JSON smoke command'

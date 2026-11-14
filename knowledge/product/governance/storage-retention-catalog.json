@@ -940,7 +940,7 @@
       "artifact_class": "log",
       "ttl_days": 30,
       "action": "delete",
-      "note": "G02: opt-in role-assumption trace JSONL (KYBERION_ROLE_ASSUMPTION_TRACE, libs/core/organization/role-assumption-trace.ts), analyzed by scripts/analyze_role_assumptions.ts. Diagnostic — short TTL."
+      "note": "G02: opt-in role-assumption trace JSONL (KYBERION_ROLE_ASSUMPTION_TRACE, libs/core/organization/role-assumption-trace.ts), analyzed by scripts/analyze/analyze_role_assumptions.ts. Diagnostic — short TTL."
     },
     {
       "path": "active/shared/runtime/front-desk-execution",
@@ -959,7 +959,7 @@
       "path": "active/shared/runtime/youtube",
       "artifact_class": "export",
       "action": "review_required",
-      "note": "G02: staged YouTube upload packages (scripts/stage_youtube_upload_package.ts). Outbound deliverables — human decision."
+      "note": "G02: staged YouTube upload packages (scripts/stage/stage_youtube_upload_package.ts). Outbound deliverables — human decision."
     },
     {
       "path": "active/shared/runtime/scheduler",

@@ -18,7 +18,7 @@ import { partitionedScopedPath } from '@agent/core/physical-namespace';
 import { PARTITIONED_RUNTIME_STATE_ROOTS } from '@agent/core/storage-layout';
 import { currentScope } from '@agent/core/scope-context';
 import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
-import { runSecretCli } from '../secret_introduce.js';
+import { runSecretCli } from '../secret/secret_introduce.js';
 import {
   ALLOCATION_ACTIONS,
   runCredentialAllocationCommand,

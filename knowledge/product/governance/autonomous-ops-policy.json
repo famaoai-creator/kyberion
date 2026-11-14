@@ -59,7 +59,7 @@
     "scripts/report/report_human_interventions.ts",
     "scripts/approval/approval_inbox.ts",
     "scripts/auto_checkpoint.ts",
-    "scripts/daemon_watchdog.ts",
+    "scripts/daemon/daemon_watchdog.ts",
     "satellites/telegram-bridge/**",
     "satellites/slack-bridge/**",
     "tests/fixtures/governance-import-baseline.json",

@@ -172,7 +172,7 @@ If temporary artifacts are needed, place them by purpose per [runtime-storage-la
 
 ### 3. Capability discovery and execution
 
-- `scripts/capability_discovery.ts`
+- `scripts/capability/capability_discovery.ts`
 - `scripts/cli.ts`
 - `scripts/check/check_esm_integrity.ts`
 - `libs/actuators/*/manifest.json`

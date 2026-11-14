@@ -1,5 +1,5 @@
 /**
- * RN-02 units for scripts/analyze_role_assumptions.ts: module initialisation
+ * RN-02 units for scripts/analyze/analyze_role_assumptions.ts: module initialisation
  * code and top-level declarations (functions, classes, function-valued
  * consts, direct-entry guarded blocks) of every analysed source file, and the
  * lookup from a node to the unit that owns it.

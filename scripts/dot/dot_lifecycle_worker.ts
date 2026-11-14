@@ -17,7 +17,7 @@
 import { cliOptionValue, cliPositionals } from '@agent/core/cli-guard';
 import { transitionDotCharterStatus } from '@agent/core/dot/dot-lifecycle';
 import type { DotCharterStatus } from '@agent/core/dot/dot-charter';
-import { DEFAULT_DAEMONS } from '../daemon_watchdog.js';
+import { DEFAULT_DAEMONS } from '../daemon/daemon_watchdog.js';
 import { defineScript, isDirectScript, stripSharedScriptFlags } from '../lib/harness.js';
 import {
   DOT_TRANSITION_EXPECT_FLAGS,

@@ -24,7 +24,8 @@ describe('buildClaudeSettings', () => {
               custom,
               {
                 type: 'command',
-                command: 'node "$CLAUDE_PROJECT_DIR/dist/scripts/claude_code_hook.js" SessionStart',
+                command:
+                  'node "$CLAUDE_PROJECT_DIR/dist/scripts/claude/claude_code_hook.js" SessionStart',
                 timeout: 10,
               },
             ],
@@ -55,7 +56,7 @@ describe('buildClaudeSettings', () => {
         PreToolUse: [
           {
             hooks: [
-              { command: 'echo dist/scripts/claude_code_hook.js PreToolUse' },
+              { command: 'echo dist/scripts/claude/claude_code_hook.js PreToolUse' },
               { command: 'node user-hook.js PreToolUse' },
             ],
           },

@@ -11,7 +11,7 @@ import { parseSafeJsonObjectInput, parseSafeJsonObjectValue } from './lib/json-i
 import { applyOnboardingInput } from './onboarding/onboarding_apply.js';
 import { runCampaignSuite } from './campaign_suite.js';
 import { runAiAudit } from './run_ai_audit.js';
-import { main as runFirstWinLifecycle } from './first_win_lifecycle_smoke.js';
+import { main as runFirstWinLifecycle } from './onboarding/first_win_lifecycle_smoke.js';
 import { runDependencyVulnerabilityScanOnce } from './scan/scan_dependency_vulns.js';
 import { runHealthDegradationWatch } from './health_degradation_watch.js';
 import {
@@ -31,7 +31,7 @@ import { createBackup, listBackups, runRestoreDrill } from './backup.js';
 import { writeBackupDrillReceipt } from '@agent/core/ops-health-state';
 import type { BackupDrillReceipt } from '@agent/core/ops-health';
 import { logger } from '@agent/core/core';
-import { generateSoftwareQualityArtifacts } from './software_quality_report.js';
+import { generateSoftwareQualityArtifacts } from './software/software_quality_report.js';
 import { runSoakEnduranceHarness } from './soak/soak_endurance.js';
 import { runSoakRestartE2E } from './soak/soak_restart_e2e.js';
 import { runMarketingVideoDryRun } from './marketing/marketing_video_dry_run.js';
@@ -46,7 +46,7 @@ import {
 import { runDocExamplesCheck } from './check/check_doc_examples.js';
 import { main as manageRegistry } from './registry_manager.js';
 import { main as missionController } from './mission_controller.js';
-import { runCapturePhoto } from './capture_photo.js';
+import { runCapturePhoto } from './capture/capture_photo.js';
 import { runGenerateAvatar } from './generate/generate_avatar.js';
 import { runRegisterAvatar } from './register/register_avatar.js';
 import { runOAuthSetupForService } from './setup/setup_oauth.js';

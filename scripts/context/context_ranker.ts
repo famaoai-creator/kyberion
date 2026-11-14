@@ -1,0 +1,680 @@
+/**
+ * scripts/context/context_ranker.ts
+ * Kyberion Context Ranker v1.0
+ *
+ * Identifies the TOP-N most relevant knowledge files for a given intent and role.
+ * Used during Phase ③ Alignment to minimize noise.
+ *
+ * Algorithm (from knowledge_management.md §4):
+ *   1. Intent Match  — intent words vs title & tags
+ *   2. Role Match    — active role vs related_roles
+ *   3. Importance    — importance metadata value
+ *   4. Recency       — freshness based on last_updated
+ *
+ * Weights are loaded from governance/analysis-config.json.
+ *
+ * Usage:
+ *   node dist/scripts/context/context_ranker.js --intent "mission governance" --role "ceo" --limit 7
+ */
+
+import * as path from 'node:path';
+import { logger } from '@agent/core/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { currentScope } from '@agent/core/scope-context';
+import { safeExistsSync, safeReaddir, safeStat } from '@agent/core/secure-io';
+import {
+  loadKnowledgeTaxonomy,
+  type KnowledgeTaxonomy,
+} from '@agent/core/knowledge/knowledge-taxonomy';
+import {
+  scopeAffinityScore,
+  docAuthorityScore,
+  recencyDecayScore,
+  knowledgeScopeProximityScore,
+  loadKnowledgeRankingWeights,
+} from '@agent/core/ranking-signals';
+import {
+  resolveKnowledgeScopeSet,
+  assertKnowledgePathInScope,
+} from '@agent/core/knowledge/knowledge-scope';
+import { loadKnowledgeUsageAggregate } from '@agent/core/knowledge/knowledge-feedback-loop';
+import { loadAnalysisConfigAtPath } from '@agent/core/analysis/analysis-config';
+import { segmentWords } from '@agent/core/foundation/locale-normalize';
+import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
+import type { ScopeContext } from '@agent/core/scope-context';
+import { isRecord, readTextFile } from '@agent/core/foundation';
+
+type Print = (value: unknown) => void;
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+export interface KnowledgeEntry {
+  path: string;
+  title: string;
+  tags: string[];
+  importance: number;
+  related_roles: string[];
+  role_affinity: string[];
+  last_updated: string;
+  tier: string;
+  kind: string;
+  scope: string;
+  /** Document authority level (policy/standard/recipe/reference/advisory). NOT the runtime Authority type. */
+  docAuthority: string;
+  phase: string[];
+  applies_to: string[];
+  owner?: string;
+  knowledge_type?: string;
+  intelligence_layer?: string;
+  usage_yield?: number;
+}
+
+export interface RankingWeights {
+  title: number;
+  id: number;
+  tag: number;
+  category: number;
+  role: number;
+  phase: number;
+  scope: number;
+  kind: number;
+  /** Weight for docAuthority ranking (policy > standard > recipe > reference > advisory). */
+  authority: number;
+  /** Weight for containment proximity (task > mission > project > org > tenant). */
+  proximity: number;
+  /** Small configurable boost for documents that users marked useful. */
+  usage_yield: number;
+}
+
+interface ScoredEntry extends KnowledgeEntry {
+  score: number;
+  breakdown: {
+    intent: number;
+    role: number;
+    phase: number;
+    scope: number;
+    kind: number;
+    docAuthority: number;
+    importance: number;
+    recency: number;
+    proximity: number;
+    usageYield: number;
+  };
+}
+
+export interface KnowledgeScanStats {
+  scanned_files: number;
+  in_scope_files: number;
+  excluded_by_scope: number;
+  knowledge_roots: string[];
+}
+
+function normalizeStringArray(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.map((item) => String(item).trim()).filter(Boolean)
+    : typeof value === 'string' && value.trim()
+      ? [value.trim()]
+      : [];
+}
+
+export function normalizeRankingWeights(
+  value: unknown,
+  defaults: RankingWeights
+): Partial<RankingWeights> {
+  if (!isRecord(value)) return {};
+  const algorithms = isRecord(value.algorithms) ? value.algorithms : {};
+  const ranking = isRecord(algorithms.ranking) ? algorithms.ranking : {};
+  const weights = isRecord(ranking.weights) ? ranking.weights : {};
+  const normalized: Partial<RankingWeights> = {};
+  for (const key of Object.keys(defaults) as Array<keyof RankingWeights>) {
+    const candidate = weights[key];
+    if (typeof candidate === 'number' && Number.isFinite(candidate)) {
+      normalized[key] = candidate;
+    }
+  }
+  return normalized;
+}
+
+let cachedTaxonomy: KnowledgeTaxonomy | null = null;
+
+function loadTaxonomy(): KnowledgeTaxonomy {
+  if (cachedTaxonomy) return cachedTaxonomy;
+  try {
+    cachedTaxonomy = loadKnowledgeTaxonomy();
+  } catch (_) {
+    cachedTaxonomy = {
+      version: 'fallback',
+      kinds: {},
+      directory_defaults: [],
+      overlay_precedence: [],
+      retrieval_priority: {},
+    };
+  }
+
+  return cachedTaxonomy;
+}
+
+function resolveDirectoryDefault(relativePath: string) {
+  const normalized = path.join('knowledge', relativePath).replace(/\\/g, '/');
+  const defaults = loadTaxonomy().directory_defaults || [];
+  return defaults.find((entry) => normalized.startsWith(entry.path_prefix));
+}
+
+function inferKind(relativePath: string, frontmatter: Record<string, any>): string {
+  if (typeof frontmatter.kind === 'string' && frontmatter.kind.trim())
+    return frontmatter.kind.trim();
+  return resolveDirectoryDefault(relativePath)?.kind || 'reference';
+}
+
+function inferScope(frontmatter: Record<string, any>): string {
+  if (typeof frontmatter.scope === 'string' && frontmatter.scope.trim())
+    return frontmatter.scope.trim();
+  const kind =
+    typeof frontmatter.kind === 'string' && frontmatter.kind.trim() ? frontmatter.kind : undefined;
+  return (kind && loadTaxonomy().kinds?.[kind]?.default_scope) || 'global';
+}
+
+function inferDocAuthority(relativePath: string, frontmatter: Record<string, any>): string {
+  if (typeof frontmatter.docAuthority === 'string' && frontmatter.docAuthority.trim())
+    return frontmatter.docAuthority.trim();
+  if (typeof frontmatter.authority === 'string' && frontmatter.authority.trim())
+    return frontmatter.authority.trim();
+  const directoryDefault = resolveDirectoryDefault(relativePath);
+  if (directoryDefault?.authority) return directoryDefault.authority;
+  const kind =
+    typeof frontmatter.kind === 'string' ? frontmatter.kind : inferKind(relativePath, frontmatter);
+  return loadTaxonomy().kinds?.[kind]?.default_authority || 'reference';
+}
+
+// ---------------------------------------------------------------------------
+// Frontmatter Parser
+// ---------------------------------------------------------------------------
+export function parseFrontmatter(content: string): Record<string, any> {
+  const match = content.match(/^---\n([\s\S]*?)\n---/);
+  if (!match) return {};
+  const lines = match[1].split('\n');
+  const result: Record<string, any> = {};
+  for (const line of lines) {
+    const colonIdx = line.indexOf(':');
+    if (colonIdx < 0) continue;
+    const key = line.slice(0, colonIdx).trim();
+    let value: any = line.slice(colonIdx + 1).trim();
+    // Parse arrays like [a, b, c]
+    if (value.startsWith('[') && value.endsWith(']')) {
+      value = value
+        .slice(1, -1)
+        .split(',')
+        .map((s: string) => s.trim().replace(/^['"]|['"]$/g, ''));
+    }
+    // Parse numbers
+    if (typeof value === 'string' && /^\d+$/.test(value)) {
+      value = parseInt(value, 10);
+    }
+    result[key] = value;
+  }
+  return result;
+}
+
+// ---------------------------------------------------------------------------
+// Knowledge Scanner
+// ---------------------------------------------------------------------------
+export function scanKnowledgeFiles(
+  scopeSet = resolveKnowledgeScopeSet(currentScope()),
+  stats?: KnowledgeScanStats
+): KnowledgeEntry[] {
+  const knowledgeRoot = pathResolver.knowledge();
+  const entries: KnowledgeEntry[] = [];
+  if (stats) {
+    stats.knowledge_roots = [...scopeSet.roots];
+    stats.scanned_files = 0;
+    stats.in_scope_files = 0;
+    stats.excluded_by_scope = 0;
+  }
+
+  function walk(dir: string) {
+    if (!safeExistsSync(dir)) return;
+    let items: string[];
+    try {
+      items = safeReaddir(dir);
+    } catch (_) {
+      return;
+    }
+    for (const item of items) {
+      const fullPath = path.join(dir, item);
+      let stat: ReturnType<typeof safeStat>;
+      try {
+        stat = safeStat(fullPath);
+      } catch (_) {
+        continue;
+      }
+      if (stat.isDirectory()) {
+        // Skip hidden dirs, node_modules, external-wisdom
+        if (item.startsWith('.') || item === 'node_modules' || item === 'external-wisdom') continue;
+        walk(fullPath);
+      } else if (stat.isFile() && item.endsWith('.md') && !item.startsWith('_')) {
+        try {
+          const relativePath = path.relative(knowledgeRoot, fullPath);
+          if (stats) stats.scanned_files += 1;
+          if (!assertKnowledgePathInScope(relativePath, scopeSet)) {
+            if (stats) stats.excluded_by_scope += 1;
+            continue;
+          }
+          if (stats) stats.in_scope_files += 1;
+          const content = readTextFile(fullPath);
+          const fm = parseFrontmatter(content);
+          const tier = relativePath.startsWith('personal/')
+            ? 'personal'
+            : relativePath.startsWith('confidential/')
+              ? 'confidential'
+              : relativePath.startsWith('product/')
+                ? 'product'
+                : 'public';
+
+          entries.push({
+            path: relativePath,
+            title: fm.title || path.basename(fullPath, '.md'),
+            tags: Array.isArray(fm.tags) ? fm.tags : [],
+            importance: typeof fm.importance === 'number' ? fm.importance : 3,
+            related_roles: Array.isArray(fm.related_roles) ? fm.related_roles : [],
+            role_affinity: normalizeStringArray(fm.role_affinity),
+            last_updated: fm.last_updated || '2020-01-01',
+            tier,
+            kind: inferKind(relativePath, fm),
+            scope: inferScope(fm),
+            docAuthority: inferDocAuthority(relativePath, fm),
+            phase: normalizeStringArray(fm.phase),
+            applies_to: normalizeStringArray(fm.applies_to),
+            owner: typeof fm.owner === 'string' ? fm.owner : undefined,
+            knowledge_type: fm.knowledge_type,
+            intelligence_layer: fm.intelligence_layer,
+          });
+        } catch (_) {
+          // Skip unreadable files
+        }
+      }
+    }
+  }
+
+  walk(knowledgeRoot);
+  return entries;
+}
+
+// ---------------------------------------------------------------------------
+// Scoring
+// ---------------------------------------------------------------------------
+export function tokenize(text: string): string[] {
+  // Intl.Segmenter-backed word segmentation keeps spaceless scripts (ja)
+  // useful; identifier separators are still split afterwards for paths/tags.
+  return segmentWords(text.toLowerCase())
+    .flatMap((t) => t.split(/[-_/.]+/))
+    .filter((t) => t.length > 1);
+}
+
+export function scoreEntry(
+  entry: KnowledgeEntry,
+  intentTokens: string[],
+  roleSlug: string,
+  phaseSlug: string,
+  currentScope: string,
+  weights: RankingWeights,
+  now: number,
+  currentScopeContext?: ScopeContext,
+  usageYield = 0
+): ScoredEntry {
+  // 1. Intent Match — title + tags
+  const titleTokens = tokenize(entry.title);
+  const tagTokens = entry.tags.map((t) => t.toLowerCase());
+  const pathTokens = tokenize(entry.path);
+
+  let intentScore = 0;
+  for (const token of intentTokens) {
+    if (titleTokens.some((t) => t.includes(token))) intentScore += weights.title;
+    if (tagTokens.some((t) => t.includes(token))) intentScore += weights.tag;
+    if (pathTokens.some((t) => t.includes(token))) intentScore += weights.category;
+  }
+
+  // 2. Role Match
+  let roleScore = 0;
+  const roleCandidates = [...entry.related_roles, ...entry.role_affinity];
+  if (roleSlug && roleCandidates.length > 0) {
+    const normalizedRoles = roleCandidates.map((r) => r.toLowerCase().replace(/\s+/g, '_'));
+    if (normalizedRoles.some((r) => r.includes(roleSlug))) {
+      roleScore = weights.role;
+    }
+  }
+
+  const taxonomy = loadTaxonomy();
+  let phaseScore = 0;
+  if (phaseSlug) {
+    const normalizedPhases = entry.phase.map((p) => p.toLowerCase());
+    if (normalizedPhases.includes(phaseSlug)) {
+      phaseScore = weights.phase;
+    }
+  }
+
+  const scopeScore = scopeAffinityScore(currentScope, entry.scope, weights.scope);
+  // Keep direct callers compatible with pre-proximity ranking weight objects.
+  // CLI-loaded weights always contain these fields, but tests and integrations
+  // may provide the older shape; undefined * a number would poison the total
+  // with NaN instead of simply omitting the newer signal.
+  const proximityWeight = Number.isFinite(weights.proximity) ? weights.proximity : 0;
+  const proximityScore =
+    knowledgeScopeProximityScore({ source: entry.path }, currentScopeContext) * proximityWeight;
+
+  let kindScore = 0;
+  if (phaseSlug) {
+    const preferredKinds = taxonomy.retrieval_priority?.[phaseSlug] || [];
+    const kindIndex = preferredKinds.indexOf(entry.kind);
+    if (kindIndex >= 0) {
+      kindScore = Math.max(1, weights.kind - kindIndex * 2);
+    }
+  }
+
+  const authorityScore = docAuthorityScore(entry.docAuthority, weights.authority);
+  const usageYieldWeight = Number.isFinite(weights.usage_yield) ? weights.usage_yield : 0;
+  const usageYieldScore = usageYield * usageYieldWeight;
+
+  // 3. Importance (normalize to 0-10 scale)
+  const importanceScore = entry.importance;
+
+  // 4. Recency (days since last update, decayed)
+  const recencyScore = recencyDecayScore(new Date(entry.last_updated).getTime(), now);
+
+  const total =
+    intentScore +
+    roleScore +
+    phaseScore +
+    scopeScore +
+    proximityScore +
+    kindScore +
+    authorityScore +
+    importanceScore +
+    recencyScore +
+    usageYieldScore;
+
+  return {
+    ...entry,
+    score: total,
+    breakdown: {
+      intent: intentScore,
+      role: roleScore,
+      phase: phaseScore,
+      scope: scopeScore,
+      proximity: proximityScore,
+      kind: kindScore,
+      docAuthority: authorityScore,
+      importance: importanceScore,
+      recency: Math.round(recencyScore * 100) / 100,
+      usageYield: Math.round(usageYieldScore * 100) / 100,
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Main
+// ---------------------------------------------------------------------------
+function loadWeights(scope?: ScopeContext): RankingWeights {
+  const defaults: RankingWeights = {
+    title: 10,
+    id: 5,
+    tag: 15,
+    category: 3,
+    role: 25,
+    phase: 18,
+    scope: 12,
+    kind: 10,
+    authority: 8,
+    proximity: 1,
+    usage_yield: 4,
+  };
+  try {
+    const config = loadAnalysisConfigAtPath();
+    return {
+      ...defaults,
+      ...normalizeRankingWeights(config, defaults),
+      ...loadKnowledgeRankingWeights(scope),
+    };
+  } catch (_) {
+    return { ...defaults, ...loadKnowledgeRankingWeights(scope) };
+  }
+}
+
+const RANK_USAGE =
+  'Usage: node dist/scripts/context/context_ranker.js ("query" | --intent "query") [--role "role"] [--phase "alignment"] [--scope "repository"] [--tenant slug] [--organization id] [--project id] [--mission id] [--task id] [--limit N] [--explain] [--json]';
+
+/** TOP-N stays a digest: above this a positional full-scan dump is a different verb. */
+const MAX_RANK_LIMIT = 100;
+
+const RANK_VALUE_FLAGS = new Set([
+  '--intent',
+  '--role',
+  '--phase',
+  '--scope',
+  '--tenant',
+  '--organization',
+  '--project',
+  '--mission',
+  '--task',
+  '--limit',
+]);
+const RANK_BOOLEAN_FLAGS = new Set(['--json', '--explain']);
+
+interface RankArgs {
+  intent: string;
+  role: string;
+  phase: string;
+  scope: string;
+  tenant?: string;
+  organization?: string;
+  project?: string;
+  mission?: string;
+  task?: string;
+  limit: number;
+  json: boolean;
+  explain: boolean;
+}
+
+/**
+ * R09 argument contract: a positional query is an alias for --intent, a
+ * conflicting pair is a usage error, and every flag needs a valid value.
+ * Scope flags only narrow which knowledge roots are scanned — per-file reads
+ * stay under tier-guard, so they can never widen permissions.
+ */
+export function parseRankArgs(args: string[]): RankArgs {
+  const usage = (message: string): ScriptExitError =>
+    new ScriptExitError(1, `${message}\n${RANK_USAGE}`, false, undefined, {
+      code: 'INVALID_USAGE',
+      category: 'invalid_input',
+      retryable: false,
+    });
+  const values = new Map<string, string>();
+  const booleans = new Set<string>();
+  const positional: string[] = [];
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (arg === undefined) continue;
+    if (RANK_VALUE_FLAGS.has(arg)) {
+      const value = args[index + 1];
+      if (value === undefined || value.startsWith('--')) {
+        throw usage(`${arg} requires a value`);
+      }
+      index += 1;
+      if (values.has(arg)) throw usage(`${arg} was given more than once`);
+      values.set(arg, value);
+    } else if (RANK_BOOLEAN_FLAGS.has(arg)) {
+      booleans.add(arg);
+    } else if (arg.startsWith('-') && arg !== '-') {
+      throw usage(`unknown option: ${arg}`);
+    } else {
+      positional.push(arg);
+    }
+  }
+
+  const positionalQuery = positional.join(' ').trim();
+  const flagIntent = (values.get('--intent') ?? '').trim();
+  if (positionalQuery && flagIntent && positionalQuery !== flagIntent) {
+    throw usage(
+      `conflicting queries: positional "${positionalQuery}" vs --intent "${flagIntent}" — pass only one`
+    );
+  }
+  const intent = flagIntent || positionalQuery;
+  if (!intent) {
+    throw usage('a query is required (positional or --intent)');
+  }
+
+  let limit = 7;
+  const rawLimit = values.get('--limit');
+  if (rawLimit !== undefined) {
+    const parsed = Number(rawLimit);
+    if (!Number.isInteger(parsed) || parsed < 1 || parsed > MAX_RANK_LIMIT) {
+      throw usage(`--limit must be an integer between 1 and ${MAX_RANK_LIMIT}, got "${rawLimit}"`);
+    }
+    limit = parsed;
+  }
+
+  return {
+    intent,
+    role: values.get('--role') ?? '',
+    phase: values.get('--phase') ?? '',
+    scope: values.get('--scope') ?? 'repository',
+    tenant: values.get('--tenant'),
+    organization: values.get('--organization'),
+    project: values.get('--project'),
+    mission: values.get('--mission'),
+    task: values.get('--task'),
+    limit,
+    json: booleans.has('--json'),
+    explain: booleans.has('--explain'),
+  };
+}
+
+export async function main(args: string[] = [], print: Print = () => undefined) {
+  const {
+    intent,
+    role,
+    phase,
+    scope,
+    tenant,
+    organization,
+    project,
+    mission,
+    task,
+    limit,
+    json: jsonFlag,
+    explain: explainFlag,
+  } = parseRankArgs(args);
+
+  logger.info(
+    `🔍 [ContextRanker] Ranking knowledge for intent="${intent}", role="${role}", phase="${phase}", scope="${scope}", limit=${limit}`
+  );
+
+  const resolvedScope = currentScope({
+    tier: tenant ? 'confidential' : currentScope().tier,
+    ...(tenant ? { tenant_slug: tenant } : {}),
+    ...(organization ? { organization_id: organization } : {}),
+    ...(project ? { project_id: project } : {}),
+    ...(mission ? { mission_id: mission } : {}),
+    ...(task ? { task_id: task } : {}),
+  });
+  const weights = loadWeights(resolvedScope);
+  const knowledgeScope = resolveKnowledgeScopeSet(resolvedScope);
+  const scanStats: KnowledgeScanStats = {
+    scanned_files: 0,
+    in_scope_files: 0,
+    excluded_by_scope: 0,
+    knowledge_roots: [],
+  };
+  const entries = scanKnowledgeFiles(knowledgeScope, scanStats);
+  const usageByPath = new Map(
+    loadKnowledgeUsageAggregate(resolvedScope).map((entry) => {
+      const total = entry.used_count + entry.not_used_count;
+      return [entry.document_path, total > 0 ? entry.used_count / total : 0] as const;
+    })
+  );
+  const scopeWarnings: string[] = [];
+  if (resolvedScope.tier === 'confidential' && !resolvedScope.tenant_slug) {
+    scopeWarnings.push(
+      'confidential scope has no tenant_slug; tenant knowledge roots are unavailable'
+    );
+  }
+  if (
+    resolvedScope.tier !== 'public' &&
+    resolvedScope.tenant_slug &&
+    !knowledgeScope.roots.some((root) =>
+      root.startsWith(`${resolvedScope.tier}/${resolvedScope.tenant_slug}`)
+    )
+  ) {
+    scopeWarnings.push(
+      `no ${resolvedScope.tier} knowledge root resolved for tenant '${resolvedScope.tenant_slug}'`
+    );
+  }
+  const intentTokens = tokenize(intent);
+  const roleSlug = role.toLowerCase().replace(/\s+/g, '_');
+  const phaseSlug = phase.toLowerCase().trim();
+  const now = Date.now();
+
+  const scored = entries
+    .map((e) =>
+      scoreEntry(
+        e,
+        intentTokens,
+        roleSlug,
+        phaseSlug,
+        scope,
+        weights,
+        now,
+        resolvedScope,
+        usageByPath.get(e.path) || 0
+      )
+    )
+    .filter((e) => e.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit);
+
+  if (jsonFlag) {
+    print(
+      JSON.stringify(
+        {
+          intent,
+          role,
+          phase,
+          scope,
+          limit,
+          knowledge_scope: knowledgeScope,
+          ...(explainFlag ? { scope_explain: { ...scanStats, warnings: scopeWarnings } } : {}),
+          results: scored,
+        },
+        null,
+        2
+      )
+    );
+  } else {
+    logger.info(`📊 TOP-${limit} Results (${scored.length} matches from ${entries.length} files):`);
+    if (explainFlag) {
+      logger.info(
+        `🔐 Scope: scanned=${scanStats.scanned_files} in_scope=${scanStats.in_scope_files} excluded=${scanStats.excluded_by_scope} roots=${scanStats.knowledge_roots.join(',') || '(none)'}`
+      );
+      for (const warning of scopeWarnings) logger.warn(`⚠️ ${warning}`);
+    }
+    for (let i = 0; i < scored.length; i++) {
+      const e = scored[i];
+      const breakdown = `intent=${e.breakdown.intent} role=${e.breakdown.role} phase=${e.breakdown.phase} scope=${e.breakdown.scope} proximity=${e.breakdown.proximity} kind=${e.breakdown.kind} auth=${e.breakdown.docAuthority} imp=${e.breakdown.importance} rec=${e.breakdown.recency}`;
+      logger.info(`  ${i + 1}. [${e.score.toFixed(1)}] ${e.path} (${breakdown})`);
+    }
+  }
+}
+
+const script = defineScript({
+  name: 'knowledge:context-ranker',
+  // Declaring --json lets the harness silence logger.info/warn lines so the
+  // stdout contract stays exactly one JSON document (R09).
+  flags: ['json'],
+  run: ({ argv, print }) => main(argv, print),
+});
+if (
+  isDirectScript(import.meta.url, 'context_ranker.ts') ||
+  isDirectScript(import.meta.url, 'context_ranker.js')
+) {
+  void script();
+}

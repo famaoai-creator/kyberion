@@ -1413,7 +1413,7 @@
     },
     {
       "id": "script.background-review.mission-e2e",
-      "module": "scripts/background_review_mission_e2e.ts",
+      "module": "scripts/background/background_review_mission_e2e.ts",
       "command": "background-review mission-e2e",
       "noun": "background-review",
       "verb": "mission-e2e",
@@ -2332,7 +2332,7 @@
     },
     {
       "id": "script.eval.mission-orchestration",
-      "module": "scripts/evaluate_mission_orchestration.ts",
+      "module": "scripts/evaluate/evaluate_mission_orchestration.ts",
       "command": "eval mission-orchestration",
       "noun": "eval",
       "verb": "mission-orchestration",
@@ -2342,7 +2342,7 @@
     },
     {
       "id": "script.eval.model-role-fitness",
-      "module": "scripts/evaluate_model_role_fitness.ts",
+      "module": "scripts/evaluate/evaluate_model_role_fitness.ts",
       "command": "eval model-role-fitness",
       "noun": "eval",
       "verb": "model-role-fitness",
@@ -2733,7 +2733,7 @@
     },
     {
       "id": "script.knowledge.rank",
-      "module": "scripts/context_ranker.ts",
+      "module": "scripts/context/context_ranker.ts",
       "command": "knowledge rank",
       "noun": "knowledge",
       "verb": "rank",
@@ -3597,7 +3597,7 @@
     },
     {
       "id": "script.release.install-smoke",
-      "module": "scripts/source_archive.ts",
+      "module": "scripts/source/source_archive.ts",
       "args": ["--install-smoke"],
       "command": "release install-smoke",
       "noun": "release",
@@ -3775,7 +3775,7 @@
     },
     {
       "id": "script.scheduler.trigger-store.rotate",
-      "module": "scripts/trigger_store_rotate.ts",
+      "module": "scripts/trigger/trigger_store_rotate.ts",
       "command": "scheduler trigger-store rotate",
       "noun": "scheduler",
       "verb": "trigger-store rotate",
@@ -3785,7 +3785,7 @@
     },
     {
       "id": "script.storage.recover-compaction-copies",
-      "module": "scripts/storage_recover_compaction_copies.ts",
+      "module": "scripts/storage/storage_recover_compaction_copies.ts",
       "command": "storage recover-compaction-copies",
       "noun": "storage",
       "verb": "recover-compaction-copies",
@@ -3930,7 +3930,7 @@
     },
     {
       "id": "script.secret.apply",
-      "module": "scripts/secret_introduce.ts",
+      "module": "scripts/secret/secret_introduce.ts",
       "command": "secret apply",
       "noun": "secret",
       "verb": "apply",
@@ -3943,7 +3943,7 @@
     },
     {
       "id": "script.secret.introduce",
-      "module": "scripts/secret_introduce.ts",
+      "module": "scripts/secret/secret_introduce.ts",
       "command": "secret introduce",
       "noun": "secret",
       "verb": "introduce",
@@ -3956,7 +3956,7 @@
     },
     {
       "id": "script.secret.status",
-      "module": "scripts/secret_introduce.ts",
+      "module": "scripts/secret/secret_introduce.ts",
       "command": "secret status",
       "noun": "secret",
       "verb": "status",
@@ -4048,7 +4048,7 @@
     },
     {
       "id": "script.skill.install",
-      "module": "scripts/skill_installer.ts",
+      "module": "scripts/skill/skill_installer.ts",
       "command": "skill install",
       "noun": "skill",
       "verb": "install",
@@ -4059,7 +4059,7 @@
     },
     {
       "id": "script.smoke.agent-pane-runtime",
-      "module": "scripts/smoke_agent_pane_runtime.ts",
+      "module": "scripts/smoke/smoke_agent_pane_runtime.ts",
       "command": "smoke agent-pane-runtime",
       "noun": "smoke",
       "verb": "agent-pane-runtime",
@@ -4148,7 +4148,7 @@
     },
     {
       "id": "script.surfaces.screenshots",
-      "module": "scripts/capture_surface_screenshots.ts",
+      "module": "scripts/capture/capture_surface_screenshots.ts",
       "command": "surfaces screenshots",
       "noun": "surfaces",
       "verb": "screenshots",
@@ -4461,7 +4461,7 @@
     },
     {
       "id": "script.vault.cleanup",
-      "module": "scripts/vault_mount_cli.ts",
+      "module": "scripts/vault/vault_mount_cli.ts",
       "args": ["cleanup"],
       "command": "vault cleanup",
       "noun": "vault",
@@ -4473,7 +4473,7 @@
     },
     {
       "id": "script.vault.list",
-      "module": "scripts/vault_mount_cli.ts",
+      "module": "scripts/vault/vault_mount_cli.ts",
       "args": ["list"],
       "command": "vault list",
       "noun": "vault",
@@ -4485,7 +4485,7 @@
     },
     {
       "id": "script.vault.mount",
-      "module": "scripts/vault_mount_cli.ts",
+      "module": "scripts/vault/vault_mount_cli.ts",
       "args": ["mount"],
       "command": "vault mount",
       "noun": "vault",
@@ -4497,7 +4497,7 @@
     },
     {
       "id": "script.vault.unmount",
-      "module": "scripts/vault_mount_cli.ts",
+      "module": "scripts/vault/vault_mount_cli.ts",
       "args": ["unmount"],
       "command": "vault unmount",
       "noun": "vault",
@@ -4620,7 +4620,7 @@
     },
     {
       "id": "script.workspace.gc",
-      "module": "scripts/workspace_ledger.ts",
+      "module": "scripts/workspace/workspace_ledger.ts",
       "command": "workspace gc",
       "noun": "workspace",
       "verb": "gc",
@@ -4631,7 +4631,7 @@
     },
     {
       "id": "script.workspace.list",
-      "module": "scripts/workspace_ledger.ts",
+      "module": "scripts/workspace/workspace_ledger.ts",
       "command": "workspace list",
       "noun": "workspace",
       "verb": "list",

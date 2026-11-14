@@ -30,16 +30,16 @@ Plan: `docs/developer/improvement-plans-2026-09/ELIZA_ADOPTION_PLAN_2026-09-24.j
 
 ## 1. Layers
 
-| Layer                     | Module                                                                        | Decides                                                        |
-| ------------------------- | ----------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| Provenance trust (KD-06)  | `plugin-source-trust.ts`, `skill-plugin-loader.ts`                            | official / curated / third-party from the resolved location    |
-| Approval binding (EP-01)  | `plugin-managed-install.ts`                                                   | approval ⇔ content digest + manifest version + grant digest    |
-| Permission grant (EP-02)  | `plugin-permissions.ts`, `governance/plugin-permission-policy.json`           | request ∩ trust ceiling ∩ tenant override                      |
-| Runtime mediation (EP-03) | `plugin-grant-runtime.ts`, `plugin-contributions.ts`, `sandbox-policy.ts`     | governed host paths check the executing plugin's grant         |
-| Lifecycle (EP-04)         | `plugin-lifecycle.ts`, `scripts/plugin_install.ts --reload/--deactivate`      | ownership ledger, activate / reload / deactivate, apply ladder |
-| Views (EP-05)             | `plugin-view-contract.ts`, Chronos `GET/POST /api/headless/a2ui/plugin-views` | declarative A2UI documents, viewer gating, action routing      |
-| Plugin host (PH-01)       | `plugin-host.ts`, Chronos `lib/plugin-host-boot.ts` (plugin-views routes)     | which approved plugins run inside a long-running surface       |
-| Iframe views (PH-02)      | `plugin-view-frame.ts`, Chronos `plugin-views/frame` route + frame broker     | sandboxed HTML views, CSP, postMessage action requests         |
+| Layer                     | Module                                                                          | Decides                                                        |
+| ------------------------- | ------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| Provenance trust (KD-06)  | `plugin-source-trust.ts`, `skill-plugin-loader.ts`                              | official / curated / third-party from the resolved location    |
+| Approval binding (EP-01)  | `plugin-managed-install.ts`                                                     | approval ⇔ content digest + manifest version + grant digest    |
+| Permission grant (EP-02)  | `plugin-permissions.ts`, `governance/plugin-permission-policy.json`             | request ∩ trust ceiling ∩ tenant override                      |
+| Runtime mediation (EP-03) | `plugin-grant-runtime.ts`, `plugin-contributions.ts`, `sandbox-policy.ts`       | governed host paths check the executing plugin's grant         |
+| Lifecycle (EP-04)         | `plugin-lifecycle.ts`, `scripts/plugin/plugin_install.ts --reload/--deactivate` | ownership ledger, activate / reload / deactivate, apply ladder |
+| Views (EP-05)             | `plugin-view-contract.ts`, Chronos `GET/POST /api/headless/a2ui/plugin-views`   | declarative A2UI documents, viewer gating, action routing      |
+| Plugin host (PH-01)       | `plugin-host.ts`, Chronos `lib/plugin-host-boot.ts` (plugin-views routes)       | which approved plugins run inside a long-running surface       |
+| Iframe views (PH-02)      | `plugin-view-frame.ts`, Chronos `plugin-views/frame` route + frame broker       | sandboxed HTML views, CSP, postMessage action requests         |
 
 Each layer only narrows what the previous one allowed; none of them widens.
 

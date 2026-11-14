@@ -33,7 +33,7 @@ const LEGACY_TEMPLATE = `<?xml version="1.0" encoding="UTF-8"?>
 <dict>
   <key>Label</key><string>com.kyberion.daemon-watchdog</string>
   <key>ProgramArguments</key>
-  <array><string>/usr/local/bin/node</string><string>${MINE}/dist/scripts/daemon_watchdog.js</string></array>
+  <array><string>/usr/local/bin/node</string><string>${MINE}/dist/scripts/daemon/daemon_watchdog.js</string></array>
   <key>StartInterval</key><integer>300</integer>
   <key>RunAtLoad</key><true/>
 </dict>

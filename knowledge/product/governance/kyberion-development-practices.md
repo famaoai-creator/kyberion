@@ -556,7 +556,7 @@ keep them mergeable:
   tracked `_index.md`, so a build cannot hide a stale index from the gate).
 - **Check the invariant, not a snapshot.** The role-assumption reachability
   report (RN-02, ~800 KB) is computed in memory: the `role-assumption-reachability`
-  PR gate (`scripts/analyze_role_assumptions.ts`) fails only on RN-03
+  PR gate (`scripts/analyze/analyze_role_assumptions.ts`) fails only on RN-03
   invariant violations — a reachable role not granted in
   `role-assumption-policy.json`, a policy/analysis system-role mismatch, a
   launched `SYSTEM_ROLE` without analysis, or a narrowed role that is no

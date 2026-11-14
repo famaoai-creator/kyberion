@@ -25,7 +25,7 @@ import { revokeApprovalRequest } from '@agent/core/governance/approval-revocatio
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeMkdir, safeWriteFile, safeRmSync } from '@agent/core/secure-io';
 import { continueHumanMissionAdmission } from './mission_admission_continuation.js';
-import { sweepMissionStartCandidates } from '../daemon_watchdog.js';
+import { sweepMissionStartCandidates } from '../daemon/daemon_watchdog.js';
 import * as mandates from '@agent/core/governance/mandate-shadow';
 import * as autonomyGate from '@agent/core/governance/autonomous-ops-gate';
 import * as operationsHalt from '@agent/core/governance/operations-halt';

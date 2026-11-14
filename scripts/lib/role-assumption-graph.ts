@@ -1,5 +1,5 @@
 /**
- * RN-02 reference graph for scripts/analyze_role_assumptions.ts: units
+ * RN-02 reference graph for scripts/analyze/analyze_role_assumptions.ts: units
  * (module initialisation code and top-level declarations), the edges between
  * them, the resolved role of every withExecutionContext* call (including
  * roles forwarded through wrapper parameters) and the child processes that

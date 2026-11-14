@@ -1239,7 +1239,7 @@
     "satellites/voice-hub/server.ts": {
       "env_direct_read_budget": 1
     },
-    "scripts/actuator_playground.ts": {
+    "scripts/actuator/actuator_playground.ts": {
       "json_state_write_budget": 1
     },
     "scripts/agent/agent_runtime_manager.ts": {
@@ -1251,7 +1251,7 @@
     "scripts/agent/agent_worktree.ts": {
       "env_direct_read_budget": 1
     },
-    "scripts/app_preflight.ts": {
+    "scripts/app/app_preflight.ts": {
       "bespoke_cli_parser_budget": 1
     },
     "scripts/apply_dependency_patch.ts": {
@@ -1267,7 +1267,7 @@
       "json_state_write_budget": 3,
       "bespoke_cli_parser_budget": 6
     },
-    "scripts/background_review_mission_e2e.ts": {
+    "scripts/background/background_review_mission_e2e.ts": {
       "json_state_write_budget": 1
     },
     "scripts/backup.ts": {
@@ -1294,7 +1294,7 @@
     "scripts/campaign_suite.ts": {
       "json_state_write_budget": 2
     },
-    "scripts/capability_discovery_entry.mjs": {
+    "scripts/capability/capability_discovery_entry.mjs": {
       "bespoke_cli_parser_budget": 1
     },
     "scripts/check/check_backend_conformance.ts": {
@@ -1414,11 +1414,11 @@
       "env_direct_read_budget": 4,
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/config_mission.ts": {
+    "scripts/config/config_mission.ts": {
       "env_direct_read_budget": 4,
       "json_state_write_budget": 5
     },
-    "scripts/context_ranker.ts": {
+    "scripts/context/context_ranker.ts": {
       "bespoke_cli_parser_budget": 12
     },
     "scripts/continuous/continuous_work_owner.ts": {
@@ -1480,10 +1480,10 @@
     "scripts/eval/eval_harness.ts": {
       "bespoke_cli_parser_budget": 2
     },
-    "scripts/evaluate_mission_orchestration.ts": {
+    "scripts/evaluate/evaluate_mission_orchestration.ts": {
       "json_state_write_budget": 1
     },
-    "scripts/evaluate_model_role_fitness.ts": {
+    "scripts/evaluate/evaluate_model_role_fitness.ts": {
       "bespoke_cli_parser_budget": 1
     },
     "scripts/export_validation_bundle.ts": {
@@ -1496,7 +1496,7 @@
     "scripts/find_dead_code.ts": {
       "json_state_write_budget": 1
     },
-    "scripts/first_win_lifecycle_smoke.ts": {
+    "scripts/onboarding/first_win_lifecycle_smoke.ts": {
       "bespoke_cli_parser_budget": 5
     },
     "scripts/generate/generate_avatar.ts": {
@@ -1807,7 +1807,7 @@
       "env_direct_read_budget": 1,
       "json_state_write_budget": 2
     },
-    "scripts/smoke_capability_seams_live.ts": {
+    "scripts/smoke/smoke_capability_seams_live.ts": {
       "json_state_write_budget": 1
     },
     "scripts/soak/soak_endurance.ts": {
@@ -1817,14 +1817,14 @@
       "json_state_write_budget": 6,
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/source_archive.ts": {
+    "scripts/source/source_archive.ts": {
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/sovereign_dashboard.ts": {
+    "scripts/sovereign/sovereign_dashboard.ts": {
       "runtime_path_literal_budget": 3,
       "bespoke_cli_parser_budget": 3
     },
-    "scripts/stage_youtube_upload_package.ts": {
+    "scripts/stage/stage_youtube_upload_package.ts": {
       "json_state_write_budget": 1,
       "runtime_path_literal_budget": 1
     },

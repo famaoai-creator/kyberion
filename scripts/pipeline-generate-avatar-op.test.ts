@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock('./generate/generate_avatar.js', () => ({ runGenerateAvatar: mocks.runGenerateAvatar }));
 vi.mock('./register/register_avatar.js', () => ({ runRegisterAvatar: mocks.runRegisterAvatar }));
-vi.mock('./capture_photo.js', () => ({ runCapturePhoto: mocks.runCapturePhoto }));
+vi.mock('./capture/capture_photo.js', () => ({ runCapturePhoto: mocks.runCapturePhoto }));
 vi.mock('@agent/core/profile-root', () => ({
   resolveActiveProfileRoot: () => mocks.profileRoot,
 }));
