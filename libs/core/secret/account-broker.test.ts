@@ -211,7 +211,6 @@ describe('account broker provisioning', () => {
         env: expect.objectContaining({
           SYSTEM_ROLE: '',
           MISSION_ROLE: '',
-          KYBERION_DELEGATED_ROLE: '',
           KYBERION_BASE_ROLE: '',
           KYBERION_PERSONA: '',
         }),
@@ -223,6 +222,7 @@ describe('account broker provisioning', () => {
     const writerEnv = fixture.exec.mock.calls[0]![2].env;
     expect(writerEnv).not.toHaveProperty('SLACK_TOKEN');
     expect(writerEnv).not.toHaveProperty('AWS_SECRET_ACCESS_KEY');
+    expect(writerEnv).not.toHaveProperty('KYBERION_DELEGATED_ROLE');
     expect(Object.keys(writerEnv).sort()).toEqual(
       [
         'PATH',
@@ -235,7 +235,6 @@ describe('account broker provisioning', () => {
         'SHELL',
         'SYSTEM_ROLE',
         'MISSION_ROLE',
-        'KYBERION_DELEGATED_ROLE',
         'KYBERION_BASE_ROLE',
         'KYBERION_PERSONA',
       ].sort()
