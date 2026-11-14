@@ -52,6 +52,17 @@ SX-06; not yet enforced by a gate.)
   - `name.integration.test.ts` — cross-component
 - **Adding a `pnpm` command**: create the script here, then wire it in
   `package.json` `scripts`.
+- **Moving a script family** (learned from the check/generate/sync/task
+  regroups — each of these bit at least once):
+  - self-locating `dirname(fileURLToPath(import.meta.url))` arithmetic breaks
+    on any depth change — use `pathResolver.rootDir()` instead;
+  - `vi.mock('./lib/x.js')` and dynamic `import('./x.js')` specifiers are NOT
+    caught by `from './x'` greps — sweep both forms;
+  - `pathResolver.rootResolve('scripts/name.ts')` / `` `scripts/${name}` ``
+    literals inside the moved files themselves are easy to miss — grep the
+    destination dir for its own family prefix after moving;
+  - verify with `pnpm build` (tsc catches missed imports) + the family's
+    vitest files + `resolve generated --check` freshness, not just grep.
 
 ## References
 
