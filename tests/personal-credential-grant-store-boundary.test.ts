@@ -1,0 +1,19 @@
+import { describeStoreGrantBoundary } from './helpers/store-grant-boundary.js';
+
+describeStoreGrantBoundary('Personal credential canonical store adapter boundary', {
+  implementation: 'libs/core/governance/personal-credential-grant-store.ts',
+  issuers: new Map([
+    ['writePersonalCredentialGrantRecord', ['libs/core/governance/personal-credential-grant.ts']],
+    ['loadPersonalCredentialGrantRecord', ['libs/core/governance/personal-credential-grant.ts']],
+  ]),
+  consumers: new Map([
+    [
+      'libs/core/governance/personal-credential-grant.ts',
+      [
+        'writePersonalCredentialGrantRecord',
+        'loadPersonalCredentialGrantRecord',
+        'newPersonalCredentialGrantId',
+      ],
+    ],
+  ]),
+});
