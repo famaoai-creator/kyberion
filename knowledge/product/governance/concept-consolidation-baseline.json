@@ -1278,10 +1278,10 @@
     "scripts/bindings.ts": {
       "bespoke_cli_parser_budget": 2
     },
-    "scripts/browser_actuator_usability_probe.ts": {
+    "scripts/browser/browser_actuator_usability_probe.ts": {
       "json_state_write_budget": 1
     },
-    "scripts/browser_bridge_host.ts": {
+    "scripts/browser/browser_bridge_host.ts": {
       "json_state_write_budget": 2,
       "runtime_path_literal_budget": 1
     },

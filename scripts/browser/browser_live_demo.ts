@@ -2,11 +2,14 @@
  * Tiny live demo: open example.com → snapshot → click Learn more → screenshot.
  *
  * Usage:
- *   KYBERION_BASE_ROLE=sovereign pnpm exec tsx scripts/browser_live_demo.ts
+ *   KYBERION_BASE_ROLE=sovereign pnpm exec tsx scripts/browser/browser_live_demo.ts
  */
-import { handleAction, closeBrowserSession } from '../libs/actuators/browser-actuator/src/index.js';
+import {
+  handleAction,
+  closeBrowserSession,
+} from '../../libs/actuators/browser-actuator/src/index.js';
 import { pathResolver } from '@agent/core/path-resolver';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from '../lib/harness.js';
 
 export async function runBrowserLiveDemo(): Promise<Record<string, unknown>> {
   const sessionId = `browser-live-demo-${process.pid}`;

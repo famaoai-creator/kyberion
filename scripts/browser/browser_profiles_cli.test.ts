@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { main } from './browser_profiles_cli.js';
-import type { BrowserProfile } from '../libs/actuators/browser-actuator/src/browser-profile-manager.js';
+import type { BrowserProfile } from '../../libs/actuators/browser-actuator/src/browser-profile-manager.js';
 import * as secureIo from '@agent/core/secure-io';
 
 describe('browser_profiles_cli', () => {
@@ -33,7 +33,7 @@ describe('browser_profiles_cli', () => {
     };
 
     const { browserProfileProvider } =
-      await import('../libs/actuators/browser-actuator/src/browser-profile-providers/chrome.js');
+      await import('../../libs/actuators/browser-actuator/src/browser-profile-providers/chrome.js');
     await browserProfileProvider.openProfile(mockProfile, 'https://example.com', () => {});
 
     expect(safeExecSpy).toHaveBeenCalledWith('open', [

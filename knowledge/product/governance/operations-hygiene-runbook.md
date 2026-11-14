@@ -2042,7 +2042,7 @@ missing-session or unsupported-capability diagnostics instead of false success.
 
 **Gate.** Run `scripts/actuator_playground.test.ts`, `libs/core/harnessing/cli-utils.test.ts`,
 the browser and terminal actuator tests, and `libs/core/shell/pty-engine.resize.test.ts`.
-Replay `scripts/browser_actuator_usability_probe.ts` and
+Replay `scripts/browser/browser_actuator_usability_probe.ts` and
 `scripts/terminal_actuator_usability_probe.ts` for live outcomes and recovery.
 Native PTY and desktop GUI checks require the corresponding host capabilities.
 A silent `PTY_ENGINE ... falling back to ChildProcess` warning means sessions

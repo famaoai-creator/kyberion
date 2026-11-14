@@ -84,13 +84,13 @@ describe('wire error boundary checker', () => {
     expect(
       findWireErrorBoundaryViolations(
         'return { ok: false, error: `failed: ${err.message}` };',
-        'scripts/browser_bridge_host.ts'
+        'scripts/browser/browser_bridge_host.ts'
       )
     ).toEqual([expect.stringContaining('browser bridge response')]);
     expect(
       findWireErrorBoundaryViolations(
         'return { ok: false, error: formatWireError(err, "failed") };',
-        'scripts/browser_bridge_host.ts'
+        'scripts/browser/browser_bridge_host.ts'
       )
     ).toEqual([]);
   });

@@ -16,7 +16,7 @@ import {
   type OpenedInspectionTicket,
   type InspectionHandoffScope,
   type InspectionHandoffTicket,
-} from './lib/browser-inspection-handoff.js';
+} from '../lib/browser-inspection-handoff.js';
 
 /** When set, writing a `submitted` ticket fails (simulates a full disk after the audit). */
 const writeFault = vi.hoisted(() => ({ failSubmitted: false }));
@@ -426,7 +426,7 @@ describe('submit_inspection (native host)', () => {
 
 describe('inspect_browser_page --mode extension (end to end through the host)', () => {
   it('receives the inspection the extension submits with the printed pairing code', async () => {
-    const { main } = await import('./inspect_browser_page.js');
+    const { main } = await import('../inspect_browser_page.js');
     const dir = resolveStorageFloor(
       'staging',
       { kind: 'tier', tier: 'personal' },

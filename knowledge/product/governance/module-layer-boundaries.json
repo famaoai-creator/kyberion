@@ -257,7 +257,7 @@
     },
     {
       "layer": "orchestration",
-      "pattern": "scripts/browser_bridge_host.ts"
+      "pattern": "scripts/browser/browser_bridge_host.ts"
     },
     {
       "layer": "orchestration",

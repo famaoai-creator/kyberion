@@ -102,7 +102,7 @@ import path from 'node:path';
 import {
   createExecuteBrowserPipeline,
   loadBrowserActuator,
-} from './browser_playwright_executor.js';
+} from './browser/browser_playwright_executor.js';
 import { createHash, randomUUID } from 'node:crypto';
 import { t as translate } from '@agent/core/t';
 import { resolveLocale, type SupportedLocale } from '@agent/core/locale';

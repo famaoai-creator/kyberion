@@ -6,7 +6,7 @@
  * Candidate eligibility reuses the same capability preflight the live
  * selector runs (browser-actuator's preflightBrowserRuntimePipeline) instead
  * of re-deriving it. Each trial loads the browser-actuator the same way the
- * host executor does (scripts/browser_playwright_executor.ts) and forces the
+ * host executor does (scripts/browser/browser_playwright_executor.ts) and forces the
  * candidate runtime via `browser_runtime`, with a fresh, unique session id
  * and `keep_alive: false` so trials never share or leak browser sessions.
  */
@@ -25,7 +25,7 @@ import { preflightBrowserRuntimePipeline } from '../../../libs/actuators/browser
 import {
   loadBrowserActuator,
   type BrowserActuatorHandle,
-} from '../../browser_playwright_executor.js';
+} from '../../browser/browser_playwright_executor.js';
 
 export interface BrowserAutomationRuntimeCalibrationInput {
   steps: unknown[];

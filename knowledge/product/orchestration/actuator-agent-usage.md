@@ -141,7 +141,7 @@ Re-run the safe synthetic browser and terminal scenarios after building core and
 actuators:
 
 ```sh
-node --import ./scripts/ts-loader.mjs scripts/browser_actuator_usability_probe.ts --json
+node --import ./scripts/ts-loader.mjs scripts/browser/browser_actuator_usability_probe.ts --json
 node --import ./scripts/ts-loader.mjs scripts/terminal_actuator_usability_probe.ts --json
 ```
 
