@@ -11,6 +11,7 @@ import {
   createPeerAutoReply,
   DEFAULT_PEER_AUTO_REPLY_BACKEND,
 } from '@agent/core/mesh/peer-auto-reply';
+import { createPeerOutboxRedelivery } from '@agent/core/mesh/peer-outbox-redelivery';
 import {
   listIsolatedTextGenerators,
   resolveIsolatedTextGenerator,
@@ -95,6 +96,12 @@ async function main(
       default: 64,
       description: 'Maximum inbound requests waiting for a handler slot before retryable overload',
     })
+    .option('redelivery-interval-ms', {
+      type: 'number',
+      default: 5_000,
+      description:
+        'Interval of the outbox redelivery pass that re-sends retryable failed messages (0 = disabled, otherwise at least 100)',
+    })
     .option('auto-reply-peers', {
       type: 'string',
       default: '',
@@ -170,6 +177,14 @@ async function main(
   ) {
     throw new Error('invalid_peer_receive_capacity');
   }
+  const redeliveryIntervalMs = Number(argv['redelivery-interval-ms']);
+  if (
+    !Number.isInteger(redeliveryIntervalMs) ||
+    redeliveryIntervalMs < 0 ||
+    (redeliveryIntervalMs > 0 && redeliveryIntervalMs < 100)
+  ) {
+    throw new Error('invalid_peer_redelivery_interval');
+  }
   const autoReplyPeers = String(argv['auto-reply-peers'] || '')
     .split(',')
     .map((peer) => peer.trim())
@@ -224,6 +239,7 @@ async function main(
       port,
       max_inflight: maxInflight,
       max_queued: maxQueued,
+      redelivery_interval_ms: redeliveryIntervalMs,
       auto_reply: {
         enabled: autoReplyPeers.length > 0,
         peers: autoReplyPeers,
@@ -387,9 +403,19 @@ async function main(
     );
   }
 
+  // Re-sends this peer's retryable failed outbox messages (original envelope,
+  // bounded attempts); it selects no peer and creates no work.
+  const redelivery = createPeerOutboxRedelivery({
+    tenantId,
+    peerId,
+    intervalMs: redeliveryIntervalMs || undefined,
+  });
+  if (redeliveryIntervalMs > 0) redelivery.start();
+
   const shutdown = async () => {
     if (heartbeatTimer) clearInterval(heartbeatTimer);
     heartbeat('maintenance');
+    await redelivery.stop();
     await autoReply.stop();
     try {
       recordProtocolServiceLifecycle({

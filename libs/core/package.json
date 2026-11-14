@@ -3036,6 +3036,10 @@
       "types": "./dist/mesh/peer-messaging.d.ts",
       "default": "./dist/mesh/peer-messaging.js"
     },
+    "./mesh/peer-outbox-redelivery": {
+      "types": "./dist/mesh/peer-outbox-redelivery.d.ts",
+      "default": "./dist/mesh/peer-outbox-redelivery.js"
+    },
     "./mesh/peer-runtime-recovery": {
       "types": "./dist/mesh/peer-runtime-recovery.d.ts",
       "default": "./dist/mesh/peer-runtime-recovery.js"

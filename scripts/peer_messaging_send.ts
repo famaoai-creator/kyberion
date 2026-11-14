@@ -1,12 +1,17 @@
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { logger } from '@agent/core/core';
 import {
+  describePeerDeliveryFailureNextStep,
+  peerDeliveryFailureOf,
   buildPeerMessageEnvelope,
   loadPeerNetworkCatalog,
+  peerNetworkCatalogPath,
+  resolvePeerNetworkCatalogPath,
   PEER_MESSAGE_TYPES,
   resolvePeerDispatchTarget,
   sendPeerMessage,
 } from '@agent/core/mesh/peer-messaging';
+import { loadTenantPeerCatalog } from '@agent/core/mesh/peer-conversation';
 import { getRegisteredEnvText } from '@agent/core/foundation';
 import { defineScript, isDirectScript, stripSharedScriptFlags } from './lib/harness.js';
 import { parseSafeJsonInput } from './lib/json-input.js';
@@ -72,11 +77,21 @@ export async function main(
     })
     .parseSync();
 
-  const catalog = loadPeerNetworkCatalog({
-    ...(argv.catalog ? { catalogPath: String(argv.catalog) } : {}),
-    ...(argv['tenant-id'] ? { tenantId: String(argv['tenant-id']) } : {}),
-  });
   const tenantId = String(argv['tenant-id']);
+  // The tenant's own catalog is confidential-tier: read it under the
+  // tenant-bound catalog reader, like every other peer sender, so the command
+  // works for an operator role that cannot read that tier. Only such a send is
+  // re-sent by outbox redelivery; an explicit catalog or the
+  // KYBERION_PEER_NETWORK_CATALOG override is read as the caller and is not.
+  const throughTenantCatalog =
+    !argv.catalog &&
+    resolvePeerNetworkCatalogPath({ tenantId }) === peerNetworkCatalogPath(tenantId);
+  const catalog = throughTenantCatalog
+    ? loadTenantPeerCatalog(tenantId)
+    : loadPeerNetworkCatalog({
+        ...(argv.catalog ? { catalogPath: String(argv.catalog) } : {}),
+        tenantId,
+      });
   const target = resolvePeerDispatchTarget(String(argv['to-peer-id']), catalog);
   const payload = parseSafeJsonInput(String(argv.payload || '{}'), 'peer message payload');
   const envelope = buildPeerMessageEnvelope({
@@ -94,16 +109,40 @@ export async function main(
     ...(argv['correlation-id'] ? { correlationId: String(argv['correlation-id']) } : {}),
   });
 
-  const receipt = await sendPeerMessage(envelope, {
-    destinationUrl: target.destinationUrl,
-    allowLocalNetwork: target.allowLocalNetwork,
-    timeoutMs: Number(argv['timeout-ms']),
-  });
+  const recovery = throughTenantCatalog ? undefined : ('caller' as const);
+  const senderPeerId = String(argv['from-peer-id']);
+  let receipt: Awaited<ReturnType<typeof sendPeerMessage>>;
+  try {
+    receipt = await sendPeerMessage(envelope, {
+      destinationUrl: target.destinationUrl,
+      allowLocalNetwork: target.allowLocalNetwork,
+      timeoutMs: Number(argv['timeout-ms']),
+      ...(recovery ? { recovery } : {}),
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `peer_message_not_delivered:${envelope.message_id} — ${message} | ${describePeerDeliveryFailureNextStep({ failure: peerDeliveryFailureOf(error), senderPeerId, recovery })}`,
+      { cause: error }
+    );
+  }
 
-  logger.success(
-    `[peer-messaging-send] ${receipt.ok ? 'delivered' : 'failed'} ${envelope.message_id} -> ${target.peer.peer_id} (${target.destinationUrl})`
+  if (receipt.ok) {
+    logger.success(
+      `[peer-messaging-send] delivered ${envelope.message_id} -> ${target.peer.peer_id} (${target.destinationUrl})`
+    );
+    print(receipt);
+    return;
+  }
+  const nextStep = describePeerDeliveryFailureNextStep({
+    failure: receipt.failure,
+    senderPeerId,
+    recovery,
+  });
+  logger.warn(
+    `[peer-messaging-send] not delivered ${envelope.message_id} -> ${target.peer.peer_id} — ${receipt.error || `http_${receipt.status}`} | ${nextStep} | destination=${target.destinationUrl}`
   );
-  print(receipt);
+  print({ ...receipt, next: nextStep });
 }
 
 const runPeerMessagingSend = defineScript({
