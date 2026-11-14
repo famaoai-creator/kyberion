@@ -9,15 +9,15 @@ import type { ScopeContext } from '@agent/core/scope-context';
 import { getRegisteredEnvText, nowIso } from '@agent/core/foundation';
 import { runKnowledgeValidationSweep } from '@agent/core/report-ops';
 import { proposeKnowledgeRankingWeightRecalculation } from '@agent/core/knowledge/knowledge-weight-recalculation';
-import { buildPlan } from './migrate_physical_namespaces.js';
-import { scanKnowledgeScopeHealth, buildHealthAlert } from './watch_knowledge_scope_health.js';
-import { scan as scanKnowledgeScopeBoundaries } from './check/check_knowledge_scope_boundaries.js';
+import { buildPlan } from '../migrate_physical_namespaces.js';
+import { scanKnowledgeScopeHealth, buildHealthAlert } from '../watch_knowledge_scope_health.js';
+import { scan as scanKnowledgeScopeBoundaries } from '../check/check_knowledge_scope_boundaries.js';
 import {
   scan as scanTierHygiene,
   type Violation as TierHygieneViolation,
-} from './check/check_tier_hygiene.js';
-import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
-import { guardCliArgs, type CliGuardSpec } from './lib/cli-guard.js';
+} from '../check/check_tier_hygiene.js';
+import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
+import { guardCliArgs, type CliGuardSpec } from '../lib/cli-guard.js';
 
 export interface KnowledgeScopeReconciliationReport {
   generated_at: string;

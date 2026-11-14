@@ -8,7 +8,7 @@
  */
 
 import { reconcileUnhandledIntents } from '@agent/core/reconcile-ops';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from '../lib/harness.js';
 
 export const runReconcileUnhandledIntents = defineScript({
   name: 'reconcile:unhandled-intents',

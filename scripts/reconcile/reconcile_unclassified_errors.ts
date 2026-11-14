@@ -8,7 +8,7 @@
  */
 
 import { reconcileUnclassifiedErrors } from '@agent/core/reconcile-ops';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from '../lib/harness.js';
 
 export const main = defineScript({
   name: 'reconcile-unclassified-errors',

@@ -167,7 +167,7 @@
     "scripts/intent.test.ts",
     "scripts/kyberion_cli_entry.mjs",
     "scripts/org.test.ts",
-    "scripts/reconcile_knowledge_scopes.entrypoint.test.ts",
+    "scripts/reconcile/reconcile_knowledge_scopes.entrypoint.test.ts",
     "scripts/run_realtime_voice_conversation.test.ts",
     "scripts/stance_create.test.ts",
     "scripts/stance_list.test.ts",

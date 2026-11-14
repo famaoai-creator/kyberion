@@ -3557,7 +3557,7 @@
     },
     {
       "id": "script.reconcile.config-fallbacks",
-      "module": "scripts/reconcile_config_fallbacks.ts",
+      "module": "scripts/reconcile/reconcile_config_fallbacks.ts",
       "command": "reconcile config-fallbacks",
       "noun": "reconcile",
       "verb": "config-fallbacks",
@@ -3567,7 +3567,7 @@
     },
     {
       "id": "script.reconcile.unclassified-errors",
-      "module": "scripts/reconcile_unclassified_errors.ts",
+      "module": "scripts/reconcile/reconcile_unclassified_errors.ts",
       "command": "reconcile unclassified-errors",
       "noun": "reconcile",
       "verb": "unclassified-errors",
@@ -3577,7 +3577,7 @@
     },
     {
       "id": "script.reconcile.unhandled-intents",
-      "module": "scripts/reconcile_unhandled_intents.ts",
+      "module": "scripts/reconcile/reconcile_unhandled_intents.ts",
       "command": "reconcile unhandled-intents",
       "noun": "reconcile",
       "verb": "unhandled-intents",
@@ -3765,7 +3765,7 @@
     },
     {
       "id": "script.scheduler.reconcile",
-      "module": "scripts/reconcile_resident_services.ts",
+      "module": "scripts/reconcile/reconcile_resident_services.ts",
       "command": "scheduler reconcile",
       "noun": "scheduler",
       "verb": "reconcile",
