@@ -70,7 +70,7 @@
     "scripts/app_preflight.ts",
     "scripts/capability_discovery_entry.mjs",
     "scripts/capability_discovery.ts",
-    "scripts/check_chronos_dom_contrast.ts",
+    "scripts/check/check_chronos_dom_contrast.ts",
     "scripts/continuous_owner_platform.ts",
     "scripts/daemon_watchdog.ts",
     "scripts/dependency_resolver.ts",

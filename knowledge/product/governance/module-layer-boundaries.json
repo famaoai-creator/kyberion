@@ -305,7 +305,7 @@
     },
     {
       "layer": "orchestration",
-      "pattern": "scripts/check_seam_multiplicity.ts"
+      "pattern": "scripts/check/check_seam_multiplicity.ts"
     },
     {
       "layer": "orchestration",

@@ -4,11 +4,11 @@ The people who maintain Kyberion. Defined per OSS best practices: a clear list, 
 
 ## Roles
 
-| Role | What they do |
-|---|---|
-| **Core maintainer** | Reviews PRs, sets direction, owns release. Has merge rights to `main`. |
-| **Area committer** | Has merge rights for a specific area (e.g. one actuator, one pipeline family). Surface to area defined per-person. |
-| **Triage** | Labels issues, asks clarifying questions, closes obvious duplicates. No merge rights but visible in CONTRIBUTING. |
+| Role                | What they do                                                                                                       |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| **Core maintainer** | Reviews PRs, sets direction, owns release. Has merge rights to `main`.                                             |
+| **Area committer**  | Has merge rights for a specific area (e.g. one actuator, one pipeline family). Surface to area defined per-person. |
+| **Triage**          | Labels issues, asks clarifying questions, closes obvious duplicates. No merge rights but visible in CONTRIBUTING.  |
 
 Promotion path: Triage → Area committer → Core maintainer. Promotion is reviewed every 6 months. Active contribution + alignment with project direction are the criteria.
 
@@ -16,35 +16,35 @@ Promotion path: Triage → Area committer → Core maintainer. Promotion is revi
 
 ### Core Maintainers
 
-| Name | GitHub | Areas | Contact |
-|---|---|---|---|
+| Name                      | GitHub           | Areas           | Contact                                          |
+| ------------------------- | ---------------- | --------------- | ------------------------------------------------ |
 | Motonobu Ichimura (famao) | @famaoai-creator | All / direction | via GitHub: open an issue or DM @famaoai-creator |
 
 ### Area Committers
 
-| Name | GitHub | Areas | Contact |
-|---|---|---|---|
-| _open_ | — | actuator authoring | — |
-| _open_ | — | mission lifecycle | — |
-| _open_ | — | knowledge / governance | — |
+| Name   | GitHub | Areas                  | Contact |
+| ------ | ------ | ---------------------- | ------- |
+| _open_ | —      | actuator authoring     | —       |
+| _open_ | —      | mission lifecycle      | —       |
+| _open_ | —      | knowledge / governance | —       |
 
 Open seats are filled by self-nomination + 30-day trial period (5 merged PRs in the area, no escalations).
 
 ### Triage
 
-| Name | GitHub | Notes |
-|---|---|---|
-| _open_ | — | — |
+| Name   | GitHub | Notes |
+| ------ | ------ | ----- |
+| _open_ | —      | —     |
 
 ## Scope Definitions
 
-| Area | Files / paths |
-|---|---|
-| Actuator framework | `libs/actuators/*`, `schemas/*-action.schema.json`, `docs/developer/EXTENSION_POINTS.md` |
-| Mission lifecycle | `scripts/mission_controller.ts`, `scripts/refactor/mission-*`, `libs/core/mission-*` |
+| Area                   | Files / paths                                                                                         |
+| ---------------------- | ----------------------------------------------------------------------------------------------------- |
+| Actuator framework     | `libs/actuators/*`, `schemas/*-action.schema.json`, `docs/developer/EXTENSION_POINTS.md`              |
+| Mission lifecycle      | `scripts/mission_controller.ts`, `scripts/refactor/mission-*`, `libs/core/mission-*`                  |
 | Knowledge / governance | `knowledge/product/governance/*`, `libs/core/tier-guard.ts`, `docs/developer/CUSTOMER_AGGREGATION.md` |
-| Voice / surfaces | `presence/displays/*`, `satellites/voice-hub/*`, `libs/actuators/voice-actuator/*` |
-| Build / release | `package.json`, `.github/workflows/*`, `scripts/check_*.ts`, `migration/*` |
+| Voice / surfaces       | `presence/displays/*`, `satellites/voice-hub/*`, `libs/actuators/voice-actuator/*`                    |
+| Build / release        | `package.json`, `.github/workflows/*`, `scripts/check/check_*.ts`, `migration/*`                      |
 
 ## Becoming a Maintainer
 
@@ -58,9 +58,9 @@ A maintainer may step down at any time by editing this file and opening a PR. In
 
 ## Emeritus
 
-| Name | Period | Areas |
-|---|---|---|
-| _none yet_ | — | — |
+| Name       | Period | Areas |
+| ---------- | ------ | ----- |
+| _none yet_ | —      | —     |
 
 ## Decision-Making
 

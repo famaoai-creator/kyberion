@@ -328,7 +328,7 @@ terminal. Shell and connected-app authentication are independent; a CLI probe le
 status `not_probed`. Never persist token values, change host DNS/hosts, or copy credentials as a
 diagnostic workaround. Gates: `github-diagnostics.test.ts` and `gh-status.test.ts`.
 
-**Rules** (enforced by `scripts/check_ci_workflow_contract.ts`):
+**Rules** (enforced by `scripts/check/check_ci_workflow_contract.ts`):
 
 - Every job declares `timeout-minutes`. The default of 360 minutes lets a hung worker hold a runner
   for six hours. Size the timeout at about 1.5–2× the job's observed duration.
@@ -425,7 +425,7 @@ or security paths. Source-specific failures name the actual scanned source and i
 expected emit, each with that file's own timestamp; absent emits have a null timestamp
 and orphan emits have no source provenance. Only mtime fallback uses target-wide newest
 files. Cover older changed inputs beside newer unchanged inputs and missing/orphan
-outputs in `scripts/check_stale_dist.test.ts`. Platform-specific fixtures must be
+outputs in `scripts/check/check_stale_dist.test.ts`. Platform-specific fixtures must be
 explicit skips elsewhere and included in the native platform's CI command;
 `tests/workflow-operations-contract.test.ts` pins the Windows invocation.
 
@@ -579,7 +579,7 @@ This covers directories and top-level `*.jsonl` / `*.json` files.
    dot wake ledger); pruning it re-fires old wakes.
 4. **Run `pnpm check -- --only runtime-store-retention`** (part of `--scope pr`). It fails with
    `file:line` for any literal runtime path that has no entry. Add a file-scoped exemption, with a
-   reason, in `scripts/check_runtime_store_retention.ts` only for strings that are not real stores.
+   reason, in `scripts/check/check_runtime_store_retention.ts` only for strings that are not real stores.
 5. **Check the janitor report.** `uncoveredRuntimeDirs` / `uncoveredRuntimeFiles` must not list the
    new name. A name there means a store was created through a dynamic path the gate cannot see; add
    its catalog entry by hand.
@@ -742,7 +742,7 @@ supervisor and PTC IPC tests when changing a listener.
   pipeline `system:shell` step, the child inherits the runner's role (`run_pipeline.bundle`).
   Prove it with a hermetic tier-guard test (copy of the governance policies under a temp
   `KYBERION_ROOT`; under the repo root Vitest does not load the policy) and by running the
-  schedule's pipeline once. Reference: `scripts/check_chronos_perf_baseline.test.ts`.
+  schedule's pipeline once. Reference: `scripts/check/check_chronos_perf_baseline.test.ts`.
 - **Give every child a deadline.** Kill the child when it expires, raise an ops alert via
   `sendOpsAlert`, and forward signals to the child on shutdown.
 
@@ -848,7 +848,7 @@ Production source inventories must exclude runtime storage roots before traversi
 them. The single-instance scan skips legacy root-level `work/` metrics, whose I/O is
 redirected into a per-test fixture; it still scans nested code directories named
 `work`. Do not suppress filesystem denials or missing-source errors to hide a scan
-failure. Gate: `scripts/check_core_single_instance.test.ts`, including the real
+failure. Gate: `scripts/check/check_core_single_instance.test.ts`, including the real
 production inventory and exact manifest-only import exception.
 
 When a store module also exports pure admission/security checks, partially mock the module

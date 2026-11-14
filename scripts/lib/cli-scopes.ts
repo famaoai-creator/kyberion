@@ -11,7 +11,11 @@
  */
 import { t, type VocabularyKey } from '@agent/core/t';
 import type { SupportedLocale } from '@agent/core/locale';
-import type { CliCommand, CliDeprecatedCommandAlias, CliManifest } from '../check_cli_manifest.js';
+import type {
+  CliCommand,
+  CliDeprecatedCommandAlias,
+  CliManifest,
+} from '../check/check_cli_manifest.js';
 
 export const SCOPE_FLAG = '--scope';
 

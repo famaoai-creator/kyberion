@@ -1368,7 +1368,9 @@ export async function runOnboarding(
     } else if (choice === '6') {
       print(`\n${mt('onboarding_menu_running_guardrails')}`);
       try {
-        await runManagedMenuTask('governance-check', ['dist/scripts/check_governance_rules.js']);
+        await runManagedMenuTask('governance-check', [
+          'dist/scripts/check/check_governance_rules.js',
+        ]);
       } catch (e) {
         print(`${mt('onboarding_menu_error_guardrails')}: ${formatMenuTaskError(e)}`);
       }

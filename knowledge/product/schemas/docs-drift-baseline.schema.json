@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "docs-drift-baseline.schema.json",
   "title": "Docs drift baseline",
-  "description": "Known exceptions for scripts/check_docs_drift.ts. Each entry needs a reason; stale entries fail the gate so the list only shrinks.",
+  "description": "Known exceptions for scripts/check/check_docs_drift.ts. Each entry needs a reason; stale entries fail the gate so the list only shrinks.",
   "type": "object",
   "additionalProperties": false,
   "required": ["exceptions"],

@@ -7,7 +7,7 @@ import {
   type CliCommand,
   type CliManifest,
   type CliScriptCommand,
-} from './check_cli_manifest.js';
+} from './check/check_cli_manifest.js';
 import { assertGovernedExec, buildSafeExecEnv, safeExecResultAsync } from '@agent/core/secure-io';
 import { constants as osConstants } from 'node:os';
 import { pathToFileURL } from 'node:url';

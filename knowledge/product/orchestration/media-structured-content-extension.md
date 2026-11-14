@@ -163,7 +163,7 @@ visual rhythm. If section order matters, split into multiple sections.
 Per-format render differences are intentional — each medium uses its native
 visual language rather than pretending to be a pixel-identical render.
 
-## File layout (post-split, ≤1500 lines each — `scripts/check_max_file_lines.ts`)
+## File layout (post-split, ≤1500 lines each — `scripts/check/check_max_file_lines.ts`)
 
 | File                                    | Role                                                                                                            |
 | --------------------------------------- | --------------------------------------------------------------------------------------------------------------- |

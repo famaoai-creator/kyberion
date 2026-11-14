@@ -1,6 +1,6 @@
 import { listCustomerChannelBindings } from '@agent/core/customer-channel-binding';
 import { collectDoctorReport } from './run_doctor.js';
-import { loadCliManifest } from './check_cli_manifest.js';
+import { loadCliManifest } from './check/check_cli_manifest.js';
 import { getGovernanceControlSummary } from '@agent/core/governance/governance-status';
 import { formatNextAction } from '@agent/core/next-action';
 import { collectOperatorHomeSummary } from '@agent/core/surface/operator-home-summary';

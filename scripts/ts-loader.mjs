@@ -58,7 +58,7 @@ const CORE_DIST = resolvePath(CORE_ROOT, 'dist');
  *   - the first `@agent/core` specifier: dist when libs/core/dist/index.js
  *     exists, source otherwise;
  *   - the first relative import of a libs/core TypeScript module (only the
- *     bootstrap scripts allowlisted by scripts/check_core_single_instance.ts
+ *     bootstrap scripts allowlisted by scripts/check/check_core_single_instance.ts
  *     do this): source.
  * After that, a `@agent/core` subpath whose dist file is missing (a stale or
  * partial build) is not quietly answered from source next to loaded dist

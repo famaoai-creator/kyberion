@@ -1647,7 +1647,7 @@
     },
     {
       "id": "script.check.backend-conformance",
-      "module": "scripts/check_backend_conformance.ts",
+      "module": "scripts/check/check_backend_conformance.ts",
       "command": "check backend-conformance",
       "noun": "check",
       "verb": "backend-conformance",
@@ -1658,7 +1658,7 @@
     },
     {
       "id": "script.check.backend-live-scenarios",
-      "module": "scripts/check_backend_live_scenarios.ts",
+      "module": "scripts/check/check_backend_live_scenarios.ts",
       "command": "check backend-live-scenarios",
       "noun": "check",
       "verb": "backend-live-scenarios",
@@ -1669,7 +1669,7 @@
     },
     {
       "id": "script.check.chronos-perf",
-      "module": "scripts/check_chronos_perf_baseline.ts",
+      "module": "scripts/check/check_chronos_perf_baseline.ts",
       "command": "check chronos-perf",
       "noun": "check",
       "verb": "chronos-perf",
@@ -1732,7 +1732,7 @@
     },
     {
       "id": "script.check.improvement-plan-metadata",
-      "module": "scripts/check_improvement_plan_metadata.ts",
+      "module": "scripts/check/check_improvement_plan_metadata.ts",
       "command": "check improvement-plan-metadata",
       "noun": "check",
       "verb": "improvement-plan-metadata",
@@ -1742,7 +1742,7 @@
     },
     {
       "id": "script.check.plugin-views-e2e",
-      "module": "scripts/check_plugin_views_e2e.ts",
+      "module": "scripts/check/check_plugin_views_e2e.ts",
       "command": "check plugin-views-e2e",
       "noun": "check",
       "verb": "plugin-views-e2e",
@@ -1764,7 +1764,7 @@
     },
     {
       "id": "script.check.rt-mode",
-      "module": "scripts/check_rt_mode.ts",
+      "module": "scripts/check/check_rt_mode.ts",
       "command": "check rt-mode",
       "noun": "check",
       "verb": "rt-mode",
@@ -1774,7 +1774,7 @@
     },
     {
       "id": "script.check.script-integrity",
-      "module": "scripts/check_script_integrity.ts",
+      "module": "scripts/check/check_script_integrity.ts",
       "command": "check script-integrity",
       "noun": "check",
       "verb": "script-integrity",
@@ -2007,7 +2007,7 @@
     },
     {
       "id": "script.docs.check",
-      "module": "scripts/check_docs_drift.ts",
+      "module": "scripts/check/check_docs_drift.ts",
       "command": "docs check",
       "noun": "docs",
       "verb": "check",

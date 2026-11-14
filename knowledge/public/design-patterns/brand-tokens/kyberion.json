@@ -106,7 +106,7 @@
       ]
     },
     "ui": {
-      "_meta": "UI-02 web UI semantic layer (kyberion-base catalog). Emitted as --kb-ui-* by scripts/generate_design_tokens.ts; tokens.colors stays the media palette. Every text pair is WCAG AA 4.5:1 and border-strong/focus-ring/accent are >= 3:1 against canvas/surface in both themes (scripts/check_design_contrast.ts). 'border' is a decorative divider; controls use border-strong. Role colors are for badges/active markers only.",
+      "_meta": "UI-02 web UI semantic layer (kyberion-base catalog). Emitted as --kb-ui-* by scripts/generate_design_tokens.ts; tokens.colors stays the media palette. Every text pair is WCAG AA 4.5:1 and border-strong/focus-ring/accent are >= 3:1 against canvas/surface in both themes (scripts/check/check_design_contrast.ts). 'border' is a decorative divider; controls use border-strong. Role colors are for badges/active markers only.",
       "light": {
         "canvas": "#f5f7fa",
         "surface": "#ffffff",

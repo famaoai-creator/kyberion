@@ -5,7 +5,7 @@
  *
  * G2: the window over one exact owner file is module-private: its AsyncLocalStorage and
  * issued set live in this module instance only (no globalThis registry; a second instance of
- * @agent/core neither sees nor honours it, scripts/check_core_single_instance.ts keeps a
+ * @agent/core neither sees nor honours it, scripts/check/check_core_single_instance.ts keeps a
  * production process on one instance). It is synchronous: it ends when the callback returns, a
  * thenable result is refused, and a captured continuation finds no window.
  *

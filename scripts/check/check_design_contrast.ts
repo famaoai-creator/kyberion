@@ -1,0 +1,498 @@
+#!/usr/bin/env node
+
+import {
+  createChronosWebThemePack,
+  createCompanionWebThemePack,
+  createConciergeWebThemePack,
+  webThemePackToCssVars,
+  type WebThemePack,
+} from '@agent/core/web-design-system';
+import {
+  loadBrandTokensAtPath,
+  type BrandUiPalette,
+  type BrandUiTokens,
+} from '@agent/core/brand-tokens';
+import { pathResolver } from '@agent/core/path-resolver';
+import { loadDesignFoundation } from '@agent/core/design-foundation';
+import { deriveStyleUiOverride } from '@agent/core/design-foundation-ui';
+import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
+import { readSafeJsonFile } from '../lib/json-input.js';
+
+type Palette = Record<string, string | undefined>;
+
+type ContrastPair = {
+  background: string;
+  foreground: string;
+  minRatio: number;
+  label: string;
+};
+
+function parseJson<T>(filePath: string): T {
+  return readSafeJsonFile<T>(filePath, `design contrast themes ${filePath}`);
+}
+
+function normalizeHex(value: string): string | null {
+  const normalized = String(value || '').trim();
+  const hex = normalized.startsWith('#') ? normalized.slice(1) : normalized;
+  if (/^[0-9a-fA-F]{3}$/.test(hex)) {
+    return hex
+      .split('')
+      .map((part) => `${part}${part}`)
+      .join('')
+      .toUpperCase();
+  }
+  if (/^[0-9a-fA-F]{6}$/.test(hex)) return hex.toUpperCase();
+  return null;
+}
+
+function parseRgba(value: string): [number, number, number, number] | null {
+  const normalized = String(value || '').trim();
+  const hex = normalizeHex(normalized);
+  if (hex) {
+    return [
+      Number.parseInt(hex.slice(0, 2), 16),
+      Number.parseInt(hex.slice(2, 4), 16),
+      Number.parseInt(hex.slice(4, 6), 16),
+      1,
+    ];
+  }
+  const match = normalized.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([0-9.]+))?\)/i);
+  if (!match) return null;
+  return [
+    Number(match[1]),
+    Number(match[2]),
+    Number(match[3]),
+    match[4] !== undefined ? Number(match[4]) : 1,
+  ];
+}
+
+function blendOver(
+  foreground: [number, number, number, number],
+  background: [number, number, number, number]
+): [number, number, number] {
+  const alpha = foreground[3] + background[3] * (1 - foreground[3]);
+  if (alpha === 0) return [0, 0, 0];
+  const r =
+    (foreground[0] * foreground[3] + background[0] * background[3] * (1 - foreground[3])) / alpha;
+  const g =
+    (foreground[1] * foreground[3] + background[1] * background[3] * (1 - foreground[3])) / alpha;
+  const b =
+    (foreground[2] * foreground[3] + background[2] * background[3] * (1 - foreground[3])) / alpha;
+  return [r, g, b];
+}
+
+function opaqueRgb(value: string, base?: string): [number, number, number] {
+  const rgba = parseRgba(value);
+  if (!rgba) throw new Error(`Unsupported color value: ${value}`);
+  if (rgba[3] >= 1) return [rgba[0], rgba[1], rgba[2]];
+  const baseRgba = (base ? parseRgba(base) : [255, 255, 255, 1]) as
+    [number, number, number, number] | null;
+  if (!baseRgba) throw new Error(`Unsupported base color value: ${base}`);
+  return blendOver(rgba, baseRgba);
+}
+
+function relativeLuminance(value: string, base?: string): number {
+  const rgb = opaqueRgb(value, base);
+  const [r, g, b] = rgb.map((channel) => {
+    const c = channel / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+function contrastRatio(a: string, b: string, base?: string): number {
+  const [l1, l2] = [relativeLuminance(a, base), relativeLuminance(b, base)].sort((x, y) => y - x);
+  return (l1 + 0.05) / (l2 + 0.05);
+}
+
+function checkPalette(
+  name: string,
+  palette: Palette,
+  pairs: ContrastPair[],
+  backgrounds: Record<string, string> = {}
+): string[] {
+  const violations: string[] = [];
+  for (const pair of pairs) {
+    const background = palette[pair.background];
+    const foreground = palette[pair.foreground];
+    if (!background || !foreground) {
+      violations.push(
+        `[${name}] missing pair ${pair.label} (${pair.background} × ${pair.foreground})`
+      );
+      continue;
+    }
+    const ratio = contrastRatio(foreground, background, backgrounds[pair.background] ?? '#ffffff');
+    if (ratio < pair.minRatio) {
+      violations.push(
+        `[${name}] ${pair.label} contrast ${ratio.toFixed(2)} < ${pair.minRatio} (${pair.background} × ${pair.foreground})`
+      );
+    }
+  }
+  return violations;
+}
+
+/**
+ * The static token files below are hand-authored, so they were the only thing
+ * this check covered. But every web surface renders from `--kb-*` vars that are
+ * DERIVED from a theme pack at runtime, and that derivation is where the
+ * readability regressions actually happen: `--kb-panel-bg` used to be
+ * `primary @ 0.82` for every theme, which made light themes paint dark text on
+ * a dark panel (contrast 1.0) while the static files stayed innocent. Check the
+ * derived output too, for every pack a surface can serve.
+ */
+function checkDerivedWebThemePacks(): string[] {
+  const packs: Array<[string, WebThemePack]> = [
+    ['web.chronos-dark', createChronosWebThemePack('dark')],
+    ['web.chronos-light', createChronosWebThemePack('light')],
+    ['web.concierge', createConciergeWebThemePack()],
+    ['web.companion', createCompanionWebThemePack()],
+  ];
+
+  const pairs: ContrastPair[] = [
+    { label: 'body text', background: 'bg_main', foreground: 'text_primary', minRatio: 4.5 },
+    { label: 'secondary text', background: 'bg_main', foreground: 'text_secondary', minRatio: 4.5 },
+    { label: 'panel text', background: 'panel_bg', foreground: 'text_primary', minRatio: 4.5 },
+    {
+      label: 'panel secondary',
+      background: 'panel_bg',
+      foreground: 'text_secondary',
+      minRatio: 4.5,
+    },
+  ];
+
+  const violations: string[] = [];
+  for (const [name, pack] of packs) {
+    const cssVars = webThemePackToCssVars(pack);
+    const palette: Palette = {
+      bg_main: cssVars['--kb-bg-main'],
+      panel_bg: cssVars['--kb-panel-bg'],
+      text_primary: cssVars['--kb-text-primary'],
+      text_secondary: cssVars['--kb-text-secondary'],
+    };
+    // A translucent panel resolves against the page background, so blend it
+    // there rather than against the checker's default white.
+    violations.push(
+      ...checkPalette(name, palette, pairs, {
+        bg_main: cssVars['--kb-bg-main'],
+        panel_bg: cssVars['--kb-bg-main'],
+      })
+    );
+    // `--kb-border` is consumed everywhere as `1px solid var(--kb-border)`, so
+    // emitting a full `border` shorthand here silently invalidates it.
+    if (/\bsolid\b/.test(cssVars['--kb-border'] || '')) {
+      violations.push(
+        `[${name}] --kb-border must be a color, not a border shorthand (got "${cssVars['--kb-border']}")`
+      );
+    }
+  }
+  return violations;
+}
+
+/**
+ * UI-02 `tokens.ui` (web UI layer, `--kb-ui-*`). WCAG AA in both themes:
+ * every text role 4.5:1 on every surface it can sit on; control boundaries
+ * (border-strong, accent fill) and the focus ring 3:1 (WCAG 1.4.11).
+ * `border` is a decorative divider and deliberately not held to 3:1.
+ */
+const UI_SURFACES = ['canvas', 'surface', 'surface-raised', 'surface-sunken'] as const;
+const UI_STATUSES = ['success', 'warning', 'danger', 'info'] as const;
+
+export function buildUiContrastPairs(roles: readonly string[]): ContrastPair[] {
+  const pairs: ContrastPair[] = [];
+  for (const background of UI_SURFACES) {
+    for (const foreground of ['text', 'text-muted', 'text-subtle', 'accent-text']) {
+      pairs.push({
+        label: `ui ${foreground} on ${background}`,
+        background,
+        foreground,
+        minRatio: 4.5,
+      });
+    }
+    for (const status of UI_STATUSES) {
+      pairs.push({
+        label: `ui ${status} text on ${background}`,
+        background,
+        foreground: `${status}-fg`,
+        minRatio: 4.5,
+      });
+    }
+    for (const role of roles) {
+      pairs.push({
+        label: `ui role ${role} on ${background}`,
+        background,
+        foreground: `role-${role}`,
+        minRatio: 4.5,
+      });
+    }
+    for (const foreground of ['border-strong', 'focus-ring', 'accent']) {
+      pairs.push({
+        label: `ui ${foreground} boundary on ${background}`,
+        background,
+        foreground,
+        minRatio: 3,
+      });
+    }
+  }
+  for (const status of UI_STATUSES) {
+    pairs.push({
+      label: `ui ${status} pill`,
+      background: `${status}-bg`,
+      foreground: `${status}-fg`,
+      minRatio: 4.5,
+    });
+    pairs.push({
+      label: `ui ${status} callout body`,
+      background: `${status}-bg`,
+      foreground: 'text',
+      minRatio: 4.5,
+    });
+  }
+  pairs.push(
+    {
+      label: 'ui accent badge / nav active',
+      background: 'accent-soft',
+      foreground: 'accent-text',
+      minRatio: 4.5,
+    },
+    {
+      label: 'ui primary button',
+      background: 'accent',
+      foreground: 'text-on-accent',
+      minRatio: 4.5,
+    },
+    {
+      label: 'ui primary button hover',
+      background: 'accent-hover',
+      foreground: 'text-on-accent',
+      minRatio: 4.5,
+    },
+    {
+      label: 'ui danger button',
+      background: 'danger-fg',
+      foreground: 'text-on-accent',
+      minRatio: 4.5,
+    },
+    {
+      label: 'ui neutral pill',
+      background: 'surface-sunken',
+      foreground: 'text-muted',
+      minRatio: 4.5,
+    }
+  );
+  return pairs;
+}
+
+export function flattenUiPalette(palette: BrandUiPalette): Palette {
+  const flat: Palette = {};
+  for (const [key, value] of Object.entries(palette)) {
+    if (typeof value === 'string') flat[key] = value;
+  }
+  for (const [status, triple] of Object.entries(palette.status)) {
+    for (const [part, value] of Object.entries(triple)) flat[`${status}-${part}`] = value;
+  }
+  for (const [role, value] of Object.entries(palette.role)) flat[`role-${role}`] = value;
+  if (palette.viz) {
+    palette.viz.categorical.forEach((value, i) => (flat[`viz-cat-${i + 1}`] = value));
+    palette.viz.sequential.forEach((value, i) => (flat[`viz-seq-${i + 1}`] = value));
+    palette.viz.diverging.forEach((value, i) => (flat[`viz-div-${i + 1}`] = value));
+    palette.viz.sequential_ink.forEach((value, i) => (flat[`viz-seq-ink-${i + 1}`] = value));
+    palette.viz.diverging_ink.forEach((value, i) => (flat[`viz-div-ink-${i + 1}`] = value));
+  }
+  return flat;
+}
+
+/**
+ * UI-01b data-viz marks (dataviz method, check 5): every categorical slot
+ * >= 3:1 on every UI surface a chart can sit on; the sequential ramp's
+ * darkest-magnitude step and both diverging poles >= 3:1 on the surface; the
+ * sequential low end >= 2:1 (ordinal floor, so a "small" cell never vanishes).
+ * CVD / normal-vision separation and the lightness band are validated with the
+ * dataviz palette validator when the palette changes (see brand-tokens schema).
+ */
+export const UI_VIZ_CATEGORICAL_SLOTS = 8;
+
+/** `ui:heatmap` value labels: one ink per ramp step (sequential + diverging). */
+export const UI_VIZ_RAMP_STEPS = 5;
+
+export function buildUiVizContrastPairs(): ContrastPair[] {
+  const pairs: ContrastPair[] = [];
+  for (const background of UI_SURFACES) {
+    for (let slot = 1; slot <= UI_VIZ_CATEGORICAL_SLOTS; slot += 1) {
+      pairs.push({
+        label: `ui viz categorical ${slot} mark on ${background}`,
+        background,
+        foreground: `viz-cat-${slot}`,
+        minRatio: 3,
+      });
+    }
+  }
+  // A heatmap cell's value label sits directly on that cell's fill (never a
+  // halo — see kyberion-ui.charts.source.css), so its ink must clear body
+  // text's 4.5:1 on every ramp step, not just the mark's own 3:1 floor.
+  for (let step = 1; step <= UI_VIZ_RAMP_STEPS; step += 1) {
+    pairs.push(
+      {
+        label: `ui viz sequential ${step} cell value ink`,
+        background: `viz-seq-${step}`,
+        foreground: `viz-seq-ink-${step}`,
+        minRatio: 4.5,
+      },
+      {
+        label: `ui viz diverging ${step} cell value ink`,
+        background: `viz-div-${step}`,
+        foreground: `viz-div-ink-${step}`,
+        minRatio: 4.5,
+      }
+    );
+  }
+  pairs.push(
+    {
+      label: 'ui viz sequential high on surface',
+      background: 'surface',
+      foreground: 'viz-seq-5',
+      minRatio: 3,
+    },
+    {
+      label: 'ui viz sequential low on surface',
+      background: 'surface',
+      foreground: 'viz-seq-1',
+      minRatio: 2,
+    },
+    {
+      label: 'ui viz diverging negative pole on surface',
+      background: 'surface',
+      foreground: 'viz-div-1',
+      minRatio: 3,
+    },
+    {
+      label: 'ui viz diverging positive pole on surface',
+      background: 'surface',
+      foreground: 'viz-div-5',
+      minRatio: 3,
+    }
+  );
+  return pairs;
+}
+
+function checkUiTokens(ui: BrandUiTokens | undefined): string[] {
+  if (!ui) return ['[ui] tokens.ui is missing from brand tokens'];
+  return (['light', 'dark'] as const).flatMap((theme) => {
+    const palette = ui[theme];
+    return checkPalette(`ui.${theme}`, flattenUiPalette(palette), [
+      ...buildUiContrastPairs(Object.keys(palette.role)),
+      ...buildUiVizContrastPairs(),
+    ]);
+  });
+}
+
+/**
+ * KDS v2: every style's derived Surface palette is held to the same pairs as the
+ * base palette, in both themes. A style that cannot reach the floors fails here,
+ * so a style is either legible on the Surfaces or it does not ship.
+ */
+export function checkStyleUiTokens(ui: BrandUiTokens | undefined): string[] {
+  const foundation = loadDesignFoundation();
+  if (!ui || !foundation) return [];
+  return Object.values(foundation.styles).flatMap((style) =>
+    (['light', 'dark'] as const).flatMap((theme) => {
+      const override = deriveStyleUiOverride(ui, foundation, style, theme);
+      if (!override) return [];
+      return checkPalette(`ui.style.${style.id}.${theme}`, flattenUiPalette(override.palette), [
+        ...buildUiContrastPairs(Object.keys(override.palette.role)),
+        ...buildUiVizContrastPairs(),
+      ]);
+    })
+  );
+}
+
+export function checkDesignContrast(): string[] {
+  const brandTokens = loadBrandTokensAtPath();
+  const themes = parseJson<{ default_theme: string; themes: Record<string, { colors: Palette }> }>(
+    pathResolver.rootResolve('knowledge/public/design-patterns/media-templates/themes.json')
+  );
+
+  const pairs: ContrastPair[] = [
+    { label: 'body text', background: 'bg_main', foreground: 'text_primary', minRatio: 4.5 },
+    { label: 'secondary text', background: 'bg_main', foreground: 'text_secondary', minRatio: 4.5 },
+    { label: 'panel text', background: 'panel_bg', foreground: 'text_primary', minRatio: 4.5 },
+    {
+      label: 'panel secondary',
+      background: 'panel_bg',
+      foreground: 'text_secondary',
+      minRatio: 4.5,
+    },
+  ];
+
+  const violations = [
+    ...checkPalette('brand.light', brandTokens.tokens.colors.light, pairs, {
+      bg_main: brandTokens.tokens.colors.light.bg_main,
+      panel_bg: brandTokens.tokens.colors.light.bg_main,
+    }),
+    ...checkPalette('brand.dark', brandTokens.tokens.colors.dark, pairs, {
+      bg_main: brandTokens.tokens.colors.dark.bg_main,
+      panel_bg: brandTokens.tokens.colors.dark.bg_main,
+    }),
+    ...Object.entries(themes.themes).flatMap(([themeId, theme]) => {
+      const colors = theme.colors;
+      const pairsForTheme: ContrastPair[] = [
+        { label: 'theme body', background: 'background', foreground: 'text', minRatio: 4.5 },
+        // accent-colored text must be readable: accent_text when provided,
+        // otherwise the raw accent is assumed to be used for text.
+        {
+          label: 'theme accent text',
+          background: 'background',
+          foreground: colors.accent_text ? 'accent_text' : 'accent',
+          minRatio: colors.accent_text ? 4.5 : 3,
+        },
+        ...(colors.surface
+          ? [
+              {
+                label: 'theme surface body',
+                background: 'surface',
+                foreground: 'text',
+                minRatio: 4.5,
+              },
+            ]
+          : []),
+        ...(colors.muted_text
+          ? [
+              {
+                label: 'theme muted text',
+                background: 'background',
+                foreground: 'muted_text',
+                minRatio: 4.5,
+              },
+            ]
+          : []),
+      ];
+      return checkPalette(`theme.${themeId}`, colors, pairsForTheme);
+    }),
+    ...checkDerivedWebThemePacks(),
+    ...checkUiTokens(brandTokens.tokens.ui),
+    ...checkStyleUiTokens(brandTokens.tokens.ui),
+  ];
+
+  return violations;
+}
+
+export const runCheckDesignContrast = defineScript({
+  name: 'check:design-contrast',
+  flags: [],
+  run(context) {
+    const violations = checkDesignContrast();
+    if (violations.length > 0) {
+      throw new ScriptExitError(
+        1,
+        ['violations detected:', ...violations.map((violation) => `- ${violation}`)].join('\n')
+      );
+    }
+    context.print('[check:design-contrast] OK');
+    return { violations };
+  },
+});
+
+if (
+  isDirectScript(import.meta.url, 'check_design_contrast.ts') ||
+  isDirectScript(import.meta.url, 'check_design_contrast.js')
+)
+  void runCheckDesignContrast();

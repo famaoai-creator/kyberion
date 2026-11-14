@@ -79,7 +79,11 @@ const REMEDIES = deriveGateRemedies(
           '--check',
         ],
       },
-      { id: 'type-ratchet', executable: 'node', args: ['dist/scripts/check_type_ratchet.js'] },
+      {
+        id: 'type-ratchet',
+        executable: 'node',
+        args: ['dist/scripts/check/check_type_ratchet.js'],
+      },
     ],
   },
   {

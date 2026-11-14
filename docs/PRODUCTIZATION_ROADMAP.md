@@ -233,9 +233,9 @@ Phase A〜D' は OSS / self-hosted / FDE の基盤レーンであり、SaaS の�
 | C-1 | ドキュメント 3 階層統合    | docs 29 + knowledge 908 を user/operator/developer の 3 階層に正規化、archive 分離 | `docs/{user,operator,developer}/`        | D5     |
 | C-2 | 1 時間で読める入口 doc     | "Kyberion を 1 時間で理解する" guided tour                                         | `docs/developer/TOUR.md`                 | D5     |
 | C-3 | CONTRIBUTING 全面更新      | 動く手順、good first issue ラベル運用、PR テンプレ、レビュー方針                   | `CONTRIBUTING.md` 更新 + `.github/` 整備 | D5     |
-| C-4 | 拡張点 semver 化           | actuator / pipeline / plugin / skill 仕様を v1 として宣言、semver 違反を CI で検出 | `scripts/check_contract_semver.ts`       | D4, D5 |
+| C-4 | 拡張点 semver 化           | actuator / pipeline / plugin / skill 仕様を v1 として宣言、semver 違反を CI で検出 | `scripts/check/check_contract_semver.ts` | D4, D5 |
 | C-5 | プラグイン authoring guide | "新しい actuator を 30 分で書く" チュートリアル + テンプレ                         | `docs/developer/plugin-authoring/`       | D4, D5 |
-| C-6 | doctest 相当               | docs 内の code block を CI で実行検証                                              | `scripts/check_doc_examples.ts`          | D5     |
+| C-6 | doctest 相当               | docs 内の code block を CI で実行検証                                              | `scripts/check/check_doc_examples.ts`    | D5     |
 | C-7 | ローカル開発体験           | watch モード、局所テスト、`pnpm verify` の改善                                     | tooling                                  | D5     |
 | C-8 | issue triage rotation      | weekly triage / monthly contributor sync の運用ルール                              | `docs/MAINTAINERSHIP.md`                 | D5     |
 | C-9 | コードベース縮小           | 死んだコード／重複 actuator／使われていない pipeline を archive                    | inventory + cleanup PR                   | D5     |

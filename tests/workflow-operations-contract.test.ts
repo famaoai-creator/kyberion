@@ -148,7 +148,7 @@ describe('Workflow operations contract', () => {
       exclusive: true,
       scope: 'pr',
       executable: 'node',
-      args: ['dist/scripts/check_golden_output.js'],
+      args: ['dist/scripts/check/check_golden_output.js'],
       owner: 'quality',
       rationale: expect.any(String),
     });
@@ -184,7 +184,7 @@ describe('Workflow operations contract', () => {
       (step) => step.name === 'Unit tests (Windows native)'
     );
     expect(windowsStep?.run).toContain('pnpm exec vitest run');
-    expect(windowsStep?.run).toContain('scripts/check_stale_dist.test.ts');
+    expect(windowsStep?.run).toContain('scripts/check/check_stale_dist.test.ts');
   });
 
   it('keeps one CI round reporting every signal and merge-queue ready', () => {

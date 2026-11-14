@@ -5,7 +5,7 @@ import {
   projectAuthorityRolePermissions,
   type AuthorityRoleCard,
 } from '@agent/core/organization/authority-role-registry';
-import { validateAuthorityRolePermissionProjection } from './check-governance-directory-consistency.js';
+import { validateAuthorityRolePermissionProjection } from './check/check-governance-directory-consistency.js';
 
 const cards: Record<string, AuthorityRoleCard> = {
   zeta_store: { role: 'zeta_store', assignable: false, permissions: { allow_write: ['z/'] } },

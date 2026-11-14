@@ -13,7 +13,7 @@
  *     refused, and a captured continuation finds no grant.
  *
  * Both live in this module instance only: a second instance of @agent/core
- * neither sees nor honours them (scripts/check_core_single_instance.ts keeps a
+ * neither sees nor honours them (scripts/check/check_core_single_instance.ts keeps a
  * production process on one instance), and there is no registry to plant.
  *
  * G2: the live grant is itself the authority (there is no store role). While it

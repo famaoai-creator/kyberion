@@ -406,7 +406,7 @@ export type KyberionUiTokenScope = 'root' | 'host';
  * style that re-declares the same `--kb-ui-*` semantic tokens (palette, radius,
  * shadow) plus `--kb-ui-font-heading` / `--kb-ui-gradient-accent`. Derived by
  * `deriveStyleUiOverride`, so contrast floors hold by construction and are
- * re-verified per style by `scripts/check_design_contrast.ts`.
+ * re-verified per style by `scripts/check/check_design_contrast.ts`.
  */
 function styleOverrideDeclarations(
   override: StyleUiOverride,

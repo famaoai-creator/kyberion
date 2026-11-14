@@ -41,7 +41,7 @@
  *
  * Every run spends real model turns. Nothing here runs in CI: tests drive a
  * deterministic stub backend and the operator entrypoint
- * (`scripts/check_backend_live_scenarios.ts`) refuses to run without `--live`.
+ * (`scripts/check/check_backend_live_scenarios.ts`) refuses to run without `--live`.
  */
 
 import * as path from 'node:path';

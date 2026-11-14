@@ -4,7 +4,7 @@
  * tests/concierge-management-capability-boundary.test.ts).
  *
  * The grant is module-private: its AsyncLocalStorage and issued set live in this module instance
- * only (no globalThis registry; scripts/check_core_single_instance.ts keeps a production process on
+ * only (no globalThis registry; scripts/check/check_core_single_instance.ts keeps a production process on
  * one @agent/core instance). It is bound to the execution scope it was opened in (the Concierge
  * management role assumption of its facade): a nested role assumption inside it sees no grant, as
  * the role-keyed checks it replaces no longer applied there.

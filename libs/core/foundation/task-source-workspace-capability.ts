@@ -4,7 +4,7 @@
  *
  * The window is module-private: its AsyncLocalStorage and issued set live in
  * this module instance only, so a second instance of @agent/core neither sees
- * nor honours it (fail closed; scripts/check_core_single_instance.ts keeps a
+ * nor honours it (fail closed; scripts/check/check_core_single_instance.ts keeps a
  * production process on one instance). Only the governed facade
  * (workforce/task-source-workspace-io.ts, import boundary test) opens one.
  *
