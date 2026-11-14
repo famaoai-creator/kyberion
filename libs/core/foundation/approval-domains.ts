@@ -70,6 +70,7 @@ export const APPROVAL_DOMAINS: Readonly<Record<string, ApprovalDomainSpec>> = {
     decision: 'system / person custody provider attestation',
   },
   'nhi-session-admission': { decision: 'NHI session admission' },
+  'account-introduction': { decision: 'human-approved exact-account token registration' },
   'onboarding-authority': { decision: 'organization onboarding authority' },
   'project-trust': { decision: 'managed project trust grant' },
   'plugin-install': { decision: 'third-party plugin install' },

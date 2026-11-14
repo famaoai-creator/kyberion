@@ -1,6 +1,7 @@
 import { withCompanyFanoutInvalidation } from '../../../../lib/company-fanout-cache';
 import { requireConciergeInstallationAccess } from '../../../../lib/installation-access';
 import { scopedLearningApprovalVisibleToViewer } from '../../../../lib/scoped-learning-approval-visibility';
+import { accountIntroductionApprovalMember } from '../../../../lib/account-introduction-server';
 import { onboardingApprovalMember } from '../../../../lib/onboarding-authority-server';
 import {
   loadConciergeApproval,
@@ -81,7 +82,11 @@ async function handlePost(req: NextRequest, context: { params: Promise<{ id: str
       requesterContext?.tenant_slug ||
       requesterContext?.tenantSlug ||
       loopContext?.tenant_slug;
-    const onboardingMember = onboardingApprovalMember(resolved.context, record);
+    const accountMember = accountIntroductionApprovalMember(resolved.context, record);
+    const onboardingMember =
+      accountMember === undefined
+        ? onboardingApprovalMember(resolved.context, record)
+        : accountMember;
     if (onboardingMember === null)
       return NextResponse.json({ ok: false, error: 'approval request not found' }, { status: 404 });
     // Deciding a personal-scope onboarding-authority card changes what this

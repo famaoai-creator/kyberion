@@ -241,6 +241,9 @@ The operations console does not directly own mission state. It delegates to:
 - `libs/core/service/service-binding.ts`
 - `libs/core/service/service-binding-reader.ts` (governed connection reads; no execution authorization)
 - `libs/core/service/service-binding-registry.ts` (writes and tenant/project/action authorization)
+- `libs/core/secret/account-introduction.ts` (owner-approved registration of exact account generations)
+- `libs/core/secret/account-broker.ts` (explicit organization account provisioning and receipt validation)
+- `libs/core/foundation/account-provision-admission.ts` (internal, bounded apply/write admission; issuer imports are checked by a boundary test)
 - `libs/core/governance/service-credential-allocation.ts` (fail-closed allocation port)
 - `libs/core/governance/service-credential-allocation-verifier.ts` (owner-approved grant verification, installed by grant-aware bootstrap)
 - `libs/core/service/service-preset-registry.ts`

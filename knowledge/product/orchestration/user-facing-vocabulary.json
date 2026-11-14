@@ -18273,6 +18273,41 @@
         "ja": "登録済みのエージェントはまだありません。",
         "qps-ploc": "⟦Ñő ȧɠėñŧş ȧřė řėɠïşŧėřėḓ ẏėŧ. ŀőřėɱ ïṗş⟧"
       },
+      "settings.account_close": {
+        "en": "Close registration form",
+        "ja": "登録フォームを閉じる",
+        "qps-ploc": "⟦Ƈŀőşė řėɠïşŧřȧŧïőñ ƒőřɱ ŀőřėɱ ï⟧"
+      },
+      "settings.account_close_help": {
+        "en": "Closing this form clears entered values. It does not cancel an approval or a save already started.",
+        "ja": "フォームを閉じると入力値が消去されます。承認依頼や開始済みの保存は取り消されません。",
+        "qps-ploc": "⟦Ƈŀőşïñɠ ŧħïş ƒőřɱ ƈŀėȧřş ėñŧėřėḓ ṽȧŀůėş. Ïŧ ḓőėş ñőŧ ƈȧñƈėŀ ȧñ ȧṗṗřőṽȧŀ őř ȧ şȧṽė ȧŀřėȧḓẏ şŧȧřŧėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈ⟧"
+      },
+      "settings.account_recovery": {
+        "en": "The save could not be confirmed. Check the connection with an operator before trying another registration.",
+        "ja": "保存完了を確認できませんでした。再登録の前に管理者と接続状態を確認してください。",
+        "qps-ploc": "⟦Ŧħė şȧṽė ƈőůŀḓ ñőŧ ƀė ƈőñƒïřɱėḓ. Ƈħėƈķ ŧħė ƈőññėƈŧïőñ ẇïŧħ ȧñ őṗėřȧŧőř ƀėƒőřė ŧřẏïñɠ ȧñőŧħėř řėɠïşŧřȧŧïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧ⟧"
+      },
+      "settings.account_preview": {
+        "en": "Review account registration",
+        "ja": "アカウント登録内容を確認",
+        "qps-ploc": "⟦Řėṽïėẇ ȧƈƈőůñŧ řėɠïşŧřȧŧïőñ ŀőřėɱ ïṗ⟧"
+      },
+      "settings.account_refresh": {
+        "en": "Check approval",
+        "ja": "承認状況を確認",
+        "qps-ploc": "⟦Ƈħėƈķ ȧṗṗřőṽȧŀ ŀőřė⟧"
+      },
+      "settings.account_apply": {
+        "en": "Register approved account",
+        "ja": "承認済みアカウントを登録",
+        "qps-ploc": "⟦Řėɠïşŧėř ȧṗṗřőṽėḓ ȧƈƈőůñŧ ŀőřėɱ ïṗ⟧"
+      },
+      "settings.account_open_approval": {
+        "en": "Review and approve",
+        "ja": "内容を確認して承認",
+        "qps-ploc": "⟦Řėṽïėẇ ȧñḓ ȧṗṗřőṽė ŀőřėɱ⟧"
+      },
       "settings.secrets_title": {
         "en": "API tokens",
         "ja": "API トークン",
