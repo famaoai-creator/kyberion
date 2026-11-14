@@ -67,9 +67,9 @@ export interface GeneratedArtifactStep {
 export const GENERATED_ARTIFACT_STEPS: readonly GeneratedArtifactStep[] = [
   {
     id: 'store-roots',
-    script: 'scripts/generate_store_roots.ts',
+    script: 'scripts/generate/generate_store_roots.ts',
     tracked: ['libs/core/foundation/runtime-state-roots.ts'],
-    run: async (argv) => (await import('./generate_store_roots.js')).main(argv),
+    run: async (argv) => (await import('./generate/generate_store_roots.js')).main(argv),
   },
   {
     // role-authority-map.json is the projection of the Org Role cards (D6).
@@ -80,66 +80,67 @@ export const GENERATED_ARTIFACT_STEPS: readonly GeneratedArtifactStep[] = [
   },
   {
     id: 'op-registry',
-    script: 'scripts/generate_op_registry.ts',
+    script: 'scripts/generate/generate_op_registry.ts',
     tracked: [
       'knowledge/product/governance/actuator-op-registry.json',
       'knowledge/product/orchestration/actuator-op-discovery.json',
     ],
-    run: async (argv) => (await import('./generate_op_registry.js')).main(argv),
+    run: async (argv) => (await import('./generate/generate_op_registry.js')).main(argv),
   },
   {
     // Writes the qps-ploc values into user-facing-vocabulary.json, which the
     // vocabulary types and the CLI reference read.
     id: 'pseudo-locale',
-    script: 'scripts/generate_pseudo_locale.ts',
+    script: 'scripts/generate/generate_pseudo_locale.ts',
     tracked: ['knowledge/product/orchestration/user-facing-vocabulary.json'],
-    run: async (argv) => (await import('./generate_pseudo_locale.js')).main(argv),
+    run: async (argv) => (await import('./generate/generate_pseudo_locale.js')).main(argv),
   },
   {
     id: 'vocabulary-types',
-    script: 'scripts/generate_vocabulary_types.ts',
+    script: 'scripts/generate/generate_vocabulary_types.ts',
     tracked: [
       'libs/core/foundation/locale-normalize.ts',
       'libs/core/knowledge/vocabulary-keys.generated.ts',
       'libs/shared-ui/vanilla/kyberion-ui-vocabulary.js',
     ],
     after: ['pseudo-locale'],
-    run: async (argv) => (await import('./generate_vocabulary_types.js')).main(argv),
+    run: async (argv) => (await import('./generate/generate_vocabulary_types.js')).main(argv),
   },
   {
     id: 'pii-rules',
-    script: 'scripts/generate_pii_rules.ts',
+    script: 'scripts/generate/generate_pii_rules.ts',
     tracked: [
       'tools/adf-replay-extension/pii-rules.generated.js',
       'tools/meet-copilot-extension/pii-rules.generated.js',
     ],
-    run: async (argv) => (await import('./generate_pii_rules.js')).runGeneratePiiRules(argv),
+    run: async (argv) =>
+      (await import('./generate/generate_pii_rules.js')).runGeneratePiiRules(argv),
   },
   {
     id: 'cli-reference',
-    script: 'scripts/generate_cli_reference.ts',
+    script: 'scripts/generate/generate_cli_reference.ts',
     tracked: ['docs/CLI_REFERENCE.md'],
     after: ['pseudo-locale'],
-    run: async (argv) => (await import('./generate_cli_reference.js')).main(argv),
+    run: async (argv) => (await import('./generate/generate_cli_reference.js')).main(argv),
   },
   {
     id: 'capability-seams',
-    script: 'scripts/generate_capability_seams.ts',
+    script: 'scripts/generate/generate_capability_seams.ts',
     tracked: ['docs/developer/CAPABILITY_SEAMS.md'],
-    run: async (argv) => (await import('./generate_capability_seams.js')).main(argv),
+    run: async (argv) => (await import('./generate/generate_capability_seams.js')).main(argv),
   },
   {
     id: 'package-dependency-graph',
-    script: 'scripts/generate_package_dependency_graph.ts',
+    script: 'scripts/generate/generate_package_dependency_graph.ts',
     tracked: ['docs/developer/architecture/dependency-graph.mmd'],
     run: async (argv) =>
-      (await import('./generate_package_dependency_graph.js')).runGeneratePackageDependencyGraph(
-        argv
-      ),
+      (
+        await import('./generate/generate_package_dependency_graph.js')
+      ).runGeneratePackageDependencyGraph(argv),
   },
   {
     id: 'subagent-definitions',
-    script: 'scripts/generate_subagent_definitions.ts',
+    script: 'scripts/generate/generate_subagent_definitions.ts',
     tracked: [
       '.claude/agents/',
       '.agents/agents/',
@@ -147,21 +148,23 @@ export const GENERATED_ARTIFACT_STEPS: readonly GeneratedArtifactStep[] = [
       '.cursor/agents/',
       '.codex/agents/',
     ],
-    run: async (argv) => (await import('./generate_subagent_definitions.js')).main(argv),
+    run: async (argv) => (await import('./generate/generate_subagent_definitions.js')).main(argv),
   },
   {
     // .gemini/settings.json and .codex/hooks.json are gitignored provider
     // state (a generation ceremony); only the tracked Claude settings count.
     id: 'provider-hooks',
-    script: 'scripts/generate_provider_hook_configs.ts',
+    script: 'scripts/generate/generate_provider_hook_configs.ts',
     tracked: ['.claude/settings.json'],
     run: async (argv) =>
-      (await import('./generate_provider_hook_configs.js')).runGenerateProviderHookConfigs(argv),
+      (await import('./generate/generate_provider_hook_configs.js')).runGenerateProviderHookConfigs(
+        argv
+      ),
   },
   {
     // Scans code for KYBERION_* names, so it runs after the code generators.
     id: 'env-registry',
-    script: 'scripts/generate_env_registry.ts',
+    script: 'scripts/generate/generate_env_registry.ts',
     tracked: [
       'knowledge/product/governance/env-registry.json',
       'docs/developer/env.example',
@@ -170,7 +173,7 @@ export const GENERATED_ARTIFACT_STEPS: readonly GeneratedArtifactStep[] = [
     ],
     mergeDriver: true,
     after: ['vocabulary-types', 'pii-rules'],
-    run: async (argv) => (await import('./generate_env_registry.js')).main(argv),
+    run: async (argv) => (await import('./generate/generate_env_registry.js')).main(argv),
     // A newly referenced name is added undocumented on the first pass and
     // promoted with a generated description on the next (mergeRegistry), so
     // one pass leaves the env-registry gate red.
@@ -179,12 +182,12 @@ export const GENERATED_ARTIFACT_STEPS: readonly GeneratedArtifactStep[] = [
   {
     // Indexes knowledge/, so it runs after every generator that writes there.
     id: 'knowledge-index',
-    script: 'scripts/generate_knowledge_index.ts',
+    script: 'scripts/generate/generate_knowledge_index.ts',
     tracked: ['knowledge/_index.md'],
     mergeDriver: true,
     after: ['op-registry', 'pseudo-locale', 'env-registry'],
     run: async (argv) =>
-      (await import('./generate_knowledge_index.js')).runGenerateKnowledgeIndex(argv),
+      (await import('./generate/generate_knowledge_index.js')).runGenerateKnowledgeIndex(argv),
   },
   {
     id: 'changelog-fragments',

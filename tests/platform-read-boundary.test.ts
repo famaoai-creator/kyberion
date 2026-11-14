@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { scanPlatformReadBaseline } from '../scripts/generate_platform_read_baseline.ts';
+import { scanPlatformReadBaseline } from '../scripts/generate/generate_platform_read_baseline.ts';
 
 /**
  * Platform read boundary — the gate that keeps OS-specific conditionals out

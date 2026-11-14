@@ -7,7 +7,7 @@ import type { PptxElement, PptxPos, PptxStyle } from '@agent/core/contracts/pptx
 /**
  * LE-02: shared PPTX layout primitives.
  *
- * These used to live privately inside scripts/generate_all_objects_layout_sample.ts,
+ * These used to live privately inside scripts/generate/generate_all_objects_layout_sample.ts,
  * which made the hand-written script path the only path with consistent
  * building blocks. They are engine-side now so scripts, snapshot protocols,
  * and the media-actuator brief path can share one vocabulary.

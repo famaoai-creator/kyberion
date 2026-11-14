@@ -2278,7 +2278,7 @@ when regenerating wiring. Do not change hook trust records or invoke an LLM from
 separate CLI instances, bounded batches, Stop silence and SessionEnd release.
 `libs/core/provider/co-session-hook.test.ts` checks interleaved hook delivery;
 `libs/core/provider/claude-code-hook.test.ts` checks recursive Stop silence;
-`scripts/generate_provider_hook_configs.test.ts` checks idempotent generation and preservation.
+`scripts/generate/generate_provider_hook_configs.test.ts` checks idempotent generation and preservation.
 
 ## Hearing completion read recovery
 

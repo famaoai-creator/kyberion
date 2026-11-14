@@ -45,7 +45,7 @@ const SOURCES = [
   ['scripts/demos/demo_telegram_flow.ts', /process\.env\.MISSION_ROLE/u],
   ['scripts/soak_restart_e2e.ts', /process\.env\.(?:VITEST|NODE_ENV)/u],
   [
-    'scripts/generate_avatar.ts',
+    'scripts/generate/generate_avatar.ts',
     /process\.env\.(?:CODEX_CLI|CODEX_VERSION|TERM_PROGRAM|AGY_CLI|ANTIGRAVITY_CLI|CURSOR_CLI|CURSOR_AGENT|CURSOR_API_KEY|KYBERION_CURSOR_CLI_BIN)/u,
   ],
 ] as const;

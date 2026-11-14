@@ -51,7 +51,7 @@ const postBuild: BuildStage[] = [
   {
     name: 'knowledge-manifest',
     command: 'node',
-    args: ['dist/scripts/generate_knowledge_index.js', '--manifest-only', '--quiet'],
+    args: ['dist/scripts/generate/generate_knowledge_index.js', '--manifest-only', '--quiet'],
   },
   { name: 'ui', command: 'pnpm', args: ['run', 'build:ui'] },
   { name: 'source-shadows', command: 'node', args: ['dist/scripts/check/check_source_shadows.js'] },

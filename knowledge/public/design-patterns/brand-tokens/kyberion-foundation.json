@@ -1,7 +1,7 @@
 {
   "version": "2.0.0",
   "name": "Kyberion Design Foundation",
-  "_meta": "KDS v2 — additive foundation layer on top of kyberion.json. kyberion.json stays the canonical brand/semantic token file (colors, tokens.ui, type roles). This file adds (1) full palette ramps, (2) primitive scales (space, radius, elevation, motion, type, layout), (3) named STYLES that restyle the fixed media/web scenarios without touching scenario definitions, and (4) COMPOSITIONS — 12-column region recipes that let a scenario pick a layout freely. Consumed by libs/core/design-foundation.ts; CSS emitted by scripts/generate_design_foundation.ts as knowledge/public/design-patterns/web/kyberion-ds.css (--kds-* variables). Never hardcode values from here in surfaces; resolve them.",
+  "_meta": "KDS v2 — additive foundation layer on top of kyberion.json. kyberion.json stays the canonical brand/semantic token file (colors, tokens.ui, type roles). This file adds (1) full palette ramps, (2) primitive scales (space, radius, elevation, motion, type, layout), (3) named STYLES that restyle the fixed media/web scenarios without touching scenario definitions, and (4) COMPOSITIONS — 12-column region recipes that let a scenario pick a layout freely. Consumed by libs/core/design-foundation.ts; CSS emitted by scripts/generate/generate_design_foundation.ts as knowledge/public/design-patterns/web/kyberion-ds.css (--kds-* variables). Never hardcode values from here in surfaces; resolve them.",
   "palettes": {
     "neutral": {
       "50": "#f8fafc",

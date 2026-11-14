@@ -309,7 +309,7 @@
     },
     {
       "layer": "orchestration",
-      "pattern": "scripts/generate_capability_seams.ts"
+      "pattern": "scripts/generate/generate_capability_seams.ts"
     },
     {
       "layer": "orchestration",

@@ -2,7 +2,7 @@
 // Regenerate with: pnpm generate:vocabulary-types
 // Check drift with: pnpm check:vocabulary-types
 // Source (SSoT): knowledge/product/orchestration/user-facing-vocabulary.json
-// Generator: scripts/generate_vocabulary_types.ts
+// Generator: scripts/generate/generate_vocabulary_types.ts
 
 /**
  * I18N-02: the union of every valid `t()` lookup key — the canonical

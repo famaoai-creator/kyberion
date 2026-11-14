@@ -474,7 +474,7 @@
       "note": "deterministic evaluation receipt stream"
     },
     {
-      "file": "scripts/generate_project_os.ts",
+      "file": "scripts/generate/generate_project_os.ts",
       "count": 1,
       "classification": "migrate-candidate",
       "note": "project-os fallback output; project-scoped artifact"

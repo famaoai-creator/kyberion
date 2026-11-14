@@ -1,6 +1,6 @@
 /* ------------------------------------------------ charts & visualisation --
  * UI-01b (SURFACE_UI_UNIFICATION_PLAN §3.2). Stamped into kyberion-ui.css
- * after kyberion-ui.source.css by scripts/generate_design_tokens.ts.
+ * after kyberion-ui.source.css by scripts/generate/generate_design_tokens.ts.
  *
  * Markup comes from libs/shared-ui/vanilla/charts.js (one layout for both
  * renderers). Marks carry `data-series` (categorical slot 1..8),

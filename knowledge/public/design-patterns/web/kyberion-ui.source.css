@@ -1,6 +1,6 @@
 /* Kyberion UI component contract (A2UI catalog `kyberion-base`, UI-02).
  *
- * Authored source. `scripts/generate_design_tokens.ts` stamps it (plus the
+ * Authored source. `scripts/generate/generate_design_tokens.ts` stamps it (plus the
  * generated status-tone rules) into each surface as `kyberion-ui.css`.
  * Rules:
  *   - Colors, radii, spacing and type sizes come only from `--kb-ui-*`

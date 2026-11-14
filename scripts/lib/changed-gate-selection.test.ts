@@ -12,7 +12,7 @@ const gates: PathTriggeredGate[] = [
   {
     id: 'op-registry',
     scope: 'full',
-    paths: ['libs/actuators/**', 'scripts/generate_op_registry.ts'],
+    paths: ['libs/actuators/**', 'scripts/generate/generate_op_registry.ts'],
   },
   { id: 'vocabulary', scope: 'full', paths: ['knowledge/product/orchestration/*-vocabulary.json'] },
   { id: 'wiring', scope: 'full', paths: ['{libs,scripts}/**/*.{ts,tsx}'] },
@@ -76,18 +76,18 @@ describe('selectChangedGates', () => {
 
   it('never selects a full gate without paths and records every matching file', () => {
     const selection = selectChangedGates(gates, [
-      'scripts/generate_op_registry.ts',
+      'scripts/generate/generate_op_registry.ts',
       'scripts/lib/other.ts',
     ]);
     expect(selection.gates.map((gate) => gate.id)).toEqual(['lint', 'op-registry', 'wiring']);
     expect(selection.gates.some((gate) => gate.id === 'audit')).toBe(false);
     const wiring = selection.extra.find((entry) => entry.id === 'wiring')!;
     expect(wiring.matches.map((match) => match.file)).toEqual([
-      'scripts/generate_op_registry.ts',
+      'scripts/generate/generate_op_registry.ts',
       'scripts/lib/other.ts',
     ]);
     expect(describeChangedGateMatch(wiring)).toBe(
-      '+ wiring [full] ← scripts/generate_op_registry.ts matches {libs,scripts}/**/*.{ts,tsx} (+1 more)'
+      '+ wiring [full] ← scripts/generate/generate_op_registry.ts matches {libs,scripts}/**/*.{ts,tsx} (+1 more)'
     );
   });
 });

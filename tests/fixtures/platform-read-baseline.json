@@ -74,7 +74,7 @@
     "scripts/continuous_owner_platform.ts",
     "scripts/daemon_watchdog.ts",
     "scripts/dependency_resolver.ts",
-    "scripts/generate_platform_read_baseline.ts",
+    "scripts/generate/generate_platform_read_baseline.ts",
     "scripts/install_chronos_launchd.ts",
     "scripts/kyberion.ts",
     "scripts/lib/cli-tty-challenge-driver.ts",

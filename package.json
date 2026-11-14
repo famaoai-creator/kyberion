@@ -29,7 +29,7 @@
   ],
   "scripts": {
     "agent-runtime:supervisor": "node scripts/run_built.mjs dist/scripts/run_agent_runtime_supervisor.js",
-    "agents:generate": "node --import ./scripts/ts-loader.mjs scripts/generate_subagent_definitions.ts",
+    "agents:generate": "node --import ./scripts/ts-loader.mjs scripts/generate/generate_subagent_definitions.ts",
     "agy:sdk-setup": "node --import ./scripts/ts-loader.mjs scripts/agy_sdk_setup.ts",
     "ai-test": "node scripts/run_built.mjs dist/scripts/run_ai_audit.js",
     "audit:verify": "node --import ./scripts/ts-loader.mjs scripts/audit_verify.ts",
@@ -69,16 +69,16 @@
     "env:bootstrap": "node scripts/run_built.mjs dist/scripts/bootstrap_environment.js",
     "examples": "node scripts/run_built.mjs dist/scripts/example_discovery.js",
     "format": "prettier --write .",
-    "generate:cli-reference": "node --import ./scripts/ts-loader.mjs scripts/generate_cli_reference.ts",
-    "generate:env-registry": "node --import ./scripts/ts-loader.mjs scripts/generate_env_registry.ts",
-    "generate:governance-import-baseline": "node --import ./scripts/ts-loader.mjs scripts/generate_governance_import_baseline.ts",
-    "generate:knowledge-index": "node --import ./scripts/ts-loader.mjs scripts/generate_knowledge_index.ts",
-    "generate:op-registry": "node --import ./scripts/ts-loader.mjs scripts/generate_op_registry.ts",
-    "generate:pii-rules": "node --import ./scripts/ts-loader.mjs scripts/generate_pii_rules.ts",
-    "generate:pseudo-locale": "node --import ./scripts/ts-loader.mjs scripts/generate_pseudo_locale.ts",
-    "generate:provider-hooks": "node --import ./scripts/ts-loader.mjs scripts/generate_provider_hook_configs.ts",
-    "generate:types": "node scripts/run_built.mjs dist/scripts/generate_types.js",
-    "generate:vocabulary-types": "node --import ./scripts/ts-loader.mjs scripts/generate_vocabulary_types.ts",
+    "generate:cli-reference": "node --import ./scripts/ts-loader.mjs scripts/generate/generate_cli_reference.ts",
+    "generate:env-registry": "node --import ./scripts/ts-loader.mjs scripts/generate/generate_env_registry.ts",
+    "generate:governance-import-baseline": "node --import ./scripts/ts-loader.mjs scripts/generate/generate_governance_import_baseline.ts",
+    "generate:knowledge-index": "node --import ./scripts/ts-loader.mjs scripts/generate/generate_knowledge_index.ts",
+    "generate:op-registry": "node --import ./scripts/ts-loader.mjs scripts/generate/generate_op_registry.ts",
+    "generate:pii-rules": "node --import ./scripts/ts-loader.mjs scripts/generate/generate_pii_rules.ts",
+    "generate:pseudo-locale": "node --import ./scripts/ts-loader.mjs scripts/generate/generate_pseudo_locale.ts",
+    "generate:provider-hooks": "node --import ./scripts/ts-loader.mjs scripts/generate/generate_provider_hook_configs.ts",
+    "generate:types": "node scripts/run_built.mjs dist/scripts/generate/generate_types.js",
+    "generate:vocabulary-types": "node --import ./scripts/ts-loader.mjs scripts/generate/generate_vocabulary_types.ts",
     "generation:schedule": "node scripts/run_built.mjs dist/scripts/run_generation_schedule.js",
     "history:search": "node --import ./scripts/ts-loader.mjs scripts/history_search.ts",
     "i18n:report": "node --import ./scripts/ts-loader.mjs scripts/report_i18n_translation_coverage.ts",
@@ -125,7 +125,7 @@
     "plugin:install": "node --import ./scripts/ts-loader.mjs scripts/plugin_install.ts",
     "prepare": "husky",
     "project": "node scripts/run_built.mjs dist/scripts/project_controller.js",
-    "project-os:init": "node scripts/run_built.mjs dist/scripts/generate_project_os.js",
+    "project-os:init": "node scripts/run_built.mjs dist/scripts/generate/generate_project_os.js",
     "provider-capabilities:scan": "node scripts/run_built.mjs dist/scripts/scan_provider_cli_capabilities.js",
     "provider-cli:setup": "node --import ./scripts/ts-loader.mjs scripts/managed_env_setup.ts",
     "reasoning:compare": "node --import ./scripts/ts-loader.mjs scripts/reasoning_compare.ts",
@@ -170,7 +170,7 @@
     "work": "node --import ./scripts/ts-loader.mjs scripts/work_coordination.ts",
     "work:inventory": "node --import ./scripts/ts-loader.mjs scripts/work_inventory.ts",
     "terminal": "pnpm exec tsx scripts/terminal_session_cli.ts",
-    "generate:platform-read-baseline": "node --import ./scripts/ts-loader.mjs scripts/generate_platform_read_baseline.ts"
+    "generate:platform-read-baseline": "node --import ./scripts/ts-loader.mjs scripts/generate/generate_platform_read_baseline.ts"
   },
   "lint-staged": {
     "*.{ts,tsx,js,mjs}": [
@@ -181,7 +181,7 @@
       "prettier --write"
     ],
     "knowledge/**/*.{md,json}": [
-      "pnpm exec tsx scripts/generate_knowledge_index.ts",
+      "pnpm exec tsx scripts/generate/generate_knowledge_index.ts",
       "git add knowledge/_index.md"
     ]
   },

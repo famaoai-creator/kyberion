@@ -35,10 +35,10 @@
 
 ```bash
 # デフォルト（Marketing Deck）
-node dist/scripts/generate_marketing_deck.js
+node dist/scripts/generate/generate_marketing_deck.js
 
 # カスタムパターン + テーマ指定
-node dist/scripts/generate_marketing_deck.js \
+node dist/scripts/generate/generate_marketing_deck.js \
   --pattern knowledge/public/design-patterns/presentation/executive-summary.json \
   --theme kyberion-standard \
   --output active/shared/exports/exec-summary.pptx
@@ -147,7 +147,7 @@ PPTX パターンでは、テーマとは別に `page_layouts` でページ単�
 PowerPoint としてそのまま利用できるテンプレート群は次で管理する。
 
 - マニフェスト: `knowledge/public/design-patterns/presentation/pptx-template-library.json`
-- 一括生成: `pnpm exec tsx scripts/generate_pptx_template_library.ts`
+- 一括生成: `pnpm exec tsx scripts/generate/generate_pptx_template_library.ts`
 - 出力先: `active/shared/exports/pptx-template-library/`
 
 ## XLSX Template Library
@@ -155,7 +155,7 @@ PowerPoint としてそのまま利用できるテンプレート群は次で管
 Excel テンプレート群は次で管理する。
 
 - マニフェスト: `knowledge/public/design-patterns/spreadsheet/xlsx-template-library.json`
-- 一括生成: `pnpm exec tsx scripts/generate_xlsx_template_library.ts`
+- 一括生成: `pnpm exec tsx scripts/generate/generate_xlsx_template_library.ts`
 - 出力先: `active/shared/exports/xlsx-template-library/`
 
 ## Common Themes

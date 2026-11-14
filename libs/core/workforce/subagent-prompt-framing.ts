@@ -4,7 +4,7 @@
  * These blocks are the governance framing every delegated sub-agent must
  * carry, regardless of how it is materialized:
  *
- *  - `scripts/generate_subagent_definitions.ts` writes them into the
+ *  - `scripts/generate/generate_subagent_definitions.ts` writes them into the
  *    generated `.claude/agents/<role>.md`, `.agents/agents/<name>/agent.md`,
  *    `.devin/agents/<role>.md`, `.cursor/agents/<role>.md`, and
  *    `.codex/agents/<role>.toml` definitions (generation ceremony,

@@ -1499,7 +1499,7 @@
     "scripts/first_win_lifecycle_smoke.ts": {
       "bespoke_cli_parser_budget": 5
     },
-    "scripts/generate_avatar.ts": {
+    "scripts/generate/generate_avatar.ts": {
       "json_state_write_budget": 2
     },
     "scripts/html-to-pptx/convert.ts": {

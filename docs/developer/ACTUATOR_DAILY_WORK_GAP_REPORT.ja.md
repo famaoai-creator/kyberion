@@ -477,7 +477,7 @@ P0 / P1 / P2 は実装済み(上表および下表)。P2-4 は docs-only / defer
 ## 9. 参照(この報告が踏んだパス)
 
 - カタログ: `libs/actuators/*/manifest.json`, `CAPABILITIES_GUIDE.md`, `libs/actuators/README.md`
-- 発見: `knowledge/product/orchestration/actuator-discovery-registry.md`, `scripts/generate_op_registry.ts`, `libs/core/actuator/actuator-sdk.ts`, `libs/core/actuator/actuator-op-registry.ts`
+- 発見: `knowledge/product/orchestration/actuator-discovery-registry.md`, `scripts/generate/generate_op_registry.ts`, `libs/core/actuator/actuator-sdk.ts`, `libs/core/actuator/actuator-op-registry.ts`
 - 起動: `scripts/cli.ts`, `scripts/actuator_playground.ts`, `package.json`
 - MCP: `knowledge/product/governance/mcp-tool-catalog.json`
 - SaaS: `knowledge/product/orchestration/service-presets/github.json`, `github-mcp.json`, `slack.json`, `google-workspace.json`, `service-harness-registry.json`

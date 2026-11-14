@@ -19,7 +19,10 @@ import {
   resolveSharedUiModule,
   toPadInlineJson,
 } from './pad-ui.js';
-import { KB_UI_STYLESHEET_PATHS, PAD_UI_TOKENS_CSS_PATH } from '../generate_design_tokens.js';
+import {
+  KB_UI_STYLESHEET_PATHS,
+  PAD_UI_TOKENS_CSS_PATH,
+} from '../generate/generate_design_tokens.js';
 
 interface Captured {
   status?: number;

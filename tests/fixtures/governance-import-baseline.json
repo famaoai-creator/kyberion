@@ -265,7 +265,7 @@
     "scripts/continuous_owner_process.test.ts",
     "scripts/dependency_resolver.ts",
     "scripts/eslint-import-cycle.test.ts",
-    "scripts/generate_changelog.test.ts",
+    "scripts/generate/generate_changelog.test.ts",
     "scripts/git_merge_regenerate.mjs",
     "scripts/help_entrypoints.test.ts",
     "scripts/install_git_merge_driver.mjs",

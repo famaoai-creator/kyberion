@@ -44,7 +44,7 @@ import { runDocExamplesCheck } from './check/check_doc_examples.js';
 import { main as manageRegistry } from './registry_manager.js';
 import { main as missionController } from './mission_controller.js';
 import { runCapturePhoto } from './capture_photo.js';
-import { runGenerateAvatar } from './generate_avatar.js';
+import { runGenerateAvatar } from './generate/generate_avatar.js';
 import { runRegisterAvatar } from './register_avatar.js';
 import { runOAuthSetupForService } from './setup_oauth.js';
 import { runOrganizationDigest } from '@agent/core/organization/organization-digest';
