@@ -5,6 +5,7 @@ import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import { isRecord } from '../foundation/text.js';
 import { loadSurfaceManifest, type SurfaceRuntimeDefinition } from './surface-runtime.js';
 import { resolveSurfaceUrl } from './surface-url.js';
+import { STORAGE_DATA_TIERS } from '../storage-layout.js';
 
 export type ControlPlaneSurface = 'presence' | 'chronos';
 
@@ -310,7 +311,7 @@ function normalizeDistillCandidateRecord(
     'mission',
     'artifact',
   ] as const);
-  const tier = optionalEnum(value.tier, ['personal', 'confidential', 'public'] as const);
+  const tier = optionalEnum(value.tier, STORAGE_DATA_TIERS);
   const status = optionalEnum(value.status, ['proposed', 'promoted', 'archived'] as const);
   const targetKind = optionalEnum(value.target_kind, [
     'pattern',

@@ -723,7 +723,11 @@ describe('enforceApprovalGate', () => {
       missingRequirements: ['approval_confirmation'],
     },
     { matchedRuleId: 'secret-policy', missingRequirements: ['dual_key_confirmation'] },
-    { matchedRuleId: 'fallback-dangerous-shell', missingRequirements: ['approval_confirmation'] },
+    {
+      matchedRuleId: 'fallback-dangerous-shell',
+      missingRequirements: ['approval_confirmation'],
+      charterEligible: false,
+    },
   ])('decision rights cannot waive hardened policy $matchedRuleId', (policy) => {
     mockResolvePolicy.mockReturnValue({ requiresApproval: true, ...policy });
     mockResolveDecisionRightsMatrix.mockReturnValue(null);

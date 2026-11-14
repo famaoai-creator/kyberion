@@ -13,6 +13,7 @@ import { isValidTenantSlug } from '../entity-scope.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import * as pathResolver from '../path-resolver.js';
 import { safeExistsSync, safeReadFile, safeRealpath } from '../secure-io.js';
+import { isSharedConfidentialOwner } from './shared-scope-prefixes.js';
 
 export type PathDataTier = StorageDataTier;
 export type PathAttributionFailureCode = 'TIER_UNRESOLVED' | 'TENANT_UNRESOLVED';
@@ -69,8 +70,8 @@ function tierOfClassified(lower: string): PathDataTier {
   return 'public';
 }
 
-/** `knowledge/confidential/{common,tenant-groups}` are shared, never a tenant. */
-const SHARED_TENANT_PREFIXES = new Set(['common', 'tenant-groups']);
+/** `knowledge/confidential/<segment>` shared owners derive from security-policy
+ * `tenant_scope.shared_prefixes` via shared-scope-prefixes.ts — never a tenant. */
 
 /** Workspace segment of tenant-less trees (`active/{projects,organizations,missions}/{tier}/shared/`). */
 const SHARED_WORKSPACE_SEGMENT = 'shared';
@@ -125,7 +126,7 @@ export function tenantOfPath(filePath: string): string | undefined {
   const original = rel.split('/');
   if (parts[0] === 'knowledge' && parts[1] === 'confidential') {
     const slug = parts[2];
-    if (slug && SHARED_TENANT_PREFIXES.has(slug)) return undefined;
+    if (slug && isSharedConfidentialOwner(slug)) return undefined;
     if (slug && isValidTenantSlug(slug)) return slug;
     throw tenantUnresolved(rel, 'not under a tenant or shared prefix');
   }

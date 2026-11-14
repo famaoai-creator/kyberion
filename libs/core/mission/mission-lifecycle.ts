@@ -13,6 +13,7 @@ import { notifyOperator } from '../surface/operator-notifications.js';
 import { runMissionRetrospective } from './mission-retrospective.js';
 import * as pathResolver from '../path-resolver.js';
 import { findMissionPath } from '../path-resolver.js';
+import { STORAGE_DATA_TIERS } from '../storage-layout.js';
 import { getRegisteredEnvBool, getRegisteredEnvText } from '../foundation/env.js';
 import { nowIso } from '../foundation/time.js';
 import { readTextFile } from '../foundation/text.js';
@@ -1352,9 +1353,7 @@ export async function finishMission(
   if (!safeExistsSync(safeArchiveDir)) safeMkdir(safeArchiveDir, { recursive: true });
   // Canonical archive layout mirrors the active one — <root>/<tier>/<tenant|shared>/<id> —
   // so archived confidential/personal content stays under tenant_scope's protected prefixes.
-  const archiveTier = ['personal', 'confidential', 'public', 'ephemeral'].includes(
-    String(state.tier || '')
-  )
+  const archiveTier = [...STORAGE_DATA_TIERS, 'ephemeral'].includes(String(state.tier || ''))
     ? String(state.tier)
     : 'public';
   const archivePath = assertSafeRepositoryPath(

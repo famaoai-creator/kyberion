@@ -26,7 +26,7 @@ export type ExternalOperationGrant =
       branch_pattern: string;
       visibility?: 'private';
     }
-  | { operation_id: 'browser:goto' | 'browser:open_tab'; origin: string }
+  | { operation_id: 'browser:goto' | 'browser:open_tab'; origin?: string }
   | {
       operation_id: 'tenant:attest_provider';
       tenant_slug: string;
@@ -35,6 +35,44 @@ export type ExternalOperationGrant =
       plan: string;
       basis: string;
       attested_by: string;
+    }
+  | { operation_id: 'service:slack:preset:post_message'; channel?: string }
+  | {
+      operation_id: 'meeting:join' | 'meeting:listen' | 'meeting:speak' | 'meeting:chat';
+      platform: string;
+      meeting_id: string;
+    }
+  | {
+      operation_id: 'meeting:join' | 'meeting:listen' | 'meeting:speak' | 'meeting:chat';
+      platform: string;
+      series_id: string;
+    }
+  | { operation_id: 'voice:playback'; platform?: string; format?: string; content_hash?: string }
+  | { operation_id: 'voice:speak'; platform?: string }
+  | { operation_id: 'network:fetch'; method?: string; origin?: string }
+  | { operation_id: 'network:exposure_check'; origin?: string }
+  | { operation_id: 'network:shell'; cmd?: string }
+  | { operation_id: 'network:a2a_send'; method?: string; peer_id?: string }
+  | { operation_id: 'calendar:create_event'; backend?: string; calendar_id?: string }
+  | {
+      operation_id: 'calendar:update_event' | 'calendar:delete_event';
+      backend?: string;
+      calendar_id?: string;
+      event_id?: string;
+    }
+  | {
+      operation_id: 'deployment:deploy_release';
+      adapter?: string;
+      environment?: string;
+      project_name?: string;
+    }
+  | {
+      operation_id:
+        | 'media:generation:generate_image'
+        | 'media:generation:generate_video'
+        | 'media:generation:generate_music'
+        | 'media:generation:run_workflow';
+      backend?: string;
     };
 
 /**
@@ -184,12 +222,14 @@ export const EXTERNAL_OPERATION_DELEGATION: Record<string, DelegationTargetSpec>
     reputational_class: 'A',
   },
   'browser:goto': {
-    fields: ['origin'],
+    fields: [],
+    optionalFields: ['origin'],
     buildTarget: (effect) => buildBrowserNavigationTarget('browser:goto', effect),
     reputational_class: 'B',
   },
   'browser:open_tab': {
-    fields: ['origin'],
+    fields: [],
+    optionalFields: ['origin'],
     buildTarget: (effect) => buildBrowserNavigationTarget('browser:open_tab', effect),
     reputational_class: 'B',
   },
@@ -228,7 +268,221 @@ export const EXTERNAL_OPERATION_DELEGATION: Record<string, DelegationTargetSpec>
     },
     reputational_class: 'A',
   },
+  'service:slack:preset:post_message': {
+    fields: [],
+    optionalFields: ['channel'],
+    buildTarget: (effect) => {
+      const params = effect.params as { channel?: unknown } | undefined;
+      const channel = nonEmptyString(params?.channel);
+      return channel ? { operation_id: 'service:slack:preset:post_message', channel } : undefined;
+    },
+    reputational_class: 'B',
+  },
+  'meeting:join': meetingSessionDelegation('meeting:join'),
+  'meeting:listen': meetingSessionDelegation('meeting:listen'),
+  'meeting:chat': meetingSessionDelegation('meeting:chat'),
+  'meeting:speak': meetingSessionDelegation('meeting:speak'),
+  'voice:playback': {
+    fields: [],
+    optionalFields: ['platform', 'format', 'content_hash'],
+    buildTarget: (effect) => {
+      const params = effect.params as
+        { platform?: unknown; format?: unknown; content_hash?: unknown } | undefined;
+      const platform = nonEmptyString(params?.platform);
+      if (!platform) return undefined;
+      const format = nonEmptyString(params?.format);
+      const content_hash = nonEmptyString(params?.content_hash);
+      return {
+        operation_id: 'voice:playback',
+        platform,
+        ...(format ? { format } : {}),
+        ...(content_hash ? { content_hash } : {}),
+      };
+    },
+    reputational_class: 'B',
+  },
+  'voice:speak': {
+    fields: [],
+    optionalFields: ['platform'],
+    buildTarget: (effect) => {
+      const params = effect.params as { platform?: unknown } | undefined;
+      const platform = nonEmptyString(params?.platform);
+      return platform ? { operation_id: 'voice:speak', platform } : undefined;
+    },
+    reputational_class: 'B',
+  },
+  'network:fetch': {
+    fields: [],
+    optionalFields: ['method', 'origin'],
+    buildTarget: (effect) => {
+      const params = effect.params as { url?: unknown; method?: unknown } | undefined;
+      const origin = httpsOrigin(params?.url);
+      const method = (nonEmptyString(params?.method) ?? 'GET').toUpperCase();
+      return origin ? { operation_id: 'network:fetch', method, origin } : undefined;
+    },
+    reputational_class: 'A',
+  },
+  'network:exposure_check': {
+    fields: [],
+    optionalFields: ['origin'],
+    buildTarget: (effect) => {
+      const params = effect.params as { url?: unknown } | undefined;
+      const origin = httpsOrigin(params?.url);
+      return origin ? { operation_id: 'network:exposure_check', origin } : undefined;
+    },
+    reputational_class: 'B',
+  },
+  'network:shell': {
+    fields: [],
+    optionalFields: ['cmd'],
+    buildTarget: (effect) => {
+      const params = effect.params as { cmd?: unknown } | undefined;
+      const cmd = nonEmptyString(params?.cmd);
+      return cmd ? { operation_id: 'network:shell', cmd } : undefined;
+    },
+    reputational_class: 'A',
+  },
+  'network:a2a_send': {
+    fields: [],
+    optionalFields: ['method', 'peer_id'],
+    buildTarget: (effect) => {
+      const params = effect.params as { method?: unknown; message?: unknown } | undefined;
+      const method = nonEmptyString(params?.method);
+      const message = params?.message;
+      if (!method || !message || typeof message !== 'object' || Array.isArray(message))
+        return undefined;
+      const record = message as Record<string, unknown>;
+      const header =
+        record.header && typeof record.header === 'object' && !Array.isArray(record.header)
+          ? (record.header as Record<string, unknown>)
+          : undefined;
+      const peer = [
+        record.recipient_peer_id,
+        record.peer_id,
+        record.to,
+        header?.recipient_peer_id,
+        header?.peer_id,
+        header?.to,
+      ].find((value): value is string => typeof value === 'string' && value.trim().length > 0);
+      return peer ? { operation_id: 'network:a2a_send', method, peer_id: peer } : undefined;
+    },
+    reputational_class: 'A',
+  },
+  'calendar:create_event': calendarDelegation('calendar:create_event', ['calendar_id']),
+  'calendar:update_event': calendarDelegation('calendar:update_event', ['calendar_id', 'event_id']),
+  'calendar:delete_event': calendarDelegation('calendar:delete_event', ['calendar_id', 'event_id']),
+  'deployment:deploy_release': {
+    fields: [],
+    optionalFields: ['adapter', 'environment', 'project_name'],
+    buildTarget: (effect) => {
+      const adapter = nonEmptyString(effect.adapter);
+      const params = effect.params as { environment?: unknown; project_name?: unknown } | undefined;
+      const environment = nonEmptyString(params?.environment);
+      if (!adapter || !environment) return undefined;
+      const project_name = nonEmptyString(params?.project_name);
+      return {
+        operation_id: 'deployment:deploy_release',
+        adapter,
+        environment,
+        ...(project_name ? { project_name } : {}),
+      };
+    },
+    reputational_class: 'A',
+  },
+  'media:generation:generate_image': mediaGenerationDelegation('media:generation:generate_image'),
+  'media:generation:generate_video': mediaGenerationDelegation('media:generation:generate_video'),
+  'media:generation:generate_music': mediaGenerationDelegation('media:generation:generate_music'),
+  'media:generation:run_workflow': mediaGenerationDelegation('media:generation:run_workflow'),
 };
+
+function nonEmptyString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim().length > 0 ? value : undefined;
+}
+
+/** Delegation only covers https origins — an http or credentialed URL falls
+ * back to per-action approval. */
+function httpsOrigin(raw: unknown): string | undefined {
+  if (typeof raw !== 'string') return undefined;
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== 'https:' || url.username || url.password) return undefined;
+    return url.origin;
+  } catch {
+    return undefined;
+  }
+}
+
+function meetingSessionDelegation(
+  operationId: 'meeting:join' | 'meeting:listen' | 'meeting:speak' | 'meeting:chat'
+): DelegationTargetSpec {
+  return {
+    fields: ['platform'],
+    optionalFields: ['meeting_id', 'series_id'],
+    requiredOneOf: ['meeting_id', 'series_id'],
+    buildTarget: (effect) => {
+      const params = effect.params as
+        { platform?: unknown; meeting_id?: unknown; series_id?: unknown } | undefined;
+      const platform = nonEmptyString(params?.platform);
+      if (!platform) return undefined;
+      // A grant names exactly one scope: the calendar series (standing
+      // delegation for a recurring meeting) or the single meeting id. When
+      // both are present the series id wins — it is the designed
+      // standing-grant match for recording.
+      const series_id = nonEmptyString(params?.series_id);
+      const meeting_id = nonEmptyString(params?.meeting_id);
+      if (series_id) return { operation_id: operationId, platform, series_id };
+      if (meeting_id) return { operation_id: operationId, platform, meeting_id };
+      return undefined;
+    },
+    reputational_class: 'B',
+  };
+}
+
+function calendarDelegation(
+  operationId: 'calendar:create_event' | 'calendar:update_event' | 'calendar:delete_event',
+  optionalFields: readonly string[]
+): DelegationTargetSpec {
+  return {
+    fields: [],
+    optionalFields: ['backend', ...optionalFields],
+    buildTarget: (effect) => {
+      const backend = nonEmptyString(effect.backend);
+      const params = effect.params as { calendar_id?: unknown; event_id?: unknown } | undefined;
+      if (!backend) return undefined;
+      const calendar_id = nonEmptyString(params?.calendar_id);
+      const event_id = nonEmptyString(params?.event_id);
+      return {
+        operation_id: operationId,
+        backend,
+        ...(calendar_id ? { calendar_id } : {}),
+        ...(event_id ? { event_id } : {}),
+      };
+    },
+    reputational_class: 'A',
+  };
+}
+
+function mediaGenerationDelegation(
+  operationId:
+    | 'media:generation:generate_image'
+    | 'media:generation:generate_video'
+    | 'media:generation:generate_music'
+    | 'media:generation:run_workflow'
+): DelegationTargetSpec {
+  return {
+    fields: [],
+    optionalFields: ['backend'],
+    buildTarget: (effect) => {
+      const backend = effect.backend;
+      const backend_id =
+        backend && typeof backend === 'object' && !Array.isArray(backend)
+          ? nonEmptyString((backend as Record<string, unknown>).backend_id)
+          : nonEmptyString(backend);
+      return backend_id ? { operation_id: operationId, backend: backend_id } : undefined;
+    },
+    reputational_class: 'A',
+  };
+}
 
 function buildBrowserNavigationTarget(
   operationId: 'browser:goto' | 'browser:open_tab',

@@ -252,7 +252,7 @@ export async function handleAction(
         operationId: `calendar:${valid.op}`,
         effect: { op: valid.op, backend: selections[0].adapter.id, params: selections[0].params },
         requiresApproval: true,
-        delegable: valid.op !== 'delete_event',
+        delegable: true,
         authority: options.externalAuthority?.(valid),
       }
     : undefined;

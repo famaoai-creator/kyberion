@@ -38,6 +38,7 @@ import type {
   RequestPermissionResponse,
   SessionNotification,
 } from '@agentclientprotocol/sdk';
+import { AGENT_BOOT_READY_TIMEOUT_MS_DEFAULT } from '../foundation/runtime-tuning-defaults.js';
 
 export {
   CodexAppServerAdapter,
@@ -201,7 +202,10 @@ function registerEnhancer(enhancers: AgentEnhancer[], enhancer: AgentEnhancer): 
 async function waitForBootSignal(
   child: ChildProcess,
   label: string,
-  timeoutMs = Number(getRegisteredEnvText('KYBERION_AGENT_BOOT_READY_TIMEOUT_MS') || 5000)
+  timeoutMs = Number(
+    getRegisteredEnvText('KYBERION_AGENT_BOOT_READY_TIMEOUT_MS') ||
+      AGENT_BOOT_READY_TIMEOUT_MS_DEFAULT
+  )
 ): Promise<void> {
   await new Promise<void>((resolve) => {
     let settled = false;

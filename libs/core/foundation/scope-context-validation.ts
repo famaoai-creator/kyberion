@@ -1,5 +1,6 @@
 import type { TierLevel } from './knowledge-tier.js';
 import { isValidTenantSlug } from './scope.js';
+import { KNOWLEDGE_TIERS } from './knowledge-tier.js';
 
 export interface ScopeContext {
   tenant_slug?: string;
@@ -74,7 +75,7 @@ export function validateScopeContext(
   const errors: string[] = [];
   const requireTenant = options.requireTenant ?? context.tier === 'confidential';
 
-  if (!context.tier || !['personal', 'confidential', 'public'].includes(context.tier)) {
+  if (!context.tier || !(KNOWLEDGE_TIERS as readonly string[]).includes(context.tier)) {
     errors.push('tier is required and must be personal, confidential, or public');
   }
   if (context.tenant_slug && !isValidTenantSlug(context.tenant_slug)) {

@@ -38,6 +38,7 @@ import {
   CONVERSATION_MAX_TURNS,
   ConversationStoreError,
 } from './front-desk-conversation-history.js';
+import { STORAGE_DATA_TIERS } from '../storage-layout.js';
 
 /** Server-owned authorization projection. No client identity/session can select a transcript. */
 export type FrontDeskConversationViewer = SurfaceViewerScope & {
@@ -339,7 +340,7 @@ function validExecutionViewer(value: unknown): value is FrontDeskConversationVie
       return false;
   }
   return (value.tierAccess as string[]).every((tier) =>
-    ['public', 'confidential', 'personal'].includes(tier)
+    (STORAGE_DATA_TIERS as readonly string[]).includes(tier)
   );
 }
 function parseExecutionRequests(

@@ -13,6 +13,9 @@ import {
   loadTenantDesignThemeOverlay,
 } from './tenant-design-override.js';
 
+/** Canonical repo-relative path of the tenant design override index. */
+export const TENANT_DESIGN_INDEX_RELATIVE_PATH = 'knowledge/confidential/tenants/index.json';
+
 export interface ResolveTenantDesignInput {
   rootDir?: string;
   customerId?: string;
@@ -55,7 +58,7 @@ export function loadTenantDesignOverrideIndex(
   _options: TenantDesignOverrideIndexLoadOptions = {}
 ): TenantDesignOverrideIndex {
   const indexPath = assertSafeRepositoryPath(
-    path.join(rootDir, 'knowledge/confidential/tenants/index.json'),
+    path.join(rootDir, TENANT_DESIGN_INDEX_RELATIVE_PATH),
     { allowMissingLeaf: true }
   );
   if (!safeExistsSync(indexPath)) return { tenants: [] };

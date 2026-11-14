@@ -47,8 +47,9 @@ async function deployRelease(params: DeploymentParams) {
       effect: { adapter: adapter.name, params: { ...params } },
       requiresApproval: true,
       approvalPolicy: { intentId: RISKY_OPS.CONFIG_UPDATE, scope: 'governance' },
-      // Release effects/costs are adapter-specific; no generic delegation grant.
-      delegable: false,
+      // Delegation is adapter + environment (+ optional project) scoped —
+      // a charter grants 'deploy <project> to <env> via <adapter>'.
+      delegable: true,
     },
     () =>
       adapter.deploy({

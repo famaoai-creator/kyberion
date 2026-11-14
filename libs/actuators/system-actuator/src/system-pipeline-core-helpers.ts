@@ -25,6 +25,7 @@ import { assertVolatileId, pathResolver } from '@agent/core/path-resolver';
 import { resolveVars, evaluateCondition } from '@agent/core/pipeline/logic-utils';
 
 import { resolveActiveProfileRoot } from '@agent/core/profile-root';
+import { STORAGE_DATA_TIERS } from '@agent/core/storage-layout';
 import { retry, getRetryDefaults } from '@agent/core/async-utils';
 import { createVirtualMediaDeviceControlBridge } from '@agent/core/virtual/virtual-media-device-control-bridge';
 import { createVirtualAudioOutputPlaybackBridge } from '@agent/core/virtual/virtual-audio-output-playback-bridge';
@@ -894,7 +895,7 @@ export const SYSTEM_CAPTURE_OP_HANDLERS: Readonly<Record<string, SystemCaptureOp
   },
   list_missions: async ({ params, ctx }) => {
     const missionRoot = resolveSystemPath('active/missions');
-    const tiers = ['personal', 'confidential', 'public'];
+    const tiers = [...STORAGE_DATA_TIERS];
     const requestedStatus =
       typeof params.status === 'string' && params.status.trim() ? params.status.trim() : undefined;
     const allMissions: Record<string, unknown>[] = [];
@@ -1140,7 +1141,7 @@ export const SYSTEM_CAPTURE_OP_HANDLERS: Readonly<Record<string, SystemCaptureOp
     const missionRoot = resolveSystemPath('active/missions');
     const count = Number(params.count || 5);
     const allTraces: Record<string, unknown>[] = [];
-    const tiers = ['personal', 'confidential', 'public'];
+    const tiers = [...STORAGE_DATA_TIERS];
     const { safeReaddir } = await import('@agent/core/secure-io');
     for (const tier of tiers) {
       const tierPath = path.join(missionRoot, tier);

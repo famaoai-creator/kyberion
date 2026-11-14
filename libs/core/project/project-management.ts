@@ -92,6 +92,7 @@ import {
   assertProjectCanArchive,
   assertProjectLifecycleOwner,
 } from './project-lifecycle-guards.js';
+import { STORAGE_DATA_TIERS } from '../storage-layout.js';
 
 export interface ProjectManagementView {
   project: ProjectRecord;
@@ -898,7 +899,7 @@ export function reconcileProjectOperationalState(
     ];
     allStateRecords = [
       ...tenantSlugs.flatMap((tenantSlug) =>
-        (['personal', 'confidential', 'public'] as const).flatMap((tier) =>
+        STORAGE_DATA_TIERS.flatMap((tier) =>
           listProjectOperationalStates({ projectId: project.project_id, tier, tenantSlug })
         )
       ),

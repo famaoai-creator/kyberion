@@ -1,5 +1,6 @@
 /** Pure, bounded contracts. A semantic judgment never grants execution authority. */
 import { z } from 'zod';
+import { KNOWLEDGE_TIERS } from '../foundation/knowledge-tier.js';
 import { assertScopeContext, type ScopeContext } from '../foundation/scope-context-validation.js';
 
 export const JUDGMENT_MODEL_INPUT_MAX_BYTES = 32 * 1024;
@@ -129,7 +130,7 @@ export type LatencyProposalFacts = z.infer<typeof latencyProposalFactsSchema>;
 /** Reuses the canonical scope validator, without accepting compatibility aliases. */
 export const judgmentScopeSchema = z
   .object({
-    tier: z.enum(['personal', 'confidential', 'public']),
+    tier: z.enum(KNOWLEDGE_TIERS),
     tenant_slug: key.optional(),
     organization_id: key.optional(),
     project_id: key.optional(),

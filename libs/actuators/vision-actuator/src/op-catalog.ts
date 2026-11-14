@@ -5,6 +5,7 @@
 
 import type { PipelineStepType } from '@agent/core/actuator/actuator-op-registry';
 import type { ActuatorOpDescription } from '@agent/core/actuator/actuator-sdk';
+import { STORAGE_DATA_TIERS } from '@agent/core/storage-layout';
 
 const VISION_SCHEMA = {
   type: 'object',
@@ -23,7 +24,7 @@ const VISION_SCHEMA = {
   required: ['path'],
 } as const;
 
-const TIER_SCHEMA = { type: 'string', enum: ['public', 'confidential', 'personal'] } as const;
+const TIER_SCHEMA = { type: 'string', enum: [...STORAGE_DATA_TIERS] } as const;
 
 const DESCRIBE_IMAGE_SCHEMA = {
   type: 'object',
