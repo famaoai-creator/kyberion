@@ -63,7 +63,7 @@ export function buildCodexAgentDefinitionSource(input: CodexAgentDefinitionInput
     '# Check drift with: pnpm agents:generate -- --check',
     '# Projection: Codex CLI custom agent (`.codex/agents/<name>.toml`)',
     '# Source: Kyberion team-role, procedure, capability-profile, and working-principles SSoT',
-    '# Adapter: scripts/codex-agent-definition-adapter.ts',
+    '# Adapter: scripts/generate/codex-agent-definition-adapter.ts',
   ].join('\n');
 
   const sandboxMode = resolveCodexSandboxMode(input.profile);

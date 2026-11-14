@@ -14,7 +14,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
  * does not load the policy, so every write would look allowed.
  */
 
-const REPO_ROOT = fileURLToPath(new URL('../', import.meta.url));
+const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const ENV_KEYS = ['KYBERION_ROOT', 'SYSTEM_ROLE', 'MISSION_ROLE', 'KYBERION_BASE_ROLE'] as const;
 
 let root = '';

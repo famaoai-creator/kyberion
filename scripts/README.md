@@ -85,6 +85,16 @@ SX-06; not yet enforced by a gate.)
   - `pathResolver.rootResolve('scripts/name.ts')` / `` `scripts/${name}` ``
     literals inside the moved files themselves are easy to miss — grep the
     destination dir for its own family prefix after moving;
+  - a `scripts/<fam>_` sweep matches the substring inside longer paths too:
+    `libs/actuators/voice-actuator/scripts/voice_x.py` became
+    `.../scripts/voice/voice_x.py`. Any sweep for `scripts/<fam>_` must be
+    boundary-anchored (start-of-string / quote / backtick / space) and the
+    same check applies in reverse: grep `*/scripts/<fam>/` after the sweep
+    to catch injected dirs, plus `scripts/<fam>/<fam>/` for double-nesting;
+  - generated files embed emitted path strings (e.g. the
+    `*-agent-definition-adapter` generators stamp `Adapter: scripts/...`
+    into `.agents/`, `.codex/`, `.cursor/`, `.devin/`) — fix the emitter
+    and regenerate, don't sed the generated output;
   - pre-existing `../libs/...` (and `../<repo-dir>/`) imports that were correct
     at root depth need `../../libs/...` after the move — sweep every `../`
     specifier, not just `./`;

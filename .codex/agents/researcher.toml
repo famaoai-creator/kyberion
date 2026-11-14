@@ -3,7 +3,7 @@
 # Check drift with: pnpm agents:generate -- --check
 # Projection: Codex CLI custom agent (`.codex/agents/<name>.toml`)
 # Source: Kyberion team-role, procedure, capability-profile, and working-principles SSoT
-# Adapter: scripts/codex-agent-definition-adapter.ts
+# Adapter: scripts/generate/codex-agent-definition-adapter.ts
 
 name = "researcher"
 description = "Collects source-indexed evidence, compares alternatives, records uncertainty, and publishes a bounded research handoff for planning; does not modify implementation code or mission-wide state."
