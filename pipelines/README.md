@@ -237,6 +237,7 @@ Meeting participation and the voice first-win path (see `docs/user/meeting-facil
 | `meeting-readiness-next-day`    | Evening check of tomorrow's calendar meetings; notifies the operator when one lacks a grant (e.g. `meeting.recording`). Opt-in schedule: `0 18 * * *`.                                                   |
 | `meeting-readiness-soon`        | Checks meetings starting 60–75 minutes ahead and notifies when one lacks a grant. Opt-in schedule: `*/15 * * * *`.                                                                                       |
 | `meeting-followup`              | Post-meeting follow-up flow: turn a meeting transcript into minutes.md, persist action items to the mission store, and emit a delivery pack for downstream handoff.                                      |
+| `hearing-agenda-generation`     | Avatar-concierge deliverable review: authors a hearing agenda and screen-spotlight definitions from a deliverable and customer persona via `meeting:hearing_session`; publishes `agenda.json` under `active/shared/runtime/hearing`. |
 
 ### Media & Reporting
 
