@@ -4,9 +4,12 @@ import { pathResolver, safeReadFile } from '@agent/core';
 describe('governance directory consistency loader boundary', () => {
   it('uses governed loaders for canonical snapshots where available', () => {
     const source = String(
-      safeReadFile(pathResolver.rootResolve('scripts/check-governance-directory-consistency.ts'), {
-        encoding: 'utf8',
-      })
+      safeReadFile(
+        pathResolver.rootResolve('scripts/check/check-governance-directory-consistency.ts'),
+        {
+          encoding: 'utf8',
+        }
+      )
     );
     expect(source).toContain('loadAgentProfileDirectory()');
     expect(source).toContain('loadAgentProfileSnapshot()');
