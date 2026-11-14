@@ -1,3 +1,4 @@
+import { writeMissionStateAtPath } from '@agent/core/mission/mission-state-reader';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -6,7 +7,7 @@ vi.mock('@agent/core/governance/audit-chain', () => ({
   auditChain: { record: vi.fn(() => ({ id: 'meeting-ops-test-audit' })) },
 }));
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeMkdir, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
+import { safeMkdir, safeRmSync } from '@agent/core/secure-io';
 import type { ActionItem } from '@agent/core/action-item-store';
 import {
   listActionItems,
@@ -39,17 +40,55 @@ const WORK_ITEM_CONTEXT = {
   tenant_slug: 'tenant-meeting-ops',
   mission_id: FIX_MISSION,
   project_id: 'project-meeting-ops',
-  task_id: 'meeting-follow-up',
 };
 
-function createFixtureWorkItem(itemId: string) {
+// A canonical synthetic mission and matching process identity let the real
+// coordinated boundary mint scope and an empty tenant credential binding.
+function installFixtureMissionScope(): void {
+  vi.stubEnv('KYBERION_BASE_ROLE', 'ecosystem_architect');
+  vi.stubEnv('MISSION_ROLE', 'mission_controller');
+  vi.stubEnv('MISSION_ID', FIX_MISSION);
+  vi.stubEnv('KYBERION_TIER', 'confidential');
+  vi.stubEnv('KYBERION_TENANT', WORK_ITEM_CONTEXT.tenant_slug);
+  vi.stubEnv('KYBERION_ORGANIZATION_ID', WORK_ITEM_CONTEXT.organization_id);
+  vi.stubEnv('KYBERION_PROJECT_ID', WORK_ITEM_CONTEXT.project_id);
+  vi.stubEnv('KYBERION_TASK_ID', '');
+  safeMkdir(path.join(MISSION_DIR, 'evidence'), { recursive: true });
+  writeMissionStateAtPath(path.join(MISSION_DIR, 'mission-state.json'), {
+    mission_id: FIX_MISSION,
+    mission_type: 'development',
+    tier: 'confidential',
+    tenant_slug: WORK_ITEM_CONTEXT.tenant_slug,
+    organization_id: WORK_ITEM_CONTEXT.organization_id,
+    status: 'active',
+    execution_mode: 'local',
+    priority: 3,
+    org_role: 'ecosystem_architect',
+    confidence_score: 1,
+    git: { branch: 'test', start_commit: 'a', latest_commit: 'a', checkpoints: [] },
+    history: [],
+    relationships: {
+      project: {
+        project_id: WORK_ITEM_CONTEXT.project_id,
+        project_path: `active/projects/confidential/${WORK_ITEM_CONTEXT.tenant_slug}/${WORK_ITEM_CONTEXT.project_id}/project-os`,
+        relationship_type: 'supports',
+        affected_artifacts: [],
+        gate_impact: 'informational',
+        traceability_refs: [],
+        note: 'Synthetic meeting follow-up fixture',
+      },
+    },
+  });
+}
+
+function createFixtureWorkItem(itemId: string, taskId: string) {
   return createWorkItem({
     itemId,
     title: 'meeting follow-up reasoning',
     description: 'test work item for governed meeting follow-up',
     projectId: 'project-meeting-ops',
     status: 'ready',
-    context: WORK_ITEM_CONTEXT,
+    context: { ...WORK_ITEM_CONTEXT, task_id: taskId },
   });
 }
 
@@ -142,18 +181,7 @@ describe('action-item follow-up ops', () => {
   beforeEach(() => {
     setWorkCoordinationNamespace(`meeting-ops-test-${process.pid}`);
     clearWorkCoordinationStore();
-    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
-    process.env.MISSION_ROLE = 'mission_controller';
-    process.env.MISSION_ID = FIX_MISSION;
-    safeMkdir(path.join(MISSION_DIR, 'evidence'), { recursive: true });
-    safeWriteFile(
-      path.join(MISSION_DIR, 'mission-state.json'),
-      JSON.stringify({
-        mission_id: FIX_MISSION,
-        tier: 'confidential',
-        org_role: 'ecosystem_architect',
-      })
-    );
+    installFixtureMissionScope();
     registerReasoningBackend({
       ...stubReasoningBackend,
       name: 'action-item-test',
@@ -175,6 +203,7 @@ describe('action-item follow-up ops', () => {
     resetReasoningBackend();
     vi.useRealTimers();
     safeRmSync(MISSION_DIR, { recursive: true, force: true });
+    vi.unstubAllEnvs();
   });
 
   it('executeSelfActionItemsOp retains generated plans without claiming execution or replanning blocked items', async () => {
@@ -194,7 +223,7 @@ describe('action-item follow-up ops', () => {
 
     const report = await executeSelfActionItemsOp({
       mission_id: FIX_MISSION,
-      work_item_id: createFixtureWorkItem('WI-MTG-OPS-SELF').item_id,
+      work_item_id: createFixtureWorkItem('WI-MTG-OPS-SELF', 'self-exec-AI-SELF-1').item_id,
       policy: basePolicy(),
     });
     const items = listActionItems(FIX_MISSION);
@@ -234,7 +263,7 @@ describe('action-item follow-up ops', () => {
     expect(summary.blocked_items).toHaveLength(2);
     const nextReport = await executeSelfActionItemsOp({
       mission_id: FIX_MISSION,
-      work_item_id: createFixtureWorkItem('WI-MTG-OPS-SELF-NEXT').item_id,
+      work_item_id: createFixtureWorkItem('WI-MTG-OPS-SELF-NEXT', 'self-exec-AI-SELF-1').item_id,
       policy: basePolicy(),
     });
     expect(nextReport.dispatched).toEqual([]);
@@ -278,12 +307,12 @@ describe('action-item follow-up ops', () => {
 
     const first = await trackPendingActionItemsOp({
       mission_id: FIX_MISSION,
-      work_item_id: createFixtureWorkItem('WI-MTG-OPS-REMINDER-1').item_id,
+      work_item_id: createFixtureWorkItem('WI-MTG-OPS-REMINDER-1', 'reminder-AI-TEAM-1').item_id,
       policy: basePolicy(),
     });
     const second = await trackPendingActionItemsOp({
       mission_id: FIX_MISSION,
-      work_item_id: createFixtureWorkItem('WI-MTG-OPS-REMINDER-2').item_id,
+      work_item_id: createFixtureWorkItem('WI-MTG-OPS-REMINDER-2', 'reminder-AI-TEAM-1').item_id,
       policy: basePolicy(),
     });
     const items = listActionItems(FIX_MISSION);
@@ -300,22 +329,12 @@ describe('action-item follow-up ops', () => {
 
 describe('auditSpeakerFairnessOp', () => {
   beforeEach(() => {
-    process.env.KYBERION_BASE_ROLE = 'ecosystem_architect';
-    process.env.MISSION_ROLE = 'mission_controller';
-    process.env.MISSION_ID = FIX_MISSION;
-    safeMkdir(path.join(MISSION_DIR, 'evidence'), { recursive: true });
-    safeWriteFile(
-      path.join(MISSION_DIR, 'mission-state.json'),
-      JSON.stringify({
-        mission_id: FIX_MISSION,
-        tier: 'confidential',
-        org_role: 'ecosystem_architect',
-      })
-    );
+    installFixtureMissionScope();
   });
 
   afterEach(() => {
     safeRmSync(MISSION_DIR, { recursive: true, force: true });
+    vi.unstubAllEnvs();
   });
 
   it('flags the warn case when one speaker dominates total share', () => {
