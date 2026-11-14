@@ -2,10 +2,12 @@
 /** Stable hook bootstrap: build cleanup may remove dist/ between hook events.
  * Keep this dependency-free so policy failures can still return a native deny.
  *
- * When the built runtime is missing the hook stays fail-closed: every Claude
- * PreToolUse (Edit/Write) and shell event is denied — except a minimal set of
- * exact-shape bootstrap commands, so the agent can rebuild dist/ itself instead
- * of deadlocking (see docs/developer/CLOUD_AGENT_ENVIRONMENT.md).
+ * When the built runtime is missing the hook stays fail-closed: every shell
+ * event is denied except a minimal set of exact-shape bootstrap commands, so
+ * the agent can rebuild dist/ itself instead of deadlocking. File-mutation
+ * tools stay allowed: a dirty tree that fails to compile can only be repaired
+ * by editing, never by building — denying edits is the deadlock itself
+ * (see docs/developer/CLOUD_AGENT_ENVIRONMENT.md).
  */
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
@@ -19,8 +21,9 @@ const PROVIDERS = {
 const UNAVAILABLE = 'Kyberion hook runtime unavailable; wait for pnpm build to finish, then retry.';
 const BOOTSTRAP_HINT =
   ' To bootstrap, run `pnpm install --prefer-offline`, then `pnpm build`, as separate Bash ' +
-  'commands (cloud sessions: `bash .claude/hooks/session-start.sh`). Until dist/ exists only ' +
-  'these exact bootstrap commands and read-only git status/log/fetch/switch are allowed.';
+  'commands (cloud sessions: `bash .claude/hooks/session-start.sh`). Until dist/ exists, file ' +
+  'edits, these exact bootstrap commands, and bounded git ' +
+  'status/log/fetch/switch/diff/restore/stash are allowed.';
 
 /** Largest hook payload we parse in the fallback path; anything bigger is denied. */
 const MAX_PAYLOAD_BYTES = 64 * 1024;
@@ -36,6 +39,35 @@ const isRef = (token) => GIT_REF.test(token) && !token.includes('..');
 /** Every token may appear at most once and must come from `allowed`. */
 function onlyFlags(tokens, allowed) {
   return new Set(tokens).size === tokens.length && tokens.every((t) => allowed.includes(t));
+}
+
+/**
+ * File-mutation tools across providers. These stay allowed while dist/ is
+ * missing: the hook registrations already scope the events to exactly this
+ * set, and editing is the only way to repair a tree that fails to compile.
+ */
+const FILE_MUTATION_TOOLS = new Set([
+  'Write',
+  'Edit',
+  'MultiEdit',
+  'NotebookEdit',
+  'write',
+  'edit',
+  'apply_patch',
+  'notebook_edit',
+  'write_file',
+  'replace',
+]);
+
+function toolNameFromPayload(raw) {
+  if (typeof raw !== 'string' || !raw || Buffer.byteLength(raw) > MAX_PAYLOAD_BYTES) return null;
+  try {
+    const payload = JSON.parse(raw);
+    const tool = payload?.tool_name;
+    return typeof tool === 'string' ? tool : null;
+  } catch {
+    return null;
+  }
 }
 
 function isAllowedGit(args) {
@@ -66,6 +98,54 @@ function isAllowedGit(args) {
       // Only the branch-creating form: bare `git checkout <x>` can restore a file
       // over uncommitted work when <x> names a path, so it stays denied.
       return rest[0] === '-b' && rest.length >= 2 && rest.length <= 3 && rest.slice(1).every(isRef);
+    case 'diff': {
+      // Read-only: bounded refs, paths, and comparison flags only.
+      const flags = [
+        '--cached',
+        '--staged',
+        '--stat',
+        '--name-only',
+        '--name-status',
+        '--shortstat',
+        '--',
+      ];
+      return rest.length <= 16 && rest.every((t) => flags.includes(t) || isRef(t));
+    }
+    case 'restore': {
+      // Recovery verb: restores index/worktree files so a broken dirty tree can
+      // be rolled back before rebuilding. Bounded to refs, paths, and flags.
+      const flags = ['--staged', '-S', '--worktree', '-W', '--'];
+      return (
+        rest.length >= 1 &&
+        rest.length <= 32 &&
+        rest.every(
+          (t) =>
+            flags.includes(t) ||
+            isRef(t) ||
+            (t.startsWith('--source=') && isRef(t.slice('--source='.length)))
+        )
+      );
+    }
+    case 'stash': {
+      // save -> rebuild clean -> pop is the recovery loop. drop/clear stay denied.
+      const verbs = ['push', 'pop', 'apply', 'list', 'show'];
+      const flags = ['-q', '--quiet', '-u', '--include-untracked'];
+      const tokens = [...rest];
+      if (tokens[0] && verbs.includes(tokens[0])) tokens.shift();
+      let expectsMessage = false;
+      for (const token of tokens) {
+        if (expectsMessage) {
+          expectsMessage = false;
+          continue;
+        }
+        if (token === '-m') {
+          expectsMessage = true;
+          continue;
+        }
+        if (!flags.includes(token)) return false;
+      }
+      return !expectsMessage;
+    }
     default:
       return false;
   }
@@ -135,20 +215,33 @@ export async function runProviderHook(provider, event, options = {}) {
     if (typeof run !== 'function') throw new Error('hook runner unavailable');
   } catch {
     const prefix = `[provider-hook:${provider}/${event}]`;
-    if (provider === 'claude' && event === 'PreToolUseShellDeny') {
-      // Only shell events read the payload: the allowlist never applies to Edit/Write.
-      let raw = '';
+    const payloadEvent =
+      (provider === 'claude' && ['PreToolUse', 'PreToolUseShellDeny'].includes(event)) ||
+      (provider === 'gemini' && event === 'BeforeTool');
+    let raw = '';
+    if (payloadEvent) {
       try {
         raw = await readInput();
       } catch {
         raw = '';
       }
+    }
+    if (provider === 'claude' && event === 'PreToolUseShellDeny') {
       const command = bootstrapCommandFromPayload(raw);
       if (command) {
         // No decision: the normal permission flow applies to the bootstrap command.
         stderr(`${prefix} ${UNAVAILABLE} Allowing bootstrap command: ${command}\n`);
         return;
       }
+    }
+    if (
+      ((provider === 'claude' && event === 'PreToolUse') ||
+        (provider === 'gemini' && event === 'BeforeTool')) &&
+      FILE_MUTATION_TOOLS.has(toolNameFromPayload(raw) ?? '')
+    ) {
+      // No decision: editing is how a tree that fails to compile gets repaired.
+      stderr(`${prefix} ${UNAVAILABLE} Allowing file edit while dist/ is missing\n`);
+      return;
     }
     stderr(`${prefix} ${UNAVAILABLE}\n`);
     if (provider === 'claude' && ['PreToolUse', 'PreToolUseShellDeny'].includes(event)) {
