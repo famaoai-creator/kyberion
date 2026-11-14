@@ -140,3 +140,6 @@ export * from './contracts/asset-scope.js';
 export * from './contracts/routing-decision.js';
 export * from './foundation/asset-address.js';
 export * from './governance/asset-scope-inspection.js';
+
+export * from './secret/account-introduction.js';
+export * from './secret/account-broker.js';
