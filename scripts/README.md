@@ -62,8 +62,9 @@ SX-06; not yet enforced by a gate.)
   regroups — each of these bit at least once):
   - self-locating `dirname(fileURLToPath(import.meta.url))` arithmetic breaks
     on any depth change — use `pathResolver.rootDir()` instead;
-  - `vi.mock('./lib/x.js')` and dynamic `import('./x.js')` specifiers are NOT
-    caught by `from './x'` greps — sweep both forms;
+  - `vi.mock('./lib/x.js')`, dynamic `import('./x.js')`, AND bare side-effect
+    `import './x.js'` (registration imports with no `from`) are NOT caught by
+    `from './x'` greps — sweep all three forms;
   - `pathResolver.rootResolve('scripts/name.ts')` / `` `scripts/${name}` ``
     literals inside the moved files themselves are easy to miss — grep the
     destination dir for its own family prefix after moving;

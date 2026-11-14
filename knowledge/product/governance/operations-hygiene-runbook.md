@@ -722,7 +722,7 @@ supervisor and PTC IPC tests when changing a listener.
   async `setInterval`.
 - **Handle `SIGTERM` and `SIGINT`.** Stop the timer, wait for the in-flight tick (bounded), release
   any leader or lease lock, record a `stopped` heartbeat, and exit 0. The reference implementation
-  is `scripts/agent_runtime_supervisor_daemon.ts`.
+  is `scripts/agent/agent_runtime_supervisor_daemon.ts`.
 - **A shutdown is not a failure.** A child that exits because the daemon forwarded `SIGTERM` during
   shutdown must not raise an ops alert or an `error` heartbeat; mark the shutdown and report the
   tick as cancelled.
@@ -3477,4 +3477,4 @@ refused rather than adopted.
 - **Local daemons**: filesystem permissions bound a Unix socket or named pipe; a TCP listener
   has no such boundary and must not serve without a configured token. A socket path that reads
   as a number is refused, because Node binds it as a TCP port on every interface. Gate:
-  `scripts/agent_runtime_supervisor_daemon.test.ts`.
+  `scripts/agent/agent_runtime_supervisor_daemon.test.ts`.

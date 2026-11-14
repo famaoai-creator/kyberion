@@ -5,7 +5,7 @@ import {
   getAgentRuntimeSupervisorHealth,
   listAgentRuntimesViaDaemon,
 } from '@agent/core/agent/agent-runtime-supervisor-client';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from '../lib/harness.js';
 
 async function main(args: string[] = []) {
   const argv = await createStandardYargs(['node', 'agent_runtime_supervisor_status', ...args])

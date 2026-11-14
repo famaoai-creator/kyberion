@@ -5,7 +5,7 @@ const asynchronousEntrypoints = [
   'scripts/minutes_record.ts',
   'scripts/meeting/meeting_participate.ts',
   'scripts/delegated_task_worker.ts',
-  'scripts/agent_runtime_supervisor_daemon.ts',
+  'scripts/agent/agent_runtime_supervisor_daemon.ts',
   'scripts/browser/browser_bridge_host.ts',
 ];
 

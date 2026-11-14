@@ -36,7 +36,7 @@
     "presence/displays/concierge/src/app/api/setup/avatar-generation/route.test.ts": 1,
     "presence/displays/operator-surface/test/selection-browser.test.ts": 4,
     "presence/displays/terminal-hud/src/voice/voice-capture.test.ts": 1,
-    "scripts/agent_runtime_supervisor_daemon.test.ts": 1,
+    "scripts/agent/agent_runtime_supervisor_daemon.test.ts": 1,
     "scripts/continuous/continuous_owner_process.test.ts": 4,
     "scripts/oauth_callback_surface.test.ts": 1,
     "scripts/run_checks.concurrency.test.ts": 1,

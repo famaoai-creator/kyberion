@@ -1,12 +1,12 @@
 import * as net from 'node:net';
-import './task/task_pipeline_executor.js';
+import '../task/task_pipeline_executor.js';
 import '@agent/core/workforce/worker-goal-driver';
 import { timingSafeEqual } from 'node:crypto';
 import { resolveLocalIpcAddress } from '@agent/core/local-ipc';
 import { tryInspectCompilerOutputs } from '@agent/core/build-coordination';
 import { restrictWindowsNamedPipeAcl } from '@agent/core/windows-named-pipe-security';
 import * as path from 'node:path';
-import { defineScript, isDirectScript, setProcessExitCode } from './lib/harness.js';
+import { defineScript, isDirectScript, setProcessExitCode } from '../lib/harness.js';
 import {
   askAgentRuntime,
   ensureAgentRuntime,
@@ -62,19 +62,19 @@ import {
   prepareReasoningExecutionHost,
 } from '@agent/core/reasoning/reasoning-bootstrap';
 import { credentialBindingReadiness } from '@agent/core/secret/secret-guard';
-import { createSupervisorReasoningRefresh } from './lib/supervisor-reasoning-readiness.js';
+import { createSupervisorReasoningRefresh } from '../lib/supervisor-reasoning-readiness.js';
 import {
   runDotSupervisorExtensions,
   triggerRunnerSource,
   reconcileDotEventRunnerDuplicate,
-} from './dot/dot_supervisor_extensions.js';
+} from '../dot/dot_supervisor_extensions.js';
 import { executeServicePreset } from '@agent/core/service/service-engine';
 import { runDotWakeWithGoalDriver } from '@agent/core/dot/dot-wake-orchestration';
 import { runDotHousekeeping } from '@agent/core/dot/dot-dispatch';
 import '@agent/core/dot/dot-extension-bootstrap';
 import { dotBudgetThrottle, type DotBudgetThrottle } from '@agent/core/dot/dot-budget';
 import { runAsDotCharter } from '@agent/core/dot/dot-key-results';
-import { notifyDotBudgetStopOnce } from './dot/dot_budget_alert.js';
+import { notifyDotBudgetStopOnce } from '../dot/dot_budget_alert.js';
 import { tickVetoWindows } from '@agent/core/governance/approval-veto-window';
 import { getOperationsHaltState } from '@agent/core/governance/operations-halt';
 import { AUTONOMY_APPROVAL_CHANNEL } from '@agent/core/governance/approval-decision-card';

@@ -919,7 +919,7 @@ export class AgentIdentityJournal {
  *   - `mission_controller` — scripts/mission_controller.ts + every mission
  *     orchestration path (`withExecutionContext('mission_controller', ...)`
  *     is the dominant governed-write context in libs/core).
- *   - `surface_runtime`   — scripts/agent_runtime_supervisor_daemon.ts sets
+ *   - `surface_runtime`   — scripts/agent/agent_runtime_supervisor_daemon.ts sets
  *     `MISSION_ROLE=surface_runtime` and is the daemon that spawns agent
  *     runtimes for surfaces.
  *   - `orchestrator`      — resolveRole()'s procName heuristic for

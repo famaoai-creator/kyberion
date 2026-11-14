@@ -67,13 +67,13 @@ last_updated: 2026-05-30
 
 ### P3: Level-up backlog
 
-| ID   | 改善項目                           | 目的                                      | 主な対象                                                                                                   | 受入条件                                                        |
-| ---- | ---------------------------------- | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
-| P3-1 | Secure I/O への統一                | 新規 CLI / utility のポリシー逸脱を減らす | `scripts/*.ts`, `libs/*/src/*`                                                                             | `node:fs` 直叩きが例外なく `@agent/core/secure-io` に置換される |
-| P3-2 | Actuator カタログと実装の整合      | 説明だけ存在する op をなくす              | `CAPABILITIES_GUIDE.md`, `libs/actuators/system-actuator`, `pipelines/*.json`                              | カタログ上の op が実装・ルーティング・テストで一致する          |
-| P3-3 | 新規 runtime の回帰固定            | 橋渡しコードの劣化を早期検出する          | `scripts/vital_check.ts`, `scripts/onboarding_apply.ts`, `scripts/agent_runtime_manager.ts`, voice bridges | 入出力・失敗時挙動・権限エラーが targeted test で固定される     |
-| P3-4 | UI / voice / browser の smoke 強化 | 起動するだけの品質から脱する              | `presence/displays/*`, `libs/actuators/voice-actuator`, `pipelines/*-smoke.json`                           | 起動、主要 API 応答、初回導線、consent gate の smoke が通る     |
-| P3-5 | 参照切れの継続監査                 | 大きな削除後の運用事故を減らす            | `package.json`, workflows, docs, runbooks                                                                  | 削除済み script / op / path への参照が CI で検出される          |
+| ID   | 改善項目                           | 目的                                      | 主な対象                                                                                                         | 受入条件                                                        |
+| ---- | ---------------------------------- | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| P3-1 | Secure I/O への統一                | 新規 CLI / utility のポリシー逸脱を減らす | `scripts/*.ts`, `libs/*/src/*`                                                                                   | `node:fs` 直叩きが例外なく `@agent/core/secure-io` に置換される |
+| P3-2 | Actuator カタログと実装の整合      | 説明だけ存在する op をなくす              | `CAPABILITIES_GUIDE.md`, `libs/actuators/system-actuator`, `pipelines/*.json`                                    | カタログ上の op が実装・ルーティング・テストで一致する          |
+| P3-3 | 新規 runtime の回帰固定            | 橋渡しコードの劣化を早期検出する          | `scripts/vital_check.ts`, `scripts/onboarding_apply.ts`, `scripts/agent/agent_runtime_manager.ts`, voice bridges | 入出力・失敗時挙動・権限エラーが targeted test で固定される     |
+| P3-4 | UI / voice / browser の smoke 強化 | 起動するだけの品質から脱する              | `presence/displays/*`, `libs/actuators/voice-actuator`, `pipelines/*-smoke.json`                                 | 起動、主要 API 応答、初回導線、consent gate の smoke が通る     |
+| P3-5 | 参照切れの継続監査                 | 大きな削除後の運用事故を減らす            | `package.json`, workflows, docs, runbooks                                                                        | 削除済み script / op / path への参照が CI で検出される          |
 
 ### 2.1 50件レポート由来の追加バックログ
 
@@ -299,7 +299,7 @@ Kyberion の docs/developer/PRODUCTION_READINESS_PLAN.ja.md を読み、P0-<id> 
 - P2-3 は `docs/user/meeting-facilitator.md` と `knowledge/product/architecture/meeting-facilitator-use-case.md` に dry-run / real meeting の違い、mission-scoped consent、recording/capture と TTS speech の fail-closed gate、doctor/bootstrap、URL redaction を明記する。`tests/user-meeting-use-case-contract.test.ts` で operator-facing safety boundary を固定する。
 - P3-1 は `provider-discovery` の disk cache を `~/.kyberion` 直書きから `active/shared/runtime/provider-cache.json` へ移し、`safeReadFile` / `safeWriteFile` / `safeMkdir` / `safeUnlinkSync` 経由にする。`libs/core/security-boundary.contract.test.ts` は production TS の raw `node:fs` import を `secure-io` / `fs-primitives` などレビュー済み low-level boundary に限定する。
 - P3-2 は `system-actuator` の public op catalog を capture / transform / apply / control に分け、`CAPABILITIES_GUIDE.md`、`schemas/system-pipeline.schema.json`、`scripts/sync/sync_component_inventory.ts`、`op-catalog.test.ts` が同じ exported op arrays を参照する状態にする。説明だけ存在する op と実装だけ存在する op の両方を contract test で検出する。
-- P3-3 は `agent_runtime_manager` の spawn 失敗を `classifyError` で分類し、`agent.manual_spawn` の failed audit を残してから rethrow する。`scripts/agent_runtime_manager.test.ts`、`scripts/vital_check.test.ts`、`scripts/onboarding_apply.test.ts`、`libs/core/voice/voice-bridge.test.ts` で runtime bridge の入出力・失敗時挙動・権限エラーの代表経路を固定する。
+- P3-3 は `agent_runtime_manager` の spawn 失敗を `classifyError` で分類し、`agent.manual_spawn` の failed audit を残してから rethrow する。`scripts/agent/agent_runtime_manager.test.ts`、`scripts/vital_check.test.ts`、`scripts/onboarding_apply.test.ts`、`libs/core/voice/voice-bridge.test.ts` で runtime bridge の入出力・失敗時挙動・権限エラーの代表経路を固定する。
 - P3-4 は `pipelines/ui-voice-browser-smoke.json` と `pnpm test -- --suite ui-voice-browser-smoke` を追加し、presence-studio の health / voice UI、`voice-hello`、`verify-session`、meeting consent gate を 1 つの smoke slice として固定する。
 - P3-5 は `tests/reference-drift-contract.test.ts` を `check:reference-drift` として `pnpm run validate` に組み込み、削除済み script / op / path 名が workflow、docs、runbook に戻った場合に CI-style gate で検出する。
 - `vault/update.patch` 由来の差分は広い。実装担当は unrelated file を整形しない。

@@ -2696,7 +2696,7 @@ packaging contract、Prettier（変更コード）を確認した。Presence の
 ### 実測 evidence
 
 - `pnpm exec vitest run scripts/control_plane_cli.test.ts scripts/run_realtime_voice_conversation.test.ts`: **2 files / 10 tests passed**。
-- `pnpm exec vitest run scripts/agent_runtime_supervisor_daemon.test.ts`: **1 file / 9 tests passed**。
+- `pnpm exec vitest run scripts/agent/agent_runtime_supervisor_daemon.test.ts`: **1 file / 9 tests passed**。
 - `pnpm run typecheck`: passed。
 - `pnpm lint`: passed。
 - `pnpm check -- --scope pr --only script-integrity`: passed。
@@ -5681,7 +5681,7 @@ source boundary test を追加し、将来の direct output 再導入を検知�
 
 検証:
 
-- `pnpm exec vitest run scripts/action_item_reminders.test.ts scripts/agent_runtime_supervisor_status.test.ts scripts/model_feedback.entrypoint.test.ts scripts/promote_voice_profile.test.ts scripts/peer_runtime_recovery.test.ts`: **5 files / 5 tests passed**。
+- `pnpm exec vitest run scripts/action_item_reminders.test.ts scripts/agent/agent_runtime_supervisor_status.test.ts scripts/model_feedback.entrypoint.test.ts scripts/promote_voice_profile.test.ts scripts/peer_runtime_recovery.test.ts`: **5 files / 5 tests passed**。
 - 各 3 CLI の `--help` を実行し、**exit 0 と usage 出力**を確認（昇格／復旧／feedback の write 操作は実行せず）。
 - `node --import ./scripts/ts-loader.mjs scripts/check_script_integrity.ts`: **OK**。
 
@@ -22454,7 +22454,7 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-06 再レビュー修正 1542
 
-- **対象**: `scripts/agent_runtime_supervisor_daemon.ts`、`scripts/refactor/prune_unused_imports.ts` と reader contract tests
+- **対象**: `scripts/agent/agent_runtime_supervisor_daemon.ts`、`scripts/refactor/prune_unused_imports.ts` と reader contract tests
 - **変更**: supervisor daemon のロックPID本文と import-pruning refactor の対象ソース本文を foundation の `readTextFile` へ移行した。バイナリ用途の secure-io 読取、daemon の stale-lock 判定／cleanup、import pruning の AST解析・write semanticsは変更せず、両エントリポイントに reader contract を追加した。
 - **検証**: supervisor daemon **既存テスト＋reader contract passed**（11 tests）、prune refactor の dry-run probe passed、foundation-adoption **passed**、対象ESLint、Prettier、改善計画metadata（335 documents）、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
 
@@ -23126,7 +23126,7 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-06 再レビュー実装 1654
 
-- **対象**: `scripts/agent_runtime_supervisor_daemon.ts`、`scripts/agent_runtime_supervisor_daemon.reader.test.ts`、PI-03
+- **対象**: `scripts/agent/agent_runtime_supervisor_daemon.ts`、`scripts/agent/agent_runtime_supervisor_daemon.reader.test.ts`、PI-03
 - **変更**: agent runtime supervisorのPID lock inspection／cleanup readを`readDaemonLockTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementを多重起動・stale lock裁定へ到達させないようにした。既存のhealthy／stale lock semanticsは維持した。
 - **検証**: supervisor lock reader **2 files／2 tests passed**、対象ESLint、Prettier、`git diff --check`。scripts全体のneeds-review個別確認とprovider実機受入は継続する。
 

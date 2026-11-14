@@ -6,7 +6,7 @@ import { readDaemonLockTextFile } from './agent_runtime_supervisor_daemon.js';
 describe('agent runtime supervisor daemon readers', () => {
   it('uses the foundation text reader for daemon lock inspection', () => {
     const source = readTextFile(
-      pathResolver.rootResolve('scripts/agent_runtime_supervisor_daemon.ts')
+      pathResolver.rootResolve('scripts/agent/agent_runtime_supervisor_daemon.ts')
     );
 
     expect(source).toContain('readDaemonLockTextFile(lockPath)');

@@ -3,7 +3,7 @@ import { pathResolver } from '@agent/core/path-resolver';
 import { safeReadFile } from '@agent/core/secure-io';
 
 const ENTRYPOINTS = [
-  'scripts/agent_runtime_supervisor_daemon.ts',
+  'scripts/agent/agent_runtime_supervisor_daemon.ts',
   'scripts/bootstrap_environment.ts',
   'scripts/company_bootstrap.ts',
   'scripts/compose_mission_team.ts',
