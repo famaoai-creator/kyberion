@@ -9,7 +9,9 @@
   "providers": {
     "gemini": {
       "models": [
+        "gemini-4-carbon",
         "gemini-4-argon",
+        "gemini-4-hydrogen",
         "gemini-3.8-flash",
         "gemini-3.7-flash",
         "gemini-3.6-flash",
@@ -20,7 +22,8 @@
         "gemini-3-flash-preview",
         "gemini-2.5-pro",
         "gemini-2.5-flash",
-        "gemini-2.5-flash-lite"
+        "gemini-2.5-flash-lite",
+        "gemini-3.1-flash-lite"
       ],
       "capabilities": [
         "reasoning",
@@ -43,6 +46,28 @@
       ],
       "modelCapabilities": {
         "gemini-4-argon": [
+          "reasoning",
+          "planning",
+          "analysis",
+          "structured_json",
+          "long_context",
+          "code",
+          "review",
+          "architecture",
+          "multimodal"
+        ],
+        "gemini-4-carbon": [
+          "reasoning",
+          "planning",
+          "analysis",
+          "structured_json",
+          "long_context",
+          "code",
+          "review",
+          "architecture",
+          "multimodal"
+        ],
+        "gemini-4-hydrogen": [
           "reasoning",
           "planning",
           "analysis",
@@ -161,6 +186,13 @@
           "low_latency",
           "surface",
           "slack"
+        ],
+        "gemini-3.1-flash-lite": [
+          "structured_json",
+          "conversation",
+          "low_latency",
+          "surface",
+          "slack"
         ]
       }
     },
@@ -173,6 +205,8 @@
         "claude-opus-4-6",
         "fable",
         "claude-fable-5",
+        "claude-fable-5-2",
+        "claude-fable-5-1",
         "claude-opus-5-5",
         "claude-opus-5",
         "claude-opus-4-8",
@@ -237,6 +271,34 @@
           "can_subagent"
         ],
         "claude-fable-5": [
+          "reasoning",
+          "planning",
+          "coordination",
+          "analysis",
+          "review",
+          "code",
+          "long_context",
+          "structured_json",
+          "deep_reasoning",
+          "managed_workflow",
+          "can_fanout",
+          "can_subagent"
+        ],
+        "claude-fable-5-2": [
+          "reasoning",
+          "planning",
+          "coordination",
+          "analysis",
+          "review",
+          "code",
+          "long_context",
+          "structured_json",
+          "deep_reasoning",
+          "managed_workflow",
+          "can_fanout",
+          "can_subagent"
+        ],
+        "claude-fable-5-1": [
           "reasoning",
           "planning",
           "coordination",
@@ -537,28 +599,21 @@
     },
     "opencode": {
       "models": [
-        "opencode/muse-spark-1.3-contributor-free",
         "opencode/glm-5.3-flash-free",
         "opencode/mimo-v2.6-flash-free",
         "opencode/deepseek-v4.1-flash-free",
         "opencode/nemotron-3.5-lightning-free",
         "opencode/nemotron-3.5-super-vl-free",
-        "opencode/nemotron-3-ultra-free",
         "opencode/beam-free",
-        "opencode/space-bunny-free",
-        "opencode/longcat-2.5-preview-free",
-        "opencode/big-pickle"
+        "opencode/big-pickle",
+        "opencode/flint-40b-free",
+        "opencode/iceman-free",
+        "opencode/inkling-2-small-free",
+        "opencode/minimax-m3.1-flash-free",
+        "opencode/longcat-2.5-free"
       ],
       "capabilities": ["reasoning", "planning", "analysis", "review", "code", "structured_json"],
       "modelCapabilities": {
-        "opencode/muse-spark-1.3-contributor-free": [
-          "reasoning",
-          "planning",
-          "analysis",
-          "review",
-          "code",
-          "structured_json"
-        ],
         "opencode/glm-5.3-flash-free": [
           "reasoning",
           "planning",
@@ -599,31 +654,7 @@
           "code",
           "structured_json"
         ],
-        "opencode/nemotron-3-ultra-free": [
-          "reasoning",
-          "planning",
-          "analysis",
-          "review",
-          "code",
-          "structured_json"
-        ],
         "opencode/beam-free": [
-          "reasoning",
-          "planning",
-          "analysis",
-          "review",
-          "code",
-          "structured_json"
-        ],
-        "opencode/space-bunny-free": [
-          "reasoning",
-          "planning",
-          "analysis",
-          "review",
-          "code",
-          "structured_json"
-        ],
-        "opencode/longcat-2.5-preview-free": [
           "reasoning",
           "planning",
           "analysis",
@@ -638,13 +669,67 @@
           "review",
           "code",
           "structured_json"
+        ],
+        "opencode/flint-40b-free": [
+          "reasoning",
+          "planning",
+          "analysis",
+          "review",
+          "code",
+          "structured_json"
+        ],
+        "opencode/iceman-free": [
+          "reasoning",
+          "planning",
+          "analysis",
+          "review",
+          "code",
+          "structured_json"
+        ],
+        "opencode/inkling-2-small-free": [
+          "reasoning",
+          "planning",
+          "analysis",
+          "review",
+          "code",
+          "structured_json"
+        ],
+        "opencode/minimax-m3.1-flash-free": [
+          "reasoning",
+          "planning",
+          "analysis",
+          "review",
+          "code",
+          "structured_json"
+        ],
+        "opencode/longcat-2.5-free": [
+          "reasoning",
+          "planning",
+          "analysis",
+          "review",
+          "code",
+          "structured_json"
         ]
       }
     },
     "devin": {
-      "models": ["swe", "opus", "sonnet", "gpt", "codex", "gemini", "fusion"],
+      "models": [
+        "adaptive",
+        "swe-2",
+        "swe",
+        "fable",
+        "opus",
+        "sonnet",
+        "gpt",
+        "codex",
+        "gemini",
+        "fusion"
+      ],
       "capabilities": ["reasoning", "planning", "analysis", "review", "code", "structured_json"],
       "modelCapabilities": {
+        "adaptive": ["reasoning", "planning", "analysis", "review", "code", "structured_json"],
+        "swe-2": ["reasoning", "planning", "analysis", "review", "code", "structured_json"],
+        "fable": ["reasoning", "planning", "analysis", "review", "code", "structured_json"],
         "swe": ["reasoning", "planning", "analysis", "review", "code", "structured_json"],
         "opus": ["reasoning", "planning", "analysis", "review", "code", "structured_json"],
         "sonnet": ["reasoning", "planning", "analysis", "review", "code", "structured_json"],
@@ -656,6 +741,12 @@
     },
     "agy": {
       "models": [
+        "Gemini 4 Hydrogen (XHigh)",
+        "Gemini 4 Hydrogen (High)",
+        "Gemini 4 Hydrogen (Medium)",
+        "Gemini 4 Hydrogen (Low)",
+        "Gemini 4 Hydrogen",
+        "gemini-4-hydrogen",
         "Gemini 4 Argon (Medium)",
         "Gemini 4 Argon (High)",
         "Gemini 4 Argon (Low)",
@@ -677,6 +768,12 @@
         "Gemini 3.5 Flash (Low)",
         "Gemini 3.1 Pro (Low)",
         "Gemini 3.1 Pro (High)",
+        "Claude Opus 5.5 (Low)",
+        "Claude Opus 5.5 (Medium)",
+        "Claude Opus 5.5 (High)",
+        "Claude Sonnet 5.5 (Low)",
+        "Claude Sonnet 5.5 (Medium)",
+        "Claude Sonnet 5.5 (High)",
         "Claude Sonnet 4.6 (Thinking)",
         "Claude Opus 4.6 (Thinking)",
         "GPT-OSS 120B (Medium)"
@@ -697,6 +794,110 @@
         "gateway"
       ],
       "modelCapabilities": {
+        "Gemini 4 Hydrogen (XHigh)": [
+          "reasoning",
+          "planning",
+          "coordination",
+          "analysis",
+          "code",
+          "review",
+          "architecture",
+          "structured_json",
+          "sandboxed_parallel"
+        ],
+        "Gemini 4 Hydrogen (High)": [
+          "reasoning",
+          "planning",
+          "coordination",
+          "analysis",
+          "code",
+          "review",
+          "architecture",
+          "structured_json",
+          "sandboxed_parallel"
+        ],
+        "Gemini 4 Hydrogen (Medium)": [
+          "reasoning",
+          "planning",
+          "coordination",
+          "analysis",
+          "code",
+          "review",
+          "architecture",
+          "structured_json",
+          "sandboxed_parallel"
+        ],
+        "Gemini 4 Hydrogen": [
+          "reasoning",
+          "planning",
+          "coordination",
+          "analysis",
+          "code",
+          "review",
+          "architecture",
+          "structured_json",
+          "sandboxed_parallel"
+        ],
+        "gemini-4-hydrogen": [
+          "reasoning",
+          "planning",
+          "coordination",
+          "analysis",
+          "code",
+          "review",
+          "architecture",
+          "structured_json",
+          "sandboxed_parallel"
+        ],
+        "Gemini 4 Hydrogen (Low)": [
+          "reasoning",
+          "analysis",
+          "code",
+          "structured_json",
+          "low_latency"
+        ],
+        "Claude Opus 5.5 (Low)": [
+          "reasoning",
+          "planning",
+          "coordination",
+          "analysis",
+          "code",
+          "review",
+          "architecture",
+          "structured_json",
+          "sandboxed_parallel"
+        ],
+        "Claude Opus 5.5 (Medium)": [
+          "reasoning",
+          "planning",
+          "coordination",
+          "analysis",
+          "code",
+          "review",
+          "architecture",
+          "structured_json",
+          "sandboxed_parallel"
+        ],
+        "Claude Opus 5.5 (High)": [
+          "reasoning",
+          "planning",
+          "coordination",
+          "analysis",
+          "code",
+          "review",
+          "architecture",
+          "structured_json",
+          "sandboxed_parallel"
+        ],
+        "Claude Sonnet 5.5 (Low)": ["reasoning", "analysis", "code", "review", "structured_json"],
+        "Claude Sonnet 5.5 (Medium)": [
+          "reasoning",
+          "analysis",
+          "code",
+          "review",
+          "structured_json"
+        ],
+        "Claude Sonnet 5.5 (High)": ["reasoning", "analysis", "code", "review", "structured_json"],
         "Gemini 4 Argon (Medium)": [
           "reasoning",
           "planning",

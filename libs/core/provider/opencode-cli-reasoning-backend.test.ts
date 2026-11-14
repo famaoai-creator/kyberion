@@ -120,7 +120,7 @@ describe('opencode-cli-reasoning-backend', () => {
 
     const backend = new OpencodeCliReasoningBackend({
       bin: 'opencode',
-      model: 'opencode/muse-spark-1.3-contributor-free',
+      model: 'opencode/glm-5.3-flash-free',
       workspaceDir: '/tmp/ws',
     });
     const result = await backend.prompt('hello');
@@ -133,7 +133,7 @@ describe('opencode-cli-reasoning-backend', () => {
     expect(args).toContain('--format');
     expect(args).toContain('json');
     expect(args).toContain('--model');
-    expect(args).toContain('opencode/muse-spark-1.3-contributor-free');
+    expect(args).toContain('opencode/glm-5.3-flash-free');
     expect(args).toContain('--agent');
     expect(args).toContain('plan');
     expect(spawnMock).toHaveBeenCalledWith(
@@ -233,7 +233,7 @@ describe('opencode-cli-reasoning-backend', () => {
     const backend = buildOpencodeCliBackendFromEnv(
       {
         KYBERION_OPENCODE_CLI_BIN: 'opencode',
-        KYBERION_OPENCODE_CLI_MODEL: 'opencode/muse-spark-1.3-contributor-free',
+        KYBERION_OPENCODE_CLI_MODEL: 'opencode/glm-5.3-flash-free',
       } as NodeJS.ProcessEnv,
       () => ({ available: true })
     );

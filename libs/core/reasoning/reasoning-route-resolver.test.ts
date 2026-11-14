@@ -186,10 +186,10 @@ describe('reasoning-route-resolver', () => {
     const route = resolveReasoningRoute({
       role: 'default',
       requestedProfile: 'opencode-cli-default',
-      env: { KYBERION_OPENCODE_CLI_MODEL: 'opencode/muse-spark-1.3-contributor-free' },
+      env: { KYBERION_OPENCODE_CLI_MODEL: 'opencode/glm-5.3-flash-free' },
     });
     expect(route.mode).toBe('opencode-cli');
-    expect(route.model).toBe('opencode:muse-spark-1.3-contributor-free');
+    expect(route.model).toBe('opencode:glm-5.3-flash-free');
   });
 
   it('resolves the grok-api default profile against the approved xAI model', () => {

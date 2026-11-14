@@ -92,7 +92,7 @@ function normalizePermissionProfile(
   throw new Error(`[opencode-cli] unsupported permission profile: ${value}`);
 }
 
-const DEFAULT_MODEL = 'opencode/muse-spark-1.3-contributor-free';
+const DEFAULT_MODEL = 'opencode/glm-5.3-flash-free';
 const DEFAULT_TIMEOUT_MS = 5 * 60 * 1000;
 const DEFAULT_BIN = 'opencode';
 const DEFAULT_PLAN_AGENT = 'plan';
