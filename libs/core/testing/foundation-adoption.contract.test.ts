@@ -24,7 +24,7 @@ const CLEANUP_TARGETS = [
 
 const SHARED_AJV_TARGETS = [
   'libs/core/actuator/actuator-sdk.ts',
-  'scripts/check_pipeline_op_schema_coverage.ts',
+  'scripts/check/check_pipeline_op_schema_coverage.ts',
 ] as const;
 
 describe('foundation schema compiler adoption', () => {

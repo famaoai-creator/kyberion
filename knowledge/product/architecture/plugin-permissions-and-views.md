@@ -298,7 +298,7 @@ tenant scope. The Chronos plugin-views screen shows a badge (host disabled /
 N plugins active / N refused) and explains a non-executable approved request
 (host disabled, host refused the plugin, or reload pending).
 
-`pnpm kyberion check plugin-views-e2e` (PE-02, `scripts/check_plugin_views_e2e.ts`)
+`pnpm kyberion check plugin-views-e2e` (PE-02, `scripts/check/check_plugin_views_e2e.ts`)
 exercises all of this together: governed third-party install and approval in a
 hermetic root, the Chronos production build with the host enabled for one
 tenant, and Playwright Chromium through the iframe view, the host confirmation,

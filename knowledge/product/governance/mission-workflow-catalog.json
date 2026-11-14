@@ -1966,7 +1966,7 @@
                   "args": [
                     "--import",
                     "{REPO_ROOT}/scripts/ts-loader.mjs",
-                    "{REPO_ROOT}/scripts/check_video_production_evidence.ts",
+                    "{REPO_ROOT}/scripts/check/check_video_production_evidence.ts",
                     "--mission",
                     "{MISSION_ID}",
                     "--stage",
@@ -2016,7 +2016,7 @@
                   "args": [
                     "--import",
                     "{REPO_ROOT}/scripts/ts-loader.mjs",
-                    "{REPO_ROOT}/scripts/check_video_production_evidence.ts",
+                    "{REPO_ROOT}/scripts/check/check_video_production_evidence.ts",
                     "--mission",
                     "{MISSION_ID}",
                     "--stage",
@@ -2042,7 +2042,7 @@
                   "args": [
                     "--import",
                     "{REPO_ROOT}/scripts/ts-loader.mjs",
-                    "{REPO_ROOT}/scripts/check_video_production_evidence.ts",
+                    "{REPO_ROOT}/scripts/check/check_video_production_evidence.ts",
                     "--mission",
                     "{MISSION_ID}",
                     "--stage",
@@ -2079,7 +2079,7 @@
                   "args": [
                     "--import",
                     "{REPO_ROOT}/scripts/ts-loader.mjs",
-                    "{REPO_ROOT}/scripts/check_video_production_evidence.ts",
+                    "{REPO_ROOT}/scripts/check/check_video_production_evidence.ts",
                     "--mission",
                     "{MISSION_ID}",
                     "--stage",
@@ -2105,7 +2105,7 @@
                   "args": [
                     "--import",
                     "{REPO_ROOT}/scripts/ts-loader.mjs",
-                    "{REPO_ROOT}/scripts/check_video_production_evidence.ts",
+                    "{REPO_ROOT}/scripts/check/check_video_production_evidence.ts",
                     "--mission",
                     "{MISSION_ID}",
                     "--stage",
@@ -2120,7 +2120,7 @@
             {
               "task_id_suffix": "accept-prototypes",
               "team_role": "implementer",
-              "description": "node --import {REPO_ROOT}/scripts/ts-loader.mjs {REPO_ROOT}/scripts/check_video_production_evidence.ts --mission {MISSION_ID} --request-approval prototypes を実行し共有 approval request を作成・再利用する。evidence/prototype-acceptance.json(kind=video-prototype-acceptance) に requests(scene_id/request_id) を記録し、人間が具体的な画像の hash を採用するまで待つ。agent は承認を決定しない。reference_image がなければ requests=[] を記録する。 request コマンドの生成物は evidence/prototype-approval-requests.json であり deliverable は書かない。人判断の後にタスク担当者が採用参照を prototype-acceptance.json へ記録する。",
+              "description": "node --import {REPO_ROOT}/scripts/ts-loader.mjs {REPO_ROOT}/scripts/check/check_video_production_evidence.ts --mission {MISSION_ID} --request-approval prototypes を実行し共有 approval request を作成・再利用する。evidence/prototype-acceptance.json(kind=video-prototype-acceptance) に requests(scene_id/request_id) を記録し、人間が具体的な画像の hash を採用するまで待つ。agent は承認を決定しない。reference_image がなければ requests=[] を記録する。 request コマンドの生成物は evidence/prototype-approval-requests.json であり deliverable は書かない。人判断の後にタスク担当者が採用参照を prototype-acceptance.json へ記録する。",
               "deliverable": "evidence/prototype-acceptance.json",
               "acceptance_criteria": [
                 "現在の原型 hash に人間の採用承認が結びついている",
@@ -2142,7 +2142,7 @@
                   "args": [
                     "--import",
                     "{REPO_ROOT}/scripts/ts-loader.mjs",
-                    "{REPO_ROOT}/scripts/check_video_production_evidence.ts",
+                    "{REPO_ROOT}/scripts/check/check_video_production_evidence.ts",
                     "--mission",
                     "{MISSION_ID}",
                     "--stage",
@@ -2192,7 +2192,7 @@
                   "args": [
                     "--import",
                     "{REPO_ROOT}/scripts/ts-loader.mjs",
-                    "{REPO_ROOT}/scripts/check_video_production_evidence.ts",
+                    "{REPO_ROOT}/scripts/check/check_video_production_evidence.ts",
                     "--mission",
                     "{MISSION_ID}",
                     "--stage",
@@ -2213,7 +2213,7 @@
                   "args": [
                     "--import",
                     "{REPO_ROOT}/scripts/ts-loader.mjs",
-                    "{REPO_ROOT}/scripts/check_video_production_evidence.ts",
+                    "{REPO_ROOT}/scripts/check/check_video_production_evidence.ts",
                     "--mission",
                     "{MISSION_ID}",
                     "--stage",
@@ -2266,7 +2266,7 @@
                   "args": [
                     "--import",
                     "{REPO_ROOT}/scripts/ts-loader.mjs",
-                    "{REPO_ROOT}/scripts/check_video_production_evidence.ts",
+                    "{REPO_ROOT}/scripts/check/check_video_production_evidence.ts",
                     "--mission",
                     "{MISSION_ID}",
                     "--stage",
@@ -2367,7 +2367,7 @@
                   "args": [
                     "--import",
                     "{REPO_ROOT}/scripts/ts-loader.mjs",
-                    "{REPO_ROOT}/scripts/check_video_production_evidence.ts",
+                    "{REPO_ROOT}/scripts/check/check_video_production_evidence.ts",
                     "--mission",
                     "{MISSION_ID}",
                     "--stage",
@@ -2388,7 +2388,7 @@
                   "args": [
                     "--import",
                     "{REPO_ROOT}/scripts/ts-loader.mjs",
-                    "{REPO_ROOT}/scripts/check_video_production_evidence.ts",
+                    "{REPO_ROOT}/scripts/check/check_video_production_evidence.ts",
                     "--mission",
                     "{MISSION_ID}",
                     "--stage",
@@ -2414,7 +2414,7 @@
                   "args": [
                     "--import",
                     "{REPO_ROOT}/scripts/ts-loader.mjs",
-                    "{REPO_ROOT}/scripts/check_video_production_evidence.ts",
+                    "{REPO_ROOT}/scripts/check/check_video_production_evidence.ts",
                     "--mission",
                     "{MISSION_ID}",
                     "--stage",
@@ -2429,7 +2429,7 @@
             {
               "task_id_suffix": "accept-playback",
               "team_role": "implementer",
-              "description": "node --import {REPO_ROOT}/scripts/ts-loader.mjs {REPO_ROOT}/scripts/check_video_production_evidence.ts --mission {MISSION_ID} --request-approval playback を実行し共有 approval request を作成・再利用する。人間に現在の final-video.mp4 の全編再生・音声聴取を依頼し、evidence/video-playback-approval.json(kind=video-playback-approval) に request_id を記録する。承認は評価通過したレンダー hash に結びつく。agent は承認を決定しない。全シーン generation.mode=none の場合は依頼なしで通過し request_id を省略する。 request コマンドは evidence/playback-approval-request.json に候補を保存し deliverable は書かない。担当者が判断後に video-playback-approval.json を記録する。",
+              "description": "node --import {REPO_ROOT}/scripts/ts-loader.mjs {REPO_ROOT}/scripts/check/check_video_production_evidence.ts --mission {MISSION_ID} --request-approval playback を実行し共有 approval request を作成・再利用する。人間に現在の final-video.mp4 の全編再生・音声聴取を依頼し、evidence/video-playback-approval.json(kind=video-playback-approval) に request_id を記録する。承認は評価通過したレンダー hash に結びつく。agent は承認を決定しない。全シーン generation.mode=none の場合は依頼なしで通過し request_id を省略する。 request コマンドは evidence/playback-approval-request.json に候補を保存し deliverable は書かない。担当者が判断後に video-playback-approval.json を記録する。",
               "deliverable": "evidence/video-playback-approval.json",
               "acceptance_criteria": [
                 "生成シーンがあれば現在の最終レンダーを人間が全編再生・聴取し承認している",
@@ -2451,7 +2451,7 @@
                   "args": [
                     "--import",
                     "{REPO_ROOT}/scripts/ts-loader.mjs",
-                    "{REPO_ROOT}/scripts/check_video_production_evidence.ts",
+                    "{REPO_ROOT}/scripts/check/check_video_production_evidence.ts",
                     "--mission",
                     "{MISSION_ID}",
                     "--stage",
@@ -2504,7 +2504,7 @@
                   "args": [
                     "--import",
                     "{REPO_ROOT}/scripts/ts-loader.mjs",
-                    "{REPO_ROOT}/scripts/check_video_production_evidence.ts",
+                    "{REPO_ROOT}/scripts/check/check_video_production_evidence.ts",
                     "--mission",
                     "{MISSION_ID}",
                     "--stage",
@@ -2560,7 +2560,7 @@
                   "args": [
                     "--import",
                     "{REPO_ROOT}/scripts/ts-loader.mjs",
-                    "{REPO_ROOT}/scripts/check_video_production_evidence.ts",
+                    "{REPO_ROOT}/scripts/check/check_video_production_evidence.ts",
                     "--mission",
                     "{MISSION_ID}",
                     "--stage",
@@ -11822,7 +11822,7 @@
                   "args": [
                     "--import",
                     "{REPO_ROOT}/scripts/ts-loader.mjs",
-                    "{REPO_ROOT}/scripts/check_refactoring_evidence.ts",
+                    "{REPO_ROOT}/scripts/check/check_refactoring_evidence.ts",
                     "--mission",
                     "{MISSION_ID}",
                     "--stage",
@@ -11871,7 +11871,7 @@
                   "args": [
                     "--import",
                     "{REPO_ROOT}/scripts/ts-loader.mjs",
-                    "{REPO_ROOT}/scripts/check_refactoring_evidence.ts",
+                    "{REPO_ROOT}/scripts/check/check_refactoring_evidence.ts",
                     "--mission",
                     "{MISSION_ID}",
                     "--stage",
@@ -11920,7 +11920,7 @@
                   "args": [
                     "--import",
                     "{REPO_ROOT}/scripts/ts-loader.mjs",
-                    "{REPO_ROOT}/scripts/check_refactoring_evidence.ts",
+                    "{REPO_ROOT}/scripts/check/check_refactoring_evidence.ts",
                     "--mission",
                     "{MISSION_ID}",
                     "--stage",
@@ -11969,7 +11969,7 @@
                   "args": [
                     "--import",
                     "{REPO_ROOT}/scripts/ts-loader.mjs",
-                    "{REPO_ROOT}/scripts/check_refactoring_evidence.ts",
+                    "{REPO_ROOT}/scripts/check/check_refactoring_evidence.ts",
                     "--mission",
                     "{MISSION_ID}",
                     "--stage",

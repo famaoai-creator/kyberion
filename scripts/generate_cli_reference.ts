@@ -19,7 +19,7 @@ import {
   type CliCommandGroup,
   type CliManifest,
   type CliScriptCommand,
-} from './check_cli_manifest.js';
+} from './check/check_cli_manifest.js';
 import { formatPrerequisiteLines } from './lib/cli-help.js';
 
 const OUTPUT_PATH = pathResolver.rootResolve('docs/CLI_REFERENCE.md');

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { CliCommand, CliManifest } from '../check_cli_manifest.js';
+import type { CliCommand, CliManifest } from '../check/check_cli_manifest.js';
 import {
   findDeprecatedCommandAlias,
   formatScopeUsage,

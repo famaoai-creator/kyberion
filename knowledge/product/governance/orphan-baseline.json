@@ -1,7 +1,7 @@
 {
   "$schema": "../schemas/orphan-baseline.schema.json",
   "version": 1,
-  "description": "OW-07 orphan ratchet exceptions (scripts/check_orphans.ts). Each entry is a reviewed, intentional exception with the reason it is kept (wave-3 triage, ORPHAN_DECISIONS_2026-10-01.md); placeholder 'backlog' reasons are rejected. New orphans fail the check, and an entry that stops being an orphan must be removed. Actuator ops advertised in actuator-op-discovery.json and named by a unit test, and ops the provider bridge resolves to a cli_native harness capability, are reachable by rule and never listed here. `documented_only` lists pipelines only Markdown docs mention (run by hand); a declared schedule, even one shipped `enabled: false` (opt-in via KYBERION_CHRONOS_SCHEDULES), counts as wired.",
+  "description": "OW-07 orphan ratchet exceptions (scripts/check/check_orphans.ts). Each entry is a reviewed, intentional exception with the reason it is kept (wave-3 triage, ORPHAN_DECISIONS_2026-10-01.md); placeholder 'backlog' reasons are rejected. New orphans fail the check, and an entry that stops being an orphan must be removed. Actuator ops advertised in actuator-op-discovery.json and named by a unit test, and ops the provider bridge resolves to a cli_native harness capability, are reachable by rule and never listed here. `documented_only` lists pipelines only Markdown docs mention (run by hand); a declared schedule, even one shipped `enabled: false` (opt-in via KYBERION_CHRONOS_SCHEDULES), counts as wired.",
   "libs_core_modules": [
     {
       "id": "libs/core/testing/finite-state-checker.ts",

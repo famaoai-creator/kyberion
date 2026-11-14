@@ -6,7 +6,7 @@ import {
   PERSISTENT_TIER_FIXTURE_PATTERNS,
   scanPersistentTierFixturePollution,
   type Violation,
-} from '../scripts/check_tier_hygiene.js';
+} from '../scripts/check/check_tier_hygiene.js';
 
 /**
  * KP-07: hermetic coverage for the persistent-tier (knowledge/personal/,
@@ -19,7 +19,7 @@ import {
  * it here would (a) not be hermetic — pass/fail would hinge on whatever a
  * given sandbox's onboarding state happens to be — and (b) collide with
  * other agents/processes sharing this checkout. See
- * scripts/check_tier_hygiene.ts's `scan()` for why the persistent-tier scan
+ * scripts/check/check_tier_hygiene.ts's `scan()` for why the persistent-tier scan
  * is intentionally not wired into the shared `pnpm check:tier-hygiene` gate,
  * and STATUS.md for the current real-tree pollution inventory.
  *

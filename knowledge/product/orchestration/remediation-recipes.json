@@ -9,10 +9,10 @@
   },
   "NON_COMPLIANT": {
     "description": "Run the self-healing health check",
-    "command": "node dist/scripts/check_skills_health.js --fix"
+    "command": "node dist/scripts/check/check_skills_health.js --fix"
   },
   "SLO_BREACH": {
     "description": "Analyze performance bottlenecks",
-    "command": "node dist/scripts/check_performance.js"
+    "command": "node dist/scripts/check/check_performance.js"
   }
 }

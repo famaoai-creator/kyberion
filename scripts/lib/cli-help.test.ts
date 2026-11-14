@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeReadFile } from '@agent/core/secure-io';
 import { t, type VocabularyKey } from '@agent/core/t';
-import { loadCliManifest } from '../check_cli_manifest.js';
+import { loadCliManifest } from '../check/check_cli_manifest.js';
 import {
   describeRegisteredCommand,
   editDistance,

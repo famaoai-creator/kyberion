@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   collectEntityGovernanceReport,
   shouldFailEntityGovernance,
-} from '../../scripts/check_entity_governance.js';
+} from '../../scripts/check/check_entity_governance.js';
 import { ENTITY_SCOPE_HIERARCHY } from './entity-scope.js';
 import { createMission } from './mission/mission-creation.js';
 import { createManagedProject } from './project/project-management.js';

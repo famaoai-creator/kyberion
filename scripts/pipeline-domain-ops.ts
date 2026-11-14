@@ -17,7 +17,7 @@ import { runHealthDegradationWatch } from './health_degradation_watch.js';
 import { runMeetingReadinessCheck, type MeetingReadinessStage } from './meeting_readiness_check.js';
 import { runKnowledgeHygieneProbe } from '@agent/core/knowledge/knowledge-hygiene-probe';
 import { runOpsHealthProbe } from '@agent/core/ops-health-probe';
-import { collectUiUxGovernanceReport } from './check_ui_ux_governance.js';
+import { collectUiUxGovernanceReport } from './check/check_ui_ux_governance.js';
 import { runTenantDriftWatch } from './watch_tenant_drift.js';
 import { runDecisionDigest } from './approval_inbox.js';
 import { createGhPrPort } from './pr_shadow.js';
@@ -34,13 +34,13 @@ import { runSoakRestartE2E } from './soak_restart_e2e.js';
 import { runMarketingVideoDryRun } from './marketing_video_dry_run.js';
 import { runComplianceScan } from './compliance_checker.js';
 import { main as promoteProcedure } from './promote_procedure.js';
-import { checkI18nHardcoding } from './check_i18n_hardcoding.js';
-import { runCatalogIntegrityCheck } from './check_catalog_integrity.js';
+import { checkI18nHardcoding } from './check/check_i18n_hardcoding.js';
+import { runCatalogIntegrityCheck } from './check/check_catalog_integrity.js';
 import {
   computeTranslationCoverageReport,
   runAlertOnRegression,
 } from './report_i18n_translation_coverage.js';
-import { runDocExamplesCheck } from './check_doc_examples.js';
+import { runDocExamplesCheck } from './check/check_doc_examples.js';
 import { main as manageRegistry } from './registry_manager.js';
 import { main as missionController } from './mission_controller.js';
 import { runCapturePhoto } from './capture_photo.js';

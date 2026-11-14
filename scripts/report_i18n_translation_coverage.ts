@@ -3,7 +3,7 @@
  * report_i18n_translation_coverage.ts — I18N-08: translation-ops instrument.
  *
  * **This is not a gate.** `pnpm run check -- --scope full --only catalogs`
- * (`scripts/check_catalog_integrity.ts`) already FAILS the build the moment
+ * (`scripts/check/check_catalog_integrity.ts`) already FAILS the build the moment
  * a key is missing an entry for any `required_locales` member — that is the
  * enforcement path, and it stays exactly where it is. This script answers a
  * different question that `check:catalogs` cannot: "how far along is a

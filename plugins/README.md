@@ -322,7 +322,7 @@ pnpm exec playwright install chromium    # once
 pnpm kyberion check plugin-views-e2e     # ~25 s; --keep-root keeps the hermetic root
 ```
 
-`scripts/check_plugin_views_e2e.ts` builds a hermetic Kyberion root under
+`scripts/check/check_plugin_views_e2e.ts` builds a hermetic Kyberion root under
 `active/shared/tmp/plugin-views-e2e/<run>/` (never the real `active/` or
 `knowledge/`), installs the fixture with `plugin_install --tenant` from outside
 that root's `plugins/` tree (so it is third-party), approves the install with

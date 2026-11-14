@@ -22,7 +22,7 @@ import {
   checkPrKnowledgeReadiness,
   GIT_REF_NAME_PATTERN,
 } from '@agent/core/knowledge/pr-knowledge-readiness';
-import { checkTitle } from './check_pr_title.js';
+import { checkTitle } from './check/check_pr_title.js';
 import { parseCheckJobs } from './run_checks.js';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import { guardCliArgsNormalized, type CliGuardSpec } from './lib/cli-guard.js';

@@ -14,7 +14,7 @@ import {
   type CliManifest,
   type CliPrerequisite,
   type CliScriptCommand,
-} from '../check_cli_manifest.js';
+} from '../check/check_cli_manifest.js';
 import { formatScopeUsage } from './cli-scopes.js';
 
 export interface CliHelpOptions {

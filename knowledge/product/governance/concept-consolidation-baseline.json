@@ -1297,77 +1297,77 @@
     "scripts/capability_discovery_entry.mjs": {
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/check_backend_conformance.ts": {
+    "scripts/check/check_backend_conformance.ts": {
       "json_state_write_budget": 1,
       "runtime_path_literal_budget": 1,
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/check_chronos_dom_contrast.ts": {
+    "scripts/check/check_chronos_dom_contrast.ts": {
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/check_chronos_perf_baseline.ts": {
+    "scripts/check/check_chronos_perf_baseline.ts": {
       "json_state_write_budget": 1,
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/check_contract_schemas_checks_1.ts": {
+    "scripts/check/check_contract_schemas_checks_1.ts": {
       "runtime_path_literal_budget": 1
     },
-    "scripts/check_contract_schemas_policy_checks.ts": {
+    "scripts/check/check_contract_schemas_policy_checks.ts": {
       "runtime_path_literal_budget": 2
     },
-    "scripts/check_contract_schemas.ts": {
+    "scripts/check/check_contract_schemas.ts": {
       "runtime_path_literal_budget": 3
     },
-    "scripts/check_contract_semver.ts": {
+    "scripts/check/check_contract_semver.ts": {
       "json_state_write_budget": 1,
       "bespoke_cli_parser_budget": 2
     },
-    "scripts/check_doc_examples.ts": {
+    "scripts/check/check_doc_examples.ts": {
       "bespoke_cli_parser_budget": 2
     },
-    "scripts/check_docs_drift.ts": {
+    "scripts/check/check_docs_drift.ts": {
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/check_entity_governance.ts": {
+    "scripts/check/check_entity_governance.ts": {
       "runtime_path_literal_budget": 3,
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/check_golden_output.ts": {
+    "scripts/check/check_golden_output.ts": {
       "json_state_write_budget": 1,
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/check_i18n_hardcoding.ts": {
+    "scripts/check/check_i18n_hardcoding.ts": {
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/check_improvement_plan_metadata.ts": {
+    "scripts/check/check_improvement_plan_metadata.ts": {
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/check_module_boundaries.ts": {
+    "scripts/check/check_module_boundaries.ts": {
       "json_state_write_budget": 1,
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/check_orphans.ts": {
+    "scripts/check/check_orphans.ts": {
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/check_pipeline_shell_independence.ts": {
+    "scripts/check/check_pipeline_shell_independence.ts": {
       "json_state_write_budget": 1,
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/check_plugin_views_e2e.ts": {
+    "scripts/check/check_plugin_views_e2e.ts": {
       "json_state_write_budget": 1
     },
-    "scripts/check_runtime_store_retention.ts": {
+    "scripts/check/check_runtime_store_retention.ts": {
       "runtime_path_literal_budget": 1
     },
-    "scripts/check_runtime_store_whole_read.ts": {
+    "scripts/check/check_runtime_store_whole_read.ts": {
       "json_state_write_budget": 1,
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/check_test_sleep_ratchet.ts": {
+    "scripts/check/check_test_sleep_ratchet.ts": {
       "json_state_write_budget": 1,
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/check_type_ratchet.ts": {
+    "scripts/check/check_type_ratchet.ts": {
       "json_state_write_budget": 1,
       "bespoke_cli_parser_budget": 1
     },

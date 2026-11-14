@@ -9,7 +9,7 @@
  * Text never wears a mark's own hue: values, ticks and legends stay in text
  * ink, EXCEPT a heatmap cell's value label (`.kb-chart__cell-value`), which
  * sits ON that mark's fill and needs a per-step *ink* (`--kb-ui-viz-*-ink-N`,
- * >= 4.5:1 on that step — scripts/check_design_contrast.ts), not the mark
+ * >= 4.5:1 on that step — scripts/check/check_design_contrast.ts), not the mark
  * color itself and not a halo.
  */
 
@@ -277,7 +277,7 @@
 .kb-chart__cell-value {
   /* Per-level/div ink (set above), not a halo: each ramp step carries its
      own text color that's actually >= 4.5:1 on that step
-     (scripts/check_design_contrast.ts), light or dark cells alike. An empty
+     (scripts/check/check_design_contrast.ts), light or dark cells alike. An empty
      cell has neither attribute and falls back to the ordinary text color. */
   fill: var(--kb-chart-ink, var(--kb-ui-text));
   font-size: calc(10px * var(--kb-chart-text-scale));

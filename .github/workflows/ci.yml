@@ -192,7 +192,7 @@ jobs:
             echo "::error::Build artifacts changed tracked source files: $STALE"
             exit 1
           fi
-          node --import ./scripts/ts-loader.mjs scripts/check_source_shadows.ts
+          node --import ./scripts/ts-loader.mjs scripts/check/check_source_shadows.ts
 
       # Classify the captured output and print the next command per failure
       # (operations-hygiene runbook §1 "CI failure triage").

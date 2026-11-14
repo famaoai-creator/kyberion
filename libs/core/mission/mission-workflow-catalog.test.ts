@@ -36,7 +36,7 @@ describe('mission-workflow-catalog', () => {
           args: [
             '--import',
             '{REPO_ROOT}/scripts/ts-loader.mjs',
-            '{REPO_ROOT}/scripts/check_video_production_evidence.ts',
+            '{REPO_ROOT}/scripts/check/check_video_production_evidence.ts',
             '--mission',
             '{MISSION_ID}',
             '--stage',

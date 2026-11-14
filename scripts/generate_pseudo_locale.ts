@@ -17,7 +17,7 @@
  *   2. `{name}` and `{count, plural, one {...} other {...}}` placeholders —
  *      the ICU MessageFormat subset `libs/core/foundation/message-format.ts` supports —
  *      are preserved byte-for-byte. Mangling a placeholder would corrupt the
- *      rendered message, and `scripts/check_catalog_integrity.ts`'s
+ *      rendered message, and `scripts/check/check_catalog_integrity.ts`'s
  *      placeholder-consistency check (via `extractPlaceholderNames`) exists
  *      precisely to catch that; `generate_pseudo_locale.test.ts` proves both
  *      that this generator never touches a placeholder and that the

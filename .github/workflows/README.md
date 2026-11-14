@@ -49,7 +49,7 @@ has no triage step yet; read its failed step log directly.
 
 ## Workflow contract (enforced)
 
-The `ci-workflow-contract` gate (`scripts/check_ci_workflow_contract.ts`, scope `pr`) fails when:
+The `ci-workflow-contract` gate (`scripts/check/check_ci_workflow_contract.ts`, scope `pr`) fails when:
 
 - a job has no `timeout-minutes` (the 360-minute default can hold a runner for six hours);
 - a `pull_request` workflow has no top-level `concurrency` with `cancel-in-progress`

@@ -174,7 +174,7 @@ If temporary artifacts are needed, place them by purpose per [runtime-storage-la
 
 - `scripts/capability_discovery.ts`
 - `scripts/cli.ts`
-- `scripts/check_esm_integrity.ts`
+- `scripts/check/check_esm_integrity.ts`
 - `libs/actuators/*/manifest.json`
 - `knowledge/product/governance/authority-roles/` (compatibility snapshot: `knowledge/product/governance/authority-role-index.json`)
 - `knowledge/product/orchestration/team-roles/` (compatibility snapshot: `knowledge/product/orchestration/team-role-index.json`)

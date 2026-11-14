@@ -54,7 +54,7 @@ const postBuild: BuildStage[] = [
     args: ['dist/scripts/generate_knowledge_index.js', '--manifest-only', '--quiet'],
   },
   { name: 'ui', command: 'pnpm', args: ['run', 'build:ui'] },
-  { name: 'source-shadows', command: 'node', args: ['dist/scripts/check_source_shadows.js'] },
+  { name: 'source-shadows', command: 'node', args: ['dist/scripts/check/check_source_shadows.js'] },
 ];
 
 /** Injectable boundaries keep shutdown tests from signalling the test process. */
@@ -254,8 +254,8 @@ export async function buildRepository(
     clean: () => runClean(),
     readiness: async () => {
       const [{ checkDistWorkspaceImports }, { findStaleDistTargets }] = await Promise.all([
-        import('./check_dist_workspace_imports.js'),
-        import('./check_stale_dist.js'),
+        import('./check/check_dist_workspace_imports.js'),
+        import('./check/check_stale_dist.js'),
       ]);
       return checkDistWorkspaceImports().length === 0 && findStaleDistTargets().stale.length === 0;
     },
@@ -266,7 +266,7 @@ export async function buildRepository(
     lock: withCompilerOutputs,
     snapshotInputs: async () => {
       const { fingerprintBuildInputs, fingerprintBuildConfigInputs } =
-        await import('./check_stale_dist.js');
+        await import('./check/check_stale_dist.js');
       const inputs = fingerprintBuildInputs();
       const config = fingerprintBuildConfigInputs();
       return {
