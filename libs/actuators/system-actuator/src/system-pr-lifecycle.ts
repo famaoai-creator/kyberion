@@ -17,7 +17,7 @@ import {
   vcsHostPrChecks,
   vcsHostPrMerge,
 } from '@agent/core/vcs/vcs-host-verbs';
-import { main as publishPullRequest } from '../../../../scripts/publish_pull_request.js';
+import { main as publishPullRequest } from '../../../../scripts/publish/publish_pull_request.js';
 
 export interface StandardPrLifecycleParams {
   branch_name: string;

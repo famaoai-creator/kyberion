@@ -22,7 +22,7 @@
 ## 再実行
 
 ```sh
-node node_modules/vitest/vitest.mjs run scripts/external-actuator-adapters-simulation.test.ts scripts/external-actuator-simulation.test.ts scripts/external-actuator-services-simulation.test.ts scripts/external-actuator-pipeline-simulation.test.ts libs/core/governance/external-operation-runtime.test.ts libs/core/governance/external-operation.test.ts libs/core/governance/external-operation-store.test.ts libs/core/pipeline/pipeline-approval-resume.test.ts --reporter=dot
+node node_modules/vitest/vitest.mjs run scripts/external/external-actuator-adapters-simulation.test.ts scripts/external/external-actuator-simulation.test.ts scripts/external/external-actuator-services-simulation.test.ts scripts/external/external-actuator-pipeline-simulation.test.ts libs/core/governance/external-operation-runtime.test.ts libs/core/governance/external-operation.test.ts libs/core/governance/external-operation-store.test.ts libs/core/pipeline/pipeline-approval-resume.test.ts --reporter=dot
 ```
 
 実行JSON（scratch保持期間内）：

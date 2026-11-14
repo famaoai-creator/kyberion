@@ -100,7 +100,7 @@ describe('systemd-user manager plans', () => {
     expect(unit).toContain('Environment="KYBERION_ROOT=/repo/Space %%n $HOME"\n');
     expect(unit).toContain('Environment="KYBERION_BASE_ROLE=worker with spaces %%n $HOME"\n');
     expect(unit).toContain(
-      'ExecStart="/opt/Node Bin/node" "/repo/Space %%n $$HOME/dist/scripts/chronos_daemon.js"\n'
+      'ExecStart="/opt/Node Bin/node" "/repo/Space %%n $$HOME/dist/scripts/chronos/chronos_daemon.js"\n'
     );
     expect(unit).not.toContain('/hostile');
   });
@@ -127,7 +127,9 @@ describe('systemd-user manager plans', () => {
 
   it('renders a resident service unit mirroring KeepAlive', () => {
     const unit = buildSystemdServiceUnit(chronos, ctx);
-    expect(unit).toContain('ExecStart=/usr/bin/node /repo/kyberion/dist/scripts/chronos_daemon.js');
+    expect(unit).toContain(
+      'ExecStart=/usr/bin/node /repo/kyberion/dist/scripts/chronos/chronos_daemon.js'
+    );
     expect(unit).toContain('WorkingDirectory=/repo/kyberion');
     expect(unit).toContain('Restart=always');
     expect(unit).toContain('WantedBy=default.target');

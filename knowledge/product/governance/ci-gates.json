@@ -75,7 +75,7 @@
       "id": "memory-benchmark",
       "scope": "pr",
       "executable": "node",
-      "args": ["--import", "./scripts/ts-loader.mjs", "scripts/benchmark_memory.ts"],
+      "args": ["--import", "./scripts/ts-loader.mjs", "scripts/benchmark/benchmark_memory.ts"],
       "owner": "quality",
       "rationale": "Runs the deterministic QM-03 V-layer notebook fold and consolidation benchmark in the governed check lane."
     },

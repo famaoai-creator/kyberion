@@ -46,7 +46,7 @@ Channel events should also be mirrored into explainable observability streams un
 
 - `active/shared/observability/channels/<channel>/`
 
-1.  **Context Injection**: The presence controller (`scripts/presence-controller.ts`) reads pending stimuli from the runtime journal for the agent session. (The legacy `system-prelude` script once claimed this role; it was retired on 2026-10-01 — see `retired/README.md`.)
+1.  **Context Injection**: The presence controller (`scripts/presence/presence-controller.ts`) reads pending stimuli from the runtime journal for the agent session. (The legacy `system-prelude` script once claimed this role; it was retired on 2026-10-01 — see `retired/README.md`.)
 2.  **Priority Resolution**: The Agent MUST address stimuli in order of priority (Voice > Slack).
 3.  **Completion**: Once a stimulus is addressed, it is marked as `PROCESSED` via the `presence-controller.js`.
 

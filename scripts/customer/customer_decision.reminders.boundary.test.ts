@@ -654,7 +654,7 @@ describe('customer-decision reminders and hand-offs (CD-11, real paths)', () => 
     async () => {
       const { runCustomerDecisionReminderOp, reminderFacadeEnv } =
         await import('../customer-decision/reminder-op.js');
-      const { buildTenantRunEnv } = await import('../chronos_daemon.js');
+      const { buildTenantRunEnv } = await import('../chronos/chronos_daemon.js');
       // The pipeline process: the identity a chronos tenant child runs with.
       const env = buildTenantRunEnv(TENANT);
       for (const key of [
@@ -732,7 +732,7 @@ describe('customer-decision reminders and hand-offs (CD-11, real paths)', () => 
       expect(installed.steps.map((item) => item.op)).toEqual(['core:customer_decision_reminders']);
       expect(installed.schedule.id).toBe('customer-decision-reminders');
       // Chronos picks it up as a tenant pipeline of this tenant.
-      const { collectTenantPipelineFiles } = await import('../chronos_daemon.js');
+      const { collectTenantPipelineFiles } = await import('../chronos/chronos_daemon.js');
       expect(collectTenantPipelineFiles(ROOT)).toEqual(
         expect.arrayContaining([
           expect.objectContaining({

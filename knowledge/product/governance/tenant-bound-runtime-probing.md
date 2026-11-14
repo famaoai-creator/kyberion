@@ -46,7 +46,7 @@ KYBERION_REASONING_BACKEND=<mode>              # runtime.reasoning_backend
 KYBERION_TENANT_EGRESS_POLICY_PATH=<json>      # runtime.egress_policy_ref (tenant egress overlay)
 ```
 
-`resolveTenantRuntimeEnv` / `buildTenantRunEnv` in `scripts/chronos_daemon.ts`
+`resolveTenantRuntimeEnv` / `buildTenantRunEnv` in `scripts/chronos/chronos_daemon.ts`
 compute this. Every declared value must be inside the tenant's
 `{knowledge_root}/governance/pipeline-runtime-allowlist.json` (absent file =
 nothing may be requested) and the global ceiling (registered service ids,
@@ -112,7 +112,7 @@ build:actuators`), and `@agent/core/*` imports in any throwaway probe
   (`withExecutionContext`, `enterExecutionEnv`, `resolveIdentityContext`).
 - Write-side policy engine: `libs/core/secure-io.ts` +
   `knowledge/product/governance/agent-policies.yaml`.
-- Tenant runner: `scripts/chronos_daemon.ts`; role
+- Tenant runner: `scripts/chronos/chronos_daemon.ts`; role
   `knowledge/product/governance/authority-roles/chronos_tenant_runner.json`.
 - Tenant egress overlay: `libs/core/governance/egress-policy.ts`
   (`KYBERION_TENANT_EGRESS_POLICY_PATH`).

@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "workflow-registration-request.schema.json",
   "title": "Workflow Registration Request",
-  "description": "Compact spec consumed by scripts/register_workflow.ts to dynamically register a new mission workflow template together with its intent, domain-ontology entry, and track routing (and optional gate profile / governance body). The script expands this into schema-valid catalog entries that pass check:governance-rules and check:workflow-catalog-refs.",
+  "description": "Compact spec consumed by scripts/register/register_workflow.ts to dynamically register a new mission workflow template together with its intent, domain-ontology entry, and track routing (and optional gate profile / governance body). The script expands this into schema-valid catalog entries that pass check:governance-rules and check:workflow-catalog-refs.",
   "type": "object",
   "additionalProperties": false,
   "required": [

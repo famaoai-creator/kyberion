@@ -1215,12 +1215,12 @@
     },
     {
       "id": "operator-readiness",
-      "module": "scripts/vital_check.ts",
+      "module": "scripts/vital/vital_check.ts",
       "commands": ["vital"]
     },
     {
       "id": "operator-setup",
-      "module": "scripts/setup_report.ts",
+      "module": "scripts/setup/setup_report.ts",
       "commands": ["setup report", "setup"]
     },
     {
@@ -1306,7 +1306,7 @@
     },
     {
       "id": "script.agy.profile",
-      "module": "scripts/agy_profile_controller.ts",
+      "module": "scripts/agy/agy_profile_controller.ts",
       "command": "agy profile",
       "noun": "agy",
       "verb": "profile",
@@ -1341,7 +1341,7 @@
     },
     {
       "id": "script.approvals.digest",
-      "module": "scripts/approval_inbox.ts",
+      "module": "scripts/approval/approval_inbox.ts",
       "command": "approvals digest",
       "noun": "approvals",
       "verb": "digest",
@@ -1351,7 +1351,7 @@
     },
     {
       "id": "script.approvals.hygiene",
-      "module": "scripts/approval_store_hygiene.ts",
+      "module": "scripts/approval/approval_store_hygiene.ts",
       "command": "approvals hygiene",
       "noun": "approvals",
       "verb": "hygiene",
@@ -1841,7 +1841,7 @@
     },
     {
       "id": "script.codex.profile",
-      "module": "scripts/codex_profile_controller.ts",
+      "module": "scripts/codex/codex_profile_controller.ts",
       "command": "codex profile",
       "noun": "codex",
       "verb": "profile",
@@ -2322,7 +2322,7 @@
     },
     {
       "id": "script.eval.learning-efficiency",
-      "module": "scripts/benchmark_learning_efficiency.ts",
+      "module": "scripts/benchmark/benchmark_learning_efficiency.ts",
       "command": "eval learning-efficiency",
       "noun": "eval",
       "verb": "learning-efficiency",
@@ -3385,7 +3385,7 @@
     },
     {
       "id": "script.pr.create",
-      "module": "scripts/publish_pull_request.ts",
+      "module": "scripts/publish/publish_pull_request.ts",
       "command": "pr create",
       "noun": "pr",
       "verb": "create",
@@ -3398,7 +3398,7 @@
     },
     {
       "id": "script.pr.preflight",
-      "module": "scripts/pr_preflight.ts",
+      "module": "scripts/pr/pr_preflight.ts",
       "command": "pr preflight",
       "noun": "pr",
       "verb": "preflight",
@@ -3410,7 +3410,7 @@
     },
     {
       "id": "script.pr.shadow-observe",
-      "module": "scripts/pr_shadow.ts",
+      "module": "scripts/pr/pr_shadow.ts",
       "command": "pr shadow-observe",
       "noun": "pr",
       "verb": "shadow-observe",
@@ -3421,7 +3421,7 @@
     },
     {
       "id": "script.pr.shadow-report",
-      "module": "scripts/pr_shadow.ts",
+      "module": "scripts/pr/pr_shadow.ts",
       "command": "pr shadow-report",
       "noun": "pr",
       "verb": "shadow-report",
@@ -3442,7 +3442,7 @@
     },
     {
       "id": "script.presence.stimuli",
-      "module": "scripts/presence-controller.ts",
+      "module": "scripts/presence/presence-controller.ts",
       "command": "presence stimuli",
       "noun": "presence",
       "verb": "stimuli",
@@ -4610,7 +4610,7 @@
     },
     {
       "id": "script.workflow.register",
-      "module": "scripts/register_workflow.ts",
+      "module": "scripts/register/register_workflow.ts",
       "command": "workflow register",
       "noun": "workflow",
       "verb": "register",

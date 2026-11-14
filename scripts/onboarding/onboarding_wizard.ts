@@ -1361,7 +1361,7 @@ export async function runOnboarding(
     } else if (choice === '5') {
       print(`\n${mt('onboarding_menu_running_ping')}`);
       try {
-        await runManagedMenuTask('setup-report', ['dist/scripts/setup_report.js']);
+        await runManagedMenuTask('setup-report', ['dist/scripts/setup/setup_report.js']);
       } catch (e) {
         print(`${mt('onboarding_menu_error_ping')}: ${formatMenuTaskError(e)}`);
       }

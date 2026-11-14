@@ -2695,7 +2695,7 @@ packaging contract、Prettier（変更コード）を確認した。Presence の
 
 ### 実測 evidence
 
-- `pnpm exec vitest run scripts/control_plane_cli.test.ts scripts/run_realtime_voice_conversation.test.ts`: **2 files / 10 tests passed**。
+- `pnpm exec vitest run scripts/control/control_plane_cli.test.ts scripts/run_realtime_voice_conversation.test.ts`: **2 files / 10 tests passed**。
 - `pnpm exec vitest run scripts/agent/agent_runtime_supervisor_daemon.test.ts`: **1 file / 9 tests passed**。
 - `pnpm run typecheck`: passed。
 - `pnpm lint`: passed。
@@ -4821,7 +4821,7 @@ governed catalog への書込制約は変更しなかった。旧 Ajv 経路の�
 
 検証:
 
-- `pnpm exec vitest run scripts/register_workflow.contract.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 1 test passed**。
+- `pnpm exec vitest run scripts/register/register_workflow.contract.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 1 test passed**。
 - `pnpm run typecheck`、`pnpm run lint`、`git diff --check`: passed。
 
 ## 296. 2026-08-30 SX-04/SX-14 env registry の専用 schema／loader 統合
@@ -5508,8 +5508,8 @@ import-safe な回帰テストを追加した。
 
 検証:
 
-- `pnpm exec vitest run scripts/benchmark_memory.test.ts scripts/lib/harness.test.ts`: **2 files / 8 tests passed**。
-- `node --import ./scripts/ts-loader.mjs scripts/benchmark_memory.ts`: **実 CLI passed**（5 checks）。
+- `pnpm exec vitest run scripts/benchmark/benchmark_memory.test.ts scripts/lib/harness.test.ts`: **2 files / 8 tests passed**。
+- `node --import ./scripts/ts-loader.mjs scripts/benchmark/benchmark_memory.ts`: **実 CLI passed**（5 checks）。
 - `pnpm check -- --scope full`: **67/67 gates passed**（Chronos を含む承認付き実行）。
 
 ## 343. 2026-08-30 SX-06 pipeline dry-run の shared harness 化
@@ -5596,8 +5596,8 @@ managed runtime の probe、`--apply` の install 操作、既存の人間向け
 
 検証:
 
-- `pnpm exec vitest run scripts/agy_sdk_setup.test.ts`: **1 file / 1 test passed**。
-- `node --import ./scripts/ts-loader.mjs scripts/agy_sdk_setup.ts`: **needs_install の案内を確認**。
+- `pnpm exec vitest run scripts/agy/agy_sdk_setup.test.ts`: **1 file / 1 test passed**。
+- `node --import ./scripts/ts-loader.mjs scripts/agy/agy_sdk_setup.ts`: **needs_install の案内を確認**。
 - `node --import ./scripts/ts-loader.mjs scripts/check_script_integrity.ts`: **OK**。
 - `pnpm run typecheck`: **passed**。
 
@@ -5810,8 +5810,8 @@ report を出力してから `ScriptExitError` で既存の fail-closed exit cod
 
 検証:
 
-- `pnpm exec vitest run scripts/vital_check.entrypoint.test.ts scripts/vital_check.test.ts scripts/dependency_resolver.entrypoint.test.ts`: **3 files / 8 tests passed**。
-- `node --import ./scripts/ts-loader.mjs scripts/vital_check.ts --help`: **exit 0、runtime report 構築なしで usage を確認**。
+- `pnpm exec vitest run scripts/vital/vital_check.entrypoint.test.ts scripts/vital/vital_check.test.ts scripts/dependency_resolver.entrypoint.test.ts`: **3 files / 8 tests passed**。
+- `node --import ./scripts/ts-loader.mjs scripts/vital/vital_check.ts --help`: **exit 0、runtime report 構築なしで usage を確認**。
 - `node --import ./scripts/ts-loader.mjs scripts/dependency_resolver.ts --help`: **exit 0、dependency probe なしで usage を確認**。
 - `node --import ./scripts/ts-loader.mjs scripts/check_script_integrity.ts`: **OK**。
 
@@ -6438,7 +6438,7 @@ interactive dashboard、MCP／server の custom output、細粒度 command regis
 
 ### 検証
 
-- `pnpm exec vitest run scripts/setup_report.entrypoint.test.ts tests/setup-report.test.ts scripts/lib/harness.test.ts --reporter=dot --pool=forks --maxWorkers=1` — 3 files / 11 tests passed。
+- `pnpm exec vitest run scripts/setup/setup_report.entrypoint.test.ts tests/setup-report.test.ts scripts/lib/harness.test.ts --reporter=dot --pool=forks --maxWorkers=1` — 3 files / 11 tests passed。
 - `pnpm --filter @agent/core run build`、`pnpm run build:repo` — green。
 - `pnpm kyberion setup report -- --json --quiet` — 依存診断の標準出力を抑制。
 - `pnpm kyberion setup report -- --json` — 人間向け table／logger 出力を混ぜず、report JSON のみを出力。
@@ -20913,7 +20913,7 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-05 再レビュー修正 1286
 
-- **対象**: `scripts/control_plane_cli.ts`、`scripts/control_plane_cli.entrypoint.test.ts`
+- **対象**: `scripts/control/control_plane_cli.ts`、`scripts/control/control_plane_cli.entrypoint.test.ts`
 - **変更**: Control Plane CLIのPresence／Chronos health check URL fallbackに残っていた環境直読を、登録済み `getRegisteredEnvText` へ統一した。既定URL、surface filter、client retry、health resultの既存 semanticsは変更していない。
 - **検証**: Control Plane CLI **2 files / 13 tests passed**、対象ESLint、Prettier、`git diff --check`、typecheck。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。
 
@@ -22406,7 +22406,7 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-06 再レビュー修正 1534
 
-- **対象**: `scripts/license_audit.ts`、`scripts/vital_check.ts`、`scripts/google_workspace_meet.ts` と対象テスト
+- **対象**: `scripts/license_audit.ts`、`scripts/vital/vital_check.ts`、`scripts/google_workspace_meet.ts` と対象テスト
 - **変更**: license file、active mission state、Google Workspace Meet payload の本文読込を foundation の `readTextFile` へ統一した。license classification、vital health／mission count、payload scope／JSON validation／gws execution semanticsは変更せず、各既存テストに reader contract を追加した。
 - **検証**: 対象テスト **4 files／10 tests passed**、license／vital／Google Workspace Meet の `--help` プローブ passed、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
 

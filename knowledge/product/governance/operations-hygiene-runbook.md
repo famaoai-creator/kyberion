@@ -268,21 +268,21 @@ write mission evidence, or project lifecycle commands.
 That mission closed 16 gaps from the 2026-10-08 operations survey. Several had been fixed before and
 had regressed.
 
-| Class                         | Gate / check                                                                    | Section |
-| ----------------------------- | ------------------------------------------------------------------------------- | ------- |
-| CI workflow drift             | `ci-workflow-contract` (scope `pr`)                                             | §1      |
-| Red CI without a next step    | `Triage failure` job-summary step, `main-failure-triage.yml` (`ci-main-red`)    | §1      |
-| Undeclared runtime stores     | `runtime-store-retention` (scope `pr`), janitor `uncovered*` lists              | §2      |
-| Daemons and child processes   | unit tests per daemon; this checklist in review                                 | §3      |
-| stdout / logging in libraries | eslint `no-console` on `libs/`                                                  | §4      |
-| Test pollution and host deps  | Vitest leak guard, strict in CI (`KYBERION_TEST_LEAK_STRICT=1`)                 | §5      |
-| Tenant scope and facade env   | `tier-guard-tenant` tests, facade binding tests                                 | §6      |
-| LLM / provider calls          | per-call-site egress tests (e.g. `mission-distill-egress.test.ts`)              | §7      |
-| Mission evidence overwrites   | generator and phase-pipeline tests in `mission-retrospective.test.ts`           | §8      |
-| Project lifecycle facades     | lifecycle regressions in `project-management.test.ts`                           | §9      |
-| secure-io link escapes        | `secure-io.symlink-canonical.test.ts`, `secure-io.symlink-root-alias`           | §10     |
-| Actuator failure receipts     | cli-utils / actuator tests, `pty-engine.resize.test.ts`, probes                 | §11     |
-| CLI hook continuation loops   | `scripts/codex_cli_hook.test.ts`, `libs/core/provider/claude-code-hook.test.ts` | §14     |
+| Class                         | Gate / check                                                                          | Section |
+| ----------------------------- | ------------------------------------------------------------------------------------- | ------- |
+| CI workflow drift             | `ci-workflow-contract` (scope `pr`)                                                   | §1      |
+| Red CI without a next step    | `Triage failure` job-summary step, `main-failure-triage.yml` (`ci-main-red`)          | §1      |
+| Undeclared runtime stores     | `runtime-store-retention` (scope `pr`), janitor `uncovered*` lists                    | §2      |
+| Daemons and child processes   | unit tests per daemon; this checklist in review                                       | §3      |
+| stdout / logging in libraries | eslint `no-console` on `libs/`                                                        | §4      |
+| Test pollution and host deps  | Vitest leak guard, strict in CI (`KYBERION_TEST_LEAK_STRICT=1`)                       | §5      |
+| Tenant scope and facade env   | `tier-guard-tenant` tests, facade binding tests                                       | §6      |
+| LLM / provider calls          | per-call-site egress tests (e.g. `mission-distill-egress.test.ts`)                    | §7      |
+| Mission evidence overwrites   | generator and phase-pipeline tests in `mission-retrospective.test.ts`                 | §8      |
+| Project lifecycle facades     | lifecycle regressions in `project-management.test.ts`                                 | §9      |
+| secure-io link escapes        | `secure-io.symlink-canonical.test.ts`, `secure-io.symlink-root-alias`                 | §10     |
+| Actuator failure receipts     | cli-utils / actuator tests, `pty-engine.resize.test.ts`, probes                       | §11     |
+| CLI hook continuation loops   | `scripts/codex/codex_cli_hook.test.ts`, `libs/core/provider/claude-code-hook.test.ts` | §14     |
 
 ---
 
@@ -862,11 +862,11 @@ to an unconditional success to repair a missing-export failure.
 
 An async mock factory must not await a module that transitively imports the module currently waiting for that factory. A new top-level validator import can create this cycle before any test or test timeout starts. Import the validator inside the schema-only test after the existing secure-I/O/authority bootstrap has completed; retain the raw-schema oracle. Verify the changed test alone before its consumer suite. Regression: `libs/core/dot/dot-charter.test.ts` exercises the raw AJV schema without changing the existing tenant mock.
 
-Broad preflight failures must retain every failing case heading and its immediate error before the bounded output tail. Tail-only diagnostics can discard earlier failures after a long related-test run. Keep test selection, failure status and deadlines unchanged; reproduce the named cases and finish data-reader selections before publishing a repair batch. Gate: scripts/pr_preflight.test.ts covers an early ANSI-colored failure displaced by a later stack.
+Broad preflight failures must retain every failing case heading and its immediate error before the bounded output tail. Tail-only diagnostics can discard earlier failures after a long related-test run. Keep test selection, failure status and deadlines unchanged; reproduce the named cases and finish data-reader selections before publishing a repair batch. Gate: scripts/pr/pr_preflight.test.ts covers an early ANSI-colored failure displaced by a later stack.
 
 Affected-test preflight must inherit the canonical core profile (TEST_SUITES.core), including no file parallelism: run core code and exact core readers first, then the remaining code and readers. Preserve the original CI selectors and exclude only the core-owned paths already covered; the real-inventory contract in tests/preflight-core-profile-boundary.test.ts proves the union and disjointness against Vitest include/exclude rules. Shared temporary ancestors can change while another file creates its fixture; do not relax snapshot identity/timestamp checks or silently retry integrity failures to accommodate a mixed parallel run. Keep strict mode and each invocation budget unchanged. Attempt every selected group even after failure and report all failures together. Native EPERM outside the governed guard remains a separate diagnostic question; a downstream policy-corrupt refusal is not evidence that the policy contents are invalid.
 
-The readiness subprocess also writes its per-gate results to stdout. On failure, preserve captured string or Buffer stdout before rethrowing the original execution error; stderr-only exception messages can hide every failing gate. Never print the success marker after such a failure. Gate: scripts/publish_pull_request.test.ts covers complete early-gate evidence, unchanged exception identity and empty-output failures.
+The readiness subprocess also writes its per-gate results to stdout. On failure, preserve captured string or Buffer stdout before rethrowing the original execution error; stderr-only exception messages can hide every failing gate. Never print the success marker after such a failure. Gate: scripts/publish/publish_pull_request.test.ts covers complete early-gate evidence, unchanged exception identity and empty-output failures.
 
 Core code uses the same six deterministic shards as the PR and main CI matrices, executed sequentially with the serial core profile. The workflow parity assertion in the inventory gate rejects shard-count drift. Preserve the existing per-invocation budget; do not squeeze an unsharded core run into it by omitting tests or increasing the deadline.
 
@@ -2043,7 +2043,7 @@ missing-session or unsupported-capability diagnostics instead of false success.
 **Gate.** Run `scripts/actuator_playground.test.ts`, `libs/core/harnessing/cli-utils.test.ts`,
 the browser and terminal actuator tests, and `libs/core/shell/pty-engine.resize.test.ts`.
 Replay `scripts/browser/browser_actuator_usability_probe.ts` and
-`scripts/terminal_actuator_usability_probe.ts` for live outcomes and recovery.
+`scripts/terminal/terminal_actuator_usability_probe.ts` for live outcomes and recovery.
 Native PTY and desktop GUI checks require the corresponding host capabilities.
 A silent `PTY_ENGINE ... falling back to ChildProcess` warning means sessions
 run without PTY semantics (no resize, tty prompts like `ssh` password reads
@@ -2274,7 +2274,7 @@ Persist notification receipts per participant under the existing Co-Session stor
 updates across hook processes, and keep ack an explicit agent action. Preserve unrelated user hooks
 when regenerating wiring. Do not change hook trust records or invoke an LLM from a hook.
 
-**Gate.** `scripts/codex_cli_hook.test.ts` exercises repeated tool events, own-message filtering,
+**Gate.** `scripts/codex/codex_cli_hook.test.ts` exercises repeated tool events, own-message filtering,
 separate CLI instances, bounded batches, Stop silence and SessionEnd release.
 `libs/core/provider/co-session-hook.test.ts` checks interleaved hook delivery;
 `libs/core/provider/claude-code-hook.test.ts` checks recursive Stop silence;
@@ -2407,7 +2407,7 @@ Approval presentation references are part of the effect binding. Preserve the
 same scoped review reference when an interactive run resumes headlessly; human
 presence must not change its authorization payload hash. Validate this with the
 real email actuator, approval store, durable pipeline journal and headless
-runner in `scripts/external-actuator-pipeline-simulation.test.ts`, with only the
+runner in `scripts/external/external-actuator-pipeline-simulation.test.ts`, with only the
 final transport and process launch simulated. A mocked gate alone cannot catch
 this integration defect.
 

@@ -778,7 +778,7 @@ describe('FD-08 removed presence-studio dashboard panels', () => {
     // canonical standard-intent catalog loader be wired here.
     expect(serverSource).toContain("presenceStudioData.app.get('/api/standard-intents'");
     // Kept because libs/core/surface/control-plane-client.ts and
-    // scripts/control_plane_cli.ts still call these on this surface.
+    // scripts/control/control_plane_cli.ts still call these on this surface.
     expect(serverSource).toContain("presenceStudioData.app.get('/api/projects'");
     expect(serverSource).toContain("presenceStudioData.app.get('/api/project-tracks'");
     expect(serverSource).toContain('registerServiceBindingsRoute({');

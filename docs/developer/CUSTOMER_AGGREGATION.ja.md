@@ -172,7 +172,7 @@ const { overlay, base } = customerResolver.overlayCandidates('policy/approval-po
   - [x] policy consumer (`libs/core/governance/approval-policy.ts`)
   - [x] mission seeds consumer (`libs/core/mission/mission-seed-registry.ts`)
   - [x] voice profile registry consumer (`libs/core/voice/voice-profile-registry.ts`)
-  - [x] vital check consumer (`scripts/vital_check.ts`)
+  - [x] vital check consumer (`scripts/vital/vital_check.ts`)
   - [x] baseline check consumer (`scripts/run_baseline_check.ts`)
 - [x] onboarding apply consumer (`scripts/onboarding/onboarding_apply.ts`)
 - [x] slack onboarding consumer (`libs/core/integrations/slack-onboarding.ts`)

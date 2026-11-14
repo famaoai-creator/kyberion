@@ -90,7 +90,7 @@ describe('Workflow operations contract', () => {
     expect(read('.github/PULL_REQUEST_TEMPLATE.md')).toContain(
       'pre-pr-ci-readiness-checklist.ja.md'
     );
-    expect(read('scripts/publish_pull_request.ts')).toContain(checklist);
+    expect(read('scripts/publish/publish_pull_request.ts')).toContain(checklist);
     expect(read(checklist)).toContain('pnpm check -- --scope pr');
   });
 
@@ -107,7 +107,9 @@ describe('Workflow operations contract', () => {
     expect(ci).toContain('pnpm run check:commit-subject');
     expect(ci).toContain('node dist/scripts/capability_discovery.js');
     expect(ci).toContain('node dist/scripts/surface/surface_runtime.js --action status');
-    expect(ci).toContain('node dist/scripts/vital_check.js --format json --exit-on-missing=false');
+    expect(ci).toContain(
+      'node dist/scripts/vital/vital_check.js --format json --exit-on-missing=false'
+    );
   });
 
   it('keeps the manifest-driven validator on the docs and read-only surface gates', () => {
@@ -134,8 +136,8 @@ describe('Workflow operations contract', () => {
   it('keeps PR validation on built build-size measurement', () => {
     const prValidation = read('.github/workflows/pr-validation.yml');
     expect(prValidation).toContain('pnpm run check:pr-title');
-    expect(prValidation).toContain('node dist/scripts/vital_check.js --format text');
-    expect(prValidation).not.toContain('npx tsx scripts/vital_check.ts');
+    expect(prValidation).toContain('node dist/scripts/vital/vital_check.js --format text');
+    expect(prValidation).not.toContain('npx tsx scripts/vital/vital_check.ts');
   });
 
   it('runs golden output checks in PR validation once stable snapshots exist', () => {

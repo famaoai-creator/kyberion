@@ -68,7 +68,7 @@ const allowedManagedProcessConsumers = [
   // resume logic is exercised without spawning a real process.
   'libs/core/pipeline/pipeline-approval-resume.test.ts',
   // Real approval/journal simulation replaces only the resume process launch.
-  'scripts/external-actuator-pipeline-simulation.test.ts',
+  'scripts/external/external-actuator-pipeline-simulation.test.ts',
   // The await-state resume scanner owns `run_pipeline --resume` spawns on the
   // same governed re-entry pattern, scoped to the external-state wait path.
   'libs/core/pipeline/pipeline-await-resume.ts',

@@ -128,7 +128,7 @@ function defaultEnabledSurfaces(): ReadonlySet<string> {
 
 async function defaultSyncSchedules(options: { dryRun: boolean }): Promise<ScheduleSyncSummary> {
   // Lazy: chronos_daemon owns the tenant gates; importing it never starts the daemon.
-  const chronos = await import('../chronos_daemon.js');
+  const chronos = await import('../chronos/chronos_daemon.js');
   return chronos.syncSchedulesFromAdf({ dryRun: options.dryRun });
 }
 

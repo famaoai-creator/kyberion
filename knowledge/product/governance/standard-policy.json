@@ -13,7 +13,7 @@
         "patterns": ["fs.writeFileSync", "fs.appendFileSync", "fs.unlinkSync", "fs.renameSync"],
         "exemptions": [
           "scripts/bootstrap.ts",
-          "scripts/setup_ecosystem.sh",
+          "scripts/setup/setup_ecosystem.sh",
           "scripts/fix_shebangs.ts",
           "scripts/mass_refactor_governance.ts"
         ],

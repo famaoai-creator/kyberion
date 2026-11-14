@@ -158,7 +158,7 @@ report changes, and left alone when it is unchanged.
 6. runtime surface manifest/status validation via `node dist/scripts/surface/surface_runtime.js --action status`
 7. smoke/unit/integration tests
 8. security audit
-9. vital check audit via `node dist/scripts/vital_check.js --format json --exit-on-missing=false`
+9. vital check audit via `node dist/scripts/vital/vital_check.js --format json --exit-on-missing=false`
 
 ## PR Validation Workflow
 
@@ -171,7 +171,7 @@ report changes, and left alone when it is unchanged.
 5. coverage threshold validation
 6. coverage reporting
 7. security scan
-8. vital check measurement using `node dist/scripts/vital_check.js --format text`
+8. vital check measurement using `node dist/scripts/vital/vital_check.js --format text`
 
 ## Coverage Threshold
 
@@ -213,7 +213,7 @@ When investigating local residue:
 ### Build size report failed
 
 - Confirm `pnpm build` produced `dist/`
-- Confirm `node dist/scripts/vital_check.js --format json --exit-on-missing=false` succeeds locally
+- Confirm `node dist/scripts/vital/vital_check.js --format json --exit-on-missing=false` succeeds locally
 
 ### Surface validation failed
 
