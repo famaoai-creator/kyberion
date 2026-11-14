@@ -1,6 +1,6 @@
 import { createManagedOrganization } from '@agent/core/organization/organization-management';
 import { baseRoleEnvText } from '@agent/core/foundation';
-import { cliApprovalRequester } from '../lib/cli-approval-requester.js';
+import { cliApprovalRequester } from '../lib/cli/cli-approval-requester.js';
 import {
   buildOrganizationManagementView,
   buildOrganizationOperationRecord,

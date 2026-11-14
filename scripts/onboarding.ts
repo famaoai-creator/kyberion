@@ -3,7 +3,7 @@ import { main as onboardCompanyMain } from './company/company_onboarding.js';
 import { main as applyOnboardingMain } from './onboarding/onboarding_apply.js';
 import { main as resetOnboardingMain } from './onboarding/onboarding_reset.js';
 import { currentProcessArgv, defineScript, isDirectScript } from './lib/harness.js';
-import { guardCliArgs } from './lib/cli-guard.js';
+import { guardCliArgs } from './lib/cli/cli-guard.js';
 import { ONBOARD_CLI } from './onboarding/onboarding_mode.js';
 
 /**

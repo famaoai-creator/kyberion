@@ -11,7 +11,7 @@ import {
   safeWriteFile,
 } from '@agent/core';
 import { MAX_SPEAK_CHARS, runSpeakCommand, SPEAK_USAGE, type SpeakDeps } from './cli-speak.js';
-import type { MediaTool } from '../lib/perception.js';
+import type { MediaTool } from '../lib/perception/perception.js';
 
 // Tier-guard denials emit best-effort audit events; keep them off the real
 // audit chain so the suite stays hermetic.

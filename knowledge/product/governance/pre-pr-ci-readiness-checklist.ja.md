@@ -224,7 +224,7 @@ CI の `lint-and-validate`（`--scope full`）でしか落ちなかった op-reg
 `node:fs` / `child_process` / managed process の allowlist、package boundary など）を実行する。
 
 3.5 **影響テストを実行する**（gate は test suite を実行しない）。`pnpm kyberion pr preflight` が次の 2 つを自動で実行する
-（`scripts/lib/affected-tests.ts`）。単独で回すときは同じものを手で実行する:
+（`scripts/lib/ci/affected-tests.ts`）。単独で回すときは同じものを手で実行する:
 
 ```bash
 pnpm exec vitest run --changed origin/main          # コード: import graph で選ばれるテスト

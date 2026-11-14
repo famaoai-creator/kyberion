@@ -98,7 +98,7 @@
     "scripts/export_validation_bundle.ts": 1,
     "scripts/intent.ts": 1,
     "scripts/intent/intent_trace.ts": 1,
-    "scripts/lib/backup-tenant-partitions.ts": 1,
+    "scripts/lib/backup/backup-tenant-partitions.ts": 1,
     "scripts/migrate/migrate_physical_namespaces.ts": 3,
     "scripts/onboarding/onboarding_first_job_status.ts": 1,
     "scripts/presence/presence-controller.ts": 1,

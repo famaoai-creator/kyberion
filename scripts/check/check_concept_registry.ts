@@ -11,7 +11,7 @@ import { readTextFile, writeJson } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync, safeLstat, safeReaddir } from '@agent/core/secure-io';
 import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
-import { resolveCiGateBaselinePath } from '../lib/ci-gate-baseline.js';
+import { resolveCiGateBaselinePath } from '../lib/ci/ci-gate-baseline.js';
 import { parseFrontmatter } from './check_improvement_plan_metadata.js';
 
 export const CONCEPT_REGISTRY = 'knowledge/product/governance/concept-registry.json';

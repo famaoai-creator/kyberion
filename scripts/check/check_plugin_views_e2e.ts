@@ -64,7 +64,7 @@ import {
 import { writeTenantProfile } from '@agent/core/organization/tenant-registry';
 import { resolveVocabularyEntry } from '@agent/core/knowledge/vocabulary-catalog';
 import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
-import { runCliAnsweringTtyChallenge } from '../lib/cli-tty-challenge-driver.js';
+import { runCliAnsweringTtyChallenge } from '../lib/tty/cli-tty-challenge-driver.js';
 
 export const PLUGIN_ID = 'plugin-view-e2e-fixture';
 export const VIEW_ID = 'panel';

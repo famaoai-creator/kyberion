@@ -11,7 +11,7 @@
  * authenticated human approved its exact content
  * (`ensureTrustedExternalHooksRegistered`); editing the file voids the approval.
  */
-import { cliApprovalRequester } from '../lib/cli-approval-requester.js';
+import { cliApprovalRequester } from '../lib/cli/cli-approval-requester.js';
 import * as path from 'node:path';
 import {
   discoverExternalHookConfigs,

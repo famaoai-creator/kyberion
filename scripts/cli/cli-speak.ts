@@ -54,7 +54,7 @@ import {
   withPerceptionMediaRole,
   type CommonArgs,
   type MediaTool,
-} from '../lib/perception.js';
+} from '../lib/perception/perception.js';
 
 /** Hard cap on spoken text; longer scripts should be split (or rendered via a pipeline). */
 export const MAX_SPEAK_CHARS = 10_000;

@@ -20,7 +20,7 @@ import {
   STORAGE_FLOOR_ROOTS,
 } from '@agent/core/storage-layout';
 import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
-import { resolveCiGateBaselinePath } from '../lib/ci-gate-baseline.js';
+import { resolveCiGateBaselinePath } from '../lib/ci/ci-gate-baseline.js';
 import { readSafeJsonFile } from '../lib/json-input.js';
 import {
   projectStoreRoots,

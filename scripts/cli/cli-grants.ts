@@ -45,7 +45,7 @@ import {
   resolveCliOperatorIdentity,
 } from '@agent/core/governance/cli-operator-principal';
 import type { ApprovalRequestRecord } from '@agent/core/governance/approval-store';
-import { cliApprovalRequester } from '../lib/cli-approval-requester.js';
+import { cliApprovalRequester } from '../lib/cli/cli-approval-requester.js';
 import { ScriptExitError } from '../lib/harness.js';
 
 export const GRANTS_USAGE = `Usage: pnpm kyberion grants <list|check|status|upcoming|grant|revoke> [options]

@@ -60,7 +60,7 @@ import {
   type SeamCalibrationReport,
 } from '@agent/core/seam-calibration';
 import { readSafeJsonFile } from './lib/json-input.js';
-import { registerSeamCalibrationAdapters } from './lib/seam-calibration-adapters.js';
+import { registerSeamCalibrationAdapters } from './lib/seam-calibration/seam-calibration-adapters.js';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 const OPERATOR_ROLE = 'sovereign_concierge';

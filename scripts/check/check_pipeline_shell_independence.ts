@@ -22,7 +22,7 @@ import {
   safeWriteFile,
 } from '@agent/core/secure-io';
 import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
-import { resolveCiGateBaselinePath } from '../lib/ci-gate-baseline.js';
+import { resolveCiGateBaselinePath } from '../lib/ci/ci-gate-baseline.js';
 import { readSafeJsonValueFile } from '../lib/json-input.js';
 
 interface ShellViolation {

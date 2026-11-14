@@ -23,7 +23,7 @@ import { safeExistsSync, safeReaddir, safeStat, safeWriteFile } from '@agent/cor
 import { nowIso, readJson, readTextFile } from '@agent/core/foundation';
 import { withExecutionContext } from '@agent/core/governance';
 import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
-import { resolveCiGateBaselinePath } from '../lib/ci-gate-baseline.js';
+import { resolveCiGateBaselinePath } from '../lib/ci/ci-gate-baseline.js';
 import { readSafeJsonFile } from '../lib/json-input.js';
 
 interface Manifest {

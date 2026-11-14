@@ -32,7 +32,7 @@ import { safeExistsSync, safeLstat, safeMkdir, safeWriteFile } from '@agent/core
 import { getAllFiles } from '@agent/core/fs-utils';
 import { withExecutionContext } from '@agent/core/governance';
 import { nowIso, readTextFile } from '@agent/core/foundation';
-import { resolveCiGateBaselinePath } from '../lib/ci-gate-baseline.js';
+import { resolveCiGateBaselinePath } from '../lib/ci/ci-gate-baseline.js';
 import { readSafeJsonFile } from '../lib/json-input.js';
 
 const ROOT = pathResolver.rootDir();

@@ -4,14 +4,14 @@
  */
 
 import { registerSeamCalibrationAdapter } from '@agent/core/seam-calibration';
-import { ocrProviderCalibrationAdapter } from './seam-calibration/ocr-provider.js';
-import { browserAutomationRuntimeCalibrationAdapter } from './seam-calibration/browser-automation-runtime.js';
-import { speechToTextBridgeCalibrationAdapter } from './seam-calibration/speech-to-text-bridge.js';
-import { streamingSttBridgeCalibrationAdapter } from './seam-calibration/streaming-stt-bridge.js';
-import { imageGenerationProviderCalibrationAdapter } from './seam-calibration/image-generation-provider.js';
-import { musicGenerationProviderCalibrationAdapter } from './seam-calibration/music-generation-provider.js';
-import { videoGenerationProviderCalibrationAdapter } from './seam-calibration/video-generation-provider.js';
-import { voiceTtsEngineCalibrationAdapter } from './seam-calibration/voice-tts-engine.js';
+import { ocrProviderCalibrationAdapter } from './ocr-provider.js';
+import { browserAutomationRuntimeCalibrationAdapter } from './browser-automation-runtime.js';
+import { speechToTextBridgeCalibrationAdapter } from './speech-to-text-bridge.js';
+import { streamingSttBridgeCalibrationAdapter } from './streaming-stt-bridge.js';
+import { imageGenerationProviderCalibrationAdapter } from './image-generation-provider.js';
+import { musicGenerationProviderCalibrationAdapter } from './music-generation-provider.js';
+import { videoGenerationProviderCalibrationAdapter } from './video-generation-provider.js';
+import { voiceTtsEngineCalibrationAdapter } from './voice-tts-engine.js';
 
 let registered = false;
 

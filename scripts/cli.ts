@@ -1110,7 +1110,7 @@ async function applyApprovalDecision(
 
 async function requestProjectTrust(inputPath: string, json = false): Promise<void> {
   const { createProjectTrustApprovalRequest } = await import('@agent/core/project/project-trust');
-  const { cliApprovalRequester } = await import('./lib/cli-approval-requester.js');
+  const { cliApprovalRequester } = await import('./lib/cli/cli-approval-requester.js');
   const record = createProjectTrustApprovalRequest({
     inputPath,
     requester: cliApprovalRequester(undefined, resolveOperatorDisplayName()),

@@ -14,7 +14,7 @@ import {
   requireTenantPipelineTrust,
   resolveTenantRuntimeEnv,
 } from './chronos_daemon.js';
-import { installGracefulShutdown, type SerialTickStopOutcome } from '../lib/daemon-loop.js';
+import { installGracefulShutdown, type SerialTickStopOutcome } from '../lib/daemon/daemon-loop.js';
 
 describe('chronos pipeline scope', () => {
   const roots: string[] = [];

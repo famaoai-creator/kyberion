@@ -1532,7 +1532,7 @@
     "scripts/kyberion.ts": {
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/lib/cli-approval-requester.ts": {
+    "scripts/lib/cli/cli-approval-requester.ts": {
       "env_direct_read_budget": 1
     },
     "scripts/lib/local-artifact-pad.ts": {
@@ -1541,7 +1541,7 @@
     "scripts/lib/operator-ask-scope.ts": {
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/lib/role-assumption-workspace.ts": {
+    "scripts/lib/role-assumption/role-assumption-workspace.ts": {
       "bespoke_cli_parser_budget": 1
     },
     "scripts/lib/video-production-evidence.ts": {

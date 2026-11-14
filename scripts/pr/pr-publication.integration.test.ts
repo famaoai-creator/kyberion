@@ -137,7 +137,7 @@ it('clean headless host queues one real human-only request, writes protected rev
       },
       input: JSON.stringify({
         root,
-        publisher: new URL('../lib/pr-publication.ts', import.meta.url).href,
+        publisher: new URL('../lib/pr/pr-publication.ts', import.meta.url).href,
       }),
       timeoutMs: 60_000,
     }

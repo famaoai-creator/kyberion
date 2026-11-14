@@ -1,16 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { readTextFile } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core';
-import { resolveRecordingPath } from '../lib/work-inventory-cli-consent.js';
-import { requireDecidedBy, WorkInventoryCliUsageError } from '../lib/work-inventory-cli-shared.js';
+import { resolveRecordingPath } from '../lib/work-inventory/work-inventory-cli-consent.js';
+import { requireDecidedBy, WorkInventoryCliUsageError } from '../lib/work-inventory/work-inventory-cli-shared.js';
 
 const SOURCE_FILES = [
   'scripts/work/work_inventory.ts',
-  'scripts/lib/work-inventory-cli-shared.ts',
-  'scripts/lib/work-inventory-cli-entries.ts',
-  'scripts/lib/work-inventory-cli-harvest.ts',
-  'scripts/lib/work-inventory-cli-consent.ts',
-  'scripts/lib/work-inventory-cli-promotion.ts',
+  'scripts/lib/work-inventory/work-inventory-cli-shared.ts',
+  'scripts/lib/work-inventory/work-inventory-cli-entries.ts',
+  'scripts/lib/work-inventory/work-inventory-cli-harvest.ts',
+  'scripts/lib/work-inventory/work-inventory-cli-consent.ts',
+  'scripts/lib/work-inventory/work-inventory-cli-promotion.ts',
 ];
 
 /**

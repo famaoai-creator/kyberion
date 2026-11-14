@@ -77,7 +77,7 @@
     "scripts/generate/generate_platform_read_baseline.ts",
     "scripts/install_chronos_launchd.ts",
     "scripts/kyberion.ts",
-    "scripts/lib/cli-tty-challenge-driver.ts",
+    "scripts/lib/tty/cli-tty-challenge-driver.ts",
     "scripts/lib/seam-calibration/voice-tts-engine.ts",
     "scripts/meeting/meeting_preflight.ts",
     "scripts/minutes_record.ts",

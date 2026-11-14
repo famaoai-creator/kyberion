@@ -9,7 +9,7 @@ import { currentScope } from '@agent/core/scope-context';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync } from '@agent/core/secure-io';
 import { defineScript, isDirectScript } from '../lib/harness.js';
-import { parseGuardedCliArgs, type CliGuardSpec } from '../lib/cli-guard.js';
+import { parseGuardedCliArgs, type CliGuardSpec } from '../lib/cli/cli-guard.js';
 import type { MemoryScopeEnvelope } from '@agent/core/knowledge/memory-scope';
 
 export const LEARNING_PREPARE_CLI: CliGuardSpec = {

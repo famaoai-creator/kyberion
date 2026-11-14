@@ -12,7 +12,7 @@ import {
   ChildDeadlineError,
   installGracefulShutdown,
   startSerialTickLoop,
-} from './lib/daemon-loop.js';
+} from './lib/daemon/daemon-loop.js';
 
 const DEFAULT_INTERVAL_MS = Number(
   getRegisteredEnvText('KYBERION_GENERATION_SCHEDULE_INTERVAL_MS') || 60_000

@@ -13,7 +13,7 @@ import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeStat } from '@agent/core/secure-io';
 import { ScriptExitError } from '../lib/harness.js';
-import { isInsideRepository, parseCommonOption } from '../lib/perception.js';
+import { isInsideRepository, parseCommonOption } from '../lib/perception/perception.js';
 
 export const RECORD_USAGE = `Usage: pnpm kyberion record screen|audio|camera [--duration <seconds>] [--fps <n>] [--out <file>] [--device <name>] [--json]
 

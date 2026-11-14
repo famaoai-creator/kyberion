@@ -90,12 +90,12 @@ import {
   cleanupRealtimeVoiceResources,
   smokeTestStreamingTts,
   transcribeRealtimeBatchFallback,
-} from './lib/realtime-voice-streaming-runtime.js';
+} from './lib/realtime-voice/realtime-voice-streaming-runtime.js';
 import {
   resolveRealtimeVoiceStreamingConfig,
   realtimeVoiceStreamingEnvironment,
   type RealtimeVoiceStreamingConfig,
-} from './lib/realtime-voice-streaming-config.js';
+} from './lib/realtime-voice/realtime-voice-streaming-config.js';
 import {
   MediaEventBuffer,
   validateMediaSessionDescriptor,

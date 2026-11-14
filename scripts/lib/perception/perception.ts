@@ -36,7 +36,7 @@ import type {
   TranscribeResult,
   TranscriptSegment,
 } from '@agent/core/voice/speech-to-text-bridge';
-import { ScriptExitError } from './harness.js';
+import { ScriptExitError } from '../harness.js';
 
 export const LOCAL_MEDIA_INPUT_ARGS = [
   '-protocol_whitelist',

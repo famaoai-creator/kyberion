@@ -16,7 +16,7 @@ import { readTextFile, writeJson } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync, safeReaddir, safeStat } from '@agent/core/secure-io';
 import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
-import { resolveCiGateBaselinePath } from '../lib/ci-gate-baseline.js';
+import { resolveCiGateBaselinePath } from '../lib/ci/ci-gate-baseline.js';
 import { readSafeJsonFile } from '../lib/json-input.js';
 
 export interface FoundationWeightBaseline {

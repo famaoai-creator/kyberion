@@ -55,7 +55,7 @@ import {
 } from '@agent/core/secure-io';
 import { nowIso, readJsonLines } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
-import { guardCliArgsNormalized, type CliGuardSpec } from './lib/cli-guard.js';
+import { guardCliArgsNormalized, type CliGuardSpec } from './lib/cli/cli-guard.js';
 import { normalizePersistedAuditEntry, type AuditEntry } from '@agent/core/governance/audit-chain';
 
 interface BundleManifest {

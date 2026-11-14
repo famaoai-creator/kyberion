@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { defineScript, isDirectScript, type ScriptContext } from '../lib/harness.js';
-import { formatCliUsage, hasHelpFlag, type CliGuardSpec } from '../lib/cli-guard.js';
+import { formatCliUsage, hasHelpFlag, type CliGuardSpec } from '../lib/cli/cli-guard.js';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { pathResolver } from '@agent/core/path-resolver';
 import { resolveScopeContext } from '@agent/core/scope-context';

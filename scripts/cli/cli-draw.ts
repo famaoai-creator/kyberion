@@ -46,7 +46,7 @@ import {
   sniffImageDimensions,
   type CommonArgs,
   type MediaTool,
-} from '../lib/perception.js';
+} from '../lib/perception/perception.js';
 
 export const MAX_DRAW_PROMPT_CHARS = 4_000;
 export const DRAW_OUT_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.webp'] as const;

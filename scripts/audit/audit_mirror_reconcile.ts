@@ -12,7 +12,7 @@ import {
   resolveApprovalRequesterInput,
   type ApprovalRequesterInput,
 } from '@agent/core/governance/approval-requester';
-import { cliApprovalRequester } from '../lib/cli-approval-requester.js';
+import { cliApprovalRequester } from '../lib/cli/cli-approval-requester.js';
 import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 import {

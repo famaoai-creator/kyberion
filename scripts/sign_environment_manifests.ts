@@ -25,7 +25,7 @@ import { safeWriteFile } from '@agent/core/secure-io';
 import { withExecutionContext } from '@agent/core/governance';
 import { getRegisteredEnvText } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
-import { guardCliArgs, type CliGuardSpec } from './lib/cli-guard.js';
+import { guardCliArgs, type CliGuardSpec } from './lib/cli/cli-guard.js';
 
 const MANIFEST_DIR = 'knowledge/product/governance/environment-manifests';
 

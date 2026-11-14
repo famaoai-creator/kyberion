@@ -17,7 +17,7 @@ import { createLogger, formatDiagnostic } from '@agent/core/logger';
 import { vcsHostAuthStatus, vcsHostDefaultBranch } from '@agent/core/vcs/vcs-host-verbs';
 import { computeApprovalPayloadHash } from '@agent/core/governance/approval-store';
 import { withRuntimeExternalOperationAuthority } from '@agent/core/governance/external-operation-runtime';
-import { publishWithWorktreeGovernance } from '../lib/pr-worktree-governance.js';
+import { publishWithWorktreeGovernance } from '../lib/pr/pr-worktree-governance.js';
 import {
   checkPrKnowledgeReadiness,
   GIT_REF_NAME_PATTERN,
@@ -25,7 +25,7 @@ import {
 import { checkTitle } from '../check/check_pr_title.js';
 import { parseCheckJobs } from '../run_checks.js';
 import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
-import { guardCliArgsNormalized, type CliGuardSpec } from '../lib/cli-guard.js';
+import { guardCliArgsNormalized, type CliGuardSpec } from '../lib/cli/cli-guard.js';
 
 type Print = (value: unknown) => void;
 

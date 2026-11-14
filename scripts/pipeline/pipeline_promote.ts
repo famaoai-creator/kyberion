@@ -73,8 +73,8 @@ import {
 } from '@agent/core/pipeline/pipeline-promotion-evidence';
 import * as nodePath from 'node:path';
 import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
-import { guardCliArgs, hasCliFlag, type CliGuardSpec } from '../lib/cli-guard.js';
-import { assertPromotionSourceScope, repoRelative } from '../lib/promotion-scope.js';
+import { guardCliArgs, hasCliFlag, type CliGuardSpec } from '../lib/cli/cli-guard.js';
+import { assertPromotionSourceScope, repoRelative } from '../lib/promotion/promotion-scope.js';
 import {
   PIPELINE_PROMOTE_SOURCE_SYSTEM,
   commitPromotionAsset,
@@ -82,7 +82,7 @@ import {
   promotionAssetSummary,
   resolvePromotionActor,
   sha256Text,
-} from '../lib/promotion-ledger.js';
+} from '../lib/promotion/promotion-ledger.js';
 
 interface PromotionAdvice {
   name?: string;

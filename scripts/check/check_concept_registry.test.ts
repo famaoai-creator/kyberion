@@ -23,7 +23,7 @@ import {
   type ConceptRegistryBaseline,
   type RepoView,
 } from './check_concept_registry.js';
-import { resolveCiGateBaselinePath } from '../lib/ci-gate-baseline.js';
+import { resolveCiGateBaselinePath } from '../lib/ci/ci-gate-baseline.js';
 import { readTextFile } from '@agent/core/foundation';
 
 function memoryView(files: Record<string, string>): RepoView {

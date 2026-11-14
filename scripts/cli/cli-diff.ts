@@ -14,7 +14,7 @@
 import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
 import { ScriptExitError } from '../lib/harness.js';
-import { assertExtension, resolveRepositoryInput } from '../lib/perception.js';
+import { assertExtension, resolveRepositoryInput } from '../lib/perception/perception.js';
 
 const DIFFABLE_EXTENSIONS = ['.docx', '.pptx', '.xlsx', '.pdf'] as const;
 type DiffableExtension = (typeof DIFFABLE_EXTENSIONS)[number];

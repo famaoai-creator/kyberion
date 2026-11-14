@@ -4,7 +4,7 @@
  * infeasibility, the test that pins it. A site missing here stays an
  * "any role" site in the report.
  */
-import { readSafeJsonFile } from './json-input.js';
+import { readSafeJsonFile } from '../json-input.js';
 import type { Workspace } from './role-assumption-workspace.js';
 
 /**

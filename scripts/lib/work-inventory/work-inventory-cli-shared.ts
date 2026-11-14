@@ -17,8 +17,8 @@ import type {
   WorkInventoryFrequency,
   WorkInventoryScope,
 } from '@agent/core/workforce/work-inventory';
-import { getOptionValue, parseCsvOption } from '../refactor/mission-cli-args.js';
-import { resolveDecidedByFromArgv } from './decided-by-args.js';
+import { getOptionValue, parseCsvOption } from '../../refactor/mission-cli-args.js';
+import { resolveDecidedByFromArgv } from '../decided-by-args.js';
 
 export class WorkInventoryCliUsageError extends Error {
   constructor(message: string) {

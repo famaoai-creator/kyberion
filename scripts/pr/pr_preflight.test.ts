@@ -29,7 +29,7 @@ import {
 } from './pr_preflight.js';
 import { TEST_SUITES } from '../test_suite.js';
 import { PUBLISH_PR_CLI } from '../publish/publish_pull_request.js';
-import { ciTestPaths } from '../lib/affected-tests.js';
+import { ciTestPaths } from '../lib/ci/affected-tests.js';
 
 describe('pr preflight', () => {
   beforeEach(() => vi.resetAllMocks());

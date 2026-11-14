@@ -2,7 +2,7 @@ import { parseSafeJsonInput } from '@agent/core/foundation/safe-json';
 import { setRegisteredEnv } from '@agent/core/foundation/env';
 import { pathResolver } from '@agent/core/path-resolver';
 import { printHelp } from './cli-presentation.js';
-import { formatCliManifestHelp } from '../lib/cli-help.js';
+import { formatCliManifestHelp } from '../lib/cli/cli-help.js';
 import { ScriptExitError } from '../lib/harness.js';
 import type { SupportedLocale } from '@agent/core/locale';
 import type { ActuatorRecord } from '../cli.js';

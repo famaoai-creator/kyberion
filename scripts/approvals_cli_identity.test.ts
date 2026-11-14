@@ -90,8 +90,8 @@ import {
 } from '@agent/core/governance/cli-operator-principal';
 import { evaluateApprovalUsability } from '@agent/core/governance/approval-store';
 import { decideApprovalFromCli } from './lib/approval-cli-decision.js';
-import { captureCliAttestationInvoker } from './lib/cli-attestation-invoker.js';
-import { resetTtyIo, useTerminalEvidence, withTtyAnswer } from './lib/tty-io.test-support.js';
+import { captureCliAttestationInvoker } from './lib/cli/cli-attestation-invoker.js';
+import { resetTtyIo, useTerminalEvidence, withTtyAnswer } from './lib/tty/tty-io.test-support.js';
 import { auditChain } from '@agent/core/governance/audit-chain';
 import { computeApprovalPresentedDigest } from '@agent/core/governance/approval-store';
 import { pathResolver } from '@agent/core/path-resolver';

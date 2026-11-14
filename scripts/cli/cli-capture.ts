@@ -15,7 +15,11 @@ import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeReadFile, safeStat } from '@agent/core/secure-io';
 import { ScriptExitError } from '../lib/harness.js';
-import { isInsideRepository, parseCommonOption, sniffImageDimensions } from '../lib/perception.js';
+import {
+  isInsideRepository,
+  parseCommonOption,
+  sniffImageDimensions,
+} from '../lib/perception/perception.js';
 
 export const CAPTURE_USAGE = `Usage: pnpm kyberion capture [--screen | --window | --camera] [--out <image>] [--json]
 

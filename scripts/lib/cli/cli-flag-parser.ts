@@ -1,5 +1,5 @@
 /**
- * scripts/lib/cli-flag-parser.ts
+ * scripts/lib/cli/cli-flag-parser.ts
  *
  * Table-driven argv flag parsing shared by CLI scripts. Each command declares
  * a spec list — adding a flag is one table entry, not another else-if branch.
