@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { parseSafeJsonInput, parseSafeJsonObjectValue } from '@agent/core/foundation';
-import { handleAction } from '../libs/actuators/service-actuator/src/service-actuator-helpers.js';
-import { defineScript, isDirectScript, stripSharedScriptFlags } from './lib/harness.js';
+import { handleAction } from '../../libs/actuators/service-actuator/src/service-actuator-helpers.js';
+import { defineScript, isDirectScript, stripSharedScriptFlags } from '../lib/harness.js';
 
 type HarnessAction = 'describe' | 'plan' | 'verify' | 'receipt';
 

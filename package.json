@@ -139,7 +139,7 @@
     "scratch:promote": "node --import ./scripts/ts-loader.mjs scripts/scratch_promote.ts",
     "secrets:encrypt": "node --import ./scripts/ts-loader.mjs scripts/encrypt_connection_documents.ts",
     "security:ledger": "node scripts/run_built.mjs dist/scripts/security-ledger.js",
-    "service:preflight": "node scripts/run_built.mjs dist/scripts/service_preflight.js",
+    "service:preflight": "node scripts/run_built.mjs dist/scripts/service/service_preflight.js",
     "service:setup": "node scripts/run_built.mjs dist/scripts/services_setup.js",
     "stance:create": "node --import ./scripts/ts-loader.mjs scripts/stance/stance_create.ts",
     "stance:list": "node --import ./scripts/ts-loader.mjs scripts/stance/stance_list.ts",

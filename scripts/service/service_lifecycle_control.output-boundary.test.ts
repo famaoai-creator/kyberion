@@ -4,7 +4,7 @@ import { pathResolver, safeReadFile } from '@agent/core';
 describe('service lifecycle CLI output boundary', () => {
   it('routes service selection and operation results through the harness printer', () => {
     const source = String(
-      safeReadFile(pathResolver.rootResolve('scripts/service_lifecycle_control.ts'), {
+      safeReadFile(pathResolver.rootResolve('scripts/service/service_lifecycle_control.ts'), {
         encoding: 'utf8',
       }) || ''
     );

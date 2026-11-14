@@ -7,7 +7,7 @@ import {
 } from '@agent/core/service/service-binding-registry';
 import { resolveTenant } from '@agent/core/organization/tenant-registry';
 import { getServicePresetRecord } from '@agent/core/service/service-preset-registry';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from '../lib/harness.js';
 
 type Print = (value: unknown) => void;
 

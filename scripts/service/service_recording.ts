@@ -23,13 +23,13 @@ import {
   findServiceRecordingReviewRequest,
   requestServiceRecordingReview,
 } from '@agent/core/service/service-recording-review-approval';
-import { decideApprovalFromCli, revokeApprovalFromCli } from './lib/approval-cli-decision.js';
+import { decideApprovalFromCli, revokeApprovalFromCli } from '../lib/approval-cli-decision.js';
 import {
   defineScript,
   isDirectScript,
   ScriptExitError,
   stripSharedScriptFlags,
-} from './lib/harness.js';
+} from '../lib/harness.js';
 
 type JsonObject = Record<string, unknown>;
 

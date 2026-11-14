@@ -6,7 +6,9 @@ import { main } from './service_recording.js';
 describe('service recording entrypoint', () => {
   it('keeps command output and exit policy behind the shared script harness', async () => {
     const source = String(
-      safeReadFile(pathResolver.rootResolve('scripts/service_recording.ts'), { encoding: 'utf8' })
+      safeReadFile(pathResolver.rootResolve('scripts/service/service_recording.ts'), {
+        encoding: 'utf8',
+      })
     );
 
     expect(source).toContain('runServiceRecording = defineScript');

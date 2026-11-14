@@ -18,7 +18,7 @@ import { safeExistsSync } from '@agent/core/secure-io';
 import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
 import { defineScript, isDirectScript } from './lib/harness.js';
-import { main as runServiceBindingController } from './service_binding_controller.js';
+import { main as runServiceBindingController } from './service/service_binding_controller.js';
 import { withSensitivePathMediation } from '@agent/core/secure-io';
 import { formatSetupHintLine, formatSetupSummaryLine } from './setup-report-format.js';
 import { discoverLocalSttBackends } from '@agent/core/local-stt-discovery';

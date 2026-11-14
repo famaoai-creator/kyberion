@@ -61,7 +61,7 @@ const SOD_CONSUMERS: ReadonlyArray<{ file: string; consumer: string }> = [
     consumer: 'installation_publication_role_migration',
   },
   { file: 'scripts/personal-workbench/actions.ts', consumer: 'personal_workbench' },
-  { file: 'scripts/service_recording.ts', consumer: 'service_recording_review' },
+  { file: 'scripts/service/service_recording.ts', consumer: 'service_recording_review' },
   {
     file: 'libs/core/service/service-recording-review-approval.ts',
     consumer: 'service_recording_promotion',
