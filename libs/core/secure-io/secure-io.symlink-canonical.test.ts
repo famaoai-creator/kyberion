@@ -3,10 +3,10 @@ import * as fs from 'node:fs';
 import * as net from 'node:net';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import * as pathResolver from './path-resolver.js';
+import * as pathResolver from '../path-resolver.js';
 // Install the full identity resolver (MISSION_ROLE / persona) the production
 // write path uses, instead of the bootstrap fallback.
-import './authority.js';
+import '../authority.js';
 import {
   safeAppendFileSync,
   safeChmodSync,
@@ -29,7 +29,7 @@ import {
   safeUnlinkSync,
   safeWriteFile,
   validateFileSize,
-} from './secure-io.js';
+} from '../secure-io.js';
 import {
   assertNotForeignHardLink,
   assertTempInCheckedDir,
@@ -38,11 +38,11 @@ import {
   sameLinkState,
   setProcFdLookupDisabledForTesting,
   setProcFdRootForTesting,
-} from './secure-io-path-guard.js';
-import { getAllFiles } from './storage/fs-utils.js';
+} from '../secure-io-path-guard.js';
+import { getAllFiles } from '../storage/fs-utils.js';
 
 // Denials emit best-effort audit events; keep them off the real audit chain.
-vi.mock('./governance/audit-chain.js', () => ({
+vi.mock('../governance/audit-chain.js', () => ({
   auditChain: { record: vi.fn() },
 }));
 
@@ -1289,7 +1289,7 @@ describe('secure-io symlink canonicalization keeps the Vitest live-subtree remap
   for (const portable of [false, true]) {
     it(`still reads through a registered vault mount outside the repository, and never writes${portable ? ' (no /proc/self/fd)' : ''}`, async () => {
       const os = await import('node:os');
-      const { mountToVault, unmountFromVault } = await import('./secret/vault-mount.js');
+      const { mountToVault, unmountFromVault } = await import('../secret/vault-mount.js');
       const host = fs.mkdtempSync(path.join(os.tmpdir(), 'secure-io-vault-'));
       const name = `vitest-secure-io-${RUN}`;
       fs.writeFileSync(path.join(host, 'doc.txt'), 'mounted');

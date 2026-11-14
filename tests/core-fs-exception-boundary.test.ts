@@ -92,18 +92,18 @@ const allowedCoreFsImports = [
   'libs/core/mission/sdlc-artifact-store.test.ts',
   // Fixture setup needs raw fs to create symlinks and verify 0600/0700 modes.
   'libs/core/secret/secret-bridge.test.ts',
-  'libs/core/secure-io.branch.test.ts',
+  'libs/core/secure-io/secure-io.branch.test.ts',
   // Mock native rm only to prove broad scratch deletion never reaches the OS.
-  'libs/core/secure-io-scratch-root.test.ts',
+  'libs/core/secure-io/secure-io-scratch-root.test.ts',
   // Fault-inject native open/readlink/stat; fixture I/O remains secure-io.
-  'libs/core/secure-io.metadata-fd.test.ts',
+  'libs/core/secure-io/secure-io.metadata-fd.test.ts',
   // secure-io's permission guards (literal + canonical symlink checks), split
   // out of secure-io.ts for size; part of the same governed I/O boundary.
   'libs/core/secure-io-path-guard.ts',
   // Plant links with raw node:fs to model links created outside secure-io.
-  'libs/core/secure-io.symlink-canonical.test.ts',
-  'libs/core/secure-io.symlink-root-alias.test.ts',
-  'libs/core/secure-io.test.ts',
+  'libs/core/secure-io/secure-io.symlink-canonical.test.ts',
+  'libs/core/secure-io/secure-io.symlink-root-alias.test.ts',
+  'libs/core/secure-io/secure-io.test.ts',
   'libs/core/secure-io.ts',
   'libs/core/security-boundary.contract.test.ts',
   'libs/core/voice/speech-to-text-bridge.test.ts',

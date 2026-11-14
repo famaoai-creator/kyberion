@@ -1,8 +1,8 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { pathResolver } from './path-resolver.js';
-import { runInResourceAccessScope } from './foundation/resource-access-scope.js';
+import { pathResolver } from '../path-resolver.js';
+import { runInResourceAccessScope } from '../foundation/resource-access-scope.js';
 import {
   safeLinkExclusiveSync,
   safeMkdir,
@@ -16,8 +16,8 @@ import {
   safeSymlinkSync,
   safeWriteFile,
   validateFileSize,
-} from './secure-io.js';
-import { statVetted } from './secure-io-path-guard.js';
+} from '../secure-io.js';
+import { statVetted } from '../secure-io-path-guard.js';
 
 vi.mock('node:fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs')>();
@@ -28,8 +28,8 @@ vi.mock('node:fs', async (importOriginal) => {
     statSync: vi.fn(actual.statSync),
   };
 });
-vi.mock('./governance/audit-chain.js', () => ({ auditChain: { record: vi.fn() } }));
-vi.mock('./governance/policy-engine.js', () => ({
+vi.mock('../governance/audit-chain.js', () => ({ auditChain: { record: vi.fn() } }));
+vi.mock('../governance/policy-engine.js', () => ({
   policyEngine: { evaluate: () => ({ allowed: true }) },
 }));
 
