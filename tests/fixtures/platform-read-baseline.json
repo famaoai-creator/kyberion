@@ -79,7 +79,7 @@
     "scripts/kyberion.ts",
     "scripts/lib/cli-tty-challenge-driver.ts",
     "scripts/lib/seam-calibration/voice-tts-engine.ts",
-    "scripts/meeting_preflight.ts",
+    "scripts/meeting/meeting_preflight.ts",
     "scripts/minutes_record.ts",
     "scripts/personal-pads/actions.ts",
     "scripts/pipeline-execution-part-results.ts",

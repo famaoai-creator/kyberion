@@ -16,14 +16,14 @@ import {
 } from '@agent/core/coreaudio-device-inventory';
 import { probeMacOSNativeAutomation } from '@agent/core/macos-native-automation';
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { collectDoctorReport } from './run_doctor.js';
-import { checkSpeakConsent } from '../libs/actuators/meeting-actuator/src/meeting-actuator-helpers.js';
+import { collectDoctorReport } from '../run_doctor.js';
+import { checkSpeakConsent } from '../../libs/actuators/meeting-actuator/src/meeting-actuator-helpers.js';
 import {
   evaluateGrantReadiness,
   type GrantReadinessReport,
 } from '@agent/core/governance/grant-readiness';
 import { getRegisteredEnvText, setRegisteredEnv } from '@agent/core/foundation';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from '../lib/harness.js';
 
 type Print = (value: unknown) => void;
 

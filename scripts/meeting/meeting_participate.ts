@@ -67,8 +67,8 @@ import type {
 import { startMeetingCommandLoop } from './meeting_commands.js';
 import type { ConversationAgent } from '@agent/core/meeting/meeting-participation-coordinator';
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { defineScript, isDirectScript, setProcessExitCode } from './lib/harness.js';
-import { parseSafeJsonObjectInput } from './lib/json-input.js';
+import { defineScript, isDirectScript, setProcessExitCode } from '../lib/harness.js';
+import { parseSafeJsonObjectInput } from '../lib/json-input.js';
 // Side-effect imports register the audio-bus capability probes so the
 // participation-runtime manifest can resolve `audio-bus.blackhole` etc.
 import '@agent/core/blackhole-audio-bus';

@@ -11,7 +11,7 @@
  * `action-item-execute-self.json`, and `action-item-tracking.json`.
  *
  * Usage:
- *   node dist/scripts/meeting_orchestrator.js \
+ *   node dist/scripts/meeting/meeting_orchestrator.js \
  *     --mission MSN-MEETING-2026-Q2 \
  *     --meeting-url "https://example.zoom.us/j/9999999999" \
  *     --platform zoom \
@@ -50,7 +50,7 @@ import {
   safeMkdir,
   safeExec,
 } from '@agent/core/secure-io';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from '../lib/harness.js';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { parseSafeJsonInput, setRegisteredEnv } from '@agent/core/foundation';
 

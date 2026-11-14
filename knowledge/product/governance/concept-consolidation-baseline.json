@@ -1560,14 +1560,14 @@
     "scripts/marketing_video_dry_run.ts": {
       "json_state_write_budget": 4
     },
-    "scripts/meeting_orchestrator.ts": {
+    "scripts/meeting/meeting_orchestrator.ts": {
       "json_state_write_budget": 1,
       "runtime_path_literal_budget": 1
     },
-    "scripts/meeting_preflight.ts": {
+    "scripts/meeting/meeting_preflight.ts": {
       "env_direct_read_budget": 1
     },
-    "scripts/meeting_readiness_check.ts": {
+    "scripts/meeting/meeting_readiness_check.ts": {
       "bespoke_cli_parser_budget": 1
     },
     "scripts/meeting-notepad/server.ts": {

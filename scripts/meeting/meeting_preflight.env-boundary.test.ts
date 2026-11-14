@@ -4,7 +4,7 @@ import { pathResolver, safeReadFile } from '@agent/core';
 describe('meeting preflight environment boundary', () => {
   it('routes ambient mission fallback through the governed environment accessor', () => {
     const source = String(
-      safeReadFile(pathResolver.rootResolve('scripts/meeting_preflight.ts'), {
+      safeReadFile(pathResolver.rootResolve('scripts/meeting/meeting_preflight.ts'), {
         encoding: 'utf8',
       })
     );

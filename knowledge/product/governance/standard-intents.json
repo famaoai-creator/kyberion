@@ -945,7 +945,7 @@
                     {
                       "op": "system:shell",
                       "params": {
-                        "cmd": "node dist/scripts/meeting_orchestrator.js --mission \"{{mission_id}}\" --meeting-url \"{{meeting_url}}\"",
+                        "cmd": "node dist/scripts/meeting/meeting_orchestrator.js --mission \"{{mission_id}}\" --meeting-url \"{{meeting_url}}\"",
                         "export_as": "meeting_orchestrator_output"
                       }
                     }

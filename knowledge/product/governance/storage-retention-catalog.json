@@ -1025,7 +1025,7 @@
       "path": "active/shared/runtime/meeting",
       "artifact_class": "report",
       "action": "review_required",
-      "note": "Per-mission meeting briefs (scripts/meeting_orchestrator.ts)."
+      "note": "Per-mission meeting briefs (scripts/meeting/meeting_orchestrator.ts)."
     },
     {
       "path": "active/shared/runtime/mission-seeds",

@@ -57,7 +57,7 @@ describe('meeting orchestrator resource boundaries', () => {
 
   it('routes both attendee input forms through the canonical contract', () => {
     const source = String(
-      safeReadFile(pathResolver.rootResolve('scripts/meeting_orchestrator.ts'), {
+      safeReadFile(pathResolver.rootResolve('scripts/meeting/meeting_orchestrator.ts'), {
         encoding: 'utf8',
       })
     );
