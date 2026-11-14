@@ -3,7 +3,7 @@
  *
  * Same shape as `core:customer_decision_reminders` (reminder-op.ts): the op
  * never counts in the pipeline process. It runs the built governed facade
- * (`dist/scripts/customer_decision.js learning`) as a child with the same
+ * (`dist/scripts/customer/customer_decision.js learning`) as a child with the same
  * explicit env (no SYSTEM_ROLE, no ambient role / persona / sudo / mission
  * keys, bound to the run's tenant), so the facade assumes its own narrow
  * roles exactly as when an operator runs `customer-decision learning`.

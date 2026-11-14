@@ -79,7 +79,7 @@ const savedRoot = process.env.KYBERION_ROOT;
  * (run `pnpm -s build`) instead of silently testing stale code.
  */
 const DIST_FILES = [
-  'dist/scripts/customer_decision.js',
+  'dist/scripts/customer/customer_decision.js',
   'dist/scripts/customer-decision/reminders.js',
   'libs/core/dist/customer-decision/reminders.js',
   'libs/core/dist/organization/customer-conversation.js',
@@ -88,7 +88,7 @@ const DIST_FILES = [
 ];
 const SOURCE_DIRS = ['scripts/customer-decision', 'libs/core/customer-decision'];
 const SOURCE_FILES = [
-  'scripts/customer_decision.ts',
+  'scripts/customer/customer_decision.ts',
   'libs/core/organization/customer-conversation.ts',
   'libs/core/organization/customer-outbound-templates.ts',
   'libs/core/organization/customer-channel-binding.ts',
@@ -653,8 +653,8 @@ describe('customer-decision reminders and hand-offs (CD-11, real paths)', () => 
     `the daily op runs the facade as a child bound to its tenant, and refuses another tenant${STALE_DIST ? ` (skipped: ${STALE_DIST} — run pnpm -s build)` : ''}`,
     async () => {
       const { runCustomerDecisionReminderOp, reminderFacadeEnv } =
-        await import('./customer-decision/reminder-op.js');
-      const { buildTenantRunEnv } = await import('./chronos_daemon.js');
+        await import('../customer-decision/reminder-op.js');
+      const { buildTenantRunEnv } = await import('../chronos_daemon.js');
       // The pipeline process: the identity a chronos tenant child runs with.
       const env = buildTenantRunEnv(TENANT);
       for (const key of [
@@ -675,7 +675,7 @@ describe('customer-decision reminders and hand-offs (CD-11, real paths)', () => 
           KYBERION_TENANT_SCOPE_REQUIRED: '1',
           KYBERION_ROOT: ROOT,
         });
-        const scriptPath = path.join(SOURCE_ROOT, 'dist/scripts/customer_decision.js');
+        const scriptPath = path.join(SOURCE_ROOT, 'dist/scripts/customer/customer_decision.js');
         const at = '2026-10-30T01:00:00.000Z';
         const dry = await runCustomerDecisionReminderOp({ dryRun: true, now: at, scriptPath });
         expect(dry).toMatchObject({
@@ -732,7 +732,7 @@ describe('customer-decision reminders and hand-offs (CD-11, real paths)', () => 
       expect(installed.steps.map((item) => item.op)).toEqual(['core:customer_decision_reminders']);
       expect(installed.schedule.id).toBe('customer-decision-reminders');
       // Chronos picks it up as a tenant pipeline of this tenant.
-      const { collectTenantPipelineFiles } = await import('./chronos_daemon.js');
+      const { collectTenantPipelineFiles } = await import('../chronos_daemon.js');
       expect(collectTenantPipelineFiles(ROOT)).toEqual(
         expect.arrayContaining([
           expect.objectContaining({

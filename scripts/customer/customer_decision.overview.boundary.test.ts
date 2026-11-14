@@ -59,7 +59,7 @@ const savedRoot = process.env.KYBERION_ROOT;
 
 /** Same rule as the reminders boundary test: skip the child run on a stale build. */
 const DIST_FILES = [
-  'dist/scripts/customer_decision.js',
+  'dist/scripts/customer/customer_decision.js',
   'dist/scripts/customer-decision/learning.js',
   'dist/scripts/customer-decision/learning-op.js',
   'libs/core/dist/customer-decision/learning.js',
@@ -67,7 +67,7 @@ const DIST_FILES = [
 ];
 const SOURCE_DIRS = ['scripts/customer-decision', 'libs/core/customer-decision'];
 const SOURCE_FILES = [
-  'scripts/customer_decision.ts',
+  'scripts/customer/customer_decision.ts',
   'libs/core/knowledge/operational-learning.ts',
 ];
 function staleDistReason(): string | null {
@@ -671,8 +671,8 @@ describe('customer-decision overview and learning (CD-12, real paths)', () => {
   it.skipIf(STALE_DIST !== null)(
     `the weekly op runs the facade as a child bound to its tenant, and refuses another tenant${STALE_DIST ? ` (skipped: ${STALE_DIST} — run pnpm -s build)` : ''}`,
     async () => {
-      const { runCustomerDecisionLearningOp } = await import('./customer-decision/learning-op.js');
-      const { buildTenantRunEnv } = await import('./chronos_daemon.js');
+      const { runCustomerDecisionLearningOp } = await import('../customer-decision/learning-op.js');
+      const { buildTenantRunEnv } = await import('../chronos_daemon.js');
       const env = buildTenantRunEnv(TENANT);
       for (const key of [
         'KYBERION_TENANT',
@@ -683,7 +683,7 @@ describe('customer-decision overview and learning (CD-12, real paths)', () => {
         process.env[key] = env[key];
       process.env.SYSTEM_ROLE = 'chronos_mirror_v2';
       try {
-        const scriptPath = path.join(SOURCE_ROOT, 'dist/scripts/customer_decision.js');
+        const scriptPath = path.join(SOURCE_ROOT, 'dist/scripts/customer/customer_decision.js');
         const dry = await runCustomerDecisionLearningOp({ dryRun: true, now: NOW, scriptPath });
         expect(dry).toMatchObject({
           tenant: TENANT,

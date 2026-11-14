@@ -5,7 +5,7 @@
  *
  * The only writer of agendas, receipts, switches, invites and the customer
  * decisions they put in the SSOD ledger. The customer-room display runs the
- * built script (`dist/scripts/customer_decision.js`) as a child process for
+ * built script (`dist/scripts/customer/customer_decision.js`) as a child process for
  * `view` / `respond` and never touches the stores itself.
  *
  * Operator verbs (all take --tenant <slug> --case <id>; --json for machine output):
@@ -84,7 +84,7 @@
  * `task-decisions.ts` (task-decisions),
  * `bolt-review.ts` (CD-10 bolt-review draft and answer routing), `reminders.ts`
  * (CD-11), `overview.ts` / `learning.ts` (CD-12 overview and learning). This file
- * is the entry point; the room spawns `dist/scripts/customer_decision.js`.
+ * is the entry point; the room spawns `dist/scripts/customer/customer_decision.js`.
  *
  * Consistency: every read → plan → write sequence on a case runs under the
  * case lock (`withCustomerDecisionCaseLock`), which also holds the decision
@@ -102,34 +102,34 @@ import {
   defineScript,
   isDirectScript,
   ScriptExitError,
-} from './lib/harness.js';
+} from '../lib/harness.js';
 import {
   type CustomerDecisionIo,
   parseCustomerDecisionArgs,
   usage,
   usageError,
-} from './customer-decision/common.js';
+} from '../customer-decision/common.js';
 import {
   runDraft,
   runGenerate,
   runSubmit,
   runActorAdd,
   runSend,
-} from './customer-decision/operator.js';
+} from '../customer-decision/operator.js';
 import {
   runStatus,
   runConfirm,
   runEnd,
   runRevoke,
-} from './customer-decision/operator-lifecycle.js';
-import { runCustomerFacing } from './customer-decision/customer-facing.js';
-import { runCollectTaskProposals } from './customer-decision/task-proposals.js';
-import { runTaskDecisions } from './customer-decision/task-decisions.js';
-import { runBoltReview } from './customer-decision/bolt-review.js';
-import { runRemind, runRemindersInstall } from './customer-decision/reminders.js';
-import { runOverview } from './customer-decision/overview.js';
-import { runLearning, runLearningInstall } from './customer-decision/learning.js';
-import { runTemplate } from './customer-decision/templates.js';
+} from '../customer-decision/operator-lifecycle.js';
+import { runCustomerFacing } from '../customer-decision/customer-facing.js';
+import { runCollectTaskProposals } from '../customer-decision/task-proposals.js';
+import { runTaskDecisions } from '../customer-decision/task-decisions.js';
+import { runBoltReview } from '../customer-decision/bolt-review.js';
+import { runRemind, runRemindersInstall } from '../customer-decision/reminders.js';
+import { runOverview } from '../customer-decision/overview.js';
+import { runLearning, runLearningInstall } from '../customer-decision/learning.js';
+import { runTemplate } from '../customer-decision/templates.js';
 
 export {
   AGENDA_APPROVE_OPERATION,
@@ -137,8 +137,8 @@ export {
   diagnosticCode,
   parseCustomerDecisionArgs,
   type CustomerDecisionIo,
-} from './customer-decision/common.js';
-export type { CustomerFacingFailure } from './customer-decision/customer-facing.js';
+} from '../customer-decision/common.js';
+export type { CustomerFacingFailure } from '../customer-decision/customer-facing.js';
 
 export async function runCustomerDecision(
   argv: readonly string[],

@@ -122,7 +122,7 @@ conflict caller, which refuses the write. Logging and returning an empty list is
 appropriate only for non-strict discovery; it must not turn unknown bindings
 into permission to reuse a channel. Preserve the existing tenant-bound read role.
 
-`customer-channel-binding.test.ts` and `scripts/customer_channel.test.ts` run in
+`customer-channel-binding.test.ts` and `scripts/customer/customer_channel.test.ts` run in
 `registration-tests`. Their regressions cover strict/non-strict reads and real
 bind attempts against malformed/schema-invalid other-tenant data, asserting
 the target's existing bytes remain unchanged.
@@ -686,12 +686,12 @@ This covers directories and top-level `*.jsonl` / `*.json` files.
 
 ### Customer decision writer consistency
 
-- Every read → plan → write sequence on a customer decision case (`scripts/customer_decision.ts` draft, generate's write, submit, send, respond, confirm, status) runs under `withCustomerDecisionCaseLock` (one inter-process lock per tenant + case, `libs/core/customer-decision/store.ts`). Take it under the caller's own identity, outside the narrow store roles, and re-read the agenda, ledger and receipts inside it. Async work (the generate model call) runs outside the lock; the write then re-reads and refuses a changed agenda.
+- Every read → plan → write sequence on a customer decision case (`scripts/customer/customer_decision.ts` draft, generate's write, submit, send, respond, confirm, status) runs under `withCustomerDecisionCaseLock` (one inter-process lock per tenant + case, `libs/core/customer-decision/store.ts`). Take it under the caller's own identity, outside the narrow store roles, and re-read the agenda, ledger and receipts inside it. Async work (the generate model call) runs outside the lock; the write then re-reads and refuses a changed agenda.
 - `respond` writes a write-ahead record (`<case>/respond-journal/<receipt_id>.json`: the receipt with its decision ids pre-assigned under the lock, and the effective decisions before) before the ledger append, then ledger → receipt → audit → switches → brief input, and removes the record. The next respond / confirm / submit / status of the case completes a run that stopped part way (`reconcileCase`); a run whose ledger write never happened is dropped and audited `not_applied`. Every completion step is idempotent. Never make a later step a precondition of an earlier one, and never delete a journal record that cannot be read — `status` reports it under `reconciled.stuck`.
 - The deal note is best-effort (narrow `customer_decision_deal_note_writer`, never `mission_controller`): a failure is logged and audited, never fails the respond. Customer-written text in a note is quoted on one line, control/bidi characters removed, truncated, attributed (`quoteCustomerText`).
 - An unexpected failure of the customer-facing verbs is audited with a reason code (`diagnosticCode`, never the token or the message); the customer room logs that code as a warning and never forwards it.
 - The room spawns the facade with `facadeChildEnv` only (exec allowlist, ambient role / persona / sudo / mission keys blanked, `SYSTEM_ROLE` cleared, `KYBERION_TENANT`, `KYBERION_ROOT`); `--dir` is accepted only in test runs.
-- Regression gates: `scripts/customer_decision.test.ts` (fault injection after the ledger and after the receipt, then status / retry repair; deal-note role and failure; coded traces; `--dir` gating), `presence/displays/customer-room/src/server/facade.integration.test.ts` (concurrent built-facade respond children: no lost decision, unique ids, one receipt per double submit; child env), `libs/core/customer-decision/store.test.ts` (lock exclusivity, journal records).
+- Regression gates: `scripts/customer/customer_decision.test.ts` (fault injection after the ledger and after the receipt, then status / retry repair; deal-note role and failure; coded traces; `--dir` gating), `presence/displays/customer-room/src/server/facade.integration.test.ts` (concurrent built-facade respond children: no lost decision, unique ids, one receipt per double submit; child env), `libs/core/customer-decision/store.test.ts` (lock exclusivity, journal records).
 
 ## §3 Daemons and child processes
 
@@ -812,7 +812,7 @@ revision changes, unchanged summary refreshes and timeout recovery in
 unbounded. When a child needs a role the server itself must not hold (a writer, or a ledger role
 such as `decision_ledger`), do not add that role to the server's `may_assume` and do not clear
 `SYSTEM_ROLE`. Give the child its own one-purpose entry script that dispatches only the verbs the
-server calls (e.g. `scripts/customer_decision_overview.ts`, `scripts/dot/dot_lifecycle_worker.ts`), a
+server calls (e.g. `scripts/customer/customer_decision_overview.ts`, `scripts/dot/dot_lifecycle_worker.ts`), a
 narrow system role granting just the roles that entry reaches, a reachability workspace entry in
 `scripts/lib/role-assumption-workspace.ts`, and a regenerated
 `role-assumption-unresolved-baseline.json` (`--print-unresolved-baseline`, never hand edits). Pin

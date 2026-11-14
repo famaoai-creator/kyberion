@@ -21,7 +21,7 @@ const EXTRA_SYSTEM_ROLE_ENTRIES: Record<string, string[]> = {
   dot_lifecycle_worker: ['scripts/dot/dot_lifecycle_worker.ts'],
   // Read-only customer-decision facade child of Concierge's /api/ops/customer-decisions
   // routes (overview | case | learning), spawned under its own role.
-  customer_decision_reader: ['scripts/customer_decision_overview.ts'],
+  customer_decision_reader: ['scripts/customer/customer_decision_overview.ts'],
 };
 
 // ---------------------------------------------------------------------------

@@ -173,7 +173,7 @@ status: active
 モジュール:
 
 - `libs/core/customer-decision/`: 型、内容ハッシュ、有効な決定の解決（純関数）、切り替わりの検出、照合、招待トークン、保存。
-- `scripts/customer_decision.ts`（`pnpm kyberion customer-decision`）: 書き込みの唯一の窓口。`draft` / `generate` / `submit` / `send` / `status` / `revoke`、および顧客向け画面が子プロセスとして呼ぶ `view` / `respond`。台帳への書き込みは `libs/core/decision-ledger` の関数を使う。
+- `scripts/customer/customer_decision.ts`（`pnpm kyberion customer-decision`）: 書き込みの唯一の窓口。`draft` / `generate` / `submit` / `send` / `status` / `revoke`、および顧客向け画面が子プロセスとして呼ぶ `view` / `respond`。台帳への書き込みは `libs/core/decision-ledger` の関数を使う。
 - `presence/displays/customer-room/`: 独立したプロセス。1 プロセスは 1 テナントだけを扱う（`KYBERION_CUSTOMER_ROOM_TENANT`）。招待トークンは URL のフラグメントで渡し、画面からはヘッダで送る（サーバのアクセスログに残さない）。読み書きとも facade の子プロセスを通し、ライブラリから台帳を直接触らない。
 - 段階 1 では、`hearing` 種別の事項は自由記述で受ける。画面内の対話（`requirements_hearing` モード）は段階 1 の後の改善で入れる。
 
@@ -257,7 +257,7 @@ status: active
 - 送る日は UTC の日付で決める。`before_due` は `respond_by` の前日、`due` は当日だけ。`override_closing` は締め切りの 2 日前から窓が閉じるまでの間（日次の実行が 1 日抜けても届くように）。重複防止は調整セット × 決定者 × 種類 × 対象の日付で、記録が `approval_pending` のものだけ次の実行で同じ相関 id のまま承認ゲートに聞き直す。`delivery_failed` と受信箱の書き込みの失敗は記録しないので次の実行で送り直す。
 - 対象: 送付済み（`sent`）で、承認が今の内容と一致している調整セットだけ。閉じた・取り下げた・承認後に編集した調整セットには送らない。決定者は失効も期限切れもしていない招待を持つ人だけ（貢献者には送らない）。答えたかどうかは、今の内容ハッシュへの決定者の決定記録があるかで見る。上書きの締め切りの知らせは、その日付の項目がまだこちらの側（`ours` / `org_default`）のときだけ。
 - 送付済みの調整セットの一覧は、テナントの招待の置き場（`listInvites`）から作る。案件ごと・調整セットごとに失敗を受け止め、1 件の失敗がほかを止めない。
-- 実行の権限: 日次の op（`scripts/customer-decision/reminder-op.ts`）は、パイプラインのプロセスの中で sweep を動かさない。顧客向け画面と同じく、ビルド済みの facade（`dist/scripts/customer_decision.js remind`）を子プロセスで動かす。子の env は SYSTEM_ROLE と役割・persona・sudo・ミッションを空にし、実行が束縛されたテナント（`KYBERION_TENANT`、`KYBERION_TENANT_SCOPE_REQUIRED`）だけを渡す。facade は運用者が `remind` を動かすときと同じ役割（案件は `decision_ledger`、招待は `customer_decision_invite_store`、受信箱は `surface_runtime`）を自分で取る。パイプラインの実行器はどの SYSTEM_ROLE のプロセスにも届くので、op の中で直接これらの役割を取ると 15 のシステム役割から `decision_ledger` などが届くことになる（`role-assumption-reachability` で確認した）。子プロセスにしたので、どのシステム役割にも新しい役割は届かず、役割の追加・拡大・ポリシーの変更はない。op は束縛されたテナント以外を受け付けない。`sendToCustomer` は facade の中でテナントに束縛した文脈（`decision_ledger`）で呼ぶ（テナントの憲章を憲章の exact scope で読むため）。
+- 実行の権限: 日次の op（`scripts/customer-decision/reminder-op.ts`）は、パイプラインのプロセスの中で sweep を動かさない。顧客向け画面と同じく、ビルド済みの facade（`dist/scripts/customer/customer_decision.js remind`）を子プロセスで動かす。子の env は SYSTEM_ROLE と役割・persona・sudo・ミッションを空にし、実行が束縛されたテナント（`KYBERION_TENANT`、`KYBERION_TENANT_SCOPE_REQUIRED`）だけを渡す。facade は運用者が `remind` を動かすときと同じ役割（案件は `decision_ledger`、招待は `customer_decision_invite_store`、受信箱は `surface_runtime`）を自分で取る。パイプラインの実行器はどの SYSTEM_ROLE のプロセスにも届くので、op の中で直接これらの役割を取ると 15 のシステム役割から `decision_ledger` などが届くことになる（`role-assumption-reachability` で確認した）。子プロセスにしたので、どのシステム役割にも新しい役割は届かず、役割の追加・拡大・ポリシーの変更はない。op は束縛されたテナント以外を受け付けない。`sendToCustomer` は facade の中でテナントに束縛した文脈（`decision_ledger`）で呼ぶ（テナントの憲章を憲章の exact scope で読むため）。
 - インストール: `reminders --install` は `pipeline:promote` でひな形をテナントのパイプラインに置く（`asset_promoter`、資産台帳、カタログの行）。Chronos が動かすのは project-trust の承認の後。
 - 引き継ぎ: 選択肢の外の回答（`hearing` 以外の `free_text`）、コメントつきの回答（bolt レビューの `request_changes` / `reject` は CD-10 の経路なので数えない）、`general_question` を、決定記録ごとに 1 件の受信箱の項目（`INBOX-CDH-…`）と通知にする。通知の重複防止のキーは本文のハッシュを含む（同じキーで本文が違うと通知の側が `uncertain` で止めるため）。respond の後と `status` で送り直す。
 
@@ -272,7 +272,7 @@ status: active
 - 定型文が受け付けない題名（300 文字超、リンク・ドメイン・メンションの書式、見えない制御文字）は、無人では送らず担当者の受信箱の「手でリマインドする」項目にする（理由 `template_refused`）。
 - 上書きの締め切りの知らせは、締め切りの時刻を調整セットの表示の時間帯（`ja` は日本時間、`en` は UTC）で `{date} {time}（{zone}）` として出す。語彙 `customer_decision:reminder_override_closing` の文面にこの 2 つの差し込みを足す必要がある（語彙の更新は別の作業で取り込む）。
 - 紐付けには顧客の id がないため、`actor-add --channel` は別の顧客の決定者がすでに使っているチャネルに警告（`warnings: channel_shared_with_customer:<顧客>`）を出すだけで、拒まない。紐付けに顧客を持たせて照合するのは後続（紐付けのスキーマの変更）。
-- 子プロセスの結合テスト（`scripts/customer_decision.reminders.boundary.test.ts` の日次の op）は、`dist/` がソースより古いときは理由つきで skip する。
+- 子プロセスの結合テスト（`scripts/customer/customer_decision.reminders.boundary.test.ts` の日次の op）は、`dist/` がソースより古いときは理由つきで skip する。
 - 受信箱の書き込みは CD-10 と同じく、受信箱だけに絞った役割 `deliverable_inbox_writer` で行う（当初は `surface_runtime` だった。ブランチ `fix/customer-decision-hardening-20261025` で置き換えた）。
 
 ## CD-12 の実装設計（2026-10-25）
@@ -318,12 +318,12 @@ status: active
 
 第 2 回レビューの対応（2026-10-24）:
 
-- 台帳ロック: `libs/core/decision-ledger/ledger.ts` の `withDecisionLedgerLock`。`pnpm decisions` と customer respond を別プロセスで同時に走らせても、どちらの記録も失われない（`scripts/customer_decision.test.ts`）。
+- 台帳ロック: `libs/core/decision-ledger/ledger.ts` の `withDecisionLedgerLock`。`pnpm decisions` と customer respond を別プロセスで同時に走らせても、どちらの記録も失われない（`scripts/customer/customer_decision.test.ts`）。
 - reconcile は先行記録ごとに失敗を受け止め、`status` の `reconciled.stuck` に診断コードつきで出し、`respond_reconcile` の失敗として監査に残す。1 件の壊れた記録が案件や `status` を止めない。
 - 監査の冪等性: 先行記録に `auditing` の段を足した。監査の追記の前後で止まった実行は、監査チェーンにその決定記録の `respond completed` があれば書き足さない。
 - `confirm` は承認ゲートを通る。`close` / `withdraw`（`--agenda <id> --by user:<member> [--reason]`）を足した。`withdraw` は未失効の招待をすべて失効させる。どちらも同じ item × key を別の調整セットで聞けるようにする。
 - 顧客向け `view` の追加: 項目ごとの `current.status` / `current.awaiting_operator_confirmation`、`agenda.from`（設定時のみ）、`approval` の項目の `draft`。`from` は `draft --from` / `draft --file` で設定し、内容ハッシュに含める（未設定の調整セットのハッシュは変わらない）。
-- `scripts/customer_decision.ts` は入口だけにし、本体を `scripts/customer-decision/`（`common` / `operator` / `operator-lifecycle` / `reconcile` / `customer-facing`）に分けた。
+- `scripts/customer/customer_decision.ts` は入口だけにし、本体を `scripts/customer-decision/`（`common` / `operator` / `operator-lifecycle` / `reconcile` / `customer-facing`）に分けた。
 
 使い方（運用者）:
 
@@ -358,7 +358,7 @@ KYBERION_CUSTOMER_ROOM_TENANT=<t> node dist/presence/displays/customer-room/serv
 - 商談メモの項目名を問いの全文ではなく短いラベルにする（テンプレートに `label_key` を足す）。
 - CD-09: ミッションの実行器に、タスク境界での照合（`checkDecisionFreshness`）を組み込む。（実装済み。「CD-09 の実装設計」の節）
 - CD-09 の残り: 判断待ちから再開したタスクの指示に、確定した顧客の決定の値を渡していない（値は confidential なので、渡し方を決めてから入れる）。（対応済み、ブランチ `feat/customer-decision-cd09-invite-20261025`: 再開したタスクには、そのタスク自身が出した `requires_customer` の問いについて、いま有効な顧客の決定の値だけを渡す。値はタスクを動かすときのプロンプト（メモリ上）にだけ入れ、どこにも保存しない。保存される形（固定ファイル、監査、プロンプトの記録、イベント）は決定の id と件数だけ。渡すのは、ミッションのコンテキストパックがそのテナントの confidential を持てるとき（同じテナント、`write_tier` が confidential、外部への送信が拒否、パックが縮退していない）だけで、それ以外は値を送らずにタスクを `customer_decision_tier_mismatch` で判断待ちにする。タスクの結果に値がそのまま出てきたら、共有の置き場に写す前に決定の id に置き換える）
-- CD-09 の残り: 判断待ちの解除（`confirm` の後の照合）を、実際の運用者の identity で動かす結合テストを足す（今のテストは facade の関数を直接呼ぶ）。（対応済み、ブランチ `fix/customer-decision-followups-20261025`: `scripts/customer_decision.confirm-release.integration.test.ts` が、組み上げた CLI をテナントに束縛した子プロセスで動かし、人の承認の後にだけ保留が解けることを確かめる。このテストで、別のテナントに束縛されたプロセスが `--tenant` で他のテナントの決定を確定できる欠陥が見つかり、facade のすべての動詞で束縛されたテナントと違う `--tenant` を拒むようにした。確定した人は承認の決定者から取り、`--by` は `requested_by` として残す。`confirm` と `submit` の承認依頼は id だけにし、テナントのスコープとテナントを含む相関 id を持たせた）
+- CD-09 の残り: 判断待ちの解除（`confirm` の後の照合）を、実際の運用者の identity で動かす結合テストを足す（今のテストは facade の関数を直接呼ぶ）。（対応済み、ブランチ `fix/customer-decision-followups-20261025`: `scripts/customer/customer_decision.confirm-release.integration.test.ts` が、組み上げた CLI をテナントに束縛した子プロセスで動かし、人の承認の後にだけ保留が解けることを確かめる。このテストで、別のテナントに束縛されたプロセスが `--tenant` で他のテナントの決定を確定できる欠陥が見つかり、facade のすべての動詞で束縛されたテナントと違う `--tenant` を拒むようにした。確定した人は承認の決定者から取り、`--by` は `requested_by` として残す。`confirm` と `submit` の承認依頼は id だけにし、テナントのスコープとテナントを含む相関 id を持たせた）
 - CD-09 の残り: 1 つの固定ファイルだけを対象にする capability は、照合（sweep）とタスクの境界とで同じ形になり、guard では区別できない。タスク境界の呼び出し元が自分の固定ファイルだけに書けることを、capability の中の owner で guard が確かめるようにする。
 - CD-09 の残り（CD-10 のレビューで判明）: `customer_decision_consumer_store` も共有の core 役割で、capability の作り方が公開されているため、SYSTEM_ROLE の任意のプロセスが任意の consumer の固定ファイルを書き換えられる（`rework` の記録や `hold` を消して手戻りの WorkItem を作り直させる、保留中のタスクを解除させる、など）。milestone と同じく、store の書き込みで変更の形（`rework` と `hold` と `task_proposal` は消さず追記だけ、`status` は `in_progress → completed` だけ）を確かめるようにする。
   - **対応済み**（ブランチ `fix/customer-decision-hardening-20261025`）: 確かめる場所を store ではなく guard にした。`customer_decision_consumer_store` の書き込みでは、tier-guard が secure-io の `safeWriteFile` に渡された新しい内容と、ディスク上の固定ファイルを比べる（`customerDecisionConsumerWriteProblem`）。識別子（case・consumer・mission・task・tenant・project）は変えられない。`rework` は追記だけ。`task_proposal` は消せず、`requires_customer` と `resolved` も外せない。新しく付ける `resolved` は、運用者が確認した顧客の決定（議題の `operator_confirmations` と、台帳の `customer-value` / `decided` の記録）を指す必要がある。`hold` は消せず、`at` と WorkItem も変わらない。`resolved_at` は、`requires_customer` の提案がすべて解決したときだけ付けられる。完了のままの固定ファイルは、`completed_at` と固定した決定を変えられない。内容を渡さない書き込み（追記・コピー・移動・リンク・削除）は、この役割では拒否する。再固定も記録を残すようにし、解決した hold は消さずに `resolved_at` 付きで残す。完了した固定ファイルを `in_progress` に戻す動き（新しい worker の実行での再固定）はそのまま残した。guard はこの再固定と、なりすましの「再実行」を区別できない。

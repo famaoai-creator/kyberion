@@ -246,7 +246,7 @@ describe('customer-channel bind / unbind / list (D8, real paths)', () => {
   });
 
   it('refuses a bind when other tenants cannot be checked, and checks them under one global lock', async () => {
-    const writer = await import('./customer-channel/bindings.js');
+    const writer = await import('../customer-channel/bindings.js');
     // customer/ cannot be listed: the cross-tenant check cannot run, so no bind.
     const list = vi.spyOn(writer.customerTenantLister, 'list').mockImplementation(() => {
       throw new Error('EACCES');

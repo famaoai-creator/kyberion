@@ -3,7 +3,7 @@ import { pathResolver } from '@agent/core/path-resolver';
 import { safeReadFile } from '@agent/core/secure-io';
 
 const mocks = vi.hoisted(() => ({ runOverview: vi.fn(() => ({ ok: true })) }));
-vi.mock('./customer-decision/overview.js', () => ({ runOverview: mocks.runOverview }));
+vi.mock('../customer-decision/overview.js', () => ({ runOverview: mocks.runOverview }));
 
 import { runCustomerDecisionOverview } from './customer_decision_overview.js';
 
@@ -50,7 +50,7 @@ describe('customer_decision_overview (read-only facade entry)', () => {
         return out.join('/').replace(/\.js$/u, '.ts');
       });
     const seen = new Set<string>();
-    const queue = ['scripts/customer_decision_overview.ts'];
+    const queue = ['scripts/customer/customer_decision_overview.ts'];
     while (queue.length) {
       const file = queue.shift()!;
       if (seen.has(file) || !file.startsWith('scripts/')) continue;
@@ -61,7 +61,7 @@ describe('customer_decision_overview (read-only facade entry)', () => {
       'scripts/customer-decision/common.ts',
       'scripts/customer-decision/overview.ts',
       'scripts/customer-decision/superseded-locks.ts',
-      'scripts/customer_decision_overview.ts',
+      'scripts/customer/customer_decision_overview.ts',
       'scripts/lib/harness.ts',
     ]);
     // The read path calls none of the writers common.ts also exports.

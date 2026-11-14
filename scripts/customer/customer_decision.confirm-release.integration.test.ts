@@ -6,12 +6,12 @@ import * as initialIO from '@agent/core/secure-io';
 import {
   seedFirstJobTestRoot,
   syntheticFirstJobOwner,
-} from './fixtures/first-job-approval-fixture.js';
+} from '../fixtures/first-job-approval-fixture.js';
 
 /**
  * CD-09: the release of a task held on a `requires_customer` proposal, driven
  * through the governed entry an operator runs (`customer-decision confirm`,
- * the BUILT facade `dist/scripts/customer_decision.js` in a child process
+ * the BUILT facade `dist/scripts/customer/customer_decision.js` in a child process
  * with no role, persona, SYSTEM_ROLE or mission in its env, bound to the
  * tenant) on a fresh fixture root: the real case store under
  * knowledge/confidential/<tenant>/decisions/, the real approval store and
@@ -79,7 +79,7 @@ const savedRoot = process.env.KYBERION_ROOT;
  */
 const SOURCE_DIRS = ['scripts/customer-decision', 'libs/core/customer-decision'];
 const SOURCE_FILES = [
-  'scripts/customer_decision.ts',
+  'scripts/customer/customer_decision.ts',
   'libs/core/mission/mission-decision-lock.ts',
   'libs/core/mission/mission-orchestration-worker-part-dispatch-context.ts',
   'libs/core/governance/approval-gate.ts',
@@ -192,7 +192,12 @@ describe('customer-decision confirm releases a held task (CD-09, governed entry,
   async function confirmChild(argv: string[], boundTenant: string): Promise<ChildRun> {
     const result = await io.safeExecResultAsync(
       process.execPath,
-      [path.join(SOURCE_ROOT, 'dist/scripts/customer_decision.js'), 'confirm', ...argv, '--json'],
+      [
+        path.join(SOURCE_ROOT, 'dist/scripts/customer/customer_decision.js'),
+        'confirm',
+        ...argv,
+        '--json',
+      ],
       {
         cwd: ROOT,
         env: {
