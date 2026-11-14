@@ -1421,7 +1421,7 @@
     "scripts/context_ranker.ts": {
       "bespoke_cli_parser_budget": 12
     },
-    "scripts/continuous_work_owner.ts": {
+    "scripts/continuous/continuous_work_owner.ts": {
       "json_state_write_budget": 1
     },
     "scripts/conversation_report.ts": {

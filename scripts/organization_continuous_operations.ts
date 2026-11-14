@@ -1,5 +1,5 @@
-import { loadContinuousOperationsConfig } from './continuous_operations_config.js';
-import { runContinuousOperationsCycle } from './continuous_operations_cycle.js';
+import { loadContinuousOperationsConfig } from './continuous/continuous_operations_config.js';
+import { runContinuousOperationsCycle } from './continuous/continuous_operations_cycle.js';
 /** Organization facade for the governed, snapshot-based continuous operations loop. */
 import { resolveScopeResolution } from '@agent/core/scope-context';
 import { withExecutionContextAsync } from '@agent/core/authority';
@@ -82,7 +82,7 @@ export async function runOrganizationContinuousOperations(
 export {
   loadContinuousOperationsConfig,
   CONTINUOUS_CONFIG_ROOT,
-} from './continuous_operations_config.js';
-export { runContinuousOperationsCycleFromRef } from './continuous_operations_cycle.js';
+} from './continuous/continuous_operations_config.js';
+export { runContinuousOperationsCycleFromRef } from './continuous/continuous_operations_cycle.js';
 
-export { runContinuousManagedOwner } from './continuous_work_owner.js';
+export { runContinuousManagedOwner } from './continuous/continuous_work_owner.js';

@@ -1,4 +1,4 @@
-import { hasCliFlag } from './lib/cli-guard.js';
+import { hasCliFlag } from '../lib/cli-guard.js';
 /** Governed controller adapters for the continuous mission-owner execution surface. */
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
@@ -28,9 +28,9 @@ import {
 } from '@agent/core/organization/continuous-work-owner';
 import { CONTINUOUS_MANAGED_WORK_PIPELINE } from '@agent/core/organization/continuous-work-plan';
 import type { DotCharter } from '@agent/core/dot/dot-charter';
-import { openAlignmentApproval } from './mission_alignment_request.js';
-import { assessAlignmentDecision } from './mission_alignment_decision.js';
-import { loadMissionBriefAtPath } from './mission-alignment-gate/mission-brief.js';
+import { openAlignmentApproval } from '../mission_alignment_request.js';
+import { assessAlignmentDecision } from '../mission_alignment_decision.js';
+import { loadMissionBriefAtPath } from '../mission-alignment-gate/mission-brief.js';
 
 import {
   runContinuousOwnerProcess,

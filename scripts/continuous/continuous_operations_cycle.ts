@@ -13,7 +13,7 @@ import { observeContinuousWork } from './continuous_operations_outcomes.js';
 import { runAsDotCharter } from '@agent/core/dot/dot-key-results';
 import { loadContinuousOperationsConfig } from './continuous_operations_config.js';
 import type { ContinuousOperationsConfig } from '@agent/core/organization/continuous-operations-policy';
-import { pipelineFileRunner } from './lib/pipeline-file-runner.js';
+import { pipelineFileRunner } from '../lib/pipeline-file-runner.js';
 
 export interface ContinuousCycleOptions {
   apply?: boolean;

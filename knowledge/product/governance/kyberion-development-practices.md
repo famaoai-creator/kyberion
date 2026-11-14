@@ -41,7 +41,7 @@ typed adapters when behavior or lifecycle differs. Do not create a registry
 solely to disguise a conditional if there is only one invariant
 implementation.
 
-For example, `scripts/continuous_owner_process.ts` supervises a process through
+For example, `scripts/continuous/continuous_owner_process.ts` supervises a process through
 the `ContinuousOwnerPlatformAdapter` seam. POSIX process-group handling and the
 Windows Job Object wrapper live in platform adapters; the resolver maps the
 host platform to an adapter. Supporting another platform requires an adapter

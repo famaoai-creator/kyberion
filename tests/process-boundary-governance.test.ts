@@ -10,8 +10,8 @@ const allowedManagedProcessConsumers = [
   'libs/shared-perception/src/audio-analysis.test.ts',
   'libs/shared-perception/src/tracking.ts',
   // Continuous owner controllers are cancellable, supervised children.
-  'scripts/continuous_owner_process.ts',
-  'scripts/continuous_owner_process.test.ts',
+  'scripts/continuous/continuous_owner_process.ts',
+  'scripts/continuous/continuous_owner_process.test.ts',
   'libs/actuators/process-actuator/src/process-actuator-helpers.ts',
   'libs/actuators/process-actuator/src/process-actuator-relay-env.test.ts',
   'libs/actuators/video-composition-actuator/src/video-composition-action-helpers.ts',
