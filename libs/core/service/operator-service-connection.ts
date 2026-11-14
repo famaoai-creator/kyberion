@@ -125,7 +125,7 @@ export function listOperatorServiceConnections(
   }
 }
 
-/** Auth strategies whose credential is a single access token the probe may inject. */
+/** Auth strategies whose credential the probe may inject from the admitted binding. */
 const PROBE_AUTH_STRATEGIES = new Set(['bearer', 'bot', 'basic', 'api_key_query']);
 const ACCESS_TOKEN_PLACEHOLDER = '{{accessToken}}';
 const TEMPLATE_TOKEN_PATTERN = /\{\{[a-zA-Z0-9_.-]+\}\}/g;
