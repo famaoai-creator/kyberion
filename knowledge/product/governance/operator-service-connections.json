@@ -43,6 +43,90 @@
           }
         ]
       }
+    },
+    {
+      "serviceId": "box",
+      "label": "Box",
+      "secretKey": "ACCESS_TOKEN",
+      "authOperation": "get_current_user",
+      "setupUrl": "https://app.box.com/developers/console",
+      "scopeNotice": "Authentication confirms this token only. Folder access, collaboration rights and token expiry still depend on the app's configuration and scopes.",
+      "probe": {
+        "baseUrl": "https://api.box.com/2.0",
+        "path": "users/me",
+        "method": "GET",
+        "successRules": [
+          {
+            "field": "type",
+            "kind": "non_empty_string"
+          },
+          {
+            "field": "id",
+            "kind": "non_empty_string"
+          }
+        ]
+      }
+    },
+    {
+      "serviceId": "cloudflare",
+      "label": "Cloudflare",
+      "secretKey": "ACCESS_TOKEN",
+      "authOperation": "verify_token",
+      "setupUrl": "https://dash.cloudflare.com/profile/api-tokens",
+      "scopeNotice": "Authentication confirms this token only. Zone and account access still depend on the token's permission groups and account scope.",
+      "probe": {
+        "baseUrl": "https://api.cloudflare.com/client/v4",
+        "path": "user/tokens/verify",
+        "method": "GET",
+        "successRules": [
+          {
+            "field": "success",
+            "kind": "true"
+          }
+        ]
+      }
+    },
+    {
+      "serviceId": "figma",
+      "label": "Figma",
+      "secretKey": "ACCESS_TOKEN",
+      "authOperation": "get_me",
+      "setupUrl": "https://www.figma.com/settings",
+      "scopeNotice": "Authentication confirms this token only. File, project and team access still depend on the token owner's permissions.",
+      "probe": {
+        "baseUrl": "https://api.figma.com/v1",
+        "path": "me",
+        "method": "GET",
+        "successRules": [
+          {
+            "field": "id",
+            "kind": "non_empty_string"
+          },
+          {
+            "field": "handle",
+            "kind": "non_empty_string"
+          }
+        ]
+      }
+    },
+    {
+      "serviceId": "stripe",
+      "label": "Stripe",
+      "secretKey": "ACCESS_TOKEN",
+      "authOperation": "get_account",
+      "setupUrl": "https://dashboard.stripe.com/apikeys",
+      "scopeNotice": "Authentication confirms this key only. Live versus test mode and restricted-key permissions are properties of the key itself.",
+      "probe": {
+        "baseUrl": "https://api.stripe.com/v1",
+        "path": "account",
+        "method": "GET",
+        "successRules": [
+          {
+            "field": "id",
+            "kind": "non_empty_string"
+          }
+        ]
+      }
     }
   ]
 }

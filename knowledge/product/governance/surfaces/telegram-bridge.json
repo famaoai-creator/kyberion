@@ -5,6 +5,7 @@
       "id": "telegram-bridge",
       "kind": "gateway",
       "description": "Telegram ingress gateway and surface-agent host",
+      "service_id": "telegram",
       "command": "node",
       "args": ["dist/satellites/telegram-bridge/src/index.js"],
       "env": {
