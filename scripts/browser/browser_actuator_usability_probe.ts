@@ -1,9 +1,12 @@
-import { handleAction, closeBrowserSession } from '../libs/actuators/browser-actuator/src/index.js';
+import {
+  handleAction,
+  closeBrowserSession,
+} from '../../libs/actuators/browser-actuator/src/index.js';
 import { createAjv } from '@agent/core/foundation';
 import { compileSchemaFromPath } from '@agent/core/schema-loader';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeWriteFile } from '@agent/core/secure-io';
-import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
 
 type Step = { type: 'capture' | 'apply' | 'control'; op: string; params: Record<string, unknown> };
 type Observation = { ref: string; selector?: string; text?: string; value?: string; name?: string };

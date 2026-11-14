@@ -213,7 +213,7 @@ Prompt API（`LanguageModel`）、Summarizer、Translator、LanguageDetector と
 > **実装状況（2026-06-23 時点）**
 >
 > - Phase 0–1: ✅ 完了（3 schema + op registry + preflight、最小権限 manifest、record-only、値・秘密・contenteditable 本文・raw selector を非記録）
-> - Phase 2: ✅ 完了（Native Messaging host `scripts/browser_bridge_host.ts` + `native-host/`、recording→pipeline candidate compile）
+> - Phase 2: ✅ 完了（Native Messaging host `scripts/browser/browser_bridge_host.ts` + `native-host/`、recording→pipeline candidate compile）
 > - Phase 3: ✅ 完了（高リスク op を approval-gate に接続、execution lease 発行、再 snapshot + ambiguity 停止の executor、receipt 生成/検証）
 > - Phase 4: 🟡 一部完了（recording→draft pipeline crystallization `compileBrowserRecordingToPipeline` + schema 適合テスト、実行フロー回帰テスト、lease 期限切れ回帰、a11y 構造テストを追加。Chrome 実機 E2E の CI 化は未着手）
 >

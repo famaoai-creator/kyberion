@@ -20,7 +20,7 @@ const resolveProcedure = vi.hoisted(() =>
   vi.fn(async (intent: string) => ({ status: 'no_match', intent }))
 );
 
-vi.mock('./ingest.js', () => ({ main: ingestMain }));
+vi.mock('../ingest.js', () => ({ main: ingestMain }));
 vi.mock('@agent/core/knowledge/procedure-registry', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   resolveProcedure,

@@ -7,8 +7,8 @@
  * schema validation, approval enforcement and lease issuance all happen here,
  * never in the extension.
  *
- * Build:    pnpm build   (emits dist/scripts/browser_bridge_host.js)
- * Launch:   node dist/scripts/browser_bridge_host.js   (via native-host/launch.sh)
+ * Build:    pnpm build   (emits dist/scripts/browser/browser_bridge_host.js)
+ * Launch:   node dist/scripts/browser/browser_bridge_host.js   (via native-host/launch.sh)
  *
  * Wire protocol (Chrome native messaging):
  *   each frame = uint32 little-endian length + UTF-8 JSON body.
@@ -17,7 +17,7 @@
 import { Buffer } from 'node:buffer';
 import { createHash, randomUUID } from 'node:crypto';
 import * as path from 'node:path';
-import { defineScript, isDirectScript, setProcessExitCode } from './lib/harness.js';
+import { defineScript, isDirectScript, setProcessExitCode } from '../lib/harness.js';
 import {
   buildBrowserExtensionPipelineCandidate,
   compileBrowserRecordingToPipeline,
@@ -96,7 +96,7 @@ import { parseBrowserBridgeMessage } from './browser-bridge-input.js';
 import {
   InspectionHandoffError,
   submitInspectionToWaitingTicket,
-} from './lib/browser-inspection-handoff.js';
+} from '../lib/browser-inspection-handoff.js';
 
 /** Load + allowlist-guard + validate a browser procedure's backing recording. */
 function loadBrowserProcedure(procedureId: string): {
@@ -1267,7 +1267,7 @@ async function ingestStagedPage(
     'browser-bridge',
   ];
   try {
-    const { main: ingestMain } = await import('./ingest.js');
+    const { main: ingestMain } = await import('../ingest.js');
     await withExecutionContextAsync(
       'sovereign_concierge',
       () => ingestMain(argv, (value) => lines.push(String(value))),

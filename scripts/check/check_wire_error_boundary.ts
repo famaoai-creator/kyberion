@@ -30,7 +30,7 @@ export const WIRE_ERROR_BOUNDARY_FILES = [
   'presence/displays/concierge/src/app/api/ops/workitems/route.ts',
   'presence/displays/presence-studio/server.ts',
   'presence/displays/presence-studio/presence-studio-runtime-data.ts',
-  'scripts/browser_bridge_host.ts',
+  'scripts/browser/browser_bridge_host.ts',
   'presence/displays/computer-surface/server.ts',
   'presence/displays/concierge/src/lib/viewer-context.ts',
   'presence/displays/concierge/src/app/api/approvals/[id]/route.ts',
@@ -73,8 +73,8 @@ export function findWireErrorBoundaryViolations(
     }
   }
   if (
-    file === 'scripts/browser_bridge_host.ts' ||
-    file.endsWith('/scripts/browser_bridge_host.ts')
+    file === 'scripts/browser/browser_bridge_host.ts' ||
+    file.endsWith('/scripts/browser/browser_bridge_host.ts')
   ) {
     const rawBridgePattern =
       /\berror:\s*(?:`[^`]*\$\{(?:err|error)[^}]*\}|(?:err|error)\s+instanceof\s+Error\s*\?\s*(?:err|error)(?:\.|\?\.)message|(?:err|error)(?:\.|\?\.)message)/gu;

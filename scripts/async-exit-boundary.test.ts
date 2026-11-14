@@ -6,7 +6,7 @@ const asynchronousEntrypoints = [
   'scripts/meeting/meeting_participate.ts',
   'scripts/delegated_task_worker.ts',
   'scripts/agent_runtime_supervisor_daemon.ts',
-  'scripts/browser_bridge_host.ts',
+  'scripts/browser/browser_bridge_host.ts',
 ];
 
 describe('asynchronous process exit boundary', () => {

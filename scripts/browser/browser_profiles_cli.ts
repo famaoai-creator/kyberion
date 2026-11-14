@@ -9,17 +9,17 @@
  */
 
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
 import {
   createPlaywrightProfile,
   type BrowserProfile,
   type BrowserProvider,
-} from '../libs/actuators/browser-actuator/src/browser-profile-manager.js';
+} from '../../libs/actuators/browser-actuator/src/browser-profile-manager.js';
 import {
   discoverBrowserProfiles,
   resolveRegisteredBrowserProfile,
   openRegisteredBrowserProfile,
-} from '../libs/actuators/browser-actuator/src/browser-profile-provider-registry.js';
+} from '../../libs/actuators/browser-actuator/src/browser-profile-provider-registry.js';
 
 function formatTable(profiles: BrowserProfile[]): string {
   if (profiles.length === 0) {

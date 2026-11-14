@@ -61,8 +61,8 @@ if [ -z "$NODE_BIN" ] || [ ! -x "$NODE_BIN" ]; then
 fi
 crumb "node=$NODE_BIN"
 
-if [ ! -r "$REPO_ROOT/dist/scripts/browser_bridge_host.js" ]; then
-  crumb "FATAL: host js unreadable: $REPO_ROOT/dist/scripts/browser_bridge_host.js"
+if [ ! -r "$REPO_ROOT/dist/scripts/browser/browser_bridge_host.js" ]; then
+  crumb "FATAL: host js unreadable: $REPO_ROOT/dist/scripts/browser/browser_bridge_host.js"
   exit 1
 fi
 
@@ -81,4 +81,4 @@ if mkdir -p "$REPO_ROOT/active/shared/tmp" 2>/dev/null \
   LOG_FILE="$REPO_ROOT/active/shared/tmp/browser-bridge-host.stderr.log"
 fi
 crumb "exec node (stderr -> $LOG_FILE)"
-exec "$NODE_BIN" "$REPO_ROOT/dist/scripts/browser_bridge_host.js" 2>> "$LOG_FILE"
+exec "$NODE_BIN" "$REPO_ROOT/dist/scripts/browser/browser_bridge_host.js" 2>> "$LOG_FILE"

@@ -1445,7 +1445,7 @@
     },
     {
       "id": "script.browser.create",
-      "module": "scripts/browser_profiles_cli.ts",
+      "module": "scripts/browser/browser_profiles_cli.ts",
       "args": ["create"],
       "command": "browser create",
       "noun": "browser",
@@ -1468,7 +1468,7 @@
     },
     {
       "id": "script.browser.open",
-      "module": "scripts/browser_profiles_cli.ts",
+      "module": "scripts/browser/browser_profiles_cli.ts",
       "args": ["open"],
       "command": "browser open",
       "noun": "browser",
@@ -1480,7 +1480,7 @@
     },
     {
       "id": "script.browser.profiles",
-      "module": "scripts/browser_profiles_cli.ts",
+      "module": "scripts/browser/browser_profiles_cli.ts",
       "args": ["profiles"],
       "command": "browser profiles",
       "noun": "browser",

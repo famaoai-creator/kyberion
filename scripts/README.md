@@ -19,6 +19,7 @@ scripts/
   task/           ← `task_*` work-item operations (init/list/run/scenario/smoke)
   reconcile/      ← `reconcile_*` config/scope/intent reconciliation sweeps
   dot/            ← `dot_*` Dot charter lifecycle/executor/cadence steps
+  browser/        ← `browser_*` + `browser-bridge-*` bridge/executor/profile ops
   lib/            ← shared helpers imported by scripts; no entry points
   <domain>/       ← grouped script sets for one bounded area
                     (personal-pads/, meeting-notepad/, daily-desk/,
@@ -32,7 +33,7 @@ family moved first (all gates, their tests and `*.baseline.json` files now
 live in `check/`; new checkers go there, never in the root), followed by the
 `generate_*` catalog/index generators in `generate/`, the `sync_*`
 code→knowledge syncers in `sync/`, and the domain entry-point families
-`meeting/`, `peer/`, `continuous/`, `task/`, `reconcile/` and `dot/`. Prefer a
+`meeting/`, `peer/`, `continuous/`, `task/`, `reconcile/`, `dot/` and `browser/`. Prefer a
 subdirectory for new domain-scoped scripts and keep the root for operations
 that genuinely span the repository. (Direction set by
 [SIMPLICITY_ABSTRACTION_PLAN](../docs/developer/improvement-plans-2026-08/SIMPLICITY_ABSTRACTION_PLAN_2026-08-25.ja.md)
@@ -63,6 +64,9 @@ SX-06; not yet enforced by a gate.)
   - `pathResolver.rootResolve('scripts/name.ts')` / `` `scripts/${name}` ``
     literals inside the moved files themselves are easy to miss — grep the
     destination dir for its own family prefix after moving;
+  - pre-existing `../libs/...` (and `../<repo-dir>/`) imports that were correct
+    at root depth need `../../libs/...` after the move — sweep every `../`
+    specifier, not just `./`;
   - verify with `pnpm build` (tsc catches missed imports) + the family's
     vitest files + `resolve generated --check` freshness, not just grep.
 
