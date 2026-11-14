@@ -292,7 +292,6 @@ export class ShellSecretResolver implements SecretResolver {
                 SHELL: shell,
                 SYSTEM_ROLE: '',
                 MISSION_ROLE: '',
-                KYBERION_DELEGATED_ROLE: '',
                 KYBERION_BASE_ROLE: '',
                 KYBERION_PERSONA: '',
               } as NodeJS.ProcessEnv,
