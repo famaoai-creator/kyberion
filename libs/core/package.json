@@ -7751,6 +7751,14 @@
     "./document-review": {
       "types": "./dist/workforce/document-review.d.ts",
       "default": "./dist/workforce/document-review.js"
+    },
+    "./secret/account-introduction": {
+      "types": "./dist/secret/account-introduction.d.ts",
+      "default": "./dist/secret/account-introduction.js"
+    },
+    "./secret/account-broker": {
+      "types": "./dist/secret/account-broker.d.ts",
+      "default": "./dist/secret/account-broker.js"
     }
   },
   "dependencies": {
