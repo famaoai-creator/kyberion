@@ -1034,7 +1034,7 @@ export async function runInlineOrganizationOperationTick(
 ): Promise<Record<string, unknown>> {
   const apply = resolveVars(params.apply ?? false, ctx) === true;
   const { executeScheduledOrganizationOperation } =
-    await import('./organization_operation_execute.js');
+    await import('./organization/organization_operation_execute.js');
   const report = await runOrganizationOperationTick(
     { apply },
     { executeOperation: executeScheduledOrganizationOperation }

@@ -8,7 +8,7 @@ import { executeServicePreset } from '@agent/core/service/service-engine';
 /** Owner-authorized CLI for information availability; mutation uses the organization facade. */
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { resolveScopeContext } from '@agent/core/scope-context';
-import { readSafeJsonFile } from './lib/json-input.js';
+import { readSafeJsonFile } from '../lib/json-input.js';
 import {
   listManagedInformationAssetLocations,
   saveManagedInformationAssetLocation,

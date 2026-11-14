@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 const cycle = vi.hoisted(() => vi.fn());
-vi.mock('./continuous_operations_cycle.js', () => ({
+vi.mock('../continuous/continuous_operations_cycle.js', () => ({
   runContinuousOperationsCycleFromRef: cycle,
   runContinuousOperationsCycle: cycle,
 }));

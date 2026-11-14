@@ -13,7 +13,7 @@ import {
   FIRST_JOB_TEST_SESSION_KEY,
   FIRST_JOB_TEST_ISSUER,
   FIRST_JOB_TEST_SUBJECT,
-} from './fixtures/first-job-approval-fixture.js';
+} from '../fixtures/first-job-approval-fixture.js';
 
 // Real policy, secure IO, lease, registry, authorization, and journal projection.
 const sourceRoot = process.cwd();
@@ -190,7 +190,7 @@ describe('people management through real secure IO', () => {
       const authn = await import('@agent/core/authn/authn-providers');
       const approvals = await import('@agent/core/governance/approval-store');
       const external = await import('@agent/core/governance/external-operation');
-      const browser = await import('../libs/actuators/browser-actuator/src/index.js');
+      const browser = await import('../../libs/actuators/browser-actuator/src/index.js');
       const canonicalJournal = path.join(
         root,
         'active/shared/coordination/identity/agent-identities.jsonl'

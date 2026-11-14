@@ -54,7 +54,10 @@ const SOD_CONSUMERS: ReadonlyArray<{ file: string; consumer: string }> = [
   { file: 'scripts/entity_governance_cleanup.ts', consumer: 'entity_governance_cleanup' },
   { file: 'scripts/mission/mission_alignment_decision.ts', consumer: 'mission_alignment_gate' },
   { file: 'scripts/lib/video-production-evidence.ts', consumer: 'video_production' },
-  { file: 'scripts/organization_decision_approval.ts', consumer: 'organization_decision' },
+  {
+    file: 'scripts/organization/organization_decision_approval.ts',
+    consumer: 'organization_decision',
+  },
   { file: 'scripts/org.ts', consumer: 'org_security_policy_write' },
   {
     file: 'libs/core/organization/publication-role-migration.ts',

@@ -6,7 +6,7 @@
  * report as a scoped artifact. Read-only mode (CLI, manual pipeline run)
  * returns the report without writing — the scan proposes, it never applies.
  *
- * CLI:  node scripts/organization_improvement_scan.ts --org <id> [--tenant <slug>]
+ * CLI:  node scripts/organization/organization_improvement_scan.ts --org <id> [--tenant <slug>]
  *        [--tier confidential] [--window-days 30] [--json]
  */
 import { createHash } from 'node:crypto';
@@ -25,7 +25,7 @@ import {
 } from '@agent/core/organization/organization-improvement-scan';
 import type { OrganizationTier } from '@agent/core/organization/organization-operating-model';
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from '../lib/harness.js';
 
 export const ORGANIZATION_IMPROVEMENT_SCAN_PIPELINE =
   'pipelines/organization-improvement-scan.json';

@@ -1,6 +1,6 @@
 import { createManagedOrganization } from '@agent/core/organization/organization-management';
 import { baseRoleEnvText } from '@agent/core/foundation';
-import { cliApprovalRequester } from './lib/cli-approval-requester.js';
+import { cliApprovalRequester } from '../lib/cli-approval-requester.js';
 import {
   buildOrganizationManagementView,
   buildOrganizationOperationRecord,
@@ -90,7 +90,7 @@ import type {
   OrganizationOperationRecord,
   OrganizationServiceRecord,
 } from '@agent/core/organization/organization-operating-model';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from '../lib/harness.js';
 
 type Print = (value: unknown) => void;
 

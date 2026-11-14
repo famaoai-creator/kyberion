@@ -1000,7 +1000,8 @@ const INLINE_OP_HANDLERS: Record<string, InlineOpHandler> = {
     return (await domainOps()).runInlineOrganizationRetro(step, params, ctx);
   },
   'core:organization_improvement_scan': async ({ step, params, ctx }) => {
-    const { runOrganizationImprovementScanOp } = await import('./organization_improvement_scan.js');
+    const { runOrganizationImprovementScanOp } =
+      await import('./organization/organization_improvement_scan.js');
     const tier = String(resolveVars(params.tier ?? 'confidential', ctx));
     const organizationId = String(resolveVars(params.organization_id ?? '', ctx));
     if (!organizationId)

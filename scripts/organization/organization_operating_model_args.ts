@@ -9,7 +9,7 @@ import type {
   OrganizationServiceState,
 } from '@agent/core/organization/organization-operating-model';
 
-/** Argument parsing and help text for `pnpm organization` (scripts/organization_operating_model.ts). */
+/** Argument parsing and help text for `pnpm organization` (scripts/organization/organization_operating_model.ts). */
 export type ParsedArgs = {
   command: string;
   organizationId?: string;
