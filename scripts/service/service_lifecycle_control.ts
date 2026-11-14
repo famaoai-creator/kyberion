@@ -9,7 +9,7 @@ import {
 } from '@agent/core/secure-io';
 import { parseSafeJsonInput } from '@agent/core/foundation';
 import { loadServicePidRegistryAtPath } from '@agent/core/service/service-pid-registry';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from '../lib/harness.js';
 
 type Print = (value: unknown) => void;
 

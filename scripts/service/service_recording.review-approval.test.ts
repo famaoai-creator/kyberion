@@ -59,8 +59,8 @@ import { cliAgentSessionEnv } from '@agent/core/governance/cli-operator-principa
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
 import type { ServiceRecording } from '@agent/core/service/service-recording';
-import { decideApprovalFromCli } from './lib/approval-cli-decision.js';
-import { withTtyAnswer } from './lib/tty-io.test-support.js';
+import { decideApprovalFromCli } from '../lib/approval-cli-decision.js';
+import { withTtyAnswer } from '../lib/tty-io.test-support.js';
 import {
   assertServiceRecordingReviewApproval,
   consumeServiceRecordingReviewApproval,

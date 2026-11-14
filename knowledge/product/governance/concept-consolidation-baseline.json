@@ -1785,13 +1785,13 @@
     "scripts/security-ledger.ts": {
       "env_direct_read_budget": 2
     },
-    "scripts/service_binding_controller.ts": {
+    "scripts/service/service_binding_controller.ts": {
       "bespoke_cli_parser_budget": 2
     },
-    "scripts/service_lifecycle_control.ts": {
+    "scripts/service/service_lifecycle_control.ts": {
       "json_state_write_budget": 1
     },
-    "scripts/service_recording.ts": {
+    "scripts/service/service_recording.ts": {
       "json_state_write_budget": 2,
       "bespoke_cli_parser_budget": 1
     },

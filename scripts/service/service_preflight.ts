@@ -2,7 +2,7 @@
 /** CLI compatibility wrapper for the canonical service preflight operation. */
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { runServicePreflight } from '@agent/core/service/service-preflight';
-import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
 
 export { parseJsonProbeOutput, runServicePreflight } from '@agent/core/service/service-preflight';
 

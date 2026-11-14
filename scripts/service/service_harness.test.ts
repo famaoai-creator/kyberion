@@ -4,7 +4,7 @@ const mocks = vi.hoisted(() => ({
   handleAction: vi.fn(),
 }));
 
-vi.mock('../libs/actuators/service-actuator/src/service-actuator-helpers.js', () => ({
+vi.mock('../../libs/actuators/service-actuator/src/service-actuator-helpers.js', () => ({
   handleAction: mocks.handleAction,
 }));
 

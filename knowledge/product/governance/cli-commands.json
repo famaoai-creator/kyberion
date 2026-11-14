@@ -3991,7 +3991,7 @@
     },
     {
       "id": "script.service.harness",
-      "module": "scripts/service_harness.ts",
+      "module": "scripts/service/service_harness.ts",
       "command": "service harness",
       "noun": "service",
       "verb": "harness",
@@ -4013,7 +4013,7 @@
     },
     {
       "id": "script.service.recording",
-      "module": "scripts/service_recording.ts",
+      "module": "scripts/service/service_recording.ts",
       "command": "service recording",
       "noun": "service",
       "verb": "recording",

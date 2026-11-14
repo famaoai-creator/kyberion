@@ -491,7 +491,7 @@
         {
           "op": "system:shell",
           "params": {
-            "cmd": "node dist/scripts/service_lifecycle_control.js --operation start"
+            "cmd": "node dist/scripts/service/service_lifecycle_control.js --operation start"
           }
         }
       ],
@@ -525,7 +525,7 @@
         {
           "op": "system:shell",
           "params": {
-            "cmd": "node dist/scripts/service_lifecycle_control.js --operation list"
+            "cmd": "node dist/scripts/service/service_lifecycle_control.js --operation list"
           }
         }
       ],

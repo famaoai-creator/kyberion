@@ -11,7 +11,7 @@ import { resolveRoutingPacket } from '@agent/core/intent';
  */
 
 function buildStopServiceShellCommand(serviceName?: string): string {
-  const base = 'node dist/scripts/service_lifecycle_control.js --operation ';
+  const base = 'node dist/scripts/service/service_lifecycle_control.js --operation ';
   if (!serviceName) return `${base}list`;
   if (!/^[A-Za-z0-9._-]+$/.test(serviceName)) {
     throw new Error(`Invalid service name: ${serviceName}`);
@@ -20,7 +20,7 @@ function buildStopServiceShellCommand(serviceName?: string): string {
 }
 
 function buildStartServiceShellCommand(serviceName?: string): string {
-  const base = 'node dist/scripts/service_lifecycle_control.js --operation ';
+  const base = 'node dist/scripts/service/service_lifecycle_control.js --operation ';
   if (!serviceName) return `${base}start`;
   if (!/^[A-Za-z0-9._-]+$/.test(serviceName)) {
     throw new Error(`Invalid service name: ${serviceName}`);

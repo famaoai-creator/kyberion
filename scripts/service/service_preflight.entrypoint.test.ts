@@ -5,7 +5,7 @@ import { safeReadFile } from '@agent/core/secure-io';
 describe('service preflight entrypoint', () => {
   it('keeps report rendering and exit handling behind the shared harness', () => {
     const source = String(
-      safeReadFile(pathResolver.rootResolve('scripts/service_preflight.ts'), {
+      safeReadFile(pathResolver.rootResolve('scripts/service/service_preflight.ts'), {
         encoding: 'utf8',
       })
     );
