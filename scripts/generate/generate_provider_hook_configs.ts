@@ -154,7 +154,7 @@ export function buildClaudeSettings(
                 return {
                   ...hook,
                   command: hook.command.replace(
-                    /dist[\\/]scripts[\\/]claude_code_hook\.js(["']?)\s+(SessionStart|UserPromptSubmit|PreToolUse|PreToolUseShellDeny|PostToolUse|Stop|SessionEnd)$/,
+                    /dist[\\/]scripts[\\/](?:claude[\\/])?claude_code_hook\.js(["']?)\s+(SessionStart|UserPromptSubmit|PreToolUse|PreToolUseShellDeny|PostToolUse|Stop|SessionEnd)$/,
                     'scripts/provider_hook_entry.mjs$1 claude $2'
                   ),
                 };

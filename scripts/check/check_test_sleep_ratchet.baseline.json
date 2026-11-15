@@ -22,7 +22,7 @@
     "libs/core/provider/agy-cli-backend.test.ts": 1,
     "libs/core/reasoning/reasoning-egress-scope.test.ts": 1,
     "libs/core/secret/secret-introduction.web.test.ts": 1,
-    "libs/core/secure-io.symlink-canonical.test.ts": 1,
+    "libs/core/secure-io/secure-io.symlink-canonical.test.ts": 1,
     "libs/core/governance/security-screen.test.ts": 1,
     "libs/shared-voice/src/streaming-voice-playback.test.ts": 10,
     "libs/core/surface/front-desk-recovery.engine.integration.test.ts": 1,
