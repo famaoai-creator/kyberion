@@ -239,6 +239,8 @@ describe('durable partitioned runtime state', () => {
       'active/shared/runtime/provider-attestations/confidential/',
       'active/shared/runtime/hints/personal/',
       'active/shared/runtime/hints/confidential/',
+      'active/shared/runtime/operator-notification-receipts/personal/',
+      'active/shared/runtime/operator-notification-receipts/confidential/',
     ]);
     expect(
       partitionedRuntimeStateTierInPath(
