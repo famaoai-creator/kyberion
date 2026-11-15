@@ -14,6 +14,10 @@
       "en": "Multi-Tenant Registration",
       "ja": "マルチテナント登録"
     },
+    "operations": {
+      "en": "Resident Loop Operations",
+      "ja": "常駐ループ運用"
+    },
     "tutorial": {
       "en": "Hands-on Tutorial",
       "ja": "ハンズオン・チュートリアル"

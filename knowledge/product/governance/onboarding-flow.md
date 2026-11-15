@@ -230,8 +230,15 @@ GUI では concierge の `/settings` を開く（旧 `/setup` と `/onboarding` 
 | 詳細設定       | 管理用の設定                                        |
 
 この段階で作られるのは identity、vision、agent identity、onboarding state と summary、
-connection 候補、tenant 候補、tutorial plan である。外部サービスへの書き込みや、最初の mission の
-実行はまだ行わない。
+connection 候補、tenant 候補、tutorial plan、そして operations の選択である。外部サービスへの
+書き込みや、最初の mission の実行はまだ行わない。
+
+operations フェーズは自律ループに必要な3点を記録する（wizard では対話、apply では入力 JSON の
+`operations` ブロック）。常駐サービスの方針（install は `pending` として記録し、`pnpm kyberion
+scheduler reconcile --apply` を operator に案内する — onboarding 自体はユニットを登録しない）、
+通知チャンネル（`knowledge/personal/notification-preferences.json` の `default_channel` へ保存）、
+有効化する event intake ソース（宣言済みソースのみ。secret 値はここでは採らず
+`pnpm kyberion secret introduce event-intake <SECRET_KEY>` の手順を next steps に出す）である。
 
 ### Step 4: baseline を all_clear にする（B）
 

@@ -65,6 +65,7 @@ import { getZonedDateParts, matchesCron } from '../pipeline/cron-utils.js';
 import { recordDaemonHeartbeat } from '../daemon/daemon-heartbeat.js';
 import { getReasoningBackend } from '../reasoning/reasoning-backend.js';
 import { isLocalReasoningBackend } from '../reasoning/reasoning-egress-scope.js';
+import { loadReasoningBackendPolicy } from '../reasoning/reasoning-backend-policy.js';
 import { sendOpsAlert, type OpsAlertInput } from '../daemon/ops-alert.js';
 import type {
   ReasoningBackend,
@@ -984,11 +985,13 @@ function alertDotWakeCircuitOnce(
 }
 
 /**
- * Local-only provider modes, in preference order. These are the reasoning
- * providers whose declared `data_egress` is `local-only` — the only modes a
- * `training_use 'local_only'` payload may reach.
+ * Local-only provider modes, in preference order. Derived from the governed
+ * `allowed_modes` list — every mode whose capability profile declares
+ * `data_egress 'local-only'` — so a newly registered local provider is tried
+ * without a code change. The literal tail is the fallback when the policy
+ * cannot be loaded.
  */
-const LOCAL_ONLY_WAKE_BACKEND_MODES = [
+const LOCAL_ONLY_WAKE_BACKEND_FALLBACK = [
   'ollama',
   'mlx',
   'lmstudio',
@@ -998,13 +1001,26 @@ const LOCAL_ONLY_WAKE_BACKEND_MODES = [
   'local',
 ] as const;
 
+function localOnlyWakeBackendModes(): readonly string[] {
+  try {
+    const modes = loadReasoningBackendPolicy().allowed_modes.filter((mode) =>
+      isLocalReasoningBackend(mode)
+    );
+    if (modes.length > 0) return modes;
+  } catch {
+    // Policy unavailable — fall back to the known-local set below.
+  }
+  return LOCAL_ONLY_WAKE_BACKEND_FALLBACK;
+}
+
 /**
  * Build a local-only backend for a confidential wake, or null when no local
  * provider can be instantiated (not installed, no endpoint configured).
  */
 async function buildLocalOnlyWakeBackend(charter: DotCharter): Promise<ReasoningBackend | null> {
   const { buildReasoningBackendForMode } = await import('../reasoning/reasoning-bootstrap.js');
-  for (const mode of LOCAL_ONLY_WAKE_BACKEND_MODES) {
+  const modes = localOnlyWakeBackendModes();
+  for (const mode of modes) {
     try {
       const built = buildReasoningBackendForMode(mode);
       if (built?.backend && isLocalReasoningBackend(built.backend.name)) return built.backend;
@@ -1013,7 +1029,7 @@ async function buildLocalOnlyWakeBackend(charter: DotCharter): Promise<Reasoning
     }
   }
   logger.debug(
-    `no local-only reasoning backend available for ${charter.dot_id} — tried ${LOCAL_ONLY_WAKE_BACKEND_MODES.join(', ')}`
+    `no local-only reasoning backend available for ${charter.dot_id} — tried ${modes.join(', ')}`
   );
   return null;
 }

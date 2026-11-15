@@ -25,10 +25,7 @@ import type { DotCharter, DotCadenceCron, LoadedDotCharter } from '@agent/core/d
 import { runAsDotCharter } from '@agent/core/dot/dot-key-results';
 import { dotBudgetHardThrottled } from '@agent/core/dot/dot-budget';
 import { dotStatePath } from '@agent/core/dot/dot-state-paths';
-import {
-  alertDotStepCircuitOpen,
-  DotSupervisorStepCircuit,
-} from '@agent/core/dot/dot-step-circuit';
+import { reportDotStepFailure, DotSupervisorStepCircuit } from '@agent/core/dot/dot-step-circuit';
 import { readJsonIfPresent, writeJson } from '@agent/core/foundation/json';
 import { createLogger } from '@agent/core/logger';
 import {
@@ -298,24 +295,12 @@ export async function runDotOrgCadenceStep(
       await runDotOrgCadenceForCharter(loaded.charter, now, active, deps);
       orgCadenceCircuit.reportSuccess(dotId);
     } catch (error) {
-      const verdict = orgCadenceCircuit.reportFailure(dotId, error);
-      if (verdict === 'open') {
-        alertDotStepCircuitOpen(
-          'dot-org-cadence',
-          loaded.charter,
-          orgCadenceCircuit.signatureOf(dotId) ?? 'unknown',
-          orgCadenceCircuit.streakOf(dotId)
-        );
-      } else if (verdict === 'counted') {
-        logger.warn(
-          diag(
-            `org cadence failed for ${dotId}`,
-            error,
-            'retried next sweep',
-            'scripts/dot/dot_org_cadence_step.ts'
-          )
-        );
-      }
+      reportDotStepFailure(orgCadenceCircuit, dotId, loaded.charter, error, {
+        what: `org cadence failed for ${dotId}`,
+        next: 'retried next sweep',
+        evidence: 'scripts/dot/dot_org_cadence_step.ts',
+        log: (line) => logger.warn(line),
+      });
     }
   }
 }

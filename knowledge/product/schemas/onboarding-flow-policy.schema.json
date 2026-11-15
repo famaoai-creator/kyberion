@@ -18,7 +18,7 @@
     },
     "phase_titles": {
       "type": "object",
-      "required": ["identity", "services", "tenants", "tutorial", "summary"],
+      "required": ["identity", "services", "tenants", "operations", "tutorial", "summary"],
       "properties": {
         "identity": {
           "$ref": "#/$defs/localizedText"
@@ -27,6 +27,9 @@
           "$ref": "#/$defs/localizedText"
         },
         "tenants": {
+          "$ref": "#/$defs/localizedText"
+        },
+        "operations": {
           "$ref": "#/$defs/localizedText"
         },
         "tutorial": {

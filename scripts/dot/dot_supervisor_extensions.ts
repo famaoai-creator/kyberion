@@ -21,10 +21,7 @@ import { settleDotArbitration } from '@agent/core/dot/dot-arbitration';
 import { runDotAutonomyStep } from '@agent/core/dot/dot-autonomy';
 import { readDotActionLedger } from '@agent/core/dot/dot-action-ledger';
 import { sendOpsAlert } from '@agent/core/ops-alert';
-import {
-  alertDotStepCircuitOpen,
-  DotSupervisorStepCircuit,
-} from '@agent/core/dot/dot-step-circuit';
+import { reportDotStepFailure, DotSupervisorStepCircuit } from '@agent/core/dot/dot-step-circuit';
 import '@agent/core/dot/dot-extension-bootstrap';
 import { FRONT_DESK_EXECUTION_SUPERVISOR_STEP } from '../front_desk_execution_step.js';
 import { DOT_EXECUTOR_SUPERVISOR_STEP } from './dot_executor_step.js';
@@ -83,19 +80,12 @@ DOT_SUPERVISOR_STEPS.push({
         );
         memoryDistillCircuit.reportSuccess(dotId);
       } catch (error) {
-        const verdict = memoryDistillCircuit.reportFailure(dotId, error);
-        if (verdict === 'open') {
-          alertDotStepCircuitOpen(
-            'dot-memory-distill',
-            loaded.charter,
-            memoryDistillCircuit.signatureOf(dotId) ?? 'unknown',
-            memoryDistillCircuit.streakOf(dotId)
-          );
-        } else if (verdict === 'counted') {
-          logger.warn(
-            `memory distill failed for ${dotId} — ${error instanceof Error ? error.message : String(error)} | next: retried next sweep | evidence: libs/core/dot/dot-memory.ts`
-          );
-        }
+        reportDotStepFailure(memoryDistillCircuit, dotId, loaded.charter, error, {
+          what: `memory distill failed for ${dotId}`,
+          next: 'retried next sweep',
+          evidence: 'libs/core/dot/dot-memory.ts',
+          log: (line) => logger.warn(line),
+        });
       }
     }
   },
@@ -117,19 +107,12 @@ DOT_SUPERVISOR_STEPS.push({
         );
         arbitrationSettleCircuit.reportSuccess(dotId);
       } catch (error) {
-        const verdict = arbitrationSettleCircuit.reportFailure(dotId, error);
-        if (verdict === 'open') {
-          alertDotStepCircuitOpen(
-            'dot-arbitration-settle',
-            loaded.charter,
-            arbitrationSettleCircuit.signatureOf(dotId) ?? 'unknown',
-            arbitrationSettleCircuit.streakOf(dotId)
-          );
-        } else if (verdict === 'counted') {
-          logger.warn(
-            `arbitration settlement failed for ${dotId} — ${error instanceof Error ? error.message : String(error)} | next: retried next sweep | evidence: libs/core/dot/dot-arbitration.ts`
-          );
-        }
+        reportDotStepFailure(arbitrationSettleCircuit, dotId, loaded.charter, error, {
+          what: `arbitration settlement failed for ${dotId}`,
+          next: 'retried next sweep',
+          evidence: 'libs/core/dot/dot-arbitration.ts',
+          log: (line) => logger.warn(line),
+        });
       }
     }
   },
@@ -155,19 +138,12 @@ DOT_SUPERVISOR_STEPS.push({
         });
         outcomesCircuit.reportSuccess(dotId);
       } catch (error) {
-        const verdict = outcomesCircuit.reportFailure(dotId, error);
-        if (verdict === 'open') {
-          alertDotStepCircuitOpen(
-            'dot-outcomes',
-            loaded.charter,
-            outcomesCircuit.signatureOf(dotId) ?? 'unknown',
-            outcomesCircuit.streakOf(dotId)
-          );
-        } else if (verdict === 'counted') {
-          logger.warn(
-            `outcome check failed for ${dotId} — ${error instanceof Error ? error.message : String(error)} | next: retried next sweep | evidence: libs/core/dot/dot-outcomes.ts`
-          );
-        }
+        reportDotStepFailure(outcomesCircuit, dotId, loaded.charter, error, {
+          what: `outcome check failed for ${dotId}`,
+          next: 'retried next sweep',
+          evidence: 'libs/core/dot/dot-outcomes.ts',
+          log: (line) => logger.warn(line),
+        });
       }
     }
   },
@@ -188,19 +164,12 @@ DOT_SUPERVISOR_STEPS.push({
         );
         autonomyCircuit.reportSuccess(dotId);
       } catch (error) {
-        const verdict = autonomyCircuit.reportFailure(dotId, error);
-        if (verdict === 'open') {
-          alertDotStepCircuitOpen(
-            'dot-autonomy',
-            loaded.charter,
-            autonomyCircuit.signatureOf(dotId) ?? 'unknown',
-            autonomyCircuit.streakOf(dotId)
-          );
-        } else if (verdict === 'counted') {
-          logger.warn(
-            `autonomy step failed for ${dotId} — ${error instanceof Error ? error.message : String(error)} | next: retried next sweep; the level is unchanged | evidence: libs/core/dot/dot-autonomy.ts`
-          );
-        }
+        reportDotStepFailure(autonomyCircuit, dotId, loaded.charter, error, {
+          what: `autonomy step failed for ${dotId}`,
+          next: 'retried next sweep; the level is unchanged',
+          evidence: 'libs/core/dot/dot-autonomy.ts',
+          log: (line) => logger.warn(line),
+        });
       }
     }
   },
@@ -221,16 +190,21 @@ DOT_SUPERVISOR_STEPS.push(DOT_ORG_CADENCE_SUPERVISOR_STEP);
 const EFFECTIVENESS_WINDOW = 20;
 const EFFECTIVENESS_MIN_ROWS = 10;
 const zeroEffectAlerted = new Set<string>();
+// A broken ledger would otherwise warn once per dot per sweep forever — the
+// same storm this step exists to prevent.
+const effectivenessCircuit = new DotSupervisorStepCircuit('dot-effectiveness');
 DOT_SUPERVISOR_STEPS.push({
   id: 'dot-effectiveness',
   async run(_now, active) {
     for (const loaded of active) {
       const dotId = loaded.charter.dot_id;
+      if (!effectivenessCircuit.admits(dotId)) continue;
       try {
         const rows = readDotActionLedger({ dotId, indexOnly: true });
         const window = rows.slice(-EFFECTIVENESS_WINDOW);
         if (window.length < EFFECTIVENESS_MIN_ROWS) {
           zeroEffectAlerted.delete(dotId);
+          effectivenessCircuit.reportSuccess(dotId);
           continue;
         }
         let dispatched = 0;
@@ -252,10 +226,13 @@ DOT_SUPERVISOR_STEPS.push({
         const zeroEffect = dispatched === 0 && dead * 2 >= window.length;
         if (!zeroEffect) {
           zeroEffectAlerted.delete(dotId);
+          effectivenessCircuit.reportSuccess(dotId);
           continue;
         }
-        if (zeroEffectAlerted.has(dotId)) continue;
-        zeroEffectAlerted.add(dotId);
+        if (zeroEffectAlerted.has(dotId)) {
+          effectivenessCircuit.reportSuccess(dotId);
+          continue;
+        }
         sendOpsAlert({
           severity: 'warning',
           title: `Zero-effect loop detected: ${dotId}`,
@@ -269,10 +246,17 @@ DOT_SUPERVISOR_STEPS.push({
           dedupe_key: `dot-zero-effect:${dotId}`,
           category: 'dot',
         });
+        // Mark alerted only after the alert actually landed — a failed send
+        // must not permanently suppress the signal for this streak.
+        zeroEffectAlerted.add(dotId);
+        effectivenessCircuit.reportSuccess(dotId);
       } catch (error) {
-        logger.warn(
-          `effectiveness check failed for ${dotId} — ${error instanceof Error ? error.message : String(error)} | next: retried next sweep | evidence: libs/core/dot/dot-action-ledger.ts`
-        );
+        reportDotStepFailure(effectivenessCircuit, dotId, loaded.charter, error, {
+          what: `effectiveness check failed for ${dotId}`,
+          next: 'retried next sweep',
+          evidence: 'libs/core/dot/dot-action-ledger.ts',
+          log: (line) => logger.warn(line),
+        });
       }
     }
   },
