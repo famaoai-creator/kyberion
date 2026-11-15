@@ -1,10 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { pathResolver } from '@agent/core/path-resolver';
+import {
+  safeChmodSync,
+  safeCopyFileSync,
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeRmSync,
+  safeWriteFile,
+} from '@agent/core/secure-io';
 
-const REPO_ROOT = path.resolve(__dirname, '../..');
+const REPO_ROOT = pathResolver.rootDir();
 
 // The module resolves knowledge paths through pathResolver bound to
 // KYBERION_ROOT at import time — stage a minimal root per test, exactly the
@@ -28,12 +36,12 @@ const REQUIRED_FILES = [
 ];
 
 beforeEach(async () => {
-  tmpRoot = path.join(os.tmpdir(), `kyberion-ops-${randomUUID()}`);
-  fs.mkdirSync(tmpRoot, { recursive: true });
-  fs.writeFileSync(path.join(tmpRoot, 'package.json'), '{}');
+  tmpRoot = pathResolver.rootResolve(`active/shared/tmp/onboarding-ops-${randomUUID()}`);
+  safeMkdir(tmpRoot, { recursive: true });
+  safeWriteFile(path.join(tmpRoot, 'package.json'), '{}');
   for (const rel of REQUIRED_FILES) {
-    fs.mkdirSync(path.dirname(path.join(tmpRoot, rel)), { recursive: true });
-    fs.copyFileSync(path.join(REPO_ROOT, rel), path.join(tmpRoot, rel));
+    safeMkdir(path.dirname(path.join(tmpRoot, rel)), { recursive: true });
+    safeCopyFileSync(path.join(REPO_ROOT, rel), path.join(tmpRoot, rel));
   }
   process.env.KYBERION_ROOT = tmpRoot;
   vi.resetModules();
@@ -42,21 +50,20 @@ beforeEach(async () => {
 
 afterEach(() => {
   delete process.env.KYBERION_ROOT;
-  fs.rmSync(tmpRoot, { recursive: true, force: true });
+  safeRmSync(tmpRoot, { recursive: true, force: true });
 });
 
 function readPolicy(): { sources: Record<string, { enabled: boolean; secret_key?: string }> } {
   return JSON.parse(
-    fs.readFileSync(
-      path.join(tmpRoot, 'knowledge/product/governance/event-intake-policy.json'),
-      'utf8'
+    String(
+      safeReadFile(path.join(tmpRoot, 'knowledge/product/governance/event-intake-policy.json'))
     )
   );
 }
 
 function readPrefs(): { default_channel?: { surface: string; target: string } } {
   const p = path.join(tmpRoot, 'knowledge/personal/notification-preferences.json');
-  return fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, 'utf8')) : {};
+  return safeExistsSync(p) ? JSON.parse(String(safeReadFile(p))) : {};
 }
 
 describe('applyResidentLoopOperations (non-interactive)', () => {
@@ -100,11 +107,11 @@ describe('applyResidentLoopOperations (non-interactive)', () => {
   it('marks an already-enabled intake source as enabled, not pending_secret', () => {
     // Pre-enable the source in the fixture policy before applying.
     const policyPath = path.join(tmpRoot, 'knowledge/product/governance/event-intake-policy.json');
-    const policy = JSON.parse(fs.readFileSync(policyPath, 'utf8')) as {
+    const policy = JSON.parse(String(safeReadFile(policyPath))) as {
       sources: Record<string, { enabled: boolean }>;
     };
     policy.sources.github.enabled = true;
-    fs.writeFileSync(policyPath, JSON.stringify(policy, null, 2));
+    safeWriteFile(policyPath, JSON.stringify(policy, null, 2));
 
     const ops = mod.applyResidentLoopOperations({ intake_enable: ['github'] });
     expect(ops.intake_sources.find((s) => s.source === 'github')?.status).toBe('enabled');
@@ -112,11 +119,11 @@ describe('applyResidentLoopOperations (non-interactive)', () => {
 
   it('reflects armed sources that were not requested in the summary rows', () => {
     const policyPath = path.join(tmpRoot, 'knowledge/product/governance/event-intake-policy.json');
-    const policy = JSON.parse(fs.readFileSync(policyPath, 'utf8')) as {
+    const policy = JSON.parse(String(safeReadFile(policyPath))) as {
       sources: Record<string, { enabled: boolean }>;
     };
     policy.sources.ci.enabled = true;
-    fs.writeFileSync(policyPath, JSON.stringify(policy, null, 2));
+    safeWriteFile(policyPath, JSON.stringify(policy, null, 2));
 
     const ops = mod.applyResidentLoopOperations({ intake_enable: ['github'] });
     expect(ops.intake_sources.find((s) => s.source === 'ci')?.status).toBe('enabled');
@@ -127,14 +134,14 @@ describe('applyResidentLoopOperations (non-interactive)', () => {
     // Read succeeds, write fails: make the governance dir read-only so an
     // atomic temp+rename write cannot land.
     const govDir = path.join(tmpRoot, 'knowledge/product/governance');
-    fs.chmodSync(govDir, 0o555);
+    safeChmodSync(govDir, 0o555);
     try {
       const ops = mod.applyResidentLoopOperations({ intake_enable: ['github'] });
       expect(ops.intake_sources.find((s) => s.source === 'github')?.status).toBe('skipped');
       // The policy stays disabled — nothing half-enabled.
       expect(readPolicy().sources.github.enabled).toBe(false);
     } finally {
-      fs.chmodSync(govDir, 0o755);
+      safeChmodSync(govDir, 0o755);
     }
   });
 });
@@ -142,11 +149,11 @@ describe('applyResidentLoopOperations (non-interactive)', () => {
 describe('currentEnabledIntakeSources', () => {
   it('lists declared sources already enabled in policy, without mutating it', () => {
     const policyPath = path.join(tmpRoot, 'knowledge/product/governance/event-intake-policy.json');
-    const policy = JSON.parse(fs.readFileSync(policyPath, 'utf8')) as {
+    const policy = JSON.parse(String(safeReadFile(policyPath))) as {
       sources: Record<string, { enabled: boolean }>;
     };
     policy.sources.github.enabled = true;
-    fs.writeFileSync(policyPath, JSON.stringify(policy, null, 2));
+    safeWriteFile(policyPath, JSON.stringify(policy, null, 2));
 
     const rows = mod.currentEnabledIntakeSources();
     expect(rows).toEqual([
