@@ -2,11 +2,11 @@
   "description": "Test files that leave records in the per-pool Vitest approval store (active/shared/runtime/vitest-approvals/run-<id>/pool-<n>/). Regenerated 2026-10-09 over the full root suite (every include in vitest.config.mts: libs, presence, satellites, scripts and tests; Linux, KYBERION_BASE_ROLE=worker MISSION_ROLE=mission_controller). tests/vitest-approval-store-guard.ts clears the store before and after every file, so these leftovers no longer reach other files. A file not listed here fails under KYBERION_TEST_LEAK_STRICT=1. Shrink-only: tests/approval-store-guard-policy.test.ts caps the count and requires every entry to exist; when you add afterEach cleanup to a listed file (the guard prints a note when a listed file left nothing), remove it here and lower the cap.",
   "files": [
     "libs/actuators/wisdom-actuator/src/decision-ops.test.ts",
-    "libs/core/governance/cloudflare-os-held-reconcile.test.ts",
     "libs/core/discussion/discussion-mission.test.ts",
     "libs/core/discussion/discussion-review.test.ts",
     "libs/core/governance/approval-separation-of-duties.test.ts",
     "libs/core/governance/approval-store.test.ts",
+    "libs/core/governance/cloudflare-os-held-reconcile.test.ts",
     "libs/core/governance/cloudflare-os-journal.test.ts",
     "libs/core/harnessing/external-hook-discovery.test.ts",
     "libs/core/knowledge/procedure-dispatcher.test.ts",
