@@ -12,6 +12,7 @@
 import * as path from 'node:path';
 import { withExecutionContextAsync } from '../authority.js';
 import { withResidentDotScope } from './resident-dot-scope.js';
+import { alertDotStepCircuitOpen, DotSupervisorStepCircuit } from './dot-step-circuit.js';
 import { appendJsonLine, readJsonLines } from '../foundation/json.js';
 import { createLogger } from '../logger.js';
 import { pathResolver } from '../path-resolver.js';
@@ -120,6 +121,34 @@ export function runAsDotCharter<T>(c: DotCharter, fn: () => Promise<T>): Promise
 
 function diag(what: string, why: unknown, next: string, evidence: string): string {
   return `${what} — ${why instanceof Error ? why.message : String(why)} | next: ${next} | evidence: ${evidence}`;
+}
+
+// A repeated identical failure (policy deny, missing grant) is deterministic —
+// warn the first few times, then hold the dot's measurement with backoff and
+// one ops alert instead of warning every sweep forever.
+const krMeasureCircuit = new DotSupervisorStepCircuit('dot-kr-measure');
+
+/** Shared catch handler: warn early, alert once on circuit open, else quiet. */
+function reportKrFailure(
+  site: string,
+  what: string,
+  error: unknown,
+  next: string,
+  evidence: string,
+  charter?: DotCharter
+): void {
+  const key = `${charter?.dot_id ?? 'unknown'}:${site}`;
+  const verdict = krMeasureCircuit.reportFailure(key, error);
+  if (verdict === 'open' && charter) {
+    alertDotStepCircuitOpen(
+      'dot-kr-measure',
+      charter,
+      krMeasureCircuit.signatureOf(key) ?? 'unknown',
+      krMeasureCircuit.streakOf(key)
+    );
+    return;
+  }
+  if (verdict === 'counted') logger.warn(diag(what, error, next, evidence));
 }
 
 function absolute(rootDir: string | undefined, rel: string): string {
@@ -380,8 +409,13 @@ export async function measureDotKeyResults(
       (row) => row.kr_id
     );
   } catch (error) {
-    logger.warn(
-      diag(`KR ledger unreadable for ${c.dot_id}`, error, 'measuring without throttle', ledger)
+    reportKrFailure(
+      'ledger-read',
+      `KR ledger unreadable for ${c.dot_id}`,
+      error,
+      'measuring without throttle',
+      ledger,
+      c
     );
     latest = new Map();
   }
@@ -410,21 +444,26 @@ export async function measureDotKeyResults(
         measured_at: now.toISOString(),
       });
     } catch (error) {
-      logger.warn(
-        diag(
-          `KR measurement failed for ${c.dot_id}/${spec.kr_id}`,
-          error,
-          'the previous value stays; retried next sweep',
-          ledger
-        )
+      reportKrFailure(
+        `measure/${spec.kr_id}`,
+        `KR measurement failed for ${c.dot_id}/${spec.kr_id}`,
+        error,
+        'the previous value stays; retried next sweep',
+        ledger,
+        c
       );
     }
   }
   try {
     appendLedger(ledger, rows, deps.rootDir);
   } catch (error) {
-    logger.warn(
-      diag(`KR ledger write failed for ${c.dot_id}`, error, 'rows dropped this sweep', ledger)
+    reportKrFailure(
+      'ledger-write',
+      `KR ledger write failed for ${c.dot_id}`,
+      error,
+      'rows dropped this sweep',
+      ledger,
+      c
     );
     return [];
   }

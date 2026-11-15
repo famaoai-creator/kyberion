@@ -27,7 +27,11 @@ import {
   spawnDelegatedTaskWorkerProcess,
 } from '@agent/core/delegated-task-observability';
 import { appendSupervisorEvent } from '@agent/core/agent/agent-runtime-events';
-import { recordDaemonHeartbeat } from '@agent/core/daemon-heartbeat';
+import {
+  listDaemonHeartbeatStatuses,
+  readDaemonHeartbeat,
+  recordDaemonHeartbeat,
+} from '@agent/core/daemon-heartbeat';
 import { runtimeSupervisor } from '@agent/core/tool/runtime-supervisor';
 import { sendOpsAlert } from '@agent/core/ops-alert';
 import {
@@ -1251,6 +1255,46 @@ async function probeDaemonHealth(target: ListenTarget, timeoutMs = 1000): Promis
   });
 }
 
+/**
+ * Rewrite heartbeat files that still claim `running`/`starting` for a
+ * verifiably dead pid. A daemon that exits without its shutdown path leaves a
+ * 'running' heartbeat behind, and stale state like that is how the supervisor
+ * looked alive for days after `process_exit`. Only ESRCH counts as dead —
+ * EPERM is uninspectable and the record is left alone (fail closed).
+ */
+function markDeadPidHeartbeats(): void {
+  try {
+    for (const status of listDaemonHeartbeatStatuses()) {
+      const heartbeat = status.heartbeat;
+      if (!heartbeat || (heartbeat.status !== 'running' && heartbeat.status !== 'starting'))
+        continue;
+      if (heartbeat.pid === process.pid) continue;
+      try {
+        process.kill(heartbeat.pid, 0);
+        continue; // alive
+      } catch (error: any) {
+        if (error?.code !== 'ESRCH') continue; // EPERM → cannot prove death
+      }
+      recordDaemonHeartbeat(heartbeat.daemon_id, {
+        pid: heartbeat.pid,
+        status: 'stopping',
+        details: {
+          ...(heartbeat.details ?? {}),
+          stopped_reason: 'process_exit_detected',
+          observed_by: 'agent-runtime-supervisor-daemon',
+        },
+      });
+      logger.info(
+        `[agent-runtime-supervisor-daemon] heartbeat for ${heartbeat.daemon_id} marked stopping — pid ${heartbeat.pid} is gone | next: watchdog or launcher may restart it | evidence: runtime/heartbeats/${heartbeat.daemon_id}.json`
+      );
+    }
+  } catch (error) {
+    logger.warn(
+      `[agent-runtime-supervisor-daemon] dead-pid heartbeat sweep failed — ${error instanceof Error ? error.message : error} | next: heartbeats keep their own values; watchdog staleness still applies`
+    );
+  }
+}
+
 export async function startAgentRuntimeSupervisorDaemon(
   options: AgentRuntimeSupervisorDaemonOptions = {}
 ): Promise<AgentRuntimeSupervisorDaemonInstance> {
@@ -1277,6 +1321,11 @@ export async function startAgentRuntimeSupervisorDaemon(
         ` | evidence: transport=unix socket_path=${JSON.stringify(socketPath)}`
     );
   }
+  // Read the incumbent heartbeat BEFORE recording our own 'starting' — when
+  // the PID lock below hits EPERM (liveness uninspectable), this snapshot is
+  // the only evidence of whether the lock holder is really a live supervisor:
+  // a live holder keeps refreshing its own pid here.
+  const priorHeartbeat = readDaemonHeartbeat('agent-runtime-supervisor-daemon');
   recordDaemonHeartbeat('agent-runtime-supervisor-daemon', {
     status: 'starting',
   });
@@ -1320,25 +1369,47 @@ export async function startAgentRuntimeSupervisorDaemon(
         // would delete a live daemon's lock and socket, creating a split-brain
         // supervisor whose heartbeat PID changes underneath clients.
         if (killErr?.code === 'EPERM') {
-          const message = `daemon lock is held by an existing process (pid ${pid}) but its liveness cannot be inspected`;
-          logger.warn(`[agent-runtime-supervisor-daemon] ${message}`);
-          if (options.exitOnExistingHealthyDaemon !== false) throw new DaemonExit(0);
-          throw new Error(message);
-        }
-        // Process does not exist, stale lock
-        try {
-          safeUnlinkSync(lockPath);
-        } catch (error: any) {
+          // EPERM means the process may exist but this launcher cannot
+          // inspect it. Treating that as dead risks a split-brain supervisor —
+          // but treating it as alive forever blocks every restart when the
+          // pid is long dead (rebooted container, PID reuse across boots).
+          // The daemon's own heartbeat is the arbiter: only a heartbeat that
+          // is fresh AND vouches for exactly this pid proves a live holder.
+          const holderAlive =
+            priorHeartbeat.status === 'healthy' && priorHeartbeat.heartbeat?.pid === pid;
+          if (holderAlive) {
+            const message = `daemon lock is held by an existing process (pid ${pid}) but its liveness cannot be inspected`;
+            logger.warn(`[agent-runtime-supervisor-daemon] ${message}`);
+            if (options.exitOnExistingHealthyDaemon !== false) throw new DaemonExit(0);
+            throw new Error(message);
+          }
           logger.warn(
-            `[agent-runtime-supervisor-daemon] failed to remove stale lock: ${error?.message || error}`
+            `[agent-runtime-supervisor-daemon] daemon lock held by uninspectable pid ${pid} is stale — heartbeat status '${priorHeartbeat.status}' does not vouch for it | next: taking the lock over | evidence: ${lockPath}`
           );
-        }
-        try {
-          safeCreateExclusiveFileSync(lockPath, process.pid.toString());
-        } catch (error: any) {
-          logger.warn(
-            `[agent-runtime-supervisor-daemon] failed to recreate daemon lock: ${error?.message || error}`
-          );
+          try {
+            safeUnlinkSync(lockPath);
+            safeCreateExclusiveFileSync(lockPath, process.pid.toString());
+          } catch (error: any) {
+            logger.warn(
+              `[agent-runtime-supervisor-daemon] failed to take over stale lock: ${error?.message || error}`
+            );
+          }
+        } else {
+          // Process does not exist, stale lock
+          try {
+            safeUnlinkSync(lockPath);
+          } catch (error: any) {
+            logger.warn(
+              `[agent-runtime-supervisor-daemon] failed to remove stale lock: ${error?.message || error}`
+            );
+          }
+          try {
+            safeCreateExclusiveFileSync(lockPath, process.pid.toString());
+          } catch (error: any) {
+            logger.warn(
+              `[agent-runtime-supervisor-daemon] failed to recreate daemon lock: ${error?.message || error}`
+            );
+          }
         }
       }
     } else {
@@ -1359,6 +1430,7 @@ export async function startAgentRuntimeSupervisorDaemon(
       }
     }
   }
+  markDeadPidHeartbeats();
 
   const filesystemSocket = process.platform !== 'win32';
   if (transport === 'unix' && (!filesystemSocket || safeExistsSync(socketPath))) {

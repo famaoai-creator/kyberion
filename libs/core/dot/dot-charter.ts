@@ -76,7 +76,18 @@ const logger = createLogger('dot-charter');
 export type DotCharterStatus = 'draft' | 'active' | 'paused' | 'retired';
 export type DotTrigger =
   | { kind: 'cron'; cron: string; timezone?: string }
-  | { kind: 'watch'; paths: string[] }
+  | {
+      kind: 'watch';
+      paths: string[];
+      /**
+       * Jsonl record `kind` values that never wake the dot by themselves: when
+       * every appended record since the last snapshot carries one of these
+       * kinds the watch stays quiet (and the snapshot advances). This is how a
+       * dot watching the ops-alert log avoids re-triggering on the
+       * undelivered-notification rows its own failed notifies produce.
+       */
+      ignore_jsonl_kinds?: string[];
+    }
   | { kind: 'wake'; channels: string[] }
   | {
       kind: 'event';
