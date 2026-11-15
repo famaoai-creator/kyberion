@@ -502,6 +502,8 @@ export const TENANT_RUNTIME_PARTITION_TARGET_KINDS = {
   provider_attestations: 'not_offboarded',
   // R5 idempotency reservations hold replayable tenant delegation output: purge with the tenant.
   delegation_idempotency: 'tenant_runtime_state',
+  // Delivery intents prevent replay: explicit offboarding exports and soft-deletes them; never TTL.
+  operator_notification_receipts: 'tenant_runtime_state',
   // Provider-reported tenant generation costs: exported, then removed with the tenant.
   generation_cost_settlements: 'tenant_runtime_state',
   // Reasoning API credential proofs (valid for 15 minutes): purge with the tenant.
@@ -720,6 +722,8 @@ export const PHYSICAL_TENANT_LEARNING_ROOTS = [
  * tenant offboarding still removes what an older version left behind.
  */
 export const PHYSICAL_LEGACY_TENANT_STATE_ROOTS = [
+  // Pre-registration notification intents remain replay authority in their exact scope.
+  PARTITIONED_RUNTIME_STATE_ROOTS.operator_notification_receipts,
   // dot-state-paths.ts: pre-partition tenant dot state (dot/tenants/<slug>/). Live
   // tenants keep the operator-reviewed `pnpm kyberion dot migrate-state` path;
   // an offboarded tenant's leftover copy is exported and soft-deleted (owner
@@ -750,9 +754,7 @@ function physicalLineageMatches(
   const tenantIndex = segments.lastIndexOf('tenants');
   const organizationIndex = segments.lastIndexOf('organizations');
   if (filter.tenantSlug && segments[tenantIndex + 1] !== filter.tenantSlug) return false;
-  if (filter.organizationId && segments[organizationIndex + 1] !== filter.organizationId)
-    return false;
-  return true;
+  return !filter.organizationId || segments[organizationIndex + 1] === filter.organizationId;
 }
 
 function physicalProjectLineageKey(repoPath: string): string {
@@ -1450,16 +1452,14 @@ export function verifyScopeOffboarded(
 function copyTree(source: string, destination: string): void {
   const safeSource = assertSafeRepositoryPath(source);
   const safeDestination = assertSafeRepositoryPath(destination, { allowMissingLeaf: true });
-  const stat = safeStat(safeSource);
-  if (stat.isDirectory()) {
+  if (safeStat(safeSource).isDirectory()) {
     if (!safeExistsSync(safeDestination)) safeMkdir(safeDestination, { recursive: true });
     for (const name of listDirEntries(safeSource)) {
       copyTree(path.join(safeSource, name), path.join(safeDestination, name));
     }
     return;
   }
-  const parent = path.dirname(safeDestination);
-  if (!safeExistsSync(parent)) safeMkdir(parent, { recursive: true });
+  safeMkdir(path.dirname(safeDestination), { recursive: true });
   safeCopyFileSync(safeSource, safeDestination);
 }
 

@@ -440,6 +440,8 @@ export interface DotMemoryDistillRow {
   refuted: number;
   hypothesis_ids: string[];
   candidate_id?: string;
+  /** Frozen source evidence survives bounded working-memory eviction. */
+  hypotheses?: DotMemoryDoc['hypotheses'];
 }
 
 /** ISO-8601 week key, e.g. `2026-W41` (UTC). */
@@ -471,6 +473,7 @@ export interface DotMemoryDistillFeedback {
   outcome: 'satisfied' | 'dissatisfied';
   comment: string;
   correction?: string;
+  evidence_refs?: string[];
 }
 
 async function recordDistillFeedback(
@@ -486,6 +489,7 @@ async function recordDistillFeedback(
     comment: input.comment,
     ...(input.correction ? { correction: input.correction } : {}),
     source: 'operator',
+    scope: input.scope,
   });
   // D8: the candidate is a queue row in the charter's scope (tenant dots:
   // the tenant's confidential partition), never a shared unscoped record.
@@ -493,6 +497,7 @@ async function recordDistillFeedback(
     feedback,
     procedureId: `dot:${input.dot_id}`,
     scope: input.scope,
+    resolvedLearningEvidence: input.evidence_refs,
   });
   return candidate ? { candidate_id: candidate.candidate_id } : {};
 }
@@ -500,8 +505,8 @@ async function recordDistillFeedback(
 /**
  * Once per ISO week per dot: distill hypotheses resolved since the last
  * distillation into an execution-feedback record (+ review candidate). Tenant
- * dots keep prose out of the shared feedback store (counts only); the
- * candidate is captured on the memory queue in the charter's own scope.
+ * Private feedback, frozen hypothesis evidence and review candidates stay in
+ * the charter's tenant or personal-owner scope.
  */
 export async function distillDotMemory(
   c: DotCharter,
@@ -530,9 +535,12 @@ export async function distillDotMemory(
     scope: c.scope,
     key,
     outcome: refuted.length > 0 ? 'dissatisfied' : 'satisfied',
-    comment:
-      tenant || confirmed.length === 0 ? summary : `${summary} Confirmed: ${prose(confirmed)}`,
-    ...(!tenant && refuted.length ? { correction: `Refuted assumptions: ${prose(refuted)}` } : {}),
+    comment: confirmed.length === 0 ? summary : `${summary} Confirmed: ${prose(confirmed)}`,
+    ...(refuted.length ? { correction: `Refuted assumptions: ${prose(refuted)}` } : {}),
+    evidence_refs: [
+      dotStatePath(c, DOT_MEMORY_DISTILL_FILE),
+      ...fresh.map((h) => `hypothesis:${h.id}`),
+    ],
   });
   const row: DotMemoryDistillRow = {
     dot_id: c.dot_id,
@@ -541,6 +549,7 @@ export async function distillDotMemory(
     confirmed: confirmed.length,
     refuted: refuted.length,
     hypothesis_ids: fresh.map((h) => h.id),
+    hypotheses: fresh.map((hypothesis) => ({ ...hypothesis })),
     ...(candidate.candidate_id ? { candidate_id: candidate.candidate_id } : {}),
   };
   safeMkdir(path.dirname(file), { recursive: true });

@@ -1,4 +1,10 @@
 import type { WorkItem, WorkItemContext, WorkItemStatus } from './work-coordination.js';
+import { KNOWLEDGE_TIERS } from '../foundation/knowledge-tier.js';
+import {
+  admitsCustody,
+  viewerPersonIds,
+  type SurfaceAuthorizationContext,
+} from '../surface/surface-authorization.js';
 
 export type WorkVisibilityScope =
   'organization' | 'home' | 'work_items' | 'operations' | 'missions' | 'governance';
@@ -67,6 +73,79 @@ export interface WorkVisibilityViewer {
   tenantSlugs: string[] | 'all';
   organizationIds?: string[] | 'all';
   projectIds?: string[] | 'all';
+  tierAccess?: readonly string[];
+  principalId?: string;
+  memberId?: string;
+  principal?: SurfaceAuthorizationContext['principal'];
+  personIds?: readonly string[];
+  includeUntenanted?: boolean;
+}
+
+/** Restrictive custody evidence, never a replacement for the typed entity context. */
+export function workItemReadScope(item: WorkItem): {
+  tier?: string;
+  ownerNhi?: string;
+  invalid: boolean;
+} {
+  const metadata = record(item.metadata);
+  const context = record(item.context);
+  const raw =
+    metadata.dot_scope ?? metadata.scope ?? (item as WorkItem & { scope?: unknown }).scope;
+  const scope = raw === undefined ? context : record(raw);
+  const tier = stringValue(scope.tier) ?? stringValue(context.tier);
+  const owner = stringValue(scope.owner_nhi) ?? stringValue(scope.nhi_id);
+  let invalid = raw !== undefined && (!raw || typeof raw !== 'object' || Array.isArray(raw));
+  // Pre-upgrade Dot rows may retain private prose in this shared routing store.
+  // Missing custody is unknown, not evidence that the item is system/public.
+  if ((stringValue(metadata.dot_id) || stringValue(metadata.action_ref)) && !tier) invalid = true;
+  if (metadata.dot_scope !== undefined && !stringValue(scope.tier)) invalid = true;
+  if (tier && !(KNOWLEDGE_TIERS as readonly string[]).includes(tier)) invalid = true;
+  if (scope.owner_nhi && scope.nhi_id && scope.owner_nhi !== scope.nhi_id) invalid = true;
+  if (context.tier && scope.tier && context.tier !== scope.tier) invalid = true;
+  if (raw !== undefined) {
+    const resolved = resolveWorkItemContext(item);
+    for (const field of ['tenant_slug', 'organization_id', 'project_id'] as const) {
+      const actual =
+        field === 'project_id' && item.context_origin?.project_id === 'default'
+          ? undefined
+          : resolved[field];
+      const bound = stringValue(scope[field]);
+      if ((bound && bound !== actual) || (tier === 'personal' && actual && bound !== actual))
+        invalid = true;
+    }
+  }
+  if (tier === 'personal' && !owner) invalid = true;
+  return { tier, ownerNhi: owner, invalid };
+}
+
+export function workItemVisibleToViewer(item: WorkItem, viewer: WorkVisibilityViewer): boolean {
+  const scope = workItemReadScope(item);
+  if (scope.invalid) return false;
+  if (scope.tier && viewer.tierAccess && !viewer.tierAccess.includes(scope.tier)) return false;
+  if (
+    scope.tier === 'personal' &&
+    (!viewer.tierAccess?.includes('personal') || !viewerPersonIds(viewer).includes(scope.ownerNhi!))
+  )
+    return false;
+  if (scope.ownerNhi && !admitsCustody(viewer, { kind: 'person', ref: scope.ownerNhi }))
+    return false;
+  const context = resolveWorkItemContext(item);
+  const personal = Boolean(scope.ownerNhi);
+  const system = !personal && !context.tenant_slug && admitsCustody(viewer, { kind: 'system' });
+  const selected = (allowed: string[] | 'all' | undefined, value: string | undefined) =>
+    !allowed ||
+    allowed === 'all' ||
+    ((personal || system) && allowed.length === 0 && !value) ||
+    Boolean(value && allowed.includes(value));
+  const project =
+    (personal || system) && item.context_origin?.project_id === 'default'
+      ? undefined
+      : context.project_id;
+  return (
+    selected(viewer.tenantSlugs, context.tenant_slug) &&
+    selected(viewer.organizationIds, context.organization_id) &&
+    selected(viewer.projectIds, project)
+  );
 }
 
 export class WorkVisibilityScopeError extends Error {
@@ -371,26 +450,17 @@ export function buildWorkVisibilityProjection(input: {
     input.projectId
   );
   const projected = input.items
+    .filter((item) =>
+      workItemVisibleToViewer(item, {
+        ...input.viewer,
+        tenantSlugs: tenantScope,
+        organizationIds: organizationScope,
+        projectIds: projectScope,
+      })
+    )
     .filter((item) => !input.missionId || matchesMissionId(item, input.missionId))
     .map((item) => ({ ...item, context: resolveWorkItemContext(item) }))
     .filter((item) => matchesScope(item, scope) && matchesView(item, view))
-    .filter((item) =>
-      tenantScope === 'all'
-        ? true
-        : Boolean(item.context.tenant_slug && tenantScope.includes(item.context.tenant_slug))
-    )
-    .filter(
-      (item) =>
-        organizationScope === 'all' ||
-        Boolean(
-          item.context.organization_id && organizationScope.includes(item.context.organization_id)
-        )
-    )
-    .filter(
-      (item) =>
-        projectScope === 'all' ||
-        Boolean(item.context.project_id && projectScope.includes(item.context.project_id))
-    )
     .sort((left, right) => right.updated_at.localeCompare(left.updated_at));
   const statuses: WorkItemStatus[] = [
     'backlog',

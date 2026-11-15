@@ -6,6 +6,7 @@ import {
 } from '@agent/core/workforce/work-coordination';
 import {
   buildWorkVisibilityProjection,
+  workItemVisibleToViewer,
   type WorkVisibilityScope,
   type WorkVisibilityView,
 } from '@agent/core/workforce/work-visibility';
@@ -70,12 +71,21 @@ export function GET(req: NextRequest) {
     const projection = buildWorkVisibilityProjection({
       items: withViewerExecutionContext(viewer, () =>
         listWorkItems({
-          tenantSlugs: tenantSlugs === 'all' ? undefined : tenantSlugs,
-          organizationIds: organizationIds === 'all' ? undefined : organizationIds,
-          projectIds: projectIds === 'all' ? undefined : projectIds,
+          tenantSlugs:
+            tenantSlugs === 'all' || (viewer.includeUntenanted && tenantSlugs.length === 0)
+              ? undefined
+              : tenantSlugs,
+          organizationIds:
+            organizationIds === 'all' || (viewer.includeUntenanted && organizationIds.length === 0)
+              ? undefined
+              : organizationIds,
+          projectIds:
+            projectIds === 'all' || (viewer.includeUntenanted && projectIds.length === 0)
+              ? undefined
+              : projectIds,
         })
       ),
-      viewer: { tenantSlugs, organizationIds, projectIds },
+      viewer: { ...viewer, tenantSlugs, organizationIds, projectIds },
       scope,
       view,
       organizationId: readChronosOptionalStringParam(
@@ -100,6 +110,7 @@ export function GET(req: NextRequest) {
           const current = withViewerExecutionContext(viewer, () => getWorkItem(item.item_id));
           if (
             !current ||
+            !workItemVisibleToViewer(current, viewer) ||
             current.context?.tenant_slug !== item.context?.tenant_slug ||
             current.context?.organization_id !== item.context?.organization_id ||
             current.context?.project_id !== item.context?.project_id
@@ -141,34 +152,14 @@ export async function POST(req: NextRequest) {
     const current = withViewerExecutionContext(viewer, () => getWorkItem(itemId));
     if (!current)
       return NextResponse.json({ ok: false, error: 'work item not found' }, { status: 404 });
-    const currentTenant =
-      current.context?.tenant_slug ||
-      (typeof current.metadata?.tenant_slug === 'string'
-        ? current.metadata.tenant_slug
-        : undefined);
-    const currentOrganization =
-      current.context?.organization_id ||
-      (typeof current.metadata?.organization_id === 'string'
-        ? current.metadata.organization_id
-        : undefined);
-    const currentProject = current.context?.project_id || current.project_id;
     if (
-      viewer.tenantSlugs !== 'all' &&
-      (!currentTenant || !viewer.tenantSlugs.includes(currentTenant))
-    ) {
-      throw new Error('viewer is not authorized for this work item tenant');
-    }
-    const organizationIds = strictViewerScopeOrganizationIds(viewer);
-    if (
-      organizationIds !== 'all' &&
-      (!currentOrganization || !organizationIds.includes(currentOrganization))
-    ) {
-      throw new Error('viewer is not authorized for this work item organization');
-    }
-    const projectIds = strictViewerScopeProjectIds(viewer);
-    if (projectIds !== 'all' && (!currentProject || !projectIds.includes(currentProject))) {
-      throw new Error('viewer is not authorized for this work item project');
-    }
+      !workItemVisibleToViewer(current, {
+        ...viewer,
+        organizationIds: strictViewerScopeOrganizationIds(viewer),
+        projectIds: strictViewerScopeProjectIds(viewer),
+      })
+    )
+      throw new Error('viewer is not authorized for this work item custody');
     if ('action' in input) {
       if (
         !current.context?.tenant_slug ||

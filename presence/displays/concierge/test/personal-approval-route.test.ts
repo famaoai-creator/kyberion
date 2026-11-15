@@ -16,12 +16,16 @@ let summary: typeof import('../src/app/api/summary/route');
 let envelopes: typeof import('@agent/core/scope-envelope');
 let helper: typeof import('@agent/core/governance/authenticated-personal-approvals');
 let viewer: ConciergeViewerContext;
+let inbox: typeof import('@agent/core/deliverable-inbox');
+let outcomes: typeof import('../src/app/api/outcomes/[id]/route');
 beforeAll(async () => {
   server = await import('../src/lib/personal-approval-server');
   decisions = await import('../src/app/api/approvals/[id]/route');
   summary = await import('../src/app/api/summary/route');
   envelopes = await import('@agent/core/scope-envelope');
   helper = await import('@agent/core/governance/authenticated-personal-approvals');
+  inbox = await import('@agent/core/deliverable-inbox');
+  outcomes = await import('../src/app/api/outcomes/[id]/route');
 }, 60000);
 beforeEach(() => {
   viewer = { ...f.viewer.scope, principal: f.viewer.principal, includeUntenanted: false };
@@ -60,6 +64,97 @@ async function decide(id: string, digest: string) {
   );
 }
 describe('personal owner real approval route', () => {
+  function notification() {
+    return f.personal(() =>
+      inbox.addInboxEntry({
+        entryId: 'INBOX-PERSONAL-NOTICE',
+        title: 'Synthetic private notice',
+        summary: 'Only the installed owner may read this.',
+        kind: 'operator_notification',
+        scope: {
+          tier: 'personal',
+          owner_nhi: f.installedId,
+          mission_id: 'MSN-PRIVATE-NOTICE',
+          task_id: 'private-notice-task',
+          session_id: 'private-notice-session',
+        },
+      })
+    );
+  }
+  const outcome = (id: string, status: string, selection = 'personal') =>
+    outcomes.POST(
+      new NextRequest('http://localhost:3050/api/outcomes/' + id + '?tenant=' + selection, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      }),
+      { params: Promise.resolve({ id }) }
+    );
+  it('shows and marks the real owner personal notification without widening the tier mask', async () => {
+    const entry = notification();
+    viewer = { ...viewer, tierAccess: ['public'] };
+    expect(inbox.listInboxEntries({ entryId: entry.entry_id })).toEqual([]);
+    const home = await summary
+      .GET(new NextRequest('http://localhost:3050/api/summary?tenant=personal'))
+      .json();
+    expect(home.summary.outcome_feed).toContainEqual(
+      expect.objectContaining({
+        entry_id: entry.entry_id,
+        title: 'Synthetic private notice',
+      })
+    );
+    expect(viewer.tierAccess).toEqual(['public']);
+    const read = await outcome(entry.entry_id, 'read');
+    expect(read.status).toBe(200);
+    expect(await read.json()).toMatchObject({
+      ok: true,
+      entry: {
+        status: 'read',
+        reviewed_by: 'user:owner',
+        scope: entry.scope,
+      },
+    });
+    const accepted = await outcome(entry.entry_id, 'accepted');
+    expect(accepted.status).toBe(200);
+    expect(await accepted.json()).toMatchObject({
+      ok: true,
+      entry: {
+        status: 'accepted',
+        acceptance_receipt: { actor_id: 'user:owner', authenticated: true },
+      },
+    });
+  });
+  it('keeps private notices hidden from foreign humans, agents, company and system selections', async () => {
+    const entry = notification();
+    const owner = viewer;
+    for (const candidate of [
+      { ...owner, principalId: 'foreign', memberId: 'foreign' },
+      {
+        ...owner,
+        principal: {
+          ...owner.principal!,
+          actor: { ...owner.principal!.actor, kind: 'agent' as const },
+        },
+      },
+    ]) {
+      viewer = candidate;
+      expect((await outcome(entry.entry_id, 'read')).status).toBe(404);
+      const home = await summary
+        .GET(new NextRequest('http://localhost:3050/api/summary?tenant=personal'))
+        .json();
+      expect(
+        home.summary.outcome_feed.map((item: { entry_id: string }) => item.entry_id)
+      ).not.toContain(entry.entry_id);
+    }
+    viewer = owner;
+    expect((await outcome(entry.entry_id, 'read', 'fixture-a')).status).toBe(404);
+    viewer = { ...owner, tenantSlugs: 'all' };
+    expect((await outcome(entry.entry_id, 'read', 'shared')).status).toBe(404);
+    expect(
+      f.personal(() => inbox.listInboxEntries({ entryId: entry.entry_id, scope: entry.scope }))[0]
+        .status
+    ).toBe('unread');
+  });
   it('shows the owner request through the actual UI summary and accepts their signed human decision', async () => {
     const record = create();
     expect(record).toBeTruthy();

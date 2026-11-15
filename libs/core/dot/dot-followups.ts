@@ -26,7 +26,7 @@ import { getZonedDateParts, matchesCron } from '../pipeline/cron-utils.js';
 import { safeMkdir, safeWriteFile } from '../secure-io.js';
 import { isFrontDeskDiagnosticDot, type DotCharter } from './dot-charter.js';
 import type { DotExtCtx, DotPromptSection, DotWakeTool } from './dot-extensions.js';
-import type { DotWakeLedgerEntry, DueDotTrigger } from './dot-runtime.js';
+import type { DotWakeLedgerEntry, DotWakeReceipt, DueDotTrigger } from './dot-runtime.js';
 import { DOT_FOLLOWUPS_FILE, dotStatePath, type DotFollowupRow } from './dot-state-paths.js';
 
 const logger = createLogger('dot-followups');
@@ -259,6 +259,87 @@ export const dotScheduleFollowupTool: DotWakeTool = {
   },
 };
 
+/** Freeze only the successor intent whose write failed after the wake delivered. */
+export function followupRetryEvidence(
+  trigger: DueDotTrigger | undefined,
+  failedTools: ReadonlySet<string>,
+  outputs: Record<string, unknown[]>,
+  deps: DotFollowupDeps
+): Pick<DotWakeLedgerEntry, 'trigger_retained' | 'followup_retry'> {
+  if (trigger?.trigger.kind !== 'followup' || !failedTools.has(DOT_FOLLOWUP_TOOL_NAME)) return {};
+  return {
+    trigger_retained: true,
+    followup_retry: {
+      scheduled_at: (deps.now?.() ?? new Date()).toISOString(),
+      values: (outputs[DOT_FOLLOWUP_TOOL_NAME] ?? []) as DotFollowupInput[],
+    },
+  };
+}
+
+/** Recover only a frozen schedule, never the model turn or its other effects. */
+export function recoverRetainedDotFollowup(
+  charter: DotCharter,
+  deps: DotFollowupDeps & { trigger?: DueDotTrigger },
+  recordOutcome: (typeof import('./dot-runtime.js'))['recordDotWakeOutcome']
+): DotWakeReceipt | undefined {
+  const trigger = deps.trigger;
+  if (trigger?.trigger.kind !== 'followup') return undefined;
+  const scoped = charter.scope.tier !== 'public' || Boolean(charter.scope.tenant_slug);
+  const rows = readJsonLinesCachedAcrossCompaction<DotWakeLedgerEntry>(
+    path.join(
+      root(deps),
+      scoped ? dotStatePath(charter, 'wake-ledger.jsonl') : DOT_FOLLOWUP_WAKE_LEDGER_PATH
+    )
+  ).filter((row) => row.dot_id === charter.dot_id && row.trigger_key === trigger.key);
+  if (rows.some((row) => row.outcome === 'rejected'))
+    return { dot_id: charter.dot_id, outcome: 'rejected', reason: 'follow-up already rejected' };
+  if (rows.some((row) => row.outcome === 'delivered' && !row.trigger_retained))
+    return { dot_id: charter.dot_id, outcome: 'delivered', reason: 'follow-up already completed' };
+  const retained = rows.filter((row) => row.outcome === 'delivered' && row.trigger_retained).at(-1);
+  if (!retained) return undefined;
+  const retry = retained.followup_retry;
+  const values = Array.isArray(retry?.values)
+    ? retry.values.map((value) => parseDotFollowup(value))
+    : undefined;
+  let errors: string[];
+  try {
+    if (
+      !retry ||
+      !Number.isFinite(Date.parse(retry.scheduled_at)) ||
+      !values?.length ||
+      values.length > dotScheduleFollowupTool.maxPerWake ||
+      values.some((value) => !value.ok)
+    )
+      throw new Error(
+        'original follow-up recovery evidence is unavailable; inspect the retained wake'
+      );
+    errors = dotScheduleFollowupTool.apply(
+      charter,
+      values.map((value) => (value.ok ? value.value : undefined)),
+      {
+        rootDir: deps.rootDir,
+        now: () => new Date(retry.scheduled_at),
+        completingFollowupKey: trigger.key,
+      }
+    );
+  } catch (error) {
+    errors = [error instanceof Error ? error.message : String(error)];
+  }
+  const pending = errors.length > 0;
+  recordOutcome(charter, trigger, 'delivered', {
+    ...deps,
+    reason: pending ? 'follow-up schedule recovery pending' : 'follow-up schedule recovered',
+    ...(pending ? { trigger_retained: true, followup_retry: retry } : {}),
+    turns_run: 0,
+    tokens_used: 0,
+  });
+  return {
+    dot_id: charter.dot_id,
+    outcome: 'delivered',
+    ...(pending ? { trigger_retained: true as const, tool_errors: errors } : {}),
+  };
+}
+
 export const dotFollowupsPromptSection: DotPromptSection = {
   id: 'dot-followups',
   order: 60,
@@ -281,13 +362,20 @@ export function evaluateDotFollowupsDue(
   const now = deps.now?.() ?? new Date();
   const rows = listPendingDotFollowups(c, deps);
   if (rows.length === 0) return [];
-  const isDue = dueChecker(readLedger(c, deps), now);
+  const ledger = readLedger(c, deps);
+  const isDue = dueChecker(ledger, now);
+  const retained = new Set(
+    ledger
+      .filter((row) => row.outcome === 'delivered' && row.trigger_retained)
+      .map((row) => row.trigger_key)
+  );
   return rows
     .filter((r) => Date.parse(r.due_at) <= now.getTime() && isDue(followupKey(r.followup_id)))
     .sort((a, b) => a.due_at.localeCompare(b.due_at))
     .map((r) => ({
       trigger: { kind: 'followup' as const },
       key: followupKey(r.followup_id),
+      ...(retained.has(followupKey(r.followup_id)) ? { followupRecovery: true as const } : {}),
       detail: `follow-up scheduled ${r.created_at}: ${r.reason}`,
     }));
 }

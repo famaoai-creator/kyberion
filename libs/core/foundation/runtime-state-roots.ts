@@ -37,6 +37,7 @@ export const PARTITIONED_RUNTIME_STATE_ROOTS = {
   api_verification: 'active/shared/runtime/health/api-verification',
   provider_attestations: 'active/shared/runtime/provider-attestations',
   hints: 'active/shared/runtime/hints',
+  operator_notification_receipts: 'active/shared/runtime/operator-notification-receipts',
 } as const;
 
 export const PARTITIONED_RUNTIME_LEDGER_ROOTS = {

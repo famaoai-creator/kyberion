@@ -28,6 +28,7 @@ import { readJson } from '../foundation/json.js';
 import { listProjectRecords } from '../project/project-registry.js';
 import { safeExistsSync, safeReaddir } from '../secure-io.js';
 import { listWorkItems } from '../workforce/work-coordination.js';
+import { workItemReadScope } from '../workforce/work-visibility.js';
 import {
   buildDecisionBrief,
   type DecisionBrief,
@@ -74,6 +75,9 @@ export interface GraphActorLink {
 export interface GraphNode extends GraphRef {
   status?: string;
   tier?: string;
+  ownerNhi?: string;
+  custodyInvalid?: boolean;
+  projectScopeDefault?: boolean;
   tenantSlug?: string;
   organizationId?: string;
   projectId?: string;
@@ -358,6 +362,7 @@ function approvalScope(record: ApprovalRequestRecord): {
 }
 
 function workItemScope(item: WorkItem) {
+  const custody = workItemReadScope(item);
   const context = item.context as
     | {
         tenant_slug?: string;
@@ -370,9 +375,15 @@ function workItemScope(item: WorkItem) {
   return {
     tenantSlug: context?.tenant_slug,
     organizationId: context?.organization_id,
-    projectId: context?.project_id || item.project_id || undefined,
+    projectId:
+      custody.tier === 'personal' && item.context_origin?.project_id === 'default'
+        ? undefined
+        : context?.project_id || item.project_id || undefined,
     missionId: context?.mission_id,
-    tier: context?.tier,
+    tier: custody.tier,
+    ownerNhi: custody.ownerNhi,
+    custodyInvalid: custody.invalid,
+    projectScopeDefault: item.context_origin?.project_id === 'default',
   };
 }
 
@@ -616,6 +627,20 @@ const GRAPH_READ_POLICY = {
  * `admitsCustody`, the one rule every viewer-scoped reader shares.
  */
 export function viewerAdmitsNode(viewer: SurfaceAuthorizationContext, node: GraphNode): boolean {
+  if (node.custodyInvalid) return false;
+  if (node.kind === 'work_item' && !node.tenantSlug && !node.ownerNhi) {
+    if (viewer.tenantSlugs !== 'all' && viewer.tenantSlugs.length > 0) return false;
+    if (
+      !node.organizationId &&
+      viewer.organizationIds !== 'all' &&
+      viewer.organizationIds.length > 0
+    )
+      return false;
+    if (!node.projectId && viewer.projectIds !== 'all' && viewer.projectIds.length > 0)
+      return false;
+  }
+  if (node.tier === 'personal' && !node.ownerNhi) return false;
+  if (node.ownerNhi && !admitsCustody(viewer, { kind: 'person', ref: node.ownerNhi })) return false;
   if (node.kind === 'actor' && node.facts?.actor_type === 'member') {
     // Custody membership cannot bypass the independent operation/tier ceiling.
     if (
@@ -635,7 +660,12 @@ export function viewerAdmitsNode(viewer: SurfaceAuthorizationContext, node: Grap
       admitsCustody(viewer, { kind: 'person', ref: node.id })
     );
   }
-  if (!node.tenantSlug && node.tier !== 'public' && !admitsCustody(viewer, { kind: 'system' }))
+  if (
+    !node.tenantSlug &&
+    node.tier !== 'public' &&
+    node.tier !== 'personal' &&
+    !admitsCustody(viewer, { kind: 'system' })
+  )
     return false;
   return authorizeSurfaceOperation({
     context: viewer,
@@ -645,7 +675,16 @@ export function viewerAdmitsNode(viewer: SurfaceAuthorizationContext, node: Grap
       ...(node.organizationId && node.kind !== 'actor'
         ? { organizationId: node.organizationId }
         : {}),
-      ...(node.projectId && ['project', 'mission', 'task', 'work_item'].includes(node.kind)
+      ...(node.projectId &&
+      ['project', 'mission', 'task', 'work_item'].includes(node.kind) &&
+      !(
+        node.projectScopeDefault &&
+        !node.tenantSlug &&
+        !node.ownerNhi &&
+        viewer.includeUntenanted &&
+        viewer.projectIds !== 'all' &&
+        viewer.projectIds.length === 0
+      )
         ? { projectId: node.projectId }
         : {}),
       ...(node.tier ? { tier: node.tier } : {}),

@@ -1,4 +1,5 @@
 import * as path from 'node:path';
+import { createHash } from 'node:crypto';
 import {
   normalizeEventScope,
   type EventScope,
@@ -24,12 +25,19 @@ export function assertPhysicalScopeSegment(value: string, label: string): string
  */
 export function physicalScopeNamespace(scopeInput: EventScopeInput): string {
   const scope = normalizeEventScope(scopeInput);
-  if (!scope.tenant_slug) return '';
+  const personal = scope.tier === 'personal';
+  if (personal && !scope.nhi_id?.trim())
+    throw new Error('[PERSONAL_SCOPE_OWNER_REQUIRED] Personal storage requires an owner identity');
+  if (!scope.tenant_slug && !personal) return '';
 
-  const segments = [
-    PHYSICAL_TENANT_NAMESPACE,
-    assertPhysicalScopeSegment(scope.tenant_slug, 'tenant_slug'),
-  ];
+  const segments = personal
+    ? [
+        'personal',
+        scope.tenant_slug || 'shared',
+        'owners',
+        createHash('sha256').update(scope.nhi_id!).digest('hex'),
+      ]
+    : [PHYSICAL_TENANT_NAMESPACE, assertPhysicalScopeSegment(scope.tenant_slug!, 'tenant_slug')];
   const entitySegments: Array<[keyof EventScope, string]> = [
     ['organization_id', 'organizations'],
     ['project_id', 'projects'],
@@ -70,6 +78,8 @@ export function partitionedScopedPath(
   ...parts: string[]
 ): string {
   const scope = normalizeEventScope(scopeInput);
+  if (scope.tier === 'personal')
+    return path.posix.join(root, physicalScopeNamespace(scope), ...parts);
   const partition = scope.tenant_slug
     ? storagePartitionSegments({ kind: 'tier', tier: scope.tier, tenant: scope.tenant_slug })
     : storagePartitionSegments({ kind: 'system' });

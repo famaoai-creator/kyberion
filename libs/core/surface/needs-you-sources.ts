@@ -193,8 +193,33 @@ function approvalsFor(viewer: SurfaceAuthorizationContext): CeoApprovalItem[] {
 }
 
 function outcomesFor(viewer: SurfaceAuthorizationContext): NeedsYouOutcomeInput[] {
-  return listInboxEntries({ status: ['unread', 'read'], limit: NEEDS_YOU_READ_LIMIT })
+  const query = { status: ['unread', 'read'], limit: NEEDS_YOU_READ_LIMIT };
+  const entries = [
+    ...listInboxEntries(query),
+    ...viewerPersonIds(viewer).flatMap((ownerNhi) => listInboxEntries({ ...query, ownerNhi })),
+  ];
+  return [...new Map(entries.map((entry) => [entry.entry_id, entry])).values()]
     .filter((entry) => admitsCustody(viewer, custodyOfScope(entry)))
+    .filter((entry) => !entry.tier || viewer.tierAccess.includes(entry.tier))
+    .filter(
+      (entry) =>
+        entry.tier !== 'personal' ||
+        Boolean(entry.owner_nhi && viewerPersonIds(viewer).includes(entry.owner_nhi))
+    )
+    .filter(
+      (entry) =>
+        viewer.organizationIds === 'all' ||
+        (entry.organization_id
+          ? viewer.organizationIds.includes(entry.organization_id)
+          : entry.tier === 'personal' && viewer.organizationIds.length === 0)
+    )
+    .filter(
+      (entry) =>
+        viewer.projectIds === 'all' ||
+        (entry.project_id
+          ? viewer.projectIds.includes(entry.project_id)
+          : entry.tier === 'personal' && viewer.projectIds.length === 0)
+    )
     .map((entry) => ({
       entry_id: entry.entry_id,
       title: entry.title,
@@ -205,6 +230,9 @@ function outcomesFor(viewer: SurfaceAuthorizationContext): NeedsYouOutcomeInput[
       updated_at: entry.updated_at,
       ...(entry.kind ? { kind: entry.kind } : {}),
       ...(entry.tenant_slug ? { tenant_slug: entry.tenant_slug } : {}),
+      ...(entry.tier ? { tier: entry.tier } : {}),
+      ...(entry.organization_id ? { organization_id: entry.organization_id } : {}),
+      ...(entry.project_id ? { project_id: entry.project_id } : {}),
       ...personCustodyFields(entry),
     }));
 }

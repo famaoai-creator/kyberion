@@ -544,7 +544,9 @@ async function runDotSweepWithStableOutputs(now: Date, deps: DotSweepDeps): Prom
             const authority = resolveCurrentTriggerAuthority(loaded.charter.scope.tenant_slug);
             return await dotTriggerRunner.run(
               {
-                idempotencyKey: `dot:${loaded.charter.dot_id}:${trigger.key}`,
+                // Recovery is a schedule-only continuation. Its own stable key
+                // also bypasses terminal delivered receipts from older runtimes.
+                idempotencyKey: `dot:${loaded.charter.dot_id}:${trigger.key}${trigger.followupRecovery ? ':schedule-recovery' : ''}`,
                 source: triggerRunnerSource(trigger),
                 createdBy: authority,
                 payload: { dot_id: loaded.charter.dot_id, trigger_key: trigger.key },
@@ -558,7 +560,11 @@ async function runDotSweepWithStableOutputs(now: Date, deps: DotSweepDeps): Prom
                 // skipped/failed keeps the key retryable and lets the dot
                 // ledger's pending event survive the block (a content-
                 // addressed wake:<hash> key can never regenerate).
-                if (wake.outcome === 'failed' || wake.outcome === 'skipped') {
+                if (
+                  wake.outcome === 'failed' ||
+                  wake.outcome === 'skipped' ||
+                  wake.trigger_retained
+                ) {
                   throw new Error(wake.reason ?? `dot wake ${wake.outcome}`);
                 }
                 return `dot-wake:${wake.outcome}`;

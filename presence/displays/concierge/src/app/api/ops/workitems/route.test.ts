@@ -30,7 +30,8 @@ vi.mock('@agent/core/workforce/work-coordination', () => ({
   updateWorkItem: mocks.updateWorkItem,
 }));
 
-vi.mock('@agent/core/workforce/work-visibility', () => ({
+vi.mock('@agent/core/workforce/work-visibility', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/workforce/work-visibility')>()),
   buildWorkVisibilityProjection: mocks.buildWorkVisibilityProjection,
 }));
 
@@ -115,6 +116,121 @@ describe('workitems route', () => {
     });
   });
 
+  it('reads legitimate system selection without dropping source rows or exposing tenant/person work', async () => {
+    const actual = await vi.importActual<typeof import('@agent/core/workforce/work-visibility')>(
+      '@agent/core/workforce/work-visibility'
+    );
+    mocks.buildWorkVisibilityProjection.mockImplementation(actual.buildWorkVisibilityProjection);
+    const row = {
+      item_id: 'system',
+      title: 'Platform maintenance',
+      description: 'System work',
+      status: 'ready',
+      project_id: '',
+      labels: [],
+      dependencies: [],
+      metadata: {},
+      created_at: '2026-11-15',
+      updated_at: '2026-11-15',
+    };
+    const context = {
+      role: 'localadmin',
+      tenantSlugs: [],
+      organizationIds: [],
+      projectIds: [],
+      tierAccess: ['public', 'confidential'],
+      includeUntenanted: true,
+    };
+    mocks.resolveOpsViewerForRequest.mockReturnValue({ context });
+    mocks.strictViewerScopeTenantSlugs.mockReturnValue([]);
+    mocks.strictViewerScopeOrganizationIds.mockReturnValue([]);
+    mocks.strictViewerScopeProjectIds.mockReturnValue([]);
+    mocks.listWorkItems.mockReturnValue([
+      row,
+      { ...row, item_id: 'tenant', context: { tenant_slug: 'company' } },
+      {
+        ...row,
+        item_id: 'personal',
+        metadata: { dot_scope: { tier: 'personal', owner_nhi: 'owner' } },
+      },
+      {
+        ...row,
+        item_id: 'public-person',
+        metadata: { dot_scope: { tier: 'public', nhi_id: 'owner' } },
+      },
+      { ...row, item_id: 'unknown-dot', metadata: { dot_id: 'old' } },
+      {
+        ...row,
+        item_id: 'public-dot',
+        metadata: { dot_id: 'public', dot_scope: { tier: 'public' } },
+      },
+    ]);
+    const response = await GET(new NextRequest('http://localhost/api/workitems'));
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.items.map((entry: { item_id: string }) => entry.item_id)).toEqual([
+      'system',
+      'public-dot',
+    ]);
+    expect(body.counts.ready).toBe(2);
+    expect(mocks.listWorkItems).toHaveBeenCalledWith({
+      tenantSlugs: undefined,
+      organizationIds: undefined,
+      projectIds: undefined,
+    });
+  });
+
+  it('filters personal rows and counts through the actual projection for public and foreign viewers', async () => {
+    const actual = await vi.importActual<typeof import('@agent/core/workforce/work-visibility')>(
+      '@agent/core/workforce/work-visibility'
+    );
+    mocks.buildWorkVisibilityProjection.mockImplementation(actual.buildWorkVisibilityProjection);
+    const row = {
+      item_id: 'private',
+      title: 'private prose',
+      description: 'secret',
+      status: 'ready',
+      project_id: '',
+      labels: [],
+      dependencies: [],
+      metadata: { dot_scope: { tier: 'personal', owner_nhi: 'owner' } },
+      created_at: '2026-11-15',
+      updated_at: '2026-11-15',
+    };
+    mocks.listWorkItems.mockReturnValue([
+      row,
+      {
+        ...row,
+        item_id: 'legacy-private-dot',
+        metadata: { dot_id: 'old-dot', action_ref: 'old-action' },
+      },
+      { ...row, item_id: 'ordinary', title: 'ordinary', metadata: {} },
+    ]);
+    for (const context of [
+      {
+        role: 'localadmin',
+        tenantSlugs: 'all',
+        tierAccess: ['public', 'confidential'],
+        principalId: 'owner',
+      },
+      {
+        role: 'localadmin',
+        tenantSlugs: 'all',
+        tierAccess: ['personal', 'public'],
+        principalId: 'foreign',
+      },
+    ]) {
+      mocks.resolveOpsViewerForRequest.mockReturnValue({ context });
+      const response = await GET(new NextRequest('http://localhost/api/workitems'));
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(body.items.map((entry: { item_id: string }) => entry.item_id)).toEqual(['ordinary']);
+      expect(body.counts.ready).toBe(1);
+      expect(JSON.stringify(body)).not.toContain('private prose');
+      expect(body.lineage.total_items).toBe(1);
+    }
+  });
+
   it('never forwards stored forged approval display metadata', async () => {
     mocks.buildWorkVisibilityProjection.mockReturnValue({
       items: [
@@ -140,7 +256,13 @@ describe('workitems route', () => {
     expect(response.status).toBe(200);
     expect(mocks.buildWorkVisibilityProjection).toHaveBeenCalledWith({
       items: [{ item_id: 'WI-1' }],
-      viewer: { tenantSlugs: 'all', organizationIds: 'all', projectIds: 'all' },
+      viewer: {
+        role: 'localadmin',
+        source: 'loopback',
+        tenantSlugs: 'all',
+        organizationIds: 'all',
+        projectIds: 'all',
+      },
       scope: 'operations',
       view: 'active',
       organizationId: undefined,
@@ -209,6 +331,45 @@ describe('explicit mission alignment action', () => {
     }
     expect(mocks.requestAlignment).toHaveBeenCalledWith(intake());
     expect(mocks.updateWorkItem).not.toHaveBeenCalled();
+  });
+  it('allows legitimate localadmin system status updates using actual ownerless record scope', async () => {
+    mocks.resolveOpsViewerForRequest.mockReturnValue({
+      context: {
+        role: 'localadmin',
+        tenantSlugs: [],
+        organizationIds: [],
+        projectIds: [],
+        includeUntenanted: true,
+      },
+    });
+    mocks.strictViewerScopeOrganizationIds.mockReturnValue([]);
+    mocks.strictViewerScopeProjectIds.mockReturnValue([]);
+    const current = { ...intake(), context: {}, metadata: {} };
+    mocks.getWorkItem.mockReturnValue(current);
+    mocks.updateWorkItem.mockReturnValue({ ...current, status: 'done' });
+    expect((await post({ itemId: 'WI-1', status: 'done' })).status).toBe(200);
+    expect(mocks.updateWorkItem).toHaveBeenCalledWith({ itemId: 'WI-1', status: 'done' });
+    mocks.requireOpsAccess.mockReturnValue(NextResponse.json({ ok: false }, { status: 403 }));
+    mocks.updateWorkItem.mockClear();
+    expect((await post({ itemId: 'WI-1', status: 'done' })).status).toBe(403);
+    expect(mocks.updateWorkItem).not.toHaveBeenCalled();
+  });
+  it('rejects personal status mutation before touching shared state even for an all-tenant administrator', async () => {
+    mocks.resolveOpsViewerForRequest.mockReturnValue({
+      context: {
+        role: 'localadmin',
+        tenantSlugs: 'all',
+        tierAccess: ['public', 'confidential'],
+        principalId: 'owner',
+      },
+    });
+    mocks.getWorkItem.mockReturnValue({
+      ...intake(),
+      metadata: { dot_scope: { tier: 'personal', owner_nhi: 'owner' } },
+    });
+    expect((await post({ itemId: 'WI-1', status: 'done' })).status).toBe(403);
+    expect(mocks.updateWorkItem).not.toHaveBeenCalled();
+    expect(mocks.requestAlignment).not.toHaveBeenCalled();
   });
   it.each(['tenant_slug', 'organization_id', 'project_id'])(
     'rejects changed or unrelated %s before invoking admission',

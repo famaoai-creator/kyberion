@@ -1,4 +1,10 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { randomUUID } from 'node:crypto';
+import { dirname } from 'node:path';
+import { dotUpdateMemoryTool, distillDotMemory } from '../dot/dot-memory.js';
+import { dotStatePath, DOT_MEMORY_DISTILL_FILE } from '../dot/dot-state-paths.js';
+import type { DotCharter } from '../dot/dot-charter.js';
+import { runtimeStatePath } from '../foundation/runtime-state-roots.js';
 import {
   buildExecutionFeedbackHints,
   loadExecutionFeedbackStore,
@@ -188,19 +194,24 @@ describe('execution feedback loop', () => {
     expect(resolveExecutionFeedbackPath(a)).not.toBe(resolveExecutionFeedbackPath());
   });
 
-  it('rejects owner-only scoped storage instead of reading or evicting legacy data', () => {
+  it('isolates owner-only scoped storage without reading or evicting legacy data', () => {
     const before = safeExistsSync(feedbackPath)
       ? safeReadFile(feedbackPath, { encoding: 'utf8' })
       : null;
-    for (const owner_nhi of ['user:synthetic-a', 'user:synthetic-b']) {
-      expect(() =>
-        recordExecutionFeedback({
-          scenario_id: 'owner-only',
-          intent_id: 'owner-only',
-          outcome: 'dissatisfied',
-          scope: { tier: 'personal', owner_nhi },
-        })
-      ).toThrow(/SCOPE_UNSUPPORTED/);
+    for (const owner_nhi of [
+      'user:synthetic-a-' + randomUUID(),
+      'user:synthetic-b-' + randomUUID(),
+    ]) {
+      const scope = { tier: 'personal' as const, owner_nhi };
+      scopedRoots.add(executionFeedbackScopeRoot(scope));
+      recordExecutionFeedback({
+        scenario_id: 'owner-only',
+        intent_id: 'owner-only',
+        outcome: 'dissatisfied',
+        scope,
+      });
+      expect(loadExecutionFeedbackStore(scope).entries).toHaveLength(1);
+      expect(resolveExecutionFeedbackPath(scope)).toContain('/personal/shared/owners/');
     }
     expect(
       safeExistsSync(feedbackPath) ? safeReadFile(feedbackPath, { encoding: 'utf8' }) : null
@@ -221,6 +232,73 @@ describe('execution feedback loop', () => {
       })
     ).toThrow(/SCOPE_UNSUPPORTED/);
   });
+
+  it.each(['confidential', 'personal'] as const)(
+    'retains confirmed and refuted %s lessons through production distillation',
+    async (tier) => {
+      const id = randomUUID();
+      const scope =
+        tier === 'personal'
+          ? { tier, owner_nhi: 'user:memory-' + id }
+          : { tier, tenant_slug: 'memory-' + id.slice(0, 8) };
+      const charter = { dot_id: 'memory-' + id, scope } as DotCharter;
+      const rootDir = 'active/shared/tmp/production-memory-' + id;
+      scopedRoots.add(rootDir);
+      scopedRoots.add(executionFeedbackScopeRoot(scope));
+      if (tier === 'personal')
+        scopedRoots.add(
+          dirname(
+            pathResolver.rootResolve(runtimeStatePath('memory.promotionQueue', scope).physicalPath)
+          )
+        );
+      const ctx = { rootDir, now: () => new Date('2026-11-15T00:00:00Z') };
+      dotUpdateMemoryTool.apply(
+        charter,
+        [
+          { op: 'add_hypothesis', text: 'Synthetic confirmed lesson ' + id },
+          { op: 'resolve_hypothesis', id: 'h-1', status: 'confirmed' },
+        ],
+        ctx
+      );
+      const first = await distillDotMemory(charter, ctx);
+      expect(first?.candidate_id).toBeTruthy();
+      const confirmed = loadMemoryPromotionCandidate(first!.candidate_id!, scope);
+      expect(confirmed?.summary).toContain('Synthetic confirmed lesson ' + id);
+      expect(confirmed?.scope).toEqual(scope);
+      const nextCtx = { ...ctx, now: () => new Date('2026-11-22T00:00:00Z') };
+      dotUpdateMemoryTool.apply(
+        charter,
+        [
+          { op: 'add_hypothesis', text: 'Synthetic refuted lesson ' + id },
+          { op: 'resolve_hypothesis', id: 'h-2', status: 'refuted' },
+        ],
+        nextCtx
+      );
+      const next = await distillDotMemory(charter, nextCtx);
+      const refuted = loadMemoryPromotionCandidate(next!.candidate_id!, scope);
+      expect(refuted?.summary).toContain('Synthetic refuted lesson ' + id);
+      const frozen = String(
+        safeReadFile(
+          pathResolver.rootResolve(rootDir + '/' + dotStatePath(charter, DOT_MEMORY_DISTILL_FILE))
+        )
+      );
+      expect(frozen).toContain('Synthetic confirmed lesson ' + id);
+      expect(frozen).toContain('Synthetic refuted lesson ' + id);
+      expect(
+        loadExecutionFeedbackStore().entries.some(
+          (entry) => entry.scenario_id === 'dot-memory:' + charter.dot_id
+        )
+      ).toBe(false);
+      expect(
+        loadMemoryPromotionCandidate(first!.candidate_id!, {
+          ...scope,
+          ...(tier === 'personal'
+            ? { owner_nhi: 'user:foreign' }
+            : { tenant_slug: 'foreign-memory' }),
+        })
+      ).toBeNull();
+    }
+  );
 
   it('rejects incomplete confidential scope before recording feedback', () => {
     expect(() =>

@@ -132,6 +132,37 @@ describe('operator home summary', () => {
     vi.resetModules();
   });
 
+  it('admits only the proven owner inbox when the personal workspace keeps ordinary tiers masked', async () => {
+    const { addInboxEntry } = await import('../task/deliverable-inbox.js');
+    const { collectOperatorHomeSummary } = await import('./operator-home-summary.js');
+    addInboxEntry({
+      entryId: 'INBOX-PERSONAL-OWN',
+      title: 'Private follow-up',
+      scope: { tier: 'personal', owner_nhi: 'person-me' },
+    });
+    const scope = {
+      tiers: ['public', 'confidential'] as Array<'public' | 'confidential'>,
+      tenantSlugs: [] as string[],
+      personIds: ['person-me'],
+    };
+    expect(collectOperatorHomeSummary({ scope }).inboxEntries).toEqual([]);
+    expect(
+      collectOperatorHomeSummary({
+        scope: { ...scope, includePersonalInbox: true },
+      }).inboxEntries.map((entry) => entry.entry_id)
+    ).toEqual(['INBOX-PERSONAL-OWN']);
+    expect(
+      collectOperatorHomeSummary({
+        scope: { ...scope, includePersonalInbox: true, personIds: ['person-other'] },
+      }).inboxEntries
+    ).toEqual([]);
+    expect(
+      collectOperatorHomeSummary({
+        scope: { ...scope, includePersonalInbox: true, personIds: [] },
+      }).inboxEntries
+    ).toEqual([]);
+  });
+
   it('summarizes approval, inbox, mission, and next-action state', async () => {
     const { addInboxEntry } = await import('../task/deliverable-inbox.js');
     const { collectOperatorHomeSummary } = await import('./operator-home-summary.js');

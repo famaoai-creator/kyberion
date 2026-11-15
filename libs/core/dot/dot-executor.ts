@@ -1,5 +1,7 @@
 import { inspectDotExecution } from './dot-executor-diagnostics.js';
 import { dotItemWorkBindingMismatch } from './dot-executor-reports.js';
+import { restoreDotWorkItemBody } from './dot-work-item.js';
+import { dotAutonomyLevel } from './dot-autonomy.js';
 import { assertOperationBinding } from './dot-lifecycle.js';
 import { orderExecutorCharters, recordExecutorTurn } from './dot-executor-scheduling.js';
 import { hasFirstJobDiagnosticProvenance } from '../surface/first-job-approval-proof.js';
@@ -101,6 +103,7 @@ import {
 import { DOT_WORK_RESULTS_FILE, dotStatePath, type DotWorkResultRow } from './dot-state-paths.js';
 import {
   activeTerminalResult,
+  executorObjective,
   actorOf,
   addressedTo,
   appendWorkResult,
@@ -108,6 +111,9 @@ import {
   attemptsSinceRelease,
   bounded,
   dotItemTenantMismatch,
+  dotItemScopeMismatch,
+  dotItemAuthorityMismatch,
+  dotItemWithAdmissionProof,
   enqueueExecutorReport,
   hasUncertainAttempt,
   meta,
@@ -304,23 +310,6 @@ function executorSystemPrompt(c: DotCharter, readOnly: boolean): string {
       : 'Do the work, verify it, then mark the goal complete (or blocked with the reason).',
     'End with a short plain-text report: what you did, what changed, and anything left open.',
   ].join('\n');
-}
-
-function executorObjective(item: WorkItem): string {
-  const lines = [`WorkItem ${item.item_id}: ${item.title}`, '', item.description];
-  const target = meta(item, 'target');
-  const intent = meta(item, 'intent');
-  if (target || intent) {
-    lines.push('', `Target: ${target ?? 'n/a'}; intent: ${intent ?? 'n/a'}`);
-  }
-  const effect = item.metadata?.expected_effect as
-    { kr_id?: string; signal?: string; direction?: string } | undefined;
-  if (effect && typeof effect === 'object') {
-    lines.push(
-      `Expected effect: ${effect.direction ?? 'move'} ${effect.kr_id ?? effect.signal ?? ''}`.trim()
-    );
-  }
-  return lines.join('\n');
 }
 
 interface Outcome {
@@ -638,6 +627,7 @@ export async function executeDotWorkItem(
   ports: DotExecutorPorts,
   deps: DotExecutorDeps = {}
 ): Promise<DotWorkResultRow> {
+  item = dotItemWithAdmissionProof(item, deps);
   const startedAt = nowOf(deps).toISOString();
   const actionRef = meta(item, 'action_ref') ?? item.item_id;
   try {
@@ -692,12 +682,51 @@ export async function executeDotWorkItem(
   if (denyCrossTenantItem(c, item, deps)) {
     return skippedRow(c, item, startedAt, DOT_EXECUTOR_CROSS_TENANT_DENIAL, deps);
   }
+  if (dotItemScopeMismatch(c, item) || dotItemAuthorityMismatch(c, item)) {
+    return skippedRow(
+      c,
+      item,
+      startedAt,
+      'admitted tier, owner, organization, project or executor role differs or is unknown; reconcile the original WorkItem before resuming',
+      deps
+    );
+  }
+  try {
+    if (c.status !== 'active' || dotAutonomyLevel(c, deps) === 'L0') {
+      return skippedRow(
+        c,
+        item,
+        startedAt,
+        'current charter is inactive or L0 shadow; work remains unclaimed',
+        deps
+      );
+    }
+  } catch (error) {
+    return skippedRow(
+      c,
+      item,
+      startedAt,
+      `current autonomy evidence unavailable: ${String(error)}`,
+      deps
+    );
+  }
   if (activeTerminalResult(terminalWorkResults(c, deps), item) || hasUncertainAttempt(item)) {
     return skippedRow(
       c,
       item,
       startedAt,
       'terminal or uncertain execution evidence exists — automatic replay refused',
+      deps
+    );
+  }
+  try {
+    item = restoreDotWorkItemBody(c, item, deps.rootDir);
+  } catch {
+    return skippedRow(
+      c,
+      item,
+      startedAt,
+      'original private execution evidence is missing or changed; reconcile the scoped action before resuming',
       deps
     );
   }
@@ -781,7 +810,20 @@ export async function executeDotWorkItem(
             status: 'blocked',
             summary: diagnosticRefusal,
           })
-        : routeItem(c, claimed.item, ports, goalMode, controller.signal, accountingId, deps)
+        : routeItem(
+            c,
+            {
+              ...claimed.item,
+              title: item.title,
+              description: item.description,
+              metadata: { ...claimed.item.metadata, ...item.metadata },
+            },
+            ports,
+            goalMode,
+            controller.signal,
+            accountingId,
+            deps
+          )
       ).catch((error): Outcome => ({
         mode: failedMode,
         status: 'failed',
@@ -841,7 +883,7 @@ export async function executeDotWorkItem(
           ? 'ready'
           : DOT_EXECUTOR_ESCALATED_STATUS;
   const summary = bounded(outcome.summary);
-  const tenantBound = Boolean(c.scope.tenant_slug);
+  const tenantBound = c.scope.tier !== 'public' || Boolean(c.scope.tenant_slug);
   const completedAt = nowOf(deps).toISOString();
   const row: DotWorkResultRow = {
     dot_id: c.dot_id,
@@ -893,6 +935,7 @@ export async function executeDotWorkItem(
   // attempt identity and the tenant learner deduplicates their receipts.
   // A pre-effect failure executed nothing, so it is no evidence for learning.
   if (
+    c.scope.tier !== 'personal' &&
     !preEffect &&
     outcome.mode === 'pipeline' &&
     !outcome.awaitingApproval &&
@@ -1029,15 +1072,16 @@ export function recordDotPipelineContinuation(
         })
       : undefined
   );
-  recordAutonomyExecution(
-    {
-      action_id: meta(item, 'gate_action_id') ?? meta(item, 'action_id') ?? 'dot_delegate_work',
-      receipt_id: `dot-execution:${charter.dot_id}:${item.item_id}:${item.current_attempt_id}`,
-      ok: outcome.succeeded,
-      ...(outcome.succeeded ? {} : { error: row.summary }),
-    },
-    { rootDir: deps.rootDir, now: deps.now, tenantSlug: charter.scope.tenant_slug }
-  );
+  if (charter.scope.tier !== 'personal')
+    recordAutonomyExecution(
+      {
+        action_id: meta(item, 'gate_action_id') ?? meta(item, 'action_id') ?? 'dot_delegate_work',
+        receipt_id: `dot-execution:${charter.dot_id}:${item.item_id}:${item.current_attempt_id}`,
+        ok: outcome.succeeded,
+        ...(outcome.succeeded ? {} : { error: row.summary }),
+      },
+      { rootDir: deps.rootDir, now: deps.now, tenantSlug: charter.scope.tenant_slug }
+    );
   return row;
 }
 
@@ -1058,7 +1102,10 @@ export function reapStrandedDotWorkItems(
   const evidence = new Map<string, Map<string, DotWorkResultRow>>();
   const executorFor = (item: WorkItem) =>
     active.find(
-      ({ charter }) => addressedTo(charter, item) && !dotItemTenantMismatch(charter, item)
+      ({ charter }) =>
+        addressedTo(charter, item) &&
+        !dotItemScopeMismatch(charter, item) &&
+        !dotItemAuthorityMismatch(charter, item)
     )?.charter;
   try {
     for (const { charter } of active) {
@@ -1303,7 +1350,8 @@ export async function runDotExecutorSweep(
         (item) =>
           item.status === 'in_progress' &&
           addressedTo(charter, item) &&
-          !dotItemTenantMismatch(charter, item)
+          !dotItemScopeMismatch(charter, item) &&
+          !dotItemAuthorityMismatch(charter, item)
       )) {
         rows.push(
           skippedRow(

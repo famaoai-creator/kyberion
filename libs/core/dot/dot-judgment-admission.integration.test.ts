@@ -222,6 +222,10 @@ describe('synthetic judgment binding propagation through actual admission and Wo
     const item = f.items()[0];
     expect(f.items()).toHaveLength(1);
     expect(item.metadata?.semantic_judgment).toEqual(f.bound.semantic_judgment);
+    expect(item.title).toBe('Scoped Dot work');
+    expect(workInput.restoreDotWorkItemBody(f.charter, item, root).description).toContain(
+      f.bound.objective
+    );
     expect(item.metadata?.pipeline_ref).toBe(f.bound.pipeline_ref);
     expect(item.item_id).toBe(identity.dotAdmissionItemId(first.action_ref));
     expect(JSON.stringify(f.bound)).toBe(original);

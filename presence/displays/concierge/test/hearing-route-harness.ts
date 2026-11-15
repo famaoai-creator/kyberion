@@ -49,6 +49,7 @@ export const hr = {
   routes: {} as Record<string, RouteModule>,
   ownerToken: '',
   memberToken: '',
+  resetFixtureMocks: undefined as undefined | (() => void),
 };
 
 const ROUTES: Record<string, string> = {
@@ -80,7 +81,11 @@ export function mint(subject: string): string {
  * single tenant, so it reaches the personal hearing store).
  */
 export async function setUpHearing(
-  options: { ownerTenants?: string[]; memberTenants?: string[] } = {}
+  options: {
+    ownerTenants?: string[];
+    memberTenants?: string[];
+    configureModules?: () => void | (() => void);
+  } = {}
 ): Promise<void> {
   const bootstrap = await import('@agent/core');
   hr.fixture = (await import(
@@ -111,7 +116,13 @@ export async function setUpHearing(
   vi.stubEnv('KYBERION_OIDC_ISSUER', hr.fixture.FIRST_JOB_TEST_ISSUER);
   vi.stubEnv('KYBERION_OIDC_CLIENT_ID', 'fixture');
   vi.resetModules();
+  // Partial mock factories cache importOriginal results independently of
+  // resetModules. Install them only after the fixture root is authoritative.
+  hr.resetFixtureMocks = options.configureModules?.() || undefined;
   hr.io = await import('@agent/core');
+  const paths = await import('@agent/core/path-resolver');
+  if (path.resolve(paths.rootDir()) !== path.resolve(hr.root))
+    throw new Error('Hearing fixture modules resolved outside their owned scratch root');
   hr.authority = await import('@agent/core/authority');
   hr.browser = await import('@agent/core/authn/authn-providers');
   hr.owner = await import('@agent/core/surface/installation-owner-access');
@@ -165,6 +176,8 @@ async function bindMembers(options: {
 }
 
 export async function tearDownHearing(): Promise<void> {
+  hr.resetFixtureMocks?.();
+  hr.resetFixtureMocks = undefined;
   vi.unstubAllEnvs();
   vi.resetModules();
   const bootstrap = await import('@agent/core');
