@@ -2,7 +2,7 @@
 title: 'Operations Hygiene Runbook: keeping fixed operational gaps fixed'
 tags:
   [governance, operations, ci, retention, daemons, tests, recurrence-prevention, secure-io, symlink]
-last_updated: 2026-11-12
+last_updated: 2026-11-16
 ---
 
 # Operations Hygiene Runbook
@@ -820,6 +820,28 @@ it with a test that the server role is refused the role and the child role is al
 (`isRoleAssumptionAllowed`), and one that the entry cannot import the writer CLI. A child
 bounded by the server role only shows up as a denied assumption at run time: check the route
 against real data, not only mocked spawns.
+
+**Resident-dot supervisor steps and deterministic failure storms.** A supervisor step that
+iterates active charters must not retry an identical failure every sweep — a missing grant or
+policy deny produced 1,881 repeated warns in ~16 h before `DotSupervisorStepCircuit`
+(`libs/core/dot/dot-step-circuit.ts`) existed. Every new per-dot or per-loop step gate-runs
+`admits(key)`, reports success, and on failure goes through `reportFailure`: identical
+signatures (normalized — pids, epochs and uuids are masked) open the circuit at the threshold,
+emit one deduped ops alert, hold with exponential backoff, and re-alert on each failed
+half-open probe. Do not log unbounded warns per sweep inside a per-dot loop; classify through
+the circuit. Steps that can produce volatile error text rely on signature normalization —
+never streak on raw messages. For daemon locks, PID-liveness `EPERM` is not proof of death and
+not proof of life: takeover requires the incumbent heartbeat to be fresh (`healthy`) AND to
+vouch for exactly the lock pid with `status` `running|starting` — a stale or `stopping` record
+means the lock is orphaned. Mark verifiably dead heartbeat pids (`ESRCH` only) `stopping`;
+leave `EPERM` heartbeats alone. A dot watching an append-only store it writes to (e.g.
+`ops-alerts.jsonl`) must declare `ignore_jsonl_kinds` for its own record kinds — the
+`operator_notification_undelivered` rows the notify path appends would otherwise re-wake the
+watcher every append (see `dot-runtime.ts` `watchAppendOnlyIgnoredKinds` and the Watches entry
+in [resident-dot-model](../architecture/resident-dot-model.md)). An undelivered operator
+notification must also surface as a deduped companion alert through the shared dedupe state in
+`ops-alert-log.ts` — appended directly, never via `sendOpsAlert`, which would re-enter the
+delivery path it just failed.
 
 **Review checklist** (when a PR adds a loop or a spawn): in-flight guard, signal handlers, stopped
 heartbeat, child deadline, `'error'` listener, test with a mocked child.
