@@ -1,0 +1,108 @@
+# Scripts
+
+Executable entry points for Kyberion development, operations, and governance.
+Most are wired to `pnpm <name>` in `package.json`, either directly
+(`node --import ./scripts/ts-loader.mjs scripts/<file>.ts`) or through the
+compiled build (`node scripts/run_built.mjs dist/scripts/<file>.js`).
+
+## Directory Layout
+
+```
+scripts/
+  *.ts            ← repo-wide operations (one file per entry point)
+  check/          ← all `check_*` / `check-*` governance gates + baselines
+  generate/       ← all `generate_*` catalog/index generators + their helpers
+  sync/           ← all `sync_*` code→knowledge reconciliation syncers
+  <prefix>/       ← grouped `prefix_*` script families, one bounded area each:
+                    meeting/ peer/ continuous/ task/ reconcile/ dot/ browser/
+                    stance/ voice/ service/ agent/ reasoning/ customer/ mission/
+                    onboarding/ organization/ tenant/ company/ eval/ watch/
+                    surface/ summarize/ operator/ marketing/ audit/ scan/
+                    report/ intent/ learning/ mcp/ oauth/ promote/ scenario/
+                    soak/ video/ setup/ work/ pr/ publish/ benchmark/ approval/
+                    chronos/ codex/ agy/ control/ vital/ virtual/ terminal/
+                    services/ register/ realtime/ presence/ external/
+  cli/            ← `cli-*` kyberion CLI internals (cli.ts entry stays root)
+  pipeline/       ← `pipeline-*` engine internals + pipeline_accept/promote
+                    (run_pipeline* stays root as the canonical runner)
+  lib/            ← shared helpers imported by scripts; no entry points
+  <domain>/       ← grouped script sets for one bounded area
+                    (personal-pads/, meeting-notepad/, daily-desk/,
+                    customer-decision/, config/, refactor/, doc-templates/,
+                    presence/, demos/, fixtures/, ...)
+```
+
+Historically every entry point landed flat in the root. Bounded domains are
+being grouped into `<prefix>/` and `<domain>/` subdirectories — the `check_*`
+governance gate family moved first (all gates, their tests and
+`*.baseline.json` files now live in `check/`; new checkers go there, never in
+the root), followed by the `generate_*` catalog/index generators, the `sync_*`
+code→knowledge syncers, and the `prefix_*` domain families listed above.
+Canonical facades stay at the root (`mission_controller.ts`, `onboarding.ts`,
+`organization.ts`, `kyberion.ts`, the `run_*` repo-wide runners, and the
+`cli_*` / `pipeline_*` machinery). Prefer a subdirectory for new domain-scoped
+scripts and keep the root for operations that genuinely span the repository.
+(Direction set by
+[SIMPLICITY_ABSTRACTION_PLAN](../docs/developer/improvement-plans-2026-08/SIMPLICITY_ABSTRACTION_PLAN_2026-08-25.ja.md)
+SX-06; not yet enforced by a gate.)
+
+## Conventions
+
+- **One entry point = one file**: `name.ts`, with its unit test beside it as
+  `name.test.ts`.
+- **Use the harness**: `scripts/lib/harness.ts` re-exports `defineScript` /
+  `defineGenerator` from `@agent/core/script-harness` — argv parsing,
+  `--json` / `--dry-run`, and exit codes in one place.
+- **Shared code goes to `lib/`**, never imported across entry points directly.
+- **Qualified test suffixes** mark non-unit checks next to a script:
+  - `name.entrypoint.test.ts` — CLI argument-mapping contract
+  - `name.contract.test.ts` — cross-module contract
+  - `name.resource-boundary.test.ts` / `name.env-boundary.test.ts` /
+    `name.output-boundary.test.ts` — storage / environment / output boundary guards
+  - `name.integration.test.ts` — cross-component
+- **Adding a `pnpm` command**: create the script here, then wire it in
+  `package.json` `scripts`.
+- **Moving a script family** (learned from the check/generate/sync/task
+  regroups — each of these bit at least once):
+  - self-locating `dirname(fileURLToPath(import.meta.url))` arithmetic AND
+    `new URL('../x', import.meta.url)` literals (including backtick template
+    URLs) break on any depth change — `../` becomes `../../`; prefer
+    `pathResolver` for new code;
+  - path-shape regexes and validators can assume flat layout long after a
+    move (`/^scripts\/(?:generate|analyze)_\w+\.ts$/` stopped matching
+    `scripts/generate/generate_op_registry.ts` and silently dropped a
+    remedy) — grep for `scripts/` inside regex/test patterns too;
+  - path-like **fixture strings** inside tests are not imports — a
+    `resolve('./x', base)` or changed-file list argument must keep its
+    literal form; restrict depth rewrites to real module specifiers;
+  - `vi.mock` specifiers can silently go stale long after a move (the mock
+    stops intercepting; tests then run the real module and fail with
+    unrelated-looking errors) — check every `vi.mock('./x')` in files that
+    were not moved too;
+  - `vi.mock('./lib/x.js')`, dynamic `import('./x.js')`, AND bare side-effect
+    `import './x.js'` (registration imports with no `from`) are NOT caught by
+    `from './x'` greps — sweep all three forms;
+  - `pathResolver.rootResolve('scripts/name.ts')` / `` `scripts/${name}` ``
+    literals inside the moved files themselves are easy to miss — grep the
+    destination dir for its own family prefix after moving;
+  - a `scripts/<fam>_` sweep matches the substring inside longer paths too:
+    `libs/actuators/voice-actuator/scripts/voice_x.py` became
+    `.../scripts/voice/voice_x.py`. Any sweep for `scripts/<fam>_` must be
+    boundary-anchored (start-of-string / quote / backtick / space) and the
+    same check applies in reverse: grep `*/scripts/<fam>/` after the sweep
+    to catch injected dirs, plus `scripts/<fam>/<fam>/` for double-nesting;
+  - generated files embed emitted path strings (e.g. the
+    `*-agent-definition-adapter` generators stamp `Adapter: scripts/...`
+    into `.agents/`, `.codex/`, `.cursor/`, `.devin/`) — fix the emitter
+    and regenerate, don't sed the generated output;
+  - pre-existing `../libs/...` (and `../<repo-dir>/`) imports that were correct
+    at root depth need `../../libs/...` after the move — sweep every `../`
+    specifier, not just `./`;
+  - verify with `pnpm build` (tsc catches missed imports) + the family's
+    vitest files + `resolve generated --check` freshness, not just grep.
+
+## References
+
+- [`CONTRIBUTING.md`](../CONTRIBUTING.md) — coding conventions and CODEOWNERS per area.
+- [`pipelines/README.md`](../pipelines/README.md) — declarative pipelines; prefer a
+  pipeline over a new script for repeatable governed work (AGENTS.md §2).

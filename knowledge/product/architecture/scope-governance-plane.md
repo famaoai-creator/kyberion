@@ -85,7 +85,7 @@ before `enforce` blocks.
 
 ## Invariants (fail-closed in CI)
 
-`libs/core/scope-governance-invariants.test.ts` + `check_op_effect_coverage`:
+`libs/core/scope/scope-governance-invariants.test.ts` + `check_op_effect_coverage`:
 
 1. `mintScopeEnvelope` runs only at dispatch boundaries.
 2. `tenantSlug` lives only on declared scope-identity record fields.

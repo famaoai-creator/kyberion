@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as path from 'node:path';
 import { safeReadFile } from '@agent/core';
-import { loadProductionEvidenceRegister } from '../scripts/check_production_evidence.js';
+import { loadProductionEvidenceRegister } from '../scripts/check/check_production_evidence.js';
 
 const rootDir = process.cwd();
 

@@ -122,7 +122,9 @@ describe('intent-compiler', () => {
         {
           id: 'start-service-list',
           op: 'system:shell',
-          params: { cmd: 'node dist/scripts/service_lifecycle_control.js --operation start' },
+          params: {
+            cmd: 'node dist/scripts/service/service_lifecycle_control.js --operation start',
+          },
         },
       ],
     },
@@ -133,7 +135,9 @@ describe('intent-compiler', () => {
         {
           id: 'stop-service-list',
           op: 'system:shell',
-          params: { cmd: 'node dist/scripts/service_lifecycle_control.js --operation list' },
+          params: {
+            cmd: 'node dist/scripts/service/service_lifecycle_control.js --operation list',
+          },
         },
       ],
     },

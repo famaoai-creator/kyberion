@@ -21,7 +21,7 @@ vi.mock('../../../../lib/ops/ops-viewer', () => ({
 
 // knowledge/personal/my-identity.json is a real, shared, non-namespaced
 // fixture path that many other test files across the repo also touch
-// concurrently (scripts/onboarding_reset.test.ts, tests/a2a-lifecycle.test.ts,
+// concurrently (scripts/onboarding/onboarding_reset.test.ts, tests/a2a-lifecycle.test.ts,
 // etc.). Writing to it here would race with them under vitest's parallel
 // file execution. Mock resolveOverlay to point at a per-test unique
 // active/shared/tmp/ directory instead (safeReadFile's tier-guard rejects

@@ -38,7 +38,7 @@ vi.mock('@agent/core/foundation/secret-resolution-session', () => ({
 }));
 vi.mock('./lib/installed-identity.js', () => ({ inspectInstalledIdentity: m.installed }));
 vi.mock('./lib/json-input.js', () => ({ readSafeJsonFile: m.review }));
-vi.mock('./lib/hidden-token-input.js', () => ({ readHiddenToken: m.collect }));
+vi.mock('./lib/tty/hidden-token-input.js', () => ({ readHiddenToken: m.collect }));
 import { main, runAccountIntroductionCli } from './account_introduction.js';
 const preview = {
   binding_id: 'github-owner',

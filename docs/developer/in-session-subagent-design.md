@@ -78,7 +78,7 @@ In-Session での委譲を成立させるため、Kyberion の標準ランタイ
 - `KYBERION_TASK_MODEL_ROUTING=advisory` が既定で、ヒントは trace と学習用サマリに残すが挙動は変えない。
 - `KYBERION_TASK_MODEL_ROUTING=enforce` は opt-in で、`task_model_hint` がある場合だけ manifest 既定を上書きする。
 - `effort` は Anthropic backend では thinking budget に反映し、他 backend では無視してよい。
-- 週次レビューでは `pipelines/weekly-review.json` の `summarize_task_model_routing` ステップで `active/shared/tmp/task-model-routing-summary.json` を更新し、モデル選択の rework 率と token 消費を確認する。
+- 週次レビューでは `knowledge/product/pipeline-templates/weekly-review.json` の `summarize_task_model_routing` ステップで `active/shared/tmp/task-model-routing-summary.json` を更新し、モデル選択の rework 率と token 消費を確認する。
 
 ## 6. ビジネス的価値（生成AI導入コンサルティングにおける強み）
 

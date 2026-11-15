@@ -13,6 +13,6 @@ Canonical source for harness adapter profiles (RSP-13).
   `knowledge/product/schemas/harness-adapter-registry.schema.json` as-is.
 - The legacy single file `harness-adapter-registry.json` has been removed
   (snapshot abolished). Read via `loadAdapterRegistry()` in
-  `scripts/generate_provider_cli_capability_report.ts`.
+  `scripts/generate/generate_provider_cli_capability_report.ts`.
 
 - `index.json` pins the canonical item order (model-registry precedent); loaders require an exact set match.

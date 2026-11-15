@@ -88,6 +88,7 @@ export class MlxEmbeddingBackend implements EmbeddingBackend {
       options.pythonBin ??
       getRegisteredEnvText('KYBERION_PYTHON_BIN') ??
       getRegisteredEnvText('KYBERION_PYTHON') ??
+      resolveManagedToolPythonBin('mlx_embeddings') ??
       resolveManagedToolPythonBin('mlx_audio') ??
       resolveManagedToolPythonBin('mlx_whisper') ??
       rootResolve('.venv/bin/python3');

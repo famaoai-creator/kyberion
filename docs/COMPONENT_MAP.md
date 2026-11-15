@@ -111,14 +111,14 @@ The concept map explains how those ideas fit together logically.
 
 - `docs/INITIALIZATION.md`
 - `docs/QUICKSTART.md`
-- `scripts/onboarding_wizard.ts`
+- `scripts/onboarding/onboarding_wizard.ts`
 
 This path establishes identity files under `knowledge/personal/` and prepares the environment for mission work.
 
 ### 2. Mission orchestration
 
 - `scripts/mission_controller.ts`
-- `scripts/mission_journal.ts`
+- `scripts/mission/mission_journal.ts`
 - `scripts/run_mission_orchestration_event_worker.ts`
 - `scripts/run_agent_runtime_supervisor.ts`
 - `libs/core/mission/mission-orchestration-events.ts`
@@ -172,9 +172,9 @@ If temporary artifacts are needed, place them by purpose per [runtime-storage-la
 
 ### 3. Capability discovery and execution
 
-- `scripts/capability_discovery.ts`
+- `scripts/capability/capability_discovery.ts`
 - `scripts/cli.ts`
-- `scripts/check_esm_integrity.ts`
+- `scripts/check/check_esm_integrity.ts`
 - `libs/actuators/*/manifest.json`
 - `knowledge/product/governance/authority-roles/` (compatibility snapshot: `knowledge/product/governance/authority-role-index.json`)
 - `knowledge/product/orchestration/team-roles/` (compatibility snapshot: `knowledge/product/orchestration/team-role-index.json`)
@@ -252,7 +252,7 @@ The operations console does not directly own mission state. It delegates to:
 - `libs/core/foundation/credential-material-capability.ts` (internal exact-file read ceilings for allocated connection documents and account generations)
 - `libs/core/foundation/account-provision-admission.ts` (internal, bounded apply/write admission; issuer imports are checked by a boundary test)
 - `scripts/account_introduction.ts` (installed-owner account preview, review-bound request, status and apply through the shared facade)
-- `scripts/lib/hidden-token-input.ts` (bounded hidden TTY token collector with terminal restoration; no file, argv or environment input)
+- `scripts/lib/tty/hidden-token-input.ts` (bounded hidden TTY token collector with terminal restoration; no file, argv or environment input)
 - `libs/core/governance/service-credential-allocation.ts` (fail-closed allocation port)
 - `libs/core/governance/service-credential-allocation-verifier.ts` (owner-approved grant verification, installed by grant-aware bootstrap)
 - `libs/core/service/service-preset-registry.ts`
@@ -345,7 +345,7 @@ Actuators are the execution layer. Current major groups include:
 - `meeting-actuator` / `voice-actuator` / `media-generation-actuator`: online-meeting bridge, local voice generation, generative image/video/music and screen capture
 - `working-memory-actuator`: volatile knowledge layer (journal, TODO, weekly review) CRUD, GC and index
 
-This list is the major groups only — the full, generated catalog of all actuators and their ops is [`CAPABILITIES_GUIDE.md`](../CAPABILITIES_GUIDE.md) (generated from the actuator manifests and op discovery by `pnpm kyberion sync component-inventory`; the op catalog itself is checked by `pnpm check -- --only op-registry`). Specialist personas live in `knowledge/product/orchestration/specialists/` (snapshot: `specialist-catalog.json`); surface lifecycle control is `scripts/surface_runtime.ts`.
+This list is the major groups only — the full, generated catalog of all actuators and their ops is [`CAPABILITIES_GUIDE.md`](../CAPABILITIES_GUIDE.md) (generated from the actuator manifests and op discovery by `pnpm kyberion sync component-inventory`; the op catalog itself is checked by `pnpm check -- --only op-registry`). Specialist personas live in `knowledge/product/orchestration/specialists/` (snapshot: `specialist-catalog.json`); surface lifecycle control is `scripts/surface/surface_runtime.ts`.
 
 ### `libs/shared-*`
 
@@ -371,7 +371,7 @@ Kyberion uses four separate concepts here:
 This means Slack and the operations console (formerly Chronos) are not part of `system-actuator`.
 They are human-facing gateways. Delivery belongs to `presence-actuator`, and authentication belongs to service binding.
 
-Background surfaces and bridges are not started ad hoc. Their canonical startup manifests are `knowledge/product/governance/surfaces/*.json`, with `knowledge/product/governance/active-surfaces.json` as the generated compatibility snapshot. Lifecycle coordination runs through `scripts/surface_runtime.ts` plus `runtime-supervisor`.
+Background surfaces and bridges are not started ad hoc. Their canonical startup manifests are `knowledge/product/governance/surfaces/*.json`, with `knowledge/product/governance/active-surfaces.json` as the generated compatibility snapshot. Lifecycle coordination runs through `scripts/surface/surface_runtime.ts` plus `runtime-supervisor`.
 
 ## Mission control model
 
@@ -415,7 +415,7 @@ The charter assumes strict isolation between these tiers. Within the confidentia
 - `knowledge/product/architecture/slack-chronos-control-model.md`: Slack ingress, Chronos control surfaces, channel outboxes, and observability boundaries; also defines gateway, service binding, delivery actuator, and system actuator boundaries
 - `knowledge/product/architecture/channel-port-surface-model.md`: channels, ports, Surface Agents, and transport/directionality taxonomy
 - `knowledge/product/architecture/browser-actuator-v3.md`: Playwright engine, `snapshot + ref` interaction model, browser session leases, and test-export direction
-- `docs/developer/architecture/dependency-graph.mmd`: workspace package dependency graph, generated from package manifests by `scripts/generate_package_dependency_graph.ts` (CI gate `package-dependency-graph`)
+- `docs/developer/architecture/dependency-graph.mmd`: workspace package dependency graph, generated from package manifests by `scripts/generate/generate_package_dependency_graph.ts` (CI gate `package-dependency-graph`)
 
 ## Recommended reading order for new contributors
 

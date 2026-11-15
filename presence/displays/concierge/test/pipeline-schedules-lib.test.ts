@@ -14,10 +14,10 @@ import {
  * pure input checks (id pattern, trigger shape, path containment/existence)
  * and never touch the schedule registry — `parseScheduleMutation` builds an
  * in-memory `ScheduledPipeline`; nothing here calls `register*`. The one file
- * that must exist (`pipelines/daily-routine.json`) is read, not written.
+ * that must exist (`pipelines/baseline-check.json`) is read, not written.
  */
 
-const RUNNABLE = 'pipelines/daily-routine.json';
+const RUNNABLE = 'pipelines/baseline-check.json';
 
 const baseRegister = {
   id: 'nightly.report',
@@ -207,12 +207,12 @@ describe('parseScheduleMutation — update', () => {
 });
 
 describe('schedule tenant scope', () => {
-  const system = { id: 'nightly.report', pipelinePath: 'pipelines/daily-routine.json' };
+  const system = { id: 'nightly.report', pipelinePath: 'pipelines/baseline-check.json' };
   const tenantByPath = {
     id: 'tenant-acme-daily',
     pipelinePath: 'knowledge/confidential/acme/pipelines/daily.json',
   };
-  const tenantById = { id: 'tenant-acme-x', pipelinePath: 'pipelines/daily-routine.json' };
+  const tenantById = { id: 'tenant-acme-x', pipelinePath: 'pipelines/baseline-check.json' };
 
   it('detects tenant binding from the pipeline path or the id prefix', () => {
     expect(scheduleTenantSlug(system)).toBeUndefined();

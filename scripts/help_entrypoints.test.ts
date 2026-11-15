@@ -23,14 +23,14 @@ function runHelp(
 
 describe('CLI help entrypoints', () => {
   it('prints usage for check_pr_title help', () => {
-    const result = runHelp(path.join('scripts', 'check_pr_title.ts'), ['--help']);
+    const result = runHelp(path.join('scripts', 'check', 'check_pr_title.ts'), ['--help']);
 
     expect(result.status).toBe(0);
     expect(result.stdout).toContain('Usage: pnpm check:pr-title');
   });
 
   it('prints usage for task_init help', () => {
-    const result = runHelp(path.join('scripts', 'task_init.ts'), ['--help']);
+    const result = runHelp(path.join('scripts', 'task', 'task_init.ts'), ['--help']);
 
     expect(result.status).toBe(0);
     expect(result.stdout).toContain('Usage: pnpm task:init');

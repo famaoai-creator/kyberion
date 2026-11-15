@@ -870,7 +870,7 @@ describe('concierge surface contract', () => {
     // change: 'apply' must not appear anywhere in the route (the GUI stops at
     // filing; the change takes effect only through the governed mission flow).
     expect(route).toContain('requireConciergeMutationAccess');
-    expect(route).toContain('dist/scripts/config_mission.js');
+    expect(route).toContain('dist/scripts/config/config_mission.js');
     expect(route).toContain('safeExecResult');
     expect(route).toContain('serverDelegatedChildEnv');
     expect(route).not.toContain('apply');

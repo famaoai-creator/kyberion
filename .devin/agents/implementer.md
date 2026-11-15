@@ -22,7 +22,7 @@ Regenerate with: pnpm agents:generate
 Check drift with: pnpm agents:generate -- --check
 Projection: Devin CLI custom subagent (`.devin/agents/<name>.md`)
 Source: Kyberion team-role, procedure, capability-profile, and working-principles SSoT
-Adapter: scripts/devin-agent-definition-adapter.ts
+Adapter: scripts/generate/devin-agent-definition-adapter.ts
 -->
 
 <!--
@@ -35,7 +35,7 @@ Sources (SSoT):
   - libs/core/workforce/subagent-capability-profiles.ts (KD-05 capability tiers)
   - libs/core/workforce/working-principles.ts (buildWorkingPrinciplesLines)
   - knowledge/product/governance/multi-provider-coexecution-contract.md (XP-04 read/write matrix)
-  Generator: scripts/generate_subagent_definitions.ts
+  Generator: scripts/generate/generate_subagent_definitions.ts
 -->
 
 # implementer — CLI subagent (KD-05 "implementer" tier)

@@ -122,7 +122,7 @@ conflict caller, which refuses the write. Logging and returning an empty list is
 appropriate only for non-strict discovery; it must not turn unknown bindings
 into permission to reuse a channel. Preserve the existing tenant-bound read role.
 
-`customer-channel-binding.test.ts` and `scripts/customer_channel.test.ts` run in
+`customer-channel-binding.test.ts` and `scripts/customer/customer_channel.test.ts` run in
 `registration-tests`. Their regressions cover strict/non-strict reads and real
 bind attempts against malformed/schema-invalid other-tenant data, asserting
 the target's existing bytes remain unchanged.
@@ -249,7 +249,7 @@ availability must check the launcher and any declared healthcheck, rather than
 equating a registered launch plan with readiness.
 
 Procedure: follow [tool runtime registration](./tool-runtimes/README.md), then
-run `scripts/tool_runtime_setup.test.ts`,
+run `scripts/tool/tool_runtime_setup.test.ts`,
 `libs/core/tool/tool-runtime-registry.test.ts` and
 `libs/core/media/media-backend-registry.test.ts`. These gates cover scoped Python
 installation, platform refusal, failed-install evidence and unavailable media
@@ -268,27 +268,27 @@ write mission evidence, or project lifecycle commands.
 That mission closed 16 gaps from the 2026-10-08 operations survey. Several had been fixed before and
 had regressed.
 
-| Class                         | Gate / check                                                                    | Section |
-| ----------------------------- | ------------------------------------------------------------------------------- | ------- |
-| CI workflow drift             | `ci-workflow-contract` (scope `pr`)                                             | §1      |
-| Red CI without a next step    | `Triage failure` job-summary step, `main-failure-triage.yml` (`ci-main-red`)    | §1      |
-| Undeclared runtime stores     | `runtime-store-retention` (scope `pr`), janitor `uncovered*` lists              | §2      |
-| Daemons and child processes   | unit tests per daemon; this checklist in review                                 | §3      |
-| stdout / logging in libraries | eslint `no-console` on `libs/`                                                  | §4      |
-| Test pollution and host deps  | Vitest leak guard, strict in CI (`KYBERION_TEST_LEAK_STRICT=1`)                 | §5      |
-| Tenant scope and facade env   | `tier-guard-tenant` tests, facade binding tests                                 | §6      |
-| LLM / provider calls          | per-call-site egress tests (e.g. `mission-distill-egress.test.ts`)              | §7      |
-| Mission evidence overwrites   | generator and phase-pipeline tests in `mission-retrospective.test.ts`           | §8      |
-| Project lifecycle facades     | lifecycle regressions in `project-management.test.ts`                           | §9      |
-| secure-io link escapes        | `secure-io.symlink-canonical.test.ts`, `secure-io.symlink-root-alias`           | §10     |
-| Actuator failure receipts     | cli-utils / actuator tests, `pty-engine.resize.test.ts`, probes                 | §11     |
-| CLI hook continuation loops   | `scripts/codex_cli_hook.test.ts`, `libs/core/provider/claude-code-hook.test.ts` | §14     |
+| Class                         | Gate / check                                                                          | Section |
+| ----------------------------- | ------------------------------------------------------------------------------------- | ------- |
+| CI workflow drift             | `ci-workflow-contract` (scope `pr`)                                                   | §1      |
+| Red CI without a next step    | `Triage failure` job-summary step, `main-failure-triage.yml` (`ci-main-red`)          | §1      |
+| Undeclared runtime stores     | `runtime-store-retention` (scope `pr`), janitor `uncovered*` lists                    | §2      |
+| Daemons and child processes   | unit tests per daemon; this checklist in review                                       | §3      |
+| stdout / logging in libraries | eslint `no-console` on `libs/`                                                        | §4      |
+| Test pollution and host deps  | Vitest leak guard, strict in CI (`KYBERION_TEST_LEAK_STRICT=1`)                       | §5      |
+| Tenant scope and facade env   | `tier-guard-tenant` tests, facade binding tests                                       | §6      |
+| LLM / provider calls          | per-call-site egress tests (e.g. `mission-distill-egress.test.ts`)                    | §7      |
+| Mission evidence overwrites   | generator and phase-pipeline tests in `mission-retrospective.test.ts`                 | §8      |
+| Project lifecycle facades     | lifecycle regressions in `project-management.test.ts`                                 | §9      |
+| secure-io link escapes        | `secure-io.symlink-canonical.test.ts`, `secure-io.symlink-root-alias`                 | §10     |
+| Actuator failure receipts     | cli-utils / actuator tests, `pty-engine.resize.test.ts`, probes                       | §11     |
+| CLI hook continuation loops   | `scripts/codex/codex_cli_hook.test.ts`, `libs/core/provider/claude-code-hook.test.ts` | §14     |
 
 ---
 
 ## §1 CI workflows
 
-Generated Markdown that a commit hook formats must use the same repository Prettier configuration in its canonical generator. Verify formatter idempotence and rerun the generator in check mode after formatting; do not bypass hooks or weaken byte-comparison gates to ship generated inventory. The component inventory generator enforces this with `scripts/sync_component_inventory.contract.test.ts`.
+Generated Markdown that a commit hook formats must use the same repository Prettier configuration in its canonical generator. Verify formatter idempotence and rerun the generator in check mode after formatting; do not bypass hooks or weaken byte-comparison gates to ship generated inventory. The component inventory generator enforces this with `scripts/sync/sync_component_inventory.contract.test.ts`.
 
 **Compiler readiness and recovery accounting.** `pnpm build`, `pnpm build:packages` and
 `pnpm build:repo` enter the source-only `scripts/build_repository.ts` bootstrap. The compiler
@@ -328,7 +328,7 @@ terminal. Shell and connected-app authentication are independent; a CLI probe le
 status `not_probed`. Never persist token values, change host DNS/hosts, or copy credentials as a
 diagnostic workaround. Gates: `github-diagnostics.test.ts` and `gh-status.test.ts`.
 
-**Rules** (enforced by `scripts/check_ci_workflow_contract.ts`):
+**Rules** (enforced by `scripts/check/check_ci_workflow_contract.ts`):
 
 - Every job declares `timeout-minutes`. The default of 360 minutes lets a hung worker hold a runner
   for six hours. Size the timeout at about 1.5–2× the job's observed duration.
@@ -395,7 +395,7 @@ raw log, and act on it in one round:
 | `test-failure`         | A Vitest test failed. The triage prints the assertion and a targeted rerun command.                                        | PR author. If the test is marked `suspected flake` (timers, TTLs, timeouts), reproduce it with the loop command. Fix it with fake timers or an explicit clock. Never just retry. See [WRITING_TESTS](../../../docs/developer/WRITING_TESTS.md). |
 | `platform`             | The test failed only in a macOS / Windows job.                                                                             | PR author. Apply §2 of [kyberion-development-practices](./kyberion-development-practices.md) (cross-platform determinism). A test that fails only on slow hosted runners is also a flake candidate.                                             |
 | `infra`                | Install, checkout, network, artifact or runner trouble before the tests ran.                                               | Anyone. Re-run the failed jobs (`gh run rerun <id> --failed`). If it repeats, treat it as a workflow defect and fix it under this section.                                                                                                      |
-| `unknown`              | Nothing matched. The triage attaches the first error block.                                                                | PR author. Read the failed step log. If the shape will recur, add a pattern and a fixture to `scripts/lib/ci-failure-triage.ts` / `scripts/ci_failure_triage.test.ts`.                                                                          |
+| `unknown`              | Nothing matched. The triage attaches the first error block.                                                                | PR author. Read the failed step log. If the shape will recur, add a pattern and a fixture to `scripts/lib/ci/ci-failure-triage.ts` / `scripts/ci_failure_triage.test.ts`.                                                                       |
 
 **Red CI on your own PR.** Read the job-summary triage (or run `pnpm kyberion ci triage` on the
 log), fix every listed failure in one push, and re-run the printed commands locally first. Pending
@@ -425,7 +425,7 @@ or security paths. Source-specific failures name the actual scanned source and i
 expected emit, each with that file's own timestamp; absent emits have a null timestamp
 and orphan emits have no source provenance. Only mtime fallback uses target-wide newest
 files. Cover older changed inputs beside newer unchanged inputs and missing/orphan
-outputs in `scripts/check_stale_dist.test.ts`. Platform-specific fixtures must be
+outputs in `scripts/check/check_stale_dist.test.ts`. Platform-specific fixtures must be
 explicit skips elsewhere and included in the native platform's CI command;
 `tests/workflow-operations-contract.test.ts` pins the Windows invocation.
 
@@ -489,7 +489,7 @@ Credential Manager through a mocked PowerShell boundary; a live probe may use
 only a fresh, non-secret lookup identity. Regression gates:
 `secret-bridge.os-keychain.test.ts`,
 `foundation/secret-resolution-session.test.ts`, and
-`scripts/lib/backup-passphrase.test.ts`.
+`scripts/lib/backup/backup-passphrase.test.ts`.
 
 ### VCS publication across Git worktrees
 
@@ -579,7 +579,7 @@ This covers directories and top-level `*.jsonl` / `*.json` files.
    dot wake ledger); pruning it re-fires old wakes.
 4. **Run `pnpm check -- --only runtime-store-retention`** (part of `--scope pr`). It fails with
    `file:line` for any literal runtime path that has no entry. Add a file-scoped exemption, with a
-   reason, in `scripts/check_runtime_store_retention.ts` only for strings that are not real stores.
+   reason, in `scripts/check/check_runtime_store_retention.ts` only for strings that are not real stores.
 5. **Check the janitor report.** `uncoveredRuntimeDirs` / `uncoveredRuntimeFiles` must not list the
    new name. A name there means a store was created through a dynamic path the gate cannot see; add
    its catalog entry by hand.
@@ -603,7 +603,7 @@ This covers directories and top-level `*.jsonl` / `*.json` files.
 - Migrating a legacy `tenants/<slug>` store: register the root, write only the partitioned path,
   keep a read fallback to the legacy copy while it may still hold live data (remove the legacy copy
   on the next write — `generation-cost-settlement.ts`), or skip the fallback when the data is
-  short-lived (`scripts/reasoning_credentials.ts` proofs expire in 15 minutes). Add the old base to
+  short-lived (`scripts/reasoning/reasoning_credentials.ts` proofs expire in 15 minutes). Add the old base to
   `PHYSICAL_LEGACY_TENANT_STATE_ROOTS` so offboarding still removes leftovers — also when the live
   migration stays operator-reviewed: `dot-state-paths.ts` keeps `pnpm kyberion dot migrate-state`
   for a live tenant, but an offboarded tenant's `dot/tenants/<slug>/` copy is exported and
@@ -686,12 +686,12 @@ This covers directories and top-level `*.jsonl` / `*.json` files.
 
 ### Customer decision writer consistency
 
-- Every read → plan → write sequence on a customer decision case (`scripts/customer_decision.ts` draft, generate's write, submit, send, respond, confirm, status) runs under `withCustomerDecisionCaseLock` (one inter-process lock per tenant + case, `libs/core/customer-decision/store.ts`). Take it under the caller's own identity, outside the narrow store roles, and re-read the agenda, ledger and receipts inside it. Async work (the generate model call) runs outside the lock; the write then re-reads and refuses a changed agenda.
+- Every read → plan → write sequence on a customer decision case (`scripts/customer/customer_decision.ts` draft, generate's write, submit, send, respond, confirm, status) runs under `withCustomerDecisionCaseLock` (one inter-process lock per tenant + case, `libs/core/customer-decision/store.ts`). Take it under the caller's own identity, outside the narrow store roles, and re-read the agenda, ledger and receipts inside it. Async work (the generate model call) runs outside the lock; the write then re-reads and refuses a changed agenda.
 - `respond` writes a write-ahead record (`<case>/respond-journal/<receipt_id>.json`: the receipt with its decision ids pre-assigned under the lock, and the effective decisions before) before the ledger append, then ledger → receipt → audit → switches → brief input, and removes the record. The next respond / confirm / submit / status of the case completes a run that stopped part way (`reconcileCase`); a run whose ledger write never happened is dropped and audited `not_applied`. Every completion step is idempotent. Never make a later step a precondition of an earlier one, and never delete a journal record that cannot be read — `status` reports it under `reconciled.stuck`.
 - The deal note is best-effort (narrow `customer_decision_deal_note_writer`, never `mission_controller`): a failure is logged and audited, never fails the respond. Customer-written text in a note is quoted on one line, control/bidi characters removed, truncated, attributed (`quoteCustomerText`).
 - An unexpected failure of the customer-facing verbs is audited with a reason code (`diagnosticCode`, never the token or the message); the customer room logs that code as a warning and never forwards it.
 - The room spawns the facade with `facadeChildEnv` only (exec allowlist, ambient role / persona / sudo / mission keys blanked, `SYSTEM_ROLE` cleared, `KYBERION_TENANT`, `KYBERION_ROOT`); `--dir` is accepted only in test runs.
-- Regression gates: `scripts/customer_decision.test.ts` (fault injection after the ledger and after the receipt, then status / retry repair; deal-note role and failure; coded traces; `--dir` gating), `presence/displays/customer-room/src/server/facade.integration.test.ts` (concurrent built-facade respond children: no lost decision, unique ids, one receipt per double submit; child env), `libs/core/customer-decision/store.test.ts` (lock exclusivity, journal records).
+- Regression gates: `scripts/customer/customer_decision.test.ts` (fault injection after the ledger and after the receipt, then status / retry repair; deal-note role and failure; coded traces; `--dir` gating), `presence/displays/customer-room/src/server/facade.integration.test.ts` (concurrent built-facade respond children: no lost decision, unique ids, one receipt per double submit; child env), `libs/core/customer-decision/store.test.ts` (lock exclusivity, journal records).
 
 ## §3 Daemons and child processes
 
@@ -722,7 +722,7 @@ supervisor and PTC IPC tests when changing a listener.
   async `setInterval`.
 - **Handle `SIGTERM` and `SIGINT`.** Stop the timer, wait for the in-flight tick (bounded), release
   any leader or lease lock, record a `stopped` heartbeat, and exit 0. The reference implementation
-  is `scripts/agent_runtime_supervisor_daemon.ts`.
+  is `scripts/agent/agent_runtime_supervisor_daemon.ts`.
 - **A shutdown is not a failure.** A child that exits because the daemon forwarded `SIGTERM` during
   shutdown must not raise an ops alert or an `error` heartbeat; mark the shutdown and report the
   tick as cancelled.
@@ -742,7 +742,7 @@ supervisor and PTC IPC tests when changing a listener.
   pipeline `system:shell` step, the child inherits the runner's role (`run_pipeline.bundle`).
   Prove it with a hermetic tier-guard test (copy of the governance policies under a temp
   `KYBERION_ROOT`; under the repo root Vitest does not load the policy) and by running the
-  schedule's pipeline once. Reference: `scripts/check_chronos_perf_baseline.test.ts`.
+  schedule's pipeline once. Reference: `scripts/check/check_chronos_perf_baseline.test.ts`.
 - **Give every child a deadline.** Kill the child when it expires, raise an ops alert via
   `sendOpsAlert`, and forward signals to the child on shutdown.
 
@@ -812,9 +812,9 @@ revision changes, unchanged summary refreshes and timeout recovery in
 unbounded. When a child needs a role the server itself must not hold (a writer, or a ledger role
 such as `decision_ledger`), do not add that role to the server's `may_assume` and do not clear
 `SYSTEM_ROLE`. Give the child its own one-purpose entry script that dispatches only the verbs the
-server calls (e.g. `scripts/customer_decision_overview.ts`, `scripts/dot_lifecycle_worker.ts`), a
+server calls (e.g. `scripts/customer/customer_decision_overview.ts`, `scripts/dot/dot_lifecycle_worker.ts`), a
 narrow system role granting just the roles that entry reaches, a reachability workspace entry in
-`scripts/lib/role-assumption-workspace.ts`, and a regenerated
+`scripts/lib/role-assumption/role-assumption-workspace.ts`, and a regenerated
 `role-assumption-unresolved-baseline.json` (`--print-unresolved-baseline`, never hand edits). Pin
 it with a test that the server role is refused the role and the child role is allowed it
 (`isRoleAssumptionAllowed`), and one that the entry cannot import the writer CLI. A child
@@ -842,13 +842,13 @@ gets clean JSON.
 
 ## §5 Tests: pollution and host dependencies
 
-Before entering an exact-path resource scope, initialize any test-owned sandbox ancestor directories in fixture setup. A narrow capability may create its admitted leaf directories, never missing ancestors outside its grant. Verify a fresh sandbox as well as a warmed one; `scripts/pipeline_promote.resource-boundary.test.ts` covers journal setup without weakening the runtime guard.
+Before entering an exact-path resource scope, initialize any test-owned sandbox ancestor directories in fixture setup. A narrow capability may create its admitted leaf directories, never missing ancestors outside its grant. Verify a fresh sandbox as well as a warmed one; `scripts/pipeline/pipeline_promote.resource-boundary.test.ts` covers journal setup without weakening the runtime guard.
 
 Production source inventories must exclude runtime storage roots before traversing
 them. The single-instance scan skips legacy root-level `work/` metrics, whose I/O is
 redirected into a per-test fixture; it still scans nested code directories named
 `work`. Do not suppress filesystem denials or missing-source errors to hide a scan
-failure. Gate: `scripts/check_core_single_instance.test.ts`, including the real
+failure. Gate: `scripts/check/check_core_single_instance.test.ts`, including the real
 production inventory and exact manifest-only import exception.
 
 When a store module also exports pure admission/security checks, partially mock the module
@@ -862,11 +862,11 @@ to an unconditional success to repair a missing-export failure.
 
 An async mock factory must not await a module that transitively imports the module currently waiting for that factory. A new top-level validator import can create this cycle before any test or test timeout starts. Import the validator inside the schema-only test after the existing secure-I/O/authority bootstrap has completed; retain the raw-schema oracle. Verify the changed test alone before its consumer suite. Regression: `libs/core/dot/dot-charter.test.ts` exercises the raw AJV schema without changing the existing tenant mock.
 
-Broad preflight failures must retain every failing case heading and its immediate error before the bounded output tail. Tail-only diagnostics can discard earlier failures after a long related-test run. Keep test selection, failure status and deadlines unchanged; reproduce the named cases and finish data-reader selections before publishing a repair batch. Gate: scripts/pr_preflight.test.ts covers an early ANSI-colored failure displaced by a later stack.
+Broad preflight failures must retain every failing case heading and its immediate error before the bounded output tail. Tail-only diagnostics can discard earlier failures after a long related-test run. Keep test selection, failure status and deadlines unchanged; reproduce the named cases and finish data-reader selections before publishing a repair batch. Gate: scripts/pr/pr_preflight.test.ts covers an early ANSI-colored failure displaced by a later stack.
 
 Affected-test preflight must inherit the canonical core profile (TEST_SUITES.core), including no file parallelism: run core code and exact core readers first, then the remaining code and readers. Preserve the original CI selectors and exclude only the core-owned paths already covered; the real-inventory contract in tests/preflight-core-profile-boundary.test.ts proves the union and disjointness against Vitest include/exclude rules. Shared temporary ancestors can change while another file creates its fixture; do not relax snapshot identity/timestamp checks or silently retry integrity failures to accommodate a mixed parallel run. Keep strict mode and each invocation budget unchanged. Attempt every selected group even after failure and report all failures together. Native EPERM outside the governed guard remains a separate diagnostic question; a downstream policy-corrupt refusal is not evidence that the policy contents are invalid.
 
-The readiness subprocess also writes its per-gate results to stdout. On failure, preserve captured string or Buffer stdout before rethrowing the original execution error; stderr-only exception messages can hide every failing gate. Never print the success marker after such a failure. Gate: scripts/publish_pull_request.test.ts covers complete early-gate evidence, unchanged exception identity and empty-output failures.
+The readiness subprocess also writes its per-gate results to stdout. On failure, preserve captured string or Buffer stdout before rethrowing the original execution error; stderr-only exception messages can hide every failing gate. Never print the success marker after such a failure. Gate: scripts/publish/publish_pull_request.test.ts covers complete early-gate evidence, unchanged exception identity and empty-output failures.
 
 Core code uses the same six deterministic shards as the PR and main CI matrices, executed sequentially with the serial core profile. The workflow parity assertion in the inventory gate rejects shard-count drift. Preserve the existing per-invocation budget; do not squeeze an unsharded core run into it by omitting tests or increasing the deadline.
 
@@ -1157,7 +1157,7 @@ mechanism has an off switch and a test that compares its output with the switch 
 | `ts.transpileModule` for every TypeScript module, in every process                                                                                                                                                          | Transpile cache in `node_modules/.cache/kyberion-ts-loader/` (`scripts/ts-loader-cache.mjs`), outside every agent-writable tree: key = SHA-256 of the cache module's own text (it holds the options), TypeScript version, absolute path and source; 0700 dirs, 0600 entries, owner/mode checked on read; temp file + rename; TypeScript is required only on a miss | `KYBERION_TS_LOADER_CACHE=0`            | `scripts/ts-loader-cache.test.ts` (invalidation, poisoning, concurrency), `libs/core/tier-guard-ts-loader-cache.test.ts` |
 | Node's default resolver runs `getPackageScopeConfig` for each `.ts` URL (type stripping is on by default in Node 24), and that call re-parses the whole `exports` string of the nearest package.json: 290KB for `libs/core` | `scripts/ts-loader.mjs` answers workspace TypeScript resolutions itself (`resolveTsSourceDirectly`, realpath URL)                                                                                                                                                                                                                                                  | `KYBERION_TS_LOADER_FAST_RESOLVE=0`     | `scripts/ts-loader-resolve.test.ts` (differential)                                                                       |
 | The same re-parse for each `libs/core/dist/*.js` module                                                                                                                                                                     | The core build writes `libs/core/dist/package.json` (`type` + `#imports` only) and one-line shims re-exporting the real `.mjs` modules (`scripts/write_core_dist_scope.mjs --run`; `--check` drift runs in the packaging-contract gate). External consumers still resolve `@agent/core/*` through the full exports map                                             | `KYBERION_CORE_DIST_SCOPE=0` (build)    | `scripts/write_core_dist_scope.test.ts` (differential)                                                                   |
-| `local-stt-discovery` probed every `python3.x` once per bridge installer                                                                                                                                                    | Memo + private host cache `node_modules/.cache/kyberion-stt-discovery/candidates.json`, both for 10 minutes, keyed on platform, PATH, registry content and the managed runtimes' bin lstat and site-packages mtimes; managed installers reset it; a hit rebuilds candidates from the registry and accepts only binaries the probe could have found                 | `KYBERION_STT_DISCOVERY_CACHE_TTL_MS=0` | `libs/core/voice/local-stt-discovery.cache.test.ts`, `scripts/voice_setup.discovery-cache.test.ts`                       |
+| `local-stt-discovery` probed every `python3.x` once per bridge installer                                                                                                                                                    | Memo + private host cache `node_modules/.cache/kyberion-stt-discovery/candidates.json`, both for 10 minutes, keyed on platform, PATH, registry content and the managed runtimes' bin lstat and site-packages mtimes; managed installers reset it; a hit rebuilds candidates from the registry and accepts only binaries the probe could have found                 | `KYBERION_STT_DISCOVERY_CACHE_TTL_MS=0` | `libs/core/voice/local-stt-discovery.cache.test.ts`, `scripts/voice/voice_setup.discovery-cache.test.ts`                 |
 
 Rules:
 
@@ -1343,7 +1343,7 @@ Legacy unscoped candidates retain their existing storage compatibility; this doe
   quieter symptom: post-partition layouts (`<tier>/<tenant>/<id>`) made flat enumerations
   report tenant directories as missions. Coverage:
   `libs/core/mission/mission-tier-scan.test.ts`,
-  `scripts/watch_tenant_drift.test.ts` (bound-partition probe),
+  `scripts/watch/watch_tenant_drift.test.ts` (bound-partition probe),
   `libs/actuators/system-actuator/src/system-pipeline-path.test.ts` (bound `list_missions`).
 - **Owner-partition IO resolves scope from the env only.** A persisted `pnpm scope use <tenant>`
   (`active/shared/runtime/scope.env`, read by `resolveProjectScope`) binds every process on the
@@ -1581,12 +1581,12 @@ isolation and parent-capability denial with an ordinary organization operator.
    and no prompt text, and that the child's cwd is not the repository root.
 4. When a CLI prints a follow-up command for a hash-bound approval, test that the printed text,
    split as a POSIX shell would, applies successfully once the request is approved (gate:
-   `scripts/onboarding_llm.test.ts` and `scripts/tenant.entrypoint.test.ts`).
+   `scripts/onboarding/onboarding_llm.test.ts` and `scripts/tenant.entrypoint.test.ts`).
 5. When you add an approval request creator, record the real requester identity in
    `requestedBy` (and `requestedByContext.actorId`), never an empty string: with separation of
    duties on, a request without a requester cannot be approved (gate:
    `libs/core/governance/approval-separation-of-duties.test.ts`). A creator that runs in a CLI or
-   script resolves its requester at the CLI entry point (`scripts/lib/cli-approval-requester.ts`,
+   script resolves its requester at the CLI entry point (`scripts/lib/cli/cli-approval-requester.ts`,
    `resolveCliApprovalRequester({ explicit, legacy })`) and passes it to the library as a lazily
    resolved `ApprovalRequesterInput` — never from the persona, a component name or
    `resolveOperatorDisplayName()`, and never read from the environment inside `libs/`. Record
@@ -1999,7 +1999,7 @@ needs copies, not links, of catalogs from the real checkout.
 
 CLI daemons use the same secure-io boundary for runtime files. Borrow log descriptors through
 `withSafeAppendFile` so spawn failures also close them; redirect detached stderr to that descriptor
-instead of appending the same log line again. Run `libs/core/security-boundary.contract.test.ts`
+instead of appending the same log line again. Run `libs/core/secure-io/security-boundary.contract.test.ts`
 alongside the CLI tests: adding a raw-fs exception to an import baseline does not satisfy this gate.
 
 **Cost.** realpath(3) walks every component: about 30 µs per call at depth 15. Measured on an idle
@@ -2023,7 +2023,7 @@ swap between check and temp open, single probe registration, `node_modules` read
 legitimate links in scope, Vitest remap, vault reads), `libs/core/secure-io.symlink-root-alias.test.ts`
 (checkout behind a linked prefix), `libs/core/foundation/lock-utils.tomb-release.test.ts` (release
 during the put-back window and with leftover tombs, against the real secure-io lock IO) and the import boundary in
-`libs/core/security-boundary.contract.test.ts`. Each attack case fails on the pre-fix code.
+`libs/core/secure-io/security-boundary.contract.test.ts`. Each attack case fails on the pre-fix code.
 
 ---
 
@@ -2040,10 +2040,10 @@ empty string may clear a field. Re-observe after a rejected reference or timeout
 For terminal operations, retain the session ID and command exit code, and return
 missing-session or unsupported-capability diagnostics instead of false success.
 
-**Gate.** Run `scripts/actuator_playground.test.ts`, `libs/core/harnessing/cli-utils.test.ts`,
+**Gate.** Run `scripts/actuator/actuator_playground.test.ts`, `libs/core/harnessing/cli-utils.test.ts`,
 the browser and terminal actuator tests, and `libs/core/shell/pty-engine.resize.test.ts`.
-Replay `scripts/browser_actuator_usability_probe.ts` and
-`scripts/terminal_actuator_usability_probe.ts` for live outcomes and recovery.
+Replay `scripts/browser/browser_actuator_usability_probe.ts` and
+`scripts/terminal/terminal_actuator_usability_probe.ts` for live outcomes and recovery.
 Native PTY and desktop GUI checks require the corresponding host capabilities.
 A silent `PTY_ENGINE ... falling back to ChildProcess` warning means sessions
 run without PTY semantics (no resize, tty prompts like `ssh` password reads
@@ -2274,11 +2274,11 @@ Persist notification receipts per participant under the existing Co-Session stor
 updates across hook processes, and keep ack an explicit agent action. Preserve unrelated user hooks
 when regenerating wiring. Do not change hook trust records or invoke an LLM from a hook.
 
-**Gate.** `scripts/codex_cli_hook.test.ts` exercises repeated tool events, own-message filtering,
+**Gate.** `scripts/codex/codex_cli_hook.test.ts` exercises repeated tool events, own-message filtering,
 separate CLI instances, bounded batches, Stop silence and SessionEnd release.
 `libs/core/provider/co-session-hook.test.ts` checks interleaved hook delivery;
 `libs/core/provider/claude-code-hook.test.ts` checks recursive Stop silence;
-`scripts/generate_provider_hook_configs.test.ts` checks idempotent generation and preservation.
+`scripts/generate/generate_provider_hook_configs.test.ts` checks idempotent generation and preservation.
 
 ## Hearing completion read recovery
 
@@ -2407,7 +2407,7 @@ Approval presentation references are part of the effect binding. Preserve the
 same scoped review reference when an interactive run resumes headlessly; human
 presence must not change its authorization payload hash. Validate this with the
 real email actuator, approval store, durable pipeline journal and headless
-runner in `scripts/external-actuator-pipeline-simulation.test.ts`, with only the
+runner in `scripts/external/external-actuator-pipeline-simulation.test.ts`, with only the
 final transport and process launch simulated. A mocked gate alone cannot catch
 this integration defect.
 
@@ -2706,14 +2706,14 @@ the entire system actuator into the scheduled generation path or add broad role
 grants to compensate. After changing imports or child environments, run the
 `role-assumption-reachability` gate (`pnpm check -- --only role-assumption-reachability`;
 it computes reachability in memory and fails on any reachable role the policy does not
-grant) and both `scripts/analyze_role_assumptions.test.ts` and
-`scripts/analyze_role_assumptions.contract.test.ts`. The analyzer must resolve
+grant) and both `scripts/analyze/analyze_role_assumptions.test.ts` and
+`scripts/analyze/analyze_role_assumptions.contract.test.ts`. The analyzer must resolve
 shorthand environment properties to their value declarations before deciding
 whether the child inherits its parent's system role.
 
 Projection refreshes used by observation writers must not reconcile or enact
 unrelated approval decisions. Keep reconciliation on explicit approval-owner
-operations; `libs/core/cloudflare-os-held-reconcile.test.ts` must prove that
+operations; `libs/core/governance/cloudflare-os-held-reconcile.test.ts` must prove that
 refresh alone retains a pending held action and explicit reconciliation recovers
 the decision. Service lifecycle receipt attribution must remain data: write
 through the shared `infrastructure_sentinel` store authority instead of assuming
@@ -2757,7 +2757,7 @@ When adopting `defineCheck`, remove obsolete caller flags such as `--fail` from 
 
 Keep the declared data tier separate from the tenant ownership boundary. Confidential drafts remain under `knowledge/confidential/<tenant>/dots/`; verified public organization/project drafts use `dots/`. Tenant-only public diagnostic drafts must pass `assertFrontDeskDiagnosticDotCharter` and registered-tenant resolution before creation: an arbitrary public label does not grant the diagnostic capability. Never repair a first-job setup failure by changing its public-only input protocol to confidential or relaxing its no-downgrade checks.
 
-Runtime operation-binding validation is read-only: use the existing tenant-bound `workspace_tenant_registry_reader`, not the dot lifecycle store roles (`dot_charter_store` / `dot_lifecycle_runtime_store`; formerly `dot_lifecycle_writer`). Regression checks are `libs/core/dot/dot-lifecycle.test.ts`, the real-store `scripts/onboarding_first_job*.test.ts` suites, and `libs/core/surface/front-desk-recovery.engine.integration.test.ts`. Recovery fixtures must create their actual synthetic tenant via the governed facade before creating a tenant-owned charter.
+Runtime operation-binding validation is read-only: use the existing tenant-bound `workspace_tenant_registry_reader`, not the dot lifecycle store roles (`dot_charter_store` / `dot_lifecycle_runtime_store`; formerly `dot_lifecycle_writer`). Regression checks are `libs/core/dot/dot-lifecycle.test.ts`, the real-store `scripts/onboarding/onboarding_first_job*.test.ts` suites, and `libs/core/surface/front-desk-recovery.engine.integration.test.ts`. Recovery fixtures must create their actual synthetic tenant via the governed facade before creating a tenant-owned charter.
 
 When splitting internal store roles, forbid them at every runtime binding entrance: schema, charter validation and typed programmatic execution. Test the legitimate worker role alongside denial cases. Protected runtime stores are also checked through their projected knowledge tier; preserve the required projection grant while restricting every raw read/metadata/write/mkdir operation to the store's physical purpose. Add cold confidential/personal secure-I/O writes, direct-knowledge denial and symlink escape regressions (`tier-guard-dot-lifecycle-stores.test.ts`). Prove claimed lock or tenant failures through the real guard before adding roles or generic matcher features; retain withdrawn hypotheses in review evidence.
 
@@ -2765,15 +2765,15 @@ When splitting internal store roles, forbid them at every runtime binding entran
 
 Keep organization responsibilities separate from tenant access and immutable agent home affiliation. Journal append grants include the journal, its writer lease, and lease metrics inside the canonical fenced writer callback; infrastructure locks remain with the host controller. Member identity updates must read every stored profile needed for uniqueness validation through exact file grants. Never broaden a directory grant to make a failed operation pass.
 
-Run `scripts/organization_people.integration.test.ts` with real secure IO, authority, registry, leases, and journal projection against a product-policy-only synthetic root. Mocked transport or facade tests cannot establish the correctness of these store grants. The gate must cover member creation, duplicate external identity refusal, agent issue, lifecycle change, accountability transfer, and restricted-home visibility.
+Run `scripts/organization/organization_people.integration.test.ts` with real secure IO, authority, registry, leases, and journal projection against a product-policy-only synthetic root. Mocked transport or facade tests cannot establish the correctness of these store grants. The gate must cover member creation, duplicate external identity refusal, agent issue, lifecycle change, accountability transfer, and restricted-home visibility.
 
-After building Concierge, run `KYBERION_TEST_CONCIERGE_BROWSER=1 pnpm exec vitest run scripts/organization_people.integration.test.ts --maxWorkers 1` explicitly for the loopback browser probe. Its authenticated decisions belong only to the synthetic fixture and exercise the real approval store; the flag never changes runtime admission policy. Stop the owned server and browser in `finally`, remove the fixture state, and retain only a synthetic screenshot in scratch when needed for review.
+After building Concierge, run `KYBERION_TEST_CONCIERGE_BROWSER=1 pnpm exec vitest run scripts/organization/organization_people.integration.test.ts --maxWorkers 1` explicitly for the loopback browser probe. Its authenticated decisions belong only to the synthetic fixture and exercise the real approval store; the flag never changes runtime admission policy. Stop the owned server and browser in `finally`, remove the fixture state, and retain only a synthetic screenshot in scratch when needed for review.
 
 The organization dashboard browser probe (`organization_dashboard.browser.integration.test.ts`, flag `KYBERION_TEST_CHRONOS_BROWSER`) is retired under `retired/scripts/`: the screen it drove (`/ops?section=home`) redirects to Concierge `/` and its dashboard component was removed, so the probe could no longer pass. The aggregation API it also exercised stays covered by `presence/displays/concierge/src/lib/ops/organization-dashboard.test.ts` and `src/app/api/ops/organization-dashboard/route.test.ts`. The practices it encoded still apply to any browser probe: use the same disposable product-policy-only root and real browser-actuator approval-store path. Verify rendered metric labels and values, member/organization switching, server-side tenant/project denial and failure-state withdrawal. At mobile width, assert element bounds and document overflow as well as internal overflow. Close every owned browser with `Promise.allSettled`, terminate the child server even if browser cleanup fails, and wait for its exit before removing the fixture. Synthetic screenshots remain in scratch under `active/shared/tmp/`; they do not establish access to the installation's real organization data. A test flag only selects the integration test and never disables admission policy.
 
 Next-based surface adapters pass `surfaceMutationRequestUrl(req)` to the shared mutation guard. Next normalizes numeric loopback hosts in its public URL getter; use the native branded Request URL to preserve the server-bound origin. Never repair this by accepting loopback aliases or trusting Host/forwarded headers. The actual NextRequest regression gate is `presence/displays/concierge/src/lib/native-request-origin.test.ts`, including IPv4/IPv6, cross-port, cross-origin, and spoofed-header refusals.
 
-Reviewed onboarding plans are immutable inputs to human consent. Publish JSON through foundation `writeJson` with `{ createOnly: true }`, which uses secure IO's exclusive-file operation; an existence check alone cannot prevent a concurrent overwrite. Reruns retain the reviewed bytes and expiry, and a changed plan requires a new filename. Regression gates are `libs/core/foundation/json.test.ts`, `scripts/onboarding_authority.test.ts`, and `scripts/onboarding_apply.identity.integration.test.ts`.
+Reviewed onboarding plans are immutable inputs to human consent. Publish JSON through foundation `writeJson` with `{ createOnly: true }`, which uses secure IO's exclusive-file operation; an existence check alone cannot prevent a concurrent overwrite. Reruns retain the reviewed bytes and expiry, and a changed plan requires a new filename. Regression gates are `libs/core/foundation/json.test.ts`, `scripts/onboarding/onboarding_authority.test.ts`, and `scripts/onboarding/onboarding_apply.identity.integration.test.ts`.
 
 ## Provenance, consent and repair recurrence checks
 
@@ -2838,7 +2838,7 @@ the work or its approved contract and explicitly returns both the child and its
 blocked continuous-owner WorkItem to `ready`. Skip native ticket creation when
 no planned tasks remain, so existing WorkItems can still advance or reach the
 rework/intervention check.
-Gate: `scripts/continuous_work_owner.test.ts` (limit, invalid counter, scope,
+Gate: `scripts/continuous/continuous_work_owner.test.ts` (limit, invalid counter, scope,
 ordinary retry and existing blocker cases).
 
 **Learning registration must survive completion and restart.** Persist a scoped,
@@ -2848,7 +2848,7 @@ replays only that candidate, without another model call or resetting a reviewed
 candidate. Continuous owners reconcile pending delivery before accepting child
 completion; ratification and promotion still use their governed approval path.
 Gate: `libs/core/mission/mission-distill.test.ts` and
-`scripts/continuous_work_owner.test.ts` (delivery failure, replay and approval
+`scripts/continuous/continuous_work_owner.test.ts` (delivery failure, replay and approval
 preservation).
 
 **Process source schemas belong in governed descriptors.** JSON sources declare
@@ -3477,4 +3477,4 @@ refused rather than adopted.
 - **Local daemons**: filesystem permissions bound a Unix socket or named pipe; a TCP listener
   has no such boundary and must not serve without a configured token. A socket path that reads
   as a number is refused, because Node binds it as a TCP port on every interface. Gate:
-  `scripts/agent_runtime_supervisor_daemon.test.ts`.
+  `scripts/agent/agent_runtime_supervisor_daemon.test.ts`.

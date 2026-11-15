@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { pathResolver } from '@agent/core/path-resolver';
 import { resolveValidationBundleOutputBase } from './export_validation_bundle.js';
-import { resolveAvatarRegistrationPaths } from './register_avatar.js';
-import { resolveIntentContractMemoryPath } from './sync_intent_contract_memory.js';
-import { resolveCapturePhotoPath } from './capture_photo.js';
-import { resolveIntentSmokeOutputDir } from './intent_smoke.js';
+import { resolveAvatarRegistrationPaths } from './register/register_avatar.js';
+import { resolveIntentContractMemoryPath } from './sync/sync_intent_contract_memory.js';
+import { resolveCapturePhotoPath } from './capture/capture_photo.js';
+import { resolveIntentSmokeOutputDir } from './intent/intent_smoke.js';
 
 describe('repository-bound script inputs', () => {
   it('keeps validation bundle exports inside the repository', () => {

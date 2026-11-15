@@ -138,4 +138,4 @@ describes the setup prerequisites and recovery limits.
 - [Credential lifecycle, allocation, and execution](./api-credential-proof-boundary.md): registration, tenant allocation, task binding, selection, and proof are independent decisions. Introduction approval authorizes storage, not use by every tenant.
 - [secret-mutation-approval-model.md](./secret-mutation-approval-model.md)
 - `libs/core/secret/secret-introduction.ts`
-- `scripts/secret_introduce.ts`
+- `scripts/secret/secret_introduce.ts`

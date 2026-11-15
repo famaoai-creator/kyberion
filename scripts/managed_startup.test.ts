@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { safeReadFile } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
 import { loadSurfaceManifest } from '@agent/core/surface/surface-runtime';
-import { normalizeSurfaceRuntimeArgs, runSurfaceRuntime } from './surface_runtime.js';
+import { normalizeSurfaceRuntimeArgs, runSurfaceRuntime } from './surface/surface_runtime.js';
 
 describe('clean-install managed startup documentation', () => {
   const quickstart = String(

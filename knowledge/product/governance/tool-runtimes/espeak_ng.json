@@ -1,0 +1,42 @@
+{
+  "version": "1.0.0",
+  "default_tool_id": "mflux",
+  "tools": [
+    {
+      "tool_id": "espeak_ng",
+      "toolsets": ["tts"],
+      "display_name": "espeak-ng TTS Toolkit",
+      "ecosystem": "system",
+      "status": "active",
+      "platforms": ["any"],
+      "supported_modes": ["trial", "approved_install", "installed", "pinned"],
+      "trial_backend": {
+        "kind": "system",
+        "command": "espeak-ng",
+        "args": ["--version"],
+        "description": "Probe espeak-ng availability without mutating workspace state."
+      },
+      "install_backend": {
+        "kind": "brew",
+        "command": "brew",
+        "args": ["install", "espeak-ng"],
+        "description": "Install espeak-ng through Homebrew on macOS."
+      },
+      "install_backend_platform_overrides": {
+        "linux": {
+          "kind": "system",
+          "command": "apt-get",
+          "args": ["install", "-y", "espeak-ng"],
+          "description": "Install espeak-ng through the system package manager."
+        }
+      },
+      "installed_backend": {
+        "kind": "system",
+        "command": "espeak-ng",
+        "args": ["--version"],
+        "description": "Re-check the espeak-ng installation."
+      },
+      "notes": "System binary backing libs/actuators/voice-actuator/scripts/espeak_ng_tts_bridge.py (voice engine espeak_ng)."
+    }
+  ]
+}

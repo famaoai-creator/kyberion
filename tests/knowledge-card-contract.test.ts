@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import Ajv from 'ajv';
 import * as path from 'node:path';
 import { safeReadFile } from '@agent/core';
-import { parseFrontmatter } from '../scripts/context_ranker.js';
+import { parseFrontmatter } from '../scripts/context/context_ranker.js';
 
 const rootDir = process.cwd();
 const schemaPath = path.join(rootDir, 'knowledge/product/schemas/knowledge-card.schema.json');

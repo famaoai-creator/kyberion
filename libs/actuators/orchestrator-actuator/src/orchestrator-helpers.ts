@@ -495,7 +495,7 @@ async function opTransform(op: string, params: any, ctx: any) {
           target_mission_id: targetMissionId,
           target_project_id: targetProjectId,
           recommended_sources: [
-            'dist/scripts/surface_runtime.js --action status',
+            'dist/scripts/surface/surface_runtime.js --action status',
             'pnpm run check -- --scope pr --only esm',
             'pnpm run check -- --scope full --only catalogs',
           ],
@@ -550,7 +550,7 @@ async function opTransform(op: string, params: any, ctx: any) {
       if (!brief || typeof brief !== 'object')
         throw new Error('collect_system_status_snapshot requires system-status-brief');
       const surfaceStatus = parseJsonCommandOutput(
-        safeExec('node', ['dist/scripts/surface_runtime.js', '--action', 'status'], {
+        safeExec('node', ['dist/scripts/surface/surface_runtime.js', '--action', 'status'], {
           cwd: pathResolver.rootDir(),
           timeoutMs: 120000,
         })
@@ -775,7 +775,7 @@ async function opTransform(op: string, params: any, ctx: any) {
               : {}),
           },
           sources: [
-            'dist/scripts/surface_runtime.js --action status',
+            'dist/scripts/surface/surface_runtime.js --action status',
             'pnpm run check -- --scope pr --only esm',
             'pnpm run check -- --scope full --only catalogs',
           ],

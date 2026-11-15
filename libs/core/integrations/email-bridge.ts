@@ -9,6 +9,7 @@ import { runExternalOperation } from '../governance/external-operation.js';
 import { wrapAdapterEffects } from '../governance/adapter-effect-proxy.js';
 import { currentScopeEnvelope } from '../scope-envelope.js';
 import { resolveScopeContext } from '../scope-context.js';
+import { resolvePython3Bin } from '../tool/tool-binary-resolvers.js';
 import { hostNodePlatform, isMacOS } from '../platform-facts.js';
 
 export type EmailBackendOperation = 'create_draft' | 'send';
@@ -253,7 +254,7 @@ export class SmtpEmailProvider implements EmailProvider {
       },
       () =>
         new Promise<EmailResult>((resolve) => {
-          const child = spawn('python3', ['-c', SMTP_SEND_SCRIPT], {
+          const child = spawn(resolvePython3Bin(), ['-c', SMTP_SEND_SCRIPT], {
             cwd: pathResolver.rootDir(),
             stdio: ['pipe', 'pipe', 'pipe'],
           });

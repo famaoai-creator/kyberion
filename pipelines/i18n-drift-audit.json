@@ -6,7 +6,7 @@
   "description": "Weekly i18n drift audit (I18N-08): surfaces ratchet baseline movement, per-locale translation-coverage regression, and unused-key accumulation. Not a gate — pnpm check -- --only i18n and pnpm check -- --only catalogs remain the enforcement paths (see knowledge/product/governance/kyberion-development-practices.md); this pipeline makes their weekly trend visible in one report and alerts on translation-coverage regression.",
   "_refs": {
     "plan": "docs/developer/improvement-plans-2026-07/INTERNATIONALIZATION_PLAN_2026-07-26.ja.md",
-    "implementation": "scripts/report_i18n_translation_coverage.ts"
+    "implementation": "scripts/report/report_i18n_translation_coverage.ts"
   },
   "schedule": {
     "id": "i18n-drift-audit-weekly",

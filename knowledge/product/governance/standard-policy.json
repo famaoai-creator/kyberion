@@ -11,12 +11,7 @@
       "check_type": "restricted_api",
       "params": {
         "patterns": ["fs.writeFileSync", "fs.appendFileSync", "fs.unlinkSync", "fs.renameSync"],
-        "exemptions": [
-          "scripts/bootstrap.ts",
-          "scripts/setup_ecosystem.sh",
-          "scripts/fix_shebangs.ts",
-          "scripts/mass_refactor_governance.ts"
-        ],
+        "exemptions": ["scripts/bootstrap.ts", "scripts/setup/setup_ecosystem.sh"],
         "target_dirs": ["libs/actuators", "scripts"],
         "file_extensions": [".ts", ".js", ".cjs"]
       }

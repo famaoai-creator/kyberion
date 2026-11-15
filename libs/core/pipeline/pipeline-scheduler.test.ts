@@ -44,7 +44,7 @@ describe('pipeline scheduler', () => {
     const schedule = {
       id: 'daily-routine',
       name: 'Daily routine',
-      pipelinePath: 'pipelines/daily-routine.json',
+      pipelinePath: 'knowledge/product/pipeline-templates/daily-routine.json',
       actuator: 'run_pipeline',
       enabled: true,
       trigger: {
@@ -134,7 +134,7 @@ describe('pipeline scheduler', () => {
       {
         id: 'daily-routine',
         name: 'Daily routine',
-        pipelinePath: 'pipelines/daily-routine.json',
+        pipelinePath: 'knowledge/product/pipeline-templates/daily-routine.json',
         actuator: 'run_pipeline',
         enabled: true,
         trigger: {
@@ -163,7 +163,7 @@ describe('pipeline scheduler', () => {
       {
         id: 'daily-routine',
         name: 'Daily routine',
-        pipelinePath: 'pipelines/daily-routine.json',
+        pipelinePath: 'knowledge/product/pipeline-templates/daily-routine.json',
         actuator: 'run_pipeline',
         enabled: true,
         trigger: {
@@ -182,7 +182,7 @@ describe('pipeline scheduler', () => {
       {
         id: 'daily-routine',
         name: 'Daily routine (updated)',
-        pipelinePath: 'pipelines/daily-routine.json',
+        pipelinePath: 'knowledge/product/pipeline-templates/daily-routine.json',
         actuator: 'run_pipeline',
         enabled: true,
         trigger: {

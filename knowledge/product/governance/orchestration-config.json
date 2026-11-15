@@ -48,12 +48,12 @@
         {
           "id": "start_services",
           "skill": "run_shell_command",
-          "args": "--command \"node dist/scripts/surface_runtime.js --action reconcile\""
+          "args": "--command \"node dist/scripts/surface/surface_runtime.js --action reconcile\""
         },
         {
           "id": "verify_status",
           "skill": "run_shell_command",
-          "args": "--command \"node dist/scripts/surface_runtime.js --action status\""
+          "args": "--command \"node dist/scripts/surface/surface_runtime.js --action status\""
         },
         {
           "id": "smoke_test",

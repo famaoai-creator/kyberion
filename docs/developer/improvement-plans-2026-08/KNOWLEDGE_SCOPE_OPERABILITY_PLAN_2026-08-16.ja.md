@@ -183,7 +183,7 @@ KS-16 checker を PR CI に入れ意味論検査へ拡張し、新区画を rete
 - [TENANT_DATA_ACTIVATION_PLAN_2026-07-28](../improvement-plans-archive/2026-07/TENANT_DATA_ACTIVATION_PLAN_2026-07-28.ja.md)(DA-08 curation / ingest ceremony)
 - [ENTITY_GOVERNANCE_UNIFICATION_PLAN_2026-08-09](./ENTITY_GOVERNANCE_UNIFICATION_PLAN_2026-08-09.ja.md)(scope-migration / physical namespace)
 - [LIFECYCLE_SMOOTHNESS_PLAN_2026-08-08](./LIFECYCLE_SMOOTHNESS_PLAN_2026-08-08.ja.md)(改善ループ信号品質)
-- `scripts/watch_tenant_drift.ts` / `pipelines/tenant-drift-watch.json`(KO-18 の雛形)、`pipelines/knowledge-curation-weekly.json`(KO-03/14/16/17 の実行基盤)
+- `scripts/watch/watch_tenant_drift.ts` / `pipelines/tenant-drift-watch.json`(KO-18 の雛形)、`pipelines/knowledge-curation-weekly.json`(KO-03/14/16/17 の実行基盤)
 
 ## 実装状況
 

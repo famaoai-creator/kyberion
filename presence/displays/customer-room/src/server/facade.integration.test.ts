@@ -1,6 +1,6 @@
 /**
  * Integration: the room's real spawner against the real built facade
- * (`dist/scripts/customer_decision.js`) on a scratch case directory. The
+ * (`dist/scripts/customer/customer_decision.js`) on a scratch case directory. The
  * agenda is written straight into the scratch directory (the operator path
  * needs a live approval gate); the invite is issued through the real invite
  * store of a throwaway tenant. Skipped when the facade is not built.

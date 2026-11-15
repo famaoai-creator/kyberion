@@ -8,7 +8,7 @@ import {
   selectChangedGates,
   validateGatePaths,
   type ChangedGateMatch,
-} from './lib/changed-gate-selection.js';
+} from './lib/ci/changed-gate-selection.js';
 
 type Gate = {
   id: string;

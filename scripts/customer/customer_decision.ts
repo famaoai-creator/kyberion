@@ -1,0 +1,207 @@
+/**
+ * customer_decision.ts — the governed facade of customer decision hearing
+ * (CD-05 / CD-06 / CD-08, plan
+ * docs/developer/improvement-plans-2026-10/CUSTOMER_DECISION_HEARING_PLAN_2026-10-24.ja.md).
+ *
+ * The only writer of agendas, receipts, switches, invites and the customer
+ * decisions they put in the SSOD ledger. The customer-room display runs the
+ * built script (`dist/scripts/customer/customer_decision.js`) as a child process for
+ * `view` / `respond` and never touches the stores itself.
+ *
+ * Operator verbs (all take --tenant <slug> --case <id>; --json for machine output):
+ *   template put --file <template.json> --by user:<member>   (no --case) write the tenant's own hearing template (HR-01,
+ *            decisions/_templates/<id>.json; inline ja/en text, optional objective); bolt-review is reserved
+ *   template list | show --template <id>              (no --case) the tenant's templates and the product ones it does not shadow
+ *   draft    --customer <slug> [--template aidlc-inception] [--title <t>] [--from <text>] [--locale ja|en] [--deal <id>] [--project <id>] [--respond-by <YYYY-MM-DD>] [--objective <text>|none]
+ *            the tenant's own template of that id is used before the product one
+ *   draft    --agenda <id> --file <agenda.json>        replace title/from/objective/entries (an approved/sent agenda becomes a new revision)
+ *   draft    --agenda <id> [--respond-by <date>|none] [--objective <text>|none]   edit only those fields
+ *   draft    --from-tasks [--agenda <draft id>] [--customer <slug>]   collect mission tasks' customer-judgment proposals (CD-09) into a draft agenda
+ *   draft    --from-tasks --reask <tp-id,...> --by user:<member> [--agenda <draft id>] [--customer <slug>]
+ *            ask again a requires_customer question whose agenda was closed / withdrawn / lost with no
+ *            confirmed answer (unresolvable); the lock keeps the old link in previous_links
+ *   generate --agenda <id> --intent-file <path> [--grounding-file <path>]
+ *   submit   --agenda <id> --by user:<member> [--role owner|approver]
+ *   actor-add --customer <slug> --actor customer:<id> --name <text> [--confirm-target <text>] [--channel <surface>:<channel_id>]
+ *   send     --agenda <id> --name <participant> --role decider|contributor --actor customer:<id> [--ttl-days 14] [--by user:<member>]
+ *   bolt-review --mission <MSN> --customer <slug> --summary-file <path> [--attach <png|jpeg|webp>]... [--preview-url <https URL>]
+ *            draft the review agenda of a finished mission (CD-10): one approval entry, open until the next bolt starts
+ *   status   [--agenda <id>]                            also completes interrupted responses; lists task proposals and held tasks;
+ *            retries the routing of bolt-review answers (request_changes → backlog WorkItem, reject → operator)
+ *   confirm  --agenda <id> --entry <entry_id> --by user:<member>   confirm a customer decision on a requires_customer entry (approval gate)
+ *   close    --agenda <id> --by user:<member> [--reason <text>]   stop taking answers; links answer `closed`
+ *   withdraw --agenda <id> --by user:<member> [--reason <text>]   revoke the agenda's open invites and withdraw it
+ *   revoke   --invite <id> --reason <text>
+ *   remind   [--case <id>] [--dry-run] [--now <iso>]   send the reminders due today (CD-11): respond-by D-1 / D0,
+ *            override-closing D-2; through the decider's bound channel (sendToCustomer, fixed template),
+ *            else an operator inbox task; --dry-run writes nothing
+ *   reminders --install --by user:<member> [--force]    install the tenant reminder pipeline (pipeline:promote;
+ *            hourly 09:30–18:30 Asia/Tokyo, each reminder sent once per day; an installed tenant re-installs
+ *            with --force); --by is the asset ledger's ingested_by (no identity env needed)
+ *   task-decisions --mission <MSN> --task <id>   (no --case; read-only) the confirmed customer decisions of a task's own
+ *            requires_customer questions, for direct CLI work on that task; stdout only, audited ids only;
+ *            refused unless bound to the tenant (KYBERION_TENANT) and the tenant is registered and active
+ *   overview [--case <id>] [--now <iso>] [--summary]   read-only tenant overview (CD-12; JSON contract
+ *            `CustomerDecisionOverview`, libs/core/customer-decision/overview.ts): status counts,
+ *            deadlines, change requests, hand-offs, reminders and held tasks per agenda; never
+ *            reconciles, routes or writes; refuses a --tenant other than a bound KYBERION_TENANT;
+ *            --summary omits agenda entries and caps attention at 50 (totals.attention_total)
+ *   overview --case <id> --detail [--now <iso>]       one case for the drill-down views (JSON contract
+ *            `CustomerDecisionCaseDetail`, case-detail.ts): ids, statuses, dates and counts per agenda,
+ *            entry (question cut to 200 chars), change request, hand-off, reminder, invite, routing and
+ *            task; never values, options, rationale, comments or names; [CUSTOMER_DECISION_CASE_NOT_FOUND]
+ *   overview --learning [--date <YYYY-MM-DD>]          the stored learning report (latest when omitted) as
+ *            `CustomerDecisionLearningView` (learning-view.ts): counts, suggestions and candidate ids,
+ *            never values or defaults; report_date null when there is none; [CUSTOMER_DECISION_REPORT_NOT_FOUND]
+ *   learning [--since <date>] [--dry-run] [--now <iso>] [--organization-id <id>]   count overturned
+ *            decisions, recurring questions and change requests (CD-12), write the tenant report
+ *            decisions/_reports/learning-<date>.json and queue organization learning candidates
+ *            (source customer_decision, once per suggestion and date); --dry-run writes nothing
+ *   learning --install --by user:<member> [--force]     install the weekly tenant learning pipeline
+ *
+ * Customer-room verbs (token on STDIN only, never argv; --case is optional and
+ * must match the invite when given):
+ *   view     --tenant <slug>    stdin {"token"}
+ *   respond  --tenant <slug>    stdin {"token","content_hash","answers":[...],"general_question"?}
+ *            (CD-11: a general question may come alone, with "answers": [])
+ *   attachment --tenant <slug>  stdin {"token","attachment_id"}  → {ok, media_type, bytes_base64}
+ *            only ids listed on the approved agenda the invite opens; anything else is `invalid_link`
+ *
+ * `send` prints the invite link once on stdout; the token is never written to
+ * disk, logs or the audit chain. Delivering the link through a bound customer
+ * channel (`sendToCustomer`) needs a bridge-supplied `deliver` and is not part
+ * of stage 1 — the operator forwards the link.
+ *
+ * `--dir <path>` (test runs only: refused unless VITEST or NODE_ENV=test)
+ * replaces the case directory; invites still live in the tenant's runtime
+ * partition.
+ *
+ * Modules: `scripts/customer-decision/` — `common.ts` (arguments, roles,
+ * audit, agenda helpers), `operator.ts` (draft … send), `operator-lifecycle.ts`
+ * (status, confirm, close / withdraw, revoke), `reconcile.ts` (respond
+ * completion and recovery), `customer-facing.ts` (view / respond / attachment),
+ * `task-proposals.ts` (draft --from-tasks [--reask], the task part of status),
+ * `task-decisions.ts` (task-decisions),
+ * `bolt-review.ts` (CD-10 bolt-review draft and answer routing), `reminders.ts`
+ * (CD-11), `overview.ts` / `learning.ts` (CD-12 overview and learning). This file
+ * is the entry point; the room spawns `dist/scripts/customer/customer_decision.js`.
+ *
+ * Consistency: every read → plan → write sequence on a case runs under the
+ * case lock (`withCustomerDecisionCaseLock`), which also holds the decision
+ * ledger lock that every ledger writer (this facade and `pnpm decisions`)
+ * takes inside `appendDecisions` / `applyPromotions`. `respond` writes a write-ahead
+ * journal record before the ledger append (receipt with pre-assigned decision
+ * ids + the effective decisions before), then ledger → receipt → audit →
+ * switches → brief input, and removes the record. A run that stopped part way
+ * is completed by the next respond / confirm / submit / status of the case
+ * (`reconcileCase`). The deal note is best-effort and never fails a respond.
+ */
+import { nowIso } from '@agent/core/foundation';
+import {
+  currentProcessArgv,
+  defineScript,
+  isDirectScript,
+  ScriptExitError,
+} from '../lib/harness.js';
+import {
+  type CustomerDecisionIo,
+  parseCustomerDecisionArgs,
+  usage,
+  usageError,
+} from '../customer-decision/common.js';
+import {
+  runDraft,
+  runGenerate,
+  runSubmit,
+  runActorAdd,
+  runSend,
+} from '../customer-decision/operator.js';
+import {
+  runStatus,
+  runConfirm,
+  runEnd,
+  runRevoke,
+} from '../customer-decision/operator-lifecycle.js';
+import { runCustomerFacing } from '../customer-decision/customer-facing.js';
+import { runCollectTaskProposals } from '../customer-decision/task-proposals.js';
+import { runTaskDecisions } from '../customer-decision/task-decisions.js';
+import { runBoltReview } from '../customer-decision/bolt-review.js';
+import { runRemind, runRemindersInstall } from '../customer-decision/reminders.js';
+import { runOverview } from '../customer-decision/overview.js';
+import { runLearning, runLearningInstall } from '../customer-decision/learning.js';
+import { runTemplate } from '../customer-decision/templates.js';
+
+export {
+  AGENDA_APPROVE_OPERATION,
+  OPERATOR_CONFIRM_OPERATION,
+  diagnosticCode,
+  parseCustomerDecisionArgs,
+  type CustomerDecisionIo,
+} from '../customer-decision/common.js';
+export type { CustomerFacingFailure } from '../customer-decision/customer-facing.js';
+
+export async function runCustomerDecision(
+  argv: readonly string[],
+  io: CustomerDecisionIo = {}
+): Promise<unknown> {
+  const { verb, opts, flags, lists } = parseCustomerDecisionArgs(argv);
+  const now = io.now ? io.now() : nowIso();
+  const runners: Record<string, () => unknown> = {
+    help: () => usage(),
+    '--help': () => usage(),
+    '-h': () => usage(),
+    // HR-01: `template put|list|show` — the action is the first positional argument.
+    template: () => runTemplate(argv[1]?.startsWith('--') ? undefined : argv[1], opts),
+    draft: () =>
+      flags.has('from-tasks') ? runCollectTaskProposals(opts, now) : runDraft(opts, now),
+    generate: () => runGenerate(opts, now),
+    submit: () => runSubmit(opts, now),
+    'actor-add': () => runActorAdd(opts),
+    send: () => runSend(opts, now),
+    'bolt-review': () => runBoltReview(opts, lists, io, now),
+    status: () => runStatus(opts, now),
+    remind: () => runRemind(opts, flags, now),
+    reminders: () => runRemindersInstall(opts, flags),
+    overview: () => runOverview(opts, flags, now),
+    learning: () =>
+      flags.has('install') ? runLearningInstall(opts, flags) : runLearning(opts, flags, now),
+    'task-decisions': () => runTaskDecisions(opts, io, now),
+    confirm: () => runConfirm(opts, now),
+    close: () => runEnd('close', opts, now),
+    withdraw: () => runEnd('withdraw', opts, now),
+    revoke: () => runRevoke(opts, now),
+    view: () => runCustomerFacing('view', opts, io, now),
+    respond: () => runCustomerFacing('respond', opts, io, now),
+    attachment: () => runCustomerFacing('attachment', opts, io, now),
+  };
+  const runner = runners[verb];
+  if (!runner) throw usageError(`unknown verb '${verb}'`);
+  return runner();
+}
+
+export const runCustomerDecisionScript = defineScript({
+  name: 'customer-decision',
+  flags: ['json', 'quiet'],
+  run: async (context) => {
+    try {
+      const result = await runCustomerDecision(
+        context.argv.filter((arg) => arg !== '--json' && arg !== '--quiet')
+      );
+      context.print(result);
+      return result;
+    } catch (error) {
+      if (error instanceof ScriptExitError) {
+        if (error.returnValue !== undefined) context.print(error.returnValue);
+        throw error;
+      }
+      throw new ScriptExitError(2, error instanceof Error ? error.message : String(error));
+    }
+  },
+});
+
+if (
+  isDirectScript(import.meta.url, 'customer_decision.ts') ||
+  isDirectScript(import.meta.url, 'customer_decision.js')
+) {
+  void runCustomerDecisionScript(currentProcessArgv().slice(2));
+}

@@ -67,7 +67,7 @@ N/A.
 
 <!-- Did this change touch a stable surface (per docs/developer/EXTENSION_POINTS.md)? -->
 
-- [ ] Touched a stable surface — version bumped + `pnpm tsx scripts/check_contract_semver.ts -- --rebaseline` run
+- [ ] Touched a stable surface — version bumped + `pnpm tsx scripts/check/check_contract_semver.ts -- --rebaseline` run
 - [ ] Did not touch a stable surface
 
 ## Checklist

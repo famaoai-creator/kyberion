@@ -80,7 +80,7 @@ export function mergeNamedEntries(base, ours, theirs) {
     if (result.conflict) return null;
     if (result.value !== undefined) entries.push(result.value);
   }
-  // Same comparator as scripts/generate_env_registry.ts, so a merge followed by
+  // Same comparator as scripts/generate/generate_env_registry.ts, so a merge followed by
   // regeneration on the same machine produces no reorder diff.
   entries.sort((a, b) => a.name.localeCompare(b.name));
   return { ...merged, entries };

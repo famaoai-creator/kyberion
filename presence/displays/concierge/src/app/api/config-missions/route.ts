@@ -35,7 +35,7 @@ export const dynamic = 'force-dynamic';
  * go exclusively through config-mission presets (§2 catalog: config-mission
  * 経由のみ、直接 JSON 編集はさせない). This route deliberately stops at
  * CREATION: it files the change request as a draft brief via the built
- * scripts/config_mission.ts CLI, and the change takes effect only after the
+ * scripts/config/config_mission.ts CLI, and the change takes effect only after the
  * governed mission flow (approval + gates) executes it. There is no direct
  * execution endpoint here and no direct-JSON-write path.
  *
@@ -46,7 +46,7 @@ export const dynamic = 'force-dynamic';
  */
 
 const PRESET_DIR_RELATIVE = 'knowledge/product/config-missions';
-const SCRIPT_RELATIVE = 'dist/scripts/config_mission.js';
+const SCRIPT_RELATIVE = 'dist/scripts/config/config_mission.js';
 // Creation only writes one draft brief — bounded and quick.
 const CREATE_TIMEOUT_MS = 30_000;
 const MAX_RECENT = 20;

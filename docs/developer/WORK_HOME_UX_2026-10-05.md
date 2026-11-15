@@ -105,6 +105,6 @@ exercises the governed lifecycle in dry-run mode, and the explicit live lifecycl
 harness requires a disposable identity plus its double opt-in. After building,
 replace both placeholders with real values (do not type the angle brackets)
 and run it as
-`KYBERION_FIRST_WIN_LIVE=1 node dist/scripts/first_win_lifecycle_smoke.js --live --identity <identity-file> --run-id <unique-run-id> --confirm-live FIRST-WIN-LIFECYCLE-LIVE`.
+`KYBERION_FIRST_WIN_LIVE=1 node dist/scripts/onboarding/first_win_lifecycle_smoke.js --live --identity <identity-file> --run-id <unique-run-id> --confirm-live FIRST-WIN-LIFECYCLE-LIVE`.
 Surface/voice acceptance also requires the relevant services and credentials to
 be available; record those results separately from the repository baseline.
