@@ -150,6 +150,10 @@ export function requestPersonalCredentialGrantApproval(
   selection: PersonalCredentialGrantSelection
 ): ApprovalRequestRecord {
   return personalOperator(principal, (owner, nhi) => {
+    // Requester and accountable human are distinct authority axes. A surface must
+    // supply the actual installed-agent initiator; never relabel an owner request
+    // as the assistant to make a self-approval look separated.
+    if (principal.requesterId !== nhi) return denied();
     const draft = prepare(owner, nhi, selection);
     const effectBinding = personalCredentialGrantEffect(draft);
     return createApprovalRequest('mission_controller', {

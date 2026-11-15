@@ -94,7 +94,10 @@ async function setup() {
     ttlDays: 1,
   };
   const approval = f.run(() =>
-    grants.requestPersonalCredentialGrantApproval(f.principal, selection)
+    grants.requestPersonalCredentialGrantApproval(
+      { ...f.principal, requesterId: f.installedId },
+      selection
+    )
   );
   f.personal(() => {
     const record = f.approvals.loadApprovalRequest('grant-standing', approval.id)!;
@@ -216,6 +219,8 @@ afterEach(() => {
 });
 
 describe('personal consent to claimed service transport', () => {
+  // Full-stack identity, approval, encrypted store, broker and actuator path.
+  // Allow 60 seconds on slower shared CI runners under coverage.
   it('uses only the approved account at the actual actuator boundary and expires cached getters', async () => {
     const x = await setup();
     await x.dispatch(async () => {
@@ -250,10 +255,7 @@ describe('personal consent to claimed service transport', () => {
       expect(() => cached!.accessToken).toThrow();
       expect(x.credentials.resolveTaskCredential('SLACK_TOKEN')).toBeNull();
     });
-  }, // Full-stack path — identity, signed approval, encrypted store, broker,
-  // actuator — ~12-15s locally; sits past the global 30s on a 3-8x slower
-  // shared CI runner under coverage (see vitest.config.mts testTimeout).
-  60000);
+  }, 60000);
   it.each(['revoked', 'rotated'] as const)(
     'rejects %s consent before a later HTTP request',
     async (change) => {
