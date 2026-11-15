@@ -1,0 +1,24 @@
+{
+  "record_id": "mem-MSN-WINDOWS-PATHS-20261116-2026_11_15",
+  "kind": "knowledge_hint",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "Normalize Windows paths before binding repository resource scopes",
+  "summary": "Portable repository paths and physical OS paths serve different purposes; normalize at the conversion boundary rather than weakening a capability issuer.",
+  "candidate_id": "mem-MSN-WINDOWS-PATHS-20261116-2026_11_15",
+  "evidence_refs": [
+    "active/missions/public/MSN-WINDOWS-PATHS-20261116/evidence/test-report.md",
+    "active/missions/public/MSN-WINDOWS-PATHS-20261116/evidence/REVIEW-execution-implement.md"
+  ],
+  "created_at": "2026-11-15T19:03:14.896Z",
+  "hint_scope": "mission",
+  "hint_triggers": [
+    "Windows path.relative returns backslashes. toRepoRelative and normalizeStoredPath must emit slash-separated references for paths within the checkout while preserving foreign and relative path semantics. Keep physical filesystem assertions OS-aware and canonical resource assertions portable. Do not accept backslashes in grant issuers to compensate for unnormalized caller paths. The diagnosed defect caused five production autonomy receipt tests to fail; all five passed after canonical conversion was repaired. Independent review verified drive and UNC containment and unchanged POSIX behavior."
+  ],
+  "recommended_refs": [
+    "active/missions/public/MSN-WINDOWS-PATHS-20261116/evidence/test-report.md",
+    "active/missions/public/MSN-WINDOWS-PATHS-20261116/evidence/REVIEW-execution-implement.md"
+  ],
+  "source_branch": "codex/windows-llm",
+  "source_commit": "380995741fbf60d74c3874de6e946b252158d877"
+}
