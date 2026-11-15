@@ -80,6 +80,31 @@ describe('exact scoped SOP rejection with real queue and viewer selection', () =
       expect(stored).not.toHaveProperty('promoted_ref');
     }
   );
+  it('refuses to reject an approved organization scoped candidate and leaves the row untouched', async () => {
+    // Approval requires a canonical human approval ref, so seed the
+    // post-approval row directly — its publication may be in flight.
+    const candidate = createMemoryPromotionCandidate({
+      candidateId: `MEM-REJECTION-${randomUUID()}`,
+      sourceType: 'task_session',
+      sourceRef: 'task_session:rejection-approved',
+      proposedMemoryKind: 'sop',
+      knowledgeDomain: 'organization',
+      summary: 'An approved organization SOP whose publication may be in flight.',
+      evidenceRefs: ['artifact:rejection-test'],
+      sensitivityTier: 'confidential',
+      scope: {
+        tier: 'confidential',
+        tenant_slug: 'review-tenant',
+        organization_id: 'review-org',
+      },
+      status: 'approved',
+    });
+    enqueueMemoryPromotionCandidate({ ...candidate, audit_ref: 'audit:synthetic' });
+    expect((await chronos(candidate)).status).toBe(409);
+    expect(loadMemoryPromotionCandidate(candidate.candidate_id, candidate.scope)?.status).toBe(
+      'approved'
+    );
+  });
   it('denies wrong scope and wrong key without changing the queued record', async () => {
     const candidate = fixture();
     expect(

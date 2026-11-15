@@ -110,10 +110,16 @@ const memoryAction: IntelligenceActionHandler = async (body, resolvedViewer, act
         ).candidate;
       } else {
         const status = action === 'memory_approve_candidate' ? 'approved' : 'rejected';
+        // Scoped learning candidates become unrejectable once approved —
+        // publication may already be in flight. Other candidates keep the
+        // approved→rejected path.
+        const rejectable =
+          candidate.status === 'queued' ||
+          (candidate.status === 'approved' && !isScopedLearningCandidate(candidate));
         if (
           status === 'approved'
             ? candidate.status !== 'queued' || !candidate.ratification_required
-            : !['queued', 'approved'].includes(candidate.status)
+            : !rejectable
         )
           return NextResponse.json(
             {

@@ -1103,7 +1103,8 @@ function updateMemoryPromotionCandidateStatusUnlocked(input: {
       if (
         isScopedLearningCandidate(current) &&
         ((current.status === 'promoted' && input.status !== 'promoted') ||
-          (current.status === 'approved' && input.status === 'queued'))
+          (current.status === 'approved' &&
+            (input.status === 'queued' || input.status === 'rejected')))
       )
         throw new Error('[LEARNING_APPROVAL_IMMUTABLE] Scoped publication status cannot regress');
       if (

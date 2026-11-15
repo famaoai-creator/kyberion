@@ -145,6 +145,24 @@ describe('scoped learning action adapter', () => {
       expect(mocks.promote).not.toHaveBeenCalled();
     }
   );
+  it('refuses to reject an approved scoped learning candidate before the queue write', async () => {
+    mocks.resolve.mockReturnValue({ ...row, status: 'approved' });
+    expect(
+      (await run('memory_reject_candidate', { expectedPayloadDigest: undefined })).status
+    ).toBe(409);
+    expect(mocks.update).not.toHaveBeenCalled();
+  });
+  it('still forwards approved rejection for non-scoped-learning candidates', async () => {
+    const candidate = { ...row, status: 'approved', knowledge_domain: 'unclassified' };
+    mocks.resolve.mockReturnValue(candidate);
+    mocks.update.mockReturnValue({ ...candidate, status: 'rejected' });
+    expect(
+      (await run('memory_reject_candidate', { expectedPayloadDigest: undefined })).status
+    ).toBe(200);
+    expect(mocks.update).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'rejected', expectedStatus: 'approved' })
+    );
+  });
   it.each([undefined, 'a'.repeat(64)])(
     'rejects missing or mismatched scoped rejection key %s',
     async (candidateKey) => {

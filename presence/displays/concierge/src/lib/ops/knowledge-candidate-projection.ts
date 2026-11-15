@@ -27,6 +27,7 @@ export function projectKnowledgeCandidate(candidate: MemoryCandidate) {
     candidateKey: memoryCandidateKey(candidate),
     status: candidate.status,
     proposed_memory_kind: candidate.proposed_memory_kind,
+    ...(candidate.knowledge_domain ? { knowledge_domain: candidate.knowledge_domain } : {}),
     summary: candidate.summary,
     evidence_refs: candidate.evidence_refs,
     sensitivity_tier: candidate.sensitivity_tier,
