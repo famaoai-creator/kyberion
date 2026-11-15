@@ -46,6 +46,15 @@ const NOTIFICATION_SURFACES = [
   'inbox',
 ] as const satisfies readonly NonNullable<OnboardingOperations['notification_surface']>[];
 type NotificationSurface = NonNullable<OnboardingOperations['notification_surface']>;
+// Compile-time completeness: a union member missing from the array fails
+// typecheck here instead of silently becoming unselectable at runtime.
+const _assertAllSurfacesListed: Exclude<
+  NotificationSurface,
+  (typeof NOTIFICATION_SURFACES)[number]
+> extends never
+  ? true
+  : never = true;
+void _assertAllSurfacesListed;
 
 export interface OperationsPromptDeps {
   ask: (question: string, fallback?: string) => Promise<string>;
@@ -113,6 +122,21 @@ export function intakeStatusLabel(status: 'enabled' | 'pending_secret' | 'skippe
   }
 }
 
+/**
+ * Declared sources already enabled in the intake policy, as summary rows.
+ * Read-only — used by the express/non-interactive path so the state and
+ * summary reflect what is actually armed instead of 'none enabled'.
+ */
+export function currentEnabledIntakeSources(): OnboardingOperations['intake_sources'] {
+  return Object.entries(loadEventIntakePolicy().sources)
+    .filter(([, source]) => source.enabled === true)
+    .map(([id, source]) => ({
+      source: id,
+      status: 'enabled' as const,
+      ...(source.secret_key ? { secret_key: source.secret_key } : {}),
+    }));
+}
+
 /** Operator-facing follow-ups for anything the phase could not finish. */
 export function operationsNextSteps(ops: OnboardingOperations): string[] {
   const steps: string[] = [];
@@ -175,10 +199,20 @@ export function applyResidentLoopOperations(
   const toEnable = requested.filter(
     (id) => policy.sources[id] && policy.sources[id].enabled !== true
   );
-  const enabledNow =
-    toEnable.length > 0
-      ? withExecutionContext('sovereign_concierge', () => enableIntakeSourcesInPolicy(toEnable))
-      : new Set<string>();
+  let enabledNow = new Set<string>();
+  if (toEnable.length > 0) {
+    try {
+      enabledNow = withExecutionContext('sovereign_concierge', () =>
+        enableIntakeSourcesInPolicy(toEnable)
+      );
+    } catch (error) {
+      // Match the interactive path: a governed write failure degrades to
+      // 'skipped' rows plus a warn — never a crashed non-interactive apply.
+      logger.warn(
+        `intake sources ${toEnable.join(', ')} could not be enabled during apply — ${error instanceof Error ? error.message : String(error)} | next: flip "enabled" in ${EVENT_INTAKE_POLICY_PATH} | evidence: scripts/onboarding/onboarding_operations.ts`
+      );
+    }
+  }
   for (const id of requested) {
     const entry = policy.sources[id];
     if (!entry) {
@@ -193,6 +227,12 @@ export function applyResidentLoopOperations(
       status: alreadyEnabled ? 'enabled' : enabledNow.has(id) ? 'pending_secret' : 'skipped',
       ...(entry.secret_key ? { secret_key: entry.secret_key } : {}),
     });
+  }
+  // Reflect declared sources that are already armed but were not requested —
+  // the summary would otherwise read 'none enabled' while they are live.
+  const recorded = new Set(ops.intake_sources.map((s) => s.source));
+  for (const row of currentEnabledIntakeSources()) {
+    if (!recorded.has(row.source)) ops.intake_sources.push(row);
   }
   return ops;
 }
@@ -276,11 +316,15 @@ export async function promptResidentLoopOperations(
         t(`Operator notifications → ${surface}:${target}`, `オペレータ通知 → ${surface}:${target}`)
       );
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      logger.warn(
+        `notification preferences could not be saved during onboarding — ${message} | next: configure in Settings | evidence: scripts/onboarding/onboarding_operations.ts`
+      );
       print(
         // i18n-exempt: bilingual prompt pair (JA side intentional)
         t(
-          `Could not save notification preferences (${error instanceof Error ? error.message : String(error)}) — configure it later in Settings.`,
-          `通知設定を保存できませんでした (${error instanceof Error ? error.message : String(error)}) — 後で Settings で設定してください。`
+          `Could not save notification preferences (${message}) — configure it later in Settings.`,
+          `通知設定を保存できませんでした (${message}) — 後で Settings で設定してください。`
         )
       );
     }
@@ -333,11 +377,15 @@ export async function promptResidentLoopOperations(
     } catch (error) {
       // A governed write failure must not crash the wizard — record the gap
       // and tell the operator exactly what to retry by hand.
+      const message = error instanceof Error ? error.message : String(error);
+      logger.warn(
+        `intake source '${id}' could not be enabled during onboarding — ${message} | next: flip "enabled" in ${EVENT_INTAKE_POLICY_PATH} | evidence: scripts/onboarding/onboarding_operations.ts`
+      );
       print(
         // i18n-exempt: bilingual prompt pair (JA side intentional)
         t(
-          `  Could not enable '${id}' (${error instanceof Error ? error.message : String(error)}) — flip "enabled" in knowledge/product/governance/event-intake-policy.json later.`,
-          `  '${id}' を有効化できませんでした (${error instanceof Error ? error.message : String(error)}) — 後で knowledge/product/governance/event-intake-policy.json の "enabled" を変更してください。`
+          `  Could not enable '${id}' (${message}) — flip "enabled" in knowledge/product/governance/event-intake-policy.json later.`,
+          `  '${id}' を有効化できませんでした (${message}) — 後で knowledge/product/governance/event-intake-policy.json の "enabled" を変更してください。`
         )
       );
     }

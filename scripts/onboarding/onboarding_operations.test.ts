@@ -109,6 +109,51 @@ describe('applyResidentLoopOperations (non-interactive)', () => {
     const ops = mod.applyResidentLoopOperations({ intake_enable: ['github'] });
     expect(ops.intake_sources.find((s) => s.source === 'github')?.status).toBe('enabled');
   });
+
+  it('reflects armed sources that were not requested in the summary rows', () => {
+    const policyPath = path.join(tmpRoot, 'knowledge/product/governance/event-intake-policy.json');
+    const policy = JSON.parse(fs.readFileSync(policyPath, 'utf8')) as {
+      sources: Record<string, { enabled: boolean }>;
+    };
+    policy.sources.ci.enabled = true;
+    fs.writeFileSync(policyPath, JSON.stringify(policy, null, 2));
+
+    const ops = mod.applyResidentLoopOperations({ intake_enable: ['github'] });
+    expect(ops.intake_sources.find((s) => s.source === 'ci')?.status).toBe('enabled');
+    expect(ops.intake_sources.find((s) => s.source === 'github')?.status).toBe('pending_secret');
+  });
+
+  it('degrades to skipped (not a crash) when the governed policy write fails', () => {
+    // Read succeeds, write fails: make the governance dir read-only so an
+    // atomic temp+rename write cannot land.
+    const govDir = path.join(tmpRoot, 'knowledge/product/governance');
+    fs.chmodSync(govDir, 0o555);
+    try {
+      const ops = mod.applyResidentLoopOperations({ intake_enable: ['github'] });
+      expect(ops.intake_sources.find((s) => s.source === 'github')?.status).toBe('skipped');
+      // The policy stays disabled — nothing half-enabled.
+      expect(readPolicy().sources.github.enabled).toBe(false);
+    } finally {
+      fs.chmodSync(govDir, 0o755);
+    }
+  });
+});
+
+describe('currentEnabledIntakeSources', () => {
+  it('lists declared sources already enabled in policy, without mutating it', () => {
+    const policyPath = path.join(tmpRoot, 'knowledge/product/governance/event-intake-policy.json');
+    const policy = JSON.parse(fs.readFileSync(policyPath, 'utf8')) as {
+      sources: Record<string, { enabled: boolean }>;
+    };
+    policy.sources.github.enabled = true;
+    fs.writeFileSync(policyPath, JSON.stringify(policy, null, 2));
+
+    const rows = mod.currentEnabledIntakeSources();
+    expect(rows).toEqual([
+      { source: 'github', status: 'enabled', secret_key: 'EVENT_INTAKE_GITHUB_SECRET' },
+    ]);
+    expect(readPolicy().sources.ci.enabled).toBe(false);
+  });
 });
 
 describe('operationsNextSteps', () => {
