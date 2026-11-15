@@ -46,7 +46,8 @@ vi.mock('../../../../../lib/passkey-server', async () => {
 vi.mock('@agent/core/authority', () => ({
   withExecutionContextAsync: vi.fn((_role: string, fn: () => unknown) => fn()),
 }));
-vi.mock('@agent/core/governance/approval-store', () => ({
+vi.mock('@agent/core/governance/approval-store', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/governance/approval-store')>()),
   loadApprovalRequest: mocks.loadApprovalRequest,
   decideApprovalRequest: mocks.decideApprovalRequest,
 }));

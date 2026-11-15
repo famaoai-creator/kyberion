@@ -7,9 +7,13 @@ import {
   computeApprovalPayloadHash,
   computeApprovalPresentedDigest,
 } from '../governance/approval-store.js';
-import { dotAdmissionMissionId } from '../dot/dot-admission-identity.js';
+import {
+  dotAdmissionMissionId,
+  dotAdmissionItemId,
+  genericDotActionIdentity,
+} from '../dot/dot-admission-identity.js';
 import { normalizeDotProposal } from '../dot/dot-proposals.js';
-import { dotWorkItemInput } from '../dot/dot-work-item.js';
+import { dotWorkItemInput as canonicalDotWorkItemInput } from '../dot/dot-work-item.js';
 import { buildWorkItemCreation } from '../workforce/work-coordination-identity.js';
 import type { DotCharter } from '../dot/dot-charter.js';
 import type { DotActionRecord } from '../dot/dot-action-ledger.js';
@@ -227,6 +231,26 @@ beforeEach(() => {
 });
 afterEach(() => safeRmSync(root, { recursive: true, force: true }));
 
+/** These production-envelope tests provide the same immutable proof as real dispatch. */
+function dotWorkItemInput(charter: DotCharter, row: DotActionRecord) {
+  row.scope = { ...charter.scope };
+  row.admission = genericDotActionIdentity(
+    charter,
+    {
+      action_id: row.action_id,
+      title: row.title,
+      objective: row.objective,
+      execution_shape: row.execution_shape,
+      mission_admission: row.mission_admission,
+    },
+    0
+  ).admission;
+  row.work_item_id = dotAdmissionItemId(row.action_ref);
+  const stored = mocks.rows.find((record) => record.action_ref === row.action_ref);
+  if (stored) Object.assign(stored, row);
+  return canonicalDotWorkItemInput(charter, row);
+}
+
 describe('Dot mission admission production and human receipt', () => {
   it('admits an organization-only Dot through real WorkItem creation normalization', () => {
     delete mocks.dot.scope.project_id;
@@ -273,9 +297,7 @@ describe('Dot mission admission production and human receipt', () => {
       'current Dot admission authority missing'
     );
     mocks.dot.scope.project_id = 'approved-project';
-    expect(() => resolveDotMissionAdmission(mocks.item)).toThrow(
-      'current Dot admission authority missing'
-    );
+    expect(() => resolveDotMissionAdmission(mocks.item)).toThrow('DOT_PRIVATE_BODY_UNAVAILABLE');
   });
   it('retains tenant, organization and admitted action proof checks for normalized items', () => {
     delete mocks.dot.scope.project_id;
@@ -293,9 +315,7 @@ describe('Dot mission admission production and human receipt', () => {
     );
     mocks.item = create();
     mocks.rows[0].work_item_id = 'other-item';
-    expect(() => resolveDotMissionAdmission(mocks.item)).toThrow(
-      'mission intake differs from admitted action'
-    );
+    expect(() => resolveDotMissionAdmission(mocks.item)).toThrow('DOT_PRIVATE_BODY_UNAVAILABLE');
   });
   it('retains structured proposal facts into deterministic tenant/org/project WorkItem metadata', () => {
     const proposal = normalizeDotProposal({
@@ -307,10 +327,12 @@ describe('Dot mission admission production and human receipt', () => {
     expect(proposal.mission_admission).toEqual(admission);
     const item = dotWorkItemInput(mocks.dot, { ...mocks.rows[0], ...proposal });
     expect(item.metadata).toMatchObject({
-      mission_admission: admission,
+      dot_private_body: { semantic_hash: expect.any(String), scope_hash: expect.any(String) },
       mission_id: missionId,
       mandate_ref: 'docs',
     });
+    expect(item.metadata?.mission_admission).toBeUndefined();
+    expect(item.metadata?.mandate_facts).toBeUndefined();
     expect(item.context).toMatchObject({
       tenant_slug: 'acme',
       organization_id: 'org-1',

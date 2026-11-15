@@ -10,7 +10,11 @@ import {
 import { buildCeoSurfaceSummary, type CeoSurfaceSummary } from '@agent/core/ceo-surface-summary';
 import { withExecutionContext } from '@agent/core/authority';
 import { readApprovalPublicationPreview } from '@agent/core/surface/approval-publication-preview';
-import { conciergeApprovalSnapshot, conciergeViewerPersonIds } from './personal-approval-server';
+import {
+  conciergeApprovalSnapshot,
+  conciergeViewerPersonIds,
+  withConciergePersonalInbox,
+} from './personal-approval-server';
 import type { OperatorHomeScopeFilter } from '@agent/core/surface/operator-home-summary';
 import type { A2UIMessage } from '@agent/core/a2ui';
 import {
@@ -221,12 +225,15 @@ export function readConciergeHome(
   };
   return withConciergeViewerContext(viewer, () => {
     const snapshot = conciergeApprovalSnapshot(viewer);
-    const summary = buildCeoSurfaceSummary({
-      scope,
-      limit: query.limit || 20,
-      approvalSnapshot: snapshot,
-      approvalBriefSources: { publicationPreview: conciergePublicationPreview(viewer) },
-    });
+    const build = (includePersonalInbox = false) =>
+      buildCeoSurfaceSummary({
+        scope: { ...scope, includePersonalInbox },
+        limit: query.limit || 20,
+        approvalSnapshot: snapshot,
+        approvalBriefSources: { publicationPreview: conciergePublicationPreview(viewer) },
+      });
+    const personal = includePersonal ? withConciergePersonalInbox(viewer, () => build(true)) : null;
+    const summary = personal ?? build();
     for (const item of summary.approval_queue) {
       const record = snapshot.find(
         (record) =>

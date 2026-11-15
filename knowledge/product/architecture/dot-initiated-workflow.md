@@ -3,7 +3,7 @@ title: Dot-Initiated Workflow — observation → claim → execution → learni
 category: Architecture
 tags: [dot, workflow, work-item, inbox, wake, autonomy, ops-health-probe]
 importance: 8
-last_updated: 2026-11-10
+last_updated: 2026-11-15
 ---
 
 # Dot-Initiated Workflow
@@ -31,14 +31,14 @@ Learn     autonomy-outcomes ledger → promotion/demotion sweep → knowledge di
 A probe/agent filing a WorkItem for a dot MUST satisfy all of these, or the
 item sits unclaimed forever:
 
-| Requirement                                                                                                                                              | Failure mode when missing                                         |
-| -------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| `status: 'ready'`                                                                                                                                        | default `backlog` is never claimed — executors only pick `ready`  |
-| `metadata.dot_id` (or `handoff_to`)                                                                                                                      | `addressedTo()` finds no target                                   |
-| `context.tenant_slug` matching the charter's tenant                                                                                                      | `dotItemTenantMismatch` → cross-tenant refusal (undefined ≠ slug) |
-| `metadata.requested_execution_shape` (legacy `requested_work_shape` is read for one release)                                                             | executor escalates with missing-shape guidance                    |
-| shape in `authority.allowed_execution_shapes` (enforced at the step port for task_session)                                                               | capability_unavailable refusal                                    |
-| `metadata.pipeline_ref` in `authority.allowed_pipelines` for pipeline shape — **repo-relative path verbatim** (`pipelines/<name>.json`, not a bare name) | `allowed_pipelines` miss or `Resource path does not exist`        |
+| Requirement                                                                                                                                              | Failure mode when missing                                                                    |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `status: 'ready'`                                                                                                                                        | default `backlog` is never claimed — executors only pick `ready`                             |
+| `metadata.dot_id` (or `handoff_to`)                                                                                                                      | `addressedTo()` finds no target                                                              |
+| Original scope and authority matching the charter: tier, tenant, organization, project and personal owner; new items retain `metadata.dot_scope`         | scope drift is held before claim; changing a charter does not reassign already admitted work |
+| `metadata.requested_execution_shape` (legacy `requested_work_shape` is read for one release)                                                             | executor escalates with missing-shape guidance                                               |
+| shape in `authority.allowed_execution_shapes` (enforced at the step port for task_session)                                                               | capability_unavailable refusal                                                               |
+| `metadata.pipeline_ref` in `authority.allowed_pipelines` for pipeline shape — **repo-relative path verbatim** (`pipelines/<name>.json`, not a bare name) | `allowed_pipelines` miss or `Resource path does not exist`                                   |
 
 ## 3. Wake delivery (inbox rows)
 

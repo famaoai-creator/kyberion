@@ -2093,9 +2093,74 @@ A dispatched proposal is queued work, never evidence that its effects finished. 
 
 Recovery reconciles creation only. Recheck current tenant, charter, approval and gate authority before creating a missing item. Reuse immutable creation identity for existing, running, done or archived items; never reopen or retry uncertain effects. Pre-upgrade parked work binds an admission before creation; an existing legacy random-ID item is adopted only after verifying its original creation snapshot. Handoff wakes use the same action identity.
 
+Keep the original tier, tenant, organization, project, personal owner and authority role
+bound through approval settlement and the executor claim. A changed charter does not
+reassign already admitted work. Re-run current pre-gate, gate and shadow checks before
+resuming parked work; unchanged usable approval needs no second card. Missing initial
+autonomy state can use the charter default, but corrupt or unreadable existing state
+must never restore broader autonomy. Preserve the evidence and repair its accessibility
+or reviewed state instead of deleting it to reset privileges.
+
 Digest completion requires a matching terminal execution receipt, current attempt identity and no superseding operator release. Missing or inaccessible evidence stays queued. Notification acceptance means durable outbox/inbox acceptance, not confirmed user delivery. Save a pending digest with frozen content in its tenant-scoped dot state directory before calling the notification port. The shared legacy ledger is metadata-only and read-only. Keep the content snapshot cutoff when delivery is delayed so later execution results remain visible. Stable delivery keys reconcile queue evidence and retained acceptance receipts; unknown external effects remain uncertain. Muted notifications settle as suppressed. Retry only definite no-effect failures, with finite attempts and age, and catch up only the newest scheduled minute inside the bounded window.
 
 When changing these paths, run dot admission/recovery, digest/recovery and operator-notification/inbox suites, including crash-before/after-create, process races, semantic mismatch, archived work, tenant isolation, revoked authority, stale attempts/releases, missed cron, restart, mute and enqueue-before-receipt failures. Preserve intent/acceptance tombstones under review-required retention; deleting them invalidates replay protection. Keep tests isolated from live channels and run them separately from builds and aggregate gates.
+
+Notification receipts use the registered `operator_notification_receipts` runtime-state root and canonical tier/tenant partitions (personal receipts retain their owner lane). Before creating a canonical intent, reconcile any existing intent in the exact legacy scoped lane; a namespace change must not replay an unknown external effect. Tenant offboarding exports and soft-deletes both canonical and legacy tenant receipt lanes explicitly. TTL cleanup must never remove these replay tombstones.
+
+### Private notifications, learning and retained follow-ups
+
+Carry explicit source scope through the notification port, receipt, inbox/outbox
+and authenticated reader. Personal content requires its original owner, not just
+an absent tenant. Confidential content retains tenant, organization and project.
+Quiet-hours and retry fallbacks preserve that scope instead of becoming system
+notifications. Keep existing public notifications and default inbox delivery
+compatible; scoped storage adds no approval step. Do not automatically reclassify
+old unscoped content as belonging to whichever person is currently signed in.
+
+Keep legitimate system WorkItems usable without fabricating a tenant or personal
+owner. Their execution actor/lease is not a person-custody tag. Only the
+server-resolved system selection admits ownerless records; it does not turn
+unknown old Dot records into public work or admit another person's content.
+Test the system-selection positive alongside tenant/person negatives and keep
+concrete company selection narrowing intact.
+
+Distillation writes actual private hypotheses and their provenance into the
+same-scope feedback and review candidate. Count-only shared metadata cannot
+substitute for a reusable lesson. Mark source hypotheses distilled only after
+the applicable durable capture succeeds. Knowledge capture remains separate
+from approval and promotion.
+
+A retained follow-up is not terminal TriggerRunner delivery. Preserve its exact
+successor identity and schedule in the existing scoped continuation evidence;
+storage recovery must retry that persistence without asking the model again or
+redispatching already admitted proposals. A retry restores the original due
+time, so an overdue successor can become due immediately after recovery.
+
+Regression checks must traverse the actual notification producer/store/reader
+and supervisor/TriggerRunner paths, with public, confidential and two distinct
+personal owners. Assert authorized positive access and unchanged-approval
+automatic continuation as well as cross-scope denial, quiet-hours, restart,
+corrupt state, lock contention and failure after effects. Mocked delivery ports
+alone do not prove custody or recovery. Run focused tests, the affected Dot and
+surface suites, core build, root typecheck and `pnpm check -- --changed`.
+
+### Personal mission recovery uses existing authority seams
+
+The personal credential claim requires the real installed runtime's canonical
+NHI and matching WorkItem, lease, attempt, minted envelope and actor scope. A
+display slug is not that identity. Do not use a mission ID as a project ID;
+repair scope at the producer rather than weakening exact credential equality.
+The Dot executor's compatibility for a generator-default project does not
+authorize explicit mission-as-project context.
+
+Task credential binding is process-local. An external CLI does not inherit it
+through environment variables. Existing-work reconciliation itself is a
+deterministic controller operation: use its existing facade and preserve the
+authenticated approval, source-commit evidence and independent review checks.
+Do not add a model call or invent a credential transfer solely for recovery.
+WorkItem completion is not mission-task acceptance; close actual deliverables
+through `record-evidence` and review facades. Never reset stale claims or rewrite
+unfinished mission context merely to make an assertion pass.
 
 ## §13 Timed-out effects and executor continuation
 
@@ -2199,9 +2264,12 @@ runs at write time (`maintainStoreAfterAppend`), not only in the janitor.
    the reason in the catalog note.
 5. After changing a store's shape, run the janitor dry-run and check the
    `Append-Only Stores` section of `storage-janitor-report.md`.
-6. Plain dot-inbox appends take the inbox lock, so they may wait up to its timeout
-   while a large compaction runs; repeated lock-timeout warnings mean compaction is
-   too slow for that store.
+6. Plain dot-inbox appends and compaction use the same lock through the final
+   replacement. They may wait up to its timeout while a large compaction runs;
+   a timeout must fail before writing, never fall back to an unlocked append.
+   A pre-rename size check cannot protect an append in the stat/rename gap.
+   Retry the same input identity after definite pre-write contention; repeated
+   timeouts require investigating slow compaction, not bypassing the lock.
 
 **Gate:** `pnpm check -- --only runtime-store-retention` and
 `--only runtime-store-whole-read` (ratchet against whole-file reads); janitor report

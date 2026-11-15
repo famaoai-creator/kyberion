@@ -62,6 +62,8 @@ import { evaluateDotTriggersDue } from './dot-runtime.js';
 import { DOT_TASK_SESSION_UNAVAILABLE_GUIDANCE } from './dot-proposals.js';
 import { dotStatePath } from './dot-state-paths.js';
 import type { DotProposal } from './dot-proposals.js';
+import { dotAutonomyDispositionOverride } from './dot-autonomy.js';
+import { DOT_DISPOSITION_OVERRIDES } from './dot-extension-registry.js';
 
 const TEST_ROOT = `active/shared/tmp/dot-dispatch-tests-${randomUUID()}`;
 const RANK = { auto: 0, notify: 1, approve: 2 } as const;
@@ -394,14 +396,17 @@ describe('dispatchDotProposals — decision and delegation', () => {
       h.deps
     );
     expect(h.items.map((item) => item.title)).toEqual([
-      'On the Issue',
-      'Cross tenant',
-      'On a path',
+      'Scoped Dot work',
+      'Scoped Dot work',
+      'Scoped Dot work',
     ]);
-    const byTitle = Object.fromEntries(h.items.map((item) => [item.title, item.parentItemId]));
-    expect(byTitle['On the Issue']).toBe('issue-acme');
-    expect(byTitle['Cross tenant']).toBeUndefined();
-    expect(byTitle['On a path']).toBeUndefined();
+    // Shared private work retains routing identity while prose stays in the scoped action.
+    const byTarget = Object.fromEntries(
+      h.items.map((item) => [item.metadata?.target, item.parentItemId])
+    );
+    expect(byTarget['work_item:issue-acme']).toBe('issue-acme');
+    expect(byTarget['work_item:issue-other']).toBeUndefined();
+    expect(byTarget['path:docs/**']).toBeUndefined();
   });
 
   it('raises the gate to the charter default_decision floor', () => {
@@ -749,6 +754,80 @@ describe('dispatchDotProposals — action scope and dedupe', () => {
 });
 
 describe('settleDotParkedActions + learning', () => {
+  it('routes personal approval to its owner and resumes only that owner-bound decision', () => {
+    const owner = 'kyberion://person/alice';
+    vi.stubEnv('KYBERION_NHI_ID', owner);
+    try {
+      const personal = { ...CHARTER, scope: { tier: 'personal' as const, owner_nhi: owner } };
+      const h = harness('approve');
+      dispatchDotProposals(personal, [PROPOSAL], h.deps);
+      expect(h.routed[0].scope).toMatchObject({ tier: 'personal', nhi_id: owner });
+      h.approvals.set('req-1', {
+        ...approval('approved'),
+        scope: { tier: 'personal', nhi_id: 'kyberion://person/bob' },
+      });
+      expect(settleDotParkedActions(personal, h.deps)).toEqual([]);
+      expect(h.items).toEqual([]);
+      h.approvals.set('req-1', {
+        ...approval('approved'),
+        scope: { tier: 'personal', nhi_id: owner },
+      });
+      expect(settleDotParkedActions(personal, h.deps)[0].status).toBe('dispatched');
+      expect(h.items[0].metadata).toMatchObject({ dot_scope: personal.scope });
+      expect(h.routed).toHaveLength(1);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it('keeps an approved action parked under current L0 and resumes the same approval when restored', () => {
+    const h = harness('approve');
+    dispatchDotProposals(CHARTER, [PROPOSAL], h.deps);
+    h.approvals.set('req-1', approval('approved'));
+    const shadow = {
+      ...CHARTER,
+      autonomy: { initial_level: 'L0' as const, max_level: 'L0' as const },
+    };
+    const override = dotAutonomyDispositionOverride();
+    DOT_DISPOSITION_OVERRIDES.push(override);
+    try {
+      expect(settleDotParkedActions(shadow, h.deps)).toEqual([]);
+      expect(h.items).toEqual([]);
+      expect(currentDotActions(CHARTER.dot_id, h.deps)[0].status).toBe('parked');
+    } finally {
+      DOT_DISPOSITION_OVERRIDES.splice(DOT_DISPOSITION_OVERRIDES.indexOf(override), 1);
+    }
+    expect(settleDotParkedActions(CHARTER, h.deps)[0].status).toBe('dispatched');
+    expect(h.routed).toHaveLength(1);
+    expect(h.items).toHaveLength(1);
+  });
+
+  it.each(['shadow', 'denied', 'unreadable'])(
+    'holds approved work while its current policy is %s without asking again',
+    (failure) => {
+      const h = harness('approve');
+      dispatchDotProposals(CHARTER, [PROPOSAL], h.deps);
+      h.approvals.set('req-1', approval('approved'));
+      const originalGate = h.deps.gate!;
+      h.deps.gate = (input) => {
+        if (failure === 'unreadable') throw new Error('policy unavailable');
+        return gateResult(input, failure === 'denied' ? 'auto' : 'approve', {
+          allowed: failure !== 'denied',
+          shadow: failure === 'shadow',
+        });
+      };
+      expect(settleDotParkedActions(CHARTER, h.deps)).toEqual([]);
+      expect(h.items).toEqual([]);
+      expect(currentDotActions(CHARTER.dot_id, h.deps)[0]).toMatchObject({
+        status: 'parked',
+        reason: expect.stringContaining('current authorization'),
+      });
+      h.deps.gate = originalGate;
+      expect(settleDotParkedActions(CHARTER, h.deps)[0].status).toBe('dispatched');
+      expect(h.routed).toHaveLength(1);
+    }
+  );
+
   it.each([undefined, { operation_id: 'monthly-close' }])(
     'keeps old operation approval parked after binding removal or change: %j',
     (work_binding) => {

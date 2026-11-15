@@ -26,6 +26,149 @@ function item(partial: Partial<WorkItem>): WorkItem {
 }
 
 describe('work-visibility', () => {
+  it('admits ownerless system work only to legitimate system selection without inventing tenant or person', () => {
+    const system = item({
+      item_id: 'system',
+      project_id: 'default',
+      context: { project_id: 'default' },
+      context_origin: { project_id: 'default' },
+    });
+    const rows = [
+      system,
+      item({ item_id: 'tenant', context: { tenant_slug: 'company' } }),
+      item({
+        item_id: 'person',
+        project_id: '',
+        metadata: { dot_scope: { tier: 'public', nhi_id: 'owner' } },
+      }),
+      item({ item_id: 'old-dot', metadata: { dot_id: 'old' } }),
+      item({
+        item_id: 'public-dot',
+        project_id: '',
+        metadata: { dot_id: 'public', dot_scope: { tier: 'public' } },
+      }),
+    ];
+    const viewer = {
+      tenantSlugs: [] as string[],
+      organizationIds: [] as string[],
+      projectIds: [] as string[],
+      includeUntenanted: true,
+      tierAccess: ['public', 'confidential'],
+    };
+    expect(
+      buildWorkVisibilityProjection({ items: rows, viewer }).items.map((entry) => entry.item_id)
+    ).toEqual(['system', 'public-dot']);
+    expect(
+      buildWorkVisibilityProjection({
+        items: rows,
+        viewer: { ...viewer, includeUntenanted: false },
+      }).items
+    ).toEqual([]);
+    expect(
+      buildWorkVisibilityProjection({
+        items: [system],
+        viewer: { ...viewer, tenantSlugs: ['company'] },
+      }).items
+    ).toEqual([]);
+  });
+  it('withholds unknown legacy Dot custody while retaining ordinary legacy and proven public Dot work', () => {
+    const projection = buildWorkVisibilityProjection({
+      items: [
+        item({
+          item_id: 'unknown-dot',
+          metadata: { dot_id: 'private-dot', action_ref: 'old-action' },
+        }),
+        item({ item_id: 'plain-legacy' }),
+        item({
+          item_id: 'public-dot',
+          metadata: { dot_id: 'public-dot', dot_scope: { tier: 'public' } },
+        }),
+      ],
+      viewer: { tenantSlugs: 'all' },
+    });
+    expect(projection.items.map((entry) => entry.item_id)).toEqual(['plain-legacy', 'public-dot']);
+    expect(projection.counts.ready).toBe(2);
+  });
+  it('keeps owner-only empty personal selection convenient without widening concrete company scope', () => {
+    const privateItem = item({
+      project_id: 'default',
+      context: { project_id: 'default' },
+      context_origin: { project_id: 'default' },
+      metadata: { dot_scope: { tier: 'personal', owner_nhi: 'owner' } },
+    });
+    const viewer = {
+      tenantSlugs: [] as string[],
+      organizationIds: [] as string[],
+      projectIds: [] as string[],
+      tierAccess: ['personal'],
+      principalId: 'owner',
+    };
+    expect(buildWorkVisibilityProjection({ items: [privateItem], viewer }).items).toHaveLength(1);
+    for (const narrowed of [
+      { tenantSlugs: ['company'] },
+      { organizationIds: ['company'] },
+      { projectIds: ['company'] },
+    ]) {
+      expect(
+        buildWorkVisibilityProjection({ items: [privateItem], viewer: { ...viewer, ...narrowed } })
+          .items
+      ).toEqual([]);
+    }
+    const polluted = {
+      ...privateItem,
+      project_id: 'MSN-EXPLICIT',
+      context: { project_id: 'MSN-EXPLICIT' },
+      context_origin: { project_id: 'explicit' as const },
+      metadata: { dot_scope: { tier: 'personal', owner_nhi: 'owner', project_id: 'MSN-EXPLICIT' } },
+    };
+    expect(buildWorkVisibilityProjection({ items: [polluted], viewer }).items).toEqual([]);
+  });
+  it('admits private custody only with both personal tier and the exact owner, before counts', () => {
+    const privateItem = item({
+      project_id: '',
+      metadata: { dot_scope: { tier: 'personal', owner_nhi: 'owner' } },
+    });
+    const publicItem = item({
+      item_id: 'public',
+      project_id: '',
+      metadata: { dot_scope: { tier: 'public' } },
+    });
+    for (const viewer of [
+      { tenantSlugs: 'all' as const },
+      { tenantSlugs: 'all' as const, tierAccess: ['public', 'confidential'], principalId: 'owner' },
+      { tenantSlugs: 'all' as const, tierAccess: ['personal', 'public'], principalId: 'other' },
+    ]) {
+      const projection = buildWorkVisibilityProjection({
+        items: [privateItem, publicItem],
+        viewer,
+      });
+      expect(projection.items.map((entry) => entry.item_id)).toEqual(['public']);
+      expect(projection.counts.ready).toBe(1);
+      expect(projection.lineage.total_items).toBe(1);
+    }
+    expect(
+      buildWorkVisibilityProjection({
+        items: [privateItem],
+        viewer: { tenantSlugs: 'all', tierAccess: ['personal'], principalId: 'owner' },
+      }).items
+    ).toHaveLength(1);
+  });
+
+  it('rejects malformed, conflicting and legacy foreign personal custody', () => {
+    for (const metadata of [
+      { dot_scope: { tier: 'personal' } },
+      { dot_scope: { tier: 'personal', owner_nhi: 'owner', nhi_id: 'other' } },
+      { scope: { tier: 'personal', owner_nhi: 'other' } },
+      { dot_scope: { tier: 'personal', owner_nhi: 'owner', tenant_slug: 'other' } },
+    ]) {
+      expect(
+        buildWorkVisibilityProjection({
+          items: [item({ metadata, context: { tenant_slug: 'acme' } })],
+          viewer: { tenantSlugs: 'all', tierAccess: ['personal'], principalId: 'owner' },
+        }).items
+      ).toEqual([]);
+    }
+  });
   it('does not invent provenance for old default-looking values', () => {
     const context = { project_id: 'default', work_shape: 'routine_operation' as const };
     expect(resolveWorkItemContext(item({ context })).field_sources).toEqual({

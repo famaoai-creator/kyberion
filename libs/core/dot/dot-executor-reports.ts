@@ -56,6 +56,7 @@ import type { DotExtCtx, DotPromptSection } from './dot-extensions.js';
 import { readDotSignals } from './dot-feedback.js';
 import { appendDotInboxEntry, type DotInboxEntryInput } from './dot-inbox.js';
 import { DOT_EXECUTOR_REPORT_SOURCE } from './dot-runtime.js';
+import { readDotActionLedgerStrict } from './dot-action-ledger.js';
 import {
   DOT_KR_LEDGER_FILE,
   DOT_WORK_RESULTS_FILE,
@@ -132,6 +133,23 @@ export function bounded(text: string, max = DOT_WORK_RESULT_SUMMARY_MAX): string
 export function meta(item: WorkItem, key: string): string | undefined {
   const value = item.metadata?.[key];
   return typeof value === 'string' && value.trim() ? value : undefined;
+}
+
+export function executorObjective(item: WorkItem): string {
+  const lines = [`WorkItem ${item.item_id}: ${item.title}`, '', item.description];
+  const target = meta(item, 'target');
+  const intent = meta(item, 'intent');
+  if (target || intent) {
+    lines.push('', `Target: ${target ?? 'n/a'}; intent: ${intent ?? 'n/a'}`);
+  }
+  const effect = item.metadata?.expected_effect as
+    { kr_id?: string; signal?: string; direction?: string } | undefined;
+  if (effect && typeof effect === 'object') {
+    lines.push(
+      `Expected effect: ${effect.direction ?? 'move'} ${effect.kr_id ?? effect.signal ?? ''}`.trim()
+    );
+  }
+  return lines.join('\n');
 }
 
 export function addressedTo(c: DotCharter, item: WorkItem): boolean {
@@ -536,7 +554,7 @@ export function enqueueExecutorReport(
       channel: 'inbox',
       source: DOT_EXECUTOR_REPORT_SOURCE,
       idempotency_key: executorReportKey(row, reportTo),
-      text: `WorkItem ${row.work_item_id} ${row.status}${!c.scope.tenant_slug && item ? `: ${bounded(item.title, 120)}` : ''}${escalated ? advice : ''}`,
+      text: `WorkItem ${row.work_item_id} ${row.status}${c.scope.tier === 'public' && !c.scope.tenant_slug && item ? `: ${bounded(item.title, 120)}` : ''}${escalated ? advice : ''}`,
       payload: {
         report_from: DOT_EXECUTOR_REPORT_SOURCE,
         work_item_id: row.work_item_id,
@@ -589,7 +607,10 @@ export function reconcileExecutorReports(
           Boolean(entry.report_to_dot_id)
       )) {
         const item = items.find(
-          (entry) => entry.item_id === row.work_item_id && !dotItemTenantMismatch(charter, entry)
+          (entry) =>
+            entry.item_id === row.work_item_id &&
+            !dotItemScopeMismatch(charter, entry) &&
+            !dotItemAuthorityMismatch(charter, entry)
         );
         enqueueExecutorReport(charter, row, deps, item);
       }
@@ -781,6 +802,72 @@ export function dotItemTenantMismatch(c: DotCharter, item: WorkItem): boolean {
   const itemTenant = item.context?.tenant_slug || undefined;
   const charterTenant = c.scope.tenant_slug || undefined;
   return itemTenant !== charterTenant;
+}
+
+/** Recover legacy custody only from the exact persisted, scope-bound admission. */
+export function dotItemWithAdmissionProof(
+  item: WorkItem,
+  deps: Pick<DotExecutorDeps, 'rootDir'>
+): WorkItem {
+  if (item.metadata?.dot_scope !== undefined) return item;
+  const dotId = meta(item, 'dot_id');
+  const actionRef = meta(item, 'action_ref');
+  if (!dotId || !actionRef) return item;
+  try {
+    const original = readDotActionLedgerStrict({ rootDir: deps.rootDir, dotId })
+      .filter(
+        (row) =>
+          row.dot_id === dotId && row.action_ref === actionRef && row.work_item_id === item.item_id
+      )
+      .at(-1);
+    if (
+      !original?.scope ||
+      !original.admission ||
+      original.admission.authority_role !== item.metadata?.authority_role
+    )
+      return item;
+    return {
+      ...item,
+      metadata: {
+        ...item.metadata,
+        dot_scope: original.scope,
+        executor_authority_role: original.admission.authority_role,
+      },
+    };
+  } catch {
+    return item;
+  }
+}
+
+/** New work pins custody at admission; legacy entity context never proves a personal owner. */
+export function dotItemScopeMismatch(c: DotCharter, item: WorkItem): boolean {
+  if (dotItemTenantMismatch(c, item)) return true;
+  for (const key of ['organization_id', 'project_id'] as const) {
+    const value =
+      key === 'project_id' && item.context_origin?.project_id === 'default'
+        ? undefined
+        : item.context?.[key] || undefined;
+    if (value !== (c.scope[key] || undefined)) return true;
+  }
+  const scope = item.metadata?.dot_scope;
+  if (scope === undefined) {
+    // Old public work has no private custody to infer. Private work without
+    // its original tier/owner evidence must be reconciled, never relabelled.
+    return c.scope.tier !== 'public' || Boolean(c.scope.owner_nhi);
+  }
+  if (!scope || typeof scope !== 'object' || Array.isArray(scope)) return true;
+  const admitted = scope as Record<string, unknown>;
+  return (['tier', 'tenant_slug', 'owner_nhi', 'organization_id', 'project_id'] as const).some(
+    (key) => (admitted[key] ?? undefined) !== (c.scope[key] ?? undefined)
+  );
+}
+
+/** A handoff pins the recipient role, rather than reusing its sender's authority. */
+export function dotItemAuthorityMismatch(c: DotCharter, item: WorkItem): boolean {
+  const role = item.metadata?.executor_authority_role ?? item.metadata?.authority_role;
+  return role !== undefined
+    ? role !== c.authority.authority_role
+    : item.metadata?.dot_scope !== undefined || c.scope.tier !== 'public';
 }
 
 /** Responsibility binding must survive admission, handoff and recovery unchanged. */

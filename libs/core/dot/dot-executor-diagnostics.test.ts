@@ -564,6 +564,39 @@ describe('current execution and retained effect evidence', () => {
     expect(JSON.stringify(inspect())).not.toContain('FOREIGN');
   });
 
+  it('withholds another personal owner and unproven legacy custody from target diagnostics', async () => {
+    const scope = { tier: 'personal' as const, owner_nhi: 'person-me' };
+    const context = { project_id: 'diagnostics-project', work_shape: 'routine_operation' as const };
+    await inventory([
+      item('personal-waiting', {
+        context,
+        metadata: { dot_id: 'ops', target: 'path:docs/operations.md', dot_scope: scope },
+      }),
+      item('FOREIGN-PERSONAL-OWNER', {
+        context,
+        status: 'archived',
+        metadata: {
+          dot_id: 'another-dot',
+          dot_scope: { tier: 'personal', owner_nhi: 'person-other' },
+        },
+        attempts: [attempt('FOREIGN-PERSONAL-RUN')],
+        effect_ownership: hold('FOREIGN-PERSONAL-RUN', {
+          target: 'path:docs/**',
+          tenant_slug: undefined,
+        }),
+      }),
+      item('UNPROVEN-PERSONAL-ITEM', { context }),
+    ]);
+    expect(inspect(charter(scope)).items).toMatchObject([
+      { work_item_id: 'personal-waiting', state: 'queued' },
+    ]);
+    expect(JSON.stringify(inspect(charter(scope)))).not.toContain('FOREIGN');
+    expect(JSON.stringify(inspect(charter(scope)))).not.toContain('UNPROVEN');
+    expect(inspect(charter({ tier: 'personal', owner_nhi: 'new-owner' })).inventory).toBe(
+      'no_current_evidence'
+    );
+  });
+
   it('prioritizes blockers in bounded output without losing the total', async () => {
     await inventory([
       ...Array.from({ length: 21 }, (_, i) => item('ready-' + String(i).padStart(2, '0'))),

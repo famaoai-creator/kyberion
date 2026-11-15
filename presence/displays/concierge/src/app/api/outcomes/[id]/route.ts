@@ -11,6 +11,8 @@ import { requireConciergeMutationAccess } from '../../../../lib/api-guard';
 import { conciergeText, resolveConciergeLocale } from '../../../../lib/i18n';
 import { readRequestObject } from '../../../../lib/request-input';
 import { conciergeErrorResponse, resolveConciergeViewer } from '../../../../lib/viewer-context';
+import { resolveConciergeSelectedViewer } from '../../../../lib/selected-tenant';
+import { withConciergePersonalInbox } from '../../../../lib/personal-approval-server';
 import {
   conciergeDecisionDenied,
   resolveConciergeDecidedBy,
@@ -69,6 +71,37 @@ async function handlePost(req: NextRequest, context: { params: Promise<{ id: str
         { status: 400 }
       );
     }
+    // Personal notifications stay in the installed owner's exact lane. The
+    // existing signed owner proof replaces tenant membership only for this
+    // personal selection; a company or system selection never enters it.
+    const selected = resolveConciergeSelectedViewer(req);
+    if (selected.response) return selected.response;
+    const personal =
+      selected.selection.mode === 'personal'
+        ? withConciergePersonalInbox(selected.context, ({ ownerNhi, actorId }) => {
+            const entry = listInboxEntries({ entryId: id, ownerNhi }).find(
+              (item) => item.tier === 'personal' && item.owner_nhi === ownerNhi
+            );
+            if (!entry?.scope || entry.scope.owner_nhi !== ownerNhi) return null;
+            const updated =
+              status === 'accepted'
+                ? acceptInboxEntryWithHumanReceipt({
+                    entryId: id,
+                    scope: entry.scope,
+                    actorId,
+                    authenticated: true,
+                    authMethod: 'surface_session',
+                    responsibilityStatement: 'I accept my personal notification.',
+                  })
+                : markInboxEntry(id, status, {
+                    scope: entry.scope,
+                    verdictNote: typeof body.note === 'string' ? body.note : undefined,
+                    reviewedBy: actorId,
+                  });
+            return updated ? NextResponse.json({ ok: true, entry: updated }) : null;
+          })
+        : null;
+    if (personal) return personal;
     // The verdict lands on the entry's tenant — the member gate checks the
     // membership for THAT tenant, not the first scope entry (B4/F2).
     const entry = withExecutionContext('sovereign_concierge', () =>
@@ -87,6 +120,7 @@ async function handlePost(req: NextRequest, context: { params: Promise<{ id: str
       status === 'accepted'
         ? acceptInboxEntryWithHumanReceipt({
             entryId: id,
+            scope: entry.scope,
             actorId: decidedBy?.id ?? 'human:concierge',
             authenticated: true,
             authMethod: 'surface_session',
@@ -95,6 +129,7 @@ async function handlePost(req: NextRequest, context: { params: Promise<{ id: str
               : 'I accept this deliverable on behalf of the operator.',
           })
         : markInboxEntry(id, status, {
+            scope: entry.scope,
             verdictNote: typeof body?.note === 'string' ? body.note : undefined,
             reviewedBy: decidedBy?.id ?? 'concierge',
           });

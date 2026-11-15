@@ -8,6 +8,7 @@ import {
 } from './dot-event-continuation.js';
 import { isFrontDeskDiagnosticDot } from './dot-charter.js';
 import { assertDotAccountabilityCharter } from './dot-authority.js';
+import { dotAdmissionScopeHash } from './dot-admission-identity.js';
 import { loadDotExecutionPolicy } from './dot-execution-policy.js';
 /**
  * Dot runtime: due-ness and one bounded goal turn per wake, called by the supervisor.
@@ -105,7 +106,11 @@ import { dotFeedbackPromptLines, dotSignalStatusLines } from './dot-feedback.js'
 import { dotStatePath } from './dot-state-paths.js';
 import { DOT_PROMPT_SECTIONS, DOT_WAKE_TOOLS } from './dot-extension-registry.js';
 import { dotExtCtx, type DotExtCtx } from './dot-extensions.js';
-import { DOT_FOLLOWUP_TOOL_NAME } from './dot-followups.js';
+import {
+  followupRetryEvidence,
+  recoverRetainedDotFollowup,
+  type DotFollowupInput,
+} from './dot-followups.js';
 import { dotOutcomeContinuation } from './dot-progress.js';
 import { assertDotStateLayoutReady } from './dot-state-paths.js';
 import {
@@ -224,6 +229,8 @@ export interface DotWakeLedgerEntry {
    * retried (with failure backoff) instead of silently ending the chain.
    */
   trigger_retained?: boolean;
+  /** Exact schedule to recover without replaying the model or governed proposals. */
+  followup_retry?: { scheduled_at: string; values: DotFollowupInput[] };
 }
 
 function escapeRegExp(value: string): string {
@@ -258,6 +265,8 @@ export interface DueDotTrigger {
   detail?: string;
   /** Set when this wake is the half-open probe of a dot whose wake circuit tripped. */
   circuit?: true;
+  /** A retained delivery uses a separate runner key, including across upgrades. */
+  followupRecovery?: true;
 }
 
 export interface DotRuntimeDeps {
@@ -321,6 +330,7 @@ export function readDotWakeLedger(deps: DotRuntimeDeps = {}): DotWakeLedgerEntry
       return {
         ...row,
         summary: undefined,
+        followup_retry: undefined,
         ...(row.reason
           ? {
               reason: isDotWakeProcessFailure(row.reason)
@@ -399,6 +409,7 @@ export function recordDotWakeOutcome(
     tokens_used?: number;
     summary?: string;
     trigger_retained?: boolean;
+    followup_retry?: DotWakeLedgerEntry['followup_retry'];
   } = {}
 ): void {
   const now = deps.now?.() ?? new Date();
@@ -435,6 +446,7 @@ export function recordDotWakeOutcome(
     ...(deps.tokens_used !== undefined ? { tokens_used: deps.tokens_used } : {}),
     ...(deps.summary ? { summary: deps.summary } : {}),
     ...(deps.trigger_retained && outcome === 'delivered' ? { trigger_retained: true } : {}),
+    ...(deps.followup_retry ? { followup_retry: deps.followup_retry } : {}),
   };
   const scoped = charter.scope.tier !== 'public' || Boolean(charter.scope.tenant_slug);
   if (scoped) appendJsonlEnsured(dotStatePath(charter, 'wake-ledger.jsonl'), row, deps);
@@ -444,6 +456,7 @@ export function recordDotWakeOutcome(
       ? {
           ...row,
           summary: undefined,
+          followup_retry: undefined,
           ...(row.reason
             ? {
                 reason: isDotWakeProcessFailure(row.reason)
@@ -879,8 +892,10 @@ function alertDotWakeCircuitOnce(
         dot_id: charter.dot_id,
         consecutive_failures: circuit.consecutive,
         reopens_at: circuit.reopens_at,
-        // Tenant dots keep failure prose out of the shared alert log.
-        ...(charter.scope.tenant_slug ? {} : { reason: circuit.reason }),
+        // All private dots keep failure prose out of the shared alert log.
+        ...(charter.scope.tier === 'public' && !charter.scope.tenant_slug
+          ? { reason: circuit.reason }
+          : {}),
       },
       recommendation: `Wakes for ${charter.dot_id} are held until ${circuit.reopens_at}. Inspect \`pnpm kyberion dot status ${charter.dot_id}\` and the wake ledger, fix the cause, then the next half-open wake closes the circuit.`,
       dedupe_key: `dot-wake-circuit:${charter.dot_id}:${circuit.reason_hash}`,
@@ -1163,11 +1178,19 @@ export interface DotWakeReceipt {
   proposal_errors?: string[];
   /** Wake-tool parse/apply errors (registered DOT_WAKE_TOOLS). */
   tool_errors?: string[];
+  /** Work completed, but its frozen follow-up schedule still needs persistence. */
+  trigger_retained?: true;
 }
 
-function extensionFailure(kind: string, id: string, dotId: string, error: unknown): void {
+function extensionFailure(kind: string, id: string, charter: DotCharter, error: unknown): void {
+  const detail =
+    charter.scope.tier === 'public' && !charter.scope.tenant_slug
+      ? error instanceof Error
+        ? error.message
+        : String(error)
+      : 'private diagnostic withheld';
   logger.warn(
-    `${kind} '${id}' failed for ${dotId} — ${error instanceof Error ? error.message : String(error)} | next: the wake continues without it | evidence: libs/core/dot/dot-extension-bootstrap.ts`
+    `${kind} '${id}' failed for ${charter.dot_id} — ${detail} | next: the wake continues without it | evidence: libs/core/dot/dot-extension-bootstrap.ts`
   );
 }
 
@@ -1180,7 +1203,7 @@ export function dotPromptSectionLines(charter: DotCharter, ctx: DotExtCtx): stri
         ...section.lines(charter, ctx).filter((line) => typeof line === 'string' && line.trim())
       );
     } catch (error) {
-      extensionFailure('prompt section', section.id, charter.dot_id, error);
+      extensionFailure('prompt section', section.id, charter, error);
     }
   }
   return lines;
@@ -1340,7 +1363,7 @@ export function applyDotWakeOutputs(
     try {
       errors.push(...tool.apply(charter, values, ctx).map((error) => `${tool.name}: ${error}`));
     } catch (error) {
-      extensionFailure('wake tool', tool.name, charter.dot_id, error);
+      extensionFailure('wake tool', tool.name, charter, error);
       failedTools?.add(tool.name);
       errors.push(
         `${tool.name}: apply failed (${error instanceof Error ? error.message : String(error)})`
@@ -1348,18 +1371,6 @@ export function applyDotWakeOutputs(
     }
   }
   return errors;
-}
-
-/**
- * A follow-up wake whose successor schedule failed to persist keeps its parent
- * follow-up pending (retried with backoff) rather than ending the chain; the
- * governed proposals of the delivered wake are never re-dispatched by that.
- */
-function followupSuccessorLost(
-  trigger: DueDotTrigger | undefined,
-  failedTools: ReadonlySet<string>
-): boolean {
-  return trigger?.trigger.kind === 'followup' && failedTools.has(DOT_FOLLOWUP_TOOL_NAME);
 }
 
 /** One dot must never run two wakes concurrently, whatever the trigger mix. */
@@ -1395,6 +1406,7 @@ async function runFencedWake(
     ...wakeTools.errors,
     ...applyDotWakeOutputs(current, wakeTools.outputs, dotExtCtx(deps, deps.trigger), failedTools),
   ];
+  const followupRetry = followupRetryEvidence(deps.trigger, failedTools, wakeTools.outputs, deps);
   assertEventContinuationOutput(deps.eventAttemptId, toolErrors.length + parsed.errors.length);
   if (deps.trigger?.trigger.kind === 'watch') {
     recordWatchSnapshotFromKey(current, deps.trigger, deps);
@@ -1404,7 +1416,7 @@ async function runFencedWake(
     reason: `${labels.ledgerReason}; proposals ${parsed.proposals.length}`,
     turns_run: 1,
     tokens_used: tokens,
-    trigger_retained: followupSuccessorLost(deps.trigger, failedTools),
+    ...followupRetry,
     // The wake ledger is a shared system-floor file: tenant prose stays out.
     summary: dotWakeSummary(text),
   });
@@ -1413,6 +1425,7 @@ async function runFencedWake(
     outcome: 'delivered',
     reason: labels.receiptReason,
     actions,
+    ...(followupRetry.trigger_retained ? { trigger_retained: true as const } : {}),
     ...(parsed.errors.length ? { proposal_errors: parsed.errors } : {}),
     ...(toolErrors.length ? { tool_errors: toolErrors } : {}),
   };
@@ -1451,12 +1464,14 @@ async function runDotWakeBaseline(
     try {
       current = rereadOwnDotCharter(loaded);
       isFrontDeskDiagnosticDot(charter);
-      if (
-        current.dot_id !== charter.dot_id ||
-        eventContinuationCharterChanged(charter, current, deps.trigger)
-      ) {
+      if (current.dot_id !== charter.dot_id) {
         throw new Error(`file now declares dot_id '${current.dot_id}'`);
       }
+      if (
+        dotAdmissionScopeHash(current) !== dotAdmissionScopeHash(charter) ||
+        eventContinuationCharterChanged(charter, current, deps.trigger)
+      )
+        throw new Error('charter scope or continuation binding changed since this wake was queued');
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       const reason = `${DOT_WAKE_FAILURE_CATEGORY.charter} — ${message} | next: pnpm kyberion dot validate ${charter.dot_id} | evidence: ${loaded.path}`;
@@ -1516,6 +1531,9 @@ async function runDotWakeBaseline(
       },
       heartbeatOptions
     );
+
+    const recoveredFollowup = recoverRetainedDotFollowup(current, deps, recordDotWakeOutcome);
+    if (recoveredFollowup) return recoveredFollowup;
 
     if (dotDailyTokenCapReached(current, deps)) {
       const reason = `token_cap_per_day ${current.goal.budget?.token_cap_per_day} reached`;
@@ -1726,6 +1744,7 @@ async function runDotWakeBaseline(
       toolErrors.push(
         ...applyDotWakeOutputs(current, toolOutputs, dotExtCtx(deps, deps.trigger), failedTools)
       );
+      const followupRetry = followupRetryEvidence(deps.trigger, failedTools, toolOutputs, deps);
       assertEventContinuationOutput(
         deps.eventAttemptId,
         toolErrors.length + collected.errors.length
@@ -1737,13 +1756,14 @@ async function runDotWakeBaseline(
         ...deps,
         turns_run: result.turnsRun,
         tokens_used: tokens,
-        trigger_retained: followupSuccessorLost(deps.trigger, failedTools),
+        ...followupRetry,
       });
       return {
         dot_id: current.dot_id,
         outcome: 'delivered',
         result,
         actions,
+        ...(followupRetry.trigger_retained ? { trigger_retained: true as const } : {}),
         ...(collected.errors.length ? { proposal_errors: collected.errors } : {}),
         ...(toolErrors.length ? { tool_errors: toolErrors } : {}),
       };

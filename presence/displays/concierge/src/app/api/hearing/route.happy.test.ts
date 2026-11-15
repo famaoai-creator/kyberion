@@ -19,72 +19,84 @@ import {
 const spawn = vi.hoisted(() => ({
   calls: [] as Array<{ args: string[]; env?: Record<string, string | undefined> }>,
 }));
-vi.mock('@agent/core/secure-io', async (original) => {
-  const actual = await original<typeof import('@agent/core/secure-io')>();
-  // The built governed scripts the route checks for exist as after an operator build.
-  const built = (target: unknown) =>
-    /dist\/scripts\/mission_(controller|alignment_request)\.js$/u.test(String(target));
-  return {
-    ...actual,
-    safeExistsSync: (...args: Parameters<typeof actual.safeExistsSync>) =>
-      built(args[0]) || actual.safeExistsSync(...args),
-    safeLstat: (...args: Parameters<typeof actual.safeLstat>) =>
-      built(args[0])
-        ? ({ isFile: () => true } as ReturnType<typeof actual.safeLstat>)
-        : actual.safeLstat(...args),
-    safeExecResult: (...args: Parameters<typeof actual.safeExecResult>) => {
-      const argv = args[1] ?? [];
-      if (argv[0] === 'dist/scripts/mission_controller.js') {
-        spawn.calls.push({ args: argv, env: args[2]?.env as Record<string, string | undefined> });
-        return { stdout: '', stderr: '', status: 0 };
-      }
-      if (argv[0] === 'dist/scripts/mission/mission_alignment_request.js') {
-        spawn.calls.push({ args: argv, env: args[2]?.env as Record<string, string | undefined> });
-        return { stdout: JSON.stringify({ requestId: 'REQ-ALIGN-1' }), stderr: '', status: 0 };
-      }
-      return actual.safeExecResult(...args);
-    },
-  };
-});
 const mission = vi.hoisted(() => ({ dir: '', state: null as null | Record<string, unknown> }));
-vi.mock('@agent/core/path-resolver', async (original) => {
-  const actual = await original<typeof import('@agent/core/path-resolver')>();
-  return { ...actual, findMissionPath: () => mission.dir || null };
-});
-vi.mock('@agent/core/mission/mission-state', async (original) => {
-  const actual = await original<typeof import('@agent/core/mission/mission-state')>();
-  return { ...actual, loadState: () => mission.state };
-});
-vi.mock('@agent/core/workforce/work-inventory-decompose', async (original) => {
-  const actual = await original<typeof import('@agent/core/workforce/work-inventory-decompose')>();
-  return {
-    ...actual,
-    proposeWorkDecomposition: (
-      input: Parameters<typeof actual.proposeWorkDecomposition>[0],
-      options: Parameters<typeof actual.proposeWorkDecomposition>[1]
-    ) => actual.proposeWorkDecomposition(input, { ...options, useModel: false }),
+function configureHearingModules() {
+  vi.doMock('@agent/core/secure-io', async (original) => {
+    const actual = await original<typeof import('@agent/core/secure-io')>();
+    // The built governed scripts the route checks for exist as after an operator build.
+    const built = (target: unknown) =>
+      /dist\/scripts\/(?:mission\/)?mission_(controller|alignment_request)\.js$/u.test(
+        String(target)
+      );
+    return {
+      ...actual,
+      safeExistsSync: (...args: Parameters<typeof actual.safeExistsSync>) =>
+        built(args[0]) || actual.safeExistsSync(...args),
+      safeLstat: (...args: Parameters<typeof actual.safeLstat>) =>
+        built(args[0])
+          ? ({ isFile: () => true } as ReturnType<typeof actual.safeLstat>)
+          : actual.safeLstat(...args),
+      safeExecResult: (...args: Parameters<typeof actual.safeExecResult>) => {
+        const argv = args[1] ?? [];
+        if (argv[0] === 'dist/scripts/mission_controller.js') {
+          spawn.calls.push({ args: argv, env: args[2]?.env as Record<string, string | undefined> });
+          return { stdout: '', stderr: '', status: 0 };
+        }
+        if (argv[0] === 'dist/scripts/mission/mission_alignment_request.js') {
+          spawn.calls.push({ args: argv, env: args[2]?.env as Record<string, string | undefined> });
+          return { stdout: JSON.stringify({ requestId: 'REQ-ALIGN-1' }), stderr: '', status: 0 };
+        }
+        return actual.safeExecResult(...args);
+      },
+    };
+  });
+  vi.doMock('@agent/core/path-resolver', async (original) => {
+    const actual = await original<typeof import('@agent/core/path-resolver')>();
+    return { ...actual, findMissionPath: () => mission.dir || null };
+  });
+  vi.doMock('@agent/core/mission/mission-state', async (original) => {
+    const actual = await original<typeof import('@agent/core/mission/mission-state')>();
+    return { ...actual, loadState: () => mission.state };
+  });
+  vi.doMock('@agent/core/workforce/work-inventory-decompose', async (original) => {
+    const actual =
+      await original<typeof import('@agent/core/workforce/work-inventory-decompose')>();
+    return {
+      ...actual,
+      proposeWorkDecomposition: (
+        input: Parameters<typeof actual.proposeWorkDecomposition>[0],
+        options: Parameters<typeof actual.proposeWorkDecomposition>[1]
+      ) => actual.proposeWorkDecomposition(input, { ...options, useModel: false }),
+    };
+  });
+  return () => {
+    vi.doUnmock('@agent/core/secure-io');
+    vi.doUnmock('@agent/core/path-resolver');
+    vi.doUnmock('@agent/core/mission/mission-state');
+    vi.doUnmock('@agent/core/workforce/work-inventory-decompose');
   };
-});
-import {
-  applyHearingTurn,
-  createHearingRecord,
-  hearingScenarioFromCatalogEntry,
-  type HearingRecord,
-} from '@agent/core/surface/hearing';
-import { findHearingScenario } from '@agent/core/hearing-scenario-catalog';
-import { hearingMissionId } from '@agent/core/surface/hearing-mission';
+}
+import type { HearingRecord } from '@agent/core/surface/hearing';
+let hearing: typeof import('@agent/core/surface/hearing');
+let catalog: typeof import('@agent/core/hearing-scenario-catalog');
+let hearingMission: typeof import('@agent/core/surface/hearing-mission');
 
-beforeAll(() => setUpHearing(), 120_000);
+beforeAll(async () => {
+  await setUpHearing({ configureModules: configureHearingModules });
+  hearing = await import('@agent/core/surface/hearing');
+  catalog = await import('@agent/core/hearing-scenario-catalog');
+  hearingMission = await import('@agent/core/surface/hearing-mission');
+}, 120_000);
 afterAll(() => tearDownHearing());
 
 const NOW = '2026-11-08T00:00:00.000Z';
 
 function answered(id: string, scenarioId?: string): HearingRecord {
-  const entry = scenarioId ? findHearingScenario(scenarioId) : undefined;
-  const scenario = entry ? hearingScenarioFromCatalogEntry(entry) : undefined;
-  let record = createHearingRecord(id, NOW, scenario);
+  const entry = scenarioId ? catalog.findHearingScenario(scenarioId) : undefined;
+  const scenario = entry ? hearing.hearingScenarioFromCatalogEntry(entry) : undefined;
+  let record = hearing.createHearingRecord(id, NOW, scenario);
   for (const item of record.requirements)
-    record = applyHearingTurn(
+    record = hearing.applyHearingTurn(
       record,
       { text: `answer for ${item.id}`, request_id: `turn-${item.id}` },
       NOW,
@@ -196,7 +208,7 @@ describe(
         decided_at: NOW,
       };
       save(record);
-      const missionId = hearingMissionId(record, HEARING_TENANT);
+      const missionId = hearingMission.hearingMissionId(record, HEARING_TENANT);
       mission.dir = hr.io.pathResolver.sharedTmp('hearing-route-happy/' + missionId);
       mission.state = {
         mission_id: missionId,

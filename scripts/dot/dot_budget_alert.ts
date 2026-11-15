@@ -17,7 +17,7 @@ const REASON_TEXT: Record<DotBudgetStopReason, string> = {
 const notified = new Set<string>();
 
 export function notifyDotBudgetStopOnce(
-  charter: Pick<DotCharter, 'dot_id'>,
+  charter: Pick<DotCharter, 'dot_id'> & Partial<Pick<DotCharter, 'scope'>>,
   reason: DotBudgetStopReason,
   now: Date,
   notify: typeof notifyOperatorSync = notifyOperatorSync
@@ -25,11 +25,15 @@ export function notifyDotBudgetStopOnce(
   const key = `${charter.dot_id}:${reason}:${now.toISOString().slice(0, 10)}`;
   if (notified.has(key)) return false;
   notified.add(key);
-  notify('ops_alert', {
-    title: `Dot ${charter.dot_id} paused by budget`,
-    body: `${charter.dot_id} ${REASON_TEXT[reason]}, so it will not wake again until the budget resets or is raised. Housekeeping continues.`,
-    correlation_id: `dot-budget-stop:${key}`,
-  });
+  notify(
+    'ops_alert',
+    {
+      title: `Dot ${charter.dot_id} paused by budget`,
+      body: `${charter.dot_id} ${REASON_TEXT[reason]}, so it will not wake again until the budget resets or is raised. Housekeeping continues.`,
+      correlation_id: `dot-budget-stop:${key}`,
+    },
+    charter.scope ? { scope: charter.scope } : {}
+  );
   return true;
 }
 

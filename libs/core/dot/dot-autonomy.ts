@@ -62,7 +62,7 @@ import {
 } from '../governance/autonomous-ops-gate.js';
 import { createLogger } from '../logger.js';
 import { pathResolver } from '../path-resolver.js';
-import { safeMkdir } from '../secure-io.js';
+import { safeExistsSync, safeMkdir } from '../secure-io.js';
 import {
   notifyOperatorSync,
   type OperatorEvent,
@@ -299,21 +299,31 @@ function initialState(c: DotCharter, now: Date): DotAutonomyStateDoc {
   };
 }
 
-/** Stored state (level clamped to the charter's current bounds), or the initial state. */
+/** Only absent state starts at the initial level; damaged authority evidence holds work. */
 export function readDotAutonomyState(
   c: DotCharter,
   deps: Pick<DotAutonomyDeps, 'rootDir' | 'now'> = {}
 ): DotAutonomyStateDoc & { persisted: boolean } {
   let stored: DotAutonomyStateDoc | null = null;
+  const file = abs(deps, dotAutonomyStatePath(c));
   try {
-    stored = readJsonIfPresent<DotAutonomyStateDoc>(abs(deps, dotAutonomyStatePath(c)));
+    stored = readJsonIfPresent<DotAutonomyStateDoc>(file);
   } catch (error) {
-    logger.warn(
-      `autonomy state unreadable for ${c.dot_id} — ${error instanceof Error ? error.message : String(error)} | next: the dot runs at its initial level until the file is fixed | evidence: ${dotAutonomyStatePath(c)}`
+    throw new Error(
+      `[DOT_AUTONOMY_STATE_UNAVAILABLE] ${c.dot_id} authority evidence is unreadable — ${error instanceof Error ? error.message : String(error)} | next: reconcile the existing autonomy state before resuming | evidence: ${dotAutonomyStatePath(c)}`
     );
   }
-  if (!stored || !isLevel(stored.level))
+  if (!stored && !safeExistsSync(file))
     return { ...initialState(c, nowOf(deps)), persisted: false };
+  if (
+    !stored ||
+    !isLevel(stored.level) ||
+    stored.dot_id !== c.dot_id ||
+    !Number.isFinite(Date.parse(stored.since))
+  )
+    throw new Error(
+      `[DOT_AUTONOMY_STATE_UNAVAILABLE] ${c.dot_id} authority evidence is invalid | next: reconcile the existing autonomy state before resuming | evidence: ${dotAutonomyStatePath(c)}`
+    );
   return {
     ...stored,
     dot_id: c.dot_id,
@@ -769,7 +779,7 @@ function notify(c: DotCharter, title: string, body: string, deps: DotAutonomyDep
     (deps.notify ?? notifyOperatorSync)(
       'decision_digest',
       { title: `[dot:${c.dot_id}] ${title}`, body, correlation_id: `dot-autonomy:${c.dot_id}` },
-      { route: dotNotificationRoute(c), quietHours: dotQuietHours(c) }
+      { route: dotNotificationRoute(c), quietHours: dotQuietHours(c), scope: c.scope }
     );
   } catch (error) {
     logger.warn(
@@ -914,13 +924,22 @@ export function runDotAutonomyStep(
     if (readable) {
       const human =
         approval?.decidedByType === 'human' && approval.decidedBy !== VETO_WINDOW_DECIDER;
+      const ownerMatches =
+        c.scope.tier !== 'personal' ||
+        (approval?.scope?.tier === 'personal' && approval.scope.nhi_id === c.scope.owner_nhi);
       // Separation of duties: an approval that cannot be used never promotes;
       // the pending promotion is cleared with an audited reason below.
       const sodRefusal =
         approval && SETTLED_APPROVED.has(approval.status) && human
           ? approvalUsabilityRefusal(approval, 'dot_autonomy_promotion')
           : undefined;
-      if (approval && SETTLED_APPROVED.has(approval.status) && human && !sodRefusal) {
+      if (
+        approval &&
+        SETTLED_APPROVED.has(approval.status) &&
+        human &&
+        ownerMatches &&
+        !sodRefusal
+      ) {
         const target = clampDotAutonomyLevel(c, pending.to);
         const from = state.level;
         if (dotAutonomyLevelRank(target) === dotAutonomyLevelRank(from) + 1) {
@@ -946,11 +965,13 @@ export function runDotAutonomyStep(
       ) {
         const why = !approval
           ? 'request missing'
-          : sodRefusal
-            ? `separation of duties: ${sodRefusal}`
-            : SETTLED_APPROVED.has(approval.status)
-              ? `approved without a human decider (${approval.decidedByType ?? 'unknown'})`
-              : `request ${approval.status}`;
+          : !ownerMatches
+            ? 'promotion approval belongs to another owner'
+            : sodRefusal
+              ? `separation of duties: ${sodRefusal}`
+              : SETTLED_APPROVED.has(approval.status)
+                ? `approved without a human decider (${approval.decidedByType ?? 'unknown'})`
+                : `request ${approval.status}`;
         const { pending_promotion: _p, ...rest } = state;
         state = rest;
         result.promotion_cleared = why;
@@ -1009,14 +1030,13 @@ export function runDotAutonomyStep(
         dedupeKey: `dot-autonomy-${c.dot_id}-${to}`,
         notificationRoute: dotNotificationRoute(c),
         quietHours: dotQuietHours(c),
-        ...(c.scope.tenant_slug
-          ? {
-              scope: {
-                tenant_slug: c.scope.tenant_slug,
-                ...(c.scope.organization_id ? { organization_id: c.scope.organization_id } : {}),
-              },
-            }
-          : {}),
+        scope: {
+          tier: c.scope.tier,
+          ...(c.scope.tenant_slug ? { tenant_slug: c.scope.tenant_slug } : {}),
+          ...(c.scope.organization_id ? { organization_id: c.scope.organization_id } : {}),
+          ...(c.scope.project_id ? { project_id: c.scope.project_id } : {}),
+          ...(c.scope.owner_nhi ? { nhi_id: c.scope.owner_nhi } : {}),
+        },
         now: now.getTime(),
       });
       if (routed.requestId) {

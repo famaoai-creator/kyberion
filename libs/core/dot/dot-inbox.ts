@@ -254,18 +254,11 @@ export function appendDotInboxEntry(
   }
   // Plain appends take the inbox lock too, so compaction (which rewrites the
   // file under this lock) can never overwrite a row appended mid-rewrite.
-  // Compaction runs after the release, so the lock is never re-entered. A lock
-  // timeout must not fail the append (P3): append unlocked — compaction
-  // re-checks the live size right before its move and aborts if it grew.
-  try {
-    withLockSync(lock, () => appendJsonLine(filePath, entry));
-  } catch (error) {
-    if (!String((error as Error)?.message).includes('[LOCK_TIMEOUT]')) throw error;
-    logger.warn(
-      `[DOT_INBOX] inbox lock busy — appending without it | next: compaction's pre-move size check protects this row | evidence: ${(error as Error).message}`
-    );
-    appendJsonLine(filePath, entry);
-  }
+  // Compaction runs after release, so the lock is never re-entered. The lock
+  // already retries transient contention for a bounded interval. If it times
+  // out, fail before writing so the producer can retry; an unlocked append
+  // can land between compaction's final stat and rename and be lost.
+  withLockSync(lock, () => appendJsonLine(filePath, entry));
   maybeCompactDotInbox(filePath, { ...deps, scope });
   return entry;
 }

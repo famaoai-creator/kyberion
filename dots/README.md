@@ -326,5 +326,18 @@ enabling a source; a row that says `stalled` is a blind watcher.
 4. Tenant-scoped dots live in `knowledge/confidential/{tenant}/dots/` and run
    under the tenant-bound runner, mirroring the scheduled-pipeline convention.
 
+Personal charters live in `knowledge/personal/dots/<owner-hash>/` and require
+`scope.tier: personal` and `scope.owner_nhi`. The current authenticated owner
+must match; a missing tenant is not system custody. Runtime state, notifications,
+delivery receipts and distilled lessons keep the same owner and tier. The
+default inbox and quiet-hours behavior stay available without another approval
+step. Changing a charter's owner, tenant, organization, project or authority
+does not transfer work already admitted under the previous binding.
+
+Unchanged usable approval resumes automatically after current policy and shadow
+checks. Corrupt existing autonomy evidence holds execution; preserve and recover
+it instead of deleting it to obtain initial defaults. Ordinary follow-up storage
+recovery retries the frozen successor, without replaying the model or proposals.
+
 See [resident-dot-model](../knowledge/product/architecture/resident-dot-model.md)
 for the mapping to OpenAI dots and the runtime wiring.

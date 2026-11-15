@@ -32,6 +32,10 @@ import { currentTriggerDeliveryId } from '../event/trigger-correlation.js';
 import { appendOpsAlertLogRecord } from '../daemon/ops-alert-log.js';
 import { withExecutionContext, withStoreGrant } from '../authority.js';
 import { sendWebPushForEvent, webPushWouldDeliver } from './web-push.js';
+import { assertMemoryScope, type MemoryScopeEnvelope } from '../knowledge/memory-scope.js';
+import { normalizeEventScope, type EventScopeInput } from '../event/event-scope.js';
+import { physicalScopedPath, partitionedScopedPath } from '../storage/physical-namespace.js';
+import { PARTITIONED_RUNTIME_STATE_ROOTS } from '../foundation/runtime-state-roots.js';
 
 /**
  * E2E-04 Task 2: the return path (Kyberion → operator).
@@ -357,7 +361,8 @@ function formatNotificationText(
 function recordUndeliveredNotification(
   event: OperatorEvent,
   payload: OperatorNotificationPayload,
-  reason: string
+  reason: string,
+  scope?: MemoryScopeEnvelope
 ): void {
   try {
     const logPath = assertSafeRepositoryPath(
@@ -369,9 +374,16 @@ function recordUndeliveredNotification(
       ts: nowIso(),
       kind: 'operator_notification_undelivered',
       event,
-      title: payload.title,
-      correlation_id: payload.correlation_id,
-      reason,
+      title:
+        scope && (scope.tier !== 'public' || scope.tenant_slug)
+          ? 'Scoped notification pending'
+          : payload.title,
+      correlation_id:
+        scope && (scope.tier !== 'public' || scope.tenant_slug)
+          ? undefined
+          : payload.correlation_id,
+      reason:
+        scope && (scope.tier !== 'public' || scope.tenant_slug) ? reason.split(':')[0] : reason,
     });
   } catch {
     // observability only — never throw from the notification path
@@ -402,6 +414,8 @@ export function resolveOperatorNotificationRoute(
  * for preference routes.
  */
 export interface OperatorNotificationOptions {
+  /** Producer-owned custody, preserved through quiet-hours fallback and replay. */
+  scope?: MemoryScopeEnvelope | EventScopeInput;
   route?: NotificationChannelTarget;
   quietHours?: NotificationQuietHours;
   /** Stable identity for one logical notification; never reuse for different content. */
@@ -426,7 +440,8 @@ function deliver(
   text: string,
   correlationId: string,
   title: string,
-  deduplicationKey?: string
+  deduplicationKey?: string,
+  scope?: MemoryScopeEnvelope
 ): void {
   // Delivery mechanics are declared per channel in the adapter registry (RS-06);
   // an unregistered surface fails closed in getChannelAdapter.
@@ -446,12 +461,14 @@ function deliver(
       // silently no-op behind the first. Hashing keeps one entry per alert
       // instance while staying deterministic for retries of the same alert.
       const entryId = `INBOX-N-${createHash('sha256')
-        .update(deduplicationKey || correlationId)
+        .update(
+          deduplicationKey || (scope ? JSON.stringify([scope, correlationId]) : correlationId)
+        )
         .digest('hex')
         .slice(-20)
         .toUpperCase()}`;
-      withExecutionContext('surface_runtime', () => {
-        const alreadyQueued = listInboxEntries({ entryId: entryId, limit: 1 }).some(
+      withNotificationStorageContext(scope, () => {
+        const alreadyQueued = listInboxEntries({ entryId: entryId, limit: 1, scope }).some(
           (entry) => entry.entry_id === entryId
         );
         if (!alreadyQueued) {
@@ -462,6 +479,7 @@ function deliver(
             kind: 'operator_notification',
             status: 'unread',
             ifAbsent: true,
+            scope,
           });
         }
       });
@@ -478,6 +496,9 @@ function deliver(
         text,
         source: 'system',
         deduplicationKey,
+        scope: scope
+          ? normalizeEventScope({ ...scope, nhi_id: scope.owner_nhi ?? scope.nhi_id })
+          : undefined,
       });
       return;
     default:
@@ -529,6 +550,15 @@ interface NotificationClaim {
 
 const digestIdentity = (value: string): string => createHash('sha256').update(value).digest('hex');
 
+function withNotificationStorageContext<T>(
+  scope: MemoryScopeEnvelope | undefined,
+  run: () => T
+): T {
+  // A supplied scope narrows storage; it never grants tier access. Preserve the
+  // authenticated producer's authority instead of replacing its private persona.
+  return scope ? run() : withExecutionContext('surface_runtime', run);
+}
+
 /**
  * Receipt and intent tombstones are never automatically expired. Removing them
  * removes replay protection even if a bridge has already drained its outbox.
@@ -540,12 +570,23 @@ function stableNotificationAttempt(
   payload: OperatorNotificationPayload,
   route: NotificationChannelTarget | null,
   key: string,
-  attempt: (durableKey: string) => OperatorNotificationReceipt
+  attempt: (durableKey: string) => OperatorNotificationReceipt,
+  scope?: MemoryScopeEnvelope
 ): OperatorNotificationReceipt {
-  return withExecutionContext('surface_runtime', () => {
-    const identity = digestIdentity(JSON.stringify([event, key]));
+  return withNotificationStorageContext(scope, () => {
+    const identity = digestIdentity(JSON.stringify([event, key, ...(scope ? [scope] : [])]));
     const durableKey = 'operator:' + identity;
-    const base = pathResolver.shared('runtime/operator-notification-receipts/' + identity);
+    let base = pathResolver.shared('runtime/operator-notification-receipts/' + identity);
+    if (scope) {
+      const receiptScope = { ...scope, nhi_id: scope.owner_nhi ?? scope.nhi_id };
+      const root = PARTITIONED_RUNTIME_STATE_ROOTS.operator_notification_receipts;
+      const legacyBase = pathResolver.rootResolve(physicalScopedPath(root, receiptScope, identity));
+      // An old intent remains delivery authority: moving namespaces must never
+      // resend an effect whose outcome is unknown. Consult only this exact lane.
+      base = safeExistsSync(legacyBase + '.intent.json')
+        ? legacyBase
+        : pathResolver.rootResolve(partitionedScopedPath(root, receiptScope, identity));
+    }
     const claimPath = assertSafeRepositoryPath(base + '.intent.json', { allowMissingLeaf: true });
     const receiptPath = assertSafeRepositoryPath(base + '.accepted.json', {
       allowMissingLeaf: true,
@@ -563,13 +604,15 @@ function stableNotificationAttempt(
         return { status: 'accepted', reason: 'durable_replay' };
       const queued =
         existing.delivery === 'local-inbox'
-          ? listInboxEntries({ entryId: existing.entryId, limit: 1 }).some(
+          ? listInboxEntries({ entryId: existing.entryId, limit: 1, scope }).some(
               (entry) => entry.entry_id === existing.entryId
             )
           : existing.delivery === 'surface-outbox'
-            ? listSurfaceOutboxMessages(existing.surface as SurfaceAsyncChannel).some(
-                (message) => message.deduplication_key === durableKey
-              )
+            ? listSurfaceOutboxMessages(existing.surface as SurfaceAsyncChannel, {
+                scope: scope
+                  ? normalizeEventScope({ ...scope, nhi_id: scope.owner_nhi ?? scope.nhi_id })
+                  : undefined,
+              }).some((message) => message.deduplication_key === durableKey)
             : false;
       if (queued) {
         // The accepted marker is advisory; a concurrent reconciler may publish it.
@@ -631,7 +674,22 @@ export function notifyOperatorWithReceiptSync(
   if (isVitestProcess() && getRegisteredEnvText('KYBERION_ALLOW_TEST_NOTIFICATIONS') !== '1') {
     return { status: 'suppressed', reason: 'test_notifications_disabled' };
   }
+  let scope: MemoryScopeEnvelope | undefined;
   try {
+    scope = options.scope
+      ? assertMemoryScope({
+          ...options.scope,
+          tier: options.scope.tier ?? 'public',
+          owner_nhi:
+            'owner_nhi' in options.scope
+              ? options.scope.owner_nhi
+              : options.scope.tier === 'personal'
+                ? options.scope.nhi_id
+                : undefined,
+        })
+      : undefined;
+    if (scope?.tier === 'personal' && !scope.owner_nhi?.trim())
+      return { status: 'suppressed', reason: 'personal_owner_required' };
     const prefs = loadNotificationPreferences();
     const route = options.route
       ? resolveCallerNotificationRoute(event, options.route, options.quietHours, prefs)
@@ -652,21 +710,26 @@ export function notifyOperatorWithReceiptSync(
           'webpush:' + event + ':' + (payload.correlation_id || payload.title)
         );
         if (pushed) return { status: 'uncertain', reason: 'direct_delivery_attempted' };
-        recordUndeliveredNotification(event, payload, 'no_channel_configured');
+        recordUndeliveredNotification(event, payload, 'no_channel_configured', scope);
         return {
           status: 'retryable',
           reason: 'no_channel_configured',
           retryAfterMs: notificationIntervalMs(),
         };
       };
-      return key ? stableNotificationAttempt(event, payload, null, key, pushOnly) : pushOnly();
+      return key
+        ? stableNotificationAttempt(event, payload, null, key, pushOnly, scope)
+        : pushOnly();
     }
     const correlationId =
       payload.correlation_id ||
       currentTriggerDeliveryId() ||
       'notify:' + event + ':' + Date.now().toString(36);
     const rateKey =
-      event + ':' + (payload.correlation_id || currentTriggerDeliveryId() || payload.title);
+      event +
+      ':' +
+      (scope ? digestIdentity(JSON.stringify(scope)) + ':' : '') +
+      (payload.correlation_id || currentTriggerDeliveryId() || payload.title);
     const attempt = (durableKey?: string): OperatorNotificationReceipt => {
       if (!shouldNotifyOperator(rateKey)) {
         return {
@@ -688,7 +751,8 @@ export function notifyOperatorWithReceiptSync(
           formatNotificationText(event, payload),
           correlationId,
           payload.title,
-          durableKey
+          durableKey,
+          scope
         );
         if (route.target !== 'quiet-hours') fanOutWebPush(event, 'webpush:' + rateKey);
         return delivery === 'imessage-direct'
@@ -699,7 +763,12 @@ export function notifyOperatorWithReceiptSync(
             };
       } catch (err) {
         const detail = err instanceof Error ? err.message : String(err);
-        recordUndeliveredNotification(event, payload, 'delivery_failed:' + detail.slice(0, 200));
+        recordUndeliveredNotification(
+          event,
+          payload,
+          'delivery_failed:' + detail.slice(0, 200),
+          scope
+        );
         // This error is thrown before outbox creation; other transport/storage
         // errors may happen after an effect and are deliberately not retryable.
         if (delivery === 'surface-outbox' && detail.startsWith('surface_target_dead:')) {
@@ -713,7 +782,7 @@ export function notifyOperatorWithReceiptSync(
         return { status: 'uncertain', reason: 'delivery_outcome_unknown' };
       }
     };
-    if (key) return stableNotificationAttempt(event, payload, route, key, attempt);
+    if (key) return stableNotificationAttempt(event, payload, route, key, attempt, scope);
     return attempt();
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
@@ -721,10 +790,15 @@ export function notifyOperatorWithReceiptSync(
       formatDiagnostic({
         component: 'operator-notifications',
         what: 'delivery failed for ' + event,
-        why: detail,
+        why: options.scope ? 'Scoped notification could not be delivered' : detail,
       })
     );
-    recordUndeliveredNotification(event, payload, 'delivery_failed:' + detail.slice(0, 200));
+    recordUndeliveredNotification(
+      event,
+      payload,
+      'delivery_failed:' + detail.slice(0, 200),
+      scope || (options.scope ? { tier: 'personal' } : undefined)
+    );
     return { status: 'uncertain', reason: 'notification_outcome_unknown' };
   }
 }

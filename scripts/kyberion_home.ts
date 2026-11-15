@@ -8,10 +8,6 @@
  * every other surface uses.
  */
 import {
-  getChannelAdapter,
-  listOperatorNotificationChannels,
-} from '@agent/core/surface/channel-adapter-registry';
-import {
   getRegisteredEnvText,
   nowIso,
   parseSafeJsonObjectInput,
@@ -44,10 +40,7 @@ import {
   resolveAllowlistedRecordingRef,
   resolveProcedure,
 } from '@agent/core/knowledge/procedure-registry';
-import {
-  loadNotificationPreferences,
-  saveNotificationPreferences,
-} from '@agent/core/surface/operator-notifications';
+import { loadNotificationPreferences } from '@agent/core/surface/operator-notifications';
 import { materializeExecutionFeedbackCandidate } from '@agent/core/execution-feedback';
 import {
   assertAskScopeOptionsSupported,
@@ -68,6 +61,7 @@ import { loadServiceRecordingAtPath } from '@agent/core/service/service-recordin
 import { loadDesktopRecordingAtPath } from '@agent/core/virtual/desktop-recording';
 import { withExecutionContext } from '@agent/core/authority';
 import { pathResolver } from '@agent/core/path-resolver';
+import { currentScope } from '@agent/core/scope-context';
 import { runSurfaceMessageConversation } from '@agent/core/surface/surface-runtime-orchestrator';
 import {
   safeExistsSync,
@@ -83,7 +77,6 @@ import type {
 } from '@agent/core/browser/browser-extension-bridge';
 import type { DesktopRecording } from '@agent/core/virtual/desktop-recording';
 import type { ServiceRecording } from '@agent/core/service/service-recording';
-import type { NotificationChannelTarget } from '@agent/core/surface/operator-notifications';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { runDoctor } from './run_doctor.js';
 import {
@@ -94,6 +87,7 @@ import {
   handleDealsSubcommand,
   handleFeedbackSubcommand,
   handleImprovements,
+  handleNotifySubcommand,
   improvementsArgsFromArgv,
 } from './operator/operator-home-secondary-actions.js';
 import { printCommands, showHome, type HomePrint } from './operator/operator-home-view.js';
@@ -147,32 +141,6 @@ function localizeRecorderWarning(warning: string): string {
   return warning;
 }
 
-// E2E-04 Task 2: `pnpm kyberion notify --set slack:C012345` writes the
-// operator's default notification channel (surface:target).
-function handleNotifySubcommand(setValue: string): void {
-  const [surface, ...rest] = setValue.split(':');
-  // Allowed channels and local default targets (`inbox` → `operator`, so
-  // `--set inbox` needs no remote target) come from the channel adapter registry.
-  const allowed = listOperatorNotificationChannels();
-  const target =
-    rest.join(':') ||
-    (allowed.includes(surface)
-      ? (getChannelAdapter(surface).operator_notification?.default_target ?? '')
-      : '');
-  if (!allowed.includes(surface) || !target) {
-    printOutput(ui('recorder:recorder_notify_usage', { channels: allowed.join('|') }));
-    throw new ScriptExitError(1, '', true);
-  }
-  const prefs = loadNotificationPreferences();
-  prefs.default_channel = { surface, target } as NotificationChannelTarget;
-  // notification-preferences.json lives in the personal tier; the concierge
-  // role is the governed writer for it (same assumption Concierge routes use).
-  const filePath = withExecutionContext('sovereign_concierge', () =>
-    saveNotificationPreferences(prefs)
-  );
-  printOutput(ui('recorder:recorder_notify_saved', { surface, target, path: filePath }));
-}
-
 function handleInboxSubcommand(argv: {
   read?: string;
   accept?: string;
@@ -180,14 +148,28 @@ function handleInboxSubcommand(argv: {
   match?: string;
   json?: boolean;
 }): void {
+  const selected = currentScope();
+  const ownerNhi = selected.tier === 'personal' ? selected.nhi_id : undefined;
+  const inboxScope =
+    selected.tier === 'personal' && ownerNhi ? { ...selected, owner_nhi: ownerNhi } : undefined;
+  const visibleEntries = (limit: number) =>
+    listInboxEntries({ limit, ownerNhi }).filter(
+      (entry) =>
+        !entry.tier ||
+        (entry.tier === selected.tier &&
+          (!entry.tenant_slug || entry.tenant_slug === selected.tenant_slug) &&
+          (!selected.organization_id || entry.organization_id === selected.organization_id) &&
+          (!selected.project_id || entry.project_id === selected.project_id) &&
+          (entry.tier !== 'personal' || Boolean(ownerNhi && entry.owner_nhi === ownerNhi)))
+    );
   if (argv.readAll) {
-    const entries = listInboxEntries({ limit: 500 }).filter(
+    const entries = visibleEntries(500).filter(
       (entry) =>
         entry.status === 'unread' &&
         (!argv.match || entry.title.includes(argv.match) || entry.summary.includes(argv.match))
     );
     for (const entry of entries) {
-      markInboxEntry(entry.entry_id, 'read', { reviewedBy: 'operator' });
+      markInboxEntry(entry.entry_id, 'read', { reviewedBy: 'operator', scope: inboxScope });
     }
     printOutput(
       ui('recorder:recorder_inbox_marked', {
@@ -199,10 +181,15 @@ function handleInboxSubcommand(argv: {
   }
   if (argv.read || argv.accept) {
     const entryId = String(argv.read || argv.accept);
+    if (!visibleEntries(10000).some((entry) => entry.entry_id === entryId)) {
+      printOutput(ui('recorder:recorder_inbox_not_found', { id: entryId }));
+      throw new ScriptExitError(1, '', true);
+    }
     const updated = argv.read
-      ? markInboxEntry(entryId, 'read', { reviewedBy: 'operator' })
+      ? markInboxEntry(entryId, 'read', { reviewedBy: 'operator', scope: inboxScope })
       : acceptInboxEntryWithHumanReceipt({
           entryId,
+          scope: inboxScope,
           actorId: 'human:operator',
           authenticated: true,
           authMethod: 'surface_session',
@@ -222,7 +209,7 @@ function handleInboxSubcommand(argv: {
     );
     return;
   }
-  const entries = listInboxEntries({ limit: 30 });
+  const entries = visibleEntries(30);
   if (argv.json) {
     printOutput(JSON.stringify(entries, null, 2));
     return;
@@ -1383,7 +1370,7 @@ async function mainImpl(args: string[] = []): Promise<void> {
   const subcommand = String(argv._[0] || '');
   switch (subcommand) {
     case 'notify':
-      if (argv.set) handleNotifySubcommand(String(argv.set));
+      if (argv.set) handleNotifySubcommand(ui, String(argv.set), printOutput);
       else printOutput(JSON.stringify(loadNotificationPreferences(), null, 2));
       return;
     case 'inbox':

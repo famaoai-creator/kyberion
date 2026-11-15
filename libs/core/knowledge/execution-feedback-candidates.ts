@@ -60,15 +60,15 @@ export function executionFeedbackScopeKey(scope?: MemoryScopeEnvelope): string {
 export function executionFeedbackScopeRoot(scope: MemoryScopeEnvelope): string {
   const scopeKey = executionFeedbackScopeKey(scope);
   const canonical = assertMemoryScope(scope);
-  if (!canonical.tenant_slug)
+  if (!canonical.tenant_slug && canonical.tier !== 'public' && !canonical.owner_nhi)
     throw new Error(
-      '[FEEDBACK_SCOPE_UNSUPPORTED] Scoped feedback requires an explicit tenant namespace; owner-only scope is not supported'
+      '[FEEDBACK_SCOPE_UNSUPPORTED] Private feedback requires an explicit tenant or owner namespace'
     );
   const key = createHash('sha256').update(scopeKey).digest('hex');
   return pathResolver.rootResolve(
     physicalScopedPath(
       'active/shared/runtime',
-      canonical,
+      { ...canonical, nhi_id: canonical.owner_nhi ?? canonical.nhi_id },
       'execution-feedback',
       canonical.tier,
       key

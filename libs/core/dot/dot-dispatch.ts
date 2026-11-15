@@ -1,13 +1,13 @@
-import { informationWorkProposalRefusal, type DotScopedProposal } from './dot-information-work.js';
+import type { DotScopedProposal } from './dot-information-work.js';
 import { dotDigestActionEvidence } from './dot-digest-evidence.js';
 import { continuousDevelopmentDecisionPresentation } from '../organization/continuous-development-consent.js';
 import { dotDelegationCapacity, resumeDotCapacityActions } from './dot-admission-capacity.js';
-import { composeDotBoundsPrompt, sameDotHandoffScope } from './dot-bounds-prompt.js';
-export { dotDelegationCapacity } from './dot-admission-capacity.js';
 import {
-  CONTINUOUS_MANAGED_WORK_PIPELINE,
-  parseContinuousWorkPlan,
-} from '../organization/continuous-work-plan.js';
+  checkDotProposalScopeWithShapes,
+  composeDotBoundsPrompt,
+  sameDotHandoffScope,
+} from './dot-bounds-prompt.js';
+export { dotDelegationCapacity } from './dot-admission-capacity.js';
 import { reconcileAdmittedDotAction } from './dot-admission-reconciliation.js';
 import { composeDotDigestText, dotCharterTimezone } from './dot-digest-composition.js';
 import { dotWorkItemInput, assertDotExistingWorkItem } from './dot-work-item.js';
@@ -18,9 +18,7 @@ import {
   recordDotApprovalFeedback,
   recordDeferredDotJudgmentApprovalFeedback,
 } from './dot-judgment-approval.js';
-import { assertDotAccountabilityCharter } from './dot-authority.js';
 import { isDotIntakeAdmission, loadDotExecutionPolicy } from './dot-execution-policy.js';
-import { dotMissionAdmissionRefusal } from './dot-mission-admission-bounds.js';
 import { sendDueDotDigest } from './dot-digest-delivery.js';
 export { DOT_DIGEST_LEDGER_PATH } from './dot-digest-delivery.js';
 import type { DotWorkResultRow } from './dot-state-paths.js';
@@ -79,7 +77,6 @@ import { inspectFrontDeskPendingRequest as inspectPendingRequest } from '../surf
 import { recoveryEvidenceHash } from '../surface/front-desk-recovery-receipt.js';
 import { validateServerDotJudgmentProposal } from './dot-judgment-binding.js';
 import { sameVersionOneAdmission } from './dot-action-ledger-version.js';
-import { dotRoutingDecision, dotRoutingRefusal } from './dot-routing-decision.js';
 import type { RoutingDecision } from '../contracts/routing-decision.js';
 import {
   evaluateAutonomousOpsAction,
@@ -101,6 +98,8 @@ import {
   type ApprovalRequestRecord,
 } from '../governance/approval-store.js';
 import { auditChain } from '../governance/audit-chain.js';
+import { isOperationsHalted } from '../governance/operations-halt.js';
+import { VETO_WINDOW_DECIDER } from '../governance/approval-veto-window.js';
 import { createWorkItemIfAbsent, listWorkItems } from '../workforce/work-coordination.js';
 import { dotParentItemId } from './dot-work-item-parent.js';
 
@@ -127,10 +126,7 @@ import {
   listDotCharters,
   type DotCharter,
 } from './dot-charter.js';
-import { resolveTenant } from '../organization/tenant-registry.js';
 import {
-  DOT_ACTION_IDS,
-  DOT_TASK_SESSION_UNAVAILABLE_GUIDANCE,
   proposalActionIdentity,
   type DotDecisionLevel,
   type DotProposal,
@@ -321,102 +317,14 @@ function recordAudit(
 export type DotBoundsVerdict =
   { ok: true; routing_decision: RoutingDecision } | { ok: false; reason: string; capacity?: true };
 
-/** What the proposal may be at all: action, shape, handoff target. Re-checked at settlement. */
 function checkDotProposalScope(
   charter: DotCharter,
   proposal: DotScopedProposal,
   deps: DotDispatchDeps
 ): DotBoundsVerdict {
-  try {
-    assertDotAccountabilityCharter(charter, deps);
-  } catch (error) {
-    return { ok: false, reason: `accountability authority refused: ${String(error)}` };
-  }
-  const missionRefusal = dotMissionAdmissionRefusal(charter, proposal, deps.now?.());
-  if (missionRefusal) return { ok: false, reason: missionRefusal };
-  const informationRefusal = informationWorkProposalRefusal(charter, proposal);
-  if (informationRefusal) return informationRefusal;
-  if (proposal.continuous_work) {
-    try {
-      parseContinuousWorkPlan(proposal.continuous_work);
-    } catch (error) {
-      return { ok: false, reason: String(error) };
-    }
-    if (
-      !charter.scope.organization_id ||
-      proposal.execution_shape !== 'pipeline' ||
-      proposal.pipeline_ref !== CONTINUOUS_MANAGED_WORK_PIPELINE ||
-      !(charter.authority.allowed_pipelines ?? []).includes(CONTINUOUS_MANAGED_WORK_PIPELINE) ||
-      proposal.handoff_to ||
-      proposal.front_desk_execution
-    ) {
-      return {
-        ok: false,
-        reason:
-          'Continuous managed work requires an organization and the explicitly allowed owner pipeline without handoff',
-      };
-    }
-  }
-  if (!DOT_ACTION_IDS.includes(proposal.action_id)) {
-    return { ok: false, reason: `action '${proposal.action_id}' is not a dot action` };
-  }
-  const shapes = effectiveDotExecutionShapes(charter, deps);
-  if (proposal.execution_shape === 'task_session' && !deps.taskSessionExecutorAvailable) {
-    return { ok: false, reason: DOT_TASK_SESSION_UNAVAILABLE_GUIDANCE };
-  }
-  if (!shapes.includes(proposal.execution_shape)) {
-    return {
-      ok: false,
-      reason: `execution_shape '${proposal.execution_shape}' is outside allowed_execution_shapes (${shapes.join(', ')})`,
-    };
-  }
-  const routingDecision = dotRoutingDecision(proposal.execution_shape);
-  const routingRefusal = dotRoutingRefusal(proposal.execution_shape, routingDecision);
-  if (routingRefusal) return { ok: false, reason: routingRefusal };
-  const tenantSlug = charter.scope.tenant_slug;
-  if (tenantSlug) {
-    try {
-      if (deps.assertTenant) {
-        deps.assertTenant(
-          tenantSlug,
-          charter.runtime.execution_mode === 'front_desk_diagnostic'
-            ? { charter, proposal }
-            : undefined
-        );
-      } else {
-        resolveTenant(tenantSlug, { rootDir: deps.rootDir });
-      }
-    } catch (error) {
-      return {
-        ok: false,
-        reason: `tenant '${tenantSlug}' cannot take work: ${error instanceof Error ? error.message : String(error)}`,
-      };
-    }
-  }
-  if (proposal.handoff_to) {
-    if (proposal.handoff_to === charter.dot_id) {
-      return { ok: false, reason: 'a dot cannot hand work to itself' };
-    }
-    const target = (deps.listCharters?.() ?? defaultListCharters(deps)).find(
-      (other) => other.dot_id === proposal.handoff_to
-    );
-    if (!target || target.status !== 'active') {
-      return { ok: false, reason: `handoff target '${proposal.handoff_to}' is not an active dot` };
-    }
-    if (!sameDotHandoffScope(charter, target)) {
-      return {
-        ok: false,
-        reason: `cross-tenant handoff denied: '${charter.dot_id}' and '${proposal.handoff_to}' are in different tenant scopes`,
-      };
-    }
-    if (!(target.team?.accepts_handoffs_from ?? []).includes(charter.dot_id)) {
-      return {
-        ok: false,
-        reason: `dot '${proposal.handoff_to}' does not accept handoffs from '${charter.dot_id}'`,
-      };
-    }
-  }
-  return { ok: true, routing_decision: routingDecision };
+  return checkDotProposalScopeWithShapes(charter, proposal, deps, () =>
+    effectiveDotExecutionShapes(charter, deps)
+  );
 }
 
 /** Charter bounds that never depend on the gate: action, shape, handoff acceptance, concurrency. */
@@ -701,6 +609,7 @@ function notifyDot(
   const options: OperatorNotificationOptions = {
     route: dotNotificationRoute(charter),
     quietHours: dotQuietHours(charter),
+    scope: charter.scope,
   };
   return (deps.notify ?? notifyOperatorSync)(
     event,
@@ -829,7 +738,14 @@ function executeDotActionUnlocked(
         ? undefined
         : (ref: string) => defaultFindWorkItemByActionRef(ref, deps.rootDir));
     const existing = options.reuseExisting ? find?.(record.action_ref) : undefined;
-    const envelope = dotWorkItemInput(charter, record, deps.rootDir, existing);
+    const executor = record.handoff_to
+      ? (deps.listCharters?.() ?? defaultListCharters(deps)).find(
+          (other) => other.dot_id === record.handoff_to
+        )
+      : charter;
+    if (!executor || executor.status !== 'active' || !sameDotHandoffScope(charter, executor))
+      throw new Error('Dot executor scope changed before WorkItem admission');
+    const envelope = dotWorkItemInput(charter, record, deps.rootDir, existing, executor);
     const parentItemId = dotParentItemId(record, envelope.context, deps.rootDir);
     const input = parentItemId ? { ...envelope, parentItemId } : envelope;
     assertDotExistingWorkItem(record, existing, input, Boolean(deps.createWorkItem));
@@ -1211,16 +1127,15 @@ function dispatchDotProposalsUnlocked(
         dedupeKey: `${charter.dot_id}-${hash}${charter.work_binding ? '-' + dotAdmissionScopeHash(charter) : ''}${proposal.continuous_work ? '-' + base.action_ref : ''}`,
         notificationRoute: dotNotificationRoute(charter),
         quietHours: dotQuietHours(charter),
-        ...(charter.scope.tenant_slug
-          ? {
-              scope: {
-                tenant_slug: charter.scope.tenant_slug,
-                ...(charter.scope.organization_id
-                  ? { organization_id: charter.scope.organization_id }
-                  : {}),
-              },
-            }
-          : {}),
+        scope: {
+          tier: charter.scope.tier,
+          ...(charter.scope.tenant_slug ? { tenant_slug: charter.scope.tenant_slug } : {}),
+          ...(charter.scope.organization_id
+            ? { organization_id: charter.scope.organization_id }
+            : {}),
+          ...(charter.scope.project_id ? { project_id: charter.scope.project_id } : {}),
+          ...(charter.scope.owner_nhi ? { nhi_id: charter.scope.owner_nhi } : {}),
+        },
         ...(admissionScope ? { scope: admissionScope } : {}),
         ...judgedRoute,
         ...continuousDevelopmentDecisionPresentation(charter, base, deps.rootDir),
@@ -1496,6 +1411,8 @@ export function settleDotParkedActions(
       // Scope/binding changes never consume an old decision, including removal
       // of an operation binding. Keep the original row parked for reconciliation.
       if (!dotRecordAdmissionMatches(charter, row)) return;
+      if (row.admission && row.admission.authority_role !== charter.authority.authority_role)
+        return;
       let approval: ApprovalRequestRecord | null;
       try {
         approval = load(row.request_id);
@@ -1535,6 +1452,12 @@ export function settleDotParkedActions(
         return;
       const outcome = approval ? SETTLED_STATUS[approval.status] : 'cancelled';
       if (!outcome) return;
+      if (
+        outcome === 'approved' &&
+        charter.scope.tier === 'personal' &&
+        (approval?.scope?.tier !== 'personal' || approval.scope.nhi_id !== charter.scope.owner_nhi)
+      )
+        return;
       const decidedBy = approval?.decidedBy;
       const deferred = Boolean(row.semantic_judgment) && outcome === 'approved';
       if (!deferred) recordDotApprovalFeedback(charter, row, approval, outcome, feedbackDeps);
@@ -1558,6 +1481,49 @@ export function settleDotParkedActions(
       }
       const sodRefusal = approvalUsabilityRefusal(approval, 'dot_dispatch'); // separation of duties
       if (sodRefusal) return void settled.push(declineParked(charter, row, sodRefusal, deps));
+      // Approval permits its original effect, never stale policy or a shadow bypass.
+      // Keep transient holds parked so the same valid approval can resume without
+      // another card once its current constraints are satisfied.
+      try {
+        const preGate = runDotPreGateChecks(charter, row, deps);
+        const { gate, floor } = evaluateDotProposalGate(charter, row, deps);
+        const disposition = runDotDispositionOverrides(
+          charter,
+          row,
+          { action_ref: row.action_ref, gate, ...(floor ? { floor } : {}) },
+          deps
+        );
+        const sameEscalation =
+          preGate.ok === 'escalate' &&
+          recoveryEvidenceHash({
+            check_id: preGate.check_id,
+            reason: preGate.reason,
+            ...(preGate.link ? { link: preGate.link } : {}),
+            ...((preGate.links?.length ?? 0) > 1 ? { links: preGate.links } : {}),
+          }) === recoveryEvidenceHash(row.escalation);
+        if (
+          charter.status !== 'active' ||
+          isOperationsHalted() ||
+          (preGate.ok !== true && !sameEscalation) ||
+          (!gate.allowed && gate.decision !== 'approve') ||
+          !Number.isFinite(gate.score) ||
+          gate.shadow ||
+          disposition ||
+          (gate.decision === 'approve' &&
+            row.decision !== 'approve' &&
+            approval?.decidedBy === VETO_WINDOW_DECIDER)
+        ) {
+          const reason = `approved but current authorization holds work: ${disposition?.reason ?? (preGate.ok !== true ? preGate.reason : gate.reason)}`;
+          if (row.reason !== reason)
+            appendActionRecord({ ...row, reason, at: nowOf(deps).toISOString() }, deps);
+          return;
+        }
+      } catch (error) {
+        const reason = `approved but current authorization is unavailable: ${String(error)}`;
+        if (row.reason !== reason)
+          appendActionRecord({ ...row, reason, at: nowOf(deps).toISOString() }, deps);
+        return;
+      }
       const executed = executeDotAction(
         charter,
         { ...row, reason: `approved by ${decidedBy ?? 'operator'}` },
@@ -1677,6 +1643,7 @@ export function maybeSendDotDigest(charter: DotCharter, deps: DotDispatchDeps = 
         route: dotNotificationRoute(charter),
         quietHours: dotQuietHours(charter),
         deduplicationKey: key,
+        scope: charter.scope,
       };
       if (deps.notifyReceipt) return deps.notifyReceipt('decision_digest', payload, options);
       if (deps.notify)
