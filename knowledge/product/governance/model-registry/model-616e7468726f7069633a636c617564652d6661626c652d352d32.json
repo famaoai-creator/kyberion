@@ -1,0 +1,22 @@
+{
+  "model_id": "anthropic:claude-fable-5-2",
+  "provider": "anthropic",
+  "family": "claude-fable",
+  "status": "approved",
+  "tier": "large",
+  "execution_tier": "deep",
+  "role_fit": {
+    "intent_compiler": "primary",
+    "surface_agent": "primary",
+    "analysis": "primary",
+    "coding": "primary"
+  },
+  "cost_band": "high",
+  "latency_band": "medium",
+  "structured_output_confidence": "high",
+  "tool_use_confidence": "high",
+  "multilingual_confidence": "high",
+  "reasoning_confidence": "high",
+  "capability_tags": ["agentic_coding", "tool_use", "multi_step_reasoning", "deep_reasoning"],
+  "notes": "Claude Fable 5.2; the current latest-model release in the Fable line, exposed as claude-fable-5-2 by Claude Code 2.1.323 and marked new in the Devin model catalog (verified 2026-11-14)."
+}

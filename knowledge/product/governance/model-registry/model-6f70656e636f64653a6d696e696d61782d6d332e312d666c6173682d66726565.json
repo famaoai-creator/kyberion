@@ -1,0 +1,22 @@
+{
+  "model_id": "opencode:minimax-m3.1-flash-free",
+  "provider": "opencode",
+  "family": "minimax-m3.1-flash",
+  "status": "candidate",
+  "tier": "standard",
+  "execution_tier": "standard",
+  "role_fit": {
+    "intent_compiler": "secondary",
+    "surface_agent": "secondary",
+    "analysis": "secondary",
+    "coding": "secondary"
+  },
+  "cost_band": "low",
+  "latency_band": "low",
+  "structured_output_confidence": "medium",
+  "tool_use_confidence": "medium",
+  "multilingual_confidence": "medium",
+  "reasoning_confidence": "medium",
+  "capability_tags": ["agentic_coding", "free_tier", "structured_output", "tool_use"],
+  "notes": "OpenCode provider free-tier model listed in `opencode models` (verified 2026-11-14); candidate until a capability probe verifies auth session and structured-output behavior on this host."
+}

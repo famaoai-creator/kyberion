@@ -11,6 +11,11 @@
       "cache_read": 0.001,
       "cache_write": 0.0125
     },
+    "gpt-6.1-terra": {
+      "prompt": 0.001,
+      "completion": 0.005,
+      "cache_read": 0.00005
+    },
     "gpt-6-sol": {
       "prompt": 0.002,
       "completion": 0.01,
@@ -42,6 +47,16 @@
       "cache_write": 0.00025
     },
     "claude-fable-5": { "prompt": 0.01, "completion": 0.05 },
+    "claude-fable-5-2": {
+      "prompt": 0.008,
+      "completion": 0.04,
+      "cache_read": 0.0002
+    },
+    "claude-fable-5-1": {
+      "prompt": 0.01,
+      "completion": 0.05,
+      "cache_read": 0.00025
+    },
     "claude-opus-5-5": {
       "prompt": 0.004,
       "completion": 0.02,
@@ -67,10 +82,20 @@
     "gpt-4o-mini": { "prompt": 0.00015, "completion": 0.0006 },
     "gpt-4.1": { "prompt": 0.002, "completion": 0.008 },
     "gemini-2.0-flash": { "prompt": 0.0001, "completion": 0.0004 },
+    "gemini-4-carbon": {
+      "prompt": 0.002,
+      "completion": 0.01,
+      "cache_read": 0.0001
+    },
     "gemini-4-argon": {
       "prompt": 0.002,
       "completion": 0.01,
       "cache_read": 0.0001
+    },
+    "gemini-4-hydrogen": {
+      "prompt": 0.0015,
+      "completion": 0.0075,
+      "cache_read": 0.00008
     },
     "gemini-3.8-flash": { "prompt": 0.0015, "completion": 0.0075 },
     "gemini-3.7-flash": { "prompt": 0.0015, "completion": 0.0075 },
@@ -112,7 +137,8 @@
   },
   "aliases": {
     "argon": "gemini-4-argon",
-    "fable": "claude-fable-5",
+    "carbon": "gemini-4-carbon",
+    "fable": "claude-fable-5-2",
     "opus": "claude-opus-5-5",
     "sonnet": "claude-sonnet-5",
     "haiku": "claude-haiku-4-5-20251001",
