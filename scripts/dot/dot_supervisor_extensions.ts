@@ -237,7 +237,16 @@ DOT_SUPERVISOR_STEPS.push({
         let dead = 0;
         for (const row of window) {
           if (row.status === 'dispatched') dispatched++;
-          else if (row.status === 'declined' || row.status === 'refused' || row.status === 'shadow')
+          // 'parked' counts as non-effect too: a vetoed proposal awaiting an
+          // operator who never acts produces zero effect exactly like a
+          // declined one (the real repo-guardian window is parked-dominant).
+          // 'admitted'/'waiting_capacity' stay out — those can still dispatch.
+          else if (
+            row.status === 'declined' ||
+            row.status === 'refused' ||
+            row.status === 'shadow' ||
+            row.status === 'parked'
+          )
             dead++;
         }
         const zeroEffect = dispatched === 0 && dead * 2 >= window.length;
@@ -254,7 +263,7 @@ DOT_SUPERVISOR_STEPS.push({
             dot_id: dotId,
             window: window.length,
             dispatched,
-            declined_refused_shadow: dead,
+            non_effect: dead,
           },
           recommendation: `${dotId} keeps proposing work that never executes (${dispatched} dispatched of ${window.length} recent actions). Check its notify lane and approval routing — proposals that never reach a decider expire as 'declined' — and whether its observation inputs carry real data.`,
           dedupe_key: `dot-zero-effect:${dotId}`,
