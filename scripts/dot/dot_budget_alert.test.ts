@@ -22,7 +22,8 @@ describe('dot budget stop alert', () => {
       expect.objectContaining({
         title: 'Dot org-ops paused by budget',
         correlation_id: 'dot-budget-stop:org-ops:token-cap:2026-10-05',
-      })
+      }),
+      {}
     );
   });
 
@@ -33,5 +34,16 @@ describe('dot budget stop alert', () => {
     notifyDotBudgetStopOnce({ dot_id: 'repo-guardian' }, 'token-cap', day, notify);
     notifyDotBudgetStopOnce(charter, 'token-cap', new Date('2026-10-06T01:00:00Z'), notify);
     expect(notify).toHaveBeenCalledTimes(4);
+  });
+
+  it('keeps a personal budget notification bound to its owner', () => {
+    const scope = { tier: 'personal' as const, owner_nhi: 'user:owner' };
+    notifyDotBudgetStopOnce(
+      { dot_id: 'personal-ops', scope },
+      'token-cap',
+      new Date('2026-11-15T01:00:00Z'),
+      notify
+    );
+    expect(notify).toHaveBeenCalledWith('ops_alert', expect.anything(), { scope });
   });
 });

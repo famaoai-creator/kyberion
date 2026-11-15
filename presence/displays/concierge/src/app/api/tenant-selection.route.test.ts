@@ -71,6 +71,7 @@ vi.mock('../../lib/headless-projections', async (importOriginal) => ({
 }));
 vi.mock('../../lib/personal-approval-server', () => ({
   conciergeApprovalSnapshot: () => [],
+  withConciergePersonalInbox: () => null,
   conciergeViewerPersonIds: (viewer: { principalId?: string }) =>
     viewer?.principalId ? [viewer.principalId] : [],
 }));

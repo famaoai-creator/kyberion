@@ -51,12 +51,14 @@ function syncInboxWithVerdict(input: {
       status === 'accepted'
         ? acceptInboxEntryWithHumanReceipt({
             entryId: entry.entry_id,
+            scope: entry.scope,
             actorId: 'human:chronos-localadmin',
             authenticated: true,
             authMethod: 'surface_session',
             responsibilityStatement: 'I accept this deliverable on behalf of the operator.',
           })
         : markInboxEntry(entry.entry_id, status, {
+            scope: entry.scope,
             verdictNote: input.comment,
             verdictReasonCategory: input.reasonCategory,
             reviewedBy: 'chronos-localadmin',

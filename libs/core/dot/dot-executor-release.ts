@@ -36,6 +36,9 @@ import {
   addressedTo,
   bounded,
   dotItemTenantMismatch,
+  dotItemScopeMismatch,
+  dotItemAuthorityMismatch,
+  dotItemWithAdmissionProof,
   hasUncertainAttempt,
   meta,
   nowOf,
@@ -111,6 +114,7 @@ function assertReleasable(
   item: WorkItem,
   deps: Pick<DotExecutorDeps, 'rootDir' | 'resultsCache'>
 ): DotWorkResultRow | undefined {
+  item = dotItemWithAdmissionProof(item, deps);
   if (!addressedTo(c, item)) {
     throw new Error(
       `[DOT_RELEASE_SCOPE] WorkItem '${item.item_id}' is not addressed to dot '${c.dot_id}'`
@@ -121,6 +125,10 @@ function assertReleasable(
       `[DOT_RELEASE_SCOPE] WorkItem '${item.item_id}' belongs to another tenant scope than dot '${c.dot_id}'`
     );
   }
+  if (dotItemScopeMismatch(c, item) || dotItemAuthorityMismatch(c, item))
+    throw new Error(
+      `[DOT_RELEASE_SCOPE] WorkItem '${item.item_id}' original custody or executor role differs or is unknown`
+    );
   if (item.lease_id || item.status === 'in_progress') {
     throw new Error(
       `[DOT_RELEASE_LEASED] WorkItem '${item.item_id}' is still leased — wait for the reaper to quarantine it`
@@ -144,14 +152,15 @@ function assertReleasable(
 }
 
 function charterApprovalScope(c: DotCharter) {
-  return c.scope.tenant_slug
-    ? {
-        scope: {
-          tenant_slug: c.scope.tenant_slug,
-          ...(c.scope.organization_id ? { organization_id: c.scope.organization_id } : {}),
-        },
-      }
-    : {};
+  return {
+    scope: {
+      tier: c.scope.tier,
+      ...(c.scope.tenant_slug ? { tenant_slug: c.scope.tenant_slug } : {}),
+      ...(c.scope.organization_id ? { organization_id: c.scope.organization_id } : {}),
+      ...(c.scope.project_id ? { project_id: c.scope.project_id } : {}),
+      ...(c.scope.owner_nhi ? { nhi_id: c.scope.owner_nhi } : {}),
+    },
+  };
 }
 
 /**
@@ -247,6 +256,15 @@ function releaseRefusal(
   const requestTenant = record.scope?.tenant_slug || undefined;
   if (requestTenant !== (item.context?.tenant_slug || undefined)) {
     return 'request tenant differs from the WorkItem tenant';
+  }
+  if (
+    c.scope.tier === 'personal' &&
+    (record.scope?.tier !== 'personal' || record.scope?.nhi_id !== c.scope.owner_nhi)
+  )
+    return 'request owner differs from the personal WorkItem owner';
+  for (const key of ['tier', 'organization_id', 'project_id'] as const) {
+    if (record.scope?.[key] !== undefined && record.scope[key] !== c.scope[key])
+      return 'request scope differs from the original WorkItem scope';
   }
   if (record.accountability.effectBinding !== releaseEffectBinding(c.dot_id, item)) {
     return 'WorkItem changed since the request — request a new release';
@@ -363,7 +381,10 @@ export function applyApprovedDotReleases(
     const verification: DotOperatorVerification = {
       operator_verified_at: nowOf(deps).toISOString(),
       operator_verified_by: decider,
-      operator_verified_reason: bounded(record.justification?.reason ?? '', 300),
+      operator_verified_reason:
+        charter.scope.tier === 'public' && !charter.scope.tenant_slug
+          ? bounded(record.justification?.reason ?? '', 300)
+          : `Details retained in scoped approval ${record.id}`,
       operator_verified_approval_id: record.id,
     };
     const priorExecutor =
@@ -414,7 +435,9 @@ export function applyApprovedDotReleases(
           operator_verified_at: verification.operator_verified_at,
           ...(terminal ? { superseded_result_status: terminal.status } : {}),
           // Tenant prose stays out of the shared audit chain.
-          ...(charter.scope.tenant_slug ? {} : { reason: verification.operator_verified_reason }),
+          ...(charter.scope.tier === 'public' && !charter.scope.tenant_slug
+            ? { reason: verification.operator_verified_reason }
+            : {}),
         },
         ...(charter.scope.tenant_slug ? { tenantSlug: charter.scope.tenant_slug } : {}),
       });

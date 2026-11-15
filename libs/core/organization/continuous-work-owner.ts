@@ -1,5 +1,6 @@
 /** Governed continuous managed work owner. */
 import * as path from 'node:path';
+import { restoreDotWorkItemBody } from '../dot/dot-work-item.js';
 import { safeExistsSync, safeReadFileSnapshot, safeWriteFile } from '../secure-io.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import { pathResolver } from '../path-resolver.js';
@@ -128,7 +129,9 @@ export async function runContinuousWorkOwner(
         let leaseId: string | undefined;
         try {
           (deps.authorizeItem ?? authorizeItem)(charter, item, rootDir);
-          const plan = parseContinuousWorkPlan(item.metadata?.continuous_work);
+          const plan = parseContinuousWorkPlan(
+            restoreDotWorkItemBody(charter, item, rootDir).metadata?.continuous_work
+          );
           const actionRef = item.metadata?.action_ref;
           if (
             typeof actionRef !== 'string' ||

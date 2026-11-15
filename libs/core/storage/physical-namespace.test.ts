@@ -46,6 +46,29 @@ describe('physical namespace', () => {
       })
     ).toThrow(/SCOPE_CONTEXT_INVALID|PHYSICAL_NAMESPACE_SEGMENT_INVALID/);
   });
+
+  it('keeps personal owner and full entity lineage distinct from system and other owners', () => {
+    const scope = {
+      tier: 'personal' as const,
+      nhi_id: 'user:alice',
+      tenant_slug: 'acme',
+      organization_id: 'org',
+      project_id: 'project',
+      mission_id: 'MSN-A',
+      task_id: 'task',
+    };
+    const alice = physicalScopedPath('base', scope, 'entry.json');
+    expect(alice).toMatch(
+      /^base\/personal\/acme\/owners\/[a-f0-9]{64}\/organizations\/org\/projects\/project\/missions\/MSN-A\/tasks\/task\/entry.json$/
+    );
+    expect(alice).not.toBe(
+      physicalScopedPath('base', { ...scope, nhi_id: 'user:bob' }, 'entry.json')
+    );
+    expect(partitionedScopedPath('base', scope, 'entry.json')).toBe(alice);
+    expect(() => physicalScopedPath('base', { tier: 'personal' }, 'entry.json')).toThrow(
+      'PERSONAL_SCOPE_OWNER_REQUIRED'
+    );
+  });
 });
 
 describe('partitionedScopedPath (registered <root>/<tier>/<tenant> layout)', () => {

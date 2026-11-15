@@ -438,6 +438,20 @@
       "sources": ["role-policy"]
     },
     {
+      "id": "operator-notification-receipts",
+      "path": "active/shared/runtime/operator-notification-receipts/<tier>/<tenant>",
+      "custody": { "kind": "tenant", "ref": "<tenant>", "shared_segment": "system" },
+      "tiers": ["personal", "confidential", "public"],
+      "status": "active",
+      "sources": ["runtime-state-roots"],
+      "registration": {
+        "family": "state",
+        "key": "operator_notification_receipts",
+        "order": 17,
+        "retention_path": "active/shared/runtime/operator-notification-receipts"
+      }
+    },
+    {
       "id": "personal-knowledge",
       "path": "knowledge/personal",
       "custody": {

@@ -5,7 +5,7 @@ import { assertContinuousDevelopmentApprovalPresentation } from './continuous-de
 import type { DotCharter } from '../dot/dot-charter.js';
 import { assertDotAccountabilityCharter } from '../dot/dot-authority.js';
 import { readDotActionLedgerStrict } from '../dot/dot-action-ledger.js';
-import { dotWorkItemInput } from '../dot/dot-work-item.js';
+import { dotWorkItemInput, restoreDotWorkItemBody } from '../dot/dot-work-item.js';
 import { dotAdmissionScopeHash } from '../dot/dot-admission-identity.js';
 import { dotProposalEvidenceHash } from '../dot/dot-action-ledger-version.js';
 import { recoveryEvidenceHash } from '../surface/front-desk-recovery-receipt.js';
@@ -314,7 +314,9 @@ export function resolveUncertainContinuousOwnerState(
   (deps.authorize ?? authorize)(charter);
   const rootDir = options.rootDir ?? pathResolver.rootDir();
   (deps.authorizeItem ?? ((c, i, r) => authorizeItem(c, i, r, false)))(charter, item, rootDir);
-  const plan = parseContinuousWorkPlan(item.metadata?.continuous_work);
+  const plan = parseContinuousWorkPlan(
+    restoreDotWorkItemBody(charter, item, rootDir).metadata?.continuous_work
+  );
   const actionRef = item.metadata?.action_ref;
   if (typeof actionRef !== 'string' || !actionRef)
     throw new Error('Managed reconcile requires admitted action identity');
@@ -366,7 +368,9 @@ export function readContinuousWorkOwnerProgress(
     throw new Error('Managed progress requires exact item scope');
   if (deps.authorizeItem) deps.authorizeItem(charter, item, rootDir);
   else authorizeItem(charter, item, rootDir, false);
-  const plan = parseContinuousWorkPlan(item.metadata?.continuous_work);
+  const plan = parseContinuousWorkPlan(
+    restoreDotWorkItemBody(charter, item, rootDir).metadata?.continuous_work
+  );
   const actionRef = item.metadata?.action_ref;
   if (typeof actionRef !== 'string' || !actionRef)
     throw new Error('Managed progress requires admitted action identity');

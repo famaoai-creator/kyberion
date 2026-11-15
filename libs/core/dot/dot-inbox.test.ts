@@ -1,4 +1,5 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import * as locks from '../foundation/lock-utils.js';
 
 import { appendJsonLine, readJsonLines } from '../foundation/json.js';
 import { streamJsonLines } from '../storage/jsonl-read.js';
@@ -23,11 +24,29 @@ const appendDotInboxEntry = (input: DotInboxEntryInput, deps?: DotInboxAppendDep
   appendScopedDotInboxEntry({ ...input, scope: input.scope ?? { tier: 'public' } }, deps);
 
 afterEach(() => {
+  vi.restoreAllMocks();
   setDotInboxTestHooks({});
   safeRmSync(TEST_ROOT, { recursive: true, force: true });
 });
 
 describe('appendDotInboxEntry', () => {
+  it.each([
+    { tier: 'public' as const },
+    { tier: 'confidential' as const, tenant_slug: 'tenant-a' },
+    { tier: 'personal' as const, owner_nhi: 'owner-a' },
+  ])('leaves a contended $tier inbox untouched and accepts the producer retry', (scope) => {
+    const input = { channel: 'inbox', dot_id: 'test', text: 'keep this input', scope };
+    const lock = vi.spyOn(locks, 'withLockSync').mockImplementationOnce(() => {
+      throw new Error('[LOCK_TIMEOUT] inbox compaction is still running');
+    });
+    expect(() => appendDotInboxEntry(input, { rootDir: TEST_ROOT })).toThrow('LOCK_TIMEOUT');
+    expect(readJsonLines(`${TEST_ROOT}/${dotInboxPath(scope)}`)).toEqual([]);
+    lock.mockRestore();
+    const entry = appendDotInboxEntry(input, { rootDir: TEST_ROOT });
+    expect(readJsonLines(`${TEST_ROOT}/${dotInboxPath(scope)}`)).toEqual([entry]);
+    if (scope.tier !== 'public')
+      expect(readJsonLines(`${TEST_ROOT}/${DOT_INBOX_PATH}`)).toEqual([]);
+  });
   it('requires an explicit trusted scope before persisting content', () => {
     expect(() =>
       appendScopedDotInboxEntry(

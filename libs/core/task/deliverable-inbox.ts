@@ -17,6 +17,9 @@ import {
 } from '../secure-io.js';
 import { resolveRole } from '../authority.js';
 import { DELIVERABLE_INBOX_WRITER_ROLE } from '../foundation/deliverable-inbox-writer-capability.js';
+import { assertMemoryScope, type MemoryScopeEnvelope } from '../knowledge/memory-scope.js';
+import { physicalScopedPath } from '../storage/physical-namespace.js';
+import { safeReaddir } from '../secure-io.js';
 
 export type DeliverableInboxStatus =
   'unread' | 'read' | 'accepted' | 'rejected' | 'changes_requested';
@@ -30,6 +33,8 @@ export interface DeliverableRoleSection {
 }
 
 export interface DeliverableInboxEntry {
+  /** Original canonical custody and entity chain, retained for exact-lane mutations. */
+  scope?: MemoryScopeEnvelope;
   entry_id: string;
   mission_id?: string;
   title: string;
@@ -39,6 +44,10 @@ export interface DeliverableInboxEntry {
   updated_at: string;
   status: DeliverableInboxStatus;
   tenant_slug?: string;
+  tier?: MemoryScopeEnvelope['tier'];
+  owner_nhi?: string;
+  organization_id?: string;
+  project_id?: string;
   kind?: string;
   /** SU-03: reviewer note attached with a rejected / changes_requested verdict. */
   verdict_note?: string;
@@ -83,6 +92,10 @@ export interface DeliverableInboxQuery {
   tenant?: string;
   status?: DeliverableInboxStatus | DeliverableInboxStatus[] | string | string[];
   limit?: number;
+  /** Exact server-owned scope, used for delivery reconciliation. */
+  scope?: MemoryScopeEnvelope;
+  /** An authenticated owner's private lane, never inferred from a tenant. */
+  ownerNhi?: string;
 }
 
 const INBOX_PATH = pathResolver.shared(path.join('inbox', 'entries.jsonl'));
@@ -90,13 +103,39 @@ const LOCK_TIMEOUT_MS = 5000;
 const INBOX_ENTRY_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/deliverable-inbox-entry.schema.json'
 );
+const inboxEntryFiles = new WeakMap<DeliverableInboxEntry, string>();
 
-function inboxPath(): string {
-  return assertSafeRepositoryPath(INBOX_PATH, { allowMissingLeaf: true });
+/** Existing shared history plus physically isolated lanes; symlinks are never followed. */
+function inboxFiles(): string[] {
+  const base = path.dirname(INBOX_PATH);
+  const visit = (dir: string): string[] => {
+    if (!safeExistsSync(dir)) return [];
+    const stat = safeLstat(dir);
+    if (stat.isSymbolicLink() || !stat.isDirectory()) return [];
+    return safeReaddir(dir).flatMap((name) => {
+      const file = assertSafeRepositoryPath(path.join(dir, name), { allowMissingLeaf: true });
+      const entry = safeLstat(file);
+      if (entry.isSymbolicLink()) return [];
+      return name === 'entries.jsonl' ? [file] : entry.isDirectory() ? visit(file) : [];
+    });
+  };
+  return visit(base);
 }
 
-function ensureInboxDir(): void {
-  const filePath = inboxPath();
+function inboxPath(scope?: MemoryScopeEnvelope): string {
+  const file = scope
+    ? pathResolver.rootResolve(
+        physicalScopedPath(
+          'active/shared/inbox',
+          { ...scope, nhi_id: scope.owner_nhi ?? scope.nhi_id },
+          'entries.jsonl'
+        )
+      )
+    : INBOX_PATH;
+  return assertSafeRepositoryPath(file, { allowMissingLeaf: true });
+}
+
+function ensureInboxDir(filePath = inboxPath()): void {
   safeMkdir(path.dirname(filePath), { recursive: true });
 }
 
@@ -120,13 +159,13 @@ function normalizeEntry(value: unknown): DeliverableInboxEntry | null {
   return parsed as DeliverableInboxEntry;
 }
 
-function readInboxEntries(): DeliverableInboxEntry[] {
-  const filePath = inboxPath();
+function readInboxEntries(filePath?: string): DeliverableInboxEntry[] {
+  if (!filePath) return inboxFiles().flatMap((file) => readInboxEntries(file));
   if (safeExistsSync(filePath) && !safeLstat(filePath).isFile()) {
     throw new Error(`[DELIVERABLE_INBOX] entries must be a regular file: ${filePath}`);
   }
   const catalog = inboxEntryCatalog(filePath);
-  return readJsonLines<DeliverableInboxEntry | null>(inboxPath(), {
+  return readJsonLines<DeliverableInboxEntry | null>(filePath, {
     onMalformed: (error) => {
       if (
         error instanceof Error &&
@@ -140,15 +179,54 @@ function readInboxEntries(): DeliverableInboxEntry[] {
       const normalized = normalizeEntry(value);
       if (!normalized) return null;
       const entry = catalog.validate(normalized, `${filePath}:${lineNumber}`);
+      if (entry.scope) {
+        const scope = assertMemoryScope(entry.scope);
+        if (scope.tier === 'personal' && !scope.owner_nhi)
+          throw new Error('[DELIVERABLE_INBOX] Personal entry requires owner_nhi');
+        for (const key of [
+          'tier',
+          'tenant_slug',
+          'owner_nhi',
+          'organization_id',
+          'project_id',
+        ] as const) {
+          if (entry[key] !== scope[key])
+            throw new Error('[DELIVERABLE_INBOX] Stored scope differs from its custody projection');
+        }
+        if (path.resolve(inboxPath(scope)) !== path.resolve(filePath))
+          throw new Error('[DELIVERABLE_INBOX] Stored scope differs from its physical lane');
+      }
       validateDeliverableRoleSections(entry);
+      inboxEntryFiles.set(entry, filePath);
       return entry;
     },
   }).filter((entry): entry is DeliverableInboxEntry => Boolean(entry));
 }
 
-function writeInboxEntries(entries: DeliverableInboxEntry[]): void {
-  ensureInboxDir();
-  const filePath = inboxPath();
+function writeInboxEntries(entries: DeliverableInboxEntry[], filePath?: string): void {
+  if (!filePath) {
+    const groups = new Map<string, DeliverableInboxEntry[]>();
+    for (const entry of entries) {
+      const target =
+        inboxEntryFiles.get(entry) ||
+        inboxPath(
+          entry.scope ||
+            (entry.tier
+              ? {
+                  tier: entry.tier,
+                  tenant_slug: entry.tenant_slug,
+                  owner_nhi: entry.owner_nhi,
+                  organization_id: entry.organization_id,
+                  project_id: entry.project_id,
+                }
+              : undefined)
+        );
+      groups.set(target, [...(groups.get(target) || []), entry]);
+    }
+    for (const [target, rows] of groups) writeInboxEntries(rows, target);
+    return;
+  }
+  ensureInboxDir(filePath);
   if (safeExistsSync(filePath) && !safeLstat(filePath).isFile()) {
     throw new Error(`[DELIVERABLE_INBOX] entries must be a regular file: ${filePath}`);
   }
@@ -205,6 +283,7 @@ export function addInboxEntry(input: {
   artifactPaths?: string[];
   summary?: string;
   tenantSlug?: string;
+  scope?: MemoryScopeEnvelope;
   kind?: string;
   status?: DeliverableInboxStatus;
   entryId?: string;
@@ -214,6 +293,14 @@ export function addInboxEntry(input: {
   roleSections?: DeliverableRoleSection[];
   integratedSummary?: string;
 }): DeliverableInboxEntry {
+  const scope = input.scope ? assertMemoryScope(input.scope) : undefined;
+  if (scope?.tier === 'personal' && !scope.owner_nhi?.trim())
+    throw new Error('[DELIVERABLE_INBOX] Personal inbox requires owner_nhi');
+  if (scope && input.tenantSlug && scope.tenant_slug !== input.tenantSlug)
+    throw new Error('[DELIVERABLE_INBOX] Conflicting tenant scope');
+  if (scope?.mission_id && input.missionId && scope.mission_id !== input.missionId.trim())
+    throw new Error('[DELIVERABLE_INBOX] Conflicting mission scope');
+  const filePath = inboxPath(scope);
   const now = nowIso();
   // Persisted paths are repo-relative and portable: an absolute path embeds
   // the operator's machine layout in the shared store and dies on any host
@@ -223,7 +310,7 @@ export function addInboxEntry(input: {
     pathResolver.toRepoRelative(String(ref).trim()).split(path.sep).join('/');
   const entry: DeliverableInboxEntry = {
     entry_id: input.entryId || `INBOX-${randomUUID().slice(0, 8).toUpperCase()}`,
-    mission_id: input.missionId?.trim() || undefined,
+    mission_id: input.missionId?.trim() || scope?.mission_id || undefined,
     title: input.title.trim() || input.missionId?.trim() || 'Deliverable',
     artifact_paths: Array.from(
       new Set((input.artifactPaths || []).map(normalizeStoredRef).filter(Boolean))
@@ -232,7 +319,16 @@ export function addInboxEntry(input: {
     created_at: input.createdAt || now,
     updated_at: input.createdAt || now,
     status: input.status || 'unread',
-    tenant_slug: input.tenantSlug?.trim() || undefined,
+    tenant_slug: scope?.tenant_slug || input.tenantSlug?.trim() || undefined,
+    ...(scope
+      ? {
+          scope,
+          tier: scope.tier,
+          ...(scope.owner_nhi ? { owner_nhi: scope.owner_nhi } : {}),
+          ...(scope.organization_id ? { organization_id: scope.organization_id } : {}),
+          ...(scope.project_id ? { project_id: scope.project_id } : {}),
+        }
+      : {}),
     kind: input.kind?.trim() || undefined,
     ...(input.roleSections?.length
       ? {
@@ -251,8 +347,9 @@ export function addInboxEntry(input: {
   return withInboxLock(() => {
     // The narrow inbox writer (a shared store, every tenant's entries) may only
     // append: keep every existing byte, whatever an older or odd line holds.
-    if (resolveRole() === DELIVERABLE_INBOX_WRITER_ROLE) return appendInboxEntryRaw(entry, input);
-    const entries = readInboxEntries();
+    if (resolveRole() === DELIVERABLE_INBOX_WRITER_ROLE)
+      return appendInboxEntryRaw(entry, input, filePath);
+    const entries = readInboxEntries(filePath);
     const existing =
       input.ifAbsent && input.entryId
         ? entries.find((item) => item.entry_id === input.entryId)
@@ -262,7 +359,7 @@ export function addInboxEntry(input: {
       return existing;
     }
     entries.push(entry);
-    writeInboxEntries(entries);
+    writeInboxEntries(entries, filePath);
     return entry;
   });
 }
@@ -277,6 +374,11 @@ function assertSameInboxIdentity(
     existing.kind !== entry.kind ||
     existing.mission_id !== entry.mission_id ||
     existing.tenant_slug !== entry.tenant_slug ||
+    JSON.stringify(existing.scope) !== JSON.stringify(entry.scope) ||
+    existing.tier !== entry.tier ||
+    existing.owner_nhi !== entry.owner_nhi ||
+    existing.organization_id !== entry.organization_id ||
+    existing.project_id !== entry.project_id ||
     JSON.stringify(existing.artifact_paths) !== JSON.stringify(entry.artifact_paths) ||
     JSON.stringify(existing.role_sections) !== JSON.stringify(entry.role_sections) ||
     existing.integrated_summary !== entry.integrated_summary
@@ -293,9 +395,9 @@ function assertSameInboxIdentity(
  */
 function appendInboxEntryRaw(
   entry: DeliverableInboxEntry,
-  input: { entryId?: string; ifAbsent?: boolean }
+  input: { entryId?: string; ifAbsent?: boolean },
+  filePath = inboxPath()
 ): DeliverableInboxEntry {
-  const filePath = inboxPath();
   if (safeExistsSync(filePath) && !safeLstat(filePath).isFile()) {
     throw new Error(`[DELIVERABLE_INBOX] entries must be a regular file: ${filePath}`);
   }
@@ -317,7 +419,7 @@ function appendInboxEntryRaw(
     }
   }
   const validated = inboxEntryCatalog(filePath).validate(entry, filePath);
-  ensureInboxDir();
+  ensureInboxDir(filePath);
   const separator = raw === '' || raw.endsWith('\n') ? '' : '\n';
   // Appended by rewriting the whole text: the writer-role guard compares full content with the file.
   writeInboxText(filePath, `${raw}${separator}${JSON.stringify(validated)}\n`);
@@ -351,21 +453,41 @@ export function listInboxEntries(query: DeliverableInboxQuery = {}): Deliverable
   const missionFilter = query.missionId?.trim().toUpperCase() || '';
   const tenantFilter = query.tenant?.trim().toLowerCase() || '';
   const textFilter = query.query?.trim().toLowerCase() || '';
-  const entries = readInboxEntries().filter((entry) => {
-    if (query.entryId !== undefined && entry.entry_id !== query.entryId) return false;
-    if (statusFilter && !statusFilter.has(entry.status)) return false;
-    if (missionFilter && entry.mission_id?.toUpperCase() !== missionFilter) return false;
-    if (
-      tenantFilter &&
-      !`${entry.tenant_slug || ''} ${entry.summary} ${entry.title}`
-        .toLowerCase()
-        .includes(tenantFilter)
-    ) {
-      return false;
-    }
-    if (textFilter && !collectSearchText(entry).includes(textFilter)) return false;
-    return true;
-  });
+  const ownerHash = query.ownerNhi
+    ? createHash('sha256').update(query.ownerNhi).digest('hex')
+    : undefined;
+  const files = query.scope
+    ? [inboxPath(assertMemoryScope(query.scope))]
+    : inboxFiles().filter((file) => {
+        const segments = path.relative(path.dirname(INBOX_PATH), file).split(path.sep);
+        return (
+          segments[0] !== 'personal' ||
+          Boolean(ownerHash && segments[2] === 'owners' && segments[3] === ownerHash)
+        );
+      });
+  const entries = files
+    .flatMap((file) => readInboxEntries(file))
+    .filter((entry) => {
+      if (
+        entry.tier === 'personal' &&
+        (!query.ownerNhi || query.ownerNhi !== entry.owner_nhi) &&
+        query.scope?.owner_nhi !== entry.owner_nhi
+      )
+        return false;
+      if (query.entryId !== undefined && entry.entry_id !== query.entryId) return false;
+      if (statusFilter && !statusFilter.has(entry.status)) return false;
+      if (missionFilter && entry.mission_id?.toUpperCase() !== missionFilter) return false;
+      if (
+        tenantFilter &&
+        !`${entry.tenant_slug || ''} ${entry.summary} ${entry.title}`
+          .toLowerCase()
+          .includes(tenantFilter)
+      ) {
+        return false;
+      }
+      if (textFilter && !collectSearchText(entry).includes(textFilter)) return false;
+      return true;
+    });
 
   return entries
     .sort((left, right) => {
@@ -467,6 +589,7 @@ export function markInboxEntry(
   entryId: string,
   status: DeliverableInboxStatus,
   options: {
+    scope?: MemoryScopeEnvelope;
     verdictNote?: string;
     reviewedBy?: string;
     verdictReasonCategory?: RejectionReasonCategory;
@@ -480,7 +603,12 @@ export function markInboxEntry(
     );
   }
   return withInboxLock(() => {
-    const entries = readInboxEntries();
+    const filePath = inboxPath(options.scope ? assertMemoryScope(options.scope) : undefined);
+    const entries = readInboxEntries(filePath).filter(
+      (entry) =>
+        entry.tier !== 'personal' ||
+        Boolean(options.scope?.owner_nhi && entry.owner_nhi === options.scope.owner_nhi)
+    );
     const index = entries.findIndex((entry) => entry.entry_id === normalizedId);
     if (index < 0) return null;
     const verdictNote = options.verdictNote?.trim();
@@ -494,7 +622,7 @@ export function markInboxEntry(
       ...(reviewedBy ? { reviewed_by: reviewedBy } : {}),
       updated_at: nowIso(),
     };
-    writeInboxEntries(entries);
+    writeInboxEntries(entries, filePath);
     return entries[index];
   });
 }
@@ -517,6 +645,7 @@ function digestDeliverable(entry: DeliverableInboxEntry): string {
  * exact artifact set presented at acceptance time.
  */
 export function acceptInboxEntryWithHumanReceipt(input: {
+  scope?: MemoryScopeEnvelope;
   entryId: string;
   actorId: string;
   authenticated: boolean;
@@ -535,7 +664,12 @@ export function acceptInboxEntryWithHumanReceipt(input: {
     );
   }
   return withInboxLock(() => {
-    const entries = readInboxEntries();
+    const filePath = inboxPath(input.scope ? assertMemoryScope(input.scope) : undefined);
+    const entries = readInboxEntries(filePath).filter(
+      (entry) =>
+        entry.tier !== 'personal' ||
+        Boolean(input.scope?.owner_nhi && entry.owner_nhi === input.scope.owner_nhi)
+    );
     const index = entries.findIndex((entry) => entry.entry_id === input.entryId.trim());
     if (index < 0) return null;
     const entry = entries[index];
@@ -557,13 +691,14 @@ export function acceptInboxEntryWithHumanReceipt(input: {
       },
     };
     entries[index] = updated;
-    writeInboxEntries(entries);
+    writeInboxEntries(entries, filePath);
     return updated;
   });
 }
 
 /** Finalize an accepted artifact for an external or durable destination. */
 export function finalizeAcceptedDeliverable(input: {
+  scope?: MemoryScopeEnvelope;
   entryId: string;
   actorId: string;
   authenticated: boolean;
@@ -577,7 +712,12 @@ export function finalizeAcceptedDeliverable(input: {
     throw new Error('[POLICY_VIOLATION] Deliverable delivery requires a destination');
   }
   return withInboxLock(() => {
-    const entries = readInboxEntries();
+    const filePath = inboxPath(input.scope ? assertMemoryScope(input.scope) : undefined);
+    const entries = readInboxEntries(filePath).filter(
+      (entry) =>
+        entry.tier !== 'personal' ||
+        Boolean(input.scope?.owner_nhi && entry.owner_nhi === input.scope.owner_nhi)
+    );
     const index = entries.findIndex((entry) => entry.entry_id === input.entryId.trim());
     if (index < 0) return null;
     const entry = entries[index];
@@ -604,7 +744,7 @@ export function finalizeAcceptedDeliverable(input: {
       },
     };
     entries[index] = updated;
-    writeInboxEntries(entries);
+    writeInboxEntries(entries, filePath);
     return updated;
   });
 }

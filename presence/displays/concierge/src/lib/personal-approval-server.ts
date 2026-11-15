@@ -27,6 +27,19 @@ export function withConciergePersonalApprovals<T>(
   }
 }
 
+/** The existing installed-owner proof also bounds personal Inbox reads/writes. */
+export function withConciergePersonalInbox<T>(
+  viewer: ConciergeViewerContext,
+  run: (owner: { ownerNhi: string; actorId: string }) => T
+): T | null {
+  return withConciergePersonalApprovals(viewer, () => {
+    const installed = inspectInstalledOnboardingRuntime({ kind: 'person' });
+    if (!installed.ready || !installed.agentId || viewer.principal?.actor.kind !== 'human')
+      return null;
+    return run({ ownerNhi: installed.agentId, actorId: viewer.principal.actor.id });
+  });
+}
+
 export function loadConciergeApproval(viewer: ConciergeViewerContext, channel: string, id: string) {
   const ordinary = loadApprovalRequest(channel, id);
   if (ordinary && !(ordinary.scope?.tier === 'personal' && !ordinary.scope.tenant_slug))
