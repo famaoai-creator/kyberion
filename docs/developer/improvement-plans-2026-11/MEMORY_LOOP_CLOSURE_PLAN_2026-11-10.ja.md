@@ -2,7 +2,7 @@
 title: 記憶のループを閉じる計画（スコープ付きの候補と 1 本の取り込み経路）
 kind: plan
 status: active
-last_updated: 2026-11-10
+last_updated: 2026-11-15
 tags: [plan, concepts, memory, distill, promotion, knowledge-index, context-pack, disclosure]
 importance: 9
 ---
@@ -66,6 +66,7 @@ importance: 9
 - **M3（済）**：mission distill の識別子とログを用語に合わせました（`loadDistillPolicy` など。古い名前は 1 リリースの間、非推奨の別名として残します）。GLOSSARY の「Promotion (Memory)」「Memory Candidate」を直しました。
 - **M3（2 回目、済）**：`wisdom-policy.json` を `distill-policy.json` に、schema を `distill-policy.schema.json` に改名しました（新しいファイルがなければ、古いパスを 1 リリースの間、警告付きで読みます）。`KYBERION_WISDOM_LLM_PROFILE` は `KYBERION_DISTILL_LLM_PROFILE` に改名し、古い名前は 1 リリースの間、非推奨の警告付きで受け付けます（env-registry と生成された設定の文書を更新）。volatile の sidecar の `status: promoted`（推薦しただけの意味）は `nominated` にし、古い値は読み込み時に `nominated` として扱います。hint は下の設計どおり 1 つのストアと生成するビューにしました。
 - **完了の合図（一部達成）**：`DistillCandidateRecord` に提案を書く処理はなくなりました。そのため、concept-registry の `memory-candidate` から `lifecycle`（`transitioning`）を外し、GLOSSARY を合わせました。ループの健全性の指標が 0 でないことは、今のところテストの fixture でしか示せていません。実際の運用で 0 でない値が続くかどうかは、まだ確かめていません。
+- **健全性の実測（2026-11-15、要対応）**：実際の checkout で `computeMemoryLoopHealth` を 28 日窓で実行したところ、`promoted=348 / retrieved=0 / used=0` で、設計どおり「loop open」の警告が出ました。指標自体は実運用で正しく動いていますが、値が 0 でした。原因は構造的なものです：`recordKnowledgeDelivery` を呼ぶのは worker 派遣（`mission-orchestration-worker-part-context.ts`）、background review、ADF 修復の経路だけで、この checkout では `active/shared/runtime/feedback-loop/` に `knowledge-usage` の aggregate が一度も書かれていません（この期間の mission はすべて direct_cli で、context pack を作る経路を通っていません）。残件は、昇格した記録を direct_cli の作業にも届ける経路を足すか、指標を経路別に分けて「派遣が無いだけ」を「届いていない」と区別するかの判断です。
 
 ### M3 の hint の設計（実装前に決めたこと）
 
