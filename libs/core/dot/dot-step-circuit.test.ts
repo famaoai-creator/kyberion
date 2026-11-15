@@ -150,4 +150,27 @@ describe('DotSupervisorStepCircuit', () => {
       circuit2.reportFailure('d', new Error('request aaaa1111-2222-3333-4444-bbbbccccdddd lost'), 1)
     ).toBe('open');
   });
+
+  it('streaks small volatile ids — short pids, ports, embedded timestamps', () => {
+    const circuit = new DotSupervisorStepCircuit('test-step', { threshold: 3 });
+    // Container and early-boot pids are 1-3 digits; a bare \d{4,} rule would
+    // never converge these.
+    expect(circuit.reportFailure('d', new Error('lock held by pid 7'), 0)).toBe('counted');
+    expect(circuit.reportFailure('d', new Error('lock held by pid 42'), 1)).toBe('counted');
+    expect(circuit.reportFailure('d', new Error('lock held by pid 101'), 2)).toBe('open');
+
+    const stamps = new DotSupervisorStepCircuit('s', { threshold: 2 });
+    stamps.reportFailure('d', new Error('state write failed at 2026-11-15T15:22:02.593Z'), 0);
+    expect(
+      stamps.reportFailure('d', new Error('state write failed at 2026-11-16T02:10:44.001Z'), 1)
+    ).toBe('open');
+  });
+
+  it('keeps semantically distinct small numbers as distinct signatures', () => {
+    const circuit = new DotSupervisorStepCircuit('s', { threshold: 2 });
+    circuit.reportFailure('d', new Error('exit code 1'), 0);
+    // A different small error code must NOT extend the same streak.
+    expect(circuit.reportFailure('d', new Error('exit code 2'), 1)).toBe('counted');
+    expect(circuit.streakOf('d')).toBe(1);
+  });
 });

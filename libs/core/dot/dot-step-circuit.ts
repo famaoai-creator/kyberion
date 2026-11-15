@@ -36,12 +36,21 @@ export type DotStepFailureVerdict = 'counted' | 'open' | 'held';
 
 function failureSignature(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
-  // Normalize volatile payloads (pids, epochs, uuids, long hex) so the same
-  // underlying defect streaks — "lock held by pid 1073" and "pid 2084" are
-  // one failure, not two distinct ones that never reach the threshold.
+  // Normalize volatile payloads (pids, epochs, uuids, timestamps, long hex)
+  // so the same underlying defect streaks — "lock held by pid 1073" and
+  // "pid 42" are one failure, not two distinct ones that never reach the
+  // threshold. Small numbers stay literal UNLESS they follow an
+  // identifier-ish field name ("pid 7" is volatile; "exit code 7" is
+  // semantic and must not collapse into a different defect's streak).
   return message
     .split('\n')[0]
+    .replace(/\b\d{4}-\d{2}-\d{2}(?:[T ][0-9:.]+(?:Z|[+-]\d{2}:?\d{2})?)?/g, '<ts>')
     .replace(/[0-9a-f]{8}-[0-9a-f-]{27,}/gi, '<id>')
+    .replace(/0x[0-9a-f]+/gi, '<ptr>')
+    .replace(
+      /\b(?:p?pid|tid|uid|gid|sid|pgid|fd|inode|port|req(?:uest)?[-_ ]?id|trace[-_ ]?id|span[-_ ]?id|correlation[-_ ]?id|session[-_ ]?id|job[-_ ]?id|task[-_ ]?id|run[-_ ]?id|attempt|epoch|timestamp|nonce)[=: #]*[\w-]+/gi,
+      '<id>'
+    )
     .replace(/\b\d{4,}\b/g, '<n>')
     .slice(0, 200);
 }
