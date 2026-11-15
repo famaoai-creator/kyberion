@@ -18293,6 +18293,16 @@
         "ja": "登録済みのエージェントはまだありません。",
         "qps-ploc": "⟦Ñő ȧɠėñŧş ȧřė řėɠïşŧėřėḓ ẏėŧ. ŀőřėɱ ïṗş⟧"
       },
+      "settings.account_gws_help": {
+        "en": "After approval, enter the authorized_user client_id, client_secret and refresh_token. This form does not sign in or export credentials automatically.",
+        "ja": "承認後に authorized_user の client_id、client_secret、refresh_token を入力してください。このフォームはログインや認証情報の自動取得を行いません。",
+        "qps-ploc": "⟦Ȧƒŧėř ȧṗṗřőṽȧŀ, ėñŧėř ŧħė ȧůŧħőřïẑėḓ_ůşėř ƈŀïėñŧ_ïḓ, ƈŀïėñŧ_şėƈřėŧ ȧñḓ řėƒřėşħ_ŧőķėñ. Ŧħïş ƒőřɱ ḓőėş ñőŧ şïɠñ ïñ őř ėẋṗőřŧ ƈřėḓėñŧïȧŀş ȧůŧőɱȧŧïƈȧŀŀẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀ⟧"
+      },
+      "settings.account_gws_registered": {
+        "en": "Account registered. Runtime use is not available yet.",
+        "ja": "アカウントを登録しました。実行時の利用にはまだ対応していません。",
+        "qps-ploc": "⟦Ȧƈƈőůñŧ řėɠïşŧėřėḓ. Řůñŧïɱė ůşė ïş ñőŧ ȧṽȧïŀȧƀŀė ẏėŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
       "settings.account_close": {
         "en": "Close registration form",
         "ja": "登録フォームを閉じる",

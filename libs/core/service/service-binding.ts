@@ -1,3 +1,4 @@
+import { personalServiceEngineAdmission } from './personal-service-engine-admission.js';
 import { buildSafeExecEnv } from '../secure-io.js';
 import { currentActor } from '../authn/actor-context.js';
 import { assertIsolatedProviderHome } from '../provider/provider-auth-home.js';
@@ -59,9 +60,21 @@ export function resolveServiceBinding(
   authMode: 'none' | 'secret-guard' | 'session' = 'none',
   credentialKeys?: readonly CredentialSuffixKey[],
   selectedBinding?: ServiceBindingRecord,
-  allocationUse?: ServiceAllocationUseScope & { action: string }
+  allocationUse?: ServiceAllocationUseScope & { action: string },
+  personalCredentialCapability?: object
 ): ServiceBinding {
-  if (credentialExecutionIdentity().personalClaim && authMode !== 'none')
+  const personal = personalCredentialCapability
+    ? personalServiceEngineAdmission(personalCredentialCapability, serviceId)
+    : undefined;
+  if (
+    personal &&
+    (authMode !== 'secret-guard' ||
+      allocationUse ||
+      !selectedBinding ||
+      JSON.stringify(selectedBinding) !== JSON.stringify(personal.binding))
+  )
+    throw new Error('[CREDENTIAL_PROVENANCE_DENIED] Personal selection changed');
+  if (credentialExecutionIdentity().personalClaim && authMode !== 'none' && !personal)
     throw new Error(
       '[CREDENTIAL_PROVENANCE_DENIED] Personal claimed service credentials are not admitted'
     );
@@ -93,8 +106,9 @@ export function resolveServiceBinding(
       (selection.service_id || selection.service_type) !== serviceId ||
       !selection.owner_ref ||
       selection.secret_refs.length === 0 ||
-      credentialExecutionIdentity().tenantSlug !==
-        (selection.owner_kind === 'person' ? allocationUse?.tenant_slug : selection.tenant_slug))
+      (!personal &&
+        credentialExecutionIdentity().tenantSlug !==
+          (selection.owner_kind === 'person' ? allocationUse?.tenant_slug : selection.tenant_slug)))
   )
     throw new Error('[CREDENTIAL_PROVENANCE_DENIED] Selected service binding is incompatible');
   const knownRefs = new Set(
@@ -128,8 +142,10 @@ export function resolveServiceBinding(
     ) {
       throw new Error('[CREDENTIAL_PROVENANCE_DENIED] Selected service binding changed');
     }
+    if (personal)
+      personalServiceEngineAdmission(personalCredentialCapability, serviceId, personal.action);
     const grant =
-      selection.owner_kind === 'person'
+      selection.owner_kind === 'person' && !personal
         ? assertServiceCredentialAllocation(selection, allocationUse!, {
             action: allocationUse!.action,
           })
@@ -139,6 +155,8 @@ export function resolveServiceBinding(
       ownerRef: selection.owner_ref!,
       secretRefs: selection.secret_refs,
       allocationGrantId: grant?.grant_id,
+      personalGrantId: personal?.grantId,
+      generation: personal?.generation,
     });
   };
   const referenceOperation = 'service.binding';
@@ -202,7 +220,7 @@ export function resolveServiceBinding(
       configurable: false,
       get: () => {
         assertCredentialOwner(owner);
-        return (owner.tenantSlug ? read(key) : captured[key]) ?? undefined;
+        return (owner.tenantSlug || owner.personalClaim ? read(key) : captured[key]) ?? undefined;
       },
     });
   }

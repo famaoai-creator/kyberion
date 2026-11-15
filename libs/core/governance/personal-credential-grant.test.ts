@@ -71,6 +71,78 @@ afterEach(async () =>
 );
 
 describe('personal standing credential consent prerequisite', () => {
+  it('keeps legacy management-only consent readable and revocable without runtime opt-in', async () => {
+    const { api, store } = await setup();
+    const requested = f.run(() =>
+      api.requestPersonalCredentialGrantApproval(f.principal, selection)
+    );
+    approve(requested.id);
+    const current = f.run(() =>
+      api.grantPersonalCredentialUse(f.principal, selection, requested.id)
+    );
+    expect(current.scope.runtime_use).toBe('selected-read-api-v1');
+    const { runtime_use: _runtime, ...legacyScope } = current.scope;
+    const { personalCredentialGrantPayload, personalCredentialGrantEffect } =
+      await import('./personal-credential-grant-scope.js');
+    const { computeApprovalPayloadHash } = await import('./approval-presentation.js');
+    const { markApprovalConsumed } = await import('./approval-revocation.js');
+    const draft = { scope: legacyScope, purpose: current.purpose, ttl_days: 1 };
+    const oldApproval = f.personal(() =>
+      f.approvals.createApprovalRequest('mission_controller', {
+        channel: 'grant-standing',
+        requestedBy: f.installedId,
+        requestedByContext: {
+          surface: 'system',
+          actorId: f.installedId,
+          actorRole: 'grant-standing',
+        },
+        scope: { tier: 'personal', scope_kind: 'system', nhi_id: f.installedId },
+        draft: { title: 'Legacy consent fixture', summary: 'Runtime token use remains disabled.' },
+        workflow: {
+          workflowId: 'legacy-consent',
+          mode: 'all_required',
+          requiredRoles: ['owner'],
+          stages: [],
+          approvals: [{ role: 'owner', status: 'pending' }],
+        },
+        accountability: {
+          finalDecision: 'human_only',
+          payloadHash: computeApprovalPayloadHash(personalCredentialGrantPayload(draft)),
+          effectBinding: personalCredentialGrantEffect(draft),
+        },
+      })
+    );
+    approve(oldApproval.id);
+    const grantId = 'GRT-20261114-abcdef123456';
+    const consumed = f.personal(() =>
+      markApprovalConsumed('mission_controller', {
+        channel: 'grant-standing',
+        requestId: oldApproval.id,
+        consumer: 'grant_standing',
+        consumedBy: 'user:owner',
+        effectRef: grantId,
+      })
+    );
+    const at = consumed.consumption!.consumedAt;
+    const legacy = {
+      ...current,
+      grant_id: grantId,
+      scope: legacyScope,
+      basis: { approval_request_id: oldApproval.id, approval_channel: 'grant-standing' },
+      granted_at: at,
+      expires_at: new Date(Date.parse(at) + 86400_000).toISOString(),
+    };
+    f.personal(() => store.writePersonalCredentialGrantRecord(legacy));
+    expect(
+      f.personal(() => store.loadPersonalCredentialGrantRecord('user:owner', grantId))
+    ).toEqual(legacy);
+    expect(f.personal(() => api.verifyPersonalCredentialGrantBasis(legacy))).toBe(true);
+    expect(
+      f.run(() =>
+        api.revokePersonalCredentialGrant(f.principal, grantId, 'withdraw legacy consent')
+      ).revoked
+    ).toBeTruthy();
+  });
   it('uses actual personal grant and approval stores while remaining excluded from tenant APIs', async () => {
     const { api, store } = await setup();
     const approval = f.run(() =>

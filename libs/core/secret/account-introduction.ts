@@ -1,5 +1,18 @@
 /** Existing-account registration. Values enter only after exact human approval. */
 import { withAccountProvisionAdmission } from '../foundation/account-provision-admission.js';
+import { randomUUID } from 'node:crypto';
+import { withGwsSessionRegistrationAdmission } from '../foundation/gws-session-registration-admission.js';
+import {
+  validateGwsSessionMaterial,
+  type GwsSessionRegistrationTarget,
+  type GwsSessionStageIdentity,
+} from './gws-session-registration-contract.js';
+import {
+  loadGwsSessionRegistration,
+  prepareGwsSessionRegistration,
+  commitGwsSessionRegistration,
+  abortGwsSessionRegistration,
+} from './gws-session-store.js';
 import {
   computeApprovalPayloadHash,
   createApprovalRequest,
@@ -42,7 +55,9 @@ const denied = (reason = 'registration unavailable'): never => {
   throw new Error(`[ACCOUNT_INTRODUCTION] ${reason}`);
 };
 interface Plan {
-  version: 1;
+  version: 1 | 2;
+  material_kind?: 'gws-authorized-user-v1';
+  runtimeAvailable?: false;
   binding_id: string;
   service_id: string;
   owner_kind: 'person' | 'organization';
@@ -56,6 +71,26 @@ interface Plan {
   accountable_id: string;
   agent_id: string;
   statement: string;
+}
+const gwsBrokerDigest = hash('local-encrypted-gws-session-v1');
+function isGws(plan: Plan) {
+  return plan.version === 2 && plan.material_kind === 'gws-authorized-user-v1';
+}
+function gwsTarget(plan: Plan): GwsSessionRegistrationTarget {
+  return {
+    bindingId: plan.binding_id,
+    serviceId: 'google-workspace',
+    ownerKind: 'organization',
+    ownerRef: plan.owner_ref,
+    tenantSlug: plan.tenant_slug!,
+    authMode: 'session',
+    expectedGeneration: plan.expected_generation,
+  };
+}
+function registration(plan: Plan) {
+  if (!isGws(plan)) return loadLocalAccountRegistration(identity(plan));
+  const state = loadGwsSessionRegistration(gwsTarget(plan));
+  return { generation: state.generation, pendingApprovalId: state.pendingStage?.approvalId };
 }
 function identity(plan: Plan): LocalAccountMaterialIdentity {
   return {
@@ -88,7 +123,12 @@ function selected(principal: OnboardingAuthorityPrincipal, bindingId: string) {
     !binding.owner_ref ||
     !['person', 'organization'].includes(binding.owner_kind ?? '') ||
     !binding.service_id ||
-    binding.auth_mode !== 'secret-guard'
+    !(
+      binding.auth_mode === 'secret-guard' ||
+      (binding.auth_mode === 'session' &&
+        binding.service_id === 'google-workspace' &&
+        binding.owner_kind === 'organization')
+    )
   )
     return denied();
   if (binding.owner_kind === 'person') {
@@ -110,12 +150,15 @@ function selected(principal: OnboardingAuthorityPrincipal, bindingId: string) {
       (s) => `${binding.service_id!.toUpperCase()}_${s}`
     ) ?? [];
   if (
-    !binding.secret_refs.length ||
-    binding.secret_refs.length > 16 ||
-    new Set(binding.secret_refs).size !== binding.secret_refs.length ||
-    binding.secret_refs.some((ref) => !allowed.includes(ref))
+    binding.auth_mode === 'secret-guard' &&
+    (!binding.secret_refs.length ||
+      binding.secret_refs.length > 16 ||
+      new Set(binding.secret_refs).size !== binding.secret_refs.length ||
+      binding.secret_refs.some((ref) => !allowed.includes(ref)))
   )
     denied('unsupported account token references');
+  if (binding.auth_mode === 'session' && binding.secret_refs.length)
+    denied('unsupported session references');
   // Registration is an installed operator action, not a tenant execution.
   // Tenant ownership above remains independent of the requesting local NHI.
   const installed = inspectInstalledOnboardingRuntime({ kind: 'person' });
@@ -131,8 +174,12 @@ function approvalScope<T>(principal: OnboardingAuthorityPrincipal, plan: Plan, r
 }
 function prepare(principal: OnboardingAuthorityPrincipal, bindingId: string): Plan {
   const { binding, installed } = selected(principal, bindingId);
+  const session = binding.auth_mode === 'session';
   const plan: Plan = {
-    version: 1,
+    version: session ? 2 : 1,
+    ...(session
+      ? { material_kind: 'gws-authorized-user-v1' as const, runtimeAvailable: false as const }
+      : {}),
     binding_id: bindingId,
     service_id: binding.service_id!,
     owner_kind: binding.owner_kind as Plan['owner_kind'],
@@ -141,8 +188,11 @@ function prepare(principal: OnboardingAuthorityPrincipal, bindingId: string): Pl
     secret_refs: [...binding.secret_refs].sort(),
     expected_generation: null,
     binding_hash: hash(binding),
-    broker_id:
-      binding.owner_kind === 'organization' ? (describeAccountBroker()?.brokerId ?? null) : null,
+    broker_id: session
+      ? gwsBrokerDigest
+      : binding.owner_kind === 'organization'
+        ? (describeAccountBroker()?.brokerId ?? null)
+        : null,
     initiated_by: principal.requesterId,
     accountable_id: principal.accountableId,
     agent_id: installed.agentId,
@@ -150,7 +200,7 @@ function prepare(principal: OnboardingAuthorityPrincipal, bindingId: string): Pl
   };
   if (plan.owner_kind === 'organization' && !plan.broker_id)
     denied('configured account broker writer required');
-  const state = loadLocalAccountRegistration(identity(plan));
+  const state = registration(plan);
   const incomplete = approvalScope(principal, plan, () =>
     listApprovalRequests({ storageChannels: [ACCOUNT_INTRODUCTION_CHANNEL] }).some(
       (record) =>
@@ -171,6 +221,15 @@ function prepare(principal: OnboardingAuthorityPrincipal, bindingId: string): Pl
       : 'Encrypted local storage only. Personal runtime use is not enabled.',
     'This does not change ownership, allowed operations, grants or approval policy.',
   ].join('\n');
+  if (session)
+    plan.statement = [
+      `Register a Google Workspace authorized-user session for existing connection ${plan.binding_id}.`,
+      `Owner: organization ${plan.owner_ref}. Approver: ${plan.accountable_id}.`,
+      `Registration requester: ${plan.agent_id} (installed local assistant, no tenant execution authority).`,
+      `Material: type, client_id, client_secret, refresh_token. Previous generation: ${state.generation ?? 'none'}.`,
+      'Activate encrypted local registration using an existing key only. Runtime access remains unavailable.',
+      'This does not change ownership, allowed operations, grants or approval policy.',
+    ].join('\n');
   return plan;
 }
 export function previewAccountIntroduction(
@@ -211,7 +270,7 @@ export function proposeAccountIntroduction(
           actorRole: 'account-introduction',
         },
         draft: {
-          title: 'Register account tokens',
+          title: isGws(plan) ? 'Register Google Workspace session' : 'Register account tokens',
           summary: `Connection ${plan.binding_id}`,
           details: plan.statement,
           severity: 'high',
@@ -264,7 +323,17 @@ function readPlan(
     return denied();
   }
   if (
-    plan.version !== 1 ||
+    !(
+      (plan.version === 1 &&
+        plan.material_kind === undefined &&
+        binding.auth_mode === 'secret-guard') ||
+      (isGws(plan) &&
+        plan.runtimeAvailable === false &&
+        binding.auth_mode === 'session' &&
+        binding.service_id === 'google-workspace' &&
+        binding.owner_kind === 'organization' &&
+        plan.broker_id === gwsBrokerDigest)
+    ) ||
     plan.accountable_id !== principal.accountableId ||
     typeof plan.initiated_by !== 'string' ||
     !plan.initiated_by.trim() ||
@@ -337,7 +406,8 @@ function unchanged(principal: OnboardingAuthorityPrincipal, plan: Plan) {
     hash(binding) !== plan.binding_hash ||
     installed.agentId !== plan.agent_id ||
     hash([...binding.secret_refs].sort()) !== hash(plan.secret_refs) ||
-    (plan.owner_kind === 'organization' && describeAccountBroker()?.brokerId !== plan.broker_id)
+    (plan.owner_kind === 'organization' &&
+      (isGws(plan) ? gwsBrokerDigest : describeAccountBroker()?.brokerId) !== plan.broker_id)
   )
     denied('review changed');
 }
@@ -347,7 +417,7 @@ export function accountIntroductionStatus(
   approvalId: string
 ) {
   const { record, plan } = readPlan(principal, bindingId, approvalId);
-  const state = loadLocalAccountRegistration(identity(plan));
+  const state = registration(plan);
   let can_apply = false;
   try {
     approved(record, plan);
@@ -367,6 +437,7 @@ export function accountIntroductionStatus(
     presented_digest: computeApprovalPresentedDigest(record),
     min_assurance: record.accountability?.min_assurance ?? 'A2',
     can_apply,
+    ...(isGws(plan) ? { material_kind: plan.material_kind, runtimeAvailable: false as const } : {}),
     recovery_required: Boolean(
       state.pendingApprovalId || (record.applyClaim && record.applyResult?.result !== 'success')
     ),
@@ -383,17 +454,18 @@ export function accountIntroductionStatus(
 export async function applyAccountIntroduction(
   principal: OnboardingAuthorityPrincipal,
   bindingId: string,
-  input: { approval_id: string; material: Record<string, string> }
+  input: { approval_id: string; material: unknown }
 ) {
   return withLock(`account-introduction:${bindingId}`, async () => {
     const { record, plan } = readPlan(principal, bindingId, input.approval_id);
     approved(record, plan);
     unchanged(principal, plan);
     const address = identity(plan);
-    const state = loadLocalAccountRegistration(address);
+    const state = registration(plan);
     if (state.pendingApprovalId || record.applyClaim || record.applyResult)
       denied('recovery_required');
     if (state.generation !== plan.expected_generation) denied('generation_conflict');
+    if (isGws(plan)) return applyGws(principal, plan, record, input.material);
     const material = input.material;
     if (
       !material ||
@@ -411,7 +483,7 @@ export async function applyAccountIntroduction(
     )
       denied('invalid token material');
     // Freeze a copy before the first await; caller mutation must not change approved fields.
-    const values = Object.freeze({ ...material });
+    const values = Object.freeze({ ...(material as Record<string, string>) });
     const claimed = approvalScope(principal, plan, () =>
       claimApprovalApply('mission_controller', {
         channel: record.channel,
@@ -461,6 +533,78 @@ export async function applyAccountIntroduction(
       storeLocalAccountRegistration(address, { generation: reference.generation });
       return { ok: true as const, status: 'applied' as const, generation: reference.generation };
     } catch {
+      return denied('recovery_required');
+    }
+  });
+}
+
+async function applyGws(
+  principal: OnboardingAuthorityPrincipal,
+  plan: Plan,
+  record: ApprovalRequestRecord,
+  submitted: unknown
+) {
+  const material = validateGwsSessionMaterial(submitted);
+  const claimed = approvalScope(principal, plan, () =>
+    claimApprovalApply('mission_controller', {
+      channel: record.channel,
+      requestId: record.id,
+      appliedBy: principal.requesterId,
+      expectedRecordHash: computeApprovalPayloadHash({ record }),
+    })
+  );
+  const claimId = claimed.applyClaim.claimId;
+  const stage: Readonly<GwsSessionStageIdentity> = Object.freeze({
+    version: 1,
+    requestId: randomUUID(),
+    target: Object.freeze(gwsTarget(plan)),
+    generation: randomUUID(),
+    requesterActorId: principal.requesterId,
+    approvalId: record.id,
+    bindingSnapshotDigest: plan.binding_hash,
+    brokerConfigurationDigest: gwsBrokerDigest,
+  });
+  return withGwsSessionRegistrationAdmission(stage, async () => {
+    try {
+      prepareGwsSessionRegistration(stage, material);
+      commitGwsSessionRegistration(stage, () => {
+        unchanged(principal, plan);
+        const current = readPlan(principal, plan.binding_id, record.id);
+        approved(current.record, current.plan);
+        if (
+          hash(current.plan) !== hash(plan) ||
+          current.record.applyClaim?.claimId !== claimId ||
+          current.record.applyResult
+        )
+          denied('approval claim changed');
+      });
+      approvalScope(principal, plan, () =>
+        recordApprovalApplyResult('mission_controller', {
+          channel: record.channel,
+          requestId: record.id,
+          claimId,
+          applyResult: {
+            result: 'success',
+            appliedAt: new Date().toISOString(),
+            appliedBy: principal.requesterId,
+          },
+        })
+      );
+      return {
+        ok: true as const,
+        status: 'applied' as const,
+        generation: stage.generation,
+        material_kind: 'gws-authorized-user-v1' as const,
+        runtimeAvailable: false as const,
+      };
+    } catch {
+      // Abort only this inactive stage. A committed generation is never removed;
+      // the durable apply claim fences uncertain outcomes from replay.
+      try {
+        abortGwsSessionRegistration(stage);
+      } catch {
+        /* Preserve recovery fence. */
+      }
       return denied('recovery_required');
     }
   });

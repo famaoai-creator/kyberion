@@ -245,48 +245,45 @@ an invented owner is not a migration. The current WorkItem project model permits
 tenantless path with a public standalone project; it does not yet establish personal-tier
 project/mission admission or missionless personal work.
 
-Empty personal bindings reject API keys, provider environments, selected service/PRESET
-operations and GWS session reuse. Operator account registration, provisioning, key access,
-connection-document reads, operator probes and ambient CLI credentials are unavailable in
-that execution. Cached clients are bound to owner, actor, WorkItem, run, lease and task
-lineage. Registration and installed-owner access remain separate from execution authority.
+The generic personal binding stays empty: ambient API keys, provider environments, native
+sessions, operator account APIs and global connection discovery remain denied. The local
+credential-allocation resolver can now broker one explicitly selected personal API-token
+operation inside that binding. The request supplies `service_binding_id` and
+`personal_credential_grant_id` as selectors, never authority. The broker requires the
+current canonical owner/NHI/WorkItem attempt/lease and exact project/mission/task, validates
+consumed human-owner consent, and reads only the selected grant, approval, registration and
+generation files through synchronous person-custody capabilities. It never changes the
+worker envelope tier or role. Missing/replaced resolvers, revoked consent, pending
+registration, changed binding/catalog/material and stale claims fail closed.
 
-Continue the dependency chain in this order, with boundary tests at each step:
+The operation overlay exposes credentials only through the selected service getter.
+Generic secret lookup, provider/native environments, nested widening and escaped async
+continuations remain denied. Cached selected getters revalidate the operation capability
+and full proof; returning to the same personal claim does not retain the credential.
 
-1. Preserve the implemented canonical claimed personal execution identity: personal owner and NHI,
-   WorkItem claim, current attempt and live lease. Derive these from trusted dispatch,
-   never a supplied owner ID or the absence of a tenant. Preserve the separate operator
-   context used for setup and registration.
-2. Extend the current empty task binding only after defining explicit personal-use
-   admission for an exact selected account generation. Bind it to
-   that personal owner/NHI/claim/lease. Missing
-   keys stay final denials; no environment, service-wide connection, global login or
-   ambient client cache fallback. Nested scopes and reused clients must reject a new
-   task or owner, and rotation/revocation must invalidate subsequent consumption.
-3. Add selected-binding admission for read-only PRESET operations first, retaining
-   operation restrictions, egress checks and per-use provenance. Prove cross-owner,
-   cross-task, expired-lease, empty-binding and stale-generation denial before enabling
-   effects. Operator success is not evidence for claimed personal execution.
-4. Add effect authorization and human approval as a separate step, bound to the exact
-   operation, actor, account and generation. Treat GWS session collection and personal
-   session execution as another later step with isolated homes and exact session
-   provenance; API-token registration must not silently enable either.
+Initial runtime support is deliberately narrow: one catalog PRESET API operation declared
+`risk: read` and `approval_required: false`, fixed path and destination, HTTPS GET/HEAD,
+Bearer/Bot Authorization header, no query authentication, path placeholders, redirects,
+local-network override, alternative transport, retry or result cache. Existing preflight,
+resource-introduction and egress checks still run. Material never participates in request
+parameter/path interpolation. Effect authorization, native/provider credentials, sessions,
+missionless work and personal-tier project admission remain separate stages.
 
-The owner-consent prerequisite now has a distinct `credential.personal_use` standing
-grant variant in the existing grant store. Its person custody and authenticated owner
-approval bind the exact NHI, account binding, service, target, secret references,
-allowed actions, generation and project/mission/task. Tenant grant APIs reject this
-variant. Registration consent does not create this grant, and the grant does not by
-itself authorize a service operation. The authenticated owner facade can request,
-issue and revoke consent; it is not a worker credential reader or runtime broker.
+The distinct `credential.personal_use` standing grant remains in the canonical grant store.
+Its authenticated owner approval binds NHI, binding, service, target, secret references,
+actions, generation and project/mission/task. Tenant grant APIs reject this variant.
+New runtime consent also binds `runtime_use: selected-read-api-v1` in its payload and effect hash.
+Legacy grants remain readable and revocable, but cannot authorize runtime use; adding the
+marker cannot reuse the old approval. Registration approval does not grant use permission, and personal-use consent does not
+implicitly share credentials with an organization. Its CLI/UI consent entrypoints remain
+unwired; the governed owner facade and synthetic integration tests exercise issuance.
 
-Only the empty-binding identity stage and owner-consent prerequisite are implemented;
-selected credentials, read-only PRESET admission, effects and sessions above remain
-future requirements. GWS has a strict portable-material validator and inactive
-registration preflight; a structurally valid export is not registered or runnable.
-Existing-key
-macOS account encryption remains unchanged; no new key backend, identity repair or
-automatic personal-to-organization sharing is included.
+GWS now uses the existing authenticated account introduction workflow for encrypted local
+registration: inactive prepare, exact-stage abort, and approval-revalidated generation-CAS
+commit. A durable apply claim fences interrupted/uncertain writes against replay. This
+registers portable material only; the runtime broker, credential-file transport, isolated
+HOME and lifecycle cleanup remain unavailable. Existing macOS keys are required; no new
+key backend, identity repair, automatic login or ownership migration is performed.
 
 ## Related contracts
 

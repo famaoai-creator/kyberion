@@ -422,15 +422,88 @@ export function resolveTaskCredential(key: string): string | null | undefined {
     : undefined;
 }
 
+export interface PersonalServiceCredentialBinding {
+  readonly serviceBindingId: string;
+  readonly serviceId: string;
+  readonly sourceOwnerRef: string;
+  readonly personalGrantId: string;
+  readonly generation: string;
+  readonly secrets: Readonly<Record<string, string>>;
+  readonly validate: () => void;
+}
+const personalServiceStorage = new AsyncLocalStorage<{
+  parent: TaskCredentialBinding;
+  source: Readonly<PersonalServiceCredentialBinding>;
+  live: boolean;
+}>();
+
+/** Internal broker-only operation overlay; never changes the ambient execution envelope. */
+export async function withPersonalServiceCredentialBinding<T>(
+  source: PersonalServiceCredentialBinding,
+  run: () => Promise<T>
+): Promise<T> {
+  const parent = checkedBinding();
+  if (
+    !parent?.personalClaim ||
+    parent.tenantSlug ||
+    personalServiceStorage.getStore() ||
+    typeof source.validate !== 'function' ||
+    ![
+      source.serviceBindingId,
+      source.serviceId,
+      source.sourceOwnerRef,
+      source.personalGrantId,
+      source.generation,
+    ].every((value) => typeof value === 'string' && value.trim()) ||
+    Object.entries(source.secrets).some(
+      ([key, value]) => !/^[A-Za-z_][A-Za-z0-9_]*$/.test(key) || typeof value !== 'string' || !value
+    )
+  )
+    throw new Error('[CREDENTIAL_SCOPE_DENIED] Exact personal operation required');
+  source.validate();
+  const window = {
+    parent,
+    source: Object.freeze({ ...source, secrets: Object.freeze({ ...source.secrets }) }),
+    live: true,
+  };
+  try {
+    return await personalServiceStorage.run(window, run);
+  } finally {
+    window.live = false;
+  }
+}
+
 /** Exact selected-connection consumption; never consult operator or ambient credentials. */
 export function resolveTaskServiceCredential(
   key: string,
   expected: Pick<TaskCredentialProvenance, 'serviceBindingId' | 'serviceId'> & {
     allocationGrantId?: string;
+    personalGrantId?: string;
+    generation?: string;
     sourceOwnerRef?: string;
   }
 ): string | null {
   const binding = checkedBinding();
+  const personal = personalServiceStorage.getStore();
+  if (personal) {
+    const source = personal.source;
+    if (
+      !personal.live ||
+      personal.parent !== binding ||
+      expected.allocationGrantId ||
+      expected.personalGrantId !== source.personalGrantId ||
+      expected.generation !== source.generation ||
+      expected.sourceOwnerRef !== source.sourceOwnerRef ||
+      expected.serviceId !== source.serviceId ||
+      expected.serviceBindingId !== source.serviceBindingId ||
+      !Object.hasOwn(source.secrets, key)
+    )
+      throw new Error(
+        '[CREDENTIAL_PROVENANCE_DENIED] Personal credential requires exact live operation'
+      );
+    source.validate();
+    return source.secrets[key] || null;
+  }
   const provenance = binding?.secretProvenance?.[key];
   if (
     !binding ||
@@ -446,6 +519,14 @@ export function resolveTaskServiceCredential(
     );
   }
   return binding.secrets[key] || null;
+}
+
+/** Internal masking-only predicate; never enumerates or resolves overlay values. */
+export function isCurrentPersonalServiceCredentialValue(value: string): boolean {
+  const window = personalServiceStorage.getStore();
+  if (!window?.live || window.parent !== checkedBinding()) return false;
+  window.source.validate();
+  return Object.values(window.source.secrets).includes(value);
 }
 
 /** undefined = trusted operator flow; tenant diagnostics never expose another binding's values. */

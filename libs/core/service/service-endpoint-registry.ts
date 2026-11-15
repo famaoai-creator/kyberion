@@ -287,10 +287,14 @@ export function loadServiceEndpointsDirectoryCatalog(
   return loadServiceEndpointsDirectory(catalogDir) as ResolvedServiceEndpointsCatalog;
 }
 
-export function loadServiceEndpointsCatalog(): ResolvedServiceEndpointsCatalog {
+export function loadServiceEndpointsCatalog(
+  options: { fresh?: boolean } = {}
+): ResolvedServiceEndpointsCatalog {
+  if (options.fresh) cachedCredentialSuffixDefaults = null;
   const catalogPath = getServiceEndpointsPath();
   const catalogDir = getServiceEndpointsDir();
   if (
+    !options.fresh &&
     cachedServiceEndpointsPath === catalogPath &&
     cachedServiceEndpointsDir === catalogDir &&
     cachedServiceEndpoints
@@ -335,8 +339,11 @@ export function loadServiceEndpointsCatalog(): ResolvedServiceEndpointsCatalog {
   return parsed;
 }
 
-export function getServiceEndpointRecord(serviceId: string): ResolvedServiceEndpointRecord | null {
-  return loadServiceEndpointsCatalog().services?.[serviceId] || null;
+export function getServiceEndpointRecord(
+  serviceId: string,
+  options: { fresh?: boolean } = {}
+): ResolvedServiceEndpointRecord | null {
+  return loadServiceEndpointsCatalog(options).services?.[serviceId] || null;
 }
 
 export function getServiceEndpointRecordForIntent(

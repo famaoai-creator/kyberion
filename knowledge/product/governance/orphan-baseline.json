@@ -5,11 +5,7 @@
   "libs_core_modules": [
     {
       "id": "libs/core/governance/personal-credential-grant.ts",
-      "reason": "Authenticated personal-owner consent prerequisite, exercised by personal-credential-grant.test.ts and personal-credential-grant-basis.test.ts against the canonical approval/grant stores. Runtime consumption and UI/CLI entrypoints remain disabled pending worker grant/material read capabilities, broker integration and selected-service admission; those dependencies and the lack of execution authority are documented in api-credential-proof-boundary.md. Remove this exception when the governed entrypoint is connected."
-    },
-    {
-      "id": "libs/core/secret/gws-session-registration-contract.ts",
-      "reason": "Portable GWS material validation and staged provisioner contract, exercised by gws-session-registration-contract.test.ts. Preflight always reports registration/runtime unavailable; service-integration-guide.md documents missing encrypted persistence, staged CAS activation, current approval/generation checks, isolated HOME lifecycle and credential-file transport. No production adapter is installed in this prerequisite slice. Remove this exception when the governed registration adapter is connected."
+      "reason": "Authenticated personal-owner consent facade, exercised against canonical approval/grant stores by personal-credential-grant tests and synthetic dispatch integration. Runtime uses the shared proof basis and exact addressed runtime reader; UI/CLI consent issuance entrypoints remain unwired, as documented in api-credential-proof-boundary.md. Remove this exception when the governed issuance entrypoint is connected."
     },
     {
       "id": "libs/core/testing/finite-state-checker.ts",

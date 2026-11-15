@@ -1,3 +1,4 @@
+import { assertPersonalCredentialUseRead } from '../foundation/personal-credential-use-capability.js';
 // Non-sensitive readiness is exposed through the public credential facade.
 export {
   credentialBindingReadiness,
@@ -17,6 +18,7 @@ import {
   resolveTaskCredential,
   credentialExecutionIdentity,
   isCurrentTaskCredentialValue,
+  isCurrentPersonalServiceCredentialValue,
 } from '../foundation/credential-binding.js';
 import {
   decryptConnectionDocument,
@@ -769,6 +771,43 @@ export function loadAllocatedLocalAccountMaterial(
   return material;
 }
 
+/** Internal claimed-person broker readers; operator APIs remain independently restricted. */
+function assertPersonalRuntimeAccountRead(
+  identity: LocalAccountMaterialIdentity,
+  generation?: string
+): void {
+  const execution = credentialExecutionIdentity();
+  if (
+    execution.tenantSlug ||
+    !execution.personalClaim ||
+    identity.ownerKind !== 'person' ||
+    identity.tenantSlug ||
+    identity.ownerRef !== execution.personalClaim.ownerId ||
+    getPluginExecutionContext()
+  )
+    throw new Error('[ACCOUNT_MATERIAL_DENIED] Exact claimed personal owner required');
+  assertPersonalCredentialUseRead('account', localAccountMaterialAccountId(identity), generation);
+}
+export function loadPersonalRuntimeAccountRegistration(
+  identity: LocalAccountMaterialIdentity
+): LocalAccountRegistrationState {
+  assertPersonalRuntimeAccountRead(identity);
+  return readLocalAccountRegistration(identity);
+}
+export function loadPersonalRuntimeAccountMaterial(
+  reference: LocalAccountMaterialReference
+): Record<string, string> {
+  assertPersonalRuntimeAccountRead(reference, reference.generation);
+  const before = readLocalAccountRegistration(reference);
+  if (before.pendingApprovalId || before.generation !== reference.generation)
+    throw new Error('[ACCOUNT_MATERIAL_DENIED] Account registration incomplete or changed');
+  const material = readLocalAccountMaterial(reference);
+  const after = readLocalAccountRegistration(reference);
+  if (after.pendingApprovalId || after.generation !== reference.generation)
+    throw new Error('[ACCOUNT_MATERIAL_DENIED] Account registration incomplete or changed');
+  return material;
+}
+
 /** Caller holds the binding lock. A persisted pending id fences incomplete external writes. */
 export function storeLocalAccountRegistration(
   identity: LocalAccountMaterialIdentity,
@@ -843,7 +882,11 @@ export const maskActiveSecrets = (
   let masked = text;
   for (const secret of _activeSecrets) {
     if (!secret || secret.length <= threshold) continue;
-    if (isCurrentTaskCredentialValue(secret) === false) continue;
+    if (
+      isCurrentTaskCredentialValue(secret) === false &&
+      !isCurrentPersonalServiceCredentialValue(secret)
+    )
+      continue;
     if (inPlugin) {
       const names = _activeSecretNames.get(secret);
       const granted =

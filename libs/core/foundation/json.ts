@@ -37,7 +37,7 @@ export function readJsonIfPresent<T>(filePath: string, options?: FoundationReadO
 export function writeJson<T>(
   filePath: string,
   value: T,
-  options?: { createOnly?: boolean; format?: 'json' | 'jsonl' }
+  options?: { createOnly?: boolean; format?: 'json' | 'jsonl'; mode?: number }
 ): void {
   const io = getFoundationIo();
   if (options?.format === 'jsonl' && !Array.isArray(value))
@@ -48,10 +48,13 @@ export function writeJson<T>(
         ((value as readonly unknown[]).length ? '\n' : '')
       : `${JSON.stringify(value, null, 2)}\n`;
   if (options?.createOnly) {
+    if (options.mode !== undefined) throw new Error('exclusive_json_mode_not_supported');
     if (!io.createExclusiveFile) throw new Error('secure_foundation_exclusive_io_not_registered');
     io.createExclusiveFile(filePath, content);
   } else {
-    io.writeFile(filePath, content);
+    const args: [] | [{ mode: number }] =
+      options?.mode === undefined ? [] : [{ mode: options.mode }];
+    io.writeFile(filePath, content, ...args);
   }
 }
 

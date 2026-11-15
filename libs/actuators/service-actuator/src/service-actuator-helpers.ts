@@ -1,3 +1,5 @@
+import { credentialExecutionIdentity } from '@agent/core/foundation/credential-binding';
+import { withPersonalServiceCredentialUse } from '@agent/core/secret/personal-service-credential-broker';
 import { runInformationAssetWork } from './information-asset-work.js';
 import {
   appendJsonLine,
@@ -536,6 +538,28 @@ async function handleSingleAction(
   const execute = async (): Promise<unknown> => {
     switch (input.mode) {
       case 'PRESET':
+        if (credentialExecutionIdentity().personalClaim) {
+          return await withPersonalServiceCredentialUse(
+            {
+              serviceId: input.service_id,
+              action: input.action,
+              bindingId: String(input.context?.service_binding_id ?? ''),
+              grantId: String(input.context?.personal_credential_grant_id ?? ''),
+            },
+            async (capability) =>
+              executeServicePreset(
+                input.service_id,
+                input.action,
+                input.params,
+                'secret-guard',
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                capability
+              )
+          );
+        }
         if (input.context?.security_scope && input.context?.service_binding_id) {
           const admission = issueTenantServiceEngineAdmission({
             securityScope: input.context.security_scope,

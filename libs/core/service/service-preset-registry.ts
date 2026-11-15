@@ -4,7 +4,7 @@ import { pathResolver } from '../path-resolver.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeReaddir, safeStat } from '../secure-io.js';
-import { loadServiceEndpointsCatalog } from './service-binding.js';
+import { loadServiceEndpointsCatalog } from './service-endpoint-registry.js';
 
 export interface ServicePresetRecord {
   service_id: string;
@@ -146,9 +146,11 @@ function loadServicePresetsFromEndpoints(): ServicePresetsCatalog {
   return { services };
 }
 
-export function loadServicePresetsCatalog(): ServicePresetsCatalog {
+export function loadServicePresetsCatalog(
+  options: { fresh?: boolean } = {}
+): ServicePresetsCatalog {
   const catalogDir = getServicePresetsDir();
-  if (cachedServicePresetsDir === catalogDir && cachedServicePresets) {
+  if (!options.fresh && cachedServicePresetsDir === catalogDir && cachedServicePresets) {
     return cachedServicePresets;
   }
 
@@ -178,7 +180,8 @@ export function loadServicePresetsCatalog(): ServicePresetsCatalog {
 
 export function getServicePresetRecord(
   serviceId: string,
-  presetPathHint?: string
+  presetPathHint?: string,
+  options: { fresh?: boolean } = {}
 ): ServicePresetRecord | null {
   const normalizedServiceId = serviceId.trim();
   if (!normalizedServiceId) return null;
@@ -196,7 +199,7 @@ export function getServicePresetRecord(
     }
   }
 
-  const catalog = loadServicePresetsCatalog();
+  const catalog = loadServicePresetsCatalog(options);
   const direct = catalog.services[normalizedServiceId];
   if (direct) return direct;
 
