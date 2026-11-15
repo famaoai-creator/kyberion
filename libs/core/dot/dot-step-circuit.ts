@@ -59,7 +59,7 @@ export class DotSupervisorStepCircuit {
   private readonly entries = new Map<string, StepCircuitEntry>();
 
   constructor(
-    private readonly stepId: string,
+    readonly stepId: string,
     private readonly options: {
       threshold?: number;
       baseCooldownMs?: number;
@@ -146,4 +146,46 @@ export function alertDotStepCircuitOpen(
   logger.warn(
     `step circuit open for ${charter.dot_id} in '${stepId}' — ${streak} consecutive identical failures | next: fix the cause; a half-open run retries after the cooldown | evidence: libs/core/dot/dot-step-circuit.ts`
   );
+}
+
+export interface DotStepFailureWarn {
+  /** Diagnostic 'what' — include the dot/site in the text. */
+  what: string;
+  /** 'next:' hint for the counted-streak warn line. */
+  next: string;
+  /** 'evidence:' pointer for the counted-streak warn line. */
+  evidence: string;
+  /** Emit the warn line; defaults to this module's logger. */
+  log?: (line: string) => void;
+}
+
+/**
+ * Shared failure dispatch for circuit-guarded supervisor loops: reports the
+ * failure, emits the one-shot open alert when the circuit trips, and logs a
+ * diagnostic warn while the streak is still counting. Every guarded step used
+ * to re-implement this verdict switch — keep it in one place so the
+ * counted/open contract cannot drift between steps.
+ */
+export function reportDotStepFailure(
+  circuit: DotSupervisorStepCircuit,
+  key: string,
+  charter: DotCharter,
+  error: unknown,
+  warn: DotStepFailureWarn
+): void {
+  const verdict = circuit.reportFailure(key, error);
+  if (verdict === 'open') {
+    alertDotStepCircuitOpen(
+      circuit.stepId,
+      charter,
+      circuit.signatureOf(key) ?? 'unknown',
+      circuit.streakOf(key)
+    );
+    return;
+  }
+  if (verdict === 'counted') {
+    (warn.log ?? ((line: string) => logger.warn(line)))(
+      `${warn.what} — ${error instanceof Error ? error.message : String(error)} | next: ${warn.next} | evidence: ${warn.evidence}`
+    );
+  }
 }

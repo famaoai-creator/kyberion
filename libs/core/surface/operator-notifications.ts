@@ -379,6 +379,9 @@ function recordUndeliveredNotification(
   reason: string,
   scope?: MemoryScopeEnvelope
 ): void {
+  // The reason class (text before the first ':') is what dedupe and scoped
+  // records key on — the tail can carry volatile detail like a channel id.
+  const reasonClass = reason.split(':')[0];
   try {
     const logPath = assertSafeRepositoryPath(
       pathResolver.shared('observability/ops-alerts.jsonl'),
@@ -397,8 +400,7 @@ function recordUndeliveredNotification(
         scope && (scope.tier !== 'public' || scope.tenant_slug)
           ? undefined
           : payload.correlation_id,
-      reason:
-        scope && (scope.tier !== 'public' || scope.tenant_slug) ? reason.split(':')[0] : reason,
+      reason: scope && (scope.tier !== 'public' || scope.tenant_slug) ? reasonClass : reason,
     });
     // The undelivered row alone reaches nobody — it sits in a queue nobody
     // reads. Surface the delivery gap itself as a deduped alert record so a
@@ -409,7 +411,7 @@ function recordUndeliveredNotification(
     if (!emittingDeliveryGapAlert && event !== 'ops_alert') {
       emittingDeliveryGapAlert = true;
       try {
-        const dedupeKey = `operator-notification-undelivered:${event}:${reason.split(':')[0]}`;
+        const dedupeKey = `operator-notification-undelivered:${event}:${reasonClass}`;
         const dedupePath = opsAlertDedupeStatePathFor(logPath);
         const nowMs = Date.now();
         const state = loadOpsAlertDedupeState(dedupePath, nowMs);
@@ -424,7 +426,7 @@ function recordUndeliveredNotification(
             suppressed: false,
             severity: 'warning',
             title: `Operator notification undelivered: ${event}`,
-            context: { event, reason: reason.split(':')[0] },
+            context: { event, reason: reasonClass },
             recommendation:
               'Configure a notification channel for this deployment (webhook env / inbox delivery); undelivered rows stay queued for `ops:alerts --redeliver`.',
             dedupe_key: dedupeKey,

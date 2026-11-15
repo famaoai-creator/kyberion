@@ -12,7 +12,7 @@
 import * as path from 'node:path';
 import { withExecutionContextAsync } from '../authority.js';
 import { withResidentDotScope } from './resident-dot-scope.js';
-import { alertDotStepCircuitOpen, DotSupervisorStepCircuit } from './dot-step-circuit.js';
+import { reportDotStepFailure, DotSupervisorStepCircuit } from './dot-step-circuit.js';
 import { appendJsonLine, readJsonLines } from '../foundation/json.js';
 import { createLogger } from '../logger.js';
 import { pathResolver } from '../path-resolver.js';
@@ -128,27 +128,25 @@ function diag(what: string, why: unknown, next: string, evidence: string): strin
 // one ops alert instead of warning every sweep forever.
 const krMeasureCircuit = new DotSupervisorStepCircuit('dot-kr-measure');
 
-/** Shared catch handler: warn early, alert once on circuit open, else quiet. */
+/**
+ * Shared catch handler: warn early, alert once on circuit open, else quiet.
+ * `key` must be the exact string the caller passed to `admits` — build it
+ * once per site and pass it through so gate and report cannot diverge.
+ */
 function reportKrFailure(
-  site: string,
+  key: string,
   what: string,
   error: unknown,
   next: string,
   evidence: string,
-  charter?: DotCharter
+  charter: DotCharter
 ): void {
-  const key = `${charter?.dot_id ?? 'unknown'}:${site}`;
-  const verdict = krMeasureCircuit.reportFailure(key, error);
-  if (verdict === 'open' && charter) {
-    alertDotStepCircuitOpen(
-      'dot-kr-measure',
-      charter,
-      krMeasureCircuit.signatureOf(key) ?? 'unknown',
-      krMeasureCircuit.streakOf(key)
-    );
-    return;
-  }
-  if (verdict === 'counted') logger.warn(diag(what, error, next, evidence));
+  reportDotStepFailure(krMeasureCircuit, key, charter, error, {
+    what,
+    next,
+    evidence,
+    log: (line) => logger.warn(line),
+  });
 }
 
 function absolute(rootDir: string | undefined, rel: string): string {
@@ -416,7 +414,7 @@ export async function measureDotKeyResults(
     }
   } catch (error) {
     reportKrFailure(
-      'ledger-read',
+      ledgerReadKey,
       `KR ledger unreadable for ${c.dot_id}`,
       error,
       'measuring without throttle',
@@ -454,7 +452,7 @@ export async function measureDotKeyResults(
       });
     } catch (error) {
       reportKrFailure(
-        `measure/${spec.kr_id}`,
+        measureKey,
         `KR measurement failed for ${c.dot_id}/${spec.kr_id}`,
         error,
         'the previous value stays; retried next sweep',
@@ -470,7 +468,7 @@ export async function measureDotKeyResults(
     krMeasureCircuit.reportSuccess(ledgerWriteKey);
   } catch (error) {
     reportKrFailure(
-      'ledger-write',
+      ledgerWriteKey,
       `KR ledger write failed for ${c.dot_id}`,
       error,
       'rows dropped this sweep',

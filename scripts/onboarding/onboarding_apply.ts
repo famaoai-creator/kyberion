@@ -66,6 +66,12 @@ import {
   formatReasoningSummary,
   type OnboardingReasoningState,
 } from './onboarding_reasoning.js';
+import type { OnboardingOperations } from '@agent/core/organization/onboarding-state';
+import {
+  applyResidentLoopOperations,
+  intakeStatusLabel,
+  operationsNextSteps,
+} from './onboarding_operations.js';
 import { generateOnboardingRunbookSkill } from './onboarding_runbook_skill.js';
 import {
   normalizeReasoningBackendChoice,
@@ -583,20 +589,30 @@ export function buildState(
   now: string,
   tenantEntries: Array<Record<string, unknown>>,
   tutorial: { mode: string; summary: string; plan_path: string },
-  reasoning: OnboardingReasoningState
+  reasoning: OnboardingReasoningState,
+  operations?: OnboardingOperations
 ) {
   const persona = resolveInputPersona(input);
   return {
     version: '1.0.0' as const,
     status: 'complete' as const,
     current_phase: 'summary' as const,
-    completed_phases: ['identity', 'reasoning', 'services', 'tenants', 'tutorial', 'summary'],
+    completed_phases: [
+      'identity',
+      'reasoning',
+      'services',
+      'tenants',
+      'operations',
+      'tutorial',
+      'summary',
+    ],
     created_at: now,
     updated_at: now,
     identity: { ...input.identity, persona },
     reasoning,
     services: { candidates: [] },
     tenants: { entries: tenantEntries },
+    ...(operations ? { operations } : {}),
     tutorial,
   };
 }
@@ -606,7 +622,8 @@ export function buildSummary(
   tenantEntries: Array<Record<string, unknown>>,
   tutorial: { mode: string; summary: string },
   reasoning?: OnboardingReasoningState,
-  activation?: ActivationSetup
+  activation?: ActivationSetup,
+  operations?: OnboardingOperations
 ) {
   const id = input.identity;
   const persona = resolveInputPersona(input);
@@ -638,10 +655,24 @@ export function buildSummary(
     `- Mode: ${tutorial.mode}`,
     `- Summary: ${tutorial.summary}`,
     '',
+    '## Resident Loop Operations',
+    ...(operations
+      ? [
+          `- Resident services: ${operations.resident_services}`,
+          `- Notification channel: ${operations.notification_surface ? `${operations.notification_surface}${operations.notification_target ? ` (${operations.notification_target})` : ''}` : 'none configured'}`,
+          ...(operations.intake_sources.length > 0
+            ? operations.intake_sources.map(
+                (s) => `- Intake '${s.source}': ${intakeStatusLabel(s.status)}`
+              )
+            : ['- Intake sources: none enabled']),
+        ]
+      : ['- Not configured']),
+    '',
     `## ${summaryPolicy.sections.next_steps}`,
     '- Connection authentication is separate from authority: open Settings → Services to connect accounts, review exact GitHub/browser targets and limits, ask the installed agent to request delegation, then approve and apply the reviewed plan. The new agent stays provisioned until its signed activation plan is applied.',
     '- CLI: run `pnpm kyberion onboarding authority show --scope person --json`, then use `preview`, `request`, `status`, and `apply` with the exact reviewed plan. Personal use needs no tenant; organization scope requires an explicitly selected tenant owner.',
     `- ${activationNextStep(activation)}`,
+    ...(operations ? operationsNextSteps(operations).map((s) => `- ${s}`) : []),
     '- Run `pnpm pipeline vital-check --format=json` to verify the live ecosystem health.',
     '- Open Chronos at http://127.0.0.1:3000 — your Identity Badge should appear in the header.',
     '',
@@ -709,13 +740,14 @@ export async function applyOnboardingInput(
     }
   }
   const reasoning = await evaluateReasoningBackend(new Date(now));
+  const operations = applyResidentLoopOperations(validatedInput.operations ?? {});
   const runbookSkill = generateOnboardingRunbookSkill({
     profileRoot: profileRoot(),
     identityName: validatedInput.identity.name,
     agentId: validatedInput.identity.agent_id,
     generatedAt: now,
   });
-  const state = buildState(validatedInput, now, tenantEntries, tutorial, reasoning);
+  const state = buildState(validatedInput, now, tenantEntries, tutorial, reasoning, operations);
   if (!validateState(state)) {
     throw new Error(`onboarding-state schema invalid: ${JSON.stringify(validateState.errors)}`);
   }
@@ -725,7 +757,7 @@ export async function applyOnboardingInput(
   });
   await writeText(
     summaryPath(),
-    buildSummary(validatedInput, tenantEntries, tutorial, reasoning, activation),
+    buildSummary(validatedInput, tenantEntries, tutorial, reasoning, activation, operations),
     'onboarding-summary'
   );
   return {

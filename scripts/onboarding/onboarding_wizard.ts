@@ -66,6 +66,11 @@ import {
 } from './onboarding_reasoning.js';
 import { promptProviderAttestation, promptReasoningModel } from './onboarding_llm_prompts.js';
 import {
+  intakeStatusLabel,
+  operationsNextSteps,
+  promptResidentLoopOperations,
+} from './onboarding_operations.js';
+import {
   generateOnboardingRunbookSkill,
   onboardingRunbookSkillPath,
 } from './onboarding_runbook_skill.js';
@@ -171,6 +176,7 @@ const PHASES: OnboardingPhase[] = [
   'reasoning',
   'services',
   'tenants',
+  'operations',
   'tutorial',
   'summary',
 ];
@@ -389,10 +395,24 @@ function buildSummaryMarkdown(state: OnboardingState): string {
     `- Mode: ${tutorial?.mode || 'skipped'}`,
     `- Summary: ${tutorial?.summary || 'n/a'}`,
     '',
+    '## Resident Loop Operations',
+    ...(state.operations
+      ? [
+          `- Resident services: ${state.operations.resident_services}`,
+          `- Notification channel: ${state.operations.notification_surface ? `${state.operations.notification_surface}${state.operations.notification_target ? ` (${state.operations.notification_target})` : ''}` : 'none configured'}`,
+          ...(state.operations.intake_sources.length > 0
+            ? state.operations.intake_sources.map(
+                (s) => `- Intake '${s.source}': ${intakeStatusLabel(s.status)}`
+              )
+            : ['- Intake sources: none enabled']),
+        ]
+      : ['- Not configured']),
+    '',
     `## ${summaryPolicy.sections.next_steps}`,
     '- Review candidate service connections before using them in missions.',
     '- Register additional tenants one at a time.',
     '- Convert the tutorial into an explicit mission only after confirming the setup.',
+    ...(state.operations ? operationsNextSteps(state.operations).map((s) => `- ${s}`) : []),
     '',
     '## Runbook Skill',
     `- Generated: ${onboardingRunbookSkillPath(profileRoot())}`,
@@ -1016,6 +1036,35 @@ async function runTenantsPhase(state: OnboardingState, print: Print): Promise<vo
 
   state.tenants = { entries };
   state.completed_phases = Array.from(new Set([...state.completed_phases, 'tenants']));
+  state.current_phase = 'operations';
+  state.updated_at = nowIso();
+  await saveState(state);
+}
+
+async function runOperationsPhase(state: OnboardingState, print: Print): Promise<void> {
+  const flowPolicy = resolveOnboardingFlowPolicy();
+  print(`\n🔄 Phase 4 — ${pt(flowPolicy.phase_titles.operations)}\n`);
+  if (interactive && !expressMode) {
+    state.operations = await promptResidentLoopOperations({
+      ask,
+      print,
+      t,
+      isAffirmative,
+      runTask: runManagedMenuTask,
+    });
+  } else {
+    // Non-interactive / express runs never spawn installers or take secrets:
+    // record the gaps so the summary's next-steps list them verbatim.
+    state.operations = { resident_services: 'pending', intake_sources: [] };
+    print(
+      // i18n-exempt: bilingual prompt pair (JA side intentional)
+      t(
+        'Non-interactive run — resident services, notification channel, and intake sources are recorded as pending; see the summary for the exact commands.',
+        '非対話実行 — 常駐サービス・通知チャンネル・intake ソースは pending として記録します。コマンドはサマリを参照してください。'
+      )
+    );
+  }
+  state.completed_phases = Array.from(new Set([...state.completed_phases, 'operations']));
   state.current_phase = 'tutorial';
   state.updated_at = nowIso();
   await saveState(state);
@@ -1023,7 +1072,7 @@ async function runTenantsPhase(state: OnboardingState, print: Print): Promise<vo
 
 async function runTutorialPhase(state: OnboardingState, print: Print): Promise<void> {
   const flowPolicy = resolveOnboardingFlowPolicy();
-  print(`\n🎓 Phase 4 — ${pt(flowPolicy.phase_titles.tutorial)}\n`);
+  print(`\n🎓 Phase 5 — ${pt(flowPolicy.phase_titles.tutorial)}\n`);
   const modeInput = (
     await ask('Tutorial mode: simulate / apply / skipped [simulate]: ', 'simulate')
   )
@@ -1068,7 +1117,7 @@ async function runTutorialPhase(state: OnboardingState, print: Print): Promise<v
 
 async function runSummaryPhase(state: OnboardingState, print: Print): Promise<void> {
   const flowPolicy = resolveOnboardingFlowPolicy();
-  print(`\n📊 Phase 5 — ${pt(flowPolicy.phase_titles.summary)}\n`);
+  print(`\n📊 Phase 6 — ${pt(flowPolicy.phase_titles.summary)}\n`);
   const ownerAuthority = activationNextStep(await prepareActivationSetup(new Date()));
   const summary = buildSummaryMarkdown(state) + '\n\n' + ownerAuthority + '\n';
   print(ownerAuthority);
@@ -1102,34 +1151,34 @@ async function runSummaryPhase(state: OnboardingState, print: Print): Promise<vo
       )
     );
   }
-  print(
+  // One list, enumerated once — appending a step can no longer desync the
+  // numbering (the pending ops steps continue the same sequence).
+  const nextSteps: string[] = [
     t(
-      `1. Review the service connection drafts in \`${path.join(profileRoot(), 'connections')}/\`.`,
+      `Review the service connection drafts in \`${path.join(profileRoot(), 'connections')}/\`.`,
       // i18n-exempt: bilingual prompt pair (JA side intentional)
-      `1. \`${path.join(profileRoot(), 'connections')}/\` のサービス接続ドラフトを確認してください。`
-    )
-  );
-  print(
+      `\`${path.join(profileRoot(), 'connections')}/\` のサービス接続ドラフトを確認してください。`
+    ),
     t(
-      `2. Review the tenant draft in \`${path.join(profileRoot(), 'tenants')}/\`.`,
+      `Review the tenant draft in \`${path.join(profileRoot(), 'tenants')}/\`.`,
       // i18n-exempt: bilingual prompt pair (JA side intentional)
-      `2. \`${path.join(profileRoot(), 'tenants')}/\` のテナントドラフトを確認してください。`
-    )
-  );
-  print(
+      `\`${path.join(profileRoot(), 'tenants')}/\` のテナントドラフトを確認してください。`
+    ),
     t(
-      '3. If the tutorial should become real work, create a mission explicitly after review.',
+      'If the tutorial should become real work, create a mission explicitly after review.',
       // i18n-exempt: bilingual prompt pair (JA side intentional)
-      '3. チュートリアルを実作業にする場合は、レビュー後に明示的にミッションを作成してください。'
-    )
-  );
-  print(
+      'チュートリアルを実作業にする場合は、レビュー後に明示的にミッションを作成してください。'
+    ),
     t(
-      '4. Re-run `pnpm surfaces reconcile` after the workspace is ready.',
+      'Re-run `pnpm surfaces reconcile` after the workspace is ready.',
       // i18n-exempt: bilingual prompt pair (JA side intentional)
-      '4. ワークスペースの準備ができたら `pnpm surfaces reconcile` を再実行してください。'
-    )
-  );
+      'ワークスペースの準備ができたら `pnpm surfaces reconcile` を再実行してください。'
+    ),
+    ...(state.operations ? operationsNextSteps(state.operations) : []),
+  ];
+  nextSteps.forEach((step, index) => {
+    print(`${index + 1}. ${step}`);
+  });
 }
 
 function onboardingArtifactsMissing(state: OnboardingState, phase: OnboardingPhase): boolean {
@@ -1430,6 +1479,7 @@ export async function runOnboarding(
     reasoning: runReasoningPhase,
     services: (s, p) => runServicesPhase(s, undefined, p),
     tenants: runTenantsPhase,
+    operations: runOperationsPhase,
     tutorial: runTutorialPhase,
     summary: runSummaryPhase,
   };
