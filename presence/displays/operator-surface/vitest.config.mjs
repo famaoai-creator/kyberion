@@ -1,13 +1,22 @@
 import { defineConfig } from 'vitest/config';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
+import { coreSourceAliases } from '../../../tests/vitest-core-aliases.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
+const rootDir = resolve(here, '../../..');
 
 export default defineConfig({
   resolve: {
     alias: [
+      // Match the root vitest config: exports-map subpaths resolve to source
+      // files so tests never mix source `@agent/core` with built dist modules.
+      ...coreSourceAliases(rootDir),
       { find: /^@agent\/core$/, replacement: resolve(here, '../../../libs/core/index.ts') },
+      {
+        find: /^@agent\/core\/(.+)$/,
+        replacement: resolve(here, '../../../libs/core/$1'),
+      },
       { find: '@', replacement: resolve(here, 'src') },
     ],
   },
