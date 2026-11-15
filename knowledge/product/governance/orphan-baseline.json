@@ -161,14 +161,6 @@
       "reason": "Deterministic media review gate (brief compile + PPTX overflow check) run by hand per pipelines/README.md; not a CI gate."
     },
     {
-      "id": "knowledge/product/pipeline-templates/meeting-hearing-session.json",
-      "reason": "OW-05 example pipeline: the runnable caller of meeting:hearing_session (asserted by scripts/orphan_op_reachability.test.ts); run by hand per knowledge/product/pipeline-templates/README.md."
-    },
-    {
-      "id": "knowledge/product/pipeline-templates/meeting-tutor-session.json",
-      "reason": "OW-05 example pipeline: the runnable caller of meeting:tutor_session (asserted by scripts/orphan_op_reachability.test.ts); run by hand per knowledge/product/pipeline-templates/README.md."
-    },
-    {
       "id": "pipelines/mission-team-prewarm.json",
       "reason": "OW-05 example pipeline: the runnable caller of agent:prewarm_mission (asserted by scripts/orphan_op_reachability.test.ts); run by hand per knowledge/product/pipeline-templates/README.md."
     },
