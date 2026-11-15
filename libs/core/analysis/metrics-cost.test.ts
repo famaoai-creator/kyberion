@@ -17,7 +17,7 @@ describe('model-cost registry — data-driven (not source-hardcoded)', () => {
     expect(reg.models['claude-opus-4-8']).toEqual({ prompt: 0.005, completion: 0.025 });
     expect(reg.models['claude-fable-5']).toEqual({ prompt: 0.01, completion: 0.05 });
     expect(reg.aliases?.opus).toBe('claude-opus-5-5');
-    expect(reg.aliases?.fable).toBe('claude-fable-5');
+    expect(reg.aliases?.fable).toBe('claude-fable-5-2');
   });
 });
 

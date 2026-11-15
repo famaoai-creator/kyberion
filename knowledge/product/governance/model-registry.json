@@ -60,6 +60,28 @@
       "notes": "GPT-6.1 Sol; available in Codex and API. Near-Astra performance for complex coding and computer-use work at Sol pricing."
     },
     {
+      "model_id": "openai:gpt-6.1-terra",
+      "provider": "openai",
+      "family": "gpt-6.1",
+      "status": "approved",
+      "tier": "standard",
+      "execution_tier": "standard",
+      "role_fit": {
+        "intent_compiler": "secondary",
+        "surface_agent": "primary",
+        "analysis": "primary",
+        "coding": "primary"
+      },
+      "cost_band": "medium",
+      "latency_band": "medium",
+      "structured_output_confidence": "high",
+      "tool_use_confidence": "high",
+      "multilingual_confidence": "high",
+      "reasoning_confidence": "high",
+      "capability_tags": ["agentic_coding", "balanced_reasoning", "tool_use"],
+      "notes": "GPT-6.1 Terra; efficient thinking tier of the GPT-6.1 line at $1/$5 per MTok in the Devin catalog (verified 2026-11-14)."
+    },
+    {
       "model_id": "openai:gpt-6-sol",
       "provider": "openai",
       "family": "gpt-6",
@@ -190,6 +212,50 @@
       "reasoning_confidence": "high",
       "capability_tags": ["structured_output", "tool_use", "multi_step_reasoning", "multilingual"],
       "notes": "Default production model for governed intent compilation and surface orchestration."
+    },
+    {
+      "model_id": "anthropic:claude-fable-5-2",
+      "provider": "anthropic",
+      "family": "claude-fable",
+      "status": "approved",
+      "tier": "large",
+      "execution_tier": "deep",
+      "role_fit": {
+        "intent_compiler": "primary",
+        "surface_agent": "primary",
+        "analysis": "primary",
+        "coding": "primary"
+      },
+      "cost_band": "high",
+      "latency_band": "medium",
+      "structured_output_confidence": "high",
+      "tool_use_confidence": "high",
+      "multilingual_confidence": "high",
+      "reasoning_confidence": "high",
+      "capability_tags": ["agentic_coding", "tool_use", "multi_step_reasoning", "deep_reasoning"],
+      "notes": "Claude Fable 5.2; the current latest-model release in the Fable line, exposed as claude-fable-5-2 by Claude Code 2.1.323 and marked new in the Devin model catalog (verified 2026-11-14)."
+    },
+    {
+      "model_id": "anthropic:claude-fable-5-1",
+      "provider": "anthropic",
+      "family": "claude-fable",
+      "status": "approved",
+      "tier": "large",
+      "execution_tier": "deep",
+      "role_fit": {
+        "intent_compiler": "primary",
+        "surface_agent": "primary",
+        "analysis": "primary",
+        "coding": "primary"
+      },
+      "cost_band": "high",
+      "latency_band": "medium",
+      "structured_output_confidence": "high",
+      "tool_use_confidence": "high",
+      "multilingual_confidence": "high",
+      "reasoning_confidence": "high",
+      "capability_tags": ["agentic_coding", "tool_use", "multi_step_reasoning", "deep_reasoning"],
+      "notes": "Claude Fable 5.1; intermediate Fable release still offered in the Devin (`fable` alias target) and OpenCode catalogs (verified 2026-11-14)."
     },
     {
       "model_id": "anthropic:claude-fable-5",
@@ -439,6 +505,34 @@
       "notes": "Standard Anthropic option for balanced reasoning and analysis."
     },
     {
+      "model_id": "gemini:gemini-4-carbon",
+      "provider": "gemini",
+      "family": "gemini-4",
+      "status": "approved",
+      "tier": "large",
+      "execution_tier": "deep",
+      "role_fit": {
+        "intent_compiler": "primary",
+        "surface_agent": "primary",
+        "analysis": "primary",
+        "coding": "primary"
+      },
+      "cost_band": "high",
+      "latency_band": "medium",
+      "structured_output_confidence": "high",
+      "tool_use_confidence": "high",
+      "multilingual_confidence": "high",
+      "reasoning_confidence": "high",
+      "capability_tags": [
+        "agentic_coding",
+        "deep_reasoning",
+        "tool_use",
+        "multimodal",
+        "long_horizon"
+      ],
+      "notes": "Google Gemini 4 Carbon; marked new in the Devin model catalog and listed by OpenCode (verified 2026-11-14). Frontier reasoning model alongside Argon."
+    },
+    {
       "model_id": "gemini:gemini-4-argon",
       "provider": "gemini",
       "family": "gemini-4",
@@ -465,6 +559,34 @@
         "long_horizon"
       ],
       "notes": "Google Gemini 4 Argon frontier reasoning model for complex agentic coding, deep logical reasoning, and long-horizon workflows."
+    },
+    {
+      "model_id": "gemini:gemini-4-hydrogen",
+      "provider": "gemini",
+      "family": "gemini-4",
+      "status": "approved",
+      "tier": "large",
+      "execution_tier": "deep",
+      "role_fit": {
+        "intent_compiler": "primary",
+        "surface_agent": "primary",
+        "analysis": "primary",
+        "coding": "primary"
+      },
+      "cost_band": "high",
+      "latency_band": "medium",
+      "structured_output_confidence": "high",
+      "tool_use_confidence": "high",
+      "multilingual_confidence": "high",
+      "reasoning_confidence": "high",
+      "capability_tags": [
+        "agentic_coding",
+        "deep_reasoning",
+        "tool_use",
+        "multimodal",
+        "long_horizon"
+      ],
+      "notes": "Google Gemini 4 Hydrogen; marked new in the Devin catalog and exposed by the agy CLI (low/medium/high/xhigh variants) and OpenCode (verified 2026-11-14)."
     },
     {
       "model_id": "gemini:gemini-3.8-flash",
@@ -587,6 +709,28 @@
       "reasoning_confidence": "medium",
       "capability_tags": ["fast_iteration", "surface_reply", "tool_first_execution"],
       "notes": "Google AI Studio Gemini model alias used by the direct REST reasoning adapter."
+    },
+    {
+      "model_id": "gemini:gemini-3.1-flash-lite",
+      "provider": "gemini",
+      "family": "gemini-3",
+      "status": "approved",
+      "tier": "small",
+      "execution_tier": "fast",
+      "role_fit": {
+        "intent_compiler": "not_recommended",
+        "surface_agent": "primary",
+        "analysis": "secondary",
+        "coding": "secondary"
+      },
+      "cost_band": "low",
+      "latency_band": "low",
+      "structured_output_confidence": "medium",
+      "tool_use_confidence": "medium",
+      "multilingual_confidence": "high",
+      "reasoning_confidence": "medium",
+      "capability_tags": ["fast_iteration", "surface_reply", "tool_first_execution"],
+      "notes": "Gemini 3.1 Flash Lite; listed by `gemini --list-models` and already wired as the gemini-fast runtime default in provider-config.json (verified 2026-11-14)."
     },
     {
       "model_id": "anthropic:claude-sonnet-4.5",
@@ -721,28 +865,6 @@
       "notes": "Grok Build CLI model identifier for hosts that expose the build-specific alias."
     },
     {
-      "model_id": "opencode:muse-spark-1.3-contributor-free",
-      "provider": "opencode",
-      "family": "muse-spark",
-      "status": "candidate",
-      "tier": "standard",
-      "execution_tier": "standard",
-      "role_fit": {
-        "intent_compiler": "secondary",
-        "surface_agent": "secondary",
-        "analysis": "secondary",
-        "coding": "secondary"
-      },
-      "cost_band": "low",
-      "latency_band": "low",
-      "structured_output_confidence": "medium",
-      "tool_use_confidence": "medium",
-      "multilingual_confidence": "medium",
-      "reasoning_confidence": "medium",
-      "capability_tags": ["agentic_coding", "tool_use", "structured_output"],
-      "notes": "OpenCode provider model; candidate until the local auth session and structured-output behavior are verified on the target host. 2026-10-17 probe: 4/4 pass, median 2.3s. (2026-10-17 capability probe via OpencodeCliReasoningBackend (planner agent, 4 probes: structured JSON, tool_use, multilingual JP->EN, reasoning; pass/4 and consolidated median latency recorded)) 2026-10-17 later probe: service-side `provider.no-route` \"Model unavailable\" (round-1 4/4 pass earlier the same day) - intermittent free-tier availability; do not use as the sole default. vision probe 2026-10-17: not verifiable at probe time (service-side provider.no-route)."
-    },
-    {
       "model_id": "opencode:glm-5.3-flash-free",
       "provider": "opencode",
       "family": "glm-5.3-flash",
@@ -871,28 +993,6 @@
       "notes": "OpenCode provider free-tier model; candidate until the local auth session and structured-output behavior are verified on the target host. 2026-10-17 probe: 4/4 pass, median 5.1s. (2026-10-17 capability probe via OpencodeCliReasoningBackend (planner agent, 4 probes: structured JSON, tool_use, multilingual JP->EN, reasoning; pass/4 and consolidated median latency recorded)) Two-round verification 2026-10-17: 6/6 pass, median 3.1s; promoted to approved. vision probe 2026-10-17: attached solid-red PNG correctly identified as Red."
     },
     {
-      "model_id": "opencode:nemotron-3-ultra-free",
-      "provider": "opencode",
-      "family": "nemotron-3",
-      "status": "blocked",
-      "tier": "standard",
-      "execution_tier": "standard",
-      "role_fit": {
-        "intent_compiler": "secondary",
-        "surface_agent": "secondary",
-        "analysis": "secondary",
-        "coding": "secondary"
-      },
-      "cost_band": "low",
-      "latency_band": "high",
-      "structured_output_confidence": "low",
-      "tool_use_confidence": "low",
-      "multilingual_confidence": "low",
-      "reasoning_confidence": "low",
-      "capability_tags": ["agentic_coding", "tool_use", "structured_output", "free_tier"],
-      "notes": "OpenCode provider free-tier model; candidate until the local auth session and structured-output behavior are verified on the target host. 2026-10-17 probe: 0/4 pass; every headless call hung past 300s (also on raw `opencode run`), treat as unusable until the OpenCode service serves it. (2026-10-17 capability probe via OpencodeCliReasoningBackend (planner agent, 4 probes: structured JSON, tool_use, multilingual JP->EN, reasoning; pass/4 and consolidated median latency recorded))"
-    },
-    {
       "model_id": "opencode:beam-free",
       "provider": "opencode",
       "family": "beam",
@@ -915,56 +1015,6 @@
       "notes": "OpenCode provider free-tier model; candidate until the local auth session and structured-output behavior are verified on the target host. 2026-10-17 probe: 4/4 pass, median 1.4s. (2026-10-17 capability probe via OpencodeCliReasoningBackend (planner agent, 4 probes: structured JSON, tool_use, multilingual JP->EN, reasoning; pass/4 and consolidated median latency recorded)) Two-round verification 2026-10-17: 6/6 pass, median 1.2s; promoted to approved."
     },
     {
-      "model_id": "opencode:space-bunny-free",
-      "provider": "opencode",
-      "family": "space-bunny",
-      "status": "approved",
-      "tier": "standard",
-      "execution_tier": "standard",
-      "role_fit": {
-        "intent_compiler": "secondary",
-        "surface_agent": "secondary",
-        "analysis": "secondary",
-        "coding": "secondary"
-      },
-      "cost_band": "low",
-      "latency_band": "low",
-      "structured_output_confidence": "medium",
-      "tool_use_confidence": "medium",
-      "multilingual_confidence": "medium",
-      "reasoning_confidence": "medium",
-      "capability_tags": [
-        "agentic_coding",
-        "free_tier",
-        "structured_output",
-        "tool_use",
-        "vision_input"
-      ],
-      "notes": "OpenCode provider free-tier model; candidate until the local auth session and structured-output behavior are verified on the target host. 2026-10-17 probe: 4/4 pass, median 2.9s. (2026-10-17 capability probe via OpencodeCliReasoningBackend (planner agent, 4 probes: structured JSON, tool_use, multilingual JP->EN, reasoning; pass/4 and consolidated median latency recorded)) Two-round verification 2026-10-17: 6/6 pass, median 1.5s; promoted to approved. vision probe 2026-10-17: attached solid-red PNG correctly identified as Red."
-    },
-    {
-      "model_id": "opencode:longcat-2.5-preview-free",
-      "provider": "opencode",
-      "family": "longcat",
-      "status": "approved",
-      "tier": "standard",
-      "execution_tier": "standard",
-      "role_fit": {
-        "intent_compiler": "secondary",
-        "surface_agent": "secondary",
-        "analysis": "secondary",
-        "coding": "secondary"
-      },
-      "cost_band": "low",
-      "latency_band": "medium",
-      "structured_output_confidence": "medium",
-      "tool_use_confidence": "medium",
-      "multilingual_confidence": "medium",
-      "reasoning_confidence": "medium",
-      "capability_tags": ["agentic_coding", "tool_use", "structured_output", "free_tier"],
-      "notes": "OpenCode provider free-tier model; candidate until the local auth session and structured-output behavior are verified on the target host. 2026-10-17 probe: 4/4 pass, median 7.8s. (2026-10-17 capability probe via OpencodeCliReasoningBackend (planner agent, 4 probes: structured JSON, tool_use, multilingual JP->EN, reasoning; pass/4 and consolidated median latency recorded)) Two-round verification 2026-10-17: 6/6 pass, median 4.5s; promoted to approved. vision probe 2026-10-17: metadata declares image input but the model returned a wrong color (not Red) for a solid-red PNG attachment; treat image input as unreliable."
-    },
-    {
       "model_id": "opencode:big-pickle",
       "provider": "opencode",
       "family": "big-pickle",
@@ -985,6 +1035,116 @@
       "reasoning_confidence": "medium",
       "capability_tags": ["agentic_coding", "tool_use", "structured_output", "free_tier"],
       "notes": "OpenCode provider free-tier model; candidate until the local auth session and structured-output behavior are verified on the target host. 2026-10-17 probe: 4/4 pass but slow (median 63.6s). (2026-10-17 capability probe via OpencodeCliReasoningBackend (planner agent, 4 probes: structured JSON, tool_use, multilingual JP->EN, reasoning; pass/4 and consolidated median latency recorded)) Two-round verification 2026-10-17: 6/6 pass, median 31.5s; promoted to approved. vision probe 2026-10-17: model states it cannot view images directly but decoded the PNG pixel bytes via tools and answered Red; tool-workaround, not vision."
+    },
+    {
+      "model_id": "opencode:flint-40b-free",
+      "provider": "opencode",
+      "family": "flint-40b",
+      "status": "candidate",
+      "tier": "standard",
+      "execution_tier": "standard",
+      "role_fit": {
+        "intent_compiler": "secondary",
+        "surface_agent": "secondary",
+        "analysis": "secondary",
+        "coding": "secondary"
+      },
+      "cost_band": "low",
+      "latency_band": "low",
+      "structured_output_confidence": "medium",
+      "tool_use_confidence": "medium",
+      "multilingual_confidence": "medium",
+      "reasoning_confidence": "medium",
+      "capability_tags": ["agentic_coding", "free_tier", "structured_output", "tool_use"],
+      "notes": "OpenCode provider free-tier model listed in `opencode models` (verified 2026-11-14); candidate until a capability probe verifies auth session and structured-output behavior on this host."
+    },
+    {
+      "model_id": "opencode:iceman-free",
+      "provider": "opencode",
+      "family": "iceman",
+      "status": "candidate",
+      "tier": "standard",
+      "execution_tier": "standard",
+      "role_fit": {
+        "intent_compiler": "secondary",
+        "surface_agent": "secondary",
+        "analysis": "secondary",
+        "coding": "secondary"
+      },
+      "cost_band": "low",
+      "latency_band": "low",
+      "structured_output_confidence": "medium",
+      "tool_use_confidence": "medium",
+      "multilingual_confidence": "medium",
+      "reasoning_confidence": "medium",
+      "capability_tags": ["agentic_coding", "free_tier", "structured_output", "tool_use"],
+      "notes": "OpenCode provider free-tier model listed in `opencode models` (verified 2026-11-14); candidate until a capability probe verifies auth session and structured-output behavior on this host."
+    },
+    {
+      "model_id": "opencode:inkling-2-small-free",
+      "provider": "opencode",
+      "family": "inkling-2-small",
+      "status": "candidate",
+      "tier": "standard",
+      "execution_tier": "standard",
+      "role_fit": {
+        "intent_compiler": "secondary",
+        "surface_agent": "secondary",
+        "analysis": "secondary",
+        "coding": "secondary"
+      },
+      "cost_band": "low",
+      "latency_band": "low",
+      "structured_output_confidence": "medium",
+      "tool_use_confidence": "medium",
+      "multilingual_confidence": "medium",
+      "reasoning_confidence": "medium",
+      "capability_tags": ["agentic_coding", "free_tier", "structured_output", "tool_use"],
+      "notes": "OpenCode provider free-tier model listed in `opencode models` (verified 2026-11-14); candidate until a capability probe verifies auth session and structured-output behavior on this host."
+    },
+    {
+      "model_id": "opencode:minimax-m3.1-flash-free",
+      "provider": "opencode",
+      "family": "minimax-m3.1-flash",
+      "status": "candidate",
+      "tier": "standard",
+      "execution_tier": "standard",
+      "role_fit": {
+        "intent_compiler": "secondary",
+        "surface_agent": "secondary",
+        "analysis": "secondary",
+        "coding": "secondary"
+      },
+      "cost_band": "low",
+      "latency_band": "low",
+      "structured_output_confidence": "medium",
+      "tool_use_confidence": "medium",
+      "multilingual_confidence": "medium",
+      "reasoning_confidence": "medium",
+      "capability_tags": ["agentic_coding", "free_tier", "structured_output", "tool_use"],
+      "notes": "OpenCode provider free-tier model listed in `opencode models` (verified 2026-11-14); candidate until a capability probe verifies auth session and structured-output behavior on this host."
+    },
+    {
+      "model_id": "opencode:longcat-2.5-free",
+      "provider": "opencode",
+      "family": "longcat",
+      "status": "candidate",
+      "tier": "standard",
+      "execution_tier": "standard",
+      "role_fit": {
+        "intent_compiler": "secondary",
+        "surface_agent": "secondary",
+        "analysis": "secondary",
+        "coding": "secondary"
+      },
+      "cost_band": "low",
+      "latency_band": "medium",
+      "structured_output_confidence": "medium",
+      "tool_use_confidence": "medium",
+      "multilingual_confidence": "medium",
+      "reasoning_confidence": "medium",
+      "capability_tags": ["agentic_coding", "free_tier", "structured_output", "tool_use"],
+      "notes": "OpenCode provider free-tier model listed in `opencode models` (verified 2026-11-14); candidate until a capability probe verifies auth session and structured-output behavior on this host."
     },
     {
       "model_id": "devin:swe",

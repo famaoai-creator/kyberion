@@ -447,7 +447,7 @@
     },
     "opencode-cli-default": {
       "mode": "opencode-cli",
-      "model_ref": "opencode:muse-spark-1.3-contributor-free",
+      "model_ref": "opencode:glm-5.3-flash-free",
       "capabilities": ["text", "structured_output", "tools"]
     },
     "opencode-cli-glm-free": {

@@ -3112,7 +3112,7 @@
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "Model id in provider/model form for the OpenCode CLI reasoning backend; defaults to opencode/muse-spark-1.3-contributor-free.",
+      "description": "Model id in provider/model form for the OpenCode CLI reasoning backend; defaults to opencode/glm-5.3-flash-free.",
       "documented": true,
       "subsystem": "reasoning"
     },
