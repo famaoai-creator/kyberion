@@ -1,0 +1,42 @@
+---
+record_id: mem-MSN-ALWAYS-ON-SCOPED-20261115-2026_11_15
+kind: pattern
+tier: public
+knowledge_domain: product
+owner_nhi: ''
+candidate_id: mem-MSN-ALWAYS-ON-SCOPED-20261115-2026_11_15
+supersedes: ''
+superseded_by: ''
+project_id: ''
+task_session_id: ''
+specialist_id: ''
+locale: ''
+created_at: 2026-11-15T14:00:38.267Z
+source_branch: fix/always-on-scoped-20261115
+source_commit: 2257e2174897b627364dd2994d8611c57d94e64d
+---
+
+# Preserve custody and authority across resident-agent continuations
+
+A queued action, notification or recovery step must retain its original custody and current authority; shared WorkItems are routing indexes, not storage for private proposal prose.
+
+## Applicability
+
+- mission
+- mission:MSN-ALWAYS-ON-SCOPED-20261115
+
+## Reusable Steps
+
+1. A queued action, notification or recovery step must retain its original custody and current authority; shared WorkItems are routing indexes, not storage for private proposal prose
+
+## Expected Outcome
+
+When changing resident Dot workflows, carry the original tier, tenant, owner and typed entity scope through notification receipts, Inbox entries, WorkItems, outcomes and memory. A missing tenant is not proof of system ownership. Store personal payloads in the owner's canonical partition and preserve exact legacy delivery intents so migration cannot resend uncertain effects. Register every new runtime store with exact protected-tier declarations, retention and offboarding; exercise a real scoped writer because registration can expose an accidental role downgrade. Preserve the caller's live authority for scoped notifications instead of assuming a transport role or granting broader rights. Keep private proposal text in the original scoped action and put only routing references plus an admission binding in shared WorkItems; restore verified content ephemerally before effects. Recheck current policy and role before claiming approved work, hold damaged authority state, and recover frozen follow-up scheduling without a second model turn. Validate ordinary owner and system selection, reference-only diagnostic intake, low-authority denial and replay safety together. See the canonical resident Dot model, dot-initiated workflow and operations hygiene runbook for the contracts; do not introduce another ownership model.
+
+## Evidence
+
+- active/missions/public/MSN-ALWAYS-ON-SCOPED-20261115/evidence/implementation-report.md
+- active/missions/public/MSN-ALWAYS-ON-SCOPED-20261115/evidence/test-report.md
+- active/missions/public/MSN-ALWAYS-ON-SCOPED-20261115/evidence/REVIEW-execution-implement.md
+
+## Artifacts
