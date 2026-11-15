@@ -25,6 +25,10 @@ import type { DotCharter, DotCadenceCron, LoadedDotCharter } from '@agent/core/d
 import { runAsDotCharter } from '@agent/core/dot/dot-key-results';
 import { dotBudgetHardThrottled } from '@agent/core/dot/dot-budget';
 import { dotStatePath } from '@agent/core/dot/dot-state-paths';
+import {
+  alertDotStepCircuitOpen,
+  DotSupervisorStepCircuit,
+} from '@agent/core/dot/dot-step-circuit';
 import { readJsonIfPresent, writeJson } from '@agent/core/foundation/json';
 import { createLogger } from '@agent/core/logger';
 import {
@@ -278,6 +282,8 @@ export async function runDotOrgCadenceForCharter(
   });
 }
 
+const orgCadenceCircuit = new DotSupervisorStepCircuit('dot-org-cadence');
+
 /** Supervisor entry: every active charter with `operations_cadence`, isolated. */
 export async function runDotOrgCadenceStep(
   now: Date,
@@ -286,17 +292,30 @@ export async function runDotOrgCadenceStep(
 ): Promise<void> {
   for (const loaded of active) {
     if (!loaded.charter.operations_cadence) continue;
+    const dotId = loaded.charter.dot_id;
+    if (!orgCadenceCircuit.admits(dotId)) continue;
     try {
       await runDotOrgCadenceForCharter(loaded.charter, now, active, deps);
+      orgCadenceCircuit.reportSuccess(dotId);
     } catch (error) {
-      logger.warn(
-        diag(
-          `org cadence failed for ${loaded.charter.dot_id}`,
-          error,
-          'retried next sweep',
-          'scripts/dot/dot_org_cadence_step.ts'
-        )
-      );
+      const verdict = orgCadenceCircuit.reportFailure(dotId, error);
+      if (verdict === 'open') {
+        alertDotStepCircuitOpen(
+          'dot-org-cadence',
+          loaded.charter,
+          orgCadenceCircuit.signatureOf(dotId) ?? 'unknown',
+          orgCadenceCircuit.streakOf(dotId)
+        );
+      } else if (verdict === 'counted') {
+        logger.warn(
+          diag(
+            `org cadence failed for ${dotId}`,
+            error,
+            'retried next sweep',
+            'scripts/dot/dot_org_cadence_step.ts'
+          )
+        );
+      }
     }
   }
 }

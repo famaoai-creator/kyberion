@@ -1,9 +1,4 @@
-import {
-  parseSafeJsonInput,
-  readJsonLines,
-  loadJsonIfPresent,
-  writeJson,
-} from '../foundation/json.js';
+import { parseSafeJsonInput, readJsonLines } from '../foundation/json.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { safeExec, safeExistsSync, safeReaddir } from '../secure-io.js';
 import * as nodePath from 'node:path';
@@ -18,9 +13,12 @@ import { createHash } from 'node:crypto';
 import {
   appendOpsAlertLogRecord,
   ensureRegularOpsAlertLogFile,
+  loadOpsAlertDedupeState,
+  opsAlertDedupeStatePathFor,
+  OPS_ALERT_DEDUPE_STATE_FILENAME,
+  persistOpsAlertDedupeState,
   resolveOpsAlertLogPath,
   validateOpsAlertLogRecord,
-  withOpsAlertFileStore,
 } from './ops-alert-log.js';
 
 export type OpsAlertSeverity = 'info' | 'warning' | 'critical';
@@ -54,6 +52,12 @@ export interface OpsAlertOptions {
   minIntervalMs?: number;
   /** Dedupe state file override (tests). Defaults to a sibling of the alert log. */
   dedupeStatePath?: string;
+  /**
+   * Record the alert (with dedupe) but skip all delivery: used from inside the
+   * notification path itself, where a delivery attempt would re-enter the very
+   * pipeline that just failed.
+   */
+  recordOnly?: boolean;
 }
 
 const DEFAULT_MIN_INTERVAL_MS = 10 * 60 * 1000;
@@ -66,41 +70,11 @@ const lastSentAt = new Map<string, number>();
  * never fired — observed: 93% of ops-alerts.jsonl were the same unsuppressed
  * daemon-heartbeat critical at ~5min cadence. The state file is the shared
  * source of truth; the in-memory map is a fallback for the case the state
- * file cannot be written.
+ * file cannot be written. The state helpers live in ops-alert-log so emitters
+ * inside the notification path can dedupe without importing this module
+ * (which calls back into it — an import cycle).
  */
-export const OPS_ALERT_DEDUPE_STATE_FILENAME = 'ops-alerts.dedupe.json';
-const DEDUPE_STATE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
-
-/** Dedupe state lives next to the alert log: `ops-alerts.dedupe.json`. */
-function dedupeStatePathFor(alertLogPath: string): string {
-  return alertLogPath.replace(/\.jsonl$/, '.dedupe.json');
-}
-
-/** Load `key -> last-sent epochMs`, pruning entries older than 30 days. */
-function loadDedupeState(filePath: string, nowMs: number): Map<string, number> {
-  const state = new Map<string, number>();
-  const raw = withOpsAlertFileStore(filePath, () =>
-    loadJsonIfPresent<Record<string, unknown>>(filePath)
-  );
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return state;
-  for (const [key, value] of Object.entries(raw)) {
-    if (typeof value !== 'number' || !Number.isFinite(value)) continue;
-    if (nowMs - value > DEDUPE_STATE_MAX_AGE_MS) continue;
-    state.set(key, value);
-  }
-  return state;
-}
-
-/** Best-effort persist — dedupe persistence must never break alerting. */
-function persistDedupeState(filePath: string, state: Map<string, number>): void {
-  try {
-    withOpsAlertFileStore(filePath, () => writeJson(filePath, Object.fromEntries(state)));
-  } catch (err) {
-    logger.debug(
-      `[ops-alert] failed to persist dedupe state: ${err instanceof Error ? err.message : String(err)}`
-    );
-  }
-}
+export { OPS_ALERT_DEDUPE_STATE_FILENAME };
 
 /** Env var carrying the webhook URL used for actual alert delivery. */
 export const OPS_ALERT_WEBHOOK_ENV = 'KYBERION_OPS_ALERT_WEBHOOK_URL';
@@ -196,8 +170,8 @@ export function sendOpsAlert(input: OpsAlertInput, options: OpsAlertOptions = {}
   // File state wins over the process-local map: it carries sends made by
   // other (short-lived) processes, while the map covers a state file that
   // could not be written.
-  const dedupeStatePath = options.dedupeStatePath ?? dedupeStatePathFor(alertLogPath);
-  const dedupeState = loadDedupeState(dedupeStatePath, now.getTime());
+  const dedupeStatePath = options.dedupeStatePath ?? opsAlertDedupeStatePathFor(alertLogPath);
+  const dedupeState = loadOpsAlertDedupeState(dedupeStatePath, now.getTime());
   const prior = dedupeState.get(key) ?? lastSentAt.get(key);
   const suppressed = prior !== undefined && now.getTime() - prior < minIntervalMs;
   const id = `${timestamp.replace(/[:.]/g, '-')}-${key.replace(/[^a-zA-Z0-9_.-]/g, '_')}`;
@@ -222,7 +196,19 @@ export function sendOpsAlert(input: OpsAlertInput, options: OpsAlertOptions = {}
   }
   lastSentAt.set(key, now.getTime());
   dedupeState.set(key, now.getTime());
-  persistDedupeState(dedupeStatePath, dedupeState);
+  persistOpsAlertDedupeState(dedupeStatePath, dedupeState);
+
+  if (options.recordOnly) {
+    return {
+      id,
+      recorded_path: recordedPath,
+      webhook_attempted: false,
+      webhook_delivered: false,
+      operator_attempted: false,
+      operator_delivered: false,
+      suppressed: false,
+    };
+  }
 
   const webhookUrl = options.webhookUrl ?? getRegisteredEnvText(OPS_ALERT_WEBHOOK_ENV);
   if (!webhookUrl) {

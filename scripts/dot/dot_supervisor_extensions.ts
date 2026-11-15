@@ -19,6 +19,12 @@ import { measureActiveDotKeyResults, runAsDotCharter } from '@agent/core/dot/dot
 import { evaluateDueDotOutcomes, scheduleDotOutcomeChecks } from '@agent/core/dot/dot-outcomes';
 import { settleDotArbitration } from '@agent/core/dot/dot-arbitration';
 import { runDotAutonomyStep } from '@agent/core/dot/dot-autonomy';
+import { readDotActionLedger } from '@agent/core/dot/dot-action-ledger';
+import { sendOpsAlert } from '@agent/core/ops-alert';
+import {
+  alertDotStepCircuitOpen,
+  DotSupervisorStepCircuit,
+} from '@agent/core/dot/dot-step-circuit';
 import '@agent/core/dot/dot-extension-bootstrap';
 import { FRONT_DESK_EXECUTION_SUPERVISOR_STEP } from '../front_desk_execution_step.js';
 import { DOT_EXECUTOR_SUPERVISOR_STEP } from './dot_executor_step.js';
@@ -64,18 +70,32 @@ DOT_SUPERVISOR_STEPS.push({
 });
 
 // DL-05 weekly working-memory distillation (once per ISO week per dot)
+const memoryDistillCircuit = new DotSupervisorStepCircuit('dot-memory-distill');
 DOT_SUPERVISOR_STEPS.push({
   id: 'dot-memory-distill',
   async run(now, active) {
     for (const loaded of active) {
+      const dotId = loaded.charter.dot_id;
+      if (!memoryDistillCircuit.admits(dotId)) continue;
       try {
         await runAsDotCharter(loaded.charter, () =>
           distillDotMemory(loaded.charter, { now: () => now })
         );
+        memoryDistillCircuit.reportSuccess(dotId);
       } catch (error) {
-        logger.warn(
-          `memory distill failed for ${loaded.charter.dot_id} — ${error instanceof Error ? error.message : String(error)} | next: retried next sweep | evidence: libs/core/dot/dot-memory.ts`
-        );
+        const verdict = memoryDistillCircuit.reportFailure(dotId, error);
+        if (verdict === 'open') {
+          alertDotStepCircuitOpen(
+            'dot-memory-distill',
+            loaded.charter,
+            memoryDistillCircuit.signatureOf(dotId) ?? 'unknown',
+            memoryDistillCircuit.streakOf(dotId)
+          );
+        } else if (verdict === 'counted') {
+          logger.warn(
+            `memory distill failed for ${dotId} — ${error instanceof Error ? error.message : String(error)} | next: retried next sweep | evidence: libs/core/dot/dot-memory.ts`
+          );
+        }
       }
     }
   },
@@ -84,18 +104,32 @@ DOT_SUPERVISOR_STEPS.push({
 // DL-11 settle combined arbitration cards (after housekeeping settled the newcomer).
 // Registered BEFORE the executor: a WorkItem the approved newcomer supersedes
 // is blocked in the same sweep, before the executor could claim it.
+const arbitrationSettleCircuit = new DotSupervisorStepCircuit('dot-arbitration-settle');
 DOT_SUPERVISOR_STEPS.push({
   id: 'dot-arbitration-settle',
   async run(now, active) {
     for (const loaded of active) {
+      const dotId = loaded.charter.dot_id;
+      if (!arbitrationSettleCircuit.admits(dotId)) continue;
       try {
         await runAsDotCharter(loaded.charter, async () =>
           settleDotArbitration(loaded.charter, now)
         );
+        arbitrationSettleCircuit.reportSuccess(dotId);
       } catch (error) {
-        logger.warn(
-          `arbitration settlement failed for ${loaded.charter.dot_id} — ${error instanceof Error ? error.message : String(error)} | next: retried next sweep | evidence: libs/core/dot/dot-arbitration.ts`
-        );
+        const verdict = arbitrationSettleCircuit.reportFailure(dotId, error);
+        if (verdict === 'open') {
+          alertDotStepCircuitOpen(
+            'dot-arbitration-settle',
+            loaded.charter,
+            arbitrationSettleCircuit.signatureOf(dotId) ?? 'unknown',
+            arbitrationSettleCircuit.streakOf(dotId)
+          );
+        } else if (verdict === 'counted') {
+          logger.warn(
+            `arbitration settlement failed for ${dotId} — ${error instanceof Error ? error.message : String(error)} | next: retried next sweep | evidence: libs/core/dot/dot-arbitration.ts`
+          );
+        }
       }
     }
   },
@@ -107,19 +141,33 @@ DOT_SUPERVISOR_STEPS.push(DOT_CONTINUOUS_OPERATIONS_SUPERVISOR_STEP);
 DOT_SUPERVISOR_STEPS.push(DOT_EXECUTOR_SUPERVISOR_STEP);
 
 // DL-04 outcome checks: schedule new done results, evaluate the due ones (each dot isolated)
+const outcomesCircuit = new DotSupervisorStepCircuit('dot-outcomes');
 DOT_SUPERVISOR_STEPS.push({
   id: 'dot-outcomes',
   async run(now, active) {
     for (const loaded of active) {
+      const dotId = loaded.charter.dot_id;
+      if (!outcomesCircuit.admits(dotId)) continue;
       try {
         await runAsDotCharter(loaded.charter, async () => {
           scheduleDotOutcomeChecks(loaded.charter, { now: () => now });
           await evaluateDueDotOutcomes(loaded.charter, { now: () => now });
         });
+        outcomesCircuit.reportSuccess(dotId);
       } catch (error) {
-        logger.warn(
-          `outcome check failed for ${loaded.charter.dot_id} — ${error instanceof Error ? error.message : String(error)} | next: retried next sweep | evidence: libs/core/dot/dot-outcomes.ts`
-        );
+        const verdict = outcomesCircuit.reportFailure(dotId, error);
+        if (verdict === 'open') {
+          alertDotStepCircuitOpen(
+            'dot-outcomes',
+            loaded.charter,
+            outcomesCircuit.signatureOf(dotId) ?? 'unknown',
+            outcomesCircuit.streakOf(dotId)
+          );
+        } else if (verdict === 'counted') {
+          logger.warn(
+            `outcome check failed for ${dotId} — ${error instanceof Error ? error.message : String(error)} | next: retried next sweep | evidence: libs/core/dot/dot-outcomes.ts`
+          );
+        }
       }
     }
   },
@@ -127,18 +175,32 @@ DOT_SUPERVISOR_STEPS.push({
 
 // DL-10 graduated autonomy: shadow ledger, automatic demotion, promotion cards
 // (daily evaluation; a promotion applies only after a human approval settles)
+const autonomyCircuit = new DotSupervisorStepCircuit('dot-autonomy');
 DOT_SUPERVISOR_STEPS.push({
   id: 'dot-autonomy',
   async run(now, active) {
     for (const loaded of active) {
+      const dotId = loaded.charter.dot_id;
+      if (!autonomyCircuit.admits(dotId)) continue;
       try {
         await runAsDotCharter(loaded.charter, async () =>
           runDotAutonomyStep(loaded.charter, { now: () => now })
         );
+        autonomyCircuit.reportSuccess(dotId);
       } catch (error) {
-        logger.warn(
-          `autonomy step failed for ${loaded.charter.dot_id} — ${error instanceof Error ? error.message : String(error)} | next: retried next sweep; the level is unchanged | evidence: libs/core/dot/dot-autonomy.ts`
-        );
+        const verdict = autonomyCircuit.reportFailure(dotId, error);
+        if (verdict === 'open') {
+          alertDotStepCircuitOpen(
+            'dot-autonomy',
+            loaded.charter,
+            autonomyCircuit.signatureOf(dotId) ?? 'unknown',
+            autonomyCircuit.streakOf(dotId)
+          );
+        } else if (verdict === 'counted') {
+          logger.warn(
+            `autonomy step failed for ${dotId} — ${error instanceof Error ? error.message : String(error)} | next: retried next sweep; the level is unchanged | evidence: libs/core/dot/dot-autonomy.ts`
+          );
+        }
       }
     }
   },
@@ -148,6 +210,64 @@ DOT_SUPERVISOR_STEPS.push({
 // that opt in with operations_cadence — scoped to the charter's own organization
 // and run as its authority role, so no sovereign chronos daemon is required
 DOT_SUPERVISOR_STEPS.push(DOT_ORG_CADENCE_SUPERVISOR_STEP);
+
+/**
+ * Loop-effectiveness watch: a dot whose trailing action window is all
+ * declines/refusals/shadows — with nothing ever dispatched — is burning wakes
+ * and tokens for zero effect (the repo-guardian pattern: 115 wakes, ~5M
+ * tokens, 0 executed actions). One deduped alert per streak, cleared when the
+ * dot produces an effect again.
+ */
+const EFFECTIVENESS_WINDOW = 20;
+const EFFECTIVENESS_MIN_ROWS = 10;
+const zeroEffectAlerted = new Set<string>();
+DOT_SUPERVISOR_STEPS.push({
+  id: 'dot-effectiveness',
+  async run(_now, active) {
+    for (const loaded of active) {
+      const dotId = loaded.charter.dot_id;
+      try {
+        const rows = readDotActionLedger({ dotId, indexOnly: true });
+        const window = rows.slice(-EFFECTIVENESS_WINDOW);
+        if (window.length < EFFECTIVENESS_MIN_ROWS) {
+          zeroEffectAlerted.delete(dotId);
+          continue;
+        }
+        let dispatched = 0;
+        let dead = 0;
+        for (const row of window) {
+          if (row.status === 'dispatched') dispatched++;
+          else if (row.status === 'declined' || row.status === 'refused' || row.status === 'shadow')
+            dead++;
+        }
+        const zeroEffect = dispatched === 0 && dead * 2 >= window.length;
+        if (!zeroEffect) {
+          zeroEffectAlerted.delete(dotId);
+          continue;
+        }
+        if (zeroEffectAlerted.has(dotId)) continue;
+        zeroEffectAlerted.add(dotId);
+        sendOpsAlert({
+          severity: 'warning',
+          title: `Zero-effect loop detected: ${dotId}`,
+          context: {
+            dot_id: dotId,
+            window: window.length,
+            dispatched,
+            declined_refused_shadow: dead,
+          },
+          recommendation: `${dotId} keeps proposing work that never executes (${dispatched} dispatched of ${window.length} recent actions). Check its notify lane and approval routing — proposals that never reach a decider expire as 'declined' — and whether its observation inputs carry real data.`,
+          dedupe_key: `dot-zero-effect:${dotId}`,
+          category: 'dot',
+        });
+      } catch (error) {
+        logger.warn(
+          `effectiveness check failed for ${dotId} — ${error instanceof Error ? error.message : String(error)} | next: retried next sweep | evidence: libs/core/dot/dot-action-ledger.ts`
+        );
+      }
+    }
+  },
+});
 
 /** Duplicate is not an acknowledgement: require an exact authoritative terminal record. */
 export function reconcileDotEventRunnerDuplicate(

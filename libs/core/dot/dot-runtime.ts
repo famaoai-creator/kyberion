@@ -43,6 +43,8 @@ import {
   safeLstat,
   safeMkdir,
   safeReadFile,
+  safeReadFileRange,
+  MAX_RANGE_READ_BYTES,
 } from '../secure-io.js';
 import { appendJsonLine, readJsonIfPresent, writeJson } from '../foundation/json.js';
 import { readJsonLinesCached } from '../storage/jsonl-tail.js';
@@ -62,6 +64,7 @@ import { parseSafeJsonObjectInput } from '../foundation/safe-json.js';
 import { getZonedDateParts, matchesCron } from '../pipeline/cron-utils.js';
 import { recordDaemonHeartbeat } from '../daemon/daemon-heartbeat.js';
 import { getReasoningBackend } from '../reasoning/reasoning-backend.js';
+import { isLocalReasoningBackend } from '../reasoning/reasoning-egress-scope.js';
 import { sendOpsAlert, type OpsAlertInput } from '../daemon/ops-alert.js';
 import type {
   ReasoningBackend,
@@ -603,11 +606,74 @@ function minuteKey(date: Date, timezone?: string): string {
   return `${parts.year}-${String(parts.month).padStart(2, '0')}-${String(parts.day).padStart(2, '0')}T${String(parts.hour).padStart(2, '0')}:${String(parts.minute).padStart(2, '0')}`;
 }
 
-function watchTriggerKey(charter: DotCharter, rel: string, deps: DotRuntimeDeps): string | null {
+/**
+ * True when every appended record since the last snapshot is an ignored kind —
+ * the file changed only on rows the charter asked to skip (e.g. the
+ * undelivered-notification rows an unwired notify lane keeps producing), so the
+ * watch must not fire. Any blank, malformed or non-ignored line fails open.
+ */
+function watchAppendOnlyIgnoredKinds(
+  rel: string,
+  fromSize: number,
+  toSize: number,
+  ignored: readonly string[],
+  deps: DotRuntimeDeps
+): boolean {
+  const appended = toSize - fromSize;
+  if (appended <= 0 || appended > MAX_RANGE_READ_BYTES) return false;
+  try {
+    const safe = assertSafeRepositoryPath(path.join(deps.rootDir ?? pathResolver.rootDir(), rel), {
+      allowMissingLeaf: true,
+    });
+    const tail = safeReadFileRange(safe, fromSize, appended).toString('utf8');
+    const lines = tail.split('\n');
+    // A trailing unterminated fragment is the next line in progress; dropping
+    // it here means it is re-evaluated once it is complete and flushed.
+    if (!tail.endsWith('\n')) lines.pop();
+    const records = lines.filter((line) => line.trim().length > 0);
+    if (records.length === 0) return true;
+    return records.every((line) => {
+      try {
+        const record: unknown = JSON.parse(line);
+        return (
+          typeof record === 'object' &&
+          record !== null &&
+          ignored.includes(String((record as { kind?: unknown }).kind))
+        );
+      } catch {
+        return false;
+      }
+    });
+  } catch {
+    return false;
+  }
+}
+
+function watchTriggerKey(
+  charter: DotCharter,
+  rel: string,
+  deps: DotRuntimeDeps,
+  ignoredKinds: readonly string[] = []
+): string | null {
   const current = confinedWatchStat(rel, deps);
   if (!current) return null;
-  const snapshot = readWatchState(deps)[charter.dot_id]?.[rel];
+  const state = readWatchState(deps);
+  const snapshot = state[charter.dot_id]?.[rel];
   if (snapshot && snapshot.mtime_ms === current.mtime_ms && snapshot.size === current.size) {
+    return null;
+  }
+  if (
+    ignoredKinds.length > 0 &&
+    snapshot &&
+    watchAppendOnlyIgnoredKinds(rel, snapshot.size, current.size, ignoredKinds, deps)
+  ) {
+    writeWatchState(
+      {
+        ...state,
+        [charter.dot_id]: { ...(state[charter.dot_id] ?? {}), [rel]: current },
+      },
+      deps
+    );
     return null;
   }
   return `watch:${rel}@${Math.round(current.mtime_ms)}:${current.size}`;
@@ -918,6 +984,61 @@ function alertDotWakeCircuitOnce(
 }
 
 /**
+ * Local-only provider modes, in preference order. These are the reasoning
+ * providers whose declared `data_egress` is `local-only` — the only modes a
+ * `training_use 'local_only'` payload may reach.
+ */
+const LOCAL_ONLY_WAKE_BACKEND_MODES = [
+  'ollama',
+  'mlx',
+  'lmstudio',
+  'localai',
+  'llamacpp',
+  'vllm',
+  'local',
+] as const;
+
+/**
+ * Build a local-only backend for a confidential wake, or null when no local
+ * provider can be instantiated (not installed, no endpoint configured).
+ */
+async function buildLocalOnlyWakeBackend(charter: DotCharter): Promise<ReasoningBackend | null> {
+  const { buildReasoningBackendForMode } = await import('../reasoning/reasoning-bootstrap.js');
+  for (const mode of LOCAL_ONLY_WAKE_BACKEND_MODES) {
+    try {
+      const built = buildReasoningBackendForMode(mode);
+      if (built?.backend && isLocalReasoningBackend(built.backend.name)) return built.backend;
+    } catch {
+      // Mode unavailable — try the next local provider.
+    }
+  }
+  logger.debug(
+    `no local-only reasoning backend available for ${charter.dot_id} — tried ${LOCAL_ONLY_WAKE_BACKEND_MODES.join(', ')}`
+  );
+  return null;
+}
+
+/** One deduped alert per dot when a confidential wake has no usable backend. */
+function alertDotWakeLocalBackendUnavailable(charter: DotCharter, activeBackend: string): void {
+  try {
+    sendOpsAlert({
+      severity: 'warning',
+      title: `No local-only reasoning backend for ${charter.dot_id}`,
+      context: {
+        dot_id: charter.dot_id,
+        active_backend: activeBackend,
+        tier: charter.scope.tier,
+      },
+      recommendation: `Wakes for ${charter.dot_id} (tier '${charter.scope.tier}', training_use 'local_only') cannot use external backend '${activeBackend}'. Install a local provider (ollama/mlx/lmstudio) or attest a no-training provider: 'pnpm onboarding llm attest --tenant ${charter.scope.tenant_slug ?? '<slug>'} --provider <id> --training-use none --request-approval'.`,
+      dedupe_key: `dot-wake-local-backend:${charter.dot_id}`,
+      category: 'dot',
+    });
+  } catch {
+    // Observability only — the classified failure below is the durable record.
+  }
+}
+
+/**
  * Apply the dot's wake circuit to a due list: open → nothing is due (one ops
  * alert per opening); tripped but past the window → only the first trigger
  * runs, marked `circuit: true` (half-open probe); closed → unchanged.
@@ -960,7 +1081,7 @@ export function evaluateDotTriggersDue(
       }
     } else if (trigger.kind === 'watch') {
       for (const rel of trigger.paths) {
-        const key = watchTriggerKey(charter, rel, deps);
+        const key = watchTriggerKey(charter, rel, deps, trigger.ignore_jsonl_kinds);
         if (key && isDue(key)) {
           due.push({ trigger, key, detail: `watch ${rel} changed` });
         }
@@ -1574,7 +1695,29 @@ async function runDotWakeBaseline(
     try {
       const execution = deps.resolveWakeExecution ? await deps.resolveWakeExecution(current) : deps;
       if (execution.backendUnavailable) throw new Error(execution.backendUnavailable);
-      const backend = execution.backend ?? getReasoningBackend();
+      let backend = execution.backend ?? getReasoningBackend();
+      if (
+        execution.backend === undefined &&
+        (current.runtime.reasoning_training_use ??
+          (current.scope.tier === 'public' ? 'training_eligible' : 'local_only')) ===
+          'local_only' &&
+        !isLocalReasoningBackend(getReasoningBackend().name)
+      ) {
+        // Confidential material may not leave the host: swap to a local-only
+        // backend when one is configured. Failing that, surface ONE deduped
+        // actionable alert — without it the wake just dies on an opaque
+        // REASONING_EGRESS_DENIED every retry.
+        const local = await buildLocalOnlyWakeBackend(current);
+        if (local) {
+          backend = local;
+        } else {
+          const activeName = getReasoningBackend().name;
+          alertDotWakeLocalBackendUnavailable(current, activeName);
+          throw new Error(
+            `dot wake needs a local-only reasoning backend (training_use 'local_only', tier '${current.scope.tier}') but the active backend '${activeName}' is external and no local backend is available — install/configure a local provider (ollama/mlx/lmstudio/…) or attest a no-training provider via 'pnpm onboarding llm attest'`
+          );
+        }
+      }
       const accounting_id = randomUUID();
       // Meter from the validated charter, never provider/model-supplied labels.
       const withWakeUsage = <T>(fn: () => T): T =>

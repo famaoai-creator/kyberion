@@ -59,7 +59,7 @@
   },
   "authority": {
     "authority_role": "organization_operator",
-    "allowed_work_shapes": ["direct_reply", "pipeline"],
+    "allowed_execution_shapes": ["direct_reply", "pipeline"],
     "allowed_pipelines": ["pipelines/organization-improvement-scan.json"]
   },
   "decisions": {

@@ -29,7 +29,12 @@ import { getChannelAdapter, listOperatorNotificationChannels } from './channel-a
 import { addInboxEntry, listInboxEntries } from '../task/deliverable-inbox.js';
 import { sendIMessage } from '../integrations/imessage-bridge.js';
 import { currentTriggerDeliveryId } from '../event/trigger-correlation.js';
-import { appendOpsAlertLogRecord } from '../daemon/ops-alert-log.js';
+import {
+  appendOpsAlertLogRecord,
+  loadOpsAlertDedupeState,
+  opsAlertDedupeStatePathFor,
+  persistOpsAlertDedupeState,
+} from '../daemon/ops-alert-log.js';
 import { withExecutionContext, withStoreGrant } from '../authority.js';
 import { sendWebPushForEvent, webPushWouldDeliver } from './web-push.js';
 import { assertMemoryScope, type MemoryScopeEnvelope } from '../knowledge/memory-scope.js';
@@ -358,6 +363,16 @@ function formatNotificationText(
     .join('\n');
 }
 
+/**
+ * Re-entrancy guard: the delivery-gap alert is appended straight to the log
+ * with shared dedupe (never via sendOpsAlert, which would re-enter this
+ * notify path). The guard stays so a future delivery attempt added here can
+ * never recurse undelivered → alert → undelivered.
+ */
+let emittingDeliveryGapAlert = false;
+/** Same cadence as sendOpsAlert's default dedupe window. */
+const DELIVERY_GAP_ALERT_MIN_INTERVAL_MS = 10 * 60 * 1000;
+
 function recordUndeliveredNotification(
   event: OperatorEvent,
   payload: OperatorNotificationPayload,
@@ -385,6 +400,41 @@ function recordUndeliveredNotification(
       reason:
         scope && (scope.tier !== 'public' || scope.tenant_slug) ? reason.split(':')[0] : reason,
     });
+    // The undelivered row alone reaches nobody — it sits in a queue nobody
+    // reads. Surface the delivery gap itself as a deduped alert record so a
+    // missing channel is a first-class signal, not silent attrition. Written
+    // directly with the shared dedupe state (never via sendOpsAlert — that
+    // would re-enter this notify path). Skipped for the ops_alert event (its
+    // own redelivery envelope already covers it).
+    if (!emittingDeliveryGapAlert && event !== 'ops_alert') {
+      emittingDeliveryGapAlert = true;
+      try {
+        const dedupeKey = `operator-notification-undelivered:${event}:${reason.split(':')[0]}`;
+        const dedupePath = opsAlertDedupeStatePathFor(logPath);
+        const nowMs = Date.now();
+        const state = loadOpsAlertDedupeState(dedupePath, nowMs);
+        const prior = state.get(dedupeKey);
+        if (prior === undefined || nowMs - prior >= DELIVERY_GAP_ALERT_MIN_INTERVAL_MS) {
+          state.set(dedupeKey, nowMs);
+          persistOpsAlertDedupeState(dedupePath, state);
+          const timestamp = new Date(nowMs).toISOString();
+          appendOpsAlertLogRecord(logPath, {
+            id: `${timestamp.replace(/[:.]/g, '-')}-${dedupeKey.replace(/[^a-zA-Z0-9_.-]/g, '_')}`,
+            timestamp,
+            suppressed: false,
+            severity: 'warning',
+            title: `Operator notification undelivered: ${event}`,
+            context: { event, reason: reason.split(':')[0] },
+            recommendation:
+              'Configure a notification channel for this deployment (webhook env / inbox delivery); undelivered rows stay queued for `ops:alerts --redeliver`.',
+            dedupe_key: dedupeKey,
+            category: 'notification',
+          });
+        }
+      } finally {
+        emittingDeliveryGapAlert = false;
+      }
+    }
   } catch {
     // observability only — never throw from the notification path
   }
