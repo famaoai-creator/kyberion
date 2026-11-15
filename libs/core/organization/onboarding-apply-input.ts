@@ -1,6 +1,7 @@
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { pathResolver } from '../path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '../secure-io.js';
+import type { OnboardingOperations } from './onboarding-state.js';
 
 export interface OnboardingApplyIdentity {
   name: string;
@@ -24,11 +25,27 @@ export interface OnboardingApplyTutorial {
   summary?: string;
 }
 
+/** Resident-loop operations block accepted by the non-interactive apply path. */
+export interface OnboardingApplyOperations {
+  /**
+   * 'install' records pending — apply never spawns service installers.
+   * 'defer' also records pending (still owed); only 'skip' opts out.
+   */
+  resident_services?: 'install' | 'defer' | 'skip';
+  notification?: {
+    surface: NonNullable<OnboardingOperations['notification_surface']>;
+    target: string;
+  };
+  /** Declared intake source ids to enable in event-intake-policy.json. */
+  intake_enable?: string[];
+}
+
 export interface OnboardingApplyInput {
   identity: OnboardingApplyIdentity;
   tenants?: OnboardingApplyTenant[];
   tutorial?: OnboardingApplyTutorial;
   reasoning_backend?: string;
+  operations?: OnboardingApplyOperations;
 }
 
 const ONBOARDING_APPLY_INPUT_SCHEMA_PATH = pathResolver.knowledge(

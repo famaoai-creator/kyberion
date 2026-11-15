@@ -62,6 +62,12 @@ import { parseSafeJsonObjectInput } from '../foundation/safe-json.js';
 import { getZonedDateParts, matchesCron } from '../pipeline/cron-utils.js';
 import { recordDaemonHeartbeat } from '../daemon/daemon-heartbeat.js';
 import { getReasoningBackend } from '../reasoning/reasoning-backend.js';
+import { isLocalReasoningBackend } from '../reasoning/reasoning-egress-scope.js';
+import {
+  alertDotWakeLocalBackendUnavailable,
+  buildLocalOnlyWakeBackend,
+} from './dot-local-backend.js';
+import { watchAppendOnlyIgnoredKinds } from './dot-append-watch.js';
 import { sendOpsAlert, type OpsAlertInput } from '../daemon/ops-alert.js';
 import type {
   ReasoningBackend,
@@ -603,11 +609,31 @@ function minuteKey(date: Date, timezone?: string): string {
   return `${parts.year}-${String(parts.month).padStart(2, '0')}-${String(parts.day).padStart(2, '0')}T${String(parts.hour).padStart(2, '0')}:${String(parts.minute).padStart(2, '0')}`;
 }
 
-function watchTriggerKey(charter: DotCharter, rel: string, deps: DotRuntimeDeps): string | null {
+function watchTriggerKey(
+  charter: DotCharter,
+  rel: string,
+  deps: DotRuntimeDeps,
+  ignoredKinds: readonly string[] = []
+): string | null {
   const current = confinedWatchStat(rel, deps);
   if (!current) return null;
-  const snapshot = readWatchState(deps)[charter.dot_id]?.[rel];
+  const state = readWatchState(deps);
+  const snapshot = state[charter.dot_id]?.[rel];
   if (snapshot && snapshot.mtime_ms === current.mtime_ms && snapshot.size === current.size) {
+    return null;
+  }
+  if (
+    ignoredKinds.length > 0 &&
+    snapshot &&
+    watchAppendOnlyIgnoredKinds(rel, snapshot.size, current.size, ignoredKinds, deps.rootDir)
+  ) {
+    writeWatchState(
+      {
+        ...state,
+        [charter.dot_id]: { ...(state[charter.dot_id] ?? {}), [rel]: current },
+      },
+      deps
+    );
     return null;
   }
   return `watch:${rel}@${Math.round(current.mtime_ms)}:${current.size}`;
@@ -960,7 +986,7 @@ export function evaluateDotTriggersDue(
       }
     } else if (trigger.kind === 'watch') {
       for (const rel of trigger.paths) {
-        const key = watchTriggerKey(charter, rel, deps);
+        const key = watchTriggerKey(charter, rel, deps, trigger.ignore_jsonl_kinds);
         if (key && isDue(key)) {
           due.push({ trigger, key, detail: `watch ${rel} changed` });
         }
@@ -1574,7 +1600,32 @@ async function runDotWakeBaseline(
     try {
       const execution = deps.resolveWakeExecution ? await deps.resolveWakeExecution(current) : deps;
       if (execution.backendUnavailable) throw new Error(execution.backendUnavailable);
-      const backend = execution.backend ?? getReasoningBackend();
+      let backend = execution.backend ?? getReasoningBackend();
+      if (execution.backend === undefined) {
+        // execution.backend is undefined here, so `backend` came from
+        // getReasoningBackend() and carries the full ReasoningBackend shape.
+        const activeName = (backend as ReasoningBackend).name;
+        if (
+          (current.runtime.reasoning_training_use ??
+            (current.scope.tier === 'public' ? 'training_eligible' : 'local_only')) ===
+            'local_only' &&
+          !isLocalReasoningBackend(activeName)
+        ) {
+          // Confidential material may not leave the host: swap to a
+          // local-only backend when one is configured. Failing that, surface
+          // ONE deduped actionable alert — without it the wake just dies on
+          // an opaque REASONING_EGRESS_DENIED every retry.
+          const local = await buildLocalOnlyWakeBackend(current);
+          if (local) {
+            backend = local;
+          } else {
+            alertDotWakeLocalBackendUnavailable(current, activeName);
+            throw new Error(
+              `dot wake needs a local-only reasoning backend (training_use 'local_only', tier '${current.scope.tier}') but the active backend '${activeName}' is external and no local backend is available — install/configure a local provider (ollama/mlx/lmstudio/…) or attest a no-training provider via 'pnpm onboarding llm attest'`
+            );
+          }
+        }
+      }
       const accounting_id = randomUUID();
       // Meter from the validated charter, never provider/model-supplied labels.
       const withWakeUsage = <T>(fn: () => T): T =>

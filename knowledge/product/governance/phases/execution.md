@@ -94,6 +94,12 @@ template task is recorded while the work happens**. Verified end to end on 2026-
      --evidence <deliverable,...> --actor-id <agent that did it> --team-role <planner|implementer|reviewer>
    ```
 
+   `TASK_ID` and `NOTE` are **positional**. A flag form such as `--task-id <id>`
+   still prints `Recorded evidence` and appends a ledger entry, but it does NOT
+   close the task — `NEXT_TASKS.json` stays `planned`. Always re-check task
+   status afterward (`status` command or the JSON) instead of trusting the
+   success line.
+
    `--actor-id` is not optional in practice: `review-task` checks legacy actor-label separation
    against the actor ids recorded for the review target, and without them review is rejected
    ("implementer identity is missing"). When `record-evidence` (or `review-task`) completes a

@@ -433,6 +433,13 @@
                       "type": "string",
                       "minLength": 1
                     }
+                  },
+                  "ignore_jsonl_kinds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
                   }
                 }
               },

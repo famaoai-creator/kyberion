@@ -54,6 +54,32 @@
         "summary": { "type": "string", "minLength": 1 }
       }
     },
-    "reasoning_backend": { "type": "string", "minLength": 1 }
+    "reasoning_backend": { "type": "string", "minLength": 1 },
+    "operations": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "resident_services": {
+          "type": "string",
+          "enum": ["install", "defer", "skip"]
+        },
+        "notification": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["surface", "target"],
+          "properties": {
+            "surface": {
+              "type": "string",
+              "enum": ["slack", "imessage", "telegram", "discord", "inbox"]
+            },
+            "target": { "type": "string", "minLength": 1 }
+          }
+        },
+        "intake_enable": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
   }
 }

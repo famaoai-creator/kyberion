@@ -31,7 +31,8 @@
       },
       {
         "kind": "watch",
-        "paths": ["active/shared/observability/ops-alerts.jsonl"]
+        "paths": ["active/shared/observability/ops-alerts.jsonl"],
+        "ignore_jsonl_kinds": ["operator_notification_undelivered"]
       },
       {
         "kind": "wake",

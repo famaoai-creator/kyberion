@@ -1440,6 +1440,10 @@
       "types": "./dist/dot/dot-state-paths.d.ts",
       "default": "./dist/dot/dot-state-paths.js"
     },
+    "./dot/dot-step-circuit": {
+      "types": "./dist/dot/dot-step-circuit.d.ts",
+      "default": "./dist/dot/dot-step-circuit.js"
+    },
     "./dot/dot-wake-backend": {
       "types": "./dist/dot/dot-wake-backend.d.ts",
       "default": "./dist/dot/dot-wake-backend.js"

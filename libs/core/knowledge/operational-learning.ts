@@ -14,6 +14,7 @@ import {
   type QueueOrganizationLearningCandidateInput,
 } from '../organization/organization-operating-model.js';
 import { resolveScopeResolution } from '../scope-context.js';
+import { sendOpsAlert } from '../daemon/ops-alert.js';
 
 export interface OperationalLearningSignal {
   signalId: string;
@@ -154,13 +155,41 @@ export function enqueueOperationalLearningSignal(
     );
     return learningId;
   } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
     logger.warn(
       formatDiagnostic({
         component: 'operational-learning',
         what: `enqueue failed for ${learningId}`,
-        why: error instanceof Error ? error.message : String(error),
+        why: reason,
       })
     );
+    // A dropped candidate is silent attrition in the improvement loop — the
+    // warn above is only in process logs. Surface it once per learning id so
+    // a scope/config defect (e.g. a personal organization missing owner
+    // binding) becomes actionable instead of recurring invisibly. Detail
+    // (title, reason) stays out of the record for non-public scopes — the
+    // ops-alert log is watched by lower-clearance readers.
+    const isPublic = scope.tier === 'public' && !scope.tenantSlug;
+    try {
+      sendOpsAlert({
+        severity: 'warning',
+        title: isPublic
+          ? `Learning candidate dropped: ${signal.title.slice(0, 120)}`
+          : 'Learning candidate dropped (scoped signal)',
+        context: {
+          signal_id: signal.signalId,
+          learning_id: learningId,
+          tier: scope.tier,
+          ...(isPublic ? { tenant: scope.tenantSlug ?? 'shared', reason } : {}),
+        },
+        recommendation:
+          'An operational learning signal could not be queued as a candidate — check the target organization learning store scope (owner binding for personal organizations, tenant binding for confidential ones).',
+        dedupe_key: `operational-learning-enqueue:${learningId}`,
+        category: 'learning',
+      });
+    } catch {
+      // observability only — the enqueue failure itself is already logged
+    }
     return null;
   }
 }

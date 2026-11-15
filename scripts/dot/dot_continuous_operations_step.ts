@@ -19,10 +19,13 @@ import {
   safeWriteFile,
 } from '@agent/core/secure-io';
 import { withLock } from '@agent/core/foundation/lock-utils';
+import { reportDotStepFailure, DotSupervisorStepCircuit } from '@agent/core/dot/dot-step-circuit';
 import { createLogger } from '@agent/core/logger';
 import type { DotSupervisorStep } from './dot_supervisor_extensions.js';
 
 const logger = createLogger('dot-continuous-operations');
+const continuousCadenceCircuit = new DotSupervisorStepCircuit('dot-continuous-cadence');
+const continuousOwnerCircuit = new DotSupervisorStepCircuit('dot-continuous-owner');
 const CONFIG_DIR = 'knowledge/product/governance/continuous-operations';
 export interface ContinuousCadenceConfig {
   ref: string;
@@ -148,6 +151,7 @@ export async function runDotContinuousOperationsStep(
       ).runContinuousManagedOwner(charter, options));
   for (const { charter } of active) {
     if (charter.status !== 'active') continue;
+    if (!continuousOwnerCircuit.admits(charter.dot_id)) continue;
     try {
       if (
         (
@@ -159,6 +163,7 @@ export async function runDotContinuousOperationsStep(
       await (deps.runAs ?? runAsDotCharter)(charter, async () => {
         for (const { ref, config } of configs) {
           if (!config.enabled || !config.schedule || !matches(charter, config)) continue;
+          if (!continuousCadenceCircuit.admits(`${charter.dot_id}/${config.loop_id}`)) continue;
           try {
             await (deps.lock ?? ((key, callback) => withLock(key, callback, 1000)))(
               `continuous-cadence-${charter.dot_id}-${config.loop_id}`,
@@ -189,23 +194,37 @@ export async function runDotContinuousOperationsStep(
                   safeWriteFile(file, `${JSON.stringify(value)}\n`);
                 }
                 await cycle(ref, { apply: true, now });
+                continuousCadenceCircuit.reportSuccess(`${charter.dot_id}/${config.loop_id}`);
               }
             );
           } catch (error) {
             failures.push(`${charter.dot_id}/${config.loop_id}`);
-            logger.warn(
-              `continuous cadence failed — ${error instanceof Error ? error.message : String(error)} | next: inspect configuration and cadence checkpoint | evidence: ${ref}`
+            reportDotStepFailure(
+              continuousCadenceCircuit,
+              `${charter.dot_id}/${config.loop_id}`,
+              charter,
+              error,
+              {
+                what: 'continuous cadence failed',
+                next: 'inspect configuration and cadence checkpoint',
+                evidence: ref,
+                log: (line) => logger.warn(line),
+              }
             );
           }
         }
         // Pending work survives source recovery, disabled loops and quiet periods.
         await owner(charter, { now });
       });
+      continuousOwnerCircuit.reportSuccess(charter.dot_id);
     } catch (error) {
       failures.push(charter.dot_id);
-      logger.warn(
-        `continuous owner failed — ${error instanceof Error ? error.message : String(error)} | next: inspect managed work and authority | evidence: dot ${charter.dot_id}`
-      );
+      reportDotStepFailure(continuousOwnerCircuit, charter.dot_id, charter, error, {
+        what: 'continuous owner failed',
+        next: 'inspect managed work and authority',
+        evidence: `dot ${charter.dot_id}`,
+        log: (line) => logger.warn(line),
+      });
     }
   }
   if (failures.length) throw new Error(`Continuous operations failed for ${failures.join(', ')}`);

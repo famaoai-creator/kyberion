@@ -66,6 +66,12 @@ import {
 } from './onboarding_reasoning.js';
 import { promptProviderAttestation, promptReasoningModel } from './onboarding_llm_prompts.js';
 import {
+  currentEnabledIntakeSources,
+  intakeStatusLabel,
+  operationsNextSteps,
+  promptResidentLoopOperations,
+} from './onboarding_operations.js';
+import {
   generateOnboardingRunbookSkill,
   onboardingRunbookSkillPath,
 } from './onboarding_runbook_skill.js';
@@ -171,6 +177,7 @@ const PHASES: OnboardingPhase[] = [
   'reasoning',
   'services',
   'tenants',
+  'operations',
   'tutorial',
   'summary',
 ];
@@ -239,8 +246,12 @@ const normalizeTenantSlug = (value: string): string => {
   throw new Error(`Invalid tenant slug: ${value}`);
 };
 
+// Japanese affirmatives belong here too — the wizard defaults to the JA
+// i18n-exempt: bilingual prompt pair (JA side intentional)
+// locale, so "はい" must not be read as a no.
 const isAffirmative = (value: string): boolean =>
-  /^(y|yes|true|1|ok|sure|please)$/i.test(value.trim());
+  // i18n-exempt: bilingual prompt pair (JA side intentional)
+  /^(y|yes|true|1|ok|sure|please|はい|うん|ええ)$/i.test(value.trim());
 
 const ensureArtifactDir = (filePath: string): void => {
   const dir = path.dirname(filePath);
@@ -389,10 +400,24 @@ function buildSummaryMarkdown(state: OnboardingState): string {
     `- Mode: ${tutorial?.mode || 'skipped'}`,
     `- Summary: ${tutorial?.summary || 'n/a'}`,
     '',
+    '## Resident Loop Operations',
+    ...(state.operations
+      ? [
+          `- Resident services: ${state.operations.resident_services}`,
+          `- Notification channel: ${state.operations.notification_surface ? `${state.operations.notification_surface}${state.operations.notification_target ? ` (${state.operations.notification_target})` : ''}` : 'none configured'}`,
+          ...(state.operations.intake_sources.length > 0
+            ? state.operations.intake_sources.map(
+                (s) => `- Intake '${s.source}': ${intakeStatusLabel(s.status)}`
+              )
+            : ['- Intake sources: none enabled']),
+        ]
+      : ['- Not configured']),
+    '',
     `## ${summaryPolicy.sections.next_steps}`,
     '- Review candidate service connections before using them in missions.',
     '- Register additional tenants one at a time.',
     '- Convert the tutorial into an explicit mission only after confirming the setup.',
+    ...(state.operations ? operationsNextSteps(state.operations).map((s) => `- ${s}`) : []),
     '',
     '## Runbook Skill',
     `- Generated: ${onboardingRunbookSkillPath(profileRoot())}`,
@@ -1016,6 +1041,40 @@ async function runTenantsPhase(state: OnboardingState, print: Print): Promise<vo
 
   state.tenants = { entries };
   state.completed_phases = Array.from(new Set([...state.completed_phases, 'tenants']));
+  state.current_phase = 'operations';
+  state.updated_at = nowIso();
+  await saveState(state);
+}
+
+async function runOperationsPhase(state: OnboardingState, print: Print): Promise<void> {
+  const flowPolicy = resolveOnboardingFlowPolicy();
+  print(`\n🔄 Phase 4 — ${pt(flowPolicy.phase_titles.operations)}\n`);
+  if (interactive && !expressMode) {
+    state.operations = await promptResidentLoopOperations({
+      ask,
+      print,
+      t,
+      isAffirmative,
+      runTask: runManagedMenuTask,
+    });
+  } else {
+    // Non-interactive / express runs never spawn installers or take secrets:
+    // record the gaps so the summary's next-steps list them verbatim, but
+    // still reflect sources that are already enabled in the intake policy.
+    state.operations = {
+      resident_services: 'pending',
+      intake_sources: currentEnabledIntakeSources(),
+    };
+    print(
+      // i18n-exempt: bilingual prompt pair (JA side intentional)
+      t(
+        'Non-interactive run — resident services and notification channel are recorded as pending; already-enabled intake sources are kept. See the summary for the exact commands.',
+        // i18n-exempt: bilingual prompt pair (JA side intentional)
+        '非対話実行 — 常駐サービス・通知チャンネルは pending として記録し、有効化済みの intake ソースはそのまま反映します。コマンドはサマリを参照してください。'
+      )
+    );
+  }
+  state.completed_phases = Array.from(new Set([...state.completed_phases, 'operations']));
   state.current_phase = 'tutorial';
   state.updated_at = nowIso();
   await saveState(state);
@@ -1023,7 +1082,7 @@ async function runTenantsPhase(state: OnboardingState, print: Print): Promise<vo
 
 async function runTutorialPhase(state: OnboardingState, print: Print): Promise<void> {
   const flowPolicy = resolveOnboardingFlowPolicy();
-  print(`\n🎓 Phase 4 — ${pt(flowPolicy.phase_titles.tutorial)}\n`);
+  print(`\n🎓 Phase 5 — ${pt(flowPolicy.phase_titles.tutorial)}\n`);
   const modeInput = (
     await ask('Tutorial mode: simulate / apply / skipped [simulate]: ', 'simulate')
   )
@@ -1068,7 +1127,7 @@ async function runTutorialPhase(state: OnboardingState, print: Print): Promise<v
 
 async function runSummaryPhase(state: OnboardingState, print: Print): Promise<void> {
   const flowPolicy = resolveOnboardingFlowPolicy();
-  print(`\n📊 Phase 5 — ${pt(flowPolicy.phase_titles.summary)}\n`);
+  print(`\n📊 Phase 6 — ${pt(flowPolicy.phase_titles.summary)}\n`);
   const ownerAuthority = activationNextStep(await prepareActivationSetup(new Date()));
   const summary = buildSummaryMarkdown(state) + '\n\n' + ownerAuthority + '\n';
   print(ownerAuthority);
@@ -1102,34 +1161,34 @@ async function runSummaryPhase(state: OnboardingState, print: Print): Promise<vo
       )
     );
   }
-  print(
+  // One list, enumerated once — appending a step can no longer desync the
+  // numbering (the pending ops steps continue the same sequence).
+  const nextSteps: string[] = [
     t(
-      `1. Review the service connection drafts in \`${path.join(profileRoot(), 'connections')}/\`.`,
+      `Review the service connection drafts in \`${path.join(profileRoot(), 'connections')}/\`.`,
       // i18n-exempt: bilingual prompt pair (JA side intentional)
-      `1. \`${path.join(profileRoot(), 'connections')}/\` のサービス接続ドラフトを確認してください。`
-    )
-  );
-  print(
+      `\`${path.join(profileRoot(), 'connections')}/\` のサービス接続ドラフトを確認してください。`
+    ),
     t(
-      `2. Review the tenant draft in \`${path.join(profileRoot(), 'tenants')}/\`.`,
+      `Review the tenant draft in \`${path.join(profileRoot(), 'tenants')}/\`.`,
       // i18n-exempt: bilingual prompt pair (JA side intentional)
-      `2. \`${path.join(profileRoot(), 'tenants')}/\` のテナントドラフトを確認してください。`
-    )
-  );
-  print(
+      `\`${path.join(profileRoot(), 'tenants')}/\` のテナントドラフトを確認してください。`
+    ),
     t(
-      '3. If the tutorial should become real work, create a mission explicitly after review.',
+      'If the tutorial should become real work, create a mission explicitly after review.',
       // i18n-exempt: bilingual prompt pair (JA side intentional)
-      '3. チュートリアルを実作業にする場合は、レビュー後に明示的にミッションを作成してください。'
-    )
-  );
-  print(
+      'チュートリアルを実作業にする場合は、レビュー後に明示的にミッションを作成してください。'
+    ),
     t(
-      '4. Re-run `pnpm surfaces reconcile` after the workspace is ready.',
+      'Re-run `pnpm surfaces reconcile` after the workspace is ready.',
       // i18n-exempt: bilingual prompt pair (JA side intentional)
-      '4. ワークスペースの準備ができたら `pnpm surfaces reconcile` を再実行してください。'
-    )
-  );
+      'ワークスペースの準備ができたら `pnpm surfaces reconcile` を再実行してください。'
+    ),
+    ...(state.operations ? operationsNextSteps(state.operations) : []),
+  ];
+  nextSteps.forEach((step, index) => {
+    print(`${index + 1}. ${step}`);
+  });
 }
 
 function onboardingArtifactsMissing(state: OnboardingState, phase: OnboardingPhase): boolean {
@@ -1164,11 +1223,28 @@ export async function runOnboarding(
 
   if (!stanceSlug && interactive && !expressMode) {
     const wantsStance = isAffirmative(
-      await ask('Set up a stance (act as another entity) now? (y/N): ', 'n')
+      await ask(
+        t(
+          'Set up a stance (act as another entity) now? (y/N): ',
+          // i18n-exempt: bilingual prompt pair (JA side intentional)
+          'スタンス(別エンティティとして振る舞う設定)を今すぐ設定しますか? (y/N): '
+        ),
+        'n'
+      )
     );
     if (wantsStance) {
       while (!stanceSlug) {
-        const slugInput = await ask('Stance slug [e.g. acme-engagement]: ', '');
+        const slugInput = await ask(
+          t(
+            'Stance slug [e.g. acme-engagement, empty to skip]: ',
+            // i18n-exempt: bilingual prompt pair (JA side intentional)
+            'スタンス slug [例: acme-engagement、空入力でスキップ]: '
+          ),
+          ''
+        );
+        // An empty answer is the only way out — without it an invalid slug
+        // would trap the operator in an unbounded retry loop.
+        if (!slugInput.trim()) break;
         try {
           createStance(slugInput);
           switchStance(slugInput);
@@ -1222,18 +1298,46 @@ export async function runOnboarding(
       )
     );
     print(
-      '    2. If you need a customer overlay, create it first with `pnpm stance:create <slug>`'
+      t(
+        '    2. If you need a customer overlay, create it first with `pnpm stance:create <slug>`',
+        // i18n-exempt: bilingual prompt pair (JA side intentional)
+        '    2. カスタマーオーバーレイが必要なら先に `pnpm stance:create <slug>` で作成し、'
+      )
     );
-    print('       and activate it with `pnpm stance:switch <slug>` before onboarding.');
     print(
-      '    3. Apply a reviewed identity file (Path B): copy knowledge/public/templates/onboarding/identity.example.json'
+      t(
+        '       and activate it with `pnpm stance:switch <slug>` before onboarding.',
+        // i18n-exempt: bilingual prompt pair (JA side intentional)
+        '       オンボーディング前に `pnpm stance:switch <slug>` で有効化してください。'
+      )
     );
     print(
-      '       into active/shared/tmp/, edit it, then `pnpm onboarding apply --identity <file> --dry-run` and rerun without --dry-run.'
+      t(
+        '    3. Apply a reviewed identity file (Path B): copy knowledge/public/templates/onboarding/identity.example.json',
+        // i18n-exempt: bilingual prompt pair (JA side intentional)
+        '    3. レビュー済み identity ファイルを適用する (Path B): knowledge/public/templates/onboarding/identity.example.json を'
+      )
     );
-    print(`       It is written to the active profile root (${profileRoot()}).`);
     print(
-      '    4. To intentionally accept defaults, re-run with KYBERION_ONBOARDING_NON_INTERACTIVE_OK=1'
+      t(
+        '       into active/shared/tmp/, edit it, then `pnpm onboarding apply --identity <file> --dry-run` and rerun without --dry-run.',
+        // i18n-exempt: bilingual prompt pair (JA side intentional)
+        '       active/shared/tmp/ へコピーして編集し、`pnpm onboarding apply --identity <file> --dry-run` の後に --dry-run 無しで再実行します。'
+      )
+    );
+    print(
+      t(
+        `       It is written to the active profile root (${profileRoot()}).`,
+        // i18n-exempt: bilingual prompt pair (JA side intentional)
+        `       有効なプロファイルルート (${profileRoot()}) に書き込まれます。`
+      )
+    );
+    print(
+      t(
+        '    4. To intentionally accept defaults, re-run with KYBERION_ONBOARDING_NON_INTERACTIVE_OK=1',
+        // i18n-exempt: bilingual prompt pair (JA side intentional)
+        '    4. 意図的に既定値を受け入れる場合は KYBERION_ONBOARDING_NON_INTERACTIVE_OK=1 を付けて再実行'
+      )
     );
     rl.close();
     throw new ScriptExitError(2);
@@ -1282,6 +1386,19 @@ export async function runOnboarding(
   const isMenuMode = args.includes('--menu') || args.includes('--reconfig');
 
   let state = loadState();
+  if (!state && safeExistsSync(statePath())) {
+    // The file exists but could not be parsed — say so instead of silently
+    // discarding whatever progress it recorded.
+    print(
+      chalk.yellow(
+        t(
+          'Existing onboarding state could not be read — starting fresh.',
+          // i18n-exempt: bilingual prompt pair (JA side intentional)
+          '既存のオンボーディング状態を読み取れないため、最初から開始します。'
+        )
+      )
+    );
+  }
   if (state?.identity?.language) {
     setWizardLanguage(state.identity.language);
   }
@@ -1411,9 +1528,9 @@ export async function runOnboarding(
   } else {
     const resume = await ask(
       t(
-        `Resume onboarding from phase "${state.current_phase}"? (Y/n): `,
+        `Resume onboarding from phase "${state.current_phase}"? (Y/n; "n" discards saved progress and starts over): `,
         // i18n-exempt: bilingual prompt pair (JA side intentional)
-        `フェーズ「${state.current_phase}」からオンボーディングを再開しますか?(Y/n): `
+        `フェーズ「${state.current_phase}」からオンボーディングを再開しますか?(Y/n。「n」で保存済みの進行を破棄して最初から開始): `
       ),
       'y'
     );
@@ -1430,14 +1547,20 @@ export async function runOnboarding(
     reasoning: runReasoningPhase,
     services: (s, p) => runServicesPhase(s, undefined, p),
     tenants: runTenantsPhase,
+    operations: runOperationsPhase,
     tutorial: runTutorialPhase,
     summary: runSummaryPhase,
   };
   for (const phase of PHASES) {
     if (state.completed_phases.includes(phase) && phase !== 'summary') {
       if (onboardingArtifactsMissing(state, phase)) {
-        // i18n-exempt: bilingual prompt pair (JA side intentional)
-        print(`completed 扱いだが成果物がありません。再実行します: ${phase}`);
+        print(
+          t(
+            `Phase "${phase}" is marked complete but its artifacts are missing — re-running it.`,
+            // i18n-exempt: bilingual prompt pair (JA side intentional)
+            `フェーズ「${phase}」は completed 扱いですが成果物がありません。再実行します。`
+          )
+        );
       } else {
         continue;
       }
