@@ -1,4 +1,5 @@
 import type { WorkItem, WorkItemContext, WorkItemStatus } from './work-coordination.js';
+import { KNOWLEDGE_TIERS } from '../foundation/knowledge-tier.js';
 import {
   admitsCustody,
   viewerPersonIds,
@@ -98,7 +99,7 @@ export function workItemReadScope(item: WorkItem): {
   // Missing custody is unknown, not evidence that the item is system/public.
   if ((stringValue(metadata.dot_id) || stringValue(metadata.action_ref)) && !tier) invalid = true;
   if (metadata.dot_scope !== undefined && !stringValue(scope.tier)) invalid = true;
-  if (tier && !['public', 'confidential', 'personal'].includes(tier)) invalid = true;
+  if (tier && !(KNOWLEDGE_TIERS as readonly string[]).includes(tier)) invalid = true;
   if (scope.owner_nhi && scope.nhi_id && scope.owner_nhi !== scope.nhi_id) invalid = true;
   if (context.tier && scope.tier && context.tier !== scope.tier) invalid = true;
   if (raw !== undefined) {
