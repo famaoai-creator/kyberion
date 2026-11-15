@@ -502,6 +502,20 @@ libs/actuators/` — plus `pnpm check -- --only catalogs` and, if you touched
   (MSN-SERVER-CONCIERGE-ASK-20261108: decision-ledger hearings on Concierge;
   review found the stored and inline paths in two rounds.)
 
+- **Widening an authorization adapter means tracing the principal through
+  the core executor, not just the route.** The surface's own checks are
+  never the only gate: downstream core functions re-verify the principal
+  (installed-owner pins, `decidedBy === accountable_id` bindings,
+  continuation `initiated_by === requesterId` checks). Admitting a new
+  principal class at the adapter without matching the executor's contract
+  produces a dead feature — or worse, an approval bound to the wrong
+  accountable identity. Keep the requester/accountable split honest:
+  the acting member in `requesterId`, the human who owns the store in
+  `accountableId`, and a requester-≠-accountable gate on every decision
+  path so nobody records a decision under someone else's accountable id.
+  (MSN-TENANT-SECRET-INTRO-20261115: tenant-owner account introduction;
+  two review rounds caught both directions.)
+
 ## 6. Process discipline for repo work
 
 - One logical change per commit; lint-staged regenerates the knowledge
