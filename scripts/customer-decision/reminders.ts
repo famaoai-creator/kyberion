@@ -9,7 +9,7 @@
  * sweeps. A tenant installed with the earlier daily schedule re-installs:
  * `reminders --install --force`, then a human re-approves the Chronos
  * project trust of the changed pipeline.
- * Part of scripts/customer_decision.ts (the entry point); see its header.
+ * Part of scripts/customer/customer_decision.ts (the entry point); see its header.
  *
  * Sweep (one tenant, every agenda it has sent invites for, or one case):
  *   1. plan (no lock): the reminders due today (UTC) and not settled yet
@@ -88,7 +88,7 @@ import { sendToCustomer } from '@agent/core/customer-conversation';
 import { renderCustomerRoutineTemplate } from '@agent/core/customer-outbound-templates';
 import { enqueueSurfaceOutboxMessage } from '@agent/core/surface/surface-coordination-store';
 import { SWEEP_LOCK_TIMEOUT_MS } from '@agent/core/mission/mission-decision-lock';
-import { installRepositoryPipelineTemplate } from '../pipeline_promote.js';
+import { installRepositoryPipelineTemplate } from '../pipeline/pipeline_promote.js';
 import {
   LEDGER_ROLE,
   asLedgerWriter,

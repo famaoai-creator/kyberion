@@ -16,7 +16,7 @@ import {
  */
 
 export interface PipelineCatalogEntry {
-  /** Repo-relative path, e.g. `pipelines/daily-routine.json`. */
+  /** Repo-relative path, e.g. `pipelines/baseline-check.json`. */
   path: string;
   name: string;
   description: string;

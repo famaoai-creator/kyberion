@@ -78,7 +78,7 @@ executeBrowserPipeline?: (input: {
 ```
 
 The production host boundary that wires `@agent/browser-actuator` `handleAction` is
-`scripts/browser_playwright_executor.ts`. Operator entry points that inject it:
+`scripts/browser/browser_playwright_executor.ts`. Operator entry points that inject it:
 
 - `pnpm kyberion browser run` → `scripts/run_browser_procedure.ts` (standalone Playwright;
   attach only with `--cdp-url` / `--cdp-port`; optional `--tab-id` is a session label)
@@ -171,7 +171,7 @@ substrate')`) — dispatcher routing, approval-gate parity, and blocked/executed
 - `libs/actuators/browser-actuator/src/index.test.ts` — end-to-end through the real
   actuator's `handleAction`, including the fallback-resolution and fail-closed cases.
 
-Run: `pnpm vitest run libs/actuators/browser-actuator libs/core/browser/browser-extension-bridge.test.ts libs/core/knowledge/procedure-dispatcher.test.ts scripts/browser_playwright_executor.test.ts scripts/run_browser_procedure.test.ts`
+Run: `pnpm vitest run libs/actuators/browser-actuator libs/core/browser/browser-extension-bridge.test.ts libs/core/knowledge/procedure-dispatcher.test.ts scripts/browser/browser_playwright_executor.test.ts scripts/run_browser_procedure.test.ts`
 
 ## Review process note
 

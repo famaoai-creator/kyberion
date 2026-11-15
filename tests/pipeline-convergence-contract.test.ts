@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync, safeReadFile } from '@agent/core/secure-io';
-import { PipelineSuspendedError } from '../scripts/pipeline-execution-part-bootstrap.js';
+import { PipelineSuspendedError } from '../scripts/pipeline/pipeline-execution-part-bootstrap.js';
 import { executeAcceptedPipelineRoute } from '../scripts/run_intent.js';
 import {
   executeAcceptedSurfacePipeline,

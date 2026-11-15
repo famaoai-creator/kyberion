@@ -431,6 +431,7 @@
     "chronos_localadmin",
     "chronos_mirror_v2",
     "chronos_operator",
+    "chronos_personal_runner",
     "chronos_tenant_runner",
     "chronos_token_registry_reader",
     "concierge_localadmin",

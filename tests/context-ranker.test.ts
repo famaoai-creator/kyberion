@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { parseFrontmatter, tokenize, scoreEntry } from '../scripts/context_ranker.js';
-import type { KnowledgeEntry, RankingWeights } from '../scripts/context_ranker.js';
+import { parseFrontmatter, tokenize, scoreEntry } from '../scripts/context/context_ranker.js';
+import type { KnowledgeEntry, RankingWeights } from '../scripts/context/context_ranker.js';
 
 describe('Context Ranker — parseFrontmatter', () => {
   it('parses standard YAML frontmatter', () => {
@@ -63,7 +63,17 @@ describe('Context Ranker — tokenize', () => {
 });
 
 describe('Context Ranker — scoreEntry', () => {
-  const weights: RankingWeights = { title: 10, id: 5, tag: 15, category: 3, role: 25, phase: 18, scope: 12, kind: 10, authority: 8 };
+  const weights: RankingWeights = {
+    title: 10,
+    id: 5,
+    tag: 15,
+    category: 3,
+    role: 25,
+    phase: 18,
+    scope: 12,
+    kind: 10,
+    authority: 8,
+  };
   const now = new Date('2025-06-01').getTime();
 
   const baseEntry: KnowledgeEntry = {
@@ -89,17 +99,41 @@ describe('Context Ranker — scoreEntry', () => {
   });
 
   it('scores higher when role matches', () => {
-    const scored = scoreEntry(baseEntry, ['mission'], 'ecosystem_architect', '', 'repository', weights, now);
+    const scored = scoreEntry(
+      baseEntry,
+      ['mission'],
+      'ecosystem_architect',
+      '',
+      'repository',
+      weights,
+      now
+    );
     expect(scored.breakdown.role).toBe(25);
   });
 
   it('role score is 0 when role does not match', () => {
-    const scored = scoreEntry(baseEntry, ['mission'], 'unknown_role', '', 'repository', weights, now);
+    const scored = scoreEntry(
+      baseEntry,
+      ['mission'],
+      'unknown_role',
+      '',
+      'repository',
+      weights,
+      now
+    );
     expect(scored.breakdown.role).toBe(0);
   });
 
   it('adds phase, scope, kind, and authority score for aligned execution context', () => {
-    const scored = scoreEntry(baseEntry, ['mission'], 'ecosystem_architect', 'alignment', 'repository', weights, now);
+    const scored = scoreEntry(
+      baseEntry,
+      ['mission'],
+      'ecosystem_architect',
+      'alignment',
+      'repository',
+      weights,
+      now
+    );
     expect(scored.breakdown.phase).toBeGreaterThan(0);
     expect(scored.breakdown.scope).toBeGreaterThan(0);
     expect(scored.breakdown.kind).toBeGreaterThan(0);

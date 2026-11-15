@@ -1,0 +1,413 @@
+import { describe, expect, it, vi } from 'vitest';
+import { pathResolver } from '../path-resolver.js';
+import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '../secure-io.js';
+import {
+  assertScopeContext,
+  currentScope,
+  normalizeScopeContext,
+  resetCurrentScope,
+  resolveScopeResolution,
+  resolveScopeContext,
+  scopeContextKey,
+  validateScopeContext,
+  writeScopeEnv,
+  clearScopeEnv,
+  pushScopeEnv,
+  popScopeEnv,
+  withScopeEnvOnly,
+} from '../scope-context.js';
+
+describe('scope-context', () => {
+  it('separates the NHI selector from policy mode and respects explicit clearing', () => {
+    const id = 'kyberion://agent/fixture/haru';
+    const options = { includePersisted: false, inferFromMission: false, inferFromCwd: false };
+    expect(
+      resolveScopeContext({}, { KYBERION_NHI_ID: id, KYBERION_NHI_ACTOR: 'enforce' }, options)
+        .nhi_id
+    ).toBe(id);
+    expect(
+      resolveScopeContext({}, { KYBERION_NHI_ACTOR: 'enforce' }, options).nhi_id
+    ).toBeUndefined();
+    expect(resolveScopeContext({}, { KYBERION_NHI_ACTOR: id }, options).nhi_id).toBe(id);
+    expect(
+      resolveScopeContext({}, { KYBERION_NHI_ID: '', KYBERION_NHI_ACTOR: id }, options).nhi_id
+    ).toBeUndefined();
+  });
+  it('invalidates the process scope after governed write and clear operations', () => {
+    const file = pathResolver.sharedTmp('scope-cache-write-clear-test.env');
+    for (const name of [
+      'KYBERION_TIER',
+      'KYBERION_TENANT',
+      'KYBERION_ORGANIZATION_ID',
+      'KYBERION_PROJECT_ID',
+      'MISSION_ID',
+      'KYBERION_TASK_ID',
+    ])
+      vi.stubEnv(name, '');
+    vi.stubEnv('KYBERION_SCOPE_ENV_PATH', file);
+    resetCurrentScope();
+    try {
+      writeScopeEnv({ tier: 'confidential', tenant_slug: 'alpha' });
+      expect(currentScope().tenant_slug).toBe('alpha');
+      writeScopeEnv({ tier: 'public' });
+      expect(currentScope().tenant_slug).toBeUndefined();
+      writeScopeEnv({ tier: 'confidential', tenant_slug: 'beta' });
+      expect(currentScope().tenant_slug).toBe('beta');
+      clearScopeEnv();
+      expect(currentScope().tenant_slug).toBeUndefined();
+    } finally {
+      safeRmSync(file, { force: true });
+      vi.unstubAllEnvs();
+      resetCurrentScope();
+    }
+  });
+
+  it('does not share the process scope cache with transported scope contexts', () => {
+    const file = pathResolver.sharedTmp('scope-cache-transport-test.env');
+    for (const name of [
+      'KYBERION_TIER',
+      'KYBERION_TENANT',
+      'KYBERION_ORGANIZATION_ID',
+      'KYBERION_PROJECT_ID',
+      'MISSION_ID',
+      'KYBERION_TASK_ID',
+    ])
+      vi.stubEnv(name, '');
+    vi.stubEnv('KYBERION_SCOPE_ENV_PATH', file);
+    resetCurrentScope();
+    try {
+      writeScopeEnv({ tier: 'confidential', tenant_slug: 'alpha' });
+      expect(currentScope().tenant_slug).toBe('alpha');
+      expect(withScopeEnvOnly(() => currentScope())).toEqual({ tier: 'public' });
+      expect(withScopeEnvOnly(() => currentScope(), { work_shape: 'task_session' })).toEqual({
+        tier: 'public',
+        work_shape: 'task_session',
+      });
+      expect(currentScope().tenant_slug).toBe('alpha');
+    } finally {
+      safeRmSync(file, { force: true });
+      vi.unstubAllEnvs();
+      resetCurrentScope();
+    }
+  });
+
+  it('keeps transported runtime scope independent of a destination persisted scope', () => {
+    const dir = pathResolver.sharedTmp(`scope-host-${process.pid}`);
+    const file = `${dir}/scope.env`;
+    const env = { KYBERION_SCOPE_ENV_PATH: file, KYBERION_TIER: 'public' };
+    safeMkdir(dir, { recursive: true });
+    try {
+      safeWriteFile(
+        file,
+        'KYBERION_TIER=confidential\nKYBERION_TENANT=destination-tenant\nKYBERION_ORGANIZATION_ID=destination-org\nMISSION_ID=MSN-DESTINATION\n'
+      );
+      const source = withScopeEnvOnly(() => resolveScopeContext({}, env));
+      expect(source).toEqual({ tier: 'public' });
+      expect(
+        withScopeEnvOnly(() => resolveScopeContext({}, env), {
+          session_id: 'source-session',
+          work_shape: 'task_session',
+        })
+      ).toEqual({ tier: 'public', session_id: 'source-session', work_shape: 'task_session' });
+      expect(
+        withScopeEnvOnly(() => resolveScopeResolution({}, env, { includePersisted: true })).scope
+      ).toEqual({ tier: 'public' });
+      expect(resolveScopeContext({}, env).tenant_slug).toBe('destination-tenant');
+      expect(
+        withScopeEnvOnly(() =>
+          resolveScopeContext(
+            {},
+            { ...env, KYBERION_TENANT: 'source-tenant', KYBERION_ORGANIZATION_ID: 'source-org' }
+          )
+        )
+      ).toEqual({ tier: 'public', tenant_slug: 'source-tenant', organization_id: 'source-org' });
+    } finally {
+      safeRmSync(dir, { recursive: true, force: true });
+    }
+  });
+  it('keeps customer stance separate from tenant scope', () => {
+    const context = resolveScopeContext(
+      { tier: 'confidential', customer_stance: 'kyberion-development-team' },
+      { KYBERION_STANCE: 'kyberion-development-team' }
+    );
+    expect(context.customer_stance).toBe('kyberion-development-team');
+    expect(context.tenant_slug).toBeUndefined();
+    expect(validateScopeContext(context)).toContain('tenant_slug is required for this scope');
+  });
+
+  it('normalizes tenant_id only as a compatibility input', () => {
+    expect(normalizeScopeContext({ tenant_id: 'acme-corp', tier: 'confidential' })).toEqual({
+      tenant_slug: 'acme-corp',
+      tier: 'confidential',
+    });
+  });
+
+  it('rejects conflicting aliases and broken parent chains', () => {
+    expect(() =>
+      normalizeScopeContext({
+        tenant_slug: 'acme-corp',
+        tenant_id: 'beta-corp',
+        tier: 'confidential',
+      })
+    ).toThrow('conflicts');
+    expect(
+      validateScopeContext({ tenant_slug: 'acme-corp', project_id: 'PRJ-1', tier: 'confidential' })
+    ).toContain('project_id requires an organization_id');
+  });
+
+  it('requires tenant scope for confidential data and permits public shared context', () => {
+    expect(() => assertScopeContext({ tier: 'confidential' })).toThrow('[SCOPE_CONTEXT_INVALID]');
+    expect(assertScopeContext({ tier: 'public' })).toEqual({ tier: 'public' });
+  });
+
+  it('produces a stable containment key', () => {
+    expect(
+      scopeContextKey({
+        tier: 'confidential',
+        tenant_slug: 'acme-corp',
+        organization_id: 'org-a',
+        mission_id: 'MSN-1',
+      })
+    ).toBe('acme-corp/org-a/_/MSN-1/_/_/confidential');
+  });
+
+  it('resolves project and task from the runtime environment', () => {
+    expect(
+      resolveScopeContext(
+        { tier: 'confidential', tenant_slug: 'acme-corp' },
+        {
+          KYBERION_ORGANIZATION_ID: 'org-a',
+          KYBERION_PROJECT_ID: 'project-a',
+          MISSION_ID: 'mission-a',
+          KYBERION_TASK_ID: 'task-a',
+        }
+      )
+    ).toMatchObject({
+      organization_id: 'org-a',
+      project_id: 'project-a',
+      mission_id: 'mission-a',
+      task_id: 'task-a',
+    });
+  });
+
+  it('reports deterministic provenance and roots for a tenant scope', () => {
+    const resolution = resolveScopeResolution(
+      { tier: 'confidential', tenant_slug: 'acme-corp' },
+      { KYBERION_ORGANIZATION_ID: 'org-a', KYBERION_PROJECT_ID: 'project-a' }
+    );
+    expect(resolution.scope).toMatchObject({
+      tier: 'confidential',
+      tenant_slug: 'acme-corp',
+      organization_id: 'org-a',
+      project_id: 'project-a',
+    });
+    expect(resolution.provenance).toMatchObject({
+      tier: 'explicit',
+      tenant_slug: 'explicit',
+      organization_id: 'env',
+      project_id: 'env',
+    });
+    expect(resolution.knowledge_roots).toContain(
+      'confidential/acme-corp/organizations/org-a/projects/project-a'
+    );
+    expect(resolution.knowledge_roots).not.toContain('confidential');
+  });
+
+  it('ignores a legacy mission project reference that has no organization', () => {
+    // Mission state is an inference source. Legacy state predates the chain and
+    // records a project with no organization above it; contributing that id
+    // makes currentScope() throw, and because reasoning-backend selection
+    // resolves the process scope at bootstrap, one stale mission then blocked
+    // unrelated CLI verbs — including the repair verb meant to fix it.
+    const missionDir = pathResolver.shared('tmp/scope-context-legacy-chain-test');
+    safeMkdir(missionDir, { recursive: true });
+    safeWriteFile(
+      pathResolver.rootResolve(`${pathResolver.toRepoRelative(missionDir)}/mission-state.json`),
+      JSON.stringify({
+        tier: 'confidential',
+        relationships: { project: { project_id: 'PRJ-UNREGISTERED' } },
+      })
+    );
+    const findMissionPath = vi.spyOn(pathResolver, 'findMissionPath').mockReturnValue(missionDir);
+    try {
+      const resolution = resolveScopeResolution(
+        { mission_id: 'legacy-chain-test' },
+        {},
+        { includePersisted: false, inferFromCwd: false }
+      );
+      expect(resolution.scope.project_id).toBeUndefined();
+      expect(resolution.scope.organization_id).toBeUndefined();
+      expect(() => currentScope({ mission_id: 'legacy-chain-test' }, {})).not.toThrow();
+    } finally {
+      findMissionPath.mockRestore();
+      resetCurrentScope();
+      safeRmSync(missionDir, { recursive: true, force: true });
+    }
+  });
+
+  it('uses the mission tier before the public default', () => {
+    const missionDir = pathResolver.shared('tmp/scope-context-mission-tier-test');
+    safeMkdir(missionDir, { recursive: true });
+    safeWriteFile(
+      pathResolver.rootResolve(`${pathResolver.toRepoRelative(missionDir)}/mission-state.json`),
+      JSON.stringify({
+        mission_id: 'mission-tier-test',
+        tier: 'confidential',
+        tenant_slug: 'acme-corp',
+        status: 'active',
+        execution_mode: 'local',
+        priority: 1,
+        org_role: 'test',
+        confidence_score: 1,
+        git: {
+          branch: 'main',
+          start_commit: 'deadbeef',
+          latest_commit: 'deadbeef',
+          checkpoints: [],
+        },
+        history: [],
+      })
+    );
+    const findMissionPath = vi.spyOn(pathResolver, 'findMissionPath').mockReturnValue(missionDir);
+    try {
+      const resolution = resolveScopeResolution(
+        { mission_id: 'mission-tier-test' },
+        {},
+        { includePersisted: false, inferFromCwd: false }
+      );
+      expect(resolution.scope).toMatchObject({
+        tier: 'confidential',
+        tenant_slug: 'acme-corp',
+      });
+      expect(resolution.provenance.tier).toBe('mission-state');
+    } finally {
+      findMissionPath.mockRestore();
+      safeRmSync(missionDir, { recursive: true, force: true });
+    }
+  });
+
+  it('round-trips the governed scope.env file', () => {
+    const env = { KYBERION_SCOPE_ENV_PATH: 'active/shared/tmp/scope-context-test.env' };
+    clearScopeEnv(env);
+    writeScopeEnv(
+      {
+        tier: 'confidential',
+        tenant_slug: 'acme-corp',
+        organization_id: 'org-a',
+        project_id: 'project-a',
+      },
+      env
+    );
+    try {
+      expect(resolveScopeResolution({}, env).scope).toMatchObject({
+        tier: 'confidential',
+        tenant_slug: 'acme-corp',
+        organization_id: 'org-a',
+        project_id: 'project-a',
+      });
+      expect(resolveScopeResolution({}, env).provenance.tenant_slug).toBe('scope.env');
+    } finally {
+      clearScopeEnv(env);
+    }
+  });
+
+  it('rejects a scope.env path outside the repository root', () => {
+    expect(() =>
+      writeScopeEnv({ tier: 'public' }, { KYBERION_SCOPE_ENV_PATH: '../../outside-scope.env' })
+    ).toThrow('[RESOURCE_PATH_SCOPE]');
+  });
+
+  it('pushes and pops the persisted scope', () => {
+    const env = { KYBERION_SCOPE_ENV_PATH: 'active/shared/tmp/scope-push-pop-test.env' };
+    clearScopeEnv(env);
+    writeScopeEnv(
+      {
+        tier: 'confidential',
+        tenant_slug: 'acme-corp',
+        organization_id: 'org-a',
+      },
+      env
+    );
+    try {
+      expect(pushScopeEnv(env)).toEqual({ depth: 1 });
+      writeScopeEnv({ tier: 'public' }, env);
+      expect(resolveScopeResolution({}, env).scope.tier).toBe('public');
+      expect(popScopeEnv(env)).toMatchObject({ depth: 0, restored: true });
+      expect(resolveScopeResolution({}, env).scope).toMatchObject({
+        tier: 'confidential',
+        tenant_slug: 'acme-corp',
+        organization_id: 'org-a',
+      });
+      expect(() => popScopeEnv(env)).toThrow('[SCOPE_STACK_EMPTY]');
+    } finally {
+      clearScopeEnv(env);
+    }
+  });
+
+  it('clear discards stashed scopes and push is depth-capped', () => {
+    const env = { KYBERION_SCOPE_ENV_PATH: 'active/shared/tmp/scope-stack-limit-test.env' };
+    clearScopeEnv(env);
+    writeScopeEnv({ tier: 'public' }, env);
+    try {
+      expect(pushScopeEnv(env)).toEqual({ depth: 1 });
+      clearScopeEnv(env);
+      expect(() => popScopeEnv(env)).toThrow('[SCOPE_STACK_EMPTY]');
+      for (let i = 0; i < 10; i++) pushScopeEnv(env);
+      expect(() => pushScopeEnv(env)).toThrow('[SCOPE_STACK_FULL]');
+    } finally {
+      clearScopeEnv(env);
+    }
+  });
+
+  it('rejects a scope.env directory instead of falling back to public scope', () => {
+    const scopePath = pathResolver.sharedTmp('scope-context-test-directory.env');
+    safeMkdir(scopePath, { recursive: true });
+    try {
+      expect(() => resolveScopeResolution({}, { KYBERION_SCOPE_ENV_PATH: scopePath })).toThrow(
+        '[SCOPE_ENV_INVALID]'
+      );
+    } finally {
+      safeRmSync(scopePath, { recursive: true, force: true });
+    }
+  });
+
+  it('memoizes and resets the process scope', () => {
+    resetCurrentScope();
+    const original = {
+      tenant: process.env.KYBERION_TENANT,
+      organization: process.env.KYBERION_ORGANIZATION_ID,
+      project: process.env.KYBERION_PROJECT_ID,
+      tier: process.env.KYBERION_TIER,
+    };
+    try {
+      process.env.KYBERION_TENANT = 'acme-corp';
+      process.env.KYBERION_ORGANIZATION_ID = 'org-a';
+      process.env.KYBERION_PROJECT_ID = 'project-a';
+      process.env.KYBERION_TIER = 'confidential';
+      const first = currentScope();
+      process.env.KYBERION_PROJECT_ID = 'project-b';
+      expect(currentScope()).toEqual(first);
+      resetCurrentScope();
+      expect(currentScope().project_id).toBe('project-b');
+    } finally {
+      resetCurrentScope();
+      for (const [key, value] of [
+        ['KYBERION_TENANT', original.tenant],
+        ['KYBERION_ORGANIZATION_ID', original.organization],
+        ['KYBERION_PROJECT_ID', original.project],
+        ['KYBERION_TIER', original.tier],
+      ] as const) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+    }
+  });
+
+  it('routes runtime scope environment reads through the governed accessor', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('libs/core/scope-context.ts'), { encoding: 'utf8' })
+    );
+    expect(source).not.toMatch(/env\.KYBERION_/u);
+    expect(source).toContain('getRegisteredEnvText');
+  });
+});

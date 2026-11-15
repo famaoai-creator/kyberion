@@ -194,7 +194,7 @@ Core implementation:
 
 CLI:
 
-- `scripts/work_coordination.ts`
+- `scripts/work/work_coordination.ts`
 
 ## Command Surface
 
@@ -399,7 +399,7 @@ Give operators a usable path before UI work.
 
 File:
 
-- `scripts/work_coordination.ts`
+- `scripts/work/work_coordination.ts`
 
 Commands:
 

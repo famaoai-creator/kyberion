@@ -16,7 +16,7 @@ A **real Claude Code plugin** that makes Claude Code a governed Kyberion front-e
 | **Lifecycle commands**      | `commands/`                                                                                        | `/ky-baseline`, `/ky-mission-start`, `/ky-review`.                                                                                                                                        |
 | **Collaboration skill**     | `skills/kyberion-coordination/SKILL.md`                                                            | Minimal operator workflow for prompt capture, mission start, and review handoff.                                                                                                          |
 
-All hook logic lives in the unit-tested `@agent/core/claude-code-hook.ts`; the hooks call the thin `dist/scripts/claude_code_hook.js` wrapper.
+All hook logic lives in the unit-tested `@agent/core/claude-code-hook.ts`; the hooks call the thin `dist/scripts/claude/claude_code_hook.js` wrapper.
 
 ## Install
 
@@ -25,7 +25,7 @@ Prerequisite: build the repo so `dist/` exists (`pnpm install && pnpm build`).
 Add this directory as a plugin (or via a marketplace entry pointing here). The hooks self-locate the repo via `$CLAUDE_PLUGIN_ROOT/../..`, so no extra env is required when the plugin lives inside the repo.
 
 Note: in this checkout the same hooks are also wired directly in the tracked
-`.claude/settings.json` (`$CLAUDE_PROJECT_DIR/dist/scripts/claude_code_hook.js`),
+`.claude/settings.json` (`$CLAUDE_PROJECT_DIR/dist/scripts/claude/claude_code_hook.js`),
 so they fire without installing this plugin. If the plugin IS installed too the
 events fire twice — handlers tolerate that (join appends a duplicate presence
 row, context blocks may appear twice), which is safe but noisy.

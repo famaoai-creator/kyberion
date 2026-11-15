@@ -79,7 +79,7 @@ export const DAEMON_SPECS: Record<string, DaemonServiceSpec> = {
   chronos: {
     id: 'chronos',
     label: CHRONOS_DAEMON_LABEL,
-    daemonScript: 'dist/scripts/chronos_daemon.js',
+    daemonScript: 'dist/scripts/chronos/chronos_daemon.js',
     logBaseName: 'kyberion-chronos',
     verificationHint: 'heartbeat: active/shared/runtime/heartbeats/chronos-daemon.json',
   },
@@ -93,7 +93,7 @@ export const DAEMON_SPECS: Record<string, DaemonServiceSpec> = {
   'daemon-watchdog': {
     id: 'daemon-watchdog',
     label: 'com.kyberion.daemon-watchdog',
-    daemonScript: 'dist/scripts/daemon_watchdog.js',
+    daemonScript: 'dist/scripts/daemon/daemon_watchdog.js',
     logBaseName: 'kyberion-daemon-watchdog',
     verificationHint: 'ops alerts: active/shared/observability/ops-alerts.jsonl',
     startIntervalSec: 300,
@@ -101,7 +101,7 @@ export const DAEMON_SPECS: Record<string, DaemonServiceSpec> = {
   'agent-runtime-supervisor': {
     id: 'agent-runtime-supervisor',
     label: 'com.kyberion.agent-runtime-supervisor',
-    daemonScript: 'dist/scripts/agent_runtime_supervisor_daemon.js',
+    daemonScript: 'dist/scripts/agent/agent_runtime_supervisor_daemon.js',
     logBaseName: 'kyberion-agent-runtime-supervisor',
     keepAliveOnCrashOnly: true,
     verificationHint:

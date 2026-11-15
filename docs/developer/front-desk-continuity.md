@@ -42,7 +42,7 @@ Follow QUICKSTART's managed reconcile, status, and setup-report sequence. Enable
 
 ## Regression map and verification limits
 
-- Startup/readiness: scripts/setup_report.test.ts, managed_startup.test.ts, setup_source_maintenance.test.ts
+- Startup/readiness: scripts/setup/setup_report.test.ts, managed_startup.test.ts, setup_source_maintenance.test.ts
 - History and replay: front-desk-conversation-store.test.ts, conversation-routes.test.ts, Concierge route.history.test.ts
 - Browser interrupted/repeated flows: ask-client.test.ts, conversation-response-input.test.ts
 - Scope and result fidelity: progress-scope-routes.test.ts, libs/core/surface/front-desk-progress.test.ts, Concierge api/progress route tests, home.test.ts

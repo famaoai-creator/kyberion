@@ -2,7 +2,7 @@
   "$schema": "../schemas/concept-registry.schema.json",
   "manifest_version": 1,
   "last_reviewed": "2026-11-13",
-  "purpose": "One registered definition, canonical document, glossary entry and owner per high-confusion Kyberion term. A term or alias may belong to exactly one entry; a homonym is declared through `senses`. The concept-registry gate (scripts/check_concept_registry.ts) enforces this file against docs/GLOSSARY.md, docs/documentation-source-map.json and doc_status frontmatter. Workflow: knowledge/product/governance/concept-registry-workflow.md.",
+  "purpose": "One registered definition, canonical document, glossary entry and owner per high-confusion Kyberion term. A term or alias may belong to exactly one entry; a homonym is declared through `senses`. The concept-registry gate (scripts/check/check_concept_registry.ts) enforces this file against docs/GLOSSARY.md, docs/documentation-source-map.json and doc_status frontmatter. Workflow: knowledge/product/governance/concept-registry-workflow.md.",
   "terms": [
     {
       "id": "mission",
@@ -414,7 +414,10 @@
       "definition": "Signed, tenant-scoped message transport between distinct enrolled Kyberion runtimes; a transport receipt is not work acceptance.",
       "glossary_anchor": "peer-messaging",
       "canonical_doc": "knowledge/product/architecture/agent-communication-layer-model.md",
-      "owner_modules": ["libs/core/mesh/peer-messaging.ts", "scripts/peer_conversation_server.ts"],
+      "owner_modules": [
+        "libs/core/mesh/peer-messaging.ts",
+        "scripts/peer/peer_conversation_server.ts"
+      ],
       "not_to_confuse_with": ["co-session", "a2a"]
     },
     {

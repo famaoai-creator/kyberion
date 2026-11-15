@@ -399,7 +399,7 @@ export const runRenderBrief = defineScript({
     safeWriteFile(resolveRenderBriefOutputPath(out), rendered, { mkdir: true, encoding: 'utf8' });
     print(`rendered mission brief → ${out}`);
     print(missingStaticPreviewMessage());
-    print(`  node dist/scripts/mission_alignment_request.js --mission <ID>`);
+    print(`  node dist/scripts/mission/mission_alignment_request.js --mission <ID>`);
     print(
       `  KYBERION_BASE_ROLE=<p> node_modules/.bin/tsx scripts/mission-alignment-gate/serve-brief.ts --mission <ID>`
     );

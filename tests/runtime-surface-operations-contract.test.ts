@@ -14,7 +14,7 @@ describe('Runtime surface operations contract', () => {
     expect(pkg.scripts.surfaces).toContain('scripts/run_with_env.ts');
     expect(pkg.scripts.surfaces).toContain('KYBERION_BASE_ROLE=worker');
     expect(pkg.scripts.surfaces).toContain('SYSTEM_ROLE=surface_runtime');
-    expect(pkg.scripts.surfaces).toContain('dist/scripts/surface_runtime.bundle.js');
+    expect(pkg.scripts.surfaces).toContain('dist/scripts/surface/surface_runtime.bundle.js');
     for (const action of ['setup', 'reconcile', 'status', 'repair', 'start', 'stop'])
       expect(pkg.scripts[`surfaces:${action}`]).toBeUndefined();
     expect(pkg.scripts['channels:list']).toBe(
@@ -32,7 +32,7 @@ describe('Runtime surface operations contract', () => {
     expect(pkg.scripts['build:repo']).toContain('scripts/build_repository.ts repo');
     expect(read('docs/INITIALIZATION.md')).toContain('pnpm surfaces reconcile');
     expect(pkg.scripts.dashboard).toBe(
-      'node scripts/run_built.mjs dist/scripts/sovereign_dashboard.js'
+      'node scripts/run_built.mjs dist/scripts/sovereign/sovereign_dashboard.js'
     );
     expect(pkg.scripts['dashboard:onboarding']).toBeUndefined();
   });
@@ -48,8 +48,8 @@ describe('Runtime surface operations contract', () => {
   });
 
   it('mentions runtime surfaces in the operator dashboard and onboarding next steps', () => {
-    const dashboard = read('scripts/sovereign_dashboard.ts');
-    const onboarding = read('scripts/onboarding_wizard.ts');
+    const dashboard = read('scripts/sovereign/sovereign_dashboard.ts');
+    const onboarding = read('scripts/onboarding/onboarding_wizard.ts');
     const operatorGuide = read('docs/OPERATOR_UX_GUIDE.md');
     expect(dashboard).toContain('ONBOARDING HOME');
     expect(dashboard).toContain('Next:');
@@ -64,7 +64,7 @@ describe('Runtime surface operations contract', () => {
   });
 
   it('includes troubleshooting diagnostics in surface runtime status', () => {
-    const surfaceRuntime = read('scripts/surface_runtime.ts');
+    const surfaceRuntime = read('scripts/surface/surface_runtime.ts');
     const lifecycleModel = read(
       'knowledge/product/architecture/runtime-surface-lifecycle-model.md'
     );

@@ -480,6 +480,7 @@ vi.mock('@agent/core/voice/voice-text-chunking', () => ({
 }));
 vi.mock('@agent/core/tool/tool-runtime-registry', () => ({
   listToolRuntimeInventory: mocks.listToolRuntimeInventory,
+  resolveManagedToolPythonBin: () => null,
 }));
 vi.mock('@agent/shared-voice/voice-capability-bridge', async () => {
   const actual = await vi.importActual<

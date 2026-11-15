@@ -59,7 +59,7 @@ status: active
 | 自律ループ・常駐             | `worker-goal-driver.ts`、`agent_runtime_supervisor_daemon.ts`、`chronos_daemon.ts`                  | 実装済み                                |
 | 緊急停止                     | `libs/core/governance/kill-switch.ts`                                                               | 実装済み                                |
 | 反論役                       | `team-roles/devils_advocate.json`、decision-support 系                                              | 実装済み                                |
-| PR 作成                      | `scripts/publish_pull_request.ts`(`pnpm kyberion pr create`)                                        | 実装済み                                |
+| PR 作成                      | `scripts/publish/publish_pull_request.ts`(`pnpm kyberion pr create`)                                | 実装済み                                |
 | パスキー承認                 | `knowledge/product/architecture/passkey-push-protocol.md`                                           | 設計のみ                                |
 
 ## 不足している部分
@@ -136,7 +136,7 @@ status: active
 
 ## P0 の結果(2026-09-27)
 
-ミッション `MSN-AUTONOMOUS-MOBILE-DECISION-20260927` で、人の介入を集計する `scripts/report_human_interventions.ts` を実装した(実行: `node dist/scripts/report_human_interventions.js [--since YYYY-MM-DD] [--json]`)。
+ミッション `MSN-AUTONOMOUS-MOBILE-DECISION-20260927` で、人の介入を集計する `scripts/report/report_human_interventions.ts` を実装した(実行: `node dist/scripts/report/report_human_interventions.js [--since YYYY-MM-DD] [--json]`)。
 情報源は承認ストア、git 履歴(PR マージと、`main` 取り込み時のコンフリクトの再現)、ミッション状態の3つである。
 
 2026-08-28 以降の30日間の集計:
@@ -188,7 +188,7 @@ P0 の結果から、P1 の最初に承認ストアを整える。これが済�
 ### P1-1〜P1-4 の実装(2026-09-27、ミッション `MSN-APPROVAL-STORE-HYGIENE-20260927`)
 
 - **P1-1(実装済み)** 承認ストアのパスを `approvalStoreRoots()` に集約した。vitest の実行中は `active/shared/runtime/vitest-approvals/` に書く。この場所は保存期間カタログで1日後に消える。本番の場所に書かないことを `approval-store.test.ts` の契約テストで確認している。
-- **P1-2(掃除の処理は実装済み、本番への適用は未実施)** `node dist/scripts/approval_store_hygiene.js` で確認できる。既定は dry-run で、`--apply` を付けると `active/archive/.trash/` へ移す。移した記録は30日間復元できる。判定規則は集計スクリプトと共通(`libs/core/governance/approval-store-hygiene.ts`)。2026-09-27 の dry-run では、本番の記録 3,086 件のうち 3,081 件がテスト由来だった。残る実際の判断は5件(計画承認3件、project-trust 2件)。P0 で「放置された秘密情報の申請」とした11件も、`secret-introduction.test.ts` の残骸だった。ごみ箱に書けるのは sovereign ペルソナだけなので、`--apply` は `KYBERION_PERSONA=sovereign node dist/scripts/approval_store_hygiene.js --apply` で実行する。ペルソナがないと、何も変更せずに実行すべきコマンドを表示して終了する。
+- **P1-2(掃除の処理は実装済み、本番への適用は未実施)** `node dist/scripts/approval/approval_store_hygiene.js` で確認できる。既定は dry-run で、`--apply` を付けると `active/archive/.trash/` へ移す。移した記録は30日間復元できる。判定規則は集計スクリプトと共通(`libs/core/governance/approval-store-hygiene.ts`)。2026-09-27 の dry-run では、本番の記録 3,086 件のうち 3,081 件がテスト由来だった。残る実際の判断は5件(計画承認3件、project-trust 2件)。P0 で「放置された秘密情報の申請」とした11件も、`secret-introduction.test.ts` の残骸だった。ごみ箱に書けるのは sovereign ペルソナだけなので、`--apply` は `KYBERION_PERSONA=sovereign node dist/scripts/approval/approval_store_hygiene.js --apply` で実行する。ペルソナがないと、何も変更せずに実行すべきコマンドを表示して終了する。
 - **P1-3(実装済み)** 秘密情報のポリシー自動承認は `decidedBy: policy:secret-introduction-local-low-risk`、`decidedByType: service` で記録する(スキーマの非人間の値は `service` / `ai_agent`)。依頼した人は note に残す。
 - **P1-4(期限切れは実装済み、ダイジェストへの掲載は P1-8)** 秘密情報の申請は作成から24時間で期限切れにする。掃除の処理は、`expiresAt` を過ぎた申請と、期限なしで14日を超えて放置された申請を、承認ストアの正規の遷移で `expired` にする。イベントには `reason` を記録する。定期実行への組み込みは未実施。
 
@@ -224,7 +224,7 @@ P0 の結果から、P1 の最初に承認ストアを整える。これが済�
 
 - **P1-6(実装済み)決裁カード** 保存する形は下の `MSN-DECISION-CARD-20260928` の `DecisionCard`(`libs/core/decision-card.ts`)に一本化し、関与の段階・試行モード・時間帯・届け先を足した。表示は `libs/core/approval-decision-card.ts` が担い、どの面でも同じ順で出す: 段階 → 決めてほしいこと → 推奨 → 人が必要な理由(ゲートの `escalations` を文章化し、全件) → 取り消せるか → 何もしない場合 → 証跡 → 返信方法。返信は `承認` / `却下`・`異議` / `appr:<id>:changes <指示>`(`revise` も可) / `appr:<id>:explain`。拒否期間付きのカードでは、ボタンが「今すぐ進める」「止める(異議)」になる。自律運用のカードは届けた面とチャットからの返信だけを受け付ける。
 - **P1-7(実装済み)拒否期間** `libs/core/approval-veto-window.ts`。ブリッジが実際に送れたとき(`drainSurfaceOutbox` の成功)に時計を始め、活動時間内の分だけ数える。30分以内に届かなければ恒久的に `decide` に切り替わり、遅れて届いても自動では進まない。期限が来たものは `policy:veto-window`(`decidedByType: service`)として承認し、人の判断としては記録しない。拒否期間付きの申請に `human_only` は付けられない。試行モードは「進んだはず」を記録するだけで、人の判断を待つ。
-- **P1-8(実装済み)ダイジェスト** `libs/core/approval-digest.ts` と `scripts/approval_inbox.ts`。先頭の1行で「あなたの判断 N件・異議がなければ進むもの M件・自動で済ませたこと K件」を示し、その下に、判断待ち(古い順)、進行予定(期限の近い順)、3日以上止まっているミッション、自動で済ませたこと、期限切れを並べる。`none` / `fyi` は承認記録を作らないため、実行記録(notice)として残してダイジェストに載せる。通知先は `per_event.decision_digest`。
+- **P1-8(実装済み)ダイジェスト** `libs/core/approval-digest.ts` と `scripts/approval/approval_inbox.ts`。先頭の1行で「あなたの判断 N件・異議がなければ進むもの M件・自動で済ませたこと K件」を示し、その下に、判断待ち(古い順)、進行予定(期限の近い順)、3日以上止まっているミッション、自動で済ませたこと、期限切れを並べる。`none` / `fyi` は承認記録を作らないため、実行記録(notice)として残してダイジェストに載せる。通知先は `per_event.decision_digest`。
 - **呼び出し口** `routeAutonomousDecision()`(`libs/core/approval-decision-routing.ts`)。エージェントはゲートの結果を渡すだけで、実行してよいか(`proceed`)、保留して他の作業へ進むか(`parked`)が返る。カード作成、拒否期間、通知、実行記録はこの関数が行う。
 
 ## 評価(2026-09-28): 持続的な自律運用に向けて
@@ -251,7 +251,7 @@ P0 の結果から、P1 の最初に承認ストアを整える。これが済�
 
 ### P2 試行モードの実装(2026-10-05)
 
-PR の自律化は、いきなり有効にせず、まず「自律ゲートなら何をしていたか」を記録して、オペレーターの実際の判断と比べる(2〜4 週間)。実装は `libs/core/governance/pr-shadow.ts`(判定と台帳)、`scripts/pr_shadow.ts`(`gh` による読み取り)、`pipelines/pr-shadow-observer.json`(30 分ごと、既定は無効)。
+PR の自律化は、いきなり有効にせず、まず「自律ゲートなら何をしていたか」を記録して、オペレーターの実際の判断と比べる(2〜4 週間)。実装は `libs/core/governance/pr-shadow.ts`(判定と台帳)、`scripts/pr/pr_shadow.ts`(`gh` による読み取り)、`pipelines/pr-shadow-observer.json`(30 分ごと、既定は無効)。
 
 - **観察は読み取り専用。** `gh pr list|view|checks` だけを使い、マージ・コメント・編集はしない。結果は `active/shared/runtime/pr-shadow/ledger.jsonl` に追記する。変更がない PR(同じ head・段階・CI)は再記録しない。ドラフトは対象外。
 - **段階の決め方。** 変更パスから、ゲートの `pr_merge_*` を評価して決める。テスト・ドキュメント・changelog・`retired/` だけの変更は低、それ以外は中、`high_risk_paths` に触れるか、ゲートが承認を求めるものは高。

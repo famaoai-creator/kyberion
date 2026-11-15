@@ -34,7 +34,7 @@ describe('install_chronos_launchd plist generation', () => {
   it('runs node against the built chronos daemon, in order', () => {
     const nodeIndex = plist.indexOf('<string>/usr/local/bin/node</string>');
     const scriptIndex = plist.indexOf(
-      '<string>/repo/kyberion/dist/scripts/chronos_daemon.js</string>'
+      '<string>/repo/kyberion/dist/scripts/chronos/chronos_daemon.js</string>'
     );
     expect(nodeIndex).toBeGreaterThan(-1);
     expect(scriptIndex).toBeGreaterThan(nodeIndex);
@@ -182,7 +182,7 @@ describe('install_chronos_launchd --daemon', () => {
 
     expect(output).toHaveLength(1);
     expect(output[0]).toContain('com.kyberion.daemon-watchdog');
-    expect(output[0]).toContain('dist/scripts/daemon_watchdog.js');
+    expect(output[0]).toContain('dist/scripts/daemon/daemon_watchdog.js');
     expect(output[0]).toContain('<key>StartInterval</key>');
     // A one-shot checker must not be kept resident by launchd.
     expect(output[0]).not.toContain('<key>KeepAlive</key>');
@@ -206,7 +206,7 @@ describe('install_chronos_launchd --daemon', () => {
   it('keeps the supervisor alive only after a crash — a clean exit means another instance owns the lock', async () => {
     const spec = LAUNCHD_DAEMON_SPECS['agent-runtime-supervisor'];
     expect(spec.label).toBe('com.kyberion.agent-runtime-supervisor');
-    expect(spec.daemonScript).toBe('dist/scripts/agent_runtime_supervisor_daemon.js');
+    expect(spec.daemonScript).toBe('dist/scripts/agent/agent_runtime_supervisor_daemon.js');
     expect(spec.keepAliveOnCrashOnly).toBe(true);
 
     const output: string[] = [];

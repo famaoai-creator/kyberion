@@ -29,7 +29,7 @@ import {
 } from '@agent/core/storage-janitor';
 import { withExecutionContext } from '@agent/core/governance';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
-import { hasCliFlag } from './lib/cli-guard.js';
+import { hasCliFlag } from './lib/cli/cli-guard.js';
 
 export const MISSION_STATE_FILENAME = 'mission-state.json';
 const MISSIONS_SUBPATH = ['active', 'missions'];

@@ -269,7 +269,7 @@ It belongs to the Slack gateway.
 
 Long-running gateways and control surfaces should be declared in
 `knowledge/product/governance/active-surfaces.json` and managed through
-`scripts/surface_runtime.ts`, not started ad hoc from unrelated CLIs.
+`scripts/surface/surface_runtime.ts`, not started ad hoc from unrelated CLIs.
 
 ## 6. Observability contract
 

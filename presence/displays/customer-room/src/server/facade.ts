@@ -1,6 +1,6 @@
 /**
  * The only door from the customer room to Kyberion: the built governed
- * facade (`dist/scripts/customer_decision.js`) run as a child process for
+ * facade (`dist/scripts/customer/customer_decision.js`) run as a child process for
  * `view` / `respond` / `attachment`. The request goes in on STDIN (the token is never an
  * argument); the tenant comes from this process's own configuration.
  *
@@ -72,7 +72,7 @@ export type FacadeSpawner = (
   input: Record<string, unknown>
 ) => Promise<FacadeOutcome>;
 
-export const FACADE_SCRIPT = 'dist/scripts/customer_decision.js';
+export const FACADE_SCRIPT = 'dist/scripts/customer/customer_decision.js';
 export const FACADE_TIMEOUT_MS = 15_000;
 export const FACADE_MAX_OUTPUT_MB = 1;
 

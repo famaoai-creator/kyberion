@@ -41,7 +41,7 @@ import { validateReadPermission } from '@agent/core/tier-guard';
 import { safeExistsSync, safeLstat, safeReaddir } from '@agent/core/secure-io';
 import { getRegisteredEnvText, nowIso } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
-import { parseCliFlags } from './lib/cli-flag-parser.js';
+import { parseCliFlags } from './lib/cli/cli-flag-parser.js';
 import {
   commitIngest,
   normalizeCard,

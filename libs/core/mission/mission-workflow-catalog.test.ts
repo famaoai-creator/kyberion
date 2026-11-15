@@ -36,7 +36,7 @@ describe('mission-workflow-catalog', () => {
           args: [
             '--import',
             '{REPO_ROOT}/scripts/ts-loader.mjs',
-            '{REPO_ROOT}/scripts/check_video_production_evidence.ts',
+            '{REPO_ROOT}/scripts/check/check_video_production_evidence.ts',
             '--mission',
             '{MISSION_ID}',
             '--stage',
@@ -127,7 +127,7 @@ describe('mission-workflow-catalog', () => {
             params: expect.objectContaining({
               command: 'node',
               args: [
-                'dist/scripts/mission_alignment_decision.js',
+                'dist/scripts/mission/mission_alignment_decision.js',
                 '--mission',
                 '{MISSION_ID}',
                 '--strict',

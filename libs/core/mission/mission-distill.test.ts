@@ -595,7 +595,7 @@ describe('DISTILLATION_SCHEMA harness2 experience contract', () => {
       },
       edit_rows: [
         {
-          component: 'scripts/check_totals.py',
+          component: 'scripts/check/check_totals.py',
           change: 'added a deterministic totals checker',
           observed: 'rollout inv1 reconciled totals without manual loop',
           verdict: 'helped',

@@ -139,9 +139,9 @@ cover this connection. They do not establish live browser or real-user execution
 ## 5. Operations
 
 ```bash
-node dist/scripts/approval_inbox.js tick            # every few minutes: advance veto windows
-node dist/scripts/approval_inbox.js digest --send   # morning and evening
-node dist/scripts/approval_inbox.js digest --hours 24 --json
+node dist/scripts/approval/approval_inbox.js tick            # every few minutes: advance veto windows
+node dist/scripts/approval/approval_inbox.js digest --send   # morning and evening
+node dist/scripts/approval/approval_inbox.js digest --hours 24 --json
 ```
 
 The digest headline answers "how many things need me?" (decide / veto / done). Sections: needs your

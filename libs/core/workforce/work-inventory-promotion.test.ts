@@ -427,7 +427,7 @@ describe('executeMissionPromotion (fake exec)', () => {
       role: 'mission_controller',
     });
     expect(calls[1].args).toEqual([
-      'dist/scripts/mission_alignment_request.js',
+      'dist/scripts/mission/mission_alignment_request.js',
       '--mission',
       plan.mission_id,
       '--json',
@@ -462,7 +462,7 @@ describe('executeMissionPromotion (fake exec)', () => {
       created: false,
     });
     expect(exec).toHaveBeenCalledTimes(1);
-    expect(exec.mock.calls[0][1][0]).toBe('dist/scripts/mission_alignment_request.js');
+    expect(exec.mock.calls[0][1][0]).toBe('dist/scripts/mission/mission_alignment_request.js');
     expect(String(safeReadFile(briefPath, { encoding: 'utf8' }))).toBe(approved);
   });
 

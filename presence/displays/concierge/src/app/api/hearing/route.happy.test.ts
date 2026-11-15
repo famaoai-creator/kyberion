@@ -38,7 +38,7 @@ vi.mock('@agent/core/secure-io', async (original) => {
         spawn.calls.push({ args: argv, env: args[2]?.env as Record<string, string | undefined> });
         return { stdout: '', stderr: '', status: 0 };
       }
-      if (argv[0] === 'dist/scripts/mission_alignment_request.js') {
+      if (argv[0] === 'dist/scripts/mission/mission_alignment_request.js') {
         spawn.calls.push({ args: argv, env: args[2]?.env as Record<string, string | undefined> });
         return { stdout: JSON.stringify({ requestId: 'REQ-ALIGN-1' }), stderr: '', status: 0 };
       }
@@ -226,7 +226,7 @@ describe(
       expect(String((res.body.next_action as { href: string }).href)).toMatch(/^\/inbox(\?|$)/u);
       expect(spawn.calls.map((item) => item.args[0])).toEqual([
         'dist/scripts/mission_controller.js',
-        'dist/scripts/mission_alignment_request.js',
+        'dist/scripts/mission/mission_alignment_request.js',
       ]);
       // Both children inherit the server's own role (bounded by its policy).
       for (const item of spawn.calls) expect(item.env?.SYSTEM_ROLE).toBe('concierge');

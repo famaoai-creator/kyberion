@@ -81,7 +81,7 @@ describe('runSurfaceAction', () => {
     const result = runSurfaceAction('start', 'nexus-daemon');
     expect(result.ok).toBe(true);
     expect(captured?.args).toEqual([
-      distScript('surface_runtime.js'),
+      distScript('surface/surface_runtime.js'),
       '--action',
       'start',
       '--surface',

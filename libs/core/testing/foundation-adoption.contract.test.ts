@@ -9,8 +9,8 @@ const TARGETS = [
   'libs/core/task/task-session.ts',
   'libs/core/analysis/source-analysis.ts',
   'libs/core/organization/onboarding-context.ts',
-  'scripts/onboarding_apply.ts',
-  'scripts/onboarding_wizard.ts',
+  'scripts/onboarding/onboarding_apply.ts',
+  'scripts/onboarding/onboarding_wizard.ts',
   'libs/core/browser/browser-extension-bridge.ts',
   'libs/shared-vision/src/browser-conversation-session.ts',
   'libs/core/pipeline/pipeline-contract.ts',
@@ -24,7 +24,7 @@ const CLEANUP_TARGETS = [
 
 const SHARED_AJV_TARGETS = [
   'libs/core/actuator/actuator-sdk.ts',
-  'scripts/check_pipeline_op_schema_coverage.ts',
+  'scripts/check/check_pipeline_op_schema_coverage.ts',
 ] as const;
 
 describe('foundation schema compiler adoption', () => {

@@ -1,0 +1,1279 @@
+/* eslint-disable no-restricted-imports -- IP-08 で safeExec へ移行予定 (docs/developer/improvement-plans-2026-07/IP-08_ERROR_HANDLING_DISCIPLINE.ja.md) */
+import * as path from 'node:path';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+import { createStandardYargs } from '@agent/core/cli-utils';
+import {
+  loadSurfaceEnablementOverrides,
+  loadSurfaceManifest,
+  loadSurfaceState,
+  normalizeSurfaceDefinition,
+  probeSurfaceHealth,
+  probeSurfacePort,
+  readSurfaceLogTail,
+  saveSurfaceManifest,
+  saveSurfaceState,
+  setSurfaceEnablementOverride,
+  surfaceEnablementOverridesPath,
+  surfaceLogPath,
+  surfaceManifestDirectoryPath,
+  surfaceManifestFilePath,
+  surfaceManifestPath,
+  surfaceResourceId,
+  surfaceStatePath,
+  type SurfaceRuntimeDefinition,
+  type SurfaceRuntimeKind,
+} from '@agent/core/surface/surface-runtime';
+import { logger } from '@agent/core/core';
+import { isLinux, isMacOS } from '@agent/core/platform';
+import { pathResolver } from '@agent/core/path-resolver';
+import { runtimeSupervisor } from '@agent/core/tool/runtime-supervisor';
+import { safeCloseFd, safeOpenAppendFile } from '@agent/core/secure-io';
+import { buildSystemRoleLaunchEnv } from '@agent/core/authority';
+import { spawnManagedProcess } from '@agent/core/managed-process';
+import {
+  isPidAlive,
+  isRecordedProcessAlive,
+  processStartMarker,
+} from '@agent/core/workforce/workspace-process-identity';
+import { inspectServiceAuth } from '@agent/core/service/service-validator';
+import { auditChain } from '@agent/core/governance/audit-chain';
+import { executionAgentId } from '@agent/core/governance/execution-agent-id';
+import { baseRoleEnvText } from '@agent/core/foundation';
+import { buildNextAction, formatNextAction } from '@agent/core/next-action';
+import { getProtocolServiceRegistryEntry } from '@agent/core/protocol-service-registry';
+import { recordProtocolServiceLifecycle } from '@agent/core/protocol-service-lifecycle';
+import { getRegisteredEnvText } from '@agent/core/foundation/env';
+import { nowIso } from '@agent/core/foundation/time';
+import { parseSafeJsonInput } from '@agent/core/foundation/safe-json';
+import { t } from '@agent/core/t';
+import { defineScript, isDirectScript, stripSharedScriptFlags } from '../lib/harness.js';
+
+type SurfaceAction =
+  | 'reconcile'
+  | 'start'
+  | 'stop'
+  | 'status'
+  | 'list-units'
+  | 'setup'
+  | 'repair'
+  | 'enable'
+  | 'disable'
+  | 'register'
+  | 'unregister';
+
+type SurfaceSetupRow = {
+  surface: string;
+  enabled: 'enabled' | 'disabled';
+  auth: 'ready' | 'missing' | 'n/a';
+  strategy: string;
+  secrets: string;
+  cli: string;
+  hint: string;
+};
+
+type RankedSurfaceSetupRow = SurfaceSetupRow & { priority: number };
+
+function setupRowPriority(row: Pick<SurfaceSetupRow, 'auth' | 'enabled' | 'surface'>): number {
+  if (row.auth === 'missing') return row.enabled === 'enabled' ? 0 : 1;
+  if (row.auth === 'ready') return row.enabled === 'enabled' ? 2 : 3;
+  return row.enabled === 'enabled' ? 4 : 5;
+}
+
+function sortSurfaceSetupRows(rows: SurfaceSetupRow[]): SurfaceSetupRow[] {
+  return rows
+    .map((row) => ({ ...row, priority: setupRowPriority(row) }) as RankedSurfaceSetupRow)
+    .sort((a, b) => a.priority - b.priority || a.surface.localeCompare(b.surface))
+    .map(({ priority: _priority, ...row }) => row);
+}
+
+const execFileAsync = promisify(execFile);
+
+async function describePortHolder(
+  port: number
+): Promise<{ pid: number; cwd: string | null } | null> {
+  if (!isMacOS() && !isLinux()) return null;
+  try {
+    const { stdout } = await execFileAsync('lsof', [
+      '-nP',
+      `-iTCP:${port}`,
+      '-sTCP:LISTEN',
+      '-Fpn',
+    ]);
+    const lines = stdout.split('\n');
+    const pidLine = lines.find((l) => l.startsWith('p'));
+    if (!pidLine) return null;
+    const pid = Number(pidLine.slice(1));
+    if (!Number.isFinite(pid) || pid <= 0) return null;
+    let cwd: string | null = null;
+    try {
+      const { stdout: cwdOut } = await execFileAsync('lsof', [
+        '-a',
+        '-d',
+        'cwd',
+        '-p',
+        String(pid),
+        '-Fn',
+      ]);
+      const nLine = cwdOut.split('\n').find((l) => l.startsWith('n'));
+      if (nLine) cwd = nLine.slice(1);
+    } catch {
+      // best-effort
+    }
+    return { pid, cwd };
+  } catch {
+    return null;
+  }
+}
+
+type SurfacePidRecord = { pid: number; pidStartMarker?: string };
+
+/**
+ * Liveness of the process named by a state record: pid existence AND its
+ * start marker, so a recycled pid is never treated as the recorded surface.
+ * Records predating markers fall back to pid-only liveness.
+ */
+function isRunning(record: SurfacePidRecord): boolean {
+  return isRecordedProcessAlive(record.pid, record.pidStartMarker);
+}
+
+/**
+ * SIGTERM the process a record names, but only while its identity is
+ * positively proven: a recorded start marker must be re-readable AND equal.
+ * An unreadable marker is 'identity_unknown' — never signal a pid whose
+ * identity cannot be proven. A live pid with a different marker is
+ * 'pid_recycled' — the recorded surface is gone and the pid is unrelated.
+ */
+function stopRecordedProcess(
+  record: SurfacePidRecord
+): 'stopped' | 'pid_recycled' | 'not_running' | 'identity_unknown' {
+  if (!isPidAlive(record.pid)) return 'not_running';
+  if (record.pidStartMarker) {
+    const current = processStartMarker(record.pid);
+    if (current === undefined) return 'identity_unknown';
+    if (current !== record.pidStartMarker) return 'pid_recycled';
+  }
+  try {
+    process.kill(record.pid, 'SIGTERM');
+  } catch (_) {
+    /* best-effort cleanup */
+  }
+  return 'stopped';
+}
+
+function registerRunningSurfaceFromState(record: any) {
+  if (
+    !runtimeSupervisor.update(record.resourceId, {
+      pid: record.pid,
+      pidStartMarker: record.pidStartMarker,
+      state: 'running',
+      metadata: {
+        ...record.metadata,
+        command: record.command,
+        args: record.args,
+        logPath: record.logPath,
+      },
+      lastActiveAt: Date.now(),
+    })
+  ) {
+    runtimeSupervisor.register({
+      resourceId: record.resourceId,
+      kind: record.kind,
+      ownerId: record.id,
+      ownerType: 'surface-runtime-manifest',
+      pid: record.pid,
+      pidStartMarker: record.pidStartMarker,
+      shutdownPolicy: record.shutdownPolicy,
+      metadata: {
+        ...record.metadata,
+        command: record.command,
+        args: record.args,
+        logPath: record.logPath,
+      },
+      cleanup: () => {
+        stopSurfaceRecord(record);
+      },
+    });
+  }
+}
+
+function stopSurfaceRecord(record: SurfacePidRecord | undefined): void {
+  if (!record) return;
+  const outcome = stopRecordedProcess(record);
+  // A cleanup that could not prove the process died has not completed —
+  // throwing lets runtimeSupervisor.cleanup() retain the record instead of
+  // reporting 'removed' for a possibly-running process.
+  if (outcome === 'identity_unknown') {
+    throw new Error(`process identity unresolved for pid ${record.pid} — not signaled`);
+  }
+}
+
+function recordProtocolSurfaceLifecycle(
+  surfaceId: string,
+  action: 'start' | 'stop' | 'reconnect',
+  status: 'started' | 'stopped' | 'reconnected',
+  metadata: Record<string, string | number | boolean | null> = {}
+): void {
+  let registryEntry;
+  try {
+    registryEntry = getProtocolServiceRegistryEntry(surfaceId);
+  } catch {
+    return;
+  }
+  if (registryEntry.lifecycle_owner === 'service') return;
+  const tenant = String(
+    getRegisteredEnvText('KYBERION_TENANT') || getRegisteredEnvText('KYBERION_TENANT_ID') || ''
+  ).trim();
+  try {
+    recordProtocolServiceLifecycle({
+      serviceId: surfaceId,
+      action,
+      status,
+      scope: tenant
+        ? { scope_kind: 'tenant', tier: 'confidential', tenant_slug: tenant }
+        : { scope_kind: 'system', tier: 'public' },
+      actorRole: 'surface_runtime',
+      principal: { kind: 'service', id: `surface-runtime:${surfaceId}` },
+      requestedBy: 'surface_runtime',
+      metadata: { origin: 'surface_runtime', ...metadata },
+    });
+  } catch (error) {
+    logger.warn(
+      `[SURFACE] Lifecycle receipt unavailable for ${surfaceId}: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+}
+
+function buildSurfaceRepairHint(
+  definition: SurfaceRuntimeDefinition,
+  record: any,
+  health: Awaited<ReturnType<typeof probeSurfaceHealth>>
+): string {
+  if (definition.startupMode === 'on-demand') {
+    return 'client-spawned surface (on-demand): its client starts it; not supervised';
+  }
+  if (record && !isRunning(record)) {
+    return 'stale state record: run pnpm surfaces repair -- --surface <surface-id>';
+  }
+  if (health.status === 'healthy') {
+    return 'healthy';
+  }
+  if (health.detail === 'no_port_or_health_path') {
+    return definition.enabled === false
+      ? 'disabled surface: enable it before repair'
+      : 'no health probe configured: inspect logs or add a health path';
+  }
+  return `unhealthy (${health.detail}): run pnpm surfaces repair -- --surface <surface-id>`;
+}
+
+function buildSurfaceNextAction(
+  surfaceId: string,
+  stateHealth: 'healthy' | 'degraded' | 'stale' | 'untracked',
+  repairHint: string
+): ReturnType<typeof buildNextAction> {
+  if (stateHealth === 'healthy') {
+    return buildNextAction({
+      title: `Inspect surface ${surfaceId}`,
+      reason: repairHint,
+      next_action_type: 'inspect_artifact',
+      suggested_command: `pnpm surfaces status -- --surface ${surfaceId}`,
+    });
+  }
+  return buildNextAction({
+    title: `Repair surface ${surfaceId}`,
+    reason: repairHint,
+    next_action_type: 'repair_surface',
+    suggested_command: `pnpm surfaces repair -- --surface ${surfaceId}`,
+  });
+}
+
+/**
+ * The env a surface is started with: this process's env plus the manifest's,
+ * then the surface's own identity (DR-01): `SYSTEM_ROLE=<surface id with - ->
+ * _>`, `AUTHORIZED_SCOPE=<service id>`, and no MISSION_ROLE or delegated role
+ * inherited from this launcher (buildSystemRoleLaunchEnv). MISSION_ROLE is the
+ * manifest's own, if it declares one; the persona is the manifest's explicit
+ * KYBERION_BASE_ROLE (or its retired name KYBERION_BASE_ROLE), else `worker` — the persona the `pnpm surfaces` launch
+ * contract gives surface_runtime and its surfaces — never one inherited from
+ * whoever started this runtime. A manifest cannot set SYSTEM_ROLE or
+ * KYBERION_DELEGATED_ROLE.
+ */
+export function buildSurfaceLaunchEnv(
+  surfaceId: string,
+  serviceId: string,
+  manifestEnv: Record<string, string | undefined> = {},
+  baseEnv: NodeJS.ProcessEnv = process.env
+): NodeJS.ProcessEnv {
+  return buildSystemRoleLaunchEnv(
+    {
+      ...baseEnv,
+      ...manifestEnv,
+      AUTHORIZED_SCOPE: serviceId, // Inject scoped identity for TIBA
+    },
+    surfaceId.replace(/-/g, '_'), // Inject role for secure-io (e.g., slack_bridge)
+    {
+      persona: baseRoleEnvText(manifestEnv) || 'worker',
+      ...(manifestEnv.MISSION_ROLE ? { missionRole: manifestEnv.MISSION_ROLE } : {}),
+    }
+  );
+}
+
+export async function startSurfaceById(surfaceId: string, manifestPath: string) {
+  const manifest = loadSurfaceManifest(manifestPath);
+  const definition = manifest.surfaces.find((entry) => entry.id === surfaceId);
+  if (!definition) {
+    throw new Error(`Surface "${surfaceId}" not found in manifest ${manifestPath}`);
+  }
+
+  const normalized = normalizeSurfaceDefinition(definition);
+  if (!normalized.enabled) {
+    throw new Error(`Surface "${surfaceId}" is disabled in manifest ${manifestPath}`);
+  }
+  if (normalized.startupMode === 'on-demand') {
+    // Client-spawned surface (e.g. a stdio MCP server): the client launches
+    // and owns the process; starting it here would just respawn a process
+    // that exits on stdin EOF.
+    return {
+      status: 'skipped_on_demand',
+      id: surfaceId,
+      detail: 'client-spawned surface (on-demand): started by its client, not supervised',
+    };
+  }
+
+  // --- AUTH VALIDATION ---
+  const serviceId = (definition as any).service_id || surfaceId;
+  const presetPath = (definition as any).preset_path;
+  if (presetPath) {
+    const authInspection = inspectServiceAuth(serviceId, presetPath);
+    const authRes = authInspection.valid
+      ? { valid: true as const }
+      : { valid: false as const, reason: authInspection.reason };
+    if (!authRes.valid) {
+      logger.error(
+        `⚠️ [SURFACE] Auth validation failed for ${surfaceId}: ${authRes.reason}. ${authInspection.setupHint}`
+      );
+      return {
+        status: 'skipped_auth_required',
+        id: surfaceId,
+        reason: authRes.reason,
+        setupHint: authInspection.setupHint,
+        requiredSecrets: authInspection.requiredSecrets,
+        missingSecrets: authInspection.missingSecrets,
+        cliFallbacks: authInspection.cliFallbacks,
+      };
+    }
+  }
+  // ------------------------
+
+  const state = loadSurfaceState();
+  const existing = state.surfaces[surfaceId];
+  if (existing && isRunning(existing)) {
+    registerRunningSurfaceFromState(existing);
+    return {
+      status: 'running',
+      id: surfaceId,
+      pid: existing.pid,
+      resourceId: existing.resourceId,
+      logPath: existing.logPath,
+    };
+  }
+
+  const health = await probeSurfaceHealth(normalized);
+  if (health.status === 'healthy') {
+    return {
+      status: 'already_healthy',
+      id: surfaceId,
+      detail: health.detail,
+      port: normalized.port,
+      healthPath: normalized.healthPath,
+    };
+  }
+
+  if (normalized.port) {
+    const portStatus = await probeSurfacePort(normalized.port);
+    if (portStatus.occupied) {
+      const offender = await describePortHolder(normalized.port);
+      const ownCwd = pathResolver.rootDir();
+      const foreignNote =
+        offender && offender.cwd && offender.cwd !== ownCwd
+          ? ` Holder appears to run from ${offender.cwd} (pid ${offender.pid}) — different from this repo at ${ownCwd}. Stop the foreign process or change ${surfaceManifestFilePath(surfaceId)}.`
+          : offender
+            ? ` Held by pid ${offender.pid}.`
+            : '';
+      throw new Error(
+        `Surface "${surfaceId}" port ${normalized.port} is already in use.${foreignNote}`
+      );
+    }
+  }
+
+  const cwd = normalized.cwd!;
+  const logPath = surfaceLogPath(surfaceId);
+  const out = safeOpenAppendFile(logPath);
+  const managed = spawnManagedProcess({
+    resourceId: surfaceResourceId(surfaceId),
+    kind: normalized.kind,
+    ownerId: surfaceId,
+    ownerType: normalized.ownerType!,
+    command: normalized.command,
+    args: normalized.args,
+    shutdownPolicy: normalized.shutdownPolicy,
+    spawnOptions: {
+      cwd,
+      env: buildSurfaceLaunchEnv(surfaceId, serviceId, normalized.env),
+      detached: normalized.shutdownPolicy === 'detached',
+      stdio: ['ignore', out, out],
+    },
+    metadata: {
+      manifestPath,
+      startupMode: normalized.startupMode,
+      port: normalized.port,
+      healthPath: normalized.healthPath,
+      cwd,
+    },
+  });
+
+  if (normalized.shutdownPolicy === 'detached') {
+    managed.child.unref();
+  }
+
+  // 'spawn'/'error' settle a tick after spawn(); a binary that never starts
+  // must not be recorded as running. The child holds a dup of `out` once
+  // spawned, so the parent's copy closes on both outcomes.
+  const spawnError = await new Promise<Error | null>((resolve) => {
+    managed.child.once('error', resolve);
+    managed.child.once('spawn', () => resolve(null));
+  });
+  safeCloseFd(out);
+  if (spawnError || managed.child.pid === undefined) {
+    return {
+      status: 'spawn_failed',
+      id: surfaceId,
+      reason: spawnError?.message || 'surface process did not start',
+      logPath,
+    };
+  }
+
+  state.surfaces[surfaceId] = {
+    id: surfaceId,
+    pid: managed.child.pid || -1,
+    pidStartMarker: managed.child.pid ? processStartMarker(managed.child.pid) : undefined,
+    resourceId: surfaceResourceId(surfaceId),
+    kind: normalized.kind,
+    command: normalized.command,
+    args: normalized.args || [],
+    cwd,
+    logPath,
+    startedAt: nowIso(),
+    shutdownPolicy: normalized.shutdownPolicy || 'detached',
+    metadata: {
+      manifestPath,
+      startupMode: normalized.startupMode,
+      port: normalized.port,
+      healthPath: normalized.healthPath,
+    },
+  };
+  saveSurfaceState(state);
+
+  recordProtocolSurfaceLifecycle(surfaceId, 'start', 'started', {
+    pid: managed.child.pid || -1,
+    manifest_path: manifestPath,
+  });
+
+  return {
+    status: 'started',
+    id: surfaceId,
+    pid: managed.child.pid,
+    resourceId: surfaceResourceId(surfaceId),
+    logPath,
+  };
+}
+
+function stopSurfaceById(surfaceId: string) {
+  const state = loadSurfaceState();
+  const record = state.surfaces[surfaceId];
+  if (!record) {
+    return { status: 'not_found', id: surfaceId };
+  }
+
+  const outcome = stopRecordedProcess(record);
+  if (outcome === 'identity_unknown') {
+    // Keep the record — the process may still be running and a delete here
+    // would orphan it for the next reconcile to respawn a duplicate.
+    return { status: 'identity_unknown', id: surfaceId, pid: record.pid };
+  }
+  runtimeSupervisor.unregister(record.resourceId);
+  delete state.surfaces[surfaceId];
+  saveSurfaceState(state);
+  recordProtocolSurfaceLifecycle(surfaceId, 'stop', 'stopped', { pid: record.pid });
+  return {
+    status: outcome === 'stopped' ? 'stopped' : outcome,
+    id: surfaceId,
+    pid: record.pid,
+  };
+}
+
+/**
+ * True when the surface has a service preset whose credentials validate
+ * (secret store / env / CLI fallback, via inspectServiceAuth). Surfaces
+ * without a preset are host-managed and report false.
+ */
+function surfaceCredentialsConfigured(definition: SurfaceRuntimeDefinition): boolean {
+  if (!definition.preset_path) return false;
+  try {
+    return inspectServiceAuth(definition.service_id || definition.id, definition.preset_path).valid;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Reconcile result for a disabled surface: a `skipped_disabled` row with the
+ * enable hint. When a gateway is disabled only because the committed registry
+ * now defaults it off, yet its credentials are configured (it used to start),
+ * also return a one-time migration warning telling the operator how to opt in.
+ */
+export function buildDisabledSurfaceReconcileRow(
+  definition: Pick<SurfaceRuntimeDefinition, 'id' | 'kind'>,
+  options: { disabledByDefault: boolean; credentialsConfigured: boolean }
+): { row: Record<string, unknown>; migrationWarning?: string } {
+  const params = { surface: definition.id };
+  const row: Record<string, unknown> = {
+    id: definition.id,
+    status: 'skipped_disabled',
+    hint: t('surface:surface_enable_hint', params),
+    enableCommand: `pnpm surfaces enable --surface ${definition.id}`,
+  };
+  if (definition.kind === 'gateway' && options.disabledByDefault && options.credentialsConfigured) {
+    const migrationWarning = t('surface:surface_gateway_disabled_by_default_warning', params);
+    row.migrationWarning = migrationWarning;
+    return { row, migrationWarning };
+  }
+  return { row };
+}
+
+async function reconcileSurfaces(manifestPath: string, cleanup = false) {
+  const manifest = loadSurfaceManifest(manifestPath);
+  const state = loadSurfaceState();
+
+  for (const [surfaceId, record] of Object.entries(state.surfaces)) {
+    if (!isRunning(record)) {
+      runtimeSupervisor.unregister(record.resourceId);
+      delete state.surfaces[surfaceId];
+    } else {
+      registerRunningSurfaceFromState(record);
+    }
+  }
+
+  const results: Array<Record<string, unknown>> = [];
+  const overrides = loadSurfaceEnablementOverrides();
+  const usesRegistry = path.resolve(manifestPath) === path.resolve(surfaceManifestPath());
+  for (const definition of manifest.surfaces.map(normalizeSurfaceDefinition)) {
+    if (!definition.enabled) {
+      const disabled = buildDisabledSurfaceReconcileRow(definition, {
+        disabledByDefault: usesRegistry && !overrides.surfaces[definition.id],
+        credentialsConfigured: surfaceCredentialsConfigured(definition),
+      });
+      if (disabled.migrationWarning) logger.warn(`⚠️  [SURFACE] ${disabled.migrationWarning}`);
+      results.push(disabled.row);
+      continue;
+    }
+    const existing = state.surfaces[definition.id];
+    if (existing && isRunning(existing)) {
+      results.push({ id: definition.id, status: 'running', pid: existing.pid });
+      continue;
+    }
+    try {
+      const started = await startSurfaceById(definition.id, manifestPath);
+      results.push(started);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      logger.warn(
+        `⚠️  [SURFACE] Failed to start "${definition.id}": ${message}. Continuing with the next surface.`
+      );
+      results.push({ id: definition.id, status: 'failed', reason: message });
+    }
+  }
+
+  if (cleanup) {
+    const manifestIds = new Set(manifest.surfaces.map((entry) => entry.id));
+    for (const surfaceId of Object.keys(state.surfaces)) {
+      if (!manifestIds.has(surfaceId)) {
+        const stopResult = stopSurfaceById(surfaceId);
+        results.push({
+          id: surfaceId,
+          status: stopResult.status === 'stopped' ? 'stopped_removed' : stopResult.status,
+        });
+      }
+    }
+  }
+
+  return {
+    status: 'reconciled',
+    manifestPath,
+    manifestDirectory: surfaceManifestDirectoryPath(),
+    statePath: surfaceStatePath(),
+    results,
+    runtime: runtimeSupervisor.snapshot(),
+  };
+}
+
+async function statusSurfaces() {
+  const state = loadSurfaceState();
+  const manifest = loadSurfaceManifest();
+  for (const [_surfaceId, record] of Object.entries(state.surfaces)) {
+    if (isRunning(record)) {
+      registerRunningSurfaceFromState(record);
+    }
+  }
+
+  const health: Record<string, unknown> = {};
+  const diagnostics: Record<string, unknown> = {};
+  for (const definition of manifest.surfaces.map(normalizeSurfaceDefinition)) {
+    const record = state.surfaces[definition.id];
+    const surfaceHealth = await probeSurfaceHealth(definition);
+    health[definition.id] = surfaceHealth;
+    const stateHealth =
+      record && isRunning(record)
+        ? // 'unknown' = no probe configured: a live supervised pid is the only
+          // signal we have — calling that "degraded" is a false positive that
+          // nags repair forever.
+          surfaceHealth.status === 'unhealthy'
+          ? 'degraded'
+          : 'healthy'
+        : definition.startupMode === 'on-demand'
+          ? 'untracked'
+          : record
+            ? 'stale'
+            : 'untracked';
+    diagnostics[definition.id] = {
+      stateHealth,
+      repairHint: buildSurfaceRepairHint(definition, record, surfaceHealth),
+      nextAction: buildSurfaceNextAction(
+        definition.id,
+        stateHealth,
+        buildSurfaceRepairHint(definition, record, surfaceHealth)
+      ),
+      lastKnownState: record
+        ? {
+            pid: record.pid,
+            startedAt: record.startedAt,
+            logPath: record.logPath,
+            startupMode: record.metadata?.startupMode || definition.startupMode,
+          }
+        : null,
+      recentLogTail: record?.logPath ? readSurfaceLogTail(record.logPath, 12) : [],
+    };
+  }
+  return {
+    status: 'ok',
+    manifestPath: surfaceManifestPath(),
+    manifestDirectory: surfaceManifestDirectoryPath(),
+    statePath: surfaceStatePath(),
+    surfaces: state.surfaces,
+    health,
+    diagnostics,
+    runtime: runtimeSupervisor.snapshot(),
+  };
+}
+
+async function listUnits() {
+  const manifest = loadSurfaceManifest();
+  const state = loadSurfaceState();
+
+  const results = await Promise.all(
+    manifest.surfaces.map(async (d) => {
+      const normalized = normalizeSurfaceDefinition(d);
+      const record = state.surfaces[d.id];
+      const running = record && isRunning(record);
+      const health = await probeSurfaceHealth(normalized);
+      const auth = (d as any).preset_path
+        ? inspectServiceAuth((d as any).service_id || d.id, (d as any).preset_path)
+        : null;
+
+      return {
+        unit: d.id,
+        kind: d.kind,
+        enabled: d.enabled !== false ? 'enabled' : 'disabled',
+        status: running ? 'running' : 'stopped',
+        health: health.status,
+        auth: auth ? (auth.valid ? 'ready' : 'missing') : 'n/a',
+        port: d.port || '-',
+        hint: auth?.setupHint || '',
+        nextAction:
+          auth && !auth.valid
+            ? buildNextAction({
+                title: `Fix surface auth for ${d.id}`,
+                reason: auth.setupHint,
+                next_action_type: 'bootstrap_environment',
+                suggested_command: 'pnpm surfaces setup',
+              })
+            : health.status !== 'healthy'
+              ? buildNextAction({
+                  title: `Repair surface ${d.id}`,
+                  reason: health.detail,
+                  next_action_type: 'repair_surface',
+                  suggested_command: `pnpm surfaces repair -- --surface ${d.id}`,
+                })
+              : buildNextAction({
+                  title: `Inspect surface ${d.id}`,
+                  reason: 'Surface is healthy.',
+                  next_action_type: 'inspect_artifact',
+                  suggested_command: `pnpm surfaces status -- --surface ${d.id}`,
+                }),
+        pid: record?.pid || '-',
+      };
+    })
+  );
+
+  return { status: 'ok', units: results };
+}
+
+/** One line per surface (health from state + probe); `--json` keeps the full diagnostics. */
+export function formatSurfaceStatus(result: Awaited<ReturnType<typeof statusSurfaces>>): string {
+  const header = `${'SURFACE'.padEnd(25)} ${'STATE'.padEnd(10)} ${'PID'.padEnd(8)} STARTED`;
+  const lines = ['', header, '-'.repeat(header.length + 16)];
+  const counts: Record<string, number> = {};
+  for (const [id, raw] of Object.entries(result.diagnostics)) {
+    const diagnostic = raw as {
+      stateHealth: string;
+      nextAction?: Parameters<typeof formatNextAction>[0];
+      lastKnownState: { pid: number; startedAt: string } | null;
+    };
+    counts[diagnostic.stateHealth] = (counts[diagnostic.stateHealth] ?? 0) + 1;
+    const icon =
+      diagnostic.stateHealth === 'healthy'
+        ? '🟢'
+        : diagnostic.stateHealth === 'untracked'
+          ? '⚪'
+          : '🟠';
+    lines.push(
+      `${id.padEnd(25)} ${icon} ${diagnostic.stateHealth.padEnd(8)} ${String(diagnostic.lastKnownState?.pid ?? '-').padEnd(8)} ${diagnostic.lastKnownState?.startedAt ?? '-'}`
+    );
+    if (
+      diagnostic.nextAction &&
+      (diagnostic.stateHealth === 'degraded' || diagnostic.stateHealth === 'stale')
+    ) {
+      lines.push(...formatNextAction(diagnostic.nextAction).map((line) => `  ${line}`));
+    }
+  }
+  lines.push(
+    '',
+    `Summary: ${Object.entries(counts)
+      .map(([state, count]) => `${count} ${state}`)
+      .join(', ')}`,
+    `State: ${result.statePath}  (add --json for full diagnostics and log tails)`,
+    ''
+  );
+  return lines.join('\n');
+}
+
+function formatListUnits(result: Awaited<ReturnType<typeof listUnits>>): string {
+  const header = `${'UNIT'.padEnd(25)} ${'KIND'.padEnd(10)} ${'ENABLED'.padEnd(10)} ${'STATUS'.padEnd(10)} ${'HEALTH'.padEnd(10)} ${'AUTH'.padEnd(10)} ${'PORT'.padEnd(6)} PID`;
+  const lines = ['', header, '-'.repeat(header.length + 5)];
+  for (const row of result.units) {
+    const statusColor = row.status === 'running' ? '🟢' : '⚪';
+    const enabledColor = row.enabled === 'enabled' ? '✅' : '❌';
+    const authColor = row.auth === 'ready' ? '✅' : row.auth === 'missing' ? '⚠️' : '—';
+    lines.push(
+      `${row.unit.padEnd(25)} ${row.kind.padEnd(10)} ${enabledColor} ${row.enabled.padEnd(8)} ${statusColor} ${row.status.padEnd(8)} ${authColor} ${row.auth.padEnd(8)} ${row.health.padEnd(10)} ${String(row.port).padEnd(6)} ${row.pid}`
+    );
+    if (
+      row.nextAction &&
+      (row.auth === 'missing' || row.health !== 'healthy' || row.enabled !== 'enabled')
+    ) {
+      lines.push(...formatNextAction(row.nextAction).map((line) => `  ${line}`));
+    }
+  }
+  lines.push('');
+  return lines.join('\n');
+}
+
+export async function setupSurfaces(_options: { quiet?: boolean } = {}) {
+  const manifest = loadSurfaceManifest();
+  const rows = sortSurfaceSetupRows(
+    await Promise.all(
+      manifest.surfaces.map(async (d) => {
+        const auth = (d as any).preset_path
+          ? inspectServiceAuth((d as any).service_id || d.id, (d as any).preset_path)
+          : null;
+        return {
+          surface: d.id,
+          enabled: d.enabled !== false ? 'enabled' : 'disabled',
+          auth: auth ? (auth.valid ? 'ready' : 'missing') : 'n/a',
+          strategy: auth?.authStrategy || 'host-managed',
+          secrets: auth?.requiredSecrets.join(', ') || '',
+          cli: auth?.cliFallbacks.join(', ') || '',
+          hint: auth?.setupHint || 'Host-managed surface or no preset path.',
+        };
+      })
+    )
+  );
+
+  const summary = rows.reduce(
+    (acc, row) => {
+      acc.total += 1;
+      if (row.enabled === 'enabled') acc.enabled += 1;
+      if (row.enabled === 'disabled') acc.disabled += 1;
+      if (row.auth === 'ready') acc.ready += 1;
+      if (row.auth === 'missing') acc.missing += 1;
+      if (row.auth === 'n/a') acc.hostManaged += 1;
+      return acc;
+    },
+    { total: 0, enabled: 0, disabled: 0, ready: 0, missing: 0, hostManaged: 0 }
+  );
+
+  return {
+    status: 'ok',
+    manifestPath: surfaceManifestPath(),
+    manifestDirectory: surfaceManifestDirectoryPath(),
+    rows,
+    summary,
+  };
+}
+
+function formatSurfaceSetupReport(report: Awaited<ReturnType<typeof setupSurfaces>>): string {
+  const lines = [
+    '',
+    `Setup summary: ${report.summary.missing} missing, ${report.summary.ready} ready, ${report.summary.hostManaged} host-managed, ${report.summary.disabled} disabled, ${report.summary.total} total`,
+    `${'SURFACE'.padEnd(25)} ${'ENABLED'.padEnd(10)} ${'AUTH'.padEnd(10)} ${'STRATEGY'.padEnd(14)} ${'SECRETS'.padEnd(36)} CLI`,
+  ];
+  const header = lines[2];
+  lines.splice(3, 0, '-'.repeat(header.length + 8));
+  for (const row of report.rows) {
+    const authSymbol = row.auth === 'ready' ? '✅' : row.auth === 'missing' ? '⚠️' : '—';
+    lines.push(
+      `${row.surface.padEnd(25)} ${row.enabled.padEnd(10)} ${authSymbol} ${row.auth.padEnd(8)} ${row.strategy.padEnd(14)} ${row.secrets.slice(0, 36).padEnd(36)} ${row.cli}`
+    );
+    if (row.auth === 'missing' || row.auth === 'n/a') lines.push(`  ↳ ${row.hint}`);
+    if (row.enabled === 'disabled')
+      lines.push(`  ↳ ${t('surface:surface_enable_hint', { surface: row.surface })}`);
+  }
+  lines.push('');
+  return lines.join('\n');
+}
+
+async function repairSurfaceById(surfaceId: string, manifestPath: string) {
+  const manifest = loadSurfaceManifest(manifestPath);
+  const definition = manifest.surfaces.find((entry) => entry.id === surfaceId);
+  if (!definition) {
+    throw new Error(`Surface "${surfaceId}" not found in manifest ${manifestPath}`);
+  }
+
+  const normalized = normalizeSurfaceDefinition(definition);
+  const state = loadSurfaceState();
+  const record = state.surfaces[surfaceId];
+  const health = await probeSurfaceHealth(normalized);
+
+  if (!record || !isRunning(record)) {
+    if (record) {
+      const stopResult = stopSurfaceById(surfaceId);
+      if (stopResult.status === 'identity_unknown') {
+        return {
+          status: 'identity_unknown',
+          id: surfaceId,
+          repairHint: 'stop inconclusive — record kept, not restarted',
+          health,
+        };
+      }
+    }
+    if (definition.enabled === false) {
+      return {
+        status: 'skipped_disabled',
+        id: surfaceId,
+        repairHint: 'surface is disabled in the manifest',
+        health,
+      };
+    }
+    if (normalized.startupMode === 'on-demand') {
+      return {
+        status: 'skipped_on_demand',
+        id: surfaceId,
+        repairHint:
+          'client-spawned surface (on-demand): its client starts it; stale records cleared, no supervised restart',
+        health,
+      };
+    }
+    const started = await startSurfaceById(surfaceId, manifestPath);
+    return {
+      ...started,
+      repairHint:
+        health.status === 'healthy'
+          ? 'already healthy before repair'
+          : `recovered from ${health.detail}`,
+    };
+  }
+
+  if (health.status === 'healthy') {
+    return {
+      status: 'already_healthy',
+      id: surfaceId,
+      repairHint: 'no repair needed',
+      health,
+    };
+  }
+
+  const stopResult = stopSurfaceById(surfaceId);
+  if (stopResult.status === 'identity_unknown') {
+    return {
+      status: 'identity_unknown',
+      id: surfaceId,
+      repairHint: `stop inconclusive after ${health.detail} — record kept, not restarted`,
+      health,
+    };
+  }
+  const restarted = await startSurfaceById(surfaceId, manifestPath);
+  return {
+    ...restarted,
+    repairHint: `restarted after ${health.detail}`,
+  };
+}
+
+async function repairSurfaces(manifestPath: string, surfaceId?: string) {
+  if (surfaceId) {
+    return repairSurfaceById(surfaceId, manifestPath);
+  }
+
+  const manifest = loadSurfaceManifest(manifestPath);
+  const state = loadSurfaceState();
+  const results: Array<Record<string, unknown>> = [];
+  for (const definition of manifest.surfaces.map(normalizeSurfaceDefinition)) {
+    const record = state.surfaces[definition.id];
+    if (!record) continue;
+    if (!isRunning(record)) {
+      results.push(await repairSurfaceById(definition.id, manifestPath));
+      continue;
+    }
+    const health = await probeSurfaceHealth(definition);
+    if (health.status === 'healthy') continue;
+    results.push(await repairSurfaceById(definition.id, manifestPath));
+  }
+
+  return {
+    status: 'repaired',
+    manifestPath,
+    results,
+  };
+}
+
+/**
+ * Persist an operator enable/disable decision. For the canonical registry the
+ * decision goes to the untracked overlay (active/shared/runtime/surfaces/
+ * overrides.json) so the committed knowledge/product/governance/surfaces/*.json
+ * defaults are never rewritten; an explicit --manifest file is operator-owned
+ * and is updated in place as before.
+ */
+function setSurfaceEnabled(surfaceId: string, manifestPath: string, enabled: boolean): boolean {
+  const usesRegistry = path.resolve(manifestPath) === path.resolve(surfaceManifestPath());
+  const manifest = loadSurfaceManifest(manifestPath, { applyOverrides: usesRegistry });
+  const definition = manifest.surfaces.find((s) => s.id === surfaceId);
+  if (!definition) throw new Error(`Surface "${surfaceId}" not found.`);
+  if ((definition.enabled !== false) === enabled) return false;
+
+  let storage: string;
+  if (usesRegistry) {
+    const committed = loadSurfaceManifest(manifestPath, { applyOverrides: false }).surfaces.find(
+      (s) => s.id === surfaceId
+    );
+    setSurfaceEnablementOverride(surfaceId, enabled, committed?.enabled !== false);
+    storage = surfaceEnablementOverridesPath();
+  } else {
+    definition.enabled = enabled;
+    saveSurfaceManifest(manifest, manifestPath);
+    storage = manifestPath;
+  }
+  auditChain.record({
+    agentId: executionAgentId('worker'),
+    action: enabled ? 'surface.enable' : 'surface.disable',
+    operation: surfaceId,
+    result: 'completed',
+    metadata: { surfaceId, manifestPath, storage },
+  });
+  return true;
+}
+
+async function enableSurfaceById(surfaceId: string, manifestPath: string) {
+  if (setSurfaceEnabled(surfaceId, manifestPath, true)) {
+    logger.success(`✅ Enabled surface "${surfaceId}".`);
+  } else {
+    logger.info(`Surface "${surfaceId}" is already enabled.`);
+  }
+  return startSurfaceById(surfaceId, manifestPath);
+}
+
+async function disableSurfaceById(surfaceId: string, manifestPath: string) {
+  if (setSurfaceEnabled(surfaceId, manifestPath, false)) {
+    logger.success(`✅ Disabled surface "${surfaceId}".`);
+  } else {
+    logger.info(`Surface "${surfaceId}" is already disabled.`);
+  }
+  return stopSurfaceById(surfaceId);
+}
+
+async function registerSurface(params: {
+  id: string;
+  kind: SurfaceRuntimeKind;
+  command: string;
+  args?: string[];
+  port?: number;
+  description?: string;
+  manifestPath: string;
+}) {
+  const manifest = loadSurfaceManifest(params.manifestPath, { applyOverrides: false });
+  if (manifest.surfaces.some((s) => s.id === params.id)) {
+    throw new Error(`Surface "${params.id}" is already registered.`);
+  }
+
+  const newSurface: SurfaceRuntimeDefinition = {
+    id: params.id,
+    kind: params.kind,
+    description: params.description || `Surface ${params.id}`,
+    command: params.command,
+    args: params.args || [],
+    port: params.port,
+    enabled: true,
+    startupMode: params.kind === 'ui' ? 'workspace-app' : 'background',
+    shutdownPolicy: 'detached',
+    ownerType: 'surface-runtime-manifest',
+  };
+
+  manifest.surfaces.push(newSurface);
+  saveSurfaceManifest(manifest, params.manifestPath);
+
+  auditChain.record({
+    agentId: executionAgentId('worker'),
+    action: 'surface.register',
+    operation: params.id,
+    result: 'completed',
+    metadata: { ...newSurface, manifestPath: params.manifestPath },
+  });
+
+  logger.success(`✅ Registered new surface "${params.id}".`);
+  return reconcileSurfaces(params.manifestPath);
+}
+
+async function unregisterSurfaceById(surfaceId: string, manifestPath: string) {
+  const manifest = loadSurfaceManifest(manifestPath, { applyOverrides: false });
+  const index = manifest.surfaces.findIndex((s) => s.id === surfaceId);
+  if (index === -1) throw new Error(`Surface "${surfaceId}" not found.`);
+
+  const [removed] = manifest.surfaces.splice(index, 1);
+  saveSurfaceManifest(manifest, manifestPath);
+
+  await stopSurfaceById(surfaceId);
+
+  auditChain.record({
+    agentId: executionAgentId('worker'),
+    action: 'surface.unregister',
+    operation: surfaceId,
+    result: 'completed',
+    metadata: { surfaceId, removed, manifestPath },
+  });
+
+  logger.success(`✅ Unregistered surface "${surfaceId}".`);
+}
+
+async function reconcileHealth(manifestPath: string) {
+  const manifest = loadSurfaceManifest(manifestPath);
+  const restarted: string[] = [];
+
+  for (const definition of manifest.surfaces.map(normalizeSurfaceDefinition)) {
+    const state = loadSurfaceState();
+    const record = state.surfaces[definition.id];
+    if (!record || !isRunning(record)) continue;
+
+    const health = await probeSurfaceHealth(definition);
+    if (health.status === 'unhealthy') {
+      const stopResult = stopSurfaceById(definition.id);
+      // An inconclusive stop kept the record and possibly the process —
+      // restarting here would spawn a duplicate; the next pass re-evaluates.
+      if (stopResult.status === 'identity_unknown') continue;
+      await startSurfaceById(definition.id, manifestPath);
+      recordProtocolSurfaceLifecycle(definition.id, 'reconnect', 'reconnected', {
+        reason: 'health_probe_unhealthy',
+      });
+      restarted.push(definition.id);
+    }
+  }
+
+  return restarted;
+}
+
+const MUTATING_SURFACE_ACTIONS = new Set<SurfaceAction>([
+  'reconcile',
+  'start',
+  'stop',
+  'repair',
+  'enable',
+  'disable',
+  'register',
+  'unregister',
+]);
+
+const SURFACE_ACTIONS = new Set<SurfaceAction>([
+  'reconcile',
+  'start',
+  'stop',
+  'status',
+  'list-units',
+  'setup',
+  'repair',
+  'enable',
+  'disable',
+  'register',
+  'unregister',
+]);
+
+export function normalizeSurfaceRuntimeArgs(args: readonly string[]): string[] {
+  const normalized = stripSharedScriptFlags(args);
+  if (normalized.includes('--action')) return normalized;
+  const [command, ...rest] = normalized;
+  if (command && SURFACE_ACTIONS.has(command as SurfaceAction)) {
+    return ['--action', command, ...rest];
+  }
+  return normalized;
+}
+
+export function parseSurfaceRegisterArgs(value: string): string[] {
+  let parsed: unknown;
+  try {
+    parsed = parseSafeJsonInput(value, 'surface register args');
+  } catch (error) {
+    if (error instanceof Error && error.message === 'surface register args must be valid JSON') {
+      return value.split(' ');
+    }
+    throw error;
+  }
+  if (!Array.isArray(parsed) || parsed.some((entry) => typeof entry !== 'string')) {
+    throw new Error('surface register args must be a JSON array of strings');
+  }
+  return parsed;
+}
+
+const main = async (args: string[] = [], options: { dryRun?: boolean; check?: boolean } = {}) => {
+  const normalizedArgs = normalizeSurfaceRuntimeArgs(args);
+  const argv = await createStandardYargs(['node', 'surface_runtime', ...normalizedArgs])
+    .option('action', {
+      type: 'string',
+      choices: [
+        'reconcile',
+        'start',
+        'stop',
+        'status',
+        'list-units',
+        'setup',
+        'repair',
+        'enable',
+        'disable',
+        'register',
+        'unregister',
+      ] as const,
+      required: true,
+    })
+    .option('surface', { type: 'string' })
+    .option('manifest', { type: 'string', default: surfaceManifestPath() })
+    .option('cleanup', { type: 'boolean', default: false })
+    .option('kind', { type: 'string', choices: ['ui', 'service', 'gateway'] })
+    .option('command', { type: 'string' })
+    .option('args', { type: 'string' })
+    .option('port', { type: 'number' })
+    .option('description', { type: 'string' })
+    .parseSync();
+
+  const action = argv.action as SurfaceAction;
+  if ((options.dryRun || options.check) && MUTATING_SURFACE_ACTIONS.has(action)) {
+    return {
+      status: 'dry_run',
+      action,
+      surface: argv.surface ? String(argv.surface) : null,
+    };
+  }
+  const manifestPath = path.isAbsolute(argv.manifest as string)
+    ? (argv.manifest as string)
+    : pathResolver.resolve(argv.manifest as string);
+
+  let result: unknown;
+  switch (action) {
+    case 'reconcile':
+      result = await reconcileSurfaces(manifestPath, Boolean(argv.cleanup));
+      Object.assign(result as object, { restartedUnhealthy: await reconcileHealth(manifestPath) });
+      break;
+    case 'start':
+      if (!argv.surface) throw new Error('--surface is required for start');
+      result = await startSurfaceById(argv.surface as string, manifestPath);
+      break;
+    case 'stop':
+      if (!argv.surface) throw new Error('--surface is required for stop');
+      result = stopSurfaceById(argv.surface as string);
+      break;
+    case 'status':
+      result = await statusSurfaces();
+      break;
+    case 'list-units':
+      result = await listUnits();
+      break;
+    case 'setup':
+      result = await setupSurfaces();
+      break;
+    case 'repair':
+      result = await repairSurfaces(manifestPath, argv.surface as string | undefined);
+      break;
+    case 'enable':
+      if (!argv.surface) throw new Error('--surface is required for enable');
+      result = await enableSurfaceById(argv.surface as string, manifestPath);
+      break;
+    case 'disable':
+      if (!argv.surface) throw new Error('--surface is required for disable');
+      result = await disableSurfaceById(argv.surface as string, manifestPath);
+      break;
+    case 'register':
+      if (!argv.surface || !argv.kind || !argv.command) {
+        throw new Error('--surface, --kind, and --command are required for register');
+      }
+      result = await registerSurface({
+        id: argv.surface as string,
+        kind: argv.kind as SurfaceRuntimeKind,
+        command: argv.command as string,
+        args: argv.args
+          ? (() => {
+              return parseSurfaceRegisterArgs(argv.args as string);
+            })()
+          : [],
+        port: argv.port as number,
+        description: argv.description as string,
+        manifestPath,
+      });
+      break;
+    case 'unregister':
+      if (!argv.surface) throw new Error('--surface is required for unregister');
+      result = await unregisterSurfaceById(argv.surface as string, manifestPath);
+      break;
+    default:
+      throw new Error(`Unsupported action: ${action}`);
+  }
+
+  return result;
+};
+
+export const runSurfaceRuntime = defineScript({
+  name: 'surfaces:runtime',
+  run: async ({ argv, json, dryRun, check, print }) => {
+    const result = await main(argv, { dryRun, check });
+    if (result === undefined) return result;
+    if (!json && typeof result === 'object' && result !== null && 'units' in result)
+      print(formatListUnits(result as Awaited<ReturnType<typeof listUnits>>));
+    else if (!json && typeof result === 'object' && result !== null && 'rows' in result)
+      print(formatSurfaceSetupReport(result as Awaited<ReturnType<typeof setupSurfaces>>));
+    else if (!json && typeof result === 'object' && result !== null && 'diagnostics' in result)
+      print(formatSurfaceStatus(result as Awaited<ReturnType<typeof statusSurfaces>>));
+    else print(result);
+    return result;
+  },
+});
+
+if (
+  isDirectScript(import.meta.url, 'surface_runtime.ts') ||
+  isDirectScript(import.meta.url, 'surface_runtime.js') ||
+  isDirectScript(import.meta.url, 'surface_runtime.bundle.js') ||
+  isDirectScript(import.meta.url, 'surface_runtime.mts')
+)
+  void runSurfaceRuntime();

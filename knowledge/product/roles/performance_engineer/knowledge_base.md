@@ -17,20 +17,20 @@ last_updated: 2026-10-08
 
 - **Execution Time (ms)**: 各スキルの平均実行時間。
 - **Memory Footprint (MB)**: 実行時の最大ヒープ使用量 (`heapUsed`) および RSS。
-- **Syntax Check Overhead**: `scripts/benchmark_memory.ts` / `scripts/benchmark_learning_efficiency.ts` で計測される、スクリプトのパース/読み込みにかかる時間。
+- **Syntax Check Overhead**: `scripts/benchmark/benchmark_memory.ts` / `scripts/benchmark/benchmark_learning_efficiency.ts` で計測される、スクリプトのパース/読み込みにかかる時間。
 - **Token Efficiency**: LLM呼び出し時の入力トークン量に対する出力の価値（ROI）。
 
 ## 2. 性能監視・計測ツール
 
 - **Capability Metrics**: `libs/core/analysis/metrics.ts` により自動収集。システム行は `work/metrics/execution-metrics.jsonl`、テナント／personal・confidential 行は `active/shared/runtime/execution-metrics/<tier>/<tenant|shared>/` に記録（全体集計は `metrics.loadHistory({ read: { all: true } })`）。
-- **System Benchmark**: `pnpm exec tsx scripts/benchmark_memory.ts` / `scripts/benchmark_learning_efficiency.ts` でベンチマークを実行。
+- **System Benchmark**: `pnpm exec tsx scripts/benchmark/benchmark_memory.ts` / `scripts/benchmark/benchmark_learning_efficiency.ts` でベンチマークを実行。
 - **Resource Profiler**: `libs/core/analysis/metrics.ts` と `pnpm dashboard` を使用して、詳細なボトルネック分析を実施。
 
 ## 3. 最適化の定石 (Optimization Patterns)
 
 - **Lazy Loading**: `libs/core/plugin/skill-wrapper.ts` で扱うような、ライブラリ（Ajv等）の遅延読み込み。
 - **Cache Strategy**: `libs/core/core.ts` の `Cache` クラスを用いたファイル/データのキャッシュ。
-- **Parallel Execution**: `scripts/pipeline-execution-part-bootstrap.ts` の `runParallelBatches()` を利用したIO待ちの解消。
+- **Parallel Execution**: `scripts/pipeline/pipeline-execution-part-bootstrap.ts` の `runParallelBatches()` を利用したIO待ちの解消。
 
 ## 4. 評価基準 (Baseline & Thresholds)
 

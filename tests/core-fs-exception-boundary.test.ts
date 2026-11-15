@@ -68,7 +68,7 @@ const allowedCoreFsImports = [
   'libs/core/workforce/output-artifacts.test.ts',
   // Linked-worktree fixture: builds synthetic .git/commondir entries so the
   // authority-store primary-root remap can be exercised hermetically.
-  'libs/core/path-resolver-authority-store.test.ts',
+  'libs/core/path-resolver/path-resolver-authority-store.test.ts',
   // AL-01 hermetic purge test: raw fs to seed/inspect a temp KYBERION_ROOT.
   'libs/core/mission/mission-maintenance.purge.test.ts',
   // AL-03 hermetic closure test: raw fs to seed/inspect a temp KYBERION_ROOT.
@@ -92,20 +92,20 @@ const allowedCoreFsImports = [
   'libs/core/mission/sdlc-artifact-store.test.ts',
   // Fixture setup needs raw fs to create symlinks and verify 0600/0700 modes.
   'libs/core/secret/secret-bridge.test.ts',
-  'libs/core/secure-io.branch.test.ts',
+  'libs/core/secure-io/secure-io.branch.test.ts',
   // Mock native rm only to prove broad scratch deletion never reaches the OS.
-  'libs/core/secure-io-scratch-root.test.ts',
+  'libs/core/secure-io/secure-io-scratch-root.test.ts',
   // Fault-inject native open/readlink/stat; fixture I/O remains secure-io.
-  'libs/core/secure-io.metadata-fd.test.ts',
+  'libs/core/secure-io/secure-io.metadata-fd.test.ts',
   // secure-io's permission guards (literal + canonical symlink checks), split
   // out of secure-io.ts for size; part of the same governed I/O boundary.
   'libs/core/secure-io-path-guard.ts',
   // Plant links with raw node:fs to model links created outside secure-io.
-  'libs/core/secure-io.symlink-canonical.test.ts',
-  'libs/core/secure-io.symlink-root-alias.test.ts',
-  'libs/core/secure-io.test.ts',
+  'libs/core/secure-io/secure-io.symlink-canonical.test.ts',
+  'libs/core/secure-io/secure-io.symlink-root-alias.test.ts',
+  'libs/core/secure-io/secure-io.test.ts',
   'libs/core/secure-io.ts',
-  'libs/core/security-boundary.contract.test.ts',
+  'libs/core/secure-io/security-boundary.contract.test.ts',
   'libs/core/voice/speech-to-text-bridge.test.ts',
   'libs/core/actuator/actuator-capability.test.ts',
   'libs/core/knowledge/feedback-loop.test.ts',
@@ -126,7 +126,7 @@ const allowedCoreFsImports = [
   // AL-01 catalog loader test: raw fs for temp catalog fixtures.
   'libs/core/storage/storage-retention-catalog.test.ts',
   'libs/core/organization/tenant-registry.test.ts',
-  'libs/core/tier-guard-tenant.test.ts',
+  'libs/core/tier-guard/tier-guard-tenant.test.ts',
   'libs/core/governance/trust-engine.test.ts',
   'libs/core/foundation/validators.test.ts',
   'libs/core/workforce/worker-event-stream.test.ts',

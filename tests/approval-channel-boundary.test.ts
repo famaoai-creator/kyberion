@@ -256,7 +256,7 @@ const dynamicChannelAllowlist: Readonly<Record<string, readonly string[]>> = {
   'libs/core/surface/surface-approval-ui.ts': ['params.channel', 'params.surface'],
   'libs/core/surface/surface-mission-steering.ts': ['channel', 'params.key.surface'],
   'libs/core/workforce/background-review-patch.ts': ['input.approvalChannel.trim'],
-  'scripts/pipeline-execution-part-execution.ts': ['suspended.storage_channel'],
+  'scripts/pipeline/pipeline-execution-part-execution.ts': ['suspended.storage_channel'],
 };
 
 /** The API definition file itself is not a call site. */

@@ -17,7 +17,7 @@ This is **operator/dev environment guidance**, not a product-runtime change. It 
 
 ## What works without `dist/`
 
-- `pnpm capabilities` / `pnpm kyberion list` — `scripts/capability_discovery_entry.mjs` (manifest scan, including Node 22)
+- `pnpm capabilities` / `pnpm kyberion list` — `scripts/capability/capability_discovery_entry.mjs` (manifest scan, including Node 22)
 - `pnpm playground -- --dry-run --json` — source playground (`tsx`), still needs `@agent/core` resolution for schema validation
 
 ## What needs the build
@@ -43,7 +43,7 @@ Node selection order: a Node `>=24` already on `PATH` → the container's `nvm` 
 
 ### Recovering when `dist/` is missing (hook deadlock)
 
-Every Claude `PreToolUse` event goes through `scripts/provider_hook_entry.mjs`, which loads the built policy runtime from `dist/scripts/claude_code_hook.js`. When that file is missing the hook stays **fail-closed**: shell calls are denied with `Kyberion hook runtime unavailable …` unless they hit a minimal, exact-shape bootstrap allowlist — one command per Bash call. File-mutation tools (Edit/Write/MultiEdit and the Gemini `write_file|replace` matchers) stay **allowed** while the runtime is missing: a dirty tree that fails to compile can only be repaired by editing, never by building, so denying edits deadlocks the session.
+Every Claude `PreToolUse` event goes through `scripts/provider_hook_entry.mjs`, which loads the built policy runtime from `dist/scripts/claude/claude_code_hook.js`. When that file is missing the hook stays **fail-closed**: shell calls are denied with `Kyberion hook runtime unavailable …` unless they hit a minimal, exact-shape bootstrap allowlist — one command per Bash call. File-mutation tools (Edit/Write/MultiEdit and the Gemini `write_file|replace` matchers) stay **allowed** while the runtime is missing: a dirty tree that fails to compile can only be repaired by editing, never by building, so denying edits deadlocks the session.
 
 | Allowed while the runtime is missing                                      | Notes                                                                          |
 | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |

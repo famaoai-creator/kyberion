@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { pathResolver, safeReadFile } from '@agent/core';
-import { main as runPipelineMain } from './pipeline-execution-part-results.js';
+import { main as runPipelineMain } from './pipeline/pipeline-execution-part-results.js';
 import { formatPipelineDryRunReport, runPipelineDryRun } from './run_pipeline_dry_run.js';
 
 describe('pipeline dry-run entrypoint', () => {
@@ -16,7 +16,9 @@ describe('pipeline dry-run entrypoint', () => {
   });
 
   it('resolves the scheduled weekly review actuator operations', async () => {
-    const report = await runPipelineDryRun('pipelines/weekly-review.json');
+    const report = await runPipelineDryRun(
+      'knowledge/product/pipeline-templates/weekly-review.json'
+    );
 
     expect(report.verdict).toBe('ready');
     expect(report.checks.filter((check) => check.id === 'capability-resolution')).toEqual(
@@ -39,9 +41,12 @@ describe('pipeline dry-run entrypoint', () => {
 
   it('keeps the dry-run CLI output and exit boundary in the shared harness', () => {
     const source = String(
-      safeReadFile(pathResolver.rootResolve('scripts/pipeline-execution-part-results.ts'), {
-        encoding: 'utf8',
-      }) || ''
+      safeReadFile(
+        pathResolver.rootResolve('scripts/pipeline/pipeline-execution-part-results.ts'),
+        {
+          encoding: 'utf8',
+        }
+      ) || ''
     );
 
     expect(source).not.toContain('process.stdout.write');
@@ -58,7 +63,7 @@ describe('pipeline dry-run entrypoint', () => {
     const output: unknown[] = [];
 
     await runPipelineMain(
-      ['--input', 'pipelines/weekly-review.json', '--dry-run', '--json'],
+      ['--input', 'knowledge/product/pipeline-templates/weekly-review.json', '--dry-run', '--json'],
       (value) => output.push(value)
     );
 

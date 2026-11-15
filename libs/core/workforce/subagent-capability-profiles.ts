@@ -39,7 +39,7 @@ export interface SubagentCapabilityProfile {
   /**
    * CLI/Agent-SDK tool-name projection of this tier (Claude Code `tools:`
    * frontmatter vocabulary and Agent SDK `allowedTools`). This is the single
-   * source of truth both `scripts/generate_subagent_definitions.ts` (CT-01
+   * source of truth both `scripts/generate/generate_subagent_definitions.ts` (CT-01
    * `.claude/agents/*.md` frontmatter) and `libs/core/agent/agent-dispatch.ts`
    * (CT-02 `HarnessSubagentDispatcher` allowlist) derive from — see
    * {@link SUBAGENT_PROFILE_CLI_TOOLS}.
@@ -127,7 +127,7 @@ export const SUBAGENT_CAPABILITY_PROFILES: readonly SubagentCapabilityProfile[] 
  * KD-05 profile -> CLI/Agent-SDK tool-name projection, keyed by profile
  * name. Derived (not hand-typed) from {@link SUBAGENT_CAPABILITY_PROFILES}
  * so there is exactly one place a tier's tool surface is declared; both
- * `scripts/generate_subagent_definitions.ts` (CT-01) and
+ * `scripts/generate/generate_subagent_definitions.ts` (CT-01) and
  * `libs/core/agent/agent-dispatch.ts` (CT-02) consume this map instead of keeping
  * their own hand-mirrored copies.
  */
@@ -163,7 +163,7 @@ export function listSubagentCapabilityProfileNames(): string[] {
  * roles project onto `planner` (no tool execution). Roles not listed fall
  * back to {@link DEFAULT_TEAM_ROLE_CAPABILITY_PROFILE} — the safest
  * (read-only) tier — rather than silently inheriting implementer's write
- * access. Moved here from `scripts/generate_subagent_definitions.ts` (CT-01)
+ * access. Moved here from `scripts/generate/generate_subagent_definitions.ts` (CT-01)
  * so it is the one place this repo defines the mapping.
  */
 export const TEAM_ROLE_CAPABILITY_PROFILE: Readonly<Record<string, string>> = {

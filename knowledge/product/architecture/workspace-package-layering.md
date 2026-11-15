@@ -156,9 +156,9 @@ platform bootstrap, authority and secure-I/O foundations need separate dependenc
 - A module moves out of core only when no core module (outside its own directory) imports it.
   Compute that closure before moving; what core still uses stays in core.
 - The published surface may only shrink unless a change raises the baseline in review
-  (gate `package-export-surface`, baseline `scripts/check_package_export_surface.baseline.json`).
+  (gate `package-export-surface`, baseline `scripts/check/check_package_export_surface.baseline.json`).
 - Foundation stays light: the gate `foundation-weight` (baseline
-  `scripts/check_foundation_weight.baseline.json`) counts, on `libs/core/dist`, how many core
+  `scripts/check/check_foundation_weight.baseline.json`) counts, on `libs/core/dist`, how many core
   modules `secure-io`, `path-resolver`, `logger` and every `foundation/**` / `contracts/**`
   module load at runtime. The 2026-11-07 measurement is 53 modules for `secure-io`;
   most are the guard's own machinery (audit chain,

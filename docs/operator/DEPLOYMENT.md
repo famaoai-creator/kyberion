@@ -462,7 +462,7 @@ KYBERION_BACKUP_PASSPHRASE='store-outside-the-archive' \
   pnpm backup create --scope tenant --tenant customer-slug --out /path/to/export.tar.gz.enc --encrypt
 # Compatibility entrypoint:
 KYBERION_BACKUP_PASSPHRASE='store-outside-the-archive' \
-  node --import ./scripts/ts-loader.mjs scripts/tenant_export.ts --customer customer-slug --out /path/to/export.tar.gz.enc
+  node --import ./scripts/ts-loader.mjs scripts/tenant/tenant_export.ts --customer customer-slug --out /path/to/export.tar.gz.enc
 
 # Remove state:
 rm -rf active/ knowledge/personal/ customer/customer-slug/

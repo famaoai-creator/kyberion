@@ -26,9 +26,11 @@ describe('Customer aggregation contract', () => {
     expect(doc).toContain(
       '[x] Voice profile registry consumer (`libs/core/voice/voice-profile-registry.ts`)'
     );
-    expect(doc).toContain('[x] Vital check consumer (`scripts/vital_check.ts`)');
+    expect(doc).toContain('[x] Vital check consumer (`scripts/vital/vital_check.ts`)');
     expect(doc).toContain('[x] Baseline check consumer (`scripts/run_baseline_check.ts`)');
-    expect(doc).toContain('[x] Onboarding apply consumer (`scripts/onboarding_apply.ts`)');
+    expect(doc).toContain(
+      '[x] Onboarding apply consumer (`scripts/onboarding/onboarding_apply.ts`)'
+    );
     expect(doc).toContain(
       '[x] Slack onboarding consumer (`libs/core/integrations/slack-onboarding.ts`)'
     );
@@ -47,7 +49,9 @@ describe('Customer aggregation contract', () => {
     expect(jp).toContain('レガシーフォールバック');
     expect(jp).toContain('レガシーフォールバックとして使う');
     expect(jp).toContain('[x] baseline check consumer (`scripts/run_baseline_check.ts`)');
-    expect(jp).toContain('[x] onboarding apply consumer (`scripts/onboarding_apply.ts`)');
+    expect(jp).toContain(
+      '[x] onboarding apply consumer (`scripts/onboarding/onboarding_apply.ts`)'
+    );
     expect(jp).toContain(
       '[x] slack onboarding consumer (`libs/core/integrations/slack-onboarding.ts`)'
     );

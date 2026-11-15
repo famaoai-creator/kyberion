@@ -177,11 +177,11 @@ jobs:
 
       - name: Validate capability discovery
         if: ${{ !cancelled() && steps.workspace.outcome == 'success' }}
-        run: node dist/scripts/capability_discovery.js > /dev/null
+        run: node dist/scripts/capability/capability_discovery.js > /dev/null
 
       - name: Validate surface runtime contract
         if: ${{ !cancelled() && steps.workspace.outcome == 'success' }}
-        run: node dist/scripts/surface_runtime.js --action status > /dev/null
+        run: node dist/scripts/surface/surface_runtime.js --action status > /dev/null
 
       - name: Verify no build artifacts shadow source
         if: ${{ !cancelled() && steps.workspace.outcome == 'success' }}
@@ -192,7 +192,7 @@ jobs:
             echo "::error::Build artifacts changed tracked source files: $STALE"
             exit 1
           fi
-          node --import ./scripts/ts-loader.mjs scripts/check_source_shadows.ts
+          node --import ./scripts/ts-loader.mjs scripts/check/check_source_shadows.ts
 
       # Classify the captured output and print the next command per failure
       # (operations-hygiene runbook §1 "CI failure triage").
@@ -566,4 +566,4 @@ jobs:
         run: pnpm audit --audit-level=critical --ignore-registry-errors
 
       - name: Vital check audit
-        run: node dist/scripts/vital_check.js --format json --exit-on-missing=false > /tmp/vital-check-report.json
+        run: node dist/scripts/vital/vital_check.js --format json --exit-on-missing=false > /tmp/vital-check-report.json

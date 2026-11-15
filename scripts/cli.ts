@@ -38,15 +38,15 @@ import {
 } from '@agent/core/foundation/command-credential-policy';
 import { DiagnosticError } from '@agent/core/logger';
 import { defineScript, isDirectScript } from './lib/harness.js';
-import { createCliCommandHandlers, type CliCommandHandler } from './cli-command-handlers.js';
-export { parseOffboardArgs } from './cli-offboard-args.js';
+import { createCliCommandHandlers, type CliCommandHandler } from './cli/cli-command-handlers.js';
+export { parseOffboardArgs } from './cli/cli-offboard-args.js';
 import {
   printBranchBanner,
   printHeader,
   withPresentationOutputPrinter,
-} from './cli-presentation.js';
-import { parseInteractionPacket } from './cli-packet-parser.js';
-export { parseInteractionPacket } from './cli-packet-parser.js';
+} from './cli/cli-presentation.js';
+import { parseInteractionPacket } from './cli/cli-packet-parser.js';
+export { parseInteractionPacket } from './cli/cli-packet-parser.js';
 
 type Print = (value: unknown) => void;
 
@@ -1110,7 +1110,7 @@ async function applyApprovalDecision(
 
 async function requestProjectTrust(inputPath: string, json = false): Promise<void> {
   const { createProjectTrustApprovalRequest } = await import('@agent/core/project/project-trust');
-  const { cliApprovalRequester } = await import('./lib/cli-approval-requester.js');
+  const { cliApprovalRequester } = await import('./lib/cli/cli-approval-requester.js');
   const record = createProjectTrustApprovalRequest({
     inputPath,
     requester: cliApprovalRequester(undefined, resolveOperatorDisplayName()),

@@ -7,7 +7,7 @@
  *
  * This module NEVER imports `scripts/**` — mission state changes only ever
  * go through `scripts/mission_controller.ts`, and the alignment gate only
- * ever opens through `scripts/mission_alignment_request.ts` (AGENTS.md §1
+ * ever opens through `scripts/mission/mission_alignment_request.ts` (AGENTS.md §1
  * invariant). Both are invoked as built subprocesses via `safeExecResult` —
  * never as library imports. `hearing-mission.ts` (pure) builds the brief and
  * the `create` argv.
@@ -61,7 +61,7 @@ import {
 } from './hearing-route-context.js';
 
 const CONTROLLER_RELATIVE = 'dist/scripts/mission_controller.js';
-const ALIGNMENT_REQUEST_RELATIVE = 'dist/scripts/mission_alignment_request.js';
+const ALIGNMENT_REQUEST_RELATIVE = 'dist/scripts/mission/mission_alignment_request.js';
 
 export type HearingRecordWithMissionHandoff = HearingRecord & HearingMissionHandoffFields;
 

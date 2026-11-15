@@ -43,7 +43,7 @@ This model defines how long-running human-facing surfaces and supporting bridges
 ## Ownership
 
 - `runtime-supervisor` owns the in-process runtime registration.
-- `scripts/surface_runtime.ts` owns durable startup and shutdown orchestration.
+- `scripts/surface/surface_runtime.ts` owns durable startup and shutdown orchestration.
 - `knowledge/product/governance/surfaces/*.json` are the canonical startup manifests.
 - `knowledge/product/governance/active-surfaces.json` is the compatibility snapshot generated from them.
 
@@ -69,13 +69,13 @@ This model defines how long-running human-facing surfaces and supporting bridges
 ## Operational Commands
 
 ```bash
-node dist/scripts/surface_runtime.js --action reconcile
-node dist/scripts/surface_runtime.js --action status
-node dist/scripts/surface_runtime.js --action start --surface slack-bridge
-node dist/scripts/surface_runtime.js --action start --surface imessage-bridge
-node dist/scripts/surface_runtime.js --action start --surface discord-bridge
-node dist/scripts/surface_runtime.js --action start --surface telegram-bridge
-node dist/scripts/surface_runtime.js --action stop --surface chronos-mirror-v2
+node dist/scripts/surface/surface_runtime.js --action reconcile
+node dist/scripts/surface/surface_runtime.js --action status
+node dist/scripts/surface/surface_runtime.js --action start --surface slack-bridge
+node dist/scripts/surface/surface_runtime.js --action start --surface imessage-bridge
+node dist/scripts/surface/surface_runtime.js --action start --surface discord-bridge
+node dist/scripts/surface/surface_runtime.js --action start --surface telegram-bridge
+node dist/scripts/surface/surface_runtime.js --action stop --surface chronos-mirror-v2
 ```
 
 ## Diagnostics Discipline
@@ -85,7 +85,7 @@ node dist/scripts/surface_runtime.js --action stop --surface chronos-mirror-v2
   - `knowledge/product/governance/surfaces/*.json`
   - `knowledge/product/governance/active-surfaces.json`
   - `active/shared/runtime/surfaces/state.json`
-  - `node dist/scripts/surface_runtime.js --action status`
+  - `node dist/scripts/surface/surface_runtime.js --action status`
 - Residual local `tsx` or CLI processes may come from the terminal host itself and must be distinguished from managed surfaces before taking remediation action.
 
 ## Boundaries

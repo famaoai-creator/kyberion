@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const handleAction = vi.fn();
-vi.mock('../../browser_playwright_executor.js', () => ({
+vi.mock('../../browser/browser_playwright_executor.js', () => ({
   loadBrowserActuator: vi.fn().mockResolvedValue({ handleAction }),
 }));
 

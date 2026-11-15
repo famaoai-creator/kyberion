@@ -230,7 +230,7 @@ function isAdmittedBackupCredentialRead(match: SensitivePathMatch): boolean {
  * Run the backup create walk with metadata access (exists / lstat / readdir —
  * never a content read, write, append or mkdir) to exactly the
  * {@link BACKUP_READABLE_CREDENTIAL_RULE_IDS} roots; tar reads the bytes into
- * the encrypted archive. Only scripts/lib/backup-file-selection.ts may import
+ * the encrypted archive. Only scripts/lib/backup/backup-file-selection.ts may import
  * it (pinned by sensitive-path-policy.test.ts). Refused unless the archive is encrypted. The admission is
  * synchronous and not re-entrant, so it ends with `run`; the caller records
  * what it read (roots and file counts, never contents) in the backup manifest.

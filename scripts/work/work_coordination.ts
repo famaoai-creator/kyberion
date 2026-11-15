@@ -1,0 +1,656 @@
+import { auditChain } from '@agent/core/governance/audit-chain';
+import { requestWorkEffectReleaseApproval } from '@agent/core/governance/work-effect-release-request';
+import { shellQuoteArg } from '@agent/core/organization/tenant-governance';
+import { createStandardYargs } from '@agent/core/cli-utils';
+import {
+  appendCoordinationEvent,
+  claimWorkItem,
+  createBoard,
+  createWorkItem,
+  handoffWorkItem,
+  issueBoardView,
+  listActiveWorkLeases,
+  listBoardItems,
+  listBoards,
+  listCoordinationEvents,
+  listWorkItems,
+  migrateLegacyWorkItemContexts,
+  releaseWorkItem,
+  releaseWorkItemEffectOwnership,
+  renewWorkItemLease,
+  updateWorkItem,
+  type WorkBoardType,
+  type WorkItemPriority,
+  type WorkItemSource,
+  type WorkItemStatus,
+  type WorkItemContext,
+} from '@agent/core/workforce/work-coordination';
+import {
+  getWorkCoordinationImportCatalogEntryByCommand,
+  listWorkCoordinationImportCatalogEntries,
+} from '@agent/core/workforce/work-coordination-import-catalog';
+import type { GitHubIssueLike } from '@agent/core/integrations/github-issues';
+import type { JiraIssueLike } from '@agent/core/integrations/jira-issues';
+import { importGitHubIssueWithEvent } from '@agent/core/integrations/github-issues';
+import { importJiraIssueWithEvent } from '@agent/core/integrations/jira-issues';
+import {
+  buildIntegratedHandoffHistory,
+  formatIntegratedHandoffHistory,
+} from '@agent/core/mesh/handoff-history';
+import { loadAiDlcPhaseState } from '@agent/core/aidlc-phase-state';
+import { loadStateAtPath } from '@agent/core/mission/mission-state';
+import { projectWorkGraphToNextTasks } from '@agent/core/workforce/work-graph-projection';
+import {
+  linkWorkItemChangeRequest,
+  listChangeRequestLinks,
+  resolveChangeRequestOwner,
+  updateWorkItemChangeRequest,
+  type ChangeRequestState,
+} from '@agent/core/workforce/work-item-change-request';
+import { getCurrentBranch } from '@agent/core/mission/mission-git';
+import { pathResolver } from '@agent/core/path-resolver';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeReaddir,
+} from '@agent/core/secure-io';
+import { parseSafeJsonObjectInput } from '@agent/core/foundation';
+import * as path from 'node:path';
+import { defineScript, isDirectScript } from '../lib/harness.js';
+import { readSafeJsonFile } from '../lib/json-input.js';
+
+type Print = (value: unknown) => void;
+
+function optionalArg(value: unknown): string | undefined {
+  return value === undefined || value === null || value === '' ? undefined : String(value);
+}
+
+/** Change requests key on the branch; default to the checkout's current one. */
+function currentBranchOrThrow(): string {
+  const branch = getCurrentBranch(process.cwd());
+  if (!branch || branch === 'HEAD' || branch === 'detached') {
+    throw new Error('not on a branch — pass --branch');
+  }
+  return branch;
+}
+
+let workCoordinationPrint: Print = () => undefined;
+
+function csv(value: unknown): string[] {
+  if (Array.isArray(value)) return value.map((entry) => String(entry)).filter(Boolean);
+  if (typeof value !== 'string' || !value.trim()) return [];
+  return value
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
+
+export function parseWorkCoordinationJson(value: unknown): Record<string, unknown> | undefined {
+  if (typeof value !== 'string' || !value.trim()) return undefined;
+  try {
+    return parseSafeJsonObjectInput(value, 'work coordination context');
+  } catch {
+    throw new Error('Expected a safe JSON object.');
+  }
+}
+
+const WORK_SHAPES = new Set<NonNullable<WorkItemContext['work_shape']>>([
+  'solution_project',
+  'service_operation',
+  'routine_operation',
+  'incident_response',
+  'governance_cadence',
+  'improvement_experiment',
+]);
+
+function context(argv: Record<string, unknown>): WorkItemContext | undefined {
+  const parsed = parseWorkCoordinationJson(argv.context);
+  const value = { ...(parsed || {}) } as Record<string, unknown>;
+  const mappings: Array<[string, keyof WorkItemContext & string]> = [
+    ['organization-id', 'organization_id'],
+    ['tenant-slug', 'tenant_slug'],
+    ['mission-id', 'mission_id'],
+    ['project-id', 'project_id'],
+    ['task-id', 'task_id'],
+  ];
+  for (const [option, key] of mappings) {
+    if (argv[option] !== undefined) value[key] = String(argv[option]);
+  }
+  if (argv['work-shape'] !== undefined) value.work_shape = String(argv['work-shape']);
+  const result: WorkItemContext = {};
+  for (const key of [
+    'organization_id',
+    'tenant_slug',
+    'mission_id',
+    'project_id',
+    'task_id',
+  ] as const) {
+    if (value[key] !== undefined && String(value[key]).trim())
+      result[key] = String(value[key]).trim();
+  }
+  if (value.work_shape !== undefined) {
+    const workShape = String(value.work_shape).trim() as NonNullable<WorkItemContext['work_shape']>;
+    if (!WORK_SHAPES.has(workShape)) throw new Error(`Invalid --work-shape: ${workShape}`);
+    result.work_shape = workShape;
+  }
+  return Object.keys(result).length > 0 ? result : undefined;
+}
+
+function print(value: unknown): void {
+  workCoordinationPrint(JSON.stringify(value, null, 2));
+}
+
+function printText(value: string): void {
+  workCoordinationPrint(value);
+}
+
+export function resolveWorkCoordinationInputPath(inputPath: string): string {
+  return assertSafeRepositoryPath(inputPath);
+}
+
+export function loadWorkCoordinationIssue(inputPath: string): GitHubIssueLike | JiraIssueLike {
+  return readSafeJsonFile<GitHubIssueLike | JiraIssueLike>(
+    resolveWorkCoordinationInputPath(inputPath),
+    'work coordination issue input'
+  );
+}
+
+function discoverReadableMissionStates(): Array<{ missionId: string; state: any }> {
+  const roots = [pathResolver.active('missions'), pathResolver.active('archive/missions')];
+  const states: Array<{ missionId: string; state: any }> = [];
+  const seen = new Set<string>();
+  const visit = (root: string, depth = 0): void => {
+    let safeRoot: string;
+    try {
+      safeRoot = assertSafeRepositoryPath(root, { allowMissingLeaf: true });
+      if (!safeExistsSync(safeRoot) || !safeLstat(safeRoot).isDirectory()) return;
+    } catch {
+      return;
+    }
+    let entries: string[];
+    try {
+      entries = safeReaddir(safeRoot);
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      try {
+        const missionDir = assertSafeRepositoryPath(path.join(safeRoot, entry), {
+          allowMissingLeaf: true,
+        });
+        if (!safeLstat(missionDir).isDirectory()) continue;
+        const candidate = assertSafeRepositoryPath(path.join(missionDir, 'mission-state.json'), {
+          allowMissingLeaf: true,
+        });
+        if (safeExistsSync(candidate)) {
+          try {
+            const state = loadStateAtPath(candidate);
+            if (state) {
+              const missionId = String(state.mission_id || path.basename(missionDir));
+              if (!seen.has(missionId)) {
+                seen.add(missionId);
+                states.push({ missionId, state });
+              }
+            }
+          } catch {
+            // Ignore malformed mission state; the history view remains best-effort.
+          }
+          continue;
+        }
+        // The archive nests three levels deeper (<tier>/<tenant|shared>/<id>).
+        if (depth < 3) visit(missionDir, depth + 1);
+      } catch {
+        // Ignore unsafe or malformed mission entries; keep safe history visible.
+      }
+    }
+  };
+  for (const root of roots) visit(root);
+  return states;
+}
+
+async function runMain(args: string[] = []): Promise<void> {
+  const yargs = createStandardYargs(['node', 'work_coordination', ...args])
+    .command(
+      'create-item',
+      'Create a new work item (requires --item-id, --title, --description)',
+      () => undefined
+    )
+    .command('create-board', 'Create or update a board', () => undefined)
+    .command(
+      'list-board',
+      'List boards, or one board (--board-id) as Issues with step progress [--all-items lists steps too]',
+      () => undefined
+    )
+    .command('claim-item', 'Claim a work item lease', () => undefined)
+    .command('release-item', 'Release a work item lease', () => undefined)
+    .command(
+      'release-effect',
+      'Release quarantined effects with an authenticated human approval',
+      () => undefined
+    )
+    .command('handoff-item', 'Hand off a leased item to another peer', () => undefined)
+    .command('renew-lease', 'Renew a work item lease', () => undefined)
+    .command('update-status', 'Update work item fields', () => undefined)
+    .command('record-event', 'Append a coordination event', () => undefined)
+    .command(
+      'list-items',
+      'List work items [--project-id] [--organization-id] [--tenant-slug] [--status] [--board-id] [--top-level] [--parent-id]',
+      () => undefined
+    )
+    .command(
+      'project-next-tasks',
+      'Project canonical Work Graph into NEXT_TASKS.json',
+      () => undefined
+    )
+    .command(
+      'migrate-context',
+      'Backfill typed WorkItem context from legacy snapshots',
+      () => undefined
+    )
+    .command(
+      'migrate-parents',
+      'Backfill parent_item_id on mission task WorkItems (dry run; --apply writes)',
+      () => undefined
+    )
+    .command('list-events', 'List coordination events', () => undefined)
+    .command('list-leases', 'List active leases', () => undefined)
+    .command('history <correlationId>', 'Show the integrated handoff history', () => undefined)
+    .command(
+      'link-change',
+      'Link a change request (PR/MR/branch) to the item you hold the claim on [--branch defaults to the current branch]',
+      () => undefined
+    )
+    .command(
+      'update-change',
+      'Record a change request observation [--change-state open|merged|closed] [--head-sha]',
+      () => undefined
+    )
+    .command(
+      'change-owner',
+      'Show the WorkItem and claim holder behind a change request (--branch, or --forge + --ref)',
+      () => undefined
+    )
+    .command('list-changes', 'List linked change requests and their owners', () => undefined)
+    .demandCommand(1)
+    .option('item-id', { type: 'string' })
+    .option('board-id', { type: 'string' })
+    .option('title', { type: 'string' })
+    .option('description', { type: 'string' })
+    .option('status', { type: 'string' })
+    .option('priority', { type: 'string' })
+    .option('source', { type: 'string' })
+    .option('source-ref', { type: 'string' })
+    .option('project-id', { type: 'string' })
+    .option('organization-id', { type: 'string' })
+    .option('tenant-slug', { type: 'string' })
+    .option('mission-id', { type: 'string' })
+    .option('task-id', { type: 'string' })
+    .option('work-shape', { type: 'string' })
+    .option('context', { type: 'string' })
+    .option('assignee-peer-id', { type: 'string' })
+    .option('assignee-user-id', { type: 'string' })
+    .option('labels', { type: 'string' })
+    .option('dependencies', { type: 'string' })
+    .option('metadata', { type: 'string' })
+    .option('board-name', { type: 'string' })
+    .option('board-type', { type: 'string' })
+    .option('filters', { type: 'string' })
+    .option('sort-by', { type: 'string' })
+    .option('lane', { type: 'array' })
+    .option('lease-id', { type: 'string' })
+    .option('actor-peer-id', { type: 'string' })
+    .option('actor-user-id', { type: 'string' })
+    .option('from-lease-id', { type: 'string' })
+    .option('from-peer-id', { type: 'string' })
+    .option('to-peer-id', { type: 'string' })
+    .option('to-user-id', { type: 'string' })
+    .option('purpose', { type: 'string', default: 'implementation' })
+    .option('ttl-ms', { type: 'number' })
+    .option('expected-version', { type: 'number' })
+    .option('approval-request-id', { type: 'string' })
+    .option('request-approval', { type: 'boolean', default: false })
+    .option('idempotency-key', { type: 'string' })
+    .option('event-type', { type: 'string' })
+    .option('command-id', { type: 'string' })
+    .option('note', { type: 'string' })
+    .option('payload', { type: 'string' })
+    .option('project', { type: 'string' })
+    .option('branch', { type: 'string' })
+    .option('base-branch', { type: 'string' })
+    .option('forge', { type: 'string' })
+    .option('ref', { type: 'string' })
+    .option('url', { type: 'string' })
+    .option('head-sha', { type: 'string' })
+    .option('change-state', { type: 'string' })
+    .option('apply', { type: 'boolean', default: false })
+    .option('top-level', { type: 'boolean', default: false })
+    .option('parent-id', { type: 'string' })
+    .option('all-items', { type: 'boolean', default: false })
+    .option('status-from-children', { type: 'boolean', default: false })
+    .option('json', { type: 'boolean', default: false });
+  for (const entry of listWorkCoordinationImportCatalogEntries()) {
+    yargs.command(
+      entry.command,
+      entry.summary || `Import a ${entry.source} issue JSON file`,
+      () => undefined
+    );
+  }
+
+  const argv = await yargs.parseSync();
+
+  const command = String(argv._[0]);
+
+  const handlers: Record<string, () => unknown> = {
+    'migrate-context': async () => {
+      print({
+        quality: migrateLegacyWorkItemContexts({ apply: Boolean(argv.apply) }),
+        applied: Boolean(argv.apply),
+      });
+    },
+    'migrate-parents': async () => {
+      // Loaded on demand: the mission layer is not needed by the other commands.
+      const { migrateMissionTaskWorkItemParents } = await import('@agent/core');
+      print({
+        quality: migrateMissionTaskWorkItemParents({ apply: Boolean(argv.apply) }),
+        applied: Boolean(argv.apply),
+      });
+    },
+    'create-item': async () => {
+      const item = createWorkItem({
+        itemId: argv['item-id'] ? String(argv['item-id']) : undefined,
+        title: String(argv.title || ''),
+        description: String(argv.description || ''),
+        status: argv.status ? (String(argv.status) as WorkItemStatus) : undefined,
+        priority: argv.priority ? (String(argv.priority) as WorkItemPriority) : undefined,
+        source: argv.source ? (String(argv.source) as WorkItemSource) : undefined,
+        sourceRef: argv['source-ref'] ? String(argv['source-ref']) : undefined,
+        projectId: argv['project-id'] ? String(argv['project-id']) : undefined,
+        context: context(argv as Record<string, unknown>),
+        assigneePeerId: argv['assignee-peer-id'] ? String(argv['assignee-peer-id']) : undefined,
+        assigneeUserId: argv['assignee-user-id'] ? String(argv['assignee-user-id']) : undefined,
+        labels: argv.labels !== undefined ? csv(argv.labels) : undefined,
+        dependencies: argv.dependencies !== undefined ? csv(argv.dependencies) : undefined,
+        metadata: parseWorkCoordinationJson(argv.metadata),
+      });
+      print(item);
+    },
+    'create-board': async () => {
+      const board = createBoard({
+        boardId: argv['board-id'] ? String(argv['board-id']) : undefined,
+        name: String(argv['board-name'] || argv.title || argv['board-id'] || ''),
+        type: (argv['board-type'] ? String(argv['board-type']) : 'project') as WorkBoardType,
+        filters: parseWorkCoordinationJson(argv.filters) as any,
+        sortBy: argv['sort-by'] ? (String(argv['sort-by']) as any) : undefined,
+        lanes: Array.isArray(argv.lane) ? argv.lane.map(String) : undefined,
+        description: argv.description ? String(argv.description) : undefined,
+      });
+      print(board);
+    },
+    'list-board': async () => {
+      if (argv['board-id']) {
+        print({
+          board: argv['board-id'],
+          items: argv['all-items']
+            ? listBoardItems(String(argv['board-id']))
+            : issueBoardView(listBoardItems(String(argv['board-id'])), listWorkItems()),
+        });
+      } else {
+        print({
+          boards: listBoards(),
+        });
+      }
+    },
+    'list-items': async () => {
+      print({
+        items: listWorkItems({
+          ...(argv['project-id'] ? { projectId: String(argv['project-id']) } : {}),
+          ...(argv['board-id'] ? { boardId: String(argv['board-id']) } : {}),
+          ...(argv['organization-id']
+            ? { organizationIds: [String(argv['organization-id'])] }
+            : {}),
+          ...(argv['tenant-slug'] ? { tenantSlugs: [String(argv['tenant-slug'])] } : {}),
+          ...(argv.status ? { status: String(argv.status) as WorkItemStatus } : {}),
+          ...(argv['top-level'] ? { topLevelOnly: true } : {}),
+          ...(argv['parent-id'] ? { parentItemId: String(argv['parent-id']) } : {}),
+        }),
+      });
+    },
+    'project-next-tasks': async () => {
+      const missionId = String(argv['mission-id'] || argv['project-id'] || '').trim();
+      if (!missionId) throw new Error('project-next-tasks requires --mission-id');
+      print(
+        projectWorkGraphToNextTasks({
+          missionId,
+          projectId: argv['project-id'] ? String(argv['project-id']) : undefined,
+          tenantSlug: argv['tenant-slug'] ? String(argv['tenant-slug']) : undefined,
+          apply: argv.apply === true,
+        })
+      );
+    },
+    'claim-item': async () => {
+      const result = claimWorkItem({
+        itemId: String(argv['item-id'] || ''),
+        actorPeerId: String(argv['actor-peer-id'] || ''),
+        actorUserId: argv['actor-user-id'] ? String(argv['actor-user-id']) : undefined,
+        purpose: String(argv.purpose || 'implementation'),
+        ttlMs: argv['ttl-ms'] ? Number(argv['ttl-ms']) : undefined,
+        expectedVersion: argv['expected-version'] ? Number(argv['expected-version']) : undefined,
+        idempotencyKey: argv['idempotency-key'] ? String(argv['idempotency-key']) : undefined,
+      });
+      print(result);
+    },
+    'release-item': async () => {
+      const result = releaseWorkItem({
+        itemId: String(argv['item-id'] || ''),
+        leaseId: String(argv['lease-id'] || ''),
+        actorPeerId: String(argv['actor-peer-id'] || ''),
+        actorUserId: argv['actor-user-id'] ? String(argv['actor-user-id']) : undefined,
+        expectedVersion: argv['expected-version'] ? Number(argv['expected-version']) : undefined,
+        nextStatus: argv.status ? (String(argv.status) as WorkItemStatus) : undefined,
+      });
+      print(result);
+    },
+    'release-effect': async () => {
+      if (argv['request-approval']) {
+        if (argv['approval-request-id'])
+          throw new Error('Choose request-approval or approval-request-id, not both');
+        const itemId = String(argv['item-id'] || '');
+        const version = Number(argv['expected-version']);
+        const approval = requestWorkEffectReleaseApproval({
+          itemId,
+          expectedVersion: version,
+          requestedBy: String(
+            argv['actor-user-id'] || argv['actor-peer-id'] || 'work-effect-recovery'
+          ),
+        });
+        print({
+          approval_request_id: approval.id,
+          status: approval.status,
+          approve_command: `pnpm kyberion approvals --approve ${approval.id}`,
+          apply_command: `pnpm work release-effect --item-id ${shellQuoteArg(itemId)} --expected-version ${version} --approval-request-id ${approval.id}`,
+        });
+        return;
+      }
+      print(
+        releaseWorkItemEffectOwnership({
+          itemId: String(argv['item-id'] || ''),
+          expectedVersion: Number(argv['expected-version']),
+          approvalRequestId: String(argv['approval-request-id'] || ''),
+        })
+      );
+    },
+    'handoff-item': async () => {
+      const result = handoffWorkItem({
+        itemId: String(argv['item-id'] || ''),
+        fromLeaseId: String(argv['from-lease-id'] || ''),
+        fromPeerId: String(argv['from-peer-id'] || ''),
+        toPeerId: String(argv['to-peer-id'] || ''),
+        toUserId: argv['to-user-id'] ? String(argv['to-user-id']) : undefined,
+        purpose: String(argv.purpose || 'implementation'),
+        ttlMs: argv['ttl-ms'] ? Number(argv['ttl-ms']) : undefined,
+        expectedVersion: argv['expected-version'] ? Number(argv['expected-version']) : undefined,
+        idempotencyKey: argv['idempotency-key'] ? String(argv['idempotency-key']) : undefined,
+      });
+      print(result);
+    },
+    'renew-lease': async () => {
+      const lease = renewWorkItemLease({
+        leaseId: String(argv['lease-id'] || ''),
+        ttlMs: argv['ttl-ms'] ? Number(argv['ttl-ms']) : undefined,
+        expectedVersion: argv['expected-version'] ? Number(argv['expected-version']) : undefined,
+      });
+      print(lease);
+    },
+    'update-status': async () => {
+      const item = updateWorkItem({
+        itemId: String(argv['item-id'] || ''),
+        expectedVersion: argv['expected-version'] ? Number(argv['expected-version']) : undefined,
+        status: argv.status ? (String(argv.status) as WorkItemStatus) : undefined,
+        title: argv.title ? String(argv.title) : undefined,
+        description: argv.description ? String(argv.description) : undefined,
+        priority: argv.priority ? (String(argv.priority) as WorkItemPriority) : undefined,
+        projectId: argv['project-id'] ? String(argv['project-id']) : undefined,
+        context: context(argv as Record<string, unknown>),
+        assigneePeerId: argv['assignee-peer-id'] ? String(argv['assignee-peer-id']) : undefined,
+        assigneeUserId: argv['assignee-user-id'] ? String(argv['assignee-user-id']) : undefined,
+        labels: argv.labels !== undefined ? csv(argv.labels) : undefined,
+        dependencies: argv.dependencies !== undefined ? csv(argv.dependencies) : undefined,
+        metadata: parseWorkCoordinationJson(argv.metadata),
+        ...(argv['status-from-children'] ? { statusFromChildren: true } : {}),
+      });
+      print(item);
+    },
+    'record-event': async () => {
+      const event = appendCoordinationEvent({
+        eventType: String(argv['event-type'] || 'item_updated') as any,
+        itemId: argv['item-id'] ? String(argv['item-id']) : undefined,
+        boardId: argv['board-id'] ? String(argv['board-id']) : undefined,
+        leaseId: argv['lease-id'] ? String(argv['lease-id']) : undefined,
+        actorPeerId: argv['actor-peer-id'] ? String(argv['actor-peer-id']) : undefined,
+        actorUserId: argv['actor-user-id'] ? String(argv['actor-user-id']) : undefined,
+        commandId: argv['command-id'] ? String(argv['command-id']) : undefined,
+        idempotencyKey: argv['idempotency-key'] ? String(argv['idempotency-key']) : undefined,
+        expectedVersion: argv['expected-version'] ? Number(argv['expected-version']) : undefined,
+        note: argv.note ? String(argv.note) : undefined,
+        payload: parseWorkCoordinationJson(argv.payload),
+      });
+      print(event);
+    },
+    'link-change': async () => {
+      print(
+        linkWorkItemChangeRequest({
+          itemId: String(argv['item-id'] || ''),
+          actorPeerId: String(argv['actor-peer-id'] || ''),
+          branch: argv.branch ? String(argv.branch) : currentBranchOrThrow(),
+          forge: optionalArg(argv.forge),
+          ref: optionalArg(argv.ref),
+          url: optionalArg(argv.url),
+          baseBranch: optionalArg(argv['base-branch']),
+          headSha: optionalArg(argv['head-sha']),
+        })
+      );
+    },
+    'update-change': async () => {
+      print(
+        updateWorkItemChangeRequest({
+          itemId: String(argv['item-id'] || ''),
+          actorPeerId: String(argv['actor-peer-id'] || ''),
+          state: optionalArg(argv['change-state']) as ChangeRequestState | undefined,
+          headSha: optionalArg(argv['head-sha']),
+          ref: optionalArg(argv.ref),
+          url: optionalArg(argv.url),
+        })
+      );
+    },
+    'change-owner': async () => {
+      const ref = optionalArg(argv.ref);
+      print(
+        resolveChangeRequestOwner({
+          branch: argv.branch ? String(argv.branch) : ref ? undefined : currentBranchOrThrow(),
+          forge: optionalArg(argv.forge),
+          ref,
+        })
+      );
+    },
+    'list-changes': async () => {
+      print({
+        changes: listChangeRequestLinks({
+          state: optionalArg(argv['change-state']) as ChangeRequestState | undefined,
+        }),
+      });
+    },
+    'list-events': async () => {
+      print({ events: listCoordinationEvents() });
+    },
+    'list-leases': async () => {
+      print({ leases: listActiveWorkLeases() });
+    },
+    history: async () => {
+      const correlationId = String(argv.correlationId || '').trim();
+      if (!correlationId) throw new Error('Missing correlation id');
+      const missions = discoverReadableMissionStates().flatMap(({ missionId, state }) => {
+        let aidlcState = null;
+        try {
+          aidlcState = loadAiDlcPhaseState(missionId);
+        } catch {
+          // Keep the mission row; its phase state may be in a restricted tier.
+        }
+        return [
+          {
+            missionId,
+            state,
+            aidlcState,
+          },
+        ];
+      });
+      const rows = buildIntegratedHandoffHistory({
+        correlationId,
+        missions,
+        coordinationEvents: listCoordinationEvents(),
+        auditEntries: auditChain.loadAll(),
+      });
+      if (argv.json) print({ correlationId, rows });
+      else printText(formatIntegratedHandoffHistory(correlationId, rows));
+    },
+  };
+  const fallback = () => {
+    const importEntry = getWorkCoordinationImportCatalogEntryByCommand(command);
+    if (!importEntry) {
+      throw new Error(`unknown command '${command}'`);
+    }
+    if (!argv.input) throw new Error('Missing --input issue JSON file');
+    const issue = loadWorkCoordinationIssue(String(argv.input));
+    const projectId = argv.project
+      ? String(argv.project)
+      : importEntry.default_project_id || undefined;
+    const result =
+      importEntry.source === 'github'
+        ? importGitHubIssueWithEvent(issue as GitHubIssueLike, projectId || 'github')
+        : importJiraIssueWithEvent(issue as JiraIssueLike, projectId);
+    print(result);
+  };
+  await (handlers[command] ?? fallback)();
+}
+
+export async function main(args: string[] = [], output: Print = () => undefined): Promise<void> {
+  const previousPrint = workCoordinationPrint;
+  workCoordinationPrint = output;
+  try {
+    await runMain(args);
+  } finally {
+    workCoordinationPrint = previousPrint;
+  }
+}
+
+export const runWorkCoordination = defineScript({
+  name: 'work:coordination',
+  flags: [],
+  run: ({ argv, print }) => main(argv, print),
+});
+
+if (
+  isDirectScript(import.meta.url, 'work_coordination.ts') ||
+  isDirectScript(import.meta.url, 'work_coordination.js')
+)
+  void runWorkCoordination();

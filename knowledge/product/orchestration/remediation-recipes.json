@@ -4,15 +4,15 @@
     "command": "npm install"
   },
   "GOVERNANCE_VIOLATION": {
-    "description": "Run the governance mass refactor tool",
-    "command": "node dist/scripts/mass_refactor_governance.js"
+    "description": "Run the governance rules check to surface every remaining violation",
+    "command": "node dist/scripts/check/check_governance_rules.js"
   },
   "NON_COMPLIANT": {
-    "description": "Run the self-healing health check",
-    "command": "node dist/scripts/check_skills_health.js --fix"
+    "description": "Run the environment doctor diagnostics",
+    "command": "node dist/scripts/run_doctor.js"
   },
   "SLO_BREACH": {
     "description": "Analyze performance bottlenecks",
-    "command": "node dist/scripts/check_performance.js"
+    "command": "node dist/scripts/check/check_chronos_perf_baseline.js"
   }
 }
