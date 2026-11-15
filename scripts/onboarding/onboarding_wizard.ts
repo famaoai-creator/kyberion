@@ -66,6 +66,7 @@ import {
 } from './onboarding_reasoning.js';
 import { promptProviderAttestation, promptReasoningModel } from './onboarding_llm_prompts.js';
 import {
+  currentEnabledIntakeSources,
   intakeStatusLabel,
   operationsNextSteps,
   promptResidentLoopOperations,
@@ -1054,13 +1055,17 @@ async function runOperationsPhase(state: OnboardingState, print: Print): Promise
     });
   } else {
     // Non-interactive / express runs never spawn installers or take secrets:
-    // record the gaps so the summary's next-steps list them verbatim.
-    state.operations = { resident_services: 'pending', intake_sources: [] };
+    // record the gaps so the summary's next-steps list them verbatim, but
+    // still reflect sources that are already enabled in the intake policy.
+    state.operations = {
+      resident_services: 'pending',
+      intake_sources: currentEnabledIntakeSources(),
+    };
     print(
       // i18n-exempt: bilingual prompt pair (JA side intentional)
       t(
-        'Non-interactive run — resident services, notification channel, and intake sources are recorded as pending; see the summary for the exact commands.',
-        '非対話実行 — 常駐サービス・通知チャンネル・intake ソースは pending として記録します。コマンドはサマリを参照してください。'
+        'Non-interactive run — resident services and notification channel are recorded as pending; already-enabled intake sources are kept. See the summary for the exact commands.',
+        '非対話実行 — 常駐サービス・通知チャンネルは pending として記録し、有効化済みの intake ソースはそのまま反映します。コマンドはサマリを参照してください。'
       )
     );
   }
