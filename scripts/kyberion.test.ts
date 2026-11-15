@@ -13,7 +13,7 @@ import {
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeReadFile, safeWriteFile, safeRmSync } from '@agent/core/secure-io';
 import { randomUUID } from 'node:crypto';
-import { loadCliManifest } from './check_cli_manifest.js';
+import { loadCliManifest } from './check/check_cli_manifest.js';
 
 describe('kyberion command router', () => {
   it('routes operator-home commands through the home entrypoint', () => {
@@ -163,20 +163,20 @@ describe('kyberion command router', () => {
 
   it('keeps verification and authentication tools module-backed', () => {
     expect(resolveScriptCommand('auth check')).toMatchObject({
-      module: 'scripts/reasoning_auth_check.ts',
+      module: 'scripts/reasoning/reasoning_auth_check.ts',
       command: 'auth check',
     });
     expect(resolveScriptCommand('check backend-conformance')).toMatchObject({
-      module: 'scripts/check_backend_conformance.ts',
+      module: 'scripts/check/check_backend_conformance.ts',
     });
     expect(resolveScriptCommand('inventory resource-loaders')).toMatchObject({
       module: 'scripts/inventory_resource_loaders.ts',
     });
     expect(resolveScriptCommand('check script-integrity')).toMatchObject({
-      module: 'scripts/check_script_integrity.ts',
+      module: 'scripts/check/check_script_integrity.ts',
     });
     expect(resolveScriptCommand('check improvement-plan-metadata')).toMatchObject({
-      module: 'scripts/check_improvement_plan_metadata.ts',
+      module: 'scripts/check/check_improvement_plan_metadata.ts',
     });
   });
 

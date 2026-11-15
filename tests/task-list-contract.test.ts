@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { pathResolver, safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from '@agent/core';
-import { listTaskScenarios, main, printTaskScenarios } from '../scripts/task_list.js';
+import { listTaskScenarios, main, printTaskScenarios } from '../scripts/task/task_list.js';
 
 const EMPTY_DIR = pathResolver.rootResolve('active/shared/tmp/task-scenario-empty');
 const READINESS_DIR = pathResolver.rootResolve('active/shared/tmp/task-scenario-readiness');

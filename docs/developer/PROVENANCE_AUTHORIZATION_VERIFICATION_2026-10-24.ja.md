@@ -50,7 +50,7 @@ CI=true KYBERION_TEST_LEAK_STRICT=1 pnpm exec vitest run \
   libs/core/pipeline/autonomous-repair.test.ts \
   libs/core/organization/tenant-knowledge-retrieval.test.ts \
   libs/actuators/service-actuator/src \
-  scripts/pipeline-execution-approval.test.ts scripts/scenario_runner.test.ts \
+  scripts/pipeline/pipeline-execution-approval.test.ts scripts/scenario/scenario_runner.test.ts \
   tests/provenance-authorization.integration.test.ts --maxWorkers 2
 ```
 

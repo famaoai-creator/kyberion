@@ -43,8 +43,8 @@ pnpm pipeline --input pipelines/baseline-check.json
 # warnings.stale_dist_targets names the FIRST stale target —
 # run the standalone checker for the full list.
 
-node dist/scripts/check_stale_dist.js        # dist-mode (exit 1 = stale, names all targets)
-node --import ./scripts/ts-loader.mjs scripts/check_stale_dist.ts   # source-mode — use when dist itself is too broken to boot
+node dist/scripts/check/check_stale_dist.js        # dist-mode (exit 1 = stale, names all targets)
+node --import ./scripts/ts-loader.mjs scripts/check/check_stale_dist.ts   # source-mode — use when dist itself is too broken to boot
 ```
 
 L2 compares each target's sources against tsbuildinfo `fileInfos` content

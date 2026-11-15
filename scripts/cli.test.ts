@@ -19,7 +19,7 @@ import {
   routeLegacyIntentToAsk,
   readCliTextFile,
 } from './cli.js';
-import { handleTaskCommand, withWorkflowOutputPrinter } from './cli-workflow-handlers.js';
+import { handleTaskCommand, withWorkflowOutputPrinter } from './cli/cli-workflow-handlers.js';
 
 async function captureMainOutput(args: string[]): Promise<string> {
   const output: string[] = [];
@@ -38,7 +38,7 @@ describe('Kyberion CLI helpers', () => {
     const source = String(
       [
         safeReadFile(pathResolver.rootResolve('scripts/cli.ts'), { encoding: 'utf8' }),
-        safeReadFile(pathResolver.rootResolve('scripts/cli-command-handlers.ts'), {
+        safeReadFile(pathResolver.rootResolve('scripts/cli/cli-command-handlers.ts'), {
           encoding: 'utf8',
         }),
       ].join('\n')

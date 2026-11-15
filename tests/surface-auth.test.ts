@@ -61,7 +61,7 @@ describe('surface_runtime: startSurfaceById with auth validation', () => {
   });
 
   it('should skip starting a surface if auth validation fails', async () => {
-    const { startSurfaceById } = await import('../scripts/surface_runtime');
+    const { startSurfaceById } = await import('../scripts/surface/surface_runtime');
 
     const manifest = {
       version: 1,
@@ -98,7 +98,7 @@ describe('surface_runtime: startSurfaceById with auth validation', () => {
   });
 
   it('should surface auth readiness details in setup report', async () => {
-    const { setupSurfaces } = await import('../scripts/surface_runtime');
+    const { setupSurfaces } = await import('../scripts/surface/surface_runtime');
 
     mocks.loadSurfaceManifest.mockReturnValue({
       version: 1,

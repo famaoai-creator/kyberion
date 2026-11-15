@@ -12,7 +12,7 @@ export function buildKyberionMcpServerConfig(
     kyberion: {
       type: 'stdio',
       command: 'node',
-      args: [nodePath.join(repoRoot, 'dist/scripts/mcp_server.js')],
+      args: [nodePath.join(repoRoot, 'dist/scripts/mcp/mcp_server.js')],
       cwd: repoRoot,
       env: { KYBERION_BASE_ROLE: baseRoleEnvText(safeChildEnv()) ?? 'sovereign_concierge' },
     } as McpServerConfig,

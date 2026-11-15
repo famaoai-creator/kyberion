@@ -1,0 +1,123 @@
+import * as path from 'node:path';
+import { describeOps } from '../../libs/actuators/wisdom-actuator/src/op-catalog.js';
+import {
+  loadActuatorOpRegistry,
+  type ActuatorOpRegistryFile,
+} from '@agent/core/actuator/actuator-op-registry';
+import { getAllFiles } from '@agent/core/fs-utils';
+import { pathResolver } from '@agent/core/path-resolver';
+import { assertSafeRepositoryPath } from '@agent/core/secure-io';
+import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
+import { readSafeJsonValueFile } from '../lib/json-input.js';
+
+type PipelineKind = 'capture' | 'transform' | 'apply' | 'control';
+
+export function checkWisdomForwarders(): string[] {
+  const registry = loadActuatorOpRegistry();
+  const forwarders = describeOps()
+    .filter((entry) => entry.forward_to)
+    .map((entry) => ({
+      source: entry.op,
+      target: `${entry.forward_to!.actuator}:${entry.forward_to!.op}`,
+      actuator: entry.forward_to!.actuator,
+      op: entry.forward_to!.op,
+    }));
+  const targets = new Map(forwarders.map((entry) => [`${entry.actuator}:${entry.op}`, entry]));
+  const errors: string[] = [];
+
+  for (const target of forwarders) {
+    const kind = findTargetKind(registry, target);
+    if (!kind) errors.push(`missing canonical target ${target.target} for wisdom:${target.source}`);
+  }
+
+  for (const root of ['pipelines', 'knowledge/product/pipeline-templates']) {
+    for (const file of getAllFiles(pathResolver.rootResolve(root)).filter((entry) =>
+      entry.endsWith('.json')
+    )) {
+      let document: unknown;
+      try {
+        const safeFile = assertSafeRepositoryPath(file);
+        document = readSafeJsonValueFile<unknown>(safeFile, `wisdom forwarder pipeline ${file}`);
+      } catch {
+        continue;
+      }
+      walkSteps(document, (step, location) => {
+        const target = targets.get(String(step.op || ''));
+        if (!target || (!step.role && !step.type)) return;
+        const expected = findTargetKind(registry, target);
+        const actual = step.type || roleToKind(step.role);
+        if (expected && actual && expected !== actual) {
+          errors.push(
+            `${path.relative(pathResolver.rootDir(), file)}${location}: ${step.op} declares ${actual}, canonical target is ${expected}`
+          );
+        }
+      });
+    }
+  }
+
+  return errors;
+}
+
+function findTargetKind(
+  registry: ActuatorOpRegistryFile,
+  target: { actuator: string; op: string }
+): PipelineKind | undefined {
+  const domain = registry.domains[target.actuator];
+  return domain
+    ? (Object.entries(domain).find(([, ops]) => ops.includes(target.op))?.[0] as
+        PipelineKind | undefined)
+    : undefined;
+}
+
+function roleToKind(role: unknown): PipelineKind | undefined {
+  if (role === 'source') return 'capture';
+  if (role === 'transform') return 'transform';
+  if (role === 'sink') return 'apply';
+  if (role === 'gate') return 'control';
+  return undefined;
+}
+
+export const runCheckWisdomForwarders = defineScript({
+  name: 'check:wisdom-forwarders',
+  flags: [],
+  run(context) {
+    const errors = checkWisdomForwarders();
+    if (errors.length > 0) {
+      for (const error of errors) context.print(`[check:wisdom-forwarders] ${error}`);
+      throw new ScriptExitError(1);
+    }
+    context.print('[check:wisdom-forwarders] OK (targets exist and pipeline kinds agree)');
+    return { errors };
+  },
+});
+
+if (
+  isDirectScript(import.meta.url, 'check_wisdom_forwarders.ts') ||
+  isDirectScript(import.meta.url, 'check_wisdom_forwarders.js')
+)
+  void runCheckWisdomForwarders();
+
+function walkSteps(
+  value: unknown,
+  callback: (step: Record<string, any>, location: string) => void,
+  location = ''
+): void {
+  if (Array.isArray(value)) {
+    value.forEach((item, index) => walkSteps(item, callback, `${location}[${index}]`));
+    return;
+  }
+  if (!value || typeof value !== 'object') return;
+  const record = value as Record<string, unknown>;
+  if (typeof record.op === 'string') callback(record as Record<string, any>, location);
+  for (const [key, child] of Object.entries(record)) {
+    if (
+      key === 'params' ||
+      key === 'then' ||
+      key === 'else' ||
+      key === 'pipeline' ||
+      key === 'steps'
+    ) {
+      walkSteps(child, callback, `${location}.${key}`);
+    }
+  }
+}

@@ -169,7 +169,7 @@ export function saveServiceBindingRecord(input: ServiceBindingRecord): string {
   }
   // Ownership is made explicit when it can be known: an organization connection names its tenant.
   // A legacy person connection has no member to name, so it stays unmarked until the owner
-  // migration (scripts/migrate_binding_owners.ts) is given one.
+  // migration (scripts/migrate/migrate_binding_owners.ts) is given one.
   const owner = resolveBindingOwner(input);
   const record: ServiceBindingRecord =
     owner.derived && owner.owner_kind !== 'organization'

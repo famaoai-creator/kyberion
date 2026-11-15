@@ -40,6 +40,10 @@
     "xcrun",
     "xcodebuild",
     "tailscale",
-    "agent_desktop"
+    "agent_desktop",
+    "mlx_embeddings",
+    "semantic_embeddings",
+    "pypdf",
+    "espeak_ng"
   ]
 }

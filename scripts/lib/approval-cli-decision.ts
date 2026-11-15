@@ -64,7 +64,7 @@ import {
   resolveCliTtyChallengeTerminal,
   type CliTerminalEvidence,
   type CliTtyIo,
-} from './cli-tty-io.js';
+} from './tty/cli-tty-io.js';
 
 /** How long a terminal attestation code stays valid (plan §5.1). */
 export const CLI_TERMINAL_ATTESTATION_TTL_MS = 60_000;

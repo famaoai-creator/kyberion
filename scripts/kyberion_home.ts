@@ -95,14 +95,14 @@ import {
   handleFeedbackSubcommand,
   handleImprovements,
   improvementsArgsFromArgv,
-} from './operator-home-secondary-actions.js';
-import { printCommands, showHome, type HomePrint } from './operator-home-view.js';
+} from './operator/operator-home-secondary-actions.js';
+import { printCommands, showHome, type HomePrint } from './operator/operator-home-view.js';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import path from 'node:path';
 import {
   createExecuteBrowserPipeline,
   loadBrowserActuator,
-} from './browser_playwright_executor.js';
+} from './browser/browser_playwright_executor.js';
 import { createHash, randomUUID } from 'node:crypto';
 import { t as translate } from '@agent/core/t';
 import { resolveLocale, type SupportedLocale } from '@agent/core/locale';

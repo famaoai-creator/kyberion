@@ -1,0 +1,35 @@
+{
+  "version": "1.0.0",
+  "default_tool_id": "mflux",
+  "tools": [
+    {
+      "tool_id": "semantic_embeddings",
+      "toolsets": ["embedding", "perception"],
+      "display_name": "Semantic Embedding Runtime",
+      "ecosystem": "python",
+      "status": "active",
+      "platforms": ["any"],
+      "supported_modes": ["trial", "approved_install", "installed", "pinned"],
+      "trial_backend": {
+        "kind": "system",
+        "command": "python3",
+        "args": ["-c", "import torch, transformers, PIL; print(\"ok\")"],
+        "description": "Probe torch, transformers and Pillow for the semantic embedding bridge."
+      },
+      "install_backend": {
+        "kind": "uv",
+        "command": "uv",
+        "args": ["pip", "install", "torch", "transformers", "pillow", "safetensors"],
+        "description": "Install torch, transformers, Pillow and safetensors into the managed Python runtime."
+      },
+      "installed_backend": {
+        "kind": "system",
+        "command": "python3",
+        "args": ["-c", "import torch, transformers, PIL, safetensors; print(\"ok\")"],
+        "description": "Re-check the semantic embedding runtime."
+      },
+      "managed_env_subpath": "tool-runtimes/semantic-embeddings",
+      "notes": "Local CLIP/SigLIP image-text embedding runtime used by libs/shared-perception/src/semantic-embedding.py (semantic-index.ts). Models must exist locally; the bridge runs fully offline."
+    }
+  ]
+}

@@ -5,7 +5,7 @@
   "description": "Daily accountability report for every accountability charter in force: what ran inside it, what was held for a decision, budget use, standing tripwires and charters near expiry. Does nothing while no charter is in force.",
   "_refs": {
     "plan": "docs/developer/improvement-plans-2026-09/ACCOUNTABILITY_CHARTER_PLAN_2026-09-30.ja.md",
-    "cli": "node dist/scripts/approval_inbox.js charter --send"
+    "cli": "node dist/scripts/approval/approval_inbox.js charter --send"
   },
   "schedule": {
     "id": "accountability-report-daily",

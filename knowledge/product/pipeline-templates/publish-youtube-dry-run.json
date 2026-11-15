@@ -2,7 +2,7 @@
   "action": "pipeline",
   "pipeline_id": "publish-youtube-dry-run",
   "version": "1.0.0",
-  "description": "Render an unapproved local YouTube preview fixture. It never represents G5 approval or publication. Use scripts/marketing_publish_dry_run.ts with a human approval record for the governed G5/G6 path.",
+  "description": "Render an unapproved local YouTube preview fixture. It never represents G5 approval or publication. Use scripts/marketing/marketing_publish_dry_run.ts with a human approval record for the governed G5/G6 path.",
   "context": {
     "output_path": "active/shared/tmp/marketing-video-dry-run/youtube-publication-preview.json",
     "verification_path": "active/shared/tmp/marketing-video-dry-run/publication-verification.json",

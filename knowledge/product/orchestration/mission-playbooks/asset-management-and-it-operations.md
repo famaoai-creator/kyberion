@@ -24,12 +24,12 @@ IT企業として重要性が増している(1)ソフトウェア資材管理(SB
 
 ## 対象と実体
 
-| #   | 対象                 | 実体                                                                                                     |
-| --- | -------------------- | -------------------------------------------------------------------------------------------------------- |
-| 1   | ソフトウェア資材管理 | ワークフロー `software-asset-management`（intent 同名）                                                  |
-| 2   | IT運用自動化         | ワークフロー `it-operations-automation`（intent 同名）                                                   |
-| 3   | AWSシミュレーション  | パイプライン `pipelines/aws-operations-simulation.json`（IT運用の simulate フェーズが参照）              |
-| 4   | 動的ワークフロー登録 | スクリプト `scripts/register_workflow.ts` + スキーマ `schemas/workflow-registration-request.schema.json` |
+| #   | 対象                 | 実体                                                                                                              |
+| --- | -------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| 1   | ソフトウェア資材管理 | ワークフロー `software-asset-management`（intent 同名）                                                           |
+| 2   | IT運用自動化         | ワークフロー `it-operations-automation`（intent 同名）                                                            |
+| 3   | AWSシミュレーション  | パイプライン `pipelines/aws-operations-simulation.json`（IT運用の simulate フェーズが参照）                       |
+| 4   | 動的ワークフロー登録 | スクリプト `scripts/register/register_workflow.ts` + スキーマ `schemas/workflow-registration-request.schema.json` |
 
 ---
 
@@ -46,7 +46,7 @@ IT企業として重要性が増している(1)ソフトウェア資材管理(SB
 | 版管理・リリースタグ  | judgment      | `VERSION_TAGGED`           | version-record.json     | semver・成果物ハッシュ                       |
 | 資材台帳登録          | approval      | `ASSET_REGISTERED` (+人間) | asset-ledger-entry.json | SBOM/脆弱性/鍵/版とトレース                  |
 
-**ツール現状**（`CAPABILITIES_GUIDE.md`）: SBOM専用アクチュエータ(syft/cyclonedx)は未実装のため SBOM フェーズは実装者/エージェントが生成。脆弱性は `scripts/scan_dependency_vulns.ts`（pnpm audit/outdated、自リポジトリ対象）。鍵は `secret-actuator`（macOS Keychain・参照のみ、AWS KMS ではない）。版は `libs/core/mission/sdlc-artifact-store.ts`(bumpVersion) + `artifact-actuator` 台帳。外部成果物の SBOM 生成を決定化する場合は syft/cyclonedx バイナリを `system:exec` で呼ぶステップを追加する（拡張ポイント）。
+**ツール現状**（`CAPABILITIES_GUIDE.md`）: SBOM専用アクチュエータ(syft/cyclonedx)は未実装のため SBOM フェーズは実装者/エージェントが生成。脆弱性は `scripts/scan/scan_dependency_vulns.ts`（pnpm audit/outdated、自リポジトリ対象）。鍵は `secret-actuator`（macOS Keychain・参照のみ、AWS KMS ではない）。版は `libs/core/mission/sdlc-artifact-store.ts`(bumpVersion) + `artifact-actuator` 台帳。外部成果物の SBOM 生成を決定化する場合は syft/cyclonedx バイナリを `system:exec` で呼ぶステップを追加する（拡張ポイント）。
 
 ## 2. IT運用自動化 (`it-operations-automation`)
 
@@ -82,7 +82,7 @@ pnpm pipeline --input pipelines/aws-operations-simulation.json \
   --context '{"change_plan_path":"active/shared/tmp/change-plan.json","output_path":"active/shared/tmp/aws-simulation-report.json"}'
 ```
 
-## 4. 動的ワークフロー登録 (`scripts/register_workflow.ts`)
+## 4. 動的ワークフロー登録 (`scripts/register/register_workflow.ts`)
 
 **設計思想**: kyberion のカタログはすべて手編集JSON + `pnpm validate` 検証。ランタイム自己書き換えはガバナンスモデルに反するため、本ツールは「コンパクトな登録リクエスト → スキーマ検証 → カタログ準拠エントリへ展開 →（提案 or 適用）→ バリデータでゲート」という、確立された _提案→検証マージ_ パターンを自動化する。
 
@@ -94,12 +94,12 @@ pnpm pipeline --input pipelines/aws-operations-simulation.json \
 
 ```bash
 # 提案(安全) → レビュー → マージ or 適用
-node dist/scripts/register_workflow.js --request active/shared/tmp/my-workflow.json --propose
-node dist/scripts/register_workflow.js --request active/shared/tmp/my-workflow.json --apply
+node dist/scripts/register/register_workflow.js --request active/shared/tmp/my-workflow.json --propose
+node dist/scripts/register/register_workflow.js --request active/shared/tmp/my-workflow.json --apply
 # 適用後は必ず検証
-pnpm run build && node dist/scripts/check_workflow_catalog_refs.js \
-  && node dist/scripts/check_governance_rules.js \
-  && node dist/scripts/check_intent_domain_coverage.js \
+pnpm run build && node dist/scripts/check/check_workflow_catalog_refs.js \
+  && node dist/scripts/check/check_governance_rules.js \
+  && node dist/scripts/check/check_intent_domain_coverage.js \
   && pnpm generate:knowledge-index
 ```
 

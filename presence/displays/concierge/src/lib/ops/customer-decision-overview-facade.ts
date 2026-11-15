@@ -5,7 +5,7 @@ import { governedWorkerEnv } from '../server-child-env';
  * `knowledge/confidential/<tenant>/decisions/`.
  *
  * Chronos never reads the case stores itself. It runs the built governed
- * facade (`dist/scripts/customer_decision_overview.js overview --tenant <t> … --json`,
+ * facade (`dist/scripts/customer/customer_decision_overview.js overview --tenant <t> … --json`,
  * a fixed argv per view kind, see {@link facadeArgs}) as a child process,
  * bound to the resolved viewer tenant, exactly as the
  * customer room does (presence/displays/customer-room/src/server/facade.ts):
@@ -48,7 +48,7 @@ import {
 /** The system role of the read-only customer-decision facade child. */
 export const CUSTOMER_DECISION_READER_ROLE = 'customer_decision_reader';
 
-export const OVERVIEW_FACADE_SCRIPT = 'dist/scripts/customer_decision_overview.js';
+export const OVERVIEW_FACADE_SCRIPT = 'dist/scripts/customer/customer_decision_overview.js';
 export const OVERVIEW_FACADE_TIMEOUT_MS = 15_000;
 export const OVERVIEW_FACADE_MAX_OUTPUT_MB = 2;
 export const OVERVIEW_CACHE_TTL_MS = 15_000;

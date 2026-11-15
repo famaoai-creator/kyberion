@@ -491,7 +491,7 @@
         {
           "op": "system:shell",
           "params": {
-            "cmd": "node dist/scripts/service_lifecycle_control.js --operation start"
+            "cmd": "node dist/scripts/service/service_lifecycle_control.js --operation start"
           }
         }
       ],
@@ -525,7 +525,7 @@
         {
           "op": "system:shell",
           "params": {
-            "cmd": "node dist/scripts/service_lifecycle_control.js --operation list"
+            "cmd": "node dist/scripts/service/service_lifecycle_control.js --operation list"
           }
         }
       ],
@@ -945,7 +945,7 @@
                     {
                       "op": "system:shell",
                       "params": {
-                        "cmd": "node dist/scripts/meeting_orchestrator.js --mission \"{{mission_id}}\" --meeting-url \"{{meeting_url}}\"",
+                        "cmd": "node dist/scripts/meeting/meeting_orchestrator.js --mission \"{{mission_id}}\" --meeting-url \"{{meeting_url}}\"",
                         "export_as": "meeting_orchestrator_output"
                       }
                     }
@@ -3359,7 +3359,7 @@
         {
           "op": "system:shell",
           "params": {
-            "cmd": "node dist/scripts/agent_runtime_supervisor_status.js"
+            "cmd": "node dist/scripts/agent/agent_runtime_supervisor_status.js"
           }
         }
       ]

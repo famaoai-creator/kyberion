@@ -220,4 +220,4 @@ turns them into `measured` values for their own environment.
    only under the compatibility contract above; write the chosen id back
    where downstream code reads it so nested calls do not re-select.
 4. Add a calibration adapter under `scripts/lib/seam-calibration/<seam>.ts`
-   and register it in `scripts/lib/seam-calibration-adapters.ts`.
+   and register it in `scripts/lib/seam-calibration/seam-calibration-adapters.ts`.

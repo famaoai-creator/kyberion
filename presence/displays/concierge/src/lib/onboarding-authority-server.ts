@@ -3,6 +3,7 @@ import { withExecutionContext } from '@agent/core/authority';
 import { withSensitivePathMediation } from '@agent/core/secure-io';
 import {
   ensureOwnerMember,
+  ownerAccountableHumanId,
   resolveMemberByPrincipal,
 } from '@agent/core/organization/member-registry';
 import {
@@ -26,7 +27,8 @@ export function asOnboardingOwner<T>(body: () => T): T {
  */
 export function onboardingAuthorityPrincipal(
   viewer: ConciergeViewerContext,
-  scope: CharterScope
+  scope: CharterScope,
+  opts?: { admitRemoteTenantOwner?: boolean }
 ): OnboardingAuthorityPrincipal {
   const installation = resolveConciergeInstallationAccess(viewer, 'read');
   return asOnboardingOwner(() => {
@@ -34,7 +36,11 @@ export function onboardingAuthorityPrincipal(
     if (scope.kind === 'person' && !installation.allowed) {
       throw new Error(installation.code);
     }
-    if (scope.kind === 'organization' && viewer.role !== 'localadmin') {
+    if (
+      scope.kind === 'organization' &&
+      viewer.role !== 'localadmin' &&
+      !opts?.admitRemoteTenantOwner
+    ) {
       throw new Error('owner_required');
     }
     if (viewer.source === 'loopback') ensureOwnerMember();
@@ -55,7 +61,13 @@ export function onboardingAuthorityPrincipal(
       throw new Error('tenant_owner_required');
     return {
       requesterId: viewer.principal?.actor.id ?? `user:${member.member_id}`,
-      accountableId: `user:${member.member_id}`,
+      // Material lands in the installation's secret store, so the installation
+      // owner member stays accountable even when a tenant owner initiated —
+      // whose identity is kept in requesterId. This also keeps the approval
+      // bound to the accountable human (decidedBy === accountable_id), so a
+      // tenant owner can propose and apply but never self-approve.
+      accountableId:
+        scope.kind === 'organization' ? ownerAccountableHumanId() : `user:${member.member_id}`,
       personalOwner,
       tenantSlugs: viewer.tenantSlugs,
     };
@@ -72,6 +84,11 @@ export function onboardingApprovalMember(
       ? { kind: 'organization', tenant_slug: record.scope.tenant_slug }
       : { kind: 'person' };
     const principal = onboardingAuthorityPrincipal(viewer, scope);
+    // A decision is recorded as decidedBy = principal.accountableId, so only a
+    // caller whose requester IS the accountable human may decide — otherwise a
+    // remote member-bound credential would falsify the audit trail by deciding
+    // as the installation owner. Mirrors the account-introduction review gate.
+    if (principal.requesterId !== principal.accountableId) return null;
     const status = asOnboardingOwner(() =>
       onboardingAuthorityRequestStatus(principal, scope, record.id)
     );

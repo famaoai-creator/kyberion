@@ -5,7 +5,7 @@
   "description": "Task 3 soak restart e2e for AO-04.",
   "_refs": {
     "plan": "docs/developer/improvement-plans-archive/2026-07/AO-04_SOAK_ENDURANCE_VALIDATION.ja.md",
-    "implementation": "scripts/soak_restart_e2e.ts"
+    "implementation": "scripts/soak/soak_restart_e2e.ts"
   },
   "steps": [
     {

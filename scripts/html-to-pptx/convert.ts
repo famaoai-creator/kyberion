@@ -20,7 +20,7 @@
 import { safeWriteFile, safeMkdir } from '@agent/core/secure-io';
 import { executePipelineFile } from '../run_pipeline.js';
 import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
-import { cliOptionValue, cliPositionals, hasCliFlag } from '../lib/cli-guard.js';
+import { cliOptionValue, cliPositionals, hasCliFlag } from '../lib/cli/cli-guard.js';
 
 type Print = (value: unknown) => void;
 

@@ -10,6 +10,7 @@
 !/.codex/agents/
 !/.codex/agents/*.toml
 .agy/
+.antigravitycli/
 /.claude/*
 !/.claude/agents/
 !/.claude/hooks/

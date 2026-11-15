@@ -6,6 +6,7 @@ import { getRegisteredEnvText } from '@agent/core/foundation/env';
 import { assertSafeRepositoryPath, buildSafeExecEnv, safeExistsSync } from '@agent/core/secure-io';
 import { rootResolve } from '@agent/core/path-resolver';
 import { registerVadBackend, type VadFactoryOptions } from '@agent/core/voice/vad-registry';
+import { resolveManagedToolPythonBin } from '@agent/core/tool/tool-runtime-registry';
 import { parseVadBridgeLine } from '@agent/core/voice/vad-bridge-protocol';
 import {
   computeChunkDurationMs,
@@ -43,6 +44,7 @@ function resolvePythonBin(opts: TenVadOptions): string {
     opts.pythonBin ||
     getRegisteredEnvText('KYBERION_TEN_VAD_PYTHON') ||
     getRegisteredEnvText('KYBERION_PYTHON_BIN') ||
+    resolveManagedToolPythonBin('ten_vad') ||
     'python3'
   );
 }

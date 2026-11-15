@@ -161,7 +161,7 @@ docs(quickstart): note KYBERION_REASONING_BACKEND=stub for offline trial
 breaking(adf)!: remove deprecated step.target field
 ```
 
-The PR title is what shows up in `CHANGELOG.md` after `pnpm tsx scripts/generate_changelog.ts --prepend`.
+The PR title is what shows up in `CHANGELOG.md` after `pnpm tsx scripts/generate/generate_changelog.ts --prepend`.
 
 ## Code review
 

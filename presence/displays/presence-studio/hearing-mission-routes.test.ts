@@ -841,7 +841,7 @@ describe('POST /api/hearing/:session/handoff', () => {
     // (d) alignment request argv shape
     const alignmentCall = vi.mocked(safeExecResult).mock.calls[1];
     expect(alignmentCall[1]).toEqual([
-      'dist/scripts/mission_alignment_request.js',
+      'dist/scripts/mission/mission_alignment_request.js',
       '--mission',
       missionId,
       '--json',
@@ -917,7 +917,7 @@ describe('POST /api/hearing/:session/handoff', () => {
         );
         return { stdout: '', stderr: '', status: 0 };
       }
-      expect(args[0]).toBe('dist/scripts/mission_alignment_request.js');
+      expect(args[0]).toBe('dist/scripts/mission/mission_alignment_request.js');
       writeGovernedArtifactJson('surface_runtime', approvalPath, {
         id: approvalId,
         kind: 'mission_gate',
@@ -1075,7 +1075,7 @@ describe('POST /api/hearing/:session/handoff', () => {
     });
     vi.mocked(safeExecResult).mockImplementation((_command, args = []) => ({
       stdout:
-        args[0] === 'dist/scripts/mission_alignment_request.js'
+        args[0] === 'dist/scripts/mission/mission_alignment_request.js'
           ? JSON.stringify({ requestId: 'REQ-SELECTED' })
           : '',
       stderr: '',

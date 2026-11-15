@@ -535,7 +535,7 @@ export const SYSTEM_CAPTURE_OP_HANDLERS: Readonly<Record<string, SystemCaptureOp
       ),
     };
     // LE-03: registry reconcile sweeps as in-process typed ops (formerly
-    // `system:shell` wrappers around dist/scripts/reconcile_*.js). Structured
+    // `system:shell` wrappers around dist/scripts/reconcile/reconcile_*.js). Structured
     // results land directly in ctx — no stdout parsing, no silent `|| echo` fallback.
   },
   reconcile_config_fallbacks: async ({ params, ctx }) => {

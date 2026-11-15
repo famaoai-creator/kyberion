@@ -12,14 +12,14 @@
  * Wired into CI by `.github/actions/ci-failure-triage` (job summary on
  * failure) and `.github/workflows/main-failure-triage.yml` (one issue per
  * failing signature on main). Classification lives in
- * `scripts/lib/ci-failure-triage.ts`; who acts on which class is in the
+ * `scripts/lib/ci/ci-failure-triage.ts`; who acts on which class is in the
  * operations-hygiene runbook §1.
  */
 import { pathResolver } from '@agent/core/path-resolver';
 import { readTextFile } from '@agent/core/foundation';
 import { safeExistsSync } from '@agent/core/secure-io';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
-import { guardCliArgs, normalizeInlineValueFlags, type CliGuardSpec } from './lib/cli-guard.js';
+import { guardCliArgs, normalizeInlineValueFlags, type CliGuardSpec } from './lib/cli/cli-guard.js';
 import { readSafeJsonFile } from './lib/json-input.js';
 import {
   renderFailureMarkdown,
@@ -27,7 +27,7 @@ import {
   triageCiLog,
   type GateRemedy,
   type TriageReport,
-} from './lib/ci-failure-triage.js';
+} from './lib/ci/ci-failure-triage.js';
 
 export const CI_TRIAGE_CLI: CliGuardSpec = {
   command: 'pnpm kyberion ci triage',
@@ -41,8 +41,8 @@ interface GateManifestLike {
 }
 
 /**
- * Map each freshness gate (`scripts/generate_*.ts --check`,
- * `scripts/analyze_*.ts --check`) to the command that rewrites its output: the
+ * Map each freshness gate (`scripts/generate/generate_*.ts --check`,
+ * `scripts/analyze/analyze_*.ts --check`) to the command that rewrites its output: the
  * package script that runs the same file without `--check` when one exists,
  * otherwise the gate's own command minus `--check`.
  */
@@ -54,7 +54,9 @@ export function deriveGateRemedies(
   for (const gate of manifest.gates) {
     const args = gate.args ?? [];
     const remedy: GateRemedy = { check: `pnpm check -- --only ${gate.id}` };
-    const scriptFile = args.find((arg) => /^scripts\/(?:generate|analyze)_[\w-]+\.ts$/u.test(arg));
+    const scriptFile = args.find((arg) =>
+      /^scripts\/[\w-]+\/(?:generate|analyze)_[\w-]+\.ts$/u.test(arg)
+    );
     if (scriptFile && args.includes('--check')) {
       const packageScript = Object.entries(packageScripts)
         .filter(([, body]) => body.includes(scriptFile) && !body.includes('--check'))

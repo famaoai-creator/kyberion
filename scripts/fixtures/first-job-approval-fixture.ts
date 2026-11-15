@@ -38,7 +38,7 @@ export function seedFirstJobTestRoot(sourceRoot: string, root: string): void {
     'knowledge/product/governance',
     'knowledge/product/orchestration',
     'pipelines/front-desk-request-receipt.json',
-    'scripts/pipeline-shell-independence.baseline.json',
+    'scripts/pipeline/pipeline-shell-independence.baseline.json',
   ])
     copy(relative);
 }

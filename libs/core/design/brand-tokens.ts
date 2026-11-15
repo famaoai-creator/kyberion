@@ -68,7 +68,7 @@ export interface BrandUiVizPalette {
   /**
    * Text ink for a value label painted directly on a `sequential[N]` /
    * `diverging[N]` cell (e.g. `ui:heatmap`), one per step, >= 4.5:1 against
-   * that step (`scripts/check_design_contrast.ts`). A ramp step's own
+   * that step (`scripts/check/check_design_contrast.ts`). A ramp step's own
    * lightness varies too much for one ink (`text` or `text-on-accent`) to
    * clear 4.5:1 on every step, so each step gets its own.
    */

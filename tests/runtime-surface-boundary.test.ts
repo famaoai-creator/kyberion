@@ -29,9 +29,11 @@ describe('Runtime surface boundary', () => {
   it('documents the canonical surface lifecycle controller', () => {
     const componentMap = read('docs/COMPONENT_MAP.md');
     const slackChronosModel = read('knowledge/product/architecture/slack-chronos-control-model.md');
-    const lifecycleModel = read('knowledge/product/architecture/runtime-surface-lifecycle-model.md');
+    const lifecycleModel = read(
+      'knowledge/product/architecture/runtime-surface-lifecycle-model.md'
+    );
 
-    expect(componentMap).toContain('scripts/surface_runtime.ts');
+    expect(componentMap).toContain('scripts/surface/surface_runtime.ts');
     expect(slackChronosModel).toContain('active-surfaces.json');
     expect(slackChronosModel).toContain('surface_runtime.ts');
     expect(lifecycleModel).toContain('knowledge/product/governance/surfaces/*.json');

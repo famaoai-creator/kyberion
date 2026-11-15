@@ -33,7 +33,7 @@
           },
           "evidence": [
             "libs/actuators/meeting-browser-driver/src/index.ts (Playwright/CDP browser driver; unattended, but subject to platform bot detection)",
-            "scripts/meeting_participate.ts (previous CLI --driver default before this policy)"
+            "scripts/meeting/meeting_participate.ts (previous CLI --driver default before this policy)"
           ]
         },
         "in-room": {

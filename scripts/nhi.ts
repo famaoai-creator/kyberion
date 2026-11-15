@@ -59,7 +59,7 @@ import {
   writePersonaIdentityBindingsAtPath,
 } from '@agent/core/persona-identity';
 import { defineScript, isDirectScript } from './lib/harness.js';
-import { parseCliFlags } from './lib/cli-flag-parser.js';
+import { parseCliFlags } from './lib/cli/cli-flag-parser.js';
 
 type Args = {
   command:

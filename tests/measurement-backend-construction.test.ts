@@ -33,7 +33,7 @@ const MEASUREMENT_ENTRY_POINTS: Record<string, { construction: Construction; rea
     construction: 'receives',
     reason: 'drives the backend its caller built; defines runBackendLiveScenarios',
   },
-  'scripts/check_backend_live_scenarios.ts': {
+  'scripts/check/check_backend_live_scenarios.ts': {
     construction: 'caller-bounded',
     reason: 'operator entry point of the live scenarios',
   },
@@ -46,7 +46,7 @@ const MEASUREMENT_ENTRY_POINTS: Record<string, { construction: Construction; rea
     construction: 'caller-bounded',
     reason: 'builds the role-fitness probe backend and bounds each probe',
   },
-  'scripts/evaluate_model_role_fitness.ts': {
+  'scripts/evaluate/evaluate_model_role_fitness.ts': {
     construction: 'receives',
     reason:
       'operator entry point; installs host seams only, the runner builds the measurement backend',

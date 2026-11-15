@@ -32,7 +32,7 @@ import {
   isDirectScript,
   ScriptExitError,
 } from './lib/harness.js';
-import { parseCliFlags } from './lib/cli-flag-parser.js';
+import { parseCliFlags } from './lib/cli/cli-flag-parser.js';
 
 type Print = (value: unknown) => void;
 

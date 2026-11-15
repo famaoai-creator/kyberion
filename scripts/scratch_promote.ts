@@ -32,7 +32,7 @@
  * A tenant promotion (not --dry-run, never --public) also appends a line to
  * the tenant's information-asset ledger (`_ledger/assets.jsonl`, source_system
  * `scratch`, content hash of the written TOOL.json); the asset ref is returned
- * as `asset` and stored in the marker, not in TOOL.json (scripts/lib/promotion-ledger.ts).
+ * as `asset` and stored in the marker, not in TOOL.json (scripts/lib/promotion/promotion-ledger.ts).
  *
  * Promotion is a holding step, not the end state: the follow-up is to move
  * deterministic logic into typed actuator ops and wire a pipeline
@@ -61,8 +61,8 @@ import {
   isAdfJsonText,
 } from '@agent/core/scratch-promotion';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
-import { guardCliArgs, hasCliFlag, type CliGuardSpec } from './lib/cli-guard.js';
-import { assertPromotionSourceScope, repoRelative } from './lib/promotion-scope.js';
+import { guardCliArgs, hasCliFlag, type CliGuardSpec } from './lib/cli/cli-guard.js';
+import { assertPromotionSourceScope, repoRelative } from './lib/promotion/promotion-scope.js';
 import {
   SCRATCH_PROMOTE_SOURCE_SYSTEM,
   commitPromotionAsset,
@@ -71,7 +71,7 @@ import {
   resolvePromotionActor,
   sha256Text,
   type PromotionAssetPlan,
-} from './lib/promotion-ledger.js';
+} from './lib/promotion/promotion-ledger.js';
 
 /** Scratch roots a promotion may read from (repo-relative). */
 export const SCRATCH_PROMOTE_SOURCE_ROOTS = [

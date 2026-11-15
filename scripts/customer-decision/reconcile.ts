@@ -1,6 +1,6 @@
 /**
  * Completion and recovery of respond runs from their write-ahead journal (all under the case lock).
- * Part of scripts/customer_decision.ts (the entry point); see its header.
+ * Part of scripts/customer/customer_decision.ts (the entry point); see its header.
  */
 import { logger } from '@agent/core/core';
 import { auditChain } from '@agent/core/governance/audit-chain';

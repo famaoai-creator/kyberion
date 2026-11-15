@@ -3,10 +3,10 @@ import { pathResolver, safeReadFile } from '@agent/core';
 
 const asynchronousEntrypoints = [
   'scripts/minutes_record.ts',
-  'scripts/meeting_participate.ts',
+  'scripts/meeting/meeting_participate.ts',
   'scripts/delegated_task_worker.ts',
-  'scripts/agent_runtime_supervisor_daemon.ts',
-  'scripts/browser_bridge_host.ts',
+  'scripts/agent/agent_runtime_supervisor_daemon.ts',
+  'scripts/browser/browser_bridge_host.ts',
 ];
 
 describe('asynchronous process exit boundary', () => {

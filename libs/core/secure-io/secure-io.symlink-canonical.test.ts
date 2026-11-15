@@ -1,0 +1,1378 @@
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import * as fs from 'node:fs';
+import * as net from 'node:net';
+import * as os from 'node:os';
+import * as path from 'node:path';
+import * as pathResolver from '../path-resolver.js';
+// Install the full identity resolver (MISSION_ROLE / persona) the production
+// write path uses, instead of the bootstrap fallback.
+import '../authority.js';
+import {
+  safeAppendFileSync,
+  safeChmodSync,
+  safeCopyFileSync,
+  safeExec,
+  safeFsyncFile,
+  safeMkdir,
+  safeMoveSync,
+  safeOpenAppendFile,
+  safeFileAgeMs,
+  safeReadFile,
+  safeReadFileRange,
+  safeReadFileSnapshot,
+  safeReadFileTail,
+  safeReaddir,
+  safeRmSync,
+  safeSpawn,
+  safeStat,
+  safeSymlinkSync,
+  safeUnlinkSync,
+  safeWriteFile,
+  validateFileSize,
+} from '../secure-io.js';
+import {
+  assertNotForeignHardLink,
+  assertTempInCheckedDir,
+  captureCheckedDir,
+  registerSensitivePathMediationProbe,
+  sameLinkState,
+  setProcFdLookupDisabledForTesting,
+  setProcFdRootForTesting,
+} from '../secure-io-path-guard.js';
+import { getAllFiles } from '../storage/fs-utils.js';
+
+// Denials emit best-effort audit events; keep them off the real audit chain.
+vi.mock('../governance/audit-chain.js', () => ({
+  auditChain: { record: vi.fn() },
+}));
+
+/*
+ * Reproduces the reviewer's finding against main: a data-only persona
+ * (worker / finance_controller) may write only active/shared/tmp/ (and its
+ * finance knowledge), yet could plant a symlink in tmp/ pointing at a path it
+ * may only READ and then write through it. The fixtures are created with raw
+ * node:fs (as an operator / another process would) so each case starts from
+ * the attacker's position; only the attacked operation runs through secure-io.
+ */
+
+const ROOT = pathResolver.rootDir();
+const RUN = `${process.pid}-${Date.now()}`;
+const ENV_KEYS = [
+  'KYBERION_TENANT',
+  'KYBERION_BASE_ROLE',
+  'MISSION_ROLE',
+  'SYSTEM_ROLE',
+  'KYBERION_SUDO',
+  'MISSION_ID',
+  'KYBERION_TENANT_SCOPE_REQUIRED',
+  'KYBERION_STANCE',
+] as const;
+
+// Writable for the data-only persona (default_allow + finance allow_write).
+const scratchRel = `active/shared/tmp/tests/secure-io-symlink-${RUN}`;
+// Readable but NOT writable for worker/finance_controller: not a default_allow
+// prefix, not in the persona or role allow_write lists. Stands in for
+// scripts/ (code) without touching tracked files.
+const protectedRel = `active/shared/coordination/vitest-secure-io-symlink-${RUN}`;
+// Higher tier the persona may not read.
+const personalRel = `knowledge/personal/vitest-secure-io-symlink-${RUN}`;
+
+const abs = (rel: string) => path.join(ROOT, rel);
+
+function asDataOnlyPersona(): void {
+  process.env.KYBERION_BASE_ROLE = 'worker';
+  process.env.MISSION_ROLE = 'finance_controller';
+}
+
+/** Child process that keeps re-pointing symlink `sw` at each of `targets` in turn. */
+function startFlipper(sw: string, targets: string[], ms = 9000) {
+  const flipper = `
+    const fs = require('node:fs');
+    const [sw, ...targets] = process.argv.slice(1);
+    const end = Date.now() + ${ms};
+    let i = 0;
+    while (Date.now() < end) {
+      const tmp = sw + '.tmp';
+      try { fs.rmSync(tmp, { force: true }); fs.symlinkSync(targets[i++ % targets.length], tmp); fs.renameSync(tmp, sw); } catch {}
+    }`;
+  return safeSpawn(process.execPath, ['-e', flipper, sw, ...targets], { stdio: 'ignore' });
+}
+
+/** A flipper still running into the next test would race its fixture reset. */
+async function stopFlipper(child: ReturnType<typeof safeSpawn>): Promise<void> {
+  if (child.exitCode !== null || child.signalCode !== null) return;
+  const exited = new Promise<void>((resolve) => child.once('exit', () => resolve()));
+  child.kill('SIGKILL');
+  await exited;
+}
+
+/**
+ * Give the owner back rwx on every directory under `root` so a fixture reset
+ * cannot fail on a mode a previous test legitimately set inside scratch.
+ */
+function restoreOwnerAccess(root: string): void {
+  let entries: fs.Dirent[];
+  try {
+    fs.chmodSync(root, fs.statSync(root).mode | 0o700);
+    entries = fs.readdirSync(root, { withFileTypes: true });
+  } catch {
+    return;
+  }
+  for (const entry of entries) {
+    if (entry.isDirectory()) restoreOwnerAccess(path.join(root, entry.name));
+  }
+}
+
+/** Run `op` for `ms`, yielding now and then; returns how many calls ran. */
+async function hammer(ms: number, op: () => void): Promise<number> {
+  let tries = 0;
+  // Liveness floor: every assertion wants >50 ops. A loaded CI runner can
+  // fall below that inside a single window without the op being broken, so
+  // keep running windows until the floor is met or a bounded deadline hits —
+  // a genuinely dead op still fails, just after bounded retries.
+  const minOps = 51;
+  const deadline = Date.now() + ms * 4;
+  do {
+    const end = Date.now() + ms;
+    while (Date.now() < end) {
+      tries += 1;
+      try {
+        op();
+      } catch {
+        // refused or raced
+      }
+      if (tries % 50 === 0) await new Promise((r) => setImmediate(r));
+    }
+  } while (tries <= minOps && Date.now() < deadline);
+  return tries;
+}
+
+/**
+ * Hard-link churn: a child loops `rm name; ln secret name` while reads and
+ * appends go through `name`. Returns how often the secret was read or grew.
+ * `mtime`: the child also truncates the secret to its own size after each
+ * step, which sets its mtime equal to its ctime (a data write's signature).
+ */
+async function hardLinkChurn(
+  ms: number,
+  variant: 'plain' | 'mtime' = 'plain'
+): Promise<Record<string, number>> {
+  const secretPath = path.join(abs(personalRel), 'secret.txt');
+  const before = fs.statSync(secretPath).size;
+  const name = abs(`${scratchRel}/churn.log`);
+  const churn = `
+    const fs = require('node:fs');
+    const [name, secret, variant] = process.argv.slice(1);
+    const size = fs.statSync(secret).size;
+    const touch = () => { if (variant === 'mtime') { try { fs.truncateSync(secret, size); } catch {} } };
+    const end = Date.now() + ${2 * ms + 2000};
+    while (Date.now() < end) {
+      try { fs.rmSync(name, { force: true }); } catch {}
+      touch();
+      try { fs.linkSync(secret, name); } catch {}
+      touch();
+    }`;
+  const child = safeSpawn(process.execPath, ['-e', churn, name, secretPath, variant], {
+    stdio: 'ignore',
+  });
+  const result = { reads: 0, readLeaks: 0, appends: 0, secretGrew: 0 };
+  const rel = `${scratchRel}/churn.log`;
+  try {
+    result.reads = await hammer(ms, () => {
+      if (String(safeReadFile(rel)).includes('personal-tier secret')) result.readLeaks += 1;
+    });
+    result.appends = await hammer(ms, () => safeAppendFileSync(rel, 'X'));
+  } finally {
+    child.kill('SIGKILL');
+  }
+  result.secretGrew = fs.statSync(secretPath).size - before;
+  return result;
+}
+
+/**
+ * Another process keeps changing `name` — replacing it atomically
+ * (write-then-rename) or chmod/utimes-ing it — while reads, appends and stats
+ * go through it. Returns how many of each were refused and whether a read
+ * ever saw anything but a whole version.
+ */
+async function concurrentChange(
+  kind: 'replace' | 'chmod' | 'utimes',
+  ms: number,
+  pauseMs = 0
+): Promise<Record<string, number>> {
+  const name = abs(`${scratchRel}/changing.log`);
+  fs.writeFileSync(name, 'v0\n');
+  const writer = `
+    const fs = require('node:fs');
+    const [name, kind, pause] = process.argv.slice(1);
+    const end = Date.now() + ${3 * ms + 3000};
+    const sleeper = new Int32Array(new SharedArrayBuffer(4));
+    let i = 0;
+    while (Date.now() < end) {
+      if (Number(pause) > 0) Atomics.wait(sleeper, 0, 0, Number(pause));
+      try {
+        i += 1;
+        if (kind === 'replace') {
+          const tmp = name + '.tmp' + (i % 2);
+          fs.writeFileSync(tmp, 'v' + i + '\\n');
+          fs.renameSync(tmp, name);
+        } else if (kind === 'chmod') fs.chmodSync(name, i % 2 ? 0o644 : 0o664);
+        else fs.utimesSync(name, new Date(), new Date(Date.now() - (i % 1000)));
+      } catch {}
+    }`;
+  const child = safeSpawn(process.execPath, ['-e', writer, name, kind, String(pauseMs)], {
+    stdio: 'ignore',
+  });
+  const rel = `${scratchRel}/changing.log`;
+  // refused: the documented fail-closed refusal; otherErrors: anything else
+  // (hammer swallows throws, so they are counted here); torn: a read that
+  // returned anything but a whole version of this file.
+  const result = { reads: 0, appends: 0, stats: 0, refused: 0, otherErrors: 0, torn: 0 };
+  const changed =
+    /^\[SECURITY\] Refusing to \w+ .*: the file changed between the permission check and the open$/;
+  const attempt = (op: () => void) => {
+    try {
+      op();
+    } catch (error) {
+      if (changed.test(String((error as Error).message))) result.refused += 1;
+      else result.otherErrors += 1;
+    }
+  };
+  try {
+    await new Promise((r) => setTimeout(r, 100));
+    result.reads = await hammer(ms, () =>
+      attempt(() => {
+        if (!/^v\d+\n/.test(String(safeReadFile(rel)))) result.torn += 1;
+      })
+    );
+    result.appends = await hammer(ms, () => attempt(() => safeAppendFileSync(rel, '')));
+    result.stats = await hammer(ms, () => attempt(() => safeStat(rel)));
+  } finally {
+    child.kill('SIGKILL');
+  }
+  return result;
+}
+
+describe('secure-io symlink canonicalization (data-only persona)', () => {
+  const saved: Partial<Record<(typeof ENV_KEYS)[number], string | undefined>> = {};
+
+  // Rebuilt per test so a case that (on vulnerable code) mutates the target
+  // cannot change the starting state of the next one.
+  function resetFixtures(): void {
+    fs.rmSync(abs(protectedRel), { recursive: true, force: true });
+    fs.mkdirSync(abs(protectedRel), { recursive: true });
+    fs.writeFileSync(path.join(abs(protectedRel), 'existing.txt'), 'protected');
+    fs.mkdirSync(abs(personalRel), { recursive: true });
+    fs.writeFileSync(path.join(abs(personalRel), 'secret.txt'), 'personal-tier secret');
+  }
+
+  afterAll(() => {
+    fs.rmSync(abs(protectedRel), { recursive: true, force: true });
+    fs.rmSync(abs(personalRel), { recursive: true, force: true });
+    restoreOwnerAccess(abs(scratchRel));
+    fs.rmSync(abs(scratchRel), { recursive: true, force: true });
+  });
+
+  beforeEach(() => {
+    for (const key of ENV_KEYS) {
+      saved[key] = process.env[key];
+      delete process.env[key];
+    }
+    restoreOwnerAccess(abs(scratchRel));
+    fs.rmSync(abs(scratchRel), { recursive: true, force: true });
+    fs.mkdirSync(abs(scratchRel), { recursive: true });
+    resetFixtures();
+    asDataOnlyPersona();
+  });
+
+  afterEach(() => {
+    for (const key of ENV_KEYS) {
+      if (saved[key] === undefined) delete process.env[key];
+      else process.env[key] = saved[key];
+    }
+  });
+
+  it('sanity: the persona may read but not write the protected directory', () => {
+    expect(safeReadFile(`${protectedRel}/existing.txt`)).toBe('protected');
+    expect(() => safeWriteFile(`${protectedRel}/direct.txt`, 'x')).toThrow(/NOT authorized/);
+  });
+
+  it('refuses to create a symlink to a target the persona may only read', () => {
+    expect(() => safeSymlinkSync(protectedRel, `${scratchRel}/link`, 'dir')).toThrow(
+      /outside the caller's write scope/
+    );
+    expect(fs.existsSync(abs(`${scratchRel}/link`))).toBe(false);
+  });
+
+  it('refuses writes, appends, mkdir and exclusive creates through a planted symlink', () => {
+    fs.symlinkSync(abs(protectedRel), abs(`${scratchRel}/link`), 'dir');
+
+    expect(() => safeWriteFile(`${scratchRel}/link/payload.ts`, 'pwned')).toThrow(
+      /Write through symbolic link denied/
+    );
+    expect(() => safeAppendFileSync(`${scratchRel}/link/existing.txt`, 'pwned')).toThrow(
+      /Write through symbolic link denied/
+    );
+    expect(() => safeMkdir(`${scratchRel}/link/newdir`)).toThrow(
+      /Write through symbolic link denied/
+    );
+
+    expect(fs.existsSync(path.join(abs(protectedRel), 'payload.ts'))).toBe(false);
+    expect(fs.existsSync(path.join(abs(protectedRel), 'newdir'))).toBe(false);
+    expect(fs.readFileSync(path.join(abs(protectedRel), 'existing.txt'), 'utf8')).toBe('protected');
+  });
+
+  it('refuses a write through a dangling symlink whose target would be created', () => {
+    fs.symlinkSync(abs(`${protectedRel}/not-yet`), abs(`${scratchRel}/dangling`), 'dir');
+    expect(() => safeWriteFile(`${scratchRel}/dangling/payload.ts`, 'pwned')).toThrow(
+      /Write through symbolic link denied/
+    );
+    expect(fs.existsSync(abs(`${protectedRel}/not-yet`))).toBe(false);
+  });
+
+  it('refuses copy and move whose destination parent is a symlink into the protected directory', () => {
+    fs.symlinkSync(abs(protectedRel), abs(`${scratchRel}/link`), 'dir');
+    fs.writeFileSync(abs(`${scratchRel}/src.txt`), 'payload');
+
+    expect(() => safeCopyFileSync(`${scratchRel}/src.txt`, `${scratchRel}/link/copied.ts`)).toThrow(
+      /Write through symbolic link denied/
+    );
+    expect(() => safeMoveSync(`${scratchRel}/src.txt`, `${scratchRel}/link/moved.ts`)).toThrow(
+      /Write through symbolic link denied/
+    );
+
+    expect(fs.existsSync(path.join(abs(protectedRel), 'copied.ts'))).toBe(false);
+    expect(fs.existsSync(path.join(abs(protectedRel), 'moved.ts'))).toBe(false);
+    expect(fs.existsSync(abs(`${scratchRel}/src.txt`))).toBe(true);
+  });
+
+  it('refuses to move a protected file out through a symlinked source parent', () => {
+    fs.symlinkSync(abs(protectedRel), abs(`${scratchRel}/link`), 'dir');
+    expect(() =>
+      safeMoveSync(`${scratchRel}/link/existing.txt`, `${scratchRel}/stolen.txt`)
+    ).toThrow(/Write through symbolic link denied/);
+    expect(fs.existsSync(path.join(abs(protectedRel), 'existing.txt'))).toBe(true);
+  });
+
+  it('refuses rm and unlink through a symlinked parent', () => {
+    fs.symlinkSync(abs(protectedRel), abs(`${scratchRel}/link`), 'dir');
+    expect(() => safeUnlinkSync(`${scratchRel}/link/existing.txt`)).toThrow(
+      /Write through symbolic link denied/
+    );
+    expect(() => safeRmSync(`${scratchRel}/link/existing.txt`)).toThrow(
+      /Write through symbolic link denied/
+    );
+    expect(fs.existsSync(path.join(abs(protectedRel), 'existing.txt'))).toBe(true);
+  });
+
+  it('still removes the link itself (rm never follows the leaf)', () => {
+    fs.symlinkSync(abs(protectedRel), abs(`${scratchRel}/link`), 'dir');
+    safeRmSync(`${scratchRel}/link`);
+    expect(fs.existsSync(abs(`${scratchRel}/link`))).toBe(false);
+    expect(fs.existsSync(path.join(abs(protectedRel), 'existing.txt'))).toBe(true);
+  });
+
+  it('refuses reads into a higher tier through a symlink placed in a readable location', () => {
+    expect(() => safeReadFile(`${personalRel}/secret.txt`)).toThrow(/Read access denied/);
+    fs.symlinkSync(abs(personalRel), abs(`${scratchRel}/personal-link`), 'dir');
+    fs.symlinkSync(
+      abs(`${personalRel}/secret.txt`),
+      abs(`${scratchRel}/secret-file-link.txt`),
+      'file'
+    );
+
+    expect(() => safeReadFile(`${scratchRel}/personal-link/secret.txt`)).toThrow(
+      /Read through symbolic link denied/
+    );
+    expect(() => safeReadFile(`${scratchRel}/secret-file-link.txt`)).toThrow(
+      /Read through symbolic link denied/
+    );
+    expect(() => safeReaddir(`${scratchRel}/personal-link`)).toThrow(
+      /Read through symbolic link denied/
+    );
+    expect(() =>
+      safeCopyFileSync(`${scratchRel}/secret-file-link.txt`, `${scratchRel}/exfil.txt`)
+    ).toThrow(/Read through symbolic link denied/);
+    expect(fs.existsSync(abs(`${scratchRel}/exfil.txt`))).toBe(false);
+  });
+
+  it('refuses junction links and symlinks that resolve outside the repository', () => {
+    expect(() =>
+      safeSymlinkSync(`${scratchRel}/real`, `${scratchRel}/j`, 'junction' as never)
+    ).toThrow(/refuses link type 'junction'/);
+    // A link whose target leaves the checkout, reached via a planted link.
+    fs.symlinkSync(path.dirname(ROOT), abs(`${scratchRel}/escape`), 'dir');
+    expect(() => safeSymlinkSync(`${scratchRel}/escape`, `${scratchRel}/second`, 'dir')).toThrow(
+      /outside the repository|Read through symbolic link denied|Read access denied/
+    );
+  });
+
+  it('does not reuse a cached directory resolution after the directory is swapped for a link', () => {
+    // Warm the per-process directory cache with a real directory...
+    safeMkdir(`${scratchRel}/swap`);
+    safeWriteFile(`${scratchRel}/swap/first.txt`, 'ok');
+    // ...then replace it, outside secure-io, with a link into the protected dir.
+    fs.rmSync(abs(`${scratchRel}/swap`), { recursive: true, force: true });
+    fs.symlinkSync(abs(protectedRel), abs(`${scratchRel}/swap`), 'dir');
+    expect(() => safeWriteFile(`${scratchRel}/swap/second.ts`, 'pwned')).toThrow(
+      /Write through symbolic link denied/
+    );
+    expect(fs.existsSync(path.join(abs(protectedRel), 'second.ts'))).toBe(false);
+  });
+
+  it('does not reuse a cached resolution after the directory is renamed away and replaced', () => {
+    safeMkdir(`${scratchRel}/moved`);
+    safeWriteFile(`${scratchRel}/moved/first.txt`, 'ok');
+    // Same inode, new path: rename the real directory into the protected tree
+    // (as a privileged actor would) and leave a link at the old path.
+    fs.renameSync(abs(`${scratchRel}/moved`), path.join(abs(protectedRel), 'moved'));
+    fs.symlinkSync(path.join(abs(protectedRel), 'moved'), abs(`${scratchRel}/moved`), 'dir');
+    expect(() => safeWriteFile(`${scratchRel}/moved/second.ts`, 'pwned')).toThrow(
+      /Write through symbolic link denied/
+    );
+    expect(fs.existsSync(path.join(abs(protectedRel), 'moved', 'second.ts'))).toBe(false);
+  });
+
+  it('does not trust an earlier resolution after an ancestor is renamed into a protected tree', () => {
+    // Resolve (and, before this fix, cache) tmp/anc/sub ...
+    safeMkdir(`${scratchRel}/anc/sub`);
+    safeWriteFile(`${scratchRel}/anc/sub/1.txt`, 'ok');
+    // ... then, outside secure-io, move the ANCESTOR into the protected tree
+    // and leave a link at its old path. The sub directory keeps its inode.
+    fs.renameSync(abs(`${scratchRel}/anc`), path.join(abs(protectedRel), 'anc'));
+    fs.symlinkSync(path.join(abs(protectedRel), 'anc'), abs(`${scratchRel}/anc`), 'dir');
+    expect(() => safeWriteFile(`${scratchRel}/anc/sub/2.txt`, 'pwned')).toThrow(
+      /Write through symbolic link denied/
+    );
+    expect(fs.existsSync(path.join(abs(protectedRel), 'anc', 'sub', '2.txt'))).toBe(false);
+  });
+
+  it('refuses in-place writes through a hard link to a protected file', () => {
+    const victim = path.join(abs(protectedRel), 'existing.txt');
+    fs.linkSync(victim, abs(`${scratchRel}/hl.txt`));
+    const hl = `${scratchRel}/hl.txt`;
+    expect(() => safeAppendFileSync(hl, 'pwned')).toThrow(/hard link/);
+    expect(() => safeOpenAppendFile(hl)).toThrow(/hard link/);
+    expect(() => safeChmodSync(hl, 0o777)).toThrow(/hard link/);
+    expect(() => safeFsyncFile(hl)).toThrow(/hard link/);
+    const modeBefore = fs.statSync(victim).mode;
+    // A copy replaces the destination entry; the protected inode is untouched.
+    fs.writeFileSync(abs(`${scratchRel}/src.txt`), 'copied');
+    safeCopyFileSync(`${scratchRel}/src.txt`, hl);
+    expect(fs.readFileSync(abs(hl), 'utf8')).toBe('copied');
+    expect(fs.readFileSync(victim, 'utf8')).toBe('protected');
+    expect(fs.statSync(victim).mode).toBe(modeBefore);
+    expect(fs.statSync(victim).nlink).toBe(1);
+  });
+
+  it('allows only the tomb side of a lock recovery pair, probe-only, in the locks directory', () => {
+    const locks = `active/shared/runtime/locks/vitest-secure-io-${RUN}`;
+    try {
+      fs.mkdirSync(abs(locks), { recursive: true });
+      fs.writeFileSync(abs(`${locks}/res.lock`), '{"pid":1}');
+      fs.linkSync(abs(`${locks}/res.lock`), abs(`${locks}/res.lock.stale-1-2-3`));
+      // The tomb names its base: one lstat decides, no directory listing.
+      expect(safeReadFile(`${locks}/res.lock.stale-1-2-3`)).toBe('{"pid":1}');
+      safeFsyncFile(`${locks}/res.lock.stale-1-2-3`);
+      // The base side would need a listing to find its tomb: refused
+      // (lock inspection treats an unreadable record as live).
+      expect(() => safeReadFile(`${locks}/res.lock`)).toThrow(/hard link/);
+      // A tomb may move within its locks directory, never elsewhere.
+      expect(() =>
+        safeMoveSync(`${locks}/res.lock.stale-1-2-3`, `${scratchRel}/MEMORY.md`)
+      ).toThrow(/only move within its locks directory/);
+      expect(fs.existsSync(abs(`${scratchRel}/MEMORY.md`))).toBe(false);
+      safeMoveSync(`${locks}/res.lock.stale-1-2-3`, `${locks}/res.lock.stale-4-5-6`);
+      // Any other name for the inode is refused, even in the locks directory.
+      fs.linkSync(abs(`${locks}/res.lock`), abs(`${locks}/other.json`));
+      expect(() => safeReadFile(`${locks}/res.lock.stale-4-5-6`)).toThrow(/hard link/);
+    } finally {
+      fs.rmSync(abs(locks), { recursive: true, force: true });
+    }
+    // The same pair outside the locks directory gets no exception.
+    fs.writeFileSync(abs(`${scratchRel}/res.lock`), 'x');
+    fs.linkSync(abs(`${scratchRel}/res.lock`), abs(`${scratchRel}/res.lock.stale-1-2-3`));
+    expect(() => safeAppendFileSync(`${scratchRel}/res.lock.stale-1-2-3`, 'y')).toThrow(
+      /hard link/
+    );
+  });
+
+  it('refuses metadata and snapshots of a higher-tier file through a hard link', () => {
+    fs.linkSync(path.join(abs(personalRel), 'secret.txt'), abs(`${scratchRel}/hl-meta.txt`));
+    expect(() => safeStat(`${scratchRel}/hl-meta.txt`)).toThrow(/hard link/);
+    expect(() => safeFileAgeMs(`${scratchRel}/hl-meta.txt`)).toThrow(/hard link/);
+    expect(() => safeReadFileSnapshot(`${scratchRel}/hl-meta.txt`, 64)).toThrow(/hard link/);
+  });
+
+  it('refuses to move a hard link to a protected file under a writable name', () => {
+    fs.linkSync(path.join(abs(protectedRel), 'existing.txt'), abs(`${scratchRel}/hl`));
+    expect(() => safeMoveSync(`${scratchRel}/hl`, `${scratchRel}/MEMORY.md`)).toThrow(/hard link/);
+    expect(fs.existsSync(abs(`${scratchRel}/MEMORY.md`))).toBe(false);
+  });
+
+  it('never truncates through a hard link (append accepts only append flags)', () => {
+    fs.linkSync(path.join(abs(protectedRel), 'existing.txt'), abs(`${scratchRel}/hl`));
+    expect(() => safeAppendFileSync(`${scratchRel}/hl`, '', { flag: 'w' })).toThrow(/only appends/);
+    expect(() => safeAppendFileSync(`${scratchRel}/hl`, '', { flag: 'r+' })).toThrow(
+      /only appends/
+    );
+    expect(fs.readFileSync(path.join(abs(protectedRel), 'existing.txt'), 'utf8')).toBe('protected');
+  });
+
+  it('gives no node_modules exemption through a workspace link into a role-writable tree', () => {
+    // node_modules/@actuator/service -> libs/actuators/service-actuator (pnpm
+    // workspace link); software_developer may write libs/actuators/.
+    const alias = 'node_modules/@actuator/service';
+    const pkgDir = 'libs/actuators/service-actuator';
+    expect(fs.realpathSync(abs(alias))).toBe(fs.realpathSync(abs(pkgDir)));
+    const plantRel = `${pkgDir}/vitest-secure-io-${RUN}`;
+    process.env.MISSION_ROLE = 'software_developer';
+    try {
+      fs.mkdirSync(abs(plantRel), { recursive: true });
+      fs.linkSync(path.join(abs(personalRel), 'secret.txt'), abs(`${plantRel}/x.txt`));
+      expect(() => safeReadFile(`${plantRel}/x.txt`)).toThrow(/hard link/);
+      expect(() => safeReadFile(`${alias}/vitest-secure-io-${RUN}/x.txt`)).toThrow(/hard link/);
+    } finally {
+      fs.rmSync(abs(plantRel), { recursive: true, force: true });
+    }
+  });
+
+  it('grants a hard-link exemption only to the inode the caller holds', () => {
+    // The state a symlink swap between open and check produces: the caller
+    // holds the planted inode, while the path now resolves into the pnpm store.
+    const planted = abs(`${scratchRel}/planted`);
+    fs.linkSync(path.join(abs(personalRel), 'secret.txt'), planted);
+    const pnpmFile = fs.realpathSync(abs('node_modules/vitest/package.json'));
+    fs.symlinkSync(pnpmFile, abs(`${scratchRel}/sw`));
+    expect(() =>
+      assertNotForeignHardLink(fs.statSync(planted), abs(`${scratchRel}/sw`), 'sw', 'read')
+    ).toThrow(/hard link/);
+    // ... and an existing outside-repository file is no exemption either (a
+    // file we create: /etc/hostname does not exist on macOS runners).
+    const outsideDir = fs.mkdtempSync(path.join(os.tmpdir(), 'secure-io-outside-'));
+    try {
+      const outside = path.join(outsideDir, 'hostname');
+      fs.writeFileSync(outside, 'host');
+      fs.rmSync(abs(`${scratchRel}/sw`));
+      fs.symlinkSync(outside, abs(`${scratchRel}/sw`));
+      expect(() =>
+        assertNotForeignHardLink(fs.statSync(planted), abs(`${scratchRel}/sw`), 'sw', 'read')
+      ).toThrow(/hard link/);
+    } finally {
+      fs.rmSync(outsideDir, { recursive: true, force: true });
+    }
+  });
+
+  it('never chmods a protected file or directory through a flipped symlink', async () => {
+    const pubdir = abs(`${scratchRel}/pubdir`);
+    fs.mkdirSync(pubdir);
+    fs.writeFileSync(abs(`${scratchRel}/pub.txt`), 'pub');
+    const pdir = path.join(abs(personalRel), 'zz-dir');
+    fs.mkdirSync(pdir, { recursive: true });
+    fs.chmodSync(pdir, 0o755);
+    const secretPath = path.join(abs(personalRel), 'secret.txt');
+    fs.chmodSync(secretPath, 0o644);
+    const sw = abs(`${scratchRel}/sw`);
+    fs.symlinkSync(pubdir, sw);
+    const child = startFlipper(sw, [pubdir, pdir, abs(`${scratchRel}/pub.txt`), secretPath]);
+    let tries = 0;
+    try {
+      tries = await hammer(2500, () => safeChmodSync(`${scratchRel}/sw`, 0o700));
+    } finally {
+      await stopFlipper(child);
+    }
+    expect(tries).toBeGreaterThan(50);
+    expect(fs.statSync(pdir).mode & 0o777).toBe(0o755);
+    expect(fs.statSync(secretPath).mode & 0o777).toBe(0o644);
+  }, 20000);
+
+  it('never creates a file through a dangling symlink flipped into a protected tree', async () => {
+    const real = abs(`${scratchRel}/real.log`);
+    fs.writeFileSync(real, '');
+    const sw = abs(`${scratchRel}/sw`);
+    fs.symlinkSync(real, sw);
+    const targets = [real];
+    for (let i = 0; i < 4; i += 1) targets.push(path.join(abs(personalRel), `created-by-${i}.txt`));
+    const child = startFlipper(sw, targets);
+    let tries = 0;
+    try {
+      tries = await hammer(2500, () => safeAppendFileSync(`${scratchRel}/sw`, 'x'));
+    } finally {
+      await stopFlipper(child);
+    }
+    expect(tries).toBeGreaterThan(50);
+    expect(fs.readdirSync(abs(personalRel)).filter((n) => n.startsWith('created-by-'))).toEqual([]);
+  }, 20000);
+
+  /**
+   * A writer that never pauses. With /proc the link count is pinned by the
+   * "(deleted)" mark, so nothing is refused. Without it (macOS) the ctime is
+   * the only churn evidence and such a writer leaves no quiet window: the
+   * documented contract is fail-closed — every failure is the "changed"
+   * refusal, no read returns anything but this file, and nothing hangs.
+   */
+  async function expectUnpacedStormContract(pinnedByProc: boolean): Promise<void> {
+    for (const kind of ['chmod', 'utimes'] as const) {
+      const started = Date.now();
+      const result = await concurrentChange(kind, 1000);
+      expect(Date.now() - started).toBeLessThan(15000);
+      expect(Math.min(result.reads, result.appends, result.stats)).toBeGreaterThan(50);
+      expect({ kind, otherErrors: result.otherErrors, torn: result.torn }).toEqual({
+        kind,
+        otherErrors: 0,
+        torn: 0,
+      });
+      if (pinnedByProc) expect({ kind, refused: result.refused }).toEqual({ kind, refused: 0 });
+    }
+  }
+
+  it('serves a file another process keeps chmod-ing or touching unpaced where /proc pins it, and fails closed elsewhere', async () => {
+    await expectUnpacedStormContract(fs.existsSync('/proc/self/fd'));
+  }, 40000);
+
+  it('never reads or appends to a protected file through hard-link churn that forges a data write (bounded race)', async () => {
+    const result = await hardLinkChurn(2500, 'mtime');
+    expect(result.reads).toBeGreaterThan(50);
+    expect(result.appends).toBeGreaterThan(50);
+    expect({ readLeaks: result.readLeaks, secretGrew: result.secretGrew }).toEqual({
+      readLeaks: 0,
+      secretGrew: 0,
+    });
+  }, 30000);
+
+  it('never refuses a file another process replaces atomically', async () => {
+    const result = await concurrentChange('replace', 1500);
+    expect(Math.min(result.reads, result.appends, result.stats)).toBeGreaterThan(50);
+    expect({ refused: result.refused, other: result.otherErrors, torn: result.torn }).toEqual({
+      refused: 0,
+      other: 0,
+      torn: 0,
+    });
+  }, 30000);
+
+  it('never reads or appends to a protected file through hard-link churn (bounded race)', async () => {
+    const result = await hardLinkChurn(2500);
+    expect(result.reads).toBeGreaterThan(50);
+    expect(result.appends).toBeGreaterThan(50);
+    expect({ readLeaks: result.readLeaks, secretGrew: result.secretGrew }).toEqual({
+      readLeaks: 0,
+      secretGrew: 0,
+    });
+  }, 30000);
+
+  it('reads a file another process keeps appending to', async () => {
+    const log = abs(`${scratchRel}/busy.log`);
+    fs.writeFileSync(log, 'start\n');
+    const writer = `
+      const fs = require('node:fs');
+      const [log] = process.argv.slice(1);
+      const end = Date.now() + 5000;
+      while (Date.now() < end) fs.appendFileSync(log, 'line\\n');`;
+    const child = safeSpawn(process.execPath, ['-e', writer, log], { stdio: 'ignore' });
+    let refused = 0;
+    let read = 0;
+    try {
+      const end = Date.now() + 2000;
+      while (Date.now() < end) {
+        try {
+          safeReadFile(`${scratchRel}/busy.log`);
+          read += 1;
+        } catch {
+          refused += 1;
+        }
+        if ((read + refused) % 50 === 0) await new Promise((r) => setImmediate(r));
+      }
+    } finally {
+      child.kill('SIGKILL');
+    }
+    expect(read).toBeGreaterThan(50);
+    expect(refused).toBe(0);
+  }, 20000);
+
+  it('keeps reading while another process atomically replaces the file', async () => {
+    // A runtime store writes a temp file and renames it over the old one.
+    // The reader may open the inode being unlinked: its /proc entry reads
+    // "(deleted)", but with nlink 0 it can never be relinked to a secret,
+    // so it is still served. Off Linux the portable pin cannot know which
+    // name the descriptor was opened through and refuses (as on main).
+    if (process.platform !== 'linux') return;
+    const log = abs(`${scratchRel}/replaced.log`);
+    fs.writeFileSync(log, 'v0\n');
+    const replacer = `
+      const fs = require('node:fs');
+      const [name] = process.argv.slice(1);
+      const tmp = name + '.tmp';
+      let i = 0;
+      const end = Date.now() + 5000;
+      while (Date.now() < end) {
+        try { fs.writeFileSync(tmp, 'v' + ++i + '\\n'); fs.renameSync(tmp, name); } catch {}
+      }`;
+    const child = safeSpawn(process.execPath, ['-e', replacer, log], { stdio: 'ignore' });
+    let refused = 0;
+    let read = 0;
+    try {
+      const end = Date.now() + 2000;
+      while (Date.now() < end) {
+        try {
+          const text = String(safeReadFile(`${scratchRel}/replaced.log`));
+          if (/^v\d+\n$/.test(text)) read += 1;
+        } catch {
+          refused += 1;
+        }
+        if ((read + refused) % 50 === 0) await new Promise((r) => setImmediate(r));
+      }
+    } finally {
+      child.kill('SIGKILL');
+    }
+    expect(read).toBeGreaterThan(50);
+    expect(refused).toBe(0);
+  }, 20000);
+
+  it('creates new files when /proc is unavailable on Linux', () => {
+    setProcFdRootForTesting('/nonexistent-proc-self-fd');
+    try {
+      safeAppendFileSync(`${scratchRel}/no-proc.log`, 'a');
+      safeAppendFileSync(`${scratchRel}/no-proc.log`, 'b');
+      expect(safeReadFile(`${scratchRel}/no-proc.log`)).toBe('ab');
+      expect(safeReaddir(scratchRel)).toContain('no-proc.log');
+    } finally {
+      setProcFdRootForTesting(undefined);
+    }
+  });
+
+  it('loses no line when concurrent appenders create the same new files', async () => {
+    // Each child appends its tag to the same 400 new files in turn: the
+    // processes race to create every file, and the losers must append too.
+    const files = 400;
+    const child = `
+      const { safeAppendFileSync } = await import(process.argv[1]);
+      const [dir, tag, n] = process.argv.slice(2);
+      for (let i = 0; i < Number(n); i += 1) safeAppendFileSync(dir + '/f' + i + '.log', tag + '\\n');`;
+    const secureIo = path.join(ROOT, 'libs/core/secure-io.ts');
+    const loader = path.join(ROOT, 'scripts/ts-loader.mjs');
+    const runs = ['a', 'b', 'c'].map(
+      (tag) =>
+        new Promise<string>((resolve) => {
+          const proc = safeSpawn(
+            process.execPath,
+            [
+              '--import',
+              loader,
+              '--input-type=module',
+              '-e',
+              child,
+              secureIo,
+              scratchRel,
+              tag,
+              String(files),
+            ],
+            { stdio: ['ignore', 'ignore', 'pipe'], cwd: ROOT }
+          );
+          let stderr = '';
+          proc.stderr?.on('data', (chunk) => (stderr += String(chunk)));
+          proc.on('close', (code) => resolve(code === 0 ? 'ok' : `exit ${code}: ${stderr}`));
+        })
+    );
+    expect(await Promise.all(runs)).toEqual(['ok', 'ok', 'ok']);
+    let lost = 0;
+    for (let i = 0; i < files; i += 1) {
+      const lines = fs
+        .readFileSync(abs(`${scratchRel}/f${i}.log`), 'utf8')
+        .split('\n')
+        .filter(Boolean);
+      lost += 3 - lines.length;
+    }
+    expect(lost).toBe(0);
+  }, 60000);
+
+  it('refuses to append through a dangling leaf link, even to an allowed target', () => {
+    fs.symlinkSync(abs(`${scratchRel}/not-yet.log`), abs(`${scratchRel}/dangling`));
+    expect(() => safeAppendFileSync(`${scratchRel}/dangling`, 'x')).toThrow(/dangling link/);
+    expect(fs.existsSync(abs(`${scratchRel}/not-yet.log`))).toBe(false);
+  });
+
+  it.skipIf(process.platform === 'win32')('refuses to chmod a Unix socket', async () => {
+    const sock = abs(`${scratchRel}/sk`);
+    const server = net.createServer();
+    // Bind by a short relative path (sun_path is ~104 bytes); bind is synchronous.
+    const cwd = process.cwd();
+    process.chdir(abs(scratchRel));
+    try {
+      server.listen('sk');
+    } finally {
+      process.chdir(cwd);
+    }
+    await new Promise<void>((resolve) => server.once('listening', () => resolve()));
+    try {
+      expect(() => safeChmodSync(`${scratchRel}/sk`, 0o600)).toThrow(/not a file or directory/);
+    } finally {
+      server.close();
+    }
+  });
+
+  it('never chmods a protected file through a path flipped between allowed and protected directories', async () => {
+    const secretPath = path.join(abs(personalRel), 'secret.txt');
+    const allowedDir = abs(`${scratchRel}/allowed-dir`);
+    fs.mkdirSync(allowedDir, { recursive: true });
+    fs.writeFileSync(path.join(allowedDir, 'secret.txt'), 'allowed');
+    fs.chmodSync(secretPath, 0o644);
+    // Windows reports only the readonly bit through Node's POSIX mode view;
+    // compare against the platform's actual baseline instead of assuming 0644.
+    const secretModeBefore = fs.statSync(secretPath).mode & 0o777;
+    const scratchModeBefore = fs.statSync(abs(scratchRel)).mode & 0o700;
+    // Directory links need no Developer Mode on Windows when created as
+    // junctions. Flip the parent between an allowed directory and the
+    // protected directory while chmod resolves its child path.
+    const sw = abs(`${scratchRel}/sw`);
+    const linkType = process.platform === 'win32' ? 'junction' : 'dir';
+    fs.symlinkSync(allowedDir, sw, linkType);
+    const flipper = `
+        const fs = require('node:fs');
+        const [sw, allowed, secret, linkType] = process.argv.slice(1);
+        const end = Date.now() + 9000;
+        let i = 0;
+        while (Date.now() < end) {
+          const tmp = sw + '.tmp';
+          try {
+            fs.rmSync(tmp, { force: true });
+            fs.symlinkSync(i++ % 2 ? allowed : secret, tmp, linkType);
+            fs.renameSync(tmp, sw);
+          } catch {}
+        }`;
+    const child = safeSpawn(
+      process.execPath,
+      ['-e', flipper, sw, allowedDir, abs(personalRel), linkType],
+      {
+        stdio: 'ignore',
+      }
+    );
+    let tries = 0;
+    try {
+      tries = await hammer(2500, () => safeChmodSync(`${scratchRel}/sw/secret.txt`, 0o600));
+    } finally {
+      await stopFlipper(child);
+    }
+    expect(tries).toBeGreaterThan(50);
+    expect(fs.statSync(secretPath).mode & 0o777).toBe(secretModeBefore);
+    expect(fs.statSync(abs(scratchRel)).mode & 0o700).toBe(scratchModeBefore);
+  }, 20000);
+
+  it('never creates in, nor deletes from, a protected directory flipped in as a parent', async () => {
+    // `d` flips between a writable directory and two protected ones; the
+    // append's create (and, on vulnerable code, its cleanup unlink) follows
+    // whichever directory `d` names at that instant.
+    const sub = abs(`${scratchRel}/sub`);
+    fs.mkdirSync(sub);
+    const psub = path.join(abs(personalRel), 'sub');
+    fs.mkdirSync(psub);
+    const victim = path.join(abs(personalRel), 'victim.txt');
+    fs.writeFileSync(victim, '');
+    const d = abs(`${scratchRel}/d`);
+    fs.symlinkSync(sub, d);
+    const child = startFlipper(d, [sub, psub, abs(personalRel)]);
+    let tries = 0;
+    let n = 0;
+    let deleted = 0;
+    try {
+      tries = await hammer(2500, () => {
+        fs.rmSync(path.join(sub, 'victim.txt'), { force: true });
+        fs.rmSync(path.join(psub, 'victim.txt'), { force: true });
+        n += 1;
+        try {
+          safeAppendFileSync(`${scratchRel}/d/victim.txt`, '');
+        } finally {
+          if (!fs.existsSync(victim)) deleted += 1;
+          safeAppendFileSync(`${scratchRel}/d/new-${n}.txt`, '');
+        }
+      });
+    } finally {
+      await stopFlipper(child);
+    }
+    expect(tries).toBeGreaterThan(50);
+    expect(deleted).toBe(0);
+    expect(fs.existsSync(victim)).toBe(true);
+    const planted = [...fs.readdirSync(psub), ...fs.readdirSync(abs(personalRel))].filter((f) =>
+      f.startsWith('new-')
+    );
+    expect(planted).toEqual([]);
+  }, 20000);
+
+  it('never lists a protected directory through a flipped symlink', async () => {
+    const pubdir = abs(`${scratchRel}/pubdir`);
+    fs.mkdirSync(pubdir);
+    fs.writeFileSync(path.join(pubdir, 'visible.txt'), 'v');
+    const sw = abs(`${scratchRel}/sw`);
+    fs.symlinkSync(pubdir, sw);
+    const child = startFlipper(sw, [pubdir, abs(personalRel)]);
+    let leaked = 0;
+    let listed = 0;
+    let tries = 0;
+    try {
+      tries = await hammer(2500, () => {
+        const names = safeReaddir(`${scratchRel}/sw`);
+        listed += 1;
+        if (names.includes('secret.txt')) leaked += 1;
+      });
+    } finally {
+      await stopFlipper(child);
+    }
+    expect(tries).toBeGreaterThan(50);
+    expect(listed).toBeGreaterThan(0);
+    expect(leaked).toBe(0);
+  }, 20000);
+
+  it('never hangs on a FIFO (reads open non-blocking and refuse non-regular files)', () => {
+    const fifo = abs(`${scratchRel}/pipe`);
+    process.env.MISSION_ROLE = 'mission_controller';
+    safeExec('mkfifo', [fifo]);
+    process.env.MISSION_ROLE = 'finance_controller';
+    expect(() => safeReadFile(`${scratchRel}/pipe`)).toThrow(/Not a regular file/);
+    expect(() => safeReadFileTail(`${scratchRel}/pipe`, 16)).toThrow(/Not a regular file/);
+    expect(() => safeReadFileRange(`${scratchRel}/pipe`, 0, 16)).toThrow(/Not a regular file/);
+    expect(() => safeCopyFileSync(`${scratchRel}/pipe`, `${scratchRel}/out.txt`)).toThrow(
+      /Not a regular file/
+    );
+    expect(() => safeChmodSync(`${scratchRel}/pipe`, 0o600)).toThrow(/not a file or directory/);
+  }, 5000);
+
+  it('does not reveal the protected location in a denial message', () => {
+    fs.symlinkSync(path.join(abs(personalRel), 'secret.txt'), abs(`${scratchRel}/to-secret`));
+    let message = '';
+    try {
+      safeReadFile(`${scratchRel}/to-secret`);
+    } catch (error) {
+      message = (error as Error).message;
+    }
+    expect(message).not.toBe('');
+    expect(message).not.toContain('vitest-secure-io-symlink');
+  });
+
+  it('keeps the guard classification, but not the location it names, in a denial', () => {
+    fs.symlinkSync(abs(protectedRel), abs(`${scratchRel}/to-protected`));
+    let message = '';
+    try {
+      safeWriteFile(`${scratchRel}/to-protected/x.txt`, 'x');
+    } catch (error) {
+      message = (error as Error).message;
+    }
+    expect(message).toMatch(/Write through symbolic link denied: .*\[POLICY_VIOLATION\]$/);
+    expect(message).not.toContain('coordination');
+  });
+
+  it('creates through a linked parent only where the create can be pinned to it', () => {
+    fs.mkdirSync(abs(`${scratchRel}/real`));
+    fs.symlinkSync(abs(`${scratchRel}/real`), abs(`${scratchRel}/alias`));
+    const previous = setProcFdLookupDisabledForTesting(true);
+    try {
+      const append = () => safeAppendFileSync(`${scratchRel}/alias/new.log`, 'x');
+      if (process.platform === 'darwin') {
+        // O_NOFOLLOW_ANY at the authorized physical path.
+        append();
+        expect(fs.readFileSync(abs(`${scratchRel}/real/new.log`), 'utf8')).toBe('x');
+      } else {
+        // No openat and no O_NOFOLLOW_ANY: refused, nothing created.
+        expect(append).toThrow(/linked parent directory cannot be pinned/);
+        expect(fs.existsSync(abs(`${scratchRel}/real/new.log`))).toBe(false);
+      }
+    } finally {
+      setProcFdLookupDisabledForTesting(previous);
+    }
+  });
+
+  it('never leaks through a symlink flipped between check and open (read, range, tail, stat, size)', async () => {
+    // No hard link: `sw` flips between a readable file, a regular file and a
+    // symlink straight to the personal-tier secret (nlink 1).
+    const secretPath = path.join(abs(personalRel), 'secret.txt');
+    const secret = fs.statSync(secretPath);
+    const readable = abs(`${scratchRel}/readable.txt`);
+    fs.writeFileSync(readable, 'readable file, a different length');
+    const plain = abs(`${scratchRel}/plain.txt`);
+    fs.writeFileSync(plain, 'plain regular file contents');
+    const sw = abs(`${scratchRel}/sw`);
+    fs.symlinkSync(readable, sw);
+    const flipper = `
+      const fs = require('node:fs');
+      const [sw, readable, plain, secret] = process.argv.slice(1);
+      const end = Date.now() + 9000;
+      let i = 0;
+      while (Date.now() < end) {
+        const tmp = sw + '.tmp';
+        try {
+          fs.rmSync(tmp, { force: true });
+          const k = i++ % 3;
+          if (k === 0) fs.symlinkSync(readable, tmp);
+          else if (k === 1) fs.copyFileSync(plain, tmp);
+          else fs.symlinkSync(secret, tmp);
+          fs.renameSync(tmp, sw);
+        } catch {}
+      }`;
+    const child = safeSpawn(process.execPath, ['-e', flipper, sw, readable, plain, secretPath], {
+      stdio: 'ignore',
+    });
+    const leaks: Record<string, number> = { read: 0, range: 0, tail: 0, stat: 0, size: 0 };
+    const tries: Record<string, number> = { read: 0, range: 0, tail: 0, stat: 0, size: 0 };
+    const rel = `${scratchRel}/sw`;
+    const ops: Record<string, () => boolean> = {
+      read: () => String(safeReadFile(rel)).includes('personal-tier secret'),
+      range: () => safeReadFileRange(rel, 0, 64).toString().includes('personal-tier secret'),
+      tail: () => safeReadFileTail(rel, 64).buffer.toString().includes('personal-tier secret'),
+      stat: () => safeStat(rel).ino === secret.ino,
+      size: () => validateFileSize(rel) === secret.size,
+    };
+    try {
+      for (const [name, op] of Object.entries(ops)) {
+        const end = Date.now() + 1500;
+        while (Date.now() < end) {
+          tries[name] += 1;
+          try {
+            if (op()) leaks[name] += 1;
+          } catch {
+            // refused or raced: never a leak
+          }
+          if (tries[name] % 50 === 0) await new Promise((r) => setImmediate(r));
+        }
+      }
+    } finally {
+      await stopFlipper(child);
+    }
+    for (const name of Object.keys(ops)) expect(tries[name]).toBeGreaterThan(50);
+    expect(leaks).toEqual({ read: 0, range: 0, tail: 0, stat: 0, size: 0 });
+  }, 30000);
+
+  it('never leaks a hard-linked secret while a symlink flips into the pnpm store (bounded race)', async () => {
+    const planted = abs(`${scratchRel}/planted`);
+    fs.linkSync(path.join(abs(personalRel), 'secret.txt'), planted);
+    const pnpmFile = fs.realpathSync(abs('node_modules/vitest/package.json'));
+    const sw = abs(`${scratchRel}/sw`);
+    fs.symlinkSync(planted, sw);
+    const flipper = `
+      const fs = require('node:fs');
+      const [sw, a, b] = process.argv.slice(1);
+      const end = Date.now() + 4000;
+      let i = 0;
+      while (Date.now() < end) {
+        const tmp = sw + '.tmp';
+        try { fs.rmSync(tmp, { force: true }); fs.symlinkSync(i++ % 2 ? a : b, tmp); fs.renameSync(tmp, sw); } catch {}
+      }`;
+    const child = safeSpawn(process.execPath, ['-e', flipper, sw, planted, pnpmFile], {
+      stdio: 'ignore',
+    });
+    let leaked = 0;
+    let tries = 0;
+    let sawStore = 0; // proves the flipper ran: the store side is readable
+    try {
+      const end = Date.now() + 3000;
+      while (Date.now() < end) {
+        tries += 1;
+        try {
+          const text = String(safeReadFile(`${scratchRel}/sw`));
+          if (text.includes('personal-tier secret')) leaked += 1;
+          if (text.includes('"name": "vitest"')) sawStore += 1;
+        } catch {
+          // refused or raced: never a leak
+        }
+        if (tries % 50 === 0) await new Promise((r) => setImmediate(r));
+      }
+    } finally {
+      await stopFlipper(child);
+    }
+    expect(tries).toBeGreaterThan(100);
+    expect(sawStore).toBeGreaterThan(0);
+    expect(leaked).toBe(0);
+  }, 20000);
+
+  it('reports a missing file with code ENOENT', () => {
+    let code: unknown;
+    try {
+      safeReadFile(`${scratchRel}/does-not-exist.json`);
+    } catch (error) {
+      code = (error as NodeJS.ErrnoException).code;
+    }
+    expect(code).toBe('ENOENT');
+  });
+
+  it('lets SUDO read pnpm store files (the store is exempt for every caller)', () => {
+    process.env.KYBERION_SUDO = 'true';
+    expect(() => safeReadFile('node_modules/vitest/package.json')).not.toThrow();
+  });
+
+  it('gives no node_modules exemption to a node_modules directory in a writable tree', () => {
+    fs.mkdirSync(abs(`${scratchRel}/node_modules/pkg`), { recursive: true });
+    fs.linkSync(
+      path.join(abs(personalRel), 'secret.txt'),
+      abs(`${scratchRel}/node_modules/pkg/index.js`)
+    );
+    expect(() => safeReadFile(`${scratchRel}/node_modules/pkg/index.js`)).toThrow(/hard link/);
+    expect(() => validateFileSize(`${scratchRel}/node_modules/pkg/index.js`)).toThrow(/hard link/);
+  });
+
+  it('refuses reads of a higher-tier file through a hard link', () => {
+    fs.linkSync(path.join(abs(personalRel), 'secret.txt'), abs(`${scratchRel}/hl-secret.txt`));
+    expect(() => safeReadFile(`${scratchRel}/hl-secret.txt`)).toThrow(/hard link/);
+    expect(() =>
+      safeCopyFileSync(`${scratchRel}/hl-secret.txt`, `${scratchRel}/exfil2.txt`)
+    ).toThrow(/hard link/);
+    expect(fs.existsSync(abs(`${scratchRel}/exfil2.txt`))).toBe(false);
+  });
+
+  it('applies the tier read guard to validateFileSize', () => {
+    expect(() => validateFileSize(`${personalRel}/secret.txt`)).toThrow(/Read access denied/);
+  });
+
+  it('keeps legitimate symlinks inside the caller write scope working', () => {
+    safeMkdir(`${scratchRel}/real`);
+    safeSymlinkSync(`${scratchRel}/real`, `${scratchRel}/alias`, 'dir');
+    safeWriteFile(`${scratchRel}/alias/note.txt`, 'hello');
+    safeAppendFileSync(`${scratchRel}/alias/note.txt`, ' world');
+    expect(safeReadFile(`${scratchRel}/alias/note.txt`)).toBe('hello world');
+    expect(fs.readFileSync(abs(`${scratchRel}/real/note.txt`), 'utf8')).toBe('hello world');
+    safeCopyFileSync(`${scratchRel}/alias/note.txt`, `${scratchRel}/alias/copy.txt`);
+    safeMoveSync(`${scratchRel}/alias/copy.txt`, `${scratchRel}/alias/moved.txt`);
+    expect(safeReaddir(`${scratchRel}/alias`).sort()).toEqual(['moved.txt', 'note.txt']);
+    // The link is stored relative, so it keeps pointing inside the checkout.
+    expect(path.isAbsolute(fs.readlinkSync(abs(`${scratchRel}/alias`)))).toBe(false);
+  });
+
+  // macOS and Windows have no /proc/self/fd: the opened descriptor is located
+  // by re-deriving the canonical path and requiring its leaf to be the inode
+  // held. The seam forces that branch here so Linux CI covers it.
+  describe('without /proc/self/fd (portable fallback)', () => {
+    let previous = false;
+    beforeEach(() => {
+      previous = setProcFdLookupDisabledForTesting(true);
+    });
+    afterEach(() => {
+      setProcFdLookupDisabledForTesting(previous);
+    });
+
+    it('never reads or appends to a protected file through hard-link churn that forges a data write (bounded race)', async () => {
+      const result = await hardLinkChurn(2500, 'mtime');
+      expect(result.reads).toBeGreaterThan(50);
+      expect(result.appends).toBeGreaterThan(50);
+      expect({ readLeaks: result.readLeaks, secretGrew: result.secretGrew }).toEqual({
+        readLeaks: 0,
+        secretGrew: 0,
+      });
+    }, 30000);
+
+    it('fails closed, never leaking or hanging, under a chmod or touch writer that never pauses', async () => {
+      await expectUnpacedStormContract(false);
+    }, 40000);
+
+    it('never refuses a file another process keeps chmod-ing or touching every millisecond', async () => {
+      for (const kind of ['chmod', 'utimes'] as const) {
+        const result = await concurrentChange(kind, 1000, 1);
+        expect(Math.min(result.reads, result.appends, result.stats)).toBeGreaterThan(50);
+        expect({
+          kind,
+          refused: result.refused,
+          other: result.otherErrors,
+          torn: result.torn,
+        }).toEqual({
+          kind,
+          refused: 0,
+          other: 0,
+          torn: 0,
+        });
+      }
+    }, 30000);
+
+    it('never refuses a file another process replaces atomically', async () => {
+      const result = await concurrentChange('replace', 1500);
+      expect(Math.min(result.reads, result.appends, result.stats)).toBeGreaterThan(50);
+      expect({ refused: result.refused, other: result.otherErrors, torn: result.torn }).toEqual({
+        refused: 0,
+        other: 0,
+        torn: 0,
+      });
+    }, 30000);
+
+    it('never reads or appends to a protected file through hard-link churn (bounded race)', async () => {
+      const result = await hardLinkChurn(2500);
+      expect(result.reads).toBeGreaterThan(50);
+      expect(result.appends).toBeGreaterThan(50);
+      expect({ readLeaks: result.readLeaks, secretGrew: result.secretGrew }).toEqual({
+        readLeaks: 0,
+        secretGrew: 0,
+      });
+    }, 30000);
+
+    it('lists and stats the checkout root (a repository walk starts there)', () => {
+      expect(safeReaddir(ROOT)).toContain('package.json');
+      expect(safeStat(ROOT).isDirectory()).toBe(true);
+      expect(getAllFiles(ROOT, { maxDepth: 0 })).toContain(path.join(ROOT, 'package.json'));
+      expect(getAllFiles(abs('libs/core/foundation'))).toContain(
+        abs('libs/core/foundation/lock-utils.ts')
+      );
+    });
+
+    it('reads, stats and lists ordinary files and directories', () => {
+      safeWriteFile(`${scratchRel}/note.txt`, 'hello');
+      expect(safeReadFile(`${scratchRel}/note.txt`)).toBe('hello');
+      expect(safeStat(`${scratchRel}/note.txt`).size).toBe(5);
+      expect(safeStat(scratchRel).isDirectory()).toBe(true);
+      expect(safeReaddir(scratchRel)).toEqual(['note.txt']);
+      expect(() => safeReaddir(personalRel)).toThrow(/ROLE_VIOLATION/);
+    });
+
+    it('never lists a protected directory, nor returns an empty listing, while a symlink flips', async () => {
+      const pubdir = abs(`${scratchRel}/pubdir`);
+      fs.mkdirSync(pubdir);
+      fs.writeFileSync(path.join(pubdir, 'visible.txt'), 'v');
+      const sw = abs(`${scratchRel}/sw`);
+      fs.symlinkSync(pubdir, sw);
+      const child = startFlipper(sw, [pubdir, abs(personalRel)]);
+      let leaked = 0;
+      let listed = 0;
+      let wrong = 0; // any listing other than the public directory's own
+      let tries = 0;
+      try {
+        tries = await hammer(2500, () => {
+          const names = safeReaddir(`${scratchRel}/sw`);
+          listed += 1;
+          if (names.includes('secret.txt')) leaked += 1;
+          if (names.join() !== 'visible.txt') wrong += 1;
+        });
+      } finally {
+        await stopFlipper(child);
+      }
+      expect(tries).toBeGreaterThan(50);
+      expect(listed).toBeGreaterThan(0);
+      expect(leaked).toBe(0);
+      expect(wrong).toBe(0);
+    }, 20000);
+
+    it('never reads a protected file through a symlink flipped between check and open', async () => {
+      const readable = abs(`${scratchRel}/readable.txt`);
+      fs.writeFileSync(readable, 'readable');
+      const sw = abs(`${scratchRel}/sw`);
+      fs.symlinkSync(readable, sw);
+      const child = startFlipper(sw, [readable, path.join(abs(personalRel), 'secret.txt')]);
+      let leaked = 0;
+      let read = 0;
+      let tries = 0;
+      try {
+        tries = await hammer(2500, () => {
+          const text = String(safeReadFile(`${scratchRel}/sw`));
+          read += 1;
+          if (text.includes('personal-tier secret')) leaked += 1;
+        });
+      } finally {
+        await stopFlipper(child);
+      }
+      expect(tries).toBeGreaterThan(50);
+      expect(read).toBeGreaterThan(0);
+      expect(leaked).toBe(0);
+    }, 20000);
+  });
+});
+
+describe('secure-io symlink canonicalization keeps the Vitest live-subtree remap', () => {
+  const liveRel = `active/shared/runtime/peer-messaging/vitest-secure-io-symlink-${RUN}`;
+  const scratchRel2 = `active/shared/tmp/tests/secure-io-symlink-remap-${RUN}`;
+
+  afterAll(() => {
+    fs.rmSync(pathResolver.resolve(liveRel), { recursive: true, force: true });
+    fs.rmSync(abs(scratchRel2), { recursive: true, force: true });
+  });
+
+  it('writes a live-subtree path into the per-pool sandbox and reads it back', () => {
+    const sandboxed = pathResolver.resolve(`${liveRel}/state.json`);
+    expect(sandboxed).toContain(pathResolver.VITEST_LIVE_SANDBOX_ROOT);
+    safeWriteFile(`${liveRel}/state.json`, '{"ok":true}');
+    expect(fs.existsSync(sandboxed)).toBe(true);
+    expect(fs.existsSync(abs(`${liveRel}/state.json`))).toBe(false);
+    expect(safeReadFile(`${liveRel}/state.json`)).toBe('{"ok":true}');
+  });
+
+  // Without /proc (macOS) the opened vault file is pinned by path identity.
+  for (const portable of [false, true]) {
+    it(`still reads through a registered vault mount outside the repository, and never writes${portable ? ' (no /proc/self/fd)' : ''}`, async () => {
+      const os = await import('node:os');
+      const { mountToVault, unmountFromVault } = await import('../secret/vault-mount.js');
+      const host = fs.mkdtempSync(path.join(os.tmpdir(), 'secure-io-vault-'));
+      const name = `vitest-secure-io-${RUN}`;
+      fs.writeFileSync(path.join(host, 'doc.txt'), 'mounted');
+      const previous = setProcFdLookupDisabledForTesting(portable);
+      try {
+        mountToVault(host, name);
+        expect(safeReadFile(`vault/mounts/${name}/doc.txt`)).toBe('mounted');
+        expect(() => safeWriteFile(`vault/mounts/${name}/new.txt`, 'x')).toThrow();
+        expect(fs.existsSync(path.join(host, 'new.txt'))).toBe(false);
+      } finally {
+        setProcFdLookupDisabledForTesting(previous);
+        unmountFromVault(name);
+        fs.rmSync(host, { recursive: true, force: true });
+      }
+    });
+  }
+
+  it('judges a link into the sandbox by the sandbox location, and allows it', () => {
+    safeMkdir(scratchRel2);
+    safeSymlinkSync(liveRel, `${scratchRel2}/live-link`, 'dir');
+    // The link was created to the remapped (sandbox) target.
+    expect(fs.realpathSync(abs(`${scratchRel2}/live-link`))).toBe(
+      fs.realpathSync(pathResolver.resolve(liveRel))
+    );
+    safeWriteFile(`${scratchRel2}/live-link/through.json`, '{}');
+    expect(fs.existsSync(path.join(pathResolver.resolve(liveRel), 'through.json'))).toBe(true);
+  });
+});
+
+describe('secure-io guard internals', () => {
+  const dirRel = `active/shared/tmp/tests/secure-io-guard-${RUN}`;
+
+  afterAll(() => {
+    fs.rmSync(abs(dirRel), { recursive: true, force: true });
+    fs.rmSync(abs(`${dirRel}-moved`), { recursive: true, force: true });
+  });
+
+  it('detects a checked directory replaced between the check and the temp open', () => {
+    fs.mkdirSync(abs(dirRel), { recursive: true });
+    const checked = captureCheckedDir(abs(dirRel));
+    fs.renameSync(abs(dirRel), abs(`${dirRel}-moved`));
+    fs.mkdirSync(abs(dirRel));
+    const temp = path.join(abs(dirRel), 'x.tmp');
+    const fd = fs.openSync(temp, 'wx');
+    try {
+      expect(() => assertTempInCheckedDir(checked, temp, fd)).toThrow(/changed between/);
+    } finally {
+      fs.closeSync(fd);
+    }
+  });
+
+  it('keeps the first sensitive-path mediation probe registered', () => {
+    registerSensitivePathMediationProbe(() => true);
+    expect(() => safeReadFile('knowledge/personal/connections/slack.json')).toThrow(
+      '[SENSITIVE_PATH_DENIED]'
+    );
+  });
+
+  it('reads pnpm store files under node_modules despite their link count', () => {
+    const pkg = 'node_modules/vitest/package.json';
+    expect(() => safeReadFile(pkg)).not.toThrow();
+  });
+
+  it('accepts only a real write between the two link-state samples', () => {
+    // The masked-churn finding: utimes(2), a same-size truncate or an
+    // in-place write can stamp ctime == mtime without a link or unlink, so
+    // "ctime moved together with mtime" alone cannot prove a data write —
+    // only a size change can.
+    const stat = (over: Partial<fs.Stats>) =>
+      ({ nlink: 1, ctimeMs: 100, mtimeMs: 100, size: 10, ...over }) as fs.Stats;
+    const before = stat({});
+    // Untouched, and a name fully unlinked in between (an orphan inode can
+    // never be a protected file — the atomic write+rename replacement).
+    expect(sameLinkState(before, stat({}))).toBe(true);
+    expect(sameLinkState(before, stat({ nlink: 0 }))).toBe(true);
+    // A link or unlink moved the link count, or only the ctime.
+    expect(sameLinkState(before, stat({ nlink: 2 }))).toBe(false);
+    expect(sameLinkState(before, stat({ ctimeMs: 200 }))).toBe(false);
+    // The mask: ctime stamped equal to mtime, the size unmoved.
+    expect(sameLinkState(before, stat({ ctimeMs: 200, mtimeMs: 200 }))).toBe(false);
+    // A real write: size, ctime and mtime all moved.
+    expect(sameLinkState(before, stat({ ctimeMs: 200, mtimeMs: 200, size: 11 }))).toBe(true);
+    // A moving size alone is not enough (ctime must belong to the write).
+    expect(sameLinkState(before, stat({ ctimeMs: 200, mtimeMs: 100, size: 11 }))).toBe(false);
+  });
+});

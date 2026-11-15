@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { scanGovernanceImportBaseline } from '../scripts/generate_governance_import_baseline.ts';
+import { scanGovernanceImportBaseline } from '../scripts/generate/generate_governance_import_baseline.ts';
 
 const rootDir = process.cwd();
 const baselinePath = path.join(rootDir, 'tests', 'fixtures', 'governance-import-baseline.json');

@@ -14,7 +14,7 @@ import {
   draftScopeRebaselineGoal,
 } from '@agent/core/mission/mission-triage';
 import { logger } from '@agent/core/core';
-import { missionControllerRequester } from '../lib/cli-approval-requester.js';
+import { missionControllerRequester } from '../lib/cli/cli-approval-requester.js';
 import type { ApprovalRequestRecord } from '@agent/core/governance/approval-store';
 
 type Print = (value: unknown) => void;

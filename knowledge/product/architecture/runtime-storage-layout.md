@@ -420,7 +420,7 @@ the record is stored follows its scope
   found, never to a caller-derived location.
 - **Legacy records**: tenant records written to the system tree before the
   partitions existed stay readable and writable in place.
-  `node dist/scripts/approval_store_hygiene.js --migrate-tenant-partitions`
+  `node dist/scripts/approval/approval_store_hygiene.js --migrate-tenant-partitions`
   lists them (dry run); add `--apply` to move each one under its record lock
   (write + fsync + read-back, move the request's passkey challenges the same
   way, remove the system copy, audit-chain entry `migrate_tenant_partition`).
@@ -618,7 +618,7 @@ declare the matching singleton `tiers` value. Generation never widens that
 binding into a generic `<tier>` location; missing or inconsistent fixed-tier
 declarations fail validation.
 
-Run `node --import ./scripts/ts-loader.mjs scripts/generate_store_roots.ts`
+Run `node --import ./scripts/ts-loader.mjs scripts/generate/generate_store_roots.ts`
 after changing registrations. The generator validates the catalog and retention
 references before replacing only the marked region in
 `libs/core/foundation/runtime-state-roots.ts`. `storage-layout.ts` imports and
