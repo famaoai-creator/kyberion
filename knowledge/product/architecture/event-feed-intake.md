@@ -11,7 +11,9 @@ last_updated: 2026-10-25
 
 Some sources cannot push. A Slack keyword search, a ticket query and a search
 result set only answer when asked. This page records how Kyberion watches them
-without creating a second notification path.
+without creating a second notification path. For the operational sequence —
+declare, secret, enable, verify, live-test, triage — see
+[dot-event-intake-playbook](../orchestration/dot-event-intake-playbook.md).
 
 ## The rule
 
