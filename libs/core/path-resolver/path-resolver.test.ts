@@ -56,7 +56,7 @@ describe('path-resolver core', () => {
     const logical = 'capability://security-scanner/src/index.ts';
     const physical = resolve(logical);
     expect(physical).toContain('security-scanner');
-    expect(physical.endsWith('src/index.ts')).toBe(true);
+    expect(physical.endsWith(path.join('src', 'index.ts'))).toBe(true);
     expect(path.isAbsolute(physical)).toBe(true);
   });
 
@@ -64,7 +64,7 @@ describe('path-resolver core', () => {
     const logical = 'skill://security-scanner/src/index.ts';
     const physical = resolve(logical);
     expect(physical).toContain('security-scanner');
-    expect(physical.endsWith('src/index.ts')).toBe(true);
+    expect(physical.endsWith(path.join('src', 'index.ts'))).toBe(true);
     expect(path.isAbsolute(physical)).toBe(true);
   });
 
@@ -83,7 +83,7 @@ describe('path-resolver core', () => {
 describe('path-resolver portability helpers', () => {
   it('toRepoRelative collapses an absolute path under the root to a repo-relative one', () => {
     const abs = path.join(rootDir(), 'knowledge', 'README.md');
-    expect(toRepoRelative(abs)).toBe(path.join('knowledge', 'README.md'));
+    expect(toRepoRelative(abs)).toBe('knowledge/README.md');
   });
 
   it('toRepoRelative leaves a foreign absolute path unchanged', () => {
@@ -96,14 +96,14 @@ describe('path-resolver portability helpers', () => {
   });
 
   it('toRepoRelative is the inverse of resolve for in-repo paths', () => {
-    const rel = path.join('libs', 'core', 'path-resolver.ts');
+    const rel = 'libs/core/path-resolver.ts';
     expect(toRepoRelative(resolve(rel))).toBe(rel);
   });
 
   it('normalizeStoredPath relativizes an in-repo absolute path and flags nothing', () => {
     const abs = path.join(rootDir(), 'scripts', 'run.ts');
     expect(normalizeStoredPath(abs)).toEqual({
-      path: path.join('scripts', 'run.ts'),
+      path: 'scripts/run.ts',
       foreign: false,
     });
   });
