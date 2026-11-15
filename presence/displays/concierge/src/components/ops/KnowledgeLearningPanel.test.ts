@@ -105,6 +105,31 @@ describe('learning panel static markup (not rendered-browser interaction evidenc
       );
     }
   );
+  it('hides rejection once an organization scoped SOP is approved but keeps it while queued', () => {
+    const onReject = vi.fn();
+    const scopedLearning: ClientKnowledgeCandidate = {
+      ...candidate,
+      knowledge_domain: 'organization',
+      status: 'approved',
+      learning: {
+        state: 'approved',
+        payloadDigest: 'b'.repeat(64),
+        approvalRef: 'terminal:approval-1',
+      },
+    };
+    const approved = render(scopedLearning, { onReject });
+    expect(approved).not.toContain('Reject candidate');
+    expect(approved).toContain('Publish approved SOP');
+    const queued = render(
+      {
+        ...scopedLearning,
+        status: 'queued',
+        learning: { state: 'draft', payloadDigest: 'b'.repeat(64) },
+      },
+      { onReject }
+    );
+    expect(queued).toContain('Reject candidate');
+  });
   it('shows the exact scope and separate save/review controls without granting authority', () => {
     const html = render();
     expect(html).toContain('acme');

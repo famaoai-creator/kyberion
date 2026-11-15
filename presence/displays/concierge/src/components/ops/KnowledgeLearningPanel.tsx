@@ -12,6 +12,7 @@ import type {
 import {
   learningReviewHref,
   learningScopeSupported,
+  scopedLearningCandidate,
   type LearningAction,
 } from '../../lib/ops/knowledge-learning-client';
 
@@ -268,7 +269,9 @@ export function KnowledgeLearningPanel({
         </Disclosure>
       ) : null}
       <div className="flex flex-wrap gap-2">
-        {onReject && ['queued', 'approved'].includes(candidate.status) ? (
+        {onReject &&
+        (candidate.status === 'queued' ||
+          (candidate.status === 'approved' && !scopedLearningCandidate(candidate))) ? (
           <Button
             label={uxText('chronos_reject_candidate', locale)}
             variant="danger"
