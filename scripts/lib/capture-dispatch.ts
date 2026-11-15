@@ -28,7 +28,7 @@ export async function dispatchCaptureCommand(input: CaptureDispatchInput): Promi
     // Still-image capture (thin over system:screenshot / system:capture_photo).
     // Stdout carries the summary (or --json).
     quietUnlessVerbose();
-    const { runCaptureCommand } = await import('../cli-capture.js');
+    const { runCaptureCommand } = await import('../cli/cli-capture.js');
     await runCaptureCommand(firstArg === undefined ? restArgs : [firstArg, ...restArgs], print);
     return true;
   }
@@ -40,7 +40,7 @@ export async function dispatchCaptureCommand(input: CaptureDispatchInput): Promi
     // record_camera). Two-word commands so the bare `record` (operator-home
     // desktop demonstration recorder) keeps working.
     quietUnlessVerbose();
-    const { runRecordCommand } = await import('../cli-record.js');
+    const { runRecordCommand } = await import('../cli/cli-record.js');
     await runRecordCommand([`--${firstArg}`, ...restArgs], print);
     return true;
   }

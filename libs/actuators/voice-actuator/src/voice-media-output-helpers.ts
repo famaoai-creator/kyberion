@@ -11,6 +11,7 @@ import {
   resolveFfprobeBin,
   resolvePython3Bin,
 } from '@agent/core/tool/tool-binary-resolvers';
+import { resolveManagedToolPythonBin } from '@agent/core/tool/tool-runtime-registry';
 import { resolveVoicePath } from '@agent/shared-voice/voice-path-policy';
 import { installObsVirtualCameraOutputBridge } from '@agent/shared-video/obs-virtual-camera-output';
 import { installV4l2VirtualCameraOutputBridge } from '@agent/shared-video/v4l2-virtual-camera-output';
@@ -299,7 +300,11 @@ export function renderTalkingAvatar(input: {
   pushFlag('--mouth-y', input.mouth_y);
   pushFlag('--mouth-w', input.mouth_w);
   pushFlag('--eyes-y', input.eyes_y);
-  const result = safeExecResult(resolvePython3Bin(), args, { timeoutMs: 10 * 60 * 1000 });
+  const result = safeExecResult(
+    resolveManagedToolPythonBin('semantic_embeddings') ?? resolvePython3Bin(),
+    args,
+    { timeoutMs: 10 * 60 * 1000 }
+  );
   if (result.error || result.status !== 0) {
     throw new Error(
       `[VOICE] talking-avatar render failed: ${result.error?.message || result.stderr?.slice(0, 500) || `exit ${result.status}`}`

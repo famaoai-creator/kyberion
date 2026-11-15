@@ -193,7 +193,7 @@ node dist/libs/actuators/weather-actuator/src/index.js --input /tmp/w.json
 ### Step 7 — Add to baseline (1 min)
 
 ```bash
-pnpm tsx scripts/check_contract_semver.ts -- --rebaseline
+pnpm tsx scripts/check/check_contract_semver.ts -- --rebaseline
 git add libs/actuators/weather-actuator/ schemas/weather-action.schema.json scripts/contract-baseline.json
 ```
 
@@ -252,7 +252,7 @@ pnpm vitest run libs/actuators/weather-actuator/
 - [ ] Trace integrated (see [`TRACE_MIGRATION_TEMPLATE.md`](./TRACE_MIGRATION_TEMPLATE.md)).
 - [ ] Errors classified via `classifyError` (see [`error-classifier.ts`](../../libs/core/analysis/error-classifier.ts)).
 - [ ] At least one unit test.
-- [ ] `pnpm tsx scripts/check_contract_semver.ts -- --rebaseline` recorded.
+- [ ] `pnpm tsx scripts/check/check_contract_semver.ts -- --rebaseline` recorded.
 - [ ] An entry added to [`CAPABILITIES_GUIDE.md`](../../CAPABILITIES_GUIDE.md) (generated from the actuator manifests; see the `capabilities-guide` check in `pnpm check`).
 
 ## Common pitfalls

@@ -1,6 +1,6 @@
 /**
  * CD-09 review B1: when the operator facade honours a consumer lock's
- * `superseded` mark. Part of scripts/customer_decision.ts (the entry point).
+ * `superseded` mark. Part of scripts/customer/customer_decision.ts (the entry point).
  *
  * The consumer store guard only checks the mark's shape (set once, alone, same
  * mission, an `approval_request_id`); a worker holding its own lock capability

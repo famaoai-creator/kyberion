@@ -31,7 +31,7 @@ node dist/scripts/mission_controller.js create <MISSION_ID> --persona <P> --tier
 node dist/scripts/mission_controller.js plan-tasks <MISSION_ID> --refresh-catalog
 
 # 3) brief と共有 approval-store のリクエストを作成
-node dist/scripts/mission_alignment_request.js --mission <MISSION_ID>
+node dist/scripts/mission/mission_alignment_request.js --mission <MISSION_ID>
 
 # 4) canonical mission surface で配信（localhost=🎤可）
 KYBERION_BASE_ROLE=<persona> node_modules/.bin/tsx scripts/mission-alignment-gate/serve-brief.ts --mission <MISSION_ID> --port 8137

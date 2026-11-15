@@ -1,6 +1,6 @@
 /**
  * Customer-room verbs (view / respond / attachment): STDIN in, customer-safe JSON out, reason codes only.
- * Part of scripts/customer_decision.ts (the entry point); see its header.
+ * Part of scripts/customer/customer_decision.ts (the entry point); see its header.
  */
 import { logger } from '@agent/core/core';
 import { auditChain } from '@agent/core/governance/audit-chain';

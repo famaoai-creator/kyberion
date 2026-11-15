@@ -166,7 +166,7 @@
       "kind": "gateway",
       "description": "Kyberion MCP Server facade — exposes Kyberion capabilities to Claude Cowork and other MCP clients via stdio transport.",
       "command": "node",
-      "args": ["dist/scripts/mcp_server.js"],
+      "args": ["dist/scripts/mcp/mcp_server.js"],
       "env": {
         "KYBERION_BASE_ROLE": "sovereign",
         "MISSION_ROLE": "mcp_server",
@@ -202,7 +202,7 @@
       "kind": "service",
       "description": "Loopback-only OAuth callback receiver that completes token exchange into Personal-tier connections.",
       "command": "node",
-      "args": ["dist/scripts/oauth_callback_surface.js"],
+      "args": ["dist/scripts/oauth/oauth_callback_surface.js"],
       "cwd": ".",
       "shutdownPolicy": "detached",
       "startupMode": "background",

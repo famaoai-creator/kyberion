@@ -1,0 +1,331 @@
+import * as path from 'node:path';
+import { describe, expect, it } from 'vitest';
+import { readTextFile } from '@agent/core/foundation';
+import { pathResolver } from '@agent/core/path-resolver';
+import {
+  safeAppendFileSync,
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeRmSync,
+  safeSymlinkSync,
+  safeWriteFile,
+} from '@agent/core/secure-io';
+import {
+  detectResourceRegressions,
+  runSoakEnduranceHarness,
+  validateSoakEvidence,
+} from './soak_endurance.js';
+
+describe('soak_endurance', () => {
+  it('uses the canonical evidence manifest loader and writer', () => {
+    const source = readTextFile(pathResolver.rootResolve('scripts/soak/soak_endurance.ts'));
+    expect(source).toContain('loadSoakEvidenceManifestAtPath');
+    expect(source).toContain('writeSoakEvidenceManifestAtPath');
+    expect(source).not.toContain('readJsonIfPresent<SoakEvidenceManifest>');
+    expect(source).not.toContain('JSON.stringify(manifest, null, 2)');
+    expect(source).not.toContain('console.log');
+    expect(source).toContain('const code = await main(argv, print)');
+    expect(source).toContain('appendJsonLine, nowIso, readJsonLines, readTextFile');
+  });
+  it('captures a time series with sampled file sizes', async () => {
+    const sampleRoot = pathResolver.sharedTmp('soak-endurance-tests/series');
+    safeRmSync(sampleRoot, { recursive: true, force: true });
+    const samplePath = pathResolver.sharedTmp('soak-endurance-tests/series/history.jsonl');
+
+    const report = await runSoakEnduranceHarness({
+      cycles: 4,
+      samplePaths: [samplePath],
+      exercise: async (cycle) => {
+        safeMkdir(pathResolver.sharedTmp('soak-endurance-tests/series'), { recursive: true });
+        if (cycle === 1) {
+          safeWriteFile(samplePath, `${'x'.repeat(cycle)}\n`);
+        } else {
+          safeAppendFileSync(samplePath, `${'x'.repeat(cycle)}\n`);
+        }
+      },
+      reportPath: pathResolver.sharedTmp('soak-endurance-tests/report.json'),
+      metricsDir: pathResolver.sharedTmp('soak-endurance-tests/metrics'),
+      metricsFile: 'history.jsonl',
+    });
+
+    expect(report.cycles).toBe(4);
+    expect(report.samples).toHaveLength(4);
+    expect(report.samples[0].sampled_files[samplePath]).toBeGreaterThan(0);
+    expect(report.maintenance_summary.tenant_drift_findings).toBeGreaterThanOrEqual(0);
+    expect(safeExistsSync(pathResolver.sharedTmp('soak-endurance-tests/report.json'))).toBe(true);
+    expect(report.evidence.window_mode).toBe('compressed');
+    expect(report.evidence.window_days_equivalent).toBe(4);
+    const validation = validateSoakEvidence(report);
+    expect(validation.evidence_files).toHaveLength(2);
+    expect(validation.issues.filter((issue) => issue.includes('artifact is missing'))).toHaveLength(
+      0
+    );
+  });
+
+  it('detects monotonic growth in resource samples', () => {
+    const samplePath = pathResolver.sharedTmp('soak-endurance-tests/growth.jsonl');
+    const samples = [
+      {
+        cycle: 1,
+        timestamp: '2026-07-05T00:00:00.000Z',
+        duration_ms: 1,
+        rss_mb: 10,
+        heap_used_mb: 10,
+        heap_total_mb: 20,
+        open_handles: 1,
+        sampled_files: { [samplePath]: 10 },
+      },
+      {
+        cycle: 2,
+        timestamp: '2026-07-05T00:00:01.000Z',
+        duration_ms: 1,
+        rss_mb: 11,
+        heap_used_mb: 11,
+        heap_total_mb: 20,
+        open_handles: 1,
+        sampled_files: { [samplePath]: 1024 },
+      },
+      {
+        cycle: 3,
+        timestamp: '2026-07-05T00:00:02.000Z',
+        duration_ms: 1,
+        rss_mb: 12,
+        heap_used_mb: 12,
+        heap_total_mb: 20,
+        open_handles: 1,
+        sampled_files: { [samplePath]: 2048 },
+      },
+      {
+        cycle: 4,
+        timestamp: '2026-07-05T00:00:03.000Z',
+        duration_ms: 1,
+        rss_mb: 13,
+        heap_used_mb: 13,
+        heap_total_mb: 20,
+        open_handles: 1,
+        sampled_files: { [samplePath]: 4096 },
+      },
+    ];
+
+    const regressions = detectResourceRegressions(samples as any);
+    expect(regressions.some((finding) => finding.resource === 'rss_mb')).toBe(true);
+    expect(regressions.some((finding) => finding.resource === samplePath)).toBe(true);
+  });
+
+  it('writes latency history that can be inspected later', async () => {
+    const historyDir = pathResolver.sharedTmp('soak-endurance-tests/latency');
+    safeRmSync(historyDir, { recursive: true, force: true });
+
+    await runSoakEnduranceHarness({
+      cycles: 2,
+      exercise: async (cycle) => {
+        const historyPath = pathResolver.sharedTmp(
+          `soak-endurance-tests/latency/cycle-${cycle}.jsonl`
+        );
+        safeMkdir(pathResolver.sharedTmp('soak-endurance-tests/latency'), { recursive: true });
+        safeAppendFileSync(historyPath, JSON.stringify({ cycle }) + '\n');
+      },
+      metricsDir: historyDir,
+      metricsFile: 'latency-history.jsonl',
+      reportPath: pathResolver.sharedTmp('soak-endurance-tests/latency-report.json'),
+    });
+
+    const persisted = safeReadFile(
+      pathResolver.sharedTmp('soak-endurance-tests/latency/latency-history.jsonl'),
+      { encoding: 'utf8' }
+    ) as string;
+    expect(persisted).toContain('ao-04-soak-cycle');
+  });
+
+  it('rolls over the 30-day evidence log to the configured retention window', async () => {
+    const report = await runSoakEnduranceHarness({
+      cycles: 4,
+      evidenceRetentionCount: 2,
+      reportPath: pathResolver.sharedTmp('soak-endurance-tests/rollover-report.json'),
+      metricsDir: pathResolver.sharedTmp('soak-endurance-tests/rollover-metrics'),
+      metricsFile: 'history.jsonl',
+      exercise: async () => {},
+    });
+
+    const evidenceLog = safeReadFile(report.evidence.run_log_path, { encoding: 'utf8' }) as string;
+    expect(evidenceLog.trim().split('\n')).toHaveLength(2);
+    expect(safeReadFile(report.evidence.summary_path, { encoding: 'utf8' })).toContain(
+      '# 30-day soak run summary'
+    );
+    expect(safeReadFile(report.evidence.summary_path, { encoding: 'utf8' })).toContain(
+      'window mode: compressed'
+    );
+  });
+
+  it('turns detected regressions into a failing evidence validation result', async () => {
+    const report = await runSoakEnduranceHarness({
+      cycles: 4,
+      reportPath: pathResolver.sharedTmp('soak-endurance-tests/validation-report.json'),
+      metricsDir: pathResolver.sharedTmp('soak-endurance-tests/validation-metrics'),
+      metricsFile: 'history.jsonl',
+      exercise: async () => {},
+    });
+
+    report.resource_regressions.push({
+      resource: 'open_handles',
+      slope_per_cycle: 1,
+      first_value: 1,
+      last_value: 4,
+      growth: 3,
+      sample_count: 4,
+      suspected_source: 'unreleased_handles',
+      threshold_per_cycle: 0.15,
+    });
+
+    const validation = validateSoakEvidence(report);
+    expect(validation.ok).toBe(false);
+    expect(validation.regression_count).toBeGreaterThanOrEqual(1);
+    expect(
+      validation.issues.some((issue) =>
+        issue.includes('resource or latency regression(s) detected')
+      )
+    ).toBe(true);
+  });
+
+  it('persists live evidence and a cumulative manifest outside shared tmp', async () => {
+    const evidenceDir = pathResolver.sharedTmp('soak-endurance-tests/live-evidence');
+    safeRmSync(evidenceDir, { recursive: true, force: true });
+
+    const report = await runSoakEnduranceHarness({
+      mode: 'live',
+      cycles: 1,
+      evidenceDir,
+      reportPath: pathResolver.sharedTmp('soak-endurance-tests/live-report.json'),
+      metricsDir: pathResolver.sharedTmp('soak-endurance-tests/live-metrics'),
+      exercise: async () => {},
+    });
+
+    expect(report.evidence.window_mode).toBe('live');
+    expect(report.evidence.manifest_path).toBe(path.join(evidenceDir, 'manifest.json'));
+    expect(safeExistsSync(report.evidence.manifest_path)).toBe(true);
+    expect(safeReadFile(report.evidence.manifest_path, { encoding: 'utf8' })).toContain(
+      '"run_count": 1'
+    );
+  });
+
+  it('detects resource growth across daily live pulses and process restarts', async () => {
+    const root = pathResolver.sharedTmp('soak-endurance-tests/live-series');
+    safeRmSync(root, { recursive: true, force: true });
+    const evidenceDir = path.join(root, 'evidence');
+    const samplePath = path.join(root, 'growing-history.jsonl');
+
+    let latestReport: Awaited<ReturnType<typeof runSoakEnduranceHarness>> | undefined;
+    for (let run = 1; run <= 4; run += 1) {
+      latestReport = await runSoakEnduranceHarness({
+        mode: 'live',
+        cycles: 1,
+        evidenceDir,
+        reportPath: path.join(root, 'latest-report.json'),
+        metricsDir: path.join(root, 'metrics'),
+        samplePaths: [samplePath],
+        exercise: async () => {
+          safeMkdir(root, { recursive: true });
+          if (run === 1) safeWriteFile(samplePath, `${'x'.repeat(4096)}\n`);
+          else safeAppendFileSync(samplePath, `${'x'.repeat(4096)}\n`);
+        },
+      });
+    }
+
+    expect(
+      latestReport?.resource_regressions.some((finding) =>
+        finding.resource.includes('growing-history')
+      )
+    ).toBe(true);
+    expect(
+      safeReadFile(path.join(evidenceDir, 'resource-history.jsonl'), { encoding: 'utf8' })
+    ).toContain('growing-history.jsonl');
+    expect(
+      latestReport?.resource_regressions.some((finding) => finding.resource === 'rss_mb')
+    ).toBe(false);
+  });
+
+  it('rejects repository-external soak resources before executing a cycle', async () => {
+    const exercise = async () => {
+      throw new Error('exercise should not run for an unsafe resource');
+    };
+
+    await expect(
+      runSoakEnduranceHarness({
+        cycles: 1,
+        reportPath: `/tmp/kyberion-soak-report-${process.pid}.json`,
+        exercise,
+      })
+    ).rejects.toThrow('[RESOURCE_PATH_SCOPE]');
+
+    await expect(
+      runSoakEnduranceHarness({
+        cycles: 1,
+        samplePaths: [`/tmp/kyberion-soak-sample-${process.pid}.json`],
+        exercise,
+      })
+    ).rejects.toThrow('[RESOURCE_PATH_SCOPE]');
+
+    await expect(
+      runSoakEnduranceHarness({
+        cycles: 1,
+        metricsDir: `/tmp/kyberion-soak-metrics-${process.pid}`,
+        exercise,
+      })
+    ).rejects.toThrow('[RESOURCE_PATH_SCOPE]');
+
+    await expect(
+      runSoakEnduranceHarness({
+        mode: 'live',
+        cycles: 1,
+        evidenceDir: `/tmp/kyberion-soak-evidence-${process.pid}`,
+        exercise,
+      })
+    ).rejects.toThrow('[RESOURCE_PATH_SCOPE]');
+  });
+
+  it('rejects symlinked soak resources and path-shaped metric filenames', async () => {
+    const root = pathResolver.sharedTmp(`soak-endurance-tests/boundary-${process.pid}`);
+    const outside = path.join(root, 'target');
+    const reportLink = path.join(root, 'report.json');
+    const metricsLink = path.join(root, 'metrics');
+    const evidenceLink = path.join(root, 'evidence');
+    const sampleLink = path.join(root, 'sample.json');
+    safeMkdir(root, { recursive: true });
+    safeMkdir(outside, { recursive: true });
+    safeWriteFile(path.join(outside, 'sample.json'), '{}\n');
+    safeSymlinkSync(path.join(outside, 'report.json'), reportLink);
+    safeSymlinkSync(outside, metricsLink);
+    safeSymlinkSync(outside, evidenceLink);
+    safeSymlinkSync(path.join(outside, 'sample.json'), sampleLink);
+
+    try {
+      await expect(
+        runSoakEnduranceHarness({ cycles: 1, reportPath: reportLink, exercise: async () => {} })
+      ).rejects.toThrow('[RESOURCE_PATH_SYMLINK]');
+      await expect(
+        runSoakEnduranceHarness({ cycles: 1, metricsDir: metricsLink, exercise: async () => {} })
+      ).rejects.toThrow('[RESOURCE_PATH_SYMLINK]');
+      await expect(
+        runSoakEnduranceHarness({
+          mode: 'live',
+          cycles: 1,
+          evidenceDir: evidenceLink,
+          exercise: async () => {},
+        })
+      ).rejects.toThrow('[RESOURCE_PATH_SYMLINK]');
+      await expect(
+        runSoakEnduranceHarness({ cycles: 1, samplePaths: [sampleLink], exercise: async () => {} })
+      ).rejects.toThrow('[RESOURCE_PATH_SYMLINK]');
+      await expect(
+        runSoakEnduranceHarness({
+          cycles: 1,
+          metricsFile: '../history.jsonl',
+          exercise: async () => {},
+        })
+      ).rejects.toThrow('metricsFile must be a single safe filename');
+    } finally {
+      safeRmSync(root, { recursive: true, force: true });
+    }
+  });
+});

@@ -32,7 +32,7 @@
       "reason": "Surface async-channel bases under active/shared/coordination/channels/<surface>/ (PHYSICAL_CHANNEL_ROOT, offboarded per surface), not active/shared/runtime."
     },
     {
-      "file": "scripts/migrate_physical_namespaces.ts",
+      "file": "scripts/migrate/migrate_physical_namespaces.ts",
       "expression": "item.base",
       "reason": "One-shot migration tool that MOVES legacy flat records into the existing physical bases it enumerates; it creates no new store."
     }

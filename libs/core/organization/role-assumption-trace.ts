@@ -16,7 +16,7 @@ const logger = createLogger('role-assumption-trace');
  * appended as one JSONL record `{system_role, assumed_role, allowed, caller, ts}`. The
  * traces are the observed-usage half of the evidence used to narrow
  * role-assumption-policy.json (AUTHORITY_MODEL.md section 3.B2); the other half
- * is scripts/analyze_role_assumptions.ts.
+ * is scripts/analyze/analyze_role_assumptions.ts.
  *
  * - Zero cost when unset: one registered-env lookup per assumption.
  * - The target must be a `.jsonl` file inside a dedicated directory,

@@ -129,7 +129,7 @@ const PIPELINE_JOB_TIMEOUT_MS = 30 * 60_000;
 const PIPELINE_JOB_OUTPUT_TAIL_LIMIT = 64_000;
 
 /** Path to the compiled audit export script. */
-const AUDIT_EXPORT_SCRIPT = nodePath.join(REPO_ROOT, 'dist/scripts/export_audit.js');
+const AUDIT_EXPORT_SCRIPT = nodePath.join(REPO_ROOT, 'dist/scripts/audit/export_audit.js');
 
 // ─── Catalog helpers ──────────────────────────────────────────────────────────
 
@@ -689,7 +689,7 @@ function getMissionJournal(missionId: string, tenant: string): string {
   return safeExec(
     'node',
     [
-      nodePath.join(REPO_ROOT, 'dist/scripts/mission_journal.js'),
+      nodePath.join(REPO_ROOT, 'dist/scripts/mission/mission_journal.js'),
       '--mission-id',
       missionId,
       '--tenant-slug',
@@ -1585,7 +1585,7 @@ export function createKyberionMcpServer(): McpServer {
 
 /**
  * Connect the server to a stdio transport and begin listening.
- * Called by scripts/mcp_server.ts.
+ * Called by scripts/mcp/mcp_server.ts.
  */
 export async function startMcpServerStdio(): Promise<void> {
   const server = createKyberionMcpServer();

@@ -11,7 +11,7 @@ Regenerate with: pnpm agents:generate
 Check drift with: pnpm agents:generate -- --check
 Projection: Cursor custom subagent (`.cursor/agents/<name>.md`)
 Source: Kyberion team-role, procedure, capability-profile, and working-principles SSoT
-Adapter: scripts/cursor-agent-definition-adapter.ts
+Adapter: scripts/generate/cursor-agent-definition-adapter.ts
 Note: Cursor has no per-tool allowlist; capability is enforced via readonly + prompt body.
 -->
 
@@ -25,7 +25,7 @@ Sources (SSoT):
   - libs/core/workforce/subagent-capability-profiles.ts (KD-05 capability tiers)
   - libs/core/workforce/working-principles.ts (buildWorkingPrinciplesLines)
   - knowledge/product/governance/multi-provider-coexecution-contract.md (XP-04 read/write matrix)
-  Generator: scripts/generate_subagent_definitions.ts
+  Generator: scripts/generate/generate_subagent_definitions.ts
 -->
 
 # reviewer — CLI subagent (KD-05 "explorer" tier)

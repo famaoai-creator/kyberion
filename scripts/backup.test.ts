@@ -24,7 +24,7 @@ import {
   selectionWarnings,
   tarExcludesFor,
   verifyWithheldCredentialMembers,
-} from './lib/backup-file-selection.js';
+} from './lib/backup/backup-file-selection.js';
 import {
   buildBackupManifest,
   copyTree,
@@ -50,7 +50,7 @@ import {
   assertExclusionsHeld,
   PLAINTEXT_TEMP_DIR_STALE_MS,
   sweepStalePlaintextTempDirs,
-} from './lib/backup-tenant-partitions.js';
+} from './lib/backup/backup-tenant-partitions.js';
 
 const FIXTURE_DIR = pathResolver.sharedTmp('backup-test');
 

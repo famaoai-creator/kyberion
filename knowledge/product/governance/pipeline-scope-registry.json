@@ -1,8 +1,8 @@
 {
   "$schema": "../schemas/pipeline-scope-registry.schema.json",
   "version": 1,
-  "last_updated": "2026-10-29",
-  "description": "Reviewed scope classification for every pipeline under pipelines/ (top level + browser/ + config/; fragments/ are parts, not pipelines). `audience` answers \"whose work is this for?\" and `placement` flags where the README scope rule says it should live. This is a triage/documentation aid only — the runtime never reads it, and no pipeline JSON is modified. Regenerate/refresh by hand when a pipeline is added, moved, or retired; the companion report is docs/developer/improvement-plans-2026-10/PIPELINE_VERIFICATION_INVENTORY_2026-10-17.ja.md.",
+  "last_updated": "2026-11-15",
+  "description": "Reviewed scope classification for every pipeline under pipelines/ (top level + config/; fragments/ are parts, not pipelines). `audience` answers \"whose work is this for?\" and `placement` flags entries that violate the README scope rule (canonical = belongs in pipelines/; should_be_template = a user-facing pattern that belongs in knowledge/product/pipeline-templates/; should_be_tenant_scoped = belongs under knowledge/confidential/{tenant}/pipelines/; should_be_personal = belongs under knowledge/personal/pipelines/). It is a documentation/triage aid: the runtime never reads it and no pipeline declares it. Pipelines moved to pipeline-templates/ or to tenant/personal scope are removed from this registry — it only covers what physically remains under pipelines/.",
   "audiences": {
     "system": "Kyberion operating itself: health, self-repair, backup, mission/approval control, capability assimilation, audits, upgrade, soak/chaos, storage janitor, volatile-layer machinery.",
     "organization": "An organization's operating model and its deliverables: organization cadence, decision/accountability governance, project/SDLC flow, executive reporting.",
@@ -113,46 +113,9 @@
       "placement": "canonical"
     },
     {
-      "pipeline": "pipelines/browser/example.json",
-      "audience": "personal",
-      "placement": "canonical"
-    },
-    {
-      "pipeline": "pipelines/browser/yahoo.json",
-      "audience": "personal",
-      "placement": "canonical"
-    },
-    {
-      "pipeline": "pipelines/browser/yahoo1.json",
-      "audience": "personal",
-      "placement": "canonical"
-    },
-    {
-      "pipeline": "pipelines/browser/yahoo3.json",
-      "audience": "personal",
-      "placement": "canonical"
-    },
-    {
-      "pipeline": "pipelines/browser/yahoo4.json",
-      "audience": "personal",
-      "placement": "canonical"
-    },
-    {
-      "pipeline": "pipelines/campaign-suite.json",
-      "audience": "product",
-      "placement": "should_be_template",
-      "reason": "Produces deck/doc/video/web deliverables from a campaign brief — a user-facing content workflow, not a Kyberion self-op."
-    },
-    {
       "pipeline": "pipelines/ce-chronos-perf.json",
       "audience": "system",
       "placement": "canonical"
-    },
-    {
-      "pipeline": "pipelines/ceo-strategic-report.json",
-      "audience": "organization",
-      "placement": "should_be_template",
-      "reason": "Executive deliverable for an organization, not a self-op."
     },
     {
       "pipeline": "pipelines/chaos-actuator-down.json",
@@ -190,27 +153,27 @@
       "placement": "canonical"
     },
     {
-      "pipeline": "pipelines/contract-review.json",
+      "pipeline": "pipelines/continuous-managed-work.json",
+      "audience": "system",
+      "placement": "canonical",
+      "reason": "Immutable admission marker for human-approved project/mission-group work; a system contract, not a runnable user flow."
+    },
+    {
+      "pipeline": "pipelines/continuous-operations-report.json",
       "audience": "organization",
-      "placement": "should_be_template",
-      "reason": "User-facing deliverable workflow; already exists as knowledge/product/pipeline-templates/contract-review.json, so the pipelines/ copy is a duplicate."
+      "placement": "canonical",
+      "reason": "Scoped organization metric evidence published through a verified dot WorkItem claim."
+    },
+    {
+      "pipeline": "pipelines/continuous-operations.json",
+      "audience": "organization",
+      "placement": "canonical",
+      "reason": "core:continuous_operations engine for scoped org operations; schedule ships disabled, runs through a bound organization operation."
     },
     {
       "pipeline": "pipelines/cowork-integration-review.json",
       "audience": "system",
       "placement": "canonical"
-    },
-    {
-      "pipeline": "pipelines/create-my-avatar.json",
-      "audience": "personal",
-      "placement": "should_be_personal",
-      "reason": "Personal avatar/profile onboarding (labels: personal); README scope rule points at knowledge/personal/pipelines/ or a template."
-    },
-    {
-      "pipeline": "pipelines/daily-routine.json",
-      "audience": "personal",
-      "placement": "should_be_personal",
-      "reason": "The operator's personal volatile-layer daily ritual."
     },
     {
       "pipeline": "pipelines/decision-digest.json",
@@ -223,10 +186,10 @@
       "placement": "canonical"
     },
     {
-      "pipeline": "pipelines/executive-narrative-bridge.json",
+      "pipeline": "pipelines/document-review.json",
       "audience": "organization",
-      "placement": "should_be_template",
-      "reason": "Executive narrative deliverable, not a self-op."
+      "placement": "canonical",
+      "reason": "Bounded isolated document/design review producing a tier-preserving report; an org-facing op entry point like source-to-engineering-artifacts."
     },
     {
       "pipeline": "pipelines/exposure-check.json",
@@ -252,17 +215,6 @@
       "pipeline": "pipelines/full-health-report.json",
       "audience": "system",
       "placement": "canonical"
-    },
-    {
-      "pipeline": "pipelines/generate-design-system-demo.json",
-      "audience": "system",
-      "placement": "canonical"
-    },
-    {
-      "pipeline": "pipelines/generate-masterclass-pptx.json",
-      "audience": "product",
-      "placement": "should_be_template",
-      "reason": "Premium PPTX demo deliverable (product/GTM), not a self-op."
     },
     {
       "pipeline": "pipelines/health-degradation-watch.json",
@@ -325,18 +277,6 @@
       "placement": "canonical"
     },
     {
-      "pipeline": "pipelines/kyberion-product-intro.json",
-      "audience": "product",
-      "placement": "should_be_template",
-      "reason": "Narrated product intro (GTM), run by hand."
-    },
-    {
-      "pipeline": "pipelines/kyberion-vtuber-narrated-demo.json",
-      "audience": "product",
-      "placement": "should_be_template",
-      "reason": "VTuber product demo (GTM)."
-    },
-    {
       "pipeline": "pipelines/launch-first-run-onboarding.json",
       "audience": "system",
       "placement": "canonical"
@@ -347,57 +287,21 @@
       "placement": "canonical"
     },
     {
-      "pipeline": "pipelines/marketing-content.json",
-      "audience": "product",
-      "placement": "should_be_template",
-      "reason": "Brand marketing materials (GTM)."
-    },
-    {
-      "pipeline": "pipelines/media-produce-and-review.json",
-      "audience": "product",
-      "placement": "should_be_template",
-      "reason": "End-to-end media/PPTX production workflow (MP-01..07), user-facing."
-    },
-    {
       "pipeline": "pipelines/media-review-fix-validation.json",
       "audience": "system",
       "placement": "canonical"
     },
     {
-      "pipeline": "pipelines/meeting-facilitation-workflow.json",
-      "audience": "personal",
-      "placement": "should_be_template",
-      "reason": "User-facing meeting assistant workflow."
+      "pipeline": "pipelines/meeting-readiness-next-day.json",
+      "audience": "system",
+      "placement": "canonical",
+      "reason": "Opt-in scheduled readiness check of the host meeting-grant posture (system self-op), not a user deliverable."
     },
     {
-      "pipeline": "pipelines/meeting-followup.json",
-      "audience": "personal",
-      "placement": "should_be_template",
-      "reason": "User-facing meeting follow-up workflow."
-    },
-    {
-      "pipeline": "pipelines/meeting-hearing-session.json",
-      "audience": "personal",
-      "placement": "should_be_template",
-      "reason": "User-facing guided hearing/interview workflow."
-    },
-    {
-      "pipeline": "pipelines/meeting-proxy-workflow.json",
-      "audience": "personal",
-      "placement": "should_be_template",
-      "reason": "User-facing meeting proxy (join/listen/action-items) workflow."
-    },
-    {
-      "pipeline": "pipelines/meeting-tutor-session.json",
-      "audience": "personal",
-      "placement": "should_be_template",
-      "reason": "User-facing tutoring workflow."
-    },
-    {
-      "pipeline": "pipelines/meeting-watcher.json",
-      "audience": "personal",
-      "placement": "should_be_template",
-      "reason": "User-facing calendar auto-join workflow."
+      "pipeline": "pipelines/meeting-readiness-soon.json",
+      "audience": "system",
+      "placement": "canonical",
+      "reason": "Opt-in scheduled readiness check of the host meeting-grant posture (system self-op), not a user deliverable."
     },
     {
       "pipeline": "pipelines/mission-hygiene-weekly.json",
@@ -420,12 +324,6 @@
       "placement": "canonical"
     },
     {
-      "pipeline": "pipelines/mv-generate.json",
-      "audience": "product",
-      "placement": "should_be_template",
-      "reason": "Music-video generation (GTM/user content)."
-    },
-    {
       "pipeline": "pipelines/open-active-surfaces.json",
       "audience": "system",
       "placement": "canonical"
@@ -444,6 +342,12 @@
       "pipeline": "pipelines/organization-daily-digest.json",
       "audience": "organization",
       "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/organization-improvement-scan.json",
+      "audience": "organization",
+      "placement": "canonical",
+      "reason": "Purpose-driven improvement loop producing a read-only ranked candidate report for org review."
     },
     {
       "pipeline": "pipelines/organization-operation-tick.json",
@@ -581,12 +485,6 @@
       "placement": "canonical"
     },
     {
-      "pipeline": "pipelines/trial-narrated-report.json",
-      "audience": "product",
-      "placement": "should_be_template",
-      "reason": "Narrated executive report demo (GTM)."
-    },
-    {
       "pipeline": "pipelines/ui-ux-governance-audit.json",
       "audience": "system",
       "placement": "canonical"
@@ -595,6 +493,12 @@
       "pipeline": "pipelines/ui-voice-browser-smoke.json",
       "audience": "system",
       "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/vcs-development-preflight.json",
+      "audience": "system",
+      "placement": "canonical",
+      "reason": "Read-only PR reconciliation gate for prepared WorkItem PRs (system verification envelope)."
     },
     {
       "pipeline": "pipelines/verify-session-fallback.json",
@@ -612,20 +516,9 @@
       "placement": "canonical"
     },
     {
-      "pipeline": "pipelines/voice-health-check.json",
-      "audience": "system",
-      "placement": "canonical"
-    },
-    {
       "pipeline": "pipelines/voice-hello.json",
       "audience": "system",
       "placement": "canonical"
-    },
-    {
-      "pipeline": "pipelines/voice-onboarding.json",
-      "audience": "personal",
-      "placement": "should_be_personal",
-      "reason": "Personal voice-profile onboarding."
     },
     {
       "pipeline": "pipelines/volatile-gc.json",
@@ -636,12 +529,6 @@
       "pipeline": "pipelines/volatile-index.json",
       "audience": "system",
       "placement": "canonical"
-    },
-    {
-      "pipeline": "pipelines/weekly-review.json",
-      "audience": "personal",
-      "placement": "should_be_personal",
-      "reason": "The operator's personal weekly memory-promotion ritual."
     }
   ]
 }

@@ -49,7 +49,7 @@ last_updated: 2026-11-12
 3. テナントの登録簿にないテナントは 403。
 4. 閲覧者が confidential tier に届かなければ 403、テナントの組織(id はテナントの slug)に届かなければ 403。
 
-`case` は台帳の案件 id の形、`date` は `YYYY-MM-DD` でなければ 400 で、子プロセスは動きません。Chronos は決定の置き場を読みません。governed facade(`dist/scripts/customer_decision.js overview`)を、そのテナントに結び付けたシステム役割なしの子プロセスとして、種類ごとに決まった引数で動かします(同時に 4 つまで、種類・テナント・引数ごとに 15 秒の控え)。応答は版・テナント・案件・日付を確かめた形に組み直し、値・選択肢・理由・コメント・名前は入りません。案件やレポートがなければ 404、facade が未ビルドなら 503、時間切れは 504、ほかは 502 で、どれも決まった文面だけを返します。
+`case` は台帳の案件 id の形、`date` は `YYYY-MM-DD` でなければ 400 で、子プロセスは動きません。Chronos は決定の置き場を読みません。governed facade(`dist/scripts/customer/customer_decision.js overview`)を、そのテナントに結び付けたシステム役割なしの子プロセスとして、種類ごとに決まった引数で動かします(同時に 4 つまで、種類・テナント・引数ごとに 15 秒の控え)。応答は版・テナント・案件・日付を確かめた形に組み直し、値・選択肢・理由・コメント・名前は入りません。案件やレポートがなければ 404、facade が未ビルドなら 503、時間切れは 504、ほかは 502 で、どれも決まった文面だけを返します。
 
 middleware は edge で secret-guard のファイル読み取りを行わない設計です。したがって middleware は credential/loopback の早期境界、token registry を伴う viewer 解決は route 側、という二段構成を維持します。
 

@@ -130,8 +130,8 @@ human_only の依頼は `accountability.min_assurance`（A0〜A3）を持ち、�
     `requestedByContext.actorId` に記録する。明示の `--requested-by` は `requestedBy` になり、identity を
     1 つ足すだけで、検出した principal を置き換えない（`approvalRequesterIdentities` は両方を見る）。
     owner が `--requested-by agent:x` で依頼を開いて自分で承認しても、自己承認として拒否される。
-  - 依頼者の解決は CLI の入口で行い（`scripts/lib/cli-approval-requester.ts`、
-    `scripts/lib/cli-attestation-invoker.ts`）、library（mission の scope-approve と reconcile-work、
+  - 依頼者の解決は CLI の入口で行い（`scripts/lib/cli/cli-approval-requester.ts`、
+    `scripts/lib/cli/cli-attestation-invoker.ts`）、library（mission の scope-approve と reconcile-work、
     provider attestation、project trust、plugin install、service recording）は解決済みの依頼者を引数で
     受け取る。依頼を実際に開くときだけ解決する（既存の依頼を再利用するとき、official plugin のように
     依頼が要らないときは解決しない）。
@@ -201,7 +201,7 @@ human_only の依頼は `accountability.min_assurance`（A0〜A3）を持ち、�
     `mission_admission_activation`（実行直前のミッション受入承認）、
     `scoped_learning_publication`（スコープ付き SOP の認証済み内容承認）、
     `organization_decision`、`org_security_policy_write`（`scripts/org.ts`）、`installation_publication_role_migration`（installation catalog の明示的更新。exact preview digest と変更パスへ human approval を束縛し、canonical apply claim と結果を保存する）、`personal_workbench`
-  - service recording: `service_recording_review`（`scripts/service_recording.ts` の review が承認を
+  - service recording: `service_recording_review`（`scripts/service/service_recording.ts` の review が承認を
     recording に書く前）、`service_recording_promotion`（promotion が review の承認を確かめる。
     `libs/core/service/service-recording-review-approval.ts`）
   - standing grant: `grant_standing`（外部とのデータ入出力を伴う capability の常設許可の付与。承認を 1 回だけ

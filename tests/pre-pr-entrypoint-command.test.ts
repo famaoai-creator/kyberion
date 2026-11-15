@@ -10,7 +10,7 @@ import { safeReadFile } from '@agent/core/secure-io';
  * prescribed `--scope pr` let full-only gate failures (e.g. the
  * concept-consolidation budgets) reach CI — see
  * pre-pr-ci-readiness-checklist.ja.md "よく落ちる gate". `pr create` /
- * `pr preflight` already run `--changed` (scripts/publish_pull_request.ts).
+ * `pr preflight` already run `--changed` (scripts/publish/publish_pull_request.ts).
  */
 const root = path.resolve(__dirname, '..');
 const read = (relative: string): string =>
@@ -64,6 +64,6 @@ describe('pre-PR entry points prescribe the CI-equivalent command', () => {
       expect(entry.ja).toContain('pnpm check -- --changed');
     }
     // The gate itself: publish_pull_request builds `check -- --changed`.
-    expect(read('scripts/publish_pull_request.ts')).toContain("'check', '--', '--changed'");
+    expect(read('scripts/publish/publish_pull_request.ts')).toContain("'check', '--', '--changed'");
   });
 });

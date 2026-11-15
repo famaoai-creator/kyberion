@@ -66,7 +66,7 @@ pnpm tool:setup -- --tools herdr,imagesnap,blackhole-2ch --apply
 ## Smoke
 
 ```bash
-KYBERION_AGENT_RUNTIME_BACKEND=pane pnpm exec tsx scripts/smoke_agent_pane_runtime.ts
+KYBERION_AGENT_RUNTIME_BACKEND=pane pnpm exec tsx scripts/smoke/smoke_agent_pane_runtime.ts
 ```
 
 ## Boundaries kept

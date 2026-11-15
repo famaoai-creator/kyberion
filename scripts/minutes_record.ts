@@ -46,7 +46,7 @@ import {
   ScriptExitError,
   setProcessExitCode,
 } from './lib/harness.js';
-import { hasCliFlag } from './lib/cli-guard.js';
+import { hasCliFlag } from './lib/cli/cli-guard.js';
 
 function getFlag(argv: string[], name: string): string | undefined {
   const index = argv.indexOf(name);

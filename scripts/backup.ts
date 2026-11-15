@@ -35,7 +35,7 @@ import {
   withPlaintextTempDir,
   normalizeArchiveMember,
   type RestoredLedgerVerification,
-} from './lib/backup-tenant-partitions.js';
+} from './lib/backup/backup-tenant-partitions.js';
 import {
   portableProtocolServicePathRef,
   recordProtocolServiceLifecycleBestEffort,
@@ -54,18 +54,18 @@ import {
   type ManifestCredentialRead,
   type WithheldRestoreRoot,
   manifestCredentialCount,
-} from './lib/backup-file-selection.js';
+} from './lib/backup/backup-file-selection.js';
 import {
   BACKUP_PASSPHRASE_ENV,
   BACKUP_PASSPHRASE_INTRODUCE_COMMAND,
   resolveBackupPassphrase,
   type BackupPassphraseDeps,
-} from './lib/backup-passphrase.js';
+} from './lib/backup/backup-passphrase.js';
 export {
   describeBackupPassphraseAvailability,
   resolveBackupPassphrase,
   type BackupPassphraseAvailability,
-} from './lib/backup-passphrase.js';
+} from './lib/backup/backup-passphrase.js';
 import {
   defineScript,
   isDirectScript,

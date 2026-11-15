@@ -24,7 +24,7 @@ Regenerate with: pnpm agents:generate
 Check drift with: pnpm agents:generate -- --check
 Projection: AGY CLI custom subagent (`.agents/agents/<name>/agent.md`)
 Source: Kyberion team-role, procedure, capability-profile, and working-principles SSoT
-Adapter: scripts/agy-agent-definition-adapter.ts
+Adapter: scripts/generate/agy-agent-definition-adapter.ts
 -->
 
 <!--
@@ -37,7 +37,7 @@ Sources (SSoT):
   - libs/core/workforce/subagent-capability-profiles.ts (KD-05 capability tiers)
   - libs/core/workforce/working-principles.ts (buildWorkingPrinciplesLines)
   - knowledge/product/governance/multi-provider-coexecution-contract.md (XP-04 read/write matrix)
-  Generator: scripts/generate_subagent_definitions.ts
+  Generator: scripts/generate/generate_subagent_definitions.ts
 -->
 
 # tester — CLI subagent (KD-05 "implementer" tier)

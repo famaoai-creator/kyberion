@@ -27,6 +27,7 @@ import {
 import type { MeetingPlatform, TranscriptChunk } from '@agent/core/meeting/meeting-session-types';
 import { StubAudioBus } from '@agent/core/voice/audio-bus';
 import { resolveAudioBus, type AudioBusId } from '@agent/core/voice/audio-bus-resolver';
+import { resolvePython3Bin } from '@agent/core/tool/tool-binary-resolvers';
 import { extensionCaptionsToTranscript } from './extension-transcript.js';
 import type { MeetingAction, MeetingActionResult } from './meeting-types.js';
 
@@ -286,7 +287,7 @@ export async function runPythonBridge(input: MeetingAction): Promise<MeetingActi
   try {
     const raw = await retry(
       async () =>
-        safeExec('python3', [bridgePath], {
+        safeExec(resolvePython3Bin(), [bridgePath], {
           input: JSON.stringify(input),
         }),
       buildRetryOptions()

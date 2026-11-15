@@ -21,7 +21,7 @@ That model is now legacy. Kyberion has two explicit runtime ownership models:
 ## Migration Mapping
 
 - `register`, `run-once`, `start`, `stop`, `status`, `unregister`
-  - move to `knowledge/product/governance/surfaces/*.json` plus `scripts/surface_runtime.ts`
+  - move to `knowledge/product/governance/surfaces/*.json` plus `scripts/surface/surface_runtime.ts`
 - ad hoc process lifetime management
   - move to `process-actuator`
 - `post-msg`, `wait-msg`

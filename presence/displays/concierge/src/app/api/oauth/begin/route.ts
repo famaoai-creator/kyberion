@@ -24,7 +24,7 @@ function resolveOAuthServiceId(raw: string): string {
 }
 
 const OAUTH_CALLBACK_SURFACE_ID = 'oauth-callback-surface';
-const SURFACE_RUNTIME_RELATIVE = 'dist/scripts/surface_runtime.js';
+const SURFACE_RUNTIME_RELATIVE = 'dist/scripts/surface/surface_runtime.js';
 const SURFACE_START_TIMEOUT_MS = 15_000;
 
 /**

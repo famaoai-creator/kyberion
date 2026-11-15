@@ -1432,7 +1432,7 @@ describe('executeServicePreset', () => {
               type: 'cli',
               command: 'node',
               args: [
-                'dist/scripts/stage_youtube_upload_package.js',
+                'dist/scripts/stage/stage_youtube_upload_package.js',
                 '{{publish_plan_path}}',
                 '{{output_path}}',
               ],
@@ -1461,7 +1461,7 @@ describe('executeServicePreset', () => {
     });
 
     expect(mocks.safeExec).toHaveBeenCalledWith('node', [
-      'dist/scripts/stage_youtube_upload_package.js',
+      'dist/scripts/stage/stage_youtube_upload_package.js',
       'knowledge/product/schemas/narrated-video-publish-plan.example.json',
       'active/shared/runtime/youtube/upload-packages/kyberion.json',
     ]);

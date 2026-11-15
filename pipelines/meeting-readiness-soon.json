@@ -5,7 +5,7 @@
   "description": "PG-07: every 15 minutes, checks meetings starting 60–75 minutes from now (each meeting once) and notifies the operator when one lacks a grant. Read-only.",
   "_refs": {
     "plan": "docs/developer/improvement-plans-2026-10/PERMISSION_GRANT_UNIFICATION_PLAN_2026-10-19.ja.md",
-    "implementation": "scripts/meeting_readiness_check.ts"
+    "implementation": "scripts/meeting/meeting_readiness_check.ts"
   },
   "schedule": {
     "id": "meeting-readiness-soon",

@@ -1,0 +1,150 @@
+{
+  "action": "pipeline",
+  "name": "weekly-review",
+  "version": "2.1.0",
+  "description": "Volatile Knowledge Layer — weekly review: opens the current week's face, then nominates it as a memory-promotion-queue candidate for distillation into knowledge/.",
+  "_refs": {
+    "schema": "knowledge/product/schemas/volatile-knowledge.schema.json",
+    "actuator": "working-memory-actuator",
+    "plan": "docs/VOLATILE_KNOWLEDGE_PLAN.ja.md § Phase 2b"
+  },
+  "schedule": {
+    "id": "weekly-review",
+    "cron": "0 7 * * 1",
+    "timezone": "Asia/Tokyo",
+    "enabled": false
+  },
+  "steps": [
+    {
+      "id": "preflight",
+      "role": "gate",
+      "op": "core:include",
+      "params": {
+        "fragment": "fragments/runtime-preflight.json",
+        "context": { "preflight_cmd": "pnpm kyberion doctor --runtime kyberion-runtime-baseline" }
+      }
+    },
+    {
+      "id": "open_weekly",
+      "role": "source",
+      "op": "working-memory:weekly-open",
+      "produces": {
+        "channel": "weekly_face",
+        "type": "WeeklyOpenResult"
+      },
+      "params": {
+        "export_as": "weekly_face"
+      }
+    },
+    {
+      "id": "check_memory_consolidation",
+      "role": "source",
+      "op": "working-memory:consolidation-status",
+      "produces": {
+        "channel": "memory_consolidation_status",
+        "type": "MemoryConsolidationStatus"
+      },
+      "params": {
+        "mdPath": "active/personal/MEMORY.md",
+        "export_as": "memory_consolidation_status"
+      }
+    },
+    {
+      "id": "log_memory_consolidation",
+      "role": "sink",
+      "op": "system:log",
+      "consumes": "memory_consolidation_status",
+      "params": {
+        "message": "[WEEKLY-REVIEW] personal memory consolidation due={{memory_consolidation_status.due}} bullets={{memory_consolidation_status.bullet_count}} threshold={{memory_consolidation_status.threshold}}."
+      }
+    },
+    {
+      "id": "reconcile_unhandled_intents",
+      "role": "source",
+      "op": "system:reconcile_unhandled_intents",
+      "produces": {
+        "channel": "reconcile_result",
+        "type": "UnhandledIntentReconcileResult"
+      },
+      "params": {}
+    },
+    {
+      "id": "emit_unhandled_intents_summary",
+      "role": "sink",
+      "op": "system:log",
+      "consumes": "reconcile_result",
+      "params": {
+        "message": "{{reconcile_result.summary_line}}"
+      }
+    },
+    {
+      "id": "nominate_promotion",
+      "role": "sink",
+      "op": "working-memory:nominate-promotion",
+      "consumes": "weekly_face",
+      "params": {
+        "export_as": "nomination_result",
+        "mdPath": "{{weekly_face.weeklyPath}}",
+        "summary": "Weekly review face — candidate for knowledge distillation",
+        "source_type": "task_session",
+        "proposed_memory_kind": "heuristic",
+        "sensitivity_tier": "personal"
+      }
+    },
+    {
+      "id": "summarize_task_model_routing",
+      "role": "source",
+      "op": "system:summarize_task_model_routing",
+      "produces": {
+        "channel": "task_model_routing_summary",
+        "type": "TaskModelRoutingSummaryResult"
+      },
+      "params": {
+        "output_path": "active/shared/tmp/task-model-routing-summary.json"
+      }
+    },
+    {
+      "id": "log_task_model_routing_summary",
+      "role": "sink",
+      "op": "system:log",
+      "consumes": "task_model_routing_summary",
+      "params": {
+        "message": "[WEEKLY-REVIEW] Task model routing summary written to active/shared/tmp/task-model-routing-summary.json."
+      }
+    },
+    {
+      "id": "summarize_memory_queue",
+      "role": "source",
+      "op": "system:summarize_memory_promotion_queue",
+      "produces": {
+        "channel": "memory_queue_summary",
+        "type": "MemoryPromotionQueueSummaryResult"
+      },
+      "params": {
+        "status": "queued",
+        "output_path": "active/shared/tmp/memory-promotion-queue-summary.md"
+      }
+    },
+    {
+      "id": "log_memory_queue_summary",
+      "role": "sink",
+      "op": "system:log",
+      "consumes": "memory_queue_summary",
+      "params": {
+        "message": "[WEEKLY-REVIEW] Memory promotion queue summary written to active/shared/tmp/memory-promotion-queue-summary.md."
+      }
+    },
+    {
+      "id": "cost_report_weekly",
+      "role": "source",
+      "op": "system:cost_report",
+      "produces": {
+        "channel": "weekly_cost_report",
+        "type": "CostReport"
+      },
+      "params": {
+        "last_days": 7
+      }
+    }
+  ]
+}

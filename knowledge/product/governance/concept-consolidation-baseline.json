@@ -1239,35 +1239,35 @@
     "satellites/voice-hub/server.ts": {
       "env_direct_read_budget": 1
     },
-    "scripts/actuator_playground.ts": {
+    "scripts/actuator/actuator_playground.ts": {
       "json_state_write_budget": 1
     },
-    "scripts/agent_runtime_manager.ts": {
+    "scripts/agent/agent_runtime_manager.ts": {
       "env_direct_read_budget": 3
     },
-    "scripts/agent_runtime_supervisor_daemon.ts": {
+    "scripts/agent/agent_runtime_supervisor_daemon.ts": {
       "env_direct_read_budget": 1
     },
-    "scripts/agent_worktree.ts": {
+    "scripts/agent/agent_worktree.ts": {
       "env_direct_read_budget": 1
     },
-    "scripts/app_preflight.ts": {
+    "scripts/app/app_preflight.ts": {
       "bespoke_cli_parser_budget": 1
     },
     "scripts/apply_dependency_patch.ts": {
       "json_state_write_budget": 1
     },
-    "scripts/approval_inbox.ts": {
+    "scripts/approval/approval_inbox.ts": {
       "bespoke_cli_parser_budget": 2
     },
-    "scripts/approval_store_hygiene.ts": {
+    "scripts/approval/approval_store_hygiene.ts": {
       "bespoke_cli_parser_budget": 2
     },
-    "scripts/audit_mirror_reconcile.ts": {
+    "scripts/audit/audit_mirror_reconcile.ts": {
       "json_state_write_budget": 3,
       "bespoke_cli_parser_budget": 6
     },
-    "scripts/background_review_mission_e2e.ts": {
+    "scripts/background/background_review_mission_e2e.ts": {
       "json_state_write_budget": 1
     },
     "scripts/backup.ts": {
@@ -1278,10 +1278,10 @@
     "scripts/bindings.ts": {
       "bespoke_cli_parser_budget": 2
     },
-    "scripts/browser_actuator_usability_probe.ts": {
+    "scripts/browser/browser_actuator_usability_probe.ts": {
       "json_state_write_budget": 1
     },
-    "scripts/browser_bridge_host.ts": {
+    "scripts/browser/browser_bridge_host.ts": {
       "json_state_write_budget": 2,
       "runtime_path_literal_budget": 1
     },
@@ -1294,103 +1294,103 @@
     "scripts/campaign_suite.ts": {
       "json_state_write_budget": 2
     },
-    "scripts/capability_discovery_entry.mjs": {
+    "scripts/capability/capability_discovery_entry.mjs": {
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/check_backend_conformance.ts": {
+    "scripts/check/check_backend_conformance.ts": {
       "json_state_write_budget": 1,
       "runtime_path_literal_budget": 1,
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/check_chronos_dom_contrast.ts": {
+    "scripts/check/check_chronos_dom_contrast.ts": {
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/check_chronos_perf_baseline.ts": {
+    "scripts/check/check_chronos_perf_baseline.ts": {
       "json_state_write_budget": 1,
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/check_contract_schemas_checks_1.ts": {
+    "scripts/check/check_contract_schemas_checks_1.ts": {
       "runtime_path_literal_budget": 1
     },
-    "scripts/check_contract_schemas_policy_checks.ts": {
+    "scripts/check/check_contract_schemas_policy_checks.ts": {
       "runtime_path_literal_budget": 2
     },
-    "scripts/check_contract_schemas.ts": {
+    "scripts/check/check_contract_schemas.ts": {
       "runtime_path_literal_budget": 3
     },
-    "scripts/check_contract_semver.ts": {
+    "scripts/check/check_contract_semver.ts": {
       "json_state_write_budget": 1,
       "bespoke_cli_parser_budget": 2
     },
-    "scripts/check_doc_examples.ts": {
+    "scripts/check/check_doc_examples.ts": {
       "bespoke_cli_parser_budget": 2
     },
-    "scripts/check_docs_drift.ts": {
+    "scripts/check/check_docs_drift.ts": {
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/check_entity_governance.ts": {
+    "scripts/check/check_entity_governance.ts": {
       "runtime_path_literal_budget": 3,
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/check_golden_output.ts": {
+    "scripts/check/check_golden_output.ts": {
       "json_state_write_budget": 1,
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/check_i18n_hardcoding.ts": {
+    "scripts/check/check_i18n_hardcoding.ts": {
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/check_improvement_plan_metadata.ts": {
+    "scripts/check/check_improvement_plan_metadata.ts": {
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/check_module_boundaries.ts": {
+    "scripts/check/check_module_boundaries.ts": {
       "json_state_write_budget": 1,
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/check_orphans.ts": {
+    "scripts/check/check_orphans.ts": {
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/check_pipeline_shell_independence.ts": {
+    "scripts/check/check_pipeline_shell_independence.ts": {
       "json_state_write_budget": 1,
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/check_plugin_views_e2e.ts": {
+    "scripts/check/check_plugin_views_e2e.ts": {
       "json_state_write_budget": 1
     },
-    "scripts/check_runtime_store_retention.ts": {
+    "scripts/check/check_runtime_store_retention.ts": {
       "runtime_path_literal_budget": 1
     },
-    "scripts/check_runtime_store_whole_read.ts": {
+    "scripts/check/check_runtime_store_whole_read.ts": {
       "json_state_write_budget": 1,
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/check_test_sleep_ratchet.ts": {
+    "scripts/check/check_test_sleep_ratchet.ts": {
       "json_state_write_budget": 1,
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/check_type_ratchet.ts": {
+    "scripts/check/check_type_ratchet.ts": {
       "json_state_write_budget": 1,
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/chronos_daemon.ts": {
+    "scripts/chronos/chronos_daemon.ts": {
       "runtime_path_literal_budget": 2,
       "bespoke_cli_parser_budget": 1
     },
     "scripts/ci_failure_triage.ts": {
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/cli-capture.ts": {
+    "scripts/cli/cli-capture.ts": {
       "runtime_path_literal_budget": 1
     },
-    "scripts/cli-memory.ts": {
+    "scripts/cli/cli-memory.ts": {
       "bespoke_cli_parser_budget": 3
     },
-    "scripts/cli-record.ts": {
+    "scripts/cli/cli-record.ts": {
       "runtime_path_literal_budget": 2
     },
-    "scripts/cli-speak.ts": {
+    "scripts/cli/cli-speak.ts": {
       "exported_type_name_duplication_budget": 1
     },
-    "scripts/cli-workflow-handlers.ts": {
+    "scripts/cli/cli-workflow-handlers.ts": {
       "json_state_write_budget": 2,
       "runtime_path_literal_budget": 2
     },
@@ -1403,25 +1403,25 @@
       "env_direct_read_budget": 1,
       "json_state_write_budget": 4
     },
-    "scripts/company_bootstrap.ts": {
+    "scripts/company/company_bootstrap.ts": {
       "env_direct_read_budget": 2,
       "bespoke_cli_parser_budget": 2
     },
-    "scripts/company_onboarding.ts": {
+    "scripts/company/company_onboarding.ts": {
       "bespoke_cli_parser_budget": 3
     },
     "scripts/compose_mission_team.ts": {
       "env_direct_read_budget": 4,
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/config_mission.ts": {
+    "scripts/config/config_mission.ts": {
       "env_direct_read_budget": 4,
       "json_state_write_budget": 5
     },
-    "scripts/context_ranker.ts": {
+    "scripts/context/context_ranker.ts": {
       "bespoke_cli_parser_budget": 12
     },
-    "scripts/continuous_work_owner.ts": {
+    "scripts/continuous/continuous_work_owner.ts": {
       "json_state_write_budget": 1
     },
     "scripts/conversation_report.ts": {
@@ -1430,7 +1430,7 @@
     "scripts/cowork_knowledge_bridge.ts": {
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/stance_migrate_from_personal.ts": {
+    "scripts/stance/stance_migrate_from_personal.ts": {
       "json_state_write_budget": 1
     },
     "scripts/daily-desk/server.ts": {
@@ -1454,10 +1454,10 @@
       "json_state_write_budget": 1,
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/dot_charters.ts": {
+    "scripts/dot/dot_charters.ts": {
       "bespoke_cli_parser_budget": 3
     },
-    "scripts/dot_continuous_operations_step.ts": {
+    "scripts/dot/dot_continuous_operations_step.ts": {
       "json_state_write_budget": 1
     },
     "scripts/email-workflow.ts": {
@@ -1474,16 +1474,16 @@
     "scripts/env_config_report.ts": {
       "bespoke_cli_parser_budget": 3
     },
-    "scripts/eval_facets.ts": {
+    "scripts/eval/eval_facets.ts": {
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/eval_harness.ts": {
+    "scripts/eval/eval_harness.ts": {
       "bespoke_cli_parser_budget": 2
     },
-    "scripts/evaluate_mission_orchestration.ts": {
+    "scripts/evaluate/evaluate_mission_orchestration.ts": {
       "json_state_write_budget": 1
     },
-    "scripts/evaluate_model_role_fitness.ts": {
+    "scripts/evaluate/evaluate_model_role_fitness.ts": {
       "bespoke_cli_parser_budget": 1
     },
     "scripts/export_validation_bundle.ts": {
@@ -1496,10 +1496,10 @@
     "scripts/find_dead_code.ts": {
       "json_state_write_budget": 1
     },
-    "scripts/first_win_lifecycle_smoke.ts": {
+    "scripts/onboarding/first_win_lifecycle_smoke.ts": {
       "bespoke_cli_parser_budget": 5
     },
-    "scripts/generate_avatar.ts": {
+    "scripts/generate/generate_avatar.ts": {
       "json_state_write_budget": 2
     },
     "scripts/html-to-pptx/convert.ts": {
@@ -1511,7 +1511,7 @@
     "scripts/install_git_merge_driver.mjs": {
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/intent_smoke.ts": {
+    "scripts/intent/intent_smoke.ts": {
       "json_state_write_budget": 1
     },
     "scripts/intent.ts": {
@@ -1532,7 +1532,7 @@
     "scripts/kyberion.ts": {
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/lib/cli-approval-requester.ts": {
+    "scripts/lib/cli/cli-approval-requester.ts": {
       "env_direct_read_budget": 1
     },
     "scripts/lib/local-artifact-pad.ts": {
@@ -1541,7 +1541,7 @@
     "scripts/lib/operator-ask-scope.ts": {
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/lib/role-assumption-workspace.ts": {
+    "scripts/lib/role-assumption/role-assumption-workspace.ts": {
       "bespoke_cli_parser_budget": 1
     },
     "scripts/lib/video-production-evidence.ts": {
@@ -1551,23 +1551,23 @@
       "json_state_write_budget": 1,
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/marketing_publish_dry_run.ts": {
+    "scripts/marketing/marketing_publish_dry_run.ts": {
       "json_state_write_budget": 1
     },
-    "scripts/marketing_review_aggregate.ts": {
+    "scripts/marketing/marketing_review_aggregate.ts": {
       "json_state_write_budget": 1
     },
-    "scripts/marketing_video_dry_run.ts": {
+    "scripts/marketing/marketing_video_dry_run.ts": {
       "json_state_write_budget": 4
     },
-    "scripts/meeting_orchestrator.ts": {
+    "scripts/meeting/meeting_orchestrator.ts": {
       "json_state_write_budget": 1,
       "runtime_path_literal_budget": 1
     },
-    "scripts/meeting_preflight.ts": {
+    "scripts/meeting/meeting_preflight.ts": {
       "env_direct_read_budget": 1
     },
-    "scripts/meeting_readiness_check.ts": {
+    "scripts/meeting/meeting_readiness_check.ts": {
       "bespoke_cli_parser_budget": 1
     },
     "scripts/meeting-notepad/server.ts": {
@@ -1578,15 +1578,15 @@
       "env_direct_read_budget": 1,
       "json_state_write_budget": 4
     },
-    "scripts/migrate_binding_owners.ts": {
+    "scripts/migrate/migrate_binding_owners.ts": {
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/migrate_peer_tenant_runtime.ts": {
+    "scripts/migrate/migrate_peer_tenant_runtime.ts": {
       "json_state_write_budget": 1,
       "runtime_path_literal_budget": 4,
       "bespoke_cli_parser_budget": 4
     },
-    "scripts/migrate_physical_namespaces.ts": {
+    "scripts/migrate/migrate_physical_namespaces.ts": {
       "json_state_write_budget": 1,
       "runtime_path_literal_budget": 6,
       "bespoke_cli_parser_budget": 2
@@ -1598,39 +1598,39 @@
       "env_direct_read_budget": 1,
       "bespoke_cli_parser_budget": 3
     },
-    "scripts/mission_journal.ts": {
+    "scripts/mission/mission_journal.ts": {
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/oauth_callback_surface.ts": {
+    "scripts/oauth/oauth_callback_surface.ts": {
       "json_state_write_budget": 2
     },
-    "scripts/onboarding_apply.ts": {
+    "scripts/onboarding/onboarding_apply.ts": {
       "json_state_write_budget": 1
     },
-    "scripts/onboarding_context.ts": {
+    "scripts/onboarding/onboarding_context.ts": {
       "bespoke_cli_parser_budget": 4
     },
-    "scripts/onboarding_first_job_status.ts": {
+    "scripts/onboarding/onboarding_first_job_status.ts": {
       "env_direct_read_budget": 3
     },
-    "scripts/onboarding_first_job.ts": {
+    "scripts/onboarding/onboarding_first_job.ts": {
       "env_direct_read_budget": 2,
       "json_state_write_budget": 1,
       "bespoke_cli_parser_budget": 3
     },
-    "scripts/onboarding_llm.ts": {
+    "scripts/onboarding/onboarding_llm.ts": {
       "bespoke_cli_parser_budget": 8
     },
-    "scripts/onboarding_mode.ts": {
+    "scripts/onboarding/onboarding_mode.ts": {
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/onboarding_reset.ts": {
+    "scripts/onboarding/onboarding_reset.ts": {
       "bespoke_cli_parser_budget": 5
     },
-    "scripts/onboarding_runbook_skill.ts": {
+    "scripts/onboarding/onboarding_runbook_skill.ts": {
       "json_state_write_budget": 1
     },
-    "scripts/onboarding_wizard.ts": {
+    "scripts/onboarding/onboarding_wizard.ts": {
       "json_state_write_budget": 1,
       "bespoke_cli_parser_budget": 4
     },
@@ -1640,13 +1640,13 @@
     "scripts/ops_alerts.ts": {
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/organization_member.ts": {
+    "scripts/organization/organization_member.ts": {
       "env_direct_read_budget": 2
     },
-    "scripts/organization_objective_measure.ts": {
+    "scripts/organization/organization_objective_measure.ts": {
       "bespoke_cli_parser_budget": 9
     },
-    "scripts/organization_operating_model.ts": {
+    "scripts/organization/organization_operating_model.ts": {
       "env_direct_read_budget": 3
     },
     "scripts/personal-pads/migrate.ts": {
@@ -1669,39 +1669,39 @@
       "env_direct_read_budget": 1,
       "json_state_write_budget": 4
     },
-    "scripts/pipeline_promote.ts": {
+    "scripts/pipeline/pipeline_promote.ts": {
       "json_state_write_budget": 1,
       "bespoke_cli_parser_budget": 3
     },
-    "scripts/pipeline-execution-part-bootstrap.ts": {
+    "scripts/pipeline/pipeline-execution-part-bootstrap.ts": {
       "json_state_write_budget": 1
     },
-    "scripts/pipeline-execution-part-results.ts": {
+    "scripts/pipeline/pipeline-execution-part-results.ts": {
       "env_direct_read_budget": 7
     },
-    "scripts/pipeline-reasoning-visibility.ts": {
+    "scripts/pipeline/pipeline-reasoning-visibility.ts": {
       "env_direct_read_budget": 1
     },
-    "scripts/presence-controller.ts": {
+    "scripts/presence/presence-controller.ts": {
       "json_state_write_budget": 2
     },
-    "scripts/promote_procedure.ts": {
+    "scripts/promote/promote_procedure.ts": {
       "env_direct_read_budget": 1,
       "json_state_write_budget": 1
     },
-    "scripts/publish_pull_request.ts": {
+    "scripts/publish/publish_pull_request.ts": {
       "bespoke_cli_parser_budget": 3
     },
-    "scripts/realtime_voice_config.ts": {
+    "scripts/realtime/realtime_voice_config.ts": {
       "bespoke_cli_parser_budget": 2
     },
-    "scripts/reasoning_auth_check.ts": {
+    "scripts/reasoning/reasoning_auth_check.ts": {
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/reasoning_setup.ts": {
+    "scripts/reasoning/reasoning_setup.ts": {
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/reconcile_knowledge_scopes.ts": {
+    "scripts/reconcile/reconcile_knowledge_scopes.ts": {
       "json_state_write_budget": 1,
       "runtime_path_literal_budget": 1,
       "bespoke_cli_parser_budget": 2
@@ -1722,20 +1722,20 @@
     "scripts/refactor/mission-queue.ts": {
       "json_state_write_budget": 2
     },
-    "scripts/register_avatar.ts": {
+    "scripts/register/register_avatar.ts": {
       "json_state_write_budget": 2
     },
-    "scripts/register_workflow.ts": {
+    "scripts/register/register_workflow.ts": {
       "json_state_write_budget": 2
     },
     "scripts/registry_manager.ts": {
       "json_state_write_budget": 2
     },
-    "scripts/report_i18n_translation_coverage.ts": {
+    "scripts/report/report_i18n_translation_coverage.ts": {
       "runtime_path_literal_budget": 1,
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/report_team_decision_support.ts": {
+    "scripts/report/report_team_decision_support.ts": {
       "bespoke_cli_parser_budget": 1
     },
     "scripts/report-review/server.ts": {
@@ -1770,12 +1770,12 @@
     "scripts/run_service_procedure.ts": {
       "env_direct_read_budget": 1
     },
-    "scripts/scan_provider_cli_capabilities.ts": {
+    "scripts/scan/scan_provider_cli_capabilities.ts": {
       "json_state_write_budget": 1,
       "runtime_path_literal_budget": 1,
       "bespoke_cli_parser_budget": 3
     },
-    "scripts/scenario_runner.ts": {
+    "scripts/scenario/scenario_runner.ts": {
       "json_state_write_budget": 1
     },
     "scripts/screenshot-annotate/server.ts": {
@@ -1785,17 +1785,17 @@
     "scripts/security-ledger.ts": {
       "env_direct_read_budget": 2
     },
-    "scripts/service_binding_controller.ts": {
+    "scripts/service/service_binding_controller.ts": {
       "bespoke_cli_parser_budget": 2
     },
-    "scripts/service_lifecycle_control.ts": {
+    "scripts/service/service_lifecycle_control.ts": {
       "json_state_write_budget": 1
     },
-    "scripts/service_recording.ts": {
+    "scripts/service/service_recording.ts": {
       "json_state_write_budget": 2,
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/setup_oauth.ts": {
+    "scripts/setup/setup_oauth.ts": {
       "json_state_write_budget": 1,
       "bespoke_cli_parser_budget": 1
     },
@@ -1807,76 +1807,76 @@
       "env_direct_read_budget": 1,
       "json_state_write_budget": 2
     },
-    "scripts/smoke_capability_seams_live.ts": {
+    "scripts/smoke/smoke_capability_seams_live.ts": {
       "json_state_write_budget": 1
     },
-    "scripts/soak_endurance.ts": {
+    "scripts/soak/soak_endurance.ts": {
       "json_state_write_budget": 2
     },
-    "scripts/soak_restart_e2e.ts": {
+    "scripts/soak/soak_restart_e2e.ts": {
       "json_state_write_budget": 6,
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/source_archive.ts": {
+    "scripts/source/source_archive.ts": {
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/sovereign_dashboard.ts": {
+    "scripts/sovereign/sovereign_dashboard.ts": {
       "runtime_path_literal_budget": 3,
       "bespoke_cli_parser_budget": 3
     },
-    "scripts/stage_youtube_upload_package.ts": {
+    "scripts/stage/stage_youtube_upload_package.ts": {
       "json_state_write_budget": 1,
       "runtime_path_literal_budget": 1
     },
-    "scripts/summarize_memory_promotion_queue.ts": {
+    "scripts/summarize/summarize_memory_promotion_queue.ts": {
       "json_state_write_budget": 1,
       "bespoke_cli_parser_budget": 4
     },
-    "scripts/summarize_task_model_routing.ts": {
+    "scripts/summarize/summarize_task_model_routing.ts": {
       "bespoke_cli_parser_budget": 2
     },
-    "scripts/surface_runtime.ts": {
+    "scripts/surface/surface_runtime.ts": {
       "env_direct_read_budget": 4
     },
-    "scripts/sync_intent_contract_memory.ts": {
+    "scripts/sync/sync_intent_contract_memory.ts": {
       "json_state_write_budget": 3
     },
-    "scripts/task_init.ts": {
+    "scripts/task/task_init.ts": {
       "json_state_write_budget": 1
     },
-    "scripts/task_smoke.ts": {
+    "scripts/task/task_smoke.ts": {
       "json_state_write_budget": 1
     },
-    "scripts/tenant_activation.ts": {
+    "scripts/tenant/tenant_activation.ts": {
       "bespoke_cli_parser_budget": 12
     },
-    "scripts/terminal_actuator_usability_probe.ts": {
+    "scripts/terminal/terminal_actuator_usability_probe.ts": {
       "json_state_write_budget": 1
     },
-    "scripts/terminal_session_cli.ts": {
+    "scripts/terminal/terminal_session_cli.ts": {
       "runtime_path_literal_budget": 1
     },
     "scripts/tui.ts": {
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/virtual_office.ts": {
+    "scripts/virtual/virtual_office.ts": {
       "env_direct_read_budget": 1
     },
-    "scripts/vital_check.ts": {
+    "scripts/vital/vital_check.ts": {
       "runtime_path_literal_budget": 1,
       "bespoke_cli_parser_budget": 1
     },
-    "scripts/voice_upgrade.ts": {
+    "scripts/voice/voice_upgrade.ts": {
       "json_state_write_budget": 1
     },
-    "scripts/watch_knowledge_scope_health.ts": {
+    "scripts/watch/watch_knowledge_scope_health.ts": {
       "runtime_path_literal_budget": 1,
       "bespoke_cli_parser_budget": 4
     },
-    "scripts/watch_tenant_drift.ts": {
+    "scripts/watch/watch_tenant_drift.ts": {
       "bespoke_cli_parser_budget": 2
     },
-    "scripts/work_inventory.ts": {
+    "scripts/work/work_inventory.ts": {
       "bespoke_cli_parser_budget": 2
     },
     "scripts/write_core_dist_scope.mjs": {
@@ -1939,7 +1939,7 @@
     "SpeakResult": [
       "libs/core/discussion/discussion-speaker.ts",
       "libs/shared-voice/src/native-tts.ts",
-      "scripts/cli-speak.ts"
+      "scripts/cli/cli-speak.ts"
     ]
   }
 }

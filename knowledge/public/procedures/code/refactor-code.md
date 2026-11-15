@@ -23,7 +23,7 @@ equivalence proof are mandatory; build/lint alone are not enough.
    clearly asks for リファクタリング / refactoring).
 2. Follow **audit → pin → atomic reshape → equivalence** in the engineering
    playbook. One smell per change set; red steps revert (Mikado).
-3. Record evidence that `scripts/check_refactoring_evidence.ts` can validate
+3. Record evidence that `scripts/check/check_refactoring_evidence.ts` can validate
    (`refactor-audit.json`, pin / reshape / equivalence reports).
 
 ## 3. What this procedure is not

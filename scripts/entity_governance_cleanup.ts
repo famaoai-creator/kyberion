@@ -5,7 +5,7 @@ import {
   resolveApprovalRequesterInput,
   type ApprovalRequesterInput,
 } from '@agent/core/governance/approval-requester';
-import { cliApprovalRequester } from './lib/cli-approval-requester.js';
+import { cliApprovalRequester } from './lib/cli/cli-approval-requester.js';
 import * as path from 'node:path';
 import {
   assertApprovalUsable,

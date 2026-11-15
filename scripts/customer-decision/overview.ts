@@ -1,7 +1,7 @@
 /**
  * CD-12: `customer-decision overview` — the read-only tenant overview the
  * Chronos organization view runs as a tenant-bound facade child (wave 2).
- * Part of scripts/customer_decision.ts (the entry point); see its header.
+ * Part of scripts/customer/customer_decision.ts (the entry point); see its header.
  *
  * Reads only: the tenant's case directories, each case's agendas, ledger,
  * receipts and consumer locks (as the tenant-bound `decision_ledger` role),

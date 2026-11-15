@@ -1583,6 +1583,14 @@
       "default": "0"
     },
     {
+      "name": "KYBERION_ESPEAK_NG_BIN",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "Optional path override for espeak ng bin; keep it inside governed repository or runtime storage.",
+      "documented": true
+    },
+    {
       "name": "KYBERION_EVENT_INTAKE_HOST",
       "category": "provider",
       "type": "string",
@@ -5076,7 +5084,7 @@
       "category": "secret",
       "type": "string",
       "required": false,
-      "description": "VAPID private key for Web Push to the concierge PWA. Generate a pair with `pnpm tsx scripts/generate_web_push_keys.ts`; keep it in the deployment secret store. Without the key pair nothing is pushed and subscribing is refused.",
+      "description": "VAPID private key for Web Push to the concierge PWA. Generate a pair with `pnpm tsx scripts/generate/generate_web_push_keys.ts`; keep it in the deployment secret store. Without the key pair nothing is pushed and subscribing is refused.",
       "documented": true
     },
     {

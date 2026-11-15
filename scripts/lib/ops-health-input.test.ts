@@ -7,7 +7,7 @@ import {
 import {
   describeBackupPassphraseAvailability,
   type BackupPassphraseSecretBackend,
-} from './backup-passphrase.js';
+} from './backup/backup-passphrase.js';
 
 function backend(value: string | null): BackupPassphraseSecretBackend {
   return {

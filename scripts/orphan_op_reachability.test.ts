@@ -4,30 +4,31 @@ import { pathResolver, safeReaddir, safeReadFile } from '@agent/core';
 /**
  * OW-05: actuator ops that are registered must be reachable from a runnable
  * pipeline (or another caller). These ops were registered but never called;
- * each now has a minimal example pipeline under pipelines/.
+ * each now has a minimal example pipeline under pipelines/ or a user-facing
+ * template under knowledge/product/pipeline-templates/.
  */
 const EXAMPLE_PIPELINE_OPS: Record<string, string> = {
-  'wisdom:document_review': 'document-review',
-  'vcs:development_loop': 'vcs-development-preflight',
-  'system:list_shortcuts': 'apple-shortcuts-readiness',
-  'system:run_shortcut': 'apple-shortcut-approved-run',
-  'system:apple_capabilities': 'apple-native-capabilities',
-  'system:ask_screen': 'apple-screen-question',
-  'browser:action_trail': 'browser-failure-evidence',
-  'browser:export_failure_bundle': 'browser-failure-evidence',
-  'browser:session_health': 'browser-failure-evidence',
-  'meeting:hearing_session': 'meeting-hearing-session',
-  'meeting:tutor_session': 'meeting-tutor-session',
-  'system:list_incidents': 'incident-review',
-  'system:sre_analyze': 'incident-review',
-  'agent:staff_mission': 'mission-team-staff',
-  'agent:prewarm_mission': 'mission-team-prewarm',
-  'modeling:terraform_to_topology_ir': 'terraform-topology-ir',
-  'modeling:terraform_asset_inventory': 'terraform-asset-inventory',
-  'modeling:asset_inventory_to_ledger': 'external-asset-ledger',
-  'modeling:security_ledger_check_plan': 'exposure-check',
-  'network:exposure_check': 'exposure-check',
-  'modeling:test_inventory_to_device_pipeline': 'test-inventory-device-pipeline',
+  'wisdom:document_review': 'pipelines/document-review.json',
+  'vcs:development_loop': 'pipelines/vcs-development-preflight.json',
+  'system:list_shortcuts': 'pipelines/apple-shortcuts-readiness.json',
+  'system:run_shortcut': 'pipelines/apple-shortcut-approved-run.json',
+  'system:apple_capabilities': 'pipelines/apple-native-capabilities.json',
+  'system:ask_screen': 'pipelines/apple-screen-question.json',
+  'browser:action_trail': 'pipelines/browser-failure-evidence.json',
+  'browser:export_failure_bundle': 'pipelines/browser-failure-evidence.json',
+  'browser:session_health': 'pipelines/browser-failure-evidence.json',
+  'meeting:hearing_session': 'knowledge/product/pipeline-templates/meeting-hearing-session.json',
+  'meeting:tutor_session': 'knowledge/product/pipeline-templates/meeting-tutor-session.json',
+  'system:list_incidents': 'pipelines/incident-review.json',
+  'system:sre_analyze': 'pipelines/incident-review.json',
+  'agent:staff_mission': 'pipelines/mission-team-staff.json',
+  'agent:prewarm_mission': 'pipelines/mission-team-prewarm.json',
+  'modeling:terraform_to_topology_ir': 'pipelines/terraform-topology-ir.json',
+  'modeling:terraform_asset_inventory': 'pipelines/terraform-asset-inventory.json',
+  'modeling:asset_inventory_to_ledger': 'pipelines/external-asset-ledger.json',
+  'modeling:security_ledger_check_plan': 'pipelines/exposure-check.json',
+  'network:exposure_check': 'pipelines/exposure-check.json',
+  'modeling:test_inventory_to_device_pipeline': 'pipelines/test-inventory-device-pipeline.json',
 };
 
 function collectOps(node: unknown, out: Set<string>): void {
@@ -43,22 +44,28 @@ function collectOps(node: unknown, out: Set<string>): void {
   }
 }
 
-function loadPipeline(id: string): { pipeline_id?: string; steps?: unknown[] } {
-  const file = pathResolver.rootResolve(`pipelines/${id}.json`);
+function loadPipeline(relative: string): { pipeline_id?: string; steps?: unknown[] } {
+  const file = pathResolver.rootResolve(relative);
   return JSON.parse(String(safeReadFile(file, { encoding: 'utf8' })));
 }
 
 describe('orphan actuator op reachability (OW-05)', () => {
   it('ships a pipeline file for every formerly-unreachable op', () => {
-    const files = new Set(safeReaddir(pathResolver.rootResolve('pipelines')));
-    for (const id of new Set(Object.values(EXAMPLE_PIPELINE_OPS))) {
-      expect(files.has(`${id}.json`), `pipelines/${id}.json`).toBe(true);
+    const dirCache = new Map<string, Set<string>>();
+    for (const relative of new Set(Object.values(EXAMPLE_PIPELINE_OPS))) {
+      const dir = relative.split('/').slice(0, -1).join('/');
+      const base = relative.split('/').pop() as string;
+      if (!dirCache.has(dir)) {
+        dirCache.set(dir, new Set(safeReaddir(pathResolver.rootResolve(dir))));
+      }
+      expect(dirCache.get(dir)?.has(base), relative).toBe(true);
     }
   });
 
-  it.each(Object.entries(EXAMPLE_PIPELINE_OPS))('%s is called by pipelines/%s.json', (op, id) => {
-    const pipeline = loadPipeline(id);
-    expect(pipeline.pipeline_id).toBe(id);
+  it.each(Object.entries(EXAMPLE_PIPELINE_OPS))('%s is called by %s', (op, relative) => {
+    const pipeline = loadPipeline(relative);
+    const name = (relative.split('/').pop() as string).replace(/\.json$/, '');
+    expect(pipeline.pipeline_id).toBe(name);
     const ops = new Set<string>();
     collectOps(pipeline.steps, ops);
     expect(ops.has(op)).toBe(true);

@@ -40,7 +40,7 @@ tool の一覧・band・呼び出せる caller role・tier・承認要否の正�
 
 ### HTTP の `kyberion.request.*` は別サーバー
 
-`kyberion.request.receive` / `status` / `result` は stdio の facade には無く、catalog にも載らない。既定で無効の HTTP resource server（`mcp-http-resource-server.ts`、起動は `scripts/mcp_http_server.ts`）だけが公開し、identity は環境変数ではなく外部 OAuth トークンと member registry から決まる。→ [mcp-http-human-requests](./mcp-http-human-requests.md)
+`kyberion.request.receive` / `status` / `result` は stdio の facade には無く、catalog にも載らない。既定で無効の HTTP resource server（`mcp-http-resource-server.ts`、起動は `scripts/mcp/mcp_http_server.ts`）だけが公開し、identity は環境変数ではなく外部 OAuth トークンと member registry から決まる。→ [mcp-http-human-requests](./mcp-http-human-requests.md)
 
 ## 3. Tools ↔ Skills ↔ Actuators
 
@@ -128,7 +128,7 @@ tool の実行主体（principal）・caller role・tenant は、MCP サーバ�
 
 ### 8.2 起動設定ごとに caller identity が違う
 
-同じサーバー（`dist/scripts/mcp_server.js`）を起動する設定が三種類あり、解決結果が異なる。
+同じサーバー（`dist/scripts/mcp/mcp_server.js`）を起動する設定が三種類あり、解決結果が異なる。
 
 | 起動設定                                                                                         | 設定する env                                                                                                   | プロセスの role                                                  | base role                         | MCP caller role | principal             |
 | ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------- | --------------- | --------------------- |
@@ -148,7 +148,7 @@ tool の実行主体（principal）・caller role・tenant は、MCP サーバ�
 
 ### 8.3 HTTP MCP サーバーは surface 一覧と protocol service registry に載っていない
 
-`scripts/mcp_http_server.ts`（CLI は `mcp http`）は `cli-commands.json` にはあるが、[`docs/SURFACES.md`](../../../docs/SURFACES.md) にも `protocol-service-registry.json` にも行が無い。registry にあるのは stdio の `mcp-server-cowork` だけ。既定で無効のサービスを registry に載せるかどうかは未決定。
+`scripts/mcp/mcp_http_server.ts`（CLI は `mcp http`）は `cli-commands.json` にはあるが、[`docs/SURFACES.md`](../../../docs/SURFACES.md) にも `protocol-service-registry.json` にも行が無い。registry にあるのは stdio の `mcp-server-cowork` だけ。既定で無効のサービスを registry に載せるかどうかは未決定。
 
 ### 8.4 MCP が作る承認の surface ラベルは `api`
 

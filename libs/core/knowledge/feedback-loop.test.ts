@@ -212,7 +212,7 @@ function makeRegistry(
     schedules: overrides.map((override, index) => ({
       id: `schedule-${index}`,
       name: `schedule-${index}`,
-      pipelinePath: 'pipelines/daily-routine.json',
+      pipelinePath: 'knowledge/product/pipeline-templates/daily-routine.json',
       actuator: 'run_pipeline',
       trigger: { type: 'cron' as const, cron: '0 6 * * *' },
       enabled: true,

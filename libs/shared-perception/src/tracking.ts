@@ -9,6 +9,7 @@ import {
   type Observation,
 } from './observation.js';
 import { pathResolver } from '@agent/core/path-resolver';
+import { resolvePython3Bin } from '@agent/core/tool/tool-binary-resolvers';
 import {
   assertSafeRepositoryPath,
   safeLstat,
@@ -223,7 +224,7 @@ export async function trackMedia(
   ] as const) {
     if (model) args.push(flag, localFile(model, true));
   }
-  const result = await run(request.python ?? 'python3', args, {
+  const result = await run(request.python ?? resolvePython3Bin(), args, {
     timeoutMs,
     maxOutputMB: 12,
     cwd: pathResolver.rootDir(),
@@ -365,7 +366,7 @@ export function openTrackingSession(
     ['--gesture-model', options.gestureModel],
   ] as const)
     if (model) args.push(flag, localFile(model, true));
-  const command = options.python ?? 'python3';
+  const command = options.python ?? resolvePython3Bin();
   assertGovernedExec(command, args);
   const handle = spawn({
     resourceId: 'perception-tracking-' + randomUUID(),

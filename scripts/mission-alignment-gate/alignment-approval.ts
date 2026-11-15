@@ -19,7 +19,7 @@ import {
 } from './mission-brief.js';
 import { buildDecisionCard, type DecisionCard } from '@agent/core/governance/decision-card';
 import type { EventScopeInput } from '@agent/core/event-scope';
-import { ALIGNMENT_BRIEF_RELATIVE_PATH } from '../mission_alignment_decision.js';
+import { ALIGNMENT_BRIEF_RELATIVE_PATH } from '../mission/mission_alignment_decision.js';
 
 /** The alignment approval always lands in the brief channel, whichever surface decides it. */
 export const ALIGNMENT_APPROVAL_CHANNEL = 'brief';
