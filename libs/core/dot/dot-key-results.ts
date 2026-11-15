@@ -12,6 +12,7 @@
 import * as path from 'node:path';
 import { withExecutionContextAsync } from '../authority.js';
 import { withResidentDotScope } from './resident-dot-scope.js';
+import { reportDotStepFailure, DotSupervisorStepCircuit } from './dot-step-circuit.js';
 import { appendJsonLine, readJsonLines } from '../foundation/json.js';
 import { createLogger } from '../logger.js';
 import { pathResolver } from '../path-resolver.js';
@@ -120,6 +121,32 @@ export function runAsDotCharter<T>(c: DotCharter, fn: () => Promise<T>): Promise
 
 function diag(what: string, why: unknown, next: string, evidence: string): string {
   return `${what} — ${why instanceof Error ? why.message : String(why)} | next: ${next} | evidence: ${evidence}`;
+}
+
+// A repeated identical failure (policy deny, missing grant) is deterministic —
+// warn the first few times, then hold the dot's measurement with backoff and
+// one ops alert instead of warning every sweep forever.
+const krMeasureCircuit = new DotSupervisorStepCircuit('dot-kr-measure');
+
+/**
+ * Shared catch handler: warn early, alert once on circuit open, else quiet.
+ * `key` must be the exact string the caller passed to `admits` — build it
+ * once per site and pass it through so gate and report cannot diverge.
+ */
+function reportKrFailure(
+  key: string,
+  what: string,
+  error: unknown,
+  next: string,
+  evidence: string,
+  charter: DotCharter
+): void {
+  reportDotStepFailure(krMeasureCircuit, key, charter, error, {
+    what,
+    next,
+    evidence,
+    log: (line) => logger.warn(line),
+  });
 }
 
 function absolute(rootDir: string | undefined, rel: string): string {
@@ -372,16 +399,27 @@ export async function measureDotKeyResults(
   const now = deps.now?.() ?? new Date();
   const ledger = dotStatePath(c, DOT_KR_LEDGER_FILE);
   let latest: Map<string, KrMeasurementRow>;
+  const ledgerReadKey = `${c.dot_id}:ledger-read`;
   try {
-    latest = latestBy(
-      readLedger(ledger, deps.rootDir).filter(
-        (row) => row.scope === 'dot' && row.dot_id === c.dot_id
-      ),
-      (row) => row.kr_id
-    );
+    if (!krMeasureCircuit.admits(ledgerReadKey)) {
+      latest = new Map();
+    } else {
+      latest = latestBy(
+        readLedger(ledger, deps.rootDir).filter(
+          (row) => row.scope === 'dot' && row.dot_id === c.dot_id
+        ),
+        (row) => row.kr_id
+      );
+      krMeasureCircuit.reportSuccess(ledgerReadKey);
+    }
   } catch (error) {
-    logger.warn(
-      diag(`KR ledger unreadable for ${c.dot_id}`, error, 'measuring without throttle', ledger)
+    reportKrFailure(
+      ledgerReadKey,
+      `KR ledger unreadable for ${c.dot_id}`,
+      error,
+      'measuring without throttle',
+      ledger,
+      c
     );
     latest = new Map();
   }
@@ -398,9 +436,12 @@ export async function measureDotKeyResults(
   };
   for (const spec of specs) {
     if (!isDue(spec, latest.get(spec.kr_id), now)) continue;
+    const measureKey = `${c.dot_id}:measure/${spec.kr_id}`;
+    if (!krMeasureCircuit.admits(measureKey)) continue;
     try {
       const value = await measureSpec(spec, target, deps, now);
       if (value === undefined) continue;
+      krMeasureCircuit.reportSuccess(measureKey);
       rows.push({
         scope: 'dot',
         dot_id: c.dot_id,
@@ -410,21 +451,29 @@ export async function measureDotKeyResults(
         measured_at: now.toISOString(),
       });
     } catch (error) {
-      logger.warn(
-        diag(
-          `KR measurement failed for ${c.dot_id}/${spec.kr_id}`,
-          error,
-          'the previous value stays; retried next sweep',
-          ledger
-        )
+      reportKrFailure(
+        measureKey,
+        `KR measurement failed for ${c.dot_id}/${spec.kr_id}`,
+        error,
+        'the previous value stays; retried next sweep',
+        ledger,
+        c
       );
     }
   }
+  const ledgerWriteKey = `${c.dot_id}:ledger-write`;
+  if (!krMeasureCircuit.admits(ledgerWriteKey)) return [];
   try {
     appendLedger(ledger, rows, deps.rootDir);
+    krMeasureCircuit.reportSuccess(ledgerWriteKey);
   } catch (error) {
-    logger.warn(
-      diag(`KR ledger write failed for ${c.dot_id}`, error, 'rows dropped this sweep', ledger)
+    reportKrFailure(
+      ledgerWriteKey,
+      `KR ledger write failed for ${c.dot_id}`,
+      error,
+      'rows dropped this sweep',
+      ledger,
+      c
     );
     return [];
   }

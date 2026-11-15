@@ -204,9 +204,18 @@ describe('operator notifications (E2E-04 Task 2)', () => {
     expect(sent).toBe(false);
     expect(enqueue).not.toHaveBeenCalled();
     const logPath = path.join(tmpRoot, 'active', 'shared', 'observability', 'ops-alerts.jsonl');
-    const record = JSON.parse(fs.readFileSync(logPath, 'utf8').trim());
-    expect(record.kind).toBe('operator_notification_undelivered');
+    const records = fs
+      .readFileSync(logPath, 'utf8')
+      .split('\n')
+      .filter((line) => line.trim())
+      .map((line) => JSON.parse(line));
+    const record = records.find((row) => row.kind === 'operator_notification_undelivered');
+    expect(record).toBeDefined();
     expect(record.reason).toBe('no_channel_configured');
+    // The delivery gap itself is surfaced as a deduped alert companion row.
+    expect(
+      records.some((row) => row.severity === 'warning' && row.title?.includes('undelivered'))
+    ).toBe(true);
   });
 
   it('rate-limits repeats of the same event×correlation', async () => {

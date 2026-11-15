@@ -250,7 +250,10 @@ describe('personal consent to claimed service transport', () => {
       expect(() => cached!.accessToken).toThrow();
       expect(x.credentials.resolveTaskCredential('SLACK_TOKEN')).toBeNull();
     });
-  });
+  }, // Full-stack path — identity, signed approval, encrypted store, broker,
+  // actuator — ~12-15s locally; sits past the global 30s on a 3-8x slower
+  // shared CI runner under coverage (see vitest.config.mts testTimeout).
+  60000);
   it.each(['revoked', 'rotated'] as const)(
     'rejects %s consent before a later HTTP request',
     async (change) => {

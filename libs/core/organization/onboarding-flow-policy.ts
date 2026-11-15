@@ -31,6 +31,7 @@ export interface OnboardingFlowPolicyCatalog {
     identity: LocalizedOnboardingText;
     services: LocalizedOnboardingText;
     tenants: LocalizedOnboardingText;
+    operations: LocalizedOnboardingText;
     tutorial: LocalizedOnboardingText;
     summary: LocalizedOnboardingText;
   };

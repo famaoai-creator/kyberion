@@ -5,7 +5,7 @@ import { pathResolver } from '../path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '../secure-io.js';
 
 export type OnboardingPhase =
-  'identity' | 'reasoning' | 'services' | 'tenants' | 'tutorial' | 'summary';
+  'identity' | 'reasoning' | 'services' | 'tenants' | 'operations' | 'tutorial' | 'summary';
 export type OnboardingStatus = 'draft' | 'complete';
 export type OnboardingServiceStatus = 'pending' | 'saved' | 'ready' | 'blocked' | 'skipped';
 
@@ -46,6 +46,25 @@ export interface OnboardingTutorial {
   plan_path?: string;
 }
 
+/**
+ * Resident-loop operations chosen during onboarding. These are the settings
+ * the autonomous loop needs beyond identity/reasoning — without them the
+ * loop runs but cannot reach the operator or observe the outside world.
+ */
+export interface OnboardingOperations {
+  /** Resident services (scheduler + daemon watchdog) that drive the sweep. */
+  resident_services: 'installed' | 'pending' | 'skipped';
+  /** Operator notification surface; absent means nothing was configured. */
+  notification_surface?: 'slack' | 'imessage' | 'telegram' | 'discord' | 'inbox';
+  notification_target?: string;
+  /** Per declared intake source: enabled in policy, pending its secret, or skipped. */
+  intake_sources: Array<{
+    source: string;
+    status: 'enabled' | 'pending_secret' | 'skipped';
+    secret_key?: string;
+  }>;
+}
+
 export interface OnboardingReasoningSnapshot {
   mode: 'real_backend_detected' | 'stub_explicit' | 'stub_acknowledged' | 'missing';
   backend_hint: string;
@@ -65,6 +84,7 @@ export interface OnboardingProfileState {
   reasoning?: OnboardingReasoningSnapshot;
   services?: { candidates: OnboardingServiceCandidate[] };
   tenants?: { entries: OnboardingTenant[] };
+  operations?: OnboardingOperations;
   tutorial?: OnboardingTutorial;
 }
 

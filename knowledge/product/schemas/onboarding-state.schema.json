@@ -23,13 +23,21 @@
     },
     "current_phase": {
       "type": "string",
-      "enum": ["identity", "reasoning", "services", "tenants", "tutorial", "summary"]
+      "enum": ["identity", "reasoning", "services", "tenants", "operations", "tutorial", "summary"]
     },
     "completed_phases": {
       "type": "array",
       "items": {
         "type": "string",
-        "enum": ["identity", "reasoning", "services", "tenants", "tutorial", "summary"]
+        "enum": [
+          "identity",
+          "reasoning",
+          "services",
+          "tenants",
+          "operations",
+          "tutorial",
+          "summary"
+        ]
       }
     },
     "created_at": {
@@ -130,6 +138,38 @@
               "assigned_role": { "type": "string" },
               "purpose": { "type": "string" },
               "created_at": { "type": "string", "format": "date-time" }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "operations": {
+      "type": "object",
+      "required": ["resident_services", "intake_sources"],
+      "properties": {
+        "resident_services": {
+          "type": "string",
+          "enum": ["installed", "pending", "skipped"]
+        },
+        "notification_surface": {
+          "type": "string",
+          "enum": ["slack", "imessage", "telegram", "discord", "inbox"]
+        },
+        "notification_target": { "type": "string" },
+        "intake_sources": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["source", "status"],
+            "properties": {
+              "source": { "type": "string" },
+              "status": {
+                "type": "string",
+                "enum": ["enabled", "pending_secret", "skipped"]
+              },
+              "secret_key": { "type": "string" }
             },
             "additionalProperties": false
           }

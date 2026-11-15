@@ -4,7 +4,7 @@ category: Architecture
 tags: [architecture, autonomy, resident-agent, dots, charter, supervision]
 importance: 8
 author: Ecosystem Architect
-last_updated: 2026-11-15
+last_updated: 2026-11-16
 ---
 
 # Resident Dot Model
@@ -279,6 +279,17 @@ wake ──proposal──▶ dispatch (gate ⊔ floors, arbitration) ──▶ W
   reconciliation; the runtime does not invent a replacement or replay effects.
   Missed cron minutes within
   `runtime.cron_catch_up_hours` (default 6, max 24) coalesce into one wake.
+- **Watches**: a charter trigger `{kind: 'watch', paths, ignore_jsonl_kinds?}`
+  wakes when a watched path's `mtime:size` stat diverges from the dot's
+  snapshot in `dot-watch-state.json`. `ignore_jsonl_kinds` lists `.jsonl`
+  record `kind` values that never fire the watch by themselves: when every
+  record appended since the snapshot parses cleanly and carries an ignored
+  kind, the snapshot advances silently (the appended range is read with a
+  bounded range read). Any malformed, blank or non-ignored line fails open
+  and the watch fires. This is how a dot watching `ops-alerts.jsonl` avoids
+  re-waking on the `operator_notification_undelivered` rows its own failed
+  notifies keep appending — an alert log is a lawful watch path, but a dot
+  must not amplify the rows it produces.
 - **Events (DL-08)**: a charter trigger `{kind: 'event', sources, types?,
 match?}` wakes on an authenticated inbound event. The loopback-only
   `event-intake` surface verifies an HMAC-SHA256 signature (secret from the
