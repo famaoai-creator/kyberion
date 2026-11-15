@@ -1,7 +1,7 @@
 ---
 title: 情報資産カタログ・収集・dots intake 統合実装計画
 kind: implementation_plan
-status: active
+status: completed
 last_updated: 2026-11-02
 tags: [information-assets, organization, collectors, dots, intake, governance]
 importance: 8
@@ -24,22 +24,22 @@ importance: 8
 
 ## 実装フェーズと受入項目
 
-| ID    | 対象                    | 受入条件                                                                                                 | 状態        |
-| ----- | ----------------------- | -------------------------------------------------------------------------------------------------------- | ----------- |
-| IA-01 | 型・schema・3種情報定義 | 顧客依頼、レビュー依頼、承認待ち申請を定義し不正入力を拒否する                                           | implemented |
-| IA-02 | 組織カタログ facade     | owner認可、tenant/org/project親子関係、CAS、lock、監査、symlink拒否を満たす                              | implemented |
-| IA-03 | 取得先 resolver         | 意味/別名から検索し、scopeで先に絞り、正本/鮮度/接続状態/未観測を説明する                                | implemented |
-| IA-04 | 収集契約と永続継続      | object IDとchange ID分離、全page受理後checkpoint、部分失敗/再開/競合/破損を試験する                      | implemented |
-| IA-05 | Gmail adapter           | list/get/history、変更token、pagination、期限切れ明示保留に対応する                                      | implemented |
-| IA-06 | GitHub adapter          | PR/review request収集、pagination、head/version差分を取り込む                                            | implemented |
-| IA-07 | Jira adapter            | enhanced searchとJSM approval読取を分け、paginationに対応する                                            | implemented |
-| IA-08 | intake接続              | catalogからcollectorを選び既存feed/event経路へ渡す。tenant/source/binding不一致時は通信しない            | pending     |
-| IA-09 | 12業務レシピ            | メール4、GitHub4、Jira4を宣言し、同一業務の再取得で重複仕事を作らない                                    | implemented |
-| IA-10 | 業務化・完了追跡        | typed contextで既存WorkItemへ渡し、外部read-back/成果物検証により完了を確認する。承認/相手待ちは保留する | pending     |
-| IA-11 | 操作・参照面            | organization CLIから登録/一覧/解決/収集/仕事確認を実行でき、ViewerContext経由で見える範囲だけ参照する    | implemented |
-| IA-12 | 来歴・運用可視性        | 取得元/版/hash/取得時刻/coverageと既存資産来歴を関連付け、未取得や不完全取得を成功表示しない             | pending     |
-| IA-13 | fixture統合試験         | 3サービスを通じた取得→イベント→仕事→確認を、拒否/重複/再開/変更/不明結果込みで検証する                   | pending     |
-| IA-14 | 文書・登録・検証        | runbook、schema/role/storage/op登録、生成物、関連testとbuildを整合させる                                 | pending     |
+| ID    | 対象                    | 受入条件                                                                                                 | 状態                                                                                                                                                                                                                        |
+| ----- | ----------------------- | -------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| IA-01 | 型・schema・3種情報定義 | 顧客依頼、レビュー依頼、承認待ち申請を定義し不正入力を拒否する                                           | implemented                                                                                                                                                                                                                 |
+| IA-02 | 組織カタログ facade     | owner認可、tenant/org/project親子関係、CAS、lock、監査、symlink拒否を満たす                              | implemented                                                                                                                                                                                                                 |
+| IA-03 | 取得先 resolver         | 意味/別名から検索し、scopeで先に絞り、正本/鮮度/接続状態/未観測を説明する                                | implemented                                                                                                                                                                                                                 |
+| IA-04 | 収集契約と永続継続      | object IDとchange ID分離、全page受理後checkpoint、部分失敗/再開/競合/破損を試験する                      | implemented                                                                                                                                                                                                                 |
+| IA-05 | Gmail adapter           | list/get/history、変更token、pagination、期限切れ明示保留に対応する                                      | implemented                                                                                                                                                                                                                 |
+| IA-06 | GitHub adapter          | PR/review request収集、pagination、head/version差分を取り込む                                            | implemented                                                                                                                                                                                                                 |
+| IA-07 | Jira adapter            | enhanced searchとJSM approval読取を分け、paginationに対応する                                            | implemented                                                                                                                                                                                                                 |
+| IA-08 | intake接続              | catalogからcollectorを選び既存feed/event経路へ渡す。tenant/source/binding不一致時は通信しない            | implemented（2026-11-15 検証:`libs/core/dot/dot-feed-source.ts` の collector 経路が confidential+tenant+org の scope 一致と catalog location の exact match を通信前に強制）                                                |
+| IA-09 | 12業務レシピ            | メール4、GitHub4、Jira4を宣言し、同一業務の再取得で重複仕事を作らない                                    | implemented                                                                                                                                                                                                                 |
+| IA-10 | 業務化・完了追跡        | typed contextで既存WorkItemへ渡し、外部read-back/成果物検証により完了を確認する。承認/相手待ちは保留する | implemented（2026-11-15 検証:`work-mission.ts` の claim→execute→release/quarantine と `work-execution.ts`/`service-actuator/information-asset-work.ts` の `verifyInformationAssetReadback`+`informationArtifactHash` 検証） |
+| IA-11 | 操作・参照面            | organization CLIから登録/一覧/解決/収集/仕事確認を実行でき、ViewerContext経由で見える範囲だけ参照する    | implemented                                                                                                                                                                                                                 |
+| IA-12 | 来歴・運用可視性        | 取得元/版/hash/取得時刻/coverageと既存資産来歴を関連付け、未取得や不完全取得を成功表示しない             | implemented（2026-11-15 検証:`readInformationAssetCollectionCoverage`/`readInformationAssetObservation` + ingest/derivation 来歴 + `organization_information_assets.ts` CLI）                                               |
+| IA-13 | fixture統合試験         | 3サービスを通じた取得→イベント→仕事→確認を、拒否/重複/再開/変更/不明結果込みで検証する                   | implemented（2026-11-15 検証:`work-integration.test.ts` の3レシピ E2E + スイート計132件通過、拒否/重複/unknown_effect/quarantine を網羅）                                                                                   |
+| IA-14 | 文書・登録・検証        | runbook、schema/role/storage/op登録、生成物、関連testとbuildを整合させる                                 | implemented（2026-11-15 検証:`information-asset-mission-work.md`、recipes schema/catalog、pipeline template、`scripts/information_asset_work.ts`、organization CLI 登録）                                                   |
 
 ## 最初に用意する業務レシピ
 
