@@ -72,6 +72,47 @@ function collectProductionTsFiles(dir: string): string[] {
 
 const PRODUCTION_ROOTS = ['libs', 'scripts', 'presence', 'satellites'];
 
+// Every fs specifier usesRawFs can detect still contains one of these quoted
+// literals in the source text — including the escaped forms '\x66s' / '\u0066s'
+// that a naive "'fs'" search would miss. Files failing this cannot import fs,
+// so only they skip the per-file TypeScript parse; coverage-on CI was timing
+// out parsing thousands of candidates that never mention fs at all.
+const FS_SPECIFIER_HINT = /['"`](?:node:)?(?:fs(?:\/promises)?|\\x66s|\\u0066s|\\146s)['"`]/;
+
+interface ProductionScan {
+  /** Absolute candidate paths grouped by production root. */
+  filesByRoot: Map<string, string[]>;
+  /** Absolute path → file source (read exactly once for the whole suite). */
+  sourceByFile: Map<string, string>;
+  /** Repo-relative paths confirmed to use raw fs. */
+  rawFsFiles: Set<string>;
+}
+
+// One walk + one read per production file for the entire suite. The earlier
+// shape re-walked every root per test and re-parsed every candidate — each
+// added test multiplied the whole-repo scan.
+let productionScan: ProductionScan | undefined;
+function scanProductionFiles(): ProductionScan {
+  if (productionScan) return productionScan;
+  const repoRoot = pathResolver.rootDir();
+  const filesByRoot = new Map<string, string[]>();
+  const sourceByFile = new Map<string, string>();
+  const rawFsFiles = new Set<string>();
+  for (const root of PRODUCTION_ROOTS) {
+    const candidates = collectProductionTsFiles(`${repoRoot}/${root}`);
+    filesByRoot.set(root, candidates);
+    for (const file of candidates) {
+      const source = String(safeReadFile(file, { encoding: 'utf8' }));
+      sourceByFile.set(file, source);
+      if (FS_SPECIFIER_HINT.test(source) && usesRawFs(source, file)) {
+        rawFsFiles.add(file.slice(repoRoot.length + 1));
+      }
+    }
+  }
+  productionScan = { filesByRoot, sourceByFile, rawFsFiles };
+  return productionScan;
+}
+
 describe('security boundary contract', () => {
   it('keeps every reviewed boundary inside an audited production root', () => {
     expect(
@@ -82,19 +123,12 @@ describe('security boundary contract', () => {
   });
 
   it.each(PRODUCTION_ROOTS)('confines raw fs in %s to reviewed low-level boundaries', (root) => {
-    const repoRoot = pathResolver.rootDir();
-    const candidates = collectProductionTsFiles(`${repoRoot}/${root}`);
-
-    // One fresh read/parse per candidate: coverage-on CI previously spent more
-    // than its test deadline repeating this scan for allowlist freshness.
-    const rawFiles = new Set(
-      candidates
-        .filter((file) => usesRawFs(String(safeReadFile(file, { encoding: 'utf8' })), file))
-        .map((file) => file.slice(repoRoot.length + 1))
-    );
+    const scan = scanProductionFiles();
+    const prefix = `${root}/`;
+    const rawFiles = new Set([...scan.rawFsFiles].filter((file) => file.startsWith(prefix)));
     expect([...rawFiles].filter((file) => !(file in ALLOWLIST))).toEqual([]);
     expect(
-      Object.keys(ALLOWLIST).filter((file) => file.startsWith(`${root}/`) && !rawFiles.has(file))
+      Object.keys(ALLOWLIST).filter((file) => file.startsWith(prefix) && !rawFiles.has(file))
     ).toEqual([]);
   });
 
@@ -135,16 +169,12 @@ describe('security boundary contract', () => {
 
   it('lets only secure-io.ts import its permission guards (secure-io-path-guard)', () => {
     const repoRoot = pathResolver.rootDir();
-    const importers = [
-      ...collectProductionTsFiles(`${repoRoot}/libs`),
-      ...collectProductionTsFiles(`${repoRoot}/scripts`),
-      ...collectProductionTsFiles(`${repoRoot}/satellites`),
-      ...collectProductionTsFiles(`${repoRoot}/presence`),
-    ]
+    const scan = scanProductionFiles();
+    const importers = [...scan.sourceByFile.keys()]
       .filter((filePath) => !filePath.endsWith('/libs/core/secure-io-path-guard.ts'))
       .filter((filePath) =>
         /['"][^'"]*secure-io-path-guard(?:\.js)?['"]/.test(
-          safeReadFile(filePath, { encoding: 'utf8' }) as string
+          scan.sourceByFile.get(filePath) as string
         )
       )
       .map((filePath) => filePath.slice(repoRoot.length + 1));
@@ -153,17 +183,11 @@ describe('security boundary contract', () => {
 
   it('lets only the backup file walk use the backup credential read admission', () => {
     const repoRoot = pathResolver.rootDir();
-    const users = [
-      ...collectProductionTsFiles(`${repoRoot}/libs`),
-      ...collectProductionTsFiles(`${repoRoot}/scripts`),
-      ...collectProductionTsFiles(`${repoRoot}/satellites`),
-      ...collectProductionTsFiles(`${repoRoot}/presence`),
-    ]
+    const scan = scanProductionFiles();
+    const users = [...scan.sourceByFile.keys()]
       .filter((filePath) => !filePath.endsWith('/libs/core/sensitive-path-policy.ts'))
       .filter((filePath) =>
-        /\bwithBackupCredentialReadAdmission\b/.test(
-          safeReadFile(filePath, { encoding: 'utf8' }) as string
-        )
+        /\bwithBackupCredentialReadAdmission\b/.test(scan.sourceByFile.get(filePath) as string)
       )
       .map((filePath) => filePath.slice(repoRoot.length + 1));
     expect(users).toEqual(['scripts/lib/backup/backup-file-selection.ts']);

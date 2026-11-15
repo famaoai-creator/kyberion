@@ -23,5 +23,10 @@ export default defineConfig({
     include: ['test/**/*.test.ts', 'src/**/*.test.ts'],
     environment: 'node',
     setupFiles: [resolve(here, '../../../tests/vitest-network-guard.ts')],
+    // Match the root vitest.config.mts policy — shared CI runners are 3-8x
+    // slower and cold module init (e.g. the @agent/core import chain) has
+    // already timed a first test out at the 5s default.
+    testTimeout: process.env.CI ? 30000 : 10000,
+    hookTimeout: process.env.CI ? 30000 : 10000,
   },
 });
