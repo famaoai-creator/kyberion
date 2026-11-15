@@ -1070,7 +1070,7 @@ export function rootResolve(relativePath: string) {
  */
 export function toRepoRelative(targetPath: string): string {
   if (!targetPath || !path.isAbsolute(targetPath)) return targetPath;
-  const rel = path.relative(PROJECT_ROOT_DIR, targetPath);
+  const rel = path.relative(PROJECT_ROOT_DIR, targetPath).split(path.sep).join('/');
   if (rel && !rel.startsWith('..') && !path.isAbsolute(rel)) return rel;
   // An authority-store path under the primary checkout is repository state,
   // not a foreign absolute path: persist its canonical repo-relative form.
@@ -1086,7 +1086,7 @@ export function toRepoRelative(targetPath: string): string {
  */
 export function normalizeStoredPath(targetPath: string): { path: string; foreign: boolean } {
   if (!targetPath || !path.isAbsolute(targetPath)) return { path: targetPath, foreign: false };
-  const rel = path.relative(PROJECT_ROOT_DIR, targetPath);
+  const rel = path.relative(PROJECT_ROOT_DIR, targetPath).split(path.sep).join('/');
   if (isPathInside(PROJECT_ROOT_DIR, targetPath)) return { path: rel, foreign: false };
   return { path: targetPath, foreign: true };
 }

@@ -44,6 +44,12 @@ describe('autonomy learning grant (G2: module-private, unforgeable)', () => {
     );
   });
 
+  it('still rejects native separators at the canonical grant boundary', () => {
+    expect(() =>
+      withAutonomyLearningCapability(TENANT, DIRECTORY.replaceAll('/', '\\'), live)
+    ).toThrow('RESOURCE_SCOPE_INVALID');
+  });
+
   it('is synchronous: no escape, no thenable, no captured continuation', async () => {
     expect(() =>
       withAutonomyLearningCapability(TENANT, DIRECTORY, () => currentResourceAccessScope())
