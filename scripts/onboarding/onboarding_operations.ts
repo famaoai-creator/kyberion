@@ -250,6 +250,7 @@ export async function promptResidentLoopOperations(
       // i18n-exempt: bilingual prompt pair (JA side intentional)
       t(
         'Install resident services (scheduler + daemon watchdog) so dots run on their own? (Y/n): ',
+        // i18n-exempt: bilingual prompt pair (JA side intentional)
         'ドットが自律的に動くよう常駐サービス(scheduler + watchdog)をインストールしますか? (Y/n): '
       ),
       'y'
@@ -269,6 +270,7 @@ export async function promptResidentLoopOperations(
         // i18n-exempt: bilingual prompt pair (JA side intentional)
         t(
           `Resident service install failed (${error instanceof Error ? error.message : String(error)}) — run it later: pnpm kyberion scheduler reconcile --apply`,
+          // i18n-exempt: bilingual prompt pair (JA side intentional)
           `常駐サービスのインストールに失敗しました (${error instanceof Error ? error.message : String(error)}) — 後で実行してください: pnpm kyberion scheduler reconcile --apply`
         )
       );
@@ -283,6 +285,7 @@ export async function promptResidentLoopOperations(
       // i18n-exempt: bilingual prompt pair (JA side intentional)
       t(
         'Operator notification surface — where alerts land (slack/imessage/telegram/discord/inbox/none; inbox is the built-in local inbox, works with no external setup) [inbox]: ',
+        // i18n-exempt: bilingual prompt pair (JA side intentional)
         'オペレータ通知の宛先 — アラートの届き先 (slack/imessage/telegram/discord/inbox/none。inbox は内蔵ローカル受信箱で外部設定不要) [inbox]: '
       ),
       'inbox'
@@ -300,6 +303,7 @@ export async function promptResidentLoopOperations(
           // i18n-exempt: bilingual prompt pair (JA side intentional)
           t(
             `Notification target on ${surface} (channel/chat/recipient id; a local label for inbox) [operator]: `,
+            // i18n-exempt: bilingual prompt pair (JA side intentional)
             `${surface} の通知ターゲット (チャンネル/チャット/受信者 ID。inbox はローカルラベル) [operator]: `
           ),
           'operator'
@@ -324,6 +328,7 @@ export async function promptResidentLoopOperations(
         // i18n-exempt: bilingual prompt pair (JA side intentional)
         t(
           `Could not save notification preferences (${message}) — configure it later in Settings.`,
+          // i18n-exempt: bilingual prompt pair (JA side intentional)
           `通知設定を保存できませんでした (${message}) — 後で Settings で設定してください。`
         )
       );
@@ -338,6 +343,7 @@ export async function promptResidentLoopOperations(
       // i18n-exempt: bilingual prompt pair (JA side intentional)
       t(
         '\nDeclared event intake sources (webhook feeds that can wake dots):',
+        // i18n-exempt: bilingual prompt pair (JA side intentional)
         '\n宣言済みイベント intake ソース (ドットを起こせる webhook フィード):'
       )
     );
@@ -360,6 +366,7 @@ export async function promptResidentLoopOperations(
         // i18n-exempt: bilingual prompt pair (JA side intentional)
         t(
           `Enable '${id}' events?${source.description ? ` ${source.description}` : ''} (y/N): `,
+          // i18n-exempt: bilingual prompt pair (JA side intentional)
           `'${id}' イベントを有効化しますか?${source.description ? ` ${source.description}` : ''} (y/N): `
         ),
         'n'
@@ -385,6 +392,7 @@ export async function promptResidentLoopOperations(
         // i18n-exempt: bilingual prompt pair (JA side intentional)
         t(
           `  Could not enable '${id}' (${message}) — flip "enabled" in knowledge/product/governance/event-intake-policy.json later.`,
+          // i18n-exempt: bilingual prompt pair (JA side intentional)
           `  '${id}' を有効化できませんでした (${message}) — 後で knowledge/product/governance/event-intake-policy.json の "enabled" を変更してください。`
         )
       );
@@ -399,6 +407,7 @@ export async function promptResidentLoopOperations(
         // i18n-exempt: bilingual prompt pair (JA side intentional)
         t(
           `  '${id}' enabled — store its HMAC secret next: ${intakeSecretCommand(source.secret_key)}`,
+          // i18n-exempt: bilingual prompt pair (JA side intentional)
           `  '${id}' を有効化しました — 次に HMAC secret を保存してください: ${intakeSecretCommand(source.secret_key)}`
         )
       );

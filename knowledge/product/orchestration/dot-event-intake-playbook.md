@@ -32,7 +32,7 @@ as untrusted input.
    Add `tenant_slug` to bind the source to one tenant (events land under
    `runtime/dot/tenants/<slug>/` and only that tenant's dots see them).
 2. **Register the secret** — the `secret_key` value must exist in the secret
-   store: `pnpm secret introduce event-intake <SECRET_KEY>` (service id
+   store: `pnpm kyberion secret introduce event-intake <SECRET_KEY>` (service id
    `event-intake`). Never paste the secret into the policy file.
 3. **Wire the dot** — in the charter's `attention.triggers`:
    `{ "kind": "event", "sources": ["<id>"], "types": [...], "match": {...} }`.
