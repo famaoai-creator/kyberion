@@ -1,6 +1,6 @@
 /* ------------------------------------------------------------- voice ----
  * PA-02 (PADS_A2UI_AND_AVATAR_PLAN §3). Stamped into kyberion-ui.css after
- * kyberion-ui.source.css by scripts/generate_design_tokens.ts.
+ * kyberion-ui.source.css by scripts/generate/generate_design_tokens.ts.
  *
  * Markup comes from libs/shared-ui/vanilla/voice.js and src/voice/*.tsx
  * (parity-tested). `--kb-ui-*` tokens only, `.kb-*` selectors only, state

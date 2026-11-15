@@ -5,7 +5,7 @@ Kyberion has two distinct message planes:
 - **Plane 1: local runtime routing**
   - `libs/core/mesh/a2a-bridge.ts`
   - `libs/core/agent/agent-runtime-supervisor.ts`
-  - `scripts/agent_runtime_supervisor_daemon.ts`
+  - `scripts/agent/agent_runtime_supervisor_daemon.ts`
   - `libs/core/mesh/peer-messaging.ts` for peer-level envelopes
 - **Plane 2: cross-peer messaging**
   - `libs/core/mesh/peer-messaging.ts` (signed envelopes between enrolled peers)

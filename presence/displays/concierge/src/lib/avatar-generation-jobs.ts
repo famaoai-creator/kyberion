@@ -5,12 +5,12 @@ import * as secureIo from '@agent/core/secure-io';
 
 /**
  * PA-10: the concierge "create an avatar from this photo" job. The generator
- * runs as `dist/scripts/generate_avatar.js` in a child process (like the
+ * runs as `dist/scripts/generate/generate_avatar.js` in a child process (like the
  * ingest ceremony) under the concierge execution identity — the photo is
  * read straight from the active profile root and nothing is copied. The job
  * record keeps only status codes and the provider id, never script output.
  */
-export const AVATAR_SCRIPT_RELATIVE = 'dist/scripts/generate_avatar.js';
+export const AVATAR_SCRIPT_RELATIVE = 'dist/scripts/generate/generate_avatar.js';
 const RESULT_PREFIX = 'AVATAR_SET_RESULT ';
 const PLAN_PREFIX = 'AVATAR_PLAN ';
 const GENERATION_TIMEOUT_MS = 20 * 60 * 1000;

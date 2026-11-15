@@ -27,7 +27,7 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 HOST_NAME="com.kyberion.browser_bridge"
-HOST_JS="$REPO_ROOT/dist/scripts/browser_bridge_host.js"
+HOST_JS="$REPO_ROOT/dist/scripts/browser/browser_bridge_host.js"
 OS_NAME="$(uname -s)"
 
 # Preconditions ---------------------------------------------------------------

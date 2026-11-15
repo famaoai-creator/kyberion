@@ -20,8 +20,8 @@ permission_denied 分類は正しい fail-closed であり、本書で扱った�
 
 ### 1.1 中間ファイルは誰がどこへ書くか
 
-1. `kyberion listen` → `runListenCommand` (`scripts/cli-listen.ts:187`) →
-   `createPerceptionWorkDir('listen', absolute)` (`scripts/lib/perception.ts:236-246`)。
+1. `kyberion listen` → `runListenCommand` (`scripts/cli/cli-listen.ts:187`) →
+   `createPerceptionWorkDir('listen', absolute)` (`scripts/lib/perception/perception.ts:236-246`)。
 2. `resolvePerceptionScope(sourceFile)` (`libs/shared-perception/src/observation.ts:47-60`) は
    **active scope と入力推定 tier の高い方**を採る。永続 scope.env
    (`active/shared/runtime/scope.env`, tier=confidential / tenant=famao-ai —
@@ -125,7 +125,7 @@ bridge 内 guard) を `withExecutionContextAsync(<role>, fn, 'worker', tenantSlu
   `active/shared/staging/confidential/${KYBERION_TENANT}/` (必要なら personal 同型) の
   allow_read/allow_write + `role-assumption-policy.json shared_core_roles` への登録 +
   `role-assumption-reachability` gate の通過
-  (`scripts/analyze_role_assumptions.ts` がメモリ上で到達可能 role を計算し、未許可なら失敗)。
+  (`scripts/analyze/analyze_role_assumptions.ts` がメモリ上で到達可能 role を計算し、未許可なら失敗)。
   可能なら dedicated store role と同じ `currentResourceAccessScope` exact
   capability 縛りにすると grant の濫用面が最小。
 - **触る境界**: security-policy.json / role-assumption-policy.json / authority-roles/

@@ -62,7 +62,7 @@ export function main(argv: string[] = [], print: Print = () => undefined): void 
     print(`\n=== ${catalogT('mission_alignment:decision_approved')} ===`);
     print(
       'Static HTML is not an approval record. Re-check the shared approval-store with ' +
-        `node dist/scripts/mission_alignment_decision.js --mission ${b.missionId || '<MISSION_ID>'} --strict`
+        `node dist/scripts/mission/mission_alignment_decision.js --mission ${b.missionId || '<MISSION_ID>'} --strict`
     );
     print(
       'If the strict check passes, use mission_controller gate-pass ALIGNMENT_APPROVED; do not run start from this output.'

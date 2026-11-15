@@ -60,7 +60,7 @@ export type GovernedArtifactRole =
   | 'sovereign_concierge';
 
 // Kept as an explicit literal union: the role assumption analysis
-// (scripts/analyze_role_assumptions.ts) resolves it without the TS lib. The
+// (scripts/analyze/analyze_role_assumptions.ts) resolves it without the TS lib. The
 // record below makes the runtime list exhaustive and exact at compile time.
 const GOVERNED_ARTIFACT_ROLE_SET: Record<GovernedArtifactRole, true> = {
   slack_bridge: true,

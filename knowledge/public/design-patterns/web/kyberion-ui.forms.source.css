@@ -1,6 +1,6 @@
 /* ------------------------------------------------- settings & forms ----
  * UI-01c (SURFACE_UI_UNIFICATION_PLAN §3.3). Stamped into kyberion-ui.css
- * after kyberion-ui.source.css by scripts/generate_design_tokens.ts.
+ * after kyberion-ui.source.css by scripts/generate/generate_design_tokens.ts.
  *
  * Markup comes from libs/shared-ui/vanilla/forms.js and src/forms/*.tsx
  * (parity-tested). Same rules as the base sheet: `--kb-ui-*` tokens only,

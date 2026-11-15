@@ -39,13 +39,13 @@ AI エージェントが作業を開始する際、巨大な規約ドキュメ�
 
 ```bash
 # 人間が読みやすい Markdown 形式で取得
-node --import ./scripts/ts-loader.mjs scripts/context_pack.ts --task "code-refactor"
+node --import ./scripts/ts-loader.mjs scripts/context/context_pack.ts --task "code-refactor"
 
 # エージェントが直接消費しやすい JSON 形式で取得
-node --import ./scripts/ts-loader.mjs scripts/context_pack.ts --task "code-refactor" --json
+node --import ./scripts/ts-loader.mjs scripts/context/context_pack.ts --task "code-refactor" --json
 
 # テナントや Tier を指定して取得
-node --import ./scripts/ts-loader.mjs scripts/context_pack.ts --task "review" --tenant "my-tenant" --tier "confidential"
+node --import ./scripts/ts-loader.mjs scripts/context/context_pack.ts --task "review" --tenant "my-tenant" --tier "confidential"
 ```
 
 ### 出力内容

@@ -366,7 +366,7 @@ does not modify live grants, connection ownership, or deployment settings.
    Tenant execution requires the binding and matching trusted runtime identity
    described above. Personal execution without a tenant remains supported.
 2. **Deliberate migration:** inspect existing records before rollout using
-   `node dist/scripts/migrate_binding_owners.js` (dry-run). For a verified
+   `node dist/scripts/migrate/migrate_binding_owners.js` (dry-run). For a verified
    single-owner legacy installation, preview with
    `--assign-person user:<member-id>`, then apply the reviewed assignment with
    `--apply --assign-person user:<member-id>`. This option assigns all eligible

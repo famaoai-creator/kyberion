@@ -1,6 +1,6 @@
 /**
  * Shared plumbing of the customer-decision facade: arguments, locations, roles, audit and agenda helpers.
- * Part of scripts/customer_decision.ts (the entry point); see its header.
+ * Part of scripts/customer/customer_decision.ts (the entry point); see its header.
  */
 import { humanActor } from '@agent/core/actor';
 import {

@@ -6,7 +6,7 @@ import {
   accountIntroductionStatus,
   applyAccountIntroduction,
 } from '@agent/core/secret/account-introduction';
-import { requireConciergeMutationAccess } from '../../../../lib/api-guard';
+import { requireConciergeMutationTransport } from '../../../../lib/api-guard';
 import { resolveConciergeViewer } from '../../../../lib/viewer-context';
 import { readRequestObject } from '../../../../lib/request-input';
 import { requireConciergeInstallationAccess } from '../../../../lib/installation-access';
@@ -19,7 +19,11 @@ const response = (value: unknown, status = 200) =>
 const invalid = () => response({ ok: false, error: 'invalid_account_request' }, 400);
 
 export async function POST(req: NextRequest) {
-  const denied = requireConciergeMutationAccess(req);
+  // Scope-specific authorization below (installation owner for person
+  // bindings, tenant-owner member for organization bindings) is stronger
+  // than a blanket localadmin surface role, so this route carries the
+  // transport checks only and lets the scope decide.
+  const denied = requireConciergeMutationTransport(req);
   if (denied) return denied;
   const resolved = resolveConciergeViewer(req);
   if (resolved.response) return resolved.response;
@@ -49,7 +53,9 @@ export async function POST(req: NextRequest) {
   )
     return invalid();
   try {
-    const { principal, scope } = accountIntroductionAccess(resolved.context, bindingId);
+    const { principal, scope } = accountIntroductionAccess(resolved.context, bindingId, {
+      admitRemoteTenantOwner: true,
+    });
     if (scope.kind === 'person' && ['request', 'apply'].includes(action)) {
       const gate = requireConciergeInstallationAccess(
         resolved.context,

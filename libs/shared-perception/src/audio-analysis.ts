@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import * as yaml from 'js-yaml';
 import { pathResolver } from '@agent/core/path-resolver';
+import { resolvePython3Bin } from '@agent/core/tool/tool-binary-resolvers';
 import {
   assertSafeRepositoryPath,
   safeLstat,
@@ -266,7 +267,7 @@ export async function analyzeAudio(request: AudioAnalysisRequest): Promise<Audio
   if (audioModel && !/\.(tflite|task)$/iu.test(audioModel))
     return invalid('audio model must be a .tflite or .task asset');
   const script = localAsset('libs/shared-perception/src/audio-analysis.py', false);
-  const command = request.python ?? 'python3';
+  const command = request.python ?? resolvePython3Bin();
   if (!command.trim() || command.startsWith('-') || /[\r\n\0]/u.test(command))
     return invalid('invalid Python executable');
   const args = ['-I', script];

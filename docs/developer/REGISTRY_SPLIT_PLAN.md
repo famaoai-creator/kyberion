@@ -27,7 +27,7 @@ This plan tracks catalog/index splits that should move from centralized JSON blo
 | RSP-13 | Harness adapter registry    | completed   | Split `knowledge/product/governance/harness-adapter-registry.json` into `knowledge/product/governance/harness-adapters/*.json` (snapshot abolished).                                                                                  |
 | RSP-14 | Gateway capability registry | completed   | Split `knowledge/product/governance/gateway-capability-registry.json` into `knowledge/product/governance/gateway-capabilities/*.json` (snapshot abolished; empty ledger, entries via `pipelines/assimilate-gateway-capability.json`). |
 | RSP-15 | External service seed       | completed   | Split `knowledge/product/orchestration/external-service-registry.json` into `knowledge/product/orchestration/external-services/*.json` (snapshot abolished; personal + runtime layers stay single files).                             |
-| RSP-16 | Governance body registry    | completed   | Split `knowledge/product/governance/governance-body-registry.json` into `knowledge/product/governance/governance-bodies/*.json` (snapshot abolished; writes via `scripts/register_workflow.ts`).                                      |
+| RSP-16 | Governance body registry    | completed   | Split `knowledge/product/governance/governance-body-registry.json` into `knowledge/product/governance/governance-bodies/*.json` (snapshot abolished; writes via `scripts/register/register_workflow.ts`).                             |
 | RSP-17 | Tool runtime registry       | completed   | Split `knowledge/product/governance/tool-runtime-registry.json` into `knowledge/product/governance/tool-runtimes/*.json` (snapshot abolished).                                                                                        |
 | RSP-18 | Service runtime registry    | completed   | Split `knowledge/product/governance/service-runtime-registry.json` into `knowledge/product/governance/service-runtimes/*.json` (snapshot abolished).                                                                                  |
 | RSP-19 | Media backend registry      | completed   | Split `knowledge/product/governance/media-backend-registry.json` into `knowledge/product/governance/media-backends/*.json` (snapshot abolished; voice backends still merged at runtime from voice-engine-registry).                   |
@@ -51,7 +51,7 @@ This plan tracks catalog/index splits that should move from centralized JSON blo
 ## Non-targets
 
 - `service-harness-registry.json` is a **generated artifact** (built by
-  `scripts/generate_service_harness_registry.ts` from the already-split
+  `scripts/generate/generate_service_harness_registry.ts` from the already-split
   `service-presets/*.json` source directory) — splitting the generated file
   would be wrong; the source is already per-item.
 - Policy-like single files (`env-registry.json`, `approval-policy.json`,

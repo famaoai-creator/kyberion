@@ -32,7 +32,7 @@ import {
  *  - SessionStart: inject the operating-guide reminder + governance status.
  *
  * Pure functions here; the stdin/stdout wiring lives in
- * `scripts/claude_code_hook.ts` so this stays unit-testable.
+ * `scripts/claude/claude_code_hook.ts` so this stays unit-testable.
  */
 
 export type PermissionDecision = 'allow' | 'deny' | 'ask';

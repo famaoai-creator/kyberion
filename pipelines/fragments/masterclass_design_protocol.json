@@ -2457,7 +2457,7 @@
         {
           "type": "text",
           "pos": { "x": 5.4, "y": 2.3, "w": 3.8, "h": 1.2 },
-          "text": "$ pnpm install\n\n$ pnpm run build:repo\n\n$ node dist/scripts/generate_all_objects_layout_sample.js",
+          "text": "$ pnpm install\n\n$ pnpm run build:repo\n\n$ node dist/scripts/generate/generate_all_objects_layout_sample.js",
           "style": {
             "fontFamily": "Courier New",
             "fontSize": 11,

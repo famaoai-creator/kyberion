@@ -20,7 +20,7 @@ import { withSecretResolutionSession } from '@agent/core/foundation/secret-resol
 import { defineScript, isDirectScript } from './lib/harness.js';
 import { inspectInstalledIdentity } from './lib/installed-identity.js';
 import { readSafeJsonFile } from './lib/json-input.js';
-import { readHiddenToken } from './lib/hidden-token-input.js';
+import { readHiddenToken } from './lib/tty/hidden-token-input.js';
 
 type Action = 'preview' | 'request' | 'status' | 'apply';
 function parse(argv: string[]) {

@@ -9,7 +9,7 @@ import {
 } from '@agent/core/voice/engine-runtime-preferences';
 import { defineScript, isDirectScript, stripSharedScriptFlags } from './lib/harness.js';
 
-import { hasCliFlag, hasHelpFlag } from './lib/cli-guard.js';
+import { hasCliFlag, hasHelpFlag } from './lib/cli/cli-guard.js';
 
 type Command = 'show' | 'set' | 'unset' | 'reset' | 'help';
 

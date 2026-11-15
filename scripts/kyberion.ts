@@ -7,7 +7,7 @@ import {
   type CliCommand,
   type CliManifest,
   type CliScriptCommand,
-} from './check_cli_manifest.js';
+} from './check/check_cli_manifest.js';
 import { assertGovernedExec, buildSafeExecEnv, safeExecResultAsync } from '@agent/core/secure-io';
 import { constants as osConstants } from 'node:os';
 import { pathToFileURL } from 'node:url';
@@ -19,22 +19,22 @@ import { resolveLocale, type SupportedLocale } from '@agent/core/locale';
 import { t } from '@agent/core/t';
 import { DiagnosticError } from '@agent/core/logger';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
-import { hasHelpFlag } from './lib/cli-guard.js';
+import { hasHelpFlag } from './lib/cli/cli-guard.js';
 import {
   describeRegisteredCommand,
   formatCliManifestHelp,
   formatUnknownCommand,
   routedCommandName,
-} from './lib/cli-help.js';
+} from './lib/cli/cli-help.js';
 import {
   findDeprecatedCommandAlias,
   formatScopeHelp,
   formatUnknownScope,
   rewriteDeprecatedCommand,
   routeScopedCommand,
-} from './lib/cli-scopes.js';
+} from './lib/cli/cli-scopes.js';
 
-export { formatCliManifestHelp, formatUnknownCommand } from './lib/cli-help.js';
+export { formatCliManifestHelp, formatUnknownCommand } from './lib/cli/cli-help.js';
 
 interface CliEntrypoint {
   id: string;
@@ -179,7 +179,7 @@ async function runScriptCommand(
   const childCommand = scriptCommand.module ? process.execPath : pnpmExecutable();
   const credentialEnv =
     scriptCommand.id === 'script.pr.create' &&
-    scriptCommand.module === 'scripts/publish_pull_request.ts'
+    scriptCommand.module === 'scripts/publish/publish_pull_request.ts'
       ? {
           GH_TOKEN: getRegisteredEnvText('GH_TOKEN'),
           GITHUB_TOKEN: getRegisteredEnvText('GITHUB_TOKEN'),
@@ -437,7 +437,7 @@ export async function main(
       return;
     }
     case 'operator-readiness': {
-      const { main: vitalMain } = await import('./vital_check.js');
+      const { main: vitalMain } = await import('./vital/vital_check.js');
       const result = await vitalMain(normalizedArgs.slice(1));
       if (result.help) print(result.help);
       else if (result.report) {
@@ -457,12 +457,12 @@ export async function main(
         if (registered) print(formatScopeHelp(registered, helpLocale(normalizedArgs)));
         return;
       }
-      const { runSetupReportCli } = await import('./setup_report.js');
+      const { runSetupReportCli } = await import('./setup/setup_report.js');
       await runSetupReportCli(normalizedArgs.slice(2));
       return;
     }
     case 'operator-voice': {
-      const { runVoiceSetupScript } = await import('./voice_setup.js');
+      const { runVoiceSetupScript } = await import('./voice/voice_setup.js');
       await runVoiceSetupScript(normalizedArgs.slice(2));
       return;
     }

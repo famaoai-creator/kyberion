@@ -13,7 +13,11 @@ import {
 import { logger } from '@agent/core/core';
 import { pathResolver } from '@agent/core/path-resolver';
 import { resolveManagedToolPythonBin } from '@agent/core/tool/tool-runtime-registry';
-import { resolveFfmpegBin, resolveFfprobeBin } from '@agent/core/tool/tool-binary-resolvers';
+import {
+  resolveEspeakNgBin,
+  resolveFfmpegBin,
+  resolveFfprobeBin,
+} from '@agent/core/tool/tool-binary-resolvers';
 import { hostNodePlatform, locateCommandInvocation } from '@agent/core/platform-facts';
 import {
   assertSafeRepositoryPath,
@@ -151,7 +155,7 @@ function resolvePythonBin(preferredTool: VoicePythonTool = 'mlx_audio'): string 
 }
 
 function hasEspeakNg(): boolean {
-  const [resolver, ...resolverArgs] = locateCommandInvocation('espeak-ng');
+  const [resolver, ...resolverArgs] = locateCommandInvocation(resolveEspeakNgBin());
   const result = safeExecResult(resolver, resolverArgs, { timeoutMs: 3000 });
   return result.status === 0 && Boolean(result.stdout.trim());
 }
@@ -936,7 +940,7 @@ async function renderWithEspeakNg(
   const adjustedRate = resolveEspeakRate(options.language, options.rate);
 
   if (options.format === 'wav') {
-    safeExec('espeak-ng', [
+    safeExec(resolveEspeakNgBin(), [
       '-v',
       normalizedLanguage,
       '-s',
@@ -950,7 +954,7 @@ async function renderWithEspeakNg(
 
   const tempWav = pathResolver.sharedTmp(`voice-generation/${options.requestId}.wav`);
   safeMkdir(path.dirname(tempWav), { recursive: true });
-  safeExec('espeak-ng', [
+  safeExec(resolveEspeakNgBin(), [
     '-v',
     normalizedLanguage,
     '-s',

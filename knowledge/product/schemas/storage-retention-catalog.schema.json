@@ -89,7 +89,7 @@
         "backup": {
           "type": "string",
           "enum": ["exclude"],
-          "description": "Backup opt-out (scripts/lib/backup-file-selection.ts). exclude = `--scope all|mission|tenant` backups leave this directory out because it is fully regenerable (rebuildable index, provider/probe cache, test-run fixtures, daemon sockets). Omit for everything else: a cache/tmp class alone never excludes, since staging stores (distill or promotion candidates, queued events, mailboxes) hold pending state a restore needs. The tmp/staging/cache floor roots are always excluded."
+          "description": "Backup opt-out (scripts/lib/backup/backup-file-selection.ts). exclude = `--scope all|mission|tenant` backups leave this directory out because it is fully regenerable (rebuildable index, provider/probe cache, test-run fixtures, daemon sockets). Omit for everything else: a cache/tmp class alone never excludes, since staging stores (distill or promotion candidates, queued events, mailboxes) hold pending state a restore needs. The tmp/staging/cache floor roots are always excluded."
         },
         "note": {
           "type": "string",

@@ -59,3 +59,5 @@ Seven documents describe what Kyberion can do. They overlap by design but have d
 ## Maintaining this index
 
 A document that is superseded gets a banner pointing at its canonical replacement; its content is not deleted. When you add a scenario, add it to USE_CASES first. `pnpm generate:cli-reference` regenerates the command reference, and the `docs-drift` gate in `pnpm check` rejects references to commands, pipelines and directories that do not exist.
+
+Improvement plans are drafted in `developer/improvement-plans-YYYY-MM/` for their month and declare `status:` in frontmatter. When a plan reaches `implemented` or `completed`, move the document to `developer/improvement-plans-archive/YYYY-MM/` (create the month folder if needed) and update the monthly `README.ja.md` index — the monthly indexes stay in place as the status map. This is rule SX-13 item 2 of the [SIMPLICITY_ABSTRACTION_PLAN](./developer/improvement-plans-2026-08/SIMPLICITY_ABSTRACTION_PLAN_2026-08-25.ja.md).

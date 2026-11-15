@@ -19,7 +19,7 @@ const HOME = '/Users/op';
 const mine = daemonInstanceFromCanonicalRoot(MINE, 'darwin');
 const other = daemonInstanceFromCanonicalRoot(OTHER, 'darwin');
 
-function plist(label: string, repoRoot: string, script = 'dist/scripts/chronos_daemon.js') {
+function plist(label: string, repoRoot: string, script = 'dist/scripts/chronos/chronos_daemon.js') {
   return buildLaunchdPlist(
     { nodePath: '/opt/homebrew/opt/node/bin/node', repoRoot, logDir: `${HOME}/Library/Logs` },
     { label, daemonScript: script, logBaseName: 'kyberion-test' }
@@ -33,7 +33,7 @@ const LEGACY_TEMPLATE = `<?xml version="1.0" encoding="UTF-8"?>
 <dict>
   <key>Label</key><string>com.kyberion.daemon-watchdog</string>
   <key>ProgramArguments</key>
-  <array><string>/usr/local/bin/node</string><string>${MINE}/dist/scripts/daemon_watchdog.js</string></array>
+  <array><string>/usr/local/bin/node</string><string>${MINE}/dist/scripts/daemon/daemon_watchdog.js</string></array>
   <key>StartInterval</key><integer>300</integer>
   <key>RunAtLoad</key><true/>
 </dict>
@@ -84,7 +84,7 @@ describe('installed-units (darwin)', () => {
         [`${agents}/com.kyberion.agent-runtime-supervisor.plist`]: plist(
           'com.kyberion.agent-runtime-supervisor',
           OTHER,
-          'dist/scripts/agent_runtime_supervisor_daemon.js'
+          'dist/scripts/agent/agent_runtime_supervisor_daemon.js'
         ),
         [`${agents}/com.kyberion.daemon-watchdog.plist`]: LEGACY_TEMPLATE,
         [`${agents}/com.example.unrelated.plist`]: plist('com.example.unrelated', MINE),

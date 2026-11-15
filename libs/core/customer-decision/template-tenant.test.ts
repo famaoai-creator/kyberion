@@ -7,7 +7,7 @@ import type { DecisionAgenda } from './model.js';
 /**
  * HR-01: tenant hearing templates (resolution order, isolation, inline text,
  * objective). The tenant store is stubbed per tenant here; the real paths are
- * covered by scripts/customer_decision.templates.boundary.test.ts.
+ * covered by scripts/customer/customer_decision.templates.boundary.test.ts.
  */
 const tenantRecords = vi.hoisted(() => new Map<string, Map<string, unknown>>());
 vi.mock('./store.js', async (importOriginal) => ({

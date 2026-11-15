@@ -64,7 +64,7 @@ status: active
 
 ### KL-03 `pr create` の Knowledge 検査(ブロッキング)
 
-`scripts/publish_pull_request.ts` に検査を追加する(ロジックは `libs/core` 側の純粋関数にする)。
+`scripts/publish/publish_pull_request.ts` に検査を追加する(ロジックは `libs/core` 側の純粋関数にする)。
 
 1. `--body-file` の Coordination 欄から Mission ID を読む。空欄(ミッションなしの PR)なら、Knowledge 欄があることだけを確認する。
 2. ミッション記録の root を解決する。

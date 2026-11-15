@@ -15,6 +15,7 @@ vi.mock('@agent/core/secure-io', () => ({
   safeReaddir: () => [],
   safeReadFile: mock.read,
   safeReadFileRange: mock.readRange,
+  safeExistsSync: () => false,
   buildSafeExecEnv: (env: Record<string, string>) => env,
   assertGovernedExec: mock.exec,
 }));

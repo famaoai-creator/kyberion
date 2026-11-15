@@ -49,7 +49,7 @@ has no triage step yet; read its failed step log directly.
 
 ## Workflow contract (enforced)
 
-The `ci-workflow-contract` gate (`scripts/check_ci_workflow_contract.ts`, scope `pr`) fails when:
+The `ci-workflow-contract` gate (`scripts/check/check_ci_workflow_contract.ts`, scope `pr`) fails when:
 
 - a job has no `timeout-minutes` (the 360-minute default can hold a runner for six hours);
 - a `pull_request` workflow has no top-level `concurrency` with `cancel-in-progress`
@@ -154,11 +154,11 @@ report changes, and left alone when it is unchanged.
 2. `pnpm build`
 3. `pnpm lint`
 4. `pnpm typecheck`
-5. capability discovery validation via `node dist/scripts/capability_discovery.js`
-6. runtime surface manifest/status validation via `node dist/scripts/surface_runtime.js --action status`
+5. capability discovery validation via `node dist/scripts/capability/capability_discovery.js`
+6. runtime surface manifest/status validation via `node dist/scripts/surface/surface_runtime.js --action status`
 7. smoke/unit/integration tests
 8. security audit
-9. vital check audit via `node dist/scripts/vital_check.js --format json --exit-on-missing=false`
+9. vital check audit via `node dist/scripts/vital/vital_check.js --format json --exit-on-missing=false`
 
 ## PR Validation Workflow
 
@@ -171,7 +171,7 @@ report changes, and left alone when it is unchanged.
 5. coverage threshold validation
 6. coverage reporting
 7. security scan
-8. vital check measurement using `node dist/scripts/vital_check.js --format text`
+8. vital check measurement using `node dist/scripts/vital/vital_check.js --format text`
 
 ## Coverage Threshold
 
@@ -213,9 +213,9 @@ When investigating local residue:
 ### Build size report failed
 
 - Confirm `pnpm build` produced `dist/`
-- Confirm `node dist/scripts/vital_check.js --format json --exit-on-missing=false` succeeds locally
+- Confirm `node dist/scripts/vital/vital_check.js --format json --exit-on-missing=false` succeeds locally
 
 ### Surface validation failed
 
 - Confirm `knowledge/product/governance/active-surfaces.json` is valid
-- Confirm `node dist/scripts/surface_runtime.js --action status` succeeds locally
+- Confirm `node dist/scripts/surface/surface_runtime.js --action status` succeeds locally

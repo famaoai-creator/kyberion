@@ -120,7 +120,7 @@ export interface ResidentServiceDesired {
   owner_surface?: string;
 }
 
-/** describeBackupPassphraseAvailability result (scripts/lib/backup-passphrase.ts); never the value. */
+/** describeBackupPassphraseAvailability result (scripts/lib/backup/backup-passphrase.ts); never the value. */
 export interface BackupPassphraseObservation {
   available: boolean;
   source: 'env' | 'secret' | null;

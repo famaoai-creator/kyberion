@@ -1,0 +1,123 @@
+{
+  "action": "pipeline",
+  "name": "meeting-followup",
+  "version": "2.2.0",
+  "description": "Post-meeting follow-up flow: turn a meeting transcript into minutes.md, persist action items to the mission store, and emit a delivery pack for downstream handoff.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v2.1: transcript intake via meeting:normalize_transcript (VTT/SRT cue parsing + speaker normalization; plain text passes through). v2.2: promoted to pipeline-templates; meeting-runtime-preflight gate added.",
+  "context": {
+    "mission_id": "",
+    "transcript_path": "",
+    "attendees": [],
+    "operator_label": "Operator",
+    "language": "ja",
+    "mission_evidence_dir": "",
+    "minutes_path": "{{mission_evidence_dir}}/minutes.md",
+    "delivery_pack_path": "{{mission_evidence_dir}}/meeting-followup-pack.json"
+  },
+  "steps": [
+    {
+      "id": "preflight",
+      "role": "gate",
+      "op": "core:include",
+      "params": {
+        "fragment": "fragments/meeting-runtime-preflight.json"
+      }
+    },
+    {
+      "id": "open_log",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "🧾 Meeting follow-up start for mission {{mission_id}}."
+      }
+    },
+    {
+      "id": "normalize_transcript",
+      "role": "sink",
+      "op": "meeting:normalize_transcript",
+      "produces": {
+        "channel": "normalized_transcript",
+        "type": "MeetingTranscriptText"
+      },
+      "params": {
+        "transcript_path": "{{transcript_path}}",
+        "attendees": "{{attendees}}",
+        "language": "{{language}}"
+      }
+    },
+    {
+      "id": "draft_minutes",
+      "role": "transform",
+      "op": "reasoning:analyze",
+      "consumes": "normalized_transcript",
+      "produces": {
+        "channel": "minutes_markdown",
+        "type": "MarkdownText"
+      },
+      "params": {
+        "instruction": "以下の会議 transcript をもとに、会議後に配布できる minutes.md を Markdown で作成してください。\n\n必須セクション:\n# Minutes\n## Summary\n## Decisions\n## Action Items\n## Risks\n## Follow-up\n\n要件:\n- Summary は 3〜5 行で簡潔に書く\n- Decisions は箇条書きで事実に限定する\n- Action Items は owner と due を明示する\n- Risks はフォローアップで気をつける点を列挙する\n- Follow-up には次の確認観点を 1〜3 件書く\n- transcript にない事実は作らない",
+        "context": [
+          "{{mission_id}}",
+          "{{language}}",
+          "{{attendees}}",
+          "{{normalized_transcript.transcript}}"
+        ]
+      }
+    },
+    {
+      "id": "write_minutes",
+      "role": "sink",
+      "op": "system:write_artifact",
+      "consumes": "minutes_markdown",
+      "params": {
+        "path": "{{mission_evidence_dir}}/minutes.md",
+        "content": "{{minutes_markdown}}"
+      }
+    },
+    {
+      "id": "extract_action_items",
+      "role": "sink",
+      "op": "meeting:extract_action_items",
+      "consumes": "normalized_transcript",
+      "produces": {
+        "channel": "action_item_count",
+        "type": "number"
+      },
+      "params": {
+        "mission_id": "{{mission_id}}",
+        "work_item_id": "{{work_item_id}}",
+        "transcript": "{{normalized_transcript.transcript}}",
+        "attendees": "{{attendees}}",
+        "operator_label": "{{operator_label}}",
+        "language": "{{language}}",
+        "output_path": "{{mission_evidence_dir}}/action-items.jsonl"
+      }
+    },
+    {
+      "id": "write_delivery_pack",
+      "role": "sink",
+      "op": "system:write_file",
+      "consumes": "action_item_count",
+      "params": {
+        "path": "{{mission_evidence_dir}}/meeting-followup-pack.json",
+        "content": {
+          "kind": "meeting-followup-delivery-pack",
+          "mission_id": "{{mission_id}}",
+          "transcript_path": "{{transcript_path}}",
+          "minutes_path": "{{mission_evidence_dir}}/minutes.md",
+          "action_items_path": "{{mission_evidence_dir}}/action-items.jsonl",
+          "action_item_count": "{{action_item_count}}"
+        }
+      }
+    },
+    {
+      "id": "log_summary",
+      "role": "sink",
+      "op": "system:log",
+      "consumes": "action_item_count",
+      "params": {
+        "message": "✅ Meeting follow-up complete: minutes={{mission_evidence_dir}}/minutes.md, action-items={{mission_evidence_dir}}/action-items.jsonl (count={{action_item_count}}), delivery-pack={{mission_evidence_dir}}/meeting-followup-pack.json"
+      }
+    }
+  ]
+}

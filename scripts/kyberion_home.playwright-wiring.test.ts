@@ -9,7 +9,7 @@ describe('kyberion home playwright wiring', () => {
   );
 
   it('injects the shared host-boundary Playwright executor instead of inlining handleAction', () => {
-    expect(source).toContain("from './browser_playwright_executor.js'");
+    expect(source).toContain("from './browser/browser_playwright_executor.js'");
     expect(source).toContain('createExecuteBrowserPipeline');
     expect(source).toContain('loadBrowserActuator');
     expect(source).not.toContain('pathToFileURL(actuatorPath)');

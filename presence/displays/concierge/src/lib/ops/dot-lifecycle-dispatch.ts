@@ -7,14 +7,14 @@ import { governedWorkerEnv } from '../server-child-env';
  * `/api/ops/workspace/autonomy` plans the change
  * read-only (`planWorkspaceAutonomyControl`: operator role, workplace
  * ownership, viewer visibility, status, admission hash) and dispatches the
- * write to the governed worker `scripts/dot_lifecycle_worker.ts`, launched as a
+ * write to the governed worker `scripts/dot/dot_lifecycle_worker.ts`, launched as a
  * child under its own system role. The worker re-validates every expectation
  * inside the charter lock and fails closed on a mismatch. Each dispatch is
  * audited as `governed_worker_dispatch`.
  */
 import type { WorkspaceAutonomyControlPlan } from '@agent/core/surface/workspace-autonomy';
 
-export const DOT_LIFECYCLE_WORKER_SCRIPT = 'dist/scripts/dot_lifecycle_worker.js';
+export const DOT_LIFECYCLE_WORKER_SCRIPT = 'dist/scripts/dot/dot_lifecycle_worker.js';
 export const DOT_LIFECYCLE_WORKER_ROLE = 'dot_lifecycle_worker';
 const DOT_LIFECYCLE_WORKER_TIMEOUT_MS = 60_000;
 

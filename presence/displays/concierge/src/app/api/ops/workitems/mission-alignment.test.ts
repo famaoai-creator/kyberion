@@ -99,7 +99,7 @@ describe('scoped server mission alignment adapter', () => {
       'original-request'
     );
     expect(h.exec.mock.calls[0][1]).toEqual([
-      '/repo/dist/scripts/mission_alignment_request.js',
+      '/repo/dist/scripts/mission/mission_alignment_request.js',
       '--work-item',
       'WI-1',
       '--expected-work-item-version',

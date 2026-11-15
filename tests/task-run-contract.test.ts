@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { pathResolver, safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from '@agent/core';
-import { describeTaskRun, main } from '../scripts/task_run.js';
+import { describeTaskRun, main } from '../scripts/task/task_run.js';
 
 const PROFILE_PATH = pathResolver.rootResolve(
   'knowledge/personal/task-profiles/task-run-profile.json'

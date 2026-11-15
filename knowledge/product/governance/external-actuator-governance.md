@@ -92,7 +92,7 @@ charter による認可が実際に成立した操作だけが、その tenant �
 ## 会議から外部連携までの自律ループ
 
 1. 許可された calendar から対象を解決し、参加・録音・発話それぞれの consent と tenant scope を確認する。
-2. pipelines/meeting-followup.json で transcript 正規化→議事録下書き→action items→delivery pack を作る。partial transcript を証拠に残し、不明な担当・期限を創作しない。
+2. knowledge/product/pipeline-templates/meeting-followup.json で transcript 正規化→議事録下書き→action items→delivery pack を作る。partial transcript を証拠に残し、不明な担当・期限を創作しない。
 3. 成果物を同じ scope に保存する。議事録作成成功を、配布や外部登録の成功として扱わない。
 4. action item ごとに対象サービスと作用を確定し共通認可へ渡す。charter 内なら進み、例外だけ具体的 payload と承認要求を提示する。
 5. 認可された操作を実行し、結果識別子と監査を記録する。外部結果を確認してから action item を完了する。モデルの計画生成だけでは完了にしない。

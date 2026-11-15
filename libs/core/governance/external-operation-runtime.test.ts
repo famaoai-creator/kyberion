@@ -30,8 +30,10 @@ vi.mock('../pipeline/op-preflight-defaults.js', () => ({
   ensureDefaultOpPreflight: vi.fn(),
   assertBuiltinOnlyOpPreflight: vi.fn(),
 }));
-vi.mock('../../../scripts/pipeline-execution-part-bootstrap.js', async (original) => ({
-  ...(await original<typeof import('../../../scripts/pipeline-execution-part-bootstrap.js')>()),
+vi.mock('../../../scripts/pipeline/pipeline-execution-part-bootstrap.js', async (original) => ({
+  ...(await original<
+    typeof import('../../../scripts/pipeline/pipeline-execution-part-bootstrap.js')
+  >()),
   loadActuatorDispatch: vi.fn(),
   assertPipelineStepCapabilityAvailable: vi.fn(),
   validatePipelineOpInput: vi.fn(),
@@ -76,10 +78,10 @@ import {
   externalOperationReplayKey,
   withRuntimeExternalOperationAuthority,
 } from './external-operation-runtime.js';
-import { loadActuatorDispatch } from '../../../scripts/pipeline-execution-part-bootstrap.js';
-import { dispatchLeafOp } from '../../../scripts/pipeline-execution-part-control.js';
-import { PipelineSuspendedError } from '../../../scripts/pipeline-execution-part-bootstrap.js';
-import { runWithRepair } from '../../../scripts/pipeline-step-repair.js';
+import { loadActuatorDispatch } from '../../../scripts/pipeline/pipeline-execution-part-bootstrap.js';
+import { dispatchLeafOp } from '../../../scripts/pipeline/pipeline-execution-part-control.js';
+import { PipelineSuspendedError } from '../../../scripts/pipeline/pipeline-execution-part-bootstrap.js';
+import { runWithRepair } from '../../../scripts/pipeline/pipeline-step-repair.js';
 
 const facts = {
   operationId: 'meeting:chat',

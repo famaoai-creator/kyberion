@@ -29,7 +29,7 @@
  * Once admitted, the shared first-job logic receives the same server-owned
  * local diagnostic viewer Studio passed (`toFrontDeskViewerScope` of a
  * loopback localadmin). The installed diagnostic mapping
- * (`scripts/onboarding_first_job.ts`) is bound to exactly that principal, and
+ * (`scripts/onboarding/onboarding_first_job.ts`) is bound to exactly that principal, and
  * the approval and recovery writers re-verify the browser session's member
  * against the owner on every call; nothing here is taken from the request.
  */
@@ -47,7 +47,7 @@ import { conciergeCredential, resolveConciergeViewer, serverTenant } from './vie
 
 /**
  * The local diagnostic operator the installed mapping names
- * (`scripts/onboarding_first_job.ts` `PRINCIPAL`). It identifies "the
+ * (`scripts/onboarding/onboarding_first_job.ts` `PRINCIPAL`). It identifies "the
  * operator of this machine" for the diagnostic charter, not a credential.
  */
 export const FIRST_JOB_LOCAL_OPERATOR_PRINCIPAL_ID = 'human:presence-studio-localadmin';

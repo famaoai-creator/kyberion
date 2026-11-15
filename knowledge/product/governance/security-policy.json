@@ -880,6 +880,30 @@
         "active/missions/personal/${MISSION_ID}/evidence/",
         "active/missions/public/${MISSION_ID}/evidence/"
       ]
+    },
+    "chronos_personal_runner": {
+      "allow_read": [
+        "knowledge/personal/pipelines/",
+        "knowledge/personal/governance/",
+        "active/personal/",
+        "active/shared/MEMORY.md",
+        "active/shared/MEMORY.volatile.json",
+        "active/INDEX.volatile.md",
+        "active/INDEX.volatile.json"
+      ],
+      "allow_write": [
+        "active/personal/",
+        "active/shared/MEMORY.md",
+        "active/shared/MEMORY.volatile.json",
+        "active/INDEX.volatile.md",
+        "active/INDEX.volatile.json",
+        "active/shared/tmp/",
+        "active/shared/logs/traces/",
+        "active/shared/logs/process/",
+        "active/shared/observability/",
+        "active/shared/coordination/",
+        "active/audit/"
+      ]
     }
   },
   "store_grants": {
@@ -955,7 +979,7 @@
       ]
     },
     "customer_decision_deal_note_writer": {
-      "description": "Tenant deal store (libs/core/organization/deal-store.ts asDealStore, S3): every read and write of a tenant's customer records — deals, deal documents, requirements captures, escalations and the deal log under knowledge/confidential/<tenant>/deals/ — runs as this role, bound to that tenant (tenant-bound: libs/core/authority.ts TENANT_BOUND_READER_ROLES), and scripts/customer_decision.ts respond / confirm uses it for the best-effort deal note (CD-08), so neither the customer-triggered path nor a surface needs mission_controller or a confidential-tier grant. Only the deal file IO runs under it; callers keep their own role for notifications and the memory promotion queue. No other knowledge, decision ledger, agenda, receipt or invite authority.",
+      "description": "Tenant deal store (libs/core/organization/deal-store.ts asDealStore, S3): every read and write of a tenant's customer records — deals, deal documents, requirements captures, escalations and the deal log under knowledge/confidential/<tenant>/deals/ — runs as this role, bound to that tenant (tenant-bound: libs/core/authority.ts TENANT_BOUND_READER_ROLES), and scripts/customer/customer_decision.ts respond / confirm uses it for the best-effort deal note (CD-08), so neither the customer-triggered path nor a surface needs mission_controller or a confidential-tier grant. Only the deal file IO runs under it; callers keep their own role for notifications and the memory promotion queue. No other knowledge, decision ledger, agenda, receipt or invite authority.",
       "allow_read": ["knowledge/confidential/${KYBERION_TENANT}/deals/"],
       "allow_write": ["knowledge/confidential/${KYBERION_TENANT}/deals/"]
     },

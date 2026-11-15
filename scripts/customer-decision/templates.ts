@@ -1,6 +1,6 @@
 /**
  * HR-01 tenant hearing templates: `template put / list / show`.
- * Part of scripts/customer_decision.ts (the entry point); see its header.
+ * Part of scripts/customer/customer_decision.ts (the entry point); see its header.
  *
  * A tenant sets its own hearing goals by writing templates under
  * `knowledge/confidential/<tenant>/decisions/_templates/<id>.json`, only

@@ -91,7 +91,7 @@
   --kb-danger: #f87171;
 }
 
-/* kyberion-ui tokens: generated from tokens.ui by scripts/generate_design_tokens.ts - do not edit */
+/* kyberion-ui tokens: generated from tokens.ui by scripts/generate/generate_design_tokens.ts - do not edit */
 :root {
   --kb-ui-color-scheme: light;
   --kb-ui-canvas: #f5f7fa;
@@ -1416,7 +1416,7 @@
  * the generated block. The UI tokens switch light/dark themselves
  * (prefers-color-scheme + :root[data-theme]), so one mapping serves both.
  * `--kb-text-secondary` keeps its generated translucent ink: the DOM contrast
- * gate (scripts/check_chronos_dom_contrast.ts) keys its theme wait on it. */
+ * gate (scripts/check/check_chronos_dom_contrast.ts) keys its theme wait on it. */
 :root,
 [data-theme='light'],
 [data-theme='dark'] {

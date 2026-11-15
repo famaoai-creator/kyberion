@@ -8,7 +8,7 @@ step-hash binding.
 ```
 extension (sendNativeMessage)
    ↓ stdio frames (uint32-LE length + JSON)
-launch.sh → node dist/scripts/browser_bridge_host.js
+launch.sh → node dist/scripts/browser/browser_bridge_host.js
    ↓ @agent/core
 preflight · approval gate · lease issuance · receipt validation
 ```
@@ -88,7 +88,7 @@ Both directories are TTL-governed by `storage-janitor` (receipts ~90d, deltas ~1
 
 ## Install (macOS / Linux) — scripted
 
-1. Build the host: `pnpm build` (or `npx tsc`) — emits `dist/scripts/browser_bridge_host.js`.
+1. Build the host: `pnpm build` (or `npx tsc`) — emits `dist/scripts/browser/browser_bridge_host.js`.
 2. Load the unpacked extension and copy its ID from `chrome://extensions`.
 3. Run the installer with that ID:
    ```

@@ -17,7 +17,7 @@ no role (`role-assumption-policy.json`): the room itself assumes none.
 ## Run
 
 ```bash
-pnpm run build:repo          # emits dist/presence/displays/customer-room/** and dist/scripts/customer_decision.js
+pnpm run build:repo          # emits dist/presence/displays/customer-room/** and dist/scripts/customer/customer_decision.js
 KYBERION_CUSTOMER_ROOM_TENANT=<tenant-slug> node dist/presence/displays/customer-room/server.js
 ```
 
@@ -75,7 +75,7 @@ Routes — everything else is a plain 404:
 | `POST /api/respond`     | `Authorization: Bearer <token>`, body `{content_hash, answers}`    |
 | `POST /api/attachment`  | `Authorization: Bearer <token>`, body `{attachment_id}` (64 hex)   |
 
-- `view` / `respond` / `attachment` run `dist/scripts/customer_decision.js <verb> --tenant <tenant> --json`
+- `view` / `respond` / `attachment` run `dist/scripts/customer/customer_decision.js <verb> --tenant <tenant> --json`
   as a child process (`src/server/facade.ts`), request on STDIN, with a time
   and output-size limit. The tenant comes only from the process environment;
   a `tenant`/`case`/`dir` in a body or query string is ignored (and the facade

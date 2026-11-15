@@ -21,7 +21,7 @@ role_affinity: [ecosystem_architect, implementer, reviewer]
 今回再測定した数値として扱わない。今回は契約テストに加え、Pocket TTS Small 1.9Mの
 実モデルを取得して、同一の短文を2回WAV生成した。聴取評価、streaming TTFA、長時間会話は未実施。
 
-このcheckoutで `node --import ./scripts/ts-loader.mjs scripts/voice_setup.ts --tool pocket_tts --json`
+このcheckoutで `node --import ./scripts/ts-loader.mjs scripts/voice/voice_setup.ts --tool pocket_tts --json`
 を最初に実行した結果は `needs_install`、`pythonBin: null` だった。その後、同じスクリプトの
 `--apply` で管理対象ランタイムをインストールし、`ready` を確認した。パッケージは `pocket-tts 4.0.1`。
 実際の `TTSModel.load_model` に `language` 引数があることも確認した。

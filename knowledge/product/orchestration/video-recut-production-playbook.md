@@ -47,10 +47,10 @@ last_updated: 2026-10-19
 
 ```sh
 # 編集計画・時刻対応表・描画バンドルを準備する
-pnpm exec tsx scripts/video_recut.ts --input active/shared/tmp/recut-input/request.json --json
+pnpm exec tsx scripts/video/video_recut.ts --input active/shared/tmp/recut-input/request.json --json
 
 # 同じ入力から、新規バンドルを準備して MP4 まで描画する
-pnpm exec tsx scripts/video_recut.ts --input active/shared/tmp/recut-input/request.json --render --json
+pnpm exec tsx scripts/video/video_recut.ts --input active/shared/tmp/recut-input/request.json --render --json
 ```
 
 読み取りには ffprobe、描画には登録済み HyperFrames バックエンドと有効な描画ポリシーが必要。

@@ -169,7 +169,7 @@ A standing grant that itself needs human approval references the approval as its
 | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
 | **Concierge** (秘書室; "Kyberion server" in code comments) | The surface and shared shell on port 3050, including the operations console at `/ops`                                                                                                                                                | `presence/displays/concierge/` — see [Concierge](#concierge)                                                            |
 | "conversational concierge surface"                         | A description of Presence Studio (the companion surface), not the Concierge app                                                                                                                                                      | [surface-responsibility-model](../knowledge/product/architecture/surface-responsibility-model.md) §3.1                  |
-| `mcp-server-cowork`                                        | The MCP server facade for Claude Cowork and other MCP clients; older docs called it "the concierge for Claude"                                                                                                                       | `scripts/mcp_server.ts`, `knowledge/product/governance/surfaces/mcp-server-cowork.json`                                 |
+| `mcp-server-cowork`                                        | The MCP server facade for Claude Cowork and other MCP clients; older docs called it "the concierge for Claude"                                                                                                                       | `scripts/mcp/mcp_server.ts`, `knowledge/product/governance/surfaces/mcp-server-cowork.json`                             |
 | `sovereign_concierge`                                      | An [Authority Role](#authority-role) ("personal onboarding and identity synchronization authority") that surface code assumes for governed reads and writes on the sovereign's behalf; it has an Org Role directory of the same name | `knowledge/product/governance/authority-roles/sovereign_concierge.json`, `knowledge/product/roles/sovereign_concierge/` |
 | `surface-concierge`                                        | A specialist in the specialist catalog: receives natural-language requests, fills missing slots and keeps the conversation smooth on any surface                                                                                     | `knowledge/product/orchestration/specialists/surface-concierge.json`                                                    |
 | `starter-concierge`                                        | A dot team starter template (a draft dot charter that owns one conversation and tracks its commitments)                                                                                                                              | `knowledge/product/orchestration/dot-team-templates/starter-concierge.json`                                             |
@@ -871,15 +871,15 @@ A `*.volatile.json` file co-located with each volatile Markdown surface. Holds m
 
 ### Onboarding Wizard
 
-`scripts/onboarding_wizard.ts`, the interactive setup for identity and initial user configuration.
+`scripts/onboarding/onboarding_wizard.ts`, the interactive setup for identity and initial user configuration.
 
 ### Capability Discovery
 
-`scripts/capability_discovery.ts`, which inspects actuator manifests and environment compatibility.
+`scripts/capability/capability_discovery.ts`, which inspects actuator manifests and environment compatibility.
 
 ### Mission Journal
 
-`scripts/mission_journal.ts`, the human-readable view over recorded mission history.
+`scripts/mission/mission_journal.ts`, the human-readable view over recorded mission history.
 
 ### Global Actuator Index
 

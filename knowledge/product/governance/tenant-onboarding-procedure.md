@@ -39,7 +39,7 @@ first-work の開始までを含む標準順序は [オンボーディング標�
 
    ```bash
    pnpm check -- --only tenant-registry
-   # ビルド前なら: node --import ./scripts/ts-loader.mjs scripts/check_tenant_registry_consistency.ts
+   # ビルド前なら: node --import ./scripts/ts-loader.mjs scripts/check/check_tenant_registry_consistency.ts
    ```
 
    全系統の slug 集合を突合し、per-slug の表を出してドリフトがあれば非0で終了する。

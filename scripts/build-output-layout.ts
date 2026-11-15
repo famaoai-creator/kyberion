@@ -72,6 +72,6 @@ export const BUNDLED_SCRIPT_NAMES = [
   'cli',
   'run_pipeline',
   'mission_controller',
-  'surface_runtime',
-  'chronos_daemon',
+  'surface/surface_runtime',
+  'chronos/chronos_daemon',
 ] as const;

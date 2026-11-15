@@ -1,0 +1,29 @@
+{
+  "role": "chronos_personal_runner",
+  "assignable": false,
+  "description": "Chronos personal-scoped pipeline runner. Entered ONLY in the child process chronos spawns for a schedule discovered under knowledge/personal/pipelines/ (and, in the daemon, synchronously while listing/reading those pipeline files). No tenant binding — reads cover the operator's personal pipeline directory and its runtime allowlist; writes cover the volatile layer those personal pipelines own plus the shared pipeline-runner surface (traces, tmp, observability, coordination). Runs require an exact-content project-trust approval, like tenant pipelines.",
+  "permissions": {
+    "allow_read": [
+      "knowledge/personal/pipelines/",
+      "knowledge/personal/governance/",
+      "active/personal/",
+      "active/shared/MEMORY.md",
+      "active/shared/MEMORY.volatile.json",
+      "active/INDEX.volatile.md",
+      "active/INDEX.volatile.json"
+    ],
+    "allow_write": [
+      "active/personal/",
+      "active/shared/MEMORY.md",
+      "active/shared/MEMORY.volatile.json",
+      "active/INDEX.volatile.md",
+      "active/INDEX.volatile.json",
+      "active/shared/tmp/",
+      "active/shared/logs/traces/",
+      "active/shared/logs/process/",
+      "active/shared/observability/",
+      "active/shared/coordination/",
+      "active/audit/"
+    ]
+  }
+}

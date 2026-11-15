@@ -11,10 +11,10 @@ function read(relPath: string): string {
 }
 
 describe('mission orchestration dashboard contract', () => {
-  let dashboardScript: typeof import('../scripts/sovereign_dashboard.js');
+  let dashboardScript: typeof import('../scripts/sovereign/sovereign_dashboard.js');
 
   // The once-mode render used to run in a child `node --import ts-loader.mjs
-  // scripts/sovereign_dashboard.ts --once`. Measured (operations-hygiene-runbook
+  // scripts/sovereign/sovereign_dashboard.ts --once`. Measured (operations-hygiene-runbook
   // §5): 4-7s per run, almost all of it process start-up — transpiling the
   // script graph and Node re-reading the 290KB libs/core/package.json for every
   // module's format lookup — not rendering. Under parallel load it crossed the
@@ -23,11 +23,11 @@ describe('mission orchestration dashboard contract', () => {
   // so the script is imported once here, with an explicit hook timeout for its
   // cold load.
   beforeAll(async () => {
-    dashboardScript = await import('../scripts/sovereign_dashboard.js');
+    dashboardScript = await import('../scripts/sovereign/sovereign_dashboard.js');
   }, 60_000);
 
   it('shows mission orchestration state in the sovereign dashboard', () => {
-    const dashboard = read('scripts/sovereign_dashboard.ts');
+    const dashboard = read('scripts/sovereign/sovereign_dashboard.ts');
     expect(dashboard).toContain('COMPANY OVERVIEW');
     expect(dashboard).toContain('resolveCompany');
     expect(dashboard).toContain('buildCompanyVisionRef');
@@ -73,7 +73,7 @@ describe('mission orchestration dashboard contract', () => {
   });
 
   it('routes --once through the CLI entry point to stdout without an exit code', async () => {
-    // runDashboard is the defineScript entry the `node scripts/sovereign_dashboard.ts`
+    // runDashboard is the defineScript entry the `node scripts/sovereign/sovereign_dashboard.ts`
     // command runs: flag parsing, the bounded branch, and its log/clearOutput
     // plumbing into the harness's console.log output.
     const lines: string[] = [];

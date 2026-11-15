@@ -1,7 +1,7 @@
 {
   "plugin_id": "plugin-view-e2e-fixture",
   "version": "1.0.0",
-  "description": "PE-01 end-to-end fixture: a third-party plugin with one sandboxed-iframe view that requests one agent-authority and one human-authority action through the host postMessage channel. Installed from outside the plugins/ tree of a hermetic root by scripts/check_plugin_views_e2e.ts.",
+  "description": "PE-01 end-to-end fixture: a third-party plugin with one sandboxed-iframe view that requests one agent-authority and one human-authority action through the host postMessage channel. Installed from outside the plugins/ tree of a hermetic root by scripts/check/check_plugin_views_e2e.ts.",
   "provides": {
     "ops": ["viewe2e:ping", "viewe2e:stamp"],
     "views": [

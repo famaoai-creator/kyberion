@@ -27,7 +27,7 @@ vi.mock('@agent/core', async (importOriginal) => {
   };
 });
 
-// scripts/services_setup.ts imports these directly from their submodules
+// scripts/services/services_setup.ts imports these directly from their submodules
 // (SX simplicity abstraction pass, commit a877d9c12) rather than the
 // aggregate `@agent/core` entry point mocked above, so the fixtures above
 // never reached the real call sites — mock the actual import sites too.
@@ -108,7 +108,7 @@ describe('services_setup', () => {
   });
 
   it('reports auth and connection readiness for external services', async () => {
-    const { setupServices } = await import('../scripts/services_setup');
+    const { setupServices } = await import('../scripts/services/services_setup');
 
     mocks.loadServiceEndpointsCatalog.mockReturnValue({
       version: '1.0.0',
