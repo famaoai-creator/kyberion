@@ -246,8 +246,10 @@ const normalizeTenantSlug = (value: string): string => {
   throw new Error(`Invalid tenant slug: ${value}`);
 };
 
+// Japanese affirmatives belong here too — the wizard defaults to the JA
+// locale, so "はい" must not be read as a no.
 const isAffirmative = (value: string): boolean =>
-  /^(y|yes|true|1|ok|sure|please)$/i.test(value.trim());
+  /^(y|yes|true|1|ok|sure|please|はい|うん|ええ)$/i.test(value.trim());
 
 const ensureArtifactDir = (filePath: string): void => {
   const dir = path.dirname(filePath);
@@ -1218,11 +1220,28 @@ export async function runOnboarding(
 
   if (!stanceSlug && interactive && !expressMode) {
     const wantsStance = isAffirmative(
-      await ask('Set up a stance (act as another entity) now? (y/N): ', 'n')
+      await ask(
+        t(
+          'Set up a stance (act as another entity) now? (y/N): ',
+          // i18n-exempt: bilingual prompt pair (JA side intentional)
+          'スタンス(別エンティティとして振る舞う設定)を今すぐ設定しますか? (y/N): '
+        ),
+        'n'
+      )
     );
     if (wantsStance) {
       while (!stanceSlug) {
-        const slugInput = await ask('Stance slug [e.g. acme-engagement]: ', '');
+        const slugInput = await ask(
+          t(
+            'Stance slug [e.g. acme-engagement, empty to skip]: ',
+            // i18n-exempt: bilingual prompt pair (JA side intentional)
+            'スタンス slug [例: acme-engagement、空入力でスキップ]: '
+          ),
+          ''
+        );
+        // An empty answer is the only way out — without it an invalid slug
+        // would trap the operator in an unbounded retry loop.
+        if (!slugInput.trim()) break;
         try {
           createStance(slugInput);
           switchStance(slugInput);
@@ -1276,18 +1295,41 @@ export async function runOnboarding(
       )
     );
     print(
-      '    2. If you need a customer overlay, create it first with `pnpm stance:create <slug>`'
+      t(
+        '    2. If you need a customer overlay, create it first with `pnpm stance:create <slug>`',
+        // i18n-exempt: bilingual prompt pair (JA side intentional)
+        '    2. カスタマーオーバーレイが必要なら先に `pnpm stance:create <slug>` で作成し、'
+      )
     );
-    print('       and activate it with `pnpm stance:switch <slug>` before onboarding.');
     print(
-      '    3. Apply a reviewed identity file (Path B): copy knowledge/public/templates/onboarding/identity.example.json'
+      t(
+        '       and activate it with `pnpm stance:switch <slug>` before onboarding.',
+        '       オンボーディング前に `pnpm stance:switch <slug>` で有効化してください。'
+      )
     );
     print(
-      '       into active/shared/tmp/, edit it, then `pnpm onboarding apply --identity <file> --dry-run` and rerun without --dry-run.'
+      t(
+        '    3. Apply a reviewed identity file (Path B): copy knowledge/public/templates/onboarding/identity.example.json',
+        '    3. レビュー済み identity ファイルを適用する (Path B): knowledge/public/templates/onboarding/identity.example.json を'
+      )
     );
-    print(`       It is written to the active profile root (${profileRoot()}).`);
     print(
-      '    4. To intentionally accept defaults, re-run with KYBERION_ONBOARDING_NON_INTERACTIVE_OK=1'
+      t(
+        '       into active/shared/tmp/, edit it, then `pnpm onboarding apply --identity <file> --dry-run` and rerun without --dry-run.',
+        '       active/shared/tmp/ へコピーして編集し、`pnpm onboarding apply --identity <file> --dry-run` の後に --dry-run 無しで再実行します。'
+      )
+    );
+    print(
+      t(
+        `       It is written to the active profile root (${profileRoot()}).`,
+        `       有効なプロファイルルート (${profileRoot()}) に書き込まれます。`
+      )
+    );
+    print(
+      t(
+        '    4. To intentionally accept defaults, re-run with KYBERION_ONBOARDING_NON_INTERACTIVE_OK=1',
+        '    4. 意図的に既定値を受け入れる場合は KYBERION_ONBOARDING_NON_INTERACTIVE_OK=1 を付けて再実行'
+      )
     );
     rl.close();
     throw new ScriptExitError(2);
@@ -1336,6 +1378,19 @@ export async function runOnboarding(
   const isMenuMode = args.includes('--menu') || args.includes('--reconfig');
 
   let state = loadState();
+  if (!state && safeExistsSync(statePath())) {
+    // The file exists but could not be parsed — say so instead of silently
+    // discarding whatever progress it recorded.
+    print(
+      chalk.yellow(
+        t(
+          'Existing onboarding state could not be read — starting fresh.',
+          // i18n-exempt: bilingual prompt pair (JA side intentional)
+          '既存のオンボーディング状態を読み取れないため、最初から開始します。'
+        )
+      )
+    );
+  }
   if (state?.identity?.language) {
     setWizardLanguage(state.identity.language);
   }
@@ -1465,9 +1520,9 @@ export async function runOnboarding(
   } else {
     const resume = await ask(
       t(
-        `Resume onboarding from phase "${state.current_phase}"? (Y/n): `,
+        `Resume onboarding from phase "${state.current_phase}"? (Y/n; "n" discards saved progress and starts over): `,
         // i18n-exempt: bilingual prompt pair (JA side intentional)
-        `フェーズ「${state.current_phase}」からオンボーディングを再開しますか?(Y/n): `
+        `フェーズ「${state.current_phase}」からオンボーディングを再開しますか?(Y/n。「n」で保存済みの進行を破棄して最初から開始): `
       ),
       'y'
     );
@@ -1491,8 +1546,13 @@ export async function runOnboarding(
   for (const phase of PHASES) {
     if (state.completed_phases.includes(phase) && phase !== 'summary') {
       if (onboardingArtifactsMissing(state, phase)) {
-        // i18n-exempt: bilingual prompt pair (JA side intentional)
-        print(`completed 扱いだが成果物がありません。再実行します: ${phase}`);
+        print(
+          t(
+            `Phase "${phase}" is marked complete but its artifacts are missing — re-running it.`,
+            // i18n-exempt: bilingual prompt pair (JA side intentional)
+            `フェーズ「${phase}」は completed 扱いですが成果物がありません。再実行します。`
+          )
+        );
       } else {
         continue;
       }
