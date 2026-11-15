@@ -40,10 +40,14 @@ describe('account approval owner adapter', () => {
       tenant_slug: 'actual',
     });
     accountIntroductionAccess(viewer, 'selected');
-    expect(mocks.principal).toHaveBeenCalledWith(viewer, {
-      kind: 'organization',
-      tenant_slug: 'actual',
-    });
+    expect(mocks.principal).toHaveBeenCalledWith(
+      viewer,
+      {
+        kind: 'organization',
+        tenant_slug: 'actual',
+      },
+      undefined
+    );
   });
   it('rejects another person and never enters generic approval fallback for its own family', () => {
     mocks.binding.mockReturnValue({ owner_kind: 'person', owner_ref: 'user:other' });

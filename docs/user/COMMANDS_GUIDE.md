@@ -73,7 +73,7 @@ pnpm kyberion schedule register <id> <pipeline-path> <actuator> "<cron>"
 pnpm kyberion schedule remove <id>
 ```
 
-`register` stores a cron-triggered entry for a pipeline file (for example `pipelines/daily-routine.json`); `remove` deletes it by id.
+`register` stores a cron-triggered entry for a pipeline file (for example `knowledge/product/pipeline-templates/daily-routine.json`); `remove` deletes it by id.
 
 ## See the world: capture and record
 

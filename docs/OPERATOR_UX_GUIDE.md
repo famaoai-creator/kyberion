@@ -144,6 +144,15 @@ explicitly configured provisioning broker. See the
 [service integration guide](../knowledge/product/orchestration/service-integration-guide.md#register-a-token-for-an-existing-account)
 for prerequisites, incomplete-save recovery and the remaining runtime limitations.
 
+An organization connection can also be introduced by the tenant's own side: an
+authenticated member with the `owner` role in that tenant can run the same
+preview → request → status → apply steps through the concierge account
+introduction API without a localadmin surface role. The value still travels only
+in the apply request body, the binding's tenant is resolved server-side (a
+caller can never nominate another tenant's connection), and a human approval on
+the existing approval surface is still required before apply — proposer and
+approver stay separate people.
+
 The installed owner can also use `pnpm kyberion account preview`,
 `pnpm kyberion account request`, `pnpm kyberion account status`, and
 `pnpm kyberion account apply`.
@@ -252,9 +261,9 @@ Use this when you want to register a new operator voice profile before meeting w
 
 1. Run `pnpm meeting:preflight`.
    - If it fails, fix the reported browser, BlackHole, mlx-audio, voice-consent, or reasoning backend gap first.
-2. Dry-run the onboarding flow with `pnpm pipeline --input pipelines/voice-onboarding.json --context '{"dry_run":true}'`.
+2. Dry-run the onboarding flow with `pnpm pipeline --input knowledge/product/pipeline-templates/voice-onboarding.json --context '{"dry_run":true}'`.
    - If dry-run fails, rerun `pnpm meeting:preflight` and inspect the failing step output.
-3. Run the real onboarding flow with `pnpm pipeline --input pipelines/voice-onboarding.json --context '{"mission_id":"MSN-...","operator_handle":"<handle>"}'`.
+3. Run the real onboarding flow with `pnpm pipeline --input knowledge/product/pipeline-templates/voice-onboarding.json --context '{"mission_id":"MSN-...","operator_handle":"<handle>"}'`.
    - The pipeline records three samples, registers the profile, renders a trial clip to `active/shared/tmp/voice-onboarding-check.wav`, and registers voice consent for the active mission.
 4. Verify the result with `pnpm meeting:consent status --mission MSN-...`.
    - If consent is missing, rerun the onboarding pipeline with the correct mission ID.
@@ -272,7 +281,7 @@ pnpm meeting:preflight
 2. 初回だけ voice profile と consent をまとめて作る。
 
 ```bash
-pnpm pipeline --input pipelines/voice-onboarding.json --context '{"mission_id":"MSN-...","operator_handle":"<handle>"}'
+pnpm pipeline --input knowledge/product/pipeline-templates/voice-onboarding.json --context '{"mission_id":"MSN-...","operator_handle":"<handle>"}'
 ```
 
 失敗したら `pnpm meeting:preflight` を再実行し、`pnpm meeting:consent status --mission MSN-...` で consent が有効か確認する。
@@ -300,7 +309,7 @@ pnpm meeting:participate \
 5. 会議後フォローアップで議事録と action items を作る。
 
 ```bash
-pnpm pipeline --input pipelines/meeting-followup.json --context '{"mission_id":"MSN-...","transcript_path":"<meeting:participate の完了ログで出た transcript_path>","attendees":[{"name":"Alice"},{"name":"Bob"},{"name":"Operator"}],"operator_label":"Operator","language":"ja"}'
+pnpm pipeline --input knowledge/product/pipeline-templates/meeting-followup.json --context '{"mission_id":"MSN-...","transcript_path":"<meeting:participate の完了ログで出た transcript_path>","attendees":[{"name":"Alice"},{"name":"Bob"},{"name":"Operator"}],"operator_label":"Operator","language":"ja"}'
 ```
 
 失敗したら transcript の実パスと reasoning backend を見直し、必要なら `pnpm meeting:preflight` からやり直す。

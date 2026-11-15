@@ -1,7 +1,7 @@
 {
   "action": "pipeline",
   "pipeline_id": "mv-generate",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "name": "Original Song MV Generation",
   "description": "Lyric-driven music video pipeline: normalize lyrics for vocal synthesis, generate the song, align vocal timings, plan lyric-synced scenes, generate per-scene stills (and optional i2v motion clips), then compose with subtitles and audio. Scenes.json is a human/LLM-editable contract — refine visual/motion prompts before the scene generation steps when quality matters.",
   "labels": ["media", "music-video", "content-generation"],
@@ -20,6 +20,12 @@
     "min_scene_sec": 5
   },
   "steps": [
+    {
+      "id": "preflight",
+      "role": "gate",
+      "op": "core:include",
+      "params": { "fragment": "fragments/music-video-preflight.json" }
+    },
     {
       "id": "normalize_lyrics",
       "role": "transform",

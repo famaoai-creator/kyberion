@@ -15,6 +15,14 @@
  * tenant (KYBERION_TENANT + KYBERION_TENANT_SCOPE_REQUIRED=1, role
  * chronos_tenant_runner) — the role and tenant binding never touch this
  * process, so concurrently running schedules cannot observe them.
+ *
+ * Personal-scoped schedules: direct children of knowledge/personal/pipelines/
+ * get the same treatment for operator-bound instantiations (the README
+ * convention for personal pipelines). The run happens in a CHILD process
+ * under role chronos_personal_runner — no tenant binding, the role's path
+ * grants cover exactly the personal pipeline dir, its runtime allowlist and
+ * the volatile layer those pipelines own — and requires the same
+ * exact-content project-trust approval as a tenant pipeline.
  */
 
 import * as path from 'node:path';
@@ -98,6 +106,9 @@ function sovereignPersonaFor(scheduleId: string): 'sovereign' | undefined {
 /** Authority role of the tenant-bound child process (security-policy.json). */
 export const CHRONOS_TENANT_RUNNER_ROLE = 'chronos_tenant_runner';
 
+/** Authority role of the personal-scoped child process (security-policy.json). */
+export const CHRONOS_PERSONAL_RUNNER_ROLE = 'chronos_personal_runner';
+
 /** Wall-clock budget for one tenant pipeline child run. */
 const TENANT_RUN_TIMEOUT_MS = 30 * 60_000;
 
@@ -123,9 +134,12 @@ interface TenantRuntimeAllowlist {
 
 export type ChronosPipelineScope =
   | { kind: 'repository'; relative: string }
-  | { kind: 'tenant'; relative: string; tenant_slug: string };
+  | { kind: 'tenant'; relative: string; tenant_slug: string }
+  | { kind: 'personal'; relative: string };
 
 const TENANT_PIPELINE_RE = /^knowledge\/confidential\/([^/]+)\/pipelines\/[^/]+\.json$/;
+const PERSONAL_PIPELINE_RE = /^knowledge\/personal\/pipelines\/[^/]+\.json$/;
+const PERSONAL_KNOWLEDGE_ROOT = 'knowledge/personal';
 
 function assertNoSymlinkSegments(root: string, relative: string): void {
   let current = root;
@@ -165,11 +179,13 @@ function assertNoSymlinkTenantPath(root: string, relative: string): void {
 }
 
 /**
- * Chronos executes repository-owned pipelines (pipelines/**) and tenant-scoped
+ * Chronos executes repository-owned pipelines (pipelines/**), tenant-scoped
  * pipelines (knowledge/confidential/{tenant}/pipelines/*.json, direct children
- * only). Anything else — including symlinked segments — is refused. The
- * returned scope is derived from the PATH alone; callers must still verify a
- * tenant scope against the tenant registry (assertRegisteredTenantPipeline).
+ * only) and personal-scoped pipelines (knowledge/personal/pipelines/*.json,
+ * direct children only). Anything else — including symlinked segments — is
+ * refused. The returned scope is derived from the PATH alone; callers must
+ * still verify a tenant scope against the tenant registry
+ * (assertRegisteredTenantPipeline).
  */
 export function assertChronosPipelinePath(
   inputPath: string,
@@ -182,16 +198,17 @@ export function assertChronosPipelinePath(
   const repository = !outside && relative.startsWith('pipelines/') && relative.endsWith('.json');
   const tenantMatch = outside ? null : TENANT_PIPELINE_RE.exec(relative);
   const tenantSlug = tenantMatch?.[1];
-  if (!repository && !(tenantSlug && isValidTenantSlug(tenantSlug))) {
+  const personal = !outside && PERSONAL_PIPELINE_RE.test(relative);
+  if (!repository && !(tenantSlug && isValidTenantSlug(tenantSlug)) && !personal) {
     throw new Error(
-      `[CHRONOS_SCOPE] scheduled pipeline must be a repository pipeline JSON or a tenant pipeline under knowledge/confidential/{tenant}/pipelines/: ${relative || inputPath}`
+      `[CHRONOS_SCOPE] scheduled pipeline must be a repository pipeline JSON, a tenant pipeline under knowledge/confidential/{tenant}/pipelines/ or a personal pipeline under knowledge/personal/pipelines/: ${relative || inputPath}`
     );
   }
   if (repository) assertNoSymlinkSegments(root, relative);
   else assertNoSymlinkTenantPath(root, relative);
-  return repository
-    ? { kind: 'repository', relative }
-    : { kind: 'tenant', relative, tenant_slug: tenantSlug as string };
+  if (repository) return { kind: 'repository', relative };
+  if (personal) return { kind: 'personal', relative };
+  return { kind: 'tenant', relative, tenant_slug: tenantSlug as string };
 }
 
 /**
@@ -259,6 +276,35 @@ export function collectTenantPipelineFiles(
   return found;
 }
 
+/**
+ * Personal pipeline files: direct *.json children of
+ * knowledge/personal/pipelines/. The directory is listed under the personal
+ * runner's own binding — the personal tier stays deny-by-default for the
+ * daemon's ambient context.
+ */
+export function collectPersonalPipelineFiles(rootDir = pathResolver.rootDir()): string[] {
+  const relativeDir = `${PERSONAL_KNOWLEDGE_ROOT}/pipelines`;
+  const found: string[] = [];
+  try {
+    withExecutionContext(CHRONOS_PERSONAL_RUNNER_ROLE, () => {
+      assertNoSymlinkTenantPath(path.resolve(rootDir), relativeDir);
+      const dir = path.join(rootDir, relativeDir);
+      if (!safeExistsSync(dir)) return;
+      for (const name of safeReaddir(dir).sort()) {
+        if (!name.endsWith('.json')) continue;
+        const full = path.join(dir, name);
+        const stat = safeLstat(full);
+        if (stat.isSymbolicLink() || !stat.isFile()) continue;
+        found.push(full);
+      }
+    });
+  } catch (err: any) {
+    // A missing or unreadable personal area means no personal schedules.
+    logger.debug(`[CHRONOS] personal pipelines not scanned: ${err?.message ?? err}`);
+  }
+  return found;
+}
+
 function stringList(value: unknown): string[] {
   return Array.isArray(value) ? value.map((entry) => String(entry)) : [];
 }
@@ -267,51 +313,33 @@ function refuseRuntime(scope: { relative: string }, message: string): never {
   throw new Error(`[CHRONOS_RUNTIME] ${scope.relative}: ${message}`);
 }
 
-/**
- * Resolve a tenant pipeline's declared `runtime` needs into the child-process
- * env, deny-by-default: every value must be (1) declared in the ADF — which
- * the project-trust approval hashes, so a human approved exactly these —
- * (2) inside the tenant's own allowlist ({knowledge_root}/governance/
- * pipeline-runtime-allowlist.json), and (3) inside the global ceiling
- * (known service ids, governed reasoning modes, the tenant's own root for
- * the egress overlay). Nothing is taken from the daemon's environment.
- */
-export function resolveTenantRuntimeEnv(
-  scope: Extract<ChronosPipelineScope, { kind: 'tenant' }>,
-  runtime: unknown,
-  rootDir = pathResolver.rootDir()
-): Record<string, string> {
-  if (runtime === undefined || runtime === null) return {};
-  if (typeof runtime !== 'object' || Array.isArray(runtime)) {
-    refuseRuntime(scope, 'runtime must be an object');
-  }
-  const declared = runtime as TenantPipelineRuntime;
-  const wantsAnything =
-    stringList(declared.authorized_scope).length > 0 ||
-    Boolean(declared.reasoning_backend) ||
-    Boolean(declared.egress_policy_ref);
-  if (!wantsAnything) return {};
+interface ScopedRuntimeResolution {
+  declared: TenantPipelineRuntime;
+  allowlist: TenantRuntimeAllowlist | null;
+  /** Error-label for the scope owner, e.g. `tenant 'acme'` or `personal scope`. */
+  scopeLabel: string;
+  /** The allowlist path the label refers to (for error text). */
+  allowlistPath: string;
+  /** Repo-relative directory an egress_policy_ref must stay inside. */
+  egressRoot: string;
+  scope: { relative: string };
+  rootDir: string;
+}
 
-  const allowlist = withExecutionContext(
-    CHRONOS_TENANT_RUNNER_ROLE,
-    (): TenantRuntimeAllowlist | null => {
-      const knowledgeRoot = resolveTenant(scope.tenant_slug, { rootDir }).knowledge_root;
-      const relative = `${knowledgeRoot}/${TENANT_RUNTIME_ALLOWLIST_RELATIVE}`;
-      assertNoSymlinkTenantPath(path.resolve(rootDir), relative);
-      const file = path.join(rootDir, relative);
-      if (!safeExistsSync(file)) return null;
-      return parseSafeJsonInput(
-        String(safeReadFile(file, { encoding: 'utf8' })),
-        `tenant runtime allowlist ${relative}`
-      ) as TenantRuntimeAllowlist;
-    },
-    undefined,
-    scope.tenant_slug
-  );
+/**
+ * Deny-by-default check of a scoped pipeline's declared `runtime` needs:
+ * every value must be (1) declared in the ADF — which the project-trust
+ * approval hashes, so a human approved exactly these — (2) inside the
+ * scope's own runtime allowlist, and (3) inside the global ceiling (known
+ * service ids, governed reasoning modes, the scope's own root for the
+ * egress overlay). Nothing is taken from the daemon's environment.
+ */
+function resolveScopedRuntimeEnv(res: ScopedRuntimeResolution): Record<string, string> {
+  const { declared, allowlist, scopeLabel, allowlistPath, egressRoot, scope, rootDir } = res;
   if (!allowlist) {
     refuseRuntime(
       scope,
-      `runtime needs are declared but tenant '${scope.tenant_slug}' has no ${TENANT_RUNTIME_ALLOWLIST_RELATIVE} (deny-by-default)`
+      `runtime needs are declared but ${scopeLabel} has no ${allowlistPath} (deny-by-default)`
     );
   }
   const env: Record<string, string> = {};
@@ -335,7 +363,7 @@ export function resolveTenantRuntimeEnv(
     if (!stringList(allowlist.authorized_scopes).includes(service)) {
       refuseRuntime(
         scope,
-        `authorized_scope '${service}' is not in tenant '${scope.tenant_slug}' allowlist ${TENANT_RUNTIME_ALLOWLIST_RELATIVE}`
+        `authorized_scope '${service}' is not in ${scopeLabel} allowlist ${allowlistPath}`
       );
     }
     env.AUTHORIZED_SCOPE = service;
@@ -353,7 +381,7 @@ export function resolveTenantRuntimeEnv(
     if (!stringList(allowlist.reasoning_backends).includes(backend)) {
       refuseRuntime(
         scope,
-        `reasoning_backend '${backend}' is not in tenant '${scope.tenant_slug}' allowlist ${TENANT_RUNTIME_ALLOWLIST_RELATIVE}`
+        `reasoning_backend '${backend}' is not in ${scopeLabel} allowlist ${allowlistPath}`
       );
     }
     env.KYBERION_REASONING_BACKEND = backend;
@@ -361,20 +389,112 @@ export function resolveTenantRuntimeEnv(
 
   if (declared.egress_policy_ref) {
     const ref = String(declared.egress_policy_ref).replace(/\\/g, '/');
-    const tenantRoot = `knowledge/confidential/${scope.tenant_slug}/`;
-    if (!ref.startsWith(tenantRoot) || ref.split('/').includes('..') || !ref.endsWith('.json')) {
-      refuseRuntime(scope, `egress_policy_ref must be a JSON file inside ${tenantRoot}`);
+    if (!ref.startsWith(egressRoot) || ref.split('/').includes('..') || !ref.endsWith('.json')) {
+      refuseRuntime(scope, `egress_policy_ref must be a JSON file inside ${egressRoot}`);
     }
     if (!stringList(allowlist.egress_policy_refs).includes(ref)) {
       refuseRuntime(
         scope,
-        `egress_policy_ref '${ref}' is not in tenant '${scope.tenant_slug}' allowlist ${TENANT_RUNTIME_ALLOWLIST_RELATIVE}`
+        `egress_policy_ref '${ref}' is not in ${scopeLabel} allowlist ${allowlistPath}`
       );
     }
     assertNoSymlinkTenantPath(path.resolve(rootDir), ref);
     env.KYBERION_TENANT_EGRESS_POLICY_PATH = ref;
   }
   return env;
+}
+
+function declaredRuntimeNeeds(
+  scope: { relative: string },
+  runtime: unknown
+): TenantPipelineRuntime | null {
+  if (runtime === undefined || runtime === null) return null;
+  if (typeof runtime !== 'object' || Array.isArray(runtime)) {
+    refuseRuntime(scope, 'runtime must be an object');
+  }
+  const declared = runtime as TenantPipelineRuntime;
+  const wantsAnything =
+    stringList(declared.authorized_scope).length > 0 ||
+    Boolean(declared.reasoning_backend) ||
+    Boolean(declared.egress_policy_ref);
+  return wantsAnything ? declared : null;
+}
+
+/**
+ * Resolve a tenant pipeline's declared `runtime` needs into the child-process
+ * env, deny-by-default (see resolveScopedRuntimeEnv for the rule).
+ */
+export function resolveTenantRuntimeEnv(
+  scope: Extract<ChronosPipelineScope, { kind: 'tenant' }>,
+  runtime: unknown,
+  rootDir = pathResolver.rootDir()
+): Record<string, string> {
+  const declared = declaredRuntimeNeeds(scope, runtime);
+  if (!declared) return {};
+
+  const allowlist = withExecutionContext(
+    CHRONOS_TENANT_RUNNER_ROLE,
+    (): TenantRuntimeAllowlist | null => {
+      const knowledgeRoot = resolveTenant(scope.tenant_slug, { rootDir }).knowledge_root;
+      const relative = `${knowledgeRoot}/${TENANT_RUNTIME_ALLOWLIST_RELATIVE}`;
+      assertNoSymlinkTenantPath(path.resolve(rootDir), relative);
+      const file = path.join(rootDir, relative);
+      if (!safeExistsSync(file)) return null;
+      return parseSafeJsonInput(
+        String(safeReadFile(file, { encoding: 'utf8' })),
+        `tenant runtime allowlist ${relative}`
+      ) as TenantRuntimeAllowlist;
+    },
+    undefined,
+    scope.tenant_slug
+  );
+  return resolveScopedRuntimeEnv({
+    declared,
+    allowlist,
+    scopeLabel: `tenant '${scope.tenant_slug}'`,
+    allowlistPath: TENANT_RUNTIME_ALLOWLIST_RELATIVE,
+    egressRoot: `knowledge/confidential/${scope.tenant_slug}/`,
+    scope,
+    rootDir,
+  });
+}
+
+/**
+ * Resolve a personal pipeline's declared `runtime` needs into the
+ * child-process env under the same deny-by-default rule. The allowlist lives
+ * at knowledge/personal/governance/pipeline-runtime-allowlist.json and egress
+ * overlays must stay inside knowledge/personal/.
+ */
+export function resolvePersonalRuntimeEnv(
+  scope: Extract<ChronosPipelineScope, { kind: 'personal' }>,
+  runtime: unknown,
+  rootDir = pathResolver.rootDir()
+): Record<string, string> {
+  const declared = declaredRuntimeNeeds(scope, runtime);
+  if (!declared) return {};
+
+  const relative = `${PERSONAL_KNOWLEDGE_ROOT}/${TENANT_RUNTIME_ALLOWLIST_RELATIVE}`;
+  const allowlist = withExecutionContext(
+    CHRONOS_PERSONAL_RUNNER_ROLE,
+    (): TenantRuntimeAllowlist | null => {
+      assertNoSymlinkTenantPath(path.resolve(rootDir), relative);
+      const file = path.join(rootDir, relative);
+      if (!safeExistsSync(file)) return null;
+      return parseSafeJsonInput(
+        String(safeReadFile(file, { encoding: 'utf8' })),
+        `personal runtime allowlist ${relative}`
+      ) as TenantRuntimeAllowlist;
+    }
+  );
+  return resolveScopedRuntimeEnv({
+    declared,
+    allowlist,
+    scopeLabel: 'personal scope',
+    allowlistPath: relative,
+    egressRoot: `${PERSONAL_KNOWLEDGE_ROOT}/`,
+    scope,
+    rootDir,
+  });
 }
 
 /**
@@ -403,6 +523,28 @@ export function buildTenantRunEnv(
 }
 
 /**
+ * Child-process environment for one personal-scoped run: the personal runner
+ * role plus ONLY the resolved runtime needs of that pipeline. No tenant
+ * binding — the tenant identity keys are explicitly blanked so a tenant
+ * binding from the daemon's own env can never leak into a personal run.
+ */
+export function buildPersonalRunEnv(
+  runtimeEnv: Record<string, string> = {}
+): Record<string, string> {
+  return {
+    AUTHORIZED_SCOPE: '',
+    KYBERION_TENANT_EGRESS_POLICY_PATH: '',
+    ...runtimeEnv,
+    KYBERION_TENANT: '',
+    KYBERION_TENANT_SCOPE_REQUIRED: '',
+    MISSION_ROLE: CHRONOS_PERSONAL_RUNNER_ROLE,
+    KYBERION_BASE_ROLE: 'worker',
+    KYBERION_PERSONA: '',
+    KYBERION_SUDO: '',
+  };
+}
+
+/**
  * The human gate for unattended tenant runs: an approved, authenticated
  * project-trust decision bound to the CURRENT content of this exact file
  * (any edit invalidates it). Without one the run is refused.
@@ -419,6 +561,26 @@ export function requireTenantPipelineTrust(
   if (!approvalId) {
     throw new Error(
       `[TRUST_REQUIRED] tenant pipeline ${scope.relative} has no approved project-trust decision for its current content — ` +
+        `run \`pnpm kyberion project-trust request ${scope.relative}\` and have a human approve it`
+    );
+  }
+  return approvalId;
+}
+
+/**
+ * Same human gate for unattended personal runs: an approved, authenticated
+ * project-trust decision bound to the CURRENT content of this exact file
+ * (any edit invalidates it). Without one the run is refused.
+ */
+export function requirePersonalPipelineTrust(
+  scope: Extract<ChronosPipelineScope, { kind: 'personal' }>
+): string {
+  const approvalId = withExecutionContext(CHRONOS_PERSONAL_RUNNER_ROLE, () =>
+    findValidProjectTrustApproval(scope.relative)
+  );
+  if (!approvalId) {
+    throw new Error(
+      `[TRUST_REQUIRED] personal pipeline ${scope.relative} has no approved project-trust decision for its current content — ` +
         `run \`pnpm kyberion project-trust request ${scope.relative}\` and have a human approve it`
     );
   }
@@ -460,6 +622,41 @@ async function runTenantPipelineInChild(
   return 'succeeded';
 }
 
+async function runPersonalPipelineInChild(
+  scope: Extract<ChronosPipelineScope, { kind: 'personal' }>,
+  projectTrustApprovalId: string,
+  runtimeEnv: Record<string, string>
+): Promise<'succeeded' | 'failed'> {
+  const root = pathResolver.rootDir();
+  const result = await safeExecResultAsync(
+    process.execPath,
+    [
+      path.join(root, 'dist/scripts/run_pipeline.js'),
+      '--input',
+      scope.relative,
+      '--project-trust-approval',
+      projectTrustApprovalId,
+    ],
+    {
+      cwd: root,
+      env: buildPersonalRunEnv(runtimeEnv),
+      timeoutMs: TENANT_RUN_TIMEOUT_MS,
+    }
+  );
+  if (result.status !== 0) {
+    const tail = `${result.stderr || ''}${result.stdout || ''}`
+      .trim()
+      .split('\n')
+      .slice(-5)
+      .join(' | ');
+    logger.error(
+      `[CHRONOS] personal run ${scope.relative} exited ${String(result.status)}: ${tail.slice(0, 600)}`
+    );
+    return 'failed';
+  }
+  return 'succeeded';
+}
+
 /**
  * Classify and load one schedulable pipeline file. Tenant files are verified
  * against the registry and read under that tenant's binding only.
@@ -488,6 +685,12 @@ export function readScheduledPipelineAdf(fullPath: string): {
     });
   };
   if (scope.kind === 'repository') return { scope, adf: readAdf() };
+  if (scope.kind === 'personal') {
+    return {
+      scope,
+      adf: withExecutionContext(CHRONOS_PERSONAL_RUNNER_ROLE, readAdf),
+    };
+  }
   assertRegisteredTenantPipeline(scope);
   return {
     scope,
@@ -505,16 +708,19 @@ function warnOperatorExcludedSchedules(): void {
 }
 
 /**
- * ADF `schedule` fields → schedule registry, with this daemon's tenant gates.
- * Exported so `pnpm kyberion scheduler reconcile` can sync without the daemon.
+ * ADF `schedule` fields → schedule registry, with this daemon's tenant and
+ * personal gates. Exported so `pnpm kyberion scheduler reconcile` can sync
+ * without the daemon.
  */
 export function syncSchedulesFromAdf(
   options: { dryRun?: boolean } = {}
 ): ScheduleRegistrySyncResult {
   return syncScheduleRegistry({
     collectTenantPipelineFiles,
+    collectPersonalPipelineFiles,
     readScheduledPipelineAdf,
     assertTenantRuntime: (scope, runtime) => void resolveTenantRuntimeEnv(scope, runtime),
+    assertPersonalRuntime: (scope, runtime) => void resolvePersonalRuntimeEnv(scope, runtime),
     dryRun: options.dryRun,
   });
 }
@@ -698,6 +904,21 @@ async function tickAsLeader(): Promise<void> {
         try {
           const resolvedPipelinePath = resolveScheduledPipelinePath(scheduled);
           const scope = assertChronosPipelinePath(resolvedPipelinePath);
+          if (scope.kind === 'personal') {
+            // Re-verified at run time: an approved project-trust decision for
+            // the file's CURRENT content is required, and the declared
+            // `runtime` needs are re-bounded by the personal allowlist.
+            const trustApprovalId = requirePersonalPipelineTrust(scope);
+            const { adf: personalAdf } = readScheduledPipelineAdf(resolvedPipelinePath);
+            const runtimeEnv = resolvePersonalRuntimeEnv(scope, personalAdf?.runtime);
+            const status = await runPersonalPipelineInChild(scope, trustApprovalId, runtimeEnv);
+            if (status === 'failed') {
+              throw new Error(`personal pipeline run failed (${scope.relative})`);
+            }
+            completeScheduledPipelineRun(scheduled.id, runToken, 'succeeded', { now });
+            logger.info(`[CHRONOS] ✓ ${scheduled.id}: succeeded (personal)`);
+            return `cron-run:${runToken}`;
+          }
           if (scope.kind === 'tenant') {
             // Re-verified at run time: a tenant suspended since registration,
             // or a path swapped for a symlink, is refused here.
