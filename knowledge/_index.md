@@ -458,6 +458,7 @@
 - [Design Divergence Playbook — contested designs via existing Kyberion roles](./product/orchestration/design-divergence-playbook.md) (public | Unknown)
 - [Design hero verification learnings — preview gate and token fidelity](./product/orchestration/design-hero-verification-learnings.md) (public | Unknown)
 - [Document File Reading Playbook (PDF / PPTX / XLSX / DOCX → text, tables, OCR)](./product/orchestration/document-file-reading-playbook.md) (public | Ecosystem Architect)
+- [Dot Event Intake Playbook — enabling a source end to end](./product/orchestration/dot-event-intake-playbook.md) (public | Unknown)
 - [Engineering Bug Fix Playbook — reproduce, isolate, minimal fix, same-surface proof](./product/orchestration/engineering-bug-fix-playbook.md) (public | Unknown)
 - [Engineering Feature Playbook — understand, design checkpoint, build, surface proof](./product/orchestration/engineering-feature-playbook.md) (public | Unknown)
 - [Engineering Investigation Playbook — cited how/why answers, read-only](./product/orchestration/engineering-investigation-playbook.md) (public | Unknown)
