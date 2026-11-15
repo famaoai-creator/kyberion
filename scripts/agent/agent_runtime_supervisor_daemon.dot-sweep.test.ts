@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   compilerBusy: false,
   due: new Map<string, DueDotTrigger[]>(),
   runnerSources: [] as string[],
+  realRunner: null as import('@agent/core/trigger-runner').TriggerRunner | null,
   reselect: vi.fn(),
   recordDotWakeOutcome: vi.fn(),
   recordDaemonHeartbeat: vi.fn(),
@@ -58,13 +59,21 @@ vi.mock('@agent/core/dot/dot-runtime', async () => ({
   recordDotWakeOutcome: mocks.recordDotWakeOutcome,
 }));
 vi.mock('@agent/core/trigger-runner', () => ({
-  resolveCurrentTriggerAuthority: () => ({ authority_role: 'test', level: 1 }),
+  resolveCurrentTriggerAuthority: (tenantSlug?: string) =>
+    mocks.realRunner
+      ? {
+          authority_role: 'chronos_gateway',
+          level: 40,
+          ...(tenantSlug ? { tenant_slug: tenantSlug } : {}),
+        }
+      : { authority_role: 'test', level: 1 },
   createTriggerRunner: () => ({
     run: async (
-      request: { idempotencyKey: string; source: string },
+      request: import('@agent/core/trigger-runner').TriggerRequest,
       deliver: () => Promise<string>
     ) => {
       mocks.runnerSources.push(request.source);
+      if (mocks.realRunner) return mocks.realRunner.run(request, deliver);
       try {
         await deliver();
         return { ...request, status: 'delivered', recordedAt: '' };
@@ -77,6 +86,7 @@ vi.mock('@agent/core/trigger-runner', () => ({
         };
       }
     },
+    records: () => mocks.realRunner?.records() ?? [],
   }),
 }));
 
@@ -87,6 +97,9 @@ import {
   runDotSweepOnce,
 } from './agent_runtime_supervisor_daemon.js';
 import { DOT_SUPERVISOR_STEPS } from '../dot/dot_supervisor_extensions.js';
+import { safeRmSync } from '@agent/core/secure-io';
+
+const RECOVERY_ROOT = 'active/shared/tmp/dot-sweep-schedule-recovery';
 
 function charter(dotId: string): DotCharter {
   return {
@@ -117,15 +130,66 @@ beforeEach(() => {
   mocks.compilerBusy = false;
   mocks.due.clear();
   mocks.runnerSources.length = 0;
+  mocks.realRunner = null;
   mocks.codeStamp.value = 1000;
   vi.clearAllMocks();
 });
 
 afterEach(() => {
   DOT_SUPERVISOR_STEPS.length = 0;
+  safeRmSync(RECOVERY_ROOT, { recursive: true, force: true });
 });
 
 describe('runDotSweepOnce', () => {
+  it.each([
+    { tier: 'public' as const },
+    { tier: 'confidential' as const, tenant_slug: 'tenant-a' },
+    { tier: 'personal' as const, owner_nhi: 'owner-a' },
+  ])(
+    'retries a retained $tier schedule through the real TriggerRunner without consuming it',
+    async (scope) => {
+      const { createTriggerRunner } = await vi.importActual<
+        typeof import('@agent/core/trigger-runner')
+      >('@agent/core/trigger-runner');
+      mocks.realRunner = createTriggerRunner({
+        storePath: `${RECOVERY_ROOT}/${scope.tier}.jsonl`,
+        now: () => NOW,
+        authorityResolver: (authority) => authority,
+      });
+      const loaded = { ...A, charter: { ...A.charter, scope } };
+      const trigger: DueDotTrigger = { trigger: { kind: 'followup' }, key: 'followup:original' };
+      mocks.due.set('a', [trigger]);
+      const wake = vi
+        .fn()
+        .mockResolvedValueOnce({ dot_id: 'a', outcome: 'delivered', trigger_retained: true })
+        .mockResolvedValue({ dot_id: 'a', outcome: 'delivered' });
+      const deps = {
+        listCharters: () => [loaded],
+        wake,
+        budgetThrottle: () => 'normal' as const,
+      };
+      expect(await runDotSweepOnce(NOW, deps)).toBe(0);
+      expect(mocks.realRunner.records().at(-1)?.status).toBe('failed');
+      // An older supervisor may already have made the parent key terminal.
+      // Upgrading must recover the frozen schedule without resetting that receipt.
+      await mocks.realRunner.run(
+        {
+          idempotencyKey: 'dot:a:followup:original',
+          source: 'wake',
+          createdBy: { authority_role: 'chronos_gateway', level: 40 },
+        },
+        async () => 'legacy-delivery'
+      );
+      mocks.due.set('a', [{ ...trigger, followupRecovery: true }]);
+      expect(await runDotSweepOnce(new Date(NOW.getTime() + 5 * 60_000), deps)).toBe(1);
+      expect(mocks.realRunner.records().at(-1)).toMatchObject({
+        status: 'delivered',
+        idempotencyKey: 'dot:a:followup:original:schedule-recovery',
+      });
+      await runDotSweepOnce(new Date(NOW.getTime() + 6 * 60_000), deps);
+      expect(wake).toHaveBeenCalledTimes(2);
+    }
+  );
   it('defers work while a compiler owns outputs without consuming triggers', async () => {
     mocks.compilerBusy = true;
     const listCharters = vi.fn(() => [A]);

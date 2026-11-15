@@ -23,6 +23,15 @@ import type { MemoryScopeEnvelope } from '@agent/core/knowledge/memory-scope';
 import type { VocabularyKey } from '@agent/core/t';
 import { withExecutionContext } from '@agent/core/authority';
 import { ScriptExitError } from '../lib/harness.js';
+import {
+  getChannelAdapter,
+  listOperatorNotificationChannels,
+} from '@agent/core/surface/channel-adapter-registry';
+import {
+  loadNotificationPreferences,
+  saveNotificationPreferences,
+  type NotificationChannelTarget,
+} from '@agent/core/surface/operator-notifications';
 
 /**
  * Governed role for the operator's deal-document writes. They land under
@@ -34,6 +43,33 @@ const DEAL_DOCUMENT_WRITE_ROLE = 'mission_controller';
 
 export type HomeUi = (key: VocabularyKey, params?: Record<string, string | number>) => string;
 export type HomePrint = (value: unknown) => void;
+
+/** Set the operator's notification route using the existing channel registry. */
+export function handleNotifySubcommand(
+  ui: HomeUi,
+  setValue: string,
+  print: HomePrint = () => undefined
+): void {
+  const [surface, ...rest] = setValue.split(':');
+  // Local channels can declare a default target, so `--set inbox` needs none.
+  const allowed = listOperatorNotificationChannels();
+  const target =
+    rest.join(':') ||
+    (allowed.includes(surface)
+      ? (getChannelAdapter(surface).operator_notification?.default_target ?? '')
+      : '');
+  if (!allowed.includes(surface) || !target) {
+    print(ui('recorder:recorder_notify_usage', { channels: allowed.join('|') }));
+    throw new ScriptExitError(1, '', true);
+  }
+  const prefs = loadNotificationPreferences();
+  prefs.default_channel = { surface, target } as NotificationChannelTarget;
+  // This personal preference has the same governed writer as Concierge routes.
+  const filePath = withExecutionContext('sovereign_concierge', () =>
+    saveNotificationPreferences(prefs)
+  );
+  print(ui('recorder:recorder_notify_saved', { surface, target, path: filePath }));
+}
 
 export function handleFeedbackSubcommand(
   ui: HomeUi,

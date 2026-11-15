@@ -1,4 +1,5 @@
 import { buildInformationAssetMissionExecutionPlan } from '../information-assets/work-types.js';
+import { restoreDotWorkItemBodyForSource } from '../dot/dot-work-item.js';
 /** Internal Dot -> mission admission. No business effect permission is issued. */
 import * as path from 'node:path';
 import { AsyncLocalStorage } from 'node:async_hooks';
@@ -133,9 +134,9 @@ export function assertHumanMissionAdmissionApproval(
   deps: Deps = {}
 ): ApprovalRequestRecord {
   if (isOperationsHalted()) throw new Error('mission admission operations halted');
-  const { admission, scope } = verifiedDotMissionAdmission(item, deps);
+  const { admission, scope, body } = verifiedDotMissionAdmission(item, deps);
   const missionId = item.metadata!.mission_id as string;
-  const brief = buildMissionAdmissionBrief(item, admission, missionId);
+  const brief = buildMissionAdmissionBrief(body, admission, missionId);
   const payloadHash = computeApprovalPayloadHash(brief);
   // Re-read durable mission evidence at the final activation boundary, after async work.
   const state = loadState(missionId, deps);
@@ -225,6 +226,17 @@ export function resolveDotMissionAdmissionScope(item: WorkItem, deps: Deps = {})
 }
 
 function verifiedDotMissionAdmission(item: WorkItem, deps: Deps) {
+  if (item.metadata?.dot_private_body) {
+    if (
+      !item.context?.tenant_slug ||
+      typeof item.metadata.dot_id !== 'string' ||
+      typeof item.metadata.action_ref !== 'string' ||
+      item.metadata.admission_only !== true ||
+      requestedExecutionShape(item.metadata) !== 'mission'
+    )
+      throw new Error('unbound mission intake');
+    item = restoreDotWorkItemBodyForSource(item, deps.rootDir);
+  }
   const admission = parseMissionAdmissionRequest(item.metadata?.mission_admission);
   const tenant = item.context?.tenant_slug;
   const dotId = item.metadata?.dot_id;
@@ -280,6 +292,7 @@ function verifiedDotMissionAdmission(item: WorkItem, deps: Deps) {
     throw new Error('mission mandate no longer covers intake');
   return {
     admission,
+    body: item,
     scope: {
       tenant_slug: tenant,
       ...(dot.scope.organization_id ? { organization_id: dot.scope.organization_id } : {}),
@@ -313,7 +326,7 @@ export function prepareMissionAdmissionBrief(
   const item = getWorkItem(workItemId, deps);
   if (!item || item.metadata?.mission_id !== missionId)
     throw new Error('mission intake identity mismatch');
-  const { admission, scope } = verifiedDotMissionAdmission(item, deps);
+  const { admission, scope, body } = verifiedDotMissionAdmission(item, deps);
   const state = loadState(missionId, deps);
   const dir = findMissionPath(missionId);
   if (
@@ -325,7 +338,7 @@ export function prepareMissionAdmissionBrief(
     state.relationships?.project?.project_id !== scope.project_id
   )
     throw new Error('planned mission preparation receipt missing');
-  const brief = buildMissionAdmissionBrief(item, admission, missionId);
+  const brief = buildMissionAdmissionBrief(body, admission, missionId);
   withLockSync('mission-admission-brief:' + dir, () => {
     const file = path.join(dir, 'evidence', 'mission-brief.json');
     if (safeExistsSync(file)) {
@@ -381,7 +394,7 @@ export function authorMissionAdmissionBrief(
   const item = getWorkItem(workItemId, deps);
   if (!item || item.metadata?.mission_id !== missionId)
     throw new Error('mission intake identity mismatch');
-  const { admission, scope } = verifiedDotMissionAdmission(item, deps);
+  const { admission, scope, body } = verifiedDotMissionAdmission(item, deps);
   const state = loadState(missionId, deps);
   const missionDir = findMissionPath(missionId);
   if (
@@ -420,7 +433,7 @@ export function authorMissionAdmissionBrief(
           throw new Error('existing mission brief has different admission; human review required');
         return;
       }
-      const brief = buildMissionAdmissionBrief(item, admission, missionId);
+      const brief = buildMissionAdmissionBrief(body, admission, missionId);
       safeMkdir(path.dirname(file), { recursive: true });
       safeWriteFile(file, JSON.stringify(brief, null, 2));
     });

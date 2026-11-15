@@ -109,6 +109,8 @@ export interface ExecutionFeedbackCandidateResult {
 export function materializeExecutionFeedbackCandidate(input: {
   feedback: ExecutionFeedbackRecord;
   procedureId?: string;
+  /** Resolved working-memory hypotheses are reviewable lessons even when confirmed. */
+  resolvedLearningEvidence?: string[];
   /** Capture scope when it differs from the feedback store scope. */
   scope?: MemoryScopeEnvelope;
 }): ExecutionFeedbackCandidateResult {
@@ -117,7 +119,7 @@ export function materializeExecutionFeedbackCandidate(input: {
     intentId: input.feedback.intent_id,
     scope: input.feedback.scope,
   });
-  if (summary.improvement_status !== 'candidate') {
+  if (summary.improvement_status !== 'candidate' && !input.resolvedLearningEvidence?.length) {
     return { summary, candidate: null };
   }
   const captureScope = input.scope || input.feedback.scope;
@@ -176,6 +178,7 @@ export function materializeExecutionFeedbackCandidate(input: {
       `execution-feedback:${input.feedback.feedback_id}`,
       `intent:${input.feedback.intent_id}`,
       ...(input.feedback.correlation_id ? [`correlation:${input.feedback.correlation_id}`] : []),
+      ...(input.resolvedLearningEvidence ?? []),
     ],
     metadata: {
       improvement_kind: 'execution_feedback',

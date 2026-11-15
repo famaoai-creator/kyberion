@@ -552,8 +552,11 @@ describe('diagnostic executor boundary', () => {
         created_at: now().toISOString(),
         updated_at: now().toISOString(),
         context: { tenant_slug: 'acme', project_id: 'default', work_shape: 'routine_operation' },
+        context_origin: { project_id: 'default', work_shape: 'explicit' },
         metadata: {
           dot_id: entry.charter.dot_id,
+          dot_scope: { ...entry.charter.scope },
+          executor_authority_role: entry.charter.authority.authority_role,
           action_ref: 'diagnostic-refused',
           requested_work_shape:
             scenario === 'direct_reply' || scenario === 'task_session' ? scenario : 'pipeline',

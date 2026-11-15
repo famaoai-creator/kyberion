@@ -110,6 +110,28 @@ describe('routeAutonomousDecision', () => {
     expect(appended).toEqual([]);
   });
 
+  it.each([
+    { tier: 'personal' as const, nhi_id: 'user:owner' },
+    { tier: 'confidential' as const, tenant_slug: 'acme' },
+  ])('keeps private report-only details out of the shared notice feed: %j', (scope) => {
+    const appended = noticesAppendedBy(() => {
+      const result = routeAutonomousDecision({
+        role: 'mission_controller',
+        gate: gate({ decision: 'auto', vetoWindowMinutes: undefined }),
+        title: 'private title',
+        question: 'private question',
+        recommendation: 'private recommendation',
+        source: { agentId: 'dot:private', missionId: 'private-mission' },
+        requestedBy: 'dot:private',
+        scope,
+      });
+      expect(result.proceed).toBe(true);
+    });
+    expect(appended).toHaveLength(1);
+    expect(appended[0]).toMatchObject({ title: 'Scoped autonomous action' });
+    expect(JSON.stringify(appended)).not.toContain('private');
+  });
+
   it('parks a veto, pushes the card once and starts the clock only on delivery', () => {
     const routed = route();
     expect(routed).toMatchObject({ level: 'veto', proceed: false, parked: true, notified: true });
@@ -135,6 +157,7 @@ describe('routeAutonomousDecision', () => {
 
   it('delivers to a caller-owned route and defers it to the inbox in quiet hours', () => {
     const quietHours = { start: '00:00', end: '23:59', timezone: 'UTC' };
+    const scope = { tier: 'public' as const };
     const routed = routeAutonomousDecision({
       role: 'mission_controller',
       gate: gate(),
@@ -144,6 +167,7 @@ describe('routeAutonomousDecision', () => {
       requestedBy: 'dot:org-ops',
       notificationRoute: { surface: 'slack', target: 'C-EXEC' },
       quietHours,
+      scope,
       now: Date.parse('2026-10-04T12:00:00Z'),
     });
     const stored = loadApprovalRequest(AUTONOMY_APPROVAL_CHANNEL, routed.requestId!);
@@ -154,7 +178,7 @@ describe('routeAutonomousDecision', () => {
       unknown,
       { route: unknown; quietHours: unknown },
     ];
-    expect(options).toEqual({ route: { surface: 'slack', target: 'C-EXEC' }, quietHours });
+    expect(options).toEqual({ route: { surface: 'slack', target: 'C-EXEC' }, quietHours, scope });
   });
 
   it('neutralizes agent-written markup for the surface the card is sent to', () => {

@@ -228,6 +228,76 @@ describe('classified wake failure reasons', () => {
 });
 
 describe('runDotWake', () => {
+  it('does not recover a retained follow-up after its trigger was rejected', async () => {
+    writeCharter(CHARTER);
+    const trigger = { trigger: { kind: 'followup' as const }, key: 'followup:rejected' };
+    const deps = { rootDir: TEST_ROOT };
+    recordDotWakeOutcome(CHARTER, trigger, 'delivered', {
+      ...deps,
+      trigger_retained: true,
+      followup_retry: {
+        scheduled_at: '2026-10-04T10:00:00Z',
+        values: [{ delay_minutes: 5, reason: 'must not schedule' }],
+      },
+    });
+    recordDotWakeOutcome(CHARTER, trigger, 'rejected', deps);
+    const runLoop = vi.fn(async () => fakeResult(1, 5));
+    const receipt = await runDotWake(
+      { path: `${TEST_ROOT}/dots/dot.json`, charter: CHARTER },
+      {
+        ...deps,
+        trigger,
+        runLoop,
+        hasRole: () => true,
+      }
+    );
+    expect(receipt.outcome).toBe('rejected');
+    expect(runLoop).not.toHaveBeenCalled();
+    expect(listPendingDotFollowups(CHARTER, deps)).toEqual([]);
+  });
+  it.each([
+    [{ tier: 'public' }, { tier: 'confidential', tenant_slug: 'acme' }],
+    [
+      { tier: 'confidential', tenant_slug: 'acme', organization_id: 'org-a' },
+      { tier: 'confidential', tenant_slug: 'acme', organization_id: 'org-b' },
+    ],
+    [
+      { tier: 'personal', owner_nhi: 'owner-a' },
+      { tier: 'personal', owner_nhi: 'owner-b' },
+    ],
+  ] as Array<[DotCharter['scope'], DotCharter['scope']]>)(
+    'refuses a queued follow-up after its scope changes',
+    async (before, after) => {
+      const original = { ...CHARTER, scope: before };
+      const dir =
+        before.tier === 'personal'
+          ? personalDotCharterDir('owner-a', TEST_ROOT)
+          : `${TEST_ROOT}/dots`;
+      safeMkdir(dir, { recursive: true });
+      safeWriteFile(`${dir}/dot.json`, JSON.stringify({ ...original, scope: after }));
+      if (before.tier === 'personal') vi.stubEnv('KYBERION_NHI_ID', 'owner-a');
+      const runLoop = vi.fn(async () => fakeResult(1, 5));
+      try {
+        const receipt = await runDotWake(
+          { path: `${dir}/dot.json`, charter: original },
+          {
+            rootDir: TEST_ROOT,
+            runLoop,
+            hasRole: () => true,
+            trigger: {
+              trigger: { kind: 'followup' },
+              key: 'followup:old-scope',
+              detail: 'old private context',
+            },
+          }
+        );
+        expect(receipt.outcome).toBe('failed');
+        expect(runLoop).not.toHaveBeenCalled();
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    }
+  );
   it('skips when the charter is no longer active (status race)', async () => {
     writeCharter({ ...CHARTER, status: 'paused' });
     const receipt = await runDotWake(
@@ -734,12 +804,26 @@ describe('runtime reliability (DL-02)', () => {
     }
   );
 
-  it.each(['native', 'fenced'] as const)(
-    'records a %s follow-up persist failure as a tool error and keeps the parent pending (backoff, no immediate retry)',
-    async (mode) => {
+  it.each(
+    (['native', 'fenced'] as const).flatMap((mode) => [
+      { mode, scope: { tier: 'public' as const } },
+      { mode, scope: { tier: 'confidential' as const, tenant_slug: 'acme' } },
+      { mode, scope: { tier: 'personal' as const, owner_nhi: 'owner-a' } },
+    ])
+  )(
+    'recovers a $mode $scope.tier follow-up persist failure without replaying work',
+    async ({ mode, scope }) => {
       DOT_WAKE_TOOLS.push(dotScheduleFollowupTool);
-      const charter: DotCharter = { ...CHARTER, followups: { max_pending: 1 } };
-      writeCharter(charter);
+      const charter: DotCharter = { ...CHARTER, scope, followups: { max_pending: 1 } };
+      const dir =
+        scope.tier === 'personal'
+          ? personalDotCharterDir('owner-a', TEST_ROOT)
+          : scope.tier === 'confidential'
+            ? `${TEST_ROOT}/knowledge/confidential/acme/dots`
+            : `${TEST_ROOT}/dots`;
+      if (scope.tier === 'personal') vi.stubEnv('KYBERION_NHI_ID', 'owner-a');
+      safeMkdir(dir, { recursive: true });
+      safeWriteFile(`${dir}/dot.json`, JSON.stringify(charter));
       const t0 = new Date('2026-10-04T10:00:00Z');
       let now = new Date('2026-10-04T10:06:00Z');
       const deps = { rootDir: TEST_ROOT, now: () => now };
@@ -764,7 +848,7 @@ describe('runtime reliability (DL-02)', () => {
         });
       try {
         const receipt = await runDotWake(
-          { path: `${TEST_ROOT}/dots/dot.json`, charter },
+          { path: `${dir}/dot.json`, charter },
           {
             ...deps,
             trigger,
@@ -793,6 +877,7 @@ describe('runtime reliability (DL-02)', () => {
           }
         );
         expect(receipt.outcome).toBe('delivered');
+        expect(receipt.trigger_retained).toBe(true);
         expect(receipt.tool_errors).toEqual([
           'dot_schedule_followup: apply failed (followup store unavailable)',
         ]);
@@ -800,6 +885,14 @@ describe('runtime reliability (DL-02)', () => {
         expect(readDotWakeLedger(deps)).toMatchObject([
           { trigger_key: trigger.key, outcome: 'delivered', trigger_retained: true },
         ]);
+        if (scope.tier !== 'public') {
+          expect(String(safeReadFile(`${TEST_ROOT}/${DOT_WAKE_LEDGER_PATH}`))).not.toContain(
+            'successor'
+          );
+          expect(readScopedDotWakeLedger(charter, deps)[0].followup_retry?.values).toEqual([
+            replacement,
+          ]);
+        }
         // The chain is not lost: the parent stays pending, but backs off — the
         // same sweep window never re-fires (nor re-dispatches) it.
         expect(listPendingDotFollowups(charter, deps).map((row) => row.reason)).toEqual([
@@ -810,29 +903,34 @@ describe('runtime reliability (DL-02)', () => {
           false
         );
         write.mockRestore();
-        // After the backoff the parent wakes again and its successor persists.
+        // After backoff recover the frozen schedule without calling the model
+        // or dispatching proposals again. Its original due time is preserved.
         now = new Date('2026-10-04T10:30:00Z');
         expect(evaluateDotFollowupsDue(charter, deps).map((t) => t.key)).toEqual([trigger.key]);
+        const replayLoop = vi.fn(async () => fakeResult(1, 5));
+        const replayDispatch = vi.fn(() => []);
         const retry = await runDotWake(
-          { path: `${TEST_ROOT}/dots/dot.json`, charter },
+          { path: `${dir}/dot.json`, charter },
           {
             ...deps,
             trigger,
             hasRole: () => true,
-            dispatch: () => [],
-            runLoop: async (options: DotWakeLoopOptions) => {
-              options.executeTool!({ name: 'dot_schedule_followup', input: replacement });
-              return fakeResult(1, 5);
-            },
+            dispatch: replayDispatch,
+            runLoop: replayLoop,
           }
         );
         expect(retry.tool_errors).toBeUndefined();
+        expect(replayLoop).not.toHaveBeenCalled();
+        expect(replayDispatch).not.toHaveBeenCalled();
         expect(listPendingDotFollowups(charter, deps).map((row) => row.reason)).toEqual([
           'successor',
         ]);
-        expect(evaluateDotFollowupsDue(charter, deps)).toEqual([]);
+        expect(evaluateDotFollowupsDue(charter, deps).map((row) => row.key)).toEqual([
+          `followup:${listPendingDotFollowups(charter, deps)[0].followup_id}`,
+        ]);
       } finally {
         write.mockRestore();
+        vi.unstubAllEnvs();
       }
     }
   );
@@ -1039,6 +1137,38 @@ describe('runtime reliability (DL-02)', () => {
         now: () => new Date(t0.getTime() + 200 * 60_000),
       }).consecutive
     ).toBe(DOT_WAKE_CIRCUIT_THRESHOLD);
+  });
+
+  it.each([
+    { tier: 'confidential' as const, tenant_slug: 'acme' },
+    { tier: 'personal' as const, owner_nhi: 'owner-a' },
+  ])('omits $tier failure reasons from shared circuit alerts', (scope) => {
+    const privateDot = { ...CHARTER, scope };
+    const t0 = Date.parse('2026-10-02T10:00:00Z');
+    for (let index = 0; index < DOT_WAKE_CIRCUIT_THRESHOLD; index += 1) {
+      recordDotWakeOutcome(
+        privateDot,
+        { trigger: { kind: 'followup' }, key: `followup:${index}` },
+        'failed',
+        {
+          rootDir: TEST_ROOT,
+          now: () => new Date(t0 + index * 60_000),
+          reason: 'synthetic private failure',
+        }
+      );
+    }
+    const opsAlert = vi.fn();
+    evaluateDotTriggersDue(privateDot, {
+      rootDir: TEST_ROOT,
+      now: () => new Date(t0 + 15 * 60_000),
+      opsAlert,
+    });
+    expect(opsAlert).toHaveBeenCalledTimes(1);
+    expect(opsAlert.mock.calls[0][0].context).not.toHaveProperty('reason');
+    expect(JSON.stringify(opsAlert.mock.calls)).not.toContain('synthetic private failure');
+    expect(readScopedDotWakeLedger(privateDot, { rootDir: TEST_ROOT })[0].reason).toBe(
+      'synthetic private failure'
+    );
   });
 
   it('opens a per-dot circuit after 5 same-reason failures on rotating keys, alerts once, then half-opens', () => {
@@ -1551,7 +1681,10 @@ describe('dot wake usage attribution', () => {
       writeCharter(current);
       const observed: ReturnType<typeof getUsageAttribution>[] = [];
       const receipt = await runDotWake(
-        { path: `${TEST_ROOT}/dots/dot.json`, charter: CHARTER },
+        {
+          path: `${TEST_ROOT}/dots/dot.json`,
+          charter: { ...current, title: 'stale snapshot title' },
+        },
         {
           rootDir: TEST_ROOT,
           hasRole: () => true,

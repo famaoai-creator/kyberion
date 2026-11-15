@@ -1,4 +1,5 @@
 import { currentExecutionScope } from '../foundation/execution-scope.js';
+import { restoreDotWorkItemBodyForSource } from '../dot/dot-work-item.js';
 import { resolveIdentityContext } from '../authority.js';
 import {
   getWorkItem,
@@ -30,7 +31,8 @@ export function resolveInformationAssetMissionExecution(
     throw new Error(
       '[INFORMATION_MISSION_REQUIRED] Enter the approved active mission before execution'
     );
-  const plan = buildInformationAssetMissionExecutionPlan(item, missionId);
+  // Preserve the ordinary reference-only binding refusal before scope checks.
+  if (!item.metadata?.dot_private_body) buildInformationAssetMissionExecutionPlan(item, missionId);
   resolveDotMissionAdmission(item, options);
   const scope = resolveDotMissionAdmissionScope(item, options);
   const current = currentExecutionScope();
@@ -50,7 +52,10 @@ export function resolveInformationAssetMissionExecution(
     throw new Error(
       '[INFORMATION_MISSION_SCOPE] Active mission, current scope and admitted source must agree'
     );
-  return plan;
+  return buildInformationAssetMissionExecutionPlan(
+    restoreDotWorkItemBodyForSource(item, options.rootDir),
+    missionId
+  );
 }
 /** Mission owner execution: activation stays exclusively with mission_controller. */
 export async function runInformationAssetMissionWork(

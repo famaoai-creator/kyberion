@@ -82,6 +82,10 @@ export interface CeoOutcomeItem {
   /** Inbox entry kind (`customer_decision_handoff` …), when the writer set one. */
   kind?: string;
   tenant_slug?: string;
+  tier?: string;
+  owner_nhi?: string;
+  organization_id?: string;
+  project_id?: string;
 }
 
 export interface CeoExceptionItem {
@@ -334,6 +338,10 @@ export function composeCeoSurfaceSummary(input: {
     updated_at: entry.updated_at,
     ...(entry.kind ? { kind: entry.kind } : {}),
     ...(entry.tenant_slug ? { tenant_slug: entry.tenant_slug } : {}),
+    ...(entry.tier ? { tier: entry.tier } : {}),
+    ...(entry.owner_nhi ? { owner_nhi: entry.owner_nhi } : {}),
+    ...(entry.organization_id ? { organization_id: entry.organization_id } : {}),
+    ...(entry.project_id ? { project_id: entry.project_id } : {}),
   }));
   const exceptionFeed: CeoExceptionItem[] = input.notifications
     .filter((notification) =>

@@ -14,6 +14,31 @@
     "status"
   ],
   "properties": {
+    "scope": {
+      "type": "object",
+      "required": ["tier"],
+      "additionalProperties": false,
+      "properties": {
+        "tier": { "enum": ["personal", "confidential", "public"] },
+        "tenant_slug": { "type": "string", "minLength": 1 },
+        "tenant_id": { "type": "string" },
+        "organization_id": { "type": "string" },
+        "project_id": { "type": "string" },
+        "mission_id": { "type": "string" },
+        "task_id": { "type": "string" },
+        "session_id": { "type": "string" },
+        "work_shape": { "type": "string" },
+        "customer_stance": { "type": "string" },
+        "viewer_principal": { "type": "string" },
+        "nhi_id": { "type": "string" },
+        "owner_nhi": { "type": "string", "minLength": 1 },
+        "retention_policy": { "type": "string" },
+        "allowed_audience": { "type": "array", "items": { "type": "string" } },
+        "promotion_policy": { "enum": ["same_scope", "brokered", "human_review"] },
+        "provenance_refs": { "type": "array", "items": { "type": "string" } },
+        "redacted": { "type": "boolean" }
+      }
+    },
     "entry_id": { "type": "string", "minLength": 1 },
     "mission_id": { "type": "string", "minLength": 1 },
     "title": { "type": "string", "minLength": 1 },
@@ -28,6 +53,10 @@
       "enum": ["unread", "read", "accepted", "rejected", "changes_requested"]
     },
     "tenant_slug": { "type": "string", "minLength": 1 },
+    "tier": { "enum": ["public", "confidential", "personal"] },
+    "owner_nhi": { "type": "string", "minLength": 1 },
+    "organization_id": { "type": "string", "minLength": 1 },
+    "project_id": { "type": "string", "minLength": 1 },
     "kind": { "type": "string", "minLength": 1 },
     "verdict_note": { "type": "string", "minLength": 1 },
     "verdict_reason_category": {

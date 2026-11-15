@@ -405,6 +405,33 @@ describe('operator notifications (E2E-04 Task 2)', () => {
     const payload = { title: 'digest', body: 'one decision', correlation_id: 'DIGEST-1' };
     const options = { deduplicationKey: 'digest-1' };
 
+    it('honors legacy tenant intents after receipt namespace registration', () => {
+      writePrefs({ default_channel: { surface: 'slack', target: 'C1' } });
+      const scopedOptions = {
+        ...options,
+        scope: { tier: 'confidential' as const, tenant_slug: 'receipt-legacy' },
+      };
+      expect(
+        mod.notifyOperatorWithReceiptSync('decision_digest', payload, scopedOptions).status
+      ).toBe('accepted');
+      const root = path.join(
+        process.env.KYBERION_ROOT!,
+        'active/shared/runtime/operator-notification-receipts'
+      );
+      const canonical = path.join(root, 'confidential/receipt-legacy');
+      const legacy = path.join(root, 'tenants/receipt-legacy');
+      fs.mkdirSync(path.dirname(legacy), { recursive: true });
+      fs.renameSync(canonical, legacy);
+      expect(
+        mod.notifyOperatorWithReceiptSync('decision_digest', payload, scopedOptions)
+      ).toMatchObject({
+        status: 'accepted',
+        reason: 'durable_replay',
+      });
+      expect(enqueue).toHaveBeenCalledTimes(1);
+      expect(fs.existsSync(canonical)).toBe(false);
+    });
+
     it('distinguishes muted, test-suppressed, no-route and rate-limit outcomes', () => {
       expect(mod.notifyOperatorWithReceiptSync('decision_digest', payload)).toMatchObject({
         status: 'retryable',

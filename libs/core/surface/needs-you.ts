@@ -243,6 +243,8 @@ function fromOutcome(item: NeedsYouOutcomeInput, now: number): NeedsYouItem {
     ...(item.mission_id ? { mission_id: item.mission_id } : {}),
     ...(item.tenant_slug ? { tenant_slug: item.tenant_slug } : {}),
     ...(item.owner_nhi ? { owner_nhi: item.owner_nhi } : {}),
+    ...(item.organization_id ? { organization_id: item.organization_id } : {}),
+    ...(item.project_id ? { project_id: item.project_id } : {}),
     ...(item.updated_at ? { waiting_since: item.updated_at } : {}),
     overdue: isOverdue(undefined, item.updated_at, now),
     // A hand-off is closed by the operator once dealt with (`/api/outcomes/[id]`

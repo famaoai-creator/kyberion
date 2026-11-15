@@ -30,6 +30,20 @@ const RECONCILE =
   'An operator must verify execution stopped and reconcile partial or late effects. Do not retry or clear ownership automatically.';
 const LIMIT = 20;
 function sameScope(c: DotCharter, item: WorkItem): boolean {
+  const original = item.metadata?.dot_scope;
+  if (original !== undefined) {
+    if (!original || typeof original !== 'object' || Array.isArray(original)) return false;
+    const declared = original as Record<string, unknown>;
+    if (
+      (['tier', 'tenant_slug', 'owner_nhi', 'organization_id', 'project_id'] as const).some(
+        (key) => (declared[key] ?? undefined) !== (c.scope[key] ?? undefined)
+      )
+    )
+      return false;
+  } else if (c.scope.tier === 'personal' || c.scope.owner_nhi) {
+    // Entity context without an owner is not proof of personal custody.
+    return false;
+  }
   return (
     item.context?.tenant_slug === c.scope.tenant_slug &&
     item.context?.organization_id === c.scope.organization_id &&

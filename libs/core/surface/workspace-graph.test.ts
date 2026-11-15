@@ -172,6 +172,146 @@ const acmeViewer: SurfaceAuthorizationContext = {
 };
 
 describe('workspace graph', () => {
+  it('keeps ownerless system operations visible in the server system selection', () => {
+    const base = {
+      ...sources().workItems()[0],
+      context: { project_id: 'default' },
+      project_id: 'default',
+      context_origin: { project_id: 'default' },
+    } as WorkItem;
+    const graph = collectWorkspaceGraph(
+      sources({
+        workItems: () => [
+          { ...base, item_id: 'system', metadata: {} },
+          {
+            ...base,
+            item_id: 'public-person',
+            metadata: { dot_scope: { tier: 'public', nhi_id: 'owner' } },
+          },
+          { ...base, item_id: 'old-dot', metadata: { dot_id: 'old' } },
+          { ...base, item_id: 'tenant', context: { tenant_slug: 'acme' }, metadata: {} },
+        ],
+      })
+    );
+    const viewer = {
+      ...acmeViewer,
+      tenantSlugs: [] as string[],
+      organizationIds: [] as string[],
+      projectIds: [] as string[],
+      includeUntenanted: true,
+    };
+    expect(
+      filterWorkspaceGraph(graph, viewer)
+        .nodes.filter((node) => node.kind === 'work_item')
+        .map((node) => node.id)
+    ).toEqual(['system']);
+    expect(
+      filterWorkspaceGraph(graph, { ...viewer, tenantSlugs: ['company'] }).nodes.some(
+        (node) => node.id === 'system'
+      )
+    ).toBe(false);
+  });
+  it('withholds unknown legacy Dot prose but retains plain legacy system and proven public Dot nodes', () => {
+    const base = { ...sources().workItems()[0], context: {}, project_id: '' } as WorkItem;
+    const graph = collectWorkspaceGraph(
+      sources({
+        workItems: () => [
+          {
+            ...base,
+            item_id: 'old-dot',
+            title: 'private legacy prose',
+            metadata: { dot_id: 'private', action_ref: 'old' },
+          },
+          { ...base, item_id: 'ordinary-legacy', metadata: {} },
+          {
+            ...base,
+            item_id: 'public-dot',
+            metadata: { dot_id: 'public', dot_scope: { tier: 'public' } },
+          },
+        ],
+      })
+    );
+    const projected = filterWorkspaceGraph(graph, {
+      ...acmeViewer,
+      tenantSlugs: 'all',
+      organizationIds: 'all',
+      projectIds: 'all',
+    });
+    expect(
+      projected.nodes.filter((node) => node.kind === 'work_item').map((node) => node.id)
+    ).toEqual(['ordinary-legacy', 'public-dot']);
+    expect(JSON.stringify(projected)).not.toContain('private legacy prose');
+  });
+  it('withholds personal work nodes from all-tenant viewers unless exact owner and tier both admit', () => {
+    const privateItem = {
+      ...sources().workItems()[0],
+      item_id: 'private',
+      project_id: '',
+      context: {},
+      metadata: { dot_scope: { tier: 'personal', owner_nhi: 'owner' } },
+    } as WorkItem;
+    const graph = collectWorkspaceGraph(sources({ workItems: () => [privateItem] }));
+    const system = {
+      ...acmeViewer,
+      tenantSlugs: 'all' as const,
+      organizationIds: 'all' as const,
+      projectIds: 'all' as const,
+    };
+    for (const viewer of [system, { ...system, tierAccess: ['personal'], principalId: 'other' }]) {
+      expect(filterWorkspaceGraph(graph, viewer).nodes.some((node) => node.id === 'private')).toBe(
+        false
+      );
+    }
+    expect(
+      filterWorkspaceGraph(graph, {
+        ...system,
+        tierAccess: ['personal'],
+        principalId: 'owner',
+      }).nodes.some((node) => node.id === 'private')
+    ).toBe(true);
+  });
+  it('does not turn a generated personal default project into an owner-only graph restriction', () => {
+    const base = {
+      ...sources().workItems()[0],
+      project_id: 'default',
+      context: { project_id: 'default' },
+      context_origin: { project_id: 'default' as const },
+      metadata: { dot_scope: { tier: 'personal', owner_nhi: 'owner' } },
+    } as WorkItem;
+    const graph = collectWorkspaceGraph(
+      sources({
+        workItems: () => [
+          { ...base, item_id: 'private-default' },
+          {
+            ...base,
+            item_id: 'private-explicit',
+            project_id: 'MSN-EXPLICIT',
+            context: { project_id: 'MSN-EXPLICIT' },
+            context_origin: { project_id: 'explicit' },
+            metadata: {
+              dot_scope: { tier: 'personal', owner_nhi: 'owner', project_id: 'MSN-EXPLICIT' },
+            },
+          },
+          { ...base, item_id: 'ordinary-default', metadata: {} },
+        ],
+      })
+    );
+    expect(graph.nodes.find((node) => node.id === 'ordinary-default')?.projectId).toBe('default');
+    expect(graph.nodes.find((node) => node.id === 'private-default')?.projectId).toBeUndefined();
+    const owner = {
+      ...acmeViewer,
+      tenantSlugs: [] as string[],
+      organizationIds: [] as string[],
+      projectIds: [] as string[],
+      tierAccess: ['personal'],
+      principalId: 'owner',
+    };
+    expect(
+      filterWorkspaceGraph(graph, owner)
+        .nodes.filter((node) => node.kind === 'work_item')
+        .map((node) => node.id)
+    ).toEqual(['private-default']);
+  });
   it('keeps tier and permission ceilings for member self and tenant-mate admission', () => {
     const graph = collectWorkspaceGraph(sources());
     const self = { ...acmeViewer, tenantSlugs: [] as string[], memberId: 'member-alice' };

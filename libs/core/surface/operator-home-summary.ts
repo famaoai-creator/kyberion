@@ -192,6 +192,8 @@ export interface OperatorHomeScopeFilter {
   includeUntenanted?: boolean;
   /** Personal workspace only: admit already owner-authenticated personal approval rows. */
   includePersonalApprovals?: boolean;
+  /** Owner-authenticated personal workspace only; affects inbox rows, never other stores. */
+  includePersonalInbox?: boolean;
   /**
    * The viewer's own person ids, resolved server-side upstream — admits
    * person-custody records to their owner only. Identity-bound, never
@@ -738,6 +740,36 @@ export function collectOperatorHomeSummary(
     return Boolean(input.scope.includeUntenanted && !legacyTenant);
   };
   const inboxMatchesScope = (entry: DeliverableInboxEntry): boolean => {
+    if (entry.tier) {
+      const own = viewerPersonIds({ personIds: input.scope?.personIds });
+      if (entry.tier === 'personal' && (!entry.owner_nhi || !own.includes(entry.owner_nhi)))
+        return false;
+      if (!input.scope) return entry.tier === 'public' && !entry.tenant_slug;
+      return (
+        admitsCustody(
+          {
+            tenantSlugs: input.scope.tenantSlugs ?? 'all',
+            personIds: own,
+            includeUntenanted: input.scope.includeUntenanted,
+          },
+          custodyOfScope(entry)
+        ) &&
+        (scopeAllows(input.scope.tiers, entry.tier) ||
+          (entry.tier === 'personal' && input.scope.includePersonalInbox === true)) &&
+        (scopeAllows(input.scope.organizationIds, entry.organization_id) ||
+          (entry.tier === 'personal' &&
+            input.scope.includePersonalInbox === true &&
+            !entry.organization_id &&
+            Array.isArray(input.scope.organizationIds) &&
+            input.scope.organizationIds.length === 0)) &&
+        (scopeAllows(input.scope.projectIds, entry.project_id) ||
+          (entry.tier === 'personal' &&
+            input.scope.includePersonalInbox === true &&
+            !entry.project_id &&
+            Array.isArray(input.scope.projectIds) &&
+            input.scope.projectIds.length === 0))
+      );
+    }
     if (!input.scope || !isScoped) return true;
     if (Array.isArray(input.scope.tiers)) {
       if (!entry.mission_id) return Boolean(input.scope.includeUntenanted && !entry.tenant_slug);
@@ -768,7 +800,16 @@ export function collectOperatorHomeSummary(
   const pendingApprovalsOther = isScoped
     ? undefined
     : pendingApprovalSnapshot.length - visiblePendingApprovals.length;
-  const inboxEntries = listInboxEntries({ limit: isScoped ? 10000 : input.limit || 8 })
+  const inboxQuery = { limit: isScoped ? 10000 : input.limit || 8 };
+  const inboxCandidates = [
+    ...listInboxEntries(inboxQuery),
+    ...viewerPersonIds({ personIds: input.scope?.personIds }).flatMap((ownerNhi) =>
+      listInboxEntries({ ...inboxQuery, ownerNhi })
+    ),
+  ];
+  const inboxEntries = [
+    ...new Map(inboxCandidates.map((entry) => [entry.entry_id, entry])).values(),
+  ]
     .filter(inboxMatchesScope)
     .slice(0, input.limit || 8);
   const unreadInbox = inboxEntries.filter((entry) => entry.status === 'unread').length;

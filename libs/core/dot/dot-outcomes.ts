@@ -25,6 +25,7 @@ import { createLogger } from '../logger.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeMkdir } from '../secure-io.js';
 import { getWorkItem } from '../workforce/work-coordination.js';
+import { restoreDotWorkItemBody } from './dot-work-item.js';
 import type { KeyResultSpec } from '../organization/key-result-spec.js';
 import type { DotCharter } from './dot-charter.js';
 import type {
@@ -111,16 +112,22 @@ function diag(what: string, why: unknown, next: string, evidence: string): strin
 }
 
 function defaultExpectedEffect(
+  charter: DotCharter,
   deps: DotOutcomeDeps
 ): (id: string) => DotExpectedEffect | undefined {
   return (id) => {
+    let item: ReturnType<typeof getWorkItem>;
     try {
-      const effect = getWorkItem(id, deps.rootDir ? { rootDir: deps.rootDir } : {})?.metadata
-        ?.expected_effect as DotExpectedEffect | undefined;
-      return effect && typeof effect === 'object' ? effect : undefined;
+      item = getWorkItem(id, deps.rootDir ? { rootDir: deps.rootDir } : {});
     } catch {
       return undefined;
     }
+    // Missing protected evidence must not become an undeclared-effect success.
+    const effect = item
+      ? (restoreDotWorkItemBody(charter, item, deps.rootDir).metadata?.expected_effect as
+          DotExpectedEffect | undefined)
+      : undefined;
+    return effect && typeof effect === 'object' ? effect : undefined;
   };
 }
 
@@ -177,7 +184,7 @@ export function scheduleDotOutcomeChecks(
       c.scope.tier === 'confidential' ? dotResultScopeSchema.parse(c.scope) : undefined
     ) as DotWorkResultRow[]
   ).filter((row) => row && row.dot_id === c.dot_id);
-  const effectOf = deps.expectedEffectOf ?? defaultExpectedEffect(deps);
+  const effectOf = deps.expectedEffectOf ?? defaultExpectedEffect(c, deps);
   const scheduled: DotOutcomePendingRow[] = [];
   for (const result of results) {
     if (result.status !== 'done' || !result.action_ref || known.has(result.action_ref)) continue;

@@ -45,6 +45,8 @@ import {
   type DotWorkResultRow,
 } from './dot-state-paths.js';
 import './dot-extension-bootstrap.js';
+import { requestDotWorkItemRelease, applyApprovedDotReleases } from './dot-executor-release.js';
+import type { ApprovalRequestRecord } from '../governance/approval-store.js';
 
 const TEST_ROOT = 'active/shared/tmp/dot-executor-tests';
 const NOW = new Date('2026-10-04T10:00:00Z');
@@ -88,6 +90,17 @@ function item(id: string, metadata: Record<string, unknown>, extra: Partial<Work
       dot_id: 'ops',
       action_ref: `dact-${id}`,
       requested_work_shape: 'task_session',
+      ...(extra.context
+        ? {
+            dot_scope: {
+              tier: extra.context.tenant_slug ? 'confidential' : 'public',
+              tenant_slug: extra.context.tenant_slug,
+              organization_id: extra.context.organization_id,
+              project_id: extra.context.project_id,
+            },
+            executor_authority_role: 'infrastructure_sentinel',
+          }
+        : {}),
       ...metadata,
     },
     ...extra,
@@ -254,6 +267,131 @@ describe('listClaimableDotWorkItems', () => {
 });
 
 describe('executeDotWorkItem', () => {
+  it('keeps personal recovery approval owner-bound and refuses a different owner decision', () => {
+    const owner = 'kyberion://person/alice';
+    const c = charter({ scope: { tier: 'personal', owner_nhi: owner } });
+    const target = item(
+      'personal-release',
+      {
+        dot_scope: c.scope,
+        executor_authority_role: c.authority.authority_role,
+        dot_executor: { escalated: true },
+      },
+      { status: 'archived' }
+    );
+    const { request } = requestDotWorkItemRelease(
+      c,
+      {
+        workItemId: target.item_id,
+        reason: 'Owner verified the private effect',
+      },
+      {
+        rootDir: TEST_ROOT,
+        getItem: () => target,
+        listApprovals: () => [],
+        createApproval: (params) =>
+          ({
+            ...params,
+            id: 'personal-release-approval',
+            status: 'pending',
+          }) as unknown as ApprovalRequestRecord,
+      }
+    );
+    expect(request.scope).toMatchObject({ tier: 'personal', nhi_id: owner });
+    const update = vi.fn();
+    expect(
+      applyApprovedDotReleases([{ path: 'personal.json', charter: c }], {
+        rootDir: TEST_ROOT,
+        getItem: () => target,
+        update,
+        listApprovals: () => [
+          {
+            ...request,
+            status: 'approved',
+            authenticated: true,
+            decidedByType: 'human',
+            decidedBy: 'human:owner',
+            decidedAt: new Date().toISOString(),
+            scope: { tier: 'personal', nhi_id: 'kyberion://person/bob' },
+          },
+        ],
+        markApplied: (record) => record,
+        audit: () => {},
+      })
+    ).toEqual([]);
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['organization', { organization_id: 'org-b' }],
+    ['project', { project_id: 'project-b' }],
+    ['tier', { tier: 'public' }],
+    ['owner', { owner_nhi: 'kyberion://person/bob' }],
+  ])('refuses ready work after %s changes before claiming it', async (_, change) => {
+    const original = charter({
+      scope: {
+        tier: 'personal',
+        owner_nhi: 'kyberion://person/alice',
+        organization_id: 'org-a',
+        project_id: 'project-a',
+      },
+    });
+    const target = item(
+      'scope-drift',
+      {
+        dot_scope: original.scope,
+        executor_authority_role: original.authority.authority_role,
+      },
+      {
+        context: {
+          organization_id: 'org-a',
+          project_id: 'project-a',
+          work_shape: 'routine_operation',
+        },
+      }
+    );
+    const h = harness([target]);
+    const p = ports();
+    const changed = { ...original, scope: { ...original.scope, ...change } } as DotCharter;
+    expect((await executeDotWorkItem(changed, target, p, h.deps)).status).toBe('skipped');
+    expect(h.claims).toEqual([]);
+    expect(p.runGoalTurn).not.toHaveBeenCalled();
+    expect(p.runPipeline).not.toHaveBeenCalled();
+  });
+
+  it('refuses an executor-role change and legacy private work without custody proof', async () => {
+    const c = charter();
+    const target = item('role-drift', {
+      dot_scope: c.scope,
+      executor_authority_role: 'other-role',
+    });
+    const h = harness([target]);
+    expect((await executeDotWorkItem(c, target, ports(), h.deps)).status).toBe('skipped');
+    expect(h.claims).toEqual([]);
+    const personal = charter({ scope: { tier: 'personal', owner_nhi: 'kyberion://person/alice' } });
+    expect(
+      (await executeDotWorkItem(personal, item('legacy-personal', {}), ports(), h.deps)).status
+    ).toBe('skipped');
+    expect(h.claims).toEqual([]);
+  });
+
+  it('continues owner-bound personal work automatically and holds it when switched to L0', async () => {
+    const c = charter({ scope: { tier: 'personal', owner_nhi: 'kyberion://person/alice' } });
+    const target = item('personal-same', {
+      dot_scope: c.scope,
+      executor_authority_role: c.authority.authority_role,
+    });
+    const h = harness([target]);
+    const p = ports();
+    expect(
+      (await executeDotWorkItem({ ...c, autonomy: { initial_level: 'L0' } }, target, p, h.deps))
+        .status
+    ).toBe('skipped');
+    expect(h.claims).toEqual([]);
+    expect((await executeDotWorkItem(c, target, p, h.deps)).status).toBe('done');
+    expect(h.claims).toHaveLength(1);
+  });
+
   it('refuses a stale operation binding before claim or any effect, including handoff', async () => {
     const c = charter({
       scope: { tier: 'public', organization_id: 'org-a' },
@@ -282,7 +420,7 @@ describe('executeDotWorkItem', () => {
       const target = item(
         'w1',
         { requested_work_shape: 'direct_reply' },
-        { context: { tenant_slug: 'acme' } }
+        { context: { tenant_slug: 'acme', organization_id: 'o1' } }
       );
       const h = harness([target]);
       h.deps.recordTokens = undefined; // Exercise the real persisted dot token ledger.
@@ -645,7 +783,9 @@ describe('executeDotWorkItem', () => {
     const c = charter({
       scope: { tier: 'confidential', tenant_slug: 'acme', organization_id: 'acme-org' },
     });
-    const target = item('w1', {}, { context: { tenant_slug: 'acme' } } as Partial<WorkItem>);
+    const target = item('w1', {}, {
+      context: { tenant_slug: 'acme', organization_id: 'acme-org' },
+    } as Partial<WorkItem>);
     const h = harness([target]);
     await executeDotWorkItem(c, target, ports(), h.deps);
     expect(h.releases[0].summary).not.toContain('Ticked');

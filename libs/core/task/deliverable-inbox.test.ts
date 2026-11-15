@@ -36,6 +36,7 @@ const secureIo = vi.hoisted(() => ({
   },
   safeExistsSync: (filePath: string) => fs.existsSync(filePath),
   safeLstat: (filePath: string) => fs.lstatSync(filePath),
+  safeReaddir: (filePath: string) => fs.readdirSync(filePath),
   safeMkdir: (dirPath: string) => fs.mkdirSync(dirPath, { recursive: true }),
   safeReadFile: (filePath: string, options: { encoding?: BufferEncoding | null } = {}) =>
     options.encoding === null ? fs.readFileSync(filePath) : fs.readFileSync(filePath, 'utf8'),
@@ -104,6 +105,49 @@ describe('deliverable inbox', () => {
   afterAll(() => {
     delete process.env.KYBERION_ROOT;
     fs.rmSync(tmpRoot, { recursive: true, force: true });
+  });
+
+  it('keeps ordinary mutations independent of a malformed foreign personal lane', async () => {
+    const {
+      addInboxEntry,
+      markInboxEntry,
+      acceptInboxEntryWithHumanReceipt,
+      finalizeAcceptedDeliverable,
+    } = await import('./deliverable-inbox.js');
+    const { physicalScopedPath } = await import('../storage/physical-namespace.js');
+    const entry = addInboxEntry({ title: 'Ordinary delivery' });
+    const privateFile = path.join(
+      tmpRoot,
+      physicalScopedPath(
+        'active/shared/inbox',
+        {
+          tier: 'personal',
+          nhi_id: 'person-foreign',
+        },
+        'entries.jsonl'
+      )
+    );
+    secureIo.safeWriteFile(privateFile, JSON.stringify({ entry_id: 'foreign-invalid-row' }) + '\n');
+    expect(markInboxEntry(entry.entry_id, 'read')?.status).toBe('read');
+    expect(
+      acceptInboxEntryWithHumanReceipt({
+        entryId: entry.entry_id,
+        actorId: 'human:owner',
+        authenticated: true,
+        authMethod: 'surface_session',
+        responsibilityStatement: 'I accept this delivery.',
+      })?.status
+    ).toBe('accepted');
+    expect(
+      finalizeAcceptedDeliverable({
+        entryId: entry.entry_id,
+        actorId: 'human:owner',
+        authenticated: true,
+        authMethod: 'surface_session',
+        destination: 'local inbox',
+      })?.delivery_receipt?.destination
+    ).toBe('local inbox');
+    expect(String(secureIo.safeReadFile(privateFile))).toContain('foreign-invalid-row');
   });
 
   it('adds, lists, and marks inbox entries', async () => {
@@ -338,6 +382,32 @@ describe('deliverable inbox', () => {
     fs.mkdirSync(path.join(inboxDir, 'entries.jsonl'), { recursive: true });
 
     expect(() => listInboxEntries()).toThrow(/entries must be a regular file/);
+  });
+  it('retains the full scoped lane when acknowledging a mission task notification', async () => {
+    const { addInboxEntry, listInboxEntries, markInboxEntry } =
+      await import('./deliverable-inbox.js');
+    const scope = {
+      tier: 'personal' as const,
+      owner_nhi: 'user:scope-lane',
+      tenant_slug: 'acme',
+      organization_id: 'org',
+      project_id: 'project',
+      mission_id: 'MSN-LANE',
+      task_id: 'task',
+      session_id: 'session',
+    };
+    const entry = addInboxEntry({ title: 'Scoped lane', scope });
+    expect(entry.scope).toEqual(scope);
+    expect(entry.mission_id).toBe(scope.mission_id);
+    expect(markInboxEntry(entry.entry_id, 'read', { scope: entry.scope })).toMatchObject({
+      status: 'read',
+      scope,
+    });
+    expect(listInboxEntries({ scope })).toHaveLength(1);
+    expect(
+      listInboxEntries({ scope: { tier: 'personal', owner_nhi: scope.owner_nhi } })
+    ).toHaveLength(0);
+    expect(listInboxEntries({ ownerNhi: scope.owner_nhi, limit: 100 })).toHaveLength(1);
   });
   it('atomically preserves explicit notification identities beyond list retention windows', async () => {
     const { addInboxEntry, listInboxEntries, markInboxEntry } =

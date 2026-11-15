@@ -16,7 +16,7 @@ import { pathResolver } from '../path-resolver.js';
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 
-import { safeMkdir, safeRmSync } from '../secure-io.js';
+import { safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
 import { appendJsonLine, readJsonLines } from '../foundation/json.js';
 import { createDotReportMarker } from './dot-result-records.js';
 import type {
@@ -64,6 +64,7 @@ import {
 } from './dot-autonomy.js';
 import {
   DOT_AUTONOMY_LEVELS,
+  dotAutonomyStatePath,
   DOT_OUTCOMES_FILE,
   DOT_WORK_RESULTS_FILE,
   dotStatePath,
@@ -179,6 +180,18 @@ useSeparationOfDutiesOverlay(
 );
 
 describe('dot autonomy levels and state', () => {
+  it.each(['{broken', 'null', '{"level":"bad"}', '{"dot_id":"other","level":"L3"}'])(
+    'holds damaged existing autonomy evidence instead of restoring initial autonomy: %s',
+    (content) => {
+      setLevel('L1');
+      const file = path.join(TEST_ROOT, dotAutonomyStatePath(CHARTER));
+      safeWriteFile(file, content);
+      expect(() => readDotAutonomyState(CHARTER, { rootDir: TEST_ROOT })).toThrow(
+        /DOT_AUTONOMY_STATE_UNAVAILABLE/
+      );
+    }
+  );
+
   it('registers floor, relaxer, status and digest sections', () => {
     expect(DOT_FLOOR_CONTRIBUTORS.map((x) => x.id)).toContain('autonomy');
     expect(DOT_DECISION_RELAXERS.map((x) => x.id)).toContain('autonomy');

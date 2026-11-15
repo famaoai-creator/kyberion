@@ -148,12 +148,17 @@ export function routeAutonomousDecision(input: RouteAutonomousDecisionInput): Ro
   if (level === 'none' || level === 'fyi') {
     // Shadow actions never execute, so there is nothing to report as done.
     if (!shadow && input.gate.allowed) {
+      // This notice feed is installation-wide. Scoped callers retain their
+      // details in their own work/digest records, never in this shared index.
+      const privateScope = input.scope && normalizeEventScope(input.scope);
+      const privateNotice =
+        privateScope && (privateScope.tier !== 'public' || Boolean(privateScope.tenant_slug));
       recordAutonomousActionNotice(input.role, {
         actionId: input.gate.actionId,
         level,
-        title: input.title,
-        summary: input.question,
-        ...(input.source?.missionId ? { missionId: input.source.missionId } : {}),
+        title: privateNotice ? 'Scoped autonomous action' : input.title,
+        ...(!privateNotice ? { summary: input.question } : {}),
+        ...(!privateNotice && input.source?.missionId ? { missionId: input.source.missionId } : {}),
       });
     }
     return {
@@ -303,9 +308,12 @@ export function routeAutonomousDecision(input: RouteAutonomousDecisionInput): Ro
         body: safe(renderDecisionCardText(card, input.locale)),
         correlation_id: approvalDeliveryCorrelationId(record),
       },
-      input.notificationRoute
-        ? { route: input.notificationRoute, quietHours: input.quietHours }
-        : {}
+      {
+        ...(input.notificationRoute
+          ? { route: input.notificationRoute, quietHours: input.quietHours }
+          : {}),
+        ...(input.scope ? { scope: input.scope } : {}),
+      }
     );
     // iMessage is sent synchronously, so a handed-off card is a delivered one;
     // outbox surfaces confirm delivery from the bridge (recordApprovalDeliveryReceipt).

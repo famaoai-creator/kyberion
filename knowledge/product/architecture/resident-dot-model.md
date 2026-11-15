@@ -4,7 +4,7 @@ category: Architecture
 tags: [architecture, autonomy, resident-agent, dots, charter, supervision]
 importance: 8
 author: Ecosystem Architect
-last_updated: 2026-11-10
+last_updated: 2026-11-15
 ---
 
 # Resident Dot Model
@@ -61,8 +61,9 @@ decision floor (ops-gate), and notification (deliver_to + digest). See
 2. Due-ness memory is `active/shared/runtime/dot-wake-ledger.jsonl`; cron keys
    are `<expr>@<minute>` in the charter timezone, watch keys encode
    `mtime:size` (snapshot in `dot-watch-state.json`), wake keys are inbox-line
-   hashes (`dot-inbox.jsonl`). Failed wakes stay retryable; cron does not
-   catch up on slept minutes.
+   hashes (`dot-inbox.jsonl`). Failed wakes stay retryable. Missed cron minutes
+   coalesce within `runtime.cron_catch_up_hours` (default 6, maximum 24);
+   this bounded catch-up does not replay the entire downtime history.
 3. `goal.budget.token_cap_per_day` is enforced across processes via
    `dot-token-usage.jsonl`; per-wake turns/wall-clock map to
    `GoalBudgetLimits` (KD-02).
@@ -121,7 +122,9 @@ governs each one in the supervisor process, under the charter role
    default; devices subscribed to Web Push still get a content-free wake-up.
 4. **Outcome**: proceed creates a `ready` WorkItem. Parked decisions are
    settled each sweep (`settleDotParkedActions`): approved runs after the
-   charter scope is re-checked (it may have narrowed while it waited);
+   charter scope, current authority, policy gate and shadow disposition are
+   re-checked (they may have changed while it waited). An unchanged usable
+   approval resumes without another decision card;
    anything else is declined, and a declined proposal is not re-asked for
    24 hours. Settlement is idempotent across a crash (one feedback row per
    action, an existing WorkItem for the `action_ref` is reused), and a
@@ -133,8 +136,8 @@ metadata, as the approval requester, as the audit-chain `agentId`/`actor`,
 and in notification titles. The wake ledger keeps a bounded `summary` of the
 dot's own words (proposal block removed), shown as "last said" in
 `dot status`, so a wake that proposed nothing still explains itself. The
-ledger is a shared system-floor file, so tenant-scoped dots never write a
-summary. A dot's
+ledger is a shared system-floor file, so tenant and personal dots keep prose
+in their scoped state and never copy it into the shared summary. A dot's
 authority is still exactly its role.
 Per-dot secret scoping beyond the role is not implemented.
 
@@ -171,10 +174,13 @@ wake ──proposal──▶ dispatch (gate ⊔ floors, arbitration) ──▶ W
   (`metadata.dot_id` or `handoff_to`) under the charter role, runs them by
   shape (`direct_reply` as a bounded text turn, `pipeline` only if listed in
   `authority.allowed_pipelines`, `mission` is escalated). The live
-  `task_session` adapter has no governed task tools yet: dispatch refuses the
-  shape before asking anyone, and a legacy item is closed as blocked with
-  `reason_code: capability_unavailable` and no report-back wake (the dot reads
-  it in its work results), so propose → block → wake → re-propose cannot loop.
+  `task_session` adapter has no governed task tools yet. New proposals are
+  refused unless a governed task-session executor is configured. The live
+  step port can run an existing `task_session` as bounded advisory goal turns
+  when the charter explicitly allows that shape and a backend resolves;
+  otherwise it is closed as blocked with `reason_code: capability_unavailable`
+  and no report-back wake. Advisory completion is not evidence that task
+  tools ran. See [dot-initiated-workflow](./dot-initiated-workflow.md).
   A model's declaration of completion is not evidence of an executed task.
   Result evidence, including the pre-work KR snapshot, is persisted before
   releasing the lease. Errors, timeouts and abandoned claims are quarantined
@@ -267,7 +273,11 @@ wake ──proposal──▶ dispatch (gate ⊔ floors, arbitration) ──▶ W
   rearming. If the replacement cannot be persisted, the wake is recorded
   delivered with `trigger_retained: true` (proposals are not re-dispatched)
   and the parent stays pending, re-firing after the failure backoff so the
-  chain is not lost. Missed cron minutes within
+  chain is not lost. Recovery persists the frozen successor without re-running
+  the model or proposals, and preserves its original due time. Historical
+  retained deliveries without that successor evidence stay pending for
+  reconciliation; the runtime does not invent a replacement or replay effects.
+  Missed cron minutes within
   `runtime.cron_catch_up_hours` (default 6, max 24) coalesce into one wake.
 - **Events (DL-08)**: a charter trigger `{kind: 'event', sources, types?,
 match?}` wakes on an authenticated inbound event. The loopback-only
@@ -314,16 +324,67 @@ match?}` wakes on an authenticated inbound event. The loopback-only
   pipelines that ship `enabled: false`; hosts opt in per id through
   `KYBERION_CHRONOS_SCHEDULES`.
 
-**State domain**: all loop state lives under `active/shared/runtime/dot/`
+**State domain**: scoped loop payloads live under `active/shared/runtime/dot/`
 (`work-results`, `kr-ledger`, `outcomes`, `outcome-pending`, `followups`,
 `events`, `memory/`, `autonomy/`, `arbitration`), addressed only through
-`dotStatePath(charter, ...parts)` (`libs/core/dot/dot-state-paths.ts`). An
-untenanted dot writes `active/shared/runtime/dot/<file>`; a tenant dot writes
-the tenant's physical namespace (`physicalScopedPath`). Tenant prose (memory,
-follow-up reasons, event bodies, results) never lands in a system-floor file:
+`dotStatePath(charter, ...parts)` (`libs/core/dot/dot-state-paths.ts`). The
+partition is `<tier>/<tenant-or-shared>/`, followed by any organization/project
+segments. Personal state additionally uses `owners/<owner-hash>/` before those
+entity segments; a tenantless public Dot uses `public/shared/`. Tenant and
+personal prose (memory, follow-up reasons, event bodies, results) never lands
+in a system-floor file:
 the pre-existing flat ledgers (`dot-wake-ledger`, `dot-action-ledger`,
-`dot-inbox`) stay shared, so tenant dots write only category-level text there.
+`dot-inbox`) stay shared, so private Dots write only category-level text there.
 See [runtime-storage-layout](./runtime-storage-layout.md).
+
+### Personal custody and normal-path continuity
+
+System work belongs to the installation rather than a tenant or person. It
+needs its ordinary role and WorkItem claim, but no invented tenant or personal
+owner. A server-resolved system selection can admit these ownerless records;
+that selection never admits personal records or unknown legacy Dot custody.
+The execution actor and lease holder identify who runs the work, not who owns
+its data. Data tier remains a separate restriction from both of those axes.
+
+Personal charters use `knowledge/personal/dots/<owner-hash>/` and require
+`scope.owner_nhi`. Their runtime state uses the same storage-layout resolver
+with the owner's partition. Notification content, recovery receipts and
+distilled hypotheses retain the original tier and owner; absence of tenant
+does not make personal content a system notification. Viewer admission needs
+the authenticated owner and personal tier access. Confidential notifications
+retain tenant, organization and project as well.
+
+The default inbox, quiet-hours deferral and stable retry identity remain the
+normal route. Scoped storage is not another approval ceremony. Private memory
+keeps the actual lesson and provenance in a same-scope feedback/candidate;
+the shared ledgers receive no private hypothesis text. Knowledge review and
+promotion retain their existing separate authority.
+
+Personal outcomes continue to inform their scoped Dot memory and results;
+they do not feed the tenant-only global action-policy learner, whose contract
+cannot represent a personal owner. This does not stop authorized personal work.
+
+Private WorkItems are shared routing indexes, with category text and a binding
+to the original scoped admission. Their executable title, objective and other
+private proposal content stay in the existing action ledger. Execution restores
+only the hash-bound original under the same scope and current authority; a
+missing or changed source is held before effects. HTTP lists, counts and workspace
+graphs also apply custody and tier checks, including old known Dot rows whose
+private/public classification cannot be established. They do not reinterpret
+unclassified legacy work as installation-wide public work.
+
+The public front-desk diagnostic receipt uses its existing signed request and
+approval binding instead of generic admission. Its shared WorkItem contains only
+the fixed reference projection from `frontDeskExecutionProposal`: request IDs,
+revisions and digests, with no caller prose or charter name. This exception does
+not admit confidential or personal input, relax binding checks, or authorize
+arbitrary tenant work.
+
+Approved work is rechecked against current scope, role, policy and shadow
+disposition before it becomes executable. An unchanged usable approval resumes
+automatically; changing owner or scope does not transfer old work. Only a
+genuinely absent initial autonomy record uses defaults. A damaged existing
+record holds authority rather than restoring a more permissive level.
 
 **Action ledger versions**: rows and admitted proposals are hash-bound, so the
 ledger is versioned instead of rewritten (`libs/core/dot/dot-action-ledger-version.ts`).
