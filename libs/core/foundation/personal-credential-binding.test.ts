@@ -122,3 +122,53 @@ describe('empty personal task credential binding', () => {
     );
   });
 });
+
+describe('personal selected operation overlay', () => {
+  it('requires exact provenance, denies ambient/provider and expires captured async work', async () => {
+    const { withPersonalServiceCredentialBinding, resolveTaskServiceCredential } =
+      await import('./credential-binding.js');
+    const source = {
+      serviceBindingId: 'slack-personal',
+      serviceId: 'slack',
+      sourceOwnerRef: claim.ownerId,
+      personalGrantId: 'GRT-20261114-123456789abc',
+      generation: 'generation',
+      secrets: { SLACK_TOKEN: 'synthetic-token' },
+      validate: () => {
+        if (!live) throw new Error('revoked');
+      },
+    };
+    let live = true;
+    let release!: () => void;
+    const barrier = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let escaped: Promise<void> | undefined;
+    await scope(() =>
+      withPersonalTaskCredentialBinding(
+        claim,
+        () => {},
+        () =>
+          withPersonalServiceCredentialBinding(source, async () => {
+            expect(resolveTaskCredential('SLACK_TOKEN')).toBeNull();
+            expect(resolveTaskServiceCredential('SLACK_TOKEN', source)).toBe('synthetic-token');
+            expect(() =>
+              resolveTaskServiceCredential('SLACK_TOKEN', { ...source, generation: 'other' })
+            ).toThrow();
+            expect(() => resolveTaskProviderEnvironment('gws')).toThrow();
+            await expect(
+              withPersonalServiceCredentialBinding(source, async () => {})
+            ).rejects.toThrow();
+            escaped = barrier.then(() => {
+              expect(() => resolveTaskServiceCredential('SLACK_TOKEN', source)).toThrow();
+            });
+            live = false;
+            expect(() => resolveTaskServiceCredential('SLACK_TOKEN', source)).toThrow('revoked');
+            live = true;
+          })
+      )
+    );
+    release();
+    await escaped;
+  });
+});

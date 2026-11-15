@@ -1,11 +1,14 @@
 'use client';
 
 import * as React from 'react';
+import { GWS_SESSION_MATERIAL_LIMITS } from '@agent/core/secret/gws-session-registration-contract';
 import { Button, Callout } from '@agent/shared-ui';
 import { frontDeskFetch } from '../../../lib/front-desk-fetch';
 import type { SettingsTranslate } from './form-scope';
 
 type Preview = {
+  material_kind?: 'gws-authorized-user-v1';
+  runtimeAvailable?: false;
   binding_id: string;
   service_id: string;
   secret_refs: string[];
@@ -14,6 +17,7 @@ type Preview = {
   expected_generation: string | null;
 };
 type Pending = { approval_id: string; approval_url: string; can_apply: boolean };
+const gwsFields = ['client_id', 'client_secret', 'refresh_token'];
 const object = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === 'object' && !Array.isArray(value);
 
@@ -29,7 +33,9 @@ export function AccountIntroductionPanel({
   const [pending, setPending] = React.useState<Pending | null>(null);
   const [values, setValues] = React.useState<Record<string, string>>({});
   const [busy, setBusy] = React.useState(false);
-  const [message, setMessage] = React.useState<'error' | 'saved' | 'recovery' | null>(null);
+  const [message, setMessage] = React.useState<'error' | 'saved' | 'saved-gws' | 'recovery' | null>(
+    null
+  );
   const sequence = React.useRef(0);
   const inFlight = React.useRef(false);
   const controller = React.useRef<AbortController | null>(null);
@@ -48,15 +54,13 @@ export function AccountIntroductionPanel({
     };
   }, [bindingId]);
 
+  const fields =
+    preview?.material_kind === 'gws-authorized-user-v1' ? gwsFields : (preview?.secret_refs ?? []);
   const run = async (action: 'preview' | 'request' | 'status' | 'apply') => {
     if (inFlight.current) return;
     if (action !== 'preview' && (!preview || preview.binding_id !== bindingId)) return;
     if ((action === 'status' || action === 'apply') && !pending) return;
-    if (
-      action === 'apply' &&
-      (!pending?.can_apply || preview!.secret_refs.some((key) => !values[key]))
-    )
-      return;
+    if (action === 'apply' && (!pending?.can_apply || fields.some((key) => !values[key]))) return;
     inFlight.current = true;
     setBusy(true);
     setMessage(null);
@@ -73,7 +77,14 @@ export function AccountIntroductionPanel({
           }
         : {}),
       ...(action === 'status' || action === 'apply' ? { approval_id: pending!.approval_id } : {}),
-      ...(action === 'apply' ? { material: values } : {}),
+      ...(action === 'apply'
+        ? {
+            material:
+              preview?.material_kind === 'gws-authorized-user-v1'
+                ? { type: 'authorized_user', ...values }
+                : values,
+          }
+        : {}),
     };
     // Clear before awaiting transport; an uncertain result never keeps a reusable token form.
     if (action === 'apply') {
@@ -96,17 +107,24 @@ export function AccountIntroductionPanel({
         );
       }
       if (action === 'preview') {
+        const gws = data.material_kind === 'gws-authorized-user-v1';
+        const validMaterial = gws
+          ? data.service_id === 'google-workspace' &&
+            data.owner_kind === 'organization' &&
+            data.runtimeAvailable === false
+          : data.material_kind === undefined &&
+            Array.isArray(data.secret_refs) &&
+            data.secret_refs.length > 0 &&
+            data.secret_refs.every(
+              (key) => typeof key === 'string' && /^[A-Z][A-Z0-9_]{0,127}$/.test(key)
+            );
         if (
           data.binding_id !== bindingId ||
           typeof data.service_id !== 'string' ||
           typeof data.digest !== 'string' ||
           typeof data.statement !== 'string' ||
           !(data.expected_generation === null || typeof data.expected_generation === 'string') ||
-          !Array.isArray(data.secret_refs) ||
-          !data.secret_refs.length ||
-          !data.secret_refs.every(
-            (key) => typeof key === 'string' && /^[A-Z][A-Z0-9_]{0,127}$/.test(key)
-          )
+          !validMaterial
         )
           throw new Error('invalid');
         setPreview(data as Preview);
@@ -132,14 +150,19 @@ export function AccountIntroductionPanel({
         if (data.status === 'applied') {
           setPending(null);
           setPreview(null);
-          setMessage('saved');
+          setMessage(preview?.material_kind === 'gws-authorized-user-v1' ? 'saved-gws' : 'saved');
         }
       } else {
-        if (data.status !== 'applied' || typeof data.generation !== 'string')
+        if (
+          data.status !== 'applied' ||
+          typeof data.generation !== 'string' ||
+          (preview?.material_kind === 'gws-authorized-user-v1' &&
+            (data.material_kind !== preview.material_kind || data.runtimeAvailable !== false))
+        )
           throw new Error('invalid');
         setPending(null);
         setPreview(null);
-        setMessage('saved');
+        setMessage(preview?.material_kind === 'gws-authorized-user-v1' ? 'saved-gws' : 'saved');
       }
     } catch (error) {
       if (ticket !== sequence.current) return;
@@ -190,7 +213,7 @@ export function AccountIntroductionPanel({
                     void run('apply');
                   }}
                 >
-                  {preview.secret_refs.map((key) => (
+                  {fields.map((key) => (
                     <label key={key}>
                       {t('settings.secret_value')} — {key}
                       <input
@@ -200,17 +223,27 @@ export function AccountIntroductionPanel({
                         required
                         value={values[key] ?? ''}
                         disabled={busy}
-                        maxLength={16384}
+                        maxLength={
+                          preview.material_kind === 'gws-authorized-user-v1' && key === 'client_id'
+                            ? GWS_SESSION_MATERIAL_LIMITS.clientIdBytes
+                            : GWS_SESSION_MATERIAL_LIMITS.secretBytes
+                        }
                         onChange={(event) =>
                           setValues((old) => ({ ...old, [key]: event.target.value }))
                         }
                       />
                     </label>
                   ))}
-                  <p>{t('settings.secret_value_help')}</p>
+                  <p>
+                    {t(
+                      preview.material_kind === 'gws-authorized-user-v1'
+                        ? 'settings.account_gws_help'
+                        : 'settings.secret_value_help'
+                    )}
+                  </p>
                   <Button
                     label={t('settings.account_apply')}
-                    disabled={busy || preview.secret_refs.some((key) => !values[key])}
+                    disabled={busy || fields.some((key) => !values[key])}
                     onClick={() => void run('apply')}
                   />
                 </form>
@@ -241,13 +274,15 @@ export function AccountIntroductionPanel({
       {busy ? <p role="status">{t('authority.pending')}</p> : null}
       {message ? (
         <Callout
-          tone={message === 'saved' ? 'success' : 'danger'}
+          tone={message === 'saved' || message === 'saved-gws' ? 'success' : 'danger'}
           title={
             message === 'recovery'
               ? t('settings.account_recovery')
               : message === 'error'
                 ? t('settings.operator_unavailable')
-                : t('settings.secret_applied', { env: bindingId })
+                : message === 'saved-gws'
+                  ? t('settings.account_gws_registered')
+                  : t('settings.secret_applied', { env: bindingId })
           }
         />
       ) : null}

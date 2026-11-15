@@ -12,7 +12,10 @@ import { loadApprovalRequest, isApprovalRequestExpired } from './approval-store-
 import { assertApprovalUsable } from './approval-separation-of-duties.js';
 import { markApprovalConsumed, revokeStandingEffectApproval } from './approval-revocation.js';
 import { assuranceOfAuthMethod } from './approval-assurance.js';
-import { serviceAllocationApprovedByOwner } from './service-credential-grant-scope.js';
+import {
+  personalCredentialApprovalMatches,
+  verifyPersonalCredentialGrantApprovalBasis,
+} from './personal-credential-grant-basis.js';
 import type { ApprovalRequestRecord } from './approval-store.js';
 import {
   GRANT_APPROVAL_CHANNEL,
@@ -22,6 +25,7 @@ import {
 } from './grant-store.js';
 import {
   PERSONAL_CREDENTIAL_CAPABILITY,
+  PERSONAL_CREDENTIAL_RUNTIME_USE,
   normalizePersonalCredentialGrantScope,
   personalCredentialGrantEffect,
   personalCredentialGrantPayload,
@@ -134,6 +138,7 @@ function prepare(
       project_id: selection.projectId,
       mission_id: selection.missionId,
       task_id: selection.taskId,
+      runtime_use: PERSONAL_CREDENTIAL_RUNTIME_USE,
     }),
     purpose,
     ttl_days: selection.ttlDays,
@@ -161,7 +166,7 @@ export function requestPersonalCredentialGrantApproval(
         summary: `Authorize ${draft.scope.binding_id} for this personal task for ${draft.ttl_days} days.`,
         details:
           JSON.stringify(personalCredentialGrantPayload(draft)) +
-          '\nThis stores consent only. Runtime token use, effects, sessions and organization sharing remain disabled.',
+          '\nAuthorize selected read-only API token use for this exact owner, agent, account generation and project/mission/task. Only catalog-declared GET/HEAD operations with header authentication are admitted. Effects, sessions, provider credentials and organization sharing are not authorized.',
       },
       sourceText: JSON.stringify(draft),
       scope: { tier: 'personal', scope_kind: 'system', nhi_id: nhi },
@@ -182,56 +187,12 @@ export function requestPersonalCredentialGrantApproval(
   });
 }
 
-function approvalMatches(
-  approval: ApprovalRequestRecord,
-  draft: PersonalCredentialGrantDraft
-): boolean {
-  const ownerDecision = approval.workflow?.approvals.find(
-    (entry) =>
-      entry.status === 'approved' &&
-      entry.decidedByType === 'human' &&
-      entry.authenticated === true &&
-      entry.approvedBy === draft.scope.owner_ref
-  );
-  return (
-    approval.status === 'approved' &&
-    !approval.revocation &&
-    approval.scope?.tier === 'personal' &&
-    approval.scope.tenant_slug === undefined &&
-    approval.scope.nhi_id === draft.scope.nhi_id &&
-    approval.requestedByContext?.actorId === draft.scope.nhi_id &&
-    approval.accountability?.effectBinding === personalCredentialGrantEffect(draft) &&
-    approval.accountability?.payloadHash ===
-      computeApprovalPayloadHash(personalCredentialGrantPayload(draft)) &&
-    !!ownerDecision &&
-    serviceAllocationApprovedByOwner(
-      { ...approval, workflow: { ...approval.workflow!, approvals: [ownerDecision] } },
-      draft.scope.owner_ref
-    )
-  );
-}
-
-/** Rechecks the canonical approval, including revocation and exact once-only consumption. */
+/** Operator scope lookup; runtime broker uses the exact addressed reader instead. */
 export function verifyPersonalCredentialGrantBasis(record: PersonalCredentialGrantRecord): boolean {
   try {
-    if (
-      !validatePersonalCredentialGrantRecord(record).valid ||
-      record.revoked ||
-      !(Date.parse(record.granted_at) <= Date.now() && Date.parse(record.expires_at) > Date.now())
-    )
-      return false;
-    const approval = loadApprovalRequest(GRANT_APPROVAL_CHANNEL, record.basis!.approval_request_id);
-    const draft = {
-      scope: record.scope,
-      purpose: record.purpose,
-      ttl_days: (Date.parse(record.expires_at) - Date.parse(record.granted_at)) / 86400_000,
-    };
-    return (
-      !!approval &&
-      approvalMatches(approval, draft) &&
-      approval.consumption?.consumer === GRANT_APPROVAL_CONSUMER &&
-      approval.consumption.effectRef === record.grant_id &&
-      approval.consumption.consumedAt === record.granted_at
+    return verifyPersonalCredentialGrantApprovalBasis(
+      record,
+      loadApprovalRequest(GRANT_APPROVAL_CHANNEL, record.basis!.approval_request_id)
     );
   } catch {
     return false;
@@ -252,7 +213,7 @@ export function grantPersonalCredentialUse(
       approval.consumption ||
       approval.applyClaim ||
       approval.applyResult ||
-      !approvalMatches(approval, draft)
+      !personalCredentialApprovalMatches(approval, draft)
     )
       return denied();
     assertApprovalUsable(approval, { consumer: GRANT_APPROVAL_CONSUMER });

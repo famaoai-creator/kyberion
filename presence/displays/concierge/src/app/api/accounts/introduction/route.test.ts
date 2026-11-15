@@ -147,3 +147,71 @@ describe('account introduction HTTP boundary', () => {
     expect(await response.json()).toEqual({ ok: false, error: 'account_registration_unavailable' });
   });
 });
+
+describe('GWS server-selected material', () => {
+  const material = {
+    type: 'authorized_user',
+    client_id: 'synthetic-client',
+    client_secret: 'synthetic-secret',
+    refresh_token: 'synthetic-refresh',
+  };
+  it('accepts only the schema selected by the server binding', async () => {
+    mocks.access.mockReturnValue({ principal, scope: { kind: 'organization' } });
+    mocks.preview.mockReturnValue({ material_kind: 'gws-authorized-user-v1' });
+    const response = await POST(
+      request({ action: 'apply', binding_id: 'selected', approval_id: 'id', material })
+    );
+    expect(response.status).toBe(200);
+    expect(mocks.preview).toHaveBeenCalledWith(principal, 'selected');
+    expect(mocks.apply).toHaveBeenCalledWith(principal, 'selected', {
+      approval_id: 'id',
+      material,
+    });
+    expect(JSON.stringify(await response.json())).not.toContain('synthetic');
+  });
+  it('does not allow GWS material to select a token binding schema', async () => {
+    expect(
+      (
+        await POST(
+          request({ action: 'apply', binding_id: 'selected', approval_id: 'id', material })
+        )
+      ).status
+    ).toBe(400);
+    expect(mocks.apply).not.toHaveBeenCalled();
+  });
+  it.each([
+    { ...material, type: 'service_account' },
+    { ...material, project_id: 'unexpected' },
+    { ...material, refresh_token: '' },
+    { ...material, client_id: 'x'.repeat(4097) },
+    { ...material, refresh_token: 'masked...' },
+    { ...material, client_secret: 'x'.repeat(16385) },
+    { type: 'authorized_user', client_id: 'synthetic-client', client_secret: 'synthetic-secret' },
+  ])('rejects incomplete, unbounded or extra GWS fields', async (value) => {
+    mocks.preview.mockReturnValue({ material_kind: 'gws-authorized-user-v1' });
+    expect(
+      (
+        await POST(
+          request({ action: 'apply', binding_id: 'selected', approval_id: 'id', material: value })
+        )
+      ).status
+    ).toBe(400);
+    expect(mocks.apply).not.toHaveBeenCalled();
+  });
+  it('rejects client material-kind overrides', async () => {
+    expect(
+      (
+        await POST(
+          request({
+            action: 'apply',
+            binding_id: 'selected',
+            approval_id: 'id',
+            material,
+            material_kind: 'gws-authorized-user-v1',
+          })
+        )
+      ).status
+    ).toBe(400);
+    expect(mocks.apply).not.toHaveBeenCalled();
+  });
+});

@@ -72,6 +72,16 @@ function fixture() {
 }
 describe('personal credential grant approval basis', () => {
   beforeEach(() => vi.clearAllMocks());
+  it('does not upgrade legacy consent by adding a runtime marker to its grant record', () => {
+    const { record } = fixture();
+    expect(verifyPersonalCredentialGrantBasis(record)).toBe(true);
+    expect(
+      verifyPersonalCredentialGrantBasis({
+        ...record,
+        scope: { ...record.scope, runtime_use: 'selected-read-api-v1' },
+      })
+    ).toBe(false);
+  });
   it('requires the owner decision even if another human decision precedes it', () => {
     const { record, approval } = fixture();
     expect(verifyPersonalCredentialGrantBasis(record)).toBe(true);

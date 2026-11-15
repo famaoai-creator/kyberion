@@ -9,6 +9,7 @@ const registrants = [
   'libs/core/foundation/autonomy-learning-capability.ts',
   'libs/core/foundation/concierge-management-capability.ts',
   'libs/core/foundation/credential-material-capability.ts',
+  'libs/core/foundation/personal-credential-use-capability.ts',
   'libs/core/foundation/customer-decision-consumer-capability.ts',
   'libs/core/foundation/customer-decision-invite-capability.ts',
   'libs/core/foundation/customer-decision-milestone-capability.ts',

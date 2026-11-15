@@ -1,3 +1,4 @@
+import { assertPersonalServiceTransport } from './personal-service-engine-admission.js';
 import { credentialExecutionIdentity } from '../foundation/credential-binding.js';
 import type { ServiceBindingRecord } from './service-binding-registry.js';
 import { createLogger } from '../logger.js';
@@ -191,6 +192,7 @@ export interface ServicePresetAlternativeExecutionContext {
   binding: ReturnType<typeof resolveServiceBinding>;
   /** Set only by the admitted, fixed authentication probe. */
   operatorProbe?: boolean;
+  personalCredentialCapability?: object;
   /** Snapshot of the connection admitted by service-engine, never request data. */
   selectedBinding?: ServiceBindingRecord;
   /** Broker-issued isolated environment for a scoped session capture. */
@@ -204,6 +206,7 @@ export interface ServicePresetAlternativeExecutionContext {
 
 function assertTransportAuthority(input: ServicePresetAlternativeExecutionContext): void {
   input.captureAuthority?.();
+  assertPersonalServiceTransport(input);
   const operationId = `service:preset:${input.serviceId}:${input.action}`;
   const params = { request: input.params, auth: input.authSelector ?? 'none' };
   const active =
@@ -269,7 +272,11 @@ export function isReplaySafeServiceOperation(operation: Record<string, unknown>)
 }
 
 function alternativeRetryOptions(input: ServicePresetAlternativeExecutionContext) {
-  if (input.operatorProbe || !isReplaySafeServiceOperation(input.preset.operations[input.action])) {
+  if (
+    input.personalCredentialCapability ||
+    input.operatorProbe ||
+    !isReplaySafeServiceOperation(input.preset.operations[input.action])
+  ) {
     return { maxRetries: 0 };
   }
   const options = buildRetryOptions(input.serviceConfig, input.preset, input.alt, {
@@ -293,10 +300,7 @@ function alternativeRetryOptions(input: ServicePresetAlternativeExecutionContext
 export async function executeServicePresetAlternative(
   input: ServicePresetAlternativeExecutionContext
 ): Promise<{ result: unknown } | null> {
-  if (credentialExecutionIdentity().personalClaim)
-    throw new Error(
-      '[CREDENTIAL_PROVENANCE_DENIED] Personal claimed service transports require separate admission'
-    );
+  assertPersonalServiceTransport(input);
   let attempted = false;
   try {
     return await executeServicePresetAlternativeOnce(input, () => {
@@ -320,7 +324,7 @@ async function executeServicePresetAlternativeOnce(
 ): Promise<{ result: unknown } | null> {
   const runtimeVars = {
     ...input.mergedParams,
-    ...input.binding,
+    ...(input.personalCredentialCapability ? {} : input.binding),
   };
 
   if (input.alt.type === 'cli') {
@@ -458,9 +462,10 @@ async function executeServicePresetAlternativeOnce(
 
       logger.info(`🚀 [ENGINE:API] Executing ${input.serviceId}:${input.action}`);
       assertTransportAuthority(input);
+      assertPersonalServiceTransport(input, `${baseUrl}/${apiPath}`);
       markAttempted();
       return await secureFetch({
-        ...(input.operatorProbe
+        ...(input.operatorProbe || input.personalCredentialCapability
           ? { maxRedirects: 0, maxContentLength: 65536, timeout: 10000 }
           : {}),
         method: method as any,
@@ -473,9 +478,10 @@ async function executeServicePresetAlternativeOnce(
           Boolean(headers.Authorization) ||
           Boolean(headers.authorization),
         kyberion_allow_local_network:
-          Boolean(input.alt.allow_local_network) ||
-          Boolean(input.preset.allow_local_network) ||
-          Boolean(input.serviceConfig.allow_local_network),
+          !input.personalCredentialCapability &&
+          (Boolean(input.alt.allow_local_network) ||
+            Boolean(input.preset.allow_local_network) ||
+            Boolean(input.serviceConfig.allow_local_network)),
       });
     }, alternativeRetryOptions(input));
 

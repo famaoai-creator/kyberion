@@ -129,3 +129,103 @@ describe('account collector lifecycle', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
+
+const gwsPreview = () => ({
+  ...preview('first'),
+  service_id: 'google-workspace',
+  owner_kind: 'organization',
+  secret_refs: [],
+  material_kind: 'gws-authorized-user-v1',
+  runtimeAvailable: false,
+});
+describe('GWS account collector', () => {
+  async function approved() {
+    fetchMock
+      .mockResolvedValueOnce(reply(gwsPreview()))
+      .mockResolvedValueOnce(reply({ approval_id: 'gws-id', approval_url: '/?approvalId=gws-id' }))
+      .mockResolvedValueOnce(reply({ can_apply: true }));
+    const view = mount();
+    await click(view.container, 'settings.account_preview');
+    await click(view.container, 'settings.secret_propose');
+    expect(view.container.querySelector('input')).toBeNull();
+    await click(view.container, 'settings.account_refresh');
+    return view;
+  }
+  async function fill(container: FakeElement) {
+    const inputs = container.querySelectorAll('input');
+    expect(inputs).toHaveLength(3);
+    await act(async () => {
+      inputs.forEach((input, i) => {
+        (input as unknown as { value: string }).value = `synthetic-${i}`;
+        fireEvent(input, 'input');
+      });
+    });
+  }
+  it('collects exact authorized_user fields after approval and reports registration-only success', async () => {
+    const { container } = await approved();
+    await fill(container);
+    fetchMock.mockResolvedValueOnce(
+      reply({
+        status: 'applied',
+        generation: 'new',
+        material_kind: 'gws-authorized-user-v1',
+        runtimeAvailable: false,
+      })
+    );
+    await act(async () => {
+      fireEvent(container.querySelector('form')!, 'submit');
+    });
+    expect(JSON.parse(fetchMock.mock.calls[3]![1].body)).toEqual({
+      action: 'apply',
+      binding_id: 'first',
+      approval_id: 'gws-id',
+      material: {
+        type: 'authorized_user',
+        client_id: 'synthetic-0',
+        client_secret: 'synthetic-1',
+        refresh_token: 'synthetic-2',
+      },
+    });
+    expect(container.querySelector('input')).toBeNull();
+    expect(container.textContent).toContain('settings.account_gws_registered');
+    expect(container.textContent).not.toContain('synthetic');
+  });
+  it.each(['close', 'reselect'])(
+    'clears all GWS fields on %s without submitting',
+    async (action) => {
+      const { container, render } = await approved();
+      await fill(container);
+      if (action === 'close') await click(container, 'settings.account_close');
+      else render('second');
+      expect(container.querySelector('input')).toBeNull();
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+    }
+  );
+  it('ignores stale GWS approval responses after reselection', async () => {
+    const { container, render } = await approved();
+    await fill(container);
+    let release!: (value: Response) => void;
+    fetchMock.mockImplementationOnce(
+      () =>
+        new Promise<Response>((resolve) => {
+          release = resolve;
+        })
+    );
+    await click(container, 'settings.account_refresh');
+    const signal = fetchMock.mock.calls[3]![1].signal as AbortSignal;
+    render('second');
+    await act(async () => {
+      release(reply({ can_apply: true }));
+    });
+    expect(signal.aborted).toBe(true);
+    expect(container.querySelector('input')).toBeNull();
+    expect(container.textContent).not.toContain('synthetic');
+  });
+  it('rejects personal GWS previews', async () => {
+    fetchMock.mockResolvedValueOnce(reply({ ...gwsPreview(), owner_kind: 'person' }));
+    const { container } = mount();
+    await click(container, 'settings.account_preview');
+    expect(container.textContent).toContain('settings.operator_unavailable');
+    expect(container.querySelector('input')).toBeNull();
+  });
+});

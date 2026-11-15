@@ -21,6 +21,30 @@ describe('foundation exclusive JSON writer', () => {
   const directory = 'active/shared/tmp/foundation-json-exclusive-tests';
   afterEach(() => safeRmSync(directory, { recursive: true, force: true }));
 
+  it('forwards explicit private mode and preserves default writer calls', () => {
+    const original = getFoundationIo();
+    const calls: unknown[][] = [];
+    registerFoundationIo({
+      ...original,
+      writeFile: (...args) => {
+        calls.push(args);
+      },
+    });
+    try {
+      writeJson('private.json', { encrypted: true }, { mode: 0o600 });
+      writeJson('ordinary.json', { ordinary: true });
+      expect(calls[0]).toEqual(['private.json', '{\n  "encrypted": true\n}\n', { mode: 0o600 }]);
+      expect(calls[1]).toEqual(['ordinary.json', '{\n  "ordinary": true\n}\n']);
+      // Exclusive bridge has no mode contract; never silently discard a request.
+      expect(() => writeJson('exclusive.json', {}, { createOnly: true, mode: 0o600 })).toThrow(
+        'exclusive_json_mode_not_supported'
+      );
+      expect(calls).toHaveLength(2);
+    } finally {
+      registerFoundationIo(original);
+    }
+  });
+
   it('creates pretty JSON with a final newline and preserves existing reviewed bytes', () => {
     const file = `${directory}/reviewed.json`;
     writeJson(file, { digest: 'reviewed' }, { createOnly: true });

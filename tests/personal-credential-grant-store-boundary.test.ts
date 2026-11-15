@@ -5,8 +5,16 @@ describeStoreGrantBoundary('Personal credential canonical store adapter boundary
   issuers: new Map([
     ['writePersonalCredentialGrantRecord', ['libs/core/governance/personal-credential-grant.ts']],
     ['loadPersonalCredentialGrantRecord', ['libs/core/governance/personal-credential-grant.ts']],
+    [
+      'loadPersonalCredentialGrantRecordForRuntime',
+      ['libs/core/governance/personal-credential-grant-runtime-reader.ts'],
+    ],
   ]),
   consumers: new Map([
+    [
+      'libs/core/governance/personal-credential-grant-runtime-reader.ts',
+      ['loadPersonalCredentialGrantRecordForRuntime'],
+    ],
     [
       'libs/core/governance/personal-credential-grant.ts',
       [

@@ -41,5 +41,11 @@ describeStoreGrantBoundary('Personal approval runtime trusted import boundary', 
       'libs/core/governance/approval-store.ts',
       ['currentPersonalApprovalOwnerHash', 'personalApprovalOwnerHash'],
     ],
+    // Exact addressed runtime reads need only the pure owner partition hash;
+    // they must not open the approval IO window or inherit its ambient owner.
+    [
+      'libs/core/governance/personal-credential-grant-runtime-reader.ts',
+      ['personalApprovalOwnerHash'],
+    ],
   ]),
 });

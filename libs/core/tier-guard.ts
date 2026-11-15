@@ -983,11 +983,13 @@ function requestResourceDenial(
   if (storeDenial) return { allowed: false, reason: storeDenial };
   // `shared` is the personal storage marker, never a tenant credential. An
   // unbound tenant-store reader must not reinterpret this owner namespace.
-  // G2: only the live personal approval owner window (no role) reaches an owner partition
-  // (G3: asked through the store grant registry; an unloaded window module admits nothing).
+  // G2: the owner window or a claimed personal credential broker's exact
+  // proof-read capability reaches this partition. The broker cannot read directories.
+  // G3: an unloaded capability module admits nothing.
   if (
     /(?:^|\/)tenant-approvals\/personal\/shared\/owners(?:\/|$)/u.test(relativePath) &&
-    storeGrantRule('personal-approval')?.pathAllowed?.(relativePath, operation) !== true
+    storeGrantRule('personal-approval')?.pathAllowed?.(relativePath, operation) !== true &&
+    storeGrantRule('personal-credential-use')?.pathAllowed?.(relativePath, operation) !== true
   )
     return {
       allowed: false,
