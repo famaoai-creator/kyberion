@@ -134,6 +134,14 @@ export function learningReviewHref(
     selection,
   });
 }
+/** Mirrors core `isScopedLearningCandidate` for UI affordance only; core enforces. */
+export function scopedLearningCandidate(candidate: ClientKnowledgeCandidate): boolean {
+  return Boolean(
+    candidate.scope &&
+    candidate.knowledge_domain === 'organization' &&
+    candidate.proposed_memory_kind === 'sop'
+  );
+}
 /** Defensive UI only. Unsupported restrictions are preserved, never stripped to gain support. */
 export function learningScopeSupported(candidate: ClientKnowledgeCandidate): boolean {
   const scope = candidate.scope;

@@ -36,6 +36,7 @@ export type ClientKnowledgeCandidate = {
   candidateKey: string;
   status: 'queued' | 'approved' | 'rejected' | 'promoted';
   proposed_memory_kind: string;
+  knowledge_domain?: string;
   summary: string;
   evidence_refs: string[];
   sensitivity_tier: 'public' | 'confidential' | 'personal';
@@ -259,6 +260,7 @@ export function parseKnowledgeCandidate(value: unknown): ClientKnowledgeCandidat
     typeof value.status !== 'string' ||
     !STATUSES.has(value.status) ||
     !nonEmptyString(value.proposed_memory_kind) ||
+    !optionalString(value.knowledge_domain) ||
     !nonEmptyString(value.summary) ||
     !stringArray(value.evidence_refs) ||
     typeof value.sensitivity_tier !== 'string' ||
@@ -297,6 +299,7 @@ export function parseKnowledgeCandidate(value: unknown): ClientKnowledgeCandidat
     candidateKey: value.candidateKey,
     status: value.status as ClientKnowledgeCandidate['status'],
     proposed_memory_kind: value.proposed_memory_kind,
+    ...(value.knowledge_domain !== undefined ? { knowledge_domain: value.knowledge_domain } : {}),
     summary: value.summary,
     evidence_refs: value.evidence_refs,
     sensitivity_tier: value.sensitivity_tier as ClientKnowledgeCandidate['sensitivity_tier'],

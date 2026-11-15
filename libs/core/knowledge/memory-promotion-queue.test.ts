@@ -121,6 +121,57 @@ describe('memory-promotion-queue', () => {
     ).toBe('rejected');
   });
 
+  it('locks approved scoped-learning candidates against rejection and demotion', () => {
+    const scope = { tier: 'confidential' as const, tenant_slug: 'tenant-scoped-guard' };
+    const approved = createMemoryPromotionCandidate({
+      sourceType: 'task_session',
+      sourceRef: 'task_session:TSK-SCOPED-GUARD',
+      knowledgeDomain: 'organization',
+      proposedMemoryKind: 'sop',
+      summary: 'Scoped SOP awaiting verified publication.',
+      evidenceRefs: ['task_session:TSK-SCOPED-GUARD'],
+      sensitivityTier: 'confidential',
+      scope,
+      ratificationRequired: true,
+      status: 'approved',
+    });
+    enqueueMemoryPromotionCandidate(approved);
+    const before = safeReadFile(queuePath, { encoding: 'utf8' });
+
+    // Publication may be mid-flight once approval is granted, so neither
+    // rejection nor demotion back to queued is allowed anymore.
+    for (const status of ['rejected', 'queued'] as const)
+      expect(() =>
+        updateMemoryPromotionCandidateStatus({
+          candidateId: approved.candidate_id,
+          scope,
+          status,
+        })
+      ).toThrow('[LEARNING_APPROVAL_IMMUTABLE]');
+    expect(safeReadFile(queuePath, { encoding: 'utf8' })).toBe(before);
+
+    // Rejection stays available while the candidate is still queued.
+    const queued = createMemoryPromotionCandidate({
+      sourceType: 'task_session',
+      sourceRef: 'task_session:TSK-SCOPED-GUARD-2',
+      knowledgeDomain: 'organization',
+      proposedMemoryKind: 'sop',
+      summary: 'A queued scoped SOP can still be rejected.',
+      evidenceRefs: ['task_session:TSK-SCOPED-GUARD-2'],
+      sensitivityTier: 'confidential',
+      scope,
+      ratificationRequired: true,
+    });
+    enqueueMemoryPromotionCandidate(queued);
+    expect(
+      updateMemoryPromotionCandidateStatus({
+        candidateId: queued.candidate_id,
+        scope,
+        status: 'rejected',
+      })?.status
+    ).toBe('rejected');
+  });
+
   it('rejects public-tier candidates that reference confidential or personal data', () => {
     const candidate = createMemoryPromotionCandidate({
       sourceType: 'artifact',
