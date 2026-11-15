@@ -16,7 +16,9 @@ describe('pipeline dry-run entrypoint', () => {
   });
 
   it('resolves the scheduled weekly review actuator operations', async () => {
-    const report = await runPipelineDryRun('pipelines/weekly-review.json');
+    const report = await runPipelineDryRun(
+      'knowledge/product/pipeline-templates/weekly-review.json'
+    );
 
     expect(report.verdict).toBe('ready');
     expect(report.checks.filter((check) => check.id === 'capability-resolution')).toEqual(
@@ -58,7 +60,7 @@ describe('pipeline dry-run entrypoint', () => {
     const output: unknown[] = [];
 
     await runPipelineMain(
-      ['--input', 'pipelines/weekly-review.json', '--dry-run', '--json'],
+      ['--input', 'knowledge/product/pipeline-templates/weekly-review.json', '--dry-run', '--json'],
       (value) => output.push(value)
     );
 

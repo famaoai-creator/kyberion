@@ -1,9 +1,9 @@
 {
   "action": "pipeline",
   "name": "voice-onboarding",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "One-command voice onboarding: record three reference samples, register the voice profile, generate a short试听 artifact, and grant per-mission voice consent. Set dry_run=true to validate the flow without creating real samples or consent.",
-  "_migration_note": "v2: Typed Flow format (role/produces/consumes).",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v2.1: promoted to pipeline-templates; voice-runtime-preflight gate added.",
   "context": {
     "dry_run": false,
     "profile_name": "owner-voice",
@@ -18,6 +18,12 @@
     "sample_03_prompt": "サンプル 3。最後に、この声で会議で話すイメージで短く話してください。"
   },
   "steps": [
+    {
+      "id": "preflight",
+      "role": "gate",
+      "op": "core:include",
+      "params": { "fragment": "fragments/voice-runtime-preflight.json" }
+    },
     {
       "role": "sink",
       "op": "system:log",

@@ -19,13 +19,16 @@ knowledge/product/pipeline-templates/
 
 - `pipelines/` contains only pipelines that operate Kyberion itself — health checks, self-repair, onboarding, capability assimilation, chaos tests.
 - User-facing workflows (voice, meeting, sales, content, etc.) live as **templates** in `knowledge/product/pipeline-templates/`.
-- Tenant-specific instantiations go in `knowledge/confidential/{tenant}/pipelines/` or `knowledge/personal/pipelines/`.
+- Tenant-specific instantiations go in `knowledge/confidential/{tenant}/pipelines/`; operator-bound instantiations go in `knowledge/personal/pipelines/` (gitignored, per-machine).
+- A personal pipeline that declares `schedule` in `knowledge/personal/pipelines/*.json` (direct children only) is picked up by chronos. It runs in a child process under role `chronos_personal_runner` (no tenant binding; the role's grants cover the personal pipeline dir, its runtime allowlist at `knowledge/personal/governance/pipeline-runtime-allowlist.json`, and the volatile layer those pipelines own) and only after an authenticated human approved its current content via `pnpm kyberion project-trust request <path>` → `pnpm kyberion approve <id> project-trust` (any edit invalidates the approval). Schedule ids are namespaced `personal-<id>` so a local file can never shadow a repository schedule.
 - A tenant pipeline that declares `schedule` in `knowledge/confidential/{tenant}/pipelines/*.json` (direct children only) is picked up by chronos for **registered, operational** tenants. It runs in a child process bound to that tenant (`KYBERION_TENANT`, `KYBERION_TENANT_SCOPE_REQUIRED=1`, role `chronos_tenant_runner`) and only after an authenticated human approved its current content via `pnpm kyberion project-trust request <path>` → `pnpm kyberion approve <id> project-trust` (any edit invalidates the approval). Symlinked paths are refused. Run-time needs (credential scope, reasoning backend, tenant egress overlay) are declared in the ADF `runtime` block and injected only into that child process, bounded by `{knowledge_root}/governance/pipeline-runtime-allowlist.json`; the daemon needs no `AUTHORIZED_SCOPE`. Details: [tenant-bound-runtime-probing](../knowledge/product/governance/tenant-bound-runtime-probing.md).
 - The reviewed classification of every pipeline in `pipelines/` — **audience** (`system` / `organization` /
   `tenant` / `personal` / `product`) and **placement** under this scope rule — lives in
   [pipeline-scope-registry.json](../knowledge/product/governance/pipeline-scope-registry.json)
   (schema: [`pipeline-scope-registry.schema.json`](../knowledge/product/schemas/pipeline-scope-registry.schema.json)).
-  It is a documentation/triage aid: the runtime never reads it and no pipeline declares it.
+  It is a documentation/triage aid: the runtime never reads it and no pipeline declares it. Entries are
+  removed when their file leaves `pipelines/` (promoted to a template or instantiated under a
+  tenant/personal scope), so the registry always describes what physically remains here.
 
 **Workflow composition:**
 
@@ -166,7 +169,7 @@ For discovery work (browser exploration, media generation, PPTX/doc/video/web de
 | `auto-checkpoint`               | —                                                                                                      | Daily automatic checkpoint pass for active missions. Schedule: `45 5 * * *`.                                                                                                                                                                                                                                                                                                                                                                                                      |
 | `mission-hygiene-weekly`        | —                                                                                                      | Weekly dry-run mission hygiene audit via core:run_mission_hygiene — stuck/abandoned missions, purge preview, and empty mission-dir candidates. Schedule: `0 9 * * 3`.                                                                                                                                                                                                                                                                                                             |
 | `sdlc-cycle`                    | —                                                                                                      | E2E-05 Task 4: one-shot SDLC intake — intent → requirements draft → design spec → task plan → NEXT_TASKS.json (worker contract) → test plan.                                                                                                                                                                                                                                                                                                                                      |
-| `contract-review`               | —                                                                                                      | Multi-perspective contract review: digest extraction, multi-agent critique, dissent logging, and written output.                                                                                                                                                                                                                                                                                                                                                                  |
+| `contract-review`               | moved                                                                                                  | Moved to `knowledge/product/pipeline-templates/contract-review.json` (user-facing deliverable).                                                                                                                                                                                                                                                                                                                                                                                   |
 
 The three cadence pipelines above (`organization-operation-tick`, `organization-standup`, `organization-retro`) are the **sovereign-only cross-tenant** path for a single operator. For per-tenant operation, prefer the resident-dot cadence: a dot charter with `operations_cadence` (see [`dots/README.md`](../dots/README.md)) has the agent-runtime supervisor run the tick, standup and retro for that charter's own organization as `organization_operator`, bound to its tenant (`dot-org-cadence` step) — no Chronos daemon running as `KYBERION_BASE_ROLE=sovereign` is required.
 
@@ -218,38 +221,26 @@ Routine cron-driven maintenance. Schedules are registered with chronos.
   | `storage-janitor` | Runs governed TTL cleanup for active/shared/tmp, shared logs, data-vault, and runtime retention directories via libs/core/storage/storage-janitor.ts. Schedule: `30 4 * * *`. |
   | `volatile-gc` | Volatile Knowledge Layer GC — single working-memory:run-gc op that scans all *.volatile.json sidecars, expires ttl/session faces, rolls over daily TODO items, and writes a summary to active/shared/... Schedule: `0 4 * * *`. |
   | `volatile-index` | Volatile Knowledge Layer — regenerates active/INDEX.volatile.{md,json} by scanning all *.volatile.json sidecars. Schedule: `0 5 * * *`. |
-  | `daily-routine` | Volatile Knowledge Layer — daily routine: opens today's journal + TODO, rolls over pending items from previous TODO.md. Schedule: `0 6 * * *`. |
-  | `weekly-review` | Volatile Knowledge Layer — weekly review: opens the current week's face, then nominates it as a memory-promotion-queue candidate for distillation into knowledge/. Schedule: `0 7 * * 1`. |
+
+`daily-routine` and `weekly-review` (the operator's volatile-layer daily/weekly rituals) moved to `knowledge/product/pipeline-templates/` — instantiate them under `knowledge/personal/pipelines/` to schedule them as personal pipelines (`personal-daily-routine`, `personal-weekly-review`).
 
 ### Meeting & Voice
 
 Meeting participation and the voice first-win path (see `docs/user/meeting-facilitator.md`).
 
-| Pipeline                        | Description                                                                                                                                                                                              |
-| ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `voice-hello`                   | Minimal voice first-win pipeline: check TTS, speak a greeting.                                                                                                                                           |
-| `voice-health-check`            | Verifies the governed voice toolchain: tool runtime inventory, mlx_audio_tts_bridge.py, native TTS, STT bridge availability, and the realtime-loop surfaces (silero VAD bridge script).                  |
-| `voice-onboarding`              | One-command voice onboarding: record three reference samples, register the voice profile, generate a short试听 artifact, and grant per-mission voice consent.                                            |
-| `create-my-avatar`              | Parameterised avatar onboarding flow that captures a reference photo, generates a stylised expression set from it (per-run consent required for cloud / host-bridge providers), and registers the pho... |
-| `meeting-facilitation-workflow` | AI-led meeting session: join → listen N seconds → leave.                                                                                                                                                 |
-| `meeting-proxy-workflow`        | Meeting proxy: join with cloned voice → listen → extract action items.                                                                                                                                   |
-| `meeting-watcher`               | Calendar-driven auto-join: list today's events, pick the meeting starting now, join with live-caption capture. Schedule: `*/5 * * * *`.                                                                  |
-| `meeting-readiness-next-day`    | Evening check of tomorrow's calendar meetings; notifies the operator when one lacks a grant (e.g. `meeting.recording`). Opt-in schedule: `0 18 * * *`.                                                   |
-| `meeting-readiness-soon`        | Checks meetings starting 60–75 minutes ahead and notifies when one lacks a grant. Opt-in schedule: `*/15 * * * *`.                                                                                       |
-| `meeting-followup`              | Post-meeting follow-up flow: turn a meeting transcript into minutes.md, persist action items to the mission store, and emit a delivery pack for downstream handoff.                                      |
+| Pipeline                     | Description                                                                                                                                            |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `voice-hello`                | Minimal voice first-win pipeline: check TTS, speak a greeting.                                                                                         |
+| `meeting-readiness-next-day` | Evening check of tomorrow's calendar meetings; notifies the operator when one lacks a grant (e.g. `meeting.recording`). Opt-in schedule: `0 18 * * *`. |
+| `meeting-readiness-soon`     | Checks meetings starting 60–75 minutes ahead and notifies when one lacks a grant. Opt-in schedule: `*/15 * * * *`.                                     |
+
+User-facing meeting/voice flows now live as templates: `voice-health-check`, `voice-onboarding`, `create-my-avatar`, `meeting-facilitation-workflow`, `meeting-proxy-workflow`, `meeting-watcher`, `meeting-followup`, `meeting-hearing-session`, `meeting-tutor-session` → `knowledge/product/pipeline-templates/`. `meeting-readiness-*` stay here because they are opt-in host readiness checks.
 
 ### Media & Reporting
 
 Governed document/deck/video production and executive reporting.
 
-| Pipeline                        | Description                                                                                                               |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `campaign-suite`                | E2E-02 Task 6: generate deck/doc/video/web/mv deliverables from one campaign brief under a single resolved design.        |
-| `ceo-strategic-report`          | Generates a strategic executive report for CEO decision-making: code analysis, multi-scenario reasoning, and PPTX output. |
-| `executive-narrative-bridge`    | Bridges raw analysis into executive-grade narrative: reasoning synthesis, multi-perspective wisdom, and system logging.   |
-| `marketing-content`             | Generates brand-aligned marketing materials: diagrams, themed PPTX slides, and merged content output.                     |
-| `trial-narrated-report`         | End-to-end narrated executive report: voice narration + video composition with strict ADF preflight.                      |
-| `kyberion-vtuber-narrated-demo` | Produce a vtuber-style video that presents Kyberion as a live operator persona with on-air cues, chat, and demo beats.    |
+Governed deliverable workflows moved to `knowledge/product/pipeline-templates/`: `campaign-suite`, `ceo-strategic-report`, `executive-narrative-bridge`, `marketing-content`, `trial-narrated-report`, `kyberion-vtuber-narrated-demo`, `media-produce-and-review`, `mv-generate`, `narrated-explainer-video` and the other media demos (`generate-design-system-demo`, `generate-masterclass-pptx`, `kyberion-product-intro` were retired).
 
 ### Chaos & Resilience
 
@@ -274,33 +265,27 @@ same tests; use an envelope when re-validating the slice after touching it.
 
 ### Media Demos and Production
 
-| Pipeline                      | Description                                                                                                                                                                    |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `media-produce-and-review`    | MP-01..07 deck flow: lock brief → design protocol → layout preflight → render → visual review → delivery gate; override `brief_path` / `mission_evidence_dir` with `--context` |
-| `generate-design-system-demo` | Diagnostic PPTX exercising all slide-layout presets and core element types; writes `active/shared/exports/design_system_demo.pptx`                                             |
-| `generate-masterclass-pptx`   | Layout sample deck from `pipelines/fragments/masterclass_design_protocol.json`; writes `active/shared/exports/all_objects_layout_sample.pptx`                                  |
-| `kyberion-product-intro`      | Local narrated product-intro video (ja; no publish). `scripts/kyberion_product_intro_render.ts` renders the same flow directly                                                 |
+Media demo/production flows moved to `knowledge/product/pipeline-templates/` (`media-produce-and-review`, `media-*-roundtrip`, `music-video-from-brief*`, `narrated-*`); `generate-design-system-demo`, `generate-masterclass-pptx` and `kyberion-product-intro` were removed. `scripts/kyberion_product_intro_render.ts` still renders the product intro directly.
 
 ### Op Entry Points
 
 Minimal runnable pipelines that make an actuator op reachable (OW-05); run them with
 `pnpm pipeline --input pipelines/<id>.json`.
 
-| Pipeline                         | Description                                                                                                                         |
-| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| `browser-failure-evidence`       | Capture the redacted browser action trail and export a failure-evidence bundle                                                      |
-| `incident-review`                | List recorded incident notes and run the SRE root-cause analysis over a failure signal                                              |
-| `meeting-hearing-session`        | Run a guided requirements hearing on a topic and export the structured result                                                       |
-| `meeting-tutor-session`          | Run a guided tutoring session over a material file and export the result                                                            |
-| `mission-team-prewarm`           | Queue a team prewarm request so a mission's agent runtimes are ready before work starts                                             |
-| `mission-team-staff`             | Staff a mission's team runtimes through the agent-runtime supervisor and return the plan                                            |
-| `open-active-surfaces`           | Open one browser tab per running UI surface                                                                                         |
-| `terraform-topology-ir`          | Parse a Terraform directory into a topology IR for diagramming or review                                                            |
-| `terraform-asset-inventory`      | Classify a Terraform directory into an external asset inventory IR (exposure/services/DNS hints)                                    |
-| `external-asset-ledger`          | Map an asset inventory onto the external-asset ledger schema (review-pending draft, Phase 2)                                        |
-| `exposure-check`                 | Probe ledger endpoints for external reachability → checks JSON for `security:ledger --record-checks` (Phase 3)                      |
-| `mv-generate`                    | Lyric-driven MV: lyric_normalize → generate_music (ACE-Step ADF) → vocal_align → mv_storyboard → per-scene image/video → mv_compose |
-| `test-inventory-device-pipeline` | Compile a test inventory and app profile into an Android/iOS device pipeline (proposal; run approved)                               |
+| Pipeline                   | Description                                                                            |
+| -------------------------- | -------------------------------------------------------------------------------------- |
+| `browser-failure-evidence` | Capture the redacted browser action trail and export a failure-evidence bundle         |
+| `incident-review`          | List recorded incident notes and run the SRE root-cause analysis over a failure signal |
+
+| `mission-team-prewarm` | Queue a team prewarm request so a mission's agent runtimes are ready before work starts |
+| `mission-team-staff` | Staff a mission's team runtimes through the agent-runtime supervisor and return the plan |
+| `open-active-surfaces` | Open one browser tab per running UI surface |
+| `terraform-topology-ir` | Parse a Terraform directory into a topology IR for diagramming or review |
+| `terraform-asset-inventory` | Classify a Terraform directory into an external asset inventory IR (exposure/services/DNS hints) |
+| `external-asset-ledger` | Map an asset inventory onto the external-asset ledger schema (review-pending draft, Phase 2) |
+| `exposure-check` | Probe ledger endpoints for external reachability → checks JSON for `security:ledger --record-checks` (Phase 3) |
+
+| `test-inventory-device-pipeline` | Compile a test inventory and app profile into an Android/iOS device pipeline (proposal; run approved) |
 
 ---
 

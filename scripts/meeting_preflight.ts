@@ -347,7 +347,7 @@ function probeVoiceProfileStore(): MeetingPreflightItem {
       'voice.profile',
       'fail',
       `voice profile store missing at ${path.relative(pathResolver.rootDir(), storeDir)}`,
-      'Run Task 2: pnpm pipeline --input pipelines/voice-onboarding.json'
+      'Run Task 2: pnpm pipeline --input knowledge/product/pipeline-templates/voice-onboarding.json'
     );
   }
 
@@ -367,7 +367,7 @@ function probeVoiceProfileStore(): MeetingPreflightItem {
     'voice.profile',
     'fail',
     `voice profile store has no metadata.json profiles under ${path.relative(pathResolver.rootDir(), storeDir)}`,
-    'Run Task 2: pnpm pipeline --input pipelines/voice-onboarding.json',
+    'Run Task 2: pnpm pipeline --input knowledge/product/pipeline-templates/voice-onboarding.json',
     { reasonCode: 'VOICE_PROFILE_MISSING' }
   );
 }

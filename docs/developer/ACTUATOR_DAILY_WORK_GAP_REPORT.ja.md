@@ -32,7 +32,7 @@ status: p2-implemented
 | ID   | 状態     | 入れたもの                                                                                                                                                                                                                                                                                                                         |
 | ---- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | P0-1 | **done** | `github.json` に `list_issues`, `get_issue`, `list_pulls`, `get_pull`, `list_reviews`, `list_review_comments`, `list_pr_files`。P1 で `create_review` / `create_review_comment`(apply/write/approval)を追加。harness registry 19 ops。                                                                                             |
-| P0-2 | **done** | MCP `kyberion.service.capture`(capture/read のみ、承認なし)。`pipelines/daily-routine.json` を pipeline allowlist へ。書き込みは従来の `service.actuate`                                                                                                                                                                           |
+| P0-2 | **done** | MCP `kyberion.service.capture`(capture/read のみ、承認なし)。`knowledge/product/pipeline-templates/daily-routine.json` を pipeline allowlist へ。書き込みは従来の `service.actuate`                                                                                                                                                |
 | P0-3 | **done** | `pnpm capabilities` / `pnpm kyberion list` は `scripts/capability_discovery_entry.mjs` のマニフェスト走査(Node 22 でも可)。仮説「ts-loader だけで足りる」は破棄 — Node 22 に `registerHooks` が無く、`@agent/core` は dist export。実行系は引き続き `dist/` 必須。Doctor は `pnpm run doctor`(bare `pnpm doctor` は pnpm 組み込み) |
 | P0-4 | **done** | [`docs/SLACK_CHANNEL_ROUTES.ja.md`](../SLACK_CHANNEL_ROUTES.ja.md)。`docs/SURFACES.md` / `CAPABILITIES_GUIDE.md` / `libs/actuators/README.md` からリンク                                                                                                                                                                           |
 
@@ -117,7 +117,7 @@ P0–P2 は実装済み(§7)。P2-4 は docs-only / deferred product。
 | `vision-actuator`            | 1.4.0 | 画像理解 facade                     | `inspect_image, ocr_image, describe_image`                                     | `vision-action.schema.json`               | pipeline。生成/キャプチャは media-generation へ                                                   |
 | `voice-actuator`             | 1.6.0 | ローカル TTS/録音                   | 12 ops                                                                         | `voice-action.schema.json`                | presence-studio / `voice:*` CLI                                                                   |
 | `wisdom-actuator`            | 1.6.0 | 知識・判断・互換 forwarder          | 81 ops                                                                         | `wisdom-action.schema.json`               | pipeline。新規は owner actuator を使え(CAPABILITIES_GUIDE 注記)                                   |
-| `working-memory-actuator`    | 1.2.0 | MEMORY/NOW/journal/TODO             | 15 ops                                                                         | `working-memory-action.schema.json`       | `pipelines/daily-routine.json`                                                                    |
+| `working-memory-actuator`    | 1.2.0 | MEMORY/NOW/journal/TODO             | 15 ops                                                                         | `working-memory-action.schema.json`       | `knowledge/product/pipeline-templates/daily-routine.json`                                         |
 
 発明していない。上記はツリー上の 32 のみ。
 
@@ -228,10 +228,10 @@ asana, aws-ce, backlog, box, brave-search, canva, cloudflare, comfyui, confluenc
 pnpm scheduler
 
 # 手動再実行
-pnpm pipeline --input pipelines/daily-routine.json
+pnpm pipeline --input knowledge/product/pipeline-templates/daily-routine.json
 ```
 
-中身([`pipelines/daily-routine.json`](../../pipelines/daily-routine.json)):
+中身([`knowledge/product/pipeline-templates/daily-routine.json`](../../knowledge/product/pipeline-templates/daily-routine.json)):
 
 1. `working-memory:daily-open` → journal / TODO 面
 2. `working-memory:todo-rollover`
@@ -481,7 +481,7 @@ P0 / P1 / P2 は実装済み(上表および下表)。P2-4 は docs-only / defer
 - 起動: `scripts/cli.ts`, `scripts/actuator_playground.ts`, `package.json`
 - MCP: `knowledge/product/governance/mcp-tool-catalog.json`
 - SaaS: `knowledge/product/orchestration/service-presets/github.json`, `github-mcp.json`, `slack.json`, `google-workspace.json`, `service-harness-registry.json`
-- 日常: `pipelines/daily-routine.json`, `knowledge/product/pipeline-templates/daily-summary.json`, `email-triage-workflow.json`, `github-issue-ingest.json`, `schedule-summary-and-coordination.json`, `weekly-executive-digest.json`
+- 日常: `knowledge/product/pipeline-templates/daily-routine.json`, `knowledge/product/pipeline-templates/daily-summary.json`, `email-triage-workflow.json`, `github-issue-ingest.json`, `schedule-summary-and-coordination.json`, `weekly-executive-digest.json`
 - 面: `docs/SURFACES.md`, `docs/OPERATOR_UX_GUIDE.md`, `pipelines/README.md`
 
 ---
