@@ -466,6 +466,8 @@ A gate that times out on busy runs:
 
 ## §2 Runtime stores and retention
 
+**Portable paths at scope and persistence boundaries.** Convert native absolute paths with `toRepoRelative` or `normalizeStoredPath` before using them as repository-relative resource bindings or stored references. Their in-checkout output uses `/` on every OS; physical filesystem paths continue to use native OS semantics. Do not weaken a capability issuer to accept backslashes when a Windows caller supplies an unnormalized path. Preserve foreign-path containment behavior. Gates: both path-resolver test files, `autonomy-learning-capability.test.ts`, and `autonomy-action-state.production-role.test.ts` cover canonical conversion, native physical paths, grant rejection and real scoped writes. File-symlink security cases additionally need Windows symlink creation privileges and must not be reported as passing when that prerequisite is missing.
+
 ### Native secret backends
 
 Platform-specific credential access belongs in `secret-bridge.ts`. Callers that
