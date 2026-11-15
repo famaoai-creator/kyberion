@@ -8,10 +8,14 @@ import { pathResolver } from '@agent/core/path-resolver';
 import {
   assertChronosPipelinePath,
   assertRegisteredTenantPipeline,
+  buildPersonalRunEnv,
   buildTenantRunEnv,
+  collectPersonalPipelineFiles,
   collectTenantPipelineFiles,
   createChronosShutdown,
+  requirePersonalPipelineTrust,
   requireTenantPipelineTrust,
+  resolvePersonalRuntimeEnv,
   resolveTenantRuntimeEnv,
 } from './chronos_daemon.js';
 import { installGracefulShutdown, type SerialTickStopOutcome } from '../lib/daemon/daemon-loop.js';
@@ -274,6 +278,169 @@ describe('chronos pipeline scope', () => {
           // Building child envs never mutates the daemon's own env.
           expect(process.env.AUTHORIZED_SCOPE).toBe('slack');
           expect(process.env.KYBERION_TENANT).toBe(saved.KYBERION_TENANT);
+        } finally {
+          for (const key of Object.keys(process.env)) if (!(key in saved)) delete process.env[key];
+          Object.assign(process.env, saved);
+        }
+      });
+    });
+  });
+
+  describe('personal-scoped pipelines', () => {
+    function personalRoot(): string {
+      const root = fs.mkdtempSync(path.join(pathResolver.sharedTmp(''), 'chronos-personal-'));
+      roots.push(root);
+      const dir = path.join(root, 'knowledge', 'personal', 'pipelines');
+      safeMkdir(path.join(dir, 'nested'), { recursive: true });
+      safeWriteFile(path.join(dir, 'daily-routine.json'), '{}');
+      safeWriteFile(path.join(dir, 'nested', 'deep.json'), '{}');
+      return root;
+    }
+
+    const SCOPE = {
+      kind: 'personal',
+      relative: 'knowledge/personal/pipelines/daily-routine.json',
+    } as const;
+
+    it('classifies a personal pipeline path', () => {
+      const root = personalRoot();
+      const file = path.join(root, 'knowledge/personal/pipelines/daily-routine.json');
+      expect(assertChronosPipelinePath(file, root)).toEqual({
+        kind: 'personal',
+        relative: 'knowledge/personal/pipelines/daily-routine.json',
+      });
+    });
+
+    it('rejects nested, non-pipeline personal paths and symlinks', () => {
+      const root = personalRoot();
+      expect(() =>
+        assertChronosPipelinePath(
+          path.join(root, 'knowledge/personal/pipelines/nested/deep.json'),
+          root
+        )
+      ).toThrow('[CHRONOS_SCOPE]');
+      expect(() =>
+        assertChronosPipelinePath(path.join(root, 'knowledge/personal/notes/x.json'), root)
+      ).toThrow('[CHRONOS_SCOPE]');
+      const dir = path.join(root, 'knowledge/personal/pipelines');
+      fs.symlinkSync(path.join(dir, 'daily-routine.json'), path.join(dir, 'linked.json'));
+      expect(() => assertChronosPipelinePath(path.join(dir, 'linked.json'), root)).toThrow(
+        'symbolic link'
+      );
+    });
+
+    it('collects only direct, regular files under knowledge/personal/pipelines/', () => {
+      const root = personalRoot();
+      const dir = path.join(root, 'knowledge/personal/pipelines');
+      fs.symlinkSync(path.join(dir, 'daily-routine.json'), path.join(dir, 'linked.json'));
+      expect(collectPersonalPipelineFiles(root)).toEqual([
+        path.join(root, 'knowledge/personal/pipelines/daily-routine.json'),
+      ]);
+    });
+
+    it('refuses an unattended personal run without a human project-trust approval', () => {
+      expect(() =>
+        requirePersonalPipelineTrust({
+          kind: 'personal',
+          relative: `knowledge/personal/pipelines/never-approved-${process.pid}-${Date.now()}.json`,
+        })
+      ).toThrow('[TRUST_REQUIRED]');
+    });
+
+    describe('runtime needs (per-process scope)', () => {
+      function withAllowlist(root: string, allowlist: Record<string, unknown>): void {
+        const file = path.join(
+          root,
+          'knowledge/personal/governance/pipeline-runtime-allowlist.json'
+        );
+        safeMkdir(path.dirname(file), { recursive: true });
+        safeWriteFile(file, JSON.stringify(allowlist));
+      }
+
+      const ALLOW = {
+        authorized_scopes: ['confluence'],
+        reasoning_backends: ['claude-cli'],
+        egress_policy_refs: ['knowledge/personal/governance/egress-policy.json'],
+      };
+      const RUNTIME = {
+        authorized_scope: ['confluence'],
+        reasoning_backend: 'claude-cli',
+        egress_policy_ref: 'knowledge/personal/governance/egress-policy.json',
+      };
+
+      it('injects exactly the declared, allowlisted needs — the egress overlay inside knowledge/personal/', () => {
+        const root = personalRoot();
+        withAllowlist(root, ALLOW);
+        expect(resolvePersonalRuntimeEnv(SCOPE, RUNTIME, root)).toEqual({
+          AUTHORIZED_SCOPE: 'confluence',
+          KYBERION_REASONING_BACKEND: 'claude-cli',
+          KYBERION_TENANT_EGRESS_POLICY_PATH: 'knowledge/personal/governance/egress-policy.json',
+        });
+        expect(resolvePersonalRuntimeEnv(SCOPE, undefined, root)).toEqual({});
+      });
+
+      it('refuses any need when the personal scope has no allowlist (deny-by-default)', () => {
+        const root = personalRoot();
+        expect(() => resolvePersonalRuntimeEnv(SCOPE, RUNTIME, root)).toThrow(
+          /\[CHRONOS_RUNTIME\].*no knowledge\/personal\/governance\/pipeline-runtime-allowlist\.json/
+        );
+      });
+
+      it('refuses a scope beyond the personal allowlist or an egress overlay outside knowledge/personal/', () => {
+        const root = personalRoot();
+        withAllowlist(root, ALLOW);
+        expect(() =>
+          resolvePersonalRuntimeEnv(SCOPE, { authorized_scope: ['jira'] }, root)
+        ).toThrow(/authorized_scope 'jira' is not in personal scope allowlist/);
+        expect(() =>
+          resolvePersonalRuntimeEnv(
+            SCOPE,
+            { egress_policy_ref: 'knowledge/confidential/acme-corp/x.json' },
+            root
+          )
+        ).toThrow(/egress_policy_ref must be a JSON file inside knowledge\/personal\//);
+        expect(() =>
+          resolvePersonalRuntimeEnv(
+            SCOPE,
+            { egress_policy_ref: 'knowledge/personal/other.json' },
+            root
+          )
+        ).toThrow(/egress_policy_ref .* is not in personal scope allowlist/);
+      });
+
+      it('never leaks a tenant binding or the daemon env into a personal child env', () => {
+        const saved = { ...process.env };
+        process.env.AUTHORIZED_SCOPE = 'slack';
+        process.env.KYBERION_TENANT = 'acme-corp';
+        process.env.KYBERION_TENANT_SCOPE_REQUIRED = '1';
+        process.env.KYBERION_TENANT_EGRESS_POLICY_PATH = 'knowledge/confidential/acme-corp/x.json';
+        process.env.KYBERION_SUDO = 'true';
+        try {
+          const withNeeds = buildPersonalRunEnv({
+            AUTHORIZED_SCOPE: 'confluence',
+            KYBERION_TENANT_EGRESS_POLICY_PATH: 'knowledge/personal/governance/egress-policy.json',
+          });
+          const without = buildPersonalRunEnv();
+          expect(withNeeds).toEqual({
+            AUTHORIZED_SCOPE: 'confluence',
+            KYBERION_TENANT_EGRESS_POLICY_PATH: 'knowledge/personal/governance/egress-policy.json',
+            KYBERION_TENANT: '',
+            KYBERION_TENANT_SCOPE_REQUIRED: '',
+            MISSION_ROLE: 'chronos_personal_runner',
+            KYBERION_BASE_ROLE: 'worker',
+            KYBERION_PERSONA: '',
+            KYBERION_SUDO: '',
+          });
+          // A pipeline that declares nothing gets explicit blanks, not the daemon's values.
+          expect(without.AUTHORIZED_SCOPE).toBe('');
+          expect(without.KYBERION_TENANT).toBe('');
+          expect(without.KYBERION_TENANT_SCOPE_REQUIRED).toBe('');
+          expect(without.KYBERION_TENANT_EGRESS_POLICY_PATH).toBe('');
+          expect(without.KYBERION_SUDO).toBe('');
+          expect(without.KYBERION_REASONING_BACKEND).toBeUndefined();
+          // Building child envs never mutates the daemon's own env.
+          expect(process.env.KYBERION_TENANT).toBe('acme-corp');
+          expect(process.env.AUTHORIZED_SCOPE).toBe('slack');
         } finally {
           for (const key of Object.keys(process.env)) if (!(key in saved)) delete process.env[key];
           Object.assign(process.env, saved);

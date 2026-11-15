@@ -115,4 +115,4 @@ Satellite は受信チャネルごとに会話モードを決める(`libs/core/s
 
 - 面の地図: [`docs/SURFACES.md`](./SURFACES.md)
 - アクチュエータ一覧: [`CAPABILITIES_GUIDE.md`](../CAPABILITIES_GUIDE.md)
-- 助手の読み取り面: MCP `kyberion.service.capture` / `kyberion.capability.list` / allowlist の `pipelines/daily-routine.json`
+- 助手の読み取り面: MCP `kyberion.service.capture` / `kyberion.capability.list` / allowlist の `knowledge/product/pipeline-templates/daily-routine.json`

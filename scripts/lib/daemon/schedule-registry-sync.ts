@@ -15,16 +15,21 @@ import { reconcileScheduledPipelines } from '@agent/core/pipeline/pipeline-sched
 
 type ScheduledPipelineInput = Parameters<typeof reconcileScheduledPipelines>[1][number];
 
-export type ScheduleScope = { kind: 'repository' } | { kind: 'tenant'; tenant_slug: string };
+export type ScheduleScope =
+  { kind: 'repository' } | { kind: 'tenant'; tenant_slug: string } | { kind: 'personal' };
 
 export interface ScheduleRegistrySyncDeps<S extends ScheduleScope = ScheduleScope> {
   rootDir?: string;
   /** Registered tenants' pipeline files (chronos collectTenantPipelineFiles). */
   collectTenantPipelineFiles: (rootDir: string) => Array<{ tenant_slug: string; file: string }>;
+  /** The operator's personal pipeline files (chronos collectPersonalPipelineFiles). */
+  collectPersonalPipelineFiles: (rootDir: string) => string[];
   /** Classify + load one file; adf null for non-pipeline JSON (chronos readScheduledPipelineAdf). */
   readScheduledPipelineAdf: (fullPath: string) => { scope: S; adf: any };
   /** Refuse tenant runtime needs beyond the allowlists (chronos resolveTenantRuntimeEnv). */
   assertTenantRuntime: (scope: Extract<S, { kind: 'tenant' }>, runtime: unknown) => void;
+  /** Refuse personal runtime needs beyond the personal allowlist (chronos resolvePersonalRuntimeEnv). */
+  assertPersonalRuntime: (scope: Extract<S, { kind: 'personal' }>, runtime: unknown) => void;
   /** Compute counts without writing the registry. */
   dryRun?: boolean;
 }
@@ -60,10 +65,11 @@ export function syncScheduleRegistry<S extends ScheduleScope>(
   const root = deps.rootDir ?? pathResolver.rootDir();
   const files = collectPipelineFiles(path.join(root, 'pipelines'));
   const tenantFiles = deps.collectTenantPipelineFiles(root);
+  const personalFiles = deps.collectPersonalPipelineFiles(root);
 
   const desired: ScheduledPipelineInput[] = [];
   const skipped: ScheduleRegistrySyncResult['skipped'] = [];
-  for (const fullPath of [...files, ...tenantFiles.map((entry) => entry.file)]) {
+  for (const fullPath of [...files, ...tenantFiles.map((entry) => entry.file), ...personalFiles]) {
     // `_`-prefixed JSON files are test fixtures / partials — never schedulable.
     if (path.basename(fullPath).startsWith('_')) continue;
     try {
@@ -73,15 +79,24 @@ export function syncScheduleRegistry<S extends ScheduleScope>(
       // tenant allowlist or the global ceiling (re-checked at run time too).
       if (scope.kind === 'tenant')
         deps.assertTenantRuntime(scope as Extract<S, { kind: 'tenant' }>, adf.runtime);
+      // Same deny-by-default bound for personal pipelines: the declared
+      // `runtime` block must fit the personal allowlist (re-checked at run
+      // time too).
+      if (scope.kind === 'personal')
+        deps.assertPersonalRuntime(scope as Extract<S, { kind: 'personal' }>, adf.runtime);
 
       const sched = adf.schedule;
       const baseId = sched.id ?? path.basename(fullPath, '.json');
       // Tenant schedules are namespaced so a tenant file can never shadow a
-      // repository schedule id (or another tenant's).
+      // repository schedule id (or another tenant's); personal schedules get
+      // the same treatment so an operator-local file cannot shadow a
+      // repository id either.
       const id =
         scope.kind === 'tenant'
           ? `tenant-${(scope as Extract<ScheduleScope, { kind: 'tenant' }>).tenant_slug}-${baseId}`
-          : baseId;
+          : scope.kind === 'personal'
+            ? `personal-${baseId}`
+            : baseId;
 
       desired.push({
         id,
@@ -98,8 +113,10 @@ export function syncScheduleRegistry<S extends ScheduleScope>(
         // Shipped-disabled schedules run only when the host lists their id in
         // KYBERION_CHRONOS_SCHEDULES (see scheduleExplicitlyOptedIn).
         optIn: sched.enabled === false,
-        // Tenant ADF context stays in the confidential file; the child reads it.
-        context: scope.kind === 'tenant' ? {} : (adf.context ?? {}),
+        // Scoped ADF context stays in the scoped file; the child reads it.
+        // A personal pipeline's context is operator data and never lands in
+        // the shared schedule registry either.
+        context: scope.kind === 'repository' ? (adf.context ?? {}) : {},
         deliver_to: sched.deliver_to,
       } as ScheduledPipelineInput);
     } catch (err: any) {
@@ -111,6 +128,7 @@ export function syncScheduleRegistry<S extends ScheduleScope>(
 
   const result = reconcileScheduledPipelines('chronos_adf', desired, {
     dryRun: deps.dryRun === true,
+    rootDir: deps.rootDir,
   });
   const changed = result.added + result.updated + result.removed;
   if (changed > 0 && !deps.dryRun) {

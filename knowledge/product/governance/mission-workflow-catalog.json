@@ -13237,7 +13237,7 @@
       "id": "music-video-production",
       "pattern": "creative_assembly_loop",
       "playbook_ref": "knowledge/product/orchestration/narrated-video-production-playbook.md",
-      "description": "オリジナル曲 MV の制作プロセス: 歌詞正規化(media-generation:lyric_normalize で発音可能形へ) → 楽曲生成(generate_music / music_adf) → vocal_align で実測タイミング取得 → 歌詞同期シーン設計(mv_storyboard) → シーン別静止画+i2v生成 → mv_compose で字幕付き合成 → 完成動画のAI評価→シーン修復ループ → 公開パッケージ→承認ゲート。pipelines/mv-generate.json が deterministic 実行体。人物一貫性には reference 画像/IPAdapter 系 backend を使う。",
+      "description": "オリジナル曲 MV の制作プロセス: 歌詞正規化(media-generation:lyric_normalize で発音可能形へ) → 楽曲生成(generate_music / music_adf) → vocal_align で実測タイミング取得 → 歌詞同期シーン設計(mv_storyboard) → シーン別静止画+i2v生成 → mv_compose で字幕付き合成 → 完成動画のAI評価→シーン修復ループ → 公開パッケージ→承認ゲート。knowledge/product/pipeline-templates/mv-generate.json が deterministic 実行体。人物一貫性には reference 画像/IPAdapter 系 backend を使う。",
       "match": {
         "mission_classes": ["content_and_media"],
         "delivery_shapes": ["single_artifact", "multi_artifact_pipeline"],

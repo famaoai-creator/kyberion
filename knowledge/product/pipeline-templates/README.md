@@ -28,16 +28,18 @@ Domain-specific templates may layer additional checks, but they should not dupli
 
 ## Instantiation
 
-1. Copy the template to `knowledge/confidential/{tenant}/pipelines/{name}.json`
-2. Fill in tenant-specific params and secrets
+1. Copy the template to `knowledge/confidential/{tenant}/pipelines/{name}.json` (tenant-bound) or `knowledge/personal/pipelines/{name}.json` (operator-bound, gitignored).
+2. Fill in tenant/personal params and secrets
 3. Keep the preflight gate intact unless the template is explicitly a non-executable reference
-4. Run from the tenant path after validating the preflight contract
+4. Run from the instantiated path after validating the preflight contract
 
 ## Chronos / schedule pickup
 
-Templates are **not** live Chronos jobs. Chronos reads a `schedule` block (`id`, `cron`, `timezone`, `enabled`) on a pipeline that has been instantiated into `pipelines/` or `knowledge/confidential/{tenant}/pipelines/`, then registered (`pnpm kyberion schedule register <id> <pipeline-path> <actuator> "<cron>"`) or picked up after `pnpm scheduler` has started once.
+Templates are **not** live Chronos jobs. Chronos reads a `schedule` block (`id`, `cron`, `timezone`, `enabled`) on a pipeline that has been instantiated into `pipelines/`, `knowledge/confidential/{tenant}/pipelines/`, or `knowledge/personal/pipelines/` (direct `.json` children only), then registered (`pnpm kyberion schedule register <id> <pipeline-path> <actuator> "<cron>"`) or picked up after `pnpm scheduler` has started once.
 
-House pattern (see `pipelines/daily-routine.json` and `meeting-watcher.json`):
+Personal instances run as `chronos_personal_runner` with schedule ids namespaced `personal-<id>`, no tenant binding, runtime needs bounded by `knowledge/personal/governance/pipeline-runtime-allowlist.json`, and — like tenant instances — only after an authenticated human approves the file's current content via `pnpm kyberion project-trust request <path>` → `pnpm kyberion approve <id> project-trust`.
+
+House pattern (see `daily-routine.json` and `meeting-watcher.json`):
 
 - keep `"enabled": false` on the template and on unused copies
 - enable only after tenant `owner` / `repo` / secrets are filled

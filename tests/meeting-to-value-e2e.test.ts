@@ -43,7 +43,9 @@ const ROOT = pathResolver.rootDir();
 const MISSION_DIR = pathResolver.tenantMissionDir(MISSION_ID, CUSTOMER_SLUG, 'confidential');
 const CUSTOMER_ROOT = path.join(ROOT, 'customer', CUSTOMER_SLUG);
 const TRANSCRIPT_PATH = pathResolver.rootResolve('tests/fixtures/meeting-transcript-sample.md');
-const PIPELINE_PATH = pathResolver.rootResolve('pipelines/meeting-followup.json');
+const PIPELINE_PATH = pathResolver.rootResolve(
+  'knowledge/product/pipeline-templates/meeting-followup.json'
+);
 const REPORT_PATH = pathResolver.rootResolve('active/shared/tmp/meeting-to-value-e2e-report.json');
 
 // The fixture injects deterministic reasoning and carries no real credentials.
@@ -252,6 +254,7 @@ describe('meeting-to-value e2e', () => {
 
     const pipeline = readPipeline();
     expect(pipeline.steps?.map((step) => step.id)).toEqual([
+      'preflight',
       'open_log',
       // 1ffdae2ea (pipeline v2.1) replaced the plain system:read_file
       // `read_transcript` step with meeting:normalize_transcript, which adds
@@ -269,7 +272,10 @@ describe('meeting-to-value e2e', () => {
 
     const result = await withFixtureCredentials(() =>
       runSteps(
-        pipeline.steps ?? [],
+        // Hermetic e2e: the `preflight` environment gate (meeting service +
+        // browser runtime doctor) is asserted in the contract test; running
+        // it here would require real services this fixture does not have.
+        (pipeline.steps ?? []).filter((step) => step.id !== 'preflight'),
         {
           ...(pipeline.context ?? {}),
           mission_id: MISSION_ID,

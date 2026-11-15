@@ -257,7 +257,7 @@
   2. テンプレート追加: 日次ログ（`## TODO` / `## Done` / `## Notes`）、週次振り返り（`## Highlights` / `## Lessons` / `## Carryover`）。
   3. `scripts/schedule` または `scheduled-tasks` で日次 `daily-open`＋週次 `weekly-open` を定期起動できるようにする（任意・オペレータ選択）。
   4. **復元仕様の取り込み**: git から回収した `daily-routine.yml` / `personal-todo.json` の良い部分を新パイプラインへ移植。
-- **変更ファイル**: actuator 拡張, `templates/`, `pipelines/daily-routine.json`(再生成), `pipelines/weekly-review.json`(新), scheduled-task 連携。
+- **変更ファイル**: actuator 拡張, `templates/`, `knowledge/product/pipeline-templates/daily-routine.json`(template; personal instance under `knowledge/personal/pipelines/`), `knowledge/product/pipeline-templates/weekly-review.json`(同), scheduled-task 連携。
 - **受入条件**: 「今日の TODO」を追加→翌日に未完が rollover され、当日の日次ログが残る。週次 `weekly-open` が当週の日次を一覧できる。
 
 ### Phase 3 — ライフサイクル & GC（rollover / rollup 込み）

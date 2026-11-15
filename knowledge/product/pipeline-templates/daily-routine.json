@@ -1,7 +1,7 @@
 {
   "action": "pipeline",
   "name": "daily-routine",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Volatile Knowledge Layer — daily routine: opens today's journal + TODO, rolls over pending items from previous TODO.md.",
   "_refs": {
     "schema": "knowledge/product/schemas/volatile-knowledge.schema.json",
@@ -12,9 +12,18 @@
     "id": "daily-routine",
     "cron": "0 6 * * *",
     "timezone": "Asia/Tokyo",
-    "enabled": true
+    "enabled": false
   },
   "steps": [
+    {
+      "id": "preflight",
+      "role": "gate",
+      "op": "core:include",
+      "params": {
+        "fragment": "fragments/runtime-preflight.json",
+        "context": { "preflight_cmd": "pnpm kyberion doctor --runtime kyberion-runtime-baseline" }
+      }
+    },
     {
       "id": "open_today",
       "role": "source",
