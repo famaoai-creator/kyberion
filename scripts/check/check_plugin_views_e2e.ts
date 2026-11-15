@@ -662,7 +662,7 @@ async function scenario(
 
   const installApprovalId = await step('governed-install', () => {
     const record = parseLastJsonObject(
-      runKyberionCli(root, 'plugin_install.js', [
+      runKyberionCli(root, 'plugin/plugin_install.js', [
         '--source',
         fixture,
         '--id',

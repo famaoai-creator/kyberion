@@ -484,7 +484,7 @@ Remaining genuine gaps:
   `validateWritePermission` and `validateReadPermission` now reject
   cross-tenant `confidential/{other}/` access; SUDO bypass preserved
   ([`tier-guard.ts`](../../../libs/core/tier-guard.ts), tests in
-  [`tier-guard-tenant.test.ts`](../../../libs/core/tier-guard-tenant.test.ts)).
+  [`tier-guard-tenant.test.ts`](../../../libs/core/tier-guard/tier-guard-tenant.test.ts)).
 - ✅ **`audit-chain` `tenantSlug`** — first-class additive field on
   `AuditEntry`; `record()` auto-fills from identity context;
   `TenantFilteringAuditForwarder` available for per-tenant SIEM routing.

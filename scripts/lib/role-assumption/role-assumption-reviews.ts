@@ -110,6 +110,10 @@ export const REVIEWED_CHILD_PROCESSES: Record<string, ReviewedChildProcess> = {
     targets: [],
     rationale: `Windows app launch / window action scripts via the powershell.exe stdin bootstrap with an env built only from Windows system variables (windowsPowerShellEnv) plus the request JSON; ${EXTERNAL_BINARY}`,
   },
+  'libs/core/integrations/email-bridge.ts#SmtpEmailProvider.send': {
+    targets: [],
+    rationale: `SMTP send via \`python3 -c\` (resolvePython3Bin) running the static inline SMTP_SEND_SCRIPT with the payload on stdin; ${EXTERNAL_BINARY}`,
+  },
   'presence/bridge/nexus-daemon.ts#dispatchFeedback': {
     targets: (ws) =>
       readSafeJsonFile<{ channels?: Array<{ connector_skill?: string }> }>(
