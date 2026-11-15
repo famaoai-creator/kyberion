@@ -16,6 +16,7 @@ import {
   loadOpsAlertDedupeState,
   opsAlertDedupeStatePathFor,
   OPS_ALERT_DEDUPE_STATE_FILENAME,
+  OPS_ALERT_DEFAULT_MIN_INTERVAL_MS,
   persistOpsAlertDedupeState,
   resolveOpsAlertLogPath,
   validateOpsAlertLogRecord,
@@ -52,15 +53,9 @@ export interface OpsAlertOptions {
   minIntervalMs?: number;
   /** Dedupe state file override (tests). Defaults to a sibling of the alert log. */
   dedupeStatePath?: string;
-  /**
-   * Record the alert (with dedupe) but skip all delivery: used from inside the
-   * notification path itself, where a delivery attempt would re-enter the very
-   * pipeline that just failed.
-   */
-  recordOnly?: boolean;
 }
 
-const DEFAULT_MIN_INTERVAL_MS = 10 * 60 * 1000;
+const DEFAULT_MIN_INTERVAL_MS = OPS_ALERT_DEFAULT_MIN_INTERVAL_MS;
 const lastSentAt = new Map<string, number>();
 
 /**
@@ -197,18 +192,6 @@ export function sendOpsAlert(input: OpsAlertInput, options: OpsAlertOptions = {}
   lastSentAt.set(key, now.getTime());
   dedupeState.set(key, now.getTime());
   persistOpsAlertDedupeState(dedupeStatePath, dedupeState);
-
-  if (options.recordOnly) {
-    return {
-      id,
-      recorded_path: recordedPath,
-      webhook_attempted: false,
-      webhook_delivered: false,
-      operator_attempted: false,
-      operator_delivered: false,
-      suppressed: false,
-    };
-  }
 
   const webhookUrl = options.webhookUrl ?? getRegisteredEnvText(OPS_ALERT_WEBHOOK_ENV);
   if (!webhookUrl) {

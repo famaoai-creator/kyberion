@@ -401,13 +401,19 @@ export async function measureDotKeyResults(
   const now = deps.now?.() ?? new Date();
   const ledger = dotStatePath(c, DOT_KR_LEDGER_FILE);
   let latest: Map<string, KrMeasurementRow>;
+  const ledgerReadKey = `${c.dot_id}:ledger-read`;
   try {
-    latest = latestBy(
-      readLedger(ledger, deps.rootDir).filter(
-        (row) => row.scope === 'dot' && row.dot_id === c.dot_id
-      ),
-      (row) => row.kr_id
-    );
+    if (!krMeasureCircuit.admits(ledgerReadKey)) {
+      latest = new Map();
+    } else {
+      latest = latestBy(
+        readLedger(ledger, deps.rootDir).filter(
+          (row) => row.scope === 'dot' && row.dot_id === c.dot_id
+        ),
+        (row) => row.kr_id
+      );
+      krMeasureCircuit.reportSuccess(ledgerReadKey);
+    }
   } catch (error) {
     reportKrFailure(
       'ledger-read',
@@ -432,9 +438,12 @@ export async function measureDotKeyResults(
   };
   for (const spec of specs) {
     if (!isDue(spec, latest.get(spec.kr_id), now)) continue;
+    const measureKey = `${c.dot_id}:measure/${spec.kr_id}`;
+    if (!krMeasureCircuit.admits(measureKey)) continue;
     try {
       const value = await measureSpec(spec, target, deps, now);
       if (value === undefined) continue;
+      krMeasureCircuit.reportSuccess(measureKey);
       rows.push({
         scope: 'dot',
         dot_id: c.dot_id,
@@ -454,8 +463,11 @@ export async function measureDotKeyResults(
       );
     }
   }
+  const ledgerWriteKey = `${c.dot_id}:ledger-write`;
+  if (!krMeasureCircuit.admits(ledgerWriteKey)) return [];
   try {
     appendLedger(ledger, rows, deps.rootDir);
+    krMeasureCircuit.reportSuccess(ledgerWriteKey);
   } catch (error) {
     reportKrFailure(
       'ledger-write',

@@ -1696,26 +1696,29 @@ async function runDotWakeBaseline(
       const execution = deps.resolveWakeExecution ? await deps.resolveWakeExecution(current) : deps;
       if (execution.backendUnavailable) throw new Error(execution.backendUnavailable);
       let backend = execution.backend ?? getReasoningBackend();
-      if (
-        execution.backend === undefined &&
-        (current.runtime.reasoning_training_use ??
-          (current.scope.tier === 'public' ? 'training_eligible' : 'local_only')) ===
-          'local_only' &&
-        !isLocalReasoningBackend(getReasoningBackend().name)
-      ) {
-        // Confidential material may not leave the host: swap to a local-only
-        // backend when one is configured. Failing that, surface ONE deduped
-        // actionable alert — without it the wake just dies on an opaque
-        // REASONING_EGRESS_DENIED every retry.
-        const local = await buildLocalOnlyWakeBackend(current);
-        if (local) {
-          backend = local;
-        } else {
-          const activeName = getReasoningBackend().name;
-          alertDotWakeLocalBackendUnavailable(current, activeName);
-          throw new Error(
-            `dot wake needs a local-only reasoning backend (training_use 'local_only', tier '${current.scope.tier}') but the active backend '${activeName}' is external and no local backend is available — install/configure a local provider (ollama/mlx/lmstudio/…) or attest a no-training provider via 'pnpm onboarding llm attest'`
-          );
+      if (execution.backend === undefined) {
+        // execution.backend is undefined here, so `backend` came from
+        // getReasoningBackend() and carries the full ReasoningBackend shape.
+        const activeName = (backend as ReasoningBackend).name;
+        if (
+          (current.runtime.reasoning_training_use ??
+            (current.scope.tier === 'public' ? 'training_eligible' : 'local_only')) ===
+            'local_only' &&
+          !isLocalReasoningBackend(activeName)
+        ) {
+          // Confidential material may not leave the host: swap to a
+          // local-only backend when one is configured. Failing that, surface
+          // ONE deduped actionable alert — without it the wake just dies on
+          // an opaque REASONING_EGRESS_DENIED every retry.
+          const local = await buildLocalOnlyWakeBackend(current);
+          if (local) {
+            backend = local;
+          } else {
+            alertDotWakeLocalBackendUnavailable(current, activeName);
+            throw new Error(
+              `dot wake needs a local-only reasoning backend (training_use 'local_only', tier '${current.scope.tier}') but the active backend '${activeName}' is external and no local backend is available — install/configure a local provider (ollama/mlx/lmstudio/…) or attest a no-training provider via 'pnpm onboarding llm attest'`
+            );
+          }
         }
       }
       const accounting_id = randomUUID();

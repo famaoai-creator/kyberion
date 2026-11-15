@@ -36,7 +36,14 @@ export type DotStepFailureVerdict = 'counted' | 'open' | 'held';
 
 function failureSignature(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
-  return message.split('\n')[0].slice(0, 200);
+  // Normalize volatile payloads (pids, epochs, uuids, long hex) so the same
+  // underlying defect streaks — "lock held by pid 1073" and "pid 2084" are
+  // one failure, not two distinct ones that never reach the threshold.
+  return message
+    .split('\n')[0]
+    .replace(/[0-9a-f]{8}-[0-9a-f-]{27,}/gi, '<id>')
+    .replace(/\b\d{4,}\b/g, '<n>')
+    .slice(0, 200);
 }
 
 export class DotSupervisorStepCircuit {
@@ -64,8 +71,11 @@ export class DotSupervisorStepCircuit {
   /**
    * Records a failure.
    * - `counted`: streak grew below the open threshold — caller logs as usual.
-   * - `open`: this failure tripped the breaker — caller emits ONE alert.
-   * - `held`: already open and this half-open probe re-failed — stay quiet.
+   * - `open`: the breaker (re-)opened — caller emits ONE alert. A half-open
+   *   probe that fails re-opens, so a persistent defect re-surfaces once per
+   *   cooldown instead of vanishing forever after the first alert.
+   * - `held`: a failure was reported while still inside the hold window —
+   *   defensive only, since callers gate execution with {@link admits}.
    */
   reportFailure(dotId: string, error: unknown, now = Date.now()): DotStepFailureVerdict {
     const signature = failureSignature(error);

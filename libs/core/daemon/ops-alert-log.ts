@@ -77,10 +77,16 @@ function appendScopedOpsAlertLogRecord(filePath: string, value: unknown): string
  */
 export const OPS_ALERT_DEDUPE_STATE_FILENAME = 'ops-alerts.dedupe.json';
 export const OPS_ALERT_DEDUPE_STATE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+/** Default minimum interval between two sends sharing a dedupe key. */
+export const OPS_ALERT_DEFAULT_MIN_INTERVAL_MS = 10 * 60 * 1000;
 
 /** Dedupe state lives next to the alert log: `ops-alerts.dedupe.json`. */
 export function opsAlertDedupeStatePathFor(alertLogPath: string): string {
-  return alertLogPath.replace(/\.jsonl$/, '.dedupe.json');
+  // A path without the .jsonl suffix must NOT collapse onto the log path
+  // itself — persisting dedupe state there would overwrite the alert log.
+  return alertLogPath.endsWith('.jsonl')
+    ? alertLogPath.replace(/\.jsonl$/, '.dedupe.json')
+    : `${alertLogPath}.dedupe.json`;
 }
 
 /** Load `key -> last-sent epochMs`, pruning entries older than 30 days. */
