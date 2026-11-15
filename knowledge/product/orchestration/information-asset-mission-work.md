@@ -21,7 +21,7 @@ last_updated: 2026-11-02
 外部操作レシピは mission-shaped WorkItem として admission される。既存 watchdog / mission alignment が正規の mission を準備・起動する。手動で準備する場合も既存の facade を使う。
 
 ```sh
-pnpm exec tsx scripts/mission_alignment_request.ts --work-item <admitted-work-item-id> --json
+pnpm exec tsx scripts/mission/mission_alignment_request.ts --work-item <admitted-work-item-id> --json
 pnpm kyberion approvals --approve <issued-alignment-approval-id>
 ```
 

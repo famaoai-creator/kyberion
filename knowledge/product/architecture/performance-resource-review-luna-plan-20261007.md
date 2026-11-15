@@ -55,7 +55,7 @@ RSS は生成用文字列、以前の試行、GC の影響を含む累積値で�
 
 ### PERF-04 / P2 / M: Chronos registry の no-op 抑制と一括更新
 
-根拠: scripts/chronos_daemon.ts:60-74,463-501,723-725、libs/core/pipeline/pipeline-scheduler.ts:228-244。tickごとにpipeline探索し、scheduleごとにregistry全体をload/write。S件の登録でregistryの総serialize量は概ね S² に増える。
+根拠: scripts/chronos/chronos_daemon.ts:60-74,463-501,723-725、libs/core/pipeline/pipeline-scheduler.ts:228-244。tickごとにpipeline探索し、scheduleごとにregistry全体をload/write。S件の登録でregistryの総serialize量は概ね S² に増える。
 第1変更: registry reconciliationをtyped opとして一括実行し、不変なら書込しない。第2変更: 計測で必要なら validated pipeline discoveryを変更検知で再利用。
 受入条件: 不変tickのregistry書込0、変更1件の書込1、削除反映、tenant suspension反映、symlink/path改変を実行時にも拒否。leader leaseとschedule claimを維持。新しいenvは登録儀式に従う。
 

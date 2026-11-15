@@ -151,7 +151,7 @@ branch, working tree and `dist/` stay shared: when one agent switches branch
 or rebuilds, every other agent's runtime goes stale. An agent worktree gives
 each agent its own checkout instead.
 
-`libs/core/workforce/agent-worktree.ts`, CLI `scripts/agent_worktree.ts`:
+`libs/core/workforce/agent-worktree.ts`, CLI `scripts/agent/agent_worktree.ts`:
 
 - `pnpm kyberion worktree create <name> [--branch <b>] [--base <ref>] [--agent <provider>] [--mission <id>] [--bootstrap]`
   checks out `--branch` (default `worktree/<name>`) at

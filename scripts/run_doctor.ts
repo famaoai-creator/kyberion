@@ -64,13 +64,13 @@ import {
   type ScriptContext,
 } from './lib/harness.js';
 import { safeExecResultAsync } from '@agent/core/secure-io';
-import { formatCliUsage, hasHelpFlag, type CliGuardSpec } from './lib/cli-guard.js';
+import { formatCliUsage, hasHelpFlag, type CliGuardSpec } from './lib/cli/cli-guard.js';
 import { getRegisteredEnvText, isVitestProcess, setRegisteredEnv } from '@agent/core/foundation';
 import {
   formatAppPreflightReport,
   runAppPreflight,
   type AppPreflightReport,
-} from './app_preflight.js';
+} from './app/app_preflight.js';
 
 // The repo-build probe must judge on the same input-set/emit basis as
 // `pnpm run check` — install the canonical compiler-outputs inspector.

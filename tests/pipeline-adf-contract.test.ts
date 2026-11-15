@@ -87,7 +87,7 @@ const KNOWN_DATA_FILES = new Set([
 const SHELL_INDEPENDENCE_BASELINE =
   (
     JSON.parse(
-      safeReadFile('scripts/pipeline-shell-independence.baseline.json', {
+      safeReadFile('scripts/pipeline/pipeline-shell-independence.baseline.json', {
         encoding: 'utf8',
       }) as string
     ) as { violations?: Array<{ file?: string; pattern?: string; match?: string }> }

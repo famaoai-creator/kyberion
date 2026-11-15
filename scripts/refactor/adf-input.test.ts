@@ -175,7 +175,7 @@ describe('readValidatedPipelineAdf', () => {
 
   it.each([
     'pipelines/full-health-report.json',
-    'pipelines/voice-onboarding.json',
+    'knowledge/product/pipeline-templates/voice-onboarding.json',
     'pipelines/launch-first-run-onboarding.json',
     'pipelines/system-upgrade-check.json',
   ])('loads representative checked-in pipeline %s with the wrapper baseline', async (relative) => {

@@ -51,7 +51,7 @@ const READABLE = new Set(['decisions.jsonl', 'switches.jsonl', 'agendas', 'consu
  * construction. A single consumer file is structurally the same either way.
  *
  * G2: the sweep marker lives in this module instance only (no globalThis
- * registry; scripts/check_core_single_instance.ts keeps a production process on
+ * registry; scripts/check/check_core_single_instance.ts keeps a production process on
  * one instance), so a second instance can neither open nor honour a sweep.
  */
 const sweepStorage = new AsyncLocalStorage<true>();

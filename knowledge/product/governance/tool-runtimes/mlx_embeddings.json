@@ -1,0 +1,35 @@
+{
+  "version": "1.0.0",
+  "default_tool_id": "mflux",
+  "tools": [
+    {
+      "tool_id": "mlx_embeddings",
+      "toolsets": ["embedding"],
+      "display_name": "MLX Text Embeddings Runtime",
+      "ecosystem": "python",
+      "status": "active",
+      "platforms": ["darwin"],
+      "supported_modes": ["trial", "approved_install", "installed", "pinned"],
+      "trial_backend": {
+        "kind": "system",
+        "command": "python3",
+        "args": ["-c", "import mlx_embeddings; print(\"ok\")"],
+        "description": "Probe the mlx-embeddings Python package."
+      },
+      "install_backend": {
+        "kind": "uv",
+        "command": "uv",
+        "args": ["pip", "install", "mlx-embeddings"],
+        "description": "Install mlx-embeddings into the managed Python runtime."
+      },
+      "installed_backend": {
+        "kind": "system",
+        "command": "python3",
+        "args": ["-c", "import mlx_embeddings; print(\"ok\")"],
+        "description": "Re-check the mlx-embeddings runtime."
+      },
+      "managed_env_subpath": "tool-runtimes/mlx-embeddings",
+      "notes": "Apple Silicon text-embedding runtime used by scripts/mlx_embed.py (libs/core/provider/mlx-embedding-backend.ts)."
+    }
+  ]
+}

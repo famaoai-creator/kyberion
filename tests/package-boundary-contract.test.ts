@@ -291,7 +291,7 @@ describe('Package boundary contract', () => {
   });
 
   // Runtime (non-test) relative imports of libs/core are owned by the
-  // core-single-instance gate (scripts/check_core_single_instance.ts), which
+  // core-single-instance gate (scripts/check/check_core_single_instance.ts), which
   // resolves every import form, including `../../core/` from inside libs/.
 
   it('forbids test imports from @agent/core/src and @agent/core/dist', () => {

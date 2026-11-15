@@ -2496,7 +2496,7 @@ packaging contract、Prettier（変更コード）を確認した。Presence の
 - `pnpm run typecheck`: passed。
 - `pnpm check -- --scope pr --only script-integrity`: passed。
 - 実CLI `--help`: marketing review／agy SDK setup の2 entrypoint が exit code 0 で help を表示した。
-- `node --import ./scripts/ts-loader.mjs scripts/eval_japanese_contextual_intent.ts`: **50/50**、全指標 **1.0**、failures **0**、exit code 0。
+- `node --import ./scripts/ts-loader.mjs scripts/eval/eval_japanese_contextual_intent.ts`: **50/50**、全指標 **1.0**、failures **0**、exit code 0。
 - 現行 source 集計: `defineScript` **206 files**、`main().catch` **29 files**。直接 `process.argv` は harness／テスト／refactor utility に限定される。
 - `git diff --check`: passed。
 
@@ -2695,8 +2695,8 @@ packaging contract、Prettier（変更コード）を確認した。Presence の
 
 ### 実測 evidence
 
-- `pnpm exec vitest run scripts/control_plane_cli.test.ts scripts/run_realtime_voice_conversation.test.ts`: **2 files / 10 tests passed**。
-- `pnpm exec vitest run scripts/agent_runtime_supervisor_daemon.test.ts`: **1 file / 9 tests passed**。
+- `pnpm exec vitest run scripts/control/control_plane_cli.test.ts scripts/run_realtime_voice_conversation.test.ts`: **2 files / 10 tests passed**。
+- `pnpm exec vitest run scripts/agent/agent_runtime_supervisor_daemon.test.ts`: **1 file / 9 tests passed**。
 - `pnpm run typecheck`: passed。
 - `pnpm lint`: passed。
 - `pnpm check -- --scope pr --only script-integrity`: passed。
@@ -4821,7 +4821,7 @@ governed catalog への書込制約は変更しなかった。旧 Ajv 経路の�
 
 検証:
 
-- `pnpm exec vitest run scripts/register_workflow.contract.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 1 test passed**。
+- `pnpm exec vitest run scripts/register/register_workflow.contract.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 1 test passed**。
 - `pnpm run typecheck`、`pnpm run lint`、`git diff --check`: passed。
 
 ## 296. 2026-08-30 SX-04/SX-14 env registry の専用 schema／loader 統合
@@ -4960,7 +4960,7 @@ schema の format 対応、既存の CLI／exit semantics は維持した。foun
 
 検証:
 
-- `pnpm exec vitest run libs/core/testing/foundation-adoption.contract.test.ts scripts/onboarding_apply.test.ts scripts/first_win_lifecycle_smoke.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 18 tests passed**。
+- `pnpm exec vitest run libs/core/testing/foundation-adoption.contract.test.ts scripts/onboarding/onboarding_apply.test.ts scripts/first_win_lifecycle_smoke.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 18 tests passed**。
 - `pnpm run typecheck`、`pnpm run lint`、`git diff --check`: passed。
 - `pnpm check -- --scope full`: **67/67 passed**。
 
@@ -5508,8 +5508,8 @@ import-safe な回帰テストを追加した。
 
 検証:
 
-- `pnpm exec vitest run scripts/benchmark_memory.test.ts scripts/lib/harness.test.ts`: **2 files / 8 tests passed**。
-- `node --import ./scripts/ts-loader.mjs scripts/benchmark_memory.ts`: **実 CLI passed**（5 checks）。
+- `pnpm exec vitest run scripts/benchmark/benchmark_memory.test.ts scripts/lib/harness.test.ts`: **2 files / 8 tests passed**。
+- `node --import ./scripts/ts-loader.mjs scripts/benchmark/benchmark_memory.ts`: **実 CLI passed**（5 checks）。
 - `pnpm check -- --scope full`: **67/67 gates passed**（Chronos を含む承認付き実行）。
 
 ## 343. 2026-08-30 SX-06 pipeline dry-run の shared harness 化
@@ -5558,8 +5558,8 @@ frame／route／clarification の比較、成功時の report と OK 表示は�
 
 検証:
 
-- `pnpm exec vitest run scripts/eval_japanese_contextual_intent.test.ts`: **1 file / 1 test passed**。
-- `node --import ./scripts/ts-loader.mjs scripts/eval_japanese_contextual_intent.ts`: **50 items / frame 1.0 / route 1.0 / ask-vs-act 1.0 / OK**。
+- `pnpm exec vitest run scripts/eval/eval_japanese_contextual_intent.test.ts`: **1 file / 1 test passed**。
+- `node --import ./scripts/ts-loader.mjs scripts/eval/eval_japanese_contextual_intent.ts`: **50 items / frame 1.0 / route 1.0 / ask-vs-act 1.0 / OK**。
 - `pnpm run typecheck`、`git diff --check`: **passed**。
 
 ## 347. 2026-08-30 SX-06 distill evaluation の import-safe harness 化
@@ -5571,8 +5571,8 @@ frame／route／clarification の比較、成功時の report と OK 表示は�
 
 検証:
 
-- `pnpm exec vitest run scripts/eval_distill.test.ts`: **1 file / 1 test passed**。
-- `node --import ./scripts/ts-loader.mjs scripts/eval_distill.ts`: **score 1.0 / hard_failures 0 / exit 0**。
+- `pnpm exec vitest run scripts/eval/eval_distill.test.ts`: **1 file / 1 test passed**。
+- `node --import ./scripts/ts-loader.mjs scripts/eval/eval_distill.ts`: **score 1.0 / hard_failures 0 / exit 0**。
 - `node --import ./scripts/ts-loader.mjs scripts/check_script_integrity.ts`: **OK**。
 
 ## 348. 2026-08-30 SX-06 intent smoke の結果境界統一
@@ -5583,7 +5583,7 @@ frame／route／clarification の比較、成功時の report と OK 表示は�
 
 検証:
 
-- `pnpm exec vitest run scripts/intent_smoke.test.ts`: **1 file / 1 test passed**。
+- `pnpm exec vitest run scripts/intent/intent_smoke.test.ts`: **1 file / 1 test passed**。
 - `node --import ./scripts/ts-loader.mjs scripts/check_script_integrity.ts`: **OK**。
 - `pnpm check -- --scope full`: **67/67 gates passed**（Chronos を含む承認付き実行）。
 
@@ -5596,8 +5596,8 @@ managed runtime の probe、`--apply` の install 操作、既存の人間向け
 
 検証:
 
-- `pnpm exec vitest run scripts/agy_sdk_setup.test.ts`: **1 file / 1 test passed**。
-- `node --import ./scripts/ts-loader.mjs scripts/agy_sdk_setup.ts`: **needs_install の案内を確認**。
+- `pnpm exec vitest run scripts/agy/agy_sdk_setup.test.ts`: **1 file / 1 test passed**。
+- `node --import ./scripts/ts-loader.mjs scripts/agy/agy_sdk_setup.ts`: **needs_install の案内を確認**。
 - `node --import ./scripts/ts-loader.mjs scripts/check_script_integrity.ts`: **OK**。
 - `pnpm run typecheck`: **passed**。
 
@@ -5610,7 +5610,7 @@ managed runtime の probe、`--apply` の install 操作、既存の人間向け
 
 検証:
 
-- `pnpm exec vitest run scripts/marketing_review_aggregate.test.ts`: **1 file / 5 tests passed**。
+- `pnpm exec vitest run scripts/marketing/marketing_review_aggregate.test.ts`: **1 file / 5 tests passed**。
 - `node --import ./scripts/ts-loader.mjs scripts/check_script_integrity.ts`: **OK**。
 - `pnpm run typecheck`: **passed**。
 
@@ -5638,8 +5638,8 @@ brief drift 防止、`human_only` accountability、approval を自動決定し�
 
 検証:
 
-- `pnpm exec vitest run scripts/mission_alignment_request.test.ts scripts/mission_alignment_e2e.test.ts`: **2 files / 5 tests passed**。
-- `node --import ./scripts/ts-loader.mjs scripts/mission_alignment_request.ts --mission missing-review-probe --json`: **fail-closed JSON と exit 1 を確認**。
+- `pnpm exec vitest run scripts/mission/mission_alignment_request.test.ts scripts/mission/mission_alignment_e2e.test.ts`: **2 files / 5 tests passed**。
+- `node --import ./scripts/ts-loader.mjs scripts/mission/mission_alignment_request.ts --mission missing-review-probe --json`: **fail-closed JSON と exit 1 を確認**。
 - `node --import ./scripts/ts-loader.mjs scripts/check_script_integrity.ts`: **OK**。
 - `pnpm run typecheck`: **passed**。
 
@@ -5652,8 +5652,8 @@ brief drift 防止、`human_only` accountability、approval を自動決定し�
 
 検証:
 
-- `pnpm exec vitest run scripts/mission_alignment_decision.test.ts scripts/mission_alignment_decision.entrypoint.test.ts scripts/mission_alignment_e2e.test.ts`: **3 files / 17 tests passed**。
-- `node --import ./scripts/ts-loader.mjs scripts/mission_alignment_decision.ts --mission missing-review-probe --strict --json`: **fail-closed report と exit 1 を確認**。
+- `pnpm exec vitest run scripts/mission/mission_alignment_decision.test.ts scripts/mission/mission_alignment_decision.entrypoint.test.ts scripts/mission/mission_alignment_e2e.test.ts`: **3 files / 17 tests passed**。
+- `node --import ./scripts/ts-loader.mjs scripts/mission/mission_alignment_decision.ts --mission missing-review-probe --strict --json`: **fail-closed report と exit 1 を確認**。
 - `node --import ./scripts/ts-loader.mjs scripts/check_script_integrity.ts`: **OK**。
 
 ## 354. 2026-08-30 SX-10 super pipeline の結果・失敗境界統一
@@ -5681,7 +5681,7 @@ source boundary test を追加し、将来の direct output 再導入を検知�
 
 検証:
 
-- `pnpm exec vitest run scripts/action_item_reminders.test.ts scripts/agent_runtime_supervisor_status.test.ts scripts/model_feedback.entrypoint.test.ts scripts/promote_voice_profile.test.ts scripts/peer_runtime_recovery.test.ts`: **5 files / 5 tests passed**。
+- `pnpm exec vitest run scripts/action_item_reminders.test.ts scripts/agent/agent_runtime_supervisor_status.test.ts scripts/model_feedback.entrypoint.test.ts scripts/promote/promote_voice_profile.test.ts scripts/peer_runtime_recovery.test.ts`: **5 files / 5 tests passed**。
 - 各 3 CLI の `--help` を実行し、**exit 0 と usage 出力**を確認（昇格／復旧／feedback の write 操作は実行せず）。
 - `node --import ./scripts/ts-loader.mjs scripts/check_script_integrity.ts`: **OK**。
 
@@ -5699,8 +5699,8 @@ watchdog を利用しながら、JSON／human 出力と終了コードを直接 
 
 検証:
 
-- `pnpm exec vitest run scripts/audit_verify.test.ts scripts/audit_verify.entrypoint.test.ts scripts/egress_warn_report.test.ts scripts/egress_warn_report.entrypoint.test.ts scripts/daemon_watchdog.test.ts scripts/daemon_watchdog.entrypoint.test.ts`: **6 files / 12 tests passed**。
-- `node --import ./scripts/ts-loader.mjs scripts/audit_verify.ts --json`: **実 CLI は既存 tenant mirror mismatch 8 件を検出し exit 1**（master／ledger integrity は OK。データ修復は行わず、監査の fail-closed 結果を確認）。
+- `pnpm exec vitest run scripts/audit/audit_verify.test.ts scripts/audit/audit_verify.entrypoint.test.ts scripts/egress_warn_report.test.ts scripts/egress_warn_report.entrypoint.test.ts scripts/daemon_watchdog.test.ts scripts/daemon_watchdog.entrypoint.test.ts`: **6 files / 12 tests passed**。
+- `node --import ./scripts/ts-loader.mjs scripts/audit/audit_verify.ts --json`: **実 CLI は既存 tenant mirror mismatch 8 件を検出し exit 1**（master／ledger integrity は OK。データ修復は行わず、監査の fail-closed 結果を確認）。
 - `node --import ./scripts/ts-loader.mjs scripts/egress_warn_report.ts --json`: **exit 0、warn mode の read-only report を確認**。
 - `node --import ./scripts/ts-loader.mjs scripts/daemon_watchdog.ts --help`: **exit 0、JSON option／usage を確認**。
 - `node --import ./scripts/ts-loader.mjs scripts/check_script_integrity.ts`: **OK**。
@@ -5715,8 +5715,8 @@ approval／dry-run／apply の authority gate と結果 schema は維持し、�
 
 検証:
 
-- `pnpm exec vitest run scripts/audit_mirror_reconcile.entrypoint.test.ts`: **1 file / 2 tests passed**。
-- `node --import ./scripts/ts-loader.mjs scripts/audit_mirror_reconcile.ts --help`: **exit 0、usage report を確認**。
+- `pnpm exec vitest run scripts/audit/audit_mirror_reconcile.entrypoint.test.ts`: **1 file / 2 tests passed**。
+- `node --import ./scripts/ts-loader.mjs scripts/audit/audit_mirror_reconcile.ts --help`: **exit 0、usage report を確認**。
 - 同 CLI の既定 dry-run write は authority gate によって拒否され、今回の確認で実データ変更がないことを確認。
 - `node --import ./scripts/ts-loader.mjs scripts/check_script_integrity.ts`: **OK**。
 - `pnpm run typecheck`、`git diff --check`: **passed**。
@@ -5747,8 +5747,8 @@ provider discovery／capability snapshot、mission team の organization context
 
 検証:
 
-- `pnpm exec vitest run scripts/scan_provider_cli_capabilities.entrypoint.test.ts scripts/compose_mission_team.entrypoint.test.ts libs/core/mission/mission-team-composer.test.ts`: **3 files / 16 tests passed**。
-- `node --import ./scripts/ts-loader.mjs scripts/scan_provider_cli_capabilities.ts --help`: **exit 0、probe／snapshot write なしで usage report を確認**。
+- `pnpm exec vitest run scripts/scan/scan_provider_cli_capabilities.entrypoint.test.ts scripts/compose_mission_team.entrypoint.test.ts libs/core/mission/mission-team-composer.test.ts`: **3 files / 16 tests passed**。
+- `node --import ./scripts/ts-loader.mjs scripts/scan/scan_provider_cli_capabilities.ts --help`: **exit 0、probe／snapshot write なしで usage report を確認**。
 - `node --import ./scripts/ts-loader.mjs scripts/compose_mission_team.ts --help`: **exit 0、mission 必須検証／binding write なしで usage report を確認**。
 - `node --import ./scripts/ts-loader.mjs scripts/check_script_integrity.ts`: **OK**。
 - `pnpm run typecheck`、`pnpm run lint`、`git diff --check`: **passed**。
@@ -5779,9 +5779,9 @@ history の `--alert` 保存、ops alert、`--fail` の fail-closed 終了は維
 
 検証:
 
-- `pnpm exec vitest run scripts/watch_knowledge_scope_health.entrypoint.test.ts`: **1 file / 2 tests passed**。
-- `node --import ./scripts/ts-loader.mjs scripts/watch_knowledge_scope_health.ts --help`: **exit 0、scan／write なしで usage を確認**。
-- `node --import ./scripts/ts-loader.mjs scripts/watch_knowledge_scope_health.ts --json --fail`: **exit 0、3 tenant healthy／legacy 0 の report を確認**。
+- `pnpm exec vitest run scripts/watch/watch_knowledge_scope_health.entrypoint.test.ts`: **1 file / 2 tests passed**。
+- `node --import ./scripts/ts-loader.mjs scripts/watch/watch_knowledge_scope_health.ts --help`: **exit 0、scan／write なしで usage を確認**。
+- `node --import ./scripts/ts-loader.mjs scripts/watch/watch_knowledge_scope_health.ts --json --fail`: **exit 0、3 tenant healthy／legacy 0 の report を確認**。
 - `node --import ./scripts/ts-loader.mjs scripts/check_script_integrity.ts`: **OK**。
 
 ## 362. 2026-08-30 SX-06 tenant drift watchdog の出力境界統一
@@ -5794,9 +5794,9 @@ history の `--alert` 保存、ops alert、`--fail` の fail-closed 終了は維
 
 検証:
 
-- `pnpm exec vitest run scripts/watch_tenant_drift.entrypoint.test.ts scripts/run_baseline_check.test.ts`: **2 files / 31 tests passed**。
-- `node --import ./scripts/ts-loader.mjs scripts/watch_tenant_drift.ts --help`: **exit 0、scan／audit／alert なしで usage を確認**。
-- `node --import ./scripts/ts-loader.mjs scripts/watch_tenant_drift.ts --json`: **exit 0、9 mission paths／drift 0 の report を確認**。
+- `pnpm exec vitest run scripts/watch/watch_tenant_drift.entrypoint.test.ts scripts/run_baseline_check.test.ts`: **2 files / 31 tests passed**。
+- `node --import ./scripts/ts-loader.mjs scripts/watch/watch_tenant_drift.ts --help`: **exit 0、scan／audit／alert なしで usage を確認**。
+- `node --import ./scripts/ts-loader.mjs scripts/watch/watch_tenant_drift.ts --json`: **exit 0、9 mission paths／drift 0 の report を確認**。
 - `node --import ./scripts/ts-loader.mjs scripts/check_script_integrity.ts`: **OK**。
 
 ## 363. 2026-08-30 SX-06 vital／dependency report の出力境界統一
@@ -5810,8 +5810,8 @@ report を出力してから `ScriptExitError` で既存の fail-closed exit cod
 
 検証:
 
-- `pnpm exec vitest run scripts/vital_check.entrypoint.test.ts scripts/vital_check.test.ts scripts/dependency_resolver.entrypoint.test.ts`: **3 files / 8 tests passed**。
-- `node --import ./scripts/ts-loader.mjs scripts/vital_check.ts --help`: **exit 0、runtime report 構築なしで usage を確認**。
+- `pnpm exec vitest run scripts/vital/vital_check.entrypoint.test.ts scripts/vital/vital_check.test.ts scripts/dependency_resolver.entrypoint.test.ts`: **3 files / 8 tests passed**。
+- `node --import ./scripts/ts-loader.mjs scripts/vital/vital_check.ts --help`: **exit 0、runtime report 構築なしで usage を確認**。
 - `node --import ./scripts/ts-loader.mjs scripts/dependency_resolver.ts --help`: **exit 0、dependency probe なしで usage を確認**。
 - `node --import ./scripts/ts-loader.mjs scripts/check_script_integrity.ts`: **OK**。
 
@@ -5825,9 +5825,9 @@ report-ops を呼び出す薄い shell でありながら、JSON／Markdown／ta
 
 検証:
 
-- `pnpm exec vitest run scripts/summarize_memory_promotion_queue.entrypoint.test.ts scripts/summarize_task_model_routing.entrypoint.test.ts`: **2 files / 4 tests passed**。
-- `node --import ./scripts/ts-loader.mjs scripts/summarize_memory_promotion_queue.ts --help`: **exit 0、queue read／write なしで usage を確認**。
-- `node --import ./scripts/ts-loader.mjs scripts/summarize_task_model_routing.ts --help`: **exit 0、event read／write なしで usage を確認**。
+- `pnpm exec vitest run scripts/summarize/summarize_memory_promotion_queue.entrypoint.test.ts scripts/summarize/summarize_task_model_routing.entrypoint.test.ts`: **2 files / 4 tests passed**。
+- `node --import ./scripts/ts-loader.mjs scripts/summarize/summarize_memory_promotion_queue.ts --help`: **exit 0、queue read／write なしで usage を確認**。
+- `node --import ./scripts/ts-loader.mjs scripts/summarize/summarize_task_model_routing.ts --help`: **exit 0、event read／write なしで usage を確認**。
 - `node --import ./scripts/ts-loader.mjs scripts/check_script_integrity.ts`: **OK**。
 
 ## 365. 2026-08-30 SX-08 run_intent gateway の解釈・出力境界統一
@@ -5928,12 +5928,12 @@ reply も文字列だけを成功とするよう揃えた。
 
 ## 371. 2026-08-30 SX-06 customer:list の結果出力境界統一
 
-再レビューで `scripts/customer_list.ts` が `defineScript` を使っている一方、テキスト結果だけを
+再レビューで `scripts/customer/customer_list.ts` が `defineScript` を使っている一方、テキスト結果だけを
 `console.log` から直接出力していた。これを `printText` が行配列を返し、script harness の
 `context.print` が最終出力を担当する形へ揃えた。これにより import／テスト時の副作用を除き、JSON
 出力とテキスト出力の責務を同じ実行境界へ集約した。
 
-検証: `pnpm exec vitest run scripts/customer_list.test.ts`: **1 file / 3 tests passed**、
+検証: `pnpm exec vitest run scripts/customer/customer_list.test.ts`: **1 file / 3 tests passed**、
 `node --import ./scripts/ts-loader.mjs scripts/check_script_integrity.ts`、`git diff --check` が OK。
 
 ## 372. 2026-08-30 SX-06 customer overlay CLI 群の結果出力境界統一
@@ -6273,7 +6273,7 @@ artifact、dependency pair を検証し、map が壊れている場合は不完�
 
 ### 検証
 
-- `pnpm exec vitest run scripts/report_i18n_translation_coverage.test.ts` — 13 tests passed。
+- `pnpm exec vitest run scripts/report/report_i18n_translation_coverage.test.ts` — 13 tests passed。
 - `pnpm run i18n:report -- --json --dry-run` — structured report を出力。
 - `pnpm run i18n:report -- --json --dry-run --quiet` — 無出力で exit 0。
 - `pnpm run i18n:report -- --alert-on-regression --dry-run --quiet` — alert／history write なしで exit 0。
@@ -6415,11 +6415,11 @@ interactive dashboard、MCP／server の custom output、細粒度 command regis
 
 ### 検証
 
-- `pnpm exec vitest run scripts/surface_runtime.entrypoint.test.ts tests/surface-auth.test.ts tests/runtime-surface-operations-contract.test.ts --reporter=dot --pool=forks --maxWorkers=1` — 3 files / 8 tests passed。
+- `pnpm exec vitest run scripts/surface/surface_runtime.entrypoint.test.ts tests/surface-auth.test.ts tests/runtime-surface-operations-contract.test.ts --reporter=dot --pool=forks --maxWorkers=1` — 3 files / 8 tests passed。
 - `pnpm run build:repo` — green。
-- `node dist/scripts/surface_runtime.js --action setup --json` — structured setup report を出力。
-- `node dist/scripts/surface_runtime.js --action setup --json --quiet` — 無出力で exit 0。
-- `node dist/scripts/surface_runtime.js --action start --surface nonexistent --dry-run --json` — mutation なしの preview を出力。
+- `node dist/scripts/surface/surface_runtime.js --action setup --json` — structured setup report を出力。
+- `node dist/scripts/surface/surface_runtime.js --action setup --json --quiet` — 無出力で exit 0。
+- `node dist/scripts/surface/surface_runtime.js --action start --surface nonexistent --dry-run --json` — mutation なしの preview を出力。
 - `pnpm run typecheck`、`pnpm lint`、`git diff --check` — green。
 - `pnpm run check -- --scope full` — 67 gates / failed=0。
 
@@ -6438,7 +6438,7 @@ interactive dashboard、MCP／server の custom output、細粒度 command regis
 
 ### 検証
 
-- `pnpm exec vitest run scripts/setup_report.entrypoint.test.ts tests/setup-report.test.ts scripts/lib/harness.test.ts --reporter=dot --pool=forks --maxWorkers=1` — 3 files / 11 tests passed。
+- `pnpm exec vitest run scripts/setup/setup_report.entrypoint.test.ts tests/setup-report.test.ts scripts/lib/harness.test.ts --reporter=dot --pool=forks --maxWorkers=1` — 3 files / 11 tests passed。
 - `pnpm --filter @agent/core run build`、`pnpm run build:repo` — green。
 - `pnpm kyberion setup report -- --json --quiet` — 依存診断の標準出力を抑制。
 - `pnpm kyberion setup report -- --json` — 人間向け table／logger 出力を混ぜず、report JSON のみを出力。
@@ -6479,7 +6479,7 @@ interactive dashboard、MCP／server の custom output、細粒度 command regis
 
 ### 検証
 
-- `pnpm exec vitest run scripts/peer_server.entrypoint.test.ts scripts/mcp_server.entrypoint.test.ts libs/shared-network/src/mcp-server-engine.test.ts --reporter=dot --pool=forks --maxWorkers=1` — 3 files / 35 tests passed。
+- `pnpm exec vitest run scripts/peer_server.entrypoint.test.ts scripts/mcp/mcp_server.entrypoint.test.ts libs/shared-network/src/mcp-server-engine.test.ts --reporter=dot --pool=forks --maxWorkers=1` — 3 files / 35 tests passed。
 - `pnpm --filter @agent/shared-network run build`、`pnpm run build:repo` — green。
 - `pnpm run typecheck`、`pnpm lint`、`git diff --check` — green。
 - `pnpm run check -- --scope full` — 67 gates / failed=0（Chronos の localhost bind を許可した実環境再検証）。
@@ -6499,7 +6499,7 @@ interactive dashboard、MCP tool catalog／server の custom protocol output、�
 
 ### 検証
 
-- `pnpm exec vitest run scripts/peer_cli.entrypoint.test.ts scripts/peer_server.entrypoint.test.ts scripts/mcp_server.entrypoint.test.ts libs/shared-network/src/mcp-server-engine.test.ts --reporter=dot --pool=forks --maxWorkers=1` — 4 files / 36 tests passed。
+- `pnpm exec vitest run scripts/peer_cli.entrypoint.test.ts scripts/peer_server.entrypoint.test.ts scripts/mcp/mcp_server.entrypoint.test.ts libs/shared-network/src/mcp-server-engine.test.ts --reporter=dot --pool=forks --maxWorkers=1` — 4 files / 36 tests passed。
 - `pnpm --filter @agent/shared-network run build`、`pnpm run build:repo`、`pnpm run typecheck`、`pnpm lint`、`git diff --check` — green。
 - `pnpm run check -- --scope full` — 67 gates / failed=0（Chronos の localhost bind を許可した実環境再検証）。
 
@@ -6519,10 +6519,10 @@ interactive dashboard、MCP tool catalog／server の custom protocol output、�
 
 ### 検証
 
-- `pnpm exec vitest run scripts/lib/harness.test.ts scripts/kyberion.test.ts scripts/check_cli_manifest.test.ts scripts/peer_cli.entrypoint.test.ts scripts/peer_server.entrypoint.test.ts scripts/mcp_server.entrypoint.test.ts libs/core/mesh/peer-conversation.test.ts libs/shared-network/src/mcp-server-engine.test.ts --reporter=dot --pool=forks --maxWorkers=1` — 8 files / 67 tests passed。
+- `pnpm exec vitest run scripts/lib/harness.test.ts scripts/kyberion.test.ts scripts/check_cli_manifest.test.ts scripts/peer_cli.entrypoint.test.ts scripts/peer_server.entrypoint.test.ts scripts/mcp/mcp_server.entrypoint.test.ts libs/core/mesh/peer-conversation.test.ts libs/shared-network/src/mcp-server-engine.test.ts --reporter=dot --pool=forks --maxWorkers=1` — 8 files / 67 tests passed。
 - `pnpm run build:repo`、`pnpm run typecheck`、`pnpm lint`、`git diff --check` — green。
 - `pnpm pipeline --input pipelines/baseline-check.json` — baseline check success。
-- `node dist/scripts/peer_conversation.js --json --dry-run open-session --tenant-id tenant-check --local-peer-id peer-a --remote-peer-id peer-b --topic review`、`node dist/scripts/peer_collaboration.js --json --dry-run accept --peer-id peer-a --tenant-id tenant-check --proposal-id proposal-1 --actor-id operator --reason review`、`node dist/scripts/peer_conversation_server.js --json --dry-run --peer-id peer-a --shared-secret check-secret --tenant-id tenant-check --port 49998`、`node dist/scripts/peer_messaging_server.js --json --dry-run --peer-id peer-a --shared-secret check-secret --tenant-id tenant-check --port 49999`、`node dist/scripts/mcp_server.js --json --dry-run` — いずれも JSON を出力し、外部送信／proposal decision／session 保存／listener bind／stdio 接続なし。
+- `node dist/scripts/peer_conversation.js --json --dry-run open-session --tenant-id tenant-check --local-peer-id peer-a --remote-peer-id peer-b --topic review`、`node dist/scripts/peer_collaboration.js --json --dry-run accept --peer-id peer-a --tenant-id tenant-check --proposal-id proposal-1 --actor-id operator --reason review`、`node dist/scripts/peer_conversation_server.js --json --dry-run --peer-id peer-a --shared-secret check-secret --tenant-id tenant-check --port 49998`、`node dist/scripts/peer_messaging_server.js --json --dry-run --peer-id peer-a --shared-secret check-secret --tenant-id tenant-check --port 49999`、`node dist/scripts/mcp/mcp_server.js --json --dry-run` — いずれも JSON を出力し、外部送信／proposal decision／session 保存／listener bind／stdio 接続なし。
 - `pnpm run check -- --scope full` — 67 gates / failed=0（Chronos の localhost bind を許可した実環境再検証）。
 
 ### 残存
@@ -6598,7 +6598,7 @@ voice surface の end-to-end runtime switching、interactive dashboard、MCP／s
 
 ### 検証
 
-- `pnpm exec vitest run scripts/surface_runtime.entrypoint.test.ts tests/runtime-surface-operations-contract.test.ts tests/next-action.test.ts tests/setup-report.test.ts tests/workflow-operations-contract.test.ts --reporter=dot --pool=forks --maxWorkers=1` — 5 files / 21 tests passed。
+- `pnpm exec vitest run scripts/surface/surface_runtime.entrypoint.test.ts tests/runtime-surface-operations-contract.test.ts tests/next-action.test.ts tests/setup-report.test.ts tests/workflow-operations-contract.test.ts --reporter=dot --pool=forks --maxWorkers=1` — 5 files / 21 tests passed。
 - `pnpm run build:repo`、`pnpm run typecheck`、`pnpm lint`、`git diff --check` — green。
 - `pnpm surfaces status -- --json`、`pnpm surfaces reconcile -- --dry-run --json` — surface status と mutation-free preview を実機確認する。
 
@@ -20799,7 +20799,7 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-05 再レビュー修正 1267
 
-- **対象**: `scripts/promote_procedure.ts`
+- **対象**: `scripts/promote/promote_procedure.ts`
 - **変更**: procedure promotion CLIのmission attributionに残っていた `MISSION_ID` の環境直読を、登録済み `getRegisteredEnvText` へ移行した。明示 `--mission-id` 優先、未指定時の警告、catalog／recording検証、audit記録の既存 semanticsは変更していない。
 - **検証**: promote procedure resource boundary **1 file / 1 test passed**、対象ESLint、Prettier、`git diff --check`、typecheck。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。
 
@@ -20913,7 +20913,7 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-05 再レビュー修正 1286
 
-- **対象**: `scripts/control_plane_cli.ts`、`scripts/control_plane_cli.entrypoint.test.ts`
+- **対象**: `scripts/control/control_plane_cli.ts`、`scripts/control/control_plane_cli.entrypoint.test.ts`
 - **変更**: Control Plane CLIのPresence／Chronos health check URL fallbackに残っていた環境直読を、登録済み `getRegisteredEnvText` へ統一した。既定URL、surface filter、client retry、health resultの既存 semanticsは変更していない。
 - **検証**: Control Plane CLI **2 files / 13 tests passed**、対象ESLint、Prettier、`git diff --check`、typecheck。canonical full gateは`chronos-dom-contrast`のlocalhost listen（`127.0.0.1:3317`）がsandbox外でも`EPERM`となり実行環境制約で未完了。
 
@@ -22136,7 +22136,7 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-06 再レビュー修正 1489
 
-- **対象**: `scripts/intent_trace.ts`、`scripts/intent_trace.test.ts`
+- **対象**: `scripts/intent/intent_trace.ts`、`scripts/intent/intent_trace.test.ts`
 - **変更**: intent trace JSONL の本文読込を foundation の `readTextFile` へ移行した。既存の repository／regular-file 境界、malformed行のskip、trace／snapshot／auditの正規化 semanticsは変更せず、intent trace CLIに残っていた旧 `safeReadFile` 直読を削減した。
 - **検証**: intent-trace **既存テスト**、対象 ESLint、Prettier、`git diff --check`。provider CLIの実機enforcement結果、残る production loader の全件codemod、全script harness／generator移行は継続課題とする。
 
@@ -22400,61 +22400,61 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-06 再レビュー修正 1533
 
-- **対象**: `scripts/reasoning_config.ts`、`scripts/reasoning_config.entrypoint.test.ts`
+- **対象**: `scripts/reasoning/reasoning_config.ts`、`scripts/reasoning/reasoning_config.entrypoint.test.ts`
 - **変更**: reasoning route config の previous snapshot 本文読込を foundation の `readTextFile` へ移行した。route validation、backup/history write、dry-run／governance action semanticsは変更せず、entrypoint contract に reader assertion を追加した。
 - **検証**: reasoning-config **entrypoint contract passed**（1 test）、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1534
 
-- **対象**: `scripts/license_audit.ts`、`scripts/vital_check.ts`、`scripts/google_workspace_meet.ts` と対象テスト
+- **対象**: `scripts/license_audit.ts`、`scripts/vital/vital_check.ts`、`scripts/google_workspace_meet.ts` と対象テスト
 - **変更**: license file、active mission state、Google Workspace Meet payload の本文読込を foundation の `readTextFile` へ統一した。license classification、vital health／mission count、payload scope／JSON validation／gws execution semanticsは変更せず、各既存テストに reader contract を追加した。
 - **検証**: 対象テスト **4 files／10 tests passed**、license／vital／Google Workspace Meet の `--help` プローブ passed、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1535
 
-- **対象**: `scripts/scan_dependency_vulns.ts`、`scripts/run_ai_audit.ts`、`scripts/pipeline_promote.ts` と対象テスト
+- **対象**: `scripts/scan/scan_dependency_vulns.ts`、`scripts/run_ai_audit.ts`、`scripts/pipeline_promote.ts` と対象テスト
 - **変更**: dependency manifest、AI audit invariant/scope、pipeline catalog README の本文読込を foundation の `readTextFile` へ移行した。dependency parsing／vulnerability decision、AI audit scope boundary、pipeline ADF validation／promotion semanticsは変更せず、各境界テストに reader contract を追加した。
 - **検証**: 対象テスト **4 files／22 tests passed**、dependency scan は `0 package(s)`、AI audit の help 出力 passed、pipeline promote は不正な既存入力を governed ADF validation で拒否、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1536
 
-- **対象**: `scripts/marketing_publish_dry_run.ts`、`scripts/export_validation_bundle.ts`、`scripts/apply_dependency_patch.ts` と対象テスト
+- **対象**: `scripts/marketing/marketing_publish_dry_run.ts`、`scripts/export_validation_bundle.ts`、`scripts/apply_dependency_patch.ts` と対象テスト
 - **変更**: marketing text artifact、validation bundle audit JSONL、dependency patch package manifest の本文読込を foundation の `readTextFile` へ移行した。artifact SHA-256／bundle binary copy、approval／audit projection、dependency patch proposal/apply semanticsは変更せず、reader contract を追加した。
 - **検証**: 対象テスト **3 files／24 tests passed**、対象ESLint、Prettier、改善計画metadata（335 documents）、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1537
 
-- **対象**: `scripts/report-review/server.ts`、`scripts/report-review/stamp.ts`、`scripts/audit_mirror_reconcile.ts`、`scripts/reasoning_backend_selection.ts` と対象テスト
+- **対象**: `scripts/report-review/server.ts`、`scripts/report-review/stamp.ts`、`scripts/audit/audit_mirror_reconcile.ts`、`scripts/reasoning/reasoning_backend_selection.ts` と対象テスト
 - **変更**: report-review HTML、audit mirror JSONL、reasoning backend の `.env.local` 本文読込を foundation の `readTextFile` へ移行した。review injection／backup、audit reconcile、backend preference persistence semanticsは変更せず、reader contract を追加した。
 - **検証**: 対象テスト **4 files／17 tests passed**、audit mirror の `--help` プローブ passed、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1538
 
-- **対象**: `scripts/company_onboarding.ts`、`scripts/company_bootstrap.ts`、`scripts/encrypt_connection_documents.ts` と対象テスト
+- **対象**: `scripts/company/company_onboarding.ts`、`scripts/company/company_bootstrap.ts`、`scripts/encrypt_connection_documents.ts` と対象テスト
 - **変更**: onboarding snapshot、company template、connection document の本文読込を foundation の `readTextFile` へ移行した。tenant／customer path boundary、template substitution、encryption/decryption と backup semanticsは変更せず、reader contract を追加した。
 - **検証**: 対象テスト **3 files／13 tests passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1539
 
-- **対象**: `scripts/scenario_storage_governance.ts`、`scripts/source_archive.ts`、`scripts/claude_code_hook.ts`、`scripts/mission-alignment-gate/read-decision.ts` と対象テスト
+- **対象**: `scripts/scenario/scenario_storage_governance.ts`、`scripts/source_archive.ts`、`scripts/claude_code_hook.ts`、`scripts/mission-alignment-gate/read-decision.ts` と対象テスト
 - **変更**: scenario log、source archive checksum manifest、Claude hook transcript、mission alignment HTML の本文読込を foundation の `readTextFile` へ移行した。archive／screen recordingのバイナリ読込、scenario／hook／alignmentの既存境界・出力 semanticsは変更せず、reader contract を追加した。
 - **検証**: 対象テスト **4 files／12 tests passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1540
 
-- **対象**: `scripts/run_baseline_check.ts`、`scripts/soak_endurance.ts`、`scripts/pipeline-execution-part-execution.ts` と対象テスト
+- **対象**: `scripts/run_baseline_check.ts`、`scripts/soak/soak_endurance.ts`、`scripts/pipeline-execution-part-execution.ts` と対象テスト
 - **変更**: baseline config、soak evidence、pipeline fragment の本文読込を foundation の `readTextFile` へ移行した。baseline／soak／pipelineの既存実行・環境境界・evidence semanticsは変更せず、reader contract を追加した。
 - **検証**: 対象テスト **3 files／40 tests passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1541
 
-- **対象**: `scripts/migrate_peer_tenant_runtime.ts`、`scripts/migrate_physical_namespaces.ts`、`scripts/marketing_video_dry_run.ts` と対象テスト
+- **対象**: `scripts/migrate/migrate_peer_tenant_runtime.ts`、`scripts/migrate/migrate_physical_namespaces.ts`、`scripts/marketing/marketing_video_dry_run.ts` と対象テスト
 - **変更**: peer tenant／physical namespace migration の入力・ハッシュ対象本文、marketing video の brief／brand／生成テキスト本文を foundation の `readTextFile` へ移行した。移行のtenant scope／quarantine、SHA-256・バイナリアーティファクト、marketing approval／media semanticsは変更せず、reader contract を追加した。
 - **検証**: 対象テスト **3 files／18 tests passed**、対象ESLint、Prettier、改善計画metadata（335 documents）、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1542
 
-- **対象**: `scripts/agent_runtime_supervisor_daemon.ts`、`scripts/refactor/prune_unused_imports.ts` と reader contract tests
+- **対象**: `scripts/agent/agent_runtime_supervisor_daemon.ts`、`scripts/refactor/prune_unused_imports.ts` と reader contract tests
 - **変更**: supervisor daemon のロックPID本文と import-pruning refactor の対象ソース本文を foundation の `readTextFile` へ移行した。バイナリ用途の secure-io 読取、daemon の stale-lock 判定／cleanup、import pruning の AST解析・write semanticsは変更せず、両エントリポイントに reader contract を追加した。
 - **検証**: supervisor daemon **既存テスト＋reader contract passed**（11 tests）、prune refactor の dry-run probe passed、foundation-adoption **passed**、対象ESLint、Prettier、改善計画metadata（335 documents）、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
 
@@ -22790,7 +22790,7 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-06 再レビュー実装 1598
 
-- **対象**: `libs/core/provider/provider-capability-overview.ts`、`scripts/scan_provider_cli_capabilities.ts`、provider capability snapshot schema／tests、SX-08B
+- **対象**: `libs/core/provider/provider-capability-overview.ts`、`scripts/scan/scan_provider_cli_capabilities.ts`、provider capability snapshot schema／tests、SX-08B
 - **変更**: provider CLI受入の残差を、version／helpの静的検出だけでなく、既存のprovider capability registryが返すruntime probe（binary検出、認証状態、sandbox flag状態）まで governed snapshotへ投影するようにした。snapshot parser／JSON Schemaを拡張し、build済みcore package経由のscanでもruntime probeを保存する。probe error本文や実行引数はsnapshotへ持ち込まず、表示・監査用の最小証跡に限定した。
 - **検証**: build後の実scanで provider registry の registered／available capability／available provider／missing provider 集計を取得し、snapshotのruntime probe（認証 true／false／unknown、sandbox supported／unsupported）を確認。provider capability overview／scan entrypoint／report contract **3 files／6 tests passed**、root typecheck、Prettier、`git diff --check`。live model call とOS-level enforcementの実証は外部CLI・環境依存の継続課題とする。
 
@@ -23060,7 +23060,7 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-06 再レビュー実装 1643
 
-- **対象**: `package.json`、`scripts/reasoning_auth_check.ts`、entrypoint test、PI-11
+- **対象**: `package.json`、`scripts/reasoning/reasoning_auth_check.ts`、entrypoint test、PI-11
 - **変更**: 既存のcredential shape／provider probe実装を重複させず、利用者向けのcanonical `pnpm kyberion auth check` を `reasoning_auth_check.ts` の module-backed command へ接続した。`--backend`、`--json`、`--probe`、`--quiet` は既存のshared harness経路を維持する。
 - **検証**: entrypoint **1 file／2 tests passed**、stub実行、Prettier、`git diff --check`、隔離環境root typecheck **exit 0**。通常auth checkは資格情報を出力せず、実provider検証は明示的な`--probe`経路に限定する。
 
@@ -23126,13 +23126,13 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-06 再レビュー実装 1654
 
-- **対象**: `scripts/agent_runtime_supervisor_daemon.ts`、`scripts/agent_runtime_supervisor_daemon.reader.test.ts`、PI-03
+- **対象**: `scripts/agent/agent_runtime_supervisor_daemon.ts`、`scripts/agent/agent_runtime_supervisor_daemon.reader.test.ts`、PI-03
 - **変更**: agent runtime supervisorのPID lock inspection／cleanup readを`readDaemonLockTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementを多重起動・stale lock裁定へ到達させないようにした。既存のhealthy／stale lock semanticsは維持した。
 - **検証**: supervisor lock reader **2 files／2 tests passed**、対象ESLint、Prettier、`git diff --check`。scripts全体のneeds-review個別確認とprovider実機受入は継続する。
 
 ## 2026-09-06 再レビュー実装 1655
 
-- **対象**: `scripts/marketing_video_dry_run.ts`、`scripts/marketing_video_dry_run.path.test.ts`、PI-03
+- **対象**: `scripts/marketing/marketing_video_dry_run.ts`、`scripts/marketing/marketing_video_dry_run.path.test.ts`、PI-03
 - **変更**: marketing video dry-runのcampaign brief／brand profile／生成artifact本文readを`readMarketingTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをmarketing validation／sensitive-data scanへ到達させないようにした。既存のpath scope、validation、dry-run semanticsは維持した。
 - **検証**: marketing dry-run path **2 files／5 tests passed**、対象ESLint、Prettier、`git diff --check`。scripts全体のneeds-review個別確認とprovider実機受入は継続する。
 
@@ -23180,13 +23180,13 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-06 再レビュー実装 1663
 
-- **対象**: `scripts/migrate_peer_tenant_runtime.ts`、`scripts/migrate_peer_tenant_runtime.test.ts`、PI-03
+- **対象**: `scripts/migrate/migrate_peer_tenant_runtime.ts`、`scripts/migrate/migrate_peer_tenant_runtime.test.ts`、PI-03
 - **変更**: peer tenant migrationのplan生成／apply再検証本文readを`readMigrationTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをtenant分割・hash再検証へ到達させないようにした。既存のtenant split、quarantine、migration plan semanticsは維持した。
 - **検証**: peer tenant migration **2 files／6 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。scripts全体のneeds-review個別確認とprovider実機受入は継続する。
 
 ## 2026-09-06 再レビュー実装 1664
 
-- **対象**: `scripts/reasoning_backend_selection.ts`、`scripts/reasoning_backend_selection.test.ts`、PI-03
+- **対象**: `scripts/reasoning/reasoning_backend_selection.ts`、`scripts/reasoning/reasoning_backend_selection.test.ts`、PI-03
 - **変更**: reasoning backend selectionの`.env.local` preference readを`readReasoningSelectionTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをbackend／persona preference解析へ到達させないようにした。既存のpolicy-derived choicesとdotenv upsert semanticsは維持した。
 - **検証**: reasoning backend selection **2 files／8 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。scripts全体のneeds-review個別確認とprovider実機受入は継続する。
 
@@ -23204,7 +23204,7 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-06 再レビュー実装 1667
 
-- **対象**: `scripts/scenario_storage_governance.ts`、`scripts/scenario_storage_governance.resource-boundary.test.ts`、PI-03
+- **対象**: `scripts/scenario/scenario_storage_governance.ts`、`scripts/scenario/scenario_storage_governance.resource-boundary.test.ts`、PI-03
 - **変更**: storage governance scenarioのtenant mirror／process log本文readを`readScenarioTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをscenarioの監査・process log解析へ到達させないようにした。既存のaudit-chain、vault、process logger semanticsは維持した。
 - **検証**: storage governance scenario **2 files／4 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。scripts全体のneeds-review個別確認とprovider実機受入は継続する。
 
@@ -23420,7 +23420,7 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-06 再レビュー実装 1703
 
-- **対象**: `scripts/intent_smoke.ts`、`scripts/intent_smoke.test.ts`、PI-03
+- **対象**: `scripts/intent/intent_smoke.ts`、`scripts/intent/intent_smoke.test.ts`、PI-03
 - **変更**: intent smokeのsummary本文readを`readIntentSmokeTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをsmoke report outputへ到達させないようにした。既存のintent execution、governed output path、failure aggregation semanticsは維持した。
 - **検証**: intent smoke **2 files／2 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。
 
@@ -23438,7 +23438,7 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 ## 2026-09-06 再レビュー実装 1706
 
-- **対象**: `scripts/reasoning_config.ts`、`scripts/reasoning_config.entrypoint.test.ts`、PI-03
+- **対象**: `scripts/reasoning/reasoning_config.ts`、`scripts/reasoning/reasoning_config.entrypoint.test.ts`、PI-03
 - **変更**: reasoning configのprevious route config本文readを`readReasoningConfigTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをbackup／history mutation判定へ到達させないようにした。既存のdry-run、revision、governance action semanticsは維持した。
 - **検証**: reasoning config **2 files／2 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。
 

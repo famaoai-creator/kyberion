@@ -4,7 +4,7 @@ import {
   collectBaselineBuildInspection,
   inspectBaselineBuildReadiness,
 } from './baseline_build_readiness.js';
-import type { StaleDistTarget } from './check_stale_dist.js';
+import type { StaleDistTarget } from './check/check_stale_dist.js';
 
 // Exercise the real inter-process mutex under a fixture key, so a developer's
 // live build and another test worker never share this test's resource.

@@ -27,7 +27,7 @@ export async function requestWorkItemMissionAlignment(authorized: WorkItem) {
     !['ready', 'blocked'].includes(authorized.status)
   )
     throw new Error('only a held typed mission intake can request alignment');
-  const script = pathResolver.rootResolve('dist/scripts/mission_alignment_request.js');
+  const script = pathResolver.rootResolve('dist/scripts/mission/mission_alignment_request.js');
   if (!safeExistsSync(script)) throw new Error('build the governed mission alignment script first');
   const env = serverDelegatedChildEnv('mission_controller');
   delete env.MISSION_ID;

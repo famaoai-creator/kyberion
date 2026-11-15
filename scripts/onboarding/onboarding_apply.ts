@@ -1,0 +1,818 @@
+import * as path from 'node:path';
+import { writeJson as writeGovernedJson } from '@agent/core/foundation/json';
+import { safeExec } from '@agent/core/secure-io';
+import {
+  normalizeRepositoryTarget,
+  parseExternalOperationGrant,
+} from '@agent/core/governance/external-operation-target';
+import {
+  vcsHostOptionsForRunner,
+  vcsHostRepositoryVisibility,
+} from '@agent/core/vcs/vcs-host-verbs';
+import type { VcsCommandRunner } from '@agent/core/vcs/git';
+import yargs from 'yargs';
+import { pathResolver } from '@agent/core/path-resolver';
+import { resolveActiveProfileRoot } from '@agent/core/profile-root';
+import {
+  writePersonalAgentIdentityAtPath,
+  readPersonalAgentIdentityStrictAtPath,
+  personalAgentIdentityRevision,
+} from '@agent/core/personal-identity-state';
+import { ensureAgentIdentityProvisioned } from '@agent/core/agent/agent-identity';
+import {
+  ensureOwnerMember,
+  ownerAccountableHumanId,
+  writeMemberProfile,
+} from '@agent/core/organization/member-registry';
+import {
+  onboardingAgentIdentityParameters,
+  inspectInstalledOnboardingRuntime,
+} from '@agent/core/organization/onboarding-runtime-identity';
+import {
+  findActiveCharter,
+  findLatestCharterForRenewal,
+} from '@agent/core/governance/accountability-charter-registry';
+import { shellQuoteArg } from '@agent/core/organization/tenant-governance';
+import {
+  resolveOnboardingFlowPolicy,
+  resolveOnboardingText,
+} from '@agent/core/organization/onboarding-flow-policy';
+import { resolveOnboardingSummaryPolicy } from '@agent/core/organization/onboarding-summary-policy';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeMkdir,
+  safeWriteFile,
+} from '@agent/core/secure-io';
+import { withExecutionContext, withExecutionContextAsync } from '@agent/core/authority';
+import { withLock } from '@agent/core/foundation/lock-utils';
+import { resolveOperatorLocale } from '@agent/core/surface/operator-identity';
+import { isValidTenantSlug } from '@agent/core/foundation/scope';
+import {
+  loadOnboardingApplyInputAtPath,
+  validateOnboardingApplyInput,
+  type OnboardingApplyInput,
+} from '@agent/core/organization/onboarding-apply-input';
+import {
+  compileSchema,
+  isRecord,
+  nowIso,
+  parseSafeJsonInput,
+  setRegisteredEnv,
+} from '@agent/core/foundation';
+import {
+  evaluateReasoningBackend,
+  formatReasoningSummary,
+  type OnboardingReasoningState,
+} from './onboarding_reasoning.js';
+import { generateOnboardingRunbookSkill } from './onboarding_runbook_skill.js';
+import {
+  normalizeReasoningBackendChoice,
+  persistReasoningBackend,
+  persistPersona,
+  readPersistedPersona,
+} from '../reasoning/reasoning_backend_selection.js';
+import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
+
+type Print = (value: unknown) => void;
+
+const ONBOARDING_IDENTITY_EXAMPLE = 'knowledge/public/templates/onboarding/identity.example.json';
+
+type ApplyInput = OnboardingApplyInput;
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+function assertInstalledAgentHandle(agentId: unknown): void {
+  const validate = compileSchema(
+    pathResolver.rootResolve('knowledge/product/schemas/personal-agent-identity.schema.json')
+  );
+  if (!validate({ agent_id: agentId }))
+    throw new Error('Reviewed agent_id does not match the installed identity schema.');
+}
+
+function profileRoot(): string {
+  return resolveActiveProfileRoot();
+}
+
+const ONBOARDING_PERSONAS = [
+  'sovereign',
+  'ecosystem_architect',
+  'mission_owner',
+  'worker',
+  'analyst',
+] as const;
+
+function resolveInputPersona(input: ApplyInput): ApplyInput['identity']['persona'] {
+  const requested = input.identity.persona?.trim().toLowerCase().replace(/\s+/g, '_');
+  if (
+    requested &&
+    ONBOARDING_PERSONAS.includes(requested as (typeof ONBOARDING_PERSONAS)[number])
+  ) {
+    return requested as ApplyInput['identity']['persona'];
+  }
+  const persisted = readPersistedPersona();
+  if (
+    persisted &&
+    ONBOARDING_PERSONAS.includes(persisted as (typeof ONBOARDING_PERSONAS)[number])
+  ) {
+    return persisted as ApplyInput['identity']['persona'];
+  }
+  return 'sovereign';
+}
+
+function onboardingRoot(): string {
+  return path.join(profileRoot(), 'onboarding');
+}
+
+function statePath(): string {
+  return path.join(onboardingRoot(), 'onboarding-state.json');
+}
+
+function summaryPath(): string {
+  return path.join(onboardingRoot(), 'onboarding-summary.md');
+}
+
+export function buildActivationInput(now: Date) {
+  return {
+    scope_kind: 'person' as const,
+    mode: 'activate' as const,
+    grants: [],
+    expires_at: new Date(now.getTime() + 30 * 86_400_000).toISOString(),
+  };
+}
+
+function activationInputPath(): string {
+  return path.join(onboardingRoot(), 'activation-input.json');
+}
+
+function delegationInputPath(): string {
+  return path.join(onboardingRoot(), 'delegation-input.json');
+}
+
+/** Human-editable template for the grant-mode authority request: prefilled
+ * with this repository's own vcs targets so the operator can pick which exact
+ * operations the charter delegates after activation. */
+export async function buildDelegationInput(
+  now: Date,
+  options: { verifyVisibility?: boolean; run?: VcsCommandRunner; remote?: string } = {}
+) {
+  const remote =
+    options.remote ??
+    (() => {
+      try {
+        return safeExec('git', ['remote', 'get-url', '--push', 'origin'], {
+          cwd: pathResolver.rootDir(),
+        }).trim();
+      } catch {
+        return '';
+      }
+    })();
+  const normalized = remote ? normalizeRepositoryTarget(remote) : undefined;
+  const verifiedShape = parseExternalOperationGrant({
+    operation_id: 'vcs:pr_create',
+    repository: normalized,
+  });
+  const repository =
+    verifiedShape && 'repository' in verifiedShape ? verifiedShape.repository : undefined;
+  const target = repository ? new URL(repository) : undefined;
+  const privateRepository = Boolean(
+    options.verifyVisibility &&
+    target &&
+    (await vcsHostRepositoryVisibility({
+      ...vcsHostOptionsForRunner({ cwd: pathResolver.rootDir() }, options.run),
+      repository: { host: target.host, slug: target.pathname.replace(/^\//, '') },
+    })) === 'private'
+  );
+  const visibility = privateRepository ? { visibility: 'private' as const } : {};
+  const grants = repository
+    ? [
+        { operation_id: 'vcs:pr_create' as const, repository, ...visibility },
+        { operation_id: 'vcs:pr_merge' as const, repository, branch: 'main', ...visibility },
+        // Feature branches are the everyday development surface — without a
+        // pattern grant every push and every stacked-PR merge asks again.
+        // 'main' itself stays outside the pattern: direct pushes and the
+        // exact main merge keep their own grant.
+        {
+          operation_id: 'vcs:pr_merge' as const,
+          repository,
+          branch_pattern: 'feat/*',
+          ...visibility,
+        },
+        {
+          operation_id: 'vcs:push' as const,
+          repository,
+          branch: 'agent/kyberion-development',
+          ...visibility,
+        },
+        {
+          operation_id: 'vcs:push' as const,
+          repository,
+          branch_pattern: 'feat/*',
+          ...visibility,
+        },
+      ]
+    : [];
+  return {
+    scope_kind: 'person' as const,
+    mode: 'grant' as const,
+    renew_existing: true,
+    grants,
+    data_tier: {
+      read: privateRepository ? ['public', 'personal'] : ['public'],
+      write: privateRepository ? ['public', 'personal'] : ['public'],
+    },
+    expires_at: new Date(now.getTime() + 90 * 86_400_000).toISOString(),
+  };
+}
+
+export interface ActivationSetup {
+  status: 'activation_available' | 'identity_active' | 'existing_authority' | 'unavailable';
+  input_path?: string;
+}
+
+export async function prepareActivationSetup(
+  now: Date,
+  options: { verifyVisibility?: boolean } = {}
+): Promise<ActivationSetup> {
+  const runtime = inspectInstalledOnboardingRuntime({ kind: 'person' });
+  if (!runtime.ready) return { status: 'unavailable' };
+  await withLock('onboarding-development-input', async () => {
+    const pending = withExecutionContext(
+      'sovereign_concierge',
+      () => !safeExistsSync(delegationInputPath())
+    );
+    if (!pending) return;
+    // The visibility probe is async (vcs-host seam); the governed write stays
+    // in the env-mirrored sync context, as before.
+    const input = await withExecutionContextAsync('sovereign_concierge', () =>
+      buildDelegationInput(now, options)
+    );
+    withExecutionContext('sovereign_concierge', () => {
+      const delegation = delegationInputPath();
+      if (!safeExistsSync(delegation)) {
+        ensureDir(path.dirname(delegation));
+        writeGovernedJson(delegation, input, { createOnly: true });
+      }
+    });
+  });
+  if (runtime.agentActive) return { status: 'identity_active' };
+  const existing = withExecutionContext(
+    'sovereign_concierge',
+    () =>
+      findActiveCharter({ kind: 'person' }, now) ?? findLatestCharterForRenewal({ kind: 'person' })
+  );
+  if (existing) return { status: 'existing_authority' };
+  await withLock('onboarding-activation-input', async () => {
+    withExecutionContext('sovereign_concierge', () => {
+      const file = activationInputPath();
+      // Rerunning onboarding must not change an already reviewed expiry/digest.
+      if (safeExistsSync(file)) return;
+      ensureDir(path.dirname(file));
+      writeGovernedJson(file, buildActivationInput(now), { createOnly: true });
+    });
+  });
+  return { status: 'activation_available', input_path: activationInputPath() };
+}
+
+export function activationNextStep(setup?: ActivationSetup): string {
+  if (setup?.status !== 'activation_available' || !setup.input_path)
+    return 'Inspect existing activation, pending requests and charter limits with `pnpm kyberion onboarding authority show --scope person --json`; resume the listed request with status/apply. Already active identities need no new activation consent.';
+  const reviewed = path.join(path.dirname(setup.input_path), 'activation-reviewed.json');
+  const delegation = delegationInputPath();
+  const developmentReviewed = path.join(
+    path.dirname(setup.input_path),
+    'development-reviewed.json'
+  );
+  return `For a newly provisioned identity, first run \`pnpm kyberion onboarding authority show --scope person --json\` and resume any existing request. For Kyberion development, review ${delegation}, including its expiry, repository, read/write tiers, candidate branch agent/kyberion-development, the feat/* branch pattern for pushes and feature-base merges, and merge target main. Run \`pnpm kyberion onboarding authority preview --file ${shellQuoteArg(delegation)} --out ${shellQuoteArg(developmentReviewed)} --json\`, inspect the saved preview, then \`pnpm kyberion onboarding authority request --file ${shellQuoteArg(developmentReviewed)} --json\`. One human approval activates the provisioned identity and grants the displayed development operations together; apply the displayed request ID. If activation without outbound delegation is intended, review ${setup.input_path} and use \`pnpm kyberion onboarding authority preview --file ${shellQuoteArg(setup.input_path)} --out ${shellQuoteArg(reviewed)} --json\` with the same request/approval/apply flow instead. Existing reviewed files are retained; choose a new output name when changing the plan.`;
+}
+
+export function ensureDir(p: string) {
+  // The selected persona is the default for subsequent work, not the writer
+  // of its own onboarding profile. Use the same bounded context as the
+  // identity writes, including when creating a fresh profile directory.
+  withExecutionContext('sovereign_concierge', () => {
+    if (!safeExistsSync(p)) safeMkdir(p, { recursive: true });
+  });
+}
+
+export function resolveOnboardingInputPath(filePath: string): string {
+  return assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+}
+
+export async function readInput(file?: string): Promise<ApplyInput> {
+  if (file) {
+    const safeFile = resolveOnboardingInputPath(file);
+    if (!safeExistsSync(safeFile) || !safeLstat(safeFile).isFile()) {
+      throw new Error(
+        `identity file not found: ${file}. Copy ${ONBOARDING_IDENTITY_EXAMPLE} and retry, or use --dry-run first.`
+      );
+    }
+    return loadOnboardingApplyInputAtPath(safeFile);
+  }
+  // stdin fallback
+  if (process.stdin.isTTY) {
+    throw new Error(
+      `No --identity given and stdin is a TTY. Pipe JSON or pass --identity <path>. Example: ${ONBOARDING_IDENTITY_EXAMPLE}. Use --dry-run first if you want to validate the payload.`
+    );
+  }
+  const chunks: Buffer[] = [];
+  for await (const chunk of process.stdin) chunks.push(chunk as Buffer);
+  return parseApplyInput(
+    parseSafeJsonInput(Buffer.concat(chunks).toString('utf8'), 'onboarding identity input')
+  );
+}
+
+export function parseApplyInput(value: unknown): ApplyInput {
+  validateInput(value);
+  return validateOnboardingApplyInput(value);
+}
+
+export function validateInput(input: unknown): asserts input is ApplyInput {
+  if (!isRecord(input) || !isRecord(input.identity)) {
+    throw new Error(`identity block is required. See ${ONBOARDING_IDENTITY_EXAMPLE}.`);
+  }
+  const candidate = input as {
+    identity: Record<string, unknown>;
+    tenants?: unknown;
+    tutorial?: unknown;
+    reasoning_backend?: unknown;
+  };
+  const { name, language, interaction_style, primary_domain, vision, agent_id, persona } =
+    candidate.identity;
+  if (
+    !isNonEmptyString(name) ||
+    !isNonEmptyString(language) ||
+    !isNonEmptyString(interaction_style) ||
+    !isNonEmptyString(primary_domain) ||
+    !isNonEmptyString(vision) ||
+    !isNonEmptyString(agent_id)
+  ) {
+    throw new Error(
+      `identity requires {name, language, interaction_style, primary_domain, vision, agent_id}. See ${ONBOARDING_IDENTITY_EXAMPLE}.`
+    );
+  }
+  if (!['Senior Partner', 'Concierge', 'Minimalist'].includes(interaction_style)) {
+    throw new Error(
+      `interaction_style must be one of Senior Partner | Concierge | Minimalist, got: ${interaction_style}`
+    );
+  }
+  assertInstalledAgentHandle(agent_id);
+  if (persona !== undefined) {
+    const normalizedPersona = isNonEmptyString(persona)
+      ? persona.trim().toLowerCase().replace(/\s+/g, '_')
+      : '';
+    if (!ONBOARDING_PERSONAS.includes(normalizedPersona as (typeof ONBOARDING_PERSONAS)[number])) {
+      throw new Error(
+        `persona must be one of ${ONBOARDING_PERSONAS.join(' | ')}, got: ${String(persona)}`
+      );
+    }
+  }
+  if (candidate.tenants !== undefined && !Array.isArray(candidate.tenants)) {
+    throw new Error('tenants must be an array when provided.');
+  }
+  for (const tenant of Array.isArray(candidate.tenants) ? candidate.tenants : []) {
+    if (
+      !isRecord(tenant) ||
+      !isNonEmptyString(tenant.tenant_slug) ||
+      !isNonEmptyString(tenant.display_name) ||
+      !isNonEmptyString(tenant.assigned_role) ||
+      (tenant.purpose !== undefined && !isNonEmptyString(tenant.purpose))
+    ) {
+      throw new Error(
+        'tenant entries require tenant_slug, display_name, and assigned_role strings.'
+      );
+    }
+    if (!isValidTenantSlug(tenant.tenant_slug)) {
+      throw new Error(`Invalid tenant_slug: ${tenant.tenant_slug}`);
+    }
+  }
+  if (candidate.tutorial !== undefined) {
+    if (
+      !isRecord(candidate.tutorial) ||
+      !['simulate', 'apply', 'skipped'].includes(String(candidate.tutorial.mode))
+    ) {
+      throw new Error('tutorial.mode must be one of simulate | apply | skipped.');
+    }
+    if (candidate.tutorial.summary !== undefined && !isNonEmptyString(candidate.tutorial.summary)) {
+      throw new Error('tutorial.summary must be a non-empty string when provided.');
+    }
+  }
+  if (candidate.reasoning_backend !== undefined) {
+    if (!isNonEmptyString(candidate.reasoning_backend)) {
+      throw new Error('reasoning_backend must be a non-empty string when provided.');
+    }
+    if (normalizeReasoningBackendChoice(candidate.reasoning_backend) === null) {
+      throw new Error(
+        `Invalid reasoning_backend: ${candidate.reasoning_backend}. See knowledge/product/governance/reasoning-backend-policy.json (allowed_modes).`
+      );
+    }
+  }
+}
+
+export async function writeJson(filePath: string, payload: unknown, lockName: string) {
+  await withLock(lockName, async () => {
+    withExecutionContext('sovereign_concierge', () => {
+      ensureDir(path.dirname(filePath));
+      safeWriteFile(filePath, JSON.stringify(payload, null, 2));
+    });
+  });
+}
+
+export async function writeText(filePath: string, content: string, lockName: string) {
+  await withLock(lockName, async () => {
+    withExecutionContext('sovereign_concierge', () => {
+      ensureDir(path.dirname(filePath));
+      safeWriteFile(filePath, content);
+    });
+  });
+}
+
+export async function applyIdentity(input: ApplyInput, now: string) {
+  const profileDir = profileRoot();
+  const agentProfilePath = path.join(profileDir, 'agent-identity.json');
+  const agentProfileRevision = withExecutionContext('sovereign_concierge', () =>
+    personalAgentIdentityRevision(readPersonalAgentIdentityStrictAtPath(agentProfilePath))
+  );
+  const id = input.identity;
+  assertInstalledAgentHandle(id.agent_id);
+  // Identity setup provisions a reviewed identity; only its separate signed
+  // authority plan may activate it. Resolve before overwriting any profile.
+  const agent = withExecutionContext('sovereign_concierge', () => {
+    const owner = ensureOwnerMember();
+    if (owner.status !== 'active') throw new Error('Active accountable owner required.');
+    const parameters = onboardingAgentIdentityParameters(id.agent_id, ownerAccountableHumanId());
+    return withExecutionContext('mission_controller', () => {
+      const record = ensureAgentIdentityProvisioned({
+        ...parameters,
+        displayName: id.name,
+        accountableHumanId: ownerAccountableHumanId(),
+      });
+      if (
+        record.accountable_human_id !== ownerAccountableHumanId() ||
+        ['suspended', 'retired'].includes(record.lifecycle_status)
+      )
+        throw new Error(
+          'Installed agent is suspended, retired or has a different accountable human.'
+        );
+      return record;
+    });
+  });
+  ensureDir(profileDir);
+  ensureDir(onboardingRoot());
+
+  const persona = resolveInputPersona(input);
+
+  await writeJson(
+    path.join(profileDir, 'my-identity.json'),
+    {
+      name: id.name,
+      language: id.language,
+      interaction_style: id.interaction_style,
+      primary_domain: id.primary_domain,
+      persona,
+      created_at: now,
+      status: 'active',
+      version: '1.0.0',
+    },
+    'onboarding-my-identity'
+  );
+
+  await writeText(
+    path.join(profileDir, 'my-vision.md'),
+    `# Sovereign Vision\n\n${id.vision}\n`,
+    'onboarding-my-vision'
+  );
+
+  withExecutionContext('sovereign_concierge', () =>
+    writePersonalAgentIdentityAtPath(
+      path.join(profileDir, 'agent-identity.json'),
+      {
+        agent_id: id.agent_id,
+        nhi_id: agent.nhi_id,
+        version: '1.0.0',
+        role: 'Ecosystem Architect / Senior Partner',
+        owner: id.name,
+        trust_tier: 'sovereign',
+        persona,
+        created_at: now,
+        description: `The primary autonomous entity of the Kyberion Ecosystem for ${id.name}.`,
+      },
+      agentProfileRevision
+    )
+  );
+  withExecutionContext('sovereign_concierge', () => {
+    const owner = ensureOwnerMember();
+    if (owner.status !== 'active') throw new Error('Active accountable owner required.');
+    if (owner.display_name !== id.name)
+      writeMemberProfile({ ...owner, display_name: id.name, updated_at: now });
+  });
+}
+
+export async function applyTenants(
+  input: ApplyInput,
+  now: string
+): Promise<Array<Record<string, unknown>>> {
+  const tenants = input.tenants || [];
+  const tenantDir = path.join(profileRoot(), 'tenants');
+  ensureDir(tenantDir);
+  const entries: Array<Record<string, unknown>> = [];
+  for (const t of tenants) {
+    const profile = {
+      tenant_slug: t.tenant_slug,
+      tenant_id: t.tenant_slug,
+      display_name: t.display_name,
+      status: 'active' as const,
+      assigned_role: t.assigned_role,
+      purpose: t.purpose,
+      created_at: now,
+      // Cross-tenant/public learning is an explicit brokered promotion, never
+      // an onboarding default. Strict isolation must remain meaningful.
+      isolation_policy: { strict_isolation: true, allow_cross_distillation: false },
+      metadata: { onboarding_source: 'pnpm onboarding apply' },
+    };
+    await writeJson(
+      path.join(tenantDir, `${t.tenant_slug}.json`),
+      profile,
+      `onboarding-tenant-${t.tenant_slug}`
+    );
+    entries.push({
+      tenant_slug: t.tenant_slug,
+      tenant_id: t.tenant_slug,
+      display_name: t.display_name,
+      status: 'active',
+      assigned_role: t.assigned_role,
+      purpose: t.purpose,
+      created_at: now,
+    });
+  }
+  return entries;
+}
+
+export async function applyTutorial(input: ApplyInput, now: string) {
+  const mode = input.tutorial?.mode || 'simulate';
+  const flowPolicy = resolveOnboardingFlowPolicy();
+  const onboardingLocale = resolveOperatorLocale();
+  const summary =
+    input.tutorial?.summary ||
+    resolveOnboardingText(flowPolicy.tutorial_default_summary, onboardingLocale);
+  const planPath = path.join(onboardingRoot(), 'tutorial-plan.md');
+  await writeText(
+    planPath,
+    [
+      `# ${resolveOnboardingText(flowPolicy.tutorial_plan_title, onboardingLocale)}`,
+      '',
+      `- Mode: ${mode}`,
+      `- Summary: ${summary}`,
+      '',
+      `## ${resolveOnboardingText(flowPolicy.tutorial_next_step_title, onboardingLocale)}`,
+      mode === 'apply'
+        ? '- Review the plan and create a mission manually if the setup is ready.'
+        : '- Run the tutorial as a dry-run first, then decide whether to promote it to a mission.',
+      '',
+    ].join('\n'),
+    'onboarding-tutorial-plan'
+  );
+  return { mode, summary, plan_path: planPath };
+}
+
+export function buildState(
+  input: ApplyInput,
+  now: string,
+  tenantEntries: Array<Record<string, unknown>>,
+  tutorial: { mode: string; summary: string; plan_path: string },
+  reasoning: OnboardingReasoningState
+) {
+  const persona = resolveInputPersona(input);
+  return {
+    version: '1.0.0' as const,
+    status: 'complete' as const,
+    current_phase: 'summary' as const,
+    completed_phases: ['identity', 'reasoning', 'services', 'tenants', 'tutorial', 'summary'],
+    created_at: now,
+    updated_at: now,
+    identity: { ...input.identity, persona },
+    reasoning,
+    services: { candidates: [] },
+    tenants: { entries: tenantEntries },
+    tutorial,
+  };
+}
+
+export function buildSummary(
+  input: ApplyInput,
+  tenantEntries: Array<Record<string, unknown>>,
+  tutorial: { mode: string; summary: string },
+  reasoning?: OnboardingReasoningState,
+  activation?: ActivationSetup
+) {
+  const id = input.identity;
+  const persona = resolveInputPersona(input);
+  const summaryPolicy = resolveOnboardingSummaryPolicy();
+  const lines = [
+    `# ${summaryPolicy.title}`,
+    '',
+    `## ${summaryPolicy.sections.identity}`,
+    `- Name: ${id.name}`,
+    `- Language: ${id.language}`,
+    `- Style: ${id.interaction_style}`,
+    `- Domain: ${id.primary_domain}`,
+    `- Vision: ${id.vision}`,
+    `- Agent ID: ${id.agent_id}`,
+    `- Persona: ${persona}`,
+    '',
+    '## Reasoning Backend',
+    ...formatReasoningSummary(reasoning),
+    '',
+    `## ${summaryPolicy.sections.services}`,
+    `- ${summaryPolicy.empty_states.services}`,
+    '',
+    `## ${summaryPolicy.sections.tenants}`,
+    ...(tenantEntries.length > 0
+      ? tenantEntries.map((t) => `- ${t.tenant_slug}: ${t.display_name} [${t.assigned_role}]`)
+      : [`- ${summaryPolicy.empty_states.tenants}`]),
+    '',
+    `## ${summaryPolicy.sections.tutorial}`,
+    `- Mode: ${tutorial.mode}`,
+    `- Summary: ${tutorial.summary}`,
+    '',
+    `## ${summaryPolicy.sections.next_steps}`,
+    '- Connection authentication is separate from authority: open Settings → Services to connect accounts, review exact GitHub/browser targets and limits, ask the installed agent to request delegation, then approve and apply the reviewed plan. The new agent stays provisioned until its signed activation plan is applied.',
+    '- CLI: run `pnpm kyberion onboarding authority show --scope person --json`, then use `preview`, `request`, `status`, and `apply` with the exact reviewed plan. Personal use needs no tenant; organization scope requires an explicitly selected tenant owner.',
+    `- ${activationNextStep(activation)}`,
+    '- Run `pnpm pipeline vital-check --format=json` to verify the live ecosystem health.',
+    '- Open Chronos at http://127.0.0.1:3000 — your Identity Badge should appear in the header.',
+    '',
+    '## Runbook Skill',
+    `- Generated: ${path.join(onboardingRoot(), 'skills', 'kyberion-onboarding-runbook', 'SKILL.md')}`,
+    '',
+  ];
+  return lines.join('\n');
+}
+
+export function buildApplySummary(
+  input: ApplyInput,
+  tenantEntries: Array<Record<string, unknown>>,
+  tutorial: { mode: string; summary: string },
+  reasoning: OnboardingReasoningState,
+  paths: { statePath: string; summaryPath: string; activation?: ActivationSetup }
+): string {
+  const lines = [
+    'Onboarding profile applied successfully. Execution and human approval are separate setup steps.',
+    `Identity: ${input.identity.name} (${input.identity.agent_id})`,
+    `Persona: ${resolveInputPersona(input)}`,
+    `Tenants: ${tenantEntries.length}`,
+    `Tutorial: ${tutorial.mode}`,
+    `Reasoning: ${reasoning.mode}`,
+    `State: ${paths.statePath}`,
+    `Summary: ${paths.summaryPath}`,
+    '',
+    'Next steps:',
+    `1. Export the persona in your shell: \`export KYBERION_BASE_ROLE=${resolveInputPersona(input)}\` (.env.local is not loaded by pnpm scripts).`,
+    `2. ${activationNextStep(paths.activation)}`,
+    '3. Run `pnpm pipeline --input pipelines/baseline-check.json` and continue the onboarding flow from its status.',
+    '4. Open Concierge and inspect First Job readiness at /first-job.',
+    '5. For an explicit public diagnostic setup, preview pnpm onboarding first-job --tenant <new-test-tenant> --json. See docs/developer/FIRST_JOB_DIAGNOSTIC_OPERATIONS.ja.md.',
+  ];
+  return lines.join('\n');
+}
+
+/** Library entry used by governed pipelines; the CLI below remains a facade. */
+export async function applyOnboardingInput(
+  input: ApplyInput,
+  print: Print = () => undefined,
+  options: { verifyRepositoryVisibility?: boolean } = {}
+) {
+  const validatedInput = parseApplyInput(input);
+  const validateState = compileSchema(
+    pathResolver.rootResolve('knowledge/product/schemas/onboarding-state.schema.json')
+  );
+
+  setRegisteredEnv('MISSION_ROLE', 'sovereign_concierge');
+  setRegisteredEnv('KYBERION_BASE_ROLE', 'sovereign');
+  const now = nowIso();
+  const persona = resolveInputPersona(input);
+  const personaEnvPath = persistPersona(persona);
+  setRegisteredEnv('KYBERION_BASE_ROLE', persona);
+  print(`Persisted KYBERION_BASE_ROLE=${persona} to ${personaEnvPath}`);
+  await applyIdentity(validatedInput, now);
+  const tenantEntries = await applyTenants(validatedInput, now);
+  const tutorial = await applyTutorial(validatedInput, now);
+  if (validatedInput.reasoning_backend !== undefined) {
+    const backend = normalizeReasoningBackendChoice(validatedInput.reasoning_backend);
+    if (backend) {
+      const envLocal = persistReasoningBackend(backend);
+      setRegisteredEnv('KYBERION_REASONING_BACKEND', backend);
+      print(`Persisted KYBERION_REASONING_BACKEND=${backend} to ${envLocal}`);
+    }
+  }
+  const reasoning = await evaluateReasoningBackend(new Date(now));
+  const runbookSkill = generateOnboardingRunbookSkill({
+    profileRoot: profileRoot(),
+    identityName: validatedInput.identity.name,
+    agentId: validatedInput.identity.agent_id,
+    generatedAt: now,
+  });
+  const state = buildState(validatedInput, now, tenantEntries, tutorial, reasoning);
+  if (!validateState(state)) {
+    throw new Error(`onboarding-state schema invalid: ${JSON.stringify(validateState.errors)}`);
+  }
+  await writeJson(statePath(), state, 'onboarding-state');
+  const activation = await prepareActivationSetup(new Date(now), {
+    verifyVisibility: options.verifyRepositoryVisibility,
+  });
+  await writeText(
+    summaryPath(),
+    buildSummary(validatedInput, tenantEntries, tutorial, reasoning, activation),
+    'onboarding-summary'
+  );
+  return {
+    status: 'complete' as const,
+    identity_name: validatedInput.identity.name,
+    agent_id: validatedInput.identity.agent_id,
+    tenants: tenantEntries.length,
+    reasoning,
+    state_path: statePath(),
+    summary_path: summaryPath(),
+    activation_setup: activation,
+    runbook_skill_path: runbookSkill.skillPath,
+    tutorial,
+  };
+}
+
+export async function main(argv: string[] = [], print: Print = () => undefined) {
+  const parsed = await yargs(argv)
+    .option('identity', {
+      type: 'string',
+      describe: 'Path to identity JSON (or pipe JSON via stdin)',
+    })
+    .option('dry-run', { type: 'boolean', default: false })
+    .option('verify-repository-visibility', {
+      type: 'boolean',
+      default: false,
+      describe:
+        'Opt in to a read-only GitHub visibility probe for a new development delegation template; preserves any existing reviewed template',
+    })
+    .option('json', {
+      type: 'boolean',
+      default: false,
+      describe: 'Emit machine-readable JSON output',
+    })
+    .strict()
+    .parse();
+
+  setRegisteredEnv('MISSION_ROLE', 'sovereign_concierge');
+  setRegisteredEnv('KYBERION_BASE_ROLE', 'sovereign');
+
+  const input = await readInput(parsed.identity as string | undefined);
+  validateInput(input);
+
+  if (parsed['dry-run']) {
+    print(JSON.stringify({ status: 'validated', identity: input.identity }, null, 2));
+    return;
+  }
+
+  const result = await applyOnboardingInput(input, print, {
+    verifyRepositoryVisibility: parsed['verify-repository-visibility'],
+  });
+  if (parsed.json) {
+    print(JSON.stringify(result, null, 2));
+    return;
+  }
+  print(
+    buildApplySummary(
+      input,
+      Array.from({ length: result.tenants }),
+      result.tutorial,
+      result.reasoning,
+      {
+        statePath: statePath(),
+        summaryPath: summaryPath(),
+        activation: result.activation_setup,
+      }
+    )
+  );
+}
+
+export const runOnboardingApply = defineScript({
+  name: 'onboarding:apply',
+  flags: [],
+  run: async ({ argv, print }) => {
+    try {
+      return await main(argv, print);
+    } catch (error) {
+      throw new ScriptExitError(
+        1,
+        `onboarding_apply failed: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  },
+});
+
+if (
+  isDirectScript(import.meta.url, 'onboarding_apply.ts') ||
+  isDirectScript(import.meta.url, 'onboarding_apply.js')
+)
+  void runOnboardingApply();

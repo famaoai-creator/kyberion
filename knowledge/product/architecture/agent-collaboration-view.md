@@ -38,7 +38,7 @@ a2a-bridge.ts             →   active/shared/observability/
 - **木**: `libs/core/agent/agent-collaboration-tree.ts` の `composeCollaborationTree(projection, opts?)` が I/O なしの純関数として、`mission → task → agent → child agent` の木と各ノードの `waiting_on`(`CollaborationWaitReason`: `approval_pending | child_running | claim_pending | blocked | review_pending | stale`)、`handoffs`(a2a `→ receiver` 注記)を導出する。並びは決定的(mission id → task id → started_at)。
 - **surface**: terminal-hud パネル 9「連携」が木を前順走査でインデント表示し、上部に「いま待っているもの」を要約する。Chronos `AgentCollaborationBoard` は既存の統計・注意項目に加えて同じ木を折りたたみ section で描画する(additive)。
 
-`buildAgentCollaborationProjection` の呼び出し元は terminal-hud、Chronos `api/collaboration` route、`headless-projections.ts`、`scripts/vital_check.ts` の 4 箇所。いずれも既定の有界読みで動く。
+`buildAgentCollaborationProjection` の呼び出し元は terminal-hud、Chronos `api/collaboration` route、`headless-projections.ts`、`scripts/vital/vital_check.ts` の 4 箇所。いずれも既定の有界読みで動く。
 
 ## 3. G1〜G4 ギャップとその解消
 

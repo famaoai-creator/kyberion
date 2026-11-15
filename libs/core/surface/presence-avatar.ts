@@ -175,7 +175,7 @@ export function getPresenceAvatarProfile(agentId?: string): PresenceAvatarProfil
 // ---------------------------------------------------------------------------
 // PA-10: personal-tier avatar overlay.
 //
-// `scripts/generate_avatar.ts` writes the user's generated set to
+// `scripts/generate/generate_avatar.ts` writes the user's generated set to
 // `<profileRoot>/avatar/<expression>.png` + `avatar-profile.json`. The product
 // registry above stays the only source for agent avatars; this overlay is
 // read from the active profile root only, is never copied to public assets,
@@ -198,7 +198,7 @@ export const AVATAR_EXPRESSIONS = [
   'blink',
 ] as const;
 export type AvatarExpression = (typeof AVATAR_EXPRESSIONS)[number];
-/** What `scripts/generate_avatar.ts` generates unless `--expressions` says otherwise. */
+/** What `scripts/generate/generate_avatar.ts` generates unless `--expressions` says otherwise. */
 export const DEFAULT_GENERATED_AVATAR_EXPRESSIONS: readonly AvatarExpression[] = [
   'neutral',
   'joy',

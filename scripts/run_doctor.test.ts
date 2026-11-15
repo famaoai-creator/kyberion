@@ -38,7 +38,7 @@ vi.mock('@agent/core/cli-utils', () => ({
   createStandardYargs: mocks.createStandardYargs,
 }));
 
-vi.mock('./app_preflight.js', () => ({
+vi.mock('./app/app_preflight.js', () => ({
   runAppPreflight: mocks.runAppPreflight,
   formatAppPreflightReport: mocks.formatAppPreflightReport,
 }));

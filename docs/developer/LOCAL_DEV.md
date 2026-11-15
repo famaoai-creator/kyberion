@@ -85,9 +85,9 @@ vs. full `pnpm lint` which scans everything.
 | Adding types only                                      | `pnpm typecheck`                                                                              |
 | Adding a new actuator                                  | `pnpm --filter @actuators/your-actuator build` then a smoke run                               |
 | Touching pipelines                                     | `pnpm pipeline --input pipelines/your-pipeline.json` (with `KYBERION_REASONING_BACKEND=stub`) |
-| Touching schemas                                       | `pnpm tsx scripts/check_contract_schemas.ts`                                                  |
-| Touching actuator manifest / contract                  | `pnpm tsx scripts/check_contract_semver.ts`                                                   |
-| Touching docs                                          | `pnpm tsx scripts/check_doc_examples.ts` (when example blocks tagged `bash check`)            |
+| Touching schemas                                       | `pnpm tsx scripts/check/check_contract_schemas.ts`                                            |
+| Touching actuator manifest / contract                  | `pnpm tsx scripts/check/check_contract_semver.ts`                                             |
+| Touching docs                                          | `pnpm tsx scripts/check/check_doc_examples.ts` (when example blocks tagged `bash check`)      |
 | Before committing                                      | `pnpm validate` (full run, ~ 1 min)                                                           |
 | Before opening a PR                                    | `pnpm ci` (validate + full test)                                                              |
 

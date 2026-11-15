@@ -111,6 +111,31 @@
       "change": "scripts/provider_hook_entry.mjs",
       "docs": ["docs/developer/CLOUD_AGENT_ENVIRONMENT.md"],
       "note": "hook fallback policy — allowed bootstrap commands and file-edit behaviour live in the cloud environment runbook"
+    },
+    {
+      "change": "presence/displays/concierge/src/app/api/accounts/**",
+      "docs": ["docs/OPERATOR_UX_GUIDE.md"],
+      "note": "the concierge account-introduction route decides who may register an account token; the operator guide describes that flow"
+    },
+    {
+      "change": "presence/displays/concierge/src/lib/api-guard.ts",
+      "docs": ["docs/OPERATOR_UX_GUIDE.md"],
+      "note": "concierge account-introduction authorization gates decide who may register an account token; the operator guide describes that flow"
+    },
+    {
+      "change": "presence/displays/concierge/src/lib/account-introduction-server.ts",
+      "docs": ["docs/OPERATOR_UX_GUIDE.md"],
+      "note": "concierge account-introduction authorization gates decide who may register an account token; the operator guide describes that flow"
+    },
+    {
+      "change": "presence/displays/concierge/src/lib/onboarding-authority-server.ts",
+      "docs": ["docs/OPERATOR_UX_GUIDE.md"],
+      "note": "concierge account-introduction authorization gates decide who may register an account token; the operator guide describes that flow"
+    },
+    {
+      "change": "scripts/lib/schedule-registry-sync.ts",
+      "docs": ["knowledge/product/governance/tenant-bound-runtime-probing.md"],
+      "note": "the schedule registry sync decides which pipeline scopes chronos picks up; the runtime-probing doc describes the pickup and isolation contract"
     }
   ],
   "ignore": [

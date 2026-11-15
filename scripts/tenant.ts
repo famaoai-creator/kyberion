@@ -11,13 +11,13 @@ import {
   deleteTenant,
 } from '@agent/core/organization/tenant-governance';
 import { renameTenantWithPlan } from '@agent/core/organization/tenant-rename';
-import { captureCliAttestationInvoker } from './lib/cli-attestation-invoker.js';
+import { captureCliAttestationInvoker } from './lib/cli/cli-attestation-invoker.js';
 import { readTenantProfile } from '@agent/core/organization/tenant-registry';
 import { withExecutionContext } from '@agent/core/authority';
 import { setRegisteredEnv } from '@agent/core/foundation/env';
 import { pathResolver } from '@agent/core/path-resolver';
 import { defineScript, isDirectScript } from './lib/harness.js';
-import { parseCliFlags } from './lib/cli-flag-parser.js';
+import { parseCliFlags } from './lib/cli/cli-flag-parser.js';
 
 /**
  * Run `fn` with no tenant binding. rename/delete touch the registry AND a

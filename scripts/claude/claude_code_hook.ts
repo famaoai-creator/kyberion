@@ -1,0 +1,198 @@
+/**
+ * Kyberion ↔ Claude Code hook entry point.
+ *
+ * Invoked by the kyberion-claude-code plugin's hooks. Reads the hook event JSON
+ * from stdin and the event name from argv[2], dispatches to the governed
+ * handlers in `@agent/core/claude-code-hook`, and writes the hook response
+ * JSON to stdout.
+ *
+ *   node dist/scripts/claude/claude_code_hook.js SessionStart  < event.json
+ *   node dist/scripts/claude/claude_code_hook.js UserPromptSubmit < event.json
+ *   node dist/scripts/claude/claude_code_hook.js PreToolUse     < event.json
+ *   node dist/scripts/claude/claude_code_hook.js PreToolUseShellDeny < event.json
+ *   node dist/scripts/claude/claude_code_hook.js PostToolUse    < event.json
+ *   node dist/scripts/claude/claude_code_hook.js Stop           < event.json
+ *   node dist/scripts/claude/claude_code_hook.js SessionEnd     < event.json
+ *
+ * Hook failures fail closed for shell execution so a policy outage cannot turn
+ * a denied command into an allowed command.
+ */
+
+import {
+  buildPostCompactionContext,
+  buildSessionEndContext,
+  buildSessionStartContext,
+  buildStopContext,
+  buildUserPromptSubmitContext,
+  denyHookResponse,
+  evaluatePreToolUse,
+  evaluatePreToolUseShellDeny,
+  recordCliUsage,
+  recordPostToolUse,
+  summarizeTranscriptUsage,
+} from '@agent/core/provider/claude-code-hook';
+import { safeExistsSync, safeLstat } from '@agent/core/secure-io';
+import { isRecord, readTextFile } from '@agent/core/foundation/text';
+import { parseSafeJsonInput } from '@agent/core/foundation/safe-json';
+import { currentProcessArgv, defineScript, isDirectScript } from '../lib/harness.js';
+
+async function readStdin(): Promise<string> {
+  if (process.stdin.isTTY) return '';
+  const chunks: Buffer[] = [];
+  for await (const chunk of process.stdin) chunks.push(Buffer.from(chunk));
+  return Buffer.concat(chunks).toString('utf8').trim();
+}
+
+export function parseHookPayload(raw: string): Record<string, unknown> {
+  if (!raw) return {};
+  try {
+    const parsed = parseSafeJsonInput(raw, 'Claude Code hook payload');
+    return isRecord(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+export function readClaudeCodeHookTranscript(filePath: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${filePath} must be a regular file`);
+  }
+  return readTextFile(filePath);
+}
+
+async function main(args: string[] = currentProcessArgv()): Promise<void> {
+  const event = args[2] ?? '';
+  const raw = await readStdin();
+  const payload = parseHookPayload(raw);
+
+  switch (event) {
+    case 'SessionStart': {
+      process.stdout.write(
+        JSON.stringify({
+          hookSpecificOutput: {
+            hookEventName: 'SessionStart',
+            additionalContext: buildSessionStartContext(payload),
+          },
+        })
+      );
+      return;
+    }
+    case 'UserPromptSubmit': {
+      process.stdout.write(
+        JSON.stringify({
+          hookSpecificOutput: {
+            hookEventName: 'UserPromptSubmit',
+            additionalContext: buildUserPromptSubmitContext(payload),
+          },
+        })
+      );
+      return;
+    }
+    case 'PreToolUse': {
+      // Deny-only: emitting 'allow' would silently auto-approve every file
+      // write (including tools merely matched by the Write|Edit regex).
+      // deny/ask reach stdout; everything else defers to Claude Code's own
+      // permission flow — same posture as the shell-deny adapter below.
+      const response = evaluatePreToolUse(payload);
+      if (response.hookSpecificOutput.permissionDecision !== 'allow') {
+        process.stdout.write(JSON.stringify(response));
+      }
+      return;
+    }
+    case 'PreToolUseShellDeny': {
+      // Deny-only: silence (no JSON) leaves the decision to Claude Code.
+      try {
+        const decision = evaluatePreToolUseShellDeny(payload);
+        if (decision) process.stdout.write(JSON.stringify(decision));
+      } catch (err) {
+        process.stdout.write(
+          JSON.stringify(
+            denyHookResponse(`Kyberion shell policy could not be evaluated: ${String(err)}`)
+          )
+        );
+      }
+      return;
+    }
+    case 'PostToolUse': {
+      try {
+        recordPostToolUse(payload);
+      } catch {
+        // audit is best-effort; never block the session
+      }
+      return;
+    }
+    case 'Stop': {
+      if (payload.stop_hook_active === true) return;
+      // Capture this CLI session's token usage into metrics (best-effort).
+      try {
+        const transcriptPath =
+          typeof payload.transcript_path === 'string' ? payload.transcript_path : '';
+        if (transcriptPath && safeExistsSync(transcriptPath)) {
+          recordCliUsage(
+            summarizeTranscriptUsage(readClaudeCodeHookTranscript(transcriptPath)),
+            payload.session_id
+          );
+        }
+      } catch {
+        // usage capture is best-effort; never block session close
+      }
+      buildStopContext(payload);
+      return;
+    }
+    case 'PostCompaction': {
+      // Devin-only event today; dormant under Claude Code. Re-injects a
+      // compact governance reminder and refreshes co-session presence.
+      process.stdout.write(
+        JSON.stringify({
+          hookSpecificOutput: {
+            hookEventName: 'PostCompaction',
+            additionalContext: buildPostCompactionContext(payload),
+          },
+        })
+      );
+      return;
+    }
+    case 'SessionEnd': {
+      // Fires once when the session ends (unlike Stop, which fires per turn):
+      // release this participant's co-session leases. SessionEnd consumes no
+      // context injection — the note goes to stderr for transcript/debug.
+      try {
+        const note = buildSessionEndContext(payload);
+        if (note) process.stderr.write(`${note}\n`);
+      } catch {
+        // cleanup is best-effort; lease TTL is the safety net
+      }
+      return;
+    }
+    default:
+      return;
+  }
+}
+
+export const claudeCodeHook = defineScript({
+  name: 'claude-code-hook',
+  flags: [],
+  run: async ({ argv }) => {
+    const hookArgv = ['node', 'claude_code_hook', ...argv];
+    try {
+      await main(hookArgv);
+    } catch (err) {
+      // Both policy entrypoints fail closed, including failures while reading stdin.
+      if (hookArgv[2] === 'PreToolUse' || hookArgv[2] === 'PreToolUseShellDeny') {
+        process.stdout.write(
+          JSON.stringify(
+            denyHookResponse(`Kyberion hook errored; refusing tool use: ${String(err)}`)
+          )
+        );
+      } else {
+        process.stderr.write(`[claude_code_hook] ${String(err)}\n`);
+      }
+    }
+  },
+});
+
+if (
+  isDirectScript(import.meta.url, 'claude_code_hook.ts') ||
+  isDirectScript(import.meta.url, 'claude_code_hook.js')
+)
+  void claudeCodeHook();

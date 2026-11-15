@@ -93,7 +93,7 @@ import {
 } from '@agent/core/ops-health';
 import { writeJanitorFailureMarker } from '@agent/core/ops-health-state';
 import { collectOpsHealthInput } from './lib/ops-health-input.js';
-import { scanTenantDrift } from './watch_tenant_drift.js';
+import { scanTenantDrift } from './watch/watch_tenant_drift.js';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import { inspectBaselineBuildReadiness, type BuildReadiness } from './baseline_build_readiness.js';
 

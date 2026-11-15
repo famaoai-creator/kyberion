@@ -56,7 +56,7 @@ function formatCueTime(totalSec: number): string {
 /**
  * Render cues as `[mm:ss] Speaker: text` lines — the same shape
  * `meeting:normalize_transcript` passes through, so captured files
- * flow straight into `pipelines/meeting-followup.json`.
+ * flow straight into `knowledge/product/pipeline-templates/meeting-followup.json`.
  */
 export function formatTranscriptCues(cues: readonly CaptionCue[]): string {
   return cues

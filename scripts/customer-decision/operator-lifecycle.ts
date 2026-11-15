@@ -1,6 +1,6 @@
 /**
  * Operator verbs on a sent agenda: status, confirm, close / withdraw, revoke.
- * Part of scripts/customer_decision.ts (the entry point); see its header.
+ * Part of scripts/customer/customer_decision.ts (the entry point); see its header.
  */
 import { auditChain } from '@agent/core/governance/audit-chain';
 import { enforceApprovalGate } from '@agent/core/governance/approval-gate';

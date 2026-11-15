@@ -16,7 +16,10 @@ import {
   requiresProjectTrust,
 } from '@agent/core/trust-requiring-resources';
 import { readSafeJsonValueFile } from '../lib/json-input.js';
-import { withPlaygroundPathRole, withPlaygroundPathRoleSync } from '../actuator_playground.js';
+import {
+  withPlaygroundPathRole,
+  withPlaygroundPathRoleSync,
+} from '../actuator/actuator_playground.js';
 
 export interface AdfInputOptions {
   /** Trusted JSON snapshot validator, invoked before any pipeline effect. */
@@ -28,7 +31,7 @@ export interface AdfInputOptions {
 }
 
 const SCRIPT_WRAPPER_BASELINE_PATH = rootResolve(
-  'scripts/pipeline-shell-independence.baseline.json'
+  'scripts/pipeline/pipeline-shell-independence.baseline.json'
 );
 
 export function readAdfInputTextFile(filePath: string): string {

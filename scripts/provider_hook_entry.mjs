@@ -13,8 +13,8 @@ import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 
 const PROVIDERS = {
-  codex: ['codex_cli_hook.js', 'runCodexCliHook'],
-  claude: ['claude_code_hook.js', 'claudeCodeHook'],
+  codex: ['codex/codex_cli_hook.js', 'runCodexCliHook'],
+  claude: ['claude/claude_code_hook.js', 'claudeCodeHook'],
   gemini: ['gemini_cli_hook.js', 'runGeminiCliHook'],
 };
 

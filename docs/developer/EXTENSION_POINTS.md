@@ -279,7 +279,7 @@ The currently executable hook vocabulary is `pre_tool_use`, `post_tool_use`,
 `pre_compact`, `post_compact`, `notification`, and `task_settled`. The
 remaining graph labels are extension roadmap anchors; their presence in this
 diagram does not imply a runtime hook has already been added.
-`scripts/check_extension_order.ts` keeps the runtime vocabulary and this
+`scripts/check/check_extension_order.ts` keeps the runtime vocabulary and this
 contract from drifting.
 
 `runOpPreflight` returns `{ decision, reason, repaired_input, terminate }`.

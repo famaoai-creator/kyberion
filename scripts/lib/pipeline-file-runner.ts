@@ -10,7 +10,7 @@
  * engine first (see `scripts/organization.ts`).
  */
 
-import type { executePipelineFile } from '../pipeline-execution-part-results.js';
+import type { executePipelineFile } from '../pipeline/pipeline-execution-part-results.js';
 
 export type PipelineFileRunner = typeof executePipelineFile;
 

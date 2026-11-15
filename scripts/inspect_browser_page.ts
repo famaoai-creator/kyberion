@@ -19,7 +19,7 @@ import {
   assertSupportedNodeEngine,
   loadBrowserActuator,
   type BrowserActuatorHandle,
-} from './browser_playwright_executor.js';
+} from './browser/browser_playwright_executor.js';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import { withExecutionContextAsync } from '@agent/core/authority';
 import {

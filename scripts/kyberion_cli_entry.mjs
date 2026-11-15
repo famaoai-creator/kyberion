@@ -29,7 +29,7 @@ if (existsSync(DIST_CLI)) {
 } else if (!command || discoveryCommands.has(command)) {
   const forwarded =
     command === 'list' ? args.slice(1) : args.filter((arg) => !discoveryCommands.has(arg));
-  run(['scripts/capability_discovery_entry.mjs', ...forwarded]);
+  run(['scripts/capability/capability_discovery_entry.mjs', ...forwarded]);
 } else {
   console.error(formatBuildRequiredMessage('dist/scripts/kyberion.js'));
   process.exit(1);

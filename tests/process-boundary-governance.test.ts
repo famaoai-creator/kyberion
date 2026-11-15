@@ -10,8 +10,8 @@ const allowedManagedProcessConsumers = [
   'libs/shared-perception/src/audio-analysis.test.ts',
   'libs/shared-perception/src/tracking.ts',
   // Continuous owner controllers are cancellable, supervised children.
-  'scripts/continuous_owner_process.ts',
-  'scripts/continuous_owner_process.test.ts',
+  'scripts/continuous/continuous_owner_process.ts',
+  'scripts/continuous/continuous_owner_process.test.ts',
   'libs/actuators/process-actuator/src/process-actuator-helpers.ts',
   'libs/actuators/process-actuator/src/process-actuator-relay-env.test.ts',
   'libs/actuators/video-composition-actuator/src/video-composition-action-helpers.ts',
@@ -68,7 +68,7 @@ const allowedManagedProcessConsumers = [
   // resume logic is exercised without spawning a real process.
   'libs/core/pipeline/pipeline-approval-resume.test.ts',
   // Real approval/journal simulation replaces only the resume process launch.
-  'scripts/external-actuator-pipeline-simulation.test.ts',
+  'scripts/external/external-actuator-pipeline-simulation.test.ts',
   // The await-state resume scanner owns `run_pipeline --resume` spawns on the
   // same governed re-entry pattern, scoped to the external-state wait path.
   'libs/core/pipeline/pipeline-await-resume.ts',
@@ -90,10 +90,10 @@ const allowedManagedProcessConsumers = [
   // Onboarding re-configuration menu: short-lived `node dist/scripts/...`
   // menu actions run supervised (stdio inherit, awaited, unregistered on
   // completion) instead of via direct child_process.
-  'scripts/onboarding_wizard.ts',
+  'scripts/onboarding/onboarding_wizard.ts',
   // PE-02 plugin views E2E: the built Chronos server under test is a
   // supervised child, stopped (SIGTERM, then SIGKILL) even on failure.
-  'scripts/check_plugin_views_e2e.ts',
+  'scripts/check/check_plugin_views_e2e.ts',
   // CU-02: the kyberion router runs interactive / long-running script
   // commands (tui, servers, daemons, onboard, build) supervised with inherited
   // stdio and no timeout, awaiting the child; the dispatch test mocks it.
@@ -102,8 +102,8 @@ const allowedManagedProcessConsumers = [
   'scripts/run_baseline_check.ts',
   // Exercises baseline maintenance ownership with a mock and finite timer-only children.
   'scripts/run_baseline_check.maintenance-submission.test.ts',
-  'scripts/soak_restart_e2e.ts',
-  'scripts/surface_runtime.ts',
+  'scripts/soak/soak_restart_e2e.ts',
+  'scripts/surface/surface_runtime.ts',
   'tests/managed-process.test.ts',
   'tests/surface-auth.test.ts',
 ].sort((a, b) => a.localeCompare(b));

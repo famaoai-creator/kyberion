@@ -129,7 +129,7 @@ function actionIndexForCompiledStep(actions: BrowserExtensionAction[], stepIndex
  * Close the self-repair loop (review finding AR-H2): splice a corrective
  * recording into the base recording at the delta's anchor and return a MERGED
  * recording draft. The result has `review.status: 'pending'` — it MUST be
- * re-reviewed and re-promoted (via scripts/promote_procedure.ts) before it can
+ * re-reviewed and re-promoted (via scripts/promote/promote_procedure.ts) before it can
  * execute; this function never auto-activates a procedure.
  *
  * Splice point: immediately AFTER the anchor step (the last good step), so the

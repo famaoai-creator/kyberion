@@ -6,7 +6,7 @@
       "type": "cli",
       "command": "node",
       "args": [
-        "dist/scripts/stage_youtube_upload_package.js",
+        "dist/scripts/stage/stage_youtube_upload_package.js",
         "{{publish_plan_path}}",
         "{{output_path}}"
       ],

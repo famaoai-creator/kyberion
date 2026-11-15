@@ -16,7 +16,9 @@ vi.mock('@agent/core/secret/account-introduction', () => ({
   accountIntroductionStatus: mocks.status,
   applyAccountIntroduction: mocks.apply,
 }));
-vi.mock('../../../../lib/api-guard', () => ({ requireConciergeMutationAccess: mocks.mutation }));
+vi.mock('../../../../lib/api-guard', () => ({
+  requireConciergeMutationTransport: mocks.mutation,
+}));
 vi.mock('../../../../lib/viewer-context', () => ({ resolveConciergeViewer: mocks.viewer }));
 vi.mock('../../../../lib/account-introduction-server', () => ({
   accountIntroductionAccess: mocks.access,
@@ -49,6 +51,13 @@ describe('account introduction HTTP boundary', () => {
     expect(response.status).toBe(200);
     expect(response.headers.get('cache-control')).toBe('no-store');
     expect(mocks.preview).toHaveBeenCalledWith(principal, 'selected');
+  });
+  it('admits remote tenant owners on the request path via the access opt-in', async () => {
+    const response = await POST(request({ action: 'preview', binding_id: 'selected' }));
+    expect(response.status).toBe(200);
+    expect(mocks.access).toHaveBeenCalledWith(expect.anything(), 'selected', {
+      admitRemoteTenantOwner: true,
+    });
   });
   it.each([
     { action: 'preview', binding_id: 'selected', tenant_slug: 'other' },
@@ -87,6 +96,42 @@ describe('account introduction HTTP boundary', () => {
       ).status
     ).toBe(403);
     expect(mocks.apply).not.toHaveBeenCalled();
+  });
+  it('applies no installation gate for an organization binding (tenant-owner member)', async () => {
+    // Remote tenant-originated secrets: org scope is admitted by the member
+    // check inside accountIntroductionAccess, never by the installation gate.
+    mocks.access.mockReturnValue({
+      principal: { accountableId: 'user:owner', requesterId: 'user:tenant-owner' },
+      scope: { kind: 'organization', tenant_slug: 'acme' },
+    });
+    const response = await POST(
+      request({
+        action: 'apply',
+        binding_id: 'selected',
+        approval_id: 'id',
+        material: { GITHUB_TOKEN: 'synthetic' },
+      })
+    );
+    expect(response.status).toBe(200);
+    expect(mocks.installation).not.toHaveBeenCalled();
+    expect(mocks.apply).toHaveBeenCalledWith(
+      { accountableId: 'user:owner', requesterId: 'user:tenant-owner' },
+      'selected',
+      { approval_id: 'id', material: { GITHUB_TOKEN: 'synthetic' } }
+    );
+  });
+  it('applies no installation gate for an organization preview either', async () => {
+    mocks.access.mockReturnValue({
+      principal: { accountableId: 'user:owner', requesterId: 'user:tenant-owner' },
+      scope: { kind: 'organization', tenant_slug: 'acme' },
+    });
+    const response = await POST(request({ action: 'preview', binding_id: 'selected' }));
+    expect(response.status).toBe(200);
+    expect(mocks.installation).not.toHaveBeenCalled();
+    expect(mocks.preview).toHaveBeenCalledWith(
+      { accountableId: 'user:owner', requesterId: 'user:tenant-owner' },
+      'selected'
+    );
   });
   it('never echoes failed storage or broker output or submitted tokens', async () => {
     mocks.apply.mockRejectedValue(new Error('synthetic-secret /private/path provider response'));

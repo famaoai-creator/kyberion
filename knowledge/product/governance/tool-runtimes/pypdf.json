@@ -1,0 +1,35 @@
+{
+  "version": "1.0.0",
+  "default_tool_id": "mflux",
+  "tools": [
+    {
+      "tool_id": "pypdf",
+      "toolsets": ["document"],
+      "display_name": "pypdf Runtime",
+      "ecosystem": "python",
+      "status": "active",
+      "platforms": ["any"],
+      "supported_modes": ["trial", "approved_install", "installed", "pinned"],
+      "trial_backend": {
+        "kind": "system",
+        "command": "python3",
+        "args": ["-c", "import pypdf; print(\"ok\")"],
+        "description": "Probe the pypdf Python package."
+      },
+      "install_backend": {
+        "kind": "uv",
+        "command": "uv",
+        "args": ["pip", "install", "pypdf"],
+        "description": "Install pypdf into the managed Python runtime."
+      },
+      "installed_backend": {
+        "kind": "system",
+        "command": "python3",
+        "args": ["-c", "import pypdf; print(\"ok\")"],
+        "description": "Re-check the pypdf runtime."
+      },
+      "managed_env_subpath": "tool-runtimes/pypdf",
+      "notes": "PDF page-operation backend used by libs/actuators/media-actuator/scripts/pdf_ops_bridge.py and pdf_split_bridge.py."
+    }
+  ]
+}

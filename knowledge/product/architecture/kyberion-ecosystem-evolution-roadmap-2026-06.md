@@ -93,7 +93,7 @@ The following invariants apply in every roadmap milestone:
 
 - New: `knowledge/product/schemas/operator-work-state.schema.json`
 - New: `libs/core/operator-work-state.ts`
-- Update: `scripts/sovereign_dashboard.ts`, `tools/adf-replay-extension/sidepanel.*`
+- Update: `scripts/sovereign/sovereign_dashboard.ts`, `tools/adf-replay-extension/sidepanel.*`
 - Tests: `libs/core/operator-work-state.test.ts`, dashboard contract tests, extension state rendering tests
 
 **Exit criteria**

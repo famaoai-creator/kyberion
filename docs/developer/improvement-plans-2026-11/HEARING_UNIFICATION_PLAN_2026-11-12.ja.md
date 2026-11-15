@@ -57,4 +57,4 @@ PR #1469 は、これらとつながらない 5 つ目の形（`hearing-agenda.s
 - 文面: 製品テンプレートは語彙のキー、テナントのテンプレートは `{ja, en}` の直書き。1 つの欄にはどちらか一方だけ。調整セットの言語の文面がなければ `[CUSTOMER_DECISION_TEMPLATE_LOCALE_MISSING]` で断り、別の言語やキーを出さない。
 - 目的: テンプレートの `objective`、または `draft --objective <text>`（`none` で消す、`--file` でも渡せる）。設定したときだけ内容ハッシュに入るので、目的のない既存の調整セットのハッシュは変わらない。運用者向けの一覧と案件の詳細には目的の文面を出さない（今までどおり id と件数だけ）。
 - 主なコード: `libs/core/customer-decision/{template,store,model,hash}.ts`、`scripts/customer-decision/templates.ts`、`presence/displays/customer-room/src/app/main.ts`、`customer-decision-{template,agenda}.schema.json`。
-- テスト: `libs/core/customer-decision/template-tenant.test.ts`（解決の順、テナント間の分離、`bolt-review`、文面の形、言語の欠け、ハッシュ）、`scripts/customer_decision.templates.boundary.test.ts`（実パスでの put / list / show / draft、束縛されたテナント）、`scripts/customer_decision.test.ts`（`--objective` と顧客の `view`）。
+- テスト: `libs/core/customer-decision/template-tenant.test.ts`（解決の順、テナント間の分離、`bolt-review`、文面の形、言語の欠け、ハッシュ）、`scripts/customer/customer_decision.templates.boundary.test.ts`（実パスでの put / list / show / draft、束縛されたテナント）、`scripts/customer/customer_decision.test.ts`（`--objective` と顧客の `view`）。

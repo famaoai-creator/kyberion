@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { validateManagedBinaryArchiveEntries } from '../scripts/tool_runtime_setup.js';
+import { validateManagedBinaryArchiveEntries } from '../scripts/tool/tool_runtime_setup.js';
 
 describe('validateManagedBinaryArchiveEntries', () => {
   it('accepts flat executable entries like the agent-desktop tarball', () => {

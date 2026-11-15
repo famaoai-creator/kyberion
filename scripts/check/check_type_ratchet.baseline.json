@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "generated_at": "2026-11-15T04:26:40.230Z",
+  "counts": {
+    "src": {
+      "any_keywords": 2377,
+      "as_any": 379,
+      "ts_ignore": 1,
+      "files": 3947,
+      "max_lines": 1998
+    },
+    "test": {
+      "any_keywords": 1582,
+      "as_any": 1008,
+      "ts_ignore": 2,
+      "files": 3498,
+      "max_lines": 3494
+    }
+  }
+}

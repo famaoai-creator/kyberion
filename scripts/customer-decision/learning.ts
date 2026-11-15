@@ -3,7 +3,7 @@
  * decisions teach us, write the tenant learning report and queue the
  * improvement suggestions as organization learning candidates; and
  * `learning --install`, the weekly tenant pipeline.
- * Part of scripts/customer_decision.ts (the entry point); see its header.
+ * Part of scripts/customer/customer_decision.ts (the entry point); see its header.
  *
  *   1. read every case of the tenant (agendas, receipts, switches) as the
  *      tenant-bound `decision_ledger` role — no case lock, nothing else read;
@@ -56,7 +56,7 @@ import {
   type LearningCaseInput,
   type LearningSuggestion,
 } from '@agent/core/customer-decision';
-import { installRepositoryPipelineTemplate } from '../pipeline_promote.js';
+import { installRepositoryPipelineTemplate } from '../pipeline/pipeline_promote.js';
 import {
   LEDGER_ROLE,
   asLedgerWriter,

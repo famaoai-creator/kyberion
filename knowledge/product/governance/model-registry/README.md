@@ -16,7 +16,7 @@ This directory is the canonical source for individual model registry entries.
 After changing an item or `index.json`, run:
 
 ```sh
-pnpm kyberion sync model-registry   # or, without a build: pnpm exec tsx scripts/sync_model_registry.ts
+pnpm kyberion sync model-registry   # or, without a build: pnpm exec tsx scripts/sync/sync_model_registry.ts
 pnpm check -- --scope full --only governance-rules
 ```
 

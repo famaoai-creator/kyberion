@@ -145,6 +145,11 @@ export function resolveHerdrBin(): string {
   return resolveExternalToolBin('herdr', ['KYBERION_AGENT_PANE_RUNTIME_BIN'], 'herdr');
 }
 
+/** espeak-ng TTS CLI backing the governed espeak_ng voice engine. */
+export function resolveEspeakNgBin(): string {
+  return resolveExternalToolBin('espeak_ng', ['KYBERION_ESPEAK_NG_BIN'], 'espeak-ng');
+}
+
 /** macOS ImageSnap still-capture CLI for virtual-camera-capture. */
 export function resolveImagesnapBin(): string {
   return resolveExternalToolBin('imagesnap', ['KYBERION_IMAGESNAP_BIN'], 'imagesnap');

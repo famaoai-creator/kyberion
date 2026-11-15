@@ -1,0 +1,307 @@
+import { describe, expect, it } from 'vitest';
+import * as path from 'node:path';
+import { pathResolver, safeReadFile } from '@agent/core';
+import {
+  buildApplySummary,
+  buildActivationInput,
+  buildDelegationInput,
+  buildState,
+  buildSummary,
+  parseApplyInput,
+  readInput,
+  validateInput,
+} from './onboarding_apply.js';
+
+const ROOT = pathResolver.rootDir();
+const TEMPLATE_PATH = 'knowledge/public/templates/onboarding/identity.example.json';
+
+function read(relPath: string): string {
+  return String(safeReadFile(path.join(ROOT, relPath), { encoding: 'utf8' }) || '');
+}
+
+const FIXTURE_INPUT = {
+  identity: {
+    name: 'Famao',
+    language: 'ja',
+    interaction_style: 'Senior Partner' as const,
+    primary_domain: 'productization',
+    vision: 'Make the ecosystem legible and reliable.',
+    agent_id: 'agent-001',
+    // The caller's persisted .env.local persona is not a test fixture.
+    persona: 'sovereign' as const,
+  },
+  tenants: [
+    {
+      tenant_slug: 'alpha-team',
+      display_name: 'Alpha Team',
+      assigned_role: 'owner',
+      purpose: 'test onboarding',
+    },
+  ],
+  tutorial: {
+    mode: 'simulate' as const,
+    summary: 'Dry run first.',
+  },
+};
+
+const FIXTURE_REASONING = {
+  mode: 'real_backend_detected' as const,
+  backend_hint: 'codex-cli',
+  available: true,
+  checked_at: '2026-05-08T00:00:00.000Z',
+};
+
+describe('onboarding_apply', () => {
+  it('all onboarding entrypoints use the shared governed agent profile writer', () => {
+    for (const file of [
+      'scripts/onboarding/onboarding_apply.ts',
+      'scripts/onboarding/onboarding_wizard.ts',
+      'libs/shared-vision/src/browser-onboarding.ts',
+      'libs/core/integrations/slack-onboarding.ts',
+    ]) {
+      expect(read(file)).toContain('writePersonalAgentIdentityAtPath(');
+    }
+    expect(read('scripts/onboarding/onboarding_wizard.ts')).toContain(
+      'personalAgentIdentityRevision('
+    );
+    expect(read('libs/core/integrations/slack-onboarding.ts')).not.toMatch(
+      /safeWriteFile\(\s*path\.join\(root, 'agent-identity\.json'/
+    );
+  });
+  it('offers one reviewed development grant with a reusable candidate branch and no direct main push', async () => {
+    const input = await buildDelegationInput(new Date('2026-10-22T00:00:00.000Z'), {
+      remote: 'git@github.com:fixture/repo.git',
+    });
+    expect(input.mode).toBe('grant');
+    expect(input.grants).toEqual([
+      { operation_id: 'vcs:pr_create', repository: 'https://github.com/fixture/repo' },
+      {
+        operation_id: 'vcs:pr_merge',
+        repository: 'https://github.com/fixture/repo',
+        branch: 'main',
+      },
+      {
+        operation_id: 'vcs:pr_merge',
+        repository: 'https://github.com/fixture/repo',
+        branch_pattern: 'feat/*',
+      },
+      {
+        operation_id: 'vcs:push',
+        repository: 'https://github.com/fixture/repo',
+        branch: 'agent/kyberion-development',
+      },
+      {
+        operation_id: 'vcs:push',
+        repository: 'https://github.com/fixture/repo',
+        branch_pattern: 'feat/*',
+      },
+    ]);
+    expect(input.data_tier).toEqual({ read: ['public'], write: ['public'] });
+  });
+  it('marks private development only after the read-only repository visibility probe proves private', async () => {
+    const now = new Date('2026-10-22T00:00:00.000Z');
+    const options = { remote: 'https://github.com/fixture/repo', verifyVisibility: true };
+    const privateInput = await buildDelegationInput(now, {
+      ...options,
+      run: () => ({ status: 0, stdout: JSON.stringify({ private: true }), stderr: '' }),
+    });
+    expect(privateInput.grants.every((grant) => grant.visibility === 'private')).toBe(true);
+    expect(privateInput.data_tier.read).toContain('personal');
+    const unknown = await buildDelegationInput(now, {
+      ...options,
+      run: () => ({ status: 1, stdout: '', stderr: 'unavailable' }),
+    });
+    expect(unknown.grants.every((grant) => !('visibility' in grant))).toBe(true);
+    expect(unknown.data_tier.read).toEqual(['public']);
+    expect((await buildDelegationInput(now, { remote: '/local/repo' })).grants).toEqual([]);
+  });
+  it('prepares reviewed activation-only consent without any standing external grant', () => {
+    expect(buildActivationInput(new Date('2026-10-22T00:00:00.000Z'))).toEqual({
+      scope_kind: 'person',
+      mode: 'activate',
+      grants: [],
+      expires_at: '2026-11-21T00:00:00.000Z',
+    });
+  });
+  it('rejects invalid tenant slugs', () => {
+    expect(() =>
+      validateInput({
+        ...FIXTURE_INPUT,
+        tenants: [{ ...FIXTURE_INPUT.tenants[0], tenant_slug: 'INVALID_SLUG' }],
+      })
+    ).toThrow('Invalid tenant_slug');
+  });
+
+  it('rejects malformed external JSON shapes before onboarding writes', () => {
+    expect(() => parseApplyInput(null)).toThrow('identity block is required');
+    expect(() => parseApplyInput({ identity: { name: 'Famao' } })).toThrow('identity requires');
+    expect(() =>
+      parseApplyInput({
+        ...FIXTURE_INPUT,
+        tenants: [{ tenant_slug: 'alpha-team', display_name: 'Alpha Team' }],
+      })
+    ).toThrow('tenant entries require');
+    expect(() => parseApplyInput({ ...FIXTURE_INPUT, tutorial: { mode: 'unknown' } })).toThrow(
+      'tutorial.mode'
+    );
+    expect(() => parseApplyInput({ ...FIXTURE_INPUT, unexpected: true })).toThrow(
+      /Invalid catalog onboarding-apply-input/u
+    );
+  });
+
+  it('accepts a catalog reasoning_backend and rejects unknown ones (LC-05)', () => {
+    expect(() =>
+      validateInput({ ...FIXTURE_INPUT, reasoning_backend: 'claude-cli' })
+    ).not.toThrow();
+    // Aliases normalize through the policy catalog.
+    expect(() => validateInput({ ...FIXTURE_INPUT, reasoning_backend: 'grok' })).not.toThrow();
+    expect(() => validateInput({ ...FIXTURE_INPUT, reasoning_backend: 'bogus-backend' })).toThrow(
+      'Invalid reasoning_backend'
+    );
+  });
+
+  it('validates and persists a supported default persona (LC-07)', () => {
+    expect(() =>
+      validateInput({
+        ...FIXTURE_INPUT,
+        identity: { ...FIXTURE_INPUT.identity, persona: 'ecosystem_architect' },
+      })
+    ).not.toThrow();
+    expect(() =>
+      validateInput({
+        ...FIXTURE_INPUT,
+        identity: { ...FIXTURE_INPUT.identity, persona: 'not-a-persona' as never },
+      })
+    ).toThrow('persona must be one of');
+  });
+
+  it('points missing identity files to the onboarding template', async () => {
+    await expect(readInput('knowledge/public/templates/onboarding/missing.json')).rejects.toThrow(
+      TEMPLATE_PATH
+    );
+  });
+
+  it('keeps the template aligned with onboarding input validation', () => {
+    const template = JSON.parse(read(TEMPLATE_PATH)) as typeof FIXTURE_INPUT;
+    expect(() => validateInput(template)).not.toThrow();
+    expect(template.identity.name).toBeTruthy();
+    expect(template.identity.language).toBeTruthy();
+    expect(template.identity.interaction_style).toBeTruthy();
+    expect(template.identity.primary_domain).toBeTruthy();
+    expect(template.identity.vision).toBeTruthy();
+    expect(template.identity.agent_id).toBeTruthy();
+  });
+
+  it('builds a summary and state from the onboarding input', () => {
+    const now = '2026-05-08T00:00:00.000Z';
+    const tenantEntries = [
+      {
+        tenant_slug: 'alpha-team',
+        tenant_id: 'alpha-team',
+        display_name: 'Alpha Team',
+        status: 'active',
+        assigned_role: 'owner',
+        purpose: 'test onboarding',
+        created_at: now,
+      },
+    ];
+
+    const summary = buildSummary(
+      FIXTURE_INPUT,
+      tenantEntries,
+      FIXTURE_INPUT.tutorial,
+      FIXTURE_REASONING
+    );
+    const state = buildState(
+      FIXTURE_INPUT,
+      now,
+      tenantEntries,
+      {
+        ...FIXTURE_INPUT.tutorial,
+        plan_path: 'customer/acme/onboarding/tutorial-plan.md',
+      },
+      FIXTURE_REASONING
+    );
+
+    expect(summary).toContain('## Identity');
+    expect(summary).toContain('## Reasoning Backend');
+    expect(summary).toContain('- Status: real_backend_detected');
+    expect(summary).toContain('Alpha Team');
+    expect(state.status).toBe('complete');
+    expect(state.completed_phases).toContain('reasoning');
+    expect(state.reasoning.mode).toBe('real_backend_detected');
+    expect(state.tenants.entries).toHaveLength(1);
+    expect(state.identity.agent_id).toBe('agent-001');
+    expect(state.identity.persona).toBe('sovereign');
+  });
+
+  it('builds a human-friendly apply summary', () => {
+    const summary = buildApplySummary(
+      FIXTURE_INPUT,
+      [
+        {
+          tenant_slug: 'alpha-team',
+          tenant_id: 'alpha-team',
+          display_name: 'Alpha Team',
+          status: 'active',
+          assigned_role: 'owner',
+          purpose: 'test onboarding',
+          created_at: '2026-05-08T00:00:00.000Z',
+        },
+      ],
+      FIXTURE_INPUT.tutorial,
+      FIXTURE_REASONING,
+      {
+        statePath: 'customer/acme/onboarding/onboarding-state.json',
+        summaryPath: 'customer/acme/onboarding/onboarding-summary.md',
+        activation: {
+          status: 'activation_available',
+          input_path: 'customer/acme/onboarding/activation-input.json',
+        },
+      }
+    );
+
+    expect(summary).toContain('Onboarding profile applied successfully.');
+    expect(summary).toContain('Execution and human approval are separate setup steps.');
+    expect(summary).toContain('/first-job');
+    expect(summary).toContain('pnpm onboarding first-job --tenant');
+    expect(summary).toContain('Identity: Famao (agent-001)');
+    expect(summary).toContain('Reasoning: real_backend_detected');
+    expect(summary).toContain('Next steps:');
+    expect(summary).toContain('onboarding/activation-input.json');
+    expect(summary).toContain('onboarding authority preview --file');
+    expect(summary).toContain('human approval');
+  });
+
+  it('guides active setups to their existing authority rather than a new activation plan', () => {
+    const summary = buildApplySummary(
+      FIXTURE_INPUT,
+      [],
+      FIXTURE_INPUT.tutorial,
+      FIXTURE_REASONING,
+      {
+        statePath: 'profile/state.json',
+        summaryPath: 'profile/summary.md',
+        activation: { status: 'identity_active' },
+      }
+    );
+    expect(summary).toContain('onboarding authority show --scope person --json');
+    expect(summary).not.toContain('authority preview --file');
+    expect(summary).toContain('Already active identities need no new activation consent');
+  });
+
+  it('uses the active customer root for onboarding artifacts', () => {
+    const script = read('scripts/onboarding/onboarding_apply.ts');
+    expect(script).toContain('resolveActiveProfileRoot');
+    expect(script).toContain('function profileRoot()');
+    expect(script).toContain("path.join(profileDir, 'my-identity.json')");
+    expect(script).toContain("path.join(profileRoot(), 'tenants')");
+    expect(script).toContain("path.join(onboardingRoot(), 'tutorial-plan.md')");
+    expect(script).toContain('statePath()');
+    expect(script).toContain('summaryPath()');
+    expect(script).toContain('loadOnboardingApplyInputAtPath');
+    expect(script).not.toContain('readJson');
+    expect(script).not.toContain('console.log');
+    expect(script).not.toContain('console.error');
+  });
+});

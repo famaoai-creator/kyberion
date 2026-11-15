@@ -14,7 +14,7 @@
       "role": "source",
       "op": "system:probe",
       "produces": { "channel": "p_mcp_script", "type": "ProbeResult" },
-      "params": { "path": "dist/scripts/mcp_server.js" }
+      "params": { "path": "dist/scripts/mcp/mcp_server.js" }
     },
     {
       "id": "probe-cowork-outbox",

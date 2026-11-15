@@ -3,7 +3,7 @@
  * --mission <M> --task <id> [--json]` — the confirmed customer decisions a
  * task held on its own `requires_customer` questions, for an agent or
  * operator doing that task by hand (no worker dispatch, so no prompt section
- * carries them). Part of scripts/customer_decision.ts (the entry point).
+ * carries them). Part of scripts/customer/customer_decision.ts (the entry point).
  *
  * Read-only: it takes no case lock, reconciles nothing and writes no store.
  * The values are printed to stdout only (same rule as the dispatch prompt:

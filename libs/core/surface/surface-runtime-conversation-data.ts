@@ -1062,7 +1062,7 @@ export async function handleTaskSessionRoute(
         const serviceName = session.payload?.service_name || 'voice-hub';
         const supervisorOutput = safeExec(
           'node',
-          ['dist/scripts/agent_runtime_supervisor_status.js'],
+          ['dist/scripts/agent/agent_runtime_supervisor_status.js'],
           {
             cwd: pathResolver.rootDir(),
           }
@@ -1076,7 +1076,7 @@ export async function handleTaskSessionRoute(
         const controlOutput = safeExec(
           'node',
           [
-            'dist/scripts/service_lifecycle_control.js',
+            'dist/scripts/service/service_lifecycle_control.js',
             '--operation',
             'start',
             '--service-name',
@@ -1092,7 +1092,7 @@ export async function handleTaskSessionRoute(
         const controlOutput = safeExec(
           'node',
           [
-            'dist/scripts/service_lifecycle_control.js',
+            'dist/scripts/service/service_lifecycle_control.js',
             '--operation',
             'stop',
             '--service-name',

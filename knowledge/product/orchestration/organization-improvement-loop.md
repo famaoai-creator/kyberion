@@ -53,7 +53,7 @@ WorkItem.expected_effect → KR 再測定 → outcome verdict → 次スキャ�
 
 ```bash
 # 手動スキャン (read-only, 書き込みなし)
-node --import ./scripts/ts-loader.mjs scripts/organization_improvement_scan.ts \
+node --import ./scripts/ts-loader.mjs scripts/organization/organization_improvement_scan.ts \
   --org <org-id> --tenant <slug> --tier confidential --window-days 30
 
 # governed 実行: dots/org-improvement.json を review して status: draft → active

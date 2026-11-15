@@ -32,14 +32,14 @@ import {
   resetDefaultLifecycleHookEngine,
 } from '@agent/core';
 import { readValidatedWorkflowAdf } from './refactor/adf-input.js';
-import { runInlineProductivityScore } from './pipeline-domain-ops.js';
-import { isPipelineNotStartedError } from './pipeline-execution-part-results.js';
+import { runInlineProductivityScore } from './pipeline/pipeline-domain-ops.js';
+import { isPipelineNotStartedError } from './pipeline/pipeline-execution-part-results.js';
 import {
   DEFAULT_CORE_WAIT_MS,
   resolveLogMessage,
   resolveReasoningContextParam,
   resolveWaitDurationMs,
-} from './pipeline-execution-part-bootstrap.js';
+} from './pipeline/pipeline-execution-part-bootstrap.js';
 
 const {
   normalizePipelineOp,
