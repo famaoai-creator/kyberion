@@ -3484,6 +3484,10 @@
       "types": "./dist/mission/mission-next-task-reader.d.ts",
       "default": "./dist/mission/mission-next-task-reader.js"
     },
+    "./mission/mission-operator-knowledge-surface": {
+      "types": "./dist/mission/mission-operator-knowledge-surface.d.ts",
+      "default": "./dist/mission/mission-operator-knowledge-surface.js"
+    },
     "./mission/mission-orchestration-artifact-review": {
       "types": "./dist/mission/mission-orchestration-artifact-review.d.ts",
       "default": "./dist/mission/mission-orchestration-artifact-review.js"
