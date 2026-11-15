@@ -247,8 +247,10 @@ const normalizeTenantSlug = (value: string): string => {
 };
 
 // Japanese affirmatives belong here too — the wizard defaults to the JA
+// i18n-exempt: bilingual prompt pair (JA side intentional)
 // locale, so "はい" must not be read as a no.
 const isAffirmative = (value: string): boolean =>
+  // i18n-exempt: bilingual prompt pair (JA side intentional)
   /^(y|yes|true|1|ok|sure|please|はい|うん|ええ)$/i.test(value.trim());
 
 const ensureArtifactDir = (filePath: string): void => {
@@ -1067,6 +1069,7 @@ async function runOperationsPhase(state: OnboardingState, print: Print): Promise
       // i18n-exempt: bilingual prompt pair (JA side intentional)
       t(
         'Non-interactive run — resident services and notification channel are recorded as pending; already-enabled intake sources are kept. See the summary for the exact commands.',
+        // i18n-exempt: bilingual prompt pair (JA side intentional)
         '非対話実行 — 常駐サービス・通知チャンネルは pending として記録し、有効化済みの intake ソースはそのまま反映します。コマンドはサマリを参照してください。'
       )
     );
@@ -1304,30 +1307,35 @@ export async function runOnboarding(
     print(
       t(
         '       and activate it with `pnpm stance:switch <slug>` before onboarding.',
+        // i18n-exempt: bilingual prompt pair (JA side intentional)
         '       オンボーディング前に `pnpm stance:switch <slug>` で有効化してください。'
       )
     );
     print(
       t(
         '    3. Apply a reviewed identity file (Path B): copy knowledge/public/templates/onboarding/identity.example.json',
+        // i18n-exempt: bilingual prompt pair (JA side intentional)
         '    3. レビュー済み identity ファイルを適用する (Path B): knowledge/public/templates/onboarding/identity.example.json を'
       )
     );
     print(
       t(
         '       into active/shared/tmp/, edit it, then `pnpm onboarding apply --identity <file> --dry-run` and rerun without --dry-run.',
+        // i18n-exempt: bilingual prompt pair (JA side intentional)
         '       active/shared/tmp/ へコピーして編集し、`pnpm onboarding apply --identity <file> --dry-run` の後に --dry-run 無しで再実行します。'
       )
     );
     print(
       t(
         `       It is written to the active profile root (${profileRoot()}).`,
+        // i18n-exempt: bilingual prompt pair (JA side intentional)
         `       有効なプロファイルルート (${profileRoot()}) に書き込まれます。`
       )
     );
     print(
       t(
         '    4. To intentionally accept defaults, re-run with KYBERION_ONBOARDING_NON_INTERACTIVE_OK=1',
+        // i18n-exempt: bilingual prompt pair (JA side intentional)
         '    4. 意図的に既定値を受け入れる場合は KYBERION_ONBOARDING_NON_INTERACTIVE_OK=1 を付けて再実行'
       )
     );
