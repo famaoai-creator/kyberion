@@ -8,7 +8,7 @@ import {
   assertChronosPipelinePath,
   collectPersonalPipelineFiles,
   resolvePersonalRuntimeEnv,
-} from '../chronos_daemon.js';
+} from '../../chronos/chronos_daemon.js';
 import { syncScheduleRegistry, type ScheduleScope } from './schedule-registry-sync.js';
 
 const REGISTRY_REL = 'active/shared/runtime/pipeline-schedules.json';
