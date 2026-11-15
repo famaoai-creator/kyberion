@@ -1,0 +1,24 @@
+{
+  "record_id": "mem-MSN-WINDOWS-LLM-20261116-2026_11_15",
+  "kind": "knowledge_hint",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "Revalidate local LLM configuration at the prompt send boundary",
+  "summary": "A cached asynchronous probe can still yield before a prompt is sent; configuration changes must invalidate both cached discovery and the pending send.",
+  "candidate_id": "mem-MSN-WINDOWS-LLM-20261116-2026_11_15",
+  "evidence_refs": [
+    "active/missions/public/MSN-WINDOWS-LLM-20261116/evidence/test-report.md",
+    "active/missions/public/MSN-WINDOWS-LLM-20261116/evidence/REVIEW-execution-implement.md"
+  ],
+  "created_at": "2026-11-15T19:03:04.389Z",
+  "hint_scope": "mission",
+  "hint_triggers": [
+    "Key local-assist availability by enabled state, normalized endpoint, model and platform. Snapshot configuration before awaiting discovery and recheck it immediately before sending, including cache hits. Suppress a pending prompt when configuration changes. Native Foundry CLI aliases need full inference model IDs resolved through bounded validated metadata. Preserve explicit endpoint authority and strict output parsing. Evidence includes reproductions, 146 combined tests and successful native Foundry inference; global readiness remains separate."
+  ],
+  "recommended_refs": [
+    "active/missions/public/MSN-WINDOWS-LLM-20261116/evidence/test-report.md",
+    "active/missions/public/MSN-WINDOWS-LLM-20261116/evidence/REVIEW-execution-implement.md"
+  ],
+  "source_branch": "codex/windows-llm",
+  "source_commit": "380995741fbf60d74c3874de6e946b252158d877"
+}

@@ -63,6 +63,12 @@ winget install --id Microsoft.FoundryLocal --exact --source winget --accept-sour
 
 導入後は Foundry Local のローカル API を起動し、必要に応じて `KYBERION_WINDOWS_AI_ENDPOINT` と `KYBERION_WINDOWS_AI_MODEL` を設定してください。
 
+`foundry server status --output json` で実際のポートを確認し、停止中なら `foundry server start` で起動します。endpoint 未指定時は、その status 応答から URL を検出します。サーバールートと `/v1` で終わる OpenAI 用 URL の両方を指定できます。Foundry の自動検出時は `foundry model info <model> --output json` で別名を完全なモデルIDに解決して送信します。endpoint を明示した場合は、`KYBERION_WINDOWS_AI_MODEL` に推論用の完全なモデルIDを設定してください。この bridge 自体はモデルをダウンロード・ロードしません。詳細は [CLI reference](https://learn.microsoft.com/en-us/azure/foundry-local/reference/reference-cli) と [REST reference](https://learn.microsoft.com/en-us/azure/foundry-local/reference/reference-rest) を参照してください。
+
+同じ設定の接続確認結果は60秒間キャッシュします。`KYBERION_WINDOWS_AI`、endpoint、model の変更は直ちに反映され、`KYBERION_WINDOWS_AI=off` で後続の送信を停止します。接続確認の待機中に設定が変わったプロンプトも送信しません。送信済みリクエストは設定変更だけではキャンセルされません。
+
+Windows の Claude CLI 検出では、ユーザーホームの `.local/bin/claude.exe` と PATH 上のネイティブ実行ファイルを探します。引用符付きで空白を含む PATH も扱い、プロジェクト内の `node_modules/.bin` shim は fallback 検出から除外します。明示指定は `KYBERION_CLAUDE_CLI_BIN` が優先です。batch／PowerShell shim はネイティブ実行ファイルには含めません。
+
 導入後に PowerShell を開き直し、通常の手順を続けてください。既存の governed manifest を使う場合は、次のコマンドで不足を確認し、承認付きで適用できます。
 
 ```powershell
