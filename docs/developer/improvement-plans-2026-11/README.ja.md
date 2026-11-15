@@ -11,9 +11,9 @@ status: active
 
 ## 情報資産とスコープ
 
-- [情報資産のスコープモデル（管理・開示・加工）の設計](./INFORMATION_ASSET_SCOPE_MODEL_DESIGN_2026-11-05.ja.md) — planned
+- [情報資産のスコープモデル（管理・開示・加工）の設計](./INFORMATION_ASSET_SCOPE_MODEL_DESIGN_2026-11-05.ja.md) — completed
 - [保存先カタログと許可証による権限判定（tier-guard の再設計）](./STORE_CATALOG_GRANT_GUARD_DESIGN_2026-11-05.ja.md) — planned
-- [情報資産カタログ・収集・dots intake 統合実装計画](./INFORMATION_ASSET_INTAKE_IMPLEMENTATION_PLAN_2026-11-02.ja.md) — active
+- [情報資産カタログ・収集・dots intake 統合実装計画](./INFORMATION_ASSET_INTAKE_IMPLEMENTATION_PLAN_2026-11-02.ja.md) — completed
 
 ## 概念モデル v2 の移行
 
