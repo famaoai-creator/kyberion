@@ -19,6 +19,33 @@ import {
  * Same-origin remains the local UI compatibility path.
  */
 export function requireConciergeMutationAccess(req: NextRequest): NextResponse | null {
+  const transport = requireConciergeMutationTransport(req);
+  if (transport) return transport;
+
+  // Do not let a readonly API-token success become an implicit write grant for
+  // approval, setup, ingest, or mission-control routes.
+  const credential = conciergeCredential(req);
+  if (credential.token) {
+    const viewer = resolveConciergeViewer(req);
+    if (viewer.response) return viewer.response;
+    if (viewer.context.role !== 'localadmin') {
+      return NextResponse.json(
+        { ok: false, error: 'Concierge mutation requires a localadmin viewer.' },
+        { status: 403 }
+      );
+    }
+  }
+  return null;
+}
+
+/**
+ * The transport half of the mutation guard — rate limit, CSRF and same-origin
+ * checks — without the localadmin viewer requirement. Routes whose own
+ * scope-specific authorization is stronger than the surface role (e.g.
+ * account introduction, where an organization binding admits a tenant-owner
+ * member, not every localadmin) use this and then enforce that scope.
+ */
+export function requireConciergeMutationTransport(req: NextRequest): NextResponse | null {
   const rateLimitResponse = guardConciergeRequest(req);
   if (rateLimitResponse) return rateLimitResponse;
   const credential = conciergeCredential(req);
@@ -45,19 +72,6 @@ export function requireConciergeMutationAccess(req: NextRequest): NextResponse |
   });
   if (!decision.ok) {
     return NextResponse.json({ ok: false, error: decision.reason }, { status: decision.status });
-  }
-
-  // Do not let a readonly API-token success become an implicit write grant for
-  // approval, setup, ingest, or mission-control routes.
-  if (credential.token) {
-    const viewer = resolveConciergeViewer(req);
-    if (viewer.response) return viewer.response;
-    if (viewer.context.role !== 'localadmin') {
-      return NextResponse.json(
-        { ok: false, error: 'Concierge mutation requires a localadmin viewer.' },
-        { status: 403 }
-      );
-    }
   }
   return null;
 }

@@ -144,6 +144,15 @@ explicitly configured provisioning broker. See the
 [service integration guide](../knowledge/product/orchestration/service-integration-guide.md#register-a-token-for-an-existing-account)
 for prerequisites, incomplete-save recovery and the remaining runtime limitations.
 
+An organization connection can also be introduced by the tenant's own side: an
+authenticated member with the `owner` role in that tenant can run the same
+preview → request → status → apply steps through the concierge account
+introduction API without a localadmin surface role. The value still travels only
+in the apply request body, the binding's tenant is resolved server-side (a
+caller can never nominate another tenant's connection), and a human approval on
+the existing approval surface is still required before apply — proposer and
+approver stay separate people.
+
 The installed owner can also use `pnpm kyberion account preview`,
 `pnpm kyberion account request`, `pnpm kyberion account status`, and
 `pnpm kyberion account apply`.
