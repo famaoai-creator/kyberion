@@ -50,10 +50,13 @@ and a resolver entry, not edits to the supervision loop.
 ## 1. Registration ceremonies — additions are not done until registered
 
 When relocating a core implementation while preserving its public subpath, update the
-export target rather than adding a source shim. The root Vitest configuration derives
-relocated source aliases from `libs/core/package.json`; keep that mapping ahead of its
-directory fallback. Validate both a package build and tests importing the preserved
-public subpath, since relative-import tests alone do not exercise export compatibility.
+export target rather than adding a source shim. Every Vitest configuration derives
+relocated source aliases through `tests/vitest-core-aliases.ts` (which reads
+`libs/core/package.json` `exports`); keep that mapping ahead of the directory
+fallback — a config that guesses `libs/core/<subpath>.ts` breaks on flat exports
+whose source lives in a subdirectory. Validate both a package build and tests
+importing the preserved public subpath, since relative-import tests alone do not
+exercise export compatibility.
 
 This repo guards its boundaries with contract tests. Adding code without the
 matching registration compiles fine locally and then fails CI (or worse,
