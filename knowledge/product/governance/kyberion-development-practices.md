@@ -334,6 +334,31 @@ allowed by `role-assumption-policy.json` or the assumption throws
 must live where that role can read it, and an unreadable overlay must warn,
 not drop silently.
 
+**Governed-path test fixtures are layered — enumerate them up front.** A
+tmpRoot fixture that exercises a policy-mediated read/write fails closed and
+usually _silently_ (deny → catch → empty result, no throw). The checklist for
+each layer is: `security-policy.json` → `agent-policies.yaml` → the
+registry/state file the facade reads (tenant registry, service registry,
+charter) → an execution context around the call (`withExecutionContext*` for
+the role that owns the write). Build the fixture to that list on the first
+attempt instead of discovering each layer one denied test at a time, and
+assert the artifact exists — `expect(noThrow)` passes on a silent deny.
+
+**Dual entry paths must wrap the governed call identically.** When a feature
+has both an interactive and a non-interactive caller (wizard + apply, CLI +
+daemon step), the `withExecutionContext*` wrap belongs _inside_ the shared
+helper or on both call sites — a wrap on only one path denies at runtime on
+the other, and unit tests that mock beneath the guard never see it.
+
+**Bilingual operator surfaces carry four mechanical checks.** For any
+prompt/summary an operator reads in a JA-default wizard: (a) every `print`/
+`ask` goes through `t()` — no raw single-language string; (b) affirmative/
+negative parsers accept the operator's primary language (`はい`/`うん`/`ええ`
+must not parse as "no"); (c) every `while` loop wrapped around `ask()` has an
+escape (empty input, or a max-attempts bail); (d) a choice that discards saved
+state says so in the prompt text, not in a follow-up the operator may never
+reach.
+
 ## 4. Build & verification order — run the check CI runs
 
 - **One compiler owns each output.** tsconfig.base.json contains language
