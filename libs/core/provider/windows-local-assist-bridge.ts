@@ -2,6 +2,7 @@ import { logger } from '../core.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { parseSafeJsonInput, parseSafeJsonObjectValue } from '../foundation/safe-json.js';
 import { safeExecResult } from '../secure-io.js';
+import { isWindows } from '../platform-facts.js';
 
 /** Availability of the optional Windows local-LLM assist adapter. */
 export interface WindowsLocalAssistAvailability {
@@ -20,20 +21,37 @@ export interface WindowsLocalAssistPromptOptions {
 const DEFAULT_ENDPOINT = 'http://127.0.0.1:5272';
 const DEFAULT_MODEL = 'qwen2.5-0.5b';
 const AVAILABILITY_TTL_MS = 60_000;
-let cached: { checkedAt: number; value: WindowsLocalAssistAvailability } | null = null;
+let cached: { key: string; checkedAt: number; value: WindowsLocalAssistAvailability } | null = null;
 
 function disabledByEnv(): boolean {
-  const value = String(getRegisteredEnvText('KYBERION_WINDOWS_AI') || '').toLowerCase();
+  const value = String(getRegisteredEnvText('KYBERION_WINDOWS_AI') || '')
+    .trim()
+    .toLowerCase();
   return value === '0' || value === 'false' || value === 'off';
 }
 
 function configuredEndpoint(): string | null {
   const explicit = getRegisteredEnvText('KYBERION_WINDOWS_AI_ENDPOINT');
-  return explicit ? explicit.replace(/\/$/, '') : null;
+  return explicit?.trim() ? normalizeEndpoint(explicit) : null;
 }
 
 function configuredModel(): string {
-  return getRegisteredEnvText('KYBERION_WINDOWS_AI_MODEL') || DEFAULT_MODEL;
+  return getRegisteredEnvText('KYBERION_WINDOWS_AI_MODEL')?.trim() || DEFAULT_MODEL;
+}
+
+/** Accept either a server root or an OpenAI SDK base URL ending in /v1. */
+function normalizeEndpoint(endpoint: string): string {
+  return endpoint.trim().replace(/\/+$/u, '').replace(/\/v1$/iu, '');
+}
+
+function probeConfiguration() {
+  const configuration = {
+    disabled: disabledByEnv(),
+    endpoint: configuredEndpoint(),
+    model: configuredModel(),
+    windows: isWindows(),
+  };
+  return { ...configuration, key: JSON.stringify(configuration) };
 }
 
 async function requestJson(url: string, init: RequestInit, timeoutMs: number): Promise<unknown> {
@@ -57,7 +75,7 @@ function discoverEndpoint(payload: unknown, fallback: string): string {
     const endpoints = record.endpoints ?? record.Endpoints;
     if (Array.isArray(endpoints)) candidates.push(...endpoints);
     const found = candidates.find((value) => typeof value === 'string' && value.length > 0);
-    return (typeof found === 'string' ? found : fallback).replace(/\/$/, '');
+    return normalizeEndpoint(typeof found === 'string' ? found : fallback);
   } catch {
     return fallback;
   }
@@ -78,10 +96,31 @@ function parseChatCompletionText(payload: unknown): string | null {
   }
 }
 
-async function probeUncached(): Promise<WindowsLocalAssistAvailability> {
-  if (disabledByEnv()) return { available: false, reason: 'disabled via KYBERION_WINDOWS_AI' };
-  const explicitEndpoint = configuredEndpoint();
-  if (process.platform !== 'win32' && !explicitEndpoint) {
+/** Foundry HTTP inference requires the full model ID, not its CLI alias. */
+function resolveFoundryModelId(model: string): string {
+  const info = safeExecResult('foundry', ['model', 'info', model, '--output', 'json'], {
+    timeoutMs: 3_000,
+  });
+  if (info.status !== 0) return model;
+  try {
+    const root = parseSafeJsonObjectValue(
+      parseSafeJsonInput(info.stdout, 'Foundry model info'),
+      'Foundry model info'
+    );
+    const detail = parseSafeJsonObjectValue(root.model, 'Foundry model info.model');
+    return typeof detail.id === 'string' && detail.id.trim() ? detail.id.trim() : model;
+  } catch {
+    return model;
+  }
+}
+
+async function probeUncached(
+  configuration: ReturnType<typeof probeConfiguration>
+): Promise<WindowsLocalAssistAvailability> {
+  if (configuration.disabled)
+    return { available: false, reason: 'disabled via KYBERION_WINDOWS_AI' };
+  const explicitEndpoint = configuration.endpoint;
+  if (!configuration.windows && !explicitEndpoint) {
     return { available: false, reason: 'requires Windows' };
   }
   let configured = explicitEndpoint;
@@ -96,7 +135,7 @@ async function probeUncached(): Promise<WindowsLocalAssistAvailability> {
           'Windows local assist availability response'
         ) as { webUrls?: unknown };
         const url = Array.isArray(parsed.webUrls) ? parsed.webUrls[0] : undefined;
-        if (typeof url === 'string') configured = url.replace(/\/$/, '');
+        if (typeof url === 'string') configured = normalizeEndpoint(url);
       } catch {
         // Fall back to the documented default endpoint below.
       }
@@ -109,7 +148,11 @@ async function probeUncached(): Promise<WindowsLocalAssistAvailability> {
     return { available: false, reason: 'Foundry Local endpoint unavailable' };
   }
   const endpoint = discoverEndpoint(status, configured);
-  return { available: true, endpoint, model: configuredModel() };
+  return {
+    available: true,
+    endpoint,
+    model: explicitEndpoint ? configuration.model : resolveFoundryModelId(configuration.model),
+  };
 }
 
 export function _resetWindowsLocalAssistAvailabilityCacheForTests(): void {
@@ -118,9 +161,14 @@ export function _resetWindowsLocalAssistAvailabilityCacheForTests(): void {
 
 /** Best-effort probe for Microsoft Foundry Local (or another compatible endpoint). */
 export async function probeWindowsLocalAssist(): Promise<WindowsLocalAssistAvailability> {
-  if (cached && Date.now() - cached.checkedAt < AVAILABILITY_TTL_MS) return cached.value;
-  const value = await probeUncached();
-  cached = { checkedAt: Date.now(), value };
+  const configuration = probeConfiguration();
+  if (cached?.key === configuration.key && Date.now() - cached.checkedAt < AVAILABILITY_TTL_MS) {
+    return cached.value;
+  }
+  const value = await probeUncached(configuration);
+  // Settings changed during HTTP discovery: do not cache or use the old endpoint.
+  if (probeConfiguration().key !== configuration.key) return probeWindowsLocalAssist();
+  cached = { key: configuration.key, checkedAt: Date.now(), value };
   return value;
 }
 
@@ -129,7 +177,10 @@ export async function windowsLocalAssistPrompt(
   promptText: string,
   options: WindowsLocalAssistPromptOptions = {}
 ): Promise<string | null> {
+  const configuration = probeConfiguration();
   const availability = await probeWindowsLocalAssist();
+  // Even a cache hit yields at await. Do not send across a settings change.
+  if (probeConfiguration().key !== configuration.key) return null;
   if (!availability.available || !availability.endpoint) return null;
   const timeoutMs = options.timeoutMs ?? 30_000;
   const payload = await requestJson(

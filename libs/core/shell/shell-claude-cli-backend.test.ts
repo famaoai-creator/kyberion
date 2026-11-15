@@ -206,6 +206,7 @@ describe('shell-claude-cli-backend', () => {
           ].join(':'),
         } as NodeJS.ProcessEnv,
         home: '/home/op',
+        platform: 'linux',
         exists: (candidate) => existing.has(candidate),
       });
 
@@ -215,6 +216,28 @@ describe('shell-claude-cli-backend', () => {
         '/extra/tools/claude',
       ]);
       expect(candidates).not.toContain('/repo/node_modules/.bin/claude');
+    });
+
+    it('finds native Windows executables with quoted Path entries and skips local shims', () => {
+      const existing = new Set(
+        [
+          'C:/Users/Operator/.local/bin/claude.exe',
+          'C:/Program Files/Claude/claude.exe',
+          'C:/repo/NODE_MODULES/.BIN/claude.exe',
+        ].map((entry) => entry.toLowerCase())
+      );
+      const candidates = resolveClaudeCliFallbackCandidates({
+        platform: 'win32',
+        home: 'C:/Users/Operator',
+        env: {
+          Path: 'C:/repo/NODE_MODULES/.BIN;"C:/Program Files/Claude";C:/USERS/OPERATOR/.LOCAL/BIN',
+        },
+        exists: (candidate) => existing.has(candidate.replaceAll('\\', '/').toLowerCase()),
+      });
+      expect(candidates.map((entry) => entry.replaceAll('\\', '/'))).toEqual([
+        'C:/Users/Operator/.local/bin/claude.exe',
+        'C:/Program Files/Claude/claude.exe',
+      ]);
     });
 
     it('returns no candidates when nothing exists on disk', () => {

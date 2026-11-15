@@ -61,6 +61,12 @@ winget install --id Microsoft.FoundryLocal --exact --source winget --accept-sour
 
 After installing, start the Foundry Local API and, if needed, set `KYBERION_WINDOWS_AI_ENDPOINT` and `KYBERION_WINDOWS_AI_MODEL`.
 
+Check the actual port with `foundry server status --output json`; start a stopped server with `foundry server start`. Without an explicit endpoint, the bridge discovers its URL from that status response. Both a server root and an OpenAI base URL ending in `/v1` are accepted. For native Foundry discovery, the bridge resolves the selected alias with `foundry model info <model> --output json` and sends its full model ID. With an explicit endpoint, set `KYBERION_WINDOWS_AI_MODEL` to the full inference model ID. This bridge does not download or load models. See the [CLI reference](https://learn.microsoft.com/en-us/azure/foundry-local/reference/reference-cli) and [REST reference](https://learn.microsoft.com/en-us/azure/foundry-local/reference/reference-rest).
+
+Availability is cached for 60 seconds for unchanged settings. Changes to `KYBERION_WINDOWS_AI`, endpoint, or model invalidate that cache immediately. Setting `KYBERION_WINDOWS_AI=off` suppresses subsequent prompts; a prompt awaiting discovery is discarded if settings change before sending. Requests already sent are not cancelled by a settings change.
+
+Windows Claude fallback discovery checks the user home `.local/bin/claude.exe` and native executables on PATH, including quoted directories containing spaces. Project-local `node_modules/.bin` shims are excluded. `KYBERION_CLAUDE_CLI_BIN` remains the explicit override. Batch and PowerShell shims are not native executables.
+
 Reopen PowerShell after installing and continue with the normal steps. If you use an existing governed manifest, check what is missing and apply it with approval:
 
 ```powershell
