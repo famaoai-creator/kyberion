@@ -1,7 +1,7 @@
 ---
 title: 'Phase Protocol: Mission Execution'
 tags: [governance, lifecycle, execution]
-last_updated: 2026-10-28
+last_updated: 2026-11-15
 runtime_stages: [contract_authoring, preflight, execution]
 ---
 
@@ -219,9 +219,22 @@ work produced _outside_ a mission and is deliberately strict: every evidence fil
 tracked unchanged at the manifest's source commit, review tasks need an
 `artifact-review-receipt` whose implementer identity comes from the execution ledger (it
 cannot be self-declared), and `apply` requires an authenticated human approval
-(`--request-approval`, then `--approval-request-id`). Reaching for it at the end of direct
-work stalls the mission; use it only for genuine adoption of external work, and plan the
-human approval up front.
+(`--request-approval`, then `--approval-request-id`). The verb itself also needs a **task
+credential binding** — it fails at entry with `[CREDENTIAL_BINDING_REQUIRED]` before the
+manifest is even read, and a `work claim-item` lease is coordination only, not a binding.
+The binding exists while a claimed WorkItem executes through the agent execution port; for
+personal-tier missions only the installed personal runtime can produce it. Reaching for
+`reconcile-work` at the end of direct work stalls the mission; use it only for genuine
+adoption of external work, and plan the human approval up front.
+
+**Personal-tier missions cannot follow this flow unchanged.** `knowledge/personal/` writes
+are restricted to authorized personal processes — a worker agent's file tools and ad-hoc
+shell writes are denied regardless of intent — and `dispatch-workitems` refuses personal
+missions (`tenant_slug` is required for project recovery). When the mission is
+`--tier personal`, either the installed personal runtime runs the claimed WorkItem (which
+mints the binding for `reconcile-work`), or an authorized personal process places the
+deliverables. See `mission-triage-playbook.md` → "Personal-tier missions" for the full
+order of operations.
 
 Other traps seen on this path:
 

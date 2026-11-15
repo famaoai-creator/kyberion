@@ -574,7 +574,7 @@ export function installReasoningBackends(options: InstallReasoningOptions = {}):
       return false;
     }
     throw new Error(
-      '[CREDENTIAL_BINDING_REQUIRED] Tenant reasoning requires a trusted task binding; dispatch through a claimed WorkItem.'
+      '[CREDENTIAL_BINDING_REQUIRED] Tenant reasoning requires a trusted task binding; execute the WorkItem through the agent execution port — a claim lease alone mints no binding.'
     );
   }
   const shouldReselect =

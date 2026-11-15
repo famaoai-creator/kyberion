@@ -1,7 +1,7 @@
 ---
 title: 'Mission Triage Playbook — closing missions that cannot finish'
 tags: [governance, lifecycle, maintenance, approval, triage]
-last_updated: 2026-09-27
+last_updated: 2026-11-15
 runtime_stages: [execution, review]
 ---
 
@@ -69,6 +69,54 @@ The human decider is recorded as `approved_by` in `context.approved_scope_change
 
 The SUDO direct path (`KYBERION_SUDO=true pnpm mission scope-approve ...`) still exists
 for the sovereign operator; workers should prefer the approval path.
+
+## Resolve: unfinished tasks left by direct work
+
+The common shape: work happened in a worktree / subagent / another PR and `NEXT_TASKS`
+never got closed, so the exit gate reports pending tasks on an otherwise finished
+mission. `checkpoint` and `record-evidence` only append ledger entries — a task closes
+when its own rule fires:
+
+- The task's declared `deliverable` file must exist at its declared path, inside the
+  mission's evidence tree — a note referencing it is not enough.
+- `record-evidence <ID> <task> "<note>" --actor-id <who did it>` closes a normal task
+  once that deliverable exists **and** every listed dependency is already completed —
+  completions cascade, so record in dependency order.
+- Review-kind tasks never close from `record-evidence`: an independent reviewer records
+  `review-task <ID> <review_task> <reviewer>` (independence is read from the execution
+  ledger, not declared). One valid receipt per review task.
+- A completed task list on an `active` mission means `verify` → `distill` → `finish`;
+  a failed `finish` leaves the mission `active`, so re-run the whole tail after fixing
+  the gate.
+- `reconcile-work` is for genuinely external work: commit-bound manifest evidence plus
+  an authenticated human approval (PI-05). It additionally requires a **task credential
+  binding** — see below — so it cannot run from a bare terminal claim.
+
+## Personal-tier missions: the constrained path
+
+Two extra limits apply only to `--tier personal` missions (`knowledge/personal/missions/`):
+
+- **Evidence placement is process-gated.** The tier guard restricts
+  `knowledge/personal/` writes to authorized personal processes — ordinary agent file
+  tools and ad-hoc shell writes are denied regardless of who asks. Either the installed
+  personal runtime places the deliverables, or the mission adopts external work via
+  `reconcile-work` (which never writes `knowledge/personal/` itself).
+- **Dispatch cannot route it.** `dispatch-workitems` needs `tenant_slug` for project
+  recovery (`[MISSION_WORKITEM_SCOPE_REQUIRED]`) and personal missions have none.
+  The only designed way a personal mission gains a task credential binding is the
+  **installed personal runtime** claiming and executing the mission's WorkItem through
+  the agent execution port — `assertPersonalTaskCredentialClaim` checks a minted scope
+  envelope, a `claim`-provenance agent actor matching the installed runtime's NHI, and a
+  live attempt + lease attributed to that agent. A `work claim-item` lease from an
+  operator CLI is coordination only; it mints no binding.
+
+So for a personal mission stalled on pending tasks, the order of operations is:
+personal runtime executes the claimed WorkItem (binding minted) → `reconcile-work
+--request-approval` files the `mission_gate` request → human approves
+(`pnpm kyberion approvals --approve`, A2+) → apply with `--approval-request-id` →
+`verify` → `distill` → `finish`. If the runtime path is unavailable, the human places
+evidence via an authorized personal process and the standard `record-evidence` flow
+closes the tasks instead.
 
 ## Resolve: abandon
 
