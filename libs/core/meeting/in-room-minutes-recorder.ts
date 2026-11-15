@@ -5,7 +5,7 @@
  * consent(purpose=recording, fail-closed)→ mic capture → EnergyVad で
  * 発話区切り → セグメント WAV をミッション evidence へ保存 → バッチ STT
  * (speech-to-text-bridge; 既定 stub は .transcript.txt sidecar)→
- * transcript.md へ追記 → stop() で pipelines/meeting-followup.json を実行し
+ * transcript.md へ追記 → stop() で knowledge/product/pipeline-templates/meeting-followup.json を実行し
  * minutes.md とアクションアイテムを生成する。
  */
 
@@ -123,7 +123,9 @@ function defaultRunMinutesPipeline(input: {
       allowMissingLeaf: true,
     });
     const runner = assertSafeRepositoryPath(rootResolve('dist/scripts/run_pipeline.js'));
-    const pipeline = assertSafeRepositoryPath(rootResolve('pipelines/meeting-followup.json'));
+    const pipeline = assertSafeRepositoryPath(
+      rootResolve('knowledge/product/pipeline-templates/meeting-followup.json')
+    );
     const child = spawn(
       'node',
       [

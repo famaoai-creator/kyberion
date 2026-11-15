@@ -3,7 +3,7 @@ title: Running and Probing Tenant-Bound Pipelines Without Policy Violations
 category: Governance
 tags: [governance, tenant, persona, authority, chronos, kill-switch, probing, tier-guard]
 importance: 7
-last_updated: 2026-11-10
+last_updated: 2026-11-15
 role_affinity: [mission_controller, ecosystem_architect, operator]
 phase_affinity: [execution, review]
 ---
@@ -57,6 +57,32 @@ invalidates the approval.
 
 Knowledge landings inside that process go through `ingest:commit`, which
 switches to the narrow `ingest_commit` role for the write itself.
+
+### Personal-scoped runs (chronos)
+
+A pipeline under `knowledge/personal/pipelines/` (direct `.json` children
+only, gitignored per-machine) is picked up by chronos the same way and runs
+in its own process with
+
+```
+MISSION_ROLE=chronos_personal_runner   # reads: knowledge/personal/pipelines/ + its governance allowlist
+KYBERION_BASE_ROLE=worker
+KYBERION_TENANT=                        # explicitly blank — no tenant binding, no tenant knowledge
+KYBERION_TENANT_SCOPE_REQUIRED=
+KYBERION_SUDO=
+# plus ONLY what the ADF `runtime` block declares, bounded by
+# knowledge/personal/governance/pipeline-runtime-allowlist.json; egress
+# overlays must live inside knowledge/personal/.
+```
+
+`resolvePersonalRuntimeEnv` / `buildPersonalRunEnv` compute this. The same
+gates apply: current-content project-trust approval (any edit invalidates
+it), deny-by-default runtime needs, and schedule ids namespaced
+`personal-<id>` so a local file can never shadow a repository schedule. The
+role's writes cover `active/personal/`, the volatile layer
+(`*.volatile.*`, `active/shared/MEMORY.*`, `active/INDEX.volatile.*`),
+`active/shared/tmp/`, logs and audit — it cannot reach `knowledge/` beyond
+its own dir or any tenant partition.
 
 Interactive, non-tenant-bound CLI work that writes confidential knowledge
 still needs a persona with a write grant (e.g.
@@ -114,6 +140,8 @@ build:actuators`), and `@agent/core/*` imports in any throwaway probe
   `knowledge/product/governance/agent-policies.yaml`.
 - Tenant runner: `scripts/chronos_daemon.ts`; role
   `knowledge/product/governance/authority-roles/chronos_tenant_runner.json`.
+- Personal runner: same daemon; role
+  `knowledge/product/governance/authority-roles/chronos_personal_runner.json`.
 - Tenant egress overlay: `libs/core/governance/egress-policy.ts`
   (`KYBERION_TENANT_EGRESS_POLICY_PATH`).
 - Kill switch / trust: `libs/core/governance/kill-switch.ts`, `libs/core/governance/trust-engine.ts`.

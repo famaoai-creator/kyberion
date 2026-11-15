@@ -295,7 +295,9 @@ describe('meeting_preflight', () => {
     }
     expect(print).toHaveBeenCalledWith(expect.stringContaining('uv pip install mlx-audio'));
     expect(print).toHaveBeenCalledWith(
-      expect.stringContaining('Run Task 2: pnpm pipeline --input pipelines/voice-onboarding.json')
+      expect.stringContaining(
+        'Run Task 2: pnpm pipeline --input knowledge/product/pipeline-templates/voice-onboarding.json'
+      )
     );
     expect(print).toHaveBeenCalledWith(
       expect.stringContaining(

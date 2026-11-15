@@ -33,7 +33,9 @@ const TRANSCRIPT_PATH = pathResolver.rootResolve('tests/fixtures/meeting-transcr
 const REPORT_PATH = pathResolver.rootResolve(
   'active/shared/tmp/test-action-item-reminders-report.json'
 );
-const PIPELINE_PATH = pathResolver.rootResolve('pipelines/meeting-followup.json');
+const PIPELINE_PATH = pathResolver.rootResolve(
+  'knowledge/product/pipeline-templates/meeting-followup.json'
+);
 const SLACK_CORRELATION_PREFIX = `${MISSION_ID}:`;
 
 function readPipeline(): {
@@ -167,6 +169,7 @@ describe('meeting-to-value contract', () => {
       }
     );
     expect(pipeline.steps?.map((step) => step.id)).toEqual([
+      'preflight',
       'open_log',
       // 1ffdae2ea (pipeline v2.1) replaced the plain system:read_file
       // `read_transcript` step with meeting:normalize_transcript, which adds

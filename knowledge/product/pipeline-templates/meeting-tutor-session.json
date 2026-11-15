@@ -1,7 +1,7 @@
 {
   "action": "pipeline",
   "pipeline_id": "meeting-tutor-session",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "name": "Guided Tutor Session",
   "description": "Run a guided tutoring session over a material file (comprehension questions and learner feedback) and export the structured result.",
   "labels": ["meeting", "tutor"],
@@ -13,6 +13,12 @@
     "output_path": "active/shared/tmp/meeting/tutor-result.json"
   },
   "steps": [
+    {
+      "id": "preflight",
+      "role": "gate",
+      "op": "core:include",
+      "params": { "fragment": "fragments/meeting-runtime-preflight.json" }
+    },
     {
       "id": "run_tutor",
       "role": "source",

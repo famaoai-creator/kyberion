@@ -684,7 +684,7 @@
       "count": 1
     },
     {
-      "file": "pipelines/daily-routine.json",
+      "file": "knowledge/product/pipeline-templates/daily-routine.json",
       "count": 1
     },
     {
@@ -788,15 +788,15 @@
       "count": 2
     },
     {
-      "file": "pipelines/meeting-hearing-session.json",
+      "file": "knowledge/product/pipeline-templates/meeting-hearing-session.json",
       "count": 1
     },
     {
-      "file": "pipelines/meeting-tutor-session.json",
+      "file": "knowledge/product/pipeline-templates/meeting-tutor-session.json",
       "count": 2
     },
     {
-      "file": "pipelines/mv-generate.json",
+      "file": "knowledge/product/pipeline-templates/mv-generate.json",
       "count": 2
     },
     {
@@ -840,7 +840,7 @@
       "count": 2
     },
     {
-      "file": "pipelines/voice-onboarding.json",
+      "file": "knowledge/product/pipeline-templates/voice-onboarding.json",
       "count": 11
     },
     {
@@ -848,7 +848,7 @@
       "count": 2
     },
     {
-      "file": "pipelines/weekly-review.json",
+      "file": "knowledge/product/pipeline-templates/weekly-review.json",
       "count": 4
     }
   ]

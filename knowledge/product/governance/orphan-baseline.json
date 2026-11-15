@@ -122,7 +122,7 @@
     },
     {
       "id": "pipelines/browser-failure-evidence.json",
-      "reason": "OW-05 example pipeline: the runnable caller of browser:action_trail / export_failure_bundle (asserted by scripts/orphan_op_reachability.test.ts); run by hand per pipelines/README.md."
+      "reason": "OW-05 example pipeline: the runnable caller of browser:action_trail / export_failure_bundle (asserted by scripts/orphan_op_reachability.test.ts); run by hand per knowledge/product/pipeline-templates/README.md."
     },
     {
       "id": "pipelines/chaos-actuator-down.json",
@@ -142,11 +142,11 @@
     },
     {
       "id": "pipelines/external-asset-ledger.json",
-      "reason": "OW-05 example pipeline: the runnable caller of modeling:asset_inventory_to_ledger (asserted by scripts/orphan_op_reachability.test.ts); run by hand per pipelines/README.md."
+      "reason": "OW-05 example pipeline: the runnable caller of modeling:asset_inventory_to_ledger (asserted by scripts/orphan_op_reachability.test.ts); run by hand per knowledge/product/pipeline-templates/README.md."
     },
     {
       "id": "pipelines/incident-review.json",
-      "reason": "OW-05 example pipeline: the runnable caller of system:list_incidents / sre_analyze (asserted by scripts/orphan_op_reachability.test.ts); run by hand per pipelines/README.md."
+      "reason": "OW-05 example pipeline: the runnable caller of system:list_incidents / sre_analyze (asserted by scripts/orphan_op_reachability.test.ts); run by hand per knowledge/product/pipeline-templates/README.md."
     },
     {
       "id": "pipelines/inspect-system-hardware.json",
@@ -161,20 +161,20 @@
       "reason": "Deterministic media review gate (brief compile + PPTX overflow check) run by hand per pipelines/README.md; not a CI gate."
     },
     {
-      "id": "pipelines/meeting-hearing-session.json",
-      "reason": "OW-05 example pipeline: the runnable caller of meeting:hearing_session (asserted by scripts/orphan_op_reachability.test.ts); run by hand per pipelines/README.md."
+      "id": "knowledge/product/pipeline-templates/meeting-hearing-session.json",
+      "reason": "OW-05 example pipeline: the runnable caller of meeting:hearing_session (asserted by scripts/orphan_op_reachability.test.ts); run by hand per knowledge/product/pipeline-templates/README.md."
     },
     {
-      "id": "pipelines/meeting-tutor-session.json",
-      "reason": "OW-05 example pipeline: the runnable caller of meeting:tutor_session (asserted by scripts/orphan_op_reachability.test.ts); run by hand per pipelines/README.md."
+      "id": "knowledge/product/pipeline-templates/meeting-tutor-session.json",
+      "reason": "OW-05 example pipeline: the runnable caller of meeting:tutor_session (asserted by scripts/orphan_op_reachability.test.ts); run by hand per knowledge/product/pipeline-templates/README.md."
     },
     {
       "id": "pipelines/mission-team-prewarm.json",
-      "reason": "OW-05 example pipeline: the runnable caller of agent:prewarm_mission (asserted by scripts/orphan_op_reachability.test.ts); run by hand per pipelines/README.md."
+      "reason": "OW-05 example pipeline: the runnable caller of agent:prewarm_mission (asserted by scripts/orphan_op_reachability.test.ts); run by hand per knowledge/product/pipeline-templates/README.md."
     },
     {
       "id": "pipelines/mission-team-staff.json",
-      "reason": "OW-05 example pipeline: the runnable caller of agent:staff_mission (asserted by scripts/orphan_op_reachability.test.ts); run by hand per pipelines/README.md."
+      "reason": "OW-05 example pipeline: the runnable caller of agent:staff_mission (asserted by scripts/orphan_op_reachability.test.ts); run by hand per knowledge/product/pipeline-templates/README.md."
     },
     {
       "id": "pipelines/open-active-surfaces.json",
@@ -210,15 +210,15 @@
     },
     {
       "id": "pipelines/terraform-asset-inventory.json",
-      "reason": "OW-05 example pipeline: the runnable caller of modeling:terraform_asset_inventory (asserted by scripts/orphan_op_reachability.test.ts); run by hand per pipelines/README.md."
+      "reason": "OW-05 example pipeline: the runnable caller of modeling:terraform_asset_inventory (asserted by scripts/orphan_op_reachability.test.ts); run by hand per knowledge/product/pipeline-templates/README.md."
     },
     {
       "id": "pipelines/terraform-topology-ir.json",
-      "reason": "OW-05 example pipeline: the runnable caller of modeling:terraform_to_topology_ir (asserted by scripts/orphan_op_reachability.test.ts); run by hand per pipelines/README.md."
+      "reason": "OW-05 example pipeline: the runnable caller of modeling:terraform_to_topology_ir (asserted by scripts/orphan_op_reachability.test.ts); run by hand per knowledge/product/pipeline-templates/README.md."
     },
     {
       "id": "pipelines/test-inventory-device-pipeline.json",
-      "reason": "OW-05 example pipeline: the runnable caller of modeling:test_inventory_to_device_pipeline (asserted by scripts/orphan_op_reachability.test.ts); run by hand per pipelines/README.md."
+      "reason": "OW-05 example pipeline: the runnable caller of modeling:test_inventory_to_device_pipeline (asserted by scripts/orphan_op_reachability.test.ts); run by hand per knowledge/product/pipeline-templates/README.md."
     },
     {
       "id": "pipelines/apple-native-capabilities.json",

@@ -382,8 +382,7 @@
     "pipelines/inspect-workspace-surfaces.json",
     "pipelines/inspect-network-environment.json",
     "pipelines/baseline-check.json",
-    "pipelines/cowork-integration-review.json",
-    "pipelines/daily-routine.json"
+    "pipelines/cowork-integration-review.json"
   ],
   "actuator_invoke_allowlist": [
     {
