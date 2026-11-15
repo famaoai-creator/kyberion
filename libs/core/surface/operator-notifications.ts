@@ -33,6 +33,7 @@ import {
   appendOpsAlertLogRecord,
   loadOpsAlertDedupeState,
   opsAlertDedupeStatePathFor,
+  OPS_ALERT_DEFAULT_MIN_INTERVAL_MS,
   persistOpsAlertDedupeState,
 } from '../daemon/ops-alert-log.js';
 import { withExecutionContext, withStoreGrant } from '../authority.js';
@@ -370,8 +371,7 @@ function formatNotificationText(
  * never recurse undelivered → alert → undelivered.
  */
 let emittingDeliveryGapAlert = false;
-/** Same cadence as sendOpsAlert's default dedupe window. */
-const DELIVERY_GAP_ALERT_MIN_INTERVAL_MS = 10 * 60 * 1000;
+const DELIVERY_GAP_ALERT_MIN_INTERVAL_MS = OPS_ALERT_DEFAULT_MIN_INTERVAL_MS;
 
 function recordUndeliveredNotification(
   event: OperatorEvent,

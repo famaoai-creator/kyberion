@@ -166,17 +166,21 @@ export function enqueueOperationalLearningSignal(
     // A dropped candidate is silent attrition in the improvement loop — the
     // warn above is only in process logs. Surface it once per learning id so
     // a scope/config defect (e.g. a personal organization missing owner
-    // binding) becomes actionable instead of recurring invisibly.
+    // binding) becomes actionable instead of recurring invisibly. Detail
+    // (title, reason) stays out of the record for non-public scopes — the
+    // ops-alert log is watched by lower-clearance readers.
+    const isPublic = scope.tier === 'public' && !scope.tenantSlug;
     try {
       sendOpsAlert({
         severity: 'warning',
-        title: `Learning candidate dropped: ${signal.title.slice(0, 120)}`,
+        title: isPublic
+          ? `Learning candidate dropped: ${signal.title.slice(0, 120)}`
+          : 'Learning candidate dropped (scoped signal)',
         context: {
           signal_id: signal.signalId,
           learning_id: learningId,
           tier: scope.tier,
-          tenant: scope.tenantSlug ?? 'shared',
-          reason,
+          ...(isPublic ? { tenant: scope.tenantSlug ?? 'shared', reason } : {}),
         },
         recommendation:
           'An operational learning signal could not be queued as a candidate — check the target organization learning store scope (owner binding for personal organizations, tenant binding for confidential ones).',

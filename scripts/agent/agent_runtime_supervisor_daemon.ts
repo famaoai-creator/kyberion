@@ -1376,7 +1376,10 @@ export async function startAgentRuntimeSupervisorDaemon(
           // The daemon's own heartbeat is the arbiter: only a heartbeat that
           // is fresh AND vouches for exactly this pid proves a live holder.
           const holderAlive =
-            priorHeartbeat.status === 'healthy' && priorHeartbeat.heartbeat?.pid === pid;
+            priorHeartbeat.status === 'healthy' &&
+            priorHeartbeat.heartbeat?.pid === pid &&
+            (priorHeartbeat.heartbeat.status === 'running' ||
+              priorHeartbeat.heartbeat.status === 'starting');
           if (holderAlive) {
             const message = `daemon lock is held by an existing process (pid ${pid}) but its liveness cannot be inspected`;
             logger.warn(`[agent-runtime-supervisor-daemon] ${message}`);
