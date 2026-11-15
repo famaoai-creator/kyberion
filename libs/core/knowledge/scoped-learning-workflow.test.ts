@@ -500,6 +500,15 @@ describe('scoped learning UI workflow', () => {
     expect(consumed?.consumer).toBe('scoped_learning_publication');
     const partial = inspectScopedLearningPublication(f.current());
     expect(inspectScopedLearningCandidate(f.address).learning.state).toBe('approved');
+    // A rejection arriving in the crash window — after consumption is recorded
+    // but before the final queue update — must be refused without touching the
+    // candidate, the partial publication, or the recorded consumption.
+    expect(() =>
+      updateMemoryPromotionCandidateStatus({ ...f.address, status: 'rejected' })
+    ).toThrow(/IMMUTABLE/);
+    expect(f.current().status).toBe('approved');
+    expect(inspectScopedLearningPublication(f.current())).toEqual(partial);
+    expect(approvals.loadApprovalRequest('terminal', requestId)!.consumption).toEqual(consumed);
     const recovered = await withExecutionContextAsync('chronos_gateway', () =>
       publishScopedLearningCandidate(input)
     );

@@ -14,8 +14,6 @@ let learningApproval: typeof import('../knowledge/scoped-learning-approval.js');
 let domain: typeof import('../knowledge/scoped-learning-domain.js');
 let publication: typeof import('../knowledge/scoped-learning-publication.js');
 let retrieval: typeof import('../knowledge/scoped-learning-retrieval.js');
-let promoted: typeof import('../knowledge/promoted-memory.js');
-let distill: typeof import('../knowledge/distill-candidate-registry.js');
 let reasoning: typeof import('../reasoning/reasoning-backend.js');
 let authority: typeof import('../authority.js');
 let members: typeof import('./member-registry.js');
@@ -53,8 +51,6 @@ beforeAll(async () => {
   domain = await import('../knowledge/scoped-learning-domain.js');
   publication = await import('../knowledge/scoped-learning-publication.js');
   retrieval = await import('../knowledge/scoped-learning-retrieval.js');
-  promoted = await import('../knowledge/promoted-memory.js');
-  distill = await import('../knowledge/distill-candidate-registry.js');
   reasoning = await import('../reasoning/reasoning-backend.js');
   authority = await import('../authority.js');
   members = await import('./member-registry.js');
@@ -269,11 +265,6 @@ function crashAt(f: Fixture, point: 'json_before_markdown' | 'consumed_before_qu
   }
   return () => reached;
 }
-function originalDistill(f: Fixture) {
-  const candidate = distill.loadDistillCandidateRecord(f.candidateId, f.scope);
-  if (!candidate) throw new Error('Actual staged distillation evidence missing');
-  return candidate;
-}
 describe('real scoped-learning publication recovery regression #1218', () => {
   it.each(['json_before_markdown', 'consumed_before_queue'] as const)(
     'recovers an unchanged approved %s crash without replacing immutable evidence',
@@ -309,7 +300,7 @@ describe('real scoped-learning publication recovery regression #1218', () => {
     }
   );
   it.each(['json_before_markdown', 'consumed_before_queue'] as const)(
-    'a rejected %s candidate cannot be republished or adopted by recovery',
+    'refuses rejection in the %s crash window and recovers the identical publication',
     async (point) => {
       const f = fixture(),
         reached = crashAt(f, point);
@@ -320,27 +311,28 @@ describe('real scoped-learning publication recovery regression #1218', () => {
       );
       expect(reached()).toBe(true);
       const record = f.read(f.absRecord),
-        md = io.safeExistsSync(f.absMarkdown) ? f.read(f.absMarkdown) : undefined;
-      const canonicalConsent = f.consentBytes(),
-        consumption = structuredClone(f.consent().consumption),
-        staged = originalDistill(f);
+        md = io.safeExistsSync(f.absMarkdown) ? f.read(f.absMarkdown) : undefined,
+        consumption = structuredClone(f.consent().consumption);
       vi.restoreAllMocks();
-      f.reject();
-      expect(f.current().status).toBe('rejected');
-      await expect(f.publish()).rejects.toThrow();
-      expect(() => promoted.savePromotedMemoryRecord(staged)).toThrow();
-      expect(f.current().status).toBe('rejected');
-      expect(f.current().learning_publication).toBeUndefined();
+      // A rejection arriving after the crash must be refused inside the queue
+      // lock without touching the candidate, partial files or consumption.
+      expect(() => f.reject()).toThrow(/IMMUTABLE/);
+      expect(f.current().status).toBe('approved');
       expect(f.read(f.absRecord)).toBe(record);
       if (md === undefined) expect(io.safeExistsSync(f.absMarkdown)).toBe(false);
       else expect(f.read(f.absMarkdown)).toBe(md);
-      expect(f.consentBytes()).toBe(canonicalConsent);
       expect(f.consent().consumption).toEqual(consumption);
-      expect(publication.verifyScopedLearningPublication(f.current())).toBeUndefined();
-      expect(f.retrieve()).toEqual({ governed: true });
+      const recovered = await f.publish();
+      expect(recovered.learning.state).toBe('published');
+      expect(f.current().status).toBe('promoted');
+      expect(f.read(f.absRecord)).toBe(record);
+      if (md !== undefined) expect(f.read(f.absMarkdown)).toBe(md);
+      if (consumption) expect(f.consent().consumption).toEqual(consumption);
+      expect(publication.verifyScopedLearningPublication(f.current())).toBeDefined();
+      expect(f.retrieve().publication).toBeDefined();
     }
   );
-  it('refuses stale-candidate consumption if the actual queue rejects immediately after publication', async () => {
+  it('refuses a rejection racing the post-publication consumption step', async () => {
     const f = fixture(),
       consume = learningApproval.recordScopedLearningPublicationConsumption;
     let reached = false;
@@ -348,21 +340,23 @@ describe('real scoped-learning publication recovery regression #1218', () => {
       (candidate, proof) => {
         if (candidate.candidate_id === f.candidateId) {
           reached = true;
+          // The canonical queue can no longer reject an approved scoped row —
+          // the publish may be in this exact window, so the attempt throws.
           f.reject();
         }
         // Invoke the REAL consumption facade against the stale approved snapshot; no approval is fabricated or rewritten.
         return consume(candidate, proof);
       }
     );
-    await expect(f.publish()).rejects.toThrow();
+    await expect(f.publish()).rejects.toThrow(/IMMUTABLE/);
     expect(reached).toBe(true);
-    expect(f.current().status).toBe('rejected');
+    expect(f.current().status).toBe('approved');
     expect(io.safeExistsSync(f.absRecord)).toBe(true);
     expect(io.safeExistsSync(f.absMarkdown)).toBe(true);
     expect(f.consent().status).toBe('approved');
     expect(
       f.consent().consumption,
-      'Queue rejection must prevent a stale approved snapshot from consuming canonical consent'
+      'The refused rejection must leave consent untouched; consumption never ran'
     ).toBeUndefined();
     expect(f.current().learning_publication).toBeUndefined();
     expect(f.retrieve()).toEqual({ governed: true });

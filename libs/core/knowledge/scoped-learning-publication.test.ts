@@ -255,26 +255,47 @@ describe('exact scoped learning publication', () => {
       )
     ).toBe(false);
     const approved = f.approve();
-    updateMemoryPromotionCandidateStatus({
-      candidateId: f.queued.candidate_id,
-      scope: f.scope,
-      status: 'rejected',
-    });
+    // An approved scoped candidate can no longer be rejected — publication may
+    // be mid-flight — so rejection stays available only while queued.
     expect(() =>
       updateMemoryPromotionCandidateStatus({
         candidateId: f.queued.candidate_id,
         scope: f.scope,
+        status: 'rejected',
+      })
+    ).toThrow(/IMMUTABLE/);
+    const second = fixture();
+    updateMemoryPromotionCandidateStatus({
+      candidateId: second.queued.candidate_id,
+      scope: second.scope,
+      status: 'rejected',
+    });
+    expect(() =>
+      updateMemoryPromotionCandidateStatus({
+        candidateId: second.queued.candidate_id,
+        scope: second.scope,
         status: 'approved',
       })
     ).toThrow(/REJECTED/);
     expect(() =>
-      savePromotedMemoryRecord({
-        ...direct,
-        metadata: {
-          ...direct.metadata,
-          approved_payload_digest: approved.learning_approval!.payload_digest,
-        },
-      })
+      savePromotedMemoryRecord(
+        createDistillCandidateRecord({
+          candidate_id: second.queued.candidate_id,
+          source_type: 'task_session',
+          tier: 'confidential',
+          scope: second.scope,
+          title: f.curation.title,
+          summary: f.curation.summary,
+          target_kind: 'sop_candidate',
+          status: 'proposed',
+          evidence_refs: second.queued.evidence_refs,
+          metadata: {
+            knowledge_domain: 'organization',
+            procedure_steps: [f.curation.content],
+            approved_payload_digest: approved.learning_approval!.payload_digest,
+          },
+        })
+      )
     ).toThrow(/APPROVAL/);
   });
   it('rejects revised approval content and superseding effects', async () => {
@@ -326,6 +347,18 @@ describe('exact scoped learning publication', () => {
       const consumed = loadApprovalRequest(channel!, id!)!.consumption;
       recordScopedLearningPublicationConsumption(approved, publication);
       expect(loadApprovalRequest(channel!, id!)!.consumption).toEqual(consumed);
+      // Crash window: consumption is recorded but the queue row is still
+      // approved. A rejection now must be refused without touching the
+      // candidate, the publication files, or the recorded consumption.
+      expect(() =>
+        updateMemoryPromotionCandidateStatus({
+          candidateId: approved.candidate_id,
+          scope: f.scope,
+          status: 'rejected',
+        })
+      ).toThrow(/IMMUTABLE/);
+      expect(loadMemoryPromotionCandidate(approved.candidate_id, f.scope)?.status).toBe('approved');
+      expect(loadApprovalRequest(channel!, id!)!.consumption).toEqual(consumed);
       const mdPath = pathResolver.rootResolve(partial.logicalPath);
       const jsonPath = mdPath.replace(/\.md$/, '.json');
       const original = safeReadFile(jsonPath, { encoding: 'utf8' });
@@ -339,7 +372,7 @@ describe('exact scoped learning publication', () => {
       expect(loadApprovalRequest(channel!, id!)!.consumption).toEqual(consumed);
     }));
 
-  it('refuses a detached approved snapshot after the actual partial candidate was rejected', () =>
+  it('refuses a detached approved snapshot when the queue row is rejected out-of-band', () =>
     withExecutionContext('ecosystem_architect', () => {
       const f = fixture();
       const approved = f.approve();
@@ -367,11 +400,20 @@ describe('exact scoped learning publication', () => {
       const bytes = paths.map((file) =>
         safeReadFile(pathResolver.rootResolve(file), { encoding: 'utf8' })
       );
-      updateMemoryPromotionCandidateStatus({
-        candidateId: approved.candidate_id,
-        scope: f.scope,
-        status: 'rejected',
-      });
+      // Approved scoped rows can no longer transition to rejected through the
+      // queue facade — rewrite the row directly to reproduce the inconsistent
+      // state the consumption guard must still defend against.
+      const queuePath = memoryPromotionQueuePath(f.scope);
+      const rewritten = String(safeReadFile(queuePath, { encoding: 'utf8' }))
+        .split('\n')
+        .filter((line) => line.trim().length > 0)
+        .map((line) => {
+          const row = JSON.parse(line) as { candidate_id?: string; status?: string };
+          if (row.candidate_id === approved.candidate_id) row.status = 'rejected';
+          return JSON.stringify(row);
+        })
+        .join('\n');
+      safeWriteFile(queuePath, rewritten + '\n');
       const queue = safeReadFile(memoryPromotionQueuePath(f.scope), { encoding: 'utf8' });
       const [channel, id] = f.approvalRef.split(':');
       const approval = loadApprovalRequest(channel!, id!);
