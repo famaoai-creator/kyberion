@@ -337,10 +337,10 @@ describe('resident dot standing binding', () => {
     state.grants = [grant('alpha', 20)];
     const dot = {
       ...charter('alpha'),
-      runtime: { heartbeat_id: 'dot-alpha-ops', reasoning_backend: 'openai' },
+      runtime: { heartbeat_id: 'dot-alpha-ops', reasoning_backend: 'openai-api' },
     } as DotCharter;
     await expect(withDotStandingBinding(src(dot), 'wake', async () => 'ran', deps)).rejects.toThrow(
-      /\[DOT_CREDENTIAL_GRANT_MISSING\].*--provider openai/
+      /\[DOT_CREDENTIAL_GRANT_MISSING\].*--provider openai-api/
     );
     const cli = {
       ...charter('alpha'),

@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   assessCredentialEligibility,
   buildCredentialRecord,
-  claudeProviderHomeRelativePath,
   credentialConnectionPath,
   credentialLendingErrors,
   credentialRecordPath,
@@ -20,6 +19,7 @@ import {
   monthOf,
   summarizeCredentialUsage,
 } from './credential-usage-ledger.js';
+import { providerAuthHomeRelativePath } from '../provider/provider-auth-home.js';
 import {
   resetCredentialBudgetAlerts,
   runCredentialUsageMonthly,
@@ -143,15 +143,25 @@ describe('credential_ref and registered record', () => {
     });
   });
 
-  it('places the isolated claude HOME on the borrower cache floor per credential', () => {
-    const a = claudeProviderHomeRelativePath('confidential', 'child', 'tenant:parent:anthropic');
-    const b = claudeProviderHomeRelativePath('confidential', 'child', 'person:owner:anthropic');
+  it('places the isolated provider HOME on the borrower cache floor per credential', () => {
+    const a = providerAuthHomeRelativePath(
+      'confidential',
+      'child',
+      'claude',
+      'tenant:parent:anthropic'
+    );
+    const b = providerAuthHomeRelativePath(
+      'confidential',
+      'child',
+      'claude',
+      'person:owner:anthropic'
+    );
     expect(a).toMatch(
       /^active\/shared\/cache\/confidential\/child\/provider-auth\/claude\/[0-9a-f]{16}\/home$/
     );
     expect(a).not.toBe(b);
     expect(() =>
-      claudeProviderHomeRelativePath('public', 'child', 'tenant:parent:anthropic')
+      providerAuthHomeRelativePath('public', 'child', 'claude', 'tenant:parent:anthropic')
     ).toThrow(/CREDENTIAL_HOME_INVALID/);
   });
 });

@@ -27,7 +27,6 @@ import {
   withCredentialMaterialCapability,
   withLentCredentialMaterialCapability,
 } from '../foundation/credential-material-capability.js';
-import { PROXY_ENV_KEYS } from '../foundation/env.js';
 import { readJson } from '../foundation/json.js';
 import { parseSafeJsonObjectValue } from '../foundation/safe-json.js';
 import type { ScopeContext } from '../foundation/scope-context-validation.js';
@@ -43,18 +42,16 @@ import {
 import { resolvePolicyIdentityContext } from '../identity-context-bridge.js';
 import { pathResolver } from '../path-resolver.js';
 import {
-  buildSafeExecEnv,
   safeExistsSync,
   safeMkdir,
   safeWriteFile,
   withSensitivePathMediation,
 } from '../secure-io.js';
 import { assertPluginGrantAllows } from '../shell/sandbox-policy.js';
+import { providerTenantIsolationForBackend } from '../provider/provider-tenant-isolation.js';
 import {
   assertCredentialEligible,
   buildCredentialRecord,
-  claudeProviderHomeRelativePath,
-  CLAUDE_PROVIDER_ENVIRONMENT,
   credentialConnectionPath,
   credentialRecordErrors,
   credentialRecordPath,
@@ -298,55 +295,17 @@ export function readLentValue(
 }
 
 // ---------------------------------------------------------------------------
-// Isolated claude environment (design §3)
+// Isolated provider environments (design §3)
 // ---------------------------------------------------------------------------
 
-/**
- * Non-secret network plumbing the isolated claude child still needs behind a
- * corporate proxy / custom CA (a bound child gets ONLY its bound env), from the
- * operator's safe exec env: CA bundle paths and proxy routing. A proxy value
- * carrying userinfo (`user:pass@host`, with or without a scheme) is a
- * credential and is never passed.
- */
-export const CLAUDE_NETWORK_PASSTHROUGH_ENV_KEYS: readonly string[] = [
-  'NODE_EXTRA_CA_CERTS',
-  'SSL_CERT_FILE',
-  'SSL_CERT_DIR',
-  ...PROXY_ENV_KEYS,
-];
-export function claudeNetworkPassthroughEnv(
-  source: NodeJS.ProcessEnv = buildSafeExecEnv()
-): Record<string, string> {
-  const picked: Record<string, string> = {};
-  for (const key of CLAUDE_NETWORK_PASSTHROUGH_ENV_KEYS) {
-    const value = source[key];
-    if (typeof value !== 'string' || !value.trim()) continue;
-    if (/_proxy$/i.test(key) && /^(?:[a-z][a-z0-9+.-]*:\/\/)?[^/@\s,]*@/iu.test(value.trim()))
-      continue;
-    picked[key] = value;
-  }
-  return picked;
-}
-
-/** Isolated claude HOME for this borrower and credential; never holds the value. */
-export function claudeProviderEnvironment(
-  tier: ScopeContext['tier'],
-  tenant: string,
-  credentialRef: string
-): NodeJS.ProcessEnv {
-  const home = pathResolver.rootResolve(
-    claudeProviderHomeRelativePath(tier, tenant, credentialRef)
-  );
-  const configDir = `${home}/.claude`;
-  try {
-    safeMkdir(configDir, { recursive: true });
-  } catch {
-    throw new Error(
-      '[CREDENTIAL_HOME_REQUIRED] Could not prepare the isolated claude HOME for this tenant credential'
-    );
-  }
-  return { ...claudeNetworkPassthroughEnv(), HOME: home, CLAUDE_CONFIG_DIR: configDir };
-}
+// Each provider's isolated env is built by its tenant-isolation spec
+// (provider-tenant-isolation.ts); re-exported here for the existing import
+// path through credential-allocations.
+export {
+  CLAUDE_NETWORK_PASSTHROUGH_ENV_KEYS,
+  claudeNetworkPassthroughEnv,
+  claudeProviderEnvironment,
+} from '../provider/claude-cli-tenant-isolation.js';
 
 // ---------------------------------------------------------------------------
 // Binding (design §3 output)
@@ -377,22 +336,22 @@ export function bindLentCredential(input: {
   if (input.reserved.has(spec.envKey)) throw allocationDenied();
   const value = readLentValue(input.tenant, grant, 'bind');
   const backends = lendingGrantBackends(grant, input.allowed);
+  const providerEnvironments: Record<string, NodeJS.ProcessEnv> = {};
+  for (const backend of backends) {
+    const isolation = providerTenantIsolationForBackend(backend);
+    if (isolation && !providerEnvironments[isolation.provider])
+      providerEnvironments[isolation.provider] = isolation.buildEnvironment(
+        input.tier,
+        input.tenant,
+        lending.credential_ref
+      );
+  }
   return {
     envKey: spec.envKey,
     value,
     kind: lending.kind,
     source: { credentialRef: lending.credential_ref, allocationGrantId: grant.grant_id },
-    ...(backends.includes('claude-cli')
-      ? {
-          providerEnvironments: {
-            [CLAUDE_PROVIDER_ENVIRONMENT]: claudeProviderEnvironment(
-              input.tier,
-              input.tenant,
-              lending.credential_ref
-            ),
-          },
-        }
-      : {}),
+    ...(Object.keys(providerEnvironments).length ? { providerEnvironments } : {}),
     validate: () => {
       const now = new Date();
       assertCredentialEligible(lending, input.tenant, now, eligibilityDeps);

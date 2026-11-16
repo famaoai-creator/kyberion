@@ -8,9 +8,9 @@ import {
 } from '../foundation/env.js';
 import { assertIsolatedProviderHome } from './provider-auth-home.js';
 import {
-  applyClaudeTenantIsolationEnv,
-  boundClaudeCredentialValues,
-} from './claude-cli-tenant-isolation.js';
+  providerTenantIsolationForProvider,
+  providerTenantIsolationSpecs,
+} from './provider-tenant-isolation.js';
 import {
   listCliReasoningProviderDescriptors,
   resolveReasoningProviderDescriptor,
@@ -471,8 +471,9 @@ export function providerCredentialEnvValues(env: NodeJS.ProcessEnv = process.env
       }
     }
   }
-  // A bound claude credential lives in the binding's secrets, not its provider env.
-  for (const value of boundClaudeCredentialValues()) values.add(value);
+  // A bound credential can live in the binding's secrets, not its provider env.
+  for (const spec of providerTenantIsolationSpecs())
+    for (const value of spec.boundSecretValues()) values.add(value);
   return [...values];
 }
 
@@ -601,9 +602,10 @@ export function buildProviderChildEnv({
     result.KYBERION_TENANT = identity.tenantSlug!;
     if (identity.missionId) result.MISSION_ID = identity.missionId;
     if (identity.taskId) result.KYBERION_TASK_ID = identity.taskId;
-    // §4 isolation: kind-selected credential, CLAUDE_CONFIG_DIR inside the
-    // bound HOME, no auto-update / non-essential traffic. Fails closed.
-    if (provider === 'claude') applyClaudeTenantIsolationEnv(result, bound, operatorPath);
+    // §4 isolation: a provider with a registered tenant-isolation spec gets
+    // kind-selected credential, config dir inside the bound HOME, no
+    // auto-update / non-essential traffic. Fails closed.
+    providerTenantIsolationForProvider(provider)?.applyEnv(result, bound, operatorPath);
   }
   return result as NodeJS.ProcessEnv;
 }

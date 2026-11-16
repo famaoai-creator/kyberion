@@ -43,9 +43,12 @@ import {
   reasoningAllocationProviderAdmitted,
 } from '../secret/credential-allocations.js';
 import {
+  CREDENTIAL_SERVICES,
+  credentialServiceBackends,
   SUBSCRIPTION_TOKEN_REMINDER_DAYS,
   subscriptionTokenDaysLeft,
 } from '../secret/credential-custody.js';
+import { resolveReasoningProviderDescriptor } from '../reasoning/reasoning-provider-registry.js';
 import { getSecretResolver } from '../secret/secret-resolver.js';
 import { withConfiguredTaskCredentials } from '../secret/task-credential-dispatch.js';
 import { notifyOperatorSync } from '../surface/operator-notifications.js';
@@ -268,9 +271,22 @@ export function assessDotCredentialGrant(
 
 export function dotCredentialAssignCommand(charter: DotCharter): string {
   const provider = charter.runtime.reasoning_backend ?? '<provider>';
-  // A CLI backend has no API proof: it is fed by a lent credential (credential_ref).
-  if (provider === 'claude-cli')
-    return `pnpm kyberion reasoning credentials assign --tenant ${charter.scope.tenant_slug} --credential <tenant:${charter.scope.tenant_slug}:anthropic|person:<member>:claude-subscription> --backends claude-cli --purpose "resident dot ${charter.dot_id}"`;
+  // A backend without an API proof is fed by a lent credential (credential_ref);
+  // an API-proof provider takes the legacy --provider path. When no registered
+  // credential service admits the backend, name the gap instead of suggesting
+  // an assign that cannot bind.
+  const descriptor =
+    charter.runtime.reasoning_backend != null
+      ? resolveReasoningProviderDescriptor(charter.runtime.reasoning_backend)
+      : undefined;
+  if (descriptor && !descriptor.api_proof) {
+    const feedable = credentialServiceBackends();
+    if (feedable.includes(descriptor.mode)) {
+      const services = Object.keys(CREDENTIAL_SERVICES).join('|');
+      return `pnpm kyberion reasoning credentials assign --tenant ${charter.scope.tenant_slug} --credential <tenant:${charter.scope.tenant_slug}:${services}|person:<member>:${services}> --backends ${descriptor.mode} --purpose "resident dot ${charter.dot_id}"`;
+    }
+    return `register a credential service admitting backend '${descriptor.mode}' (registered services admit: ${feedable.join(', ')}), then assign`;
+  }
   return `pnpm kyberion reasoning credentials assign --tenant ${charter.scope.tenant_slug} --provider ${provider} --purpose "resident dot ${charter.dot_id}"`;
 }
 
