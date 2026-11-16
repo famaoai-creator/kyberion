@@ -9,6 +9,11 @@ import {
   matchesReasoningCredentialVersion,
 } from '@agent/core/reasoning/reasoning-api-credentials';
 import { pathResolver } from '@agent/core/path-resolver';
+import {
+  CREDENTIAL_PLANS,
+  CREDENTIAL_SERVICES,
+  credentialServiceBackends,
+} from '@agent/core/secret/credential-allocations';
 import { withExecutionContextAsync } from '@agent/core/authority';
 import { withSecretResolutionSession } from '@agent/core/foundation/secret-resolution-session';
 import { credentialExecutionIdentity } from '@agent/core/foundation/credential-binding';
@@ -148,10 +153,16 @@ async function runCredentialCommandImpl(
       'Tenant allocation: assign --provider <provider> --tenant <tenant> --purpose <text> [--days 30] [--approval <id>]'
     );
     print(
-      'Custody credential: register --custody person|tenant [--owner <tenant>] --service anthropic|claude-subscription [--label <l>] [--plan api|team|enterprise|pro|max|ultra] [--token-expires YYYY-MM-DD] [--contract-tenant <t>] [--from-file <path>] [--approval <id>] (replacing a tenant value needs owner approval)'
+      `Custody credential: register --custody person|tenant [--owner <tenant>] --service ${Object.keys(
+        CREDENTIAL_SERVICES
+      ).join('|')} [--label <l>] [--plan ${CREDENTIAL_PLANS.join(
+        '|'
+      )}] [--token-expires YYYY-MM-DD] [--contract-tenant <t>] [--from-file <path>] [--approval <id>] (replacing a tenant value needs owner approval)`
     );
     print(
-      'Lend to a tenant: assign --tenant <borrower> --credential <custody>:<owner>:<service>[:<label>] [--backends claude-cli,anthropic] [--budget-usd <n>] --purpose <text> [--approval <id>] (terms come from the registered record; --plan/--token-expires/--contract-tenant only check it; --provider <p> = person API key, legacy). A consumer token needs pnpm tenant personal-owner first.'
+      `Lend to a tenant: assign --tenant <borrower> --credential <custody>:<owner>:<service>[:<label>] [--backends ${credentialServiceBackends().join(
+        ','
+      )}] [--budget-usd <n>] --purpose <text> [--approval <id>] (terms come from the registered record; --plan/--token-expires/--contract-tenant only check it; --provider <p> = person API key, legacy). A consumer token needs pnpm tenant personal-owner first.`
     );
     print('Usage: usage --tenant <borrower> [--month YYYY-MM]');
     print('Inspect: allocations --tenant <tenant>; check --provider <provider> --tenant <tenant>');

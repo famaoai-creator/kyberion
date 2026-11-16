@@ -49,6 +49,8 @@ export interface CredentialServiceSpec {
   readonly plans: readonly CredentialPlan[];
   /** Canonical backend recorded as the grant's credential_provider. */
   readonly primaryBackend: string;
+  /** Operator-facing hint for minting a fresh value (remediation text; e.g. "run `x setup-token"`). */
+  readonly obtainHint: string;
 }
 
 /**
@@ -68,6 +70,7 @@ export const CREDENTIAL_SERVICES: Readonly<Record<string, CredentialServiceSpec>
     backends: Object.freeze(['anthropic', 'claude-cli']),
     plans: Object.freeze(['api', 'team', 'enterprise'] as CredentialPlan[]),
     primaryBackend: 'anthropic',
+    obtainHint: 'issue a new Anthropic Console API key',
   }),
   'claude-subscription': Object.freeze({
     service: 'claude-subscription',
@@ -79,6 +82,7 @@ export const CREDENTIAL_SERVICES: Readonly<Record<string, CredentialServiceSpec>
     backends: Object.freeze(['claude-cli']),
     plans: Object.freeze(['pro', 'max', 'ultra', 'team', 'enterprise'] as CredentialPlan[]),
     primaryBackend: 'claude-cli',
+    obtainHint: 'run `claude setup-token`',
   }),
 });
 
@@ -530,8 +534,12 @@ export function assessCredentialEligibility(
     lending.custody === 'person' &&
     deps.personalOwnerOf(borrowerTenant) === personPrincipal(lending.owner);
   if (lending.kind === 'subscription_token') {
-    const register = `pnpm kyberion reasoning credentials register --custody tenant --owner ${borrowerTenant} --service anthropic --plan api`;
-    const lendKey = `use an API key instead: ${register}, then pnpm kyberion reasoning credentials assign --tenant ${borrowerTenant} --credential tenant:${borrowerTenant}:anthropic --backends claude-cli,anthropic --purpose "<why>"`;
+    // Remediation names an actual api_key service from the registry rather than
+    // a literal one — a second registered service does not falsify the hint.
+    const apiKeyService = Object.values(CREDENTIAL_SERVICES).find((s) => s.kind === 'api_key');
+    const lendKey = apiKeyService
+      ? `use an API key instead: pnpm kyberion reasoning credentials register --custody tenant --owner ${borrowerTenant} --service ${apiKeyService.service} --plan ${apiKeyService.plans[0]}, then pnpm kyberion reasoning credentials assign --tenant ${borrowerTenant} --credential tenant:${borrowerTenant}:${apiKeyService.service} --backends ${apiKeyService.backends.join(',')} --purpose "<why>"`
+      : 'lend a commercial-terms (api_key) credential to this tenant instead (no api_key service is registered)';
     const markOwn = `if ${borrowerTenant} really is ${lending.custody === 'person' ? personPrincipal(lending.owner) : 'the holder'}'s own tenant: pnpm kyberion tenant personal-owner --tenant ${borrowerTenant} --person ${lending.custody === 'person' ? personPrincipal(lending.owner) : '<user:member>'}`;
     // Review 3: a person-held token (any plan) serves only the holder's verified
     // personal tenants; a tenant-held seat only its own (contracting) tenant.
@@ -545,7 +553,7 @@ export function assessCredentialEligibility(
     if (lending.token_expires_at && Date.parse(lending.token_expires_at) <= now.getTime())
       return deny(
         'CREDENTIAL_TOKEN_EXPIRED',
-        `${lending.credential_ref} expired at ${lending.token_expires_at} | next: run \`claude setup-token\`, then pnpm kyberion reasoning credentials register --custody ${lending.custody}${lending.custody === 'tenant' ? ` --owner ${lending.owner}` : ''} --service ${lending.service} --plan ${lending.plan} --token-expires <YYYY-MM-DD>`
+        `${lending.credential_ref} expired at ${lending.token_expires_at} | next: ${spec.obtainHint}, then pnpm kyberion reasoning credentials register --custody ${lending.custody}${lending.custody === 'tenant' ? ` --owner ${lending.owner}` : ''} --service ${lending.service} --plan ${lending.plan} --token-expires <YYYY-MM-DD>`
       );
   }
   if (!deps.borrowerAttested(borrowerTenant, spec.egressProvider, now))

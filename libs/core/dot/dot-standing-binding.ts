@@ -287,7 +287,12 @@ export function dotCredentialAssignCommand(charter: DotCharter): string {
     }
     return `register a credential service admitting backend '${descriptor.mode}' (registered services admit: ${feedable.join(', ')}), then assign`;
   }
-  return `pnpm kyberion reasoning credentials assign --tenant ${charter.scope.tenant_slug} --provider ${provider} --purpose "resident dot ${charter.dot_id}"`;
+  // A named backend that resolves to no registered descriptor cannot take the
+  // --provider path either; name the registration gap instead.
+  if (!descriptor && charter.runtime.reasoning_backend != null)
+    return `register reasoning backend '${provider}' in the provider registry first (knowledge/product/governance/reasoning-providers/), then assign`;
+  // An alias resolves to its canonical mode for the suggestion.
+  return `pnpm kyberion reasoning credentials assign --tenant ${charter.scope.tenant_slug} --provider ${descriptor?.mode ?? provider} --purpose "resident dot ${charter.dot_id}"`;
 }
 
 export function dotCredentialExtendCommand(tenant: string, grantId: string): string {
@@ -560,7 +565,7 @@ export function remindDotCredentialGrantExpiry(
             tokenDays < 0
               ? `Subscription token ${lending.credential_ref} expired — ${tenant} resident dots stopped`
               : `Subscription token ${lending.credential_ref} expires in ${tokenDays} day(s)`,
-          body: `${lending.credential_ref} (${lending.plan}) token expires at ${lending.token_expires_at}. Renew it: run \`claude setup-token\`, store it with pnpm kyberion reasoning credentials register --custody ${lending.custody}${lending.custody === 'tenant' ? ` --owner ${lending.owner}` : ''} --service ${lending.service} --plan ${lending.plan} --token-expires <YYYY-MM-DD>, then re-assign the grant with the new --token-expires.`,
+          body: `${lending.credential_ref} (${lending.plan}) token expires at ${lending.token_expires_at}. Renew it: ${CREDENTIAL_SERVICES[lending.service]?.obtainHint ?? 'mint a fresh token for the service'}, store it with pnpm kyberion reasoning credentials register --custody ${lending.custody}${lending.custody === 'tenant' ? ` --owner ${lending.owner}` : ''} --service ${lending.service} --plan ${lending.plan} --token-expires <YYYY-MM-DD>, then re-assign the grant with the new --token-expires.`,
           correlation_id: `credential-token-expiry:${tokenKey}`,
         },
         { scope: charter.scope }
