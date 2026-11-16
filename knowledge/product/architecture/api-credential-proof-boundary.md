@@ -325,8 +325,10 @@ implicitly share credentials with an organization. The `account consent-request`
 `account consent-apply` CLI entrypoints authenticate an existing signed workload token
 through only the `agent-token` provider, then require the installed personal NHI and
 accountable owner to match. Environment agent markers are not authentication. Both
-commands use bounded hidden TTY input, preserve an exact metadata selection across
-input, and call the existing facade; neither can decide an approval.
+commands use bounded hidden TTY input or an explicit dedicated inherited pipe for
+an already-issued token, preserve an exact metadata selection across input, and
+call the existing facade; neither can decide an approval. The pipe does not
+authenticate its writer, issue a token or bypass the host-only scope restriction.
 `account consent-revoke` withdraws through the existing local owner facade without
 requiring the assistant to remain installed or active. Owner-facing consent UI remains
 unwired. The CLI never issues tokens, creates keys, repairs identity or accepts a
