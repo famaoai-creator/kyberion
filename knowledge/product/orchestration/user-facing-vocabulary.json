@@ -11349,6 +11349,21 @@
         "en": "Promote or verify entries in the tenant external-asset security registry",
         "ja": "テナント外部資産セキュリティ台帳のエントリを昇格・検証する",
         "qps-ploc": "⟦Ṗřőɱőŧė őř ṽėřïƒẏ ėñŧřïėş ïñ ŧħė ŧėñȧñŧ ėẋŧėřñȧŀ-ȧşşėŧ şėƈůřïŧẏ řėɠïşŧřẏ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "cli_cmd_script_account_consent_request": {
+        "en": "Request personal account use with an authenticated agent",
+        "ja": "認証済み agent から個人アカウント利用の承認を申請",
+        "qps-ploc": "⟦Řėɋůėşŧ ṗėřşőñȧŀ ȧƈƈőůñŧ ůşė ẇïŧħ ȧñ ȧůŧħėñŧïƈȧŧėḓ ȧɠėñŧ ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "cli_cmd_script_account_consent_apply": {
+        "en": "Issue personal account use after owner approval",
+        "ja": "所有者の承認後に個人アカウント利用許可を発行",
+        "qps-ploc": "⟦Ïşşůė ṗėřşőñȧŀ ȧƈƈőůñŧ ůşė ȧƒŧėř őẇñėř ȧṗṗřőṽȧŀ ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "cli_cmd_script_account_consent_revoke": {
+        "en": "Withdraw personal account use permission",
+        "ja": "個人アカウント利用許可を撤回",
+        "qps-ploc": "⟦Ẇïŧħḓřȧẇ ṗėřşőñȧŀ ȧƈƈőůñŧ ůşė ṗėřɱïşşïőñ ŀőřėɱ ïṗşůɱ ḓ⟧"
       }
     },
     "recorder": {

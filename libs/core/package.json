@@ -1984,6 +1984,10 @@
       "types": "./dist/governance/org-budget-governor.d.ts",
       "default": "./dist/governance/org-budget-governor.js"
     },
+    "./governance/personal-credential-grant": {
+      "types": "./dist/governance/personal-credential-grant.d.ts",
+      "default": "./dist/governance/personal-credential-grant.js"
+    },
     "./governance/policy-engine": {
       "types": "./dist/governance/policy-engine.d.ts",
       "default": "./dist/governance/policy-engine.js"
