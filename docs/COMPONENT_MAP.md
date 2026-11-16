@@ -261,6 +261,7 @@ The operations console does not directly own mission state. It delegates to:
 - `libs/core/authn/authn-agent-token.ts` (internal workload token contract and verifier; bounded lifetime, ledger owner/tenant/revision fencing, no acquisition endpoint)
 - `scripts/account_introduction.ts` (installed-owner account preview, review-bound request, status and apply through the shared facade)
 - `scripts/lib/tty/hidden-token-input.ts` (bounded hidden TTY token collector with terminal restoration; no file, argv or environment input)
+- `scripts/lib/tty/private-token-pipe.ts` (bounded inherited-pipe collection of an existing workload token; no issuance or launcher authentication)
 - `libs/core/governance/service-credential-allocation.ts` (fail-closed allocation port)
 - `libs/core/governance/service-credential-allocation-verifier.ts` (owner-approved grant verification, installed by grant-aware bootstrap)
 - `libs/core/service/service-preset-registry.ts`

@@ -1,4 +1,5 @@
 import * as fs from 'node:fs';
+import { Socket } from 'node:net';
 import { writeBaseRoleEnv } from './foundation/base-role-env.js';
 import * as path from 'node:path';
 import { rawReadFileSnapshot } from './fs-primitives.js';
@@ -11,6 +12,7 @@ import {
   type SpawnOptions,
 } from 'node:child_process';
 export type { ChildProcess, SpawnOptions };
+
 import { createHash, randomUUID } from 'node:crypto';
 import * as pathResolver from './path-resolver.js';
 import { assertSafeRepositoryPath } from './path-resolver.js';
@@ -76,6 +78,32 @@ import {
 export { safeRealpath } from './secure-io-path-guard.js';
 import { platformFacts } from './platform-facts.js';
 
+/**
+ * Take ownership of the explicit CLI credential pipe on inherited FD 3.
+ * No path or caller-selected descriptor is accepted. libuv socket reads are
+ * cancellable; fs.createReadStream on a pipe can leave a blocked worker read.
+ */
+export function safeOpenInheritedTokenPipe(): Socket {
+  const fd = 3;
+  let owned = false;
+  try {
+    const stat = fs.fstatSync(fd);
+    if (!stat.isFIFO() && !stat.isSocket()) throw new Error('invalid pipe');
+    owned = true;
+    const stream = new Socket({ fd, readable: true, writable: false });
+    owned = false; // Socket now owns closure, including error and cancellation.
+    return stream;
+  } catch {
+    if (owned) {
+      try {
+        fs.closeSync(fd);
+      } catch {
+        /* The descriptor may already be closed. */
+      }
+    }
+    throw new Error('[ACCOUNT_CLI] Private token pipe is unavailable or unsupported.');
+  }
+}
 const logger = createLogger('secure-io');
 const auditChain = auditChainModule.auditChain;
 

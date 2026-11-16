@@ -12,6 +12,7 @@ const m = vi.hoisted(() => ({
   requester: vi.fn(),
   authenticate: vi.fn(),
   collect: vi.fn(),
+  pipe: vi.fn(),
   read: vi.fn(),
   path: vi.fn(),
   stat: vi.fn(),
@@ -74,6 +75,7 @@ vi.mock('@agent/core/governance/personal-credential-grant', () => ({
 vi.mock('./lib/installed-identity.js', () => ({ inspectInstalledIdentity: m.local }));
 vi.mock('./lib/json-input.js', () => ({ readSafeJsonFile: m.read }));
 vi.mock('./lib/tty/hidden-token-input.js', () => ({ readHiddenToken: m.collect }));
+vi.mock('./lib/tty/private-token-pipe.js', () => ({ readPrivateTokenPipe: m.pipe }));
 
 import { main, runPersonalCredentialConsentCli } from './personal_credential_consent.js';
 
@@ -117,6 +119,7 @@ beforeEach(() => {
   });
   m.authenticate.mockReturnValue({ principal });
   m.collect.mockResolvedValue('synthetic-workload-token');
+  m.pipe.mockResolvedValue('synthetic-workload-token');
   m.read.mockImplementation(() => ({
     ...selection,
     allowedActions: [...selection.allowedActions],
@@ -130,6 +133,60 @@ beforeEach(() => {
 });
 
 describe('personal credential consent CLI', () => {
+  it('uses the explicit pipe without TTY fallback and keeps input outside sensitive mediation', async () => {
+    m.pipe.mockImplementation(async () => {
+      expect(m.mediationDepth).toBe(0);
+      return 'synthetic-workload-token';
+    });
+    await runPersonalCredentialConsentCli([...request, '--token-pipe']);
+    expect(m.pipe).toHaveBeenCalledOnce();
+    expect(m.collect).not.toHaveBeenCalled();
+    expect(m.authenticate).toHaveBeenCalledTimes(2);
+    m.pipe.mockRejectedValueOnce(Error('Private pipe cancelled'));
+    m.request.mockClear();
+    await expect(runPersonalCredentialConsentCli([...request, '--token-pipe'])).rejects.toThrow(
+      'cancelled'
+    );
+    expect(m.collect).not.toHaveBeenCalled();
+    expect(m.request).not.toHaveBeenCalled();
+  });
+
+  it.each(['envelope', 'resource', 'plugin', 'delegated'] as const)(
+    'rejects the %s ceiling before opening the private pipe',
+    async (context) => {
+      m[context].mockReturnValue({});
+      await expect(runPersonalCredentialConsentCli([...request, '--token-pipe'])).rejects.toThrow(
+        'unscoped'
+      );
+      expect(m.pipe).not.toHaveBeenCalled();
+    }
+  );
+
+  it('rechecks host and installed identity boundaries after pipe input', async () => {
+    m.pipe.mockImplementationOnce(async () => {
+      m.delegated.mockReturnValue(true);
+      return 'synthetic-workload-token';
+    });
+    await expect(runPersonalCredentialConsentCli([...request, '--token-pipe'])).rejects.toThrow(
+      'unscoped'
+    );
+    expect(m.request).not.toHaveBeenCalled();
+    m.delegated.mockReturnValue(false);
+    m.pipe.mockImplementationOnce(async () => {
+      m.installed.mockReturnValue({
+        ready: true,
+        agentActive: true,
+        ownerId: 'user:other',
+        agentId: nhi,
+      });
+      return 'synthetic-workload-token';
+    });
+    await expect(runPersonalCredentialConsentCli([...request, '--token-pipe'])).rejects.toThrow(
+      'authentication refused'
+    );
+    expect(m.request).not.toHaveBeenCalled();
+  });
+
   it('mediates synchronous sensitive reads and writes without spanning terminal input', async () => {
     m.collect.mockImplementation(async () => {
       expect(m.mediationDepth).toBe(0);
@@ -315,11 +372,16 @@ describe('personal credential consent CLI', () => {
       ['apply', '--selection', file],
       ['approve', 'approval-1'],
       ['revoke', 'grant-1'],
+      ['revoke', 'grant-1', '--reason', 'Withdraw', '--token-pipe'],
+      ['request', '--selection', file, '--token-pipe', '--token-pipe'],
+      ['request', '--selection', file, '--token-pipe=4'],
+      ['request', '--selection', file, '--token-fd', '4'],
     ].map((args) => ({ args }))
   )('rejects unsupported, duplicate or incomplete arguments', async ({ args }) => {
     await expect(runPersonalCredentialConsentCli(args)).rejects.toThrow('[PERSONAL_CONSENT_CLI]');
     expect(m.collect).not.toHaveBeenCalled();
     expect(m.request).not.toHaveBeenCalled();
+    expect(m.pipe).not.toHaveBeenCalled();
   });
 
   it('cancellation collects no approval or grant', async () => {
