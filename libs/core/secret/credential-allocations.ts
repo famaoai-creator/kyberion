@@ -3,7 +3,7 @@ import { assertServiceCredentialAllocation } from '../governance/service-credent
 import { verifyServiceCredentialAllocation } from '../governance/service-credential-allocation-verifier.js';
 /** Local credential allocations reuse standing grants; material stays in the secret store. */
 import { timingSafeEqual } from 'node:crypto';
-import { assertStoreGrantIssuanceAllowed, withStoreGrant } from '../authority.js';
+import { assertStoreGrantIssuanceAllowed } from '../authority.js';
 import { currentExecutionScope, runInExecutionScope } from '../foundation/execution-scope.js';
 import { resolvePolicyIdentityContext } from '../identity-context-bridge.js';
 import {
@@ -22,6 +22,16 @@ import {
   verifyGrantBasis,
   type GrantRecord,
 } from '../governance/grant-store.js';
+import {
+  allocationDenied,
+  allocationReader,
+  bindLentCredential,
+  CREDENTIAL_USE_CAPABILITY,
+  installCredentialLendingPolicy,
+  lendingGrantBackends,
+  selectLendingGrants,
+} from './credential-lending-broker.js';
+import { credentialServiceBackends } from './credential-custody.js';
 import {
   listReasoningApiProviders,
   requireReasoningApiProvider,
@@ -124,7 +134,7 @@ function readAllocatedServiceMaterial(
   return { grantId, bindingId, binding: JSON.stringify(selected), generation, material };
 }
 
-export const CREDENTIAL_USE_CAPABILITY = 'credential.use';
+export { CREDENTIAL_USE_CAPABILITY };
 let installedLocalResolver: SecretResolver | undefined;
 /** Exact installed default, never a caller-supplied resolver name. Reset/reinstall changes identity. */
 export function isLocalCredentialAllocationResolver(resolver: SecretResolver | null): boolean {
@@ -133,6 +143,7 @@ export function isLocalCredentialAllocationResolver(resolver: SecretResolver | n
 export function installLocalCredentialAllocations(): boolean {
   // The source verifier is required for external brokers too; never replace their resolver.
   registerServiceCredentialAllocationVerifier(verifyServiceCredentialAllocation);
+  installCredentialLendingPolicy();
   if (getSecretResolver()) return false;
   const resolver: SecretResolver = {
     name: 'local-credential-allocations',
@@ -146,21 +157,8 @@ export function installLocalCredentialAllocations(): boolean {
   installedLocalResolver = resolver;
   return true;
 }
-const denied = () =>
-  new Error('[CREDENTIAL_ALLOCATION_DENIED] Allocation missing, expired, revoked, or changed');
-
-function reader<T>(tenant: string, run: () => T): T {
-  const identity = credentialExecutionIdentity();
-  if (identity.personalClaim || (identity.tenantSlug && identity.tenantSlug !== tenant))
-    throw denied();
-  return withStoreGrant('credential_allocation_reader', run, {
-    tenantSlug: tenant,
-    identity: {
-      missionId: identity.missionId ?? null,
-      taskId: identity.taskId ?? null,
-    },
-  });
-}
+const denied = allocationDenied;
+const reader = allocationReader;
 
 export function listCredentialAllocations(tenant: string): GrantRecord[] {
   return reader(tenant, () =>
@@ -241,6 +239,96 @@ function readAllocatedMaterial(tenant: string, grantId: string, provider: string
   });
 }
 
+/**
+ * The one admission predicate for a tenant allocation at bind time: same
+ * tenant, active, approval basis intact, and any service-allocation
+ * project/mission/task restriction matching the claimed scope. Pre-checks
+ * (e.g. the resident Dot standing binding) reuse it instead of a parallel rule.
+ */
+export function allocationGrantInScope(
+  grant: GrantRecord,
+  scope: Pick<ScopeContext, 'tenant_slug' | 'project_id' | 'mission_id' | 'task_id'>,
+  now: Date
+): boolean {
+  return (
+    grant.scope.tenant_slug === scope.tenant_slug &&
+    grantStatusAt(grant, now) === 'active' &&
+    verifyGrantBasis(grant) &&
+    (!grant.scope.service_allocation?.project_id ||
+      grant.scope.service_allocation.project_id === scope.project_id) &&
+    (!grant.scope.service_allocation?.mission_id ||
+      grant.scope.service_allocation.mission_id === scope.mission_id) &&
+    (!grant.scope.service_allocation?.task_id ||
+      grant.scope.service_allocation.task_id === scope.task_id)
+  );
+}
+
+/**
+ * A reasoning allocation's provider is bound only if canonical and allowed by
+ * the envelope: an API provider with an API proof, or a backend a lendable
+ * credential service feeds (e.g. claude-cli for a subscription token).
+ */
+export function reasoningAllocationProviderAdmitted(
+  provider: string | undefined,
+  allowedReasoningBackends?: readonly string[]
+): boolean {
+  return Boolean(
+    provider &&
+    (allowedReasoningBackends === undefined || allowedReasoningBackends.includes(provider)) &&
+    (isApiProvider(provider) || credentialServiceBackends().includes(provider))
+  );
+}
+
+function isApiProvider(provider: string | undefined): boolean {
+  return Boolean(provider && listReasoningApiProviders().some((entry) => entry.mode === provider));
+}
+
+/** Backends a grant may feed in this envelope (lending: its allowed_backends; legacy: its provider). */
+export function allocationGrantBackends(
+  grant: GrantRecord,
+  allowedReasoningBackends?: readonly string[]
+): string[] {
+  if (grant.scope.credential_lending) return lendingGrantBackends(grant, allowedReasoningBackends);
+  const provider = grant.scope.credential_provider;
+  return isApiProvider(provider) &&
+    reasoningAllocationProviderAdmitted(provider, allowedReasoningBackends)
+    ? [provider!]
+    : [];
+}
+
+/**
+ * The reasoning allocation a run with these allowed backends binds first (review 6):
+ * the lent credential bind selects (`selectLendingGrants`, the same function),
+ * else the latest legacy API-provider grant. The Dot pre-check ranks with this.
+ */
+export function selectReasoningAllocation(
+  grants: readonly GrantRecord[],
+  allowedReasoningBackends?: readonly string[]
+): GrantRecord | undefined {
+  return (
+    selectLendingGrants(grants, allowedReasoningBackends)[0] ??
+    grants
+      .filter(
+        (grant) =>
+          !grant.scope.credential_lending &&
+          !grant.scope.service_allocation &&
+          allocationGrantBackends(grant, allowedReasoningBackends).length > 0
+      )
+      .sort((a, b) => Date.parse(b.expires_at) - Date.parse(a.expires_at))[0]
+  );
+}
+
+export { selectLendingGrants };
+export {
+  assertLendingUsable,
+  claudeNetworkPassthroughEnv,
+  readCredentialRecord,
+  registerPersonCredentialRecord,
+  registerTenantCredential,
+  setCredentialLendingDepsForTests,
+  installCredentialLendingPolicy,
+} from './credential-lending-broker.js';
+
 /** Called at the coordinated dispatch boundary, never from arbitrary CLI tenant flags. */
 export async function bindAllocatedTaskCredentials(
   input: Readonly<{
@@ -250,18 +338,10 @@ export async function bindAllocatedTaskCredentials(
 ): Promise<TaskCredentialBinding | null> {
   const tenant = input.scope.tenant_slug!;
   const claim = assertTaskCredentialClaim(input);
+  const now = new Date();
   const grants = reader(tenant, () =>
-    listCredentialAllocations(tenant).filter(
-      (grant) =>
-        grant.scope.tenant_slug === tenant &&
-        grantStatusAt(grant, new Date()) === 'active' &&
-        verifyGrantBasis(grant) &&
-        (!grant.scope.service_allocation?.project_id ||
-          grant.scope.service_allocation.project_id === input.scope.project_id) &&
-        (!grant.scope.service_allocation?.mission_id ||
-          grant.scope.service_allocation.mission_id === input.scope.mission_id) &&
-        (!grant.scope.service_allocation?.task_id ||
-          grant.scope.service_allocation.task_id === input.scope.task_id)
+    listCredentialAllocations(tenant).filter((grant) =>
+      allocationGrantInScope(grant, input.scope, now)
     )
   );
   // No local grant preserves non-credential delegation. Provider access later
@@ -282,25 +362,37 @@ export async function bindAllocatedTaskCredentials(
       reserved.add(key);
     }
   }
-  const providers = new Set<string>(listReasoningApiProviders().map((p) => p.mode));
+  // Lent credentials (design §2–§3): one selection shared with the Dot pre-check.
+  const lent = bindLentCredential({
+    tenant,
+    tier: input.scope.tier,
+    grants,
+    allowed,
+    reserved,
+    now,
+  });
+  if (lent) secrets[lent.envKey] = lent.value;
   for (const grant of grants) {
     const provider = grant.scope.credential_provider;
     if (
-      !provider ||
-      (allowed !== undefined && !allowed.includes(provider)) ||
-      !providers.has(provider) ||
-      admitted.some((entry) => entry.provider === provider)
+      grant.scope.credential_lending ||
+      !isApiProvider(provider) ||
+      !reasoningAllocationProviderAdmitted(provider, allowed) ||
+      admitted.some((entry) => entry.provider === provider) ||
+      requireReasoningApiProvider(provider!).secret_refs![0]!.env_keys.some((name) =>
+        Object.hasOwn(secrets, name)
+      )
     )
       continue;
-    const names = requireReasoningApiProvider(provider).secret_refs![0]!.env_keys;
+    const names = requireReasoningApiProvider(provider!).secret_refs![0]!.env_keys;
     for (const name of names) {
       if (reserved.has(name)) throw denied();
     }
-    const key = readAllocatedMaterial(tenant, grant.grant_id, provider);
+    const key = readAllocatedMaterial(tenant, grant.grant_id, provider!);
     for (const name of names) {
       secrets[name] = key;
     }
-    admitted.push({ grantId: grant.grant_id, provider, key });
+    admitted.push({ grantId: grant.grant_id, provider: provider!, key });
   }
   for (const grant of grants) {
     const allocation = grant.scope.service_allocation;
@@ -320,9 +412,10 @@ export async function bindAllocatedTaskCredentials(
     serviceAdmitted.push(entry);
   }
   if (claim !== assertTaskCredentialClaim(input)) throw denied();
-  if (!admitted.length && !serviceAdmitted.length) return null;
+  if (!admitted.length && !serviceAdmitted.length && !lent) return null;
   const validate = () => {
     if (claim !== assertTaskCredentialClaim(input)) throw denied();
+    lent?.validate();
     for (const entry of admitted) {
       const current = readAllocatedMaterial(tenant, entry.grantId, entry.provider);
       // Binding already holds the key in memory; compare directly instead of
@@ -354,6 +447,37 @@ export async function bindAllocatedTaskCredentials(
     taskId: input.scope.task_id,
     secrets,
     ...(serviceAdmitted.length ? { secretProvenance } : {}),
+    ...(lent?.providerEnvironments ? { providerEnvironments: lent.providerEnvironments } : {}),
+    ...(lent
+      ? { credentialKind: lent.kind }
+      : admitted.length
+        ? { credentialKind: 'api_key' }
+        : {}),
+    ...(lent ? { credentialSource: lent.source } : {}),
     validate,
   };
 }
+
+/**
+ * Operator-facing facade of credential custody / lending (no extra public
+ * subpaths): the reasoning credentials CLI and the Chronos usage job import
+ * these through `@agent/core/secret/credential-allocations`.
+ */
+export {
+  buildCredentialRecord,
+  CREDENTIAL_PLANS,
+  CREDENTIAL_SERVICES,
+  credentialServiceBackends,
+  formatCredentialRef,
+  lendingFromRecord,
+  parseCredentialRef,
+  requireCredentialService,
+  subscriptionTokenDaysLeft,
+  type CredentialPlan,
+} from './credential-custody.js';
+export {
+  assessCredentialBudget,
+  monthOf,
+  summarizeCredentialUsage,
+} from './credential-usage-ledger.js';
+export { runCredentialUsageMonthly } from './credential-usage-report.js';

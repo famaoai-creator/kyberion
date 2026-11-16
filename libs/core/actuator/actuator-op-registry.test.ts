@@ -54,6 +54,7 @@ describe('actuator-op-registry', () => {
     const captureOps = [
       'accountability_report',
       'approval_store_hygiene',
+      'credential_usage_monthly',
       'decision_digest',
       'organization_digest',
       'organization_retro',
@@ -105,7 +106,7 @@ describe('actuator-op-registry', () => {
       'validate_productivity_dry_run',
       'wait',
     ];
-    expect(captureOps).toHaveLength(13);
+    expect(captureOps).toHaveLength(14);
     expect(transformOps).toHaveLength(3);
     expect(applyOps).toHaveLength(36);
     for (const op of captureOps) expect(determineActuatorStepType('core', op)).toBe('capture');
@@ -116,7 +117,7 @@ describe('actuator-op-registry', () => {
       ...(registeredCoreOps.capture || []),
       ...(registeredCoreOps.transform || []),
       ...(registeredCoreOps.apply || []),
-    ]).toHaveLength(52);
+    ]).toHaveLength(53);
   });
 
   it('prefers apply semantics when provider ops overlap', () => {

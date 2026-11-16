@@ -1,8 +1,19 @@
 ---
 title: Stance / Tenant / Customer — three layers that all get called "customer"
-tags: [architecture, governance, tenant, customer, stance, affiliation, multi-tenant, channel]
-last_updated: 2026-11-12
-concepts: [stance, tenant, tenants-customers]
+tags:
+  [
+    architecture,
+    governance,
+    tenant,
+    customer,
+    stance,
+    affiliation,
+    multi-tenant,
+    channel,
+    credential-custody,
+  ]
+last_updated: 2026-11-16
+concepts: [stance, tenant, tenants-customers, credential-custody]
 ---
 
 # Stance / Tenant / Customer
@@ -165,3 +176,74 @@ For someone holding concurrent roles at independent entities, this is not
 bookkeeping. It makes accidental mixing the non-default, and leaves an
 answerable record of every deliberate crossing: what moved, when, and under which
 stance. That record is the only thing that can substantiate the claim afterwards.
+
+## Credential custody: whose reasoning credential does tenant work use?
+
+The tenant answers "whose data is this?". A reasoning credential has its own
+owner — its **custody** — and the two are deliberately separate
+([design](../../../docs/developer/improvement-plans-2026-11/CLAUDE_CLI_TENANT_CREDENTIAL_DESIGN_2026-11-16.ja.md),
+`libs/core/secret/credential-custody.ts`). Custody reuses the custody-owner
+vocabulary of provider attestations (`libs/core/contracts/custody-owner.ts`):
+a credential is held by a **person** or a **tenant**; `system` custody never
+lends. Person custody means the installation person who owns
+`knowledge/personal/` (the owner member); a `person:<other>:…` ref is refused
+(`[CREDENTIAL_CUSTODY_PERSON_MISMATCH]`).
+
+**Registration.** `pnpm kyberion reasoning credentials register` stores the
+value in the owner's store — `knowledge/personal/connections/<service>[.<label>].json`
+(person, through secret introduction) or
+`knowledge/confidential/<owner>/connections/<service>[.<label>].json` (tenant,
+by an owner member of that tenant; replacing a registered value needs an
+owner approval) — plus a non-secret record `<service>[.<label>].record.json`.
+The record is the **only** source of the lending terms:
+
+| Record field        | Meaning                                                                                                                   |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `credential_ref`    | `<person\|tenant>:<owner>:<service>[:<label>]`, e.g. `tenant:parent:anthropic`                                            |
+| `kind` / `terms`    | `api_key` (commercial) or `subscription_token` (`claude setup-token`; Pro/Max/Ultra consumer, Team/Enterprise commercial) |
+| `plan`              | `api` / `team` / `enterprise` / `pro` / `max` / `ultra`                                                                   |
+| `token_expires_at`  | subscription tokens only; reminded 30 days ahead                                                                          |
+| `contract_tenant`   | tenant-held Team/Enterprise seat only: always the owner tenant itself                                                     |
+| `value_fingerprint` | `sha256:` of the value — never the value                                                                                  |
+
+**Lending.** The owner may lend a credential to the work of another tenant
+(the borrower) through the existing `credential.use` standing grant, whose
+`credential_lending` scope copies the record's terms and fingerprint and adds
+`allowed_backends` and an optional `budget_monthly_usd`. Assign flags never
+set terms; they are only checked against the record. The owner approves (the
+installation person, or an owner member of the owner tenant); the borrower's
+data consent stays its provider attestation for `claude`. A value or record
+that changed after approval is refused (`[CREDENTIAL_VALUE_CHANGED]`,
+`[CREDENTIAL_RECORD_MISMATCH]`) until re-approved. The kind decides how far a
+credential may be lent, checked at approval **and** at every use:
+
+| Kind / terms                                | May be lent to                                                                           | Refusal                             |
+| ------------------------------------------- | ---------------------------------------------------------------------------------------- | ----------------------------------- |
+| `api_key` / commercial                      | any tenant with a valid provider attestation                                             | `[CREDENTIAL_ATTESTATION_REQUIRED]` |
+| person-held `subscription_token` (any plan) | only tenants whose verified `personal_owner` is the holder — never via a contract tenant | `[CREDENTIAL_KIND_NOT_ELIGIBLE]`    |
+| tenant-held `subscription_token` (seat)     | only its own owner tenant                                                                | `[CREDENTIAL_KIND_NOT_ELIGIBLE]`    |
+
+`personal_owner` is an explicit tenant-profile fact set only by
+`pnpm tenant personal-owner <slug> --person user:<member>` (approved by that
+person, audited as `tenant.personal_owner_changed`), stored with its approval
+basis and re-verified against the approval store at every use; a hand-edited
+value counts for nothing. `pnpm kyberion doctor` warns with every personal tenant.
+Company use of a seat or key is tenant custody, registered by that tenant's
+owner (any change of value or terms needs the owner's approval). Member-registry `owner`
+memberships and `assigned_role` are bootstrapped for every tenant and never
+make a company tenant "personal".
+
+A tenant-custody value read for another tenant's run is a brokered crossing
+like any other: one exact-file capability bound to the owner, a durable
+`credential.lent_read` audit row (credential_ref, borrower, mission/task,
+grant), and the value goes only into the run's in-memory binding — never into
+the borrower's storage. A subscription token is not a generic task secret:
+only the isolated claude spawn reads it. Usage is metered per run on the
+borrower's execution-metrics rows (`credential_ref`), in Asia/Tokyo business
+months, summarized by the `credential-usage-monthly` Chronos job; 80% of the
+budget notifies, 100% stops new runs and running bindings
+(`[CREDENTIAL_BUDGET_EXCEEDED]`, per-use check on a one-minute cached total).
+The isolated claude HOME (`active/shared/cache/<tier>/<borrower>/provider-auth/claude/<hash>/home`)
+holds no credential (it is passed per launch) and may hold CLI session data;
+it is cache: the cache floor's 30-day TTL removes it, and it is recreated at
+the next bind.

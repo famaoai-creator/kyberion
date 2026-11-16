@@ -76,6 +76,8 @@ const SOD_CONSUMERS: ReadonlyArray<{ file: string; consumer: string }> = [
     consumer: 'service_recording_promotion',
   },
   { file: 'libs/core/governance/grant-store.ts', consumer: 'grant_standing' },
+  { file: 'libs/core/governance/grant-store.ts', consumer: 'grant_extension' },
+  { file: 'libs/core/secret/credential-custody-approval.ts', consumer: 'credential_custody' },
   { file: 'libs/core/virtual/shortcut-bridge.ts', consumer: 'apple_shortcut_run' },
 ];
 

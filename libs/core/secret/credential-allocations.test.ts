@@ -45,6 +45,7 @@ vi.mock('../governance/service-credential-allocation-verifier.js', () => ({
   verifyServiceCredentialAllocation: state.serviceVerify,
 }));
 vi.mock('../governance/grant-store.js', () => ({
+  registerCredentialLendingPolicy: () => undefined,
   listGrants: () => [
     grant(),
     ...(state.extraProvider

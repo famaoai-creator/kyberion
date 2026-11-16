@@ -258,14 +258,21 @@ async function reportWake(argv: string[]) {
   const dotId = argv.find((arg) => !arg.startsWith('--'));
   if (!dotId) throw new Error('usage: pnpm kyberion dot wake <dot_id>');
   const loaded = findDot(dotId);
-  installReasoningBackends();
+  // A tenant Dot reasons only under its standing binding, which builds its own
+  // per-task backend chain; a process-level install under a tenant scope is
+  // refused by design (CREDENTIAL_BINDING_REQUIRED). Tenantless Dots keep the
+  // process chain, exactly as the supervisor sweep does.
+  if (!loaded.charter.scope.tenant_slug) installReasoningBackends();
   // Same attribution as the daemon sweep: ledger/heartbeat writes and the
   // turn all happen under the charter's declared role.
   const receipt = await withExecutionContextAsync(
     loaded.charter.authority.authority_role,
     () => runDotWakeWithGoalDriver(loaded, {}),
     undefined,
-    loaded.charter.scope.tenant_slug
+    loaded.charter.scope.tenant_slug,
+    // Organization-scoped Dot state (wake ledger, cadence) is guarded by the
+    // organization binding, exactly as the executor enters it.
+    loaded.charter.scope.organization_id
   );
   return {
     ok: receipt.outcome !== 'failed',

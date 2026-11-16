@@ -108,7 +108,23 @@ WorkItem claimを持たないmission kickoffや単独CLIへ、tenantの資格情
 `bindTask` のない外部resolverから、ローカルのタスク束縛を自動補完することもありません。
 外部resolverの空結果・失敗から、ローカル割り当てや個人キーへfallbackしません。
 
-## 6. 取り消しと終了
+## 6. 期限の延長（同じGrant）
+
+Grantは最長30日です。常駐Dotなど継続して使う場合は、期限が切れる前に同じGrantを延長します。
+ID・承認者・tenant・provider・目的は変わらず、`expires_at` だけが動きます。
+
+```bash
+pnpm kyberion reasoning credentials allocations --tenant "$TENANT"   # expires_at と days_left
+pnpm kyberion reasoning credentials extend --tenant "$TENANT" --grant <grant_id> --days 30
+pnpm kyberion approvals --approve <approval_id>                     # ownerが承認
+pnpm kyberion reasoning credentials extend --tenant "$TENANT" --grant <grant_id> --days 30 --approval <approval_id>
+```
+
+新しい期限は承認を適用した時刻から数え、1回あたり30日を超えません。取り消したGrantは延長できません。
+期限切れから7日以内なら延長でき、その間Grantは何も許可しません。7日を過ぎたら手順3から新しいGrantを依頼してください。
+期限の7日前から、supervisorがops_alertで毎日1回知らせます。
+
+## 7. 取り消しと終了
 
 ```bash
 pnpm kyberion reasoning credentials revoke --tenant "$TENANT" --grant <grant_id> --reason 'Finished testing'

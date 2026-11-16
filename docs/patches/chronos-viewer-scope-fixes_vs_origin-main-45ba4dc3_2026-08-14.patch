@@ -1,0 +1,2098 @@
+diff --git a/knowledge/_manifest.json b/knowledge/_manifest.json
+index a0e03833..a5c70660 100644
+--- a/knowledge/_manifest.json
++++ b/knowledge/_manifest.json
+@@ -4749,7 +4749,7 @@
+     {
+       "path": "product/orchestration/user-facing-vocabulary.json",
+       "tier": "public",
+-      "size": 452720,
++      "size": 463454,
+       "type": "json"
+     },
+     {
+diff --git a/knowledge/product/orchestration/user-facing-vocabulary.json b/knowledge/product/orchestration/user-facing-vocabulary.json
+index ad9a5cd8..cc7d5878 100644
+--- a/knowledge/product/orchestration/user-facing-vocabulary.json
++++ b/knowledge/product/orchestration/user-facing-vocabulary.json
+@@ -3050,6 +3050,251 @@
+         "en": "Dismiss first run banner",
+         "ja": "初回バナーを閉じる",
+         "qps-ploc": "⟦Ḓïşɱïşş ƒïřşŧ řůñ ƀȧññėř ŀőřėɱ ï⟧"
++      },
++      "chronos_overview": {
++        "en": "Overview",
++        "ja": "概要",
++        "qps-ploc": "⟦Őṽėřṽïėẇ ŀőř⟧"
++      },
++      "chronos_metadata": {
++        "en": "Metadata",
++        "ja": "メタデータ",
++        "qps-ploc": "⟦Ɱėŧȧḓȧŧȧ ŀőř⟧"
++      },
++      "chronos_status": {
++        "en": "status",
++        "ja": "状態",
++        "qps-ploc": "⟦şŧȧŧůş ŀőř⟧"
++      },
++      "chronos_kind": {
++        "en": "kind",
++        "ja": "種別",
++        "qps-ploc": "⟦ķïñḓ ŀőř⟧"
++      },
++      "chronos_tier": {
++        "en": "tier",
++        "ja": "tier",
++        "qps-ploc": "⟦ŧïėř ŀőř⟧"
++      },
++      "chronos_source": {
++        "en": "source",
++        "ja": "出所",
++        "qps-ploc": "⟦şőůřƈė ŀőř⟧"
++      },
++      "chronos_service": {
++        "en": "service",
++        "ja": "サービス",
++        "qps-ploc": "⟦şėřṽïƈė ŀőř⟧"
++      },
++      "chronos_specialist": {
++        "en": "specialist",
++        "ja": "スペシャリスト",
++        "qps-ploc": "⟦şṗėƈïȧŀïşŧ ŀőř⟧"
++      },
++      "chronos_team": {
++        "en": "team",
++        "ja": "team",
++        "qps-ploc": "⟦ŧėȧɱ ŀőř⟧"
++      },
++      "chronos_authority": {
++        "en": "authority",
++        "ja": "権限",
++        "qps-ploc": "⟦ȧůŧħőřïŧẏ ŀőř⟧"
++      },
++      "chronos_context": {
++        "en": "context",
++        "ja": "文脈",
++        "qps-ploc": "⟦ƈőñŧėẋŧ ŀőř⟧"
++      },
++      "chronos_resolution": {
++        "en": "resolution",
++        "ja": "解決",
++        "qps-ploc": "⟦řėşőŀůŧïőñ ŀőř⟧"
++      },
++      "chronos_outcome": {
++        "en": "outcome",
++        "ja": "成果",
++        "qps-ploc": "⟦őůŧƈőɱė ŀőř⟧"
++      },
++      "chronos_learned": {
++        "en": "learned",
++        "ja": "学び",
++        "qps-ploc": "⟦ŀėȧřñėḓ ŀőř⟧"
++      },
++      "chronos_processing": {
++        "en": "processing",
++        "ja": "処理中",
++        "qps-ploc": "⟦ṗřőƈėşşïñɠ ŀőř⟧"
++      },
++      "chronos_archive": {
++        "en": "archive",
++        "ja": "アーカイブ",
++        "qps-ploc": "⟦ȧřƈħïṽė ŀőř⟧"
++      },
++      "chronos_promote": {
++        "en": "promote",
++        "ja": "昇格",
++        "qps-ploc": "⟦ṗřőɱőŧė ŀőř⟧"
++      },
++      "chronos_promoted": {
++        "en": "promoted",
++        "ja": "昇格済み",
++        "qps-ploc": "⟦ṗřőɱőŧėḓ ŀőř⟧"
++      },
++      "chronos_promote_to_mission": {
++        "en": "promote to mission",
++        "ja": "mission に昇格",
++        "qps-ploc": "⟦ṗřőɱőŧė ŧő ɱïşşïőñ ŀőřėɱ⟧"
++      },
++      "chronos_approvals": {
++        "en": "Approvals",
++        "ja": "承認",
++        "qps-ploc": "⟦Ȧṗṗřőṽȧŀş ŀőř⟧"
++      },
++      "chronos_no_pending_approvals": {
++        "en": "No pending approvals.",
++        "ja": "保留中の承認はありません。",
++        "qps-ploc": "⟦Ñő ṗėñḓïñɠ ȧṗṗřőṽȧŀş. ŀőřėɱ ⟧"
++      },
++      "chronos_no_detail": {
++        "en": "No detail.",
++        "ja": "詳細はありません。",
++        "qps-ploc": "⟦Ñő ḓėŧȧïŀ. ŀőř⟧"
++      },
++      "chronos_no_summary": {
++        "en": "No summary available yet.",
++        "ja": "サマリーはまだありません。",
++        "qps-ploc": "⟦Ñő şůɱɱȧřẏ ȧṽȧïŀȧƀŀė ẏėŧ. ŀőřėɱ ïṗ⟧"
++      },
++      "chronos_delivery_exceptions_detail": {
++        "en": "Outbox entries awaiting operator attention",
++        "ja": "オペレーターの確認を待っている outbox のエントリ",
++        "qps-ploc": "⟦Őůŧƀőẋ ėñŧřïėş ȧẇȧïŧïñɠ őṗėřȧŧőř ȧŧŧėñŧïőñ ŀőřėɱ ïṗşůɱ ḓő⟧"
++      },
++      "chronos_task": {
++        "en": "task",
++        "ja": "task",
++        "qps-ploc": "⟦ŧȧşķ ŀőř⟧"
++      },
++      "chronos_tasks": {
++        "en": "tasks",
++        "ja": "task",
++        "qps-ploc": "⟦ŧȧşķş ŀőř⟧"
++      },
++      "chronos_task_sessions": {
++        "en": "task sessions",
++        "ja": "task session",
++        "qps-ploc": "⟦ŧȧşķ şėşşïőñş ŀőřė⟧"
++      },
++      "chronos_pipelines": {
++        "en": "pipelines",
++        "ja": "pipeline",
++        "qps-ploc": "⟦ṗïṗėŀïñėş ŀőř⟧"
++      },
++      "chronos_pipeline_role": {
++        "en": "Pipeline is a replayable execution procedure, not a parent container.",
++        "ja": "Pipeline は再実行できる実行手順であり、親コンテナではありません。",
++        "qps-ploc": "⟦Ṗïṗėŀïñė ïş ȧ řėṗŀȧẏȧƀŀė ėẋėƈůŧïőñ ṗřőƈėḓůřė, ñőŧ ȧ ṗȧřėñŧ ƈőñŧȧïñėř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
++      },
++      "chronos_project_lineage": {
++        "en": "project lineage",
++        "ja": "プロジェクトの系譜",
++        "qps-ploc": "⟦ṗřőĵėƈŧ ŀïñėȧɠė ŀőřė⟧"
++      },
++      "chronos_project_hierarchy": {
++        "en": "Project → Track → Mission → Task / Task Session",
++        "ja": "Project → Track → Mission → Task / Task Session",
++        "qps-ploc": "⟦Ṗřőĵėƈŧ → Ŧřȧƈķ → Ɱïşşïőñ → Ŧȧşķ / Ŧȧşķ Şėşşïőñ ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
++      },
++      "chronos_lineage_counts": {
++        "en": "counts",
++        "ja": "件数",
++        "qps-ploc": "⟦ƈőůñŧş ŀőř⟧"
++      },
++      "chronos_tracks": {
++        "en": "tracks",
++        "ja": "track",
++        "qps-ploc": "⟦ŧřȧƈķş ŀőř⟧"
++      },
++      "chronos_no_tracks": {
++        "en": "No tracks registered yet.",
++        "ja": "track はまだ登録されていません。",
++        "qps-ploc": "⟦Ñő ŧřȧƈķş řėɠïşŧėřėḓ ẏėŧ. ŀőřėɱ ïṗ⟧"
++      },
++      "chronos_tracks_description": {
++        "en": "Tracks are the SDLC and gating lanes inside a project. Focus a track to review evidence, approvals, and durable work without assuming one project equals one lifecycle.",
++        "ja": "Track はプロジェクト内の SDLC とゲートのレーンです。track に絞り込むと、1プロジェクト＝1ライフサイクルと決めつけずに、証跡・承認・継続的な作業を確認できます。",
++        "qps-ploc": "⟦Ŧřȧƈķş ȧřė ŧħė ŞḒĿƇ ȧñḓ ɠȧŧïñɠ ŀȧñėş ïñşïḓė ȧ ṗřőĵėƈŧ. Ƒőƈůş ȧ ŧřȧƈķ ŧő řėṽïėẇ ėṽïḓėñƈė, ȧṗṗřőṽȧŀş, ȧñḓ ḓůřȧƀŀė ẇőřķ ẇïŧħőůŧ ȧşşůɱïñɠ őñė ṗřőĵėƈŧ ėɋůȧŀş őñė ŀïƒėƈẏƈŀė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ï⟧"
++      },
++      "chronos_focus_track": {
++        "en": "focus track",
++        "ja": "track に絞り込む",
++        "qps-ploc": "⟦ƒőƈůş ŧřȧƈķ ŀőř⟧"
++      },
++      "chronos_seed_next_work": {
++        "en": "seed next work",
++        "ja": "次の作業を起こす",
++        "qps-ploc": "⟦şėėḓ ñėẋŧ ẇőřķ ŀőřė⟧"
++      },
++      "chronos_gate_readiness": {
++        "en": "gate readiness",
++        "ja": "ゲートの充足状況",
++        "qps-ploc": "⟦ɠȧŧė řėȧḓïñėşş ŀőřė⟧"
++      },
++      "chronos_current_gate": {
++        "en": "current gate",
++        "ja": "現在のゲート",
++        "qps-ploc": "⟦ƈůřřėñŧ ɠȧŧė ŀőř⟧"
++      },
++      "chronos_next_required": {
++        "en": "next required",
++        "ja": "次に必要なもの",
++        "qps-ploc": "⟦ñėẋŧ řėɋůïřėḓ ŀőřė⟧"
++      },
++      "chronos_required_artifacts": {
++        "en": "required artifacts",
++        "ja": "必要な成果物",
++        "qps-ploc": "⟦řėɋůïřėḓ ȧřŧïƒȧƈŧş ŀőřėɱ⟧"
++      },
++      "chronos_skeleton_detail": {
++        "en": "Skeleton Detail",
++        "ja": "Skeleton の詳細",
++        "qps-ploc": "⟦Şķėŀėŧőñ Ḓėŧȧïŀ ŀőřė⟧"
++      },
++      "chronos_skeleton_detail_empty": {
++        "en": "Select a track-generated skeleton to inspect its title, metadata, overview, and sections without leaving Chronos.",
++        "ja": "track が生成した skeleton を選ぶと、Chronos を離れずにタイトル・メタデータ・概要・セクションを確認できます。",
++        "qps-ploc": "⟦Şėŀėƈŧ ȧ ŧřȧƈķ-ɠėñėřȧŧėḓ şķėŀėŧőñ ŧő ïñşṗėƈŧ ïŧş ŧïŧŀė, ɱėŧȧḓȧŧȧ, őṽėřṽïėẇ, ȧñḓ şėƈŧïőñş ẇïŧħőůŧ ŀėȧṽïñɠ Ƈħřőñőş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ⟧"
++      },
++      "chronos_open_skeleton": {
++        "en": "open skeleton",
++        "ja": "skeleton を開く",
++        "qps-ploc": "⟦őṗėñ şķėŀėŧőñ ŀőřė⟧"
++      },
++      "chronos_open_raw_skeleton": {
++        "en": "open raw skeleton",
++        "ja": "raw skeleton を開く",
++        "qps-ploc": "⟦őṗėñ řȧẇ şķėŀėŧőñ ŀőřėɱ⟧"
++      },
++      "chronos_open_template": {
++        "en": "open template",
++        "ja": "テンプレートを開く",
++        "qps-ploc": "⟦őṗėñ ŧėɱṗŀȧŧė ŀőřė⟧"
++      },
++      "chronos_distill_candidates": {
++        "en": "Distill Candidates",
++        "ja": "蒸留候補",
++        "qps-ploc": "⟦Ḓïşŧïŀŀ Ƈȧñḓïḓȧŧėş ŀőřėɱ⟧"
++      },
++      "chronos_no_distill_candidates": {
++        "en": "No distill candidates recorded yet.",
++        "ja": "蒸留候補はまだ記録されていません。",
++        "qps-ploc": "⟦Ñő ḓïşŧïŀŀ ƈȧñḓïḓȧŧėş řėƈőřḓėḓ ẏėŧ. ŀőřėɱ ïṗşůɱ⟧"
++      },
++      "chronos_distill_candidates_description": {
++        "en": "Completed work can become reusable organizational memory. This queue highlights outcome-backed candidates that may be promoted into patterns, SOPs, or governed knowledge later.",
++        "ja": "完了した仕事は再利用できる組織の記憶になります。このキューは、後からパターン・SOP・統制されたナレッジへ昇格できる、成果に裏付けられた候補を示します。",
++        "qps-ploc": "⟦Ƈőɱṗŀėŧėḓ ẇőřķ ƈȧñ ƀėƈőɱė řėůşȧƀŀė őřɠȧñïẑȧŧïőñȧŀ ɱėɱőřẏ. Ŧħïş ɋůėůė ħïɠħŀïɠħŧş őůŧƈőɱė-ƀȧƈķėḓ ƈȧñḓïḓȧŧėş ŧħȧŧ ɱȧẏ ƀė ṗřőɱőŧėḓ ïñŧő ṗȧŧŧėřñş, ŞŐṖş, őř ɠőṽėřñėḓ ķñőẇŀėḓɠė ŀȧŧėř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ⟧"
+       }
+     },
+     "cli": {
+diff --git a/libs/core/authority.test.ts b/libs/core/authority.test.ts
+index 0882534d..3c738022 100644
+--- a/libs/core/authority.test.ts
++++ b/libs/core/authority.test.ts
+@@ -3,6 +3,7 @@ import {
+   buildExecutionEnv,
+   inferPersonaFromRole,
+   resolveIdentityContext,
++  resolveRole,
+   withExecutionContext,
+   withExecutionContextAsync,
+ } from './authority.js';
+@@ -10,6 +11,7 @@ import {
+ describe('resolveIdentityContext', () => {
+   const originalPersona = process.env.KYBERION_PERSONA;
+   const originalRole = process.env.MISSION_ROLE;
++  const originalSystemRole = process.env.SYSTEM_ROLE;
+   const originalMissionId = process.env.MISSION_ID;
+   const originalSudo = process.env.KYBERION_SUDO;
+   const originalSudoScope = process.env.KYBERION_SUDO_SCOPE;
+@@ -19,6 +21,8 @@ describe('resolveIdentityContext', () => {
+     else process.env.KYBERION_PERSONA = originalPersona;
+     if (originalRole === undefined) delete process.env.MISSION_ROLE;
+     else process.env.MISSION_ROLE = originalRole;
++    if (originalSystemRole === undefined) delete process.env.SYSTEM_ROLE;
++    else process.env.SYSTEM_ROLE = originalSystemRole;
+     if (originalMissionId === undefined) delete process.env.MISSION_ID;
+     else process.env.MISSION_ID = originalMissionId;
+     if (originalSudo === undefined) delete process.env.KYBERION_SUDO;
+@@ -102,6 +106,42 @@ describe('resolveIdentityContext', () => {
+     expect(process.env.KYBERION_PERSONA).toBe('worker');
+   });
+ 
++  it('outranks a process SYSTEM_ROLE for the duration of the scope', () => {
++    // Surfaces started through `pnpm surfaces:start` run with
++    // SYSTEM_ROLE=surface_runtime, and resolveRole() reads SYSTEM_ROLE before
++    // MISSION_ROLE. Without suppressing it here, every per-request execution
++    // context inside such a process resolves as the host role instead of the
++    // role it was opened with — silently voiding request-scoped authorization.
++    process.env.SYSTEM_ROLE = 'surface_runtime';
++    delete process.env.MISSION_ROLE;
++
++    const inside = withExecutionContext('chronos_localadmin', () => ({
++      resolved: resolveRole(),
++      systemRole: process.env.SYSTEM_ROLE,
++      role: resolveIdentityContext().role,
++    }));
++
++    expect(inside).toEqual({
++      resolved: 'chronos_localadmin',
++      systemRole: undefined,
++      role: 'chronos_localadmin',
++    });
++    expect(process.env.SYSTEM_ROLE).toBe('surface_runtime');
++    expect(resolveRole()).toBe('surface_runtime');
++  });
++
++  it('restores SYSTEM_ROLE after async governed work', async () => {
++    process.env.SYSTEM_ROLE = 'surface_runtime';
++
++    const inside = await withExecutionContextAsync('chronos_localadmin', async () => {
++      await Promise.resolve();
++      return resolveRole();
++    });
++
++    expect(inside).toBe('chronos_localadmin');
++    expect(process.env.SYSTEM_ROLE).toBe('surface_runtime');
++  });
++
+   it('keeps execution context through async governed work', async () => {
+     delete process.env.MISSION_ROLE;
+     delete process.env.KYBERION_PERSONA;
+diff --git a/libs/core/authority.ts b/libs/core/authority.ts
+index f53591a2..9737e079 100644
+--- a/libs/core/authority.ts
++++ b/libs/core/authority.ts
+@@ -220,31 +220,62 @@ export function buildExecutionEnv(
+   return nextEnv;
+ }
+ 
+-export function withExecutionContext<T>(
+-  role: string,
+-  fn: () => T,
+-  persona?: Persona,
+-  tenantSlug?: string
+-): T {
+-  const previousRole = process.env.MISSION_ROLE;
+-  const previousPersona = process.env.KYBERION_PERSONA;
++interface PreviousExecutionEnv {
++  role: string | undefined;
++  systemRole: string | undefined;
++  persona: string | undefined;
++}
++
++/**
++ * Establishes the role/persona env a governed scope runs under.
++ *
++ * `SYSTEM_ROLE` is suppressed for the duration on purpose: `resolveRole()`
++ * reads `SYSTEM_ROLE || MISSION_ROLE`, so a process that declares a system role
++ * (every surface started through `pnpm surfaces:start` does) would otherwise
++ * keep that role and silently discard the role this scope was opened with —
++ * making the whole helper inert exactly where per-request authorization needs
++ * it. The process-level role is restored on exit; only the scope is narrowed.
++ */
++function enterExecutionEnv(role: string, persona?: Persona): PreviousExecutionEnv {
++  const previous: PreviousExecutionEnv = {
++    role: process.env.MISSION_ROLE,
++    systemRole: process.env.SYSTEM_ROLE,
++    persona: process.env.KYBERION_PERSONA,
++  };
+   process.env.MISSION_ROLE = role;
++  delete process.env.SYSTEM_ROLE;
+   const resolvedPersona = persona || inferPersonaFromRole(role);
+   if (resolvedPersona !== 'unknown') {
+     process.env.KYBERION_PERSONA = resolvedPersona;
+   } else if (persona === undefined) {
+     delete process.env.KYBERION_PERSONA;
+   }
++  return previous;
++}
++
++function restoreExecutionEnv(previous: PreviousExecutionEnv): void {
++  if (previous.role === undefined) delete process.env.MISSION_ROLE;
++  else process.env.MISSION_ROLE = previous.role;
++  if (previous.systemRole === undefined) delete process.env.SYSTEM_ROLE;
++  else process.env.SYSTEM_ROLE = previous.systemRole;
++  if (previous.persona === undefined) delete process.env.KYBERION_PERSONA;
++  else process.env.KYBERION_PERSONA = previous.persona;
++}
++
++export function withExecutionContext<T>(
++  role: string,
++  fn: () => T,
++  persona?: Persona,
++  tenantSlug?: string
++): T {
++  const previous = enterExecutionEnv(role, persona);
+   try {
+     return executionScopeStorage.run(
+       { tenantBound: tenantSlug !== undefined, ...(tenantSlug ? { tenantSlug } : {}) },
+       fn
+     );
+   } finally {
+-    if (previousRole === undefined) delete process.env.MISSION_ROLE;
+-    else process.env.MISSION_ROLE = previousRole;
+-    if (previousPersona === undefined) delete process.env.KYBERION_PERSONA;
+-    else process.env.KYBERION_PERSONA = previousPersona;
++    restoreExecutionEnv(previous);
+   }
+ }
+ 
+@@ -259,25 +290,14 @@ export async function withExecutionContextAsync<T>(
+   persona?: Persona,
+   tenantSlug?: string
+ ): Promise<T> {
+-  const previousRole = process.env.MISSION_ROLE;
+-  const previousPersona = process.env.KYBERION_PERSONA;
+-  process.env.MISSION_ROLE = role;
+-  const resolvedPersona = persona || inferPersonaFromRole(role);
+-  if (resolvedPersona !== 'unknown') {
+-    process.env.KYBERION_PERSONA = resolvedPersona;
+-  } else if (persona === undefined) {
+-    delete process.env.KYBERION_PERSONA;
+-  }
++  const previous = enterExecutionEnv(role, persona);
+   try {
+     return await executionScopeStorage.run(
+       { tenantBound: tenantSlug !== undefined, ...(tenantSlug ? { tenantSlug } : {}) },
+       fn
+     );
+   } finally {
+-    if (previousRole === undefined) delete process.env.MISSION_ROLE;
+-    else process.env.MISSION_ROLE = previousRole;
+-    if (previousPersona === undefined) delete process.env.KYBERION_PERSONA;
+-    else process.env.KYBERION_PERSONA = previousPersona;
++    restoreExecutionEnv(previous);
+   }
+ }
+ 
+diff --git a/libs/core/organization-operating-model.test.ts b/libs/core/organization-operating-model.test.ts
+index 54a6980e..d83e233e 100644
+--- a/libs/core/organization-operating-model.test.ts
++++ b/libs/core/organization-operating-model.test.ts
+@@ -563,6 +563,30 @@ describe('organization operating model', () => {
+       missing_decision_cadences: ['decision-1:missing-cadence'],
+       pending_decisions: ['decision-1'],
+     });
++
++    const view = buildOrganizationManagementView({
++      organizationId,
++      tier: 'confidential',
++      tenantSlug,
++    });
++    // A pending decision is reported by reconciliation AND by the decision
++    // record itself. It is still one thing to act on: listing it twice made
++    // the operator's queue half duplicates, and the two copies disagreed on
++    // priority, so the truncated view showed the weaker one.
++    const decisionPoints = view.control_plane.intervention_points.filter(
++      (point) => point.kind === 'decision' && point.id === 'decision-1'
++    );
++    expect(decisionPoints).toHaveLength(1);
++    expect(decisionPoints[0]).toMatchObject({
++      priority: 'high',
++      reason: 'Decision is pending_approval.',
++    });
++    const keys = view.control_plane.intervention_points.map((point) => `${point.kind}:${point.id}`);
++    expect(new Set(keys).size).toBe(keys.length);
++    // Consumers truncate the list, so the urgent entries must survive the cut.
++    const ranks = { low: 0, medium: 1, high: 2 } as const;
++    const priorities = view.control_plane.intervention_points.map((point) => ranks[point.priority]);
++    expect([...priorities].sort((a, b) => b - a)).toEqual(priorities);
+   });
+ 
+   it('builds proposed learning candidates without promoting them automatically', () => {
+diff --git a/libs/core/organization-operating-model.ts b/libs/core/organization-operating-model.ts
+index 46aea5a1..16eac7c6 100644
+--- a/libs/core/organization-operating-model.ts
++++ b/libs/core/organization-operating-model.ts
+@@ -3246,11 +3246,36 @@ export function buildOrganizationManagementView(input: {
+     (entry) => entry.status !== 'resolved' && entry.status !== 'closed'
+   );
+   const activeOperations = operations.filter((entry) => entry.status === 'active').length;
+-  const interventionPoints: OrganizationManagementView['control_plane']['intervention_points'] = [];
++  type InterventionPoint =
++    OrganizationManagementView['control_plane']['intervention_points'][number];
++  const PRIORITY_RANK: Record<InterventionPoint['priority'], number> = {
++    low: 0,
++    medium: 1,
++    high: 2,
++  };
++  // One entity is one intervention point. Reconciliation reports a pending
++  // decision, and so does the decision record itself; pushed blindly, the same
++  // decision appeared twice with contradictory priorities, and the operator's
++  // list was half duplicates. Later, entity-derived entries carry the more
++  // specific reason ("Decision is proposed." beats "pending_decisions requires
++  // operator attention."), so they win the merge — but the priority is the
++  // highest either source claimed, so nothing is quietly downgraded.
++  const interventionByTarget = new Map<string, InterventionPoint>();
++  const addInterventionPoint = (point: InterventionPoint): void => {
++    const key = `${point.kind}:${point.id}`;
++    const existing = interventionByTarget.get(key);
++    interventionByTarget.set(key, {
++      ...point,
++      priority:
++        existing && PRIORITY_RANK[existing.priority] > PRIORITY_RANK[point.priority]
++          ? existing.priority
++          : point.priority,
++    });
++  };
+   for (const [key, values] of Object.entries(reconciliation)) {
+     if (key === 'status' || !Array.isArray(values)) continue;
+     for (const id of values) {
+-      interventionPoints.push({
++      addInterventionPoint({
+         kind: key.includes('decision')
+           ? 'decision'
+           : key.includes('operation')
+@@ -3270,7 +3295,7 @@ export function buildOrganizationManagementView(input: {
+     }
+   }
+   for (const incident of openIncidents) {
+-    interventionPoints.push({
++    addInterventionPoint({
+       kind: 'incident',
+       id: incident.incident_id,
+       priority:
+@@ -3281,13 +3306,19 @@ export function buildOrganizationManagementView(input: {
+   for (const decision of decisions.filter(
+     (entry) => entry.status === 'proposed' || entry.status === 'pending_approval'
+   )) {
+-    interventionPoints.push({
++    addInterventionPoint({
+       kind: 'decision',
+       id: decision.decision_id,
+       priority: 'high',
+       reason: `Decision is ${decision.status}.`,
+     });
+   }
++  // Consumers truncate this list (Chronos shows the first six), so order is
++  // part of the contract: most urgent first, insertion order preserved within
++  // a priority so the same input always yields the same list.
++  const interventionPoints = [...interventionByTarget.values()].sort(
++    (left, right) => PRIORITY_RANK[right.priority] - PRIORITY_RANK[left.priority]
++  );
+   const learningRefs = [
+     ...(operationalState?.recent_outcome_refs || []),
+     ...serviceStates.flatMap((entry) => entry.last_outcome_refs || []),
+diff --git a/libs/core/vocabulary-keys.generated.ts b/libs/core/vocabulary-keys.generated.ts
+index 203f1faa..108bc9e9 100644
+--- a/libs/core/vocabulary-keys.generated.ts
++++ b/libs/core/vocabulary-keys.generated.ts
+@@ -200,12 +200,14 @@ export type VocabularyKey =
+   | 'chronos:chronos_approval_strong_auth'
+   | 'chronos:chronos_approval_value_missing'
+   | 'chronos:chronos_approval_value_present'
++  | 'chronos:chronos_approvals'
+   | 'chronos:chronos_approvals_description'
+   | 'chronos:chronos_approvals_empty'
+   | 'chronos:chronos_approvals_title'
+   | 'chronos:chronos_approve'
+   | 'chronos:chronos_approve_candidate'
+   | 'chronos:chronos_approve_start'
++  | 'chronos:chronos_archive'
+   | 'chronos:chronos_attention_approval_next_step'
+   | 'chronos:chronos_attention_mission_next_step'
+   | 'chronos:chronos_attention_mission_reason'
+@@ -214,6 +216,7 @@ export type VocabularyKey =
+   | 'chronos:chronos_attention_surface_next_step'
+   | 'chronos:chronos_attention_surface_reason'
+   | 'chronos:chronos_audit_events_loaded'
++  | 'chronos:chronos_authority'
+   | 'chronos:chronos_background'
+   | 'chronos:chronos_bindings'
+   | 'chronos:chronos_build_test_completed'
+@@ -273,6 +276,7 @@ export type VocabularyKey =
+   | 'chronos:chronos_connection_check'
+   | 'chronos:chronos_connection_review'
+   | 'chronos:chronos_content_to_register'
++  | 'chronos:chronos_context'
+   | 'chronos:chronos_control_actions_disabled'
+   | 'chronos:chronos_control_actions_enabled'
+   | 'chronos:chronos_control_model'
+@@ -281,6 +285,7 @@ export type VocabularyKey =
+   | 'chronos:chronos_control_summary'
+   | 'chronos:chronos_correlation'
+   | 'chronos:chronos_critical'
++  | 'chronos:chronos_current_gate'
+   | 'chronos:chronos_current_state'
+   | 'chronos:chronos_custom'
+   | 'chronos:chronos_cycle_execute'
+@@ -307,6 +312,7 @@ export type VocabularyKey =
+   | 'chronos:chronos_deliverables_show_all'
+   | 'chronos:chronos_delivery'
+   | 'chronos:chronos_delivery_exceptions'
++  | 'chronos:chronos_delivery_exceptions_detail'
+   | 'chronos:chronos_delivery_needs_review'
+   | 'chronos:chronos_delivery_queue'
+   | 'chronos:chronos_detail'
+@@ -325,6 +331,8 @@ export type VocabularyKey =
+   | 'chronos:chronos_diagnostics_runtime_attention'
+   | 'chronos:chronos_diagnostics_surface_attention'
+   | 'chronos:chronos_diagnostics_tokens'
++  | 'chronos:chronos_distill_candidates'
++  | 'chronos:chronos_distill_candidates_description'
+   | 'chronos:chronos_dl_hide_cleaned'
+   | 'chronos:chronos_dl_none_live'
+   | 'chronos:chronos_dl_show_cleaned'
+@@ -344,8 +352,10 @@ export type VocabularyKey =
+   | 'chronos:chronos_flagged'
+   | 'chronos:chronos_focus_mission'
+   | 'chronos:chronos_focus_project'
++  | 'chronos:chronos_focus_track'
+   | 'chronos:chronos_focused'
+   | 'chronos:chronos_from_manifest'
++  | 'chronos:chronos_gate_readiness'
+   | 'chronos:chronos_governance_approvals_action'
+   | 'chronos:chronos_governance_approvals_description'
+   | 'chronos:chronos_governance_approvals_label'
+@@ -383,6 +393,7 @@ export type VocabularyKey =
+   | 'chronos:chronos_jump_to_section'
+   | 'chronos:chronos_jump_to_target'
+   | 'chronos:chronos_kickoff'
++  | 'chronos:chronos_kind'
+   | 'chronos:chronos_knowledge_description'
+   | 'chronos:chronos_knowledge_empty'
+   | 'chronos:chronos_knowledge_evidence_details'
+@@ -398,11 +409,14 @@ export type VocabularyKey =
+   | 'chronos:chronos_latest_deliverable'
+   | 'chronos:chronos_latest_intervention'
+   | 'chronos:chronos_latest_orchestration_transitions'
++  | 'chronos:chronos_learned'
++  | 'chronos:chronos_lineage_counts'
+   | 'chronos:chronos_live_agent_conversation'
+   | 'chronos:chronos_loading'
+   | 'chronos:chronos_localadmin_required'
+   | 'chronos:chronos_memory_no_action'
+   | 'chronos:chronos_memory_promotion'
++  | 'chronos:chronos_metadata'
+   | 'chronos:chronos_mh_all_statuses'
+   | 'chronos:chronos_mh_no_match'
+   | 'chronos:chronos_mission'
+@@ -441,6 +455,7 @@ export type VocabularyKey =
+   | 'chronos:chronos_needs_attention_detail'
+   | 'chronos:chronos_needs_attention_panel'
+   | 'chronos:chronos_next_action_prefix'
++  | 'chronos:chronos_next_required'
+   | 'chronos:chronos_next_tasks'
+   | 'chronos:chronos_next_work'
+   | 'chronos:chronos_no'
+@@ -449,6 +464,8 @@ export type VocabularyKey =
+   | 'chronos:chronos_no_artifact_yet'
+   | 'chronos:chronos_no_blocking_issue'
+   | 'chronos:chronos_no_budget_guard'
++  | 'chronos:chronos_no_detail'
++  | 'chronos:chronos_no_distill_candidates'
+   | 'chronos:chronos_no_evidence'
+   | 'chronos:chronos_no_immediate_intervention'
+   | 'chronos:chronos_no_immediate_next_actions'
+@@ -460,18 +477,24 @@ export type VocabularyKey =
+   | 'chronos:chronos_no_mission_thread_hint'
+   | 'chronos:chronos_no_operator_intervention'
+   | 'chronos:chronos_no_owner_summaries'
++  | 'chronos:chronos_no_pending_approvals'
+   | 'chronos:chronos_no_projects'
+   | 'chronos:chronos_no_recent_artifacts'
+   | 'chronos:chronos_no_recent_control_actions'
+   | 'chronos:chronos_no_recent_surface_outbox'
++  | 'chronos:chronos_no_summary'
+   | 'chronos:chronos_no_surface_actions'
++  | 'chronos:chronos_no_tracks'
+   | 'chronos:chronos_no_unified_mission_thread'
+   | 'chronos:chronos_none'
+   | 'chronos:chronos_not_required'
+   | 'chronos:chronos_not_reviewed'
+   | 'chronos:chronos_open_delivery'
+   | 'chronos:chronos_open_new_window'
++  | 'chronos:chronos_open_raw_skeleton'
+   | 'chronos:chronos_open_related_view'
++  | 'chronos:chronos_open_skeleton'
++  | 'chronos:chronos_open_template'
+   | 'chronos:chronos_open_work'
+   | 'chronos:chronos_operator_console'
+   | 'chronos:chronos_organization_scope_hint'
+@@ -486,11 +509,15 @@ export type VocabularyKey =
+   | 'chronos:chronos_os_no_observations'
+   | 'chronos:chronos_os_observations'
+   | 'chronos:chronos_os_reversible'
++  | 'chronos:chronos_outcome'
++  | 'chronos:chronos_overview'
+   | 'chronos:chronos_owner'
+   | 'chronos:chronos_owner_summaries'
+   | 'chronos:chronos_pending'
+   | 'chronos:chronos_persona_field'
+   | 'chronos:chronos_pipeline_completed'
++  | 'chronos:chronos_pipeline_role'
++  | 'chronos:chronos_pipelines'
+   | 'chronos:chronos_plan'
+   | 'chronos:chronos_plan_pending'
+   | 'chronos:chronos_plan_ready'
+@@ -501,12 +528,18 @@ export type VocabularyKey =
+   | 'chronos:chronos_preview_stale'
+   | 'chronos:chronos_previewing'
+   | 'chronos:chronos_previous_note'
++  | 'chronos:chronos_processing'
+   | 'chronos:chronos_project'
+   | 'chronos:chronos_project_bootstrap_notice'
++  | 'chronos:chronos_project_hierarchy'
++  | 'chronos:chronos_project_lineage'
+   | 'chronos:chronos_project_mission'
+   | 'chronos:chronos_projects'
+   | 'chronos:chronos_projects_description'
+   | 'chronos:chronos_promotable'
++  | 'chronos:chronos_promote'
++  | 'chronos:chronos_promote_to_mission'
++  | 'chronos:chronos_promoted'
+   | 'chronos:chronos_provider_inventory_loaded'
+   | 'chronos:chronos_qa_action_agents'
+   | 'chronos:chronos_qa_action_audit_log'
+@@ -556,6 +589,8 @@ export type VocabularyKey =
+   | 'chronos:chronos_request_source'
+   | 'chronos:chronos_requested_by'
+   | 'chronos:chronos_required'
++  | 'chronos:chronos_required_artifacts'
++  | 'chronos:chronos_resolution'
+   | 'chronos:chronos_restart_runtime'
+   | 'chronos:chronos_result'
+   | 'chronos:chronos_results'
+@@ -609,6 +644,7 @@ export type VocabularyKey =
+   | 'chronos:chronos_screen_roles_description'
+   | 'chronos:chronos_screen_roles_title'
+   | 'chronos:chronos_search'
++  | 'chronos:chronos_seed_next_work'
+   | 'chronos:chronos_select_agent_definition'
+   | 'chronos:chronos_select_approval'
+   | 'chronos:chronos_select_deliverable'
+@@ -616,14 +652,20 @@ export type VocabularyKey =
+   | 'chronos:chronos_select_mission_to_inspect_thread'
+   | 'chronos:chronos_selected_mission_label'
+   | 'chronos:chronos_selected_mission_thread'
++  | 'chronos:chronos_service'
+   | 'chronos:chronos_service_bindings'
+   | 'chronos:chronos_service_bindings_description'
+   | 'chronos:chronos_show_details'
+   | 'chronos:chronos_show_full_console'
+   | 'chronos:chronos_show_latest_action'
+   | 'chronos:chronos_show_mission_details'
++  | 'chronos:chronos_skeleton_detail'
++  | 'chronos:chronos_skeleton_detail_empty'
++  | 'chronos:chronos_source'
+   | 'chronos:chronos_source_next_step'
++  | 'chronos:chronos_specialist'
+   | 'chronos:chronos_starting'
++  | 'chronos:chronos_status'
+   | 'chronos:chronos_status_active'
+   | 'chronos:chronos_status_clear'
+   | 'chronos:chronos_status_completed'
+@@ -657,17 +699,24 @@ export type VocabularyKey =
+   | 'chronos:chronos_surface_unhealthy'
+   | 'chronos:chronos_surface_unknown'
+   | 'chronos:chronos_surfaces'
++  | 'chronos:chronos_task'
++  | 'chronos:chronos_task_sessions'
++  | 'chronos:chronos_tasks'
++  | 'chronos:chronos_team'
+   | 'chronos:chronos_tenant'
+   | 'chronos:chronos_tenant_data_level'
+   | 'chronos:chronos_theme_auto'
+   | 'chronos:chronos_theme_dark'
+   | 'chronos:chronos_theme_light'
+   | 'chronos:chronos_thread'
++  | 'chronos:chronos_tier'
+   | 'chronos:chronos_tier_confidential'
+   | 'chronos:chronos_tier_personal'
+   | 'chronos:chronos_tier_public'
+   | 'chronos:chronos_today'
+   | 'chronos:chronos_track'
++  | 'chronos:chronos_tracks'
++  | 'chronos:chronos_tracks_description'
+   | 'chronos:chronos_unknown'
+   | 'chronos:chronos_unknown_mission'
+   | 'chronos:chronos_unknown_runtime'
+@@ -849,12 +898,14 @@ export type VocabularyKey =
+   | 'chronos_approval_strong_auth'
+   | 'chronos_approval_value_missing'
+   | 'chronos_approval_value_present'
++  | 'chronos_approvals'
+   | 'chronos_approvals_description'
+   | 'chronos_approvals_empty'
+   | 'chronos_approvals_title'
+   | 'chronos_approve'
+   | 'chronos_approve_candidate'
+   | 'chronos_approve_start'
++  | 'chronos_archive'
+   | 'chronos_attention'
+   | 'chronos_attention_approval_next_step'
+   | 'chronos_attention_mission_next_step'
+@@ -864,6 +915,7 @@ export type VocabularyKey =
+   | 'chronos_attention_surface_next_step'
+   | 'chronos_attention_surface_reason'
+   | 'chronos_audit_events_loaded'
++  | 'chronos_authority'
+   | 'chronos_available_tenants'
+   | 'chronos_background'
+   | 'chronos_bindings'
+@@ -926,6 +978,7 @@ export type VocabularyKey =
+   | 'chronos_connection_check'
+   | 'chronos_connection_review'
+   | 'chronos_content_to_register'
++  | 'chronos_context'
+   | 'chronos_control_actions_disabled'
+   | 'chronos_control_actions_enabled'
+   | 'chronos_control_model'
+@@ -934,6 +987,7 @@ export type VocabularyKey =
+   | 'chronos_control_summary'
+   | 'chronos_correlation'
+   | 'chronos_critical'
++  | 'chronos_current_gate'
+   | 'chronos_current_state'
+   | 'chronos_custom'
+   | 'chronos_cycle_execute'
+@@ -960,6 +1014,7 @@ export type VocabularyKey =
+   | 'chronos_deliverables_show_all'
+   | 'chronos_delivery'
+   | 'chronos_delivery_exceptions'
++  | 'chronos_delivery_exceptions_detail'
+   | 'chronos_delivery_needs_review'
+   | 'chronos_delivery_queue'
+   | 'chronos_detail'
+@@ -978,6 +1033,8 @@ export type VocabularyKey =
+   | 'chronos_diagnostics_runtime_attention'
+   | 'chronos_diagnostics_surface_attention'
+   | 'chronos_diagnostics_tokens'
++  | 'chronos_distill_candidates'
++  | 'chronos_distill_candidates_description'
+   | 'chronos_dl_hide_cleaned'
+   | 'chronos_dl_none_live'
+   | 'chronos_dl_show_cleaned'
+@@ -997,8 +1054,10 @@ export type VocabularyKey =
+   | 'chronos_flagged'
+   | 'chronos_focus_mission'
+   | 'chronos_focus_project'
++  | 'chronos_focus_track'
+   | 'chronos_focused'
+   | 'chronos_from_manifest'
++  | 'chronos_gate_readiness'
+   | 'chronos_governance_approvals_action'
+   | 'chronos_governance_approvals_description'
+   | 'chronos_governance_approvals_label'
+@@ -1049,6 +1108,7 @@ export type VocabularyKey =
+   | 'chronos_jump_to_section'
+   | 'chronos_jump_to_target'
+   | 'chronos_kickoff'
++  | 'chronos_kind'
+   | 'chronos_knowledge_description'
+   | 'chronos_knowledge_empty'
+   | 'chronos_knowledge_evidence_details'
+@@ -1064,7 +1124,9 @@ export type VocabularyKey =
+   | 'chronos_latest_deliverable'
+   | 'chronos_latest_intervention'
+   | 'chronos_latest_orchestration_transitions'
++  | 'chronos_learned'
+   | 'chronos_lineage_complete'
++  | 'chronos_lineage_counts'
+   | 'chronos_lineage_description'
+   | 'chronos_lineage_incomplete'
+   | 'chronos_lineage_missing'
+@@ -1081,6 +1143,7 @@ export type VocabularyKey =
+   | 'chronos_localadmin_required'
+   | 'chronos_memory_no_action'
+   | 'chronos_memory_promotion'
++  | 'chronos_metadata'
+   | 'chronos_mh_all_statuses'
+   | 'chronos_mh_no_match'
+   | 'chronos_mission'
+@@ -1148,6 +1211,7 @@ export type VocabularyKey =
+   | 'chronos_needs_attention_detail'
+   | 'chronos_needs_attention_panel'
+   | 'chronos_next_action_prefix'
++  | 'chronos_next_required'
+   | 'chronos_next_tasks'
+   | 'chronos_next_work'
+   | 'chronos_no'
+@@ -1157,6 +1221,8 @@ export type VocabularyKey =
+   | 'chronos_no_artifact_yet'
+   | 'chronos_no_blocking_issue'
+   | 'chronos_no_budget_guard'
++  | 'chronos_no_detail'
++  | 'chronos_no_distill_candidates'
+   | 'chronos_no_evidence'
+   | 'chronos_no_immediate_intervention'
+   | 'chronos_no_immediate_next_actions'
+@@ -1168,11 +1234,14 @@ export type VocabularyKey =
+   | 'chronos_no_mission_thread_hint'
+   | 'chronos_no_operator_intervention'
+   | 'chronos_no_owner_summaries'
++  | 'chronos_no_pending_approvals'
+   | 'chronos_no_projects'
+   | 'chronos_no_recent_artifacts'
+   | 'chronos_no_recent_control_actions'
+   | 'chronos_no_recent_surface_outbox'
++  | 'chronos_no_summary'
+   | 'chronos_no_surface_actions'
++  | 'chronos_no_tracks'
+   | 'chronos_no_unified_mission_thread'
+   | 'chronos_none'
+   | 'chronos_not_required'
+@@ -1181,7 +1250,10 @@ export type VocabularyKey =
+   | 'chronos_office_description'
+   | 'chronos_open_delivery'
+   | 'chronos_open_new_window'
++  | 'chronos_open_raw_skeleton'
+   | 'chronos_open_related_view'
++  | 'chronos_open_skeleton'
++  | 'chronos_open_template'
+   | 'chronos_open_work'
+   | 'chronos_operations_details_hint'
+   | 'chronos_operations_details_title'
+@@ -1234,12 +1306,16 @@ export type VocabularyKey =
+   | 'chronos_os_no_observations'
+   | 'chronos_os_observations'
+   | 'chronos_os_reversible'
++  | 'chronos_outcome'
++  | 'chronos_overview'
+   | 'chronos_owner'
+   | 'chronos_owner_summaries'
+   | 'chronos_pending'
+   | 'chronos_persona_field'
+   | 'chronos_phase'
+   | 'chronos_pipeline_completed'
++  | 'chronos_pipeline_role'
++  | 'chronos_pipelines'
+   | 'chronos_plan'
+   | 'chronos_plan_pending'
+   | 'chronos_plan_ready'
+@@ -1250,12 +1326,18 @@ export type VocabularyKey =
+   | 'chronos_preview_stale'
+   | 'chronos_previewing'
+   | 'chronos_previous_note'
++  | 'chronos_processing'
+   | 'chronos_project'
+   | 'chronos_project_bootstrap_notice'
++  | 'chronos_project_hierarchy'
++  | 'chronos_project_lineage'
+   | 'chronos_project_mission'
+   | 'chronos_projects'
+   | 'chronos_projects_description'
+   | 'chronos_promotable'
++  | 'chronos_promote'
++  | 'chronos_promote_to_mission'
++  | 'chronos_promoted'
+   | 'chronos_provider_inventory_loaded'
+   | 'chronos_qa_action_agents'
+   | 'chronos_qa_action_audit_log'
+@@ -1305,6 +1387,8 @@ export type VocabularyKey =
+   | 'chronos_request_source'
+   | 'chronos_requested_by'
+   | 'chronos_required'
++  | 'chronos_required_artifacts'
++  | 'chronos_resolution'
+   | 'chronos_restart_runtime'
+   | 'chronos_result'
+   | 'chronos_results'
+@@ -1360,6 +1444,7 @@ export type VocabularyKey =
+   | 'chronos_screen_roles_description'
+   | 'chronos_screen_roles_title'
+   | 'chronos_search'
++  | 'chronos_seed_next_work'
+   | 'chronos_select_agent_definition'
+   | 'chronos_select_approval'
+   | 'chronos_select_deliverable'
+@@ -1367,14 +1452,20 @@ export type VocabularyKey =
+   | 'chronos_select_mission_to_inspect_thread'
+   | 'chronos_selected_mission_label'
+   | 'chronos_selected_mission_thread'
++  | 'chronos_service'
+   | 'chronos_service_bindings'
+   | 'chronos_service_bindings_description'
+   | 'chronos_show_details'
+   | 'chronos_show_full_console'
+   | 'chronos_show_latest_action'
+   | 'chronos_show_mission_details'
++  | 'chronos_skeleton_detail'
++  | 'chronos_skeleton_detail_empty'
++  | 'chronos_source'
+   | 'chronos_source_next_step'
++  | 'chronos_specialist'
+   | 'chronos_starting'
++  | 'chronos_status'
+   | 'chronos_status_active'
+   | 'chronos_status_archived'
+   | 'chronos_status_backlog'
+@@ -1430,6 +1521,10 @@ export type VocabularyKey =
+   | 'chronos_surface_unknown'
+   | 'chronos_surface_visible_count'
+   | 'chronos_surfaces'
++  | 'chronos_task'
++  | 'chronos_task_sessions'
++  | 'chronos_tasks'
++  | 'chronos_team'
+   | 'chronos_tenant'
+   | 'chronos_tenant_data_level'
+   | 'chronos_tenant_scope_unavailable'
+@@ -1447,12 +1542,15 @@ export type VocabularyKey =
+   | 'chronos_theme_dark'
+   | 'chronos_theme_light'
+   | 'chronos_thread'
++  | 'chronos_tier'
+   | 'chronos_tier_confidential'
+   | 'chronos_tier_personal'
+   | 'chronos_tier_public'
+   | 'chronos_today'
+   | 'chronos_track'
+   | 'chronos_track_record'
++  | 'chronos_tracks'
++  | 'chronos_tracks_description'
+   | 'chronos_unknown'
+   | 'chronos_unknown_mission'
+   | 'chronos_unknown_runtime'
+diff --git a/presence/displays/chronos-mirror-v2/src/app/api/organization-operating-model/route.test.ts b/presence/displays/chronos-mirror-v2/src/app/api/organization-operating-model/route.test.ts
+index 2481f73c..8a77f450 100644
+--- a/presence/displays/chronos-mirror-v2/src/app/api/organization-operating-model/route.test.ts
++++ b/presence/displays/chronos-mirror-v2/src/app/api/organization-operating-model/route.test.ts
+@@ -4,11 +4,12 @@ import { NextRequest } from 'next/server';
+ const mocks = vi.hoisted(() => ({
+   buildOrganizationManagementView: vi.fn(),
+   withExecutionContext: vi.fn((_role: string, operation: () => unknown) => operation()),
++  listTenantProfileSlugs: vi.fn(),
+   resolveCompany: vi.fn(),
+   guardRequest: vi.fn(() => null),
+   requireChronosAccess: vi.fn(() => null),
+   resolveViewerContextForRequest: vi.fn(),
+-  viewerScopeTenantSlugs: vi.fn(),
++  strictViewerScopeTenantSlugs: vi.fn(),
+   withViewerExecutionContext: vi.fn((_viewer: unknown, operation: () => unknown) => operation()),
+   viewerErrorResponse: vi.fn((error: Error) => new Response(error.message, { status: 403 })),
+ }));
+@@ -16,6 +17,7 @@ const mocks = vi.hoisted(() => ({
+ vi.mock('@agent/core', () => ({
+   buildOrganizationManagementView: mocks.buildOrganizationManagementView,
+   withExecutionContext: mocks.withExecutionContext,
++  listTenantProfileSlugs: mocks.listTenantProfileSlugs,
+ }));
+ 
+ vi.mock('@agent/core/company', () => ({
+@@ -29,7 +31,7 @@ vi.mock('../../../lib/api-guard', () => ({
+ 
+ vi.mock('../../../lib/viewer-context', () => ({
+   resolveViewerContextForRequest: mocks.resolveViewerContextForRequest,
+-  viewerScopeTenantSlugs: mocks.viewerScopeTenantSlugs,
++  strictViewerScopeTenantSlugs: mocks.strictViewerScopeTenantSlugs,
+   withViewerExecutionContext: mocks.withViewerExecutionContext,
+   viewerErrorResponse: mocks.viewerErrorResponse,
+   ViewerContextError: class ViewerContextError extends Error {},
+@@ -41,11 +43,12 @@ describe('organization-operating-model route', () => {
+   beforeEach(() => {
+     mocks.buildOrganizationManagementView.mockReset();
+     mocks.withExecutionContext.mockClear();
++    mocks.listTenantProfileSlugs.mockReset();
+     mocks.resolveCompany.mockReset();
+     mocks.guardRequest.mockReset();
+     mocks.requireChronosAccess.mockReset();
+     mocks.resolveViewerContextForRequest.mockReset();
+-    mocks.viewerScopeTenantSlugs.mockReset();
++    mocks.strictViewerScopeTenantSlugs.mockReset();
+     mocks.withViewerExecutionContext.mockReset();
+     mocks.viewerErrorResponse.mockReset();
+     mocks.guardRequest.mockReturnValue(null);
+@@ -53,7 +56,8 @@ describe('organization-operating-model route', () => {
+     mocks.resolveViewerContextForRequest.mockReturnValue({
+       context: { role: 'localadmin', tenantSlugs: 'all', source: 'loopback' },
+     });
+-    mocks.viewerScopeTenantSlugs.mockReturnValue(['acme']);
++    mocks.strictViewerScopeTenantSlugs.mockReturnValue(['acme']);
++    mocks.listTenantProfileSlugs.mockReturnValue(['acme']);
+     mocks.withViewerExecutionContext.mockImplementation(
+       (_viewer: unknown, operation: () => unknown) => operation()
+     );
+@@ -80,9 +84,9 @@ describe('organization-operating-model route', () => {
+     expect(response.status).toBe(200);
+     expect(mocks.requireChronosAccess).toHaveBeenCalledWith(expect.anything(), 'readonly');
+     expect(mocks.resolveViewerContextForRequest).toHaveBeenCalled();
+-    expect(mocks.viewerScopeTenantSlugs).toHaveBeenCalledWith(
++    expect(mocks.strictViewerScopeTenantSlugs).toHaveBeenCalledWith(
+       { role: 'localadmin', tenantSlugs: 'all', source: 'loopback' },
+-      'acme'
++      undefined
+     );
+     expect(mocks.withViewerExecutionContext).toHaveBeenCalledWith(
+       { role: 'localadmin', tenantSlugs: 'all', source: 'loopback' },
+@@ -93,12 +97,66 @@ describe('organization-operating-model route', () => {
+       tier: 'confidential',
+       tenantSlug: 'acme',
+     });
++    expect(mocks.resolveCompany).toHaveBeenCalledWith('acme');
+     expect(await response.json()).toMatchObject({
+       view: { organization_id: 'acme' },
+       tenant: { tenant_slug: 'acme' },
+     });
+   });
+ 
++  it('reads the tenant registry inside the viewer execution context', async () => {
++    // Tenant profiles live in the personal tier: listing them outside the
++    // viewer context runs as the host process and the tier guard refuses it.
++    const contexts: string[] = [];
++    mocks.withViewerExecutionContext.mockImplementation(
++      (_viewer: unknown, operation: () => unknown) => {
++        contexts.push('enter');
++        try {
++          return operation();
++        } finally {
++          contexts.push('exit');
++        }
++      }
++    );
++    mocks.listTenantProfileSlugs.mockImplementation(() => {
++      expect(contexts.at(-1)).toBe('enter');
++      return ['acme'];
++    });
++
++    const response = await GET(
++      new NextRequest('http://localhost/api/organization-operating-model')
++    );
++
++    expect(response.status).toBe(200);
++    expect(mocks.listTenantProfileSlugs).toHaveBeenCalled();
++  });
++
++  it('does not touch the personal-tier registry for an all-tenant viewer', async () => {
++    // Nothing to validate when no tenant is named, and the registry read would
++    // deny the projection to every viewer without personal-tier access.
++    mocks.strictViewerScopeTenantSlugs.mockReturnValue('all');
++
++    const response = await GET(
++      new NextRequest('http://localhost/api/organization-operating-model')
++    );
++
++    expect(response.status).toBe(200);
++    expect(mocks.listTenantProfileSlugs).not.toHaveBeenCalled();
++    expect(mocks.resolveCompany).toHaveBeenCalledWith(undefined);
++  });
++
++  it('refuses a tenant that is not in the registry', async () => {
++    mocks.listTenantProfileSlugs.mockReturnValue(['acme']);
++    mocks.strictViewerScopeTenantSlugs.mockReturnValue(['ghost']);
++
++    const response = await GET(
++      new NextRequest('http://localhost/api/organization-operating-model?tenant=ghost')
++    );
++
++    expect(response.status).toBe(403);
++    expect(mocks.buildOrganizationManagementView).not.toHaveBeenCalled();
++  });
++
+   it('does not expose the projection when localadmin access is denied', async () => {
+     mocks.requireChronosAccess.mockReturnValue(new Response('forbidden', { status: 403 }));
+ 
+diff --git a/presence/displays/chronos-mirror-v2/src/app/api/organization-operating-model/route.ts b/presence/displays/chronos-mirror-v2/src/app/api/organization-operating-model/route.ts
+index bf95ac13..582548a5 100644
+--- a/presence/displays/chronos-mirror-v2/src/app/api/organization-operating-model/route.ts
++++ b/presence/displays/chronos-mirror-v2/src/app/api/organization-operating-model/route.ts
+@@ -33,9 +33,15 @@ export async function GET(req: NextRequest) {
+     const selectedTenant =
+       requestedTenant ||
+       (tenantSlugs !== 'all' && tenantSlugs.length === 1 ? tenantSlugs[0] : undefined);
+-    const registeredTenants = withViewerExecutionContext(viewer, () => listTenantProfileSlugs());
+-    if (selectedTenant && !registeredTenants.includes(selectedTenant)) {
+-      throw new ViewerContextError(403, `tenant is not registered: ${selectedTenant}`);
++    // Only a selected tenant needs the registry, and the registry is personal
++    // tier: listing it unconditionally denied the whole projection to every
++    // viewer without personal-tier access, including the all-tenant operator
++    // view that names no tenant at all.
++    if (selectedTenant) {
++      const registeredTenants = withViewerExecutionContext(viewer, () => listTenantProfileSlugs());
++      if (!registeredTenants.includes(selectedTenant)) {
++        throw new ViewerContextError(403, `tenant is not registered: ${selectedTenant}`);
++      }
+     }
+     const company = resolveCompany(selectedTenant);
+     const view = withViewerExecutionContext(viewer, () =>
+diff --git a/presence/displays/chronos-mirror-v2/src/app/api/tenant-scope/route.test.ts b/presence/displays/chronos-mirror-v2/src/app/api/tenant-scope/route.test.ts
+new file mode 100644
+index 00000000..c8db8c95
+--- /dev/null
++++ b/presence/displays/chronos-mirror-v2/src/app/api/tenant-scope/route.test.ts
+@@ -0,0 +1,131 @@
++import { beforeEach, describe, expect, it, vi } from 'vitest';
++import { NextRequest } from 'next/server';
++
++const mocks = vi.hoisted(() => ({
++  listTenantProfileSlugs: vi.fn(),
++  readTenantProfile: vi.fn(),
++  guardRequest: vi.fn(() => null),
++  requireChronosAccess: vi.fn(() => null),
++  resolveViewerContextForRequest: vi.fn(),
++  strictViewerScopeTenantSlugs: vi.fn(),
++  withViewerExecutionContext: vi.fn((_viewer: unknown, operation: () => unknown) => operation()),
++}));
++
++vi.mock('@agent/core', () => ({
++  listTenantProfileSlugs: mocks.listTenantProfileSlugs,
++  readTenantProfile: mocks.readTenantProfile,
++}));
++
++vi.mock('../../../lib/api-guard', () => ({
++  guardRequest: mocks.guardRequest,
++  requireChronosAccess: mocks.requireChronosAccess,
++}));
++
++vi.mock('../../../lib/viewer-context', () => ({
++  resolveViewerContextForRequest: mocks.resolveViewerContextForRequest,
++  strictViewerScopeTenantSlugs: mocks.strictViewerScopeTenantSlugs,
++  withViewerExecutionContext: mocks.withViewerExecutionContext,
++}));
++
++import { GET } from './route.js';
++
++const VIEWER = { role: 'localadmin', tenantSlugs: 'all', source: 'loopback' };
++
++const PROFILES: Record<string, { display_name: string; status: string }> = {
++  acme: { display_name: 'Acme', status: 'active' },
++  globex: { display_name: 'Globex', status: 'active' },
++};
++
++describe('tenant-scope route', () => {
++  beforeEach(() => {
++    for (const mock of Object.values(mocks)) mock.mockReset();
++    mocks.guardRequest.mockReturnValue(null);
++    mocks.requireChronosAccess.mockReturnValue(null);
++    mocks.resolveViewerContextForRequest.mockReturnValue({ context: VIEWER });
++    mocks.strictViewerScopeTenantSlugs.mockReturnValue('all');
++    mocks.listTenantProfileSlugs.mockReturnValue(['acme', 'globex']);
++    mocks.readTenantProfile.mockImplementation((slug: string) => PROFILES[slug] ?? null);
++    mocks.withViewerExecutionContext.mockImplementation(
++      (_viewer: unknown, operation: () => unknown) => operation()
++    );
++  });
++
++  it('returns the registered tenants visible to the viewer', async () => {
++    const response = await GET(new NextRequest('http://localhost/api/tenant-scope'));
++
++    expect(response.status).toBe(200);
++    expect(await response.json()).toEqual({
++      ok: true,
++      tenants: [
++        { slug: 'acme', displayName: 'Acme', status: 'active' },
++        { slug: 'globex', displayName: 'Globex', status: 'active' },
++      ],
++      selected: null,
++      source: 'loopback',
++    });
++  });
++
++  it('reads every tenant profile inside the viewer execution context', () => {
++    // Profiles live in the personal tier. A read that escapes the viewer
++    // context runs as the host process — under `pnpm surfaces:start` that is
++    // surface_runtime, which the tier guard refuses, turning the whole surface
++    // into a 403 even for a fully authorized local operator.
++    let depth = 0;
++    const depthsAtRead: number[] = [];
++    mocks.withViewerExecutionContext.mockImplementation(
++      (_viewer: unknown, operation: () => unknown) => {
++        depth += 1;
++        try {
++          return operation();
++        } finally {
++          depth -= 1;
++        }
++      }
++    );
++    mocks.readTenantProfile.mockImplementation((slug: string) => {
++      depthsAtRead.push(depth);
++      return PROFILES[slug] ?? null;
++    });
++    mocks.listTenantProfileSlugs.mockImplementation(() => {
++      depthsAtRead.push(depth);
++      return ['acme', 'globex'];
++    });
++
++    GET(new NextRequest('http://localhost/api/tenant-scope'));
++
++    expect(depthsAtRead).toHaveLength(3);
++    expect(depthsAtRead.every((entry) => entry > 0)).toBe(true);
++  });
++
++  it('narrows the listing to a scoped viewer and selects its sole tenant', async () => {
++    mocks.strictViewerScopeTenantSlugs.mockReturnValue(['globex']);
++
++    const response = await GET(new NextRequest('http://localhost/api/tenant-scope'));
++
++    expect(await response.json()).toMatchObject({
++      tenants: [{ slug: 'globex' }],
++      selected: 'globex',
++    });
++  });
++
++  it('drops a scoped tenant that has no registered profile', async () => {
++    mocks.strictViewerScopeTenantSlugs.mockReturnValue(['ghost']);
++
++    const response = await GET(new NextRequest('http://localhost/api/tenant-scope'));
++
++    expect(await response.json()).toMatchObject({ tenants: [], selected: null });
++    expect(mocks.readTenantProfile).not.toHaveBeenCalled();
++  });
++
++  it('refuses a tenant outside the viewer grant', async () => {
++    mocks.strictViewerScopeTenantSlugs.mockImplementation(() => {
++      throw new Error('viewer tenant scope denied: globex');
++    });
++
++    const response = await GET(new NextRequest('http://localhost/api/tenant-scope?tenant=globex'));
++
++    expect(response.status).toBe(403);
++    expect(await response.json()).toMatchObject({ ok: false });
++    expect(mocks.listTenantProfileSlugs).not.toHaveBeenCalled();
++  });
++});
+diff --git a/presence/displays/chronos-mirror-v2/src/app/api/tenant-scope/route.ts b/presence/displays/chronos-mirror-v2/src/app/api/tenant-scope/route.ts
+index 36946fe7..ba50dbd0 100644
+--- a/presence/displays/chronos-mirror-v2/src/app/api/tenant-scope/route.ts
++++ b/presence/displays/chronos-mirror-v2/src/app/api/tenant-scope/route.ts
+@@ -17,19 +17,24 @@ export function GET(req: NextRequest) {
+   try {
+     const requested = req.nextUrl.searchParams.get('tenant') || undefined;
+     const tenants = strictViewerScopeTenantSlugs(resolvedViewer.context, requested);
+-    const visibleSlugs = withViewerExecutionContext(resolvedViewer.context, () =>
+-      tenants === 'all'
+-        ? listTenantProfileSlugs()
+-        : tenants.filter((slug) => listTenantProfileSlugs().includes(slug))
+-    );
+-    const options = visibleSlugs
+-      .map((slug) => {
+-        const profile = readTenantProfile(slug);
+-        return profile ? { slug, displayName: profile.display_name, status: profile.status } : null;
+-      })
+-      .filter((option): option is { slug: string; displayName: string; status: string } =>
+-        Boolean(option)
+-      );
++    // Profiles live in the personal tier, so the profile reads must stay inside
++    // the viewer execution context alongside the listing — outside it they run
++    // as the host process and are refused by the tier guard.
++    const options = withViewerExecutionContext(resolvedViewer.context, () => {
++      const registered = listTenantProfileSlugs();
++      const visibleSlugs =
++        tenants === 'all' ? registered : tenants.filter((slug) => registered.includes(slug));
++      return visibleSlugs
++        .map((slug) => {
++          const profile = readTenantProfile(slug);
++          return profile
++            ? { slug, displayName: profile.display_name, status: profile.status }
++            : null;
++        })
++        .filter((option): option is { slug: string; displayName: string; status: string } =>
++          Boolean(option)
++        );
++    });
+     return NextResponse.json({
+       ok: true,
+       tenants: options,
+diff --git a/presence/displays/chronos-mirror-v2/src/app/api/workitems/route.test.ts b/presence/displays/chronos-mirror-v2/src/app/api/workitems/route.test.ts
+index ebc7a260..8002a609 100644
+--- a/presence/displays/chronos-mirror-v2/src/app/api/workitems/route.test.ts
++++ b/presence/displays/chronos-mirror-v2/src/app/api/workitems/route.test.ts
+@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({
+   guardRequest: vi.fn(() => null),
+   requireChronosAccess: vi.fn(() => null),
+   resolveViewerContextForRequest: vi.fn(),
+-  viewerScopeTenantSlugs: vi.fn(),
++  strictViewerScopeTenantSlugs: vi.fn(),
+   viewerErrorResponse: vi.fn(),
+   withViewerExecutionContext: vi.fn((_viewer: unknown, fn: () => unknown) => fn()),
+ }));
+@@ -29,7 +29,7 @@ vi.mock('../../../lib/api-guard', () => ({
+ 
+ vi.mock('../../../lib/viewer-context', () => ({
+   resolveViewerContextForRequest: mocks.resolveViewerContextForRequest,
+-  viewerScopeTenantSlugs: mocks.viewerScopeTenantSlugs,
++  strictViewerScopeTenantSlugs: mocks.strictViewerScopeTenantSlugs,
+   viewerErrorResponse: mocks.viewerErrorResponse,
+   withViewerExecutionContext: mocks.withViewerExecutionContext,
+ }));
+@@ -43,7 +43,7 @@ describe('workitems route', () => {
+     mocks.guardRequest.mockReset();
+     mocks.requireChronosAccess.mockReset();
+     mocks.resolveViewerContextForRequest.mockReset();
+-    mocks.viewerScopeTenantSlugs.mockReset();
++    mocks.strictViewerScopeTenantSlugs.mockReset();
+     mocks.viewerErrorResponse.mockReset();
+     mocks.withViewerExecutionContext.mockReset();
+     mocks.withViewerExecutionContext.mockImplementation((_viewer: unknown, fn: () => unknown) =>
+@@ -54,7 +54,7 @@ describe('workitems route', () => {
+     mocks.resolveViewerContextForRequest.mockReturnValue({
+       context: { role: 'localadmin', tenantSlugs: 'all', source: 'loopback' },
+     });
+-    mocks.viewerScopeTenantSlugs.mockImplementation(
++    mocks.strictViewerScopeTenantSlugs.mockImplementation(
+       (_viewer: unknown, tenant: string | undefined) => (tenant ? [tenant] : 'all')
+     );
+     mocks.listWorkItems.mockReturnValue([{ item_id: 'WI-1' }]);
+diff --git a/presence/displays/chronos-mirror-v2/src/app/page.tsx b/presence/displays/chronos-mirror-v2/src/app/page.tsx
+index 538978de..69580242 100644
+--- a/presence/displays/chronos-mirror-v2/src/app/page.tsx
++++ b/presence/displays/chronos-mirror-v2/src/app/page.tsx
+@@ -98,6 +98,12 @@ type StatusCard = {
+   targetId: string;
+ };
+ 
++/** The two fields the planned-mission chips on the operator home actually read. */
++type PlannedMissionChip = {
++  missionId: string;
++  projectId?: string;
++};
++
+ type ConsoleSectionId =
+   | 'home'
+   | 'organization'
+@@ -1666,18 +1672,20 @@ function ChronosMirrorV2Content() {
+                       {uxText('chronos_home_planned_title', locale)}
+                     </div>
+                     <div className="mt-2 flex flex-wrap gap-2">
+-                      {operatorHomeSummary.plannedMissions.slice(0, 4).map((mission: any) => (
+-                        <button
+-                          key={mission.missionId}
+-                          type="button"
+-                          onClick={() =>
+-                            handleOperatorViewOpen('mission-control-plane', mission.missionId)
+-                          }
+-                          className="rounded-full border kb-border-subtle px-3 py-1 text-[10px] font-mono kb-text-secondary hover:kb-border-accent hover:kb-text-accent"
+-                        >
+-                          {mission.missionId} · {mission.projectId || 'project pending'}
+-                        </button>
+-                      ))}
++                      {operatorHomeSummary.plannedMissions
++                        .slice(0, 4)
++                        .map((mission: PlannedMissionChip) => (
++                          <button
++                            key={mission.missionId}
++                            type="button"
++                            onClick={() =>
++                              handleOperatorViewOpen('mission-control-plane', mission.missionId)
++                            }
++                            className="rounded-full border kb-border-subtle px-3 py-1 text-[10px] font-mono kb-text-secondary hover:kb-border-accent hover:kb-text-accent"
++                          >
++                            {mission.missionId} · {mission.projectId || 'project pending'}
++                          </button>
++                        ))}
+                     </div>
+                   </div>
+                 ) : null}
+diff --git a/presence/displays/chronos-mirror-v2/src/components/ChronosTenantScope.tsx b/presence/displays/chronos-mirror-v2/src/components/ChronosTenantScope.tsx
+index d6aa5e1c..fc322daa 100644
+--- a/presence/displays/chronos-mirror-v2/src/components/ChronosTenantScope.tsx
++++ b/presence/displays/chronos-mirror-v2/src/components/ChronosTenantScope.tsx
+@@ -10,14 +10,35 @@ export function useChronosTenant(): string {
+   return useSearchParams().get('tenant') || '';
+ }
+ 
++interface TenantOption {
++  slug: string;
++  displayName: string;
++  status?: string;
++}
++
++/**
++ * Narrows one entry of the /api/tenant-scope payload. The route returns
++ * objects, but the older shape was a bare slug string, so both are accepted;
++ * anything else is dropped rather than rendered as a blank option.
++ */
++function toTenantOption(value: unknown): TenantOption | null {
++  if (typeof value === 'string') return { slug: value, displayName: value };
++  if (!value || typeof value !== 'object') return null;
++  const entry = value as Record<string, unknown>;
++  if (typeof entry.slug !== 'string') return null;
++  return {
++    slug: entry.slug,
++    displayName: typeof entry.displayName === 'string' ? entry.displayName : entry.slug,
++    ...(typeof entry.status === 'string' ? { status: entry.status } : {}),
++  };
++}
++
+ export function ChronosTenantScope({ compact = false }: { compact?: boolean }) {
+   const locale = useChronosLocale();
+   const router = useRouter();
+   const pathname = usePathname();
+   const searchParams = useSearchParams();
+-  const [tenants, setTenants] = React.useState<
+-    Array<{ slug: string; displayName: string; status?: string }>
+-  >([]);
++  const [tenants, setTenants] = React.useState<TenantOption[]>([]);
+   const [loadError, setLoadError] = React.useState<string | null>(null);
+   const selected = searchParams.get('tenant') || '';
+ 
+@@ -25,28 +46,17 @@ export function ChronosTenantScope({ compact = false }: { compact?: boolean }) {
+     let cancelled = false;
+     void fetch('/api/tenant-scope', { cache: 'no-store' })
+       .then((response) => response.json())
+-      .then((payload) => {
+-        if (!cancelled && Array.isArray(payload.tenants)) {
+-          setTenants(
+-            payload.tenants
+-              .map((tenant: unknown) =>
+-                typeof tenant === 'string'
+-                  ? { slug: tenant, displayName: tenant }
+-                  : tenant && typeof tenant === 'object' && typeof (tenant as any).slug === 'string'
+-                    ? {
+-                        slug: (tenant as any).slug,
+-                        displayName:
+-                          typeof (tenant as any).displayName === 'string'
+-                            ? (tenant as any).displayName
+-                            : (tenant as any).slug,
+-                        status: (tenant as any).status,
+-                      }
+-                    : null
+-              )
+-              .filter(Boolean)
+-          );
+-          setLoadError(null);
+-        }
++      .then((payload: unknown) => {
++        if (cancelled) return;
++        const entries =
++          payload && typeof payload === 'object'
++            ? (payload as { tenants?: unknown }).tenants
++            : undefined;
++        if (!Array.isArray(entries)) return;
++        setTenants(
++          entries.map(toTenantOption).filter((tenant): tenant is TenantOption => tenant !== null)
++        );
++        setLoadError(null);
+       })
+       .catch(() => {
+         if (!cancelled) setLoadError(uxText('chronos_tenant_scope_unavailable', locale));
+diff --git a/scripts/check_type_ratchet.baseline.json b/scripts/check_type_ratchet.baseline.json
+index f97cd5b0..84b078ae 100644
+--- a/scripts/check_type_ratchet.baseline.json
++++ b/scripts/check_type_ratchet.baseline.json
+@@ -1,18 +1,18 @@
+ {
+   "version": 1,
+-  "generated_at": "2026-08-12T14:24:13.073Z",
++  "generated_at": "2026-08-14T06:20:17.000Z",
+   "counts": {
+     "src": {
+       "any_keywords": 3349,
+       "as_any": 712,
+       "ts_ignore": 1,
+-      "files": 1538
++      "files": 1547
+     },
+     "test": {
+-      "any_keywords": 1542,
+-      "as_any": 1008,
++      "any_keywords": 1541,
++      "as_any": 1007,
+       "ts_ignore": 2,
+-      "files": 1116
++      "files": 1117
+     }
+   }
+ }
+diff --git a/tests/best-of-n-judge.test.ts b/tests/best-of-n-judge.test.ts
+index fd891b8b..743937c8 100644
+--- a/tests/best-of-n-judge.test.ts
++++ b/tests/best-of-n-judge.test.ts
+@@ -79,6 +79,12 @@ async function seedMission(risk: string): Promise<void> {
+   );
+ }
+ 
++// Two candidate runs plus a judge pass, each seeding and reading a real mission
++// on disk — measured ~23s locally under a parallel suite run, against the 10s
++// default. Declared per test so the cost stays visible where it is paid rather
++// than by loosening the global bound (see vitest.config.mts).
++const BEST_OF_N_TIMEOUT_MS = 60_000;
++
+ describe.sequential('best-of-2 + judge (E2E-03 Task 5)', () => {
+   beforeEach(async () => {
+     vi.resetModules();
+@@ -118,57 +124,61 @@ describe.sequential('best-of-2 + judge (E2E-03 Task 5)', () => {
+     delete process.env.KYBERION_DRAFT_REFINE;
+   });
+ 
+-  it('runs two candidates + judge for high-risk tasks and adopts the winner', async () => {
+-    await seedMission('high');
+-    mocks.route.mockImplementation(async (envelope: any) => {
+-      const prompt = String(envelope?.payload?.text || '');
+-      if (prompt.includes('independent judge')) {
+-        return {
+-          payload: {
+-            text: JSON.stringify({
+-              winner: 'B',
+-              rationale: 'B handles edge cases',
+-              merge_hints: ['keep A error message wording'],
+-            }),
+-          },
+-        };
+-      }
+-      if (prompt.includes('best-of-N candidate A')) {
+-        return { payload: { text: makeTaskResultText('Candidate A minimal implementation.') } };
+-      }
+-      if (prompt.includes('best-of-N candidate B')) {
+-        return { payload: { text: makeTaskResultText('Candidate B robust implementation.') } };
+-      }
+-      return { payload: { text: makeTaskResultText('unexpected single-shot call') } };
+-    });
+-
+-    const { dispatchMissionNextTasks } =
+-      await import('../libs/core/mission-orchestration-worker.js');
+-    const { missionDir } = await import('../libs/core/path-resolver.js');
+-    const { safeReadFile, safeExistsSync } = await import('../libs/core/secure-io.js');
+-
+-    await dispatchMissionNextTasks(MISSION);
+-
+-    expect(mocks.route).toHaveBeenCalledTimes(3);
+-    const stored = JSON.parse(
+-      safeReadFile(`${missionDir(MISSION, 'public')}/NEXT_TASKS.json`, {
+-        encoding: 'utf8',
+-      }) as string
+-    );
+-    expect(stored[0].last_result.summary).toContain('Candidate B robust implementation.');
+-
+-    const loserPath = `${missionDir(MISSION, 'public')}/evidence/alternatives/task-1-candidate-A.json`;
+-    expect(safeExistsSync(loserPath)).toBe(true);
+-    const loser = JSON.parse(safeReadFile(loserPath, { encoding: 'utf8' }) as string);
+-    expect(loser.winner).toBe('B');
+-    expect(loser.task_result.summary).toContain('Candidate A minimal implementation.');
+-
+-    const judgeEvents = mocks.emitMissionTaskEvent.mock.calls
+-      .map((call) => call[0])
+-      .filter((event: any) => event.decision === 'best_of_judged');
+-    expect(judgeEvents).toHaveLength(1);
+-    expect(judgeEvents[0].payload.winner).toBe('B');
+-  });
++  it(
++    'runs two candidates + judge for high-risk tasks and adopts the winner',
++    async () => {
++      await seedMission('high');
++      mocks.route.mockImplementation(async (envelope: any) => {
++        const prompt = String(envelope?.payload?.text || '');
++        if (prompt.includes('independent judge')) {
++          return {
++            payload: {
++              text: JSON.stringify({
++                winner: 'B',
++                rationale: 'B handles edge cases',
++                merge_hints: ['keep A error message wording'],
++              }),
++            },
++          };
++        }
++        if (prompt.includes('best-of-N candidate A')) {
++          return { payload: { text: makeTaskResultText('Candidate A minimal implementation.') } };
++        }
++        if (prompt.includes('best-of-N candidate B')) {
++          return { payload: { text: makeTaskResultText('Candidate B robust implementation.') } };
++        }
++        return { payload: { text: makeTaskResultText('unexpected single-shot call') } };
++      });
++
++      const { dispatchMissionNextTasks } =
++        await import('../libs/core/mission-orchestration-worker.js');
++      const { missionDir } = await import('../libs/core/path-resolver.js');
++      const { safeReadFile, safeExistsSync } = await import('../libs/core/secure-io.js');
++
++      await dispatchMissionNextTasks(MISSION);
++
++      expect(mocks.route).toHaveBeenCalledTimes(3);
++      const stored = JSON.parse(
++        safeReadFile(`${missionDir(MISSION, 'public')}/NEXT_TASKS.json`, {
++          encoding: 'utf8',
++        }) as string
++      );
++      expect(stored[0].last_result.summary).toContain('Candidate B robust implementation.');
++
++      const loserPath = `${missionDir(MISSION, 'public')}/evidence/alternatives/task-1-candidate-A.json`;
++      expect(safeExistsSync(loserPath)).toBe(true);
++      const loser = JSON.parse(safeReadFile(loserPath, { encoding: 'utf8' }) as string);
++      expect(loser.winner).toBe('B');
++      expect(loser.task_result.summary).toContain('Candidate A minimal implementation.');
++
++      const judgeEvents = mocks.emitMissionTaskEvent.mock.calls
++        .map((call) => call[0])
++        .filter((event: any) => event.decision === 'best_of_judged');
++      expect(judgeEvents).toHaveLength(1);
++      expect(judgeEvents[0].payload.winner).toBe('B');
++    },
++    BEST_OF_N_TIMEOUT_MS
++  );
+ 
+   it('keeps normal-risk tasks single-shot', async () => {
+     await seedMission('medium');
+diff --git a/tests/chronos-operator-console.test.ts b/tests/chronos-operator-console.test.ts
+index c3dbee70..5179797f 100644
+--- a/tests/chronos-operator-console.test.ts
++++ b/tests/chronos-operator-console.test.ts
+@@ -7,28 +7,54 @@ import {
+   SURFACE_ROLES,
+   buildAttentionItems,
+ } from "../presence/displays/chronos-mirror-v2/src/lib/operator-console";
++import { uxText } from "../presence/displays/chronos-mirror-v2/src/lib/ux-vocabulary";
+ 
++// SURFACE_ROLES and MISSION_CYCLE carry vocabulary keys rather than literal
++// labels, so these assertions resolve them the way the screen does. uxText
++// returns the key itself when the catalog has no entry, which is exactly the
++// silent breakage worth pinning: an unresolved key renders as
++// "chronos_role_request_label" in the UI instead of failing anywhere.
+ describe("Chronos operator console helpers", () => {
+   it("defines the expected surface taxonomy for human-agent connection", () => {
+-    expect(SURFACE_ROLES.map((entry) => entry.label)).toEqual([
+-      "Command Surface",
+-      "Control Surface",
+-      "Performance Surface",
+-      "Work Surface",
++    expect(SURFACE_ROLES.map((entry) => uxText(entry.labelKey, "en"))).toEqual([
++      "Request screen",
++      "Review screen",
++      "Activity screen",
++      "Detail screen",
+     ]);
+   });
+ 
++  it("resolves every surface role key in both shipped locales", () => {
++    for (const role of SURFACE_ROLES) {
++      for (const key of [role.labelKey, role.valueKey, role.detailKey]) {
++        for (const locale of ["en", "ja"] as const) {
++          expect(uxText(key, locale), `${key} (${locale})`).not.toBe(key);
++        }
++      }
++    }
++  });
++
+   it("defines the mission cycle through inspection and distillation", () => {
+-    expect(MISSION_CYCLE.map((entry) => entry.label)).toEqual([
+-      "Intent",
+-      "Mission",
+-      "Execution",
+-      "Explanation",
+-      "Inspection",
+-      "Distillation",
++    expect(MISSION_CYCLE.map((entry) => uxText(entry.labelKey, "en"))).toEqual([
++      "Request",
++      "Plan",
++      "Execute",
++      "Explain",
++      "Review",
++      "Record",
+     ]);
+   });
+ 
++  it("resolves every mission cycle key in both shipped locales", () => {
++    for (const step of MISSION_CYCLE) {
++      for (const key of [step.labelKey, step.detailKey]) {
++        for (const locale of ["en", "ja"] as const) {
++          expect(uxText(key, locale), `${key} (${locale})`).not.toBe(key);
++        }
++      }
++    }
++  });
++
+   it("exposes runtime topology in the operator view menu", () => {
+     expect(OPERATOR_VIEW_LINKS.map((entry) => entry.label)).toContain("Runtime Topology");
+     expect(OPERATOR_VIEW_LINKS.find((entry) => entry.label === "Runtime Topology")).toMatchObject({
+diff --git a/tests/chronos-ux-vocabulary-contract.test.ts b/tests/chronos-ux-vocabulary-contract.test.ts
+index eb42ac8c..2cd940dc 100644
+--- a/tests/chronos-ux-vocabulary-contract.test.ts
++++ b/tests/chronos-ux-vocabulary-contract.test.ts
+@@ -11,6 +11,19 @@ import vocabulary from '../knowledge/product/orchestration/user-facing-vocabular
+ 
+ const CHRONOS_SRC = path.join(process.cwd(), 'presence/displays/chronos-mirror-v2/src');
+ 
++/**
++ * Every key the catalog defines, flattened across namespaces — chronos resolves
++ * by bare key, so membership is checked the same way.
++ */
++function catalogKeys(): Set<string> {
++  const { domains } = vocabulary as { domains?: Record<string, Record<string, unknown>> };
++  const keys = new Set<string>();
++  for (const entries of Object.values(domains ?? {})) {
++    for (const key of Object.keys(entries ?? {})) keys.add(key);
++  }
++  return keys;
++}
++
+ function* walkFiles(dir: string): Generator<string> {
+   for (const entry of safeReaddir(dir) as string[]) {
+     const full = path.join(dir, entry);
+@@ -28,11 +41,7 @@ describe('chronos ux vocabulary contract (UX-03)', () => {
+     // namespaced domains. chronos's uxText/uxLabel still resolve by bare
+     // (unqualified) key across every namespace, so this contract flattens
+     // all namespaces the same way before checking membership.
+-    const domains = (vocabulary as any).domains ?? {};
+-    const flatKeys = new Set<string>();
+-    for (const entries of Object.values(domains) as Array<Record<string, unknown>>) {
+-      for (const key of Object.keys(entries || {})) flatKeys.add(key);
+-    }
++    const flatKeys = catalogKeys();
+     const missing: string[] = [];
+     let referenced = 0;
+ 
+@@ -50,6 +59,30 @@ describe('chronos ux vocabulary contract (UX-03)', () => {
+     expect(missing).toEqual([]);
+   });
+ 
++  it('every literal uxTextOr/mt key referenced in chronos exists in the catalog', () => {
++    // uxTextOr carries a fallback for keys computed at runtime, which the check
++    // above cannot see. Used with a LITERAL key it is a silent ja regression
++    // instead: the English fallback renders in every locale and nothing fails.
++    // MissionIntelligence's `mt` helper is uxTextOr under another name, so it
++    // is held to the same rule.
++    const flatKeys = catalogKeys();
++    const missing: string[] = [];
++    let referenced = 0;
++
++    for (const file of walkFiles(CHRONOS_SRC)) {
++      const source = safeReadFile(file, { encoding: 'utf8' }) as string;
++      for (const match of source.matchAll(/\b(?:uxTextOr|mt)\(\s*'([^']+)'/g)) {
++        referenced += 1;
++        if (!flatKeys.has(match[1])) {
++          missing.push(`${path.relative(process.cwd(), file)}: ${match[1]}`);
++        }
++      }
++    }
++
++    expect(referenced).toBeGreaterThan(20);
++    expect(missing).toEqual([]);
++  });
++
+   it('uxText no longer accepts inline fallback strings', () => {
+     const offenders: string[] = [];
+     for (const file of walkFiles(CHRONOS_SRC)) {
+diff --git a/tests/code-change-pr-collaboration.test.ts b/tests/code-change-pr-collaboration.test.ts
+index dc15f858..c674a605 100644
+--- a/tests/code-change-pr-collaboration.test.ts
++++ b/tests/code-change-pr-collaboration.test.ts
+@@ -118,6 +118,12 @@ async function seedMission(options: { withReviewTask: boolean }): Promise<string
+   return missionPath;
+ }
+ 
++// Seeds a micro-repo, runs implement + review dispatches, and shells out to git
++// for the diff — measured 9.5-13.5s locally against the 10s default, so it fails
++// or passes on machine load alone. Declared per test so the cost stays visible
++// where it is paid rather than by loosening the global bound.
++const CODE_CHANGE_E2E_TIMEOUT_MS = 60_000;
++
+ describe.sequential('code_change PR collaboration (E2E-03 Task 6)', () => {
+   beforeEach(async () => {
+     vi.resetModules();
+@@ -163,58 +169,62 @@ describe.sequential('code_change PR collaboration (E2E-03 Task 6)', () => {
+     clearWorkCoordinationNamespace();
+   });
+ 
+-  it('publishes diff.patch + PR.md on implement completion and injects the diff into review', async () => {
+-    const missionPath = await seedMission({ withReviewTask: true });
+-    const { safeWriteFile, safeReadFile, safeExistsSync, safeExec } =
+-      await import('../libs/core/secure-io.js');
+-
+-    mocks.route.mockImplementation(async (envelope: any) => {
+-      const taskId = String(envelope?.payload?.context?.task_id || '');
+-      if (taskId === 'task-1') {
+-        // implement work mutates the micro-repo worktree
+-        safeWriteFile(`${missionPath}/deliverables/change.md`, '# change v2 with fix');
+-        return { payload: { text: makeTaskResultText({ summary: 'Changed the code.' }) } };
+-      }
+-      return {
+-        payload: {
+-          text: makeTaskResultText({ summary: 'Looks good.', review_findings: [] }),
+-        },
+-      };
+-    });
+-
+-    const { dispatchMissionNextTasks } =
+-      await import('../libs/core/mission-orchestration-worker.js');
+-    await dispatchMissionNextTasks(MISSION);
+-
+-    const diffPath = `${missionPath}/evidence/prs/task-1/diff.patch`;
+-    const prPath = `${missionPath}/evidence/prs/task-1/PR.md`;
+-    expect(safeExistsSync(diffPath)).toBe(true);
+-    expect(safeExistsSync(prPath)).toBe(true);
+-    const diff = safeReadFile(diffPath, { encoding: 'utf8' }) as string;
+-    expect(diff).toContain('change v2 with fix');
+-    const pr = safeReadFile(prPath, { encoding: 'utf8' }) as string;
+-    expect(pr).toContain('Changed the code.');
+-    expect(pr).toContain('- Branch: task/task-1');
+-    expect(pr).toContain('deliverables/change.md');
+-
+-    const branches = String(
+-      safeExec('git', ['branch', '--list', 'task/task-1'], { cwd: missionPath })
+-    );
+-    expect(branches).toContain('task/task-1');
+-
+-    // reviewer prompt carries the diff
+-    const reviewPrompt = mocks.route.mock.calls
+-      .map((call) => String((call[0] as any)?.payload?.text || ''))
+-      .find((prompt) => prompt.includes('Diff under review'));
+-    expect(reviewPrompt).toBeTruthy();
+-    expect(reviewPrompt).toContain('change v2 with fix');
+-
+-    // every dispatch prompt carries the mission goal (本来の目的), not just the task wording
+-    const firstPrompt = String((mocks.route.mock.calls[0][0] as any)?.payload?.text || '');
+-    expect(firstPrompt).toContain('## Mission goal');
+-    expect(firstPrompt).toContain('Ship the login change safely');
+-    expect(firstPrompt).toContain('review approves the change');
+-  });
++  it(
++    'publishes diff.patch + PR.md on implement completion and injects the diff into review',
++    async () => {
++      const missionPath = await seedMission({ withReviewTask: true });
++      const { safeWriteFile, safeReadFile, safeExistsSync, safeExec } =
++        await import('../libs/core/secure-io.js');
++
++      mocks.route.mockImplementation(async (envelope: any) => {
++        const taskId = String(envelope?.payload?.context?.task_id || '');
++        if (taskId === 'task-1') {
++          // implement work mutates the micro-repo worktree
++          safeWriteFile(`${missionPath}/deliverables/change.md`, '# change v2 with fix');
++          return { payload: { text: makeTaskResultText({ summary: 'Changed the code.' }) } };
++        }
++        return {
++          payload: {
++            text: makeTaskResultText({ summary: 'Looks good.', review_findings: [] }),
++          },
++        };
++      });
++
++      const { dispatchMissionNextTasks } =
++        await import('../libs/core/mission-orchestration-worker.js');
++      await dispatchMissionNextTasks(MISSION);
++
++      const diffPath = `${missionPath}/evidence/prs/task-1/diff.patch`;
++      const prPath = `${missionPath}/evidence/prs/task-1/PR.md`;
++      expect(safeExistsSync(diffPath)).toBe(true);
++      expect(safeExistsSync(prPath)).toBe(true);
++      const diff = safeReadFile(diffPath, { encoding: 'utf8' }) as string;
++      expect(diff).toContain('change v2 with fix');
++      const pr = safeReadFile(prPath, { encoding: 'utf8' }) as string;
++      expect(pr).toContain('Changed the code.');
++      expect(pr).toContain('- Branch: task/task-1');
++      expect(pr).toContain('deliverables/change.md');
++
++      const branches = String(
++        safeExec('git', ['branch', '--list', 'task/task-1'], { cwd: missionPath })
++      );
++      expect(branches).toContain('task/task-1');
++
++      // reviewer prompt carries the diff
++      const reviewPrompt = mocks.route.mock.calls
++        .map((call) => String((call[0] as any)?.payload?.text || ''))
++        .find((prompt) => prompt.includes('Diff under review'));
++      expect(reviewPrompt).toBeTruthy();
++      expect(reviewPrompt).toContain('change v2 with fix');
++
++      // every dispatch prompt carries the mission goal (本来の目的), not just the task wording
++      const firstPrompt = String((mocks.route.mock.calls[0][0] as any)?.payload?.text || '');
++      expect(firstPrompt).toContain('## Mission goal');
++      expect(firstPrompt).toContain('Ship the login change safely');
++      expect(firstPrompt).toContain('review approves the change');
++    },
++    CODE_CHANGE_E2E_TIMEOUT_MS
++  );
+ 
+   it('blocks a code_change plan without a review task as a planner contract violation', async () => {
+     await seedMission({ withReviewTask: false });
+diff --git a/tests/mission-orchestration-dashboard-contract.test.ts b/tests/mission-orchestration-dashboard-contract.test.ts
+index 2dde6f55..8f7d5847 100644
+--- a/tests/mission-orchestration-dashboard-contract.test.ts
++++ b/tests/mission-orchestration-dashboard-contract.test.ts
+@@ -92,9 +92,13 @@ describe('mission orchestration dashboard contract', () => {
+     expect(component).toContain('audit drilldown');
+     expect(component).toContain('control summary');
+     expect(component).toContain('requested by');
+-    expect(component).toContain('Recent Control Actions');
+-    expect(component).toContain('show details');
+-    expect(component).toContain('jump to target');
++    // UX-03: these labels moved into the vocabulary catalog. Anchor on the key
++    // rather than the English fallback — the fallback is copy that gets
++    // re-cased and reworded, and asserting on it makes this contract fail for
++    // edits that change nothing about the capability being pinned.
++    expect(component).toContain("mt('chronos_recent_control_actions'");
++    expect(component).toContain("mt('chronos_show_details'");
++    expect(component).toContain("mt('chronos_jump_to_target'");
+     expect(component).toContain('show latest action');
+     expect(component).toContain('retry latest action');
+     expect(component).toContain('operator guidance');
+@@ -117,9 +121,13 @@ describe('mission orchestration dashboard contract', () => {
+     expect(component).toContain('mission pinned');
+     expect(component).toContain("url.searchParams.set('mission', selectedMissionId)");
+     expect(component).toContain("const mission = params.get('mission')");
+-    expect(component).toContain("new EventSource('/api/intelligence/stream')");
++    // The stream is opened tenant-aware now, so the URL is built rather than
++    // literal; both the unscoped and the tenant-scoped form must stay.
++    expect(component).toContain('new EventSource(');
++    expect(component).toContain("'/api/intelligence/stream'");
++    expect(component).toContain('/api/intelligence/stream?tenant=');
+     expect(component).toContain('No mission-scoped agent messages observed yet.');
+-    expect(component).toContain('Owner Summaries');
++    expect(component).toContain("mt('chronos_owner_summaries'");
+     expect(component).toContain('Delivery Exceptions');
+     expect(component).toContain('clear outbox');
+     expect(component).toContain('Surface Control');
+diff --git a/tests/scratch-usage-baseline.test.ts b/tests/scratch-usage-baseline.test.ts
+index d8f5f6c5..44f23dfa 100644
+--- a/tests/scratch-usage-baseline.test.ts
++++ b/tests/scratch-usage-baseline.test.ts
+@@ -9,34 +9,46 @@ function normalize(relPath: string): string {
+   return relPath.split(path.sep).join('/');
+ }
+ 
++// This walks and reads every source/policy file in the repo, so its cost grows
++// with the tree — measured ~12s locally against the 10s default. Declared here
++// rather than by loosening the global bound, so the cost stays visible where it
++// is paid (vitest.config.mts keeps the tight local default on purpose).
++const FULL_TREE_SCAN_TIMEOUT_MS = 60_000;
++
+ describe('Governed temp hierarchy', () => {
+-  it('keeps scratch/ out of runtime source and policy files', () => {
+-    const actual = getAllFiles(rootDir)
+-      .map((filePath) => normalize(path.relative(rootDir, filePath)))
+-      .filter((relPath) => !relPath.startsWith('dist/'))
+-      .filter((relPath) => !relPath.includes('/.next/'))
+-      .filter((relPath) => /\.(ts|tsx|js|jsx|mjs|cjs|md|json)$/.test(relPath))
+-      .filter((relPath) => safeExistsSync(path.join(rootDir, relPath)))
+-      .filter((relPath) => {
+-        try {
+-          const content = safeReadFile(path.join(rootDir, relPath), { encoding: 'utf8' }) as string;
+-          return content.includes('scratch/');
+-        } catch (error: any) {
+-          if (String(error?.message || '').includes('File not found:')) {
+-            return false;
++  it(
++    'keeps scratch/ out of runtime source and policy files',
++    () => {
++      const actual = getAllFiles(rootDir)
++        .map((filePath) => normalize(path.relative(rootDir, filePath)))
++        .filter((relPath) => !relPath.startsWith('dist/'))
++        .filter((relPath) => !relPath.includes('/.next/'))
++        .filter((relPath) => /\.(ts|tsx|js|jsx|mjs|cjs|md|json)$/.test(relPath))
++        .filter((relPath) => safeExistsSync(path.join(rootDir, relPath)))
++        .filter((relPath) => {
++          try {
++            const content = safeReadFile(path.join(rootDir, relPath), {
++              encoding: 'utf8',
++            }) as string;
++            return content.includes('scratch/');
++          } catch (error) {
++            if (error instanceof Error && error.message.includes('File not found:')) {
++              return false;
++            }
++            throw error;
+           }
+-          throw error;
+-        }
+-      })
+-      .filter((relPath) => !relPath.startsWith('knowledge/public/'))
+-      .filter((relPath) => !relPath.startsWith('knowledge/confidential/'))
+-      .filter((relPath) => !relPath.startsWith('knowledge/personal/'))
+-      .filter((relPath) => !relPath.startsWith('docs/'))
+-      .filter((relPath) => !['CLAUDE.md', 'CODEX.md', 'GEMINI.md'].includes(relPath))
+-      .filter((relPath) => relPath !== 'eslint.config.js')
+-      .filter((relPath) => relPath !== 'tests/scratch-usage-baseline.test.ts')
+-      .sort((a, b) => a.localeCompare(b));
++        })
++        .filter((relPath) => !relPath.startsWith('knowledge/public/'))
++        .filter((relPath) => !relPath.startsWith('knowledge/confidential/'))
++        .filter((relPath) => !relPath.startsWith('knowledge/personal/'))
++        .filter((relPath) => !relPath.startsWith('docs/'))
++        .filter((relPath) => !['CLAUDE.md', 'CODEX.md', 'GEMINI.md'].includes(relPath))
++        .filter((relPath) => relPath !== 'eslint.config.js')
++        .filter((relPath) => relPath !== 'tests/scratch-usage-baseline.test.ts')
++        .sort((a, b) => a.localeCompare(b));
+ 
+-    expect(actual).toEqual([]);
+-  });
++      expect(actual).toEqual([]);
++    },
++    FULL_TREE_SCAN_TIMEOUT_MS
++  );
+ });
+diff --git a/tests/surface-smoke-contract.test.ts b/tests/surface-smoke-contract.test.ts
+index 848a89d6..c85ae255 100644
+--- a/tests/surface-smoke-contract.test.ts
++++ b/tests/surface-smoke-contract.test.ts
+@@ -29,7 +29,8 @@ describe('surface smoke contract', () => {
+     expect(page).toContain('chronos://quick-action/schedule-tick');
+     expect(page).toContain('chronos://quick-action/schedule-list');
+     expect(page).toContain('chronos://quick-action/vital-check');
+-    expect(banner).toContain('First Run');
++    // UX-03: the banner renders every string through the vocabulary catalog.
++    expect(banner).toContain("uxText('chronos_first_run_eyebrow'");
+     expect(banner).toContain('Open');
+     expect(banner).toContain('Prereq Check');
+     expect(banner).toContain('Setup Report');

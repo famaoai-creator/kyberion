@@ -510,6 +510,7 @@
       "status": "active",
       "grants": [
         "nhi_accountability_reader",
+        "member_owner_reader",
         "workspace_graph_reader",
         "concierge_management_reader"
       ],
@@ -1104,7 +1105,12 @@
       },
       "tiers": ["confidential"],
       "status": "active",
-      "grants": ["peer_catalog_reader", "customer_channel_binding_store"],
+      "grants": [
+        "peer_catalog_reader",
+        "customer_channel_binding_store",
+        "credential_custody_store"
+      ],
+      "note": "Tenant connection documents. Reasoning credentials of tenant custody (<service>[.<label>].json + .record.json) are written only inside the credential custody store grant (issuance right credential_custody_store, secret/credential-lending-broker.ts; listed in no role-assumption-policy entry, so only an operator CLI process without SYSTEM_ROLE — pnpm kyberion reasoning credentials register — can issue it, never a surface or daemon) and read for another tenant only through the brokered lent capability with a credential.lent_read audit.",
       "sources": ["role-policy"]
     },
     {

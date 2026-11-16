@@ -69,6 +69,13 @@ import {
   loadApprovalRequest,
 } from './approval-store-reader.js';
 import { validateHumanFinalDecision } from './approval-human-decision.js';
+import {
+  credentialLendingErrors,
+  memberIdOfPrincipal,
+  personPrincipal,
+  requireCredentialService,
+  type CredentialLendingScope,
+} from '../secret/credential-custody.js';
 import type { ApprovalAssuranceLevel, ApprovalRequestRecord } from './approval-store.js';
 import { markApprovalConsumed, revokeStandingEffectApproval } from './approval-revocation.js';
 import {
@@ -90,6 +97,8 @@ export interface GrantScope {
   tenant_slug?: string;
   credential_provider?: string;
   credential_ref?: string;
+  /** Custody/kind lending terms (secret/credential-custody.ts); absent = legacy person API key. */
+  credential_lending?: CredentialLendingScope;
   service_allocation?: ServiceCredentialAllocationScope;
   /** Calendar series ids of the meetings this grant covers. */
   meeting_series_ids?: string[];
@@ -123,6 +132,27 @@ export interface GrantRecord {
   };
   /** The audit-chain event recorded before the grant was written. */
   audit_event_id: string;
+  /**
+   * Owner-approved expiry extensions, oldest first. Only `expires_at` moves:
+   * id, principal, scope and purpose stay. Each step is bound to its own
+   * approval and re-verified at every use (verifyGrantBasis).
+   */
+  extensions?: GrantExtension[];
+}
+
+/** One approved expiry extension step of a standing grant. */
+export interface GrantExtension {
+  approval_request_id: string;
+  approval_channel: string;
+  /** The grant's expires_at the approval was requested against. */
+  previous_expires_at: string;
+  /** extended_at + extend_days (never more than the capability's max_ttl_days). */
+  expires_at: string;
+  /** When the approval was consumed; the new lifetime counts from here. */
+  extended_at: string;
+  extend_days: number;
+  extended_by: GrantedBy;
+  audit_event_id: string;
 }
 
 /** What an operator asks to grant (before normalization). */
@@ -131,6 +161,7 @@ export interface GrantDraft {
   tenant_slug: string;
   credential_provider?: string;
   credential_ref?: string;
+  credential_lending?: CredentialLendingScope;
   service_allocation?: ServiceCredentialAllocationScope;
   meeting_series_ids?: string[];
   meeting_urls?: string[];
@@ -145,6 +176,7 @@ export interface NormalizedGrantDraft {
   tenant_slug: string;
   credential_provider?: string;
   credential_ref?: string;
+  credential_lending?: CredentialLendingScope;
   service_allocation?: ServiceCredentialAllocationScope;
   meeting_series_ids: string[];
   meeting_urls: string[];
@@ -179,6 +211,14 @@ export class GrantError extends Error {
 export const GRANT_APPROVAL_CHANNEL = 'grant-standing';
 /** Separation-of-duties consumer id (approval-sod-consumers.contract.test.ts). */
 export const GRANT_APPROVAL_CONSUMER = 'grant_standing';
+/** Separate consumer for extension approvals: an extension never mints a grant. */
+export const GRANT_EXTENSION_CONSUMER = 'grant_extension';
+/**
+ * An expired grant may still be extended (owner approval) for this many days
+ * after its expiry; it grants nothing meanwhile. Past the grace window a new
+ * grant must be requested. A revoked grant is never extended.
+ */
+export const GRANT_EXTENSION_GRACE_DAYS = 7;
 const GRANT_ID_PATTERN = /^GRT-\d{8}-[a-f0-9]{12}$/;
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** Tenant grants are operator governance data of that tenant: confidential tier. */
@@ -232,6 +272,11 @@ export function requireStandingGrantPolicy(capability: string): StandingGrantCap
   return policy;
 }
 
+/** Expiry the original approval set: before any extension step. */
+export function grantBaseExpiry(record: Pick<GrantRecord, 'expires_at' | 'extensions'>): string {
+  return record.extensions?.[0]?.previous_expires_at ?? record.expires_at;
+}
+
 function uniqueSorted(values: string[]): string[] {
   return [...new Set(values)].sort(codepointCompare);
 }
@@ -271,6 +316,21 @@ export function normalizeGrantDraft(draft: GrantDraft): NormalizedGrantDraft {
     } catch (error) {
       throw new GrantError('invalid_input', String(error));
     }
+  }
+  let lending: CredentialLendingScope | undefined;
+  if (draft.credential_lending !== undefined) {
+    const errors =
+      capability !== 'credential.use' || serviceAllocation
+        ? ['credential_lending is exclusive to reasoning credential.use grants']
+        : credentialLendingErrors(draft.credential_lending);
+    if (errors.length) throw new GrantError('invalid_input', errors.join('; '));
+    lending = draft.credential_lending;
+    const spec = requireCredentialService(lending.service);
+    if (provider !== spec.primaryBackend || reference !== `${spec.service}/${spec.secretKey}`)
+      throw new GrantError(
+        'invalid_input',
+        'credential_lending must agree with credential_provider / credential_ref'
+      );
   }
   if (!serviceAllocation && policy.scope_keys.includes('credential_provider') && !provider)
     throw new GrantError('invalid_input', 'credential_provider is required');
@@ -317,6 +377,7 @@ export function normalizeGrantDraft(draft: GrantDraft): NormalizedGrantDraft {
     ...(serviceAllocation ? { service_allocation: serviceAllocation } : {}),
     ...(provider ? { credential_provider: provider } : {}),
     ...(reference ? { credential_ref: reference } : {}),
+    ...(lending ? { credential_lending: lending } : {}),
     tenant_slug: tenant,
     meeting_series_ids: seriesIds,
     meeting_urls: meetingUrls,
@@ -394,6 +455,11 @@ export function validateGrantRecord(input: unknown): { valid: boolean; errors: s
         errors.push(String(error));
       }
     }
+    if (record.scope.credential_lending !== undefined) {
+      if (record.capability !== 'credential.use' || allocation)
+        errors.push('credential_lending is exclusive to reasoning credential.use grants');
+      else errors.push(...credentialLendingErrors(record.scope.credential_lending));
+    }
     if (
       !allocation &&
       policy.scope_keys.includes('credential_provider') &&
@@ -416,10 +482,29 @@ export function validateGrantRecord(input: unknown): { valid: boolean; errors: s
     }
   }
   const granted = Date.parse(record.granted_at);
-  const expires = Date.parse(record.expires_at);
+  const expires = Date.parse(grantBaseExpiry(record));
   if (!(expires > granted)) errors.push('expires_at must be after granted_at');
   if (policy && expires - granted > policy.max_ttl_days * DAY_MS) {
     errors.push(`grant lifetime exceeds ${policy.max_ttl_days} days`);
+  }
+  if (record.extensions) {
+    if (!policy?.external_io) errors.push('only external_io grants can be extended');
+    let previous = grantBaseExpiry(record);
+    for (const step of record.extensions) {
+      const from = Date.parse(step.extended_at);
+      const to = Date.parse(step.expires_at);
+      if (step.previous_expires_at !== previous) errors.push('extension chain is broken');
+      if (!(to > Date.parse(step.previous_expires_at)))
+        errors.push('an extension must move expires_at later');
+      if (
+        policy &&
+        (step.extend_days > policy.max_ttl_days || to - from !== step.extend_days * DAY_MS)
+      )
+        errors.push(`an extension step must be 1..${policy.max_ttl_days} whole days from approval`);
+      if (from < granted) errors.push('an extension cannot precede granted_at');
+      previous = step.expires_at;
+    }
+    if (previous !== record.expires_at) errors.push('expires_at must equal the last extension');
   }
   if (record.revoked && Date.parse(record.revoked.at) < granted) {
     errors.push('revoked.at must not precede granted_at');
@@ -630,6 +715,7 @@ export function validatePersonalCredentialGrantRecord(input: unknown): {
       errors.push('personal grant requires canonical approval basis');
     if (record.revoked && Date.parse(record.revoked.at) < Date.parse(record.granted_at))
       errors.push('revocation precedes grant');
+    if ('extensions' in record) errors.push('personal grants are never extended');
   } catch {
     errors.push('invalid personal grant scope');
   }
@@ -654,6 +740,7 @@ function writeNewGrant(
       ...(draft.service_allocation ? { service_allocation: draft.service_allocation } : {}),
       ...(draft.credential_provider ? { credential_provider: draft.credential_provider } : {}),
       ...(draft.credential_ref ? { credential_ref: draft.credential_ref } : {}),
+      ...(draft.credential_lending ? { credential_lending: draft.credential_lending } : {}),
       ...(draft.meeting_series_ids.length ? { meeting_series_ids: draft.meeting_series_ids } : {}),
       ...(draft.meeting_urls.length ? { meeting_urls: draft.meeting_urls } : {}),
     },
@@ -689,6 +776,7 @@ export function grantApprovalPayload(draft: NormalizedGrantDraft): Record<string
     ...(draft.service_allocation ? { service_allocation: draft.service_allocation } : {}),
     ...(draft.credential_provider ? { credential_provider: draft.credential_provider } : {}),
     ...(draft.credential_ref ? { credential_ref: draft.credential_ref } : {}),
+    ...(draft.credential_lending ? { credential_lending: draft.credential_lending } : {}),
     action: 'grant_standing',
     capability: draft.capability,
     tenant_slug: draft.tenant_slug,
@@ -710,6 +798,18 @@ export function buildGrantApprovalDetails(
     lines.push(`Service allocation: ${JSON.stringify(draft.service_allocation)}`);
   if (draft.credential_provider) lines.push(`Credential provider: ${draft.credential_provider}`);
   if (draft.credential_ref) lines.push(`Credential reference: ${draft.credential_ref}`);
+  if (draft.credential_lending) {
+    const lending = draft.credential_lending;
+    lines.push(
+      `Credential lent: ${lending.credential_ref} (${lending.kind}, ${lending.terms} terms, plan ${lending.plan}) to tenant ${draft.tenant_slug}`,
+      `Backends: ${lending.allowed_backends.join(', ')}`,
+      ...(lending.budget_monthly_usd !== undefined
+        ? [`Monthly budget: $${lending.budget_monthly_usd} (80% notifies, 100% stops new runs)`]
+        : []),
+      ...(lending.token_expires_at ? [`Token expires: ${lending.token_expires_at}`] : []),
+      `Approver must be the credential owner (${lending.custody === 'person' ? `user:${lending.owner}` : `an owner of tenant ${lending.owner}`})`
+    );
+  }
   if (draft.meeting_series_ids.length) {
     lines.push(`Meeting series: ${draft.meeting_series_ids.join(', ')}`);
   }
@@ -759,6 +859,8 @@ export function requestGrantApproval(
       `${normalized.capability} is not external_io; grant it directly without an approval`
     );
   }
+  // Design §2.3: an ineligible lending never reaches the owner's approval queue.
+  assertCredentialLendingEligible(normalized, options.now ?? new Date());
   const existing = findGrantApprovalRequest(normalized);
   if (existing) return existing;
   const requester = resolveApprovalRequesterInput(options.requester);
@@ -807,6 +909,87 @@ export function requestGrantApproval(
 }
 
 /**
+ * Registry-backed rules of credential lending (design §2.3–2.4), installed by
+ * secret/credential-allocations.ts (the broker) so this store does not import
+ * the member / tenant registries. Unregistered = every lending approval fails closed.
+ */
+export interface CredentialLendingPolicy {
+  /** Is the member an owner member of the tenant (approver of that tenant's credentials)? */
+  ownsTenant(memberId: string, tenant: string): boolean;
+  /** Member id of the installation person who owns knowledge/personal/ (person custody). */
+  installationPerson(): string | undefined;
+  /** Throws the classified eligibility refusal for this borrower now. */
+  assertEligible(lending: CredentialLendingScope, borrowerTenant: string, now: Date): void;
+}
+let lendingPolicy: CredentialLendingPolicy | undefined;
+export function registerCredentialLendingPolicy(policy: CredentialLendingPolicy | undefined): void {
+  lendingPolicy = policy;
+}
+
+/**
+ * The lending was approved by the credential's owner: the person holding it,
+ * or an owner member of the tenant holding it — same authenticated human-only
+ * decision rule as a service allocation.
+ */
+export function credentialLendingApprovedByOwner(
+  lending: CredentialLendingScope,
+  approval: ApprovalRequestRecord
+): boolean {
+  if (lending.custody === 'person') {
+    // Review S1: person custody is the installation person's personal store only.
+    let person: string | undefined;
+    try {
+      person = lendingPolicy?.installationPerson();
+    } catch {
+      person = undefined;
+    }
+    return (
+      Boolean(person) &&
+      person === lending.owner &&
+      serviceAllocationApprovedByOwner(approval, personPrincipal(lending.owner))
+    );
+  }
+  const approver = approval.workflow?.approvals?.find(
+    (entry) =>
+      entry.status === 'approved' && entry.decidedByType === 'human' && entry.authenticated === true
+  )?.approvedBy;
+  const memberId = approver ? memberIdOfPrincipal(approver) : undefined;
+  if (!approver || !memberId || !lendingPolicy) return false;
+  try {
+    return (
+      serviceAllocationApprovedByOwner(approval, approver) &&
+      lendingPolicy.ownsTenant(memberId, lending.owner)
+    );
+  } catch {
+    return false;
+  }
+}
+
+function assertCredentialLendingApproval(
+  draft: NormalizedGrantDraft,
+  approval: ApprovalRequestRecord
+): void {
+  const lending = draft.credential_lending!;
+  if (!credentialLendingApprovedByOwner(lending, approval))
+    throw new GrantError(
+      'approval_invalid',
+      `credential lending requires the authenticated decision of the credential owner (${lending.custody === 'person' ? personPrincipal(lending.owner) : `an owner of tenant ${lending.owner}`})`
+    );
+  assertCredentialLendingEligible(draft);
+}
+
+/** Eligibility at request / approval time (the broker re-checks at every use). */
+export function assertCredentialLendingEligible(
+  draft: Pick<NormalizedGrantDraft, 'credential_lending' | 'tenant_slug'>,
+  now: Date = new Date()
+): void {
+  if (!draft.credential_lending) return;
+  if (!lendingPolicy)
+    throw new GrantError('invalid_state', 'credential lending policy is not installed');
+  lendingPolicy.assertEligible(draft.credential_lending, draft.tenant_slug, now);
+}
+
+/**
  * Apply-side validation (mirrors assertScopeChangeApproval): approved by an
  * authenticated human, unexpired, usable (not revoked / consumed, separation
  * of duties) and bound by payloadHash to exactly this draft.
@@ -814,6 +997,40 @@ export function requestGrantApproval(
 export function assertGrantApproval(
   draft: NormalizedGrantDraft,
   approvalRequestId: string
+): {
+  approval: ApprovalRequestRecord;
+  humanDecider: string;
+  assurance: ApprovalAssuranceLevel;
+  role: GrantedBy['role'];
+} {
+  const checked = assertHumanGrantDecision(approvalRequestId, {
+    consumer: GRANT_APPROVAL_CONSUMER,
+    effectBinding: grantApprovalEffectBinding(draft),
+    payloadHash: computeApprovalPayloadHash(grantApprovalPayload(draft)),
+    payloadMismatch:
+      'grant approval is bound to a different capability/tenant/meetings/purpose/lifetime',
+  });
+  if (
+    draft.service_allocation &&
+    !serviceAllocationApprovedByOwner(checked.approval, draft.service_allocation.owner_ref)
+  )
+    throw new GrantError(
+      'approval_invalid',
+      'service allocation requires its authenticated personal owner decision'
+    );
+  if (draft.credential_lending) assertCredentialLendingApproval(draft, checked.approval);
+  return checked;
+}
+
+/** Approved by an authenticated human, unexpired, unused, usable and hash-bound to the effect. */
+function assertHumanGrantDecision(
+  approvalRequestId: string,
+  binding: {
+    consumer: typeof GRANT_APPROVAL_CONSUMER | typeof GRANT_EXTENSION_CONSUMER;
+    effectBinding: string;
+    payloadHash: string;
+    payloadMismatch: string;
+  }
 ): {
   approval: ApprovalRequestRecord;
   humanDecider: string;
@@ -833,17 +1050,14 @@ export function assertGrantApproval(
   if (approval.consumption || approval.applyClaim || approval.applyResult) {
     throw new GrantError('approval_invalid', `grant approval ${approval.id} was already used`);
   }
-  assertApprovalUsable(approval, { consumer: 'grant_standing' });
-  if (approval.accountability?.effectBinding !== grantApprovalEffectBinding(draft)) {
+  if (binding.consumer === GRANT_EXTENSION_CONSUMER)
+    assertApprovalUsable(approval, { consumer: 'grant_extension' });
+  else assertApprovalUsable(approval, { consumer: 'grant_standing' });
+  if (approval.accountability?.effectBinding !== binding.effectBinding) {
     throw new GrantError('approval_invalid', 'grant approval is bound to a different effect');
   }
-  if (
-    approval.accountability?.payloadHash !== computeApprovalPayloadHash(grantApprovalPayload(draft))
-  ) {
-    throw new GrantError(
-      'approval_invalid',
-      'grant approval is bound to a different capability/tenant/meetings/purpose/lifetime'
-    );
+  if (approval.accountability?.payloadHash !== binding.payloadHash) {
+    throw new GrantError('approval_invalid', binding.payloadMismatch);
   }
   const humanApproval = approval.workflow?.approvals?.find(
     (entry) =>
@@ -872,14 +1086,6 @@ export function assertGrantApproval(
   if (!humanDecider) {
     throw new GrantError('approval_invalid', 'grant approval does not name its human decider');
   }
-  if (
-    draft.service_allocation &&
-    !serviceAllocationApprovedByOwner(approval, draft.service_allocation.owner_ref)
-  )
-    throw new GrantError(
-      'approval_invalid',
-      'service allocation requires its authenticated personal owner decision'
-    );
   return {
     approval,
     humanDecider,
@@ -917,13 +1123,20 @@ export function verifyGrantBasis(record: GrantRecord): boolean {
         record.granted_by.actor_id !== record.scope.service_allocation.owner_ref)
     )
       return false;
+    if (
+      record.scope.credential_lending &&
+      (!validateGrantRecord(record).valid ||
+        !credentialLendingApprovedByOwner(record.scope.credential_lending, approval))
+    )
+      return false;
     const consumption = approval.consumption;
     if (consumption?.consumer !== GRANT_APPROVAL_CONSUMER) return false;
     // Bound to the record this approval created: same grant id, and the grant
     // started exactly when the approval was consumed (no copy, no time shift).
     if (consumption.effectRef !== record.grant_id) return false;
     if (consumption.consumedAt !== record.granted_at) return false;
-    const lifetimeMs = Date.parse(record.expires_at) - Date.parse(record.granted_at);
+    if (record.extensions && !verifyGrantExtensions(record)) return false;
+    const lifetimeMs = Date.parse(grantBaseExpiry(record)) - Date.parse(record.granted_at);
     const ttlDays = lifetimeMs / DAY_MS;
     // Exactly the approved number of whole days — no rounding slack.
     if (!Number.isInteger(ttlDays) || ttlDays < 1) return false;
@@ -936,6 +1149,9 @@ export function verifyGrantBasis(record: GrantRecord): boolean {
         ? { credential_provider: record.scope.credential_provider }
         : {}),
       ...(record.scope.credential_ref ? { credential_ref: record.scope.credential_ref } : {}),
+      ...(record.scope.credential_lending
+        ? { credential_lending: record.scope.credential_lending }
+        : {}),
       tenant_slug: record.scope.tenant_slug,
       meeting_series_ids: record.scope.meeting_series_ids ?? [],
       meeting_urls: record.scope.meeting_urls ?? [],
@@ -1044,6 +1260,291 @@ export function grantStandingDirect(
     undefined,
     options.now ?? new Date()
   );
+}
+
+// ---------------------------------------------------------------------------
+// Extension (owner-approved, same grant: only expires_at moves)
+// ---------------------------------------------------------------------------
+
+/** What an operator asks to extend. The step is pinned to the grant's current expiry. */
+export interface GrantExtensionDraft {
+  grant_id: string;
+  tenant_slug: string;
+  /** Days from approval consumption; defaults to and never exceeds max_ttl_days. */
+  extend_days?: number;
+}
+
+/** Effect binding of one extension step: a later step can never reuse an earlier approval. */
+export function grantExtensionEffectBinding(grantId: string, previousExpiresAt: string): string {
+  return `grant-extend:${grantId}:${previousExpiresAt}`;
+}
+
+function grantExtensionEffectRef(grantId: string, previousExpiresAt: string): string {
+  return `${grantId}@${previousExpiresAt}`;
+}
+
+/** Canonical payload hashed into an extension approval. */
+export function grantExtensionPayload(
+  record: GrantRecord,
+  previousExpiresAt: string,
+  extendDays: number
+): Record<string, unknown> {
+  return {
+    action: 'grant_extend',
+    grant_id: record.grant_id,
+    capability: record.capability,
+    tenant_slug: record.scope.tenant_slug,
+    ...(record.scope.credential_provider
+      ? { credential_provider: record.scope.credential_provider }
+      : {}),
+    ...(record.scope.credential_ref ? { credential_ref: record.scope.credential_ref } : {}),
+    ...(record.scope.service_allocation
+      ? { service_allocation: record.scope.service_allocation }
+      : {}),
+    granted_by: record.granted_by.actor_id,
+    previous_expires_at: previousExpiresAt,
+    extend_days: extendDays,
+    effect: grantExtensionEffectBinding(record.grant_id, previousExpiresAt),
+  };
+}
+
+/** Whole days until expiry (negative once expired); for status and reminders. */
+export function grantDaysLeft(record: Pick<GrantRecord, 'expires_at'>, now: Date): number {
+  return Math.floor((Date.parse(record.expires_at) - now.getTime()) / DAY_MS);
+}
+
+/**
+ * Refuse what may not be extended: revoked, unverifiable basis, not
+ * external_io, personal or service allocations (their owner consent is a
+ * separate flow), or expired beyond {@link GRANT_EXTENSION_GRACE_DAYS}.
+ */
+export function assertGrantExtendable(
+  record: GrantRecord,
+  now: Date,
+  extendDays?: number
+): { extendDays: number } {
+  if (record.revoked || grantStatusAt(record, now) === 'revoked')
+    throw new GrantError(
+      'invalid_state',
+      `grant ${record.grant_id} is revoked; request a new grant`
+    );
+  const policy = requireStandingGrantPolicy(record.capability);
+  if (!policy.external_io || record.scope.service_allocation)
+    throw new GrantError('invalid_state', `grant ${record.grant_id} cannot be extended`);
+  if (!verifyGrantBasis(record))
+    throw new GrantError(
+      'invalid_state',
+      `grant ${record.grant_id} no longer rests on a valid approval; request a new grant`
+    );
+  const expiredFor = now.getTime() - Date.parse(record.expires_at);
+  if (expiredFor > GRANT_EXTENSION_GRACE_DAYS * DAY_MS)
+    throw new GrantError(
+      'invalid_state',
+      `grant ${record.grant_id} expired more than ${GRANT_EXTENSION_GRACE_DAYS} days ago; request a new grant`
+    );
+  const days = extendDays ?? policy.max_ttl_days;
+  if (!Number.isInteger(days) || days < 1 || days > policy.max_ttl_days)
+    throw new GrantError(
+      'invalid_input',
+      `an extension must be an integer between 1 and ${policy.max_ttl_days} days`
+    );
+  if (now.getTime() + days * DAY_MS <= Date.parse(record.expires_at))
+    throw new GrantError(
+      'invalid_input',
+      `an extension of ${days} day(s) from now would not move the expiry past ${record.expires_at}`
+    );
+  return { extendDays: days };
+}
+
+function requireExtendableGrant(draft: GrantExtensionDraft): GrantRecord {
+  const tenant = String(draft.tenant_slug ?? '').trim();
+  if (!isValidTenantSlug(tenant)) throw new GrantError('invalid_input', 'invalid tenant slug');
+  const record = findGrantById(String(draft.grant_id ?? '').trim(), tenant);
+  if (!record) throw new GrantError('not_found', `grant ${draft.grant_id} not found`);
+  return record;
+}
+
+/** Open (or reuse) the hash-bound owner approval for one extension step. */
+export function requestGrantExtension(
+  draft: GrantExtensionDraft,
+  options: { requester: ApprovalRequesterInput; now?: Date }
+): ApprovalRequestRecord {
+  const now = options.now ?? new Date();
+  const record = requireExtendableGrant(draft);
+  const { extendDays } = assertGrantExtendable(record, now, draft.extend_days);
+  const payloadHash = computeApprovalPayloadHash(
+    grantExtensionPayload(record, record.expires_at, extendDays)
+  );
+  const effectBinding = grantExtensionEffectBinding(record.grant_id, record.expires_at);
+  const existing = listApprovalRequests({
+    storageChannels: [GRANT_APPROVAL_CHANNEL],
+    status: ['pending', 'approved'],
+  }).find(
+    (entry) =>
+      entry.accountability?.payloadHash === payloadHash &&
+      entry.accountability?.effectBinding === effectBinding &&
+      !entry.consumption &&
+      !entry.applyClaim &&
+      !isApprovalRequestExpired(entry) &&
+      (entry.status !== 'approved' ||
+        !evaluateApprovalUsability(entry, { consumer: 'grant_extension' }))
+  );
+  if (existing) return existing;
+  const requester = resolveApprovalRequesterInput(options.requester);
+  const details = [
+    `Grant: ${record.grant_id}`,
+    `Capability: ${record.capability}`,
+    `Tenant: ${record.scope.tenant_slug}`,
+    ...(record.scope.credential_provider
+      ? [`Credential provider: ${record.scope.credential_provider}`]
+      : []),
+    `Current expiry: ${record.expires_at}`,
+    `New expiry: ${extendDays} day(s) after this extension is applied`,
+    `Requested by: ${requester.requestedBy}`,
+    'Effect if approved: the same grant (id, principal, scope, purpose unchanged) stays usable until the new expiry or revocation.',
+  ].join('\n');
+  return createApprovalRequest('mission_controller', {
+    channel: GRANT_APPROVAL_CHANNEL,
+    storageChannel: GRANT_APPROVAL_CHANNEL,
+    threadTs: `${record.capability}:${record.scope.tenant_slug}:extend`,
+    correlationId: effectBinding,
+    requestedBy: requester.requestedBy,
+    ...(requester.displayName ? { requestedByDisplayName: requester.displayName } : {}),
+    expiresAt: new Date(now.getTime() + APPROVAL_TTL_MS).toISOString(),
+    kind: 'channel-approval',
+    draft: {
+      title: `Extend standing grant ${record.grant_id} (${record.capability}) for ${record.scope.tenant_slug}`,
+      summary: `Approve extending ${record.grant_id} by ${extendDays} day(s) from approval.`,
+      details,
+      severity: 'high',
+    },
+    requestedByContext: {
+      surface: 'terminal',
+      actorId: approvalRequesterActorId(requester),
+      actorRole: 'grant-standing',
+    },
+    justification: {
+      reason: `Extend standing grant ${record.grant_id} of ${record.capability}`,
+      requestedEffects: [effectBinding],
+      impactSummary: details,
+    },
+    risk: { level: 'high', restartScope: 'manual', requiresStrongAuth: true, policyId: 'PG-03' },
+    workflow: {
+      workflowId: `pg-03-grant-extend-${record.grant_id}`,
+      mode: 'all_required',
+      requiredRoles: ['sovereign'],
+      stages: [],
+      approvals: [{ role: 'sovereign', status: 'pending' }],
+    },
+    accountability: { finalDecision: 'human_only', payloadHash, effectBinding },
+  });
+}
+
+/**
+ * Apply an approved extension step to the same grant. The approval is consumed
+ * once; the new expiry is consumption time + extend_days. Audited before the
+ * record is written; verified again at every use (verifyGrantBasis).
+ */
+export function extendStandingGrant(
+  draft: GrantExtensionDraft,
+  options: { approvalRequestId: string; now?: Date }
+): GrantRecord {
+  const now = options.now ?? new Date();
+  const record = requireExtendableGrant(draft);
+  const { extendDays } = assertGrantExtendable(record, now, draft.extend_days);
+  const previous = record.expires_at;
+  const approvalRequestId = String(options.approvalRequestId ?? '').trim();
+  if (!approvalRequestId)
+    throw new GrantError('approval_required', 'an extension needs an approval request id');
+  const checked = assertHumanGrantDecision(approvalRequestId, {
+    consumer: GRANT_EXTENSION_CONSUMER,
+    effectBinding: grantExtensionEffectBinding(record.grant_id, previous),
+    payloadHash: computeApprovalPayloadHash(grantExtensionPayload(record, previous, extendDays)),
+    payloadMismatch: 'extension approval is bound to a different grant, expiry or length',
+  });
+  const consumed = markApprovalConsumed('mission_controller', {
+    channel: GRANT_APPROVAL_CHANNEL,
+    requestId: checked.approval.id,
+    consumer: GRANT_EXTENSION_CONSUMER,
+    consumedBy: checked.humanDecider,
+    effectRef: grantExtensionEffectRef(record.grant_id, previous),
+  });
+  const extendedAt = consumed.consumption?.consumedAt;
+  if (!extendedAt)
+    throw new GrantError(
+      'approval_invalid',
+      `extension approval ${checked.approval.id} was not consumed`
+    );
+  const step: Omit<GrantExtension, 'audit_event_id'> = {
+    approval_request_id: checked.approval.id,
+    approval_channel: GRANT_APPROVAL_CHANNEL,
+    previous_expires_at: previous,
+    expires_at: new Date(Date.parse(extendedAt) + extendDays * DAY_MS).toISOString(),
+    extended_at: extendedAt,
+    extend_days: extendDays,
+    extended_by: {
+      actor_id: checked.humanDecider,
+      role: checked.role,
+      assurance: checked.assurance,
+    },
+  };
+  const pending: GrantRecord = {
+    ...record,
+    expires_at: step.expires_at,
+    extensions: [...(record.extensions ?? []), { ...step, audit_event_id: 'pending' }],
+  };
+  const precheck = validateGrantRecord(pending);
+  if (!precheck.valid) throw new GrantError('invalid_input', precheck.errors.join('; '));
+  const auditEventId = recordGrantAudit(
+    'grant.extended',
+    pending,
+    { kind: 'human', id: checked.humanDecider },
+    {
+      previous_expires_at: previous,
+      extend_days: extendDays,
+      extension_approval_request_id: checked.approval.id,
+    }
+  );
+  const extended: GrantRecord = {
+    ...pending,
+    extensions: [...(record.extensions ?? []), { ...step, audit_event_id: auditEventId }],
+  };
+  writeGrant(extended);
+  return extended;
+}
+
+/** Use-time re-verification of every extension step (approval, binding, chain). */
+function verifyGrantExtensions(record: GrantRecord): boolean {
+  let previous = grantBaseExpiry(record);
+  for (const step of record.extensions ?? []) {
+    if (step.previous_expires_at !== previous || step.approval_channel !== GRANT_APPROVAL_CHANNEL)
+      return false;
+    if (
+      Date.parse(step.extended_at) - Date.parse(step.previous_expires_at) >
+      GRANT_EXTENSION_GRACE_DAYS * DAY_MS
+    )
+      return false;
+    if (Date.parse(step.expires_at) - Date.parse(step.extended_at) !== step.extend_days * DAY_MS)
+      return false;
+    const approval = loadApprovalRequest(GRANT_APPROVAL_CHANNEL, step.approval_request_id);
+    if (!approval || approval.status !== 'approved' || approval.revocation) return false;
+    const consumption = approval.consumption;
+    if (
+      consumption?.consumer !== GRANT_EXTENSION_CONSUMER ||
+      consumption.effectRef !== grantExtensionEffectRef(record.grant_id, previous) ||
+      consumption.consumedAt !== step.extended_at
+    )
+      return false;
+    if (
+      approval.accountability?.effectBinding !==
+        grantExtensionEffectBinding(record.grant_id, previous) ||
+      approval.accountability?.payloadHash !==
+        computeApprovalPayloadHash(grantExtensionPayload(record, previous, step.extend_days))
+    )
+      return false;
+    previous = step.expires_at;
+  }
+  return previous === record.expires_at;
 }
 
 // ---------------------------------------------------------------------------

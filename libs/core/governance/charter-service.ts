@@ -1,5 +1,6 @@
 import type { MemberRole } from '../organization/member-registry.js';
 import {
+  describeInvalidExternalOperationGrants,
   parseExternalOperationGrants,
   type ExternalOperationGrant,
 } from './external-operation-target.js';
@@ -119,7 +120,11 @@ export function parseCharterForm(
   if (scopeKind === 'person' ? tenant !== '' : !isValidTenantSlug(tenant))
     return { ok: false, error: 'tenant_slug is invalid' };
   const externalOperations = parseExternalOperationGrants(r.external_operations ?? []);
-  if (!externalOperations) return { ok: false, error: 'external_operations is invalid' };
+  if (!externalOperations)
+    return {
+      ok: false,
+      error: `external_operations is invalid: ${describeInvalidExternalOperationGrants(r.external_operations ?? []).join('; ')}`,
+    };
   const nums: Record<string, number> = {};
   for (const key of ['per_action', 'per_day', 'per_month', 'max_loss_per_incident']) {
     const v = amount(r[key], key);

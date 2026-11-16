@@ -42,6 +42,73 @@
               "type": "string",
               "pattern": "^[a-z0-9][a-z0-9._-]{0,63}/[A-Z][A-Z0-9_]{0,63}$"
             },
+            "credential_lending": {
+              "description": "Credential custody/kind lending terms of a credential.use grant (CLAUDE_CLI_TENANT_CREDENTIAL_DESIGN §2.2; libs/core/secret/credential-custody.ts). Approval-bound; re-checked for eligibility at every use.",
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "credential_ref",
+                "custody",
+                "owner",
+                "service",
+                "kind",
+                "terms",
+                "plan",
+                "allowed_backends",
+                "value_fingerprint"
+              ],
+              "properties": {
+                "credential_ref": {
+                  "type": "string",
+                  "pattern": "^(person|tenant):[a-z0-9][a-z0-9-]{0,63}:[a-z][a-z0-9-]{0,63}(:[a-z0-9][a-z0-9-]{0,31})?$"
+                },
+                "custody": {
+                  "enum": ["person", "tenant"]
+                },
+                "owner": {
+                  "type": "string",
+                  "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+                },
+                "service": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9-]{0,63}$"
+                },
+                "kind": {
+                  "enum": ["api_key", "subscription_token"]
+                },
+                "terms": {
+                  "enum": ["commercial", "consumer"]
+                },
+                "plan": {
+                  "enum": ["api", "team", "enterprise", "pro", "max", "ultra"]
+                },
+                "allowed_backends": {
+                  "type": "array",
+                  "minItems": 1,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9-]{0,63}$"
+                  }
+                },
+                "budget_monthly_usd": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "token_expires_at": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "contract_tenant": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9-]{1,30}$"
+                },
+                "value_fingerprint": {
+                  "type": "string",
+                  "pattern": "^sha256:[0-9a-f]{64}$"
+                }
+              }
+            },
             "tenant_slug": {
               "type": "string",
               "pattern": "^[a-z][a-z0-9-]{1,30}$"
@@ -257,6 +324,75 @@
     "expires_at": {
       "type": "string",
       "format": "date-time"
+    },
+    "extensions": {
+      "description": "Owner-approved expiry extensions, oldest first. Only expires_at moves; each step is bound by payloadHash to its grant id, previous expiry and extension days, and re-verified at every use.",
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "approval_request_id",
+          "approval_channel",
+          "previous_expires_at",
+          "expires_at",
+          "extended_at",
+          "extend_days",
+          "extended_by",
+          "audit_event_id"
+        ],
+        "properties": {
+          "approval_request_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "approval_channel": {
+            "type": "string",
+            "minLength": 1
+          },
+          "previous_expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "extended_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "extend_days": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "extended_by": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["actor_id", "role", "assurance"],
+            "properties": {
+              "actor_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "role": {
+                "type": "string",
+                "enum": ["operator", "member_self", "sovereign"]
+              },
+              "assurance": {
+                "type": "string",
+                "enum": ["A0", "A1", "A2", "A3"]
+              }
+            }
+          },
+          "audit_event_id": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
     },
     "revoked": {
       "type": "object",

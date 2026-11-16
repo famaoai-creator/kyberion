@@ -30,6 +30,22 @@ export type ReasoningBackendMode =
   | 'openrouter'
   | 'stub';
 
+/**
+ * Credential service → reasoning backend modes the service's material may
+ * feed (`allowed_backends` vocabulary; see secret/credential-custody.ts).
+ * This file is the sanctioned in-code home for CLI-mode lists (RS-01).
+ */
+export const CREDENTIAL_SERVICE_BACKENDS: Readonly<
+  Record<string, readonly ReasoningBackendMode[]>
+> = Object.freeze({
+  anthropic: Object.freeze(['anthropic', 'claude-cli'] as const),
+  'claude-subscription': Object.freeze(['claude-cli'] as const),
+  openai: Object.freeze(['openai-api', 'codex-cli'] as const),
+  gemini: Object.freeze(['gemini-api', 'gemini-cli', 'agy-cli'] as const),
+  grok: Object.freeze(['grok-api'] as const),
+  cursor: Object.freeze(['cursor-cli'] as const),
+});
+
 export interface ReasoningBackendSelectionRule {
   env_any?: string[];
   env_equals?: Record<string, string>;

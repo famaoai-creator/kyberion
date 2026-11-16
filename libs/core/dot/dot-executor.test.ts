@@ -45,6 +45,7 @@ import {
   type DotWorkResultRow,
 } from './dot-state-paths.js';
 import './dot-extension-bootstrap.js';
+import { DotStandingBindingRefusal } from './dot-standing-binding.js';
 import { requestDotWorkItemRelease, applyApprovedDotReleases } from './dot-executor-release.js';
 import type { ApprovalRequestRecord } from '../governance/approval-store.js';
 
@@ -841,6 +842,69 @@ describe('runDotExecutorSweep', () => {
     );
     expect(rows.map((r) => r.work_item_id)).toEqual(['w1']);
     expect(h.claims.map((c) => c.itemId)).toEqual(['w1']);
+  });
+
+  it('runs tenant items inside the standing binding hook and builds ports inside it', async () => {
+    const c = charter({
+      scope: { tier: 'confidential', tenant_slug: 'acme', organization_id: 'acme-org' },
+    });
+    const target = item('w1', {}, {
+      context: { tenant_slug: 'acme', organization_id: 'acme-org' },
+    } as Partial<WorkItem>);
+    const h = harness([target]);
+    let inside = false;
+    const built: boolean[] = [];
+    h.deps.runBound = async (_c, run) => {
+      inside = true;
+      try {
+        return await run();
+      } finally {
+        inside = false;
+      }
+    };
+    const rows = await runDotExecutorSweep(
+      [{ path: 'dots/ops.json', charter: c }],
+      () => {
+        built.push(inside);
+        return ports();
+      },
+      h.deps
+    );
+    expect(rows.map((row) => row.status)).toEqual(['done']);
+    expect(built).toEqual([true]);
+  });
+
+  it('skips tenant items unclaimed with one classified standing refusal row per sweep', async () => {
+    const c = charter({
+      scope: { tier: 'confidential', tenant_slug: 'acme', organization_id: 'acme-org' },
+    });
+    const target = item('w1', {}, {
+      context: { tenant_slug: 'acme', organization_id: 'acme-org' },
+    } as Partial<WorkItem>);
+    const second = item('w2', {}, {
+      context: { tenant_slug: 'acme', organization_id: 'acme-org' },
+    } as Partial<WorkItem>);
+    const h = harness([target, second]);
+    h.deps.runBound = async () => {
+      throw new DotStandingBindingRefusal('DOT_CREDENTIAL_GRANT_MISSING', 'no grant for acme');
+    };
+    const rows = await runDotExecutorSweep(
+      [{ path: 'dots/ops.json', charter: c }],
+      ports(),
+      h.deps
+    );
+    expect(rows).toMatchObject([
+      { status: 'skipped', summary: expect.stringContaining('[DOT_CREDENTIAL_GRANT_MISSING]') },
+    ]);
+    expect(h.claims).toHaveLength(0);
+  });
+
+  it('never wraps a tenantless dot in the standing binding', async () => {
+    const h = harness([item('w1', {})]);
+    h.deps.runBound = vi.fn(async (_c, run) => run());
+    await runDotExecutorSweep([{ path: 'dots/ops.json', charter: charter() }], ports(), h.deps);
+    expect(h.deps.runBound).not.toHaveBeenCalled();
+    expect(h.claims.map((claim) => claim.itemId)).toEqual(['w1']);
   });
 
   it('holds execution when the budget governor throws', async () => {

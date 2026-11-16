@@ -8,6 +8,10 @@ import {
 } from '../foundation/env.js';
 import { assertIsolatedProviderHome } from './provider-auth-home.js';
 import {
+  providerTenantIsolationForProvider,
+  providerTenantIsolationSpecs,
+} from './provider-tenant-isolation.js';
+import {
   listCliReasoningProviderDescriptors,
   resolveReasoningProviderDescriptor,
 } from '../reasoning/reasoning-provider-registry.js';
@@ -413,7 +417,10 @@ const PROVIDER_REQUIRED_ENV_KEYS: Readonly<Record<ProviderId, readonly string[]>
 const PROVIDER_CREDENTIAL_ENV_KEYS: Readonly<Record<ProviderId, readonly string[]>> = {
   claude: ['ANTHROPIC_API_KEY'],
   codex: ['OPENAI_API_KEY'],
-  agy: [],
+  // Antigravity CLI: Google-account sign-in is its primary auth, but a
+  // GEMINI_API_KEY env (with modelProvider "gemini" in its settings) is the
+  // documented headless/API-key path.
+  agy: ['GEMINI_API_KEY'],
   // Grok Build primarily uses OAuth via `grok login`; optional direct API key
   // still allowed through when present.
   grok: ['XAI_API_KEY'],
@@ -421,8 +428,9 @@ const PROVIDER_CREDENTIAL_ENV_KEYS: Readonly<Record<ProviderId, readonly string[
   cursor: ['CURSOR_API_KEY'],
   // OpenCode primarily uses its login session; no provider API key passes through.
   opencode: [],
-  // Devin CLI primarily uses its `devin auth login` session; WINDSURF_API_KEY
-  // is the documented credential override (shared Cognition/Windsurf auth).
+  // Devin CLI primarily uses its `devin auth login` session (verified on
+  // 3000.x: env keys do NOT authenticate the agent session); these vars are
+  // still passed for Cognition tooling compatibility.
   devin: ['WINDSURF_API_KEY', 'DEVIN_API_KEY'],
 };
 
@@ -467,6 +475,9 @@ export function providerCredentialEnvValues(env: NodeJS.ProcessEnv = process.env
       }
     }
   }
+  // A bound credential can live in the binding's secrets, not its provider env.
+  for (const spec of providerTenantIsolationSpecs())
+    for (const value of spec.boundSecretValues()) values.add(value);
   return [...values];
 }
 
@@ -531,6 +542,7 @@ export function buildProviderChildEnv({
     throw new Error(
       '[CREDENTIAL_HOME_INVALID] Personal claimed provider environments are not admitted'
     );
+  const operatorPath = baseEnv.PATH;
   const bound = resolveTaskProviderEnvironment(provider);
   if (bound) {
     const tenant = credentialExecutionIdentity().tenantSlug;
@@ -538,6 +550,11 @@ export function buildProviderChildEnv({
     assertIsolatedProviderHome(bound, tenant);
     baseEnv = bound;
   }
+  // No bound environment: the allowlisted HOME carries the ambient login
+  // sessions — the intentional "bring-your-own CLI" channel. A tenant scope
+  // still requires a trusted binding upstream (checkedBinding), so ambient
+  // carry-in is limited to dispatched work; lent credentials always come
+  // with a bound isolated HOME instead.
   if (!bound && isProviderEnvAllowlistDisabled(baseEnv)) {
     // Full inheritance would hand the child the raw key the relay exists to
     // withhold, so the two settings are refused together (fail closed).
@@ -594,6 +611,10 @@ export function buildProviderChildEnv({
     result.KYBERION_TENANT = identity.tenantSlug!;
     if (identity.missionId) result.MISSION_ID = identity.missionId;
     if (identity.taskId) result.KYBERION_TASK_ID = identity.taskId;
+    // §4 isolation: a provider with a registered tenant-isolation spec gets
+    // kind-selected credential, config dir inside the bound HOME, no
+    // auto-update / non-essential traffic. Fails closed.
+    providerTenantIsolationForProvider(provider)?.applyEnv(result, bound, operatorPath);
   }
   return result as NodeJS.ProcessEnv;
 }

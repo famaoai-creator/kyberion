@@ -1,7 +1,7 @@
 ---
 title: 'Continuous Operations Loop'
 tags: [architecture, organization, autonomy, continuous-operations]
-last_updated: 2026-10-18
+last_updated: 2026-11-16
 ---
 
 # 継続運営ループ
@@ -55,6 +55,6 @@ scope は tenant → organization → project を一致させる。状態は同�
 
 owner は各副作用の前に元の承認 hash・scope・charter・claim・lease を再確認する。期限超過・不確実な副作用は隔離し、同じ操作を自動再試行しない。機械による gate-pass は --machine-only を使い、stored gate の失敗・欠落・生の人間確認を拒否する。完了は全 task contract が completed かつ verification が verified の場合だけ返す。
 
-組織運営用の organization-operations.json は既存 org-operations charter と同じ scope を使い、15分ごとに内部集計を観測する。レポートと判断待ち事項の project / mission 群を別ルールに分配する。通知は既存 charter の既定 inbox、実効果は既存 autonomy / approval gate に従う。
+組織運営用の organization-operations.json は、tenant に導入した org-operations charter（[テンプレート](../orchestration/dot-team-templates/org-operations.json)から `dot create` したもの）と同じ dot_id・scope を宣言し、15分ごとに内部集計を観測する。sweep は dot_id と scope が完全一致する active charter がある環境でだけこの設定を実行し、一致しない環境では何もしない。設定の scope は現状 1 tenant に固定されており、他の tenant で使うには同じディレクトリにその tenant 用のレビュー済み設定を追加する。レポートと判断待ち事項の project / mission 群を別ルールに分配する。通知は既存 charter の既定 inbox、実効果は既存 autonomy / approval gate に従う。
 
 任意 SaaS の認証情報の追加、自由文からの権限生成、進行中の他 owner の強制取消は対象外。データ別 collector を追加する際も既存許可済み pipeline とスコープ付き snapshot の契約へ接続する。

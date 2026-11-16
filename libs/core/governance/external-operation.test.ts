@@ -1050,6 +1050,54 @@ describe('external operation common admission', () => {
     expect(observer).not.toHaveBeenCalled();
   });
 
+  it('records a failed observation-only read as failed without a verification stop', async () => {
+    vi.mocked(runCharterGate).mockReturnValue({
+      kind: 'allow',
+      acceptedCharter: acceptedFixture,
+      message: 'allow',
+    });
+    const observer = vi.fn();
+    const failure = new Error('[APPROVAL_QUEUE_LOGIN] login.confirm failed');
+    await withExternalOperationApprovalObserver(observer, () =>
+      expect(
+        runExternalOperation(
+          operation({ operationId: 'browser:approval_queue_inspect', observationOnly: true }),
+          async () => {
+            throw failure;
+          },
+          () => 'succeeded'
+        )
+      ).rejects.toBe(failure)
+    );
+    expect(observer).not.toHaveBeenCalled();
+    expect(recordCharterExecutionOutcome).toHaveBeenLastCalledWith(
+      expect.anything(),
+      expect.objectContaining({ outcome: 'failed' }),
+      undefined
+    );
+  });
+
+  it('ignores observationOnly on an operation that is not a registry read', async () => {
+    vi.mocked(runCharterGate).mockReturnValue({
+      kind: 'allow',
+      acceptedCharter: acceptedFixture,
+      message: 'allow',
+    });
+    const observer = vi.fn();
+    await withExternalOperationApprovalObserver(observer, () =>
+      expect(
+        runExternalOperation(
+          operation({ observationOnly: true }),
+          async () => {
+            throw new Error('connection lost');
+          },
+          () => 'succeeded'
+        )
+      ).rejects.toThrow('EXTERNAL_RESULT_UNVERIFIED')
+    );
+    expect(observer).toHaveBeenCalledOnce();
+  });
+
   it('allows only one delayed execution for an invocation including after unknown outcome', async () => {
     vi.mocked(runCharterGate).mockReturnValue({
       kind: 'allow',

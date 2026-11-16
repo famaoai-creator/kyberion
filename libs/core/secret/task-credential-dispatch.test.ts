@@ -161,10 +161,9 @@ describe('configured task credential dispatch', () => {
         // Scoped miss, never an operator-env fallback.
         expect(resolveTaskCredential('TEST_BOUND_KEY')).toBeNull();
         expect(selectProviderCredential(['TEST_BOUND_KEY'], 'operator-key')).toBeUndefined();
-        // Provider env access is denied outright — no isolated env is bound.
-        expect(() => resolveTaskProviderEnvironment('claude-cli')).toThrow(
-          '[CREDENTIAL_PROVIDER_DENIED]'
-        );
+        // No isolated provider env is bound: the trusted lineage binding
+        // permits the ambient carry-in channel instead of operator secrets.
+        expect(resolveTaskProviderEnvironment('claude-cli')).toBeUndefined();
         // API key selection finds nothing bound and refuses the operator value.
         expect(() => resolveProviderApiCredential(['TEST_BOUND_KEY'], 'operator-key')).toThrow(
           '[CREDENTIAL_KEY_UNAVAILABLE]'

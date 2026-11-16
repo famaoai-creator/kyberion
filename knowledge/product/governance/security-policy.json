@@ -945,6 +945,11 @@
       "allow_read": ["knowledge/personal/connections/chronos-access.json"],
       "allow_write": []
     },
+    "member_owner_reader": {
+      "description": "Read-only member tenant-role lookup for credential custody (libs/core/secret/credential-eligibility-deps.ts lookupMemberTenantRole): reads one member profile under knowledge/personal/members/ and exposes only {member, tenant, role} to decide whether the approver of a tenant-custody credential lending, registration or replacement is an owner member of the owner tenant. Reached wherever a lent credential is bound or re-validated (dot runtime as organization_operator inside credential_allocation_reader, surfaces through reasoning bootstrap). No writes, no other reads (persona worker).",
+      "allow_read": ["knowledge/personal/members/"],
+      "allow_write": []
+    },
     "nhi_accountability_reader": {
       "description": "Read-only member-status lookup for NHI accountability reports. Resolves operator user IDs against knowledge/personal/members/ and grants no writes or other role reads.",
       "allow_read": ["knowledge/personal/members/"],

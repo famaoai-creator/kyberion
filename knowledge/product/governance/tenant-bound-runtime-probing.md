@@ -3,7 +3,7 @@ title: Running and Probing Tenant-Bound Pipelines Without Policy Violations
 category: Governance
 tags: [governance, tenant, persona, authority, chronos, kill-switch, probing, tier-guard]
 importance: 7
-last_updated: 2026-11-15
+last_updated: 2026-11-16
 role_affinity: [mission_controller, ecosystem_architect, operator]
 phase_affinity: [execution, review]
 ---
@@ -84,6 +84,44 @@ role's writes cover `active/personal/`, the volatile layer
 `active/shared/tmp/`, logs and audit — it cannot reach `knowledge/` beyond
 its own dir or any tenant partition.
 
+### Tenant egress approvals for resident Dots (in-process tenant binding)
+
+Resident Dots do not get a per-tenant process: the agent-runtime supervisor
+runs every charter in ONE process and binds each wake to the charter's tenant
+through the execution scope (`withExecutionContextAsync(authority_role, fn,
+undefined, tenant_slug)`), not through `KYBERION_TENANT`. The env overlay above
+therefore never applies to them, and without an approval a confidential wake
+fails with `[TIER_EGRESS_DENIED] confidential material for tenant <t> may not
+be sent to <host>`.
+
+Put the tenant's approval in its own confidential root, at the fixed path
+
+```
+knowledge/confidential/<tenant>/governance/egress-policy.json
+```
+
+(same schema as `knowledge/product/governance/egress-policy.json`; only
+`tenant_allowed_providers` / `tenant_allowed_domains` for `<tenant>` are
+used), never in the public `egress-policy.json`. Whenever the current
+execution scope is bound to `<tenant>`, `loadEgressPolicy` merges those
+entries (union) onto the governed policy:
+
+- an unbound scope, or a scope bound to another tenant, never sees them; the
+  merged policy is cached per overlay (path + file mtime/size), so tenants
+  alternating in one process never share a merged policy, and an added or
+  edited file takes effect without a restart;
+- absent file = no overlay; an unreadable (tier-guard denied) or invalid file
+  merges nothing and logs `[EGRESS_OVERLAY_UNREADABLE]` — fail-closed;
+- entries naming other tenants are ignored with an `[EGRESS_OVERLAY_SCOPE]`
+  warning; mode, blocked domains and the general allowlist are never changed;
+- the read runs under the wake's own role: `organization_operator` already
+  reads `knowledge/confidential/${KYBERION_TENANT}/`, so no grant is widened.
+  A tenant-bound role without that read simply gets no overlay.
+
+When the env overlay is set (chronos tenant runner) and the scope is unbound or
+bound to the same tenant, the env overlay wins and keeps its stricter rules
+(a path outside the tenant root or a foreign-tenant entry throws).
+
 Interactive, non-tenant-bound CLI work that writes confidential knowledge
 still needs a persona with a write grant (e.g.
 `KYBERION_BASE_ROLE=ecosystem_architect`, `MISSION_ROLE=mission_controller` for
@@ -143,5 +181,6 @@ build:actuators`), and `@agent/core/*` imports in any throwaway probe
 - Personal runner: same daemon; role
   `knowledge/product/governance/authority-roles/chronos_personal_runner.json`.
 - Tenant egress overlay: `libs/core/governance/egress-policy.ts`
-  (`KYBERION_TENANT_EGRESS_POLICY_PATH`).
+  (`KYBERION_TENANT_EGRESS_POLICY_PATH`; scope-bound conventional path
+  `TENANT_EGRESS_OVERLAY_CONVENTIONAL_PATH`, `getTenantEgressOverlayRef`).
 - Kill switch / trust: `libs/core/governance/kill-switch.ts`, `libs/core/governance/trust-engine.ts`.

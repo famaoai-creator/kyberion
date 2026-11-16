@@ -60,6 +60,11 @@ import {
   type ReasoningBackend,
 } from '@agent/core/reasoning/reasoning-backend';
 import { runGoalDrivenLoop } from '@agent/core/workforce/worker-goal-driver';
+import { hasTaskCredentialBinding } from '@agent/core/foundation/credential-binding';
+import {
+  dotBoundTaskBackend,
+  runDotExecutorItemBound,
+} from '@agent/core/dot/dot-wake-orchestration';
 import type { DotSupervisorStep } from './dot_supervisor_extensions.js';
 
 const logger = createLogger('dot-executor-step');
@@ -321,6 +326,14 @@ function goalModeOf(resolution: DotWakeBackendResolution): DotGoalMode {
   return resolution.mode === 'tool' ? 'tool' : 'delegated';
 }
 
+/**
+ * Inside a tenant Dot's standing binding the claimed task gets its own private
+ * chain; the process-global chain belongs to the operator identity.
+ */
+function executorBackend(charter: DotCharter) {
+  return hasTaskCredentialBinding() ? dotBoundTaskBackend(charter) : getReasoningBackend();
+}
+
 /** Real executor ports for one charter. */
 export function buildDotExecutorPorts(
   charter: DotCharter,
@@ -331,7 +344,7 @@ export function buildDotExecutorPorts(
     isFrontDeskDiagnosticDot(charter) || Boolean(persisted && isFrontDeskDiagnosticDot(persisted));
   const resolution: DotWakeBackendResolution = diagnostic
     ? { mode: 'unavailable', reason: 'front_desk_diagnostic has no model execution' }
-    : resolveDotWakeBackend(charter, deps.backend ?? getReasoningBackend(), {
+    : resolveDotWakeBackend(charter, deps.backend ?? executorBackend(charter), {
         injected: deps.backend !== undefined,
       });
   const resolved = resolution.mode === 'unavailable' ? undefined : resolution.backend;
@@ -413,7 +426,12 @@ export async function runDotExecutorStep(
   const rows = await runDotExecutorSweep(
     active,
     (charter) => buildDotExecutorPorts(charter, deps),
-    { now: () => now, ...deps }
+    {
+      now: () => now,
+      // Tenant Dots execute as one claimed step of their standing Issue (credential binding).
+      runBound: (loaded, run) => runDotExecutorItemBound(loaded, run),
+      ...deps,
+    }
   );
   for (const row of rows) {
     if (row.status === 'skipped') {

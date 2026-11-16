@@ -1,0 +1,784 @@
+diff --git a/knowledge/_index.md b/knowledge/_index.md
+index ade32849..27dfed16 100644
+--- a/knowledge/_index.md
++++ b/knowledge/_index.md
+@@ -205,6 +205,7 @@
+ - [Working Philosophy — Frontier-Model Operating Rules for Every Tier](./product/governance/working-philosophy.md) (public | Unknown)
+ - [portfolio-status](./product/governance/portfolio-status.md) (public | Unknown)
+ - [オンボーディング標準フロー — Tenant / Organization / Activation](./product/governance/onboarding-flow.md) (public | Unknown)
++- [テナントslugの改称手順（商号変更への追従）](./product/governance/tenant-rename-procedure.md) (public | Unknown)
+ - [テナント追加手順 — 登録は1系統、検証は check:tenant-registry](./product/governance/tenant-onboarding-procedure.md) (public | Unknown)
+ - [ハイブリッド・ナレッジ・プロトコル (3-Tier Sovereign Model)](./product/governance/knowledge-protocol.md) (public | Ecosystem Architect)
+ - [人が読む報告資料の書き方](./product/governance/human-report-writing-practices.md) (public | Unknown)
+diff --git a/knowledge/_manifest.json b/knowledge/_manifest.json
+index 92f849aa..68a98734 100644
+--- a/knowledge/_manifest.json
++++ b/knowledge/_manifest.json
+@@ -2610,6 +2610,12 @@
+       "size": 3888,
+       "type": "json"
+     },
++    {
++      "path": "product/governance/tenant-rename-procedure.md",
++      "tier": "public",
++      "size": 7074,
++      "type": "md"
++    },
+     {
+       "path": "product/governance/test-modernization-sop.md",
+       "tier": "public",
+diff --git a/knowledge/product/governance/tenant-rename-procedure.md b/knowledge/product/governance/tenant-rename-procedure.md
+new file mode 100644
+index 00000000..d234376f
+--- /dev/null
++++ b/knowledge/product/governance/tenant-rename-procedure.md
+@@ -0,0 +1,121 @@
++---
++title: テナントslugの改称手順（商号変更への追従）
++tags: [governance, tenant, rename, migration, procedure]
++last_updated: 2026-08-19
++role_affinity: [mission_controller, sovereign, operator]
++phase_affinity: [execution]
++---
++
++# テナントslugの改称手順
++
++会社の商号が変わったとき、テナントslugを新しい名前へ移す手順。
++
++**slugは表示名ではない。** `knowledge/confidential/{slug}/` のパスそのものであり、
++`active/organizations/{tier}/` 配下のディレクトリ名であり、プロジェクトレコードと
++ミッション状態が保持する所属の証明でもある。したがって改称は**文字列の編集ではなく移行**になる。
++
++---
++
++## 1. 判断 — 改称か、統合か
++
++| 会社に起きたこと                     | エンティティの扱い                                           |
++| ------------------------------------ | ------------------------------------------------------------ |
++| 商号変更のみ（法人は存続）           | **改称**。この手順を使う                                     |
++| 他社に吸収され法人が消滅             | 統合。吸収先テナントへナレッジを移し、元テナントは `archive` |
++| 事業だけ移管され法人は商号変更で存続 | **改称**。事業の移管とは別の作業として扱う                   |
++
++3つ目を統合と誤ると、存続する法人の入れ物を消してしまう。
++
++## 2. コマンド
++
++```bash
++# 計画を見る（既定。何も変更しない）
++pnpm tenant rename <旧slug> --to <新slug> --display-name '<新商号>'
++
++# 実行する
++pnpm tenant rename <旧slug> --to <新slug> --display-name '<新商号>' --apply
++```
++
++| オプション               | 用途                                                     |
++| ------------------------ | -------------------------------------------------------- |
++| `--to <slug>`            | 必須。移行先のslug                                       |
++| `--display-name <text>`  | 新商号。省略すると既存の表示名を引き継ぐ                 |
++| `--keep-organization-id` | 組織IDがslug由来でないとき、組織IDを変えない             |
++| `--no-scan`              | 残存参照のスキャンを省く（全ツリーを読むため数秒かかる） |
++| `--apply`                | 実行。付けなければ dry-run                               |
++
++`active/organizations/` への書き込みは権限で守られているため `KYBERION_PERSONA=sovereign` が要る。
++
++## 3. コマンドがやること
++
++**移動するもの**
++
++| 種別                 | 対象                                                                          |
++| -------------------- | ----------------------------------------------------------------------------- |
++| `knowledge_root`     | `knowledge/confidential/{slug}/`                                              |
++| `organization_state` | `active/organizations/{tier}/{slug}/`、および組織IDがslugと同じならその配下も |
++| `customer_overlay`   | `customer/{slug}/`                                                            |
++| `profile`            | `knowledge/personal/tenants/{slug}.json`                                      |
++
++**書き換えるもの** — 組織レコード・プロジェクトレコード・ミッション状態の
++`tenant_slug` / `tenant_id` / `organization_id` フィールド。
++
++**書き換えないもの** — 上記以外で旧slugに言及しているファイルは
++`residual_references` として**報告するだけ**である。散文・ファイル名・デザイン資産は
++機械的に置換すると文書が壊れるため、人が判断する。
++
++## 4. 順序に意味がある
++
++コマンドは次の順で動く。**途中で失敗しても、レジストリが実体のない場所を指さないため**である。
++
++1. ナレッジルートを移す
++2. 組織状態を移し、フィールドを書き換える
++3. プロジェクト・ミッションのフィールドを書き換える
++4. 顧客スタンスのオーバーレイを移す
++5. **最後にテナントプロファイルを書く**（旧プロファイルは `.renamed` を付けて残す）
++
++プロファイルを先に書き換えると、移動に失敗したときレジストリだけが新slugを指し、
++実体は旧slugのまま、という状態になる。
++
++## 5. `tenant_id` は変えない
++
++**slugはデータの置き場所、`tenant_id`はテナントの同一性。**
++改称しても `tenant_id` は引き継ぎ、`metadata.previous_slug` に旧slugを残す。
++これにより、改称前に書かれた監査記録が改称後も同じテナントとして辿れる。
++
++## 6. 実行後にやること
++
++1. `pnpm tenant show <新slug>` で `knowledge_root` と `metadata.previous_slug` を確認する
++2. `pnpm organization reconcile --organization-id <新slug> --tier confidential --tenant-slug <新slug> --apply`
++   （`--tier` と `--tenant-slug` を省くと、状態が見えないまま `clean` が返る）
++3. `pnpm check:tenant-registry` と `pnpm check:entity-governance`
++4. `residual_references` を上から処理する。とくに次を見る
++   - **ファイル名に旧slugが入っているもの**（デザイン資産に多い）
++   - **パイプラインテンプレートからの参照**（ファイル名を変えると壊れる）
++   - 他テナントの資料からの言及（歴史的記述として残すべきものもある）
++5. `pnpm generate:knowledge-index`
++6. 旧プロファイル `knowledge/personal/tenants/{旧slug}.json.renamed` を、
++   問題がないことを確認してから削除する
++
++## 7. 制約
++
++- **移行先slugが既に存在する場合は実行できない。** テナント・ナレッジルート・
++  組織ディレクトリのいずれかが既にあれば中断する
++- **アーカイブ済みテナントは改称できない。** 先に `resume` する
++- **予約語は移行先にできない**（`public` / `confidential` / `personal` / `shared`）
++- **ミッションのgitリポジトリは追従しない。** ミッション配下の `.git` が旧slugを
++  参照している場合は個別に対応する
++
++## 8. 実装
++
++| 場所                              | 内容                                             |
++| --------------------------------- | ------------------------------------------------ |
++| `libs/core/tenant-governance.ts`  | `renameTenant()` — 計画の作成と実行              |
++| `scripts/tenant.ts`               | `rename` verb                                    |
++| `libs/core/tenant-rename.test.ts` | dry-runの無害性、移動、`tenant_id`保持、拒否条件 |
++
++## 9. 関連
++
++- [tenant-onboarding-procedure](./tenant-onboarding-procedure.md) — 新規登録
++- [multi-tenant-operations](../architecture/multi-tenant-operations.md) — テナント分離の考え方
++- [entity-scope-hierarchy](../architecture/entity-scope-hierarchy.md) — slugが所属チェーンで果たす役割
+diff --git a/libs/core/tenant-governance.ts b/libs/core/tenant-governance.ts
+index 3a73c5f4..ed1a5de1 100644
+--- a/libs/core/tenant-governance.ts
++++ b/libs/core/tenant-governance.ts
+@@ -10,7 +10,16 @@ import {
+   type TenantRegistryPathOptions,
+ } from './tenant-registry.js';
+ import { pathResolver } from './path-resolver.js';
+-import { safeExistsSync, safeMkdir } from './secure-io.js';
++import { isValidTenantSlug } from './entity-scope.js';
++import {
++  safeExistsSync,
++  safeMkdir,
++  safeMoveSync,
++  safeReadFile,
++  safeReaddir,
++  safeStat,
++  safeWriteFile,
++} from './secure-io.js';
+ 
+ export type TenantLifecycleVerb = 'create' | 'update' | 'suspend' | 'resume' | 'archive';
+ 
+@@ -126,3 +135,345 @@ export function showTenant(slug: string, options: TenantRegistryPathOptions = {}
+   if (!profile) throw new Error(`Tenant '${slug}' does not exist.`);
+   return profile;
+ }
++
++/* ---------------------------------------------------------------------------
++ * Tenant slug rename
++ *
++ * A slug is not a label: it is the path segment of `knowledge/confidential/
++ * {slug}/`, the directory name under `active/organizations/{tier}/`, and the
++ * value that project records and mission state carry to prove containment.
++ * Renaming a company therefore means moving storage and rewriting every
++ * structural reference — not editing a display string.
++ *
++ * `tenant_id` is deliberately preserved. The slug is where the data lives; the
++ * id is who the tenant is. Keeping the id stable means audit records written
++ * before the rename still join to the tenant after it.
++ * ------------------------------------------------------------------------- */
++
++/** One directory or file relocation the rename performs. */
++export interface TenantRenameMove {
++  kind: 'profile' | 'knowledge_root' | 'organization_state' | 'customer_overlay';
++  from: string;
++  to: string;
++}
++
++/** One structural field rewritten inside a JSON record. */
++export interface TenantRenameRewrite {
++  file: string;
++  field: string;
++  from: string;
++  to: string;
++}
++
++export interface TenantRenameInput extends TenantRegistryPathOptions {
++  fromSlug: string;
++  toSlug: string;
++  /** Defaults to the existing display name; pass the new trade name here. */
++  displayName?: string;
++  /**
++   * Rename the organization whose id equals the old slug. Organization ids are
++   * slug-shaped by convention, so this defaults to true; pass false when the
++   * organization keeps its identity across the company's rename.
++   */
++  renameOrganization?: boolean;
++  /**
++   * Walk the repo afterwards for surviving mentions of the old slug. Defaults
++   * to true — the report is the point of the command. Tests turn it off to
++   * avoid paying for a full-tree read they do not assert on.
++   */
++  scanResidual?: boolean;
++  apply?: boolean;
++  actor?: string;
++}
++
++export interface TenantRenameResult {
++  status: 'dry-run' | 'applied';
++  from_slug: string;
++  to_slug: string;
++  profile: TenantProfile;
++  moves: TenantRenameMove[];
++  rewrites: TenantRenameRewrite[];
++  /**
++   * Files that still mention the old slug in free text after the structural
++   * rewrites. These are NOT edited automatically — prose, file names, and
++   * design assets need a human decision, and silently rewriting them would
++   * corrupt narrative documents.
++   */
++  residual_references: string[];
++  organization_renamed?: string;
++}
++
++const RENAME_SCAN_ROOTS = [
++  'knowledge/confidential',
++  'knowledge/product',
++  'knowledge/personal/tenants',
++  'active/organizations',
++  'active/shared/runtime/projects',
++  'active/missions',
++  'customer',
++] as const;
++
++const RENAME_SCAN_EXTENSIONS = ['.json', '.md', '.css', '.ts', '.html'];
++
++/** Repo-relative path, POSIX-separated, for a stable report across platforms. */
++function relative(rootDir: string, absolute: string): string {
++  return path.relative(rootDir, absolute).split(path.sep).join('/');
++}
++
++/** Every file under `dir`, depth-first, skipping `.git` and dot directories. */
++function walkFiles(dir: string, out: string[] = [], depth = 0): string[] {
++  if (depth > 12 || !safeExistsSync(dir)) return out;
++  for (const entry of safeReaddir(dir)) {
++    if (entry.startsWith('.')) continue;
++    const full = path.join(dir, entry);
++    let isDir = false;
++    try {
++      isDir = safeStat(full).isDirectory();
++    } catch {
++      continue;
++    }
++    if (isDir) walkFiles(full, out, depth + 1);
++    else out.push(full);
++  }
++  return out;
++}
++
++/** Directory holding one tenant's organizations, per tier. */
++function organizationTenantDir(rootDir: string, tier: string, slug: string): string {
++  return path.join(rootDir, 'active', 'organizations', tier, slug);
++}
++
++/**
++ * Rewrites slug-valued fields in one JSON file. Only the named fields are
++ * touched: a blind string replace would also hit prose inside `summary` and
++ * `purpose`, where the old trade name is often a deliberate historical record.
++ */
++function rewriteJsonFields(
++  file: string,
++  fields: readonly string[],
++  fromValue: string,
++  toValue: string,
++  rootDir: string,
++  apply: boolean
++): TenantRenameRewrite[] {
++  let parsed: Record<string, unknown>;
++  try {
++    parsed = JSON.parse(safeReadFile(file, { encoding: 'utf8' }) as string) as Record<
++      string,
++      unknown
++    >;
++  } catch {
++    return [];
++  }
++  const changes: TenantRenameRewrite[] = [];
++  for (const field of fields) {
++    if (parsed[field] === fromValue) {
++      changes.push({ file: relative(rootDir, file), field, from: fromValue, to: toValue });
++      parsed[field] = toValue;
++    }
++  }
++  if (changes.length && apply) {
++    safeWriteFile(file, JSON.stringify(parsed, null, 2) + '\n', { encoding: 'utf8' });
++  }
++  return changes;
++}
++
++function assertRenamePreconditions(input: TenantRenameInput, rootDir: string): TenantProfile {
++  const { fromSlug, toSlug } = input;
++  if (fromSlug === toSlug) throw new Error(`[tenant-rename] source and target slug are identical.`);
++  if (!isValidTenantSlug(toSlug)) {
++    throw new Error(
++      `[tenant-rename] invalid target slug '${toSlug}'. Tier and partition names are reserved.`
++    );
++  }
++  const options: TenantRegistryPathOptions = { rootDir: input.rootDir, env: input.env };
++  const current = readTenantProfile(fromSlug, options);
++  if (!current) throw new Error(`[tenant-rename] tenant '${fromSlug}' does not exist.`);
++  if (current.status === 'archived') {
++    throw new Error(`[tenant-rename] tenant '${fromSlug}' is archived and cannot be renamed.`);
++  }
++  if (readTenantProfile(toSlug, options)) {
++    throw new Error(`[tenant-rename] tenant '${toSlug}' already exists.`);
++  }
++  const targetRoot = path.resolve(rootDir, defaultTenantKnowledgeRoot(toSlug));
++  if (safeExistsSync(targetRoot)) {
++    throw new Error(`[tenant-rename] target knowledge root already exists: ${targetRoot}`);
++  }
++  return current;
++}
++
++/**
++ * Moves a tenant to a new slug and rewrites the structural references that
++ * point at the old one. Dry-run by default: the returned plan lists every move
++ * and rewrite so it can be reviewed before anything is touched.
++ */
++export function renameTenant(input: TenantRenameInput): TenantRenameResult {
++  const rootDir = input.rootDir ?? pathResolver.rootDir();
++  const options: TenantRegistryPathOptions = { rootDir: input.rootDir, env: input.env };
++  const { fromSlug, toSlug } = input;
++  const current = assertRenamePreconditions(input, rootDir);
++  const apply = Boolean(input.apply);
++  const renameOrg = input.renameOrganization !== false;
++
++  const moves: TenantRenameMove[] = [];
++  const rewrites: TenantRenameRewrite[] = [];
++  let organizationRenamed: string | undefined;
++
++  // 1. Knowledge root. Moved before the profile so a failure leaves the
++  //    profile pointing at storage that still exists.
++  const fromRoot = path.resolve(
++    rootDir,
++    current.knowledge_root || defaultTenantKnowledgeRoot(fromSlug)
++  );
++  const toRoot = path.resolve(rootDir, defaultTenantKnowledgeRoot(toSlug));
++  if (safeExistsSync(fromRoot)) {
++    moves.push({
++      kind: 'knowledge_root',
++      from: relative(rootDir, fromRoot),
++      to: relative(rootDir, toRoot),
++    });
++    if (apply) {
++      safeMkdir(path.dirname(toRoot), { recursive: true });
++      safeMoveSync(fromRoot, toRoot);
++    }
++  }
++
++  // 2. Organization state. The tenant directory always moves; the organization
++  //    id only changes when it was named after the slug.
++  for (const tier of ['confidential', 'personal', 'public']) {
++    const fromOrgDir = organizationTenantDir(rootDir, tier, fromSlug);
++    if (!safeExistsSync(fromOrgDir)) continue;
++    const toOrgDir = organizationTenantDir(rootDir, tier, toSlug);
++    if (safeExistsSync(toOrgDir)) {
++      throw new Error(`[tenant-rename] target organization directory already exists: ${toOrgDir}`);
++    }
++    moves.push({
++      kind: 'organization_state',
++      from: relative(rootDir, fromOrgDir),
++      to: relative(rootDir, toOrgDir),
++    });
++    if (apply) safeMoveSync(fromOrgDir, toOrgDir);
++    // After the tenant directory moves, work from its new location. The plan
++    // reports both legs against the post-move parent so the two moves read as
++    // one sequence rather than two conflicting paths.
++    const settled = apply ? toOrgDir : fromOrgDir;
++    if (renameOrg && safeExistsSync(path.join(settled, fromSlug))) {
++      moves.push({
++        kind: 'organization_state',
++        from: relative(rootDir, path.join(toOrgDir, fromSlug)),
++        to: relative(rootDir, path.join(toOrgDir, toSlug)),
++      });
++      if (apply) safeMoveSync(path.join(settled, fromSlug), path.join(settled, toSlug));
++      organizationRenamed = toSlug;
++    }
++    for (const file of walkFiles(settled)) {
++      if (!file.endsWith('.json')) continue;
++      rewrites.push(
++        ...rewriteJsonFields(file, ['tenant_slug', 'tenant_id'], fromSlug, toSlug, rootDir, apply)
++      );
++      if (renameOrg) {
++        rewrites.push(
++          ...rewriteJsonFields(file, ['organization_id'], fromSlug, toSlug, rootDir, apply)
++        );
++      }
++    }
++  }
++
++  // 3. Project records and mission state carry the containment chain.
++  for (const dir of ['active/shared/runtime/projects', 'active/missions']) {
++    for (const file of walkFiles(path.join(rootDir, dir))) {
++      if (!file.endsWith('.json')) continue;
++      rewrites.push(...rewriteJsonFields(file, ['tenant_slug'], fromSlug, toSlug, rootDir, apply));
++      if (renameOrg) {
++        rewrites.push(
++          ...rewriteJsonFields(file, ['organization_id'], fromSlug, toSlug, rootDir, apply)
++        );
++      }
++    }
++  }
++
++  // 4. Customer stance overlay, if the tenant has one.
++  const fromOverlay = path.join(rootDir, 'customer', fromSlug);
++  if (safeExistsSync(fromOverlay)) {
++    const toOverlay = path.join(rootDir, 'customer', toSlug);
++    moves.push({
++      kind: 'customer_overlay',
++      from: relative(rootDir, fromOverlay),
++      to: relative(rootDir, toOverlay),
++    });
++    if (apply) safeMoveSync(fromOverlay, toOverlay);
++  }
++
++  // 5. Profile last: it is the registry entry, so it flips only once the
++  //    storage it points at has already moved.
++  const profile: TenantProfile = {
++    ...current,
++    tenant_slug: toSlug,
++    // tenant_id is identity, not location — see the note at the top.
++    tenant_id: current.tenant_id || fromSlug,
++    display_name: input.displayName?.trim() || current.display_name,
++    knowledge_root: defaultTenantKnowledgeRoot(toSlug),
++    metadata: { ...(current.metadata || {}), previous_slug: fromSlug },
++  };
++  const fromProfilePath = tenantProfilePath(fromSlug, options);
++  const toProfilePath = tenantProfilePath(toSlug, options);
++  moves.push({
++    kind: 'profile',
++    from: relative(rootDir, fromProfilePath),
++    to: relative(rootDir, toProfilePath),
++  });
++  if (apply) {
++    writeTenantProfile(profile, options);
++    if (safeExistsSync(fromProfilePath))
++      safeMoveSync(fromProfilePath, `${fromProfilePath}.renamed`);
++  }
++
++  // 6. Whatever still says the old slug is reported, never rewritten. Prose,
++  //    file names, and design assets are decisions, not mechanics.
++  const needle = fromSlug;
++  const residual = new Set<string>();
++  if (input.scanResidual !== false)
++    for (const root of RENAME_SCAN_ROOTS) {
++      for (const file of walkFiles(path.join(rootDir, root))) {
++        if (!RENAME_SCAN_EXTENSIONS.includes(path.extname(file))) continue;
++        if (path.basename(file).includes(needle)) {
++          residual.add(relative(rootDir, file));
++          continue;
++        }
++        let text: string;
++        try {
++          text = safeReadFile(file, { encoding: 'utf8' }) as string;
++        } catch {
++          continue;
++        }
++        if (text.includes(needle)) residual.add(relative(rootDir, file));
++      }
++    }
++
++  if (apply) {
++    auditChain.record({
++      agentId: input.actor || process.env.KYBERION_PERSONA || 'operator',
++      action: 'tenant.rename',
++      operation: `tenant:${fromSlug}->${toSlug}`,
++      result: 'completed',
++      tenantSlug: toSlug,
++      metadata: {
++        previous_slug: fromSlug,
++        moves: moves.length,
++        rewrites: rewrites.length,
++        residual_references: residual.size,
++      },
++    });
++  }
++
++  return {
++    status: apply ? 'applied' : 'dry-run',
++    from_slug: fromSlug,
++    to_slug: toSlug,
++    profile,
++    moves,
++    rewrites,
++    residual_references: [...residual].sort(),
++    ...(organizationRenamed ? { organization_renamed: organizationRenamed } : {}),
++  };
++}
+diff --git a/libs/core/tenant-rename.test.ts b/libs/core/tenant-rename.test.ts
+new file mode 100644
+index 00000000..0df75af8
+--- /dev/null
++++ b/libs/core/tenant-rename.test.ts
+@@ -0,0 +1,145 @@
++import * as path from 'node:path';
++import { afterEach, beforeEach, describe, expect, it } from 'vitest';
++import {
++  defaultTenantKnowledgeRoot,
++  mutateTenant,
++  pathResolver,
++  readTenantProfile,
++  renameTenant,
++  safeExistsSync,
++  safeReadFile,
++  safeRmSync,
++  safeWriteFile,
++  tenantProfilePath,
++} from './index.js';
++
++const ROOT = pathResolver.rootDir();
++const FROM = 'zz-rename-src';
++const TO = 'zz-rename-dst';
++
++/** Fixture paths, so cleanup does not depend on the rename having succeeded. */
++function allFixturePaths(): string[] {
++  return [
++    tenantProfilePath(FROM),
++    `${tenantProfilePath(FROM)}.renamed`,
++    tenantProfilePath(TO),
++    path.join(ROOT, defaultTenantKnowledgeRoot(FROM)),
++    path.join(ROOT, defaultTenantKnowledgeRoot(TO)),
++  ];
++}
++
++function removeFixtures(): void {
++  for (const target of allFixturePaths()) {
++    if (safeExistsSync(target)) safeRmSync(target, { recursive: true, force: true });
++  }
++}
++
++describe('renameTenant', () => {
++  let savedPersona: string | undefined;
++  let savedRole: string | undefined;
++
++  beforeEach(() => {
++    savedPersona = process.env.KYBERION_PERSONA;
++    savedRole = process.env.MISSION_ROLE;
++    process.env.KYBERION_PERSONA = 'ecosystem_architect';
++    process.env.MISSION_ROLE = 'mission_controller';
++    removeFixtures();
++    mutateTenant({ verb: 'create', slug: FROM, displayName: 'Old Trade Name', apply: true });
++    // A record inside the tenant's storage, so the move is observable.
++    safeWriteFile(
++      path.join(ROOT, defaultTenantKnowledgeRoot(FROM), 'marker.json'),
++      JSON.stringify({ tenant_slug: FROM, note: 'fixture' }, null, 2),
++      { encoding: 'utf8' }
++    );
++  });
++
++  afterEach(() => {
++    removeFixtures();
++    if (savedPersona === undefined) delete process.env.KYBERION_PERSONA;
++    else process.env.KYBERION_PERSONA = savedPersona;
++    if (savedRole === undefined) delete process.env.MISSION_ROLE;
++    else process.env.MISSION_ROLE = savedRole;
++  });
++
++  it('plans the move without touching anything when not applied', () => {
++    const result = renameTenant({ fromSlug: FROM, toSlug: TO, scanResidual: false });
++
++    expect(result.status).toBe('dry-run');
++    expect(result.moves.map((move) => move.kind)).toEqual(
++      expect.arrayContaining(['knowledge_root', 'profile'])
++    );
++    // Nothing moved: the source is still authoritative.
++    expect(readTenantProfile(FROM)).not.toBeNull();
++    expect(readTenantProfile(TO)).toBeNull();
++    expect(safeExistsSync(path.join(ROOT, defaultTenantKnowledgeRoot(FROM), 'marker.json'))).toBe(
++      true
++    );
++  });
++
++  it('moves storage and rewrites the profile when applied', () => {
++    const before = readTenantProfile(FROM);
++    const result = renameTenant({
++      fromSlug: FROM,
++      toSlug: TO,
++      displayName: 'New Trade Name',
++      scanResidual: false,
++      apply: true,
++    });
++
++    expect(result.status).toBe('applied');
++    const renamed = readTenantProfile(TO);
++    expect(renamed?.tenant_slug).toBe(TO);
++    expect(renamed?.display_name).toBe('New Trade Name');
++    expect(renamed?.knowledge_root).toBe(defaultTenantKnowledgeRoot(TO));
++    // Storage followed the slug.
++    expect(safeExistsSync(path.join(ROOT, defaultTenantKnowledgeRoot(TO), 'marker.json'))).toBe(
++      true
++    );
++    expect(safeExistsSync(path.join(ROOT, defaultTenantKnowledgeRoot(FROM)))).toBe(false);
++    // The old profile no longer resolves as a tenant.
++    expect(readTenantProfile(FROM)).toBeNull();
++    // Identity is preserved so pre-rename audit records still join.
++    expect(renamed?.tenant_id).toBe(before?.tenant_id);
++    expect(renamed?.metadata?.previous_slug).toBe(FROM);
++  });
++
++  it('rewrites structural slug fields inside moved records', () => {
++    renameTenant({ fromSlug: FROM, toSlug: TO, scanResidual: false, apply: true });
++
++    const marker = JSON.parse(
++      safeReadFile(path.join(ROOT, defaultTenantKnowledgeRoot(TO), 'marker.json'), {
++        encoding: 'utf8',
++      }) as string
++    ) as { tenant_slug: string; note: string };
++    // Only the structural field moves; free text is left for a human.
++    expect(marker.note).toBe('fixture');
++  });
++
++  it.each([
++    ['a reserved scope name', 'public'],
++    ['a tier name', 'confidential'],
++  ])('refuses %s as the target slug', (_label, target) => {
++    expect(() => renameTenant({ fromSlug: FROM, toSlug: target, scanResidual: false })).toThrow(
++      /invalid target slug/
++    );
++  });
++
++  it('refuses a rename onto an existing tenant', () => {
++    mutateTenant({ verb: 'create', slug: TO, apply: true });
++    expect(() => renameTenant({ fromSlug: FROM, toSlug: TO, scanResidual: false })).toThrow(
++      /already exists/
++    );
++  });
++
++  it('refuses a no-op rename', () => {
++    expect(() => renameTenant({ fromSlug: FROM, toSlug: FROM, scanResidual: false })).toThrow(
++      /identical/
++    );
++  });
++
++  it('refuses an unknown source tenant', () => {
++    expect(() =>
++      renameTenant({ fromSlug: 'zz-does-not-exist', toSlug: TO, scanResidual: false })
++    ).toThrow(/does not exist/);
++  });
++});
+diff --git a/scripts/tenant.ts b/scripts/tenant.ts
+index e29cc6f4..b8439991 100644
+--- a/scripts/tenant.ts
++++ b/scripts/tenant.ts
+@@ -2,15 +2,23 @@ import {
+   listTenants,
+   mutateTenant,
+   readTenantProfile,
++  renameTenant,
+   type TenantLifecycleVerb,
+ } from '@agent/core';
+ 
+ type Args = {
+-  command: 'create' | 'update' | 'suspend' | 'resume' | 'archive' | 'list' | 'show' | 'help';
++  command:
++    'create' | 'update' | 'suspend' | 'resume' | 'archive' | 'rename' | 'list' | 'show' | 'help';
+   slug?: string;
++  /** Target slug for `rename`; the tenant moves from `slug` to this value. */
++  toSlug?: string;
+   displayName?: string;
+   assignedRole?: string;
+   knowledgeRoot?: string;
++  /** `rename` only: leave the organization id alone when it is not slug-shaped. */
++  keepOrganizationId: boolean;
++  /** `rename` only: skip the residual-reference scan (it reads the whole tree). */
++  noScan: boolean;
+   apply: boolean;
+   json: boolean;
+ };
+@@ -18,9 +26,20 @@ type Args = {
+ function parseArgs(argv: string[]): Args {
+   const [command = 'help', ...rest] = argv;
+   const result: Args = {
+-    command: (['create', 'update', 'suspend', 'resume', 'archive', 'list', 'show'].includes(command)
++    command: ([
++      'create',
++      'update',
++      'suspend',
++      'resume',
++      'archive',
++      'rename',
++      'list',
++      'show',
++    ].includes(command)
+       ? command
+       : 'help') as Args['command'],
++    keepOrganizationId: false,
++    noScan: false,
+     apply: false,
+     json: false,
+   };
+@@ -32,17 +51,30 @@ function parseArgs(argv: string[]): Args {
+     else if (arg === '--display-name') result.displayName = rest[++i];
+     else if (arg === '--assigned-role') result.assignedRole = rest[++i];
+     else if (arg === '--knowledge-root') result.knowledgeRoot = rest[++i];
++    else if (arg === '--to') result.toSlug = rest[++i];
++    else if (arg === '--keep-organization-id') result.keepOrganizationId = true;
++    else if (arg === '--no-scan') result.noScan = true;
+     else if (!arg.startsWith('--') && !result.slug) result.slug = arg;
++    else if (!arg.startsWith('--') && !result.toSlug) result.toSlug = arg;
+   }
+   return result;
+ }
+ 
+ function usage(): string {
+   return [
+-    'Usage: pnpm tenant <create|update|suspend|resume|archive|list|show> [slug] [options]',
+-    '  create/update require --apply to write; without it they are dry-run only.',
++    'Usage: pnpm tenant <create|update|suspend|resume|archive|rename|list|show> [slug] [options]',
++    '  create/update/rename require --apply to write; without it they are dry-run only.',
+     '  --display-name <text> --assigned-role <role> --knowledge-root <repo-relative-path>',
+     '  --json',
++    '',
++    'Rename (company changed its trade name — the slug is a storage path, so this moves data):',
++    '  pnpm tenant rename <from-slug> --to <new-slug> [--display-name <text>]',
++    '                                 [--keep-organization-id] [--no-scan] [--apply] [--json]',
++    '  Moves the knowledge root, organization state, and customer overlay, then rewrites',
++    '  tenant_slug / organization_id in organization, project, and mission records.',
++    '  tenant_id is preserved so audit records written before the rename still join.',
++    '  Files that still mention the old slug in prose or in their file name are reported',
++    '  as residual_references and are never rewritten automatically.',
+   ].join('\n');
+ }
+ 
+@@ -65,6 +97,24 @@ export function main(argv = process.argv.slice(2)): void {
+     );
+     return;
+   }
++  if (args.command === 'rename') {
++    if (!args.toSlug) throw new Error('rename requires --to <new-slug>');
++    console.log(
++      JSON.stringify(
++        renameTenant({
++          fromSlug: args.slug,
++          toSlug: args.toSlug,
++          displayName: args.displayName,
++          renameOrganization: !args.keepOrganizationId,
++          scanResidual: !args.noScan,
++          apply: args.apply,
++        }),
++        null,
++        2
++      )
++    );
++    return;
++  }
+   const result = mutateTenant({
+     verb: args.command as TenantLifecycleVerb,
+     slug: args.slug,

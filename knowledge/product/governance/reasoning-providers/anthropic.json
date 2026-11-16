@@ -3,7 +3,11 @@
   "providers": [
     {
       "mode": "anthropic",
-      "api_proof": { "protocol": "messages", "base_url": "https://api.anthropic.com/v1", "default_model_role": "anthropic-default" },
+      "api_proof": {
+        "protocol": "messages",
+        "base_url": "https://api.anthropic.com/v1",
+        "default_model_role": "anthropic-default"
+      },
       "provider": "anthropic",
       "module": "./reasoning/reasoning-api-provider",
       "capabilities": {
@@ -36,6 +40,7 @@
       },
       "model_vendor": "anthropic",
       "endpoint": "https://api.anthropic.com",
+      "egress_provider_id": "claude",
       "model_env_keys": ["KYBERION_ANTHROPIC_MODEL", "KYBERION_CLAUDE_MODEL"],
       "setup_hint": "Configure ANTHROPIC_API_KEY."
     }

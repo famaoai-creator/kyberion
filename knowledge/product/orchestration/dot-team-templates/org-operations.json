@@ -1,18 +1,18 @@
 {
-  "$schema": "../knowledge/product/schemas/dot-charter.schema.json",
+  "$schema": "../../schemas/dot-charter.schema.json",
   "kind": "dot-charter",
   "dot_id": "org-operations",
   "version": "1.0.0",
   "title": "Organization Operations Sentinel",
-  "purpose": "組織運営ループ（Operation tick、意思決定の進捗監視、サービスヘルス、プロジェクト進捗）を常駐監視し、自律的な定常業務遂行とオーナーへの判断要請を担う。",
-  "status": "active",
+  "purpose": "組織運営ループ（Operation tick、意思決定の進捗監視、サービスヘルス、プロジェクト進捗）を常駐監視し、自律的な定常業務遂行とオーナーへの判断要請を担う。tenant 非依存のテンプレート: <tenant-slug> と <organization-id> を置き換え、`pnpm kyberion dot create` で tenant の dots/ に draft として配置してから activate する。",
+  "status": "draft",
   "scope": {
     "tier": "confidential",
-    "tenant_slug": "kyberion-service-studio",
-    "organization_id": "kyberion-development-team"
+    "tenant_slug": "<tenant-slug>",
+    "organization_id": "<organization-id>"
   },
   "goal": {
-    "statement": "組織 kyberion-development-team の定常運用ループを滞りなく回す。期限を迎えたオペレーションを tick し、未観測サービスを検知し、判断待ちの意思決定を整理してオーナーへ提示する。",
+    "statement": "組織 <organization-id> の定常運用ループを滞りなく回す。期限を迎えたオペレーションを tick し、未観測サービスを検知し、判断待ちの意思決定を整理してオーナーへ提示する。",
     "success_signals": [
       "未実行（overdue）のオペレーションが 0 件",
       "全サービスのヘルス状態が 24時間以内に観測済み（healthy）",
@@ -35,7 +35,7 @@
         "kind": "probe",
         "probe": {
           "type": "file",
-          "path": "active/organizations/confidential/kyberion-service-studio/kyberion-development-team/state/organization-state.json",
+          "path": "active/organizations/confidential/<tenant-slug>/<organization-id>/state/organization-state.json",
           "expect": "changed"
         }
       },
@@ -61,12 +61,13 @@
   "decisions": {
     "default_decision": "notify",
     "veto_window_minutes": 60,
-    "escalate_channel": "slack"
+    "escalate_channel": "surface"
   },
   "notification": {
+    "delivery_mode": "inbox",
     "deliver_to": {
-      "surface": "slack",
-      "channel": "kyberion-executive"
+      "surface": "surface",
+      "channel": "inbox"
     },
     "digest_cron": "0 9,18 * * 1-5",
     "quiet_hours": {
@@ -93,6 +94,7 @@
   },
   "runtime": {
     "heartbeat_id": "dot-org-operations",
-    "max_idle_wake_ms": 345600000
+    "max_idle_wake_ms": 345600000,
+    "reasoning_training_use": "no_training"
   }
 }

@@ -67,6 +67,9 @@ const STORE_GRANT_MATRIX_SPECS: readonly StoreGrantMatrixSpec[] = [
   { name: 'peer_task_artifact_writer', bind: 'tenant' },
   { name: 'metrics_cap_reader', bind: 'none' },
   { name: 'nhi_accountability_reader', bind: 'none' },
+  // Declared directly as a store grant (credential custody); same read-only rules as
+  // nhi_accountability_reader, so it must decide exactly as that matrix.
+  { name: 'member_owner_reader', bind: 'none' },
   { name: 'audit_mirror_writer', bind: 'tenant' },
   { name: 'tenant_ledger_store', bind: 'tenant' },
   { name: 'delegation_record_store', bind: 'tenant' },

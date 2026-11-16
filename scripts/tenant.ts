@@ -13,6 +13,11 @@ import {
 import { renameTenantWithPlan } from '@agent/core/organization/tenant-rename';
 import { captureCliAttestationInvoker } from './lib/cli/cli-attestation-invoker.js';
 import { readTenantProfile } from '@agent/core/organization/tenant-registry';
+import {
+  applyTenantPersonalOwner,
+  requestTenantPersonalOwner,
+} from '@agent/core/organization/tenant-governance';
+import { resolveCliApprovalRequester } from '@agent/core/governance/cli-operator-principal';
 import { withExecutionContext } from '@agent/core/authority';
 import { setRegisteredEnv } from '@agent/core/foundation/env';
 import { pathResolver } from '@agent/core/path-resolver';
@@ -57,6 +62,7 @@ type Args = {
     | 'list'
     | 'show'
     | 'attest-provider'
+    | 'personal-owner'
     | 'help';
   slug?: string;
   to?: string;
@@ -71,6 +77,8 @@ type Args = {
   plan?: string;
   basis?: string;
   attestedBy?: string;
+  person?: string;
+  clear?: boolean;
   validForDays?: number;
   apply: boolean;
   accept: boolean;
@@ -95,6 +103,7 @@ function parseArgs(argv: string[]): Args {
       'list',
       'show',
       'attest-provider',
+      'personal-owner',
     ].includes(command)
       ? command
       : 'help') as Args['command'],
@@ -131,6 +140,8 @@ function parseArgs(argv: string[]): Args {
       { flags: ['--assigned-role'], takesValue: 'next', apply: setTo('assignedRole') },
       { flags: ['--knowledge-root'], takesValue: 'next', apply: setTo('knowledgeRoot') },
       { flags: ['--provider'], takesValue: 'next', apply: setTo('provider') },
+      { flags: ['--person'], takesValue: 'next', apply: setTo('person') },
+      { flags: ['--clear'], apply: setTrue('clear') },
       { flags: ['--training-use'], takesValue: 'next', apply: setTo('trainingUse') },
       { flags: ['--plan'], takesValue: 'next', apply: setTo('plan') },
       { flags: ['--basis'], takesValue: 'next', apply: setTo('basis') },
@@ -154,7 +165,10 @@ function parseArgs(argv: string[]): Args {
 
 function usage(): string {
   return [
-    'Usage: pnpm tenant <create|update|suspend|resume|archive|rename|delete|list|show|attest-provider> [slug] [options]',
+    'Usage: pnpm tenant <create|update|suspend|resume|archive|rename|delete|list|show|attest-provider|personal-owner> [slug] [options]',
+    '  personal-owner <slug> --person user:<member> | --clear [--approval-request-id <id>]',
+    "    marks the tenant as that person's own tenant (owner-approved, audited); only then may",
+    "    the person's consumer subscription token (Claude Pro/Max) serve it.",
     '  rename <slug> --to <new-slug> --apply [--display-name <text>] [--keep-organization-id] [--no-scan]',
     '      Renames the registry entry; the default knowledge/confidential/<slug>',
     '      directory moves with it (a custom --knowledge-root path is left as-is).',
@@ -230,6 +244,61 @@ export function main(
     if (!profile) throw new Error(`Tenant '${args.slug}' does not exist.`);
     print(
       args.json ? JSON.stringify(profile, null, 2) : `${profile.tenant_slug}: ${profile.status}`
+    );
+    return;
+  }
+  if (args.command === 'personal-owner') {
+    // Review B1: the only path that marks a tenant as one person's own tenant
+    // (consumer subscription tokens serve only such tenants). Owner-approved, audited.
+    if (!args.clear && !args.person)
+      throw new Error('personal-owner requires --person user:<member> or --clear');
+    const personalOwner = args.clear ? null : args.person!;
+    if (!args.approvalRequestId) {
+      const { approval, approver } = withExecutionContext(
+        'sovereign_concierge',
+        () =>
+          requestTenantPersonalOwner({
+            slug: args.slug!,
+            personalOwner,
+            requester: resolveCliApprovalRequester({ legacy: 'operator' }),
+          }),
+        undefined,
+        args.slug
+      );
+      print(
+        JSON.stringify(
+          {
+            status: 'approval_required',
+            approval_id: approval.id,
+            approver,
+            next: [
+              `${approver} decides: pnpm kyberion approvals --approve ${approval.id}`,
+              `Then apply: pnpm tenant personal-owner ${args.slug} ${args.clear ? '--clear' : `--person ${args.person}`} --approval-request-id ${approval.id}`,
+            ],
+          },
+          null,
+          2
+        )
+      );
+      return;
+    }
+    const profile = withExecutionContext(
+      'sovereign_concierge',
+      () =>
+        applyTenantPersonalOwner({
+          slug: args.slug!,
+          personalOwner,
+          approvalRequestId: args.approvalRequestId!,
+          actor: resolveCliApprovalRequester({ legacy: 'operator' }).requestedBy,
+        }),
+      undefined,
+      args.slug
+    );
+    print(
+      JSON.stringify({
+        tenant: profile.tenant_slug,
+        personal_owner: profile.personal_owner ?? null,
+      })
     );
     return;
   }
