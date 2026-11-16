@@ -3929,6 +3929,41 @@
       "interactive": true
     },
     {
+      "id": "script.account.consent-request",
+      "module": "scripts/personal_credential_consent.ts",
+      "command": "account consent-request",
+      "noun": "account",
+      "verb": "consent-request",
+      "audience": "operator",
+      "args": ["request"],
+      "description": "cli_cmd_script_account_consent_request",
+      "group": "operate",
+      "interactive": true
+    },
+    {
+      "id": "script.account.consent-apply",
+      "module": "scripts/personal_credential_consent.ts",
+      "command": "account consent-apply",
+      "noun": "account",
+      "verb": "consent-apply",
+      "audience": "operator",
+      "args": ["apply"],
+      "description": "cli_cmd_script_account_consent_apply",
+      "group": "operate",
+      "interactive": true
+    },
+    {
+      "id": "script.account.consent-revoke",
+      "module": "scripts/personal_credential_consent.ts",
+      "command": "account consent-revoke",
+      "noun": "account",
+      "verb": "consent-revoke",
+      "audience": "operator",
+      "args": ["revoke"],
+      "description": "cli_cmd_script_account_consent_revoke",
+      "group": "operate"
+    },
+    {
       "id": "script.secret.apply",
       "module": "scripts/secret/secret_introduce.ts",
       "command": "secret apply",

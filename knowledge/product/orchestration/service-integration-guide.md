@@ -1,7 +1,7 @@
 ---
 title: 'Service Integration and Connection Guide'
 tags: [service, integration, connection, onboarding, security]
-last_updated: 2026-11-14
+last_updated: 2026-11-16
 runtime_stages: [alignment, contract_authoring, execution]
 ---
 
@@ -563,8 +563,9 @@ keeps its generic binding empty, while the local broker can admit an explicitly 
 personal token for one owner-consented fixed-path HTTPS GET/HEAD PRESET with Bearer/Bot
 headers. Pass service_binding_id and personal_credential_grant_id in context; they are
 selectors, not proof. This requires new `selected-read-api-v1` runtime consent; legacy
-grants remain manageable but cannot authorize execution. Owner consent issuance still
-uses the governed facade; its UI/CLI entrypoints remain unwired. Provider/native/session
+grants remain manageable but cannot authorize execution. Owner consent issuance
+uses the governed facade through the authenticated agent CLI below; owner-facing
+consent UI remains separate work. Provider/native/session
 credentials remain denied. GWS registration
 now uses the existing approved account introduction flow, separately from runtime use. Installing this change
 performs no live login, key creation, allocation, ownership migration or security-setting
@@ -596,6 +597,57 @@ command does not repair identity or create encryption keys. The current account
 encryption backend remains macOS Keychain with an existing key. See the
 [tenantless execution dependency roadmap](../architecture/api-credential-proof-boundary.md#tenantless-personal-execution-dependency-roadmap)
 for the separate steps required to execute claimed personal work without a tenant.
+
+### Request and withdraw personal account use from the terminal
+
+For an already registered personal API-token account, prepare a non-secret selection
+JSON file under the active personal profile. Its exact fields are:
+
+```json
+{
+  "bindingId": "personal-slack",
+  "projectId": "project-a",
+  "missionId": "MSN-A",
+  "taskId": "task-a",
+  "allowedActions": ["auth_test"],
+  "purpose": "Read account identity for this personal task",
+  "ttlDays": 1
+}
+```
+
+Use real existing identifiers for the selected binding and personal work. Unknown
+fields and owner/tenant overrides are not accepted; this metadata has no secret-input field. Never put secret material here. These identifiers
+select the requested scope; they do not establish a live work claim or runtime access.
+
+```bash
+pnpm kyberion account consent-request --selection knowledge/personal/consent.json --json
+# Open the returned approval URL and decide using the existing authenticated owner session.
+pnpm kyberion account consent-apply --selection knowledge/personal/consent.json --approval-id <id> --json
+pnpm kyberion account consent-revoke <grant-id> --reason "Task access no longer needed" --json
+```
+
+Request and apply prompt for an **existing signed Kyberion agent workload token**, not
+the external account's API token. Collection is hidden, limited to 16 KiB and two minutes,
+and requires an interactive terminal. There is no token argument, token file, environment
+input or piped-input mode. The verifier is fixed to `agent-token`; a human, environment
+agent marker, foreign agent, tenant credential, expired signature or missing verification
+key cannot fall back to another authentication provider. The credential must name the
+installed personal agent acting for the registered local owner. The CLI does not issue
+workload tokens, create verification keys, install identity or repair configuration.
+
+Run request/apply as a standalone command in the installed checkout, outside tenant,
+mission/worker, delegated and plugin execution scopes. The selection is re-read after
+interactive input and must be unchanged. Apply requires the same selection and usable
+owner approval; generation changes, expired approval and replay are rejected by the
+shared facade. Owner-origin requests are never relabelled as an agent, and no new
+self-consent exception is introduced. Approval does not execute the service operation.
+
+Revocation uses the existing local owner's withdrawal authority and does not require
+an active or installed assistant. Agent-marked or scoped callers cannot use this CLI
+withdrawal route. A terminal's local-owner attribution is not a new cryptographic proof
+of a human decision: this command only withdraws an existing grant. Human approval
+continues through the authenticated approval surface. None of these commands grants
+organization sharing or GWS runtime access.
 
 ### GWS session registration and remaining runtime work
 
