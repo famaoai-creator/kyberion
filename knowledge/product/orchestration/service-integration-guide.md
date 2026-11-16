@@ -626,10 +626,22 @@ pnpm kyberion account consent-apply --selection knowledge/personal/consent.json 
 pnpm kyberion account consent-revoke <grant-id> --reason "Task access no longer needed" --json
 ```
 
-Request and apply prompt for an **existing signed Kyberion agent workload token**, not
-the external account's API token. Collection is hidden, limited to 16 KiB and two minutes,
-and requires an interactive terminal. There is no token argument, token file, environment
-input or piped-input mode. The verifier is fixed to `agent-token`; a human, environment
+Request and apply require an **existing signed Kyberion agent workload token**, not
+the external account's API token. By default collection uses a hidden interactive
+terminal prompt, limited to 16 KiB and two minutes. A provisioner that already holds
+a valid token may instead launch the compiled entrypoint directly as
+`node dist/scripts/personal_credential_consent.js request --selection <path> --token-pipe --json`
+(or `apply` with the same selection and `--approval-id`) and provide it on the
+dedicated inherited descriptor 3. The launcher must attach a private pipe/socket
+at child stdio index 3, write the existing token, then close its writing end.
+The `pnpm kyberion` wrappers do not forward extra descriptors; this mode requires
+the direct entrypoint. This is not stdin: ordinary shell piping and
+redirecting a token file are not supported. The descriptor must be a pipe or socket;
+regular files and terminals are refused. The single ASCII `kya1.` token may have one
+final LF and must be followed by EOF. Collection rejects extra frames, trailing data,
+oversize input, errors and deadline expiry without falling back to the terminal.
+Never place the token in arguments, environment, process metadata or durable files.
+`--token-pipe` is not accepted for withdrawal. The verifier is fixed to `agent-token`; a human, environment
 agent marker, foreign agent, tenant credential, expired signature or missing verification
 key cannot fall back to another authentication provider. The credential must name the
 installed personal agent acting for the registered local owner. The CLI does not issue
@@ -639,14 +651,16 @@ The existing server-side token primitive requires an active canonical identity,
 ledger-bound owner and tenant scope, and a lifetime of at most 900 seconds.
 Verification rejects older tokens without the explicit owner/scope/identity
 revision claims, and any identity journal change invalidates outstanding tokens.
-There is no automatic renewal. A governed product path to acquire and privately
-deliver these tokens is still missing; the CLI consumes an already supplied valid
+There is no automatic renewal. Governed issuance, trusted launcher admission and
+execution-bound acquisition are still missing. The inherited pipe provides private
+conveyance of an already-held credential; possession of the pipe does not authenticate
+its writer or authorize token issuance. The CLI consumes an already supplied valid
 credential and is not an end-to-end onboarding flow. Do not substitute an NHI
 registration, runtime session identifier or service-use grant for that credential.
 
 Run request/apply as a standalone command in the installed checkout, outside tenant,
 mission/worker, delegated and plugin execution scopes. The selection is re-read after
-interactive input and must be unchanged. Apply requires the same selection and usable
+token input and must be unchanged. Apply requires the same selection and usable
 owner approval; generation changes, expired approval and replay are rejected by the
 shared facade. Owner-origin requests are never relabelled as an agent, and no new
 self-consent exception is introduced. Approval does not execute the service operation.
