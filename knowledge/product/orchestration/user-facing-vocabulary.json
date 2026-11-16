@@ -10125,6 +10125,11 @@
         "ja": "ブラウザプロファイルを一覧",
         "qps-ploc": "⟦Ŀïşŧ ƀřőẇşėř ṗřőƒïŀėş ŀőřėɱ ⟧"
       },
+      "cli_cmd_script_browser_approval_queue": {
+        "en": "Show an approval-queue profile's hash and the grant to sign",
+        "ja": "承認待ち点検プロファイルのハッシュと署名する grant を表示",
+        "qps-ploc": "⟦Şħőẇ ȧñ ȧṗṗřőṽȧŀ-ɋůėůė ṗřőƒïŀė'ş ħȧşħ ȧñḓ ŧħė ɠřȧñŧ ŧő şïɠñ ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
       "cli_cmd_script_browser_open": {
         "en": "Open a browser profile",
         "ja": "ブラウザプロファイルを開く",
@@ -10461,9 +10466,9 @@
         "qps-ploc": "⟦Ïñşṗėƈŧ, ƈȧŀïƀřȧŧė, ȧñḓ şėŧ şėȧɱ ṗřőṽïḓėř şėŀėƈŧïőñ ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
       },
       "cli_cmd_script_reasoning_credentials": {
-        "en": "Register, allocate, verify and revoke reasoning API credentials",
-        "ja": "推論 API のキー登録・tenant割り当て・実証・取り消し",
-        "qps-ploc": "⟦Řėɠïşŧėř, ȧŀŀőƈȧŧė, ṽėřïƒẏ ȧñḓ řėṽőķė řėȧşőñïñɠ ȦṖÏ ƈřėḓėñŧïȧŀş ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+        "en": "Register, lend to tenants, extend, verify, meter and revoke reasoning credentials",
+        "ja": "推論の資格情報の登録・テナントへの貸し出し・期限延長・実証・利用量・取り消し",
+        "qps-ploc": "⟦Řėɠïşŧėř, ŀėñḓ ŧő ŧėñȧñŧş, ėẋŧėñḓ, ṽėřïƒẏ, ɱėŧėř ȧñḓ řėṽőķė řėȧşőñïñɠ ƈřėḓėñŧïȧŀş ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
       },
       "cli_cmd_script_reasoning_setup": {
         "en": "Set up a reasoning backend",

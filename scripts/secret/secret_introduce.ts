@@ -126,7 +126,7 @@ async function readSecretHidden(prompt: string): Promise<string> {
   });
 }
 
-async function collectSecret(flags: Record<string, string | boolean>): Promise<string> {
+export async function collectSecret(flags: Record<string, string | boolean>): Promise<string> {
   const fromFile = flags['from-file'];
   if (typeof fromFile === 'string' && fromFile.trim()) {
     return readSecretFromFile(fromFile.trim());

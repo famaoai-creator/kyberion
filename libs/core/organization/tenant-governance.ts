@@ -119,6 +119,11 @@ function buildProfile(input: TenantMutationInput, current: TenantProfile | null)
       ? { provider_attestations: current.provider_attestations }
       : {}),
     ...(current?.ingest_sources ? { ingest_sources: current.ingest_sources } : {}),
+    // Only `pnpm tenant personal-owner` changes these (approval-backed); updates keep them.
+    ...(current?.personal_owner ? { personal_owner: current.personal_owner } : {}),
+    ...(current?.personal_owner_basis
+      ? { personal_owner_basis: current.personal_owner_basis }
+      : {}),
     ...(input.metadata || current?.metadata
       ? { metadata: { ...(current?.metadata || {}), ...(input.metadata || {}) } }
       : {}),
@@ -1054,3 +1059,6 @@ export function attestTenantProvider(
     ...(delegated ? { delegation: delegated } : {}),
   };
 }
+
+/** Governed tenant personal_owner (re-exported so the tenant CLI needs no extra subpath). */
+export { applyTenantPersonalOwner, requestTenantPersonalOwner } from './tenant-personal-owner.js';

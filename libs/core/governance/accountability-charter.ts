@@ -1,6 +1,7 @@
 import type { MemberRole } from '../organization/member-registry.js';
 import type { StorageDataTier } from '../storage-layout.js';
 import {
+  describeInvalidExternalOperationGrants,
   parseExternalOperationGrants,
   parseExternalOperationGrant,
   externalOperationGrantMatches,
@@ -413,7 +414,9 @@ export function validateCharter(charter: Charter, ctx: CharterValidationContext)
     envelope.external_operations !== undefined &&
     !parseExternalOperationGrants(envelope.external_operations)
   )
-    violations.push('external_operations must contain valid exact operation targets');
+    violations.push(
+      `external_operations must contain valid exact operation targets: ${describeInvalidExternalOperationGrants(envelope.external_operations).join('; ')}`
+    );
 
   if (!parseActorRef({ kind: 'human', id: accountable.actor })) {
     violations.push(`accountable.actor '${accountable.actor}' is not a valid human actor id`);

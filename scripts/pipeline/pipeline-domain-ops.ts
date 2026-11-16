@@ -1280,6 +1280,48 @@ export function runInlineApprovalStoreHygiene(
   );
 }
 
+/**
+ * core:credential_usage_monthly — month-to-date usage of lent reasoning
+ * credentials per borrower tenant, with 80% / 100% budget alerts
+ * (libs/core/secret/credential-usage-report.ts, design §6).
+ */
+export async function runInlineCredentialUsageMonthly(
+  step: PipelineAdfStep,
+  params: Record<string, unknown>,
+  ctx: Record<string, unknown>
+): Promise<Record<string, unknown>> {
+  const { withStoreGrant } = await import('@agent/core/authority');
+  const { listTenantProfileSlugs } = await import('@agent/core/organization/tenant-registry');
+  const { listCredentialAllocations, runCredentialUsageMonthly } =
+    await import('@agent/core/secret/credential-allocations');
+  const month = resolveVars(params.month ?? '', ctx);
+  const tenants = withStoreGrant('workspace_tenant_registry_index_reader', () =>
+    listTenantProfileSlugs()
+  );
+  const report = runCredentialUsageMonthly({
+    tenants,
+    listAllocations: listCredentialAllocations,
+    ...(typeof month === 'string' && /^\d{4}-\d{2}$/u.test(month) ? { month } : {}),
+  });
+  return exportValue(
+    params,
+    step,
+    {
+      month: report.month,
+      summaries: report.summaries,
+      alerts: report.alerts.map((alert) => ({
+        tenant: alert.tenant,
+        grant_id: alert.grant_id,
+        credential_ref: alert.credential_ref,
+        level: alert.level,
+        spent_usd: alert.assessment.spent_usd,
+        budget_usd: alert.assessment.budget_usd,
+      })),
+    },
+    ctx
+  );
+}
+
 /** core:organization_record_run — record one completed organization operation run. */
 export function runInlineOrganizationRecordRun(
   step: PipelineAdfStep,

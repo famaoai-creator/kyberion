@@ -179,6 +179,17 @@ const OPERATIONS: Readonly<Record<string, RegistryEntry>> = {
     },
     protectedPaths: [['params', 'url']],
   },
+  // Logs in and reads one tenant approval queue inside an origin-set confined
+  // browser; decisive buttons are refused by the op itself.
+  'browser:approval_queue_inspect': {
+    effectClass: 'external_read',
+    authority: { kind: 'admission', boundary: 'external' },
+    delegable: {
+      fields: ['origin', 'profile_hash'],
+      reputational_class: 'B',
+    },
+    protectedPaths: [['origin'], ['confined_origins'], ['profile_hash']],
+  },
   // --- External messaging / meetings ---
   'service:slack:preset:post_message': {
     effectClass: 'external_mutation',

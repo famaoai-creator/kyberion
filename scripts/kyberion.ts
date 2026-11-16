@@ -197,6 +197,11 @@ async function runScriptCommand(
     );
     return;
   }
+  // The buffered child gets the same operator `KYBERION_*` configuration as the
+  // streamed path (tenant binding, backend, locale, ...). Without it a
+  // tenant-scoped operator command such as `dot migrate-state` would lose
+  // KYBERION_TENANT, which is not on the secure-io env allowlist.
+  const childEnv = { ...kyberionConfigEnv(), ...credentialEnv };
   const result = scriptCommand.module
     ? await safeExecResultAsync(
         process.execPath,
@@ -207,12 +212,12 @@ async function runScriptCommand(
           ...(scriptCommand.args || []),
           ...commandArgs,
         ],
-        { cwd: pathResolver.rootDir(), timeoutMs: 120_000, env: credentialEnv }
+        { cwd: pathResolver.rootDir(), timeoutMs: 120_000, env: childEnv }
       )
     : await safeExecResultAsync(pnpmExecutable(), ['run', scriptCommand.script!, ...commandArgs], {
         cwd: pathResolver.rootDir(),
         timeoutMs: 120_000,
-        env: credentialEnv,
+        env: childEnv,
       });
   if (result.stdout.trim()) print(result.stdout.trim());
   if (result.status !== 0) {

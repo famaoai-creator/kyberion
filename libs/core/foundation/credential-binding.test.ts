@@ -462,12 +462,15 @@ describe('task-local credential binding', () => {
         withTaskCredentialBinding(
           {
             tenantSlug: 'alpha',
-            secrets: {},
+            // §4: the claude credential comes from the binding's secrets by kind;
+            // a key embedded in the provider environment is never passed through.
+            secrets: { ANTHROPIC_API_KEY: 'alpha-key' },
+            credentialKind: 'api_key',
             providerEnvironments: {
               claude: {
                 HOME: providerHome,
                 PATH: '/bin',
-                ANTHROPIC_API_KEY: 'alpha-key',
+                ANTHROPIC_API_KEY: 'env-embedded-key',
                 OTHER_TOKEN: 'never',
                 KYBERION_PROVIDER_ENV_ALLOWLIST: '0',
               },

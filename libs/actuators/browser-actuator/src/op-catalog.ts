@@ -57,6 +57,17 @@ const BROWSER_EXTRA_CONTRACTS: Record<string, InputSchema> = {
     },
     additionalProperties: false,
   },
+  approval_queue_inspect: {
+    type: 'object',
+    properties: {
+      profile: { type: 'string', minLength: 1 },
+      origin: { type: 'string', minLength: 1 },
+      headless: { type: 'boolean' },
+      export_as: { type: 'string' },
+    },
+    required: ['profile', 'origin'],
+    additionalProperties: false,
+  },
   distill_dom: {
     type: 'object',
     properties: {
@@ -312,6 +323,13 @@ const BROWSER_EXTRA_CONTRACTS: Record<string, InputSchema> = {
 
 const BROWSER_EXTRA_EXAMPLES: Record<string, Array<Record<string, unknown>>> = {
   local_session_probe: [{ path: 'active/shared/tmp/first-win-session.png' }],
+  approval_queue_inspect: [
+    {
+      profile: 'knowledge/confidential/acme/approval-queues/workflow.json',
+      origin: 'https://workflow.example.com',
+      export_as: 'workflow_queue',
+    },
+  ],
   distill_dom: [{ max_elements: 50 }],
   console: [{ limit: 20 }],
   evaluate: [{ script: 'document.title' }],
@@ -369,6 +387,7 @@ export const BROWSER_ACTUATOR_CAPTURE_OPS = [
   'extract_text_ref',
   'session_health',
   'local_session_probe',
+  'approval_queue_inspect',
   'action_trail',
   'screenshot',
   'snapshot',

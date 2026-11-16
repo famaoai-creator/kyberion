@@ -173,6 +173,14 @@ scoped cadence mode — the tenant bound to the run must equal the
 organization's tenant, and the audit records `tick:scoped` /
 `standup:scoped` / `retro:scoped`.
 
+The product ships no tenant-bound organization charter. The reference charter
+is the tenant-free draft template
+[`org-operations.json`](../knowledge/product/orchestration/dot-team-templates/org-operations.json):
+replace `<tenant-slug>` / `<organization-id>`, then
+`pnpm kyberion dot create --file <draft.json> --apply` writes it to
+`knowledge/confidential/<tenant-slug>/dots/` (steps in the
+[starter playbook](../knowledge/product/orchestration/dot-team-starter-playbook.ja.md#org-operations-テンプレートを-tenant-に導入する)).
+
 ```json
 "operations_cadence": {
   "tick_every_minutes": 15,
@@ -194,7 +202,7 @@ The repo cadence pipelines (`pipelines/organization-{operation-tick,standup,retr
 stay **sovereign-only** and aggregate across tenants for a single operator;
 prefer the dot cadence for per-tenant operation. A dot that wakes only on
 weekday crons should set `runtime.max_idle_wake_ms` above the weekend gap
-(`dots/org-operations.json` uses 4 days) so the watchdog does not page it.
+(the org-operations template uses 4 days) so the watchdog does not page it.
 
 ## Execution model
 
@@ -325,6 +333,8 @@ enabling a source; a row that says `stalled` is a blind watcher.
    activation gate; `pnpm kyberion dot activate <dot_id>` flips to active.
 4. Tenant-scoped dots live in `knowledge/confidential/{tenant}/dots/` and run
    under the tenant-bound runner, mirroring the scheduled-pipeline convention.
+   Never commit a charter bound to a specific tenant into `dots/`; ship a
+   draft template with placeholders instead (see `operations_cadence` above).
 
 Personal charters live in `knowledge/personal/dots/<owner-hash>/` and require
 `scope.tier: personal` and `scope.owner_nhi`. The current authenticated owner

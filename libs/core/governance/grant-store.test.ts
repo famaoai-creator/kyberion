@@ -21,7 +21,12 @@ import {
 } from './approval-store.js';
 import {
   GRANT_APPROVAL_CHANNEL,
+  GRANT_EXTENSION_GRACE_DAYS,
   GrantError,
+  extendStandingGrant,
+  grantDaysLeft,
+  requestGrantExtension,
+  verifyGrantBasis,
   grantRecordPath,
   grantStanding,
   grantStandingDirect,
@@ -40,7 +45,23 @@ import {
   resolveGrant,
 } from './grant-resolver.js';
 
-const GRANTS_ROOT = pathResolver.rootResolve(PARTITIONED_RUNTIME_STATE_ROOTS.grants);
+// Hermetic grant store: every grant path the store resolves is redirected from the
+// live `active/shared/runtime/grants` root into this file's own scratch root, so the
+// suite never reads, writes or deletes live grant state (operations-hygiene §5).
+// Approval records already go to the per-run, per-pool Vitest approval store.
+const LIVE_GRANTS_REL = PARTITIONED_RUNTIME_STATE_ROOTS.grants;
+const TEST_GRANTS_REL = `active/shared/tmp/vitest-grant-store-${process.pid}-${Date.now().toString(36)}`;
+const realRootResolve = pathResolver.rootResolve.bind(pathResolver);
+vi.spyOn(pathResolver, 'rootResolve').mockImplementation((relative: string) =>
+  realRootResolve(
+    relative === LIVE_GRANTS_REL || relative.startsWith(`${LIVE_GRANTS_REL}/`)
+      ? TEST_GRANTS_REL + relative.slice(LIVE_GRANTS_REL.length)
+      : relative
+  )
+);
+const GRANTS_ROOT = realRootResolve(TEST_GRANTS_REL);
+if (!GRANTS_ROOT.split(path.sep).join('/').includes('/active/shared/tmp/vitest-grant-store-'))
+  throw new Error('grant-store test root must be a scratch root');
 const MISSION_ID = 'MSN-GRANT-STORE-TEST';
 const MISSION_DIR = path.join(pathResolver.rootDir(), 'active/missions/confidential', MISSION_ID);
 const HUMAN = 'user:grant-test-owner';
@@ -149,7 +170,7 @@ describe('grant store', () => {
     expect(record.basis?.approval_request_id).toBeTruthy();
     expect(record.granted_by).toEqual({ actor_id: HUMAN, role: 'sovereign', assurance: 'A1' });
     const file = grantRecordPath('acme', record.grant_id);
-    expect(file.split(path.sep).join('/')).toContain('/runtime/grants/confidential/acme/');
+    expect(file.split(path.sep).join('/')).toContain(`/${TEST_GRANTS_REL}/confidential/acme/`);
     expect(loadGrant('acme', record.grant_id)).toEqual(record);
     expect(listGrants({ tenant_slug: 'acme' }).map((r) => r.grant_id)).toEqual([record.grant_id]);
   });
@@ -368,6 +389,119 @@ describe('grant approval flow', () => {
     const next = requestGrantApproval(draft, { requester: { requestedBy: 'agent:requester' } });
     approvalIds.push(next.id);
     expect(next.id).not.toBe(request.id);
+  });
+});
+
+describe('grant extension (owner-approved, same grant)', () => {
+  const DAY = 86_400_000;
+  function extend(record: GrantRecord, days: number, now: Date): GrantRecord {
+    const request = requestGrantExtension(
+      { grant_id: record.grant_id, tenant_slug: 'acme', extend_days: days },
+      { requester: { requestedBy: 'agent:requester' }, now }
+    );
+    approvalIds.push(request.id);
+    approve(request);
+    return extendStandingGrant(
+      { grant_id: record.grant_id, tenant_slug: 'acme', extend_days: days },
+      { approvalRequestId: request.id, now }
+    );
+  }
+
+  it('moves only expires_at, keeps id/principal/scope, audits and re-verifies at use', () => {
+    const record = approvedGrant({ ...draft, ttl_days: 10 });
+    const audit = vi.spyOn(auditChain, 'record');
+    const extended = extend(record, 30, new Date());
+    expect(extended.grant_id).toBe(record.grant_id);
+    expect(extended.scope).toEqual(record.scope);
+    expect(extended.granted_by).toEqual(record.granted_by);
+    expect(extended.granted_at).toBe(record.granted_at);
+    expect(Date.parse(extended.expires_at)).toBeGreaterThan(Date.parse(record.expires_at));
+    expect(extended.extensions).toHaveLength(1);
+    expect(extended.extensions?.[0]?.previous_expires_at).toBe(record.expires_at);
+    expect(Date.parse(extended.expires_at) - Date.parse(extended.extensions![0]!.extended_at)).toBe(
+      30 * DAY
+    );
+    expect(audit.mock.calls.some(([entry]) => entry.action === 'grant.extended')).toBe(true);
+    audit.mockRestore();
+    const stored = loadGrant('acme', record.grant_id)!;
+    expect(stored).toEqual(extended);
+    expect(verifyGrantBasis(stored)).toBe(true);
+    expect(grantDaysLeft(stored, new Date())).toBeGreaterThanOrEqual(29);
+    // Hand-editing the expiry (or the step) breaks the basis: it grants nothing.
+    expect(
+      verifyGrantBasis({
+        ...stored,
+        expires_at: new Date(Date.parse(stored.expires_at) + DAY).toISOString(),
+        extensions: [
+          {
+            ...stored.extensions![0]!,
+            expires_at: new Date(Date.parse(stored.expires_at) + DAY).toISOString(),
+          },
+        ],
+      })
+    ).toBe(false);
+    // Dropping the extension list while keeping the new expiry is refused too.
+    const { extensions: _drop, ...bare } = stored;
+    expect(verifyGrantBasis(bare)).toBe(false);
+  });
+
+  it('refuses a step longer than the capability maximum and reuse of a consumed approval', () => {
+    const record = approvedGrant({ ...draft, ttl_days: 10 });
+    expect(() =>
+      requestGrantExtension(
+        { grant_id: record.grant_id, tenant_slug: 'acme', extend_days: 91 },
+        { requester: { requestedBy: 'agent:requester' } }
+      )
+    ).toThrow(/between 1 and 90/);
+    const request = requestGrantExtension(
+      { grant_id: record.grant_id, tenant_slug: 'acme', extend_days: 20 },
+      { requester: { requestedBy: 'agent:requester' } }
+    );
+    approvalIds.push(request.id);
+    approve(request);
+    extendStandingGrant(
+      { grant_id: record.grant_id, tenant_slug: 'acme', extend_days: 20 },
+      { approvalRequestId: request.id }
+    );
+    expect(() =>
+      extendStandingGrant(
+        { grant_id: record.grant_id, tenant_slug: 'acme', extend_days: 20 },
+        { approvalRequestId: request.id }
+      )
+    ).toThrow(/different effect|already used/);
+  });
+
+  it('denies extending a revoked grant', () => {
+    const record = approvedGrant({ ...draft, ttl_days: 10 });
+    revokeGrant(record.grant_id, { by: HUMAN_ACTOR, reason: 'no longer needed' });
+    expect(() =>
+      requestGrantExtension(
+        { grant_id: record.grant_id, tenant_slug: 'acme' },
+        { requester: { requestedBy: 'agent:requester' } }
+      )
+    ).toThrow(/revoked/);
+  });
+
+  it('extends an expired grant only inside the grace window', () => {
+    const realNow = Date.now();
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(realNow - 12 * DAY));
+    const record = approvedGrant({ ...draft, ttl_days: 10 });
+    vi.setSystemTime(new Date(realNow - (11 + GRANT_EXTENSION_GRACE_DAYS) * DAY));
+    const old = approvedGrant({ ...draft, ttl_days: 10, purpose: 'older series' });
+    vi.useRealTimers();
+    // Two days after expiry: inside grace, extendable; it granted nothing meanwhile.
+    expect(Date.parse(record.expires_at)).toBeLessThan(Date.now());
+    const extended = extend(record, 15, new Date());
+    expect(Date.parse(extended.expires_at)).toBeGreaterThan(Date.now());
+    expect(verifyGrantBasis(loadGrant('acme', record.grant_id)!)).toBe(true);
+
+    expect(() =>
+      requestGrantExtension(
+        { grant_id: old.grant_id, tenant_slug: 'acme' },
+        { requester: { requestedBy: 'agent:requester' } }
+      )
+    ).toThrow(/expired more than 7 days ago/);
   });
 });
 

@@ -9,8 +9,16 @@ describeStoreGrantBoundary(
   {
     implementation: 'libs/core/foundation/credential-material-capability.ts',
     issuers: new Map([
-      ['withCredentialMaterialCapability', ['libs/core/secret/credential-allocations.ts']],
+      [
+        'withCredentialMaterialCapability',
+        [
+          'libs/core/secret/credential-allocations.ts',
+          'libs/core/secret/credential-lending-broker.ts',
+        ],
+      ],
       ['withAccountCredentialMaterialCapability', ['libs/core/secret/credential-allocations.ts']],
+      ['withLentCredentialMaterialCapability', ['libs/core/secret/credential-lending-broker.ts']],
+      ['withCredentialCustodyWriteCapability', ['libs/core/secret/credential-lending-broker.ts']],
     ]),
     consumers: new Map([
       [
@@ -19,6 +27,16 @@ describeStoreGrantBoundary(
           'withCredentialMaterialCapability',
           'withAccountCredentialMaterialCapability',
           'CREDENTIAL_MATERIAL_GRANT_ISSUANCE_RIGHT',
+        ],
+      ],
+      [
+        'libs/core/secret/credential-lending-broker.ts',
+        [
+          'withCredentialMaterialCapability',
+          'withLentCredentialMaterialCapability',
+          'withCredentialCustodyWriteCapability',
+          'CREDENTIAL_MATERIAL_GRANT_ISSUANCE_RIGHT',
+          'CREDENTIAL_CUSTODY_STORE_ISSUANCE_RIGHT',
         ],
       ],
       ['libs/core/secret/secret-guard.ts', ['assertAccountCredentialMaterialRead']],

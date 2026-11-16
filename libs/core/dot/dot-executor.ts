@@ -68,6 +68,11 @@ import {
 } from '../surface/front-desk-execution.js';
 import type { FrontDeskArtifactVerification } from './dot-state-paths.js';
 import { withExecutionContextAsync } from '../authority.js';
+import {
+  dotStandingLineage,
+  isDotStandingBindingRefusal,
+  isDotStandingItem,
+} from './dot-standing-binding.js';
 import { createLogger } from '../logger.js';
 import { withUsageAttribution } from '../finance/usage-accounting.js';
 import {
@@ -290,6 +295,7 @@ export function listClaimableDotWorkItems(c: DotCharter, deps: DotExecutorDeps =
     .filter(
       (item) =>
         item.status === 'ready' &&
+        !isDotStandingItem(item) &&
         !item.metadata?.continuous_work &&
         !(requestedShape(item) === 'mission' && item.metadata?.mandate_ref) &&
         !item.lease_id &&
@@ -1085,8 +1091,13 @@ export function recordDotPipelineContinuation(
   return row;
 }
 
+// Standing-lineage Issues/steps (dot-standing-binding.ts) are attempt records, not
+// dot work: they never enter this reaper or the claimable list; the standing
+// binding archives its own orphaned steps.
 const isDotItem = (item: WorkItem): boolean =>
-  typeof item.metadata?.dot_id === 'string' && item.metadata.dot_id.length > 0;
+  typeof item.metadata?.dot_id === 'string' &&
+  item.metadata.dot_id.length > 0 &&
+  !isDotStandingItem(item);
 
 /**
  * Crash recovery replays durable completion evidence and quarantines stranded
@@ -1380,7 +1391,8 @@ export async function runDotExecutorSweep(
     );
     return rows;
   }
-  for (const { charter } of ordered) {
+  for (const loadedCharter of ordered) {
+    const { charter } = loadedCharter;
     if (charter.status !== 'active') continue;
     if (clock() - sweepStart >= sweepBudget) {
       logger.info(
@@ -1432,15 +1444,37 @@ export async function runDotExecutorSweep(
           );
           continue;
         }
-        charterPorts ??= typeof ports === 'function' ? ports(charter) : ports;
+        const bound = deps.runBound && dotStandingLineage(charter) ? deps.runBound : undefined;
+        if (!bound) charterPorts ??= typeof ports === 'function' ? ports(charter) : ports;
+        let refused = false;
         const row = await withExecutionContextAsync(
           charter.authority.authority_role,
-          () => executeDotWorkItem(charter, item, charterPorts!, deps),
+          async () => {
+            if (!bound) return executeDotWorkItem(charter, item, charterPorts!, deps);
+            try {
+              // Ports are built inside the binding so their backend is the claimed task's chain.
+              return await bound(loadedCharter, () =>
+                executeDotWorkItem(
+                  charter,
+                  item,
+                  typeof ports === 'function' ? ports(charter) : ports,
+                  deps
+                )
+              );
+            } catch (error) {
+              if (!isDotStandingBindingRefusal(error)) throw error;
+              refused = true;
+              return skippedRow(charter, item, nowOf(deps).toISOString(), error.message, deps);
+            }
+          },
           undefined,
           charter.scope.tenant_slug,
           charter.scope.organization_id
         );
         rows.push(row);
+        // A standing refusal (missing grant, unbound charter) is the same for every
+        // candidate of this dot: one skipped row per dot per sweep, not one per item.
+        if (refused) break;
       }
     } catch (error) {
       logger.warn(

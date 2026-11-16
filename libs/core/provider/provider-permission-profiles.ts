@@ -8,6 +8,10 @@ import {
 } from '../foundation/env.js';
 import { assertIsolatedProviderHome } from './provider-auth-home.js';
 import {
+  applyClaudeTenantIsolationEnv,
+  boundClaudeCredentialValues,
+} from './claude-cli-tenant-isolation.js';
+import {
   listCliReasoningProviderDescriptors,
   resolveReasoningProviderDescriptor,
 } from '../reasoning/reasoning-provider-registry.js';
@@ -467,6 +471,8 @@ export function providerCredentialEnvValues(env: NodeJS.ProcessEnv = process.env
       }
     }
   }
+  // A bound claude credential lives in the binding's secrets, not its provider env.
+  for (const value of boundClaudeCredentialValues()) values.add(value);
   return [...values];
 }
 
@@ -531,6 +537,7 @@ export function buildProviderChildEnv({
     throw new Error(
       '[CREDENTIAL_HOME_INVALID] Personal claimed provider environments are not admitted'
     );
+  const operatorPath = baseEnv.PATH;
   const bound = resolveTaskProviderEnvironment(provider);
   if (bound) {
     const tenant = credentialExecutionIdentity().tenantSlug;
@@ -594,6 +601,9 @@ export function buildProviderChildEnv({
     result.KYBERION_TENANT = identity.tenantSlug!;
     if (identity.missionId) result.MISSION_ID = identity.missionId;
     if (identity.taskId) result.KYBERION_TASK_ID = identity.taskId;
+    // §4 isolation: kind-selected credential, CLAUDE_CONFIG_DIR inside the
+    // bound HOME, no auto-update / non-essential traffic. Fails closed.
+    if (provider === 'claude') applyClaudeTenantIsolationEnv(result, bound, operatorPath);
   }
   return result as NodeJS.ProcessEnv;
 }

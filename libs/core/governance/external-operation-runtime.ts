@@ -129,7 +129,17 @@ export function createOnboardingExternalOperationAuthority(options: {
     )
       return authority;
     const isVcs = ['vcs:pr_create', 'vcs:pr_merge', 'vcs:push'].includes(facts.operationId);
-    if (effectiveTier !== 'public') {
+    // Reading the tenant's own business system brings data into that tenant's
+    // scope; the only outbound value is that system's own credential.
+    const isTenantSystemRead = facts.operationId === 'browser:approval_queue_inspect';
+    if (isTenantSystemRead) {
+      if (
+        effectiveTier !== 'confidential' ||
+        scope.kind !== 'organization' ||
+        source.tenant_slug !== scope.tenant_slug
+      )
+        return authority;
+    } else if (effectiveTier !== 'public') {
       if (
         !isVcs ||
         !target ||

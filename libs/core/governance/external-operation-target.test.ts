@@ -711,6 +711,131 @@ describe('exact public operation target grants', () => {
       expect(resolve()(input)).not.toHaveProperty('charter');
     }
   );
+  it('delegates a confined tenant approval-queue inspection only inside the same organization', () => {
+    const origin = 'https://wf.example.jp';
+    const inspect = {
+      operation_id: 'browser:approval_queue_inspect' as const,
+      origin,
+      profile_hash: 'b'.repeat(64),
+    };
+    const c = charter();
+    c.scope = { kind: 'organization', tenant_slug: 'acme' };
+    c.envelope.data_tier.read = ['confidential:acme'];
+    c.envelope.external_operations = [inspect];
+    state.charter = c;
+    state.tier = 'confidential';
+    state.tenant = 'acme';
+    const resolver = createOnboardingExternalOperationAuthority({
+      scope: c.scope,
+      agentId: 'kyberion://agent/local/installed-worker',
+      ownerActor: 'user:owner',
+      invocationId: 'inspect',
+    });
+    const effect = {
+      navigation_confinement: 'authenticated-origin-set-v1',
+      origin,
+      confined_origins: [origin],
+      system: 'workflow',
+      profile_hash: 'b'.repeat(64),
+    };
+    const input = {
+      operationId: 'browser:approval_queue_inspect',
+      requiresApproval: true,
+      delegable: true,
+      effect,
+    };
+    expect(resolver(input)).toMatchObject({
+      charter: {
+        action: {
+          action_class: 'target_scoped_external_operation',
+          external_operation: inspect,
+          data: { tier: 'confidential', tenant_slug: 'acme', mode: 'read' },
+        },
+      },
+    });
+    c.envelope.irreversible_named_actions = ['browser:approval_queue_inspect'];
+    expect(validateCharter(c, { holder_role: 'owner', now: new Date('2026-10-21') })).toEqual([]);
+    expect(
+      evaluateAgainstCharter({
+        charter: c,
+        action: resolver(input)!.charter!.action,
+        usage: { spent_today: 0, spent_this_month: 0, tripwires_hit: [] },
+        availability: { accountable_available: true, available_deputies: [] },
+        now: new Date('2026-10-21'),
+      }).decision
+    ).toMatch(/^allow/);
+    for (const changed of [
+      { ...effect, navigation_confinement: 'isolated-public-read-v1' },
+      { ...effect, confined_origins: ['https://other.example.jp'] },
+      {
+        ...effect,
+        origin: 'https://other.example.jp',
+        confined_origins: ['https://other.example.jp'],
+      },
+      { ...effect, origin: 'http://wf.example.jp', confined_origins: ['http://wf.example.jp'] },
+      // A wider confinement set than the signed origin.
+      { ...effect, confined_origins: [origin, 'https://collector.example'] },
+      // A profile other than the one the human signed.
+      { ...effect, profile_hash: 'c'.repeat(64) },
+      { ...effect, profile_hash: undefined },
+    ])
+      expect(resolver({ ...input, effect: changed })).not.toHaveProperty('charter');
+    expect(resolver({ ...input, delegable: false })).not.toHaveProperty('charter');
+    state.tenant = 'beta';
+    expect(resolver(input)).not.toHaveProperty('charter');
+    state.tenant = 'acme';
+    state.tier = 'public';
+    expect(resolver(input)).not.toHaveProperty('charter');
+    state.tier = 'confidential';
+    c.envelope.data_tier.read = ['public'];
+    expect(resolver(input)).not.toHaveProperty('charter');
+    c.envelope.data_tier.read = ['confidential:acme'];
+    for (const partial of [
+      { operation_id: 'browser:approval_queue_inspect' },
+      { operation_id: 'browser:approval_queue_inspect', origin },
+      { operation_id: 'browser:approval_queue_inspect', profile_hash: 'b'.repeat(64) },
+      { operation_id: 'browser:approval_queue_inspect', origin, profile_hash: 'not-a-hash' },
+    ])
+      expect(parseExternalOperationGrant(partial)).toBe(undefined);
+    expect(parseExternalOperationGrant({ ...inspect, profile_hash: 'B'.repeat(64) })).toEqual(
+      inspect
+    );
+    c.envelope.external_operations = [
+      inspect,
+      { ...inspect, profile_hash: `sha256:${'b'.repeat(64)}` },
+    ] as never;
+    expect(validateCharter(c, { holder_role: 'owner', now: new Date('2026-10-21') })).toEqual([
+      expect.stringContaining(
+        'external_operations[1] (browser:approval_queue_inspect) must set exactly origin, profile_hash as exact values; profile_hash is the 64-hex SHA-256'
+      ),
+    ]);
+    c.envelope.external_operations = [inspect];
+  });
+  it('never delegates an approval-queue inspection from a person scope', () => {
+    const origin = 'https://wf.example.jp';
+    const c = charter();
+    c.envelope.data_tier.read = ['public', 'personal'];
+    c.envelope.external_operations = [
+      { operation_id: 'browser:approval_queue_inspect', origin, profile_hash: 'b'.repeat(64) },
+    ];
+    state.charter = c;
+    for (const tier of ['public', 'personal']) {
+      state.tier = tier;
+      expect(
+        resolve()({
+          operationId: 'browser:approval_queue_inspect',
+          requiresApproval: true,
+          delegable: true,
+          effect: {
+            navigation_confinement: 'authenticated-origin-set-v1',
+            origin,
+            confined_origins: [origin],
+            profile_hash: 'b'.repeat(64),
+          },
+        })
+      ).not.toHaveProperty('charter');
+    }
+  });
   it('never delegates opaque browser interactions or query URL egress', () => {
     for (const [operationId, url] of [
       ['browser:goto', 'https://example.com/public'],

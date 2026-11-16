@@ -1,6 +1,7 @@
 import {
   credentialExecutionIdentity,
   assertCredentialOwner,
+  hasTaskCredentialBinding,
 } from '../foundation/credential-binding.js';
 import { assertOperatorNativeCredentialOwner } from '../agent/native-credential-fence.js';
 /* eslint-disable no-restricted-imports -- IP-08 で managed-process 経由へ移行予定 (docs/developer/improvement-plans-2026-07/IP-08_ERROR_HANDLING_DISCIPLINE.ja.md) */
@@ -23,7 +24,7 @@ import { assertOperatorNativeCredentialOwner } from '../agent/native-credential-
  * and parses the `structured_output` field from the CLI's JSON result.
  */
 
-import { spawn } from 'node:child_process';
+import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { cliOptionValue } from '../harnessing/cli-guard.js';
 import { memoizedCliSpawnSync } from '../provider/provider-discovery.js';
 import * as readline from 'node:readline';
@@ -62,6 +63,11 @@ import {
   recordCliUsage,
 } from '../provider/cli-usage-metering.js';
 import { isClaudeCliAuthenticated } from '../provider/claude-cli-auth-status.js';
+import {
+  CLAUDE_TENANT_ISOLATION_ARGS,
+  boundClaudeCredentialValues,
+  prepareClaudeBoundLaunch,
+} from '../provider/claude-cli-tenant-isolation.js';
 import {
   CLAUDE_CLI_PLACEHOLDER_SIGNATURE,
   isClaudeCliFallbackEligible,
@@ -240,6 +246,14 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
         this.dispatchNativeSubagent(instruction, context, callOptions),
       getInfo: () => (this.lastHarnessSubagentInfo ? { ...this.lastHarnessSubagentInfo } : null),
     };
+  }
+
+  /**
+   * Operator CLI extras (KYBERION_CLAUDE_CLI_EXTRA_ARGS) apply to operator
+   * runs only: a bound (tenant) launch never inherits operator settings.
+   */
+  private callerExtraArgs(): string[] {
+    return hasTaskCredentialBinding() ? [] : this.extraArgs;
   }
 
   /** The validated executable path used by this backend and its adapters. */
@@ -548,7 +562,7 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
       ...permissionArgs,
       // Advice-only calls have a closed argv: custom extras must not append
       // a second permission-mode flag after the governed planner projection.
-      ...(options?.advisory ? [] : this.extraArgs),
+      ...(options?.advisory ? [] : this.callerExtraArgs()),
     ];
     return this.spawnCli(
       args,
@@ -589,13 +603,7 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
       '-p',
       '--tools',
       '',
-      '--strict-mcp-config',
-      '--mcp-config',
-      '{"mcpServers":{}}',
-      '--setting-sources',
-      '',
-      '--settings',
-      '{"disableAllHooks":true}',
+      ...CLAUDE_TENANT_ISOLATION_ARGS,
       '--model',
       model,
       ...(options?.effort ? ['--effort', options.effort] : []),
@@ -648,30 +656,49 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
       model,
       ...(options?.effort ? ['--effort', options.effort] : []),
       ...this.resolvePermissionArgs(options?.advisory ? 'planner' : undefined),
-      ...this.extraArgs,
+      ...this.callerExtraArgs(),
     ];
     const started = Date.now();
     const usageEvents: string[] = [];
     let completionChars = 0;
     let meteringStatus: 'success' | 'error' = 'error';
     let requestNotSent = false;
-    // Keep the same provider-scoped child environment as the batch path.
-    const pendingSpawnEnv = buildDelegationSpawnEnvWithRelay({
-      provider: 'claude',
-      sessionId: newDelegationSessionId('claude'),
-      profile: resolveEffectiveProviderPermissionProfile(
-        'claude',
-        options?.advisory ? 'planner' : undefined
-      ),
-    });
-    // Await only when a credential relay had to start (no extra tick otherwise).
-    const spawnEnv = pendingSpawnEnv instanceof Promise ? await pendingSpawnEnv : pendingSpawnEnv;
-    const child = spawnWithDelegationEnv(spawnEnv, () =>
-      spawn(this.bin, args, {
-        stdio: ['pipe', 'pipe', 'pipe'],
-        env: spawnEnv.env,
-      })
-    );
+    // §4: a bound launch gets the isolated argv and a tenant scratch cwd, or
+    // fails closed here — before any env is built or child is spawned.
+    const bound = prepareClaudeBoundLaunch(args);
+    // Captured while the binding is live: the child's close event and the
+    // finally below dispose the launch before a stderr-bearing error surfaces.
+    const launchSecrets = bound ? boundClaudeCredentialValues() : [];
+    let spawnEnv: Awaited<ReturnType<typeof buildDelegationSpawnEnvWithRelay>>;
+    let child: ChildProcessWithoutNullStreams;
+    try {
+      // Keep the same provider-scoped child environment as the batch path.
+      const pendingSpawnEnv = buildDelegationSpawnEnvWithRelay({
+        provider: 'claude',
+        sessionId: newDelegationSessionId('claude'),
+        profile: resolveEffectiveProviderPermissionProfile(
+          'claude',
+          options?.advisory ? 'planner' : undefined
+        ),
+      });
+      // Await only when a credential relay had to start (no extra tick otherwise).
+      spawnEnv = pendingSpawnEnv instanceof Promise ? await pendingSpawnEnv : pendingSpawnEnv;
+      const env = spawnEnv;
+      child = spawnWithDelegationEnv(env, () =>
+        spawn(this.bin, bound?.args ?? args, {
+          stdio: ['pipe', 'pipe', 'pipe'],
+          env: env.env,
+          ...(bound ? { cwd: bound.cwd } : {}),
+        })
+      );
+    } catch (error) {
+      bound?.dispose();
+      throw error;
+    }
+    if (bound) {
+      child.once('close', () => bound.dispose());
+      child.once('error', () => bound.dispose());
+    }
     let stderr = '';
     child.stderr.on('data', (chunk) => {
       stderr = `${stderr}${chunk.toString()}`.slice(-2000);
@@ -794,6 +821,9 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
       }
       if (!yielded) throw new Error('[shell-claude-cli] streaming CLI returned no text');
       meteringStatus = 'success';
+    } catch (error) {
+      // Redact (stderr may echo the bound credential) before the launch is disposed.
+      throw redactProviderOutputError(error, launchSecrets);
     } finally {
       recordCliUsage('claude-cli', model, started, meteringStatus, {
         report:
@@ -807,6 +837,7 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
       options?.signal?.removeEventListener('abort', onAbort);
       if (child.exitCode === null && child.signalCode === null) child.kill('SIGTERM');
       spawnEnv.dispose();
+      bound?.dispose();
     }
   }
 
@@ -987,7 +1018,7 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
       '-p',
       prompt,
       ...(input.maxTurns !== undefined ? ['--max-turns', String(input.maxTurns)] : []),
-      ...this.extraArgs,
+      ...this.callerExtraArgs(),
     ];
 
     return this.spawnCli(args, '', undefined, resolveEffectiveProviderPermissionProfile('claude'));
@@ -1010,7 +1041,7 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
       '-p',
       prompt,
       ...(input.maxTurns !== undefined ? ['--max-turns', String(input.maxTurns)] : []),
-      ...this.extraArgs,
+      ...this.callerExtraArgs(),
     ];
 
     return this.spawnCli(args, '', undefined, resolveEffectiveProviderPermissionProfile('claude'));
@@ -1045,7 +1076,7 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
       JSON.stringify(jsonSchema),
       '--model',
       this.model,
-      ...this.extraArgs,
+      ...this.callerExtraArgs(),
     ];
 
     const stdout = await this.spawnCliRaw(args, params.userPrompt);
@@ -1116,10 +1147,14 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
     let completionChars = 0;
     let status: 'success' | 'error' = 'error';
     let requestNotSent = true;
+    let bound: ReturnType<typeof prepareClaudeBoundLaunch> = null;
     try {
       // XP-02: minimal allowlisted env (no cross-provider credential
       // leakage); SA-05: one delegation hop deeper than us; WS-02: private git
       // index for implementer delegations.
+      // §4: a bound launch gets the isolated argv and a tenant scratch cwd,
+      // or fails closed here — before any env is built or child is spawned.
+      bound = prepareClaudeBoundLaunch(cliArgs);
       const pendingSpawnEnv = buildDelegationSpawnEnvWithRelay({
         provider: 'claude',
         sessionId: newDelegationSessionId('claude'),
@@ -1128,9 +1163,10 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
       // Await only when a credential relay had to start (no extra tick otherwise).
       const spawnEnv = pendingSpawnEnv instanceof Promise ? await pendingSpawnEnv : pendingSpawnEnv;
       const child = spawnWithDelegationEnv(spawnEnv, () =>
-        spawn(this.bin, cliArgs, {
+        spawn(this.bin, bound?.args ?? cliArgs, {
           stdio: ['pipe', 'pipe', 'pipe'],
           env: spawnEnv.env,
+          ...(bound ? { cwd: bound.cwd } : {}),
         })
       );
       requestNotSent = false;
@@ -1193,6 +1229,7 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
       status = 'success';
       return text;
     } finally {
+      bound?.dispose();
       recordCliUsage('claude-cli', model, started, status, {
         ...(nativeJson ? { report: parseClaudeCliUsage(stdout) } : {}),
         promptChars,

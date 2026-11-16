@@ -139,6 +139,35 @@ describe('tenant lifecycle preserves provider policy state', () => {
     ).toBeNull();
   });
 
+  it('keeps personal_owner and its basis across update / suspend / resume (re-review 2)', () => {
+    const file = path.join(rootDir, 'knowledge', 'personal', 'tenants', 'acme.json');
+    const basis = {
+      approval_request_id: 'APR-1',
+      decided_at: '2026-11-16T01:00:00.000Z',
+      audit_id: 'A1',
+    };
+    withExecutionContext('sovereign_concierge', () =>
+      safeWriteFile(
+        file,
+        JSON.stringify({
+          tenant_slug: 'acme',
+          display_name: 'Acme',
+          status: 'active',
+          assigned_role: 'owner',
+          personal_owner: 'user:owner',
+          personal_owner_basis: basis,
+        })
+      )
+    );
+    for (const verb of ['update', 'suspend', 'resume'] as const) {
+      const result = withExecutionContext('sovereign_concierge', () =>
+        mutateTenant({ verb, slug: 'acme', displayName: 'Acme', rootDir, apply: true })
+      );
+      expect(result.profile.personal_owner).toBe('user:owner');
+      expect(result.profile.personal_owner_basis).toEqual(basis);
+    }
+  });
+
   it('creates new tenants strictly isolated so activation can pass memory_policy', () => {
     const result = withExecutionContext('sovereign_concierge', () =>
       mutateTenant({ verb: 'create', slug: 'beta', displayName: 'Beta', rootDir, apply: true })

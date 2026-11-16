@@ -1,7 +1,7 @@
 ---
 title: 3役で始める dot チーム — 非稼働スターターテンプレート
 tags: [orchestration, dots, charter, handoff, verification, starter]
-last_updated: 2026-10-05
+last_updated: 2026-11-16
 role_affinity: [ecosystem_architect, qa_lead, knowledge_steward]
 runtime_stages: [intake, planning, execution, review]
 ---
@@ -11,7 +11,7 @@ runtime_stages: [intake, planning, execution, review]
 5つの責任を、最初は3つの論理役にまとめる。実装・文章・デザインは必要時の短命な worker に渡し、専門分野ごとの常駐 dot は増やさない。
 
 これは **導入候補のテンプレート**。自動インストール、常駐プロセス起動、cadence 有効化、権限追加、外部接続は行わない。
-[charter JSON](./dot-team-templates/) は既存の DotCharter schema に適合するが、runtime が探索する `dots/` および tenant の `dots/` の外に置いてある。3件とも `draft` である。
+[charter JSON](./dot-team-templates/) は既存の DotCharter schema に適合するが、runtime が探索する `dots/` および tenant の `dots/` の外に置いてある。3件とも `draft` である。同じ場所に、組織運営 dot の tenant 非依存テンプレート [org-operations](./dot-team-templates/org-operations.json) も置く（[後述](#org-operations-テンプレートを-tenant-に導入する)）。
 
 ## 3役と5責任
 
@@ -25,14 +25,14 @@ runtime_stages: [intake, planning, execution, review]
 
 ## 既存 dot との共存
 
-現在の標準 charter は [repo-guardian](../../../dots/repo-guardian.json) と [org-operations](../../../dots/org-operations.json)。前者の `repository.health`、後者の `organization.operations-loop` はそのまま残す。候補はそれぞれ別の `team.*` 責任を持ち、既存 dot の名前・scope・status・通知先・cadence・handoff allowlist を変更しない。
+現在の標準 charter は [repo-guardian](../../../dots/repo-guardian.json) と、tenant ごとに導入する [org-operations](./dot-team-templates/org-operations.json)。前者の `repository.health`、後者の `organization.operations-loop` はそのまま残す。候補はそれぞれ別の `team.*` 責任を持ち、既存 dot の名前・scope・status・通知先・cadence・handoff allowlist を変更しない。
 
 「最初の3役」は論理的なチーム構成であり、「現在稼働する dot が3件」という意味ではない。2件の既存設定がある環境に候補を3件導入すれば設定は5件になる。既存役との統合や置き換えが必要なら、担当と移行条件を別途合意する。
 
 既存 charter の `active` は設定値であり、daemon が現在動いている証拠ではない。このテンプレートは既存稼働状況を判定しない。
 
 - repo-guardian: repository health の実行責任者。新しい保守係は発見を分類するだけで、重複した監視・修復を始めない。
-- org-operations: 組織の運営 cadence の実行責任者。標準設定は confidential tenant に属する。この public 候補から直接引き継げない。
+- org-operations: 組織の運営 cadence の実行責任者。導入した charter は confidential tenant に属する。この public 候補から直接引き継げない。
 - 現在の両 charter は候補からの handoff を許可していない。concierge に振り分け案を返し、権限を持つ operator が既存経路で扱う。拒否を受けて allowlist を自動追加したり、tenant を横断して inbox に書き込んだりしない。
 
 ## Handoff 契約
@@ -88,6 +88,17 @@ verifier と ops-librarian は concierge に証跡を返し、ユーザーへ別
 4. operator の明示的な判断後に `pnpm kyberion dot activate <dot_id>` を使う。JSON の status を手書き変更しない。inbox-only、approve、L1、予算上限は維持する。
 5. 機密情報のない小さな検証依頼を1件だけ使い、同一 scope の handoff、独立検品、承認待ち、取消、重複しない報告を確認する。provider に渡す情報と能力は先に承認する。失敗や未検証を「稼働済み」と数えない。
 6. 予期しない動作では `pnpm kyberion dot pause <dot_id>`。未決 WorkItem / approval / quarantine を確認し、既存の復旧手順に従う。cadence / live 通知 / pipeline / autonomy 拡張は別の判断とする。
+
+## org-operations テンプレートを tenant に導入する
+
+[org-operations.json](./dot-team-templates/org-operations.json) は組織運営ループ（operation tick・standup・retro の `operations_cadence`、意思決定・サービスヘルス・プロジェクト進捗の監視）を担う dot の **tenant 非依存テンプレート**。製品は特定 tenant に束縛された稼働中 charter を同梱しない。tenant を持たない環境で wake のたびに失敗するため。
+
+1. テンプレートを `active/shared/tmp/` にコピーし、`<tenant-slug>`（scope と probe path）と `<organization-id>`（scope・goal・probe path）をすべて置き換える。置き換え漏れは `dot create` の scope 検証で拒否される。
+2. 1 installation に組織運営 dot が 1 件なら `dot_id: org-operations` / `heartbeat_id: dot-org-operations` のまま使う（`ops-health-probe` / `knowledge-hygiene-probe` の WorkItem、`repo-guardian` と `org-improvement` の handoff allowlist、`continuous-operations/organization-operations.json` がこの id を参照する）。2 件目以降は `<tenant>-org-operations` のように一意にする。
+3. 通知は既定で local inbox。Slack 等の live 配信は宛先を確認したうえで `notification.delivery_mode: live` と `deliver_to` を明示的に書く。
+4. `pnpm kyberion dot create --file active/shared/tmp/<draft>.json` で確認し、`--apply` で `knowledge/confidential/<tenant-slug>/dots/<dot_id>.json` に draft として書き込む（gitignored）。
+5. `pnpm kyberion dot validate <dot_id>` のあと、operator の判断で `pnpm kyberion dot activate <dot_id>`。
+6. 組織の運営 cadence を同じ組織に重複させない。既存の tenant charter（例: `<tenant>-org-operations`）があればそちらを更新する。
 
 ## 関連
 

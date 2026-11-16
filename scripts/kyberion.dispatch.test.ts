@@ -51,7 +51,21 @@ describe('kyberion script-command dispatch', () => {
     expect(otherEnv.GH_TOKEN).toBeUndefined();
     expect(otherEnv.GITHUB_TOKEN).toBeUndefined();
     await main(['stance', 'list'], () => undefined);
-    expect(mocks.safeExecResultAsync.mock.calls[0][2].env).toEqual({});
+    const bufferedEnv = mocks.safeExecResultAsync.mock.calls[0][2].env;
+    expect(bufferedEnv.GH_TOKEN).toBeUndefined();
+    expect(bufferedEnv.GITHUB_TOKEN).toBeUndefined();
+    expect(bufferedEnv.ANTHROPIC_API_KEY).toBeUndefined();
+  });
+
+  it('forwards the operator KYBERION_* configuration (tenant binding) to buffered commands', async () => {
+    vi.stubEnv('KYBERION_TENANT', 'acme');
+    vi.stubEnv('KYBERION_BASE_ROLE', 'sovereign');
+    vi.stubEnv('ANTHROPIC_API_KEY', 'fake-unrelated-binding');
+    await main(['stance', 'list'], () => undefined);
+    const bufferedEnv = mocks.safeExecResultAsync.mock.calls[0][2].env;
+    expect(bufferedEnv.KYBERION_TENANT).toBe('acme');
+    expect(bufferedEnv.KYBERION_BASE_ROLE).toBe('sovereign');
+    expect(bufferedEnv.ANTHROPIC_API_KEY).toBeUndefined();
   });
 
   it('CU-02: runs interactive / long-running commands on the operator terminal without a timeout', async () => {

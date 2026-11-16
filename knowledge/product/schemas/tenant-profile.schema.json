@@ -4,35 +4,20 @@
   "title": "Tenant Profile",
   "description": "Definition of a tenant and the user's role within it.",
   "type": "object",
-  "required": [
-    "tenant_slug",
-    "display_name",
-    "status",
-    "assigned_role"
-  ],
+  "required": ["tenant_slug", "display_name", "status", "assigned_role"],
   "properties": {
     "tenant_slug": {
       "type": "string",
       "pattern": "^[a-z][a-z0-9-]{1,30}$",
       "not": {
-        "enum": [
-          "public",
-          "confidential",
-          "personal",
-          "shared"
-        ]
+        "enum": ["public", "confidential", "personal", "shared"]
       }
     },
     "tenant_id": {
       "type": "string",
       "pattern": "^[a-z0-9-]+$",
       "not": {
-        "enum": [
-          "public",
-          "confidential",
-          "personal",
-          "shared"
-        ]
+        "enum": ["public", "confidential", "personal", "shared"]
       }
     },
     "display_name": {
@@ -40,15 +25,27 @@
     },
     "status": {
       "type": "string",
-      "enum": [
-        "active",
-        "suspended",
-        "archived"
-      ]
+      "enum": ["active", "suspended", "archived"]
     },
     "assigned_role": {
       "type": "string",
       "description": "The user's primary role in this tenant (e.g., strategist, pm, lead)."
+    },
+    "personal_owner": {
+      "type": "string",
+      "pattern": "^user:[A-Za-z0-9][A-Za-z0-9._-]{0,127}$",
+      "description": "Explicit statement that this tenant is one person's own (personal) tenant, e.g. a home development tenant. Set only by the owner-approved, audited `pnpm tenant personal-owner` (libs/core/organization/tenant-personal-owner.ts); no bootstrap or member-registry path writes it. A person-held subscription token (Claude Pro/Max/Team seat) of that person may serve only tenants whose personal_owner names them and whose personal_owner_basis verifies (secret/credential-custody.ts)."
+    },
+    "personal_owner_basis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["approval_request_id", "decided_at", "audit_id"],
+      "description": "Approval evidence of personal_owner, written only by libs/core/organization/tenant-personal-owner.ts and verified against the approval store at every use; a personal_owner without a verifiable basis makes nothing eligible.",
+      "properties": {
+        "approval_request_id": { "type": "string", "minLength": 1 },
+        "decided_at": { "type": "string", "minLength": 1 },
+        "audit_id": { "type": "string", "minLength": 1 }
+      }
     },
     "allowed_reasoning_backends": {
       "type": "array",
@@ -83,10 +80,7 @@
       "description": "Ingest source systems declared for this tenant (DA-01).",
       "items": {
         "type": "object",
-        "required": [
-          "source_system",
-          "enabled"
-        ],
+        "required": ["source_system", "enabled"],
         "additionalProperties": false,
         "properties": {
           "source_system": {
@@ -112,18 +106,11 @@
       "additionalProperties": {
         "type": "object",
         "additionalProperties": false,
-        "required": [
-          "training_use",
-          "attested_at"
-        ],
+        "required": ["training_use", "attested_at"],
         "properties": {
           "training_use": {
             "type": "string",
-            "enum": [
-              "none",
-              "used",
-              "unknown"
-            ],
+            "enum": ["none", "used", "unknown"],
             "description": "Whether the vendor trains on material sent under this plan."
           },
           "plan": {

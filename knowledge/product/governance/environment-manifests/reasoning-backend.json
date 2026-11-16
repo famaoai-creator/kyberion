@@ -16,6 +16,29 @@
       }
     },
     {
+      "capability_id": "claude-tenant-isolation",
+      "kind": "vendor-credential",
+      "description": "Canary for tenant claude CLI runs: the real claude CLI started with the bound-launch env shape (isolated HOME / CLAUDE_CONFIG_DIR, no credential) must report not logged in, so a tenant run can never fall back to the operator's own login. Runs `claude auth status` only (no model request); satisfied and skipped when claude is not installed.",
+      "required_for": ["claude-cli"],
+      "probe": { "kind": "probe", "probe_id": "claude-tenant-isolation" },
+      "install": {
+        "operator_confirmed": true,
+        "instruction": "Isolation is broken: a claude CLI started with an empty isolated CLAUDE_CONFIG_DIR still reports a login. Do not run tenant claude work until fixed. Check the installed claude CLI version (`claude --version`) against knowledge/product/orchestration/tenant-task-credential-binding.ja.md (claude CLI isolation) and rerun `pnpm kyberion doctor --manifest reasoning-backend`."
+      }
+    },
+    {
+      "capability_id": "tenant-personal-owners",
+      "kind": "vendor-credential",
+      "description": "Lists tenants marked as a person's own tenant (tenant profile personal_owner, set by the owner-approved `pnpm tenant personal-owner`): a person's consumer subscription token (Claude Pro/Max) may serve exactly those tenants. Warns whenever any is set so a company tenant marked personal is visible; satisfied when none is.",
+      "required_for": ["claude-cli"],
+      "optional": true,
+      "probe": { "kind": "probe", "probe_id": "tenant-personal-owners" },
+      "install": {
+        "operator_confirmed": true,
+        "instruction": "Review the listed tenants. Only a person's own tenants (e.g. a home development tenant) may be personal; clear any company or client tenant with `pnpm tenant personal-owner <slug> --clear` (approved by the current personal owner)."
+      }
+    },
+    {
       "capability_id": "reasoning-backend.preference",
       "kind": "env-var",
       "description": "KYBERION_REASONING_BACKEND is set so the bootstrap chooses deterministically rather than auto-discovering on every start.",
