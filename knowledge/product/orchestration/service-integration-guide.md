@@ -635,6 +635,15 @@ key cannot fall back to another authentication provider. The credential must nam
 installed personal agent acting for the registered local owner. The CLI does not issue
 workload tokens, create verification keys, install identity or repair configuration.
 
+The existing server-side token primitive requires an active canonical identity,
+ledger-bound owner and tenant scope, and a lifetime of at most 900 seconds.
+Verification rejects older tokens without the explicit owner/scope/identity
+revision claims, and any identity journal change invalidates outstanding tokens.
+There is no automatic renewal. A governed product path to acquire and privately
+deliver these tokens is still missing; the CLI consumes an already supplied valid
+credential and is not an end-to-end onboarding flow. Do not substitute an NHI
+registration, runtime session identifier or service-use grant for that credential.
+
 Run request/apply as a standalone command in the installed checkout, outside tenant,
 mission/worker, delegated and plugin execution scopes. The selection is re-read after
 interactive input and must be unchanged. Apply requires the same selection and usable

@@ -109,6 +109,7 @@ function seedActiveAgent(slug: string): string {
       kind: 'agent',
       // No tenant in scope: a tenantless identity (D3 `_/_`, no 'default' org).
       slug,
+      personScope: true,
       accountableHumanId: 'user:founder',
     });
     return activateAgentIdentity(issued.nhi_id);
@@ -642,14 +643,15 @@ describe('authn provider — agent-token', () => {
 
   it('issues and resolves a signed workload credential', () => {
     const nhiId = seedActiveAgent('token-agent');
-    const token = tokenFor(nhiId, { tenants: ['default'] });
+    const { token, payload } = issueAgentToken({ nhiId }, deps);
+    expect(payload).toMatchObject({ iss: AGENT_TOKEN_ISSUER, obo: 'user:founder', tenants: [] });
     const resolution = resolveAuthnPrincipal(
-      { credential: { type: 'agent-token', token }, serverTenant: 'default' },
+      { credential: { type: 'agent-token', token } },
       { deps }
     );
     expect(resolution.principal.provider).toBe('agent-token');
     expect(resolution.principal.actor).toMatchObject({ kind: 'agent', id: nhiId });
-    expect(resolution.principal.tenantSlugs).toEqual(['default']);
+    expect(resolution.principal.tenantSlugs).toEqual([]);
     expect(resolution.principal.assurance).toBe('high');
     expect(resolution.principal.expiresAt).toBeDefined();
   });
