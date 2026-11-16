@@ -202,14 +202,24 @@ function notifyPanel(message) {
   }
 }
 
+function isLoopbackHost(host) {
+  const h = String(host || '')
+    .trim()
+    .toLowerCase();
+  return h === '127.0.0.1' || h === 'localhost' || h === '::1' || h === '[::1]';
+}
+
 async function getConfig() {
   const cfg = await chrome.storage.local.get([
     'meetCopilotHost',
     'meetCopilotPort',
     'meetCopilotAuthToken',
   ]);
+  const host = String(cfg.meetCopilotHost || DEFAULT_HOST).trim();
   return {
-    host: cfg.meetCopilotHost || DEFAULT_HOST,
+    // The control channel is a plaintext WebSocket carrying the auth token and
+    // live captions; never let stored config point it at a non-loopback host.
+    host: isLoopbackHost(host) ? host : DEFAULT_HOST,
     port: cfg.meetCopilotPort || DEFAULT_PORT,
     authToken: String(cfg.meetCopilotAuthToken || '').trim(),
   };
@@ -221,6 +231,25 @@ const MEETING_URL_PATTERNS = [
   'https://teams.live.com/*',
   'https://*.zoom.us/*',
 ];
+const MEETING_HOST_SUFFIXES = [
+  'meet.google.com',
+  'teams.microsoft.com',
+  'teams.live.com',
+  'zoom.us',
+];
+
+// Join URLs are driver-supplied; opening a tab must never navigate the user's
+// browser to a non-meeting, non-HTTPS origin.
+function isMeetingUrl(value) {
+  try {
+    const url = new URL(String(value || ''));
+    if (url.protocol !== 'https:') return false;
+    const host = url.hostname.toLowerCase();
+    return MEETING_HOST_SUFFIXES.some((suffix) => host === suffix || host.endsWith(`.${suffix}`));
+  } catch {
+    return false;
+  }
+}
 
 async function findMeetTab(targetUrl) {
   const tabs = await chrome.tabs.query({ url: MEETING_URL_PATTERNS });
@@ -319,6 +348,10 @@ async function handleCommand(msg) {
     if (msg.cmd === 'join') {
       if (typeof msg.control_token !== 'string' || msg.control_token.length < 32) return;
       controlToken = msg.control_token;
+      if (msg.url !== undefined && !isMeetingUrl(msg.url)) {
+        sendEvent({ event: 'error', message: 'join url is not a meeting platform URL' });
+        return;
+      }
       const tab = await ensureMeetTab(msg.url);
       if (!tab) {
         sendEvent({ event: 'error', message: 'no Meet tab and no url provided' });
@@ -442,8 +475,18 @@ function scheduleReconnect() {
 
 // Content script pushes caption/join/leave/status events up to the driver;
 // popup queries/controls come in on the same channel.
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  // meet:event is pushed by our content script inside a meeting tab; popup:*
+  // and panel:* must come from extension pages (no sender.tab). Enforcing the
+  // surface split keeps an injected page path from sending chats or reading
+  // panel state.
+  const fromTab = Boolean(sender && sender.tab);
   if (message && message.type === 'meet:event') {
+    const senderUrl = sender && sender.url;
+    if (!fromTab || (senderUrl && !isMeetingUrl(senderUrl))) {
+      sendResponse({ ok: false, error: 'meet:event requires a meeting-tab sender' });
+      return true;
+    }
     let p = message.payload || {};
     if (p.event === 'caption') {
       const text = redactText(p.text);
@@ -465,6 +508,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     else if (p.event === 'error') uiState.lastError = p.message || '';
     sendEvent(p);
     sendResponse({ ok: true });
+    return true;
+  }
+  if (fromTab) {
+    sendResponse({ ok: false, error: 'popup/panel messages require an extension-page sender' });
     return true;
   }
   if (message && message.type === 'popup:get-status') {

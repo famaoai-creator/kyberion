@@ -10,7 +10,11 @@ const STATE_KEY = 'browserBridgeState';
 const NATIVE_HOST = 'com.kyberion.browser_bridge';
 
 chrome.action.onClicked.addListener(async (tab) => {
-  if (tab.windowId !== undefined) await chrome.sidePanel.open({ windowId: tab.windowId });
+  try {
+    if (tab.windowId !== undefined) await chrome.sidePanel.open({ windowId: tab.windowId });
+  } catch {
+    /* window closed or side panel already open */
+  }
 });
 
 // Serialize every read-modify-write of the persisted state. Without this, the
@@ -2650,7 +2654,7 @@ async function sendPage(form) {
       await broadcastState();
     });
   }
-  await chrome.storage.session.set({ [SEND_DRAFT_KEY]: null });
+  await chrome.storage.session.remove(SEND_DRAFT_KEY);
   return {
     state: await loadState(),
     sendResult: {
