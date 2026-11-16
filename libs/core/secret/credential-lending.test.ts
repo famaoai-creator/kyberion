@@ -26,6 +26,7 @@ import {
   type CredentialRecord,
 } from './credential-custody.js';
 import { resetCredentialBudgetCache } from './credential-usage-ledger.js';
+import { storeRelativePath } from '../path-resolver.js';
 
 const state = vi.hoisted(() => ({
   grants: [] as GrantRecord[],
@@ -81,7 +82,7 @@ vi.mock('../governance/audit-chain.js', async (original) => {
 });
 vi.mock('../secure-io.js', async (original) => {
   const actual = await original<typeof import('../secure-io.js')>();
-  const rel = (target: string) => String(target).replaceAll('\\', '/').split('/kyberion/').pop()!;
+  const rel = (target: string) => storeRelativePath(String(target));
   return {
     ...actual,
     safeMkdir: (target: string) => {
