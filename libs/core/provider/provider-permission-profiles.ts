@@ -551,8 +551,10 @@ export function buildProviderChildEnv({
     baseEnv = bound;
   }
   // No bound environment: the allowlisted HOME carries the ambient login
-  // sessions — an intentional "bring-your-own CLI" channel for unbound work.
-  // Lent credentials always come with a bound isolated HOME instead.
+  // sessions — the intentional "bring-your-own CLI" channel. A tenant scope
+  // still requires a trusted binding upstream (checkedBinding), so ambient
+  // carry-in is limited to dispatched work; lent credentials always come
+  // with a bound isolated HOME instead.
   if (!bound && isProviderEnvAllowlistDisabled(baseEnv)) {
     // Full inheritance would hand the child the raw key the relay exists to
     // withhold, so the two settings are refused together (fail closed).

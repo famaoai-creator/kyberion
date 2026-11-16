@@ -162,7 +162,10 @@ function dotActorNhi(tenant: string, organizationId: string | undefined, dotId: 
 /** Deterministic standing lineage of a tenant Dot; null for public / tenantless Dots. */
 export function dotStandingLineage(charter: DotCharter): DotStandingLineage | null {
   const tenant = charter.scope.tenant_slug;
-  if (!tenant) return null;
+  // Standing lineage exists to lend tenant credentials; a public-tier Dot has
+  // no tenant credential claim and keeps running unbound (ambient carry-in),
+  // even when it happens to carry a tenant_slug for attribution.
+  if (!tenant || charter.scope.tier !== 'confidential') return null;
   const ref = standingRef(charter);
   const context = normalizeWorkItemContext({
     tenant_slug: tenant,

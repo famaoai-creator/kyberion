@@ -30,12 +30,11 @@ import {
   CLAUDE_PROVIDER_ENVIRONMENT,
 } from './claude-cli-tenant-isolation.js';
 import { apiKeyCliTenantIsolation } from './api-key-tenant-isolation.js';
+import { resolveReasoningProviderDescriptor } from '../reasoning/reasoning-provider-registry.js';
 
 export interface ProviderTenantIsolationSpec {
   /** `providerEnvironments` key / the provider id seen by buildProviderChildEnv. */
   readonly provider: string;
-  /** `allowed_backends` values that activate this provider's isolated env. */
-  readonly backends: readonly string[];
   /** Isolated provider env for one borrower + credential; never holds the value. */
   readonly buildEnvironment: (
     tier: ScopeContext['tier'],
@@ -56,7 +55,6 @@ export const PROVIDER_TENANT_ISOLATION: Readonly<Record<string, ProviderTenantIs
   Object.freeze({
     [CLAUDE_PROVIDER_ENVIRONMENT]: Object.freeze({
       provider: CLAUDE_PROVIDER_ENVIRONMENT,
-      backends: Object.freeze(['claude-cli']),
       buildEnvironment: claudeProviderEnvironment,
       applyEnv: applyClaudeTenantIsolationEnv,
       boundSecretValues: boundClaudeCredentialValues,
@@ -69,7 +67,6 @@ export const PROVIDER_TENANT_ISOLATION: Readonly<Record<string, ProviderTenantIs
     // the installed CLIs (2026-11):
     codex: apiKeyCliTenantIsolation({
       provider: 'codex',
-      backends: ['codex-cli'],
       credentialEnvKey: 'OPENAI_API_KEY',
       credentialEnvKeys: ['OPENAI_API_KEY'],
       configDirEnv: { key: 'CODEX_HOME', dirName: '.codex' },
@@ -92,7 +89,6 @@ export const PROVIDER_TENANT_ISOLATION: Readonly<Record<string, ProviderTenantIs
     }),
     gemini: apiKeyCliTenantIsolation({
       provider: 'gemini',
-      backends: ['gemini-cli'],
       credentialEnvKey: 'GEMINI_API_KEY',
       credentialEnvKeys: ['KYBERION_GEMINI_API_KEY', 'GEMINI_API_KEY', 'GOOGLE_API_KEY'],
       // Headless -p runs refuse untrusted cwds; the bound cwd is the tenant's
@@ -104,7 +100,6 @@ export const PROVIDER_TENANT_ISOLATION: Readonly<Record<string, ProviderTenantIs
     // plus GEMINI_API_KEY; the isolated HOME supplies the private config dir.
     agy: apiKeyCliTenantIsolation({
       provider: 'agy',
-      backends: ['agy-cli'],
       credentialEnvKey: 'GEMINI_API_KEY',
       credentialEnvKeys: ['GEMINI_API_KEY', 'GOOGLE_API_KEY', 'KYBERION_GEMINI_API_KEY'],
       configFiles: [
@@ -119,7 +114,6 @@ export const PROVIDER_TENANT_ISOLATION: Readonly<Record<string, ProviderTenantIs
     // under HOME, so the redirect alone isolates them.
     cursor: apiKeyCliTenantIsolation({
       provider: 'cursor',
-      backends: ['cursor-cli'],
       credentialEnvKey: 'CURSOR_API_KEY',
       credentialEnvKeys: ['CURSOR_API_KEY'],
     }),
@@ -142,9 +136,10 @@ export function providerTenantIsolationForProvider(
   return PROVIDER_TENANT_ISOLATION[provider];
 }
 
-/** The first isolation spec activated by a backend id, or undefined. */
+/** The isolation spec a backend mode resolves to via its descriptor provider, or undefined. */
 export function providerTenantIsolationForBackend(
   backend: string
 ): ProviderTenantIsolationSpec | undefined {
-  return Object.values(PROVIDER_TENANT_ISOLATION).find((spec) => spec.backends.includes(backend));
+  const descriptor = resolveReasoningProviderDescriptor(backend);
+  return descriptor ? PROVIDER_TENANT_ISOLATION[descriptor.provider] : undefined;
 }

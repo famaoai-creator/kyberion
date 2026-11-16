@@ -445,7 +445,7 @@ describe('task-local credential binding', () => {
     });
   });
 
-  it('never inherits operator CLI auth or permits the allowlist escape hatch in a tenant', () => {
+  it('ambient carry-in needs a trusted binding; bound envs stay isolated in a tenant', () => {
     vi.stubEnv('KYBERION_TIER', 'confidential');
     withExecutionContext(
       'sovereign_concierge',
@@ -455,16 +455,21 @@ describe('task-local credential binding', () => {
           '[CREDENTIAL_BINDING_REQUIRED]'
         );
         withTaskCredentialBinding({ tenantSlug: 'alpha', secrets: {} }, () => {
-          expect(() => buildProviderChildEnv({ provider: 'claude' })).toThrow(
-            '[CREDENTIAL_PROVIDER_DENIED]'
-          );
+          // A trusted binding with no bound provider env is the ambient
+          // carry-in channel: the allowlisted HOME passes through, so the
+          // child may use the operator's CLI login sessions for unbound work.
+          const ambient = buildProviderChildEnv({
+            provider: 'claude',
+            baseEnv: { HOME: '/operator', PATH: '/bin' },
+          });
+          expect(ambient.HOME).toBe('/operator');
         });
         withTaskCredentialBinding(
           {
             tenantSlug: 'alpha',
             // §4: the claude credential comes from the binding's secrets by kind;
             // a key embedded in the provider environment is never passed through.
-            secrets: { ANTHROPIC_API_KEY: 'alpha-key' },
+            secrets: { ANTHROPIC_API_KEY: 'alpha-key', GEMINI_API_KEY: 'alpha-gemini' },
             credentialKind: 'api_key',
             providerEnvironments: {
               claude: {
@@ -477,7 +482,6 @@ describe('task-local credential binding', () => {
               gemini: {
                 HOME: providerHome,
                 PATH: '/bin',
-                KYBERION_GEMINI_API_KEY: 'alpha-gemini',
                 KYBERION_SUDO: 'true',
               },
             },
@@ -492,7 +496,10 @@ describe('task-local credential binding', () => {
             expect(env.OTHER_TOKEN).toBeUndefined();
             expect(env.KYBERION_TENANT).toBe('alpha');
             const gemini = buildProviderChildEnv({ provider: 'gemini' });
-            expect(gemini.KYBERION_GEMINI_API_KEY).toBe('alpha-gemini');
+            // The spec injects the bound secret under the CLI's declared key;
+            // family aliases are dropped regardless of what the env carried.
+            expect(gemini.GEMINI_API_KEY).toBe('alpha-gemini');
+            expect(gemini.KYBERION_GEMINI_API_KEY).toBeUndefined();
             expect(gemini.KYBERION_SUDO).toBeUndefined();
           }
         );

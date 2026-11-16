@@ -232,9 +232,11 @@ describe('memory-promotion-workflow', () => {
         tags: ['mission', 'closure'],
       },
     ] as any);
+    // Non-stub name with no egress-provider mapping: the contradiction check
+    // runs because the egress gate only applies to provider-mapped backends.
     registerReasoningBackend({
       ...stubReasoningBackend,
-      name: 'anthropic',
+      name: 'unmapped-review-backend',
       prompt: vi.fn(async () =>
         JSON.stringify({ verdict: 'yes', reason: 'conflicts with the existing checklist.' })
       ),
