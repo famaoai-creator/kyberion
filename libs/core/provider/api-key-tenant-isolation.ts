@@ -32,12 +32,24 @@ export interface ApiKeyCliIsolationInput {
   readonly provider: string;
   /** Backend modes (allowed_backends values) that activate this spec. */
   readonly backends: readonly string[];
-  /** The single bound credential env var the child receives. */
+  /** The bound credential's binding-secrets key (and default env delivery name). */
   readonly credentialEnvKey: string;
   /** Every credential env var of this provider's family; all but the bound key are dropped. */
   readonly credentialEnvKeys: readonly string[];
   /** Optional config-dir env pinned inside the bound HOME (e.g. CODEX_HOME → `.codex`). */
   readonly configDirEnv?: { readonly key: string; readonly dirName: string };
+  /**
+   * How the bound secret reaches the child. `env` (default) injects it under
+   * `credentialEnvKey`. `configFile` writes it into `secretFile` inside the
+   * config dir at spawn time — required by CLIs that ignore env credentials
+   * (codex reads `$CODEX_HOME/auth.json`, verified live: env alone yields
+   * `401 Missing bearer`). Requires `configDirEnv`.
+   */
+  readonly secretDelivery?: 'env' | 'configFile';
+  readonly secretFile?: {
+    readonly name: string;
+    readonly render: (secret: string) => string;
+  };
   /**
    * Fixed files the CLI needs inside its config dir — e.g. the
    * `{"modelProvider": "gemini"}` that switches agy to API-key auth. Written
@@ -52,6 +64,10 @@ export interface ApiKeyCliIsolationInput {
 export function apiKeyCliTenantIsolation(
   input: ApiKeyCliIsolationInput
 ): ProviderTenantIsolationSpec {
+  if (input.secretDelivery === 'configFile' && (!input.configDirEnv || !input.secretFile))
+    throw new Error(
+      `[CREDENTIAL_PROVIDER_DENIED] ${input.provider} configFile delivery requires configDirEnv and secretFile`
+    );
   const denied = (detail: string): Error =>
     new Error(
       `[CREDENTIAL_PROVIDER_DENIED] ${detail} — the bound ${input.provider} CLI is not started`
@@ -119,7 +135,19 @@ export function apiKeyCliTenantIsolation(
       const secret = resolveTaskCredential(input.credentialEnvKey);
       if (typeof secret !== 'string' || !secret)
         throw denied(`The bound ${input.credentialEnvKey} credential is missing`);
-      env[input.credentialEnvKey] = secret;
+      if (input.secretDelivery === 'configFile') {
+        const configDir = bound[configDirKey!] || path.join(home, configDirName!);
+        try {
+          safeWriteFile(
+            path.join(configDir, input.secretFile!.name),
+            input.secretFile!.render(secret)
+          );
+        } catch {
+          throw denied(`The bound ${input.provider} credential file could not be written`);
+        }
+      } else {
+        env[input.credentialEnvKey] = secret;
+      }
       env.HOME = home;
       Object.assign(env, input.staticEnv);
       if (!env.PATH && operatorPath) env.PATH = operatorPath;

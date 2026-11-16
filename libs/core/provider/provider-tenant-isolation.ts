@@ -62,22 +62,33 @@ export const PROVIDER_TENANT_ISOLATION: Readonly<Record<string, ProviderTenantIs
       boundSecretValues: boundClaudeCredentialValues,
     }),
     // Generic API-key adapters: isolated HOME redirects the CLI's own
-    // config/session directory (~/.codex, ~/.gemini, ~/.grok); the bound key
-    // is injected under the provider's env name and every other credential
-    // var of the family is dropped. No provider-specific argv closure — see
-    // api-key-tenant-isolation.ts.
+    // config/session directory; the bound key is delivered by env or by a
+    // credential file inside the isolated config dir, and every other
+    // credential var of the family is dropped. No provider-specific argv
+    // closure — see api-key-tenant-isolation.ts. Deliveries verified against
+    // the installed CLIs (2026-11):
     codex: apiKeyCliTenantIsolation({
       provider: 'codex',
       backends: ['codex-cli'],
       credentialEnvKey: 'OPENAI_API_KEY',
       credentialEnvKeys: ['OPENAI_API_KEY'],
       configDirEnv: { key: 'CODEX_HOME', dirName: '.codex' },
+      // codex ignores OPENAI_API_KEY env (401 "Missing bearer"); auth.json is
+      // its only API-key channel — same shape `codex login --api-key` writes.
+      secretDelivery: 'configFile',
+      secretFile: {
+        name: 'auth.json',
+        render: (secret) => `${JSON.stringify({ OPENAI_API_KEY: secret })}\n`,
+      },
     }),
     gemini: apiKeyCliTenantIsolation({
       provider: 'gemini',
       backends: ['gemini-cli'],
       credentialEnvKey: 'GEMINI_API_KEY',
       credentialEnvKeys: ['KYBERION_GEMINI_API_KEY', 'GEMINI_API_KEY', 'GOOGLE_API_KEY'],
+      // Headless -p runs refuse untrusted cwds; the bound cwd is the tenant's
+      // own scratch, and isolated HOME already keeps operator state out.
+      staticEnv: { GEMINI_CLI_TRUST_WORKSPACE: 'true' },
     }),
     // Antigravity CLI (gemini-cli's successor): API-key auth needs
     // `modelProvider: "gemini"` in ~/.gemini/antigravity-cli/settings.json
@@ -94,12 +105,8 @@ export const PROVIDER_TENANT_ISOLATION: Readonly<Record<string, ProviderTenantIs
         },
       ],
     }),
-    grok: apiKeyCliTenantIsolation({
-      provider: 'grok',
-      backends: ['grok-cli'],
-      credentialEnvKey: 'XAI_API_KEY',
-      credentialEnvKeys: ['XAI_API_KEY', 'KYBERION_GROK_API_KEY'],
-    }),
+    // grok-cli is deliberately absent: grok's only auth is `grok login`
+    // (OAuth); it ignores XAI_API_KEY env — there is no lendable channel.
   });
 
 /** Every registered isolation spec. */
