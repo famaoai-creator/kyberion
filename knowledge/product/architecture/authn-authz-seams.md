@@ -177,6 +177,15 @@ those properties. `nhi issue` registers an identity, NHI session admission creat
 a distinct runtime-binding identifier, and a personal credential grant records
 owner-approved service use; none is an agent workload token.
 
+The personal consent CLI also accepts an already-issued credential through an
+explicit inherited pipe (descriptor 3, `--token-pipe`). This only replaces hidden
+TTY collection; the fixed signed-agent verifier, installed owner/agent checks and
+host-only scope restriction remain unchanged. EOF, a bounded single frame and an
+absolute deadline are required before authentication or mutation. There is no
+issuer, trusted launcher or child admission ceremony behind this option, and the
+pipe itself does not authenticate its writer. A caller must not clear a worker's
+scope to pass a dispatcher credential to this host-only command.
+
 ## Surface wiring contract (when binding to HTTP)
 
 - The adapter proves transport facts; the seam never trusts the wire:

@@ -1,11 +1,15 @@
-/** Real authentication, approval and grant stores; only terminal input is synthetic. */
+/** Real authentication, approval and grant stores; only credential conveyance is synthetic. */
 import * as path from 'node:path';
 import { createHmac } from 'node:crypto';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useOnboardingAuthorityFixture } from '../tests/helpers/onboarding-authority-fixture.js';
 
-const input = vi.hoisted(() => ({ read: vi.fn<() => Promise<string>>() }));
+const input = vi.hoisted(() => ({
+  read: vi.fn<() => Promise<string>>(),
+  pipe: vi.fn<() => Promise<string>>(),
+}));
 vi.mock('./lib/tty/hidden-token-input.js', () => ({ readHiddenToken: input.read }));
+vi.mock('./lib/tty/private-token-pipe.js', () => ({ readPrivateTokenPipe: input.pipe }));
 const f = useOnboardingAuthorityFixture();
 const key = 'synthetic-consent-cli-workload-key-never-an-account-secret';
 const generation = '12345678-1234-4123-8123-123456789abc';
@@ -24,7 +28,7 @@ const selection = {
   purpose: 'Synthetic CLI personal consent',
   ttlDays: 1,
 };
-async function setup() {
+async function setup(mode: 'tty' | 'pipe' = 'tty') {
   for (const name of [
     'KYBERION_NHI_ID',
     'KYBERION_AGENT_ID',
@@ -37,6 +41,7 @@ async function setup() {
     vi.stubEnv(name, '');
   vi.stubEnv('KYBERION_AGENT_TOKEN_SECRET', key);
   input.read.mockReset();
+  input.pipe.mockReset();
   const { runPersonalCredentialConsentCli: cli } = await import('./personal_credential_consent.js');
   const authn = await import('@agent/core/authn/authn-providers');
   const bindings = await import('@agent/core/service/service-binding-registry');
@@ -72,18 +77,21 @@ async function setup() {
   const issued = f.run(() => authn.issueAgentToken({ nhiId: f.installedId, ttlSeconds: 900 }));
   const { token, payload } = issued;
   input.read.mockResolvedValue(token);
+  input.pipe.mockResolvedValue(token);
+  const conveyance = mode === 'pipe' ? ['--token-pipe'] : [];
+  const collector = mode === 'pipe' ? input.pipe : input.read;
   const request = async () => {
-    const result = await cli(['request', '--selection', file]);
+    const result = await cli(['request', '--selection', file, ...conveyance]);
     expect(result).toMatchObject({ status: 'pending', approval_id: expect.any(String) });
     expect(JSON.stringify(result)).not.toContain(token);
     return (result as { approval_id: string }).approval_id;
   };
   const apply = async (id: string) => {
-    const result = await cli(['apply', '--selection', file, '--approval-id', id]);
+    const result = await cli(['apply', '--selection', file, '--approval-id', id, ...conveyance]);
     expect(result).toMatchObject({ status: 'granted', grant_id: expect.any(String) });
     return (result as { grant_id: string }).grant_id;
   };
-  return { cli, authn, guard, io, file, token, payload, request, apply, writeSelection };
+  return { cli, authn, guard, io, file, token, payload, collector, request, apply, writeSelection };
 }
 function approve(id: string) {
   return f.personal(() => {
@@ -119,71 +127,84 @@ afterEach(async () => {
 });
 
 describe('personal credential consent CLI full chain', () => {
-  it('authenticates the agent, requires the separate signed human decision and refuses replay', async () => {
-    const x = await setup();
-    vi.stubEnv('KYBERION_NHI_ID', 'kyberion://agent/_/_/untrusted-env-hint');
-    const id = await x.request();
-    const record = f.personal(() => f.approvals.loadApprovalRequest('grant-standing', id)!);
-    expect(record.requestedBy).toBe(f.installedId);
-    expect(record.requestedByContext?.actorId).toBe(f.installedId);
-    await expect(x.apply(id)).rejects.toThrow();
-    approve(id);
-    const grant = await x.apply(id);
-    await expect(x.apply(id)).rejects.toThrow();
-    vi.stubEnv('KYBERION_NHI_ID', '');
-    input.read.mockClear();
-    await expect(
-      x.cli(['revoke', grant, '--reason', 'Owner withdraws synthetic consent'])
-    ).resolves.toEqual({ grant_id: grant, status: 'revoked' });
-    expect(input.read).not.toHaveBeenCalled();
-    expect(
-      f.personal(() => f.approvals.loadApprovalRequest('grant-standing', id)?.revocation)
-    ).toBeTruthy();
-  }, 60000);
+  it.each(['tty', 'pipe'] as const)(
+    'authenticates through %s, requires the separate signed human decision and refuses replay',
+    async (mode) => {
+      const x = await setup(mode);
+      vi.stubEnv('KYBERION_NHI_ID', 'kyberion://agent/_/_/untrusted-env-hint');
+      const id = await x.request();
+      const record = f.personal(() => f.approvals.loadApprovalRequest('grant-standing', id)!);
+      expect(record.requestedBy).toBe(f.installedId);
+      expect(record.requestedByContext?.actorId).toBe(f.installedId);
+      await expect(x.apply(id)).rejects.toThrow();
+      approve(id);
+      const grant = await x.apply(id);
+      await expect(x.apply(id)).rejects.toThrow();
+      vi.stubEnv('KYBERION_NHI_ID', '');
+      expect(mode === 'pipe' ? input.read : input.pipe).not.toHaveBeenCalled();
+      input.read.mockClear();
+      input.pipe.mockClear();
+      await expect(
+        x.cli(['revoke', grant, '--reason', 'Owner withdraws synthetic consent'])
+      ).resolves.toEqual({ grant_id: grant, status: 'revoked' });
+      expect(input.read).not.toHaveBeenCalled();
+      expect(input.pipe).not.toHaveBeenCalled();
+      expect(
+        f.personal(() => f.approvals.loadApprovalRequest('grant-standing', id)?.revocation)
+      ).toBeTruthy();
+    },
+    60000
+  );
 
-  it('rejects invalid, expired, foreign and tenant-bearing signed credentials without creating approval', async () => {
-    const x = await setup();
-    const foreign = f.governIdentity(() => {
-      const issued = f.identities.issueAgentIdentity({
-        kind: 'agent',
-        slug: 'foreign-cli-agent',
-        personScope: true,
-        displayName: 'Synthetic other agent',
-        accountableHumanId: 'user:owner',
+  it.each(['tty', 'pipe'] as const)(
+    'rejects invalid, expired, foreign and tenant-bearing signed credentials through %s without creating approval',
+    async (mode) => {
+      const x = await setup(mode);
+      const foreign = f.governIdentity(() => {
+        const issued = f.identities.issueAgentIdentity({
+          kind: 'agent',
+          slug: 'foreign-cli-agent',
+          personScope: true,
+          displayName: 'Synthetic other agent',
+          accountableHumanId: 'user:owner',
+        });
+        return f.identities.activateAgentIdentity(issued.nhi_id).nhi_id;
       });
-      return f.identities.activateAgentIdentity(issued.nhi_id).nhi_id;
-    });
-    // The public issuer now refuses owner/scope substitution. Independently sign
-    // those malformed claims with the synthetic key to also exercise verification.
-    expect(() =>
-      f.run(() => x.authn.issueAgentToken({ nhiId: f.installedId, tenants: ['fixture-a'] }))
-    ).toThrow();
-    expect(() =>
-      f.run(() => x.authn.issueAgentToken({ nhiId: f.installedId, onBehalfOf: 'user:other' }))
-    ).toThrow();
-    const signClaims = (claims: unknown) => {
-      const body = Buffer.from(JSON.stringify(claims)).toString('base64url');
-      const signature = createHmac('sha256', key).update(`kya1.${body}`).digest('base64url');
-      return `kya1.${body}.${signature}`;
-    };
-    const legacy: Record<string, unknown> = { ...x.payload };
-    delete legacy.identity_revision;
-    const tokens = f.run(() => [
-      'not-a-signed-workload-token',
-      x.token.slice(0, -1) + (x.token.endsWith('A') ? 'B' : 'A'),
-      x.authn.issueAgentToken({ nhiId: f.installedId, ttlSeconds: 1 }, { now: Date.now() - 10_000 })
-        .token,
-      x.authn.issueAgentToken({ nhiId: foreign }).token,
-      signClaims({ ...x.payload, tenants: ['fixture-a'] }),
-      signClaims({ ...x.payload, obo: 'user:other' }),
-      signClaims(legacy),
-    ]);
-    for (const token of tokens) {
-      input.read.mockResolvedValueOnce(token);
-      await expect(x.request()).rejects.toThrow();
-    }
-    expect(f.personal(() => f.approvals.listApprovalRequests({ status: 'pending' }))).toEqual([]);
-  }, 60000);
+      // The public issuer now refuses owner/scope substitution. Independently sign
+      // those malformed claims with the synthetic key to also exercise verification.
+      expect(() =>
+        f.run(() => x.authn.issueAgentToken({ nhiId: f.installedId, tenants: ['fixture-a'] }))
+      ).toThrow();
+      expect(() =>
+        f.run(() => x.authn.issueAgentToken({ nhiId: f.installedId, onBehalfOf: 'user:other' }))
+      ).toThrow();
+      const signClaims = (claims: unknown) => {
+        const body = Buffer.from(JSON.stringify(claims)).toString('base64url');
+        const signature = createHmac('sha256', key).update(`kya1.${body}`).digest('base64url');
+        return `kya1.${body}.${signature}`;
+      };
+      const legacy: Record<string, unknown> = { ...x.payload };
+      delete legacy.identity_revision;
+      const tokens = f.run(() => [
+        'not-a-signed-workload-token',
+        x.token.slice(0, -1) + (x.token.endsWith('A') ? 'B' : 'A'),
+        x.authn.issueAgentToken(
+          { nhiId: f.installedId, ttlSeconds: 1 },
+          { now: Date.now() - 10_000 }
+        ).token,
+        x.authn.issueAgentToken({ nhiId: foreign }).token,
+        signClaims({ ...x.payload, tenants: ['fixture-a'] }),
+        signClaims({ ...x.payload, obo: 'user:other' }),
+        signClaims(legacy),
+      ]);
+      for (const token of tokens) {
+        x.collector.mockResolvedValueOnce(token);
+        await expect(x.request()).rejects.toThrow();
+      }
+      expect(f.personal(() => f.approvals.listApprovalRequests({ status: 'pending' }))).toEqual([]);
+    },
+    60000
+  );
 
   it('never turns an environment marker into authentication and fails without an existing verification key', async () => {
     const x = await setup();

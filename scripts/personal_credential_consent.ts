@@ -34,6 +34,7 @@ import { defineScript, isDirectScript } from './lib/harness.js';
 import { inspectInstalledIdentity } from './lib/installed-identity.js';
 import { readSafeJsonFile } from './lib/json-input.js';
 import { readHiddenToken } from './lib/tty/hidden-token-input.js';
+import { readPrivateTokenPipe } from './lib/tty/private-token-pipe.js';
 
 const fail = (message: string): never => {
   throw new Error(`[PERSONAL_CONSENT_CLI] ${message}`);
@@ -53,11 +54,12 @@ function parse(argv: string[]) {
         selection: { type: 'string' },
         'approval-id': { type: 'string' },
         reason: { type: 'string' },
+        'token-pipe': { type: 'boolean' },
       },
     });
   } catch {
     // Native parser errors may echo a credential mistakenly supplied in argv.
-    return fail('Unsupported arguments. Workload tokens belong only at the hidden prompt.');
+    return fail('Unsupported arguments. Use hidden token entry or the explicit private pipe.');
   }
   const [action, grantId] = parsed.positionals;
   if (action !== 'request' && action !== 'apply' && action !== 'revoke')
@@ -76,9 +78,9 @@ function parse(argv: string[]) {
   const flags = parsed.values;
   const allowed =
     action === 'request'
-      ? ['json', 'selection']
+      ? ['json', 'selection', 'token-pipe']
       : action === 'apply'
-        ? ['json', 'selection', 'approval-id']
+        ? ['json', 'selection', 'approval-id', 'token-pipe']
         : ['json', 'reason'];
   if (Object.keys(flags).some((key) => !allowed.includes(key)))
     return fail('Unsupported option for this consent step.');
@@ -259,7 +261,9 @@ export async function runPersonalCredentialConsentCli(argv: string[]): Promise<u
       let token = '';
       try {
         // Sensitive-path mediation is synchronous and must not span terminal input.
-        token = await readHiddenToken('Existing agent workload token (hidden): ');
+        token = flags['token-pipe']
+          ? await readPrivateTokenPipe()
+          : await readHiddenToken('Existing agent workload token (hidden): ');
         return withSensitivePathMediation(() => {
           assertHostContext();
           authenticatedAgent(token, ownerId);
