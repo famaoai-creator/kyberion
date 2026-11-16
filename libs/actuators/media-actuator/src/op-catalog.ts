@@ -209,6 +209,7 @@ const MEDIA_REQUIRED_INPUTS: Record<string, string[]> = {
   pptx_extract: ['path'],
   pptx_package_check: ['path'],
   pptx_package_diff: ['before', 'after'],
+  pptx_slide_text: ['path'],
   xlsx_extract: ['path'],
   apply_pattern: ['pattern_path'],
   pptx_diff: ['before', 'after'],
@@ -217,23 +218,35 @@ const MEDIA_REQUIRED_INPUTS: Record<string, string[]> = {
   pptx_patch_paragraphs: ['path', 'paragraph_replacements'],
   pptx_replace_slides: ['path', 'out', 'replace_index', 'slides'],
   save_brand_to_confidential: ['brand_name', 'tenant_slug'],
-  write_file: ['path'],
 };
 // deck_from_html は HTML をインライン(html)・ファイル(path)・ctx チャネル(from) のいずれかで受ける。
+// document_digest likewise: a source path or a pre-extracted protocol channel.
 const MEDIA_ANY_OF_INPUTS: Record<string, string[]> = {
   deck_from_html: ['html', 'path', 'from'],
+  document_digest: ['path', 'from'],
+};
+/** Ops needing fixed keys AND at least one of several alternatives. */
+const MEDIA_REQUIRED_AND_ANY_OF: Record<string, { required: string[]; anyOf: string[] }> = {
+  // write_file sources its payload inline (`content`) or from a ctx channel (`from`).
+  write_file: { required: ['path'], anyOf: ['content', 'from'] },
 };
 const MEDIA_EXTRA_CONTRACTS: Record<string, InputSchema> = Object.fromEntries(
   MEDIA_EXTRA_OPS.map((op) => [
     op,
-    MEDIA_REQUIRED_INPUTS[op]
-      ? { ...MEDIA_MIGRATION_SCHEMA, required: MEDIA_REQUIRED_INPUTS[op] }
-      : MEDIA_ANY_OF_INPUTS[op]
-        ? {
-            ...MEDIA_MIGRATION_SCHEMA,
-            anyOf: MEDIA_ANY_OF_INPUTS[op].map((key) => ({ required: [key] })),
-          }
-        : MEDIA_MIGRATION_SCHEMA,
+    MEDIA_REQUIRED_AND_ANY_OF[op]
+      ? {
+          ...MEDIA_MIGRATION_SCHEMA,
+          required: MEDIA_REQUIRED_AND_ANY_OF[op].required,
+          anyOf: MEDIA_REQUIRED_AND_ANY_OF[op].anyOf.map((key) => ({ required: [key] })),
+        }
+      : MEDIA_REQUIRED_INPUTS[op]
+        ? { ...MEDIA_MIGRATION_SCHEMA, required: MEDIA_REQUIRED_INPUTS[op] }
+        : MEDIA_ANY_OF_INPUTS[op]
+          ? {
+              ...MEDIA_MIGRATION_SCHEMA,
+              anyOf: MEDIA_ANY_OF_INPUTS[op].map((key) => ({ required: [key] })),
+            }
+          : MEDIA_MIGRATION_SCHEMA,
   ])
 );
 const MEDIA_EXTRA_EXAMPLES: Record<string, Array<Record<string, unknown>>> = {

@@ -247,9 +247,15 @@ describe('providerIdForReasoningIdentifier', () => {
     expect(providerIdForReasoningIdentifier('copilot')).toBe('copilot');
   });
 
+  it('maps both claude runtimes (CLI and API) to the one business id', () => {
+    // Design §5: attestation and egress overlay apply to claude-cli and anthropic alike.
+    expect(providerIdForReasoningIdentifier('anthropic')).toBe('claude');
+    expect(providerIdForReasoningIdentifier('claude-cli')).toBe('claude');
+  });
+
   it('returns undefined for unmapped or absent identifiers, rather than guessing', () => {
     expect(providerIdForReasoningIdentifier('stub')).toBeUndefined();
-    expect(providerIdForReasoningIdentifier('anthropic')).toBeUndefined();
+    expect(providerIdForReasoningIdentifier('openai-api')).toBeUndefined();
     expect(providerIdForReasoningIdentifier(undefined)).toBeUndefined();
     expect(providerIdForReasoningIdentifier('')).toBeUndefined();
   });

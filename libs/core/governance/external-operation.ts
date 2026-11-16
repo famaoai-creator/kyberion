@@ -257,6 +257,17 @@ export interface ExternalOperation {
   interface?: () => OperationInterfaceBinding;
   /** Additional reviewed argument paths requiring user/policy origins or exact approval. */
   protectedArguments?: string[][];
+  /** The effect only observes remote state, so a failed attempt is recorded as
+   * failed and needs no verification before the next scheduled read. Honoured
+   * only for registry `external_read` operations. */
+  observationOnly?: boolean;
+}
+
+function isObservationOnly(input: ExternalOperation): boolean {
+  return (
+    input.observationOnly === true &&
+    operationAuthorization(input.operationId).effectClass === 'external_read'
+  );
 }
 
 function protectionFor(input: ExternalOperation) {
@@ -793,6 +804,10 @@ export async function runExternalOperation<T>(
   try {
     result = await execute();
   } catch (error) {
+    if (isObservationOnly(input)) {
+      recordExternalOperationOutcome(input, 'failed');
+      throw error;
+    }
     recordExternalOperationOutcome(input, 'unknown');
     // Repairing a transport exception may change the operation/destination and
     // bypass a same-invocation reservation. Never repair an attempted mutation.
@@ -811,7 +826,8 @@ export async function runExternalOperation<T>(
   recordExternalOperationOutcome(input, outcome);
   // The SDK may turn a failed/partial receipt into an ordinary result envelope.
   // Preserve the verification stop at the trusted outer dispatch boundary.
-  if (input.requiresApproval && outcome !== 'succeeded') signalExternalOutcomeStop(input);
+  if (input.requiresApproval && outcome !== 'succeeded' && !isObservationOnly(input))
+    signalExternalOutcomeStop(input);
   return result;
 }
 

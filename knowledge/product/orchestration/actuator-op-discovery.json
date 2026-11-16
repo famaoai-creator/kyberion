@@ -3718,6 +3718,38 @@
           ]
         },
         {
+          "op": "approval_queue_inspect",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "profile": {
+                "type": "string",
+                "minLength": 1
+              },
+              "origin": {
+                "type": "string",
+                "minLength": 1
+              },
+              "headless": {
+                "type": "boolean"
+              },
+              "export_as": {
+                "type": "string"
+              }
+            },
+            "required": ["profile", "origin"],
+            "additionalProperties": false
+          },
+          "examples": [
+            {
+              "profile": "knowledge/confidential/acme/approval-queues/workflow.json",
+              "origin": "https://workflow.example.com",
+              "export_as": "workflow_queue"
+            }
+          ]
+        },
+        {
           "op": "action_trail",
           "kind": "capture",
           "input_schema": {
@@ -9532,7 +9564,15 @@
                 "type": "string"
               }
             },
-            "additionalProperties": false
+            "additionalProperties": false,
+            "anyOf": [
+              {
+                "required": ["path"]
+              },
+              {
+                "required": ["from"]
+              }
+            ]
           },
           "examples": [
             {
@@ -14964,7 +15004,8 @@
                 "type": "string"
               }
             },
-            "additionalProperties": false
+            "additionalProperties": false,
+            "required": ["path"]
           },
           "examples": [
             {
@@ -28681,7 +28722,15 @@
               }
             },
             "additionalProperties": false,
-            "required": ["path"]
+            "required": ["path"],
+            "anyOf": [
+              {
+                "required": ["content"]
+              },
+              {
+                "required": ["from"]
+              }
+            ]
           },
           "examples": [
             {

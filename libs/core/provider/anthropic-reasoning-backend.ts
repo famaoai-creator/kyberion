@@ -17,6 +17,7 @@ import { currentExecutionScope } from '../foundation/execution-scope.js';
 import { automaticReasoningRedispatchAllowed } from '../reasoning/reasoning-dispatch-scope.js';
 import { normalizeEventScope } from '../event/event-scope.js';
 import { getUsageAttribution } from '../finance/usage-accounting.js';
+import { credentialUsageFields } from '../secret/credential-usage-ledger.js';
 import { llmSemaphore } from '../foundation/semaphore.js';
 import { metrics } from '../analysis/metrics.js';
 import { resolveRuntimeModelId } from '../tool/runtime-model-defaults.js';
@@ -452,6 +453,7 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
       metrics.record('anthropic-sdk', Date.now() - started, status, {
         model: String(model || this.model),
         agent: 'anthropic-sdk',
+        ...credentialUsageFields(),
         cause: 'assistant',
         ...(scope ? { scope } : {}),
         ...(attribution ? { actor_id: attribution.actor_id } : {}),

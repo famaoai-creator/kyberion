@@ -23,7 +23,7 @@ import {
   safeWriteFile,
 } from '../secure-io.js';
 import { withLockSync } from '../foundation/lock-utils.js';
-import { writeJson } from '../foundation/json.js';
+import { readJson, writeJson } from '../foundation/json.js';
 import { readJsonLinesCached } from '../storage/jsonl-tail.js';
 import { resolvePolicyIdentityContext } from '../identity-context-bridge.js';
 import { assertScopeContext } from '../foundation/scope-context-validation.js';
@@ -57,6 +57,22 @@ const LEGACY_DOT_ENTRIES = new Set([
   'event-continuations',
   'org-cadence.json',
 ]);
+/**
+ * Legacy directories that hold one `<dot_id>.json` per dot (same layout as
+ * `dotStatePath(c, <dir>, '<dot_id>.json')`), so a single dot's file can be
+ * relocated without touching its neighbours. `wake-circuit` belongs here: the
+ * runtime writes `dotStatePath(charter, 'wake-circuit', '<dot_id>.json')`.
+ */
+const PER_DOT_FILE_DIRS: ReadonlySet<string> = new Set(['memory', 'autonomy', 'wake-circuit']);
+/**
+ * A tier/tenant scope tag is an object. Some ledgers use `scope` for their own
+ * domain value instead (KR rows: `'dot' | 'org'`), which is not a tier claim and
+ * must be neither compared with nor overwritten by the reviewed scope.
+ */
+const ORG_CADENCE_STATE_FILE = 'org-cadence.json';
+function isScopeTag(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
 function legacyDotStateRoot(c: DotCharter): string {
   return physicalScopedPath(DOT_STATE_ROOT, {
     tenant_slug: c.scope.tenant_slug,
@@ -72,7 +88,7 @@ function legacyEntries(c: DotCharter, root: string): string[] {
     )
     .filter((entry) => {
       const source = path.join(dir, entry);
-      if (['memory', 'autonomy'].includes(entry))
+      if (PER_DOT_FILE_DIRS.has(entry))
         return safeExistsSync(path.join(source, `${c.dot_id}.json`));
       if (entry.endsWith('.jsonl') && safeLstat(source).isFile()) {
         const rows = String(safeReadFile(source))
@@ -149,7 +165,7 @@ export function migrateLegacyDotState(
       // authorizes moving its neighbours or an unowned aggregate.
       const plans = entries.map((entry) => {
         const src = path.join(source, entry);
-        if (['memory', 'autonomy'].includes(entry))
+        if (PER_DOT_FILE_DIRS.has(entry))
           return {
             entry,
             src: path.join(src, `${c.dot_id}.json`),
@@ -173,7 +189,7 @@ export function migrateLegacyDotState(
           for (const { row } of rows) {
             if (
               row.dot_id === c.dot_id &&
-              row.scope &&
+              isScopeTag(row.scope) &&
               ['tier', 'tenant_slug', 'owner_nhi', 'organization_id', 'project_id'].some(
                 (key) =>
                   (row.scope[key] ?? '') !==
@@ -191,6 +207,22 @@ export function migrateLegacyDotState(
             selected: rows.filter(({ row }) => row.dot_id === c.dot_id).map(({ line }) => line),
             remaining: rows.filter(({ row }) => row.dot_id !== c.dot_id).map(({ line }) => line),
           };
+        }
+        if (entry === ORG_CADENCE_STATE_FILE && safeLstat(src).isFile()) {
+          // Scheduling state that names its owner. When the runtime has already
+          // resumed and written a live copy at the destination, that copy
+          // supersedes the legacy last-run timestamps (see write step).
+          let owner: unknown;
+          try {
+            owner = readJson<{ dot_id?: unknown }>(src)?.dot_id;
+          } catch {
+            owner = undefined;
+          }
+          if (owner !== c.dot_id)
+            throw new Error(
+              '[DOT_STATE_MIGRATION_OWNERSHIP] org cadence state is not owned by this dot; classify it separately'
+            );
+          return { entry, src, dest: path.join(destination, entry), supersededByLiveCopy: true };
         }
         throw new Error(
           '[DOT_STATE_MIGRATION_OWNERSHIP] aggregate or unknown legacy state requires separate ownership classification; recover it without relocating the shared namespace'
@@ -212,6 +244,7 @@ export function migrateLegacyDotState(
           const stat = safeLstat(plan.src);
           if (!stat.isFile() || stat.isSymbolicLink())
             throw new Error('[DOT_STATE_MIGRATION_TYPE] selected state must be a regular file');
+          if ('supersededByLiveCopy' in plan && safeExistsSync(plan.dest)) return null;
           const bytes = safeReadFile(plan.src);
           if (
             safeExistsSync(plan.dest) &&
@@ -228,7 +261,7 @@ export function migrateLegacyDotState(
               .filter((line) => line.trim())
           : [];
         const merged = [...existing];
-        const identities = new Map<string, string>();
+        const identities = new Map<string, Set<string>>();
         const identity = (row: Record<string, unknown>) =>
           JSON.stringify([
             row.dot_id,
@@ -257,44 +290,53 @@ export function migrateLegacyDotState(
             !row ||
             typeof row.dot_id !== 'string' ||
             !row.scope ||
-            ['tier', 'tenant_slug', 'owner_nhi', 'organization_id', 'project_id'].some(
-              (key) =>
-                (row.scope[key] ?? '') !== (reviewedScope[key as keyof typeof reviewedScope] ?? '')
-            )
+            (isScopeTag(row.scope) &&
+              ['tier', 'tenant_slug', 'owner_nhi', 'organization_id', 'project_id'].some(
+                (key) =>
+                  (row.scope[key] ?? '') !==
+                  (reviewedScope[key as keyof typeof reviewedScope] ?? '')
+              ))
           )
             throw new Error(
               '[DOT_STATE_MIGRATION_SCOPE] destination evidence lacks matching reviewed scope'
             );
           return row;
         };
+        // Legacy ledgers are append-only histories (digest status transitions,
+        // repeated wake errors), so one identity legitimately carries several
+        // rows. Conflicts are judged only against evidence already at the
+        // destination: an exact copy is skipped (replay after an interrupted
+        // migration), a differing row for a destination identity is refused,
+        // and selected rows are never compared with each other.
         for (const line of existing) {
           const row = validate(line);
           const key = identity(row);
-          const canonical = JSON.stringify(row);
-          if (identities.has(key) && identities.get(key) !== canonical)
-            throw new Error(
-              '[DOT_STATE_MIGRATION_CONFLICT] destination row identity has conflicting evidence'
-            );
-          identities.set(key, canonical);
+          const known = identities.get(key) ?? new Set<string>();
+          known.add(JSON.stringify(row));
+          identities.set(key, known);
         }
         for (const line of plan.selected) {
-          const row = { ...JSON.parse(line), scope: reviewedScope };
+          const parsed = JSON.parse(line);
+          // A string `scope` is the row's own domain field (KR level 'dot' | 'org'),
+          // not a tier tag — keep it; the destination path carries the tier scope.
+          const row =
+            parsed.scope === undefined || isScopeTag(parsed.scope)
+              ? { ...parsed, scope: reviewedScope }
+              : parsed;
           const canonical = JSON.stringify(row);
-          const key = identity(row);
-          if (identities.has(key)) {
-            if (identities.get(key) !== canonical)
-              throw new Error(
-                '[DOT_STATE_MIGRATION_CONFLICT] selected row identity conflicts with destination evidence'
-              );
-          } else {
-            identities.set(key, canonical);
-            merged.push(canonical);
-          }
+          const known = identities.get(identity(row));
+          if (known?.has(canonical)) continue;
+          if (known)
+            throw new Error(
+              '[DOT_STATE_MIGRATION_CONFLICT] selected row identity conflicts with destination evidence'
+            );
+          merged.push(canonical);
         }
         return { dest: plan.dest, bytes: merged.join('\n') + '\n' };
       });
       // All destination conflicts are checked before the first mutation.
       for (const write of writes) {
+        if (!write) continue; // legacy copy superseded by the live destination copy
         safeMkdir(path.dirname(write.dest), { recursive: true });
         safeWriteFile(write.dest, write.bytes);
       }

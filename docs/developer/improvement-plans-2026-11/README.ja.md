@@ -19,10 +19,10 @@ status: active
 
 決定記録は [Concept Model v2](../../../knowledge/product/architecture/decisions/2026-11-10-concept-model-v2.md) です。依存関係の順に並べています。
 
-1. [スコープ・ID・権限（Grant）の統合計画](./SCOPE_IDENTITY_GRANT_CONSOLIDATION_PLAN_2026-11-10.ja.md) — planned
-2. [WorkItem（Issue と子ステップ）と Lease の統合計画](./WORKITEM_ISSUE_LEASE_CONSOLIDATION_PLAN_2026-11-10.ja.md) — planned
+1. [スコープ・ID・権限（Grant）の統合計画](./SCOPE_IDENTITY_GRANT_CONSOLIDATION_PLAN_2026-11-10.ja.md) — partial
+2. [WorkItem（Issue と子ステップ）と Lease の統合計画](./WORKITEM_ISSUE_LEASE_CONSOLIDATION_PLAN_2026-11-10.ja.md) — completed
 3. [意図の解決器の一本化計画](./INTENT_RESOLVER_UNIFICATION_PLAN_2026-11-10.ja.md) — completed
-4. [記憶のループを閉じる計画](./MEMORY_LOOP_CLOSURE_PLAN_2026-11-10.ja.md) — planned
+4. [記憶のループを閉じる計画](./MEMORY_LOOP_CLOSURE_PLAN_2026-11-10.ja.md) — active
 
 ## 顧客とのやり取り
 
@@ -31,3 +31,4 @@ status: active
 ## 外部ホスト連携
 
 - [VCS host API seam の設計 (gh CLI 依存の抽象化)](./VCS_HOST_API_SEAM_DESIGN_2026-11-04.ja.md) — completed
+- [推論の資格情報の持ち主・種類・貸し出しと claude CLI の隔離（設計）](./CLAUDE_CLI_TENANT_CREDENTIAL_DESIGN_2026-11-16.ja.md) — active

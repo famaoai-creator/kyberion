@@ -23,6 +23,7 @@ import { assertExternalOperationBatchResumable } from '@agent/core/governance/ex
 import { withExternalOperationOccurrence } from '@agent/core/governance/external-operation-occurrence';
 import { countBrowserExternalEffects } from './browser-external-governance.js';
 import { runLocalSessionProbe } from './browser-local-session-probe.js';
+import { runApprovalQueueInspect } from './approval-queue-inspect.js';
 import {
   forgetIsolatedNavigationConfinement,
   registerIsolatedBrowserProfile,
@@ -96,6 +97,14 @@ export async function executePipeline(
       );
     }
     return runLocalSessionProbe(steps[0].params || {}, initialCtx);
+  }
+  if (steps.some((step) => step.op === 'approval_queue_inspect')) {
+    if (steps.length !== 1 || steps[0].type !== 'capture') {
+      throw new Error(
+        '[APPROVAL_QUEUE_CONTRACT] The confined inspection must be the only capture step.'
+      );
+    }
+    return runApprovalQueueInspect(steps[0].params || {}, initialCtx);
   }
   assertExternalOperationBatchResumable(() => countBrowserExternalEffects(steps));
   const isolated = inputOptions?.onboarding_isolated_navigation === true;

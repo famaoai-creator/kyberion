@@ -728,8 +728,17 @@ export type DotWakeFailureCategory =
  * counts toward the per-dot wake circuit — a healthy dot resumes as soon as
  * the backend recovers instead of being held for the circuit's backoff.
  */
+/**
+ * A credential the dot's binding should have served (grant missing/expired, or
+ * the bound credential refused at the model call): the tenant's configuration,
+ * not the process backend. Counted by the wake circuit, never a reselect.
+ */
+const DOT_CREDENTIAL_FAILURE =
+  /\[DOT_CREDENTIAL_GRANT_(?:MISSING|EXPIRED)\]|\[CREDENTIAL_(?:KEY_UNAVAILABLE|PROVIDER_DENIED|ALLOCATION_DENIED|KIND_NOT_ELIGIBLE|ATTESTATION_REQUIRED|TOKEN_EXPIRED|BUDGET_EXCEEDED|CUSTODY_PERSON_MISMATCH|VALUE_CHANGED|RECORD_MISMATCH|RECORD_INVALID)\]/;
+
 export function isDotWakeProcessFailure(reason: string | undefined): boolean {
   if (!reason) return false;
+  if (DOT_CREDENTIAL_FAILURE.test(reason)) return false;
   if (reason === DOT_WAKE_FAILURE_CATEGORY.backend) return true;
   return /no real reasoning backend|lacks generateWithTools|failed across \d+ candidate|has no tool-capable backend/.test(
     reason
@@ -742,11 +751,16 @@ export type DotWakeReasonCode =
   | 'provider_failover_exhausted'
   | 'wall_clock_exceeded'
   | 'charter'
+  | 'credential_grant'
+  | 'standing_binding'
   | 'wake';
 
 /** Map a failed wake's reason text (full text or tenant category) to a stable code. */
 export function classifyDotWakeReason(reason: string | undefined): DotWakeReasonCode {
   const text = String(reason ?? '');
+  // Standing-binding refusals (dot-standing-binding.ts): fix the grant or claim, not the dot.
+  if (DOT_CREDENTIAL_FAILURE.test(text)) return 'credential_grant';
+  if (/\[DOT_STANDING_[A-Z_]+\]/.test(text)) return 'standing_binding';
   if (/wall_clock budget/.test(text)) return 'wall_clock_exceeded';
   if (/lacks generateWithTools|has no tool-capable backend|failed across 0 candidate/.test(text))
     return 'no_tool_backend';

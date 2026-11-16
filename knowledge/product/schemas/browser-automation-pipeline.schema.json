@@ -51,6 +51,7 @@
           "op": {
             "enum": [
               "local_session_probe",
+              "approval_queue_inspect",
               "distill_dom",
               "goto",
               "screenshot",

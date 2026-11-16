@@ -59,6 +59,8 @@ export const DECLARED_STORE_GRANTS: Readonly<Record<string, DeclaredStoreGrantDe
     chronos_token_registry_reader: Object.freeze({ baseRole: 'base_worker', tenantBound: false }),
     // agent/nhi-lifecycle-governance.ts: accountable member status.
     nhi_accountability_reader: Object.freeze({ baseRole: 'base_worker', tenantBound: false }),
+    // secret/credential-eligibility-deps.ts: member tenant role ({member, tenant, role} only).
+    member_owner_reader: Object.freeze({ baseRole: 'base_worker', tenantBound: false }),
     // operator-surface selection-service.ts: the reasoning route settings and their history.
     reasoning_settings_writer: Object.freeze({ baseRole: 'base_worker', tenantBound: false }),
     // analysis/metrics.ts: the partitioned metrics ledgers for cap enforcement (numbers only).

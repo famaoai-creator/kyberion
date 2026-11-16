@@ -31,6 +31,7 @@ const grant = () => ({
   },
 });
 vi.mock('../governance/grant-store.js', () => ({
+  registerCredentialLendingPolicy: () => undefined,
   listGrants: () => [grant()],
   loadGrant: () => grant(),
   grantStatusAt: () => (state.revoked ? 'revoked' : 'active'),

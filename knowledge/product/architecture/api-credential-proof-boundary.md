@@ -105,16 +105,55 @@ remain part of admission; duplicate token names fail closed. This is explicitly
 allocated consumption, not fallback from a missing tenant key. An external binder's
 miss/failure never falls through to the local broker.
 
-Missing binding, an empty bound set, or a missing bound key is final. Never fall
-back to operator environment variables, personal connections, or operator CLI login.
+Missing binding, an empty bound set, or a missing bound key is final for secret
+material. Never fall back to operator environment variables, personal connections,
+or operator CLI login _as a source of secret values_ — `resolveTaskCredential`,
+`resolveProviderApiCredential`, and provider secret injection stay fail-closed.
+Process-level sessions are a separate seam covered by the carry-in rule below.
 Secret-management role changes must preserve tenant/task identity. Tenant execution
 cannot register a personal key, including before the OS keychain write begins.
+
+### Spawned provider CLI: bound env, ambient carry-in, or refused
+
+A provider CLI child's process environment resolves in exactly three ways
+(`buildProviderChildEnv`, `resolveTaskProviderEnvironment`):
+
+| Path                   | Condition                                                                                                                                        | What the child sees                                                                               |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
+| **Bound isolated env** | The binding carries `providerEnvironments[provider]` (credential lending built it)                                                               | The isolated HOME under the tenant's `provider-auth/` floor, plus the lent credential only        |
+| **Ambient carry-in**   | A trusted tenant binding exists but has no bound env for this provider (`resolveTaskProviderEnvironment` returns `undefined`)                    | The allowlisted ambient env — including `HOME`, so the machine's CLI login sessions are reachable |
+| **Refused**            | No binding at all (`[CREDENTIAL_BINDING_REQUIRED]`), a `personalClaim` binding, a service-session provenance selection, or a malformed bound env | Nothing — the spawn fails closed                                                                  |
+
+The canonical use case for ambient carry-in is the **single-tenant installation**:
+the operator and the only tenant share one human, so a bound-but-unbound spawn
+inherits the person's own CLI sessions (`~/.claude`, `~/.codex`, `~/.grok`, …) for
+their own work — the "bring-your-own CLI" default. The trusted binding still
+proves the work was dispatched (claim → scope envelope → binding), so carry-in is
+never anonymous, and it never merges lent secrets into an ambient env.
+
+In a **multi-tenant install** ambient carry-in means _all_ machine sessions are
+reachable by _every_ tenant's unbound work — the sessions carry no per-tenant
+attribution. That is accepted as the default today; per-tenant opt-out
+(e.g. a tenant-profile `ambient_carry_in` flag) is follow-up work the tenant
+registry can host without changing the dispatch shape. A tenant-private CLI
+session (a login that belongs to one tenant, not the operator) is also future
+work — it would use the isolated-HOME path with a `--device-code`-style login
+ceremony rather than ambient inheritance.
 
 Rotation and revocation are distinct. Local bindings recheck the grant, approval,
 expiry, claim and stored key version before subsequent managed API consumption.
 Revocation blocks new local bindings and subsequent managed sends; rotation
 invalidates an old binding. Already-sent requests are not cancelled. External
 binders and spawned CLI sessions retain their own revocation boundaries.
+
+An allocation's lifetime can be extended only as the same grant: an owner
+approval bound to the grant id, its current expiry and the extension length moves
+`expires_at` (at most the capability maximum from approval), and every step is
+re-verified at use. A revoked grant is never extended; an expired one only within
+a short grace window, during which it allows nothing. Resident tenant Dots consume
+allocations through the same claimed-task binding as any WorkItem, using a
+standing lineage rather than an operator exception
+([tenant-task-credential-binding](../orchestration/tenant-task-credential-binding.ja.md)).
 
 ### Provider CLI children: output redaction and the credential relay
 

@@ -103,8 +103,109 @@ export function withCredentialMaterialCapability<T>(tenant: string, file: string
   );
 }
 
+const TENANT_CONNECTION =
+  /^knowledge\/confidential\/([a-z][a-z0-9-]{1,30})\/connections\/[a-z0-9][a-z0-9._-]{0,63}\.json$/;
+const lentGrants = createSynchronousResourceGrantIssuer<
+  Readonly<{ owner: string; borrower: string; file: string }>
+>('LENT_CREDENTIAL_CAPABILITY');
+
+/**
+ * Brokered cross-tenant read ceiling (design §2.5): exactly one tenant-custody
+ * connection file of the OWNER tenant, read on behalf of a borrower tenant's
+ * admitted allocation. The resource scope is bound to the owner (the file's
+ * tenant), so tier-guard's tenant check holds; the borrower never gains a
+ * path into the owner's tree. Only the allocation broker reaches it, after
+ * eligibility and grant admission, and it audits `credential.lent_read`.
+ */
+export function withLentCredentialMaterialCapability<T>(
+  owner: string,
+  borrower: string,
+  file: string,
+  run: () => T
+): T {
+  const match = TENANT_CONNECTION.exec(file);
+  if (!match || match[1] !== owner)
+    throw new Error('[CREDENTIAL_CAPABILITY_INVALID] Exact owner tenant connection path required');
+  const connections = `knowledge/confidential/${owner}/connections`;
+  return lentGrants.run(
+    Object.freeze({ owner, borrower, file }),
+    {
+      tenantSlug: owner,
+      readExact: [file],
+      writeExact: [],
+      mkdirExact: [],
+      metadataExact: [
+        file,
+        connections,
+        `knowledge/confidential/${owner}`,
+        'knowledge/confidential',
+        'knowledge',
+      ],
+      allowProductKnowledgeRead: true,
+    },
+    run
+  );
+}
+
+/**
+ * Issuance right of the credential custody store grant (G2 pattern). Deliberately
+ * listed in NO role-assumption-policy entry: only a process without SYSTEM_ROLE
+ * (the operator CLI `pnpm kyberion reasoning credentials register`) can issue it;
+ * every surface / daemon gets [ROLE_ASSUMPTION_DENIED]. Distinct from the material READ
+ * right: registering / replacing a credential is a write, and only the lending
+ * broker's register facades (secret/credential-lending-broker.ts) issue it.
+ */
+export const CREDENTIAL_CUSTODY_STORE_ISSUANCE_RIGHT = 'credential_custody_store';
+const PERSONAL_RECORD =
+  /^knowledge\/personal\/connections\/[a-z0-9][a-z0-9._-]{0,63}\.record\.json$/;
+const custodyWriteGrants = createSynchronousResourceGrantIssuer<
+  Readonly<{ owner: string | null; file: string }>
+>('CREDENTIAL_CUSTODY_STORE_CAPABILITY');
+
+/**
+ * Exact write ceiling of one credential custody file (design §2.1):
+ * - tenant custody (`owner` = tenant): the connection or its `.record.json` under
+ *   `knowledge/confidential/<owner>/connections/`, bound to that tenant;
+ * - person custody (`owner` = null): only the non-secret `.record.json` beside the
+ *   personal connection (the value itself stays with secret introduction).
+ * Nothing else under the tenant / personal root.
+ */
+export function withCredentialCustodyWriteCapability<T>(
+  custody: Readonly<{ kind: 'tenant' | 'person'; owner: string }>,
+  file: string,
+  run: () => T
+): T {
+  const owner = custody.kind === 'tenant' ? custody.owner : null;
+  const match = owner ? TENANT_CONNECTION.exec(file) : PERSONAL_RECORD.exec(file);
+  if (!match || (owner && match[1] !== owner))
+    throw new Error('[CREDENTIAL_CAPABILITY_INVALID] Exact custody store path required');
+  const directories = owner
+    ? [
+        `knowledge/confidential/${owner}/connections`,
+        `knowledge/confidential/${owner}`,
+        'knowledge/confidential',
+      ]
+    : ['knowledge/personal/connections', 'knowledge/personal'];
+  return custodyWriteGrants.run(
+    Object.freeze({ owner, file }),
+    {
+      ...(owner
+        ? { tenantSlug: owner }
+        : { custody: { kind: 'person' as const, ref: custody.owner } }),
+      readExact: [file],
+      writeExact: [file],
+      mkdirExact: directories,
+      metadataExact: [file, ...directories, 'knowledge'],
+      allowProductKnowledgeRead: true,
+    },
+    run
+  );
+}
+
 export function isCredentialMaterialCapability(scope: ResourceAccessScope | undefined): boolean {
-  return Boolean(grants.resolve(scope) || accountGrants.resolve(scope));
+  return Boolean(
+    grants.resolve(scope) || accountGrants.resolve(scope) || lentGrants.resolve(scope)
+  );
 }
 
 /**
@@ -119,8 +220,24 @@ export function credentialMaterialGrantAllows(
   operation: ResourceAccessOperation
 ): boolean {
   const scope = currentResourceAccessScope();
+  const custodyWrite = custodyWriteGrants.resolve(scope);
+  if (custodyWrite) {
+    const { file } = custodyWrite.binding;
+    const inside =
+      target === file ||
+      (['mkdir', 'metadata'].includes(operation) && file.startsWith(target + '/'));
+    return inside && decideResourceAccess(scope!, target, operation).allowed;
+  }
   if (!isCredentialMaterialCapability(scope)) return false;
   if (operation !== 'read' && operation !== 'metadata') return false;
+  const lent = lentGrants.resolve(scope);
+  if (lent) {
+    const directory = `knowledge/confidential/${lent.binding.owner}/connections`;
+    const inside = target === lent.binding.file;
+    const ancestor = operation === 'metadata' && lent.binding.file.startsWith(target + '/');
+    if (!inside && !ancestor && target !== directory) return false;
+    return decideResourceAccess(scope!, target, operation).allowed;
+  }
   const under = target === CONNECTIONS || target.startsWith(CONNECTIONS + '/');
   const ancestor = operation === 'metadata' && CONNECTIONS.startsWith(target + '/');
   if (!under && !ancestor) return false;

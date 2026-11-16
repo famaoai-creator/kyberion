@@ -73,7 +73,10 @@ import {
   reconcileDotEventRunnerDuplicate,
 } from '../dot/dot_supervisor_extensions.js';
 import { executeServicePreset } from '@agent/core/service/service-engine';
-import { runDotWakeWithGoalDriver } from '@agent/core/dot/dot-wake-orchestration';
+import {
+  remindDotCredentialGrantExpiry,
+  runDotWakeWithGoalDriver,
+} from '@agent/core/dot/dot-wake-orchestration';
 import { runDotHousekeeping } from '@agent/core/dot/dot-dispatch';
 import '@agent/core/dot/dot-extension-bootstrap';
 import { dotBudgetThrottle, type DotBudgetThrottle } from '@agent/core/dot/dot-budget';
@@ -425,6 +428,17 @@ async function runDotSweepWithStableOutputs(now: Date, deps: DotSweepDeps): Prom
       }));
       for (const message of housekeeping.errors) {
         logger.warn(`[dot-sweep] housekeeping for ${loaded.charter.dot_id} — ${message}`);
+      }
+      // Tenant dots reason only under an owner-approved credential.use grant:
+      // remind (ops_alert, once per grant per day) before it lapses.
+      if (loaded.charter.scope.tenant_slug) {
+        await runAsDotCharter(loaded.charter, async () =>
+          remindDotCredentialGrantExpiry(loaded.charter, now)
+        ).catch((error: unknown) =>
+          logger.warn(
+            `[dot-sweep] credential grant reminder for ${loaded.charter.dot_id} failed — ${error instanceof Error ? error.message : error} | next: check \`pnpm kyberion reasoning credentials allocations --tenant ${loaded.charter.scope.tenant_slug}\` | evidence: active/shared/runtime/grants`
+          )
+        );
       }
     }
     // P1-9: a halted system runs housekeeping only. Dots still heartbeat so the

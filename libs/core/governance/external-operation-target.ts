@@ -27,6 +27,7 @@ export type ExternalOperationGrant =
       visibility?: 'private';
     }
   | { operation_id: 'browser:goto' | 'browser:open_tab'; origin?: string }
+  | { operation_id: 'browser:approval_queue_inspect'; origin: string; profile_hash: string }
   | {
       operation_id: 'tenant:attest_provider';
       tenant_slug: string;
@@ -231,6 +232,32 @@ export const EXTERNAL_OPERATION_DELEGATION: Record<string, DelegationTargetSpec>
     fields: [],
     optionalFields: ['origin'],
     buildTarget: (effect) => buildBrowserNavigationTarget('browser:open_tab', effect),
+    reputational_class: 'B',
+  },
+  'browser:approval_queue_inspect': {
+    fields: ['origin', 'profile_hash'],
+    buildTarget: (effect) => {
+      if (effect.navigation_confinement !== 'authenticated-origin-set-v1') return undefined;
+      const { origin, confined_origins: confined, profile_hash: profileHash } = effect;
+      // A grant names one origin; a wider confinement set would let the
+      // profile post the credential somewhere the human never signed.
+      if (
+        typeof origin !== 'string' ||
+        !Array.isArray(confined) ||
+        confined.length !== 1 ||
+        confined[0] !== origin ||
+        typeof profileHash !== 'string' ||
+        !/^[0-9a-f]{64}$/.test(profileHash)
+      )
+        return undefined;
+      try {
+        const url = new URL(origin);
+        if (url.protocol !== 'https:' || url.origin !== origin) return undefined;
+      } catch {
+        return undefined;
+      }
+      return { operation_id: 'browser:approval_queue_inspect', origin, profile_hash: profileHash };
+    },
     reputational_class: 'B',
   },
   'tenant:attest_provider': {
@@ -570,6 +597,7 @@ export function parseExternalOperationGrant(raw: unknown): ExternalOperationGran
     const raw = value[field] as string | undefined;
     if (raw === undefined) continue;
     if (field === 'visibility' && raw !== 'private') return undefined;
+    if (field === 'profile_hash' && !/^[0-9a-f]{64}$/i.test(raw)) return undefined;
     normalized[field] =
       field === 'repository'
         ? normalizeRepositoryUrl(raw)
@@ -579,11 +607,35 @@ export function parseExternalOperationGrant(raw: unknown): ExternalOperationGran
             ? normalizeBranchPattern(raw)
             : field === 'origin'
               ? normalizeOrigin(raw)
-              : raw;
+              : field === 'profile_hash'
+                ? raw.toLowerCase()
+                : raw;
   }
   if (Object.values(normalized).some((v) => !v)) return undefined;
   if (op === 'tenant:attest_provider' && normalized.training_use !== 'none') return undefined;
   return { operation_id: op, ...normalized } as ExternalOperationGrant;
+}
+
+/** Which grants a charter cannot use, by index, so a hand-written grant is fixable. */
+export function describeInvalidExternalOperationGrants(raw: unknown): string[] {
+  if (!Array.isArray(raw) || raw.length > 32)
+    return ['external_operations must be an array of at most 32 grants'];
+  const problems = raw.flatMap((value, index) => {
+    if (parseExternalOperationGrant(value)) return [];
+    const op =
+      value && typeof value === 'object' && !Array.isArray(value)
+        ? (value as Record<string, unknown>).operation_id
+        : undefined;
+    const spec = typeof op === 'string' ? EXTERNAL_OPERATION_DELEGATION[op] : undefined;
+    return [
+      spec
+        ? `external_operations[${index}] (${op}) must set exactly ${spec.fields.join(', ')}${spec.optionalFields?.length ? ` (optional: ${spec.optionalFields.join(', ')})` : ''} as exact values${spec.fields.includes('profile_hash') ? '; profile_hash is the 64-hex SHA-256 of the profile file' : ''}`
+        : `external_operations[${index}] names an operation that cannot be delegated (${typeof op === 'string' ? op : 'missing operation_id'})`,
+    ];
+  });
+  if (problems.length === 0 && !parseExternalOperationGrants(raw))
+    problems.push('external_operations must not repeat the same grant');
+  return problems;
 }
 
 export function parseExternalOperationGrants(raw: unknown): ExternalOperationGrant[] | undefined {

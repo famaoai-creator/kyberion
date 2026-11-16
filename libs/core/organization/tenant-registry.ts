@@ -39,6 +39,13 @@ export interface TenantProfile {
   display_name: string;
   status: 'active' | 'suspended' | 'archived';
   assigned_role: string;
+  /**
+   * Explicit personal-tenant owner (`user:<member>`), set only through the owner-approved
+   * `pnpm tenant personal-owner` (organization/tenant-personal-owner.ts). Never bootstrapped.
+   */
+  personal_owner?: string;
+  /** Approval evidence of `personal_owner`, verified at every use (credential-custody-approval.ts). */
+  personal_owner_basis?: { approval_request_id: string; decided_at: string; audit_id: string };
   /** Tenant-level upper bound on providers allowed to receive its knowledge. */
   allowed_reasoning_backends?: string[];
   /**

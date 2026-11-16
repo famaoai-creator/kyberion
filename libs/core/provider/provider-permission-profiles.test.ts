@@ -215,11 +215,11 @@ describe('provider-permission-profiles', () => {
       expect(env.CODEX_HOME).toBe('/home/test/.codex');
     });
 
-    it('excludes all credential vars for agy and carries AGY_PROFILE', () => {
+    it('excludes other providers credentials for agy, and carries GEMINI_API_KEY + AGY_PROFILE', () => {
       const env = buildProviderChildEnv({ provider: 'agy', baseEnv: fakeBaseEnv() });
+      expect(env.GEMINI_API_KEY).toBe('fake-gemini-key');
       expect(env.OPENAI_API_KEY).toBeUndefined();
       expect(env.ANTHROPIC_API_KEY).toBeUndefined();
-      expect(env.GEMINI_API_KEY).toBeUndefined();
       expect(env.GH_TOKEN).toBeUndefined();
       expect(env.XAI_API_KEY).toBeUndefined();
       expect(env.AGY_PROFILE).toBe('work');

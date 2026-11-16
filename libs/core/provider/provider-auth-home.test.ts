@@ -34,7 +34,8 @@ describe('provider auth HOME spawn fence', () => {
         withTaskCredentialBinding(
           {
             tenantSlug: tenant,
-            secrets: {},
+            secrets: { OPENAI_API_KEY: 'sk-fixture-key' },
+            credentialKind: 'api_key',
             providerEnvironments: {
               codex: {
                 HOME: home,
@@ -77,7 +78,8 @@ describe('provider auth HOME spawn fence', () => {
       withTaskCredentialBinding(
         {
           tenantSlug: tenant,
-          secrets: {},
+          secrets: { OPENAI_API_KEY: 'sk-fixture-key' },
+          credentialKind: 'api_key',
           providerEnvironments: { codex: { HOME: home, CODEX_HOME: home, PATH: '/bin' } },
         },
         () => {

@@ -1,7 +1,12 @@
 import * as path from 'node:path';
+import { createHash } from 'node:crypto';
 import { pathResolver } from '../path-resolver.js';
 import { safeLstat, safeReaddir, safeRealpath, assertSafeRepositoryPath } from '../secure-io.js';
-import { classifyStorageFloorPath } from '../storage-layout.js';
+import {
+  classifyStorageFloorPath,
+  storageFloorRelativePath,
+  type StorageDataTier,
+} from '../storage-layout.js';
 
 const MAX_AUTH_HOME_ENTRIES = 2048;
 const MAX_AUTH_HOME_DEPTH = 12;
@@ -67,4 +72,32 @@ export function assertIsolatedProviderHome(env: NodeJS.ProcessEnv, tenantSlug: s
   } catch {
     throw denied();
   }
+}
+
+/** Short stable hash naming one credential's provider-auth directory (never the value). */
+export function credentialRefHash(credentialRef: string): string {
+  return createHash('sha256').update(credentialRef).digest('hex').slice(0, 16);
+}
+
+/**
+ * Repo-relative isolated HOME of one provider for one borrower and one
+ * credential: `active/shared/cache/<tier>/<borrower>/provider-auth/<provider>/<hash>/home`.
+ * The cache floor of the borrower's non-public tier.
+ */
+export function providerAuthHomeRelativePath(
+  tier: StorageDataTier,
+  borrowerTenant: string,
+  provider: string,
+  credentialRef: string
+): string {
+  if (tier === 'public')
+    throw new Error('[CREDENTIAL_HOME_INVALID] Provider auth never lives on the public tier');
+  return storageFloorRelativePath(
+    'cache',
+    { kind: 'tier', tier, tenant: borrowerTenant },
+    'provider-auth',
+    provider,
+    credentialRefHash(credentialRef),
+    'home'
+  );
 }

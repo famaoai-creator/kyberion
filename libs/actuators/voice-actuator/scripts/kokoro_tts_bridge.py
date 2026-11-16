@@ -5,6 +5,7 @@ Usage (stdin JSON):
   echo '{"action":"generate","params":{...}}' | python3 kokoro_tts_bridge.py
 """
 
+import re
 import sys
 import json
 import contextlib
@@ -66,6 +67,10 @@ def _generate(params: dict) -> dict:
     # Default voices: jf_alpha (Japanese female), af_heart (English female)
     default_voice = "jf_alpha" if kokoro_lang == "j" else "af_heart"
     voice = str(params.get("voice") or default_voice).strip()
+    # Callers may pass a platform voice name (e.g. the macOS default "Samantha");
+    # Kokoro voice ids look like "af_heart", so anything else would 404 on download.
+    if not re.fullmatch(r"[a-z]{2}_[a-z0-9]+", voice):
+        voice = default_voice
 
     try:
         with suppress_stdout():

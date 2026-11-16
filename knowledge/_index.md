@@ -209,6 +209,7 @@
 - [情報資産の所在・観測・作業化の接続](./product/architecture/information-assets.md) (public | Unknown)
 - [時間コンテキストとカレンダーワークフローモデル](./product/architecture/temporal-context-model.ja.md) (public | Unknown)
 - [検討報告：マルチテナント・ナレッジガバナンスの最適化案](./product/architecture/analysis-multi-tenant-governance-20260304.md) (public | Ecosystem Architect)
+- [業務SaaSの承認キューを人の都度承認なしで点検する設計](./product/architecture/autonomous-approval-queue.md) (public | Unknown)
 - [音声・リアルタイム映像の技術再評価 2026-10](./product/architecture/realtime-av-technology-review-2026-10.md) (public | Unknown)
 
 ## 📁 product/architecture/decisions
@@ -569,6 +570,7 @@
 - [外部操作の接続と権限委任オンボーディング](./product/orchestration/onboarding-action-authority.md) (public | Unknown)
 - [情報資産の外部操作を承認済み mission で実行する](./product/orchestration/information-asset-mission-work.md) (public | Unknown)
 - [手順の成功チェック プレイブック（golden シナリオ）](./product/orchestration/procedure-success-check-playbook.ja.md) (public | Unknown)
+- [推論の資格情報を用意して Dot を動かすまでの流れ（持ち主・貸し出し・延長）](./product/orchestration/reasoning-credential-lending-playbook.ja.md) (public | Unknown)
 - [文書理解・設計レビューの実行と証跡](./product/orchestration/document-review-playbook.md) (public | Unknown)
 - [残留データ（残骸）運用プレイブック — 実測スナップショットと掃除・運用の虎の巻](./product/orchestration/storage-residue-operations-playbook.ja.md) (public | Unknown)
 - [目的駆動の改善ループ — improvement-scan](./product/orchestration/organization-improvement-loop.md) (public | Unknown)
