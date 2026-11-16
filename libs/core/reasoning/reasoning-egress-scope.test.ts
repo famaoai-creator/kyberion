@@ -589,7 +589,7 @@ describe('no_training honours tenant provider attestations', () => {
 
   it('denies a backend that maps to no egress provider id', () => {
     noTraining('attested-tenant', () => {
-      expect(() => assertReasoningEgressAllowed('anthropic')).toThrow(/no egress provider id/);
+      expect(() => assertReasoningEgressAllowed('openai-api')).toThrow(/no egress provider id/);
     });
   });
 

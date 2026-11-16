@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { listCliReasoningProviderDescriptors } from '../reasoning/reasoning-provider-registry.js';
 import {
   providerTenantIsolationForBackend,
   providerTenantIsolationForProvider,
@@ -9,7 +10,6 @@ describe('provider tenant isolation registry', () => {
   it('dispatches bound-launch isolation through specs, not provider literals', () => {
     const claude = providerTenantIsolationForProvider('claude');
     expect(claude?.provider).toBe('claude');
-    expect(claude?.backends).toContain('claude-cli');
     expect(providerTenantIsolationForBackend('claude-cli')).toBe(claude);
   });
 
@@ -22,7 +22,6 @@ describe('provider tenant isolation registry', () => {
     ] as const) {
       const spec = providerTenantIsolationForProvider(provider);
       expect(spec?.provider).toBe(provider);
-      expect(spec?.backends).toContain(backend);
       expect(providerTenantIsolationForBackend(backend)).toBe(spec);
     }
   });
@@ -36,14 +35,19 @@ describe('provider tenant isolation registry', () => {
     expect(providerTenantIsolationForBackend('opencode-cli')).toBeUndefined();
   });
 
-  it('every spec is a complete adapter: backend, env builder, apply and redaction hooks', () => {
+  it('every spec is a complete adapter backed by a descriptor provider', () => {
     expect(providerTenantIsolationSpecs().length).toBeGreaterThan(0);
     for (const spec of providerTenantIsolationSpecs()) {
       expect(spec.provider).toBeTruthy();
-      expect(spec.backends.length).toBeGreaterThan(0);
       expect(typeof spec.buildEnvironment).toBe('function');
       expect(typeof spec.applyEnv).toBe('function');
       expect(typeof spec.boundSecretValues).toBe('function');
+      // The provider id must round-trip: at least one CLI descriptor maps to it.
+      expect(
+        listCliReasoningProviderDescriptors().some(
+          (descriptor) => descriptor.provider === spec.provider
+        )
+      ).toBe(true);
     }
   });
 });

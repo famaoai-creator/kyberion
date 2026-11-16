@@ -30,8 +30,6 @@ import type { ProviderTenantIsolationSpec } from './provider-tenant-isolation.js
 export interface ApiKeyCliIsolationInput {
   /** `providerEnvironments` key / the provider id seen by buildProviderChildEnv. */
   readonly provider: string;
-  /** Backend modes (allowed_backends values) that activate this spec. */
-  readonly backends: readonly string[];
   /** The bound credential's binding-secrets key (and default env delivery name). */
   readonly credentialEnvKey: string;
   /** Every credential env var of this provider's family; all but the bound key are dropped. */
@@ -77,7 +75,6 @@ export function apiKeyCliTenantIsolation(
 
   return Object.freeze({
     provider: input.provider,
-    backends: Object.freeze([...input.backends]),
 
     buildEnvironment(
       tier: ScopeContext['tier'],

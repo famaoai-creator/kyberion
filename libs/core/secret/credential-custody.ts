@@ -18,6 +18,7 @@ import type { CustodyOwnerKind } from '../contracts/custody-owner.js';
 import { isValidMemberId, isValidTenantSlug } from '../foundation/scope.js';
 import { calendarDateInZone, zonedWallTimeToInstant } from '../temporal/business-calendar.js';
 import { installationTimezone } from '../temporal/temporal-context.js';
+import { CREDENTIAL_SERVICE_BACKENDS } from '../reasoning/reasoning-backend-policy.js';
 
 /** Who holds a lendable credential. `system` custody never lends a credential. */
 export type CredentialCustody = Extract<CustodyOwnerKind, 'person' | 'tenant'>;
@@ -75,7 +76,7 @@ export const CREDENTIAL_SERVICES: Readonly<Record<string, CredentialServiceSpec>
     connectionField: 'api_key',
     envKey: 'ANTHROPIC_API_KEY',
     egressProvider: 'claude',
-    backends: Object.freeze(['anthropic', 'claude-cli']),
+    backends: CREDENTIAL_SERVICE_BACKENDS.anthropic,
     plans: Object.freeze(['api', 'team', 'enterprise'] as CredentialPlan[]),
     primaryBackend: 'anthropic',
     obtainHint: 'issue a new Anthropic Console API key',
@@ -87,7 +88,7 @@ export const CREDENTIAL_SERVICES: Readonly<Record<string, CredentialServiceSpec>
     connectionField: 'api_key',
     envKey: 'OPENAI_API_KEY',
     egressProvider: 'codex',
-    backends: Object.freeze(['openai-api', 'codex-cli']),
+    backends: CREDENTIAL_SERVICE_BACKENDS.openai,
     plans: Object.freeze(['api', 'team', 'enterprise'] as CredentialPlan[]),
     primaryBackend: 'openai-api',
     obtainHint: 'issue a new OpenAI API key',
@@ -101,7 +102,7 @@ export const CREDENTIAL_SERVICES: Readonly<Record<string, CredentialServiceSpec>
     egressProvider: 'gemini',
     // The same Gemini API key also feeds Antigravity CLI (gemini-cli's
     // successor), which reads it via modelProvider "gemini" settings.
-    backends: Object.freeze(['gemini-api', 'gemini-cli', 'agy-cli']),
+    backends: CREDENTIAL_SERVICE_BACKENDS.gemini,
     plans: Object.freeze(['api', 'team', 'enterprise'] as CredentialPlan[]),
     primaryBackend: 'gemini-api',
     obtainHint: 'issue a new Gemini API key',
@@ -115,7 +116,7 @@ export const CREDENTIAL_SERVICES: Readonly<Record<string, CredentialServiceSpec>
     egressProvider: 'grok',
     // grok-cli cannot consume an API key (OAuth `grok login` only) — the key
     // feeds the HTTP API backend only.
-    backends: Object.freeze(['grok-api']),
+    backends: CREDENTIAL_SERVICE_BACKENDS.grok,
     plans: Object.freeze(['api', 'team', 'enterprise'] as CredentialPlan[]),
     primaryBackend: 'grok-api',
     obtainHint: 'issue a new xAI API key',
@@ -127,7 +128,7 @@ export const CREDENTIAL_SERVICES: Readonly<Record<string, CredentialServiceSpec>
     connectionField: 'api_key',
     envKey: 'CURSOR_API_KEY',
     egressProvider: 'cursor',
-    backends: Object.freeze(['cursor-cli']),
+    backends: CREDENTIAL_SERVICE_BACKENDS.cursor,
     plans: Object.freeze(['api', 'team', 'enterprise'] as CredentialPlan[]),
     primaryBackend: 'cursor-cli',
     obtainHint: 'create a Cursor API key in Cursor settings',
@@ -139,7 +140,7 @@ export const CREDENTIAL_SERVICES: Readonly<Record<string, CredentialServiceSpec>
     connectionField: 'oauth_token',
     envKey: 'CLAUDE_CODE_OAUTH_TOKEN',
     egressProvider: 'claude',
-    backends: Object.freeze(['claude-cli']),
+    backends: CREDENTIAL_SERVICE_BACKENDS['claude-subscription'],
     plans: Object.freeze(['pro', 'max', 'ultra', 'team', 'enterprise'] as CredentialPlan[]),
     primaryBackend: 'claude-cli',
     obtainHint: 'run `claude setup-token`',

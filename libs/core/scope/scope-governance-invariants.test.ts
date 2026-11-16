@@ -48,7 +48,11 @@ describe('scope governance invariants', () => {
           // no-egress ceremony. No callback or reusable scope escapes; missing
           // history fails closed. Issuance/execution minting needs new review.
           !line.startsWith('libs/core/governance/personal-credential-grant.ts:') &&
-          !line.startsWith('libs/core/organization/continuous-mission-scope.ts:')
+          !line.startsWith('libs/core/organization/continuous-mission-scope.ts:') &&
+          // A resident dot step is a claimed dispatch boundary: it mints from
+          // the immutable standing lineage (never ambient env), identical to
+          // the WorkItem path in coordinated-agent-execution-port.
+          !line.startsWith('libs/core/dot/dot-standing-binding.ts:')
       );
     expect(offenders).toEqual([]);
   });

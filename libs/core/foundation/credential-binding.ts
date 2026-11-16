@@ -603,8 +603,15 @@ export function resolveTaskProviderEnvironment(provider: string): NodeJS.Process
     binding.providerEnvironments && Object.hasOwn(binding.providerEnvironments, provider)
       ? binding.providerEnvironments[provider]
       : undefined;
-  if (!env)
-    throw new Error('[CREDENTIAL_PROVIDER_DENIED] No isolated provider environment is bound');
+  if (!env) {
+    // A trusted tenant binding without this provider's environment is the
+    // ambient carry-in channel: dispatched work may run the CLI with the
+    // machine's ambient login sessions. Personal-claimed bindings admit no
+    // provider environment at all.
+    if (binding.personalClaim)
+      throw new Error('[CREDENTIAL_PROVIDER_DENIED] No isolated provider environment is bound');
+    return undefined;
+  }
   return { ...env };
 }
 

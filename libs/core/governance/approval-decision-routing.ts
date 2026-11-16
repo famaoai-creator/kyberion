@@ -249,7 +249,10 @@ export function routeAutonomousDecision(input: RouteAutonomousDecisionInput): Ro
   }
 
   let record: ApprovalRequestRecord = createApprovalRequest(input.role, {
-    channel: deliveredVia?.target ?? 'operator',
+    // The channel is the delivery *surface* ('inbox', 'slack', ...), not the
+    // target inside it — an inbox-routed dot request carries `dot:<dot_id>`
+    // as its target, which is not a channel.
+    channel: deliveredVia?.surface ?? 'operator',
     storageChannel: AUTONOMY_APPROVAL_CHANNEL,
     threadTs: '',
     correlationId: input.dedupeKey

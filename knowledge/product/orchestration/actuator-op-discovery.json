@@ -9565,7 +9565,14 @@
               }
             },
             "additionalProperties": false,
-            "required": ["path"]
+            "anyOf": [
+              {
+                "required": ["path"]
+              },
+              {
+                "required": ["from"]
+              }
+            ]
           },
           "examples": [
             {
@@ -28715,7 +28722,15 @@
               }
             },
             "additionalProperties": false,
-            "required": ["path", "content"]
+            "required": ["path"],
+            "anyOf": [
+              {
+                "required": ["content"]
+              },
+              {
+                "required": ["from"]
+              }
+            ]
           },
           "examples": [
             {
