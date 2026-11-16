@@ -18,6 +18,7 @@ describe('provider tenant isolation registry', () => {
       ['codex', 'codex-cli'],
       ['gemini', 'gemini-cli'],
       ['agy', 'agy-cli'],
+      ['cursor', 'cursor-cli'],
     ] as const) {
       const spec = providerTenantIsolationForProvider(provider);
       expect(spec?.provider).toBe(provider);

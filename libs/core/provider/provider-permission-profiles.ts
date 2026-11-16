@@ -428,8 +428,9 @@ const PROVIDER_CREDENTIAL_ENV_KEYS: Readonly<Record<ProviderId, readonly string[
   cursor: ['CURSOR_API_KEY'],
   // OpenCode primarily uses its login session; no provider API key passes through.
   opencode: [],
-  // Devin CLI primarily uses its `devin auth login` session; WINDSURF_API_KEY
-  // is the documented credential override (shared Cognition/Windsurf auth).
+  // Devin CLI primarily uses its `devin auth login` session (verified on
+  // 3000.x: env keys do NOT authenticate the agent session); these vars are
+  // still passed for Cognition tooling compatibility.
   devin: ['WINDSURF_API_KEY', 'DEVIN_API_KEY'],
 };
 

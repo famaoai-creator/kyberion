@@ -19,11 +19,19 @@ const runScoped = <T>(tenant_: string, run: () => T): T =>
 /** Mirror of the lending broker: spec env → binding → child env. */
 function boundChildEnv(provider: string, opts: { kind?: 'api_key' | 'subscription_token' } = {}) {
   const spec = providerTenantIsolationForBackend(
-    { codex: 'codex-cli', gemini: 'gemini-cli', agy: 'agy-cli' }[provider]!
+    {
+      codex: 'codex-cli',
+      gemini: 'gemini-cli',
+      agy: 'agy-cli',
+      cursor: 'cursor-cli',
+    }[provider]!
   )!;
-  const envKey = { codex: 'OPENAI_API_KEY', gemini: 'GEMINI_API_KEY', agy: 'GEMINI_API_KEY' }[
-    provider
-  ]!;
+  const envKey = {
+    codex: 'OPENAI_API_KEY',
+    gemini: 'GEMINI_API_KEY',
+    agy: 'GEMINI_API_KEY',
+    cursor: 'CURSOR_API_KEY',
+  }[provider]!;
   const built = spec.buildEnvironment('confidential', tenant, `tenant:owner:${provider}:key`);
   const binding = {
     tenantSlug: tenant,
@@ -50,6 +58,7 @@ describe('generic API-key tenant isolation (spec → binding → child env)', ()
   for (const [provider, envKey] of [
     ['gemini', 'GEMINI_API_KEY'],
     ['agy', 'GEMINI_API_KEY'],
+    ['cursor', 'CURSOR_API_KEY'],
   ] as const) {
     it(`${provider}: isolates HOME on the tenant floor and injects only the bound key`, () => {
       const { built, child, home } = boundChildEnv(provider, { kind: 'api_key' });
@@ -63,7 +72,7 @@ describe('generic API-key tenant isolation (spec → binding → child env)', ()
     });
   }
 
-  for (const provider of ['codex', 'gemini', 'agy'] as const) {
+  for (const provider of ['codex', 'gemini', 'agy', 'cursor'] as const) {
     it(`${provider}: refuses a bound launch without an api_key credential kind`, () => {
       expect(() => boundChildEnv(provider)).toThrow(/CREDENTIAL_PROVIDER_DENIED/);
       expect(() => boundChildEnv(provider, { kind: 'subscription_token' })).toThrow(
@@ -81,6 +90,9 @@ describe('generic API-key tenant isolation (spec → binding → child env)', ()
     // be on disk, never in the child's environment.
     expect(child.OPENAI_API_KEY).toBeUndefined();
     expect(safeExistsSync(path.join(child.CODEX_HOME!, 'auth.json'))).toBe(true);
+    // The credential store is pinned to auth.json so a bound codex cannot
+    // fall back to the operator's OS keyring (the default "auto" store).
+    expect(safeExistsSync(path.join(child.CODEX_HOME!, 'config.toml'))).toBe(true);
   });
 
   it('agy: writes modelProvider "gemini" settings into the isolated HOME', () => {

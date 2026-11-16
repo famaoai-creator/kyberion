@@ -80,6 +80,15 @@ export const PROVIDER_TENANT_ISOLATION: Readonly<Record<string, ProviderTenantIs
         name: 'auth.json',
         render: (secret) => `${JSON.stringify({ OPENAI_API_KEY: secret })}\n`,
       },
+      // Pin the credential store to auth.json inside the isolated CODEX_HOME;
+      // the default "auto" may fall back to the OS keyring, which lives
+      // outside the bound HOME and would leak tenant credentials sideways.
+      configFiles: [
+        {
+          relativePath: '.codex/config.toml',
+          contents: 'cli_auth_credentials_store = "file"\n',
+        },
+      ],
     }),
     gemini: apiKeyCliTenantIsolation({
       provider: 'gemini',
@@ -105,8 +114,20 @@ export const PROVIDER_TENANT_ISOLATION: Readonly<Record<string, ProviderTenantIs
         },
       ],
     }),
+    // cursor-agent honors CURSOR_API_KEY env (verified: the binary reports it
+    // loaded the key from the environment); its session/config dirs live
+    // under HOME, so the redirect alone isolates them.
+    cursor: apiKeyCliTenantIsolation({
+      provider: 'cursor',
+      backends: ['cursor-cli'],
+      credentialEnvKey: 'CURSOR_API_KEY',
+      credentialEnvKeys: ['CURSOR_API_KEY'],
+    }),
     // grok-cli is deliberately absent: grok's only auth is `grok login`
     // (OAuth); it ignores XAI_API_KEY env — there is no lendable channel.
+    // devin-cli likewise: `devin auth login` writes
+    // ~/.local/share/devin/credentials.toml; env keys are not honored
+    // (verified on devin 3000.x — DEVIN_API_KEY/WINDSURF_API_KEY are ignored).
   });
 
 /** Every registered isolation spec. */

@@ -62,8 +62,8 @@ export interface CredentialServiceSpec {
  * API proof and is consumed only by the claude CLI. `openai` / `gemini` /
  * `grok` are the API keys of those providers — `openai`/`gemini` feed both
  * their API-proof and CLI backends (codex consumes via auth.json, gemini-cli
- * and agy via env), while `grok` feeds only `grok-api` (grok-cli is
- * OAuth-only). Service ids match the providers' `secret_refs.service_id`, so
+ * and agy via env), `cursor` feeds `cursor-cli`, while `grok` feeds only
+ * `grok-api` (grok-cli is OAuth-only). Service ids match the providers' `secret_refs.service_id`, so
  * the same `secret introduce <service> API_KEY` registration feeds either
  * path.
  */
@@ -119,6 +119,18 @@ export const CREDENTIAL_SERVICES: Readonly<Record<string, CredentialServiceSpec>
     plans: Object.freeze(['api', 'team', 'enterprise'] as CredentialPlan[]),
     primaryBackend: 'grok-api',
     obtainHint: 'issue a new xAI API key',
+  }),
+  cursor: Object.freeze({
+    service: 'cursor',
+    kind: 'api_key',
+    secretKey: 'API_KEY',
+    connectionField: 'api_key',
+    envKey: 'CURSOR_API_KEY',
+    egressProvider: 'cursor',
+    backends: Object.freeze(['cursor-cli']),
+    plans: Object.freeze(['api', 'team', 'enterprise'] as CredentialPlan[]),
+    primaryBackend: 'cursor-cli',
+    obtainHint: 'create a Cursor API key in Cursor settings',
   }),
   'claude-subscription': Object.freeze({
     service: 'claude-subscription',
