@@ -73,7 +73,12 @@ import {
 } from '../agent/nhi-actor-verification.js';
 import { parseNhiId } from '../contracts/nhi-id.js';
 import { assertSafeRepositoryPath, safeExistsSync } from '../secure-io.js';
-import { secretGuard } from '../secret/secret-guard.js';
+import { agentTokenProvider, AGENT_TOKEN_PREFIX } from './authn-agent-token.js';
+export {
+  issueAgentToken,
+  AGENT_TOKEN_ISSUER,
+  type AgentTokenPayload,
+} from './authn-agent-token.js';
 import {
   defaultSurfaceViewerTierAccess,
   resolveSurfaceViewerTierAccess,
@@ -541,24 +546,6 @@ const agentContextProvider: AuthnProvider = {
   },
 };
 
-// ---------------------------------------------------------------------------
-// agent-token — kya1.<b64url payload>.<b64url HMAC-SHA256> workload credential
-// ---------------------------------------------------------------------------
-
-export const AGENT_TOKEN_ISSUER = 'kyberion-agent-token';
-const AGENT_TOKEN_PREFIX = 'kya1.';
-const AGENT_TOKEN_SECRET_DOC = 'kyberion-agent-token';
-
-export interface AgentTokenPayload {
-  iss: typeof AGENT_TOKEN_ISSUER;
-  sub: string; // canonical nhi_id
-  obo?: string; // on-behalf-of human actor id (user:<member>)
-  exp: number; // epoch seconds
-  iat: number;
-  jti: string;
-  tenants?: string[];
-}
-
 function b64urlEncode(input: string | Buffer): string {
   return Buffer.from(input).toString('base64url');
 }
@@ -566,180 +553,6 @@ function b64urlEncode(input: string | Buffer): string {
 function b64urlJson(value: unknown): string {
   return b64urlEncode(JSON.stringify(value));
 }
-
-function agentTokenKey(deps?: AuthnResolveDeps): Buffer | null {
-  const envKey = envText(deps, 'KYBERION_AGENT_TOKEN_SECRET')?.trim();
-  if (envKey) return Buffer.from(envKey, 'utf8');
-  try {
-    const doc = secretGuard.loadConnectionDocument(AGENT_TOKEN_SECRET_DOC) as
-      { hmac_key?: string } | undefined;
-    const key = doc?.hmac_key?.trim();
-    return key ? Buffer.from(key, 'utf8') : null;
-  } catch {
-    return null;
-  }
-}
-
-function signAgentTokenPayload(payloadB64: string, key: Buffer): string {
-  return createHmac('sha256', key).update(`${AGENT_TOKEN_PREFIX}${payloadB64}`).digest('base64url');
-}
-
-/**
- * Issue a signed workload credential for a registered agent identity.
- * The subject must exist in the NI-01 ledger and be non-retired —
- * credentials are never minted for identities the registry does not know.
- */
-export function issueAgentToken(
-  input: {
-    nhiId: string;
-    onBehalfOf?: string;
-    ttlSeconds?: number;
-    tenants?: string[];
-  },
-  deps?: AuthnResolveDeps
-): { token: string; payload: AgentTokenPayload } {
-  const nhiId = input.nhiId.trim();
-  if (!parseNhiId(nhiId)) {
-    throw new AuthnError(401, 'unauthenticated', `agent token subject is not a valid nhi_id`);
-  }
-  const record = getAgentIdentity(nhiId);
-  if (!record) {
-    throw new AuthnError(401, 'unauthenticated', `agent identity ${nhiId} is not registered`);
-  }
-  if (record.lifecycle_status === 'retired' || record.lifecycle_status === 'suspended') {
-    throw new AuthnError(
-      401,
-      'unauthenticated',
-      `agent identity ${nhiId} is ${record.lifecycle_status}`
-    );
-  }
-  const key = agentTokenKey(deps);
-  if (!key) {
-    throw new AuthnError(
-      401,
-      'unauthenticated',
-      'no agent token signing key (KYBERION_AGENT_TOKEN_SECRET or secret-guard kyberion-agent-token)'
-    );
-  }
-  const nowSec = Math.floor((deps?.now ?? Date.now()) / 1000);
-  const payload: AgentTokenPayload = {
-    iss: AGENT_TOKEN_ISSUER,
-    sub: nhiId,
-    ...(input.onBehalfOf ? { obo: input.onBehalfOf } : {}),
-    iat: nowSec,
-    exp: nowSec + Math.max(1, input.ttlSeconds ?? 900),
-    jti: createHash('sha256')
-      .update(`${nhiId}:${nowSec}:${Math.random()}`)
-      .digest('hex')
-      .slice(0, 24),
-    ...(input.tenants?.length ? { tenants: [...input.tenants] } : {}),
-  };
-  const payloadB64 = b64urlJson(payload);
-  return {
-    token: `${AGENT_TOKEN_PREFIX}${payloadB64}.${signAgentTokenPayload(payloadB64, key)}`,
-    payload,
-  };
-}
-
-function parseAgentToken(
-  token: string
-): { payloadB64: string; signature: string; payload: AgentTokenPayload } | null {
-  if (!token.startsWith(AGENT_TOKEN_PREFIX)) return null;
-  const body = token.slice(AGENT_TOKEN_PREFIX.length);
-  const dot = body.lastIndexOf('.');
-  if (dot <= 0) return null;
-  const payloadB64 = body.slice(0, dot);
-  const signature = body.slice(dot + 1);
-  let payload: AgentTokenPayload;
-  try {
-    payload = JSON.parse(Buffer.from(payloadB64, 'base64url').toString('utf8'));
-  } catch {
-    return null;
-  }
-  if (!payload || typeof payload !== 'object') return null;
-  return { payloadB64, signature, payload };
-}
-
-const agentTokenProvider: AuthnProvider = {
-  id: 'agent-token',
-  capabilities: {
-    credentialTypes: ['agent-token', 'bearer'],
-    loopback: false,
-    agentPrincipals: true,
-    humanPrincipals: false,
-    externalIdp: false,
-    requiresNetwork: false,
-    zeroConfig: false,
-  },
-  canResolve(request, deps) {
-    const token = credentialToken(request.credential);
-    if (!token.startsWith(AGENT_TOKEN_PREFIX)) {
-      return { eligible: false, unmet: ['credential is not a kya1. agent token'] };
-    }
-    if (!agentTokenKey(deps)) {
-      return { eligible: false, unmet: ['no agent token verification key configured'] };
-    }
-    return { eligible: true };
-  },
-  resolve(request, deps) {
-    const token = credentialToken(request.credential);
-    const parsed = parseAgentToken(token);
-    if (!parsed) return null;
-    const key = agentTokenKey(deps);
-    if (!key) return null;
-    const expected = signAgentTokenPayload(parsed.payloadB64, key);
-    const sigOk =
-      parsed.signature.length === expected.length &&
-      timingSafeEqual(Buffer.from(parsed.signature), Buffer.from(expected));
-    if (!sigOk) {
-      throw new AuthnError(401, 'unauthenticated', 'agent token signature invalid');
-    }
-    const { payload } = parsed;
-    if (payload.iss !== AGENT_TOKEN_ISSUER) {
-      throw new AuthnError(401, 'unauthenticated', 'agent token issuer mismatch');
-    }
-    const nowSec = Math.floor((deps?.now ?? Date.now()) / 1000);
-    if (typeof payload.exp !== 'number' || payload.exp <= nowSec) {
-      throw new AuthnError(401, 'unauthenticated', 'agent token expired');
-    }
-    if (!parseNhiId(payload.sub)) {
-      throw new AuthnError(401, 'unauthenticated', 'agent token subject is not a valid nhi_id');
-    }
-    const record = getAgentIdentity(payload.sub);
-    if (
-      !record ||
-      record.lifecycle_status === 'retired' ||
-      record.lifecycle_status === 'suspended'
-    ) {
-      throw new AuthnError(
-        401,
-        'unauthenticated',
-        `agent identity ${payload.sub} is ${record ? record.lifecycle_status : 'unregistered'}`
-      );
-    }
-    const tenants = (payload.tenants ?? []).filter((slug) => isValidTenantSlug(slug));
-    const onBehalfOf =
-      payload.obo && parseActorRef({ kind: 'human', id: payload.obo }) ? payload.obo : undefined;
-    return {
-      actor: agentActor(payload.sub, onBehalfOf ?? record.accountable_human_id),
-      principalId: payload.sub,
-      role: 'readonly',
-      tenantSlugs: tenants.length
-        ? tenants
-        : request.serverTenant?.trim()
-          ? [request.serverTenant.trim()]
-          : [],
-      organizationIds: 'all',
-      projectIds: 'all',
-      tierAccess: defaultSurfaceViewerTierAccess('readonly'),
-      source: 'agent',
-      provider: 'agent-token',
-      assurance: 'high',
-      expiresAt: new Date(payload.exp * 1000).toISOString(),
-      claims: { jti: payload.jti, iat: payload.iat },
-    };
-  },
-};
 
 // ---------------------------------------------------------------------------
 // oidc-jwt — external IdP JWT verified against configured JWKS

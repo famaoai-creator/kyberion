@@ -6,6 +6,13 @@ last_updated: 2026-11-16
 
 # Credential lifecycle, allocation, and execution boundaries
 
+Agent workload authentication is a prerequisite separate from credential-use
+consent. Its server-side issuer/verifier binds a short-lived token to the current
+canonical active identity, accountable human, exact tenant scope and identity
+revision; it does not grant service access. A governed token acquisition/private
+delivery flow is still absent. See [the authentication seam contract](./authn-authz-seams.md#workload-credential-boundary-and-acquisition-prerequisite)
+for compatibility, revocation limits and the remaining admission boundary.
+
 ## Conceptual contract
 
 This document joins secret introduction, provider configuration, tenant allocation,
