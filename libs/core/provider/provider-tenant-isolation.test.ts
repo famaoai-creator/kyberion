@@ -13,11 +13,26 @@ describe('provider tenant isolation registry', () => {
     expect(providerTenantIsolationForBackend('claude-cli')).toBe(claude);
   });
 
-  it('returns undefined for providers with no isolation spec (generic env only)', () => {
-    expect(providerTenantIsolationForProvider('codex')).toBeUndefined();
-    expect(providerTenantIsolationForProvider('grok')).toBeUndefined();
-    expect(providerTenantIsolationForBackend('grok-cli')).toBeUndefined();
+  it('covers every API-key CLI provider through the generic adapter', () => {
+    for (const [provider, backend] of [
+      ['codex', 'codex-cli'],
+      ['gemini', 'gemini-cli'],
+      ['agy', 'agy-cli'],
+      ['grok', 'grok-cli'],
+    ] as const) {
+      const spec = providerTenantIsolationForProvider(provider);
+      expect(spec?.provider).toBe(provider);
+      expect(spec?.backends).toContain(backend);
+      expect(providerTenantIsolationForBackend(backend)).toBe(spec);
+    }
+  });
+
+  it('returns undefined for backends with no isolation spec (generic env only)', () => {
+    // API-proof backends take env injection only — no CLI home to isolate.
     expect(providerTenantIsolationForBackend('anthropic')).toBeUndefined();
+    expect(providerTenantIsolationForBackend('openai-api')).toBeUndefined();
+    // CLIs without a lendable credential path stay un-isolated.
+    expect(providerTenantIsolationForBackend('opencode-cli')).toBeUndefined();
   });
 
   it('every spec is a complete adapter: backend, env builder, apply and redaction hooks', () => {

@@ -350,9 +350,19 @@ describe('resident dot standing binding', () => {
     await expect(withDotStandingBinding(src(cli), 'wake', async () => 'ran', deps)).rejects.toThrow(
       /\[DOT_CREDENTIAL_GRANT_MISSING\].*--credential .*--backends claude-cli/
     );
+    // Other registered services feed their own CLI backends the same way.
+    const codex = {
+      ...charter('alpha'),
+      runtime: { heartbeat_id: 'dot-alpha-ops', reasoning_backend: 'codex-cli' },
+    } as DotCharter;
+    await expect(
+      withDotStandingBinding(src(codex), 'wake', async () => 'ran', deps)
+    ).rejects.toThrow(
+      /\[DOT_CREDENTIAL_GRANT_MISSING\].*--credential <tenant:alpha:openai\|person:<member>:openai> --backends codex-cli/
+    );
     const unknown = {
       ...charter('alpha'),
-      runtime: { heartbeat_id: 'dot-alpha-ops', reasoning_backend: 'gemini-cli' },
+      runtime: { heartbeat_id: 'dot-alpha-ops', reasoning_backend: 'opencode-cli' },
     } as DotCharter;
     await expect(
       withDotStandingBinding(src(unknown), 'wake', async () => 'ran', deps)

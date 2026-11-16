@@ -213,7 +213,8 @@ describe('isolated Codex credential environment', () => {
           withTaskCredentialBinding(
             {
               tenantSlug: tenant,
-              secrets: {},
+              secrets: { OPENAI_API_KEY: 'sk-fixture-key' },
+              credentialKind: 'api_key',
               providerEnvironments: {
                 codex: { HOME: home, CODEX_HOME: path.join(home, '.codex'), PATH: '/fixture/bin' },
               },

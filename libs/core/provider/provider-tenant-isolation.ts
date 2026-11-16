@@ -29,6 +29,7 @@ import {
   claudeProviderEnvironment,
   CLAUDE_PROVIDER_ENVIRONMENT,
 } from './claude-cli-tenant-isolation.js';
+import { apiKeyCliTenantIsolation } from './api-key-tenant-isolation.js';
 
 export interface ProviderTenantIsolationSpec {
   /** `providerEnvironments` key / the provider id seen by buildProviderChildEnv. */
@@ -59,6 +60,45 @@ export const PROVIDER_TENANT_ISOLATION: Readonly<Record<string, ProviderTenantIs
       buildEnvironment: claudeProviderEnvironment,
       applyEnv: applyClaudeTenantIsolationEnv,
       boundSecretValues: boundClaudeCredentialValues,
+    }),
+    // Generic API-key adapters: isolated HOME redirects the CLI's own
+    // config/session directory (~/.codex, ~/.gemini, ~/.grok); the bound key
+    // is injected under the provider's env name and every other credential
+    // var of the family is dropped. No provider-specific argv closure — see
+    // api-key-tenant-isolation.ts.
+    codex: apiKeyCliTenantIsolation({
+      provider: 'codex',
+      backends: ['codex-cli'],
+      credentialEnvKey: 'OPENAI_API_KEY',
+      credentialEnvKeys: ['OPENAI_API_KEY'],
+      configDirEnv: { key: 'CODEX_HOME', dirName: '.codex' },
+    }),
+    gemini: apiKeyCliTenantIsolation({
+      provider: 'gemini',
+      backends: ['gemini-cli'],
+      credentialEnvKey: 'GEMINI_API_KEY',
+      credentialEnvKeys: ['KYBERION_GEMINI_API_KEY', 'GEMINI_API_KEY', 'GOOGLE_API_KEY'],
+    }),
+    // Antigravity CLI (gemini-cli's successor): API-key auth needs
+    // `modelProvider: "gemini"` in ~/.gemini/antigravity-cli/settings.json
+    // plus GEMINI_API_KEY; the isolated HOME supplies the private config dir.
+    agy: apiKeyCliTenantIsolation({
+      provider: 'agy',
+      backends: ['agy-cli'],
+      credentialEnvKey: 'GEMINI_API_KEY',
+      credentialEnvKeys: ['GEMINI_API_KEY', 'GOOGLE_API_KEY', 'KYBERION_GEMINI_API_KEY'],
+      configFiles: [
+        {
+          relativePath: '.gemini/antigravity-cli/settings.json',
+          contents: '{\n  "modelProvider": "gemini"\n}\n',
+        },
+      ],
+    }),
+    grok: apiKeyCliTenantIsolation({
+      provider: 'grok',
+      backends: ['grok-cli'],
+      credentialEnvKey: 'XAI_API_KEY',
+      credentialEnvKeys: ['XAI_API_KEY', 'KYBERION_GROK_API_KEY'],
     }),
   });
 

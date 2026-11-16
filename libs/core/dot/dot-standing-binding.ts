@@ -282,7 +282,12 @@ export function dotCredentialAssignCommand(charter: DotCharter): string {
   if (descriptor && !descriptor.api_proof) {
     const feedable = credentialServiceBackends();
     if (feedable.includes(descriptor.mode)) {
-      const services = Object.keys(CREDENTIAL_SERVICES).join('|');
+      // Only services that actually admit this backend — an impossible
+      // credential_ref fails closed at assign time anyway.
+      const services = Object.values(CREDENTIAL_SERVICES)
+        .filter((spec) => spec.backends.includes(descriptor.mode))
+        .map((spec) => spec.service)
+        .join('|');
       return `pnpm kyberion reasoning credentials assign --tenant ${charter.scope.tenant_slug} --credential <tenant:${charter.scope.tenant_slug}:${services}|person:<member>:${services}> --backends ${descriptor.mode} --purpose "resident dot ${charter.dot_id}"`;
     }
     return `register a credential service admitting backend '${descriptor.mode}' (registered services admit: ${feedable.join(', ')}), then assign`;

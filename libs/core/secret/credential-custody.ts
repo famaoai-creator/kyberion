@@ -16,6 +16,8 @@
 import { createHash } from 'node:crypto';
 import type { CustodyOwnerKind } from '../contracts/custody-owner.js';
 import { isValidMemberId, isValidTenantSlug } from '../foundation/scope.js';
+import { calendarDateInZone, zonedWallTimeToInstant } from '../temporal/business-calendar.js';
+import { installationTimezone } from '../temporal/temporal-context.js';
 
 /** Who holds a lendable credential. `system` custody never lends a credential. */
 export type CredentialCustody = Extract<CustodyOwnerKind, 'person' | 'tenant'>;
@@ -57,7 +59,11 @@ export interface CredentialServiceSpec {
  * The lendable credential services. `anthropic` is the Console API key (the
  * reasoning provider descriptor `anthropic` owns its API proof);
  * `claude-subscription` is a `claude setup-token` OAuth token, which has no
- * API proof and is consumed only by the claude CLI.
+ * API proof and is consumed only by the claude CLI. `openai` / `gemini` /
+ * `grok` are the API keys of those providers — each feeds both its API-proof
+ * backend and its CLI backend (which reads the key from its env). Service
+ * ids match the providers' `secret_refs.service_id`, so the same
+ * `secret introduce <service> API_KEY` registration feeds either path.
  */
 export const CREDENTIAL_SERVICES: Readonly<Record<string, CredentialServiceSpec>> = Object.freeze({
   anthropic: Object.freeze({
@@ -71,6 +77,44 @@ export const CREDENTIAL_SERVICES: Readonly<Record<string, CredentialServiceSpec>
     plans: Object.freeze(['api', 'team', 'enterprise'] as CredentialPlan[]),
     primaryBackend: 'anthropic',
     obtainHint: 'issue a new Anthropic Console API key',
+  }),
+  openai: Object.freeze({
+    service: 'openai',
+    kind: 'api_key',
+    secretKey: 'API_KEY',
+    connectionField: 'api_key',
+    envKey: 'OPENAI_API_KEY',
+    egressProvider: 'codex',
+    backends: Object.freeze(['openai-api', 'codex-cli']),
+    plans: Object.freeze(['api', 'team', 'enterprise'] as CredentialPlan[]),
+    primaryBackend: 'openai-api',
+    obtainHint: 'issue a new OpenAI API key',
+  }),
+  gemini: Object.freeze({
+    service: 'gemini',
+    kind: 'api_key',
+    secretKey: 'API_KEY',
+    connectionField: 'api_key',
+    envKey: 'GEMINI_API_KEY',
+    egressProvider: 'gemini',
+    // The same Gemini API key also feeds Antigravity CLI (gemini-cli's
+    // successor), which reads it via modelProvider "gemini" settings.
+    backends: Object.freeze(['gemini-api', 'gemini-cli', 'agy-cli']),
+    plans: Object.freeze(['api', 'team', 'enterprise'] as CredentialPlan[]),
+    primaryBackend: 'gemini-api',
+    obtainHint: 'issue a new Gemini API key',
+  }),
+  grok: Object.freeze({
+    service: 'grok',
+    kind: 'api_key',
+    secretKey: 'API_KEY',
+    connectionField: 'api_key',
+    envKey: 'XAI_API_KEY',
+    egressProvider: 'grok',
+    backends: Object.freeze(['grok-api', 'grok-cli']),
+    plans: Object.freeze(['api', 'team', 'enterprise'] as CredentialPlan[]),
+    primaryBackend: 'grok-api',
+    obtainHint: 'issue a new xAI API key',
   }),
   'claude-subscription': Object.freeze({
     service: 'claude-subscription',
@@ -91,7 +135,6 @@ export const SUBSCRIPTION_TOKEN_REMINDER_DAYS = 30;
 /** Default subscription token lifetime when the owner does not enter one (design §2.1). */
 export const SUBSCRIPTION_TOKEN_DEFAULT_DAYS = 365;
 const DAY_MS = 24 * 60 * 60 * 1000;
-const JST_OFFSET_MS = 9 * 60 * 60 * 1000;
 
 export function requireCredentialService(service: string): CredentialServiceSpec {
   const spec = Object.hasOwn(CREDENTIAL_SERVICES, service) ? CREDENTIAL_SERVICES[service] : null;
@@ -219,14 +262,19 @@ export function buildCredentialRecord(input: {
   const now = input.now ?? new Date();
   let tokenExpiresAt: string | undefined;
   if (spec.kind === 'subscription_token') {
-    // The default is aligned to the Asia/Tokyo business day (the installation timezone used
-    // for budget months too), so a request and its approved apply describe the same record;
-    // the overwrite approval also carries the computed value for the apply to repeat.
+    // The default is aligned to a local business day (the installation
+    // timezone — the OS zone the budget month uses too), so a request and its
+    // approved apply describe the same record; the overwrite approval also
+    // carries the computed value for the apply to repeat.
+    const timeZone = installationTimezone();
+    const localDayStart = zonedWallTimeToInstant(
+      calendarDateInZone(now, timeZone),
+      '00:00',
+      timeZone
+    ).getTime();
     const parsed = input.tokenExpiresAt
       ? Date.parse(input.tokenExpiresAt)
-      : Math.floor((now.getTime() + JST_OFFSET_MS) / DAY_MS) * DAY_MS -
-        JST_OFFSET_MS +
-        SUBSCRIPTION_TOKEN_DEFAULT_DAYS * DAY_MS;
+      : localDayStart + SUBSCRIPTION_TOKEN_DEFAULT_DAYS * DAY_MS;
     if (!Number.isFinite(parsed))
       throw new Error('[CREDENTIAL_TOKEN_EXPIRY_INVALID] --token-expires must be YYYY-MM-DD');
     tokenExpiresAt = new Date(parsed).toISOString();
