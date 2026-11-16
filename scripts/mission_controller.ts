@@ -329,6 +329,12 @@ async function startMission(
   const state = loadState(targetId);
   if (state?.status === 'active') {
     writeFocusedMissionId(targetId);
+    // Direct_cli delivery seam (MEMORY_LOOP_CLOSURE): dispatched workers get
+    // promoted records in their context pack; the operator path delivers the
+    // same lane at start so KP-05 telemetry sees direct_cli retrievals too.
+    const { printPromotedKnowledgeForActiveMission } =
+      await import('@agent/core/mission/mission-operator-knowledge-surface');
+    await printPromotedKnowledgeForActiveMission(targetId);
   }
 }
 
@@ -469,6 +475,9 @@ async function resumeMission(id?: string) {
     } catch {
       // Older missions may not have HO-02 state yet; lifecycle resume remains valid.
     }
+    const { printPromotedKnowledgeForActiveMission } =
+      await import('@agent/core/mission/mission-operator-knowledge-surface');
+    await printPromotedKnowledgeForActiveMission(id.toUpperCase());
   }
   return result;
 }
