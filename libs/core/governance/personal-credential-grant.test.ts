@@ -71,10 +71,38 @@ afterEach(async () =>
 );
 
 describe('personal standing credential consent prerequisite', () => {
+  it('refuses owner or unrelated-agent requests instead of attributing them to the installed NHI', async () => {
+    const { api } = await setup();
+    for (const requesterId of ['user:owner', 'user:other', 'kyberion://agent/_/_/other', '']) {
+      expect(() =>
+        f.run(() =>
+          api.requestPersonalCredentialGrantApproval({ ...f.principal, requesterId }, selection)
+        )
+      ).toThrow('[PERSONAL_CREDENTIAL_GRANT_DENIED]');
+    }
+    expect(f.personal(() => f.approvals.listApprovalRequests({ status: 'pending' }))).toEqual([]);
+    const requested = f.run(() =>
+      api.requestPersonalCredentialGrantApproval(
+        { ...f.principal, requesterId: f.installedId },
+        selection
+      )
+    );
+    expect(requested.requestedBy).toBe(f.installedId);
+    expect(requested.requestedByContext?.actorId).toBe(f.installedId);
+    approve(requested.id);
+    const granted = f.run(() =>
+      api.grantPersonalCredentialUse(f.principal, selection, requested.id)
+    );
+    expect(granted.granted_by.actor_id).toBe('user:owner');
+  });
+
   it('keeps legacy management-only consent readable and revocable without runtime opt-in', async () => {
     const { api, store } = await setup();
     const requested = f.run(() =>
-      api.requestPersonalCredentialGrantApproval(f.principal, selection)
+      api.requestPersonalCredentialGrantApproval(
+        { ...f.principal, requesterId: f.installedId },
+        selection
+      )
     );
     approve(requested.id);
     const current = f.run(() =>
@@ -146,7 +174,10 @@ describe('personal standing credential consent prerequisite', () => {
   it('uses actual personal grant and approval stores while remaining excluded from tenant APIs', async () => {
     const { api, store } = await setup();
     const approval = f.run(() =>
-      api.requestPersonalCredentialGrantApproval(f.principal, selection)
+      api.requestPersonalCredentialGrantApproval(
+        { ...f.principal, requesterId: f.installedId },
+        selection
+      )
     );
     expect(f.run(() => f.approvals.loadApprovalRequest('grant-standing', approval.id))).toBeNull();
     expect(() =>
@@ -193,7 +224,10 @@ describe('personal standing credential consent prerequisite', () => {
   it('refuses generation drift, changed task and unselected actions before grant creation', async () => {
     const { api, guard } = await setup();
     const approval = f.run(() =>
-      api.requestPersonalCredentialGrantApproval(f.principal, selection)
+      api.requestPersonalCredentialGrantApproval(
+        { ...f.principal, requesterId: f.installedId },
+        selection
+      )
     );
     approve(approval.id);
     expect(() =>
@@ -212,10 +246,13 @@ describe('personal standing credential consent prerequisite', () => {
     ).toThrow();
     expect(() =>
       f.run(() =>
-        api.requestPersonalCredentialGrantApproval(f.principal, {
-          ...selection,
-          allowedActions: ['write'],
-        })
+        api.requestPersonalCredentialGrantApproval(
+          { ...f.principal, requesterId: f.installedId },
+          {
+            ...selection,
+            allowedActions: ['write'],
+          }
+        )
       )
     ).toThrow();
     f.run(() =>
@@ -229,11 +266,16 @@ describe('personal standing credential consent prerequisite', () => {
   });
   it('rejects unauthenticated owner claims, inactive installed NHI and pending registration', async () => {
     const { api, guard } = await setup();
-    expect(() => api.requestPersonalCredentialGrantApproval(f.principal, selection)).toThrow();
+    expect(() =>
+      api.requestPersonalCredentialGrantApproval(
+        { ...f.principal, requesterId: f.installedId },
+        selection
+      )
+    ).toThrow();
     expect(() =>
       f.run(() =>
         api.requestPersonalCredentialGrantApproval(
-          { ...f.principal, accountableId: 'user:other' },
+          { ...f.principal, requesterId: f.installedId, accountableId: 'user:other' },
           selection
         )
       )
@@ -242,17 +284,30 @@ describe('personal standing credential consent prerequisite', () => {
       guard.storeLocalAccountRegistration(address, { generation, pendingApprovalId: 'pending' })
     );
     expect(() =>
-      f.run(() => api.requestPersonalCredentialGrantApproval(f.principal, selection))
+      f.run(() =>
+        api.requestPersonalCredentialGrantApproval(
+          { ...f.principal, requesterId: f.installedId },
+          selection
+        )
+      )
     ).toThrow();
     f.installAgent(false, 'inactive-test');
     expect(() =>
-      f.run(() => api.requestPersonalCredentialGrantApproval(f.principal, selection))
+      f.run(() =>
+        api.requestPersonalCredentialGrantApproval(
+          { ...f.principal, requesterId: f.installedId },
+          selection
+        )
+      )
     ).toThrow();
   });
   it('rejects mixed/forged personal records and legacy tenant issuance of personal capability', async () => {
     const { api, store } = await setup();
     const approval = f.run(() =>
-      api.requestPersonalCredentialGrantApproval(f.principal, selection)
+      api.requestPersonalCredentialGrantApproval(
+        { ...f.principal, requesterId: f.installedId },
+        selection
+      )
     );
     approve(approval.id);
     const grant = f.run(() => api.grantPersonalCredentialUse(f.principal, selection, approval.id));
@@ -289,7 +344,10 @@ describe('personal standing credential consent prerequisite', () => {
     async (change) => {
       const { api } = await setup();
       const approval = f.run(() =>
-        api.requestPersonalCredentialGrantApproval(f.principal, selection)
+        api.requestPersonalCredentialGrantApproval(
+          { ...f.principal, requesterId: f.installedId },
+          selection
+        )
       );
       approve(approval.id);
       const grant = f.run(() =>
@@ -332,7 +390,10 @@ describe('personal standing credential consent prerequisite', () => {
   it('refuses a forged historical NHI belonging to another owner', async () => {
     const { api, store } = await setup();
     const approval = f.run(() =>
-      api.requestPersonalCredentialGrantApproval(f.principal, selection)
+      api.requestPersonalCredentialGrantApproval(
+        { ...f.principal, requesterId: f.installedId },
+        selection
+      )
     );
     approve(approval.id);
     const grant = f.run(() => api.grantPersonalCredentialUse(f.principal, selection, approval.id));

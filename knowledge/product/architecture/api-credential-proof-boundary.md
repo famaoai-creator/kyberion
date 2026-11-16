@@ -277,6 +277,11 @@ Legacy grants remain readable and revocable, but cannot authorize runtime use; a
 marker cannot reuse the old approval. Registration approval does not grant use permission, and personal-use consent does not
 implicitly share credentials with an organization. Its CLI/UI consent entrypoints remain
 unwired; the governed owner facade and synthetic integration tests exercise issuance.
+Request creation additionally requires the actual initiator to equal the installed personal
+NHI. An owner-initiated request must not be relabelled as the agent: owner-initiated UI
+consent remains deferred, and `grant-standing` has no self-consent exemption. The
+accountable owner still decides through the existing authenticated human approval path;
+requesting, deciding, applying and revoking remain separate operations.
 
 GWS now uses the existing authenticated account introduction workflow for encrypted local
 registration: inactive prepare, exact-stage abort, and approval-revalidated generation-CAS
