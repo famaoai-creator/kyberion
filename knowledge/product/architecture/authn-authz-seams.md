@@ -18,7 +18,7 @@ tags:
     audit,
   ]
 owner: ecosystem_architect
-last_updated: 2026-09-22
+last_updated: 2026-11-16
 ---
 
 # AuthN/AuthZ seams
@@ -129,13 +129,53 @@ Declarative policies follow `knowledge/product/schemas/authz-policy.schema.json`
   `pnpm kyberion seam select rules set --seam authn-principal-resolver …`
   (see [seam-provider-selection](./seam-provider-selection.md)). Purposes:
   `local_dev`, `remote_human`, `default_surface`, `membership`, `lockdown`, `test`.
-- Mint agent workload credentials server-side:
+- The existing server-side workload credential primitive is:
   `issueAgentToken({ nhiId, onBehalfOf?, ttlSeconds?, tenants? }, deps)` —
-  refuses unregistered / suspended / retired NI-01 identities.
+  it requires an active canonical NI-01 agent and derives its accountable human
+  and default tenant scope from the ledger. An explicit owner must match; an
+  explicit tenant scope may only narrow the identity's affiliation. Personal
+  identities have an empty tenant scope. TTL is an integer from 1 to 900 seconds,
+  with 900 seconds as the default. It uses an existing signing key only.
 - Tests: `setAuthnAuditSinkForTests` / `setAuthzAuditSinkForTests`,
   `deps.env` / `deps.jwks` / `deps.now` / `deps.policyPath` /
   `deps.memberRegistry` keep suites hermetic (see
   `libs/core/authn/authn-principal-resolver.test.ts`).
+
+### Workload credential boundary and acquisition prerequisite
+
+The `kya1.` signature is not sufficient by itself. Verification requires explicit
+`obo`, `tenants` and `identity_revision` claims matching the current identity,
+valid bounded `iat`/`exp`, and a well-formed identifier. Issuance generates the
+identifier with cryptographic randomness. Tenant scope
+never comes from `serverTenant`: a server tenant outside the signed scope is
+refused, including a personal token presented to a tenant-scoped server. Invalid
+or unknown claims fail closed instead of being dropped or treated as unscoped.
+
+Every identity journal revision conservatively invalidates previously issued
+credentials, including suspend/reactivate transitions and runtime-instance
+changes. The next valid token must be minted against the current revision.
+Old tokens missing the required claims are rejected even if their signatures
+and expiry are otherwise valid. There is no automatic migration or renewal.
+This is a credential compatibility change, not a request to modify signing keys.
+
+This primitive still has no governed product issuance/delivery ceremony. Do not
+expose it through an owner terminal or HTTP handler merely by accepting an NHI
+name: loopback ownership, environment markers and `ActorContext` attribution do
+not authenticate the requesting agent. An installed personal work claim combines
+a minted envelope with the current lease/attempt; it is a candidate input to a
+future trusted dispatcher admission, not permission to discard that scope or to
+manufacture a high-assurance wire principal. The personal consent CLI continues
+to refuse worker/delegated scopes.
+
+A future acquisition slice must bind the requester to the admitted execution,
+define its audience and purpose, constrain lifetime to that execution, and deliver
+the token through a private process-bound channel without stdout/log/file leakage.
+Human credential-use approval remains a separate decision. No audience binding,
+per-token revocation store, process-bound delivery or new token endpoint is added
+here. The existing maximum lifetime and identity-revision fence do not imply
+those properties. `nhi issue` registers an identity, NHI session admission creates
+a distinct runtime-binding identifier, and a personal credential grant records
+owner-approved service use; none is an agent workload token.
 
 ## Surface wiring contract (when binding to HTTP)
 

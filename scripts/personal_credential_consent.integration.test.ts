@@ -1,5 +1,6 @@
 /** Real authentication, approval and grant stores; only terminal input is synthetic. */
 import * as path from 'node:path';
+import { createHmac } from 'node:crypto';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useOnboardingAuthorityFixture } from '../tests/helpers/onboarding-authority-fixture.js';
 
@@ -68,7 +69,8 @@ async function setup() {
     guard.storeLocalAccountRegistration(address, { generation });
   });
   writeSelection();
-  const token = f.run(() => authn.issueAgentToken({ nhiId: f.installedId, ttlSeconds: 900 }).token);
+  const issued = f.run(() => authn.issueAgentToken({ nhiId: f.installedId, ttlSeconds: 900 }));
+  const { token, payload } = issued;
   input.read.mockResolvedValue(token);
   const request = async () => {
     const result = await cli(['request', '--selection', file]);
@@ -81,7 +83,7 @@ async function setup() {
     expect(result).toMatchObject({ status: 'granted', grant_id: expect.any(String) });
     return (result as { grant_id: string }).grant_id;
   };
-  return { cli, authn, guard, io, file, token, request, apply, writeSelection };
+  return { cli, authn, guard, io, file, token, payload, request, apply, writeSelection };
 }
 function approve(id: string) {
   return f.personal(() => {
@@ -151,14 +153,30 @@ describe('personal credential consent CLI full chain', () => {
       });
       return f.identities.activateAgentIdentity(issued.nhi_id).nhi_id;
     });
+    // The public issuer now refuses owner/scope substitution. Independently sign
+    // those malformed claims with the synthetic key to also exercise verification.
+    expect(() =>
+      f.run(() => x.authn.issueAgentToken({ nhiId: f.installedId, tenants: ['fixture-a'] }))
+    ).toThrow();
+    expect(() =>
+      f.run(() => x.authn.issueAgentToken({ nhiId: f.installedId, onBehalfOf: 'user:other' }))
+    ).toThrow();
+    const signClaims = (claims: unknown) => {
+      const body = Buffer.from(JSON.stringify(claims)).toString('base64url');
+      const signature = createHmac('sha256', key).update(`kya1.${body}`).digest('base64url');
+      return `kya1.${body}.${signature}`;
+    };
+    const legacy: Record<string, unknown> = { ...x.payload };
+    delete legacy.identity_revision;
     const tokens = f.run(() => [
       'not-a-signed-workload-token',
       x.token.slice(0, -1) + (x.token.endsWith('A') ? 'B' : 'A'),
       x.authn.issueAgentToken({ nhiId: f.installedId, ttlSeconds: 1 }, { now: Date.now() - 10_000 })
         .token,
       x.authn.issueAgentToken({ nhiId: foreign }).token,
-      x.authn.issueAgentToken({ nhiId: f.installedId, tenants: ['fixture-a'] }).token,
-      x.authn.issueAgentToken({ nhiId: f.installedId, onBehalfOf: 'user:other' }).token,
+      signClaims({ ...x.payload, tenants: ['fixture-a'] }),
+      signClaims({ ...x.payload, obo: 'user:other' }),
+      signClaims(legacy),
     ]);
     for (const token of tokens) {
       input.read.mockResolvedValueOnce(token);

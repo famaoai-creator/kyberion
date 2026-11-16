@@ -258,6 +258,7 @@ The operations console does not directly own mission state. It delegates to:
 - `libs/core/foundation/credential-material-capability.ts` (internal exact-file read ceilings for allocated connection documents and account generations)
 - `libs/core/foundation/account-provision-admission.ts` (internal, bounded apply/write admission; issuer imports are checked by a boundary test)
 - `scripts/personal_credential_consent.ts` (signed-agent personal consent request/apply, separate local-owner withdrawal; no token issuance or human approval decision)
+- `libs/core/authn/authn-agent-token.ts` (internal workload token contract and verifier; bounded lifetime, ledger owner/tenant/revision fencing, no acquisition endpoint)
 - `scripts/account_introduction.ts` (installed-owner account preview, review-bound request, status and apply through the shared facade)
 - `scripts/lib/tty/hidden-token-input.ts` (bounded hidden TTY token collector with terminal restoration; no file, argv or environment input)
 - `libs/core/governance/service-credential-allocation.ts` (fail-closed allocation port)
