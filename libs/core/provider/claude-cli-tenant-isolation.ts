@@ -29,7 +29,14 @@ import {
   type TaskCredentialKind,
 } from '../foundation/credential-binding.js';
 import { classifyStorageFloorPath, resolveStorageFloor } from '../storage-layout.js';
-import { safeMkdir, safeRmSync } from '../secure-io.js';
+import { safeMkdir, safeRmSync, buildSafeExecEnv } from '../secure-io.js';
+import { pathResolver } from '../path-resolver.js';
+import { PROXY_ENV_KEYS } from '../foundation/env.js';
+import type { ScopeContext } from '../foundation/scope-context-validation.js';
+import { providerAuthHomeRelativePath } from './provider-auth-home.js';
+
+/** Provider-environment key of the claude family (design §3 `providerEnvironments.claude`). */
+export const CLAUDE_PROVIDER_ENVIRONMENT = 'claude';
 
 /**
  * Closed settings / MCP / hooks surface applied to every bound claude path.
@@ -271,4 +278,55 @@ export function prepareClaudeBoundLaunch(args: readonly string[]): ClaudeBoundLa
       workspace.dispose();
     },
   };
+}
+
+// ---------------------------------------------------------------------------
+// Isolated claude environment (design §3)
+// ---------------------------------------------------------------------------
+
+/**
+ * Non-secret network plumbing the isolated claude child still needs behind a
+ * corporate proxy / custom CA (a bound child gets ONLY its bound env), from the
+ * operator's safe exec env: CA bundle paths and proxy routing. A proxy value
+ * carrying userinfo (`user:pass@host`, with or without a scheme) is a
+ * credential and is never passed.
+ */
+export const CLAUDE_NETWORK_PASSTHROUGH_ENV_KEYS: readonly string[] = [
+  'NODE_EXTRA_CA_CERTS',
+  'SSL_CERT_FILE',
+  'SSL_CERT_DIR',
+  ...PROXY_ENV_KEYS,
+];
+export function claudeNetworkPassthroughEnv(
+  source: NodeJS.ProcessEnv = buildSafeExecEnv()
+): Record<string, string> {
+  const picked: Record<string, string> = {};
+  for (const key of CLAUDE_NETWORK_PASSTHROUGH_ENV_KEYS) {
+    const value = source[key];
+    if (typeof value !== 'string' || !value.trim()) continue;
+    if (/_proxy$/i.test(key) && /^(?:[a-z][a-z0-9+.-]*:\/\/)?[^/@\s,]*@/iu.test(value.trim()))
+      continue;
+    picked[key] = value;
+  }
+  return picked;
+}
+
+/** Isolated claude HOME for this borrower and credential; never holds the value. */
+export function claudeProviderEnvironment(
+  tier: ScopeContext['tier'],
+  tenant: string,
+  credentialRef: string
+): NodeJS.ProcessEnv {
+  const home = pathResolver.rootResolve(
+    providerAuthHomeRelativePath(tier, tenant, CLAUDE_PROVIDER_ENVIRONMENT, credentialRef)
+  );
+  const configDir = `${home}/.claude`;
+  try {
+    safeMkdir(configDir, { recursive: true });
+  } catch {
+    throw new Error(
+      '[CREDENTIAL_HOME_REQUIRED] Could not prepare the isolated claude HOME for this tenant credential'
+    );
+  }
+  return { ...claudeNetworkPassthroughEnv(), HOME: home, CLAUDE_CONFIG_DIR: configDir };
 }

@@ -16,8 +16,6 @@
 import { createHash } from 'node:crypto';
 import type { CustodyOwnerKind } from '../contracts/custody-owner.js';
 import { isValidMemberId, isValidTenantSlug } from '../foundation/scope.js';
-import type { StorageDataTier } from '../storage-layout.js';
-import { storageFloorRelativePath } from '../storage-layout.js';
 
 /** Who holds a lendable credential. `system` custody never lends a credential. */
 export type CredentialCustody = Extract<CustodyOwnerKind, 'person' | 'tenant'>;
@@ -84,8 +82,6 @@ export const CREDENTIAL_SERVICES: Readonly<Record<string, CredentialServiceSpec>
   }),
 });
 
-/** Provider-environment key of the claude family (design §3 `providerEnvironments.claude`). */
-export const CLAUDE_PROVIDER_ENVIRONMENT = 'claude';
 /** Days before `token_expires_at` the owner is reminded (design §2.4). */
 export const SUBSCRIPTION_TOKEN_REMINDER_DAYS = 30;
 /** Default subscription token lifetime when the owner does not enter one (design §2.1). */
@@ -586,32 +582,6 @@ export function subscriptionTokenDaysLeft(
   return Math.floor((Date.parse(lending.token_expires_at) - now.getTime()) / DAY_MS);
 }
 
-// ---------------------------------------------------------------------------
-// Isolated provider HOME (design §3)
-// ---------------------------------------------------------------------------
-/** Short stable hash naming one credential's provider-auth directory (never the value). */
-export function credentialRefHash(credentialRef: string): string {
-  return createHash('sha256').update(credentialRef).digest('hex').slice(0, 16);
-}
-
-/**
- * Repo-relative isolated HOME of the claude CLI for one borrower and one
- * credential: `active/shared/cache/<tier>/<borrower>/provider-auth/claude/<hash>/home`.
- * The cache floor of the borrower's non-public tier (provider-auth-home.ts rules).
- */
-export function claudeProviderHomeRelativePath(
-  tier: StorageDataTier,
-  borrowerTenant: string,
-  credentialRef: string
-): string {
-  if (tier === 'public')
-    throw new Error('[CREDENTIAL_HOME_INVALID] Provider auth never lives on the public tier');
-  return storageFloorRelativePath(
-    'cache',
-    { kind: 'tier', tier, tenant: borrowerTenant },
-    'provider-auth',
-    CLAUDE_PROVIDER_ENVIRONMENT,
-    credentialRefHash(credentialRef),
-    'home'
-  );
-}
+// Isolated provider HOMEs live under `provider-auth/<provider>/<hash>/home`
+// (provider-auth-home.ts `providerAuthHomeRelativePath`); custody records only
+// name the credential, never the launch layout.
