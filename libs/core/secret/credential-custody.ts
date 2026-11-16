@@ -60,10 +60,12 @@ export interface CredentialServiceSpec {
  * reasoning provider descriptor `anthropic` owns its API proof);
  * `claude-subscription` is a `claude setup-token` OAuth token, which has no
  * API proof and is consumed only by the claude CLI. `openai` / `gemini` /
- * `grok` are the API keys of those providers — each feeds both its API-proof
- * backend and its CLI backend (which reads the key from its env). Service
- * ids match the providers' `secret_refs.service_id`, so the same
- * `secret introduce <service> API_KEY` registration feeds either path.
+ * `grok` are the API keys of those providers — `openai`/`gemini` feed both
+ * their API-proof and CLI backends (codex consumes via auth.json, gemini-cli
+ * and agy via env), while `grok` feeds only `grok-api` (grok-cli is
+ * OAuth-only). Service ids match the providers' `secret_refs.service_id`, so
+ * the same `secret introduce <service> API_KEY` registration feeds either
+ * path.
  */
 export const CREDENTIAL_SERVICES: Readonly<Record<string, CredentialServiceSpec>> = Object.freeze({
   anthropic: Object.freeze({
@@ -111,7 +113,9 @@ export const CREDENTIAL_SERVICES: Readonly<Record<string, CredentialServiceSpec>
     connectionField: 'api_key',
     envKey: 'XAI_API_KEY',
     egressProvider: 'grok',
-    backends: Object.freeze(['grok-api', 'grok-cli']),
+    // grok-cli cannot consume an API key (OAuth `grok login` only) — the key
+    // feeds the HTTP API backend only.
+    backends: Object.freeze(['grok-api']),
     plans: Object.freeze(['api', 'team', 'enterprise'] as CredentialPlan[]),
     primaryBackend: 'grok-api',
     obtainHint: 'issue a new xAI API key',

@@ -18,7 +18,6 @@ describe('provider tenant isolation registry', () => {
       ['codex', 'codex-cli'],
       ['gemini', 'gemini-cli'],
       ['agy', 'agy-cli'],
-      ['grok', 'grok-cli'],
     ] as const) {
       const spec = providerTenantIsolationForProvider(provider);
       expect(spec?.provider).toBe(provider);
@@ -31,7 +30,8 @@ describe('provider tenant isolation registry', () => {
     // API-proof backends take env injection only — no CLI home to isolate.
     expect(providerTenantIsolationForBackend('anthropic')).toBeUndefined();
     expect(providerTenantIsolationForBackend('openai-api')).toBeUndefined();
-    // CLIs without a lendable credential path stay un-isolated.
+    // grok-cli has no lendable channel (OAuth-only CLI); opencode likewise.
+    expect(providerTenantIsolationForBackend('grok-cli')).toBeUndefined();
     expect(providerTenantIsolationForBackend('opencode-cli')).toBeUndefined();
   });
 
