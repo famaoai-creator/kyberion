@@ -1,7 +1,7 @@
 ---
 title: Credential lifecycle, allocation, and execution boundaries
 tags: [reasoning, credentials, tenant, architecture, extensibility, verification]
-last_updated: 2026-11-14
+last_updated: 2026-11-16
 ---
 
 # Credential lifecycle, allocation, and execution boundaries
@@ -275,8 +275,16 @@ actions, generation and project/mission/task. Tenant grant APIs reject this vari
 New runtime consent also binds `runtime_use: selected-read-api-v1` in its payload and effect hash.
 Legacy grants remain readable and revocable, but cannot authorize runtime use; adding the
 marker cannot reuse the old approval. Registration approval does not grant use permission, and personal-use consent does not
-implicitly share credentials with an organization. Its CLI/UI consent entrypoints remain
-unwired; the governed owner facade and synthetic integration tests exercise issuance.
+implicitly share credentials with an organization. The `account consent-request` and
+`account consent-apply` CLI entrypoints authenticate an existing signed workload token
+through only the `agent-token` provider, then require the installed personal NHI and
+accountable owner to match. Environment agent markers are not authentication. Both
+commands use bounded hidden TTY input, preserve an exact metadata selection across
+input, and call the existing facade; neither can decide an approval.
+`account consent-revoke` withdraws through the existing local owner facade without
+requiring the assistant to remain installed or active. Owner-facing consent UI remains
+unwired. The CLI never issues tokens, creates keys, repairs identity or accepts a
+caller-selected provider. Missing existing identity or verification material fails closed.
 Request creation additionally requires the actual initiator to equal the installed personal
 NHI. An owner-initiated request must not be relabelled as the agent: owner-initiated UI
 consent remains deferred, and `grant-standing` has no self-consent exemption. The
