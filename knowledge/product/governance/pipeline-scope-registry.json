@@ -176,6 +176,11 @@
       "placement": "canonical"
     },
     {
+      "pipeline": "pipelines/credential-usage-monthly.json",
+      "audience": "organization",
+      "placement": "canonical"
+    },
+    {
       "pipeline": "pipelines/decision-digest.json",
       "audience": "organization",
       "placement": "canonical"

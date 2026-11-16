@@ -282,7 +282,7 @@ had regressed.
 | Project lifecycle facades     | lifecycle regressions in `project-management.test.ts`                                 | §9      |
 | secure-io link escapes        | `secure-io.symlink-canonical.test.ts`, `secure-io.symlink-root-alias`                 | §10     |
 | Actuator failure receipts     | cli-utils / actuator tests, `pty-engine.resize.test.ts`, probes                       | §11     |
-| CLI hook continuation loops   | `scripts/codex/codex_cli_hook.test.ts`, `libs/core/provider/claude-code-hook.test.ts` | §14     |
+| CLI hook continuation loops   | `scripts/codex/codex_cli_hook.test.ts`, `libs/core/provider/claude-code-hook.test.ts` | §16     |
 
 ---
 
@@ -2137,6 +2137,14 @@ When changing these paths, run dot admission/recovery, digest/recovery and opera
 
 Notification receipts use the registered `operator_notification_receipts` runtime-state root and canonical tier/tenant partitions (personal receipts retain their owner lane). Before creating a canonical intent, reconcile any existing intent in the exact legacy scoped lane; a namespace change must not replay an unknown external effect. Tenant offboarding exports and soft-deletes both canonical and legacy tenant receipt lanes explicitly. TTL cleanup must never remove these replay tombstones.
 
+### Tenant dot credentials go through the standing claim
+
+A tenant dot never reaches provider credentials from the supervisor's ambient context or the operator's environment. Every wake and executor item runs as one claimed child step of the dot's standing Issue (`libs/core/dot/dot-standing-binding.ts`) and binds through `withConfiguredTaskCredentials`; do not add a "dot exception" to `credential-binding.ts`, and do not hold one lease across wakes. A wake that cannot bind must fail as a classified wake (`[DOT_CREDENTIAL_GRANT_MISSING]` / `_EXPIRED` / `[DOT_STANDING_*]`), counted by the wake circuit, before any model call. Grant lifetime is extended only with `reasoning credentials extend` (owner approval, same grant, `grant_extension` consumer) — never by editing `expires_at`. When changing these paths, run `dot-standing-binding.integration.test.ts`, `dot-executor.test.ts` and the grant-store extension suite.
+
+### Tenant claude runs never read operator settings or login
+
+A bound (tenant) `claude` CLI launch reads no operator settings, hooks, MCP servers, CLI extras or login. Every claude path (delegate, stream, prompted-tools) goes through `prepareClaudeBoundLaunch` and `buildProviderChildEnv` (`libs/core/provider/claude-cli-tenant-isolation.ts`): closed settings/MCP/hooks argv, a tenant scratch cwd, the bound HOME and `CLAUDE_CONFIG_DIR`, and only the credential matching the binding's `credentialKind` (`api_key` adds `--bare`). A binding without the kind or its secret fails closed with `[CREDENTIAL_PROVIDER_DENIED]` before spawn. Do not add a claude spawn site that bypasses these helpers, and do not pass a credential through `providerEnvironments`. Gates: `libs/core/shell/shell-claude-cli-tenant-isolation.test.ts`, `libs/core/provider/claude-tenant-isolation-canary.test.ts`, and the real-CLI canary `claude-tenant-isolation` in `pnpm kyberion doctor --manifest reasoning-backend`.
+
 ### Private notifications, learning and retained follow-ups
 
 Carry explicit source scope through the notification port, receipt, inbox/outbox
@@ -2348,7 +2356,7 @@ generation or dry-run success.
 malformed transport JSON refusal and stable retries. A live probe must additionally
 record provider success, queue handoff and the separately approved replay result.
 
-## §14 CLI hook continuation loops
+## §16 CLI hook continuation loops
 
 **Build-safe hook startup.** Provider hook commands enter through
 `scripts/provider_hook_entry.mjs`, which has no built-runtime dependency. Canonical

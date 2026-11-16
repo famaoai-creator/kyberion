@@ -36,7 +36,29 @@ export interface TaskCredentialBinding {
   /** Complete provider env, including an isolated HOME. Never merged with operator env. */
   readonly providerProvenance?: Readonly<Record<string, TaskProviderProvenance>>;
   readonly providerEnvironments?: Readonly<Record<string, Readonly<NodeJS.ProcessEnv>>>;
+  /**
+   * Kind of the bound reasoning credential a provider CLI consumes. Set by the
+   * trusted allocation broker next to `secrets`; the claude CLI spawn selects
+   * its argv/env from it (`api_key` → `--bare` + ANTHROPIC_API_KEY,
+   * `subscription_token` → CLAUDE_CODE_OAUTH_TOKEN). Absent ⇒ a bound claude
+   * CLI spawn fails closed.
+   */
+  readonly credentialKind?: TaskCredentialKind;
+  /**
+   * Non-secret source of the bound reasoning credential (custody `credential_ref`
+   * + allocation grant), for the usage ledger and budget checks only. Never authority.
+   */
+  readonly credentialSource?: Readonly<TaskCredentialSource>;
 }
+
+/** Usage attribution of a lent reasoning credential (secret/credential-custody.ts). */
+export interface TaskCredentialSource {
+  readonly credentialRef: string;
+  readonly allocationGrantId: string;
+}
+
+/** Bound reasoning credential kinds (API key = commercial terms; subscription token = owner's own work only). */
+export type TaskCredentialKind = 'api_key' | 'subscription_token';
 
 const KEY = Symbol.for('kyberion.core.task-credential-binding.v1');
 const host = globalThis as typeof globalThis & {
@@ -227,6 +249,12 @@ export function hasTaskCredentialBinding(): boolean {
 export function withTaskCredentialBinding<T>(binding: TaskCredentialBinding, run: () => T): T {
   if (binding.validate !== undefined && typeof binding.validate !== 'function')
     throw new Error('[CREDENTIAL_BINDING_INVALID] Expected a trusted freshness check');
+  if (
+    binding.credentialKind !== undefined &&
+    binding.credentialKind !== 'api_key' &&
+    binding.credentialKind !== 'subscription_token'
+  )
+    throw new Error('[CREDENTIAL_BINDING_INVALID] Unknown credential kind');
   const identity = credentialExecutionIdentity();
   if (
     (!identity.tenantSlug && !identity.personalClaim) ||
@@ -243,7 +271,9 @@ export function withTaskCredentialBinding<T>(binding: TaskCredentialBinding, run
       Object.keys(binding.secrets).length ||
       binding.secretProvenance ||
       binding.providerEnvironments ||
-      binding.providerProvenance)
+      binding.providerProvenance ||
+      binding.credentialKind ||
+      binding.credentialSource)
   )
     throw new Error('[CREDENTIAL_SCOPE_DENIED] Personal dispatch admits an empty binding only');
   const parent = storage.getStore();
@@ -265,6 +295,8 @@ export function withTaskCredentialBinding<T>(binding: TaskCredentialBinding, run
       ) ||
       binding.providerEnvironments !== parent.providerEnvironments ||
       binding.providerProvenance !== parent.providerProvenance ||
+      binding.credentialKind !== parent.credentialKind ||
+      binding.credentialSource !== parent.credentialSource ||
       binding.validate !== parent.validate)
   ) {
     throw new Error('[CREDENTIAL_SCOPE_DENIED] Nested credential bindings may only narrow');
@@ -416,10 +448,23 @@ export function withTaskCredentialBinding<T>(binding: TaskCredentialBinding, run
 export function resolveTaskCredential(key: string): string | null | undefined {
   const binding = checkedBinding();
   return binding
-    ? binding.secretProvenance?.[key]?.allocationGrantId
+    ? binding.secretProvenance?.[key]?.allocationGrantId || key === CLAUDE_SUBSCRIPTION_TOKEN_KEY
       ? null
       : binding.secrets[key] || null
     : undefined;
+}
+
+/**
+ * A bound consumer subscription token (`claude setup-token`) is not a generic
+ * secret: getSecret / resolveTaskCredential never return it. Only the isolated
+ * claude CLI spawn (provider/claude-cli-tenant-isolation.ts) reads it here, for
+ * the child's CLAUDE_CODE_OAUTH_TOKEN.
+ */
+export const CLAUDE_SUBSCRIPTION_TOKEN_KEY = 'CLAUDE_CODE_OAUTH_TOKEN';
+export function resolveTaskClaudeSubscriptionToken(): string | null {
+  const binding = checkedBinding();
+  if (!binding || binding.credentialKind !== 'subscription_token') return null;
+  return binding.secrets[CLAUDE_SUBSCRIPTION_TOKEN_KEY] || null;
 }
 
 export interface PersonalServiceCredentialBinding {
@@ -535,6 +580,20 @@ export function isCurrentTaskCredentialValue(value: string): boolean | undefined
   return binding ? Object.values(binding.secrets).includes(value) : undefined;
 }
 
+/** undefined = operator flow or a binding that declares no credential kind. */
+export function resolveTaskCredentialKind(): TaskCredentialKind | undefined {
+  return checkedBinding()?.credentialKind;
+}
+
+/** Non-secret usage attribution of the bound lent credential; never throws (metering only). */
+export function currentTaskCredentialSource(): Readonly<TaskCredentialSource> | undefined {
+  try {
+    return storage.getStore()?.credentialSource;
+  } catch {
+    return undefined;
+  }
+}
+
 export function resolveTaskProviderEnvironment(provider: string): NodeJS.ProcessEnv | undefined {
   const binding = checkedBinding();
   if (!binding) return undefined;
@@ -590,7 +649,8 @@ export function selectProviderCredential(
   const binding = checkedBinding();
   if (!binding) return operatorValue || undefined;
   for (const key of keys) {
-    if (binding.secretProvenance?.[key]?.allocationGrantId) continue;
+    if (binding.secretProvenance?.[key]?.allocationGrantId || key === CLAUDE_SUBSCRIPTION_TOKEN_KEY)
+      continue;
     const value = binding.secrets[key];
     if (value) return value;
   }

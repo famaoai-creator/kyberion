@@ -185,6 +185,7 @@
     "browser": {
       "capture": [
         "action_trail",
+        "approval_queue_inspect",
         "cdp",
         "console",
         "content",
@@ -298,6 +299,7 @@
       "capture": [
         "accountability_report",
         "approval_store_hygiene",
+        "credential_usage_monthly",
         "decision_digest",
         "organization_digest",
         "organization_retro",

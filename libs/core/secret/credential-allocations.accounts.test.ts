@@ -56,6 +56,7 @@ const grant = (other = false): GrantRecord => ({
   audit_event_id: 'test',
 });
 vi.mock('../governance/grant-store.js', () => ({
+  registerCredentialLendingPolicy: () => undefined,
   listGrants: () => [grant(), ...(state.duplicate || state.unrelated ? [grant(true)] : [])],
   loadGrant: (_tenant: string, id: string) => (id === 'GRT-OWNER' ? grant() : grant(true)),
   grantStatusAt: () => (state.revoked ? 'revoked' : 'active'),

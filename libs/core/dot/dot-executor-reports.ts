@@ -111,6 +111,15 @@ export interface DotExecutorDeps {
    * module's own appends/marks. `runDotExecutorSweep` creates one per sweep.
    */
   resultsCache?: Map<string, DotWorkResultRow[]>;
+  /**
+   * Runs one tenant item's execution inside the Dot's standing credential
+   * binding (dot-standing-binding.ts). Production passes
+   * `withDotStandingBinding(loaded, 'executor', run)`; ports are then built inside
+   * the binding for each item. A thrown `DotStandingBindingRefusal` skips the
+   * item unclaimed with its classified reason. Absent: no binding (tests,
+   * tenantless hosts).
+   */
+  runBound?: <T>(loaded: LoadedDotCharter, run: () => Promise<T>) => Promise<T>;
 }
 
 export function nowOf(deps: DotExecutorDeps): Date {

@@ -109,6 +109,15 @@ Revocation blocks new local bindings and subsequent managed sends; rotation
 invalidates an old binding. Already-sent requests are not cancelled. External
 binders and spawned CLI sessions retain their own revocation boundaries.
 
+An allocation's lifetime can be extended only as the same grant: an owner
+approval bound to the grant id, its current expiry and the extension length moves
+`expires_at` (at most the capability maximum from approval), and every step is
+re-verified at use. A revoked grant is never extended; an expired one only within
+a short grace window, during which it allows nothing. Resident tenant Dots consume
+allocations through the same claimed-task binding as any WorkItem, using a
+standing lineage rather than an operator exception
+([tenant-task-credential-binding](../orchestration/tenant-task-credential-binding.ja.md)).
+
 ### Provider CLI children: output redaction and the credential relay
 
 Every provider CLI reasoning backend redacts at its output exits: final answer

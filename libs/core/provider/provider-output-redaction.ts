@@ -49,9 +49,14 @@ export function redactProviderStructuredResult<T>(value: T): T {
  * classification relies on survive. Non-Error throwables are walked
  * value-wise.
  */
-export function redactProviderOutputError(error: unknown): unknown {
-  if (!(error instanceof Error)) return redactProviderOutputValue(error);
-  const options = { extraSecrets: extraSecrets() };
+export function redactProviderOutputError(
+  error: unknown,
+  captured: readonly string[] = []
+): unknown {
+  // `captured`: values seen while the output was produced (e.g. a launch whose
+  // binding was revoked or disposed before the final error surfaced).
+  const options = { extraSecrets: [...new Set([...captured, ...extraSecrets()])] };
+  if (!(error instanceof Error)) return redactSecretsDeep(error, options);
   try {
     error.message = redactSecretValuesInText(error.message, options);
     if (typeof error.stack === 'string') {
@@ -74,14 +79,17 @@ export function redactProviderOutputError(error: unknown): unknown {
 export async function* redactProviderOutputStream(
   stream: AsyncIterable<string>
 ): AsyncGenerator<string, void, undefined> {
-  const redactor = createSecretStreamRedactor({ extraSecrets: extraSecrets() });
+  const captured = extraSecrets();
+  const redactor = createSecretStreamRedactor({ extraSecrets: captured });
   try {
     for await (const chunk of stream) {
       const safe = redactor.push(chunk);
       if (safe) yield safe;
     }
   } catch (error) {
-    throw redactProviderOutputError(error);
+    // The stream's own finally may have disposed the launch (and its captured
+    // values) before this catch runs: redact with what was captured up front too.
+    throw redactProviderOutputError(error, captured);
   }
   const rest = redactor.flush();
   if (rest) yield rest;

@@ -15,6 +15,10 @@
  *   node-version.floor           — running Node satisfies package.json engines
  *   playwright.chromium-browser  — a Playwright browser cache is present
  *   public-ingress.any-ready     — a live public-ingress provider is ready
+ *   claude-tenant-isolation      — a bound claude launch cannot reach the
+ *                                  operator's login (no-credential canary)
+ *   tenant-personal-owners       — warns with every tenant marked personal
+ *                                  (personal_owner: consumer tokens may serve it)
  *
  * Importing this module triggers `installCoreEnvironmentProbes()` for
  * its side effect; tests that reset the probe registry can re-arm by
@@ -43,6 +47,14 @@ import {
 } from './environment-capability.js';
 import { probeShellClaudeCliAvailability } from '../shell/shell-claude-cli-backend.js';
 import {
+  CLAUDE_TENANT_ISOLATION_PROBE_ID,
+  probeClaudeTenantIsolation,
+} from '../provider/claude-tenant-isolation-canary.js';
+import {
+  probeTenantPersonalOwners,
+  TENANT_PERSONAL_OWNERS_PROBE_ID,
+} from '../organization/tenant-personal-owner.js';
+import {
   probeReasoningProviderReadiness,
   type ReasoningProviderReadinessDeps,
 } from '../reasoning/reasoning-provider-readiness.js';
@@ -64,6 +76,8 @@ export function installCoreEnvironmentProbes(): void {
     ['node-version.floor', probeNodeVersionFloor],
     ['playwright.chromium-browser', probePlaywrightChromium],
     ['public-ingress.any-ready', probePublicIngress],
+    [CLAUDE_TENANT_ISOLATION_PROBE_ID, () => probeClaudeTenantIsolation()],
+    [TENANT_PERSONAL_OWNERS_PROBE_ID, () => probeTenantPersonalOwners()],
   ];
   for (const [probeId, probe] of coreProbes) {
     if (!hasEnvironmentCapabilityProbe(probeId)) registerEnvironmentCapabilityProbe(probeId, probe);

@@ -22,7 +22,9 @@ independent verification, operations triage and knowledge curation, see the
 [starter playbook](../orchestration/dot-team-starter-playbook.ja.md). Its three
 charter templates are drafts outside resident discovery; they do not activate
 workers, add authority, or replace the existing repo-guardian and org-operations
-charters. The playbook distinguishes quality acceptance from action approval
+charters. The org-operations charter itself ships only as a tenant-free draft
+template next to them and is instantiated per tenant organization into
+`knowledge/confidential/<tenant>/dots/`. The playbook distinguishes quality acceptance from action approval
 and documents the current handoff and executor limitations.
 
 ## Element mapping
@@ -76,6 +78,25 @@ decision floor (ops-gate), and notification (deliver_to + digest). See
    pages, same as any daemon.
 6. A dot never acts directly: it proposes (MSN-RESIDENT-DOT-AUTONOMY-20261004,
    see "Governed proposals" below).
+7. Tenant dots reason through a claimed-task credential binding, never the
+   operator's credentials (MSN-DOT-STANDING-BINDING-20261116,
+   `libs/core/dot/dot-standing-binding.ts`). Each tenant dot has one standing
+   Issue on the deterministic `MSN-DOT-*` lineage (the mission-admission id
+   rule applied to `dot-standing:<tenant>:<dot_id>`); every wake and every
+   executor item is one claim (one attempt) on a reusable child step per kind,
+   held by the dot's canonical NHI with its lease renewed by the supervisor
+   for the run, so a dot owns at most three WorkItems. Only charters loaded
+   from `knowledge/confidential/<tenant>/dots/` bind that tenant's
+   credentials; a repo-level charter declaring a tenant fails closed. The binding is minted
+   from that live claim by `withConfiguredTaskCredentials`; the provider
+   credential still comes only from the tenant owner's `credential.use`
+   standing grant, re-validated at every use. The standing claim is not
+   authority: the charter grants nothing, and proposals still become separate
+   WorkItems. A missing or expired grant fails the wake with
+   `[DOT_CREDENTIAL_GRANT_MISSING]` / `[DOT_CREDENTIAL_GRANT_EXPIRED]` (counted
+   by the wake circuit, no model call). Tenantless dots are unchanged. Grant
+   extension and the expiry reminder:
+   [tenant-task-credential-binding](../orchestration/tenant-task-credential-binding.ja.md#常駐-dot-の-bindingstanding-lineage).
 
 ## Governed proposals (landed MSN-RESIDENT-DOT-AUTONOMY-20261004)
 

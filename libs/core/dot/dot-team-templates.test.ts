@@ -5,7 +5,8 @@ import { validateWritePermission } from '../tier-guard.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeExistsSync, safeReadFile, safeReaddir } from '../secure-io.js';
 import { loadAuthorityRoleIndex } from '../organization/authority-role-registry.js';
-import { listDotCharterPaths, loadDotCharter } from './dot-charter.js';
+import { listDotCharterPaths, loadDotCharter, validateDotCharter } from './dot-charter.js';
+import { createDraftDotCharter } from './dot-lifecycle.js';
 
 const TEMPLATE_DIR = 'knowledge/product/orchestration/dot-team-templates';
 const GUIDE = 'knowledge/product/orchestration/dot-team-starter-playbook.ja.md';
@@ -13,6 +14,7 @@ const root = pathResolver.rootDir();
 const ids = ['starter-concierge', 'starter-ops-librarian', 'starter-result-verifier'];
 const templates = () =>
   ids.map((id) => loadDotCharter(path.join(root, TEMPLATE_DIR, id + '.json')));
+const ORG_OPERATIONS = path.join(root, TEMPLATE_DIR, 'org-operations.json');
 
 afterEach(() => vi.unstubAllEnvs());
 
@@ -41,7 +43,7 @@ describe('inactive three-role dot team starter', () => {
 
   it('ships exactly three schema-valid drafts outside resident discovery', () => {
     expect(safeReaddir(path.join(root, TEMPLATE_DIR)).sort()).toEqual(
-      ids.map((id) => id + '.json')
+      ['org-operations', ...ids].map((id) => id + '.json')
     );
     const discovered = new Set(listDotCharterPaths(root));
     for (const charter of templates()) {
@@ -123,8 +125,8 @@ describe('inactive three-role dot team starter', () => {
     expect(new Set(responsibilities).size).toBe(5);
     const heartbeats = candidates.map((c) => c.runtime.heartbeat_id);
     expect(new Set(heartbeats).size).toBe(3);
-    for (const id of ['repo-guardian', 'org-operations']) {
-      const existing = loadDotCharter(path.join(root, 'dots', id + '.json'));
+    for (const file of [path.join(root, 'dots', 'repo-guardian.json'), ORG_OPERATIONS]) {
+      const existing = loadDotCharter(file);
       expect(existing.team?.responsibilities?.some((key) => responsibilities.includes(key))).toBe(
         false
       );
@@ -172,5 +174,67 @@ describe('inactive three-role dot team starter', () => {
     for (const link of links) {
       expect(safeExistsSync(path.resolve(root, path.dirname(GUIDE), link)), link).toBe(true);
     }
+  });
+});
+
+describe('tenant-free org-operations charter template', () => {
+  const raw = () => safeReadFile(ORG_OPERATIONS, { encoding: 'utf8' }) as string;
+  const instantiate = (tenant: string, organization: string) =>
+    validateDotCharter(
+      JSON.parse(
+        raw().replaceAll('<tenant-slug>', tenant).replaceAll('<organization-id>', organization)
+      )
+    );
+
+  it('replaces the tenant-bound live charter with an undiscovered draft', () => {
+    expect(safeExistsSync(path.join(root, 'dots', 'org-operations.json'))).toBe(false);
+    expect(listDotCharterPaths(root)).not.toContain(ORG_OPERATIONS);
+    const template = loadDotCharter(ORG_OPERATIONS);
+    expect(template.status).toBe('draft');
+    expect(template.scope).toEqual({
+      tier: 'confidential',
+      tenant_slug: '<tenant-slug>',
+      organization_id: '<organization-id>',
+    });
+  });
+
+  it('keeps the organization cadence, operator authority and no-training runtime', () => {
+    const template = loadDotCharter(ORG_OPERATIONS);
+    expect(loadAuthorityRoleIndex(root)[template.authority.authority_role]).toBeDefined();
+    expect(template.authority.authority_role).toBe('organization_operator');
+    expect(template.operations_cadence).toEqual({
+      tick_every_minutes: 15,
+      standup: { cron: '45 8 * * 1-5', timezone: 'Asia/Tokyo' },
+      retro: { cron: '0 17 * * 5', timezone: 'Asia/Tokyo' },
+    });
+    expect(template.team?.responsibilities).toEqual(['organization.operations-loop']);
+    expect(template.runtime.reasoning_training_use).toBe('no_training');
+    // Product default never sends to a tenant-specific external channel.
+    expect(template.notification.delivery_mode).toBe('inbox');
+    expect(template.notification.deliver_to).toEqual({ surface: 'surface', channel: 'inbox' });
+  });
+
+  it('instantiates for a tenant organization by replacing both placeholders', () => {
+    const charter = instantiate('acme', 'acme-ops');
+    expect(charter.scope).toEqual({
+      tier: 'confidential',
+      tenant_slug: 'acme',
+      organization_id: 'acme-ops',
+    });
+    expect(JSON.stringify(charter)).not.toMatch(/<(tenant-slug|organization-id)>/);
+    expect(charter.attention.triggers).toContainEqual({
+      kind: 'probe',
+      probe: {
+        type: 'file',
+        path: 'active/organizations/confidential/acme/acme-ops/state/organization-state.json',
+        expect: 'changed',
+      },
+    });
+  });
+
+  it('refuses to create a charter while placeholders remain', () => {
+    expect(() => createDraftDotCharter(JSON.parse(raw()), { rootDir: root, dryRun: true })).toThrow(
+      'WORKSPACE_SCOPE_UNAVAILABLE'
+    );
   });
 });

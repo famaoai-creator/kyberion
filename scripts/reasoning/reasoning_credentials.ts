@@ -99,11 +99,22 @@ async function runCredentialCommandImpl(
   print: (value: string) => void
 ): Promise<number> {
   const args = rawArgs.filter((arg) => !['--', '--json', '--quiet'].includes(arg));
-  if (ALLOCATION_ACTIONS.has(args[0] ?? '') && !hasHelpFlag(args)) {
+  // `register` stays the personal API-key registration unless it names a custody (design §7).
+  const custodyRegister =
+    args[0] === 'register' &&
+    args.some((arg) => arg === '--custody' || arg.startsWith('--custody='));
+  if (
+    (args[0] === 'register' ? custodyRegister : ALLOCATION_ACTIONS.has(args[0] ?? '')) &&
+    !hasHelpFlag(args)
+  ) {
     try {
       return await runCredentialAllocationCommand(args, print);
     } catch (error) {
       if (error instanceof ScriptExitError) throw error;
+      // Grant lifecycle refusals (revoked, past the extension grace, wrong approval)
+      // carry no secret material and name the next step; show them as-is.
+      if (error instanceof Error && error.name === 'GrantError')
+        throw new ScriptExitError(1, error.message);
       if (error instanceof Error && error.message.startsWith('[CREDENTIAL_ALLOCATION_DENIED]'))
         throw new ScriptExitError(
           1,
@@ -136,8 +147,18 @@ async function runCredentialCommandImpl(
     print(
       'Tenant allocation: assign --provider <provider> --tenant <tenant> --purpose <text> [--days 30] [--approval <id>]'
     );
+    print(
+      'Custody credential: register --custody person|tenant [--owner <tenant>] --service anthropic|claude-subscription [--label <l>] [--plan api|team|enterprise|pro|max|ultra] [--token-expires YYYY-MM-DD] [--contract-tenant <t>] [--from-file <path>] [--approval <id>] (replacing a tenant value needs owner approval)'
+    );
+    print(
+      'Lend to a tenant: assign --tenant <borrower> --credential <custody>:<owner>:<service>[:<label>] [--backends claude-cli,anthropic] [--budget-usd <n>] --purpose <text> [--approval <id>] (terms come from the registered record; --plan/--token-expires/--contract-tenant only check it; --provider <p> = person API key, legacy). A consumer token needs pnpm tenant personal-owner first.'
+    );
+    print('Usage: usage --tenant <borrower> [--month YYYY-MM]');
     print('Inspect: allocations --tenant <tenant>; check --provider <provider> --tenant <tenant>');
     print('Revoke: revoke --tenant <tenant> --grant <grant_id> --reason <text>');
+    print(
+      'Extend (same grant, owner approval): extend --tenant <tenant> --grant <grant_id> [--days 30] [--approval <id>]'
+    );
     print(
       'Task proof: probe --tenant <tenant> --provider <provider> --mission <active_mission> --model <model> --allow-paid'
     );

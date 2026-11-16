@@ -1,4 +1,5 @@
 import { metrics } from '../analysis/metrics.js';
+import { credentialUsageFields } from '../secret/credential-usage-ledger.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import { resolveProjectScope } from '../foundation/project-scope-env.js';
@@ -546,6 +547,7 @@ export function recordCliUsage(
       metrics.record(component, Date.now() - started, effectiveStatus, {
         model: entry.model || model,
         agent: options.agent ?? component,
+        ...credentialUsageFields(),
         ...(options.cause ? { cause: options.cause } : {}),
         ...(attribution
           ? {

@@ -195,6 +195,19 @@
       "not_to_confuse_with": ["tenant", "stance"]
     },
     {
+      "id": "credential-custody",
+      "term": "Credential Custody",
+      "category": "governance",
+      "definition": "Who holds a reasoning credential (person or tenant), separate from the data owner (tenant); its kind (api_key / subscription_token) decides to which borrower tenants it may be lent through a credential.use grant.",
+      "glossary_anchor": "credential-custody",
+      "canonical_doc": "knowledge/product/architecture/stance-tenant-customer-model.md",
+      "owner_modules": [
+        "libs/core/secret/credential-custody.ts",
+        "libs/core/secret/credential-allocations.ts"
+      ],
+      "not_to_confuse_with": ["tenant", "grant", "stance"]
+    },
+    {
       "id": "hearing",
       "term": "Hearing",
       "aliases": ["ヒアリング", "customer decision hearing"],
@@ -394,6 +407,17 @@
       "canonical_doc": "knowledge/product/architecture/agent-runtime-supervisor-daemon.md",
       "owner_modules": [],
       "not_to_confuse_with": ["runtime-supervisor"]
+    },
+    {
+      "id": "dot",
+      "term": "Dot",
+      "aliases": ["Resident Dot"],
+      "category": "execution",
+      "definition": "An always-on resident agent holding a standing responsibility across sessions, declared by a dot charter (goal, attention triggers, an existing authority envelope and a tier/tenant/organization scope) and driven by the agent-runtime supervisor.",
+      "glossary_anchor": "dot-resident-dot",
+      "canonical_doc": "knowledge/product/architecture/resident-dot-model.md",
+      "owner_modules": ["libs/core/dot/dot-charter.ts", "libs/core/dot/resident-dot-scope.ts"],
+      "not_to_confuse_with": ["agent-runtime-supervisor", "nhi"]
     },
     {
       "id": "co-session",

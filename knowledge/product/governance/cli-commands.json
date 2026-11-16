@@ -1444,6 +1444,18 @@
       "group": "inspect"
     },
     {
+      "id": "script.browser.approval-queue",
+      "module": "scripts/browser/approval_queue_profile_cli.ts",
+      "args": [],
+      "command": "browser approval-queue",
+      "noun": "browser",
+      "verb": "approval-queue",
+      "audience": "operator",
+      "description": "cli_cmd_script_browser_approval_queue",
+      "group": "inspect",
+      "native_help": false
+    },
+    {
       "id": "script.browser.create",
       "module": "scripts/browser/browser_profiles_cli.ts",
       "args": ["create"],

@@ -1,0 +1,41 @@
+---
+record_id: mem-MSN-AUTONOMOUS-APPROVAL-20261116-2026_11_16
+kind: pattern
+tier: public
+knowledge_domain: product
+owner_nhi: ''
+candidate_id: mem-MSN-AUTONOMOUS-APPROVAL-20261116-2026_11_16
+supersedes: ''
+superseded_by: ''
+project_id: ''
+task_session_id: ''
+specialist_id: ''
+locale: ''
+created_at: 2026-11-16T10:08:53.816Z
+source_branch: feat/autonomous-approval-queue
+source_commit: 9638c6a73928337273de43e305452608a6d4c656
+---
+
+# Delegate a signed-in browser read as one origin-bound operation
+
+A tenant charter can delegate a signed-in approval-queue read only for one HTTPS origin plus the SHA-256 of the signed profile, and a zero count is a result only while a visible empty-state marker is shown.
+
+## Applicability
+
+- mission
+- mission:MSN-AUTONOMOUS-APPROVAL-20261116
+
+## Reusable Steps
+
+1. A tenant charter can delegate a signed-in approval-queue read only for one HTTPS origin plus the SHA-256 of the signed profile, and a zero count is a result only while a visible empty-state marker is shown
+
+## Expected Outcome
+
+Delegate a signed-in browser read as one business operation, never as raw clicks. The grant names one exact HTTPS origin and the SHA-256 of the profile file bytes; the browser is confined to that single origin, and any byte change to the profile needs a new signature. Report zero pending items only while a visible empty-state marker is shown, and count only visible rows, so a mistyped selector or a hidden template cannot report an empty queue. Because the operation only reads, record a failed attempt as failed and let the next scheduled run start fresh; do not park it for a person to verify an effect that was never written. Put the failed phase, the session-free URL and the blocked host names in the error so an unattended run can be diagnosed without being repeated.
+
+## Evidence
+
+- active/missions/public/MSN-AUTONOMOUS-APPROVAL-20261116/evidence/distillation.md
+- active/missions/public/MSN-AUTONOMOUS-APPROVAL-20261116/evidence/test-report.md
+
+## Artifacts

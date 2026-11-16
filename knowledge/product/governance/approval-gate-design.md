@@ -205,7 +205,12 @@ human_only の依頼は `accountability.min_assurance`（A0〜A3）を持ち、�
     recording に書く前）、`service_recording_promotion`（promotion が review の承認を確かめる。
     `libs/core/service/service-recording-review-approval.ts`）
   - standing grant: `grant_standing`（外部とのデータ入出力を伴う capability の常設許可の付与。承認を 1 回だけ
-    消費してから記録を書く。`libs/core/governance/grant-store.ts`）
+    消費してから記録を書く。`libs/core/governance/grant-store.ts`）、`grant_extension`（同じ常設許可の
+    有効期限の延長。grant id・直前の期限・延長日数に payloadHash で結び付いた承認を 1 回だけ消費し、
+    `expires_at` だけを動かす。利用のたびに延長の連鎖ごと確かめ直す。同ファイル）
+  - credential custody: `credential_custody`（テナントの `personal_owner` の設定・解除と、登録済みのテナント資格情報の値の差し替え。
+    変更内容と値の fingerprint に payloadHash で結び付いた、持ち主本人またはテナントの owner の承認を 1 回だけ消費する。
+    `libs/core/secret/credential-custody-approval.ts`）
 - **利用できない承認の扱い**: 利用時の拒否メッセージは「この承認は再利用されない。新しい承認を依頼し、
   別の、サーバーが識別した principal に決定してもらう」と、分かる場合は再依頼の正確なコマンドを示す
   （held action の場合は held action 自体を依頼し直すよう示す）。承認済みで claim も適用もされていないレコードなら、
