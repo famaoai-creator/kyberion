@@ -467,6 +467,7 @@ export {
   buildCredentialRecord,
   CREDENTIAL_PLANS,
   CREDENTIAL_SERVICES,
+  credentialServiceBackends,
   formatCredentialRef,
   lendingFromRecord,
   parseCredentialRef,
