@@ -164,8 +164,12 @@ environment input, and the command does not create or repair identity. Follow th
 An explicitly owner-approved service allocation can allow a tenant task to use a
 registered personal API-token account through the local broker. Ownership stays
 personal; the current claim, allocation, connection and generation are checked on
-use. Saving a token alone grants nothing. Claimed personal execution without a tenant
-and GWS session collection are still separate follow-up work.
+use. Saving a token alone grants nothing. Personal claimed read-only token use additionally
+requires exact owner consent. Use `account consent-request` and `account consent-apply`
+with an existing authenticated agent workload token, then `account consent-revoke`
+for local owner withdrawal. Human decisions stay on the existing approval surface.
+See [personal consent CLI](../knowledge/product/orchestration/service-integration-guide.md#request-and-withdraw-personal-account-use-from-the-terminal).
+GWS encrypted registration remains separate from runtime activation.
 
 ### Presence Studio
 
