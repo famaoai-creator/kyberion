@@ -417,7 +417,10 @@ const PROVIDER_REQUIRED_ENV_KEYS: Readonly<Record<ProviderId, readonly string[]>
 const PROVIDER_CREDENTIAL_ENV_KEYS: Readonly<Record<ProviderId, readonly string[]>> = {
   claude: ['ANTHROPIC_API_KEY'],
   codex: ['OPENAI_API_KEY'],
-  agy: [],
+  // Antigravity CLI: Google-account sign-in is its primary auth, but a
+  // GEMINI_API_KEY env (with modelProvider "gemini" in its settings) is the
+  // documented headless/API-key path.
+  agy: ['GEMINI_API_KEY'],
   // Grok Build primarily uses OAuth via `grok login`; optional direct API key
   // still allowed through when present.
   grok: ['XAI_API_KEY'],

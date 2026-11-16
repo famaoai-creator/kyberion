@@ -16,6 +16,8 @@ import {
   currentTaskCredentialSource,
   resolveTaskCredentialKind,
 } from '../foundation/credential-binding.js';
+import { calendarDateInZone } from '../temporal/business-calendar.js';
+import { installationTimezone } from '../temporal/temporal-context.js';
 import type { CredentialLendingScope } from './credential-custody.js';
 
 /** Row stamp added by the metering funnel; empty outside a lent binding. */
@@ -70,14 +72,18 @@ const num = (value: unknown): number =>
   typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : 0;
 
 /**
- * Budget months are business months in the installation timezone, Asia/Tokyo
- * (UTC+9, no DST) — the same zone the `credential-usage-monthly` Chronos job is
- * scheduled in, so the ledger, the report, the alerts and the bind-time stop agree.
+ * Budget months are business months in the installation timezone — the OS
+ * timezone reported by Intl (temporal-context `installationTimezone`, UTC
+ * fallback) — the same zone the `credential-usage-monthly` Chronos job is
+ * scheduled in, so the ledger, the report, the alerts and the bind-time stop
+ * agree.
  */
-export const CREDENTIAL_BUDGET_TIMEZONE = 'Asia/Tokyo';
-const JST_OFFSET_MS = 9 * 60 * 60 * 1000;
-export function monthOf(date: Date): string {
-  return new Date(date.getTime() + JST_OFFSET_MS).toISOString().slice(0, 7);
+export function credentialBudgetTimezone(): string {
+  return installationTimezone();
+}
+export function monthOf(date: Date, timeZone: string = credentialBudgetTimezone()): string {
+  const { year, month } = calendarDateInZone(date, timeZone);
+  return `${year}-${String(month).padStart(2, '0')}`;
 }
 
 export function credentialUsageRows(

@@ -56,6 +56,16 @@ export interface TemporalWindow {
 const DEFAULT_DURATION_MINUTES = 30;
 const TIME_RE = /^\d{2}:\d{2}$/u;
 
+/**
+ * The installation timezone: the IANA zone the host OS reports through Intl,
+ * falling back to UTC when the runtime cannot name one. Shared so day and
+ * month boundaries agree across modules (budget months, token expiry
+ * defaults, quiet hours).
+ */
+export function installationTimezone(): string {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+}
+
 function parseDate(value: Date | string | undefined, label: string, fallback: Date): Date {
   if (value === undefined) return new Date(fallback.getTime());
   const parsed = value instanceof Date ? new Date(value.getTime()) : new Date(value);
@@ -84,8 +94,7 @@ function assertDuration(value: number): void {
 }
 
 export function resolveTemporalContext(input: TemporalContextInput = {}): TemporalContext {
-  const timezone =
-    input.timezone?.trim() || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  const timezone = input.timezone?.trim() || installationTimezone();
   assertTimezone(timezone);
   const now = parseDate(input.now, 'now', new Date());
   const duration = input.default_duration_minutes ?? DEFAULT_DURATION_MINUTES;

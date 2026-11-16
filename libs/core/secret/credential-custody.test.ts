@@ -19,6 +19,8 @@ import {
   monthOf,
   summarizeCredentialUsage,
 } from './credential-usage-ledger.js';
+import { calendarDateInZone, zonedWallTimeToInstant } from '../temporal/business-calendar.js';
+import { installationTimezone } from '../temporal/temporal-context.js';
 import { providerAuthHomeRelativePath } from '../provider/provider-auth-home.js';
 import {
   resetCredentialBudgetAlerts,
@@ -77,7 +79,7 @@ describe('credential_ref and registered record', () => {
     );
     for (const bad of [
       'system:x:anthropic',
-      'tenant:parent:openai',
+      'tenant:parent:mistral',
       'person:owner',
       'tenant:Bad:anthropic',
     ])
@@ -91,8 +93,15 @@ describe('credential_ref and registered record', () => {
     expect(key.value_fingerprint).not.toContain(VALUE);
     const pro = record('person:owner:claude-subscription', { plan: 'pro' });
     expect(pro).toMatchObject({ kind: 'subscription_token', terms: 'consumer' });
-    expect(pro.token_expires_at).toBe('2027-11-15T15:00:00.000Z'); // Asia/Tokyo business day + 365;
-    expect(subscriptionTokenDaysLeft(pro, NOW)).toBe(364);
+    // Default expiry = local midnight in the installation timezone + 365 days.
+    const tz = installationTimezone();
+    const expectedExpiry = new Date(
+      zonedWallTimeToInstant(calendarDateInZone(NOW, tz), '00:00', tz).getTime() + 365 * 86_400_000
+    ).toISOString();
+    expect(pro.token_expires_at).toBe(expectedExpiry);
+    expect(subscriptionTokenDaysLeft(pro, NOW)).toBe(
+      Math.floor((Date.parse(expectedExpiry) - NOW.getTime()) / 86_400_000)
+    );
     expect(record('person:owner:claude-subscription', { plan: 'team' }).terms).toBe('commercial');
     expect(() => record('person:owner:claude-subscription')).toThrow(/CREDENTIAL_PLAN_INVALID/);
     expect(() =>
@@ -251,9 +260,16 @@ describe('usage ledger and budget (design §6, review S4)', () => {
   });
   const lending = lendingFromRecord(record('tenant:parent:anthropic'), { budgetMonthlyUsd: 100 });
 
-  it('uses Asia/Tokyo business months', () => {
-    expect(monthOf(new Date('2026-11-30T15:30:00Z'))).toBe('2026-12');
-    expect(monthOf(new Date('2026-11-30T14:59:00Z'))).toBe('2026-11');
+  it('uses installation-timezone calendar months', () => {
+    // Zone pinned to Asia/Tokyo: the instant crosses the month boundary there.
+    expect(monthOf(new Date('2026-11-30T15:30:00Z'), 'Asia/Tokyo')).toBe('2026-12');
+    expect(monthOf(new Date('2026-11-30T14:59:00Z'), 'Asia/Tokyo')).toBe('2026-11');
+    // The default follows the OS-reported installation timezone.
+    const tz = installationTimezone();
+    for (const at of ['2026-11-30T15:30:00Z', '2026-11-30T14:59:00Z']) {
+      const { year, month } = calendarDateInZone(new Date(at), tz);
+      expect(monthOf(new Date(at))).toBe(`${year}-${String(month).padStart(2, '0')}`);
+    }
   });
 
   it('summarizes per borrower, credential and month, ignoring unstamped and other-month rows', () => {
