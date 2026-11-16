@@ -1,13 +1,15 @@
 ---
 title: 保存先カタログと許可証による権限判定（tier-guard の再設計）
 kind: design
-status: planned
-last_updated: 2026-11-08
+status: partial
+last_updated: 2026-11-15
 tags: [design, tier-guard, secure-io, scope, custody, grant, storage, governance]
 importance: 8
 ---
 
 # 保存先カタログと許可証による権限判定（tier-guard の再設計）
+
+> 実施状況（2026-11-15 確認）：G0〜G2 は実施済み。残件は `concierge_management_writer` の許可証化のみ（grant 宣言への祖先 mkdir/coverage 移管、`${KYBERION_ORGANIZATION_ID}` の許可証スコープ展開、下流の assumed role/persona 属性移行の 3 ブロッカーが前提）。横断読みロール 3 件は P4 の判断で意図的に残置。詳細は「G3 の残りの段階」以降の記録を参照。
 
 基準は `2702273f`（2026-11-05 の `origin/main`）と `refactor/core-package-split`。
 [情報資産のスコープモデル](./INFORMATION_ASSET_SCOPE_MODEL_DESIGN_2026-11-05.ja.md)
