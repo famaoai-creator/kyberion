@@ -1868,11 +1868,11 @@ function loadContentRecorder() {
   const start = source.indexOf('function record(event, dedupeKey)');
   const end = source.indexOf('async function sha256');
   if (start < 0 || end < 0) throw new Error('record block not found in content.js');
-  const sent: any[] = [];
+  const sent: Array<{ type: string; event: { target: { snapshot_hash: unknown } } }> = [];
   const env = {
     chrome: {
       runtime: {
-        sendMessage: (message: any) => {
+        sendMessage: (message: { type: string; event: { target: { snapshot_hash: unknown } } }) => {
           sent.push(message);
           return Promise.resolve();
         },
