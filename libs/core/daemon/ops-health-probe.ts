@@ -374,7 +374,10 @@ export function runOpsHealthProbe(deps: OpsHealthProbeDeps = {}): OpsHealthProbe
     ...probeStaleCompactionCopies(deps),
   ];
   const findingsPath = repoFile(deps.rootDir, OPS_FINDINGS_PATH);
-  safeMkdir(path.dirname(findingsPath), { recursive: true });
+  // Create the directory only when missing: a writer granted just the
+  // findings file (chronos_gateway) may not mkdir the observability root.
+  if (!safeExistsSync(path.dirname(findingsPath)))
+    safeMkdir(path.dirname(findingsPath), { recursive: true });
   // Dedupe findings rows by finding_id: the file is append-only and the probe
   // reruns daily, so the same defect would otherwise produce a new identical
   // row each run and drown the signal.

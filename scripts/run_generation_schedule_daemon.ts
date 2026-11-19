@@ -6,6 +6,7 @@ import { recordRuntimeHealthSample } from '@agent/core/tool/runtime-health-histo
 import { sendOpsAlert } from '@agent/core/ops-alert';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { getRegisteredEnvText } from '@agent/core/foundation';
+import { tryInspectCompilerOutputs } from '@agent/core/build-coordination';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import {
   awaitChildWithDeadline,
@@ -52,20 +53,48 @@ let shuttingDown = false;
  * exiting on one bad tick was itself an unobserved outage.
  */
 async function runTick(): Promise<void> {
+  // stderr is piped (and mirrored to ours) so a failure can say why; stdout
+  // stays inherited for the launchd log.
   const child = spawn(process.execPath, [SCHEDULE_TICK_ENTRY, '--action', 'tick'], {
     cwd: ROOT_DIR,
     env: process.env,
-    stdio: 'inherit',
+    stdio: ['inherit', 'inherit', 'pipe'],
   });
   currentChild = child;
+  let stderrTail = '';
+  child.stderr?.on('data', (chunk: Buffer) => {
+    process.stderr.write(chunk);
+    stderrTail = (stderrTail + chunk.toString('utf8')).slice(-STDERR_TAIL_CHARS);
+  });
   try {
     await awaitChildWithDeadline(child, {
       label: 'generation schedule daemon tick',
       deadlineMs: TICK_DEADLINE_MS,
     });
+  } catch (err) {
+    if (err instanceof Error && stderrTail.trim()) {
+      (err as Error & { stderrTail?: string }).stderrTail = stderrTail.trim();
+    }
+    throw err;
   } finally {
     currentChild = null;
   }
+}
+
+/** Last characters of the tick child's stderr kept for the alert. */
+const STDERR_TAIL_CHARS = 1200;
+
+/**
+ * The tick entry lives in dist/. While `pnpm build` rewrites dist the module
+ * is briefly missing — an expected, self-healing condition, not a tick bug.
+ */
+export function isDistRebuildFailure(stderrTail: string | undefined): boolean {
+  return /Cannot find module '[^']*[\\/]dist[\\/]/.test(stderrTail ?? '');
+}
+
+async function compilerOutputsIdle(): Promise<boolean> {
+  const inspection = await tryInspectCompilerOutputs(async () => true);
+  return 'value' in inspection;
 }
 
 export interface TickReportDeps {
@@ -73,6 +102,8 @@ export interface TickReportDeps {
   isShuttingDown: () => boolean;
   recordHeartbeat: typeof recordDaemonHeartbeat;
   sendAlert: typeof sendOpsAlert;
+  /** False while a build holds the compiler outputs; the tick then waits. */
+  compilerOutputsIdle?: () => Promise<boolean>;
 }
 
 export async function runTickAndReport(
@@ -81,18 +112,37 @@ export async function runTickAndReport(
     isShuttingDown: () => shuttingDown,
     recordHeartbeat: recordDaemonHeartbeat,
     sendAlert: sendOpsAlert,
+    compilerOutputsIdle,
   }
 ): Promise<void> {
+  if (deps.compilerOutputsIdle && !(await deps.compilerOutputsIdle())) {
+    // A build owns dist/: the tick entry may be missing mid-rewrite. Skip this
+    // tick (heartbeat stays fresh) instead of failing it.
+    deps.recordHeartbeat(DAEMON_ID, { status: 'running', details: { phase: 'deferred_build' } });
+    logger.debug(
+      '[generation-schedule-daemon] compiler outputs busy — tick deferred | next: next tick | evidence: compiler-outputs'
+    );
+    return;
+  }
   deps.recordHeartbeat(DAEMON_ID, { status: 'running', details: { phase: 'tick' } });
   try {
     await deps.runTick();
   } catch (err: any) {
     const message = err?.message ?? String(err);
+    const stderrTail: string | undefined = err?.stderrTail;
     if (deps.isShuttingDown()) {
       // The shutdown forwarded SIGTERM/SIGINT to this child: an expected
       // cancellation — no error heartbeat, no ops alert (a deploy mid-tick
       // must not page anyone). The stopping heartbeat follows from shutdown.
       logger.info(`[generation-schedule-daemon] tick cancelled by shutdown: ${message}`);
+      return;
+    }
+    if (isDistRebuildFailure(stderrTail)) {
+      // A build started after the idle check and removed the entry mid-spawn.
+      logger.warn(
+        `[generation-schedule-daemon] tick skipped — dist/ is being rebuilt | next: next tick retries | evidence: ${message}`
+      );
+      deps.recordHeartbeat(DAEMON_ID, { status: 'running', details: { phase: 'deferred_build' } });
       return;
     }
     const timedOut = err instanceof ChildDeadlineError;
@@ -104,6 +154,7 @@ export async function runTickAndReport(
       context: {
         daemon_id: DAEMON_ID,
         error: message,
+        ...(stderrTail ? { stderr_tail: stderrTail } : {}),
         ...(timedOut ? { deadline_ms: TICK_DEADLINE_MS } : {}),
       },
       recommendation: timedOut

@@ -177,7 +177,7 @@ Use when you want:
 
 - conversational interaction
 - hands-free or voice interaction
-- 会議の録音 → 自動議事録(「会議を記録」ボタン / `pnpm minutes:record --mission <ID>`)
+- 会議の録音 → 自動議事録(「会議を記録」ボタン / `pnpm minutes:record --mission <ID>`、`--mission` 省略時は会議ミッションを自動作成)
 - browser assistance
 - live task detail and artifact access
 - immediate project bootstrap context

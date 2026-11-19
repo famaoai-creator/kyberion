@@ -1440,6 +1440,12 @@ export interface EnforcementRowView {
   /** Number when finite; null when present but not a finite number; undefined when absent. */
   readonly cost_usd?: number | null;
   readonly cost_status?: UsageCostStatus;
+  /**
+   * Provider-reported or registry-priced reference cost when the billable cost
+   * is unknown (e.g. a CLI whose billing mode is not recorded). Caps may count
+   * it as an upper-bound estimate instead of treating the cost as missing.
+   */
+  readonly reference_cost_usd?: number;
   readonly usage?: Readonly<{
     prompt_tokens: number;
     completion_tokens: number;
@@ -1489,6 +1495,9 @@ export function projectEnforcementRow(row: unknown): EnforcementRowView {
   return Object.freeze({
     ...(typeof r.timestamp === 'string' ? { timestamp: r.timestamp } : {}),
     ...(!hasCostEvidence ? {} : { cost_usd: cost, cost_status: resolved.cost_status }),
+    ...(hasCostEvidence && resolved.reference_cost_usd !== undefined
+      ? { reference_cost_usd: resolved.reference_cost_usd }
+      : {}),
     ...(u
       ? {
           usage: Object.freeze({

@@ -15,6 +15,7 @@ import {
   readDotMemory,
   writeDotMemory,
   DOT_MEMORY_PROMPT_BUDGET,
+  DOT_MEMORY_PROMPT_OPEN_HYPOTHESES_MAX,
   type DotMemoryOp,
 } from './dot-memory.js';
 import { DOT_MEMORY_DISTILL_FILE, dotStatePath } from './dot-state-paths.js';
@@ -173,6 +174,65 @@ describe('dot memory ops', () => {
     const lines = dotMemoryPromptLines(CHARTER, ctx);
     expect(lines.join('\n').length).toBeLessThanOrEqual(DOT_MEMORY_PROMPT_BUDGET + 10);
     expect(lines[1]).toContain('open thing');
+  });
+});
+
+describe('dot memory hygiene', () => {
+  it('accepts dismissed as a hypothesis resolution', () => {
+    expect(parseDotMemoryOp({ op: 'resolve_hypothesis', id: 'h-1', status: 'dismissed' })).toEqual({
+      ok: true,
+      value: { op: 'resolve_hypothesis', id: 'h-1', status: 'dismissed' },
+    });
+    const { doc } = applyDotMemoryOps(
+      emptyDotMemory('d', NOW),
+      [
+        { op: 'add_hypothesis', text: 'stale idea' },
+        { op: 'resolve_hypothesis', id: 'h-1', status: 'dismissed' },
+      ],
+      NOW,
+      8192
+    );
+    expect(doc.hypotheses[0]).toMatchObject({ id: 'h-1', status: 'dismissed' });
+  });
+
+  it('caps open hypotheses in the prompt to the newest, with an omitted count', () => {
+    const ops: DotMemoryOp[] = [];
+    for (let i = 1; i <= 10; i++) ops.push({ op: 'add_hypothesis', text: `hyp-${i}` });
+    dotUpdateMemoryTool.apply(CHARTER, ops, ctx);
+    dotUpdateMemoryTool.apply(
+      CHARTER,
+      [{ op: 'resolve_hypothesis', id: 'h-10', status: 'dismissed' }],
+      ctx
+    );
+    const text = dotMemoryPromptLines(CHARTER, ctx).join('\n');
+    const shown = text.match(/hyp-\d+/g) ?? [];
+    expect(shown).toHaveLength(DOT_MEMORY_PROMPT_OPEN_HYPOTHESES_MAX);
+    expect(shown[0]).toBe('hyp-9');
+    expect(text).not.toContain('hyp-10');
+    expect(text).not.toMatch(/hyp-1(?!\d)/);
+    expect(text).toContain('(1 older open hypotheses omitted');
+  });
+
+  it('never distills dismissed hypotheses', async () => {
+    const recorded: unknown[] = [];
+    dotUpdateMemoryTool.apply(
+      CHARTER,
+      [
+        { op: 'add_hypothesis', text: 'moot' },
+        { op: 'resolve_hypothesis', id: 'h-1', status: 'dismissed' },
+      ],
+      ctx
+    );
+    expect(
+      await distillDotMemory(CHARTER, {
+        ...ctx,
+        recordFeedback: async (input: unknown) => {
+          recorded.push(input);
+          return {};
+        },
+      })
+    ).toBeUndefined();
+    expect(recorded).toHaveLength(0);
   });
 });
 

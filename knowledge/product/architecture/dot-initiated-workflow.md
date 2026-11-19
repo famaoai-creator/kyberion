@@ -109,6 +109,12 @@ Mission proposals flow through the evidence ladder, not direct execution:
   trusting integration results. Daemons run the bundle, not source.
 - A running supervisor executes the bundle it started with — merged code
   reaches the daemon via the `stale_code` heartbeat → governed restart path,
-  not by editing source.
+  not by editing source. Under launchd/systemd the daemon recycles itself:
+  once the core dist stamp is unchanged across two checks taken under the
+  compiler-outputs lock, and no sweep, mutating IPC request, busy runtime or delegated worker
+  is in flight, it closes admission to new mutating requests, drains and exits 75 so the service manager respawns it
+  (at most once per 15 min, tracked in the heartbeat's `last_self_recycle_at`;
+  `KYBERION_AGENT_RUNTIME_SUPERVISOR_STALE_CODE_RECYCLE=0` disables). A
+  foreground run only warns.
 - Filed test items are consumed by the live daemon's next sweep — race it by
   filing and invoking `runDotExecutorStep` in one process.

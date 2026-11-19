@@ -7,7 +7,7 @@
   "mission_cap_usd": 20,
   "tenant_overrides": {},
   "org_budget": {
-    "daily_token_cap": 3000000,
+    "daily_token_cap": 5000000,
     "soft_ratio": 0.8,
     "hard_ratio": 1.0,
     "tenant_overrides": {},

@@ -27,18 +27,10 @@ import {
   spawnDelegatedTaskWorkerProcess,
 } from '@agent/core/delegated-task-observability';
 import { appendSupervisorEvent } from '@agent/core/agent/agent-runtime-events';
-import {
-  listDaemonHeartbeatStatuses,
-  readDaemonHeartbeat,
-  recordDaemonHeartbeat,
-} from '@agent/core/daemon-heartbeat';
+import { readDaemonHeartbeat, recordDaemonHeartbeat } from '@agent/core/daemon-heartbeat';
 import { runtimeSupervisor } from '@agent/core/tool/runtime-supervisor';
 import { sendOpsAlert } from '@agent/core/ops-alert';
-import {
-  computeSupervisorCodeStamp,
-  normalizeSupervisorResponse,
-  normalizeSupervisorResult,
-} from '@agent/core/agent/agent-runtime-supervisor-client';
+import { computeSupervisorCodeStamp } from '@agent/core/agent/agent-runtime-supervisor-client';
 import { getRegisteredEnvText, parseSafeJsonInput, setRegisteredEnv } from '@agent/core/foundation';
 import { withExecutionContext } from '@agent/core/authority';
 import { createTriggerRunner, resolveCurrentTriggerAuthority } from '@agent/core/trigger-runner';
@@ -95,6 +87,32 @@ import {
 export { resolveInflightLimit } from './agent_runtime_supervisor_daemon.capacity.js';
 export { readDaemonLockTextFile } from './agent_runtime_supervisor_daemon.capacity.js';
 import { DaemonExit, acquireDaemonLockOrThrow } from './daemon-lock-takeover.js';
+import {
+  markDeadPidHeartbeats,
+  probeDaemonHealth,
+  type ListenTarget,
+} from './agent_runtime_supervisor_daemon.liveness.js';
+import {
+  adoptLastSelfRecycleAt,
+  isStaleCodeSelfRecycling,
+  resetStaleCodeRecycleStateForTests,
+  runStaleCodeSelfRecycleCheck,
+  selfRecycleHeartbeatDetails,
+  staleCodeHeartbeatDetails,
+  type StaleCodeRecycleDecision,
+  type StaleCodeSelfRecycleDeps,
+} from './agent_runtime_supervisor_daemon.stale-code-recycle.js';
+export {
+  STALE_CODE_RECYCLE_EXIT_CODE,
+  STALE_CODE_RECYCLE_MIN_INTERVAL_MS,
+  decideStaleCodeRecycle,
+  detectSupervisingServiceManager,
+  staleCodeSelfRecycleEnabled,
+  type StaleCodeRecycleDecision,
+  type StaleCodeRecycleInput,
+  type StaleCodeSelfRecycleDeps,
+  type SupervisingServiceManager,
+} from './agent_runtime_supervisor_daemon.stale-code-recycle.js';
 import { logger } from '@agent/core/core';
 import { pathResolver, rootDir } from '@agent/core/path-resolver';
 import {
@@ -203,6 +221,8 @@ const AGENT_LIMIT = resolveInflightLimit(
 );
 
 let daemonGlobalInflight = 0;
+/** Includes runtime creation before the runtime is visible in supervisor snapshots. */
+let daemonMutatingRequestsInflight = 0;
 const daemonAgentInflightMap = new Map<string, number>();
 const delegatedWorkerStarts = new Map<string, Promise<{ resourceId: string; pid?: number }>>();
 const delegatedWorkerRestartCounts = new Map<string, number>();
@@ -290,13 +310,10 @@ let dotSweepInFlight = false;
 export const DOT_BACKEND_RESELECT_INTERVAL_MS = 30 * 60 * 1000;
 /** Minimum spacing of failure-driven reselects (all wakes failed on the backend). */
 const DOT_BACKEND_FAILURE_RESELECT_MIN_MS = 5 * 60 * 1000;
-/** Stale-code drift is warned at most this often. */
-const STALE_CODE_WARN_INTERVAL_MS = 60 * 60 * 1000;
 
 let lastDotCharterErrors: DotCharterLoadError[] = [];
 const warnedDotCharterErrors = new Set<string>();
 let lastFailureReselectAt = 0;
-let lastStaleCodeWarnAt = 0;
 const supervisorReasoningRefresh = createSupervisorReasoningRefresh({
   inspect: credentialBindingReadiness,
   install: installReasoningBackends,
@@ -324,14 +341,6 @@ export interface DotSweepDeps {
 
 /** Heartbeat details for the daemon: charter load errors and code-stamp drift. */
 export function dotSupervisorHeartbeatDetails(nowMs: number = Date.now()): Record<string, unknown> {
-  const currentStamp = computeSupervisorCodeStamp();
-  const stale = currentStamp !== 0 && DAEMON_CODE_STAMP !== 0 && currentStamp !== DAEMON_CODE_STAMP;
-  if (stale && nowMs - lastStaleCodeWarnAt >= STALE_CODE_WARN_INTERVAL_MS) {
-    lastStaleCodeWarnAt = nowMs;
-    logger.warn(
-      `[dot-sweep] supervisor runs stale code — core dist changed since start (${DAEMON_CODE_STAMP} → ${currentStamp}) | next: restart the agent-runtime supervisor daemon to load the new build | evidence: libs/core/dist/index.js`
-    );
-  }
   return {
     reasoning_backend: supervisorReasoningRefresh.snapshot(),
     ...(lastDotCharterErrors.length
@@ -342,7 +351,7 @@ export function dotSupervisorHeartbeatDetails(nowMs: number = Date.now()): Recor
           })),
         }
       : {}),
-    ...(stale ? { stale_code: true, code_stamp: DAEMON_CODE_STAMP, dist_stamp: currentStamp } : {}),
+    ...staleCodeHeartbeatDetails(DAEMON_CODE_STAMP, nowMs),
   };
 }
 
@@ -351,29 +360,60 @@ export function resetDotSweepStateForTests(): void {
   lastDotCharterErrors = [];
   warnedDotCharterErrors.clear();
   lastFailureReselectAt = 0;
-  lastStaleCodeWarnAt = 0;
   dotSweepInFlight = false;
   supervisorReasoningRefresh.reset();
+  resetStaleCodeRecycleStateForTests();
+}
+
+/** One stale-code self-recycle check against this daemon's in-flight state. */
+export function maybeSelfRecycleOnStaleCode(
+  deps: StaleCodeSelfRecycleDeps = {}
+): Promise<StaleCodeRecycleDecision> {
+  return runStaleCodeSelfRecycleCheck(
+    {
+      loadedStamp: DAEMON_CODE_STAMP,
+      dotSweepInFlight: () => dotSweepInFlight,
+      inflightAsks: () => daemonMutatingRequestsInflight,
+      pendingDelegatedWorkerStarts: () => delegatedWorkerStarts.size,
+      stopDelegatedWorkers: () => {
+        delegatedWorkerShutdown = true;
+      },
+      requestShutdown: (exitCode) => requestShutdown?.(exitCode),
+    },
+    deps
+  );
+}
+
+/**
+ * True when no build owns the compiler outputs right now. The lock is held
+ * only for this check — never across a wake, whose tool loop can run for the
+ * charter's whole wall-clock budget and would otherwise block `pnpm build`
+ * for that long. A build that starts mid-wake is caught by the next check
+ * (no further wakes this sweep) and by the stale-code heartbeat.
+ */
+async function compilerOutputsIdle(): Promise<boolean> {
+  const inspection = await tryInspectCompilerOutputs(async () => true);
+  return 'value' in inspection;
 }
 
 export async function runDotSweepOnce(
   now: Date = new Date(),
   deps: DotSweepDeps = {}
 ): Promise<number> {
-  const inspection = await tryInspectCompilerOutputs(() => runDotSweepWithStableOutputs(now, deps));
-  if (!('value' in inspection)) {
+  if (!(await compilerOutputsIdle())) {
     logger.debug(
       '[dot-sweep] compiler outputs busy — sweep deferred until build completes | next: retry next sweep | evidence: compiler-outputs'
     );
     return 0;
   }
-  return inspection.value;
+  return runDotSweepWithStableOutputs(now, deps);
 }
 
 async function runDotSweepWithStableOutputs(now: Date, deps: DotSweepDeps): Promise<number> {
   // One sweep at a time: a slow wake (up to the charter's wall-clock budget)
-  // must not let the next tick pile a second sweep on top.
-  if (dotSweepInFlight) return 0;
+  // must not let the next tick pile a second sweep on top. A committed
+  // stale-code self-recycle starts no further sweeps.
+  if (dotSweepInFlight || isStaleCodeSelfRecycling()) return 0;
   dotSweepInFlight = true;
   try {
     const charterErrors: DotCharterLoadError[] = [];
@@ -457,6 +497,14 @@ async function runDotSweepWithStableOutputs(now: Date, deps: DotSweepDeps): Prom
     // housekeeping and before wakes; each step is isolated.
     await runDotSupervisorExtensions(now, active);
     for (const loaded of active) {
+      // A build that started since the last check owns the outputs: leave the
+      // remaining dots (and their triggers) for the next sweep.
+      if (!(await compilerOutputsIdle())) {
+        logger.debug(
+          `[dot-sweep] compiler outputs busy — remaining wakes deferred from ${loaded.charter.dot_id} | next: retry next sweep | evidence: compiler-outputs`
+        );
+        break;
+      }
       // Budget-capped dots skip before the runner layer so a pending trigger
       // doesn't burn a warn + 'failed' receipt every tick — but they still
       // heartbeat, or the watchdog would page a dot that is healthy-but-capped.
@@ -669,9 +717,6 @@ export interface AgentRuntimeSupervisorDaemonInstance {
   lockPath: string;
   cleanup: () => void;
 }
-
-type TcpListenTarget = { host: string; port: number };
-type ListenTarget = string | TcpListenTarget;
 
 function readTaskModelHint(value: unknown): TaskModelHint | undefined {
   if (!value || typeof value !== 'object') return undefined;
@@ -923,7 +968,30 @@ function watchDelegatedTaskWorkerProcess(
   });
 }
 
-async function handleRequest(
+export async function handleRequest(
+  request: SupervisorRequest,
+  socketLabel: string
+): Promise<SupervisorResponse> {
+  const mutating = !['health', 'status', 'list'].includes(request.method);
+  // Admission and accounting are synchronous with the recycle commit. Existing
+  // calls finish before recycling; no new work can enter while drain awaits.
+  if (mutating && isStaleCodeSelfRecycling()) {
+    return {
+      id: request.id,
+      ok: false,
+      error: 'Supervisor is restarting onto a new build; retry the request.',
+      errorDetail: { type: 'busy', retry_after_ms: 1000 },
+    };
+  }
+  if (mutating) daemonMutatingRequestsInflight += 1;
+  try {
+    return await dispatchRequest(request, socketLabel);
+  } finally {
+    if (mutating) daemonMutatingRequestsInflight -= 1;
+  }
+}
+
+async function dispatchRequest(
   request: SupervisorRequest,
   socketLabel: string
 ): Promise<SupervisorResponse> {
@@ -1219,90 +1287,6 @@ async function handleRequest(
   }
 }
 
-async function probeDaemonHealth(target: ListenTarget, timeoutMs = 1000): Promise<boolean> {
-  return new Promise((resolve) => {
-    const socket =
-      typeof target === 'string'
-        ? net.createConnection(target)
-        : net.createConnection({ host: target.host, port: target.port });
-    let settled = false;
-    const done = (value: boolean) => {
-      if (settled) return;
-      settled = true;
-      socket.destroy();
-      resolve(value);
-    };
-    socket.setTimeout(timeoutMs);
-    socket.once('connect', () => {
-      socket.write(
-        `${JSON.stringify({
-          id: 'health-probe',
-          method: 'health',
-          ...(registeredEnv('KYBERION_AGENT_RUNTIME_SUPERVISOR_TOKEN')
-            ? { auth_token: registeredEnv('KYBERION_AGENT_RUNTIME_SUPERVISOR_TOKEN') }
-            : {}),
-        })}\n`
-      );
-    });
-    socket.on('data', (chunk) => {
-      const line = String(chunk).trim();
-      if (!line) return done(false);
-      try {
-        const response = normalizeSupervisorResponse<unknown>(
-          parseSafeJsonInput(line, 'agent runtime supervisor response')
-        );
-        if (!response.ok) return done(false);
-        normalizeSupervisorResult('health', response.result);
-        done(true);
-      } catch {
-        done(false);
-      }
-    });
-    socket.once('timeout', () => done(false));
-    socket.once('error', () => done(false));
-  });
-}
-
-/**
- * Rewrite heartbeat files that still claim `running`/`starting` for a
- * verifiably dead pid. A daemon that exits without its shutdown path leaves a
- * 'running' heartbeat behind, and stale state like that is how the supervisor
- * looked alive for days after `process_exit`. Only ESRCH counts as dead —
- * EPERM is uninspectable and the record is left alone (fail closed).
- */
-function markDeadPidHeartbeats(): void {
-  try {
-    for (const status of listDaemonHeartbeatStatuses()) {
-      const heartbeat = status.heartbeat;
-      if (!heartbeat || (heartbeat.status !== 'running' && heartbeat.status !== 'starting'))
-        continue;
-      if (heartbeat.pid === process.pid) continue;
-      try {
-        process.kill(heartbeat.pid, 0);
-        continue; // alive
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException | undefined)?.code !== 'ESRCH') continue; // EPERM → cannot prove death
-      }
-      recordDaemonHeartbeat(heartbeat.daemon_id, {
-        pid: heartbeat.pid,
-        status: 'stopping',
-        details: {
-          ...(heartbeat.details ?? {}),
-          stopped_reason: 'process_exit_detected',
-          observed_by: 'agent-runtime-supervisor-daemon',
-        },
-      });
-      logger.info(
-        `[agent-runtime-supervisor-daemon] heartbeat for ${heartbeat.daemon_id} marked stopping — pid ${heartbeat.pid} is gone | next: watchdog or launcher may restart it | evidence: runtime/heartbeats/${heartbeat.daemon_id}.json`
-      );
-    }
-  } catch (error) {
-    logger.warn(
-      `[agent-runtime-supervisor-daemon] dead-pid heartbeat sweep failed — ${error instanceof Error ? error.message : error} | next: heartbeats keep their own values; watchdog staleness still applies`
-    );
-  }
-}
-
 export async function startAgentRuntimeSupervisorDaemon(
   options: AgentRuntimeSupervisorDaemonOptions = {}
 ): Promise<AgentRuntimeSupervisorDaemonInstance> {
@@ -1334,8 +1318,10 @@ export async function startAgentRuntimeSupervisorDaemon(
   // the only evidence of whether the lock holder is really a live supervisor:
   // a live holder keeps refreshing its own pid here.
   const priorHeartbeat = readDaemonHeartbeat('agent-runtime-supervisor-daemon');
+  const carriedDetails = adoptLastSelfRecycleAt(priorHeartbeat.heartbeat?.details);
   recordDaemonHeartbeat('agent-runtime-supervisor-daemon', {
     status: 'starting',
+    ...(carriedDetails ? { details: carriedDetails } : {}),
   });
   const lockPath = resolveLockPath(options);
   ensureSocketDir(socketPath, transport, lockPath);
@@ -1504,7 +1490,11 @@ export async function startAgentRuntimeSupervisorDaemon(
         });
         recordDaemonHeartbeat('agent-runtime-supervisor-daemon', {
           status: 'running',
-          details: { socket_path: socketLabel || socketPath, transport },
+          details: {
+            socket_path: socketLabel || socketPath,
+            transport,
+            ...selfRecycleHeartbeatDetails(),
+          },
         });
         logger.info(`[agent-runtime-supervisor-daemon] listening on ${socketLabel || socketPath}`);
       } catch (error) {
@@ -1538,7 +1528,10 @@ export async function startAgentRuntimeSupervisorDaemon(
     });
     recordDaemonHeartbeat('agent-runtime-supervisor-daemon', {
       status: 'stopping',
-      details: { reason: 'process_exit' },
+      details: {
+        reason: isStaleCodeSelfRecycling() ? 'stale_code_self_recycle' : 'process_exit',
+        ...selfRecycleHeartbeatDetails(),
+      },
     });
     // Do not unlink the pathname here. A stale daemon can still receive a
     // signal after a newer daemon has rebound the same path; unlinking from
@@ -1601,6 +1594,12 @@ async function main(_args: string[] = []) {
     recordDaemonHeartbeat('agent-runtime-supervisor-daemon', {
       status: 'running',
       details: dotSupervisorHeartbeatDetails(),
+    });
+    // Runs after the heartbeat so a recycle's 'stopping' record is the last word.
+    void maybeSelfRecycleOnStaleCode().catch((error) => {
+      logger.warn(
+        `[agent-runtime-supervisor-daemon] stale-code self-recycle check failed — ${error instanceof Error ? error.message : error} | next: restart the daemon by hand if stale_code persists | evidence: heartbeats/agent-runtime-supervisor-daemon.json`
+      );
     });
   }, 30_000).unref?.();
   // Resident-dot multiplex: evaluate active charters' triggers each sweep.

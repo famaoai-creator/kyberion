@@ -122,7 +122,12 @@ export interface MissionControllerRoutingContext {
   ) => Awaitable<unknown>;
   delegateMission: (id: string, agentId: string, a2aMessageId: string) => Awaitable<void>;
   importMission: (id: string, remoteUrl: string) => Awaitable<void>;
-  verifyMission: (id: string, result: 'verified' | 'rejected', note: string) => Awaitable<void>;
+  verifyMission: (
+    id: string,
+    result: 'verified' | 'rejected',
+    note: string,
+    allowOpenTasks?: string
+  ) => Awaitable<void>;
   distillMission: (id: string) => Awaitable<void>;
   dispatchMissionTickets: (
     id: string,
@@ -222,7 +227,7 @@ export interface MissionControllerRoutingContext {
     actorType?: 'agent' | 'human' | 'service',
     provider?: string,
     taskBinding?: TaskEvidenceBinding
-  ) => Awaitable<void>;
+  ) => Awaitable<unknown>;
   recordArtifactReview: (
     missionId: string,
     reviewTaskId: string,

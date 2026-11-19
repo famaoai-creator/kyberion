@@ -4,6 +4,7 @@ import { safeReadFile } from '@agent/core/secure-io';
 import {
   resolveTickDeadlineMs,
   runTickAndReport,
+  isDistRebuildFailure,
   type TickReportDeps,
 } from './run_generation_schedule_daemon.js';
 
@@ -75,5 +76,73 @@ describe('runTickAndReport (G10 review)', () => {
     expect(d.sendAlert).toHaveBeenCalledWith(
       expect.objectContaining({ dedupe_key: 'generation-schedule-daemon:tick-failed' })
     );
+  });
+});
+
+describe('runTickAndReport build awareness (2026-11-19)', () => {
+  const base = () => ({
+    isShuttingDown: () => false,
+    recordHeartbeat: vi.fn<TickReportDeps['recordHeartbeat']>(),
+    sendAlert: vi.fn<TickReportDeps['sendAlert']>(),
+  });
+
+  it('defers the tick while a build holds the compiler outputs', async () => {
+    const d = { ...base(), runTick: vi.fn(async () => {}), compilerOutputsIdle: async () => false };
+    await runTickAndReport(d);
+    expect(d.runTick).not.toHaveBeenCalled();
+    expect(d.sendAlert).not.toHaveBeenCalled();
+    expect(d.recordHeartbeat.mock.calls[0][1]).toMatchObject({
+      status: 'running',
+      details: { phase: 'deferred_build' },
+    });
+  });
+
+  it('treats a missing dist module (build raced the spawn) as a skip, not a failure', async () => {
+    const err = Object.assign(
+      new Error('generation schedule daemon tick failed with exit code 1'),
+      {
+        stderrTail: "Error: Cannot find module '/repo/dist/scripts/run_generation_schedule.js'",
+      }
+    );
+    const d = {
+      ...base(),
+      runTick: vi.fn(async () => {
+        throw err;
+      }),
+      compilerOutputsIdle: async () => true,
+    };
+    await runTickAndReport(d);
+    expect(d.sendAlert).not.toHaveBeenCalled();
+    expect(d.recordHeartbeat.mock.calls.map((c) => c[1]?.status)).toEqual(['running', 'running']);
+  });
+
+  it('puts the child stderr tail into the alert for other failures', async () => {
+    const err = Object.assign(
+      new Error('generation schedule daemon tick failed with exit code 1'),
+      {
+        stderrTail: 'TypeError: registry.schedules is not iterable',
+      }
+    );
+    const d = {
+      ...base(),
+      runTick: vi.fn(async () => {
+        throw err;
+      }),
+      compilerOutputsIdle: async () => true,
+    };
+    await runTickAndReport(d);
+    expect(d.sendAlert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        context: expect.objectContaining({
+          stderr_tail: 'TypeError: registry.schedules is not iterable',
+        }),
+      })
+    );
+  });
+
+  it('recognises only dist module misses as rebuild races', () => {
+    expect(isDistRebuildFailure("Cannot find module '/a/dist/scripts/x.js'")).toBe(true);
+    expect(isDistRebuildFailure("Cannot find module 'lodash'")).toBe(false);
+    expect(isDistRebuildFailure(undefined)).toBe(false);
   });
 });

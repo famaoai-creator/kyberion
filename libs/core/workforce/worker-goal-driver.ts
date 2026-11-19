@@ -118,6 +118,7 @@ import {
   resumeGoal,
   serializeGoalStateForPersistence,
   type GoalBudgetLimits,
+  type GoalCompletionMode,
   type GoalRuntimeState,
   type GoalState,
   type GoalUpdateSignal,
@@ -345,6 +346,18 @@ export interface RunGoalDrivenLoopOptions {
   blockedPersistTurns?: number;
   /** Hard safety bound on turns; a goal still active at the bound is paused. */
   maxTurns?: number;
+  /**
+   * Per-turn completion-audit wording (default `strict`). `event_handler` is
+   * for goals that handle one bounded event and should complete as soon as it
+   * is handled (resident dot wakes).
+   */
+  completionMode?: GoalCompletionMode;
+  /**
+   * KD-02 grace step after a reached budget (default true). False ends the goal
+   * at the budget without the extra prose-only turn — for callers whose
+   * per-turn tool outputs are already the durable result (dot wakes).
+   */
+  budgetGraceStep?: boolean;
   /** KD-02: opt-in multi-turn goal budgets. Never invented — omit to keep
    * KD-01's unbounded-except-maxTurns behavior. */
   budget?: GoalBudgetLimits;
@@ -602,7 +615,10 @@ export async function runGoalDrivenLoop(
   // Trusted goal-status provider (re-audit contract + state line).
   const statusProvider: DynamicInjectionProvider = {
     id: `worker-goal-status:${goal.goalId}`,
-    collect: () => buildGoalStatusReminder(live.state, live.checkpointIds),
+    collect: () =>
+      buildGoalStatusReminder(live.state, live.checkpointIds, {
+        ...(options.completionMode ? { completionMode: options.completionMode } : {}),
+      }),
   };
   // Untrusted objective provider — framed via KD-04 (buildUntrustedDataInjectionProvider).
   const objectiveProvider = buildUntrustedDataInjectionProvider(
@@ -641,7 +657,7 @@ export async function runGoalDrivenLoop(
 
     let report: string | undefined = turnResult.text?.trim() || undefined;
 
-    if (hadToolCalls && !graceStepUsed) {
+    if (hadToolCalls && !graceStepUsed && options.budgetGraceStep !== false) {
       graceStepUsed = true;
       const graceTurnNumber = goal.turnCount + 1;
       turnsRun += 1;

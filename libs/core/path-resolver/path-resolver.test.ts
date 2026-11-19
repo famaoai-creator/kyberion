@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { afterAll, beforeAll, describe, it, expect, vi } from 'vitest';
 import * as path from 'node:path';
 import { safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
 import { withExecutionContext } from '../authority.js';
@@ -160,10 +160,46 @@ describe('path-resolver portability helpers', () => {
 });
 
 describe('findMissionPath tenant-partition scan', () => {
+  // Hermetic: the partitions live under a fixture KYBERION_ROOT (scratch floor),
+  // never under the real active/missions tree. A fresh path-resolver module is
+  // loaded against that root; seeds are written through the scratch floor.
   const tenant = `scan-tenant-${process.pid}`;
   const missionId = `MSN-SCAN-${process.pid}`;
+  let fixtureRoot: string;
+  let scoped: typeof import('../path-resolver.js');
 
-  const tenantDir = () => path.join(rootDir(), 'active/missions/confidential', tenant, missionId);
+  beforeAll(async () => {
+    fixtureRoot = shared(`tmp/vitest-path-resolver/${process.pid}-${Date.now()}`);
+    withExecutionContext('mission_controller', () => {
+      safeMkdir(path.join(fixtureRoot, 'knowledge/product/governance'), { recursive: true });
+      safeWriteFile(path.join(fixtureRoot, 'package.json'), '{}');
+      safeWriteFile(
+        path.join(fixtureRoot, 'knowledge/product/governance/mission-management-config.json'),
+        JSON.stringify({
+          directories: {
+            personal: 'knowledge/personal/missions',
+            confidential: 'active/missions/confidential',
+            public: 'active/missions/public',
+          },
+        })
+      );
+    });
+    vi.stubEnv('KYBERION_ROOT', fixtureRoot);
+    vi.stubEnv('KYBERION_TENANT', '');
+    vi.resetModules();
+    scoped = await import('../path-resolver.js');
+  });
+
+  afterAll(() => {
+    vi.unstubAllEnvs();
+    vi.resetModules();
+    withExecutionContext('mission_controller', () =>
+      safeRmSync(fixtureRoot, { recursive: true, force: true })
+    );
+  });
+
+  const confidentialRoot = () => path.join(fixtureRoot, 'active/missions/confidential');
+  const tenantDir = () => path.join(confidentialRoot(), tenant, missionId);
   const seedTenantMission = (withState = true) => {
     safeMkdir(tenantDir(), { recursive: true });
     if (withState) {
@@ -175,11 +211,15 @@ describe('findMissionPath tenant-partition scan', () => {
   };
   const cleanup = (dir: string) => safeRmSync(dir, { recursive: true, force: true });
 
+  it('resolves against the fixture root, not the real checkout', () => {
+    expect(scoped.rootDir()).toBe(fixtureRoot);
+  });
+
   it('finds a tenant-bound mission from a process with no tenant scope', () => {
     withExecutionContext('mission_controller', () => {
       seedTenantMission();
       try {
-        expect(findMissionPath(missionId)).toBe(tenantDir());
+        expect(scoped.findMissionPath(missionId)).toBe(tenantDir());
       } finally {
         cleanup(tenantDir());
       }
@@ -188,12 +228,12 @@ describe('findMissionPath tenant-partition scan', () => {
 
   it('resolves to the stated dir when a stateless skeleton shadows it', () => {
     withExecutionContext('mission_controller', () => {
-      const skeleton = path.join(rootDir(), 'active/missions/confidential', missionId);
+      const skeleton = path.join(confidentialRoot(), missionId);
       seedTenantMission(true);
       safeMkdir(skeleton, { recursive: true });
       safeWriteFile(path.join(skeleton, 'NOW.md'), '# now');
       try {
-        expect(findMissionPath(missionId)).toBe(tenantDir());
+        expect(scoped.findMissionPath(missionId)).toBe(tenantDir());
       } finally {
         cleanup(skeleton);
         cleanup(tenantDir());
@@ -204,7 +244,7 @@ describe('findMissionPath tenant-partition scan', () => {
   it('fails closed when the same id exists under two tenant partitions', () => {
     withExecutionContext('mission_controller', () => {
       const other = `scan-other-${process.pid}`;
-      const otherDir = path.join(rootDir(), 'active/missions/confidential', other, missionId);
+      const otherDir = path.join(confidentialRoot(), other, missionId);
       seedTenantMission(true);
       safeMkdir(otherDir, { recursive: true });
       safeWriteFile(
@@ -212,7 +252,7 @@ describe('findMissionPath tenant-partition scan', () => {
         JSON.stringify({ mission_id: missionId, tier: 'confidential', tenant_slug: other })
       );
       try {
-        expect(() => findMissionPath(missionId)).toThrow(/OWNER_AMBIGUOUS/);
+        expect(() => scoped.findMissionPath(missionId)).toThrow(/OWNER_AMBIGUOUS/);
       } finally {
         cleanup(otherDir);
         cleanup(tenantDir());

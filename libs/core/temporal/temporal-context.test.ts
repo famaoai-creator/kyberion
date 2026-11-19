@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { resolveTemporalContext, resolveTemporalWindow } from './temporal-context.js';
+import {
+  installationTimezone,
+  resolveTemporalContext,
+  resolveTemporalWindow,
+} from './temporal-context.js';
 
 describe('temporal context', () => {
   it('resolves a Japanese bank business-day window in the requested timezone', () => {
@@ -24,5 +28,15 @@ describe('temporal context', () => {
         working_hours: { start: '18:00', end: '09:00' },
       })
     ).toThrow(/working_hours.start/);
+  });
+
+  it('pins the installation timezone with KYBERION_TIMEZONE and ignores an invalid value', () => {
+    const os = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+    expect(installationTimezone({ KYBERION_TIMEZONE: 'America/New_York' })).toBe(
+      'America/New_York'
+    );
+    expect(installationTimezone({ KYBERION_TIMEZONE: ' Asia/Tokyo ' })).toBe('Asia/Tokyo');
+    expect(installationTimezone({ KYBERION_TIMEZONE: 'Mars/Olympus' })).toBe(os);
+    expect(installationTimezone({})).toBe(os);
   });
 });

@@ -1,7 +1,7 @@
 ---
 title: 'Phase Protocol: Mission Execution'
 tags: [governance, lifecycle, execution]
-last_updated: 2026-11-15
+last_updated: 2026-11-18
 runtime_stages: [contract_authoring, preflight, execution]
 ---
 
@@ -40,6 +40,20 @@ At each significant milestone or task completion, the owner agent MUST record pr
 `deliverable` file exists and every dependency it lists is already completed — this is what
 makes the plain checkpoint + record-evidence flow actually reach `finish` without a manual
 `NEXT_TASKS.json` edit. `checkpoint` itself still only appends to the execution ledger.
+When the task stays open, `record-evidence` says why: a warning (and a printed
+`task_completion` result) names the missing deliverable path and/or the dependency task ids
+that are not completed yet — write that file or close those tasks, then record again.
+The evidence commit never includes meeting audio or other large media: the mission repo's
+`.gitignore` excludes `evidence/audio/` and audio/video extensions (added on init and lazily
+on the next `record-evidence` for older missions; files already on disk are kept).
+
+**`verify <ID> verified` refuses while tasks are open.** Every `NEXT_TASKS.json` task outside
+the `delivery` / `retrospective` phases must be completed, proven-superseded, `skipped` or
+`cancelled`; otherwise verify lists the open task ids and leaves the mission unchanged. An
+operator who deliberately verifies anyway passes `--allow-open-tasks "<reason>"`, which is
+recorded in mission history (`VERIFY_OPEN_TASKS_OVERRIDE`). A missing, malformed or
+unreadable task board fails verification even with this override: restore the board
+before verifying; an unreadable board is not proof of completed work.
 
 **Review-kind tasks are the one exception — `record-evidence` alone can NEVER close them.**
 A task with `phase_kind: "review"` (e.g. `self_review-code-review`), or `assigned_to.role`

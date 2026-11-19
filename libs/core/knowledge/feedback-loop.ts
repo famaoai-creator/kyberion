@@ -186,6 +186,10 @@ export interface FailedScheduleFinding {
   lastStatus?: string;
   lastRun?: string;
   consecutiveFailures: number;
+  /** First failure of the current streak (pipeline-scheduler). */
+  failingSince?: string;
+  /** Failing step + error of the last failed run, when recorded. */
+  lastError?: string;
   disabledReason?: string;
 }
 
@@ -212,6 +216,8 @@ export function collectFailedSchedules(
       ...(schedule.lastStatus ? { lastStatus: schedule.lastStatus } : {}),
       ...(schedule.lastRun ? { lastRun: schedule.lastRun } : {}),
       consecutiveFailures,
+      ...(typeof raw.failingSince === 'string' ? { failingSince: raw.failingSince } : {}),
+      ...(typeof raw.lastError === 'string' ? { lastError: raw.lastError } : {}),
       ...(disabledReason !== undefined ? { disabledReason } : {}),
     });
   }
@@ -257,7 +263,7 @@ export function sweepFailedSchedules(
       title: `${alertable.length} scheduled pipeline(s) in failed state`,
       context: { failed_schedules: alertable },
       recommendation:
-        'Inspect the failing pipelines (lastStatus/consecutiveFailures above), fix the root cause, and re-enable any auto-disabled schedule in active/shared/runtime/pipeline-schedules.json.',
+        'Inspect the failing pipelines (lastError/lastStatus/consecutiveFailures/failingSince above), fix the root cause, and re-enable any auto-disabled schedule in active/shared/runtime/pipeline-schedules.json.',
       options: [
         'pnpm ops:alerts  # triage the alert backlog',
         'node dist/scripts/run_pipeline.js --input <pipelinePath>  # reproduce one failing run',

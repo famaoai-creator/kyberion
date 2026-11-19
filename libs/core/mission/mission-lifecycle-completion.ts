@@ -393,17 +393,26 @@ export function updateMissionMemorySidecar(mdPath: string, candidateId: string):
   });
 }
 
-export function readMissionNextTasks(missionDir: string): Array<Record<string, unknown>> {
+export function readMissionNextTasks(
+  missionDir: string,
+  options: { strict?: boolean } = {}
+): Array<Record<string, unknown>> {
   const nextTasksPath = safeMissionPath(missionDir, 'NEXT_TASKS.json', true);
-  if (!safeExistsSync(nextTasksPath)) return [];
+  if (!safeExistsSync(nextTasksPath)) {
+    if (options.strict)
+      throw new Error(`[MISSION_NEXT_TASKS] missing task board: ${nextTasksPath}`);
+    return [];
+  }
   try {
-    return (
-      loadMissionNextTaskObjectsAtPath(
-        nextTasksPath,
-        path.basename(safeMissionDir(missionDir, true))
-      ) || []
+    const tasks = loadMissionNextTaskObjectsAtPath(
+      nextTasksPath,
+      path.basename(safeMissionDir(missionDir, true))
     );
-  } catch {
+    if (tasks === null && options.strict)
+      throw new Error(`[MISSION_NEXT_TASKS] invalid task board: ${nextTasksPath}`);
+    return tasks || [];
+  } catch (error) {
+    if (options.strict) throw error;
     return [];
   }
 }
@@ -762,10 +771,76 @@ interface AutoCompleteOptions {
   verifiedSourceTarget?: string;
 }
 
-interface AutoCompleteResult {
+export interface TaskCompletionBlockers {
+  /** Mission-relative deliverable path that does not exist yet. */
+  missing_deliverable?: string;
+  /** The task declares neither `deliverable` nor `target_path`. */
+  deliverable_unset?: boolean;
+  /** Dependency task ids not completed yet (with their current status). */
+  pending_dependencies?: Array<{ task_id: string; status: string }>;
+  /** A review-kind task whose deliverable exists but whose review receipt does not. */
+  review_receipt_missing?: boolean;
+}
+
+export interface AutoCompleteResult {
   completed: boolean;
   reason: string;
   cascaded: string[];
+  /** Why the task stayed open, when its deliverable/dependency check failed. */
+  blockers?: TaskCompletionBlockers;
+}
+
+/**
+ * Explains why {@link isTaskDeliverableSatisfied} is false for `task`, so a
+ * caller can tell the operator which file to write or which task to close.
+ */
+export function describeTaskCompletionBlockers(
+  missionDir: string,
+  task: Record<string, unknown>,
+  statusByTaskId: Map<string, string>
+): TaskCompletionBlockers {
+  const taskId = String(task.task_id || '');
+  const blockers: TaskCompletionBlockers = {};
+  const pending = (Array.isArray(task.dependencies) ? task.dependencies : [])
+    .map((dependency) => String(dependency))
+    .filter((dependency) => dependency !== taskId)
+    .map((dependency) => ({
+      task_id: dependency,
+      status: statusByTaskId.get(dependency) || 'missing',
+    }))
+    .filter((dependency) => !MISSION_TASK_COMPLETED_STATUSES.has(dependency.status));
+  if (pending.length > 0) blockers.pending_dependencies = pending;
+  const deliverable = String(task.deliverable || task.target_path || '');
+  if (!deliverable) {
+    blockers.deliverable_unset = true;
+  } else {
+    let exists = false;
+    try {
+      exists = safeExistsSync(safeMissionPath(missionDir, deliverable));
+    } catch {
+      exists = false;
+    }
+    if (!exists) blockers.missing_deliverable = deliverable;
+    else if (pending.length === 0 && isReviewKindTask(task)) blockers.review_receipt_missing = true;
+  }
+  return blockers;
+}
+
+/** One-line human summary of {@link TaskCompletionBlockers}. */
+export function formatTaskCompletionBlockers(blockers: TaskCompletionBlockers): string {
+  const parts: string[] = [];
+  if (blockers.missing_deliverable)
+    parts.push(`deliverable missing: ${blockers.missing_deliverable}`);
+  if (blockers.deliverable_unset) parts.push('task declares no deliverable or target_path');
+  if (blockers.pending_dependencies?.length) {
+    parts.push(
+      `dependencies not completed: ${blockers.pending_dependencies
+        .map((dependency) => `${dependency.task_id} (${dependency.status})`)
+        .join(', ')}`
+    );
+  }
+  if (blockers.review_receipt_missing) parts.push('review receipt missing (run review-task)');
+  return parts.join('; ') || 'deliverable file missing or a dependency is not yet completed';
 }
 
 /** Completes the task (and its satisfied dependents) on `nextTasks` in place. */
@@ -811,10 +886,12 @@ function autoCompleteOnBoard(
     )
   );
   if (!verifiedSourceSatisfied && !isTaskDeliverableSatisfied(missionDir, task, statusByTaskId)) {
+    const blockers = describeTaskCompletionBlockers(missionDir, task, statusByTaskId);
     return {
       completed: false,
-      reason: 'deliverable file missing or a dependency is not yet completed',
+      reason: formatTaskCompletionBlockers(blockers),
       cascaded: [],
+      blockers,
     };
   }
   if (options.isHeld?.(taskId)) {

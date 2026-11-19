@@ -19,6 +19,12 @@ import {
   daemonRecoveryKey,
   DAEMON_RECOVERY_MAX_ATTEMPTS_PER_EPISODE,
   resolveWatchdogServiceSpec,
+  resolveWatchedDaemons,
+  isConfirmedOutage,
+  daemonWatchdogRunStatePath,
+  DAEMON_WATCHDOG_CONFIRM_WINDOW_MS,
+  watchdogConfirmsOutage,
+  type ResidentServiceView,
 } from './daemon_watchdog.js';
 import { resolveDaemonInstance } from '@agent/core/daemon/specs';
 import * as workCoordination from '@agent/core/workforce/work-coordination';
@@ -43,6 +49,16 @@ import {
 const ROOT = pathResolver.sharedTmp('daemon-watchdog-test/heartbeats');
 const ALERT_LOG = pathResolver.sharedTmp('daemon-watchdog-test/alerts.jsonl');
 const TRIGGER_STORE = 'active/shared/tmp/daemon-watchdog-test/trigger-deliveries.jsonl';
+/** Every DEFAULT_DAEMON treated as running here (hermetic watched set). */
+const ALL_INSTALLED: ResidentServiceView = {
+  services: [
+    { id: 'chronos', requirement: 'required' },
+    { id: 'agent-runtime-supervisor', requirement: 'optional' },
+    { id: 'generation-schedule', requirement: 'optional', owner_surface: 'generation-schedule' },
+  ],
+  installedIds: new Set(['agent-runtime-supervisor', 'generation-schedule']),
+  enabledSurfaces: new Set(),
+};
 const missionProposal: ReturnType<typeof workCoordination.listWorkItems>[number] = {
   item_id: 'proposal-1',
   title: 'Mission proposal',
@@ -313,6 +329,7 @@ describe('daemon_watchdog', () => {
       alertLogPath: ALERT_LOG,
       // Hermetic: no live dot charters join the default set in tests.
       dotHeartbeatSpecs: [],
+      residentServiceView: ALL_INSTALLED,
     });
 
     expect(report.ok).toBe(true);
@@ -352,6 +369,7 @@ describe('daemon_watchdog', () => {
       now: new Date(now.getTime() + 60_000),
       alertLogPath: ALERT_LOG,
       dotHeartbeatSpecs: [{ heartbeat_id: 'dot-repo-guardian', stale_after_ms: 15 * 60 * 1000 }],
+      residentServiceView: ALL_INSTALLED,
     });
     expect(report.ok).toBe(true);
     expect(report.statuses.map((status) => status.daemon_id)).toContain('dot-repo-guardian');
@@ -430,35 +448,154 @@ describe('daemon_watchdog', () => {
     });
   });
 
-  it('records an ops alert when any heartbeat is stale or missing', () => {
+  it('warns on a first sighting and escalates a required daemon to critical on the next run', () => {
     safeRmSync(pathResolver.sharedTmp('daemon-watchdog-test'), { recursive: true, force: true });
     recordDaemonHeartbeat(
       'chronos-daemon',
       { pid: 101, status: 'running' },
       { rootDir: ROOT, now: new Date('2026-07-04T00:00:00.000Z') }
     );
+    const run = (iso: string) =>
+      checkDaemonHeartbeats({
+        daemons: ['chronos-daemon', 'agent-runtime-supervisor-daemon'],
+        rootDir: ROOT,
+        now: new Date(iso),
+        staleAfterMs: 3 * 60 * 1000,
+        alertLogPath: ALERT_LOG,
+        webhookUrl: '',
+        residentServiceView: ALL_INSTALLED,
+      });
 
-    const report = checkDaemonHeartbeats({
-      daemons: ['chronos-daemon', 'agent-runtime-supervisor-daemon'],
-      rootDir: ROOT,
-      now: new Date('2026-07-04T00:10:00.000Z'),
-      staleAfterMs: 3 * 60 * 1000,
-      alertLogPath: ALERT_LOG,
-      webhookUrl: '',
-    });
+    const first = run('2026-07-04T00:10:00.000Z');
+    expect(first.ok).toBe(false);
+    expect(first.grace_run).toBe(true);
+    expect(first.statuses.map((status) => status.status)).toEqual(['stale', 'missing']);
+    expect(first.alerts?.map((entry) => entry.severity)).toEqual(['warning', 'warning']);
+    expect(safeExistsSync(daemonWatchdogRunStatePath(ROOT))).toBe(true);
 
-    expect(report.ok).toBe(false);
-    expect(report.statuses.map((status) => status.status)).toEqual(['stale', 'missing']);
-    expect(report.alert?.recorded_path).toBe(ALERT_LOG);
-    expect(safeExistsSync(ALERT_LOG)).toBe(true);
-    const line = String(safeReadFile(ALERT_LOG, { encoding: 'utf8' }))
+    const second = run('2026-07-04T00:15:00.000Z');
+    expect(second.grace_run).toBeUndefined();
+    // Required chronos is confirmed → critical; optional supervisor stays a warning.
+    expect(second.alerts?.map((entry) => [entry.daemon_id, entry.severity])).toEqual([
+      ['chronos-daemon', 'critical'],
+      ['agent-runtime-supervisor-daemon', 'warning'],
+    ]);
+    expect(second.alerts?.[0]?.receipt.suppressed).toBe(false);
+    // The supervisor warning repeats within the hour → suppressed (per-daemon key).
+    expect(second.alerts?.[1]?.receipt.suppressed).toBe(true);
+    const records = String(safeReadFile(ALERT_LOG, { encoding: 'utf8' }))
       .trim()
-      .split('\n')[0]!;
-    expect(JSON.parse(line)).toMatchObject({
+      .split('\n')
+      .map((line) => JSON.parse(line));
+    expect(records.at(-2)).toMatchObject({
       severity: 'critical',
-      title: 'Daemon heartbeat watchdog detected unhealthy daemon(s)',
+      title: 'Daemon heartbeat watchdog: chronos-daemon is stale',
     });
-    expect(formatDaemonWatchdogReport(report).join('\n')).toContain('Ops alert: recorded=');
+    expect(formatDaemonWatchdogReport(second).join('\n')).toContain(
+      'Ops alert (chronos-daemon critical)'
+    );
+
+    // A continuing episode does not re-page within 60 minutes.
+    const third = run('2026-07-04T00:20:00.000Z');
+    expect(third.alerts?.[0]).toMatchObject({ severity: 'critical' });
+    expect(third.alerts?.[0]?.receipt.suppressed).toBe(true);
+  });
+
+  it('treats a run after a sleep gap as a grace run (no critical)', () => {
+    safeRmSync(pathResolver.sharedTmp('daemon-watchdog-test'), { recursive: true, force: true });
+    const run = (iso: string) =>
+      checkDaemonHeartbeats({
+        daemons: ['chronos-daemon'],
+        rootDir: ROOT,
+        now: new Date(iso),
+        alertLogPath: ALERT_LOG,
+        webhookUrl: '',
+        residentServiceView: ALL_INSTALLED,
+      });
+    run('2026-07-04T00:00:00.000Z');
+    // Host slept for 8 hours: previous run is not the immediately preceding one.
+    const afterWake = run('2026-07-04T08:00:00.000Z');
+    expect(afterWake.grace_run).toBe(true);
+    expect(afterWake.alerts?.[0]?.severity).toBe('warning');
+  });
+
+  it('records an info record when a daemon recovers', () => {
+    safeRmSync(pathResolver.sharedTmp('daemon-watchdog-test'), { recursive: true, force: true });
+    const run = (iso: string) =>
+      checkDaemonHeartbeats({
+        daemons: ['chronos-daemon'],
+        rootDir: ROOT,
+        now: new Date(iso),
+        alertLogPath: ALERT_LOG,
+        webhookUrl: '',
+        residentServiceView: ALL_INSTALLED,
+      });
+    run('2026-07-04T00:00:00.000Z');
+    recordDaemonHeartbeat(
+      'chronos-daemon',
+      { pid: 101, status: 'running' },
+      { rootDir: ROOT, now: new Date('2026-07-04T00:04:30.000Z') }
+    );
+    const recovered = run('2026-07-04T00:05:00.000Z');
+    expect(recovered.ok).toBe(true);
+    expect(recovered.alerts).toEqual([
+      expect.objectContaining({ daemon_id: 'chronos-daemon', severity: 'info' }),
+    ]);
+  });
+
+  it('confirms an outage only within the confirm window', () => {
+    const previous = { timestamp: '2026-07-04T00:00:00.000Z', unhealthy: { a: 'stale' } };
+    const at = (ms: number) => new Date(Date.parse(previous.timestamp) + ms);
+    expect(isConfirmedOutage('a', previous, at(5 * 60 * 1000))).toBe(true);
+    expect(isConfirmedOutage('a', previous, at(DAEMON_WATCHDOG_CONFIRM_WINDOW_MS))).toBe(false);
+    expect(isConfirmedOutage('b', previous, at(60_000))).toBe(false);
+    expect(isConfirmedOutage('a', null, at(60_000))).toBe(false);
+  });
+
+  it('lets the baseline page chronos-dead only on a watchdog-confirmed outage', () => {
+    const now = new Date('2026-07-04T00:05:00.000Z');
+    const recent = {
+      timestamp: '2026-07-04T00:01:00.000Z',
+      unhealthy: {} as Record<string, string>,
+    };
+    expect(watchdogConfirmsOutage('chronos-daemon', null, now)).toBe(true);
+    expect(watchdogConfirmsOutage('chronos-daemon', recent, now)).toBe(false);
+    // First sighting (grace run) is recorded as unhealthy but not confirmed.
+    expect(
+      watchdogConfirmsOutage(
+        'chronos-daemon',
+        { ...recent, unhealthy: { 'chronos-daemon': 'stale' } },
+        now
+      )
+    ).toBe(false);
+    expect(
+      watchdogConfirmsOutage(
+        'chronos-daemon',
+        { ...recent, unhealthy: { 'chronos-daemon': 'stale' }, confirmed: ['chronos-daemon'] },
+        now
+      )
+    ).toBe(true);
+    // Watchdog last ran before the host slept → not confirmed yet.
+    expect(
+      watchdogConfirmsOutage(
+        'chronos-daemon',
+        {
+          timestamp: '2026-07-03T18:00:00.000Z',
+          unhealthy: { 'chronos-daemon': 'stale' },
+          confirmed: ['chronos-daemon'],
+        },
+        now
+      )
+    ).toBe(false);
+  });
+
+  it('watches optional daemons only when installed or surface-owned', () => {
+    const base: ResidentServiceView = { ...ALL_INSTALLED, installedIds: new Set() };
+    expect(resolveWatchedDaemons(base)).toEqual(['chronos-daemon']);
+    expect(
+      resolveWatchedDaemons({ ...base, enabledSurfaces: new Set(['generation-schedule']) })
+    ).toEqual(['chronos-daemon', 'generation-schedule-daemon']);
+    expect(resolveWatchedDaemons(ALL_INSTALLED)).toEqual(DEFAULT_DAEMONS);
   });
 
   describe('service unit identity (checkout-scoped)', () => {
@@ -635,6 +772,7 @@ describe('daemon_watchdog', () => {
           alertLogPath: ALERT_LOG,
           webhookUrl: '',
           triggerStorePath: TRIGGER_STORE,
+          residentServiceView: ALL_INSTALLED,
         });
       const first = await run('2026-07-04T00:10:00.000Z');
       const second = await run('2026-07-04T00:11:00.000Z');

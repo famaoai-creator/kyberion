@@ -5,7 +5,7 @@ import {
   type DaemonHeartbeatStatus,
 } from '@agent/core/daemon-heartbeat';
 import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
-import { sendOpsAlert, type OpsAlertReceipt } from '@agent/core/ops-alert';
+import { sendOpsAlert, type OpsAlertReceipt, type OpsAlertSeverity } from '@agent/core/ops-alert';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import {
   createTriggerRunner,
@@ -16,7 +16,7 @@ import {
   evaluateAutonomousOpsAction,
   type AutonomousOpsGateResult,
 } from '@agent/core/governance/autonomous-ops-gate';
-import { withExecutionContextAsync } from '@agent/core/authority';
+import { withExecutionContext, withExecutionContextAsync } from '@agent/core/authority';
 import {
   isAutonomyDecisionRoutingEnabled,
   routeAutonomousDecision,
@@ -31,6 +31,21 @@ import {
 } from '@agent/core/daemon/specs';
 import { resolveDaemonManager, type DaemonServiceSpec } from '@agent/core/daemon/service-manager';
 import { inspectInstalledUnits, type InstalledUnit } from '@agent/core/daemon/installed-units';
+import {
+  loadResidentServicesPolicy,
+  type ResidentServiceRequirement,
+} from '@agent/core/daemon/resident-services';
+import { loadSurfaceManifest } from '@agent/core/surface/surface-runtime';
+import { writeJson } from '@agent/core/foundation';
+import {
+  DAEMON_WATCHDOG_CONFIRM_WINDOW_MS,
+  DAEMON_WATCHDOG_REPAGE_INTERVAL_MS,
+  daemonWatchdogRunStatePath,
+  isConfirmedOutage,
+  readDaemonWatchdogRunState,
+  type DaemonWatchdogRunState,
+} from './daemon_watchdog_state.js';
+export * from './daemon_watchdog_state.js';
 import { safeExecResult } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
@@ -72,6 +87,100 @@ export const DEFAULT_DAEMONS = [
   'generation-schedule-daemon',
 ];
 const DEFAULT_STALE_AFTER_MS = 3 * 60 * 1000;
+
+function withRunStateAuthority<T>(rootDir: string | undefined, fn: () => T): T {
+  // The default store is written under the watchdog's own authority; a custom
+  // root (tests, --root-dir) keeps the caller's rights.
+  return rootDir ? fn() : withExecutionContext(DAEMON_WATCHDOG_ROLE, fn);
+}
+
+function loadRunState(rootDir: string | undefined): DaemonWatchdogRunState | null {
+  return withRunStateAuthority(rootDir, () => readDaemonWatchdogRunState(rootDir));
+}
+
+function persistRunState(rootDir: string | undefined, state: DaemonWatchdogRunState): void {
+  try {
+    withRunStateAuthority(rootDir, () => writeJson(daemonWatchdogRunStatePath(rootDir), state));
+  } catch (error) {
+    logger.warn(
+      `[daemon-watchdog] run state not persisted — ${error instanceof Error ? error.message : String(error)} | next: every run stays a grace run until the state is writable | evidence: ${daemonWatchdogRunStatePath(rootDir)}`
+    );
+  }
+}
+
+/** Resident-service facts the watched set is derived from (injectable for tests). */
+export interface ResidentServiceView {
+  services: Array<{ id: string; requirement: ResidentServiceRequirement; owner_surface?: string }>;
+  /** Service ids with an OS unit owned by this checkout. */
+  installedIds: ReadonlySet<string>;
+  /** Enabled runtime surface ids (a surface may run an optional daemon). */
+  enabledSurfaces: ReadonlySet<string>;
+}
+
+const FALLBACK_RESIDENT_SERVICES: ResidentServiceView['services'] = [
+  { id: 'chronos', requirement: 'required' },
+  { id: 'daemon-watchdog', requirement: 'required' },
+  { id: 'agent-runtime-supervisor', requirement: 'optional' },
+  { id: 'generation-schedule', requirement: 'optional', owner_surface: 'generation-schedule' },
+];
+
+export function loadResidentServiceView(): ResidentServiceView {
+  let services = FALLBACK_RESIDENT_SERVICES;
+  try {
+    services = loadResidentServicesPolicy().services;
+  } catch {
+    /* fall back to the shipped policy shape */
+  }
+  let installedIds = new Set<string>();
+  try {
+    installedIds = new Set(
+      inspectInstalledUnits({ repoRoot: pathResolver.rootDir(), probeLoaded: false })
+        .units.filter((unit) => unit.ownedByThisCheckout)
+        .map((unit) => unit.id)
+    );
+  } catch {
+    /* uninspectable host: optional daemons are simply not watched */
+  }
+  let enabledSurfaces = new Set<string>();
+  try {
+    enabledSurfaces = new Set(
+      loadSurfaceManifest()
+        .surfaces.filter((surface) => surface.enabled !== false)
+        .map((surface) => surface.id)
+    );
+  } catch {
+    /* no surface manifest: no surface-owned daemons */
+  }
+  return { services, installedIds, enabledSurfaces };
+}
+
+function serviceIdOf(daemonId: string): string {
+  return daemonId.replace(/-daemon$/, '');
+}
+
+/** Resident-service requirement of a heartbeat id; undefined = not a resident service. */
+export function daemonRequirement(
+  daemonId: string,
+  view: ResidentServiceView
+): ResidentServiceRequirement | undefined {
+  return view.services.find((service) => service.id === serviceIdOf(daemonId))?.requirement;
+}
+
+/**
+ * Watched daemons = DEFAULT_DAEMONS that resident-services.json requires, plus
+ * optional ones that actually run here (an owned OS unit, or an enabled owner
+ * surface). An optional daemon nobody installed is not an outage.
+ */
+export function resolveWatchedDaemons(view: ResidentServiceView): string[] {
+  return DEFAULT_DAEMONS.filter((daemonId) => {
+    const service = view.services.find((entry) => entry.id === serviceIdOf(daemonId));
+    if (!service || service.requirement === 'required') return true;
+    return (
+      view.installedIds.has(service.id) ||
+      Boolean(service.owner_surface && view.enabledSurfaces.has(service.owner_surface))
+    );
+  });
+}
 
 /**
  * The service unit that runs `daemonId` (heartbeat id or DAEMON_SPECS id) for
@@ -175,7 +284,12 @@ export interface DaemonWatchdogReport {
   ok: boolean;
   timestamp: string;
   statuses: DaemonHeartbeatStatus[];
+  /** Most severe alert of this run (kept for single-receipt callers). */
   alert?: OpsAlertReceipt;
+  /** One receipt per unhealthy daemon, plus one `info` per recovered daemon. */
+  alerts?: Array<{ daemon_id: string; severity: OpsAlertSeverity; receipt: OpsAlertReceipt }>;
+  /** True when no recent previous run exists (first run or host wake). */
+  grace_run?: boolean;
   /** EV-02: one governed recovery receipt per unhealthy daemon. */
   recovery?: DaemonRecoveryOutcome[];
 }
@@ -241,6 +355,8 @@ export interface DaemonWatchdogOptions {
    * default resolves live charters). Ignored when `daemons` is explicit.
    */
   dotHeartbeatSpecs?: DotHeartbeatSpec[];
+  /** Resident-service facts (tests inject; default reads policy + host units). */
+  residentServiceView?: ResidentServiceView;
 }
 
 function parseDaemons(value: unknown): string[] {
@@ -271,9 +387,11 @@ export function checkDaemonHeartbeats(options: DaemonWatchdogOptions = {}): Daem
   const dotStaleAfter = new Map(
     dotSpecs.map((spec) => [spec.heartbeat_id, spec.stale_after_ms] as const)
   );
+  const serviceView = options.residentServiceView ?? loadResidentServiceView();
+  const baseDaemons = resolveWatchedDaemons(serviceView);
   const daemons = options.daemons ?? [
-    ...DEFAULT_DAEMONS,
-    ...dotSpecs.map((spec) => spec.heartbeat_id).filter((id) => !DEFAULT_DAEMONS.includes(id)),
+    ...baseDaemons,
+    ...dotSpecs.map((spec) => spec.heartbeat_id).filter((id) => !baseDaemons.includes(id)),
   ];
   const baseHeartbeatOptions = {
     rootDir: options.rootDir,
@@ -290,38 +408,91 @@ export function checkDaemonHeartbeats(options: DaemonWatchdogOptions = {}): Daem
         )
       : listDaemonHeartbeatStatuses(baseHeartbeatOptions);
   const failed = statuses.filter((status) => status.status !== 'healthy');
+  const previous = loadRunState(options.rootDir);
+  const previousGap = previous ? now.getTime() - Date.parse(previous.timestamp) : NaN;
+  const graceRun = !(
+    Number.isFinite(previousGap) &&
+    previousGap >= 0 &&
+    previousGap < DAEMON_WATCHDOG_CONFIRM_WINDOW_MS
+  );
   const report: DaemonWatchdogReport = {
     ok: failed.length === 0,
     timestamp: now.toISOString(),
     statuses,
+    ...(graceRun ? { grace_run: true } : {}),
   };
-  if (failed.length > 0) {
-    report.alert = sendOpsAlert(
+  const alertOptions = {
+    now,
+    alertLogPath: options.alertLogPath,
+    webhookUrl: options.webhookUrl,
+  };
+  const alerts: NonNullable<DaemonWatchdogReport['alerts']> = [];
+  const confirmedIds: string[] = [];
+  for (const status of failed) {
+    // Critical needs a confirmed outage of a daemon that must run: unhealthy
+    // on this run AND on the immediately preceding one. A first sighting —
+    // typically right after the host wakes — and optional daemons warn.
+    const optional = daemonRequirement(status.daemon_id, serviceView) === 'optional';
+    const confirmed = isConfirmedOutage(status.daemon_id, previous, now);
+    if (confirmed) confirmedIds.push(status.daemon_id);
+    const severity: OpsAlertSeverity = !optional && confirmed ? 'critical' : 'warning';
+    const receipt = sendOpsAlert(
       {
-        severity: 'critical',
-        title: 'Daemon heartbeat watchdog detected unhealthy daemon(s)',
+        severity,
+        title: `Daemon heartbeat watchdog: ${status.daemon_id} is ${status.status}`,
         context: {
-          unhealthy_count: failed.length,
-          unhealthy_daemons: failed.map((status) => ({
-            daemon_id: status.daemon_id,
-            status: status.status,
-            age_ms: status.age_ms,
-            reason: status.reason,
-          })),
-          stale_after_ms: baseHeartbeatOptions.staleAfterMs,
+          daemon_id: status.daemon_id,
+          status: status.status,
+          age_ms: status.age_ms,
+          reason: status.reason,
+          requirement: optional ? 'optional' : 'required',
+          confirmed,
+          stale_after_ms: dotStaleAfter.get(status.daemon_id) ?? baseHeartbeatOptions.staleAfterMs,
         },
-        recommendation:
-          'Verify the launchd/systemd unit for each unhealthy daemon, restart the unit if needed, and inspect the daemon logs before resuming unattended operation.',
-        options: buildWatchdogRestartHints(failed.map((status) => status.daemon_id)),
-        dedupe_key: `daemon-watchdog:${failed.map((status) => `${status.daemon_id}:${status.status}`).join(',')}`,
+        recommendation: confirmed
+          ? 'Verify the launchd/systemd unit for this daemon, restart the unit if needed, and inspect the daemon logs before resuming unattended operation.'
+          : 'First sighting (or first run after the host woke) — the next watchdog run confirms or clears it; restart only if it persists.',
+        options: buildWatchdogRestartHints([status.daemon_id]),
+        // Per daemon and severity: another daemon failing, or this warning
+        // escalating to critical, is a new key and pages immediately.
+        dedupe_key: `daemon-watchdog:${status.daemon_id}:${severity}`,
+        category: 'daemon',
       },
-      {
-        now,
-        alertLogPath: options.alertLogPath,
-        webhookUrl: options.webhookUrl,
-      }
+      { ...alertOptions, minIntervalMs: DAEMON_WATCHDOG_REPAGE_INTERVAL_MS }
     );
+    alerts.push({ daemon_id: status.daemon_id, severity, receipt });
   }
+  // Resolved records close the episode in the alert log.
+  for (const status of statuses) {
+    if (status.status !== 'healthy' || !previous?.unhealthy[status.daemon_id]) continue;
+    const receipt = sendOpsAlert(
+      {
+        severity: 'info',
+        title: `Daemon heartbeat watchdog: ${status.daemon_id} recovered`,
+        context: {
+          daemon_id: status.daemon_id,
+          status: 'healthy',
+          previous_status: previous.unhealthy[status.daemon_id],
+          resolved: true,
+        },
+        recommendation: 'No action needed; the daemon is writing heartbeats again.',
+        dedupe_key: `daemon-watchdog:${status.daemon_id}:resolved:${previous.timestamp}`,
+        category: 'daemon',
+      },
+      alertOptions
+    );
+    alerts.push({ daemon_id: status.daemon_id, severity: 'info', receipt });
+  }
+  if (alerts.length > 0) {
+    report.alerts = alerts;
+    const rank: Record<OpsAlertSeverity, number> = { critical: 2, warning: 1, info: 0 };
+    report.alert = [...alerts].sort((a, b) => rank[b.severity] - rank[a.severity])[0]!.receipt;
+  }
+  persistRunState(options.rootDir, {
+    timestamp: now.toISOString(),
+    unhealthy: Object.fromEntries(failed.map((status) => [status.daemon_id, status.status])),
+    confirmed: confirmedIds,
+  });
   return report;
 }
 
@@ -526,9 +697,20 @@ export function formatDaemonWatchdogReport(report: DaemonWatchdogReport): string
       }`
     );
   }
-  if (report.alert) {
+  if (report.grace_run && !report.ok) {
+    lines.push('Grace run: no recent previous run (first run or host wake) — findings warn only');
+  }
+  const alertLines = report.alerts?.length
+    ? report.alerts.map((entry) => ({
+        prefix: `${entry.daemon_id} ${entry.severity}`,
+        receipt: entry.receipt,
+      }))
+    : report.alert
+      ? [{ prefix: '', receipt: report.alert }]
+      : [];
+  for (const { prefix, receipt } of alertLines) {
     lines.push(
-      `Ops alert: recorded=${report.alert.recorded_path}; suppressed=${report.alert.suppressed}; webhook=${report.alert.webhook_delivered ? 'delivered' : 'not-delivered'}`
+      `Ops alert${prefix ? ` (${prefix})` : ''}: recorded=${receipt.recorded_path}; suppressed=${receipt.suppressed}; webhook=${receipt.webhook_delivered ? 'delivered' : 'not-delivered'}`
     );
   }
   for (const recovery of report.recovery ?? []) {

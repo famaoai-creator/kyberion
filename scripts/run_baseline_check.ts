@@ -93,6 +93,10 @@ import {
 } from '@agent/core/ops-health';
 import { writeJanitorFailureMarker } from '@agent/core/ops-health-state';
 import { collectOpsHealthInput } from './lib/ops-health-input.js';
+import {
+  readDaemonWatchdogRunState,
+  watchdogConfirmsOutage,
+} from './daemon/daemon_watchdog_state.js';
 import { scanTenantDrift } from './watch/watch_tenant_drift.js';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import { inspectBaselineBuildReadiness, type BuildReadiness } from './baseline_build_readiness.js';
@@ -1097,8 +1101,14 @@ export async function runBaselineCheck() {
   if (!isVitestProcess()) {
     try {
       const marker = readSchedulerOpsAlertDays();
+      // Sleep awareness: page only when the watchdog's own recent run also saw
+      // chronos unhealthy (or no watchdog state exists at all). Right after the
+      // host wakes the heartbeat is stale for one tick; the watchdog — which
+      // watches chronos as a required daemon — pages if it persists, and the
+      // day marker stays unspent for a real outage.
       if (
         !schedulerHealth.scheduler_alive.ok &&
+        watchdogConfirmsOutage('chronos-daemon', readDaemonWatchdogRunState(), schedulerNow) &&
         shouldEmitDailyOpsAlert(marker, 'scheduler_alive', schedulerNow)
       ) {
         schedulerAlerts.scheduler_alive = sendOpsAlert({

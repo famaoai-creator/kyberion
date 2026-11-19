@@ -15,7 +15,7 @@
  *     with false positives on legitimately public documents.
  *
  * Regex-impossible detectors carry a `validator`:
- *   - 'luhn'        — 13-19 digit payment card numbers, Luhn check digit;
+ *   - 'luhn'        — 13-19 digit payment card numbers, issuer prefix 2-6 and Luhn check digit;
  *   - 'jp_mynumber' — 12-digit マイナンバー, 番号法 check-digit algorithm
  *                     (Q_n = n+1 for n≤6, n−5 for n≥7 over the 11 body
  *                     digits counted from the right; check = 0 when
@@ -229,8 +229,21 @@ export function passesMyNumberChecksum(candidate: string): boolean {
   return check === digits.charCodeAt(11) - 48;
 }
 
+/**
+ * Payment card numbers start with a major-industry digit of 2-6 (Mastercard
+ * 2/5, Amex 3, Visa 4, Discover/UnionPay/JCB 3/6). Epoch-millisecond
+ * timestamps (17…) and other machine ids that merely pass Luhn — about one in
+ * ten — are not card candidates.
+ */
+export function hasCardIssuerPrefix(candidate: string): boolean {
+  const first = String(candidate || '')
+    .replace(/\D/g, '')
+    .charAt(0);
+  return first >= '2' && first <= '6';
+}
+
 function matchIsReal(rule: PiiRule, match: string): boolean {
-  if (rule.validator === 'luhn') return passesLuhn(match);
+  if (rule.validator === 'luhn') return hasCardIssuerPrefix(match) && passesLuhn(match);
   if (rule.validator === 'jp_mynumber') return passesMyNumberChecksum(match);
   return true;
 }

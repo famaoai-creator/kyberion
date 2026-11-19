@@ -18,6 +18,7 @@ import {
   pauseMission as _pauseMission,
   reenterMissionFromReview as _reenterMissionFromReview,
   verifyMission as _verifyMission,
+  type VerifyMissionOptions,
 } from './mission-lifecycle.js';
 import {
   approveScopeChange as _approveScopeChange,
@@ -170,13 +171,19 @@ export function buildMissionSystem(rootDir = pathResolver.rootDir()) {
         syncProjectLedgerIfLinkedInternal
       ).then(() => syncProjectOperationalStateIfLinked(id));
     },
-    verifyMission(id: string, result: 'verified' | 'rejected', note: string) {
+    verifyMission(
+      id: string,
+      result: 'verified' | 'rejected',
+      note: string,
+      verifyOptions?: VerifyMissionOptions
+    ) {
       return _verifyMission(
         id,
         result,
         note,
         transitionStatus as any,
-        syncProjectLedgerIfLinkedInternal
+        syncProjectLedgerIfLinkedInternal,
+        verifyOptions
       ).then(() => syncProjectOperationalStateIfLinked(id));
     },
     finishMission(id: string, seal = false) {
@@ -278,7 +285,10 @@ export function buildMissionSystem(rootDir = pathResolver.rootDir()) {
         taskBinding,
         getGitHash,
         syncProjectLedgerIfLinked: syncProjectLedgerIfLinkedInternal,
-      }).then(() => syncProjectOperationalStateIfLinked(missionId));
+      }).then(async (result) => {
+        await syncProjectOperationalStateIfLinked(missionId);
+        return result;
+      });
     },
     recordArtifactReview(
       missionId: string,

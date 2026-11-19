@@ -34,13 +34,18 @@ export const DOT_MEMORY_MIN_BYTES = 512;
 export const DOT_MEMORY_OPS_PER_WAKE = 10;
 /** Budget of the memory prompt section (characters). */
 export const DOT_MEMORY_PROMPT_BUDGET = 1500;
+/** Open hypotheses rendered into the wake prompt (newest first); the rest are counted. */
+export const DOT_MEMORY_PROMPT_OPEN_HYPOTHESES_MAX = 8;
+/** Terminal hypothesis states; `dismissed` drops a stale one without claiming evidence. */
+export const DOT_HYPOTHESIS_RESOLUTIONS = ['confirmed', 'refuted', 'dismissed'] as const;
+export type DotHypothesisResolution = (typeof DOT_HYPOTHESIS_RESOLUTIONS)[number];
 
 export type DotMemoryOp =
   | { op: 'add_note'; text: string }
   | { op: 'add_item'; text: string; due?: string }
   | { op: 'close_item'; id: string }
   | { op: 'add_hypothesis'; text: string; confidence?: number }
-  | { op: 'resolve_hypothesis'; id: string; status: 'confirmed' | 'refuted' }
+  | { op: 'resolve_hypothesis'; id: string; status: DotHypothesisResolution }
   | { op: 'remove'; id: string };
 
 export const dotMemoryEnabled = (c: DotCharter): boolean => c.memory?.enabled !== false;
@@ -219,10 +224,16 @@ export function parseDotMemoryOp(
     case 'resolve_hypothesis': {
       const id = clipId(raw.id);
       if (!id) return { ok: false, error: 'resolve_hypothesis needs a valid id' };
-      if (raw.status !== 'confirmed' && raw.status !== 'refuted') {
-        return { ok: false, error: "resolve_hypothesis status must be 'confirmed' or 'refuted'" };
+      if (!DOT_HYPOTHESIS_RESOLUTIONS.includes(raw.status as DotHypothesisResolution)) {
+        return {
+          ok: false,
+          error: "resolve_hypothesis status must be 'confirmed', 'refuted' or 'dismissed'",
+        };
       }
-      return { ok: true, value: { op: 'resolve_hypothesis', id, status: raw.status } };
+      return {
+        ok: true,
+        value: { op: 'resolve_hypothesis', id, status: raw.status as DotHypothesisResolution },
+      };
     }
     default:
       return { ok: false, error: `unknown op '${String(raw.op)}'` };
@@ -366,7 +377,12 @@ const OP_SCHEMA = {
     text: { type: 'string', description: `Up to ${DOT_MEMORY_TEXT_MAX} characters.` },
     due: { type: 'string', description: 'Optional ISO due time (add_item).' },
     confidence: { type: 'number', description: '0..1 (add_hypothesis).' },
-    status: { type: 'string', enum: ['confirmed', 'refuted'], description: 'resolve_hypothesis.' },
+    status: {
+      type: 'string',
+      enum: [...DOT_HYPOTHESIS_RESOLUTIONS],
+      description:
+        'resolve_hypothesis: confirmed / refuted by evidence, or dismissed when stale or moot.',
+    },
   },
   required: ['op'],
 };
@@ -397,6 +413,21 @@ export const dotUpdateMemoryTool: DotWakeTool = {
   },
 };
 
+/** Newest {@link DOT_MEMORY_PROMPT_OPEN_HYPOTHESES_MAX} open hypotheses, plus a count of the rest. */
+function openHypothesisLines(doc: DotMemoryDoc): string[] {
+  const open = doc.hypotheses.filter((h) => h.status === 'open');
+  const shown = open.slice(-DOT_MEMORY_PROMPT_OPEN_HYPOTHESES_MAX).reverse();
+  const omitted = open.length - shown.length;
+  return [
+    ...shown.map((h) => `- [${h.id}] hypothesis (${h.confidence}): ${h.text}`),
+    ...(omitted > 0
+      ? [
+          `- (${omitted} older open hypotheses omitted — resolve or dismiss stale ones with resolve_hypothesis)`,
+        ]
+      : []),
+  ];
+}
+
 /** Prompt lines for the memory doc, within {@link DOT_MEMORY_PROMPT_BUDGET} characters. */
 export function dotMemoryPromptLines(c: DotCharter, ctx: DotExtCtx): string[] {
   if (!dotMemoryEnabled(c)) return [];
@@ -405,9 +436,7 @@ export function dotMemoryPromptLines(c: DotCharter, ctx: DotExtCtx): string[] {
     ...doc.open_items
       .filter((i) => i.status === 'open')
       .map((i) => `- [${i.id}] open: ${i.text}${i.due ? ` (due ${i.due})` : ''}`),
-    ...doc.hypotheses
-      .filter((h) => h.status === 'open')
-      .map((h) => `- [${h.id}] hypothesis (${h.confidence}): ${h.text}`),
+    ...openHypothesisLines(doc),
     ...[...doc.notes].reverse().map((n) => `- [${n.id}] note: ${n.text}`),
   ];
   const header = 'Your working memory (edit with dot_update_memory):';
@@ -522,7 +551,10 @@ export async function distillDotMemory(
   if (rows.some((r) => r.key === key)) return undefined;
   const seen = new Set(rows.flatMap((r) => r.hypothesis_ids ?? []));
   const doc = readDotMemory(c, { rootDir: deps.rootDir, now: () => now });
-  const fresh = doc.hypotheses.filter((h) => h.status !== 'open' && !seen.has(h.id));
+  // Dismissed hypotheses are housekeeping, not evidence: they are never distilled.
+  const fresh = doc.hypotheses.filter(
+    (h) => (h.status === 'confirmed' || h.status === 'refuted') && !seen.has(h.id)
+  );
   if (fresh.length === 0) return undefined;
   const confirmed = fresh.filter((h) => h.status === 'confirmed');
   const refuted = fresh.filter((h) => h.status === 'refuted');

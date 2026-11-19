@@ -14,6 +14,7 @@ import {
   GOAL_BUDGET_GRACE_STEP_PROMPT,
   GOAL_CANCEL_SYSTEM_REMINDER,
   GOAL_CONTINUATION_REAUDIT_PROMPT,
+  GOAL_EVENT_HANDLER_AUDIT_PROMPT,
   GOAL_CONVERGENCE_MODE_PROMPT,
   GOAL_CONVERGENCE_THRESHOLD_RATIO,
   GOAL_STEADY_PROGRESS_PROMPT,
@@ -209,6 +210,14 @@ describe('turn accounting + prompt fragments', () => {
     expect(reminder).toContain('blocked_streak: 2/');
     expect(reminder).toContain('rewind_checkpoints: ckpt-0');
     expect(reminder).not.toContain('do the thing');
+  });
+
+  it('event_handler mode swaps the anti-early-completion audit for the handle-and-finish contract', () => {
+    const reminder = buildGoalStatusReminder(activeGoal(), [], { completionMode: 'event_handler' });
+    expect(reminder).toContain(GOAL_EVENT_HANDLER_AUDIT_PROMPT);
+    expect(reminder).not.toContain(GOAL_CONTINUATION_REAUDIT_PROMPT);
+    expect(GOAL_EVENT_HANDLER_AUDIT_PROMPT).toContain('status="complete" THIS turn');
+    expect(buildGoalStatusReminder(activeGoal())).toContain(GOAL_CONTINUATION_REAUDIT_PROMPT);
   });
 });
 

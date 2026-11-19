@@ -18,14 +18,16 @@
       "active/shared/observability/",
       "active/shared/runtime/",
       "presence/bridge/runtime/",
-      "active/shared/tmp/"
+      "active/shared/tmp/",
+      "active/shared/inbox/entries.jsonl"
     ],
     "allow_write": [
       "active/shared/coordination/channels/",
       "active/shared/observability/",
       "active/shared/runtime/",
       "presence/bridge/runtime/",
-      "active/shared/tmp/"
+      "active/shared/tmp/",
+      "active/shared/inbox/entries.jsonl"
     ]
   }
 }

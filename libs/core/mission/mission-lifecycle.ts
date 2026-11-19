@@ -91,7 +91,10 @@ export {
   supersededTaskRefusal,
   tryAutoCompleteTaskFromEvidence,
 };
-export type { MissionCompletionReconciliationContext } from './mission-lifecycle-completion.js';
+export type {
+  MissionCompletionReconciliationContext,
+  TaskCompletionBlockers,
+} from './mission-lifecycle-completion.js';
 export {
   delegateMission,
   importMission,
@@ -464,12 +467,49 @@ function maybeRunVolatileGc(
   }
 }
 
+export interface VerifyMissionOptions {
+  /** Reason to verify despite open tasks; recorded in mission history. */
+  allowOpenTasks?: string;
+}
+
+/** Statuses that do not keep a mission from being verified, beyond closed-for-gate. */
+const VERIFY_IGNORED_TASK_STATUSES: ReadonlySet<string> = new Set(['skipped', 'cancelled']);
+/**
+ * Phases that legitimately close after `verify` (review.md: verify → distill
+ * before the PR; delivery and the retrospective follow). The finish gate
+ * still requires them.
+ */
+const VERIFY_POST_PHASES: ReadonlySet<string> = new Set(['delivery', 'retrospective']);
+
+/**
+ * NEXT_TASKS.json tasks that are not closed (completed, proven-superseded,
+ * skipped or cancelled), excluding post-verify phases. Missing or unreadable
+ * boards fail closed; they cannot prove that execution is complete.
+ */
+export function listOpenMissionTasksForVerify(
+  missionDir: string
+): Array<{ task_id: string; status: string }> {
+  const tasks = readMissionNextTasks(missionDir, { strict: true });
+  return tasks
+    .filter((task) => {
+      const status = String(task.status || 'planned').toLowerCase();
+      if (VERIFY_IGNORED_TASK_STATUSES.has(status)) return false;
+      if (VERIFY_POST_PHASES.has(String(task.phase || '').toLowerCase())) return false;
+      return !isTaskClosedForGate(missionDir, task, 'the verify gate');
+    })
+    .map((task) => ({
+      task_id: String(task.task_id || task.description || 'unknown-task'),
+      status: String(task.status || 'planned').toLowerCase(),
+    }));
+}
+
 export async function verifyMission(
   id: string,
   result: 'verified' | 'rejected',
   note: string,
   transitionStatus: (current: string, next: string) => any,
-  syncProjectLedgerIfLinked: (missionId: string) => Promise<void>
+  syncProjectLedgerIfLinked: (missionId: string) => Promise<void>,
+  verifyOptions: VerifyMissionOptions = {}
 ): Promise<void> {
   if (!id || !result || !['verified', 'rejected'].includes(result)) {
     logger.error('Usage: mission_controller verify <MISSION_ID> <verified|rejected> <note>');
@@ -505,7 +545,28 @@ export async function verifyMission(
 
   logger.info(`🛡️ Verifying Mission ${upperId}: Result = ${result.toUpperCase()}`);
 
+  let openTasksOverride: string | null = null;
   if (result === 'verified') {
+    // A mission is not verified while its own task board says the work is
+    // unfinished (0/8 tasks done was once verified). Override is explicit and
+    // recorded in history with its reason.
+    const openTasks = listOpenMissionTasksForVerify(missionDir);
+    if (openTasks.length > 0) {
+      const overrideReason = verifyOptions.allowOpenTasks?.trim();
+      if (!overrideReason) {
+        throw new Error(
+          `❌ [OPEN_TASKS] Mission ${upperId} not verified — ${openTasks.length} task(s) not completed: ${openTasks
+            .map((task) => `${task.task_id} (${task.status})`)
+            .join(
+              ', '
+            )} | next: close them via record-evidence / review-task / supersede-task, or re-run verify with --allow-open-tasks "<reason>" | evidence: ${path.join(missionDir, 'NEXT_TASKS.json')}`
+        );
+      }
+      openTasksOverride = `${openTasks.map((task) => task.task_id).join(', ')} — ${overrideReason}`;
+      logger.warn(
+        `verify with open tasks — override: ${overrideReason} | open: ${openTasks.map((task) => task.task_id).join(', ')} | mission=${upperId}`
+      );
+    }
     const driftSummary = evaluateMissionIntentDrift(upperId);
     const driftReview = summarizeReviewGateVerdicts({
       reviewMode: 'standard',
@@ -570,6 +631,13 @@ export async function verifyMission(
     note,
   };
 
+  if (openTasksOverride) {
+    state.history.push({
+      ts: nowIso(),
+      event: 'VERIFY_OPEN_TASKS_OVERRIDE',
+      note: `Verified with open tasks: ${openTasksOverride}`,
+    });
+  }
   state.history.push({
     ts: nowIso(),
     event: 'VERIFY',

@@ -554,6 +554,31 @@ export const GOAL_CONTINUATION_REAUDIT_PROMPT = [
 ].join('\n');
 
 /**
+ * Completion-audit mode for the per-turn reminder.
+ * - `strict` (default): {@link GOAL_CONTINUATION_REAUDIT_PROMPT} — long-running
+ *   objectives where early completion is the failure mode to guard against.
+ * - `event_handler`: {@link GOAL_EVENT_HANDLER_AUDIT_PROMPT} — the objective is
+ *   to handle one bounded event (e.g. a resident dot wake); finishing as soon
+ *   as the event is handled is the desired outcome, not a shortcut.
+ */
+export type GoalCompletionMode = 'strict' | 'event_handler';
+
+/**
+ * Re-audit contract for event-handler goals. Completion is expected as soon as
+ * the event is handled or judged to need nothing — idling through continue
+ * turns is the waste this mode prevents.
+ */
+export const GOAL_EVENT_HANDLER_AUDIT_PROMPT = [
+  'ACTIVE GOAL — this goal handles ONE event; re-audit before doing anything else this turn:',
+  '(a) As soon as you have recorded what matters about this event (via the available tools), or',
+  '    determined that nothing needs doing, call goal_update with status="complete" THIS turn.',
+  '    Completing early is correct here; do not spend turns re-checking or with nothing new to do.',
+  '(b) Use status="continue" only when you still have a concrete next action for this event.',
+  '(c) Report status="blocked" only when the event cannot be handled at all, with the reason.',
+  'To end the goal you MUST call the goal_update tool with a structured status. Prose alone does nothing.',
+].join('\n');
+
+/**
  * One-shot reminder delivered when a goal is cancelled/cleared: the model must
  * disregard any earlier active-goal reminders still in its context (there is no
  * `cancelled` state — a cancelled goal simply stops existing).
@@ -599,10 +624,13 @@ export const GOAL_BUDGET_GRACE_STEP_PROMPT = [
  */
 export function buildGoalStatusReminder(
   state: GoalRuntimeState,
-  availableCheckpointIds: readonly string[] = []
+  availableCheckpointIds: readonly string[] = [],
+  options: { completionMode?: GoalCompletionMode } = {}
 ): string {
   const lines = [
-    GOAL_CONTINUATION_REAUDIT_PROMPT,
+    options.completionMode === 'event_handler'
+      ? GOAL_EVENT_HANDLER_AUDIT_PROMPT
+      : GOAL_CONTINUATION_REAUDIT_PROMPT,
     '',
     `goal_id: ${state.goalId}`,
     `goal_state: ${state.state}`,

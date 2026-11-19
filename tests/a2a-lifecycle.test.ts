@@ -135,8 +135,16 @@ describe('A2A Mission Lifecycle & Trust Engine Integration', SUITE_OPTIONS, () =
     // 2. Delegate
     runMissionController('delegate', missionId, AGENT_ID, 'MSG-SUCCESS');
 
-    // 3. Verify
-    runMissionController('verify', missionId, 'verified', 'Good work');
+    // 3. This trust-ledger fixture has no implementation work to complete.
+    // Keep the open-task exception explicit rather than bypassing the verify gate.
+    runMissionController(
+      'verify',
+      missionId,
+      'verified',
+      'Good work',
+      '--allow-open-tasks',
+      'Trust-ledger integration fixture; implementation tasks are outside this scenario'
+    );
 
     // 4. Check Score
     const ledger = readLedger();
