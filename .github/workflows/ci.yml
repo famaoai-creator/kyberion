@@ -58,6 +58,7 @@ jobs:
             libs/kernel/dist/
             libs/shared-*/dist/
             presence/displays/terminal-hud/dist/
+            presence/displays/mission-deck/dist/
             plugins/dist/
             satellites/*/dist/
             knowledge/_integrity-manifest.json

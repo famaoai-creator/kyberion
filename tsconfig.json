@@ -26,6 +26,7 @@
     "test-results",
     "presence/displays/chronos-mirror-v2/",
     "presence/displays/terminal-hud/",
+    "presence/displays/mission-deck/",
     "presence/displays/operator-surface/",
     "presence/displays/concierge/",
     "libs/actuators/**/*.test.ts",
@@ -74,6 +75,9 @@
     },
     {
       "path": "./presence/displays/terminal-hud"
+    },
+    {
+      "path": "./presence/displays/mission-deck"
     }
   ]
 }
