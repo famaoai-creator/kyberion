@@ -126,17 +126,30 @@ jobs:
     if: ${{ needs.changes.outputs.code == 'true' }}
     name: ${{ matrix.os }} / Node ${{ matrix.node-version }} / shard ${{ matrix.shard }}/${{ matrix.total }}
     runs-on: ${{ matrix.os }}
-    # The Unix core suite takes ~21 minutes on macOS; follow-up smoke checks
-    # and post-job cache save push the full job past 30 minutes. Keep enough
-    # headroom for those steps on the slowest hosted runner.
+    # The macOS core-suite shard takes ~15-20 minutes at 4 shards; follow-up
+    # smoke checks and post-job cache save push the full job toward 25
+    # minutes. Keep enough headroom for those steps on the slowest hosted
+    # runner.
     timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
         node-version: [24]
-        shard: [1, 2, 3]
-        total: [3]
+        shard: [1, 2, 3, 4]
+        total: [4]
+        # Linux runs a single smoke job: the core suite and the governance
+        # boundary tests are always owned by another Linux lane (pr-validation
+        # on pull_request/merge_group, ci.yml coverage shards on push/schedule),
+        # so only the macOS shards multiply. macOS went 3 -> 4 shards because
+        # the ~21-minute suite made shard 1 the ~25-minute PR wall clock.
+        exclude:
+          - os: ubuntu-latest
+            shard: 2
+          - os: ubuntu-latest
+            shard: 3
+          - os: ubuntu-latest
+            shard: 4
     steps:
       - uses: actions/checkout@v5
 
@@ -223,16 +236,20 @@ jobs:
         env:
           KYBERION_BASE_ROLE: worker
           MISSION_ROLE: mission_controller
-        # On pull requests and in the merge queue pr-validation.yml runs the
-        # Linux core shards; this workflow adds the macOS coverage only.
-        if: ${{ !(runner.os == 'Linux' && (github.event_name == 'pull_request' || github.event_name == 'merge_group')) }}
+        # macOS only. The Linux run is always owned elsewhere: pr-validation
+        # core-tests on pull_request/merge_group, ci.yml core-coverage-shards
+        # on push to main and the weekly schedule — a second Linux run here
+        # was pure duplicate cost (~18min x 3 ubuntu runners on pushes).
+        if: ${{ runner.os == 'macOS' }}
         shell: bash
         run: pnpm test -- --suite core --shard=${{ matrix.shard }}/${{ matrix.total }} 2>&1 | tee -a "$RUNNER_TEMP/kyberion-ci-output.log"
 
       - name: Governance boundary tests
-        # pr-validation.yml test-extra runs these on Linux for pull requests
-        # and in the merge queue.
-        if: ${{ !(runner.os == 'Linux' && (github.event_name == 'pull_request' || github.event_name == 'merge_group')) }}
+        # Same ownership rule as the core suite: pr-validation test-extra on
+        # pull_request/merge_group, the pr-scope registration-tests gate via
+        # ci.yml `--scope full` on push/schedule. macOS keeps the OS-parity
+        # signal.
+        if: ${{ runner.os == 'macOS' }}
         shell: bash
         run: pnpm exec vitest run tests/foundation-io-boundary.test.ts tests/core-fs-exception-boundary.test.ts tests/process-boundary-governance.test.ts tests/runtime-child-process-boundary.test.ts 2>&1 | tee -a "$RUNNER_TEMP/kyberion-ci-output.log"
 

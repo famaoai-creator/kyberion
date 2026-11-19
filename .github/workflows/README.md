@@ -59,13 +59,16 @@ The `ci-workflow-contract` gate (`scripts/check/check_ci_workflow_contract.ts`, 
 - a job runs `pnpm --filter '@agent/core' build` before `pnpm run build` (the full build already
   builds every workspace package).
 
-**One owner per suite on pull requests.** `pr-validation.yml` owns the PR run of the core suite
-(6 shards), the actuator suite, the pr-scope gates (`pnpm run check -- --scope pr`, including the
-governance boundary tests in the `registration-tests` gate), lint, typecheck and format. On
+**One owner per suite.** `pr-validation.yml` owns the Linux run of the core suite
+(6 shards) on `pull_request` and `merge_group`; `ci.yml` `core-coverage-shards` owns it on `main`
+pushes and the weekly schedule. `pr-validation.yml` also owns the actuator suite, the pr-scope
+gates (`pnpm run check -- --scope pr`, including the governance boundary tests in the
+`registration-tests` gate), lint, typecheck and format on pull requests. On
 `pull_request` and `merge_group` events `ci.yml` skips its core coverage jobs,
-`actuators` matrix entry and lint/format/typecheck steps, and `cross-os.yml` skips the Linux core shards and boundary tests; all of them
-still run on `main` pushes and on the weekly schedule. Before adding a test step to a workflow,
-check which workflow already owns that suite for pull requests.
+`actuators` matrix entry and lint/format/typecheck steps. `cross-os.yml` never runs the core
+suite or the boundary tests on Linux — that second Linux run duplicated the owning lane on every
+event — and only adds the macOS shards plus a single ubuntu smoke job. Before adding a test step
+to a workflow, check which workflow already owns that suite for pull requests.
 
 **Check scopes per event.** Gates in `knowledge/product/governance/ci-gates.json` declare `pr`,
 `full` or `release`; `--scope` selects:
@@ -119,8 +122,9 @@ workspace (the `workspace` download step), still run after an earlier check fail
 still fails if any step failed.
 
 **Cross-OS shape.** `cross-os.yml` runs `changes` → `build-artifacts` (one Linux build, artifact
-`cross-os-build-outputs`) → `build-and-smoke` (ubuntu/macOS × 3 shards, downloading that
-artifact — compiler outputs are plain JS, native addons come from each OS's own `pnpm install`)
+`cross-os-build-outputs`) → `build-and-smoke` (one ubuntu smoke job + macOS × 4 shards,
+downloading that artifact — compiler outputs are plain JS, native addons come from each OS's
+own `pnpm install`)
 and `windows-native` (keeps its own `pnpm run build`, because `scripts/build_repository.ts` has a
 Windows-specific spawn path). Typecheck is not repeated per OS. `changes` diffs the PR merge
 commit against its first parent (or the merge-group base) and skips the OS jobs when only prose
