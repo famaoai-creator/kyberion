@@ -69,6 +69,22 @@ export interface LatencyRegression {
   increaseRate: number;
 }
 
+/**
+ * Absolute floor for latency regressions. detectRegressions is purely
+ * relative, so a fast op that moves 69ms → 294ms (4x) was flagged although no
+ * one can notice it. A regression is material only when the last run is slow
+ * in absolute terms (≥ 1s) or it got slower by a noticeable amount (≥ 500ms).
+ */
+export const LATENCY_REGRESSION_MIN_LAST_MS = 1000;
+export const LATENCY_REGRESSION_MIN_DELTA_MS = 500;
+
+export function isMaterialLatencyRegression(regression: LatencyRegression): boolean {
+  return (
+    regression.lastDuration >= LATENCY_REGRESSION_MIN_LAST_MS ||
+    regression.lastDuration - regression.historicalAvg >= LATENCY_REGRESSION_MIN_DELTA_MS
+  );
+}
+
 const THRESHOLDS_PATH = pathResolver.knowledge('product/governance/health-thresholds.json');
 
 const DEFAULT_THRESHOLDS: HealthThresholds = {
@@ -156,8 +172,9 @@ export function evaluateDegradation(input: {
     });
   }
 
-  const regressionsCritical = input.regressions.length >= thresholds.red_regressions;
-  for (const regression of input.regressions) {
+  const regressions = input.regressions.filter(isMaterialLatencyRegression);
+  const regressionsCritical = regressions.length >= thresholds.red_regressions;
+  for (const regression of regressions) {
     findings.push({
       kind: 'latency_regression',
       severity: regressionsCritical ? 'critical' : 'warning',

@@ -4,6 +4,10 @@ import { appendJsonLine } from '../foundation/json.js';
 import type { DotCharter } from './dot-charter.js';
 import { evaluateDotTriggersDue, recordDotWatchSnapshot } from './dot-runtime.js';
 import { DotSupervisorStepCircuit } from './dot-step-circuit.js';
+import {
+  summarizeAppendedJsonlRecords,
+  WATCH_APPENDED_DETAIL_MAX_CHARS,
+} from './dot-append-watch.js';
 
 const TEST_ROOT = 'active/shared/tmp/dot-step-circuit-tests';
 // Watched paths are relative to deps.rootDir.
@@ -89,6 +93,112 @@ describe('watch trigger ignore_jsonl_kinds', () => {
     });
     appendJsonLine(WATCH_ABS, { ts: '3', kind: 'ops_alert', title: 'new' });
     expect(evaluateDotTriggersDue(CHARTER, deps()).length).toBe(1);
+  });
+});
+
+describe('watch trigger min_severity', () => {
+  const SEVERITY_CHARTER: DotCharter = {
+    ...CHARTER,
+    attention: { triggers: [{ kind: 'watch', paths: [WATCH_REL], min_severity: 'critical' }] },
+  };
+
+  it('leaves lower-severity appends to the next cron wake and fires on a critical one', () => {
+    writeAlerts([{ timestamp: '1', severity: 'critical', title: 'baseline' }]);
+    expect(evaluateDotTriggersDue(SEVERITY_CHARTER, deps()).length).toBe(1);
+    recordDotWatchSnapshot(SEVERITY_CHARTER, deps());
+
+    appendJsonLine(WATCH_ABS, { timestamp: '2', severity: 'warning', title: 'learning dropped' });
+    appendJsonLine(WATCH_ABS, { timestamp: '3', severity: 'info', title: 'note' });
+    expect(evaluateDotTriggersDue(SEVERITY_CHARTER, deps())).toHaveLength(0);
+
+    appendJsonLine(WATCH_ABS, { timestamp: '4', severity: 'critical', title: 'daemon dead' });
+    expect(evaluateDotTriggersDue(SEVERITY_CHARTER, deps()).length).toBe(1);
+  });
+
+  it('still fires on a record that carries no severity', () => {
+    writeAlerts([{ timestamp: '1', severity: 'critical', title: 'baseline' }]);
+    evaluateDotTriggersDue(SEVERITY_CHARTER, deps());
+    recordDotWatchSnapshot(SEVERITY_CHARTER, deps());
+    appendJsonLine(WATCH_ABS, { timestamp: '2', title: 'unrated' });
+    expect(evaluateDotTriggersDue(SEVERITY_CHARTER, deps()).length).toBe(1);
+  });
+});
+
+describe('watch trigger detail carries appended records', () => {
+  const SEVERITY_CHARTER: DotCharter = {
+    ...CHARTER,
+    attention: {
+      triggers: [
+        {
+          kind: 'watch',
+          paths: [WATCH_REL],
+          ignore_jsonl_kinds: ['operator_notification_undelivered'],
+          min_severity: 'critical',
+        },
+      ],
+    },
+  };
+
+  it('includes only non-skipped appended records, compacted', () => {
+    writeAlerts([{ timestamp: '1', severity: 'critical', title: 'baseline' }]);
+    const first = evaluateDotTriggersDue(SEVERITY_CHARTER, deps());
+    expect(first[0].detail).toBe(`watch ${WATCH_REL} changed`);
+    recordDotWatchSnapshot(SEVERITY_CHARTER, deps());
+
+    appendJsonLine(WATCH_ABS, { timestamp: '2', severity: 'warning', title: 'low-sev' });
+    appendJsonLine(WATCH_ABS, {
+      timestamp: '3',
+      severity: 'critical',
+      kind: 'operator_notification_undelivered',
+      title: 'ignored-kind',
+    });
+    appendJsonLine(WATCH_ABS, {
+      timestamp: '2026-11-18T01:00:00Z',
+      severity: 'critical',
+      title: 'daemon dead',
+      dedupe_key: 'daemon:x',
+      recommendation: 'r'.repeat(1000),
+      unrelated: 'zzz-not-shown',
+    });
+    const due = evaluateDotTriggersDue(SEVERITY_CHARTER, deps());
+    expect(due).toHaveLength(1);
+    const detail = due[0].detail ?? '';
+    expect(detail).toContain('Appended records:');
+    expect(detail).toContain('2026-11-18T01:00:00Z [critical] daemon dead dedupe_key=daemon:x');
+    expect(detail).not.toContain('low-sev');
+    expect(detail).not.toContain('ignored-kind');
+    expect(detail).not.toContain('zzz-not-shown');
+    // Free text is clipped to ~200 characters.
+    expect(detail).not.toContain('r'.repeat(201));
+  });
+
+  it('never exceeds the cap and keeps the newest records', () => {
+    writeAlerts([{ timestamp: '0', severity: 'critical', title: 'baseline' }]);
+    evaluateDotTriggersDue(SEVERITY_CHARTER, deps());
+    recordDotWatchSnapshot(SEVERITY_CHARTER, deps());
+    for (let i = 1; i <= 60; i += 1)
+      appendJsonLine(WATCH_ABS, {
+        timestamp: String(i),
+        severity: 'critical',
+        title: `alert-${i}`,
+        context: 'c'.repeat(300),
+      });
+    const detail = evaluateDotTriggersDue(SEVERITY_CHARTER, deps())[0].detail ?? '';
+    const records = detail.split('Appended records:\n')[1] ?? '';
+    expect(records.length).toBeLessThanOrEqual(WATCH_APPENDED_DETAIL_MAX_CHARS);
+    expect(records).toContain('alert-60');
+    expect(records).not.toContain('alert-1 ');
+    expect(records).toMatch(/earlier record\(s\) omitted/);
+  });
+
+  it('summarizeAppendedJsonlRecords respects a tiny cap even for one oversized row', () => {
+    writeAlerts([{ timestamp: '1', severity: 'critical', title: 'x'.repeat(500) }]);
+    const text = summarizeAppendedJsonlRecords(WATCH_REL, 0, 10_000, {
+      rootDir: TEST_ROOT,
+      maxChars: 50,
+    });
+    expect(text).toBeDefined();
+    expect(text!.length).toBeLessThanOrEqual(50);
   });
 });
 

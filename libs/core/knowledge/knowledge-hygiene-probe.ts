@@ -6,7 +6,7 @@
  */
 import * as path from 'node:path';
 import { pathResolver } from '../path-resolver.js';
-import { safeMkdir } from '../secure-io.js';
+import { safeExistsSync, safeMkdir } from '../secure-io.js';
 import { appendJsonLine } from '../foundation/json.js';
 import { createLogger } from '../logger.js';
 import { reviewMemoryPromotionQueue } from './memory-promotion-review.js';
@@ -87,7 +87,10 @@ export function runKnowledgeHygieneProbe(deps: KnowledgeHygieneDeps = {}): {
 
   const findingsPath = path.join(deps.rootDir ?? pathResolver.rootDir(), OPS_FINDINGS_PATH);
   const filed: string[] = [];
-  safeMkdir(path.dirname(findingsPath), { recursive: true });
+  // Create the directory only when missing: a writer granted just the
+  // findings file (chronos_gateway) may not mkdir the observability root.
+  if (!safeExistsSync(path.dirname(findingsPath)))
+    safeMkdir(path.dirname(findingsPath), { recursive: true });
   for (const f of findings) {
     appendJsonLine(findingsPath, f);
     if (deps.fileWorkItems) {

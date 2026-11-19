@@ -68,7 +68,18 @@ describe('Slack and Chronos governance contract', () => {
       'active/audit/',
       'active/shared/observability/ops-alerts.jsonl',
       'active/shared/runtime/delegation-records/system/',
+      // Exact files only: ops-health / knowledge-hygiene probe findings and the
+      // weekly curation report (knowledge-curation-weekly).
+      'active/shared/observability/ops-findings.jsonl',
+      'knowledge/product/governance/CURATION_REPORT.md',
     ]);
+    // Dot digest local-inbox delivery: the unscoped entries file, not the inbox root.
+    expect(securityPolicy.authority_role_permissions.infrastructure_sentinel.allow_write).toContain(
+      'active/shared/inbox/entries.jsonl'
+    );
+    expect(
+      securityPolicy.authority_role_permissions.infrastructure_sentinel.allow_write
+    ).not.toContain('active/shared/inbox/');
     expect(securityPolicy.authority_role_permissions.chronos_operator.allow_write).toEqual([]);
     expect(securityPolicy.authority_role_permissions.chronos_operator.allow_read).toContain(
       'active/shared/observability/'

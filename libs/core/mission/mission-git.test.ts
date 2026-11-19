@@ -1,12 +1,18 @@
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createSessionWorktree, type CreateSessionWorktreeOptions } from './mission-git.js';
+import {
+  createSessionWorktree,
+  ensureMissionRepoMediaIgnores,
+  stageMissionRepoChanges,
+  type CreateSessionWorktreeOptions,
+} from './mission-git.js';
 import * as pathResolver from '../path-resolver.js';
 import {
   safeExecResult,
   safeExistsSync,
   safeMkdir,
+  safeReadFile,
   safeRmSync,
   safeWriteFile,
 } from '../secure-io.js';
@@ -100,5 +106,37 @@ describe('createSessionWorktree', () => {
       createSessionWorktree({ sessionId: 's-bad', repoRoot: repo, ref: 'no-such-ref' }, options)
     ).toThrow(/git worktree add failed/);
     expect(listWorkspaces(options.ledger)).toEqual([]);
+  });
+});
+
+describe('mission repo media ignores', () => {
+  it('appends the media ignores idempotently, keeping existing lines', () => {
+    safeWriteFile(path.join(repo, '.gitignore'), 'node_modules/');
+    const added = ensureMissionRepoMediaIgnores(repo);
+    expect(added).toContain('evidence/audio/');
+    expect(added).toContain('*.wav');
+    const text = String(safeReadFile(path.join(repo, '.gitignore'), { encoding: 'utf8' }));
+    expect(text.startsWith('node_modules/\n')).toBe(true);
+    expect(ensureMissionRepoMediaIgnores(repo)).toEqual([]);
+    expect(String(safeReadFile(path.join(repo, '.gitignore'), { encoding: 'utf8' }))).toBe(text);
+  });
+
+  it('stages evidence but never meeting audio, without deleting the audio', () => {
+    safeMkdir(path.join(repo, 'evidence/audio'), { recursive: true });
+    safeWriteFile(path.join(repo, 'evidence/audio/segment-001.wav'), 'RIFF');
+    safeWriteFile(path.join(repo, 'evidence/clip.m4a'), 'm4a');
+    safeWriteFile(path.join(repo, 'evidence/minutes.md'), '# minutes\n');
+
+    expect(stageMissionRepoChanges(repo)).toBe(true);
+    const staged = git(repo, ['diff', '--cached', '--name-only']).split('\n').filter(Boolean);
+    expect(staged).toEqual(expect.arrayContaining(['.gitignore', 'evidence/minutes.md']));
+    expect(staged.some((file) => file.includes('audio') || file.endsWith('.m4a'))).toBe(false);
+    expect(safeExistsSync(path.join(repo, 'evidence/audio/segment-001.wav'))).toBe(true);
+  });
+
+  it('never stages into an enclosing checkout when the mission has no repo', () => {
+    const notRepo = path.join(base, 'not-a-repo');
+    safeMkdir(notRepo, { recursive: true });
+    expect(stageMissionRepoChanges(notRepo)).toBe(false);
   });
 });

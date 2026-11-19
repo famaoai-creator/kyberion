@@ -89,6 +89,11 @@ export function safeOpenInheritedTokenPipe(): Socket {
   try {
     const stat = fs.fstatSync(fd);
     if (!stat.isFIFO() && !stat.isSocket()) throw new Error('invalid pipe');
+    // When no pipe was inherited, FD 3 can be the runtime's own descriptor:
+    // on macOS libuv's kqueue sits there and fstat reports it as a FIFO with
+    // no permission bits. Wrapping it aborts the process (uv__io_poll), and
+    // it is never ours to close. A real pipe or socketpair carries mode bits.
+    if (stat.isFIFO() && (stat.mode & 0o777) === 0) throw new Error('runtime descriptor');
     owned = true;
     const stream = new Socket({ fd, readable: true, writable: false });
     owned = false; // Socket now owns closure, including error and cancellation.

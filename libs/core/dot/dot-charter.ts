@@ -87,6 +87,13 @@ export type DotTrigger =
        * undelivered-notification rows its own failed notifies produce.
        */
       ignore_jsonl_kinds?: string[];
+      /**
+       * Jsonl records whose `severity` ranks below this never wake the dot by
+       * themselves (info < warning < critical). Records without a severity
+       * still wake it. Lets a dot watching the ops-alert log wake at once for
+       * critical alerts and leave warnings to its next cron wake.
+       */
+      min_severity?: DotWatchSeverity;
     }
   | { kind: 'wake'; channels: string[] }
   | {
@@ -259,6 +266,13 @@ export interface DotCharter {
     /** Off when absent. Shadow requires injected fixture ports; no production budget/provider adapter. */
     semantic_judgment?: { mode: 'off' | 'shadow' };
     max_idle_wake_ms?: number;
+    /**
+     * Upper bound between REAL (model-calling) cron wakes. A cron wake with no
+     * new signal since the last real wake is closed as an idle skip until this
+     * much time has passed (default 6 h). Distinct from `max_idle_wake_ms`,
+     * the watchdog staleness bound.
+     */
+    force_wake_every_ms?: number;
     /** Hours of missed cron runs coalesced into one catch-up wake (1-24, default 6). */
     cron_catch_up_hours?: number;
   };
@@ -395,6 +409,9 @@ export function validateDotCharter(value: unknown, sourcePath = '<inline>'): Dot
   assertFeedTriggersHaveConsumer(bound, sourcePath);
   return bound;
 }
+
+/** Severity ranks a watch trigger's `min_severity` compares against. */
+export type DotWatchSeverity = 'info' | 'warning' | 'critical';
 
 export function loadDotCharter(filePath: string): DotCharter {
   const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;

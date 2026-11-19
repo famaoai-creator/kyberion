@@ -32,6 +32,17 @@ Use `meeting_participate`'s runtime plan options to make the live execution path
 - `--dry-run` disables hard prerequisites for validation and tests, but does not represent a live meeting run.
 - `--voice-profile-id` defaults to the active registry's default profile. If you pass one explicitly, it must exist in the registry before the meeting starts.
 
+## In-room minutes (`pnpm minutes:record`)
+
+Record into a meeting mission, never a code-change one. Without `--mission`,
+`pnpm minutes:record` creates `MSN-MEETING-<YYYYMMDD>-<HHMM>` with mission type
+`meeting_facilitation` through the mission lifecycle facade (tier confidential when
+`--tenant`/`KYBERION_TENANT` is set, personal otherwise). A fresh mission has no
+voice consent yet, so this path needs a standing `meeting.recording` grant matched by
+`--meeting-series` or `--meeting-url`; it checks that before creating anything. With
+`--mission <ID>` the given mission is used as is (its type is not changed). Audio
+segments stay on disk under `evidence/audio/` and are excluded from the mission repo.
+
 ## Preflight
 
 Before joining or speaking, decide which brief questions and role to use.

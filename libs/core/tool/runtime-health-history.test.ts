@@ -62,6 +62,27 @@ describe('runtime health trends (OP-04)', () => {
     expect(evaluateRuntimeHealthTrends([sample({ rss_mb: 100 })], THRESHOLDS)).toEqual([]);
   });
 
+  it('ignores a post-sleep dip and GC saw-tooth around a flat level', () => {
+    const rss = [29.4, 260, 27.9, 240, 280, 230, 270, 250, 290, 245, 260, 255];
+    const samples = rss.map((rss_mb) => sample({ rss_mb }));
+    expect(evaluateRuntimeHealthTrends(samples, THRESHOLDS)).toEqual([]);
+  });
+
+  it('still flags sustained growth across the window', () => {
+    const samples = [100, 110, 105, 120, 180, 220, 260, 300, 320].map((rss_mb) =>
+      sample({ rss_mb })
+    );
+    expect(evaluateRuntimeHealthTrends(samples, THRESHOLDS)).toEqual([
+      expect.objectContaining({ kind: 'rss_growth', severity: 'critical' }),
+    ]);
+  });
+
+  it('ignores small absolute growth even at a high ratio', () => {
+    expect(
+      evaluateRuntimeHealthTrends([sample({ rss_mb: 14 }), sample({ rss_mb: 29 })], THRESHOLDS)
+    ).toEqual([]);
+  });
+
   it('flags restart storms from cumulative per-agent counts', () => {
     const findings = evaluateRuntimeHealthTrends(
       [

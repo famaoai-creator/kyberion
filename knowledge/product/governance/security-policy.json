@@ -350,14 +350,16 @@
         "active/shared/observability/",
         "active/shared/runtime/",
         "presence/bridge/runtime/",
-        "active/shared/tmp/"
+        "active/shared/tmp/",
+        "active/shared/inbox/entries.jsonl"
       ],
       "allow_write": [
         "active/shared/coordination/channels/",
         "active/shared/observability/",
         "active/shared/runtime/",
         "presence/bridge/runtime/",
-        "active/shared/tmp/"
+        "active/shared/tmp/",
+        "active/shared/inbox/entries.jsonl"
       ]
     },
     "slack_bridge": {
@@ -397,7 +399,8 @@
         "active/shared/runtime/terminal/",
         "active/audit/",
         "active/shared/observability/ops-alerts.jsonl",
-        "active/shared/runtime/delegation-records/system/"
+        "active/shared/runtime/delegation-records/system/",
+        "active/shared/observability/ops-findings.jsonl"
       ],
       "allow_write": [
         "active/shared/coordination/chronos/",
@@ -408,7 +411,9 @@
         "active/shared/runtime/terminal/",
         "active/audit/",
         "active/shared/observability/ops-alerts.jsonl",
-        "active/shared/runtime/delegation-records/system/"
+        "active/shared/runtime/delegation-records/system/",
+        "active/shared/observability/ops-findings.jsonl",
+        "knowledge/product/governance/CURATION_REPORT.md"
       ]
     },
     "chronos_operator": {

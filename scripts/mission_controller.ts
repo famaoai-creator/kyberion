@@ -351,9 +351,16 @@ async function importMission(id: string, remoteUrl: string) {
   return missionLifecycleService.importMission(id, remoteUrl);
 }
 
-async function verifyMission(id: string, result: 'verified' | 'rejected', note: string) {
+async function verifyMission(
+  id: string,
+  result: 'verified' | 'rejected',
+  note: string,
+  allowOpenTasks?: string
+) {
   const { missionLifecycleService } = await import('@agent/core/mission/mission-lifecycle-service');
-  const output = await missionLifecycleService.verify(id, result, note);
+  const output = allowOpenTasks
+    ? await missionLifecycleService.verify(id, result, note, { allowOpenTasks })
+    : await missionLifecycleService.verify(id, result, note);
   if (result === 'verified') {
     syncIntentContractMemorySnapshot(id, 'verify');
   }

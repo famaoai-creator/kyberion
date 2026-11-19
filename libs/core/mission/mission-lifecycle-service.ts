@@ -413,10 +413,14 @@ export function buildMissionLifecycleService(
       id: string,
       result: 'verified' | 'rejected',
       note: string,
-      options?: MissionLifecycleVerbOptions
+      options?: MissionLifecycleVerbOptions & { allowOpenTasks?: string }
     ) {
       return runGovernedVerb('verify', normalizeMissionId(id), options, () =>
-        resolveSystem(explicitSystem).verifyMission(id, result, note)
+        options?.allowOpenTasks
+          ? resolveSystem(explicitSystem).verifyMission(id, result, note, {
+              allowOpenTasks: options.allowOpenTasks,
+            })
+          : resolveSystem(explicitSystem).verifyMission(id, result, note)
       );
     },
 

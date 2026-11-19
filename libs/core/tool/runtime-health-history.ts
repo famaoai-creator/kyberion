@@ -194,13 +194,22 @@ export function evaluateRuntimeHealthTrends(
     const first = list[0];
     const last = list[list.length - 1];
 
-    if (first.rss_mb > 0) {
-      const ratio = last.rss_mb / first.rss_mb;
+    // RSS of a GC'd process saw-tooths, and on macOS a sample taken right
+    // after the host wakes is paged out (tens of MB). First-vs-last of single
+    // samples reads that noise as growth, so compare the upper quartile of the
+    // first and last thirds of the window (robust to paged-out dips) and
+    // require a minimum absolute increase.
+    const span = Math.max(1, Math.floor(list.length / 3));
+    const before = upperQuartileOf(list.slice(0, span).map((s) => s.rss_mb));
+    const after = upperQuartileOf(list.slice(-span).map((s) => s.rss_mb));
+    if (before > 0 && after - before >= RSS_GROWTH_MIN_DELTA_MB) {
+      const ratio = after / before;
       if (ratio >= thresholds.rss_growth_warning_ratio) {
+        const label = span > 1 ? ` (upper quartile of ${span} samples each end)` : '';
         findings.push({
           kind: 'rss_growth',
           severity: ratio >= thresholds.rss_growth_red_ratio ? 'critical' : 'warning',
-          detail: `${processName}: RSS ${first.rss_mb}MB → ${last.rss_mb}MB (${ratio.toFixed(2)}x) in the window`,
+          detail: `${processName}: RSS ${before}MB → ${after}MB (${ratio.toFixed(2)}x) in the window${label}`,
         });
       }
     }
@@ -215,6 +224,15 @@ export function evaluateRuntimeHealthTrends(
     }
   }
   return findings;
+}
+
+/** Growth smaller than this (MB) is never reported, whatever the ratio. */
+export const RSS_GROWTH_MIN_DELTA_MB = 50;
+
+/** Nearest-rank 75th percentile. */
+function upperQuartileOf(values: number[]): number {
+  const sorted = [...values].sort((a, b) => a - b);
+  return sorted[Math.max(0, Math.ceil(sorted.length * 0.75) - 1)]!;
 }
 
 function sumRestartDelta(

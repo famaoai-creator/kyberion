@@ -40,6 +40,7 @@ import {
   recordDotWakeOutcome,
   compactDotWakeLedger,
   DOT_WAKE_CIRCUIT_THRESHOLD,
+  DOT_WAKE_CREDENTIAL_RECHECK_MS,
   dotWakeErrorsPath,
   DOT_WAKE_FAILURE_CATEGORY,
   isDotWakeProcessFailure,
@@ -1928,5 +1929,203 @@ describe('dot wake usage attribution', () => {
       safeWriteFile(ledgerPath, row('repo-guardian', 'wake:k1', 'delivered') + '\n');
       expect(compactDotWakeLedger({ rootDir: TEST_ROOT }).compacted).toBe(false); // default 8 MiB gate
     });
+  });
+});
+
+describe('host suspension during a wake', () => {
+  const wallClockBlocked = async (): Promise<DotWakeLoopResult> => ({
+    finalState: 'blocked',
+    turnsRun: 1,
+    goal: {
+      budgetStats: { tokensUsed: 0 },
+      terminalReason: 'goal budget reached: wall-clock budget 1800000ms',
+    },
+  });
+  const monitor = (suspendedMs: number) => () => ({
+    suspendedMs: () => suspendedMs,
+    stop: () => {},
+  });
+
+  it('records a wall-clock overrun caused by host sleep as skipped and keeps the follow-up due', async () => {
+    const charter: DotCharter = { ...CHARTER, followups: { max_pending: 1 } };
+    writeCharter(charter);
+    const t0 = new Date('2026-11-18T16:00:00Z');
+    const now = new Date('2026-11-18T16:38:54Z');
+    const deps = { rootDir: TEST_ROOT, now: () => now };
+    dotScheduleFollowupTool.apply(charter, [{ delay_minutes: 5, reason: 'check CI' }], {
+      ...deps,
+      now: () => t0,
+    });
+    const [trigger] = evaluateDotFollowupsDue(charter, deps);
+    expect(trigger.key).toMatch(/^followup:/);
+
+    const receipt = await runDotWake(
+      { path: `${TEST_ROOT}/dots/dot.json`, charter },
+      {
+        ...deps,
+        trigger,
+        hasRole: () => true,
+        runLoop: wallClockBlocked,
+        suspensionMonitor: monitor(4 * 60 * 60_000),
+      }
+    );
+    expect(receipt.outcome).toBe('skipped');
+    expect(receipt.reason).toContain('host suspended');
+    const rows = readDotWakeLedger(deps).filter((row) => row.trigger_key === trigger.key);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ outcome: 'skipped', reason_code: 'host_suspended' });
+
+    // Not consumed, not backed off, not a circuit failure: the next sweep retries it.
+    expect(evaluateDotFollowupsDue(charter, deps).map((due) => due.key)).toEqual([trigger.key]);
+    expect(evaluateDotWakeCircuit(charter, deps)).toMatchObject({ consecutive: 0, tripped: false });
+  });
+
+  it('keeps a genuine wall-clock overrun (no suspension) a failure', async () => {
+    writeCharter(CHARTER);
+    const trigger = { trigger: CHARTER.attention.triggers[0], key: 'cron:no-sleep@1' };
+    const receipt = await runDotWake(
+      { path: `${TEST_ROOT}/dots/dot.json`, charter: CHARTER },
+      {
+        rootDir: TEST_ROOT,
+        trigger,
+        hasRole: () => true,
+        runLoop: wallClockBlocked,
+        // Below the 30 s threshold: event-loop jitter, not a host sleep.
+        suspensionMonitor: monitor(10_000),
+      }
+    );
+    expect(receipt.outcome).toBe('failed');
+    expect(
+      readDotWakeLedger({ rootDir: TEST_ROOT }).find((row) => row.trigger_key === trigger.key)
+    ).toMatchObject({ outcome: 'failed', reason_code: 'wall_clock_exceeded' });
+  });
+
+  it('keeps a non-wall-clock failure a failure even when the host slept', async () => {
+    writeCharter(CHARTER);
+    const trigger = { trigger: CHARTER.attention.triggers[0], key: 'cron:slept-other@1' };
+    const receipt = await runDotWake(
+      { path: `${TEST_ROOT}/dots/dot.json`, charter: CHARTER },
+      {
+        rootDir: TEST_ROOT,
+        trigger,
+        hasRole: () => true,
+        runLoop: async () => {
+          throw new Error('provider exploded');
+        },
+        suspensionMonitor: monitor(4 * 60 * 60_000),
+      }
+    );
+    expect(receipt.outcome).toBe('failed');
+  });
+});
+
+describe('credential_grant wake circuit', () => {
+  const tenantDot: DotCharter = {
+    ...CHARTER,
+    dot_id: 'tenant-dot',
+    scope: { tier: 'confidential', tenant_slug: 'acme' },
+    attention: { triggers: [{ kind: 'cron', cron: '* * * * *', timezone: 'UTC' }] },
+    runtime: { heartbeat_id: 'dot-tenant-dot', reasoning_training_use: 'no_training' },
+  };
+  const dir = `${TEST_ROOT}/knowledge/confidential/acme/dots`;
+  const refusal =
+    '[DOT_CREDENTIAL_GRANT_MISSING] tenant acme has no active owner-approved credential.use grant; dot tenant-dot does not run | next: assign | evidence: x';
+
+  it('holds wakes after one refusal until the grant inputs change, with one alert', async () => {
+    safeMkdir(dir, { recursive: true });
+    safeWriteFile(`${dir}/tenant-dot.json`, JSON.stringify(tenantDot));
+    let fingerprint = 'grants-v1';
+    let now = new Date('2026-11-19T04:45:10Z');
+    const alerts: Array<{ title: string }> = [];
+    const runLoop = vi.fn(async () => fakeResult(1, 5));
+    const deps = {
+      rootDir: TEST_ROOT,
+      now: () => now,
+      hasRole: () => true,
+      credentialInputsFingerprint: () => fingerprint,
+      opsAlert: (input: { title: string }) => void alerts.push(input),
+    };
+    const wake = (trigger: ReturnType<typeof evaluateDotTriggersDue>[number]) =>
+      runDotWake(
+        { path: `${dir}/tenant-dot.json`, charter: tenantDot },
+        {
+          ...deps,
+          trigger,
+          resolveWakeExecution: async () => ({ backendUnavailable: refusal }),
+        }
+      );
+
+    const [first] = evaluateDotTriggersDue(tenantDot, deps);
+    expect((await wake(first)).outcome).toBe('failed');
+    const circuit = evaluateDotWakeCircuit(tenantDot, deps);
+    expect(circuit).toMatchObject({ credential: true, tripped: true, open: true, consecutive: 1 });
+    expect(Date.parse(circuit.reopens_at!) - now.getTime()).toBe(DOT_WAKE_CREDENTIAL_RECHECK_MS);
+
+    // Later sweeps: nothing due, no new ledger rows, a single operator alert.
+    const rowsBefore = readDotWakeLedger({ rootDir: TEST_ROOT }).length;
+    for (const minutes of [1, 2, 60, 6 * 60, 12 * 60]) {
+      now = new Date(Date.parse('2026-11-19T04:45:10Z') + minutes * 60_000);
+      expect(evaluateDotTriggersDue(tenantDot, deps)).toHaveLength(0);
+    }
+    expect(readDotWakeLedger({ rootDir: TEST_ROOT })).toHaveLength(rowsBefore);
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0].title).toContain('credential grant');
+    expect(runLoop).not.toHaveBeenCalled();
+
+    // The operator assigns a grant: the next sweep probes once (idempotent re-apply).
+    fingerprint = 'grants-v2';
+    now = new Date(now.getTime() + 60_000);
+    const probe = evaluateDotTriggersDue(tenantDot, deps);
+    expect(probe).toHaveLength(1);
+    expect(probe[0].circuit).toBe(true);
+    expect(evaluateDotTriggersDue(tenantDot, deps)).toHaveLength(1);
+
+    // The probe is refused again (unrelated change): held again on the new inputs.
+    expect((await wake(probe[0])).outcome).toBe('failed');
+    now = new Date(now.getTime() + 60_000);
+    expect(evaluateDotTriggersDue(tenantDot, deps)).toHaveLength(0);
+    expect(alerts).toHaveLength(1);
+
+    // After the recheck window a single half-open probe runs even without a change.
+    now = new Date(now.getTime() + DOT_WAKE_CREDENTIAL_RECHECK_MS);
+    expect(evaluateDotTriggersDue(tenantDot, deps)).toHaveLength(1);
+
+    // The marker lives under the tenant's own dot state path.
+    expect(
+      safeExistsSync(`${TEST_ROOT}/${dotStatePath(tenantDot, 'wake-circuit', 'tenant-dot.json')}`)
+    ).toBe(true);
+    expect(dotStatePath(tenantDot, 'wake-circuit', 'tenant-dot.json')).toContain('acme');
+  });
+
+  it('a delivered wake closes the credential hold', async () => {
+    safeMkdir(dir, { recursive: true });
+    safeWriteFile(`${dir}/tenant-dot.json`, JSON.stringify(tenantDot));
+    const t0 = Date.parse('2026-11-19T04:45:10Z');
+    recordDotWakeOutcome(
+      tenantDot,
+      { trigger: { kind: 'probe' } as never, key: 'probe:a:b' },
+      'failed',
+      {
+        rootDir: TEST_ROOT,
+        now: () => new Date(t0),
+        reason: 'wake failed',
+        reason_code: 'credential_grant',
+      }
+    );
+    expect(
+      evaluateDotWakeCircuit(tenantDot, { rootDir: TEST_ROOT, now: () => new Date(t0 + 1000) })
+    ).toMatchObject({ credential: true, open: true });
+    recordDotWakeOutcome(
+      tenantDot,
+      { trigger: { kind: 'probe' } as never, key: 'probe:a:c' },
+      'delivered',
+      {
+        rootDir: TEST_ROOT,
+        now: () => new Date(t0 + 2000),
+      }
+    );
+    expect(
+      evaluateDotWakeCircuit(tenantDot, { rootDir: TEST_ROOT, now: () => new Date(t0 + 3000) })
+    ).toMatchObject({ tripped: false, open: false });
   });
 });

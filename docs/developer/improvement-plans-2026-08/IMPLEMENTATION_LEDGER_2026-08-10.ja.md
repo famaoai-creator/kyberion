@@ -30,6 +30,8 @@ status: active
 
 ## 今回の取り込み追記 (2026-08-11)
 
+旧 `docs/patches/IMPLEMENTATION_LEDGER.ja.md` の配送履歴: EV-01〜10、media HTML→PPTX、tenant-data-activation、meet-copilot 基盤は `732a17f3` までに取り込まれ、残差分は `101b9ad9` を基点とする branch-delta パッチへ集約した。派生パッチが次の差分へ自身を内包しないよう、branch-delta と併走 alignment-gate パッチは追跡対象から除外した。2026-11-20 の整理では、現行実装へ取り込み済みの配布パッチと重複台帳を削除した。未取り込みの trading PoC パッチは保持している。
+
 この台帳と3パッチは、現行ブランチ `40b676ff` 上で再適用・補正した。`origin/main` 相当の生成物を含むパッチは、現行生成規約に合わせて `knowledge/_integrity-manifest.json`、権限ロール索引、op discovery/catalog、PII ルールを再生成した。競合した共有ファイルのうち、既存変更を保持すべき箇所は手動統合し、元パッチの意図を欠落させていない。
 
 追加の取り込み時補正として、HTML→PPTX の入力サイズ上限と entity code point 検証、Meet 拡張のセッション単位 control token と AI イベント検証を実装した。これにより、未認証の WebSocket 制御・不正 AI イベント・過大な HTML 入力を受け付けない。

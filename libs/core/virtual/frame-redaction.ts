@@ -208,8 +208,19 @@ export function prepareDistillationEgress(
 ): DistillationEgressResult {
   try {
     const textSpans = findPiiSpans(payload.text);
-    if (textSpans.some((span) => span.action === 'block' || span.severity === 'secret'))
-      return { status: 'withheld', reason: 'text_secret_detected' };
+    const secretRules = [
+      ...new Set(
+        textSpans
+          .filter((span) => span.action === 'block' || span.severity === 'secret')
+          .map((span) => span.rule_id)
+      ),
+    ];
+    // Rule ids only — never the matched value — so a denial is diagnosable.
+    if (secretRules.length > 0)
+      return {
+        status: 'withheld',
+        reason: `text_secret_detected (rules: ${secretRules.join(',')})`,
+      };
     const knownValues = (payload.known_sensitive_text || []).filter((value) => value.length > 0);
     if (knownValues.some((value) => payload.text.includes(value)))
       return { status: 'withheld', reason: 'known_sensitive_text_detected' };

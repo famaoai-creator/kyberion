@@ -11,6 +11,7 @@ import {
   zonedWallTimeToInstant,
   type CalendarDate,
 } from './business-calendar.js';
+import { getRegisteredEnvText } from '../foundation/env.js';
 
 export type TemporalBusinessCalendar = 'none' | 'japanese_bank';
 
@@ -57,13 +58,27 @@ const DEFAULT_DURATION_MINUTES = 30;
 const TIME_RE = /^\d{2}:\d{2}$/u;
 
 /**
- * The installation timezone: the IANA zone the host OS reports through Intl,
- * falling back to UTC when the runtime cannot name one. Shared so day and
- * month boundaries agree across modules (budget months, token expiry
- * defaults, quiet hours).
+ * The installation timezone: the `KYBERION_TIMEZONE` setting when it names a
+ * valid IANA zone (pins day and month boundaries on hosts whose OS zone
+ * differs from the business zone — cloud runners, travel), otherwise the zone
+ * the host OS reports through Intl, falling back to UTC when the runtime
+ * cannot name one. An invalid setting is ignored rather than failing every
+ * budget and expiry check. Shared so day and month boundaries agree across
+ * modules (budget months, token expiry defaults, quiet hours).
  */
-export function installationTimezone(): string {
+export function installationTimezone(env?: Record<string, string | undefined>): string {
+  const configured = getRegisteredEnvText('KYBERION_TIMEZONE', env ? { env } : {})?.trim();
+  if (configured && isValidTimezone(configured)) return configured;
   return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+}
+
+function isValidTimezone(timezone: string): boolean {
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: timezone }).format();
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function parseDate(value: Date | string | undefined, label: string, fallback: Date): Date {

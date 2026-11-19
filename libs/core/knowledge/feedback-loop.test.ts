@@ -268,6 +268,25 @@ describe('failed-schedule sweep (LC-01c)', () => {
     });
   });
 
+  it('collectFailedSchedules carries the failing reason and streak start', () => {
+    const findings = collectFailedSchedules(
+      makeRegistry([
+        {
+          id: 'reasoned',
+          lastStatus: 'failed',
+          consecutiveFailures: 4,
+          failingSince: '2026-07-05T00:00:00.000Z',
+          lastError: 'step system:exec: exit 1',
+        } as never,
+      ])
+    );
+    expect(findings[0]).toMatchObject({
+      consecutiveFailures: 4,
+      failingSince: '2026-07-05T00:00:00.000Z',
+      lastError: 'step system:exec: exit 1',
+    });
+  });
+
   it('collectFailedSchedules returns empty for a healthy or empty registry', () => {
     expect(collectFailedSchedules(makeRegistry([]))).toEqual([]);
     expect(

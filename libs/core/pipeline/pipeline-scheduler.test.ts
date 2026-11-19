@@ -16,6 +16,7 @@ import { safeWriteFile } from '../secure-io.js';
 import {
   claimScheduledPipelineRun,
   completeScheduledPipelineRun,
+  describeScheduledRunFailure,
   getSchedulesDueNow,
   isScheduledPipelineDue,
   loadScheduleRegistry,
@@ -124,6 +125,57 @@ describe('pipeline scheduler', () => {
     });
     expect(nextClaim?.runLock?.token).toBeTruthy();
     expect(loadScheduleRegistry({ rootDir }).schedules[0]?.lastStatus).toBe('succeeded');
+  });
+
+  it('tracks a failing streak and resets it on success', () => {
+    const rootDir = makeRootDir();
+    registerScheduledPipeline(
+      {
+        id: 'flaky',
+        name: 'Flaky',
+        pipelinePath: 'pipelines/flaky.json',
+        actuator: 'run_pipeline',
+        enabled: true,
+        trigger: { type: 'interval', intervalMs: 60_000 },
+      },
+      { rootDir }
+    );
+    const run = (iso: string, status: 'succeeded' | 'failed', error?: string) => {
+      const now = new Date(iso);
+      const claimed = claimScheduledPipelineRun('flaky', { rootDir, now });
+      return completeScheduledPipelineRun('flaky', claimed!.runLock!.token, status, {
+        rootDir,
+        now,
+        ...(error ? { error } : {}),
+      });
+    };
+    run('2026-07-05T00:00:00Z', 'failed', 'step system:exec: exit 1');
+    const second = run('2026-07-05T00:02:00Z', 'failed', 'x'.repeat(900));
+    expect(second).toMatchObject({
+      lastStatus: 'failed',
+      consecutiveFailures: 2,
+      failingSince: '2026-07-05T00:00:00.000Z',
+    });
+    expect(second?.lastError).toHaveLength(500);
+    // Persisted through the schema-validated registry.
+    expect(loadScheduleRegistry({ rootDir }).schedules[0]?.consecutiveFailures).toBe(2);
+    // Still enabled: tracking never auto-disables here.
+    expect(second?.enabled).toBe(true);
+
+    const healed = run('2026-07-05T00:04:00Z', 'succeeded');
+    expect(healed?.consecutiveFailures).toBe(0);
+    expect(healed?.failingSince).toBeUndefined();
+    expect(healed?.lastError).toBeUndefined();
+  });
+
+  it('describes the first failed step of a run', () => {
+    expect(
+      describeScheduledRunFailure([
+        { op: 'core:log', status: 'success' },
+        { op: 'system:exec', status: 'failed', error: 'exit 2' },
+      ])
+    ).toBe('step system:exec: exit 2');
+    expect(describeScheduledRunFailure([{ op: 'core:log', status: 'success' }])).toBeUndefined();
   });
 
   it('lists due schedules while excluding locked runs', () => {

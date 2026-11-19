@@ -201,6 +201,15 @@
       "documented": true
     },
     {
+      "name": "KYBERION_AGENT_RUNTIME_SUPERVISOR_STALE_CODE_RECYCLE",
+      "category": "flag",
+      "type": "boolean",
+      "required": false,
+      "description": "Set to 0/false/no/off to stop the launchd/systemd-managed agent-runtime supervisor from restarting itself (exit 75) onto a newer core build when idle. Default on.",
+      "documented": true,
+      "subsystem": "runtime"
+    },
+    {
       "name": "KYBERION_AGENT_RUNTIME_SUPERVISOR_TOKEN",
       "category": "secret",
       "type": "string",
@@ -4657,7 +4666,7 @@
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "Optional runtime setting for timezone; leave unset to use the built-in configuration.",
+      "description": "IANA timezone (e.g. Asia/Tokyo) that pins the installation timezone: display formatting, credential budget months and token-expiry days. Unset or invalid uses the OS timezone.",
       "documented": true
     },
     {

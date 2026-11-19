@@ -97,6 +97,7 @@ import {
   reconcileLifecycleClosureCriteria,
   tryAutoCompleteTaskFromEvidence,
   verifyMission,
+  listOpenMissionTasksForVerify,
   writeMissionNextTasks,
 } from './mission-lifecycle.js';
 
@@ -673,6 +674,7 @@ describe('mission lifecycle finish gate', () => {
 
   it('blocks verification when the intent drift gate sees a blocking origin mismatch', async () => {
     prepareMissionState('active');
+    safeWriteFile(`${missionPath}/NEXT_TASKS.json`, '[]');
     safeMkdir(`${missionPath}/evidence`, { recursive: true });
     emitIntentSnapshot({
       missionId,
@@ -712,6 +714,91 @@ describe('mission lifecycle finish gate', () => {
       safeReadFile(`${missionPath}/NEXT_TASKS.json`, { encoding: 'utf8' }) as string
     );
     expect(nextTasks.some((task: any) => task.task_id === 'repair-intent-drift')).toBe(true);
+  });
+
+  it.each(['missing', 'malformed', 'invalid-envelope'])(
+    'refuses verification with a %s task board, even with an open-task override',
+    async (kind) => {
+      prepareMissionState('active');
+      if (kind !== 'missing')
+        safeWriteFile(`${missionPath}/NEXT_TASKS.json`, kind === 'malformed' ? '{' : '{}');
+      await expect(
+        verifyMission(
+          missionId,
+          'verified',
+          'must remain unverified',
+          transitionStatus,
+          async () => undefined,
+          { allowOpenTasks: 'does not authorize unreadable evidence' }
+        )
+      ).rejects.toThrow();
+      const state = JSON.parse(
+        safeReadFile(`${missionPath}/mission-state.json`, { encoding: 'utf8' }) as string
+      );
+      expect(state.status).toBe('active');
+      expect(state.verification).toBeUndefined();
+    }
+  );
+
+  it('blocks verification while NEXT_TASKS.json still has open tasks', async () => {
+    prepareMissionState('active');
+    safeWriteFile(
+      `${missionPath}/NEXT_TASKS.json`,
+      JSON.stringify([
+        { task_id: 'done-task', status: 'completed', dependencies: [] },
+        { task_id: 'skipped-task', status: 'skipped', dependencies: [] },
+        { task_id: 'open-a', status: 'planned', dependencies: [] },
+        { task_id: 'open-b', status: 'in_progress', dependencies: [] },
+        { task_id: 'delivery-deliver', phase: 'delivery', status: 'planned', dependencies: [] },
+        {
+          task_id: 'retrospective-retrospective',
+          phase: 'retrospective',
+          status: 'planned',
+          dependencies: [],
+        },
+      ])
+    );
+
+    await expect(
+      verifyMission(missionId, 'verified', 'premature', transitionStatus, async () => undefined)
+    ).rejects.toThrow('[OPEN_TASKS]');
+
+    const state = JSON.parse(
+      safeReadFile(`${missionPath}/mission-state.json`, { encoding: 'utf8' }) as string
+    );
+    expect(state.status).toBe('active');
+    expect(state.verification).toBeUndefined();
+    expect(listOpenMissionTasksForVerify(missionPath)).toEqual([
+      { task_id: 'open-a', status: 'planned' },
+      { task_id: 'open-b', status: 'in_progress' },
+    ]);
+  });
+
+  it('verifies with open tasks only under an explicit override recorded in history', async () => {
+    prepareMissionState('active');
+    safeWriteFile(
+      `${missionPath}/NEXT_TASKS.json`,
+      JSON.stringify([{ task_id: 'open-a', status: 'planned', dependencies: [] }])
+    );
+
+    await verifyMission(
+      missionId,
+      'verified',
+      'operator accepted',
+      transitionStatus,
+      async () => undefined,
+      { allowOpenTasks: 'meeting container, code tasks not applicable' }
+    );
+
+    const state = JSON.parse(
+      safeReadFile(`${missionPath}/mission-state.json`, { encoding: 'utf8' }) as string
+    );
+    expect(state.status).toBe('distilling');
+    const override = state.history.find(
+      (entry: { event: string }) => entry.event === 'VERIFY_OPEN_TASKS_OVERRIDE'
+    );
+    expect(override?.note).toContain('open-a');
+    expect(override?.note).toContain('meeting container, code tasks not applicable');
   });
 
   it('resumes existing pending work without creating a synthetic finish repair loop', async () => {
@@ -1970,6 +2057,9 @@ describe('tryAutoCompleteTaskFromEvidence', () => {
 
     expect(result.completed).toBe(false);
     expect(tasks.find((task) => task.task_id === 'execution-implement')?.status).toBe('planned');
+    // The reason names the file to write, not a generic "missing or not completed".
+    expect(result.reason).toContain('evidence/implementation-report.md');
+    expect(result.blockers).toEqual({ missing_deliverable: 'evidence/implementation-report.md' });
   });
 
   it('does not complete a task whose dependency is not yet completed, even if its own deliverable exists', () => {
@@ -1999,7 +2089,10 @@ describe('tryAutoCompleteTaskFromEvidence', () => {
     const result = tryAutoCompleteTaskFromEvidence(missionPath, 'downstream');
 
     expect(result.completed).toBe(false);
-    expect(result.reason).toContain('dependency');
+    expect(result.reason).toContain('dependencies not completed: upstream (planned)');
+    expect(result.blockers).toEqual({
+      pending_dependencies: [{ task_id: 'upstream', status: 'planned' }],
+    });
   });
 
   it('is a no-op for a task that is already completed', () => {

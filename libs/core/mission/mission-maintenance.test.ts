@@ -596,6 +596,48 @@ describe('direct-CLI usage accounting', () => {
     warn.mockRestore();
   });
 
+  it('says why a task stayed open: missing deliverable path and pending dependencies', async (ctx) => {
+    const { missionId, missionPath, readTasks } = seedMission(
+      ctx,
+      [
+        { task_id: 'design', status: 'planned', deliverable: 'evidence/design.md' },
+        {
+          task_id: 'impl',
+          status: 'planned',
+          dependencies: ['design'],
+          deliverable: 'evidence/report.md',
+        },
+      ],
+      []
+    );
+    const warn = vi.spyOn(logger, 'warn');
+    const result = await recordEvidence({ ...evidenceArgs(missionId), taskId: 'impl' });
+    expect(readTasks()[1].status).toBe('planned');
+    expect(result.task_completion).toMatchObject({
+      completed: false,
+      blockers: {
+        missing_deliverable: 'evidence/report.md',
+        pending_dependencies: [{ task_id: 'design', status: 'planned' }],
+      },
+    });
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringMatching(
+        /task impl not completed — deliverable missing: evidence\/report\.md.*design \(planned\)/
+      )
+    );
+    warn.mockRestore();
+    // Meeting audio never reaches the mission repo; the file stays on disk.
+    safeMkdir(`${missionPath}/evidence/audio`, { recursive: true });
+    safeWriteFile(`${missionPath}/evidence/audio/segment-001.wav`, 'RIFF');
+    safeWriteFile(`${missionPath}/evidence/design.md`, '# design\n');
+    const closed = await recordEvidence({ ...evidenceArgs(missionId), taskId: 'design' });
+    expect(closed.task_completion?.completed).toBe(true);
+    const tracked = safeExec('git', ['ls-files'], { cwd: missionPath });
+    expect(tracked).toContain('evidence/design.md');
+    expect(tracked).not.toContain('segment-001.wav');
+    expect(safeExistsSync(`${missionPath}/evidence/audio/segment-001.wav`)).toBe(true);
+  });
+
   it('record-task naming a task pins its customer decisions once (CD-09)', async (ctx) => {
     const { missionId } = seedMission(ctx, [{ task_id: 'impl', status: 'planned' }], []);
     decisionLock.pin.mockClear();
@@ -818,7 +860,7 @@ describe('direct-CLI usage accounting', () => {
     };
     await expect(
       recordEvidence({ ...evidenceArgs(missionId), taskId: 'impl' })
-    ).resolves.toBeUndefined();
+    ).resolves.toMatchObject({ task_completion: { completed: true } });
     expect(readTasks()[0].status).toBe('completed');
   });
 
