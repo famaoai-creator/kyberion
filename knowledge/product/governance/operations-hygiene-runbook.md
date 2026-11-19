@@ -893,9 +893,9 @@ deletions, archival, trash purges and status skips at debug. Use the janitor rep
 counts and keep warnings visible for operator action. The baseline maintenance child
 captures command output with a finite limit and caps inherited debug verbosity at info.
 Use a foreground run when per-path diagnostics are needed. If the failure marker says
-`command output exceeded`, check the child
-log for repeated messages. The storage janitor test verifies that a deletion still
-updates the report and emits its path only at debug.
+`command output exceeded`, check the child log for repeated messages. The storage
+janitor test verifies that a deletion still updates the report and emits its path
+only at debug.
 
 ## §5 Tests: pollution and host dependencies
 

@@ -1,0 +1,43 @@
+---
+record_id: mem-MSN-JANITOR-OUTPUT-20261120-2026_11_19
+kind: pattern
+tier: public
+knowledge_domain: product
+owner_nhi: ''
+candidate_id: mem-MSN-JANITOR-OUTPUT-20261120-2026_11_19
+supersedes: ''
+superseded_by: ''
+project_id: ''
+task_session_id: ''
+specialist_id: ''
+locale: ''
+created_at: 2026-11-19T18:12:55.882Z
+source_branch: fix/janitor-cleanup-log-volume-20261120
+source_commit: a43c742a9ed152ee226290f68dceea5effefe3d7
+---
+
+# Keep high-cardinality maintenance diagnostics out of bounded child output
+
+Routine cleanup paths can fill a child output cap before the work finishes. Keep aggregate reports and warnings at normal verbosity and inspect individual paths in a foreground debug run.
+
+## Applicability
+
+- mission
+- mission:MSN-JANITOR-OUTPUT-20261120
+
+## Reusable Steps
+
+1. Routine cleanup paths can fill a child output cap before the work finishes
+2. Keep aggregate reports and warnings at normal verbosity and inspect individual paths in a foreground debug run
+
+## Expected Outcome
+
+When maintenance fails with an output-limit error, inspect the captured tail for repeated path-level events and distinguish a child killed by output volume from a parent kept alive by a referenced detached handle. Move success-path details to debug, constrain inherited verbosity for the captured background job, and keep report counters and audit records intact. Verify that the child still completes and produces an updated report through focused tests.
+
+## Evidence
+
+- active/missions/public/MSN-JANITOR-OUTPUT-20261120/evidence/design-spec.json
+- active/missions/public/MSN-JANITOR-OUTPUT-20261120/evidence/implementation-report.md
+- active/missions/public/MSN-JANITOR-OUTPUT-20261120/evidence/test-report.md
+
+## Artifacts
