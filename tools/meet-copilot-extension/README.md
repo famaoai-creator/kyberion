@@ -137,7 +137,10 @@ local STT model.
    this shared secret.
 3. (Optional) change the control port — default is `8779`. In the extension's
    service-worker console: `chrome.storage.local.set({ meetCopilotPort: 8779 })`.
-   Use the same value as the driver's `--extension-ws-port`.
+   Use the same value as the driver's `--extension-ws-port`. The host is pinned
+   to loopback: a `meetCopilotHost` value that is not `127.0.0.1`, `localhost`,
+   or `::1` is ignored, so the auth token and captions can never leave the
+   plaintext local channel.
 4. Sign into Google in this Chrome profile (this is why Meet accepts the session).
 
 ## Run (mode A′: attend + listen/transcribe, mic muted)

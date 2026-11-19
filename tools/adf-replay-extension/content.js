@@ -2,7 +2,17 @@ let recordingEnabled = false;
 let extractionMode = false;
 let conditionalMode = false;
 let snapshotHash = null;
-const recordedFieldStates = new Set();
+// Dedupe is windowed, not permanent: a burst of input/change events for one
+// gesture collapses into a single step, but a deliberate repeat (toggle off →
+// on, re-entering a field) must still record — otherwise replay diverges from
+// what the user actually did.
+const DEDUPE_WINDOW_MS = 800;
+const DEDUPE_MAX_KEYS = 500;
+const recordedFieldStates = new Map();
+// Gestures fired before the first snapshot hash is ready are held here and
+// flushed once observePage() completes, so early actions are never lost.
+const pendingRecords = [];
+const PENDING_RECORDS_MAX = 100;
 let lastExtractionPointer = null;
 let lastConditionalPointer = null;
 
@@ -67,10 +77,14 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     }
     if (recordingEnabled) {
       recordedFieldStates.clear();
+      pendingRecords.length = 0;
       lastRecordedActionAt = 0;
       observePage();
       startOutcomeObserver();
     } else {
+      // Drop held gestures too: a later non-recording observePage() must not
+      // flush actions captured before the user stopped recording.
+      pendingRecords.length = 0;
       stopOutcomeObserver();
     }
     sendResponse({ ok: true });
@@ -852,6 +866,7 @@ async function observePage() {
       })),
     })
   );
+  flushPendingRecords();
   return {
     url: location.href,
     title: document.title,
@@ -941,11 +956,12 @@ function describeTarget(candidate) {
   if (!(element instanceof HTMLElement) || !isVisible(element)) return null;
   const role = roleOf(element);
   const name = accessibleName(element);
-  if (!snapshotHash) return null;
   const target = {
     ref: semanticRef(element, role, name),
     role,
     name: name || role,
+    // May be null while the first post-enable snapshot is still hashing;
+    // record() holds such events until observePage() backfills the hash.
     snapshot_hash: snapshotHash,
   };
   // Structural anchor: lets replay fall back to "the element in the same slot"
@@ -1075,12 +1091,19 @@ function armPopupSentinel() {
     for (const mutation of mutations) {
       for (const node of mutation.addedNodes) {
         if (node.nodeType !== Node.ELEMENT_NODE) continue;
-        if (!isModalNode(node)) continue;
-        const heading = node.querySelector?.('[role="heading"], h1, h2');
+        // Dialogs commonly arrive wrapped in a portal/overlay container, so
+        // look inside the added subtree as well as at the added node itself.
+        const modal = isModalNode(node)
+          ? node
+          : node.querySelector?.(
+              'dialog, [role="dialog"], [role="alertdialog"], [aria-modal="true"]'
+            );
+        if (!modal) continue;
+        const heading = modal.querySelector?.('[role="heading"], h1, h2');
         const title = safeText(
-          node.getAttribute?.('aria-label') || heading?.textContent || node.tagName || ''
+          modal.getAttribute?.('aria-label') || heading?.textContent || modal.tagName || ''
         );
-        const reason = isMfaNode(node) ? 'mfa' : 'new_popup';
+        const reason = isMfaNode(modal) ? 'mfa' : 'new_popup';
         chrome.runtime
           .sendMessage({ type: 'bridge:execution-interrupted', reason, detail: title })
           .catch(() => undefined);
@@ -1218,9 +1241,35 @@ function recordCustomToggle(element) {
 }
 
 function record(event, dedupeKey) {
+  if (event && event.target && !event.target.snapshot_hash) {
+    if (pendingRecords.length < PENDING_RECORDS_MAX) pendingRecords.push([event, dedupeKey]);
+    return;
+  }
+  emitRecord(event, dedupeKey);
+}
+
+function flushPendingRecords() {
+  if (!pendingRecords.length) return;
+  const queued = pendingRecords.splice(0, pendingRecords.length);
+  for (const [event, dedupeKey] of queued) {
+    if (event.target && !event.target.snapshot_hash) event.target.snapshot_hash = snapshotHash;
+    emitRecord(event, dedupeKey);
+  }
+}
+
+function emitRecord(event, dedupeKey) {
   if (dedupeKey) {
-    if (recordedFieldStates.has(dedupeKey)) return;
-    recordedFieldStates.add(dedupeKey);
+    const now = Date.now();
+    const last = recordedFieldStates.get(dedupeKey);
+    if (typeof last === 'number' && now - last < DEDUPE_WINDOW_MS) return;
+    recordedFieldStates.delete(dedupeKey);
+    recordedFieldStates.set(dedupeKey, now);
+    let excess = recordedFieldStates.size - DEDUPE_MAX_KEYS;
+    for (const key of recordedFieldStates.keys()) {
+      if (excess <= 0) break;
+      recordedFieldStates.delete(key);
+      excess -= 1;
+    }
   }
   if (event.op !== 'wait_for_ref') {
     lastRecordedActionAt = Date.now();

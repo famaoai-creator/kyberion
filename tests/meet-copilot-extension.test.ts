@@ -107,9 +107,12 @@ async function createHarness() {
   await Promise.resolve();
   await Promise.resolve();
 
-  const send = async (message: Record<string, unknown>) =>
+  // The worker splits surfaces by sender: meet:event must come from a meeting
+  // tab, popup:*/panel:* from an extension page (no sender.tab).
+  const tabSender = { tab, url: tab.url };
+  const send = async (message: Record<string, unknown>, sender: Record<string, unknown> = {}) =>
     new Promise<any>((resolve) => {
-      messageListener!(message, {}, resolve);
+      messageListener!(message, sender, resolve);
     });
   const openSocket = () => {
     const socket = sockets[sockets.length - 1];
@@ -117,9 +120,9 @@ async function createHarness() {
     return socket;
   };
   const caption = (text: string) =>
-    send({ type: 'meet:event', payload: { event: 'caption', text, platform: 'meet' } });
+    send({ type: 'meet:event', payload: { event: 'caption', text, platform: 'meet' } }, tabSender);
 
-  return { send, hooks, openSocket, caption };
+  return { send, hooks, openSocket, caption, tabSender };
 }
 
 describe('Meeting Copilot service worker', () => {
@@ -288,6 +291,33 @@ describe('Meeting Copilot service worker', () => {
     expect(harness.hooks.relayed).toContainEqual({ type: 'meet:admit', name: 'Taro' });
     expect(socket.sent.join('\n')).toContain('"raised_hand"');
     expect(socket.sent.join('\n')).toContain('"admitted"');
+  });
+
+  it('rejects meet:event without a meeting-tab sender', async () => {
+    const harness = await createHarness();
+
+    const noTab = await harness.send({
+      type: 'meet:event',
+      payload: { event: 'caption', text: 'x' },
+    });
+    const wrongUrl = await harness.send(
+      { type: 'meet:event', payload: { event: 'caption', text: 'x' } },
+      { tab: { id: 9 }, url: 'https://evil.example.com/' }
+    );
+
+    expect(noTab.ok).toBe(false);
+    expect(wrongUrl.ok).toBe(false);
+  });
+
+  it('rejects popup/panel messages sent by a meeting tab', async () => {
+    const harness = await createHarness();
+
+    const state = await harness.send({ type: 'panel:get-state' }, harness.tabSender);
+    const chat = await harness.send({ type: 'panel:send-chat', text: 'hello' }, harness.tabSender);
+
+    expect(state.ok).toBe(false);
+    expect(chat.ok).toBe(false);
+    expect(harness.hooks.relayed).toHaveLength(0);
   });
 
   it('rejects malformed raise_hand and admit control messages', async () => {

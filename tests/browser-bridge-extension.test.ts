@@ -191,6 +191,9 @@ async function createHarness() {
         set: vi.fn(async (value: Record<string, any>) => {
           for (const k of Object.keys(value)) store[k] = structuredClone(value[k]);
         }),
+        remove: vi.fn(async (key: string) => {
+          delete store[key];
+        }),
       },
     },
   };
@@ -1847,5 +1850,111 @@ describe('Browser Bridge page inspection hand-off (Native Messaging only)', () =
     expect(panel).not.toContain('inspectCliPort');
     expect(read('sidepanel.html')).not.toContain('inspect-port-input');
     expect(read('background.js')).not.toMatch(/https?:\/\/(127\.0\.0\.1|localhost)/);
+  });
+});
+
+/**
+ * The recorder lives inside content.js's page context. Lift the record /
+ * flushPendingRecords / emitRecord block out of the source so these assertions
+ * run against the code that actually ships (same approach as the Meet caption
+ * extractor tests) rather than a copy that can drift.
+ */
+function loadContentRecorder() {
+  const source = String(
+    safeReadFile(path.resolve(__dirname, '../tools/adf-replay-extension/content.js'), {
+      encoding: 'utf8',
+    })
+  );
+  const start = source.indexOf('function record(event, dedupeKey)');
+  const end = source.indexOf('async function sha256');
+  if (start < 0 || end < 0) throw new Error('record block not found in content.js');
+  const sent: Array<{ type: string; event: { target: { snapshot_hash: unknown } } }> = [];
+  const env = {
+    chrome: {
+      runtime: {
+        sendMessage: (message: { type: string; event: { target: { snapshot_hash: unknown } } }) => {
+          sent.push(message);
+          return Promise.resolve();
+        },
+      },
+    },
+    snapshotOutcomeBaseline: () => undefined,
+    DEDUPE_WINDOW_MS: 800,
+    DEDUPE_MAX_KEYS: 500,
+    PENDING_RECORDS_MAX: 100,
+  };
+  const recorder = new Function(
+    'env',
+    `const { chrome, snapshotOutcomeBaseline } = env;
+     let snapshotHash = null;
+     let lastRecordedActionAt = 0;
+     const DEDUPE_WINDOW_MS = env.DEDUPE_WINDOW_MS;
+     const DEDUPE_MAX_KEYS = env.DEDUPE_MAX_KEYS;
+     const PENDING_RECORDS_MAX = env.PENDING_RECORDS_MAX;
+     const recordedFieldStates = new Map();
+     const pendingRecords = [];
+     ${source.slice(start, end)}
+     return {
+       record,
+       flushPendingRecords,
+       setSnapshotHash: (value) => { snapshotHash = value; },
+       pendingCount: () => pendingRecords.length,
+     };`
+  )(env);
+  return { ...recorder, sent };
+}
+
+describe('Browser Bridge content-script recording', () => {
+  it('dedupes a burst of identical gestures but records a deliberate repeat', () => {
+    vi.useFakeTimers();
+    try {
+      const { record, sent } = loadContentRecorder();
+      const event = { op: 'click_ref', summary: 'x', target: { ref: '@b_1', snapshot_hash: HASH } };
+
+      record(event, 'k1');
+      record(event, 'k1');
+      record(event, 'k1');
+      expect(sent).toHaveLength(1);
+
+      // The same action 1s later is a new gesture, not a duplicate.
+      vi.setSystemTime(Date.now() + 1000);
+      record(event, 'k1');
+      expect(sent).toHaveLength(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('holds pre-snapshot gestures and backfills the hash on flush', () => {
+    const { record, flushPendingRecords, setSnapshotHash, pendingCount, sent } =
+      loadContentRecorder();
+    const early = {
+      op: 'click_ref',
+      summary: 'early',
+      target: { ref: '@b_2', snapshot_hash: null },
+    };
+
+    record(early);
+    expect(sent).toHaveLength(0);
+    expect(pendingCount()).toBe(1);
+
+    setSnapshotHash(HASH);
+    flushPendingRecords();
+    expect(sent).toHaveLength(1);
+    expect(sent[0].event.target.snapshot_hash).toBe(HASH);
+    expect(pendingCount()).toBe(0);
+  });
+
+  it('detects modals nested inside an added container (popup sentinel)', () => {
+    const source = String(
+      safeReadFile(path.resolve(__dirname, '../tools/adf-replay-extension/content.js'), {
+        encoding: 'utf8',
+      })
+    );
+    // The sentinel must descend into added subtrees — dialogs wrapped in a
+    // portal container are as much an interruption as a top-level <dialog>.
+    expect(source).toContain('dialog, [role="dialog"], [role="alertdialog"], [aria-modal="true"]');
+    expect(source).toContain('isModalNode(node)');
+    expect(source).toContain('isMfaNode(modal)');
   });
 });

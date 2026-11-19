@@ -1125,8 +1125,12 @@ describe('follow-ups: rate limit, 405, retry link, cross-site logout', () => {
   beforeEach(() => resetSurfaceAuthRateLimitForTests());
 
   it('rate-limits a client after the per-client budget and sends Retry-After', async () => {
+    // Small injected limits keep this off wall-clock-sensitive loop counts:
+    // hundreds of route calls pass locally and still hit the 30s CI timeout
+    // on a loaded shared runner (kyberion-development-practices §2).
+    resetSurfaceAuthRateLimitForTests(undefined, { client_limit: 4 });
     let last;
-    for (let i = 0; i < 121; i++) {
+    for (let i = 0; i < 5; i++) {
       last = await handleSurfaceAuthRoute(
         { ...base, clientKey: '203.0.113.9' },
         { env, now: 1_000 }
@@ -1148,8 +1152,9 @@ describe('follow-ups: rate limit, 405, retry link, cross-site logout', () => {
   });
 
   it('caps the whole surface so rotating client keys cannot mint fresh budgets', async () => {
+    resetSurfaceAuthRateLimitForTests(undefined, { surface_limit: 8 });
     let denied = 0;
-    for (let i = 0; i < 700; i++) {
+    for (let i = 0; i < 12; i++) {
       const res = await handleSurfaceAuthRoute(
         { ...base, clientKey: `k-${i}` },
         { env, now: 2_000 }
@@ -1160,7 +1165,8 @@ describe('follow-ups: rate limit, 405, retry link, cross-site logout', () => {
   });
 
   it('exempts loopback from the surface and per-client ceilings', async () => {
-    for (let i = 0; i < 700; i++) {
+    resetSurfaceAuthRateLimitForTests(undefined, { client_limit: 2, surface_limit: 4 });
+    for (let i = 0; i < 12; i++) {
       const res = await handleSurfaceAuthRoute(
         { ...base, loopback: true, clientKey: '127.0.0.1' },
         { env, now: 4_000 }
@@ -1170,25 +1176,27 @@ describe('follow-ups: rate limit, 405, retry link, cross-site logout', () => {
   });
 
   it('applies only the surface ceiling to an indistinguishable shared caller', async () => {
-    // 121st shared request is still served (no per-client cap on an unknown caller)...
+    resetSurfaceAuthRateLimitForTests(undefined, { client_limit: 3, surface_limit: 8 });
+    // Past the per-client budget the shared caller is still served (no
+    // per-client cap on an unknown caller)...
     let last;
-    for (let i = 0; i < 121; i++) {
+    for (let i = 0; i < 7; i++) {
       last = await handleSurfaceAuthRoute({ ...base, clientKey: 'shared' }, { env, now: 5_000 });
     }
     expect(last?.status).toBe(200);
     // ...until the whole-surface ceiling.
-    for (let i = 0; i < 600; i++) {
+    for (let i = 0; i < 5; i++) {
       last = await handleSurfaceAuthRoute({ ...base, clientKey: 'shared' }, { env, now: 5_000 });
     }
     expect(last?.status).toBe(429);
   });
 
   it('evicts the least recently used bucket, so key rotation cannot reset a hot client', async () => {
-    resetSurfaceAuthRateLimitForTests(50);
+    resetSurfaceAuthRateLimitForTests(50, { client_limit: 4 });
     const hot = { ...base, clientKey: '198.51.100.7' };
-    for (let i = 0; i < 119; i++) await handleSurfaceAuthRoute(hot, { env, now: 6_000 });
+    for (let i = 0; i < 4; i++) await handleSurfaceAuthRoute(hot, { env, now: 6_000 });
     // Rotate far more keys than the tracker holds; the hot client keeps being touched.
-    for (let i = 0; i < 400; i++) {
+    for (let i = 0; i < 70; i++) {
       await handleSurfaceAuthRoute(
         { ...base, surfaceId: `other-${i % 20}`, clientKey: `rot-${i}` },
         { env, now: 6_000 }
@@ -1199,7 +1207,8 @@ describe('follow-ups: rate limit, 405, retry link, cross-site logout', () => {
   });
 
   it('does not rate-limit when the adapter supplies no client key (Express surfaces limit at the HTTP layer)', async () => {
-    for (let i = 0; i < 700; i++) {
+    resetSurfaceAuthRateLimitForTests(undefined, { surface_limit: 4 });
+    for (let i = 0; i < 8; i++) {
       const res = await handleSurfaceAuthRoute(base, { env, now: 3_000 });
       expect(res?.status).toBe(200);
     }
