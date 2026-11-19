@@ -888,6 +888,15 @@ heartbeat, child deadline, `'error'` listener, test with a mocked child.
 it (for example `mission_controller`) print them, and check every pipeline op that calls it still
 gets clean JSON.
 
+Storage janitor sweeps can touch thousands of paths in one run. Record routine per-path
+deletions, archival, trash purges and status skips at debug. Use the janitor report for
+counts and keep warnings visible for operator action. The baseline maintenance child
+captures command output with a finite limit and caps inherited debug verbosity at info.
+Use a foreground run when per-path diagnostics are needed. If the failure marker says
+`command output exceeded`, check the child
+log for repeated messages. The storage janitor test verifies that a deletion still
+updates the report and emits its path only at debug.
+
 ## §5 Tests: pollution and host dependencies
 
 Before entering an exact-path resource scope, initialize any test-owned sandbox ancestor directories in fixture setup. A narrow capability may create its admitted leaf directories, never missing ancestors outside its grant. Verify a fresh sandbox as well as a warmed one; `scripts/pipeline/pipeline_promote.resource-boundary.test.ts` covers journal setup without weakening the runtime guard.

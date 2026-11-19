@@ -1995,7 +1995,8 @@ describe('storage-janitor', () => {
       expect(report.deletedTmp).toBe(0);
     });
 
-    it('deletes and counts correctly when dryRun=false', () => {
+    it('counts cleanup at normal verbosity and logs individual paths only at debug', async () => {
+      const { logger } = await import('../core.js');
       const oldFile = path.join(tmpDir, 'delete-via-janitor.json');
       writeFile(oldFile);
       setMtime(oldFile, DEFAULT_TMP_TTL_MS + 5000);
@@ -2003,6 +2004,8 @@ describe('storage-janitor', () => {
       const report = runJanitor({ dryRun: false });
       expect(report.deletedTmp).toBeGreaterThanOrEqual(1);
       expect(fs.existsSync(oldFile)).toBe(false);
+      expect(logger.debug).toHaveBeenCalledWith(`[JANITOR] deleted: ${oldFile}`);
+      expect(logger.info).not.toHaveBeenCalledWith(expect.stringContaining(oldFile));
     });
 
     it('sweeps expired dated supervisor-event files but never the legacy file (AC-10)', () => {

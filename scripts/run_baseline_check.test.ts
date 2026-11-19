@@ -533,6 +533,13 @@ describe('WI-13 review: baseline-check janitor spawn env', () => {
     expect(env.PATH).toBe('/usr/bin');
     expect(parent).not.toHaveProperty('KYBERION_RUN_ORIGIN');
   });
+
+  it('keeps inherited debug output out of bounded maintenance capture', () => {
+    const parent = { LOG_LEVEL: 'debug' };
+    expect(janitorSpawnEnv(parent).LOG_LEVEL).toBe('info');
+    expect(parent.LOG_LEVEL).toBe('debug');
+    expect(janitorSpawnEnv({ LOG_LEVEL: 'warn' }).LOG_LEVEL).toBe('warn');
+  });
 });
 
 describe('resident ops layers (L10 per-schedule / L12)', () => {
