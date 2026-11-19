@@ -116,15 +116,31 @@ function html(
 
 let rateLimiter: ReturnType<typeof fixedWindowLimiter> | undefined;
 let maxTrackedKeysOverride: number | undefined;
+let limitsOverride:
+  { window_ms?: number; client_limit?: number; surface_limit?: number } | undefined;
 
-export function resetSurfaceAuthRateLimitForTests(maxTrackedKeys?: number): void {
+export function resetSurfaceAuthRateLimitForTests(
+  maxTrackedKeys?: number,
+  limits?: { window_ms?: number; client_limit?: number; surface_limit?: number }
+): void {
   rateLimiter = undefined;
   maxTrackedKeysOverride = maxTrackedKeys;
+  limitsOverride = limits;
+}
+
+function surfaceAuthPolicy(): {
+  window_ms: number;
+  client_limit: number;
+  surface_limit: number;
+  max_keys: number;
+} {
+  const policy = loadRuntimeControlPolicy().surface_auth;
+  return limitsOverride ? { ...policy, ...limitsOverride } : policy;
 }
 
 function takeRateToken(key: string, limit: number, now: number): boolean {
   if (!rateLimiter) {
-    const policy = loadRuntimeControlPolicy().surface_auth;
+    const policy = surfaceAuthPolicy();
     rateLimiter = fixedWindowLimiter({
       windowMs: policy.window_ms,
       maxKeys: maxTrackedKeysOverride ?? policy.max_keys,
@@ -145,7 +161,7 @@ const SHARED_CLIENT_KEY = 'shared';
  */
 function withinRateLimit(req: SurfaceAuthRouteRequest, now: number): boolean {
   if (req.clientKey === undefined || req.loopback) return true;
-  const policy = loadRuntimeControlPolicy().surface_auth;
+  const policy = surfaceAuthPolicy();
   const surfaceOk = takeRateToken(`s:${req.surfaceId}`, policy.surface_limit, now);
   if (req.clientKey === SHARED_CLIENT_KEY) return surfaceOk;
   const clientOk = takeRateToken(`c:${req.surfaceId}:${req.clientKey}`, policy.client_limit, now);
@@ -293,9 +309,7 @@ export async function handleSurfaceAuthRoute(
   const method = req.method.toUpperCase();
   if (isSurfaceAuthPath(req.pathname) && !withinRateLimit(req, deps.now ?? Date.now())) {
     return html(req, 429, { kind: 'failed', code: 'rate_limited' }, [], {
-      'Retry-After': String(
-        Math.max(1, Math.ceil(loadRuntimeControlPolicy().surface_auth.window_ms / 1000))
-      ),
+      'Retry-After': String(Math.max(1, Math.ceil(surfaceAuthPolicy().window_ms / 1000))),
     });
   }
   const next = sanitizeNextPath(req.searchParams.get('next'));
