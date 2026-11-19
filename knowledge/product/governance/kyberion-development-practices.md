@@ -1,6 +1,6 @@
 ---
 title: 'Kyberion Development Practices — Hard-Won Rules for Changing This Repo'
-last_updated: 2026-11-08
+last_updated: 2026-11-19
 ---
 
 # Kyberion Development Practices — Hard-Won Rules for Changing This Repo
@@ -180,6 +180,15 @@ dist/scripts/check/check_golden_output.js --rebaseline`); `vital-check` is
   deleting the data directory alone does not isolate locks stored elsewhere.
   Do not weaken production lock recovery or simply raise deadlines to hide a
   timeout cascade. Compare the same baseline shard before calling it pre-existing.
+- **Loop counts sized to production limits are load-sensitive.** A test that
+  iterates a real ceiling (hundreds of route calls to reach a rate-limit cap,
+  thousands for an eviction table) passes in ~2s on a dev Mac and still eats
+  the 30s CI `testTimeout` on a loaded shared runner — macOS shard 3/3 timed
+  out this way on main. Inject small limits through the existing test hook
+  (`resetSurfaceAuthRateLimitForTests(maxKeys, { client_limit, surface_limit })`
+  is the reference) and keep iterations just past the injected bound. The
+  mechanism under test is limiter behavior, not the policy numbers; policy
+  values live in `runtime-control-policy.json`.
 - **Platform-specific behavior is declared, not discovered**:
   `it.skipIf(process.platform !== 'darwin')` for say/mlx/BlackHole-class
   tests, with a comment saying why.
