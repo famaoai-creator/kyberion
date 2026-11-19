@@ -138,6 +138,21 @@ export interface GracefulShutdownOptions {
 }
 
 /**
+ * Last-resort exit after a graceful stop: if a stray handle keeps the event
+ * loop alive past `afterMs`, exit with `exitCode`. The timer is unref'd, so a
+ * clean drain exits earlier on its own.
+ */
+export function armForcedExit(
+  exitCode: number,
+  afterMs: number,
+  proc: Pick<ShutdownProcess, 'exit'> = process
+): ReturnType<typeof setTimeout> {
+  const timer = setTimeout(() => proc.exit(exitCode), afterMs);
+  timer.unref?.();
+  return timer;
+}
+
+/**
  * Install SIGTERM/SIGINT handlers (once each). Returns a promise-returning
  * trigger so callers/tests can run the same path without a real signal.
  */
@@ -175,8 +190,7 @@ export function installGracefulShutdown(
         proc.exit(exitCode);
         return;
       }
-      const forceExit = setTimeout(() => proc.exit(exitCode), forceExitAfterMs);
-      forceExit.unref?.();
+      armForcedExit(exitCode, forceExitAfterMs, proc);
     })();
     return shuttingDown;
   };

@@ -41,6 +41,7 @@ import {
   getSchedulesDueNow,
   claimScheduledPipelineRun,
   completeScheduledPipelineRun,
+  describeScheduledRunFailure,
   listOperatorExcludedSchedules,
   listScheduledPipelines,
 } from '@agent/core/pipeline/pipeline-scheduler';
@@ -1009,12 +1010,23 @@ async function tickAsLeader(): Promise<void> {
             scheduled.id,
             runToken,
             result.status === 'succeeded' && deliverySucceeded ? 'succeeded' : 'failed',
-            { now }
+            {
+              now,
+              error:
+                result.status !== 'succeeded'
+                  ? describeScheduledRunFailure(result.results)
+                  : deliverySucceeded
+                    ? undefined
+                    : 'direct delivery failed',
+            }
           );
           logger.info(`[CHRONOS] ✓ ${scheduled.id}: ${result.status}`);
           return `cron-run:${runToken}`;
         } catch (err: any) {
-          completeScheduledPipelineRun(scheduled.id, runToken, 'failed', { now });
+          completeScheduledPipelineRun(scheduled.id, runToken, 'failed', {
+            now,
+            error: err?.message ?? String(err),
+          });
           logger.error(`[CHRONOS] ✗ ${scheduled.id}: ${err.message}`);
           sendOpsAlert({
             severity: 'warning',

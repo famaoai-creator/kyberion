@@ -26253,6 +26253,16 @@
       }
     },
     "minutes_record": {
+      "meeting_mission_goal": {
+        "en": "Produce minutes and action items for the meeting",
+        "ja": "会議の議事録とアクションアイテムを作成する",
+        "qps-ploc": "⟦Ṗřőḓůƈė ɱïñůŧėş ȧñḓ ȧƈŧïőñ ïŧėɱş ƒőř ŧħė ɱėėŧïñɠ ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "meeting_mission_goal_titled": {
+        "en": "Produce minutes and action items for the meeting \"{title}\"",
+        "ja": "会議「{title}」の議事録とアクションアイテムを作成する",
+        "qps-ploc": "⟦Ṗřőḓůƈė ɱïñůŧėş ȧñḓ ȧƈŧïőñ ïŧėɱş ƒőř ŧħė ɱėėŧïñɠ \"{title}\" ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
       "mic_capture_failed": {
         "en": "Could not start microphone capture: {reason}",
         "ja": "マイクキャプチャを開始できません: {reason}",

@@ -71,6 +71,7 @@ import {
   MISSION_TASK_CLOSED_STATUSES,
   readMissionNextTasks,
   tryAutoCompleteTaskFromEvidence,
+  type TaskCompletionBlockers,
   writeMissionNextTasks,
 } from './mission-lifecycle.js';
 import { gcMissionRuntimeResidue } from '../storage/scope-offboarding.js';
@@ -78,6 +79,7 @@ import { retireIdentitiesForScopeBestEffort } from '../agent/nhi-lifecycle-gover
 import { writeDispatchArtifact } from './mission-dispatch-lifecycle.js';
 import { generateMissionWorkReconciliationScaffold } from './mission-work-reconciliation.js';
 import { recordDirectCliTaskUsage } from './mission-direct-cli-usage.js';
+import { stageMissionRepoChanges } from './mission-git.js';
 import {
   isTaskAwaitingCustomerDecision,
   pinTaskDecisions,
@@ -896,11 +898,12 @@ export async function recordEvidence(args: {
   taskBinding?: TaskEvidenceBinding;
   getGitHash: (cwd: string) => string;
   syncProjectLedgerIfLinked: (missionId: string) => Promise<void>;
-}): Promise<void> {
+}): Promise<RecordEvidenceResult> {
   const upperId = args.missionId.toUpperCase();
   const missionPathCandidate = findMissionPath(upperId);
   if (!missionPathCandidate) throw new Error(`Mission ${upperId} not found.`);
   const missionPath = safeMissionRoot(missionPathCandidate);
+  let taskCompletion: RecordEvidenceResult['task_completion'];
 
   // Runtime claims carry a verified actor. Reuse it when the caller did not
   // redundantly pass --actor-id; the fence below still validates the claim.
@@ -1032,6 +1035,21 @@ export async function recordEvidence(args: {
             (taskId === args.taskId && heldIds.length > 0) ||
             isTaskAwaitingCustomerDecision({ missionId: upperId, taskId }),
         });
+        taskCompletion = {
+          completed: autoComplete.completed,
+          reason: autoComplete.reason,
+          cascaded: autoComplete.cascaded,
+          ...(autoComplete.blockers ? { blockers: autoComplete.blockers } : {}),
+        };
+        if (
+          !autoComplete.completed &&
+          autoComplete.reason !== 'already completed' &&
+          heldIds.length === 0
+        ) {
+          logger.warn(
+            `task ${args.taskId} not completed — ${autoComplete.reason} | next: write the deliverable / close the listed dependencies, then record-evidence again | mission=${upperId}`
+          );
+        }
         if (autoComplete.completed) {
           logger.info(`✅ Task "${args.taskId}" auto-completed (${autoComplete.reason}).`);
           recordDirectCliTaskUsage({
@@ -1049,7 +1067,9 @@ export async function recordEvidence(args: {
         }
       }
     );
-    safeExec('git', ['add', '.'], { cwd: missionPath });
+    // Large media (meeting audio) is gitignored first — existing missions get
+    // the ignore lazily here — and a failed add never aborts the evidence record.
+    stageMissionRepoChanges(missionPath);
     try {
       safeExec('git', ['commit', '-m', `evidence(${upperId}): ${args.taskId} - ${args.note}`], {
         cwd: missionPath,
@@ -1071,6 +1091,19 @@ export async function recordEvidence(args: {
 
   await args.syncProjectLedgerIfLinked(upperId);
   logger.success(`✅ Recorded evidence for ${upperId}.`);
+  return { mission_id: upperId, task_id: args.taskId, task_completion: taskCompletion };
+}
+
+export interface RecordEvidenceResult {
+  mission_id: string;
+  task_id: string;
+  /** Auto-complete outcome for the task (absent when the fence skipped it). */
+  task_completion?: {
+    completed: boolean;
+    reason: string;
+    cascaded: string[];
+    blockers?: TaskCompletionBlockers;
+  };
 }
 
 /** Distinct actor_ids that recorded evidence for `taskId` in this mission's execution ledger. */

@@ -200,6 +200,23 @@ describe('runDotSweepOnce', () => {
     expect(mocks.recordDotWakeOutcome).not.toHaveBeenCalled();
   });
 
+  it('holds the compiler lock only for checks: a build started mid-sweep defers the remaining wakes', async () => {
+    mocks.due.set('a', [{ trigger: { kind: 'cron', cron: '* * * * *' }, key: 'cron:a' }]);
+    mocks.due.set('b', [{ trigger: { kind: 'cron', cron: '* * * * *' }, key: 'cron:b' }]);
+    const woken: string[] = [];
+    const wake = async (loaded: LoadedDotCharter) => {
+      woken.push(loaded.charter.dot_id);
+      // The wake runs without the lock, so a build can take it meanwhile.
+      mocks.compilerBusy = true;
+      return { dot_id: loaded.charter.dot_id, outcome: 'delivered' as const };
+    };
+    expect(await runDotSweepOnce(NOW, { listCharters: () => [A, B], wake })).toBe(1);
+    expect(woken).toEqual(['a']);
+    mocks.compilerBusy = false;
+    await runDotSweepOnce(NOW, { listCharters: () => [B], wake });
+    expect(woken).toEqual(['a', 'b']);
+  });
+
   it('surfaces malformed charters in the heartbeat and still wakes the good ones', async () => {
     mocks.due.set('a', [{ trigger: { kind: 'cron', cron: '* * * * *' }, key: 'cron:a' }]);
     const woken: string[] = [];

@@ -513,7 +513,8 @@ export interface DotMemoryDoc {
     id: string;
     text: string;
     confidence: number;
-    status: 'open' | 'confirmed' | 'refuted';
+    /** `dismissed`: no longer worth tracking (stale / moot) — not evidence either way. */
+    status: 'open' | 'confirmed' | 'refuted' | 'dismissed';
     at: string;
   }>;
 }

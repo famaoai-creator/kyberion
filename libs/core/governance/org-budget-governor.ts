@@ -438,8 +438,17 @@ export function computeBudgetUsage(scope: OrgBudgetScope, deps: OrgBudgetDeps = 
       }
       const c = e.cost_usd;
       if (typeof c === 'number' && c >= 0) cost += c;
-      else if (hasCostEvidence) {
-        if (attributable) costUnknown = true;
+      else if (typeof e.reference_cost_usd === 'number' && e.reference_cost_usd >= 0) {
+        // Billing mode unrecorded (e.g. a provider CLI that may be on a
+        // subscription): the reported reference price is an upper bound, so the
+        // cap still binds instead of failing closed for the rest of the day.
+        cost += e.reference_cost_usd;
+      } else if (hasCostEvidence) {
+        // A call that reported no usage (aborted at its wall clock, failed
+        // before the provider answered) carries only an "unknown" marker: its
+        // tokens are still charged through the dot ledger, so it makes the cost
+        // partial rather than pausing the scope until the UTC rollover.
+        if (attributable && hasUsage) costUnknown = true;
         else costPartial = true;
       }
     };

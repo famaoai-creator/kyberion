@@ -136,7 +136,10 @@ function inboxPath(scope?: MemoryScopeEnvelope): string {
 }
 
 function ensureInboxDir(filePath = inboxPath()): void {
-  safeMkdir(path.dirname(filePath), { recursive: true });
+  // mkdir only when missing: a writer granted just the entries file
+  // (infrastructure_sentinel delivering a dot digest) may not mkdir the inbox root.
+  if (!safeExistsSync(path.dirname(filePath)))
+    safeMkdir(path.dirname(filePath), { recursive: true });
 }
 
 function inboxEntryCatalog(filePath: string): GovernedCatalog<DeliverableInboxEntry> {

@@ -44,6 +44,7 @@ import {
 import {
   createGoal,
   GOAL_CONVERGENCE_MODE_PROMPT,
+  GOAL_EVENT_HANDLER_AUDIT_PROMPT,
   GOAL_STEADY_PROGRESS_PROMPT,
   type GoalRuntimeState,
 } from './worker-goal.js';
@@ -706,6 +707,30 @@ function fakeWallClockScheduler(): {
   };
   return handle;
 }
+
+describe('runGoalDrivenLoop — event-handler goals (dot wakes)', () => {
+  it('uses the event-handler audit wording and skips the grace turn when budgetGraceStep is false', async () => {
+    const backend = scriptedBackend([
+      { toolCalls: [{ name: 'search', input: { q: 'first' } }] },
+      { text: 'should never run', toolCalls: [{ name: 'search', input: {} }] },
+    ]);
+    const result = await runGoalDrivenLoop({
+      objective: 'handle this wake',
+      goalId: 'g-event-handler',
+      backend,
+      completionMode: 'event_handler',
+      budgetGraceStep: false,
+      budget: { turnBudget: 1 },
+    });
+    expect(result.finalState).toBe('blocked');
+    expect(result.goal.terminalReason).toBe('goal budget reached: turn budget 1');
+    expect(result.turnsRun).toBe(1);
+    expect(backend.prompts).toHaveLength(1);
+    expect(backend.prompts[0]).toContain(GOAL_EVENT_HANDLER_AUDIT_PROMPT);
+    expect(backend.prompts[0]).not.toContain('is NOT complete');
+    expect(appliedSequence()).toEqual(['continue']);
+  });
+});
 
 describe('runGoalDrivenLoop — KD-02 acceptance #1: token budget grace step then blocked', () => {
   it('forwards deferred tool settings to the budget grace turn', async () => {

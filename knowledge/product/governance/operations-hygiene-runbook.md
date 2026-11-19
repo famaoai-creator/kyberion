@@ -2,7 +2,7 @@
 title: 'Operations Hygiene Runbook: keeping fixed operational gaps fixed'
 tags:
   [governance, operations, ci, retention, daemons, tests, recurrence-prevention, secure-io, symlink]
-last_updated: 2026-11-16
+last_updated: 2026-11-18
 ---
 
 # Operations Hygiene Runbook
@@ -839,11 +839,35 @@ means the lock is orphaned. Mark verifiably dead heartbeat pids (`ESRCH` only) `
 leave `EPERM` heartbeats alone. A dot watching an append-only store it writes to (e.g.
 `ops-alerts.jsonl`) must declare `ignore_jsonl_kinds` for its own record kinds — the
 `operator_notification_undelivered` rows the notify path appends would otherwise re-wake the
-watcher every append (see `dot-runtime.ts` `watchAppendOnlyIgnoredKinds` and the Watches entry
+watcher every append (see `dot-append-watch.ts` `watchAppendOnlyIgnoredKinds` and the Watches entry
 in [resident-dot-model](../architecture/resident-dot-model.md)). An undelivered operator
 notification must also surface as a deduped companion alert through the shared dedupe state in
 `ops-alert-log.ts` — appended directly, never via `sendOpsAlert`, which would re-enter the
 delivery path it just failed.
+
+**Watchdog paging (sleep-aware, per daemon).** The daemon watchdog
+(`scripts/daemon/daemon_watchdog.ts`) watches the `DEFAULT_DAEMONS` that
+`resident-services.json` marks `required`, plus `optional` ones that actually run here (an
+owned OS unit or an enabled `owner_surface`); an optional daemon only ever warns. A stale or
+missing heartbeat pages `critical` only when the previous watchdog run was unhealthy for the
+same daemon AND ran less than `DAEMON_WATCHDOG_CONFIRM_WINDOW_MS` (2 × the unit interval)
+ago; a first sighting or a run after a sleep gap is a grace run and warns. The last run lives
+in `active/shared/runtime/heartbeats/watchdog-runs/last-run.json`
+(`scripts/daemon/daemon_watchdog_state.ts`). Alerts are keyed
+`daemon-watchdog:<daemon>:<severity>` with a 60-minute re-page interval, and a recovered
+daemon gets one `info` record. `run_baseline_check`'s `scheduler:chronos-daemon-dead` page
+uses the same state: it pages only when the watchdog's recent run also saw chronos unhealthy
+(or no watchdog state exists), so a wake does not spend the day's alert. Never page on a single
+heartbeat observation.
+
+**Schedule failure tracking.** `completeScheduledPipelineRun` keeps `consecutiveFailures`,
+`failingSince` and a bounded `lastError` (first failed step, ≤500 chars) per schedule and
+resets them on success; the failed-schedule sweep alert carries them. Tracking never
+auto-disables — that stays with the failure policy.
+
+**Latency regressions need an absolute floor.** `evaluateDegradation` drops relative
+regressions unless the last run is ≥ `LATENCY_REGRESSION_MIN_LAST_MS` (1000 ms) or slower by
+≥ `LATENCY_REGRESSION_MIN_DELTA_MS` (500 ms); 69 → 294 ms is noise, not degradation.
 
 **Review checklist** (when a PR adds a loop or a spawn): in-flight guard, signal handlers, stopped
 heartbeat, child deadline, `'error'` listener, test with a mocked child.
@@ -3584,3 +3608,9 @@ refused rather than adopted.
   has no such boundary and must not serve without a configured token. A socket path that reads
   as a number is refused, because Node binds it as a TCP port on every interface. Gate:
   `scripts/agent/agent_runtime_supervisor_daemon.test.ts`.
+  A supervisor self-recycle must reject new mutating IPC before draining and wait for
+  every admitted mutation, including an `ensure` still awaiting runtime publication.
+  Gate: `scripts/agent/agent_runtime_supervisor_daemon.stale-code-recycle.test.ts`.
+  Mission verification reads `NEXT_TASKS.json` strictly: a missing or invalid board
+  cannot become an empty completed board, including under an open-task override.
+  Gate: `libs/core/mission/mission-lifecycle.test.ts`.

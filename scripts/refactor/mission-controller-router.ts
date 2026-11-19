@@ -592,11 +592,21 @@ export async function runMissionControllerAction(
         await context.importMission(arg1!, arg2!);
       },
       verify: async () => {
-        await context.verifyMission(
-          arg1!,
-          (arg2 as 'verified' | 'rejected') || 'verified',
-          arg3 || ''
-        );
+        const allowOpenTasks = getValue('--allow-open-tasks', context.argv);
+        if (allowOpenTasks) {
+          await context.verifyMission(
+            arg1!,
+            (arg2 as 'verified' | 'rejected') || 'verified',
+            arg3 || '',
+            allowOpenTasks
+          );
+        } else {
+          await context.verifyMission(
+            arg1!,
+            (arg2 as 'verified' | 'rejected') || 'verified',
+            arg3 || ''
+          );
+        }
       },
       distill: async () => {
         await context.distillMission(arg1!);
@@ -863,7 +873,7 @@ export async function runMissionControllerAction(
         return;
       },
       'record-evidence': async () => {
-        await context.recordEvidence(
+        const recorded = await context.recordEvidence(
           arg1!,
           arg2 || 'manual',
           arg3 || 'evidence recorded',
@@ -878,6 +888,10 @@ export async function runMissionControllerAction(
               )
             : undefined
         );
+        // A task that stayed open says why (missing deliverable / pending dependencies).
+        const completion = (recorded as { task_completion?: { completed?: boolean } } | undefined)
+          ?.task_completion;
+        if (completion && !completion.completed) context.print?.(recorded);
       },
       'review-task': async () => {
         const findingsRaw = getValue('--findings', context.argv);

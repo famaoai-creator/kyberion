@@ -4,7 +4,13 @@
  */
 
 import * as path from 'node:path';
-import { safeExec, safeExecResult, safeExistsSync } from '../secure-io.js';
+import {
+  safeExec,
+  safeExecResult,
+  safeExistsSync,
+  safeReadFile,
+  safeWriteFile,
+} from '../secure-io.js';
 import { logger } from '../core.js';
 import { resolveRole } from '../authority.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
@@ -37,13 +43,96 @@ export function deriveMissionBranchName(missionId: string): string {
   return `mission/${normalized || 'unnamed'}`;
 }
 
+/**
+ * Paths a mission micro-repo never versions: meeting recordings and other
+ * large media. Committing them (1 GB+ across minutes missions) made every
+ * evidence commit slow enough to hit git ETIMEDOUT. The files stay on disk
+ * under evidence/ — only git stops tracking new ones.
+ */
+export const MISSION_REPO_MEDIA_IGNORES: readonly string[] = [
+  'evidence/audio/',
+  '*.wav',
+  '*.mp3',
+  '*.m4a',
+  '*.aac',
+  '*.flac',
+  '*.ogg',
+  '*.opus',
+  '*.aiff',
+  '*.caf',
+  '*.webm',
+  '*.mp4',
+  '*.mov',
+];
+
+const MISSION_REPO_IGNORE_HEADER =
+  '# kyberion: large media is kept on disk but never committed to the mission repo';
+
+/**
+ * Ensures the mission repo's `.gitignore` excludes large media. Idempotent:
+ * appends only the missing patterns and keeps any existing lines. Returns the
+ * patterns it added. Files already tracked stay tracked (history is never
+ * rewritten); only new media stops being staged.
+ */
+export function ensureMissionRepoMediaIgnores(missionDir: string): string[] {
+  const ignorePath = path.join(missionDir, '.gitignore');
+  let existing = '';
+  if (safeExistsSync(ignorePath)) {
+    existing = String(safeReadFile(ignorePath, { encoding: 'utf8' }));
+  }
+  const present = new Set(existing.split(/\r?\n/).map((line) => line.trim()));
+  const missing = MISSION_REPO_MEDIA_IGNORES.filter((pattern) => !present.has(pattern));
+  if (missing.length === 0) return [];
+  const prefix = existing.length > 0 && !existing.endsWith('\n') ? '\n' : '';
+  const header = present.has(MISSION_REPO_IGNORE_HEADER) ? [] : [MISSION_REPO_IGNORE_HEADER];
+  safeWriteFile(ignorePath, `${existing}${prefix}${[...header, ...missing].join('\n')}\n`);
+  return missing;
+}
+
+/**
+ * Stages every change in the mission repo except ignored media. Tolerant: a
+ * failed add (an ignored path named explicitly, a slow filesystem) is logged
+ * and reported instead of aborting the caller, which has already persisted
+ * its state. Returns false when staging failed.
+ */
+export function stageMissionRepoChanges(missionDir: string): boolean {
+  // Without its own .git, git would walk up to the enclosing checkout (where
+  // active/ is ignored) — never stage there.
+  if (!safeExistsSync(path.join(missionDir, '.git'))) {
+    logger.warn(
+      `mission repo staging skipped — no .git in the mission directory | next: initialize the mission repo (mission_controller start) | evidence: ${missionDir}`
+    );
+    return false;
+  }
+  try {
+    ensureMissionRepoMediaIgnores(missionDir);
+  } catch (error) {
+    logger.warn(
+      `mission repo .gitignore not updated — ${error instanceof Error ? error.message : String(error)} | next: add evidence/audio/ to ${path.join(missionDir, '.gitignore')} by hand | evidence: ${missionDir}`
+    );
+  }
+  const added = safeExecResult('git', ['add', '-A', '--', '.'], {
+    cwd: missionDir,
+    timeoutMs: 120_000,
+  });
+  if (added.status === 0) return true;
+  const stderr = (added.stderr || added.error?.message || '').trim();
+  // "paths are ignored by one of your .gitignore files" exits 1 but stages the rest.
+  if (/ignored by one of your \.gitignore files/i.test(stderr)) return true;
+  logger.warn(
+    `mission repo staging failed — ${stderr.split('\n')[0] || `exit ${added.status}`} | next: inspect the mission repo with git status; evidence was recorded in the ledger | evidence: ${missionDir}`
+  );
+  return false;
+}
+
 export function initMissionRepo(missionDir: string, missionId?: string): void {
   if (!safeExistsSync(path.join(missionDir, '.git'))) {
     logger.info(`🌱 Initializing independent Git repo for mission at ${missionDir}...`);
     safeExec('git', ['init'], { cwd: missionDir });
     safeExec('git', ['config', 'user.name', 'Kyberion Sovereign Entity'], { cwd: missionDir });
     safeExec('git', ['config', 'user.email', 'sovereign@kyberion.local'], { cwd: missionDir });
-    safeExec('git', ['add', '.'], { cwd: missionDir });
+    ensureMissionRepoMediaIgnores(missionDir);
+    safeExec('git', ['add', '-A', '--', '.'], { cwd: missionDir });
     safeExec('git', ['commit', '-m', 'chore: initial mission state'], { cwd: missionDir });
     safeExec(
       'git',

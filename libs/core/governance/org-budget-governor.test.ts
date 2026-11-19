@@ -211,6 +211,56 @@ describe('org-budget-governor', () => {
     }
   );
 
+  it('counts a CLI reference cost when the billing mode is unrecorded instead of failing closed', () => {
+    // Shape recorded by provider-CLI dot wakes: usage + provider-reported
+    // reference cost, billing_mode unknown, so the billable cost_usd is null.
+    const cliWake = {
+      timestamp: '2026-10-04T01:00:00Z',
+      component: 'claude-cli',
+      actor_id: 'dot:a',
+      accounting_id: 'acct-1',
+      scope: { tier: 'public', scope_kind: 'system' },
+      billing_mode: 'unknown',
+      usage_source: 'provider',
+      usage: { prompt_tokens: 2, completion_tokens: 900 },
+      reference_cost_usd: 1.5,
+      cost_source: 'provider_report',
+      cost_usd: null,
+      cost_status: 'unknown',
+    };
+    const deps = base({
+      readDotTokenUsage: () => [],
+      policy: { daily_token_cap: 10_000, daily_cost_cap_usd: 10, soft_ratio: 0.8, hard_ratio: 1 },
+    });
+    const one = evaluateBudgetThrottle({}, { ...deps, readMetricsHistory: () => [cliWake] });
+    expect(one.throttle).toBe('normal');
+    expect(one.usage.cost_usd).toBe(1.5);
+    expect(one.usage.cost_status).toBeUndefined();
+    // The reference price still binds the cost cap.
+    const many = evaluateBudgetThrottle(
+      {},
+      { ...deps, readMetricsHistory: () => Array.from({ length: 7 }, () => cliWake) }
+    );
+    expect(many.throttle).toBe('hard');
+    expect(many.reason).toContain('cost $10.5/$10');
+    // Without any reference price the cost stays unknown and fails closed.
+    const bare = { ...cliWake, reference_cost_usd: undefined, cost_source: undefined };
+    const blind = evaluateBudgetThrottle({}, { ...deps, readMetricsHistory: () => [bare] });
+    expect(blind.usage.cost_status).toBe('unknown');
+    expect(blind.throttle).toBe('hard');
+    // A call aborted before any usage report (wall-clock timeout) has no spend
+    // evidence to price: partial, not a day-long pause.
+    const aborted = {
+      ...bare,
+      status: 'error',
+      usage: undefined,
+      cost_source: 'none',
+    };
+    const timedOut = evaluateBudgetThrottle({}, { ...deps, readMetricsHistory: () => [aborted] });
+    expect(timedOut.usage.cost_status).toBe('partial');
+    expect(timedOut.throttle).toBe('normal');
+  });
+
   it('alerts once per scope/day/throttle', () => {
     const alert = vi.fn();
     const e = evaluateBudgetThrottle({ tenant_slug: 'acme' }, base());
@@ -224,7 +274,7 @@ describe('org-budget-governor', () => {
 
   it('loads the shipped policy with cost cap inherited and caches 60 s', () => {
     const p = loadOrgBudgetPolicy(now);
-    expect(p.daily_token_cap).toBe(3_000_000);
+    expect(p.daily_token_cap).toBe(5_000_000);
     expect(p.soft_ratio).toBe(0.8);
     expect(p.daily_cost_cap_usd).toBe(50);
     expect(loadOrgBudgetPolicy(now)).toBe(p);

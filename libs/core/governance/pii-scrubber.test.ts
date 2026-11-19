@@ -188,6 +188,14 @@ describe('scanContent', () => {
     expect(
       scanContent('番号は次のとおり。4111 1111 1111 1111').findings.map((f) => f.rule_id)
     ).toContain('CREDIT_CARD');
+    // Epoch-millisecond timestamps that happen to pass Luhn (dot watch trigger
+    // keys) are not card numbers: no issuer starts with 1.
+    expect(
+      scanContent('watch:ops-alerts.jsonl@1794901636305:560092').findings.map((f) => f.rule_id)
+    ).not.toContain('CREDIT_CARD');
+    expect(scanContent('card 5555 5555 5555 4444').findings.map((f) => f.rule_id)).toContain(
+      'CREDIT_CARD'
+    );
   });
 
   it('bank account needs 支店/口座 context; postal needs 〒; dates are not phone numbers', () => {

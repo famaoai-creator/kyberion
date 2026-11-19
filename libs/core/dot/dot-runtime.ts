@@ -1,5 +1,4 @@
 import { buildTrustedInformationAssetWakeProposals } from '../information-assets/collector-wake.js';
-import { runtimeStatePath } from '../foundation/runtime-state-roots.js';
 import {
   assertEventContinuationOutput,
   claimEventContinuation,
@@ -35,7 +34,7 @@ import { loadDotExecutionPolicy } from './dot-execution-policy.js';
  */
 
 import * as path from 'node:path';
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { pathResolver } from '../path-resolver.js';
 import {
   assertSafeRepositoryPath,
@@ -44,14 +43,9 @@ import {
   safeMkdir,
   safeReadFile,
 } from '../secure-io.js';
-import { appendJsonLine, readJsonIfPresent, writeJson } from '../foundation/json.js';
+import { writeJson } from '../foundation/json.js';
 import { readJsonLinesCached } from '../storage/jsonl-tail.js';
-import { readJsonLinesCachedAcrossCompaction } from '../storage/jsonl-parked-read.js';
 import { streamJsonLines } from '../storage/jsonl-read.js';
-import {
-  compactDotWakeLedgerAt,
-  type DotWakeLedgerCompactionResult,
-} from './dot-wake-ledger-compaction.js';
 import {
   DOT_TOKEN_USAGE_PATH,
   maintainDotTokenUsageAfterAppend,
@@ -67,8 +61,8 @@ import {
   alertDotWakeLocalBackendUnavailable,
   buildLocalOnlyWakeBackend,
 } from './dot-local-backend.js';
-import { watchAppendOnlyIgnoredKinds } from './dot-append-watch.js';
-import { sendOpsAlert, type OpsAlertInput } from '../daemon/ops-alert.js';
+import { summarizeAppendedJsonlRecords, watchAppendOnlyIgnoredKinds } from './dot-append-watch.js';
+import type { OpsAlertInput } from '../daemon/ops-alert.js';
 import type {
   ReasoningBackend,
   ToolCall,
@@ -108,14 +102,22 @@ import {
   dotBoundsPromptLines,
   type DotActionRecord,
 } from './dot-dispatch.js';
-import { dotFeedbackPromptLines, dotSignalStatusLines } from './dot-feedback.js';
+import { dotFeedbackPromptLines, dotSignalStatusLines, readDotFeedback } from './dot-feedback.js';
+import { readDotActionLedger } from './dot-action-ledger.js';
+import { loadApprovalRequest } from '../governance/approval-store-reader.js';
+import { AUTONOMY_APPROVAL_CHANNEL } from '../governance/approval-decision-card.js';
 import { dotStatePath } from './dot-state-paths.js';
+import {
+  DOT_WAKE_SUSPENSION_THRESHOLD_MS,
+  startDotWakeSuspensionMonitor,
+  type DotWakeSuspensionMonitorFactory,
+} from './dot-wake-suspension.js';
 import { DOT_PROMPT_SECTIONS, DOT_WAKE_TOOLS } from './dot-extension-registry.js';
 import { dotExtCtx, type DotExtCtx } from './dot-extensions.js';
 import {
+  evaluateDotFollowupsDue,
   followupRetryEvidence,
   recoverRetainedDotFollowup,
-  type DotFollowupInput,
 } from './dot-followups.js';
 import { dotOutcomeContinuation } from './dot-progress.js';
 import { assertDotStateLayoutReady } from './dot-state-paths.js';
@@ -128,7 +130,6 @@ import {
 
 const logger = createLogger('dot-runtime');
 
-export const DOT_WAKE_LEDGER_PATH = runtimeStatePath('dot.wakeLedger').logicalPath;
 export { DOT_TOKEN_USAGE_PATH, type DotTokenUsageEntry } from './dot-token-usage.js';
 export const DOT_WATCH_STATE_PATH = 'active/shared/runtime/dot-watch-state.json';
 export const DOT_PROBE_STATE_PATH = 'active/shared/runtime/dot-probe-state.json';
@@ -139,20 +140,59 @@ import {
   dotInboxWakeKey,
   DOT_EXECUTOR_REPORT_SOURCE_VALUE,
 } from './dot-inbox.js';
+import {
+  classifyDotWakeReason,
+  dotWakeErrorsPath,
+  isDotWakeProcessFailure,
+  DOT_WAKE_FAILURE_CATEGORY,
+  type DotWakeFailureCategory,
+} from './dot-wake-reasons.js';
+import {
+  appendJsonlEnsured,
+  DOT_WAKE_LEDGER_PATH,
+  dotRuntimePath as runtimePath,
+  readDotWakeLedger,
+  recordDotWakeOutcome,
+  type DotWakeLedgerEntry,
+  type DotWakeOutcome,
+  type DotWakeTrigger,
+} from './dot-wake-ledger.js';
+import {
+  applyDotWakeCircuit,
+  dotWakeBackoffMs,
+  recordDotCredentialFailureInputs,
+} from './dot-wake-circuit.js';
+// Moved out of this module; re-exported so existing callers keep one import site.
+export {
+  DOT_WAKE_FAILURE_CATEGORY,
+  classifyDotWakeReason,
+  dotWakeErrorsPath,
+  isDotWakeProcessFailure,
+  normalizeDotWakeReason,
+  type DotWakeFailureCategory,
+  type DotWakeReasonCode,
+} from './dot-wake-reasons.js';
+export {
+  DOT_WAKE_LEDGER_PATH,
+  compactDotWakeLedger,
+  readDotWakeLedger,
+  recordDotWakeOutcome,
+  type DotWakeLedgerEntry,
+  type DotWakeOutcome,
+  type DotWakeTrigger,
+} from './dot-wake-ledger.js';
+export {
+  DOT_WAKE_CIRCUIT_THRESHOLD,
+  DOT_WAKE_CREDENTIAL_RECHECK_MS,
+  DOT_WAKE_MAX_BACKOFF_MS,
+  DOT_WAKE_RETRY_AFTER_MS,
+  applyDotWakeCircuit,
+  dotCredentialInputsFingerprint,
+  dotWakeBackoffMs,
+  evaluateDotWakeCircuit,
+  type DotWakeCircuitState,
+} from './dot-wake-circuit.js';
 
-/** A failed wake is retried no sooner than this (per trigger key); doubles per consecutive failure. */
-export const DOT_WAKE_RETRY_AFTER_MS = 5 * 60 * 1000;
-/** Ceiling of the per-key / per-dot exponential backoff. */
-export const DOT_WAKE_MAX_BACKOFF_MS = 6 * 60 * 60 * 1000;
-/** Consecutive same-reason failures that open a dot's wake circuit. */
-export const DOT_WAKE_CIRCUIT_THRESHOLD = 5;
-
-/** `min(5min * 2^(n-1), 6h)` for the n-th consecutive failure (n >= 1). */
-export function dotWakeBackoffMs(consecutiveFailures: number): number {
-  if (consecutiveFailures <= 0) return 0;
-  const exponent = Math.min(consecutiveFailures - 1, 30);
-  return Math.min(DOT_WAKE_RETRY_AFTER_MS * 2 ** exponent, DOT_WAKE_MAX_BACKOFF_MS);
-}
 /** Ceiling for a delegated-turn wake when the charter sets no wall clock. */
 const DEFAULT_DELEGATED_WAKE_TIMEOUT_MS = 15 * 60 * 1000;
 
@@ -173,6 +213,10 @@ export interface DotWakeLoopOptions {
     wallClockBudgetMs?: number;
     turnBudget?: number;
   };
+  /** Goal driver completion-audit wording; dot wakes use `event_handler`. */
+  completionMode?: 'strict' | 'event_handler';
+  /** Goal driver KD-02 grace step after a reached budget; dot wakes pass false. */
+  budgetGraceStep?: boolean;
   /** The proposal tool plus registered wake tools — the only tools a dot is given. */
   extraTools?: ToolDefinition[];
   executeTool?: (call: ToolCall) => { resultText: string };
@@ -206,37 +250,6 @@ function wallClockCancelledReason(result: DotWakeLoopResult): string | undefined
   const reason = result.goal.terminalReason ?? '';
   if (result.finalState !== 'blocked' || !/wall[-_]clock budget/.test(reason)) return undefined;
   return `wake tool loop exceeded its wall_clock budget before a backend turn completed (${reason})`;
-}
-
-export type DotWakeOutcome = 'delivered' | 'skipped' | 'failed' | 'rejected';
-
-/** Runtime-only trigger kinds beyond the charter's declared ones. */
-export type DotWakeTrigger = DotTrigger | { kind: 'followup' } | { kind: 'outcome' };
-
-export interface DotWakeLedgerEntry {
-  scope?: DotCharter['scope'];
-  /** Durable event attempt correlation; absence never proves a dispatch did not occur. */
-  event_attempt_id?: string;
-  dot_id: string;
-  trigger_key: string;
-  kind: DotWakeTrigger['kind'] | 'manual';
-  fired_at: string;
-  outcome: DotWakeOutcome;
-  reason?: string;
-  /** Classified cause of a failed wake; `reason` keeps the original text. */
-  reason_code?: DotWakeReasonCode;
-  turns_run?: number;
-  tokens_used?: number;
-  /** The dot's own words (proposal block removed), so "why did it propose nothing?" is answerable. */
-  summary?: string;
-  /**
-   * Delivered, but the trigger stays pending: the follow-up this wake was
-   * completing could not persist its successor, so the parent follow-up is
-   * retried (with failure backoff) instead of silently ending the chain.
-   */
-  trigger_retained?: boolean;
-  /** Exact schedule to recover without replaying the model or governed proposals. */
-  followup_retry?: { scheduled_at: string; values: DotFollowupInput[] };
 }
 
 function escapeRegExp(value: string): string {
@@ -303,7 +316,7 @@ export interface DotRuntimeDeps {
   hasRole?: (role: string) => boolean;
   /** Proposal governance port; defaults to {@link dispatchDotProposals}. */
   dispatch?: (charter: DotCharter, proposals: readonly DotProposal[]) => DotActionRecord[];
-  /** Ops-alert port for the wake circuit; defaults to {@link sendOpsAlert}. */
+  /** Ops-alert port for the wake circuit; defaults to `sendOpsAlert` (dot-wake-circuit.ts). */
   opsAlert?: (input: OpsAlertInput) => void;
   /**
    * Set by orchestration when backend resolution found nothing real to run
@@ -311,45 +324,13 @@ export interface DotRuntimeDeps {
    * instead of fabricating a delivery.
    */
   backendUnavailable?: string;
-}
-
-function runtimePath(rootDir: string | undefined, rel: string): string {
-  return path.join(rootDir ?? pathResolver.rootDir(), rel);
-}
-
-/**
- * The wake ledger is load-bearing history (a delivered/rejected key stays
- * consumed forever), so it is never truncated; instead every hot-path read —
- * due-ness, the circuit, and the per-skip dedupe in
- * {@link recordDotWakeOutcome} — goes through a per-process incremental
- * replay that parses only the rows appended since the previous call (G01).
- */
-export function readDotWakeLedger(deps: DotRuntimeDeps = {}): DotWakeLedgerEntry[] {
-  // Parked-aware: a compaction in another process never hides consumed keys.
-  return readJsonLinesCachedAcrossCompaction<DotWakeLedgerEntry>(
-    runtimePath(deps.rootDir, DOT_WAKE_LEDGER_PATH)
-  )
-    .filter((row) => typeof row?.dot_id === 'string' && typeof row?.trigger_key === 'string')
-    .map((row) => {
-      if (row.scope?.tier === 'public' && !row.scope.tenant_slug) return row;
-      // Old unscoped rows never become public just because their producer omitted tier.
-      return {
-        ...row,
-        summary: undefined,
-        followup_retry: undefined,
-        ...(row.reason
-          ? {
-              reason: isDotWakeProcessFailure(row.reason)
-                ? DOT_WAKE_FAILURE_CATEGORY.backend
-                : row.reason_code === 'charter' || row.reason === DOT_WAKE_FAILURE_CATEGORY.charter
-                  ? DOT_WAKE_FAILURE_CATEGORY.charter
-                  : row.outcome === 'failed'
-                    ? DOT_WAKE_FAILURE_CATEGORY.wake
-                    : `scoped wake ${row.outcome}`,
-            }
-          : {}),
-      };
-    });
+  /** Host-suspension detector for one wake (test seam); defaults to the timer-gap monitor. */
+  suspensionMonitor?: DotWakeSuspensionMonitorFactory;
+  /**
+   * Fingerprint of the inputs a `credential_grant` failure depends on (test
+   * seam); defaults to {@link dotCredentialInputsFingerprint}.
+   */
+  credentialInputsFingerprint?: (charter: DotCharter) => string | undefined;
 }
 
 /** Owner-scoped diagnostics; the global ledger remains a content-free control index. */
@@ -377,109 +358,6 @@ export {
   DOT_WAKE_LEDGER_COMPACT_MIN_BYTES,
   type DotWakeLedgerCompactionResult,
 } from './dot-wake-ledger-compaction.js';
-
-/** Replay-safe, size-gated compaction of the wake ledger (see dot-wake-ledger-compaction.ts). */
-export function compactDotWakeLedger(
-  deps: DotRuntimeDeps & {
-    compactMinBytes?: number;
-    chunkBytes?: number;
-    maxLineBytes?: number;
-  } = {}
-): DotWakeLedgerCompactionResult {
-  return compactDotWakeLedgerAt(runtimePath(deps.rootDir, DOT_WAKE_LEDGER_PATH), {
-    compactMinBytes: deps.compactMinBytes,
-    chunkBytes: deps.chunkBytes,
-    maxLineBytes: deps.maxLineBytes,
-    now: deps.now?.(),
-  });
-}
-
-function appendJsonlEnsured(rel: string, value: unknown, deps: DotRuntimeDeps): void {
-  const filePath = runtimePath(deps.rootDir, rel);
-  safeMkdir(path.dirname(filePath), { recursive: true });
-  appendJsonLine(filePath, value);
-}
-
-/**
- * Append a wake-ledger row. 'skipped' rows are written at most once per
- * trigger key — they are an audit marker, not a consumption record.
- */
-export function recordDotWakeOutcome(
-  charter: DotCharter,
-  trigger: DueDotTrigger | undefined,
-  outcome: DotWakeOutcome,
-  deps: DotRuntimeDeps & {
-    reason?: string;
-    reason_code?: DotWakeReasonCode;
-    turns_run?: number;
-    tokens_used?: number;
-    summary?: string;
-    trigger_retained?: boolean;
-    followup_retry?: DotWakeLedgerEntry['followup_retry'];
-  } = {}
-): void {
-  const now = deps.now?.() ?? new Date();
-  const key = trigger?.key ?? `manual:${now.toISOString()}`;
-  if (outcome === 'skipped') {
-    const already = readDotWakeLedger(deps).some(
-      (row) => row.dot_id === charter.dot_id && row.trigger_key === key && row.outcome === 'skipped'
-    );
-    if (already) return;
-  }
-  // The writer maintains its own store: wakes are rare, so an opportunistic
-  // size-gated compaction here keeps the ledger bounded without a hot-path
-  // read — a compaction failure must never block outcome recording.
-  try {
-    compactDotWakeLedger(deps);
-  } catch (error) {
-    logger.warn(
-      `[DOT] wake-ledger compaction failed — ledger stays append-only | next: inspect the archive/staging siblings | evidence: ${error instanceof Error ? error.message : String(error)}`
-    );
-  }
-  const row: DotWakeLedgerEntry = {
-    scope: charter.scope,
-    dot_id: charter.dot_id,
-    ...(deps.eventAttemptId ? { event_attempt_id: deps.eventAttemptId } : {}),
-    trigger_key: key,
-    kind: trigger?.trigger.kind ?? 'manual',
-    fired_at: now.toISOString(),
-    outcome,
-    ...(deps.reason ? { reason: deps.reason } : {}),
-    ...(outcome === 'failed'
-      ? { reason_code: deps.reason_code ?? classifyDotWakeReason(deps.reason) }
-      : {}),
-    ...(deps.turns_run !== undefined ? { turns_run: deps.turns_run } : {}),
-    ...(deps.tokens_used !== undefined ? { tokens_used: deps.tokens_used } : {}),
-    ...(deps.summary ? { summary: deps.summary } : {}),
-    ...(deps.trigger_retained && outcome === 'delivered' ? { trigger_retained: true } : {}),
-    ...(deps.followup_retry ? { followup_retry: deps.followup_retry } : {}),
-  };
-  const scoped = charter.scope.tier !== 'public' || Boolean(charter.scope.tenant_slug);
-  if (scoped) appendJsonlEnsured(dotStatePath(charter, 'wake-ledger.jsonl'), row, deps);
-  appendJsonlEnsured(
-    DOT_WAKE_LEDGER_PATH,
-    scoped
-      ? {
-          ...row,
-          summary: undefined,
-          followup_retry: undefined,
-          ...(row.reason
-            ? {
-                reason: isDotWakeProcessFailure(row.reason)
-                  ? DOT_WAKE_FAILURE_CATEGORY.backend
-                  : row.reason_code === 'charter' ||
-                      row.reason === DOT_WAKE_FAILURE_CATEGORY.charter
-                    ? DOT_WAKE_FAILURE_CATEGORY.charter
-                    : row.outcome === 'failed'
-                      ? DOT_WAKE_FAILURE_CATEGORY.wake
-                      : `scoped wake ${row.outcome}`,
-              }
-            : {}),
-        }
-      : row,
-    deps
-  );
-}
 
 export function recordDotTokenUsage(
   dotId: string,
@@ -613,8 +491,9 @@ function watchTriggerKey(
   charter: DotCharter,
   rel: string,
   deps: DotRuntimeDeps,
-  ignoredKinds: readonly string[] = []
-): string | null {
+  ignoredKinds: readonly string[] = [],
+  minSeverity?: string
+): { key: string; detail: string } | null {
   const current = confinedWatchStat(rel, deps);
   if (!current) return null;
   const state = readWatchState(deps);
@@ -623,9 +502,16 @@ function watchTriggerKey(
     return null;
   }
   if (
-    ignoredKinds.length > 0 &&
+    (ignoredKinds.length > 0 || minSeverity !== undefined) &&
     snapshot &&
-    watchAppendOnlyIgnoredKinds(rel, snapshot.size, current.size, ignoredKinds, deps.rootDir)
+    watchAppendOnlyIgnoredKinds(
+      rel,
+      snapshot.size,
+      current.size,
+      ignoredKinds,
+      deps.rootDir,
+      minSeverity
+    )
   ) {
     writeWatchState(
       {
@@ -636,7 +522,22 @@ function watchTriggerKey(
     );
     return null;
   }
-  return `watch:${rel}@${Math.round(current.mtime_ms)}:${current.size}`;
+  // Append-only JSONL: carry the wake-worthy appended records (bounded) so the
+  // wake does not spend turns rediscovering what changed.
+  const appended =
+    snapshot && rel.endsWith('.jsonl') && current.size > snapshot.size
+      ? summarizeAppendedJsonlRecords(rel, snapshot.size, current.size, {
+          ignored: ignoredKinds,
+          ...(minSeverity !== undefined ? { minSeverity } : {}),
+          ...(deps.rootDir ? { rootDir: deps.rootDir } : {}),
+        })
+      : undefined;
+  return {
+    key: `watch:${rel}@${Math.round(current.mtime_ms)}:${current.size}`,
+    detail: appended
+      ? `watch ${rel} changed\nAppended records:\n${appended}`
+      : `watch ${rel} changed`,
+  };
 }
 
 /** `payload.report_from` of an executor report-back inbox row (DL-01). */
@@ -710,73 +611,6 @@ export function buildDotDueChecker(
 }
 
 /**
- * Category-only failure reasons. Tenant dots write only these to the shared
- * system-floor wake ledger and heartbeat; the full message goes to the
- * tenant-scoped `wake-errors.jsonl` ({@link dotWakeErrorsPath}).
- */
-export const DOT_WAKE_FAILURE_CATEGORY = {
-  charter: 'charter unreadable',
-  backend: 'backend unavailable',
-  wake: 'wake failed',
-} as const;
-export type DotWakeFailureCategory =
-  (typeof DOT_WAKE_FAILURE_CATEGORY)[keyof typeof DOT_WAKE_FAILURE_CATEGORY];
-
-/**
- * Backend / process-level failure (no real backend, no tool-capable
- * candidate, failover chain exhausted): not this dot's fault, so it never
- * counts toward the per-dot wake circuit — a healthy dot resumes as soon as
- * the backend recovers instead of being held for the circuit's backoff.
- */
-/**
- * A credential the dot's binding should have served (grant missing/expired, or
- * the bound credential refused at the model call): the tenant's configuration,
- * not the process backend. Counted by the wake circuit, never a reselect.
- */
-const DOT_CREDENTIAL_FAILURE =
-  /\[DOT_CREDENTIAL_GRANT_(?:MISSING|EXPIRED)\]|\[CREDENTIAL_(?:KEY_UNAVAILABLE|PROVIDER_DENIED|ALLOCATION_DENIED|KIND_NOT_ELIGIBLE|ATTESTATION_REQUIRED|TOKEN_EXPIRED|BUDGET_EXCEEDED|CUSTODY_PERSON_MISMATCH|VALUE_CHANGED|RECORD_MISMATCH|RECORD_INVALID)\]/;
-
-export function isDotWakeProcessFailure(reason: string | undefined): boolean {
-  if (!reason) return false;
-  if (DOT_CREDENTIAL_FAILURE.test(reason)) return false;
-  if (reason === DOT_WAKE_FAILURE_CATEGORY.backend) return true;
-  return /no real reasoning backend|lacks generateWithTools|failed across \d+ candidate|has no tool-capable backend/.test(
-    reason
-  );
-}
-
-export type DotWakeReasonCode =
-  | 'backend_unavailable'
-  | 'no_tool_backend'
-  | 'provider_failover_exhausted'
-  | 'wall_clock_exceeded'
-  | 'charter'
-  | 'credential_grant'
-  | 'standing_binding'
-  | 'wake';
-
-/** Map a failed wake's reason text (full text or tenant category) to a stable code. */
-export function classifyDotWakeReason(reason: string | undefined): DotWakeReasonCode {
-  const text = String(reason ?? '');
-  // Standing-binding refusals (dot-standing-binding.ts): fix the grant or claim, not the dot.
-  if (DOT_CREDENTIAL_FAILURE.test(text)) return 'credential_grant';
-  if (/\[DOT_STANDING_[A-Z_]+\]/.test(text)) return 'standing_binding';
-  if (/wall_clock budget/.test(text)) return 'wall_clock_exceeded';
-  if (/lacks generateWithTools|has no tool-capable backend|failed across 0 candidate/.test(text))
-    return 'no_tool_backend';
-  if (/failed across \d+ candidate/.test(text)) return 'provider_failover_exhausted';
-  if (text === DOT_WAKE_FAILURE_CATEGORY.backend || /no real reasoning backend/.test(text))
-    return 'backend_unavailable';
-  if (text === DOT_WAKE_FAILURE_CATEGORY.charter) return 'charter';
-  return 'wake';
-}
-
-/** Tenant-scoped full-text wake error log for a dot. */
-export function dotWakeErrorsPath(charter: DotCharter): string {
-  return dotStatePath(charter, 'wake-errors.jsonl');
-}
-
-/**
  * Record a failed wake. Untenanted dots keep the full reason in the shared
  * ledger; tenant dots write only `category` there and the full reason to
  * their tenant-scoped `wake-errors.jsonl`. Returns the ledger reason.
@@ -788,6 +622,8 @@ function recordDotWakeFailure(
   reason: string,
   deps: DotRuntimeDeps & { turns_run?: number; tokens_used?: number }
 ): string {
+  if (classifyDotWakeReason(reason) === 'credential_grant')
+    recordDotCredentialFailureInputs(charter, deps);
   if (charter.scope.tier === 'public' && !charter.scope.tenant_slug) {
     recordDotWakeOutcome(charter, trigger, 'failed', { ...deps, reason });
     return reason;
@@ -818,163 +654,90 @@ function recordDotWakeFailure(
   return category;
 }
 
-/** Digits and hex runs stripped, so "same failure, different id/mtime" is one reason. */
-export function normalizeDotWakeReason(reason: string | undefined): string {
-  return String(reason ?? '')
-    .replace(/\b[0-9a-f]{6,}\b/gi, '#')
-    .replace(/\d+/g, '#')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 300);
-}
-
-export interface DotWakeCircuitState {
-  /** Trailing failed wakes of this dot sharing one normalized reason. */
-  consecutive: number;
-  /** consecutive >= DOT_WAKE_CIRCUIT_THRESHOLD. */
-  tripped: boolean;
-  /** Tripped and still inside the backoff window — every due trigger is held. */
-  open: boolean;
-  reason?: string;
-  reason_hash?: string;
-  last_failed_at?: string;
-  streak_started_at?: string;
-  /** When a single half-open probe wake is allowed again. */
-  reopens_at?: string;
-}
+/** Default {@link DotCharter.runtime.force_wake_every_ms}: a real cron wake at least every 6 h. */
+export const DOT_FORCE_WAKE_EVERY_MS_DEFAULT = 6 * 60 * 60 * 1000;
+/** Most recent approval-bearing actions inspected by the idle pre-check. */
+const IDLE_CHECK_MAX_APPROVALS = 50;
 
 /**
- * Per-dot wake circuit: the last {@link DOT_WAKE_CIRCUIT_THRESHOLD} wake
- * attempts (skipped audit markers and backend/process-level failures
- * ignored — see {@link isDotWakeProcessFailure}) all failed with the same
- * normalized reason → hold every trigger until `lastFailedAt + backoff(n)`.
- * This is what stops rotating keys (`watch:<file>@<mtime>`) from defeating
- * the per-key backoff and flooding the ledger with one failure per change.
+ * Deterministic no-op pre-check for a cron wake. Returns the idle reason when
+ * the model need not be called: the last real wake of this dot was delivered,
+ * it is younger than `runtime.force_wake_every_ms`, and since it there is no
+ * due inbox row, pending watched-file change, due follow-up, outcome
+ * continuation, new dot-feedback row or approval decision on this dot's
+ * requests. Any signal that cannot be read means "wake" (returns undefined).
  */
-export function evaluateDotWakeCircuit(
+export function dotCronWakeIdleReason(
   charter: DotCharter,
+  trigger: DueDotTrigger | undefined,
   deps: DotRuntimeDeps = {}
-): DotWakeCircuitState {
-  const now = (deps.now?.() ?? new Date()).getTime();
-  // Skipped audit markers and backend/process-level failures are transparent:
-  // they neither extend nor break a dot's own failure streak.
-  const rows = readDotWakeLedger(deps).filter(
-    (row) =>
-      row.dot_id === charter.dot_id &&
-      row.outcome !== 'skipped' &&
-      !(row.outcome === 'failed' && isDotWakeProcessFailure(row.reason))
-  );
-  const last = rows.at(-1);
-  if (!last || last.outcome !== 'failed') return { consecutive: 0, tripped: false, open: false };
-  const reason = normalizeDotWakeReason(last.reason);
-  let consecutive = 0;
-  let streakStart = last;
-  for (let index = rows.length - 1; index >= 0; index -= 1) {
-    const row = rows[index];
-    if (row.outcome !== 'failed' || normalizeDotWakeReason(row.reason) !== reason) break;
-    consecutive += 1;
-    streakStart = row;
-  }
-  const tripped = consecutive >= DOT_WAKE_CIRCUIT_THRESHOLD;
-  const lastAt = Date.parse(last.fired_at);
-  const reopensAt = (Number.isFinite(lastAt) ? lastAt : now) + dotWakeBackoffMs(consecutive);
-  return {
-    consecutive,
-    tripped,
-    open: tripped && now < reopensAt,
-    reason,
-    reason_hash: createHash('sha256').update(reason).digest('hex').slice(0, 12),
-    last_failed_at: last.fired_at,
-    streak_started_at: streakStart.fired_at,
-    ...(tripped ? { reopens_at: new Date(reopensAt).toISOString() } : {}),
-  };
-}
-
-interface DotWakeCircuitMarker {
-  dot_id: string;
-  opening_id: string;
-  alerted_at: string;
-}
-
-function circuitMarkerPath(charter: DotCharter, deps: DotRuntimeDeps): string {
-  return runtimePath(deps.rootDir, dotStatePath(charter, 'wake-circuit', `${charter.dot_id}.json`));
-}
-
-/** One ops alert per circuit opening, durable across daemon restarts. */
-function alertDotWakeCircuitOnce(
-  charter: DotCharter,
-  circuit: DotWakeCircuitState,
-  deps: DotRuntimeDeps
-): void {
-  const openingId = `${circuit.reason_hash}@${circuit.streak_started_at}`;
-  const markerPath = circuitMarkerPath(charter, deps);
+): string | undefined {
+  if (trigger?.trigger.kind !== 'cron' || trigger.circuit) return undefined;
   try {
-    const marker = readJsonIfPresent<DotWakeCircuitMarker>(markerPath);
-    if (marker?.opening_id === openingId) return;
-    const alert =
-      deps.opsAlert ??
-      ((input: OpsAlertInput) =>
-        void sendOpsAlert(
-          input,
-          deps.rootDir
-            ? {
-                alertLogPath: runtimePath(
-                  deps.rootDir,
-                  'active/shared/observability/ops-alerts.jsonl'
-                ),
-              }
-            : {}
-        ));
-    alert({
-      severity: 'warning',
-      title: `Dot wake circuit open: ${charter.dot_id}`,
-      context: {
-        dot_id: charter.dot_id,
-        consecutive_failures: circuit.consecutive,
-        reopens_at: circuit.reopens_at,
-        // All private dots keep failure prose out of the shared alert log.
-        ...(charter.scope.tier === 'public' && !charter.scope.tenant_slug
-          ? { reason: circuit.reason }
-          : {}),
-      },
-      recommendation: `Wakes for ${charter.dot_id} are held until ${circuit.reopens_at}. Inspect \`pnpm kyberion dot status ${charter.dot_id}\` and the wake ledger, fix the cause, then the next half-open wake closes the circuit.`,
-      dedupe_key: `dot-wake-circuit:${charter.dot_id}:${circuit.reason_hash}`,
-      category: 'dot',
-    });
-    safeMkdir(path.dirname(markerPath), { recursive: true });
-    writeJson(markerPath, {
-      dot_id: charter.dot_id,
-      opening_id: openingId,
-      alerted_at: (deps.now?.() ?? new Date()).toISOString(),
-    } satisfies DotWakeCircuitMarker);
-    logger.warn(
-      `wake circuit open for ${charter.dot_id} — ${circuit.consecutive} consecutive failures with one reason | next: fix the cause; one probe wake runs at ${circuit.reopens_at} | evidence: ${DOT_WAKE_LEDGER_PATH}`
-    );
-  } catch (error) {
-    logger.warn(
-      `wake circuit alert failed for ${charter.dot_id} — ${error instanceof Error ? error.message : error} | next: wakes stay held regardless | evidence: ${markerPath}`
-    );
-  }
-}
+    const now = deps.now?.() ?? new Date();
+    const last = readDotWakeLedger(deps)
+      .filter((row) => row.dot_id === charter.dot_id && row.outcome !== 'skipped' && !row.idle_skip)
+      .at(-1);
+    if (!last || last.outcome !== 'delivered' || last.trigger_retained) return undefined;
+    const lastAt = Date.parse(last.fired_at);
+    if (!Number.isFinite(lastAt)) return undefined;
+    const forceEvery = charter.runtime.force_wake_every_ms ?? DOT_FORCE_WAKE_EVERY_MS_DEFAULT;
+    if (now.getTime() - lastAt >= forceEvery) return undefined;
+    // fired_at marks the END of that wake; anything recorded while it ran counts as new.
+    const sinceMs =
+      lastAt - (charter.goal.budget?.wall_clock_ms_per_wake ?? DEFAULT_DELEGATED_WAKE_TIMEOUT_MS);
 
-/**
- * Apply the dot's wake circuit to a due list: open → nothing is due (one ops
- * alert per opening); tripped but past the window → only the first trigger
- * runs, marked `circuit: true` (half-open probe); closed → unchanged.
- * Idempotent, so callers that concatenate several due lists re-apply it.
- */
-export function applyDotWakeCircuit(
-  charter: DotCharter,
-  due: DueDotTrigger[],
-  deps: DotRuntimeDeps = {}
-): DueDotTrigger[] {
-  if (isFrontDeskDiagnosticDot(charter)) return [];
-  if (due.length === 0) return due;
-  const circuit = evaluateDotWakeCircuit(charter, deps);
-  if (!circuit.tripped) return due;
-  alertDotWakeCircuitOnce(charter, circuit, deps);
-  if (circuit.open) return [];
-  return [{ ...due[0], circuit: true }];
+    const isDue = buildDotDueChecker(charter, now, deps);
+    if (wakeTriggerKeys(charter, deps).some((hit) => isDue(hit.key))) return undefined;
+
+    const watchState = readWatchState(deps)[charter.dot_id] ?? {};
+    for (const t of charter.attention.triggers) {
+      if (t.kind !== 'watch') continue;
+      for (const rel of t.paths) {
+        const current = confinedWatchStat(rel, deps);
+        const snapshot = watchState[rel];
+        if (!current && !snapshot) continue;
+        if (
+          !current ||
+          !snapshot ||
+          current.mtime_ms !== snapshot.mtime_ms ||
+          current.size !== snapshot.size
+        )
+          return undefined;
+      }
+    }
+
+    if (evaluateDotFollowupsDue(charter, { ...deps, now: () => now }).length > 0) return undefined;
+    const outcome = dotOutcomeContinuation(charter, { ...deps, now: () => now });
+    if (outcome && isDue(outcome.key)) return undefined;
+
+    if (
+      readDotFeedback(charter.dot_id, { ...deps, now: () => now }).some(
+        (row) => !(Date.parse(row.recorded_at) < sinceMs)
+      )
+    )
+      return undefined;
+
+    const latest = new Map<string, string>();
+    for (const row of readDotActionLedger({ rootDir: deps.rootDir, indexOnly: true })) {
+      if (row.dot_id !== charter.dot_id) continue;
+      latest.delete(row.action_ref);
+      if (row.request_id) latest.set(row.action_ref, row.request_id);
+    }
+    for (const requestId of [...latest.values()].slice(-IDLE_CHECK_MAX_APPROVALS)) {
+      const approval = loadApprovalRequest(AUTONOMY_APPROVAL_CHANNEL, requestId);
+      if (!approval) continue;
+      if (approval.status === 'pending') continue;
+      const decidedMs = Date.parse(approval.decidedAt ?? approval.requestedAt);
+      if (!(decidedMs < sinceMs)) return undefined;
+    }
+    return `skipped_idle: no inbox, watch, follow-up, feedback or approval change since ${last.fired_at}`;
+  } catch (error) {
+    logger.debug(
+      `idle pre-check unavailable for ${charter.dot_id} — ${error instanceof Error ? error.message : String(error)}; waking`
+    );
+    return undefined;
+  }
 }
 
 /**
@@ -1000,9 +763,15 @@ export function evaluateDotTriggersDue(
       }
     } else if (trigger.kind === 'watch') {
       for (const rel of trigger.paths) {
-        const key = watchTriggerKey(charter, rel, deps, trigger.ignore_jsonl_kinds);
-        if (key && isDue(key)) {
-          due.push({ trigger, key, detail: `watch ${rel} changed` });
+        const hit = watchTriggerKey(
+          charter,
+          rel,
+          deps,
+          trigger.ignore_jsonl_kinds,
+          trigger.min_severity
+        );
+        if (hit && isDue(hit.key)) {
+          due.push({ trigger, key: hit.key, detail: hit.detail });
         }
       }
     }
@@ -1292,16 +1061,39 @@ function dotSystemPrompt(
     .join('\n');
 }
 
+/**
+ * The per-wake objective: handle THIS trigger against the standing goal, then
+ * finish. The standing goal is context, not the objective — a wake whose
+ * objective is the open-ended charter goal never completes and idles through
+ * `continue` turns up to its cap.
+ */
+export function dotWakeObjective(
+  charter: DotCharter,
+  mode: 'tool' | 'fence',
+  trigger: DueDotTrigger | undefined
+): string {
+  const wakeLine = trigger
+    ? `Wake trigger: ${trigger.key}${trigger.detail ? `\nDetail: ${trigger.detail}` : ''}`
+    : 'Wake trigger: (none — manual wake)';
+  const finish =
+    mode === 'tool'
+      ? 'When you have recorded what matters (memory / proposal / followup) or determined nothing needs doing, call goal_update with status "complete".'
+      : 'Record what matters (memory / proposal / followup) in this single reply, or state that nothing needs doing.';
+  return [
+    `Objective for this wake: handle the wake trigger below against your standing goal (${charter.goal.statement}).`,
+    finish,
+    wakeLine,
+  ].join('\n');
+}
+
+/** Full single-prompt wake (fenced / delegated path): system framing + per-wake objective. */
 function wakePrompt(
   charter: DotCharter,
   mode: 'tool' | 'fence',
   trigger: DueDotTrigger | undefined,
   deps: DotRuntimeDeps
 ): string {
-  const wakeLine = trigger
-    ? `\n\nWake trigger: ${trigger.key}${trigger.detail ? `\nDetail: ${trigger.detail}` : ''}`
-    : '';
-  return `${dotSystemPrompt(charter, mode, deps)}\n\nObjective: ${charter.goal.statement}${wakeLine}`;
+  return `${dotSystemPrompt(charter, mode, deps)}\n\n${dotWakeObjective(charter, mode, trigger)}`;
 }
 
 function governProposals(
@@ -1610,7 +1402,20 @@ async function runDotWakeBaseline(
       return { dot_id: current.dot_id, outcome: 'failed', reason };
     }
 
+    const idleReason = dotCronWakeIdleReason(current, deps.trigger, deps);
+    if (idleReason) {
+      recordDotWakeOutcome(current, deps.trigger, 'delivered', {
+        ...deps,
+        reason: idleReason,
+        turns_run: 0,
+        tokens_used: 0,
+        idle_skip: true,
+      });
+      return { dot_id: current.dot_id, outcome: 'delivered', reason: idleReason };
+    }
+
     const budget = current.goal.budget;
+    const suspension = (deps.suspensionMonitor ?? startDotWakeSuspensionMonitor)();
     try {
       const execution = deps.resolveWakeExecution ? await deps.resolveWakeExecution(current) : deps;
       if (execution.backendUnavailable) throw new Error(execution.backendUnavailable);
@@ -1698,10 +1503,15 @@ async function runDotWakeBaseline(
               estimatedTokens += tokens;
               return tokens;
             },
-            objective: wakePrompt(current, 'tool', deps.trigger, deps),
+            // The system framing travels once, as systemPrompt; the objective is per-wake.
+            objective: dotWakeObjective(current, 'tool', deps.trigger),
             goalId: `dot-${current.dot_id}`,
             actorId: `dot:${current.dot_id}`,
             systemPrompt: dotSystemPrompt(current, 'tool', deps),
+            // A wake handles one trigger: completing once it is handled is the goal,
+            // and per-turn tool outputs are already the durable result (no grace turn).
+            completionMode: 'event_handler',
+            budgetGraceStep: false,
             toolRole: current.authority.authority_role,
             extraTools: [
               buildDotProposeToolDefinition(),
@@ -1836,6 +1646,33 @@ async function runDotWakeBaseline(
       const reason = error instanceof Error ? error.message : String(error);
       const partial = (error as { dotPartial?: { turns_run: number; tokens_used: number } })
         ?.dotPartial;
+      const suspendedMs = suspension.suspendedMs();
+      if (
+        !deps.eventAttemptId &&
+        classifyDotWakeReason(reason) === 'wall_clock_exceeded' &&
+        suspendedMs > DOT_WAKE_SUSPENSION_THRESHOLD_MS
+      ) {
+        // The budget ran out while the host slept (macOS DarkWake / Power
+        // Nap): not this dot's failure. A skipped row consumes nothing, so the
+        // same trigger stays due and the next sweep retries it; the failure
+        // circuits and per-key backoff never see it. A claimed durable event
+        // attempt stays a failure — its provider effects are ambiguous.
+        const skipReason = `${reason}; host suspended ~${Math.round(suspendedMs / 1000)}s during the wake — retried on the next sweep`;
+        logger.warn(
+          `wake of ${current.dot_id} ran out of wall clock while the host was suspended — not counted as a failure | next: nothing; the trigger stays due | evidence: ${DOT_WAKE_LEDGER_PATH}`
+        );
+        recordDotWakeOutcome(current, deps.trigger, 'skipped', {
+          ...deps,
+          reason:
+            current.scope.tier === 'public' && !current.scope.tenant_slug
+              ? skipReason
+              : 'host suspended during wake',
+          reason_code: 'host_suspended',
+          ...(partial?.turns_run ? { turns_run: partial.turns_run } : {}),
+          ...(partial?.tokens_used ? { tokens_used: partial.tokens_used } : {}),
+        });
+        return { dot_id: current.dot_id, outcome: 'skipped', reason: skipReason };
+      }
       const category = isDotWakeProcessFailure(reason)
         ? DOT_WAKE_FAILURE_CATEGORY.backend
         : DOT_WAKE_FAILURE_CATEGORY.wake;
@@ -1850,6 +1687,8 @@ async function runDotWakeBaseline(
         heartbeatOptions
       );
       return { dot_id: current.dot_id, outcome: 'failed', reason };
+    } finally {
+      suspension.stop();
     }
   } finally {
     wakingDots.delete(charter.dot_id);

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   evaluateDegradation,
+  isMaterialLatencyRegression,
   loadHealthThresholds,
   runDegradationWatch,
   type LatencyRegression,
@@ -67,6 +68,26 @@ describe('evaluateDegradation', () => {
     );
     expect(evaluateDegradation({ regressions: [], demotedProviders: ['codex'] }).verdict).toBe(
       'yellow'
+    );
+  });
+
+  it('ignores relative regressions below the absolute floor', () => {
+    const fast: LatencyRegression = {
+      skill: 'tiny-op',
+      lastDuration: 294,
+      historicalAvg: 69,
+      increaseRate: 4.26,
+    };
+    expect(isMaterialLatencyRegression(fast)).toBe(false);
+    expect(
+      evaluateDegradation({ regressions: [fast, fast, fast], demotedProviders: [] }).verdict
+    ).toBe('green');
+    // Slow in absolute terms, or a noticeable delta, still counts.
+    expect(isMaterialLatencyRegression({ ...fast, lastDuration: 1000, historicalAvg: 600 })).toBe(
+      true
+    );
+    expect(isMaterialLatencyRegression({ ...fast, lastDuration: 800, historicalAvg: 200 })).toBe(
+      true
     );
   });
 

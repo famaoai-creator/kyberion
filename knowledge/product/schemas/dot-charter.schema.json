@@ -440,6 +440,10 @@
                       "type": "string",
                       "minLength": 1
                     }
+                  },
+                  "min_severity": {
+                    "enum": ["info", "warning", "critical"],
+                    "description": "Jsonl records with a lower `severity` never wake the dot by themselves; records without a severity still wake it."
                   }
                 }
               },
@@ -855,6 +859,11 @@
           "type": "integer",
           "minimum": 60000,
           "description": "Upper bound between wakes even when no trigger fires (self-check cadence)."
+        },
+        "force_wake_every_ms": {
+          "type": "integer",
+          "minimum": 60000,
+          "description": "Upper bound between real (model-calling) cron wakes. A cron wake with no new inbox row, watched-file change, due follow-up, feedback or approval decision since the last real wake is recorded as an idle skip (no model call) until this much time has passed. Default 6h."
         },
         "cron_catch_up_hours": {
           "type": "integer",

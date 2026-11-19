@@ -4,7 +4,7 @@ category: Architecture
 tags: [architecture, autonomy, resident-agent, dots, charter, supervision]
 importance: 8
 author: Ecosystem Architect
-last_updated: 2026-11-16
+last_updated: 2026-11-19
 ---
 
 # Resident Dot Model
@@ -68,17 +68,39 @@ decision floor (ops-gate), and notification (deliver_to + digest). See
    this bounded catch-up does not replay the entire downtime history.
 3. `goal.budget.token_cap_per_day` is enforced across processes via
    `dot-token-usage.jsonl`; per-wake turns/wall-clock map to
-   `GoalBudgetLimits` (KD-02).
-4. Status transitions are governed (`libs/core/dot/dot-lifecycle.ts`,
+   `GoalBudgetLimits` (KD-02). A wake is an event-handler goal, not the
+   standing goal: its objective is "handle this trigger against the standing
+   goal" (the charter system prompt is sent once, as `systemPrompt`), the goal
+   driver runs it with `completionMode: 'event_handler'` (complete as soon as
+   the trigger is handled or needs nothing, instead of the strict
+   anti-early-completion audit) and `budgetGraceStep: false` (no extra
+   prose-only turn at the cap). `max_turns_per_wake` stays the hard cap.
+   A wall-clock overrun during which the process did not run for more than
+   30 s (host asleep, e.g. a macOS DarkWake that slept again) is recorded as
+   `skipped` with `reason_code: host_suspended`, not `failed`: the trigger is
+   not consumed and the failure circuit and backoff ignore it
+   (`dot-wake-suspension.ts`, a timer-gap monitor — on Node 24/darwin
+   `hrtime`/`performance.now` keep counting across sleep, so a clock delta
+   cannot see it). A claimed durable event attempt stays a failure.
+4. Idle cron wakes skip the model (`dotCronWakeIdleReason`): a cron wake whose
+   last real wake was delivered and that sees no due inbox row, pending
+   watched-file change, due follow-up, outcome continuation, new
+   `dot-feedback` row or approval decision on this dot's requests since then is
+   recorded `delivered` with `idle_skip: true`, `turns_run: 0` (the cron key
+   and catch-up treat it as handled; the heartbeat is still written). At least
+   every `runtime.force_wake_every_ms` (default 6 h; distinct from the
+   watchdog bound `max_idle_wake_ms`) a real wake runs. Any unreadable signal
+   means wake.
+5. Status transitions are governed (`libs/core/dot/dot-lifecycle.ts`,
    `kyberion dot activate|pause|retire`): activation requires the authority
    role in the canonical registry and a heartbeat_id that collides with
    neither `DEFAULT_DAEMONS` nor another active dot.
-5. The dot's heartbeat (`runtime.heartbeat_id`) joins `daemon_watchdog`'s
+6. The dot's heartbeat (`runtime.heartbeat_id`) joins `daemon_watchdog`'s
    supervised set while active (`listActiveDotHeartbeatIds`), so a silent dot
    pages, same as any daemon.
-6. A dot never acts directly: it proposes (MSN-RESIDENT-DOT-AUTONOMY-20261004,
+7. A dot never acts directly: it proposes (MSN-RESIDENT-DOT-AUTONOMY-20261004,
    see "Governed proposals" below).
-7. Tenant dots reason through a claimed-task credential binding, never the
+8. Tenant dots reason through a claimed-task credential binding, never the
    operator's credentials (MSN-DOT-STANDING-BINDING-20261116,
    `libs/core/dot/dot-standing-binding.ts`). Each tenant dot has one standing
    Issue on the deterministic `MSN-DOT-*` lineage (the mission-admission id
@@ -93,8 +115,12 @@ decision floor (ops-gate), and notification (deliver_to + digest). See
    standing grant, re-validated at every use. The standing claim is not
    authority: the charter grants nothing, and proposals still become separate
    WorkItems. A missing or expired grant fails the wake with
-   `[DOT_CREDENTIAL_GRANT_MISSING]` / `[DOT_CREDENTIAL_GRANT_EXPIRED]` (counted
-   by the wake circuit, no model call). Tenantless dots are unchanged. Grant
+   `[DOT_CREDENTIAL_GRANT_MISSING]` / `[DOT_CREDENTIAL_GRANT_EXPIRED]` (no
+   model call). One `credential_grant` failure opens the dot's wake circuit at
+   once: wakes are held for 24 h (`DOT_WAKE_CREDENTIAL_RECHECK_MS`) or until
+   the tenant's `credential.use` grant records or the charter's routed backend
+   change (fingerprint kept in the tenant-scoped `wake-circuit/` marker), with
+   one ops alert per opening and no ledger row per held sweep. Tenantless dots are unchanged. Grant
    extension and the expiry reminder:
    [tenant-task-credential-binding](../orchestration/tenant-task-credential-binding.ja.md#常駐-dot-の-bindingstanding-lineage).
 
@@ -287,6 +313,9 @@ wake ──proposal──▶ dispatch (gate ⊔ floors, arbitration) ──▶ W
   `dot-memory` fence and distilled weekly. Persisted ID high-water marks survive
   eviction/removal; legacy migration also reads distillation history strictly.
   Already-reused legacy IDs cannot be reliably reconstructed and are not relabeled.
+  A hypothesis resolves `confirmed`, `refuted` or `dismissed` (stale/moot; never
+  distilled). The prompt renders only the newest 8 open hypotheses plus a count
+  of the omitted ones.
 - **Follow-ups and catch-up (DL-09)**: `dot_schedule_followup` / `dot-followup`
   (5 min to 7 days, 3 pending) writes `followups.jsonl`; a due follow-up is a
   `followup:<id>` wake. A follow-up can atomically replace itself at capacity;
@@ -300,17 +329,23 @@ wake ──proposal──▶ dispatch (gate ⊔ floors, arbitration) ──▶ W
   reconciliation; the runtime does not invent a replacement or replay effects.
   Missed cron minutes within
   `runtime.cron_catch_up_hours` (default 6, max 24) coalesce into one wake.
-- **Watches**: a charter trigger `{kind: 'watch', paths, ignore_jsonl_kinds?}`
+- **Watches**: a charter trigger `{kind: 'watch', paths, ignore_jsonl_kinds?, min_severity?}`
   wakes when a watched path's `mtime:size` stat diverges from the dot's
   snapshot in `dot-watch-state.json`. `ignore_jsonl_kinds` lists `.jsonl`
   record `kind` values that never fire the watch by themselves: when every
   record appended since the snapshot parses cleanly and carries an ignored
   kind, the snapshot advances silently (the appended range is read with a
-  bounded range read). Any malformed, blank or non-ignored line fails open
+  bounded range read). `min_severity` (`info` < `warning` < `critical`)
+  skips records whose `severity` ranks lower the same way, so a dot can wake
+  at once on critical alerts and leave warnings to its next cron wake; a
+  record with no severity still fires. Any malformed, blank or non-ignored line fails open
   and the watch fires. This is how a dot watching `ops-alerts.jsonl` avoids
   re-waking on the `operator_notification_undelivered` rows its own failed
   notifies keep appending — an alert log is a lawful watch path, but a dot
-  must not amplify the rows it produces.
+  must not amplify the rows it produces. For an append-only `.jsonl` watch the
+  wake detail carries the appended records that were not skipped, compacted to
+  timestamp / severity / kind / title / `dedupe_key` / ~200 chars of
+  recommendation or context, newest first kept, capped at 1500 characters.
 - **Events (DL-08)**: a charter trigger `{kind: 'event', sources, types?,
 match?}` wakes on an authenticated inbound event. The loopback-only
   `event-intake` surface verifies an HMAC-SHA256 signature (secret from the
@@ -335,7 +370,10 @@ match?}` wakes on an authenticated inbound event. The loopback-only
   evidence with dot-ledger estimates, including late responses; uncorrelated
   legacy rows count conservatively and can overcount same-day overlap. Configured
   cost caps pause on relevant unreadable, unpriced or unscoped cost evidence;
-  token-only policies do not pause solely for unknown cost. Historic dot-ledger
+  a row whose billing mode is unrecorded (provider CLIs) but that carries a
+  provider-reported or registry reference cost counts that reference as an
+  upper-bound spend instead of pausing, and a call aborted before any usage
+  report marks cost partial (its tokens still count via the dot ledger). Token-only policies do not pause solely for unknown cost. Historic dot-ledger
   scope still depends on valid, stable charter scope. Unrelated governor exceptions
   retain the existing outer fail-open behavior.
 - **Autonomy L0-L4 (DL-10)**: L0 shadow (decisions recorded, nothing acts),

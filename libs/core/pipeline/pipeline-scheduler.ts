@@ -35,6 +35,10 @@ export interface ScheduledPipeline {
   lastRun?: string;
   lastStatus?: 'succeeded' | 'failed';
   consecutiveFailures?: number;
+  /** First failure of the current failing streak; cleared on success. */
+  failingSince?: string;
+  /** Failure reason of the last failed run (failing step + error), bounded. */
+  lastError?: string;
   disabledReason?: string;
   disabledAt?: string;
   context?: Record<string, any>; // additional context to inject
@@ -479,11 +483,20 @@ export function claimScheduledPipelineRun(
   return schedule;
 }
 
+/** Bound on the persisted failure reason (the registry is not a log store). */
+export const SCHEDULE_LAST_ERROR_MAX_CHARS = 500;
+
+/**
+ * Close a claimed run. Failures are tracked, never acted on here: each failed
+ * run increments `consecutiveFailures`, `failingSince` anchors the streak and
+ * `lastError` keeps the reason for the failed-schedule sweep; a success resets
+ * all three. Auto-disable stays with the failure policy (feedback-loop).
+ */
 export function completeScheduledPipelineRun(
   id: string,
   token: string,
   status: 'succeeded' | 'failed',
-  options: PipelineSchedulerOptions = {}
+  options: PipelineSchedulerOptions & { error?: string } = {}
 ): ScheduledPipeline | null {
   const registry = loadScheduleRegistry(options);
   const schedule = registry.schedules.find((entry) => entry.id === id);
@@ -491,8 +504,27 @@ export function completeScheduledPipelineRun(
 
   schedule.runLock = undefined;
   schedule.lastStatus = status;
+  if (status === 'failed') {
+    schedule.consecutiveFailures = (Number(schedule.consecutiveFailures) || 0) + 1;
+    schedule.failingSince ??= nowValue(options).toISOString();
+    const error = options.error?.trim();
+    if (error) schedule.lastError = error.slice(0, SCHEDULE_LAST_ERROR_MAX_CHARS);
+  } else {
+    schedule.consecutiveFailures = 0;
+    delete schedule.failingSince;
+    delete schedule.lastError;
+  }
   saveScheduleRegistry(registry, options);
   return schedule;
+}
+
+/** "step <op>: <error>" for the first failed step of a run, if any. */
+export function describeScheduledRunFailure(
+  results: ReadonlyArray<{ op: string; status: string; error?: string }> | undefined
+): string | undefined {
+  const failed = results?.find((step) => step.status === 'failed');
+  if (!failed) return undefined;
+  return `step ${failed.op}: ${failed.error ?? 'failed'}`;
 }
 
 /**

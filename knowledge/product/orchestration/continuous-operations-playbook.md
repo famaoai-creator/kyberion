@@ -91,7 +91,7 @@ managed work は強制的に人間承認へ送られる。承認後も各 missio
 pnpm kyberion scheduler restart --apply --daemon agent-runtime-supervisor
 ```
 
-heartbeat の stale_code、healthy、PID と continuous cadence checkpoint を確認する。承認待ちや veto window を解除するために autonomy を下げたり、承認レコードを手書きしたりしない。既存 approvals UI / CLI から本人が判断する。
+launchd / systemd 配下の agent-runtime-supervisor は、build 完了後に dist の stamp が 2 回連続で同じで、sweep・ask・busy runtime・delegated worker が無いときに自分で終了コード 75 で再起動する（15 分に 1 回まで、heartbeat の `last_self_recycle_at` に記録。`KYBERION_AGENT_RUNTIME_SUPERVISOR_STALE_CODE_RECYCLE=0` で無効）。stale_code が続く場合だけ上の restart を使う。heartbeat の stale_code、healthy、PID と continuous cadence checkpoint を確認する。承認待ちや veto window を解除するために autonomy を下げたり、承認レコードを手書きしたりしない。既存 approvals UI / CLI から本人が判断する。
 
 分配枠が満杯の場合は inventory の limited として待機し、admission identity を増やさない。枠が空き、cooldown を満たした周期で分配する。既に確定拒否された試行は上記 recover-admissions を明示的に使い、元の cooldown を保持する。指標が回復しても同じ episode の既存 action / WorkItem 参照は保持し、進行中の仕事と成果を追跡する。
 

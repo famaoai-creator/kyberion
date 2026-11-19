@@ -17,22 +17,23 @@
       "No unacknowledged ops-alert older than 24h"
     ],
     "budget": {
-      "max_turns_per_wake": 10,
+      "max_turns_per_wake": 4,
       "wall_clock_ms_per_wake": 1800000,
-      "token_cap_per_day": 1000000
+      "token_cap_per_day": 1500000
     }
   },
   "attention": {
     "triggers": [
       {
         "kind": "cron",
-        "cron": "*/15 * * * *",
+        "cron": "0 * * * *",
         "timezone": "Asia/Tokyo"
       },
       {
         "kind": "watch",
         "paths": ["active/shared/observability/ops-alerts.jsonl"],
-        "ignore_jsonl_kinds": ["operator_notification_undelivered"]
+        "ignore_jsonl_kinds": ["operator_notification_undelivered"],
+        "min_severity": "critical"
       },
       {
         "kind": "wake",
@@ -78,6 +79,7 @@
   },
   "runtime": {
     "heartbeat_id": "dot-repo-guardian",
-    "max_idle_wake_ms": 900000
+    "max_idle_wake_ms": 4500000,
+    "force_wake_every_ms": 21600000
   }
 }
