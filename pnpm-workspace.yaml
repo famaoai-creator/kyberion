@@ -113,4 +113,4 @@ minimumReleaseAgeExclude:
   - '@ai-sdk/provider-utils@3.0.28 || 4.0.33'
   - vitest@4.1.11
   - '@vitest/mocker@4.1.11'
-  - baseline-browser-mapping@2.11.0
+  - baseline-browser-mapping@2.11.0 || 2.11.38
