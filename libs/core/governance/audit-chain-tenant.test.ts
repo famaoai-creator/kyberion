@@ -109,14 +109,14 @@ describe('audit-chain — tenant mirror', () => {
       action: 'date-boundary',
       operation: 'audit',
       result: 'completed',
-      tenantSlug: 'tenant_a',
+      tenantSlug: 'tenant-a',
     });
     const date = recorded.timestamp.slice(0, 10);
 
     expect(
       fs.existsSync(path.join(testRoot, 'active', 'shared', 'logs', 'audit', `audit-${date}.jsonl`))
     ).toBe(true);
-    expect(fs.existsSync(path.join(mirrorDir('tenant_a'), `audit-${date}.jsonl`))).toBe(true);
+    expect(fs.existsSync(path.join(mirrorDir('tenant-a'), `audit-${date}.jsonl`))).toBe(true);
   });
 
   it('uses the existing Vitest mirror floor for both append and verification', async () => {
@@ -128,14 +128,16 @@ describe('audit-chain — tenant mirror', () => {
       action: 'mirror-sandbox',
       operation: 'audit',
       result: 'completed',
-      tenantSlug: 'tenant_a',
+      tenantSlug: 'tenant-a',
     });
-    expect(io.safeExistsSync(path.join(mirrorDir('tenant_a'), 'audit-2026-07-01.jsonl'))).toBe(false);
+    expect(io.safeExistsSync(path.join(mirrorDir('tenant-a'), 'audit-2026-07-01.jsonl'))).toBe(
+      false
+    );
     expect(
       io.safeExistsSync(
         path.join(
           testRoot,
-          'vitest-live/shared/runtime/audit-mirror/confidential/tenant_a/audit-2026-07-01.jsonl'
+          'vitest-live/shared/runtime/audit-mirror/confidential/tenant-a/audit-2026-07-01.jsonl'
         )
       )
     ).toBe(true);
@@ -206,10 +208,10 @@ describe('audit-chain — tenant mirror', () => {
       operation: 'auth',
       result: 'allowed',
       correlationId: 'corr-audit-001',
-      tenantSlug: 'tenant_a',
+      tenantSlug: 'tenant-a',
     });
 
-    const tenantAuditDir = mirrorDir('tenant_a');
+    const tenantAuditDir = mirrorDir('tenant-a');
     expect(fs.existsSync(tenantAuditDir)).toBe(true);
     const files = fs.readdirSync(tenantAuditDir);
     expect(files.length).toBe(1);
@@ -219,14 +221,14 @@ describe('audit-chain — tenant mirror', () => {
       .trim()
       .split('\n')
       .map((l) => JSON.parse(l));
-    expect(entries[0].tenantSlug).toBe('tenant_a');
+    expect(entries[0].tenantSlug).toBe('tenant-a');
     expect(entries[0].action).toBe('login');
     expect(entries[0].correlationId).toBe('corr-audit-001');
   });
 
   it('does not mirror through a symlinked mirror partition', async () => {
     const outsideRoot = path.join(testRoot, 'outside-mirror');
-    const linkedRoot = mirrorDir('tenant_a');
+    const linkedRoot = mirrorDir('tenant-a');
     fs.mkdirSync(path.dirname(linkedRoot), { recursive: true });
     fs.mkdirSync(outsideRoot, { recursive: true });
     fs.symlinkSync(outsideRoot, linkedRoot, 'dir');
@@ -237,7 +239,7 @@ describe('audit-chain — tenant mirror', () => {
       action: 'login',
       operation: 'auth',
       result: 'allowed',
-      tenantSlug: 'tenant_a',
+      tenantSlug: 'tenant-a',
     });
 
     expect(fs.readdirSync(outsideRoot)).toEqual([]);
@@ -259,17 +261,17 @@ describe('audit-chain — tenant mirror', () => {
       action: 'create',
       operation: 'x',
       result: 'completed',
-      tenantSlug: 'tenant_a',
+      tenantSlug: 'tenant-a',
     });
     auditChain.record({
       agentId: 'a',
       action: 'update',
       operation: 'y',
       result: 'allowed',
-      tenantSlug: 'tenant_a',
+      tenantSlug: 'tenant-a',
     });
 
-    const tenantAuditDir = mirrorDir('tenant_a');
+    const tenantAuditDir = mirrorDir('tenant-a');
     const files = fs.readdirSync(tenantAuditDir);
     expect(files).toHaveLength(1);
 
@@ -288,18 +290,18 @@ describe('audit-chain — tenant mirror', () => {
       action: 'op',
       operation: 'x',
       result: 'completed',
-      tenantSlug: 'tenant_a',
+      tenantSlug: 'tenant-a',
     });
     auditChain.record({
       agentId: 'b',
       action: 'op',
       operation: 'y',
       result: 'completed',
-      tenantSlug: 'tenant_b',
+      tenantSlug: 'tenant-b',
     });
 
-    expect(fs.existsSync(mirrorDir('tenant_a'))).toBe(true);
-    expect(fs.existsSync(mirrorDir('tenant_b'))).toBe(true);
+    expect(fs.existsSync(mirrorDir('tenant-a'))).toBe(true);
+    expect(fs.existsSync(mirrorDir('tenant-b'))).toBe(true);
   });
 
   it('records canonical scope and exposes only the requested tenant view', async () => {
@@ -312,7 +314,7 @@ describe('audit-chain — tenant mirror', () => {
       scope: {
         scope_kind: 'organization',
         tier: 'confidential',
-        tenant_slug: 'tenant_a',
+        tenant_slug: 'tenant-a',
         organization_id: 'org-a',
       },
     });
@@ -325,12 +327,12 @@ describe('audit-chain — tenant mirror', () => {
 
     expect(auditChain.loadAll().at(-2)?.scope).toMatchObject({
       scope_kind: 'organization',
-      tenant_slug: 'tenant_a',
+      tenant_slug: 'tenant-a',
       organization_id: 'org-a',
     });
     expect(
       auditChain
-        .loadForScope({ tenant_slug: 'tenant_a' })
+        .loadForScope({ tenant_slug: 'tenant-a' })
         .filter((entry) => entry.action === 'tenant-a')
     ).toHaveLength(1);
     expect(
@@ -340,7 +342,7 @@ describe('audit-chain — tenant mirror', () => {
 
   it('rejects an explicit scope outside the active tenant context', async () => {
     const previousTenant = process.env.KYBERION_TENANT;
-    process.env.KYBERION_TENANT = 'tenant_a';
+    process.env.KYBERION_TENANT = 'tenant-a';
     try {
       const { auditChain } = await import('./audit-chain.js');
       expect(() =>
@@ -352,7 +354,7 @@ describe('audit-chain — tenant mirror', () => {
           scope: {
             scope_kind: 'tenant',
             tier: 'confidential',
-            tenant_slug: 'tenant_b',
+            tenant_slug: 'tenant-b',
           },
         })
       ).toThrow(/AUDIT_SCOPE_DENIED/);
@@ -373,7 +375,7 @@ describe('audit-chain — tenant mirror', () => {
         scope: {
           scope_kind: 'organization',
           tier: 'confidential',
-          tenant_slug: 'tenant_a',
+          tenant_slug: 'tenant-a',
         },
       })
     ).toThrow(/AUDIT_SCOPE_INVALID/);
@@ -615,14 +617,14 @@ describe('audit-chain — tenant mirror', () => {
       action: 'mirrored',
       operation: 'op',
       result: 'completed',
-      tenantSlug: 'tenant_a',
+      tenantSlug: 'tenant-a',
     });
-    fs.appendFileSync(path.join(mirrorDir('tenant_a'), 'audit-2026-07-01.jsonl'), 'not json\n');
+    fs.appendFileSync(path.join(mirrorDir('tenant-a'), 'audit-2026-07-01.jsonl'), 'not json\n');
 
     const mirrors = run.auditChain.verifyTenantMirrors();
     expect(mirrors.ok).toBe(false);
     expect(mirrors.findings).toEqual([
-      'tenant_mirror_unreadable:tenant_a:audit-2026-07-01.jsonl:line:2:invalid_record',
+      'tenant_mirror_unreadable:tenant-a:audit-2026-07-01.jsonl:line:2:invalid_record',
     ]);
   });
 
@@ -675,10 +677,10 @@ describe('audit-chain — tenant mirror', () => {
         action: 'mirrored',
         operation: 'op',
         result: 'completed',
-        tenantSlug: 'tenant_a',
+        tenantSlug: 'tenant-a',
       });
     record();
-    const mirror = path.join(mirrorDir('tenant_a'), 'audit-2026-07-01.jsonl');
+    const mirror = path.join(mirrorDir('tenant-a'), 'audit-2026-07-01.jsonl');
     fs.appendFileSync(mirror, '{"x":');
     const second = record();
 
