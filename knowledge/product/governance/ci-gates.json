@@ -53,7 +53,8 @@
       "executable": "node",
       "args": ["dist/scripts/check/check_golden_output.js"],
       "owner": "quality",
-      "rationale": "Keeps deterministic pipeline output snapshots stable in every validation scope. Resource isolation avoids overlapping baseline compiler/input scans with other CPU-heavy gates; an isolated diagnostic completed in 62s with natural exit and no retained handle. The exact failed-runner exit delay remains unattributed. Selection and the 120s timeout are unchanged."
+      "timeout_ms": 240000,
+      "rationale": "Keeps deterministic pipeline output snapshots stable in every validation scope. Resource isolation avoids overlapping baseline compiler/input scans with other CPU-heavy gates. Whole-repo scan cost grows with file count; the ~260-file governance catalog split (security-policy roles + storage-retention entries) pushed the scan past the 120s default on loaded runners, so this gate carries an explicit 240s budget."
     },
     {
       "id": "scenario-pr-deterministic",
@@ -170,11 +171,7 @@
       "id": "governance-catalogs",
       "scope": "pr",
       "executable": "node",
-      "args": [
-        "--import",
-        "./scripts/ts-loader.mjs",
-        "scripts/check/check_governance_catalogs.ts"
-      ],
+      "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check/check_governance_catalogs.ts"],
       "owner": "governance",
       "rationale": "Keeps security-policy.json and storage-retention-catalog.json semantically identical to their directory sources (roles/, entries/) so per-entry edits cannot drift from the committed runtime artifacts. Semantic (not byte) compare: every pull_request run merges with main, which still carries the pre-normalization format during the transition."
     },
@@ -1085,7 +1082,8 @@
       "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check/check_orphans.ts"],
       "baseline": "knowledge/product/governance/orphan-baseline.json",
       "owner": "architecture",
-      "rationale": "OW-07: fails when a new orphan appears — an unimported libs/core module, an uninvoked script, an unreachable pipeline or an unreferenced actuator op; known exceptions are reasoned baseline entries that may only shrink."
+      "timeout_ms": 240000,
+      "rationale": "OW-07: fails when a new orphan appears — an unimported libs/core module, an uninvoked script, an unreachable pipeline or an unreferenced actuator op; known exceptions are reasoned baseline entries that may only shrink. Repo-wide import scan cost grows with file count; the ~260-file governance catalog split pushed it past the 120s default on loaded runners, so this gate carries an explicit 240s budget."
     },
     {
       "id": "dep-cycles",
