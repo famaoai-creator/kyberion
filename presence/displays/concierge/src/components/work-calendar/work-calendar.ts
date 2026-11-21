@@ -57,6 +57,16 @@ export interface ExternalCalendarEvent {
 }
 
 /** External events as calendar items, on the viewer's local start day. */
+/**
+ * The command that signs the provider's CLI in again, shown when the stored
+ * login expired. Only `gws` reports an expired login today; another provider
+ * shows none.
+ */
+export function providerReloginCommand(provider: string | null | undefined): string | null {
+  if (provider === 'google-workspace') return 'gws auth login';
+  return null;
+}
+
 export function fromExternalEvents(events: readonly ExternalCalendarEvent[]): CalendarItem[] {
   return events.flatMap((event) => {
     const day = event.allDay ? event.start.slice(0, 10) : localDayOfInstant(event.start);

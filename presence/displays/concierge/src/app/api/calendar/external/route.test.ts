@@ -117,6 +117,68 @@ describe('GET /api/calendar/external', () => {
     expect(body).toMatchObject({ connected: true });
   });
 
+  it('reports a stored login the provider refused as login_expired (no provider call)', async () => {
+    // `gws auth status` on a revoked refresh token: credentials on disk, refresh refused.
+    mocks.raw = {
+      encrypted_credentials_exists: true,
+      token_cache_exists: true,
+      token_valid: false,
+      token_refresh_failed: true,
+    };
+    const body = await (await get('from=2026-11-16&to=2026-11-29')).json();
+    expect(body).toMatchObject({ ok: true, connected: false, login_expired: true, events: [] });
+    expect(mocks.agendaCalls).toBe(0);
+  });
+
+  it('checks the login again after a failed read instead of trusting the cache', async () => {
+    mocks.raw = { encrypted_credentials_exists: true, token_valid: true };
+    mocks.agendaError = new Error('invalid_grant');
+    expect(await (await get('from=2026-11-16&to=2026-11-29')).json()).toMatchObject({
+      degraded: true,
+    });
+    mocks.raw = {
+      encrypted_credentials_exists: true,
+      token_valid: false,
+      token_refresh_failed: true,
+    };
+    expect(await (await get('from=2026-11-16&to=2026-11-29')).json()).toMatchObject({
+      connected: false,
+      login_expired: true,
+    });
+  });
+
+  it('sees a new sign-in at once after an expired login (expired is not cached)', async () => {
+    mocks.raw = {
+      encrypted_credentials_exists: true,
+      token_valid: false,
+      token_refresh_failed: true,
+    };
+    expect(await (await get('from=2026-11-16&to=2026-11-29')).json()).toMatchObject({
+      login_expired: true,
+    });
+    // The owner ran `gws auth login` and reloaded.
+    mocks.raw = {
+      encrypted_credentials_exists: true,
+      token_valid: true,
+      token_refresh_failed: false,
+    };
+    expect(await (await get('from=2026-11-16&to=2026-11-29')).json()).toMatchObject({
+      connected: true,
+    });
+    expect(mocks.agendaCalls).toBe(1);
+  });
+
+  it('keeps a login whose token is merely not cached yet as signed in', async () => {
+    mocks.raw = {
+      encrypted_credentials_exists: true,
+      token_valid: false,
+      token_refresh_failed: false,
+    };
+    expect(await (await get('from=2026-11-16&to=2026-11-29')).json()).toMatchObject({
+      connected: true,
+    });
+  });
+
   it('reports a provider failure as degraded with a fixed message', async () => {
     mocks.agendaError = new Error('token expired for user@example.com');
     const body = await (await get('from=2026-11-16&to=2026-11-29')).json();

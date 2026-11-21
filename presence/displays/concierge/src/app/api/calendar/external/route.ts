@@ -7,7 +7,10 @@ import { isCalendarDate } from '@agent/core/foundation/time';
 import { createLogger } from '@agent/core/logger';
 import { resolveConciergeInstallationAccess } from '../../../../lib/installation-access';
 import { resolveConciergeViewer } from '../../../../lib/viewer-context';
-import { providerLoggedIn } from '../../../../lib/external-calendar-status';
+import {
+  forgetProviderLoginState,
+  providerLoginState,
+} from '../../../../lib/external-calendar-status';
 
 export const dynamic = 'force-dynamic';
 
@@ -38,7 +41,9 @@ function dayCount(from: string, to: string): number {
  * login, so its events are that person's personal data: only the installation
  * owner (attested loopback peer or bound owner principal) receives them, and
  * nobody else learns whether a calendar is connected. Nothing is called on the
- * network unless the provider reports an authenticated login. A provider
+ * network unless the provider reports an authenticated login; a stored login
+ * the provider refused answers `login_expired` so the owner can sign in again.
+ * A provider
  * failure answers `degraded` with a fixed message (never the raw error).
  */
 export async function GET(req: NextRequest) {
@@ -75,10 +80,18 @@ export async function GET(req: NextRequest) {
       { headers: NO_STORE }
     );
   }
-  const connected = await providerLoggedIn(provider);
-  if (!connected) {
+  const login = await providerLoginState(provider);
+  if (login !== 'signed_in') {
+    // `login_expired`: credentials are stored but the provider refused them;
+    // the owner has to sign in again (the page shows the command).
     return NextResponse.json(
-      { ok: true, provider, connected: false, events: [] },
+      {
+        ok: true,
+        provider,
+        connected: false,
+        ...(login === 'expired' ? { login_expired: true } : {}),
+        events: [],
+      },
       { headers: NO_STORE }
     );
   }
@@ -113,6 +126,8 @@ export async function GET(req: NextRequest) {
       { headers: NO_STORE }
     );
   } catch (error) {
+    // The login may have expired since it was checked: check it again next time.
+    forgetProviderLoginState(provider);
     // The reply stays fixed (wire boundary); the operator log carries the cause.
     logger.warn(
       `external calendar read failed — ${error instanceof Error ? error.message : String(error)} | ` +

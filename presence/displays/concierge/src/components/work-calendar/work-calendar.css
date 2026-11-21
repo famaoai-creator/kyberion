@@ -88,15 +88,15 @@
 }
 
 /* Source accent on the left edge; due-state colours (overdue / soon) still win below. */
-.wc-entry[data-source="operation"] {
+.wc-entry[data-source='operation'] {
   border-left-color: var(--kb-ui-info-border);
 }
 
-.wc-entry[data-source="action_item"] {
+.wc-entry[data-source='action_item'] {
   border-left-color: var(--kb-ui-success-border);
 }
 
-.wc-entry[data-source="external"] {
+.wc-entry[data-source='external'] {
   border-left-color: var(--kb-ui-accent);
 }
 
@@ -130,6 +130,15 @@
   margin: 0;
   font-size: var(--kb-ui-font-size-sm);
   color: var(--kb-ui-text-muted);
+}
+
+.wc-command {
+  font-family: var(--kb-ui-font-mono);
+  padding: 0 4px;
+  border-radius: var(--kb-ui-radius-sm);
+  background: var(--kb-ui-surface-sunken);
+  color: var(--kb-ui-text);
+  user-select: all;
 }
 
 .wc-summary__soon[data-tone='warning'] {
