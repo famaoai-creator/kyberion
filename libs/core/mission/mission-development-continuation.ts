@@ -18,6 +18,19 @@ import {
   type FactoryCiFailureRecord,
 } from '../governance/factory-ci-autofix.js';
 import type { FactoryAutonomyPolicy } from '../governance/factory-policy.js';
+import type { ApprovalVetoWindow } from '../governance/approval-veto-window.js';
+import type { AutonomyStateDeps } from '../governance/autonomy-action-state.js';
+import {
+  evaluateFactoryMergeGate,
+  type FactoryMergeGateResult,
+} from '../governance/factory-merge-gate.js';
+import {
+  buildFactoryConvergencePlan,
+  planFactoryPostMergeRevert,
+  type FactoryConvergencePlan,
+  type FactoryPostMergeRevertPlan,
+} from '../governance/factory-post-merge.js';
+import type { PrFile } from '../governance/pr-shadow.js';
 import {
   assessFactoryBranchMainSync,
   type FactoryMainSyncPlan,
@@ -90,6 +103,9 @@ export interface MissionDevelopmentResult {
   allow_task_dispatch?: boolean;
   approval_request_id?: string;
   ci_verified?: boolean;
+  factory_merge_decision?: FactoryMergeGateResult;
+  factory_revert_plan?: FactoryPostMergeRevertPlan;
+  factory_convergence_plan?: FactoryConvergencePlan;
 }
 interface ContinuationState {
   version: 1;
@@ -103,9 +119,61 @@ interface ContinuationState {
   original_target_path?: string;
   fetched_revision?: string;
   ci_failure_signatures?: string[];
+  factory_veto_head_sha?: string;
+  factory_veto_window?: ApprovalVetoWindow;
 }
 const digest = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const closed = new Set(['completed', 'done', 'accepted', 'reviewed']);
+
+function isValidVetoWindow(value: unknown): value is ApprovalVetoWindow {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const candidate = value as Record<string, unknown>;
+  if (
+    typeof candidate.windowMinutes !== 'number' ||
+    !Number.isFinite(candidate.windowMinutes) ||
+    candidate.windowMinutes <= 0
+  )
+    return false;
+  if (
+    typeof candidate.deliveryDeadlineAt !== 'string' ||
+    Number.isNaN(Date.parse(candidate.deliveryDeadlineAt))
+  )
+    return false;
+  if (
+    candidate.deliveredAt !== undefined &&
+    (typeof candidate.deliveredAt !== 'string' || Number.isNaN(Date.parse(candidate.deliveredAt)))
+  )
+    return false;
+  if (
+    candidate.proceedsAt !== undefined &&
+    (typeof candidate.proceedsAt !== 'string' || Number.isNaN(Date.parse(candidate.proceedsAt)))
+  )
+    return false;
+  if (
+    candidate.shadowElapsedAt !== undefined &&
+    (typeof candidate.shadowElapsedAt !== 'string' ||
+      Number.isNaN(Date.parse(candidate.shadowElapsedAt)))
+  )
+    return false;
+  if (candidate.shadow !== undefined && typeof candidate.shadow !== 'boolean') return false;
+  if (candidate.fallback !== undefined && candidate.fallback !== 'undelivered') return false;
+  if (candidate.activeHours !== undefined) {
+    if (
+      !candidate.activeHours ||
+      typeof candidate.activeHours !== 'object' ||
+      Array.isArray(candidate.activeHours)
+    )
+      return false;
+    const hours = candidate.activeHours as Record<string, unknown>;
+    if (
+      typeof hours.start !== 'string' ||
+      typeof hours.end !== 'string' ||
+      typeof hours.timezone !== 'string'
+    )
+      return false;
+  }
+  return true;
+}
 
 /** Injectable domain dependencies retain the same production adapters and authority gates. */
 export interface MissionDevelopmentDeps {
@@ -161,6 +229,36 @@ export interface MissionDevelopmentDeps {
     pr: Awaited<ReturnType<typeof readVcsDevelopmentPr>>,
     context: { cwd: string }
   ) => string | undefined | Promise<string | undefined>;
+  prFiles?: (
+    pr: Awaited<ReturnType<typeof readVcsDevelopmentPr>>,
+    context: { cwd: string }
+  ) => PrFile[] | Promise<PrFile[]>;
+  vetoState?: (
+    pr: Awaited<ReturnType<typeof readVcsDevelopmentPr>>,
+    currentWindow?: ApprovalVetoWindow
+  ) =>
+    | { window?: ApprovalVetoWindow; objected?: boolean }
+    | Promise<{ window?: ApprovalVetoWindow; objected?: boolean }>;
+  postMergeRevertContext?: (
+    pr: Awaited<ReturnType<typeof readVcsDevelopmentPr>>,
+    verified: Awaited<ReturnType<typeof runPreparedVcsDevelopment>>
+  ) =>
+    | {
+        failureReproducedOnRerun: boolean;
+        revertConflict?: boolean;
+        revertAttemptsUsed?: number;
+        applyDemotion?: boolean;
+        autonomyStateDeps?: AutonomyStateDeps;
+      }
+    | Promise<{
+        failureReproducedOnRerun: boolean;
+        revertConflict?: boolean;
+        revertAttemptsUsed?: number;
+        applyDemotion?: boolean;
+        autonomyStateDeps?: AutonomyStateDeps;
+      }>;
+  now?: () => Date;
+  operationsHalted?: boolean;
 }
 
 export async function advanceMissionDevelopment(
@@ -326,7 +424,12 @@ export async function advanceMissionDevelopment(
               progress.ci_failure_signatures.length > 16 ||
               progress.ci_failure_signatures.some(
                 (entry) => typeof entry !== 'string' || !/^[a-f0-9]{12}$/u.test(entry)
-              )))
+              ))) ||
+          (progress.factory_veto_head_sha !== undefined &&
+            (typeof progress.factory_veto_head_sha !== 'string' ||
+              !/^[a-f0-9]{40,64}$/iu.test(progress.factory_veto_head_sha))) ||
+          (progress.factory_veto_window !== undefined &&
+            !isValidVetoWindow(progress.factory_veto_window))
         )
           throw new Error('Development continuation or specification changed');
         const assertChild = () => {
@@ -914,6 +1017,64 @@ export async function advanceMissionDevelopment(
             'Remaining mission quality contracts advanced before publication'
           );
         }
+        let mergeGate: FactoryMergeGateResult | undefined;
+        if (spec.factory_envelope && pr.state === 'open') {
+          const prFiles = deps.prFiles
+            ? await deps.prFiles(pr, { cwd })
+            : sourcePaths.map((entry) => ({ path: entry, additions: 0, deletions: 0 }));
+          const changedPaths = prFiles.map((entry) => entry.path);
+          const storedWindow =
+            progress.factory_veto_head_sha === pr.headSha
+              ? progress.factory_veto_window
+              : undefined;
+          const vetoUpdate = deps.vetoState ? await deps.vetoState(pr, storedWindow) : undefined;
+          const effectiveWindow = vetoUpdate?.window ?? storedWindow;
+          mergeGate = evaluateFactoryMergeGate({
+            envelope: spec.factory_envelope,
+            changed_paths: changedPaths,
+            files: prFiles,
+            ci_green: ci.state === 'success',
+            cross_provider_review_verified: review.ok,
+            repairs_used: progress.repairs,
+            max_repairs: maxRepairs,
+            veto_window: effectiveWindow,
+            veto_objected: vetoUpdate?.objected,
+            now: deps.now?.(),
+            tenant_slug: state.tenant_slug,
+            factory_policy: deps.factoryPolicy,
+            operations_halted: deps.operationsHalted,
+          });
+          if (mergeGate.action === 'open_veto_window') {
+            progress.factory_veto_head_sha = pr.headSha;
+            progress.factory_veto_window = mergeGate.veto_window;
+            save();
+            return {
+              ...result('running', mergeGate.reason),
+              factory_merge_decision: mergeGate,
+            };
+          }
+          if (mergeGate.action === 'wait_veto_window') {
+            if (
+              effectiveWindow &&
+              (progress.factory_veto_head_sha !== pr.headSha ||
+                JSON.stringify(effectiveWindow) !== JSON.stringify(progress.factory_veto_window))
+            ) {
+              progress.factory_veto_head_sha = pr.headSha;
+              progress.factory_veto_window = effectiveWindow;
+              save();
+            }
+            return {
+              ...result('running', mergeGate.reason),
+              factory_merge_decision: mergeGate,
+            };
+          }
+          if (mergeGate.action === 'escalate_human') {
+            return {
+              ...result('blocked', mergeGate.reason),
+              factory_merge_decision: mergeGate,
+            };
+          }
+        }
         assertChild();
         const verified = await (deps.reconcile ?? runPreparedVcsDevelopment)(
           prepared,
@@ -926,7 +1087,18 @@ export async function advanceMissionDevelopment(
         if (
           verified.status === 'merged' &&
           /^[a-f0-9]{40,64}$/iu.test(verified.knownMergeCommitSha ?? '')
-        )
+        ) {
+          const convergencePlan = spec.factory_envelope
+            ? buildFactoryConvergencePlan({
+                mission_id: state.mission_id,
+                mission_status: state.status,
+                development_branch: branch,
+                merge_commit_sha: verified.knownMergeCommitSha,
+                pr_number: pr.number,
+                pr_url: pr.url,
+                main_ci_verified: true,
+              })
+            : undefined;
           return {
             ...result('completed', 'Immutable merge commit and required CI verified'),
             evidence_refs: [
@@ -934,9 +1106,37 @@ export async function advanceMissionDevelopment(
               pr.url,
               `commit:${verified.knownMergeCommitSha}`,
             ],
+            ...(mergeGate ? { factory_merge_decision: mergeGate } : {}),
+            ...(convergencePlan ? { factory_convergence_plan: convergencePlan } : {}),
           };
+        }
         if (verified.status === 'merged')
           return result('blocked', 'Merge verification lacks its immutable commit receipt');
+        if (verified.status === 'post_merge_failed' && spec.factory_envelope) {
+          const revertCtx = deps.postMergeRevertContext
+            ? await deps.postMergeRevertContext(pr, verified)
+            : { failureReproducedOnRerun: false, revertAttemptsUsed: 0 };
+          const revertPlan = planFactoryPostMergeRevert({
+            mission_id: state.mission_id,
+            merge_commit_sha: verified.knownMergeCommitSha ?? '',
+            pr_number: pr.number,
+            incident_id: `${state.mission_id}:${verified.knownMergeCommitSha ?? pr.headSha}`,
+            main_ci_failed: true,
+            failure_reproduced_on_rerun: revertCtx.failureReproducedOnRerun,
+            revert_attempts_used: revertCtx.revertAttemptsUsed ?? 0,
+            revert_conflict: revertCtx.revertConflict,
+            changed_paths: sourcePaths,
+            tenant_slug: state.tenant_slug,
+            factory_policy: deps.factoryPolicy,
+            apply_demotion: revertCtx.applyDemotion ?? false,
+            autonomy_state_deps: revertCtx.autonomyStateDeps,
+          });
+          return {
+            ...result('blocked', revertPlan.reason),
+            ...(mergeGate ? { factory_merge_decision: mergeGate } : {}),
+            factory_revert_plan: revertPlan,
+          };
+        }
         return result(
           ['blocked', 'post_merge_failed', 'post_merge_unverified'].includes(verified.status)
             ? 'blocked'
@@ -1002,6 +1202,8 @@ function queueRepair(
   progress.repairs += 1;
   progress.pushed_head = undefined;
   progress.review_key = undefined;
+  progress.factory_veto_head_sha = undefined;
+  progress.factory_veto_window = undefined;
   save();
   const current = (deps.get ?? getWorkItem)(item.item_id);
   if (!current) throw new Error('Repair WorkItem disappeared');

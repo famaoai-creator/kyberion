@@ -13,9 +13,11 @@ import { findMissionPath as resolveMissionPath, rootDir } from '@agent/core/path
 import { evaluateAutonomousOpsAction } from '@agent/core/governance/autonomous-ops-gate';
 import { observeMandateCoverage } from '@agent/core/governance/mandate-shadow';
 import {
+  formatFactoryDelivery,
   formatMissionAdmission,
   isStrictRequirementsFramingEnabled,
   loadMissionBriefAtPath,
+  validateFactoryDeliveryConfig,
   validateStrictMissionBriefFraming,
   type MissionBrief,
 } from './mission-brief.js';
@@ -132,6 +134,18 @@ export function openAlignmentApproval(
     }
   }
 
+  if (brief.factoryDelivery?.enabled === true) {
+    const factoryCheck = validateFactoryDeliveryConfig(brief);
+    if (!factoryCheck.ok) {
+      return {
+        missionId,
+        created: false,
+        briefPath,
+        reason: `Alignment brief failed factoryDelivery validation: ${factoryCheck.reasons.join(' ')}`,
+      };
+    }
+  }
+
   const payloadHash = computeApprovalPayloadHash(brief as unknown as Record<string, unknown>);
 
   const existing = findPendingAlignmentApproval(missionId);
@@ -163,7 +177,11 @@ export function openAlignmentApproval(
         title: mt('mission_alignment:approval_title', { title: brief.title || missionId }),
         summary: brief.intent || mt('mission_alignment:approval_summary', { missionId }),
         details:
-          [formatVictoryConditions(brief.victoryConditions), formatMissionAdmission(brief)]
+          [
+            formatVictoryConditions(brief.victoryConditions),
+            formatMissionAdmission(brief),
+            formatFactoryDelivery(brief),
+          ]
             .filter(Boolean)
             .join('\n\n') || undefined,
         severity: 'high',

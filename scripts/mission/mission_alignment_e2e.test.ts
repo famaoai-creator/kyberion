@@ -257,4 +257,67 @@ describe('MO-11 alignment gate end-to-end', () => {
     });
     expect(strictReport.reasons[0]).toContain('scope.out');
   });
+
+  it('discloses and hash-binds 1-shot factoryDelivery delegation and rejects invalid factoryDelivery config', () => {
+    writeBrief({
+      ...BRIEF,
+      factoryDelivery: {
+        enabled: true,
+      },
+    });
+    const invalidOpened = openAlignmentApproval(MISSION_ID);
+    expect(invalidOpened.created).toBe(false);
+    expect(invalidOpened.reason).toContain('factoryDelivery');
+
+    writeBrief({
+      ...BRIEF,
+      factoryDelivery: {
+        enabled: true,
+        branch: 'agent/factory-1shot-demo',
+        mergeMode: 'veto_window',
+        maxCiRepairAttempts: 2,
+        allowedPaths: ['docs/**', 'libs/core/example.ts'],
+      },
+    });
+    const opened = openAlignmentApproval(MISSION_ID);
+    expect(opened.created).toBe(true);
+    const openedRecord = withExecutionContext('surface_runtime', () =>
+      listApprovalRequests({ storageChannels: ['brief'] }).find((r) => r.id === opened.requestId)
+    );
+    expect(openedRecord?.details).toContain('Factory Delivery Delegation:');
+    expect(openedRecord?.details).toContain('agent/factory-1shot-demo');
+
+    decideApprovalRequest('surface_runtime', {
+      channel: 'brief',
+      storageChannel: 'brief',
+      requestId: opened.requestId!,
+      decision: 'approved',
+      decidedBy: 'concierge',
+      decidedByRole: 'sovereign',
+      authMethod: 'surface_session',
+      decidedByType: 'human',
+      authenticated: true,
+      payloadHash: opened.payloadHash,
+    });
+    expect(assessAlignmentDecision(MISSION_ID)).toMatchObject({
+      verdict: 'approved',
+      satisfied: true,
+    });
+
+    // Mutating factoryDelivery.mergeMode invalidates the bound approval hash.
+    writeBrief({
+      ...BRIEF,
+      factoryDelivery: {
+        enabled: true,
+        branch: 'agent/factory-1shot-demo',
+        mergeMode: 'auto_low_risk',
+        maxCiRepairAttempts: 2,
+        allowedPaths: ['docs/**', 'libs/core/example.ts'],
+      },
+    });
+    expect(assessAlignmentDecision(MISSION_ID)).toMatchObject({
+      verdict: 'brief_drifted',
+      satisfied: false,
+    });
+  });
 });
