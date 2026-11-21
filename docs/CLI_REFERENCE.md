@@ -59,7 +59,7 @@ Every governed `kyberion` command and `pnpm` script, generated from the command 
 
 | Command                               | pnpm script           | What it does                                                                                                                                                       |
 | ------------------------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `pnpm kyberion approvals`             |                       | Review and decide approval requests                                                                                                                                |
+| `pnpm kyberion approvals`             |                       | Review and decide approval requests (--approve/--deny <id>; add --new-window from an agent CLI without a TTY)                                                      |
 | `pnpm kyberion calendar`              |                       | Calendar workflow: status, agenda, free/busy, events — **[readiness]** · Live ops need: trusted task binding (see `kyberion task`)                                 |
 | `pnpm kyberion calendar create-event` |                       | Create a calendar event (approval-gated) — **[state change]** · Needs: trusted task binding (see `kyberion task`), task credentials (see `kyberion service setup`) |
 | `pnpm kyberion capture`               |                       | Capture a still image of the screen, a window, or the camera — **[state change]** · Needs: OS consent (see `kyberion permissions`)                                 |

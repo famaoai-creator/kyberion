@@ -9041,9 +9041,9 @@
         "qps-ploc": "⟦Řėṽïėẇ ȧñḓ ȧƈƈėṗŧ ḓėŀïṽėřȧƀŀėş ïñ ŧħė ïñƀőẋ ŀőřėɱ ïṗşůɱ ḓő⟧"
       },
       "cli_cmd_operator_home_approvals": {
-        "en": "Review and decide approval requests",
-        "ja": "承認リクエストを確認して裁可",
-        "qps-ploc": "⟦Řėṽïėẇ ȧñḓ ḓėƈïḓė ȧṗṗřőṽȧŀ řėɋůėşŧş ŀőřėɱ ïṗşůɱ⟧"
+        "en": "Review and decide approval requests (--approve/--deny <id>; add --new-window from an agent CLI without a TTY)",
+        "ja": "承認リクエストを確認して裁可(--approve/--deny <id>。TTY のないエージェント CLI からは --new-window を付ける)",
+        "qps-ploc": "⟦Řėṽïėẇ ȧñḓ ḓėƈïḓė ȧṗṗřőṽȧŀ řėɋůėşŧş (--ȧṗṗřőṽė/--ḓėñẏ <ïḓ>; ȧḓḓ --ñėẇ-ẇïñḓőẇ ƒřőɱ ȧñ ȧɠėñŧ ƇĿÏ ẇïŧħőůŧ ȧ ŦŦẎ) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧů⟧"
       },
       "cli_cmd_operator_home_notify": {
         "en": "Inspect or configure notification targets",
@@ -11891,6 +11891,41 @@
         "en": "Pending approval not found: {id}",
         "ja": "承認待ちが見つかりません: {id}",
         "qps-ploc": "⟦Ṗėñḓïñɠ ȧṗṗřőṽȧŀ ñőŧ ƒőůñḓ: {id} ŀőřėɱ ïṗşů⟧"
+      },
+      "recorder_approval_window_opened": {
+        "en": "Opened a new terminal window to decide {id}. Check the request there and type the code it shows. (Same as running: {command})",
+        "ja": "{id} を判断するための新しいターミナル窓を開きました。その窓で内容を確認し、表示されたコードを入力してください。(実行内容: {command})",
+        "qps-ploc": "⟦Őṗėñėḓ ȧ ñėẇ ŧėřɱïñȧŀ ẇïñḓőẇ ŧő ḓėƈïḓė {id}. Ƈħėƈķ ŧħė řėɋůėşŧ ŧħėřė ȧñḓ ŧẏṗė ŧħė ƈőḓė ïŧ şħőẇş. (Şȧɱė ȧş řůññïñɠ: {command}) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗ⟧"
+      },
+      "recorder_approval_window_manual": {
+        "en": "No window can be opened here ({reason}). Open a terminal yourself and run: {command}",
+        "ja": "ここでは窓を開けません({reason})。ご自身でターミナルを開いて次を実行してください: {command}",
+        "qps-ploc": "⟦Ñő ẇïñḓőẇ ƈȧñ ƀė őṗėñėḓ ħėřė ({reason}). Őṗėñ ȧ ŧėřɱïñȧŀ ẏőůřşėŀƒ ȧñḓ řůñ: {command} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
+      },
+      "recorder_approval_window_recorded": {
+        "en": "Recorded.",
+        "ja": "記録しました。",
+        "qps-ploc": "⟦Řėƈőřḓėḓ. ŀőř⟧"
+      },
+      "recorder_approval_window_not_recorded": {
+        "en": "Not recorded (wrong code, timeout or refusal); nothing changed.",
+        "ja": "記録されていません(コード違い・時間切れ・拒否)。変更はありません。",
+        "qps-ploc": "⟦Ñőŧ řėƈőřḓėḓ (ẇřőñɠ ƈőḓė, ŧïɱėőůŧ őř řėƒůşȧŀ); ñőŧħïñɠ ƈħȧñɠėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "recorder_approval_window_close": {
+        "en": "Press Enter to close this window.",
+        "ja": "Enter キーでこの窓を閉じます。",
+        "qps-ploc": "⟦Ṗřėşş Ėñŧėř ŧő ƈŀőşė ŧħïş ẇïñḓőẇ. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "recorder_approval_window_reason_unquotable_path": {
+        "en": "the repository path has characters a Windows script cannot quote safely",
+        "ja": "リポジトリのパスに Windows のスクリプトで安全に扱えない文字が含まれています",
+        "qps-ploc": "⟦ŧħė řėṗőşïŧőřẏ ṗȧŧħ ħȧş ƈħȧřȧƈŧėřş ȧ Ẇïñḓőẇş şƈřïṗŧ ƈȧññőŧ ɋůőŧė şȧƒėŀẏ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "recorder_approval_window_reason_no_os_terminal": {
+        "en": "this OS cannot open a terminal window outside the agent session",
+        "ja": "この OS ではエージェントのセッションの外に端末の窓を開けません",
+        "qps-ploc": "⟦ŧħïş ŐŞ ƈȧññőŧ őṗėñ ȧ ŧėřɱïñȧŀ ẇïñḓőẇ őůŧşïḓė ŧħė ȧɠėñŧ şėşşïőñ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
       },
       "recorder_approvals_revoke_not_found": {
         "en": "Revocable approved approval not found: {id}",
