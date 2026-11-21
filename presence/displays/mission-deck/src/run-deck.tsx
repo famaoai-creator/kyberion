@@ -5,7 +5,7 @@ import { DeckStore, initialDeckState } from './store/deck-store.js';
 import { createInlineHost, createWorkerHost, type DeckHost } from './data/host.js';
 import { OSC_SIGNALS } from './controller.js';
 import { runHandoff, type HandoffRunner } from './actions/handoff.js';
-import { auditEffect } from './actions/effects.js';
+import { auditEffect, setOperatorBaseRole } from './actions/effects.js';
 import { renderSnapshotLines } from './snapshot.js';
 import { sanitizeTerminalText } from './ui/terminal-text.js';
 import { defaultLocale, makeI18n } from './i18n.js';
@@ -17,6 +17,11 @@ export interface RunDeckOptions {
   locale?: SupportedLocale;
   /** Run the data engine in-process instead of a worker thread. */
   inline?: boolean;
+  /**
+   * The operator's base role before the deck raised its own read role;
+   * child processes run on this one. Undefined = no base role.
+   */
+  operatorBaseRole?: string;
 }
 
 function canUseInteractiveTerminal(): boolean {
@@ -28,12 +33,12 @@ function canUseInteractiveTerminal(): boolean {
 function createHost(options: RunDeckOptions, locale: SupportedLocale): DeckHost {
   if (!options.inline) {
     try {
-      return createWorkerHost({ locale });
+      return createWorkerHost({ locale, operatorBaseRole: options.operatorBaseRole });
     } catch {
       // fall through to the in-process engine
     }
   }
-  return createInlineHost({ locale });
+  return createInlineHost({ locale, operatorBaseRole: options.operatorBaseRole });
 }
 
 export async function runDeck(
@@ -41,6 +46,7 @@ export async function runDeck(
   handoff: HandoffRunner = runHandoff
 ): Promise<void> {
   let locale = options.locale ?? defaultLocale();
+  setOperatorBaseRole(options.operatorBaseRole);
   if (options.once || !canUseInteractiveTerminal()) {
     const lines = renderSnapshotLines(locale);
     process.stdout.write(lines.map(sanitizeTerminalText).join('\n') + '\n');
@@ -65,6 +71,8 @@ export async function runDeck(
           signals={OSC_SIGNALS}
           onLocaleChange={(next) => {
             locale = next;
+            // Loader-built text (labels, reasons) follows the operator's language too.
+            host.setLocale(next);
             rerender?.(element());
           }}
         />

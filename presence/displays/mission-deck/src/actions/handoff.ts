@@ -10,8 +10,8 @@
 import * as path from 'node:path';
 import { safeSpawn } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeChildEnv } from '@agent/core/foundation';
 import { resolveHerdrBin } from '@agent/core/tool/tool-binary-resolvers';
+import { deckChildEnv, unsafePositional } from './effects.js';
 
 export interface HandoffSpec {
   kind: 'attach' | 'approval';
@@ -54,28 +54,55 @@ export function approvalSpec(
 
 export type HandoffRunner = (spec: HandoffSpec) => Promise<number | null>;
 
-export const runHandoff: HandoffRunner = (spec) =>
-  new Promise((resolve) => {
-    process.stdout.write(`\n${spec.banner}\n\n`);
+export interface HandoffIo {
+  spawn: typeof safeSpawn;
+  stdin: Pick<NodeJS.ReadStream, 'pause'>;
+  write: (text: string) => void;
+}
+
+const defaultIo: HandoffIo = {
+  spawn: safeSpawn,
+  stdin: process.stdin,
+  write: (text) => process.stdout.write(text),
+};
+
+export function createHandoffRunner(io: HandoffIo = defaultIo): HandoffRunner {
+  return (spec) => runHandoffWith(spec, io);
+}
+
+export const runHandoff: HandoffRunner = createHandoffRunner();
+
+function runHandoffWith(spec: HandoffSpec, io: HandoffIo): Promise<number | null> {
+  return new Promise((resolve) => {
+    // The subject is the child's last positional (agent target / approval
+    // request id): one that looks like an option would change the command.
+    const unsafe = unsafePositional(spec.subject);
+    if (unsafe) {
+      io.write(`\nrefused: ${unsafe}\n`);
+      resolve(null);
+      return;
+    }
+    io.write(`\n${spec.banner}\n\n`);
     // Ink unrefs stdin on unmount but does not pause it; a flowing parent
     // stream would swallow keystrokes meant for the child (attach / approval
     // challenge). Ink resumes stdin on the next mount.
-    process.stdin.pause();
+    io.stdin.pause();
     let child;
     try {
-      child = safeSpawn(spec.command, spec.args, {
+      child = io.spawn(spec.command, spec.args, {
         cwd: pathResolver.rootDir(),
-        env: { ...safeChildEnv() },
+        env: deckChildEnv(),
         stdio: 'inherit',
       });
     } catch (err) {
-      process.stdout.write(`${err instanceof Error ? err.message : String(err)}\n`);
+      io.write(`${err instanceof Error ? err.message : String(err)}\n`);
       resolve(null);
       return;
     }
     child.on('error', (err) => {
-      process.stdout.write(`${err.message}\n`);
+      io.write(`${err.message}\n`);
       resolve(null);
     });
     child.on('exit', (code) => resolve(code));
   });
+}

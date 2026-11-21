@@ -76,6 +76,14 @@ describe('loadSnapshot scope', () => {
 });
 
 describe('DeckEngine', () => {
+  it('reloads right away in the new language when the locale changes', () => {
+    const emitted: DeckSnapshot[] = [];
+    const engine = new DeckEngine((s) => emitted.push(s), { locale: 'en', loaderDeps: deps() });
+    engine.setLocale('ja');
+    expect(emitted).toHaveLength(1);
+    expect((engine as unknown as { options: { locale?: string } }).options.locale).toBe('ja');
+  });
+
   it('keeps the last snapshot and marks it stale when loading throws', () => {
     const emitted: DeckSnapshot[] = [];
     const engine = new DeckEngine((s) => emitted.push(s), { loaderDeps: deps() });
@@ -123,6 +131,7 @@ function fallbackHost(): DeckHost & { emit: (s: DeckSnapshot) => void } {
     emit: (s) => listener?.(s),
     request: async () => ({ ok: true, message: 'inline' }),
     refresh: vi.fn(),
+    setLocale: vi.fn(),
     stop: vi.fn(),
   };
 }
@@ -166,6 +175,29 @@ describe('createWorkerHost', () => {
     );
     worker.emit('message', { type: 'fatal', error: 'module not found' });
     expect(host.mode).toBe('inline');
+  });
+
+  it('sends a locale switch to the worker, and to the fallback after a failover', () => {
+    const worker = new FakeWorker();
+    const inline = fallbackHost();
+    const factory = vi.fn(() => inline);
+    const host = createWorkerHost(
+      { locale: 'en', operatorBaseRole: 'worker' },
+      factory,
+      () => worker
+    );
+    expect(worker.posted[0]).toMatchObject({
+      type: 'config',
+      locale: 'en',
+      operatorBaseRole: 'worker',
+    });
+    host.setLocale('ja');
+    expect(worker.posted.at(-1)).toEqual({ type: 'locale', locale: 'ja' });
+    worker.emit('exit', 1);
+    // the fallback starts in the language the operator switched to
+    expect(factory).toHaveBeenCalledWith(expect.objectContaining({ locale: 'ja' }));
+    host.setLocale('en');
+    expect(inline.setLocale).toHaveBeenCalledWith('en');
   });
 
   it('does not fail over on a deliberate stop', () => {

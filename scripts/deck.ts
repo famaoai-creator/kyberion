@@ -8,11 +8,13 @@
  */
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { runDeck } from '@presence/mission-deck';
-import { setRegisteredEnv } from '@agent/core/foundation';
+import { baseRoleEnvText, setRegisteredEnv } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 // Same base role as the terminal HUD: personal-tier mission reads need it;
-// every write still goes through its governed owner.
+// every write still goes through its governed owner. Children the deck starts
+// (herdr, mission_controller, approvals) get the operator's own role back.
+const operatorBaseRole = baseRoleEnvText();
 setRegisteredEnv('KYBERION_BASE_ROLE', 'sovereign');
 
 export async function main(args: string[] = []): Promise<void> {
@@ -25,7 +27,12 @@ export async function main(args: string[] = []): Promise<void> {
     .option('inline', { type: 'boolean', default: false, describe: 'Run data loaders in-process' })
     .strict()
     .parse(args);
-  await runDeck({ once: options.once, view: options.view, inline: options.inline });
+  await runDeck({
+    once: options.once,
+    view: options.view,
+    inline: options.inline,
+    operatorBaseRole,
+  });
 }
 
 export const runDeckScript = defineScript({

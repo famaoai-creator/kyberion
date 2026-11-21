@@ -121,6 +121,7 @@ export function fakeHost(
       return respond(request);
     },
     refresh: vi.fn(),
+    setLocale: vi.fn(),
     stop: () => undefined,
   };
 }

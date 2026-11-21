@@ -7,7 +7,14 @@ export type HostRequest = DeckRequest | { op: 'missionDetail'; id: string; row?:
 export type HostResponseValue = EffectResult | MissionDetail | undefined;
 
 export type ToWorker =
-  | { type: 'config'; locale?: SupportedLocale; intervalMs: number; includeAgents: boolean }
+  | {
+      type: 'config';
+      locale?: SupportedLocale;
+      intervalMs: number;
+      includeAgents: boolean;
+      operatorBaseRole?: string;
+    }
+  | { type: 'locale'; locale: SupportedLocale }
   | { type: 'refresh' }
   | { type: 'request'; id: number; request: HostRequest }
   | { type: 'stop' };

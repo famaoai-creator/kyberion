@@ -5,6 +5,7 @@
 import { Worker } from 'node:worker_threads';
 import { fileURLToPath } from 'node:url';
 import type { SupportedLocale } from '@agent/core/locale';
+import { setOperatorBaseRole } from '../actions/effects.js';
 import { DeckEngine, type EngineOptions } from './engine.js';
 import type { DeckSnapshot } from '../model/types.js';
 import type { FromWorker, HostRequest, HostResponseValue, ToWorker } from './protocol.js';
@@ -13,6 +14,8 @@ export interface DeckHost {
   subscribe(listener: (snapshot: DeckSnapshot) => void): () => void;
   request(request: HostRequest): Promise<HostResponseValue>;
   refresh(): void;
+  /** Switches the language of loader-built text (the worker has its own copy). */
+  setLocale(locale: SupportedLocale): void;
   stop(): void;
   readonly mode: 'worker' | 'inline';
 }
@@ -21,6 +24,8 @@ export interface HostOptions {
   locale?: SupportedLocale;
   intervalMs?: number;
   includeAgents?: boolean;
+  /** Base role for child processes; see setOperatorBaseRole. */
+  operatorBaseRole?: string;
 }
 
 class Listeners {
@@ -39,6 +44,7 @@ class Listeners {
 
 export function createInlineHost(options: HostOptions & EngineOptions = {}): DeckHost {
   const listeners = new Listeners();
+  if ('operatorBaseRole' in options) setOperatorBaseRole(options.operatorBaseRole);
   const engine = new DeckEngine((snapshot) => listeners.emit(snapshot), options);
   // Defer the first (synchronous) load so subscribers attach first.
   const startTimer = setTimeout(() => engine.start(), 0);
@@ -47,6 +53,7 @@ export function createInlineHost(options: HostOptions & EngineOptions = {}): Dec
     subscribe: (listener) => listeners.add(listener),
     request: (request) => engine.handle(request),
     refresh: () => engine.refresh(),
+    setLocale: (locale) => engine.setLocale(locale),
     stop: () => {
       clearTimeout(startTimer);
       engine.stop();
@@ -77,13 +84,15 @@ export interface WorkerLike {
 }
 
 export function createWorkerHost(
-  options: HostOptions = {},
+  initialOptions: HostOptions = {},
   inlineFallback: (options: HostOptions) => DeckHost = createInlineHost,
   spawnWorker: () => WorkerLike = () => {
     const entry = workerEntry();
     return new Worker(entry.url, entry.execArgv ? { execArgv: entry.execArgv } : {}) as WorkerLike;
   }
 ): DeckHost {
+  // Mutable copy: a locale switch must also reach a later in-process fallback.
+  const options: HostOptions = { ...initialOptions };
   const listeners = new Listeners();
   const worker = spawnWorker();
   worker.unref();
@@ -143,6 +152,7 @@ export function createWorkerHost(
     locale: options.locale,
     intervalMs: options.intervalMs ?? 2000,
     includeAgents: options.includeAgents ?? true,
+    operatorBaseRole: options.operatorBaseRole,
   });
 
   return {
@@ -159,6 +169,11 @@ export function createWorkerHost(
       });
     },
     refresh: () => (fallback ? fallback.refresh() : send({ type: 'refresh' })),
+    setLocale: (locale) => {
+      options.locale = locale;
+      if (fallback) fallback.setLocale(locale);
+      else send({ type: 'locale', locale });
+    },
     stop: () => {
       send({ type: 'stop' });
       stopped = true;
