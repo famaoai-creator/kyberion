@@ -8981,9 +8981,9 @@
         "qps-ploc": "⟦  őƒƒƀőȧřḓ <ŧėñȧñŧ|ṗřőĵėƈŧ> <ïḓ>  Ṗřėṽïėẇ (ḓėƒȧůŀŧ) őř řůñ ėẋṗőřŧ → ḓėŀėŧė ƒőř ȧ ƈŀőşïñɠ şƈőṗė ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşė⟧"
       },
       "cli_help_offboard_usage": {
-        "en": "Usage: pnpm kyberion offboard <tenant|project> <id> [--execute --approved-by <who> --purpose \"<why>\"] [--json]",
-        "ja": "使い方: pnpm kyberion offboard <tenant|project> <id> [--execute --approved-by <承認者> --purpose \"<理由>\"] [--json]",
-        "qps-ploc": "⟦Ůşȧɠė: ṗñṗɱ ķẏƀėřïőñ őƒƒƀőȧřḓ <ŧėñȧñŧ|ṗřőĵėƈŧ> <ïḓ> [--ėẋėƈůŧė --ȧṗṗřőṽėḓ-ƀẏ <ẇħő> --ṗůřṗőşė \"<ẇħẏ>\"] [--ĵşőñ] ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř⟧"
+        "en": "Usage: pnpm kyberion offboard <tenant|project> <id> [--execute --preview-id <id> --approved-by <who> --purpose \"<why>\"] [--json]",
+        "ja": "使い方: pnpm kyberion offboard <tenant|project> <id> [--execute --preview-id <id> --approved-by <承認者> --purpose \"<理由>\"] [--json]",
+        "qps-ploc": "⟦Ůşȧɠė: ṗñṗɱ ķẏƀėřïőñ őƒƒƀőȧřḓ <ŧėñȧñŧ|ṗřőĵėƈŧ> <ïḓ> [--ėẋėƈůŧė --ṗřėṽïėẇ-ïḓ <ïḓ> --ȧṗṗřőṽėḓ-ƀẏ <ẇħő> --ṗůřṗőşė \"<ẇħẏ>\"] [--ĵşőñ] ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗï⟧"
       },
       "cli_help_offboard_dry_run_short": {
         "en": "  (default)  Dry run: list the active/ trees that would be exported and deleted. Writes nothing.",
@@ -8991,9 +8991,9 @@
         "qps-ploc": "⟦  (ḓėƒȧůŀŧ)  Ḓřẏ řůñ: ŀïşŧ ŧħė ȧƈŧïṽė/ ŧřėėş ŧħȧŧ ẇőůŀḓ ƀė ėẋṗőřŧėḓ ȧñḓ ḓėŀėŧėḓ. Ẇřïŧėş ñőŧħïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈ⟧"
       },
       "cli_help_offboard_execute_short": {
-        "en": "  --execute  Export every target under active/shared/exports/offboarding/, then delete it. Requires --approved-by and --purpose.",
-        "ja": "  --execute  対象を active/shared/exports/offboarding/ へ export してから削除。--approved-by と --purpose が必須。",
-        "qps-ploc": "⟦  --ėẋėƈůŧė  Ėẋṗőřŧ ėṽėřẏ ŧȧřɠėŧ ůñḓėř ȧƈŧïṽė/şħȧřėḓ/ėẋṗőřŧş/őƒƒƀőȧřḓïñɠ/, ŧħėñ ḓėŀėŧė ïŧ. Řėɋůïřėş --ȧṗṗřőṽėḓ-ƀẏ ȧñḓ --ṗůřṗőşė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗï⟧"
+        "en": "  --execute  Export every target under active/shared/exports/offboarding/, then delete it. Requires --preview-id, --approved-by and --purpose.",
+        "ja": "  --execute  対象を active/shared/exports/offboarding/ へ export してから削除。確認した --preview-id に加え、--approved-by と --purpose が必須。",
+        "qps-ploc": "⟦  --ėẋėƈůŧė  Ėẋṗőřŧ ėṽėřẏ ŧȧřɠėŧ ůñḓėř ȧƈŧïṽė/şħȧřėḓ/ėẋṗőřŧş/őƒƒƀőȧřḓïñɠ/, ŧħėñ ḓėŀėŧė ïŧ. Řėɋůïřėş --ṗřėṽïėẇ-ïḓ, --ȧṗṗřőṽėḓ-ƀẏ ȧñḓ --ṗůřṗőşė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ⟧"
       },
       "cli_help_offboard_restore_note": {
         "en": "  Deletions are soft: everything moves to active/archive/.trash/ and stays restorable until the janitor purges it.",

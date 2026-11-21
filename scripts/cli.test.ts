@@ -413,6 +413,12 @@ describe('Kyberion CLI helpers', () => {
     ).toThrowError(/--approved-by/);
   });
 
+  it('requires a valid preview id even when the approval arguments are present', () => {
+    const args = ['tenant', 'acme', '--execute', '--approved-by', 'owner', '--purpose', 'closure'];
+    expect(() => parseOffboardArgs(args)).toThrow(/--preview-id/);
+    expect(() => parseOffboardArgs([...args, '--preview-id', 'invalid'])).toThrow(/--preview-id/);
+  });
+
   it('carries a complete offboard approval through', () => {
     expect(
       parseOffboardArgs([
@@ -423,12 +429,15 @@ describe('Kyberion CLI helpers', () => {
         'founder',
         '--purpose',
         'contract ended',
+        '--preview-id',
+        'a'.repeat(64),
       ])
     ).toEqual({
       scopeType: 'tenant',
       scopeId: 'acme',
       mode: 'execute',
       json: false,
+      expectedPreviewId: 'a'.repeat(64),
       approval: { approved_by: 'founder', purpose: 'contract ended' },
     });
   });

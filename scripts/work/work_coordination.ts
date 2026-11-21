@@ -1,3 +1,5 @@
+import { resolveIdentityContext } from '@agent/core/authority';
+import { listArtifactOwnershipRecordsByQuery } from '@agent/core/workforce/artifact-registry';
 import { auditChain } from '@agent/core/governance/audit-chain';
 import { requestWorkEffectReleaseApproval } from '@agent/core/governance/work-effect-release-request';
 import { shellQuoteArg } from '@agent/core/organization/tenant-governance';
@@ -7,6 +9,7 @@ import {
   claimWorkItem,
   createBoard,
   createWorkItem,
+  getWorkItem,
   handoffWorkItem,
   issueBoardView,
   listActiveWorkLeases,
@@ -236,6 +239,7 @@ async function runMain(args: string[] = []): Promise<void> {
       'Release quarantined effects with an authenticated human approval',
       () => undefined
     )
+    .command('session-summary', 'Read the current tenant work item and its mission artifacts (--item-id)', () => undefined)
     .command('handoff-item', 'Hand off a leased item to another peer', () => undefined)
     .command('renew-lease', 'Renew a work item lease', () => undefined)
     .command('update-status', 'Update work item fields', () => undefined)
@@ -414,6 +418,50 @@ async function runMain(args: string[] = []): Promise<void> {
           boards: listBoards(),
         });
       }
+    },
+    'session-summary': async () => {
+      const itemId = optionalArg(argv['item-id']);
+      if (!itemId) throw new Error('session-summary requires --item-id');
+      const tenantSlug = resolveIdentityContext().tenantSlug;
+      if (!tenantSlug) throw new Error('session-summary requires a tenant-bound execution context');
+      const item = getWorkItem(itemId);
+      if (!item || item.context?.tenant_slug !== tenantSlug ||
+          (argv['tenant-slug'] && argv['tenant-slug'] !== tenantSlug)) {
+        throw new Error('Work item unavailable in current tenant');
+      }
+      const attempt = item.attempts?.find(entry => entry.attempt_id === item.current_attempt_id)
+        ?? item.attempts?.at(-1);
+      const executor = item.metadata?.dot_executor;
+      const pending = executor && typeof executor === 'object' && 'awaiting_approval' in executor &&
+        executor.awaiting_approval === true && 'approval_request_id' in executor &&
+        typeof executor.approval_request_id === 'string' ? executor.approval_request_id : null;
+      const missionId = item.context.mission_id;
+      const artifacts = missionId ? listArtifactOwnershipRecordsByQuery({
+        tenantSlug, missionId, organizationId: item.context.organization_id,
+        projectId: item.context.project_id, includeTmp: false,
+      }) : [];
+      print({
+        item_id: item.item_id, title: item.title, status: item.status, version: item.version,
+        owner: item.claimed_by_peer_id ?? item.claimed_by_user_id ?? null,
+        attempt_status: attempt?.status ?? null, last_summary: attempt?.summary ?? null,
+        blocked_reason: attempt?.blocked_reason ?? null,
+        effect_state: item.effect_ownership?.state ?? null,
+        settlement: item.effect_ownership?.settlement ?? null,
+        approval_request_id: pending,
+        next_action: pending ? 'inspect_approval'
+          : item.effect_ownership?.state === 'held' ? 'reconcile_effect'
+          : item.status === 'blocked' ? 'inspect_blocker'
+          : item.status === 'done' || item.status === 'archived' ? 'review_result' : 'inspect_work',
+        mission_id: missionId ?? null,
+        mission_artifacts: artifacts.map(record => ({
+          artifact_id: record.artifact_id, kind: record.kind, path: record.path,
+          storage_class: record.storage_class, created_at: record.created_at,
+          external_ref: record.external_ref, evidence_refs: record.evidence_refs,
+          quality_verdict: record.metadata?.quality_verdict ?? null,
+          delivery_statuses: record.metadata?.delivery_statuses ?? null,
+        })),
+        resume_command: ['pnpm', 'work', 'session-summary', '--item-id', itemId, '--json'],
+      });
     },
     'list-items': async () => {
       print({

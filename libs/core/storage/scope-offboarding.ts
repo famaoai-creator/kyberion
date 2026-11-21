@@ -27,6 +27,7 @@
  */
 
 import * as path from 'node:path';
+export type { OffboardApproval, OffboardScopeInput } from './scope-offboarding-derived.js';
 import { readJson, readJsonLines } from '../foundation/json.js';
 import * as pathResolver from '../path-resolver.js';
 import { parseSafeJsonInput, parseSafeJsonObjectValue } from '../foundation/safe-json.js';
@@ -80,6 +81,8 @@ import {
   readUnchangedDerivedTarget,
   retainCollectedLeftovers,
   exportUnchangedDerivedTarget,
+  scopeOffboardPreviewId,
+  type OffboardScopeInput,
 } from './scope-offboarding-derived.js';
 
 // ---------------------------------------------------------------------------
@@ -288,12 +291,6 @@ export type OffboardScopeType = 'tenant' | 'project';
  * Without it the verb refuses to delete (fail-closed) — a dry run and the
  * export need no approval, only the removal does.
  */
-export interface OffboardApproval {
-  approved_by: string;
-  purpose: string;
-  /** ISO-8601; stamped at execution time when the caller omits it. */
-  approved_at?: string;
-}
 
 export type OffboardTargetKind =
   | 'project_tree'
@@ -370,6 +367,7 @@ export interface OffboardScopeResult {
   scope_type: OffboardScopeType;
   scope_id: string;
   dry_run: boolean;
+  preview_id?: string;
   targets: OffboardTarget[];
   /** Repo-relative export directory (execute mode only). */
   export_path?: string;
@@ -1463,20 +1461,6 @@ function copyTree(source: string, destination: string): void {
   safeCopyFileSync(safeSource, safeDestination);
 }
 
-export interface OffboardScopeInput {
-  scopeType: OffboardScopeType;
-  scopeId: string;
-  /** Optional tenant lineage for a project with a reused project ID. */
-  tenantSlug?: string;
-  /** Optional organization lineage for a project with a reused project ID. */
-  organizationId?: string;
-  /** `dry_run` (default) only reports; `execute` exports then deletes. */
-  mode?: 'dry_run' | 'execute';
-  approval?: OffboardApproval;
-  /** Clock override for deterministic export directory names in tests. */
-  nowIso?: string;
-}
-
 /**
  * Tenant / project offboarding: **discover → export → delete**.
  *
@@ -1580,6 +1564,14 @@ export function offboardScope(input: OffboardScopeInput): OffboardScopeResult {
       return result;
     }
 
+    result.preview_id = scopeOffboardPreviewId(
+      [scopeType, scopeId, tenantSlug, organizationId],
+      result.targets,
+      ownedArtifacts,
+      dedupPrune?.removedLines,
+      ledgerPrunes,
+      delegationTracePrunes
+    );
     if (mode !== 'execute') {
       appendRetentionAudit({
         event: 'SCOPE_OFFBOARD_DRY_RUN',
@@ -1609,11 +1601,14 @@ export function offboardScope(input: OffboardScopeInput): OffboardScopeResult {
 
     const approvedBy = input.approval?.approved_by?.trim();
     const purpose = input.approval?.purpose?.trim();
-    if (!approvedBy || !purpose) {
+    const previewChanged =
+      input.expectedPreviewId !== undefined && input.expectedPreviewId !== result.preview_id;
+    if (!approvedBy || !purpose || previewChanged) {
       result.status = 'approval_required';
-      result.reason =
-        'offboarding delete requires a human approval with approved_by and purpose ' +
-        '(dry_run needs none) — refusing to delete';
+      result.reason = previewChanged
+        ? 'Scope targets changed. Review a fresh dry run before executing.'
+        : 'offboarding delete requires a human approval with approved_by and purpose ' +
+          '(dry_run needs none) — refusing to delete';
       appendRetentionAudit({
         event: 'SCOPE_OFFBOARD_DENIED',
         scope_type: scopeType,

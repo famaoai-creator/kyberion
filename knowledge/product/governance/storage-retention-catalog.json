@@ -1103,7 +1103,7 @@
       "artifact_class": "evidence",
       "action": "review_required",
       "audit": true,
-      "note": "DA-08: governed tenant knowledge, including each tenant's append-only information-asset ledger (knowledge/confidential/{tenant}/_ledger/assets.jsonl, DA-05) — NEVER auto-deletable. Removal happens only through the audited tenant offboarding ceremony (scope-offboarding.ts, `pnpm kyberion offboard tenant <slug> --execute`), which exports before purging. Declared so the ledger's retention decision is explicit rather than silently uncovered. WI-10: this prefix also covers each tenant's promoted work-inventory records (knowledge/confidential/{tenant}/work-inventory/entries/*.json, calibration.json, work-inventory.ts) — same never-auto-delete, offboarding-only-removal semantics; declared here rather than as a separate entry because the tenant slug is a variable path segment this catalog's prefix matching already spans."
+      "note": "DA-08: governed tenant knowledge, including each tenant's append-only information-asset ledger (knowledge/confidential/{tenant}/_ledger/assets.jsonl, DA-05) — NEVER auto-deletable. Removal happens only through the audited tenant offboarding ceremony (scope-offboarding.ts, `pnpm kyberion offboard tenant <slug> --execute --preview-id <id> --approved-by <actor> --purpose <reason>`), which exports before purging. Declared so the ledger's retention decision is explicit rather than silently uncovered. WI-10: this prefix also covers each tenant's promoted work-inventory records (knowledge/confidential/{tenant}/work-inventory/entries/*.json, calibration.json, work-inventory.ts) — same never-auto-delete, offboarding-only-removal semantics; declared here rather than as a separate entry because the tenant slug is a variable path segment this catalog's prefix matching already spans."
     },
     {
       "path": "active/shared/observability/mission-control",
@@ -1188,9 +1188,7 @@
           "id": "wi-observation-pending-review-expiry",
           "path_pattern": "*/work-inventory/observations/*.json",
           "status_field": "status",
-          "statuses": [
-            "pending_review"
-          ],
+          "statuses": ["pending_review"],
           "age_field": "created_at",
           "ttl_days": 30,
           "action": "delete"
@@ -1199,9 +1197,7 @@
           "id": "wi-observation-discarded-expiry",
           "path_pattern": "*/work-inventory/observations/*.json",
           "status_field": "status",
-          "statuses": [
-            "discarded"
-          ],
+          "statuses": ["discarded"],
           "age_field": "discarded_at",
           "ttl_days": 30,
           "action": "delete"

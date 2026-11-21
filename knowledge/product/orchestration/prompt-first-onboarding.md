@@ -81,8 +81,7 @@ onboarding company の help が返す vertical から用途に合う候補を確
 
 ## 4. 対話の回答を既存 facade へ渡す
 
-エージェントの実行ツール越しに裸の pnpm onboarding を起動しない。readline が人間の端末を
-待って停止するため、会話で聞いた値から reviewed JSON を作り onboarding apply を使う。
+非TTYで引数なしの `pnpm onboarding` を実行すると、必要な入力と dry-run の引数列が JSON で返る。本人に確認した値を reviewed JSON に保存し、返された引数列のファイル名を置き換えて検証する。
 人間が直接端末を操作する場合のウィザードはそのまま利用できる。
 
 - 入力契約は [identity.example.json](../../public/templates/onboarding/identity.example.json)。

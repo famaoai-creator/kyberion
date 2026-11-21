@@ -57,6 +57,29 @@ export async function main(
     if (status !== 0) throw new Error(`onboard company failed with exit code ${status}`);
     return;
   }
+  if (args.every((arg) => arg === '--json') && !(process.stdin.isTTY && process.stdout.isTTY)) {
+    print(
+      JSON.stringify(
+        {
+          status: 'needs_input',
+          required_input: 'reviewed_identity_file',
+          input_example: 'knowledge/public/templates/onboarding/identity.example.json',
+          guide: 'knowledge/product/orchestration/prompt-first-onboarding.md',
+          next_command: [
+            'pnpm',
+            'onboarding',
+            'apply',
+            '--identity',
+            '<reviewed-file>',
+            '--dry-run',
+          ],
+        },
+        null,
+        2
+      )
+    );
+    return;
+  }
   const { runOnboarding: runOnboardingWizard } = await import('./onboarding/onboarding_wizard.js');
   await runOnboardingWizard(args, print);
 }

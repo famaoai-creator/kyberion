@@ -280,7 +280,7 @@ function printOffboardHelp(locale = resolveLocale()): void {
   printText(t('cli_help_examples', locale));
   printText('  pnpm kyberion offboard tenant acme');
   printText(
-    '  pnpm kyberion offboard tenant acme --execute --approved-by founder --purpose "contract ended"'
+    '  pnpm kyberion offboard tenant acme --execute --preview-id <preview-id> --approved-by founder --purpose "contract ended"'
   );
   printText(
     '  pnpm kyberion offboard project PRJ-ALPHA --tenant-slug acme --organization-id ORG-ALPHA --json'
@@ -304,6 +304,7 @@ export async function handleOffboardCommand(
     tenantSlug: parsed.tenantSlug,
     organizationId: parsed.organizationId,
     mode: parsed.mode,
+    expectedPreviewId: parsed.expectedPreviewId,
     approval: parsed.approval
       ? { approved_by: parsed.approval.approved_by, purpose: parsed.approval.purpose }
       : undefined,
@@ -329,7 +330,7 @@ export async function handleOffboardCommand(
     if (result.status === 'dry_run') {
       printText('');
       printText(
-        'Dry run — nothing was written. Re-run with --execute --approved-by <who> --purpose "<why>" to apply.'
+        `Reviewed scope preview: ${result.preview_id}. To apply use --execute --preview-id ${result.preview_id} --approved-by <who> --purpose "<why>".`
       );
     }
     printText('');
