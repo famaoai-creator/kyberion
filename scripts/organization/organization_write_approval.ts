@@ -95,6 +95,8 @@ export function requestOrganizationWriteApproval(input: {
   scope: OrganizationWriteScope;
   parsed: Record<string, unknown>;
   requester?: ApprovalRequesterInput;
+  /** The caller's own role (it lacks write authority; the write later runs as organization_operator). */
+  callerRole?: string;
 }): { request_id: string; effect: string } {
   const { scope } = input;
   const effect = effectBinding(scope);
@@ -123,7 +125,7 @@ export function requestOrganizationWriteApproval(input: {
     requestedByContext: {
       surface: 'terminal',
       actorId: approvalRequesterActorId(requester),
-      actorRole: ORGANIZATION_WRITE_ROLE,
+      actorRole: input.callerRole || 'unknown',
     },
     justification: {
       reason: `The caller has no organization write authority; a human approves this one write.`,

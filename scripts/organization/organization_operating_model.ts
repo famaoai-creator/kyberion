@@ -1520,7 +1520,11 @@ function runApprovedOrganizationWrite(
   const scope = { command: parsed.command, organizationId, tier, tenantSlug };
   const fields = parsed as unknown as Record<string, unknown>;
   if (!parsed.approvalRequestId) {
-    const { request_id } = requestOrganizationWriteApproval({ scope, parsed: fields });
+    const { request_id } = requestOrganizationWriteApproval({
+      scope,
+      parsed: fields,
+      callerRole: baseRoleEnvText() || 'unknown',
+    });
     print(
       [
         `Approval requested: ${request_id} — nothing was written.`,
