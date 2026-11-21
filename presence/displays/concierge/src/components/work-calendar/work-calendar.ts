@@ -51,23 +51,43 @@ export interface CalendarApiEntry {
   title: string;
   date: string;
   startDate?: string;
+  /** Work items: the due day (a start-only item has none). */
+  dueDate?: string;
+  /** Timed action items: the instant; its local day is the viewer's own. */
+  dueAt?: string;
   done: boolean;
   missed?: boolean;
   link: { kind: 'work_item' | 'organization' | 'mission'; id: string };
 }
 
-/** API entries as calendar items: done entries read as finished, the day is the due day. */
+/** The viewer's local day of an instant, or undefined for an invalid one. */
+function localDayOf(instant: string): string | undefined {
+  const date = new Date(instant);
+  return Number.isNaN(date.getTime()) ? undefined : localCalendarDate(date);
+}
+
+/**
+ * API entries as calendar items. A work item keeps its own start / due days (a
+ * start-only item is never due); a timed action item falls on the viewer's
+ * local day; everything else is due on its day. Done entries read as finished.
+ */
 export function fromCalendarEntries(
   entries: readonly CalendarApiEntry[],
   hrefFor: (link: CalendarApiEntry['link']) => string | undefined
 ): CalendarItem[] {
   return entries.map((entry) => {
     const href = hrefFor(entry.link);
+    const dueDate =
+      entry.source === 'work_item'
+        ? entry.dueDate
+        : entry.dueAt
+          ? (localDayOf(entry.dueAt) ?? entry.date)
+          : entry.date;
     return {
       id: entry.id,
       title: entry.title,
       status: entry.done ? 'done' : 'open',
-      dueDate: entry.date,
+      ...(dueDate ? { dueDate } : {}),
       ...(entry.startDate ? { startDate: entry.startDate } : {}),
       ...(href ? { href } : {}),
       source: entry.source,

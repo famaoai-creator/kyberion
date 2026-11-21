@@ -54,12 +54,28 @@ const graphSources: WorkspaceGraphSources = {
       tenantSlug: 'beta',
       organizationId: 'beta-org',
     },
+    {
+      id: 'MSN-A-PRJ',
+      status: 'active',
+      tier: 'confidential',
+      tenantSlug: 'acme',
+      organizationId: 'acme-hq',
+      projectId: 'PRJ',
+    },
+    {
+      id: 'MSN-A-OLD',
+      status: 'archived',
+      tier: 'confidential',
+      tenantSlug: 'acme',
+      organizationId: 'acme-hq',
+    },
   ],
   missionDetail: () => ({ tasks: [], staffing: [] }),
   workItems: () => [
     workItem('WI-A', 'acme', 'acme-hq', { due_date: '2026-11-25' }),
     workItem('WI-A-SPAN', 'acme', 'acme-hq', { start_date: '2026-10-20', due_date: '2026-12-20' }),
     workItem('WI-A-OUT', 'acme', 'acme-hq', { due_date: '2027-01-15' }),
+    workItem('WI-A-START', 'acme', 'acme-hq', { start_date: '2026-11-10' }),
     workItem('WI-B', 'beta', 'beta-org', { due_date: '2026-11-25' }),
   ],
   approvals: () => [],
@@ -93,14 +109,20 @@ const operation = (over: Partial<OrganizationOperationRecord>): OrganizationOper
 
 function calendarSources(
   runs: OrganizationOperationRun[] = [],
-  actionItems: Record<string, ActionItem[]> = {}
+  actionItems: Record<string, ActionItem[]> = {},
+  operationOver: Partial<OrganizationOperationRecord> = {}
 ) {
   const reads: string[] = [];
+  let grants = 0;
   const sources: WorkspaceCalendarSources = {
+    withReads: (fn) => {
+      grants += 1;
+      return fn();
+    },
     operations: (scope: OrganizationScope) => {
       reads.push(`operations:${scope.tenantSlug}/${scope.organizationId}`);
       return {
-        operations: [operation({ organization_id: scope.organizationId })],
+        operations: [operation({ organization_id: scope.organizationId, ...operationOver })],
         states: [
           {
             operation_id: 'month-close',
@@ -120,7 +142,7 @@ function calendarSources(
       return actionItems[missionId] ?? [];
     },
   };
-  return { sources, reads };
+  return { sources, reads, grants: () => grants };
 }
 
 const acmeViewer: SurfaceAuthorizationContext = {
@@ -166,7 +188,12 @@ describe('workspace.calendar', () => {
     const result = calendar({ from: '2026-11-01', to: '2026-11-30' }, sources);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(reads.sort()).toEqual(['action_items:MSN-A', 'operations:acme/acme-hq']);
+    // Archived missions are not read; one store grant covers the whole request.
+    expect(reads.sort()).toEqual([
+      'action_items:MSN-A',
+      'action_items:MSN-A-PRJ',
+      'operations:acme/acme-hq',
+    ]);
     const ids = result.data.entries.map((entry) => entry.id);
     expect(
       ids.some((id) => id.includes('beta') || id.includes('WI-B') || id.includes('MSN-B'))
@@ -184,7 +211,7 @@ describe('workspace.calendar', () => {
     const result = calendar({ from: '2026-11-01', to: '2026-11-30' }, sources);
     if (!result.ok) throw new Error('calendar failed');
     const work = result.data.entries.filter((entry) => entry.source === 'work_item');
-    expect(work.map((entry) => entry.link.id).sort()).toEqual(['WI-A', 'WI-A-SPAN']);
+    expect(work.map((entry) => entry.link.id).sort()).toEqual(['WI-A', 'WI-A-SPAN', 'WI-A-START']);
     expect(work.find((entry) => entry.link.id === 'WI-A-SPAN')).toMatchObject({
       date: '2026-12-20',
       startDate: '2026-10-20',
@@ -229,6 +256,66 @@ describe('workspace.calendar', () => {
     const { sources, reads } = calendarSources();
     calendar({ from: '2026-11-01', to: '2026-11-30', mission_id: 'MSN-A' }, sources);
     expect(reads).toEqual(['action_items:MSN-A']);
+  });
+
+  it('opens the store grant once per request', () => {
+    const { sources, grants } = calendarSources();
+    calendar({ from: '2026-11-01', to: '2026-11-30' }, sources);
+    expect(grants()).toBe(1);
+  });
+
+  it("gives a project-scoped viewer no organization operations and only its projects' missions", () => {
+    const { sources, reads } = calendarSources();
+    calendar({ from: '2026-11-01', to: '2026-11-30' }, sources, {
+      ...acmeViewer,
+      projectIds: ['PRJ'],
+    });
+    expect(reads).toEqual(['action_items:MSN-A-PRJ']);
+  });
+
+  it('keeps a start-only work item as a start, never as due', () => {
+    const { sources } = calendarSources();
+    const result = calendar({ from: '2026-11-01', to: '2026-11-30' }, sources);
+    if (!result.ok) throw new Error('calendar failed');
+    const start = result.data.entries.find((entry) => entry.link.id === 'WI-A-START');
+    expect(start).toMatchObject({ date: '2026-11-10', startDate: '2026-11-10' });
+    expect(start).not.toHaveProperty('dueDate');
+  });
+
+  it('judges a past period in its own month even far east of UTC (Auckland)', () => {
+    // October 2026 deadline met by a run on 10-05; November (current) has no run.
+    const { sources } = calendarSources(
+      [
+        {
+          run_id: 'r-oct',
+          operation_id: 'month-close',
+          organization_id: 'acme-hq',
+          tier: 'confidential',
+          status: 'succeeded',
+          started_at: '2026-10-04T20:00:00Z',
+          completed_at: '2026-10-04T21:00:00Z',
+          recorded_at: '2026-10-04T21:00:00Z',
+        } as OrganizationOperationRun,
+      ],
+      {},
+      { trigger: { kind: 'schedule', expression: '0 9 * * 1', timezone: 'Pacific/Auckland' } }
+    );
+    const result = calendar({ from: '2026-10-01', to: '2026-10-31' }, sources);
+    if (!result.ok) throw new Error('calendar failed');
+    const october = result.data.entries.find((entry) => entry.source === 'operation_deadline');
+    expect(october).toMatchObject({ date: '2026-10-05', status: 'met', done: true });
+  });
+
+  it('sends a timed action item with its instant so the viewer can use their own day', () => {
+    const { sources } = calendarSources([], {
+      // 2026-11-30T23:30Z is already 12-01 in Tokyo: keep it at the range edge.
+      'MSN-A': [actionItem({ due_at: '2026-11-30T23:30:00Z' })],
+    });
+    const result = calendar({ from: '2026-12-01', to: '2026-12-31' }, sources);
+    if (!result.ok) throw new Error('calendar failed');
+    expect(result.data.entries.find((entry) => entry.source === 'action_item')).toMatchObject({
+      dueAt: '2026-11-30T23:30:00Z',
+    });
   });
 
   it('cannot widen the scope with a client tenant parameter', () => {

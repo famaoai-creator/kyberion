@@ -81,7 +81,13 @@ export function WorkCalendar({ t }: { t: Translate }) {
   // Moving to the next month keeps the last grid on screen while it loads.
   const lastReady = React.useRef<CalendarData | null>(null);
   if (resource.state === 'ready') lastReady.current = resource.data;
-  const data = resource.state === 'ready' ? resource.data : lastReady.current;
+  // After a failed load the old range's entries would sit under the new grid: show none.
+  const data =
+    resource.state === 'ready'
+      ? resource.data
+      : resource.state === 'error'
+        ? null
+        : lastReady.current;
 
   const items = React.useMemo(
     () =>

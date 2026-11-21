@@ -10,8 +10,13 @@
  * Visibility is inherited, never re-derived: an operation is read only for an
  * organization node, and an action item only for a mission node, that is in
  * the viewer-filtered workspace graph (`filterWorkspaceGraph`). No store of a
- * scope the viewer cannot see is opened. The readers run under the same
- * `workspace_graph_reader` store grant as the graph.
+ * scope the viewer cannot see is opened. A project-scoped viewer gets no
+ * organization-level operations (they belong to no project) and only the
+ * action items of missions in its projects.
+ *
+ * One request opens the `workspace_graph_reader` store grant once (each
+ * opening is a disclosure audit record) and store reads are cached briefly,
+ * like the graph join itself.
  */
 import { withStoreGrant } from '../authority.js';
 import { isCalendarDate } from '../foundation/time.js';
@@ -31,7 +36,12 @@ import {
   organizationOperationDeadlineProjection,
   organizationOperationDueProjection,
 } from '../organization/organization-operation-runtime.js';
-import { calendarDateInZone, nthBusinessDayOfMonthClamped } from '../temporal/business-calendar.js';
+import {
+  calendarDateInZone,
+  nthBusinessDayOfMonthClamped,
+  zonedWallTimeToInstant,
+} from '../temporal/business-calendar.js';
+import type { SurfaceAuthorizationContext } from './surface-authorization.js';
 import {
   WORKSPACE_GRAPH_READER_ROLE,
   type GraphNode,
@@ -46,14 +56,18 @@ export type WorkspaceCalendarSource =
 
 export interface WorkspaceCalendarEntry {
   source: WorkspaceCalendarSource;
-  /** Unique within one result (`<source>:<record id>[:<day>]`). */
+  /** Unique within one result (`<source>:<tenant>:<record id>[:<day>]`). */
   id: string;
   title: string;
   /** The calendar day the entry falls on (`YYYY-MM-DD`). */
   date: string;
-  /** Work items with a start day: the first day of the span. */
+  /** Work items: their start day, when set. */
   startDate?: string;
-  /** Finished: a done work item, a met deadline, a completed action item. */
+  /** Work items: their due day, when set (a start-only item has none). */
+  dueDate?: string;
+  /** Action items due at a time: the instant, so the viewer's own day can be used. */
+  dueAt?: string;
+  /** Finished, or nothing left to ask: a done item, a met or untracked deadline. */
   done: boolean;
   /** A deadline that was missed (finished late or not at all). */
   missed?: boolean;
@@ -65,7 +79,15 @@ export interface WorkspaceCalendarEntry {
   missionId?: string;
 }
 
+export interface OrganizationScope {
+  organizationId: string;
+  tier: OrganizationTier;
+  tenantSlug?: string;
+}
+
 export interface WorkspaceCalendarSources {
+  /** Runs the whole read under one store grant (one disclosure record). */
+  withReads<T>(fn: () => T): T;
   operations(scope: OrganizationScope): {
     operations: OrganizationOperationRecord[];
     states: OrganizationOperationState[];
@@ -74,18 +96,33 @@ export interface WorkspaceCalendarSources {
   actionItems(missionId: string): ActionItem[];
 }
 
-export interface OrganizationScope {
-  organizationId: string;
-  tier: OrganizationTier;
-  tenantSlug?: string;
+const SOURCE_TTL_MS = 3000;
+const sourceCache = new Map<string, { at: number; value: unknown }>();
+
+function cached<T>(key: string, read: () => T): T {
+  const now = Date.now();
+  const hit = sourceCache.get(key);
+  if (hit && now - hit.at <= SOURCE_TTL_MS) return hit.value as T;
+  const value = read();
+  sourceCache.set(key, { at: now, value });
+  if (sourceCache.size > 2000) {
+    for (const [entryKey, entry] of sourceCache) {
+      if (now - entry.at > SOURCE_TTL_MS) sourceCache.delete(entryKey);
+    }
+  }
+  return value;
+}
+
+/** Drop cached store reads (tests; after a write that the calendar must show at once). */
+export function clearWorkspaceCalendarCache(): void {
+  sourceCache.clear();
 }
 
 export function defaultWorkspaceCalendarSources(): WorkspaceCalendarSources {
-  const read = <T>(fn: () => T): T =>
-    withStoreGrant(WORKSPACE_GRAPH_READER_ROLE, fn, { tenantSlug: '' });
   return {
+    withReads: (fn) => withStoreGrant(WORKSPACE_GRAPH_READER_ROLE, fn, { tenantSlug: '' }),
     operations: (scope) =>
-      read(() => {
+      cached(`operations:${scope.tier}/${scope.tenantSlug ?? ''}/${scope.organizationId}`, () => {
         const query = {
           organizationId: scope.organizationId,
           tier: scope.tier,
@@ -97,7 +134,8 @@ export function defaultWorkspaceCalendarSources(): WorkspaceCalendarSources {
           runs: listOrganizationOperationRuns(query),
         };
       }),
-    actionItems: (missionId) => read(() => listActionItems(missionId)),
+    actionItems: (missionId) =>
+      cached(`action_items:${missionId}`, () => listActionItems(missionId)),
   };
 }
 
@@ -120,6 +158,10 @@ export function parseWorkspaceCalendarRange(from: unknown, to: unknown): Workspa
 
 function dayNumber(date: string): number {
   return Math.floor(Date.parse(`${date}T00:00:00.000Z`) / 86_400_000);
+}
+
+function shiftDay(date: string, days: number): string {
+  return new Date((dayNumber(date) + days) * 86_400_000).toISOString().slice(0, 10);
 }
 
 function inRange(date: string | undefined, range: WorkspaceCalendarRange): boolean {
@@ -158,6 +200,18 @@ function monthsIn(range: WorkspaceCalendarRange): Array<{ year: number; month: n
   return months;
 }
 
+function tenantKey(node: GraphNode): string {
+  return node.tenantSlug ?? '-';
+}
+
+function scopeOf(node: GraphNode) {
+  return {
+    ...(node.tenantSlug ? { tenantSlug: node.tenantSlug } : {}),
+    ...(node.organizationId ? { organizationId: node.organizationId } : {}),
+    ...(node.missionId ? { missionId: node.missionId } : {}),
+  };
+}
+
 function workItemEntries(nodes: readonly GraphNode[], range: WorkspaceCalendarRange) {
   const entries: WorkspaceCalendarEntry[] = [];
   for (const node of nodes) {
@@ -173,10 +227,11 @@ function workItemEntries(nodes: readonly GraphNode[], range: WorkspaceCalendarRa
     if (!date || !touches) continue;
     entries.push({
       source: 'work_item',
-      id: `work_item:${node.id}`,
+      id: `work_item:${tenantKey(node)}:${node.id}`,
       title: node.label,
       date,
-      ...(start && due ? { startDate: start } : {}),
+      ...(start ? { startDate: start } : {}),
+      ...(due ? { dueDate: due } : {}),
       done: node.status === 'done' || node.status === 'archived',
       ...(node.status ? { status: node.status } : {}),
       link: { kind: 'work_item', id: node.id },
@@ -186,12 +241,14 @@ function workItemEntries(nodes: readonly GraphNode[], range: WorkspaceCalendarRa
   return entries;
 }
 
-function scopeOf(node: GraphNode) {
-  return {
-    ...(node.tenantSlug ? { tenantSlug: node.tenantSlug } : {}),
-    ...(node.organizationId ? { organizationId: node.organizationId } : {}),
-    ...(node.missionId ? { missionId: node.missionId } : {}),
-  };
+/**
+ * The instant a past period is judged at: its last local day, 23:59 in the
+ * trigger timezone — so the projection, which reads the period from the
+ * instant's local date, grades that month in every zone (UTC−12 … UTC+14).
+ */
+function periodEndInstant(year: number, month: number, timeZone: string): Date {
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  return zonedWallTimeToInstant({ year, month, day: lastDay }, '23:59', timeZone);
 }
 
 function operationEntries(
@@ -205,6 +262,7 @@ function operationEntries(
   for (const operation of data.operations) {
     if (operation.status !== 'active') continue;
     const timeZone = operation.trigger.timezone;
+    const key = `${tenantKey(org)}:${operation.organization_id}:${operation.operation_id}`;
     const base = {
       link: { kind: 'organization' as const, id: org.id },
       ...scopeOf(org),
@@ -219,7 +277,7 @@ function operationEntries(
     if (runDay && inRange(runDay, range)) {
       entries.push({
         source: 'operation_run',
-        id: `operation_run:${operation.organization_id}:${operation.operation_id}`,
+        id: `operation_run:${key}`,
         title: operation.name,
         date: runDay,
         done: false,
@@ -229,17 +287,16 @@ function operationEntries(
     }
     if (!operation.deadline || !timeZone) continue;
     const runs = data.runs.filter((run) => run.operation_id === operation.operation_id);
-    const today = zoneDay(now, timeZone)!;
+    const current = zoneDay(now, timeZone)!.slice(0, 7);
     for (const { year, month } of monthsIn(range)) {
       const business = nthBusinessDayOfMonthClamped(year, month, operation.deadline.business_day);
       const day = isoDay(business.year, business.month, business.day);
       if (!inRange(day, range)) continue;
       // Judge each period as of its own end (past), now (current) or not yet (future).
       const monthKey = `${year}-${String(month).padStart(2, '0')}`;
-      const current = today.slice(0, 7);
       const asOf =
         monthKey < current
-          ? new Date(Date.UTC(year, month, 0, 12, 0, 0))
+          ? periodEndInstant(year, month, timeZone)
           : monthKey === current
             ? now
             : null;
@@ -249,10 +306,11 @@ function operationEntries(
       const status = projection?.status ?? 'upcoming';
       entries.push({
         source: 'operation_deadline',
-        id: `operation_deadline:${operation.organization_id}:${operation.operation_id}:${day}`,
+        id: `operation_deadline:${key}:${day}`,
         title: operation.name,
         date: day,
-        done: status === 'met',
+        // `untracked`: the deadline predates its own rule — nothing to chase.
+        done: status === 'met' || status === 'untracked',
         ...(status === 'missed' ? { missed: true } : {}),
         status,
         ...base,
@@ -267,16 +325,20 @@ function actionItemEntries(
   items: readonly ActionItem[],
   range: WorkspaceCalendarRange
 ): WorkspaceCalendarEntry[] {
+  // A timestamp's local day can be one day either side of its UTC day.
+  const wide = { from: shiftDay(range.from, -1), to: shiftDay(range.to, 1) };
   const entries: WorkspaceCalendarEntry[] = [];
   for (const item of items) {
     if (!item.due_at || item.status === 'cancelled') continue;
-    const day = isCalendarDate(item.due_at) ? item.due_at : zoneDay(item.due_at, 'UTC');
-    if (!day || !inRange(day, range)) continue;
+    const dateOnly = isCalendarDate(item.due_at);
+    const day = dateOnly ? item.due_at : zoneDay(item.due_at, 'UTC');
+    if (!day || !inRange(day, dateOnly ? range : wide)) continue;
     entries.push({
       source: 'action_item',
-      id: `action_item:${item.mission_id}:${item.item_id}`,
+      id: `action_item:${tenantKey(mission)}:${item.mission_id}:${item.item_id}`,
       title: item.title,
       date: day,
+      ...(dateOnly ? {} : { dueAt: item.due_at }),
       done: item.status === 'completed',
       status: item.status,
       link: { kind: 'mission', id: mission.id },
@@ -310,36 +372,47 @@ function narrowed(node: GraphNode, filter: WorkspaceCalendarFilter): boolean {
 export function buildWorkspaceCalendar(
   graph: WorkspaceGraph,
   sources: WorkspaceCalendarSources,
-  options: { range: WorkspaceCalendarRange; filter?: WorkspaceCalendarFilter; now?: Date }
+  options: {
+    range: WorkspaceCalendarRange;
+    filter?: WorkspaceCalendarFilter;
+    now?: Date;
+    /** The viewer's project ceiling; a project-scoped viewer reads project-bound records only. */
+    viewerProjectIds?: SurfaceAuthorizationContext['projectIds'];
+  }
 ): { entries: WorkspaceCalendarEntry[]; degraded: string[] } {
-  const { range, filter = {}, now = new Date() } = options;
+  const { range, filter = {}, now = new Date(), viewerProjectIds = 'all' } = options;
+  const projectCeiling =
+    viewerProjectIds !== 'all' && viewerProjectIds.length > 0 ? new Set(viewerProjectIds) : null;
   const nodes = graph.nodes.filter((node) => narrowed(node, filter));
   const degraded: string[] = [];
   const entries = workItemEntries(nodes, range);
-  // Operations belong to an organization, not to a project or mission.
-  if (!filter.projectId && !filter.missionId) {
-    for (const org of nodes) {
-      if (org.kind !== 'organization') continue;
-      try {
-        const data = sources.operations({
-          organizationId: org.id,
-          tier: (org.tier ?? 'confidential') as OrganizationTier,
-          ...(org.tenantSlug ? { tenantSlug: org.tenantSlug } : {}),
-        });
-        entries.push(...operationEntries(org, data, range, now));
-      } catch {
-        degraded.push('operations');
+  sources.withReads(() => {
+    // Operations belong to an organization, not to a project or mission.
+    if (!filter.projectId && !filter.missionId && !projectCeiling) {
+      for (const org of nodes) {
+        if (org.kind !== 'organization') continue;
+        try {
+          const data = sources.operations({
+            organizationId: org.id,
+            tier: (org.tier ?? 'confidential') as OrganizationTier,
+            ...(org.tenantSlug ? { tenantSlug: org.tenantSlug } : {}),
+          });
+          entries.push(...operationEntries(org, data, range, now));
+        } catch {
+          degraded.push('operations');
+        }
       }
     }
-  }
-  for (const mission of nodes) {
-    if (mission.kind !== 'mission') continue;
-    try {
-      entries.push(...actionItemEntries(mission, sources.actionItems(mission.id), range));
-    } catch {
-      degraded.push('action_items');
+    for (const mission of nodes) {
+      if (mission.kind !== 'mission' || mission.status === 'archived') continue;
+      if (projectCeiling && !(mission.projectId && projectCeiling.has(mission.projectId))) continue;
+      try {
+        entries.push(...actionItemEntries(mission, sources.actionItems(mission.id), range));
+      } catch {
+        degraded.push('action_items');
+      }
     }
-  }
+  });
   entries.sort(
     (left, right) =>
       left.date.localeCompare(right.date) ||
