@@ -8,6 +8,7 @@ import {
   fromExternalEvents,
   sourceGroup,
   localCalendarDate,
+  providerReloginCommand,
   shiftAnchor,
   startOfWeek,
   summarizeCalendar,
@@ -238,5 +239,16 @@ describe('external calendar events', () => {
     const grid = buildCalendarGrid(events, { view: 'month', anchor: TODAY, today: TODAY });
     const entry = grid.weeks.flat().find((day) => day.date === '2026-11-19')!.entries[0];
     expect(entry.due.state).toBe('none');
+  });
+});
+
+describe('providerReloginCommand', () => {
+  it.each([
+    ['google-workspace', 'gws auth login'],
+    ['m365', null],
+    ['other', null],
+    [null, null],
+  ])('%s → %s', (provider, command) => {
+    expect(providerReloginCommand(provider)).toBe(command);
   });
 });

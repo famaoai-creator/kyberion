@@ -113,6 +113,15 @@ export interface GwsAuthStatus {
   plain_credentials_exists: boolean;
   storage: string | null;
   token_cache_exists: boolean;
+  /** `gws` checked the stored token: true, false, or null when it did not say. */
+  token_valid?: boolean | null;
+  /**
+   * The stored login was refused when `gws` tried to refresh it (`token_valid:
+   * false` with a refusal `token_error`, e.g. `invalid_grant` for a revoked or
+   * expired refresh token): sign in again. Other refresh errors (network,
+   * timeout) are not a refusal. The provider's error text itself is not kept.
+   */
+  token_refresh_failed?: boolean;
   client_config?: string | null;
   encrypted_credentials?: string | null;
   plain_credentials?: string | null;
@@ -748,6 +757,10 @@ export function readEmailDraftArtifact(): EmailDraftArtifact {
   };
 }
 
+/** A refresh the OAuth server refused (as opposed to one that could not reach it). */
+const GWS_TOKEN_REFUSAL =
+  /invalid_grant|invalid_client|unauthorized_client|bad request|unauthori[sz]ed|revoked|expired|\b40[01]\b/iu;
+
 export function readGwsAuthStatus(): GwsAuthStatus {
   const checkedAt = nowIso();
   try {
@@ -765,6 +778,11 @@ export function readGwsAuthStatus(): GwsAuthStatus {
       plain_credentials_exists: Boolean(parsed.plain_credentials_exists),
       storage: typeof parsed.storage === 'string' ? parsed.storage : null,
       token_cache_exists: Boolean(parsed.token_cache_exists),
+      token_valid: typeof parsed.token_valid === 'boolean' ? parsed.token_valid : null,
+      token_refresh_failed:
+        parsed.token_valid === false &&
+        typeof parsed.token_error === 'string' &&
+        GWS_TOKEN_REFUSAL.test(parsed.token_error),
       client_config: typeof parsed.client_config === 'string' ? parsed.client_config : null,
       encrypted_credentials:
         typeof parsed.encrypted_credentials === 'string' ? parsed.encrypted_credentials : null,

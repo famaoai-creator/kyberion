@@ -1,39 +1,55 @@
 import { readCalendarProviderAuthStatus } from '@agent/core/meeting/calendar-workflow';
 
 /**
- * A provider status says whether its CLI answers, not whether anyone is signed
- * in (`gws auth status` exits 0 logged out). Signed in means stored
- * credentials or a token cache; a status without those fields (another
- * provider) falls back to its own `ok`.
+ * Whether the machine's provider login can read a calendar:
+ * - `signed_out`: the CLI does not answer, or nothing is stored (`gws auth
+ *   status` exits 0 logged out, so `ok` alone is not enough);
+ * - `expired`: credentials are stored but the provider refused to refresh
+ *   them (`token_refresh_failed`, projected by `readGwsAuthStatus` from
+ *   `token_valid: false` with a `token_error`, e.g. `invalid_grant`); the
+ *   person has to sign in again;
+ * - `signed_in`: otherwise. A status without these fields (another provider)
+ *   falls back to its own `ok`.
  */
-export function isProviderLoggedIn(status: { ok?: boolean; raw?: unknown }): boolean {
-  if (status.ok !== true) return false;
+export type ProviderLoginState = 'signed_in' | 'signed_out' | 'expired';
+
+export function classifyProviderLogin(status: { ok?: boolean; raw?: unknown }): ProviderLoginState {
+  if (status.ok !== true) return 'signed_out';
   const raw = status.raw;
-  if (!raw || typeof raw !== 'object') return true;
+  if (!raw || typeof raw !== 'object') return 'signed_in';
   const fields = raw as Record<string, unknown>;
   const known = [
     'encrypted_credentials_exists',
     'plain_credentials_exists',
     'token_cache_exists',
   ].filter((key) => key in fields);
-  return known.length === 0 || known.some((key) => fields[key] === true);
+  if (known.length > 0 && !known.some((key) => fields[key] === true)) return 'signed_out';
+  if (fields.token_refresh_failed === true) return 'expired';
+  return 'signed_in';
 }
 
 /** The status probe runs a CLI synchronously; reuse it briefly instead of on every navigation. */
 const STATUS_TTL_MS = 60_000;
-const statusCache = new Map<string, { at: number; loggedIn: boolean }>();
+const statusCache = new Map<string, { at: number; state: ProviderLoginState }>();
 
-export async function providerLoggedIn(provider: string): Promise<boolean> {
+export async function providerLoginState(provider: string): Promise<ProviderLoginState> {
   const hit = statusCache.get(provider);
-  if (hit && Date.now() - hit.at < STATUS_TTL_MS) return hit.loggedIn;
-  let loggedIn = false;
+  if (hit && Date.now() - hit.at < STATUS_TTL_MS) return hit.state;
+  let state: ProviderLoginState = 'signed_out';
   try {
-    loggedIn = isProviderLoggedIn(await readCalendarProviderAuthStatus(provider));
+    state = classifyProviderLogin(await readCalendarProviderAuthStatus(provider));
   } catch {
-    loggedIn = false;
+    state = 'signed_out';
   }
-  statusCache.set(provider, { at: Date.now(), loggedIn });
-  return loggedIn;
+  // An expired login is not cached: the page tells the owner to sign in again
+  // and reload, so the next view must see the new login at once.
+  if (state !== 'expired') statusCache.set(provider, { at: Date.now(), state });
+  return state;
+}
+
+/** A read failed: check the login again next time instead of trusting the cached answer. */
+export function forgetProviderLoginState(provider: string): void {
+  statusCache.delete(provider);
 }
 
 /** Tests: forget cached provider status. */

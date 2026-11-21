@@ -16,6 +16,7 @@ import {
   fromCalendarEntries,
   fromExternalEvents,
   localCalendarDate,
+  providerReloginCommand,
   shiftAnchor,
   sourceGroup,
   startOfWeek,
@@ -40,6 +41,8 @@ type CalendarData = { entries: CalendarApiEntry[]; degraded: string[] };
  */
 type ExternalState =
   | { state: 'off' | 'loading' | 'unavailable' | 'disconnected' | 'degraded' }
+  /** Stored login the provider refused: show the command that signs in again. */
+  | { state: 'expired'; command: string | null }
   | { state: 'ready'; events: ExternalCalendarEvent[] };
 
 function useExternalCalendar(
@@ -65,7 +68,9 @@ function useExternalCalendar(
         const body = (await response.json().catch(() => null)) as {
           ok?: boolean;
           error_code?: string;
+          provider?: string | null;
           connected?: boolean;
+          login_expired?: boolean;
           degraded?: boolean;
           events?: ExternalCalendarEvent[];
         } | null;
@@ -79,7 +84,9 @@ function useExternalCalendar(
           return;
         }
         setKnown(true);
-        if (!body.connected) setResult({ state: 'disconnected' });
+        if (!body.connected && body.login_expired)
+          setResult({ state: 'expired', command: providerReloginCommand(body.provider) });
+        else if (!body.connected) setResult({ state: 'disconnected' });
         else if (body.degraded) setResult({ state: 'degraded' });
         else setResult({ state: 'ready', events: Array.isArray(body.events) ? body.events : [] });
       })
@@ -376,6 +383,12 @@ export function WorkCalendar({ t }: { t: Translate }) {
             <p className="wc-hint">
               {t('ia_shell_work_cal_external_disconnected')}{' '}
               <a href="/settings#setup-services">{t('ia_shell_work_cal_external_connect')}</a>
+            </p>
+          ) : null}
+          {external.state === 'expired' && shownGroups.has('external') ? (
+            <p className="wc-hint" role="status">
+              {t('ia_shell_work_cal_external_expired')}{' '}
+              {external.command ? <code className="wc-command">{external.command}</code> : null}
             </p>
           ) : null}
           {external.state === 'degraded' && shownGroups.has('external') ? (
