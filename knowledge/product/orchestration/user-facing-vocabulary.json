@@ -1,7 +1,11 @@
 {
   "version": "2.0",
   "default_locale": "en",
-  "required_locales": ["en", "ja", "qps-ploc"],
+  "required_locales": [
+    "en",
+    "ja",
+    "qps-ploc"
+  ],
   "domains": {
     "mission": {
       "mission_distillation_label": {
@@ -9559,6 +9563,11 @@
         "en": "Regenerate the governance import baseline fixture",
         "ja": "ガバナンスインポートのベースラインフィクスチャを再生成",
         "qps-ploc": "⟦Řėɠėñėřȧŧė ŧħė ɠőṽėřñȧñƈė ïɱṗőřŧ ƀȧşėŀïñė ƒïẋŧůřė ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "cli_cmd_script_generate_governance_catalogs": {
+        "en": "Rebuild governed catalogs from directory sources",
+        "ja": "ディレクトリ正本からガバナンスカタログを再生成",
+        "qps-ploc": "⟦Řėƀůïŀḓ ɠőṽėřñėḓ ƈȧŧȧŀőɠş ƒřőɱ ḓïřėƈŧőřẏ şőůřƈėş ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
       },
       "cli_cmd_script_generate_platform_read_baseline": {
         "en": "Regenerate the platform-read baseline fixture",
