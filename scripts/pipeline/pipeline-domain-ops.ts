@@ -53,9 +53,18 @@ import { runOAuthSetupForService } from '../setup/setup_oauth.js';
 import { runOrganizationDigest } from '@agent/core/organization/organization-digest';
 import { persistOrganizationDigest } from '@agent/core/organization/organization-digest-artifacts';
 import {
+  authorizeOrganizationCadence,
+  cadenceOrganizations,
+  listOrganizationScopes,
   runOrganizationOperationTick,
   type OrganizationCadenceScope,
 } from '@agent/core/organization/organization-cadence';
+import type { OrganizationScopeRef } from '@agent/core/organization/organization-operation-tick';
+import { measureOrganizationKeyResults } from '@agent/core/dot/dot-key-results';
+import type {
+  KrMeasurementRow,
+  ObjectiveProgressScope,
+} from '@agent/core/organization/organization-objective-progress';
 import {
   runOrganizationStandup,
   type CadencePersistence,
@@ -1043,6 +1052,62 @@ export async function runInlineOrganizationOperationTick(
   if (report.failures.length > 0) {
     throw new Error(
       `core:organization_operation_tick: ${report.failures.length} operation run(s) failed: ${report.failures.join('; ')}`
+    );
+  }
+  return result;
+}
+
+/**
+ * core:organization_kr_measure — measures every due organization objective key
+ * result into the org-KR ledger. Scoped to one organization when the context
+ * carries organization identity (an operation-bound run); otherwise a
+ * sovereign-only cross-tenant sweep of every organization under the
+ * confidential and public tiers. A measurement failure in one organization is
+ * reported alongside the rest, then fails the step — same policy as the
+ * operation tick.
+ */
+export async function runInlineOrganizationKrMeasure(
+  step: PipelineAdfStep,
+  params: Record<string, unknown>,
+  ctx: Record<string, unknown>,
+  deps: {
+    measure?: (scope: ObjectiveProgressScope) => Promise<KrMeasurementRow[]>;
+    list?: (tier: OrganizationTier) => OrganizationScopeRef[];
+  } = {}
+): Promise<Record<string, unknown>> {
+  const scope = cadenceScopeFromContext(params, ctx);
+  authorizeOrganizationCadence('key-result measure', scope);
+  const force = resolveVars(params.force ?? false, ctx) === true;
+  const measure =
+    deps.measure ?? ((s: ObjectiveProgressScope) => measureOrganizationKeyResults(s, { force }));
+  const list = deps.list ?? ((tier: OrganizationTier) => listOrganizationScopes({ tier }));
+  const organizations: OrganizationScopeRef[] = scope
+    ? cadenceOrganizations(scope.tier, scope, undefined, () => list(scope.tier))
+    : (['confidential', 'public'] as const).flatMap((tier) => list(tier));
+  const measured: Array<Record<string, unknown>> = [];
+  const failures: string[] = [];
+  for (const org of organizations) {
+    const label = `${org.tier}/${org.tenantSlug ?? 'shared'}/${org.organizationId}`;
+    try {
+      const rows = await measure({
+        organizationId: org.organizationId,
+        tier: org.tier,
+        ...(org.tenantSlug ? { tenantSlug: org.tenantSlug } : {}),
+      });
+      measured.push({ organization_id: label, measurements: rows.length });
+    } catch (error) {
+      failures.push(`${label}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  const result = exportValue(
+    params,
+    step,
+    { organizations: organizations.length, measured, failures },
+    ctx
+  );
+  if (failures.length) {
+    throw new Error(
+      `core:organization_kr_measure: ${failures.length} organization(s) failed: ${failures.join('; ')}`
     );
   }
   return result;
