@@ -462,6 +462,23 @@ describe('governed vcs-host verbs', () => {
     expect(mocks.admitted.some((a) => a.operationId === 'vcs:pr_merge')).toBe(true);
   });
 
+  it('merge-when-green hands the pinned head to an injected governed merge step', async () => {
+    const forge = memory();
+    forge.state.pulls[0].checks = [{ name: 'build', bucket: 'pass' }];
+    const step = vi.fn(async () => undefined);
+    const result = await vcsHostPrMergeWhenGreen({ ...opts, ref: '7', mergeStep: step });
+    expect(step).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ref: '7',
+        expectedHeadSha: HEAD,
+        method: 'merge',
+        deleteBranch: true,
+      })
+    );
+    expect(result).toMatchObject({ merged: true, number: 7, headSha: HEAD });
+    expect(forge.merges).toHaveLength(0);
+  });
+
   it('merge-when-green refuses failing checks without reaching the merge gate', async () => {
     const forge = memory();
     forge.state.pulls[0].checks = [{ name: 'build', bucket: 'fail' }];

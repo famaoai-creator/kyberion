@@ -11,11 +11,46 @@
  * operator's charter delegates `vcs:pr_merge` for the base branch.
  */
 import { pathResolver } from '@agent/core/path-resolver';
-import { vcsHostPrMergeWhenGreen } from '@agent/core/vcs/vcs-host-verbs';
+import { withRuntimeExternalOperationAuthority } from '@agent/core/governance/external-operation-runtime';
+import { vcsHostInvocationId, type VcsHostMutation } from '@agent/core/vcs/publication-host';
+import { vcsHostPrMergeWhenGreen, type VcsHostPrMergeParams } from '@agent/core/vcs/vcs-host-verbs';
 import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
 import { cliPositionals, guardCliArgsNormalized, type CliGuardSpec } from '../lib/cli/cli-guard.js';
+import { runVcsMutationWithWorktreeGovernance } from '../lib/pr/pr-worktree-governance.js';
 
 type Print = (value: unknown) => void;
+
+/**
+ * The merge step `pr create` uses for its publication: the VCS approval host
+ * inside the installed runtime authority, so a charter grant for the base
+ * branch delegates the merge and anything else opens a human decision (with
+ * its review artifact) instead of failing headless.
+ */
+export function governedMergeStep(print: Print) {
+  return async (params: VcsHostPrMergeParams): Promise<void> => {
+    const {
+      provider: _provider,
+      hostProvider: _hostProvider,
+      git: _git,
+      ...rest
+    } = params as VcsHostPrMergeParams & {
+      provider?: unknown;
+      hostProvider?: unknown;
+      git?: unknown;
+    };
+    const mutation: VcsHostMutation = {
+      operation: 'pr_merge',
+      params: { ...rest, cwd: rest.cwd ?? pathResolver.rootDir() },
+    };
+    const invocationId = vcsHostInvocationId(mutation);
+    const result = await withRuntimeExternalOperationAuthority(
+      { stepId: 'pr:merge', runId: invocationId },
+      () => runVcsMutationWithWorktreeGovernance(mutation, invocationId, print)
+    );
+    if (result.error || result.status !== 0)
+      throw new Error(result.stderr?.trim() || result.error?.message || 'pr merge failed');
+  };
+}
 
 export const MERGE_PR_CLI: CliGuardSpec = {
   command: 'pnpm kyberion pr merge',
@@ -85,6 +120,7 @@ export async function main(
       method: options.method,
       deleteBranch: true,
       checksTimeoutMs: options.checksTimeoutMinutes * 60_000,
+      mergeStep: governedMergeStep(print),
     });
   } catch (error) {
     throw new Error(approvalHint(error, options.ref) ?? errorText(error));
@@ -105,12 +141,16 @@ export function approvalHint(error: unknown, ref: string): string | undefined {
   const message = errorText(error);
   if (!message.startsWith('[EXTERNAL_APPROVAL_REQUIRED]')) return undefined;
   const id = message.match(APPROVAL_ID)?.[1];
-  const decide = id
-    ? `pnpm kyberion approvals --approve ${id}`
-    : 'pnpm kyberion approvals (approve the pending merge)';
+  // The script harness prefixes "[pr:merge]" itself.
+  if (!id)
+    return (
+      `PR ${ref} not merged — checks passed, but the merge gate opened no approval request` +
+      ` (${message.replace('[EXTERNAL_APPROVAL_REQUIRED] ', '')})` +
+      ` | next: run pnpm kyberion pr merge ${ref} from a human terminal, or delegate vcs:pr_merge for the base branch in your charter`
+    );
   return (
-    `[pr:merge] PR ${ref} not merged yet — checks passed and the merge needs your approval` +
-    ` | next: ${decide}, then rerun pnpm kyberion pr merge ${ref}` +
+    `PR ${ref} not merged yet — checks passed and the merge needs your approval` +
+    ` | next: pnpm kyberion approvals --approve ${id}, then rerun pnpm kyberion pr merge ${ref}` +
     ' | evidence: a charter that delegates vcs:pr_merge for the base branch skips this step'
   );
 }

@@ -43,6 +43,7 @@ describe('pr merge', () => {
         method: 'merge',
         deleteBranch: true,
         checksTimeoutMs: 300_000,
+        mergeStep: expect.any(Function),
       })
     );
     expect(lines.at(-1)).toBe(
@@ -58,6 +59,15 @@ describe('pr merge', () => {
       'next: pnpm kyberion approvals --approve req-42, then rerun pnpm kyberion pr merge 7'
     );
     expect(approvalHint(new Error('other'), '7')).toBeUndefined();
+    // a headless gate that opened no request says so instead of pointing at an empty queue
+    expect(
+      approvalHint(
+        new Error('[EXTERNAL_APPROVAL_REQUIRED] External operation requires approval'),
+        '7'
+      )
+    ).toMatch(
+      /opened no approval request .*next: run pnpm kyberion pr merge 7 from a human terminal/
+    );
   });
 
   it('formats the wait', () => {

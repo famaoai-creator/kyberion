@@ -584,6 +584,12 @@ export interface VcsHostPrMergeWhenGreenParams extends VcsHostCallOptions {
   /** How long to wait for checks to reach a terminal state (default 30 min). */
   checksTimeoutMs?: number;
   checksIntervalMs?: number;
+  /**
+   * The governed merge step (default {@link vcsHostPrMerge}). A CLI passes the
+   * approval host (`runVcsMutationWithWorktreeGovernance`) so a missing
+   * charter grant opens a human decision instead of failing headless.
+   */
+  mergeStep?: (params: VcsHostPrMergeParams) => Promise<unknown>;
 }
 
 export interface VcsHostPrMergeWhenGreenResult {
@@ -608,7 +614,8 @@ export async function vcsHostPrMergeWhenGreen(
   sleep?: (ms: number) => Promise<void>
 ): Promise<VcsHostPrMergeWhenGreenResult> {
   assertNotFlagLike(params.ref, 'pr ref');
-  const { ref, method, deleteBranch, checksTimeoutMs, checksIntervalMs, ...host } = params;
+  const { ref, method, deleteBranch, checksTimeoutMs, checksIntervalMs, mergeStep, ...host } =
+    params;
   const before = await vcsHostPrView({ ...host, ref });
   // A URL ref must name the PR it resolves to: a provider that reads only the
   // number from a URL would otherwise merge the bound repository's PR of that
@@ -645,9 +652,8 @@ export async function vcsHostPrMergeWhenGreen(
       detail = `${pr} not merged — checks failing: ${checks.failing.join(', ') || checks.state} | next: fix and push, then rerun`;
     throw new Error(`[PR_MERGE_CHECKS_NOT_GREEN] ${detail} | evidence: gh pr checks ${ref}`);
   }
-  let merged: VcsPrMergeResult;
   try {
-    merged = await vcsHostPrMerge({
+    await (mergeStep ?? vcsHostPrMerge)({
       ...host,
       ref,
       method: method ?? 'merge',
@@ -671,7 +677,7 @@ export async function vcsHostPrMergeWhenGreen(
       );
     throw error;
   }
-  return { merged: true, number: merged.number, headSha, waited_ms: checks.waited_ms };
+  return { merged: true, number: Number(before.number), headSha, waited_ms: checks.waited_ms };
 }
 
 /** Linear-time trailing-slash trim (a `/\/+$/` replace backtracks on long runs of '/'). */

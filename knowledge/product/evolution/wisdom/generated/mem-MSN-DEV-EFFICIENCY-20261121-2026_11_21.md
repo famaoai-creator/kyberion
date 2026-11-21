@@ -32,7 +32,7 @@ mission
 2. **Never act on the first checks read after creating a PR.** It is always pending; a one-shot read that refuses on pending never succeeds (the old `standard_pr_lifecycle` `auto_merge` did this). Wait for terminal states and fail closed on failure, timeout and zero checks.
 3. **Fake the CLI, not just its payload.** `gh pr checks <pr> --json ...` exits 1 with empty stdout and stderr "no checks reported on the '<branch>' branch" when a PR has no checks. Treat that as `[]`; a fake that returns `[]` with exit 0 hides the bug.
 4. **Validate URL refs against the bound repository.** A provider that reads only the PR number from a URL would act on the bound repository's PR of that number; compare the resolved PR url with the ref before waiting.
-5. **Keep authority where it was.** Waiting is mechanics; the merge stays the governed `vcs:pr_merge` operation (approval, or a charter grant for the base branch).
+5. **Keep authority where it was.** Waiting is mechanics; the merge stays the governed `vcs:pr_merge` operation (approval, or a charter grant for the base branch). Route it through the approval host — `runVcsMutationWithWorktreeGovernance` inside `withRuntimeExternalOperationAuthority`, as `pr create` does; calling `vcsHostPrMerge` directly from a CLI is headless, so the gate refuses without opening an approval request or consulting the charter.
 
 ## Recommended References
 
