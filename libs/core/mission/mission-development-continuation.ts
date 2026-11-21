@@ -13,6 +13,16 @@ import {
   type FactoryDeliveryEnvelope,
 } from '../governance/factory-delivery-envelope.js';
 import {
+  classifyCiProofFailure,
+  planFactoryCiAutofix,
+  type FactoryCiFailureRecord,
+} from '../governance/factory-ci-autofix.js';
+import type { FactoryAutonomyPolicy } from '../governance/factory-policy.js';
+import {
+  assessFactoryBranchMainSync,
+  type FactoryMainSyncPlan,
+} from '../vcs/factory-branch-sync.js';
+import {
   getWorkItem,
   listWorkItems,
   updateWorkItem,
@@ -92,6 +102,7 @@ interface ContinuationState {
   workspace_owned?: boolean;
   original_target_path?: string;
   fetched_revision?: string;
+  ci_failure_signatures?: string[];
 }
 const digest = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const closed = new Set(['completed', 'done', 'accepted', 'reviewed']);
@@ -141,6 +152,15 @@ export interface MissionDevelopmentDeps {
   workspace?: typeof prepareMissionDevelopmentWorkspace;
   sourceWorkspace?: typeof ensureMissionDevelopmentSourceWorkspace;
   recordCiEvidence?: RecordRequiredCiEvidence;
+  ciTriage?: (
+    pr: Awaited<ReturnType<typeof readVcsDevelopmentPr>>,
+    ci: Awaited<ReturnType<typeof readVcsDevelopmentCiProof>>
+  ) => FactoryCiFailureRecord[] | Promise<FactoryCiFailureRecord[]>;
+  factoryPolicy?: FactoryAutonomyPolicy;
+  syncBaseSha?: (
+    pr: Awaited<ReturnType<typeof readVcsDevelopmentPr>>,
+    context: { cwd: string }
+  ) => string | undefined | Promise<string | undefined>;
 }
 
 export async function advanceMissionDevelopment(
@@ -300,7 +320,13 @@ export async function advanceMissionDevelopment(
             (typeof progress.review_key !== 'string' ||
               !/^[a-f0-9]{64}$/u.test(progress.review_key))) ||
           (progress.pr_number !== undefined &&
-            (!Number.isSafeInteger(progress.pr_number) || progress.pr_number < 1))
+            (!Number.isSafeInteger(progress.pr_number) || progress.pr_number < 1)) ||
+          (progress.ci_failure_signatures !== undefined &&
+            (!Array.isArray(progress.ci_failure_signatures) ||
+              progress.ci_failure_signatures.length > 16 ||
+              progress.ci_failure_signatures.some(
+                (entry) => typeof entry !== 'string' || !/^[a-f0-9]{12}$/u.test(entry)
+              )))
         )
           throw new Error('Development continuation or specification changed');
         const assertChild = () => {
@@ -607,11 +633,82 @@ export async function advanceMissionDevelopment(
               'blocked',
               'Post-publication CI failed; preserve merge evidence for operator recovery'
             );
+          if (!spec.factory_envelope) {
+            return queueRepair(input, state, item, progress, maxRepairs, save, deps, result, {
+              kind: 'ci_failure',
+              head_sha: pr.headSha,
+              required_checks: ci.requiredChecks,
+              reasons: ci.reasons,
+            });
+          }
+          let syncPlan: FactoryMainSyncPlan | undefined;
+          if (deps.syncBaseSha) {
+            const latestBaseSha = await deps.syncBaseSha(pr, { cwd });
+            if (latestBaseSha && latestBaseSha !== pr.baseSha) {
+              const syncAssessment = assessFactoryBranchMainSync({
+                cwd,
+                baseSha: latestBaseSha,
+                headSha: pr.headSha,
+                tenantSlug: state.tenant_slug,
+                factoryPolicy: deps.factoryPolicy,
+                envelope: spec.factory_envelope,
+                run: deps.git ? (_command, args) => deps.git!(args, cwd) : undefined,
+              });
+              syncPlan = syncAssessment;
+              if (syncAssessment.classification === 'semantic') {
+                return result('blocked', syncAssessment.reason);
+              }
+            }
+          }
+          const failures = deps.ciTriage
+            ? await deps.ciTriage(pr, ci)
+            : [classifyCiProofFailure(ci)];
+          const decision = planFactoryCiAutofix({
+            failures,
+            priorSignatures: progress.ci_failure_signatures ?? [],
+            attemptsUsed: progress.repairs,
+            maxAttempts: Math.min(maxRepairs, spec.factory_envelope.max_ci_repair_attempts),
+            tenantSlug: state.tenant_slug,
+            changedPaths: sourcePaths,
+            factoryPolicy: deps.factoryPolicy,
+          });
+          const nextSignatures = [
+            ...new Set([
+              ...(progress.ci_failure_signatures ?? []),
+              ...decision.observed_signatures,
+            ]),
+          ].slice(0, 16);
+          if (nextSignatures.length > 0) progress.ci_failure_signatures = nextSignatures;
+          if (decision.action === 'escalate_human') {
+            save();
+            return result('blocked', decision.reason);
+          }
+          if (decision.action === 'retry_ci_or_wait') {
+            save();
+            return result('running', decision.reason);
+          }
           return queueRepair(input, state, item, progress, maxRepairs, save, deps, result, {
             kind: 'ci_failure',
             head_sha: pr.headSha,
             required_checks: ci.requiredChecks,
             reasons: ci.reasons,
+            factory_ci_autofix: {
+              action: decision.action,
+              primary_signature: decision.primary_signature,
+              primary_class: decision.primary_class,
+              next_commands: decision.next_commands.slice(0, 8),
+              ...(syncPlan
+                ? {
+                    sync_plan: {
+                      classification: syncPlan.classification,
+                      strategy: syncPlan.strategy,
+                      allowed: syncPlan.allowed,
+                      conflict_paths: syncPlan.conflict_paths.slice(0, 16),
+                      commands: syncPlan.commands.slice(0, 8),
+                    },
+                  }
+                : {}),
+            },
           });
         }
         if (ci.state !== 'success') return result('blocked', 'CI provenance is unverified');
