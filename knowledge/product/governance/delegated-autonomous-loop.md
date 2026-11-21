@@ -26,6 +26,12 @@ CLI へのテキスト委任では、実際に選ばれる候補ごとに既存�
 - standing mandates: mission 開始についての明示的な委任範囲。従来の shadow 評価と実行権限を区別する。
 - accountability charter と操作マッピング: 実際の入力から評価事実を導出し、外部実行を許可する範囲を設定する。未対応の操作や不明な評価事実は人間承認へ戻す。任意コードを設定に埋め込んで新たな権限を作らない。
 
+自律実行の判断ポリシーは三層に分かれ、役割が重ならない。混同しやすいため対応を示す:
+
+- `autonomous-ops-policy.json`（`autonomous-ops-gate.ts`）: 個々のアクションを scope / reversibility / sensitivity / confidence の軸スコアで `auto` / `notify` / `approve` に分類する判断ポリシー。`high_risk_paths`・`never_auto`・稼働時間とアクション別の上限・必要証跡を保持する。
+- `autonomy-learning-policy.json`（`autonomy-action-state.ts`）: 実績に基づいてアクションの自律レベルを昇格・降格させる学習境界。観測窓・cooldown・最小決定数・成功率・事故数上限を定め、`notify → auto` の昇格を検証済み結果だけで行う。
+- `factory-autonomy-policy.json`（`factory-policy.ts`）: factory アクション群の shadow 解除をテナント単位で opt-in する昇格ポリシー。既定は全テナント shadow で、ポリシーが許すアクションだけが上記二層の判定に進む。
+
 既存の precheck / floor contributor / decision relaxer はこの境界を保って利用する。認可の判定が例外で失敗した場合に、許可とみなして処理を続けてはならない。
 
 ## 人間が見るものと残す証跡
