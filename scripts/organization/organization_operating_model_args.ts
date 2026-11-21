@@ -95,6 +95,8 @@ export type ParsedArgs = {
   unknownFlags: string[];
   everySeconds?: number;
   requestApproval?: boolean;
+  /** A human-approved organization write approval to use once (organization_write_approval.ts). */
+  approvalRequestId?: string;
   promotedRef?: string;
   rationale?: string;
   requestedBy?: string;
@@ -191,6 +193,7 @@ export function parseArgs(args: string[]): ParsedArgs {
     '--option': { kind: 'push', field: 'options' },
     '--chosen-option': { kind: 'value', field: 'chosenOption' },
     '--request-approval': { kind: 'flag', field: 'requestApproval' },
+    '--approval-request-id': { kind: 'value', field: 'approvalRequestId' },
     '--promoted-ref': { kind: 'value', field: 'promotedRef' },
     '--rationale': { kind: 'value', field: 'rationale' },
     '--requested-by': { kind: 'value', field: 'requestedBy' },
