@@ -47,6 +47,10 @@ installProcessGuards('nexus-daemon');
 const ROOT_DIR = pathResolver.rootDir();
 const STIMULI_PATH = path.join(ROOT_DIR, 'presence/bridge/runtime/stimuli.jsonl');
 const RUNTIME_BASE = path.join(ROOT_DIR, 'active/shared/runtime/terminal');
+// Identity for the daemon's short-lived secret grants and its children's
+// MISSION_ID. It is not a mission: nothing may write a mission-state for it
+// (a flat active/missions/<id>/ dir has no tier, so mission lookups and the
+// entity-governance check reject it).
 const NEXUS_MISSION_ID = 'MSN-SYSTEM-NEXUS-DISPATCH';
 
 function readNexusJson(filePath: string): unknown {
@@ -101,29 +105,6 @@ function parseNexusDispatchResult(value: unknown): NexusDispatchResult | null {
     ok: typeof ok === 'boolean' ? ok : true,
     ...(typeof record.error === 'string' ? { error: record.error } : {}),
   };
-}
-
-/**
- * Ensures the system mission exists physically for TIBA compliance.
- */
-function ensureSystemMission() {
-  const missionDir = path.join(ROOT_DIR, 'active/missions', NEXUS_MISSION_ID);
-  const safeMissionDir = safeNexusPath(missionDir, true);
-  const statePath = safeNexusPath(path.join(safeMissionDir, 'mission-state.json'), true);
-
-  if (!safeExistsSync(safeMissionDir)) {
-    safeMkdir(safeMissionDir, { recursive: true });
-  }
-
-  const state = {
-    mission_id: NEXUS_MISSION_ID,
-    status: 'Active',
-    started_at: nowIso(),
-    role: 'System Dispatcher',
-  };
-
-  safeWriteFile(statePath, JSON.stringify(state, null, 2));
-  logger.info(`🛡️ [Nexus] System Mission physical state established.`);
 }
 
 const CHECK_INTERVAL_MS = Number(getRegisteredEnvText('NEXUS_INTERVAL')) || 3000;
@@ -322,8 +303,6 @@ async function scanAndDispatch(channels: ChannelRegistryChannel[]) {
 
 async function nexusLoop() {
   logger.info('🛡️ Nexus Daemon (v6.1) standardized. Stateless Evidence-as-State established.');
-
-  ensureSystemMission();
 
   // Initialize Reflex Engine with a generic dispatcher.
   //
