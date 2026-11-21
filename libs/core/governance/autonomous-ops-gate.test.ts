@@ -354,4 +354,54 @@ describe('autonomous-ops-gate', () => {
     expect(degraded.allowed).toBe(false);
     expect(degraded.reason).toContain('unavailable or invalid');
   });
+
+  it('graduates shadow actions only for opted-in tenants while keeping high-risk paths human-approved', () => {
+    const gated = evaluateAutonomousOpsAction({
+      actionId: 'mission_start_mandate',
+      tenantSlug: 'acme',
+      executionMode: 'apply',
+    });
+    expect(gated.shadow).toBe(true);
+    expect(gated.allowed).toBe(false);
+
+    const graduatedPolicy = {
+      version: '1.0.0',
+      tenants: {
+        acme: {
+          enabled: true,
+          graduated_actions: ['mission_start_mandate' as const, 'ci_autofix_attempt' as const],
+        },
+      },
+    };
+    const graduated = evaluateAutonomousOpsAction({
+      actionId: 'mission_start_mandate',
+      tenantSlug: 'acme',
+      executionMode: 'apply',
+      factoryPolicy: graduatedPolicy,
+    });
+    expect(graduated.shadow).toBe(false);
+    expect(graduated.decision).toBe('auto');
+    expect(graduated.allowed).toBe(true);
+
+    const highRisk = evaluateAutonomousOpsAction({
+      actionId: 'mission_start_mandate',
+      tenantSlug: 'acme',
+      changedPaths: ['AGENTS.md'],
+      executionMode: 'apply',
+      factoryPolicy: graduatedPolicy,
+    });
+    expect(highRisk.shadow).toBe(false);
+    expect(highRisk.decision).toBe('approve');
+    expect(highRisk.allowed).toBe(false);
+    expect(highRisk.escalations).toContain('high_risk_path');
+
+    const otherTenant = evaluateAutonomousOpsAction({
+      actionId: 'mission_start_mandate',
+      tenantSlug: 'other',
+      executionMode: 'apply',
+      factoryPolicy: graduatedPolicy,
+    });
+    expect(otherTenant.shadow).toBe(true);
+    expect(otherTenant.allowed).toBe(false);
+  });
 });

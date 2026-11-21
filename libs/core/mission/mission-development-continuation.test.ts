@@ -854,4 +854,102 @@ describe('continuous owner development stage', () => {
     expect((await tick()).status).toBe('blocked');
     expect(publish).not.toHaveBeenCalled();
   });
+  it('routes mission-scoped factory branches to workspace while blocking invalid branches', async () => {
+    const invalid = await run(() =>
+      core.advanceMissionDevelopment(
+        { missionId, development: { ...spec, branch: 'main' }, assertCurrent: () => {} },
+        deps
+      )
+    );
+    expect(invalid.status).toBe('blocked');
+    expect(invalid.reason).toContain('Invalid development branch');
+    const seen: unknown[] = [];
+    const baseWorkspace = deps.workspace;
+    deps.workspace = vi.fn((arg) => {
+      seen.push(arg);
+      return baseWorkspace ? baseWorkspace(arg) : 'unchanged';
+    });
+    await run(() =>
+      core.advanceMissionDevelopment(
+        {
+          missionId,
+          development: { ...spec, branch: 'agent/factory-docs-01' },
+          assertCurrent: () => {},
+        },
+        deps
+      )
+    );
+    expect(seen.length).toBeGreaterThan(0);
+    expect(seen[0]).toEqual(expect.objectContaining({ branch: 'agent/factory-docs-01' }));
+  });
+  it('enforces attached factory delivery envelopes before dispatching workspace mutations', async () => {
+    const { createFactoryDeliveryEnvelope } =
+      await import('../governance/factory-delivery-envelope.js');
+    const validEnvelope = createFactoryDeliveryEnvelope({
+      mission_id: missionId,
+      tenant_slug: 'acme',
+      authority_kind: 'alignment_brief',
+      alignment_approval_ref: 'apr-factory-1',
+      development_branch: 'agent/factory-docs-01',
+      scope_in: spec.source_edit_paths,
+      allowed_paths: spec.source_edit_paths,
+      merge_mode: 'veto_window',
+    });
+
+    const spyWorkspace = vi.fn(deps.workspace ?? (() => 'unchanged' as const));
+    deps.workspace = spyWorkspace;
+
+    await run(() =>
+      core.advanceMissionDevelopment(
+        {
+          missionId,
+          development: {
+            ...spec,
+            branch: 'agent/factory-docs-01',
+            factory_envelope: validEnvelope,
+          },
+          assertCurrent: () => {},
+        },
+        deps
+      )
+    );
+    expect(spyWorkspace).toHaveBeenCalled();
+
+    spyWorkspace.mockClear();
+    const branchMismatch = await run(() =>
+      core.advanceMissionDevelopment(
+        {
+          missionId,
+          development: {
+            ...spec,
+            branch: 'agent/factory-docs-02',
+            factory_envelope: validEnvelope,
+          },
+          assertCurrent: () => {},
+        },
+        deps
+      )
+    );
+    expect(branchMismatch.status).toBe('blocked');
+    expect(branchMismatch.reason).toContain('Factory delivery envelope');
+    expect(spyWorkspace).not.toHaveBeenCalled();
+
+    const tampered = await run(() =>
+      core.advanceMissionDevelopment(
+        {
+          missionId,
+          development: {
+            ...spec,
+            branch: 'agent/factory-docs-01',
+            factory_envelope: { ...validEnvelope, allowed_paths: ['docs/**'] },
+          },
+          assertCurrent: () => {},
+        },
+        deps
+      )
+    );
+    expect(tampered.status).toBe('blocked');
+    expect(tampered.reason).toContain('Factory delivery envelope');
+    expect(spyWorkspace).not.toHaveBeenCalled();
+  });
 });

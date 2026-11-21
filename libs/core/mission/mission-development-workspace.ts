@@ -33,9 +33,12 @@ import { runtimeStatePath } from '../foundation/runtime-state-roots.js';
 import { storagePartitionSegments } from '../storage-layout.js';
 import type { MissionState } from './mission-types.js';
 import {
-  createDevelopmentWorkspaceGitRunner,
-  cloneIsolatedDevelopmentRepository,
+  FACTORY_BRANCH_PATTERN,
+  MISSION_DEVELOPMENT_BRANCH,
   assertReviewedLocalDevelopmentBaseline,
+  cloneIsolatedDevelopmentRepository,
+  createDevelopmentWorkspaceGitRunner,
+  resolveMissionDevelopmentBranch,
 } from './mission-development-git.js';
 import { normalizeRepositoryTarget } from '../governance/external-operation-target.js';
 
@@ -171,7 +174,7 @@ export function ensureMissionDevelopmentSourceWorkspace(
   return { cwd, sourcePaths: sourcePaths.map((source) => `${prefix}/${source}`), created };
 }
 
-export const MISSION_DEVELOPMENT_BRANCH = 'agent/kyberion-development';
+export { FACTORY_BRANCH_PATTERN, MISSION_DEVELOPMENT_BRANCH, resolveMissionDevelopmentBranch };
 /** Compatibility name for callers predating isolation of public source. */
 export const ensureMissionDevelopmentPrivateWorkspace = ensureMissionDevelopmentSourceWorkspace;
 export interface MissionDevelopmentWorkspaceInput {
@@ -180,6 +183,7 @@ export interface MissionDevelopmentWorkspaceInput {
   owned: boolean;
   commit: boolean;
   taskId: string;
+  branch?: string;
   assertCurrent: () => void;
   reserve: () => void;
 }
@@ -192,13 +196,14 @@ export function prepareMissionDevelopmentWorkspace(
   if (path.resolve(cwd) !== path.resolve(runtimeRoot))
     throw new Error('Development executor must run in its dedicated repository root');
   assertSafeRepositoryPath(path.join(cwd, 'package.json'), { allowMissingLeaf: true });
+  const targetBranch = resolveMissionDevelopmentBranch(input.branch);
   const paths = validateTaskSourcePaths(input.sourcePaths);
   if (
     !paths.length ||
     paths.some((name) => !TASK_SOURCE_ROOTS.some((root) => name.startsWith(root)))
   )
     throw new Error('Development requires exact reviewed repository-relative code file paths');
-  run ??= createDevelopmentWorkspaceGitRunner(cwd, paths, input.taskId);
+  run ??= createDevelopmentWorkspaceGitRunner(cwd, paths, input.taskId, targetBranch);
   const read = (args: string[]) => {
     const result = gitRun(args, cwd, run);
     if (result.status !== 0 || result.error) throw new Error('Development workspace read failed');
@@ -216,20 +221,20 @@ export function prepareMissionDevelopmentWorkspace(
   if (staged.result.status !== 0 || staged.paths.length)
     throw new Error('Preexisting staged changes require owner reconciliation');
   const currentBranch = read(['branch', '--show-current']);
-  if (currentBranch !== MISSION_DEVELOPMENT_BRANCH) {
+  if (currentBranch !== targetBranch) {
     if (currentBranch !== 'main' || read(['status', '--porcelain']))
       throw new Error(
         'Development requires a clean dedicated main checkout before creating its candidate'
       );
     const existing = gitRun(
-      ['show-ref', '--verify', '--quiet', `refs/heads/${MISSION_DEVELOPMENT_BRANCH}`],
+      ['show-ref', '--verify', '--quiet', `refs/heads/${targetBranch}`],
       cwd,
       run
     );
     if (existing.status !== 1 || existing.error)
       throw new Error('Existing development candidate must be reconciled by its owner');
     input.reserve();
-    mutation(() => gitCheckout(cwd, MISSION_DEVELOPMENT_BRANCH, { createBranch: true }, run));
+    mutation(() => gitCheckout(cwd, targetBranch, { createBranch: true }, run));
     return 'advanced';
   }
   if (!input.owned) throw new Error('Existing development candidate is not owned by this WorkItem');

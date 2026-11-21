@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   createGhPrPort,
+  formatFactoryReadiness,
   formatObserveResult,
   formatPrShadowSummary,
   runPrShadow,
@@ -165,7 +166,7 @@ describe('formatting and arguments', () => {
     ).toContain('error: #1: boom');
   });
 
-  it('rejects an unknown command and a bare --ignore-check', async () => {
+  it('rejects an unknown command, a bare --ignore-check, and a bare --tenant', async () => {
     process.exitCode = undefined;
     try {
       expect(await runPrShadow(['merge'])).toBeUndefined();
@@ -173,8 +174,32 @@ describe('formatting and arguments', () => {
       process.exitCode = undefined;
       expect(await runPrShadow(['observe', '--ignore-check'])).toBeUndefined();
       expect(process.exitCode).toBe(2);
+      process.exitCode = undefined;
+      expect(await runPrShadow(['report', '--tenant'])).toBeUndefined();
+      expect(process.exitCode).toBe(2);
     } finally {
       process.exitCode = undefined;
     }
+  });
+
+  it('formats factory readiness and attaches it when --tenant is passed to report', async () => {
+    const formatted = formatFactoryReadiness({
+      ready: false,
+      tenant_slug: 'acme',
+      halted: false,
+      tenant_enabled: false,
+      graduated_actions: [],
+      active_mandate_count: 1,
+      actions: [],
+      blockers: ["Tenant 'acme' is not opted in under factory-autonomy-policy"],
+    });
+    expect(formatted).toContain('Factory readiness (acme): NOT READY');
+    expect(formatted).toContain('blocker: Tenant');
+
+    const report = (await runPrShadow(['report', '--tenant', 'acme', '--json'])) as {
+      factory_readiness?: { ready: boolean; tenant_slug?: string };
+    };
+    expect(report?.factory_readiness?.tenant_slug).toBe('acme');
+    expect(report?.factory_readiness?.ready).toBe(false);
   });
 });

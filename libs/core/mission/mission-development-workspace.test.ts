@@ -116,4 +116,44 @@ describe('owner candidate workspace with real git', () => {
     vi.stubEnv('KYBERION_DELEGATION_DEPTH', '1');
     expect(() => run(true)).toThrow('mission owner only');
   });
+  it('supports mission-scoped factory branches and rejects invalid custom branches', () => {
+    const status = withExecutionContext('mission_controller', () =>
+      prepareMissionDevelopmentWorkspace(
+        {
+          cwd: root,
+          sourcePaths: ['libs/core/example.ts'],
+          owned,
+          commit: false,
+          taskId: 'implementation',
+          branch: 'agent/factory-track1',
+          assertCurrent: () => {},
+          reserve: () => {
+            owned = true;
+          },
+        },
+        undefined,
+        root
+      )
+    );
+    expect(status).toBe('advanced');
+    expect(git(['rev-parse', '--abbrev-ref', 'HEAD'])).toBe('agent/factory-track1');
+    expect(() =>
+      withExecutionContext('mission_controller', () =>
+        prepareMissionDevelopmentWorkspace(
+          {
+            cwd: root,
+            sourcePaths: ['libs/core/example.ts'],
+            owned,
+            commit: false,
+            taskId: 'implementation',
+            branch: 'main',
+            assertCurrent: () => {},
+            reserve: () => {},
+          },
+          undefined,
+          root
+        )
+      )
+    ).toThrow('Invalid development branch');
+  });
 });

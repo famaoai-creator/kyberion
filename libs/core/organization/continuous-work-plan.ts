@@ -1,5 +1,6 @@
 /** Server-authored, bounded plan for a continuous operations owner. */
 import type { MissionDevelopmentSpec } from '../mission/mission-development-continuation.js';
+import { resolveMissionDevelopmentBranch } from '../vcs/development-branch.js';
 import { parseExternalOperationGrant } from '../governance/external-operation-target.js';
 import {
   TASK_SOURCE_ROOTS,
@@ -72,6 +73,7 @@ function development(value: unknown): MissionDevelopmentSpec {
       'title',
       'body_file',
       'max_repairs',
+      'branch',
     ],
     'mission development'
   );
@@ -103,6 +105,11 @@ function development(value: unknown): MissionDevelopmentSpec {
     (!Number.isSafeInteger(d.max_repairs) || Number(d.max_repairs) < 0 || Number(d.max_repairs) > 3)
   )
     throw new Error('Invalid development repair limit');
+  let resolvedBranch: string | undefined;
+  if (d.branch !== undefined) {
+    if (typeof d.branch !== 'string') throw new Error('Invalid development branch');
+    resolvedBranch = resolveMissionDevelopmentBranch(d.branch);
+  }
   return {
     cwd: relativePath(d.cwd, 'development repository path', true),
     repository_url: target.repository,
@@ -112,6 +119,7 @@ function development(value: unknown): MissionDevelopmentSpec {
     title: text(d.title, 'development PR title', 160),
     body_file: body,
     ...(d.max_repairs !== undefined ? { max_repairs: Number(d.max_repairs) } : {}),
+    ...(resolvedBranch !== undefined ? { branch: resolvedBranch } : {}),
   };
 }
 export function parseContinuousWorkPlan(value: unknown): ContinuousWorkPlan {
