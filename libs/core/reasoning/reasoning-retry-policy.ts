@@ -9,6 +9,9 @@ export const AUTH_FAILURE_PATTERN =
 export const AUTH_FAILURE_DEMOTION_MS = 6 * 60 * 60 * 1000;
 export const DEFAULT_IN_PLACE_RETRIES = 3;
 export const DEFAULT_RETRY_BASE_MS = 250;
+// An unbounded server-supplied Retry-After would let a remote endpoint stall an
+// in-place retry indefinitely; longer waits belong to the demotion path.
+export const MAX_IN_PLACE_RETRY_DELAY_MS = 5 * 60 * 1000;
 export function resolveDemotionRetryAfterMs(error: unknown): number | undefined {
   const message = error instanceof Error ? error.message : String(error);
   return (
@@ -64,10 +67,11 @@ export function resolveRetryBaseMs(): number {
 
 export function resolveInPlaceRetryDelayMs(error: unknown, retryAttempt: number): number {
   const retryAfterMs = readRetryAfterMs(error);
-  if (retryAfterMs !== undefined) return Math.round(retryAfterMs);
+  if (retryAfterMs !== undefined)
+    return Math.min(Math.round(retryAfterMs), MAX_IN_PLACE_RETRY_DELAY_MS);
   const exponential = resolveRetryBaseMs() * 2 ** Math.max(0, retryAttempt - 1);
   const jitter = 0.75 + Math.random() * 0.5;
-  return Math.round(exponential * jitter);
+  return Math.min(Math.round(exponential * jitter), MAX_IN_PLACE_RETRY_DELAY_MS);
 }
 
 export function sleep(ms: number): Promise<void> {

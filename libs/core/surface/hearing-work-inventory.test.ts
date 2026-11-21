@@ -69,8 +69,18 @@ describe('parseWorkInventoryFrequency', () => {
     expect(parseWorkInventoryFrequency('週3で対応')).toEqual({ per: 'week', count: 3 });
   });
 
+  it('parses "3回/週" style counts', () => {
+    expect(parseWorkInventoryFrequency('3回/週')).toEqual({ per: 'week', count: 3 });
+    expect(parseWorkInventoryFrequency('月に2回 / 週で対応')).toEqual({ per: 'week', count: 2 });
+  });
+
   it('returns undefined when nothing obvious matches', () => {
     expect(parseWorkInventoryFrequency('不定期')).toBeUndefined();
+  });
+
+  it('handles adversarial digit and whitespace runs without backtracking blowup', () => {
+    expect(parseWorkInventoryFrequency('0'.repeat(20_000))).toBeUndefined();
+    expect(parseWorkInventoryFrequency('0\t'.repeat(20_000))).toBeUndefined();
   });
 });
 
@@ -87,8 +97,19 @@ describe('parseWorkInventoryEffortMinutes', () => {
     expect(parseWorkInventoryEffortMinutes('about 1.5h')).toBe(90);
   });
 
+  it('parses "minutes"/"min" alternatives', () => {
+    expect(parseWorkInventoryEffortMinutes('takes 45 minutes')).toBe(45);
+    expect(parseWorkInventoryEffortMinutes('15min each')).toBe(15);
+    expect(parseWorkInventoryEffortMinutes('roughly 2 hours')).toBe(120);
+  });
+
   it('returns undefined when nothing obvious matches', () => {
     expect(parseWorkInventoryEffortMinutes('すぐ終わる')).toBeUndefined();
+  });
+
+  it('handles adversarial digit runs without backtracking blowup', () => {
+    expect(parseWorkInventoryEffortMinutes('0'.repeat(20_000))).toBeUndefined();
+    expect(parseWorkInventoryEffortMinutes('0\t'.repeat(20_000))).toBeUndefined();
   });
 });
 

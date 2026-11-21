@@ -62,7 +62,10 @@ export function inferWorkInventoryTriggerKind(
   return 'request';
 }
 
-const WEEK_COUNT_PATTERN = /週\s*(\d+(?:\.\d+)?)|(\d+(?:\.\d+)?)\s*(?:回)?\s*\/\s*週/;
+// `(?<![\d.])` blocks restarts inside a digit run; `(?:回\s*)?` keeps a single
+// whitespace matcher when 回 is absent — both guard against quadratic
+// backtracking on adversarial free text.
+const WEEK_COUNT_PATTERN = /週\s*(\d+(?:\.\d+)?)|(?<![\d.])(\d+(?:\.\d+)?)\s*(?:回\s*)?\/\s*週/;
 
 /** Best-effort `WorkInventoryFrequency` from a free-text answer; `undefined`
  * when nothing obvious is present (per WI-08 §4, the field stays omitted
@@ -83,8 +86,8 @@ export function parseWorkInventoryFrequency(text: string): WorkInventoryFrequenc
 // `\b` only guards the ASCII alternatives (h/hour/hours, min/minute/minutes)
 // — 時間/分 are not `\w` characters, so `\b` would never match right after
 // them and silently fail to match "30分"/"1時間" at all.
-const HOUR_PATTERN = /(\d+(?:\.\d+)?)\s*(?:時間|(?:hours?|h)\b)/i;
-const MINUTE_PATTERN = /(\d+(?:\.\d+)?)\s*(?:分|(?:minutes?|min)\b)/i;
+const HOUR_PATTERN = /(?<![\d.])(\d+(?:\.\d+)?)\s*(?:時間|h(?:ours?)?\b)/i;
+const MINUTE_PATTERN = /(?<![\d.])(\d+(?:\.\d+)?)\s*(?:分|min(?:utes?)?\b)/i;
 
 /** Best-effort effort minutes from a free-text answer ("30分" -> 30,
  * "1時間" -> 60, "1.5h" -> 90); `undefined` when nothing obvious matches. */
