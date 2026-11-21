@@ -444,6 +444,11 @@
                   "min_severity": {
                     "enum": ["info", "warning", "critical"],
                     "description": "Jsonl records with a lower `severity` never wake the dot by themselves; records without a severity still wake it."
+                  },
+                  "min_interval_seconds": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "description": "Minimum seconds between watch wakes for this trigger's paths; appends inside the window coalesce into the next wake's accumulated range — distinct events are never dropped."
                   }
                 }
               },
