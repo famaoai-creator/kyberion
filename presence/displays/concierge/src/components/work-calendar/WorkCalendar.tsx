@@ -100,7 +100,19 @@ export function WorkCalendar({ t }: { t: Translate }) {
     () => buildCalendarGrid(items, { view, anchor, today }),
     [items, view, anchor, today]
   );
-  const summary = React.useMemo(() => summarizeCalendar(items, today), [items, today]);
+  // Count only what the grid shows (the API widens timed items by a day either side).
+  const summary = React.useMemo(
+    () =>
+      summarizeCalendar(
+        items.filter(
+          (item) =>
+            (item.dueDate ?? item.startDate ?? '') >= range.from &&
+            (item.dueDate ?? item.startDate ?? '') <= range.to
+        ),
+        today
+      ),
+    [items, today, range.from, range.to]
+  );
 
   const monthTitle = formatter(locale, { year: 'numeric', month: 'long' });
   const shortDay = formatter(locale, { month: 'short', day: 'numeric' });

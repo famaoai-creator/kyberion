@@ -386,33 +386,39 @@ export function buildWorkspaceCalendar(
   const nodes = graph.nodes.filter((node) => narrowed(node, filter));
   const degraded: string[] = [];
   const entries = workItemEntries(nodes, range);
-  sources.withReads(() => {
-    // Operations belong to an organization, not to a project or mission.
-    if (!filter.projectId && !filter.missionId && !projectCeiling) {
-      for (const org of nodes) {
-        if (org.kind !== 'organization') continue;
-        try {
-          const data = sources.operations({
-            organizationId: org.id,
-            tier: (org.tier ?? 'confidential') as OrganizationTier,
-            ...(org.tenantSlug ? { tenantSlug: org.tenantSlug } : {}),
-          });
-          entries.push(...operationEntries(org, data, range, now));
-        } catch {
-          degraded.push('operations');
+  try {
+    sources.withReads(() => {
+      // Operations belong to an organization, not to a project or mission.
+      if (!filter.projectId && !filter.missionId && !projectCeiling) {
+        for (const org of nodes) {
+          if (org.kind !== 'organization') continue;
+          try {
+            const data = sources.operations({
+              organizationId: org.id,
+              tier: (org.tier ?? 'confidential') as OrganizationTier,
+              ...(org.tenantSlug ? { tenantSlug: org.tenantSlug } : {}),
+            });
+            entries.push(...operationEntries(org, data, range, now));
+          } catch {
+            degraded.push('operations');
+          }
         }
       }
-    }
-    for (const mission of nodes) {
-      if (mission.kind !== 'mission' || mission.status === 'archived') continue;
-      if (projectCeiling && !(mission.projectId && projectCeiling.has(mission.projectId))) continue;
-      try {
-        entries.push(...actionItemEntries(mission, sources.actionItems(mission.id), range));
-      } catch {
-        degraded.push('action_items');
+      for (const mission of nodes) {
+        if (mission.kind !== 'mission' || mission.status === 'archived') continue;
+        if (projectCeiling && !(mission.projectId && projectCeiling.has(mission.projectId)))
+          continue;
+        try {
+          entries.push(...actionItemEntries(mission, sources.actionItems(mission.id), range));
+        } catch {
+          degraded.push('action_items');
+        }
       }
-    }
-  });
+    });
+  } catch {
+    // The grant (or its disclosure record) failed: keep the work items, report the rest.
+    degraded.push('operations', 'action_items');
+  }
   entries.sort(
     (left, right) =>
       left.date.localeCompare(right.date) ||

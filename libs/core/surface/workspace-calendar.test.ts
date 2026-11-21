@@ -258,6 +258,22 @@ describe('workspace.calendar', () => {
     expect(reads).toEqual(['action_items:MSN-A']);
   });
 
+  it('keeps work items when the store grant itself fails', () => {
+    const { sources } = calendarSources();
+    const result = calendar(
+      { from: '2026-11-01', to: '2026-11-30' },
+      {
+        ...sources,
+        withReads: () => {
+          throw new Error('audit unavailable');
+        },
+      }
+    );
+    if (!result.ok) throw new Error('calendar failed');
+    expect(result.data.degraded.sort()).toEqual(['action_items', 'operations']);
+    expect(result.data.entries.some((entry) => entry.source === 'work_item')).toBe(true);
+  });
+
   it('opens the store grant once per request', () => {
     const { sources, grants } = calendarSources();
     calendar({ from: '2026-11-01', to: '2026-11-30' }, sources);
