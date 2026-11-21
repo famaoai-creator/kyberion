@@ -7,7 +7,12 @@
   "additionalProperties": false,
   "required": ["version", "schedule_ids"],
   "properties": {
-    "version": { "const": "1.0" },
+    "$schema": {
+      "type": "string"
+    },
+    "version": {
+      "const": "1.0"
+    },
     "schedule_ids": {
       "type": "array",
       "uniqueItems": true,
