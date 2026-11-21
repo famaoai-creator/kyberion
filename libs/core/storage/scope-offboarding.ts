@@ -27,7 +27,7 @@
  */
 
 import * as path from 'node:path';
-import { createHash } from 'node:crypto';
+export type { OffboardApproval, OffboardScopeInput } from './scope-offboarding-derived.js';
 import { readJson, readJsonLines } from '../foundation/json.js';
 import * as pathResolver from '../path-resolver.js';
 import { parseSafeJsonInput, parseSafeJsonObjectValue } from '../foundation/safe-json.js';
@@ -81,6 +81,8 @@ import {
   readUnchangedDerivedTarget,
   retainCollectedLeftovers,
   exportUnchangedDerivedTarget,
+  scopeOffboardPreviewId,
+  type OffboardScopeInput,
 } from './scope-offboarding-derived.js';
 
 // ---------------------------------------------------------------------------
@@ -289,12 +291,6 @@ export type OffboardScopeType = 'tenant' | 'project';
  * Without it the verb refuses to delete (fail-closed) — a dry run and the
  * export need no approval, only the removal does.
  */
-export interface OffboardApproval {
-  approved_by: string;
-  purpose: string;
-  /** ISO-8601; stamped at execution time when the caller omits it. */
-  approved_at?: string;
-}
 
 export type OffboardTargetKind =
   | 'project_tree'
@@ -1465,21 +1461,6 @@ function copyTree(source: string, destination: string): void {
   safeCopyFileSync(safeSource, safeDestination);
 }
 
-export interface OffboardScopeInput {
-  scopeType: OffboardScopeType;
-  scopeId: string;
-  /** Optional tenant lineage for a project with a reused project ID. */
-  tenantSlug?: string;
-  /** Optional organization lineage for a project with a reused project ID. */
-  organizationId?: string;
-  /** `dry_run` (default) only reports; `execute` exports then deletes. */
-  mode?: 'dry_run' | 'execute';
-  expectedPreviewId?: string;
-  approval?: OffboardApproval;
-  /** Clock override for deterministic export directory names in tests. */
-  nowIso?: string;
-}
-
 /**
  * Tenant / project offboarding: **discover → export → delete**.
  *
@@ -1583,27 +1564,14 @@ export function offboardScope(input: OffboardScopeInput): OffboardScopeResult {
       return result;
     }
 
-    // Bind the reviewed target set and shared-ledger rows to this scope.
-    result.preview_id = createHash('sha256')
-      .update(
-        JSON.stringify({
-          scopeType,
-          scopeId,
-          tenantSlug,
-          organizationId,
-          targets: result.targets.map(({ kind, path }) => [kind, path].join(':')).sort(),
-          artifacts: ownedArtifacts.map((record) => JSON.stringify(record)).sort(),
-          dedup: dedupPrune?.removedLines.slice().sort() ?? [],
-          ledgers: ledgerPrunes.map(({ ledger, prune }) => [
-            ledger.result_key,
-            prune.removedLines.slice().sort(),
-          ]),
-          traces: delegationTracePrunes
-            .map(({ path, prune }) => [path, prune.removedLines.slice().sort()])
-            .sort(),
-        })
-      )
-      .digest('hex');
+    result.preview_id = scopeOffboardPreviewId(
+      [scopeType, scopeId, tenantSlug, organizationId],
+      result.targets,
+      ownedArtifacts,
+      dedupPrune?.removedLines,
+      ledgerPrunes,
+      delegationTracePrunes
+    );
     if (mode !== 'execute') {
       appendRetentionAudit({
         event: 'SCOPE_OFFBOARD_DRY_RUN',
