@@ -99,6 +99,7 @@ const SOVEREIGN_SCHEDULE_IDS: ReadonlySet<string> = new Set([
   'organization-kr-measure',
   'audit-verify-daily',
   'backup-daily',
+  'organization-improvement-scan',
 ]);
 
 function sovereignPersonaFor(scheduleId: string): 'sovereign' | undefined {
