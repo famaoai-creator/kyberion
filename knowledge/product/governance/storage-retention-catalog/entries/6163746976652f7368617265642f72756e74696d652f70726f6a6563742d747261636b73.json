@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/project-tracks",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "Project track state (mission-context-pack.ts) — load-bearing across missions."
+}

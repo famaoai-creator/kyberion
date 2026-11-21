@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/presentation-preferences",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "Presentation preference state. Surfaced uncovered in the 2026-10-15 janitor report; load-bearing, no auto action."
+}

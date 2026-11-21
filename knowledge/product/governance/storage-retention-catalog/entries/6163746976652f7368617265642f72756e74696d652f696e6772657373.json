@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/ingress",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "Public ingress exposure state (libs/core/ingress/public-ingress-service.ts state.json)."
+}

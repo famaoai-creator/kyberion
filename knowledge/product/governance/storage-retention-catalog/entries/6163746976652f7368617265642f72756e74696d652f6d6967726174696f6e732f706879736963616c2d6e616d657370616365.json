@@ -1,0 +1,7 @@
+{
+  "path": "active/shared/runtime/migrations/physical-namespace",
+  "artifact_class": "evidence",
+  "action": "review_required",
+  "audit": true,
+  "note": "Physical namespace migration manifests and quarantined legacy records. Keep until the owner verifies the one-way cutover and explicitly decides whether quarantined records can be removed."
+}

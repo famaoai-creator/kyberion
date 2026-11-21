@@ -1,0 +1,7 @@
+{
+  "path": "active/shared/observability/delegations.jsonl",
+  "artifact_class": "log",
+  "action": "rotate",
+  "audit": true,
+  "note": "LEGACY (read-only since 2026-11-05): the pre-partition, tenant-mixed delegation index log. delegated-task-observability.ts no longer appends here (the trace moved to active/shared/runtime/delegation-records/<partition>/delegations.jsonl); readers fall back to it per row attribution, tenant offboarding exports and prunes a tenant's rows from it and from its rotated segments (SCOPE_OFFBOARD_DELEGATION_TRACE_PRUNE), and the remaining segments expire under the observability 90d sweep. The sibling legacy record directory observability/delegations/ is migrated record by record on the next write and offboarded per tenant (target kind delegation_legacy_record)."
+}

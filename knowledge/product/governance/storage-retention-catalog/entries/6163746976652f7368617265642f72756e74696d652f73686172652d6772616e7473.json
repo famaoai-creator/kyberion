@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/share-grants",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "Share-grant graph state incl. its HMAC key (libs/core/governance/share-grant-graph.ts) — deleting the key invalidates every grant."
+}

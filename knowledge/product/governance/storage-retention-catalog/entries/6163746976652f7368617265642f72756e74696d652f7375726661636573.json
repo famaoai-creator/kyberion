@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/surfaces",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "Surface runtime state (surface-runtime.ts) — load-bearing for running surfaces."
+}

@@ -1,0 +1,7 @@
+{
+  "path": "active/shared/runtime/procedure-deltas",
+  "artifact_class": "cache",
+  "ttl_days": 14,
+  "action": "delete",
+  "note": "Self-repair artifacts — short-lived until promoted."
+}

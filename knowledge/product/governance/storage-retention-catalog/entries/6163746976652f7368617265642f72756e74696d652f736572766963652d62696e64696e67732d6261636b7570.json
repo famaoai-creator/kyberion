@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/service-bindings-backup",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "G02: pre-migration snapshots of service bindings (service-binding-registry.ts BINDING_BACKUP_ROOT) — the rollback source for an owner migration; human decision before removal."
+}

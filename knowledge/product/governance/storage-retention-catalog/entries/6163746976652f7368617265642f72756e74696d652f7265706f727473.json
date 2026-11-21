@@ -1,0 +1,9 @@
+{
+  "path": "active/shared/runtime/reports",
+  "artifact_class": "report",
+  "ttl_days": 90,
+  "action": "delete",
+  "audit": true,
+  "soft_delete_days": 14,
+  "note": "Generated system/janitor reports. Deletions are audited and get a 14d trash grace because reports are sometimes referenced as evidence after the fact."
+}

@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/ingest",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "DA-08: ingest dedup content-hash registry (content-hash-registry.jsonl, ingest-actuator dedup.ts) — load-bearing append-only dedup state; TTL deletion would re-open duplicate ingests. Tenant lines are pruned only by the audited tenant offboarding ceremony (scope-offboarding.ts). MSN-STORE-BOUNDS-2: the registry is read by one forward streaming pass that stops at the first matching hash (no size cap); check-then-register runs under a per-registry lock."
+}

@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/operator-notification-receipts",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "Stable notification intent and accepted-receipt tombstones. Never automatically expire: outbox draining or inbox retention cannot prove a notification was not delivered. Removing these records invalidates replay protection; retire only after all matching caller retries are retired. Stores hashed identities, not notification content. Registered tier/tenant partitions and legacy tenants/<slug> lanes are exported and soft-deleted only by explicit tenant offboarding. Existing exact-scope legacy intents remain authoritative before selecting the canonical partition; personal receipts never consult another owner lane."
+}

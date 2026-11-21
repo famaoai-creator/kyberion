@@ -1,0 +1,7 @@
+{
+  "path": "active/shared/runtime/peer-recovery-quarantine",
+  "artifact_class": "evidence",
+  "action": "review_required",
+  "audit": true,
+  "note": "G02: tenant-partitioned quarantine of rejected peer-recovery payloads (libs/core/mesh/peer-runtime-recovery.ts, scripts/backup.ts). Security evidence — never auto-deleted."
+}

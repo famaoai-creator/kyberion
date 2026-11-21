@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/hints",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "D8 runtime hint store (libs/core/knowledge/hint-store.ts), partitioned <tier>/<tenant|shared>/<category>.json. Trace, learning-signal and human-rejection hints plus the promoted hints that generate HINTS.md views; tenant partitions are offboarded with the tenant, never auto-deleted."
+}

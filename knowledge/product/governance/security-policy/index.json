@@ -1,0 +1,857 @@
+{
+  "$schema": "../schemas/security-policy.schema.json",
+  "version": "1.3.0",
+  "default_allow": [
+    "active/missions/${MISSION_ID}/",
+    "active/missions/confidential/${MISSION_ID}/",
+    "active/missions/personal/${MISSION_ID}/",
+    "active/missions/public/${MISSION_ID}/",
+    "active/shared/tmp/",
+    "active/shared/staging/",
+    "active/shared/cache/",
+    "active/shared/artifacts/",
+    "active/shared/exports/",
+    "work/metrics/",
+    "active/shared/runtime/",
+    "active/audit/",
+    "active/shared/logs/",
+    "active/shared/runtime/session/",
+    "active/shared/runtime/ttl/",
+    "active/shared/MEMORY.md",
+    "active/shared/MEMORY.volatile.json",
+    "active/INDEX.volatile.md",
+    "active/INDEX.volatile.json",
+    "active/personal/"
+  ],
+  "volatile_face_policy": {
+    "description": "Volatile Knowledge Layer (working-memory) path governance. tier_restrictions apply — active/personal/ is personal tier only.",
+    "paths": {
+      "session": "active/shared/runtime/session/<session_id>/",
+      "mission": "active/missions/<TIER>/<MISSION_ID>/MEMORY.md",
+      "project": "active/projects/<TIER>/<project>/MEMORY.md",
+      "personal": "active/personal/",
+      "global": "active/shared/MEMORY.md",
+      "daily_journal": "active/personal/journal/<YYYY-MM-DD>.md",
+      "today_todo": "active/personal/today/TODO.md",
+      "weekly": "active/personal/weekly/<YYYY>-W<WW>.md",
+      "adhoc_ttl": "active/shared/runtime/ttl/"
+    },
+    "personal_tier_paths": ["active/personal/"],
+    "sidecar_pattern": "*.volatile.json",
+    "schema_ref": "schemas/volatile-knowledge.schema.json"
+  },
+  "tenant_scope": {
+    "slug_pattern": "^[a-z][a-z0-9-]{1,30}$",
+    "require_tenant_binding": false,
+    "protected_prefixes": [
+      "active/shared/runtime/workspaces/personal/",
+      "active/shared/runtime/workspaces/confidential/",
+      "knowledge/confidential/",
+      "active/organizations/personal/",
+      "active/organizations/confidential/",
+      "active/missions/personal/",
+      "active/missions/confidential/",
+      "active/archive/missions/personal/",
+      "active/archive/missions/confidential/",
+      "active/projects/personal/",
+      "active/projects/confidential/",
+      "active/shared/tmp/personal/",
+      "active/shared/tmp/confidential/",
+      "active/shared/staging/personal/",
+      "active/shared/staging/confidential/",
+      "active/shared/cache/personal/",
+      "active/shared/cache/confidential/",
+      "active/shared/artifacts/personal/",
+      "active/shared/artifacts/confidential/",
+      "active/shared/runtime/usage-ledger/personal/",
+      "active/shared/runtime/usage-ledger/confidential/",
+      "active/shared/runtime/execution-metrics/personal/",
+      "active/shared/runtime/execution-metrics/confidential/",
+      "active/shared/runtime/tenant-ledger/personal/",
+      "active/shared/runtime/tenant-ledger/confidential/",
+      "active/shared/runtime/tenant-approvals/personal/",
+      "active/shared/runtime/tenant-approvals/confidential/",
+      "active/shared/runtime/asset-derivations/personal/",
+      "active/shared/runtime/asset-derivations/confidential/",
+      "active/shared/runtime/audit-mirror/personal/",
+      "active/shared/runtime/audit-mirror/confidential/",
+      "active/shared/runtime/surface-management/personal/",
+      "active/shared/runtime/surface-management/confidential/",
+      "active/shared/runtime/delegation-records/personal/",
+      "active/shared/runtime/delegation-records/confidential/",
+      "active/shared/runtime/hearing/personal/",
+      "active/shared/runtime/hearing/confidential/",
+      "active/shared/runtime/discussion-create-requests/personal/",
+      "active/shared/runtime/discussion-create-requests/confidential/",
+      "active/shared/runtime/grants/personal/",
+      "active/shared/runtime/grants/confidential/",
+      "active/shared/runtime/customer-decision-invites/personal/",
+      "active/shared/runtime/customer-decision-invites/confidential/",
+      "active/shared/runtime/browser-bridge-mailbox/personal/",
+      "active/shared/runtime/browser-bridge-mailbox/confidential/",
+      "active/shared/runtime/seam-selection-defaults/personal/",
+      "active/shared/runtime/seam-selection-defaults/confidential/",
+      "active/shared/runtime/provider-attestations/personal/",
+      "active/shared/runtime/provider-attestations/confidential/",
+      "active/shared/runtime/hints/personal/",
+      "active/shared/runtime/hints/confidential/",
+      "active/shared/runtime/delegation-idempotency/personal/",
+      "active/shared/runtime/delegation-idempotency/confidential/",
+      "active/shared/runtime/operator-notification-receipts/personal/",
+      "active/shared/runtime/operator-notification-receipts/confidential/",
+      "active/shared/runtime/media-generation/cost-settlements/personal/",
+      "active/shared/runtime/media-generation/cost-settlements/confidential/",
+      "active/shared/runtime/health/api-verification/personal/",
+      "active/shared/runtime/health/api-verification/confidential/",
+      "active/shared/runtime/autonomy-learning/personal/",
+      "active/shared/runtime/autonomy-learning/confidential/",
+      "active/shared/runtime/pipeline-library-runs/personal/",
+      "active/shared/runtime/pipeline-library-runs/confidential/",
+      "active/shared/runtime/external-operations/personal/",
+      "active/shared/runtime/external-operations/confidential/",
+      "active/shared/runtime/dot/personal/",
+      "active/shared/runtime/dot/confidential/"
+    ],
+    "shared_prefixes": [
+      "knowledge/confidential/tenant-groups/",
+      "knowledge/confidential/common/",
+      "knowledge/confidential/heuristics/",
+      "knowledge/confidential/relationships/",
+      "active/organizations/personal/shared/",
+      "active/organizations/public/shared/"
+    ],
+    "system_registry_reads": [
+      {
+        "path": "knowledge/confidential/tenants/index.json",
+        "roles": ["check_tenant_registry_consistency"]
+      }
+    ],
+    "broker_requirements": {
+      "require_approved_by": true,
+      "require_approved_at": true,
+      "require_expires_at": true
+    }
+  },
+  "tier_restrictions": {
+    "personal": {
+      "allow_read": ["personal", "sovereign", "ecosystem_architect"],
+      "allow_write": ["personal", "sovereign"],
+      "block_message": "Sovereign Sanctuary: Access restricted to authorized personal processes only."
+    },
+    "confidential": {
+      "allow_read": ["confidential", "public", "sovereign", "ecosystem_architect"],
+      "allow_write": ["confidential", "sovereign"],
+      "block_message": "Organization Confidential: Higher tier required."
+    },
+    "product": {
+      "allow_read": ["sovereign", "ecosystem_architect", "worker", "analyst"],
+      "allow_write": ["sovereign", "ecosystem_architect"],
+      "block_message": "Product tier: Kyberion system content. Ecosystem Architect persona required to write."
+    }
+  },
+  "authority_role_permissions": {},
+  "store_grants": {
+    "scope_locale_reader": {
+      "description": "IT-05/S2: least-privilege reader of a tenant's stored reply locale (knowledge/confidential/<tenant>/locale.json). libs/core locale resolution assumes it, bound to the turn's tenant scope, so surface runtimes whose role cannot read the confidential tier still reply in the tenant locale; it grants that single file only and no write (persona worker). It is a tenant-bound reader (authority.ts TENANT_BOUND_READER_ROLES): the bound tenant must be explicit and equal the caller's active tenant when one exists.",
+      "allow_read": ["knowledge/confidential/${KYBERION_TENANT}/locale.json"],
+      "allow_write": []
+    },
+    "peer_catalog_reader": {
+      "description": "Least-privilege reader of a tenant's peer transport catalog (knowledge/confidential/<tenant>/connections/peer-network.json). libs/core/mesh/peer-conversation.ts assumes it, bound to the sending tenant, to resolve the recipient endpoint and HMAC secret, so peer senders whose role cannot read the confidential tier can still send, and libs/core/mesh/peer-task-exchange.ts assumes it to read the recipient's typed peer task catalog (knowledge/confidential/<tenant>/connections/peer-tasks.json) and the tenant profile (knowledge/personal/tenants/<tenant>.json) for the registration check before an accepted task becomes a WorkItem; it grants those three files only and no write (persona worker). It is a tenant-bound reader (authority.ts TENANT_BOUND_READER_ROLES): the bound tenant must be explicit and equal the caller's active tenant when one exists.",
+      "allow_read": [
+        "knowledge/confidential/${KYBERION_TENANT}/connections/peer-network.json",
+        "knowledge/confidential/${KYBERION_TENANT}/connections/peer-tasks.json",
+        "knowledge/personal/tenants/${KYBERION_TENANT}.json"
+      ],
+      "allow_write": []
+    },
+    "peer_task_artifact_writer": {
+      "description": "Least-privilege writer for typed peer task results. libs/core/mesh/peer-task-exchange.ts assumes it, bound to the receiving tenant, after the recipient operator accepts a peer task: it writes the task report and output log under active/shared/artifacts/confidential/<tenant>/report/peer-tasks/ and appends that tenant's scoped artifact index, and reads only those paths (persona worker). It is tenant-bound (authority.ts TENANT_BOUND_READER_ROLES): the bound tenant must be explicit and equal the caller's active tenant when one exists.",
+      "allow_read": [
+        "active/shared/artifacts/confidential/${KYBERION_TENANT}/report/peer-tasks/",
+        "active/shared/artifacts/confidential/${KYBERION_TENANT}/artifacts-index.jsonl"
+      ],
+      "allow_write": [
+        "active/shared/artifacts/confidential/${KYBERION_TENANT}/report/peer-tasks/",
+        "active/shared/artifacts/confidential/${KYBERION_TENANT}/artifacts-index.jsonl"
+      ]
+    },
+    "first_job_tenant_status_reader": {
+      "description": "CLI-only first-job diagnostic operational-status reader. Entered only after current strict charter, server mapping, exact durable request and infrastructure_sentinel tenant/organization binding are validated. Reads exactly knowledge/personal/tenants/${KYBERION_TENANT}.json and returns only operational status; no profile or write grants. Deliberately unavailable to SYSTEM_ROLE runtimes.",
+      "allow_read": ["knowledge/personal/tenants/${KYBERION_TENANT}.json"],
+      "allow_write": []
+    },
+    "chronos_token_registry_reader": {
+      "description": "TR-01: least-privilege reader of the Chronos viewer token registry (knowledge/personal/connections/chronos-access.json, SHA-256 token hashes only). Surfaces launched with a SYSTEM_ROLE that cannot read the personal tier assume it only to resolve a bearer/cookie viewer token; it grants no other read and no role write grant (persona worker, so only the worker persona and default_allow write paths remain).",
+      "allow_read": ["knowledge/personal/connections/chronos-access.json"],
+      "allow_write": []
+    },
+    "member_owner_reader": {
+      "description": "Read-only member tenant-role lookup for credential custody (libs/core/secret/credential-eligibility-deps.ts lookupMemberTenantRole): reads one member profile under knowledge/personal/members/ and exposes only {member, tenant, role} to decide whether the approver of a tenant-custody credential lending, registration or replacement is an owner member of the owner tenant. Reached wherever a lent credential is bound or re-validated (dot runtime as organization_operator inside credential_allocation_reader, surfaces through reasoning bootstrap). No writes, no other reads (persona worker).",
+      "allow_read": ["knowledge/personal/members/"],
+      "allow_write": []
+    },
+    "nhi_accountability_reader": {
+      "description": "Read-only member-status lookup for NHI accountability reports. Resolves operator user IDs against knowledge/personal/members/ and grants no writes or other role reads.",
+      "allow_read": ["knowledge/personal/members/"],
+      "allow_write": []
+    },
+    "reasoning_settings_writer": {
+      "description": "Writes only reasoning-route user settings, their previous backup, and revision history as additional role grants. Retains the unchanged worker and default workspace permissions; no actuation or security authority is added.",
+      "allow_read": [
+        "active/shared/state/reasoning-route-user-config.json",
+        "active/shared/state/reasoning-route-user-config.json.previous",
+        "active/shared/state/reasoning-route-user-config.json.history/"
+      ],
+      "allow_write": [
+        "active/shared/state/reasoning-route-user-config.json",
+        "active/shared/state/reasoning-route-user-config.json.previous",
+        "active/shared/state/reasoning-route-user-config.json.history/"
+      ]
+    },
+    "metrics_cap_reader": {
+      "description": "R4: least-privilege, read-only reader of the tier/tenant-partitioned metrics ledgers (active/shared/runtime/execution-metrics/, active/shared/runtime/usage-ledger/). libs/core metrics.ts assumes it only inside aggregateMetricsForEnforcement, bound to the caller's tenant, so cap enforcers (spend guard, org budget governor, generation-cost dedup) count every tier of their scope whatever the caller's persona; the call returns numbers only, never rows. No write, no knowledge/ access (persona worker).",
+      "allow_read": [
+        "active/shared/runtime/execution-metrics/",
+        "active/shared/runtime/usage-ledger/"
+      ],
+      "allow_write": []
+    },
+    "operational_learning_writer": {
+      "description": "Narrow internal store-writer for machine-generated organization learning proposals, bound to one organization and tenant execution scope.",
+      "allow_write": [
+        "active/organizations/personal/shared/${KYBERION_ORGANIZATION_ID}/state/learning/",
+        "active/organizations/personal/${KYBERION_TENANT}/${KYBERION_ORGANIZATION_ID}/state/learning/",
+        "active/organizations/confidential/${KYBERION_TENANT}/${KYBERION_ORGANIZATION_ID}/state/learning/",
+        "active/organizations/public/shared/${KYBERION_ORGANIZATION_ID}/state/learning/",
+        "active/organizations/public/${KYBERION_TENANT}/${KYBERION_ORGANIZATION_ID}/state/learning/"
+      ]
+    },
+    "customer_decision_deal_note_writer": {
+      "description": "Tenant deal store (libs/core/organization/deal-store.ts asDealStore, S3): every read and write of a tenant's customer records — deals, deal documents, requirements captures, escalations and the deal log under knowledge/confidential/<tenant>/deals/ — runs as this role, bound to that tenant (tenant-bound: libs/core/authority.ts TENANT_BOUND_READER_ROLES), and scripts/customer/customer_decision.ts respond / confirm uses it for the best-effort deal note (CD-08), so neither the customer-triggered path nor a surface needs mission_controller or a confidential-tier grant. Only the deal file IO runs under it; callers keep their own role for notifications and the memory promotion queue. No other knowledge, decision ledger, agenda, receipt or invite authority.",
+      "allow_read": ["knowledge/confidential/${KYBERION_TENANT}/deals/"],
+      "allow_write": ["knowledge/confidential/${KYBERION_TENANT}/deals/"]
+    },
+    "credential_allocation_reader": {
+      "description": "G2 allocation broker reader: libs/core/secret/credential-allocations.ts reads the bound tenant's credential allocation records (active/shared/runtime/grants/confidential/<tenant>/), bound to the allocation's tenant and the claim's mission/task; read only.",
+      "allow_read": ["active/shared/runtime/grants/confidential/${KYBERION_TENANT}/"]
+    },
+    "tenant_ledger_store": {
+      "description": "D9: tenant-bound store role of the hybrid ledger's tenant partitions (libs/core/governance/ledger.ts). libs/core/governance/ledger.ts assumes it (withExecutionContext) for every tenant partition read and append, always bound to the record's tenant, so the grants resolve through ${KYBERION_TENANT} to that one tenant's active/shared/runtime/tenant-ledger/<personal|confidential>/<tenant>/ partition (public tenant records are stored in the confidential partition): it reads the hash-chain tail, appends tenant records and tenant mission metadata, and verifies the chain. Tenant-bound (TENANT_BOUND_READER_ROLES): a caller with another active tenant cannot bind it. No knowledge, mission, system-ledger or customer/ grant.",
+      "allow_read": [
+        "active/shared/runtime/tenant-ledger/personal/${KYBERION_TENANT}/",
+        "active/shared/runtime/tenant-ledger/confidential/${KYBERION_TENANT}/"
+      ],
+      "allow_write": [
+        "active/shared/runtime/tenant-ledger/personal/${KYBERION_TENANT}/",
+        "active/shared/runtime/tenant-ledger/confidential/${KYBERION_TENANT}/"
+      ]
+    },
+    "delegation_record_store": {
+      "description": "Tenant-bound store role of the delegated-task trace and record partitions (libs/core/workforce/delegated-task-observability.ts). The delegation store assumes it (withExecutionContext / withExecutionContextAsync) for every tenant partition read and write — trace append, record write/read/listing, child-inbox queue I/O, background-completion notification queue (libs/core/mission/delegation-notifications.ts: <partition>/notifications.jsonl) append, read and claim — always bound to the delegation's tenant, so the grants resolve through ${KYBERION_TENANT} to that one tenant's active/shared/runtime/delegation-records/confidential/<tenant>/ partition. Tenant-bound (TENANT_BOUND_READER_ROLES): a caller with another active tenant cannot bind it, so a process bound to one tenant never reads another tenant's delegation instructions or results. The inter-process locks stay under the caller's role. No knowledge, mission, system partition, legacy observability or customer/ grant.",
+      "allow_read": ["active/shared/runtime/delegation-records/confidential/${KYBERION_TENANT}/"],
+      "allow_write": ["active/shared/runtime/delegation-records/confidential/${KYBERION_TENANT}/"]
+    },
+    "tenant_approval_store": {
+      "description": "Tenant-bound store role of the per-tenant approval store partitions (libs/core/governance/approval-store-location.ts). The approval store assumes it (withExecutionContext) for every tenant partition read and write, always bound to the record's tenant, so the grants resolve through ${KYBERION_TENANT} to that one tenant's active/shared/runtime/tenant-approvals/<personal|confidential>/<tenant>/ partition (public tenant records are stored in the confidential partition): it reads, writes and lists request records, reads and writes passkey challenges and appends the channel's approval event log. Tenant-bound (TENANT_BOUND_READER_ROLES): a caller with another active tenant cannot bind it, so a process bound to one tenant never finds another tenant's approvals. No knowledge, mission, system approval tree or customer/ grant.",
+      "allow_read": [
+        "active/shared/runtime/tenant-approvals/personal/${KYBERION_TENANT}/",
+        "active/shared/runtime/tenant-approvals/confidential/${KYBERION_TENANT}/"
+      ],
+      "allow_write": [
+        "active/shared/runtime/tenant-approvals/personal/${KYBERION_TENANT}/",
+        "active/shared/runtime/tenant-approvals/confidential/${KYBERION_TENANT}/"
+      ]
+    },
+    "tenant_approval_partition_index_reader": {
+      "description": "Read-only index reader of the per-tenant approval store partitions (libs/core/governance/approval-store-location.ts listApprovalPartitions). Assumed only by a process without an active tenant to enumerate the tenant directory names under active/shared/runtime/tenant-approvals/<personal|confidential>/; descendant reads are explicitly denied, so it never reads a record. Each listed tenant is then read as the tenant-bound tenant_approval_store. No write authority.",
+      "allow_read": [
+        "active/shared/runtime/tenant-approvals/personal/",
+        "active/shared/runtime/tenant-approvals/confidential/"
+      ],
+      "deny_read_descendants": [
+        "active/shared/runtime/tenant-approvals/personal/",
+        "active/shared/runtime/tenant-approvals/confidential/"
+      ],
+      "allow_write": []
+    },
+    "audit_mirror_writer": {
+      "description": "G17 follow-up: dedicated store-writer of the audit chain's per-tenant mirror (active/shared/runtime/audit-mirror/confidential/<tenant>/). libs/core/authority.ts registers it as the audit chain's tenant mirror writer context, always bound to the entry's tenant, so the grant resolves through ${KYBERION_TENANT} to that one tenant's mirror directory. Its only role grant is that write (no role read grant). Like every narrow store-writer role it runs with persona worker, so it also keeps the paths every worker identity has (security-policy default_allow and worker persona grants, e.g. active/shared/tmp/ and the current mission's evidence); it adds nothing else. Nothing else assumes it (resident dots and coordination store writers run as infrastructure_sentinel, which has no audit mirror grant). The legacy-named context also encloses the audit chain own key/lock/master persistence, after the caller tenant and attribution have been checked and captured. Its role policy grants are unchanged: common worker defaults already cover those paths. Persistence runs only canonical audit code and keeps the caller resource-access ceiling; no audit read/key/append authority is added to narrow application store roles.",
+      "allow_read": [],
+      "allow_write": ["active/shared/runtime/audit-mirror/confidential/${KYBERION_TENANT}/"]
+    },
+    "ops_alert_store": {
+      "description": "Operational alert store: libs/core/foundation/operational-store-policy.ts (seam registered by authority.ts) reads and writes the ops alert ledger, its dedupe index and the scheduler alert-day state only.",
+      "allow_read": [
+        "active/shared/observability/ops-alerts.jsonl",
+        "active/shared/observability/ops-alerts.dedupe.json",
+        "active/shared/runtime/state/scheduler-ops-alert-days.json"
+      ],
+      "allow_write": [
+        "active/shared/observability/ops-alerts.jsonl",
+        "active/shared/observability/ops-alerts.dedupe.json",
+        "active/shared/runtime/state/scheduler-ops-alert-days.json"
+      ]
+    },
+    "workspace_tenant_registry_reader": {
+      "description": "Shared core exact-tenant registry existence reader. Workspace resolution first narrows authenticated viewer grants, then binds this read-only context to that tenant. Reads one knowledge/personal/tenants/${KYBERION_TENANT}.json profile and returns only tenant_slug; never exposes personal profile fields or grants directory enumeration or writes.",
+      "allow_read": ["knowledge/personal/tenants/${KYBERION_TENANT}.json"],
+      "allow_write": []
+    },
+    "workspace_tenant_registry_index_reader": {
+      "description": "Shared core read-only workspace tenant selector index reader. Used only for authenticated viewers whose tenant grants are all. Enumerates registry filenames only; descendant file reads are explicitly denied. Each valid slug is subsequently checked by the exact tenant-bound registry reader; no personal profile fields or write authority are exposed.",
+      "allow_read": ["knowledge/personal/tenants/"],
+      "deny_read_descendants": ["knowledge/personal/tenants/"],
+      "allow_write": []
+    },
+    "deliverable_inbox_writer": {
+      "description": "Deliverable inbox writer (libs/core/foundation/deliverable-inbox-writer-capability.ts): libs/core assumes it only to add an operator task to the deliverable inbox (active/shared/inbox/entries.jsonl, libs/core/task/deliverable-inbox.ts addInboxEntry) on behalf of a caller with no inbox grant: the CD-10 bolt-review rejection (libs/core/mission/mission-bolt-review.ts) and the CD-11 operator hand-off / manual reminder tasks (libs/core/customer-decision/operator-handoff.ts). Its grant is the inbox and the shared lock directory; the tier guard narrows every write and mkdir to the inbox entries file, its directory and the inbox's own deliverable-inbox-<sha256>.lock files. No other active/shared/runtime/ path, no knowledge, mission, approval or surface state.",
+      "allow_read": ["active/shared/inbox/", "active/shared/runtime/locks/"],
+      "allow_write": ["active/shared/inbox/", "active/shared/runtime/locks/"],
+      "narrow": {
+        "only": {
+          "write": [
+            {
+              "path": "active/shared/inbox/entries.jsonl"
+            },
+            {
+              "pattern": "^active/shared/runtime/locks/deliverable-inbox-[a-f0-9]{64}\\.lock[.A-Za-z0-9_-]{0,160}$"
+            }
+          ],
+          "mkdir": [
+            {
+              "path": "active/shared/inbox"
+            },
+            {
+              "path": "active/shared/runtime"
+            },
+            {
+              "path": "active/shared/runtime/locks"
+            }
+          ]
+        },
+        "only_reason": "[DELIVERABLE_INBOX_WRITER_SCOPE] The inbox writer writes only the deliverable inbox and its own lock",
+        "content_check": [
+          {
+            "path": "active/shared/inbox/entries.jsonl",
+            "kind": "append_only_jsonl",
+            "id_field": "entry_id",
+            "refusal_prefix": "[DELIVERABLE_INBOX_WRITE_REFUSED]"
+          }
+        ]
+      }
+    },
+    "customer_channel_binding_store": {
+      "description": "Customer channel binding storage (libs/core/foundation/customer-channel-binding-store-capability.ts): scripts/customer-channel/bindings.ts writeBindingChange (pnpm kyberion customer-channel bind|unbind) assumes it to read and write one tenant's knowledge/confidential/<tenant>/connections/channel-bindings.json; tenant-bound (libs/core/authority.ts TENANT_BOUND_READER_ROLES). Its grant is the bound tenant's knowledge/confidential/<tenant>/connections/ directory; the tier guard narrows every write and mkdir to the bindings file and the directories leading to it. No connection secrets, no other customer/ file, no knowledge or runtime state (it replaces customer_create on that write).",
+      "allow_read": ["knowledge/confidential/${KYBERION_TENANT}/connections/channel-bindings.json"],
+      "allow_write": ["knowledge/confidential/${KYBERION_TENANT}/connections/"],
+      "narrow": {
+        "only": {
+          "write": [
+            {
+              "pattern": "^knowledge/confidential/[a-z][a-z0-9-]{1,30}/connections/channel-bindings\\.json$"
+            }
+          ],
+          "mkdir": [
+            {
+              "pattern": "^knowledge/confidential(/[a-z][a-z0-9-]{1,30}(/connections)?)?$"
+            }
+          ]
+        },
+        "only_reason": "[CUSTOMER_CHANNEL_BINDING_STORE_SCOPE] The binding store writes only knowledge/confidential/<tenant>/connections/channel-bindings.json"
+      }
+    },
+    "archived_mission_state_reader": {
+      "description": "Archived mission state reader (libs/core/foundation/archived-mission-state-capability.ts): read-only, tenant-bound (libs/core/authority.ts TENANT_BOUND_READER_ROLES). libs/core/mission/mission-decision-lock.ts loadDecisionCaseMissionState assumes it to read one archived tenant mission's active/archive/missions/<personal|confidential>/<tenant>/<id>/mission-state.json, always inside an exact read-only capability naming that file (plus product schemas). No write, no other file of the mission folder or archive, no mission lifecycle authority (it replaces the borrowed mission_controller role on that read).",
+      "allow_read": [
+        "active/archive/missions/confidential/${KYBERION_TENANT}/",
+        "active/archive/missions/personal/${KYBERION_TENANT}/"
+      ],
+      "allow_write": [],
+      "narrow": {
+        "deny": ["write", "mkdir"],
+        "deny_reason": "[RESOURCE_SCOPE_REQUIRED] Archived mission state reads require their exact read-only capability",
+        "require_scope": {
+          "custody": "tenant",
+          "exact": {
+            "read_only": true,
+            "read_path_pattern": "^active/archive/missions/(personal|confidential)/([a-z][a-z0-9-]{1,30})/[A-Za-z0-9][A-Za-z0-9._-]{0,160}/mission-state\\.json$",
+            "read_path_tenant_group": 2,
+            "allow_product_knowledge_read": true
+          },
+          "reason": "[RESOURCE_SCOPE_REQUIRED] Archived mission state reads require their exact read-only capability"
+        }
+      }
+    },
+    "concierge_management_writer": {
+      "description": "Authenticated human-owner organization/project descriptive mutation role. Requires a matching immutable request resource capability; exact ceiling precedes all ambient/default grants. No lifecycle, membership, provisioning or deployment authority.",
+      "allow_read": [
+        "knowledge/personal/tenants/${KYBERION_TENANT}.json",
+        "active/organizations/confidential/${KYBERION_TENANT}/${KYBERION_ORGANIZATION_ID}/",
+        "active/organizations/public/${KYBERION_TENANT}/${KYBERION_ORGANIZATION_ID}/",
+        "active/projects/confidential/${KYBERION_TENANT}/",
+        "active/projects/public/${KYBERION_TENANT}/",
+        "active/shared/runtime/projects/",
+        "active/shared/runtime/surface-management/confidential/${KYBERION_TENANT}/"
+      ],
+      "allow_write": [
+        "active/organizations/confidential/${KYBERION_TENANT}/${KYBERION_ORGANIZATION_ID}/",
+        "active/organizations/public/${KYBERION_TENANT}/${KYBERION_ORGANIZATION_ID}/",
+        "active/projects/confidential/${KYBERION_TENANT}/",
+        "active/projects/public/${KYBERION_TENANT}/",
+        "active/shared/runtime/projects/",
+        "active/shared/runtime/surface-management/confidential/${KYBERION_TENANT}/"
+      ],
+      "narrow": {
+        "require_scope": {
+          "fields": ["organizationId"],
+          "reason": "[RESOURCE_SCOPE_REQUIRED] Management writer needs a bound request capability"
+        },
+        "structural_mkdir": true
+      }
+    },
+    "dot_charter_store": {
+      "description": "Store role of dot charter documents (libs/core/dot/dot-lifecycle.ts): dots/ at repo root, knowledge/confidential/<tenant>/dots/ and knowledge/personal/dots/<owner-hash>/ — all three custodies. The lifecycle facade assumes it (withExecutionContext) at each charter read/write inside the dot_lifecycle_worker process, binding the charter's tenant for confidential custody and explicitly clearing the ambient tenant ('' tenantCleared) for personal and system custody. Its read scopes additionally carry the validation reads that ran under the former dot_lifecycle_writer (tenants/<t>.json, organization operational state, runtime projects). Deliberately not a role a dot may bind at runtime, so an active dot can never rewrite the contract it runs under. The lifecycle audit ledger, activation heartbeats, event-continuation state and inter-process locks live under other roles (dot_lifecycle_runtime_store / the worker's ambient locks grant).",
+      "allow_read": [
+        "dots/",
+        "knowledge/personal/dots/",
+        "knowledge/personal/tenants/${KYBERION_TENANT}.json",
+        "active/organizations/confidential/${KYBERION_TENANT}/${KYBERION_ORGANIZATION_ID}/",
+        "active/organizations/public/shared/${KYBERION_ORGANIZATION_ID}/",
+        "knowledge/confidential/${KYBERION_TENANT}/dots/",
+        "active/shared/runtime/",
+        "active/shared/tmp/"
+      ],
+      "allow_write": [
+        "dots/",
+        "knowledge/personal/dots/",
+        "knowledge/confidential/${KYBERION_TENANT}/dots/",
+        "active/shared/tmp/"
+      ],
+      "narrow": {
+        "only": {
+          "write": [
+            {
+              "pattern": "^dots/[^/]+\\.json$"
+            },
+            {
+              "pattern": "^knowledge/confidential/[^/]+/dots/[^/]+\\.json$"
+            },
+            {
+              "pattern": "^knowledge/personal/dots/[^/]+/[^/]+\\.json$"
+            },
+            {
+              "pattern": "^active/shared/tmp/.+/dots/[^/]+\\.json$"
+            },
+            {
+              "pattern": "^active/shared/tmp/.+/knowledge/confidential/[^/]+/dots/[^/]+\\.json$"
+            },
+            {
+              "pattern": "^active/shared/tmp/.+/knowledge/personal/dots/[^/]+/[^/]+\\.json$"
+            }
+          ],
+          "mkdir": [
+            {
+              "path": "dots"
+            },
+            {
+              "path": "knowledge/personal/dots"
+            },
+            {
+              "pattern": "^knowledge/personal/dots/[^/]+$"
+            },
+            {
+              "pattern": "^knowledge/confidential/[^/]+/dots$"
+            },
+            {
+              "path": "active/shared/tmp"
+            },
+            {
+              "pattern": "^active/shared/tmp/.+$"
+            }
+          ]
+        },
+        "only_reason": "[DOT_CHARTER_SCOPE] The dot charter store writes only dot charter documents under the three custody dot roots",
+        "structural_mkdir": true
+      }
+    },
+    "dot_lifecycle_runtime_store": {
+      "description": "Store role of the dot lifecycle runtime surfaces (libs/core/dot/dot-lifecycle.ts): the lifecycle audit ledger (active/shared/runtime/dot-lifecycle-audit.jsonl, append-only), activation heartbeats (active/shared/runtime/heartbeats/) and dot event-continuation state (active/shared/runtime/dot/.../event-continuations/ + events.jsonl). Assumed inside the lifecycle facade for these writes only — charter documents go through dot_charter_store and inter-process locks stay under the dot_lifecycle_worker ambient role. The narrow.only declaration restricts writes to exactly those artifacts and their mkdir ancestors. Tenant-confidential event-continuation partitions bind the charter's tenant; personal and system partitions run with the ambient tenant explicitly cleared. Protected runtime data also requires projected knowledge-tier grants; the raw read/metadata/write/mkdir purpose ceilings forbid using those virtual grants on actual knowledge files. Confidential projection grants expand only from the bound tenant; cleared custody does not admit confidential data.",
+      "allow_read": [
+        "active/shared/runtime/dot-lifecycle-audit.jsonl",
+        "active/shared/runtime/heartbeats/",
+        "active/shared/runtime/dot/public/shared/",
+        "active/shared/runtime/dot/personal/shared/owners/",
+        "active/shared/runtime/dot/confidential/${KYBERION_TENANT}/",
+        "active/shared/tmp/",
+        "knowledge/personal/",
+        "knowledge/confidential/${KYBERION_TENANT}/"
+      ],
+      "allow_write": [
+        "active/shared/runtime/dot-lifecycle-audit.jsonl",
+        "active/shared/runtime/heartbeats/",
+        "active/shared/runtime/dot/public/shared/",
+        "active/shared/runtime/dot/personal/shared/owners/",
+        "active/shared/runtime/dot/confidential/${KYBERION_TENANT}/",
+        "active/shared/tmp/",
+        "knowledge/personal/",
+        "knowledge/confidential/${KYBERION_TENANT}/"
+      ],
+      "narrow": {
+        "only": {
+          "write": [
+            {
+              "path": "active/shared/runtime/dot-lifecycle-audit.jsonl"
+            },
+            {
+              "pattern": "^active/shared/runtime/dot/(?:public|confidential|personal)/.+/event-continuations/[^/]+\\.json$"
+            },
+            {
+              "pattern": "^active/shared/runtime/dot/(?:public|confidential|personal)/.+/events\\.jsonl$"
+            },
+            {
+              "pattern": "^active/shared/runtime/heartbeats/[^/]+\\.json$"
+            },
+            {
+              "pattern": "^active/shared/tmp/.+/active/shared/runtime/dot-lifecycle-audit\\.jsonl$"
+            },
+            {
+              "pattern": "^active/shared/tmp/.+/active/shared/runtime/dot/(?:public|confidential|personal)/.+/event-continuations/[^/]+\\.json$"
+            },
+            {
+              "pattern": "^active/shared/tmp/.+/active/shared/runtime/dot/(?:public|confidential|personal)/.+/events\\.jsonl$"
+            },
+            {
+              "pattern": "^active/shared/tmp/.+/active/shared/runtime/heartbeats/[^/]+\\.json$"
+            }
+          ],
+          "mkdir": [
+            {
+              "path": "active"
+            },
+            {
+              "path": "active/shared"
+            },
+            {
+              "path": "active/shared/runtime"
+            },
+            {
+              "path": "active/shared/runtime/heartbeats"
+            },
+            {
+              "pattern": "^active/shared/runtime/dot(/.*)?$"
+            },
+            {
+              "path": "active/shared/tmp"
+            },
+            {
+              "pattern": "^active/shared/tmp/.+$"
+            }
+          ],
+          "read": [
+            {
+              "prefix": "knowledge/product/"
+            },
+            {
+              "path": "active/shared/runtime/dot-lifecycle-audit.jsonl"
+            },
+            {
+              "prefix": "active/shared/runtime/heartbeats/"
+            },
+            {
+              "prefix": "active/shared/runtime/dot/public/shared/"
+            },
+            {
+              "prefix": "active/shared/runtime/dot/personal/shared/owners/"
+            },
+            {
+              "prefix": "active/shared/runtime/dot/confidential/"
+            },
+            {
+              "prefix": "active/shared/tmp/"
+            }
+          ],
+          "metadata": [
+            {
+              "prefix": "knowledge/product/"
+            },
+            {
+              "path": "active/shared/runtime/dot-lifecycle-audit.jsonl"
+            },
+            {
+              "prefix": "active/shared/runtime/heartbeats/"
+            },
+            {
+              "prefix": "active/shared/runtime/dot/public/shared/"
+            },
+            {
+              "prefix": "active/shared/runtime/dot/personal/shared/owners/"
+            },
+            {
+              "prefix": "active/shared/runtime/dot/confidential/"
+            },
+            {
+              "prefix": "active/shared/tmp/"
+            },
+            {
+              "path": "knowledge/product"
+            },
+            {
+              "path": "active"
+            },
+            {
+              "path": "active/shared"
+            },
+            {
+              "path": "active/shared/runtime"
+            },
+            {
+              "path": "active/shared/runtime/heartbeats"
+            },
+            {
+              "path": "active/shared/runtime/dot"
+            },
+            {
+              "path": "active/shared/runtime/dot/public"
+            },
+            {
+              "path": "active/shared/runtime/dot/public/shared"
+            },
+            {
+              "path": "active/shared/runtime/dot/personal"
+            },
+            {
+              "path": "active/shared/runtime/dot/personal/shared"
+            },
+            {
+              "path": "active/shared/runtime/dot/personal/shared/owners"
+            },
+            {
+              "path": "active/shared/runtime/dot/confidential"
+            },
+            {
+              "path": "active/shared/tmp"
+            }
+          ]
+        },
+        "only_reason": "[DOT_LIFECYCLE_RUNTIME_SCOPE] The lifecycle runtime store writes only the lifecycle audit ledger, dot event-continuation state and activation heartbeats",
+        "structural_mkdir": true
+      }
+    },
+    "workspace_graph_reader": {
+      "description": "Workspace graph read model (MSN-SURFACE-UNIFY-20261103): read-only join of missions, projects, organizations, work items, approvals, agent identities, tenant profiles and member profiles for libs/core/surface/workspace-graph.ts. It is never tenant-bound: rows are filtered afterwards by the caller's server-resolved SurfaceAuthorizationContext (viewerAdmitsNode), so a client tenant can only narrow. No write grant; persona worker.",
+      "allow_read": [
+        "active/missions/",
+        "active/archive/missions/",
+        "active/projects/",
+        "active/organizations/",
+        "active/shared/runtime/work-coordination/",
+        "active/shared/coordination/channels/",
+        "active/shared/coordination/identity/",
+        "knowledge/personal/tenants/",
+        "knowledge/personal/members/",
+        "knowledge/personal/missions/"
+      ],
+      "allow_write": []
+    },
+    "concierge_management_reader": {
+      "description": "Read-only management projection and fresh owner-membership verification. Requires an exact request resource capability; no write operations or credential access.",
+      "allow_read": [
+        "active/shared/runtime/dot/confidential/${KYBERION_TENANT}/",
+        "active/shared/runtime/service-bindings/",
+        "knowledge/personal/members/",
+        "knowledge/personal/tenants/${KYBERION_TENANT}.json",
+        "active/organizations/confidential/${KYBERION_TENANT}/",
+        "active/organizations/public/${KYBERION_TENANT}/",
+        "active/projects/confidential/${KYBERION_TENANT}/",
+        "active/projects/public/${KYBERION_TENANT}/",
+        "active/shared/runtime/projects/",
+        "active/shared/runtime/surface-management/confidential/${KYBERION_TENANT}/"
+      ],
+      "allow_write": [],
+      "narrow": {
+        "deny": ["write", "mkdir"],
+        "deny_reason": "[RESOURCE_SCOPE_REQUIRED] Management reader needs a read-only tenant capability",
+        "require_scope": {
+          "reason": "[RESOURCE_SCOPE_REQUIRED] Management reader needs a read-only tenant capability"
+        }
+      }
+    },
+    "peer_responder_reader": {
+      "description": "Least-privilege reader for peer conversation auto replies. libs/core/mesh/peer-auto-reply.ts assumes it, bound to the receiving tenant, to retrieve tenant knowledge (queryTenantKnowledge) that grounds an opt-in LLM reply; it reads that tenant's profile, knowledge/confidential/<tenant>/ only, never knowledge/confidential/<tenant>/connections/ (peer secrets; security-policy.json deny_read), and writes nothing (persona worker). It is a tenant-bound reader (authority.ts TENANT_BOUND_READER_ROLES): the bound tenant must be explicit and equal the caller's active tenant when one exists.",
+      "allow_read": [
+        "knowledge/personal/tenants/${KYBERION_TENANT}.json",
+        "knowledge/confidential/${KYBERION_TENANT}/"
+      ],
+      "deny_read": ["knowledge/confidential/${KYBERION_TENANT}/connections/"],
+      "allow_write": []
+    },
+    "notification_preferences_reader": {
+      "description": "S4 (ADR concept-model-v2 D6): read-only grant of the single knowledge/personal/notification-preferences.json routing file, issued by libs/core/surface/operator-notifications.ts loadNotificationPreferences for shared operator delivery callers (persona worker; no tenant). Reads validated notification preferences only; no other personal files, writes, or decision authority. Formerly the notification_preferences_reader Authority Role (same allow_read / allow_write).",
+      "allow_read": ["knowledge/personal/notification-preferences.json"],
+      "allow_write": []
+    },
+    "tool_runtime_policy_reader": {
+      "description": "S4 (ADR concept-model-v2 D6): read-only grant of the tool availability policy, issued by libs/core/tool/tool-runtime-policy.ts getToolRuntimePolicy for the canonical product policy and the exact operator or configured customer onboarding policy (persona worker; no tenant). An explicit KYBERION_TOOL_RUNTIME_POLICY_PATH keeps the caller's own permissions (no grant). No installation, pinning, writes, or decision authority. Formerly the tool_runtime_policy_reader Authority Role (same allow_read / allow_write).",
+      "allow_read": [
+        "knowledge/product/governance/tool-runtime-policy.json",
+        "knowledge/personal/onboarding/tool-runtime-policy.json",
+        "knowledge/personal/stances/${KYBERION_STANCE}/onboarding/tool-runtime-policy.json"
+      ],
+      "allow_write": []
+    }
+  },
+  "authority_permissions": {
+    "SUDO": {
+      "allow_read": ["/"],
+      "allow_write": ["/"]
+    },
+    "KNOWLEDGE_WRITE": {
+      "allow_read": ["knowledge/"],
+      "allow_write": ["knowledge/"]
+    },
+    "GIT_WRITE": {
+      "allow_read": [
+        ".git/",
+        "README.md",
+        "AGENTS.md",
+        "libs/",
+        "scripts/",
+        "tests/",
+        "knowledge/",
+        "satellites/",
+        "presence/"
+      ],
+      "allow_write": [
+        ".git/",
+        "README.md",
+        "AGENTS.md",
+        "libs/",
+        "scripts/",
+        "tests/",
+        "knowledge/",
+        "satellites/",
+        "presence/"
+      ]
+    },
+    "SECRET_READ": {
+      "allow_read": ["vault/", "knowledge/personal/connections/", "active/shared/auth-grants.json"]
+    },
+    "NETWORK_FETCH": {
+      "allow_read": ["knowledge/product/orchestration/"]
+    },
+    "SYSTEM_EXEC": {
+      "allow_read": ["active/shared/tmp/", "active/shared/exports/"],
+      "allow_write": ["active/shared/tmp/", "active/shared/exports/"]
+    }
+  },
+  "project_permissions": {
+    "canton-node": {
+      "description": "Canton SV Node project data",
+      "allowed_base_roles": ["ecosystem_architect"],
+      "allowed_roles": ["SUDO", "canton-admin"]
+    },
+    "_default": {
+      "description": "Default confidential access",
+      "allowed_base_roles": ["ecosystem_architect"],
+      "allowed_roles": ["SUDO"]
+    }
+  },
+  "quality_requirements": {
+    "require_test_success": true,
+    "require_seal": false,
+    "require_blockchain_anchor": false,
+    "min_coverage_pct": 0
+  },
+  "a2a_policy": {
+    "min_trust_score_personal": 8,
+    "min_trust_score_confidential": 5,
+    "mandatory_external_audit": true
+  },
+  "network_guardrails": {
+    "allowed_domains": [
+      "localhost",
+      "127.0.0.1",
+      "github.com",
+      "api.github.com",
+      "registry.npmjs.org",
+      "pnpm.io",
+      "google.com",
+      "generativelanguage.googleapis.com",
+      "canva.com",
+      "api.canva.com",
+      "atlassian.net",
+      "atlassian.com",
+      "api.telegram.org",
+      "discord.com",
+      "api.discord.app"
+    ],
+    "max_request_size_kb": 2048,
+    "max_requests_per_mission": 50,
+    "leak_detection_enabled": true
+  },
+  "role_order": [
+    "mission_controller",
+    "knowledge_steward",
+    "run_baseline_check",
+    "ops_alerts",
+    "task_runtime_worker",
+    "run_pipeline",
+    "run_super_pipeline",
+    "surface_runtime",
+    "software_developer",
+    "finance_controller",
+    "strategic_sales",
+    "marketing_growth",
+    "talent_culture",
+    "line_manager",
+    "system_configurator",
+    "ruthless_auditor",
+    "cyber_security",
+    "infrastructure_sentinel",
+    "slack_bridge",
+    "chronos_tenant_runner",
+    "chronos_gateway",
+    "chronos_operator",
+    "chronos_mirror_v2",
+    "chronos_localadmin",
+    "perception_media_worker",
+    "actuator_playground_worker",
+    "generation_scheduler",
+    "physical_namespace_migration",
+    "service_actuator",
+    "nexus_daemon",
+    "check_tenant_registry_consistency",
+    "secret_introduce",
+    "credential_allocation_manager",
+    "credential_allocation_probe",
+    "build_repository",
+    "customer_create",
+    "onboarding",
+    "assemble_changelog",
+    "generate_changelog",
+    "generate_design_tokens",
+    "generate_subagent_definitions",
+    "generate_provider_hook_configs",
+    "ingest_commit",
+    "asset_promoter",
+    "public_tool_promoter",
+    "reconcile_config_fallbacks",
+    "register_workflow",
+    "check_chronos_perf_baseline",
+    "evaluate_model_role_fitness",
+    "concierge_localadmin",
+    "concierge_operator",
+    "organization_operator",
+    "decision_ledger",
+    "daemon_watchdog",
+    "engine_runtime_preferences_operator",
+    "dot_lifecycle_worker",
+    "base_analyst",
+    "base_ecosystem_architect",
+    "base_sovereign",
+    "base_worker",
+    "chronos_personal_runner",
+    "generate_governance_catalogs"
+  ]
+}

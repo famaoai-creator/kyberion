@@ -1,0 +1,8 @@
+{
+  "path": "active/shared/runtime/history-search",
+  "artifact_class": "cache",
+  "ttl_days": 30,
+  "action": "delete",
+  "backup": "exclude",
+  "note": "History search index (history-search-index.ts) — regenerable from source logs."
+}

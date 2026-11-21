@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/mandate-shadow",
+  "artifact_class": "log",
+  "action": "review_required",
+  "note": "Mandate shadow-mode decision ledger (libs/core/governance/mandate-shadow.ts); evidence for promoting shadow mandates."
+}

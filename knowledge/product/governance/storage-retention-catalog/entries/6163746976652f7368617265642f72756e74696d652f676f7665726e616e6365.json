@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/governance",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "Load-bearing global operations halt and governance state. Never expire automatically: deleting the halt flag could resume autonomous work without an operator decision. Retire only through explicit governance review."
+}

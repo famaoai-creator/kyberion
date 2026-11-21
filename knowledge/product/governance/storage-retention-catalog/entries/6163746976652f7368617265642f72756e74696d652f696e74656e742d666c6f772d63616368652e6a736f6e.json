@@ -1,0 +1,7 @@
+{
+  "path": "active/shared/runtime/intent-flow-cache.json",
+  "artifact_class": "cache",
+  "action": "delete",
+  "backup": "exclude",
+  "note": "Intent flow cache (libs/core/intent/intent-flow-cache.ts), one file rewritten in place; entries self-expire by the policy's cache_ttl_hours, so the file carries no TTL of its own."
+}

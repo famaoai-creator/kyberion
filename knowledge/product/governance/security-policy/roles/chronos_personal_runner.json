@@ -1,0 +1,24 @@
+{
+  "allow_read": [
+    "knowledge/personal/pipelines/",
+    "knowledge/personal/governance/",
+    "active/personal/",
+    "active/shared/MEMORY.md",
+    "active/shared/MEMORY.volatile.json",
+    "active/INDEX.volatile.md",
+    "active/INDEX.volatile.json"
+  ],
+  "allow_write": [
+    "active/personal/",
+    "active/shared/MEMORY.md",
+    "active/shared/MEMORY.volatile.json",
+    "active/INDEX.volatile.md",
+    "active/INDEX.volatile.json",
+    "active/shared/tmp/",
+    "active/shared/logs/traces/",
+    "active/shared/logs/process/",
+    "active/shared/observability/",
+    "active/shared/coordination/",
+    "active/audit/"
+  ]
+}

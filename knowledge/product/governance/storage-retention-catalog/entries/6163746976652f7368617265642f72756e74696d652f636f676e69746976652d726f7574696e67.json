@@ -1,0 +1,7 @@
+{
+  "path": "active/shared/runtime/cognitive-routing",
+  "artifact_class": "log",
+  "ttl_days": 90,
+  "action": "delete",
+  "note": "Metadata-only comparison-run records (instruction digest, taxonomy labels, winner). Raw prompts are not stored."
+}

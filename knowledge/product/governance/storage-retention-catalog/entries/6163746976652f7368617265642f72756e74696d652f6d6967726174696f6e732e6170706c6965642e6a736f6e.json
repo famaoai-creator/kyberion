@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/migrations.applied.json",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "Applied-migration ledger (scripts/run_migrations.ts); deleting it would re-run migrations."
+}

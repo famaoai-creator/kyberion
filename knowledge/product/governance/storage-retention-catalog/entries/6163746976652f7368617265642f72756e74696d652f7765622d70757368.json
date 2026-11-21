@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/web-push",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "Web-push subscriptions (libs/core/surface/web-push.ts)."
+}

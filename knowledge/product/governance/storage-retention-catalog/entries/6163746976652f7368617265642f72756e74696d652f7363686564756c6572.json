@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/scheduler",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "G02: durable schedule declarations (scheduler-actuator scheduler-helpers.ts SCHEDULER_STORE_RELATIVE)."
+}

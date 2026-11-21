@@ -1,0 +1,7 @@
+{
+  "path": "active/shared/runtime/a2a-conversations",
+  "artifact_class": "log",
+  "ttl_days": 30,
+  "action": "delete",
+  "note": "A2A conversation transcripts."
+}

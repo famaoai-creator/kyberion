@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/design-patterns",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "Operator-authored runtime overlay for media design themes (media-actuator media-design-protocol.ts)."
+}

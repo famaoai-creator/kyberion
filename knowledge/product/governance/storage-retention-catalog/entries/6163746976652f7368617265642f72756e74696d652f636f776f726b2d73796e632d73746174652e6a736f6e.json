@@ -1,0 +1,7 @@
+{
+  "path": "active/shared/runtime/cowork-sync-state.json",
+  "artifact_class": "state",
+  "action": "review_required",
+  "audit": true,
+  "note": "Cowork synchronization checkpoint. Preserve as load-bearing state until a tenant-specific replacement is verified."
+}

@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/presence",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "Surface presence coordination state (surface-coordination-store.ts)."
+}

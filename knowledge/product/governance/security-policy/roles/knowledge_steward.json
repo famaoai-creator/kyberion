@@ -1,0 +1,4 @@
+{
+  "allow_read": ["knowledge/personal/stances/"],
+  "allow_write": ["knowledge/personal/stances/"]
+}

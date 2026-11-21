@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/seam-selection-defaults",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "Saved seam provider defaults per tenant / organization / project (libs/core/provider/seam-selection-defaults.ts), tier/tenant partitioned — human judgment, never auto-deleted; offboarded with the tenant."
+}

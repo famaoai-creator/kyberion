@@ -1,0 +1,7 @@
+{
+  "path": "presence/bridge/runtime",
+  "artifact_class": "cache",
+  "ttl_days": 7,
+  "action": "delete",
+  "note": "EV-06: the KANS stimuli journal (stimuli.jsonl) and bridge scratch state. Stimuli carry TTLs measured in seconds-to-hours and readers only consult a recent window, so 7d is already far beyond usefulness. stimuli-journal.ts additionally self-rotates at 5MB (STIMULI_MAX_BYTES) so a burst cannot outrun the daily janitor."
+}

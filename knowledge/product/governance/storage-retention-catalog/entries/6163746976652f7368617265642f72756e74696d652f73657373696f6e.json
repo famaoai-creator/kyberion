@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/session",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "Session-scoped volatile workspaces (path-resolver volatile('session')). GC'd by scope-linked mission-archive GC (AL-04, mission-maintenance.ts), not by TTL."
+}

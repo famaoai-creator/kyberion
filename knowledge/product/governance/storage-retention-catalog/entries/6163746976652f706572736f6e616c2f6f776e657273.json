@@ -1,0 +1,6 @@
+{
+  "path": "active/personal/owners",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "Owner-isolated learning queues, feedback receipts and distill candidates. Descriptive review inventory only; no automatic deletion, TTL, migration or access change. Removal requires an explicit retention decision."
+}

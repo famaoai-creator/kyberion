@@ -1,0 +1,7 @@
+{
+  "path": "active/shared/runtime/tenants",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "Physical tenant runtime namespaces for scoped intent, cowork, and other load-bearing state. Never TTL-delete; remove only through audited tenant offboarding.",
+  "audit": true
+}

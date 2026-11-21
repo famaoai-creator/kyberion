@@ -1,0 +1,8 @@
+{
+  "path": "active/shared/runtime/baseline-check-cache",
+  "artifact_class": "cache",
+  "ttl_days": 14,
+  "action": "delete",
+  "backup": "exclude",
+  "note": "Baseline-check / provider-capability probe cache — regenerated on the next session start."
+}

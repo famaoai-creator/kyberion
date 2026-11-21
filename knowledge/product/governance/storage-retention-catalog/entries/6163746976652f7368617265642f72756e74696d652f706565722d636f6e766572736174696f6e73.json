@@ -1,0 +1,7 @@
+{
+  "path": "active/shared/runtime/peer-conversations",
+  "artifact_class": "log",
+  "ttl_days": 30,
+  "action": "delete",
+  "note": "Peer conversation transcripts (peer-conversation.ts) — same retention as a2a-conversations."
+}

@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/dot-watch-state.json",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "Single-file watch-trigger snapshot (dot-runtime.ts DOT_WATCH_STATE_PATH), rewritten in place; bounded by the number of watched paths."
+}

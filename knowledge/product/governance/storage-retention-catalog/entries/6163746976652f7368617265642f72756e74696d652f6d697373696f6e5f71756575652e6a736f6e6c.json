@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/mission_queue.jsonl",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "G01: mission dispatch queue (scripts/mission_controller.ts QUEUE_PATH); pending queue state, never TTL-deleted. Self-bounded: the dispatch rewrite (scripts/refactor/mission-queue.ts) prunes terminal rows (dispatched/failed) older than MISSION_QUEUE_TERMINAL_RETENTION_MS (14d, measured from metadata.dispatched_at, else last_attempt_at, else enqueued_at); pending rows are always kept. Only mission-queue.ts reads the queue and it acts on pending rows only. Reads stream."
+}

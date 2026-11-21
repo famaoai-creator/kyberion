@@ -1,0 +1,7 @@
+{
+  "path": "knowledge/personal/work-inventory",
+  "artifact_class": "evidence",
+  "action": "review_required",
+  "audit": true,
+  "note": "WI-10: self-reported work-inventory records for non-tenant-scoped personal use (work-inventory.ts's workInventoryRoot fallback) — entries/*.json and calibration.json. Same never-auto-delete, human-review-before-removal semantics as the knowledge/confidential prefix above; these are durable structured records of the member's own recurring work, not disposable scratch."
+}

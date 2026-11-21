@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/provider-capabilities.json",
+  "artifact_class": "report",
+  "action": "delete",
+  "note": "Provider CLI capability scan report (scripts/scan/scan_provider_cli_capabilities.ts), overwritten in place each scan — bounded by construction, regenerable."
+}

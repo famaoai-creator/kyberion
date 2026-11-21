@@ -1,0 +1,7 @@
+{
+  "path": "active/shared/runtime/ingest/quota",
+  "artifact_class": "log",
+  "ttl_days": 30,
+  "action": "delete",
+  "note": "DA-08: per-tenant daily ingest quota counters (ingest-quota.ts) — one JSON per tenant per UTC day; only the current day is load-bearing, older counters expire after 30d."
+}

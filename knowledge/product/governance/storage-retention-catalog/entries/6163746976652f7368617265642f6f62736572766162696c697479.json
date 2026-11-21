@@ -1,0 +1,8 @@
+{
+  "path": "active/shared/observability",
+  "artifact_class": "evidence",
+  "ttl_days": 90,
+  "action": "delete",
+  "note": "EV-06: residual rule for observability files not covered by a more specific entry below — notably ops-alerts.jsonl, the sink for sendOpsAlert and for operator-notifications' undelivered-notification record of last resort. 90d so a missed alert is still discoverable at a quarterly review. scanEventStores resolves each file's owning entry by longest prefix, so channels/ and chronos/ keep their own 30d rule rather than inheriting this one.",
+  "audit": true
+}

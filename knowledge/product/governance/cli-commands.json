@@ -2445,6 +2445,16 @@
       "group": "dev"
     },
     {
+      "id": "script.generate.governance-catalogs",
+      "script": "generate:governance-catalogs",
+      "command": "generate governance-catalogs",
+      "noun": "generate",
+      "verb": "governance-catalogs",
+      "audience": "dev",
+      "description": "cli_cmd_script_generate_governance_catalogs",
+      "group": "dev"
+    },
+    {
       "id": "script.generate.knowledge-index",
       "script": "generate:knowledge-index",
       "command": "generate knowledge-index",

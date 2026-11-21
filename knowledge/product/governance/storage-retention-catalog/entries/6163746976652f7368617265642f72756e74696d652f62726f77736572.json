@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/browser",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "Browser conversation-session state (browser-conversation-session.ts)."
+}

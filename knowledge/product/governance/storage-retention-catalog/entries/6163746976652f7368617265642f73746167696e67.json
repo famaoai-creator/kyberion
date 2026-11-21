@@ -1,0 +1,7 @@
+{
+  "path": "active/shared/staging",
+  "artifact_class": "tmp",
+  "ttl_days": 3,
+  "action": "delete",
+  "note": "Storage-layout staging floor: inbound external files copied in for perception / ingest (staging/<partition>/<domain>/<job>/). Consumed by ingest; a short grace beyond the tmp TTL covers multi-day review of an inbound batch."
+}

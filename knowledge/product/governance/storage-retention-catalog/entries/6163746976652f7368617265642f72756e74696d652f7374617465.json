@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/state",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "Miscellaneous runtime state incl. janitor-last-run marker and reasoning failover state (reasoning-failover.ts), plus the ops-health receipts (ops-health-state.ts): backup-drill-last.json (restore drill receipt), janitor-last-failure.json (failed baseline-submitted janitor run) and <daemon>-starts.json (rolling 24h start history; self-bounded, pruned on every start), and resident-services.json (daemon/resident-services.ts: what `pnpm kyberion scheduler reconcile --apply` installed for this checkout — one record per service, rewritten in place, self-bounded)."
+}

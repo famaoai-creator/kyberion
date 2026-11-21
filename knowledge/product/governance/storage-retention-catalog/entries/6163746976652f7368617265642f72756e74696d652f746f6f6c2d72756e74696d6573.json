@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/tool-runtimes",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "G02: canonical install root for every managed tool runtime (venvs, managed binaries, approval-provenance state.json, provider-CLI installs) — resolveToolRuntimesRoot in libs/core/tool/tool-runtime-policy.ts, used by tool-runtime-registry.ts and provider-managed-env.ts. Installed files keep old mtimes, so an mtime TTL would delete live tools; reinstall is the operator's call."
+}

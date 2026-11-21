@@ -1,0 +1,8 @@
+{
+  "path": "active/shared/observability/tenants",
+  "artifact_class": "evidence",
+  "ttl_days": 90,
+  "action": "delete",
+  "audit": true,
+  "note": "Tenant-sharded observability streams. Keep a quarterly audit window; tenant offboarding exports and removes the matching namespace first."
+}

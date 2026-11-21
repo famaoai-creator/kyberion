@@ -167,6 +167,19 @@
       "rationale": "Keeps static foundation state/ledger/floor roots projected from validated catalog registrations without runtime catalog I/O."
     },
     {
+      "id": "governance-catalogs",
+      "scope": "pr",
+      "executable": "node",
+      "args": [
+        "--import",
+        "./scripts/ts-loader.mjs",
+        "scripts/generate/generate_governance_catalogs.ts",
+        "--check"
+      ],
+      "owner": "governance",
+      "rationale": "Keeps security-policy.json and storage-retention-catalog.json byte-identical to their directory sources (roles/, entries/) so per-entry edits cannot drift from the committed runtime artifacts."
+    },
+    {
       "id": "org-role-grants",
       "scope": "pr",
       "executable": "node",

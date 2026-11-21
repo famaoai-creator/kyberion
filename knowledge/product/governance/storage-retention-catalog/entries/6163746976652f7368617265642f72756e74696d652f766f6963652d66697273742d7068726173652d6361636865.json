@@ -1,0 +1,7 @@
+{
+  "path": "active/shared/runtime/voice-first-phrase-cache",
+  "artifact_class": "cache",
+  "action": "delete",
+  "backup": "exclude",
+  "note": "Synthesized first-phrase audio cache (libs/shared-voice/src/voice-first-phrase-cache.ts); self-evicting LRU (maxEntries, default 64), regenerable."
+}

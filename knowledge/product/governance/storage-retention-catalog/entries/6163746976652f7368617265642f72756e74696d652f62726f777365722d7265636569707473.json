@@ -1,0 +1,7 @@
+{
+  "path": "active/shared/runtime/browser-receipts",
+  "artifact_class": "evidence",
+  "ttl_days": 90,
+  "action": "delete",
+  "note": "Browser execution evidence — kept ~90d to align with audit retention (review finding OP-M3)."
+}

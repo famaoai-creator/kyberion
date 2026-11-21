@@ -1,0 +1,7 @@
+{
+  "path": "active/shared/runtime/reasoning-failover-events.jsonl",
+  "artifact_class": "log",
+  "action": "rotate",
+  "note": "G01: append-only reasoning backend switch log (libs/core/reasoning/reasoning-failover.ts appendReasoningFailoverEvent). Diagnostic only — no hot-path reader; the latest switch lives in runtime/state/reasoning-failover.json. Grows with failovers only; operator trims or archives. | Rotated when oversized; segments expire at 30d (runtime top-level files have no dir sweep, so ttl_days here governs the segments).",
+  "ttl_days": 30
+}

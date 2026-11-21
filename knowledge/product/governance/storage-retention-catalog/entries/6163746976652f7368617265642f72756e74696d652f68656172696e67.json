@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/hearing",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "Durable hearing sessions and committed receipt state, partitioned by tier and tenant. Never automatically expire or include in metrics offboarding: deleting this evidence invalidates receipt recovery and replay protection. Removal requires an explicit retention review."
+}

@@ -1,0 +1,7 @@
+{
+  "path": "active/shared/runtime/health",
+  "artifact_class": "log",
+  "ttl_days": 90,
+  "action": "delete",
+  "note": "Runtime health history (runtime-health-history.ts) — log-like time series, aligned with report retention. MSN-STORE-BOUNDS-2: the mtime-based TTL never fires for runtime-health.jsonl because every sample refreshes its mtime; runtime-health-history.ts keeps a 30-day window at write time (1 MiB threshold, no archive) and reads backward to its window."
+}

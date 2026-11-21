@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/exports",
+  "artifact_class": "export",
+  "action": "review_required",
+  "note": "Outbound deliverables incl. tenant-offboarding tarballs — deletion is a human decision, never automatic."
+}

@@ -1,0 +1,10 @@
+{
+  "path": "active/shared/runtime/work-coordination/leases.jsonl",
+  "artifact_class": "state",
+  "action": "compact",
+  "compact_key": "lease_id",
+  "compact_min_bytes": 1048576,
+  "audit": true,
+  "note": "Versioned WorkLease store — same append-per-update pattern as items.jsonl; folded by lease_id. Active leases are always the latest record per id, so folding never drops a live lease. MSN-STORE-BOUNDS-2: also compacted by the writer at write time inside the coordination mutation fence (WORK_LEASES_COMPACT_MIN_BYTES 1 MiB), and self_managed: the janitor no longer folds it outside the coordination fence (a janitor park could hide an active lease from a concurrent claim). Readers stream and read the parked copy during a compaction; the archive goes to work-coordination/compaction-archive/.",
+  "self_managed": true
+}

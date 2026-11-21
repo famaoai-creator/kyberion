@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/a2a",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "A2A envelope-signature / peer identity state (a2a-envelope-signature.ts) — load-bearing trust material, no automatic deletion."
+}

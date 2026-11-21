@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/mesh-hub",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "Mesh hub delivery and peer state; tenant-scoped records are removed only through audited offboarding. MSN-STORE-BOUNDS: tenants/<tenant>/presence.jsonl (one append per heartbeat) is compacted at write time to the latest record per peer_id with no archive (presence is ephemeral; latest-per-peer loses nothing a reader uses); each compaction is audited. The writer triggers it (mesh-peer-directory.ts MESH_PRESENCE_COMPACT_MIN_BYTES, 1 MiB, re-run after each doubling) with an explicit policy — the path is per tenant and the runtime root is env-overridable, so an exact-path catalog compact entry cannot express it. registrations.jsonl and capabilities.jsonl are low-rate and not compacted (registration history carries revocations; the capability key is the pair peer_id+capability_id). All readers stream with no size cap. tenants/<tenant>/deliveries.jsonl and dead-letter.jsonl have no writer since the mesh message broker and delivery driver were retired on 2026-11-12 (retired/libs-core/mesh/mesh-message-broker.ts), so they no longer grow and are no longer compacted; rows written before that stay until offboarding. mesh-hub-inspection.ts still streams them and folds latest-per-key for `mesh-hub inspect` and the doctor line."
+}

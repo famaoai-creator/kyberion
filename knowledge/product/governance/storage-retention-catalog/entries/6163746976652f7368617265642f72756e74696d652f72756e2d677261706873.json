@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/run-graphs",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "Execution graph records are load-bearing lineage and require scope-linked cleanup."
+}

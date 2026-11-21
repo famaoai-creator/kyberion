@@ -1,0 +1,9 @@
+{
+  "allow_write": [
+    ".claude/agents/",
+    ".agents/agents/",
+    ".devin/agents/",
+    ".cursor/agents/",
+    ".codex/agents/"
+  ]
+}

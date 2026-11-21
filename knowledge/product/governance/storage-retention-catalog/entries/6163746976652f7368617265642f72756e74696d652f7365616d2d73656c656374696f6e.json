@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/seam-selection",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "G02: operator seam selection rules (libs/core/provider/seam-selection-rules.ts rules.json) — operator judgment, never auto-deleted."
+}

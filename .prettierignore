@@ -11,6 +11,10 @@ knowledge/product/scaffolds/
 # Generated redaction boundary: `pnpm check:pii-rules` compares the file byte
 # for byte against the generator output, so prettier must not reformat it.
 tools/*/pii-rules.generated.js
+# Generated catalogs: `pnpm generate:governance-catalogs --check` is a
+# byte-exact sync gate against the directory sources; prettier must not reformat.
+knowledge/product/governance/security-policy.json
+knowledge/product/governance/storage-retention-catalog.json
 # Parallel-session / external-tool debris
 .worktrees/
 .tmp-mulmoclaude/

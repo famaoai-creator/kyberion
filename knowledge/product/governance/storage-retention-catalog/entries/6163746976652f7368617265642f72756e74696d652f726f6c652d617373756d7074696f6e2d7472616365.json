@@ -1,0 +1,7 @@
+{
+  "path": "active/shared/runtime/role-assumption-trace",
+  "artifact_class": "log",
+  "ttl_days": 30,
+  "action": "delete",
+  "note": "G02: opt-in role-assumption trace JSONL (KYBERION_ROLE_ASSUMPTION_TRACE, libs/core/organization/role-assumption-trace.ts), analyzed by scripts/analyze/analyze_role_assumptions.ts. Diagnostic — short TTL."
+}

@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/youtube",
+  "artifact_class": "export",
+  "action": "review_required",
+  "note": "G02: staged YouTube upload packages (scripts/stage/stage_youtube_upload_package.ts). Outbound deliverables — human decision."
+}

@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/scope-surfaces.env",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "Surface-viewer scope selector env (ViewerContext staging); rewritten in place."
+}

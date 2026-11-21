@@ -1,0 +1,7 @@
+{
+  "path": "active/shared/runtime/intent-contract-memory.json",
+  "artifact_class": "state",
+  "action": "review_required",
+  "audit": true,
+  "note": "System-level intent contract seed/runtime snapshot. Tenant-scoped entries must migrate to active/shared/runtime/tenants/<tenant>; the global snapshot is never TTL-deleted."
+}

@@ -1,0 +1,4 @@
+{
+  "allow_read": ["active/projects/", "tests/", "libs/actuators/"],
+  "allow_write": ["active/projects/", "tests/", "libs/actuators/"]
+}

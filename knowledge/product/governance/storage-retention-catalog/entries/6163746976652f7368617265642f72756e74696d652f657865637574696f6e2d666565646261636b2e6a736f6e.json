@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/execution-feedback.json",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "Execution feedback store (libs/core/knowledge/execution-feedback.ts); self-bounded to the newest MAX_FEEDBACK_ENTRIES (500) entries on every write."
+}

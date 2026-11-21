@@ -1,0 +1,7 @@
+{
+  "path": "active/shared/runtime/front-desk-execution",
+  "artifact_class": "evidence",
+  "action": "review_required",
+  "audit": true,
+  "note": "G02: tier/tenant-partitioned front-desk execution receipts (libs/core/surface/front-desk-execution.ts, front-desk-recovery-evidence.ts); recovery reads them back."
+}

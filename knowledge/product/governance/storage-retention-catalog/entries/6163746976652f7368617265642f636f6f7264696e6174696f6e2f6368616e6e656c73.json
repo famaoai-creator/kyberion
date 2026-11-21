@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/coordination/channels",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "Tenant-aware surface coordination queues, notifications, outbox, dead-letter, dead-target, and physical tenant namespaces. Deletion is owned by delivery recovery or the audited tenant/project offboarding ceremony, never by TTL cleanup."
+}
