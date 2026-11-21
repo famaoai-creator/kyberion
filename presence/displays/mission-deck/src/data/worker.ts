@@ -4,6 +4,7 @@
  */
 import { parentPort } from 'node:worker_threads';
 import { DeckEngine } from './engine.js';
+import { setOperatorBaseRole } from '../actions/effects.js';
 import type { FromWorker, ToWorker } from './protocol.js';
 
 const port = parentPort;
@@ -16,6 +17,8 @@ if (port) {
   port.on('message', (message: ToWorker) => {
     switch (message.type) {
       case 'config':
+        // Effects run in this thread: their children need the operator's role here too.
+        setOperatorBaseRole(message.operatorBaseRole);
         engine.configure({
           locale: message.locale,
           intervalMs: message.intervalMs,
@@ -29,6 +32,9 @@ if (port) {
             post({ type: 'fatal', error: err instanceof Error ? err.message : String(err) });
           }
         }
+        return;
+      case 'locale':
+        engine.setLocale(message.locale);
         return;
       case 'refresh':
         engine.refresh();

@@ -11,7 +11,7 @@ pnpm deck --view missions    # 初期ビュー: conversation | missions | termin
 pnpm deck --inline           # データ読み込みをワーカースレッドではなく同一プロセスで実行
 ```
 
-`KYBERION_BASE_ROLE=sovereign` で動作します(personal tier のミッション読み取りに必要。書き込みはすべて各公認 API 経由)。
+`KYBERION_BASE_ROLE=sovereign` で動作します(personal tier のミッション読み取りに必要。書き込みはすべて各公認 API 経由)。デッキから起動する子プロセス(herdr・`mission_controller`・`kyberion approvals`)には `sovereign` を渡さず、起動前の操作者自身の base role(未設定なら base role なし)で実行します。
 
 ## 画面
 
@@ -50,7 +50,7 @@ Mission Deck 自身は書き込み権限を持たず、各操作をその唯一�
 | 会話                             | `runSurfaceMessageConversation`(cli surface / channel `mission-deck`、1 セッション 1 スレッド) |
 | ミッションへの指示               | `enqueueSurfaceAgentInput`(`steer`。現在の作業は止めず次のステップで反映)                      |
 | エージェントへの返信/中断        | `herdr agent prompt` / `herdr agent send-keys <target> esc`                                    |
-| 一時停止・再開・チェックポイント | `mission_controller` をサブプロセスで実行(UI はブロックしない)                                 |
+| 一時停止・再開・チェックポイント | `mission_controller` をサブプロセスで実行(UI はブロックしない。ソース実行時はソース版を使う)   |
 | 承認 / 却下                      | TTY を `kyberion approvals --approve                                                           | --deny <id>` に引き渡す(本人確認は公認 CLI が担う) |
 | エージェント接続                 | TTY を `herdr agent attach <target>` に引き渡し、終了後に状態を保ったまま復帰                  |
 

@@ -36,6 +36,12 @@ export class DeckEngine {
     }
   }
 
+  /** Re-renders loader text in the new language right away. */
+  setLocale(locale: SupportedLocale): void {
+    this.options = { ...this.options, locale };
+    this.refresh();
+  }
+
   start(): void {
     this.refresh();
     const interval = this.options.intervalMs ?? 2000;
