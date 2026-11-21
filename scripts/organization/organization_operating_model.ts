@@ -95,13 +95,7 @@ import { defineScript, isDirectScript } from '../lib/harness.js';
 type Print = (value: unknown) => void;
 
 import { parseArgs, usage, type ParsedArgs } from './organization_operating_model_args.js';
-import { withExecutionContext } from '@agent/core/authority';
-import {
-  ORGANIZATION_WRITE_ROLE,
-  requestOrganizationWriteApproval,
-  runWithOrganizationWriteApproval,
-  verifyOrganizationWriteApproval,
-} from './organization_write_approval.js';
+import { runApprovedOrganizationWrite } from './organization_write_approval_runner.js';
 
 /** Organization state file an --apply write in this invocation targets; set per run. */
 let writePreflightTarget: string | undefined;
@@ -1471,7 +1465,20 @@ export function runOrganizationOperatingModelCli(
         `A tenant is required for ${readScope.tier} organization scope. Pass --tenant-slug or select one with pnpm scope use.`
       );
     }
-    if (runApprovedOrganizationWrite(parsed, organizationId, readScope, activePrint)) return;
+    if (
+      runApprovedOrganizationWrite<OrgCommandContext, OrgCommandContext['readScope']>(
+        parsed,
+        organizationId,
+        readScope,
+        activePrint,
+        {
+          writeTarget: writePreflightTarget,
+          handlers: ORGANIZATION_COMMAND_HANDLERS,
+          usage,
+        }
+      )
+    )
+      return;
     {
       const handler = ORGANIZATION_COMMAND_HANDLERS[parsed.command];
       if (handler) {
@@ -1484,94 +1491,6 @@ export function runOrganizationOperatingModelCli(
   } finally {
     activePrint = previousPrint;
   }
-}
-
-/**
- * The approval-mediated write path (organization_write_approval.ts). Returns
- * true when it handled the invocation (request opened, or the approved write
- * ran); false for every ordinary invocation, which continues unchanged.
- * Only an `--apply` write the caller may not perform takes this path; decision
- * transitions keep their own approval flow.
- */
-function runApprovedOrganizationWrite(
-  parsed: ParsedArgs,
-  organizationId: string | undefined,
-  readScope: OrgCommandContext['readScope'],
-  print: Print
-): boolean {
-  const wantsApproval = parsed.approvalRequestId || parsed.requestApproval;
-  if (!parsed.apply || !wantsApproval || parsed.command === 'decision transition') return false;
-  if (!writePreflightTarget || !organizationId) return false;
-  if (validateWritePermission(writePreflightTarget).allowed) {
-    throw new Error(
-      parsed.approvalRequestId
-        ? 'This caller can already write this organization; run the command without --approval-request-id (the approval stays unused). Nothing was written.'
-        : 'This caller can already write this organization, so no approval is needed; run the command without --request-approval. Nothing was written.'
-    );
-  }
-  const tier = parsed.tier || readScope.tier;
-  // The handlers write with --tenant-slug only: the approval must name that same
-  // tenant, never one taken from the current scope selection.
-  const tenantSlug = parsed.tenantSlug;
-  if (!tier || !tenantSlug) {
-    throw new Error(
-      'An approval-mediated organization write needs an explicit --tenant-slug (the current scope selection is not used); shared-scope organizations still need KYBERION_BASE_ROLE=sovereign. Nothing was written.'
-    );
-  }
-  const scope = { command: parsed.command, organizationId, tier, tenantSlug };
-  const fields = parsed as unknown as Record<string, unknown>;
-  if (!parsed.approvalRequestId) {
-    const { request_id } = requestOrganizationWriteApproval({
-      scope,
-      parsed: fields,
-      callerRole: baseRoleEnvText() || 'unknown',
-    });
-    print(
-      [
-        `Approval requested: ${request_id} — nothing was written.`,
-        `A human approves it with: pnpm kyberion approvals --approve ${request_id}`,
-        `  (from an agent CLI such as Claude Code: pnpm kyberion approvals --approve ${request_id} --new-window)`,
-        `Then re-run this exact command with --approval-request-id ${request_id} instead of --request-approval.`,
-      ].join('\n')
-    );
-    return true;
-  }
-  const handler = ORGANIZATION_COMMAND_HANDLERS[parsed.command];
-  if (!handler) throw new Error(`Unknown command '${parsed.command}'.\n${usage()}`);
-  // An argument mistake must not burn the approval: verify it, then run the same
-  // command as a dry run (nothing written) before the approval is used.
-  verifyOrganizationWriteApproval(parsed.approvalRequestId, scope, fields);
-  withExecutionContext(
-    ORGANIZATION_WRITE_ROLE,
-    () =>
-      handler({
-        parsed: { ...parsed, apply: false, dryRun: true },
-        organizationId,
-        readScope,
-        activePrint: () => undefined,
-      }),
-    undefined,
-    tenantSlug,
-    organizationId
-  );
-  // Verified again and marked used (inside the approval's record lock); then only
-  // this one write runs with the role, bound to the organization's tenant.
-  runWithOrganizationWriteApproval(
-    parsed.approvalRequestId,
-    scope,
-    fields,
-    `pnpm organization ${parsed.command}`,
-    () =>
-      withExecutionContext(
-        ORGANIZATION_WRITE_ROLE,
-        () => handler({ parsed, organizationId, readScope, activePrint: print }),
-        undefined,
-        tenantSlug,
-        organizationId
-      )
-  );
-  print(`Approval ${parsed.approvalRequestId} used for this write; it cannot authorize another.`);
-  return true;
 }
 
 export const runOrganizationOperatingModel = defineScript({

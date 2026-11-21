@@ -20,7 +20,10 @@ describe('planApprovalWindow', () => {
       '/work/kyberion/active/shared/tmp/approval-window/approve-apr-123.command'
     );
     expect(plan.scriptBody).toContain("cd '/work/kyberion' || exit 1");
-    expect(plan.scriptBody).toContain('pnpm kyberion approvals --approve apr-123\n');
+    expect(plan.scriptBody).toContain('if pnpm kyberion approvals --approve apr-123; then');
+    // The person sees whether the decision was recorded, not just "done".
+    expect(plan.scriptBody).toContain('Recorded.');
+    expect(plan.scriptBody).toContain('Not recorded');
     // The window only runs the same command a person would type: no bypass flags.
     expect(plan.scriptBody).not.toMatch(/--yes|--force|--skip|CLAUDE|env -i/u);
   });

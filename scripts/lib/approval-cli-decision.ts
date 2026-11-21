@@ -143,6 +143,14 @@ export function describeRequest(request: ApprovalRequestRecord, digest: string):
   ];
 }
 
+/** The `--new-window` command for the decision being made (approve or deny). */
+function newWindowCommand(
+  request: ApprovalRequestRecord,
+  decision: 'approved' | 'rejected'
+): string {
+  return `pnpm kyberion approvals --${decision === 'approved' ? 'approve' : 'deny'} ${request.id} --new-window`;
+}
+
 /** The challenge needs a person at an interactive terminal; anything else is refused. */
 function refuseNonInteractiveTerminal(
   request: ApprovalRequestRecord,
@@ -154,7 +162,7 @@ function refuseNonInteractiveTerminal(
     throw new Error(
       challenge.humanOnly
         ? `[APPROVAL_HUMAN_PROOF_REQUIRED] approval decision blocked — human-only request ${request.id} needs terminal attestation and this terminal is not interactive ` +
-            `| next: add --new-window (pnpm kyberion approvals --approve ${request.id} --new-window) to decide in a terminal window the OS opens, run the command in an interactive terminal and type the code it prints, or decide it in a signed-in Concierge or Chronos session ` +
+            `| next: add --new-window (${newWindowCommand(request, challenge.decision)}) to decide in a terminal window the OS opens, run the command in an interactive terminal and type the code it prints, or decide it in a signed-in Concierge or Chronos session ` +
             `| evidence: ${evidence}`
         : '[POLICY_VIOLATION] approval decision blocked — separation of duties is on and this terminal is not interactive, ' +
             'so the approval cannot be confirmed at the keyboard ' +
@@ -216,13 +224,14 @@ async function confirmDecisionByTtyChallenge(
 /** A provider CLI among the parent processes makes this an agent session (plan §5.1). */
 function refuseProviderHarnessLineage(
   request: ApprovalRequestRecord,
-  evidence: CliTerminalEvidence
+  evidence: CliTerminalEvidence,
+  decision: 'approved' | 'rejected'
 ) {
   const harness = providerHarnessInProcessLineage(evidence.lineage.map((entry) => entry.command));
   if (!harness) return;
   throw new Error(
     `[APPROVAL_HUMAN_PROOF_REQUIRED] approval decision blocked — this command runs under a provider CLI (${harness}) and request ${request.id} is human-only ` +
-      `| next: add --new-window (pnpm kyberion approvals --approve ${request.id} --new-window) to decide in a terminal window the OS opens, run the decision from your own terminal outside the agent session, or decide it in a signed-in Concierge or Chronos session ` +
+      `| next: add --new-window (${newWindowCommand(request, decision)}) to decide in a terminal window the OS opens, run the decision from your own terminal outside the agent session, or decide it in a signed-in Concierge or Chronos session ` +
       `| evidence: parent process lineage ${evidence.lineage.map((entry) => entry.command).join(' < ')}`
   );
 }
@@ -269,7 +278,7 @@ export async function decideApprovalFromCli(
   if (humanOnly && terminal) {
     refuseNonInteractiveTerminal(request, terminal.io, { decision: params.decision, humanOnly });
     evidence = resolveCliTerminalEvidence();
-    refuseProviderHarnessLineage(request, evidence);
+    refuseProviderHarnessLineage(request, evidence, params.decision);
   }
   let attestation: TtyAttestation | undefined;
   if (terminal) {

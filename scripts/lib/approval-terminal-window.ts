@@ -24,6 +24,40 @@ import { safeChmodSync, safeWriteFile } from '@agent/core/secure-io';
 
 export type ApprovalWindowDecision = 'approve' | 'deny';
 
+/** What the window prints after the decision, in the operator's language (vocabulary catalog). */
+export interface ApprovalWindowTexts {
+  recorded: string;
+  notRecorded: string;
+  close: string;
+}
+
+const DEFAULT_TEXTS: ApprovalWindowTexts = {
+  recorded: 'Recorded.',
+  notRecorded: 'Not recorded (wrong code, timeout or refusal); nothing changed.',
+  close: 'Press Enter to close this window.',
+};
+
+/** The window texts from the vocabulary catalog, in the operator's language. */
+export function approvalWindowTexts(
+  t: (
+    key:
+      | 'recorder:recorder_approval_window_recorded'
+      | 'recorder:recorder_approval_window_not_recorded'
+      | 'recorder:recorder_approval_window_close'
+  ) => string
+): ApprovalWindowTexts {
+  return {
+    recorded: t('recorder:recorder_approval_window_recorded'),
+    notRecorded: t('recorder:recorder_approval_window_not_recorded'),
+    close: t('recorder:recorder_approval_window_close'),
+  };
+}
+
+/** A line `cmd.exe` echoes literally: its operators and quotes are removed. */
+function cmdEchoText(text: string): string {
+  return text.replace(/[\^&|<>()%!"]/gu, '');
+}
+
 const SAFE_REQUEST_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
 
 export type ApprovalWindowPlan =
@@ -35,7 +69,10 @@ export type ApprovalWindowPlan =
       /** Same command, for the message shown here. */
       command: string;
     }
-  | { kind: 'manual'; command: string; reason: string };
+  | { kind: 'manual'; command: string; reason: ApprovalWindowManualReason };
+
+/** Why no window was opened; the caller shows it in the person's language. */
+export type ApprovalWindowManualReason = 'unquotable_path' | 'no_os_terminal';
 
 function decisionCommand(decision: ApprovalWindowDecision, requestId: string): string {
   return `pnpm kyberion approvals --${decision} ${requestId}`;
@@ -56,8 +93,10 @@ export function planApprovalWindow(input: {
   requestId: string;
   decision: ApprovalWindowDecision;
   scriptDir: string;
+  texts?: ApprovalWindowTexts;
 }): ApprovalWindowPlan {
   const { repoRoot, requestId, decision, scriptDir } = input;
+  const texts = input.texts ?? DEFAULT_TEXTS;
   if (!SAFE_REQUEST_ID.test(requestId)) {
     throw new Error(`approval request id is not a safe id: ${JSON.stringify(requestId)}`);
   }
@@ -68,9 +107,12 @@ export function planApprovalWindow(input: {
       '#!/bin/bash',
       '# Kyberion: decide one approval in this window (opened by --new-window).',
       `cd ${shellQuote(repoRoot)} || exit 1`,
-      command,
-      'echo',
-      'read -r -p "Done. Press Enter to close this window." _',
+      `if ${command}; then`,
+      `  echo; echo ${shellQuote(texts.recorded)}`,
+      'else',
+      `  echo; echo ${shellQuote(texts.notRecorded)}`,
+      'fi',
+      `read -r -p ${shellQuote(`${texts.close} `)} _`,
       '',
     ].join('\n');
     return {
@@ -85,7 +127,7 @@ export function planApprovalWindow(input: {
       return {
         kind: 'manual',
         command,
-        reason: 'the repository path contains characters a .cmd script cannot quote safely',
+        reason: 'unquotable_path',
       };
     }
     const scriptBody = [
@@ -93,7 +135,7 @@ export function planApprovalWindow(input: {
       'rem Kyberion: decide one approval in this window (opened by --new-window).',
       `cd /d "${repoRoot}" || exit /b 1`,
       `call ${command}`,
-      'echo.',
+      `if errorlevel 1 (echo. & echo ${cmdEchoText(texts.notRecorded)}) else (echo. & echo ${cmdEchoText(texts.recorded)})`,
       'pause',
       '',
     ].join('\r\n');
@@ -102,8 +144,7 @@ export function planApprovalWindow(input: {
   return {
     kind: 'manual',
     command,
-    reason:
-      'this platform has no OS-started terminal window (a window opened from here would still run inside the agent session)',
+    reason: 'no_os_terminal',
   };
 }
 
@@ -111,19 +152,30 @@ export function planApprovalWindow(input: {
 export function approvalWindowMessage(
   plan: ApprovalWindowPlan,
   requestId: string
-): [
-  'recorder:recorder_approval_window_opened' | 'recorder:recorder_approval_window_manual',
-  Record<string, string>,
-] {
+): {
+  key: 'recorder:recorder_approval_window_opened' | 'recorder:recorder_approval_window_manual';
+  params: Record<string, string>;
+  reasonKey?:
+    | 'recorder:recorder_approval_window_reason_unquotable_path'
+    | 'recorder:recorder_approval_window_reason_no_os_terminal';
+} {
   return plan.kind === 'launch'
-    ? ['recorder:recorder_approval_window_opened', { id: requestId, command: plan.command }]
-    : ['recorder:recorder_approval_window_manual', { command: plan.command, reason: plan.reason }];
+    ? {
+        key: 'recorder:recorder_approval_window_opened',
+        params: { id: requestId, command: plan.command },
+      }
+    : {
+        key: 'recorder:recorder_approval_window_manual',
+        params: { command: plan.command },
+        reasonKey: `recorder:recorder_approval_window_reason_${plan.reason}`,
+      };
 }
 
 /** Open the decision window for this host, or return the manual instruction. */
 export async function openApprovalWindow(
   requestId: string,
-  decision: ApprovalWindowDecision
+  decision: ApprovalWindowDecision,
+  texts?: ApprovalWindowTexts
 ): Promise<ApprovalWindowPlan> {
   const plan = planApprovalWindow({
     platform: currentPlatform,
@@ -131,6 +183,7 @@ export async function openApprovalWindow(
     requestId,
     decision,
     scriptDir: pathResolver.sharedTmp('approval-window'),
+    ...(texts ? { texts } : {}),
   });
   if (plan.kind === 'manual') return plan;
   safeWriteFile(plan.scriptPath, plan.scriptBody);

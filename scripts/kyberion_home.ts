@@ -265,10 +265,12 @@ async function handleApprovalsSubcommand(argv: ApprovalsArgv): Promise<void> {
     }
     if (argv['new-window']) {
       // The decision itself runs in the new window (real TTY, outside this session).
-      const { openApprovalWindow, approvalWindowMessage } =
-        await import('./lib/approval-terminal-window.js');
-      const plan = await openApprovalWindow(requestId, argv.approve ? 'approve' : 'deny');
-      return void printOutput(ui(...approvalWindowMessage(plan, requestId)));
+      const win = await import('./lib/approval-terminal-window.js');
+      const decision = argv.approve ? 'approve' : 'deny';
+      const plan = await win.openApprovalWindow(requestId, decision, win.approvalWindowTexts(ui));
+      const message = win.approvalWindowMessage(plan, requestId);
+      const reason = message.reasonKey ? { reason: ui(message.reasonKey) } : {};
+      return void printOutput(ui(message.key, { ...message.params, ...reason }));
     }
     const decided = await decideApprovalFromCli(request, {
       decision: argv.approve ? 'approved' : 'rejected',
