@@ -606,6 +606,10 @@ function markJanitorSubmission(): void {
 export function janitorSpawnEnv(baseEnv: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = { ...baseEnv };
   setRegisteredEnv('KYBERION_RUN_ORIGIN', 'scheduled', env);
+  // The maintenance child captures output and terminates on overflow.
+  if (getRegisteredEnvText('LOG_LEVEL', { env }) === 'debug') {
+    setRegisteredEnv('LOG_LEVEL', 'info', env);
+  }
   return env;
 }
 

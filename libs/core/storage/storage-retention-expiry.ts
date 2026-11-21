@@ -247,15 +247,15 @@ export function expireFilePerPolicy(
     safeMkdir(nodePath.dirname(archivePath), { recursive: true });
     safeMoveSync(filePath, archivePath);
     outcome.archived.push(filePath);
-    logger.info(`[JANITOR] archived: ${filePath} -> ${archivePath}`);
+    logger.debug(`[JANITOR] archived: ${filePath} -> ${archivePath}`);
   } else if (softDelete) {
     softDeleteToTrash(filePath);
     outcome.softDeleted.push(filePath);
-    logger.info(`[JANITOR] soft-deleted (trash): ${filePath}`);
+    logger.debug(`[JANITOR] soft-deleted (trash): ${filePath}`);
   } else {
     safeUnlinkSync(filePath);
     outcome.deleted.push(filePath);
-    logger.info(`[JANITOR] deleted: ${filePath}`);
+    logger.debug(`[JANITOR] deleted: ${filePath}`);
   }
   if (entry?.audit || softDelete || archive || auditExtra) {
     appendRetentionAudit({

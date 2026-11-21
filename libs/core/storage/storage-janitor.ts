@@ -387,7 +387,7 @@ export function scanTmp(opts: ScanTmpOptions): ScanTmpResult {
       if (!opts.dryRun) {
         safeRmdirSync(dirPath);
         outcome.deleted.push(dirPath);
-        logger.info(`[JANITOR] deleted empty dir: ${dirPath}`);
+        logger.debug(`[JANITOR] deleted empty dir: ${dirPath}`);
         if (entry?.audit) {
           appendRetentionAudit({
             event: 'RETENTION_DELETE',
@@ -716,7 +716,7 @@ function sweepStatusRulesInContext(opts: {
         // the file between the scan read above and the delete. Re-read right
         // before deleting and skip unless the status and age still match.
         if (expiredStatusRuleMatch(filePath, rule, Date.now()) !== status) {
-          logger.info(`[JANITOR] status changed before delete, kept: ${filePath}`);
+          logger.debug(`[JANITOR] status changed before delete, kept: ${filePath}`);
           continue;
         }
         expired.push(filePath);
@@ -1169,7 +1169,7 @@ export function sweepTrash(opts: {
         if (!opts.dryRun) {
           safeUnlinkSync(filePath);
           purged.push(filePath);
-          logger.info(`[JANITOR] purged trash: ${filePath}`);
+          logger.debug(`[JANITOR] purged trash: ${filePath}`);
           appendRetentionAudit({
             event: 'RETENTION_TRASH_PURGED',
             path: `${TRASH_REPO_SUBPATH}/${originalRepoRel}`,
