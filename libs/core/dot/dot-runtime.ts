@@ -403,7 +403,10 @@ export function dotDailyTokenCapReached(charter: DotCharter, deps: DotRuntimeDep
   return dotTokensUsedToday(charter.dot_id, deps) >= cap;
 }
 
-type WatchState = Record<string, Record<string, { mtime_ms: number; size: number }>>;
+type WatchState = Record<
+  string,
+  Record<string, { mtime_ms: number; size: number; last_wake_ms?: number }>
+>;
 
 function readWatchState(deps: DotRuntimeDeps): WatchState {
   const filePath = runtimePath(deps.rootDir, DOT_WATCH_STATE_PATH);
@@ -452,7 +455,8 @@ export function recordDotWatchSnapshot(charter: DotCharter, deps: DotRuntimeDeps
     if (trigger.kind !== 'watch') continue;
     for (const rel of trigger.paths) {
       const current = confinedWatchStat(rel, deps);
-      if (current) dotState[rel] = current;
+      const prior = dotState[rel]?.last_wake_ms;
+      if (current) dotState[rel] = { ...current, ...(prior ? { last_wake_ms: prior } : {}) };
       else delete dotState[rel];
     }
   }
@@ -475,7 +479,11 @@ function recordWatchSnapshotFromKey(
       ...state,
       [charter.dot_id]: {
         ...(state[charter.dot_id] ?? {}),
-        [rel]: { mtime_ms: Number(mtime), size: Number(size) },
+        [rel]: {
+          mtime_ms: Number(mtime),
+          size: Number(size),
+          last_wake_ms: (deps.now?.() ?? new Date()).getTime(),
+        },
       },
     },
     deps
@@ -492,7 +500,8 @@ function watchTriggerKey(
   rel: string,
   deps: DotRuntimeDeps,
   ignoredKinds: readonly string[] = [],
-  minSeverity?: string
+  minSeverity?: string,
+  minIntervalSeconds?: number
 ): { key: string; detail: string } | null {
   const current = confinedWatchStat(rel, deps);
   if (!current) return null;
@@ -500,6 +509,10 @@ function watchTriggerKey(
   const snapshot = state[charter.dot_id]?.[rel];
   if (snapshot && snapshot.mtime_ms === current.mtime_ms && snapshot.size === current.size) {
     return null;
+  }
+  if (minIntervalSeconds && minIntervalSeconds > 0 && snapshot?.last_wake_ms) {
+    const nowMs = (deps.now?.() ?? new Date()).getTime();
+    if (nowMs - snapshot.last_wake_ms < minIntervalSeconds * 1000) return null;
   }
   if (
     (ignoredKinds.length > 0 || minSeverity !== undefined) &&
@@ -768,7 +781,8 @@ export function evaluateDotTriggersDue(
           rel,
           deps,
           trigger.ignore_jsonl_kinds,
-          trigger.min_severity
+          trigger.min_severity,
+          trigger.min_interval_seconds
         );
         if (hit && isDue(hit.key)) {
           due.push({ trigger, key: hit.key, detail: hit.detail });
