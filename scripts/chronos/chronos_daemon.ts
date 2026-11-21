@@ -91,7 +91,13 @@ const triggerRunner = createTriggerRunner();
  * but only when the operator started the daemon with KYBERION_BASE_ROLE=sovereign.
  * Adding an id here is a privilege decision; keep the list minimal.
  */
-const SOVEREIGN_SCHEDULE_IDS: ReadonlySet<string> = new Set(['organization-daily-digest']);
+const SOVEREIGN_SCHEDULE_IDS: ReadonlySet<string> = new Set([
+  'organization-daily-digest',
+  'organization-operation-tick',
+  'organization-standup',
+  'organization-retro',
+  'organization-kr-measure',
+]);
 
 function sovereignPersonaFor(scheduleId: string): 'sovereign' | undefined {
   return SOVEREIGN_SCHEDULE_IDS.has(scheduleId) &&

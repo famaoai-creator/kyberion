@@ -989,6 +989,11 @@ const INLINE_OP_HANDLERS: Record<string, InlineOpHandler> = {
 
     return (await domainOps()).runInlineOrganizationOperationTick(step, params, ctx);
   },
+  'core:organization_kr_measure': async (dctx) => {
+    const { step, params, ctx } = dctx;
+
+    return (await domainOps()).runInlineOrganizationKrMeasure(step, params, ctx);
+  },
   'core:organization_standup': async (dctx) => {
     const { step, params, ctx } = dctx;
 

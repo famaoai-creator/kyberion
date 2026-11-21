@@ -1,0 +1,25 @@
+{
+  "action": "pipeline",
+  "name": "organization-kr-measure",
+  "version": "1.0.0",
+  "description": "Sovereign hourly sweep that measures every organization's due objective key results into the org-KR ledgers, so `pnpm organization status` reports live progress without a resident dot.",
+  "schedule": {
+    "id": "organization-kr-measure",
+    "cron": "10 * * * *",
+    "timezone": "Asia/Tokyo",
+    "enabled": false
+  },
+  "steps": [
+    {
+      "id": "measure_krs",
+      "role": "source",
+      "op": "core:organization_kr_measure",
+      "params": {},
+      "produces": {
+        "channel": "organization_kr_measure",
+        "type": "Json",
+        "sensitive": true
+      }
+    }
+  ]
+}
