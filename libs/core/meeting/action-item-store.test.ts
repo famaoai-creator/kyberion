@@ -2,6 +2,7 @@ import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import * as fs from 'node:fs';
 import {
+  actionItemStoreSignature,
   recordActionItem,
   updateActionItemStatus,
   appendReminder,
@@ -52,6 +53,20 @@ describe('action-item-store', () => {
     } catch {
       /* ignore */
     }
+  });
+
+  it('changes the store signature on every write (readers revalidate caches with it)', () => {
+    expect(actionItemStoreSignature(FIX_MISSION)).toBe('missing');
+    recordActionItem({
+      item_id: 'AI-SIG-1',
+      mission_id: FIX_MISSION,
+      title: 'First',
+      assignee: { kind: 'operator_self', label: 'Operator' },
+    });
+    const first = actionItemStoreSignature(FIX_MISSION);
+    expect(first).not.toBe('missing');
+    updateActionItemStatus({ mission_id: FIX_MISSION, item_id: 'AI-SIG-1', status: 'completed' });
+    expect(actionItemStoreSignature(FIX_MISSION)).not.toBe(first);
   });
 
   it('records and reads back an action item', () => {

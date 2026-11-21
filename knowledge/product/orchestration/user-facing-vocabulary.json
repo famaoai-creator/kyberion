@@ -21098,6 +21098,31 @@
         "ja": "会議のアクション",
         "qps-ploc": "⟦Ɱėėŧïñɠ ȧƈŧïőñş ŀőřė⟧"
       },
+      "ia_shell_work_cal_source_external": {
+        "en": "Your calendar",
+        "ja": "あなたのカレンダー",
+        "qps-ploc": "⟦Ẏőůř ƈȧŀėñḓȧř ŀőřė⟧"
+      },
+      "ia_shell_work_cal_event": {
+        "en": "Event",
+        "ja": "予定",
+        "qps-ploc": "⟦Ėṽėñŧ ŀőř⟧"
+      },
+      "ia_shell_work_cal_external_disconnected": {
+        "en": "Your Google or Microsoft 365 calendar is not connected.",
+        "ja": "Google / Microsoft 365 のカレンダーが未接続です。",
+        "qps-ploc": "⟦Ẏőůř Ɠőőɠŀė őř Ɱïƈřőşőƒŧ 365 ƈȧŀėñḓȧř ïş ñőŧ ƈőññėƈŧėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "ia_shell_work_cal_external_connect": {
+        "en": "Connect it in Settings",
+        "ja": "設定で接続する",
+        "qps-ploc": "⟦Ƈőññėƈŧ ïŧ ïñ Şėŧŧïñɠş ŀőřėɱ ï⟧"
+      },
+      "ia_shell_work_cal_external_degraded": {
+        "en": "Your calendar could not be loaded right now.",
+        "ja": "あなたのカレンダーを読み込めませんでした。",
+        "qps-ploc": "⟦Ẏőůř ƈȧŀėñḓȧř ƈőůŀḓ ñőŧ ƀė ŀőȧḓėḓ řïɠħŧ ñőẇ. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
       "ia_shell_work_cal_run": {
         "en": "Run",
         "ja": "実行",

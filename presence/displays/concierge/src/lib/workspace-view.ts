@@ -41,9 +41,16 @@ export function isWorkspaceKind(value: unknown): value is GraphEntityKind {
   return typeof value === 'string' && (WORKSPACE_KINDS as readonly string[]).includes(value);
 }
 
-/** `/w/<kind>/<id>`; ids are one encoded segment (task ids contain `/`). */
-export function entityHref(kind: GraphEntityKind, id: string): string {
-  return `/w/${kind}/${encodeURIComponent(id)}`;
+/**
+ * `/w/<kind>/<id>`; ids are one encoded segment (task ids contain `/`). An
+ * organization id is unique only within its tenant, so its link names the
+ * tenant (`?tenant=`) when known; the page narrows to it, never widens.
+ */
+export function entityHref(kind: GraphEntityKind, id: string, tenantSlug?: string): string {
+  const path = `/w/${kind}/${encodeURIComponent(id)}`;
+  return kind === 'organization' && tenantSlug
+    ? `${path}?tenant=${encodeURIComponent(tenantSlug)}`
+    : path;
 }
 
 /** A list page, optionally narrowed by scope query parameters. */
@@ -167,20 +174,41 @@ export function nodeLineage(
     ['project', node.projectId],
     ['mission', node.missionId],
   ];
-  return chain.flatMap(([kind, id]) =>
-    !id || (kind === node.kind && id === node.id)
-      ? []
-      : [{ kind, id, label: labels.get(`${kind}:${id}`) ?? id }]
-  );
+  return chain.flatMap(([kind, id]): GraphRef[] => {
+    if (!id || (kind === node.kind && id === node.id)) return [];
+    if (kind === 'organization') {
+      // An organization id is unique only within its tenant.
+      const label =
+        (node.tenantSlug && labels.get(`organization:${node.tenantSlug}:${id}`)) ||
+        labels.get(`organization:${id}`) ||
+        id;
+      return [{ kind, id, label, ...(node.tenantSlug ? { tenantSlug: node.tenantSlug } : {}) }];
+    }
+    return [{ kind, id, label: labels.get(`${kind}:${id}`) ?? id }];
+  });
 }
 
-/** `kind:id` → label for every ref of a workspace summary tree. */
+/**
+ * `kind:id` → label for every ref of a workspace summary tree. Organizations
+ * are also keyed `organization:<tenant>:<id>`; the bare `organization:<id>`
+ * key is kept only while the id is unique across tenants.
+ */
 export function summaryLabelIndex(summary: WorkspaceGraphSummary | null): Map<string, string> {
   const index = new Map<string, string>();
+  const ambiguous = new Set<string>();
   for (const tenant of summary?.tenants ?? []) {
     index.set(`tenant:${tenant.id}`, tenant.label);
     for (const org of tenant.organizations) {
-      index.set(`organization:${org.id}`, org.label);
+      index.set(`organization:${tenant.id}:${org.id}`, org.label);
+      const bare = `organization:${org.id}`;
+      if (ambiguous.has(org.id)) {
+        // Already shared by two tenants: no bare key, but its projects still get labels.
+      } else if (index.has(bare)) {
+        index.delete(bare);
+        ambiguous.add(org.id);
+      } else {
+        index.set(bare, org.label);
+      }
       for (const project of org.projects) index.set(`project:${project.id}`, project.label);
     }
   }

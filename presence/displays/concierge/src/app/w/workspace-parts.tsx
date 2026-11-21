@@ -100,8 +100,8 @@ export function WorkspaceCrumbs({
           <a href="/">{t('ia_shell_crumb_home')}</a>
         </li>
         {lineage.map((ref) => (
-          <li key={`${ref.kind}:${ref.id}`}>
-            <a href={entityHref(ref.kind, ref.id)}>
+          <li key={`${ref.kind}:${ref.tenantSlug ?? ''}:${ref.id}`}>
+            <a href={entityHref(ref.kind, ref.id, ref.tenantSlug)}>
               <span className="ws-crumbs__kind">{kindLabel(t, ref.kind)}</span>
               {ref.label}
             </a>
@@ -123,7 +123,7 @@ function RowLineage({ t, lineage }: { t: Translate; lineage: readonly GraphRef[]
   return (
     <span className="ws-row__lineage">
       {lineage.map((ref, index) => (
-        <React.Fragment key={`${ref.kind}:${ref.id}`}>
+        <React.Fragment key={`${ref.kind}:${ref.tenantSlug ?? ''}:${ref.id}`}>
           {index ? <span aria-hidden="true"> › </span> : null}
           <span title={kindLabel(t, ref.kind)}>{ref.label}</span>
         </React.Fragment>
@@ -237,7 +237,7 @@ export function EntityRow({
       <div className="ws-row__main">
         {showKind ? <Badge label={kindLabel(t, node.kind)} tone="accent" /> : null}
         {linkable ? (
-          <a className="ws-row__title" href={entityHref(node.kind, node.id)}>
+          <a className="ws-row__title" href={entityHref(node.kind, node.id, node.tenantSlug)}>
             {title}
           </a>
         ) : (
@@ -295,7 +295,7 @@ export function EntityList({
     <ul className="ws-list" aria-label={label}>
       {rows.map(({ node, sameCount }) => (
         <EntityRow
-          key={`${node.kind}:${node.id}`}
+          key={`${node.kind}:${node.tenantSlug ?? ''}:${node.id}`}
           t={t}
           node={node}
           labels={labels}

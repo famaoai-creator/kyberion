@@ -460,6 +460,7 @@ describe('workspace graph', () => {
             kind: 'organization',
             id: 'acme-hq',
             label: 'Acme HQ',
+            tenantSlug: 'acme',
             projects: [{ kind: 'project', id: 'PRJ-A', label: 'Launch' }],
           },
         ],
@@ -776,5 +777,55 @@ describe('work items read in Issue units (W2)', () => {
     expect(byId.get('DATED-1')?.facts).toMatchObject({ due_date: '2026-11-30' });
     expect(byId.get('DATED-2')?.facts).toMatchObject({ start_date: '2026-12-01' });
     expect(byId.get('DATED-1')?.facts).not.toHaveProperty('start_date');
+  });
+});
+
+describe('organization ids repeat across tenants', () => {
+  const shared = () =>
+    sources({
+      organizations: (tenant) =>
+        tenant === 'acme' ? [{ id: 'hq', name: 'Acme HQ' }] : [{ id: 'hq', name: 'Beta HQ' }],
+      projects: () => [
+        {
+          project_id: 'PRJ-BETA',
+          name: 'Beta launch',
+          tier: 'confidential',
+          tenant_slug: 'beta',
+          organization_id: 'hq',
+        },
+      ],
+      missions: () => [],
+      workItems: () => [],
+      approvals: () => [],
+      agents: () => [],
+    });
+  const betaViewer: SurfaceAuthorizationContext = { ...acmeViewer, tenantSlugs: ['beta'] };
+
+  it('keeps one organization node per tenant, each visible only to its tenant', () => {
+    const graph = collectWorkspaceGraph(shared());
+    const orgs = (viewer: SurfaceAuthorizationContext) =>
+      filterWorkspaceGraph(graph, viewer)
+        .nodes.filter((node) => node.kind === 'organization')
+        .map((node) => `${node.tenantSlug}:${node.label}`);
+    expect(orgs(acmeViewer)).toEqual(['acme:Acme HQ']);
+    expect(orgs(betaViewer)).toEqual(['beta:Beta HQ']);
+    expect(orgs(admin).sort()).toEqual(['acme:Acme HQ', 'beta:Beta HQ']);
+  });
+
+  it('resolves an id several tenants share to nothing without a tenant', () => {
+    const graph = filterWorkspaceGraph(collectWorkspaceGraph(shared()), admin);
+    expect(getGraphEntity(graph, 'organization', 'hq')).toBeNull();
+  });
+
+  it('resolves an organization and a lineage within the right tenant', () => {
+    const graph = filterWorkspaceGraph(collectWorkspaceGraph(shared()), admin);
+    expect(
+      getGraphEntity(graph, 'organization', 'hq', undefined, { tenantSlug: 'beta' })?.node.label
+    ).toBe('Beta HQ');
+    const project = getGraphEntity(graph, 'project', 'PRJ-BETA');
+    expect(project?.lineage.find((ref) => ref.kind === 'organization')).toMatchObject({
+      label: 'Beta HQ',
+      tenantSlug: 'beta',
+    });
   });
 });

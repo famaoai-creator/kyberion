@@ -96,6 +96,10 @@
   border-left-color: var(--kb-ui-success-border);
 }
 
+.wc-entry[data-source="external"] {
+  border-left-color: var(--kb-ui-accent);
+}
+
 .wc-summary {
   display: flex;
   flex-wrap: wrap;
