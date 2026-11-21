@@ -22,6 +22,7 @@ export interface ParsedOffboardCommand {
   organizationId?: string;
   mode: 'dry_run' | 'execute';
   json: boolean;
+  expectedPreviewId?: string;
   approval?: { approved_by: string; purpose: string };
 }
 
@@ -68,6 +69,10 @@ export function parseOffboardArgs(args: string[]): ParsedOffboardCommand {
         'Run without --execute for a dry run.'
     );
   }
+  const preview = options['--preview-id'];
+  if (typeof preview !== 'string' || !/^[a-f0-9]{64}$/.test(preview)) {
+    throw new Error('offboard --execute requires --preview-id from the reviewed dry run');
+  }
   return {
     scopeType,
     scopeId,
@@ -75,6 +80,7 @@ export function parseOffboardArgs(args: string[]): ParsedOffboardCommand {
     ...(organizationId ? { organizationId } : {}),
     mode,
     json,
+    expectedPreviewId: preview,
     approval: { approved_by: approvedBy.trim(), purpose: purpose.trim() },
   };
 }

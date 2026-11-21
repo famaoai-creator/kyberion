@@ -27,6 +27,7 @@
  */
 
 import * as path from 'node:path';
+import { createHash } from 'node:crypto';
 import { readJson, readJsonLines } from '../foundation/json.js';
 import * as pathResolver from '../path-resolver.js';
 import { parseSafeJsonInput, parseSafeJsonObjectValue } from '../foundation/safe-json.js';
@@ -370,6 +371,7 @@ export interface OffboardScopeResult {
   scope_type: OffboardScopeType;
   scope_id: string;
   dry_run: boolean;
+  preview_id?: string;
   targets: OffboardTarget[];
   /** Repo-relative export directory (execute mode only). */
   export_path?: string;
@@ -1472,6 +1474,7 @@ export interface OffboardScopeInput {
   organizationId?: string;
   /** `dry_run` (default) only reports; `execute` exports then deletes. */
   mode?: 'dry_run' | 'execute';
+  expectedPreviewId?: string;
   approval?: OffboardApproval;
   /** Clock override for deterministic export directory names in tests. */
   nowIso?: string;
@@ -1580,6 +1583,27 @@ export function offboardScope(input: OffboardScopeInput): OffboardScopeResult {
       return result;
     }
 
+    // Bind the reviewed target set and shared-ledger rows to this scope.
+    result.preview_id = createHash('sha256')
+      .update(
+        JSON.stringify({
+          scopeType,
+          scopeId,
+          tenantSlug,
+          organizationId,
+          targets: result.targets.map(({ kind, path }) => [kind, path].join(':')).sort(),
+          artifacts: ownedArtifacts.map((record) => JSON.stringify(record)).sort(),
+          dedup: dedupPrune?.removedLines.slice().sort() ?? [],
+          ledgers: ledgerPrunes.map(({ ledger, prune }) => [
+            ledger.result_key,
+            prune.removedLines.slice().sort(),
+          ]),
+          traces: delegationTracePrunes
+            .map(({ path, prune }) => [path, prune.removedLines.slice().sort()])
+            .sort(),
+        })
+      )
+      .digest('hex');
     if (mode !== 'execute') {
       appendRetentionAudit({
         event: 'SCOPE_OFFBOARD_DRY_RUN',
@@ -1609,11 +1633,14 @@ export function offboardScope(input: OffboardScopeInput): OffboardScopeResult {
 
     const approvedBy = input.approval?.approved_by?.trim();
     const purpose = input.approval?.purpose?.trim();
-    if (!approvedBy || !purpose) {
+    const previewChanged =
+      input.expectedPreviewId !== undefined && input.expectedPreviewId !== result.preview_id;
+    if (!approvedBy || !purpose || previewChanged) {
       result.status = 'approval_required';
-      result.reason =
-        'offboarding delete requires a human approval with approved_by and purpose ' +
-        '(dry_run needs none) — refusing to delete';
+      result.reason = previewChanged
+        ? 'Scope targets changed. Review a fresh dry run before executing.'
+        : 'offboarding delete requires a human approval with approved_by and purpose ' +
+          '(dry_run needs none) — refusing to delete';
       appendRetentionAudit({
         event: 'SCOPE_OFFBOARD_DENIED',
         scope_type: scopeType,

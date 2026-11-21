@@ -111,6 +111,9 @@ export function saveArtifactRecord(record: ArtifactRecord): string {
     : null;
   const metadata = {
     ...(canonicalInput.metadata || {}),
+    ...(canonicalInput.delivered_to
+      ? { delivery_statuses: canonicalInput.delivered_to.map((entry) => entry.status) }
+      : {}),
     ...(qualityReport
       ? {
           quality_kind: qualityReport.kind,
@@ -171,6 +174,8 @@ export function attachArtifactRecordToTaskSession(
   appendArtifactOwnershipRecord(
     createArtifactOwnershipRecord({
       artifact_id: record.artifact_id,
+      tenant_slug: record.tenant_slug,
+      organization_id: record.organization_id,
       project_id: record.project_id,
       mission_id: record.mission_id,
       task_session_id: record.task_session_id || sessionId,

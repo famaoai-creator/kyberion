@@ -491,3 +491,10 @@ Repository build, test, generator and gate scripts for contributors.
 ## Deprecated aliases
 
 No deprecated aliases. Every entry below is the canonical name — use it as written.
+
+### Non-interactive lifecycle
+
+- `pnpm onboarding --json` returns the required reviewed identity input and its validation command when run without a TTY.
+- `pnpm pipeline --input pipelines/baseline-check.json` reports `next_action` alongside the readiness status.
+- `pnpm work session-summary --item-id <id> --json` prints the current tenant's work state and mission artifacts.
+- `pnpm kyberion offboard <tenant|project> <id> --json` previews scope retirement. Execution requires the reviewed `--preview-id`, `--approved-by`, and `--purpose`.

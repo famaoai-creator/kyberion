@@ -20,6 +20,7 @@ process.env.KYBERION_PROVIDER_CAPABILITY_PROBE = '0';
 
 const {
   parseConnectionReadinessConfig,
+  baselineNextAction,
   deriveBaselineStatus,
   reasoningFailoverWarning,
   summarizeProviderCapabilities,
@@ -56,6 +57,18 @@ function fakeCapability(overrides: Partial<ProviderCapability> = {}): ProviderCa
 }
 
 describe('run_baseline_check', () => {
+  it.each([
+    ['all_clear', {}, 'proceed'],
+    ['needs_onboarding', {}, 'onboard'],
+    ['needs_recovery', {}, 'recover'],
+    ['needs_recovery', { circuitBroken: true }, 'request_operator'],
+    ['needs_attention', { deferred: true }, 'wait'],
+    ['needs_attention', {}, 'inspect_attention'],
+    ['fatal_error', {}, 'request_operator'],
+  ] as const)('maps %s with %j to %s', (status, result, expected) => {
+    expect(baselineNextAction(status, result)).toBe(expected);
+  });
+
   it('defers L2 during a compiler build without requesting automated recovery', () => {
     expect(
       deriveBaselineStatus(
