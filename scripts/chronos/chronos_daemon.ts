@@ -97,6 +97,8 @@ const SOVEREIGN_SCHEDULE_IDS: ReadonlySet<string> = new Set([
   'organization-standup',
   'organization-retro',
   'organization-kr-measure',
+  'audit-verify-daily',
+  'backup-daily',
 ]);
 
 function sovereignPersonaFor(scheduleId: string): 'sovereign' | undefined {
@@ -973,9 +975,16 @@ async function tickAsLeader(): Promise<void> {
               { pipelinePath: resolvedPipelinePath, runId: deliveryId }
             );
           const sovereign = sovereignPersonaFor(scheduled.id);
+          // Repository-lane schedules are system jobs: clear the operator's
+          // ambient tenant binding (scope.env / KYBERION_TENANT) so tenant
+          // identity never leaks into a cross-tenant or repo-level run and
+          // mints a phantom CREDENTIAL_BINDING_REQUIRED. The '' tenant binds
+          // `tenantCleared` — a raw runInExecutionScope without an assumable
+          // role gets rebuilt and drops the flag. Tenant pipelines are
+          // unaffected — they rebind their own slug in a child process.
           const result = sovereign
-            ? await withExecutionContextAsync('chronos_gateway', runScheduledSteps, sovereign)
-            : await runScheduledSteps();
+            ? await withExecutionContextAsync('chronos_gateway', runScheduledSteps, sovereign, '')
+            : await withExecutionContextAsync('chronos_gateway', runScheduledSteps, undefined, '');
 
           let deliverySucceeded = true;
           if (result.status === 'succeeded' && scheduled.deliver_to) {
