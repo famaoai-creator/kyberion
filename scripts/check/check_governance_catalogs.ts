@@ -34,7 +34,12 @@ function readJson(file: string): Json {
   return readSafeJsonFile<Json>(file, file);
 }
 
-function assemble(dir: string, listKey: string, orderKey: string, fileFor?: (id: string) => string): Json {
+function assemble(
+  dir: string,
+  listKey: string,
+  orderKey: string,
+  fileFor?: (id: string) => string
+): Json {
   const index = readJson(nodePath.join(dir, 'index.json'));
   const order = index[orderKey] as string[];
   const sub = listKey === 'authority_role_permissions' ? 'roles' : 'entries';
@@ -55,27 +60,46 @@ function assemble(dir: string, listKey: string, orderKey: string, fileFor?: (id:
 
 const failures: string[] = [];
 
-const policy = assemble('knowledge/product/governance/security-policy', 'authority_role_permissions', 'role_order');
+const policy = assemble(
+  'knowledge/product/governance/security-policy',
+  'authority_role_permissions',
+  'role_order'
+);
 const livePolicy = readJson(pathResolver.knowledge('product/governance/security-policy.json'));
 if (!deepEqual(policy, livePolicy)) failures.push('security-policy.json');
 
 const retentionDir = 'knowledge/product/governance/storage-retention-catalog';
-const retention = assemble(retentionDir, 'entries', 'entry_order', (p) => `${Buffer.from(p, 'utf8').toString('hex')}.json`);
-const liveRetention = readJson(pathResolver.knowledge('product/governance/storage-retention-catalog.json'));
+const retention = assemble(
+  retentionDir,
+  'entries',
+  'entry_order',
+  (p) => `${Buffer.from(p, 'utf8').toString('hex')}.json`
+);
+const liveRetention = readJson(
+  pathResolver.knowledge('product/governance/storage-retention-catalog.json')
+);
 if (!deepEqual(retention, liveRetention)) failures.push('storage-retention-catalog.json');
 
 export const main = defineScript({
   name: 'check:governance-catalogs',
   run(context) {
     if (failures.length > 0) {
-      throw new ScriptExitError(1, [
-        'governance catalogs drift from directory sources:',
-        ...failures.map((f) => `- ${f} is not what the directory sources assemble`),
-      ]);
+      throw new ScriptExitError(
+        1,
+        [
+          'governance catalogs drift from directory sources:',
+          ...failures.map((f) => `- ${f} is not what the directory sources assemble`),
+        ].join('\n')
+      );
     }
-    context.print('governance catalogs: directory sources and generated artifacts are semantically in sync');
+    context.print(
+      'governance catalogs: directory sources and generated artifacts are semantically in sync'
+    );
   },
 });
 
-if (isDirectScript(import.meta.url, 'check_governance_catalogs.ts') || isDirectScript(import.meta.url, 'check_governance_catalogs.js'))
+if (
+  isDirectScript(import.meta.url, 'check_governance_catalogs.ts') ||
+  isDirectScript(import.meta.url, 'check_governance_catalogs.js')
+)
   void main();
