@@ -173,11 +173,10 @@
       "args": [
         "--import",
         "./scripts/ts-loader.mjs",
-        "scripts/generate/generate_governance_catalogs.ts",
-        "--check"
+        "scripts/check/check_governance_catalogs.ts"
       ],
       "owner": "governance",
-      "rationale": "Keeps security-policy.json and storage-retention-catalog.json byte-identical to their directory sources (roles/, entries/) so per-entry edits cannot drift from the committed runtime artifacts."
+      "rationale": "Keeps security-policy.json and storage-retention-catalog.json semantically identical to their directory sources (roles/, entries/) so per-entry edits cannot drift from the committed runtime artifacts. Semantic (not byte) compare: every pull_request run merges with main, which still carries the pre-normalization format during the transition."
     },
     {
       "id": "org-role-grants",
