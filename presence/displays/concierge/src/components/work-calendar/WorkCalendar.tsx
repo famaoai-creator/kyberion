@@ -64,14 +64,18 @@ function useExternalCalendar(
       .then(async (response) => {
         const body = (await response.json().catch(() => null)) as {
           ok?: boolean;
+          error_code?: string;
           connected?: boolean;
           degraded?: boolean;
           events?: ExternalCalendarEvent[];
         } | null;
         if (controller.signal.aborted) return;
         if (!response.ok || body?.ok !== true) {
-          refused.current = true;
-          setResult({ state: 'unavailable' });
+          // Only "not the installation owner" is permanent; a passing error retries next time.
+          const notOwner =
+            response.status === 403 && body?.error_code === 'installation_owner_required';
+          if (notOwner) refused.current = true;
+          setResult({ state: notOwner ? 'unavailable' : 'degraded' });
           return;
         }
         setKnown(true);

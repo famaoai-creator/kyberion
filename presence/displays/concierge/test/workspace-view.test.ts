@@ -197,3 +197,28 @@ describe('organization labels when ids repeat across tenants', () => {
     });
   });
 });
+
+describe('labels when three tenants share an organization id', () => {
+  it('still labels every tenant project', () => {
+    const tenant = (id: string) => ({
+      kind: 'tenant',
+      id,
+      label: id,
+      organizations: [
+        {
+          kind: 'organization',
+          id: 'hq',
+          label: `${id} HQ`,
+          projects: [{ kind: 'project', id: `P-${id}`, label: `Project ${id}` }],
+        },
+      ],
+    });
+    const labels = summaryLabelIndex({ tenants: ['a', 'b', 'c'].map(tenant) } as never);
+    expect(['a', 'b', 'c'].map((id) => labels.get(`project:P-${id}`))).toEqual([
+      'Project a',
+      'Project b',
+      'Project c',
+    ]);
+    expect(labels.get('organization:c:hq')).toBe('c HQ');
+  });
+});

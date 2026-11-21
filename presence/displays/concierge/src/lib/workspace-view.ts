@@ -201,8 +201,9 @@ export function summaryLabelIndex(summary: WorkspaceGraphSummary | null): Map<st
     for (const org of tenant.organizations) {
       index.set(`organization:${tenant.id}:${org.id}`, org.label);
       const bare = `organization:${org.id}`;
-      if (ambiguous.has(org.id)) continue;
-      if (index.has(bare)) {
+      if (ambiguous.has(org.id)) {
+        // Already shared by two tenants: no bare key, but its projects still get labels.
+      } else if (index.has(bare)) {
         index.delete(bare);
         ambiguous.add(org.id);
       } else {
