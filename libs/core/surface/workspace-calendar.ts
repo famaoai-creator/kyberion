@@ -15,12 +15,18 @@
  * action items of missions in its projects.
  *
  * One request opens the `workspace_graph_reader` store grant once (each
- * opening is a disclosure audit record) and store reads are cached briefly,
- * like the graph join itself.
+ * opening is a disclosure audit record). Action-item lists (one store per
+ * mission) are reused only while the store's change signature is unchanged,
+ * so a write from any process shows on the next read; operation records are
+ * read fresh (few, small, per visible organization).
  */
 import { withStoreGrant } from '../authority.js';
 import { isCalendarDate } from '../foundation/time.js';
-import { listActionItems, type ActionItem } from '../meeting/action-item-store.js';
+import {
+  actionItemStoreSignature,
+  listActionItems,
+  type ActionItem,
+} from '../meeting/action-item-store.js';
 import {
   listOrganizationOperationRuns,
   listOrganizationOperations,
@@ -96,46 +102,45 @@ export interface WorkspaceCalendarSources {
   actionItems(missionId: string): ActionItem[];
 }
 
-const SOURCE_TTL_MS = 3000;
-const sourceCache = new Map<string, { at: number; value: unknown }>();
+const MAX_CACHED_STORES = 2000;
+const actionItemCache = new Map<string, { signature: string; items: ActionItem[] }>();
 
-function cached<T>(key: string, read: () => T): T {
-  const now = Date.now();
-  const hit = sourceCache.get(key);
-  if (hit && now - hit.at <= SOURCE_TTL_MS) return hit.value as T;
-  const value = read();
-  sourceCache.set(key, { at: now, value });
-  if (sourceCache.size > 2000) {
-    for (const [entryKey, entry] of sourceCache) {
-      if (now - entry.at > SOURCE_TTL_MS) sourceCache.delete(entryKey);
-    }
+/** A mission's action items, reused while its store is unchanged (cross-process safe). */
+function actionItemsFresh(missionId: string): ActionItem[] {
+  const signature = actionItemStoreSignature(missionId);
+  if (signature === 'missing') {
+    actionItemCache.delete(missionId);
+    return [];
   }
-  return value;
+  const hit = actionItemCache.get(missionId);
+  if (hit && hit.signature === signature) return hit.items;
+  const items = listActionItems(missionId);
+  if (actionItemCache.size >= MAX_CACHED_STORES) actionItemCache.clear();
+  actionItemCache.set(missionId, { signature, items });
+  return items;
 }
 
-/** Drop cached store reads (tests; after a write that the calendar must show at once). */
+/** Drop cached action-item lists (tests). Writes need no call: the signature check sees them. */
 export function clearWorkspaceCalendarCache(): void {
-  sourceCache.clear();
+  actionItemCache.clear();
 }
 
 export function defaultWorkspaceCalendarSources(): WorkspaceCalendarSources {
   return {
     withReads: (fn) => withStoreGrant(WORKSPACE_GRAPH_READER_ROLE, fn, { tenantSlug: '' }),
-    operations: (scope) =>
-      cached(`operations:${scope.tier}/${scope.tenantSlug ?? ''}/${scope.organizationId}`, () => {
-        const query = {
-          organizationId: scope.organizationId,
-          tier: scope.tier,
-          ...(scope.tenantSlug ? { tenantSlug: scope.tenantSlug } : {}),
-        };
-        return {
-          operations: listOrganizationOperations(query),
-          states: listOrganizationOperationStates(query),
-          runs: listOrganizationOperationRuns(query),
-        };
-      }),
-    actionItems: (missionId) =>
-      cached(`action_items:${missionId}`, () => listActionItems(missionId)),
+    operations: (scope) => {
+      const query = {
+        organizationId: scope.organizationId,
+        tier: scope.tier,
+        ...(scope.tenantSlug ? { tenantSlug: scope.tenantSlug } : {}),
+      };
+      return {
+        operations: listOrganizationOperations(query),
+        states: listOrganizationOperationStates(query),
+        runs: listOrganizationOperationRuns(query),
+      };
+    },
+    actionItems: (missionId) => actionItemsFresh(missionId),
   };
 }
 
