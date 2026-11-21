@@ -613,7 +613,7 @@ export async function vcsHostPrMergeWhenGreen(
   // A URL ref must name the PR it resolves to: a provider that reads only the
   // number from a URL would otherwise merge the bound repository's PR of that
   // number for a URL that points at another repository.
-  if (/^https?:\/\//iu.test(ref) && ref.replace(/\/+$/u, '') !== String(before.url ?? ''))
+  if (/^https?:\/\//iu.test(ref) && withoutTrailingSlashes(ref) !== String(before.url ?? ''))
     throw new Error(
       `[PR_MERGE_WRONG_REPOSITORY] ${ref} is not a PR of this checkout's repository (resolved ${String(before.url ?? 'nothing')}) — nothing was merged | next: run from a checkout of that repository, or pass the PR number`
     );
@@ -672,4 +672,11 @@ export async function vcsHostPrMergeWhenGreen(
     throw error;
   }
   return { merged: true, number: merged.number, headSha, waited_ms: checks.waited_ms };
+}
+
+/** Linear-time trailing-slash trim (a `/\/+$/` replace backtracks on long runs of '/'). */
+function withoutTrailingSlashes(value: string): string {
+  let end = value.length;
+  while (end > 0 && value.charCodeAt(end - 1) === 47) end -= 1;
+  return value.slice(0, end);
 }
