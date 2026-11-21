@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/provider-health.json",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "Provider health snapshot, rewritten in place — self-bounded. Surfaced uncovered in the 2026-10-15 janitor report."
+}

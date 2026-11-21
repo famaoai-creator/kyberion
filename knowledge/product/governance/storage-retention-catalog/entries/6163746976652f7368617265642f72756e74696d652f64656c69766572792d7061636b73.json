@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/delivery-packs",
+  "artifact_class": "export",
+  "action": "review_required",
+  "note": "G02: delivery packs written by the artifact-actuator delivery-pack template (orchestrator-execution-brief-helpers.ts). Deliverables are never silently expired."
+}

@@ -1,0 +1,7 @@
+{
+  "path": "active/shared/runtime/apple-intelligence",
+  "artifact_class": "cache",
+  "ttl_days": 30,
+  "action": "delete",
+  "note": "Apple Intelligence bridge spool (apple-intelligence-bridge.ts) — request/response intermediates."
+}

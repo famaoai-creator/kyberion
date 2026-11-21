@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/audit",
+  "artifact_class": "evidence",
+  "action": "review_required",
+  "note": "Audit chain integrity state (chain-integrity.ts) — never auto-delete audit material."
+}

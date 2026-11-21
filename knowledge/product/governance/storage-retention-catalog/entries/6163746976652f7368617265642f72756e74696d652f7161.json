@@ -1,0 +1,7 @@
+{
+  "path": "active/shared/runtime/qa",
+  "artifact_class": "evidence",
+  "action": "review_required",
+  "audit": true,
+  "note": "Software-quality defect event log (libs/core/testing/software-quality-operations.ts qa/defect-events.jsonl)."
+}

@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/dot-action-ledger.jsonl",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "G01: append-only dot action snapshots (dot-action-ledger.ts / dot-dispatch.ts); dispatch and recovery replay it, so it is load-bearing state. MSN-STORE-BOUNDS: no automatic retention — readDotActionLedgerStrict negative proofs need full per-action_ref history (e.g. no row was ever dispatched; the original parked row a recovery receipt hashes), so latest-per-action_ref compaction or truncation could re-fire consumed actions. Readers stream-fold with no size cap (the strict reader 16MB cap was removed); appends warn once per doubling past DOT_ACTION_LEDGER_GROWTH_WARN_BYTES (64 MiB)."
+}

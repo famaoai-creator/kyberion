@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/cache",
+  "artifact_class": "cache",
+  "action": "delete",
+  "note": "Storage-layout cache floor root. Unpartitioned legacy files here (knowledge-index ki-*.json) are self-managed: knowledge-index evicts them by its own ki-usage.json LRU, which mtime cannot see, so the root carries no directory TTL. Partitions below carry the TTL."
+}

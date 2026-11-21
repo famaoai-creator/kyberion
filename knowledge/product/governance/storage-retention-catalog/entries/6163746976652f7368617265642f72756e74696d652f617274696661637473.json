@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/artifacts",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "Artifact-record store payloads (artifact-record.ts) referenced by artifact_id — deleting by TTL would break references; lifecycle belongs to AL-02/AL-03 scoped closure."
+}

@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/system",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "Platform-wide (system partition) durable state that carries no tenant data. scratch-promotion-candidates.json is rewritten whole by every janitor tmp sweep (self-bounded: it lists only tmp job directories currently inside their code grace window, and names no files for personal/confidential partitions). Never auto-delete: removing it only loses first_seen times."
+}

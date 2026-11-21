@@ -1,0 +1,7 @@
+{
+  "path": "active/shared/observability/chronos",
+  "artifact_class": "log",
+  "ttl_days": 30,
+  "action": "delete",
+  "note": "EV-06: Chronos surface event streams (emitChronosSurfaceEvent)."
+}

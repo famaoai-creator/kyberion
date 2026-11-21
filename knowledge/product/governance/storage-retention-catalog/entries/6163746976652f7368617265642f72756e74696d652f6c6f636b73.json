@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/locks",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "Cross-process lock files (src/lock-utils.ts) — deleting a held lock breaks mutual exclusion."
+}

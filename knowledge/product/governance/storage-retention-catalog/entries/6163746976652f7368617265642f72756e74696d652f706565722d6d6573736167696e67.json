@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/peer-messaging",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "Peer messaging queues (peer-messaging.ts) — undelivered messages are load-bearing. Also covers the per-peer LLM auto-reply job ledger tenants/<tenant>/peers/<local>/reply-jobs.jsonl (peer-auto-reply.ts): latest row per <sender>:<message_id> is the job state and the idempotency record, so it is never TTL-deleted; skipped rows are coalesced to one per (sender, session, reason) per hour, bounding its growth to real reply jobs. MSN-STORE-BOUNDS-2: task-exchange.jsonl (key direction:task_id) and reply-jobs.jsonl (key) are compacted at write time to the latest row per key (peer-messaging.ts compactPeerLedgerAfterAppend, 4 MiB, no archive) — latest-per-key is exactly what readers and reply dedupe use. inbox.jsonl / outbox.jsonl have no retention (each message row is load-bearing); all readers stream with no size cap."
+}

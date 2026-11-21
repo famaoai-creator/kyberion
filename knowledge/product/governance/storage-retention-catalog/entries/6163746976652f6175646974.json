@@ -1,0 +1,6 @@
+{
+  "path": "active/audit",
+  "artifact_class": "evidence",
+  "action": "review_required",
+  "note": "Audit evidence directory (the system ledger file has its own entry)."
+}

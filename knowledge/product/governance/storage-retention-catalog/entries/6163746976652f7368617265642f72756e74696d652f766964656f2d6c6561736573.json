@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/video-leases",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "G02: one fenced lease record per video device uid (libs/core/video/video-device-lease.ts on libs/core/lease/device-lease.ts, W3); released records stay to keep the fence, expired ones are replaced on the next acquire."
+}

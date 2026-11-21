@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/delegation-children.json",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "Delegation child-process registry (mission/delegation-concurrency.ts); the janitor's sweepDelegationChildren prunes stale rows itself."
+}

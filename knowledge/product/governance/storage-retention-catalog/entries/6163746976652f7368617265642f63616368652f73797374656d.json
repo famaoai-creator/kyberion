@@ -1,0 +1,7 @@
+{
+  "path": "active/shared/cache/system",
+  "artifact_class": "cache",
+  "ttl_days": 30,
+  "action": "delete",
+  "note": "Storage-layout cache partition (system): derived, re-generable data (digest-keyed sidecars, model/build trees). Deletion only costs a rebuild; anything that cannot be rebuilt belongs in runtime/ state instead."
+}

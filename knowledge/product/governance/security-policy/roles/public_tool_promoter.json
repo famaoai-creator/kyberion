@@ -1,0 +1,13 @@
+{
+  "allow_read": [
+    "knowledge/public/tools/",
+    "active/shared/tmp/",
+    "active/shared/staging/",
+    "active/missions/"
+  ],
+  "allow_write": [
+    "knowledge/public/tools/",
+    "active/shared/tmp/",
+    "active/shared/staging/"
+  ]
+}

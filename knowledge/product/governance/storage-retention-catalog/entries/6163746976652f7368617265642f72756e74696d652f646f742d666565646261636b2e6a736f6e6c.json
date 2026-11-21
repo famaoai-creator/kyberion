@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/dot-feedback.jsonl",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "Operator feedback on dot actions (dot-feedback.ts DOT_FEEDBACK_PATH); feeds later wakes' prompts. MSN-STORE-BOUNDS-2: readers scan backward to the 30-day feedback window (readJsonLinesSince); the writer keeps a 37-day time window at write time (DOT_FEEDBACK_RETENTION_MS, min 8 MiB) and archives dropped rows to <store dir>/compaction-archive/. No reader looks past 30 days, so nothing a reader uses is lost. The janitor never rewrites it."
+}

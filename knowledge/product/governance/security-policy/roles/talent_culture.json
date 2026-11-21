@@ -1,0 +1,10 @@
+{
+  "allow_read": [
+    "active/projects/people/",
+    "active/shared/tmp/"
+  ],
+  "allow_write": [
+    "active/projects/people/",
+    "active/shared/tmp/"
+  ]
+}

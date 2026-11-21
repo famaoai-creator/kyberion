@@ -1,0 +1,7 @@
+{
+  "path": "active/shared/runtime/dot-lifecycle-audit.jsonl",
+  "artifact_class": "evidence",
+  "action": "review_required",
+  "audit": true,
+  "note": "G01: dot charter lifecycle audit trail (dot-charter.ts / dot-lifecycle.ts). Audit evidence — human retention decision only."
+}

@@ -1,0 +1,6 @@
+{
+  "allow_read": [
+    "knowledge/personal/tenants/"
+  ],
+  "allow_write": []
+}

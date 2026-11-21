@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/computer",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "Computer-surface session state (computer-surface.ts)."
+}

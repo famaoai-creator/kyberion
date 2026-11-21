@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/dot-probe-state.json",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "Single-file probe-trigger baseline/fingerprint state (dot-runtime.ts DOT_PROBE_STATE_PATH), rewritten in place."
+}

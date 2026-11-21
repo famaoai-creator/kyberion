@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/delegations",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "LEGACY (read-only since 2026-11-05): the pre-partition, tenant-mixed delegation notification queue (notifications.jsonl). libs/core/mission/delegation-notifications.ts no longer appends here (the queue moved to active/shared/runtime/delegation-records/<partition>/notifications.jsonl); readers fall back to it per row attribution (tenant stamp, the partition of the delegation record, else the mission location; unattributed rows reach unbound processes only), a claimed legacy row is copied, claimed, into its partition and shadowed there (the file is never rewritten at runtime), and tenant offboarding exports and prunes a tenant's rows under the queue lock (SCOPE_OFFBOARD_DELEGATION_NOTIFICATION_PRUNE). Remaining rows are a reviewed removal."
+}

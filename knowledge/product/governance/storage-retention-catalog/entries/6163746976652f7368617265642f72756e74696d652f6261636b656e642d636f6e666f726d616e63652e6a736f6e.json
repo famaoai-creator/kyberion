@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/backend-conformance.json",
+  "artifact_class": "report",
+  "action": "delete",
+  "note": "Backend conformance report (scripts/check/check_backend_conformance.ts), overwritten in place each run — bounded by construction, regenerable."
+}

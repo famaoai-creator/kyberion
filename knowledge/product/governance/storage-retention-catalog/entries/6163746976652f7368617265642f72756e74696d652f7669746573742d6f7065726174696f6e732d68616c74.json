@@ -1,0 +1,8 @@
+{
+  "path": "active/shared/runtime/vitest-operations-halt",
+  "artifact_class": "tmp",
+  "ttl_days": 1,
+  "action": "delete",
+  "backup": "exclude",
+  "note": "Per-process operations-halt flags written by test runs (operations-halt.ts under vitest). Isolated so a test that engages a halt never stops the live system."
+}

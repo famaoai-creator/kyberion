@@ -1,0 +1,12 @@
+{
+  "allow_read": [
+    "knowledge/",
+    "active/audit/"
+  ],
+  "allow_write": [
+    "active/shared/tmp/",
+    "knowledge/product/evolution/",
+    "active/audit/",
+    "active/shared/logs/"
+  ]
+}

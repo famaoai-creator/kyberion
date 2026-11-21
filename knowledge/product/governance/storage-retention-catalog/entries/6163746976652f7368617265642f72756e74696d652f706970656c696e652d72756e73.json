@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/pipeline-runs",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "Pipeline run records are evidence-linked and must be retained until the owning mission closes."
+}

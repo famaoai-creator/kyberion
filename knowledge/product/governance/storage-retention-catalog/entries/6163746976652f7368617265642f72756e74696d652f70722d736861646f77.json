@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/pr-shadow",
+  "artifact_class": "log",
+  "action": "review_required",
+  "note": "PR shadow-mode decision ledger (libs/core/governance/pr-shadow.ts); evidence for promoting shadow PR policy."
+}

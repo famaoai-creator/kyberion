@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/service-bindings",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "Service binding registry (service-binding-registry.ts) — connection state, never TTL-deleted."
+}

@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/dot-inbox.jsonl",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "G01: dot wake inbox (libs/core/dot/dot-inbox.ts). Wake trigger keys hash the row's line index, so truncating or rewriting the file would re-key and re-fire every row — never TTL-deleted, truncated or folded. Past 4 MiB, compactDotInbox replaces consumed rows with same-position tombstones (line count and indexes preserved) under the inbox lock; MSN-STORE-BOUNDS-2: that rewrite and the audit are streamed, and readers stream with line numbers matching the old split indexing."
+}

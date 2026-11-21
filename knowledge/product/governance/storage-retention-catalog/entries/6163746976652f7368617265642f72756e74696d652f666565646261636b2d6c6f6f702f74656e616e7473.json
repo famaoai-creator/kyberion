@@ -1,0 +1,7 @@
+{
+  "path": "active/shared/runtime/feedback-loop/tenants",
+  "artifact_class": "cache",
+  "ttl_days": 30,
+  "action": "delete",
+  "note": "Promotion-candidate staging (promotion-candidates.ts) — same promote-or-expire contract as distill-candidates."
+}

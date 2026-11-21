@@ -1,0 +1,8 @@
+{
+  "path": "active/shared/observability/mission-control/agent-runtime-supervisor-events",
+  "artifact_class": "log",
+  "ttl_days": 14,
+  "action": "delete",
+  "audit": true,
+  "note": "AC-10: virtual (non-directory) lookup key for the dated agent-runtime-supervisor-events-YYYY-MM-DD.jsonl family written by agent-runtime-events.ts's appendSupervisorEvent (rotated daily; storage-janitor.ts's sweepSupervisorEventFiles resolves this entry by exact match only, never by directory-prefix walk, so it never shadows the mission-control entry above that still governs task-events.jsonl / orchestration-events.jsonl at 90d). The pre-rotation legacy agent-runtime-supervisor-events.jsonl file is excluded from both this entry and the mission-control entry above — the janitor never auto-deletes it; an operator may archive/remove it by hand once no longer needed."
+}

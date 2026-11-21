@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/terminal",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "Terminal bridge session state (terminal-bridge.ts)."
+}

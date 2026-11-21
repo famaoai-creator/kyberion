@@ -1,0 +1,9 @@
+{
+  "path": "active/shared/runtime/voice-loopback-receipts",
+  "artifact_class": "evidence",
+  "ttl_days": 90,
+  "action": "delete",
+  "audit": true,
+  "soft_delete_days": 30,
+  "note": "TTS loopback verification receipts (tts-loopback-verifier.ts) — execution evidence, same 90d as browser-receipts, audited with a 30d trash grace."
+}

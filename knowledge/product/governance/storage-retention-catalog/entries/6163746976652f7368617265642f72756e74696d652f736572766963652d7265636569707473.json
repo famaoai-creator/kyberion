@@ -1,0 +1,8 @@
+{
+  "path": "active/shared/runtime/service-receipts",
+  "artifact_class": "evidence",
+  "ttl_days": 90,
+  "action": "delete",
+  "audit": true,
+  "note": "G02: one receipt per service-harness call (libs/core/service/service-harness.ts RECEIPT_DIR). Write-only execution evidence — kept ~90d like browser-receipts / voice-loopback-receipts."
+}

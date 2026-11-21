@@ -1,0 +1,7 @@
+{
+  "path": "active/shared/logs",
+  "artifact_class": "log",
+  "ttl_days": 30,
+  "action": "delete",
+  "note": "Formerly DEFAULT_LOG_RETENTION_DAYS. Covers audit/process/surfaces/traces log subtrees."
+}

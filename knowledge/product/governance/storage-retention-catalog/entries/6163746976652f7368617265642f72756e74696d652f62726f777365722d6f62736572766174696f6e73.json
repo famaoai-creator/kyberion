@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/browser-observations",
+  "artifact_class": "evidence",
+  "action": "review_required",
+  "note": "Browser observation captures. Evidence class — human retention decision; surfaced uncovered in the 2026-10-15 janitor report."
+}

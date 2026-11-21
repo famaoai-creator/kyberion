@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/voice-profiles",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "Voice profile registry (voice-profile-registry.ts) — user-facing configuration, never TTL-deleted."
+}

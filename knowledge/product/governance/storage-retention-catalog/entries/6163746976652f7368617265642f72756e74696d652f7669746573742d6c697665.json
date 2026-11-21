@@ -1,0 +1,8 @@
+{
+  "path": "active/shared/runtime/vitest-live",
+  "artifact_class": "tmp",
+  "ttl_days": 1,
+  "action": "delete",
+  "backup": "exclude",
+  "note": "Delivery outboxes, audit logs, ops alerts, inboxes and peer mailboxes written by test runs (path-resolver vitestLivePath under vitest). Kept out of the live operational tree so fixtures are never delivered or counted as evidence."
+}

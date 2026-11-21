@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/usage-ledger",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "Tier/tenant-partitioned resource-usage ledgers (libs/core/analysis/metrics.ts RESOURCE_USAGE_LEDGER_ROOT): <tier>/<tenant|shared>/resource-usage.jsonl for usage whose scope carries a tenant or a personal/confidential tier; untenanted public usage stays in work/metrics/resource-usage.jsonl. Append-only cost/accounting evidence read by mission retrospectives, cost reports and generation-cost dedup, so no TTL deletion; personal/confidential subtrees are tenant_scope protected prefixes and follow the knowledge-tier persona read rules."
+}

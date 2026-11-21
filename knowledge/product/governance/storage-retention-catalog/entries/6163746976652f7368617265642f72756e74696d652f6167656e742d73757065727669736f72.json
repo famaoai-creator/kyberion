@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/agent-supervisor",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "Agent runtime supervisor state — load-bearing while supervised runtimes exist."
+}

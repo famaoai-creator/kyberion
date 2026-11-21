@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/background-review",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "Background-review patches/records referenced by approval requests — load-bearing while a review is pending."
+}

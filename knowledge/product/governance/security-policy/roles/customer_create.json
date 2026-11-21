@@ -1,0 +1,6 @@
+{
+  "allow_write": [
+    "knowledge/personal/stances/",
+    "knowledge/confidential/"
+  ]
+}

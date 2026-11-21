@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/audio-leases",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "One fenced lease record per audio device uid (libs/core/voice/audio-device-lease.ts on libs/core/lease/device-lease.ts, W3); released records stay to keep the fence, expired ones are replaced on the next acquire."
+}

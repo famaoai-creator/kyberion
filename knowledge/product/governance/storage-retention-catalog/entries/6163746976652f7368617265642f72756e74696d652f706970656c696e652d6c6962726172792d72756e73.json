@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/pipeline-library-runs",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "Protected tenant-partitioned delegated library pipeline journals retain original source/input and permanent effect claims across human approval and recovery. No TTL or automatic replay; remove only after scope-linked audited reconciliation."
+}

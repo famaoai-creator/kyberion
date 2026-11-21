@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/provider-capability-registry.json",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "Runtime provider capability registry (libs/core/provider/provider-capability-registry.ts)."
+}

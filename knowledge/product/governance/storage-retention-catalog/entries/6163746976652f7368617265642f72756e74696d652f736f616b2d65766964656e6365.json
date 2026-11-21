@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/soak-evidence",
+  "artifact_class": "evidence",
+  "action": "review_required",
+  "note": "Soak-test evidence captures. Surfaced uncovered in the 2026-10-15 janitor report; human retention decision."
+}

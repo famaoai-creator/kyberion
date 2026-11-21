@@ -1,0 +1,14 @@
+{
+  "allow_read": [
+    "active/shared/runtime/dot/confidential/${KYBERION_TENANT}/",
+    "active/missions/",
+    "active/archive/missions/",
+    "active/projects/",
+    "active/organizations/",
+    "active/shared/artifacts/personal/",
+    "active/shared/artifacts/confidential/",
+    "active/shared/observability/",
+    "active/shared/runtime/"
+  ],
+  "allow_write": []
+}

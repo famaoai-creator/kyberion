@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/dot-digest-ledger.jsonl",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "Legacy metadata-only digest receipts, read-only compatibility input. New pending text and delivery states live under tenant-scoped dotStatePath digest-ledger.jsonl, covered by the dot/tenant state retention entries. Replay protection is load-bearing; never automatically delete."
+}

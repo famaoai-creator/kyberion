@@ -1,0 +1,7 @@
+{
+  "path": "active/shared/runtime/vuln-ledger.jsonl",
+  "artifact_class": "evidence",
+  "action": "review_required",
+  "audit": true,
+  "note": "Dependency vulnerability ledger (libs/core/governance/dependency-vulnerability-ledger.ts); security evidence trail. MSN-STORE-BOUNDS-2: full history is load-bearing (previous-state fold over every scan), so no retention; the reader streams with no size cap."
+}

@@ -1,0 +1,7 @@
+{
+  "path": "active/shared/observability/work-coordination/events.jsonl",
+  "artifact_class": "log",
+  "action": "rotate",
+  "audit": true,
+  "note": "Coordination event feed (audit trail; authoritative state is items.jsonl/leases.jsonl). Segments expire under the observability 90d sweep."
+}

@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/oauth",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "OAuth token/flow state — credentials, never TTL-deleted."
+}

@@ -1,0 +1,8 @@
+{
+  "allow_read": [
+    "active/shared/runtime/locks/"
+  ],
+  "allow_write": [
+    "active/shared/runtime/locks/"
+  ]
+}

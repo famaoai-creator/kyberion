@@ -1,0 +1,7 @@
+{
+  "allow_read": [
+    "knowledge/personal/tenants/",
+    "knowledge/personal/stances/",
+    "knowledge/confidential/tenants/index.json"
+  ]
+}

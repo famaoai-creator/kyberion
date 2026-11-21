@@ -1,0 +1,10 @@
+{
+  "path": "active/audit/system-ledger.jsonl",
+  "artifact_class": "evidence",
+  "action": "rotate",
+  "self_managed": true,
+  "ttl_days": 365,
+  "segment_action": "archive",
+  "audit": true,
+  "note": "System hash-chained ledger (ledger.ts; untenanted records). MSN-STORE-BOUNDS-3: the ledger rotates itself (ledger.ts LEDGER_SEGMENT_ROTATE_BYTES, 64 MiB, under the ledger lock): the live file is renamed to <stem>-YYYYMMDD-HHmmss[-n].jsonl and the new live file opens with a chained, signed LEDGER_SEGMENT_OPENED entry naming the previous segment and its last hash, so the chain continues across files. audit:verify streams every segment then live and reports a broken boundary or a missing middle segment by name; after the oldest segments are archived it verifies from the oldest remaining segment (anchoredFrom), proven by the archive receipt. self_managed: write-time maintenance and the janitor never rotate or compact the live file (they would not write the opening entry). Segments are never deleted or rewritten by code. The janitor archives them (never deletes) after ttl_days in chain order, oldest first, stopping at the first unexpired segment and never moving the newest one; each move appends a signed LEDGER_SEGMENT_ARCHIVED receipt (segment, last hash, archive path) to the live chain. Verification accepts a chain that starts at a segment-opened marker only when a matching receipt exists; otherwise it reports chain_start:<file>:unproven_anchor:<segment>, so deleting the oldest segments is detected."
+}

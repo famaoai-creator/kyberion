@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/mission-seeds",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "Mission seed registry (libs/core/mission/mission-seed-registry.ts)."
+}

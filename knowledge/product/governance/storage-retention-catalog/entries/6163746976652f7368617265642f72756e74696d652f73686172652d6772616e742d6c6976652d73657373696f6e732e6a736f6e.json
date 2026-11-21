@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/share-grant-live-sessions.json",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "Live share-grant session registry (libs/core/governance/share-grant-live-sessions.ts)."
+}

@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/ingest-cursors",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "DA-03/DA-08: incremental sync cursor state per tenant/source — live state, never TTL-deleted; a tenant's subtree is purged by the audited tenant offboarding ceremony (scope-offboarding.ts)."
+}

@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/pipeline-schedules.json",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "Pipeline scheduler registry (libs/core/pipeline/pipeline-scheduler.ts); operator-declared schedules."
+}

@@ -1,0 +1,7 @@
+{
+  "path": "active/shared/runtime/provider-cache.json",
+  "artifact_class": "cache",
+  "action": "delete",
+  "backup": "exclude",
+  "note": "Provider discovery disk cache (libs/core/provider/provider-discovery.ts), one file rewritten on every refresh — bounded by construction, regenerable."
+}

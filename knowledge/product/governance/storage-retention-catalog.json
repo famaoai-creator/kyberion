@@ -1188,7 +1188,9 @@
           "id": "wi-observation-pending-review-expiry",
           "path_pattern": "*/work-inventory/observations/*.json",
           "status_field": "status",
-          "statuses": ["pending_review"],
+          "statuses": [
+            "pending_review"
+          ],
           "age_field": "created_at",
           "ttl_days": 30,
           "action": "delete"
@@ -1197,7 +1199,9 @@
           "id": "wi-observation-discarded-expiry",
           "path_pattern": "*/work-inventory/observations/*.json",
           "status_field": "status",
-          "statuses": ["discarded"],
+          "statuses": [
+            "discarded"
+          ],
           "age_field": "discarded_at",
           "ttl_days": 30,
           "action": "delete"

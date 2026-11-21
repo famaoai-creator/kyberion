@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/outside.json",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "Small self-rewritten state file (surfaced uncovered in the 2026-10-15 janitor report). JSON, not append-only — bounded by state size."
+}

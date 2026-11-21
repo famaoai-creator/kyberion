@@ -1,0 +1,8 @@
+{
+  "path": "active/shared/tmp",
+  "artifact_class": "tmp",
+  "ttl_days": 1,
+  "code_grace_days": 2,
+  "action": "delete",
+  "note": "Formerly DEFAULT_TMP_TTL_MS (24h). Shared scratch floor — anything here is consumable by contract. Partitioned as tmp/system/<domain>/ or tmp/<tier>/<tenant|shared>/<domain>/ (libs/core/storage-layout.ts); unpartitioned subtrees are legacy call sites ratcheted by shared-tmp-allowlist.json. code_grace_days: an unpromoted job directory (tmp/<job>/, tmp/system/<domain>/<job>/, tmp/<tier>/<tenant|shared>/<domain>/<job>/) holding authored code or ADF keeps its files that many days beyond the TTL; the janitor warns with the exact pnpm scratch:promote command and lists it in active/shared/runtime/system/scratch-promotion-candidates.json (libs/core/storage/scratch-promotion.ts)."
+}

@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/observability/mission-control/agent-runtime-events.jsonl",
+  "artifact_class": "log",
+  "action": "rotate",
+  "note": "Live agent-runtime event stream sibling of the dated supervisor-events family (which has its own 14d sweep). Segments expire under the mission-control 90d entry."
+}

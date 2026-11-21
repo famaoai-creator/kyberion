@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/provider-attestations",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "System / person custody provider attestations (libs/core/provider/custody-provider-attestation-store.ts): system/attestations.json and personal/shared/<owner>.json, approval-mediated contract statements that expire by policy TTL — human judgment, never auto-deleted."
+}

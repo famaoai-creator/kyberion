@@ -1,0 +1,7 @@
+{
+  "path": "active/archive/.trash",
+  "artifact_class": "tmp",
+  "action": "delete",
+  "backup": "exclude",
+  "note": "Soft-delete grace floor (AL-04): expired files from soft_delete_days entries land here preserving their original repo-relative path. The janitor trash sweep purges each file after its governing entry's soft_delete_days (30d default when no entry covers it). Code-driven — no directory-level ttl_days."
+}

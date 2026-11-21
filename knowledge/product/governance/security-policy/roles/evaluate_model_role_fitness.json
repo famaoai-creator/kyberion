@@ -1,0 +1,10 @@
+{
+  "allow_read": [
+    "knowledge/product/governance/",
+    "knowledge/product/schemas/",
+    "active/shared/observability/retrospectives/"
+  ],
+  "allow_write": [
+    "active/shared/observability/retrospectives/"
+  ]
+}
