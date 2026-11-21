@@ -1,6 +1,6 @@
 ---
 title: 'Loop Closure Machinery — 4つの自己改善ループの実装地図'
-last_updated: 2026-10-05
+last_updated: 2026-11-21
 ---
 
 # Loop Closure Machinery — 4つの自己改善ループの実装地図
@@ -40,7 +40,7 @@ L4 人間フィードバック 却下 → ask-why 1問(5カテゴリ) → イベ
 ## L2: LLM 判断配置
 
 - **正本**: [`knowledge/product/governance/llm-invocation-rubric.md`](../governance/llm-invocation-rubric.md) — 6段ラダーと判定質問。pipeline/タスク設計時はこれを先に読む。
-- **lint**: `libs/core/pipeline/adf-guardrails.ts` — `llm-decide-without-distill` / `llm-decide-without-fallback`(warn)。蒸留なし・fallback 宣言なしの `llm_decide` を preflight で警告。
+- **lint**: `libs/core/pipeline/adf-guardrails.ts` — `llm-decide-without-distill` / `llm-decide-without-fallback`(既定 `warn`、`AdfGuardrailOptions.strictUncertaintyContract` または `knowledge/product/governance/adf-execution-policy.json` の `uncertainty.require_llm_decide_fallback: true` 指定時は `error` へ昇格し `runAdfLifecycle` で `autoRepair` を発火)。蒸留なし・fallback 宣言なしの `llm_decide` を preflight で検知。
 - **プリミティブ**: `libs/core/reasoning/semantic-decide.ts` `decideFromObservation`(選択>生成、options 外は拒否→null)、`delegateStructured<T>`(schema 強制+retry)、`delegateBestOf`(N案+judge)— すべて `libs/core/reasoning/reasoning-backend.ts`。
 - **蒸留→判断の全面展開**(AR-07 完了): `llm_decide` は全5 actuator で利用可能。op 本体は共通ヘルパ `executeLlmDecideOp`(semantic-decide.ts)。蒸留段: browser `distill_dom` / android `summarize_ui_tree` / system `distill_output` / network `distill_response`(後2者は `libs/core/reasoning/observation-distill.ts` — head/tail/error行・JSON shape・HTML title+links)/ terminal は observation 明示必須。
 - ワーカーへの周知: `libs/core/workforce/working-principles.ts` の strategist 追補にラダー参照が入る(全 worker prompt に注入)。
@@ -64,11 +64,13 @@ L4 人間フィードバック 却下 → ask-why 1問(5カテゴリ) → イベ
       UI: chronos 成果物レビュー + chronos 承認キュー
   → note + reason_category が承認イベント JSONL / review entry に永続化
   → [再実行] 再突入キュー(libs/core/workforce/review-reentry.ts)に enqueue
-      → mission finish が pending 要求を completion reconciliation の gaps に合流
-      → IL-04 goal loop が implementer+reviewer の rework タスクを自動生成
-        (task brief に verdict + カテゴリ別ガイダンス + レビュアーコメント)
+      → mission finish / review-reenter が pending 要求を処理
+        - 既定(OFF): completion reconciliation の gaps に合流 → IL-04 が一律 `goal-gap-*` (`implementer` + `reviewer`) を生成
+        - opt-in(ON: `state.context.requirements_change_level_routing: true` または `mission-brief.json` の `requirementsGovernance.changeLevelRouting: true`): `libs/core/mission/mission-reentry-routing.ts` がカテゴリを L1/L2/L3 にルーティング
+          - `L1_goal_purpose`(`wrong_direction`): `status: 'paused'` + `alignment_reapproval_required: true` + `product_strategist` 再アラインメント → `reviewer`
+          - `L2_requirement_process`(`scope`): `product_strategist` 仕様更新 → 依存 `implementer` → `reviewer`
+          - `L3_implementation_model`(`incorrect_content`/`quality`/`other`): 有界 `implementer` 修正 → `reviewer`
       → 上限 KYBERION_GOAL_LOOP_MAX_ROUNDS(既定2)、超過は operator エスカレーション
-      → 完了済みミッションは: pnpm exec ... mission_controller review-reenter <ID>
   → [学習] human-rejection:<category> の KnowledgeHint を persist
       (knowledge index に自動取り込み → 次回同型作業の検索に乗る)
       + KM-03 promotion queue に memory candidate(統治付き、直接 HINTS.md は書かない)

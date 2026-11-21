@@ -42,7 +42,12 @@ import {
   type ApprovalRequestRecord,
 } from '@agent/core/governance/approval-store';
 import { findMissionPath } from '@agent/core/path-resolver';
-import { loadMissionBriefAtPath } from '../mission-alignment-gate/mission-brief.js';
+import {
+  isStrictRequirementsFramingEnabled,
+  loadMissionBriefAtPath,
+  validateStrictMissionBriefFraming,
+  type MissionBrief,
+} from '../mission-alignment-gate/mission-brief.js';
 
 export const ALIGNMENT_BRIEF_RELATIVE_PATH = path.join('evidence', 'mission-brief.json');
 export const ALIGNMENT_APPROVAL_CHANNEL = 'brief';
@@ -55,6 +60,7 @@ export type AlignmentDecisionVerdict =
   | 'no_mission'
   | 'brief_missing'
   | 'brief_unsafe'
+  | 'brief_incomplete'
   | 'brief_drifted'
   | 'unbound';
 
@@ -75,13 +81,15 @@ export interface AlignmentDecisionReport {
   reasons: string[];
 }
 
-function readBriefHash(briefPath: string): string | undefined {
+function readBriefWithHash(briefPath: string): { brief: MissionBrief; hash: string } | undefined {
   if (!safeExistsSync(briefPath)) return undefined;
   if (!safeLstat(briefPath).isFile()) return undefined;
   try {
-    return computeApprovalPayloadHash(
-      loadMissionBriefAtPath(briefPath) as unknown as Record<string, unknown>
-    );
+    const brief = loadMissionBriefAtPath(briefPath);
+    return {
+      brief,
+      hash: computeApprovalPayloadHash(brief as unknown as Record<string, unknown>),
+    };
   } catch {
     return undefined;
   }
@@ -103,7 +111,10 @@ function findAlignmentRequest(missionId: string): ApprovalRequestRecord | undefi
   );
 }
 
-export function assessAlignmentDecision(missionIdInput: string): AlignmentDecisionReport {
+export function assessAlignmentDecision(
+  missionIdInput: string,
+  options: { strictRequirementsFraming?: boolean } = {}
+): AlignmentDecisionReport {
   const missionId = missionIdInput.trim().toUpperCase();
   const missionDir = findMissionPath(missionId);
   if (!missionDir) {
@@ -187,8 +198,8 @@ export function assessAlignmentDecision(missionIdInput: string): AlignmentDecisi
     };
   }
 
-  const actual = readBriefHash(briefPath);
-  if (!actual) {
+  const loaded = readBriefWithHash(briefPath);
+  if (!loaded) {
     return {
       ...base,
       verdict: 'brief_missing',
@@ -197,15 +208,29 @@ export function assessAlignmentDecision(missionIdInput: string): AlignmentDecisi
     };
   }
 
-  if (actual !== expected) {
+  if (loaded.hash !== expected) {
     return {
       ...base,
       verdict: 'brief_drifted',
       satisfied: false,
       reasons: [
-        `The brief changed after approval (approved ${expected.slice(0, 12)}…, current ${actual.slice(0, 12)}…). Re-request approval for the updated brief.`,
+        `The brief changed after approval (approved ${expected.slice(0, 12)}…, current ${loaded.hash.slice(0, 12)}…). Re-request approval for the updated brief.`,
       ],
     };
+  }
+
+  if (isStrictRequirementsFramingEnabled(loaded.brief, options.strictRequirementsFraming)) {
+    const framing = validateStrictMissionBriefFraming(loaded.brief);
+    if (!framing.ok) {
+      return {
+        ...base,
+        verdict: 'brief_incomplete',
+        satisfied: false,
+        reasons: [
+          `Alignment brief failed strict requirements framing (${framing.missing.join(', ')}): ${framing.reasons.join(' ')}`,
+        ],
+      };
+    }
   }
 
   return { ...base, verdict: 'approved', satisfied: true, reasons: [] };
@@ -227,10 +252,15 @@ export async function main(
   const argv = await createStandardYargs(['node', 'mission_alignment_decision', ...args])
     .option('mission', { alias: 'm', type: 'string', demandOption: true })
     .option('strict', { type: 'boolean', default: false })
+    .option('strict-framing', { type: 'boolean' })
     .option('json', { type: 'boolean', default: false })
     .parseSync();
 
-  const report = assessAlignmentDecision(String(argv.mission));
+  const report = assessAlignmentDecision(String(argv.mission), {
+    ...(typeof argv['strict-framing'] === 'boolean'
+      ? { strictRequirementsFraming: argv['strict-framing'] }
+      : {}),
+  });
 
   return { report, strict: Boolean(argv.strict) };
 }

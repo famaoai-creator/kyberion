@@ -57,6 +57,7 @@ export async function main(args = currentProcessArgv()): Promise<OpenAlignmentAp
       return true;
     })
     .option('requested-by', { type: 'string' })
+    .option('strict-framing', { type: 'boolean' })
     .option('json', { type: 'boolean', default: false })
     .parseSync();
 
@@ -85,6 +86,9 @@ export async function main(args = currentProcessArgv()): Promise<OpenAlignmentAp
   }
   const result = openAlignmentApproval(String(argv.mission), {
     ...(argv['requested-by'] ? { requestedBy: String(argv['requested-by']) } : {}),
+    ...(typeof argv['strict-framing'] === 'boolean'
+      ? { strictRequirementsFraming: argv['strict-framing'] }
+      : {}),
   });
 
   return result;

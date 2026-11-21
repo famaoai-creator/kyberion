@@ -212,4 +212,14 @@ describe('review re-entry queue (LC-11)', () => {
       markReviewReentryProcessed('mission_controller', 'MSN-OK', '../escape', [])
     ).toThrow('Invalid review re-entry request id');
   });
+
+  it('classifies rejection categories into L1/L2/L3 change levels', async () => {
+    const { classifyReviewReentryChangeLevel } = await import('./review-reentry.js');
+    expect(classifyReviewReentryChangeLevel('wrong_direction')).toBe('L1_goal_purpose');
+    expect(classifyReviewReentryChangeLevel('scope')).toBe('L2_requirement_process');
+    expect(classifyReviewReentryChangeLevel('incorrect_content')).toBe('L3_implementation_model');
+    expect(classifyReviewReentryChangeLevel('quality')).toBe('L3_implementation_model');
+    expect(classifyReviewReentryChangeLevel('other')).toBe('L3_implementation_model');
+    expect(classifyReviewReentryChangeLevel(undefined)).toBe('L3_implementation_model');
+  });
 });

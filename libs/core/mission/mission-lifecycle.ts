@@ -27,6 +27,7 @@ import {
   listPendingReviewReentryRequests,
   markReviewReentryProcessed,
 } from '../workforce/review-reentry.js';
+import { dispatchReviewReentryWithPolicy } from './mission-reentry-routing.js';
 import { ledger } from '../governance/ledger.js';
 import { logger } from '../core.js';
 import { t } from '../localization/t.js';
@@ -1014,12 +1015,17 @@ export async function finishMission(
     const gapSummary = completionReconciliation.gaps.slice(0, 3).join(' / ');
     if (currentRound < goalLoopMaxRounds) {
       const nextRound = currentRound + 1;
-      const gapTaskIds = upsertGoalGapTasks({
+      const reentryDispatch = dispatchReviewReentryWithPolicy({
         missionDir,
         round: nextRound,
-        gaps: completionReconciliation.gaps,
+        state,
+        pendingReviewReentries,
+        rawGoalGaps: rawCompletionReconciliation.gaps,
+        fallbackAllGaps: completionReconciliation.gaps,
         goal: completionGoal,
+        legacyUpsertGoalGapTasks: upsertGoalGapTasks,
       });
+      const gapTaskIds = reentryDispatch.gapTaskIds;
       for (const request of pendingReviewReentries) {
         try {
           markReviewReentryProcessed('mission_controller', upperId, request.request_id, gapTaskIds);
@@ -1028,21 +1034,26 @@ export async function finishMission(
           // which re-merges it next round instead of losing it.
         }
       }
+      const routeOutcome =
+        reentryDispatch.nextStatus === 'paused'
+          ? 'mission paused pending alignment re-approval'
+          : 'mission realigned to active for rework';
       state.context = {
         ...(state.context || {}),
+        ...reentryDispatch.contextPatch,
         goal_reconciliation_round: nextRound,
         goal_reconciliation_last_gaps: completionReconciliation.gaps.slice(0, 5),
         // Record a fresh gate reason so the controller reports the real
-        // outcome (gap tasks dispatched, realigned to active) instead of the
+        // outcome (gap tasks dispatched, realigned/paused) instead of the
         // misleading "archive was not confirmed" fallback.
-        mission_finish_gate_last_reason: `goal gaps remain (round ${nextRound}/${goalLoopMaxRounds}): ${gapSummary} — gap tasks dispatched (${gapTaskIds.join(', ')}), mission realigned to active for rework`,
+        mission_finish_gate_last_reason: `goal gaps remain (round ${nextRound}/${goalLoopMaxRounds}): ${gapSummary} — gap tasks dispatched (${gapTaskIds.join(', ')}), ${routeOutcome}`,
         mission_finish_gate_last_checked_at: nowIso(),
       };
-      state.status = 'active';
+      state.status = reentryDispatch.nextStatus;
       state.history.push({
         ts: nowIso(),
         event: 'GOAL_GAP_REALIGN',
-        note: `Goal not yet satisfied (round ${nextRound}/${goalLoopMaxRounds}). Gap tasks dispatched: ${gapTaskIds.join(', ')} — ${gapSummary}`,
+        note: `Goal not yet satisfied (round ${nextRound}/${goalLoopMaxRounds}). Gap tasks dispatched: ${gapTaskIds.join(', ')}${reentryDispatch.routedSummary ? ` [${reentryDispatch.routedSummary}]` : ''} — ${gapSummary}`,
       });
       writeMissionGateRecord({
         missionId: upperId,
@@ -1540,7 +1551,16 @@ export async function reenterMissionFromReview(
   // is not capped by KYBERION_GOAL_LOOP_MAX_ROUNDS.
   const nextRound = Number(state.context?.goal_reconciliation_round || 0) + 1;
   const gaps = pending.map((request) => buildReviewGapText(request));
-  const gapTaskIds = upsertGoalGapTasks({ missionDir, round: nextRound, gaps, goal });
+  const reentryDispatch = dispatchReviewReentryWithPolicy({
+    missionDir,
+    round: nextRound,
+    state,
+    pendingReviewReentries: pending,
+    fallbackAllGaps: gaps,
+    goal,
+    legacyUpsertGoalGapTasks: upsertGoalGapTasks,
+  });
+  const gapTaskIds = reentryDispatch.gapTaskIds;
   for (const request of pending) {
     try {
       markReviewReentryProcessed('mission_controller', upperId, request.request_id, gapTaskIds);
@@ -1550,16 +1570,17 @@ export async function reenterMissionFromReview(
   }
 
   const previousStatus = state.status;
-  state.status = 'active';
+  state.status = reentryDispatch.nextStatus;
   state.context = {
     ...(state.context || {}),
+    ...reentryDispatch.contextPatch,
     goal_reconciliation_round: nextRound,
     review_reentry_last_gaps: gaps.slice(0, 5),
   };
   state.history.push({
     ts: nowIso(),
     event: 'REVIEW_GAP_REALIGN',
-    note: `Human review re-entry (${pending.length} request(s), was ${previousStatus}). Rework tasks: ${gapTaskIds.join(', ')}`,
+    note: `Human review re-entry (${pending.length} request(s), was ${previousStatus})${reentryDispatch.routedSummary ? ` [${reentryDispatch.routedSummary}]` : ''}. Rework tasks: ${gapTaskIds.join(', ')}`,
   });
   await saveState(upperId, state);
   recordAgentRuntimeEvent(

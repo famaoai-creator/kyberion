@@ -26,6 +26,30 @@ import type { RejectionReasonCategory } from '../contracts/rejection-reason.js';
 
 export type ReviewReentryVerdict = 'reject' | 'request-changes';
 
+export type ReviewChangeLevel =
+  'L1_goal_purpose' | 'L2_requirement_process' | 'L3_implementation_model';
+
+/**
+ * Map a closed human rejection category onto IPA's 3-level change hierarchy
+ * so opt-in routing can separate goal re-alignment (L1) and requirement/scope
+ * updates (L2) from bounded implementation rework (L3).
+ */
+export function classifyReviewReentryChangeLevel(
+  category?: RejectionReasonCategory
+): ReviewChangeLevel {
+  switch (category) {
+    case 'wrong_direction':
+      return 'L1_goal_purpose';
+    case 'scope':
+      return 'L2_requirement_process';
+    case 'incorrect_content':
+    case 'quality':
+    case 'other':
+    default:
+      return 'L3_implementation_model';
+  }
+}
+
 export interface ReviewReentryRequest {
   request_id: string;
   mission_id: string;

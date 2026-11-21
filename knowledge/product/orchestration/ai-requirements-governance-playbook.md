@@ -133,7 +133,22 @@ Enable opt-in constraints incrementally based on tenant maturity; as a practical
 | **Lv.4 Quantitative** | Metrics & KR tracking via Continuous Operations | Opt into automated re-evaluation triggers and Assurance Case summaries                                 |
 | **Lv.5 Optimizing**   | Cross-tenant learning & strict assurance        | Enforce 3-layer legal traceability, full Assurance Cases, and automated defect feedback into Alignment |
 
-## 8. External Reference & Related Kyberion Docs
+## 8. Implemented Opt-In Runtime Switches
+
+All enforcement upgrades keep legacy behavior unchanged unless explicitly opted in:
+
+- **Alignment strict framing gate**:
+  - Brief contract (`knowledge/product/schemas/mission-brief.schema.json`): `requirementsGovernance` (`strictFraming`, `changeLevelRouting`, `requireUncertaintyFallback`, `assumptions`, `maturityLevel`).
+  - CLI / assessor flags: `mission_alignment_request.ts --strict-framing` and `mission_alignment_decision.ts --strict-framing` (or `requirementsGovernance.strictFraming: true` on the brief). Rejects requests missing `intent`, `victoryConditions`, `scope.in`, `scope.out`, `deliverables`, or `assumptions_or_risks`, and emits verdict `brief_incomplete` if checked at decision time.
+- **Change-level review re-entry routing (L1 / L2 / L3)**:
+  - Opt-in triggers (`libs/core/mission/mission-reentry-routing.ts`): `MissionState.context.requirements_change_level_routing: true` or `MissionBrief.requirementsGovernance.changeLevelRouting: true`.
+  - Category mapping (`classifyReviewReentryChangeLevel` in `libs/core/workforce/review-reentry.ts`): `wrong_direction` → `L1_goal_purpose` (sets `status: 'paused'`, `alignment_reapproval_required: true`, and dispatches `product_strategist` re-alignment + `reviewer` without premature `implementer` work); `scope` → `L2_requirement_process` (`product_strategist` spec → dependent `implementer` → `reviewer`); `incorrect_content` / `quality` / `other` → `L3_implementation_model` (bounded `implementer` fix + regression tests → `reviewer`).
+- **ADF uncertainty fallback guardrail**:
+  - Policy (`knowledge/product/governance/adf-execution-policy.json`): `uncertainty.require_llm_decide_fallback` (default `false`) or per-call `AdfGuardrailOptions.strictUncertaintyContract: true` (`libs/core/pipeline/adf-guardrails.ts`), promoting `llm-decide-without-fallback` on generation-mode `llm_decide` without `on_degraded` from `warn` to blocking `error` so `runAdfLifecycle` triggers `autoRepair`.
+- **Worker compact prompt principles**:
+  - `CORE_WORKING_PRINCIPLES[0]` (always included in compact mode) instructs workers to stop guessing and escalate out-of-distribution/conflicting premises in `gaps`/`needs` or `customer_decisions`; `ROLE_WORKING_PRINCIPLES.product_strategist` (`planner` alias included) enforces Who/Objective/In-Out Scope/Success Criteria/Assumptions framing prior to task split.
+
+## 9. External Reference & Related Kyberion Docs
 
 - **External design reference**: Information-technology Promotion Agency, Japan (IPA), Digital & AI Systems Design Center (DADC), _AI-Era Requirements Management Handbook_ (Version 1.0.0, October 2026) — concepts synthesized into Kyberion's governance model with no verbatim text or table reproduction.
 - **Related Kyberion docs**:
