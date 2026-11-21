@@ -6,6 +6,7 @@ import { DOT_ACTION_LEDGER_PATH, type DotActionRecord } from '../dot/dot-action-
 import { dotStatePath } from '../dot/dot-state-paths.js';
 import type { DotCharter } from '../dot/dot-charter.js';
 import type { MissionDevelopmentSpec } from '../mission/mission-development-continuation.js';
+import { resolveMissionDevelopmentBranch } from '../vcs/development-branch.js';
 import type { ContinuousWorkOwnerScope } from './continuous-work-owner-state.js';
 import type { EventScopeInput } from '../event/event-scope.js';
 import type { ApprovalRequestRecord } from '../governance/approval-store.js';
@@ -18,7 +19,7 @@ export function continuousDevelopmentConsentSummary(
   const summary = [
     `Delegate development: ${development.repository_url}`,
     `Scope: ${scope.tier}; organization: ${scope.organization_id ?? 'none'}; tenant: ${scope.tenant_slug ?? 'none'}.`,
-    'Branches: agent/kyberion-development → main.',
+    `Branches: ${resolveMissionDevelopmentBranch(development.branch)} → main.`,
     `Exact source files: ${development.source_edit_paths.length}; maximum code repairs: ${development.max_repairs ?? 2}.`,
     'Automatic effects: implement, test, repair, push, create PR, independent review, merge and verify merge CI.',
     'CODE_REVIEW and DELIVERY use actual independent review and merge/CI proof instead of another per-step human confirmation.',

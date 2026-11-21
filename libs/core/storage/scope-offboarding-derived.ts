@@ -1,3 +1,4 @@
+import type { OffboardScopeType } from './scope-offboarding.js';
 /** Guard the exact regular-file generation selected by authoritative lineage. */
 import { createHash } from 'node:crypto';
 import * as path from 'node:path';
@@ -115,4 +116,52 @@ export function collectDerivedAssetTargets(
     targets.push(target);
   }
   return targets;
+}
+
+/** Bind the reviewed scope to the discovered trees and shared ledger rows. */
+export function scopeOffboardPreviewId(
+  scope: readonly (string | undefined)[],
+  targets: readonly { kind: string; path: string }[],
+  artifacts: readonly object[],
+  dedup: readonly string[] = [],
+  ledgers: readonly { ledger: { result_key: string }; prune: { removedLines: string[] } }[],
+  traces: readonly { path: string; prune: { removedLines: string[] } }[]
+): string {
+  return createHash('sha256')
+    .update(
+      JSON.stringify({
+        scope,
+        targets: targets.map(({ kind, path }) => [kind, path].join(':')).sort(),
+        artifacts: artifacts.map((record) => JSON.stringify(record)).sort(),
+        dedup: [...dedup].sort(),
+        ledgers: ledgers.map(({ ledger, prune }) => [
+          ledger.result_key,
+          [...prune.removedLines].sort(),
+        ]),
+        traces: traces.map(({ path, prune }) => [path, [...prune.removedLines].sort()]).sort(),
+      })
+    )
+    .digest('hex');
+}
+
+export interface OffboardScopeInput {
+  scopeType: OffboardScopeType;
+  scopeId: string;
+  /** Optional tenant lineage for a project with a reused project ID. */
+  tenantSlug?: string;
+  /** Optional organization lineage for a project with a reused project ID. */
+  organizationId?: string;
+  /** `dry_run` (default) only reports; `execute` exports then deletes. */
+  mode?: 'dry_run' | 'execute';
+  expectedPreviewId?: string;
+  approval?: OffboardApproval;
+  /** Clock override for deterministic export directory names in tests. */
+  nowIso?: string;
+}
+
+export interface OffboardApproval {
+  approved_by: string;
+  purpose: string;
+  /** ISO-8601; stamped at execution time when the caller omits it. */
+  approved_at?: string;
 }

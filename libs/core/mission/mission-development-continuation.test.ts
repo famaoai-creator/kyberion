@@ -854,4 +854,381 @@ describe('continuous owner development stage', () => {
     expect((await tick()).status).toBe('blocked');
     expect(publish).not.toHaveBeenCalled();
   });
+  it('routes mission-scoped factory branches to workspace while blocking invalid branches', async () => {
+    const invalid = await run(() =>
+      core.advanceMissionDevelopment(
+        { missionId, development: { ...spec, branch: 'main' }, assertCurrent: () => {} },
+        deps
+      )
+    );
+    expect(invalid.status).toBe('blocked');
+    expect(invalid.reason).toContain('Invalid development branch');
+    const seen: unknown[] = [];
+    const baseWorkspace = deps.workspace;
+    deps.workspace = vi.fn((arg) => {
+      seen.push(arg);
+      return baseWorkspace ? baseWorkspace(arg) : 'unchanged';
+    });
+    await run(() =>
+      core.advanceMissionDevelopment(
+        {
+          missionId,
+          development: { ...spec, branch: 'agent/factory-docs-01' },
+          assertCurrent: () => {},
+        },
+        deps
+      )
+    );
+    expect(seen.length).toBeGreaterThan(0);
+    expect(seen[0]).toEqual(expect.objectContaining({ branch: 'agent/factory-docs-01' }));
+  });
+  it('enforces attached factory delivery envelopes before dispatching workspace mutations', async () => {
+    const { createFactoryDeliveryEnvelope } =
+      await import('../governance/factory-delivery-envelope.js');
+    const validEnvelope = createFactoryDeliveryEnvelope({
+      mission_id: missionId,
+      tenant_slug: 'acme',
+      authority_kind: 'alignment_brief',
+      alignment_approval_ref: 'apr-factory-1',
+      development_branch: 'agent/factory-docs-01',
+      scope_in: spec.source_edit_paths,
+      allowed_paths: spec.source_edit_paths,
+      merge_mode: 'veto_window',
+    });
+
+    const spyWorkspace = vi.fn(deps.workspace ?? (() => 'unchanged' as const));
+    deps.workspace = spyWorkspace;
+
+    await run(() =>
+      core.advanceMissionDevelopment(
+        {
+          missionId,
+          development: {
+            ...spec,
+            branch: 'agent/factory-docs-01',
+            factory_envelope: validEnvelope,
+          },
+          assertCurrent: () => {},
+        },
+        deps
+      )
+    );
+    expect(spyWorkspace).toHaveBeenCalled();
+
+    spyWorkspace.mockClear();
+    const branchMismatch = await run(() =>
+      core.advanceMissionDevelopment(
+        {
+          missionId,
+          development: {
+            ...spec,
+            branch: 'agent/factory-docs-02',
+            factory_envelope: validEnvelope,
+          },
+          assertCurrent: () => {},
+        },
+        deps
+      )
+    );
+    expect(branchMismatch.status).toBe('blocked');
+    expect(branchMismatch.reason).toContain('Factory delivery envelope');
+    expect(spyWorkspace).not.toHaveBeenCalled();
+
+    const tampered = await run(() =>
+      core.advanceMissionDevelopment(
+        {
+          missionId,
+          development: {
+            ...spec,
+            branch: 'agent/factory-docs-01',
+            factory_envelope: { ...validEnvelope, allowed_paths: ['docs/**'] },
+          },
+          assertCurrent: () => {},
+        },
+        deps
+      )
+    );
+    expect(tampered.status).toBe('blocked');
+    expect(tampered.reason).toContain('Factory delivery envelope');
+    expect(spyWorkspace).not.toHaveBeenCalled();
+  });
+  it('plans bounded CI autofix, persists failure signatures, halts duplicates/shadow/non-auto/semantic-sync', async () => {
+    const { createFactoryDeliveryEnvelope } =
+      await import('../governance/factory-delivery-envelope.js');
+    const { computeFactoryCiSignature } = await import('../governance/factory-ci-autofix.js');
+    const tenant = 'acme';
+    const tenantMissionId = 'MSN-FACTORY-CI-FIXTURE';
+    const branchName = 'agent/factory-ci-1';
+    const tenantDir = resolver.pathResolver.missionDir(tenantMissionId, 'confidential', tenant);
+    const envelope = createFactoryDeliveryEnvelope({
+      mission_id: tenantMissionId,
+      tenant_slug: tenant,
+      authority_kind: 'alignment_brief',
+      alignment_approval_ref: 'apr-ci-1',
+      development_branch: branchName,
+      scope_in: spec.source_edit_paths,
+      allowed_paths: spec.source_edit_paths,
+      max_ci_repair_attempts: 3,
+      merge_mode: 'veto_window',
+    });
+    const tenantSpec: MissionDevelopmentSpec = {
+      ...spec,
+      branch: branchName,
+      max_repairs: 3,
+      factory_envelope: envelope,
+    };
+    const graduatedPolicy = {
+      version: '1.0.0',
+      tenants: {
+        [tenant]: {
+          enabled: true,
+          graduated_actions: ['ci_autofix_attempt' as const, 'main_sync_clean' as const],
+        },
+      },
+    };
+    const resetTenantFixture = () => {
+      vi.stubEnv('KYBERION_TIER', 'confidential');
+      vi.stubEnv('KYBERION_TENANT', tenant);
+      prExists = false;
+      ci = {
+        state: 'failure',
+        policyDigest: 'c'.repeat(64),
+        requiredChecks: ['op-registry'],
+        reasons: ['op-registry drift detected'],
+      };
+      run(() => {
+        coordination.clearWorkCoordinationStore();
+        io.safeMkdir(path.join(tenantDir, 'evidence/development'), { recursive: true });
+        io.safeWriteFile(path.join(tenantDir, 'evidence/pr-body.md'), 'Tenant PR body');
+        io.safeWriteFile(
+          path.join(tenantDir, 'mission-state.json'),
+          JSON.stringify({
+            mission_id: tenantMissionId,
+            tier: 'confidential',
+            tenant_slug: tenant,
+            status: 'active',
+            execution_mode: 'local',
+            priority: 1,
+            org_role: 'tester',
+            confidence_score: 1,
+            relationships: {
+              project: { project_id: 'PRJ-DEVELOPMENT-FIXTURE', relationship_type: 'belongs_to' },
+            },
+            git: {
+              branch: branchName,
+              start_commit: revision.baseSha,
+              latest_commit: revision.headSha,
+              checkpoints: [],
+            },
+            history: [],
+          })
+        );
+        io.safeWriteFile(
+          path.join(tenantDir, 'NEXT_TASKS.json'),
+          JSON.stringify([
+            {
+              task_id: spec.implementation_task_id,
+              target_path: 'evidence/implementation.md',
+              source_edit_paths: spec.source_edit_paths,
+              source_edit_requires_approval: false,
+              status: 'completed',
+              assigned_to: { role: 'implementer', agent_id: 'implementer' },
+            },
+            {
+              task_id: spec.review_task_id,
+              status: 'planned',
+              assigned_to: { role: 'reviewer', agent_id: 'independent-reviewer' },
+              review_target: spec.implementation_task_id,
+            },
+            { task_id: 'delivery', phase: 'delivery', status: 'planned' },
+          ])
+        );
+        for (const [id, taskId, status, actor] of [
+          ['implementation', spec.implementation_task_id, 'done', 'implementer'],
+          ['review', spec.review_task_id, 'ready', 'independent-reviewer'],
+          ['delivery', 'delivery', 'ready', 'implementer'],
+        ] as const) {
+          coordination.createWorkItem({
+            itemId: id,
+            title: id,
+            description: 'Tenant factory CI fixture',
+            projectId: 'PRJ-DEVELOPMENT-FIXTURE',
+            status,
+            assigneePeerId: actor,
+            context: {
+              mission_id: tenantMissionId,
+              tenant_slug: tenant,
+              project_id: 'PRJ-DEVELOPMENT-FIXTURE',
+              task_id: taskId,
+              work_shape: 'improvement_experiment',
+            },
+            metadata: {
+              task_id: taskId,
+              mission_id: tenantMissionId,
+              team_role: actor === 'implementer' ? 'implementer' : 'reviewer',
+            },
+          });
+        }
+      });
+    };
+
+    try {
+      resetTenantFixture();
+      const recordedRepairs: unknown[] = [];
+      const baseGit = deps.git!;
+      const localDeps: MissionDevelopmentDeps = {
+        ...deps,
+        pr: () => ({ ...revision, headBranch: branchName }),
+        git: (args, cwd) => {
+          if (args[0] === 'branch') return { status: 0, stdout: branchName, stderr: '' };
+          return baseGit(args, cwd);
+        },
+        artifact: (filePath, payload, meta) => {
+          recordedRepairs.push(payload);
+          io.safeMkdir(path.dirname(filePath), { recursive: true });
+          io.safeWriteFile(filePath, JSON.stringify(payload, null, 2));
+          void meta;
+        },
+        factoryPolicy: graduatedPolicy,
+      };
+      const tickFactory = () =>
+        run(() =>
+          core.advanceMissionDevelopment(
+            { missionId: tenantMissionId, development: tenantSpec, assertCurrent: () => {} },
+            localDeps
+          )
+        );
+
+      // Push -> pr_create -> first CI failure triggers bounded autofix plan
+      const firstTick = await tickFactory();
+      expect(firstTick.status, firstTick.reason).toBe('running');
+      const secondTick = await tickFactory();
+      expect(secondTick.status, secondTick.reason).toBe('running');
+      const repaired = await tickFactory();
+      expect(repaired.status).toBe('running');
+      expect(repaired.reason).toContain('Repair queued');
+      expect(recordedRepairs[0]).toMatchObject({
+        observations: {
+          factory_ci_autofix: {
+            action: 'run_resolve_generated',
+            primary_class: 'generated-drift',
+          },
+        },
+      });
+      const afterFirst = run(
+        () => coordination.getWorkItem('implementation')!.metadata?.mission_development
+      ) as { repairs: number; ci_failure_signatures?: string[] };
+      expect(afterFirst.repairs).toBe(1);
+      expect(afterFirst.ci_failure_signatures?.length).toBe(1);
+
+      // Simulate repair completion without changing failure signature -> immediate duplicate stop
+      run(() => {
+        coordination.updateWorkItem({
+          itemId: 'implementation',
+          expectedVersion: coordination.getWorkItem('implementation')!.version,
+          status: 'done',
+        });
+        io.safeWriteFile(
+          path.join(tenantDir, 'NEXT_TASKS.json'),
+          JSON.stringify(
+            (
+              parseSafeJsonInput(
+                String(io.safeReadFile(path.join(tenantDir, 'NEXT_TASKS.json'))),
+                'tenant next tasks'
+              ) as Array<Record<string, unknown>>
+            ).map((row) =>
+              row.task_id === spec.implementation_task_id ? { ...row, status: 'completed' } : row
+            )
+          )
+        );
+      });
+      const duplicateStop = await tickFactory();
+      expect(duplicateStop.status).toBe('blocked');
+      expect(duplicateStop.reason).toContain('Repeated CI failure signature');
+      const afterDuplicate = run(
+        () => coordination.getWorkItem('implementation')!.metadata?.mission_development
+      ) as { repairs: number };
+      expect(afterDuplicate.repairs).toBe(1);
+
+      // Shadow mode (without graduated policy) blocks without consuming repair budget
+      resetTenantFixture();
+      const shadowDeps: MissionDevelopmentDeps = {
+        ...localDeps,
+        factoryPolicy: { version: '1.0.0', tenants: {} },
+      };
+      const tickShadow = () =>
+        run(() =>
+          core.advanceMissionDevelopment(
+            { missionId: tenantMissionId, development: tenantSpec, assertCurrent: () => {} },
+            shadowDeps
+          )
+        );
+      await tickShadow();
+      await tickShadow();
+      const shadowStop = await tickShadow();
+      expect(shadowStop.status).toBe('blocked');
+      expect(shadowStop.reason).toContain('shadow_mode');
+
+      // Ratchet non-auto failure class escalates immediately
+      resetTenantFixture();
+      const ratchetDeps: MissionDevelopmentDeps = {
+        ...localDeps,
+        ciTriage: () => [
+          {
+            class: 'ratchet/registration',
+            signature: computeFactoryCiSignature(['ratchet/registration', 'orphans']),
+            title: 'orphans ratchet failed',
+            gate: 'orphans',
+            next: ['pnpm check -- --only orphans'],
+          },
+        ],
+      };
+      const tickRatchet = () =>
+        run(() =>
+          core.advanceMissionDevelopment(
+            { missionId: tenantMissionId, development: tenantSpec, assertCurrent: () => {} },
+            ratchetDeps
+          )
+        );
+      await tickRatchet();
+      await tickRatchet();
+      const ratchetStop = await tickRatchet();
+      expect(ratchetStop.status).toBe('blocked');
+      expect(ratchetStop.reason).toContain('ratchet/registration');
+
+      // Semantic main-sync conflict escalates before queuing CI repairs
+      resetTenantFixture();
+      const semanticSyncDeps: MissionDevelopmentDeps = {
+        ...localDeps,
+        syncBaseSha: () => 'e'.repeat(40),
+        git: (args, cwd) => {
+          if (args[0] === 'branch') return { status: 0, stdout: branchName, stderr: '' };
+          if (args.includes('merge-tree')) {
+            return {
+              status: 1,
+              stdout: `${'f'.repeat(40)}\nlibs/core/example.ts\n`,
+              stderr: '',
+            };
+          }
+          return baseGit(args, cwd);
+        },
+      };
+      const tickSync = () =>
+        run(() =>
+          core.advanceMissionDevelopment(
+            { missionId: tenantMissionId, development: tenantSpec, assertCurrent: () => {} },
+            semanticSyncDeps
+          )
+        );
+      await tickSync();
+      await tickSync();
+      const syncBlocked = await tickSync();
+      expect(syncBlocked.status).toBe('blocked');
+      expect(syncBlocked.reason).toContain('Semantic or protected conflicts');
+    } finally {
+      vi.stubEnv('KYBERION_TIER', 'public');
+      vi.stubEnv('KYBERION_TENANT', '');
+      run(() => io.safeRmSync(tenantDir, { recursive: true, force: true }));
+    }
+  });
 });

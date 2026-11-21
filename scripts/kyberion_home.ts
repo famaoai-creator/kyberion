@@ -238,6 +238,8 @@ function handleInboxSubcommand(argv: {
 
 type ApprovalsArgv = Partial<Record<'approve' | 'deny' | 'revoke' | 'reason' | 'note', string>> & {
   json?: boolean;
+  /** Decide in a new OS-started terminal window (approval-terminal-window.ts). */
+  'new-window'?: boolean;
 };
 
 async function handleApprovalsSubcommand(argv: ApprovalsArgv): Promise<void> {
@@ -260,6 +262,15 @@ async function handleApprovalsSubcommand(argv: ApprovalsArgv): Promise<void> {
     if (!request) {
       printOutput(ui('recorder:recorder_approvals_not_found', { id: requestId }));
       throw new ScriptExitError(1, '', true);
+    }
+    if (argv['new-window']) {
+      // The decision itself runs in the new window (real TTY, outside this session).
+      const win = await import('./lib/approval-terminal-window.js');
+      const decision = argv.approve ? 'approve' : 'deny';
+      const plan = await win.openApprovalWindow(requestId, decision, win.approvalWindowTexts(ui));
+      const message = win.approvalWindowMessage(plan, requestId);
+      const reason = message.reasonKey ? { reason: ui(message.reasonKey) } : {};
+      return void printOutput(ui(message.key, { ...message.params, ...reason }));
     }
     const decided = await decideApprovalFromCli(request, {
       decision: argv.approve ? 'approved' : 'rejected',
@@ -1273,6 +1284,11 @@ async function mainImpl(args: string[] = []): Promise<void> {
     })
     .option('reason', { type: 'string', description: 'approvals: revocation reason' })
     .option('note', { type: 'string', description: 'approvals: decision note' })
+    .option('new-window', {
+      type: 'boolean',
+      description:
+        'approvals --approve/--deny: decide in a new terminal window the OS opens (for agent CLIs without a TTY)',
+    })
     .option('substrate', { type: 'string', choices: ['browser', 'desktop', 'service'] })
     .option('origin', { type: 'string', description: 'browser procedure origin binding' })
     .option('tab-id', {

@@ -58,6 +58,7 @@ import { sweepAwaitStateRuns } from '@agent/core/pipeline/pipeline-await-resume'
 import { executeServicePreset } from '@agent/core/service/service-engine';
 import { withExecutionContext, withExecutionContextAsync } from '@agent/core/authority';
 import { listTenantProfileSlugs, resolveTenant } from '@agent/core/organization/tenant-registry';
+import { sovereignScheduleIds } from '@agent/core/pipeline/chronos-sovereign-schedules';
 import { isValidTenantSlug } from '@agent/core/entity-scope';
 import { assertSafeRepositoryPath, safeExecResultAsync, safeReadFile } from '@agent/core/secure-io';
 import { loadServiceEndpointsCatalog } from '@agent/core/service/service-endpoint-registry';
@@ -85,22 +86,15 @@ const SHUTDOWN_GRACE_MS = 30_000;
 const triggerRunner = createTriggerRunner();
 
 /**
- * Schedules whose ops are sovereign-only (cross-tenant aggregation). The
- * chronos_gateway role binds persona `worker` into the execution scope, which
- * outranks the process env, so these run under an explicit sovereign scope —
- * but only when the operator started the daemon with KYBERION_BASE_ROLE=sovereign.
- * Adding an id here is a privilege decision; keep the list minimal.
+ * Schedules whose ops are sovereign-only (cross-tenant aggregation) come
+ * from the governed catalog `chronos-sovereign-schedules.json`, not code —
+ * adding an id is a file-level privilege decision. The chronos_gateway role
+ * binds persona `worker` into the execution scope, which outranks the
+ * process env, so these run under an explicit sovereign scope — but only
+ * when the operator started the daemon with KYBERION_BASE_ROLE=sovereign.
  */
-const SOVEREIGN_SCHEDULE_IDS: ReadonlySet<string> = new Set([
-  'organization-daily-digest',
-  'organization-operation-tick',
-  'organization-standup',
-  'organization-retro',
-  'organization-kr-measure',
-]);
-
 function sovereignPersonaFor(scheduleId: string): 'sovereign' | undefined {
-  return SOVEREIGN_SCHEDULE_IDS.has(scheduleId) &&
+  return sovereignScheduleIds().has(scheduleId) &&
     readConfiguredActorIdentity().baseRole === 'sovereign'
     ? 'sovereign'
     : undefined;
@@ -973,9 +967,16 @@ async function tickAsLeader(): Promise<void> {
               { pipelinePath: resolvedPipelinePath, runId: deliveryId }
             );
           const sovereign = sovereignPersonaFor(scheduled.id);
+          // Repository-lane schedules are system jobs: clear the operator's
+          // ambient tenant binding (scope.env / KYBERION_TENANT) so tenant
+          // identity never leaks into a cross-tenant or repo-level run and
+          // mints a phantom CREDENTIAL_BINDING_REQUIRED. The '' tenant binds
+          // `tenantCleared` — a raw runInExecutionScope without an assumable
+          // role gets rebuilt and drops the flag. Tenant pipelines are
+          // unaffected — they rebind their own slug in a child process.
           const result = sovereign
-            ? await withExecutionContextAsync('chronos_gateway', runScheduledSteps, sovereign)
-            : await runScheduledSteps();
+            ? await withExecutionContextAsync('chronos_gateway', runScheduledSteps, sovereign, '')
+            : await withExecutionContextAsync('chronos_gateway', runScheduledSteps, undefined, '');
 
           let deliverySucceeded = true;
           if (result.status === 'succeeded' && scheduled.deliver_to) {

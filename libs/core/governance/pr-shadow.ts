@@ -382,3 +382,10 @@ export function summarizePrShadow(records: readonly PrShadowRecord[]): PrShadowS
     readiness,
   };
 }
+
+export {
+  evaluateFactoryReadiness,
+  type FactoryActionReadiness,
+  type FactoryReadinessInput,
+  type FactoryReadinessReport,
+} from './factory-readiness.js';

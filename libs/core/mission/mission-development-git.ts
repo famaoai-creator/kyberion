@@ -6,6 +6,13 @@ import { hardenedLocalWorkspaceGitOptions } from '../shell/git-probe-hardening.j
 import { assertMissionOwnerPath } from './mission-git.js';
 import type { VcsCommandRunner } from '../vcs/git.js';
 import { gitFetch } from '../vcs/git.js';
+import {
+  FACTORY_BRANCH_PATTERN,
+  MISSION_DEVELOPMENT_BRANCH,
+  resolveMissionDevelopmentBranch,
+} from '../vcs/development-branch.js';
+
+export { FACTORY_BRANCH_PATTERN, MISSION_DEVELOPMENT_BRANCH, resolveMissionDevelopmentBranch };
 import { assertVcsCwdScope } from '../vcs/cwd-scope.js';
 import { pathResolver } from '../path-resolver.js';
 
@@ -46,8 +53,10 @@ export function assertReviewedLocalDevelopmentBaseline(
 export function createDevelopmentWorkspaceGitRunner(
   cwd: string,
   sourcePaths: readonly string[],
-  taskId: string
+  taskId: string,
+  branch: string = MISSION_DEVELOPMENT_BRANCH
 ): VcsCommandRunner {
+  const targetBranch = resolveMissionDevelopmentBranch(branch);
   return (command, args, options = {}) => {
     assertMissionOwnerPath('read or mutate the exact development candidate');
     assertVcsCwdScope(cwd);
@@ -59,12 +68,12 @@ export function createDevelopmentWorkspaceGitRunner(
       exact('branch', '--show-current') ||
       exact('status', '--porcelain') ||
       exact('rev-parse', 'HEAD') ||
-      exact('show-ref', '--verify', '--quiet', 'refs/heads/agent/kyberion-development') ||
+      exact('show-ref', '--verify', '--quiet', `refs/heads/${targetBranch}`) ||
       exact('diff', '--name-only', '-z') ||
       exact('diff', '--name-only', '-z', '--cached') ||
       exact('ls-files', '--others', '--exclude-standard', '-z');
     const mutation =
-      exact('checkout', '-b', 'agent/kyberion-development') ||
+      exact('checkout', '-b', targetBranch) ||
       (args.length === 3 &&
         args[0] === 'add' &&
         args[1] === '--' &&

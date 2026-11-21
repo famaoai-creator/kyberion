@@ -1,0 +1,14 @@
+{
+  "$schema": "../schemas/chronos-sovereign-schedules.schema.json",
+  "version": "1.0",
+  "schedule_ids": [
+    "audit-verify-daily",
+    "backup-daily",
+    "organization-daily-digest",
+    "organization-improvement-scan",
+    "organization-kr-measure",
+    "organization-operation-tick",
+    "organization-retro",
+    "organization-standup"
+  ]
+}

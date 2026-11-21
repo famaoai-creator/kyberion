@@ -95,6 +95,7 @@ import { defineScript, isDirectScript } from '../lib/harness.js';
 type Print = (value: unknown) => void;
 
 import { parseArgs, usage, type ParsedArgs } from './organization_operating_model_args.js';
+import { runApprovedOrganizationWrite } from './organization_write_approval_runner.js';
 
 /** Organization state file an --apply write in this invocation targets; set per run. */
 let writePreflightTarget: string | undefined;
@@ -110,7 +111,8 @@ function resolveWriteMode(parsed: ParsedArgs, command: string): 'dry_run' | 'app
     if (!guard.allowed) {
       throw new Error(
         `${command} --apply is not permitted for persona '${baseRoleEnvText() || 'unknown'}' (${guard.reason}). ` +
-          'Organization writes need KYBERION_BASE_ROLE=sovereign, or MISSION_ROLE=organization_operator with KYBERION_TENANT set to this tenant; nothing was written.'
+          'Organization writes need KYBERION_BASE_ROLE=sovereign, or MISSION_ROLE=organization_operator with KYBERION_TENANT set to this tenant; ' +
+          'or add --request-approval to ask a human to approve this one write (then re-run with --approval-request-id <id>); nothing was written.'
       );
     }
   }
@@ -1463,6 +1465,20 @@ export function runOrganizationOperatingModelCli(
         `A tenant is required for ${readScope.tier} organization scope. Pass --tenant-slug or select one with pnpm scope use.`
       );
     }
+    if (
+      runApprovedOrganizationWrite<OrgCommandContext, OrgCommandContext['readScope']>(
+        parsed,
+        organizationId,
+        readScope,
+        activePrint,
+        {
+          writeTarget: writePreflightTarget,
+          handlers: ORGANIZATION_COMMAND_HANDLERS,
+          usage,
+        }
+      )
+    )
+      return;
     {
       const handler = ORGANIZATION_COMMAND_HANDLERS[parsed.command];
       if (handler) {

@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { defineCatalog, type GovernedCatalog } from '../foundation/governed-catalog.js';
-import { safeWriteFile, safeExistsSync } from '../secure-io.js';
+import { safeWriteFile, safeExistsSync, safeReadFile } from '../secure-io.js';
 import { logger } from '../core.js';
 import { pathResolver } from '../path-resolver.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
@@ -161,7 +161,12 @@ export function saveScheduleRegistry(
     })),
   };
   const validated = registryCatalog(options).validate(normalizedRegistry, registryPath(options));
-  safeWriteFile(registryPath(options), JSON.stringify(validated, null, 2));
+  const serialized = JSON.stringify(validated, null, 2);
+  if (safeExistsSync(registryPath(options))) {
+    const existingText = safeReadFile(registryPath(options), { encoding: 'utf8' }) as string;
+    if (existingText === serialized) return;
+  }
+  safeWriteFile(registryPath(options), serialized);
   logger.info(
     `[PIPELINE-SCHEDULER] Registry saved with ${normalizedRegistry.schedules.length} schedule(s)`
   );

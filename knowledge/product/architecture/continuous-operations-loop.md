@@ -1,7 +1,7 @@
 ---
 title: 'Continuous Operations Loop'
 tags: [architecture, organization, autonomy, continuous-operations]
-last_updated: 2026-11-21
+last_updated: 2026-11-22
 ---
 
 # 継続運営ループ
@@ -72,3 +72,20 @@ owner は各副作用の前に元の承認 hash・scope・charter・claim・leas
 7. **監査指摘・重大インシデント**: セキュリティ／コンプライアンス指摘または障害発生
 
 これらはテナント・組織の監視設定で明示的に **opt-in** された場合にだけ自動起票・再評価ルールとして有効化し、既定では助言候補の提示にとどめる（既存の進行中作業を強制取消しない原則・lease 契約は維持する）。
+
+## Software Factory 自律基盤（Track 1: 並列ブランチ・封筒・opt-in 段階昇格）
+
+既定動作（`agent/kyberion-development` 単一ブランチおよび全 `shadow: true` アクション停止）を保ったまま、ミッション単位で完結・検証・収束できる基盤を段階導入する。
+
+- **ミッション単位の並列開発ブランチ**: `libs/core/vcs/development-branch.ts` により、従来の `agent/kyberion-development` に加えて `agent/factory-<slug>`（`^agent/factory-[a-z0-9][a-z0-9-]{1,60}$`）を許可し、複数ミッションを相互干渉なく並列実行できるようにした。
+- **テナント別 opt-in shadow 昇格ポリシー**: `knowledge/product/governance/factory-autonomy-policy.json`（既定 `"tenants": {}`）と `libs/core/governance/factory-policy.ts` により、明示的に有効化されたテナントかつ許可済みアクション（`mission_start_mandate`、`ci_autofix_attempt`、`main_sync_clean`、`conflict_mechanical`、`pr_merge_low`、`pr_merge_medium`、`auto_revert_on_main_failure`）だけ shadow を解除する。`high_risk_paths` / `never_auto` / スコア上限による人間承認エスカレーションは常に維持する。
+- **不変 Delivery Envelope と差分検証**: `libs/core/governance/factory-delivery-envelope.ts` が Standing Mandate または承認済み Alignment Brief に紐づく SHA-256 署名付き `FactoryDeliveryEnvelope` を生成し、`high_risk_paths`・`scope_out`・`allowed_paths` 逸脱および低リスク自動マージの安全側縮小（`auto_low_risk` → `veto_window`）を強制する。
+- **導入診断 (`evaluateFactoryReadiness`)**: `libs/core/governance/factory-readiness.ts` が halt 状態・テナント opt-in・有効な Standing Mandate 件数・各ゲート判定を統合し、有効化前のブロッカーを一覧化する。
+
+## Software Factory 自律基盤（Track 2: 有界 CI 自動修復・機械的 main 同期分類）
+
+PR 作成後の CI 失敗・ベースブランチ追従に対して、無制限ループや規約回避を防ぎつつ回復を自動化する境界を定義した。
+
+- **有界 CI 自動修復計画 (`libs/core/governance/factory-ci-autofix.ts`)**: `planFactoryCiAutofix` が失敗クラス（`generated-drift` / `test-failure` / `gate-failure` / `infra` / `ratchet/registration` / `platform` / `unknown`）と最大 3 回の試行上限、`priorSignatures` による同一失敗署名での即時停止、`ci_autofix_attempt` の opt-in 昇格ゲートを統合評価する。`validateCiAutofixPatchGuard` はベースライン・設定変更や `.skip()` / `// @ts-ignore` / アサーション削除を検出して `approve` へ引き戻す。
+- **読み取り専用 `git merge-tree` による main 同期分類 (`libs/core/vcs/factory-branch-sync.ts`)**: `git-probe-hardening.ts` に厳格な 6 引数の `merge-tree --write-tree --name-only --no-messages` 文法を追加し、`clean`（無競合）・`mechanical`（生成物のみ競合、`pnpm kyberion resolve generated` 対象）・`semantic`（コード・`high_risk_paths`・設定競合は即エスカレーション）を非破壊に判定する。
+- **`mission-development-continuation.ts` 統合**: `factory_envelope` が付与された開発仕様では、CI 失敗時に `ci_failure_signatures` を永続化しつつ `assessFactoryBranchMainSync` および `planFactoryCiAutofix` を実行し、自動修復・待機・人間エスカレーションを決定論的に振り分ける。

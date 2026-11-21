@@ -6,45 +6,89 @@ import { Button } from '@agent/shared-ui';
 import { localeToBcp47 } from '@agent/core/foundation/locale-normalize';
 import { useConciergeI18n } from '../../lib/use-concierge-i18n';
 import { useWorkspaceResource } from '../../lib/use-workspace-resource';
-import {
-  entityHref,
-  listQueryFromSearch,
-  workspaceApiPath,
-  type GraphNode,
-} from '../../lib/workspace-view';
-import { cardTitle } from '../work-board/work-item-board';
+import { entityHref, listQueryFromSearch, workspaceApiPath } from '../../lib/workspace-view';
 import { LoadErrorState, LoadingState, type Translate } from '../../app/w/workspace-parts';
 import {
+  CALENDAR_SOURCE_GROUPS,
   addDays,
   buildCalendarGrid,
+  calendarGridRange,
+  fromCalendarEntries,
+  fromExternalEvents,
   localCalendarDate,
   shiftAnchor,
+  sourceGroup,
   startOfWeek,
   summarizeCalendar,
+  type CalendarApiEntry,
   type CalendarDay,
-  type CalendarItem,
+  type CalendarEntry,
+  type CalendarSourceGroup,
   type CalendarView,
+  type ExternalCalendarEvent,
 } from './work-calendar';
 import './work-calendar.css';
 
-/** The list operation's ceiling; at this size the calendar says it may be partial. */
-const LIST_LIMIT = 500;
 /** Entries a month cell shows before "+N more". */
 const MONTH_CELL_ENTRIES = 3;
 
-function toCalendarItems(nodes: readonly GraphNode[]): CalendarItem[] {
-  return nodes.map((node) => {
-    const startDate = node.facts?.start_date;
-    const dueDate = node.facts?.due_date;
-    return {
-      id: node.id,
-      title: cardTitle(node.label, node.missionId),
-      status: node.status ?? 'backlog',
-      ...(typeof startDate === 'string' ? { startDate } : {}),
-      ...(typeof dueDate === 'string' ? { dueDate } : {}),
-      href: entityHref('work_item', node.id),
-    };
-  });
+type CalendarData = { entries: CalendarApiEntry[]; degraded: string[] };
+
+/**
+ * The installation owner's own calendar for the days on screen. `unavailable`
+ * (any refusal) hides the source: other viewers never see that it exists.
+ */
+type ExternalState =
+  | { state: 'off' | 'loading' | 'unavailable' | 'disconnected' | 'degraded' }
+  | { state: 'ready'; events: ExternalCalendarEvent[] };
+
+function useExternalCalendar(
+  range: { from: string; to: string },
+  enabled: boolean
+): ExternalState & { known: boolean } {
+  const [result, setResult] = React.useState<ExternalState>({ state: 'off' });
+  // Once refused (not the installation owner) stay refused: no request per navigation.
+  const refused = React.useRef(false);
+  // Whether the route ever answered as something other than a refusal (shows the toggle).
+  const [known, setKnown] = React.useState(false);
+  React.useEffect(() => {
+    if (refused.current) return;
+    if (!enabled) {
+      setResult({ state: 'off' });
+      return;
+    }
+    const controller = new AbortController();
+    setResult({ state: 'loading' });
+    const query = new URLSearchParams({ from: range.from, to: range.to });
+    void fetch(`/api/calendar/external?${query}`, { cache: 'no-store', signal: controller.signal })
+      .then(async (response) => {
+        const body = (await response.json().catch(() => null)) as {
+          ok?: boolean;
+          error_code?: string;
+          connected?: boolean;
+          degraded?: boolean;
+          events?: ExternalCalendarEvent[];
+        } | null;
+        if (controller.signal.aborted) return;
+        if (!response.ok || body?.ok !== true) {
+          // Only "not the installation owner" is permanent; a passing error retries next time.
+          const notOwner =
+            response.status === 403 && body?.error_code === 'installation_owner_required';
+          if (notOwner) refused.current = true;
+          setResult({ state: notOwner ? 'unavailable' : 'degraded' });
+          return;
+        }
+        setKnown(true);
+        if (!body.connected) setResult({ state: 'disconnected' });
+        else if (body.degraded) setResult({ state: 'degraded' });
+        else setResult({ state: 'ready', events: Array.isArray(body.events) ? body.events : [] });
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setResult({ state: 'degraded' });
+      });
+    return () => controller.abort();
+  }, [range.from, range.to, enabled]);
+  return { ...result, known };
 }
 
 function utcDate(date: string): Date {
@@ -61,11 +105,15 @@ function formatter(locale: string, options: Intl.DateTimeFormatOptions): Intl.Da
 }
 
 /**
- * `/work?tab=calendar` — dated work items on a month or week grid. Items come
- * from the same viewer-scoped workspace list as the board (`dated=true`), so
- * the calendar never shows more than the viewer may see; scope narrowing in
- * the URL (tenant / organization / project / mission) applies here too.
- * Dates are set on the board card; the calendar only reads.
+ * `/work?tab=calendar` — every dated thing the viewer may see, on a month or
+ * week grid: work-item start / due days, organization operation runs and
+ * monthly deadlines, and meeting action items. Entries come from
+ * `workspace.calendar` for exactly the days on screen; that operation reads
+ * only organizations and missions in the viewer's graph, and URL scope
+ * narrowing (tenant / organization / project / mission) applies too. The
+ * installation owner also sees their own Google / Microsoft 365 events
+ * (`/api/calendar/external`, appointments: never due or overdue). The
+ * calendar only reads: dates are set where each entry is managed.
  */
 export function WorkCalendar({ t }: { t: Translate }) {
   const { locale: uiLocale } = useConciergeI18n();
@@ -75,27 +123,64 @@ export function WorkCalendar({ t }: { t: Translate }) {
     const {
       q: _q,
       status: _status,
+      actor_id: _actor,
       ...narrowing
     } = listQueryFromSearch(new URLSearchParams(searchParams?.toString() ?? ''));
     return narrowing;
   }, [searchParams]);
-  const list = useWorkspaceResource<{ items: GraphNode[] }>(
-    workspaceApiPath('list', { kind: 'work_item', dated: 'true', limit: LIST_LIMIT, ...scope })
-  );
 
   const today = localCalendarDate();
   const [view, setView] = React.useState<CalendarView>('month');
   const [anchor, setAnchor] = React.useState(today);
+  const [shownGroups, setShownGroups] = React.useState<ReadonlySet<CalendarSourceGroup>>(
+    () => new Set(CALENDAR_SOURCE_GROUPS)
+  );
+  const range = calendarGridRange(view, anchor);
+  const resource = useWorkspaceResource<CalendarData>(
+    workspaceApiPath('calendar', { from: range.from, to: range.to, ...scope })
+  );
+  // Moving to the next month keeps the last grid on screen while it loads.
+  const lastReady = React.useRef<CalendarData | null>(null);
+  if (resource.state === 'ready') lastReady.current = resource.data;
+  // After a failed load the old range's entries would sit under the new grid: show none.
+  const data =
+    resource.state === 'ready'
+      ? resource.data
+      : resource.state === 'error'
+        ? null
+        : lastReady.current;
 
+  const external = useExternalCalendar(range, shownGroups.has('external'));
+  const groups = CALENDAR_SOURCE_GROUPS.filter(
+    (group) => group !== 'external' || (external.known && external.state !== 'unavailable')
+  );
   const items = React.useMemo(
-    () => (list.state === 'ready' ? toCalendarItems(list.data.items) : []),
-    [list]
+    () =>
+      [
+        ...fromCalendarEntries(data?.entries ?? [], (link, tenantSlug) =>
+          entityHref(link.kind, link.id, tenantSlug)
+        ),
+        ...(external.state === 'ready' ? fromExternalEvents(external.events) : []),
+      ].filter((item) => shownGroups.has(sourceGroup(item.source))),
+    [data, external, shownGroups]
   );
   const grid = React.useMemo(
     () => buildCalendarGrid(items, { view, anchor, today }),
     [items, view, anchor, today]
   );
-  const summary = React.useMemo(() => summarizeCalendar(items, today), [items, today]);
+  // Count only what the grid shows (the API widens timed items by a day either side).
+  const summary = React.useMemo(
+    () =>
+      summarizeCalendar(
+        items.filter(
+          (item) =>
+            (item.dueDate ?? item.startDate ?? '') >= range.from &&
+            (item.dueDate ?? item.startDate ?? '') <= range.to
+        ),
+        today
+      ),
+    [items, today, range.from, range.to]
+  );
 
   const monthTitle = formatter(locale, { year: 'numeric', month: 'long' });
   const shortDay = formatter(locale, { month: 'short', day: 'numeric' });
@@ -114,6 +199,31 @@ export function WorkCalendar({ t }: { t: Translate }) {
   const weekdays = Array.from({ length: 7 }, (_, index) =>
     weekdayName.format(utcDate(addDays(weekStart, index)))
   );
+
+  const roleLabel = (entry: CalendarEntry) => {
+    if (entry.role === 'start') return t('ia_shell_work_cal_start');
+    if (entry.role === 'span') return t('ia_shell_work_cal_underway');
+    switch (entry.item.source) {
+      case 'operation_run':
+        return t('ia_shell_work_cal_run');
+      case 'operation_deadline':
+        return t('ia_shell_work_cal_deadline');
+      case 'action_item':
+        return t('ia_shell_work_cal_action');
+      case 'external_event':
+        return t('ia_shell_work_cal_event');
+      default:
+        return t('ia_shell_work_cal_due');
+    }
+  };
+
+  const toggleGroup = (group: CalendarSourceGroup) =>
+    setShownGroups((current) => {
+      const next = new Set(current);
+      if (next.has(group)) next.delete(group);
+      else next.add(group);
+      return next;
+    });
 
   const renderDay = (day: CalendarDay) => {
     const limit = view === 'month' ? MONTH_CELL_ENTRIES : Infinity;
@@ -143,17 +253,18 @@ export function WorkCalendar({ t }: { t: Translate }) {
                 key={`${entry.item.id}:${entry.role}`}
                 className="wc-entry"
                 data-role={entry.role}
+                data-source={sourceGroup(entry.item.source)}
                 data-due={entry.role === 'due' ? entry.due.state : undefined}
               >
-                <span className="wc-entry__role">
-                  {entry.role === 'due'
-                    ? t('ia_shell_work_cal_due')
-                    : entry.role === 'start'
-                      ? t('ia_shell_work_cal_start')
-                      : t('ia_shell_work_cal_underway')}
-                </span>
+                <span className="wc-entry__role">{roleLabel(entry)}</span>
                 {entry.item.href ? (
-                  <a href={entry.item.href} title={entry.item.title}>
+                  <a
+                    href={entry.item.href}
+                    title={entry.item.title}
+                    {...(entry.item.source === 'external_event'
+                      ? { target: '_blank', rel: 'noreferrer' }
+                      : {})}
+                  >
                     {entry.item.title}
                   </a>
                 ) : (
@@ -211,11 +322,25 @@ export function WorkCalendar({ t }: { t: Translate }) {
         </div>
       </div>
 
-      {list.state === 'loading' ? <LoadingState t={t} /> : null}
-      {list.state === 'error' ? (
-        <LoadErrorState t={t} error={list.error} onRetry={list.reload} />
+      <fieldset className="wc-sources">
+        <legend>{t('ia_shell_work_cal_sources_label')}</legend>
+        {groups.map((group) => (
+          <label key={group} className="wc-sources__option" data-source={group}>
+            <input
+              type="checkbox"
+              checked={shownGroups.has(group)}
+              onChange={() => toggleGroup(group)}
+            />
+            <span>{t(`ia_shell_work_cal_source_${group}`)}</span>
+          </label>
+        ))}
+      </fieldset>
+
+      {!data && resource.state === 'loading' ? <LoadingState t={t} /> : null}
+      {resource.state === 'error' ? (
+        <LoadErrorState t={t} error={resource.error} onRetry={resource.reload} />
       ) : null}
-      {list.state === 'ready' ? (
+      {data ? (
         <>
           <div className="wc-summary">
             {summary.overdue.length ? (
@@ -247,8 +372,24 @@ export function WorkCalendar({ t }: { t: Translate }) {
               </p>
             ) : null}
           </div>
+          {external.state === 'disconnected' && shownGroups.has('external') ? (
+            <p className="wc-hint">
+              {t('ia_shell_work_cal_external_disconnected')}{' '}
+              <a href="/settings#setup-services">{t('ia_shell_work_cal_external_connect')}</a>
+            </p>
+          ) : null}
+          {external.state === 'degraded' && shownGroups.has('external') ? (
+            <p className="wc-hint" role="status">
+              {t('ia_shell_work_cal_external_degraded')}
+            </p>
+          ) : null}
+          {data.degraded.length ? (
+            <p className="wc-hint" role="status">
+              {t('ia_shell_work_cal_degraded')}
+            </p>
+          ) : null}
           {items.length === 0 ? <p className="wc-hint">{t('ia_shell_work_cal_empty')}</p> : null}
-          <div className="wc-grid" data-view={view}>
+          <div className="wc-grid" data-view={view} aria-busy={resource.state === 'loading'}>
             <ol className="wc-weekdays" aria-hidden="true">
               {weekdays.map((name) => (
                 <li key={name}>{name}</li>
@@ -260,11 +401,7 @@ export function WorkCalendar({ t }: { t: Translate }) {
               </ol>
             ))}
           </div>
-          <p className="wc-hint">
-            {items.length >= LIST_LIMIT
-              ? t('ia_shell_work_cal_truncated', { count: LIST_LIMIT })
-              : t('ia_shell_work_cal_undated_hint')}
-          </p>
+          <p className="wc-hint">{t('ia_shell_work_cal_undated_hint')}</p>
         </>
       ) : null}
     </section>

@@ -198,7 +198,8 @@ Runtime/package hygiene for this layer is enforced by `pnpm run check -- --scope
 - `presence/displays/chronos-mirror-v2/` (compatibility redirects to Concierge `/ops` and `/api/ops`, port 3000; no screens of its own)
 - `presence/displays/presence-studio/` (companion workbench, port 3031)
 - `presence/displays/computer-surface/` (local mirror, port 3040)
-- `presence/displays/operator-surface/` (read-only audit monitor, port 3331)
+- `presence/displays/operator-surface/` (audit monitor, port 3331). Its read-only `/peer-tasks`
+  view projects incoming peer tasks, related WorkItem status, and artifact references.
 - `presence/displays/customer-room/` (customer-facing decision room opened through an invite link, port 3046, operator-launched)
 - `presence/displays/a2ui-host/` (developer A2UI viewer, loopback port 3036, operator-launched)
 - `presence/displays/terminal-hud/` (Ink TUI, `pnpm tui`)
@@ -330,7 +331,7 @@ The kernel of the ecosystem. Important responsibilities:
 - resident work continuity: `dot/dot-dispatch.ts` revalidates approved work, `dot/dot-executor.ts` binds the original scope and authority, and `dot/dot-runtime.ts` restores retained follow-up schedules without replaying effects; `dot/dot-memory.ts` captures lessons in their original scope
 - resident tenant credentials: `dot/dot-standing-binding.ts` runs each tenant dot wake / executor item as one claimed step of the dot's standing Issue so the claimed-task dispatch mints its credential binding (`dot/dot-wake-orchestration.ts` composes it for wakes and executor items); `governance/grant-store.ts` extends a standing grant only as the same grant under an owner approval
 - coordination acts: `foundation/coordination-act.ts` (the eight canonical acts) and `mesh/coordination-act-map.ts` (each communication layer's kinds → act, gated by `tests/coordination-act-boundary.test.ts`; see [agent-communication-layer-model §11](../knowledge/product/architecture/agent-communication-layer-model.md#11-coordination-acts))
-- organization and tenancy: `organization/organization-operating-model.ts`, `project/project-management.ts`, `workforce/work-coordination.ts` + `workforce/work-visibility.ts` (work-item context chain and visibility projections) + `workforce/work-item-hierarchy.ts` / `workforce/work-item-parent-status.ts` (Issue and step links, parent status from steps) + `workforce/work-item-schedule.ts` (WorkItem `start_date` / `due_date` calendar-day rules), `organization/tenant-registry.ts`, `organization/tenant-knowledge-retrieval.ts`, `mesh/peer-messaging.ts` (tenant peer mesh)
+- organization and tenancy: `organization/organization-operating-model.ts`, `project/project-management.ts`, `workforce/work-coordination.ts` + `workforce/work-visibility.ts` (work-item context chain and visibility projections) + `workforce/work-item-hierarchy.ts` / `workforce/work-item-parent-status.ts` (Issue and step links, parent status from steps) + `workforce/work-item-schedule.ts` (WorkItem `start_date` / `due_date` calendar-day rules) + `surface/workspace-calendar.ts` (`workspace.calendar`: dated work items, organization operation runs/deadlines and meeting action items, visibility inherited from the viewer-filtered graph), `organization/tenant-registry.ts`, `organization/tenant-knowledge-retrieval.ts`, `mesh/peer-messaging.ts` (tenant peer mesh)
 - identity and authorization: `agent/agent-identity.ts` (NHI), `authority.ts`, `tier-guard.ts`, `mission/delegation-chain.ts`
 - history search: `history-search-index.ts` (SQLite FTS5, tier-isolated)
 

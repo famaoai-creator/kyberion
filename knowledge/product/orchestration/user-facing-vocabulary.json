@@ -8981,9 +8981,9 @@
         "qps-ploc": "⟦  őƒƒƀőȧřḓ <ŧėñȧñŧ|ṗřőĵėƈŧ> <ïḓ>  Ṗřėṽïėẇ (ḓėƒȧůŀŧ) őř řůñ ėẋṗőřŧ → ḓėŀėŧė ƒőř ȧ ƈŀőşïñɠ şƈőṗė ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşė⟧"
       },
       "cli_help_offboard_usage": {
-        "en": "Usage: pnpm kyberion offboard <tenant|project> <id> [--execute --approved-by <who> --purpose \"<why>\"] [--json]",
-        "ja": "使い方: pnpm kyberion offboard <tenant|project> <id> [--execute --approved-by <承認者> --purpose \"<理由>\"] [--json]",
-        "qps-ploc": "⟦Ůşȧɠė: ṗñṗɱ ķẏƀėřïőñ őƒƒƀőȧřḓ <ŧėñȧñŧ|ṗřőĵėƈŧ> <ïḓ> [--ėẋėƈůŧė --ȧṗṗřőṽėḓ-ƀẏ <ẇħő> --ṗůřṗőşė \"<ẇħẏ>\"] [--ĵşőñ] ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř⟧"
+        "en": "Usage: pnpm kyberion offboard <tenant|project> <id> [--execute --preview-id <id> --approved-by <who> --purpose \"<why>\"] [--json]",
+        "ja": "使い方: pnpm kyberion offboard <tenant|project> <id> [--execute --preview-id <id> --approved-by <承認者> --purpose \"<理由>\"] [--json]",
+        "qps-ploc": "⟦Ůşȧɠė: ṗñṗɱ ķẏƀėřïőñ őƒƒƀőȧřḓ <ŧėñȧñŧ|ṗřőĵėƈŧ> <ïḓ> [--ėẋėƈůŧė --ṗřėṽïėẇ-ïḓ <ïḓ> --ȧṗṗřőṽėḓ-ƀẏ <ẇħő> --ṗůřṗőşė \"<ẇħẏ>\"] [--ĵşőñ] ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗï⟧"
       },
       "cli_help_offboard_dry_run_short": {
         "en": "  (default)  Dry run: list the active/ trees that would be exported and deleted. Writes nothing.",
@@ -8991,9 +8991,9 @@
         "qps-ploc": "⟦  (ḓėƒȧůŀŧ)  Ḓřẏ řůñ: ŀïşŧ ŧħė ȧƈŧïṽė/ ŧřėėş ŧħȧŧ ẇőůŀḓ ƀė ėẋṗőřŧėḓ ȧñḓ ḓėŀėŧėḓ. Ẇřïŧėş ñőŧħïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈ⟧"
       },
       "cli_help_offboard_execute_short": {
-        "en": "  --execute  Export every target under active/shared/exports/offboarding/, then delete it. Requires --approved-by and --purpose.",
-        "ja": "  --execute  対象を active/shared/exports/offboarding/ へ export してから削除。--approved-by と --purpose が必須。",
-        "qps-ploc": "⟦  --ėẋėƈůŧė  Ėẋṗőřŧ ėṽėřẏ ŧȧřɠėŧ ůñḓėř ȧƈŧïṽė/şħȧřėḓ/ėẋṗőřŧş/őƒƒƀőȧřḓïñɠ/, ŧħėñ ḓėŀėŧė ïŧ. Řėɋůïřėş --ȧṗṗřőṽėḓ-ƀẏ ȧñḓ --ṗůřṗőşė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗï⟧"
+        "en": "  --execute  Export every target under active/shared/exports/offboarding/, then delete it. Requires --preview-id, --approved-by and --purpose.",
+        "ja": "  --execute  対象を active/shared/exports/offboarding/ へ export してから削除。確認した --preview-id に加え、--approved-by と --purpose が必須。",
+        "qps-ploc": "⟦  --ėẋėƈůŧė  Ėẋṗőřŧ ėṽėřẏ ŧȧřɠėŧ ůñḓėř ȧƈŧïṽė/şħȧřėḓ/ėẋṗőřŧş/őƒƒƀőȧřḓïñɠ/, ŧħėñ ḓėŀėŧė ïŧ. Řėɋůïřėş --ṗřėṽïėẇ-ïḓ, --ȧṗṗřőṽėḓ-ƀẏ ȧñḓ --ṗůřṗőşė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ⟧"
       },
       "cli_help_offboard_restore_note": {
         "en": "  Deletions are soft: everything moves to active/archive/.trash/ and stays restorable until the janitor purges it.",
@@ -9041,9 +9041,9 @@
         "qps-ploc": "⟦Řėṽïėẇ ȧñḓ ȧƈƈėṗŧ ḓėŀïṽėřȧƀŀėş ïñ ŧħė ïñƀőẋ ŀőřėɱ ïṗşůɱ ḓő⟧"
       },
       "cli_cmd_operator_home_approvals": {
-        "en": "Review and decide approval requests",
-        "ja": "承認リクエストを確認して裁可",
-        "qps-ploc": "⟦Řėṽïėẇ ȧñḓ ḓėƈïḓė ȧṗṗřőṽȧŀ řėɋůėşŧş ŀőřėɱ ïṗşůɱ⟧"
+        "en": "Review and decide approval requests (--approve/--deny <id>; add --new-window from an agent CLI without a TTY)",
+        "ja": "承認リクエストを確認して裁可(--approve/--deny <id>。TTY のないエージェント CLI からは --new-window を付ける)",
+        "qps-ploc": "⟦Řėṽïėẇ ȧñḓ ḓėƈïḓė ȧṗṗřőṽȧŀ řėɋůėşŧş (--ȧṗṗřőṽė/--ḓėñẏ <ïḓ>; ȧḓḓ --ñėẇ-ẇïñḓőẇ ƒřőɱ ȧñ ȧɠėñŧ ƇĿÏ ẇïŧħőůŧ ȧ ŦŦẎ) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧů⟧"
       },
       "cli_cmd_operator_home_notify": {
         "en": "Inspect or configure notification targets",
@@ -11896,6 +11896,41 @@
         "en": "Pending approval not found: {id}",
         "ja": "承認待ちが見つかりません: {id}",
         "qps-ploc": "⟦Ṗėñḓïñɠ ȧṗṗřőṽȧŀ ñőŧ ƒőůñḓ: {id} ŀőřėɱ ïṗşů⟧"
+      },
+      "recorder_approval_window_opened": {
+        "en": "Opened a new terminal window to decide {id}. Check the request there and type the code it shows. (Same as running: {command})",
+        "ja": "{id} を判断するための新しいターミナル窓を開きました。その窓で内容を確認し、表示されたコードを入力してください。(実行内容: {command})",
+        "qps-ploc": "⟦Őṗėñėḓ ȧ ñėẇ ŧėřɱïñȧŀ ẇïñḓőẇ ŧő ḓėƈïḓė {id}. Ƈħėƈķ ŧħė řėɋůėşŧ ŧħėřė ȧñḓ ŧẏṗė ŧħė ƈőḓė ïŧ şħőẇş. (Şȧɱė ȧş řůññïñɠ: {command}) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗ⟧"
+      },
+      "recorder_approval_window_manual": {
+        "en": "No window can be opened here ({reason}). Open a terminal yourself and run: {command}",
+        "ja": "ここでは窓を開けません({reason})。ご自身でターミナルを開いて次を実行してください: {command}",
+        "qps-ploc": "⟦Ñő ẇïñḓőẇ ƈȧñ ƀė őṗėñėḓ ħėřė ({reason}). Őṗėñ ȧ ŧėřɱïñȧŀ ẏőůřşėŀƒ ȧñḓ řůñ: {command} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
+      },
+      "recorder_approval_window_recorded": {
+        "en": "Recorded.",
+        "ja": "記録しました。",
+        "qps-ploc": "⟦Řėƈőřḓėḓ. ŀőř⟧"
+      },
+      "recorder_approval_window_not_recorded": {
+        "en": "Not recorded (wrong code, timeout or refusal); nothing changed.",
+        "ja": "記録されていません(コード違い・時間切れ・拒否)。変更はありません。",
+        "qps-ploc": "⟦Ñőŧ řėƈőřḓėḓ (ẇřőñɠ ƈőḓė, ŧïɱėőůŧ őř řėƒůşȧŀ); ñőŧħïñɠ ƈħȧñɠėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "recorder_approval_window_close": {
+        "en": "Press Enter to close this window.",
+        "ja": "Enter キーでこの窓を閉じます。",
+        "qps-ploc": "⟦Ṗřėşş Ėñŧėř ŧő ƈŀőşė ŧħïş ẇïñḓőẇ. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "recorder_approval_window_reason_unquotable_path": {
+        "en": "the repository path has characters a Windows script cannot quote safely",
+        "ja": "リポジトリのパスに Windows のスクリプトで安全に扱えない文字が含まれています",
+        "qps-ploc": "⟦ŧħė řėṗőşïŧőřẏ ṗȧŧħ ħȧş ƈħȧřȧƈŧėřş ȧ Ẇïñḓőẇş şƈřïṗŧ ƈȧññőŧ ɋůőŧė şȧƒėŀẏ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "recorder_approval_window_reason_no_os_terminal": {
+        "en": "this OS cannot open a terminal window outside the agent session",
+        "ja": "この OS ではエージェントのセッションの外に端末の窓を開けません",
+        "qps-ploc": "⟦ŧħïş ŐŞ ƈȧññőŧ őṗėñ ȧ ŧėřɱïñȧŀ ẇïñḓőẇ őůŧşïḓė ŧħė ȧɠėñŧ şėşşïőñ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
       },
       "recorder_approvals_revoke_not_found": {
         "en": "Revocable approved approval not found: {id}",
@@ -21083,6 +21118,71 @@
         "ja": "ほか {count} 件",
         "qps-ploc": "⟦+{count} ɱőřė ŀőřė⟧"
       },
+      "ia_shell_work_cal_sources_label": {
+        "en": "Show",
+        "ja": "表示する予定",
+        "qps-ploc": "⟦Şħőẇ ŀőř⟧"
+      },
+      "ia_shell_work_cal_source_work_item": {
+        "en": "Work items",
+        "ja": "作業",
+        "qps-ploc": "⟦Ẇőřķ ïŧėɱş ŀőř⟧"
+      },
+      "ia_shell_work_cal_source_operation": {
+        "en": "Routine operations",
+        "ja": "定常業務",
+        "qps-ploc": "⟦Řőůŧïñė őṗėřȧŧïőñş ŀőřėɱ⟧"
+      },
+      "ia_shell_work_cal_source_action_item": {
+        "en": "Meeting actions",
+        "ja": "会議のアクション",
+        "qps-ploc": "⟦Ɱėėŧïñɠ ȧƈŧïőñş ŀőřė⟧"
+      },
+      "ia_shell_work_cal_source_external": {
+        "en": "Your calendar",
+        "ja": "あなたのカレンダー",
+        "qps-ploc": "⟦Ẏőůř ƈȧŀėñḓȧř ŀőřė⟧"
+      },
+      "ia_shell_work_cal_event": {
+        "en": "Event",
+        "ja": "予定",
+        "qps-ploc": "⟦Ėṽėñŧ ŀőř⟧"
+      },
+      "ia_shell_work_cal_external_disconnected": {
+        "en": "Your Google or Microsoft 365 calendar is not connected.",
+        "ja": "Google / Microsoft 365 のカレンダーが未接続です。",
+        "qps-ploc": "⟦Ẏőůř Ɠőőɠŀė őř Ɱïƈřőşőƒŧ 365 ƈȧŀėñḓȧř ïş ñőŧ ƈőññėƈŧėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "ia_shell_work_cal_external_connect": {
+        "en": "Connect it in Settings",
+        "ja": "設定で接続する",
+        "qps-ploc": "⟦Ƈőññėƈŧ ïŧ ïñ Şėŧŧïñɠş ŀőřėɱ ï⟧"
+      },
+      "ia_shell_work_cal_external_degraded": {
+        "en": "Your calendar could not be loaded right now.",
+        "ja": "あなたのカレンダーを読み込めませんでした。",
+        "qps-ploc": "⟦Ẏőůř ƈȧŀėñḓȧř ƈőůŀḓ ñőŧ ƀė ŀőȧḓėḓ řïɠħŧ ñőẇ. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "ia_shell_work_cal_run": {
+        "en": "Run",
+        "ja": "実行",
+        "qps-ploc": "⟦Řůñ ŀőř⟧"
+      },
+      "ia_shell_work_cal_deadline": {
+        "en": "Deadline",
+        "ja": "締切",
+        "qps-ploc": "⟦Ḓėȧḓŀïñė ŀőř⟧"
+      },
+      "ia_shell_work_cal_action": {
+        "en": "Action",
+        "ja": "アクション",
+        "qps-ploc": "⟦Ȧƈŧïőñ ŀőř⟧"
+      },
+      "ia_shell_work_cal_degraded": {
+        "en": "Some entries (routine operations or meeting actions) could not be loaded.",
+        "ja": "一部の予定(定常業務または会議のアクション)を読み込めませんでした。",
+        "qps-ploc": "⟦Şőɱė ėñŧřïėş (řőůŧïñė őṗėřȧŧïőñş őř ɱėėŧïñɠ ȧƈŧïőñş) ƈőůŀḓ ñőŧ ƀė ŀőȧḓėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+      },
       "ia_shell_work_cal_day_label": {
         "en": "{date}: {count} items",
         "ja": "{date}：{count} 件",
@@ -21104,19 +21204,14 @@
         "qps-ploc": "⟦{count} ḓůė ẇïŧħïñ 2 ḓȧẏş ŀőřėɱ ïṗ⟧"
       },
       "ia_shell_work_cal_empty": {
-        "en": "No work item has a date yet. Set a due date on a card in the Work items tab.",
-        "ja": "期日のある作業はまだありません。「作業」タブのカードで期日を設定できます。",
-        "qps-ploc": "⟦Ñő ẇőřķ ïŧėɱ ħȧş ȧ ḓȧŧė ẏėŧ. Şėŧ ȧ ḓůė ḓȧŧė őñ ȧ ƈȧřḓ ïñ ŧħė Ẇőřķ ïŧėɱş ŧȧƀ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+        "en": "Nothing is scheduled in this period. Set a due date on a card in the Work items tab.",
+        "ja": "この期間に予定はありません。作業の期日は「作業」タブのカードで設定できます。",
+        "qps-ploc": "⟦Ñőŧħïñɠ ïş şƈħėḓůŀėḓ ïñ ŧħïş ṗėřïőḓ. Şėŧ ȧ ḓůė ḓȧŧė őñ ȧ ƈȧřḓ ïñ ŧħė Ẇőřķ ïŧėɱş ŧȧƀ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
       },
       "ia_shell_work_cal_undated_hint": {
         "en": "Work items without a date appear only on the Work items board.",
         "ja": "期日のない作業は「作業」タブのボードにだけ表示されます。",
         "qps-ploc": "⟦Ẇőřķ ïŧėɱş ẇïŧħőůŧ ȧ ḓȧŧė ȧṗṗėȧř őñŀẏ őñ ŧħė Ẇőřķ ïŧėɱş ƀőȧřḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
-      },
-      "ia_shell_work_cal_truncated": {
-        "en": "Showing the {count} most recently updated dated work items; narrow the scope to see the rest.",
-        "ja": "期日のある作業のうち、更新が新しい {count} 件を表示しています。残りは範囲を絞ると表示されます。",
-        "qps-ploc": "⟦Şħőẇïñɠ ŧħė {count} ɱőşŧ řėƈėñŧŀẏ ůṗḓȧŧėḓ ḓȧŧėḓ ẇőřķ ïŧėɱş; ñȧřřőẇ ŧħė şƈőṗė ŧő şėė ŧħė řėşŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşė⟧"
       },
       "ia_work_requests_list_label": {
         "en": "Your requests",
@@ -30808,6 +30903,66 @@
         "ja": "拡張機能",
         "qps-ploc": "⟦Ėẋŧėñşïőñş ŀőř⟧"
       },
+      "setup_inventory": {
+        "en": "Setup overview",
+        "ja": "初期設定の確認",
+        "qps-ploc": "⟦Şėŧůṗ őṽėřṽïėẇ ŀőřė⟧"
+      },
+      "setup_inventory_agent": {
+        "en": "Configured agent",
+        "ja": "設定済みエージェント",
+        "qps-ploc": "⟦Ƈőñƒïɠůřėḓ ȧɠėñŧ ŀőřėɱ⟧"
+      },
+      "setup_inventory_runtime": {
+        "en": "Agent CLI and model candidates",
+        "ja": "エージェント CLI とモデル候補",
+        "qps-ploc": "⟦Ȧɠėñŧ ƇĿÏ ȧñḓ ɱőḓėŀ ƈȧñḓïḓȧŧėş ŀőřėɱ ïṗşů⟧"
+      },
+      "setup_inventory_detected": {
+        "en": "CLI detected",
+        "ja": "CLI 検出済み",
+        "qps-ploc": "⟦ƇĿÏ ḓėŧėƈŧėḓ ŀőř⟧"
+      },
+      "setup_inventory_missing": {
+        "en": "CLI not detected",
+        "ja": "CLI 未検出",
+        "qps-ploc": "⟦ƇĿÏ ñőŧ ḓėŧėƈŧėḓ ŀőřėɱ⟧"
+      },
+      "setup_inventory_probe": {
+        "en": "Check CLI availability",
+        "ja": "CLI の検出状況を確認",
+        "qps-ploc": "⟦Ƈħėƈķ ƇĿÏ ȧṽȧïŀȧƀïŀïŧẏ ŀőřėɱ ï⟧"
+      },
+      "setup_inventory_unavailable": {
+        "en": "CLI information is unavailable for this session.",
+        "ja": "このセッションでは CLI 情報を取得できません。",
+        "qps-ploc": "⟦ƇĿÏ ïñƒőřɱȧŧïőñ ïş ůñȧṽȧïŀȧƀŀė ƒőř ŧħïş şėşşïőñ. ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "setup_inventory_auth": {
+        "en": "CLI detection does not verify sign-in.",
+        "ja": "CLI の検出状況とログイン状態は別です。",
+        "qps-ploc": "⟦ƇĿÏ ḓėŧėƈŧïőñ ḓőėş ñőŧ ṽėřïƒẏ şïɠñ-ïñ. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "setup_inventory_scope": {
+        "en": "Viewing tenant and role",
+        "ja": "閲覧中のテナントとロール",
+        "qps-ploc": "⟦Ṽïėẇïñɠ ŧėñȧñŧ ȧñḓ řőŀė ŀőřėɱ ï⟧"
+      },
+      "setup_inventory_connection": {
+        "en": "Connection registered",
+        "ja": "接続設定を登録済み",
+        "qps-ploc": "⟦Ƈőññėƈŧïőñ řėɠïşŧėřėḓ ŀőřėɱ ⟧"
+      },
+      "setup_inventory_unknown": {
+        "en": "Unconfirmed",
+        "ja": "未確認",
+        "qps-ploc": "⟦Ůñƈőñƒïřɱėḓ ŀőř⟧"
+      },
+      "setup_inventory_capabilities": {
+        "en": "Capabilities",
+        "ja": "利用できる機能",
+        "qps-ploc": "⟦Ƈȧṗȧƀïŀïŧïėş ŀőř⟧"
+      },
       "settings_nav_authority": {
         "en": "Authority and approvals",
         "ja": "権限と承認",
@@ -36424,6 +36579,106 @@
         "en": "Set KYBERION_OS_GUARDED_SURFACE_URL to link the decision surface.",
         "ja": "判断用の画面を開くには KYBERION_OS_GUARDED_SURFACE_URL を設定してください。",
         "qps-ploc": "⟦Şėŧ ĶẎɃĖŘÏŐÑ_ŐŞ_ƓŮȦŘḒĖḒ_ŞŮŘƑȦƇĖ_ŮŘĿ ŧő ŀïñķ ŧħė ḓėƈïşïőñ şůřƒȧƈė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "peer_tasks_title": {
+        "en": "Peer tasks",
+        "ja": "ピアタスク",
+        "qps-ploc": "⟦Ṗėėř ŧȧşķş ŀőř⟧"
+      },
+      "peer_tasks_subtitle": {
+        "en": "Track incoming requests, local work, and artifact references.",
+        "ja": "受信した依頼、ローカルの作業、成果物の参照を確認できます。",
+        "qps-ploc": "⟦Ŧřȧƈķ ïñƈőɱïñɠ řėɋůėşŧş, ŀőƈȧŀ ẇőřķ, ȧñḓ ȧřŧïƒȧƈŧ řėƒėřėñƈėş. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "peer_tasks_tenant": {
+        "en": "Tenant {tenant}",
+        "ja": "テナント {tenant}",
+        "qps-ploc": "⟦Ŧėñȧñŧ {tenant} ŀőřė⟧"
+      },
+      "peer_tasks_peer": {
+        "en": "Local peer ID",
+        "ja": "ローカルピア ID",
+        "qps-ploc": "⟦Ŀőƈȧŀ ṗėėř ÏḒ ŀőřė⟧"
+      },
+      "peer_tasks_show": {
+        "en": "Show tasks",
+        "ja": "タスクを表示",
+        "qps-ploc": "⟦Şħőẇ ŧȧşķş ŀőř⟧"
+      },
+      "peer_tasks_invalid_peer": {
+        "en": "Enter a valid local peer ID.",
+        "ja": "有効なローカルピア ID を入力してください。",
+        "qps-ploc": "⟦Ėñŧėř ȧ ṽȧŀïḓ ŀőƈȧŀ ṗėėř ÏḒ. ŀőřėɱ ïṗş⟧"
+      },
+      "peer_tasks_empty": {
+        "en": "No incoming tasks for this peer.",
+        "ja": "このピアへの依頼はありません。",
+        "qps-ploc": "⟦Ñő ïñƈőɱïñɠ ŧȧşķş ƒőř ŧħïş ṗėėř. ŀőřėɱ ïṗşů⟧"
+      },
+      "peer_tasks_unavailable": {
+        "en": "A configured tenant and tenant-wide confidential access are required.",
+        "ja": "テナントの設定と、そのテナント全体の機密データ閲覧権限が必要です。",
+        "qps-ploc": "⟦Ȧ ƈőñƒïɠůřėḓ ŧėñȧñŧ ȧñḓ ŧėñȧñŧ-ẇïḓė ƈőñƒïḓėñŧïȧŀ ȧƈƈėşş ȧřė řėɋůïřėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
+      },
+      "peer_tasks_state": {
+        "en": "State",
+        "ja": "状態",
+        "qps-ploc": "⟦Şŧȧŧė ŀőř⟧"
+      },
+      "peer_tasks_type": {
+        "en": "Task type",
+        "ja": "タスク種別",
+        "qps-ploc": "⟦Ŧȧşķ ŧẏṗė ŀőř⟧"
+      },
+      "peer_tasks_requester": {
+        "en": "Requesting peer",
+        "ja": "依頼元ピア",
+        "qps-ploc": "⟦Řėɋůėşŧïñɠ ṗėėř ŀőřė⟧"
+      },
+      "peer_tasks_requested": {
+        "en": "Requested at",
+        "ja": "依頼日時",
+        "qps-ploc": "⟦Řėɋůėşŧėḓ ȧŧ ŀőř⟧"
+      },
+      "peer_tasks_artifacts": {
+        "en": "Artifact references ({count})",
+        "ja": "成果物の参照（{count}件）",
+        "qps-ploc": "⟦Ȧřŧïƒȧƈŧ řėƒėřėñƈėş ({count}) ŀőřėɱ ïṗş⟧"
+      },
+      "peer_tasks_pending": {
+        "en": "Awaiting acceptance",
+        "ja": "受諾待ち",
+        "qps-ploc": "⟦Ȧẇȧïŧïñɠ ȧƈƈėṗŧȧñƈė ŀőřėɱ ⟧"
+      },
+      "peer_tasks_accepted": {
+        "en": "Accepted",
+        "ja": "受諾済み",
+        "qps-ploc": "⟦Ȧƈƈėṗŧėḓ ŀőř⟧"
+      },
+      "peer_tasks_running": {
+        "en": "Running",
+        "ja": "実行中",
+        "qps-ploc": "⟦Řůññïñɠ ŀőř⟧"
+      },
+      "peer_tasks_completed": {
+        "en": "Completed",
+        "ja": "完了",
+        "qps-ploc": "⟦Ƈőɱṗŀėŧėḓ ŀőř⟧"
+      },
+      "peer_tasks_failed": {
+        "en": "Failed",
+        "ja": "失敗",
+        "qps-ploc": "⟦Ƒȧïŀėḓ ŀőř⟧"
+      },
+      "peer_tasks_rejected": {
+        "en": "Rejected",
+        "ja": "拒否",
+        "qps-ploc": "⟦Řėĵėƈŧėḓ ŀőř⟧"
+      },
+      "peer_tasks_expired": {
+        "en": "Expired",
+        "ja": "期限切れ",
+        "qps-ploc": "⟦Ėẋṗïřėḓ ŀőř⟧"
       },
       "inbox_title": {
         "en": "Inbox",

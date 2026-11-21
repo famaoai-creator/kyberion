@@ -40,6 +40,12 @@ import {
 } from './needs-you.js';
 import { readNeedsYouSources } from './needs-you-sources.js';
 import {
+  buildWorkspaceCalendar,
+  defaultWorkspaceCalendarSources,
+  parseWorkspaceCalendarRange,
+  type WorkspaceCalendarSources,
+} from './workspace-calendar.js';
+import {
   buildSetupChecklist,
   collectSetupChecklistSignals,
   type SetupChecklistReaders,
@@ -57,6 +63,10 @@ export interface SurfaceOperationContext {
   needsYou?: () => NeedsYouSourceData;
   /** Test seam for `setup.checklist`; production reads the governed stores. */
   setupReaders?: SetupChecklistReaders;
+  /** Test seam for `workspace.calendar`; production reads the governed stores. */
+  calendarSources?: WorkspaceCalendarSources;
+  /** Test seam for `workspace.calendar`: the instant deadlines are judged at. */
+  calendarNow?: Date;
 }
 
 export interface SurfaceOperationDescriptor {
@@ -192,21 +202,72 @@ const operations = [
     description:
       'One entity with its lineage (tenant › organization › project › mission), contained entities grouped by kind, and the actors involved. Missions include their tasks and staffing.',
     policy: readPolicy('workspace.get'),
-    input: z.object({ kind: z.enum(GRAPH_ENTITY_KINDS), id: ID }).strict(),
+    // `tenant` picks which tenant's organization an id names (ids repeat across tenants);
+    // it only narrows within the viewer-filtered graph.
+    input: z.object({ kind: z.enum(GRAPH_ENTITY_KINDS), id: ID, tenant: ID.optional() }).strict(),
     run: (
       ctx: SurfaceOperationContext,
-      input: { kind: (typeof GRAPH_ENTITY_KINDS)[number]; id: string }
+      input: { kind: (typeof GRAPH_ENTITY_KINDS)[number]; id: string; tenant?: string }
     ) => {
       const view = getGraphEntity(
         viewerGraph(ctx),
         input.kind,
         input.id,
-        ctx.sources ?? defaultWorkspaceGraphSources()
+        ctx.sources ?? defaultWorkspaceGraphSources(),
+        { tenantSlug: input.tenant }
       );
       if (!view)
         throw new OperationNotFound(`${input.kind} ${input.id} is not visible in this scope.`);
       return view;
     },
+  },
+  {
+    id: 'workspace.calendar',
+    title: 'Work calendar',
+    description:
+      'Dated entries between `from` and `to` (YYYY-MM-DD, at most 92 days): work-item start/due days, the next scheduled run and monthly business-day deadline of each visible organization operation, and meeting action-item due days of each visible mission. Narrow with tenant, organization_id, project_id or mission_id.',
+    policy: readPolicy('workspace.calendar'),
+    input: z
+      .object({
+        from: z.string().trim(),
+        to: z.string().trim(),
+        ...scopeFilter,
+        mission_id: ID.optional(),
+      })
+      .strict()
+      .superRefine((value, issue) => {
+        try {
+          parseWorkspaceCalendarRange(value.from, value.to);
+        } catch (error) {
+          issue.addIssue({ code: 'custom', message: (error as Error).message, path: ['from'] });
+        }
+      }),
+    run: (
+      ctx: SurfaceOperationContext,
+      input: {
+        from: string;
+        to: string;
+        tenant?: string;
+        organization_id?: string;
+        project_id?: string;
+        mission_id?: string;
+      }
+    ) =>
+      buildWorkspaceCalendar(
+        viewerGraph(ctx),
+        ctx.calendarSources ?? defaultWorkspaceCalendarSources(),
+        {
+          range: parseWorkspaceCalendarRange(input.from, input.to),
+          ...(ctx.calendarNow ? { now: ctx.calendarNow } : {}),
+          viewerProjectIds: ctx.viewer.projectIds,
+          filter: {
+            tenantSlug: input.tenant,
+            organizationId: input.organization_id,
+            projectId: input.project_id,
+            missionId: input.mission_id,
+          },
+        }
+      ),
   },
   {
     id: 'workspace.search',

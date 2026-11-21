@@ -1,7 +1,8 @@
 /**
- * Pure model of the `/work?tab=calendar` work calendar (MSN-WORK-CALENDAR-20261121):
- * month / week grids of calendar days and the dated work items that fall on
- * them. Dates are `YYYY-MM-DD` calendar days (WorkItem `start_date` /
+ * Pure model of the `/work?tab=calendar` work calendar (MSN-WORK-CALENDAR-20261121,
+ * MSN-CALENDAR-SOURCES-20261121): month / week grids of calendar days and the
+ * dated entries that fall on them — work items, organization operation runs
+ * and deadlines, and meeting action items (`workspace.calendar`). Dates are `YYYY-MM-DD` calendar days (WorkItem `start_date` /
  * `due_date`), so every computation runs on UTC day numbers — no timezone can
  * move an item to a neighbouring day. "Today" is the viewer's local day.
  *
@@ -11,6 +12,73 @@ import { dueState, type DueState } from '../work-board/work-item-board';
 
 export type CalendarView = 'month' | 'week';
 
+export type CalendarSource =
+  | 'work_item'
+  | 'operation_run'
+  | 'operation_deadline'
+  | 'action_item'
+  /** An event in the installation owner's own (Google / Microsoft 365) calendar. */
+  | 'external_event';
+
+/** Toggle groups: an operation's runs and deadlines show or hide together. */
+export type CalendarSourceGroup = 'work_item' | 'operation' | 'action_item' | 'external';
+
+export const CALENDAR_SOURCE_GROUPS: readonly CalendarSourceGroup[] = [
+  'work_item',
+  'operation',
+  'action_item',
+  'external',
+];
+
+export function sourceGroup(source: CalendarSource | undefined): CalendarSourceGroup {
+  return source === 'operation_run' || source === 'operation_deadline'
+    ? 'operation'
+    : source === 'action_item'
+      ? 'action_item'
+      : source === 'external_event'
+        ? 'external'
+        : 'work_item';
+}
+
+/** An appointment, not a task: it is never due, overdue or counted in the summary. */
+export function isAppointment(item: Pick<CalendarItem, 'source'>): boolean {
+  return item.source === 'external_event';
+}
+
+/** One event from `/api/calendar/external`. */
+export interface ExternalCalendarEvent {
+  id: string;
+  title: string;
+  /** ISO instant, or `YYYY-MM-DD` for an all-day event. */
+  start: string;
+  end?: string;
+  allDay: boolean;
+  link?: string;
+}
+
+/** External events as calendar items, on the viewer's local start day. */
+export function fromExternalEvents(events: readonly ExternalCalendarEvent[]): CalendarItem[] {
+  return events.flatMap((event) => {
+    const day = event.allDay ? event.start.slice(0, 10) : localDayOfInstant(event.start);
+    if (!day) return [];
+    return [
+      {
+        id: `external_event:${event.id}`,
+        title: event.title,
+        status: 'open',
+        dueDate: day,
+        ...(event.link ? { href: event.link } : {}),
+        source: 'external_event' as const,
+      },
+    ];
+  });
+}
+
+function localDayOfInstant(instant: string): string | undefined {
+  const date = new Date(instant);
+  return Number.isNaN(date.getTime()) ? undefined : localCalendarDate(date);
+}
+
 export interface CalendarItem {
   id: string;
   title: string;
@@ -18,6 +86,63 @@ export interface CalendarItem {
   startDate?: string;
   dueDate?: string;
   href?: string;
+  /** Where the entry comes from (absent: a work item). */
+  source?: CalendarSource;
+  /** A deadline that was missed. */
+  missed?: boolean;
+}
+
+/** One `workspace.calendar` entry, as the API returns it. */
+export interface CalendarApiEntry {
+  source: CalendarSource;
+  id: string;
+  title: string;
+  date: string;
+  startDate?: string;
+  /** Work items: the due day (a start-only item has none). */
+  dueDate?: string;
+  /** Timed action items: the instant; its local day is the viewer's own. */
+  dueAt?: string;
+  done: boolean;
+  missed?: boolean;
+  link: { kind: 'work_item' | 'organization' | 'mission'; id: string };
+  tenantSlug?: string;
+}
+
+/** The viewer's local day of an instant, or undefined for an invalid one. */
+function localDayOf(instant: string): string | undefined {
+  const date = new Date(instant);
+  return Number.isNaN(date.getTime()) ? undefined : localCalendarDate(date);
+}
+
+/**
+ * API entries as calendar items. A work item keeps its own start / due days (a
+ * start-only item is never due); a timed action item falls on the viewer's
+ * local day; everything else is due on its day. Done entries read as finished.
+ */
+export function fromCalendarEntries(
+  entries: readonly CalendarApiEntry[],
+  hrefFor: (link: CalendarApiEntry['link'], tenantSlug?: string) => string | undefined
+): CalendarItem[] {
+  return entries.map((entry) => {
+    const href = hrefFor(entry.link, entry.tenantSlug);
+    const dueDate =
+      entry.source === 'work_item'
+        ? entry.dueDate
+        : entry.dueAt
+          ? (localDayOf(entry.dueAt) ?? entry.date)
+          : entry.date;
+    return {
+      id: entry.id,
+      title: entry.title,
+      status: entry.done ? 'done' : 'open',
+      ...(dueDate ? { dueDate } : {}),
+      ...(entry.startDate ? { startDate: entry.startDate } : {}),
+      ...(href ? { href } : {}),
+      source: entry.source,
+      ...(entry.missed ? { missed: true } : {}),
+    };
+  });
 }
 
 export interface CalendarEntry<T extends CalendarItem = CalendarItem> {
@@ -101,7 +226,9 @@ function entriesFor<T extends CalendarItem>(
 ): CalendarEntry<T>[] {
   const entries: CalendarEntry<T>[] = [];
   for (const item of items) {
-    const due = dueState(item.dueDate, item.status, today);
+    const due: DueState = isAppointment(item)
+      ? { state: 'none' }
+      : dueState(item.dueDate, item.status, today);
     if (item.dueDate === date) {
       entries.push({ item, role: 'due', due });
     } else if (item.startDate === date) {
@@ -138,17 +265,27 @@ function entriesFor<T extends CalendarItem>(
  * single week, with each day's entries. Month cells list due and start days;
  * the week view also marks the days an item is underway.
  */
+/** First and last day a grid shows: whole Monday-first weeks of the month, or one week. */
+export function calendarGridRange(
+  view: CalendarView,
+  anchor: string
+): { from: string; to: string } {
+  const monthPrefix = anchor.slice(0, 7);
+  const from = view === 'month' ? startOfWeek(`${monthPrefix}-01`) : startOfWeek(anchor);
+  const to =
+    view === 'month'
+      ? addDays(startOfWeek(addDays(addMonths(`${monthPrefix}-01`, 1), -1)), 6)
+      : addDays(from, 6);
+  return { from, to };
+}
+
 export function buildCalendarGrid<T extends CalendarItem>(
   items: readonly T[],
   options: { view: CalendarView; anchor: string; today: string }
 ): CalendarGrid<T> {
   const { view, anchor, today } = options;
   const monthPrefix = anchor.slice(0, 7);
-  const first = view === 'month' ? startOfWeek(`${monthPrefix}-01`) : startOfWeek(anchor);
-  const last =
-    view === 'month'
-      ? addDays(startOfWeek(addDays(addMonths(`${monthPrefix}-01`, 1), -1)), 6)
-      : addDays(first, 6);
+  const { from: first, to: last } = calendarGridRange(view, anchor);
   const dated = items.filter((item) => item.dueDate || item.startDate);
   const weeks: CalendarDay<T>[][] = [];
   for (let cursor = first; cursor <= last; cursor = addDays(cursor, 1)) {
@@ -180,6 +317,7 @@ export function summarizeCalendar<T extends CalendarItem>(
   const overdue: T[] = [];
   const dueSoon: T[] = [];
   for (const item of items) {
+    if (isAppointment(item)) continue;
     const state = dueState(item.dueDate, item.status, today).state;
     if (state === 'overdue') overdue.push(item);
     else if (state === 'due_today' || state === 'due_soon') dueSoon.push(item);

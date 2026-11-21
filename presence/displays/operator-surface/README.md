@@ -5,6 +5,15 @@ knowledge, inbox entries, and reasoning settings. CLI remains available for broa
 mission operations. This app now has narrowly scoped, governed selection mutations;
 it is no longer an entirely read-only application.
 
+## Incoming peer tasks
+
+Open `/peer-tasks` and enter the recipient runtime's local peer ID to see its 100 most
+recent incoming requests, their acceptance and execution state, the associated WorkItem
+status, and artifact references with checksums. The view uses the configured
+`KYBERION_TENANT` and requires tenant-wide confidential read access.
+Use the recipient runtime's `pnpm kyberion peer task` commands for decisions and result
+delivery. Artifact references identify files on the recipient runtime.
+
 ## Selection pages and exact write boundary
 
 - /missions/:id: inspect each team role's requested and effective agent identity,

@@ -63,6 +63,10 @@ tags: [coordination, kanban, work-item, github, jira, peer, todo]
 - CLI: `pnpm work create-item --due-date 2026-11-30 [--start-date …]`、`pnpm work update-status --item-id <id> --due-date <day|none>`(`none` で消す)。
 - UI: workspace graph の `facts.start_date` / `facts.due_date` として各面に出る。concierge の作業カードに期日チップ(期限超過・今日・2 日以内)、`/work?tab=calendar` に月 / 週のカレンダー。日付の変更は governed `POST /api/ops/workitems {itemId, dueDate}`(localadmin、閲覧範囲を再確認)。
 - 日付は表示・計画用のメタデータで実行効果を持たないため、claim 中や効果保持中の項目でも変更できる（実行スコープ `context` の不変条件とは別扱い）。年は 1970〜2999 に限る（入力途中の年の誤保存を防ぐ）。
+- カレンダーの読み出しは surface 操作 `workspace.calendar`(`/api/v1/workspace/calendar?from=&to=`、MCP `kyberion.workspace.calendar`、最大 92 日)。作業の日付に加え、閲覧者の graph に見えている組織の定常業務(次回実行日 = cron、月次締切 = 営業日、met/missed 判定)と、見えているミッションの会議アクションアイテム `due_at` を返す。見えない組織・ミッションのストアは開かない(`libs/core/surface/workspace-calendar.ts`)。
+- 組織 ID はテナント内でのみ一意。ワークスペースグラフは組織ノードを tenant + id で保持し、`workspace.get` の `tenant`・リンクの `?tenant=` でどのテナントの組織かを指定する(閲覧者の graph 内で絞るだけ)。
+- アクションアイテムの一覧はストアの変更シグネチャ(mtime + size)が同じ間だけ再利用し、定常業務は毎回読む。CLI など別プロセスからの書き込みも次の読み出しで反映される。
+- 外部カレンダー: `GET /api/calendar/external?from=&to=`(concierge)。マシンのプロバイダ・ログイン(Google Workspace / Microsoft 365)はインストール所有者本人のものなので、本人だけに予定を返す(他の閲覧者には接続の有無も見せない)。未ログインならプロバイダを呼ばず `connected: false`、失敗は固定文言の `degraded`。予定は締切ではない(期限超過・サマリーに数えない)。
 
 ### Board
 

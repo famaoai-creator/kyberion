@@ -62,6 +62,8 @@ export interface GraphRef {
   kind: GraphEntityKind;
   id: string;
   label: string;
+  /** Organizations: the tenant, since an organization id is unique only within its tenant. */
+  tenantSlug?: string;
 }
 
 export interface GraphActorLink {
@@ -411,11 +413,14 @@ export function collectWorkspaceGraph(
     }
   };
   const nodes = new Map<string, GraphNode>();
-  const key = (kind: GraphEntityKind, id: string) => `${kind}:${id}`;
+  // An organization id is unique only within its tenant: two tenants may both
+  // have `hq`, and each must keep its own node (and its own viewers).
+  const key = (kind: GraphEntityKind, id: string, tenantSlug?: string) =>
+    kind === 'organization' ? `${kind}:${tenantSlug ?? ''}:${id}` : `${kind}:${id}`;
   const put = (node: GraphNode) => {
-    const existing = nodes.get(key(node.kind, node.id));
+    const existing = nodes.get(key(node.kind, node.id, node.tenantSlug));
     nodes.set(
-      key(node.kind, node.id),
+      key(node.kind, node.id, node.tenantSlug),
       existing ? { ...node, ...compact(existing) } : compact(node)
     );
   };
@@ -823,18 +828,36 @@ export interface GraphEntityView {
 }
 
 function ref(node: GraphNode): GraphRef {
-  return { kind: node.kind, id: node.id, label: node.label };
+  return {
+    kind: node.kind,
+    id: node.id,
+    label: node.label,
+    ...(node.kind === 'organization' && node.tenantSlug ? { tenantSlug: node.tenantSlug } : {}),
+  };
 }
 
 export function getGraphEntity(
   graph: WorkspaceGraph,
   kind: GraphEntityKind,
   id: string,
-  sources?: Pick<WorkspaceGraphSources, 'missionDetail'>
+  sources?: Pick<WorkspaceGraphSources, 'missionDetail'>,
+  /** Which tenant's organization `id` names, when several tenants share the id. */
+  options: { tenantSlug?: string } = {}
 ): GraphEntityView | null {
-  const find = (k: GraphEntityKind, i: string | undefined) =>
-    i ? graph.nodes.find((n) => n.kind === k && n.id === i) : undefined;
-  const node = find(kind, id);
+  // Organizations are matched within a tenant when one is known (ids repeat across tenants).
+  // Without a tenant, an organization id that several tenants share is ambiguous:
+  // resolve it to nothing rather than to whichever tenant comes first.
+  const find = (k: GraphEntityKind, i: string | undefined, tenantSlug?: string) => {
+    if (!i) return undefined;
+    const matches = graph.nodes.filter(
+      (n) =>
+        n.kind === k &&
+        n.id === i &&
+        (k !== 'organization' || !tenantSlug || n.tenantSlug === tenantSlug)
+    );
+    return matches.length === 1 || k !== 'organization' ? matches[0] : undefined;
+  };
+  const node = find(kind, id, options.tenantSlug);
   if (!node) return null;
 
   const lineage: GraphRef[] = [];
@@ -846,7 +869,7 @@ export function getGraphEntity(
   ];
   for (const [k, i] of chain) {
     if (!i || (k === node.kind && i === node.id)) continue;
-    const parent = find(k, i);
+    const parent = find(k, i, node.tenantSlug);
     // An unknown parent is still shown (as its id) so the chain never breaks.
     lineage.push(parent ? ref(parent) : { kind: k, id: i, label: i });
   }

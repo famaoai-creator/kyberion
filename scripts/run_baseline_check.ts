@@ -752,6 +752,24 @@ export function maybeSubmitJanitorMaintenanceJob(): {
   };
 }
 
+export function baselineNextAction(
+  status: ReturnType<typeof deriveBaselineStatus> | 'fatal_error',
+  result: { deferred?: boolean; circuitBroken?: boolean }
+) {
+  if (status === 'fatal_error') return 'request_operator';
+  if (result.deferred) return 'wait';
+  switch (status) {
+    case 'all_clear':
+      return 'proceed';
+    case 'needs_recovery':
+      return result.circuitBroken ? 'request_operator' : 'recover';
+    case 'needs_onboarding':
+      return 'onboard';
+    case 'needs_attention':
+      return 'inspect_attention';
+  }
+}
+
 export function deriveBaselineStatus(
   result: { success: boolean; failedLayer?: string | null; deferred?: boolean },
   janitorMaintenance: BaselineMaintenanceState,
@@ -1338,6 +1356,7 @@ export async function runBaselineCheck() {
   // Format Output
   const report = {
     status,
+    next_action: baselineNextAction(status, result),
     circuit_broken: result.circuitBroken,
     failed_layer: result.failedLayer || null,
     details: state.layers,
@@ -1466,6 +1485,7 @@ export const runBaselineCheckCli = defineScript({
       if (error instanceof ScriptExitError) throw error;
       const fatalReport = {
         status: 'fatal_error' as const,
+        next_action: baselineNextAction('fatal_error', {}),
         circuit_broken: true,
         failed_layer: null,
         details: {},

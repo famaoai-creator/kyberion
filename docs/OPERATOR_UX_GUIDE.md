@@ -890,3 +890,15 @@ node dist/libs/actuators/build-actuator/src/index.js --input /tmp/build-input.js
 ```
 
 補足: iOS は `ios_generate_project`(xcodegen)→ `ios_build`。実機/シミュレータ検証は `KYBERION_MOBILE_TOOLCHAIN=1 pnpm vitest run tests/app-lifecycle-e2e.test.ts`。
+
+## CLI session handoff
+
+Before ending a tenant-bound session, run `pnpm work session-summary --item-id <id> --json`.
+The next session can run the returned argument vector to read current work, attempt and effect
+state. A held effect requires reconciliation before retry. The summary lists durable current
+artifact registrations for the item's mission in its tenant and project. Mission artifacts can
+belong to sibling tasks. Ending the session only requires retaining the item ID.
+
+To retire a project or tenant, run `pnpm kyberion offboard <project|tenant> <id> --json`.
+Review the target set. Use the returned `preview_id` with `--preview-id` alongside the existing
+approval arguments when executing. Changed target sets require another preview and review.

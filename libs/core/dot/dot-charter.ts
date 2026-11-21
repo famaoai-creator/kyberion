@@ -94,6 +94,14 @@ export type DotTrigger =
        * critical alerts and leave warnings to its next cron wake.
        */
       min_severity?: DotWatchSeverity;
+      /**
+       * Minimum seconds between watch wakes for this trigger's paths. Appends
+       * landing inside the window do not wake the dot; the snapshot stays put
+       * so the next wake sees the whole accumulated range — bursts coalesce
+       * into one wake carrying every appended record, and distinct events are
+       * never dropped.
+       */
+      min_interval_seconds?: number;
     }
   | { kind: 'wake'; channels: string[] }
   | {

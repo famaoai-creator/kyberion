@@ -1,0 +1,26 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/chronos-sovereign-schedules.schema.json",
+  "title": "Chronos sovereign schedule ids",
+  "description": "Allowlist of repository-lane schedule ids that run under the sovereign persona (cross-tenant aggregation, sovereign-only reads). Adding an id is a privilege decision gated by the daemon's KYBERION_BASE_ROLE — a non-sovereign daemon ignores entries entirely.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "schedule_ids"],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "version": {
+      "const": "1.0"
+    },
+    "schedule_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "minItems": 0,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9][a-z0-9._-]*$"
+      }
+    }
+  }
+}

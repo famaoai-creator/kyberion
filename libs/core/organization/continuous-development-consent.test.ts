@@ -107,4 +107,29 @@ describe('visible continuous development consent', () => {
       })
     ).toThrow('presentation changed');
   });
+  it('renders custom factory branches in consent summaries while preserving default branch compatibility', async () => {
+    const { continuousDevelopmentConsentSummary } =
+      await import('./continuous-development-consent.js');
+    const baseSpec = {
+      cwd: '.',
+      repository_url: 'https://github.com/owner/repo',
+      source_edit_paths: ['libs/core/example.ts'],
+      implementation_task_id: 'impl',
+      review_task_id: 'rev',
+      title: 'Factory change',
+      body_file: 'evidence/pr.md',
+    };
+    expect(continuousDevelopmentConsentSummary(baseSpec, { tier: 'public' })).toContain(
+      'Branches: agent/kyberion-development → main.'
+    );
+    expect(
+      continuousDevelopmentConsentSummary(
+        { ...baseSpec, branch: 'agent/factory-docs-01' },
+        { tier: 'public' }
+      )
+    ).toContain('Branches: agent/factory-docs-01 → main.');
+    expect(() =>
+      continuousDevelopmentConsentSummary({ ...baseSpec, branch: 'main' }, { tier: 'public' })
+    ).toThrow('Invalid development branch');
+  });
 });

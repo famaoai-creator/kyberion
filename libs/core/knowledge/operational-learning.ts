@@ -54,6 +54,8 @@ interface LearningScope {
   tier: OrganizationTier;
   tenantSlug?: string;
   organizationId: string;
+  /** The producer's resolved NHI — the owner for personal-tier candidates. */
+  ownerNhi?: string;
 }
 
 /**
@@ -105,7 +107,15 @@ function resolveLearningScope(
     );
     return null;
   }
-  return { tier, ...(tenantSlug ? { tenantSlug } : {}), organizationId: activeOrganizationId };
+  // Personal-tier candidates are partitioned by owner_nhi; the producer's
+  // resolved nhi_id is the only honest owner — never invent or default one.
+  const ownerNhi = tier === 'personal' ? resolvedScope.nhi_id?.trim() || undefined : undefined;
+  return {
+    tier,
+    ...(tenantSlug ? { tenantSlug } : {}),
+    ...(ownerNhi ? { ownerNhi } : {}),
+    organizationId: activeOrganizationId,
+  };
 }
 
 function candidateInput(
@@ -124,6 +134,7 @@ function candidateInput(
     targetKind: signal.targetKind || 'sop_candidate',
     tier: scope.tier,
     ...(scope.tenantSlug ? { tenantSlug: scope.tenantSlug } : {}),
+    ...(scope.ownerNhi ? { ownerNhi: scope.ownerNhi } : {}),
     ...(signal.metadata ? { metadata: signal.metadata } : {}),
   };
 }

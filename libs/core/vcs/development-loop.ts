@@ -27,6 +27,7 @@ import {
 import type { VcsCommandRunner, VcsCommandResult } from './git.js';
 import type { VcsHostMutation } from './publication-host.js';
 import { developmentReviewDiff } from './development-review-content.js';
+import { resolveMissionDevelopmentBranch } from './development-branch.js';
 import { runHardenedGitProbe } from '../shell/git-probe-hardening.js';
 
 export interface PreparedDevelopmentInput {
@@ -34,6 +35,7 @@ export interface PreparedDevelopmentInput {
   ref: string;
   workItemId: string;
   reviewTaskId: string;
+  branch?: string;
   dryRun?: boolean;
   /** Continuous development requires actual hash-bound source bytes; legacy manual preparation remains compatible. */
   requireSourceDiff?: boolean;
@@ -78,8 +80,10 @@ const same = (a: VcsDevelopmentPr, b: VcsDevelopmentPr) =>
  * Re-entry rereads remote and receipt facts rather than reusing prior success. */
 export async function reconcileVcsDevelopment(
   ports: DevelopmentLoopPorts,
-  dryRun = true
+  dryRun = true,
+  options: { expectedHeadBranch?: string } = {}
 ): Promise<DevelopmentLoopResult> {
+  const expectedBranch = resolveMissionDevelopmentBranch(options.expectedHeadBranch);
   const pr = await ports.snapshot();
   const result = (
     status: DevelopmentLoopResult['status'],
@@ -91,7 +95,7 @@ export async function reconcileVcsDevelopment(
     revision: pr,
     ...(policyDigest ? { policyDigest } : {}),
   });
-  if (pr.headBranch !== 'agent/kyberion-development' || pr.baseBranch !== 'main')
+  if (pr.headBranch !== expectedBranch || pr.baseBranch !== 'main')
     return {
       ...result('blocked', 'Unexpected development branch lineage'),
       ...(pr.mergeCommitSha ? { knownMergeCommitSha: pr.mergeCommitSha } : {}),
@@ -117,13 +121,10 @@ export async function reconcileVcsDevelopment(
   if (
     pr.state !== 'open' ||
     pr.draft ||
-    pr.headBranch !== 'agent/kyberion-development' ||
+    pr.headBranch !== expectedBranch ||
     pr.baseBranch !== 'main'
   )
-    return result(
-      'blocked',
-      'Prepare an open non-draft PR from agent/kyberion-development to main'
-    );
+    return result('blocked', `Prepare an open non-draft PR from ${expectedBranch} to main`);
   const ci = await ports.ci(pr);
   if (ci.state === 'pending')
     return result('waiting', 'Reconcile after required CI finishes', ci.policyDigest);
@@ -207,7 +208,8 @@ export function runPreparedVcsDevelopment(
           },
         }),
     },
-    input.dryRun !== false
+    input.dryRun !== false,
+    { ...(input.branch ? { expectedHeadBranch: input.branch } : {}) }
   );
 }
 

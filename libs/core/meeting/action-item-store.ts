@@ -161,6 +161,18 @@ function ensureRegularActionItemFile(filePath: string): void {
   }
 }
 
+/**
+ * The store's change signature (inode, mtime, ctime, size), `missing` when it does not exist.
+ * Readers that cache an item list compare it before reusing the list, so a
+ * write from any process shows on the next read.
+ */
+export function actionItemStoreSignature(missionId: string): string {
+  const filePath = storePathFor(missionId);
+  if (!safeExistsSync(filePath)) return 'missing';
+  const stat = safeLstat(filePath);
+  return `${stat.ino}:${stat.mtimeMs}:${stat.ctimeMs}:${stat.size}`;
+}
+
 function storePathFor(missionId: string): string {
   const evidenceDir = pathResolver.missionEvidenceDir(missionId);
   const candidate = evidenceDir

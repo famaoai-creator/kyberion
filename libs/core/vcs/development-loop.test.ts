@@ -252,4 +252,16 @@ describe('post-merge reviewed CI policy continuity', () => {
     p.verifyMerged = p.ci;
     expect((await reconcileVcsDevelopment(p, false)).status).toBe('post_merge_unverified');
   });
+  it('accepts mission-scoped factory branches when expectedHeadBranch matches and blocks mismatches', async () => {
+    const p = fixture();
+    p.snapshot = () => ({ ...pr, headBranch: 'agent/factory-docs-01' });
+    const matched = await reconcileVcsDevelopment(p, false, {
+      expectedHeadBranch: 'agent/factory-docs-01',
+    });
+    expect(matched.status).not.toBe('blocked');
+    const mismatched = await reconcileVcsDevelopment(p, false, {
+      expectedHeadBranch: 'agent/factory-docs-02',
+    });
+    expect(mismatched.status).toBe('blocked');
+  });
 });
