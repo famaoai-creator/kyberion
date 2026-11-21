@@ -227,6 +227,8 @@ export function committableDueDate(draft: string, current: string | undefined): 
  * The card's due-date field. Typing only changes a local draft; the date is
  * sent once, on blur or Enter, so typing a year segment never saves the
  * half-typed values a date field reports per keystroke. Escape restores it.
+ * A value already sent is not sent again (Enter, then blur), and a refused
+ * value goes back to the saved one so a later blur does not resend it.
  */
 function DueDateInput({
   label,
@@ -241,12 +243,22 @@ function DueDateInput({
   value: string | undefined;
   min: string | undefined;
   saving: boolean;
-  onCommit: (value: string) => void;
+  onCommit: (value: string) => Promise<boolean>;
 }) {
   const [draft, setDraft] = React.useState(value ?? '');
+  const sent = React.useRef<string | null>(null);
   const commit = () => {
-    if (committableDueDate(draft, value)) onCommit(draft);
-    else setDraft(value ?? '');
+    if (saving || draft === sent.current) return;
+    if (!committableDueDate(draft, value)) {
+      setDraft(value ?? '');
+      return;
+    }
+    sent.current = draft;
+    void onCommit(draft).then((saved) => {
+      if (saved) return;
+      sent.current = null;
+      setDraft(value ?? '');
+    });
   };
   return (
     <label>
@@ -395,14 +407,17 @@ export function WorkItemBoard<T extends BoardCard>({
     }
   };
 
-  const schedule = async (card: T, dueDate: string | null) => {
-    if (!onSchedule) return;
+  /** True when the server saved the date; a refusal shows the failure callout. */
+  const schedule = async (card: T, dueDate: string | null): Promise<boolean> => {
+    if (!onSchedule) return false;
     setFailure(null);
     setScheduleSaving(card.id);
     try {
       await onSchedule(card, dueDate);
+      return true;
     } catch {
       setFailure(t('ux_b_card_due_failed', { title: cardTitle(card.title, card.mission?.id) }));
+      return false;
     } finally {
       setScheduleSaving(null);
     }
@@ -496,13 +511,16 @@ export function WorkItemBoard<T extends BoardCard>({
               value={card.dueDate}
               min={card.startDate}
               saving={scheduleSaving === card.id}
-              onCommit={(value) => void schedule(card, value)}
+              onCommit={(value) => schedule(card, value)}
             />
             {card.dueDate ? (
               <button
                 type="button"
                 className="wb-card__due-clear"
                 disabled={scheduleSaving === card.id}
+                // Keep focus in the date field: its blur would save a pending draft
+                // and disable this button before the click lands.
+                onMouseDown={(event) => event.preventDefault()}
                 onClick={() => void schedule(card, null)}
               >
                 {t('ux_b_card_due_clear')}
