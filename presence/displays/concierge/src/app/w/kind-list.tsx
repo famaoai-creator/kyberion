@@ -334,6 +334,8 @@ function WorkItemGraphBoard({
       items.map((node) => {
         const assignee = node.actors?.find((actor) => actor.role === 'assignee');
         const priority = node.facts?.priority;
+        const startDate = node.facts?.start_date;
+        const dueDate = node.facts?.due_date;
         return {
           id: node.id,
           title: node.label,
@@ -359,6 +361,8 @@ function WorkItemGraphBoard({
               }
             : {}),
           updatedAt: node.updatedAt,
+          ...(typeof startDate === 'string' ? { startDate } : {}),
+          ...(typeof dueDate === 'string' ? { dueDate } : {}),
           description: node.summary,
           href: entityHref('work_item', node.id),
           ...(node.steps ? { steps: node.steps } : {}),
@@ -401,9 +405,24 @@ function WorkItemGraphBoard({
     [onMoved]
   );
 
+  const schedule = React.useCallback(
+    async (card: GraphCard, dueDate: string | null) => {
+      const response = await fetch(opsApiPath('/workitems'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ itemId: card.id, dueDate }),
+      });
+      const payload = (await response.json().catch(() => null)) as { ok?: unknown } | null;
+      if (!response.ok || payload?.ok !== true) throw new Error('work item schedule refused');
+      onMoved();
+    },
+    [onMoved]
+  );
+
   return (
     <WorkItemBoard
       cards={cards}
+      onSchedule={schedule}
       t={boardT}
       statusLabel={statusName}
       locale={localeToBcp47(uiLocale)}

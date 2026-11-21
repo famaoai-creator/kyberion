@@ -284,6 +284,49 @@ a.wb-card__title:hover {
   padding-bottom: var(--kb-ui-space-1);
 }
 
+.wb-card__due {
+  margin: 0;
+  display: flex;
+}
+
+.wb-card__due-edit {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--kb-ui-space-1) var(--kb-ui-space-2);
+  font-size: var(--kb-ui-font-size-xs);
+  color: var(--kb-ui-text-muted);
+}
+
+.wb-card__due-edit label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kb-ui-space-1);
+}
+
+.wb-card__due-edit .kb-input {
+  width: auto;
+  min-height: 0;
+  font-size: var(--kb-ui-font-size-xs);
+  padding-top: var(--kb-ui-space-1);
+  padding-bottom: var(--kb-ui-space-1);
+}
+
+.wb-card__due-clear {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--kb-ui-text-muted);
+  font-size: var(--kb-ui-font-size-xs);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.wb-card__due-clear:focus-visible {
+  outline: 2px solid var(--kb-ui-focus-ring);
+  outline-offset: 2px;
+}
+
 .wb-collapsed {
   padding: var(--kb-ui-space-2) var(--kb-ui-space-3);
   border: 1px dashed var(--kb-ui-border);
@@ -317,6 +360,7 @@ a.wb-card__title:hover {
     overflow: visible;
   }
   .wb-card__move,
+  .wb-card__due-edit,
   .wb-toggle {
     display: none;
   }

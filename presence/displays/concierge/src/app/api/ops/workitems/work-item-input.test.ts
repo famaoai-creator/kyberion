@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { parseWorkItemStatusInput } from './work-item-input';
+import {
+  parseWorkItemActionInput,
+  parseWorkItemScheduleInput,
+  parseWorkItemStatusInput,
+} from './work-item-input';
 
 describe('parseWorkItemStatusInput', () => {
   it('normalizes a strict status update body', () => {
@@ -26,5 +30,40 @@ describe('parseWorkItemStatusInput', () => {
       parseWorkItemStatusInput({ itemId: `work-${'x'.repeat(252)}`, status: 'done' })
     ).toThrow();
     expect(() => parseWorkItemStatusInput({ itemId: 'work-item-1', status: ['done'] })).toThrow();
+  });
+});
+
+describe('parseWorkItemScheduleInput', () => {
+  it('sets, clears and keeps dates', () => {
+    expect(parseWorkItemScheduleInput({ itemId: 'w-1', dueDate: '2026-11-30' })).toEqual({
+      itemId: 'w-1',
+      dueDate: '2026-11-30',
+    });
+    expect(parseWorkItemScheduleInput({ itemId: 'w-1', startDate: null, dueDate: null })).toEqual({
+      itemId: 'w-1',
+      startDate: null,
+      dueDate: null,
+    });
+  });
+
+  it.each([
+    ['no date', { itemId: 'w-1' }],
+    ['timestamp', { itemId: 'w-1', dueDate: '2026-11-30T09:00:00Z' }],
+    ['non-string date', { itemId: 'w-1', dueDate: 20261130 }],
+    ['status mixed in', { itemId: 'w-1', dueDate: '2026-11-30', status: 'done' }],
+    ['client scope', { itemId: 'w-1', dueDate: '2026-11-30', tenant: 'acme' }],
+  ])('rejects %s', (_label, value) => {
+    expect(() => parseWorkItemScheduleInput(value)).toThrow();
+  });
+
+  it('is chosen by the action parser only when a date field is present', () => {
+    expect(parseWorkItemActionInput({ itemId: 'w-1', dueDate: '2026-11-30' })).toEqual({
+      itemId: 'w-1',
+      dueDate: '2026-11-30',
+    });
+    expect(parseWorkItemActionInput({ itemId: 'w-1', status: 'done' })).toEqual({
+      itemId: 'w-1',
+      status: 'done',
+    });
   });
 });

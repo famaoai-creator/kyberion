@@ -7,6 +7,7 @@ import {
   ageInDays,
   boardMoveTargets,
   cardTitle,
+  dueState,
   groupBoardColumns,
   orderBoardSteps,
   resolveBoardDrop,
@@ -74,6 +75,54 @@ export interface WorkItemBoardProps<T extends BoardCard> {
   layout?: BoardViewMode;
   /** An Issue's steps, read when its card is expanded (cards are Issues; D1). */
   loadSteps?: (card: T) => Promise<readonly BoardStep[]>;
+  /** Sends the governed due-date change (`null` clears); must throw when refused. */
+  onSchedule?: (card: T, dueDate: string | null) => Promise<void>;
+  /** The viewer's local day (`YYYY-MM-DD`) for due chips; tests pin it. */
+  today?: string;
+}
+
+const DUE_TONE: Record<string, KbTone> = {
+  overdue: 'danger',
+  due_today: 'warning',
+  due_soon: 'warning',
+  upcoming: 'neutral',
+  done: 'neutral',
+};
+
+/** `2026-11-30` as a short local date (the day itself never shifts: UTC in, UTC out). */
+export function formatCalendarDay(date: string, locale: string): string {
+  const [year, month, day] = date.split('-').map(Number);
+  try {
+    return new Intl.DateTimeFormat(locale, {
+      month: 'short',
+      day: 'numeric',
+      timeZone: 'UTC',
+    }).format(new Date(Date.UTC(year, month - 1, day)));
+  } catch {
+    return date;
+  }
+}
+
+/** The due chip text for a card, or null when it has no due day. */
+export function dueChipText(
+  t: BoardTranslate,
+  dueDate: string | undefined,
+  status: string,
+  today: string,
+  locale: string
+): { text: string; tone: KbTone; state: string } | null {
+  const due = dueState(dueDate, status, today);
+  if (due.state === 'none' || !dueDate) return null;
+  const date = formatCalendarDay(dueDate, locale);
+  const text =
+    due.state === 'overdue'
+      ? t('ux_b_card_due_overdue', { days: -(due.days ?? 0), date })
+      : due.state === 'due_today'
+        ? t('ux_b_card_due_today')
+        : due.state === 'due_soon'
+          ? t('ux_b_card_due_soon', { days: due.days ?? 0, date })
+          : t('ux_b_card_due_on', { date });
+  return { text, tone: DUE_TONE[due.state] ?? 'neutral', state: due.state };
 }
 
 type StepsState =
@@ -163,6 +212,85 @@ function CardSteps<T extends BoardCard>({
 
 type PendingMove<T> = { card: T; to: string };
 
+/** Mirrors the store's year range (`work-item-schedule.ts`); the store still decides. */
+const MIN_DUE_YEAR = 1970;
+const MAX_DUE_YEAR = 2999;
+
+/** True when `draft` is a whole date worth sending (a typed year is not finished before 1970). */
+export function committableDueDate(draft: string, current: string | undefined): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/u.test(draft) || draft === current) return false;
+  const year = Number(draft.slice(0, 4));
+  return year >= MIN_DUE_YEAR && year <= MAX_DUE_YEAR;
+}
+
+/**
+ * The card's due-date field. Typing only changes a local draft; the date is
+ * sent once, on blur or Enter, so typing a year segment never saves the
+ * half-typed values a date field reports per keystroke. Escape restores it.
+ * A value already sent is not sent again (Enter, then blur), and a refused
+ * value goes back to the saved one so a later blur does not resend it.
+ */
+function DueDateInput({
+  label,
+  ariaLabel,
+  value,
+  min,
+  saving,
+  onCommit,
+}: {
+  label: string;
+  ariaLabel: string;
+  value: string | undefined;
+  min: string | undefined;
+  saving: boolean;
+  onCommit: (value: string) => Promise<boolean>;
+}) {
+  const [draft, setDraft] = React.useState(value ?? '');
+  const sent = React.useRef<string | null>(null);
+  const commit = () => {
+    if (saving || draft === sent.current) return;
+    if (!committableDueDate(draft, value)) {
+      setDraft(value ?? '');
+      return;
+    }
+    sent.current = draft;
+    void onCommit(draft).then((saved) => {
+      if (saved) return;
+      sent.current = null;
+      setDraft(value ?? '');
+    });
+  };
+  return (
+    <label>
+      <span>{label}</span>
+      <input
+        type="date"
+        className="kb-input"
+        value={draft}
+        min={min}
+        aria-label={ariaLabel}
+        aria-busy={saving || undefined}
+        readOnly={saving}
+        onChange={(event) => setDraft(event.target.value)}
+        onBlur={commit}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            commit();
+          } else if (event.key === 'Escape') {
+            setDraft(value ?? '');
+          }
+        }}
+      />
+    </label>
+  );
+}
+
+function localDay(now: Date): string {
+  const pad = (value: number) => String(value).padStart(2, '0');
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
+
 /**
  * Work items as a kanban board: one column per status, cards that read at a
  * glance (title, priority, assignee, project › mission, age), and status
@@ -181,7 +309,10 @@ export function WorkItemBoard<T extends BoardCard>({
   label,
   layout = 'board',
   loadSteps,
+  onSchedule,
+  today: todayOverride,
 }: WorkItemBoardProps<T>) {
+  const [scheduleSaving, setScheduleSaving] = React.useState<string | null>(null);
   const [overrides, setOverrides] = React.useState<Record<string, string>>({});
   const [pending, setPending] = React.useState<PendingMove<T> | null>(null);
   const [saving, setSaving] = React.useState<string | null>(null);
@@ -237,6 +368,7 @@ export function WorkItemBoard<T extends BoardCard>({
   );
   const grouped = React.useMemo(() => groupBoardColumns(effective), [effective]);
   const now = Date.now();
+  const today = todayOverride ?? localDay(new Date(now));
   const relative = React.useMemo(() => {
     try {
       return new Intl.RelativeTimeFormat(locale, { numeric: 'auto' });
@@ -275,8 +407,25 @@ export function WorkItemBoard<T extends BoardCard>({
     }
   };
 
+  /** True when the server saved the date; a refusal shows the failure callout. */
+  const schedule = async (card: T, dueDate: string | null): Promise<boolean> => {
+    if (!onSchedule) return false;
+    setFailure(null);
+    setScheduleSaving(card.id);
+    try {
+      await onSchedule(card, dueDate);
+      return true;
+    } catch {
+      setFailure(t('ux_b_card_due_failed', { title: cardTitle(card.title, card.mission?.id) }));
+      return false;
+    } finally {
+      setScheduleSaving(null);
+    }
+  };
+
   const renderCard = (card: T) => {
     const title = cardTitle(card.title, card.mission?.id);
+    const dueChip = dueChipText(t, card.dueDate, card.status, today, locale);
     const described = summarizeWorkItemDescription(card.description, title);
     const age = ageInDays(card.updatedAt, now);
     const lineage = [card.project, card.mission].filter((ref): ref is NonNullable<typeof ref> =>
@@ -327,6 +476,12 @@ export function WorkItemBoard<T extends BoardCard>({
           statusLabel={statusLabel}
           loadSteps={loadSteps}
         />
+        {dueChip ? (
+          <p className="wb-card__due" data-due={dueChip.state}>
+            <span className="wb-visually-hidden">{t('ux_b_card_due_label')}: </span>
+            <Badge tone={dueChip.tone} label={dueChip.text} />
+          </p>
+        ) : null}
         <p className="wb-card__meta">
           <span>{card.assignee || t('ux_b_card_unassigned')}</span>
           {age !== null ? (
@@ -346,6 +501,33 @@ export function WorkItemBoard<T extends BoardCard>({
           </details>
         ) : null}
         {renderCardExtra ? renderCardExtra(card) : null}
+        {canMove && onSchedule ? (
+          <div className="wb-card__due-edit">
+            <DueDateInput
+              // A saved date from the server resets the draft.
+              key={`due:${card.dueDate ?? ''}`}
+              label={t('ux_b_card_due_label')}
+              ariaLabel={`${t('ux_b_card_due_label')}: ${title}`}
+              value={card.dueDate}
+              min={card.startDate}
+              saving={scheduleSaving === card.id}
+              onCommit={(value) => schedule(card, value)}
+            />
+            {card.dueDate ? (
+              <button
+                type="button"
+                className="wb-card__due-clear"
+                disabled={scheduleSaving === card.id}
+                // Keep focus in the date field: its blur would save a pending draft
+                // and disable this button before the click lands.
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => void schedule(card, null)}
+              >
+                {t('ux_b_card_due_clear')}
+              </button>
+            ) : null}
+          </div>
+        ) : null}
         {movable ? (
           <label className="wb-card__move">
             <span className="wb-visually-hidden">

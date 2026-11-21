@@ -32,6 +32,14 @@ import { CHRONOS_WORK_ITEM_STATUSES, parseWorkItemActionInput } from './work-ite
 
 export const dynamic = 'force-dynamic';
 
+function isWorkItemValidationError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    error.name === 'WorkCoordinationError' &&
+    (error as Error & { code?: unknown }).code === 'validation_error'
+  );
+}
+
 export function GET(req: NextRequest) {
   const denied = guardOpsRequest(req);
   if (denied) return denied;
@@ -147,7 +155,16 @@ export async function POST(req: NextRequest) {
     if (parsedBody.ok !== true) {
       return NextResponse.json({ ok: false, error: parsedBody.error }, { status: 400 });
     }
-    const input = parseWorkItemActionInput(parsedBody.body);
+    let input: ReturnType<typeof parseWorkItemActionInput>;
+    try {
+      input = parseWorkItemActionInput(parsedBody.body);
+    } catch {
+      // A malformed body is the caller's mistake, never a server fault.
+      return NextResponse.json(
+        { ok: false, error: 'invalid work item request', error_code: 'invalid_input' },
+        { status: 400 }
+      );
+    }
     const { itemId } = input;
     const current = withViewerExecutionContext(viewer, () => getWorkItem(itemId));
     if (!current)
@@ -175,12 +192,29 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true, ...result });
     }
     const updated = withViewerExecutionContext(viewer, () =>
-      updateWorkItem({ itemId, status: input.status })
+      'status' in input
+        ? updateWorkItem({ itemId, status: input.status })
+        : updateWorkItem({
+            itemId,
+            ...(input.startDate !== undefined ? { startDate: input.startDate } : {}),
+            ...(input.dueDate !== undefined ? { dueDate: input.dueDate } : {}),
+          })
     );
     // The workspace graph (/w boards) caches its join briefly; a move must show at once.
     invalidateWorkspaceGraphCache();
     return NextResponse.json({ ok: true, item: updated });
   } catch (error) {
+    // The store refuses an impossible change (e.g. a due date before the start date).
+    if (isWorkItemValidationError(error)) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: 'the work item store refused this change as invalid',
+          error_code: 'invalid_change',
+        },
+        { status: 400 }
+      );
+    }
     return viewerErrorResponse(
       error,
       error instanceof ViewerContextError ||

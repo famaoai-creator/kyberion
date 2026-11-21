@@ -1,0 +1,309 @@
+/* Work calendar (`/work?tab=calendar`). Tokens only (`--kb-ui-*`); every class
+   is `wc-` prefixed. At phone width the month grid reads as an agenda: only
+   days with entries, one per row. */
+
+.wc {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-3);
+  min-width: 0;
+}
+
+.wc-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kb-ui-space-2);
+}
+
+.wc-toolbar__nav {
+  display: flex;
+  gap: var(--kb-ui-space-1);
+}
+
+.wc-toolbar__title {
+  margin: 0;
+  font-size: var(--kb-ui-font-size-lg);
+  font-weight: 600;
+  color: var(--kb-ui-text);
+}
+
+.wc-toggle {
+  display: inline-flex;
+  border: 1px solid var(--kb-ui-border);
+  border-radius: var(--kb-ui-radius-md);
+  overflow: hidden;
+}
+
+.wc-toggle__option {
+  padding: var(--kb-ui-space-1) var(--kb-ui-space-3);
+  font-size: var(--kb-ui-font-size-sm);
+  color: var(--kb-ui-text-muted);
+  background: var(--kb-ui-surface);
+  border: 0;
+  cursor: pointer;
+}
+
+.wc-toggle__option + .wc-toggle__option {
+  border-left: 1px solid var(--kb-ui-border);
+}
+
+.wc-toggle__option[aria-pressed='true'] {
+  color: var(--kb-ui-accent-text);
+  background: var(--kb-ui-accent-soft);
+  font-weight: 600;
+}
+
+.wc-toggle__option:focus-visible,
+.wc-day__more:focus-visible,
+.wc-entry a:focus-visible,
+.wc-summary__group > summary:focus-visible {
+  outline: 2px solid var(--kb-ui-focus-ring);
+  outline-offset: 2px;
+}
+
+.wc-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--kb-ui-space-2) var(--kb-ui-space-4);
+  align-items: flex-start;
+  font-size: var(--kb-ui-font-size-sm);
+}
+
+.wc-summary__group[data-tone='danger'] > summary {
+  color: var(--kb-ui-danger-fg);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.wc-summary__group ul {
+  margin: var(--kb-ui-space-1) 0 0;
+  padding-left: var(--kb-ui-space-4);
+}
+
+.wc-summary__date {
+  margin-left: var(--kb-ui-space-2);
+  color: var(--kb-ui-text-muted);
+}
+
+.wc-summary__clear,
+.wc-summary__soon,
+.wc-hint {
+  margin: 0;
+  font-size: var(--kb-ui-font-size-sm);
+  color: var(--kb-ui-text-muted);
+}
+
+.wc-summary__soon[data-tone='warning'] {
+  color: var(--kb-ui-warning-fg);
+  font-weight: 600;
+}
+
+.wc-grid {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--kb-ui-border);
+  border-radius: var(--kb-ui-radius-md);
+  overflow: hidden;
+  background: var(--kb-ui-surface);
+}
+
+.wc-weekdays,
+.wc-week {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.wc-weekdays li {
+  padding: var(--kb-ui-space-1) var(--kb-ui-space-2);
+  font-size: var(--kb-ui-font-size-xs);
+  color: var(--kb-ui-text-muted);
+  border-bottom: 1px solid var(--kb-ui-border);
+}
+
+.wc-week + .wc-week {
+  border-top: 1px solid var(--kb-ui-border);
+}
+
+.wc-day {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-1);
+  min-width: 0;
+  min-height: 6.5rem;
+  padding: var(--kb-ui-space-1) var(--kb-ui-space-2);
+}
+
+.wc-grid[data-view='week'] .wc-day {
+  min-height: 14rem;
+}
+
+.wc-day + .wc-day {
+  border-left: 1px solid var(--kb-ui-border);
+}
+
+.wc-day[data-weekend='true'] {
+  background: var(--kb-ui-surface-sunken);
+}
+
+.wc-day[data-in-range='false'] {
+  color: var(--kb-ui-text-subtle);
+}
+
+.wc-day[data-in-range='false'] .wc-day__entries {
+  opacity: 0.6;
+}
+
+.wc-day__head {
+  display: flex;
+  justify-content: space-between;
+  margin: 0;
+  font-size: var(--kb-ui-font-size-xs);
+}
+
+/* The weekday sits in the column header on wide screens; the agenda shows it. */
+.wc-day__weekday {
+  display: none;
+  color: var(--kb-ui-text-muted);
+}
+
+.wc-day__number {
+  margin-left: auto;
+  font-weight: 600;
+}
+
+.wc-day[data-today='true'] .wc-day__number {
+  padding: 0 var(--kb-ui-space-1);
+  border-radius: var(--kb-ui-radius-sm);
+  color: var(--kb-ui-accent-text);
+  background: var(--kb-ui-accent-soft);
+}
+
+.wc-day__entries {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.wc-entry {
+  display: flex;
+  gap: var(--kb-ui-space-1);
+  align-items: baseline;
+  min-width: 0;
+  padding: 0 var(--kb-ui-space-1);
+  border-left: 3px solid var(--kb-ui-border);
+  border-radius: var(--kb-ui-radius-sm);
+  font-size: var(--kb-ui-font-size-xs);
+  background: var(--kb-ui-surface-sunken);
+}
+
+.wc-entry a,
+.wc-entry > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--kb-ui-text);
+}
+
+.wc-entry__role {
+  flex: none;
+  color: var(--kb-ui-text-muted);
+}
+
+.wc-entry[data-due='overdue'] {
+  border-left-color: var(--kb-ui-danger-border);
+  background: var(--kb-ui-danger-bg);
+}
+
+.wc-entry[data-due='overdue'] .wc-entry__role {
+  color: var(--kb-ui-danger-fg);
+  font-weight: 600;
+}
+
+.wc-entry[data-due='due_today'],
+.wc-entry[data-due='due_soon'] {
+  border-left-color: var(--kb-ui-warning-border);
+  background: var(--kb-ui-warning-bg);
+}
+
+.wc-entry[data-due='done'] a {
+  color: var(--kb-ui-text-muted);
+  text-decoration: line-through;
+}
+
+.wc-entry[data-role='span'] {
+  border-left-style: dashed;
+  background: transparent;
+}
+
+.wc-day__more {
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--kb-ui-accent-text);
+  font-size: var(--kb-ui-font-size-xs);
+  cursor: pointer;
+}
+
+@media (max-width: 640px) {
+  .wc-weekdays {
+    display: none;
+  }
+
+  .wc-week {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .wc-week + .wc-week {
+    border-top: 0;
+  }
+
+  .wc-day,
+  .wc-grid[data-view='week'] .wc-day {
+    min-height: 0;
+    padding: var(--kb-ui-space-2);
+  }
+
+  .wc-day + .wc-day {
+    border-left: 0;
+  }
+
+  .wc-day {
+    border-bottom: 1px solid var(--kb-ui-border);
+  }
+
+  /* Agenda: a month shows only the days that hold something (or today). */
+  .wc-grid[data-view='month'] .wc-day[data-empty='true']:not([data-today='true']),
+  .wc-grid[data-view='month'] .wc-day[data-in-range='false'] {
+    display: none;
+  }
+
+  .wc-day__head {
+    justify-content: flex-start;
+    gap: var(--kb-ui-space-2);
+  }
+
+  .wc-day__weekday {
+    display: inline;
+  }
+
+  .wc-day__number {
+    margin-left: 0;
+  }
+}
+
+@media print {
+  .wc-toolbar__nav,
+  .wc-toggle {
+    display: none;
+  }
+}
