@@ -1,3 +1,7 @@
+---
+category: Added
+---
+
 ## CLI agent lifecycle
 
 - Non-interactive onboarding returns identity input requirements and a dry-run command. Baseline diagnostics expose the recommended next action.
