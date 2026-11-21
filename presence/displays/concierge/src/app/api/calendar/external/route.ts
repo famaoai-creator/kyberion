@@ -1,0 +1,122 @@
+import { NextRequest, NextResponse } from 'next/server';
+import {
+  listCalendarAgenda,
+  readCalendarProviderAuthStatus,
+  normalizeCalendarProviderId,
+} from '@agent/core/meeting/calendar-workflow';
+import { isCalendarDate } from '@agent/core/foundation/time';
+import { resolveConciergeInstallationAccess } from '../../../../lib/installation-access';
+import { resolveConciergeViewer } from '../../../../lib/viewer-context';
+
+export const dynamic = 'force-dynamic';
+
+/** Same ceiling as `workspace.calendar` (a month grid is 42 days). */
+const MAX_DAYS = 92;
+const MAX_EVENTS = 250;
+const NO_STORE = { 'Cache-Control': 'private, no-store' };
+
+export interface ExternalCalendarEvent {
+  id: string;
+  title: string;
+  /** ISO instant, or `YYYY-MM-DD` for an all-day event. */
+  start: string;
+  end?: string;
+  allDay: boolean;
+  link?: string;
+}
+
+function dayCount(from: string, to: string): number {
+  return (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000 + 1;
+}
+
+/**
+ * The installation owner's own calendar (Google Workspace / Microsoft 365) for
+ * the work calendar's visible days. The connection is the machine's provider
+ * login, so its events are that person's personal data: only the installation
+ * owner (attested loopback peer or bound owner principal) receives them, and
+ * nobody else learns whether a calendar is connected. Nothing is called on the
+ * network unless the provider reports an authenticated login. A provider
+ * failure answers `degraded` with a fixed message (never the raw error).
+ */
+export async function GET(req: NextRequest) {
+  const resolved = resolveConciergeViewer(req);
+  if (resolved.response) return resolved.response;
+  if (!resolveConciergeInstallationAccess(resolved.context, 'read', req).allowed) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: 'installation_owner_required',
+        error_code: 'installation_owner_required',
+      },
+      { status: 403, headers: NO_STORE }
+    );
+  }
+  const from = req.nextUrl.searchParams.get('from')?.trim();
+  const to = req.nextUrl.searchParams.get('to')?.trim();
+  if (!isCalendarDate(from) || !isCalendarDate(to) || from > to || dayCount(from, to) > MAX_DAYS) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: `from and to must be calendar days, at most ${MAX_DAYS} days apart`,
+        error_code: 'invalid_input',
+      },
+      { status: 400, headers: NO_STORE }
+    );
+  }
+  const provider = normalizeCalendarProviderId();
+  let connected = false;
+  try {
+    connected = (await readCalendarProviderAuthStatus(provider)).ok === true;
+  } catch {
+    connected = false;
+  }
+  if (!connected) {
+    return NextResponse.json(
+      { ok: true, provider, connected: false, events: [] },
+      { headers: NO_STORE }
+    );
+  }
+  try {
+    // Pad a day either side: the viewer's local day of an instant can differ from UTC.
+    const timeMin = new Date(Date.parse(`${from}T00:00:00Z`) - 86_400_000).toISOString();
+    const timeMax = new Date(Date.parse(`${to}T23:59:59Z`) + 86_400_000).toISOString();
+    const agenda = await listCalendarAgenda({
+      provider,
+      time_min: timeMin,
+      time_max: timeMax,
+      max_results: MAX_EVENTS,
+    });
+    const events: ExternalCalendarEvent[] = agenda.events
+      .filter((event) => event.status !== 'cancelled' && event.start)
+      .map((event) => ({
+        id: event.id,
+        title: event.summary || '(no title)',
+        start: event.start,
+        ...(event.end ? { end: event.end } : {}),
+        allDay: isCalendarDate(event.start),
+        ...(event.html_link ? { link: event.html_link } : {}),
+      }));
+    return NextResponse.json(
+      {
+        ok: true,
+        provider,
+        connected: true,
+        events,
+        ...(agenda.total_items >= MAX_EVENTS ? { truncated: true } : {}),
+      },
+      { headers: NO_STORE }
+    );
+  } catch {
+    return NextResponse.json(
+      {
+        ok: true,
+        provider,
+        connected: true,
+        degraded: true,
+        error: 'the calendar provider could not be read',
+        events: [],
+      },
+      { headers: NO_STORE }
+    );
+  }
+}

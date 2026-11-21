@@ -12,15 +12,22 @@ import { dueState, type DueState } from '../work-board/work-item-board';
 
 export type CalendarView = 'month' | 'week';
 
-export type CalendarSource = 'work_item' | 'operation_run' | 'operation_deadline' | 'action_item';
+export type CalendarSource =
+  | 'work_item'
+  | 'operation_run'
+  | 'operation_deadline'
+  | 'action_item'
+  /** An event in the installation owner's own (Google / Microsoft 365) calendar. */
+  | 'external_event';
 
 /** Toggle groups: an operation's runs and deadlines show or hide together. */
-export type CalendarSourceGroup = 'work_item' | 'operation' | 'action_item';
+export type CalendarSourceGroup = 'work_item' | 'operation' | 'action_item' | 'external';
 
 export const CALENDAR_SOURCE_GROUPS: readonly CalendarSourceGroup[] = [
   'work_item',
   'operation',
   'action_item',
+  'external',
 ];
 
 export function sourceGroup(source: CalendarSource | undefined): CalendarSourceGroup {
@@ -28,7 +35,48 @@ export function sourceGroup(source: CalendarSource | undefined): CalendarSourceG
     ? 'operation'
     : source === 'action_item'
       ? 'action_item'
-      : 'work_item';
+      : source === 'external_event'
+        ? 'external'
+        : 'work_item';
+}
+
+/** An appointment, not a task: it is never due, overdue or counted in the summary. */
+export function isAppointment(item: Pick<CalendarItem, 'source'>): boolean {
+  return item.source === 'external_event';
+}
+
+/** One event from `/api/calendar/external`. */
+export interface ExternalCalendarEvent {
+  id: string;
+  title: string;
+  /** ISO instant, or `YYYY-MM-DD` for an all-day event. */
+  start: string;
+  end?: string;
+  allDay: boolean;
+  link?: string;
+}
+
+/** External events as calendar items, on the viewer's local start day. */
+export function fromExternalEvents(events: readonly ExternalCalendarEvent[]): CalendarItem[] {
+  return events.flatMap((event) => {
+    const day = event.allDay ? event.start.slice(0, 10) : localDayOfInstant(event.start);
+    if (!day) return [];
+    return [
+      {
+        id: `external_event:${event.id}`,
+        title: event.title,
+        status: 'open',
+        dueDate: day,
+        ...(event.link ? { href: event.link } : {}),
+        source: 'external_event' as const,
+      },
+    ];
+  });
+}
+
+function localDayOfInstant(instant: string): string | undefined {
+  const date = new Date(instant);
+  return Number.isNaN(date.getTime()) ? undefined : localCalendarDate(date);
 }
 
 export interface CalendarItem {
@@ -178,7 +226,9 @@ function entriesFor<T extends CalendarItem>(
 ): CalendarEntry<T>[] {
   const entries: CalendarEntry<T>[] = [];
   for (const item of items) {
-    const due = dueState(item.dueDate, item.status, today);
+    const due: DueState = isAppointment(item)
+      ? { state: 'none' }
+      : dueState(item.dueDate, item.status, today);
     if (item.dueDate === date) {
       entries.push({ item, role: 'due', due });
     } else if (item.startDate === date) {
@@ -267,6 +317,7 @@ export function summarizeCalendar<T extends CalendarItem>(
   const overdue: T[] = [];
   const dueSoon: T[] = [];
   for (const item of items) {
+    if (isAppointment(item)) continue;
     const state = dueState(item.dueDate, item.status, today).state;
     if (state === 'overdue') overdue.push(item);
     else if (state === 'due_today' || state === 'due_soon') dueSoon.push(item);

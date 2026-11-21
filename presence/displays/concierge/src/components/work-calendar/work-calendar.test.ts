@@ -5,6 +5,7 @@ import {
   buildCalendarGrid,
   calendarGridRange,
   fromCalendarEntries,
+  fromExternalEvents,
   sourceGroup,
   localCalendarDate,
   shiftAnchor,
@@ -208,5 +209,34 @@ describe('calendar API entries: days', () => {
       () => undefined
     );
     expect(item.dueDate).toBe('2026-12-01');
+  });
+});
+
+describe('external calendar events', () => {
+  const events = fromExternalEvents([
+    {
+      id: 'e1',
+      title: 'Customer call',
+      start: new Date(2026, 10, 19, 9, 0).toISOString(),
+      allDay: false,
+    },
+    { id: 'e2', title: 'Holiday', start: '2026-11-23', end: '2026-11-24', allDay: true },
+    { id: 'e3', title: 'Broken', start: 'not a date', allDay: false },
+  ]);
+
+  it('lands on the viewer local start day, all-day events on their own day', () => {
+    expect(events.map((event) => [event.title, event.dueDate])).toEqual([
+      ['Customer call', '2026-11-19'],
+      ['Holiday', '2026-11-23'],
+    ]);
+    expect(sourceGroup(events[0].source)).toBe('external');
+  });
+
+  it('is an appointment: never overdue, never in the summary', () => {
+    // 11-19 is before TODAY (11-21): a task would be overdue; an event is not.
+    expect(summarizeCalendar(events, TODAY)).toEqual({ overdue: [], dueSoon: [] });
+    const grid = buildCalendarGrid(events, { view: 'month', anchor: TODAY, today: TODAY });
+    const entry = grid.weeks.flat().find((day) => day.date === '2026-11-19')!.entries[0];
+    expect(entry.due.state).toBe('none');
   });
 });

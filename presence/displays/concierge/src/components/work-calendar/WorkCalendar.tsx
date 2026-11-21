@@ -14,6 +14,7 @@ import {
   buildCalendarGrid,
   calendarGridRange,
   fromCalendarEntries,
+  fromExternalEvents,
   localCalendarDate,
   shiftAnchor,
   sourceGroup,
@@ -24,6 +25,7 @@ import {
   type CalendarEntry,
   type CalendarSourceGroup,
   type CalendarView,
+  type ExternalCalendarEvent,
 } from './work-calendar';
 import './work-calendar.css';
 
@@ -31,6 +33,46 @@ import './work-calendar.css';
 const MONTH_CELL_ENTRIES = 3;
 
 type CalendarData = { entries: CalendarApiEntry[]; degraded: string[] };
+
+/**
+ * The installation owner's own calendar for the days on screen. `unavailable`
+ * (any refusal) hides the source: other viewers never see that it exists.
+ */
+type ExternalState =
+  | { state: 'off' | 'loading' | 'unavailable' | 'disconnected' | 'degraded' }
+  | { state: 'ready'; events: ExternalCalendarEvent[] };
+
+function useExternalCalendar(range: { from: string; to: string }, enabled: boolean): ExternalState {
+  const [result, setResult] = React.useState<ExternalState>({ state: 'off' });
+  React.useEffect(() => {
+    if (!enabled) {
+      setResult((current) => (current.state === 'unavailable' ? current : { state: 'off' }));
+      return;
+    }
+    const controller = new AbortController();
+    setResult({ state: 'loading' });
+    const query = new URLSearchParams({ from: range.from, to: range.to });
+    void fetch(`/api/calendar/external?${query}`, { cache: 'no-store', signal: controller.signal })
+      .then(async (response) => {
+        const body = (await response.json().catch(() => null)) as {
+          ok?: boolean;
+          connected?: boolean;
+          degraded?: boolean;
+          events?: ExternalCalendarEvent[];
+        } | null;
+        if (controller.signal.aborted) return;
+        if (!response.ok || body?.ok !== true) setResult({ state: 'unavailable' });
+        else if (!body.connected) setResult({ state: 'disconnected' });
+        else if (body.degraded) setResult({ state: 'degraded' });
+        else setResult({ state: 'ready', events: Array.isArray(body.events) ? body.events : [] });
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setResult({ state: 'degraded' });
+      });
+    return () => controller.abort();
+  }, [range.from, range.to, enabled]);
+  return result;
+}
 
 function utcDate(date: string): Date {
   const [year, month, day] = date.split('-').map(Number);
@@ -52,6 +94,8 @@ function formatter(locale: string, options: Intl.DateTimeFormatOptions): Intl.Da
  * `workspace.calendar` for exactly the days on screen; that operation reads
  * only organizations and missions in the viewer's graph, and URL scope
  * narrowing (tenant / organization / project / mission) applies too. The
+ * installation owner also sees their own Google / Microsoft 365 events
+ * (`/api/calendar/external`, appointments: never due or overdue). The
  * calendar only reads: dates are set where each entry is managed.
  */
 export function WorkCalendar({ t }: { t: Translate }) {
@@ -89,12 +133,19 @@ export function WorkCalendar({ t }: { t: Translate }) {
         ? null
         : lastReady.current;
 
+  const external = useExternalCalendar(range, shownGroups.has('external'));
+  const groups = CALENDAR_SOURCE_GROUPS.filter(
+    (group) => group !== 'external' || external.state !== 'unavailable'
+  );
   const items = React.useMemo(
     () =>
-      fromCalendarEntries(data?.entries ?? [], (link, tenantSlug) =>
-        entityHref(link.kind, link.id, tenantSlug)
-      ).filter((item) => shownGroups.has(sourceGroup(item.source))),
-    [data, shownGroups]
+      [
+        ...fromCalendarEntries(data?.entries ?? [], (link, tenantSlug) =>
+          entityHref(link.kind, link.id, tenantSlug)
+        ),
+        ...(external.state === 'ready' ? fromExternalEvents(external.events) : []),
+      ].filter((item) => shownGroups.has(sourceGroup(item.source))),
+    [data, external, shownGroups]
   );
   const grid = React.useMemo(
     () => buildCalendarGrid(items, { view, anchor, today }),
@@ -142,6 +193,8 @@ export function WorkCalendar({ t }: { t: Translate }) {
         return t('ia_shell_work_cal_deadline');
       case 'action_item':
         return t('ia_shell_work_cal_action');
+      case 'external_event':
+        return t('ia_shell_work_cal_event');
       default:
         return t('ia_shell_work_cal_due');
     }
@@ -188,7 +241,13 @@ export function WorkCalendar({ t }: { t: Translate }) {
               >
                 <span className="wc-entry__role">{roleLabel(entry)}</span>
                 {entry.item.href ? (
-                  <a href={entry.item.href} title={entry.item.title}>
+                  <a
+                    href={entry.item.href}
+                    title={entry.item.title}
+                    {...(entry.item.source === 'external_event'
+                      ? { target: '_blank', rel: 'noreferrer' }
+                      : {})}
+                  >
                     {entry.item.title}
                   </a>
                 ) : (
@@ -248,7 +307,7 @@ export function WorkCalendar({ t }: { t: Translate }) {
 
       <fieldset className="wc-sources">
         <legend>{t('ia_shell_work_cal_sources_label')}</legend>
-        {CALENDAR_SOURCE_GROUPS.map((group) => (
+        {groups.map((group) => (
           <label key={group} className="wc-sources__option" data-source={group}>
             <input
               type="checkbox"
@@ -296,6 +355,17 @@ export function WorkCalendar({ t }: { t: Translate }) {
               </p>
             ) : null}
           </div>
+          {external.state === 'disconnected' && shownGroups.has('external') ? (
+            <p className="wc-hint">
+              {t('ia_shell_work_cal_external_disconnected')}{' '}
+              <a href="/settings#setup-services">{t('ia_shell_work_cal_external_connect')}</a>
+            </p>
+          ) : null}
+          {external.state === 'degraded' && shownGroups.has('external') ? (
+            <p className="wc-hint" role="status">
+              {t('ia_shell_work_cal_external_degraded')}
+            </p>
+          ) : null}
           {data.degraded.length ? (
             <p className="wc-hint" role="status">
               {t('ia_shell_work_cal_degraded')}
