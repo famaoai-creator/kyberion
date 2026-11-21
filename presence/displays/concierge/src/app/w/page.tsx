@@ -141,8 +141,14 @@ function StructureTree({
           {tenant.organizations.length ? (
             <ul>
               {tenant.organizations.map((org) => (
-                <li key={org.id}>
-                  <TreeNode t={t} kind="organization" id={org.id} label={org.label} />
+                <li key={`${tenant.id}:${org.id}`}>
+                  <TreeNode
+                    t={t}
+                    kind="organization"
+                    id={org.id}
+                    label={org.label}
+                    tenantSlug={tenant.id}
+                  />
                   <ul>
                     {org.projects.length ? (
                       org.projects.map((project) => (
@@ -173,16 +179,19 @@ function TreeNode({
   kind,
   id,
   label,
+  tenantSlug,
 }: {
   t: Translate;
   kind: GraphEntityKind;
   id: string;
   label: string;
+  /** Organizations: the tenant the id belongs to (ids repeat across tenants). */
+  tenantSlug?: string;
 }) {
   return (
     <span className="ws-tree__node">
       <span className="ws-crumbs__kind">{kindLabel(t, kind)}</span>
-      <a href={entityHref(kind, id)}>{label}</a>
+      <a href={entityHref(kind, id, tenantSlug)}>{label}</a>
     </span>
   );
 }

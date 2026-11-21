@@ -163,3 +163,37 @@ describe('lineage and facets', () => {
     ).toEqual(['organizations', 'approvals']);
   });
 });
+
+describe('organization labels when ids repeat across tenants', () => {
+  const summary = {
+    tenants: [
+      {
+        kind: 'tenant',
+        id: 'acme',
+        label: 'Acme',
+        organizations: [{ kind: 'organization', id: 'hq', label: 'Acme HQ', projects: [] }],
+      },
+      {
+        kind: 'tenant',
+        id: 'beta',
+        label: 'Beta',
+        organizations: [{ kind: 'organization', id: 'hq', label: 'Beta HQ', projects: [] }],
+      },
+    ],
+  } as unknown as Parameters<typeof summaryLabelIndex>[0];
+
+  it('labels a row with its own tenant organization, never the other tenant one', () => {
+    const labels = summaryLabelIndex(summary);
+    expect(labels.has('organization:hq')).toBe(false);
+    const lineage = nodeLineage(
+      { kind: 'project', id: 'P', label: 'P', tenantSlug: 'beta', organizationId: 'hq' } as never,
+      labels
+    );
+    expect(lineage.find((ref) => ref.kind === 'organization')).toEqual({
+      kind: 'organization',
+      id: 'hq',
+      label: 'Beta HQ',
+      tenantSlug: 'beta',
+    });
+  });
+});

@@ -123,7 +123,7 @@ function RowLineage({ t, lineage }: { t: Translate; lineage: readonly GraphRef[]
   return (
     <span className="ws-row__lineage">
       {lineage.map((ref, index) => (
-        <React.Fragment key={`${ref.kind}:${ref.id}`}>
+        <React.Fragment key={`${ref.kind}:${ref.tenantSlug ?? ''}:${ref.id}`}>
           {index ? <span aria-hidden="true"> › </span> : null}
           <span title={kindLabel(t, ref.kind)}>{ref.label}</span>
         </React.Fragment>
@@ -295,7 +295,7 @@ export function EntityList({
     <ul className="ws-list" aria-label={label}>
       {rows.map(({ node, sameCount }) => (
         <EntityRow
-          key={`${node.kind}:${node.id}`}
+          key={`${node.kind}:${node.tenantSlug ?? ''}:${node.id}`}
           t={t}
           node={node}
           labels={labels}

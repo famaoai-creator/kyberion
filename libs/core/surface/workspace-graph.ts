@@ -845,15 +845,18 @@ export function getGraphEntity(
   options: { tenantSlug?: string } = {}
 ): GraphEntityView | null {
   // Organizations are matched within a tenant when one is known (ids repeat across tenants).
-  const find = (k: GraphEntityKind, i: string | undefined, tenantSlug?: string) =>
-    i
-      ? graph.nodes.find(
-          (n) =>
-            n.kind === k &&
-            n.id === i &&
-            (k !== 'organization' || !tenantSlug || n.tenantSlug === tenantSlug)
-        )
-      : undefined;
+  // Without a tenant, an organization id that several tenants share is ambiguous:
+  // resolve it to nothing rather than to whichever tenant comes first.
+  const find = (k: GraphEntityKind, i: string | undefined, tenantSlug?: string) => {
+    if (!i) return undefined;
+    const matches = graph.nodes.filter(
+      (n) =>
+        n.kind === k &&
+        n.id === i &&
+        (k !== 'organization' || !tenantSlug || n.tenantSlug === tenantSlug)
+    );
+    return matches.length === 1 || k !== 'organization' ? matches[0] : undefined;
+  };
   const node = find(kind, id, options.tenantSlug);
   if (!node) return null;
 

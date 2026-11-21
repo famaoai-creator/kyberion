@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   owner: true,
   connected: true,
+  raw: null as unknown,
   agendaError: null as Error | null,
   agendaCalls: 0,
 }));
@@ -16,7 +17,11 @@ vi.mock('../../../../lib/installation-access', () => ({
 }));
 vi.mock('@agent/core/meeting/calendar-workflow', () => ({
   normalizeCalendarProviderId: () => 'google-workspace',
-  readCalendarProviderAuthStatus: async () => ({ ok: mocks.connected, available: true, raw: null }),
+  readCalendarProviderAuthStatus: async () => ({
+    ok: mocks.connected,
+    available: true,
+    raw: mocks.raw,
+  }),
   listCalendarAgenda: async () => {
     mocks.agendaCalls += 1;
     if (mocks.agendaError) throw mocks.agendaError;
@@ -45,6 +50,8 @@ vi.mock('@agent/core/meeting/calendar-workflow', () => ({
 }));
 
 const { GET } = await import('./route');
+const { resetExternalCalendarStatusCache } =
+  await import('../../../../lib/external-calendar-status');
 
 const get = (query: string) =>
   GET(new NextRequest(`http://127.0.0.1:3050/api/calendar/external?${query}`));
@@ -53,7 +60,9 @@ describe('GET /api/calendar/external', () => {
   beforeEach(() => {
     mocks.owner = true;
     mocks.connected = true;
+    mocks.raw = null;
     mocks.agendaError = null;
+    resetExternalCalendarStatusCache();
     mocks.agendaCalls = 0;
   });
 
@@ -88,6 +97,24 @@ describe('GET /api/calendar/external', () => {
     const body = await (await get('from=2026-11-16&to=2026-11-29')).json();
     expect(body).toMatchObject({ ok: true, connected: false, events: [] });
     expect(mocks.agendaCalls).toBe(0);
+  });
+
+  it('treats an installed but signed-out gws as not connected (no provider call)', async () => {
+    mocks.raw = {
+      auth_method: null,
+      encrypted_credentials_exists: false,
+      plain_credentials_exists: false,
+      token_cache_exists: false,
+    };
+    const body = await (await get('from=2026-11-16&to=2026-11-29')).json();
+    expect(body).toMatchObject({ connected: false });
+    expect(mocks.agendaCalls).toBe(0);
+  });
+
+  it('treats stored gws credentials as signed in', async () => {
+    mocks.raw = { encrypted_credentials_exists: true, token_cache_exists: false };
+    const body = await (await get('from=2026-11-16&to=2026-11-29')).json();
+    expect(body).toMatchObject({ connected: true });
   });
 
   it('reports a provider failure as degraded with a fixed message', async () => {

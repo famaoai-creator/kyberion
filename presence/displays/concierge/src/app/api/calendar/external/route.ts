@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
   listCalendarAgenda,
-  readCalendarProviderAuthStatus,
   normalizeCalendarProviderId,
 } from '@agent/core/meeting/calendar-workflow';
 import { isCalendarDate } from '@agent/core/foundation/time';
 import { createLogger } from '@agent/core/logger';
 import { resolveConciergeInstallationAccess } from '../../../../lib/installation-access';
 import { resolveConciergeViewer } from '../../../../lib/viewer-context';
+import { providerLoggedIn } from '../../../../lib/external-calendar-status';
 
 export const dynamic = 'force-dynamic';
 
@@ -66,13 +66,16 @@ export async function GET(req: NextRequest) {
       { status: 400, headers: NO_STORE }
     );
   }
-  const provider = normalizeCalendarProviderId();
-  let connected = false;
+  let provider: string;
   try {
-    connected = (await readCalendarProviderAuthStatus(provider)).ok === true;
+    provider = normalizeCalendarProviderId();
   } catch {
-    connected = false;
+    return NextResponse.json(
+      { ok: true, provider: null, connected: false, events: [] },
+      { headers: NO_STORE }
+    );
   }
+  const connected = await providerLoggedIn(provider);
   if (!connected) {
     return NextResponse.json(
       { ok: true, provider, connected: false, events: [] },

@@ -219,7 +219,7 @@ export function CommandPalette() {
     const found: PaletteEntry[] =
       hits && hits.q === query.trim()
         ? hits.items.map((node) => ({
-            id: `ws-${node.kind}-${node.id}`,
+            id: `ws-${node.kind}-${node.tenantSlug ?? ''}-${node.id}`,
             label: node.label,
             sublabel: t(`ws_kind_${node.kind}`),
             group_label: t('ws_palette_group'),

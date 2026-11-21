@@ -812,6 +812,11 @@ describe('organization ids repeat across tenants', () => {
     expect(orgs(admin).sort()).toEqual(['acme:Acme HQ', 'beta:Beta HQ']);
   });
 
+  it('resolves an id several tenants share to nothing without a tenant', () => {
+    const graph = filterWorkspaceGraph(collectWorkspaceGraph(shared()), admin);
+    expect(getGraphEntity(graph, 'organization', 'hq')).toBeNull();
+  });
+
   it('resolves an organization and a lineage within the right tenant', () => {
     const graph = filterWorkspaceGraph(collectWorkspaceGraph(shared()), admin);
     expect(

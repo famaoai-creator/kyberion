@@ -42,11 +42,19 @@ type ExternalState =
   | { state: 'off' | 'loading' | 'unavailable' | 'disconnected' | 'degraded' }
   | { state: 'ready'; events: ExternalCalendarEvent[] };
 
-function useExternalCalendar(range: { from: string; to: string }, enabled: boolean): ExternalState {
+function useExternalCalendar(
+  range: { from: string; to: string },
+  enabled: boolean
+): ExternalState & { known: boolean } {
   const [result, setResult] = React.useState<ExternalState>({ state: 'off' });
+  // Once refused (not the installation owner) stay refused: no request per navigation.
+  const refused = React.useRef(false);
+  // Whether the route ever answered as something other than a refusal (shows the toggle).
+  const [known, setKnown] = React.useState(false);
   React.useEffect(() => {
+    if (refused.current) return;
     if (!enabled) {
-      setResult((current) => (current.state === 'unavailable' ? current : { state: 'off' }));
+      setResult({ state: 'off' });
       return;
     }
     const controller = new AbortController();
@@ -61,8 +69,13 @@ function useExternalCalendar(range: { from: string; to: string }, enabled: boole
           events?: ExternalCalendarEvent[];
         } | null;
         if (controller.signal.aborted) return;
-        if (!response.ok || body?.ok !== true) setResult({ state: 'unavailable' });
-        else if (!body.connected) setResult({ state: 'disconnected' });
+        if (!response.ok || body?.ok !== true) {
+          refused.current = true;
+          setResult({ state: 'unavailable' });
+          return;
+        }
+        setKnown(true);
+        if (!body.connected) setResult({ state: 'disconnected' });
         else if (body.degraded) setResult({ state: 'degraded' });
         else setResult({ state: 'ready', events: Array.isArray(body.events) ? body.events : [] });
       })
@@ -71,7 +84,7 @@ function useExternalCalendar(range: { from: string; to: string }, enabled: boole
       });
     return () => controller.abort();
   }, [range.from, range.to, enabled]);
-  return result;
+  return { ...result, known };
 }
 
 function utcDate(date: string): Date {
@@ -135,7 +148,7 @@ export function WorkCalendar({ t }: { t: Translate }) {
 
   const external = useExternalCalendar(range, shownGroups.has('external'));
   const groups = CALENDAR_SOURCE_GROUPS.filter(
-    (group) => group !== 'external' || external.state !== 'unavailable'
+    (group) => group !== 'external' || (external.known && external.state !== 'unavailable')
   );
   const items = React.useMemo(
     () =>
