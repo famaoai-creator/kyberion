@@ -13,6 +13,7 @@ import { hasCurrentRequiredCiEvidence } from './mission-development-ci-proof.js'
 import { findMissionPath } from '../path-resolver.js';
 import { missionPathOrNull } from './mission-lookup.js';
 import { runPreparedVcsDevelopment } from '../vcs/development-loop.js';
+import { resolveMissionDevelopmentBranch } from '../vcs/development-branch.js';
 import type { MissionDevelopmentSpec } from './mission-development-continuation.js';
 
 export async function verifyMissionDevelopmentPublication(
@@ -116,10 +117,11 @@ export async function verifyMissionDevelopmentPublication(
               throw new Error('CI evidence source commit is unavailable');
             return value.stdout.trim();
           })();
+      const expectedBranch = resolveMissionDevelopmentBranch(development.branch);
       const ci = await (deps.ci ?? readVcsDevelopmentCiProof)(pr, { cwd });
       if (
         pr.repository === development.repository_url &&
-        pr.headBranch === 'agent/kyberion-development' &&
+        pr.headBranch === expectedBranch &&
         pr.baseBranch === 'main' &&
         pr.headSha === head &&
         (ci.state === 'pending' || ci.state === 'failure')
@@ -133,7 +135,7 @@ export async function verifyMissionDevelopmentPublication(
       const ok = Boolean(
         dir &&
         pr.repository === development.repository_url &&
-        pr.headBranch === 'agent/kyberion-development' &&
+        pr.headBranch === expectedBranch &&
         pr.baseBranch === 'main' &&
         pr.headSha === head &&
         ci.state === 'success' &&
@@ -162,6 +164,7 @@ export async function verifyMissionDevelopmentPublication(
           reason: review.reason ?? 'Independent artifact review proof unavailable',
         };
     }
+    const expectedBranch = resolveMissionDevelopmentBranch(development.branch);
     const proof = await (deps.reconcile ?? runPreparedVcsDevelopment)(
       {
         cwd,
@@ -170,6 +173,7 @@ export async function verifyMissionDevelopmentPublication(
         reviewTaskId: development.review_task_id,
         requireSourceDiff: true,
         dryRun: true,
+        ...(development.branch !== undefined ? { branch: expectedBranch } : {}),
       },
       () => {
         throw new Error('Read-only development proof cannot publish');

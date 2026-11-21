@@ -1,8 +1,11 @@
+import { parseArgs } from 'node:util';
 import {
   DEFAULT_IGNORED_CHECKS,
+  evaluateFactoryReadiness,
   listPrShadowRecords,
   observePullRequests,
   summarizePrShadow,
+  type FactoryReadinessReport,
   type ObserveResult,
   type PrCiState,
   type PrFile,
@@ -156,6 +159,36 @@ export function formatObserveResult(result: ObserveResult): string {
   return lines.join('\n');
 }
 
+function readTenantOption(argv: string[]): string | undefined {
+  const { values, tokens } = parseArgs({
+    args: argv,
+    options: { tenant: { type: 'string' } },
+    allowPositionals: true,
+    strict: false,
+    tokens: true,
+  });
+  const hasTenantOption = tokens.some(
+    (token) => token.kind === 'option' && token.name === 'tenant'
+  );
+  if (!hasTenantOption) return undefined;
+  const raw = typeof values.tenant === 'string' ? values.tenant.trim() : '';
+  if (!raw || raw.startsWith('-')) {
+    throw new ScriptExitError(2, '--tenant requires a tenant slug');
+  }
+  return raw;
+}
+
+export function formatFactoryReadiness(report: FactoryReadinessReport): string {
+  const lines = [
+    `Factory readiness (${report.tenant_slug ?? 'unknown'}): ${report.ready ? 'READY' : 'NOT READY'}`,
+    `  halted: ${report.halted ? `yes${report.halt_reason ? ` (${report.halt_reason})` : ''}` : 'no'}`,
+    `  tenant_enabled: ${report.tenant_enabled ? 'yes' : 'no'}; active_mandates: ${report.active_mandate_count}`,
+    `  graduated_actions: ${report.graduated_actions.length > 0 ? report.graduated_actions.join(', ') : 'none'}`,
+  ];
+  for (const blocker of report.blockers) lines.push(`  blocker: ${blocker}`);
+  return lines.join('\n');
+}
+
 export const runPrShadow = defineScript({
   name: 'pr-shadow',
   flags: ['json'],
@@ -170,11 +203,22 @@ export const runPrShadow = defineScript({
       return result;
     }
     if (command === 'report') {
+      const tenant = readTenantOption(context.argv);
       const summary = summarizePrShadow(listPrShadowRecords());
+      if (!tenant) {
+        context.print(
+          context.json ? JSON.stringify(summary, null, 2) : formatPrShadowSummary(summary)
+        );
+        return summary;
+      }
+      const factoryReadiness = evaluateFactoryReadiness({ tenant_slug: tenant });
+      const reportWithFactory = { ...summary, factory_readiness: factoryReadiness };
       context.print(
-        context.json ? JSON.stringify(summary, null, 2) : formatPrShadowSummary(summary)
+        context.json
+          ? JSON.stringify(reportWithFactory, null, 2)
+          : `${formatPrShadowSummary(summary)}\n\n${formatFactoryReadiness(factoryReadiness)}`
       );
-      return summary;
+      return reportWithFactory;
     }
     throw new ScriptExitError(2, `Unknown pr-shadow command: ${command} (observe | report)`);
   },

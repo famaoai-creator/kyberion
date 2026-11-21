@@ -1,0 +1,6 @@
+{
+  "$schema": "../schemas/factory-autonomy-policy.schema.json",
+  "version": "1.0.0",
+  "description": "Opt-in per-tenant shadow graduation policy for autonomous software factory operations. Default ships with zero tenants graduated.",
+  "tenants": {}
+}

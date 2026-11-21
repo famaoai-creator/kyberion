@@ -6,6 +6,7 @@ import { clamp } from '../foundation/text.js';
 import { assertSafeRepositoryPath } from '../secure-io.js';
 import { resolveIdentityContext } from '../authority.js';
 import { applyAutonomyOverride, recordAutonomyOutcome } from './autonomy-action-state.js';
+import { isFactoryActionGraduated, type FactoryAutonomyPolicy } from './factory-policy.js';
 
 export type AutonomousOpsDecision = 'auto' | 'notify' | 'approve';
 export type AutonomousOpsMode = 'apply' | 'dry_run';
@@ -55,6 +56,8 @@ export interface AutonomousOpsGateInput {
   detectedClasses?: string[];
   /** An agent may ask for a stricter tier than the computed one, never a looser one. */
   requestedDecision?: AutonomousOpsDecision;
+  /** Optional opt-in factory graduation policy for tenant shadow graduation. */
+  factoryPolicy?: FactoryAutonomyPolicy;
 }
 
 export interface AutonomousOpsGateResult {
@@ -267,7 +270,10 @@ export function evaluateAutonomousOpsAction(
 
   const score = scoreAction(action, policy);
   const maxScore = policy.decision_thresholds.notify_max_score;
-  const shadow = action.shadow === true;
+  const factoryGraduated =
+    action.shadow === true &&
+    isFactoryActionGraduated(input.actionId, tenantSlug, input.factoryPolicy);
+  const shadow = action.shadow === true && !factoryGraduated;
   const escalations: string[] = [];
   const reasons = [`autonomous ops score ${score}/${maxScore} for ${input.actionId}`];
   let highRiskPathMatches: string[] = [];
@@ -338,6 +344,9 @@ export function evaluateAutonomousOpsAction(
   }
 
   if (shadow) reasons.push(AUTONOMOUS_OPS_SHADOW_REASON);
+  else if (factoryGraduated) {
+    reasons.push(`factory shadow graduation active for ${tenantSlug}:${input.actionId}`);
+  }
 
   // Evidence-driven per-action adjustment (autonomy-action-state): a demoted
   // action falls back to 'approve'; a promoted one relaxes toward relaxed_to

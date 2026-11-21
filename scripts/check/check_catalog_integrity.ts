@@ -202,6 +202,11 @@ const CHECKS: CatalogCheck[] = [
     dataPath: 'knowledge/product/governance/autonomous-ops-policy.json',
   },
   {
+    id: 'factory-autonomy-policy',
+    schemaPath: 'knowledge/product/schemas/factory-autonomy-policy.schema.json',
+    dataPath: 'knowledge/product/governance/factory-autonomy-policy.json',
+  },
+  {
     id: 'tool-actuator-routing-policy',
     schemaPath: 'knowledge/product/schemas/tool-actuator-routing-policy.schema.json',
     dataPath: 'knowledge/product/governance/tool-actuator-routing-policy.json',

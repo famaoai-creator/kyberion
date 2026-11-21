@@ -108,6 +108,14 @@ describe('continuous managed work plan', () => {
     expect(first).not.toBe(
       dotProposalHash('operator', { ...normalized, continuous_work: changed })
     );
+    const factoryPlan = parseContinuousWorkPlan({
+      kind: 'mission',
+      missions: [{ ...mission, development: { ...development, branch: 'agent/factory-docs-01' } }],
+    });
+    expect(factoryPlan.missions[0]?.development?.branch).toBe('agent/factory-docs-01');
+    expect(first).not.toBe(
+      dotProposalHash('operator', { ...normalized, continuous_work: factoryPlan })
+    );
   });
   it.each([
     { cwd: '../other-checkout' },
@@ -132,6 +140,10 @@ describe('continuous managed work plan', () => {
     { max_repairs: 4 },
     { max_repairs: -1 },
     { max_repairs: 0.5 },
+    { branch: 'main' },
+    { branch: 'feature/custom' },
+    { branch: 'agent/kyberion-development-extra' },
+    { branch: 123 },
     { approved: true },
   ])('rejects unsafe or self-authorizing development inputs: %j', (change) => {
     expect(() =>
