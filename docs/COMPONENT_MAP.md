@@ -198,7 +198,8 @@ Runtime/package hygiene for this layer is enforced by `pnpm run check -- --scope
 - `presence/displays/chronos-mirror-v2/` (compatibility redirects to Concierge `/ops` and `/api/ops`, port 3000; no screens of its own)
 - `presence/displays/presence-studio/` (companion workbench, port 3031)
 - `presence/displays/computer-surface/` (local mirror, port 3040)
-- `presence/displays/operator-surface/` (read-only audit monitor, port 3331)
+- `presence/displays/operator-surface/` (audit monitor, port 3331). Its read-only `/peer-tasks`
+  view projects incoming peer tasks, related WorkItem status, and artifact references.
 - `presence/displays/customer-room/` (customer-facing decision room opened through an invite link, port 3046, operator-launched)
 - `presence/displays/a2ui-host/` (developer A2UI viewer, loopback port 3036, operator-launched)
 - `presence/displays/terminal-hud/` (Ink TUI, `pnpm tui`)

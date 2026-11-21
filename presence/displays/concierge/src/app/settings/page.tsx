@@ -101,6 +101,7 @@ import {
 import { createSettingsNavigation, resolveSettingsTarget } from './settings-navigation';
 import './settings.css';
 import { SettingsReadiness } from './settings-readiness';
+import { SetupOverview } from './sections/SetupOverview';
 import { createSettingsMenu } from './settings-menu';
 
 /**
@@ -1242,6 +1243,14 @@ export default function SettingsPage() {
             diagnostics={extraDiagnostics}
             onNavigate={jumpToSection}
           >
+            <SetupOverview
+              key={selectedTenant}
+              setup={setup}
+              viewing={meViewing}
+              locale={locale}
+              t={t}
+              onNavigate={jumpToSection}
+            />
             {extraDiagnostics.length > 0 ? (
               <SettingsReadiness
                 diagnostics={extraDiagnostics}

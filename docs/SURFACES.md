@@ -94,6 +94,8 @@ presence-studio の `/ui-gallery` は開発者向けのコンポーネントギ�
 
 最小ロールは member role(`viewer` < `operator` < `approver` < `owner`)で、満たさない項目は `allowed: false` で返る。member に紐付かない viewer は `localadmin` → owner、`readonly` → viewer として扱う。これはメニューの表示制御であり、各ページと API は自分で viewer を再解決して認可する。
 
+設定のチェックリスト内にある「初期設定の確認」では、設定済みエージェント、閲覧中のテナントとロール、接続用認証情報の登録状況を確認できる。「CLI の検出状況を確認」を押すと、CLI の検出結果とモデル候補が表示される。ログイン状態は各プロバイダで確認する。
+
 レールに載らないリンク先(他の画面から飛ぶ先): 頼む(相棒 `/ask`)、スタジオのホーム(相棒 `/home`)、はじめての仕事(秘書室 `/first-job`)、使い方(秘書室 `/help`。レールのヘルプリンク)、進み具合(秘書室 `/work?tab=requests`)。置き換えられた旧 URL(`/w`、`/w/<kind>`、`/ingest`、`/setup`、`/ops?section=missions` など)は新しいページへ 308 で転送される(`presence/displays/concierge/src/lib/ia-routes.ts`)。
 
 レールの実装は 1 つ(`libs/core/surface/front-desk-nav.ts`)を両サーフェスが読む。ラベル・href・許可(role gate)はすべて各サーフェスの `GET /api/front-desk/nav` から、「私は誰でどのテナントを見ているか」は `GET /api/me` から取得する(`?tenant=` クエリは許可集合を狭めるだけで、絶対に拡大しない)。

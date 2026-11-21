@@ -30,6 +30,7 @@ export interface MosReadEvent {
     | 'intent_snapshots'
     | 'surface_directory'
     | 'deliverable_inbox'
+    | 'peer_tasks'
     | 'reasoning_routes'
     | 'os_control_plane';
   resource_id?: string;
