@@ -201,6 +201,10 @@
     "active/shared/runtime/soak-evidence",
     "active/shared/runtime/outside.json",
     "active/shared/runtime/provider-health.json",
-    "active/shared/runtime/terminal-daemon"
+    "active/shared/runtime/terminal-daemon",
+    "active/shared/runtime/customer.env",
+    "active/shared/runtime/scope-surfaces.env",
+    "active/shared/runtime/confidential",
+    "active/shared/runtime/execution-feedback"
   ]
 }
