@@ -24,7 +24,7 @@
       "role": "sink",
       "op": "system:log",
       "params": {
-        "message": "[BASELINE] status={{baseline_check.status}} failed_layer={{baseline_check.failed_layer}} — branch on status per AGENTS.md §3 (detail: node dist/scripts/run_baseline_check.js)"
+        "message": "[BASELINE] status={{baseline_check.status}} next_action={{baseline_check.next_action}} failed_layer={{baseline_check.failed_layer}} — branch on status per AGENTS.md §3 (detail: node dist/scripts/run_baseline_check.js)"
       }
     }
   ]

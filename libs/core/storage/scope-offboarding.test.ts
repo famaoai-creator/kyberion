@@ -678,6 +678,43 @@ describe('AL-04 tenant/project offboarding', () => {
     expect(auditEvents().map((e) => e.event)).toContain('SCOPE_OFFBOARD_DRY_RUN');
   });
 
+  it('requires renewed review after the preview target set changes', () => {
+    seedTenant();
+    const scope = { scopeType: 'tenant' as const, scopeId: 'tenant-alpha' };
+    const preview = offboardScope(scope);
+    expect(preview.preview_id).toMatch(/^[a-f0-9]{64}$/);
+    expect(offboardScope(scope).preview_id).toBe(preview.preview_id);
+    writeJson(
+      abs('active/missions/public/MIS-ALPHA-2/mission-state.json'),
+      missionState({ mission_id: 'MIS-ALPHA-2', tenant_slug: 'tenant-alpha' })
+    );
+    const changed = offboardScope({
+      ...scope,
+      mode: 'execute',
+      expectedPreviewId: preview.preview_id,
+      approval: { approved_by: 'owner', purpose: 'fixture retirement' },
+    });
+    expect(changed.status).toBe('approval_required');
+    expect(changed.soft_deleted).toEqual([]);
+    expect(changed.export_path).toBeUndefined();
+    expect(auditEvents().map((event) => event.event)).toContain('SCOPE_OFFBOARD_DENIED');
+  });
+
+  it('executes a reviewed preview and verifies the scope is clear', () => {
+    seedTenant();
+    const scope = { scopeType: 'tenant' as const, scopeId: 'tenant-alpha' };
+    const preview = offboardScope(scope);
+    const result = offboardScope({
+      ...scope,
+      mode: 'execute',
+      expectedPreviewId: preview.preview_id,
+      approval: { approved_by: 'owner', purpose: 'fixture retirement' },
+    });
+    expect(result.status).toBe('offboarded');
+    expect(result.verification).toEqual({ clean: true, leftovers: [] });
+    expect(fs.existsSync(abs('active/missions/public/MIS-BETA-1/mission-state.json'))).toBe(true);
+  });
+
   it('refuses to delete without a human approval (fail-closed) and audits the denial', () => {
     seedTenant();
     const result = offboardScope({
