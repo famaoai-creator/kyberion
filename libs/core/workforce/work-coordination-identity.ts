@@ -9,6 +9,7 @@ import { parseSafeJsonInput } from '../foundation/json.js';
 import { nowIso } from '../foundation/time.js';
 import { resolveTenant } from '../organization/tenant-registry.js';
 import { WorkCoordinationError } from './work-coordination-error.js';
+import { workItemScheduleCreation } from './work-item-schedule.js';
 import type {
   ClaimWorkItemInput,
   CreateWorkItemInput,
@@ -117,6 +118,7 @@ export function buildWorkItemCreation(input: CreateWorkItemInput): WorkItem {
     ...(input.assigneeUserId ? { assignee_user_id: input.assigneeUserId } : {}),
     labels: [...(input.labels || [])],
     dependencies: [...(input.dependencies || [])],
+    ...workItemScheduleCreation(input),
     version: 1,
     created_at: now,
     updated_at: now,

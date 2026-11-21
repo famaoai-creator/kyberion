@@ -514,7 +514,13 @@ export function collectWorkspaceGraph(
         : {}),
       ...(actors.length ? { actors } : {}),
       ...(item.parent_item_id ? { parentItemId: item.parent_item_id } : {}),
-      facts: { priority: item.priority, source: item.source },
+      facts: {
+        priority: item.priority,
+        source: item.source,
+        // Calendar days (YYYY-MM-DD) for the board's due chip and the work calendar.
+        ...(item.start_date ? { start_date: item.start_date } : {}),
+        ...(item.due_date ? { due_date: item.due_date } : {}),
+      },
     });
   }
 
@@ -744,6 +750,8 @@ export interface GraphListFilter {
   topLevelOnly?: boolean;
   /** Work items (W2): only the direct steps of this Issue. */
   parentItemId?: string;
+  /** Work items: only those with a `start_date` or `due_date` (the work calendar). */
+  datedOnly?: boolean;
 }
 
 function matchesQuery(node: GraphNode, q: string): boolean {
@@ -775,6 +783,8 @@ export function listGraphNodes(graph: WorkspaceGraph, filter: GraphListFilter = 
     (node) =>
       (!filter.kind || node.kind === filter.kind) &&
       (!filter.topLevelOnly || !isStep(node)) &&
+      (!filter.datedOnly ||
+        (node.kind === 'work_item' && Boolean(node.facts?.due_date || node.facts?.start_date))) &&
       (!filter.parentItemId ||
         (node.kind === 'work_item' && node.parentItemId === filter.parentItemId)) &&
       (!filter.tenantSlug ||

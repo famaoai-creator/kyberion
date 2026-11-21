@@ -83,6 +83,7 @@ describe('MSN-SHELL-IA §1 redirects', () => {
     expect(iaListHref('nope')).toBeNull();
     expect(resolveIaTab(IA_WORK_TABS, 'items')).toBe('items');
     expect(resolveIaTab(IA_WORK_TABS, 'requests')).toBe('requests');
+    expect(resolveIaTab(IA_WORK_TABS, 'calendar')).toBe('calendar');
     expect(resolveIaTab(IA_WORK_TABS, 'bogus')).toBe('missions');
     expect(resolveIaTab(IA_WORK_TABS, null)).toBe('missions');
   });

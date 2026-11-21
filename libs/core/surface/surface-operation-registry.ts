@@ -137,7 +137,7 @@ const operations = [
     id: 'workspace.list',
     title: 'List workspace entities',
     description:
-      'List entities of one kind, optionally narrowed by tenant, organization, project, mission, actor, status or a text query. Work items: `top_level=true` lists Issues only (each with its step progress); `parent_item_id` lists the steps of one Issue.',
+      'List entities of one kind, optionally narrowed by tenant, organization, project, mission, actor, status or a text query. Work items: `top_level=true` lists Issues only (each with its step progress); `parent_item_id` lists the steps of one Issue; `dated=true` lists only items with a start or due date (the work calendar).',
     policy: readPolicy('workspace.list'),
     input: z
       .object({
@@ -150,6 +150,7 @@ const operations = [
         limit: z.coerce.number().int().min(1).max(500).optional(),
         top_level: z.enum(['true', 'false']).optional(),
         parent_item_id: ID.optional(),
+        dated: z.enum(['true', 'false']).optional(),
       })
       .strict(),
     run: (
@@ -166,6 +167,7 @@ const operations = [
         limit?: number;
         top_level?: 'true' | 'false';
         parent_item_id?: string;
+        dated?: 'true' | 'false';
       }
     ) => ({
       items: listGraphNodes(viewerGraph(ctx), {
@@ -180,6 +182,7 @@ const operations = [
         limit: input.limit,
         topLevelOnly: input.top_level === 'true',
         parentItemId: input.parent_item_id,
+        datedOnly: input.dated === 'true',
       }),
     }),
   },

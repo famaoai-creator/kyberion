@@ -13663,6 +13663,41 @@
         "ja": "{age}に更新",
         "qps-ploc": "⟦Ůṗḓȧŧėḓ {age} ŀőřė⟧"
       },
+      "ux_b_card_due_label": {
+        "en": "Due date",
+        "ja": "期日",
+        "qps-ploc": "⟦Ḓůė ḓȧŧė ŀőř⟧"
+      },
+      "ux_b_card_due_overdue": {
+        "en": "Overdue by {days} d ({date})",
+        "ja": "期限超過 {days}日（{date}）",
+        "qps-ploc": "⟦Őṽėřḓůė ƀẏ {days} ḓ ({date}) ŀőřėɱ ïṗş⟧"
+      },
+      "ux_b_card_due_today": {
+        "en": "Due today",
+        "ja": "今日が期限",
+        "qps-ploc": "⟦Ḓůė ŧőḓȧẏ ŀőř⟧"
+      },
+      "ux_b_card_due_soon": {
+        "en": "Due in {days} d ({date})",
+        "ja": "あと{days}日（{date}）",
+        "qps-ploc": "⟦Ḓůė ïñ {days} ḓ ({date}) ŀőřėɱ ï⟧"
+      },
+      "ux_b_card_due_on": {
+        "en": "Due {date}",
+        "ja": "期限 {date}",
+        "qps-ploc": "⟦Ḓůė {date} ŀőř⟧"
+      },
+      "ux_b_card_due_clear": {
+        "en": "Clear date",
+        "ja": "期日をはずす",
+        "qps-ploc": "⟦Ƈŀėȧř ḓȧŧė ŀőř⟧"
+      },
+      "ux_b_card_due_failed": {
+        "en": "Couldn't save the due date for “{title}”. Check that it is not before the start date.",
+        "ja": "「{title}」の期日を保存できませんでした。開始日より前になっていないか確認してください。",
+        "qps-ploc": "⟦Ƈőůŀḓñ'ŧ şȧṽė ŧħė ḓůė ḓȧŧė ƒőř “{title}”. Ƈħėƈķ ŧħȧŧ ïŧ ïş ñőŧ ƀėƒőřė ŧħė şŧȧřŧ ḓȧŧė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈő⟧"
+      },
       "ux_b_card_steps_progress": {
         "en": "{done} of {total} steps done",
         "ja": "ステップ {total} 件中 {done} 件が完了",
@@ -20982,6 +21017,101 @@
         "en": "Requests",
         "ja": "依頼",
         "qps-ploc": "⟦Řėɋůėşŧş ŀőř⟧"
+      },
+      "ia_shell_work_tab_calendar": {
+        "en": "Calendar",
+        "ja": "カレンダー",
+        "qps-ploc": "⟦Ƈȧŀėñḓȧř ŀőř⟧"
+      },
+      "ia_shell_work_cal_label": {
+        "en": "Work calendar",
+        "ja": "作業カレンダー",
+        "qps-ploc": "⟦Ẇőřķ ƈȧŀėñḓȧř ŀőřė⟧"
+      },
+      "ia_shell_work_cal_view_label": {
+        "en": "Calendar view",
+        "ja": "カレンダーの表示",
+        "qps-ploc": "⟦Ƈȧŀėñḓȧř ṽïėẇ ŀőřė⟧"
+      },
+      "ia_shell_work_cal_view_month": {
+        "en": "Month",
+        "ja": "月",
+        "qps-ploc": "⟦Ɱőñŧħ ŀőř⟧"
+      },
+      "ia_shell_work_cal_view_week": {
+        "en": "Week",
+        "ja": "週",
+        "qps-ploc": "⟦Ẇėėķ ŀőř⟧"
+      },
+      "ia_shell_work_cal_prev": {
+        "en": "Previous",
+        "ja": "前へ",
+        "qps-ploc": "⟦Ṗřėṽïőůş ŀőř⟧"
+      },
+      "ia_shell_work_cal_next": {
+        "en": "Next",
+        "ja": "次へ",
+        "qps-ploc": "⟦Ñėẋŧ ŀőř⟧"
+      },
+      "ia_shell_work_cal_today": {
+        "en": "Today",
+        "ja": "今日",
+        "qps-ploc": "⟦Ŧőḓȧẏ ŀőř⟧"
+      },
+      "ia_shell_work_cal_due": {
+        "en": "Due",
+        "ja": "期限",
+        "qps-ploc": "⟦Ḓůė ŀőř⟧"
+      },
+      "ia_shell_work_cal_start": {
+        "en": "Starts",
+        "ja": "開始",
+        "qps-ploc": "⟦Şŧȧřŧş ŀőř⟧"
+      },
+      "ia_shell_work_cal_underway": {
+        "en": "Underway",
+        "ja": "進行中",
+        "qps-ploc": "⟦Ůñḓėřẇȧẏ ŀőř⟧"
+      },
+      "ia_shell_work_cal_more": {
+        "en": "+{count} more",
+        "ja": "ほか {count} 件",
+        "qps-ploc": "⟦+{count} ɱőřė ŀőřė⟧"
+      },
+      "ia_shell_work_cal_day_label": {
+        "en": "{date}: {count} items",
+        "ja": "{date}：{count} 件",
+        "qps-ploc": "⟦{date}: {count} ïŧėɱş ŀőřėɱ ⟧"
+      },
+      "ia_shell_work_cal_overdue": {
+        "en": "{count} overdue",
+        "ja": "期限超過 {count} 件",
+        "qps-ploc": "⟦{count} őṽėřḓůė ŀőřė⟧"
+      },
+      "ia_shell_work_cal_clear": {
+        "en": "Nothing is overdue.",
+        "ja": "期限を過ぎた作業はありません。",
+        "qps-ploc": "⟦Ñőŧħïñɠ ïş őṽėřḓůė. ŀőřėɱ ⟧"
+      },
+      "ia_shell_work_cal_due_soon": {
+        "en": "{count} due within 2 days",
+        "ja": "2日以内に期限 {count} 件",
+        "qps-ploc": "⟦{count} ḓůė ẇïŧħïñ 2 ḓȧẏş ŀőřėɱ ïṗ⟧"
+      },
+      "ia_shell_work_cal_empty": {
+        "en": "No work item has a date yet. Set a due date on a card in the Work items tab.",
+        "ja": "期日のある作業はまだありません。「作業」タブのカードで期日を設定できます。",
+        "qps-ploc": "⟦Ñő ẇőřķ ïŧėɱ ħȧş ȧ ḓȧŧė ẏėŧ. Şėŧ ȧ ḓůė ḓȧŧė őñ ȧ ƈȧřḓ ïñ ŧħė Ẇőřķ ïŧėɱş ŧȧƀ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+      },
+      "ia_shell_work_cal_undated_hint": {
+        "en": "Work items without a date appear only on the Work items board.",
+        "ja": "期日のない作業は「作業」タブのボードにだけ表示されます。",
+        "qps-ploc": "⟦Ẇőřķ ïŧėɱş ẇïŧħőůŧ ȧ ḓȧŧė ȧṗṗėȧř őñŀẏ őñ ŧħė Ẇőřķ ïŧėɱş ƀőȧřḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "ia_shell_work_cal_truncated": {
+        "en": "Showing the {count} most recently updated dated work items; narrow the scope to see the rest.",
+        "ja": "期日のある作業のうち、更新が新しい {count} 件を表示しています。残りは範囲を絞ると表示されます。",
+        "qps-ploc": "⟦Şħőẇïñɠ ŧħė {count} ɱőşŧ řėƈėñŧŀẏ ůṗḓȧŧėḓ ḓȧŧėḓ ẇőřķ ïŧėɱş; ñȧřřőẇ ŧħė şƈőṗė ŧő şėė ŧħė řėşŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşė⟧"
       },
       "ia_work_requests_list_label": {
         "en": "Your requests",

@@ -36,6 +36,7 @@ import * as workLease from './work-item-lease.js';
 export { loadWorkBoardCatalogAtPath } from './work-board-catalog.js';
 export { issueBoardView } from './work-item-hierarchy.js';
 import { assertCreatedWorkItemParent, workItemHierarchyUpdate } from './work-item-hierarchy.js';
+import { workItemScheduleUpdate } from './work-item-schedule.js';
 import {
   assertClaimPayloadReplayable,
   assertOriginalWorkItemIdentity,
@@ -548,6 +549,7 @@ function updateWorkItemInternal(input: UpdateWorkItemInput, keepOrigins = false)
       ...(input.assigneeUserId !== undefined ? { assignee_user_id: input.assigneeUserId } : {}),
       ...(input.labels ? { labels: [...input.labels] } : {}),
       ...(input.dependencies ? { dependencies: [...input.dependencies] } : {}),
+      ...workItemScheduleUpdate(current, input),
       ...workItemContextUpdate(current, input.context, keepOrigins),
       ...parentPatch,
       ...(statusOrigin ? { status_origin: statusOrigin } : {}),

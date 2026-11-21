@@ -39,6 +39,7 @@
  * one inbox entry per receipt, ids and counts only.
  */
 import { createHash } from 'node:crypto';
+import { isCalendarDate } from '../foundation/time.js';
 import { isOverrideWindowOpen } from './effective.js';
 import { agendaContentHash } from './hash.js';
 import { agendaAnswerState } from './respond.js';
@@ -65,12 +66,8 @@ export function addUtcDays(date: string, days: number): string {
   return new Date(Date.parse(`${date}T00:00:00.000Z`) + days * DAY_MS).toISOString().slice(0, 10);
 }
 
-/** Is `value` a real calendar date written `YYYY-MM-DD`? */
-export function isCalendarDate(value: unknown): value is string {
-  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/u.test(value)) return false;
-  const ms = Date.parse(`${value}T00:00:00.000Z`);
-  return Number.isFinite(ms) && new Date(ms).toISOString().slice(0, 10) === value;
-}
+/** Is `value` a real calendar date written `YYYY-MM-DD`? (defined in foundation/time) */
+export { isCalendarDate };
 
 function digest(parts: readonly string[]): string {
   return createHash('sha256').update(parts.join('\u0000')).digest('hex').slice(0, 16);
