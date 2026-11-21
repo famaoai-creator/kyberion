@@ -1,7 +1,7 @@
 ---
 title: Organization Operations Runbook
 tags: [organization, operation, incident, decision, governance]
-last_updated: 2026-11-21
+last_updated: 2026-11-22
 ---
 
 # Organization operations
@@ -38,6 +38,16 @@ When recording a completed Run for a mission-backed Operation, `--execution-ref`
 An Operation may carry a `deadline` (`--deadline-business-day <n> --deadline-time <HH:MM>`), evaluated in the trigger timezone on the Japanese bank calendar: weekends, national holidays (including substitute and citizen's holidays) and December 31 – January 3 are closed. A business day past the month's count is clamped to the month's last business day. A period is met only by a succeeded Run completed inside the period and at or before the deadline; a later success stays missed and is marked `completed_late`. The builder stamps `deadline.deadline_effective_from` when a deadline is added or its day/time changes and carries it forward otherwise, so a period whose deadline passed before that moment is `untracked` rather than missed. Editing other fields does not hide a missed period. Records without the field fall back to `updated_at`.
 
 `pipelines/organization-daily-digest.json` (08:30 Asia/Tokyo) aggregates every organization across tenants for the sovereign operator: overdue and due Operations, business-day deadlines, pending Decisions, service observations that are stale or expire within seven days, and open Incidents. It runs only as `KYBERION_BASE_ROLE=sovereign`, records one audit entry naming the tenants read, and skips a tenant it cannot read, listing it in the digest and the audit entry. Delivery goes to Slack through Chronos `deliver_to` with `channel: env:KYBERION_OPERATOR_SLACK_DM`; an unset value fails closed. On a host, `KYBERION_CHRONOS_SCHEDULES` (comma-separated schedule ids) limits which schedules Chronos runs; a value that lists no ids runs nothing. Install the daemon with `pnpm kyberion scheduler install --apply --forward-env KYBERION_BASE_ROLE --forward-env KYBERION_CHRONOS_SCHEDULES --forward-env KYBERION_OPERATOR_SLACK_DM`.
+
+## Writes without organization authority (approval-mediated)
+
+An `--apply` write (e.g. `init`, `operation add`, `operation run record`) from a caller without organization write authority (no `KYBERION_BASE_ROLE=sovereign`, no `MISSION_ROLE=organization_operator` for the tenant — typically an agent session) can be approved for one run instead of granting a role:
+
+1. Add `--request-approval` to the `--apply` command. It opens a human-only approval bound to that exact command, its arguments and the organization scope; nothing is written.
+2. A human approves it: `pnpm kyberion approvals --approve <id>`. From an agent CLI without a TTY (e.g. Claude Code `!`), add `--new-window`: the OS opens a terminal window where the typed-code challenge runs. A terminal attestation (A2) is accepted for these writes; organization decisions keep their stronger rule below.
+3. Re-run the exact command with `--approval-request-id <id>` instead of `--request-approval`. The approval is checked against the recomputed arguments and scope, used up once, and only that write runs as `organization_operator` bound to the tenant. A changed argument, another tenant or command, a reused approval or a decision below A2 is refused.
+
+Shared-scope organizations (no tenant) still need `KYBERION_BASE_ROLE=sovereign`. Implementation: `scripts/organization/organization_write_approval.ts`.
 
 ## Incidents and decisions
 

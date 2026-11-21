@@ -11892,6 +11892,16 @@
         "ja": "承認待ちが見つかりません: {id}",
         "qps-ploc": "⟦Ṗėñḓïñɠ ȧṗṗřőṽȧŀ ñőŧ ƒőůñḓ: {id} ŀőřėɱ ïṗşů⟧"
       },
+      "recorder_approval_window_opened": {
+        "en": "Opened a new terminal window for {id}. Check the request there and type the code it shows. (Same as running: {command})",
+        "ja": "{id} の承認用に新しいターミナル窓を開きました。その窓で内容を確認し、表示されたコードを入力してください。(実行内容: {command})",
+        "qps-ploc": "⟦Őṗėñėḓ ȧ ñėẇ ŧėřɱïñȧŀ ẇïñḓőẇ ƒőř {id}. Ƈħėƈķ ŧħė řėɋůėşŧ ŧħėřė ȧñḓ ŧẏṗė ŧħė ƈőḓė ïŧ şħőẇş. (Şȧɱė ȧş řůññïñɠ: {command}) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓ⟧"
+      },
+      "recorder_approval_window_manual": {
+        "en": "No window can be opened here ({reason}). Open a terminal yourself and run: {command}",
+        "ja": "ここでは窓を開けません({reason})。ご自身でターミナルを開いて次を実行してください: {command}",
+        "qps-ploc": "⟦Ñő ẇïñḓőẇ ƈȧñ ƀė őṗėñėḓ ħėřė ({reason}). Őṗėñ ȧ ŧėřɱïñȧŀ ẏőůřşėŀƒ ȧñḓ řůñ: {command} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
+      },
       "recorder_approvals_revoke_not_found": {
         "en": "Revocable approved approval not found: {id}",
         "ja": "取り消せる承認済みの承認が見つかりません: {id}",
