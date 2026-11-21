@@ -226,6 +226,9 @@ export const SYSTEM_PROCEDURE_OP_HANDLERS: Readonly<Record<string, SystemCapture
       pr_title: String(resolve(params.pr_title)),
       pr_body: String(resolve(params.pr_body)),
       auto_merge: resolve(params.auto_merge) === true,
+      ...(params.checks_timeout_minutes !== undefined
+        ? { checks_timeout_minutes: Number(resolve(params.checks_timeout_minutes)) }
+        : {}),
     });
     return { ...ctx, [String(params.export_as ?? 'pr_creation_result')]: result };
   },

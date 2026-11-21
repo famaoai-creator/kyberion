@@ -5,6 +5,7 @@ import {
   buildVitestEnv,
   gateCoveredTestFiles,
   parseTestSuiteArgs,
+  prSuiteDuplicatedGateFiles,
   TEST_SUITES,
   runTestSuite,
 } from './test_suite.js';
@@ -101,6 +102,47 @@ describe('test suite dispatcher', () => {
     );
     expect(ci).toContain('pnpm test -- --suite integration --skip-gate-tests --shard=1/2');
     expect(ci).toContain('pnpm test -- --suite integration --skip-gate-tests --shard=2/2');
+  });
+
+  it('ratchets pr gate files that a PR suite already runs (no new duplicates)', () => {
+    const read = (file: string) =>
+      JSON.parse(String(safeReadFile(pathResolver.rootResolve(file), { encoding: 'utf8' })));
+    const duplicated = prSuiteDuplicatedGateFiles(
+      read('knowledge/product/governance/ci-gates.json')
+    );
+    const baseline: string[] = read('scripts/check/test_suite_gate_duplicates.baseline.json').files;
+    const added = duplicated.filter((file) => !baseline.includes(file));
+    const stale = baseline.filter((file) => !duplicated.includes(file));
+    expect(
+      added,
+      'these files already run in the core/actuators PR suite; leave them out of the pr gate ' +
+        '(or, for a fast contract the gate must catch locally, add them to the baseline with a reason)'
+    ).toEqual([]);
+    expect(
+      stale,
+      'remove these from scripts/check/test_suite_gate_duplicates.baseline.json'
+    ).toEqual([]);
+  });
+
+  it('detects a pr gate file under a PR suite root', () => {
+    const vitest = ['node_modules/vitest/vitest.mjs', 'run'];
+    expect(
+      prSuiteDuplicatedGateFiles({
+        gates: [
+          {
+            id: 'g',
+            scope: 'pr',
+            args: [
+              ...vitest,
+              'tests/a.test.ts',
+              'libs/core/x.test.ts',
+              'libs/actuators/y/z.test.ts',
+            ],
+          },
+          { id: 'f', scope: 'full', args: [...vitest, 'libs/core/full.test.ts'] },
+        ],
+      })
+    ).toEqual(['libs/actuators/y/z.test.ts', 'libs/core/x.test.ts']);
   });
 
   it('rejects missing and unknown suite names', () => {

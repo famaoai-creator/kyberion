@@ -12,11 +12,7 @@ import {
   gitPush,
   type VcsCommandResult,
 } from '@agent/core/vcs';
-import {
-  vcsHostOptionsForRunner,
-  vcsHostPrChecks,
-  vcsHostPrMerge,
-} from '@agent/core/vcs/vcs-host-verbs';
+import { vcsHostOptionsForRunner, vcsHostPrMergeWhenGreen } from '@agent/core/vcs/vcs-host-verbs';
 import { main as publishPullRequest } from '../../../../scripts/publish/publish_pull_request.js';
 
 export interface StandardPrLifecycleParams {
@@ -25,11 +21,15 @@ export interface StandardPrLifecycleParams {
   pr_title: string;
   pr_body: string;
   auto_merge?: boolean;
+  /** auto_merge only: minutes to wait for CI before refusing (default 30). */
+  checks_timeout_minutes?: number;
 }
 export interface PrLifecycleDependencies {
   exec: typeof safeExecResult;
   write: typeof safeWriteFile;
   publish: typeof publishPullRequest;
+  /** auto_merge check polling (tests inject a clock-advancing sleep). */
+  sleep?: (ms: number) => Promise<void>;
 }
 
 function assertOk(result: VcsCommandResult, label: string): void {
@@ -87,31 +87,30 @@ export async function runStandardPrLifecycle(
   if (params.auto_merge === true) {
     // The governed default exec resolves the vcs-host seam (gh-cli or
     // github-rest); an injected exec keeps driving the gh CLI it was built for.
+    // A just-created PR always has pending checks: wait for them, then merge
+    // the head they passed on (fail closed on timeout / failure / no checks).
     const host = vcsHostOptionsForRunner({ cwd }, exec);
-    let checks;
     try {
-      checks = await vcsHostPrChecks({ ...host, ref: url });
+      await vcsHostPrMergeWhenGreen(
+        {
+          ...host,
+          ref: url,
+          method: 'merge',
+          deleteBranch: true,
+          checksTimeoutMs: Math.min(180, Math.max(1, params.checks_timeout_minutes ?? 30)) * 60_000,
+        },
+        deps.sleep
+      );
     } catch (error) {
-      throw new Error(
-        `[PR_LIFECYCLE_COMMAND_FAILED] gh pr checks: ${error instanceof Error ? error.message : String(error)}`
-      );
-    }
-    // Fail closed: merge only on an explicit success. 'none' (no checks
-    // reported) refuses too — matching the old code, which threw on any
-    // non-zero `gh pr checks` exit rather than merge with zero CI evidence.
-    if (checks.state !== 'success') {
-      throw new Error(
-        `[PR_LIFECYCLE_CHECKS_FAILED] auto-merge refused; checks state=${checks.state}` +
-          (checks.failing.length ? `; failing: ${checks.failing.join(', ')}` : '') +
-          (checks.pending.length ? `; pending: ${checks.pending.join(', ')}` : '')
-      );
-    }
-    try {
-      await vcsHostPrMerge({ ...host, ref: url, method: 'merge', deleteBranch: true });
-    } catch (error) {
-      throw new Error(
-        `[PR_LIFECYCLE_COMMAND_FAILED] pr merge: ${error instanceof Error ? error.message : String(error)}`
-      );
+      const message = error instanceof Error ? error.message : String(error);
+      if (message.startsWith('[PR_MERGE_CHECKS_NOT_GREEN]'))
+        throw new Error(
+          message.replace(
+            '[PR_MERGE_CHECKS_NOT_GREEN]',
+            '[PR_LIFECYCLE_CHECKS_FAILED] auto-merge refused:'
+          )
+        );
+      throw new Error(`[PR_LIFECYCLE_COMMAND_FAILED] pr merge: ${message}`);
     }
     assertOk(gitCheckout(cwd, 'main', {}, exec), 'git checkout main');
     assertOk(gitPull(cwd, { remote: 'origin', ref: 'main' }, exec), 'git pull --ff-only');

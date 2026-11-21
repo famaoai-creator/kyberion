@@ -36645,6 +36645,11 @@
               "auto_merge": {
                 "type": "boolean"
               },
+              "checks_timeout_minutes": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 180
+              },
               "export_as": {
                 "type": "string"
               }

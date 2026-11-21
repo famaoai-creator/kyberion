@@ -9745,6 +9745,16 @@
         "ja": "準備ゲートを通してから GitHub の PR を作成",
         "qps-ploc": "⟦Őṗėñ ȧ ƓïŧĦůƀ ṗůŀŀ řėɋůėşŧ ȧƒŧėř ŧħė řėȧḓïñėşş ɠȧŧėş ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
       },
+      "cli_cmd_script_pr_merge": {
+        "en": "Wait for a pull request's checks, then merge it through the governed merge gate",
+        "ja": "PR のチェック完了を待ち、統制されたマージゲートを通してマージ",
+        "qps-ploc": "⟦Ẇȧïŧ ƒőř ȧ ṗůŀŀ řėɋůėşŧ'ş ƈħėƈķş, ŧħėñ ɱėřɠė ïŧ ŧħřőůɠħ ŧħė ɠőṽėřñėḓ ɱėřɠė ɠȧŧė ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
+      },
+      "cli_caution_pr_merge": {
+        "en": "Merges only the commit every check passed on, then deletes the branch; needs your approval unless your charter delegates the merge",
+        "ja": "全チェックが成功したコミットだけをマージし、ブランチを削除します。charter で委任していない場合はあなたの承認が必要です",
+        "qps-ploc": "⟦Ɱėřɠėş őñŀẏ ŧħė ƈőɱɱïŧ ėṽėřẏ ƈħėƈķ ṗȧşşėḓ őñ, ŧħėñ ḓėŀėŧėş ŧħė ƀřȧñƈħ; ñėėḓş ẏőůř ȧṗṗřőṽȧŀ ůñŀėşş ẏőůř ƈħȧřŧėř ḓėŀėɠȧŧėş ŧħė ɱėřɠė ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïş⟧"
+      },
       "cli_cmd_script_pr_preflight": {
         "en": "Run the pull-request readiness gates and affected tests for changed paths without creating a PR",
         "ja": "PR を作成せずに、変更パスに応じた PR 準備ゲートと影響テストを実行",
@@ -10204,6 +10214,11 @@
         "en": "Project controller (same target as kyberion project)",
         "ja": "プロジェクト管理 (kyberion project と同じ実体)",
         "qps-ploc": "⟦Ṗřőĵėƈŧ ƈőñŧřőŀŀėř (şȧɱė ŧȧřɠėŧ ȧş ķẏƀėřïőñ ṗřőĵėƈŧ) ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "cli_cmd_script_create_presence": {
+        "en": "Scaffold a presence package and register it in tsconfig, build layout, CI caches and i18n",
+        "ja": "presence パッケージの雛形を作り、tsconfig・ビルド配置・CI キャッシュ・i18n に登録",
+        "qps-ploc": "⟦Şƈȧƒƒőŀḓ ȧ ṗřėşėñƈė ṗȧƈķȧɠė ȧñḓ řėɠïşŧėř ïŧ ïñ ŧşƈőñƒïɠ, ƀůïŀḓ ŀȧẏőůŧ, ƇÏ ƈȧƈħėş ȧñḓ ï18ñ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñ⟧"
       },
       "cli_cmd_script_create_actuator": {
         "en": "Scaffold a new actuator",

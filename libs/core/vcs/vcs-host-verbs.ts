@@ -576,3 +576,100 @@ export async function vcsHostPrMerge(params: VcsHostPrMergeParams): Promise<VcsP
     (result) => (result?.merged === true ? 'succeeded' : 'unknown')
   );
 }
+
+export interface VcsHostPrMergeWhenGreenParams extends VcsHostCallOptions {
+  ref: string;
+  method?: 'merge' | 'squash' | 'rebase';
+  deleteBranch?: boolean;
+  /** How long to wait for checks to reach a terminal state (default 30 min). */
+  checksTimeoutMs?: number;
+  checksIntervalMs?: number;
+}
+
+export interface VcsHostPrMergeWhenGreenResult {
+  merged: true;
+  number: number;
+  headSha: string;
+  waited_ms: number;
+}
+
+/**
+ * Wait for a PR's checks, then merge the exact head they passed on.
+ *
+ * Fail closed: a timeout, any failing check, or no reported checks refuses
+ * the merge. The head commit is pinned before waiting and passed to
+ * {@link vcsHostPrMerge} as `expectedHeadSha`, so a push that lands while CI
+ * runs is never merged on the earlier revision's green. The merge itself stays
+ * the governed `vcs:pr_merge` operation: it needs a human approval or a
+ * charter grant for the base branch, exactly as before.
+ */
+export async function vcsHostPrMergeWhenGreen(
+  params: VcsHostPrMergeWhenGreenParams,
+  sleep?: (ms: number) => Promise<void>
+): Promise<VcsHostPrMergeWhenGreenResult> {
+  assertNotFlagLike(params.ref, 'pr ref');
+  const { ref, method, deleteBranch, checksTimeoutMs, checksIntervalMs, ...host } = params;
+  const before = await vcsHostPrView({ ...host, ref });
+  // A URL ref must name the PR it resolves to: a provider that reads only the
+  // number from a URL would otherwise merge the bound repository's PR of that
+  // number for a URL that points at another repository.
+  if (/^https?:\/\//iu.test(ref) && ref.replace(/\/+$/u, '') !== String(before.url ?? ''))
+    throw new Error(
+      `[PR_MERGE_WRONG_REPOSITORY] ${ref} is not a PR of this checkout's repository (resolved ${String(before.url ?? 'nothing')}) — nothing was merged | next: run from a checkout of that repository, or pass the PR number`
+    );
+  const headSha = String(before.headRefOid ?? '');
+  if (!SHA.test(headSha))
+    throw new Error('[VCS_SNAPSHOT_UNAVAILABLE] PR head commit required before waiting for checks');
+  const checks = await vcsHostPrChecksWait(
+    {
+      ...host,
+      ref,
+      timeoutMs: checksTimeoutMs ?? 30 * 60_000,
+      ...(checksIntervalMs !== undefined ? { intervalMs: checksIntervalMs } : {}),
+    },
+    sleep
+  );
+  if (checks.timed_out || checks.state !== 'success') {
+    const budgetMs = checksTimeoutMs ?? 30 * 60_000;
+    const budget =
+      budgetMs >= 60_000
+        ? `${Math.round(budgetMs / 60_000)} min`
+        : `${Math.round(budgetMs / 1000)}s`;
+    const pr = `PR ${ref}`;
+    let detail: string;
+    if (checks.state === 'none')
+      detail = `${pr} not merged — no checks were reported within ${budget}, so CI never ran on it (a PR whose base is not main gets no CI) | next: check the PR base and the workflow runs, then rerun`;
+    else if (checks.timed_out)
+      detail = `${pr} not merged — checks still pending after ${budget}: ${checks.pending.join(', ')} | next: rerun with a longer --checks-timeout-minutes`;
+    else
+      detail = `${pr} not merged — checks failing: ${checks.failing.join(', ') || checks.state} | next: fix and push, then rerun`;
+    throw new Error(`[PR_MERGE_CHECKS_NOT_GREEN] ${detail} | evidence: gh pr checks ${ref}`);
+  }
+  let merged: VcsPrMergeResult;
+  try {
+    merged = await vcsHostPrMerge({
+      ...host,
+      ref,
+      method: method ?? 'merge',
+      deleteBranch: deleteBranch !== false,
+      expectedHeadSha: headSha,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (!message.startsWith('[VCS_REVIEW_STALE]') && !message.startsWith('[VCS_SNAPSHOT_CHANGED]'))
+      throw error;
+    // The snapshot also covers the base: say "new commit" only when the head moved.
+    let currentHead = '';
+    try {
+      currentHead = String((await vcsHostPrView({ ...host, ref })).headRefOid ?? '');
+    } catch {
+      throw error;
+    }
+    if (currentHead && currentHead !== headSha)
+      throw new Error(
+        `[PR_MERGE_HEAD_MOVED] PR ${ref} not merged — a new commit was pushed while checks ran (checked ${headSha.slice(0, 10)}, now ${currentHead.slice(0, 10)}) | next: rerun to wait for checks on the new head`
+      );
+    throw error;
+  }
+  return { merged: true, number: merged.number, headSha, waited_ms: checks.waited_ms };
+}

@@ -214,6 +214,7 @@ const SYSTEM_EXTRA_CONTRACTS: Record<string, SystemOpSpec['input_schema']> = {
       pr_title: { type: 'string', minLength: 1 },
       pr_body: { type: 'string' },
       auto_merge: { type: 'boolean' },
+      checks_timeout_minutes: { type: 'integer', minimum: 1, maximum: 180 },
       export_as: { type: 'string' },
     },
     additionalProperties: false,

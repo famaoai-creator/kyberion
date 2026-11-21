@@ -47,6 +47,7 @@ import {
   vcsHostPrCreate,
   vcsHostPrList,
   vcsHostPrMerge,
+  vcsHostPrMergeWhenGreen,
   vcsHostPrView,
 } from './vcs-host-verbs.js';
 import { createGhCliVcsHostProvider, failureDetail } from './gh-cli-host-provider.js';
@@ -446,6 +447,103 @@ describe('governed vcs-host verbs', () => {
     ).rejects.toThrow(/VCS_GH_WAIT_FAILED/);
   });
 
+  it('merge-when-green waits for checks and merges the head they passed on', async () => {
+    const forge = memory();
+    const pull = forge.state.pulls[0];
+    pull.checks = [{ name: 'build', bucket: 'pending' }];
+    const result = await vcsHostPrMergeWhenGreen(
+      { ...opts, ref: '7', checksIntervalMs: 1000 },
+      async () => {
+        pull.checks = [{ name: 'build', bucket: 'pass' }];
+      }
+    );
+    expect(result).toMatchObject({ merged: true, number: 7, headSha: HEAD });
+    expect(forge.merges[0]).toMatchObject({ number: 7, expectedHeadSha: HEAD });
+    expect(mocks.admitted.some((a) => a.operationId === 'vcs:pr_merge')).toBe(true);
+  });
+
+  it('merge-when-green refuses failing checks without reaching the merge gate', async () => {
+    const forge = memory();
+    forge.state.pulls[0].checks = [{ name: 'build', bucket: 'fail' }];
+    await expect(
+      vcsHostPrMergeWhenGreen({ ...opts, ref: '7' }, async () => undefined)
+    ).rejects.toThrow(/PR_MERGE_CHECKS_NOT_GREEN.*failing: build/);
+    expect(forge.merges).toHaveLength(0);
+    expect(mocks.admitted.some((a) => a.operationId === 'vcs:pr_merge')).toBe(false);
+  });
+
+  it('merge-when-green refuses when a push lands while checks run', async () => {
+    const forge = memory();
+    const pull = forge.state.pulls[0];
+    pull.checks = [{ name: 'build', bucket: 'pending' }];
+    const original = forge.prView.bind(forge);
+    let pushed = false;
+    forge.prView = async (...args) => {
+      const view = await original(...args);
+      return pushed ? { ...view, headRefOid: 'c'.repeat(40) } : view;
+    };
+    await expect(
+      vcsHostPrMergeWhenGreen({ ...opts, ref: '7', checksIntervalMs: 1000 }, async () => {
+        pushed = true;
+        pull.checks = [{ name: 'build', bucket: 'pass' }];
+      })
+    ).rejects.toThrow(/PR_MERGE_HEAD_MOVED.*new commit was pushed/);
+    expect(forge.merges).toHaveLength(0);
+  });
+
+  it('merge-when-green times out fail-closed', async () => {
+    const forge = memory();
+    forge.state.pulls[0].checks = [{ name: 'build', bucket: 'pending' }];
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      await expect(
+        vcsHostPrMergeWhenGreen(
+          { ...opts, ref: '7', checksIntervalMs: 1000, checksTimeoutMs: 5000 },
+          async (ms) => {
+            vi.setSystemTime(Date.now() + Math.max(ms, 1000));
+          }
+        )
+      ).rejects.toThrow(/still pending after 5s: build/);
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(forge.merges).toHaveLength(0);
+  });
+
+  it('merge-when-green refuses a URL that resolves to another repository', async () => {
+    const forge = memory();
+    forge.state.pulls[0].checks = [{ name: 'build', bucket: 'pass' }];
+    await expect(
+      vcsHostPrMergeWhenGreen(
+        { ...opts, ref: 'https://github.com/other/repo/pull/7' },
+        async () => undefined
+      )
+    ).rejects.toThrow(/PR_MERGE_WRONG_REPOSITORY/);
+    expect(forge.merges).toHaveLength(0);
+    // the bound repository's own URL is accepted
+    await expect(
+      vcsHostPrMergeWhenGreen({ ...opts, ref: 'https://github.com/acme/widgets/pull/7' })
+    ).resolves.toMatchObject({ merged: true });
+  });
+
+  it('merge-when-green keeps a base-only change distinct from a pushed head', async () => {
+    const forge = memory();
+    forge.state.pulls[0].checks = [{ name: 'build', bucket: 'pass' }];
+    const original = forge.prView.bind(forge);
+    let reads = 0;
+    forge.prView = async (...args) => {
+      const view = await original(...args);
+      reads += 1;
+      // first read pins; the merge's own snapshots see a moved base only
+      return reads > 2 ? { ...view, baseRefOid: 'e'.repeat(40) } : view;
+    };
+    const error = await vcsHostPrMergeWhenGreen({ ...opts, ref: '7' }).catch((e: Error) => e);
+    expect(String(error)).not.toMatch(/PR_MERGE_HEAD_MOVED/);
+    expect(String(error)).toMatch(/VCS_/);
+    expect(forge.merges).toHaveLength(0);
+    expect(forge.merges).toHaveLength(0);
+  });
+
   it('prefers an injected provider instance over seam resolution', async () => {
     const injected = createMemoryVcsHostProvider({ id: 'injected', repository: REPO });
     expect(resolveVcsHostProvider({ hostProvider: injected, provider: 'gh-cli' })).toBe(injected);
@@ -673,6 +771,18 @@ describe('gh CLI failure detail', () => {
     await expect(provider.repository(ctx())).rejects.toThrow(
       'gh repo view failed — error connecting to api.github.com'
     );
+  });
+
+  it('reads "no checks reported" as zero checks, not a transport failure', async () => {
+    const provider = createGhCliVcsHostProvider({
+      run: () =>
+        ({ status: 1, stdout: '', stderr: "no checks reported on the 'feat/x' branch" }) as never,
+    });
+    await expect(provider.prChecks(ctx(), REPO, '7')).resolves.toEqual([]);
+    const failing = createGhCliVcsHostProvider({
+      run: () => ({ status: 1, stdout: '', stderr: 'HTTP 502' }) as never,
+    });
+    await expect(failing.prChecks(ctx(), REPO, '7')).rejects.toThrow(/gh pr checks failed/);
   });
 });
 
