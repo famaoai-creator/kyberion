@@ -16,6 +16,56 @@
       "daemon-watchdog reports ok=true on every 300s tick",
       "No unacknowledged ops-alert older than 24h"
     ],
+    "signal_probes": [
+      {
+        "signal": "daemon watchdog reports no unhealthy daemons",
+        "probe": {
+          "type": "file",
+          "path": "active/shared/runtime/heartbeats/watchdog-runs/last-run.json",
+          "expect": "matches",
+          "regex": "\"unhealthy\"\\s*:\\s*\\{\\s*\\}"
+        },
+        "every_s": 900
+      },
+      {
+        "signal": "scheduled pipelines have no consecutive failures",
+        "probe": {
+          "type": "file",
+          "path": "active/shared/runtime/pipeline-schedules.json",
+          "expect": "matches",
+          "regex": "\"version\":\\s*\"1\\.0\"(?:(?!\"consecutiveFailures\":\\s*[1-9])[\\s\\S])*(?![\\s\\S])"
+        },
+        "every_s": 900
+      }
+    ],
+    "key_results": [
+      {
+        "kr_id": "daemon_health_ratio",
+        "title": "Daemon watchdog clean-tick ratio",
+        "metric": {
+          "source": "signal_ratio",
+          "signal": "daemon watchdog reports no unhealthy daemons",
+          "window_hours": 24
+        },
+        "target": 95,
+        "direction": "increase",
+        "unit": "%",
+        "every_s": 900
+      },
+      {
+        "kr_id": "pipeline_failure_free_ratio",
+        "title": "Scheduled-pipeline failure-free ratio",
+        "metric": {
+          "source": "signal_ratio",
+          "signal": "scheduled pipelines have no consecutive failures",
+          "window_hours": 24
+        },
+        "target": 80,
+        "direction": "increase",
+        "unit": "%",
+        "every_s": 900
+      }
+    ],
     "budget": {
       "max_turns_per_wake": 4,
       "wall_clock_ms_per_wake": 1800000,
