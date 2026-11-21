@@ -9,5 +9,8 @@
   },
   "network": {
     "allow_local_network": false
+  },
+  "uncertainty": {
+    "require_llm_decide_fallback": false
   }
 }

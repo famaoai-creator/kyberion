@@ -2,7 +2,11 @@ import { afterEach, describe, expect, it } from 'vitest';
 import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeMkdir, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
-import { loadMissionBriefAtPath } from './mission-brief.js';
+import {
+  isStrictRequirementsFramingEnabled,
+  loadMissionBriefAtPath,
+  validateStrictMissionBriefFraming,
+} from './mission-brief.js';
 
 const root = pathResolver.sharedTmp(`mission-brief-loader-${process.pid}`);
 
@@ -36,5 +40,48 @@ describe('mission brief canonical loader', () => {
     const filePath = writeBrief({ missionId: 'MSN-LOADER', unexpected: true });
 
     expect(() => loadMissionBriefAtPath(filePath)).toThrow(/Invalid catalog mission-brief/u);
+  });
+
+  it('loads opt-in requirementsGovernance and checks strict framing fields', () => {
+    const incompletePath = writeBrief({
+      missionId: 'MSN-STRICT-1',
+      intent: 'Improve loop traceability',
+      victoryConditions: ['All checks pass'],
+      requirementsGovernance: {
+        strictFraming: true,
+        changeLevelRouting: true,
+        maturityLevel: 3,
+      },
+    });
+    const incomplete = loadMissionBriefAtPath(incompletePath);
+    expect(isStrictRequirementsFramingEnabled(incomplete)).toBe(true);
+    expect(isStrictRequirementsFramingEnabled(incomplete, false)).toBe(false);
+    const incompleteCheck = validateStrictMissionBriefFraming(incomplete);
+    expect(incompleteCheck.ok).toBe(false);
+    expect(incompleteCheck.missing).toEqual([
+      'scope.in',
+      'scope.out',
+      'deliverables',
+      'assumptions_or_risks',
+    ]);
+
+    const completePath = writeBrief({
+      missionId: 'MSN-STRICT-2',
+      intent: 'Improve loop traceability',
+      victoryConditions: ['All checks pass'],
+      scope: { in: ['libs/core/mission'], out: ['unrelated surfaces'] },
+      deliverables: ['mission-reentry-routing.ts'],
+      requirementsGovernance: {
+        strictFraming: true,
+        assumptions: ['Existing legacy missions stay opt-out by default'],
+        maturityLevel: 3,
+      },
+    });
+    const complete = loadMissionBriefAtPath(completePath);
+    expect(validateStrictMissionBriefFraming(complete)).toEqual({
+      ok: true,
+      missing: [],
+      reasons: [],
+    });
   });
 });

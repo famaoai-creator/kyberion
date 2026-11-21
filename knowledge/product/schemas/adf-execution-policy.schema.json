@@ -23,6 +23,13 @@
       "properties": {
         "allow_local_network": { "type": "boolean" }
       }
+    },
+    "uncertainty": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "require_llm_decide_fallback": { "type": "boolean" }
+      }
     }
   }
 }

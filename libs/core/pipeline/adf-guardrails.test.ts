@@ -7,6 +7,7 @@ import {
   isScriptWrapperCommand,
   validatePipelineGuardrails,
 } from './adf-guardrails.js';
+import { runAdfLifecycle } from './adf-lifecycle.js';
 
 describe('validatePipelineGuardrails', () => {
   it('uses the canonical execution policy without a fallback catalog', () => {
@@ -422,5 +423,73 @@ describe('logic-layering lint (LE-04/LE-05)', () => {
     } as unknown as Parameters<typeof validatePipelineGuardrails>[0]);
     expect(report.findings.some((f) => f.code === 'step-budget-exceeded')).toBe(true);
     expect(report.findings.some((f) => f.code === 'transform-script-oversized')).toBe(true);
+  });
+
+  it('escalates llm-decide-without-fallback to error under opt-in strictUncertaintyContract and repairs through runAdfLifecycle', async () => {
+    const draftAdf = {
+      id: 'strict-uncertainty-demo',
+      steps: [
+        {
+          op: 'system:llm_decide',
+          params: {
+            observation: 'distilled stdout log',
+            prompt: 'Decide next step',
+          },
+        },
+      ],
+    } as unknown as Parameters<typeof validatePipelineGuardrails>[0];
+
+    // Default remains advisory warning (backward compatible).
+    const defaultReport = validatePipelineGuardrails(draftAdf);
+    expect(defaultReport.ok).toBe(true);
+    expect(
+      defaultReport.findings.find((f) => f.code === 'llm-decide-without-fallback')?.severity
+    ).toBe('warn');
+
+    // Opt-in strictUncertaintyContract promotes missing fallback to blocking error.
+    const strictReport = validatePipelineGuardrails(draftAdf, 'draft.json', {
+      strictUncertaintyContract: true,
+    });
+    expect(strictReport.ok).toBe(false);
+    expect(
+      strictReport.findings.find((f) => f.code === 'llm-decide-without-fallback')?.severity
+    ).toBe('error');
+
+    // Passing runAdfLifecycle auto-repairs by adding explicit on_degraded fallback.
+    const lifecycleResult = await runAdfLifecycle({
+      draft: () => structuredClone(draftAdf),
+      preflight: (candidate) => {
+        const report = validatePipelineGuardrails(candidate, 'draft.json', {
+          strictUncertaintyContract: true,
+        });
+        if (!report.ok) {
+          throw new Error(report.findings.map((f) => f.code).join(','));
+        }
+        return candidate;
+      },
+      autoRepair: (candidate) => ({
+        ...candidate,
+        steps: candidate.steps.map((step) => ({
+          ...step,
+          params: {
+            ...(step.params as Record<string, unknown>),
+            on_degraded: 'fail',
+          },
+        })),
+      }),
+      commit: (prepared) => prepared,
+      execute: (committed) => committed,
+    });
+
+    expect(lifecycleResult.phases.map((p) => p.phase)).toEqual([
+      'draft',
+      'auto-repair',
+      'preflight',
+      'commit',
+      'execute',
+    ]);
+    expect((lifecycleResult.result.steps[0].params as Record<string, unknown>).on_degraded).toBe(
+      'fail'
+    );
   });
 });

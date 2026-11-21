@@ -14,7 +14,9 @@ import { evaluateAutonomousOpsAction } from '@agent/core/governance/autonomous-o
 import { observeMandateCoverage } from '@agent/core/governance/mandate-shadow';
 import {
   formatMissionAdmission,
+  isStrictRequirementsFramingEnabled,
   loadMissionBriefAtPath,
+  validateStrictMissionBriefFraming,
   type MissionBrief,
 } from './mission-brief.js';
 import { buildDecisionCard, type DecisionCard } from '@agent/core/governance/decision-card';
@@ -49,6 +51,7 @@ export function openAlignmentApproval(
   missionIdInput: string,
   options: {
     requestedBy?: string;
+    strictRequirementsFraming?: boolean;
     binding?: {
       source: ApprovalRequestSource;
       scope: EventScopeInput;
@@ -115,6 +118,18 @@ export function openAlignmentApproval(
       briefPath,
       reason: `Alignment brief is invalid: ${error instanceof Error ? error.message : String(error)}`,
     };
+  }
+
+  if (isStrictRequirementsFramingEnabled(brief, options.strictRequirementsFraming)) {
+    const framing = validateStrictMissionBriefFraming(brief);
+    if (!framing.ok) {
+      return {
+        missionId,
+        created: false,
+        briefPath,
+        reason: `Alignment brief failed strict requirements framing (${framing.missing.join(', ')}): ${framing.reasons.join(' ')}`,
+      };
+    }
   }
 
   const payloadHash = computeApprovalPayloadHash(brief as unknown as Record<string, unknown>);

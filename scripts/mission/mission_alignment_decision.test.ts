@@ -280,4 +280,12 @@ describe('mission_alignment_decision', () => {
     expect(report.missionId).toBe(MISSION_ID);
     expect(report.verdict).toBe('approved');
   });
+
+  it('returns brief_incomplete when opt-in strict framing is enabled on an incomplete approved brief', () => {
+    mocks.listApprovalRequests.mockReturnValue([approvalRecord()]);
+    const report = assessAlignmentDecision(MISSION_ID, { strictRequirementsFraming: true });
+    expect(report.verdict).toBe('brief_incomplete');
+    expect(report.satisfied).toBe(false);
+    expect(report.reasons[0]).toContain('scope.out');
+  });
 });

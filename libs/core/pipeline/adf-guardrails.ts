@@ -36,6 +36,8 @@ export interface AdfGuardrailOptions {
   scriptWrapperBaseline?: readonly AdfScriptWrapperBaselineEntry[];
   /** Optional resolved policy used to preflight network-bearing ADF hooks. */
   sandboxPolicy?: SandboxPolicy;
+  /** Opt-in: escalate generation-mode llm_decide without on_degraded from warning to blocking error. */
+  strictUncertaintyContract?: boolean;
 }
 
 function normalizeGuardrailSourcePath(sourcePath: string): string {
@@ -86,6 +88,9 @@ interface AdfExecutionPolicy {
   network: {
     allow_local_network: boolean;
   };
+  uncertainty: {
+    require_llm_decide_fallback: boolean;
+  };
 }
 
 const DEFAULT_POLICY: AdfExecutionPolicy = {
@@ -98,6 +103,9 @@ const DEFAULT_POLICY: AdfExecutionPolicy = {
   },
   network: {
     allow_local_network: false,
+  },
+  uncertainty: {
+    require_llm_decide_fallback: false,
   },
 };
 
@@ -135,6 +143,9 @@ function loadAdfExecutionPolicy(): AdfExecutionPolicy {
     },
     network: {
       allow_local_network: parsed?.network?.allow_local_network === true,
+    },
+    uncertainty: {
+      require_llm_decide_fallback: parsed?.uncertainty?.require_llm_decide_fallback === true,
     },
   };
 }
@@ -244,6 +255,8 @@ export function validatePipelineGuardrails(
     }
   }
   const policy = loadAdfExecutionPolicy();
+  const requireLlmDecideFallback =
+    options.strictUncertaintyContract ?? policy.uncertainty.require_llm_decide_fallback;
   let totalSteps = 0;
 
   const rawMaxSteps = pipeline.options?.max_steps;
@@ -407,7 +420,7 @@ export function validatePipelineGuardrails(
         if (!Array.isArray(params.options) && params.on_degraded == null) {
           findings.push({
             code: 'llm-decide-without-fallback',
-            severity: 'warn',
+            severity: requireLlmDecideFallback ? 'error' : 'warn',
             message:
               'generation-mode llm_decide (no options) without on_degraded — prefer selection mode, or declare how degradation is handled',
             path: stepPath,
