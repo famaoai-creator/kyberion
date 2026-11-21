@@ -1,7 +1,6 @@
 import type { OffboardScopeType } from './scope-offboarding.js';
 /** Guard the exact regular-file generation selected by authoritative lineage. */
 import { createHash } from 'node:crypto';
-import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 import { withLockSync } from '../foundation/lock-utils.js';
 import { pathResolver } from '../path-resolver.js';
