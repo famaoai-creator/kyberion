@@ -1,11 +1,7 @@
 {
   "version": "2.0",
   "default_locale": "en",
-  "required_locales": [
-    "en",
-    "ja",
-    "qps-ploc"
-  ],
+  "required_locales": ["en", "ja", "qps-ploc"],
   "domains": {
     "mission": {
       "mission_distillation_label": {
