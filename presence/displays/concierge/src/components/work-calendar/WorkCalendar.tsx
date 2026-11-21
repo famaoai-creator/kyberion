@@ -217,11 +217,13 @@ export function WorkCalendar({ t }: { t: Translate }) {
       ) : null}
       {list.state === 'ready' ? (
         <>
-          <div className="wc-summary" role="status">
+          <div className="wc-summary">
             {summary.overdue.length ? (
               <details className="wc-summary__group" data-tone="danger">
                 <summary>
-                  {t('ia_shell_work_cal_overdue', { count: summary.overdue.length })}
+                  <span role="status">
+                    {t('ia_shell_work_cal_overdue', { count: summary.overdue.length })}
+                  </span>
                 </summary>
                 <ul>
                   {summary.overdue.map((item) => (
@@ -235,10 +237,12 @@ export function WorkCalendar({ t }: { t: Translate }) {
                 </ul>
               </details>
             ) : (
-              <p className="wc-summary__clear">{t('ia_shell_work_cal_clear')}</p>
+              <p className="wc-summary__clear" role="status">
+                {t('ia_shell_work_cal_clear')}
+              </p>
             )}
             {summary.dueSoon.length ? (
-              <p className="wc-summary__soon" data-tone="warning">
+              <p className="wc-summary__soon" data-tone="warning" role="status">
                 {t('ia_shell_work_cal_due_soon', { count: summary.dueSoon.length })}
               </p>
             ) : null}

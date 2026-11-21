@@ -62,6 +62,7 @@ tags: [coordination, kanban, work-item, github, jira, peer, todo]
 - `start_date` / `due_date`: 暦日 `YYYY-MM-DD`(時刻・タイムゾーンなし)。両方あるときは `start_date <= due_date`。検証は `libs/core/workforce/work-item-schedule.ts`、更新で `null` を渡すと消える。
 - CLI: `pnpm work create-item --due-date 2026-11-30 [--start-date …]`、`pnpm work update-status --item-id <id> --due-date <day|none>`(`none` で消す)。
 - UI: workspace graph の `facts.start_date` / `facts.due_date` として各面に出る。concierge の作業カードに期日チップ(期限超過・今日・2 日以内)、`/work?tab=calendar` に月 / 週のカレンダー。日付の変更は governed `POST /api/ops/workitems {itemId, dueDate}`(localadmin、閲覧範囲を再確認)。
+- 日付は表示・計画用のメタデータで実行効果を持たないため、claim 中や効果保持中の項目でも変更できる（実行スコープ `context` の不変条件とは別扱い）。年は 1970〜2999 に限る（入力途中の年の誤保存を防ぐ）。
 
 ### Board
 

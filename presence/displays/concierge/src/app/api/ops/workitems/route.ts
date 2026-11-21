@@ -209,8 +209,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           ok: false,
-          error:
-            'the work item change is invalid (dates must be real days, start on or before due)',
+          error: 'the work item store refused this change as invalid',
           error_code: 'invalid_change',
         },
         { status: 400 }

@@ -10,15 +10,23 @@ import { isCalendarDate } from '../foundation/time.js';
 import { WorkCoordinationError } from './work-coordination-error.js';
 import type { WorkItem } from './work-coordination-types.js';
 
+/**
+ * Years a work date may name. A half-typed year (`0002-11-30` while someone is
+ * still typing `2026`) is a slip, not a plan; refuse it rather than store it.
+ */
+export const WORK_DATE_MIN_YEAR = 1970;
+export const WORK_DATE_MAX_YEAR = 2999;
+
 function assertCalendarDate(field: string, value: unknown): string {
   const text = typeof value === 'string' ? value.trim() : value;
-  if (!isCalendarDate(text)) {
+  const year = isCalendarDate(text) ? Number(text.slice(0, 4)) : NaN;
+  if (!(year >= WORK_DATE_MIN_YEAR && year <= WORK_DATE_MAX_YEAR)) {
     throw new WorkCoordinationError(
       'validation_error',
-      `${field} must be a calendar date (YYYY-MM-DD)`
+      `${field} must be a calendar date (YYYY-MM-DD) between ${WORK_DATE_MIN_YEAR} and ${WORK_DATE_MAX_YEAR}`
     );
   }
-  return text;
+  return text as string;
 }
 
 function assertOrder(start: string | undefined, due: string | undefined): void {

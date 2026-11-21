@@ -212,6 +212,68 @@ function CardSteps<T extends BoardCard>({
 
 type PendingMove<T> = { card: T; to: string };
 
+/** Mirrors the store's year range (`work-item-schedule.ts`); the store still decides. */
+const MIN_DUE_YEAR = 1970;
+const MAX_DUE_YEAR = 2999;
+
+/** True when `draft` is a whole date worth sending (a typed year is not finished before 1970). */
+export function committableDueDate(draft: string, current: string | undefined): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/u.test(draft) || draft === current) return false;
+  const year = Number(draft.slice(0, 4));
+  return year >= MIN_DUE_YEAR && year <= MAX_DUE_YEAR;
+}
+
+/**
+ * The card's due-date field. Typing only changes a local draft; the date is
+ * sent once, on blur or Enter, so typing a year segment never saves the
+ * half-typed values a date field reports per keystroke. Escape restores it.
+ */
+function DueDateInput({
+  label,
+  ariaLabel,
+  value,
+  min,
+  saving,
+  onCommit,
+}: {
+  label: string;
+  ariaLabel: string;
+  value: string | undefined;
+  min: string | undefined;
+  saving: boolean;
+  onCommit: (value: string) => void;
+}) {
+  const [draft, setDraft] = React.useState(value ?? '');
+  const commit = () => {
+    if (committableDueDate(draft, value)) onCommit(draft);
+    else setDraft(value ?? '');
+  };
+  return (
+    <label>
+      <span>{label}</span>
+      <input
+        type="date"
+        className="kb-input"
+        value={draft}
+        min={min}
+        aria-label={ariaLabel}
+        aria-busy={saving || undefined}
+        readOnly={saving}
+        onChange={(event) => setDraft(event.target.value)}
+        onBlur={commit}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            commit();
+          } else if (event.key === 'Escape') {
+            setDraft(value ?? '');
+          }
+        }}
+      />
+    </label>
+  );
+}
+
 function localDay(now: Date): string {
   const pad = (value: number) => String(value).padStart(2, '0');
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
@@ -426,21 +488,16 @@ export function WorkItemBoard<T extends BoardCard>({
         {renderCardExtra ? renderCardExtra(card) : null}
         {canMove && onSchedule ? (
           <div className="wb-card__due-edit">
-            <label>
-              <span>{t('ux_b_card_due_label')}</span>
-              <input
-                type="date"
-                className="kb-input"
-                value={card.dueDate ?? ''}
-                min={card.startDate}
-                disabled={scheduleSaving === card.id}
-                aria-label={`${t('ux_b_card_due_label')}: ${title}`}
-                onChange={(event) => {
-                  const value = event.target.value;
-                  if (value && value !== card.dueDate) void schedule(card, value);
-                }}
-              />
-            </label>
+            <DueDateInput
+              // A saved date from the server resets the draft.
+              key={`due:${card.dueDate ?? ''}`}
+              label={t('ux_b_card_due_label')}
+              ariaLabel={`${t('ux_b_card_due_label')}: ${title}`}
+              value={card.dueDate}
+              min={card.startDate}
+              saving={scheduleSaving === card.id}
+              onCommit={(value) => void schedule(card, value)}
+            />
             {card.dueDate ? (
               <button
                 type="button"

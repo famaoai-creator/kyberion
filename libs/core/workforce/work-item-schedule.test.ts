@@ -35,6 +35,9 @@ describe('work item schedule rules', () => {
       workItemScheduleCreation({ startDate: '2026-12-01', dueDate: '2026-11-30' })
     ).toThrow(/must not be after/);
     expect(() => workItemScheduleCreation({ dueDate: 'next friday' })).toThrow(/YYYY-MM-DD/);
+    // A half-typed year from a date input is refused, not stored.
+    expect(() => workItemScheduleCreation({ dueDate: '0002-11-30' })).toThrow(/between 1970/);
+    expect(workItemScheduleCreation({ dueDate: '2999-12-31' })).toEqual({ due_date: '2999-12-31' });
   });
 
   it('keeps omitted dates, clears null, and checks the resulting pair', () => {
