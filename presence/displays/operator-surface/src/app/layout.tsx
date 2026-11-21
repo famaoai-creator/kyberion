@@ -4,6 +4,7 @@ import { operatorTranslator, operatorUiMessages } from '@/lib/i18n';
 import { getRequestLocale } from '@/lib/request-locale';
 import { requireOperatorViewer } from '@/lib/viewer-context';
 import { isSelectionAdmin } from '@/lib/selection-access';
+import { canReadPeerTasks } from '@/lib/peer-tasks';
 import { THEME_BOOTSTRAP_SCRIPT } from '@/lib/display-preferences';
 import { OperatorShell, type OperatorNavItem } from './operator-shell';
 // Shared UI layer (UI-02): globals.css carries the generated --kb-* / --kb-ui-*
@@ -43,6 +44,14 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     { id: 'knowledge', label: t('nav_knowledge'), href: '/knowledge', icon: 'book' },
     { id: 'inbox', label: t('inbox_title'), href: '/inbox', icon: 'mail' },
   ];
+  if (canReadPeerTasks(viewer, scope)) {
+    items.push({
+      id: 'peer-tasks',
+      label: t('peer_tasks_title'),
+      href: '/peer-tasks',
+      icon: 'chat',
+    });
+  }
   return (
     // `data-theme` (a pinned light/dark choice) is set before paint by the
     // bootstrap script, hence suppressHydrationWarning.

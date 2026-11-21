@@ -30803,6 +30803,66 @@
         "ja": "拡張機能",
         "qps-ploc": "⟦Ėẋŧėñşïőñş ŀőř⟧"
       },
+      "setup_inventory": {
+        "en": "Setup overview",
+        "ja": "初期設定の確認",
+        "qps-ploc": "⟦Şėŧůṗ őṽėřṽïėẇ ŀőřė⟧"
+      },
+      "setup_inventory_agent": {
+        "en": "Configured agent",
+        "ja": "設定済みエージェント",
+        "qps-ploc": "⟦Ƈőñƒïɠůřėḓ ȧɠėñŧ ŀőřėɱ⟧"
+      },
+      "setup_inventory_runtime": {
+        "en": "Agent CLI and model candidates",
+        "ja": "エージェント CLI とモデル候補",
+        "qps-ploc": "⟦Ȧɠėñŧ ƇĿÏ ȧñḓ ɱőḓėŀ ƈȧñḓïḓȧŧėş ŀőřėɱ ïṗşů⟧"
+      },
+      "setup_inventory_detected": {
+        "en": "CLI detected",
+        "ja": "CLI 検出済み",
+        "qps-ploc": "⟦ƇĿÏ ḓėŧėƈŧėḓ ŀőř⟧"
+      },
+      "setup_inventory_missing": {
+        "en": "CLI not detected",
+        "ja": "CLI 未検出",
+        "qps-ploc": "⟦ƇĿÏ ñőŧ ḓėŧėƈŧėḓ ŀőřėɱ⟧"
+      },
+      "setup_inventory_probe": {
+        "en": "Check CLI availability",
+        "ja": "CLI の検出状況を確認",
+        "qps-ploc": "⟦Ƈħėƈķ ƇĿÏ ȧṽȧïŀȧƀïŀïŧẏ ŀőřėɱ ï⟧"
+      },
+      "setup_inventory_unavailable": {
+        "en": "CLI information is unavailable for this session.",
+        "ja": "このセッションでは CLI 情報を取得できません。",
+        "qps-ploc": "⟦ƇĿÏ ïñƒőřɱȧŧïőñ ïş ůñȧṽȧïŀȧƀŀė ƒőř ŧħïş şėşşïőñ. ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "setup_inventory_auth": {
+        "en": "CLI detection does not verify sign-in.",
+        "ja": "CLI の検出状況とログイン状態は別です。",
+        "qps-ploc": "⟦ƇĿÏ ḓėŧėƈŧïőñ ḓőėş ñőŧ ṽėřïƒẏ şïɠñ-ïñ. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "setup_inventory_scope": {
+        "en": "Viewing tenant and role",
+        "ja": "閲覧中のテナントとロール",
+        "qps-ploc": "⟦Ṽïėẇïñɠ ŧėñȧñŧ ȧñḓ řőŀė ŀőřėɱ ï⟧"
+      },
+      "setup_inventory_connection": {
+        "en": "Connection registered",
+        "ja": "接続設定を登録済み",
+        "qps-ploc": "⟦Ƈőññėƈŧïőñ řėɠïşŧėřėḓ ŀőřėɱ ⟧"
+      },
+      "setup_inventory_unknown": {
+        "en": "Unconfirmed",
+        "ja": "未確認",
+        "qps-ploc": "⟦Ůñƈőñƒïřɱėḓ ŀőř⟧"
+      },
+      "setup_inventory_capabilities": {
+        "en": "Capabilities",
+        "ja": "利用できる機能",
+        "qps-ploc": "⟦Ƈȧṗȧƀïŀïŧïėş ŀőř⟧"
+      },
       "settings_nav_authority": {
         "en": "Authority and approvals",
         "ja": "権限と承認",
@@ -36419,6 +36479,106 @@
         "en": "Set KYBERION_OS_GUARDED_SURFACE_URL to link the decision surface.",
         "ja": "判断用の画面を開くには KYBERION_OS_GUARDED_SURFACE_URL を設定してください。",
         "qps-ploc": "⟦Şėŧ ĶẎɃĖŘÏŐÑ_ŐŞ_ƓŮȦŘḒĖḒ_ŞŮŘƑȦƇĖ_ŮŘĿ ŧő ŀïñķ ŧħė ḓėƈïşïőñ şůřƒȧƈė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "peer_tasks_title": {
+        "en": "Peer tasks",
+        "ja": "ピアタスク",
+        "qps-ploc": "⟦Ṗėėř ŧȧşķş ŀőř⟧"
+      },
+      "peer_tasks_subtitle": {
+        "en": "Track incoming requests, local work, and artifact references.",
+        "ja": "受信した依頼、ローカルの作業、成果物の参照を確認できます。",
+        "qps-ploc": "⟦Ŧřȧƈķ ïñƈőɱïñɠ řėɋůėşŧş, ŀőƈȧŀ ẇőřķ, ȧñḓ ȧřŧïƒȧƈŧ řėƒėřėñƈėş. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "peer_tasks_tenant": {
+        "en": "Tenant {tenant}",
+        "ja": "テナント {tenant}",
+        "qps-ploc": "⟦Ŧėñȧñŧ {tenant} ŀőřė⟧"
+      },
+      "peer_tasks_peer": {
+        "en": "Local peer ID",
+        "ja": "ローカルピア ID",
+        "qps-ploc": "⟦Ŀőƈȧŀ ṗėėř ÏḒ ŀőřė⟧"
+      },
+      "peer_tasks_show": {
+        "en": "Show tasks",
+        "ja": "タスクを表示",
+        "qps-ploc": "⟦Şħőẇ ŧȧşķş ŀőř⟧"
+      },
+      "peer_tasks_invalid_peer": {
+        "en": "Enter a valid local peer ID.",
+        "ja": "有効なローカルピア ID を入力してください。",
+        "qps-ploc": "⟦Ėñŧėř ȧ ṽȧŀïḓ ŀőƈȧŀ ṗėėř ÏḒ. ŀőřėɱ ïṗş⟧"
+      },
+      "peer_tasks_empty": {
+        "en": "No incoming tasks for this peer.",
+        "ja": "このピアへの依頼はありません。",
+        "qps-ploc": "⟦Ñő ïñƈőɱïñɠ ŧȧşķş ƒőř ŧħïş ṗėėř. ŀőřėɱ ïṗşů⟧"
+      },
+      "peer_tasks_unavailable": {
+        "en": "A configured tenant and tenant-wide confidential access are required.",
+        "ja": "テナントの設定と、そのテナント全体の機密データ閲覧権限が必要です。",
+        "qps-ploc": "⟦Ȧ ƈőñƒïɠůřėḓ ŧėñȧñŧ ȧñḓ ŧėñȧñŧ-ẇïḓė ƈőñƒïḓėñŧïȧŀ ȧƈƈėşş ȧřė řėɋůïřėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
+      },
+      "peer_tasks_state": {
+        "en": "State",
+        "ja": "状態",
+        "qps-ploc": "⟦Şŧȧŧė ŀőř⟧"
+      },
+      "peer_tasks_type": {
+        "en": "Task type",
+        "ja": "タスク種別",
+        "qps-ploc": "⟦Ŧȧşķ ŧẏṗė ŀőř⟧"
+      },
+      "peer_tasks_requester": {
+        "en": "Requesting peer",
+        "ja": "依頼元ピア",
+        "qps-ploc": "⟦Řėɋůėşŧïñɠ ṗėėř ŀőřė⟧"
+      },
+      "peer_tasks_requested": {
+        "en": "Requested at",
+        "ja": "依頼日時",
+        "qps-ploc": "⟦Řėɋůėşŧėḓ ȧŧ ŀőř⟧"
+      },
+      "peer_tasks_artifacts": {
+        "en": "Artifact references ({count})",
+        "ja": "成果物の参照（{count}件）",
+        "qps-ploc": "⟦Ȧřŧïƒȧƈŧ řėƒėřėñƈėş ({count}) ŀőřėɱ ïṗş⟧"
+      },
+      "peer_tasks_pending": {
+        "en": "Awaiting acceptance",
+        "ja": "受諾待ち",
+        "qps-ploc": "⟦Ȧẇȧïŧïñɠ ȧƈƈėṗŧȧñƈė ŀőřėɱ ⟧"
+      },
+      "peer_tasks_accepted": {
+        "en": "Accepted",
+        "ja": "受諾済み",
+        "qps-ploc": "⟦Ȧƈƈėṗŧėḓ ŀőř⟧"
+      },
+      "peer_tasks_running": {
+        "en": "Running",
+        "ja": "実行中",
+        "qps-ploc": "⟦Řůññïñɠ ŀőř⟧"
+      },
+      "peer_tasks_completed": {
+        "en": "Completed",
+        "ja": "完了",
+        "qps-ploc": "⟦Ƈőɱṗŀėŧėḓ ŀőř⟧"
+      },
+      "peer_tasks_failed": {
+        "en": "Failed",
+        "ja": "失敗",
+        "qps-ploc": "⟦Ƒȧïŀėḓ ŀőř⟧"
+      },
+      "peer_tasks_rejected": {
+        "en": "Rejected",
+        "ja": "拒否",
+        "qps-ploc": "⟦Řėĵėƈŧėḓ ŀőř⟧"
+      },
+      "peer_tasks_expired": {
+        "en": "Expired",
+        "ja": "期限切れ",
+        "qps-ploc": "⟦Ėẋṗïřėḓ ŀőř⟧"
       },
       "inbox_title": {
         "en": "Inbox",
