@@ -47,7 +47,9 @@ An `--apply` write (e.g. `init`, `operation add`, `operation run record`) from a
 2. A human approves it: `pnpm kyberion approvals --approve <id>`. From an agent CLI without a TTY (e.g. Claude Code `!`), add `--new-window`: the OS opens a terminal window where the typed-code challenge runs. A terminal attestation (A2) is accepted for these writes; organization decisions keep their stronger rule below.
 3. Re-run the exact command with `--approval-request-id <id>` instead of `--request-approval`. The approval is checked against the recomputed arguments and scope, used up once, and only that write runs as `organization_operator` bound to the tenant. A changed argument, another tenant or command, a reused approval or a decision below A2 is refused.
 
-Shared-scope organizations (no tenant) still need `KYBERION_BASE_ROLE=sovereign`. Implementation: `scripts/organization/organization_write_approval.ts`.
+Shared-scope organizations (no tenant) still need `KYBERION_BASE_ROLE=sovereign`, and the approval path needs an explicit `--tenant-slug` (the current scope selection is not used). A caller that already has write authority is refused with `--request-approval` / `--approval-request-id` instead of writing silently. The approval is verified, marked used and only then written, inside the approval's record lock, so it can never write twice; a write that fails leaves it used. The challenge shows the request details (the exact arguments) before the code.
+
+Limits: arguments that name a file (e.g. `--execution-ref`, `--post-incident-review-ref`) are bound by path, not by content. A2 terminal attestation is best effort (`scripts/lib/approval-cli-decision.ts` header): anything that gives an agent a pseudo-terminal can read and type a code, and `--new-window` makes an OS-opened terminal the normal path, so A2 stops mistaken or casual agent-driven approvals, not a determined compromised agent session. Use a signed-in Concierge session (A2 surface session) or passkey (A3) where that matters. Implementation: `scripts/organization/organization_write_approval.ts`.
 
 ## Incidents and decisions
 

@@ -111,7 +111,8 @@ function challengeCode(
     .slice(0, 6);
 }
 
-function describeRequest(request: ApprovalRequestRecord, digest: string): string[] {
+/** What the challenge prints before its code (exported for tests). */
+export function describeRequest(request: ApprovalRequestRecord, digest: string): string[] {
   const via =
     request.requestedByContext?.actorId &&
     request.requestedByContext.actorId !== request.requestedBy
@@ -127,6 +128,16 @@ function describeRequest(request: ApprovalRequestRecord, digest: string): string
     ...(request.scope?.tenant_slug ? [`  tenant: ${request.scope.tenant_slug}`] : []),
     ...(request.accountability?.effectBinding
       ? [`  effect: ${request.accountability.effectBinding}`]
+      : []),
+    // Human-only requests show their full details (e.g. the exact arguments of
+    // an organization write): the code is derived from the digest that covers them.
+    ...(request.accountability?.finalDecision === 'human_only' && request.details
+      ? [
+          '  details:',
+          ...String(request.details)
+            .split('\n')
+            .map((line) => `    ${line}`),
+        ]
       : []),
     `  presented digest: ${digest}`,
   ];

@@ -9041,9 +9041,9 @@
         "qps-ploc": "⟦Řėṽïėẇ ȧñḓ ȧƈƈėṗŧ ḓėŀïṽėřȧƀŀėş ïñ ŧħė ïñƀőẋ ŀőřėɱ ïṗşůɱ ḓő⟧"
       },
       "cli_cmd_operator_home_approvals": {
-        "en": "Review and decide approval requests",
-        "ja": "承認リクエストを確認して裁可",
-        "qps-ploc": "⟦Řėṽïėẇ ȧñḓ ḓėƈïḓė ȧṗṗřőṽȧŀ řėɋůėşŧş ŀőřėɱ ïṗşůɱ⟧"
+        "en": "Review and decide approval requests (--approve/--deny <id>; add --new-window from an agent CLI without a TTY)",
+        "ja": "承認リクエストを確認して裁可(--approve/--deny <id>。TTY のないエージェント CLI からは --new-window を付ける)",
+        "qps-ploc": "⟦Řėṽïėẇ ȧñḓ ḓėƈïḓė ȧṗṗřőṽȧŀ řėɋůėşŧş (--ȧṗṗřőṽė/--ḓėñẏ <ïḓ>; ȧḓḓ --ñėẇ-ẇïñḓőẇ ƒřőɱ ȧñ ȧɠėñŧ ƇĿÏ ẇïŧħőůŧ ȧ ŦŦẎ) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧů⟧"
       },
       "cli_cmd_operator_home_notify": {
         "en": "Inspect or configure notification targets",

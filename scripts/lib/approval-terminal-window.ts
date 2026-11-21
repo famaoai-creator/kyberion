@@ -107,6 +107,19 @@ export function planApprovalWindow(input: {
   };
 }
 
+/** The vocabulary key and params that tell the person what happened. */
+export function approvalWindowMessage(
+  plan: ApprovalWindowPlan,
+  requestId: string
+): [
+  'recorder:recorder_approval_window_opened' | 'recorder:recorder_approval_window_manual',
+  Record<string, string>,
+] {
+  return plan.kind === 'launch'
+    ? ['recorder:recorder_approval_window_opened', { id: requestId, command: plan.command }]
+    : ['recorder:recorder_approval_window_manual', { command: plan.command, reason: plan.reason }];
+}
+
 /** Open the decision window for this host, or return the manual instruction. */
 export async function openApprovalWindow(
   requestId: string,

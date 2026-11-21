@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const load = vi.hoisted(() => vi.fn());
 const create = vi.hoisted(() => vi.fn());
 const usable = vi.hoisted(() => vi.fn());
+const order = vi.hoisted(() => [] as string[]);
 const consumed = vi.hoisted(() => vi.fn());
 vi.mock('@agent/core/governance/approval-store', async (importOriginal) => ({
   computeApprovalPayloadHash: (
@@ -13,13 +14,32 @@ vi.mock('@agent/core/governance/approval-store', async (importOriginal) => ({
   // Single use and separation of duties are covered by approval-separation-of-duties.test.ts.
   assertApprovalUsable: usable,
 }));
-vi.mock('@agent/core/governance/approval-revocation', () => ({ markApprovalConsumed: consumed }));
+// The record lock and the already-used refusal are covered by approval-revocation tests;
+// here the order inside the lock: verify, consume, then write.
+vi.mock('@agent/core/governance/approval-revocation', () => ({
+  consumeApprovalWithin: (
+    _role: string,
+    params: unknown,
+    run: (consume: () => unknown) => unknown
+  ) =>
+    run(() => {
+      order.push('consume');
+      consumed(params);
+      return {};
+    }),
+}));
+vi.mock('@agent/core/governance/cli-operator-principal', () => ({
+  resolveCliApprovalRequester: () => ({
+    requestedBy: 'agent:claude-code',
+    actorId: 'agent:claude-code',
+  }),
+}));
 
 import {
   canonicalWriteArgs,
-  consumeOrganizationWriteApproval,
   organizationWritePayloadHash,
   requestOrganizationWriteApproval,
+  runWithOrganizationWriteApproval,
   verifyOrganizationWriteApproval,
 } from './organization_write_approval.js';
 
@@ -64,6 +84,7 @@ beforeEach(() => {
   create.mockReset();
   usable.mockReset();
   consumed.mockReset();
+  order.length = 0;
 });
 
 describe('organization write approval', () => {
@@ -144,13 +165,48 @@ describe('organization write approval', () => {
     );
   });
 
-  it('marks the approval used for one organization write', () => {
-    consumeOrganizationWriteApproval('APR-1', 'pnpm organization operation add');
-    expect(consumed).toHaveBeenCalledWith('mission_controller', {
-      channel: 'terminal',
-      requestId: 'APR-1',
-      consumer: 'organization_write',
-      consumedBy: 'pnpm organization operation add',
-    });
+  it('names the agent that asked, not a generic CLI', () => {
+    create.mockReturnValue({ id: 'APR-1' });
+    requestOrganizationWriteApproval({ scope, parsed });
+    expect(create.mock.calls[0][1]).toMatchObject({ requestedBy: 'agent:claude-code' });
+  });
+
+  it('verifies, marks the approval used, then writes — in that order', () => {
+    load.mockReturnValue(approved());
+    const result = runWithOrganizationWriteApproval(
+      'APR-1',
+      scope,
+      parsed,
+      'pnpm organization operation add',
+      () => {
+        order.push('write');
+        return 'written';
+      }
+    );
+    expect(result).toBe('written');
+    expect(order).toEqual(['consume', 'write']);
+    expect(consumed).toHaveBeenCalledWith(
+      expect.objectContaining({ requestId: 'APR-1', consumer: 'organization_write' })
+    );
+  });
+
+  it('never writes when the approval does not match', () => {
+    load.mockReturnValue(approved({ status: 'pending' }));
+    const write = vi.fn();
+    expect(() => runWithOrganizationWriteApproval('APR-1', scope, parsed, 'x', write)).toThrow(
+      /ORGANIZATION_WRITE_APPROVAL_INVALID/
+    );
+    expect(write).not.toHaveBeenCalled();
+    expect(consumed).not.toHaveBeenCalled();
+  });
+
+  it('leaves the approval used when the write fails (it can never be replayed)', () => {
+    load.mockReturnValue(approved());
+    expect(() =>
+      runWithOrganizationWriteApproval('APR-1', scope, parsed, 'x', () => {
+        throw new Error('disk full');
+      })
+    ).toThrow(/disk full/);
+    expect(consumed).toHaveBeenCalledTimes(1);
   });
 });

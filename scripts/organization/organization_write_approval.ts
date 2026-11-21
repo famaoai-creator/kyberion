@@ -26,7 +26,8 @@ import {
   createApprovalRequest,
   loadApprovalRequest,
 } from '@agent/core/governance/approval-store';
-import { markApprovalConsumed } from '@agent/core/governance/approval-revocation';
+import { consumeApprovalWithin } from '@agent/core/governance/approval-revocation';
+import { resolveCliApprovalRequester } from '@agent/core/governance/cli-operator-principal';
 import {
   approvalRequesterActorId,
   resolveApprovalRequesterInput,
@@ -97,9 +98,9 @@ export function requestOrganizationWriteApproval(input: {
 }): { request_id: string; effect: string } {
   const { scope } = input;
   const effect = effectBinding(scope);
-  const requester = input.requester
-    ? resolveApprovalRequesterInput(input.requester)
-    : { requestedBy: 'organization-cli' };
+  const requester = resolveApprovalRequesterInput(
+    input.requester ?? resolveCliApprovalRequester({ legacy: 'organization-cli' })
+  );
   const args = canonicalWriteArgs(input.parsed);
   const record = createApprovalRequest('mission_controller', {
     channel: ORGANIZATION_WRITE_APPROVAL_CHANNEL,
@@ -187,12 +188,27 @@ export function verifyOrganizationWriteApproval(
   assertApprovalUsable(approval!, { consumer: CONSUMER });
 }
 
-/** One write per approval: mark it used so it can never authorize another. */
-export function consumeOrganizationWriteApproval(requestId: string, consumedBy: string): void {
-  markApprovalConsumed('mission_controller', {
-    channel: ORGANIZATION_WRITE_APPROVAL_CHANNEL,
-    requestId,
-    consumer: CONSUMER,
-    consumedBy,
-  });
+/**
+ * Runs `write` under one approval, at most once ever. Inside the approval's
+ * record lock: verify it for exactly this write, mark it used, then write.
+ * Marking comes first, so a second run with the same id is refused before
+ * any write (a used approval cannot write twice), and a write that fails
+ * leaves the approval used rather than reusable.
+ */
+export function runWithOrganizationWriteApproval<T>(
+  requestId: string,
+  scope: OrganizationWriteScope,
+  parsed: Record<string, unknown>,
+  consumedBy: string,
+  write: () => T
+): T {
+  return consumeApprovalWithin(
+    'mission_controller',
+    { channel: ORGANIZATION_WRITE_APPROVAL_CHANNEL, requestId, consumer: CONSUMER, consumedBy },
+    (consume) => {
+      verifyOrganizationWriteApproval(requestId, scope, parsed);
+      consume();
+      return write();
+    }
+  );
 }

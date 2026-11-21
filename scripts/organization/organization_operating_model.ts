@@ -98,9 +98,8 @@ import { parseArgs, usage, type ParsedArgs } from './organization_operating_mode
 import { withExecutionContext } from '@agent/core/authority';
 import {
   ORGANIZATION_WRITE_ROLE,
-  consumeOrganizationWriteApproval,
   requestOrganizationWriteApproval,
-  verifyOrganizationWriteApproval,
+  runWithOrganizationWriteApproval,
 } from './organization_write_approval.js';
 
 /** Organization state file an --apply write in this invocation targets; set per run. */
@@ -1503,18 +1502,19 @@ function runApprovedOrganizationWrite(
   if (!parsed.apply || !wantsApproval || parsed.command === 'decision transition') return false;
   if (!writePreflightTarget || !organizationId) return false;
   if (validateWritePermission(writePreflightTarget).allowed) {
-    if (parsed.approvalRequestId) {
-      throw new Error(
-        'This caller can already write this organization; run the command without --approval-request-id (the approval stays unused).'
-      );
-    }
-    return false;
+    throw new Error(
+      parsed.approvalRequestId
+        ? 'This caller can already write this organization; run the command without --approval-request-id (the approval stays unused). Nothing was written.'
+        : 'This caller can already write this organization, so no approval is needed; run the command without --request-approval. Nothing was written.'
+    );
   }
   const tier = parsed.tier || readScope.tier;
-  const tenantSlug = parsed.tenantSlug || readScope.tenantSlug;
+  // The handlers write with --tenant-slug only: the approval must name that same
+  // tenant, never one taken from the current scope selection.
+  const tenantSlug = parsed.tenantSlug;
   if (!tier || !tenantSlug) {
     throw new Error(
-      'An approval-mediated organization write needs a tenant organization (--tenant-slug); shared-scope organizations still need KYBERION_BASE_ROLE=sovereign.'
+      'An approval-mediated organization write needs an explicit --tenant-slug (the current scope selection is not used); shared-scope organizations still need KYBERION_BASE_ROLE=sovereign. Nothing was written.'
     );
   }
   const scope = { command: parsed.command, organizationId, tier, tenantSlug };
@@ -1531,18 +1531,24 @@ function runApprovedOrganizationWrite(
     );
     return true;
   }
-  verifyOrganizationWriteApproval(parsed.approvalRequestId, scope, fields);
   const handler = ORGANIZATION_COMMAND_HANDLERS[parsed.command];
   if (!handler) throw new Error(`Unknown command '${parsed.command}'.\n${usage()}`);
-  // Only this one write runs with the role, bound to the organization's tenant.
-  withExecutionContext(
-    ORGANIZATION_WRITE_ROLE,
-    () => handler({ parsed, organizationId, readScope, activePrint: print }),
-    undefined,
-    tenantSlug,
-    organizationId
+  // Verified and marked used first (inside the approval's record lock); then only
+  // this one write runs with the role, bound to the organization's tenant.
+  runWithOrganizationWriteApproval(
+    parsed.approvalRequestId,
+    scope,
+    fields,
+    `pnpm organization ${parsed.command}`,
+    () =>
+      withExecutionContext(
+        ORGANIZATION_WRITE_ROLE,
+        () => handler({ parsed, organizationId, readScope, activePrint: print }),
+        undefined,
+        tenantSlug,
+        organizationId
+      )
   );
-  consumeOrganizationWriteApproval(parsed.approvalRequestId, `pnpm organization ${parsed.command}`);
   print(`Approval ${parsed.approvalRequestId} used for this write; it cannot authorize another.`);
   return true;
 }
