@@ -472,9 +472,10 @@ CI be the first place a gate sees the change:
    defect in the change — classify first, fix second.
 5. **Edit large governed JSON surgically.** Preserve the file's existing
    byte formatting — `json.dumps`/re-serializing the whole file produces
-   cosmetic diffs that obscure review (see the directory-source registries:
-   `security-policy/`, `storage-retention-catalog/` — edit per-entry files
-   and regenerate via `pnpm generate:governance-catalogs`).
+   cosmetic diffs that obscure review. Where a catalog has a directory
+   source (per-entry files assembled into the committed single file by its
+   generator), edit the directory files and run the catalog's generator —
+   never hand-edit the generated artifact.
 
 ## 5. Governance & policy mechanics
 
