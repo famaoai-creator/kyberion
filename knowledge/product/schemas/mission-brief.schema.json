@@ -125,6 +125,21 @@
         "ref": { "type": "string" },
         "tenantSlug": { "type": "string" }
       }
+    },
+    "requirementsGovernance": {
+      "type": "object",
+      "description": "Optional IPA requirements-management opt-in controls bound to the mission brief hash.",
+      "additionalProperties": false,
+      "properties": {
+        "strictFraming": { "type": "boolean" },
+        "requireUncertaintyFallback": { "type": "boolean" },
+        "changeLevelRouting": { "type": "boolean" },
+        "assumptions": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "maturityLevel": { "type": "integer", "minimum": 1, "maximum": 5 }
+      }
     }
   }
 }

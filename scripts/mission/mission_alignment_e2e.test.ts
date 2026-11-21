@@ -175,4 +175,86 @@ describe('MO-11 alignment gate end-to-end', () => {
 
     safeRmSync(outside, { force: true });
   });
+
+  it('enforces opt-in strict framing before creating a request and passes once framed', () => {
+    // Incomplete brief with opt-in strictFraming is blocked before creating a request.
+    writeBrief({
+      ...BRIEF,
+      requirementsGovernance: {
+        strictFraming: true,
+      },
+    });
+    const rejectedOpen = openAlignmentApproval(MISSION_ID);
+    expect(rejectedOpen.created).toBe(false);
+    expect(rejectedOpen.reason).toContain('scope.in');
+    expect(rejectedOpen.reason).toContain('scope.out');
+    expect(rejectedOpen.reason).toContain('deliverables');
+    expect(rejectedOpen.reason).toContain('assumptions_or_risks');
+    const createdRequests = listApprovalRequests({
+      storageChannels: ['brief'],
+      kind: 'mission_gate',
+    }).filter((r) => r.source?.missionId === MISSION_ID);
+    expect(createdRequests).toHaveLength(0);
+
+    // Complete framed brief opens, approves, and satisfies strict decision check.
+    writeBrief({
+      ...BRIEF,
+      scope: {
+        in: ['scripts/mission-alignment-gate'],
+        out: ['runtime execution'],
+      },
+      deliverables: ['evidence/framing-verified.md'],
+      requirementsGovernance: {
+        strictFraming: true,
+        assumptions: ['Human sovereign reviews the framed brief hash'],
+        maturityLevel: 3,
+      },
+    });
+    const opened = openAlignmentApproval(MISSION_ID);
+    expect(opened.created).toBe(true);
+    decideApprovalRequest('surface_runtime', {
+      channel: 'brief',
+      storageChannel: 'brief',
+      requestId: opened.requestId!,
+      decision: 'approved',
+      decidedBy: 'concierge',
+      decidedByRole: 'sovereign',
+      authMethod: 'surface_session',
+      decidedByType: 'human',
+      authenticated: true,
+      payloadHash: opened.payloadHash,
+    });
+    expect(assessAlignmentDecision(MISSION_ID)).toMatchObject({
+      verdict: 'approved',
+      satisfied: true,
+    });
+  });
+
+  it('rejects a legacy approved brief only when --strict-framing override is active', () => {
+    writeBrief(BRIEF);
+    const legacyOpened = openAlignmentApproval(MISSION_ID);
+    expect(legacyOpened.created).toBe(true);
+    decideApprovalRequest('surface_runtime', {
+      channel: 'brief',
+      storageChannel: 'brief',
+      requestId: legacyOpened.requestId!,
+      decision: 'approved',
+      decidedBy: 'concierge',
+      decidedByRole: 'sovereign',
+      authMethod: 'surface_session',
+      decidedByType: 'human',
+      authenticated: true,
+      payloadHash: legacyOpened.payloadHash,
+    });
+    expect(assessAlignmentDecision(MISSION_ID)).toMatchObject({
+      verdict: 'approved',
+      satisfied: true,
+    });
+    const strictReport = assessAlignmentDecision(MISSION_ID, { strictRequirementsFraming: true });
+    expect(strictReport).toMatchObject({
+      verdict: 'brief_incomplete',
+      satisfied: false,
+    });
+    expect(strictReport.reasons[0]).toContain('scope.out');
+  });
 });

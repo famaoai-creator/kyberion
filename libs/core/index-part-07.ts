@@ -287,6 +287,8 @@ export {
   listPendingReviewReentryRequests,
   markReviewReentryProcessed,
   buildReviewGapText,
+  classifyReviewReentryChangeLevel,
+  type ReviewChangeLevel,
   type ReviewReentryRequest,
   type ReviewReentryVerdict,
 } from './workforce/review-reentry.js';

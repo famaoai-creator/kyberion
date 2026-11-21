@@ -68,6 +68,16 @@ describe('working principles brief', () => {
     expect(text).toContain('[reviewer]');
   });
 
+  it('compact mode always surfaces OOD escalation and planner inherits strategist framing', () => {
+    const compactUnknown = buildWorkingPrinciplesLines('unknown-role').join('\n');
+    expect(compactUnknown).toContain('out-of-distribution');
+    expect(compactUnknown).toContain('gaps/needs or customer_decisions');
+
+    const plannerText = buildWorkingPrinciplesLines('planner').join('\n');
+    expect(plannerText).toContain('[product_strategist]');
+    expect(plannerText).toContain('explicit in/out scope boundaries');
+  });
+
   it('every rule is a single line (prompt-safe)', () => {
     for (const rule of [
       ...CORE_WORKING_PRINCIPLES,

@@ -93,6 +93,7 @@ import {
   evaluateMissionFinishExitGate,
   finishMission,
   readMissionNextTasks,
+  reenterMissionFromReview,
   repairLegacyMissionState,
   reconcileLifecycleClosureCriteria,
   tryAutoCompleteTaskFromEvidence,
@@ -100,6 +101,7 @@ import {
   listOpenMissionTasksForVerify,
   writeMissionNextTasks,
 } from './mission-lifecycle.js';
+import { writeGovernedArtifactJson } from '../workforce/artifact-store.js';
 
 const missionId = 'MSN-LIFECYCLE-GATE-001';
 const missionPath = pathResolver.missionDir(missionId, 'public');
@@ -2473,5 +2475,79 @@ describe('tryAutoCompleteTaskFromEvidence', () => {
     const result = tryAutoCompleteTaskFromEvidence(missionPath, 'self_review-code-review');
 
     expect(result.completed).toBe(false);
+  });
+
+  it('opt-in change-level routing pauses on L1 wrong_direction re-entry while keeping default legacy active', async () => {
+    const reentryDir = pathResolver.rootResolve(
+      `active/shared/coordination/review-reentry/${missionId}`
+    );
+    try {
+      // 1. Default OFF: reenterMissionFromReview creates legacy goal-gap tasks and keeps status active.
+      prepareMissionState('completed');
+      writeGovernedArtifactJson(
+        'mission_controller',
+        `active/shared/coordination/review-reentry/${missionId}/req-off.json`,
+        {
+          request_id: 'req-off',
+          mission_id: missionId,
+          artifact_id: 'brief-v1',
+          verdict: 'reject',
+          reason_category: 'wrong_direction',
+          comment: 'Goal does not match user expectation',
+          reviewer: 'human:test',
+          requested_at: '2026-11-21T00:00:00.000Z',
+          status: 'pending',
+        }
+      );
+      const offRes = await reenterMissionFromReview(missionId);
+      expect(offRes).toEqual({
+        status: 'reentered',
+        gapTaskIds: ['goal-gap-r1-1', 'goal-gap-r1-1-review'],
+      });
+      const offState = JSON.parse(
+        safeReadFile(`${missionPath}/mission-state.json`, { encoding: 'utf8' }) as string
+      );
+      expect(offState.status).toBe('active');
+
+      // 2. Opt-in ON: wrong_direction routes to L1 product_strategist alignment and pauses mission.
+      offState.status = 'completed';
+      offState.context = {
+        ...(offState.context || {}),
+        requirements_change_level_routing: true,
+      };
+      safeWriteFile(`${missionPath}/mission-state.json`, JSON.stringify(offState, null, 2));
+      writeGovernedArtifactJson(
+        'mission_controller',
+        `active/shared/coordination/review-reentry/${missionId}/req-on.json`,
+        {
+          request_id: 'req-on',
+          mission_id: missionId,
+          artifact_id: 'brief-v2',
+          verdict: 'reject',
+          reason_category: 'wrong_direction',
+          comment: 'Re-align before editing code',
+          reviewer: 'human:test',
+          requested_at: '2026-11-21T01:00:00.000Z',
+          status: 'pending',
+        }
+      );
+      const onRes = await reenterMissionFromReview(missionId);
+      expect(onRes).toEqual({
+        status: 'reentered',
+        gapTaskIds: ['review-l1-r2-1', 'review-l1-r2-1-review'],
+      });
+      const onState = JSON.parse(
+        safeReadFile(`${missionPath}/mission-state.json`, { encoding: 'utf8' }) as string
+      );
+      expect(onState.status).toBe('paused');
+      expect(onState.context.alignment_reapproval_required).toBe(true);
+      expect(onState.context.review_reentry_highest_level).toBe('L1_goal_purpose');
+      const tasks = readMissionNextTasks(missionPath);
+      expect(tasks.find((t) => t.task_id === 'review-l1-r2-1')?.assigned_to).toEqual({
+        role: 'product_strategist',
+      });
+    } finally {
+      safeRmSync(reentryDir, { recursive: true, force: true });
+    }
   });
 });
