@@ -4404,6 +4404,10 @@
       "types": "./dist/pipeline/adf-repair-agent.d.ts",
       "default": "./dist/pipeline/adf-repair-agent.js"
     },
+    "./pipeline/chronos-sovereign-schedules": {
+      "types": "./dist/pipeline/chronos-sovereign-schedules.d.ts",
+      "default": "./dist/pipeline/chronos-sovereign-schedules.js"
+    },
     "./pipeline/cron-utils": {
       "types": "./dist/pipeline/cron-utils.d.ts",
       "default": "./dist/pipeline/cron-utils.js"
