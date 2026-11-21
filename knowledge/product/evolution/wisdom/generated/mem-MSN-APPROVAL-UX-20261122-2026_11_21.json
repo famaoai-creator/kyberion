@@ -1,0 +1,24 @@
+{
+  "record_id": "mem-MSN-APPROVAL-UX-20261122-2026_11_21",
+  "kind": "knowledge_hint",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "Human approvals from agent CLIs and one-shot approval-mediated writes",
+  "summary": "Let a human decide in an OS-opened terminal window when the agent CLI has no TTY; bind a one-shot write approval to the exact arguments and scope; dry-run, then verify, consume and write inside the approval record lock.",
+  "candidate_id": "mem-MSN-APPROVAL-UX-20261122-2026_11_21",
+  "evidence_refs": [
+    "active/missions/public/MSN-APPROVAL-UX-20261122/evidence/REVIEW-execution-implement.md",
+    "active/missions/public/MSN-APPROVAL-UX-20261122/evidence/test-report.md"
+  ],
+  "created_at": "2026-11-21T17:39:51.137Z",
+  "hint_scope": "mission",
+  "hint_triggers": [
+    "Lessons from MSN-APPROVAL-UX-20261122:\n\n1. Human-only approvals are refused inside an agent session (no TTY, provider CLI among the parents) by design, so `!` commands in Claude Code always fail. Do not weaken that check; give the human an easy separate path: `pnpm kyberion approvals --approve|--deny <id> --new-window` asks the OS (macOS `open` .command, Windows `explorer` .cmd) to open a terminal window running the ordinary decision, where the typed-code challenge runs and its code is shown only to the person. On Linux a window would still be in the agent lineage: print the command instead.\n2. One-shot approval-mediated writes: bind the approval to a payload hash of the canonical arguments (flow flags excluded) plus an effect binding and scope; require the tenant explicitly so the approved tenant is the written tenant; show the arguments on the challenge (they are in the presented digest).\n3. Order matters: consume before the write, inside consumeApprovalWithin (record lock): verify, consume, write. Consuming after the write lets a second or concurrent run write before the reuse is refused. But consuming first makes an argument mistake burn the approval, so run the same command as a dry run before the locked step.\n4. Refuse --request-approval / --approval-request-id from a caller who already has authority instead of silently writing; record the detected requester principal and its real role.\n5. Terminal attestation (A2) is best effort: anything that drives a pseudo-terminal can type a code. Document it where A2 is accepted; use a signed-in surface session or passkey where it matters.\n6. Repo ceremonies hit on the way: sharedTmp() call sites must be registered in shared-tmp-allowlist.json; CLI_REFERENCE.md is generated from vocabulary (edit the vocabulary, run generate:cli-reference); user-facing kana literals in scripts fail the i18n gate; files have a 1500-line cap (extract a module rather than squeezing)."
+  ],
+  "recommended_refs": [
+    "active/missions/public/MSN-APPROVAL-UX-20261122/evidence/REVIEW-execution-implement.md",
+    "active/missions/public/MSN-APPROVAL-UX-20261122/evidence/test-report.md"
+  ],
+  "source_branch": "feat/approval-ux-20261122",
+  "source_commit": "fff5967ea4719f4878bb49cf1d11337dab9f7d54"
+}
