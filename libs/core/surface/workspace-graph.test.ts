@@ -556,6 +556,7 @@ describe('surface operation registry', () => {
       'workspace.summary',
       'workspace.list',
       'workspace.get',
+      'workspace.calendar',
       'workspace.search',
       'setup.checklist',
       'needs-you.list',
@@ -564,6 +565,10 @@ describe('surface operation registry', () => {
     expect(ops.find((o) => o.id === 'workspace.get')?.inputSchema).toMatchObject({
       type: 'object',
       required: ['kind', 'id'],
+    });
+    expect(ops.find((o) => o.id === 'workspace.calendar')?.inputSchema).toMatchObject({
+      type: 'object',
+      required: ['from', 'to'],
     });
   });
 

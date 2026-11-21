@@ -6,46 +6,31 @@ import { Button } from '@agent/shared-ui';
 import { localeToBcp47 } from '@agent/core/foundation/locale-normalize';
 import { useConciergeI18n } from '../../lib/use-concierge-i18n';
 import { useWorkspaceResource } from '../../lib/use-workspace-resource';
-import {
-  entityHref,
-  listQueryFromSearch,
-  workspaceApiPath,
-  type GraphNode,
-} from '../../lib/workspace-view';
-import { cardTitle } from '../work-board/work-item-board';
+import { entityHref, listQueryFromSearch, workspaceApiPath } from '../../lib/workspace-view';
 import { LoadErrorState, LoadingState, type Translate } from '../../app/w/workspace-parts';
 import {
+  CALENDAR_SOURCE_GROUPS,
   addDays,
   buildCalendarGrid,
+  calendarGridRange,
+  fromCalendarEntries,
   localCalendarDate,
   shiftAnchor,
+  sourceGroup,
   startOfWeek,
   summarizeCalendar,
+  type CalendarApiEntry,
   type CalendarDay,
-  type CalendarItem,
+  type CalendarEntry,
+  type CalendarSourceGroup,
   type CalendarView,
 } from './work-calendar';
 import './work-calendar.css';
 
-/** The list operation's ceiling; at this size the calendar says it may be partial. */
-const LIST_LIMIT = 500;
 /** Entries a month cell shows before "+N more". */
 const MONTH_CELL_ENTRIES = 3;
 
-function toCalendarItems(nodes: readonly GraphNode[]): CalendarItem[] {
-  return nodes.map((node) => {
-    const startDate = node.facts?.start_date;
-    const dueDate = node.facts?.due_date;
-    return {
-      id: node.id,
-      title: cardTitle(node.label, node.missionId),
-      status: node.status ?? 'backlog',
-      ...(typeof startDate === 'string' ? { startDate } : {}),
-      ...(typeof dueDate === 'string' ? { dueDate } : {}),
-      href: entityHref('work_item', node.id),
-    };
-  });
-}
+type CalendarData = { entries: CalendarApiEntry[]; degraded: string[] };
 
 function utcDate(date: string): Date {
   const [year, month, day] = date.split('-').map(Number);
@@ -61,11 +46,13 @@ function formatter(locale: string, options: Intl.DateTimeFormatOptions): Intl.Da
 }
 
 /**
- * `/work?tab=calendar` — dated work items on a month or week grid. Items come
- * from the same viewer-scoped workspace list as the board (`dated=true`), so
- * the calendar never shows more than the viewer may see; scope narrowing in
- * the URL (tenant / organization / project / mission) applies here too.
- * Dates are set on the board card; the calendar only reads.
+ * `/work?tab=calendar` — every dated thing the viewer may see, on a month or
+ * week grid: work-item start / due days, organization operation runs and
+ * monthly deadlines, and meeting action items. Entries come from
+ * `workspace.calendar` for exactly the days on screen; that operation reads
+ * only organizations and missions in the viewer's graph, and URL scope
+ * narrowing (tenant / organization / project / mission) applies too. The
+ * calendar only reads: dates are set where each entry is managed.
  */
 export function WorkCalendar({ t }: { t: Translate }) {
   const { locale: uiLocale } = useConciergeI18n();
@@ -75,21 +62,33 @@ export function WorkCalendar({ t }: { t: Translate }) {
     const {
       q: _q,
       status: _status,
+      actor_id: _actor,
       ...narrowing
     } = listQueryFromSearch(new URLSearchParams(searchParams?.toString() ?? ''));
     return narrowing;
   }, [searchParams]);
-  const list = useWorkspaceResource<{ items: GraphNode[] }>(
-    workspaceApiPath('list', { kind: 'work_item', dated: 'true', limit: LIST_LIMIT, ...scope })
-  );
 
   const today = localCalendarDate();
   const [view, setView] = React.useState<CalendarView>('month');
   const [anchor, setAnchor] = React.useState(today);
+  const [shownGroups, setShownGroups] = React.useState<ReadonlySet<CalendarSourceGroup>>(
+    () => new Set(CALENDAR_SOURCE_GROUPS)
+  );
+  const range = calendarGridRange(view, anchor);
+  const resource = useWorkspaceResource<CalendarData>(
+    workspaceApiPath('calendar', { from: range.from, to: range.to, ...scope })
+  );
+  // Moving to the next month keeps the last grid on screen while it loads.
+  const lastReady = React.useRef<CalendarData | null>(null);
+  if (resource.state === 'ready') lastReady.current = resource.data;
+  const data = resource.state === 'ready' ? resource.data : lastReady.current;
 
   const items = React.useMemo(
-    () => (list.state === 'ready' ? toCalendarItems(list.data.items) : []),
-    [list]
+    () =>
+      fromCalendarEntries(data?.entries ?? [], (link) => entityHref(link.kind, link.id)).filter(
+        (item) => shownGroups.has(sourceGroup(item.source))
+      ),
+    [data, shownGroups]
   );
   const grid = React.useMemo(
     () => buildCalendarGrid(items, { view, anchor, today }),
@@ -114,6 +113,29 @@ export function WorkCalendar({ t }: { t: Translate }) {
   const weekdays = Array.from({ length: 7 }, (_, index) =>
     weekdayName.format(utcDate(addDays(weekStart, index)))
   );
+
+  const roleLabel = (entry: CalendarEntry) => {
+    if (entry.role === 'start') return t('ia_shell_work_cal_start');
+    if (entry.role === 'span') return t('ia_shell_work_cal_underway');
+    switch (entry.item.source) {
+      case 'operation_run':
+        return t('ia_shell_work_cal_run');
+      case 'operation_deadline':
+        return t('ia_shell_work_cal_deadline');
+      case 'action_item':
+        return t('ia_shell_work_cal_action');
+      default:
+        return t('ia_shell_work_cal_due');
+    }
+  };
+
+  const toggleGroup = (group: CalendarSourceGroup) =>
+    setShownGroups((current) => {
+      const next = new Set(current);
+      if (next.has(group)) next.delete(group);
+      else next.add(group);
+      return next;
+    });
 
   const renderDay = (day: CalendarDay) => {
     const limit = view === 'month' ? MONTH_CELL_ENTRIES : Infinity;
@@ -143,15 +165,10 @@ export function WorkCalendar({ t }: { t: Translate }) {
                 key={`${entry.item.id}:${entry.role}`}
                 className="wc-entry"
                 data-role={entry.role}
+                data-source={sourceGroup(entry.item.source)}
                 data-due={entry.role === 'due' ? entry.due.state : undefined}
               >
-                <span className="wc-entry__role">
-                  {entry.role === 'due'
-                    ? t('ia_shell_work_cal_due')
-                    : entry.role === 'start'
-                      ? t('ia_shell_work_cal_start')
-                      : t('ia_shell_work_cal_underway')}
-                </span>
+                <span className="wc-entry__role">{roleLabel(entry)}</span>
                 {entry.item.href ? (
                   <a href={entry.item.href} title={entry.item.title}>
                     {entry.item.title}
@@ -211,11 +228,25 @@ export function WorkCalendar({ t }: { t: Translate }) {
         </div>
       </div>
 
-      {list.state === 'loading' ? <LoadingState t={t} /> : null}
-      {list.state === 'error' ? (
-        <LoadErrorState t={t} error={list.error} onRetry={list.reload} />
+      <fieldset className="wc-sources">
+        <legend>{t('ia_shell_work_cal_sources_label')}</legend>
+        {CALENDAR_SOURCE_GROUPS.map((group) => (
+          <label key={group} className="wc-sources__option" data-source={group}>
+            <input
+              type="checkbox"
+              checked={shownGroups.has(group)}
+              onChange={() => toggleGroup(group)}
+            />
+            <span>{t(`ia_shell_work_cal_source_${group}`)}</span>
+          </label>
+        ))}
+      </fieldset>
+
+      {!data && resource.state === 'loading' ? <LoadingState t={t} /> : null}
+      {resource.state === 'error' ? (
+        <LoadErrorState t={t} error={resource.error} onRetry={resource.reload} />
       ) : null}
-      {list.state === 'ready' ? (
+      {data ? (
         <>
           <div className="wc-summary">
             {summary.overdue.length ? (
@@ -247,8 +278,13 @@ export function WorkCalendar({ t }: { t: Translate }) {
               </p>
             ) : null}
           </div>
+          {data.degraded.length ? (
+            <p className="wc-hint" role="status">
+              {t('ia_shell_work_cal_degraded')}
+            </p>
+          ) : null}
           {items.length === 0 ? <p className="wc-hint">{t('ia_shell_work_cal_empty')}</p> : null}
-          <div className="wc-grid" data-view={view}>
+          <div className="wc-grid" data-view={view} aria-busy={resource.state === 'loading'}>
             <ol className="wc-weekdays" aria-hidden="true">
               {weekdays.map((name) => (
                 <li key={name}>{name}</li>
@@ -260,11 +296,7 @@ export function WorkCalendar({ t }: { t: Translate }) {
               </ol>
             ))}
           </div>
-          <p className="wc-hint">
-            {items.length >= LIST_LIMIT
-              ? t('ia_shell_work_cal_truncated', { count: LIST_LIMIT })
-              : t('ia_shell_work_cal_undated_hint')}
-          </p>
+          <p className="wc-hint">{t('ia_shell_work_cal_undated_hint')}</p>
         </>
       ) : null}
     </section>

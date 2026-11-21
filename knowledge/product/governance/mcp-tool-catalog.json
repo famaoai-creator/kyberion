@@ -179,6 +179,16 @@
       "band": "discover"
     },
     {
+      "name": "kyberion.workspace.calendar",
+      "description": "Dated work items, organization operation runs and deadlines, and meeting action items in a date range.",
+      "category": "workspace",
+      "risk_class": "low",
+      "requires_approval": false,
+      "allowed_tiers": ["public", "confidential"],
+      "allowed_caller_roles": ["operator", "agent", "cowork"],
+      "band": "discover"
+    },
+    {
       "name": "kyberion.workspace.search",
       "description": "Search workspace entities of every kind by text.",
       "category": "workspace",

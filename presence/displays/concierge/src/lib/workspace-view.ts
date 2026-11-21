@@ -121,7 +121,7 @@ export function listQueryFromSearch(params: URLSearchParams): WorkspaceListQuery
 
 /** `/api/v1/workspace/<verb>?…` with only defined, non-empty parameters. */
 export function workspaceApiPath(
-  verb: 'summary' | 'list' | 'get' | 'search',
+  verb: 'summary' | 'list' | 'get' | 'search' | 'calendar',
   params: Record<string, string | number | undefined> = {}
 ): string {
   const query = new URLSearchParams();
