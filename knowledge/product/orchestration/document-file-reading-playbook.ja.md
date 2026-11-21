@@ -4,7 +4,7 @@ category: Orchestration
 tags: [orchestration, media-actuator, ingest-actuator, pdf, pptx, xlsx, docx, ocr, ingest]
 importance: 8
 author: Ecosystem Architect
-last_updated: 2026-10-18
+last_updated: 2026-11-21
 role_affinity: [ecosystem_architect, knowledge_steward, researcher, analyst, mission_controller]
 phase_affinity: [alignment, execution]
 ---
@@ -32,6 +32,7 @@ phase_affinity: [alignment, execution]
 - `media:document_digest { path, ocr? }` → ページ区切り・推定表・メタデータ付き Markdown。
 - `ocr: true`（または `{ enabled, language, mode, min_area_ratio }`）でページ内の画像（貼り付けた表・グラフ・スクリーンショット）を OCR する。ページ面積の 3% 未満（ロゴ等）は対象外。既定はローカルのみ（`training_use: 'local_only'`、Apple Vision / tesseract）。請求書など個人情報を含む文書は一律拒否せず、`tier: 'confidential'` または `tier: 'personal'` とテナントを指定して、その tier の知識として保持できる。外部 OCR を使う場合だけ `training_use: 'zero_retention'` または `training_use: 'training_eligible'` を明示し、通常のテナント外部送信許可を通す。
 - テキスト層が Unicode に写像できない PDF（`/ToUnicode` を欠くサブセット CID フォント — Quartz/macOS「印刷→PDF」生成の CJK 文書に典型）は、まず決定的にデコードされる。子孫フォントの CIDSystemInfo の Ordering から、ベンダー済み Adobe ROS→UCS2 CMap（`libs/core/media/native-pdf-engine/cmaps/`。現在 Japan1・GB1・CNS1・Korea1 を同梱。`Adobe-<Ordering>-UCS2` ファイルを置くだけで拡張可能。仕組みの詳細は `knowledge/product/architecture/pdf-cid-font-unicode-fallback.md`）を名前解決する。マップが無い場合のみ `read --ocr` が `pdftoppm` でラスタライズしてページ OCR で復旧する。`--ocr` なしの場合は警告が対象ページを知らせる。
+- **オーナー暗号化 PDF**（閲覧パスワードなし・操作制限のみ）: `kyberion read` / `document_digest` は `pdf.js`（`pdf-parse`）へフォールバックしてテキストとタイトルを抽出し、埋め込み画像とネイティブ表レイアウトは未抽出である旨の警告を出す。フォールバック先が空テキストのページも `--images <dir>` / `--ocr` でレンダリング・OCR 可能。閲覧（ユーザー）パスワード付き PDF は fail-closed で拒否される。
 - スキャン PDF（1 ページ 1 枚の全面画像）: `media:pdf_to_pptx_design` に `hints.features.fullPageImageOcrOverlay: true`。このオーバーレイはページの一部にある画像では**発火しない**ので、その場合は上の `ocr: true` を使う。
 - PDF → 表グリッド: `media:pdf_to_xlsx_design`。
 - ページ操作のみ（分割・結合・回転・暗号化等）: `pdf_*` の pypdf 系 op。内容は読まない。
@@ -82,6 +83,6 @@ pnpm kyberion read active/shared/tmp/<job>/<file> --images active/shared/tmp/<jo
 5. **confidential 書込の実行主体。** `pnpm knowledge:ingest` には `KYBERION_BASE_ROLE=ecosystem_architect MISSION_ROLE=mission_controller` が必要。儀式は最初にこれを確認し、足りなければポリシー違反を出さずに正しい実行方法を示して止まる。ロールを当て推量で試さないこと（10 分で 3 回の違反でキルスイッチが作動する）。
 6. **PII。** 取込ゲートはメール・電話・口座・住所をマスクし、カード番号・マイナンバーをブロックする。氏名は検出しない。契約書の OCR や PDF メタデータ（作成者）には氏名が載りうるので、コミット前に確認する。
 7. **抽出画像を片付ける。** PDF の画像は `active/shared/tmp/native-pdf/images/<文書ハッシュ>/`、PPTX のアセットは `active/shared/tmp/actuators/media-actuator/` に出る。テナントの図表を 24 時間 TTL の間そこへ残さず、カードをコミットしたら自分が作ったディレクトリを消す。
-8. **パスワード付きの Office ファイル**（`file` で `CDFV2 Encrypted` と出る）は読めない。復号の op は無いので、再試行せず持ち主に復号済みのコピーを依頼する。
+8. **パスワード付きの Office ファイル / PDF**: 暗号化された Office ファイル（`file` で `CDFV2 Encrypted` と出る）および閲覧（ユーザー）パスワード付きの PDF は復号 op が無いため fail-closed で拒否される。再試行せず持ち主に復号済みのコピーを依頼する（閲覧パスワード無しのオーナー/操作制限のみの暗号化 PDF は警告付きで `pdf.js` テキストフォールバックにより読める）。
 9. **元のファイル名のままコピーする。** 見出しの無い文書ではカードのタイトルがファイル名になる。`incident.docx` のような英数字への改名はそのままタイトルになってしまう。元の名前を保ち、` (1)` のようなコピー接尾辞だけ外す。
 10. **テキストの取得方法を記録する。** カードに、どこがエンジンのテキストか、どこが OCR（未検証）か、どこが手作業の転記かを書き、読み手が何を再確認すべきか分かるようにする。

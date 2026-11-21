@@ -4,7 +4,7 @@ category: Architecture
 tags: [change-propagation, coherence, impact-analysis, sdlc]
 importance: 8
 author: Ecosystem Architect
-last_updated: 2026-10-05
+last_updated: 2026-11-21
 kind: evergreen
 ---
 
@@ -62,6 +62,14 @@ When a requirement, incident lesson, or fix changes, the system should identify:
 - which governed references support the claim
 - which follow-up missions are needed
 
+### 4. Change-Level Routing and Reason Taxonomy (advisory; opt-in strict)
+
+- **Change level** determines where a change re-enters the loop:
+  - `L1_goal_purpose`: Changes to business goal, mission scope, or Victory Conditions → route back to Alignment and human approval.
+  - `L2_requirement_process`: Changes to stakeholder expectations, workflow sequence, or policy bounds → update Decision Ledger and evaluate impact bands.
+  - `L3_implementation_model`: Prompt, adapter, code, or model swaps with unchanged requirements → bounded task + regression verification.
+- **Reason taxonomy** (`environment_change`, `operational_learning`, `initial_requirement_defect`) identifies why a change occurred so initial requirement gaps improve Alignment checklists rather than merely patching code. Both classifications are **advisory by default** and become mandatory only via explicit project or tenant opt-in.
+
 ## Kyberion Mapping
 
 | CoDD idea                               | Kyberion mapping                                |
@@ -106,6 +114,7 @@ The responsibility boundary for this flow is:
 Reference:
 
 - [analysis-execution-boundary.md](analysis-execution-boundary.md)
+- [ai-requirements-governance-playbook.md](../orchestration/ai-requirements-governance-playbook.md)
 
 ## Remaining Work
 

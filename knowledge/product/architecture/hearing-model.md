@@ -1,7 +1,7 @@
 ---
 title: Hearing — one model for asking a person what the work needs
 tags: [architecture, hearing, customer, decision, tenant, template, elicitation]
-last_updated: 2026-11-13
+last_updated: 2026-11-21
 concepts: [hearing, tenants-customers]
 role_affinity: [planner, implementer, reviewer]
 runtime_stages: [alignment, execution, review]
@@ -41,6 +41,8 @@ The model answers four requirements.
 4. **Answers can be counted.** Answers are stored as option values, typed values
    and outcomes, not as transcripts, so they can be aggregated per template
    entry without reading the person's text.
+
+Counts establish majority patterns, but high-impact minority exceptions or off-option comments ("weak signals") remain reviewable alongside aggregated distributions so rare risks are not lost. Keep new elicitation checks advisory unless a tenant template explicitly opts in (for example, marking entries `required` in HR-03); see [AI-Era Requirements Governance Playbook](../orchestration/ai-requirements-governance-playbook.md).
 
 ## The mechanisms today
 
