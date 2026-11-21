@@ -446,6 +446,36 @@ libs/actuators/` — plus `pnpm check -- --only catalogs` and, if you touched
   as new. Confirm a CodeQL fix with the local CodeQL CLI over the same scope
   GitHub scans (test files included) before pushing.
 
+### 4.1 Pre-push self-check — run the gate chain before CI does
+
+Most CI failures are registration-surface or environment misses, not code
+bugs — they reproduce locally. Run this sequence before pushing; do not let
+CI be the first place a gate sees the change:
+
+1. **Prepare the worktree.** `pnpm install --frozen-lockfile` — without it
+   `ts-loader` cannot resolve `@agent/core` and every dist-dependent check
+   is invisible locally.
+2. **Enumerate the registration surfaces for this change** (§1 table before
+   implementing): new package script → `cli-commands.json` `script_commands`
+   + `cli_cmd_script_*` vocabulary + `MAX_PACKAGE_SCRIPTS`; new module
+   imported by package name → `libs/core/package.json` exports +
+   `check_package_export_surface.baseline.json`; new authority role →
+   `authority-roles/<role>.json` card + re-record
+   `org-role-default-grant-equivalence.json` fixture; generated value
+   (qps-ploc, indexes, CLI_REFERENCE) → run its generator, never hand-write.
+3. **Run the PR gate set locally:** `pnpm check -- --scope pr`, plus
+   `pnpm exec prettier --check` on changed `.json` sources, the focused
+   vitest files touched, and `pnpm run check:pr-title` for the PR title
+   (Conventional Commit `type(scope): subject`).
+4. **Triage failures before fixing:** a `Test timed out`/network flake is a
+   rerun candidate (`gh run rerun --failed`); everything else is a real
+   defect in the change — classify first, fix second.
+5. **Edit large governed JSON surgically.** Preserve the file's existing
+   byte formatting — `json.dumps`/re-serializing the whole file produces
+   cosmetic diffs that obscure review (see the directory-source registries:
+   `security-policy/`, `storage-retention-catalog/` — edit per-entry files
+   and regenerate via `pnpm generate:governance-catalogs`).
+
 ## 5. Governance & policy mechanics
 
 - File I/O only via `@agent/core` secure-io; writes to `knowledge/**` are

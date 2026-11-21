@@ -1,0 +1,1 @@
+Add §4.1 "Pre-push self-check" to kyberion-development-practices.md — codify the gate sequence (worktree install, registration-surface enumeration, local pr-gates run, flake triage, surgical JSON edits) so CI is not the first place a gate sees a change.
