@@ -1,5 +1,3 @@
 {
-  "allow_write": [
-    "active/shared/observability/chronos/ce-08-perf-baseline.json"
-  ]
+  "allow_write": ["active/shared/observability/chronos/ce-08-perf-baseline.json"]
 }

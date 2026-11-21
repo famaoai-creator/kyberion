@@ -1,6 +1,3 @@
 {
-  "allow_write": [
-    "knowledge/confidential/",
-    "knowledge/public/ingest/"
-  ]
+  "allow_write": ["knowledge/confidential/", "knowledge/public/ingest/"]
 }

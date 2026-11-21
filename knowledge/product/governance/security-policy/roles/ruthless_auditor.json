@@ -1,9 +1,4 @@
 {
-  "allow_read": [
-    "active/audit/",
-    "knowledge/personal/stances/"
-  ],
-  "allow_write": [
-    "active/audit/"
-  ]
+  "allow_read": ["active/audit/", "knowledge/personal/stances/"],
+  "allow_write": ["active/audit/"]
 }

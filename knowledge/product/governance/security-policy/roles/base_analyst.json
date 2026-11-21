@@ -1,8 +1,5 @@
 {
-  "allow_read": [
-    "knowledge/",
-    "active/audit/"
-  ],
+  "allow_read": ["knowledge/", "active/audit/"],
   "allow_write": [
     "active/shared/tmp/",
     "knowledge/product/evolution/",

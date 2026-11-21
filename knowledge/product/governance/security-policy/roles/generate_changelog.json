@@ -1,5 +1,3 @@
 {
-  "allow_write": [
-    "CHANGELOG.md"
-  ]
+  "allow_write": ["CHANGELOG.md"]
 }

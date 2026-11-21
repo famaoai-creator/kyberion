@@ -1,0 +1,1 @@
+Split the two highest-churn governed catalogs into per-entry directory sources: security-policy roles (authority-roles/ cards + security-policy/roles/) and storage-retention-catalog entries now live as individual JSON files assembled by `pnpm generate:governance-catalogs`, with a byte-exact `governance-catalogs` pr gate keeping the committed runtime artifacts in sync.

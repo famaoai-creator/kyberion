@@ -1,5 +1,3 @@
 {
-  "allow_write": [
-    "dist/.build-generation.json"
-  ]
+  "allow_write": ["dist/.build-generation.json"]
 }

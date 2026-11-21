@@ -1,7 +1,5 @@
 {
-  "allow_read": [
-    "knowledge/personal/voice/profile-registry.json"
-  ],
+  "allow_read": ["knowledge/personal/voice/profile-registry.json"],
   "allow_write": [
     "active/shared/tmp/",
     "active/shared/logs/traces/",

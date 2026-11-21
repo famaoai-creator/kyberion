@@ -6,7 +6,5 @@
     "knowledge/product/governance/env-registry.json",
     "knowledge/product/governance/agent-policies.yaml"
   ],
-  "allow_write": [
-    "knowledge/personal/"
-  ]
+  "allow_write": ["knowledge/personal/"]
 }
