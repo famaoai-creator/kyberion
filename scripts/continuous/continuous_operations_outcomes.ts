@@ -2,9 +2,12 @@
 import type { DotCharter } from '@agent/core/dot/dot-charter';
 import { readDotWorkResults } from '@agent/core/dot/dot-executor';
 import { readDotActionLedger } from '@agent/core/dot/dot-action-ledger';
-import { getWorkItem, normalizeWorkItemContext } from '@agent/core/workforce/work-coordination';
+import { getWorkItem } from '@agent/core/workforce/work-coordination';
 import { listArtifactOwnershipRecordsByQuery } from '@agent/core/workforce/artifact-registry';
-import { readContinuousWorkOwnerProgress } from '@agent/core/organization/continuous-work-owner';
+import {
+  normalizeWorkItemContext,
+  readContinuousWorkOwnerProgress,
+} from '@agent/core/organization/continuous-work-owner';
 import type { ContinuousOperationsReport } from '@agent/core/organization/continuous-operations';
 export interface ContinuousOutcomeDeps {
   actions?: typeof readDotActionLedger;

@@ -48,7 +48,6 @@ import {
   normalizeWorkItemContext,
   workItemContextUpdate,
 } from './work-coordination-identity.js';
-export { normalizeWorkItemContext } from './work-coordination-identity.js';
 import {
   hasUndispatchedWorkItemEvidenceScope,
   inspectUndispatchedWorkItemHistory,

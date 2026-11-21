@@ -23,6 +23,7 @@ import {
 } from '../workforce/work-coordination.js';
 import type { WorkItem } from '../workforce/work-coordination-types.js';
 import { normalizeWorkItemContext } from '../workforce/work-coordination-identity.js';
+export { normalizeWorkItemContext } from '../workforce/work-coordination-identity.js';
 import { assertScopedCadenceExecution } from './organization-cadence.js';
 import {
   parseContinuousWorkPlan,
