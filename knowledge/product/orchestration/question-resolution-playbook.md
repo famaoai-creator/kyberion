@@ -4,7 +4,7 @@ category: Orchestration
 tags: [question-resolution, intent, preflight, knowledge, governance, customer-decision]
 importance: 8
 author: Kyberion
-last_updated: 2026-10-24
+last_updated: 2026-11-21
 ---
 
 # Question Resolution Playbook
@@ -90,6 +90,13 @@ That keeps the loop:
 2. record the answer with traceability
 3. reuse the answer when the same context returns
 4. promote the pattern only after it is stable
+
+## Requirements framing and weak signals (advisory; opt-in strict)
+
+- Separate raw wishes (**Needs**) from agreed expectations (**Stakeholder Requirements**) and verifiable criteria (**System Requirements**) before encoding intake answers as execution contracts.
+- Challenge legacy procedures ("why must this approval/format exist?") instead of mirroring unnecessary rules into new question slots.
+- Retain high-impact minority comments or edge-case exceptions ("weak signals") alongside aggregated majority counts when surfacing findings.
+- **Opt-in enforcement**: These checks remain advisory by default and become mandatory only where a tenant template or project policy explicitly opts in. Reference: [AI-Era Requirements Governance Playbook](./ai-requirements-governance-playbook.md).
 
 ## Operational rule
 

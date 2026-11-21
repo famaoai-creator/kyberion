@@ -1118,7 +1118,6 @@
         "scripts/generate/generate_store_roots.test.ts",
         "libs/core/foundation/runtime-state-roots.test.ts",
         "libs/core/provider/custody-provider-attestation-governance.test.ts",
-        "libs/core/mission/mission-orchestration-worker.cd09-decision-lock.test.ts",
         "libs/core/governance/delegated-execution.test.ts",
         "libs/core/governance/delegated-execution.production-path.integration.test.ts",
         "libs/core/pipeline/pipeline-run-journal.tenant-store.test.ts",
@@ -1154,7 +1153,7 @@
       ],
       "timeout_ms": 300000,
       "owner": "quality",
-      "rationale": "S3: registration-ceremony ratchets (storage/IO/process/package boundaries, R5 delegation start reporting per reasoning backend, tenant-partitioned runtime stores reachable by offboarding, loopback child-env NO_PROXY guard, typed provider results redacted fail-closed, non-public reasoning payload scopes declaring training_use) and seam lifecycle/provider-boundary contracts, including OCR removal cache invalidation. Budget: about 30s wall alone; scanning under six concurrent gates uses a 60s test timeout and 300s gate timeout. tests/core-runtime-import-contract.test.ts stays in the test job."
+      "rationale": "S3: registration-ceremony ratchets (storage/IO/process/package boundaries, R5 delegation start reporting per reasoning backend, tenant-partitioned runtime stores reachable by offboarding, loopback child-env NO_PROXY guard, typed provider results redacted fail-closed, non-public reasoning payload scopes declaring training_use) and seam lifecycle/provider-boundary contracts, including OCR removal cache invalidation. Budget: about 30s wall alone; scanning under six concurrent gates uses a 60s test timeout and 300s gate timeout. tests/core-runtime-import-contract.test.ts stays in the test job. Behaviour suites that the core suite already runs on every PR (e.g. the 47s mission-orchestration-worker CD-09 decision-lock suite) stay out: doubling them pushed this gate to 240-276s of its 300s budget on loaded runners."
     },
     {
       "id": "test-sleep-ratchet",

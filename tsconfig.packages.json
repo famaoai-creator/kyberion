@@ -40,6 +40,9 @@
     },
     {
       "path": "./presence/displays/terminal-hud"
+    },
+    {
+      "path": "./presence/displays/mission-deck"
     }
   ]
 }

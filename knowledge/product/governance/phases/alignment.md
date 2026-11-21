@@ -1,7 +1,7 @@
 ---
 title: 'Phase Protocol: Alignment'
 tags: [governance, lifecycle, alignment]
-last_updated: 2026-08-11
+last_updated: 2026-11-21
 runtime_stages: [intake, classification, planning]
 ---
 
@@ -33,6 +33,16 @@ For a mission-shaped request with an alignment gate, the governed order is:
 6. Continue with the planned execution and verification steps.
 
 The browser must not invoke `mission_controller create` or `start`. Creation is an explicit, auditable session operation; approval remains required before activation.
+
+## Requirements framing checklist (advisory; opt-in strict)
+
+Use this pass during Alignment to avoid building the wrong thing cleanly:
+
+- **Separate Needs, Stakeholder Requirements, and System Requirements / Victory Conditions**: Do not treat raw stakeholder wishes directly as implementation specs. Separate what the requestor needs from agreed behavioral expectations and verifiable acceptance criteria.
+- **Simplify given conditions before AI-enabling**: Challenge legacy approvals, manual handoffs, or rigid procedural steps first rather than automating unnecessary complexity as-is.
+- **Preserve weak signals**: Keep high-impact minority exceptions or outlier edge cases visible alongside high-frequency requests instead of averaging them away.
+
+_Enforcement posture_: This checklist is **advisory by default**. Make individual items blocking pre-execution checks only when a tenant, project, or workflow policy explicitly opts in. See [AI-Era Requirements Governance Playbook](../../orchestration/ai-requirements-governance-playbook.md).
 
 ## Constraints
 

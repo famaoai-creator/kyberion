@@ -416,6 +416,25 @@
       "tools_enabled": true,
       "allowed_tools": ["read_file", "list_directory"]
     },
+    "gemini-api-neon": {
+      "mode": "gemini-api",
+      "model_ref": "gemini:gemini-4-neon",
+      "capabilities": ["text", "structured_output", "tools", "vision", "streaming"],
+      "tools_enabled": true,
+      "allowed_tools": ["read_file", "list_directory"]
+    },
+    "gemini-cli-neon": {
+      "mode": "gemini-cli",
+      "model_ref": "gemini:gemini-4-neon",
+      "capabilities": ["text", "structured_output", "tools"]
+    },
+    "agy-neon": {
+      "mode": "agy-cli",
+      "model_ref": "gemini:gemini-4-neon",
+      "capabilities": ["text", "structured_output", "tools"],
+      "tools_enabled": true,
+      "allowed_tools": ["read_file", "list_directory"]
+    },
     "openai-api-default": { "mode": "openai-api", "capabilities": ["text", "structured_output"] },
     "openrouter-default": {
       "mode": "openrouter",

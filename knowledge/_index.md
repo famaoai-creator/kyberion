@@ -417,6 +417,7 @@
 - [ADF パイプライン分類レポート](./product/orchestration/adf-pipeline-classification-report.md) (public | Unknown)
 - [ADF パイプライン検証計画](./product/orchestration/adf-pipeline-validation-plan.md) (public | Unknown)
 - [ADF パイプライン簡素化ミッション計画](./product/orchestration/adf-pipeline-simplification-mission-plan.md) (public | Unknown)
+- [AI-Era Requirements Governance Playbook (Opt-In Constraints & Tailoring)](./product/orchestration/ai-requirements-governance-playbook.md) (public | Ecosystem Architect)
 - [AIDLC Integration Process](./product/orchestration/aidlc-integration-process.md) (public | Kyberion)
 - [Action Playbook (converse / hands / move — which executor for which target)](./product/orchestration/action-playbook.md) (public | Ecosystem Architect)
 - [Active Inquiry Protocol: The Power of Questioning](./product/orchestration/active_inquiry_protocol.md) (public | Ecosystem Architect)

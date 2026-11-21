@@ -1,0 +1,23 @@
+{
+  "name": "@presence/mission-deck",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Kyberion Mission Deck — conversation-centric multi-agent TUI (Ink)",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc --build && node ../../../scripts/write_core_dist_scope.mjs --run"
+  },
+  "dependencies": {
+    "@agent/core": "workspace:*",
+    "ink": "^7.1.1",
+    "ink-text-input": "^6.0.0",
+    "react": "^19.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "@types/react": "^19.3.0",
+    "ink-testing-library": "^4.0.0",
+    "typescript": "^5.9.3"
+  }
+}

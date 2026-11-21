@@ -68,6 +68,7 @@
     "presence/displays/operator-surface",
     "presence/displays/presence-studio",
     "presence/displays/terminal-hud",
+    "presence/displays/mission-deck",
     "presence/bridge/approvals",
     "presence/bridge/runtime",
     "presence/bridge/terminal",

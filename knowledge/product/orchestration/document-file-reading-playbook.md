@@ -4,7 +4,7 @@ category: Orchestration
 tags: [orchestration, media-actuator, ingest-actuator, pdf, pptx, xlsx, docx, ocr, ingest]
 importance: 8
 author: Ecosystem Architect
-last_updated: 2026-10-18
+last_updated: 2026-11-21
 role_affinity: [ecosystem_architect, knowledge_steward, researcher, analyst, mission_controller]
 phase_affinity: [alignment, execution]
 ---
@@ -71,6 +71,7 @@ the ingest ceremony is the only sanctioned way into
   `read --ocr` recover the pages by rasterizing via `pdftoppm` and OCR-ing the
   rendered pages; without `--ocr` a warning names the affected pages.
   `media:pdf_extract` does not page-OCR.
+- **Owner-encrypted PDFs** (permissions-locked with an empty user password): `kyberion read` / `document_digest` falls back to `pdf.js` (`pdf-parse`) for text and title extraction and emits a warning that embedded images and native table layout were not extracted; empty-text fallback pages can still be rendered with `--images <dir>` or OCR'd with `--ocr`. User-password-protected PDFs fail closed.
 - Scanned PDFs (one full-page image per page): `media:pdf_to_pptx_design` with
   `hints.features.fullPageImageOcrOverlay: true`. This overlay does **not** fire for
   partial-page images; use `ocr: true` above for those.
@@ -179,9 +180,7 @@ file to read a document.
    `active/shared/tmp/native-pdf/images/<doc-hash>/`, PPTX assets under
    `active/shared/tmp/actuators/media-actuator/`. Tenant figures should not sit there
    for the 24h TTL; remove the directories you created once the card is committed.
-8. **Password-protected Office files** (`file` reports `CDFV2 Encrypted`) cannot be
-   read — there is no decryption op. Ask the owner for a decrypted copy instead of
-   retrying.
+8. **Password-protected Office files & PDFs**: encrypted Office files (`file` reports `CDFV2 Encrypted`) and user-password-protected PDFs fail closed — there is no decryption op with a user password. Ask the owner for a decrypted copy instead of retrying. (Owner/permissions-only encrypted PDFs with no open password are read via the `pdf.js` text fallback with a warning.)
 9. **Stage with the original file name.** When a document has no heading, its card
    title falls back to the file name — an ASCII rename like `incident.docx` becomes
    the title. Keep the original name (drop only copy suffixes such as ` (1)`).

@@ -6,7 +6,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import * as path from 'node:path';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import AdmZip from 'adm-zip';
 import ExcelJS from 'exceljs';
 import {
@@ -84,6 +84,142 @@ async function xlsxFixture(): Promise<Buffer> {
   sheet.addRow(['Alpha', 100]);
   workbook.addWorksheet('Scratch').state = 'hidden';
   return Buffer.from(await workbook.xlsx.writeBuffer());
+}
+
+const PDF_STANDARD_PADDING = Buffer.from([
+  0x28, 0xbf, 0x4e, 0x5e, 0x4e, 0x75, 0x8a, 0x41, 0x64, 0x00, 0x4e, 0x56, 0xff, 0xfa, 0x01, 0x08,
+  0x2e, 0x2e, 0x00, 0xb6, 0xd0, 0x68, 0x3e, 0x80, 0x2f, 0x0c, 0xa9, 0xfe, 0x64, 0x53, 0x69, 0x7a,
+]);
+
+function md5(data: Buffer): Buffer {
+  return createHash('md5').update(data).digest();
+}
+
+function rc4(key: Buffer, data: Buffer): Buffer {
+  const s = Uint8Array.from({ length: 256 }, (_, idx) => idx);
+  let j = 0;
+  for (let i = 0; i < 256; i += 1) {
+    j = (j + s[i] + key[i % key.length]) & 255;
+    [s[i], s[j]] = [s[j], s[i]];
+  }
+  const out = Buffer.alloc(data.length);
+  let i = 0;
+  j = 0;
+  for (let k = 0; k < data.length; k += 1) {
+    i = (i + 1) & 255;
+    j = (j + s[i]) & 255;
+    [s[i], s[j]] = [s[j], s[i]];
+    out[k] = data[k] ^ s[(s[i] + s[j]) & 255];
+  }
+  return out;
+}
+
+function encryptedPdfFixture(input: {
+  userPassword?: string;
+  ownerPassword: string;
+  pages: string[];
+  title?: string;
+}): Buffer {
+  const userPwd = input.userPassword ?? '';
+  const padPassword = (pwd: string): Buffer =>
+    Buffer.concat([Buffer.from(pwd, 'latin1'), PDF_STANDARD_PADDING]).subarray(0, 32);
+
+  const fileId = Buffer.from('0123456789abcdef', 'hex');
+  const permissions = -44;
+  const pBuf = Buffer.alloc(4);
+  pBuf.writeInt32LE(permissions, 0);
+
+  const ownerKey = md5(padPassword(input.ownerPassword || userPwd)).subarray(0, 5);
+  const ownerEntry = rc4(ownerKey, padPassword(userPwd));
+  const encKey = md5(Buffer.concat([padPassword(userPwd), ownerEntry, pBuf, fileId])).subarray(
+    0,
+    5
+  );
+  const userEntry = rc4(encKey, PDF_STANDARD_PADDING);
+
+  const objectKey = (objNum: number): Buffer => {
+    const suffix = Buffer.alloc(5);
+    suffix.writeUIntLE(objNum, 0, 3);
+    return md5(Buffer.concat([encKey, suffix])).subarray(0, 10);
+  };
+
+  const pageCount = input.pages.length;
+  const fontObjId = 3 + pageCount;
+  const firstContentId = fontObjId + 1;
+  const pageRefs = Array.from({ length: pageCount }, (_, i) => `${3 + i} 0 R`).join(' ');
+
+  const chunks: Buffer[] = [
+    Buffer.from(
+      `%PDF-1.4\n1 0 obj<< /Type /Catalog /Pages 2 0 R >>endobj\n` +
+        `2 0 obj<< /Type /Pages /Kids [${pageRefs}] /Count ${pageCount} >>endobj\n`,
+      'latin1'
+    ),
+  ];
+
+  for (let i = 0; i < pageCount; i += 1) {
+    const pageObjId = 3 + i;
+    const contentObjId = firstContentId + i;
+    chunks.push(
+      Buffer.from(
+        `${pageObjId} 0 obj<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] ` +
+          `/Contents ${contentObjId} 0 R /Resources << /Font << /F1 ${fontObjId} 0 R >> >> >>endobj\n`,
+        'latin1'
+      )
+    );
+  }
+
+  chunks.push(
+    Buffer.from(
+      `${fontObjId} 0 obj<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>endobj\n`,
+      'latin1'
+    )
+  );
+
+  for (let i = 0; i < pageCount; i += 1) {
+    const contentObjId = firstContentId + i;
+    const pageText = input.pages[i];
+    const plainStream = Buffer.from(
+      pageText ? `BT /F1 12 Tf 72 720 Td (${pageText}) Tj ET` : '',
+      'latin1'
+    );
+    const encStream = rc4(objectKey(contentObjId), plainStream);
+    chunks.push(
+      Buffer.from(`${contentObjId} 0 obj<< /Length ${encStream.length} >>stream\n`, 'latin1'),
+      encStream,
+      Buffer.from('\nendstream\nendobj\n', 'latin1')
+    );
+  }
+
+  let nextObjId = firstContentId + pageCount;
+  let infoRef = '';
+  if (input.title) {
+    const infoObjId = nextObjId;
+    nextObjId += 1;
+    const titleHex = rc4(objectKey(infoObjId), Buffer.from(input.title, 'latin1')).toString('hex');
+    chunks.push(Buffer.from(`${infoObjId} 0 obj<< /Title <${titleHex}> >>endobj\n`, 'latin1'));
+    infoRef = ` /Info ${infoObjId} 0 R`;
+  }
+
+  const encryptObjId = nextObjId;
+  nextObjId += 1;
+  chunks.push(
+    Buffer.from(
+      `${encryptObjId} 0 obj<< /Filter /Standard /V 1 /R 2 /O <${ownerEntry.toString('hex')}> ` +
+        `/U <${userEntry.toString('hex')}> /P ${permissions} >>endobj\n`,
+      'latin1'
+    )
+  );
+
+  const fileIdHex = fileId.toString('hex');
+  chunks.push(
+    Buffer.from(
+      `trailer<< /Size ${nextObjId} /Root 1 0 R${infoRef} /Encrypt ${encryptObjId} 0 R ` +
+        `/ID [<${fileIdHex}><${fileIdHex}>] >>\n%%EOF\n`,
+      'latin1'
+    )
+  );
+
+  return Buffer.concat(chunks);
 }
 
 describe('document-reader', () => {
@@ -350,6 +486,84 @@ trailer<< /Size 7 /Root 1 0 R /Info 6 0 R >>
     const result = await readDocument(pdfPath, 'pdf');
     expect(result.title).toBe('Report (Draft)');
     expect(result.markdown.startsWith('# Report (Draft)')).toBe(true);
+  });
+
+  it('reads owner-encrypted multi-page PDFs via pdf.js fallback and warns', async () => {
+    const pdfBuf = encryptedPdfFixture({
+      ownerPassword: 'owner-secret',
+      title: 'Encrypted Report',
+      pages: ['First page owner locked', 'Second page owner locked'],
+    });
+    const result = await readDocument(pdfBuf, 'pdf');
+    expect(result.title).toBe('Encrypted Report');
+    expect(result.markdown.startsWith('# Encrypted Report')).toBe(true);
+    expect(result.markdown).toContain('<!-- Page 1 -->');
+    expect(result.markdown).toContain('First page owner locked');
+    expect(result.markdown).toContain('<!-- Page 2 -->');
+    expect(result.markdown).toContain('Second page owner locked');
+    expect(result.warnings).toEqual(
+      expect.arrayContaining([expect.stringMatching(/encrypted.*pdf\.js fallback/i)])
+    );
+  });
+
+  it('rejects user-password-protected PDFs with an actionable error', async () => {
+    const pdfBuf = encryptedPdfFixture({
+      userPassword: 'user-secret',
+      ownerPassword: 'owner-secret',
+      title: 'Locked Report',
+      pages: ['Confidential page'],
+    });
+    await expect(readDocument(pdfBuf, 'pdf')).rejects.toThrow(/password-protected/);
+  });
+
+  it('flags empty-text owner-encrypted PDFs and renders page images when requested', async () => {
+    const pdfBuf = encryptedPdfFixture({
+      ownerPassword: 'owner-secret',
+      pages: [''],
+    });
+    const withoutImages = await readDocument(pdfBuf, 'pdf');
+    expect(withoutImages.warnings).toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/encrypted.*pdf\.js fallback/i),
+        expect.stringMatching(/page 1: text layer is unreadable/i),
+      ])
+    );
+
+    const imagesDir = path.join(workDir, 'encrypted-renders');
+    const withImages = await readDocument(pdfBuf, 'pdf', { imagesDir });
+    expect(withImages.images).toHaveLength(1);
+    expect(withImages.images[0].location).toBe('page 1');
+    const pngBytes = safeReadFile(withImages.images[0].path, { encoding: null }) as Buffer;
+    expect(pngBytes.subarray(0, 8).toString('hex')).toBe('89504e470d0a1a0a');
+  });
+
+  it('handles unencrypted multi-page PDFs with a blank middle page without false warnings', async () => {
+    const pdf = Buffer.from(
+      `%PDF-1.4
+1 0 obj<< /Type /Catalog /Pages 2 0 R >>endobj
+2 0 obj<< /Type /Pages /Kids [3 0 R 4 0 R 5 0 R] /Count 3 >>endobj
+3 0 obj<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 7 0 R /Resources << /Font << /F1 6 0 R >> >> >>endobj
+4 0 obj<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 8 0 R /Resources << /Font << /F1 6 0 R >> >> >>endobj
+5 0 obj<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 9 0 R /Resources << /Font << /F1 6 0 R >> >> >>endobj
+6 0 obj<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>endobj
+7 0 obj<< /Length 47 >>stream
+BT /F1 12 Tf 72 720 Td (Page One) Tj ET
+endstream endobj
+8 0 obj<< /Length 0 >>stream
+
+endstream endobj
+9 0 obj<< /Length 49 >>stream
+BT /F1 12 Tf 72 720 Td (Page Three) Tj ET
+endstream endobj
+trailer<< /Size 10 /Root 1 0 R >>
+%%EOF
+`,
+      'latin1'
+    );
+    const result = await readDocument(pdf, 'pdf');
+    expect(result.markdown).toContain('Page One');
+    expect(result.markdown).toContain('Page Three');
+    expect(result.warnings).toEqual([]);
   });
 
   it('rejects password-protected Office bytes and paths outside the repository', async () => {

@@ -17,12 +17,18 @@ export const PACKAGE_BUILD_OUTPUTS = [
     sourceRoot: 'presence/displays/terminal-hud/src',
     excludeTests: true,
   },
+  {
+    id: 'presence/displays/mission-deck',
+    sourceRoot: 'presence/displays/mission-deck/src',
+    excludeTests: true,
+  },
 ] as const;
 
 export const ROOT_SOURCE_EXCLUSIONS = {
   presence: [
     'displays/chronos-mirror-v2',
     'displays/terminal-hud',
+    'displays/mission-deck',
     'displays/operator-surface',
     'displays/concierge',
   ],

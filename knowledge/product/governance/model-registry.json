@@ -533,6 +533,34 @@
       "notes": "Google Gemini 4 Carbon; marked new in the Devin model catalog and listed by OpenCode (verified 2026-11-14). Frontier reasoning model alongside Argon."
     },
     {
+      "model_id": "gemini:gemini-4-neon",
+      "provider": "gemini",
+      "family": "gemini-4",
+      "status": "approved",
+      "tier": "large",
+      "execution_tier": "deep",
+      "role_fit": {
+        "intent_compiler": "primary",
+        "surface_agent": "primary",
+        "analysis": "primary",
+        "coding": "primary"
+      },
+      "cost_band": "high",
+      "latency_band": "medium",
+      "structured_output_confidence": "high",
+      "tool_use_confidence": "high",
+      "multilingual_confidence": "high",
+      "reasoning_confidence": "high",
+      "capability_tags": [
+        "agentic_coding",
+        "deep_reasoning",
+        "tool_use",
+        "multimodal",
+        "long_horizon"
+      ],
+      "notes": "Google Gemini 4 Neon frontier reasoning model for agentic coding, refactoring, and multi-step workflows; exposed by the agy CLI (low/medium/high/xhigh variants) and Gemini API (verified 2026-11-20). Published rates: $3.00 / $0.15 cached / $15.00 per 1M tokens."
+    },
+    {
       "model_id": "gemini:gemini-4-argon",
       "provider": "gemini",
       "family": "gemini-4",
