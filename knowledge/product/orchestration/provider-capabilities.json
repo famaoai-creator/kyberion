@@ -10,6 +10,7 @@
     "gemini": {
       "models": [
         "gemini-4-carbon",
+        "gemini-4-neon",
         "gemini-4-argon",
         "gemini-4-hydrogen",
         "gemini-3.8-flash",
@@ -57,6 +58,17 @@
           "multimodal"
         ],
         "gemini-4-carbon": [
+          "reasoning",
+          "planning",
+          "analysis",
+          "structured_json",
+          "long_context",
+          "code",
+          "review",
+          "architecture",
+          "multimodal"
+        ],
+        "gemini-4-neon": [
           "reasoning",
           "planning",
           "analysis",
@@ -741,6 +753,16 @@
     },
     "agy": {
       "models": [
+        "Gemini 4 Neon (XHigh)",
+        "Gemini 4 Neon (High)",
+        "Gemini 4 Neon (Medium)",
+        "Gemini 4 Neon (Low)",
+        "Gemini 4 Neon",
+        "gemini-4-neon",
+        "gemini-4-neon-xhigh",
+        "gemini-4-neon-high",
+        "gemini-4-neon-medium",
+        "gemini-4-neon-low",
         "Gemini 4 Hydrogen (XHigh)",
         "Gemini 4 Hydrogen (High)",
         "Gemini 4 Hydrogen (Medium)",
@@ -752,6 +774,10 @@
         "Gemini 4 Argon (Low)",
         "Gemini 4 Argon",
         "gemini-4-argon",
+        "Orchestrator (Neon)",
+        "gemini-pro-orchestrator-neon",
+        "Orchestrator (Argon)",
+        "gemini-pro-orchestrator-g1-pro",
         "Gemini 3.8 Flash (Medium)",
         "Gemini 3.8 Flash (High)",
         "Gemini 3.8 Flash (Low)",
@@ -794,6 +820,96 @@
         "gateway"
       ],
       "modelCapabilities": {
+        "Gemini 4 Neon (XHigh)": [
+          "reasoning",
+          "planning",
+          "coordination",
+          "analysis",
+          "code",
+          "review",
+          "architecture",
+          "structured_json",
+          "sandboxed_parallel"
+        ],
+        "Gemini 4 Neon (High)": [
+          "reasoning",
+          "planning",
+          "coordination",
+          "analysis",
+          "code",
+          "review",
+          "architecture",
+          "structured_json",
+          "sandboxed_parallel"
+        ],
+        "Gemini 4 Neon (Medium)": [
+          "reasoning",
+          "planning",
+          "coordination",
+          "analysis",
+          "code",
+          "review",
+          "architecture",
+          "structured_json",
+          "sandboxed_parallel"
+        ],
+        "Gemini 4 Neon": [
+          "reasoning",
+          "planning",
+          "coordination",
+          "analysis",
+          "code",
+          "review",
+          "architecture",
+          "structured_json",
+          "sandboxed_parallel"
+        ],
+        "gemini-4-neon": [
+          "reasoning",
+          "planning",
+          "coordination",
+          "analysis",
+          "code",
+          "review",
+          "architecture",
+          "structured_json",
+          "sandboxed_parallel"
+        ],
+        "gemini-4-neon-xhigh": [
+          "reasoning",
+          "planning",
+          "coordination",
+          "analysis",
+          "code",
+          "review",
+          "architecture",
+          "structured_json",
+          "sandboxed_parallel"
+        ],
+        "gemini-4-neon-high": [
+          "reasoning",
+          "planning",
+          "coordination",
+          "analysis",
+          "code",
+          "review",
+          "architecture",
+          "structured_json",
+          "sandboxed_parallel"
+        ],
+        "gemini-4-neon-medium": [
+          "reasoning",
+          "planning",
+          "coordination",
+          "analysis",
+          "code",
+          "review",
+          "architecture",
+          "structured_json",
+          "sandboxed_parallel"
+        ],
+        "Gemini 4 Neon (Low)": ["reasoning", "analysis", "code", "structured_json", "low_latency"],
+        "gemini-4-neon-low": ["reasoning", "analysis", "code", "structured_json", "low_latency"],
         "Gemini 4 Hydrogen (XHigh)": [
           "reasoning",
           "planning",
@@ -933,6 +1049,50 @@
           "sandboxed_parallel"
         ],
         "gemini-4-argon": [
+          "reasoning",
+          "planning",
+          "coordination",
+          "analysis",
+          "code",
+          "review",
+          "architecture",
+          "structured_json",
+          "sandboxed_parallel"
+        ],
+        "Orchestrator (Neon)": [
+          "reasoning",
+          "planning",
+          "coordination",
+          "analysis",
+          "code",
+          "review",
+          "architecture",
+          "structured_json",
+          "sandboxed_parallel"
+        ],
+        "gemini-pro-orchestrator-neon": [
+          "reasoning",
+          "planning",
+          "coordination",
+          "analysis",
+          "code",
+          "review",
+          "architecture",
+          "structured_json",
+          "sandboxed_parallel"
+        ],
+        "Orchestrator (Argon)": [
+          "reasoning",
+          "planning",
+          "coordination",
+          "analysis",
+          "code",
+          "review",
+          "architecture",
+          "structured_json",
+          "sandboxed_parallel"
+        ],
+        "gemini-pro-orchestrator-g1-pro": [
           "reasoning",
           "planning",
           "coordination",
