@@ -87,6 +87,11 @@
       "completion": 0.01,
       "cache_read": 0.0001
     },
+    "gemini-4-neon": {
+      "prompt": 0.003,
+      "completion": 0.015,
+      "cache_read": 0.00015
+    },
     "gemini-4-argon": {
       "prompt": 0.002,
       "completion": 0.01,
@@ -138,6 +143,10 @@
   "aliases": {
     "argon": "gemini-4-argon",
     "carbon": "gemini-4-carbon",
+    "hydrogen": "gemini-4-hydrogen",
+    "neon": "gemini-4-neon",
+    "gemini-pro-orchestrator-neon": "gemini-4-neon",
+    "gemini-pro-orchestrator-g1-pro": "gemini-4-argon",
     "fable": "claude-fable-5-2",
     "opus": "claude-opus-5-5",
     "sonnet": "claude-sonnet-5",

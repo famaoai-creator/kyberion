@@ -134,6 +134,19 @@ describe('GeminiApiBackend', () => {
     expect(argonBackend?.getModel()).toBe('gemini-4-argon');
   });
 
+  it('supports gemini-4-neon while keeping default as gemini-3.8-flash', () => {
+    const defaultBackend = buildGeminiApiBackendFromEnv({
+      GEMINI_API_KEY: 'test-gemini-key',
+    });
+    expect(defaultBackend?.getModel()).toBe('gemini-3.8-flash');
+
+    const neonBackend = buildGeminiApiBackendFromEnv({
+      GEMINI_API_KEY: 'test-gemini-key',
+      KYBERION_GEMINI_MODEL: 'gemini-4-neon',
+    });
+    expect(neonBackend?.getModel()).toBe('gemini-4-neon');
+  });
+
   it('sends Gemini function declarations and maps function calls', async () => {
     const request = vi.fn().mockResolvedValue({
       candidates: [

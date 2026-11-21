@@ -275,6 +275,24 @@ describe('reasoning-route-resolver', () => {
     expect(route.model).toBe('xai:grok-4.5-build');
   });
 
+  it('resolves agy-neon and gemini-api-neon profiles to gemini:gemini-4-neon', () => {
+    const agyRoute = resolveReasoningRoute({
+      role: 'default',
+      requestedProfile: 'agy-neon',
+      env: {},
+    });
+    expect(agyRoute.mode).toBe('agy-cli');
+    expect(agyRoute.model).toBe('gemini:gemini-4-neon');
+
+    const geminiApiRoute = resolveReasoningRoute({
+      role: 'default',
+      requestedProfile: 'gemini-api-neon',
+      env: { GEMINI_API_KEY: 'test-key' },
+    });
+    expect(geminiApiRoute.mode).toBe('gemini-api');
+    expect(geminiApiRoute.model).toBe('gemini:gemini-4-neon');
+  });
+
   it('rejects parameters unsupported by an adapter', () => {
     expect(() =>
       resolveSamplingParams({ mode: 'codex-cli', sampling: { temperature: 0.2 } })

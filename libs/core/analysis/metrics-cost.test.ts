@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import {
   loadModelCostRegistry,
   _resetModelCostRegistryCacheForTests,
+  resolveCostRateModelKey,
   resolveCostRates,
 } from './metrics.js';
 
@@ -70,6 +71,22 @@ describe('resolveCostRates — per-model cost resolution', () => {
     expect(fast.completion).toBeCloseTo(0.012 / 1000);
     expect(resolveCostRates('grok-4.7-build-fast', 200_000).completion).toBeCloseTo(0.018 / 1000);
     expect(resolveCostRates('grok-4.7-build-fast', 200_000).cache_read).toBeCloseTo(0.0015 / 1000);
+  });
+
+  it('prices Gemini 4 Neon and resolves Orchestrator and Gemini 4 aliases', () => {
+    const neon = resolveCostRates('gemini-4-neon');
+    expect(neon.prompt).toBeCloseTo(0.003 / 1000);
+    expect(neon.completion).toBeCloseTo(0.015 / 1000);
+    expect(neon.cache_read).toBeCloseTo(0.00015 / 1000);
+
+    expect(resolveCostRateModelKey('Gemini 4 Neon (High)')).toBe('gemini-4-neon');
+    expect(resolveCostRateModelKey('gemini-4-neon-xhigh')).toBe('gemini-4-neon');
+    expect(resolveCostRateModelKey('gemini-pro-orchestrator-neon')).toBe('gemini-4-neon');
+    expect(resolveCostRateModelKey('Orchestrator (Neon)')).toBe('gemini-4-neon');
+
+    expect(resolveCostRateModelKey('gemini-pro-orchestrator-g1-pro')).toBe('gemini-4-argon');
+    expect(resolveCostRateModelKey('Orchestrator (Argon)')).toBe('gemini-4-argon');
+    expect(resolveCostRateModelKey('hydrogen')).toBe('gemini-4-hydrogen');
   });
 
   it('falls back to default for unknown models', () => {
