@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import { Badge, Callout, EmptyState, KeyValue, PageHeader, Section, Tabs } from '@agent/shared-ui';
 import { useConciergeI18n } from '../../../../lib/use-concierge-i18n';
 import { useWorkspaceResource } from '../../../../lib/use-workspace-resource';
@@ -71,7 +71,11 @@ export default function WorkspaceEntityPage() {
  */
 function EntityDetail({ t, kind, id }: { t: Translate; kind: GraphEntityKind; id: string }) {
   const { locale } = useConciergeI18n();
-  const entity = useWorkspaceResource<GraphEntityView>(workspaceApiPath('get', { kind, id }));
+  // Which tenant's organization the id names (ids repeat across tenants); narrows only.
+  const tenant = useSearchParams()?.get('tenant')?.trim() || undefined;
+  const entity = useWorkspaceResource<GraphEntityView>(
+    workspaceApiPath('get', { kind, id, ...(kind === 'organization' && tenant ? { tenant } : {}) })
+  );
   const summary = useWorkspaceResource<WorkspaceGraphSummary>(workspaceApiPath('summary'));
   const approvalBriefs = useApprovalBriefs();
 

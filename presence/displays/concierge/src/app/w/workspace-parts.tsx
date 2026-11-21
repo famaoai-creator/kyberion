@@ -100,8 +100,8 @@ export function WorkspaceCrumbs({
           <a href="/">{t('ia_shell_crumb_home')}</a>
         </li>
         {lineage.map((ref) => (
-          <li key={`${ref.kind}:${ref.id}`}>
-            <a href={entityHref(ref.kind, ref.id)}>
+          <li key={`${ref.kind}:${ref.tenantSlug ?? ''}:${ref.id}`}>
+            <a href={entityHref(ref.kind, ref.id, ref.tenantSlug)}>
               <span className="ws-crumbs__kind">{kindLabel(t, ref.kind)}</span>
               {ref.label}
             </a>
@@ -237,7 +237,7 @@ export function EntityRow({
       <div className="ws-row__main">
         {showKind ? <Badge label={kindLabel(t, node.kind)} tone="accent" /> : null}
         {linkable ? (
-          <a className="ws-row__title" href={entityHref(node.kind, node.id)}>
+          <a className="ws-row__title" href={entityHref(node.kind, node.id, node.tenantSlug)}>
             {title}
           </a>
         ) : (

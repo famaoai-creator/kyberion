@@ -223,7 +223,7 @@ export function CommandPalette() {
             label: node.label,
             sublabel: t(`ws_kind_${node.kind}`),
             group_label: t('ws_palette_group'),
-            href: entityHref(node.kind, node.id),
+            href: entityHref(node.kind, node.id, node.tenantSlug),
           }))
         : [];
     return [

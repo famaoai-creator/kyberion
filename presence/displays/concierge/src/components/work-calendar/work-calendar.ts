@@ -58,6 +58,7 @@ export interface CalendarApiEntry {
   done: boolean;
   missed?: boolean;
   link: { kind: 'work_item' | 'organization' | 'mission'; id: string };
+  tenantSlug?: string;
 }
 
 /** The viewer's local day of an instant, or undefined for an invalid one. */
@@ -73,10 +74,10 @@ function localDayOf(instant: string): string | undefined {
  */
 export function fromCalendarEntries(
   entries: readonly CalendarApiEntry[],
-  hrefFor: (link: CalendarApiEntry['link']) => string | undefined
+  hrefFor: (link: CalendarApiEntry['link'], tenantSlug?: string) => string | undefined
 ): CalendarItem[] {
   return entries.map((entry) => {
-    const href = hrefFor(entry.link);
+    const href = hrefFor(entry.link, entry.tenantSlug);
     const dueDate =
       entry.source === 'work_item'
         ? entry.dueDate

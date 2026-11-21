@@ -91,9 +91,9 @@ export function WorkCalendar({ t }: { t: Translate }) {
 
   const items = React.useMemo(
     () =>
-      fromCalendarEntries(data?.entries ?? [], (link) => entityHref(link.kind, link.id)).filter(
-        (item) => shownGroups.has(sourceGroup(item.source))
-      ),
+      fromCalendarEntries(data?.entries ?? [], (link, tenantSlug) =>
+        entityHref(link.kind, link.id, tenantSlug)
+      ).filter((item) => shownGroups.has(sourceGroup(item.source))),
     [data, shownGroups]
   );
   const grid = React.useMemo(

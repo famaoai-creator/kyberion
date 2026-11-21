@@ -41,9 +41,16 @@ export function isWorkspaceKind(value: unknown): value is GraphEntityKind {
   return typeof value === 'string' && (WORKSPACE_KINDS as readonly string[]).includes(value);
 }
 
-/** `/w/<kind>/<id>`; ids are one encoded segment (task ids contain `/`). */
-export function entityHref(kind: GraphEntityKind, id: string): string {
-  return `/w/${kind}/${encodeURIComponent(id)}`;
+/**
+ * `/w/<kind>/<id>`; ids are one encoded segment (task ids contain `/`). An
+ * organization id is unique only within its tenant, so its link names the
+ * tenant (`?tenant=`) when known; the page narrows to it, never widens.
+ */
+export function entityHref(kind: GraphEntityKind, id: string, tenantSlug?: string): string {
+  const path = `/w/${kind}/${encodeURIComponent(id)}`;
+  return kind === 'organization' && tenantSlug
+    ? `${path}?tenant=${encodeURIComponent(tenantSlug)}`
+    : path;
 }
 
 /** A list page, optionally narrowed by scope query parameters. */
