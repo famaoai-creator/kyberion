@@ -7,6 +7,7 @@ import {
   ageInDays,
   boardMoveTargets,
   cardTitle,
+  dueState,
   groupBoardColumns,
   orderBoardSteps,
   resolveBoardDrop,
@@ -74,6 +75,54 @@ export interface WorkItemBoardProps<T extends BoardCard> {
   layout?: BoardViewMode;
   /** An Issue's steps, read when its card is expanded (cards are Issues; D1). */
   loadSteps?: (card: T) => Promise<readonly BoardStep[]>;
+  /** Sends the governed due-date change (`null` clears); must throw when refused. */
+  onSchedule?: (card: T, dueDate: string | null) => Promise<void>;
+  /** The viewer's local day (`YYYY-MM-DD`) for due chips; tests pin it. */
+  today?: string;
+}
+
+const DUE_TONE: Record<string, KbTone> = {
+  overdue: 'danger',
+  due_today: 'warning',
+  due_soon: 'warning',
+  upcoming: 'neutral',
+  done: 'neutral',
+};
+
+/** `2026-11-30` as a short local date (the day itself never shifts: UTC in, UTC out). */
+export function formatCalendarDay(date: string, locale: string): string {
+  const [year, month, day] = date.split('-').map(Number);
+  try {
+    return new Intl.DateTimeFormat(locale, {
+      month: 'short',
+      day: 'numeric',
+      timeZone: 'UTC',
+    }).format(new Date(Date.UTC(year, month - 1, day)));
+  } catch {
+    return date;
+  }
+}
+
+/** The due chip text for a card, or null when it has no due day. */
+export function dueChipText(
+  t: BoardTranslate,
+  dueDate: string | undefined,
+  status: string,
+  today: string,
+  locale: string
+): { text: string; tone: KbTone; state: string } | null {
+  const due = dueState(dueDate, status, today);
+  if (due.state === 'none' || !dueDate) return null;
+  const date = formatCalendarDay(dueDate, locale);
+  const text =
+    due.state === 'overdue'
+      ? t('ux_b_card_due_overdue', { days: -(due.days ?? 0), date })
+      : due.state === 'due_today'
+        ? t('ux_b_card_due_today')
+        : due.state === 'due_soon'
+          ? t('ux_b_card_due_soon', { days: due.days ?? 0, date })
+          : t('ux_b_card_due_on', { date });
+  return { text, tone: DUE_TONE[due.state] ?? 'neutral', state: due.state };
 }
 
 type StepsState =
@@ -163,6 +212,11 @@ function CardSteps<T extends BoardCard>({
 
 type PendingMove<T> = { card: T; to: string };
 
+function localDay(now: Date): string {
+  const pad = (value: number) => String(value).padStart(2, '0');
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
+
 /**
  * Work items as a kanban board: one column per status, cards that read at a
  * glance (title, priority, assignee, project › mission, age), and status
@@ -181,7 +235,10 @@ export function WorkItemBoard<T extends BoardCard>({
   label,
   layout = 'board',
   loadSteps,
+  onSchedule,
+  today: todayOverride,
 }: WorkItemBoardProps<T>) {
+  const [scheduleSaving, setScheduleSaving] = React.useState<string | null>(null);
   const [overrides, setOverrides] = React.useState<Record<string, string>>({});
   const [pending, setPending] = React.useState<PendingMove<T> | null>(null);
   const [saving, setSaving] = React.useState<string | null>(null);
@@ -237,6 +294,7 @@ export function WorkItemBoard<T extends BoardCard>({
   );
   const grouped = React.useMemo(() => groupBoardColumns(effective), [effective]);
   const now = Date.now();
+  const today = todayOverride ?? localDay(new Date(now));
   const relative = React.useMemo(() => {
     try {
       return new Intl.RelativeTimeFormat(locale, { numeric: 'auto' });
@@ -275,8 +333,22 @@ export function WorkItemBoard<T extends BoardCard>({
     }
   };
 
+  const schedule = async (card: T, dueDate: string | null) => {
+    if (!onSchedule) return;
+    setFailure(null);
+    setScheduleSaving(card.id);
+    try {
+      await onSchedule(card, dueDate);
+    } catch {
+      setFailure(t('ux_b_card_due_failed', { title: cardTitle(card.title, card.mission?.id) }));
+    } finally {
+      setScheduleSaving(null);
+    }
+  };
+
   const renderCard = (card: T) => {
     const title = cardTitle(card.title, card.mission?.id);
+    const dueChip = dueChipText(t, card.dueDate, card.status, today, locale);
     const described = summarizeWorkItemDescription(card.description, title);
     const age = ageInDays(card.updatedAt, now);
     const lineage = [card.project, card.mission].filter((ref): ref is NonNullable<typeof ref> =>
@@ -327,6 +399,12 @@ export function WorkItemBoard<T extends BoardCard>({
           statusLabel={statusLabel}
           loadSteps={loadSteps}
         />
+        {dueChip ? (
+          <p className="wb-card__due" data-due={dueChip.state}>
+            <span className="wb-visually-hidden">{t('ux_b_card_due_label')}: </span>
+            <Badge tone={dueChip.tone} label={dueChip.text} />
+          </p>
+        ) : null}
         <p className="wb-card__meta">
           <span>{card.assignee || t('ux_b_card_unassigned')}</span>
           {age !== null ? (
@@ -346,6 +424,35 @@ export function WorkItemBoard<T extends BoardCard>({
           </details>
         ) : null}
         {renderCardExtra ? renderCardExtra(card) : null}
+        {canMove && onSchedule ? (
+          <div className="wb-card__due-edit">
+            <label>
+              <span>{t('ux_b_card_due_label')}</span>
+              <input
+                type="date"
+                className="kb-input"
+                value={card.dueDate ?? ''}
+                min={card.startDate}
+                disabled={scheduleSaving === card.id}
+                aria-label={`${t('ux_b_card_due_label')}: ${title}`}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  if (value && value !== card.dueDate) void schedule(card, value);
+                }}
+              />
+            </label>
+            {card.dueDate ? (
+              <button
+                type="button"
+                className="wb-card__due-clear"
+                disabled={scheduleSaving === card.id}
+                onClick={() => void schedule(card, null)}
+              >
+                {t('ux_b_card_due_clear')}
+              </button>
+            ) : null}
+          </div>
+        ) : null}
         {movable ? (
           <label className="wb-card__move">
             <span className="wb-visually-hidden">

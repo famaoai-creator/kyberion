@@ -209,6 +209,13 @@ function discoverReadableMissionStates(): Array<{ missionId: string; state: any 
   return states;
 }
 
+/** `--due-date` / `--start-date` on update: omitted keeps, `none` clears, else the day. */
+function scheduleArg(value: unknown): string | null | undefined {
+  if (value === undefined) return undefined;
+  const text = String(value).trim();
+  return text === 'none' ? null : text;
+}
+
 async function runMain(args: string[] = []): Promise<void> {
   const yargs = createStandardYargs(['node', 'work_coordination', ...args])
     .command(
@@ -279,6 +286,11 @@ async function runMain(args: string[] = []): Promise<void> {
     .option('description', { type: 'string' })
     .option('status', { type: 'string' })
     .option('priority', { type: 'string' })
+    .option('start-date', {
+      type: 'string',
+      describe: 'Start day YYYY-MM-DD (update-status: none clears)',
+    })
+    .option('due-date', { type: 'string', describe: 'Due day YYYY-MM-DD (update-status: none clears)' })
     .option('source', { type: 'string' })
     .option('source-ref', { type: 'string' })
     .option('project-id', { type: 'string' })
@@ -371,6 +383,8 @@ async function runMain(args: string[] = []): Promise<void> {
         assigneeUserId: argv['assignee-user-id'] ? String(argv['assignee-user-id']) : undefined,
         labels: argv.labels !== undefined ? csv(argv.labels) : undefined,
         dependencies: argv.dependencies !== undefined ? csv(argv.dependencies) : undefined,
+        startDate: argv['start-date'] ? String(argv['start-date']) : undefined,
+        dueDate: argv['due-date'] ? String(argv['due-date']) : undefined,
         metadata: parseWorkCoordinationJson(argv.metadata),
       });
       print(item);
@@ -516,6 +530,8 @@ async function runMain(args: string[] = []): Promise<void> {
         assigneeUserId: argv['assignee-user-id'] ? String(argv['assignee-user-id']) : undefined,
         labels: argv.labels !== undefined ? csv(argv.labels) : undefined,
         dependencies: argv.dependencies !== undefined ? csv(argv.dependencies) : undefined,
+        startDate: scheduleArg(argv['start-date']),
+        dueDate: scheduleArg(argv['due-date']),
         metadata: parseWorkCoordinationJson(argv.metadata),
         ...(argv['status-from-children'] ? { statusFromChildren: true } : {}),
       });

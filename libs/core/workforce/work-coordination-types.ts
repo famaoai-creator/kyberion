@@ -45,6 +45,10 @@ export interface WorkItem {
    */
   labels: string[];
   dependencies: string[];
+  /** Calendar day the work starts (`YYYY-MM-DD`, no timezone); see `work-item-schedule.ts`. */
+  start_date?: string;
+  /** Calendar day the work is due (`YYYY-MM-DD`, no timezone); never before `start_date`. */
+  due_date?: string;
   version: number;
   created_at: string;
   updated_at: string;
@@ -218,6 +222,10 @@ export interface CreateWorkItemInput {
   assigneeUserId?: string;
   labels?: string[];
   dependencies?: string[];
+  /** `YYYY-MM-DD`; see `work-item-schedule.ts`. */
+  startDate?: string;
+  /** `YYYY-MM-DD`; see `work-item-schedule.ts`. */
+  dueDate?: string;
   metadata?: Record<string, unknown>;
   attempts?: WorkItemAttempt[];
   currentAttemptId?: string;
@@ -239,6 +247,10 @@ export interface UpdateWorkItemInput {
   assigneeUserId?: string;
   labels?: string[];
   dependencies?: string[];
+  /** `YYYY-MM-DD` sets, `null` clears, omitted keeps the start date. */
+  startDate?: string | null;
+  /** `YYYY-MM-DD` sets, `null` clears, omitted keeps the due date. */
+  dueDate?: string | null;
   metadata?: Record<string, unknown>;
   attempts?: WorkItemAttempt[];
   currentAttemptId?: string;

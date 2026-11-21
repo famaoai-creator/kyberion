@@ -743,4 +743,33 @@ describe('work items read in Issue units (W2)', () => {
       )
     ).toMatchObject({ ok: false, status: 400 });
   });
+
+  it('projects calendar dates as facts and lists only dated items with dated=true', () => {
+    const datedSources = () =>
+      sources({
+        workItems: () =>
+          [
+            { ...base, item_id: 'DATED-1', title: 'Due soon', due_date: '2026-11-30' },
+            {
+              ...base,
+              item_id: 'DATED-2',
+              title: 'Starts later',
+              start_date: '2026-12-01',
+              parent_item_id: 'DATED-1',
+            },
+            { ...base, item_id: 'UNDATED', title: 'No date' },
+          ] as unknown as WorkItem[],
+      });
+    const result = invokeSurfaceOperation(
+      'workspace.list',
+      { kind: 'work_item', dated: 'true' },
+      { viewer: acmeViewer, sources: datedSources() }
+    ) as { ok: boolean; data: { items: Array<{ id: string; facts?: Record<string, unknown> }> } };
+    expect(result.ok).toBe(true);
+    const byId = new Map(result.data.items.map((node) => [node.id, node]));
+    expect([...byId.keys()].sort()).toEqual(['DATED-1', 'DATED-2']);
+    expect(byId.get('DATED-1')?.facts).toMatchObject({ due_date: '2026-11-30' });
+    expect(byId.get('DATED-2')?.facts).toMatchObject({ start_date: '2026-12-01' });
+    expect(byId.get('DATED-1')?.facts).not.toHaveProperty('start_date');
+  });
 });

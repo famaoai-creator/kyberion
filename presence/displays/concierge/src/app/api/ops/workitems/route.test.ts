@@ -354,6 +354,38 @@ describe('explicit mission alignment action', () => {
     expect((await post({ itemId: 'WI-1', status: 'done' })).status).toBe(403);
     expect(mocks.updateWorkItem).not.toHaveBeenCalled();
   });
+  it('sends a schedule change through the same custody gate without a status', async () => {
+    const current = { ...intake(), status: 'ready' };
+    mocks.getWorkItem.mockReturnValue(current);
+    mocks.updateWorkItem.mockReturnValue({ ...current, due_date: '2026-11-30' });
+    expect((await post({ itemId: 'WI-1', dueDate: '2026-11-30', startDate: null })).status).toBe(
+      200
+    );
+    expect(mocks.updateWorkItem).toHaveBeenCalledWith({
+      itemId: 'WI-1',
+      dueDate: '2026-11-30',
+      startDate: null,
+    });
+    mocks.updateWorkItem.mockClear();
+    mocks.strictViewerScopeOrganizationIds.mockReturnValue(['org-other']);
+    expect((await post({ itemId: 'WI-1', dueDate: '2026-11-30' })).status).toBe(403);
+    expect(mocks.updateWorkItem).not.toHaveBeenCalled();
+  });
+  it('answers 400, not 500, for a malformed date or a date the store refuses', async () => {
+    mocks.getWorkItem.mockReturnValue({ ...intake(), status: 'ready' });
+    const bad = await post({ itemId: 'WI-1', dueDate: 'next friday' });
+    expect(bad.status).toBe(400);
+    expect(mocks.updateWorkItem).not.toHaveBeenCalled();
+    mocks.updateWorkItem.mockImplementation(() => {
+      throw Object.assign(new Error('start_date must not be after due_date'), {
+        name: 'WorkCoordinationError',
+        code: 'validation_error',
+      });
+    });
+    const refused = await post({ itemId: 'WI-1', dueDate: '2026-11-01' });
+    expect(refused.status).toBe(400);
+    expect(await refused.json()).toMatchObject({ ok: false, error_code: 'invalid_change' });
+  });
   it('rejects personal status mutation before touching shared state even for an all-tenant administrator', async () => {
     mocks.resolveOpsViewerForRequest.mockReturnValue({
       context: {

@@ -9,10 +9,12 @@ import { DestinationTabs } from '../destination-tabs';
 import { KindList } from '../w/kind-list';
 import { MissionPlanPanel } from '../../components/mission-plan/MissionPlanPanel';
 import { RequestsPanel } from './requests-panel';
+import { WorkCalendar } from '../../components/work-calendar/WorkCalendar';
 
 /**
  * `/work` 仕事 (MSN-SHELL-IA §1): missions as a state board plus their list,
- * the work-item kanban, and 依頼 — the viewer's requests (moved from
+ * the work-item kanban, the work calendar (dated work items by month / week),
+ * and 依頼 — the viewer's requests (moved from
  * presence-studio 進み具合, Kyberion server phase 2). Replaces `/w/mission`, `/w/work_item` and the
  * console's missions / work-items sections; detail pages stay at
  * `/w/<kind>/<id>`.
@@ -57,11 +59,14 @@ function Work() {
         tabs={[
           { id: 'missions', label: t('ia_shell_work_tab_missions') },
           { id: 'items', label: t('ia_shell_work_tab_items') },
+          { id: 'calendar', label: t('ia_shell_work_tab_calendar') },
           { id: 'requests', label: t('ia_shell_work_tab_requests') },
         ]}
       />
       {tab === 'requests' ? (
         <RequestsPanel />
+      ) : tab === 'calendar' ? (
+        <WorkCalendar t={t} />
       ) : tab === 'items' ? (
         <KindList key="items" t={t} kind="work_item" embedded />
       ) : (

@@ -54,6 +54,10 @@ export interface BoardCard {
   project?: BoardRef;
   mission?: BoardRef;
   updatedAt?: string;
+  /** Calendar day the work starts (`YYYY-MM-DD`). */
+  startDate?: string;
+  /** Calendar day the work is due (`YYYY-MM-DD`). */
+  dueDate?: string;
   description?: string;
   href?: string;
   /** An Issue's steps (D1): how many there are and how many are finished. */
@@ -155,6 +159,40 @@ export function cardTitle(title: string, missionId?: string): string {
     if (rest) return rest;
   }
   return text;
+}
+
+/** Days within which an open item counts as due soon (today excluded). */
+export const DUE_SOON_DAYS = 2;
+
+export interface DueState {
+  /**
+   * `overdue`: open and the due day has passed. `due_today` / `due_soon`
+   * (within {@link DUE_SOON_DAYS}): open and close. `upcoming`: later.
+   * `done`: finished, so the date no longer asks for anything. `none`: no date.
+   */
+  state: 'overdue' | 'due_today' | 'due_soon' | 'upcoming' | 'done' | 'none';
+  /** Whole days from today to the due day (negative when overdue). */
+  days?: number;
+}
+
+const CALENDAR_DAY = /^\d{4}-\d{2}-\d{2}$/u;
+
+function calendarDayNumber(date: string): number {
+  const [year, month, day] = date.split('-').map(Number);
+  return Math.floor(Date.UTC(year, month - 1, day) / 86_400_000);
+}
+
+/** How urgent a due day is for an item in `status`, seen from `today` (`YYYY-MM-DD`). */
+export function dueState(dueDate: string | undefined, status: string, today: string): DueState {
+  if (!dueDate || !CALENDAR_DAY.test(dueDate) || !CALENDAR_DAY.test(today)) {
+    return { state: 'none' };
+  }
+  const days = calendarDayNumber(dueDate) - calendarDayNumber(today);
+  if (status === 'done' || status === ARCHIVED_STATUS) return { state: 'done', days };
+  if (days < 0) return { state: 'overdue', days };
+  if (days === 0) return { state: 'due_today', days };
+  if (days <= DUE_SOON_DAYS) return { state: 'due_soon', days };
+  return { state: 'upcoming', days };
 }
 
 /** Whole days since `iso` (0 = today), or null for a missing / invalid date. */
