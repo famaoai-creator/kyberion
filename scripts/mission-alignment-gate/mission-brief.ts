@@ -37,6 +37,14 @@ export interface MissionBriefRequirementsGovernance {
   maturityLevel?: number;
 }
 
+export interface MissionBriefFactoryDelivery {
+  enabled?: boolean;
+  branch?: string;
+  mergeMode?: 'auto_low_risk' | 'veto_window' | 'human_only';
+  maxCiRepairAttempts?: number;
+  allowedPaths?: string[];
+}
+
 export interface MissionBrief {
   /** Hash-bound internal admission facts, never business-effect permission. */
   missionAdmission?: {
@@ -71,6 +79,8 @@ export interface MissionBrief {
   source?: { kind: string; ref: string; tenantSlug?: string };
   /** Opt-in requirements-management controls (strict framing, L1/L2/L3 routing, assumptions). */
   requirementsGovernance?: MissionBriefRequirementsGovernance;
+  /** Optional Software Factory 1-shot delivery delegation bound to the brief hash. */
+  factoryDelivery?: MissionBriefFactoryDelivery;
 }
 
 /** Same disclosure on every approval surface and the HTML brief. */
@@ -177,4 +187,73 @@ export function validateStrictMissionBriefFraming(
     missing,
     reasons,
   };
+}
+
+const FACTORY_BRANCH_PATTERN = /^agent\/factory-[a-z0-9][a-z0-9-]{1,60}$/u;
+const FACTORY_MERGE_MODES = new Set(['auto_low_risk', 'veto_window', 'human_only']);
+
+function isSafeRepoRelativePattern(entry: unknown): boolean {
+  if (typeof entry !== 'string') return false;
+  if (entry !== entry.trim() || entry.length === 0) return false;
+  if (entry.startsWith('/') || entry.includes('\\') || /\0|\s/u.test(entry)) return false;
+  const cleaned = entry.replace(/^(?:\.\/)+/u, '');
+  if (!cleaned) return false;
+  const segments = cleaned.split('/');
+  return !segments.some(
+    (segment) => segment === '' || segment === '.' || segment === '..' || segment === '.git'
+  );
+}
+
+/** Validate 1-shot Software Factory delivery delegation when enabled on the brief. */
+export function validateFactoryDeliveryConfig(brief: MissionBrief): {
+  ok: boolean;
+  reasons: string[];
+} {
+  const cfg = brief.factoryDelivery;
+  if (cfg?.enabled !== true) return { ok: true, reasons: [] };
+
+  const reasons: string[] = [];
+  if (typeof cfg.branch !== 'string' || !FACTORY_BRANCH_PATTERN.test(cfg.branch)) {
+    reasons.push(
+      'factoryDelivery.branch must be present and match ^agent/factory-[a-z0-9][a-z0-9-]{1,60}$.'
+    );
+  }
+  if (
+    cfg.mergeMode !== undefined &&
+    (typeof cfg.mergeMode !== 'string' || !FACTORY_MERGE_MODES.has(cfg.mergeMode))
+  ) {
+    reasons.push('factoryDelivery.mergeMode must be auto_low_risk, veto_window, or human_only.');
+  }
+  if (
+    cfg.maxCiRepairAttempts !== undefined &&
+    (!Number.isInteger(cfg.maxCiRepairAttempts) ||
+      cfg.maxCiRepairAttempts < 0 ||
+      cfg.maxCiRepairAttempts > 3)
+  ) {
+    reasons.push('factoryDelivery.maxCiRepairAttempts must be an integer between 0 and 3.');
+  }
+  if (
+    !Array.isArray(cfg.allowedPaths) ||
+    cfg.allowedPaths.length === 0 ||
+    cfg.allowedPaths.some((entry) => !isSafeRepoRelativePattern(entry))
+  ) {
+    reasons.push(
+      'factoryDelivery.allowedPaths must be a non-empty array of safe repo-relative paths or globs.'
+    );
+  }
+
+  return { ok: reasons.length === 0, reasons };
+}
+
+/** Format human-readable disclosure of 1-shot factory delegation for approval cards. */
+export function formatFactoryDelivery(brief: MissionBrief): string | undefined {
+  const cfg = brief.factoryDelivery;
+  if (cfg?.enabled !== true) return undefined;
+  return [
+    'Factory Delivery Delegation:',
+    `- branch: ${cfg.branch ?? '(unset)'}`,
+    `- mergeMode: ${cfg.mergeMode ?? 'veto_window'}`,
+    `- maxCiRepairAttempts: ${cfg.maxCiRepairAttempts ?? 3}`,
+    `- allowedPaths: ${(cfg.allowedPaths ?? []).join(', ') || '(none)'}`,
+  ].join('\n');
 }

@@ -1231,4 +1231,374 @@ describe('continuous owner development stage', () => {
       run(() => io.safeRmSync(tenantDir, { recursive: true, force: true }));
     }
   });
+  it('enforces Track 3 merge tiers, veto windows, post-merge revert planning, and convergence plans', async () => {
+    const { createFactoryDeliveryEnvelope } =
+      await import('../governance/factory-delivery-envelope.js');
+    const tenant = 'acme';
+    const tenantMissionId = 'MSN-FACTORY-MERGE-FIXTURE';
+    const branchName = 'agent/factory-merge-1';
+    const tenantDir = resolver.pathResolver.missionDir(tenantMissionId, 'confidential', tenant);
+    const graduatedPolicy = {
+      version: '1.0.0',
+      tenants: {
+        [tenant]: {
+          enabled: true,
+          graduated_actions: [
+            'pr_merge_low' as const,
+            'pr_merge_medium' as const,
+            'auto_revert_on_main_failure' as const,
+          ],
+        },
+      },
+    };
+
+    const approveTenantReview = (reviewSpec: MissionDevelopmentSpec) =>
+      run(() => {
+        const manifest = path.join(
+          tenantDir,
+          `evidence/development/${reviewSpec.implementation_task_id}/revision.json`
+        );
+        const artifactPath = resolver.pathResolver.toRepoRelative(manifest);
+        const sha256 = artifacts.hashArtifactForReview(manifest);
+        const receipt = artifacts.buildArtifactReviewReceipt({
+          reviewId: 'factory-revision-review',
+          missionId: tenantMissionId,
+          reviewTaskId: reviewSpec.review_task_id,
+          reviewTargetTaskId: reviewSpec.implementation_task_id,
+          artifact: { path: artifactPath, sha256, kind: 'code' },
+          reviewerAgentId: 'independent-reviewer',
+          reviewerTeamRole: 'reviewer',
+          specialistRoles: ['code-reviewer'],
+          independentFrom: ['implementer'],
+          findings: [],
+          acceptanceCriteria: ['Review exact revision and CI policy'],
+        });
+        io.safeMkdir(path.join(tenantDir, 'evidence/reviews'), { recursive: true });
+        io.safeWriteFile(
+          path.join(tenantDir, 'evidence/reviews/receipt.json'),
+          JSON.stringify(receipt)
+        );
+        const currentTasks = parseSafeJsonInput(
+          String(io.safeReadFile(path.join(tenantDir, 'NEXT_TASKS.json'))),
+          'tenant next tasks'
+        ) as Array<Record<string, unknown>>;
+        io.safeWriteFile(
+          path.join(tenantDir, 'NEXT_TASKS.json'),
+          JSON.stringify(
+            currentTasks.map((task) =>
+              task.task_id === reviewSpec.review_task_id
+                ? {
+                    ...task,
+                    status: 'completed',
+                    artifact_review_receipt: 'evidence/reviews/receipt.json',
+                    artifact_review_profile: {
+                      artifact_kind: 'code',
+                      artifact_path: artifactPath,
+                      artifact_sha256: sha256,
+                      required_reviewer_roles: ['code-reviewer'],
+                      independence_required: true,
+                      implementer_agent_ids: ['implementer'],
+                    },
+                  }
+                : task
+            )
+          )
+        );
+        coordination.updateWorkItem({ itemId: 'review', status: 'done' });
+      });
+
+    const seedTenantMission = (
+      targetSpec: MissionDevelopmentSpec,
+      missionStatus: string = 'active'
+    ) => {
+      vi.stubEnv('KYBERION_TIER', 'confidential');
+      vi.stubEnv('KYBERION_TENANT', tenant);
+      prExists = false;
+      ci = {
+        state: 'success',
+        policyDigest: 'c'.repeat(64),
+        requiredChecks: ['CI'],
+        reasons: [],
+      };
+      run(() => {
+        coordination.clearWorkCoordinationStore();
+        io.safeRmSync(tenantDir, { recursive: true, force: true });
+        io.safeMkdir(path.join(tenantDir, 'evidence/development'), { recursive: true });
+        io.safeWriteFile(path.join(tenantDir, 'evidence/pr-body.md'), 'Tenant Track 3 PR body');
+        io.safeWriteFile(
+          path.join(tenantDir, 'mission-state.json'),
+          JSON.stringify({
+            mission_id: tenantMissionId,
+            tier: 'confidential',
+            tenant_slug: tenant,
+            status: missionStatus,
+            execution_mode: 'local',
+            priority: 1,
+            org_role: 'tester',
+            confidence_score: 1,
+            relationships: {
+              project: { project_id: 'PRJ-DEVELOPMENT-FIXTURE', relationship_type: 'belongs_to' },
+            },
+            git: {
+              branch: branchName,
+              start_commit: revision.baseSha,
+              latest_commit: revision.headSha,
+              checkpoints: [],
+            },
+            history: [],
+          })
+        );
+        io.safeWriteFile(
+          path.join(tenantDir, 'NEXT_TASKS.json'),
+          JSON.stringify([
+            {
+              task_id: targetSpec.implementation_task_id,
+              target_path: 'evidence/implementation.md',
+              source_edit_paths: targetSpec.source_edit_paths,
+              source_edit_requires_approval: false,
+              status: 'completed',
+              assigned_to: { role: 'implementer', agent_id: 'implementer' },
+            },
+            {
+              task_id: targetSpec.review_task_id,
+              status: 'planned',
+              assigned_to: { role: 'reviewer', agent_id: 'independent-reviewer' },
+              review_target: targetSpec.implementation_task_id,
+            },
+            { task_id: 'delivery', phase: 'delivery', status: 'planned' },
+          ])
+        );
+        for (const [id, taskId, status, actor] of [
+          ['implementation', targetSpec.implementation_task_id, 'done', 'implementer'],
+          ['review', targetSpec.review_task_id, 'ready', 'independent-reviewer'],
+          ['delivery', 'delivery', 'ready', 'implementer'],
+        ] as const) {
+          coordination.createWorkItem({
+            itemId: id,
+            title: id,
+            description: 'Tenant factory merge fixture',
+            projectId: 'PRJ-DEVELOPMENT-FIXTURE',
+            status,
+            assigneePeerId: actor,
+            context: {
+              mission_id: tenantMissionId,
+              tenant_slug: tenant,
+              project_id: 'PRJ-DEVELOPMENT-FIXTURE',
+              task_id: taskId,
+              work_shape: 'improvement_experiment',
+            },
+            metadata: {
+              task_id: taskId,
+              mission_id: tenantMissionId,
+              team_role: actor === 'implementer' ? 'implementer' : 'reviewer',
+            },
+          });
+        }
+      });
+    };
+
+    try {
+      const baseGit = deps.git!;
+
+      // 1. Low-risk envelope + graduated pr_merge_low -> auto_merge + protected active convergence plan
+      const lowSpec: MissionDevelopmentSpec = {
+        ...spec,
+        source_edit_paths: ['docs/guide.md'],
+        branch: branchName,
+        factory_envelope: createFactoryDeliveryEnvelope({
+          mission_id: tenantMissionId,
+          tenant_slug: tenant,
+          authority_kind: 'alignment_brief',
+          alignment_approval_ref: 'apr-low-1',
+          development_branch: branchName,
+          scope_in: ['docs/**'],
+          allowed_paths: ['docs/**'],
+          merge_mode: 'auto_low_risk',
+        }),
+      };
+      seedTenantMission(lowSpec, 'active');
+      const lowReconcile = vi.fn(() => ({
+        status: 'merged' as const,
+        nextAction: 'Merged low-risk PR',
+        knownMergeCommitSha: 'e'.repeat(40),
+      }));
+      const lowDeps: MissionDevelopmentDeps = {
+        ...deps,
+        pr: () => ({ ...revision, headBranch: branchName }),
+        git: (args, cwd) => {
+          if (args[0] === 'branch') return { status: 0, stdout: branchName, stderr: '' };
+          if (args.includes('diff'))
+            return {
+              status: 0,
+              stdout: 'diff --git a/docs/guide.md b/docs/guide.md\n+doc\n',
+              stderr: '',
+            };
+          return baseGit(args, cwd);
+        },
+        review: (inputArg, prArg, proofArg, options) =>
+          reader.verifyPreparedWorkItemReview(inputArg, prArg, proofArg, {
+            ...options,
+            run: (_command, args) => ({
+              status: 0,
+              stderr: '',
+              stdout: args.includes('diff')
+                ? 'diff --git a/docs/guide.md b/docs/guide.md\n+doc\n'
+                : '',
+            }),
+          }),
+        reconcile: lowReconcile,
+        factoryPolicy: graduatedPolicy,
+        operationsHalted: false,
+      };
+      const tickLow = () =>
+        run(() =>
+          core.advanceMissionDevelopment(
+            { missionId: tenantMissionId, development: lowSpec, assertCurrent: () => {} },
+            lowDeps
+          )
+        );
+      await tickLow(); // push
+      await tickLow(); // pr_create
+      await tickLow(); // prepare review manifest
+      approveTenantReview(lowSpec);
+      const lowCompleted = await tickLow();
+      expect(lowReconcile).toHaveBeenCalledOnce();
+      expect(lowCompleted.status).toBe('completed');
+      expect(lowCompleted.factory_merge_decision).toMatchObject({
+        action: 'auto_merge',
+        tier: 'low',
+        action_id: 'pr_merge_low',
+      });
+      expect(lowCompleted.factory_convergence_plan).toMatchObject({
+        mission_id: tenantMissionId,
+        ready_for_cleanup: false,
+        mission_terminal: false,
+      });
+
+      // 2. Medium-risk envelope -> Turn 1 opens/persists veto window without reconcile; Turn 2 elapsed auto-merges
+      const mediumSpec: MissionDevelopmentSpec = {
+        ...spec,
+        source_edit_paths: ['libs/core/example.ts'],
+        branch: branchName,
+        factory_envelope: createFactoryDeliveryEnvelope({
+          mission_id: tenantMissionId,
+          tenant_slug: tenant,
+          authority_kind: 'alignment_brief',
+          alignment_approval_ref: 'apr-med-1',
+          development_branch: branchName,
+          scope_in: ['libs/core/example.ts'],
+          allowed_paths: ['libs/core/example.ts'],
+          merge_mode: 'auto_low_risk',
+        }),
+      };
+      seedTenantMission(mediumSpec, 'active');
+      const medReconcile = vi.fn(() => ({
+        status: 'merged' as const,
+        nextAction: 'Merged medium-risk PR after veto elapsed',
+        knownMergeCommitSha: 'f'.repeat(40),
+      }));
+      let currentNow = new Date('2026-11-22T01:00:00.000Z');
+      let deliverVeto = false;
+      const medDeps: MissionDevelopmentDeps = {
+        ...deps,
+        pr: () => ({ ...revision, headBranch: branchName }),
+        git: (args, cwd) => {
+          if (args[0] === 'branch') return { status: 0, stdout: branchName, stderr: '' };
+          return baseGit(args, cwd);
+        },
+        reconcile: medReconcile,
+        factoryPolicy: graduatedPolicy,
+        operationsHalted: false,
+        now: () => currentNow,
+        vetoState: (_pr, currentWindow) => {
+          if (deliverVeto && currentWindow) {
+            return {
+              window: {
+                ...currentWindow,
+                deliveredAt: '2026-11-22T01:05:00.000Z',
+                proceedsAt: '2026-11-22T03:05:00.000Z',
+              },
+            };
+          }
+          return { window: currentWindow };
+        },
+      };
+      const tickMed = () =>
+        run(() =>
+          core.advanceMissionDevelopment(
+            { missionId: tenantMissionId, development: mediumSpec, assertCurrent: () => {} },
+            medDeps
+          )
+        );
+      await tickMed(); // push
+      await tickMed(); // pr_create
+      await tickMed(); // prepare review manifest
+      approveTenantReview(mediumSpec);
+
+      const vetoOpened = await tickMed();
+      expect(medReconcile).not.toHaveBeenCalled();
+      expect(vetoOpened.status).toBe('running');
+      expect(vetoOpened.factory_merge_decision).toMatchObject({
+        action: 'open_veto_window',
+        tier: 'medium',
+        action_id: 'pr_merge_medium',
+        veto_state: 'awaiting_delivery',
+      });
+      const persisted = run(
+        () => coordination.getWorkItem('implementation')!.metadata?.mission_development
+      ) as { factory_veto_head_sha?: string; factory_veto_window?: { windowMinutes: number } };
+      expect(persisted.factory_veto_head_sha).toBe(revision.headSha);
+      expect(persisted.factory_veto_window?.windowMinutes).toBe(120);
+
+      deliverVeto = true;
+      currentNow = new Date('2026-11-22T04:00:00.000Z');
+      const medCompleted = await tickMed();
+      expect(medReconcile).toHaveBeenCalledOnce();
+      expect(medCompleted.status).toBe('completed');
+      expect(medCompleted.factory_merge_decision).toMatchObject({
+        action: 'auto_merge',
+        action_id: 'pr_merge_medium',
+        veto_state: 'elapsed',
+      });
+
+      // 3. Post-merge failure with rerun reproduction -> returns blocked with open_revert_pr plan
+      seedTenantMission(lowSpec, 'active');
+      const failReconcile = vi.fn(() => ({
+        status: 'post_merge_failed' as const,
+        nextAction: 'Main CI failed after merge',
+        knownMergeCommitSha: 'e'.repeat(40),
+      }));
+      const revertDeps: MissionDevelopmentDeps = {
+        ...lowDeps,
+        reconcile: failReconcile,
+        postMergeRevertContext: () => ({
+          failureReproducedOnRerun: true,
+          revertAttemptsUsed: 0,
+          applyDemotion: false,
+        }),
+      };
+      const tickRevert = () =>
+        run(() =>
+          core.advanceMissionDevelopment(
+            { missionId: tenantMissionId, development: lowSpec, assertCurrent: () => {} },
+            revertDeps
+          )
+        );
+      await tickRevert();
+      await tickRevert();
+      await tickRevert();
+      approveTenantReview(lowSpec);
+      const revertBlocked = await tickRevert();
+      expect(revertBlocked.status).toBe('blocked');
+      expect(revertBlocked.factory_revert_plan).toMatchObject({
+        action: 'open_revert_pr',
+        allowed: true,
+        revert_branch: `agent/factory-revert-${'e'.repeat(10)}`,
+      });
+    } finally {
+      vi.stubEnv('KYBERION_TIER', 'public');
+      vi.stubEnv('KYBERION_TENANT', '');
+      run(() => io.safeRmSync(tenantDir, { recursive: true, force: true }));
+    }
+  });
 });

@@ -89,3 +89,12 @@ PR 作成後の CI 失敗・ベースブランチ追従に対して、無制限�
 - **有界 CI 自動修復計画 (`libs/core/governance/factory-ci-autofix.ts`)**: `planFactoryCiAutofix` が失敗クラス（`generated-drift` / `test-failure` / `gate-failure` / `infra` / `ratchet/registration` / `platform` / `unknown`）と最大 3 回の試行上限、`priorSignatures` による同一失敗署名での即時停止、`ci_autofix_attempt` の opt-in 昇格ゲートを統合評価する。`validateCiAutofixPatchGuard` はベースライン・設定変更や `.skip()` / `// @ts-ignore` / アサーション削除を検出して `approve` へ引き戻す。
 - **読み取り専用 `git merge-tree` による main 同期分類 (`libs/core/vcs/factory-branch-sync.ts`)**: `git-probe-hardening.ts` に厳格な 6 引数の `merge-tree --write-tree --name-only --no-messages` 文法を追加し、`clean`（無競合）・`mechanical`（生成物のみ競合、`pnpm kyberion resolve generated` 対象）・`semantic`（コード・`high_risk_paths`・設定競合は即エスカレーション）を非破壊に判定する。
 - **`mission-development-continuation.ts` 統合**: `factory_envelope` が付与された開発仕様では、CI 失敗時に `ci_failure_signatures` を永続化しつつ `assessFactoryBranchMainSync` および `planFactoryCiAutofix` を実行し、自動修復・待機・人間エスカレーションを決定論的に振り分ける。
+
+## Software Factory 自律基盤（Track 3: リスク段階マージ・Veto 窓・1-Shot 承認委任・自動リバートと収束）
+
+PR 作成・CI 合格・独立レビュー完了後のマージ判断と、マージ後インシデント復旧・ワークツリー収束までをリスク段階に応じて完結させる。
+
+- **1-Shot Alignment Brief 委任 (`knowledge/product/schemas/mission-brief.schema.json`, `libs/core/governance/factory-delivery-envelope.ts`)**: `mission-brief.json` に任意フィールド `factoryDelivery`（`enabled` / `branch` / `mergeMode` / `maxCiRepairAttempts` / `allowedPaths`）を追加し、承認ハッシュ (`payloadHash`) と承認 UI 開示 (`formatFactoryDelivery`) に束縛する。`createFactoryEnvelopeFromAlignedBrief` が承認済みブリーフから署名付き `FactoryDeliveryEnvelope` を構築する。
+- **リスク段階マージ & Veto 窓 (`libs/core/governance/factory-merge-gate.ts`)**: `evaluateFactoryMergeGate` が停止スイッチ・封筒境界・CI 緑・独立レビュー・修復上限・PR リスク層を検証し、低リスク（`pr_merge_low` 昇格時のみ）を自動マージ、中リスク（`pr_merge_medium` 昇格時）を 120 分 fail-closed Veto 窓（配信猶予・稼働時間・異議・未配信エスカレーション）で処理し、高リスク・シャドウ・`never_auto`・修復上限到達は常に人間承認（`human_only`）へ引き戻す。
+- **マージ後自動リバートと収束 (`libs/core/governance/factory-post-merge.ts`)**: `planFactoryPostMergeRevert` は `main` CI 再実行再現を前提に 1 インシデント 1 回限りの `agent/factory-revert-<sha>` リバート PR を計画し、必要に応じて `autonomy-action-state` でマージ自律レベルを即時降格する（競合・`high_risk_paths`・シャドウ時は人間エスカレーション）。`buildFactoryConvergencePlan` はミッション終端状態と不変マージコミット検証を確認した上で `main` 同期・ワークツリー削除・`agent/factory-*` ブランチ削除手順を組み立て、非終端ミッションの台帳（`active/missions/`）保護を強制する。
+- **継続開発ループ統合 (`libs/core/mission/mission-development-continuation.ts`)**: `factory_envelope` 付与時は `reconcile` 前に `evaluateFactoryMergeGate` と `factory_veto_window` 永続化を強制し、`merged` 時に `factory_convergence_plan` を、`post_merge_failed` 時に `factory_revert_plan` を返す。

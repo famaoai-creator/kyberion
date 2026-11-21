@@ -3,8 +3,10 @@ import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeMkdir, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
 import {
+  formatFactoryDelivery,
   isStrictRequirementsFramingEnabled,
   loadMissionBriefAtPath,
+  validateFactoryDeliveryConfig,
   validateStrictMissionBriefFraming,
 } from './mission-brief.js';
 
@@ -83,5 +85,58 @@ describe('mission brief canonical loader', () => {
       missing: [],
       reasons: [],
     });
+  });
+
+  it('loads and validates optional factoryDelivery 1-shot delegation config', () => {
+    const validPath = writeBrief({
+      missionId: 'MSN-FACTORY-BRIEF-1',
+      factoryDelivery: {
+        enabled: true,
+        branch: 'agent/factory-brief-01',
+        mergeMode: 'veto_window',
+        maxCiRepairAttempts: 2,
+        allowedPaths: ['docs/**', 'libs/core/example.ts'],
+      },
+    });
+    const brief = loadMissionBriefAtPath(validPath);
+    expect(validateFactoryDeliveryConfig(brief)).toEqual({ ok: true, reasons: [] });
+    const disclosure = formatFactoryDelivery(brief);
+    expect(disclosure).toContain('Factory Delivery Delegation:');
+    expect(disclosure).toContain('agent/factory-brief-01');
+    expect(disclosure).toContain('veto_window');
+
+    const badBranchPath = writeBrief({
+      missionId: 'MSN-FACTORY-BRIEF-2',
+      factoryDelivery: {
+        enabled: true,
+        branch: 'main',
+        allowedPaths: ['docs/**'],
+      },
+    });
+    expect(() => loadMissionBriefAtPath(badBranchPath)).toThrow(/Invalid catalog mission-brief/u);
+
+    const incompleteDelegationPath = writeBrief({
+      missionId: 'MSN-FACTORY-BRIEF-3',
+      factoryDelivery: {
+        enabled: true,
+      },
+    });
+    const incomplete = loadMissionBriefAtPath(incompleteDelegationPath);
+    const validation = validateFactoryDeliveryConfig(incomplete);
+    expect(validation.ok).toBe(false);
+    expect(validation.reasons.join(' ')).toContain('factoryDelivery.branch');
+    expect(validation.reasons.join(' ')).toContain('factoryDelivery.allowedPaths');
+
+    expect(
+      validateFactoryDeliveryConfig({
+        missionId: 'MSN-FACTORY-BRIEF-4',
+        factoryDelivery: {
+          enabled: true,
+          branch: 'agent/factory-brief-04',
+          allowedPaths: ['../outside/**'],
+        },
+      }).ok
+    ).toBe(false);
+    expect(formatFactoryDelivery({ missionId: 'MSN-NO-DELEGATION' })).toBeUndefined();
   });
 });

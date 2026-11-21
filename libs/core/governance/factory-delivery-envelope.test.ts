@@ -4,6 +4,7 @@ import type { MandateCatalog } from './mandate-shadow.js';
 import {
   computeFactoryEnvelopeHash,
   createFactoryDeliveryEnvelope,
+  createFactoryEnvelopeFromAlignedBrief,
   createFactoryEnvelopeFromMandateBrief,
   evaluateDiffAgainstFactoryEnvelope,
   verifyFactoryEnvelopeIntegrity,
@@ -222,5 +223,84 @@ describe('factory-delivery-envelope', () => {
     });
     expect(tampered.ok).toBe(false);
     expect(tampered.violations.map((v) => v.code)).toEqual(['integrity_mismatch']);
+  });
+
+  it('creates an alignment_brief envelope from 1-shot factoryDelivery config and fails closed on invalid input', () => {
+    const built = createFactoryEnvelopeFromAlignedBrief({
+      mission_id: 'MSN-BRIEF-1',
+      tenant_slug: 'acme',
+      alignment_approval_ref: 'apr-brief-1',
+      now: new Date('2026-11-22T00:00:00.000Z'),
+      brief: {
+        scope: { in: ['docs/**', 'libs/core/example.ts'], out: ['docs/internal/**'] },
+        factoryDelivery: {
+          enabled: true,
+          branch: 'agent/factory-brief-01',
+          mergeMode: 'auto_low_risk',
+          maxCiRepairAttempts: 2,
+          allowedPaths: ['docs/**', 'libs/core/example.ts'],
+        },
+      },
+    });
+    expect(built.ok).toBe(true);
+    if (built.ok) {
+      expect(built.envelope.authority_kind).toBe('alignment_brief');
+      expect(built.envelope.alignment_approval_ref).toBe('apr-brief-1');
+      expect(built.envelope.development_branch).toBe('agent/factory-brief-01');
+      expect(built.envelope.merge_mode).toBe('auto_low_risk');
+      expect(built.envelope.max_ci_repair_attempts).toBe(2);
+      expect(verifyFactoryEnvelopeIntegrity(built.envelope)).toBe(true);
+    }
+
+    const disabled = createFactoryEnvelopeFromAlignedBrief({
+      mission_id: 'MSN-BRIEF-2',
+      alignment_approval_ref: 'apr-brief-2',
+      brief: {
+        factoryDelivery: {
+          enabled: false,
+          branch: 'agent/factory-brief-02',
+          allowedPaths: ['docs/**'],
+        },
+      },
+    });
+    expect(disabled.ok).toBe(false);
+
+    const missingBranch = createFactoryEnvelopeFromAlignedBrief({
+      mission_id: 'MSN-BRIEF-3',
+      alignment_approval_ref: 'apr-brief-3',
+      brief: {
+        factoryDelivery: {
+          enabled: true,
+          allowedPaths: ['docs/**'],
+        },
+      },
+    });
+    expect(missingBranch.ok).toBe(false);
+
+    const missingAllowedPaths = createFactoryEnvelopeFromAlignedBrief({
+      mission_id: 'MSN-BRIEF-4',
+      alignment_approval_ref: 'apr-brief-4',
+      brief: {
+        factoryDelivery: {
+          enabled: true,
+          branch: 'agent/factory-brief-04',
+          allowedPaths: [],
+        },
+      },
+    });
+    expect(missingAllowedPaths.ok).toBe(false);
+
+    const emptyRef = createFactoryEnvelopeFromAlignedBrief({
+      mission_id: 'MSN-BRIEF-5',
+      alignment_approval_ref: '   ',
+      brief: {
+        factoryDelivery: {
+          enabled: true,
+          branch: 'agent/factory-brief-05',
+          allowedPaths: ['docs/**'],
+        },
+      },
+    });
+    expect(emptyRef.ok).toBe(false);
   });
 });
