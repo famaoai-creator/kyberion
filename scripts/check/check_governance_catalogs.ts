@@ -11,7 +11,7 @@
  * the byte-exact `--check` can be restored.
  */
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeReaddir } from '@agent/core/secure-io';
+
 import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
 import { readSafeJsonFile } from '../lib/json-input.js';
 import * as nodePath from 'node:path';
@@ -32,12 +32,6 @@ function deepEqual(a: unknown, b: unknown): boolean {
 
 function readJson(file: string): Json {
   return readSafeJsonFile<Json>(file, file);
-}
-
-function listJson(dir: string): string[] {
-  return safeReaddir(dir)
-    .filter((f) => f.endsWith('.json'))
-    .sort();
 }
 
 function assemble(dir: string, listKey: string, orderKey: string, fileFor?: (id: string) => string): Json {
