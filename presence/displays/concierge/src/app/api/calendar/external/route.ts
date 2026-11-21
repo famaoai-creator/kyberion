@@ -5,10 +5,13 @@ import {
   normalizeCalendarProviderId,
 } from '@agent/core/meeting/calendar-workflow';
 import { isCalendarDate } from '@agent/core/foundation/time';
+import { createLogger } from '@agent/core/logger';
 import { resolveConciergeInstallationAccess } from '../../../../lib/installation-access';
 import { resolveConciergeViewer } from '../../../../lib/viewer-context';
 
 export const dynamic = 'force-dynamic';
+
+const logger = createLogger('concierge-external-calendar');
 
 /** Same ceiling as `workspace.calendar` (a month grid is 42 days). */
 const MAX_DAYS = 92;
@@ -106,7 +109,13 @@ export async function GET(req: NextRequest) {
       },
       { headers: NO_STORE }
     );
-  } catch {
+  } catch (error) {
+    // The reply stays fixed (wire boundary); the operator log carries the cause.
+    logger.warn(
+      `external calendar read failed — ${error instanceof Error ? error.message : String(error)} | ` +
+        `next: check the provider login (gws auth status / m365) and the service connection | ` +
+        `evidence: provider=${provider}`
+    );
     return NextResponse.json(
       {
         ok: true,
