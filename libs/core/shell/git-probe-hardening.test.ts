@@ -91,6 +91,17 @@ describe('automatic Git probe hardening', () => {
       sha,
       sha,
     ]);
+    expect(
+      hardenedGitProbeArgs(['merge-tree', '--write-tree', '--name-only', '--no-messages', sha, sha])
+    ).toEqual([
+      '--no-replace-objects',
+      'merge-tree',
+      '--write-tree',
+      '--name-only',
+      '--no-messages',
+      sha,
+      sha,
+    ]);
     for (const args of [
       ['commit'],
       ['diff', '--ext-diff'],
@@ -100,6 +111,8 @@ describe('automatic Git probe hardening', () => {
       ['diff', '--', 'README.md'],
       ['diff-tree', '-r', '-z', '--no-renames', 'HEAD', 'HEAD'],
       ['ls-files', '-s', '-z', '--recurse-submodules'],
+      ['merge-tree', '--write-tree', '--name-only', '--no-messages', 'main', 'HEAD'],
+      ['merge-tree', '--write-tree', '--name-only', '--allow-unrelated-histories', sha, sha],
     ]) {
       expect(() => hardenedGitProbeArgs(args)).toThrow('GIT_PROBE_UNAVAILABLE');
     }

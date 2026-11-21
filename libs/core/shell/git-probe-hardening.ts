@@ -70,13 +70,29 @@ export function hardenedGitProbeArgs(args: readonly string[]): string[] {
     sha(args[4]) &&
     sha(args[5]) &&
     args[6] === '--';
+  const mergeTreeProbe =
+    args.length === 6 &&
+    args[0] === 'merge-tree' &&
+    args[1] === '--write-tree' &&
+    args[2] === '--name-only' &&
+    args[3] === '--no-messages' &&
+    sha(args[4]) &&
+    sha(args[5]);
   // Deliberately no generic status/worktree diff: filter discovery in a prior
   // process cannot fence concurrent changes or submodule configurations.
-  if (!revisionProbe && !indexProbe && !treeProbe && !treeDiff && !historyProbe && !publicationDiff)
+  if (
+    !revisionProbe &&
+    !indexProbe &&
+    !treeProbe &&
+    !treeDiff &&
+    !historyProbe &&
+    !publicationDiff &&
+    !mergeTreeProbe
+  )
     throw new GitProbeUnavailableError('unsupported object/index probe grammar');
   if (historyProbe)
     return ['--no-replace-objects', args[0], '--no-ext-diff', '--no-textconv', ...args.slice(1)];
-  if (publicationDiff) return ['--no-replace-objects', ...args];
+  if (publicationDiff || mergeTreeProbe) return ['--no-replace-objects', ...args];
   return treeDiff ? [args[0], '--no-ext-diff', '--no-textconv', ...args.slice(1)] : [...args];
 }
 

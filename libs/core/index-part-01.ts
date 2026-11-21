@@ -387,6 +387,8 @@ export * from './governance/mandate-shadow.js';
 export * from './governance/factory-policy.js';
 export * from './governance/factory-delivery-envelope.js';
 export * from './governance/factory-readiness.js';
+export * from './governance/factory-ci-autofix.js';
+export * from './vcs/factory-branch-sync.js';
 
 export * from './governance/approval-decision-card.js';
 
