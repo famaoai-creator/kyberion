@@ -100,6 +100,7 @@ import {
   ORGANIZATION_WRITE_ROLE,
   requestOrganizationWriteApproval,
   runWithOrganizationWriteApproval,
+  verifyOrganizationWriteApproval,
 } from './organization_write_approval.js';
 
 /** Organization state file an --apply write in this invocation targets; set per run. */
@@ -1537,7 +1538,23 @@ function runApprovedOrganizationWrite(
   }
   const handler = ORGANIZATION_COMMAND_HANDLERS[parsed.command];
   if (!handler) throw new Error(`Unknown command '${parsed.command}'.\n${usage()}`);
-  // Verified and marked used first (inside the approval's record lock); then only
+  // An argument mistake must not burn the approval: verify it, then run the same
+  // command as a dry run (nothing written) before the approval is used.
+  verifyOrganizationWriteApproval(parsed.approvalRequestId, scope, fields);
+  withExecutionContext(
+    ORGANIZATION_WRITE_ROLE,
+    () =>
+      handler({
+        parsed: { ...parsed, apply: false, dryRun: true },
+        organizationId,
+        readScope,
+        activePrint: () => undefined,
+      }),
+    undefined,
+    tenantSlug,
+    organizationId
+  );
+  // Verified again and marked used (inside the approval's record lock); then only
   // this one write runs with the role, bound to the organization's tenant.
   runWithOrganizationWriteApproval(
     parsed.approvalRequestId,
