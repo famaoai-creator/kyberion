@@ -176,6 +176,9 @@ export function createGhCliVcsHostProvider(
       );
       const raw = (result.stdout || '').trim();
       if (!raw) {
+        // A PR with no check runs yet makes gh exit 1 with "no checks reported
+        // on the '<branch>' branch" — that is zero checks, not a transport error.
+        if (!result.error && /no checks reported/iu.test(String(result.stderr ?? ''))) return [];
         if (result.error || (result.status ?? 0) !== 0)
           throw new VcsHostError(classify(result), 'gh pr checks failed');
         return [];

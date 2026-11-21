@@ -71,10 +71,17 @@ pnpm kyberion pr create \
 
 # 8. CI を最後まで見る
 gh pr checks <number> --watch
+
+# 9. (任意) CI が全部通ったらマージする。待機から統制されたマージまでを1コマンドで行う
+pnpm kyberion pr merge <number> [--checks-timeout-minutes 30]
 ```
 
 守ること:
 
+- **`pr merge` は `vcs:pr_merge` の承認ゲートを通る**。全チェックが成功するまで待ち、成功した head commit だけを
+  マージする（待機中に push されたら拒否）。失敗・タイムアウトは拒否し、チェック 0 件もタイムアウトまで待ってから拒否する。成功後はブランチを削除する。charter で `vcs:pr_merge`
+  を委任していなければ承認要求が作られるので、`pnpm kyberion approvals --approve <id>` のあと同じコマンドを再実行する。
+  PR 作成と同時に自動マージする場合は `system:standard_pr_lifecycle` の `auto_merge`（同じ待機・同じゲート）を使う。
 - **base は `main`**。PR Validation は base が `main` / `develop` の PR でしか起動しない。別 PR の上に積む
   （stacked）と CI が走らないので、依存先がマージされるのを待って rebase するか、base を `main` にする。
 - **`--title` を必ず渡す**。省略すると HEAD commit の件名がタイトルになり、最後の小さな修正 commit が

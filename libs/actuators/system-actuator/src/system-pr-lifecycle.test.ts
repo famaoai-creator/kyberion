@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 // Lifecycle transport/readiness assertions isolate the shared external gate;
 // canonical VCS admission is covered in vcs-external-governance.test.ts.
 vi.mock('@agent/core/governance/external-operation', async (original) => ({
@@ -64,13 +64,19 @@ function setup(
     if (options.publishError) throw new Error('readiness rejected');
     if (!options.noUrl) print(url);
   });
-  return { exec, write, publish } as PrLifecycleDependencies & {
+  // Advance the (faked) clock instead of sleeping: the check wait polls.
+  const sleep = async (ms: number) => {
+    vi.setSystemTime(Date.now() + Math.max(ms, 1000));
+  };
+  return { exec, write, publish, sleep } as PrLifecycleDependencies & {
     exec: typeof exec;
     write: typeof write;
     publish: typeof publish;
   };
 }
 describe('standard PR lifecycle with fully mocked effects', () => {
+  beforeEach(() => vi.useFakeTimers({ toFake: ['Date'] }));
+  afterEach(() => vi.useRealTimers());
   it('stages NUL-delimited paths intact and creates through governed publisher', async () => {
     const deps = setup();
     expect(await runStandardPrLifecycle(params, deps)).toEqual({ stdout: url, status: 0 });
@@ -132,6 +138,20 @@ describe('standard PR lifecycle with fully mocked effects', () => {
     await expect(runStandardPrLifecycle({ ...params, auto_merge: true }, deps)).rejects.toThrow(
       'COMMAND_FAILED'
     );
+    expect(deps.exec.mock.calls.some(([, a]) => a[1] === 'merge')).toBe(false);
+  });
+  it('refuses auto-merge when a check fails, naming it', async () => {
+    const deps = setup({ checks: '[{"name":"ci","bucket":"fail"}]' });
+    await expect(runStandardPrLifecycle({ ...params, auto_merge: true }, deps)).rejects.toThrow(
+      /PR_LIFECYCLE_CHECKS_FAILED.*failing: ci/
+    );
+    expect(deps.exec.mock.calls.some(([, a]) => a[1] === 'merge')).toBe(false);
+  });
+  it('refuses auto-merge when checks stay pending past the budget', async () => {
+    const deps = setup({ checks: '[{"name":"ci","bucket":"pending"}]' });
+    await expect(
+      runStandardPrLifecycle({ ...params, auto_merge: true, checks_timeout_minutes: 1 }, deps)
+    ).rejects.toThrow(/PR_LIFECYCLE_CHECKS_FAILED.*still pending after 1 min: ci/);
     expect(deps.exec.mock.calls.some(([, a]) => a[1] === 'merge')).toBe(false);
   });
   it('refuses auto-merge when no checks are reported (zero CI evidence)', async () => {

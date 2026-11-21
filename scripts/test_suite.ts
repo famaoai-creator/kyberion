@@ -69,6 +69,24 @@ export function gateCoveredTestFiles(manifest: GateTestManifest): string[] {
   ].sort();
 }
 
+/**
+ * Path roots of the suites CI already runs on every pull request
+ * (pr-validation.yml: `--suite core`, `--suite actuators`).
+ */
+export const PR_SUITE_ROOTS = ['libs/core/', 'libs/shared-', 'libs/actuators/'] as const;
+
+/**
+ * Test files a pr-scope vitest gate runs although a PR suite already runs
+ * them. Each one runs twice per PR, and a slow one eats the gate's timeout
+ * budget (the 47s CD-09 suite pushed registration-tests to 276s of 300s).
+ * The list is ratcheted: see scripts/check/test_suite_gate_duplicates.baseline.json.
+ */
+export function prSuiteDuplicatedGateFiles(manifest: GateTestManifest): string[] {
+  return gateCoveredTestFiles(manifest).filter((file) =>
+    PR_SUITE_ROOTS.some((root) => file.startsWith(root))
+  );
+}
+
 export function parseTestSuiteArgs(argv: readonly string[]): {
   suite: TestSuite;
   vitestArgs: string[];

@@ -1928,6 +1928,17 @@
       "native_help": true
     },
     {
+      "id": "script.create.presence",
+      "module": "scripts/create_presence.ts",
+      "command": "create presence",
+      "noun": "create",
+      "verb": "presence",
+      "audience": "operator",
+      "description": "cli_cmd_script_create_presence",
+      "group": "operate",
+      "native_help": true
+    },
+    {
       "id": "script.daemon.watchdog",
       "script": "daemon:watchdog",
       "command": "daemon watchdog",
@@ -3417,6 +3428,19 @@
       "audience": "operator",
       "description": "cli_cmd_script_pr_preflight",
       "group": "inspect",
+      "long_running": true,
+      "native_help": true
+    },
+    {
+      "id": "script.pr.merge",
+      "module": "scripts/pr/pr_merge.ts",
+      "command": "pr merge",
+      "noun": "pr",
+      "verb": "merge",
+      "audience": "operator",
+      "description": "cli_cmd_script_pr_merge",
+      "group": "operate",
+      "caution": "cli_caution_pr_merge",
       "long_running": true,
       "native_help": true
     },
