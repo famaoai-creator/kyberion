@@ -51,7 +51,7 @@ import {
 } from './protocol-to-markdown.js';
 import type { PdfDesignProtocol, PdfPage } from '../contracts/pdf-protocol.js';
 import { dropBrokenTextElements, pageNeedsRender, renderPdfPages } from './pdf-page-raster.js';
-import { loadPdfParseConstructor } from './pdf-parse-runtime.js';
+import { isPdfParsePasswordError, loadPdfParseRuntime } from './pdf-parse-runtime.js';
 import { extractHtmlTitle, htmlToMarkdown } from './html-to-markdown.js';
 import { extractOoxmlCoreTitle, OOXML_PLACEHOLDER_TITLES } from './ooxml-core-props.js';
 
@@ -439,20 +439,68 @@ async function readPptx(
 
 // ─── PDF ───────────────────────────────────────────────────
 
-async function pdfParsePageTexts(raw: Buffer): Promise<string[] | null> {
+interface PdfParseDocumentData {
+  pages: string[];
+  title?: string;
+  encrypted: boolean;
+  pageDimensions: Map<number, { width: number; height: number }>;
+}
+
+const PDF_PASSWORD_ERROR_MESSAGE =
+  '[document-reader] the pdf is password-protected. ' +
+  'Ask the owner for a decrypted copy (remove the open/user password) and read that.';
+
+async function extractPdfParseDocument(
+  raw: Buffer,
+  shouldFetchInfo: (pageCount: number) => boolean
+): Promise<PdfParseDocumentData | null> {
+  let runtime: Awaited<ReturnType<typeof loadPdfParseRuntime>>;
   try {
-    const PDFParse = await loadPdfParseConstructor();
-    const parser = new PDFParse({ data: new Uint8Array(raw) });
-    try {
-      const result = await parser.getText();
-      return Array.isArray(result.pages)
-        ? result.pages.map((page: { text?: string }) => String(page.text ?? '').trim())
-        : null;
-    } finally {
-      await parser.destroy();
-    }
+    runtime = await loadPdfParseRuntime();
   } catch {
+    return null;
+  }
+  const parser = new runtime.PDFParse({ data: new Uint8Array(raw) });
+  try {
+    const result = await parser.getText();
+    if (!Array.isArray(result.pages)) return null;
+    const pages = result.pages.map((page: { text?: string }) => String(page.text ?? '').trim());
+    let title: string | undefined;
+    let encrypted = false;
+    const pageDimensions = new Map<number, { width: number; height: number }>();
+    if (shouldFetchInfo(pages.length)) {
+      try {
+        const infoResult = await parser.getInfo({ parsePageInfo: true });
+        if (typeof infoResult.info?.Title === 'string' && infoResult.info.Title.trim()) {
+          title = infoResult.info.Title.trim();
+        }
+        encrypted = Boolean(infoResult.info?.EncryptFilterName);
+        for (const pageInfo of infoResult.pages ?? []) {
+          if (
+            typeof pageInfo.pageNumber === 'number' &&
+            typeof pageInfo.width === 'number' &&
+            pageInfo.width > 0 &&
+            typeof pageInfo.height === 'number' &&
+            pageInfo.height > 0
+          ) {
+            pageDimensions.set(pageInfo.pageNumber, {
+              width: pageInfo.width,
+              height: pageInfo.height,
+            });
+          }
+        }
+      } catch {
+        // Metadata and dimension lookup is best-effort once text extraction succeeded.
+      }
+    }
+    return { pages, title, encrypted, pageDimensions };
+  } catch (error) {
+    if (isPdfParsePasswordError(error, runtime.PasswordException)) {
+      throw new Error(PDF_PASSWORD_ERROR_MESSAGE);
+    }
     return null; // pdf-parse unavailable or failed — the native text stands.
+  } finally {
+    await parser.destroy();
   }
 }
 
@@ -594,12 +642,15 @@ async function renderUnreadablePdfPages(
   pages: PdfPage[],
   workDir: string,
   options: ReadDocumentOptions,
-  exporter?: ImageExporter
+  exporter?: ImageExporter,
+  extraUnreadablePages?: ReadonlySet<number>
 ): Promise<string[]> {
   // Garbage glyphs must not reach the Markdown, nor feed the table detector.
   for (const page of pages) dropBrokenTextElements(page);
-  const flagged = pages.filter((page) =>
-    pageNeedsRender(page, selectPdfOcrImages(page).length > 0)
+  const flagged = pages.filter(
+    (page) =>
+      extraUnreadablePages?.has(page.pageNumber) ||
+      pageNeedsRender(page, selectPdfOcrImages(page).length > 0)
   );
   if (flagged.length === 0) return [];
   const labels = flagged.map((page) => page.pageNumber).join(', ');
@@ -649,6 +700,9 @@ async function renderUnreadablePdfPages(
   return warnings;
 }
 
+const DEFAULT_PDF_PAGE_WIDTH = 595;
+const DEFAULT_PDF_PAGE_HEIGHT = 842;
+
 async function readPdf(
   raw: Buffer,
   options: ReadDocumentOptions,
@@ -664,15 +718,95 @@ async function readPdf(
         if (image.path) imageDirs.add(path.dirname(image.path));
     }
     try {
+      const nativePages = design.content?.pages ?? [];
+      const hasEncryptMarker = raw.includes('/Encrypt');
       // pdf-parse reconstructs reading order better than the positioned-glyph
-      // text; keep the native layout/images and swap in its per-page text.
-      const cleaner = await pdfParsePageTexts(raw);
-      const pages = design.content?.pages ?? [];
-      if (cleaner && cleaner.length === pages.length) {
-        pages.forEach((page, index) => {
-          if (cleaner[index]) page.text = cleaner[index];
-        });
+      // text, and also decrypts owner/permissions-locked PDFs that the native
+      // parser skips; keep native layout/images when unencrypted and swap in its text.
+      const parsed = await extractPdfParseDocument(
+        raw,
+        (parsedPageCount) =>
+          hasEncryptMarker ||
+          nativePages.length === 0 ||
+          parsedPageCount !== nativePages.length ||
+          !pickDocumentTitle(design.metadata?.title)
+      );
+
+      let pages: PdfPage[] = nativePages;
+      let effectiveDesign: PdfDesignProtocol = design;
+      let fallbackEncrypted = false;
+      let fullFallbackCount = 0;
+      const synthesizedMissingPageNumbers: number[] = [];
+      const fallbackEmptyPageNumbers = new Set<number>();
+
+      const buildFallbackPage = (pageNumber: number, text: string): PdfPage => {
+        const dims = parsed?.pageDimensions.get(pageNumber);
+        return {
+          pageNumber,
+          width: dims?.width ?? DEFAULT_PDF_PAGE_WIDTH,
+          height: dims?.height ?? DEFAULT_PDF_PAGE_HEIGHT,
+          text,
+        };
+      };
+
+      if (parsed && parsed.pages.length > 0) {
+        if (parsed.encrypted || nativePages.length === 0) {
+          fallbackEncrypted = parsed.encrypted;
+          pages = parsed.pages.map((text, index) => {
+            const pageNumber = index + 1;
+            if (!text.trim()) fallbackEmptyPageNumbers.add(pageNumber);
+            return buildFallbackPage(pageNumber, text);
+          });
+          fullFallbackCount = pages.length;
+          // On encrypted PDFs, native outlines/acroForm contain un-decrypted bytes.
+          effectiveDesign = {
+            ...design,
+            content: {
+              text: pages.map((page) => page.text).join('\n\n'),
+              pages,
+            },
+            ...(parsed.encrypted ? { outlines: undefined, acroForm: undefined } : {}),
+          };
+        } else if (parsed.pages.length === nativePages.length) {
+          nativePages.forEach((page, index) => {
+            if (parsed.pages[index]) page.text = parsed.pages[index];
+          });
+        } else {
+          const nativeByPage = new Map<number, PdfPage>();
+          for (const nativePage of nativePages) {
+            nativeByPage.set(nativePage.pageNumber, nativePage);
+          }
+          const merged: PdfPage[] = [];
+          parsed.pages.forEach((text, index) => {
+            const pageNumber = index + 1;
+            const nativePage = nativeByPage.get(pageNumber);
+            if (nativePage) {
+              if (text) nativePage.text = text;
+              merged.push(nativePage);
+              return;
+            }
+            if (text.trim()) {
+              merged.push(buildFallbackPage(pageNumber, text));
+              synthesizedMissingPageNumbers.push(pageNumber);
+            }
+          });
+          for (const nativePage of nativePages) {
+            if (nativePage.pageNumber > parsed.pages.length) {
+              merged.push(nativePage);
+            }
+          }
+          merged.sort((a, b) => a.pageNumber - b.pageNumber);
+          pages = merged;
+          effectiveDesign = {
+            ...design,
+            content: {
+              text: pages.map((page) => page.text).join('\n\n'),
+              pages,
+            },
+          };
+        }
       }
+
       // Judge what the renderer would emit: page.text plus positioned
       // element text — a clean pdf-parse text can replace page.text while the
       // elements still carry raw-byte mojibake into table reconstruction.
@@ -690,8 +824,15 @@ async function readPdf(
         ocrFailed = recovery.failed;
         rasterUnavailable = recovery.unavailable_reason;
       }
-      if (options.ocr) await ocrPdfDesignImages(design, options);
-      const renderWarnings = await renderUnreadablePdfPages(raw, pages, workDir, options, exporter);
+      if (options.ocr) await ocrPdfDesignImages(effectiveDesign, options);
+      const renderWarnings = await renderUnreadablePdfPages(
+        raw,
+        pages,
+        workDir,
+        options,
+        exporter,
+        fallbackEmptyPageNumbers
+      );
       if (exporter) {
         for (const page of pages) {
           for (const image of page.images ?? []) {
@@ -707,10 +848,24 @@ async function readPdf(
       }
       // Author / creator are personal names more often than not — the reader
       // does not surface them. Subject stays in distill metadata only.
-      const title = pickDocumentTitle(design.metadata?.title);
-      const body = pdfToMarkdown({ ...design, metadata: undefined } as PdfDesignProtocol);
+      // Never use un-decrypted native metadata when the PDF is encrypted.
+      const title = fallbackEncrypted
+        ? pickDocumentTitle(parsed?.title)
+        : pickDocumentTitle(design.metadata?.title, parsed?.title);
+      const body = pdfToMarkdown({ ...effectiveDesign, metadata: undefined } as PdfDesignProtocol);
       const headed = withLeadingTitle(body, title);
       const warnings: string[] = [...renderWarnings];
+      if (fullFallbackCount > 0) {
+        warnings.push(
+          fallbackEncrypted
+            ? `PDF is encrypted (owner/permissions lock) — extracted text from ${fullFallbackCount} page(s) via pdf.js fallback; embedded images and native table layout were not extracted`
+            : `native PDF parser extracted 0 page(s) — extracted text from ${fullFallbackCount} page(s) via pdf.js fallback; embedded images and native table layout were not extracted`
+        );
+      } else if (synthesizedMissingPageNumbers.length > 0) {
+        warnings.push(
+          `page ${synthesizedMissingPageNumbers.join(', ')}: native PDF parser missed these page(s) — extracted text via pdf.js fallback; embedded images and native table layout were not extracted`
+        );
+      }
       const skipped = pages.reduce((sum, page) => sum + (page.imageOcrSkipped?.length ?? 0), 0);
       if (skipped) warnings.push(`${skipped} page image(s) could not be OCR’d`);
       if (ocrRecovered > 0) {
@@ -730,6 +885,9 @@ async function readPdf(
       }
       if (!options.ocr && pages.some((page) => selectPdfOcrImages(page).length > 0)) {
         warnings.push('page images were not OCR’d — pass ocr to read text inside them');
+      }
+      if (!headed.markdown.trim() && warnings.length === 0) {
+        warnings.push('PDF yielded no readable text or pages');
       }
       return {
         format: 'pdf' as const,

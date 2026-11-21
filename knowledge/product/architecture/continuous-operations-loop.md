@@ -1,7 +1,7 @@
 ---
 title: 'Continuous Operations Loop'
 tags: [architecture, organization, autonomy, continuous-operations]
-last_updated: 2026-11-16
+last_updated: 2026-11-21
 ---
 
 # 継続運営ループ
@@ -58,3 +58,17 @@ owner は各副作用の前に元の承認 hash・scope・charter・claim・leas
 組織運営用の organization-operations.json は、tenant に導入した org-operations charter（[テンプレート](../orchestration/dot-team-templates/org-operations.json)から `dot create` したもの）と同じ dot_id・scope を宣言し、15分ごとに内部集計を観測する。sweep は dot_id と scope が完全一致する active charter がある環境でだけこの設定を実行し、一致しない環境では何もしない。設定の scope は現状 1 tenant に固定されており、他の tenant で使うには同じディレクトリにその tenant 用のレビュー済み設定を追加する。レポートと判断待ち事項の project / mission 群を別ルールに分配する。通知は既存 charter の既定 inbox、実効果は既存 autonomy / approval gate に従う。
 
 任意 SaaS の認証情報の追加、自由文からの権限生成、進行中の他 owner の強制取消は対象外。データ別 collector を追加する際も既存許可済み pipeline とスコープ付き snapshot の契約へ接続する。
+
+## 再評価トリガー条件（既定: 助言 / opt-in で監視ルール化）
+
+精度や前提条件が時間とともに変化する AI 適用業務では、継続観測から再評価へ繋ぐ以下の 7 トリガーを監視候補として扱う（[ai-requirements-governance-playbook.md](../orchestration/ai-requirements-governance-playbook.md) §4）。
+
+1. **精度・KR ドリフト**: 目標指標や成果判定の連続劣化
+2. **入力分布・OOD 変化**: 想定外入力や未マッピング入力比率の上昇
+3. **苦情・手戻り閾値超過**: 再作業 WorkItem や差し戻し率の増加
+4. **法規制・社内規定改定**: 外部規範やテナント方針の更新
+5. **モデル・プロンプト・知識更新**: 推論バックエンドや中核ナレッジの変更
+6. **外部 API・SLA 変更**: 依存先サービスの仕様・制限・応答品質の変化
+7. **監査指摘・重大インシデント**: セキュリティ／コンプライアンス指摘または障害発生
+
+これらはテナント・組織の監視設定で明示的に **opt-in** された場合にだけ自動起票・再評価ルールとして有効化し、既定では助言候補の提示にとどめる（既存の進行中作業を強制取消しない原則・lease 契約は維持する）。

@@ -1,6 +1,6 @@
 ---
 title: 'LLM Invocation Rubric — どのポイントで LLM に頼むか'
-last_updated: 2026-10-05
+last_updated: 2026-11-21
 ---
 
 # LLM Invocation Rubric — どのポイントで LLM に頼むか
@@ -37,8 +37,22 @@ last_updated: 2026-10-05
 - 縮退 fallback に暗黙依存して「動いているように見える」pipeline(LC-09 の縮退カウントを確認する)
 - 繰り返し実行する決定論手順を毎回 LLM に再発明させる(成功後に `pipelines/` へ昇格する — AGENTS.md §2)
 
+## 不確実性・分布外（OOD）時の事前振る舞い仕様（既定: 助言 / opt-in で契約必須化）
+
+LLM を組み込む工程では、「例外を投げなかった」だけでなく、判断に迷う境界での振る舞いを事前に定義しておく。
+
+| 不確実性の状況                   | 取り得る安全側アクション（要件に応じて選択）                                                | Kyberion での受け皿                                                              |
+| -------------------------------- | ------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| **低確信（閾値未満・候補拮抗）** | 上位候補提示、`delegateStructured` 再試行、または安全側デフォルトへ縮退（`_degraded` 記録） | `options` 制約 / 決定論 fallback / `on_degraded`                                 |
+| **入力が前提外・分布外（OOD）**  | 未知入力を自動処理せず拒否・診断警告を出し、自律コミットを迂回する                          | preflight schema 検証 / fail-closed ゲート                                       |
+| **根拠不足・証拠矛盾**           | 推測補完せず不足事実を `needs_input` / `customer_decisions` として切り出す                  | [question-resolution-playbook](../orchestration/question-resolution-playbook.md) |
+| **高リスク・不可逆判断**         | 対外副作用を保留し、責任者（人間）の承認ゲートへエスカレーションする                        | [ai-use-charter-operations](./ai-use-charter-operations.md) ハードフロア         |
+
+既定では設計時の**助言チェックリスト**として扱い、事前宣言の強制制約化はプロジェクト・テナント・ワークフロー方針で明示的に **opt-in** された場合のみ必須化する（既存の `on_degraded: fail` や charter ハードフロアは常に維持）。
+
 ## 関連正本
 
 - [ORCHESTRATION_HARNESS_MODEL](../../../docs/developer/ORCHESTRATION_HARNESS_MODEL.ja.md) — 分解・ブリフ・評価ループの原則体系
 - [AR-07](../../../docs/developer/improvement-plans-archive/2026-07/AR-07_SEMANTIC_INLOOP_OPS.ja.md) — in-loop semantic op のタクソノミ
 - [LOOP_CLOSURE_PLAN](../../../docs/developer/improvement-plans-archive/2026-07/LOOP_CLOSURE_PLAN_2026-07-13.ja.md) — 本 rubric を含む4ループ計画
+- [ai-requirements-governance-playbook](../orchestration/ai-requirements-governance-playbook.md) — 不確実性仕様と成熟度別 opt-in 制約の全体設計

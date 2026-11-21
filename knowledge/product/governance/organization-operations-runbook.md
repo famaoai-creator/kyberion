@@ -1,7 +1,7 @@
 ---
 title: Organization Operations Runbook
 tags: [organization, operation, incident, decision, governance]
-last_updated: 2026-11-16
+last_updated: 2026-11-21
 ---
 
 # Organization operations
@@ -128,3 +128,7 @@ pnpm organization init --organization-id CHILD --name "<name>" --tier confidenti
 pnpm organization parent set --organization-id CHILD --tier confidential --tenant-slug TENANT --parent-organization-id PARENT --apply
 pnpm organization parent set --organization-id CHILD --tier confidential --tenant-slug TENANT --clear --apply
 ```
+
+## Requirements governance tailoring (opt-in)
+
+Keep live organizational records (`WorkItem`, Decision Ledger, `mission-state.json`, `audit-chain`, and governed `knowledge/`) as the single source of truth rather than maintaining duplicate specification documents alongside them (generate readable specs as views). Organizations may progressively opt into stricter requirements framing, AI uncertainty contracts, automated re-evaluation triggers, and three-layer legal traceability according to maturity level as described in [ai-requirements-governance-playbook.md](../orchestration/ai-requirements-governance-playbook.md); all added requirements constraints remain opt-in and advisory by default.

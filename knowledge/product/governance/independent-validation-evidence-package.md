@@ -3,7 +3,7 @@ title: Independent Validation Evidence Package
 category: Governance
 tags: [validation, sr-11-7, audit, model-risk, regulated-finance, evidence]
 importance: 8
-last_updated: 2026-10-05
+last_updated: 2026-11-21
 ---
 
 # Independent Validation Evidence Package
@@ -104,6 +104,17 @@ operator's identity, the mission_id, and a short statement.
 | "All `rubric.override_accepted` events are accompanied by their original reason text and are unaltered."               | tenant_risk_officer (or equivalent) |
 | "The reasoning backend identified in §2.3 is the one that produced the output, and no post-hoc backend swap occurred." | ecosystem_architect                 |
 
+### 2.7 Assurance case summary (opt-in)
+
+When a tenant policy or validation scope explicitly opts in, include `assurance-case.json` or `assurance-case.md` alongside §2.1–§2.5 artefacts so the argument linking evidence to safety/compliance claims is explicit:
+
+- **Claim**: Specific assertion under validation (accuracy ceiling, data isolation, fail-closed safety behavior).
+- **Argument**: Reasoning chain showing how design controls and runtime gates support the claim.
+- **Evidence**: Exact references into `audit-chain`, test/simulation receipts, finite-state model checks, and signed §2.6 attestations.
+- **Assumptions & validity boundaries**: Input distribution domain, policy/model versions, human-oversight cadence, and triggers that invalidate the claim.
+
+This section is **opt-in**: standard decision-support bundles remain complete under §2.1–§2.6 unless an organization or regulator engagement explicitly requires structured assurance-case framing.
+
 ## 3. What the validator should be able to do with the bundle
 
 The bundle is sufficient when an external validator can, **without
@@ -152,3 +163,4 @@ Until the dedicated command exists, assemble the bundle by hand following
 - [`../procedures/system/rubric-disclosure-template.md`](../../public/procedures/system/rubric-disclosure-template.md)
 - [`../architecture/multi-tenant-operations.md`](../architecture/multi-tenant-operations.md)
 - [`../architecture/operator-surface-strategy.md`](../architecture/operator-surface-strategy.md)
+- [`../orchestration/ai-requirements-governance-playbook.md`](../orchestration/ai-requirements-governance-playbook.md)

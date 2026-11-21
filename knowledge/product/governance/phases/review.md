@@ -1,7 +1,7 @@
 ---
 title: 'Phase Protocol: Review & Distillation'
 tags: [governance, lifecycle, review]
-last_updated: 2026-10-08
+last_updated: 2026-11-21
 runtime_stages: [verification, delivery, retrospective]
 ---
 
@@ -33,6 +33,8 @@ A steward must explicitly classify the durable knowledge domain before approval:
 Use memory-review, then approve with memory-approve --knowledge-domain product|organization|personal. Mission candidates also require --curation-json with title, summary, content, and evidence_refs selected from the original candidate evidence. This is the steward's explicit extraction step: do not copy distillation.md wholesale. Then run memory-promote after evidence and provenance checks. The archived distillation.md remains immutable mission evidence; the promoted record is the discoverable durable knowledge, linked by source/evidence refs and candidate promoted_ref. A candidate remains visibly queued until curated/classified/approved/promoted or rejected; do not treat mission finish as promotion. Tier answers who may see the knowledge; domain answers whose durable knowledge it is. Never downgrade sensitivity by relabeling. Legacy candidates without a domain remain organization-scoped for compatibility and must be reviewed conservatively. Only curated organization knowledge_hint records update governance HINTS.md.
 
 Example: `pnpm mission memory-approve <ID> --knowledge-domain organization --curation-json '{"title":"...","summary":"...","content":"...","evidence_refs":["active/missions/public/<ID>/evidence/distillation.md"]}' --note "Selected reusable operating lesson"`. When a public mission is archived before promotion, review resolves this stable public-mission evidence reference against its archive location.
+
+When curating rework or change-driven lessons, stewards may optionally tag the root cause (`environment_change`, `operational_learning`, or `initial_requirement_defect`) so `initial_requirement_defect` findings feed back into Alignment checklists and hearing templates (advisory by default; opt-in strict per tenant or project policy — see [AI-Era Requirements Governance Playbook](../../orchestration/ai-requirements-governance-playbook.md)).
 
 ### Product lessons ship inside the code PR
 
