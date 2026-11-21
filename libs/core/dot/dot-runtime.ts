@@ -403,7 +403,10 @@ export function dotDailyTokenCapReached(charter: DotCharter, deps: DotRuntimeDep
   return dotTokensUsedToday(charter.dot_id, deps) >= cap;
 }
 
-type WatchState = Record<string, Record<string, { mtime_ms: number; size: number }>>;
+type WatchState = Record<
+  string,
+  Record<string, { mtime_ms: number; size: number; last_wake_ms?: number }>
+>;
 
 function readWatchState(deps: DotRuntimeDeps): WatchState {
   const filePath = runtimePath(deps.rootDir, DOT_WATCH_STATE_PATH);
@@ -452,7 +455,8 @@ export function recordDotWatchSnapshot(charter: DotCharter, deps: DotRuntimeDeps
     if (trigger.kind !== 'watch') continue;
     for (const rel of trigger.paths) {
       const current = confinedWatchStat(rel, deps);
-      if (current) dotState[rel] = current;
+      const prior = dotState[rel]?.last_wake_ms;
+      if (current) dotState[rel] = { ...current, ...(prior ? { last_wake_ms: prior } : {}) };
       else delete dotState[rel];
     }
   }
@@ -475,7 +479,11 @@ function recordWatchSnapshotFromKey(
       ...state,
       [charter.dot_id]: {
         ...(state[charter.dot_id] ?? {}),
-        [rel]: { mtime_ms: Number(mtime), size: Number(size) },
+        [rel]: {
+          mtime_ms: Number(mtime),
+          size: Number(size),
+          last_wake_ms: (deps.now?.() ?? new Date()).getTime(),
+        },
       },
     },
     deps
@@ -487,19 +495,29 @@ function minuteKey(date: Date, timezone?: string): string {
   return `${parts.year}-${String(parts.month).padStart(2, '0')}-${String(parts.day).padStart(2, '0')}T${String(parts.hour).padStart(2, '0')}:${String(parts.minute).padStart(2, '0')}`;
 }
 
+interface WatchTriggerOptions {
+  ignoredKinds?: readonly string[];
+  minSeverity?: string;
+  minIntervalSeconds?: number;
+}
+
 function watchTriggerKey(
   charter: DotCharter,
   rel: string,
   deps: DotRuntimeDeps,
-  ignoredKinds: readonly string[] = [],
-  minSeverity?: string
+  options: WatchTriggerOptions = {}
 ): { key: string; detail: string } | null {
+  const { ignoredKinds = [], minSeverity, minIntervalSeconds } = options;
   const current = confinedWatchStat(rel, deps);
   if (!current) return null;
   const state = readWatchState(deps);
   const snapshot = state[charter.dot_id]?.[rel];
   if (snapshot && snapshot.mtime_ms === current.mtime_ms && snapshot.size === current.size) {
     return null;
+  }
+  if (minIntervalSeconds && minIntervalSeconds > 0 && snapshot?.last_wake_ms) {
+    const nowMs = (deps.now?.() ?? new Date()).getTime();
+    if (nowMs - snapshot.last_wake_ms < minIntervalSeconds * 1000) return null;
   }
   if (
     (ignoredKinds.length > 0 || minSeverity !== undefined) &&
@@ -516,7 +534,13 @@ function watchTriggerKey(
     writeWatchState(
       {
         ...state,
-        [charter.dot_id]: { ...(state[charter.dot_id] ?? {}), [rel]: current },
+        [charter.dot_id]: {
+          ...(state[charter.dot_id] ?? {}),
+          [rel]: {
+            ...current,
+            ...(snapshot.last_wake_ms ? { last_wake_ms: snapshot.last_wake_ms } : {}),
+          },
+        },
       },
       deps
     );
@@ -763,13 +787,11 @@ export function evaluateDotTriggersDue(
       }
     } else if (trigger.kind === 'watch') {
       for (const rel of trigger.paths) {
-        const hit = watchTriggerKey(
-          charter,
-          rel,
-          deps,
-          trigger.ignore_jsonl_kinds,
-          trigger.min_severity
-        );
+        const hit = watchTriggerKey(charter, rel, deps, {
+          ignoredKinds: trigger.ignore_jsonl_kinds,
+          minSeverity: trigger.min_severity,
+          minIntervalSeconds: trigger.min_interval_seconds,
+        });
         if (hit && isDue(hit.key)) {
           due.push({ trigger, key: hit.key, detail: hit.detail });
         }

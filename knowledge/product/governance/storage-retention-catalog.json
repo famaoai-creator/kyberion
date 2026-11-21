@@ -1188,7 +1188,9 @@
           "id": "wi-observation-pending-review-expiry",
           "path_pattern": "*/work-inventory/observations/*.json",
           "status_field": "status",
-          "statuses": ["pending_review"],
+          "statuses": [
+            "pending_review"
+          ],
           "age_field": "created_at",
           "ttl_days": 30,
           "action": "delete"
@@ -1197,7 +1199,9 @@
           "id": "wi-observation-discarded-expiry",
           "path_pattern": "*/work-inventory/observations/*.json",
           "status_field": "status",
-          "statuses": ["discarded"],
+          "statuses": [
+            "discarded"
+          ],
           "age_field": "discarded_at",
           "ttl_days": 30,
           "action": "delete"
@@ -1323,6 +1327,30 @@
       "action": "delete",
       "backup": "exclude",
       "note": "terminal_session_cli.ts daemon state — Unix socket, pidfile, and startup log for the persistent terminal-actuator bridge. Files are recreated on daemon start; leftovers from a dead daemon are stale and safe to delete (same lifecycle as heartbeats)."
+    },
+    {
+      "path": "active/shared/runtime/customer.env",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Active customer/company overlay selector; rewritten in place by onboarding flows."
+    },
+    {
+      "path": "active/shared/runtime/scope-surfaces.env",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Surface-viewer scope selector env (ViewerContext staging); rewritten in place."
+    },
+    {
+      "path": "active/shared/runtime/confidential",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Tenant-scoped runtime state partition (per-tenant runtime data); governed by tenant scope rules, never bulk-expired."
+    },
+    {
+      "path": "active/shared/runtime/execution-feedback",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Per-tier execution feedback store directory (libs/core/knowledge/execution-feedback-candidates.ts); entries self-bounded per file."
     }
   ]
 }

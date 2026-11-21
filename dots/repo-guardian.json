@@ -83,7 +83,8 @@
         "kind": "watch",
         "paths": ["active/shared/observability/ops-alerts.jsonl"],
         "ignore_jsonl_kinds": ["operator_notification_undelivered"],
-        "min_severity": "critical"
+        "min_severity": "critical",
+        "min_interval_seconds": 600
       },
       {
         "kind": "wake",

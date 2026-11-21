@@ -12,6 +12,19 @@ describe('pipelineBootstrapNeeds', () => {
       expect(pipelineBootstrapNeeds(pipeline.steps)).toEqual({ required: false, reasons: [] });
     }
   );
+  it.each([
+    'ops-health-probe',
+    'organization-operation-tick',
+    'organization-standup',
+    'organization-retro',
+    'organization-kr-measure',
+    'organization-daily-digest',
+  ])('keeps the deterministic %s cadence provider-free', (id) => {
+    const pipeline = readJson<{ steps: Parameters<typeof pipelineBootstrapNeeds>[0] }>(
+      `pipelines/${id}.json`
+    );
+    expect(pipelineBootstrapNeeds(pipeline.steps)).toEqual({ required: false, reasons: [] });
+  });
   it('lets baseline report readiness without bootstrapping tenant credentials', () => {
     const baseline = [
       { op: 'system:baseline_check', params: { export_as: 'baseline_check' } },

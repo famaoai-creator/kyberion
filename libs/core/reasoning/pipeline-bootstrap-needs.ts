@@ -43,6 +43,15 @@ const INERT_OPS: ReadonlySet<string> = new Set([
   'working-memory:run-gc',
   // Governed local retention cleanup never needs a model or provider secret.
   'core:run_janitor',
+  // Deterministic organization cadence + ops probe: aggregate governed state
+  // only, never call a reasoning backend. Inert so scoped (tenant-bound)
+  // cadence runs proceed without demanding a WorkItem credential binding.
+  'core:run_ops_health_probe',
+  'core:organization_operation_tick',
+  'core:organization_standup',
+  'core:organization_retro',
+  'core:organization_digest',
+  'core:organization_kr_measure',
   'system:write_artifact',
   'system:log',
   'system:baseline_check',

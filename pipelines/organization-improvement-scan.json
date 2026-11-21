@@ -21,5 +21,11 @@
         "sensitive": true
       }
     }
-  ]
+  ],
+  "schedule": {
+    "id": "organization-improvement-scan",
+    "cron": "0 9 * * 1",
+    "timezone": "Asia/Tokyo",
+    "enabled": false
+  }
 }
