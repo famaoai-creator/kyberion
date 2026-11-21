@@ -129,6 +129,9 @@ importers:
       '@openai/codex':
         specifier: ^0.153.4
         version: 0.153.4
+      '@presence/mission-deck':
+        specifier: workspace:*
+        version: link:presence/displays/mission-deck
       '@presence/terminal-hud':
         specifier: workspace:*
         version: link:presence/displays/terminal-hud
@@ -1024,6 +1027,34 @@ importers:
       vitest:
         specifier: ^5.0.5
         version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@26.6.5)(@vitest/coverage-v8@5.0.5)(jsdom@29.1.1(@noble/hashes@1.8.0))(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@1.21.7)(tsx@4.23.15)(yaml@2.9.1))
+
+  presence/displays/mission-deck:
+    dependencies:
+      '@agent/core':
+        specifier: workspace:*
+        version: link:../../../libs/core
+      ink:
+        specifier: ^7.1.1
+        version: 7.1.1(@types/react@19.3.0)(react@19.3.1)
+      ink-text-input:
+        specifier: ^6.0.0
+        version: 6.0.0(ink@7.1.1(@types/react@19.3.0)(react@19.3.1))(react@19.3.1)
+      react:
+        specifier: ^19.3.1
+        version: 19.3.1
+    devDependencies:
+      '@types/node':
+        specifier: ^26.6.5
+        version: 26.6.5
+      '@types/react':
+        specifier: ^19.3.0
+        version: 19.3.0
+      ink-testing-library:
+        specifier: ^4.0.0
+        version: 4.0.0(@types/react@19.3.0)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
 
   presence/displays/operator-surface:
     dependencies:

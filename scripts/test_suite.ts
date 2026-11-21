@@ -38,7 +38,7 @@ export const TEST_SUITES = {
     'libs/core/browser/chrome-extension-meeting-driver.test.ts',
   ],
   coverage: ['--coverage'],
-  tui: ['presence/displays/terminal-hud/'],
+  tui: ['presence/displays/terminal-hud/', 'presence/displays/mission-deck/'],
 } as const satisfies Record<string, readonly string[]>;
 
 export type TestSuite = keyof typeof TEST_SUITES;

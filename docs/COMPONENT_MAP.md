@@ -202,6 +202,7 @@ Runtime/package hygiene for this layer is enforced by `pnpm run check -- --scope
 - `presence/displays/customer-room/` (customer-facing decision room opened through an invite link, port 3046, operator-launched)
 - `presence/displays/a2ui-host/` (developer A2UI viewer, loopback port 3036, operator-launched)
 - `presence/displays/terminal-hud/` (Ink TUI, `pnpm tui`)
+- `presence/displays/mission-deck/` (conversation-centric multi-agent Ink TUI, `pnpm deck`)
 - `knowledge/product/architecture/slack-chronos-control-model.md`
 - `docs/SURFACES.md` (role map for all of the above)
 

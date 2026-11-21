@@ -10080,6 +10080,11 @@
         "ja": "バーチャルオフィスを開く",
         "qps-ploc": "⟦Őṗėñ ŧħė Ṽïřŧůȧŀ Őƒƒïƈė şůřƒȧƈė ŀőřėɱ ïṗşů⟧"
       },
+      "cli_cmd_script_deck": {
+        "en": "Open the Mission Deck (conversation, decisions, agents)",
+        "ja": "Mission Deck を開く(会話・判断・エージェント)",
+        "qps-ploc": "⟦Őṗėñ ŧħė Ɱïşşïőñ Ḓėƈķ (ƈőñṽėřşȧŧïőñ, ḓėƈïşïőñş, ȧɠėñŧş) ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
       "cli_cmd_script_tui": {
         "en": "Open the terminal HUD",
         "ja": "ターミナル HUD を開く",
@@ -40363,6 +40368,693 @@
         "en": "Opens {host} in a new tab",
         "ja": "{host} を新しいタブで開きます",
         "qps-ploc": "⟦Őṗėñş {host} ïñ ȧ ñėẇ ŧȧƀ ŀőřėɱ ïṗ⟧"
+      }
+    },
+    "deck": {
+      "action_approve": {
+        "en": "Approve",
+        "ja": "承認",
+        "qps-ploc": "⟦Ȧṗṗřőṽė ŀőř⟧"
+      },
+      "action_deny": {
+        "en": "Deny",
+        "ja": "却下",
+        "qps-ploc": "⟦Ḓėñẏ ŀőř⟧"
+      },
+      "agent_unlinked": {
+        "en": "Not linked to a mission",
+        "ja": "ミッションに紐付いていません",
+        "qps-ploc": "⟦Ñőŧ ŀïñķėḓ ŧő ȧ ɱïşşïőñ ŀőřėɱ ï⟧"
+      },
+      "agent_idle": {
+        "en": "Idle",
+        "ja": "待機中",
+        "qps-ploc": "⟦Ïḓŀė ŀőř⟧"
+      },
+      "agent_working": {
+        "en": "Working",
+        "ja": "作業中",
+        "qps-ploc": "⟦Ẇőřķïñɠ ŀőř⟧"
+      },
+      "agent_blocked": {
+        "en": "Needs input",
+        "ja": "入力待ち",
+        "qps-ploc": "⟦Ñėėḓş ïñṗůŧ ŀőř⟧"
+      },
+      "agent_done": {
+        "en": "Done",
+        "ja": "完了",
+        "qps-ploc": "⟦Ḓőñė ŀőř⟧"
+      },
+      "agent_unknown": {
+        "en": "Unknown",
+        "ja": "不明",
+        "qps-ploc": "⟦Ůñķñőẇñ ŀőř⟧"
+      },
+      "agents_hint_start": {
+        "en": "Start an agent in herdr to see it here.",
+        "ja": "herdr でエージェントを起動するとここに表示されます。",
+        "qps-ploc": "⟦Şŧȧřŧ ȧñ ȧɠėñŧ ïñ ħėřḓř ŧő şėė ïŧ ħėřė. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "agents_none": {
+        "en": "No agents are running.",
+        "ja": "実行中のエージェントはありません。",
+        "qps-ploc": "⟦Ñő ȧɠėñŧş ȧřė řůññïñɠ. ŀőřėɱ ï⟧"
+      },
+      "agents_title": {
+        "en": "Agents",
+        "ja": "エージェント",
+        "qps-ploc": "⟦Ȧɠėñŧş ŀőř⟧"
+      },
+      "agents_unavailable": {
+        "en": "Agent list is unavailable (herdr not reachable).",
+        "ja": "エージェント一覧を取得できません(herdr に接続できません)。",
+        "qps-ploc": "⟦Ȧɠėñŧ ŀïşŧ ïş ůñȧṽȧïŀȧƀŀė (ħėřḓř ñőŧ řėȧƈħȧƀŀė). ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "announce_pending": {
+        "en": "{count} item(s) need your decision.",
+        "ja": "判断が必要な項目が {count} 件あります。",
+        "qps-ploc": "⟦{count} ïŧėɱ(ş) ñėėḓ ẏőůř ḓėƈïşïőñ. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "card_if_no_response": {
+        "en": "If no response",
+        "ja": "応答がない場合",
+        "qps-ploc": "⟦Ïƒ ñő řėşṗőñşė ŀőřė⟧"
+      },
+      "card_irreversible": {
+        "en": "Cannot be undone",
+        "ja": "取り消しできません",
+        "qps-ploc": "⟦Ƈȧññőŧ ƀė ůñḓőñė ŀőřėɱ⟧"
+      },
+      "card_recommendation": {
+        "en": "Recommendation",
+        "ja": "推奨",
+        "qps-ploc": "⟦Řėƈőɱɱėñḓȧŧïőñ ŀőřė⟧"
+      },
+      "card_reversible": {
+        "en": "Can be undone",
+        "ja": "取り消し可能",
+        "qps-ploc": "⟦Ƈȧñ ƀė ůñḓőñė ŀőřė⟧"
+      },
+      "composer_busy": {
+        "en": "Working on your last message…",
+        "ja": "前のメッセージを処理しています…",
+        "qps-ploc": "⟦Ẇőřķïñɠ őñ ẏőůř ŀȧşŧ ɱėşşȧɠė… ŀőřėɱ ïṗş⟧"
+      },
+      "composer_placeholder": {
+        "en": "Tell Kyberion what you want to get done",
+        "ja": "やりたいことを Kyberion に伝えてください",
+        "qps-ploc": "⟦Ŧėŀŀ Ķẏƀėřïőñ ẇħȧŧ ẏőů ẇȧñŧ ŧő ɠėŧ ḓőñė ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "composer_unfocused": {
+        "en": "Press i or / to write",
+        "ja": "i または / で入力",
+        "qps-ploc": "⟦Ṗřėşş ï őř / ŧő ẇřïŧė ŀőřėɱ ⟧"
+      },
+      "confirm_approve": {
+        "en": "Approve “{title}”?",
+        "ja": "「{title}」を承認しますか?",
+        "qps-ploc": "⟦Ȧṗṗřőṽė “{title}”? ŀőřėɱ⟧"
+      },
+      "confirm_deny": {
+        "en": "Deny “{title}”?",
+        "ja": "「{title}」を却下しますか?",
+        "qps-ploc": "⟦Ḓėñẏ “{title}”? ŀőřė⟧"
+      },
+      "confirm_interrupt": {
+        "en": "Interrupt {name}? Its current step stops; you can send it a new instruction afterwards.",
+        "ja": "{name} を中断しますか?現在のステップが止まります。その後に新しい指示を送れます。",
+        "qps-ploc": "⟦Ïñŧėřřůṗŧ {name}? Ïŧş ƈůřřėñŧ şŧėṗ şŧőṗş; ẏőů ƈȧñ şėñḓ ïŧ ȧ ñėẇ ïñşŧřůƈŧïőñ ȧƒŧėřẇȧřḓş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈő⟧"
+      },
+      "confirm_no": {
+        "en": "No",
+        "ja": "いいえ",
+        "qps-ploc": "⟦Ñő ŀőř⟧"
+      },
+      "confirm_pause": {
+        "en": "Pause “{title}”? You can resume it later.",
+        "ja": "「{title}」を一時停止しますか?後で再開できます。",
+        "qps-ploc": "⟦Ṗȧůşė “{title}”? Ẏőů ƈȧñ řėşůɱė ïŧ ŀȧŧėř. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "confirm_title": {
+        "en": "Confirm",
+        "ja": "確認",
+        "qps-ploc": "⟦Ƈőñƒïřɱ ŀőř⟧"
+      },
+      "confirm_yes": {
+        "en": "Yes",
+        "ja": "はい",
+        "qps-ploc": "⟦Ẏėş ŀőř⟧"
+      },
+      "count_decide": {
+        "en": "{count} to decide",
+        "ja": "判断 {count}",
+        "qps-ploc": "⟦{count} ŧő ḓėƈïḓė ŀőřėɱ⟧"
+      },
+      "count_review": {
+        "en": "{count} to review",
+        "ja": "レビュー {count}",
+        "qps-ploc": "⟦{count} ŧő řėṽïėẇ ŀőřėɱ⟧"
+      },
+      "count_running": {
+        "en": "{count} running",
+        "ja": "実行中 {count}",
+        "qps-ploc": "⟦{count} řůññïñɠ ŀőřė⟧"
+      },
+      "detail_agents": {
+        "en": "Agents",
+        "ja": "エージェント",
+        "qps-ploc": "⟦Ȧɠėñŧş ŀőř⟧"
+      },
+      "detail_evidence": {
+        "en": "Evidence",
+        "ja": "成果・証跡",
+        "qps-ploc": "⟦Ėṽïḓėñƈė ŀőř⟧"
+      },
+      "detail_progress": {
+        "en": "Progress",
+        "ja": "進捗",
+        "qps-ploc": "⟦Ṗřőɠřėşş ŀőř⟧"
+      },
+      "detail_select": {
+        "en": "Select a mission to see its details.",
+        "ja": "ミッションを選ぶと詳細を表示します。",
+        "qps-ploc": "⟦Şėŀėƈŧ ȧ ɱïşşïőñ ŧő şėė ïŧş ḓėŧȧïŀş. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "detail_success": {
+        "en": "Done when",
+        "ja": "完了条件",
+        "qps-ploc": "⟦Ḓőñė ẇħėñ ŀőř⟧"
+      },
+      "handoff_approval": {
+        "en": "Opening the approval prompt. Return here when you are done.",
+        "ja": "承認画面を開きます。終わるとこの画面に戻ります。",
+        "qps-ploc": "⟦Őṗėñïñɠ ŧħė ȧṗṗřőṽȧŀ ṗřőɱṗŧ. Řėŧůřñ ħėřė ẇħėñ ẏőů ȧřė ḓőñė. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "handoff_attach": {
+        "en": "Attaching to {name}. Detach to return here.",
+        "ja": "{name} に接続します。切断するとこの画面に戻ります。",
+        "qps-ploc": "⟦Ȧŧŧȧƈħïñɠ ŧő {name}. Ḓėŧȧƈħ ŧő řėŧůřñ ħėřė. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "help_compose": {
+        "en": "Write a message",
+        "ja": "メッセージを書く",
+        "qps-ploc": "⟦Ẇřïŧė ȧ ɱėşşȧɠė ŀőřė⟧"
+      },
+      "help_decide": {
+        "en": "Approve / deny the selected decision",
+        "ja": "選択中の判断を承認 / 却下",
+        "qps-ploc": "⟦Ȧṗṗřőṽė / ḓėñẏ ŧħė şėŀėƈŧėḓ ḓėƈïşïőñ ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "help_enter": {
+        "en": "Open or attach",
+        "ja": "開く / 接続する",
+        "qps-ploc": "⟦Őṗėñ őř ȧŧŧȧƈħ ŀőřė⟧"
+      },
+      "help_escape": {
+        "en": "Close or leave the input",
+        "ja": "閉じる / 入力をやめる",
+        "qps-ploc": "⟦Ƈŀőşė őř ŀėȧṽė ŧħė ïñṗůŧ ŀőřėɱ ï⟧"
+      },
+      "help_focus": {
+        "en": "Move between areas",
+        "ja": "エリアを移動",
+        "qps-ploc": "⟦Ɱőṽė ƀėŧẇėėñ ȧřėȧş ŀőřėɱ⟧"
+      },
+      "help_goto_decision": {
+        "en": "Jump to the next decision",
+        "ja": "次の判断へ移動",
+        "qps-ploc": "⟦Ĵůɱṗ ŧő ŧħė ñėẋŧ ḓėƈïşïőñ ŀőřėɱ ïṗ⟧"
+      },
+      "help_interrupt": {
+        "en": "Interrupt the selected agent (agents area)",
+        "ja": "選択中のエージェントを中断(エージェントのエリアで)",
+        "qps-ploc": "⟦Ïñŧėřřůṗŧ ŧħė şėŀėƈŧėḓ ȧɠėñŧ (ȧɠėñŧş ȧřėȧ) ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "help_locale": {
+        "en": "Switch language",
+        "ja": "言語を切り替え",
+        "qps-ploc": "⟦Şẇïŧƈħ ŀȧñɠůȧɠė ŀőřė⟧"
+      },
+      "help_move": {
+        "en": "Move the selection",
+        "ja": "選択を移動",
+        "qps-ploc": "⟦Ɱőṽė ŧħė şėŀėƈŧïőñ ŀőřėɱ⟧"
+      },
+      "help_palette": {
+        "en": "Command palette",
+        "ja": "コマンドパレット",
+        "qps-ploc": "⟦Ƈőɱɱȧñḓ ṗȧŀėŧŧė ŀőřė⟧"
+      },
+      "help_pause": {
+        "en": "Pause the selected mission",
+        "ja": "選択中のミッションを一時停止",
+        "qps-ploc": "⟦Ṗȧůşė ŧħė şėŀėƈŧėḓ ɱïşşïőñ ŀőřėɱ ïṗ⟧"
+      },
+      "help_peek": {
+        "en": "Peek at agent output",
+        "ja": "エージェント出力をのぞく",
+        "qps-ploc": "⟦Ṗėėķ ȧŧ ȧɠėñŧ őůŧṗůŧ ŀőřėɱ ⟧"
+      },
+      "help_quit": {
+        "en": "Quit",
+        "ja": "終了",
+        "qps-ploc": "⟦Ɋůïŧ ŀőř⟧"
+      },
+      "help_refresh": {
+        "en": "Refresh now",
+        "ja": "今すぐ更新",
+        "qps-ploc": "⟦Řėƒřėşħ ñőẇ ŀőř⟧"
+      },
+      "help_steer": {
+        "en": "Add a note for the selected mission or agent",
+        "ja": "選択中のミッション / エージェントに指示を追加",
+        "qps-ploc": "⟦Ȧḓḓ ȧ ñőŧė ƒőř ŧħė şėŀėƈŧėḓ ɱïşşïőñ őř ȧɠėñŧ ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "help_title": {
+        "en": "Keys",
+        "ja": "キー操作",
+        "qps-ploc": "⟦Ķėẏş ŀőř⟧"
+      },
+      "help_views": {
+        "en": "Conversation / Missions / Terminals",
+        "ja": "会話 / ミッション / ターミナル",
+        "qps-ploc": "⟦Ƈőñṽėřşȧŧïőñ / Ɱïşşïőñş / Ŧėřɱïñȧŀş ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "hint_agents": {
+        "en": "Space peek · Enter attach · s message · ! interrupt · ? help",
+        "ja": "Space のぞく · Enter 接続 · s メッセージ · ! 中断 · ? ヘルプ",
+        "qps-ploc": "⟦Şṗȧƈė ṗėėķ · Ėñŧėř ȧŧŧȧƈħ · ş ɱėşşȧɠė · ! ïñŧėřřůṗŧ · ? ħėŀṗ ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "hint_composer": {
+        "en": "Enter send · Esc leave input",
+        "ja": "Enter 送信 · Esc 入力をやめる",
+        "qps-ploc": "⟦Ėñŧėř şėñḓ · Ėşƈ ŀėȧṽė ïñṗůŧ ŀőřėɱ ïṗş⟧"
+      },
+      "hint_rail": {
+        "en": "j/k move · Enter open · ? help",
+        "ja": "j/k 移動 · Enter 開く · ? ヘルプ",
+        "qps-ploc": "⟦ĵ/ķ ɱőṽė · Ėñŧėř őṗėñ · ? ħėŀṗ ŀőřėɱ ïṗşů⟧"
+      },
+      "hint_terminals": {
+        "en": "j/k move · Space peek · Enter attach · s message · 1 back",
+        "ja": "j/k 移動 · Space のぞく · Enter 接続 · s メッセージ · 1 戻る",
+        "qps-ploc": "⟦ĵ/ķ ɱőṽė · Şṗȧƈė ṗėėķ · Ėñŧėř ȧŧŧȧƈħ · ş ɱėşşȧɠė · 1 ƀȧƈķ ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "intent_missing": {
+        "en": "Still needed",
+        "ja": "不足している情報",
+        "qps-ploc": "⟦Şŧïŀŀ ñėėḓėḓ ŀőř⟧"
+      },
+      "intent_next": {
+        "en": "Next",
+        "ja": "次の動き",
+        "qps-ploc": "⟦Ñėẋŧ ŀőř⟧"
+      },
+      "intent_returns": {
+        "en": "You get",
+        "ja": "受け取るもの",
+        "qps-ploc": "⟦Ẏőů ɠėŧ ŀőř⟧"
+      },
+      "intent_shape": {
+        "en": "Handled as",
+        "ja": "進め方",
+        "qps-ploc": "⟦Ħȧñḓŀėḓ ȧş ŀőř⟧"
+      },
+      "intent_understood": {
+        "en": "Understood",
+        "ja": "理解した内容",
+        "qps-ploc": "⟦Ůñḓėřşŧőőḓ ŀőř⟧"
+      },
+      "lane_blocked": {
+        "en": "Cannot proceed",
+        "ja": "進行できない",
+        "qps-ploc": "⟦Ƈȧññőŧ ṗřőƈėėḓ ŀőřė⟧"
+      },
+      "lane_decide": {
+        "en": "Needs your decision",
+        "ja": "判断待ち",
+        "qps-ploc": "⟦Ñėėḓş ẏőůř ḓėƈïşïőñ ŀőřėɱ ⟧"
+      },
+      "lane_done": {
+        "en": "Done",
+        "ja": "完了",
+        "qps-ploc": "⟦Ḓőñė ŀőř⟧"
+      },
+      "lane_review": {
+        "en": "Ready for review",
+        "ja": "レビュー待ち",
+        "qps-ploc": "⟦Řėȧḓẏ ƒőř řėṽïėẇ ŀőřėɱ⟧"
+      },
+      "lane_running": {
+        "en": "Running",
+        "ja": "実行中",
+        "qps-ploc": "⟦Řůññïñɠ ŀőř⟧"
+      },
+      "loading": {
+        "en": "Loading…",
+        "ja": "読み込み中…",
+        "qps-ploc": "⟦Ŀőȧḓïñɠ… ŀőř⟧"
+      },
+      "overlay_close": {
+        "en": "Press any key to close",
+        "ja": "何かキーを押すと閉じます",
+        "qps-ploc": "⟦Ṗřėşş ȧñẏ ķėẏ ŧő ƈŀőşė ŀőřėɱ ï⟧"
+      },
+      "palette_checkpoint": {
+        "en": "Save progress of the selected mission",
+        "ja": "選択中のミッションの途中経過を保存",
+        "qps-ploc": "⟦Şȧṽė ṗřőɠřėşş őƒ ŧħė şėŀėƈŧėḓ ɱïşşïőñ ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "palette_empty": {
+        "en": "No matching command.",
+        "ja": "一致するコマンドはありません。",
+        "qps-ploc": "⟦Ñő ɱȧŧƈħïñɠ ƈőɱɱȧñḓ. ŀőřėɱ ⟧"
+      },
+      "palette_resume": {
+        "en": "Resume the selected mission",
+        "ja": "選択中のミッションを再開",
+        "qps-ploc": "⟦Řėşůɱė ŧħė şėŀėƈŧėḓ ɱïşşïőñ ŀőřėɱ ïṗ⟧"
+      },
+      "palette_title": {
+        "en": "Commands",
+        "ja": "コマンド",
+        "qps-ploc": "⟦Ƈőɱɱȧñḓş ŀőř⟧"
+      },
+      "peek_gone": {
+        "en": "This agent is no longer running.",
+        "ja": "このエージェントはもう実行されていません。",
+        "qps-ploc": "⟦Ŧħïş ȧɠėñŧ ïş ñő ŀőñɠėř řůññïñɠ. ŀőřėɱ ïṗşů⟧"
+      },
+      "peek_hint": {
+        "en": "Enter send · Tab attach · Esc close",
+        "ja": "Enter 送信 · Tab 接続 · Esc 閉じる",
+        "qps-ploc": "⟦Ėñŧėř şėñḓ · Ŧȧƀ ȧŧŧȧƈħ · Ėşƈ ƈŀőşė ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "peek_reply": {
+        "en": "Reply",
+        "ja": "返信",
+        "qps-ploc": "⟦Řėṗŀẏ ŀőř⟧"
+      },
+      "peek_title": {
+        "en": "Agent output",
+        "ja": "エージェント出力",
+        "qps-ploc": "⟦Ȧɠėñŧ őůŧṗůŧ ŀőř⟧"
+      },
+      "phase_agreed": {
+        "en": "Agreed",
+        "ja": "合意",
+        "qps-ploc": "⟦Ȧɠřėėḓ ŀőř⟧"
+      },
+      "phase_done": {
+        "en": "Done",
+        "ja": "完了",
+        "qps-ploc": "⟦Ḓőñė ŀőř⟧"
+      },
+      "phase_executing": {
+        "en": "Executing",
+        "ja": "実行",
+        "qps-ploc": "⟦Ėẋėƈůŧïñɠ ŀőř⟧"
+      },
+      "phase_intent": {
+        "en": "Intent",
+        "ja": "意図",
+        "qps-ploc": "⟦Ïñŧėñŧ ŀőř⟧"
+      },
+      "phase_learning": {
+        "en": "Learning",
+        "ja": "学習",
+        "qps-ploc": "⟦Ŀėȧřñïñɠ ŀőř⟧"
+      },
+      "phase_review": {
+        "en": "Review",
+        "ja": "レビュー",
+        "qps-ploc": "⟦Řėṽïėẇ ŀőř⟧"
+      },
+      "rail_empty": {
+        "en": "Nothing needs you right now.",
+        "ja": "今対応が必要なものはありません。",
+        "qps-ploc": "⟦Ñőŧħïñɠ ñėėḓş ẏőů řïɠħŧ ñőẇ. ŀőřėɱ ïṗş⟧"
+      },
+      "reply_empty": {
+        "en": "No reply was returned. Try again or rephrase.",
+        "ja": "返答がありませんでした。もう一度送るか言い換えてください。",
+        "qps-ploc": "⟦Ñő řėṗŀẏ ẇȧş řėŧůřñėḓ. Ŧřẏ ȧɠȧïñ őř řėṗħřȧşė. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "snapshot_degraded": {
+        "en": "Some sources could not be read:",
+        "ja": "一部の情報源を読み取れませんでした:",
+        "qps-ploc": "⟦Şőɱė şőůřƈėş ƈőůŀḓ ñőŧ ƀė řėȧḓ: ŀőřėɱ ïṗşů⟧"
+      },
+      "steer_explain": {
+        "en": "Your note is queued and picked up at the next step; it does not stop current work.",
+        "ja": "指示はキューに入り、次のステップで反映されます。現在の作業は止まりません。",
+        "qps-ploc": "⟦Ẏőůř ñőŧė ïş ɋůėůėḓ ȧñḓ ṗïƈķėḓ ůṗ ȧŧ ŧħė ñėẋŧ şŧėṗ; ïŧ ḓőėş ñőŧ şŧőṗ ƈůřřėñŧ ẇőřķ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
+      },
+      "steer_hint": {
+        "en": "Enter send · Esc cancel",
+        "ja": "Enter 送信 · Esc キャンセル",
+        "qps-ploc": "⟦Ėñŧėř şėñḓ · Ėşƈ ƈȧñƈėŀ ŀőřėɱ ï⟧"
+      },
+      "steer_title_agent": {
+        "en": "Message to {name}",
+        "ja": "{name} へのメッセージ",
+        "qps-ploc": "⟦Ɱėşşȧɠė ŧő {name} ŀőřėɱ⟧"
+      },
+      "steer_title_mission": {
+        "en": "Note for “{title}”",
+        "ja": "「{title}」への指示",
+        "qps-ploc": "⟦Ñőŧė ƒőř “{title}” ŀőřėɱ⟧"
+      },
+      "tag_approval": {
+        "en": "approval",
+        "ja": "承認",
+        "qps-ploc": "⟦ȧṗṗřőṽȧŀ ŀőř⟧"
+      },
+      "tag_input": {
+        "en": "input",
+        "ja": "入力",
+        "qps-ploc": "⟦ïñṗůŧ ŀőř⟧"
+      },
+      "thinking": {
+        "en": "writing a reply…",
+        "ja": "返答を作成中…",
+        "qps-ploc": "⟦ẇřïŧïñɠ ȧ řėṗŀẏ… ŀőřėɱ⟧"
+      },
+      "toast_busy": {
+        "en": "Still working on the previous request.",
+        "ja": "前の依頼を処理中です。",
+        "qps-ploc": "⟦Şŧïŀŀ ẇőřķïñɠ őñ ŧħė ṗřėṽïőůş řėɋůėşŧ. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "toast_done": {
+        "en": "Done.",
+        "ja": "完了しました。",
+        "qps-ploc": "⟦Ḓőñė. ŀőř⟧"
+      },
+      "toast_interrupted": {
+        "en": "Interrupted.",
+        "ja": "中断しました。",
+        "qps-ploc": "⟦Ïñŧėřřůṗŧėḓ. ŀőř⟧"
+      },
+      "toast_nothing_waiting": {
+        "en": "Nothing is waiting for you.",
+        "ja": "待っている項目はありません。",
+        "qps-ploc": "⟦Ñőŧħïñɠ ïş ẇȧïŧïñɠ ƒőř ẏőů. ŀőřėɱ ïṗ⟧"
+      },
+      "toast_paused": {
+        "en": "Paused.",
+        "ja": "一時停止しました。",
+        "qps-ploc": "⟦Ṗȧůşėḓ. ŀőř⟧"
+      },
+      "toast_refreshing": {
+        "en": "Refreshing…",
+        "ja": "更新しています…",
+        "qps-ploc": "⟦Řėƒřėşħïñɠ… ŀőř⟧"
+      },
+      "toast_select_decision": {
+        "en": "Select a decision first.",
+        "ja": "先に判断項目を選んでください。",
+        "qps-ploc": "⟦Şėŀėƈŧ ȧ ḓėƈïşïőñ ƒïřşŧ. ŀőřėɱ ï⟧"
+      },
+      "toast_select_target": {
+        "en": "Select a mission or agent first.",
+        "ja": "先にミッションかエージェントを選んでください。",
+        "qps-ploc": "⟦Şėŀėƈŧ ȧ ɱïşşïőñ őř ȧɠėñŧ ƒïřşŧ. ŀőřėɱ ïṗşů⟧"
+      },
+      "toast_sent_agent": {
+        "en": "Sent to the agent.",
+        "ja": "エージェントに送りました。",
+        "qps-ploc": "⟦Şėñŧ ŧő ŧħė ȧɠėñŧ. ŀőřėɱ⟧"
+      },
+      "toast_steer_queued": {
+        "en": "Note received. It is applied at the next step.",
+        "ja": "指示を受け付けました。次のステップで反映されます。",
+        "qps-ploc": "⟦Ñőŧė řėƈėïṽėḓ. Ïŧ ïş ȧṗṗŀïėḓ ȧŧ ŧħė ñėẋŧ şŧėṗ. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "toast_working": {
+        "en": "Working…",
+        "ja": "処理中…",
+        "qps-ploc": "⟦Ẇőřķïñɠ… ŀőř⟧"
+      },
+      "view_conversation": {
+        "en": "Conversation",
+        "ja": "会話",
+        "qps-ploc": "⟦Ƈőñṽėřşȧŧïőñ ŀőř⟧"
+      },
+      "view_missions": {
+        "en": "Missions",
+        "ja": "ミッション",
+        "qps-ploc": "⟦Ɱïşşïőñş ŀőř⟧"
+      },
+      "view_terminals": {
+        "en": "Terminals",
+        "ja": "ターミナル",
+        "qps-ploc": "⟦Ŧėřɱïñȧŀş ŀőř⟧"
+      },
+      "welcome_body": {
+        "en": "Say what you want done. Kyberion shows how it understood you before acting, and anything that needs your decision appears on the left.",
+        "ja": "やりたいことを書いてください。Kyberion は動く前に理解した内容を示し、あなたの判断が必要なものは左側に表示されます。",
+        "qps-ploc": "⟦Şȧẏ ẇħȧŧ ẏőů ẇȧñŧ ḓőñė. Ķẏƀėřïőñ şħőẇş ħőẇ ïŧ ůñḓėřşŧőőḓ ẏőů ƀėƒőřė ȧƈŧïñɠ, ȧñḓ ȧñẏŧħïñɠ ŧħȧŧ ñėėḓş ẏőůř ḓėƈïşïőñ ȧṗṗėȧřş őñ ŧħė ŀėƒŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈ⟧"
+      },
+      "welcome_title": {
+        "en": "What should we work on?",
+        "ja": "何に取り組みましょうか?",
+        "qps-ploc": "⟦Ẇħȧŧ şħőůŀḓ ẇė ẇőřķ őñ? ŀőřėɱ ï⟧"
+      },
+      "who_you": {
+        "en": "you",
+        "ja": "あなた",
+        "qps-ploc": "⟦ẏőů ŀőř⟧"
+      },
+      "confirm_opens_approval": {
+        "en": "Next, the approval screen takes over the terminal to confirm it is you. The deck comes back afterwards.",
+        "ja": "この後、本人確認のため承認画面がターミナルを使います。終わるとこの画面に戻ります。",
+        "qps-ploc": "⟦Ñėẋŧ, ŧħė ȧṗṗřőṽȧŀ şƈřėėñ ŧȧķėş őṽėř ŧħė ŧėřɱïñȧŀ ŧő ƈőñƒïřɱ ïŧ ïş ẏőů. Ŧħė ḓėƈķ ƈőɱėş ƀȧƈķ ȧƒŧėřẇȧřḓş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧė⟧"
+      },
+      "hint_rail_decision": {
+        "en": "a approve · d deny · Space show card · g next decision · ? help",
+        "ja": "a 承認 · d 却下 · Space カード表示 · g 次の判断 · ? ヘルプ",
+        "qps-ploc": "⟦ȧ ȧṗṗřőṽė · ḓ ḓėñẏ · Şṗȧƈė şħőẇ ƈȧřḓ · ɠ ñėẋŧ ḓėƈïşïőñ · ? ħėŀṗ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "hint_rail_mission": {
+        "en": "Enter details · s note · p pause · j/k move · ? help",
+        "ja": "Enter 詳細 · s 指示 · p 一時停止 · j/k 移動 · ? ヘルプ",
+        "qps-ploc": "⟦Ėñŧėř ḓėŧȧïŀş · ş ñőŧė · ṗ ṗȧůşė · ĵ/ķ ɱőṽė · ? ħėŀṗ ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "hint_rail_agent": {
+        "en": "Space peek · Enter attach · s message · ! interrupt · ? help",
+        "ja": "Space のぞく · Enter 接続 · s メッセージ · ! 中断 · ? ヘルプ",
+        "qps-ploc": "⟦Şṗȧƈė ṗėėķ · Ėñŧėř ȧŧŧȧƈħ · ş ɱėşşȧɠė · ! ïñŧėřřůṗŧ · ? ħėŀṗ ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "hint_main_missions": {
+        "en": "s note · p pause · Tab move · ? help",
+        "ja": "s 指示 · p 一時停止 · Tab 移動 · ? ヘルプ",
+        "qps-ploc": "⟦ş ñőŧė · ṗ ṗȧůşė · Ŧȧƀ ɱőṽė · ? ħėŀṗ ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "hint_main_conversation": {
+        "en": "a approve · d deny (marked card) · i write · ? help",
+        "ja": "a 承認 · d 却下(▶ のカード) · i 入力 · ? ヘルプ",
+        "qps-ploc": "⟦ȧ ȧṗṗřőṽė · ḓ ḓėñẏ (ɱȧřķėḓ ƈȧřḓ) · ï ẇřïŧė · ? ħėŀṗ ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "toast_select_agent": {
+        "en": "Select an agent first (Tab to the agents area).",
+        "ja": "先にエージェントを選んでください(Tab でエージェントのエリアへ)。",
+        "qps-ploc": "⟦Şėŀėƈŧ ȧñ ȧɠėñŧ ƒïřşŧ (Ŧȧƀ ŧő ŧħė ȧɠėñŧş ȧřėȧ). ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "card_other": {
+        "en": "Older request — select it in the list to decide.",
+        "ja": "以前の依頼です。左の一覧で選ぶと判断できます。",
+        "qps-ploc": "⟦Őŀḓėř řėɋůėşŧ — şėŀėƈŧ ïŧ ïñ ŧħė ŀïşŧ ŧő ḓėƈïḓė. ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "help_legend": {
+        "en": "◆ needs decision  ◇ review  ■ cannot proceed  ⟳ running  ✓ done  ? needs input  · idle  ✗ failed  ○ planned",
+        "ja": "◆ 判断待ち  ◇ レビュー  ■ 進行できない  ⟳ 実行中  ✓ 完了  ? 入力待ち  · 待機  ✗ 失敗  ○ 予定",
+        "qps-ploc": "⟦◆ ñėėḓş ḓėƈïşïőñ  ◇ řėṽïėẇ  ■ ƈȧññőŧ ṗřőƈėėḓ  ⟳ řůññïñɠ  ✓ ḓőñė  ? ñėėḓş ïñṗůŧ  · ïḓŀė  ✗ ƒȧïŀėḓ  ○ ṗŀȧññėḓ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧ⟧"
+      },
+      "help_focus_marker": {
+        "en": "The focused area has a thick border.",
+        "ja": "操作対象のエリアは太い枠で表示されます。",
+        "qps-ploc": "⟦Ŧħė ƒőƈůşėḓ ȧřėȧ ħȧş ȧ ŧħïƈķ ƀőřḓėř. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "context_tier": {
+        "en": "Tier",
+        "ja": "階層",
+        "qps-ploc": "⟦Ŧïėř ŀőř⟧"
+      },
+      "context_tenant": {
+        "en": "Tenant",
+        "ja": "テナント",
+        "qps-ploc": "⟦Ŧėñȧñŧ ŀőř⟧"
+      },
+      "context_type": {
+        "en": "Type",
+        "ja": "種類",
+        "qps-ploc": "⟦Ŧẏṗė ŀőř⟧"
+      },
+      "context_owner": {
+        "en": "Owner",
+        "ja": "担当",
+        "qps-ploc": "⟦Őẇñėř ŀőř⟧"
+      },
+      "fail_ask": {
+        "en": "Kyberion could not answer — {reason}. Try again in a moment.",
+        "ja": "Kyberion が返答できませんでした — {reason}。少し待って再度送ってください。",
+        "qps-ploc": "⟦Ķẏƀėřïőñ ƈőůŀḓ ñőŧ ȧñşẇėř — {reason}. Ŧřẏ ȧɠȧïñ ïñ ȧ ɱőɱėñŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "fail_steer": {
+        "en": "The note was not queued — {reason}. Press r to refresh and try again.",
+        "ja": "指示をキューに入れられませんでした — {reason}。r で更新して再試行してください。",
+        "qps-ploc": "⟦Ŧħė ñőŧė ẇȧş ñőŧ ɋůėůėḓ — {reason}. Ṗřėşş ř ŧő řėƒřėşħ ȧñḓ ŧřẏ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
+      },
+      "fail_agent_send": {
+        "en": "The message did not reach the agent — {reason}. Check that herdr is running.",
+        "ja": "エージェントに届きませんでした — {reason}。herdr が動いているか確認してください。",
+        "qps-ploc": "⟦Ŧħė ɱėşşȧɠė ḓïḓ ñőŧ řėȧƈħ ŧħė ȧɠėñŧ — {reason}. Ƈħėƈķ ŧħȧŧ ħėřḓř ïş řůññïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+      },
+      "fail_interrupt": {
+        "en": "The agent was not interrupted — {reason}. Check that herdr is running.",
+        "ja": "エージェントを中断できませんでした — {reason}。herdr が動いているか確認してください。",
+        "qps-ploc": "⟦Ŧħė ȧɠėñŧ ẇȧş ñőŧ ïñŧėřřůṗŧėḓ — {reason}. Ƈħėƈķ ŧħȧŧ ħėřḓř ïş řůññïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "fail_mission": {
+        "en": "The mission command did not complete — {reason}. Press r to refresh and check the mission state.",
+        "ja": "ミッション操作が完了しませんでした — {reason}。r で更新して状態を確認してください。",
+        "qps-ploc": "⟦Ŧħė ɱïşşïőñ ƈőɱɱȧñḓ ḓïḓ ñőŧ ƈőɱṗŀėŧė — {reason}. Ṗřėşş ř ŧő řėƒřėşħ ȧñḓ ƈħėƈķ ŧħė ɱïşşïőñ şŧȧŧė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈ⟧"
+      },
+      "reason_unknown": {
+        "en": "no details were returned",
+        "ja": "詳細は返されませんでした",
+        "qps-ploc": "⟦ñő ḓėŧȧïŀş ẇėřė řėŧůřñėḓ ŀőřėɱ ï⟧"
+      },
+      "handoff_approval_done": {
+        "en": "Approval screen closed. The list is refreshing.",
+        "ja": "承認画面を閉じました。一覧を更新しています。",
+        "qps-ploc": "⟦Ȧṗṗřőṽȧŀ şƈřėėñ ƈŀőşėḓ. Ŧħė ŀïşŧ ïş řėƒřėşħïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "handoff_approval_failed": {
+        "en": "The approval screen ended without a decision. Select the item and press a or d to try again.",
+        "ja": "承認画面が判断なしで終了しました。項目を選んで a か d で再試行してください。",
+        "qps-ploc": "⟦Ŧħė ȧṗṗřőṽȧŀ şƈřėėñ ėñḓėḓ ẇïŧħőůŧ ȧ ḓėƈïşïőñ. Şėŀėƈŧ ŧħė ïŧėɱ ȧñḓ ṗřėşş ȧ őř ḓ ŧő ŧřẏ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñş⟧"
+      },
+      "handoff_attach_done": {
+        "en": "Detached. Back in the deck.",
+        "ja": "接続を終了しました。デッキに戻りました。",
+        "qps-ploc": "⟦Ḓėŧȧƈħėḓ. Ƀȧƈķ ïñ ŧħė ḓėƈķ. ŀőřėɱ ïṗ⟧"
+      },
+      "handoff_attach_failed": {
+        "en": "Could not attach to the agent. Start herdr with `herdr`, then press r.",
+        "ja": "エージェントに接続できませんでした。`herdr` で herdr を起動してから r を押してください。",
+        "qps-ploc": "⟦Ƈőůŀḓ ñőŧ ȧŧŧȧƈħ ŧő ŧħė ȧɠėñŧ. Şŧȧřŧ ħėřḓř ẇïŧħ `ħėřḓř`, ŧħėñ ṗřėşş ř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "degraded_header": {
+        "en": "⚠ {count} source(s) unavailable — r to retry",
+        "ja": "⚠ {count} 件の情報源を読めません — r で再試行",
+        "qps-ploc": "⟦⚠ {count} şőůřƈė(ş) ůñȧṽȧïŀȧƀŀė — ř ŧő řėŧřẏ ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "agents_hint_unavailable": {
+        "en": "Run `herdr` in another terminal to start it, then press r.",
+        "ja": "別のターミナルで `herdr` を起動してから r を押してください。",
+        "qps-ploc": "⟦Řůñ `ħėřḓř` ïñ ȧñőŧħėř ŧėřɱïñȧŀ ŧő şŧȧřŧ ïŧ, ŧħėñ ṗřėşş ř. ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
       }
     }
   }

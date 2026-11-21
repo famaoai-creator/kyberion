@@ -4460,6 +4460,19 @@
       "effect": "state_change"
     },
     {
+      "id": "script.deck",
+      "script": "deck",
+      "command": "deck default",
+      "noun": "deck",
+      "verb": "default",
+      "audience": "operator",
+      "description": "cli_cmd_script_deck",
+      "group": "operate",
+      "interactive": true,
+      "long_running": true,
+      "native_help": true
+    },
+    {
       "id": "script.tui",
       "script": "tui",
       "command": "tui default",

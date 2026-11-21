@@ -65,6 +65,7 @@ graph TD
   subgraph presence ["Presence surfaces"]
     presence_chronos_mirror_v2["@presence/chronos-mirror-v2"]
     presence_concierge["@presence/concierge"]
+    presence_mission_deck["@presence/mission-deck"]
     presence_operator_surface["@presence/operator-surface"]
     presence_terminal_bridge["@presence/terminal-bridge"]
     presence_terminal_hud["@presence/terminal-hud"]
@@ -152,6 +153,7 @@ graph TD
   presence_concierge --> agent_core
   presence_concierge --> agent_shared_ui
   presence_concierge --> agent_shared_vision
+  presence_mission_deck --> agent_core
   presence_operator_surface --> agent_core
   presence_operator_surface --> agent_shared_ui
   presence_terminal_hud --> agent_core
@@ -170,4 +172,5 @@ graph TD
   kyberion --> agent_shared_video
   kyberion --> agent_shared_vision
   kyberion --> agent_shared_voice
+  kyberion --> presence_mission_deck
   kyberion --> presence_terminal_hud
