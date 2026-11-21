@@ -17,6 +17,7 @@ describe('MCP workspace facade', () => {
       'kyberion.workspace.summary',
       'kyberion.workspace.list',
       'kyberion.workspace.get',
+      'kyberion.workspace.calendar',
       'kyberion.workspace.search',
       'kyberion.setup.checklist',
       'kyberion.needs-you.list',

@@ -21078,6 +21078,46 @@
         "ja": "ほか {count} 件",
         "qps-ploc": "⟦+{count} ɱőřė ŀőřė⟧"
       },
+      "ia_shell_work_cal_sources_label": {
+        "en": "Show",
+        "ja": "表示する予定",
+        "qps-ploc": "⟦Şħőẇ ŀőř⟧"
+      },
+      "ia_shell_work_cal_source_work_item": {
+        "en": "Work items",
+        "ja": "作業",
+        "qps-ploc": "⟦Ẇőřķ ïŧėɱş ŀőř⟧"
+      },
+      "ia_shell_work_cal_source_operation": {
+        "en": "Routine operations",
+        "ja": "定常業務",
+        "qps-ploc": "⟦Řőůŧïñė őṗėřȧŧïőñş ŀőřėɱ⟧"
+      },
+      "ia_shell_work_cal_source_action_item": {
+        "en": "Meeting actions",
+        "ja": "会議のアクション",
+        "qps-ploc": "⟦Ɱėėŧïñɠ ȧƈŧïőñş ŀőřė⟧"
+      },
+      "ia_shell_work_cal_run": {
+        "en": "Run",
+        "ja": "実行",
+        "qps-ploc": "⟦Řůñ ŀőř⟧"
+      },
+      "ia_shell_work_cal_deadline": {
+        "en": "Deadline",
+        "ja": "締切",
+        "qps-ploc": "⟦Ḓėȧḓŀïñė ŀőř⟧"
+      },
+      "ia_shell_work_cal_action": {
+        "en": "Action",
+        "ja": "アクション",
+        "qps-ploc": "⟦Ȧƈŧïőñ ŀőř⟧"
+      },
+      "ia_shell_work_cal_degraded": {
+        "en": "Some entries (routine operations or meeting actions) could not be loaded.",
+        "ja": "一部の予定(定常業務または会議のアクション)を読み込めませんでした。",
+        "qps-ploc": "⟦Şőɱė ėñŧřïėş (řőůŧïñė őṗėřȧŧïőñş őř ɱėėŧïñɠ ȧƈŧïőñş) ƈőůŀḓ ñőŧ ƀė ŀőȧḓėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+      },
       "ia_shell_work_cal_day_label": {
         "en": "{date}: {count} items",
         "ja": "{date}：{count} 件",
@@ -21099,19 +21139,14 @@
         "qps-ploc": "⟦{count} ḓůė ẇïŧħïñ 2 ḓȧẏş ŀőřėɱ ïṗ⟧"
       },
       "ia_shell_work_cal_empty": {
-        "en": "No work item has a date yet. Set a due date on a card in the Work items tab.",
-        "ja": "期日のある作業はまだありません。「作業」タブのカードで期日を設定できます。",
-        "qps-ploc": "⟦Ñő ẇőřķ ïŧėɱ ħȧş ȧ ḓȧŧė ẏėŧ. Şėŧ ȧ ḓůė ḓȧŧė őñ ȧ ƈȧřḓ ïñ ŧħė Ẇőřķ ïŧėɱş ŧȧƀ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+        "en": "Nothing is scheduled in this period. Set a due date on a card in the Work items tab.",
+        "ja": "この期間に予定はありません。作業の期日は「作業」タブのカードで設定できます。",
+        "qps-ploc": "⟦Ñőŧħïñɠ ïş şƈħėḓůŀėḓ ïñ ŧħïş ṗėřïőḓ. Şėŧ ȧ ḓůė ḓȧŧė őñ ȧ ƈȧřḓ ïñ ŧħė Ẇőřķ ïŧėɱş ŧȧƀ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
       },
       "ia_shell_work_cal_undated_hint": {
         "en": "Work items without a date appear only on the Work items board.",
         "ja": "期日のない作業は「作業」タブのボードにだけ表示されます。",
         "qps-ploc": "⟦Ẇőřķ ïŧėɱş ẇïŧħőůŧ ȧ ḓȧŧė ȧṗṗėȧř őñŀẏ őñ ŧħė Ẇőřķ ïŧėɱş ƀőȧřḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
-      },
-      "ia_shell_work_cal_truncated": {
-        "en": "Showing the {count} most recently updated dated work items; narrow the scope to see the rest.",
-        "ja": "期日のある作業のうち、更新が新しい {count} 件を表示しています。残りは範囲を絞ると表示されます。",
-        "qps-ploc": "⟦Şħőẇïñɠ ŧħė {count} ɱőşŧ řėƈėñŧŀẏ ůṗḓȧŧėḓ ḓȧŧėḓ ẇőřķ ïŧėɱş; ñȧřřőẇ ŧħė şƈőṗė ŧő şėė ŧħė řėşŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşė⟧"
       },
       "ia_work_requests_list_label": {
         "en": "Your requests",

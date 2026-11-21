@@ -3,6 +3,9 @@ import { dueState } from '../work-board/work-item-board';
 import {
   addMonths,
   buildCalendarGrid,
+  calendarGridRange,
+  fromCalendarEntries,
+  sourceGroup,
   localCalendarDate,
   shiftAnchor,
   startOfWeek,
@@ -114,5 +117,96 @@ describe('summarizeCalendar', () => {
     const summary = summarizeCalendar(items, TODAY);
     expect(summary.overdue.map((item) => item.id)).toEqual(['late', 'span']);
     expect(summary.dueSoon.map((item) => item.id)).toEqual(['today']);
+  });
+});
+
+describe('calendar API entries', () => {
+  it('reads each entry on its day, finished when done, linked where it is managed', () => {
+    const items = fromCalendarEntries(
+      [
+        {
+          source: 'operation_deadline',
+          id: 'operation_deadline:hq:close:2026-11-05',
+          title: 'Month-end close',
+          date: '2026-11-05',
+          done: false,
+          missed: true,
+          link: { kind: 'organization', id: 'hq' },
+        },
+        {
+          source: 'action_item',
+          id: 'action_item:MSN-1:ai-1',
+          title: 'Send the quote',
+          date: '2026-11-27',
+          done: true,
+          link: { kind: 'mission', id: 'MSN-1' },
+        },
+      ],
+      (link) => `/w/${link.kind}/${link.id}`
+    );
+    expect(items[0]).toMatchObject({
+      status: 'open',
+      dueDate: '2026-11-05',
+      missed: true,
+      href: '/w/organization/hq',
+    });
+    expect(items[1]).toMatchObject({ status: 'done', href: '/w/mission/MSN-1' });
+    // A missed deadline is overdue; a finished action item is not.
+    expect(summarizeCalendar(items, TODAY).overdue.map((item) => item.title)).toEqual([
+      'Month-end close',
+    ]);
+  });
+
+  it('groups operation runs and deadlines under one toggle', () => {
+    expect(sourceGroup('operation_run')).toBe('operation');
+    expect(sourceGroup('operation_deadline')).toBe('operation');
+    expect(sourceGroup('action_item')).toBe('action_item');
+    expect(sourceGroup(undefined)).toBe('work_item');
+  });
+
+  it('asks the API for exactly the days the grid shows (within the 92-day cap)', () => {
+    expect(calendarGridRange('month', TODAY)).toEqual({ from: '2026-10-26', to: '2026-12-06' });
+    expect(calendarGridRange('week', TODAY)).toEqual({ from: '2026-11-16', to: '2026-11-22' });
+  });
+});
+
+describe('calendar API entries: days', () => {
+  it('keeps a start-only work item as a start, not as due (and never overdue)', () => {
+    const items = fromCalendarEntries(
+      [
+        {
+          source: 'work_item',
+          id: 'work_item:acme:W1',
+          title: 'Kick off',
+          date: '2026-11-10',
+          startDate: '2026-11-10',
+          done: false,
+          link: { kind: 'work_item', id: 'W1' },
+        },
+      ],
+      () => undefined
+    );
+    expect(items[0]).toMatchObject({ startDate: '2026-11-10' });
+    expect(items[0]).not.toHaveProperty('dueDate');
+    expect(summarizeCalendar(items, TODAY).overdue).toEqual([]);
+  });
+
+  it('puts a timed action item on the viewer local day', () => {
+    const instant = new Date(2026, 11, 1, 8, 30).toISOString();
+    const [item] = fromCalendarEntries(
+      [
+        {
+          source: 'action_item',
+          id: 'action_item:acme:M:1',
+          title: 'Call back',
+          date: instant.slice(0, 10),
+          dueAt: instant,
+          done: false,
+          link: { kind: 'mission', id: 'M' },
+        },
+      ],
+      () => undefined
+    );
+    expect(item.dueDate).toBe('2026-12-01');
   });
 });
