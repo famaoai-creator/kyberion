@@ -308,6 +308,92 @@ export function createFactoryEnvelopeFromMandateBrief(input: {
   return { ok: true, envelope, mandate_id: mandate.id };
 }
 
+export interface AlignedBriefFactoryDeliveryConfig {
+  enabled?: boolean;
+  branch?: string;
+  mergeMode?: FactoryMergeMode;
+  maxCiRepairAttempts?: number;
+  allowedPaths?: string[];
+}
+
+export interface AlignedBriefEnvelopeInput {
+  mission_id: string;
+  tenant_slug?: string;
+  alignment_approval_ref: string;
+  brief: {
+    scope?: { in?: string[]; out?: string[] };
+    factoryDelivery?: AlignedBriefFactoryDeliveryConfig;
+  };
+  development_branch?: string;
+  now?: Date;
+}
+
+/** Build an immutable delivery envelope bound to an approved 1-shot alignment brief. */
+export function createFactoryEnvelopeFromAlignedBrief(
+  input: AlignedBriefEnvelopeInput
+): { ok: true; envelope: FactoryDeliveryEnvelope } | { ok: false; reasons: string[] } {
+  const config = input.brief.factoryDelivery;
+  if (config?.enabled !== true) {
+    return { ok: false, reasons: ['factoryDelivery is not enabled on the aligned brief'] };
+  }
+  const approvalRef =
+    typeof input.alignment_approval_ref === 'string' ? input.alignment_approval_ref.trim() : '';
+  if (!approvalRef) {
+    return {
+      ok: false,
+      reasons: ['alignment_approval_ref is required for alignment_brief envelope'],
+    };
+  }
+  const branchCandidate = config.branch ?? input.development_branch;
+  if (typeof branchCandidate !== 'string' || !branchCandidate.trim()) {
+    return {
+      ok: false,
+      reasons: ['factoryDelivery.branch is required for aligned brief envelope'],
+    };
+  }
+  let developmentBranch: string;
+  try {
+    developmentBranch = resolveMissionDevelopmentBranch(branchCandidate);
+  } catch (error) {
+    return { ok: false, reasons: [error instanceof Error ? error.message : String(error)] };
+  }
+
+  const rawAllowed = config.allowedPaths;
+  if (!Array.isArray(rawAllowed) || rawAllowed.length === 0) {
+    return {
+      ok: false,
+      reasons: ['factoryDelivery.allowedPaths must contain at least one path or glob'],
+    };
+  }
+
+  const scopeIn = (input.brief.scope?.in ?? []).filter(
+    (entry) => typeof entry === 'string' && entry.trim().length > 0
+  );
+  const scopeOut = (input.brief.scope?.out ?? []).filter(
+    (entry) => typeof entry === 'string' && entry.trim().length > 0
+  );
+  const mergeMode: FactoryMergeMode = config.mergeMode ?? 'veto_window';
+
+  try {
+    const envelope = createFactoryDeliveryEnvelope({
+      mission_id: input.mission_id,
+      tenant_slug: input.tenant_slug,
+      authority_kind: 'alignment_brief',
+      alignment_approval_ref: approvalRef,
+      development_branch: developmentBranch,
+      scope_in: scopeIn.length > 0 ? scopeIn : [...rawAllowed],
+      scope_out: scopeOut,
+      allowed_paths: [...rawAllowed],
+      max_ci_repair_attempts: config.maxCiRepairAttempts,
+      merge_mode: mergeMode,
+      issued_at: (input.now ?? new Date()).toISOString(),
+    });
+    return { ok: true, envelope };
+  } catch (error) {
+    return { ok: false, reasons: [error instanceof Error ? error.message : String(error)] };
+  }
+}
+
 export function evaluateDiffAgainstFactoryEnvelope(
   input: FactoryEnvelopeDiffCheckInput
 ): FactoryEnvelopeDiffCheckResult {
