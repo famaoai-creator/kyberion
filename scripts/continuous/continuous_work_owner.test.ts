@@ -14,6 +14,7 @@ import type { ContinuousOwnerProcessOptions } from './continuous_owner_process.j
 import type { AlignmentDecisionReport } from '../mission/mission_alignment_decision.js';
 import type { WorkItem } from '@agent/core/workforce/work-coordination-types';
 import { continuousDevelopmentAlignmentScope } from '@agent/core/organization/continuous-development-consent';
+import * as organizationModel from '@agent/core/organization/organization-operating-model';
 
 const managed = vi.hoisted(() => ({ run: vi.fn() }));
 vi.mock('./continuous_owner_process.js', () => ({ runContinuousOwnerProcess: managed.run }));
@@ -74,6 +75,7 @@ function harness(options: { present?: boolean; status?: string; gated?: boolean 
     ...projectInput,
     tier: scope.tier,
     organization_id: scope.organization_id,
+    status: 'active',
     metadata: { continuous_operation_key: projectInput.operation_key },
   };
   const state = () => ({
@@ -657,6 +659,22 @@ describe('continuous work production owner ports', () => {
       await expect(h.ports.ensureProject(input)).rejects.toThrow('identity mismatch');
     expect(h.exec).not.toHaveBeenCalled();
   });
+  it('verifies project recovery only for the approved fields and an attached project', () => {
+    const h = harness();
+    const organization = vi.spyOn(organizationModel, 'loadOrganizationOperationalState');
+    const result = (active_project_ids: string[]) =>
+      ({ active_project_ids }) as ReturnType<
+        typeof organizationModel.loadOrganizationOperationalState
+      >;
+    organization.mockReturnValue(result([projectInput.project_id]));
+    expect(h.ports.verifyCreatedProject?.(projectInput)).toBe(true);
+    expect(h.ports.verifyCreatedProject?.({ ...projectInput, objective_ids: ['other'] })).toBe(
+      false
+    );
+    organization.mockReturnValue(result([]));
+    expect(h.ports.verifyCreatedProject?.(projectInput)).toBe(false);
+    expect(h.exec).not.toHaveBeenCalled();
+  });
   it('creates projects through the controller with scope and origin metadata', async () => {
     const h = harness();
     h.setProjectPresent(false);
@@ -682,6 +700,20 @@ describe('continuous work production owner ports', () => {
       ])
     );
     expect(child.env.KYBERION_ORGANIZATION_ID).toBe(scope.organization_id);
+  });
+  it('retains a classified project failure without recording child stderr', async () => {
+    const h = harness();
+    h.setProjectPresent(false);
+    h.exec.mockResolvedValueOnce({
+      stdout: '',
+      stderr: "[project] Unknown objective(s) for organization 'private-org': private-objective.",
+      status: 1,
+    });
+    const result = h.ports.ensureProject(projectInput);
+    await expect(result).rejects.toThrow(
+      'project references an unregistered organization objective'
+    );
+    await expect(result).rejects.not.toThrow('private-objective');
   });
   it('creates a scoped mission, durable origin and hash-bound approval brief; changed replay is rejected', async () => {
     const h = harness({ present: false });

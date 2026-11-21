@@ -2967,6 +2967,24 @@ they must not obtain success by weakening production admission checks.
 
 ## Continuous organization work and extension registration
 
+**Compare the admitted WorkItem in its persisted form.** Apply the same context
+normalization used at creation to the expected admission context. Compare it
+against the stored context and compare metadata exactly. Organization-scoped
+work may carry the storage default project even when the charter has no project.
+Gate: `libs/core/organization/continuous-work-owner-state.test.ts`.
+
+**Validate organizational objective links before claiming a new project effect.**
+Use the managed project validator before recording effect intent so a missing
+objective can be registered before a later sweep. The project controller still
+validates links at creation. Preserve checkpoints for uncertain effects.
+Gate: `libs/core/organization/continuous-work-owner.test.ts`.
+
+**Require a committed project before advancing an uncertain project creation.**
+An eligible WorkItem with current admission may advance when the persisted
+project matches the exact creation operation, approved fields and organization
+membership. Keep the checkpoint when a project is missing or mismatched. A
+quarantined WorkItem still requires the normal operator intervention.
+
 **Bounded rework must end in an explicit intervention state.** When independent
 review exhausts its rework allowance (or the counter is invalid), block the exact
 typed-scope WorkItem with its review reason and recovery action. Return `blocked`

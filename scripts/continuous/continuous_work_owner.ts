@@ -11,6 +11,7 @@ import { isSupersedeProvenForGate } from '@agent/core/mission/mission-task-super
 import { loadState } from '@agent/core/mission/mission-state';
 import { DISTILL_MEMORY_OUTBOX_FILE } from '@agent/core/mission/mission-distill';
 import { loadProjectRecord } from '@agent/core/project/project-registry';
+import { loadOrganizationOperationalState } from '@agent/core/organization/organization-operating-model';
 import { advanceMissionDevelopment } from '@agent/core/mission/mission-development-continuation';
 import { verifyMissionDevelopmentPublication } from '@agent/core/mission/mission-development-proof';
 import { installMissionDevelopmentProofVerifier } from '@agent/core/mission/mission-development-gates';
@@ -142,7 +143,15 @@ export function createContinuousOwnerPorts(
       )
     )
       return false;
-    if (result.status !== 0 || result.error)
+    if (result.status !== 0 || result.error) {
+      const diagnostic =
+        script === 'project_controller.js' &&
+        args[0] === 'create' &&
+        result.status === 1 &&
+        !result.error &&
+        /^\[project\] Unknown objective\(s\) for organization /m.test(result.stderr)
+          ? '; cause: project references an unregistered organization objective'
+          : '';
       throw new Error(
         'Governed controller failed or timed out; verify effects before recovery: ' +
           script +
@@ -150,8 +159,10 @@ export function createContinuousOwnerPorts(
           args[0] +
           ' (exit ' +
           String(result.status) +
-          ')'
+          ')' +
+          diagnostic
       );
+    }
     return true;
   };
   const readMarker = (dir: string, operationKey: string) => {
@@ -797,6 +808,31 @@ export function createContinuousOwnerPorts(
     },
   };
   return {
+    verifyCreatedProject(input) {
+      const { scope } = input;
+      const record = (deps.project ?? loadProjectRecord)(input.project_id, { rootDir: root });
+      if (
+        !record ||
+        record.project_id !== input.project_id ||
+        record.tier !== scope.tier ||
+        record.tenant_slug !== scope.tenant_slug ||
+        record.organization_id !== scope.organization_id ||
+        record.name !== input.name ||
+        record.summary !== input.summary ||
+        record.status !== 'active' ||
+        record.metadata?.continuous_operation_key !== input.operation_key ||
+        JSON.stringify([...(record.objective_ids ?? [])].sort()) !==
+          JSON.stringify([...new Set(input.objective_ids ?? [])].sort())
+      )
+        return false;
+      return (
+        loadOrganizationOperationalState(scope.organization_id, {
+          tier: scope.tier,
+          tenantSlug: scope.tenant_slug,
+          rootDir: root,
+        })?.active_project_ids?.includes(input.project_id) === true
+      );
+    },
     ensureProject: (input) =>
       withExecutionContextAsync(
         'mission_controller',
@@ -833,7 +869,7 @@ export function createContinuousOwnerPorts(
 }
 export async function runContinuousManagedOwner(
   charter: DotCharter,
-  options: { now?: Date; rootDir?: string } = {}
+  options: { now?: Date; rootDir?: string; itemId?: string } = {}
 ) {
   if (
     !charter.scope.organization_id ||

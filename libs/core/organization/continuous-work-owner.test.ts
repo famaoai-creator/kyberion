@@ -7,6 +7,7 @@ import * as path from 'node:path';
 import { safeMkdir, safeWriteFile, safeRmSync } from '../secure-io.js';
 import type { DotCharter } from '../dot/dot-charter.js';
 import type { WorkItem } from '../workforce/work-coordination-types.js';
+import * as projectObjectives from '../project/project-objective-links.js';
 import { CONTINUOUS_MANAGED_WORK_PIPELINE } from './continuous-work-plan.js';
 import {
   runContinuousWorkOwner,
@@ -36,14 +37,18 @@ const charter = {
     max_concurrent_delegations: 2,
   },
 } as DotCharter;
-function fixture(kind = 'mission') {
+function fixture(kind = 'mission', boundCharter = charter) {
   let item = {
     item_id: 'WI-ONE',
     title: 'Managed',
     status: 'ready',
     version: 1,
     created_at: '2026-10-18T00:00:00Z',
-    context: { tenant_slug: 'acme', organization_id: 'org', project_id: 'PRJ-EXISTING' },
+    context: {
+      tenant_slug: 'acme',
+      organization_id: 'org',
+      project_id: boundCharter.scope.project_id ?? 'default',
+    },
     metadata: {
       dot_id: 'operator',
       action_ref: 'action-1',
@@ -70,7 +75,7 @@ function fixture(kind = 'mission') {
     })),
   };
   const deps: ContinuousWorkOwnerDeps = {
-    currentCharter: () => charter,
+    currentCharter: () => boundCharter,
     authorize: () => undefined,
     authorizeItem: () => undefined,
     halted: () => false,
@@ -107,10 +112,43 @@ function fixture(kind = 'mission') {
     deps,
     files,
     item: () => item,
-    run: () => runContinuousWorkOwner(charter, ports, { rootDir: pathResolver.rootDir() }, deps),
+    run: () =>
+      runContinuousWorkOwner(boundCharter, ports, { rootDir: pathResolver.rootDir() }, deps),
   };
 }
 describe('continuous managed owner', () => {
+  it('waits for a missing objective before claiming work or recording project intent', async () => {
+    const h = fixture('project');
+    const plan = h.item().metadata!.continuous_work as { project: { objective_ids?: string[] } };
+    plan.project.objective_ids = ['verify-loop'];
+    const validate = vi
+      .spyOn(projectObjectives, 'assertProjectObjectiveLinks')
+      .mockImplementationOnce(() => {
+        throw new Error('Unknown objective: verify-loop');
+      })
+      .mockImplementation(() => undefined);
+    try {
+      expect(await h.run()).toEqual([
+        expect.objectContaining({ status: 'blocked', reason: 'Unknown objective: verify-loop' }),
+      ]);
+      expect(h.deps.claim).not.toHaveBeenCalled();
+      expect(h.ports.ensureProject).not.toHaveBeenCalled();
+      expect(h.files.size).toBe(0);
+      expect(await h.run()).toEqual([expect.objectContaining({ status: 'pending_approval' })]);
+      expect(h.ports.ensureProject).toHaveBeenCalledOnce();
+    } finally {
+      validate.mockRestore();
+    }
+  });
+  it('advances an organization-scoped project plan with the stored default project context', async () => {
+    const h = fixture('project', {
+      ...charter,
+      scope: { ...charter.scope, project_id: undefined },
+    });
+    expect(await h.run()).toEqual([expect.objectContaining({ status: 'pending_approval' })]);
+    expect(h.ports.ensureProject).toHaveBeenCalledOnce();
+    expect(h.ports.advanceMission).toHaveBeenCalledOnce();
+  });
   it('threads only the admitted development descriptor to creation and each owner advancement', async () => {
     const h = fixture();
     const development = {
@@ -254,6 +292,40 @@ describe('continuous managed owner', () => {
     );
     expect(f.ports.ensureMission).toHaveBeenCalledTimes(1);
     expect(f.ports.advanceMission).not.toHaveBeenCalled();
+  });
+  it('continues an interrupted project creation only when its committed effect is verified', async () => {
+    const f = fixture('project');
+    vi.mocked(f.ports.ensureProject).mockRejectedValue(new Error('lost controller result'));
+    expect((await f.run())[0]?.status).toBe('blocked');
+    const verify = vi.fn(() => false);
+    f.ports.verifyCreatedProject = verify;
+    Object.assign(f.item(), { status: 'ready' });
+    expect((await f.run())[0]?.status).toBe('blocked');
+    expect(f.ports.ensureMission).not.toHaveBeenCalled();
+    verify.mockReturnValue(true);
+    expect((await f.run())[0]?.status).toBe('pending_approval');
+    expect(verify).toHaveBeenLastCalledWith(
+      expect.objectContaining({ operation_key: 'action-1:project' })
+    );
+    expect(f.ports.ensureProject).toHaveBeenCalledOnce();
+    expect(f.ports.ensureMission).toHaveBeenCalledOnce();
+  });
+  it('advances one organization-scoped item across approval, execution and completion ticks', async () => {
+    const f = fixture('project', {
+      ...charter,
+      scope: { ...charter.scope, project_id: undefined },
+    });
+    vi.mocked(f.ports.advanceMission)
+      .mockResolvedValueOnce({ status: 'pending_approval', evidence_refs: [] })
+      .mockResolvedValueOnce({ status: 'running', evidence_refs: [] })
+      .mockResolvedValueOnce({ status: 'completed', evidence_refs: ['verified:result'] });
+    const rows = [(await f.run())[0], (await f.run())[0], (await f.run())[0]];
+    expect(rows.map((row) => row?.status)).toEqual(['pending_approval', 'running', 'completed']);
+    expect(new Set(rows.map((row) => row?.work_item_id))).toEqual(new Set(['WI-ONE']));
+    expect(f.ports.ensureProject).toHaveBeenCalledOnce();
+    expect(f.ports.ensureMission).toHaveBeenCalledOnce();
+    expect(await f.run()).toEqual([]);
+    expect(f.ports.advanceMission).toHaveBeenCalledTimes(3);
   });
   it('refuses checkpoint plan tampering and lapsed leases before effects', async () => {
     const f = fixture();

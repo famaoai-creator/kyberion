@@ -22,6 +22,7 @@ import {
   updateWorkItem,
 } from '../workforce/work-coordination.js';
 import type { WorkItem } from '../workforce/work-coordination-types.js';
+import { normalizeWorkItemContext } from '../workforce/work-coordination-identity.js';
 import { assertScopedCadenceExecution } from './organization-cadence.js';
 import {
   parseContinuousWorkPlan,
@@ -83,6 +84,9 @@ export interface ContinuousMissionProgress {
   reason?: string;
 }
 export interface ContinuousWorkOwnerPorts {
+  verifyCreatedProject?(
+    input: Omit<EnsureContinuousProjectInput, 'assertCurrent' | 'signal'>
+  ): boolean;
   ensureProject(input: EnsureContinuousProjectInput): Promise<{ project_id: string }>;
   ensureMission(input: EnsureContinuousMissionInput): Promise<{ mission_id: string }>;
   /** Must observe terminal states first, validate approval, and never retry uncertain dispatch. */
@@ -112,6 +116,7 @@ export interface ContinuousWorkOwnerRow {
   reason?: string;
 }
 export interface ContinuousWorkOwnerOptions {
+  itemId?: string;
   rootDir?: string;
   now?: Date;
   limit?: number;
@@ -194,9 +199,10 @@ export function authorizeItem(
   )
     throw new Error('Managed admission binding changed');
   const expected = dotWorkItemInput(charter, record, rootDir);
+  const expectedContext = normalizeWorkItemContext(expected.context ?? {}, expected.projectId);
   if (
     digest(expected.metadata) !== digest(item.metadata) ||
-    digest(expected.context) !== digest(item.context)
+    digest(expectedContext) !== digest(item.context)
   )
     throw new Error('Managed WorkItem differs from its immutable admitted envelope');
   if (!currentApproval) return;
@@ -363,7 +369,7 @@ export function readContinuousWorkOwnerProgress(
     item.metadata?.dot_id !== charter.dot_id ||
     (item.context?.tenant_slug ?? '') !== (charter.scope.tenant_slug ?? '') ||
     item.context?.organization_id !== charter.scope.organization_id ||
-    (item.context?.project_id ?? '') !== (charter.scope.project_id ?? '')
+    item.context?.project_id !== normalizeWorkItemContext(charter.scope).project_id
   )
     throw new Error('Managed progress requires exact item scope');
   if (deps.authorizeItem) deps.authorizeItem(charter, item, rootDir);

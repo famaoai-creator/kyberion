@@ -10,6 +10,8 @@ import { dotBudgetHardThrottled } from '../dot/dot-budget.js';
 import { dotDailyTokenCapReached } from '../dot/dot-runtime.js';
 import { findDotCharter, resolveDotDelegationLimit, type DotCharter } from '../dot/dot-charter.js';
 import { withExecutionContext } from '../authority.js';
+import { assertProjectObjectiveLinks } from '../project/project-objective-links.js';
+import { normalizeWorkItemContext } from '../workforce/work-coordination-identity.js';
 import {
   getWorkItem,
   listWorkItems,
@@ -45,6 +47,7 @@ export async function runContinuousWorkOwner(
   deps: ContinuousWorkOwnerDeps = {}
 ): Promise<ContinuousWorkOwnerRow[]> {
   (deps.authorize ?? authorize)(charter);
+  const expectedScope = normalizeWorkItemContext(charter.scope);
   const rootDir = options.rootDir ?? pathResolver.rootDir();
   // The halt API's historical rootDir option is an exact flag-file override.
   const halted =
@@ -102,6 +105,7 @@ export async function runContinuousWorkOwner(
   )()
     .filter(
       (item) =>
+        (!options.itemId || item.item_id === options.itemId) &&
         item.metadata?.continuous_work &&
         item.metadata.dot_id === charter.dot_id &&
         item.metadata.pipeline_ref === CONTINUOUS_MANAGED_WORK_PIPELINE &&
@@ -140,13 +144,12 @@ export async function runContinuousWorkOwner(
             !item.metadata.approval_request_id
           )
             throw new Error('Managed owner requires an admitted human-approved action');
-          if ((item.context?.project_id ?? '') !== (charter.scope.project_id ?? ''))
+          if (item.context?.project_id !== expectedScope.project_id)
             throw new Error('Managed owner project context mismatch');
           const checkpoint = continuousWorkCheckpoint(charter, actionRef, plan, rootDir);
           const { ids, identity } = checkpoint;
-          statePath = checkpoint.statePath;
-          const stored = read(statePath);
-          state =
+          const stored = read(checkpoint.statePath);
+          const checkpointState: OwnerState =
             stored === undefined
               ? {
                   version: 1,
@@ -167,11 +170,40 @@ export async function runContinuousWorkOwner(
                   step: 0,
                 }
               : validateState(stored, identity, ids);
-          if (state.intent || state.error)
-            throw new Error(
-              state.error ??
-                `Uncertain owner operation '${state.intent}'; verify effects before resuming`
+          if (
+            !checkpointState.project_created &&
+            !checkpointState.intent &&
+            !checkpointState.error &&
+            plan.project?.objective_ids?.length
+          ) {
+            assertProjectObjectiveLinks(
+              { ...scope, project_id: ids.project_id, objective_ids: plan.project.objective_ids },
+              rootDir
             );
+          }
+          statePath = checkpoint.statePath;
+          state = checkpointState;
+          let projectRecovered = false;
+          if (state.intent || state.error) {
+            if (
+              state.intent === 'ensure-project' &&
+              !state.project_created &&
+              plan.project &&
+              ports.verifyCreatedProject?.({
+                ...plan.project,
+                project_id: ids.project_id,
+                scope,
+                operation_key: `${actionRef}:project`,
+              })
+            ) {
+              projectRecovered = true;
+            } else {
+              throw new Error(
+                state.error ??
+                  `Uncertain owner operation '${state.intent}'; verify effects before resuming`
+              );
+            }
+          }
           const ttlMs = options.leaseTtlMs ?? 3_600_000;
           if (item.status === 'in_progress') {
             if (!item.lease_id || item.claimed_by_peer_id !== actor)
@@ -192,6 +224,15 @@ export async function runContinuousWorkOwner(
               idempotencyKey: `continuous-owner:${actionRef}`,
               requireNewLease: true,
             }).lease.lease_id;
+          }
+          if (projectRecovered) {
+            state = {
+              ...state,
+              project_created: true,
+              step: state.step + 1,
+              intent: undefined,
+              error: undefined,
+            };
           }
           write(statePath, state);
           if (state.completed) {
@@ -401,11 +442,7 @@ export async function runContinuousWorkOwner(
               latest.context?.organization_id,
               latest.context?.project_id ?? '',
             ]) ===
-              digest([
-                scope.tenant_slug ?? '',
-                scope.organization_id,
-                charter.scope.project_id ?? '',
-              ])
+              digest([scope.tenant_slug ?? '', scope.organization_id, expectedScope.project_id])
           ) {
             try {
               // Deliberately omit effectDisposition: the unresolved effect hold survives quarantine.
