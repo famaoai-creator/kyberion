@@ -575,7 +575,17 @@
         "libs/core/surface/surface-delivery.ts",
         "libs/core/workforce/artifact-record.ts"
       ],
-      "not_to_confuse_with": ["artifact", "result"]
+      "not_to_confuse_with": ["artifact", "result", "factory-delivery-envelope"]
+    },
+    {
+      "id": "factory-delivery-envelope",
+      "term": "Factory Delivery Envelope",
+      "category": "governance",
+      "definition": "A signed record binding a factory mission's delivery authority — a standing mandate or an approved alignment brief — to its path scope, merge mode and CI repair bounds; the factory merge gate evaluates it before any automated merge.",
+      "glossary_anchor": "factory-delivery-envelope",
+      "canonical_doc": "knowledge/product/architecture/continuous-operations-loop.md",
+      "owner_modules": ["libs/core/governance/factory-delivery-envelope.ts"],
+      "not_to_confuse_with": ["delivery", "grant"]
     },
     {
       "id": "result",

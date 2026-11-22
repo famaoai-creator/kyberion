@@ -304,7 +304,19 @@ A structured unit of delegated work inside a mission. Task contracts define obje
 
 ### Semantic Brief
 
-A content and intent brief for a visual or other designed artifact. It states meaning, audience, and constraints while leaving presentation choices to the governed design layer.
+A content and intent brief for a visual or other designed artifact. It states meaning, audience, and constraints while leaving presentation choices to the governed design layer. Not to be confused with a [Mission Brief](#mission-brief) (mission admission) or a discussion-room decision brief.
+
+### Mission Brief
+
+A structured admission brief for a mission (`mission-brief.json`, schema `knowledge/product/schemas/mission-brief.schema.json`) that the mission alignment gate evaluates before admission. An **Alignment Brief** is the same artifact once its alignment approval is recorded, and a [Factory Delivery Envelope](#factory-delivery-envelope) may bind to it as its delivery authority. Not to be confused with a [Semantic Brief](#semantic-brief) or a discussion-room decision brief.
+
+### Factory Delivery Envelope
+
+The signed record (SHA-256 over the payload hash) that binds a factory mission's delivery authority — a `standing_mandate` id from `standing-mandates.json` or an approved `alignment_brief` — to its path scope (`allowed_paths`, `scope_out`), merge mode (`auto_low_risk` / `veto_window` / `human_only`) and CI repair bounds. `libs/core/governance/factory-delivery-envelope.ts` issues it and the factory merge gate evaluates it before any automated merge. Not to be confused with [Delivery](#delivery) — transport of an artifact to a destination — nor with a charter's authority envelope.
+
+### Workspace Calendar
+
+The `workspace.calendar` surface op (`libs/core/surface/workspace-calendar.ts`): dated WorkItems, organization operation runs/deadlines and meeting action items projected through the viewer-filtered workspace graph. The Concierge component lives under `work-calendar/` (`WorkCalendar.tsx`) — the shorter directory name refers to the same feature.
 
 ### Existing Work Reconciliation
 

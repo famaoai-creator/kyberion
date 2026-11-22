@@ -2,13 +2,27 @@
 title: 'Continuous Operations Loop'
 tags: [architecture, organization, autonomy, continuous-operations]
 last_updated: 2026-11-22
+concepts:
+  [
+    organization-work-loop,
+    mission,
+    work-item,
+    pipeline,
+    dot,
+    delivery,
+    factory-delivery-envelope,
+    outcome,
+    evidence,
+    organization,
+    tenant,
+  ]
 ---
 
 # 継続運営ループ
 
 ## 目的と計画
 
-データを定期観測し、目標との差から仕事を棚卸しし、権限と予算の範囲で分配・実行・再観測する。ループは長寿命、仕事は有限とする。仕事を作らない周期も正常。
+このループは [Organization Work Loop](organization-work-loop.md)（親モデル）の常駐運用プロジェクションであり、独立した状態機械ではない。データを定期観測し、目標との差から仕事を棚卸しし、権限と予算の範囲で分配・実行・再観測する。ループは長寿命、仕事は有限とする。仕事を作らない周期も正常。
 
 | 段階       | 実装                                          | 受入条件                                                       |
 | ---------- | --------------------------------------------- | -------------------------------------------------------------- |
