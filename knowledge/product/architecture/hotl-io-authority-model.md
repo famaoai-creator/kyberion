@@ -45,7 +45,11 @@ the admission decision (signed charter vs. per-action prompt).
 
 Three layers must agree for a grant to apply:
 
-1. **Call site** passes `delegable: true` (all external-op call sites do).
+1. **Call site** derives `delegable` from the registry via
+   `isDelegableExternalOperation(<operationId>)` — never a bare literal; the
+   `delegable-flag-literal` contract test scans `libs/`+`scripts/` and only
+   tolerates context-forced literals listed with reasons in its
+   `DELEGABLE_LITERAL_ALLOWLIST`.
 2. **Registry** (`foundation/authorization-registry.ts` `delegable` spec)
    declares the grant fields + reputational class — `isDelegableExternalOperation`
    reads only this.
@@ -103,9 +107,12 @@ duties still apply at execution, and scoped-off effects fall back to HITL.
 - **Unscoped effects**: a `network:fetch` to http/credentialed URLs, an
   `a2a_send` envelope with no recipient identity, a `meeting:join` with no
   meeting/series id — `buildTarget` returns `undefined` → per-action approval.
-- **Opaque routes**: `service:*` API/HARNESS mode and MCP mode stay
-  `delegable: false` at the call site — provider ops become delegable by
-  adding a registry spec + a reviewed `buildTarget` entry (see slack preset).
+- **Opaque routes**: `service:*` API/HARNESS mode and MCP mode resolve
+  `delegable: false` from the same registry derivation — provider ops become
+  delegable by adding a registry spec + a reviewed `buildTarget` entry (see
+  slack preset). Sites whose effects genuinely cannot be classified at flag
+  construction stay literal under the contract-test allowlist (email custom
+  adapters, generic service effects).
 - **Policy-driven risk / charter eligibility**: what counts as risky is
   governed data, not a fixed code list. `approval-policy.json` rules carry an
   optional `charter_eligible`; `resolveApprovalPolicy` derives

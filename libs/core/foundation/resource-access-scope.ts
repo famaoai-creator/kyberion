@@ -50,6 +50,58 @@ export interface ResourceAccessScope {
 const RESOURCE_ACCESS_OPERATIONS = ['read', 'write', 'append', 'mkdir', 'metadata'] as const;
 export type ResourceAccessOperation = (typeof RESOURCE_ACCESS_OPERATIONS)[number];
 
+/**
+ * Derived operation classes — the only places membership lists may live.
+ * `mkdir` mutates the tree but writes no content, so content rules test
+ * CONTENT_MUTATING while placement rules test MUTATING.
+ */
+const CONTENT_MUTATING_RESOURCE_ACCESS_OPERATIONS = ['write', 'append'] as const;
+export type ContentMutatingResourceAccessOperation =
+  (typeof CONTENT_MUTATING_RESOURCE_ACCESS_OPERATIONS)[number];
+const MUTATING_RESOURCE_ACCESS_OPERATIONS = ['write', 'append', 'mkdir'] as const;
+export type MutatingResourceAccessOperation = (typeof MUTATING_RESOURCE_ACCESS_OPERATIONS)[number];
+const READ_LIKE_RESOURCE_ACCESS_OPERATIONS = ['read', 'metadata'] as const;
+export type ReadLikeResourceAccessOperation = (typeof READ_LIKE_RESOURCE_ACCESS_OPERATIONS)[number];
+
+export function isContentMutatingResourceAccessOperation(
+  operation: ResourceAccessOperation | undefined
+): operation is ContentMutatingResourceAccessOperation {
+  return (
+    operation !== undefined &&
+    (CONTENT_MUTATING_RESOURCE_ACCESS_OPERATIONS as readonly string[]).includes(operation)
+  );
+}
+
+export function isMutatingResourceAccessOperation(
+  operation: ResourceAccessOperation | undefined
+): operation is MutatingResourceAccessOperation {
+  return (
+    operation !== undefined &&
+    (MUTATING_RESOURCE_ACCESS_OPERATIONS as readonly string[]).includes(operation)
+  );
+}
+
+export function isReadLikeResourceAccessOperation(
+  operation: ResourceAccessOperation | undefined
+): operation is ReadLikeResourceAccessOperation {
+  return (
+    operation !== undefined &&
+    (READ_LIKE_RESOURCE_ACCESS_OPERATIONS as readonly string[]).includes(operation)
+  );
+}
+
+/**
+ * `metadata` may inspect an ancestor of the store root — the only operation
+ * allowed outside `root/` when `root` itself lives under `target`.
+ */
+export function isMetadataAncestorAccess(
+  operation: ResourceAccessOperation,
+  root: string,
+  target: string
+): boolean {
+  return operation === 'metadata' && root.startsWith(target + '/');
+}
+
 export type ResourceAccessDecision =
   | { readonly allowed: true }
   | {

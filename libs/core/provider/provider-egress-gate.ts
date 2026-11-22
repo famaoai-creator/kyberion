@@ -53,6 +53,7 @@ import {
   CustodyOwnerConflictError,
   custodyOwnerLabel,
   deriveCustodyOwner,
+  isPersonCustody,
   type CustodyOwner,
 } from '../contracts/custody-owner.js';
 import {
@@ -571,7 +572,7 @@ export function custodyAttestationRequestCommand(custody: CustodyOwner, provider
 /** How a denial names the custody owner (tenant wording kept from before P1). */
 function custodySubject(custody: CustodyOwner): string {
   if (custody.kind === 'tenant') return `tenant '${custody.tenant_slug}'`;
-  if (custody.kind === 'person') return `person custody (${custodyOwnerLabel(custody)})`;
+  if (isPersonCustody(custody)) return `person custody (${custodyOwnerLabel(custody)})`;
   return 'the installation (system custody)';
 }
 

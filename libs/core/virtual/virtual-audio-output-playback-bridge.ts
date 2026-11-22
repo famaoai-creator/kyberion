@@ -18,6 +18,7 @@ import {
   assertExternalOperationBatchResumable,
 } from '../governance/external-operation.js';
 import { withExternalOperationOccurrence } from '../governance/external-operation-occurrence.js';
+import { isDelegableExternalOperation } from '../governance/external-operation-target.js';
 import { createHash } from 'node:crypto';
 import {
   createVirtualDeviceInventoryBridge,
@@ -363,7 +364,7 @@ export class VirtualAudioOutputPlaybackBridgeImpl implements VirtualAudioOutputP
                 },
               },
               requiresApproval: true,
-              delegable: true,
+              delegable: isDelegableExternalOperation('voice:playback'),
             },
             async () => {
               if (

@@ -22,6 +22,7 @@ import { resolveVoicePath } from './voice-path-policy.js';
 import { clamp } from '@agent/core/foundation/text';
 import { getRegisteredEnvText } from '@agent/core/foundation/env';
 import { runExternalOperation } from '@agent/core/governance/external-operation';
+import { isDelegableExternalOperation } from '@agent/core/governance/external-operation-target';
 
 export interface RecordVoiceSampleRequest {
   action: 'record_voice_sample';
@@ -268,7 +269,7 @@ export async function recordVoiceSample(
           },
         },
         requiresApproval: true,
-        delegable: true,
+        delegable: isDelegableExternalOperation('voice:record_sample'),
       },
       async () => {
         await prepareRecording(promptText, countdownSec, promptDisplayHoldMs);
@@ -401,7 +402,7 @@ export async function recordVoiceSample(
         },
       },
       requiresApproval: true,
-      delegable: false,
+      delegable: isDelegableExternalOperation('voice:record_sample'),
     },
     async () => {
       safeExecShellScript(shell, command, {

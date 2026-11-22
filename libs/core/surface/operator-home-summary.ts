@@ -26,6 +26,9 @@ import { nowIso } from '../foundation/time.js';
 import {
   admitsCustody,
   custodyOfScope,
+  isPersonRecordCustody,
+  isSystemRecordCustody,
+  isTenantRecordCustody,
   viewerPersonIds,
   type ViewerRecordCustody,
 } from './surface-authorization.js';
@@ -233,7 +236,8 @@ function scopeAdmitsCustody(
   custody: ViewerRecordCustody,
   legacyTenant?: string
 ): boolean {
-  if (custody.kind === 'system' && Array.isArray(scope?.tenantSlugs) && legacyTenant) return false;
+  if (isSystemRecordCustody(custody) && Array.isArray(scope?.tenantSlugs) && legacyTenant)
+    return false;
   return admitsCustody(
     {
       tenantSlugs: scope?.tenantSlugs ?? 'all',
@@ -691,9 +695,9 @@ export function collectOperatorHomeSummary(
     // records — person custody is identity-bound, not scope-bound.
     if (!input.scope || !isScoped)
       return (
-        custody.kind === 'system' ||
-        custody.kind === 'tenant' ||
-        (custody.kind === 'person' &&
+        isSystemRecordCustody(custody) ||
+        isTenantRecordCustody(custody) ||
+        (isPersonRecordCustody(custody) &&
           viewerPersonIds({ personIds: input.scope?.personIds }).includes(custody.ref))
       );
     const missionId =
@@ -714,7 +718,7 @@ export function collectOperatorHomeSummary(
       scope?.tenant_slug ||
       scope?.organization_id ||
       scope?.project_id ||
-      custody.kind === 'person'
+      isPersonRecordCustody(custody)
     ) {
       if (Array.isArray(input.scope.tiers) && !scopeAllows(input.scope.tiers, tier)) {
         // An explicit scope cannot be rescued by a visible mission label.
@@ -729,8 +733,8 @@ export function collectOperatorHomeSummary(
             !legacyTenant &&
             // Defense in depth: a row that names its owner is person-custody
             // even inside the owner-authenticated snapshot.
-            (custody.kind === 'system' ||
-              (custody.kind === 'person' &&
+            (isSystemRecordCustody(custody) ||
+              (isPersonRecordCustody(custody) &&
                 viewerPersonIds({ personIds: input.scope.personIds }).includes(custody.ref))))) &&
         scopeAllows(input.scope.organizationIds, organizationId) &&
         scopeAllows(input.scope.projectIds, projectId)

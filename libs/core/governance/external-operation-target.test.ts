@@ -1413,3 +1413,36 @@ describe('bare operation grants', () => {
     ).toBeDefined();
   });
 });
+
+describe('external operation egress classes', () => {
+  it('every classified operation is a registered external operation', async () => {
+    const { EXTERNAL_OPERATION_CLASSES } = await import('./external-operation-target.js');
+    const { operationAuthorization } = await import('../foundation/authorization-registry.js');
+    const offenders = Object.keys(EXTERNAL_OPERATION_CLASSES).filter(
+      (opId) => !operationAuthorization(opId).declared
+    );
+    expect(offenders).toEqual([]);
+  });
+
+  it('every repository-target class also resolves a charter target', async () => {
+    const { EXTERNAL_OPERATION_CLASSES, EXTERNAL_OPERATION_DELEGATION } =
+      await import('./external-operation-target.js');
+    const missing = Object.entries(EXTERNAL_OPERATION_CLASSES)
+      .filter(([opId, cls]) => cls.repositoryTarget && !(opId in EXTERNAL_OPERATION_DELEGATION))
+      .map(([opId]) => opId);
+    expect(missing).toEqual([]);
+  });
+
+  it('externalOperationClass returns the declared class and a default for unknown ops', async () => {
+    const { externalOperationClass } = await import('./external-operation-target.js');
+    expect(externalOperationClass('vcs:push')).toEqual({
+      tierSource: {
+        tierField: 'publication_source_tier',
+        tenantField: 'publication_source_tenant',
+        storageTiersOnly: true,
+      },
+      repositoryTarget: true,
+    });
+    expect(externalOperationClass('mcp:call_tool')).toEqual({});
+  });
+});

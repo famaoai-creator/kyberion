@@ -68,6 +68,8 @@ import { currentExecutionScope } from './foundation/execution-scope.js';
 import { informationAssetCoverageReadAllowed } from './foundation/information-asset-coverage-access.js';
 import {
   currentResourceAccessScope,
+  isMutatingResourceAccessOperation,
+  type MutatingResourceAccessOperation,
   type ResourceAccessOperation,
 } from './foundation/resource-access-scope.js';
 import type {
@@ -971,7 +973,7 @@ function requestResourceDenial(
       reason: '[DERIVATION_RECEIPT_AUTHORITY] Issuance receipts require a trusted producer',
     };
   if (
-    (operation === 'write' || operation === 'append' || operation === 'mkdir') &&
+    isMutatingResourceAccessOperation(operation) &&
     isMemoryProvenanceStatePath(relativePath) &&
     !['mission_controller', 'knowledge_steward', 'chronos_gateway'].includes(normalizedRole || '')
   )
@@ -1073,7 +1075,7 @@ function decide(
 
 export function validateWritePermission(
   filePath: string,
-  operation: 'write' | 'append' | 'mkdir' = 'write',
+  operation: MutatingResourceAccessOperation = 'write',
   content?: WriteContent
 ): { allowed: boolean; reason?: string } {
   const decided = decide(filePath, operation, content);
@@ -1158,7 +1160,7 @@ function personaTierWriteDecision(
   policy: any,
   relativePath: string,
   identity: ReturnType<typeof resolvePolicyIdentityContext>,
-  operation: 'write' | 'append' | 'mkdir'
+  operation: MutatingResourceAccessOperation
 ): { allowed: boolean; reason?: string } {
   const {
     baseRole: currentPersona,

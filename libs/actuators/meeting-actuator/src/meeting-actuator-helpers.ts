@@ -30,6 +30,7 @@ import {
   type ExternalOperationAuthority,
 } from '@agent/core/governance/external-operation';
 import { withExternalOperationOccurrence } from '@agent/core/governance/external-operation-occurrence';
+import { isDelegableExternalOperation } from '@agent/core/governance/external-operation-target';
 import { getRegisteredEnvText, nowIso, readJson } from '@agent/core/foundation';
 import {
   createStandardYargs,
@@ -288,7 +289,7 @@ async function handleSessionAction(
       operationId: `meeting:${input.action}`,
       effect: { action: input.action, params: input.params },
       requiresApproval: ['join', 'listen', 'speak', 'chat'].includes(input.action),
-      delegable: true,
+      delegable: isDelegableExternalOperation(`meeting:${input.action}`),
       authority: options.externalAuthority?.(input),
     },
     () => executeSessionTransport(input),

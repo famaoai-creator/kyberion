@@ -155,9 +155,11 @@ the KL-03 knowledge gate, then a **human external-publication approval**.
   (grant pins `backend` + exact `to`, optional `from`), `meeting:*`,
   `voice:playback`/`speak`/`transcribe_provider` (grant pins `provider`),
   `network:fetch`/`exposure_check`/`shell`/`a2a_send`, `calendar:*`,
-  `deployment:deploy_release`, `media:generation:*`. Ops whose call sites mark
-  `delegable: false` — `mcp:connect`/`call_tool`, `voice:render_provider`,
-  `voice:camera_output`, non-send `email:*` — stay human-gated by design.
+  `deployment:deploy_release`, `media:generation:*`. Call sites derive the
+  flag via `isDelegableExternalOperation` (enforced by the
+  `delegable-flag-literal` contract test); ops with no registry entry —
+  `mcp:connect`/`call_tool`, `voice:render_provider`, `voice:camera_output`,
+  non-send `email:*` — resolve `false` and stay human-gated by design.
 - `vcs:pr_create` additionally requires the PR body to carry **public
   provenance**: an inline `--body` or a `--body-file` under `knowledge/public/`
   or a `public` storage floor (e.g. `active/shared/artifacts/public/…`). A

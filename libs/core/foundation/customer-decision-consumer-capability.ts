@@ -5,6 +5,8 @@ import {
   createSynchronousResourceGrantIssuer,
   currentResourceAccessScope,
   decideResourceAccess,
+  isContentMutatingResourceAccessOperation,
+  isMetadataAncestorAccess,
   type ResourceAccessOperation,
   type ResourceAccessScope,
 } from './resource-access-scope.js';
@@ -760,7 +762,7 @@ export function customerDecisionConsumerGrantAllows(
   if (!scope || !isCustomerDecisionConsumerCapability(scope)) return false;
   const root = customerDecisionsRootDir(scope.tenantSlug);
   const under = target === root || target.startsWith(root + '/');
-  const ancestor = operation === 'metadata' && root.startsWith(target + '/');
+  const ancestor = isMetadataAncestorAccess(operation, root, target);
   if (!under && !ancestor) return false;
   return decideResourceAccess(scope, target, operation).allowed;
 }
@@ -777,7 +779,7 @@ registerStoreGrant({
   active: customerDecisionConsumerGrantActive,
   authorizes: (target, operation) => customerDecisionConsumerGrantAllows(target, operation),
   narrowing: ({ relativePath, operation, scope, content, readRepoFile }) =>
-    (operation === 'write' || operation === 'append') && customerDecisionConsumerGrantActive()
+    isContentMutatingResourceAccessOperation(operation) && customerDecisionConsumerGrantActive()
       ? caseRecordWriteDenial(
           'consumer',
           customerDecisionConsumerWriteProblem,

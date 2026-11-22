@@ -5,6 +5,7 @@ import {
   type SeamProviderMetadata,
 } from '@agent/core/seam';
 import { runExternalOperation } from '@agent/core/governance/external-operation';
+import { isDelegableExternalOperation } from '@agent/core/governance/external-operation-target';
 
 export const VIDEO_FILTER_TYPES = ['color_correction', 'chroma_key', 'crop'] as const;
 export type VideoFilterType = (typeof VIDEO_FILTER_TYPES)[number];
@@ -294,7 +295,7 @@ export async function applyVideoFilter(
       operationId: VIDEO_FILTER_APPLY_OPERATION_ID,
       effect: { provider_id: selectedId, target_id: target, request },
       requiresApproval: true,
-      delegable: false,
+      delegable: isDelegableExternalOperation(VIDEO_FILTER_APPLY_OPERATION_ID),
     },
     async () => {
       const result = validateInfo(await commit());

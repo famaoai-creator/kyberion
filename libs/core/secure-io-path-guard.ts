@@ -12,7 +12,11 @@ import {
   validateWritePermission,
   type WriteContent,
 } from './tier-guard.js';
-import { currentResourceAccessScope } from './foundation/resource-access-scope.js';
+import {
+  currentResourceAccessScope,
+  type MutatingResourceAccessOperation,
+  type ReadLikeResourceAccessOperation,
+} from './foundation/resource-access-scope.js';
 import { isLinux, isMacOS } from './platform-facts.js';
 import { vaultTargetIdentity } from './secret/vault-mount.js';
 
@@ -163,6 +167,10 @@ function openOrErrno(target: string, flags: number, operation: string): number {
  * ---------------------------------------------------------------------------
  */
 export type CanonicalMode = 'follow' | 'leaf';
+
+/** Narrow a write-class op name to the mutating subset; other names default to 'write'. */
+const toMutatingIoOperation = (operation: string): MutatingResourceAccessOperation =>
+  operation === 'mkdir' ? 'mkdir' : operation === 'append' ? 'append' : 'write';
 
 // eslint-disable-next-line no-var
 var realRootCache: { root: string; real: string; caseInsensitive: boolean } | undefined;
@@ -450,7 +458,7 @@ export function assertCanonicalWritable(
   resolved: string,
   displayPath: string,
   mode: CanonicalMode = 'follow',
-  operation: 'write' | 'append' | 'mkdir' = 'write',
+  operation: MutatingResourceAccessOperation = 'write',
   content?: WriteContent
 ): string {
   const canonical = canonicalGuardPath(resolved, mode);
@@ -470,7 +478,7 @@ export function assertCanonicalReadable(
   resolved: string,
   displayPath: string,
   mode: CanonicalMode = 'follow',
-  operation: 'read' | 'metadata' = 'read'
+  operation: ReadLikeResourceAccessOperation = 'read'
 ): string {
   const canonical = canonicalGuardPath(resolved, mode);
   if (canonical === path.resolve(resolved)) return canonical;
@@ -501,7 +509,7 @@ export function guardWritePath(
     resolved,
     filePath,
     mode,
-    operation === 'mkdir' ? 'mkdir' : operation === 'append' ? 'append' : 'write'
+    toMutatingIoOperation(operation)
   );
   return { resolved, canonical };
 }
@@ -518,11 +526,7 @@ export function guardLiteralWritePath(
 ): string {
   assertSensitivePathAllowed(filePath, operation, mediationProbe());
   const resolved = pathResolver.resolve(filePath);
-  const guard = validateWritePermission(
-    resolved,
-    operation === 'mkdir' ? 'mkdir' : operation === 'append' ? 'append' : 'write',
-    content
-  );
+  const guard = validateWritePermission(resolved, toMutatingIoOperation(operation), content);
   if (!guard.allowed) throw new Error(guard.reason);
   return resolved;
 }
@@ -773,7 +777,7 @@ export function vetOpenedFd(
   displayPath: string,
   operation: HardLinkOperation,
   authorizedCanonical?: string,
-  readOperation: 'read' | 'metadata' = 'read'
+  readOperation: ReadLikeResourceAccessOperation = 'read'
 ): fs.Stats {
   const held = fs.fstatSync(fd);
   const actual = openedLocation(fd, resolved, held);
@@ -957,7 +961,7 @@ function settleDirectory(dir: string): boolean {
 export function statVetted(
   resolved: string,
   displayPath: string,
-  readOperation: 'read' | 'metadata' = 'read'
+  readOperation: ReadLikeResourceAccessOperation = 'read'
 ): fs.Stats {
   let peek: fs.Stats;
   try {
@@ -1099,7 +1103,7 @@ function assertAuthorizedAt(
   actual: string,
   displayPath: string,
   operation: HardLinkOperation,
-  readOperation: 'read' | 'metadata' = 'read'
+  readOperation: ReadLikeResourceAccessOperation = 'read'
 ): void {
   assertSensitivePathAllowed(actual, operation, mediationProbe());
   const guard =
@@ -1118,7 +1122,7 @@ export function guardReadPath(
   filePath: string,
   deny: (reason: string | undefined) => string,
   mode: CanonicalMode = 'follow',
-  operation: 'read' | 'metadata' = 'read'
+  operation: ReadLikeResourceAccessOperation = 'read'
 ): string {
   const assertSensitive = (candidate: string): void => {
     if (operation === 'metadata') assertSensitiveMetadataAllowed(candidate, mediationProbe());

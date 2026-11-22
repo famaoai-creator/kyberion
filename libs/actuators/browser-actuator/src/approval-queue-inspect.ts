@@ -8,6 +8,7 @@ import {
 import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 import { runExternalOperation } from '@agent/core/governance/external-operation';
+import { isDelegableExternalOperation } from '@agent/core/governance/external-operation-target';
 import { currentScopeEnvelope } from '@agent/core/scope-envelope';
 import { resolveScopeContext } from '@agent/core/scope-context';
 import { pathResolver } from '@agent/core/path-resolver';
@@ -811,7 +812,7 @@ export async function runApprovalQueueInspect(
         headless,
       },
       requiresApproval: true,
-      delegable: true,
+      delegable: isDelegableExternalOperation(OPERATION_ID),
       observationOnly: true,
     },
     () => inspectInsideConfinement(profile, origin, headless, relativePath),

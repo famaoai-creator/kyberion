@@ -6,6 +6,7 @@ import { getPresenceAvatarProfile } from '@agent/core/presence-avatar';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExec, safeExecResult, safeMkdir, safeReadFile } from '@agent/core/secure-io';
 import { runExternalOperation } from '@agent/core/governance/external-operation';
+import { isDelegableExternalOperation } from '@agent/core/governance/external-operation-target';
 import {
   resolveFfmpegBin,
   resolveFfprobeBin,
@@ -401,7 +402,7 @@ export async function outputToVirtualCamera(input: {
         operationId: 'voice:camera_output',
         effect: { target, stop: true },
         requiresApproval: true,
-        delegable: false,
+        delegable: isDelegableExternalOperation('voice:camera_output'),
       },
       stop,
       () => 'succeeded'
@@ -446,7 +447,7 @@ export async function outputToVirtualCamera(input: {
         loop: request.loop,
       },
       requiresApproval: true,
-      delegable: false,
+      delegable: isDelegableExternalOperation('voice:camera_output'),
     },
     async () => {
       if (digest() !== sourceHash)

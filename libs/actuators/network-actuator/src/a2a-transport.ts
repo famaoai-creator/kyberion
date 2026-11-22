@@ -17,6 +17,7 @@ import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from '@agent/c
 import * as path from 'node:path';
 import * as crypto from 'node:crypto';
 import { runExternalOperation } from '@agent/core/governance/external-operation';
+import { isDelegableExternalOperation } from '@agent/core/governance/external-operation-target';
 
 /**
  * A2A Physical Transport Layer v1.0
@@ -183,7 +184,7 @@ export async function sendA2AMessage(
         },
       },
       requiresApproval: true,
-      delegable: true,
+      delegable: isDelegableExternalOperation('network:a2a_send'),
     },
     async () => {
       let payload = JSON.stringify(envelope);

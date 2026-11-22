@@ -23,15 +23,24 @@
  * ceiling (ancestors above those roots) stays with the caller's own policy.
  */
 import { AsyncLocalStorage } from 'node:async_hooks';
-import type { CharterScope } from '../governance/accountability-charter.js';
+import {
+  charterScopeTenantSlug,
+  isPersonalCharterScope,
+  type CharterScope,
+} from './charter-scope.js';
 import { PARTITIONED_RUNTIME_STATE_ROOTS, STORAGE_FLOOR_ROOTS } from './runtime-state-roots.js';
 import { isValidTenantSlug } from './scope.js';
+import {
+  isContentMutatingResourceAccessOperation,
+  isReadLikeResourceAccessOperation,
+  type ResourceAccessOperation,
+} from './resource-access-scope.js';
 import { registerStoreGrant } from './store-grant-registry.js';
 
 export type VcsPublicationOperation = 'vcs:pr_create' | 'vcs:push' | 'vcs:pr_merge';
 export type PrPublicationStoreKind =
   'charter-read' | 'charter-ledger-write' | 'review-write' | 'reservation-write' | 'body-stage';
-export type PrPublicationOperation = 'read' | 'write' | 'append' | 'mkdir' | 'metadata';
+export type PrPublicationOperation = ResourceAccessOperation;
 
 /**
  * Issuance right of the PR publication store grant (G2). The former shared core role of this
@@ -104,10 +113,9 @@ export function withPrPublicationBinding<T>(
     throw new Error('[PR_PUBLICATION_SCOPE] Valid publication scope required');
   if (!OPERATIONS.includes(operationId))
     throw new Error('[PR_PUBLICATION_SCOPE] Typed VCS mutation required');
-  const frozen: CharterScope =
-    scope.kind === 'person'
-      ? Object.freeze({ kind: 'person' as const })
-      : Object.freeze({ kind: 'organization' as const, tenant_slug: scope.tenant_slug });
+  const frozen: CharterScope = isPersonalCharterScope(scope)
+    ? Object.freeze({ kind: 'person' as const })
+    : Object.freeze({ kind: 'organization' as const, tenant_slug: scope.tenant_slug });
   const binding: PublicationBinding = Object.freeze({ scope: frozen, invocationId, operationId });
   issuedBindings.add(binding);
   // The binding may span awaits (approval request, VCS transport); it ends when
@@ -146,7 +154,7 @@ export function currentPrPublicationBinding():
 /** The binding's tenant (organization scope), or undefined for a person publication. */
 export function prPublicationGrantTenant(): string | undefined {
   const grant = currentGrant();
-  return grant?.binding.scope.kind === 'organization' ? grant.binding.scope.tenant_slug : undefined;
+  return grant?.binding.scope ? charterScopeTenantSlug(grant.binding.scope) : undefined;
 }
 
 /** Is a live store grant of this instance current? */
@@ -169,7 +177,7 @@ function ceilingAllows(
     value.startsWith('/')
   )
     return false;
-  const tenant = binding.scope.kind === 'organization' ? binding.scope.tenant_slug : undefined;
+  const tenant = charterScopeTenantSlug(binding.scope);
   const charter = tenant
     ? `knowledge/confidential/${tenant}/charters`
     : 'knowledge/personal/charters';
@@ -265,11 +273,11 @@ export function prPublicationResourceAllowed(
   const grant = currentGrant();
   if (!grant) return false;
   if (
-    (operation === 'read' || operation === 'metadata') &&
+    isReadLikeResourceAccessOperation(operation) &&
     (target === 'knowledge/product' || target.startsWith('knowledge/product/'))
   )
     return true;
-  if (operation === 'write' || operation === 'append') return grant.write.includes(target);
+  if (isContentMutatingResourceAccessOperation(operation)) return grant.write.includes(target);
   if (operation === 'read') return grant.read.includes(target) || grant.write.includes(target);
   return [...grant.read, ...grant.write].some(
     (file) => file === target || target === '' || file.startsWith(target + '/')
@@ -294,21 +302,19 @@ export function prPublicationGrantAuthorizes(
 ): boolean {
   const grant = currentGrant();
   if (!grant?.authorizes || !prPublicationResourceAllowed(target, operation)) return false;
-  const tenant =
-    grant.binding.scope.kind === 'organization' ? grant.binding.scope.tenant_slug : undefined;
+  const tenant = charterScopeTenantSlug(grant.binding.scope);
   const charters = tenant ? [`knowledge/confidential/${tenant}/charters`] : [];
   const artifacts = STORAGE_FLOOR_ROOTS.artifact;
   const shared = [PARTITIONED_RUNTIME_STATE_ROOTS.external_operations, STORAGE_FLOOR_ROOTS.scratch];
-  const roots =
-    operation === 'read' || operation === 'metadata'
-      ? [
-          'knowledge/personal/charters',
-          ...charters,
-          `${artifacts}/personal/shared`,
-          ...(tenant ? [`${artifacts}/confidential/${tenant}`] : []),
-          ...shared,
-        ]
-      : [...charters, artifacts, ...shared];
+  const roots = isReadLikeResourceAccessOperation(operation)
+    ? [
+        'knowledge/personal/charters',
+        ...charters,
+        `${artifacts}/personal/shared`,
+        ...(tenant ? [`${artifacts}/confidential/${tenant}`] : []),
+        ...shared,
+      ]
+    : [...charters, artifacts, ...shared];
   return roots.some((root) => within(target, root));
 }
 

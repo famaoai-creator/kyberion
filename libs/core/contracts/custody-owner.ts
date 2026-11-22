@@ -29,6 +29,19 @@ export type CustodyOwner =
 
 export type CustodyOwnerKind = CustodyOwner['kind'];
 
+/** Canonical projections on the custody union — branch on these, not literals. */
+export const isPersonCustody = (
+  owner: CustodyOwner
+): owner is Extract<CustodyOwner, { kind: 'person' }> => owner.kind === 'person';
+
+export const isTenantCustody = (
+  owner: CustodyOwner
+): owner is Extract<CustodyOwner, { kind: 'tenant' }> => owner.kind === 'tenant';
+
+export const isSystemCustody = (
+  owner: CustodyOwner
+): owner is Extract<CustodyOwner, { kind: 'system' }> => owner.kind === 'system';
+
 export const CUSTODY_OWNER_KINDS: readonly CustodyOwnerKind[] = ['system', 'tenant', 'person'];
 
 /** Error code prefix of a custody declaration that contradicts the scope. */

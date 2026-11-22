@@ -18,6 +18,7 @@ import {
   STORAGE_FLOOR_ROOTS,
 } from './storage-layout.js';
 import { rolePermissionRecord } from './foundation/declared-store-grant.js';
+import type { MutatingResourceAccessOperation } from './foundation/resource-access-scope.js';
 import { baseAuthorityRolePermissionRecord } from './foundation/base-authority-role.js';
 import type { TierLevel } from './types.js';
 import { isRecord } from './foundation/primitives.js';
@@ -200,7 +201,7 @@ export function tenantStorePartitionWriteDecision(
   relativePath: string,
   identity: PartitionWriteIdentity,
   deps: {
-    operation: 'write' | 'append' | 'mkdir';
+    operation: MutatingResourceAccessOperation;
     sudoAllows: (sudoScope: string[] | undefined) => boolean;
     matches: (pattern: string) => boolean;
   }

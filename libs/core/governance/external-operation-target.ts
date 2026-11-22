@@ -560,6 +560,49 @@ function buildBrowserNavigationTarget(
   }
 }
 
+/**
+ * Runtime egress classification: which effect fields carry source provenance,
+ * which operations target repositories, and which read the tenant's own
+ * business system. Declared per operation so a new op class updates this one
+ * table instead of inline literal lists in the admission path. Every key must
+ * be a registered operation — enforced by test.
+ */
+export interface ExternalOperationClass {
+  /** Effect fields carrying a body/publication source tier+tenant that may raise the effective tier. */
+  readonly tierSource?: {
+    readonly tierField: string;
+    readonly tenantField: string;
+    /** When true the tier value must be a real storage data tier ('inline' rejected). */
+    readonly storageTiersOnly?: boolean;
+  };
+  /** Repo-targeted: the grant target may pin visibility; private repos exempt the public-only rule. */
+  readonly repositoryTarget?: boolean;
+  /** Reads the tenant's own business system: data stays in-scope, only the credential leaves. */
+  readonly tenantSystemRead?: boolean;
+}
+
+export const EXTERNAL_OPERATION_CLASSES: Record<string, ExternalOperationClass> = {
+  'vcs:pr_create': {
+    tierSource: { tierField: 'body_source_tier', tenantField: 'body_source_tenant' },
+    repositoryTarget: true,
+  },
+  'vcs:pr_merge': { repositoryTarget: true },
+  'vcs:push': {
+    tierSource: {
+      tierField: 'publication_source_tier',
+      tenantField: 'publication_source_tenant',
+      storageTiersOnly: true,
+    },
+    repositoryTarget: true,
+  },
+  'browser:approval_queue_inspect': { tenantSystemRead: true },
+};
+
+/** Egress classification of an operation (empty = unclassified/default). */
+export function externalOperationClass(operationId: string): ExternalOperationClass {
+  return EXTERNAL_OPERATION_CLASSES[operationId] ?? {};
+}
+
 /** True when the operation may consult an exact charter grant. The
  * authorization registry is the single source for delegability; this table
  * supplies the effect→target builders. */

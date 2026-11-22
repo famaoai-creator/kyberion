@@ -9,7 +9,7 @@ import {
   createOnboardingExternalOperationAuthority,
   withInstalledPersonCharterRuntime,
 } from '../governance/external-operation-runtime.js';
-import type { CharterScope } from '../governance/accountability-charter.js';
+import { isPersonalCharterScope, type CharterScope } from '../governance/accountability-charter.js';
 import { inspectInstalledOnboardingRuntime } from './onboarding-runtime-identity.js';
 
 export function withInstalledOnboardingAuthority<T>(
@@ -40,7 +40,7 @@ export function withInstalledOnboardingAuthority<T>(
       }),
       action
     );
-  return scope.kind === 'person'
+  return isPersonalCharterScope(scope)
     ? withInstalledPersonCharterRuntime(
         { ownerActor: installed.ownerId, agentId: installed.agentId },
         run
