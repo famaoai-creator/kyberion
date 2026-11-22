@@ -145,6 +145,9 @@ import { registerInstalledReasoningModeReader } from './installed-reasoning-mode
 let installed = false;
 let installedMode: ReasoningBackendMode | null = null;
 let installedIdentity: CredentialIdentity | undefined;
+// Long-lived hosts re-select the chain on a timer; an identical re-install is
+// routine heartbeat, not news — log it at debug so the file sink stays quiet.
+let lastLoggedChainSignature: string | null = null;
 let lastBrokerSelection: {
   resolvedMode: ReasoningBackendMode;
   provider: string;
@@ -935,11 +938,18 @@ function _installReasoningBackendsCore(options: InstallReasoningOptions): boolea
   } else {
     clearReasoningDegraded();
   }
-  logger.success(
-    `[reasoning-bootstrap] mode=${mode} — reasoning failover chain installed (primary=${primaryMode}, candidates=${chain
-      .map((candidate) => candidate.mode)
-      .join(' -> ')})`
-  );
+  const chainSignature = `${mode}|${primaryMode}|${chain
+    .map((candidate) => candidate.mode)
+    .join('>')}`;
+  const chainLine = `[reasoning-bootstrap] mode=${mode} — reasoning failover chain installed (primary=${primaryMode}, candidates=${chain
+    .map((candidate) => candidate.mode)
+    .join(' -> ')})`;
+  if (chainSignature === lastLoggedChainSignature) {
+    logger.debug(chainLine);
+  } else {
+    lastLoggedChainSignature = chainSignature;
+    logger.success(chainLine);
+  }
   return true;
 }
 
@@ -963,6 +973,7 @@ export function resetReasoningBootstrap(): void {
   installedMode = null;
   lastBrokerSelection = null;
   lastModeSelectionReason = null;
+  lastLoggedChainSignature = null;
 }
 
 /** Which mode was selected on the last successful install, or null. */
