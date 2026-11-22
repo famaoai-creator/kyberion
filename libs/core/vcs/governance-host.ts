@@ -129,16 +129,18 @@ function stageUnprovablePrBodyFile(
       standingScope,
       invocationId,
       () =>
-        withPrPublicationStoreAccess('body-stage', [], [artifactPath, indexPath], () =>
-          writeScopedArtifact({
-            // Public shared floor — the body is published verbatim to the PR
-            // either way; staging under the acting tenant blurs provenance.
+        writeScopedArtifact(
+          {
             scope: { tenant: 'shared' },
             tier: 'public',
             artifact_class: 'evidence',
+            create_only: true,
+            reuse_identical: true,
             name,
             content,
-          })
+          },
+          (write) =>
+            withPrPublicationStoreAccess('body-stage', [], [artifactPath, indexPath], write)
         ),
       'vcs:pr_create'
     );

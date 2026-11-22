@@ -432,7 +432,8 @@ describe('main() wiring (KL-03)', () => {
       )
     ).rejects.toThrow(ExternalOperationApprovalRequired);
     expect(mocks.writeScopedArtifact).toHaveBeenCalledWith(
-      expect.objectContaining({ content: effect, tier: 'personal' })
+      expect.objectContaining({ content: effect, tier: 'personal' }),
+      expect.any(Function)
     );
     expect(print).toHaveBeenCalledWith(expect.stringContaining('/protected/review.json'));
     expect(print).toHaveBeenCalledWith(

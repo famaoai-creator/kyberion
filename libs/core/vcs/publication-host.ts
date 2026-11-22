@@ -136,14 +136,17 @@ export async function runVcsMutationWithApproval(
               const name = `${family}/${invocationId}/${computeApprovalPayloadHash(effect)}.json`;
               const root = `active/shared/artifacts/${floor}`;
               const paths = [`${root}/evidence/${name}`, `${root}/artifacts-index.jsonl`];
-              review = withPrPublicationStoreAccess('review-write', paths, paths, () =>
-                writeScopedArtifact({
+              review = writeScopedArtifact(
+                {
                   scope: { tenant: scope.tenant_slug ?? 'shared' },
                   tier: scope.tenant_slug ? 'confidential' : 'personal',
                   artifact_class: 'evidence',
+                  create_only: true,
+                  reuse_identical: true,
                   name,
                   content: effect,
-                })
+                },
+                (write) => withPrPublicationStoreAccess('review-write', paths, paths, write)
               );
               return [review.repo_relative_path];
             },

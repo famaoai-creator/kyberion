@@ -325,6 +325,10 @@ dependent-first and retirement-first orders as well as a direct service
 retirement attempt. Existing missing-reference drift remains visible to
 the reconciliation checks.
 
+The PR publication host takes the artifact write lock before opening the exact
+file grant for the review or body. Repeating publication preparation reuses
+only byte-identical evidence and retains a single scoped index entry.
+
 ## Assurance boundary
 
 This is exhaustive safety checking **of the supplied finite abstraction**, plus

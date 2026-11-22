@@ -228,6 +228,8 @@ export type ScopedArtifactFormat = 'json' | 'text' | 'buffer';
 export interface WriteScopedArtifactInput {
   /** Atomically refuse an existing target, including a concurrent creator. */
   create_only?: boolean;
+  /** Recover exclusive creation by reusing only an exact match of the stored bytes. */
+  reuse_identical?: boolean;
   scope: ScopedArtifactScope;
   artifact_class: RetentionArtifactClass;
   /**
@@ -626,12 +628,18 @@ export function scopedArtifactDir(
   return { dir, scope_kind: kind };
 }
 
-export function writeScopedArtifact(input: WriteScopedArtifactInput): WriteScopedArtifactResult {
-  return withScopedArtifactWriteLock(() => {
-    const { role, ...writeInput } = input;
-    const write = () => writeScopedArtifactInternal(writeInput);
-    return role ? withRole(role, write) : write();
-  });
+export function writeScopedArtifact(
+  input: WriteScopedArtifactInput,
+  withFileAccess: (write: () => WriteScopedArtifactResult) => WriteScopedArtifactResult = (write) =>
+    write()
+): WriteScopedArtifactResult {
+  return withScopedArtifactWriteLock(() =>
+    withFileAccess(() => {
+      const { role, ...writeInput } = input;
+      const write = () => writeScopedArtifactInternal(writeInput);
+      return role ? withRole(role, write) : write();
+    })
+  );
 }
 
 function writeScopedArtifactInternal(
@@ -721,8 +729,9 @@ function writeScopedArtifactInternal(
   }
   const performWrite = (): void => {
     ensureRegularScopedArtifactIndex(indexPath);
+    const reuseIdentical = input.create_only && input.reuse_identical && hasBytes(absolutePath);
     const index =
-      digest || (!input.create_only && safeExistsSync(absolutePath))
+      digest || reuseIdentical || (!input.create_only && safeExistsSync(absolutePath))
         ? readScopedArtifactIndex(input.scope, root.tier)
         : [];
     if (!digest && !input.create_only && safeExistsSync(absolutePath)) {
@@ -732,7 +741,7 @@ function writeScopedArtifactInternal(
       );
     }
     if (!safeExistsSync(targetDir)) safeMkdir(targetDir, { recursive: true });
-    if (input.create_only || !digest || !hasBytes(absolutePath)) {
+    if (!reuseIdentical && (input.create_only || !digest || !hasBytes(absolutePath))) {
       safeWriteFile(
         absolutePath,
         data,
@@ -740,10 +749,11 @@ function writeScopedArtifactInternal(
       );
     }
     const alreadyIndexed =
-      digest &&
+      (digest || reuseIdentical) &&
       index.some(
         (row) =>
           row.path === repoRelative &&
+          row.artifact_class === input.artifact_class &&
           row.content_sha256 === digest &&
           row.scope_kind === kind &&
           ATTEMPT_SCOPE_KEYS.every((key) => row.scope[key] === input.scope[key])

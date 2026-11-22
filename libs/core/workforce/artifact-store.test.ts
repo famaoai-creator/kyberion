@@ -222,6 +222,34 @@ describe('writeScopedArtifact (AL-02)', () => {
     fs.rmSync(tmpRoot, { recursive: true, force: true });
   });
 
+  it('locks before opening the exact PR review grant and reuses the recorded bytes', async () => {
+    const { withPrPublicationRuntime, withPrPublicationStoreAccess } =
+      await import('../governance/pr-publication-runtime.js');
+    const invocation = 'c'.repeat(64);
+    const name = `pr-publication/${invocation}/${'d'.repeat(64)}.json`;
+    const root = 'active/shared/artifacts/personal/shared';
+    const files = [`${root}/evidence/${name}`, `${root}/artifacts-index.jsonl`];
+    const save = (content: { decision: string }) =>
+      withPrPublicationRuntime({ kind: 'person' }, invocation, () =>
+        store.writeScopedArtifact(
+          {
+            scope: { tenant: 'shared' },
+            tier: 'personal',
+            artifact_class: 'evidence',
+            name,
+            create_only: true,
+            reuse_identical: true,
+            content,
+          },
+          (write) => withPrPublicationStoreAccess('review-write', files, files, write)
+        )
+      );
+    const first = save({ decision: 'review' });
+    expect(save({ decision: 'review' })).toEqual(first);
+    expect(() => save({ decision: 'other' })).toThrow(/EEXIST/);
+    expect(readIndex(first.index_path).filter((entry) => entry.name === name)).toHaveLength(1);
+  });
+
   it('mission scope: places under <missionDir>/artifacts/<class>/ and records the index', () => {
     const result = store.writeScopedArtifact({
       scope: { mission: 'M-AL02-A' },
