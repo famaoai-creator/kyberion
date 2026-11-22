@@ -6,14 +6,12 @@
  */
 import { createRequire } from 'node:module';
 import { safeReadFile } from '@agent/core/secure-io';
+import type { CodeGraphGrammarRef } from '@agent/core/source-analysis';
 import { Language, Parser, Query, type Tree } from 'web-tree-sitter';
 
 const require = createRequire(import.meta.url);
 
-export interface GrammarRef {
-  package: string;
-  wasm: string;
-}
+export type GrammarRef = CodeGraphGrammarRef;
 
 export interface GrammarCapture {
   line: number;

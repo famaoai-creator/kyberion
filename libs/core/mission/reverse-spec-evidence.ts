@@ -19,6 +19,11 @@ import {
   resolveWorkspaceSourceRoot,
   type ResolvedSourceRoot,
 } from '../analysis/source-fingerprint.js';
+import {
+  codeGraphLanguageFor,
+  loadCodeGraphEnumerationRules,
+  SOURCE_LIKE_EXTENSIONS,
+} from '../analysis/code-graph-rules.js';
 
 export const REVERSE_SPEC_EVIDENCE_STAGES = [
   'scope',
@@ -166,7 +171,7 @@ class SourceView {
   ) {}
 
   /** Files the fingerprint covers; citations outside it (symlinks, skipped secrets) do not resolve. */
-  private files(): Set<string> {
+  files(): Set<string> {
     this.listed ??= new Set(listSourceTreeFiles(this.root.absolute, { maxFiles: this.maxFiles }));
     return this.listed;
   }
@@ -282,6 +287,56 @@ function sameSet(listed: string[], expected: Set<string>): boolean {
   return listed.length === expected.size && listed.every((entry) => expected.has(entry));
 }
 
+/**
+ * Re-derive the module denominator from the source tree with the governed rules, so the graph
+ * cannot shrink it by omission: every non-excluded file a requested rule language covers needs a
+ * `MOD:<file>` node, and every other source-like file (or file of a filtered-out rule language)
+ * needs its extension declared in the scope's uncovered_extensions.
+ */
+function deriveDenominatorProblems(
+  graph: Json,
+  source: SourceView,
+  nodeIds: Set<string>,
+  uncoveredExtensions: string[]
+): string[] {
+  const problems: string[] = [];
+  const rules = loadCodeGraphEnumerationRules().languages;
+  const generatedBy = isRecord(graph.generated_by) ? graph.generated_by : {};
+  const requested = stringList(generatedBy.languages);
+  const unknown = requested.filter((id) => !rules.some((rule) => rule.id === id));
+  if (unknown.length)
+    problems.push(`generated_by.languages names unknown rules: ${capList(unknown)}`);
+  const active = requested.length ? rules.filter((rule) => requested.includes(rule.id)) : rules;
+  const inactive = rules.filter((rule) => !active.includes(rule));
+  const excluded = stringList(graph.excluded_paths).map((entry) =>
+    path.posix.normalize(entry).replace(/\/$/u, '')
+  );
+  const missing: string[] = [];
+  const undeclared = new Set<string>();
+  for (const file of source.files()) {
+    if (excluded.some((prefix) => file === prefix || file.startsWith(`${prefix}/`))) continue;
+    if (codeGraphLanguageFor(file, active)) {
+      if (!nodeIds.has(`MOD:${file}`)) missing.push(file);
+      continue;
+    }
+    const ext = path.posix.extname(file).toLowerCase();
+    if (
+      (SOURCE_LIKE_EXTENSIONS.has(ext) || codeGraphLanguageFor(file, inactive)) &&
+      !uncoveredExtensions.includes(ext)
+    )
+      undeclared.add(ext);
+  }
+  if (missing.length)
+    problems.push(
+      `${missing.length} source file(s) covered by the rules have no MOD: node — the denominator was shrunk by omission: ${capList(missing)}`
+    );
+  if (undeclared.size)
+    problems.push(
+      `source extensions no rule analyzed, not declared in reverse-spec-scope.json uncovered_extensions: ${capList([...undeclared].sort())}`
+    );
+  return problems;
+}
+
 function validateCodeGraphDocument(
   missionDir: string,
   source: SourceView,
@@ -308,14 +363,6 @@ function validateCodeGraphDocument(
     problems.push(
       `excluded_paths not declared in reverse-spec-scope.json exclusions: ${capList(undeclared)}`
     );
-  // Source files no rule analyzed are a coverage gap: each extension must be declared with a reason.
-  const uncovered = Object.keys(
-    isRecord(graph.unanalyzed_extensions) ? graph.unanalyzed_extensions : {}
-  ).filter((ext) => !declared.uncoveredExtensions.includes(ext.toLowerCase()));
-  if (uncovered.length)
-    problems.push(
-      `unanalyzed_extensions not declared in reverse-spec-scope.json uncovered_extensions: ${capList(uncovered)}`
-    );
   const nodes = records(graph.nodes);
   if (nodes.length === 0)
     problems.push('nodes must be non-empty — the denominator cannot be empty');
@@ -340,12 +387,14 @@ function validateCodeGraphDocument(
   if (badCitation.length)
     problems.push(`node locations that do not resolve: ${capList(badCitation)}`);
   const nodeIds = new Set(ids);
+  problems.push(...deriveDenominatorProblems(graph, source, nodeIds, declared.uncoveredExtensions));
   const dangling = records(graph.edges)
     .filter((edge) => !nodeIds.has(String(edge.from)) || !nodeIds.has(String(edge.to)))
     .map((edge) => `${String(edge.from)}->${String(edge.to)}`);
   if (dangling.length) problems.push(`edges referencing unknown nodes: ${capList(dangling)}`);
   // The reconciliation must describe the nodes actually listed: counts and element differences are
-  // recomputed from each node's routes, so deleting nodes or editing counts cannot pass.
+  // recomputed from each node's routes. Module omissions are caught against the source tree above;
+  // entrypoint/boundary markers are trusted to the extractor (re-running it is the stronger check).
   const reconciliation = records(graph.reconciliation);
   for (const row of reconciliation) {
     if (!(REVERSE_SPEC_NODE_KINDS as readonly unknown[]).includes(row.node_kind))
@@ -643,9 +692,7 @@ function validateAuditDocument(
     problems.push(
       `${open.length} claim(s) still unsupported/fabricated — correct or downgrade them, then re-verify: ${capList(open.map(([id]) => id))}`
     );
-  const now = computeSourceFingerprint(source.root.absolute, {
-    maxFiles: Math.max(DEFAULT_SOURCE_TREE_MAX_FILES, graph.fileCount),
-  });
+  const now = computeSourceFingerprint(source.root.absolute, { files: [...source.files()] });
   if (now.value !== graph.fingerprint)
     problems.push(
       `source changed since the code graph was frozen (fingerprint ${graph.fingerprint.slice(0, 12)}… → ${now.value.slice(0, 12)}…, files ${graph.fileCount} → ${now.file_count}) — the analysis target must stay read-only`

@@ -5,7 +5,7 @@
  * source root.
  */
 import * as path from 'node:path';
-import type { CodeGraphImportRule } from './enumeration-rules.js';
+import type { CodeGraphImportRule } from '@agent/core/source-analysis';
 
 export interface ImportResolutionContext {
   files: ReadonlySet<string>;

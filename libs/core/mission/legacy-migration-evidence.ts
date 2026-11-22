@@ -155,12 +155,16 @@ function validateBrief(
     // The brief gate re-runs the source mission's audit: a spec that no longer passes cannot seed
     // a rebuild. Later stages rely on that frozen result — a strangler-fig or in-place rebuild
     // changes the legacy tree by design, so its fingerprint is not re-checked after the brief.
-    if (verifySourceAudit) validateReverseSpecEvidenceAt(sourceMissionDir, 'audit');
-    const purpose = readReverseSpecPurpose(sourceMissionDir);
-    if (purpose !== 'rebuild')
-      problems.push(
-        `source reverse_spec mission purpose is ${purpose}; a migration needs purpose rebuild (implementation-depth specs)`
-      );
+    if (verifySourceAudit) {
+      validateReverseSpecEvidenceAt(sourceMissionDir, 'audit');
+      // Read through the scope (resolves the live source root): only at the brief, so a legacy
+      // tree retired after cut-over does not break the later gates.
+      const purpose = readReverseSpecPurpose(sourceMissionDir);
+      if (purpose !== 'rebuild')
+        problems.push(
+          `source reverse_spec mission purpose is ${purpose}; a migration needs purpose rebuild (implementation-depth specs)`
+        );
+    }
   } catch (error) {
     problems.push(
       `source reverse_spec mission ${brief.source_spec_mission_id} does not pass its audit: ${error instanceof Error ? error.message.split('\n')[0] : String(error)}`

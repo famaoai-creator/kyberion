@@ -15,12 +15,12 @@ import {
   computeSourceFingerprint,
   listSourceTreeFiles,
   resolveWorkspaceSourceRoot,
-} from '@agent/core/source-analysis';
-import {
+  codeGraphLanguageFor,
   loadCodeGraphEnumerationRules,
+  SOURCE_LIKE_EXTENSIONS,
   type CodeGraphLanguageRule,
   type CodeGraphMarkerRule,
-} from './enumeration-rules.js';
+} from '@agent/core/source-analysis';
 import { loadGrammar, type LoadedGrammar } from './grammar-loader.js';
 import { resolveImport, type ImportResolutionContext } from './import-resolution.js';
 
@@ -85,59 +85,11 @@ export interface ExtractCodeGraphOptions {
 
 const NODE_KINDS: CodeGraphNodeKind[] = ['module', 'entrypoint', 'boundary'];
 
-/** Source extensions worth flagging when no rule covers them (coverage gap, not an error). */
-const SOURCE_LIKE_EXTENSIONS = new Set([
-  '.kt',
-  '.kts',
-  '.swift',
-  '.m',
-  '.mm',
-  '.dart',
-  '.lua',
-  '.pl',
-  '.pm',
-  '.r',
-  '.jl',
-  '.ex',
-  '.exs',
-  '.erl',
-  '.hs',
-  '.ml',
-  '.fs',
-  '.vb',
-  '.cls',
-  '.bas',
-  '.frm',
-  '.cbl',
-  '.cob',
-  '.cpy',
-  '.pls',
-  '.pks',
-  '.pkb',
-  '.sql',
-  '.groovy',
-  '.clj',
-  '.vue',
-  '.svelte',
-]);
-
 interface MarkerHit {
   kind: CodeGraphNodeKind;
   subtype: string;
   line: number;
   name?: string;
-}
-
-function languageFor(
-  file: string,
-  rules: CodeGraphLanguageRule[]
-): CodeGraphLanguageRule | undefined {
-  const lower = file.toLowerCase();
-  return rules.find(
-    (rule) =>
-      rule.extensions.some((ext) => lower.endsWith(ext)) &&
-      !(rule.exclude_suffixes ?? []).some((suffix) => lower.endsWith(suffix))
-  );
 }
 
 /** Code-unit order: deterministic across machines and ICU locales. */
@@ -243,7 +195,7 @@ export async function extractCodeGraph(
   const unanalyzed: Record<string, number> = {};
   for (const file of files) {
     if (isExcluded(file)) continue;
-    const rule = languageFor(file, languageRules);
+    const rule = codeGraphLanguageFor(file, languageRules);
     if (rule) {
       const list = byLanguage.get(rule) ?? [];
       list.push(file);
@@ -251,7 +203,7 @@ export async function extractCodeGraph(
       continue;
     }
     const ext = path.posix.extname(file).toLowerCase();
-    if (SOURCE_LIKE_EXTENSIONS.has(ext) || languageFor(file, filteredOut))
+    if (SOURCE_LIKE_EXTENSIONS.has(ext) || codeGraphLanguageFor(file, filteredOut))
       unanalyzed[ext] = (unanalyzed[ext] ?? 0) + 1;
   }
 

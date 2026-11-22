@@ -1,12 +1,17 @@
 /**
- * Governed per-language enumeration rules for the code graph. The rules are
- * data (knowledge/product/governance/code-graph-enumeration-rules.json): adding
- * a language or a marker is a catalog change validated by its schema, not a
- * code change.
+ * Governed per-language enumeration rules for the reverse_spec code graph
+ * (knowledge/product/governance/code-graph-enumeration-rules.json). Shared by
+ * the extractor (modeling:extract_code_graph) and the code_graph gate, which
+ * re-derives the module denominator from the source tree with the same rules.
  */
-import { defineCatalog } from '@agent/core/foundation';
-import { pathResolver } from '@agent/core/path-resolver';
-import type { GrammarRef } from './grammar-loader.js';
+import { defineCatalog } from '../foundation/governed-catalog.js';
+import * as pathResolver from '../path-resolver.js';
+
+/** npm grammar package and the prebuilt WASM file it ships. */
+export interface CodeGraphGrammarRef {
+  package: string;
+  wasm: string;
+}
 
 export type ImportResolverKind =
   'relative_path' | 'python_module' | 'qualified_name' | 'namespace' | 'go_package' | 'rust_module';
@@ -34,7 +39,7 @@ export interface CodeGraphMarkerRule {
 
 export interface CodeGraphLanguageRule {
   id: string;
-  grammar: GrammarRef;
+  grammar: CodeGraphGrammarRef;
   extensions: string[];
   exclude_suffixes?: string[];
   imports?: CodeGraphImportRule;
@@ -54,4 +59,53 @@ const catalog = defineCatalog<CodeGraphEnumerationRules>({
 
 export function loadCodeGraphEnumerationRules(): CodeGraphEnumerationRules {
   return catalog.load();
+}
+
+/** Source extensions worth flagging when no rule covers them (coverage gap, not an error). */
+export const SOURCE_LIKE_EXTENSIONS: ReadonlySet<string> = new Set([
+  '.kt',
+  '.kts',
+  '.swift',
+  '.m',
+  '.mm',
+  '.dart',
+  '.lua',
+  '.pl',
+  '.pm',
+  '.r',
+  '.jl',
+  '.ex',
+  '.exs',
+  '.erl',
+  '.hs',
+  '.ml',
+  '.fs',
+  '.vb',
+  '.cls',
+  '.bas',
+  '.frm',
+  '.cbl',
+  '.cob',
+  '.cpy',
+  '.pls',
+  '.pks',
+  '.pkb',
+  '.sql',
+  '.groovy',
+  '.clj',
+  '.vue',
+  '.svelte',
+]);
+
+/** The rule that analyzes a source-relative file, if any (extension match minus excluded suffixes). */
+export function codeGraphLanguageFor(
+  file: string,
+  rules: CodeGraphLanguageRule[]
+): CodeGraphLanguageRule | undefined {
+  const lower = file.toLowerCase();
+  return rules.find(
+    (rule) =>
+      rule.extensions.some((ext) => lower.endsWith(ext)) &&
+      !(rule.exclude_suffixes ?? []).some((suffix) => lower.endsWith(suffix))
+  );
 }

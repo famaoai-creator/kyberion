@@ -7,7 +7,7 @@ import { writeJson } from '@agent/core/foundation';
 import { handleAction } from '../index.js';
 import { validateReverseSpecEvidenceAt } from '@agent/core/mission';
 import { extractCodeGraph, type CodeGraphRegistry } from './extract-code-graph.js';
-import { loadCodeGraphEnumerationRules } from './enumeration-rules.js';
+import { loadCodeGraphEnumerationRules } from '@agent/core/source-analysis';
 
 const ROOT = pathResolver.rootDir();
 const FIXTURE_DIR = path.join(ROOT, 'libs/actuators/modeling-actuator/src/code-graph/__fixtures__');

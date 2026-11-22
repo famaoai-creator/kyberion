@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { loadCodeGraphEnumerationRules } from './enumeration-rules.js';
+import { loadCodeGraphEnumerationRules } from '@agent/core/source-analysis';
 import { loadGrammar } from './grammar-loader.js';
 
 describe('code-graph enumeration rules contract', () => {
