@@ -34,7 +34,6 @@ import {
 } from '@agent/shared-vision/browser-control-service';
 import { listBrowserControlSessions } from '@agent/shared-vision/browser-control-sessions';
 import { withExecutionContext, withExecutionContextAsync } from '@agent/core/authority';
-import { parseGuardedCliArgs } from '@agent/core/cli-guard';
 import { detectCliAgentPrincipal } from '@agent/core/governance/cli-operator-principal';
 import type { BrowserBridgeControlStep } from '@agent/shared-vision/browser-bridge-mailbox';
 import { ScriptExitError } from '../lib/harness.js';
@@ -51,10 +50,26 @@ export const BROWSER_CONTROL_USAGE = `Usage: pnpm kyberion browser control <verb
     common: [--session <BCS-…>] [--mission <id>] [--timeout-sec N] [--json]`;
 
 const STEP_OPS = new Set([
-  'snapshot', 'screenshot', 'extract_text_ref', 'list_tabs', 'open_tab',
-  'select_tab', 'navigate', 'click_ref', 'click_if_present', 'fill_ref',
-  'select_ref', 'press_ref', 'wait_for_ref', 'submit_form', 'upload_file',
-  'download_file', 'delete', 'purchase', 'credential_submit', 'settings_change',
+  'snapshot',
+  'screenshot',
+  'extract_text_ref',
+  'list_tabs',
+  'open_tab',
+  'select_tab',
+  'navigate',
+  'click_ref',
+  'click_if_present',
+  'fill_ref',
+  'select_ref',
+  'press_ref',
+  'wait_for_ref',
+  'submit_form',
+  'upload_file',
+  'download_file',
+  'delete',
+  'purchase',
+  'credential_submit',
+  'settings_change',
 ]);
 
 function fail(message: string): never {
@@ -243,11 +258,7 @@ async function deliverResult(
   );
   const json = parsed.options.json === true;
   if (record.status !== 'completed') {
-    printResult(
-      { status: record.status, error: record.response?.error },
-      json,
-      print
-    );
+    printResult({ status: record.status, error: record.response?.error }, json, print);
     throw new ScriptExitError(1, `step ${record.status}: ${record.response?.error ?? ''}`);
   }
   const secrets = drainStepSecrets(requestId);
@@ -296,7 +307,9 @@ export async function runBrowserControlCommand(
       );
       return;
     }
-    print(`waiting for operator approval: pnpm kyberion approvals --approve ${approval_request_id}`);
+    print(
+      `waiting for operator approval: pnpm kyberion approvals --approve ${approval_request_id}`
+    );
     await waitForApproval(approval_request_id, timeoutMs(parsed));
     const minted = mintSessionIfApproved(approval_request_id, {
       origin,
