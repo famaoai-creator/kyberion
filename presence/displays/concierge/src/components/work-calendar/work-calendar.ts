@@ -46,9 +46,47 @@ export function sourceGroup(source: CalendarSource | undefined): CalendarSourceG
           : 'work_item';
 }
 
+/** A provider/model working block (co-session participant or delegation). */
+export function isAgentSession(item: Pick<CalendarItem, 'source'>): boolean {
+  return item.source === 'agent_session';
+}
+
+/** An event in the installation owner's own (Google / Microsoft 365) calendar. */
+export function isExternalEvent(item: Pick<CalendarItem, 'source'>): boolean {
+  return item.source === 'external_event';
+}
+
 /** An appointment or history record, not a task: it is never due, overdue or counted in the summary. */
 export function isAppointment(item: Pick<CalendarItem, 'source'>): boolean {
-  return item.source === 'external_event' || item.source === 'agent_session';
+  return isExternalEvent(item) || isAgentSession(item);
+}
+
+/**
+ * The small role marker beside an entry: an i18n token for dated work, or
+ * `provider:<name>` for agent sessions — providers are proper nouns, not
+ * vocabulary. Literal knowledge of every source lives here, in the module
+ * that owns the union; consumers never compare `source === 'x'`.
+ */
+export function entryRoleToken(
+  entry: Pick<CalendarEntry, 'role'> & {
+    item: Pick<CalendarItem, 'source' | 'provider'>;
+  }
+): string {
+  if (isAgentSession(entry.item)) return `provider:${entry.item.provider ?? 'session'}`;
+  if (entry.role === 'start') return 'start';
+  if (entry.role === 'span') return 'underway';
+  switch (entry.item.source) {
+    case 'operation_run':
+      return 'run';
+    case 'operation_deadline':
+      return 'deadline';
+    case 'action_item':
+      return 'action';
+    case 'external_event':
+      return 'event';
+    default:
+      return 'due';
+  }
 }
 
 /** One event from `/api/calendar/external`. */

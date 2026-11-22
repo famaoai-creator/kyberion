@@ -18,8 +18,11 @@ import {
   addDays,
   buildCalendarGrid,
   calendarGridRange,
+  entryRoleToken,
   fromCalendarEntries,
   fromExternalEvents,
+  isAgentSession,
+  isExternalEvent,
   localCalendarDate,
   providerReloginCommand,
   shiftAnchor,
@@ -218,21 +221,10 @@ export function WorkCalendar({ t }: { t: Translate }) {
   );
 
   const roleLabel = (entry: CalendarEntry) => {
-    if (entry.item.source === 'agent_session') return entry.item.provider ?? 'session';
-    if (entry.role === 'start') return t('ia_shell_work_cal_start');
-    if (entry.role === 'span') return t('ia_shell_work_cal_underway');
-    switch (entry.item.source) {
-      case 'operation_run':
-        return t('ia_shell_work_cal_run');
-      case 'operation_deadline':
-        return t('ia_shell_work_cal_deadline');
-      case 'action_item':
-        return t('ia_shell_work_cal_action');
-      case 'external_event':
-        return t('ia_shell_work_cal_event');
-      default:
-        return t('ia_shell_work_cal_due');
-    }
+    const token = entryRoleToken(entry);
+    return token.startsWith('provider:')
+      ? token.slice('provider:'.length)
+      : t(`ia_shell_work_cal_${token}`);
   };
 
   const toggleGroup = (group: CalendarSourceGroup) =>
@@ -247,9 +239,7 @@ export function WorkCalendar({ t }: { t: Translate }) {
     const limit = view === 'month' ? MONTH_CELL_ENTRIES : Infinity;
     // Week view: sessions live in the hour lane, not the flat entry list.
     const listed =
-      view === 'week'
-        ? day.entries.filter((entry) => entry.item.source !== 'agent_session')
-        : day.entries;
+      view === 'week' ? day.entries.filter((entry) => !isAgentSession(entry.item)) : day.entries;
     const shown = listed.slice(0, limit);
     const hidden = listed.length - shown.length;
     return (
@@ -272,7 +262,7 @@ export function WorkCalendar({ t }: { t: Translate }) {
         {view === 'week'
           ? (() => {
               const sessions = day.entries
-                .filter((entry) => entry.item.source === 'agent_session')
+                .filter((entry) => isAgentSession(entry.item))
                 .map((entry) => ({ entry, span: sessionSpanForDay(entry.item, day.date) }))
                 .filter((row) => row.span);
               if (!sessions.length) return null;
@@ -346,7 +336,7 @@ export function WorkCalendar({ t }: { t: Translate }) {
                   <a
                     href={entry.item.href}
                     title={entry.item.title}
-                    {...(entry.item.source === 'external_event'
+                    {...(isExternalEvent(entry.item)
                       ? { target: '_blank', rel: 'noreferrer' }
                       : {})}
                   >
