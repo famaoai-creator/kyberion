@@ -1789,12 +1789,13 @@ async function handleMfaChallenge(lease, recording, session) {
 // ---------------------------------------------------------------------------
 //
 // Native Messaging stays the only transport: the extension polls the native
-// host (`poll_requests`) and answers with `respond_request`. The poller runs
-// every minute via chrome.alarms, every 5 s while a Side Panel holds a
-// `sidepanel` port, and every 5 s for a bounded window after control_step
-// activity (the native call each tick performs keeps the MV3 service worker
-// warm — no side panel needed for an interactive control loop). Nothing here
-// answers a request on its own: observe_tab
+// host (`poll_requests`) and answers with `respond_request`. Delivery is
+// hinted — a persistent port subscribes to `watch_mailbox` and the host taps
+// `mailbox_hint` when the request files change, so new work lands in ~1-2 s.
+// Polling remains the fallback: every minute via chrome.alarms, every 5 s
+// while a Side Panel holds a `sidepanel` port, and every 5 s for a bounded
+// window after control_step activity (each tick's native call keeps the MV3
+// service worker warm). Nothing here answers a request on its own: observe_tab
 // needs an explicit click in the Side Panel, local_infer runs in the Side Panel
 // (Built-in AI document APIs are unavailable in a service worker), and
 // approval_pending notifications are display-only.
@@ -2084,6 +2085,43 @@ async function pollMailbox() {
 function schedulePoll() {
   return withInboxLock(pollMailbox).catch(() => undefined);
 }
+
+// ---------------------------------------------------------------------------
+// Mailbox push hint — the host watches request files on a persistent port and
+// taps us on the shoulder, which is what kills the ~1 min first-step wait.
+// Pull polling stays the transport: the hint never carries request bodies.
+// ---------------------------------------------------------------------------
+let mailboxPushPort = null;
+let mailboxPushRetryTimer = null;
+
+function connectMailboxPush() {
+  if (mailboxPushPort) return;
+  try {
+    const port = chrome.runtime.connectNative(NATIVE_HOST);
+    port.onMessage.addListener((message) => {
+      if (message?.type === 'mailbox_hint') {
+        void schedulePoll();
+      }
+      // mailbox_heartbeat frames only keep this service worker warm.
+    });
+    port.onDisconnect.addListener(() => {
+      if (mailboxPushPort === port) mailboxPushPort = null;
+      void chrome.runtime.lastError; // native errors are non-fatal; pull still works
+      if (!mailboxPushRetryTimer) {
+        mailboxPushRetryTimer = setTimeout(() => {
+          mailboxPushRetryTimer = null;
+          connectMailboxPush();
+        }, 30_000);
+      }
+    });
+    mailboxPushPort = port;
+    port.postMessage({ type: 'watch_mailbox' });
+  } catch {
+    mailboxPushPort = null;
+  }
+}
+
+connectMailboxPush();
 
 function startFastPoll() {
   if (fastPollTimer) return;

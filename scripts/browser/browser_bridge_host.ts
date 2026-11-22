@@ -70,6 +70,7 @@ import { resolveCliOperatorIdentity } from '@agent/core/governance/cli-operator-
 import { withExecutionContext, withExecutionContextAsync } from '@agent/core/authority';
 import {
   BrowserBridgeMailboxError,
+  browserBridgeMailboxSignature,
   listDeliverableBrowserBridgeRequests,
   listPendingApprovalsForBridge,
   loadBrowserBridgeRequest,
@@ -1215,6 +1216,62 @@ function handleStoreArtifact(message: any): HostResponse {
   }
 }
 
+/**
+ * watch_mailbox: push channel for the extension's persistent port. The
+ * mailbox stays the source of truth and the transport stays one-way per
+ * message — this is only a "something changed, come poll" tap on the
+ * shoulder. The watcher diffs a cheap file signature; request bodies never
+ * cross this channel. A heartbeat frame every ~24 s keeps the MV3 service
+ * worker warm so the push actually arrives.
+ */
+const MAILBOX_WATCH_INTERVAL_MS = 1_500;
+const MAILBOX_WATCH_HEARTBEAT_TICKS = 16;
+let mailboxWatchTimer: ReturnType<typeof setInterval> | null = null;
+
+function handleWatchMailbox(): HostResponse {
+  if (!mailboxWatchTimer) {
+    let lastSignature = '';
+    let ticksSinceHeartbeat = 0;
+    const push = (type: 'mailbox_hint' | 'mailbox_heartbeat') => {
+      void writeFrame({ ok: true, type }).catch(() => {
+        /* the port may be gone — the next scan retries or stdin ends us */
+      });
+    };
+    const scan = () => {
+      let signature = '';
+      try {
+        signature = browserBridgeMailboxSignature();
+      } catch {
+        signature = '';
+      }
+      if (signature !== lastSignature) {
+        lastSignature = signature;
+        push('mailbox_hint');
+        ticksSinceHeartbeat = 0;
+        return;
+      }
+      ticksSinceHeartbeat += 1;
+      if (ticksSinceHeartbeat >= MAILBOX_WATCH_HEARTBEAT_TICKS) {
+        ticksSinceHeartbeat = 0;
+        push('mailbox_heartbeat');
+      }
+    };
+    const stop = () => {
+      if (mailboxWatchTimer) {
+        clearInterval(mailboxWatchTimer);
+        mailboxWatchTimer = null;
+      }
+    };
+    // Unref'd so it never keeps a one-shot host alive past stdin close; the
+    // listener re-arms cleanly if a later connection re-subscribes.
+    process.stdin.once('end', stop);
+    mailboxWatchTimer = setInterval(scan, MAILBOX_WATCH_INTERVAL_MS);
+    mailboxWatchTimer.unref?.();
+    scan(); // first frame delivers anything already queued
+  }
+  return { ok: true, watching: true };
+}
+
 const SEND_PAGE_MAX_TEXT = 30_000;
 
 function canonicalPageOrigin(value: unknown): string | null {
@@ -1528,6 +1585,7 @@ export function handle(message: any): HostResponse | Promise<HostResponse> {
     poll_requests: () => handlePollRequests(),
     respond_request: () => handleRespondRequest(message),
     store_artifact: () => handleStoreArtifact(message),
+    watch_mailbox: () => handleWatchMailbox(),
     send_page: () => handleSendPage(message),
     submit_inspection: () => handleSubmitInspection(message),
   };
