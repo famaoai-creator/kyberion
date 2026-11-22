@@ -307,7 +307,7 @@ describe('separation-of-duties consumer registry', () => {
 
   it('terminal decisions record the operator principal, never the display name', () => {
     expect(read('scripts/lib/approval-cli-decision.ts')).toContain('resolveCliApprovalDecider(');
-    for (const file of ['scripts/kyberion_home.ts', 'scripts/cli.ts']) {
+    for (const file of ['scripts/lib/approvals-subcommand.ts', 'scripts/cli.ts']) {
       const source = read(file);
       expect(source).toContain('decideApprovalFromCli(');
       expect(source).not.toMatch(/decidedBy:\s*resolveOperatorDisplayName\(\)/);

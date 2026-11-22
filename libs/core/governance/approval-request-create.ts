@@ -101,6 +101,12 @@ export function createApprovalRequest(
      * partition (approval-store-location.ts approvalPartitionForScope).
      */
     tenantActive?: boolean;
+    /**
+     * Trusted, registry-derived delegation target for a delegable external
+     * operation — enables `approvals --delegate` to compose an exact charter
+     * grant for this effect's destination.
+     */
+    delegationTarget?: import('./external-operation-target.js').CharterExternalOperationTarget;
   }
 ): ApprovalRequestRecord {
   if (params.decisionCard) validateDecisionCard(params.decisionCard);
@@ -192,6 +198,7 @@ export function createApprovalRequest(
     expiresAt: params.expiresAt,
     requestedByContext: params.requestedByContext,
     target: params.target,
+    ...(params.delegationTarget ? { delegation_target: params.delegationTarget } : {}),
     justification: params.justification,
     risk: params.risk,
     workflow: params.workflow,

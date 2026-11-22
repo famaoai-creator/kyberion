@@ -92,6 +92,30 @@ After the grant is installed, `pnpm onboarding llm attest --tenant <t>
 --apply --accept` executes **without** a human approval request and records
 `delegated_via_charter` + `grant_hash` in the audit.
 
+### Simpler composition paths (no hand-written plan JSON)
+
+- **Discoverability**: `pnpm kyberion approvals` marks each pending request
+  carrying a delegation target with a `charter-delegable` hint line, and the
+  summary footer lists `--delegate <id>` alongside `--approve`/`--deny`.
+- **`pnpm kyberion approvals --delegate <request-id>`** converts a pending
+  delegable external-operation request into an authority plan in one step:
+  the request's stored, registry-derived `delegation_target` is re-validated,
+  wrapped into a `grant` plan (default expiry +90 days; `--expires-at <ISO>`
+  overrides), previewed, and submitted as an onboarding-authority request.
+  Approve that request (`approvals --approve`), then
+  `onboarding authority apply --request-id <id>` — the human ceremony is
+  unchanged. The original pending request still needs its own decision;
+  delegation applies to future calls. Requests for non-delegable operations
+  or without a recorded target refuse with a reason.
+- **`pnpm onboarding authority preview --grant <operation_id>
+[--grant-field key=value …] [--mode grant|revoke] --expires-at <ISO>
+--scope person|organization [--tenant <slug>]`** composes the same plan
+  input without `--file`. Each `--grant` opens a grant; following
+  `--grant-field` entries attach to it; composed grants are validated by the
+  delegation registry (unknown operations/fields and wildcards fail). Then
+  continue with `request --file <saved preview>` exactly as above.
+  `--file` and `--grant` are mutually exclusive.
+
 ## 4. Routine operations cadence
 
 - Dot charter (`dots/<name>.json`): `operations_cadence` (tick / standup /

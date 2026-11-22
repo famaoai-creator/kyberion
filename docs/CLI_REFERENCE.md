@@ -57,50 +57,50 @@ Every governed `kyberion` command and `pnpm` script, generated from the command 
 
 ### Operate
 
-| Command                               | pnpm script           | What it does                                                                                                                                                       |
-| ------------------------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `pnpm kyberion approvals`             |                       | Review and decide approval requests (--approve/--deny <id>; add --new-window from an agent CLI without a TTY)                                                      |
-| `pnpm kyberion calendar`              |                       | Calendar workflow: status, agenda, free/busy, events — **[readiness]** · Live ops need: trusted task binding (see `kyberion task`)                                 |
-| `pnpm kyberion calendar create-event` |                       | Create a calendar event (approval-gated) — **[state change]** · Needs: trusted task binding (see `kyberion task`), task credentials (see `kyberion service setup`) |
-| `pnpm kyberion capture`               |                       | Capture a still image of the screen, a window, or the camera — **[state change]** · Needs: OS consent (see `kyberion permissions`)                                 |
-| `pnpm kyberion draw`                  |                       | Generate an image — **[state change]** · Needs: local backend (see `kyberion tool setup`)                                                                          |
-| `pnpm kyberion email`                 |                       | Email workflow: status, drafts, delivery, archive — **[readiness]** · Live ops need: trusted task binding (see `kyberion task`)                                    |
-| `pnpm kyberion email deliver`         |                       | Send an approved email draft — **[state change]** · Needs: trusted task binding (see `kyberion task`), task credentials (see `kyberion service setup`)             |
-| `pnpm kyberion email draft`           |                       | Draft email replies from a triage file — **[state change]** · Needs: trusted task binding (see `kyberion task`), task credentials (see `kyberion service setup`)   |
-| `pnpm kyberion feedback`              |                       | Record feedback or a correction for a past intent                                                                                                                  |
-| `pnpm kyberion notify`                |                       | Inspect or configure notification targets — **[state change]**                                                                                                     |
-| `pnpm kyberion procedure`             |                       | List, inspect, repair, promote, or run registered procedures                                                                                                       |
-| `pnpm kyberion record`                |                       | Record an OS demonstration with screen evidence — **[state change]** · Needs: OS consent (see `kyberion permissions`)                                              |
-| `pnpm kyberion record audio`          |                       | Record audio — **[state change]** · Needs: OS consent (see `kyberion permissions`)                                                                                 |
-| `pnpm kyberion record camera`         |                       | Record the camera — **[state change]** · Needs: OS consent (see `kyberion permissions`)                                                                            |
-| `pnpm kyberion record screen`         |                       | Record the screen — **[state change]** · Needs: OS consent (see `kyberion permissions`)                                                                            |
-| `pnpm kyberion schedule`              |                       | Manage scheduled pipelines                                                                                                                                         |
-| `pnpm kyberion speak`                 |                       | Speak text aloud — Needs: local backend (see `kyberion voice setup`)                                                                                               |
-| `pnpm kyberion work inventory`        | `pnpm work:inventory` | Manage the work inventory                                                                                                                                          |
-| `pnpm kyberion write`                 |                       | Author a document from a semantic brief — **[state change]**                                                                                                       |
+| Command                               | pnpm script           | What it does                                                                                                                                                                   |
+| ------------------------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `pnpm kyberion approvals`             |                       | Review and decide approval requests (--approve/--deny <id>; --delegate <id> composes a charter grant plan for delegable ops; add --new-window from an agent CLI without a TTY) |
+| `pnpm kyberion calendar`              |                       | Calendar workflow: status, agenda, free/busy, events — **[readiness]** · Live ops need: trusted task binding (see `kyberion task`)                                             |
+| `pnpm kyberion calendar create-event` |                       | Create a calendar event (approval-gated) — **[state change]** · Needs: trusted task binding (see `kyberion task`), task credentials (see `kyberion service setup`)             |
+| `pnpm kyberion capture`               |                       | Capture a still image of the screen, a window, or the camera — **[state change]** · Needs: OS consent (see `kyberion permissions`)                                             |
+| `pnpm kyberion draw`                  |                       | Generate an image — **[state change]** · Needs: local backend (see `kyberion tool setup`)                                                                                      |
+| `pnpm kyberion email`                 |                       | Email workflow: status, drafts, delivery, archive — **[readiness]** · Live ops need: trusted task binding (see `kyberion task`)                                                |
+| `pnpm kyberion email deliver`         |                       | Send an approved email draft — **[state change]** · Needs: trusted task binding (see `kyberion task`), task credentials (see `kyberion service setup`)                         |
+| `pnpm kyberion email draft`           |                       | Draft email replies from a triage file — **[state change]** · Needs: trusted task binding (see `kyberion task`), task credentials (see `kyberion service setup`)               |
+| `pnpm kyberion feedback`              |                       | Record feedback or a correction for a past intent                                                                                                                              |
+| `pnpm kyberion notify`                |                       | Inspect or configure notification targets — **[state change]**                                                                                                                 |
+| `pnpm kyberion procedure`             |                       | List, inspect, repair, promote, or run registered procedures                                                                                                                   |
+| `pnpm kyberion record`                |                       | Record an OS demonstration with screen evidence — **[state change]** · Needs: OS consent (see `kyberion permissions`)                                                          |
+| `pnpm kyberion record audio`          |                       | Record audio — **[state change]** · Needs: OS consent (see `kyberion permissions`)                                                                                             |
+| `pnpm kyberion record camera`         |                       | Record the camera — **[state change]** · Needs: OS consent (see `kyberion permissions`)                                                                                        |
+| `pnpm kyberion record screen`         |                       | Record the screen — **[state change]** · Needs: OS consent (see `kyberion permissions`)                                                                                        |
+| `pnpm kyberion schedule`              |                       | Manage scheduled pipelines                                                                                                                                                     |
+| `pnpm kyberion speak`                 |                       | Speak text aloud — Needs: local backend (see `kyberion voice setup`)                                                                                                           |
+| `pnpm kyberion work inventory`        | `pnpm work:inventory` | Manage the work inventory                                                                                                                                                      |
+| `pnpm kyberion write`                 |                       | Author a document from a semantic brief — **[state change]**                                                                                                                   |
 
 ## Operator commands
 
 ### Start
 
-| Command                                | pnpm script               | What it does                                                                                           |
-| -------------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------ |
-| `pnpm kyberion agy sdk-setup`          | `pnpm agy:sdk-setup`      | Set up the agy SDK — **[state change]**                                                                |
-| `pnpm kyberion env bootstrap`          | `pnpm env:bootstrap`      | Bootstrap the local environment                                                                        |
-| `pnpm kyberion kyberion`               | `pnpm kyberion`           | The kyberion CLI itself                                                                                |
-| `pnpm kyberion onboarding`             | `pnpm onboarding`         | Run the onboarding wizard (identity, services, tenant)                                                 |
-| `pnpm kyberion onboarding authority`   |                           | Review, request and apply human-approved scoped GitHub and browser authority                           |
-| `pnpm kyberion onboarding context`     | `pnpm onboarding:context` | Resolve tenant and organization context for onboarding                                                 |
-| `pnpm kyberion onboarding nhi-session` |                           | Request, apply, list and revoke human-approved NHI session admissions                                  |
-| `pnpm kyberion provider-cli setup`     | `pnpm provider-cli:setup` | Install or inspect managed provider CLIs                                                               |
-| `pnpm kyberion reasoning credentials`  |                           | Register, lend to tenants, extend, verify, meter and revoke reasoning credentials — **[state change]** |
-| `pnpm kyberion reasoning setup`        | `pnpm reasoning:setup`    | Set up a reasoning backend — **[state change]**                                                        |
-| `pnpm kyberion service setup`          | `pnpm service:setup`      | Set up external service connections — **[state change]**                                               |
-| `pnpm kyberion setup`                  |                           | Set up one area (onboarding, reasoning, env, services, tools, voice, ...) — **[state change]**         |
-| `pnpm kyberion setup report`           |                           | Report setup status and missing steps                                                                  |
-| `pnpm kyberion tool setup`             | `pnpm tool:setup`         | Install or inspect tool runtimes — **[state change]**                                                  |
-| `pnpm kyberion vital`                  |                           | Check operator readiness (vital signs) — **[readiness]**                                               |
-| `pnpm kyberion voice setup`            |                           | Check and set up voice readiness — **[state change]**                                                  |
+| Command                                | pnpm script               | What it does                                                                                                         |
+| -------------------------------------- | ------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `pnpm kyberion agy sdk-setup`          | `pnpm agy:sdk-setup`      | Set up the agy SDK — **[state change]**                                                                              |
+| `pnpm kyberion env bootstrap`          | `pnpm env:bootstrap`      | Bootstrap the local environment                                                                                      |
+| `pnpm kyberion kyberion`               | `pnpm kyberion`           | The kyberion CLI itself                                                                                              |
+| `pnpm kyberion onboarding`             | `pnpm onboarding`         | Run the onboarding wizard (identity, services, tenant)                                                               |
+| `pnpm kyberion onboarding authority`   |                           | Review, request and apply human-approved scoped authority (preview takes a plan file or --grant/--grant-field flags) |
+| `pnpm kyberion onboarding context`     | `pnpm onboarding:context` | Resolve tenant and organization context for onboarding                                                               |
+| `pnpm kyberion onboarding nhi-session` |                           | Request, apply, list and revoke human-approved NHI session admissions                                                |
+| `pnpm kyberion provider-cli setup`     | `pnpm provider-cli:setup` | Install or inspect managed provider CLIs                                                                             |
+| `pnpm kyberion reasoning credentials`  |                           | Register, lend to tenants, extend, verify, meter and revoke reasoning credentials — **[state change]**               |
+| `pnpm kyberion reasoning setup`        | `pnpm reasoning:setup`    | Set up a reasoning backend — **[state change]**                                                                      |
+| `pnpm kyberion service setup`          | `pnpm service:setup`      | Set up external service connections — **[state change]**                                                             |
+| `pnpm kyberion setup`                  |                           | Set up one area (onboarding, reasoning, env, services, tools, voice, ...) — **[state change]**                       |
+| `pnpm kyberion setup report`           |                           | Report setup status and missing steps                                                                                |
+| `pnpm kyberion tool setup`             | `pnpm tool:setup`         | Install or inspect tool runtimes — **[state change]**                                                                |
+| `pnpm kyberion vital`                  |                           | Check operator readiness (vital signs) — **[readiness]**                                                             |
+| `pnpm kyberion voice setup`            |                           | Check and set up voice readiness — **[state change]**                                                                |
 
 ### Inspect
 

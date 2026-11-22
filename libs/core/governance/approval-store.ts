@@ -274,6 +274,14 @@ export interface ApprovalRequestRecord extends ApprovalRequestDraft {
   /** Canonical authority scope of the effect being approved. */
   scope?: EventScope;
   /**
+   * Registry-derived charter delegation target for a delegable external
+   * operation — built server-side from the trusted effect via
+   * `resolveCharterExternalOperationTarget`, never from model payload claims.
+   * `pnpm kyberion approvals --delegate` re-validates this through
+   * `parseExternalOperationGrant` before composing a charter grant.
+   */
+  delegation_target?: import('./external-operation-target.js').CharterExternalOperationTarget;
+  /**
    * Autonomous-operation P1-6: what the operator sees on a phone — display
    * only, never the decision. See `decision-card.ts` / `approval-decision-card.ts`.
    */

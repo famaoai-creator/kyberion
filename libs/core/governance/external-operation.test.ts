@@ -242,6 +242,36 @@ describe('external operation common admission', () => {
       }
     );
   });
+  it('persists the registry-derived delegation target on requests for delegable operations only', () => {
+    const delegable = operation({
+      operationId: 'vcs:pr_create',
+      effect: {
+        body_source_tier: 'inline',
+        repository: {
+          url: 'https://github.com/acme/widgets',
+          host: 'github.com',
+          slug: 'acme/widgets',
+        },
+      },
+    });
+    delegable.authority = { ...delegable.authority!, hasHuman: true, charter: undefined };
+    expect(() => admitExternalOperation(delegable)).toThrow(ExternalOperationApprovalRequired);
+    expect(vi.mocked(createApprovalRequest).mock.calls[0]![1]).toEqual(
+      expect.objectContaining({
+        delegationTarget: {
+          operation_id: 'vcs:pr_create',
+          repository: 'https://github.com/acme/widgets',
+        },
+      })
+    );
+    vi.mocked(createApprovalRequest).mockClear();
+    // A non-registry operation id records no delegation target, so a later
+    // --delegate has nothing to compose a charter grant from.
+    const other = operation();
+    other.authority = { ...other.authority!, hasHuman: true, charter: undefined };
+    expect(() => admitExternalOperation(other)).toThrow(ExternalOperationApprovalRequired);
+    expect(vi.mocked(createApprovalRequest).mock.calls[0]![1].delegationTarget).toBeUndefined();
+  });
   it('refuses unreviewed executing interfaces even when an interactive human is available', () => {
     const input = operation({ operationId: 'unreviewed:execute' });
     input.authority = { ...input.authority!, hasHuman: true };

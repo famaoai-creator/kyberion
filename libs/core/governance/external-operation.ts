@@ -701,6 +701,14 @@ export function admitExternalOperation(input: ExternalOperation): ApprovalGateRe
         // An unbound CLI call never opens prompts or obtains standing delegation.
         hasHuman: authority?.hasHuman ?? false,
         ...(enqueueRequest ? { enqueueRequest: true } : {}),
+        ...(input.delegable
+          ? {
+              delegationTarget: resolveCharterExternalOperationTarget(
+                input.operationId,
+                input.effect
+              ),
+            }
+          : {}),
         ...(enqueueRequest && request?.requestScope ? { requestScope: request.requestScope } : {}),
         ...(charter ? { charter } : {}),
         ...(authority?.pipelineContext
