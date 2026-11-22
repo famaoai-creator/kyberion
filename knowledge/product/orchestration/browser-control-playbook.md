@@ -82,11 +82,11 @@ most recent active session is used. `--json` prints the raw response.
   extension grant: connect the tab once in the side panel ("このタブを接続")
   or the step fails with a permission hint. `tabs`/`tab`/`navigate` work
   without it.
-- Mailbox delivery is pull-based: the alarm poll runs ~1/min, so a session's
-  first step may wait up to a minute; once any control_step is seen the
-  extension holds a 5 s fast poll for a 5-minute activity window (each tick's
-  native call keeps the service worker warm) — interactive loops stay fast
-  without the side panel open.
+- Mailbox delivery is hinted, not polled: the extension holds a persistent
+  native port and the host pushes `mailbox_hint` when request files change
+  (~1-2 s pickup, first step included). If the push channel is down the alarm
+  poll (~1/min) plus a 5-minute fast-poll window after control_step activity
+  still guarantee delivery.
 - Sessions and the secrets side-channel are checkout-local — a step queued
   here is answered by the extension bound to this checkout's native host.
 

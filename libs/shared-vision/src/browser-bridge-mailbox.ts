@@ -53,6 +53,7 @@ import { pathResolver } from '@agent/core/path-resolver';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
+  safeLstat,
   safeMkdir,
   safeReaddir,
   safeUnlink,
@@ -439,6 +440,36 @@ function mailboxPartitions(): BrowserBridgeScope[] {
     }
   }
   return scopes;
+}
+
+/**
+ * Cheap change detector for the host's mailbox watcher: request count plus
+ * the newest mtime across all readable partitions. A new request file or a
+ * status rewrite bumps the signature without reading any request body.
+ */
+export function browserBridgeMailboxSignature(): string {
+  let count = 0;
+  let newest = 0;
+  for (const scope of mailboxPartitions()) {
+    const dir = partitionDir(scope);
+    let names: string[];
+    try {
+      names = safeReaddir(dir);
+    } catch {
+      continue;
+    }
+    for (const name of names) {
+      if (!name.endsWith('.json')) continue;
+      try {
+        const stat = safeLstat(path.posix.join(dir, name));
+        count += 1;
+        if (stat.mtimeMs > newest) newest = stat.mtimeMs;
+      } catch {
+        /* vanished between listing and stat — ignore */
+      }
+    }
+  }
+  return `${count}:${newest}`;
 }
 
 function requestIdsIn(scope: BrowserBridgeScope): string[] {

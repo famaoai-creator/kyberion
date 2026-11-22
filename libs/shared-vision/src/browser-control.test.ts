@@ -4,6 +4,7 @@ import { safeExistsSync, safeRmSync } from '@agent/core/secure-io';
 import {
   BROWSER_BRIDGE_MAILBOX_ROOT,
   BROWSER_CONTROL_SECRET_ROOT,
+  browserBridgeMailboxSignature,
   enqueueBrowserBridgeRequest,
   loadBrowserBridgeRequest,
   readBrowserControlSecrets,
@@ -106,7 +107,11 @@ describe('browser control sessions', () => {
     const admitted = admitControlStep(session.session_id, step, at(1));
     expect(admitted.ok).toBe(true);
     // A different high-risk step (different hash) is still gated.
-    const other = admitControlStep(session.session_id, { ...step, ref: 'e4', step_id: 't-10' }, at(1));
+    const other = admitControlStep(
+      session.session_id,
+      { ...step, ref: 'e4', step_id: 't-10' },
+      at(1)
+    );
     expect(other.ok === false && other.reason === 'approval_required').toBe(true);
   });
 
@@ -205,10 +210,26 @@ describe('control_step mailbox lifecycle', () => {
     ).toThrow(/echo the request step/);
   });
 
+  it('mailbox signature changes on enqueue and respond', () => {
+    const before = browserBridgeMailboxSignature();
+    const session = mint();
+    const request = enqueueStep(session);
+    const afterEnqueue = browserBridgeMailboxSignature();
+    expect(afterEnqueue).not.toBe(before);
+    respondBrowserBridgeRequest(
+      request.request_id,
+      {
+        status: 'completed',
+        origin: 'https://api.slack.com',
+        result: { step: { step_id: 't-1', op: 'click_ref' } },
+      },
+      { now: at(2) }
+    );
+    expect(browserBridgeMailboxSignature()).not.toBe(afterEnqueue);
+  });
+
   it('rejects arbitrary ops at schema validation', () => {
     const session = mint();
-    expect(() =>
-      enqueueStep(session, { op: 'evaluate' as never, text: 'alert(1)' })
-    ).toThrow();
+    expect(() => enqueueStep(session, { op: 'evaluate' as never, text: 'alert(1)' })).toThrow();
   });
 });

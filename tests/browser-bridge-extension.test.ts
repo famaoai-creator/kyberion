@@ -47,6 +47,7 @@ async function createHarness() {
   let alarmListener: ((alarm: { name: string }) => void) | undefined;
   let contextMenuListener: ((info: any, tab: any) => void) | undefined;
   const nativeCalls: any[] = [];
+  const nativePorts: Array<{ emit: (frame: Record<string, unknown>) => void }> = [];
   const store: Record<string, any> = {};
   const tab = { id: 42, windowId: 1, url: 'https://example.com/start', title: 'Example' };
   const hooks = {
@@ -133,7 +134,12 @@ async function createHarness() {
             });
           },
           disconnect: vi.fn(() => undefined),
+          // Push a host-initiated frame into the port (mailbox_hint tests).
+          emit: (response: Record<string, unknown>) => {
+            messageListeners.forEach((listener) => listener(response));
+          },
         };
+        nativePorts.push(port);
         return port;
       }),
     },
@@ -240,6 +246,7 @@ async function createHarness() {
     hooks,
     chrome,
     nativeCalls,
+    nativePorts,
     connectSidePanel,
     install: installedListener!,
     fireAlarm: (name: string) => alarmListener!({ name }),
@@ -950,6 +957,24 @@ describe('Browser Bridge mailbox inbox (受信)', () => {
     expect(pollCalls(harness)).toHaveLength(settled);
   });
 
+  it('subscribes to watch_mailbox on a persistent port and polls immediately on a hint', async () => {
+    const harness = await createHarness();
+    await flush();
+    expect(harness.nativeCalls.some((call) => call.type === 'watch_mailbox')).toBe(true);
+
+    mailboxHost(harness, []);
+    const port = harness.nativePorts.at(-1);
+    expect(port).toBeDefined();
+    port!.emit({ type: 'mailbox_hint' });
+    await flush();
+    expect(pollCalls(harness)).toHaveLength(1);
+
+    // Heartbeat frames keep the worker warm but never trigger a poll.
+    port!.emit({ type: 'mailbox_heartbeat' });
+    await flush();
+    expect(pollCalls(harness)).toHaveLength(1);
+  });
+
   it('stores the inbox, badges actionable items, and toasts new observe / approval items once', async () => {
     const harness = await createHarness();
     mailboxHost(
@@ -1559,7 +1584,8 @@ describe('Browser Bridge mailbox hardening', () => {
         expect(response.error).toContain('Side Panel');
       }
     }
-    expect(harness.nativeCalls).toHaveLength(0);
+    // The startup watch_mailbox subscription is unrelated to the senders above.
+    expect(harness.nativeCalls.filter((call) => call.type !== 'watch_mailbox')).toHaveLength(0);
 
     // A content script still records events and reads state as before.
     const state = await harness.send({ type: 'bridge:get-state' }, contentScript);
