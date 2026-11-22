@@ -8,6 +8,7 @@
   "operations": {
     "brave_web_search": {
       "type": "mcp",
+      "risk": "read",
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-brave-search"],
       "tool_name": "brave_web_search",
@@ -20,6 +21,7 @@
     },
     "brave_local_search": {
       "type": "mcp",
+      "risk": "read",
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-brave-search"],
       "tool_name": "brave_local_search",
