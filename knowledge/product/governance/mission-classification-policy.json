@@ -58,6 +58,61 @@
       "mission_class": "web_design_improvement"
     },
     {
+      "id": "class-code-change-reverse-spec-hint",
+      "match": {
+        "mission_type_hints": ["reverse_spec"]
+      },
+      "mission_class": "code_change"
+    },
+    {
+      "id": "class-code-change-reverse-spec-utterance",
+      "match": {
+        "utterance_patterns": [
+          "リバーススペック",
+          "既存コードから仕様",
+          "既存のコードから仕様",
+          "既存のソースコードから仕様",
+          "ソースコードから仕様",
+          "レガシーコードから仕様",
+          "レガシーの仕様を抽出",
+          "reverse spec",
+          "reverse-spec",
+          "specs from existing code",
+          "specification from existing code",
+          "specifications from legacy code",
+          "spec from the legacy code"
+        ]
+      },
+      "mission_class": "code_change"
+    },
+    {
+      "id": "class-code-change-legacy-migration-hint",
+      "match": {
+        "mission_type_hints": ["legacy_migration"]
+      },
+      "mission_class": "code_change"
+    },
+    {
+      "id": "class-code-change-legacy-migration-utterance",
+      "match": {
+        "utterance_patterns": [
+          "レガシー移行",
+          "レガシーマイグレーション",
+          "レガシーシステムの移行",
+          "レガシーシステムを移行",
+          "レガシーを移行",
+          "レガシーの再構築",
+          "レガシーシステムの再構築",
+          "legacy migration",
+          "legacy modernization",
+          "migrate the legacy",
+          "modernize the legacy",
+          "rebuild the legacy"
+        ]
+      },
+      "mission_class": "code_change"
+    },
+    {
       "id": "class-code-change-refactoring-hint",
       "match": {
         "mission_type_hints": ["refactoring", "code_change"]

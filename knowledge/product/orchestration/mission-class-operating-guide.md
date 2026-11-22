@@ -40,6 +40,19 @@ classify が決める「ミッションクラス」ごとに、**AI がどう進
 
 発話に「リファクタリング」「refactor this」などが含まれる場合も mission type を `refactoring` に昇格する。feature と混ぜない。
 
+### 1.2 `code_change` の specialization: mission type `reverse_spec` / `legacy_migration`
+
+どちらも新しい MissionClass ではない。既存コードから仕様を起こす作業と、その仕様をもとにした作り直しを、それぞれ専用ワークフローに載せる。
+
+| 項目           | reverse_spec                                                                  | legacy_migration                                                                           |
+| -------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| workflow       | `reverse-spec-extraction`                                                     | `legacy-migration-rebuild`                                                                 |
+| playbook       | [`engineering-reverse-spec-playbook`](./engineering-reverse-spec-playbook.md) | [`engineering-legacy-migration-playbook`](./engineering-legacy-migration-playbook.md)      |
+| 不変条件       | 解析対象は参照専用。全記述に `path:line` 根拠、確かめられないことは UNKNOWN   | 入力は監査済み（purpose=rebuild）の reverse_spec。パリティシナリオで旧システムと同等を証明 |
+| チームテンプレ | `development`（alias）                                                        | `development`（alias）                                                                     |
+
+「既存コードから仕様を抽出」「リバーススペック」などの発話は `reverse_spec` に、「レガシー移行」「legacy migration」などは `legacy_migration` に昇格する。両方を含む依頼は、仕様化が先なので `reverse_spec` になる。通常の DB マイグレーションは feature のまま。
+
 ## 2. 共通原則
 
 1. AI は「準備・分析・照合・草案・記録」を担い、「承認・確定・約束・支払・採否」は人間が行う(posture が既定値)。

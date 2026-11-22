@@ -1033,6 +1033,72 @@
       "notes": "Explicit mission_type=refactoring under class code_change binds code-refactoring-aidlc (audit→pin→reshape→equivalence)."
     },
     {
+      "scenario_id": "code-reverse-spec-mission-hint",
+      "utterance": "既存コードから仕様と振る舞いを根拠つきで抽出して",
+      "classification_input": {
+        "progress_signals": ["plan_ready"],
+        "mission_type_hint": "reverse_spec",
+        "execution_shape": "mission"
+      },
+      "work_scope_input": {
+        "catalog_minimum_shape": "mission",
+        "replay_or_variant_likelihood": true,
+        "high_stakes_or_dogfood_evidence": true
+      },
+      "expected": {
+        "execution_shape": "mission",
+        "mission_class": "code_change",
+        "delivery_shape": "single_artifact",
+        "risk_profile": "review_required",
+        "stage": "planning",
+        "workflow_id": "reverse-spec-extraction",
+        "workflow_pattern": "aidlc_code_change",
+        "review_mode": "standard",
+        "required_gate_ids": [
+          "CONTRACT_VALID",
+          "QA_READY",
+          "INTENT_DRIFT",
+          "ARTIFACT_BUNDLE",
+          "DELIVERABLE_QUALITY"
+        ],
+        "promotion_required": true
+      },
+      "notes": "Explicit mission_type=reverse_spec under class code_change binds reverse-spec-extraction (scope→code graph→analysis→specify→independent audit)."
+    },
+    {
+      "scenario_id": "code-legacy-migration-mission-hint",
+      "utterance": "監査済みの仕様をもとにレガシー移行して新しいスタックで再構築して",
+      "classification_input": {
+        "progress_signals": ["plan_ready"],
+        "mission_type_hint": "legacy_migration",
+        "execution_shape": "mission"
+      },
+      "work_scope_input": {
+        "catalog_minimum_shape": "mission",
+        "replay_or_variant_likelihood": true,
+        "high_stakes_or_dogfood_evidence": true
+      },
+      "expected": {
+        "execution_shape": "mission",
+        "mission_class": "code_change",
+        "delivery_shape": "single_artifact",
+        "risk_profile": "review_required",
+        "stage": "planning",
+        "workflow_id": "legacy-migration-rebuild",
+        "workflow_pattern": "aidlc_code_change",
+        "review_mode": "standard",
+        "required_gate_ids": [
+          "CONTRACT_VALID",
+          "QA_READY",
+          "INTENT_DRIFT",
+          "ARTIFACT_BUNDLE",
+          "DELIVERABLE_QUALITY"
+        ],
+        "promotion_required": true
+      },
+      "notes": "Explicit mission_type=legacy_migration under class code_change binds legacy-migration-rebuild (brief→decisions→parity pin→rebuild→equivalence)."
+    },
+    {
       "scenario_id": "web-design-improvement-ja",
       "utterance": "設定画面がごちゃごちゃして見づらいので、選択できる項目は選択式にしてUI改善してほしい",
       "classification_input": {

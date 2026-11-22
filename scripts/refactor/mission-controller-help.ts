@@ -200,7 +200,7 @@ Mission Input Contract:
     --tenant-slug <slug>           # multi-tenant isolation (^[a-z][a-z0-9-]{1,30}$)
     --organization-id <ORG>        # selects KYBERION_STANCE for org-specific defaults
     --org <ORG>                    # alias for --organization-id
-    --mission-type <TYPE>          # e.g. development | code_change | refactoring | operations_report
+    --mission-type <TYPE>          # e.g. development | code_change | refactoring | reverse_spec | legacy_migration | operations_report
     --vision-ref <REF>            Defaults to the active customer vision when KYBERION_STANCE is set
     --org-role <NAME>              # Org Role (legacy alias: --persona)
     --dry-run

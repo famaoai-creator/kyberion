@@ -22,7 +22,7 @@ export interface MissionWorkflowSelectionInput {
   missionTypeHint?: string;
   intentId?: string;
   taskType?: string;
-  /** When set, refactoring utterance markers promote taskType to `refactoring`. */
+  /** When set, specialized code-change utterance markers (refactoring, reverse_spec, legacy_migration) promote the type. */
   utterance?: string;
 }
 
@@ -30,8 +30,8 @@ export {
   loadRefactoringUtterancePatterns,
   resolveEffectiveMissionType,
   utteranceRequestsRefactoring,
-} from './mission-refactoring-routing.js';
-import { resolveEffectiveMissionType } from './mission-refactoring-routing.js';
+} from './mission-type-promotion.js';
+import { resolveEffectiveMissionType } from './mission-type-promotion.js';
 
 export type WorkflowPhaseGateCheckKind =
   | 'evidence_exists'
@@ -313,6 +313,16 @@ export function resolveMissionWorkflowDesign(
     code_change: {
       missionClass: 'code_change',
       taskType: 'development',
+    },
+    // Spec extraction from existing code and legacy rebuild: same mission_class,
+    // dedicated task types so their workflows win over code-change-aidlc.
+    reverse_spec: {
+      missionClass: 'code_change',
+      taskType: 'reverse_spec',
+    },
+    legacy_migration: {
+      missionClass: 'code_change',
+      taskType: 'legacy_migration',
     },
     customer_onboarding: {
       missionClass: 'customer_engagement',

@@ -27,6 +27,38 @@
       ]
     },
     {
+      "name": "reverse_spec",
+      "files": [
+        {
+          "path": "TASK_BOARD.md",
+          "content_template": "# TASK_BOARD: {MISSION_ID}\n\n## 🛡️ Governance Pre-flight\n- [ ] Branch: `{BRANCH}` (Should not be main/master)\n- [ ] Initial Hash: `{HASH}`\n- [ ] Checkpoint: Initial state recorded\n- [ ] Playbook: engineering-reverse-spec-playbook (gates decide completion, not self-report)\n\n## Vision Context\n- Tenant: {TENANT_ID}\n- Vision: {VISION_REF}\n- Mission type: reverse_spec (extract specs from existing code; the source stays read-only)\n\n## Status: Planned\n\n### 🛠️ Execution Phase\n- [ ] Step 1: Pin the baseline + purpose + scope; inventory existing docs as unverified claims\n- [ ] Step 2: Build the code-graph denominator (two-route reconciliation) and freeze it\n- [ ] Step 3: Analyze every node (ARCH/REQ/API/DATA/BEHAVIOR/NFR) or record a decision for excluding it\n- [ ] Step 4: Write specs with path:line evidence and confidence labels; UNKNOWN instead of guesses\n- [ ] Step 5: Independent verification by a different agent; zero open fabricated claims; source intact\n\n### 🧠 Distillation & Reflex Phase\n- [ ] Step 6: Knowledge Distillation\n- [ ] Step 7: Mission Logic\n- [ ] Step 8: Final Cleanup\n"
+        }
+      ],
+      "knowledge_injections": [
+        {
+          "tier": "public",
+          "domains": ["orchestration"],
+          "tags": ["reverse-spec", "specification", "verification", "playbook"]
+        }
+      ]
+    },
+    {
+      "name": "legacy_migration",
+      "files": [
+        {
+          "path": "TASK_BOARD.md",
+          "content_template": "# TASK_BOARD: {MISSION_ID}\n\n## 🛡️ Governance Pre-flight\n- [ ] Branch: `{BRANCH}` (Should not be main/master)\n- [ ] Initial Hash: `{HASH}`\n- [ ] Checkpoint: Initial state recorded\n- [ ] Playbook: engineering-legacy-migration-playbook (starts from an audited rebuild-purpose reverse_spec)\n\n## Vision Context\n- Tenant: {TENANT_ID}\n- Vision: {VISION_REF}\n- Mission type: legacy_migration (rebuild a legacy system on a target stack from its specs)\n\n## Status: Planned\n\n### 🛠️ Execution Phase\n- [ ] Step 1: Brief: audited source spec mission, objective, success metrics, target stack, scope\n- [ ] Step 2: Decide paradigm, migrate/discard per essence spec, and the migration strategy\n- [ ] Step 3: Pin parity scenarios on the legacy (record known bugs as fail_recorded)\n- [ ] Step 4: Rebuild on the target stack traced to spec ids\n- [ ] Step 5: Prove equivalence on the target; approve every deviation\n\n### 🧠 Distillation & Reflex Phase\n- [ ] Step 6: Knowledge Distillation\n- [ ] Step 7: Mission Logic\n- [ ] Step 8: Final Cleanup\n"
+        }
+      ],
+      "knowledge_injections": [
+        {
+          "tier": "public",
+          "domains": ["orchestration"],
+          "tags": ["legacy-migration", "modernization", "verification", "playbook"]
+        }
+      ]
+    },
+    {
       "name": "code_change",
       "files": [
         {

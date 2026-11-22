@@ -82,6 +82,8 @@ export * from './testing/software-quality-report-reader.js';
 
 export * from './analysis/source-analysis.js';
 
+export * from './analysis/source-fingerprint.js';
+
 export * from './agent/agentic-source-review.js';
 
 export * from './agent/agentic-source-review-verification.js';

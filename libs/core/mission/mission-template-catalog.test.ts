@@ -7,6 +7,8 @@ describe('mission template catalog', () => {
     expect(catalog.templates.map((template) => template.name)).toEqual([
       'development',
       'refactoring',
+      'reverse_spec',
+      'legacy_migration',
       'code_change',
       'meeting_facilitation',
       'operations',

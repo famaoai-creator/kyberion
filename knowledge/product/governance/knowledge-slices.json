@@ -70,6 +70,87 @@
       ]
     },
     {
+      "id": "reverse-spec-planner",
+      "description": "Planners on reverse_spec missions pin the evidence contract (baseline, denominator, confidence labels) before shaping NEXT_TASKS.",
+      "match": {
+        "team_role": "planner",
+        "mission_type": "reverse_spec"
+      },
+      "pinned": ["knowledge/product/orchestration/engineering-reverse-spec-playbook.md"]
+    },
+    {
+      "id": "reverse-spec-implementer",
+      "description": "Implementers on reverse_spec missions pin the extraction rules: code-graph denominator, path:line citations, UNKNOWN instead of guesses, read-only source.",
+      "match": {
+        "team_role": "implementer",
+        "mission_type": "reverse_spec"
+      },
+      "pinned": ["knowledge/product/orchestration/engineering-reverse-spec-playbook.md"]
+    },
+    {
+      "id": "reverse-spec-tester",
+      "description": "Testers on reverse_spec missions act as the independent verifier: check that each cited line actually supports its claim.",
+      "match": {
+        "team_role": "tester",
+        "mission_type": "reverse_spec"
+      },
+      "pinned": ["knowledge/product/orchestration/engineering-reverse-spec-playbook.md"]
+    },
+    {
+      "id": "reverse-spec-reviewer",
+      "description": "Reviewers on reverse_spec missions check that specs capture rebuild-relevant essence rather than current-stack implementation detail.",
+      "match": {
+        "team_role": "reviewer",
+        "mission_type": "reverse_spec"
+      },
+      "pinned": ["knowledge/product/orchestration/engineering-reverse-spec-playbook.md"]
+    },
+    {
+      "id": "legacy-migration-planner",
+      "description": "Planners on legacy_migration missions pin the brief/disposition/strategy contract and its human holds.",
+      "match": {
+        "team_role": "planner",
+        "mission_type": "legacy_migration"
+      },
+      "pinned": [
+        "knowledge/product/orchestration/engineering-legacy-migration-playbook.md",
+        "knowledge/product/orchestration/engineering-reverse-spec-playbook.md"
+      ]
+    },
+    {
+      "id": "legacy-migration-implementer",
+      "description": "Implementers on legacy_migration missions rebuild only what approved specs and dispositions say, traced to spec ids.",
+      "match": {
+        "team_role": "implementer",
+        "mission_type": "legacy_migration"
+      },
+      "pinned": ["knowledge/product/orchestration/engineering-legacy-migration-playbook.md"]
+    },
+    {
+      "id": "legacy-migration-tester",
+      "description": "Testers on legacy_migration missions own parity scenarios pinned on the legacy and equivalence on the target.",
+      "match": {
+        "team_role": "tester",
+        "mission_type": "legacy_migration"
+      },
+      "pinned": [
+        "knowledge/product/orchestration/engineering-legacy-migration-playbook.md",
+        "knowledge/product/orchestration/engineering-refactoring-playbook.md"
+      ]
+    },
+    {
+      "id": "legacy-migration-reviewer",
+      "description": "Reviewers on legacy_migration missions check spec fidelity, discarded-rule impact and deviation approvals.",
+      "match": {
+        "team_role": "reviewer",
+        "mission_type": "legacy_migration"
+      },
+      "pinned": [
+        "knowledge/product/orchestration/engineering-legacy-migration-playbook.md",
+        "knowledge/product/orchestration/blast-radius-playbook.md"
+      ]
+    },
+    {
       "id": "tester-verification-engineering",
       "description": "Testers pin the verification-skill playbook and search orchestration for benchmark/success-check guidance without filling the entire hint budget.",
       "match": {

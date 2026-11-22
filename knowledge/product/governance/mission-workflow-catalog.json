@@ -11774,6 +11774,744 @@
       ]
     },
     {
+      "id": "reverse-spec-extraction",
+      "pattern": "aidlc_code_change",
+      "description": "Reverse Spec Flow: extract traceable, independently verified specifications from existing code (pinned baseline, code-graph denominator, path:line citations, UNKNOWN instead of guesses, source intact). Binds engineering-reverse-spec-playbook.",
+      "playbook_ref": "knowledge/product/orchestration/engineering-reverse-spec-playbook.md",
+      "match": {
+        "mission_classes": ["code_change"],
+        "execution_shapes": ["mission"],
+        "task_types": ["reverse_spec"]
+      },
+      "phases": [
+        "intake",
+        "classification",
+        {
+          "id": "ingest",
+          "title": "取り込み・スコープ確定",
+          "kind": "judgment",
+          "default_tasks": [
+            {
+              "task_id_suffix": "scope",
+              "team_role": "planner",
+              "description": "解析対象の断面(コミット)・目的(maintenance/evaluation/rebuild)・範囲と除外・既存資料の棚卸しを evidence/reverse-spec-scope.json に固定する。既存資料は検証待ちの主張(unverified_claim)として扱い、解析対象は参照専用とする",
+              "deliverable": "evidence/reverse-spec-scope.json",
+              "acceptance_criteria": [
+                "source_root と baseline_commit(または VCS が無い理由)が固定されている",
+                "purpose と範囲・除外が明示されている",
+                "既存資料がすべて unverified_claim として棚卸しされている"
+              ],
+              "expected_output_format": "structured",
+              "estimated_scope": "M",
+              "risk": "medium"
+            }
+          ],
+          "exit_gate": {
+            "id": "REVERSE_SPEC_SCOPE_CONFIRMED",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/reverse-spec-scope.json"
+                }
+              },
+              {
+                "kind": "command_succeeds",
+                "params": {
+                  "command": "node",
+                  "args": [
+                    "--import",
+                    "{REPO_ROOT}/scripts/ts-loader.mjs",
+                    "{REPO_ROOT}/scripts/check/check_reverse_spec_evidence.ts",
+                    "--mission",
+                    "{MISSION_ID}",
+                    "--stage",
+                    "scope"
+                  ],
+                  "cwd": "{REPO_ROOT}"
+                }
+              },
+              {
+                "kind": "human_override"
+              }
+            ]
+          }
+        },
+        {
+          "id": "code_graph",
+          "title": "コードグラフ(網羅の分母)",
+          "kind": "deterministic",
+          "default_tasks": [
+            {
+              "task_id_suffix": "code-graph",
+              "team_role": "implementer",
+              "description": "モジュール・入口・外部境界のノードと依存エッジを機械的な全走査で列挙し、2 経路の突合(要素差分つき)と source fingerprint を含めて evidence/code-graph.json に出力する。狙い撃ちの grep で分母を作らない。凍結後の分母変更は人の判断を要する",
+              "deliverable": "evidence/code-graph.json",
+              "acceptance_criteria": [
+                "全ノードが path:line を持ち解析対象内に解決する",
+                "ノード種別ごとに 2 経路の件数と要素差分が記録され、差分には解消理由がある",
+                "source_fingerprint が記録されている"
+              ],
+              "expected_output_format": "structured",
+              "estimated_scope": "L",
+              "risk": "medium"
+            }
+          ],
+          "exit_gate": {
+            "id": "CODE_GRAPH_FROZEN",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/code-graph.json"
+                }
+              },
+              {
+                "kind": "command_succeeds",
+                "params": {
+                  "command": "node",
+                  "args": [
+                    "--import",
+                    "{REPO_ROOT}/scripts/ts-loader.mjs",
+                    "{REPO_ROOT}/scripts/check/check_reverse_spec_evidence.ts",
+                    "--mission",
+                    "{MISSION_ID}",
+                    "--stage",
+                    "code_graph"
+                  ],
+                  "cwd": "{REPO_ROOT}"
+                }
+              },
+              {
+                "kind": "human_override"
+              }
+            ]
+          }
+        },
+        {
+          "id": "analysis",
+          "title": "観点別分析",
+          "kind": "judgment",
+          "default_tasks": [
+            {
+              "task_id_suffix": "analysis",
+              "team_role": "implementer",
+              "description": "コードグラフの各ノードを ARCH/REQ/API/DATA/BEHAVIOR/NFR の観点で実装まで精読して分析し evidence/analysis-ledger.json に記録する。分母を縮める(対象外にする)ときは理由と決定記録(decision_ref)を残す",
+              "deliverable": "evidence/analysis-ledger.json",
+              "acceptance_criteria": [
+                "コードグラフの全ノードが分析済みか、決定記録つきで対象外になっている",
+                "分析項目 ID(ANA-<観点>-<n>)が一意である"
+              ],
+              "expected_output_format": "structured",
+              "estimated_scope": "L",
+              "risk": "medium"
+            }
+          ],
+          "exit_gate": {
+            "id": "DENOMINATOR_COVERED",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/analysis-ledger.json"
+                }
+              },
+              {
+                "kind": "command_succeeds",
+                "params": {
+                  "command": "node",
+                  "args": [
+                    "--import",
+                    "{REPO_ROOT}/scripts/ts-loader.mjs",
+                    "{REPO_ROOT}/scripts/check/check_reverse_spec_evidence.ts",
+                    "--mission",
+                    "{MISSION_ID}",
+                    "--stage",
+                    "analysis"
+                  ],
+                  "cwd": "{REPO_ROOT}"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "specify",
+          "title": "仕様化",
+          "kind": "judgment",
+          "default_tasks": [
+            {
+              "task_id_suffix": "specify",
+              "team_role": "implementer",
+              "description": "分析物から仕様書を evidence/specs/ に書き、仕様 ID・層(implementation/essence)・主張ごとの確度(confirmed/inferred/unknown)と path:line 根拠を evidence/spec-ledger.json に記録する。確かめられないことは推測で埋めず UNKNOWN 区分で残す",
+              "deliverable": "evidence/spec-ledger.json",
+              "acceptance_criteria": [
+                "confirmed の主張がすべて解決する path:line 根拠を持つ",
+                "unknown の主張に UNKNOWN 区分がある",
+                "全分析項目がいずれかの仕様に引用されている",
+                "evaluation/rebuild では技術非依存の本質層仕様がある"
+              ],
+              "expected_output_format": "files",
+              "estimated_scope": "L",
+              "risk": "medium",
+              "deliverable_kind": "doc"
+            }
+          ],
+          "exit_gate": {
+            "id": "SPECS_TRACEABLE",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/spec-ledger.json"
+                }
+              },
+              {
+                "kind": "command_succeeds",
+                "params": {
+                  "command": "node",
+                  "args": [
+                    "--import",
+                    "{REPO_ROOT}/scripts/ts-loader.mjs",
+                    "{REPO_ROOT}/scripts/check/check_reverse_spec_evidence.ts",
+                    "--mission",
+                    "{MISSION_ID}",
+                    "--stage",
+                    "specify"
+                  ],
+                  "cwd": "{REPO_ROOT}"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "audit",
+          "title": "独立検証・監査",
+          "kind": "judgment",
+          "default_tasks": [
+            {
+              "task_id_suffix": "independent-verify",
+              "team_role": "tester",
+              "description": "書き手とは別のエージェントが各主張を解析対象のソースと突き合わせ、引用行が主張を本当に裏付けるかを判定して evidence/verification-ledger.json に記録する。rebuild は全数、それ以外は母集団を宣言した標本で検証し、unsupported/fabricated を残さない",
+              "deliverable": "evidence/verification-ledger.json",
+              "acceptance_criteria": [
+                "検証者が仕様の書き手と異なる",
+                "unsupported / fabricated の未解消がゼロ",
+                "解析対象がコードグラフ凍結時から変更されていない"
+              ],
+              "expected_output_format": "structured",
+              "estimated_scope": "L",
+              "risk": "medium"
+            }
+          ],
+          "exit_gate": {
+            "id": "SPEC_AUDIT_PASSED",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/verification-ledger.json"
+                }
+              },
+              {
+                "kind": "command_succeeds",
+                "params": {
+                  "command": "node",
+                  "args": [
+                    "--import",
+                    "{REPO_ROOT}/scripts/ts-loader.mjs",
+                    "{REPO_ROOT}/scripts/check/check_reverse_spec_evidence.ts",
+                    "--mission",
+                    "{MISSION_ID}",
+                    "--stage",
+                    "audit"
+                  ],
+                  "cwd": "{REPO_ROOT}"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "self_review",
+          "title": "セルフレビュー",
+          "kind": "review",
+          "default_tasks": [
+            {
+              "task_id_suffix": "spec-review",
+              "team_role": "reviewer",
+              "description": "仕様が実装の都合ではなく作り直しに必要な本質を捉えているか、網羅・UNKNOWN の扱い・根拠の妥当性の観点でレビューする",
+              "review_target_suffix": "specify",
+              "acceptance_criteria": [
+                "must_fix 指摘が解消済み",
+                "ブロッキングな UNKNOWN の扱いが合意されている"
+              ],
+              "expected_output_format": "structured",
+              "estimated_scope": "S",
+              "risk": "medium"
+            }
+          ],
+          "exit_gate": {
+            "id": "SPEC_REVIEW_PASSED",
+            "checks": [
+              {
+                "kind": "reviewer_approved",
+                "params": {
+                  "task_id": "self_review-spec-review"
+                }
+              }
+            ]
+          }
+        },
+        "verification",
+        {
+          "id": "delivery",
+          "title": "デリバリー",
+          "kind": "deterministic",
+          "default_tasks": [
+            {
+              "task_id_suffix": "deliver",
+              "team_role": "implementer",
+              "description": "仕様書・索引(仕様 ID→ファイル、ソース→仕様の逆引き)・監査結果を引き渡し、evidence/delivery-report.md に記録する。仕様書はコード抜粋を含むためソースと同じ機密区分で扱う",
+              "deliverable": "evidence/delivery-report.md",
+              "acceptance_criteria": [
+                "仕様書と索引・監査結果がリンクされている",
+                "引き渡し先とデータ区分が記録されている"
+              ],
+              "expected_output_format": "files",
+              "estimated_scope": "S",
+              "risk": "medium",
+              "deliverable_kind": "doc"
+            }
+          ],
+          "exit_gate": {
+            "id": "DELIVERY_APPROVED",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/delivery-report.md"
+                }
+              },
+              {
+                "kind": "human_override"
+              }
+            ]
+          }
+        },
+        {
+          "id": "retrospective",
+          "title": "振り返り",
+          "kind": "judgment",
+          "default_tasks": [
+            {
+              "task_id_suffix": "retrospective",
+              "team_role": "planner",
+              "description": "学びと改善点を evidence/retrospective.md に蒸留し knowledge へ昇格候補を挙げる",
+              "deliverable": "evidence/retrospective.md",
+              "acceptance_criteria": [
+                "学びが成功・失敗の両面で記録されている",
+                "知識候補がない場合は理由を記録し、ある場合は候補IDと分類・承認・昇格の処理状態を記録している"
+              ],
+              "expected_output_format": "files",
+              "estimated_scope": "S",
+              "risk": "low",
+              "deliverable_kind": "doc"
+            }
+          ],
+          "exit_gate": {
+            "id": "RETROSPECTIVE_DONE",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/retrospective.md"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "legacy-migration-rebuild",
+      "pattern": "aidlc_code_change",
+      "description": "Legacy migration (Reimagine): rebuild an audited reverse_spec on a target stack — paradigm and rule-by-rule disposition, strategy, parity scenarios pinned on the legacy, equivalence proven on the target. Binds engineering-legacy-migration-playbook.",
+      "playbook_ref": "knowledge/product/orchestration/engineering-legacy-migration-playbook.md",
+      "match": {
+        "mission_classes": ["code_change"],
+        "execution_shapes": ["mission"],
+        "task_types": ["legacy_migration"]
+      },
+      "phases": [
+        "intake",
+        "classification",
+        {
+          "id": "intake_scope",
+          "title": "移行ブリーフ",
+          "kind": "judgment",
+          "default_tasks": [
+            {
+              "task_id_suffix": "migration-brief",
+              "team_role": "planner",
+              "description": "監査済み(purpose=rebuild)の reverse_spec ミッションを入力に、移行の目的・成功指標・移行先スタック・範囲を evidence/migration-brief.json に固定する",
+              "deliverable": "evidence/migration-brief.json",
+              "acceptance_criteria": [
+                "source_spec_mission_id の監査ゲートが通る",
+                "目的・成功指標・移行先スタック・範囲が明示されている"
+              ],
+              "expected_output_format": "structured",
+              "estimated_scope": "M",
+              "risk": "medium"
+            }
+          ],
+          "exit_gate": {
+            "id": "MIGRATION_BRIEF_READY",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/migration-brief.json"
+                }
+              },
+              {
+                "kind": "command_succeeds",
+                "params": {
+                  "command": "node",
+                  "args": [
+                    "--import",
+                    "{REPO_ROOT}/scripts/ts-loader.mjs",
+                    "{REPO_ROOT}/scripts/check/check_legacy_migration_evidence.ts",
+                    "--mission",
+                    "{MISSION_ID}",
+                    "--stage",
+                    "brief"
+                  ],
+                  "cwd": "{REPO_ROOT}"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "planning",
+          "title": "パラダイム・取捨・戦略",
+          "kind": "judgment",
+          "default_tasks": [
+            {
+              "task_id_suffix": "migration-decisions",
+              "team_role": "planner",
+              "description": "旧/新のパラダイムと差分を判断し、本質層の仕様ごとに migrate/discard/human_decision を決め、Strangler Fig・Big Bang・Parallel Run・Branch by Abstraction から戦略を選んで evidence/migration-decisions.json に記録する",
+              "deliverable": "evidence/migration-decisions.json",
+              "acceptance_criteria": [
+                "本質層の全仕様に処遇がある",
+                "human_decision が残っていない",
+                "戦略に却下した代替案と根拠がある"
+              ],
+              "expected_output_format": "structured",
+              "estimated_scope": "M",
+              "risk": "medium"
+            }
+          ],
+          "exit_gate": {
+            "id": "MIGRATION_STRATEGY_APPROVED",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/migration-decisions.json"
+                }
+              },
+              {
+                "kind": "command_succeeds",
+                "params": {
+                  "command": "node",
+                  "args": [
+                    "--import",
+                    "{REPO_ROOT}/scripts/ts-loader.mjs",
+                    "{REPO_ROOT}/scripts/check/check_legacy_migration_evidence.ts",
+                    "--mission",
+                    "{MISSION_ID}",
+                    "--stage",
+                    "decisions"
+                  ],
+                  "cwd": "{REPO_ROOT}"
+                }
+              },
+              {
+                "kind": "human_override"
+              }
+            ]
+          }
+        },
+        {
+          "id": "contract_authoring",
+          "title": "パリティ固定",
+          "kind": "judgment",
+          "default_tasks": [
+            {
+              "task_id_suffix": "parity-pin",
+              "team_role": "tester",
+              "description": "migrate する仕様ごとに Gherkin / golden / characterization のパリティシナリオを書き、旧システムでの結果(既知バグは fail_recorded として固定)を evidence/parity-matrix.json に記録する",
+              "deliverable": "evidence/parity-matrix.json",
+              "acceptance_criteria": [
+                "migrate の全仕様にシナリオがある",
+                "旧システムでの結果が記録されている"
+              ],
+              "expected_output_format": "files",
+              "estimated_scope": "M",
+              "risk": "medium",
+              "deliverable_kind": "doc"
+            }
+          ],
+          "exit_gate": {
+            "id": "PARITY_PINNED",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/parity-matrix.json"
+                }
+              },
+              {
+                "kind": "command_succeeds",
+                "params": {
+                  "command": "node",
+                  "args": [
+                    "--import",
+                    "{REPO_ROOT}/scripts/ts-loader.mjs",
+                    "{REPO_ROOT}/scripts/check/check_legacy_migration_evidence.ts",
+                    "--mission",
+                    "{MISSION_ID}",
+                    "--stage",
+                    "pin"
+                  ],
+                  "cwd": "{REPO_ROOT}"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "execution",
+          "title": "再構築",
+          "kind": "judgment",
+          "default_tasks": [
+            {
+              "task_id_suffix": "rebuild",
+              "team_role": "implementer",
+              "description": "承認済みの仕様と戦略に沿って移行先で実装し、仕様 ID とパリティシナリオの対応・実行結果を evidence/migration-report.md に記録する。仕様に無い振る舞いを推測で足さない",
+              "deliverable": "evidence/migration-report.md",
+              "acceptance_criteria": [
+                "実装が仕様 ID に紐づいている",
+                "パリティシナリオが移行先で green"
+              ],
+              "expected_output_format": "files",
+              "estimated_scope": "L",
+              "risk": "medium",
+              "deliverable_kind": "doc"
+            }
+          ],
+          "exit_gate": {
+            "id": "REBUILD_DONE",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/migration-report.md"
+                }
+              },
+              {
+                "kind": "command_succeeds",
+                "params": {
+                  "command": "node",
+                  "args": [
+                    "--import",
+                    "{REPO_ROOT}/scripts/ts-loader.mjs",
+                    "{REPO_ROOT}/scripts/check/check_legacy_migration_evidence.ts",
+                    "--mission",
+                    "{MISSION_ID}",
+                    "--stage",
+                    "implement"
+                  ],
+                  "cwd": "{REPO_ROOT}"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "test",
+          "title": "同等性検証",
+          "kind": "deterministic",
+          "default_tasks": [
+            {
+              "task_id_suffix": "equivalence-verify",
+              "team_role": "tester",
+              "description": "全パリティシナリオを移行先で実行し、結果と承認済みの逸脱を evidence/equivalence-report.json にまとめて旧システムとの同等性を証明する",
+              "deliverable": "evidence/equivalence-report.json",
+              "acceptance_criteria": [
+                "全シナリオに移行先の結果がある",
+                "逸脱はすべて理由と承認者つき"
+              ],
+              "expected_output_format": "files",
+              "estimated_scope": "M",
+              "risk": "medium",
+              "deliverable_kind": "doc"
+            }
+          ],
+          "exit_gate": {
+            "id": "MIGRATION_EQUIVALENCE_PROVEN",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/equivalence-report.json"
+                }
+              },
+              {
+                "kind": "command_succeeds",
+                "params": {
+                  "command": "node",
+                  "args": [
+                    "--import",
+                    "{REPO_ROOT}/scripts/ts-loader.mjs",
+                    "{REPO_ROOT}/scripts/check/check_legacy_migration_evidence.ts",
+                    "--mission",
+                    "{MISSION_ID}",
+                    "--stage",
+                    "equivalence"
+                  ],
+                  "cwd": "{REPO_ROOT}"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "self_review",
+          "title": "セルフレビュー",
+          "kind": "review",
+          "default_tasks": [
+            {
+              "task_id_suffix": "migration-review",
+              "team_role": "reviewer",
+              "description": "仕様への忠実性・破棄した業務ルールの影響・逸脱の妥当性・データ移行の安全性の観点で再構築をレビューする",
+              "review_target_suffix": "rebuild",
+              "acceptance_criteria": [
+                "must_fix 指摘が解消済み",
+                "破棄・逸脱に人間の承認記録がある"
+              ],
+              "expected_output_format": "structured",
+              "estimated_scope": "S",
+              "risk": "medium"
+            }
+          ],
+          "exit_gate": {
+            "id": "MIGRATION_REVIEW_PASSED",
+            "checks": [
+              {
+                "kind": "reviewer_approved",
+                "params": {
+                  "task_id": "self_review-migration-review"
+                }
+              }
+            ]
+          }
+        },
+        "verification",
+        {
+          "id": "delivery",
+          "title": "デリバリー",
+          "kind": "deterministic",
+          "default_tasks": [
+            {
+              "task_id_suffix": "deliver",
+              "team_role": "implementer",
+              "description": "移行ブリーフ・取捨・パリティ・同等性の証跡つきで PR/リリースし evidence/delivery-report.md に記録する",
+              "deliverable": "evidence/delivery-report.md",
+              "acceptance_criteria": [
+                "リリース/PR が作成されている",
+                "取捨・パリティ・同等性の証跡がリンクされている"
+              ],
+              "expected_output_format": "files",
+              "estimated_scope": "S",
+              "risk": "medium",
+              "deliverable_kind": "doc"
+            },
+            {
+              "task_id_suffix": "docs-sync",
+              "team_role": "implementer",
+              "description": "変更差分に対して pnpm check:docs-impact を実行し、ドキュメント面の抜け漏れを evidence/docs-sync-report.md に記録する。not_updated / unmapped の各項目は、ドキュメント更新を同じ変更に含めるか、対象外の理由をレポートの Resolution に記録して解消する",
+              "deliverable": "evidence/docs-sync-report.md",
+              "acceptance_criteria": [
+                "evidence/docs-sync-report.md に base・changed files・findings が記録されている",
+                "not_updated / unmapped の各項目について、ドキュメント更新または対象外理由が記録されている"
+              ],
+              "expected_output_format": "files",
+              "estimated_scope": "S",
+              "risk": "low",
+              "deliverable_kind": "doc",
+              "phase_kind": "implement"
+            }
+          ],
+          "exit_gate": {
+            "id": "DELIVERY_APPROVED",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/delivery-report.md"
+                }
+              },
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/docs-sync-report.md"
+                }
+              },
+              {
+                "kind": "human_override"
+              }
+            ]
+          }
+        },
+        {
+          "id": "retrospective",
+          "title": "振り返り",
+          "kind": "judgment",
+          "default_tasks": [
+            {
+              "task_id_suffix": "retrospective",
+              "team_role": "planner",
+              "description": "学びと改善点を evidence/retrospective.md に蒸留し knowledge へ昇格候補を挙げる",
+              "deliverable": "evidence/retrospective.md",
+              "acceptance_criteria": [
+                "学びが成功・失敗の両面で記録されている",
+                "知識候補がない場合は理由を記録し、ある場合は候補IDと分類・承認・昇格の処理状態を記録している"
+              ],
+              "expected_output_format": "files",
+              "estimated_scope": "S",
+              "risk": "low",
+              "deliverable_kind": "doc"
+            }
+          ],
+          "exit_gate": {
+            "id": "RETROSPECTIVE_DONE",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/retrospective.md"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
       "id": "code-refactoring-aidlc",
       "pattern": "aidlc_code_change",
       "description": "Structure-only refactoring under AI-DLC: audit smells, pin behavior, reshape atomically, prove equivalence. Binds engineering-refactoring-playbook.",
