@@ -105,6 +105,10 @@ describe('mission-classification', () => {
         { utterance: 'Plan the legacy migration to TypeScript' },
         'class-code-change-legacy-migration-utterance',
       ],
+      [
+        { utterance: 'レガシーを新しいスタックに移行したい' },
+        'class-code-change-legacy-migration-utterance',
+      ],
     ] as const;
     for (const [input, ruleId] of cases) {
       const result = resolveMissionClassification(input);

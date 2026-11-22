@@ -68,6 +68,16 @@ export class LegacyMigrationEvidenceError extends Error {
 
 type Json = Record<string, unknown>;
 
+/** First line of a nested gate error plus its first offending items, for the brief's message. */
+function nestedProblems(error: unknown): string {
+  if (!(error instanceof Error)) return String(error);
+  const problems = (error as { problems?: unknown }).problems;
+  const head = error.message.split('\n')[0];
+  return Array.isArray(problems) && problems.length
+    ? `${head}: ${problems.slice(0, 3).map(String).join('; ')}${problems.length > 3 ? ` (+${problems.length - 3})` : ''}`
+    : head;
+}
+
 function fail(message: string): never {
   throw new Error(`[LEGACY_MIGRATION_EVIDENCE] ${message}`);
 }
@@ -167,7 +177,7 @@ function validateBrief(
     }
   } catch (error) {
     problems.push(
-      `source reverse_spec mission ${brief.source_spec_mission_id} does not pass its audit: ${error instanceof Error ? error.message.split('\n')[0] : String(error)}`
+      `source reverse_spec mission ${brief.source_spec_mission_id} does not pass its audit: ${nestedProblems(error)} (run check_reverse_spec_evidence --mission ${brief.source_spec_mission_id} --stage audit for the full list)`
     );
   }
   if (problems.length)
@@ -262,7 +272,7 @@ function validatePin(missionDir: string, migrate: Set<string>): Map<string, stri
   for (const scenario of records(matrix.scenarios)) {
     const id = String(scenario.scenario_id ?? '');
     if (!id) {
-      problems.push('every scenario needs a scenario_id');
+      problems.push(`scenarios entry for ${String(scenario.spec_id ?? '?')} needs a scenario_id`);
       continue;
     }
     if (scenarios.has(id)) problems.push(`duplicate scenario id ${id}`);
@@ -360,7 +370,9 @@ export function validateLegacyMigrationEvidenceAt(
   options: LegacyMigrationValidationOptions = {}
 ): LegacyMigrationEvidenceResult {
   if (!(LEGACY_MIGRATION_EVIDENCE_STAGES as readonly string[]).includes(stage))
-    fail(`unknown stage ${stage}`);
+    fail(
+      `unknown stage ${stage} — why: not a legacy_migration gate stage | next: use one of ${LEGACY_MIGRATION_EVIDENCE_STAGES.join('|')}`
+    );
   const evidencePath = path.join(missionDir, LEGACY_MIGRATION_EVIDENCE_FILES[stage]);
   if (stage === 'implement') {
     validateImplement(missionDir);
@@ -399,6 +411,9 @@ export function assertLegacyMigrationEvidence(
   stage: LegacyMigrationEvidenceStage
 ): LegacyMigrationEvidenceResult {
   const dir = findMissionPath(missionId);
-  if (!dir) fail(`mission directory not found for ${missionId}`);
+  if (!dir)
+    fail(
+      `mission directory not found for ${missionId} — why: the mission locator returned nothing visible to this process | next: check the id with pnpm mission list (tier/tenant scope)`
+    );
   return validateLegacyMigrationEvidenceAt(dir, stage);
 }

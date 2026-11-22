@@ -225,10 +225,15 @@ function loadScope(
   source: SourceView;
 } {
   const scope = readJsonEvidence(missionDir, REVERSE_SPEC_EVIDENCE_FILES.scope);
-  if (!nonEmpty(scope.source_root)) fail('reverse-spec-scope.json: source_root required');
+  if (!nonEmpty(scope.source_root))
+    fail(
+      `reverse-spec-scope.json has no source_root — why: the gate cannot locate the analyzed source | next: set source_root to the copied target (active/shared/staging/<job>/) | evidence: ${REVERSE_SPEC_EVIDENCE_FILES.scope}`
+    );
   const purpose = scope.purpose;
   if (!(REVERSE_SPEC_PURPOSES as readonly unknown[]).includes(purpose))
-    fail(`reverse-spec-scope.json: purpose must be one of ${REVERSE_SPEC_PURPOSES.join('|')}`);
+    fail(
+      `reverse-spec-scope.json purpose is invalid — why: got ${String(purpose)} | next: set purpose to one of ${REVERSE_SPEC_PURPOSES.join('|')} | evidence: ${REVERSE_SPEC_EVIDENCE_FILES.scope}`
+    );
   return {
     scope,
     purpose: purpose as ReverseSpecPurpose,
@@ -248,15 +253,15 @@ function validateScope(missionDir: string): Record<string, number | string> {
   if (stringList(scope.in_scope).length < 1)
     problems.push('in_scope must list at least one path or area');
   if (!Array.isArray(scope.exclusions)) problems.push('exclusions must be an array (may be empty)');
-  for (const exclusion of records(scope.exclusions)) {
+  for (const [index, exclusion] of records(scope.exclusions).entries()) {
     if (!nonEmpty(exclusion.path) || !nonEmpty(exclusion.reason))
-      problems.push('each exclusion needs path and reason');
+      problems.push(`exclusions[${index}] needs path and reason`);
   }
   if (scope.uncovered_extensions !== undefined && !Array.isArray(scope.uncovered_extensions))
     problems.push('uncovered_extensions must be an array of {extension, reason}');
-  for (const entry of records(scope.uncovered_extensions)) {
+  for (const [index, entry] of records(scope.uncovered_extensions).entries()) {
     if (!nonEmpty(entry.extension) || !nonEmpty(entry.reason))
-      problems.push('each uncovered_extensions entry needs extension and reason');
+      problems.push(`uncovered_extensions[${index}] needs extension and reason`);
   }
   if (!Array.isArray(scope.references)) problems.push('references must be an array (may be empty)');
   for (const reference of records(scope.references)) {
@@ -602,7 +607,10 @@ function validateSpecDocument(
   }
   const dupClaims = duplicates(claimIds);
   if (dupClaims.length) problems.push(`duplicate claim ids: ${capList(dupClaims)}`);
-  if (claimIds.some((id) => !id)) problems.push('every claim needs a claim_id');
+  const unnamed = specs
+    .filter((spec) => records(spec.claims).some((claim) => !nonEmpty(claim.claim_id)))
+    .map((spec) => String(spec.spec_id ?? '?'));
+  if (unnamed.length) problems.push(`claims without claim_id in: ${capList(unnamed)}`);
   if (uncited.length)
     problems.push(`confirmed claims without a path:line citation: ${capList(uncited)}`);
   if (unresolved.length)
@@ -713,7 +721,9 @@ export function validateReverseSpecEvidenceAt(
   stage: ReverseSpecEvidenceStage
 ): ReverseSpecEvidenceResult {
   if (!(REVERSE_SPEC_EVIDENCE_STAGES as readonly string[]).includes(stage))
-    fail(`unknown stage ${stage}`);
+    fail(
+      `unknown stage ${stage} — why: not a reverse_spec gate stage | next: use one of ${REVERSE_SPEC_EVIDENCE_STAGES.join('|')}`
+    );
   const evidencePath = path.join(missionDir, REVERSE_SPEC_EVIDENCE_FILES[stage]);
   if (stage === 'scope')
     return { stage, path: evidencePath, ok: true, summary: validateScope(missionDir) };
@@ -781,7 +791,10 @@ export function readReverseSpecSpecIds(missionDir: string): { spec_id: string; l
 
 export function resolveReverseSpecMissionDir(missionId: string): string {
   const dir = findMissionPath(missionId);
-  if (!dir) fail(`mission directory not found for ${missionId}`);
+  if (!dir)
+    fail(
+      `mission directory not found for ${missionId} — why: the mission locator returned nothing visible to this process | next: check the id with pnpm mission list (tier/tenant scope)`
+    );
   return dir;
 }
 
