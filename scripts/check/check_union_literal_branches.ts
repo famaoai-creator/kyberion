@@ -75,14 +75,12 @@ const LITERAL_SOURCES: LiteralSource[] = [
 
 /**
  * Extra files allowed to branch on these literals — canonical projections
- * outside the declaring module, with a one-line reason each. Shrink-only.
+ * outside the declaring module, with a one-line reason each. Empty by
+ * design: a projection belongs inside the module that owns the union, so a
+ * non-empty list is itself debt. Pre-existing comparisons live in the
+ * baseline instead, which records them as shrink-only violations.
  */
-const PROJECTION_ALLOWLIST: Record<string, string> = {
-  'presence/displays/concierge/src/components/work-calendar/WorkCalendar.tsx':
-    'calendar view projection: renders per-source styling decided by sourceGroup',
-  'scripts/co-session-monitor/poll.ts':
-    'co-session monitor: per-provider dispatch decided by the provider registry',
-};
+const PROJECTION_ALLOWLIST: Record<string, string> = {};
 
 /** Directories scanned for literal comparisons (repo-relative). */
 const SCAN_DIRS = ['libs/core', 'scripts', 'presence/displays/concierge/src'];
