@@ -63,5 +63,9 @@ export interface GenerationSchedule {
   last_completed_at?: string;
   created_at: string;
   updated_at?: string;
-  [k: string]: unknown;
+  run_lock?: {
+    token: string;
+    acquiredAt: string;
+    expiresAt: string;
+  } | null;
 }

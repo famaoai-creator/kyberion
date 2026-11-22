@@ -44,7 +44,7 @@
         "scripts/check/check_ci_workflow_contract.ts"
       ],
       "owner": "release",
-      "rationale": "Keeps every workflow job time-boxed, pull_request workflows cancel superseded runs, actions on Node24 majors, and no redundant core build (operations-hygiene runbook \u00a7CI)."
+      "rationale": "Keeps every workflow job time-boxed, pull_request workflows cancel superseded runs, actions on Node24 majors, and no redundant core build (operations-hygiene runbook §CI)."
     },
     {
       "id": "golden",
@@ -557,6 +557,25 @@
       ],
       "owner": "experience",
       "rationale": "Checks generated vocabulary types."
+    },
+    {
+      "id": "contract-types",
+      "scope": "full",
+      "executable": "node",
+      "args": [
+        "--import",
+        "./scripts/ts-loader.mjs",
+        "scripts/generate/generate_types.ts",
+        "--check"
+      ],
+      "paths": [
+        "knowledge/product/schemas/*.schema.json",
+        "libs/core/contracts/*.ts",
+        "scripts/generate/generate_types.ts",
+        ".prettierrc*"
+      ],
+      "owner": "contracts",
+      "rationale": "Checks that generated contract type projections (json-schema-to-typescript, postprocessed for tier single-sourcing and prettier-canonical formatting) match the committed files — prevents hand edits and stale outputs from accumulating drift."
     },
     {
       "id": "pseudo-locale",
@@ -1082,7 +1101,7 @@
       "baseline": "knowledge/product/governance/orphan-baseline.json",
       "owner": "architecture",
       "timeout_ms": 240000,
-      "rationale": "OW-07: fails when a new orphan appears \u2014 an unimported libs/core module, an uninvoked script, an unreachable pipeline or an unreferenced actuator op; known exceptions are reasoned baseline entries that may only shrink. Repo-wide import scan cost grows with file count; the ~260-file governance catalog split pushed it past the 120s default on loaded runners, so this gate carries an explicit 240s budget."
+      "rationale": "OW-07: fails when a new orphan appears — an unimported libs/core module, an uninvoked script, an unreachable pipeline or an unreferenced actuator op; known exceptions are reasoned baseline entries that may only shrink. Repo-wide import scan cost grows with file count; the ~260-file governance catalog split pushed it past the 120s default on loaded runners, so this gate carries an explicit 240s budget."
     },
     {
       "id": "dep-cycles",

@@ -1,4 +1,5 @@
 import { compileFromFile } from 'json-schema-to-typescript';
+import { format as prettierFormat, resolveConfig as resolvePrettierConfig } from 'prettier';
 import { pathResolver } from '@agent/core/path-resolver';
 import { defineGenerator, isDirectScript, type GeneratedFile } from '../lib/harness.js';
 
@@ -7,7 +8,7 @@ interface GenerationTarget {
   outputPath: string;
 }
 
-const targets: GenerationTarget[] = [
+export const targets: GenerationTarget[] = [
   {
     schemaPath: 'knowledge/product/schemas/wisdom-action.schema.json',
     outputPath: 'libs/core/contracts/wisdom-action.ts',
@@ -118,6 +119,42 @@ const targets: GenerationTarget[] = [
   },
 ];
 
+/**
+ * Single-source the storage tier union: schemas declare the enum, the emitted
+ * type defers to `StorageDataTier` so the tier vocabulary lives in exactly one
+ * module (storage-layout.ts) instead of being reprinted in every contract.
+ */
+const TIER_UNION_MEMBER = `'(?:personal|confidential|public)'`;
+const TIER_UNION_PATTERN = new RegExp(
+  `(?<!\\|\\s*)${TIER_UNION_MEMBER}(?:\\s*\\|\\s*${TIER_UNION_MEMBER}){2}(?!\\s*\\|)`,
+  'g'
+);
+const TIER_UNION_MEMBERS = new Set(['personal', 'confidential', 'public']);
+const STORAGE_TIER_IMPORT = `import type { StorageDataTier } from '../storage-layout.js';`;
+
+const isTierUnion = (expression: string): boolean => {
+  const members = expression.match(/'(\w+)'/g)?.map((literal) => literal.slice(1, -1)) ?? [];
+  return (
+    members.length === TIER_UNION_MEMBERS.size && members.every((m) => TIER_UNION_MEMBERS.has(m))
+  );
+};
+
+export function substituteTierUnion(content: string): string {
+  let substitutedAny = false;
+  const substituted = content.replace(TIER_UNION_PATTERN, (match) => {
+    if (!isTierUnion(match)) return match;
+    substitutedAny = true;
+    return 'StorageDataTier';
+  });
+  if (!substitutedAny || substituted.includes(STORAGE_TIER_IMPORT)) return substituted;
+  return substituted.replace(/\nexport /, `\n${STORAGE_TIER_IMPORT}\nexport `);
+}
+
+async function postprocess(content: string): Promise<string> {
+  const config = (await resolvePrettierConfig(pathResolver.rootResolve('.prettierrc.json'))) ?? {};
+  return prettierFormat(substituteTierUnion(content), { ...config, parser: 'typescript' });
+}
+
 async function render(): Promise<GeneratedFile[]> {
   const files: GeneratedFile[] = [];
   for (const target of targets) {
@@ -137,7 +174,7 @@ async function render(): Promise<GeneratedFile[]> {
         singleQuote: true,
       },
     });
-    files.push({ path: outputPath, content: compiled });
+    files.push({ path: outputPath, content: await postprocess(compiled) });
   }
   return files;
 }
