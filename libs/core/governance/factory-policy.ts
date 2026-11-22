@@ -2,13 +2,21 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { isValidTenantSlug } from '../entity-scope.js';
 import { defineCatalog, type GovernedCatalog } from '../foundation/governed-catalog.js';
+import { createLogger } from '../logger.js';
+import {
+  readTenantGovernanceOverlays,
+  type TenantGovernanceOverlay,
+} from '../organization/tenant-governance-overlay.js';
 import * as pathResolver from '../path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync } from '../secure-io.js';
+
+const logger = createLogger('factory-policy');
 
 export const FACTORY_AUTONOMY_POLICY_REL =
   'knowledge/product/governance/factory-autonomy-policy.json';
 export const FACTORY_AUTONOMY_SCHEMA_REL =
   'knowledge/product/schemas/factory-autonomy-policy.schema.json';
+export const TENANT_FACTORY_POLICY_OVERLAY_FILE = 'factory-autonomy-policy.json';
 
 export const FACTORY_GRADUATABLE_ACTIONS = [
   'mission_start_mandate',
@@ -41,6 +49,8 @@ export interface FactoryAutonomyPolicy {
 export interface FactoryPolicyLoadOptions {
   policyPath?: string;
   rootDir?: string;
+  /** Merge confidential tenant overlays under knowledge/confidential/<slug>/governance/ (default true except with explicit policyPath). */
+  tenantOverlays?: boolean;
 }
 
 const DEFAULT_EMPTY_FACTORY_POLICY: FactoryAutonomyPolicy = {
@@ -76,6 +86,57 @@ function resolveSchemaPath(rootDir?: string): string {
   return candidates[0];
 }
 
+/**
+ * Merge confidential tenant governance overlays into the base factory policy.
+ * Each overlay is validated against the canonical schema and strictly scoped to
+ * its directory tenant; invalid overlays or foreign tenant keys are dropped with
+ * a warning rather than affecting other tenants.
+ */
+export function mergeTenantFactoryAutonomyOverlays(
+  base: FactoryAutonomyPolicy,
+  overlays: readonly TenantGovernanceOverlay[],
+  schemaPath?: string
+): FactoryAutonomyPolicy {
+  const resolvedSchemaPath = schemaPath ?? resolveSchemaPath();
+  const validator = defineCatalog<FactoryAutonomyPolicy>({
+    id: 'factory-autonomy-policy',
+    path: resolvedSchemaPath,
+    schema: resolvedSchemaPath,
+  });
+  const tenants: Record<string, FactoryTenantAutonomyConfig> = { ...base.tenants };
+  for (const overlay of overlays) {
+    if (!isValidTenantSlug(overlay.tenant_slug)) {
+      logger.warn(
+        `tenant overlay ignored — invalid tenant slug '${overlay.tenant_slug}' | next: use a valid tenant slug directory | evidence: ${overlay.path}`
+      );
+      continue;
+    }
+    try {
+      if (overlay.error) throw new Error(overlay.error);
+      const value = overlay.value;
+      if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        throw new Error('overlay must be a JSON object');
+      }
+      const validated = validator.validate(value, overlay.path);
+      for (const key of Object.keys(validated.tenants)) {
+        if (key !== overlay.tenant_slug) {
+          logger.warn(
+            `tenant ${overlay.tenant_slug} factory autonomy overlay ignored foreign tenant '${key}' — overlay scope is restricted to '${overlay.tenant_slug}' | next: remove '${key}' from ${overlay.path} | evidence: ${overlay.path}`
+          );
+        }
+      }
+      if (Object.hasOwn(validated.tenants, overlay.tenant_slug)) {
+        tenants[overlay.tenant_slug] = validated.tenants[overlay.tenant_slug]!;
+      }
+    } catch (error) {
+      logger.warn(
+        `tenant ${overlay.tenant_slug} factory autonomy overlay ignored — invalid file | next: fix ${overlay.path} | evidence: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
+  return { ...base, tenants };
+}
+
 export function loadFactoryAutonomyPolicy(
   options: FactoryPolicyLoadOptions = {}
 ): FactoryAutonomyPolicy {
@@ -88,19 +149,28 @@ export function loadFactoryAutonomyPolicy(
     }).load();
   }
   if (options.rootDir !== undefined) {
+    const schema = resolveSchemaPath(options.rootDir);
     const resolved = assertSafeRepositoryPath(
       path.resolve(options.rootDir, FACTORY_AUTONOMY_POLICY_REL),
       { allowMissingLeaf: true }
     );
-    return defineCatalog<FactoryAutonomyPolicy>({
+    const base = defineCatalog<FactoryAutonomyPolicy>({
       id: 'factory-autonomy-policy',
       path: resolved,
-      schema: resolveSchemaPath(options.rootDir),
+      schema,
       fallback: emptyFactoryPolicy,
       fallbackOnInvalid: false,
     }).load();
+    if (options.tenantOverlays === false) return base;
+    return mergeTenantFactoryAutonomyOverlays(
+      base,
+      readTenantGovernanceOverlays(TENANT_FACTORY_POLICY_OVERLAY_FILE, {
+        rootDir: options.rootDir,
+      }),
+      schema
+    );
   }
-  return getFactoryAutonomyPolicy();
+  return getFactoryAutonomyPolicy(options);
 }
 
 export function getFactoryAutonomyPolicy(
@@ -120,7 +190,13 @@ export function getFactoryAutonomyPolicy(
     });
     cachedRootDir = currentRoot;
   }
-  return cachedCatalog.load();
+  const base = cachedCatalog.load();
+  if (options?.tenantOverlays === false) return base;
+  return mergeTenantFactoryAutonomyOverlays(
+    base,
+    readTenantGovernanceOverlays(TENANT_FACTORY_POLICY_OVERLAY_FILE, { rootDir: currentRoot }),
+    resolveSchemaPath(currentRoot)
+  );
 }
 
 export function getTenantFactoryAutonomyConfig(
