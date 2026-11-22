@@ -451,10 +451,12 @@ export function composeMissionTeamPlan(input: {
   });
   const missionType =
     input.missionType || mapMissionClassToMissionTypeTemplate(missionClassification.mission_class);
-  // Structure-only / alias types reuse the development staffing template.
+  // Code-change specializations (refactoring, reverse_spec, legacy_migration) reuse the development staffing template.
   const TEAM_TEMPLATE_ALIASES: Record<string, string> = {
     refactoring: 'development',
     code_change: 'development',
+    reverse_spec: 'development',
+    legacy_migration: 'development',
   };
   const teamTemplateKey = TEAM_TEMPLATE_ALIASES[missionType] ?? missionType;
   const templates = loadMissionTeamTemplates(organizationProfile, compositionScope);

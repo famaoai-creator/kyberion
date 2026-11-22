@@ -508,6 +508,63 @@ describe('mission-workflow-catalog', () => {
     expect(auditGate?.checks.some((check) => check.kind === 'command_succeeds')).toBe(true);
   });
 
+  it('routes reverse_spec and legacy_migration hints and utterances onto their workflows', () => {
+    const design = (missionTypeHint: string, utterance?: string) =>
+      resolveMissionWorkflowDesign({
+        missionClass: 'code_change',
+        deliveryShape: 'single_artifact',
+        riskProfile: 'review_required',
+        stage: 'planning',
+        executionShape: 'mission',
+        missionTypeHint,
+        ...(utterance ? { utterance } : {}),
+      });
+    const reverseSpec = design('reverse_spec');
+    const migration = design('legacy_migration');
+
+    expect(reverseSpec.workflow_id).toBe('reverse-spec-extraction');
+    expect(design('development', '既存コードから仕様書を起こして').workflow_id).toBe(
+      'reverse-spec-extraction'
+    );
+    expect(migration.workflow_id).toBe('legacy-migration-rebuild');
+    expect(design('development', 'レガシー移行を進めたい').workflow_id).toBe(
+      'legacy-migration-rebuild'
+    );
+    // A combined request starts with the spec: a migration needs an audited spec first.
+    expect(
+      design('development', 'レガシー移行のために既存コードから仕様を抽出して').workflow_id
+    ).toBe('reverse-spec-extraction');
+    // Ordinary data or schema migrations stay feature work.
+    expect(design('development', 'add a database migration for the orders table').workflow_id).toBe(
+      'code-change-aidlc'
+    );
+    expect(reverseSpec.phases).toEqual(
+      expect.arrayContaining(['ingest', 'code_graph', 'analysis', 'specify', 'audit'])
+    );
+    for (const [workflow, phaseId, stage] of [
+      [reverseSpec, 'code_graph', 'code_graph'],
+      [reverseSpec, 'audit', 'audit'],
+      [migration, 'intake_scope', 'brief'],
+      [migration, 'test', 'equivalence'],
+    ] as const) {
+      const gate = workflow.phase_specs?.find((phase) => phase.id === phaseId)?.exit_gate;
+      const command = gate?.checks.find((check) => check.kind === 'command_succeeds');
+      expect((command?.params as { args?: string[] } | undefined)?.args).toEqual(
+        expect.arrayContaining(['--stage', stage])
+      );
+    }
+    const heldGates = (workflow: typeof reverseSpec) =>
+      (workflow.phase_specs ?? [])
+        .filter((phase) => phase.exit_gate?.checks.some((check) => check.kind === 'human_override'))
+        .map((phase) => phase.exit_gate?.id);
+    expect(heldGates(reverseSpec)).toEqual([
+      'REVERSE_SPEC_SCOPE_CONFIRMED',
+      'CODE_GRAPH_FROZEN',
+      'DELIVERY_APPROVED',
+    ]);
+    expect(heldGates(migration)).toEqual(['MIGRATION_STRATEGY_APPROVED', 'DELIVERY_APPROVED']);
+  });
+
   it('routes the operations_report mission-type hint onto the short org ops report process', () => {
     const workflow = resolveMissionWorkflowDesign({
       missionClass: 'operations_and_release',
@@ -549,7 +606,7 @@ describe('mission-workflow-catalog', () => {
     // Regression: a delivery task once shipped team_role 'reviewer' without a
     // review_target — expansion classified it review-kind, the board validator
     // rejected the task, and every loadAllNextTasks for those missions failed.
-    for (const missionTypeHint of ['development', 'refactoring']) {
+    for (const missionTypeHint of ['development', 'refactoring', 'legacy_migration']) {
       const design = resolveMissionWorkflowDesign({
         missionClass: 'code_change',
         deliveryShape: 'single_artifact',
@@ -568,5 +625,29 @@ describe('mission-workflow-catalog', () => {
       expect(docsSync?.review_target).toBeUndefined();
       expect(docsSync?.deliverable).toBe('evidence/docs-sync-report.md');
     }
+  });
+
+  it('expands the reverse_spec template into one deliverable per phase', () => {
+    const design = resolveMissionWorkflowDesign({
+      missionClass: 'code_change',
+      deliveryShape: 'single_artifact',
+      riskProfile: 'review_required',
+      stage: 'planning',
+      executionShape: 'mission',
+      missionTypeHint: 'reverse_spec',
+    });
+    const tasks = expandProcessTemplateTasks({ missionId: 'MSN-REVERSE-SPEC-EXPANSION', design });
+    expect(() => validatePlannedNextTasks(tasks, 'MSN-REVERSE-SPEC-EXPANSION')).not.toThrow();
+    expect(tasks.map((task) => [task.task_id, task.deliverable])).toEqual(
+      expect.arrayContaining([
+        ['ingest-scope', 'evidence/reverse-spec-scope.json'],
+        ['code_graph-code-graph', 'evidence/code-graph.json'],
+        ['analysis-analysis', 'evidence/analysis-ledger.json'],
+        ['specify-specify', 'evidence/spec-ledger.json'],
+        ['audit-independent-verify', 'evidence/verification-ledger.json'],
+      ])
+    );
+    const review = tasks.find((task) => task.task_id === 'self_review-spec-review');
+    expect(review?.review_target).toBe('specify-specify');
   });
 });

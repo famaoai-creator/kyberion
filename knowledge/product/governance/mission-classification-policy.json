@@ -58,6 +58,60 @@
       "mission_class": "web_design_improvement"
     },
     {
+      "id": "class-code-change-reverse-spec-hint",
+      "match": {
+        "mission_type_hints": ["reverse_spec"]
+      },
+      "mission_class": "code_change"
+    },
+    {
+      "id": "class-code-change-reverse-spec-utterance",
+      "match": {
+        "utterance_patterns": [
+          "リバーススペック",
+          "既存コードから仕様",
+          "ソースコードから仕様",
+          "コードから仕様書",
+          "仕様書を起こ",
+          "仕様を抽出",
+          "仕様抽出",
+          "reverse spec",
+          "reverse-spec",
+          "spec extraction",
+          "extract specifications from",
+          "extract a spec from"
+        ]
+      },
+      "mission_class": "code_change"
+    },
+    {
+      "id": "class-code-change-legacy-migration-hint",
+      "match": {
+        "mission_type_hints": ["legacy_migration"]
+      },
+      "mission_class": "code_change"
+    },
+    {
+      "id": "class-code-change-legacy-migration-utterance",
+      "match": {
+        "utterance_patterns": [
+          "レガシー移行",
+          "レガシーマイグレーション",
+          "レガシーシステムの移行",
+          "レガシーシステムを移行",
+          "レガシーを移行",
+          "レガシーの再構築",
+          "モダナイゼーション",
+          "legacy migration",
+          "legacy modernization",
+          "migrate the legacy",
+          "modernize the legacy",
+          "rebuild the legacy"
+        ]
+      },
+      "mission_class": "code_change"
+    },
+    {
       "id": "class-code-change-refactoring-hint",
       "match": {
         "mission_type_hints": ["refactoring", "code_change"]

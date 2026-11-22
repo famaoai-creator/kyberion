@@ -40,13 +40,15 @@ Internally, Kyberion maps each Request through:
 
 ### 3.1 Software delivery
 
-| Use case                          | Mission class                              | Primary pipeline(s)                                                                                                            |
-| --------------------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
-| Implement feature / fix bug       | `code_change`                              | `code-change-aidlc` (`implementation-plan` → mission dispatch → `code-review-cycle`)                                           |
-| Structure-only refactor           | `code_change` + mission type `refactoring` | `code-refactoring-aidlc` (audit → behavior pin → atomic reshape → equivalence); playbook `engineering-refactoring-playbook.md` |
-| Cut a release                     | `operations_and_release`                   | `release-package` → `deploy-release`                                                                                           |
-| Review a contract / spec          | `research_and_absorption`                  | `contract-review`                                                                                                              |
-| Review plain text / approval copy | `decision_support`                         | `review-text`                                                                                                                  |
+| Use case                          | Mission class                                   | Primary pipeline(s)                                                                                                                                  |
+| --------------------------------- | ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Implement feature / fix bug       | `code_change`                                   | `code-change-aidlc` (`implementation-plan` → mission dispatch → `code-review-cycle`)                                                                 |
+| Structure-only refactor           | `code_change` + mission type `refactoring`      | `code-refactoring-aidlc` (audit → behavior pin → atomic reshape → equivalence); playbook `engineering-refactoring-playbook.md`                       |
+| Extract specs from existing code  | `code_change` + mission type `reverse_spec`     | `reverse-spec-extraction` (scope → code-graph denominator → analysis → specify → independent audit); playbook `engineering-reverse-spec-playbook.md` |
+| Rebuild a legacy system           | `code_change` + mission type `legacy_migration` | `legacy-migration-rebuild` (brief → disposition/strategy → parity pin → rebuild → equivalence); playbook `engineering-legacy-migration-playbook.md`  |
+| Cut a release                     | `operations_and_release`                        | `release-package` → `deploy-release`                                                                                                                 |
+| Review a contract / spec          | `research_and_absorption`                       | `contract-review`                                                                                                                                    |
+| Review plain text / approval copy | `decision_support`                              | `review-text`                                                                                                                                        |
 
 ### 3.2 Customer-facing requirements to delivery
 
@@ -351,6 +353,7 @@ per the source's tier.
 ```
 1. code_change             - default class for source modifications
    · mission type `refactoring` (same class) binds `code-refactoring-aidlc` + engineering-refactoring-playbook
+   · mission types `reverse_spec` / `legacy_migration` (same class) bind `reverse-spec-extraction` / `legacy-migration-rebuild`
    · feature/bugfix keep mission type `development` / `code_change` → `code-change-aidlc`
 2. product_delivery        - end-to-end product shipment
 3. operations_and_release  - operations / release

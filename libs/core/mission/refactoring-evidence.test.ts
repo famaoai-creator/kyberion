@@ -4,7 +4,7 @@ import {
   loadRefactoringUtterancePatterns,
   resolveEffectiveMissionType,
   utteranceRequestsRefactoring,
-} from './mission-refactoring-routing.js';
+} from './mission-type-promotion.js';
 import { loadMissionClassificationPolicy } from './mission-classification.js';
 
 describe('refactoring evidence and mission-type promotion', () => {
@@ -37,6 +37,33 @@ describe('refactoring evidence and mission-type promotion', () => {
         matchedClassRuleId: 'class-code-change-refactoring-utterance',
       })
     ).toBe('refactoring');
+  });
+
+  it('promotes default types to reverse_spec / legacy_migration with spec-first precedence', () => {
+    expect(
+      resolveEffectiveMissionType({ missionType: 'development', utterance: 'レガシー移行したい' })
+    ).toBe('legacy_migration');
+    expect(
+      resolveEffectiveMissionType({
+        missionType: 'development',
+        utterance: 'レガシー移行の前に既存コードから仕様を抽出して',
+      })
+    ).toBe('reverse_spec');
+    expect(
+      resolveEffectiveMissionType({
+        missionType: 'development',
+        matchedClassRuleId: 'class-code-change-legacy-migration-hint',
+      })
+    ).toBe('legacy_migration');
+    expect(
+      resolveEffectiveMissionType({
+        missionType: 'reverse_spec',
+        utterance: 'リファクタリングして',
+      })
+    ).toBe('reverse_spec');
+    expect(
+      resolveEffectiveMissionType({ missionType: 'development', utterance: 'add a db migration' })
+    ).toBe('development');
   });
 
   it('rejects missing mission evidence without a directory', () => {

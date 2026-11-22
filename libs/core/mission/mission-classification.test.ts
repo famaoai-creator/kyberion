@@ -96,6 +96,23 @@ describe('mission-classification', () => {
     );
   });
 
+  it('routes reverse_spec and legacy_migration hints and utterances into code_change', () => {
+    const cases = [
+      [{ missionTypeHint: 'reverse_spec' }, 'class-code-change-reverse-spec-hint'],
+      [{ utterance: '既存コードから仕様を抽出したい' }, 'class-code-change-reverse-spec-utterance'],
+      [{ missionTypeHint: 'legacy_migration' }, 'class-code-change-legacy-migration-hint'],
+      [
+        { utterance: 'Plan the legacy migration to TypeScript' },
+        'class-code-change-legacy-migration-utterance',
+      ],
+    ] as const;
+    for (const [input, ruleId] of cases) {
+      const result = resolveMissionClassification(input);
+      expect(result.mission_class).toBe('code_change');
+      expect(result.matched_rules.mission_class_rule_id).toBe(ruleId);
+    }
+  });
+
   it('routes incident analysis hints and intents into operations_and_release (MO-01)', () => {
     const byHint = resolveMissionClassification({ missionTypeHint: 'incident_analysis' });
     const byIntent = resolveMissionClassification({ intentId: 'incident-analysis' });
