@@ -1,0 +1,22 @@
+{
+  "record_id": "mem-MSN-OPS-ALERT-WINDOW-20261122-2026_11_22",
+  "kind": "pattern",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "Bound rolling log dominance probes to a recency window and count actual sample keys",
+  "summary": "Bounding ops-health-probe alert dominance checks to a 24h recency window (ALERT_DOMINANCE_WINDOW_MS) prevents fixed historical bursts from permanently drowning live signal, and per-key counting selects the true dominant sample_key.",
+  "candidate_id": "mem-MSN-OPS-ALERT-WINDOW-20261122-2026_11_22",
+  "evidence_refs": [
+    "active/missions/public/MSN-OPS-ALERT-WINDOW-20261122/evidence/implementation-report.md",
+    "active/missions/public/MSN-OPS-ALERT-WINDOW-20261122/evidence/test-report.md",
+    "active/missions/public/MSN-OPS-ALERT-WINDOW-20261122/evidence/distillation.md"
+  ],
+  "created_at": "2026-11-22T05:41:13.433Z",
+  "applicability": ["mission", "mission:MSN-OPS-ALERT-WINDOW-20261122"],
+  "reusable_steps": [
+    "Bounding ops-health-probe alert dominance checks to a 24h recency window (ALERT_DOMINANCE_WINDOW_MS) prevents fixed historical bursts from permanently drowning live signal, and per-key counting selects the true dominant sample_key"
+  ],
+  "expected_outcome": "## Context\nWhen an append-only alert log like ops-alerts.jsonl is rotation-bounded, resolved historical incident bursts stay readable in the file after the emitter stops failing.\n\n## Pattern\n1. Filter timestamped rows against a bounded recency window (default 24h via ALERT_DOMINANCE_WINDOW_MS) while retaining un-timestamped rows fail-open and offering an explicit alertDominanceWindowMs <= 0 opt-out.\n2. Track exact per-key occurrence counts in a map instead of keeping the lexicographically largest key so sample_key and sample_key_count accurately identify the dominant alert cause.\n\n## Outcome\nLive ops-alerts.jsonl findings for daemon-watchdog dropped from 1 false alert_dominance finding (2092/2166 historical rows) to 0 under the 24h window, and unbounded mode accurately surfaces the true mode sample_key (1105 occurrences).",
+  "source_branch": "agent/factory-ops-alert-window",
+  "source_commit": "a856fb0598425de3d80b4eae85457c66c6ddde07"
+}

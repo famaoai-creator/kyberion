@@ -66,6 +66,8 @@ export const OPS_ALERTS_PATH = 'active/shared/observability/ops-alerts.jsonl';
 
 /** One alert key owning this share of the log = alert fatigue. */
 export const ALERT_DOMINANCE_RATIO = 0.5;
+/** Recency window for alert-dominance calculation so fixed historical bursts age out. */
+export const ALERT_DOMINANCE_WINDOW_MS = 24 * 60 * 60 * 1000;
 /** An append-only store over this multiple of its compact/rotate threshold is a finding. */
 export const STORE_OVERGROWTH_FACTOR = 2;
 /** Minimum absolute size before an over-threshold store is worth a ticket. */
@@ -103,6 +105,8 @@ export interface OpsHealthProbeDeps {
   fileWorkItems?: boolean;
   /** Ceiling for review_required stores (tests inject small values). */
   reviewRequiredMaxBytes?: number;
+  /** Recency window (ms) for alert dominance (default 24h; <= 0 scans all rows). */
+  alertDominanceWindowMs?: number;
 }
 
 /**
@@ -276,15 +280,39 @@ export function probeStaleCompactionCopies(deps: OpsHealthProbeDeps = {}): OpsFi
     }));
 }
 
+/** Pick the highest-frequency sample key for a source, breaking ties lexicographically. */
+function selectTopSampleKey(sourceKeyCounts: Map<string, number> | undefined): {
+  key: string;
+  count: number;
+} {
+  let sampleKey = '';
+  let sampleKeyCount = 0;
+  for (const [k, kCount] of sourceKeyCounts ?? []) {
+    if (
+      kCount > sampleKeyCount ||
+      (kCount === sampleKeyCount && (sampleKey === '' || k < sampleKey))
+    ) {
+      sampleKey = k;
+      sampleKeyCount = kCount;
+    }
+  }
+  return { key: sampleKey, count: sampleKeyCount };
+}
+
 /** One alert source dominating the log — the 93%-watchdog defect class.
  *  Keys embed detail segments (daemon sets, minute stamps), so dominance must
- *  group by the source prefix before the first ':' — a per-key count would
- *  fragment one noisy source into many <50% slices and never fire. */
+ *  group by the source prefix before the first ':'; timestamped rows outside the
+ *  recency window are excluded so resolved historical bursts age out, and the
+ *  representative sample_key picks the highest-frequency key. */
 export function probeAlertDominance(deps: OpsHealthProbeDeps = {}): OpsFinding[] {
   const alertPath = repoFile(deps.rootDir, OPS_ALERTS_PATH);
   if (!safeExistsSync(alertPath)) return [];
+  const nowMs = (deps.now?.() ?? new Date()).getTime();
+  const windowMs = deps.alertDominanceWindowMs ?? ALERT_DOMINANCE_WINDOW_MS;
+  const boundedWindowMs = Number.isFinite(windowMs) && windowMs > 0 ? windowMs : undefined;
+  const cutoffMs = boundedWindowMs !== undefined ? nowMs - boundedWindowMs : undefined;
   const counts = new Map<string, number>();
-  const topKey = new Map<string, { key: string; count: number }>();
+  const keyCounts = new Map<string, Map<string, number>>();
   let total = 0;
   // Streamed (the live file is rotation-bounded, but size must never make the
   // probe fail) and torn/malformed lines are skipped, not fatal.
@@ -295,25 +323,41 @@ export function probeAlertDominance(deps: OpsHealthProbeDeps = {}): OpsFinding[]
     // meta-records (undelivered-notification / redelivery / ack markers).
     if (typeof row?.dedupe_key !== 'string' && typeof row?.title !== 'string') continue;
     if (typeof row?.kind === 'string' && row.kind !== 'ops_alert') continue;
+    if (cutoffMs !== undefined && typeof row.timestamp === 'string') {
+      const parsedTs = Date.parse(row.timestamp);
+      if (!Number.isNaN(parsedTs) && parsedTs < cutoffMs) continue;
+    }
     total++;
     const key =
       typeof row.dedupe_key === 'string' ? row.dedupe_key : `${row.severity}:${row.title}`;
     const source = key.split(':', 1)[0] ?? key;
     counts.set(source, (counts.get(source) ?? 0) + 1);
-    const t = topKey.get(source);
-    if (!t || t.key < key) topKey.set(source, { key, count: 0 });
+    let sourceKeys = keyCounts.get(source);
+    if (!sourceKeys) {
+      sourceKeys = new Map<string, number>();
+      keyCounts.set(source, sourceKeys);
+    }
+    sourceKeys.set(key, (sourceKeys.get(key) ?? 0) + 1);
   }
   if (total < 20) return []; // too little data to call dominance
   const findings: OpsFinding[] = [];
   for (const [source, count] of counts) {
     if (count / total < ALERT_DOMINANCE_RATIO) continue;
+    const { key: sampleKey, count: sampleKeyCount } = selectTopSampleKey(keyCounts.get(source));
     findings.push({
       finding_id: findingId('alert_dominance', source),
       kind: 'alert_dominance',
       severity: 'warning',
-      summary: `alert source "${source}" is ${((count / total) * 100).toFixed(0)}% of ops-alerts (${count}/${total}) — signal is drowning (sample: ${(topKey.get(source)?.key ?? '').slice(0, 70)})`,
-      evidence: { source, count, total, sample_key: topKey.get(source)?.key },
-      detected_at: (deps.now?.() ?? new Date()).toISOString(),
+      summary: `alert source "${source}" is ${((count / total) * 100).toFixed(0)}% of ops-alerts (${count}/${total}) — signal is drowning (sample: ${sampleKey.slice(0, 70)})`,
+      evidence: {
+        source,
+        count,
+        total,
+        sample_key: sampleKey,
+        sample_key_count: sampleKeyCount,
+        window_ms: boundedWindowMs ?? null,
+      },
+      detected_at: new Date(nowMs).toISOString(),
     });
   }
   return findings;
