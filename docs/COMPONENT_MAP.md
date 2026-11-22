@@ -128,6 +128,8 @@ This path establishes identity files under `knowledge/personal/` and prepares th
 - `libs/core/mission/mission-controller-start-input.ts` carries approved scope into child controllers and provides the shared launcher for Surface, MCP and orchestration.
 - `scripts/mission/mission_admission_continuation.ts` checks readiness before claiming a WorkItem approval.
 - `scripts/continuous/continuous_work_owner.ts` provisions Project OS before a linked Mission.
+- `scripts/project/project_outer_loop_preview.ts` projects improvement candidates from the managed Project view within the selected scope. The preview supports standalone Projects and returns an explicit admission hold.
+- `libs/core/organization/continuous-operations.ts` owns observation-to-admission episodes. The resident cadence and organization CLI share the same checkpoint interpretation in `scripts/continuous/continuous_operations_cadence.ts`.
 - `libs/core/mission/mission-orchestration-events.ts`
 - `libs/core/mission/mission-orchestration-worker.ts`
 - `libs/core/agent/agent-runtime-supervisor.ts`

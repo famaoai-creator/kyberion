@@ -2,7 +2,11 @@
 import { randomUUID } from 'node:crypto';
 import { spawnManagedProcess, stopManagedProcess } from '@agent/core/managed-process';
 import { buildSafeExecEnv } from '@agent/core/secure-io';
-import { resolveContinuousOwnerPlatform } from './continuous_owner_platform.js';
+import {
+  continuousProcessContainment,
+  type ContinuousProcessContainment,
+  resolveContinuousOwnerPlatform,
+} from './continuous_owner_platform.js';
 
 export interface ContinuousOwnerProcessOptions {
   cwd: string;
@@ -10,12 +14,15 @@ export interface ContinuousOwnerProcessOptions {
   timeoutMs: number;
   maxOutputMB: number;
   signal?: AbortSignal;
+  onSpawn?: (process: ContinuousProcessContainment) => void;
 }
 export interface ContinuousOwnerProcessResult {
   stdout: string;
   stderr: string;
   status: number | null;
   error?: Error;
+  /** The OS rejected the spawn before a process ID existed. */
+  notSpawned?: true;
 }
 
 export function runContinuousOwnerProcess(
@@ -54,9 +61,6 @@ export function runContinuousOwnerProcess(
       bytes = 0,
       settled = false;
     let failure: Error | undefined;
-    invocation.writeInput?.(child, (error) => {
-      if (!settled) failure = error;
-    });
     const killGroup = () =>
       invocation.terminate(child, (error) => {
         failure = error;
@@ -72,7 +76,7 @@ export function runContinuousOwnerProcess(
       () => stop(new Error('Continuous owner controller deadline exceeded')),
       options.timeoutMs
     );
-    const finish = (status: number | null, error?: Error) => {
+    const finish = (status: number | null, error?: Error, notSpawned?: true) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
@@ -80,7 +84,13 @@ export function runContinuousOwnerProcess(
       killGroup();
       options.signal?.removeEventListener('abort', onAbort);
       stopManagedProcess(resourceId, null);
-      resolve({ stdout, stderr, status, ...(error || failure ? { error: error ?? failure } : {}) });
+      resolve({
+        stdout,
+        stderr,
+        status,
+        ...(error || failure ? { error: error ?? failure } : {}),
+        ...(notSpawned ? { notSpawned } : {}),
+      });
     };
     const append = (channel: 'stdout' | 'stderr', chunk: Buffer | string) => {
       bytes += Buffer.byteLength(chunk);
@@ -95,8 +105,17 @@ export function runContinuousOwnerProcess(
     child.stderr?.on('data', (chunk: Buffer) => append('stderr', chunk));
     child.on('error', (error: Error) => {
       failure = error;
-      if (!child.pid) finish(null, error);
+      if (!child.pid) finish(null, error, true);
     });
     child.on('close', (status: number | null) => finish(status));
+    try {
+      if (child.pid)
+        options.onSpawn?.(continuousProcessContainment(child.pid, invocation.detached));
+      invocation.writeInput?.(child, (error) => {
+        if (!settled) failure = error;
+      });
+    } catch (error) {
+      stop(error instanceof Error ? error : new Error(String(error)));
+    }
   });
 }

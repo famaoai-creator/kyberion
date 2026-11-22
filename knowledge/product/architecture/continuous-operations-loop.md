@@ -57,21 +57,35 @@ scope は tenant → organization → project を一致させる。状態は同�
 
 初版の境界を拡張し、収集 → 分析 → episode → 承認 → WorkItem → 実行 → 成果物・指標の再観測を接続した。
 
-| 経路                              | 実装と責任                                                                                                                                                                                                                      |
-| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 収集                              | snapshot、組織 facade の集計指標、charter 許可済み pipeline collector。取得失敗・古い値・別 scope は分配前に拒否する。pipeline の完了時刻で鮮度を検証する。                                                                     |
-| タスク                            | dot executor が既存 claim / lease の下で report pipeline を実行し、writeScopedArtifact でスコープ付き成果物を publish する。                                                                                                    |
-| project / mission / mission_group | レビュー済み work_plan を immutable admission として保持する。必ず human approval を要求し、通常 worker からの実行を拒否する。                                                                                                  |
-| lifecycle owner                   | mission owner 専用 port が governed project facade と mission_controller を子プロセスで実行する。project 作成、mission 作成、alignment approval、ticket import、bounded dispatch、phase gate、verify / distill を順に接続する。 |
-| 進行                              | ミッションの依存関係を DAG として検証する。前段の検証済み完了を待って次へ進み、approval / paused / blocked / uncertain を保持する。                                                                                             |
-| 再観測                            | admission、WorkItem、実行結果、成果物、project / mission の進捗を周期 report へ戻す。完了と指標改善は別々に観測する。                                                                                                           |
-| 常駐                              | 既存 agent-runtime-supervisor の continuous step がレビュー済み schedule.every_seconds を処理する。新 daemon は作らない。                                                                                                       |
+| 経路                              | 実装と責任                                                                                                                                                                                                                                                                                   |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 収集                              | snapshot、組織 facade の集計指標、charter 許可済み pipeline collector。取得失敗・古い値・別 scope は分配前に拒否する。実行結果を確認できない collector は該当する観測元と依存ルールだけを保留し、独立した観測と起票を継続する。pipeline の出力は完了試行 ID と照合し、観測の鮮度を検証する。 |
+| タスク                            | dot executor が既存 claim / lease の下で report pipeline を実行し、writeScopedArtifact でスコープ付き成果物を publish する。                                                                                                                                                                 |
+| project / mission / mission_group | レビュー済み work_plan を immutable admission として保持する。必ず human approval を要求し、通常 worker からの実行を拒否する。                                                                                                                                                               |
+| lifecycle owner                   | mission owner 専用 port が governed project facade と mission_controller を子プロセスで実行する。project 作成、mission 作成、alignment approval、ticket import、bounded dispatch、phase gate、verify / distill を順に接続する。                                                              |
+| 進行                              | ミッションの依存関係を DAG として検証する。前段の検証済み完了を待って次へ進み、approval / paused / blocked / uncertain を保持する。                                                                                                                                                          |
+| 再観測                            | admission、WorkItem、実行結果、成果物、project / mission の進捗を周期 report へ戻す。完了と指標改善は別々に観測する。                                                                                                                                                                        |
+| 常駐                              | 既存 agent-runtime-supervisor の continuous step がレビュー済み schedule.every_seconds を処理する。新 daemon は作らない。                                                                                                                                                                    |
 
 owner は各副作用の前に元の承認 hash・scope・charter・claim・lease を再確認する。期限超過・不確実な副作用は隔離し、同じ操作を自動再試行しない。機械による gate-pass は --machine-only を使い、stored gate の失敗・欠落・生の人間確認を拒否する。完了は全 task contract が completed かつ verification が verified の場合だけ返す。
 
 組織運営用の organization-operations.json は、tenant に導入した org-operations charter（[テンプレート](../orchestration/dot-team-templates/org-operations.json)から `dot create` したもの）と同じ dot_id・scope を宣言し、15分ごとに内部集計を観測する。sweep は dot_id と scope が完全一致する active charter がある環境でだけこの設定を実行し、一致しない環境では何もしない。設定の scope は現状 1 tenant に固定されており、他の tenant で使うには同じディレクトリにその tenant 用のレビュー済み設定を追加する。レポートと判断待ち事項の project / mission 群を別ルールに分配する。通知は既存 charter の既定 inbox、実効果は既存 autonomy / approval gate に従う。
 
 任意 SaaS の認証情報の追加、自由文からの権限生成、進行中の他 owner の強制取消は対象外。データ別 collector を追加する際も既存許可済み pipeline とスコープ付き snapshot の契約へ接続する。
+
+## 定期観測と実行の障害分離
+
+単独 Project は、対象の scope を選択したうえで `pnpm project outer-loop <PROJECT_ID> --json` から改善候補を確認できる。Project レコードと同一 scope の作業を観測し、blocked と review の件数および根拠を返す。起票・実行は Project に適用される責任者の割り当て・予算・操作承認を解決できる段階で接続する。
+
+組織の運用周期は active のテナント組織を構成元とする。対象がなければ登録を待ち、システムの常駐処理は継続する。正規の組織 CLI が登録し、supervisor は参照できるスコープの定期照合と実行を担う。テナント・tier・組織から導出した一意な charter ID を使い、既存の手動 cadence と charter の pause・retire を尊重する。既定 charter は既存の組織 tick・standup・retro のみを担当し、モデル wake や提案の実行権限を持たない。レビュー済みの観測ルールを持つ個別の continuous operations 設定は、引き続き個別設定の契約に従う。
+
+定期観測（Outer Loop）と起票済み作業を進める lifecycle owner（Inner Loop）は、同じ supervisor 内で別々の circuit を持つ。owner の連続障害で circuit が開いている間も、チャーターのスコープと予算の範囲で定期観測を続ける。owner の障害調査には `dot-continuous-owner`、観測側の障害調査には `dot-continuous-cadence` の運用アラートを使う。
+
+周期の checkpoint には直近の開始時刻（`last_run_at`）と、完了まで到達した直近の周期の開始時刻（`last_success_at`）を保持する。開始だけが更新されている場合は、その周期が進行中か、失敗・中断した可能性がある。旧形式の checkpoint から読み込んだ直後は完了時刻が不明で、次の正常な周期で記録する。個々の起票や成果の成否は周期レポートで確認する。
+
+再観測対象の admission がない周期では、観測・閾値判定までを行い、実行履歴と成果物レジストリの参照を省く。既存 episode に admission がある場合は、指標が正常化した周期も成果を確認する。
+
+起票枠は既存の rule priority 順に割り当てる。同じ優先度は設定順とする。起票時の観測を episode に保持し、同じ action と WorkItem の完了が確認できた後に採取された観測を、目標・前後の根拠・差分とともに報告する。旧 episode に起票時の観測が残っていない場合は、前後比較を省略する。
 
 ## 再評価トリガー条件（既定: 助言 / opt-in で監視ルール化）
 

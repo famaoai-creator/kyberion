@@ -57,11 +57,11 @@ export interface OrganizationWriteScope {
   command: string;
   organizationId: string;
   tier: string;
-  tenantSlug: string;
+  tenantSlug?: string;
 }
 
 function effectBinding(scope: OrganizationWriteScope): string {
-  return `organization:write:${scope.tenantSlug}:${scope.organizationId}:${scope.command}`;
+  return `organization:write:${scope.tenantSlug ?? 'shared'}:${scope.organizationId}:${scope.command}`;
 }
 
 /** The write's arguments as approved: every parsed field except the flow flags, empty values dropped. */
@@ -107,16 +107,16 @@ export function requestOrganizationWriteApproval(input: {
   const record = createApprovalRequest('mission_controller', {
     channel: ORGANIZATION_WRITE_APPROVAL_CHANNEL,
     threadTs: `organization-write-${scope.organizationId}-${Date.now()}`,
-    correlationId: `organization:${scope.tenantSlug}:${scope.organizationId}:write:${scope.command}`,
+    correlationId: `organization:${scope.tenantSlug ?? 'shared'}:${scope.organizationId}:write:${scope.command}`,
     requestedBy: requester.requestedBy,
     ...(requester.displayName ? { requestedByDisplayName: requester.displayName } : {}),
     kind: 'mission_gate',
     draft: {
       title: `Organization write: ${scope.command} (${scope.organizationId})`,
-      summary: `Allow one 'pnpm organization ${scope.command}' write to ${scope.organizationId} in tenant ${scope.tenantSlug} (${scope.tier}).`,
+      summary: `Allow one 'pnpm organization ${scope.command}' write to ${scope.organizationId} in tenant ${scope.tenantSlug ?? 'shared'} (${scope.tier}).`,
       details: [
         `Command: pnpm organization ${scope.command}`,
-        `Organization: ${scope.organizationId} · tenant ${scope.tenantSlug} · tier ${scope.tier}`,
+        `Organization: ${scope.organizationId} · tenant ${scope.tenantSlug ?? 'shared'} · tier ${scope.tier}`,
         `Arguments: ${JSON.stringify(args)}`,
         `Runs once as ${ORGANIZATION_WRITE_ROLE}, then the approval is used up.`,
       ].join('\n'),

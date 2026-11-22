@@ -14,6 +14,7 @@ import { pathResolver } from '../path-resolver.js';
 import { safeReadFileSnapshot, safeWriteFile, safeRmSync } from '../secure-io.js';
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
+import { organizationOperationalStatePath } from './organization-operating-model-persistence.js';
 
 const now = new Date('2026-10-18T01:00:00.000Z');
 const config = {
@@ -92,6 +93,25 @@ function fixture() {
   };
 }
 describe('continuous operations runtime', () => {
+  it('admits the highest-priority triggered rule when a cycle has one slot', () => {
+    const f = fixture();
+    const report = runContinuousOperations(
+      {
+        ...config,
+        max_proposals_per_run: 1,
+        rules: [
+          { ...config.rules[0], priority: 'low' },
+          { ...config.rules[0], rule_id: 'urgent-errors', priority: 'urgent' },
+        ],
+      },
+      { apply: true, now, rootDir: '/test' },
+      f.deps
+    );
+    expect(report.inventory).toMatchObject([
+      { rule_id: 'urgent-errors', disposition: 'proposed' },
+      { rule_id: 'errors', disposition: 'limited' },
+    ]);
+  });
   it('keeps admitted work observable after recovery without mislabeling a new episode', () => {
     const f = fixture();
     f.run();
@@ -100,6 +120,7 @@ describe('continuous operations runtime', () => {
       disposition: 'recovered',
       action_ref: 'action',
       work_item_id: 'work',
+      admission_observation: { value: 10 },
     });
     expect(f.run().inventory[0]).toMatchObject({
       disposition: 'not_triggered',
@@ -110,6 +131,7 @@ describe('continuous operations runtime', () => {
     const recurrence = f.run();
     expect(recurrence.inventory[0].disposition).toBe('cooldown');
     expect(recurrence.inventory[0].action_ref).toBeUndefined();
+    expect(recurrence.inventory[0].admission_observation).toBeUndefined();
     f.deps.capacity = () => ({ cap: 1, open: 1, free: 0 });
     const limited = f.run(true, new Date(now.getTime() + 60000));
     expect(limited.inventory[0].disposition).toBe('limited');
@@ -211,6 +233,91 @@ describe('continuous operations runtime', () => {
     expect(calls).toHaveLength(2);
     expect(calls[0][2]).not.toBe(calls[1][2]);
   });
+  it('binds captured observations and admission history to the current personal owner', () => {
+    const f = fixture();
+    const input = {
+      ...config,
+      scope: { tier: 'personal' as const, organization_id: config.scope.organization_id },
+      sources: [{ source_id: 'quality', kind: 'organization_metrics', max_age_seconds: 60 }],
+    };
+    const snapshots = [
+      {
+        source_id: 'quality',
+        observations: [
+          {
+            metric: 'errors',
+            value: 10,
+            observed_at: now.toISOString(),
+            evidence_ref: 'personal:evidence',
+          },
+        ],
+      },
+    ];
+    let ownerNhi = 'owner-a';
+    f.deps.charters = () => [{ ...charter, scope: { ...input.scope, owner_nhi: ownerNhi } }];
+    const run = (observationOwnerNhi: string) =>
+      runContinuousOperations(
+        input,
+        { apply: true, now, rootDir: '/test', snapshots, observationOwnerNhi },
+        f.deps
+      );
+    const first = run('owner-a');
+    ownerNhi = 'owner-b';
+    expect(() => run('owner-a')).toThrow('current personal owner');
+    expect(f.dispatch).toHaveBeenCalledOnce();
+    const second = run('owner-b');
+    expect(second.state_path).not.toBe(first.state_path);
+    expect(second.state_path).toContain('/owners/');
+    expect(f.dispatch).toHaveBeenCalledTimes(2);
+    expect(f.dispatch.mock.calls[0]).not.toEqual(f.dispatch.mock.calls[1]);
+  });
+
+  it('refuses a personal admission when its owner changes after observation validation', () => {
+    const f = fixture();
+    const scope = { tier: 'personal' as const, organization_id: config.scope.organization_id };
+    const input = {
+      ...config,
+      scope,
+      sources: [{ source_id: 'quality', kind: 'organization_metrics', max_age_seconds: 60 }],
+    };
+    const snapshots = [
+      {
+        source_id: 'quality',
+        observations: [
+          {
+            metric: 'errors',
+            value: 10,
+            observed_at: now.toISOString(),
+            evidence_ref: 'personal:evidence',
+          },
+        ],
+      },
+    ];
+    let ownerNhi = 'owner-a';
+    f.deps.charters = () => [{ ...charter, scope: { ...scope, owner_nhi: ownerNhi } }];
+    const lock = f.deps.lock!;
+    f.deps.lock = (key, fn) =>
+      lock(key, () => {
+        ownerNhi = 'owner-b';
+        return fn();
+      });
+    expect(() =>
+      runContinuousOperations(
+        input,
+        {
+          apply: true,
+          now,
+          rootDir: '/test',
+          snapshots,
+          observationOwnerNhi: 'owner-a',
+        },
+        f.deps
+      )
+    ).toThrow('personal owner changed');
+    expect(f.dispatch).not.toHaveBeenCalled();
+    expect(f.write).not.toHaveBeenCalled();
+  });
+
   it('uses precollected observations without reading a source and validates before checkpointing', () => {
     const f = fixture();
     const read = vi.spyOn(f.deps, 'read');
@@ -351,9 +458,91 @@ describe('continuous operations runtime', () => {
     const keys = (f.dispatch.mock.calls as unknown[][]).map((call) => call[2]);
     expect(new Set(keys).size).toBe(3);
   });
+  it('does not dispatch a snapshot rule when the charter pauses after admission intent', () => {
+    const f = fixture();
+    let status: DotCharter['status'] = 'active';
+    f.deps.charters = () => [{ ...charter, status }];
+    const write = f.deps.write!;
+    f.deps.write = (file, state) => {
+      status = 'paused';
+      write(file, state);
+    };
+    expect(() => f.run()).toThrow('charter authority changed');
+    expect(f.dispatch).not.toHaveBeenCalled();
+    expect([...f.files.values()][0]).toEqual(expect.objectContaining({ rules: {} }));
+  });
+
+  it.each(['after collection', 'after admission intent'])(
+    'withholds the revoked collector %s and continues independent rules',
+    (when) => {
+      const f = fixture();
+      const ref = 'pipelines/collect.json';
+      const pipeline = { ...config.sources[0], kind: 'pipeline', pipeline_ref: ref };
+      const input = {
+        ...config,
+        sources: [
+          pipeline,
+          { source_id: 'independent', kind: 'organization_metrics', max_age_seconds: 60 },
+        ],
+        rules: [
+          ...config.rules,
+          { ...config.rules[0], rule_id: 'independent', source_id: 'independent' },
+        ],
+        max_proposals_per_run: 1,
+      };
+      let allowed = when !== 'after collection';
+      f.deps.charters = () => [
+        {
+          ...charter,
+          authority: { ...charter.authority, allowed_pipelines: allowed ? [ref] : [] },
+        },
+      ];
+      const write = f.deps.write!;
+      f.deps.write = (file, state) => {
+        if (when === 'after admission intent') allowed = false;
+        write(file, state);
+      };
+      const withheldSources = new Set<string>();
+      const report = runContinuousOperations(
+        input,
+        {
+          apply: true,
+          now,
+          rootDir: '/test',
+          withheldSources,
+          snapshots: input.sources.map((source) => ({
+            source_id: source.source_id,
+            observations: [
+              {
+                metric: 'errors',
+                value: 10,
+                observed_at: now.toISOString(),
+                evidence_ref: 'probe:evidence',
+              },
+            ],
+          })),
+        },
+        f.deps
+      );
+      expect([...withheldSources]).toEqual(['quality']);
+      expect(report.inventory.map((row) => row.rule_id)).toEqual(['independent']);
+      expect(f.dispatch).toHaveBeenCalledOnce();
+      expect(f.files.get(report.state_path)).toMatchObject({
+        rules: { independent: expect.any(Object) },
+      });
+      expect(f.files.get(report.state_path)).not.toHaveProperty('rules.errors');
+    }
+  );
+
   it('starts a fresh episode when the configured collector changes, retaining cooldown', () => {
     const f = fixture();
     f.run();
+    f.deps.charters = () => [
+      {
+        ...charter,
+        authority: { ...charter.authority, allowed_pipelines: ['pipelines/collect.json'] },
+      },
+    ];
     const input = {
       ...config,
       sources: [{ ...config.sources[0], kind: 'pipeline', pipeline_ref: 'pipelines/collect.json' }],
@@ -457,6 +646,17 @@ describe('continuous operations runtime', () => {
     const source = path.join(rootDir, config.sources[0].path);
     const f = fixture();
     try {
+      safeWriteFile(
+        organizationOperationalStatePath('org', 'confidential', 'acme', rootDir),
+        JSON.stringify({
+          organization_id: 'org',
+          tenant_slug: 'acme',
+          tier: 'confidential',
+          name: 'Test organization',
+          status: 'active',
+          updated_at: now.toISOString(),
+        })
+      );
       safeWriteFile(
         source,
         JSON.stringify([

@@ -60,6 +60,62 @@ function fixture(managed = false) {
   return { deps, item, progress };
 }
 describe('continuous operations feedback', () => {
+  it('compares the admission observation only with evidence measured after completed work', () => {
+    const f = fixture();
+    f.item.status = 'done';
+    const completedAt = '2026-11-22T00:01:00Z';
+    f.deps.results = (() => [
+      { action_ref: 'a', work_item_id: 'w', status: 'done', completed_at: completedAt },
+    ]) as unknown as ContinuousOutcomeDeps['results'];
+    const entry = {
+      ...report.inventory[0],
+      objective_ref: 'reliability',
+      admission_observation: {
+        metric: 'open_incidents',
+        value: 5,
+        observed_at: '2026-11-22T00:00:00Z',
+        evidence_ref: 'before',
+      },
+      current_value: 2,
+      observed_at: completedAt,
+      evidence_refs: ['after'],
+    };
+    expect(
+      observeContinuousWork(charter, { ...report, inventory: [entry] }, '/repo', f.deps)[0]
+        .observation_comparison
+    ).toBeUndefined();
+    entry.observed_at = '2026-11-22T00:02:00Z';
+    expect(
+      observeContinuousWork(charter, { ...report, inventory: [entry] }, '/repo', f.deps)[0]
+        .observation_comparison
+    ).toMatchObject({
+      objective_ref: 'reliability',
+      delta: -3,
+      after: { evidence_refs: ['after'] },
+    });
+    f.item.status = 'in_progress';
+    expect(
+      observeContinuousWork(charter, { ...report, inventory: [entry] }, '/repo', f.deps)[0]
+        .observation_comparison
+    ).toBeUndefined();
+  });
+  it('returns an empty feedback cycle without scanning history when nothing has been admitted', () => {
+    const deps = {
+      actions: vi.fn(),
+      results: vi.fn(),
+      artifacts: vi.fn(),
+    };
+    const quiet = {
+      ...report,
+      inventory: [
+        { ...report.inventory[0], disposition: 'not_triggered' as const, action_ref: undefined },
+      ],
+    };
+    expect(observeContinuousWork(charter, quiet, '/repo', deps)).toEqual([]);
+    expect(deps.actions).not.toHaveBeenCalled();
+    expect(deps.results).not.toHaveBeenCalled();
+    expect(deps.artifacts).not.toHaveBeenCalled();
+  });
   it('joins managed artifacts only through proven project and created mission identities', () => {
     const f = fixture(true);
     f.progress.mockReturnValue({

@@ -22,6 +22,7 @@ export function observeContinuousWork(
   rootDir?: string,
   deps: ContinuousOutcomeDeps = {}
 ) {
+  if (!report.inventory.some((entry) => entry.action_ref)) return [];
   const scope = charter.scope;
   const itemProjectId = normalizeWorkItemContext(scope).project_id;
   const actions = (deps.actions ?? readDotActionLedger)({ rootDir }).filter(
@@ -29,19 +30,17 @@ export function observeContinuousWork(
   );
   const results = (deps.results ?? readDotWorkResults)(charter, { rootDir });
   // Exact filtering is required even if a query implementation treats omitted dimensions as wildcards.
-  const artifacts = report.inventory.some((entry) => entry.action_ref)
-    ? (deps.artifacts ?? listArtifactOwnershipRecordsByQuery)({
-        tenantSlug: scope.tenant_slug,
-        organizationId: scope.organization_id,
-        projectId: scope.project_id,
-      }).filter(
-        (row) =>
-          (row.tenant_slug ?? '') === (scope.tenant_slug ?? '') &&
-          row.organization_id === scope.organization_id &&
-          (row.project_id ?? '') === (scope.project_id ?? '') &&
-          row.metadata?.tier === scope.tier
-      )
-    : [];
+  const artifacts = (deps.artifacts ?? listArtifactOwnershipRecordsByQuery)({
+    tenantSlug: scope.tenant_slug,
+    organizationId: scope.organization_id,
+    projectId: scope.project_id,
+  }).filter(
+    (row) =>
+      (row.tenant_slug ?? '') === (scope.tenant_slug ?? '') &&
+      row.organization_id === scope.organization_id &&
+      (row.project_id ?? '') === (scope.project_id ?? '') &&
+      row.metadata?.tier === scope.tier
+  );
   return report.inventory.flatMap((entry) => {
     if (!entry.action_ref) return [];
     const action = actions.filter((row) => row.action_ref === entry.action_ref).at(-1);
@@ -60,6 +59,24 @@ export function observeContinuousWork(
         (row) => row.action_ref === entry.action_ref && (!item || row.work_item_id === item.item_id)
       )
       .at(-1);
+    const baseline = entry.admission_observation;
+    const comparison =
+      baseline &&
+      item?.status === 'done' &&
+      result?.status === 'done' &&
+      Date.parse(result.completed_at) >= Date.parse(baseline.observed_at) &&
+      Date.parse(entry.observed_at) > Date.parse(result.completed_at)
+        ? {
+            objective_ref: entry.objective_ref,
+            before: baseline,
+            after: {
+              value: entry.current_value,
+              observed_at: entry.observed_at,
+              evidence_refs: entry.evidence_refs,
+            },
+            delta: entry.current_value - baseline.value,
+          }
+        : undefined;
     const managed = item?.metadata?.continuous_work
       ? (deps.progress ?? readContinuousWorkOwnerProgress)(charter, item, { rootDir })
       : undefined;
@@ -94,6 +111,7 @@ export function observeContinuousWork(
         work_item_status: item?.status,
         execution_status: result?.status,
         completed_at: result?.completed_at,
+        ...(comparison ? { observation_comparison: comparison } : {}),
         artifact_refs: item
           ? [
               ...artifacts.filter((row) => row.metadata?.work_item_id === item.item_id),

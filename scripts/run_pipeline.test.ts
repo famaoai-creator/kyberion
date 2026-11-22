@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { randomUUID } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
 
 // Verify pipeline wiring without scanning unrelated checkout runtime data.
@@ -19,6 +20,8 @@ vi.mock('@agent/core/storage-janitor', async (importOriginal) => ({
 import { TraceContext } from '@agent/core';
 import { logger } from '@agent/core/core';
 import { pathResolver } from '@agent/core/path-resolver';
+import * as pathResolverModule from '@agent/core/path-resolver';
+import { getReasoningPayloadScope } from '@agent/core/reasoning/reasoning-egress-scope';
 import {
   createPipelineRunJournal,
   decideApprovalRequest,
@@ -55,6 +58,7 @@ const {
   isReasoningBudgetExceeded,
   findStepByIdRecursive,
   resolvePipelinePresetArgs,
+  main,
 } = await import(new URL('./run_pipeline.js', import.meta.url).href);
 
 describe('pipeline preset routing', () => {
@@ -150,11 +154,13 @@ describe('run_pipeline compatibility', () => {
     reason?: string;
   };
 
-  it('executes a validated pipeline file in-process through the shared lifecycle', async () => {
+  it('executes a validated pipeline file in-process with its reserved journal identity', async () => {
+    const journalRunId = randomUUID();
     const result = await executePipelineFile(
       'pipelines/fragments/_test-run-pipeline-include.json',
       {
         context: { greeting: 'hello' },
+        journalRunId,
         quiet: true,
         trustResolved: true,
         trace: new TraceContext('pipeline:library-entry', { pipelineId: 'library-entry' }),
@@ -162,8 +168,60 @@ describe('run_pipeline compatibility', () => {
     );
 
     expect(result.status).toBe('succeeded');
+    expect(result.runId).toBe(journalRunId);
+    expect(
+      loadPipelineRunJournal(journalRunId, undefined, { tier: 'public' }).finished
+    ).toMatchObject({ status: 'succeeded' });
     expect(result.context.fragment_result).toBe('hello from fragment');
     expect(result.context.trace_persisted_path).toContain('/logs/traces/');
+  });
+
+  it('does not report a reserved journal collision as a proven unstarted attempt', async () => {
+    const journalRunId = randomUUID();
+    const ref = 'pipelines/fragments/_test-run-pipeline-include.json';
+    createPipelineRunJournal(
+      journalRunId,
+      {
+        pipeline_id: 'collector',
+        input_path: ref,
+        step_ids: [],
+      },
+      undefined,
+      { tier: 'public' }
+    );
+    const error = await executePipelineFile(ref, { quiet: true, journalRunId }).catch(
+      (cause: unknown) => cause
+    );
+    expect(String(error)).toContain('run already exists');
+    expect(isPipelineNotStartedError(error)).toBe(false);
+  });
+
+  it('rejects generic CLI continuation of a suspended collector journal', async () => {
+    const attemptId = randomUUID();
+    const journal = createPipelineRunJournal(
+      attemptId,
+      {
+        pipeline_id: 'collector',
+        input_path: 'pipelines/fragments/_test-run-pipeline-include.json',
+        step_ids: ['approval'],
+        collector_execution: { dot_id: 'collector-dot', attempt_id: attemptId },
+      },
+      undefined,
+      { tier: 'public' }
+    );
+    journal.append('run_suspended', {
+      step_id: 'approval',
+      approval_request_id: 'apr-test',
+      storage_channel: 'pipeline-approval',
+      on_timeout: 'abort',
+    });
+    await expect(
+      main(['--resume', attemptId, '--journal-tier', 'public'], vi.fn())
+    ).rejects.toThrow('Collector runs require Continuous Operations reconciliation');
+    expect(journal.state().events.map((entry) => entry.event)).toEqual([
+      'run_started',
+      'run_suspended',
+    ]);
   });
 
   it('propagates an unresolved trust decision before importing workflow modules', async () => {
@@ -200,6 +258,70 @@ describe('run_pipeline compatibility', () => {
       expect(isPipelineNotStartedError(error)).toBe(false);
     } finally {
       dispose();
+    }
+  });
+
+  it('preserves the collector tenant payload restrictions in a nested Pipeline', async () => {
+    const parentPath = pathResolver.sharedTmp(`collector-scope-parent-${randomUUID()}.json`);
+    const childPath = pathResolver.sharedTmp(`collector-scope-child-${randomUUID()}.json`);
+    safeWriteFile(
+      childPath,
+      JSON.stringify({
+        pipeline_id: 'collector-scope-child',
+        context: { mission_id: 'MSN-COLLECTOR-NESTED' },
+        steps: [{ op: 'system:log', params: { message: 'nested' } }],
+      })
+    );
+    safeWriteFile(
+      parentPath,
+      JSON.stringify({
+        pipeline_id: 'collector-scope-parent',
+        steps: [
+          { op: 'core:run_pipeline', params: { input: pathResolver.toRepoRelative(childPath) } },
+        ],
+      })
+    );
+    const mission = vi
+      .spyOn(pathResolverModule, 'findMissionPath')
+      .mockReturnValue('/repo/active/missions/confidential/MSN-COLLECTOR-NESTED');
+    const observe = vi.fn(() => getReasoningPayloadScope());
+    const dispose = getDefaultLifecycleHookEngine().register({
+      id: 'collector-scope-observer',
+      event: 'session_start',
+      matcher: '^collector-scope-child$',
+      handler: () => {
+        observe();
+        return { block: false };
+      },
+    });
+    try {
+      const result = await executePipelineFile(parentPath, {
+        quiet: true,
+        hasHuman: false,
+        trustResolved: true,
+        collectorExecution: { dot_id: 'collector', attempt_id: randomUUID() },
+        payloadScope: {
+          tier: 'confidential',
+          tenant_slug: 'acme',
+          training_use: 'no_training',
+          external_egress: 'deny',
+          allowed_reasoning_backends: ['stub'],
+        },
+      });
+      expect(result.status).toBe('succeeded');
+      expect(observe).toHaveBeenCalledOnce();
+      expect(observe.mock.results[0].value).toMatchObject({
+        tier: 'confidential',
+        tenant_slug: 'acme',
+        training_use: 'no_training',
+        external_egress: 'deny',
+        allowed_reasoning_backends: ['stub'],
+      });
+    } finally {
+      mission.mockRestore();
+      dispose();
+      safeRmSync(parentPath);
+      safeRmSync(childPath);
     }
   });
 

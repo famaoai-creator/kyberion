@@ -18,6 +18,10 @@ export type { NormalizedStepBudget } from './pipeline/pipeline-execution-part-bo
 export type { ReasoningStepPolicy } from './pipeline/pipeline-execution-part-bootstrap.js';
 export type { FlowValidationError } from './pipeline/pipeline-execution-part-bootstrap.js';
 export type { ExecutePipelineFileOptions } from './pipeline/pipeline-execution-part-results.js';
+export {
+  isPipelineNotStartedError,
+  pipelinePayloadTrainingUse,
+} from './pipeline/pipeline-execution-part-results.js';
 export { formatPipelineFailure } from './pipeline/pipeline-result-reporting.js';
 
 export {

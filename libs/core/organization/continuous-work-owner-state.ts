@@ -127,6 +127,7 @@ export interface ContinuousWorkOwnerOptions {
   leaseTtlMs?: number;
 }
 export interface ContinuousWorkOwnerDeps {
+  organizationActive?: () => boolean;
   currentCharter?: (charter: DotCharter, rootDir: string) => DotCharter | undefined;
   authorize?: (charter: DotCharter) => void;
   authorizeItem?: (charter: DotCharter, item: WorkItem, rootDir: string) => void;

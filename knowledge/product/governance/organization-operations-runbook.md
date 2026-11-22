@@ -12,6 +12,10 @@ Shared-scope organizations (`active/organizations/<tier>/shared/…`) are not te
 
 Setting up an organization for the first time? Follow the [Organization Lifecycle Verification Playbook](./organization-lifecycle-verification-playbook.md) end to end first (formation, domain and service, operation, cadence and decision, project, run, incident and learning, reconcile), then use this runbook for routine operation.
 
+Inspect a reviewed loop with `pnpm organization continuous status --config <governed-config.json>` after selecting its exact tier, tenant, organization, and project. The command reads the cadence checkpoint. Its due time is the earliest scheduled opportunity and remains subject to supervisor health, authority, and budget. See the [continuous operations playbook](../orchestration/continuous-operations-playbook.md).
+
+When a tenant-confidential organization becomes active through `organization init`, `state ensure`, or `resume` with `--apply`, the organization facade reconciles its default operations cadence. The supervisor inspects organization scopes it can read every 15 minutes and reports persistent setup drift once per finding. For existing organizations created through other entry points, run the governed `state ensure --apply` in the matching scope to reconcile the charter. The default runs governed operation ticks, standups and retrospectives and grants no model wakes or proposal execution. Pause and archive hold the generated cadence while preserving its records. An existing exact-scope cadence takes precedence over the default.
+
 ## Routine operations
 
 Register a scheduled Operation with a five-field cron expression and an IANA timezone. When `--timezone` is omitted, due calculations use UTC. `operation run execute` runs an active Operation whose execution target is an existing governed file under `pipelines/`. It records a started Run, executes the validated pipeline, then records a completed Run and State with a trace reference. A failed pipeline also opens an Incident with the Run ID.

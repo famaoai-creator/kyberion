@@ -85,7 +85,11 @@ pnpm organization continuous run --config knowledge/product/governance/continuou
 
 ## 接続済みの運転経路（2026-10-18）
 
-source.kind は snapshot（省略時も同じ）、organization_metrics、pipeline を受け付ける。organization_metrics は overdue_operations / open_incidents / pending_decisions / unhealthy_services の数値のみを返す。pipeline は pipeline_ref と生成先 path を宣言し、charter の allowed_pipelines に登録する。dry-run では collector を実行せず、既存 snapshot のみ読む。
+source.kind は `snapshot`（省略時も同じ）、`organization_metrics`、`pipeline`、`pipeline_schedule_health` を受け付ける。組織 Operation の `overdue_operations`、`failing_operations`、`blocked_operations` は、対象組織の運用状態から集計する。`pipeline` は pipeline_ref と生成先 path を宣言し、charter の allowed_pipelines に登録する。Pipeline はコンテキストの `collector_attempt_id` を使い、出力を `{"collector_attempt_id":"<current-id>","observations":[...]}` として atomic に書く。観測配列の各要素は通常の snapshot と同じ形式。別 Pipeline の生成先を同じパスに設定すると構成エラーになる。dry-run は Pipeline を起動せず、完了記録の試行 ID に一致する観測だけを読む。
+
+`pipeline_schedule_health` はレビュー済み設定の `pipeline_ref` で指定した Chronos の定期ジョブを読み取り、`registered_pipeline_schedules`、`failing_pipeline_schedules`、`due_pipeline_schedules` を既存のルールに渡す。同じテナントの Pipeline またはテナント非所属の public 設定から参照するリポジトリ Pipeline を対象とする。同一テナントの他の組織と共有する依存先は、Pipeline の稼働状態として扱う。個々の実行を観測元の組織や Project の成果に帰属させるには別途記録が必要。状態を読む際も Chronos が定期実行を担当し、collector が Pipeline を起動することはない。Project の `outer-loop` プレビューも、Project の `pipeline_refs` に明示された定期ジョブを同じ方法で観測する。
+
+プレビューは登録状態、前回結果、登録情報から計算した期限の到来、実行可否の判定元を分けて表示する。期限の到来は Chronos ホストでの実行許可を確定しない。ホスト側のポリシーを観測できない場合は `chronos_policy_unobserved` を返す。
 
 自動分配に project / mission / mission_group が必要なルールは work_plan を設定し、pipeline_ref に pipelines/continuous-managed-work.json を指定する。project は name / summary / objective_ids、missions は key / title / goal / success_condition / mission_type / depends_on を持つ。最大16件、依存関係は循環不可。任意の観測値やモデル文章から work_plan を作らない。
 
@@ -96,6 +100,35 @@ managed work は強制的に人間承認へ送られる。承認後も各 missio
 通常のタスク成果物は pipelines/continuous-operations-report.json が生成する。実行中の dot WorkItem と attempt / lease を検証し、同一 scope の集計レポートを publish する。cycle の outcomes で action / approval / WorkItem / execution / artifact / managed work を追跡し、次周期の inventory で数値差分を確認する。
 
 コードを更新した常駐プロセスは build 後、governed scheduler で再起動する。
+
+停滞時は supervisor の heartbeat と、対象スコープの cadence checkpoint を照合する。
+
+`pnpm organization continuous status --config <governed-config.json>` は、選択したスコープのチェックポイントから直近の試行・完了・次回実行可能時刻を返す。`due` は周期が到来した状態を示す。実際に実行できるかは、supervisor の稼働、circuit、停止・予算の判定にも従う。
+
+出力は定常運用の `organization_cadence` と、観測ルールの `continuous_operations` を分ける。チェックポイントの `last_observation_at` は、観測と起票判定まで到達した周期を示す。その周期に起票エラーがある場合は件数を `last_admission_error_count` に記録し、`last_success_at` の更新を保留する。
+
+Supervisor は観測と起票済み作業の進行を、それぞれ複数の有界な実行枠で処理する。定期実行と手動の `--apply` は、同一スコープ・同一 Pipeline のロックを共有し、起動前に試行 ID を記録する。子プロセスは期限、運用停止、組織停止、charter の失効、許可の取り消し、Personal charter の所有者変更で停止する。ネストされた Pipeline にも親 collector のデータ tier、テナント、推論送信制約を引き継ぐ。正常終了が確認できない場合は、その collector と依存ルールだけを保留し、独立した観測・起票・起票済み作業の進行を続ける。取得後に Pipeline の許可が取り消された場合も、該当する観測元の起票だけを保留する。保留中の観測元は周期結果の `withheld_sources` に表示される。正常終了した collector の出力は同じロック内で取得し、欠落・破損・期限切れの観測元は周期から除外する。
+
+起動ファイルの欠落や Pipeline の事前検証エラーなど、副作用の開始前と確認できる失敗は `not_started` と記録し、原因解消後に次の周期で再試行する。`continuous status` の `reason_code` と `next` で原因と確認先を参照できる。正常終了した試行は完了結果を先に記録する。直後に停止や権限変更があった周期では、その観測を起票に使わない。
+
+`continuous status` の `collectors` で `unconfirmed` の試行 ID と開始時刻、起動前に確保した `pipeline_run_id` を確認する。同じホストで登録済みのプロセスグループ（Windows では Job のコントローラー）の停止確認が必要。停止を確認できない場合、保留を維持する。停止確認の時刻は承認依頼の前に `stop_confirmed_at` として保存する。承認を待つ間も試行は `unconfirmed` のまま維持され、承認後は保存済みの停止確認を使う。プロセスの登録を必要としなかった旧形式の未確認記録も保留を維持する。対応する Pipeline 履歴と副作用を照合し、安全に次の周期へ進める状態にしたうえで、証跡の参照を指定して承認を依頼する。人間の承認後、同じ引数で `--request-approval` を `--approval-request-id <id>` に置き換える。解除は指定した試行にだけ適用される。次の手動実行または予定周期が新しい試行を開始する。collector の履歴は汎用 Pipeline CLI で再開できない。承認後に同じ実行を継続する処理は、承認と再開を管理できる managed WorkItem に配置する。組織や charter を停止している間も、権限のある担当者は同じスコープで試行を照合できる。解除は charter の実行権限を変更しない。
+
+```sh
+pnpm organization continuous reconcile-collector --config <ref> --pipeline-ref <ref> --attempt-id <id> --evidence <ref> --request-approval
+```
+
+Personal のファイル観測は、charter の所有者・組織・プロジェクトに対応する dot 状態ディレクトリの `continuous-operations/snapshots/` 配下に置く。他の所有者のパスを指定した場合は、読み取りや Pipeline 実行の前に拒否する。Personal の観測と起票は同じ所有者に結び付ける。所有者が変わった場合は取得済みの観測での起票を止め、新しい所有者は独立した起票状態を使う。
+
+組織が未構成・停止中・廃止済みの間は、既存の安全な観測に留め、新規起票と managed work の副作用を保留する。起票エラーの circuit が開いている間も観測を続ける。Chronos の opt-in を観測できないジョブは `timing_due` を未確定として返し、周期上の期限が到来していれば `unconfirmed_due_pipeline_schedules` に計上する。
+
+限定稼働のレビューでは、同一スコープの低リスクなレポートを1件選び、承認待ちの別件と並行して観測する。機能面では起票件数・重複・承認後の再開・成果物を、NFR では停止から最初の正常周期までの時間と処理可能な作業の滞留を、運用 UX では状態と次の確認先を判定できるかを記録する。成果の完了後に採取した観測は `observation_comparison` の目標・前後の根拠・差分を確認する。自律範囲の昇格・降格は、取得した証跡をもとに既存のテナント承認とポリシーで判断する。
+
+| 観測                                           | 次の確認                                                                                                                        |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| heartbeat が古い                               | supervisor の稼働状態と直近の sweep を確認する。                                                                                |
+| `last_run_at` が進み、`last_success_at` が古い | 進行中の周期と `dot-continuous-cadence` のアラートを確認する。失敗後は次の予定周期または circuit の cooldown 後に再評価される。 |
+| 両方が進むが managed work が滞留する           | 対象 WorkItem の状態・承認と `dot-continuous-owner` のアラートを確認する。owner の circuit が開いていても観測は続く。           |
+| 両方が進み、起票がない                         | 周期レポートで閾値、cooldown、重複、容量の判断を確認する。閾値内で起票なしなら正常。                                            |
 
 ```sh
 pnpm kyberion scheduler restart --apply --daemon agent-runtime-supervisor

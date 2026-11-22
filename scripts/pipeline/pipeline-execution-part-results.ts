@@ -264,6 +264,9 @@ export interface ExecutePipelineFileOptions {
   trustResolved?: boolean;
   /** Durable human approval for the exact project-local resource being loaded. */
   projectTrustApprovalId?: string;
+  /** Host-reserved run ID for correlating a new protected journal before launch. */
+  journalRunId?: string;
+  collectorExecution?: { dot_id: string; attempt_id: string };
   /** Trusted caller's data tier for reasoning egress during this pipeline run. */
   payloadScope?: PipelinePayloadScopeInput;
 }
@@ -412,46 +415,46 @@ async function executePipelineFileOnce(
   }));
   if (!options.executionMode) await installReasoningBackendsForSteps(steps);
   assertPipelineExecutionCurrent(options);
-  // Nothing above has an effect; lifecycle hooks (extensible) and steps may.
-  progress.started = true;
-  const sessionStart = await firePipelineLifecycleHooks(options.executionMode, 'session_start', {
-    matcher_value: pipelineId,
-    pipeline_id: pipelineId,
-    ...(missionId ? { mission_id: missionId } : {}),
-  });
-  if (sessionStart.blocked) {
-    throw new Error(
-      `[SAFETY_LIMIT][HOOK_BLOCKED] session_start blocked: ${sessionStart.reasons.join('; ')}`
-    );
-  }
-  assertPipelineExecutionCurrent(options);
-  const beforeAgentStart = await firePipelineLifecycleHooks(
-    options.executionMode,
-    'before_agent_start',
-    {
-      matcher_value: pipelineId,
-      pipeline_id: pipelineId,
-      ...(missionId ? { mission_id: missionId } : {}),
-      systemPromptOptions: {
-        pipelineId,
-        ...(missionId ? { missionId } : {}),
-        promptVisibility: 'ledgered',
-        stepCount: steps.length,
-      },
-    }
-  );
-  if (beforeAgentStart.blocked) {
-    throw new Error(
-      `[HOOK_BLOCKED] before_agent_start blocked pipeline ${pipelineId}: ${beforeAgentStart.reasons.join('; ')}`
-    );
-  }
   let libraryJournal: PipelineRunJournalHandle | undefined;
-  const run = (): Promise<{
+  const run = async (): Promise<{
     status: 'succeeded' | 'failed';
     results: PipelineStepResult[];
     context: Record<string, unknown>;
-  }> =>
-    withDelegatedExecutionOptions({ workItem: options.delegatedWorkItem }, () =>
+  }> => {
+    // Nothing above has an effect; lifecycle hooks (extensible) and steps may.
+    progress.started = true;
+    const sessionStart = await firePipelineLifecycleHooks(options.executionMode, 'session_start', {
+      matcher_value: pipelineId,
+      pipeline_id: pipelineId,
+      ...(missionId ? { mission_id: missionId } : {}),
+    });
+    if (sessionStart.blocked) {
+      throw new Error(
+        `[SAFETY_LIMIT][HOOK_BLOCKED] session_start blocked: ${sessionStart.reasons.join('; ')}`
+      );
+    }
+    assertPipelineExecutionCurrent(options);
+    const beforeAgentStart = await firePipelineLifecycleHooks(
+      options.executionMode,
+      'before_agent_start',
+      {
+        matcher_value: pipelineId,
+        pipeline_id: pipelineId,
+        ...(missionId ? { mission_id: missionId } : {}),
+        systemPromptOptions: {
+          pipelineId,
+          ...(missionId ? { missionId } : {}),
+          promptVisibility: 'ledgered',
+          stepCount: steps.length,
+        },
+      }
+    );
+    if (beforeAgentStart.blocked) {
+      throw new Error(
+        `[HOOK_BLOCKED] before_agent_start blocked pipeline ${pipelineId}: ${beforeAgentStart.reasons.join('; ')}`
+      );
+    }
+    return withDelegatedExecutionOptions({ workItem: options.delegatedWorkItem }, () =>
       withDelegatedExecutionFrame(pathResolver.toRepoRelative(inputPath), () =>
         runValidatedSteps(steps, mergedContext, {
           trace,
@@ -475,6 +478,8 @@ async function executePipelineFileOnce(
           runPipelineFile: (nestedPath, nestedOptions = {}) =>
             executePipelineFile(nestedPath, {
               ...nestedOptions,
+              collectorExecution: options.collectorExecution,
+              ...(options.collectorExecution ? { payloadScope: effectivePayloadScope } : {}),
               assertExecutionCurrent: options.assertExecutionCurrent,
               delegatedExecution: options.delegatedExecution,
               delegatedWorkItem: options.delegatedWorkItem,
@@ -484,6 +489,7 @@ async function executePipelineFileOnce(
         })
       )
     );
+  };
   const missionTier = String(autoContext.mission_tier || '');
   const payloadTier: 'public' | 'confidential' | 'personal' =
     missionTier === 'personal'
@@ -491,13 +497,13 @@ async function executePipelineFileOnce(
       : missionTier === 'confidential'
         ? 'confidential'
         : 'public';
-  const effectivePayloadScope: ReasoningPayloadScope = withPipelineTrainingUse(
-    options.payloadScope || {
+  const effectivePayloadScope: ReasoningPayloadScope = withPipelineTrainingUse({
+    purpose: `pipeline ${pipelineId}`,
+    ...(options.payloadScope ?? {
       tier: payloadTier,
       tenant_slug: registeredEnv('KYBERION_STANCE')?.trim() || undefined,
-      purpose: `pipeline ${pipelineId}`,
-    }
-  );
+    }),
+  });
   const tierRank = { public: 0, confidential: 1, personal: 2 };
   if (tierRank[effectivePayloadScope.tier] < tierRank[payloadTier]) {
     throw new Error('Pipeline payload scope cannot be lower than its mission tier.');
@@ -597,13 +603,16 @@ async function executePipelineFileOnce(
       tierRank[scope.tier] > tierRank[effectivePayloadScope.tier]
         ? scope.tier
         : effectivePayloadScope.tier;
+    // An existing reserved journal may already have effects from this attempt.
+    if (options.journalRunId) progress.started = true;
     libraryJournal = createPipelineRunJournal(
-      newPipelineRunId(),
+      options.journalRunId ?? newPipelineRunId(),
       {
         pipeline_id: pipelineId,
         input_path: pathResolver.rootResolve(inputPath),
         pipeline_sha256: createHash('sha256').update(loadedSource).digest('hex'),
         trace_id: trace.traceId,
+        ...(options.collectorExecution ? { collector_execution: options.collectorExecution } : {}),
         ...(missionId ? { mission_id: missionId } : {}),
         step_ids: steps.map((step) => step.id),
       },
@@ -695,6 +704,10 @@ export async function resumeLibraryPipelineRun(
 ) {
   assertCallerCurrent?.();
   const state = loadPipelineRunJournal(runId, undefined, scope);
+  if (state.started?.collector_execution)
+    throw new Error(
+      '[PIPELINE_RESUME_DENIED] Collector runs require Continuous Operations reconciliation'
+    );
   const snapshot = state.started?.library_execution;
   if (
     !snapshot ||
@@ -1019,6 +1032,10 @@ export async function main(args?: string[], print: Print = () => undefined) {
     )
       journalScope = undefined;
     resumeState = loadPipelineRunJournal(String(argv.resume), resumeMissionId, journalScope);
+    if (resumeState.started?.collector_execution)
+      throw new Error(
+        '[PIPELINE_RESUME_DENIED] Collector runs require Continuous Operations reconciliation'
+      );
     if (resumeState.started?.library_execution) {
       if (
         !journalScope ||

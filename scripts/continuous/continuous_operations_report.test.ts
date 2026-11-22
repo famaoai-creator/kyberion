@@ -124,6 +124,17 @@ function fixture() {
   };
 }
 describe('continuous organization report task', () => {
+  it('allows read-only schedule health in the scoped report', async () => {
+    const f = fixture();
+    f.config.sources.push({
+      kind: 'pipeline_schedule_health',
+      source_id: 'scheduled-check',
+      pipeline_ref: 'knowledge/confidential/acme/pipelines/check.json',
+      max_age_seconds: 60,
+    });
+    await expect(f.run()).resolves.toMatchObject({ artifact_ref: 'ART-REPORT' });
+    expect(f.collect).toHaveBeenCalledOnce();
+  });
   it('publishes only scoped aggregate counts and objective evidence through the artifact facade', async () => {
     const f = fixture();
     const result = await f.run();

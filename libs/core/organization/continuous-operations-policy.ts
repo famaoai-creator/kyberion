@@ -13,6 +13,8 @@ import {
   type DotExpectedEffect,
 } from '../dot/dot-proposals.js';
 import { STORAGE_DATA_TIERS } from '../storage-layout.js';
+import { PARTITIONED_RUNTIME_STATE_ROOTS } from '../foundation/runtime-state-roots.js';
+import { isScopedScheduleRef } from './recurring-work-observation.js';
 
 export interface ContinuousOperationsScope {
   tier: StorageDataTier;
@@ -28,6 +30,7 @@ export type ContinuousOperationsSource = ContinuousOperationsSourceBase &
   (
     | { kind?: 'snapshot'; path: string }
     | { kind: 'organization_metrics' }
+    | { kind: 'pipeline_schedule_health'; pipeline_ref: string }
     | { kind: 'pipeline'; path: string; pipeline_ref: string }
   );
 export interface ContinuousOperationsRule {
@@ -175,7 +178,12 @@ export function parseContinuousOperationsConfig(value: unknown): ContinuousOpera
       const kind =
         source.kind === undefined
           ? undefined
-          : choice(source.kind, ['snapshot', 'organization_metrics', 'pipeline']);
+          : choice(source.kind, [
+              'snapshot',
+              'organization_metrics',
+              'pipeline',
+              'pipeline_schedule_health',
+            ]);
       const base = {
         source_id: id(source.source_id),
         max_age_seconds: positive(source.max_age_seconds),
@@ -184,6 +192,12 @@ export function parseContinuousOperationsConfig(value: unknown): ContinuousOpera
         if (source.path !== undefined || source.pipeline_ref !== undefined)
           fail('organization metrics cannot define a path or pipeline');
         return { ...base, kind };
+      }
+      if (kind === 'pipeline_schedule_health') {
+        const ref = path(source.pipeline_ref);
+        if (source.path !== undefined || !isScopedScheduleRef(scope, ref))
+          fail('schedule health requires a pipeline reference in the configured custody');
+        return { ...base, kind, pipeline_ref: ref };
       }
       const p = path(source.path);
       const partition = scope.tenant_slug ?? 'shared';
@@ -207,12 +221,13 @@ export function parseContinuousOperationsConfig(value: unknown): ContinuousOpera
         p.startsWith(cachePrefix) &&
         Boolean(p.slice(cachePrefix.length)) &&
         !p.slice(cachePrefix.length).startsWith('projects/');
-      if (
-        !p.startsWith(`active/shared/runtime/${scope.tier}/${partition}/`) &&
-        !p.startsWith(knowledgePrefix) &&
-        !scopedSnapshotCache
-      )
-        fail('source outside configured scope');
+      const allowedPath =
+        scope.tier === 'personal'
+          ? p.startsWith(`${PARTITIONED_RUNTIME_STATE_ROOTS.dot}/personal/shared/owners/`)
+          : p.startsWith(`active/shared/runtime/${scope.tier}/${partition}/`) ||
+            p.startsWith(knowledgePrefix) ||
+            scopedSnapshotCache;
+      if (!allowedPath) fail('source outside configured scope');
       if (kind === 'pipeline')
         return { ...base, kind, path: p, pipeline_ref: pipelinePath(source.pipeline_ref) };
       if (source.pipeline_ref !== undefined) fail('snapshot cannot define a pipeline');
@@ -221,6 +236,14 @@ export function parseContinuousOperationsConfig(value: unknown): ContinuousOpera
   );
   if (!sources.length) fail('sources required');
   unique(sources.map((source) => source.source_id));
+  const outputOwners = new Map<string, string>();
+  for (const source of sources) {
+    if (source.kind !== 'pipeline') continue;
+    const owner = outputOwners.get(source.path);
+    if (owner && owner !== source.pipeline_ref)
+      fail('collector output path cannot be shared by different pipelines');
+    outputOwners.set(source.path, source.pipeline_ref);
+  }
   const rules = rows(r.rules, 1000).map((value) => {
     const rule = record(value, [
       'rule_id',
@@ -297,6 +320,16 @@ export function parseContinuousOperationsConfig(value: unknown): ContinuousOpera
   };
 }
 
+export function parseCollectorObservations(
+  value: unknown,
+  attemptId: string
+): ContinuousObservation[] {
+  const output = record(value, ['collector_attempt_id', 'observations']);
+  if (output.collector_attempt_id !== attemptId)
+    fail('collector observation belongs to a different attempt');
+  return parseContinuousObservations(output.observations);
+}
+
 export function parseContinuousObservations(value: unknown): ContinuousObservation[] {
   const result = rows(value, 1000).map((value) => {
     const r = record(value, ['metric', 'value', 'observed_at', 'evidence_ref']);
@@ -335,30 +368,55 @@ function managedObjective(objective: string, plan: ContinuousWorkPlan): string {
   return text.length > 950 ? `${text.slice(0, 947)}…` : text;
 }
 
+export function validateContinuousSourceSnapshot(
+  config: ContinuousOperationsConfig,
+  source: ContinuousOperationsSource,
+  snapshot: ContinuousSourceSnapshot,
+  now: Date
+): ContinuousObservation[] {
+  const parsed = parseContinuousObservations(snapshot.observations);
+  for (const row of parsed) {
+    const age = now.getTime() - Date.parse(row.observed_at);
+    if (age < 0 || age > source.max_age_seconds * 1000) fail('stale or future observation');
+  }
+  for (const rule of config.rules) {
+    if (rule.source_id === source.source_id && !parsed.some((row) => row.metric === rule.metric))
+      fail(`missing metric ${source.source_id}/${rule.metric}`);
+  }
+  return parsed;
+}
+
 export function evaluateContinuousOperations(
   config: ContinuousOperationsConfig,
   snapshots: ContinuousSourceSnapshot[],
-  now: Date
+  now: Date,
+  withheldSources: ReadonlySet<string> = new Set()
 ): ContinuousOperationsCandidate[] {
   config = parseContinuousOperationsConfig(config);
   if (!Number.isFinite(now.getTime())) fail('invalid clock');
-  if (!Array.isArray(snapshots) || snapshots.length !== config.sources.length)
+  if (
+    !Array.isArray(snapshots) ||
+    [...withheldSources].some(
+      (id) =>
+        !config.sources.some((source) => source.source_id === id && source.kind === 'pipeline')
+    ) ||
+    snapshots.length + withheldSources.size !== config.sources.length
+  )
     fail('incomplete sources');
   unique(snapshots.map((snapshot) => snapshot.source_id));
   const observations = new Map<string, ContinuousObservation[]>();
   for (const snapshot of snapshots) {
     const source = config.sources.find((source) => source.source_id === snapshot.source_id);
-    if (!source) fail('unknown snapshot source');
-    const parsed = parseContinuousObservations(snapshot.observations);
-    for (const row of parsed) {
-      const age = now.getTime() - Date.parse(row.observed_at);
-      if (age < 0 || age > source.max_age_seconds * 1000) fail('stale or future observation');
-    }
-    observations.set(source.source_id, parsed);
+    if (!source || withheldSources.has(snapshot.source_id)) fail('unknown snapshot source');
+    observations.set(
+      source.source_id,
+      validateContinuousSourceSnapshot(config, source, snapshot, now)
+    );
   }
   if (!config.enabled) return [];
   const candidates: ContinuousOperationsCandidate[] = [];
   for (const rule of config.rules) {
+    if (withheldSources.has(rule.source_id)) continue;
     const row = observations.get(rule.source_id)?.find((row) => row.metric === rule.metric);
     if (!row) fail(`missing metric ${rule.source_id}/${rule.metric}`);
     const match =

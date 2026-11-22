@@ -1,4 +1,5 @@
 import { createManagedOrganization } from '@agent/core/organization/organization-management';
+import { reconcileOrganizationCadence } from './organization_cadence_reconcile.js';
 import { baseRoleEnvText } from '@agent/core/foundation';
 import { cliApprovalRequester } from '../lib/cli/cli-approval-requester.js';
 import {
@@ -389,7 +390,11 @@ const handlePauseResumeArchive: OrgCommandHandler = (ctx) => {
           tenant_slug: parsed.tenantSlug,
           reason: parsed.reason,
         };
-  emit({ mode, state: next }, parsed.json);
+  const cadence =
+    mode === 'apply' && parsed.command === 'resume'
+      ? reconcileOrganizationCadence(next as ReturnType<typeof transitionOrganizationLifecycle>)
+      : undefined;
+  emit({ mode, state: next, ...(cadence ? { cadence } : {}) }, parsed.json);
   return;
 };
 
@@ -722,7 +727,8 @@ const ORGANIZATION_COMMAND_HANDLERS: Record<string, OrgCommandHandler> = {
       mode === 'apply'
         ? createManagedOrganization(input)
         : { ...buildOrganizationScaffold(input), saved_paths: [] };
-    emit({ mode, ...scaffold }, parsed.json);
+    const cadence = mode === 'apply' ? reconcileOrganizationCadence(scaffold.state) : undefined;
+    emit({ mode, ...scaffold, ...(cadence ? { cadence } : {}) }, parsed.json);
     return;
   },
   'parent set': (ctx) => {
@@ -1230,6 +1236,7 @@ const ORGANIZATION_COMMAND_HANDLERS: Record<string, OrgCommandHandler> = {
         already_present: result.already_present,
         state: result.state,
         saved_paths: savedPaths,
+        ...(mode === 'apply' ? { cadence: reconcileOrganizationCadence(result.state) } : {}),
       },
       parsed.json
     );
