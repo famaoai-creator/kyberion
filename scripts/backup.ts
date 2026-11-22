@@ -56,7 +56,7 @@ import {
   verifyWithheldCredentialMembers,
   type ManifestCredentialRead,
   type WithheldRestoreRoot,
-  manifestCredentialCount,
+  inspectWithheldRestoreRoots,
 } from './lib/backup/backup-file-selection.js';
 import {
   BACKUP_PASSPHRASE_ENV,
@@ -1331,11 +1331,7 @@ export function restoreBackup(
   options: BackupCliOptions,
   passphraseDeps: BackupPassphraseDeps = {},
   controls: {
-    /**
-     * Archive subtrees never written to the target (the restore drill withholds
-     * credential roots so a disposable copy never holds tokens). A member that
-     * appears there causes the restore to fail.
-     */
+    /** Archive subtrees excluded from the restore target, such as credentials in a drill. */
     withholdRoots?: string[];
   } = {}
 ): {
@@ -1412,22 +1408,12 @@ function restoreBackupToTarget(
       stampId: stamp(),
       withheldRoots: controls.withholdRoots,
     });
-    const withheld = (controls.withholdRoots ?? []).map((root) => {
-      const landed = path.join(target, root);
-      if (safeExistsSync(landed)) {
-        throw new Error(
-          `[BACKUP_RESTORE_WITHHOLD_FAILED] the target contains a withheld subtree | next: rerun in a clean restore target | evidence: ${root}`
-        );
-      }
-      return {
-        root,
-        archived_members: members.filter((member) => member.startsWith(`${root}/`)).length,
-        manifest_file_count: manifestCredentialCount(manifest.credential_reads, root),
-        ...(manifest.credential_reads?.find((entry) => entry.root === root)?.uncounted
-          ? { uncounted: true }
-          : {}),
-      };
-    });
+    const withheld = inspectWithheldRestoreRoots(
+      target,
+      controls.withholdRoots ?? [],
+      members,
+      manifest.credential_reads
+    );
     const trimmedTails = extracted.trimmedTails;
     const ledgerVerification = extracted.ledgerVerification;
     const quarantinePaths: string[] = [];

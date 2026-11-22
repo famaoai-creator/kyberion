@@ -25,7 +25,8 @@ describe('concierge surface contract', () => {
       page.indexOf('const decide = async'),
       page.indexOf('const visible =')
     );
-    expect(decision).toContain('await postApprovalDecision(item.approval!, decision.decision)');
+    expect(decision).toContain('await postApprovalDecision(item.approval!, decision.decision, {');
+    expect(decision).toContain('{ primaryAction: decision.primaryAction }');
     expect(decision).toContain('formatApprovalFailure(error, locale)');
     // No raw error text reaches the operator, for any kind.
     expect(decision).not.toContain('error.message,');
@@ -40,7 +41,7 @@ describe('concierge surface contract', () => {
     const client = safeReadFile(path.join(appDir, 'src/lib/needs-you-client.ts')).toString();
     const approval = client.slice(
       client.indexOf('export async function postApprovalDecision'),
-      client.indexOf('export async function postReviewVerdict')
+      client.indexOf('export async function postWorkflowDisposition')
     );
     expect(approval).toContain(
       'if (!response.ok) throw await readApprovalResponseFailure(response)'

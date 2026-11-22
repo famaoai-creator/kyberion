@@ -755,8 +755,7 @@ function writeScopedArtifactInternal(
       });
     }
   };
-  if (input.role) withRole(input.role, performWrite);
-  else performWrite();
+  performWrite();
 
   return {
     absolute_path: absolutePath,

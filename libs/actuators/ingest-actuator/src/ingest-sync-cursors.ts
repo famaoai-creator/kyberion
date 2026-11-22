@@ -169,13 +169,17 @@ export function listSyncBatchIds(
     : [];
 }
 
+function writeSyncRecord(file: string, text: string, createOnly = false): void {
+  safeMkdir(path.dirname(file), { recursive: true });
+  safeWriteFile(file, text, { createOnly });
+}
+
 export function persistSyncBatch(batch: SyncBatch, options: SyncCursorPathOptions): string {
   const dir = syncBatchDir(batch.tenant_slug, batch.source_system, options);
   const text = `${JSON.stringify(batch)}\n`;
   const id = batchDigest(text);
-  safeMkdir(dir, { recursive: true });
   try {
-    safeWriteFile(path.join(dir, `${id}.json`), text, { createOnly: true });
+    writeSyncRecord(path.join(dir, `${id}.json`), text, true);
   } catch (error) {
     if ((error as { code?: string }).code !== 'EEXIST') throw error;
     readSyncBatch(batch.tenant_slug, batch.source_system, id, options);
@@ -317,9 +321,7 @@ function writeCursorState(
 ): SyncCursorState {
   const file = syncCursorPath(tenantSlug, sourceSystem, options);
   assertCursorState(state, file);
-  safeMkdir(path.dirname(file), { recursive: true });
-  // safeWriteFile is atomic (temp file + rename) — no torn cursor on crash.
-  safeWriteFile(file, `${JSON.stringify(state, null, 2)}\n`);
+  writeSyncRecord(file, `${JSON.stringify(state, null, 2)}\n`);
   return state;
 }
 

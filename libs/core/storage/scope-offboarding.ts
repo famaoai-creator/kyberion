@@ -33,14 +33,13 @@ import * as pathResolver from '../path-resolver.js';
 import { parseSafeJsonInput, parseSafeJsonObjectValue } from '../foundation/safe-json.js';
 import { readTextFile } from '../foundation/text.js';
 import { streamTextLines } from './jsonl-read.js';
+import { copyTree, listDirEntries } from './scope-offboarding-files.js';
 import { nowIso } from '../foundation/time.js';
 import { logger } from '../core.js';
 import {
   assertSafeRepositoryPath,
-  safeCopyFileSync,
   safeExistsSync,
   safeMkdir,
-  safeReaddir,
   safeLstat,
   safeStat,
   safeWriteFile,
@@ -129,25 +128,6 @@ function readJsonRecord(filePath: string): Record<string, unknown> | null {
     return parseSafeJsonObjectValue(readJson<unknown>(safePath), `scope record ${filePath}`);
   } catch {
     return null;
-  }
-}
-
-function listDirEntries(dir: string): string[] {
-  let safeDir: string;
-  try {
-    safeDir = assertSafeRepositoryPath(dir, { allowMissingLeaf: true });
-  } catch {
-    return [];
-  }
-  if (!safeExistsSync(safeDir)) return [];
-  try {
-    return safeReaddir(safeDir);
-  } catch (error) {
-    // Only a directory that vanished is empty. A refused or changed listing
-    // is rethrown, so verification reports it instead of claiming clean.
-    const code = (error as { code?: unknown } | null)?.code;
-    if (code === 'ENOENT' || code === 'ENOTDIR') return [];
-    throw error;
   }
 }
 
@@ -1449,35 +1429,7 @@ export function verifyScopeOffboarded(
   return { clean: leftovers.length === 0, leftovers };
 }
 
-/** Recursive copy through secure-io (no shell, cross-platform). */
-function copyTree(source: string, destination: string): void {
-  const safeSource = assertSafeRepositoryPath(source);
-  const safeDestination = assertSafeRepositoryPath(destination, { allowMissingLeaf: true });
-  if (safeStat(safeSource).isDirectory()) {
-    if (!safeExistsSync(safeDestination)) safeMkdir(safeDestination, { recursive: true });
-    for (const name of listDirEntries(safeSource)) {
-      copyTree(path.join(safeSource, name), path.join(safeDestination, name));
-    }
-    return;
-  }
-  safeMkdir(path.dirname(safeDestination), { recursive: true });
-  safeCopyFileSync(safeSource, safeDestination);
-}
-
-/**
- * Tenant / project offboarding: **discover → export → delete**.
- *
- *  - `mode: 'dry_run'` (default) reports the targets and writes nothing —
- *    always safe to run, never needs approval.
- *  - `mode: 'execute'` requires a human {@link OffboardApproval}; without one
- *    the verb returns `approval_required` and touches nothing (fail-closed).
- *    With one it copies every target into
- *    `active/shared/exports/offboarding/<scope>-<id>-<timestamp>/` (plus a
- *    `manifest.json` recording the approval), then soft-deletes the originals.
- *
- * Idempotent (a second execute finds no targets → `not_found`) and never
- * throws.
- */
+/** Preview scope-owned data, or export and soft-delete it with human approval. */
 export function offboardScope(input: OffboardScopeInput): OffboardScopeResult {
   if (input.mode !== 'execute') return performOffboarding(input);
   try {
@@ -1518,8 +1470,6 @@ function performOffboarding(input: OffboardScopeInput): OffboardScopeResult {
   try {
     const physicalFilter = { tenantSlug, organizationId };
     result.targets = collectScopeTargets(scopeType, scopeId, physicalFilter);
-    // Ownership history, not only current owners: an artifact this scope
-    // owned before it was re-registered (e.g. promoted) still counts.
     const ownedArtifacts = listArtifactOwnershipHistoryByQuery(
       scopeType === 'tenant' ? { tenantSlug: scopeId } : { projectId: scopeId }
     );
@@ -1530,9 +1480,6 @@ function performOffboarding(input: OffboardScopeInput): OffboardScopeResult {
         records_retained: true,
       };
     }
-    // DA-08: dedup-registry lines are pruned in place (line-level, not a
-    // tree), so they ride next to `targets`. Computed while the ledger still
-    // exists — this must precede any deletion.
     const dedupPrune = scopeType === 'tenant' ? computeDedupRegistryPrune(scopeId) : null;
     if (dedupPrune && dedupPrune.removedLines.length > 0) {
       result.dedup_registry = { matched: dedupPrune.removedLines.length, removed: 0 };
@@ -1553,8 +1500,6 @@ function performOffboarding(input: OffboardScopeInput): OffboardScopeResult {
       scopeType === 'tenant' && isValidTenantSlug(scopeId)
         ? tenantMissionIds(scopeId, result.targets)
         : new Set<string>();
-    // …and its delegation ids (partition records + attributed legacy records),
-    // which attribute legacy notification rows carrying neither stamp nor mission.
     const legacyDelegationIds =
       scopeType === 'tenant' && isValidTenantSlug(scopeId)
         ? tenantDelegationIds(scopeId, legacyMissionIds)

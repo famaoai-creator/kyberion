@@ -183,6 +183,30 @@ export interface WithheldRestoreRoot {
   uncounted?: boolean;
 }
 
+/** Confirm that withheld credentials stayed outside the restore target. */
+export function inspectWithheldRestoreRoots(
+  target: string,
+  roots: readonly string[],
+  members: readonly string[],
+  credentialReads: ManifestCredentialRead[] | undefined
+): WithheldRestoreRoot[] {
+  return roots.map((root) => {
+    if (safeExistsSync(path.join(target, root))) {
+      throw new Error(
+        `[BACKUP_RESTORE_WITHHOLD_FAILED] the target contains a withheld subtree | next: rerun in a clean restore target | evidence: ${root}`
+      );
+    }
+    return {
+      root,
+      archived_members: members.filter((member) => member.startsWith(`${root}/`)).length,
+      manifest_file_count: manifestCredentialCount(credentialReads, root),
+      ...(credentialReads?.find((entry) => entry.root === root)?.uncounted
+        ? { uncounted: true }
+        : {}),
+    };
+  });
+}
+
 /**
  * The restore drill's credential check: the withheld roots the archive or its
  * manifest mentions, refusing any whose archived member count differs from
