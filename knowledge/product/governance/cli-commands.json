@@ -764,6 +764,30 @@
       ]
     },
     {
+      "id": "operator-cli.browser",
+      "command": "browser",
+      "noun": "browser",
+      "verb": "default",
+      "entry": "operator-cli",
+      "audience": "operator",
+      "description": "cli_cmd_operator_cli_browser",
+      "group": "operate",
+      "effect": "connection",
+      "prerequisites": [{ "kind": "service_setup", "via": "browser profiles" }]
+    },
+    {
+      "id": "operator-cli.browser.control",
+      "command": "browser control",
+      "noun": "browser",
+      "verb": "control",
+      "entry": "operator-cli",
+      "audience": "operator",
+      "description": "cli_cmd_operator_cli_browser_control",
+      "group": "operate",
+      "effect": "connection",
+      "prerequisites": [{ "kind": "service_setup", "via": "browser profiles" }]
+    },
+    {
       "id": "operator-cli.grants",
       "command": "grants",
       "noun": "grants",
@@ -1367,6 +1391,8 @@
         "browser-bridge request",
         "browser-bridge status",
         "browser-bridge wait",
+        "browser",
+        "browser control",
         "grants",
         "grants list",
         "grants check",

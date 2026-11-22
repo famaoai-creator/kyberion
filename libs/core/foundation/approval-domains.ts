@@ -88,6 +88,9 @@ export const APPROVAL_DOMAINS: Readonly<Record<string, ApprovalDomainSpec>> = {
   'config-mission': { decision: 'config mission approval' },
   'personal-workbench': { decision: 'personal workbench action approval' },
   'apple-shortcuts': { decision: 'Apple Shortcuts bridge action' },
+  'browser-control': {
+    decision: 'interactive browser control session lease + per-step high-risk approval',
+  },
   operator: { decision: 'operator-directed approvals (dot executor, mission admission)' },
   slack: { decision: 'slack-surfaced approvals' },
   inbox: { decision: 'inbox-surfaced approvals' },

@@ -5,6 +5,7 @@
   "description": "Record and review governed Kyberion browser workflows in the active tab.",
   "permissions": [
     "activeTab",
+    "tabs",
     "scripting",
     "storage",
     "sidePanel",

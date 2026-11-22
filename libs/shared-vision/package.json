@@ -26,6 +26,14 @@
       "types": "./dist/browser-bridge-mailbox.d.ts",
       "default": "./dist/browser-bridge-mailbox.js"
     },
+    "./browser-control-service": {
+      "types": "./dist/browser-control-service.d.ts",
+      "default": "./dist/browser-control-service.js"
+    },
+    "./browser-control-sessions": {
+      "types": "./dist/browser-control-sessions.d.ts",
+      "default": "./dist/browser-control-sessions.js"
+    },
     "./browser-conversation-session": {
       "types": "./dist/browser-conversation-session.d.ts",
       "default": "./dist/browser-conversation-session.js"

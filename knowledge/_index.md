@@ -436,6 +436,7 @@
 - [Browser Automation Operating Checklist](./product/orchestration/browser-automation-best-practices.md) (public | Ecosystem Architect)
 - [Browser Discovery & Inspection Playbook](./product/orchestration/browser-discovery-playbook.md) (public | Kyberion Engineering)
 - [Browser Site Learning Playbook (新規サイト→リプレイ可能ADF)](./product/orchestration/browser-site-learning-playbook.md) (public | Kyberion Engineering)
+- [Browser control playbook (interactive extension control)](./product/orchestration/browser-control-playbook.md) (public | Unknown)
 - [Browser exploration to reviewed pipeline task session](./product/orchestration/browser-exploration-task-session.md) (public | Unknown)
 - [CLI Reliability Baseline — R00 接続表と証拠分類](./product/orchestration/cli-reliability-baseline.ja.md) (public | Unknown)
 - [CLI Reliability PR — reviewer 向け変更地図と residual](./product/orchestration/cli-reliability-pr-notes.ja.md) (public | Unknown)
