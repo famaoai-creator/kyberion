@@ -405,3 +405,32 @@
 .wc-entry[data-source='agent_session'] {
   border-left-color: var(--kb-ui-accent);
 }
+
+/* Per-provider hues for session blocks (photo-style provider color coding). */
+.wc-lane__block[data-provider='claude'] {
+  background: rgba(217, 119, 87, 0.35);
+  border-left-color: rgb(217, 119, 87);
+}
+.wc-lane__block[data-provider='codex'],
+.wc-lane__block[data-provider='opencode'] {
+  background: rgba(90, 170, 110, 0.35);
+  border-left-color: rgb(90, 170, 110);
+}
+.wc-lane__block[data-provider='devin'],
+.wc-lane__block[data-provider='agy'] {
+  background: rgba(120, 140, 230, 0.35);
+  border-left-color: rgb(120, 140, 230);
+}
+.wc-lane__block[data-provider='gemini'] {
+  background: rgba(80, 160, 210, 0.35);
+  border-left-color: rgb(80, 160, 210);
+}
+.wc-lane__block[data-provider='grok'],
+.wc-lane__block[data-provider='copilot'] {
+  background: rgba(150, 110, 190, 0.35);
+  border-left-color: rgb(150, 110, 190);
+}
+.wc-lane__block[data-kind='delegation'] {
+  background: rgba(200, 140, 40, 0.3);
+  border-left-color: rgb(200, 140, 40);
+}

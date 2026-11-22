@@ -1177,22 +1177,44 @@ export interface CoSessionActivity {
 
 /**
  * Every session record under the store with its lifecycle event log (live
- * `events.jsonl` plus rotated `events-<stamp>.jsonl` segments). Read model for
+ * `events.jsonl` plus rotated `events.<stamp>Z-<pid>.jsonl` segments). Read model for
  * the agent-session calendar — presence/handoffs are not part of the slice.
  */
-export function listCoSessionActivity(): CoSessionActivity[] {
+export function listCoSessionActivity(window?: {
+  /** Skip sessions created after this instant and rotated segments sealed before `from`. */
+  from?: string;
+  to?: string;
+}): CoSessionActivity[] {
   const root = runtimeRoot();
   if (!safeExistsSync(root)) return [];
+  const toMs = window?.to ? Date.parse(window.to) : undefined;
+  // A rotated segment is `events.<YYYYmmddTHHMMSS>Z-<pid>.jsonl`: every event
+  // inside predates the stamp, so a stamp at or before `from` is all history.
+  const fromCompact = window?.from
+    ? new Date(`${window.from}T00:00:00.000Z`)
+        .toISOString()
+        .replace(/[-:]/g, '')
+        .replace(/\..*$/, '')
+    : undefined;
   const out: CoSessionActivity[] = [];
   for (const entry of safeReaddir(root)) {
     const file = sessionFile(entry);
     const record = readJsonIfPresent<CoSessionRecord>(file);
     if (!record || typeof record.session_id !== 'string') continue;
+    if (toMs !== undefined) {
+      const created = Date.parse(record.created_at ?? '');
+      if (Number.isFinite(created) && created > toMs) continue;
+    }
     const events: CoSessionEvent[] = [];
     const obsDir = path.join(obsRoot(), record.session_id);
     if (safeExistsSync(obsDir)) {
       const segments = safeReaddir(obsDir)
-        .filter((name) => name === 'events.jsonl' || /^events-.+\.jsonl$/.test(name))
+        .filter(
+          (name) =>
+            name === 'events.jsonl' ||
+            (/^events\.\d{8}T\d{6}Z-\d+\.jsonl$/.test(name) &&
+              (!fromCompact || name.slice(7, 23) >= fromCompact))
+        )
         .sort();
       for (const name of segments) {
         events.push(...readCoSessionJsonl<CoSessionEvent>(path.join(obsDir, name)));

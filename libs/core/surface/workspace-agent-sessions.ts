@@ -45,14 +45,14 @@ export interface AgentSessionBlock {
 }
 
 export interface AgentSessionSources {
-  coSessions(): CoSessionActivity[];
+  coSessions(window?: { from?: string; to?: string }): CoSessionActivity[];
   delegations(tenants: readonly string[] | 'all'): DelegatedTaskRecord[];
 }
 
 /** Production readers: the governed stores, one grant-aware opening each. */
 export function defaultAgentSessionSources(): AgentSessionSources {
   return {
-    coSessions: () => listCoSessionActivity(),
+    coSessions: (window) => listCoSessionActivity(window),
     delegations: (tenants) => {
       const includeSystem = tenants === 'all';
       const available = listDelegationTenantPartitions();
@@ -197,7 +197,10 @@ export function buildAgentSessionBlocks(
   const degraded: string[] = [];
   let blocks: AgentSessionBlock[] = [];
   try {
-    for (const activity of sources.coSessions()) {
+    for (const activity of sources.coSessions({
+      from: range.from,
+      to: `${range.to}T23:59:59.999Z`,
+    })) {
       blocks.push(...coSessionBlocks(activity, range, now));
     }
   } catch {

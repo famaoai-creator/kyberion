@@ -209,6 +209,7 @@ export function WorkCalendar({ t }: { t: Translate }) {
   );
 
   const roleLabel = (entry: CalendarEntry) => {
+    if (entry.item.source === 'agent_session') return entry.item.provider ?? 'session';
     if (entry.role === 'start') return t('ia_shell_work_cal_start');
     if (entry.role === 'span') return t('ia_shell_work_cal_underway');
     switch (entry.item.source) {
