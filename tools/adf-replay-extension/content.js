@@ -450,7 +450,12 @@ function resolveTarget(step) {
   }
   if (exact.length === 1) {
     const element = exact[0];
-    if (roleOf(element) !== step.target.role || accessibleName(element) !== step.target.name) {
+    // Interactive control steps carry ref only (role/name arrive as ''); treat
+    // absent fields as unconstrained — recorded steps always send both.
+    if (
+      (step.target.role && roleOf(element) !== step.target.role) ||
+      (step.target.name && accessibleName(element) !== step.target.name)
+    ) {
       return {
         result: { status: 'ambiguous', detail: '対象の役割または名称が記録時から変化しました' },
       };

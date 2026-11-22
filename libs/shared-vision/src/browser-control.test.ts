@@ -315,14 +315,21 @@ describe('browser control journal → recording export', () => {
       role: 'button',
       name: 'Delete app',
     });
+    journalEnqueuedStep(session.session_id, {
+      step_id: 's-6',
+      op: 'open_tab',
+      url: 'https://api.slack.com/apps/manage',
+    });
 
     const out = exportBrowserControlRecording({ session_id: session.session_id });
     expect(out.status).toBe('exported');
     if (out.status !== 'exported') return;
     exportedIds.push(out.recording_id);
 
-    expect(out.action_count).toBe(4); // snapshot is observation-only → skipped
-    expect(out.skipped_steps).toBe(1);
+    // snapshot is observation-only; open_tab is session establishment — the
+    // action schema has no url field and replay opens tab.origin itself.
+    expect(out.action_count).toBe(4);
+    expect(out.skipped_steps).toBe(2);
 
     const file = pathResolver.rootResolve(out.recording_ref);
     const recording = loadBrowserExtensionRecordingAtPath(file);

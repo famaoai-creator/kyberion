@@ -2028,3 +2028,59 @@ describe('Browser Bridge content-script recording', () => {
     expect(source).toContain('isMfaNode(modal)');
   });
 });
+
+/**
+ * Interactive control steps carry only `ref` (background.js maps role/name to
+ * ''). resolveTarget must treat absent role/name as unconstrained — otherwise
+ * every ref-based interactive step fails as "changed since recording".
+ */
+function loadResolveTarget() {
+  const source = String(
+    safeReadFile(path.resolve(__dirname, '../tools/adf-replay-extension/content.js'), {
+      encoding: 'utf8',
+    })
+  );
+  const start = source.indexOf('function resolveTarget(step)');
+  const end = source.indexOf('// Positional fallback');
+  if (start < 0 || end < 0) throw new Error('resolveTarget block not found in content.js');
+  const env: Record<string, unknown> = {
+    resolveOutcomeMessage: () => null,
+    elements: [] as Array<{ __ref: string; __role: string; __name: string }>,
+  };
+  const resolveTarget = new Function(
+    'env',
+    `const { resolveOutcomeMessage } = env;
+     const candidatesFor = () => env.elements;
+     const semanticRef = (el) => el.__ref;
+     const roleOf = (el) => el.__role;
+     const accessibleName = (el) => el.__name;
+     ${source.slice(start, end)}
+     return resolveTarget;`
+  )(env) as (step: { target: { ref: string; role?: string; name?: string } }) => {
+    element?: unknown;
+    result?: { status: string };
+  };
+  return { resolveTarget, env };
+}
+
+describe('Browser Bridge content-script resolveTarget', () => {
+  const element = { __ref: '@link_abc_1', __role: 'link', __name: 'Learn more' };
+
+  it('resolves a ref-only interactive step (empty role/name are unconstrained)', () => {
+    const { resolveTarget, env } = loadResolveTarget();
+    env.elements = [element];
+    const out = resolveTarget({ target: { ref: '@link_abc_1', role: '', name: '' } });
+    expect(out.element).toBe(element);
+    expect(out.result).toBeUndefined();
+  });
+
+  it('still rejects a recorded step whose role/name drifted', () => {
+    const { resolveTarget, env } = loadResolveTarget();
+    env.elements = [element];
+    const out = resolveTarget({
+      target: { ref: '@link_abc_1', role: 'link', name: 'Sign in' },
+    });
+    expect(out.element).toBeUndefined();
+    expect(out.result?.status).toBe('ambiguous');
+  });
+});
