@@ -39,6 +39,13 @@ export type CharterExternalOperationTarget =
     }
   | { operation_id: 'service:slack:preset:post_message'; channel?: string }
   | {
+      operation_id: 'email:send';
+      backend: string;
+      /** Exact recipient the human delegated to; wildcards are rejected by the parser. */
+      to: string;
+      from?: string;
+    }
+  | {
       operation_id: 'meeting:join' | 'meeting:listen' | 'meeting:speak' | 'meeting:chat';
       platform: string;
       meeting_id: string;
@@ -50,6 +57,7 @@ export type CharterExternalOperationTarget =
     }
   | { operation_id: 'voice:playback'; platform?: string; format?: string; content_hash?: string }
   | { operation_id: 'voice:speak'; platform?: string }
+  | { operation_id: 'voice:transcribe_provider'; provider: string }
   | { operation_id: 'network:fetch'; method?: string; origin?: string }
   | { operation_id: 'network:exposure_check'; origin?: string }
   | { operation_id: 'network:shell'; cmd?: string }
@@ -308,6 +316,19 @@ export const EXTERNAL_OPERATION_DELEGATION: Record<string, DelegationTargetSpec>
     },
     reputational_class: 'B',
   },
+  'email:send': {
+    fields: ['backend', 'to'],
+    optionalFields: ['from'],
+    buildTarget: (effect) => {
+      const backend = nonEmptyString(effect.backend);
+      const params = effect.params as { to?: unknown; from?: unknown } | undefined;
+      const to = nonEmptyString(params?.to);
+      if (!backend || !to) return undefined;
+      const from = nonEmptyString(params?.from);
+      return { operation_id: 'email:send', backend, to, ...(from ? { from } : {}) };
+    },
+    reputational_class: 'B',
+  },
   'meeting:join': meetingSessionDelegation('meeting:join'),
   'meeting:listen': meetingSessionDelegation('meeting:listen'),
   'meeting:chat': meetingSessionDelegation('meeting:chat'),
@@ -338,6 +359,14 @@ export const EXTERNAL_OPERATION_DELEGATION: Record<string, DelegationTargetSpec>
       const params = effect.params as { platform?: unknown } | undefined;
       const platform = nonEmptyString(params?.platform);
       return platform ? { operation_id: 'voice:speak', platform } : undefined;
+    },
+    reputational_class: 'B',
+  },
+  'voice:transcribe_provider': {
+    fields: ['provider'],
+    buildTarget: (effect) => {
+      const provider = nonEmptyString(effect.provider);
+      return provider ? { operation_id: 'voice:transcribe_provider', provider } : undefined;
     },
     reputational_class: 'B',
   },

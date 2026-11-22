@@ -6,6 +6,7 @@ import { getAdapterDefault } from '../actuator/adapter-default-preferences.js';
 import { EmailProvider, EmailParams, EmailResult } from './email-types.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { runExternalOperation } from '../governance/external-operation.js';
+import { isDelegableExternalOperation } from '../governance/external-operation-target.js';
 import { wrapAdapterEffects } from '../governance/adapter-effect-proxy.js';
 import { currentScopeEnvelope } from '../scope-envelope.js';
 import { resolveScopeContext } from '../scope-context.js';
@@ -132,7 +133,7 @@ export class MacMailAppEmailProvider implements EmailProvider {
         tenantSlug: (currentScopeEnvelope()?.identity ?? resolveScopeContext()).tenant_slug,
         effect: { backend: this.id, params: frozen },
         requiresApproval: true,
-        delegable: op === 'send',
+        delegable: isDelegableExternalOperation(`email:${op}`),
       },
       () =>
         new Promise<EmailResult>((resolve) => {
@@ -250,7 +251,7 @@ export class SmtpEmailProvider implements EmailProvider {
           params: { from, to, subject, body, cc },
         },
         requiresApproval: true,
-        delegable: true,
+        delegable: isDelegableExternalOperation('email:send'),
       },
       () =>
         new Promise<EmailResult>((resolve) => {

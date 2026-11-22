@@ -263,6 +263,11 @@ const OPERATIONS: Readonly<Record<string, RegistryEntry>> = {
     effectClass: 'external_mutation',
     authority: { kind: 'admission', boundary: 'external' },
     actionClass: 'send_message_external',
+    delegable: {
+      fields: ['backend', 'to'],
+      optionalFields: ['from'],
+      reputational_class: 'B',
+    },
     protectedPaths: [['params', 'to'], ['params', 'cc'], ['params', 'from'], ['account']],
   },
   'email:create_draft': {
@@ -329,6 +334,10 @@ const OPERATIONS: Readonly<Record<string, RegistryEntry>> = {
   'voice:transcribe_provider': {
     effectClass: 'external_mutation',
     authority: { kind: 'admission', boundary: 'external' },
+    delegable: {
+      fields: ['provider'],
+      reputational_class: 'B',
+    },
   },
   'voice:record_sample': {
     effectClass: 'external_mutation',
