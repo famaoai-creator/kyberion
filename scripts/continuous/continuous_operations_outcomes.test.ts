@@ -9,7 +9,7 @@ const report = { inventory: [{ rule_id: 'r', action_ref: 'a' }] } as ContinuousO
 function fixture(managed = false) {
   const item = {
     item_id: 'w',
-    context: { tenant_slug: 'acme', organization_id: 'org' },
+    context: { tenant_slug: 'acme', organization_id: 'org', project_id: 'default' },
     status: 'in_progress',
     metadata: managed ? { continuous_work: {} } : {},
   };
@@ -138,5 +138,10 @@ describe('continuous operations feedback', () => {
     expect(
       observeContinuousWork(charter, report, '/repo', f.deps)[0]?.execution_status
     ).toBeUndefined();
+  });
+  it('rejects an explicit project from an organization-scoped outcome', () => {
+    const f = fixture();
+    f.item.context.project_id = 'PRJ-OTHER';
+    expect(() => observeContinuousWork(charter, report, '/repo', f.deps)).toThrow('scope mismatch');
   });
 });

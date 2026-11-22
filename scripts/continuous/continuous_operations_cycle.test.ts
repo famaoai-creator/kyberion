@@ -165,6 +165,7 @@ describe('full continuous observation cycle', () => {
       f.deps
     );
     expect(second.inventory[0].disposition).toBe('duplicate');
+    expect(second.inventory[0].admission_dot_status).toBe('dispatched');
     expect(f.dispatch).toHaveBeenCalledTimes(1);
   });
   it('does not admit work after collector failure', async () => {

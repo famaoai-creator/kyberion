@@ -6,7 +6,13 @@ import type { ProjectRecord } from './project-registry.js';
  * be an objective of the project's own organization, so the link cannot
  * point across organizations or at a typo.
  */
-export function assertProjectObjectiveLinks(record: ProjectRecord, rootDir?: string): void {
+export function assertProjectObjectiveLinks(
+  record: Pick<
+    ProjectRecord,
+    'project_id' | 'tier' | 'tenant_slug' | 'organization_id' | 'objective_ids'
+  >,
+  rootDir?: string
+): void {
   if (!record.objective_ids?.length) return;
   if (!record.organization_id) {
     throw new Error(

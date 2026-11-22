@@ -20,11 +20,15 @@ export async function main(
     await runOrganizationInformationAssets(args.slice(1), print);
     return;
   }
-  if (args[0] === 'continuous' && args[1] === 'run') {
+  if (args[0] === 'continuous' && ['run', 'owner-tick'].includes(args[1] ?? '')) {
     await import('./run_pipeline.js');
-    const { runOrganizationContinuousOperations } =
+    const { runOrganizationContinuousOperations, runOrganizationContinuousOwnerTick } =
       await import('./organization/organization_continuous_operations.js');
-    await runOrganizationContinuousOperations(args.slice(2), print);
+    const run =
+      args[1] === 'owner-tick'
+        ? runOrganizationContinuousOwnerTick
+        : runOrganizationContinuousOperations;
+    await run(args.slice(2), print);
     return;
   }
   if (args[0] === 'role') {

@@ -59,7 +59,14 @@ export async function runContinuousOperationsCycle(
   const outcomes = deps.outcomes
     ? deps.outcomes(charter, report)
     : observeContinuousWork(charter, report, options.rootDir);
-  return { ...report, outcomes };
+  return {
+    ...report,
+    inventory: report.inventory.map((entry) => ({
+      ...entry,
+      ...(entry.dot_status ? { admission_dot_status: entry.dot_status } : {}),
+    })),
+    outcomes,
+  };
 }
 export async function runContinuousOperationsCycleFromRef(
   ref: string,

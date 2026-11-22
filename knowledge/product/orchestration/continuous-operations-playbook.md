@@ -61,6 +61,16 @@ supervisor の dot executor が許可された pipeline を claim して実行�
 
 ## 復旧と効果
 
+特定の承認済み WorkItem を既存 owner で確認する操作は、同じ scope を選択して実行する。
+
+```sh
+pnpm organization continuous owner-tick --config knowledge/product/governance/continuous-operations/<loop>.json --work-item-id <id>
+```
+
+このコマンドは対象の WorkItem を最大1回進める。停止したプロジェクト作成は、同じ操作キーと承認済みの項目を持つプロジェクト、および組織への登録が確認できた場合に続行する。プロジェクトが見つからない場合や別の効果の不確実性が残る場合は停止を保持する。
+
+出力の inventory の `admission_dot_status` は受付時に記録された値。outcomes の `dot_status`、`work_item_status`、`managed_work.status` は実績から観測した値。
+
 全 source の検証後に checkpoint を書く。取得・鮮度エラーなら分配しない。admission 前に operation identity を保存するため、checkpoint 後のプロセス停止は同じ identity で自動復旧する。明示的な admission 例外や拒否は勝手に再試行しない。
 
 原因を修正した後、同一 scope で次を実行する:

@@ -4,7 +4,10 @@ import { readDotWorkResults } from '@agent/core/dot/dot-executor';
 import { readDotActionLedger } from '@agent/core/dot/dot-action-ledger';
 import { getWorkItem } from '@agent/core/workforce/work-coordination';
 import { listArtifactOwnershipRecordsByQuery } from '@agent/core/workforce/artifact-registry';
-import { readContinuousWorkOwnerProgress } from '@agent/core/organization/continuous-work-owner';
+import {
+  normalizeWorkItemContext,
+  readContinuousWorkOwnerProgress,
+} from '@agent/core/organization/continuous-work-owner';
 import type { ContinuousOperationsReport } from '@agent/core/organization/continuous-operations';
 export interface ContinuousOutcomeDeps {
   actions?: typeof readDotActionLedger;
@@ -20,6 +23,7 @@ export function observeContinuousWork(
   deps: ContinuousOutcomeDeps = {}
 ) {
   const scope = charter.scope;
+  const itemProjectId = normalizeWorkItemContext(scope).project_id;
   const actions = (deps.actions ?? readDotActionLedger)({ rootDir }).filter(
     (row) => row.dot_id === charter.dot_id
   );
@@ -48,7 +52,7 @@ export function observeContinuousWork(
       item &&
       ((item.context?.tenant_slug ?? '') !== (scope.tenant_slug ?? '') ||
         item.context?.organization_id !== scope.organization_id ||
-        (item.context?.project_id ?? '') !== (scope.project_id ?? ''))
+        item.context?.project_id !== itemProjectId)
     )
       throw new Error('Continuous outcome WorkItem scope mismatch');
     const result = results

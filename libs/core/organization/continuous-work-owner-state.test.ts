@@ -30,6 +30,7 @@ import type { DotCharter } from '../dot/dot-charter.js';
 import type { DotActionRecord } from '../dot/dot-action-ledger.js';
 import type { DotProposal } from '../dot/dot-proposals.js';
 import type { WorkItem } from '../workforce/work-coordination-types.js';
+import { buildWorkItemCreation } from '../workforce/work-coordination-identity.js';
 const charter = {
   dot_id: 'operator',
   scope: {
@@ -40,7 +41,7 @@ const charter = {
   },
   authority: { authority_role: 'organization_operator' },
 } as DotCharter;
-function fixture() {
+function fixture(boundCharter = charter) {
   const proposal: DotProposal = {
     action_id: 'dot_delegate_work',
     title: 'Repair',
@@ -54,7 +55,7 @@ function fixture() {
       ],
     },
   };
-  const identity = genericDotActionIdentity(charter, proposal, 0, 'stable');
+  const identity = genericDotActionIdentity(boundCharter, proposal, 0, 'stable');
   const record = {
     ...proposal,
     ...identity,
@@ -63,12 +64,7 @@ function fixture() {
     decision: 'approve',
     request_id: 'request-1',
   } as DotActionRecord;
-  const input = dotWorkItemInput(charter, record, '/repo');
-  const item = {
-    item_id: input.itemId,
-    metadata: input.metadata,
-    context: input.context,
-  } as WorkItem;
+  const item = buildWorkItemCreation(dotWorkItemInput(boundCharter, record, '/repo'));
   record.work_item_id = item.item_id;
   const approval = {
     status: 'approved',
@@ -88,6 +84,20 @@ describe('continuous owner immutable authority', () => {
     vi.clearAllMocks();
     mocks.expired.mockReturnValue(false);
     mocks.usable.mockReturnValue(undefined);
+  });
+  it('accepts the persisted default project for organization-scoped work and rejects scope changes', () => {
+    const organizationCharter = { ...charter, scope: { ...charter.scope, project_id: undefined } };
+    const { item } = fixture(organizationCharter);
+    expect(item.context?.project_id).toBe('default');
+    expect(() => authorizeItem(organizationCharter, item, '/repo')).not.toThrow();
+    for (const change of [
+      { project_id: 'PRJ-OTHER' },
+      { tenant_slug: 'other' },
+      { organization_id: 'other' },
+    ]) {
+      const changed: WorkItem = { ...item, context: { ...item.context, ...change } };
+      expect(() => authorizeItem(organizationCharter, changed, '/repo')).toThrow('immutable');
+    }
   });
   it('requires the exact payload and effect approval, rejecting approval transplant and AI decisions', () => {
     const f = fixture();
