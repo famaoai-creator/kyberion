@@ -44,5 +44,9 @@ export interface ProposalStorylineADF {
     branding?: {
       [k: string]: unknown;
     };
+    /**
+     * What the presenter says on this slide; rendered as PowerPoint speaker notes.
+     */
+    speaker_notes?: string;
   }[];
 }
