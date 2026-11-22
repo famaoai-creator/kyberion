@@ -243,11 +243,22 @@ export function NeedsYouCard({
     const approval = item.approval;
     const allowOnceLabel =
       approval.min_assurance === 'A3' ? f('decide_approve_passkey') : f('decide_allow_once');
+    // A3 passkey path does not thread primaryAction — hide Always there.
+    const alwaysAvailable =
+      approval.min_assurance !== 'A3' && has('allow_always');
+    const alwaysEnabled = alwaysAvailable && approval.always_enabled === true;
     const alwaysScope =
-      approval.channel || approval.storage_channel || approval.title || 'this action';
-    const whyLines = brief?.why?.length
-      ? brief.why.map((line) => renderDisplayText(line, locale)).filter(Boolean)
-      : [];
+      approval.always_scope ||
+      approval.channel ||
+      approval.storage_channel ||
+      approval.title ||
+      'this action';
+    // Prefer the decision-brief why block; avoid a duplicate decide_why panel
+    // when brief.why is already rendered inside DecisionBriefBlock.
+    const whyLines =
+      !brief?.why?.length && approval.reason
+        ? [approval.reason]
+        : [];
     body = (
       <>
         {brief ? (
@@ -303,11 +314,16 @@ export function NeedsYouCard({
             }
           />
         ) : null}
-        {has('allow_always') ? (
+        {alwaysAvailable ? (
           <Button
             label={f('decide_allow_always', { scope: alwaysScope })}
             variant="secondary"
-            disabled={busy}
+            disabled={busy || !alwaysEnabled}
+            title={
+              !alwaysEnabled
+                ? approval.always_disabled_reason || f('decide_allow_always_unavailable')
+                : undefined
+            }
             onClick={() =>
               void onDecide({
                 kind: 'approval',
@@ -486,7 +502,19 @@ export function NeedsYouCard({
             label={f('decide_reassign')}
             variant="secondary"
             disabled={busy}
-            onClick={() => void onDecide({ kind: 'disposition', item, disposition: 'reassign' })}
+            onClick={() => {
+              const newOwnerId =
+                typeof window !== 'undefined'
+                  ? window.prompt(f('decide_reassign_prompt'))?.trim()
+                  : '';
+              if (!newOwnerId) return;
+              void onDecide({
+                kind: 'disposition',
+                item,
+                disposition: 'reassign',
+                newOwnerId,
+              });
+            }}
           />
         ) : null}
         {has('accept') ? (

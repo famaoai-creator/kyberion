@@ -85,10 +85,14 @@ export function appendVerdictRepair(input: AppendVerdictRepairInput): AppendVerd
     return { ok: false, stop_reason: 'not_ready' };
   }
 
-  const prior =
-    typeof state.verdict_repair_count === 'number'
-      ? state.verdict_repair_count
-      : readRepairCount(failed);
+  // Prefer the higher of in-memory state and durable WorkItem metadata so a
+  // stale caller state cannot undercount past repairs.
+  const prior = Math.max(
+    typeof state.verdict_repair_count === 'number' && Number.isFinite(state.verdict_repair_count)
+      ? Math.max(0, Math.floor(state.verdict_repair_count))
+      : 0,
+    readRepairCount(failed)
+  );
   if (prior >= MAX_VERDICT_REPAIRS) {
     return { ok: false, stop_reason: 'replan_limit' };
   }

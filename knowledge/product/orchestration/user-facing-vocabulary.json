@@ -21028,6 +21028,16 @@
         "ja": "依頼を更新できませんでした。変更はされていません。もう一度お試しください。",
         "qps-ploc": "⟦Ŧħė řėɋůėşŧ ƈőůŀḓ ñőŧ ƀė ůṗḓȧŧėḓ. Ñőŧħïñɠ ẇȧş ƈħȧñɠėḓ; ŧřẏ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
       },
+      "ia_inbox_error_failure": {
+        "en": "The disposition could not be recorded. Nothing was changed; try again.",
+        "ja": "対応を記録できませんでした。変更はされていません。もう一度お試しください。",
+        "qps-ploc": "⟦Ŧħė ḓïşṗőşïŧïőñ ƈőůŀḓ ñőŧ ƀė řėƈőřḓėḓ. Ñőŧħïñɠ ẇȧş ƈħȧñɠėḓ; ŧřẏ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "ia_inbox_error_reassign_owner": {
+        "en": "Choose who should take over before reassigning.",
+        "ja": "担当を変えるには、引き継ぐ相手を指定してください。",
+        "qps-ploc": "⟦Ƈħőőşė ẇħő şħőůŀḓ ŧȧķė őṽėř ƀėƒőřė řėȧşşïɠñïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
       "ia_shell_tabs_label": {
         "en": "Sections of this page",
         "ja": "このページの表示",
@@ -30623,10 +30633,10 @@
         "ja": "常に許可（{scope}）",
         "qps-ploc": "⟦Ȧŀẇȧẏş ȧŀŀőẇ ({scope}) ŀőřėɱ⟧"
       },
-      "decide_why": {
-        "en": "Why am I asked?",
-        "ja": "なぜ聞かれているか",
-        "qps-ploc": "⟦Ẇħẏ ȧɱ Ї ȧşķėḓ? ŀőřėɱ⟧"
+      "decide_allow_always_unavailable": {
+        "en": "Always allow is not available for this request",
+        "ja": "この依頼では常に許可は使えません",
+        "qps-ploc": "⟦Ȧŀẇȧẏş ȧŀŀőẇ ïş ñőŧ ȧṽȧïŀȧƀŀė ƒőř ŧħïş řėɋůėşŧ ŀőřėɱ⟧"
       },
       "decide_retry": {
         "en": "Retry",
@@ -30642,6 +30652,11 @@
         "en": "Reassign",
         "ja": "担当変更",
         "qps-ploc": "⟦Řėȧşşïĝñ ŀőřėɱ⟧"
+      },
+      "decide_reassign_prompt": {
+        "en": "Peer id of the new owner",
+        "ja": "新しい担当のピア ID",
+        "qps-ploc": "⟦Ṗėėř ïḓ őƒ ŧħė ñėẇ őẇñėř ŀőřėɱ⟧"
       },
       "decide_accept": {
         "en": "Accept as-is",

@@ -69,7 +69,8 @@ export function primaryActionToStoreDecision(
 
 /**
  * Derive a Policy Category from the approval subject / title when present.
- * Unknown subjects leave Always available (Grant path still needs a binding).
+ * Unknown subjects leave Always disabled (fail-closed) until a known category
+ * is inferred; Grant / effect binding still gate separately.
  */
 export function inferPolicyCategoryFromApproval(
   record: Pick<ApprovalRequestRecord, 'subject' | 'title' | 'summary'>
@@ -91,7 +92,7 @@ export function inferPolicyCategoryFromApproval(
 }
 
 export function approvalAlwaysScopeLabel(
-  record: Pick<ApprovalRequestRecord, 'subject' | 'channel' | 'requester' | 'title'>
+  record: Pick<ApprovalRequestRecord, 'subject' | 'channel' | 'title'>
 ): string {
   const subject = String(record.subject ?? '').trim();
   if (subject) return subject;
@@ -122,13 +123,15 @@ export function buildApprovalPrimaryActions(
   // PR #1563: Owner Allow once + CLI Grant resume — not process-session Always.
   const ownerGrant = requiresTenantOwnerApproval(record);
   const alwaysEnabled = alwaysOk && hasBinding && !ownerGrant;
-  const alwaysDisabledReason = !alwaysOk
-    ? 'always_forbidden_for_category'
-    : ownerGrant
-      ? 'grant_resume_not_session_always'
-      : !hasBinding
-        ? 'always_requires_effect_binding'
-        : undefined;
+  const alwaysDisabledReason = !policyCategory
+    ? 'always_requires_known_category'
+    : !alwaysOk
+      ? 'always_forbidden_for_category'
+      : ownerGrant
+        ? 'grant_resume_not_session_always'
+        : !hasBinding
+          ? 'always_requires_effect_binding'
+          : undefined;
 
   const buttons: ApprovalPrimaryActionButton[] = [
     {

@@ -64,4 +64,14 @@ describe('approval primary actions', () => {
       'always_requires_effect_binding'
     );
   });
+
+  it('disables Always when the category cannot be inferred (fail-closed)', () => {
+    const draft = record({ title: 'Generic request', summary: 'needs a decision' });
+    expect(inferPolicyCategoryFromApproval(draft)).toBeUndefined();
+    const set = buildApprovalPrimaryActions(draft);
+    expect(set.buttons.find((b) => b.kind === 'allow_always')?.enabled).toBe(false);
+    expect(set.buttons.find((b) => b.kind === 'allow_always')?.disabledReason).toBe(
+      'always_requires_known_category'
+    );
+  });
 });

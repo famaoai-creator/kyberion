@@ -901,12 +901,36 @@ export function collectActiveMissions(): MissionSummary[] {
   return missions.sort((a, b) => a.missionId.localeCompare(b.missionId));
 }
 
-export function collectMissionProgress(activeMissions: MissionSummary[]): MissionProgressSummary[] {
+export function collectMissionProgress(
+  activeMissions: MissionSummary[],
+  tenantSlugs: string[] | 'all' = 'all'
+): MissionProgressSummary[] {
   const missionRoots = [
     pathResolver.active('missions/public'),
     pathResolver.active('missions/confidential'),
   ];
   const summaries: MissionProgressSummary[] = [];
+  // Load once under the viewer tenant set — never scan every WorkItem per mission.
+  let scopedChildren: ReturnType<typeof listWorkItems> = [];
+  try {
+    const tenantFilter = Array.from(
+      new Set(
+        activeMissions
+          .map((mission) => mission.tenantSlug)
+          .filter((slug): slug is string => Boolean(slug))
+      )
+    );
+    scopedChildren = listWorkItems({
+      tenantSlugs:
+        tenantSlugs === 'all'
+          ? tenantFilter.length
+            ? tenantFilter
+            : undefined
+          : tenantSlugs,
+    });
+  } catch {
+    scopedChildren = [];
+  }
 
   for (const mission of activeMissions) {
     const missionPath = missionRoots
@@ -954,28 +978,16 @@ export function collectMissionProgress(activeMissions: MissionSummary[]): Missio
     }
 
     const assets = normalizeMissionAssets(generatedAssets);
-    let children: Array<{
-      item_id: string;
-      title: string;
-      status: string;
-      parent_item_id?: string;
-      task_id?: string;
-      context?: { mission_id?: string; task_id?: string };
-    }> = [];
-    try {
-      children = listWorkItems({})
-        .filter((item) => item.context?.mission_id === mission.missionId)
-        .map((item) => ({
-          item_id: item.item_id,
-          title: item.title,
-          status: item.status,
-          ...(item.parent_item_id ? { parent_item_id: item.parent_item_id } : {}),
-          ...(item.context?.task_id ? { task_id: item.context.task_id } : {}),
-          context: item.context,
-        }));
-    } catch {
-      // Coordination store unavailable — Changes/Tasks still shows artifacts.
-    }
+    const children = scopedChildren
+      .filter((item) => item.context?.mission_id === mission.missionId)
+      .map((item) => ({
+        item_id: item.item_id,
+        title: item.title,
+        status: item.status,
+        ...(item.parent_item_id ? { parent_item_id: item.parent_item_id } : {}),
+        ...(item.context?.task_id ? { task_id: item.context.task_id } : {}),
+        context: item.context,
+      }));
     const progress = withMissionChangesTasks(
       {
         missionId: mission.missionId,

@@ -172,7 +172,8 @@ export function evaluatePolicyCategory(facts: PolicyCategoryFacts): PolicyCatego
 
 /** Whether an Always (standing / session) primary action may be offered. */
 export function allowsAlwaysPrimaryAction(category: PolicyCategory | undefined): boolean {
-  if (!category) return true;
+  // Fail-closed: Always requires a known non-forbidden category.
+  if (!category) return false;
   return !POLICY_ALWAYS_FORBIDDEN.has(category);
 }
 

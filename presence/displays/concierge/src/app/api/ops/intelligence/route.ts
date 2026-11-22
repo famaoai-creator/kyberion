@@ -118,7 +118,7 @@ export async function GET(req: NextRequest) {
       rawSurfaces,
       controlActions
     );
-    const missionProgress = intelligenceData.collectMissionProgress(activeMissions);
+    const missionProgress = intelligenceData.collectMissionProgress(activeMissions, tenantSlugs);
     const agentActivity = collectAgentActivity({
       readObservationRecords: (file) => observationReadCache.read(file),
     });

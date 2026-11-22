@@ -57,6 +57,8 @@ describe('evaluatePolicyCategory', () => {
     ).toBe('ask:user_send_confirmation');
     expect(allowsAlwaysPrimaryAction('send_out')).toBe(false);
     expect(allowsAlwaysPrimaryAction('image_generation')).toBe(false);
+    expect(allowsAlwaysPrimaryAction(undefined)).toBe(false);
+    expect(allowsAlwaysPrimaryAction('write_file')).toBe(true);
   });
 
   it('protected paths deny even at always', () => {

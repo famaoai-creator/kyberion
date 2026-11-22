@@ -27,6 +27,8 @@ import {
 } from './decision-brief.js';
 import { decisionReasonText } from './decision-reason-text.js';
 import { readApprovalPublicationPreview } from './approval-publication-preview.js';
+import { buildApprovalPrimaryActions } from './approval-primary-actions.js';
+import type { ApprovalRequestRecord } from '../governance/approval-store.js';
 
 export interface CeoIntentItem {
   mission_id: string;
@@ -61,6 +63,10 @@ export interface CeoApprovalItem {
   min_assurance?: 'A0' | 'A1' | 'A2' | 'A3';
   /** What to decide, why, and what each answer does — display only (see `decision-brief.ts`). */
   brief?: DecisionBrief;
+  /** PB-01: Always button enablement projected from buildApprovalPrimaryActions. */
+  always_enabled?: boolean;
+  always_scope?: string;
+  always_disabled_reason?: string;
 }
 
 /** Display-only enrichment for approval briefs; absent in pure callers and tests. */
@@ -276,6 +282,11 @@ export function toCeoApprovalItem(
 ): CeoApprovalItem {
   const record = approval as Record<string, any>;
   const brief = approvalBrief(approval, sources);
+  const primary = buildApprovalPrimaryActions(approval as ApprovalRequestRecord);
+  const always = primary.buttons.find((button) => button.kind === 'allow_always');
+  const alwaysEnabled = Boolean(always?.enabled);
+  const alwaysScope = primary.scopeLabel || undefined;
+  const alwaysDisabledReason = always?.disabledReason;
   return {
     ...(brief ? { brief } : {}),
     ...(approval.decisionCard?.evidence?.length
@@ -313,6 +324,9 @@ export function toCeoApprovalItem(
           ),
         }
       : {}),
+    always_enabled: alwaysEnabled,
+    ...(alwaysScope ? { always_scope: alwaysScope } : {}),
+    ...(alwaysDisabledReason ? { always_disabled_reason: alwaysDisabledReason } : {}),
   };
 }
 
