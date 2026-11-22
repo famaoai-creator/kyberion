@@ -120,6 +120,7 @@ function loadPolicyViolationPatterns(): PolicyViolationPattern[] {
 // ─── Authority Diagnostics ────────────────────────────────────────────────────
 
 export type PolicyViolationType =
+  | 'persona_write_denied'
   | 'project_scope_denied'
   | 'tenant_scope_denied'
   | 'tenant_broker_missing'

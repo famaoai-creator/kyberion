@@ -221,41 +221,46 @@ afterEach(() => {
 describe('personal consent to claimed service transport', () => {
   // Full-stack identity, approval, encrypted store, broker and actuator path.
   // Allow 60 seconds on slower shared CI runners under coverage.
-  it('uses only the approved account at the actual actuator boundary and expires cached getters', async () => {
-    const x = await setup();
-    await x.dispatch(async () => {
-      const envelope = x.scopes.currentScopeEnvelope();
-      expect(x.credentials.resolveTaskCredential('SLACK_TOKEN')).toBeNull();
-      expect(() => x.guard.loadConnectionDocument('slack')).toThrow();
-      expect(() => x.credentials.resolveTaskProviderEnvironment('gws')).toThrow();
-      await x.actuator.handleAction(x.input());
-      expect(http).toHaveBeenCalledOnce();
-      expect(http.mock.calls[0]?.[0]).toMatchObject({
-        method: 'GET',
-        url: 'https://slack.com/api/search.messages',
-        headers: { Authorization: 'Bearer synthetic-personal-api-token' },
-        maxRedirects: 0,
+  it(
+    'uses only the approved account at the actual actuator boundary and expires cached getters',
+    { timeout: 30_000 },
+    async () => {
+      const x = await setup();
+      await x.dispatch(async () => {
+        const envelope = x.scopes.currentScopeEnvelope();
+        expect(x.credentials.resolveTaskCredential('SLACK_TOKEN')).toBeNull();
+        expect(() => x.guard.loadConnectionDocument('slack')).toThrow();
+        expect(() => x.credentials.resolveTaskProviderEnvironment('gws')).toThrow();
+        await x.actuator.handleAction(x.input());
+        expect(http).toHaveBeenCalledOnce();
+        expect(http.mock.calls[0]?.[0]).toMatchObject({
+          method: 'GET',
+          url: 'https://slack.com/api/search.messages',
+          headers: { Authorization: 'Bearer synthetic-personal-api-token' },
+          maxRedirects: 0,
+        });
+        expect(x.scopes.currentScopeEnvelope()).toBe(envelope);
+        let cached: ReturnType<typeof x.serviceBinding.resolveServiceBinding> | undefined;
+        await x.broker.withPersonalServiceCredentialUse(
+          { serviceId: 'slack', action, bindingId: address.bindingId, grantId: x.grant.grant_id },
+          async (capability) => {
+            cached = x.serviceBinding.resolveServiceBinding(
+              'slack',
+              'secret-guard',
+              undefined,
+              x.binding,
+              undefined,
+              capability
+            );
+            expect(cached.accessToken).toBe('synthetic-personal-api-token');
+          }
+        );
+        expect(() => cached!.accessToken).toThrow();
+        expect(x.credentials.resolveTaskCredential('SLACK_TOKEN')).toBeNull();
       });
-      expect(x.scopes.currentScopeEnvelope()).toBe(envelope);
-      let cached: ReturnType<typeof x.serviceBinding.resolveServiceBinding> | undefined;
-      await x.broker.withPersonalServiceCredentialUse(
-        { serviceId: 'slack', action, bindingId: address.bindingId, grantId: x.grant.grant_id },
-        async (capability) => {
-          cached = x.serviceBinding.resolveServiceBinding(
-            'slack',
-            'secret-guard',
-            undefined,
-            x.binding,
-            undefined,
-            capability
-          );
-          expect(cached.accessToken).toBe('synthetic-personal-api-token');
-        }
-      );
-      expect(() => cached!.accessToken).toThrow();
-      expect(x.credentials.resolveTaskCredential('SLACK_TOKEN')).toBeNull();
-    });
-  }, 60000);
+    },
+    60000
+  );
   it.each(['revoked', 'rotated'] as const)(
     'rejects %s consent before a later HTTP request',
     async (change) => {
@@ -284,28 +289,32 @@ describe('personal consent to claimed service transport', () => {
       expect(http).toHaveBeenCalledOnce();
     }
   );
-  it('rejects a different selection and a released actual lease before HTTP', async () => {
-    const x = await setup();
-    await expect(
-      x.dispatch(async (itemId) => {
-        const input = x.input();
-        input.context.service_binding_id = 'another-binding';
-        await expect(x.actuator.handleAction(input)).rejects.toThrow();
-        expect(http).not.toHaveBeenCalled();
-        const held = x.coordination.getWorkItem(itemId)!;
-        x.coordination.releaseWorkItem({
-          itemId,
-          leaseId: held.lease_id!,
-          actorPeerId: f.installedId,
-          expectedVersion: held.version,
-          nextStatus: 'ready',
-        });
-        await expect(x.actuator.handleAction(x.input())).rejects.toThrow();
-        expect(http).not.toHaveBeenCalled();
-      })
-    ).rejects.toThrow();
-  });
-  it('keeps no-resolver execution credential-free', async () => {
+  it(
+    'rejects a different selection and a released actual lease before HTTP',
+    { timeout: 30_000 },
+    async () => {
+      const x = await setup();
+      await expect(
+        x.dispatch(async (itemId) => {
+          const input = x.input();
+          input.context.service_binding_id = 'another-binding';
+          await expect(x.actuator.handleAction(input)).rejects.toThrow();
+          expect(http).not.toHaveBeenCalled();
+          const held = x.coordination.getWorkItem(itemId)!;
+          x.coordination.releaseWorkItem({
+            itemId,
+            leaseId: held.lease_id!,
+            actorPeerId: f.installedId,
+            expectedVersion: held.version,
+            nextStatus: 'ready',
+          });
+          await expect(x.actuator.handleAction(x.input())).rejects.toThrow();
+          expect(http).not.toHaveBeenCalled();
+        })
+      ).rejects.toThrow();
+    }
+  );
+  it('keeps no-resolver execution credential-free', { timeout: 30_000 }, async () => {
     const x = await setup();
     x.resolver.resetSecretResolver();
     await x.dispatch(async () => {
