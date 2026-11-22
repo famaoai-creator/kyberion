@@ -48,7 +48,7 @@ describe('pnpm kyberion system', () => {
     expect(grouped.control).toContain('while');
   });
 
-  it.each(['exec', 'shell', 'run_js'])(
+  it.each(['exec', 'shell', 'run_js', 'run_applescript', 'run_shortcut'])(
     "keeps raw-command op '%s' off the interactive surface",
     async (op) => {
       await expect(runSystemCommand([op], () => {})).rejects.toThrow(
@@ -57,6 +57,22 @@ describe('pnpm kyberion system', () => {
       expect(execCalls).toHaveLength(0);
     }
   );
+
+  it.each(['if', 'while'])(
+    "keeps pipeline flow-control op '%s' off the interactive surface",
+    async (op) => {
+      await expect(runSystemCommand([op], () => {})).rejects.toThrow(
+        new RegExp(`op '${op}' is not exposed on this surface`)
+      );
+      expect(execCalls).toHaveLength(0);
+    }
+  );
+
+  it('rejects an invalid --kind filter', async () => {
+    await expect(runSystemCommand(['ops', '--kind', 'bogus'], () => {})).rejects.toThrow(
+      /--kind must be capture\|transform\|apply\|control/
+    );
+  });
 
   it('rejects an unknown op without spawning the actuator', async () => {
     await expect(runSystemCommand(['not_an_op'], () => {})).rejects.toThrow(
@@ -120,6 +136,26 @@ describe('pnpm kyberion system', () => {
       session_id: 'S-1',
       target: { x: 10, y: 20 },
     });
+  });
+
+  it('never lets --params override the positional action type or top-level fields', async () => {
+    await runSystemCommand(
+      [
+        'interact',
+        'key',
+        '--params',
+        '{"type":"screenshot","session_id":"S-evil","target":{"x":1},"key":"Enter"}',
+      ],
+      () => {}
+    );
+    const input = execCalls.at(-1)!.input;
+    expect(input).toEqual({
+      version: '0.1',
+      kind: 'computer_interaction',
+      action: { type: 'key', key: 'Enter' },
+    });
+    expect(input.session_id).toBeUndefined();
+    expect(input.target).toBeUndefined();
   });
 
   it('forwards --dry-run to the actuator invocation', async () => {

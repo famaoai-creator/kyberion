@@ -33,6 +33,13 @@ export async function runOpsCommand(args: string[], print: (line: string) => voi
     }
   }
 
+  if (kindFilter && !['capture', 'transform', 'apply', 'control'].includes(kindFilter)) {
+    throw new ScriptExitError(
+      1,
+      `--kind must be capture|transform|apply|control (got '${kindFilter}')\n\n${OPS_USAGE}`
+    );
+  }
+
   const domains = listOpDomains();
   const [domain] = positionals;
   if (!domain) {

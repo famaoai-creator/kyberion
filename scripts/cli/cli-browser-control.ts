@@ -45,8 +45,11 @@ import { withExecutionContext, withExecutionContextAsync } from '@agent/core/aut
 import { safeExec, safeReadFile } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
 import { runtimeStatePath } from '@agent/core/foundation/runtime-state-roots';
-import { detectCliAgentPrincipal } from '@agent/core/governance/cli-operator-principal';
-import type { BrowserBridgeControlStep } from '@agent/shared-vision/browser-bridge-mailbox';
+import path from 'node:path';
+import {
+  canonicalHttpOrigin,
+  type BrowserBridgeControlStep,
+} from '@agent/shared-vision/browser-bridge-mailbox';
 import { ScriptExitError } from '../lib/harness.js';
 import { resolveBrowserBridgeActor } from './cli-browser-bridge.js';
 
@@ -62,8 +65,9 @@ export const BROWSER_CONTROL_USAGE = `Usage: pnpm kyberion browser control <verb
   settings-change <ref> | credential-submit <ref>
   resume <approval_id>
   export <session> [--title <t>]
-                        Compile the session journal into a browser-recording.v1
-                        (review: pending) under the recordings store
+                        Compile completed session steps into a
+                        browser-recording.v1 (review: pending) under the
+                        recordings store
   recordings | recordings show <BCR-…>
                         List exported recordings / inspect one for review
   review <BCR-…> (--approve-all|--approve <ids>|--reject <ids>)
@@ -126,7 +130,7 @@ function parseArgs(args: string[]): ParsedArgs {
       continue;
     }
     const name = arg.slice(2);
-    if (['json', 'no-wait', 'checked', 'verbose', 'approve-all'].includes(name)) {
+    if (['json', 'no-wait', 'checked', 'verbose', 'approve-all', 'help'].includes(name)) {
       options[name] = true;
     } else {
       const value = args[i + 1];
@@ -156,7 +160,6 @@ function resolveSessionId(parsed: ParsedArgs): string {
 }
 
 function actorOf(parsed: ParsedArgs): { actor_id: string; mission_id?: string } {
-  void detectCliAgentPrincipal;
   return {
     actor_id: resolveBrowserBridgeActor(),
     ...(str(parsed.options, 'mission') ? { mission_id: str(parsed.options, 'mission') } : {}),
@@ -164,7 +167,11 @@ function actorOf(parsed: ParsedArgs): { actor_id: string; mission_id?: string } 
 }
 
 function timeoutMs(parsed: ParsedArgs): number {
-  const seconds = Number(str(parsed.options, 'timeout-sec') ?? '120');
+  const raw = str(parsed.options, 'timeout-sec');
+  const seconds = Number(raw ?? '120');
+  if (raw !== undefined && (!Number.isFinite(seconds) || seconds <= 0)) {
+    fail('--timeout-sec must be a positive number');
+  }
   return Math.max(5_000, Math.min(300_000, Math.round(seconds * 1000)));
 }
 
@@ -257,7 +264,7 @@ function buildStep(parsed: ParsedArgs): BrowserBridgeControlStep {
       step.ref = need(0, '<ref>');
       const filePath = str(parsed.options, 'file') ?? need(1, '--file <path>');
       const buffer = safeReadFile(filePath, { encoding: null, maxSizeMB: 1, label: 'upload' });
-      const name = filePath.split('/').pop() ?? 'upload.bin';
+      const name = path.basename(filePath) || 'upload.bin';
       step.file = {
         name: name.slice(0, 120),
         mime: str(parsed.options, 'mime') ?? 'application/octet-stream',
@@ -339,27 +346,52 @@ export async function runBrowserControlCommand(
 
   if (verb === 'open') {
     const url = parsed.positionals[1];
-    if (!url) fail('open needs <url>');
+    const ceiling = str(parsed.options, 'ceiling') ?? 'low';
+    if (ceiling !== 'low' && ceiling !== 'observe') fail('--ceiling must be low|observe');
     const actor = actorOf(parsed);
-    const { approval_request_id, origin } = requestBrowserControlSession({
-      origin: url,
-      risk_ceiling: (str(parsed.options, 'ceiling') as 'low' | 'observe') ?? 'low',
-      label: str(parsed.options, 'label'),
-      actor,
-    });
-    if (parsed.options['no-wait'] === true) {
-      printResult(
-        {
-          status: 'approval_pending',
-          approval_request_id,
-          origin,
-          approve: `pnpm kyberion approvals --approve ${approval_request_id}`,
-          then: `pnpm kyberion browser control open ${url} --approval ${approval_request_id}`,
-        },
-        json,
-        print
+
+    let approval_request_id: string;
+    let origin: string;
+    const resumeApprovalId = str(parsed.options, 'approval');
+    if (resumeApprovalId) {
+      // Resume: the request already exists — recover the origin it was granted
+      // for and verify the URL stays on it. Minting against a different origin
+      // than the approved one would be a consent bypass.
+      const { status, record } = approvalStatus(resumeApprovalId);
+      if (!record) fail(`approval ${resumeApprovalId} is ${status}`);
+      const effect = record.justification?.requestedEffects?.find((entry) =>
+        entry.startsWith('browser-control:')
       );
-      return;
+      if (!effect) fail(`approval ${resumeApprovalId} is not a browser-control session request`);
+      origin = effect.slice('browser-control:'.length);
+      if (url && canonicalHttpOrigin(url) !== origin) {
+        fail(`url origin does not match approval ${resumeApprovalId} (${origin})`);
+      }
+      approval_request_id = resumeApprovalId;
+    } else {
+      if (!url) fail('open needs <url>');
+      const requested = requestBrowserControlSession({
+        origin: url,
+        risk_ceiling: ceiling,
+        label: str(parsed.options, 'label'),
+        actor,
+      });
+      approval_request_id = requested.approval_request_id;
+      origin = requested.origin;
+      if (parsed.options['no-wait'] === true) {
+        printResult(
+          {
+            status: 'approval_pending',
+            approval_request_id,
+            origin,
+            approve: `pnpm kyberion approvals --approve ${approval_request_id}`,
+            then: `pnpm kyberion browser control open ${url} --approval ${approval_request_id}`,
+          },
+          json,
+          print
+        );
+        return;
+      }
     }
     print(
       `waiting for operator approval: pnpm kyberion approvals --approve ${approval_request_id}`
@@ -367,7 +399,7 @@ export async function runBrowserControlCommand(
     await waitForApproval(approval_request_id, timeoutMs(parsed));
     const minted = mintSessionIfApproved(approval_request_id, {
       origin,
-      risk_ceiling: (str(parsed.options, 'ceiling') as 'low' | 'observe') ?? 'low',
+      risk_ceiling: ceiling,
       label: str(parsed.options, 'label'),
       actor,
     });
@@ -378,7 +410,7 @@ export async function runBrowserControlCommand(
       () =>
         enqueueSessionStep({
           session_id: minted.session.session_id,
-          step: { step_id: nextStepId(), op: 'open_tab', url },
+          step: { step_id: nextStepId(), op: 'open_tab', url: url ?? origin },
           actor,
         }),
       'sovereign'
@@ -538,7 +570,12 @@ export async function runBrowserControlCommand(
           `run \`browser control review ${recordingId} --approve-all\` (or --approve <ids>) first`
       );
     }
-    const host = new URL(recording.tab.origin).hostname;
+    let host: string;
+    try {
+      host = new URL(recording.tab.origin).hostname;
+    } catch {
+      fail(`recording ${recordingId} origin is not a valid URL`);
+    }
     const procedureId =
       str(parsed.options, 'id') ??
       host

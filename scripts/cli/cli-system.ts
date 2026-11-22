@@ -14,13 +14,16 @@
  *                       actuator's op-preflight / approval boundary — this
  *                       surface only admits what the governed path admits.
  *
- * `exec`/`shell` and other raw-command ops are intentionally not exposed
- * here: pipeline steps can still reach them through the governed ADF path.
+ * Raw-command ops (`exec`, `shell`, `run_js`, `run_applescript`,
+ * `run_shortcut`) and pipeline flow-control ops (`if`, `while`) are
+ * intentionally not exposed here: both need the governed ADF path.
+ * Named governed ops (`process_kill`, `write_file`, `press_key`, …) stay
+ * reachable — they go through the same preflight/approval as a pipeline.
  */
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { pathResolver } from '@agent/core/path-resolver';
-import { assertSafeRepositoryPath, safeExec, safeMkdir } from '@agent/core/secure-io';
+import { assertSafeRepositoryPath, safeExec, safeMkdir, safeRmSync } from '@agent/core/secure-io';
 import { writeJson } from '@agent/core/foundation/json';
 import { loadOpDomain } from '../lib/actuator-op-registry.js';
 import { ScriptExitError } from '../lib/harness.js';
@@ -28,7 +31,7 @@ import { ScriptExitError } from '../lib/harness.js';
 const ACTUATOR_ENTRY_REL = 'libs/actuators/system-actuator/src/index.ts';
 
 /** Raw-command ops stay off the interactive surface (see module header). */
-const BLOCKED_OPS = new Set(['exec', 'shell', 'run_js']);
+const BLOCKED_OPS = new Set(['exec', 'shell', 'run_js', 'run_applescript', 'run_shortcut']);
 
 const SYSTEM_USAGE = `Usage: pnpm kyberion system <command> [options]
 
@@ -42,6 +45,8 @@ const SYSTEM_USAGE = `Usage: pnpm kyberion system <command> [options]
 function fail(message: string): never {
   throw new ScriptExitError(1, `${message}\n\n${SYSTEM_USAGE}`);
 }
+
+const STEP_KINDS = new Set(['capture', 'transform', 'apply', 'control']);
 
 function loadSystemOps(): Record<string, 'capture' | 'transform' | 'apply' | 'control'> {
   const domain = loadOpDomain('system');
@@ -64,7 +69,7 @@ function parseArgs(args: string[]): ParsedArgs {
       continue;
     }
     const name = arg.slice(2);
-    if (['json', 'dry-run', 'verbose'].includes(name)) {
+    if (['json', 'dry-run', 'verbose', 'help'].includes(name)) {
       options[name] = true;
     } else {
       const value = args[i + 1];
@@ -129,7 +134,16 @@ function runActuator(input: Record<string, unknown>, tag: string, dryRun: boolea
     inputPath,
     ...(dryRun ? ['--dry-run'] : []),
   ];
-  return safeExec('node', args, { cwd: pathResolver.rootDir(), timeoutMs: 300_000 });
+  try {
+    return safeExec('node', args, { cwd: pathResolver.rootDir(), timeoutMs: 300_000 });
+  } finally {
+    // One-shot input — the failing command line is in the error, the file is not.
+    try {
+      safeRmSync(inputPath, { force: true });
+    } catch {
+      /* best-effort cleanup */
+    }
+  }
 }
 
 export async function runSystemCommand(
@@ -143,6 +157,9 @@ export async function runSystemCommand(
 
   if (verb === 'ops') {
     const kindFilter = parsed.options.kind;
+    if (typeof kindFilter === 'string' && !STEP_KINDS.has(kindFilter)) {
+      fail('--kind must be capture|transform|apply|control');
+    }
     const grouped: Record<string, string[]> = {};
     for (const [op, kind] of Object.entries(ops)) {
       if (kindFilter !== undefined && kindFilter !== true && kind !== kindFilter) continue;
@@ -156,10 +173,19 @@ export async function runSystemCommand(
     const type = parsed.positionals[1];
     if (!type) fail('interact needs <type> (ax_snapshot, type, key, left_click, …)');
     const params = buildParams(parsed);
+    // The action shape is positional — `--params` may carry action fields but
+    // never override `type` (and `session_id`/`target` are top-level, not
+    // action fields).
+    const {
+      type: _dropType,
+      session_id: _dropSession,
+      target: _dropTarget,
+      ...actionParams
+    } = params;
     const input: Record<string, unknown> = {
       version: '0.1',
       kind: 'computer_interaction',
-      action: { type, ...params },
+      action: { ...actionParams, type },
     };
     const sessionId = parsed.options.session;
     if (typeof sessionId === 'string') input.session_id = sessionId;
@@ -178,7 +204,9 @@ export async function runSystemCommand(
 
   const op = verb.replace(/^system:/, '');
   const kind = ops[op];
-  if (!kind || BLOCKED_OPS.has(op)) {
+  // `control` ops (if/while) are pipeline flow control — meaningless as a
+  // one-shot step; BLOCKED_OPS are raw command channels.
+  if (!kind || kind === 'control' || BLOCKED_OPS.has(op)) {
     fail(
       `op '${verb}' is not exposed on this surface ` +
         `(see \`pnpm kyberion system ops\` for the vocabulary; pipelines reach the rest via ADF)`

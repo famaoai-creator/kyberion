@@ -87,10 +87,19 @@ pnpm kyberion browser control promote --recording <BCR-…> [--id <procedure_id>
 
 `export` preserves op, target ref/role/name, risk, navigation transitions and
 variables; the recording lands under the allowlisted recordings store with
-`review.status=pending`. `promote` derives a safe `procedure_id` and intent
-phrases from the session metadata, then calls the existing `promote-procedure`
-pipeline — the candidate still needs an approved review before it reaches the
-ProcedureCatalog and Pattern B replay.
+`review.status=pending`. Only steps that actually **completed** are exported —
+failed, declined or still-pending steps are dropped (the export reports the
+count), and a `press` with a non-default key is skipped because the recording
+schema cannot express it (replay defaults to Enter). `fill` values never reach
+the journal — they are scrubbed at write time — and export always emits the
+`user_input` variable placeholder instead.
+
+`promote` derives a safe `procedure_id` and intent phrases from the session
+metadata, then calls the existing `promote-procedure` pipeline — the candidate
+still needs an approved review before it reaches the ProcedureCatalog and
+Pattern B replay. `--approve-all` on `promote`/`review` compresses
+export → review → promote into **one explicit operator judgment** — it is the
+human decision recorded, not a bypass.
 
 ## Vocabulary map
 

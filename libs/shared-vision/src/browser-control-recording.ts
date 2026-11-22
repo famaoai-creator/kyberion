@@ -47,12 +47,24 @@ const NON_REPLAY_OPS = new Set<string>([
   'select_tab',
 ]);
 
+/**
+ * `press_ref` replays with the extension's default key (Enter); the recording
+ * action schema has no `key` field, so a non-default key would silently
+ * downgrade to Enter at replay — skip those steps instead of miscompiling.
+ */
+function isReplayable(step: BrowserBridgeControlStep): boolean {
+  if (NON_REPLAY_OPS.has(step.op)) return false;
+  if (step.op === 'press_ref' && step.key !== undefined && step.key !== 'Enter') return false;
+  return true;
+}
+
 const OBSERVE_RISK_OPS = new Set<string>(['wait_for_ref', 'navigate']);
 
 interface JournalEntry {
   ts?: string;
   event?: string;
   step_id?: string;
+  request_id?: string;
   step?: BrowserBridgeControlStep & { file?: { name?: string; mime?: string; bytes?: number } };
 }
 
@@ -61,7 +73,10 @@ export interface ControlRecordingExport {
   recording_id: string;
   recording_ref: string;
   action_count: number;
+  /** Non-replayable or non-default-key steps intentionally left out. */
   skipped_steps: number;
+  /** Enqueued steps with no successful outcome — never demonstrated. */
+  dropped_unexecuted: number;
   session: Pick<BrowserControlSession, 'session_id' | 'origin' | 'status'>;
 }
 
@@ -112,7 +127,7 @@ function toAction(
   capturedAt: string,
   prevOrigin: string
 ): { action: BrowserExtensionAction | null; nextOrigin: string } {
-  if (NON_REPLAY_OPS.has(step.op)) return { action: null, nextOrigin: prevOrigin };
+  if (!isReplayable(step)) return { action: null, nextOrigin: prevOrigin };
 
   const action: BrowserExtensionAction = {
     action_id: `act-${String(index + 1).padStart(3, '0')}`,
@@ -164,17 +179,42 @@ export function exportBrowserControlRecording(input: {
   session_id: string;
   title?: string;
 }): ControlRecordingExportResult {
-  const session = loadBrowserControlSession(input.session_id);
+  // Malformed ids throw inside the session path guard — surface them as the
+  // same clean error as an unknown-but-well-formed id.
+  let session: BrowserControlSession | null = null;
+  try {
+    session = loadBrowserControlSession(input.session_id);
+  } catch {
+    session = null;
+  }
   if (!session) return { status: 'error', reason: `unknown session ${input.session_id}` };
 
   const entries = readJournalEntries(input.session_id);
-  const steps = entries
-    .filter((entry) => entry.event === 'step.enqueued' && entry.step)
-    .map((entry) => ({ step: entry.step as BrowserBridgeControlStep, ts: entry.ts }));
+  // Only steps the extension actually reported `completed` are demonstrated
+  // behavior — failed/declined/expired or still-pending steps are dropped so
+  // the recording replays what provably worked.
+  const completed = new Set(
+    entries
+      .filter((entry) => entry.event === 'step.completed' && entry.request_id)
+      .map((entry) => entry.request_id as string)
+  );
+  let droppedUnexecuted = 0;
+  const steps: { step: BrowserBridgeControlStep; ts?: string }[] = [];
+  for (const entry of entries) {
+    if (entry.event !== 'step.enqueued' || !entry.step) continue;
+    if (!entry.request_id || !completed.has(entry.request_id)) {
+      droppedUnexecuted += 1;
+      continue;
+    }
+    steps.push({ step: entry.step, ts: entry.ts });
+  }
   if (steps.length === 0) {
     return {
       status: 'error',
-      reason: `session ${input.session_id} has no enqueued steps to export`,
+      reason:
+        droppedUnexecuted > 0
+          ? `session ${input.session_id} has no completed steps to export (${droppedUnexecuted} enqueued step(s) had no successful outcome)`
+          : `session ${input.session_id} has no enqueued steps to export`,
     };
   }
 
@@ -235,6 +275,7 @@ export function exportBrowserControlRecording(input: {
     recording_ref: rel,
     action_count: actions.length,
     skipped_steps: skipped,
+    dropped_unexecuted: droppedUnexecuted,
     session: {
       session_id: session.session_id,
       origin: session.origin,
@@ -260,9 +301,8 @@ function recordingPath(recordingId: string): string {
 }
 
 export function loadExportedRecording(recordingId: string): BrowserExtensionRecording | null {
-  const file = recordingPath(recordingId);
   try {
-    const parsed = readJsonIfPresent<BrowserExtensionRecording>(file);
+    const parsed = readJsonIfPresent<BrowserExtensionRecording>(recordingPath(recordingId));
     return parsed?.schema_version === 'browser-recording.v1' ? parsed : null;
   } catch {
     return null;
@@ -285,7 +325,12 @@ export function listExportedRecordings(): RecordingSummary[] {
   const out: RecordingSummary[] = [];
   for (const name of safeReaddir(dir)) {
     if (!name.endsWith('.json')) continue;
-    const recording = loadExportedRecording(name.replace(/\.json$/, ''));
+    let recording: BrowserExtensionRecording | null = null;
+    try {
+      recording = loadExportedRecording(name.replace(/\.json$/, ''));
+    } catch {
+      continue; // stray or malformed entry — not a recording
+    }
     if (!recording) continue;
     out.push({
       recording_id: recording.recording_id,

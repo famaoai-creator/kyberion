@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeExistsSync, safeRmSync } from '@agent/core/secure-io';
+import { safeExistsSync, safeReadFile, safeRmSync } from '@agent/core/secure-io';
 import {
   BROWSER_BRIDGE_MAILBOX_ROOT,
   BROWSER_CONTROL_SECRET_ROOT,
@@ -28,6 +28,7 @@ import {
   loadExportedRecording,
   reviewExportedRecording,
 } from './browser-control-recording.js';
+import { enqueueSessionStep } from './browser-control-service.js';
 import { loadBrowserExtensionRecordingAtPath } from '@agent/core/browser/browser-extension-bridge';
 
 const SESSION_ROOT = pathResolver.rootResolve(BROWSER_CONTROL_SESSION_ROOT);
@@ -249,14 +250,27 @@ describe('control_step mailbox lifecycle', () => {
 const RECORDINGS_DIR = pathResolver.rootResolve('active/shared/runtime/recordings');
 const exportedIds: string[] = [];
 
-function journalEnqueuedStep(sessionId: string, step: Record<string, unknown>): void {
+function journalEnqueuedStep(
+  sessionId: string,
+  step: Record<string, unknown>,
+  outcome: 'completed' | 'failed' | 'none' = 'completed'
+): void {
+  const requestId = `req-${String(step.step_id)}`;
   appendBrowserControlJournal(sessionId, {
     event: 'step.enqueued',
     step_id: step.step_id,
     op: step.op,
+    request_id: requestId,
     ...(step.ref ? { ref: step.ref } : {}),
     step,
   });
+  if (outcome !== 'none') {
+    appendBrowserControlJournal(sessionId, {
+      event: `step.${outcome}`,
+      step_id: step.step_id,
+      request_id: requestId,
+    });
+  }
 }
 
 afterEach(() => {
@@ -386,5 +400,101 @@ describe('browser control journal → recording export', () => {
 
     const listed = listExportedRecordings();
     expect(listed.some((entry) => entry.recording_id === out.recording_id)).toBe(true);
+  });
+
+  it('exports only steps that reported a completed outcome', () => {
+    const session = mint();
+    journalEnqueuedStep(session.session_id, {
+      step_id: 's-ok',
+      op: 'click_ref',
+      ref: '@button_a1_1',
+      role: 'button',
+      name: 'Save',
+    });
+    journalEnqueuedStep(
+      session.session_id,
+      { step_id: 's-fail', op: 'click_ref', ref: '@button_b2_2', role: 'button' },
+      'failed'
+    );
+    journalEnqueuedStep(
+      session.session_id,
+      { step_id: 's-pending', op: 'navigate', url: 'https://api.slack.com/x' },
+      'none'
+    );
+
+    const out = exportBrowserControlRecording({ session_id: session.session_id });
+    expect(out.status).toBe('exported');
+    if (out.status !== 'exported') return;
+    exportedIds.push(out.recording_id);
+    expect(out.action_count).toBe(1);
+    expect(out.dropped_unexecuted).toBe(2);
+  });
+
+  it('errors with an unexecuted count when nothing completed', () => {
+    const session = mint();
+    journalEnqueuedStep(
+      session.session_id,
+      { step_id: 's-1', op: 'click_ref', ref: '@b1' },
+      'failed'
+    );
+    const out = exportBrowserControlRecording({ session_id: session.session_id });
+    expect(out.status).toBe('error');
+    if (out.status === 'error') expect(out.reason).toMatch(/no completed steps.*1 enqueued/);
+  });
+
+  it('skips a press_ref whose non-default key the replay cannot express', () => {
+    const session = mint();
+    journalEnqueuedStep(session.session_id, {
+      step_id: 's-1',
+      op: 'press_ref',
+      ref: '@input_1',
+      key: 'Tab',
+    });
+    journalEnqueuedStep(session.session_id, {
+      step_id: 's-2',
+      op: 'click_ref',
+      ref: '@button_2',
+      role: 'button',
+      name: 'Go',
+    });
+    const out = exportBrowserControlRecording({ session_id: session.session_id });
+    expect(out.status).toBe('exported');
+    if (out.status !== 'exported') return;
+    exportedIds.push(out.recording_id);
+    expect(out.action_count).toBe(1);
+    expect(out.skipped_steps).toBe(1);
+  });
+
+  it('tolerates malformed ids and stray files in the recordings store', () => {
+    expect(loadExportedRecording('.hidden')).toBeNull();
+    expect(loadExportedRecording('nope/../x')).toBeNull();
+  });
+
+  it('scrubs fill_ref values from the journal at write time', () => {
+    // enqueueSessionStep admits against the real clock — anchor at now.
+    const session = mint({ now: new Date() });
+    const enqueued = enqueueSessionStep({
+      session_id: session.session_id,
+      step: {
+        step_id: 's-fill',
+        op: 'fill_ref',
+        ref: '@textbox_1',
+        value: 'hunter2-super-secret',
+      },
+      actor: { actor_id: 'agent:test', mission_id: 'MSN-TEST-1' },
+    });
+    expect(enqueued.status).toBe('queued');
+
+    const journal = pathResolver.rootResolve(
+      `${BROWSER_CONTROL_SESSION_ROOT}/${session.session_id}.journal.jsonl`
+    );
+    const raw = String(safeReadFile(journal, { encoding: 'utf8' }));
+    expect(raw).not.toContain('hunter2-super-secret');
+    const entry = raw
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line) as Record<string, unknown>)
+      .find((line) => line.event === 'step.enqueued');
+    expect((entry?.step as Record<string, unknown>).value_redacted).toBe(true);
   });
 });
