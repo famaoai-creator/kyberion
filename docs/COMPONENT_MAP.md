@@ -20,6 +20,8 @@ For a layer-oriented view of the concepts themselves, read:
 
 ## System at a glance
 
+The Mission CLI binds the selected tenant for lifecycle commands and their cleanup. The shared authorization registry and operation preflight resolve operations, resources, and egress before execution. The approval store records decisions from the terminal and Concierge, and the Grant store verifies and consumes the decision when issuing a Grant. The [scope governance design](../knowledge/product/architecture/scope-governance-plane.md) describes where each check runs.
+
 ```text
 Sovereign intent
   -> AGENTS.md governance and 5-phase lifecycle
