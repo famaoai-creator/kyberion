@@ -222,7 +222,7 @@ export const runUnionLiteralBranches = defineScript({
   name: 'check-union-literal-branches',
   flags: [],
   run(context) {
-    const writeBaseline = context.argv.includes('--write-baseline');
+    const writeBaseline = context.unknownFlags.includes('--write-baseline');
     const { violations, unexpected, shrunk } = checkUnionLiteralBranches(undefined, {
       writeBaseline,
     });
