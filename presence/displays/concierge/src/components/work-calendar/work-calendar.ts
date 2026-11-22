@@ -6,9 +6,11 @@
  * `due_date`), so every computation runs on UTC day numbers — no timezone can
  * move an item to a neighbouring day. "Today" is the viewer's local day.
  *
- * Client-safe: no imports beyond the board's due-state rules.
+ * Client-safe: runtime imports only the board's due-state rules; the
+ * concierge message-key type is erased at compile time.
  */
 import { dueState, type DueState } from '../work-board/work-item-board';
+import type { ConciergeMessageKey } from '../../lib/i18n';
 
 export type CalendarView = 'month' | 'week';
 
@@ -62,30 +64,31 @@ export function isAppointment(item: Pick<CalendarItem, 'source'>): boolean {
 }
 
 /**
- * The small role marker beside an entry: an i18n token for dated work, or
- * `provider:<name>` for agent sessions — providers are proper nouns, not
- * vocabulary. Literal knowledge of every source lives here, in the module
- * that owns the union; consumers never compare `source === 'x'`.
+ * The small role marker beside an entry: the concierge message key for
+ * dated work, or `undefined` for agent sessions — provider names are
+ * proper nouns, not vocabulary. Literal knowledge of every source lives
+ * here, in the module that owns the union; consumers never compare
+ * `source === 'x'`.
  */
-export function entryRoleToken(
+export function entryRoleLabelKey(
   entry: Pick<CalendarEntry, 'role'> & {
-    item: Pick<CalendarItem, 'source' | 'provider'>;
+    item: Pick<CalendarItem, 'source'>;
   }
-): string {
-  if (isAgentSession(entry.item)) return `provider:${entry.item.provider ?? 'session'}`;
-  if (entry.role === 'start') return 'start';
-  if (entry.role === 'span') return 'underway';
+): ConciergeMessageKey | undefined {
+  if (isAgentSession(entry.item)) return undefined;
+  if (entry.role === 'start') return 'ia_shell_work_cal_start';
+  if (entry.role === 'span') return 'ia_shell_work_cal_underway';
   switch (entry.item.source) {
     case 'operation_run':
-      return 'run';
+      return 'ia_shell_work_cal_run';
     case 'operation_deadline':
-      return 'deadline';
+      return 'ia_shell_work_cal_deadline';
     case 'action_item':
-      return 'action';
+      return 'ia_shell_work_cal_action';
     case 'external_event':
-      return 'event';
+      return 'ia_shell_work_cal_event';
     default:
-      return 'due';
+      return 'ia_shell_work_cal_due';
   }
 }
 

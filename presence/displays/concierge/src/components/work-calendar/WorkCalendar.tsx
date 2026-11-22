@@ -18,7 +18,7 @@ import {
   addDays,
   buildCalendarGrid,
   calendarGridRange,
-  entryRoleToken,
+  entryRoleLabelKey,
   fromCalendarEntries,
   fromExternalEvents,
   isAgentSession,
@@ -221,10 +221,8 @@ export function WorkCalendar({ t }: { t: Translate }) {
   );
 
   const roleLabel = (entry: CalendarEntry) => {
-    const token = entryRoleToken(entry);
-    return token.startsWith('provider:')
-      ? token.slice('provider:'.length)
-      : t(`ia_shell_work_cal_${token}`);
+    const key = entryRoleLabelKey(entry);
+    return key ? t(key) : (entry.item.provider ?? 'session');
   };
 
   const toggleGroup = (group: CalendarSourceGroup) =>
