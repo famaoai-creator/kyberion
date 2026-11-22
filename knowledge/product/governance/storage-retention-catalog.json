@@ -47,7 +47,7 @@
       "ttl_days": 7,
       "action": "delete",
       "audit": true,
-      "note": "Interactive browser-control sessions (libs/shared-vision/src/browser-control-sessions.ts): BCS-*/LCS-* leases, step journals, pending-step approval hand-offs and the extract_text_ref secret side-channel under secrets/. Sessions are operator-local coordination state with a 30-minute TTL; secrets/<request>.json holds raw captured credential values only until the CLI drains them — short TTL plus audited deletion, never long-term credential storage."
+      "note": "Interactive browser-control state (libs/shared-vision/src/browser-control-sessions.ts): BCS-*/LCS-* session leases, step journals, pending-step approvals under sessions/, and the extract_text_ref secret side-channel under secrets/. Sessions self-expire at 30 minutes; a 7d sweep bound removes abandoned leases and drained secret captures, audited to storage-retention.jsonl."
     },
     {
       "path": "active/shared/runtime/customer-decision-invites",
