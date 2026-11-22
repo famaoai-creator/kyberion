@@ -1,7 +1,7 @@
 ---
 title: 'Knowledge Curation Report'
 kind: governance
-last_updated: 2026-10-05
+last_updated: 2026-11-21
 ---
 
 # Knowledge Curation Report
@@ -14,21 +14,19 @@ last_updated: 2026-10-05
 > **Candidates only** — no file is deleted, archived, or demoted automatically.
 > KM-03 guardrail: a knowledge_steward must review and approve any demotion by hand.
 
-generated_at: 2026-10-05T14:36:16.242Z
+generated_at: 2026-11-21T18:01:52.693Z
 low_yield_delivery_threshold: 5
-scanned_document_count: 398
-legacy_unscoped_hint_count: 3
+scanned_document_count: 467
+legacy_unscoped_hint_count: 0
 archive_advisory_count: 0
+memory_loop: promoted 356 → retrieved 0 → used 0 (last 28 days)
+memory_loop_warning: memory loop open — 356 promoted record(s), none retrieved into a context pack in the last 28 day(s) | next: check findRelevantPromotedKnowledge results and knowledge-slices excludes | evidence: KP-05 usage aggregate (runtime/feedback-loop/knowledge-usage)
 
 ## Low-Yield Hints
 
 Delivered at least 5 time(s) with zero recorded uses (KP-05 usage aggregate).
 
-| Tenant          | Document                                                                             | Delivered | Used | Occurrences | Last Seen                |
-| --------------- | ------------------------------------------------------------------------------------ | --------- | ---- | ----------- | ------------------------ |
-| unscoped-legacy | knowledge/product/evolution/distill_channel-port-surface-consolidation_2026_03_15.md | 453       | 0    | 454         | 2026-10-05T13:04:07.618Z |
-| unscoped-legacy | knowledge/product/governance/working-philosophy.md                                   | 14        | 0    | 14          | 2026-10-03T04:11:24.471Z |
-| unscoped-legacy | knowledge/product/incidents/distill_msn-intent-catalog-gaps-20260427_2026_04_27.md   | 453       | 0    | 454         | 2026-10-05T13:04:08.464Z |
+_(none)_
 
 ## Archive Advisories
 
@@ -40,7 +38,40 @@ _(none)_
 
 Kind-based re-verify deadlines from `knowledge/product/governance/knowledge-curation-slo.json`, applied to frontmatter `last_updated`.
 
-_(none)_
+| Document                                                                             | Kind         | Last Updated | Age (days) | Threshold (days) | Reason               |
+| ------------------------------------------------------------------------------------ | ------------ | ------------ | ---------- | ---------------- | -------------------- |
+| knowledge/product/architecture/component-lifecycle-inventory.md                      | architecture | _(missing)_  | —          | 180              | missing_last_updated |
+| knowledge/product/architecture/decision-support-design-rationale.md                  | architecture | 2026-04-20   | 215        | 180              | stale                |
+| knowledge/product/architecture/gateway-coordination-model.md                         | architecture | 2026-05-04   | 201        | 180              | stale                |
+| knowledge/product/architecture/hyperframes-video-absorption-assessment.md            | architecture | 2026-04-19   | 216        | 180              | stale                |
+| knowledge/product/architecture/intent-and-pipeline-simulation-report-2026-04-29.md   | architecture | 2026-04-29   | 206        | 180              | stale                |
+| knowledge/product/architecture/intent-contract-learning-design-2026-04-29.md         | architecture | 2026-04-29   | 206        | 180              | stale                |
+| knowledge/product/architecture/intent-domain-evaluation-2026-04-29.md                | architecture | 2026-04-29   | 206        | 180              | stale                |
+| knowledge/product/architecture/kyberion-scenario-coverage-matrix.md                  | architecture | 2026-04-27   | 208        | 180              | stale                |
+| knowledge/product/architecture/meeting-facilitator-use-case.md                       | architecture | 2026-04-27   | 208        | 180              | stale                |
+| knowledge/product/architecture/personal-voice-narrated-video-delivery-plan.md        | architecture | 2026-04-19   | 216        | 180              | stale                |
+| knowledge/product/architecture/spectrum-ts-message-handling-absorption-assessment.md | architecture | 2026-04-23   | 212        | 180              | stale                |
+| knowledge/product/architecture/studio-agent-orchestration-absorption-plan.md         | architecture | 2026-04-19   | 216        | 180              | stale                |
+| knowledge/product/architecture/subagent-observability-model.md                       | architecture | 2026-05-03   | 202        | 180              | stale                |
+| knowledge/product/architecture/tenant-scoped-actuator-execution.md                   | playbook     | 2026-09-11   | 71         | 60               | stale                |
+| knowledge/product/architecture/voice-generation-absorption-plan.md                   | architecture | 2026-04-18   | 217        | 180              | stale                |
+| knowledge/product/governance/agent-context-economy.md                                | governance   | 2026-08-19   | 94         | 90               | stale                |
+| knowledge/product/governance/agent-efficiency-questions.md                           | governance   | 2026-08-19   | 94         | 90               | stale                |
+| knowledge/product/governance/audit-ledger-recovery.md                                | governance   | 2026-08-09   | 104        | 90               | stale                |
+| knowledge/product/governance/tenant-onboarding-procedure.md                          | governance   | 2026-08-15   | 98         | 90               | stale                |
+| knowledge/product/incidents/distill_msn-intent-catalog-gaps-20260427_2026_04_27.md   | incident     | 2026-04-27   | 208        | 180              | stale                |
+| knowledge/product/incidents/distill_msn-ip-implementation-20260427_2026_04_27.md     | incident     | 2026-04-27   | 208        | 180              | stale                |
+| knowledge/product/incidents/distill_msn-jgb-retrofit-20260422_2026_04_22.md          | incident     | 2026-04-22   | 213        | 180              | stale                |
+| knowledge/product/incidents/distill_msn-meeting-facilitator-20260427_2026_04_27.md   | incident     | 2026-04-27   | 208        | 180              | stale                |
+| knowledge/product/incidents/distill_msn-mtg-smoke3-20260427_2026_04_27.md            | incident     | 2026-04-27   | 208        | 180              | stale                |
+| knowledge/product/incidents/distill_msn-outcome-sim-20260427_2026_04_27.md           | incident     | 2026-04-27   | 208        | 180              | stale                |
+| knowledge/product/incidents/distill_msn-partial-closure-20260427_2026_04_27.md       | incident     | 2026-04-27   | 208        | 180              | stale                |
+| knowledge/product/incidents/distill_msn-wip-takeover-20260427_2026_04_27.md          | incident     | 2026-04-27   | 208        | 180              | stale                |
+| knowledge/public/procedures/browser/calendar-management.md                           | capability   | 2026-04-14   | 221        | 180              | stale                |
+| knowledge/public/procedures/system/developer-onboarding.md                           | capability   | 2026-04-27   | 208        | 180              | stale                |
+| knowledge/public/procedures/system/github-pr-management.md                           | capability   | 2026-04-14   | 221        | 180              | stale                |
+| knowledge/public/procedures/system/rubric-disclosure-template.md                     | capability   | 2026-04-27   | 208        | 180              | stale                |
+| knowledge/public/procedures/system/security-incident-response.md                     | capability   | 2026-04-14   | 221        | 180              | stale                |
 
 ## Tenant Ingest Freshness (DA-08)
 
