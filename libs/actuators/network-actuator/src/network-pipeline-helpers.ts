@@ -286,10 +286,10 @@ async function opCapture(op: string, rawParams: unknown, ctx: NetworkPipelineCon
       const fetch = () => secureFetch(request);
       const response = await runExternalOperation(
         {
-          operationId: 'network:fetch',
+          operationId: readOnly ? 'network:fetch_read' : 'network:fetch',
           effect: { params: request },
           requiresApproval: !readOnly,
-          delegable: true,
+          delegable: !readOnly,
         },
         () => (readOnly ? retry(fetch, buildRetryOptions(params)) : fetch()),
         (result) =>

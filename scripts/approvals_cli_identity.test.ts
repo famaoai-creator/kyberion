@@ -10,7 +10,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
  * onboarding display name are stubbed; separation of duties is switched on
  * through a customer overlay of the real approval policy.
  */
-const identity = vi.hoisted(() => ({ ownerPresent: true, displayName: 'Alice Example' }));
+const identity = vi.hoisted(() => ({
+  ownerPresent: true,
+  displayName: 'Alice Example',
+  memberships: [] as Array<{ tenant_slug: string; role: string }>,
+}));
 
 // Separation of duties is switched through a customer overlay of the real
 // approval policy, the way an operator enables it.
@@ -36,7 +40,7 @@ vi.mock('@agent/core/organization/member-registry', async (importOriginal) => {
             member_id: 'owner',
             display_name: identity.displayName,
             status: 'active',
-            memberships: [],
+            memberships: identity.memberships,
             access_registrations: [],
             created_at: '2026-10-01T00:00:00.000Z',
             updated_at: '2026-10-01T00:00:00.000Z',
@@ -74,6 +78,7 @@ import {
   approvalEventLogicalPath,
   approvalRequestLogicalPath,
   approvalStoreRoots,
+  createApprovalRequest,
   loadApprovalRequest,
 } from '@agent/core/governance/approval-store';
 import {
@@ -180,6 +185,7 @@ describe('terminal approvals record one stable operator principal', () => {
   beforeEach(() => {
     plainTerminal();
     identity.ownerPresent = true;
+    identity.memberships = [];
     rootDir = path.join(parent, `fixture-${process.pid}-${Date.now()}-${Math.random()}`);
     useSeparationOfDutiesOverlay(path.join(rootDir, 'approval-policy-overlay.json'));
     safeMkdir(path.join(rootDir, 'knowledge', 'personal', 'tenants'), { recursive: true });
@@ -201,6 +207,51 @@ describe('terminal approvals record one stable operator principal', () => {
     // Tenant-scoped requests live in the tenant approval partitions.
     safeRmSync(approvalStoreRoots().tenantApprovals, { recursive: true, force: true });
     safeRmSync(rootDir, { recursive: true, force: true });
+  });
+
+  it('accepts the terminal decision only from an Owner of the Grant tenant', async () => {
+    const request = createApprovalRequest('mission_controller', {
+      channel: 'grant-standing',
+      storageChannel: 'grant-standing',
+      threadTs: 'owner-grant-test',
+      correlationId: 'owner-grant-test',
+      requestedBy: 'agent:test',
+      scope: { tier: 'confidential', tenant_slug: 'beta' },
+      draft: {
+        title: 'Credential Grant',
+        summary: 'Scoped credential use',
+        details: 'Fixture',
+        severity: 'high',
+      },
+      workflow: {
+        workflowId: 'owner',
+        mode: 'all_required',
+        requiredRoles: ['owner'],
+        stages: [],
+        approvals: [{ role: 'owner', status: 'pending' }],
+      },
+      accountability: {
+        finalDecision: 'human_only',
+        payloadHash: 'a'.repeat(64),
+        effectBinding: 'grant-standing:credential.use:beta',
+      },
+    });
+    const decide = () =>
+      decideApprovalFromCli(request, { decision: 'approved', note: 'owner fixture' });
+    identity.memberships = [
+      { tenant_slug: 'other', role: 'owner' },
+      { tenant_slug: 'beta', role: 'approver' },
+    ];
+    await expect(decide()).rejects.toThrow('requires the tenant Owner');
+    expect(loadApprovalRequest('grant-standing', request.id)?.status).toBe('pending');
+    identity.memberships = [{ tenant_slug: 'beta', role: 'owner' }];
+    const approved = await withTtyAnswer((code) => code, decide);
+    expect(approved.workflow?.approvals[0]).toMatchObject({
+      status: 'approved',
+      role: 'owner',
+      approvedBy: 'user:owner',
+      authMethod: 'terminal_attested',
+    });
   });
 
   it('with SoD on, refuses the operator approving the request they opened from the CLI', async () => {

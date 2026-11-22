@@ -6,7 +6,7 @@ import './authorization-overlay.js';
  * `branch_pattern` — a single trailing wildcard over a literal tree prefix
  * ('feat/*' covers every branch under feat/) — no other wildcard matching.
  */
-export type ExternalOperationGrant =
+export type CharterExternalOperationTarget =
   | {
       operation_id: 'vcs:pr_create';
       repository: string;
@@ -75,6 +75,9 @@ export type ExternalOperationGrant =
         | 'media:generation:run_workflow';
       backend?: string;
     };
+
+/** Compatibility name for a Charter target. It carries no principal authority. */
+export type ExternalOperationGrant = CharterExternalOperationTarget;
 
 /**
  * Declarative delegation registry: one entry per operation that may consult
@@ -543,6 +546,14 @@ export function buildExternalOperationTarget(
   return EXTERNAL_OPERATION_DELEGATION[operationId]?.buildTarget(effect);
 }
 
+/** Resolve the concrete target with the same normalization as charter rules. */
+export function resolveCharterExternalOperationTarget(
+  operationId: string,
+  effect: Record<string, unknown>
+): CharterExternalOperationTarget | undefined {
+  return parseExternalOperationGrant(buildExternalOperationTarget(operationId, effect));
+}
+
 function normalizeRepositoryUrl(target: string): string | undefined {
   try {
     const url = new URL(target);
@@ -567,7 +578,9 @@ function normalizeOrigin(target: string): string | undefined {
   }
 }
 
-export function parseExternalOperationGrant(raw: unknown): ExternalOperationGrant | undefined {
+export function parseExternalOperationGrant(
+  raw: unknown
+): CharterExternalOperationTarget | undefined {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
   const value = raw as Record<string, unknown>;
   const op = value.operation_id;
@@ -613,7 +626,7 @@ export function parseExternalOperationGrant(raw: unknown): ExternalOperationGran
   }
   if (Object.values(normalized).some((v) => !v)) return undefined;
   if (op === 'tenant:attest_provider' && normalized.training_use !== 'none') return undefined;
-  return { operation_id: op, ...normalized } as ExternalOperationGrant;
+  return { operation_id: op, ...normalized } as CharterExternalOperationTarget;
 }
 
 /** Which grants a charter cannot use, by index, so a hand-written grant is fixable. */
@@ -638,11 +651,13 @@ export function describeInvalidExternalOperationGrants(raw: unknown): string[] {
   return problems;
 }
 
-export function parseExternalOperationGrants(raw: unknown): ExternalOperationGrant[] | undefined {
+export function parseExternalOperationGrants(
+  raw: unknown
+): CharterExternalOperationTarget[] | undefined {
   if (!Array.isArray(raw) || raw.length > 32) return undefined;
   const result = raw.map(parseExternalOperationGrant);
   if (result.some((value) => !value)) return undefined;
-  const grants = result as ExternalOperationGrant[];
+  const grants = result as CharterExternalOperationTarget[];
   if (new Set(grants.map((value) => JSON.stringify(value))).size !== grants.length)
     return undefined;
   return grants;
@@ -655,8 +670,8 @@ export function parseExternalOperationGrants(raw: unknown): ExternalOperationGra
  * sits under it (used for parent-charter containment).
  */
 export function externalOperationGrantMatches(
-  grant: ExternalOperationGrant,
-  target: ExternalOperationGrant
+  grant: CharterExternalOperationTarget,
+  target: CharterExternalOperationTarget
 ): boolean {
   const a = parseExternalOperationGrant(grant);
   const b = parseExternalOperationGrant(target);

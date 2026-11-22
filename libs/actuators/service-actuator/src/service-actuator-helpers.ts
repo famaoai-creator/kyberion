@@ -55,6 +55,7 @@ import {
 } from '@agent/core/service/service-harness';
 import { recordServiceCall } from '@agent/core/service/service-recording-session';
 import { sharedControlPlane } from '@agent/core/cloudflare-os-shared';
+import { currentScopeEnvelope, runtimeScopeIdentity } from '@agent/core/scope-envelope';
 import type {
   IntroductionMode,
   OsKnowledgeTier,
@@ -446,9 +447,9 @@ export async function handleAction(
 /** Reviewed preset risk is authoritative; opaque routes never infer read from action names. */
 export function describeServiceExternalEffect(
   input: ServiceAction
-): Pick<ExternalOperation, 'requiresApproval' | 'delegable'> {
+): Pick<ExternalOperation, 'requiresApproval' | 'delegable'> & { resourceScope: ResourceScope } {
   if (input.action === 'pipeline' || input.mode === 'HARNESS') {
-    return { requiresApproval: false, delegable: false };
+    return { requiresApproval: false, delegable: false, resourceScope: 'read' };
   }
   if (input.mode === 'PRESET') {
     const declared = getServicePresetRecord(input.service_id)?.operations?.[input.action];
@@ -470,14 +471,17 @@ export function describeServiceExternalEffect(
           route.type === 'api' &&
           ['GET', 'HEAD'].includes(String(route.method ?? declared?.method).toUpperCase())
       );
+    const readOnly = op.risk === 'read' && knownRead;
     return {
-      requiresApproval: op.approval_required || op.risk !== 'read' || !knownRead,
+      requiresApproval: op.approval_required || !readOnly,
       delegable: op.risk === 'write',
+      resourceScope: readOnly ? 'read' : 'write',
     };
   }
   return {
     requiresApproval: !(input.mode === 'API' && input.method === 'GET'),
     delegable: false,
+    resourceScope: input.mode === 'API' && input.method === 'GET' ? 'read' : 'write',
   };
 }
 
@@ -490,7 +494,7 @@ async function handleSingleAction(
   if (!alreadyAdmitted) input = await admitServiceAction(input, options);
   const bindingAuthorization = authorizeTenantServiceBinding(input);
   const scope = resolveTrustedScope(input.context ?? {}, Boolean(bindingAuthorization.bindingId));
-  const effectDescription = describeServiceExternalEffect(input);
+  const { resourceScope, ...effectDescription } = describeServiceExternalEffect(input);
   const external: ExternalOperation = {
     operationId: `service:${input.service_id}:${input.mode.toLowerCase()}:${input.action}`,
     effect: input as unknown as Record<string, unknown>,
@@ -509,7 +513,7 @@ async function handleSingleAction(
   );
 
   const preparedObservation = prepareServiceObservation(input);
-  enforceResourceIntroduction(input);
+  enforceResourceIntroduction(input, resourceScope);
 
   const egressContext = prepareServiceEgressContext(input);
   const serviceTarget = delegatedServiceTarget(input);
@@ -916,7 +920,34 @@ function resolveTrustedScope(
   return scope;
 }
 
-function enforceResourceIntroduction(input: ServiceAction): void {
+function resolveServiceIntroductionResource(input: ServiceAction): string | undefined {
+  if (input.mode === 'API') return serviceApiUrl(input);
+  if (input.mode !== 'PRESET' || input.service_id !== 'github') return undefined;
+  const operation = getServicePresetRecord(input.service_id)?.operations?.[input.action];
+  const routes = operation?.alternatives?.length ? operation.alternatives : [operation];
+  if (
+    !routes.every(
+      (route) =>
+        isRecord(route) &&
+        typeof route.path === 'string' &&
+        route.path.startsWith('repos/{{owner}}/{{repo}}/')
+    )
+  )
+    return undefined;
+  const owner = input.params?.owner;
+  const repo = input.params?.repo;
+  if (
+    typeof owner === 'string' &&
+    typeof repo === 'string' &&
+    /^[\w-]+$/.test(owner) &&
+    /^[\w.-]+$/.test(repo) &&
+    repo !== '.' &&
+    repo !== '..'
+  )
+    return `repo:${owner.toLowerCase()}/${repo.toLowerCase()}`;
+}
+
+function enforceResourceIntroduction(input: ServiceAction, resourceScope: ResourceScope): void {
   if (input.mode === 'OAUTH' || input.mode === 'RECONCILE') return;
   const context = input.context || {};
   const mode = (context.introduction_mode ||
@@ -928,24 +959,28 @@ function enforceResourceIntroduction(input: ServiceAction): void {
   const securityScope = resolveTrustedScope(context, mode === 'enforce');
   if (!securityScope) return;
   const missionId = securityScope.mission_id;
-  const resourceRef = String(context.resource_ref || context.resourceRef || '').trim();
+  const claimedResourceRef = String(context.resource_ref || context.resourceRef || '').trim();
+  if (mode === 'warn' && !claimedResourceRef) return;
+  const resourceRef = resolveServiceIntroductionResource(input);
   if (!missionId || !resourceRef) {
     if (mode === 'enforce') {
       throw new Error(
-        '[POLICY_VIOLATION] Enforced service actions require mission_id and resource_ref'
+        '[POLICY_VIOLATION] Enforced service actions require a mission and a resource resolved from the operation'
       );
     }
     return;
   }
-  const resourceScope = (context.resource_scope ||
-    context.resourceScope ||
-    (context.observation ? 'read' : input.method === 'GET' ? 'read' : 'write')) as ResourceScope;
-  if (resourceScope !== 'read' && resourceScope !== 'write') {
-    throw new Error(`[POLICY_VIOLATION] Invalid resource scope: ${String(resourceScope)}`);
-  }
+  if (claimedResourceRef && claimedResourceRef !== resourceRef && mode === 'enforce')
+    throw new Error('[POLICY_VIOLATION] Declared resource differs from the operation target');
+  const identity = currentScopeEnvelope()?.identity ?? runtimeScopeIdentity();
+  if (
+    (identity.mission_id && identity.mission_id !== missionId) ||
+    (identity.tenant_slug && identity.tenant_slug !== resolveTenantAlias(securityScope))
+  )
+    throw new Error('[POLICY_VIOLATION] Resource introduction scope differs from execution scope');
   controlPlane().enforceIntroduction({
     missionId,
-    taskId: String(context.task_id || context.taskId || '').trim() || undefined,
+    taskId: identity.task_id,
     service: input.service_id,
     resourceRef,
     scope: resourceScope,
@@ -1095,12 +1130,16 @@ async function reconcileServices(input: ServiceAction) {
   return { status: 'reconciled', active_services: Object.keys(pids) };
 }
 
+function serviceApiUrl(input: ServiceAction): string {
+  return `${resolveServiceBaseUrl(input.service_id)}/${input.action}`;
+}
+
 async function executeApiRequest(input: ServiceAction) {
   const binding = input.auth
     ? resolveServiceBinding(input.service_id, input.auth)
     : resolveServiceBinding(input.service_id, 'none');
   const token: string | null = binding.accessToken || null;
-  const baseUrl = resolveServiceBaseUrl(input.service_id);
+  const url = serviceApiUrl(input);
   const httpMethod = input.method || (input.params ? 'POST' : 'GET');
   const readOnly = ['GET', 'HEAD', 'OPTIONS'].includes(httpMethod.toUpperCase());
   return await retry(
@@ -1108,7 +1147,7 @@ async function executeApiRequest(input: ServiceAction) {
       try {
         return await secureFetch({
           method: httpMethod,
-          url: `${baseUrl}/${input.action}`,
+          url,
           headers: token ? { Authorization: `Bearer ${token}` } : {},
           data: httpMethod !== 'GET' ? input.params : undefined,
           params: httpMethod === 'GET' ? input.params : undefined,

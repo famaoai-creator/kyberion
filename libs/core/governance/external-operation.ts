@@ -39,8 +39,7 @@ export {
 } from './operation-protection.js';
 export type { OperationArgumentOrigin, OperationInterfaceBinding } from './operation-protection.js';
 import {
-  buildExternalOperationTarget,
-  parseExternalOperationGrant,
+  resolveCharterExternalOperationTarget,
   externalOperationGrantMatches,
 } from './external-operation-target.js';
 import { remoteMcpBindingForEffect } from './remote-mcp-interface.js';
@@ -194,6 +193,8 @@ const admittedOperations = new WeakMap<
   {
     authority?: ExternalOperationAuthority;
     operationId: string;
+    requiresApproval: boolean;
+    tenantSlug?: string;
     effectHash: string;
     protectionHash: string;
     proof?: ExternalOperationCommitProof;
@@ -341,6 +342,7 @@ export function assertExternalOperationCommit(input: ExternalOperation): void {
   if (!admitted) stopExternalGovernance('[EXTERNAL_ADMISSION_REQUIRED] No current admission');
   if (admitted.committed)
     stopExternalGovernance('[EXTERNAL_COMMIT_ALREADY_USED] An admission permits one commit only');
+  assertExternalBoundaryScope(admitted.tenantSlug, admitted.authority !== undefined);
   let current: ReturnType<typeof protectionFor>;
   try {
     current = protectionFor(input);
@@ -353,6 +355,8 @@ export function assertExternalOperationCommit(input: ExternalOperation): void {
   }
   if (
     admitted.operationId !== input.operationId ||
+    admitted.requiresApproval !== input.requiresApproval ||
+    admitted.tenantSlug !== (input.tenantSlug ?? admitted.authority?.tenantSlug) ||
     admitted.effectHash !== computeApprovalPayloadHash(input.effect) ||
     admitted.protectionHash !== current.hash
   ) {
@@ -427,6 +431,53 @@ function stopExternalGovernance(
   throw new ExternalOperationApprovalRequired(approval);
 }
 
+function assertExternalBoundaryScope(tenantSlug: string | undefined, hasAuthority: boolean): void {
+  const envelope = currentScopeEnvelope();
+  if (envelope?.policy?.external_egress === 'deny')
+    stopExternalGovernance('[EXTERNAL_EGRESS_DENIED] Scope envelope prohibits external egress');
+  if (
+    envelope &&
+    (tenantSlug !== undefined || hasAuthority) &&
+    tenantSlug !== envelope.identity.tenant_slug
+  )
+    stopExternalGovernance(
+      '[EXTERNAL_SCOPE_MISMATCH] Operation must match the active scope envelope'
+    );
+}
+
+/** Select delegation evidence after the boundary checks. The approval gate owns the final decision. */
+function charterForExternalApproval(
+  input: ExternalOperation,
+  authority: ExternalOperationAuthority | undefined,
+  trustedTenant: string | undefined,
+  requiresExactApproval: boolean,
+  hasDelegatedServiceProof: boolean
+): ApprovalGateCharterInput | undefined {
+  const declaredCharter = input.delegable ? authority?.charter : undefined;
+  const target = resolveCharterExternalOperationTarget(input.operationId, input.effect);
+  const matchesCharterTarget =
+    target &&
+    declaredCharter?.action.external_operation &&
+    externalOperationGrantMatches(declaredCharter.action.external_operation, target);
+  const needsExactApproval = requiresExactApproval && !matchesCharterTarget;
+  // A broad delegation is not proof of the origin of a new destination.
+  if (hasDelegatedServiceProof && needsExactApproval)
+    stopExternalGovernance(
+      '[OP_ARGUMENT_AUTHORITY_REQUIRED] Destination needs exact human approval or a verified user/policy origin'
+    );
+  if (
+    declaredCharter &&
+    (declaredCharter.scope.kind === 'person'
+      ? Boolean(trustedTenant)
+      : !authority?.tenantSlug || declaredCharter.scope.tenant_slug !== authority.tenantSlug)
+  ) {
+    stopExternalGovernance(
+      '[EXTERNAL_SCOPE_MISMATCH] Charter must match the trusted tenant binding'
+    );
+  }
+  return needsExactApproval ? undefined : declaredCharter;
+}
+
 /** Bridge only the real service effect shape to main's exact, currently
  * verified execution context. JSON assertions never count as proof. */
 function currentServiceExecutionProof(input: ExternalOperation) {
@@ -475,6 +526,19 @@ export function admitExternalOperation(input: ExternalOperation): ApprovalGateRe
   admissions.delete(input);
   admittedOperations.delete(input);
   const declaredAuth = operationAuthorization(input.operationId);
+  if (
+    !input.requiresApproval &&
+    (input.approvalPolicy ||
+      declaredAuth.authority.kind === 'approval' ||
+      (declaredAuth.declared &&
+        declaredAuth.source === 'code' &&
+        declaredAuth.effectClass === 'external_mutation' &&
+        !declaredAuth.approvalExemptCleanup))
+  ) {
+    stopExternalGovernance(
+      '[EXTERNAL_APPROVAL_CLASSIFICATION_MISMATCH] The operation requires an approval-capable admission'
+    );
+  }
   if (!declaredAuth.declared) {
     logger.warn(
       `[external-operation] undeclared operationId '${input.operationId}' admitted — declare it in libs/core/foundation/authorization-registry.ts | next: add a registry entry`
@@ -528,19 +592,15 @@ export function admitExternalOperation(input: ExternalOperation): ApprovalGateRe
       '[EXTERNAL_SCOPE_MISMATCH] Authority must match the boundary tenant binding'
     );
   }
-  const envelope = currentScopeEnvelope();
-  if (envelope?.policy?.external_egress === 'deny')
-    stopExternalGovernance('[EXTERNAL_EGRESS_DENIED] Scope envelope prohibits external egress');
-  if (authority && envelope && authority.tenantSlug !== envelope.identity.tenant_slug) {
-    stopExternalGovernance(
-      '[EXTERNAL_SCOPE_MISMATCH] Authority must match the active scope envelope'
-    );
-  }
+  const trustedTenant = input.tenantSlug ?? authority?.tenantSlug;
+  assertExternalBoundaryScope(trustedTenant, authority !== undefined);
   const effectHash = computeApprovalPayloadHash(input.effect);
   if (!input.requiresApproval) {
     admittedOperations.set(input, {
       authority,
       operationId: input.operationId,
+      requiresApproval: input.requiresApproval,
+      tenantSlug: trustedTenant,
       effectHash,
       protectionHash: protection.hash,
     });
@@ -553,7 +613,6 @@ export function admitExternalOperation(input: ExternalOperation): ApprovalGateRe
   }
   // Standing tenant stops tighten every external mutation, including opaque
   // human-only operations that cannot obtain delegated authority.
-  const trustedTenant = input.tenantSlug ?? authority?.tenantSlug;
   if (
     authority?.standingScope &&
     (authority.standingScope.kind === 'person'
@@ -592,31 +651,13 @@ export function admitExternalOperation(input: ExternalOperation): ApprovalGateRe
       }
     }
   }
-  const target = parseExternalOperationGrant(
-    buildExternalOperationTarget(input.operationId, input.effect)
+  const charter = charterForExternalApproval(
+    input,
+    authority,
+    trustedTenant,
+    protection.argumentsCheck.requiresExactApproval,
+    serviceProof?.kind === 'delegated'
   );
-  const literalGrant =
-    target &&
-    authority?.charter?.action.external_operation &&
-    externalOperationGrantMatches(authority.charter.action.external_operation, target);
-  const needsExactApproval = protection.argumentsCheck.requiresExactApproval && !literalGrant;
-  // A broad delegation is not proof of the origin of a new destination.
-  if (serviceProof?.kind === 'delegated' && needsExactApproval)
-    stopExternalGovernance(
-      '[OP_ARGUMENT_AUTHORITY_REQUIRED] Destination needs exact human approval or a verified user/policy origin'
-    );
-  const declaredCharter = input.delegable ? authority?.charter : undefined;
-  if (
-    declaredCharter &&
-    (declaredCharter.scope.kind === 'person'
-      ? Boolean(trustedTenant)
-      : !authority?.tenantSlug || declaredCharter.scope.tenant_slug !== authority.tenantSlug)
-  ) {
-    stopExternalGovernance(
-      '[EXTERNAL_SCOPE_MISMATCH] Charter must match the trusted tenant binding'
-    );
-  }
-  const charter = needsExactApproval ? undefined : declaredCharter;
   // Invocation identity prevents one approval becoming a standing grant for
   // identical messages; the effect hash prevents edits while awaiting approval.
   const request = explicitRequestContext.getStore();
@@ -775,6 +816,8 @@ export function admitExternalOperation(input: ExternalOperation): ApprovalGateRe
   admittedOperations.set(input, {
     authority,
     operationId: input.operationId,
+    requiresApproval: input.requiresApproval,
+    tenantSlug: trustedTenant,
     effectHash,
     protectionHash: protection.hash,
     proof,

@@ -67,6 +67,26 @@ describe('tenant attest-provider requires --apply --accept', () => {
       ?.provider_attestations?.codex;
   const args = ['attest-provider', 'acme', '--provider', 'codex', '--training-use', 'used'];
 
+  it('reads the registry using dedicated grants and keeps tenant-bound discovery narrow', () => {
+    const list = (argv: string[]) => {
+      const print = vi.fn();
+      main(argv, print, { rootDir });
+      return JSON.parse(print.mock.calls[0]![0]);
+    };
+    expect(list(['list'])).toEqual([expect.objectContaining({ tenant_slug: 'acme' })]);
+    withExecutionContext(
+      'mission_controller',
+      () => {
+        expect(list(['show', 'acme', '--json'])).toMatchObject({ tenant_slug: 'acme' });
+        expect(() => main(['show', 'other'], () => undefined, { rootDir })).toThrow(
+          'ROLE_TENANT_SCOPE_MISMATCH'
+        );
+      },
+      undefined,
+      'acme'
+    );
+  });
+
   it('does not write with --apply alone', () => {
     expect(() => main([...args, '--apply'], () => undefined, { rootDir })).toThrow(
       /requires --accept/

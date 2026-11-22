@@ -357,8 +357,15 @@ export async function runCredentialAllocationCommand(
             ...(values.days ? { ttl_days: Number(values.days) } : {}),
           };
         }
-        if (values.approval) {
-          const grant = grantStanding(draft, { approvalRequestId: values.approval });
+        const request = values.approval
+          ? undefined
+          : requestGrantApproval(draft, {
+              requester: resolveCliApprovalRequester({ legacy: 'operator' }),
+            });
+        const approvalRequestId =
+          values.approval ?? (request?.status === 'approved' ? request.id : undefined);
+        if (approvalRequestId) {
+          const grant = grantStanding(draft, { approvalRequestId });
           print(
             JSON.stringify({
               status: 'allocated',
@@ -371,9 +378,7 @@ export async function runCredentialAllocationCommand(
               expires_at: grant.expires_at,
             })
           );
-        } else {
-          const requester = resolveCliApprovalRequester({ legacy: 'operator' });
-          const request = requestGrantApproval(draft, { requester });
+        } else if (request) {
           print(
             JSON.stringify({
               status: 'approval_required',
@@ -389,14 +394,23 @@ export async function runCredentialAllocationCommand(
                         : `an owner of tenant ${draft.credential_lending.owner}`,
                   }
                 : {}),
-              next: [
-                `pnpm scope use --tier confidential --tenant ${tenant}`,
-                `pnpm kyberion approvals --approve ${request.id}`,
-              ],
-              scope_note:
-                'Stash with scope push before changing scope, unless already stashed; restore with scope pop after the workflow.',
+              next: request.scope?.tenant_slug
+                ? [
+                    'Owner: open Concierge /inbox?reason=approval and review this approval ID.',
+                    `Or, from an interactive Owner terminal in the request scope: pnpm kyberion approvals --approve ${request.id}`,
+                  ]
+                : [
+                    `pnpm scope use --tier confidential --tenant ${tenant}`,
+                    `pnpm kyberion approvals --approve ${request.id}`,
+                  ],
+              ...(!request.scope?.tenant_slug
+                ? {
+                    scope_note:
+                      'Stash with scope push before changing scope, unless already stashed; restore with scope pop after the workflow.',
+                  }
+                : {}),
               apply:
-                'Repeat the same assign options with --approval <approval_id> after human approval.',
+                'After human approval, rerun this assign command with the same options. The CLI applies the matching approved request.',
             })
           );
         }

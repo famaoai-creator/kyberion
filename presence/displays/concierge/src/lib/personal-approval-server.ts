@@ -1,7 +1,10 @@
 /** Personal approvals are exposed only to the signed-in installed human owner. */
+import { NextResponse } from 'next/server';
 import {
   listApprovalRequests,
   loadApprovalRequest,
+  tenantOwnerApprovalDenied,
+  TENANT_OWNER_APPROVAL_REQUIRED,
   type ApprovalRequestRecord,
 } from '@agent/core/governance/approval-store';
 import { withAuthenticatedPersonalApprovals } from '@agent/core/governance/authenticated-personal-approvals';
@@ -9,6 +12,15 @@ import { inspectInstalledOnboardingRuntime } from '@agent/core/organization/onbo
 import { viewerPersonIds } from '@agent/core/surface/surface-authorization';
 import { asOnboardingOwner, onboardingAuthorityPrincipal } from './onboarding-authority-server';
 import type { ConciergeViewerContext } from './viewer-context';
+
+export function conciergeTenantOwnerApprovalDenied(
+  record: ApprovalRequestRecord,
+  memberRole?: string
+) {
+  if (!tenantOwnerApprovalDenied(record, memberRole)) return null;
+  const { code, message } = TENANT_OWNER_APPROVAL_REQUIRED;
+  return NextResponse.json({ ok: false, code, error: message }, { status: 403 });
+}
 
 export function withConciergePersonalApprovals<T>(
   viewer: ConciergeViewerContext,

@@ -57,7 +57,7 @@ const call = (op: string, context?: Record<string, unknown>): OpPreflightCall =>
 });
 
 /** Run `fn` under a runtime-minted envelope — the only identity the stages trust. */
-const inScope = <T>(fn: () => T): T =>
+const inScope = <T>(fn: () => T, externalEgress?: 'deny'): T =>
   withScopeEnvelope(
     mintScopeEnvelope({
       identity: {
@@ -66,7 +66,7 @@ const inScope = <T>(fn: () => T): T =>
         task_id: 'task-s5',
         tier: 'confidential',
       },
-      policy: { purpose: 'stage test' },
+      policy: { purpose: 'stage test', external_egress: externalEgress },
     }),
     fn
   );
@@ -87,6 +87,11 @@ describe('introductionResult', () => {
     inScope(() =>
       expect(() => introductionResult(call('file:pipeline'), writeInput)).toThrow(
         '[POLICY_VIOLATION]'
+      )
+    );
+    inScope(() =>
+      expect(() => introductionResult(call('file:pipeline'), { _effect: 'write' })).toThrow(
+        'Cannot resolve the operation resource'
       )
     );
   });
@@ -247,6 +252,13 @@ describe('provenanceEgressResult (SC-06)', () => {
     expect(guard(egressInput({ _egress_destination: UNLISTED_HOST }))).toBeUndefined();
   });
 
+  it('enforces an explicit envelope egress denial even in warn mode', () => {
+    setOpPreflightRolloutForTests({ stages: { egress: { default: 'warn' } } });
+    expect(
+      inScope(() => provenanceEgressResult(call('export:publish'), egressInput()), 'deny')
+    ).toMatchObject({ decision: 'block', reason: expect.stringContaining('Scope envelope') });
+  });
+
   it('fails closed when a tainted mission has no declared destination', () => {
     observe('confidential');
     const { _egress_destination: _omitted, ...undeclared } = egressInput();
@@ -263,6 +275,7 @@ describe('provenanceEgressResult (SC-06)', () => {
       payloadHash: egressPayloadHash(bound),
       targetAudience: 'public',
       targetTenant: 'tenant-a',
+      targetDestination: PUBLIC_HOST,
       requestedBy: 'agent:x',
     });
     sharedControlPlane().decideHeldAction(held.id, 'approved', {
@@ -275,6 +288,9 @@ describe('provenanceEgressResult (SC-06)', () => {
     await sharedControlPlane().applyHeldAction(held.id);
 
     expect(guard(bound)).toBeUndefined();
+    expect(guard({ ...bound, _egress_destination: 'https://public.example/other' })?.decision).toBe(
+      'block'
+    );
     // Changed content is denied again, even when it claims the approved hash.
     expect(
       guard({ ...bound, body: 'confidential appendix', payload_hash: egressPayloadHash(bound) })

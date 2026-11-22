@@ -867,6 +867,10 @@ export function requestGrantApproval(
   const now = options.now ?? new Date();
   const effectBinding = grantApprovalEffectBinding(normalized);
   const details = buildGrantApprovalDetails(normalized, requester.requestedBy);
+  const sameTenantCredential =
+    normalized.credential_lending?.custody === 'tenant' &&
+    normalized.credential_lending.owner === normalized.tenant_slug;
+  const approvalRole = sameTenantCredential ? 'owner' : 'sovereign';
   return createApprovalRequest('mission_controller', {
     channel: GRANT_APPROVAL_CHANNEL,
     storageChannel: GRANT_APPROVAL_CHANNEL,
@@ -874,6 +878,9 @@ export function requestGrantApproval(
     correlationId: effectBinding,
     requestedBy: requester.requestedBy,
     ...(requester.displayName ? { requestedByDisplayName: requester.displayName } : {}),
+    ...(sameTenantCredential
+      ? { scope: { tier: 'confidential', tenant_slug: normalized.tenant_slug } }
+      : {}),
     expiresAt: new Date(now.getTime() + APPROVAL_TTL_MS).toISOString(),
     kind: 'channel-approval',
     draft: {
@@ -896,9 +903,9 @@ export function requestGrantApproval(
     workflow: {
       workflowId: `pg-03-grant-${normalized.capability}-${normalized.tenant_slug}`,
       mode: 'all_required',
-      requiredRoles: ['sovereign'],
+      requiredRoles: [approvalRole],
       stages: [],
-      approvals: [{ role: 'sovereign', status: 'pending' }],
+      approvals: [{ role: approvalRole, status: 'pending' }],
     },
     accountability: {
       finalDecision: 'human_only',

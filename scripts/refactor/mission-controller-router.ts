@@ -959,7 +959,7 @@ export async function runMissionControllerAction(
           REVIEWER_TEAM_ROLES
         );
         const specialistRoles = parseCsvOption('--specialist-roles', context.argv);
-        await context.recordArtifactReview(
+        const result = await context.recordArtifactReview(
           arg1!,
           arg2!,
           arg3!,
@@ -968,6 +968,7 @@ export async function runMissionControllerAction(
           specialistRoles,
           getValue('--provider', context.argv)
         );
+        if (json) context.print?.(result);
         return;
       },
       'reconcile-work': async () => {

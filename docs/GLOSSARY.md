@@ -153,6 +153,8 @@ When the question is "what may be done with this information asset", use the **i
 
 A standing grant that itself needs human approval references the approval as its basis (`basis.approval_request_id`).
 
+An authenticated human approves an external-I/O standing Grant. Kyberion consumes that decision once and records the human as grantor. The local Owner member can directly issue eligible standing Grants for capabilities without external I/O. Mission dispatch issues task-scoped Grants to the assigned NHI within the task's authority and lifetime. See the [operator checklist](./OPERATOR_UX_GUIDE.md#authorization-and-disclosure-checks).
+
 ### Execution definitions
 
 | Term              | Meaning                                                                                                                                                                                                                       |
@@ -674,7 +676,7 @@ An always-on resident agent holding a standing responsibility across sessions, d
 
 ### Accountability Charter
 
-A tenant-scoped standing declaration of the accountable human, authority envelope (spend limits, deputies, validity) and loss appetite (`libs/core/governance/accountability-charter*.ts`). Inside an active charter the approval gate lets an action run without a per-action approval, audited against the responsible human; outside it a human decides, and hardened policies are never delegable. Owners sign it in Concierge Settings › Organization and members; `approval_inbox charter` reports what ran under it. Distinct from a dot charter and from the Charter (`AGENTS.md`).
+A tenant-scoped standing declaration of the accountable human, authority envelope (spend limits, deputies, validity) and loss appetite (`libs/core/governance/accountability-charter*.ts`). The charter bounds delegation of existing authority. An eligible action within an active charter may run with accountable-human attribution and no per-action approval. A delegation miss can fall back to individual approval when the policy and execution boundary allow it. A hard stop blocks execution. See the [external-operation decision table](../knowledge/product/architecture/scope-governance-plane.md#外部操作1件の認可). Owners sign it in Concierge Settings › Organization and members; `approval_inbox charter` reports what ran under it. Distinct from a dot charter and from the Charter (`AGENTS.md`).
 
 ### Scope Envelope
 

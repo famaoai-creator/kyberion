@@ -4,6 +4,7 @@ import { scopedLearningApprovalVisibleToViewer } from '../../../../lib/scoped-le
 import { accountIntroductionApprovalMember } from '../../../../lib/account-introduction-server';
 import { onboardingApprovalMember } from '../../../../lib/onboarding-authority-server';
 import {
+  conciergeTenantOwnerApprovalDenied,
   loadConciergeApproval,
   withConciergeApproval,
 } from '../../../../lib/personal-approval-server';
@@ -107,6 +108,8 @@ async function handlePost(req: NextRequest, context: { params: Promise<{ id: str
     if (decisionDenied) return decisionDenied;
     const decidedBy =
       onboardingMember ?? resolveConciergeDecidedBy(resolved.context, resourceTenant);
+    const ownerDenied = conciergeTenantOwnerApprovalDenied(record, decidedBy?.role);
+    if (ownerDenied) return ownerDenied;
     const updated = withConciergeApproval(resolved.context, record, () =>
       decideApprovalRequest('sovereign_concierge', {
         channel,

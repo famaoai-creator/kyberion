@@ -5,7 +5,7 @@ import {
   parseExternalOperationGrants,
   parseExternalOperationGrant,
   externalOperationGrantMatches,
-  type ExternalOperationGrant,
+  type CharterExternalOperationTarget,
 } from './external-operation-target.js';
 export type { ExternalOperationGrant } from './external-operation-target.js';
 /**
@@ -14,7 +14,8 @@ export type { ExternalOperationGrant } from './external-operation-target.js';
  * Replaces per-action human approval (HITL) with a standing declaration by the
  * accountable human: who takes the fall, within what authority, and up to what
  * loss. Inside the charter an agent acts without asking; outside it the
- * action is denied and an amendment is proposed (nobody waits on a click).
+ * charter delegation is denied. The calling approval gate decides whether a
+ * separate human request is permitted or the operation must stop.
  *
  * Invariants (see ACCOUNTABILITY_CHARTER_PLAN_2026-09-30.ja.md):
  *  1. Effective scope = accountable human's real authority ∩ envelope ∩ appetite.
@@ -107,7 +108,7 @@ export interface MoneyLimits {
 }
 
 export interface CharterEnvelope {
-  external_operations?: ExternalOperationGrant[];
+  external_operations?: CharterExternalOperationTarget[];
   money: MoneyLimits;
   data_tier: {
     read: string[]; // 'public' | 'confidential:<tenant>' | 'personal'
@@ -170,7 +171,7 @@ export interface CharterUsage {
 }
 
 export interface CharterAction {
-  external_operation?: ExternalOperationGrant;
+  external_operation?: CharterExternalOperationTarget;
   /** The executing actor. Agents must name the accountable human (or a deputy) in `on_behalf_of`. */
   actor: ActorRef;
   action_class: string;

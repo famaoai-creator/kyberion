@@ -67,6 +67,8 @@ export interface DelegationSpec {
 
 export interface OperationAuthorization {
   readonly effectClass: EffectClass;
+  /** Reviewed cleanup that must remain available without acquiring approval. */
+  readonly approvalExemptCleanup?: true;
   readonly authority: AuthorityRequirement;
   readonly delegable?: DelegationSpec;
   /** Optional charter decision-vocabulary class (payment, sign_contract, …)
@@ -244,14 +246,15 @@ const OPERATIONS: Readonly<Record<string, RegistryEntry>> = {
   'meeting:leave': {
     effectClass: 'external_mutation',
     authority: { kind: 'admission', boundary: 'external' },
+    approvalExemptCleanup: true,
   },
   'meeting:status': {
-    effectClass: 'external_mutation',
+    effectClass: 'external_read',
     authority: { kind: 'admission', boundary: 'external' },
   },
   'meeting:check_consent': {
-    effectClass: 'external_mutation',
-    authority: { kind: 'admission', boundary: 'external' },
+    effectClass: 'local_only',
+    authority: { kind: 'free' },
   },
   // --- Email ops with reviewed protected paths (narrower than the email: prefix union) ---
   'email:send': {
@@ -360,6 +363,11 @@ const OPERATIONS: Readonly<Record<string, RegistryEntry>> = {
       optionalFields: ['method', 'origin'],
       reputational_class: 'A',
     },
+    protectedPaths: [['params', 'url']],
+  },
+  'network:fetch_read': {
+    effectClass: 'external_read',
+    authority: { kind: 'admission', boundary: 'external' },
     protectedPaths: [['params', 'url']],
   },
   'network:exposure_check': {

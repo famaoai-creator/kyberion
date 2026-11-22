@@ -26,6 +26,8 @@ status: active
 
 利用者向けの定義は[基本概念](../../CORE_CONCEPTS.md)と[用語集](../../GLOSSARY.md)に反映しています。旧 Chronos の運用コンソールは Concierge の `/ops` へ移設済みです。[サーフェスマップ](../../SURFACES.md)に現行の入口と認可を記載しています。
 
+外部操作の共通実行境界では、テナント照合と操作区分の検査を実装済みです。サービスのリソース検査は直接 API と対応する GitHub プリセットで実行対象を解決します。開示例外は内容と個別の HTTP(S) 宛先に結び付きます。未対応のサービスでの対象解決と、共通検査の警告モードから強制モードへの段階移行が残っています。[設計](../../../knowledge/product/architecture/scope-governance-plane.md) · [運用時の確認項目](../../OPERATOR_UX_GUIDE.md#authorization-and-disclosure-checks)
+
 ## 顧客とのやり取り
 
 - [ヒアリングを 1 つの概念にまとめる計画 (HR-01〜05)](./HEARING_UNIFICATION_PLAN_2026-11-12.ja.md) — active
