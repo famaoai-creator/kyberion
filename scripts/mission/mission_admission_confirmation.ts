@@ -220,15 +220,7 @@ export async function applyApprovedMissionAdmissionConfirmation(
     recordConfirmationFailure(record, deps);
     return { status: 'refused', reason: 'card expired before it could be applied' };
   }
-  const claimed = withExecutionContext(ROLE, () =>
-    claimApprovalApply(ROLE, {
-      channel: record.channel,
-      storageChannel: record.storageChannel,
-      requestId: record.id,
-      appliedBy: APPLIER,
-      expectedRecordHash: computeApprovalPayloadHash({ record }),
-    })
-  );
+  let claimId: string | undefined;
   let continuation: AdmissionContinuationResult;
   try {
     continuation = await (deps.prepare ?? continueHumanMissionAdmission)(item.item_id, {
@@ -236,11 +228,30 @@ export async function applyApprovedMissionAdmissionConfirmation(
       ...(deps.now ? { now: deps.now } : {}),
       prepare: true,
       expectedVersion: item.version,
+      authorizePreparation: () => {
+        claimId = withExecutionContext(
+          ROLE,
+          () =>
+            claimApprovalApply(ROLE, {
+              channel: record.channel,
+              storageChannel: record.storageChannel,
+              requestId: record.id,
+              appliedBy: APPLIER,
+              expectedRecordHash: computeApprovalPayloadHash({ record }),
+            }).applyClaim.claimId
+        );
+      },
     });
   } catch (error) {
     // Settle the claim so the card is never left half-applied and silent.
-    recordConfirmationFailure(record, deps, claimed.applyClaim.claimId);
+    if (claimId) recordConfirmationFailure(record, deps, claimId);
     throw error;
+  }
+  if (!claimId) {
+    logger.warn(
+      `[CONFIRM] mission admission remains held — ${continuation.reason ?? continuation.status} | next: resolve preparation requirements | evidence: ${item.item_id}`
+    );
+    return continuation;
   }
   const ok = ['pending_approval', 'approved', 'completed'].includes(continuation.status);
   withExecutionContext(ROLE, () =>
@@ -248,7 +259,7 @@ export async function applyApprovedMissionAdmissionConfirmation(
       channel: record.channel,
       storageChannel: record.storageChannel,
       requestId: record.id,
-      claimId: claimed.applyClaim.claimId,
+      claimId,
       applyResult: {
         result: ok ? 'success' : 'failed',
         appliedAt: (deps.now?.() ?? new Date()).toISOString(),

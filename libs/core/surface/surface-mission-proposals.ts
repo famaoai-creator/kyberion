@@ -1,7 +1,8 @@
 import type { StorageDataTier } from '../storage-layout.js';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { parseEventScopeInput } from '../event/event-scope.js';
 import { assertScopeContext } from '../foundation/scope-context-validation.js';
+import { resolveScopeResolution } from '../scope-context.js';
 
 import { pathResolver } from '../path-resolver.js';
 import {
@@ -17,11 +18,11 @@ import {
   safeLstat,
   safeRmSync,
 } from '../secure-io.js';
-import { buildExecutionEnv, withExecutionContext } from '../authority.js';
+import { withExecutionContext } from '../authority.js';
+import { missionControllerStartInput } from '../mission/mission-controller-start-input.js';
 import {
   emitMissionOrchestrationObservation,
-  enqueueMissionOrchestrationEvent,
-  startMissionOrchestrationWorker,
+  queueMissionIssuanceOnce,
 } from '../mission/mission-orchestration-events.js';
 import {
   appendGovernedArtifactJsonl,
@@ -213,15 +214,37 @@ function sanitizeMissionSlug(value: string): string {
 }
 
 function buildSurfaceMissionId(
-  prefix: string,
-  threadTs: string,
-  proposal: MissionProposal,
-  sourceText?: string
+  params: MissionIssuanceParams,
+  selected: {
+    surface: string;
+    tier: StorageDataTier;
+    missionType: string;
+    orgRole: string;
+    goal?: string;
+  }
 ): string {
-  const base = proposal.summary || sourceText || proposal.why || proposal.mission_type || 'request';
-  const slug = sanitizeMissionSlug(base);
-  const numericThread = threadTs.replace(/\D+/g, '').slice(-8) || Date.now().toString().slice(-8);
-  return `MSN-${prefix}-${slug}-${numericThread}`;
+  const ambient = params.scope
+    ? undefined
+    : resolveScopeResolution({}, undefined, { inferFromMission: false, inferFromCwd: false }).scope;
+  const scope = params.scope ?? ambient;
+  const identity = [
+    selected.surface,
+    params.channel.trim(),
+    params.thread.trim(),
+    selected.tier,
+    scope?.tenant_slug,
+    scope?.organization_id,
+    scope?.project_id,
+    ambient?.customer_stance,
+    selected.missionType,
+    selected.orgRole,
+    selected.goal,
+    params.sourceText?.trim(),
+  ];
+  const digest = createHash('sha256').update(JSON.stringify(identity)).digest('hex');
+  const prefix = sanitizeMissionSlug(selected.surface);
+  const slug = sanitizeMissionSlug(selected.goal || selected.missionType);
+  return `MSN-${prefix}-${slug}-${digest.slice(0, 20).toUpperCase()}`;
 }
 
 function formatRoutingDecisionSummary(routingDecision?: AgentRoutingDecision): string | undefined {
@@ -538,9 +561,9 @@ export interface MissionIssuanceParams {
   requestedBy?: string;
   /** Team Channel P2: principal that confirmed the proposal (`user:<member_id>`). */
   confirmedBy?: string;
-  /** Team Channel P2: tenant scope of the originating channel; progress replies stay in it. */
+  /** Originating tenant scope or a shared public managed project. */
   scope?: {
-    tenant_slug: string;
+    tenant_slug?: string;
     organization_id?: string;
     project_id?: string;
     tier?: StorageDataTier;
@@ -572,16 +595,10 @@ export async function issueMissionFromProposal(
         ...params.scope,
         tier: params.scope.tier ?? params.proposal.tier ?? 'public',
       }),
-      { requireTenant: true }
+      { requireTenant: !(params.scope.tier === 'public' && params.scope.project_id) }
     );
   }
   const surface = params.surface.trim().toLowerCase() || 'slack';
-  const missionId = buildSurfaceMissionId(
-    surface.toUpperCase(),
-    params.thread,
-    params.proposal,
-    params.sourceText
-  );
   // Team Channel P2: a mission never runs above the originating channel's
   // disclosure tier, whatever tier the model proposed.
   const proposedTier = params.proposal.tier || 'public';
@@ -589,38 +606,34 @@ export async function issueMissionFromProposal(
     params.scope?.tier && TIER_RANK[proposedTier] > TIER_RANK[params.scope.tier]
       ? params.scope.tier
       : proposedTier;
-  const tenantArgs = params.scope
-    ? [
-        '--tenant-slug',
-        params.scope.tenant_slug,
-        ...(params.scope.organization_id
-          ? ['--organization-id', params.scope.organization_id]
-          : []),
-        ...(params.scope.project_id ? ['--project-id', params.scope.project_id] : []),
-      ]
-    : [];
   const missionType = params.proposal.mission_type || 'development';
-  const persona = params.proposal.assigned_persona || 'Ecosystem Architect';
-  const env = buildExecutionEnv(process.env, 'mission_controller');
+  const persona = params.proposal.assigned_persona || 'ecosystem_architect';
+  const goal =
+    params.proposal.summary?.trim() || params.sourceText?.trim() || params.proposal.why?.trim();
+  const missionId = buildSurfaceMissionId(params, {
+    surface,
+    tier,
+    missionType,
+    orgRole: persona,
+    goal,
+  });
+  const { args, env } = missionControllerStartInput({
+    missionId,
+    tier,
+    missionType,
+    orgRole: persona,
+    scope: params.scope,
+  });
   const routingDecisionArg = params.routingDecision
     ? ['--routing-decision', JSON.stringify(params.routingDecision)]
     : [];
+  const goalArgs = goal ? ['--goal', goal.startsWith('--') ? `Mission: ${goal}` : goal] : [];
 
   // process.execPath, not 'node': PATH lookup breaks (ELOOP) when any PATH
   // entry is a looping symlink — observed live with a broken CLI install dir.
   const startOutput = safeExec(
     process.execPath,
-    [
-      'dist/scripts/mission_controller.js',
-      'start',
-      missionId,
-      tier,
-      persona,
-      'default',
-      missionType,
-      ...routingDecisionArg,
-      ...tenantArgs,
-    ],
+    ['dist/scripts/mission_controller.js', ...args, ...goalArgs, ...routingDecisionArg],
     { env, cwd: pathResolver.rootDir() }
   );
   let orchestrationStatus: SlackMissionIssuanceResult['orchestrationStatus'] = 'queued';
@@ -631,11 +644,9 @@ export async function issueMissionFromProposal(
     // their own orchestration write scope (terminal, messaging bridges) still
     // enqueue through the mission_controller execution context.
     orchestrationJobPath = withExecutionContext('mission_controller', () => {
-      const orchestrationEvent = enqueueMissionOrchestrationEvent({
-        eventType: 'mission_issue_requested',
+      return queueMissionIssuanceOnce({
         missionId,
         requestedBy: params.requestedBy || `${surface}_bridge`,
-        correlationId: randomUUID(),
         payload: {
           surface,
           channel: params.channel,
@@ -650,7 +661,6 @@ export async function issueMissionFromProposal(
         },
         ...(params.scope ? { scope: { ...params.scope, tier } } : {}),
       });
-      return startMissionOrchestrationWorker(orchestrationEvent);
     });
   } catch (error) {
     orchestrationStatus = 'failed';
@@ -667,7 +677,7 @@ export async function issueMissionFromProposal(
     thread_ts: params.thread,
     surface_channel: params.channel,
     ...(params.confirmedBy ? { confirmed_by: params.confirmedBy } : {}),
-    ...(params.scope ? { tenant_slug: params.scope.tenant_slug } : {}),
+    ...(params.scope?.tenant_slug ? { tenant_slug: params.scope.tenant_slug } : {}),
     mission_type: missionType,
     tier,
     routing_decision_summary: formatRoutingDecisionSummary(params.routingDecision),

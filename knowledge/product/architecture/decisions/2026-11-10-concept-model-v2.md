@@ -117,9 +117,11 @@ bookkeeping.
 
 A tenant is the contract and isolation boundary. Organizations are the operating units inside
 it (departments, business units). Company is an alias for tenant, not a third level. An NHI
-belongs to a tenant and optionally to an organization inside it. The NHI id carries the tenant
-(`kyberion://agent/<tenant>/<org|_>/<slug>`), `tenant_slug` is required, and the
-`org = 'default'` fallback is removed. Organization profiles are stored per organization.
+with a tenant affiliation has a required tenant slug and may belong to an organization inside
+that tenant (`kyberion://agent/<tenant>/<org|_>/<slug>`). An NHI without a tenant affiliation
+uses `kyberion://agent/_/_/<slug>` and has no organization affiliation. Here `_` denotes an
+absent affiliation. An absent organization is represented explicitly, and organization profiles
+are stored per organization.
 
 ### D4 — Stance is the acting-for selection
 

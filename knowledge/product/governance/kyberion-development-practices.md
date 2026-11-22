@@ -41,6 +41,21 @@ typed adapters when behavior or lifecycle differs. Do not create a registry
 solely to disguise a conditional if there is only one invariant
 implementation.
 
+Before extending shared code, identify what remains invariant across callers
+and which inputs genuinely change domain behavior. Translate the caller's
+labels and defaults at the boundary. Use a typed input and result that name
+the domain action, relevant identity and scope, and the outcome a caller can
+act on. During review, trace a second caller through the same contract. If
+adding it requires editing several caller-name checks in the core, move the
+translation to the boundary. A conditional on a domain state or a real policy
+decision can remain in the shared operation.
+
+For durable writes, identify the source of truth, the idempotency key and
+the recovery path between writes. Exercise interruption after the first
+write, retry, and duplicate input. For batch actions, check which reads,
+locks and writes can be shared. For user-facing failures, distinguish an
+already completed action from invalid input and recoverable storage failure.
+
 For example, `scripts/continuous/continuous_owner_process.ts` supervises a process through
 the `ContinuousOwnerPlatformAdapter` seam. POSIX process-group handling and the
 Windows Job Object wrapper live in platform adapters; the resolver maps the
@@ -458,12 +473,12 @@ CI be the first place a gate sees the change:
    is invisible locally.
 2. **Enumerate the registration surfaces for this change** (§1 table before
    implementing): new package script → `cli-commands.json` `script_commands`
-   + `cli_cmd_script_*` vocabulary + `MAX_PACKAGE_SCRIPTS`; new module
-   imported by package name → `libs/core/package.json` exports +
-   `check_package_export_surface.baseline.json`; new authority role →
-   `authority-roles/<role>.json` card + re-record
-   `org-role-default-grant-equivalence.json` fixture; generated value
-   (qps-ploc, indexes, CLI_REFERENCE) → run its generator, never hand-write.
+   - `cli_cmd_script_*` vocabulary + `MAX_PACKAGE_SCRIPTS`; new module
+     imported by package name → `libs/core/package.json` exports +
+     `check_package_export_surface.baseline.json`; new authority role →
+     `authority-roles/<role>.json` card + re-record
+     `org-role-default-grant-equivalence.json` fixture; generated value
+     (qps-ploc, indexes, CLI_REFERENCE) → run its generator, never hand-write.
 3. **Run the PR gate set locally:** `pnpm check -- --scope pr`, plus
    `pnpm exec prettier --check` on changed `.json` sources, the focused
    vitest files touched, and `pnpm run check:pr-title` for the PR title

@@ -13,7 +13,7 @@ may coincide for one person; they are not the same concept.
 
 ## 1. Mission
 
-A bounded unit of work with a lifecycle (`planned → active → validating → distilling → completed`, plus `paused` / `failed` / `archived`), its own git history, state, and evidence. Missions are started, checkpointed, and finished only through the mission controller (`pnpm mission …`), so work is resumable and auditable (`pnpm mission finish` moves it to `completed`). Lighter, conversational work is a **Task Session**; a mission is for work that needs evidence and rollback. How Mission, Task, Task Contract, Task Session and WorkItem relate: [Units of work](./GLOSSARY.md#units-of-work).
+A **WorkItem** tracks what needs to happen as an Issue. A **Mission** executes that Issue with a bounded lifecycle (`planned → active → validating → distilling → completed`, plus `paused` / `failed` / `archived`), its own git history, state, and evidence. The mission controller (`pnpm mission …`) starts, checkpoints, and finishes missions. A **Task Session** is a lighter execution option for conversational work. See [Units of work](./GLOSSARY.md#units-of-work) for how steps and worker assignments fit.
 
 - Glossary: [Mission](./GLOSSARY.md#mission) · [Task Session](./GLOSSARY.md#task-session) · [Artifact](./GLOSSARY.md#artifact)
 - Try: `pnpm mission hygiene` (lists stalled missions)
@@ -76,7 +76,7 @@ storing material or changing the displayed context grants no execution authority
 
 ## 5. Surface
 
-A human-facing entrance, each with one role: **Concierge** (what do I decide?), **Presence Studio** (what are we doing together?), **Chronos Mirror** (control tower), the audit monitor, the hands-on mirror, the terminal home (`pnpm kyberion`), chat bridges, and the local capture **pads** (`pnpm pads`). Surfaces show state and take requests; they do not own missions.
+A human-facing entrance with a defined responsibility. **Concierge** helps you decide what needs your attention and houses the operations console at `/ops`. **Presence Studio** supports live collaboration. Other entrances include the read-only **Operator Surface** for audit, the hands-on mirror, the terminal home (`pnpm kyberion`), chat bridges, and local capture **pads** (`pnpm pads`). Legacy Chronos Mirror URLs redirect to Concierge. The mission controller owns the mission lifecycle.
 
 - Glossary: [Surfaces and channels](./GLOSSARY.md#surfaces-and-channels) (Surface, Display, Presence, Satellite, Bridge/Gateway/Channel, Pad, Concierge, Front Desk)
 - Map: [SURFACES](./SURFACES.md) · Start with `pnpm kyberion`

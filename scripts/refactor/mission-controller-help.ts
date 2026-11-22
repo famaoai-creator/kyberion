@@ -27,6 +27,8 @@ Lifecycle Commands:
                                  Verify a mission (active → distilling or back to active)
   distill  <ID>                  Extract knowledge via LLM (distilling → completed)
   finish   <ID> [--seal]         Archive a completed mission (optionally encrypt)
+  gate-pass <ID> <GATE_ID> [--machine-only] [--dry-run --json]
+                                 Preview startup and stored gate, or evaluate and advance
   resume   [ID]                  Resume the last active mission and replay orchestration journal (or specify ID)
   pause    <ID> [--note <TEXT>] [--decided-by user:<member-id>] [--decided-by-name <TEXT>] [--decided-by-role <owner|approver|viewer>]
                                  Pause an active mission without losing state
@@ -86,8 +88,8 @@ Queue Commands:
 
 Visibility Commands:
   list     [status]              List all missions (optionally filter by status)
-  status   <ID> [--refresh-providers]
-                                 Show detailed status of a specific mission and backend availability
+  status   <ID> [--refresh-providers | --json] [--tenant-slug <slug>]
+                                 Show a specific mission. JSON includes only the mission status view.
   outbox   [ID] [--ack]          Show mission results delivered to the terminal surface (--ack to clear)
   sync-project-ledger <ID>       Upsert this mission into the related project mission-ledger
   reassign-project <ID> --project-id <PROJECT_ID> [--project-path <PATH>] [--track-id <TRACK_ID>] [--dry-run] [--force]
@@ -135,6 +137,7 @@ Maintenance Commands:
   record-evidence <ID> <task_id> <note> [--actor-id <ID>] [--provider <ID>]
                                  Append an execution-ledger evidence entry and commit it; a task it completes gets
                                  an estimated direct_cli usage entry (provider: --provider, else inferred from --actor-id)
+                                 --knowledge-used <CSV> reports delivered paths or path@snapshot-hash for a recorded task.
   review-task <ID> <review_task_id> <reviewer_agent_id> [--findings <JSON>] [--reviewer-team-role reviewer|qa] [--specialist-roles <CSV>] [--provider <ID>]
                                  Record a real ArtifactReviewReceipt for a review-kind task (required before it
                                  can complete — bare record-evidence is not enough for review tasks). Independence
@@ -199,7 +202,7 @@ Mission Input Contract:
     --org <ORG>                    # alias for --organization-id
     --mission-type <TYPE>          # e.g. development | code_change | refactoring | operations_report
     --vision-ref <REF>            Defaults to the active customer vision when KYBERION_STANCE is set
-    --persona <NAME>
+    --org-role <NAME>              # Org Role (legacy alias: --persona)
     --dry-run
     --relationships <JSON>
     --relationships-file <PATH>

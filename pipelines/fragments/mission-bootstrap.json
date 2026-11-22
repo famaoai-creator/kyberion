@@ -2,11 +2,10 @@
   "action": "pipeline",
   "name": "mission-bootstrap-fragment",
   "version": "2.0.0",
-  "description": "Standardizes the creation of a new Kyberion mission, initializing the evidence directory and Git repository.",
+  "description": "Creates a Kyberion mission from a caller-supplied mission ID and scope.",
   "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
   "context": {
     "tier": "confidential",
-    "tenant_id": "default",
     "mission_type": "development",
     "vision_ref": "vision_001",
     "persona": "ecosystem_architect"
@@ -18,8 +17,8 @@
       "op": "core:run_mission_create",
       "produces": { "channel": "bootstrap_result", "type": "Json" },
       "params": {
+        "mission_id": "{{mission_id}}",
         "tier": "{{tier}}",
-        "tenant_id": "{{tenant_id}}",
         "mission_type": "{{mission_type}}",
         "vision_ref": "{{vision_ref}}",
         "persona": "{{persona}}"

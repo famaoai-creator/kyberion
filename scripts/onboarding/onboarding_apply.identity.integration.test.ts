@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import * as path from 'node:path';
 import { useOnboardingAuthorityFixture } from '../../tests/helpers/onboarding-authority-fixture.js';
-import { safeReadFile, safeWriteFile } from '@agent/core/secure-io';
+import { safeMkdir, safeReadFile, safeWriteFile } from '@agent/core/secure-io';
 const f = useOnboardingAuthorityFixture();
 let onboarding: typeof import('./onboarding_apply.js');
 let cli: typeof import('./onboarding_authority.js');
@@ -67,9 +67,19 @@ describe('CLI identity provisioning with actual NHI and signed authority stores'
   }, 60000);
   it('runs fresh onboarding through the generated activation plan without standing external rights', async () => {
     vi.stubEnv('KYBERION_REASONING_BACKEND', 'stub');
-    await onboarding.applyOnboardingInput(
-      onboarding.parseApplyInput(input('Fresh_Activation_Agent'))
-    );
+    const identityPath = path.join(f.root, 'active/shared/tmp/personal-usage-identity.json');
+    f.run(() => {
+      safeMkdir(path.dirname(identityPath), { recursive: true });
+      safeWriteFile(identityPath, JSON.stringify(input('Fresh_Activation_Agent')));
+    });
+    for (const options of [['--dry-run'], []]) {
+      const output: unknown[] = [];
+      await onboarding.main(['--identity', identityPath, '--json', ...options], (value) =>
+        output.push(value)
+      );
+      expect(output).toHaveLength(1);
+      expect(JSON.parse(String(output[0]))).toBeTypeOf('object');
+    }
     const installed = f.run(profile).nhi_id;
     vi.stubEnv('KYBERION_AGENT_ID', installed);
     const source = path.join(f.root, 'knowledge/personal/onboarding/activation-input.json');
@@ -82,6 +92,21 @@ describe('CLI identity provisioning with actual NHI and signed authority stores'
       grants: [],
       scope_kind: 'person',
     });
+    await expect(cli.main(['show', '--scope', 'organization', '--json'])).rejects.toThrow(
+      'valid actual scope'
+    );
+    await expect(
+      cli.main([
+        'preview',
+        '--scope',
+        'organization',
+        '--tenant',
+        'fixture-a',
+        '--file',
+        source,
+        '--json',
+      ])
+    ).rejects.toThrow('file scope does not match');
     const originalInput = f.run(() => String(safeReadFile(source)));
     await onboarding.prepareActivationSetup(new Date(Date.now() + 86_400_000));
     expect(f.run(() => String(safeReadFile(source)))).toBe(originalInput);
@@ -116,6 +141,92 @@ describe('CLI identity provisioning with actual NHI and signed authority stores'
       f.run(() => f.charters.findActiveCharter({ kind: 'person' }, new Date()))?.envelope
         .external_operations
     ).toEqual([]);
+
+    // Switch from the requesting agent to the fixture's standalone operator terminal.
+    const { agentExecutionContextEnvNames } = await import('@agent/core/agent-execution-context');
+    const operatorEnvironment = new Map(
+      [...agentExecutionContextEnvNames(), 'SYSTEM_ROLE', 'MISSION_ROLE', 'MISSION_ID'].map(
+        (name) => [name, process.env[name]] as const
+      )
+    );
+    try {
+      for (const name of agentExecutionContextEnvNames()) vi.stubEnv(name, '');
+      vi.stubEnv('SYSTEM_ROLE', '');
+      vi.stubEnv('MISSION_ROLE', 'mission_controller');
+      const mission = await import('../mission_controller.js');
+      const missionId = 'MSN-PERSONAL-USAGE-20261122';
+      const document = 'knowledge/public/common/wisdom/generated/personal-test.md';
+      f.run(() => {
+        // CLI modules are loaded from the checkout. This marker satisfies the
+        // Mission preflight for the isolated fixture root.
+        safeMkdir(path.join(f.root, 'node_modules'), { recursive: true });
+        safeMkdir(path.dirname(path.join(f.root, document)), { recursive: true });
+        safeWriteFile(
+          path.join(f.root, document),
+          [
+            '---',
+            'record_id: personal-test',
+            'kind: wisdom',
+            'tier: public',
+            '---',
+            '',
+            '# Reconcile weekly household receipts',
+            '',
+            'Reconcile weekly household receipts using dates, totals, and original records.',
+            '',
+          ].join('\n')
+        );
+      });
+      await mission.main(
+        [
+          'kickoff',
+          missionId,
+          '--tier',
+          'personal',
+          '--goal',
+          'Reconcile weekly household receipts',
+          '--success-condition',
+          'A matched evidence report records knowledge usage',
+          '--json',
+        ],
+        (value) => printed.push(value)
+      );
+      expect(printed.pop()).toMatchObject({
+        ok: true,
+        mission_id: missionId,
+        knowledge: expect.arrayContaining([
+          expect.stringContaining(`Usage reference: ${document}@`),
+        ]),
+      });
+      const report = [
+        'record-evidence',
+        missionId,
+        'alignment-requirements',
+        'Used the receipt procedure',
+        '--actor-id',
+        'user:owner',
+        '--actor-type',
+        'human',
+        '--knowledge-used',
+        document,
+      ];
+      await mission.main(report, (value) => printed.push(value));
+      expect(printed.pop()).toMatchObject({
+        knowledge_usage: [{ reference: document, status: 'recorded' }],
+      });
+      await mission.main(report, (value) => printed.push(value));
+      expect(printed.pop()).toMatchObject({
+        knowledge_usage: [{ reference: document, status: 'already_recorded' }],
+      });
+      vi.stubEnv('KYBERION_AGENT_ID', installed);
+      await mission.main(report, (value) => printed.push(value));
+      expect(printed.pop()).toMatchObject({
+        evidence_recorded: false,
+        knowledge_usage: [{ reference: document, status: 'personal_owner_required' }],
+      });
+    } finally {
+      for (const [name, value] of operatorEnvironment) vi.stubEnv(name, value);
+    }
   }, 60000);
   it('registers the reviewed human name on a fresh owner bootstrap instead of retaining a placeholder', async () => {
     const { safeRmSync } = await import('@agent/core/secure-io');

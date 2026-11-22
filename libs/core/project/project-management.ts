@@ -527,10 +527,7 @@ export function updateManagedProjectMetadata(
   return next;
 }
 
-function createManagedProjectInternal(
-  input: ManagedProjectCreateInput,
-  deferAudit: boolean
-): ProjectRecord {
+function prepareManagedProjectCreation(input: ManagedProjectCreateInput) {
   assertProjectLifecycleOwner();
   const projectId = assertManagedProjectId(input.project_id);
   if (loadProjectRecord(projectId, { rootDir: input.rootDir }))
@@ -565,6 +562,20 @@ function createManagedProjectInternal(
       `Project '${projectId}' and organization '${input.organization_id}' belong to different tenants.`
     );
   }
+  return { record, organizationState };
+}
+
+/** Exercise the normal create checks without registering a Project. */
+export function previewManagedProjectCreation(input: ManagedProjectCreateInput): ProjectRecord {
+  return prepareManagedProjectCreation(input).record;
+}
+
+function createManagedProjectInternal(
+  input: ManagedProjectCreateInput,
+  deferAudit: boolean
+): ProjectRecord {
+  const { record, organizationState } = prepareManagedProjectCreation(input);
+  const projectId = record.project_id;
   const projectPath = saveProjectRecord(record, { rootDir: input.rootDir });
   if (organizationState) {
     try {

@@ -1,7 +1,7 @@
 ---
 title: README
 tags: [improvement-plan, 2026-11]
-last_updated: 2026-11-13
+last_updated: 2026-11-22
 status: active
 ---
 
@@ -19,10 +19,12 @@ status: active
 
 決定記録は [Concept Model v2](../../../knowledge/product/architecture/decisions/2026-11-10-concept-model-v2.md) です。依存関係の順に並べています。
 
-1. [スコープ・ID・権限（Grant）の統合計画](./SCOPE_IDENTITY_GRANT_CONSOLIDATION_PLAN_2026-11-10.ja.md) — partial
-2. [WorkItem（Issue と子ステップ）と Lease の統合計画](./WORKITEM_ISSUE_LEASE_CONSOLIDATION_PLAN_2026-11-10.ja.md) — completed
-3. [意図の解決器の一本化計画](./INTENT_RESOLVER_UNIFICATION_PLAN_2026-11-10.ja.md) — completed
-4. [記憶のループを閉じる計画](./MEMORY_LOOP_CLOSURE_PLAN_2026-11-10.ja.md) — active
+1. [スコープ・ID・権限（Grant）の統合計画](./SCOPE_IDENTITY_GRANT_CONSOLIDATION_PLAN_2026-11-10.ja.md)（`partial`）。Stance の行動先選択、NHI の ID 形式、Member Role の型統合を反映済みです。Mission 起動時に `--org-role` を使えます。旧設定・旧 ID の互換読み込みと Authority Role の書き込み範囲の整理が残っています。
+2. [WorkItem（Issue と子ステップ）と Lease の統合計画](./WORKITEM_ISSUE_LEASE_CONSOLIDATION_PLAN_2026-11-10.ja.md)（`completed`）。WorkItem が Issue を追跡し、担当を確保するステップは Lease を持つ子 WorkItem になります。Mission や Pipeline は Issue の実行方式です。
+3. [意図の解決器の一本化計画](./INTENT_RESOLVER_UNIFICATION_PLAN_2026-11-10.ja.md)（`completed`）。各入口は共通の解決器が返す `RoutingDecision` と `ExecutionShape` を使います。
+4. [記憶のループを閉じる計画](./MEMORY_LOOP_CLOSURE_PLAN_2026-11-10.ja.md)（`active`）。候補キューと昇格手順を統合し、直接 CLI 作業への配信と取得を確認済みです。直接 CLI 作業の利用報告を追加し、継続的に計測されることの確認が残っています。
+
+利用者向けの定義は[基本概念](../../CORE_CONCEPTS.md)と[用語集](../../GLOSSARY.md)に反映しています。旧 Chronos の運用コンソールは Concierge の `/ops` へ移設済みです。[サーフェスマップ](../../SURFACES.md)に現行の入口と認可を記載しています。
 
 ## 顧客とのやり取り
 

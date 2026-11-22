@@ -36,6 +36,10 @@ At each significant milestone or task completion, the owner agent MUST record pr
   - Recording of commit hashes in `mission-state.json`.
   - Evidence records append to `execution-ledger.jsonl` and refresh `git.latest_commit`.
 
+For direct CLI work, pass `--knowledge-used <CSV>` to `record-evidence` for a recorded mission task. Report promoted document paths you used. The recorder matches operator deliveries for the same mission and scope. If the result is `version_required`, use `path@snapshot-hash` with the matching hash from the returned `versions`. Each reference reports whether it was recorded, already recorded, undelivered, ambiguous, blocked by missing task evidence, or affected by a retryable storage error. Retrying a saved receipt resumes aggregation without counting it twice. Delivery alone does not count as use. Explicit use measures reuse and does not establish verified evidence for the document.
+
+For a personal mission, the standalone operator CLI uses the installed operator's active personal NHI. Delivery and usage stay inside that owner's partition. If the report returns `personal_owner_required`, use an onboarded standalone operator terminal with an active personal NHI. Agent sessions, tenant-bound callers and scoped runtimes do not inherit the installation owner's partition. Missing ownership or a task that cannot be resolved returns `evidence_recorded: false` and a next action before the evidence write.
+
 **`record-evidence` closes a normal `NEXT_TASKS.json` task automatically** once the task's own
 `deliverable` file exists and every dependency it lists is already completed — this is what
 makes the plain checkpoint + record-evidence flow actually reach `finish` without a manual

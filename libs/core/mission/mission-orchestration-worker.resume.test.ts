@@ -76,7 +76,7 @@ describe('mission-orchestration-worker resume replay', () => {
     }
   });
 
-  it('replays the next event and resumes the mission controller command', async () => {
+  it('delegates resume and pending replay to the mission controller once', async () => {
     const missionId = 'MSN-RESUME-REPLAY';
     const missionPath = withExecutionContext('mission_controller', () =>
       pathResolver.missionDir(missionId, 'public')
@@ -144,24 +144,18 @@ describe('mission-orchestration-worker resume replay', () => {
       `${pathResolver.shared('coordination/orchestration/events')}/${controlEvent.event_id}.json`
     );
 
-    expect(mocks.spawnManagedProcess).toHaveBeenCalledWith(
-      expect.objectContaining({
-        args: [
-          'dist/scripts/run_mission_orchestration_event_worker.js',
-          '--event',
-          `${pathResolver.shared('coordination/orchestration/events')}/${followup.event_id}.json`,
-        ],
-      })
-    );
     expect(mocks.safeExec).toHaveBeenCalledWith(
       'node',
       ['dist/scripts/mission_controller.js', 'resume', missionId],
-      expect.objectContaining({ timeoutMs: expect.any(Number) })
+      expect.objectContaining({
+        env: expect.objectContaining({ KYBERION_TIER: 'public' }),
+        timeoutMs: expect.any(Number),
+      })
     );
     const orchestrationWorkerCalls = mocks.spawnManagedProcess.mock.calls.filter(
       ([spec]) => spec?.args?.[0] === 'dist/scripts/run_mission_orchestration_event_worker.js'
     );
-    expect(orchestrationWorkerCalls).toHaveLength(1);
+    expect(orchestrationWorkerCalls).toHaveLength(0);
     const resumeCommands = mocks.safeExec.mock.calls.filter(
       ([command, args]) =>
         command === 'node' &&

@@ -29,6 +29,8 @@ import {
   recordVerifiedMissionAdmissionApproval,
   resolveDotMissionAdmission,
   resolveDotMissionAdmissionScope,
+  inspectMissionAdmissionActivation,
+  sealMissionAdmissionActivation,
   assertMissionAdmissionActivation,
 } from './mission-admission.js';
 
@@ -357,6 +359,48 @@ describe('Dot mission admission production and human receipt', () => {
     expect(mocks.execution).not.toHaveBeenCalled();
     authorMissionAdmissionBrief(missionId, 'work-1');
     expect(mocks.claim).toHaveBeenCalledTimes(1);
+  });
+  it('requires a matching brief and complete scope to recognize active admission', () => {
+    const scope = resolveDotMissionAdmissionScope(mocks.item);
+    expect(inspectMissionAdmissionActivation(missionId, mocks.item, scope, admission)).toBe(
+      'conflict'
+    );
+    authorMissionAdmissionBrief(missionId, 'work-1');
+    expect(inspectMissionAdmissionActivation(missionId, mocks.item, scope, admission)).toBe(
+      'matched'
+    );
+    expect(
+      inspectMissionAdmissionActivation(
+        missionId,
+        { ...mocks.item, item_id: 'another-work-item' },
+        scope,
+        admission
+      )
+    ).toBe('conflict');
+    expect(
+      inspectMissionAdmissionActivation(
+        missionId,
+        mocks.item,
+        { ...scope, organization_id: 'another-org' },
+        admission
+      )
+    ).toBe('conflict');
+  });
+  it('seals the admission brief before an active receipt exists', () => {
+    mocks.state.status = 'planned';
+    sealMissionAdmissionActivation(missionId, mocks.item.item_id, 'acme', {
+      organizationId: 'org-1',
+      projectId: 'proj-1',
+    });
+    const scope = resolveDotMissionAdmissionScope(mocks.item);
+    expect(inspectMissionAdmissionActivation(missionId, mocks.item, scope, admission)).toBe(
+      'inactive'
+    );
+    expect(mocks.claim).not.toHaveBeenCalled();
+    mocks.state.status = 'active';
+    expect(inspectMissionAdmissionActivation(missionId, mocks.item, scope, admission)).toBe(
+      'matched'
+    );
   });
   it('records stable success only from an actual human decision after activation and exact brief binding', () => {
     authorMissionAdmissionBrief(missionId, 'work-1');

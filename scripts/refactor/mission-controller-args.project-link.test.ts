@@ -1,6 +1,8 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { safeMkdir, safeRmSync } from '@agent/core/secure-io';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { safeMkdir, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
+import { pathResolver } from '@agent/core/path-resolver';
 import { projectRecordPath, saveProjectRecord } from '@agent/core/project/project-registry';
+import { withExecutionContextAsync } from '@agent/core/authority';
 import { validateMissionStartCreateInput } from './mission-controller-args.js';
 
 // relationships.project is the single source of project membership: a link must
@@ -36,6 +38,7 @@ afterEach(() => {
   safeRmSync(projectRecordPath(PROJECT_ID), { force: true });
   process.env.KYBERION_BASE_ROLE = savedEnv.persona;
   process.env.MISSION_ROLE = savedEnv.role;
+  vi.unstubAllEnvs();
 });
 
 function argvWithoutPath(): string[] {
@@ -52,6 +55,153 @@ function argvWithoutPath(): string[] {
 }
 
 describe('mission → project link validation', () => {
+  it('blocks a missing confidential tenant in dry-run and execution', () => {
+    vi.stubEnv('KYBERION_TENANT', '');
+    vi.stubEnv('KYBERION_STANCE', '');
+    vi.stubEnv('KYBERION_CUSTOMER', '');
+    vi.stubEnv('KYBERION_TENANT_SCOPE_REQUIRED', 'strict');
+    const args = ['create', 'MSN-LINK-ARGS', '--tier', 'confidential'];
+    expect(
+      validateMissionStartCreateInput('create', 'MSN-LINK-ARGS', [...args, '--dry-run']).preflight
+    ).toMatchObject({ ready: false, issues: [expect.stringContaining('requires a tenant')] });
+    expect(() => validateMissionStartCreateInput('create', 'MSN-LINK-ARGS', args)).toThrow(
+      'requires a tenant'
+    );
+  });
+
+  it('does not allow an explicit tenant to override the active tenant', () => {
+    vi.stubEnv('KYBERION_TENANT', 'tenant-a');
+    vi.stubEnv('KYBERION_STANCE', '');
+    vi.stubEnv('KYBERION_CUSTOMER', '');
+    const args = ['create', 'MSN-LINK-ARGS', '--tier', 'public', '--tenant-slug', 'tenant-b'];
+    expect(() => validateMissionStartCreateInput('create', 'MSN-LINK-ARGS', args)).toThrow(
+      'Tenant conflicts'
+    );
+  });
+
+  it('requires values for explicitly supplied scope selectors', () => {
+    expect(() =>
+      validateMissionStartCreateInput('create', 'MSN-LINK-ARGS', [
+        'create',
+        'MSN-LINK-ARGS',
+        '--tenant-slug',
+        '--dry-run',
+      ])
+    ).toThrow('--tenant-slug requires a value');
+  });
+
+  it('does not inherit the shell tenant or Stance in a governed caller', async () => {
+    vi.stubEnv('KYBERION_TENANT', 'tenant-a');
+    vi.stubEnv('KYBERION_STANCE', 'unknown-shell-stance');
+    const input = await withExecutionContextAsync(
+      'mission_controller',
+      () =>
+        validateMissionStartCreateInput('create', 'MSN-LINK-ARGS', [
+          'create',
+          'MSN-LINK-ARGS',
+          'public',
+          '--tenant-slug',
+          'tenant-b',
+        ]),
+      'ecosystem_architect',
+      'tenant-b'
+    );
+    expect(input).toMatchObject({
+      tier: 'public',
+      tenantSlug: 'tenant-b',
+      preflight: { ready: true },
+    });
+    expect(input.preflight?.stance).toBeUndefined();
+  });
+
+  it('refuses to add a tenant inside an explicitly tenant-free execution', async () => {
+    await withExecutionContextAsync(
+      'mission_controller',
+      () => {
+        expect(() =>
+          validateMissionStartCreateInput('create', 'MSN-LINK-ARGS', [
+            'create',
+            'MSN-LINK-ARGS',
+            '--tier',
+            'public',
+            '--tenant-slug',
+            'tenant-b',
+          ])
+        ).toThrow('tenant-free governed execution scope');
+      },
+      'ecosystem_architect',
+      ''
+    );
+  });
+
+  it('requires the bound Project in a project-scoped execution', async () => {
+    await withExecutionContextAsync(
+      'mission_controller',
+      () => {
+        expect(() =>
+          validateMissionStartCreateInput('create', 'MSN-LINK-ARGS', [
+            'create',
+            'MSN-LINK-ARGS',
+            '--tier',
+            'public',
+          ])
+        ).toThrow('Select its bound Project');
+      },
+      'ecosystem_architect',
+      undefined,
+      undefined,
+      { projectId: PROJECT_ID }
+    );
+  });
+
+  it('reports unfinished mission prerequisites during dry-run', () => {
+    const input = validateMissionStartCreateInput('start', 'MSN-LINK-ARGS', [
+      'start',
+      'MSN-LINK-ARGS',
+      'public',
+      '--prerequisites',
+      'MSN-NO-SUCH-PREREQUISITE',
+      '--dry-run',
+    ]);
+    expect(input.preflight).toMatchObject({
+      ready: false,
+      issues: [expect.stringContaining('MISSION_PREREQUISITES_UNMET')],
+    });
+  });
+  it('rechecks a planned Mission’s saved Project link when no Project flag is supplied', () => {
+    const missionId = `MSN-SAVED-LINK-${suffix}`;
+    const missionDir = pathResolver.missionDir(missionId, 'public');
+    safeMkdir(missionDir, { recursive: true });
+    try {
+      safeWriteFile(
+        `${missionDir}/mission-state.json`,
+        JSON.stringify({
+          mission_id: missionId,
+          tier: 'public',
+          status: 'planned',
+          execution_mode: 'local',
+          priority: 5,
+          org_role: 'worker',
+          confidence_score: 1,
+          git: { branch: 'main', start_commit: 'abc', latest_commit: 'abc', checkpoints: [] },
+          history: [],
+          relationships: {
+            project: { project_id: PROJECT_ID, relationship_type: 'belongs_to' },
+          },
+        })
+      );
+      const input = validateMissionStartCreateInput('start', missionId, [
+        'start',
+        missionId,
+        '--dry-run',
+      ]);
+      expect(input.preflight?.ready).toBe(false);
+      expect(input.preflight?.issues[0]).toContain('project not found');
+    } finally {
+      safeRmSync(missionDir, { recursive: true, force: true });
+    }
+  });
+
   it('derives --project-path from the project record when it is omitted', () => {
     saveProjectRecord({
       project_id: PROJECT_ID,
@@ -112,6 +262,13 @@ describe('mission → project link validation', () => {
         argv('--organization-id', 'ORG-OTHER')
       )
     ).toThrow("organization 'ORG-OTHER' must match project organization 'ORG-LINK-ARGS'");
+    const preview = validateMissionStartCreateInput(
+      'create',
+      'MSN-LINK-ARGS',
+      argv('--organization-id', 'ORG-OTHER', '--dry-run')
+    );
+    expect(preview.preflight?.ready).toBe(false);
+    expect(preview.preflight?.issues[0]).toContain('must match project organization');
   });
 
   it('inherits the project tier and tenant when they are not given', () => {

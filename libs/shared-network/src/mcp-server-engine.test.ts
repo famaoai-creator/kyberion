@@ -848,7 +848,8 @@ describe('createKyberionMcpServer()', () => {
 
   describe('kyberion.mission.status', () => {
     it('mission_controller.js status を呼び出して結果を返す', async () => {
-      mockSafeExec.mockReturnValue('Mission status: running');
+      const status = { mission_id: 'MISSION-ABC', tenant_slug: 'tenant-a', status: 'active' };
+      mockSafeExec.mockReturnValue(JSON.stringify(status));
 
       createKyberionMcpServer();
       const handler = registeredTools.get('kyberion.mission.status')!.handler;
@@ -856,12 +857,30 @@ describe('createKyberionMcpServer()', () => {
       const result = await handler({ mission_id: 'mission-abc', tenant: 'tenant-a' });
 
       expect(result.isError).toBeFalsy();
-      expect(result.content[0].text).toBe('Mission status: running');
+      expect(result.structuredContent).toEqual({ ok: true, data: status });
       expect(mockSafeExec).toHaveBeenCalledWith(
         'node',
-        expect.arrayContaining(['status', '--mission-id', 'mission-abc']),
-        expect.any(Object)
+        expect.arrayContaining(['status', 'mission-abc', '--tenant-slug', 'tenant-a', '--json']),
+        expect.objectContaining({
+          env: expect.objectContaining({ KYBERION_TENANT: 'tenant-a', MISSION_ID: 'mission-abc' }),
+        })
       );
+    });
+
+    it.each([
+      'Nothing found, backend ready',
+      '{"mission_id":"MISSION-ABC","tenant_slug":"tenant-b","status":"active"}',
+    ])('refuses status output outside the exact result contract', async (output) => {
+      vi.stubEnv('KYBERION_MCP_TENANT', 'tenant-a');
+      mockSafeExec.mockReturnValue(output);
+      createKyberionMcpServer();
+      const result = await registeredTools.get('kyberion.mission.status')!.handler({
+        mission_id: 'mission-abc',
+        tenant: 'tenant-a',
+      });
+      expect(result.isError).toBe(true);
+      expect(result.structuredContent.ok).toBe(false);
+      expect(result.content[0].text).not.toContain(output);
     });
   });
 
@@ -918,11 +937,26 @@ describe('createKyberionMcpServer()', () => {
       });
 
       expect(result.isError).toBeFalsy();
-      expect(result.content[0].text).toBe('Mission created: mission-001');
+      const created = JSON.parse(result.content[0].text);
+      expect(created).toEqual({
+        mission_id: expect.stringMatching(/^MSN-MCP-[A-F0-9]{24}$/),
+        output: 'Mission created: mission-001',
+      });
       expect(mockSafeExec).toHaveBeenCalledWith(
-        'node',
-        expect.arrayContaining(['--tenant-slug', 'tenant-a']),
-        expect.any(Object)
+        process.execPath,
+        expect.arrayContaining([
+          'create',
+          created.mission_id,
+          '--tier',
+          'confidential',
+          '--goal',
+          'MCP mission: Scoped mission\n\nDo scoped work',
+          '--tenant-slug',
+          'tenant-a',
+        ]),
+        expect.objectContaining({
+          env: expect.objectContaining({ KYBERION_TENANT: 'tenant-a', KYBERION_STANCE: '' }),
+        })
       );
     });
 

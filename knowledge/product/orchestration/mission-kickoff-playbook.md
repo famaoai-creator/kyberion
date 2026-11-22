@@ -75,10 +75,18 @@ Declare missions that must finish first with `--prerequisites MSN-A,MSN-B` on
 `relationships.prerequisites`). A prerequisite is satisfied once its mission is
 `completed` or `archived`; archived missions are found in the archive
 (`mission-management-config.json` `directories.archive`). An unmet prerequisite
-makes `start` fail with `[MISSION_PREREQUISITES_UNMET]` and a non-zero exit;
-`--force` bypasses it. `enqueue <ID> <tier> [priority] [deps]` adds queue-level
-dependencies, and `dispatch` starts the highest-priority entry whose queue and
-mission prerequisites are all met, keeping it pending if the start fails.
+makes `start` fail with `[MISSION_PREREQUISITES_UNMET]` and a non-zero exit.
+`--force` bypasses predecessor completion. `enqueue <ID> <tier> [priority] [deps]`
+adds queue-level dependencies. During `dispatch`, a missing prerequisite keeps
+the entry pending and lets the same sweep examine the next candidate.
+
+Preview scope and prerequisites with `pnpm mission start <ID> --dry-run --json`.
+Use `input.preflight.ready` to decide whether to start. Use
+`pnpm mission gate-pass <ID> <GATE_ID> --machine-only --dry-run --json` to preview
+startup and the stored gate definition. The actual machine gate evaluates its
+checks and starts through the Mission lifecycle before advancing the phase.
+A prepared WorkItem admission requires its bound activation path; a journal
+with uncertain effects requires reconciliation before replay.
 
 ## 2. Pitfalls hit (and the fix)
 

@@ -8,6 +8,7 @@ import {
   type KnowledgeDeliverySnapshot,
 } from './knowledge-delivery-snapshot.js';
 import { appendJsonLine, readJsonLines } from '../foundation/json.js';
+import { streamJsonLines } from '../storage/jsonl-read.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 /**
  * KP-05: knowledge delivery telemetry + task_result knowledge_feedback
@@ -513,8 +514,40 @@ function bumpUsageAggregate(
   at: string,
   scope?: MemoryScopeEnvelope
 ): void {
-  const entries = loadUsageAggregate(scope);
-  const cap = loadKnowledgeFeedbackCap(scope);
+  withUsageAggregateLock(scope, () => {
+    const entries = loadKnowledgeUsageAggregateAtPath(usageAggregatePath(scope));
+    if (applyBoundedUsageDelta(entries, documentPath, delta, at, scope)) {
+      saveUsageAggregate(entries, scope);
+    }
+  });
+}
+
+function applyBoundedUsageDelta(
+  entries: KnowledgeUsageAggregateEntry[],
+  documentPath: string,
+  delta: Parameters<typeof applyUsageDelta>[2],
+  at: string,
+  scope?: MemoryScopeEnvelope
+): boolean {
+  const index = entries.findIndex((entry) => entry.document_path === documentPath);
+  const previous = entries[index];
+  applyUsageDelta(entries, documentPath, delta, at, scope);
+  if (withinUsageAggregateCap(entries, scope)) return true;
+  if (previous) entries[index] = previous;
+  else entries.pop();
+  logger.warn('[KP-05] usage aggregate capacity reached — next: review feedback policy capacity');
+  return false;
+}
+
+function applyUsageDelta(
+  entries: KnowledgeUsageAggregateEntry[],
+  documentPath: string,
+  delta: Partial<
+    Pick<KnowledgeUsageAggregateEntry, 'delivered_count' | 'used_count' | 'not_used_count'>
+  >,
+  at: string,
+  scope?: MemoryScopeEnvelope
+): KnowledgeUsageAggregateEntry {
   // Advisory tenant-level ranking only. Exact attribution belongs to scoped receipts.
   const aggregateScope = scope?.tenant_slug
     ? { tier: scope.tier, tenant_slug: scope.tenant_slug }
@@ -531,17 +564,15 @@ function bumpUsageAggregate(
       used_count: current.used_count + (delta.used_count || 0),
       not_used_count: current.not_used_count + (delta.not_used_count || 0),
       occurrences: current.occurrences + 1,
-      last_seen: at,
-      ...(delta.delivered_count ? { last_delivered_at: at } : {}),
-      ...(delta.used_count ? { last_used_at: at } : {}),
+      last_seen: current.last_seen > at ? current.last_seen : at,
+      ...(delta.delivered_count && (!current.last_delivered_at || at > current.last_delivered_at)
+        ? { last_delivered_at: at }
+        : {}),
+      ...(delta.used_count && (!current.last_used_at || at > current.last_used_at)
+        ? { last_used_at: at }
+        : {}),
     };
   } else {
-    if (entries.length >= cap.max_usage_entries) {
-      logger.warn(
-        `[KP-05] usage aggregate entry cap reached (${cap.max_usage_entries}); delivery telemetry remains in JSONL but ranking aggregate was not expanded`
-      );
-      return;
-    }
     entries.push({
       document_path: documentPath,
       ...(scope ? { scope_context_key: knowledgeAttributionScopeKey(aggregateScope) } : {}),
@@ -554,14 +585,24 @@ function bumpUsageAggregate(
       ...(delta.used_count ? { last_used_at: at } : {}),
     });
   }
-  const serialized = JSON.stringify(entries, null, 2);
-  if (Buffer.byteLength(serialized, 'utf8') > cap.max_usage_bytes) {
-    logger.warn(
-      `[KP-05] usage aggregate byte cap reached (${cap.max_usage_bytes}); delivery telemetry remains in JSONL but ranking aggregate was not expanded`
-    );
-    return;
-  }
-  saveUsageAggregate(entries, scope);
+  return entries[index < 0 ? entries.length - 1 : index]!;
+}
+
+function withinUsageAggregateCap(
+  entries: KnowledgeUsageAggregateEntry[],
+  scope?: MemoryScopeEnvelope
+): boolean {
+  const cap = loadKnowledgeFeedbackCap(scope);
+  return (
+    entries.length <= cap.max_usage_entries &&
+    Buffer.byteLength(JSON.stringify(entries, null, 2), 'utf8') <= cap.max_usage_bytes
+  );
+}
+
+function withUsageAggregateLock<T>(scope: MemoryScopeEnvelope | undefined, run: () => T): T {
+  const aggregatePath = usageAggregatePath(scope);
+  const resource = scope?.tier === 'personal' ? knowledgeTextSha256(aggregatePath) : aggregatePath;
+  return withLockSync('knowledge-usage:' + resource, run);
 }
 
 /**
@@ -644,6 +685,7 @@ function deliveredRefsForFeedback(input: {
   taskId?: string;
   scope?: MemoryScopeEnvelope;
   deliveredRefs?: DeliveredKnowledgeRef[];
+  recipientKind?: string;
 }): DeliveredKnowledgeRef[] {
   const dir = deliveryLogDir(input.scope);
   if (!safeExistsSync(dir)) return [];
@@ -653,10 +695,11 @@ function deliveredRefsForFeedback(input: {
   )) {
     const file = path.join(dir, name);
     ensureRegularFeedbackFile(file);
-    for (const record of readJsonLines<KnowledgeDeliveryRecord>(file, { onMalformed: 'skip' })) {
+    for (const record of streamJsonLines<KnowledgeDeliveryRecord>(file, { onMalformed: 'skip' })) {
       if (
         record.mission_id !== input.missionId ||
         record.task_id !== input.taskId ||
+        (input.recipientKind && record.recipient_kind !== input.recipientKind) ||
         knowledgeAttributionScopeKey(record.scope_context) !==
           knowledgeAttributionScopeKey(input.scope)
       )
@@ -679,14 +722,7 @@ function deliveredRefsForFeedback(input: {
       }
     }
   }
-  // A path-only worker claim cannot disambiguate two delivered versions.
-  return refs.filter(
-    (ref, index) =>
-      refs.findIndex((other) => other.path === ref.path) === index &&
-      !refs.some(
-        (other) => other.path === ref.path && other.snapshot?.sha256 !== ref.snapshot?.sha256
-      )
-  );
+  return refs;
 }
 
 /**
@@ -699,14 +735,7 @@ export function recordKnowledgeUsageFeedback(
   input: Parameters<typeof recordKnowledgeUsageFeedbackUnlocked>[0]
 ): ReturnType<typeof recordKnowledgeUsageFeedbackUnlocked> {
   try {
-    const aggregatePath = usageAggregatePath(input.scope);
-    // New private paths carry two hashes; do not exceed the lock filename limit.
-    // Preserve existing shared lock identities for rolling-version compatibility.
-    const lockResource =
-      input.scope?.tier === 'personal' ? knowledgeTextSha256(aggregatePath) : aggregatePath;
-    return withLockSync('knowledge-usage:' + lockResource, () =>
-      recordKnowledgeUsageFeedbackUnlocked(input)
-    );
+    return withUsageAggregateLock(input.scope, () => recordKnowledgeUsageFeedbackUnlocked(input));
   } catch (error) {
     logger.warn(
       '[KP-05] usage receipt not recorded — ' +
@@ -736,7 +765,14 @@ function recordKnowledgeUsageFeedbackUnlocked(input: {
 
   let delivered: DeliveredKnowledgeRef[];
   try {
-    delivered = deliveredRefsForFeedback(input);
+    const refs = deliveredRefsForFeedback(input);
+    delivered = refs.filter(
+      (ref, index) =>
+        refs.findIndex((other) => other.path === ref.path) === index &&
+        !refs.some(
+          (other) => other.path === ref.path && other.snapshot?.sha256 !== ref.snapshot?.sha256
+        )
+    );
   } catch {
     delivered = [];
   }
@@ -800,13 +836,18 @@ function recordKnowledgeUsageFeedbackUnlocked(input: {
         scope: input.scope,
         at: now,
       });
-    for (const documentPath of used) {
-      bumpUsageAggregate(documentPath, { used_count: 1 }, now, input.scope);
-      usageUpdated = true;
-    }
-    for (const documentPath of notUsed) {
-      bumpUsageAggregate(documentPath, { not_used_count: 1 }, now, input.scope);
-      usageUpdated = true;
+    if (used.length || notUsed.length) {
+      const entries = loadKnowledgeUsageAggregateAtPath(usageAggregatePath(input.scope));
+      const usedChanges = used.map((documentPath) =>
+        applyBoundedUsageDelta(entries, documentPath, { used_count: 1 }, now, input.scope)
+      );
+      const unusedChanges = notUsed.map((documentPath) =>
+        applyBoundedUsageDelta(entries, documentPath, { not_used_count: 1 }, now, input.scope)
+      );
+      if ([...usedChanges, ...unusedChanges].some(Boolean)) {
+        saveUsageAggregate(entries, input.scope);
+        usageUpdated = true;
+      }
     }
   } catch (error: any) {
     logger.warn(
@@ -859,6 +900,236 @@ function recordKnowledgeUsageFeedbackUnlocked(input: {
     usedRefs: receiptRecorded ? usedRefs : [],
     ...(receiptRecorded && receiptId ? { receiptId } : {}),
   };
+}
+
+export interface ExplicitKnowledgeUseResult {
+  reference: string;
+  status:
+    'recorded' | 'already_recorded' | 'not_delivered' | 'version_required' | 'retryable_error';
+  versions?: string[];
+}
+
+interface ExplicitUseReceipt {
+  receipt_id: string;
+  recorded_at: string;
+  evidence: 'explicit_use' | 'operator_report';
+  mission_id: string;
+  reported_task_id: string;
+  scope_context: MemoryScopeEnvelope;
+  delivery?: { recipientKind: string; taskId?: string };
+  used: DeliveredKnowledgeRef[];
+}
+
+interface UsageProjectionEvent {
+  receipt_id: string;
+  document_path: string;
+  recorded_at: string;
+}
+
+/** Explicit use is an attestation bound to a task and a scoped delivery. */
+export function recordExplicitKnowledgeUse(input: {
+  missionId: string;
+  reportTaskId: string;
+  scope: MemoryScopeEnvelope;
+  delivery: { recipientKind: string; taskId?: string };
+  references: string[];
+}): ExplicitKnowledgeUseResult[] {
+  const references = [...new Set(input.references)];
+  try {
+    return withUsageAggregateLock(input.scope, () => {
+      const delivered = deliveredRefsForFeedback({
+        missionId: input.missionId,
+        scope: input.scope,
+        ...input.delivery,
+      });
+      const deliveriesByPath = new Map<string, Map<string, DeliveredKnowledgeRef>>();
+      for (const ref of delivered) {
+        const versions = deliveriesByPath.get(ref.path) ?? new Map<string, DeliveredKnowledgeRef>();
+        versions.set(ref.snapshot?.sha256 ?? '', ref);
+        deliveriesByPath.set(ref.path, versions);
+      }
+      const log = scopedFeedbackPath('usage', input.scope);
+      ensureRegularFeedbackFile(log);
+      const scopeKey = knowledgeAttributionScopeKey(input.scope);
+      const historical: ExplicitUseReceipt[] = [];
+      for (const row of streamJsonLines<ExplicitUseReceipt>(log, { onMalformed: 'skip' })) {
+        if (
+          (row?.evidence === 'explicit_use' || row?.evidence === 'operator_report') &&
+          row.mission_id === input.missionId &&
+          row.reported_task_id === input.reportTaskId &&
+          knowledgeAttributionScopeKey(row.scope_context) === scopeKey
+        )
+          historical.push(row);
+      }
+      for (const row of historical) {
+        if (
+          row.evidence !== 'explicit_use' ||
+          row.delivery?.recipientKind !== input.delivery.recipientKind ||
+          row.delivery?.taskId !== input.delivery.taskId
+        )
+          continue;
+        for (const ref of row.used ?? []) {
+          const versions =
+            deliveriesByPath.get(ref.path) ?? new Map<string, DeliveredKnowledgeRef>();
+          versions.set(ref.snapshot?.sha256 ?? '', ref);
+          deliveriesByPath.set(ref.path, versions);
+        }
+      }
+      const receipts = new Map(historical.map((row) => [row.receipt_id, row] as const));
+      const legacy = new Set(
+        historical
+          .filter((row) => row.evidence === 'operator_report')
+          .flatMap((row) => row.used ?? [])
+          .map((ref) => JSON.stringify([ref.path, ref.snapshot?.sha256]))
+      );
+      const aggregatePath = usageAggregatePath(input.scope);
+      const journal = `${aggregatePath}.explicit.jsonl`;
+      ensureRegularFeedbackFile(journal);
+      const selectors = references.map((reference) => {
+        const match = /^(.*)@([a-f0-9]{64})$/.exec(reference);
+        return { reference, documentPath: match?.[1] ?? reference, version: match?.[2] };
+      });
+      const selectedPaths = new Set(selectors.map((selector) => selector.documentPath));
+      const useReceiptId = (documentPath: string, ref: DeliveredKnowledgeRef) =>
+        knowledgeTextSha256(
+          JSON.stringify([
+            'explicit_use',
+            scopeKey,
+            input.missionId,
+            input.reportTaskId,
+            documentPath,
+            ref.snapshot?.sha256,
+          ])
+        );
+      const selectedReceiptIds = new Set(
+        [...selectedPaths].flatMap((documentPath) =>
+          [...(deliveriesByPath.get(documentPath)?.values() ?? [])].map((ref) =>
+            useReceiptId(documentPath, ref)
+          )
+        )
+      );
+      // Only aggregate fields and an opaque receipt key cross into this partition.
+      // The scoped receipt retains the task, delivery and evidence.
+      type Projection = { count: number; lastUsedAt: string };
+      const projectionByReceipt = new Map<string, Projection>();
+      const projectionByPath = new Map<string, Projection>();
+      const indexEvent = (event: UsageProjectionEvent): Projection => {
+        const previous = projectionByReceipt.get(event.receipt_id);
+        if (previous !== undefined) return previous;
+        const latest = projectionByPath.get(event.document_path);
+        const next = {
+          count: (latest?.count ?? 0) + 1,
+          lastUsedAt:
+            latest && latest.lastUsedAt > event.recorded_at ? latest.lastUsedAt : event.recorded_at,
+        };
+        projectionByPath.set(event.document_path, next);
+        if (selectedReceiptIds.has(event.receipt_id))
+          projectionByReceipt.set(event.receipt_id, next);
+        return next;
+      };
+      for (const event of streamJsonLines<UsageProjectionEvent>(journal, { onMalformed: 'skip' })) {
+        if (event?.receipt_id && selectedPaths.has(event.document_path) && event.recorded_at)
+          indexEvent(event);
+      }
+      const entries = loadKnowledgeUsageAggregateAtPath(aggregatePath);
+      const projectedByPath = new Map(
+        entries.map((entry) => [entry.document_path, entry.explicit_used_count ?? 0] as const)
+      );
+      const pending = new Set<string>();
+      const results = selectors.map(
+        ({ reference, documentPath, version }): ExplicitKnowledgeUseResult => {
+          const versions = deliveriesByPath.get(documentPath);
+          if (!versions) return { reference, status: 'not_delivered' };
+          if (!version && versions.size > 1) {
+            return {
+              reference,
+              status: 'version_required',
+              versions: [...versions.keys()].filter(Boolean),
+            };
+          }
+          const ref = version ? versions.get(version) : versions.values().next().value;
+          if (!ref) return { reference, status: 'not_delivered' };
+          if (legacy.has(JSON.stringify([documentPath, ref.snapshot?.sha256]))) {
+            return { reference, status: 'already_recorded' };
+          }
+          const receiptId = useReceiptId(documentPath, ref);
+          if (pending.has(receiptId)) return { reference, status: 'recorded' };
+          const projected = projectedByPath.get(documentPath) ?? 0;
+          let projection = projectionByReceipt.get(receiptId);
+          if (projection && projection.count <= projected) {
+            return { reference, status: 'already_recorded' };
+          }
+          const prior = receipts.get(receiptId);
+          const recordedAt = prior?.recorded_at ?? nowIso();
+          if (!prior) {
+            safeMkdir(path.dirname(log), { recursive: true });
+            appendJsonLine(
+              log,
+              {
+                receipt_id: receiptId,
+                recorded_at: recordedAt,
+                mission_id: input.missionId,
+                reported_task_id: input.reportTaskId,
+                scope_context: input.scope,
+                evidence: 'explicit_use',
+                delivery: input.delivery,
+                used: [ref],
+              },
+              { leadingNewline: true }
+            );
+          }
+          if (!projection) {
+            const event = {
+              receipt_id: receiptId,
+              document_path: documentPath,
+              recorded_at: recordedAt,
+            };
+            safeMkdir(path.dirname(journal), { recursive: true });
+            appendJsonLine(journal, event, { leadingNewline: true });
+            projection = indexEvent(event);
+          }
+          const index = entries.findIndex((entry) => entry.document_path === documentPath);
+          const previous = entries[index];
+          const applied = previous?.explicit_used_count ?? 0;
+          if (projection.count <= applied) return { reference, status: 'recorded' };
+          const entry = applyUsageDelta(
+            entries,
+            documentPath,
+            { used_count: projection.count - applied },
+            projection.lastUsedAt,
+            input.scope
+          );
+          entry.explicit_used_count = projection.count;
+          entry.occurrences += projection.count - applied - 1;
+          if (!withinUsageAggregateCap(entries, input.scope)) {
+            if (previous) entries[index] = previous;
+            else entries.pop();
+            return { reference, status: 'retryable_error' };
+          }
+          pending.add(receiptId);
+          return { reference, status: 'recorded' };
+        }
+      );
+      if (pending.size) {
+        try {
+          saveUsageAggregate(entries, input.scope);
+        } catch (error) {
+          logger.warn(
+            `[KP-05] explicit use could not be projected — ${String(error)} | next: check feedback storage and retry`
+          );
+          return results.map((result) =>
+            result.status === 'recorded' ? { ...result, status: 'retryable_error' } : result
+          );
+        }
+      }
+      return results;
+    });
+  } catch (error) {
+    logger.warn(
+      `[KP-05] explicit use could not be projected — ${String(error)} | next: check feedback storage and retry`
+    );
+    return references.map((reference) => ({ reference, status: 'retryable_error' }));
+  }
 }
 
 export function loadKnowledgeUsageAggregate(

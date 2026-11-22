@@ -92,7 +92,7 @@ presence-studio の `/ui-gallery` は開発者向けのコンポーネントギ�
 | **運用**       | エージェント・画面・診断 | `/ops`          | owner      | 運用コンソール(エージェント運用 / 画面の管理 / 診断 / ディスカッション、`/ops/automation`)                                                                                                                                                                                       |
 | **設定**       | 初期設定と各種設定       | `/settings`     | owner      | レール最下部に固定                                                                                                                                                                                                                                                               |
 
-最小ロールは member role(`viewer` < `operator` < `approver` < `owner`)で、満たさない項目は `allowed: false` で返る。member に紐付かない viewer は `localadmin` → owner、`readonly` → viewer として扱う。これはメニューの表示制御であり、各ページと API は自分で viewer を再解決して認可する。
+メニューの表示条件には Member Role（`viewer` < `operator` < `approver` < `owner`）を使い、条件を満たさない項目は `allowed: false` で返す。member に紐付かない viewer は、メニューの表示判定で `localadmin` → `owner`、`readonly` → `viewer` として扱う。各ページと API は viewer を再解決して認可する。D5 の移行中、`/api/ops` では `readonly` / `localadmin` による閲覧・介入の判定と、介入に必要な mutation gate が適用される。[Member Role と Grant の定義](./GLOSSARY.md#member-role)を参照。
 
 設定のチェックリスト内にある「初期設定の確認」では、設定済みエージェント、閲覧中のテナントとロール、接続用認証情報の登録状況を確認できる。「CLI の検出状況を確認」を押すと、CLI の検出結果とモデル候補が表示される。ログイン状態は各プロバイダで確認する。
 

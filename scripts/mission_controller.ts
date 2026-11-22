@@ -15,6 +15,7 @@
  *   - mission-seal.ts            → Cryptographic sealing (AES+RSA)
  */
 
+import { AsyncLocalStorage } from 'node:async_hooks';
 import * as path from 'node:path';
 import { baseRoleEnvText } from '@agent/core/foundation';
 import { withMissionPrerequisiteIdentityProbe } from '@agent/core/mission/mission-prerequisite-identity';
@@ -42,11 +43,14 @@ function registeredEnv(name: string): string | undefined {
   return getRegisteredEnvText(name);
 }
 
-let activeMissionControllerArgs: string[] = [];
-let activePrint: Print = () => undefined;
+const invocation = new AsyncLocalStorage<{ args: string[]; print: Print }>();
+
+function activeMissionControllerArgs(): string[] {
+  return invocation.getStore()?.args ?? [];
+}
 
 function printOutput(value: unknown): void {
-  activePrint(value);
+  invocation.getStore()?.print(value);
 }
 
 // --- Sub-module imports ---
@@ -56,7 +60,12 @@ import {
   resolveMissionWorkItemDispatchOptionsFromArgv,
   validateMissionStartCreateInput,
 } from './refactor/mission-controller-args.js';
-import { currentProcessArgv, defineScript, isDirectScript } from './lib/harness.js';
+import {
+  currentProcessArgv,
+  defineScript,
+  isDirectScript,
+  ScriptExitError,
+} from './lib/harness.js';
 import { DiagnosticError } from '@agent/core/logger';
 import { withMissionMutationExpectation } from '@agent/core/mission/mission-mutation-snapshot';
 import { buildHelpText } from './refactor/mission-controller-help.js';
@@ -202,14 +211,70 @@ async function enqueueMission(
   priority: number = 5,
   deps: string[] = []
 ) {
-  const { enqueueMission: _enqueueMission } = await import('./refactor/mission-queue.js');
-  await _enqueueMission(QUEUE_PATH, id, tier, priority, deps);
+  const { enqueueMission: persistEntry } = await import('./refactor/mission-queue.js');
+  const scope = queueScope(id, tier);
+  if (scope.tier !== tier) throw new Error('Queue tier must match the saved Mission tier.');
+  await persistEntry(QUEUE_PATH, id, tier, priority, deps, scope);
+}
+
+function queueScope(id: string, tier: 'personal' | 'confidential' | 'public') {
+  const state = loadState(id.toUpperCase());
+  const input = state
+    ? undefined
+    : validateMissionStartCreateInput('create', id, ['create', id, '--tier', tier]);
+  return {
+    tier: state?.tier ?? tier,
+    tenantSlug: state?.tenant_slug ?? input?.tenantSlug,
+    organizationId: state?.organization_id ?? input?.organizationId,
+    projectId: state?.relationships?.project?.project_id,
+  };
 }
 
 async function dispatchNextMission() {
-  const { dispatchNextQueuedMission } = await import('./refactor/mission-queue.js');
-  await dispatchNextQueuedMission(QUEUE_PATH, checkDependencies, async (missionId, tier) =>
-    startMission(missionId, tier)
+  const { dispatchNextQueuedMission, requireMissionQueueScope } =
+    await import('./refactor/mission-queue.js');
+  const resolveQueueStart = (
+    missionId: string,
+    tier: 'personal' | 'confidential' | 'public',
+    entry: import('./refactor/mission-queue.js').MissionQueueEntry
+  ) => {
+    requireMissionQueueScope(entry, queueScope(missionId, tier));
+    return validateMissionStartCreateInput('start', missionId, [
+      'start',
+      missionId,
+      '--tier',
+      tier,
+      '--dry-run',
+    ]);
+  };
+  await dispatchNextQueuedMission(
+    QUEUE_PATH,
+    checkDependencies,
+    async (missionId, tier, entry) => {
+      const input = resolveQueueStart(missionId, tier, entry);
+      if (!input.preflight?.ready) throw new Error(input.preflight?.issues.join(' | '));
+      await startMission(
+        missionId,
+        input.tier,
+        input.persona,
+        input.tenantId,
+        input.missionType,
+        input.visionRef,
+        input.relationships,
+        input.tenantSlug,
+        input.organizationId
+      );
+    },
+    async (missionId, tier, entry) => {
+      try {
+        const result = resolveQueueStart(missionId, tier, entry).preflight;
+        return result?.ready
+          ? undefined
+          : result?.issues.join(' | ') || 'Mission preflight unavailable';
+      } catch (error) {
+        return error instanceof Error ? error.message : String(error);
+      }
+    }
   );
 }
 
@@ -227,18 +292,21 @@ async function createMission(
 ) {
   const { missionLifecycleService } = await import('@agent/core/mission/mission-lifecycle-service');
   const { withOrganizationContext } = await import('./refactor/organization-context.js');
-  return withOrganizationContext(organizationId, () =>
-    missionLifecycleService.create(
-      id,
-      tier,
-      tenantId,
-      missionType,
-      visionRef,
-      persona,
-      relationships,
-      tenantSlug,
-      { ...options, organizationId }
-    )
+  return withOrganizationContext(
+    organizationId,
+    () =>
+      missionLifecycleService.create(
+        id,
+        tier,
+        tenantId,
+        missionType,
+        visionRef,
+        persona,
+        relationships,
+        tenantSlug,
+        { ...options, organizationId }
+      ),
+    { selectStanceFromOrganization: false }
   );
 }
 
@@ -308,18 +376,21 @@ async function startMission(
 ) {
   const { missionLifecycleService } = await import('@agent/core/mission/mission-lifecycle-service');
   const { withOrganizationContext } = await import('./refactor/organization-context.js');
-  await withOrganizationContext(organizationId, () =>
-    missionLifecycleService.start(
-      id,
-      tier,
-      persona,
-      tenantId,
-      missionType,
-      visionRef,
-      relationships,
-      tenantSlug,
-      { ...options, organizationId }
-    )
+  await withOrganizationContext(
+    organizationId,
+    () =>
+      missionLifecycleService.start(
+        id,
+        tier,
+        persona,
+        tenantId,
+        missionType,
+        visionRef,
+        relationships,
+        tenantSlug,
+        { ...options, organizationId }
+      ),
+    { selectStanceFromOrganization: false }
   );
   const targetId = id.toUpperCase();
   if (options?.admissionWorkItem) {
@@ -327,6 +398,7 @@ async function startMission(
     authorMissionAdmissionBrief(targetId, options.admissionWorkItem);
   }
   const state = loadState(targetId);
+  const knowledgeLines: string[] = [];
   if (state?.status === 'active') {
     writeFocusedMissionId(targetId);
     // Direct_cli delivery seam (MEMORY_LOOP_CLOSURE): dispatched workers get
@@ -334,8 +406,12 @@ async function startMission(
     // same lane at start so KP-05 telemetry sees direct_cli retrievals too.
     const { printPromotedKnowledgeForActiveMission } =
       await import('@agent/core/mission/mission-operator-knowledge-surface');
-    await printPromotedKnowledgeForActiveMission(targetId);
+    await printPromotedKnowledgeForActiveMission(targetId, (line) => {
+      knowledgeLines.push(line.trim());
+      logger.info(line);
+    });
   }
+  return { knowledgeLines };
 }
 
 // syncProjectLedger and syncProjectLedgerIfLinked are defined as wrappers
@@ -760,20 +836,51 @@ async function listMissions(filterStatus?: string, jsonOutput = false) {
   logger.info(`${missions.length} mission(s) found.`);
 }
 
-async function showMissionStatus(id: string, follow: boolean = false) {
+async function showMissionStatus(
+  id: string,
+  options: { follow?: boolean; json?: boolean; tenantSlug?: string } = {}
+) {
+  const { follow, json, tenantSlug } = options;
   const { missionLifecycleService } = await import('@agent/core/mission/mission-lifecycle-service');
-  const { renderStatus } = await import('@agent/core/ux-vocabulary');
-  const { buildMissionStatusView } = await import('@agent/core/mission/mission-read-model');
   if (!id) {
+    if (json) throw new Error('Usage: mission_controller status <MISSION_ID> --json');
     logger.error('Usage: mission_controller status <MISSION_ID>');
     return;
   }
   const view = missionLifecycleService.status(id);
-  if (!view) {
+  if (
+    !view ||
+    view.state.mission_id.toUpperCase() !== id.trim().toUpperCase() ||
+    (tenantSlug && view.state.tenant_slug !== tenantSlug)
+  ) {
+    if (json)
+      throw new ScriptExitError(1, 'Mission not visible in the selected scope.', false, undefined, {
+        code: 'MISSION_STATUS_NOT_FOUND',
+        category: 'not_found',
+        retryable: false,
+        next_action: 'check the Mission ID and its registered scope',
+      });
     logger.error(`Mission ${id.toUpperCase()} not found. Run "list" to see available missions.`);
     return;
   }
   const { state, missionPath, nextAction, recentHistory } = view;
+  if (json) {
+    printOutput({
+      mission_id: state.mission_id,
+      status: state.status,
+      tier: state.tier,
+      tenant_slug: state.tenant_slug,
+      organization_id: state.organization_id,
+      project_id: state.relationships?.project?.project_id,
+      org_role: state.org_role,
+      next_action: nextAction,
+      recent_history: recentHistory,
+    });
+    return;
+  }
+
+  const { renderStatus } = await import('@agent/core/ux-vocabulary');
+  const { buildMissionStatusView } = await import('@agent/core/mission/mission-read-model');
 
   printOutput('');
   printOutput(`  Mission:     ${state.mission_id}`);
@@ -886,7 +993,7 @@ async function showReasoningBackendStatus(): Promise<void> {
   ]);
   const selectedMode = getInstalledReasoningMode();
   const forceRefresh =
-    activeMissionControllerArgs.includes('--refresh-providers') ||
+    activeMissionControllerArgs().includes('--refresh-providers') ||
     registeredEnv('KYBERION_PROVIDER_DISCOVERY_REFRESH') === '1';
   const observed = forceRefresh ? discoverProviders(true) : peekProviderDiscovery().providers;
   const providers = observed.filter((provider) =>
@@ -1199,17 +1306,100 @@ async function resolveGate(missionId: string, gateFile?: string): Promise<string
 async function gatePass(missionId: string, gateFile?: string, note?: string): Promise<void> {
   const { recordMissionGateOverride } = await import('@agent/core/mission/mission-gate-engine');
   const {
-    activateMissionOnGateProgress,
     advanceCurrentPhase,
     evaluateStoredMissionGate,
     markPhaseTasksCompleted,
+    readStoredMissionGate,
+    requireMissionGateActivation,
   } = await import('@agent/core/mission/mission-process-planning');
-  if (activeMissionControllerArgs.includes('--machine-only')) {
-    const { runMachineOnlyMissionGate } = await import('./mission/mission_machine_gate.js');
+  const { activateMissionOnGateProgress } = await import('@agent/core/mission/mission-creation');
+  const argv = activeMissionControllerArgs();
+  const dryRun = argv.includes('--dry-run');
+  const machineOnly = argv.includes('--machine-only');
+  const requireGateScope = () => {
+    const state = loadState(missionId.toUpperCase());
+    if (!state) throw new Error(`Mission ${missionId} was not found in the current scope.`);
+    const options = extractMissionStartCreateOptionsFromArgv(argv);
+    const selections = [
+      ['Tenant', options.tenantSlug, state.tenant_slug],
+      ['Tenant', options.tenantId, state.tenant_slug],
+      ['Tenant', getOptionValue('--tenant', argv), state.tenant_slug],
+      ['Organization', options.organizationId, state.organization_id],
+      ['Tier', options.tier, state.tier],
+      [
+        'Project',
+        options.relationships?.project?.project_id,
+        state.relationships?.project?.project_id,
+      ],
+    ];
+    for (const [label, selected, saved] of selections) {
+      if (selected && selected !== saved)
+        throw new Error(
+          `[MISSION_GATE_SCOPE_MISMATCH] ${label} does not match the saved Mission scope.`
+        );
+    }
+    return state;
+  };
+  const inspectActivation = (gateId: string) => {
+    const state = requireGateScope();
+    if (state.status === 'planned') {
+      requireMissionGateActivation(state, gateId);
+      const input = validateMissionStartCreateInput('start', missionId, [
+        'start',
+        missionId,
+        '--dry-run',
+      ]);
+      if (!input.preflight?.ready) throw new Error(input.preflight?.issues.join(' | '));
+    }
+  };
+
+  const { parseMachineMissionGate, runMachineOnlyMissionGate } =
+    await import('./mission/mission_machine_gate.js');
+  const inspectStoredGate = (upperId: string, gateId: string) => {
+    inspectActivation(gateId);
+    const stored = readStoredMissionGate(upperId, gateId);
+    if (!stored) throw new Error(`Stored gate definition missing: ${upperId}/${gateId}`);
+    if (
+      machineOnly &&
+      stored.definition.gate.checks.some(
+        (check) => check.kind === 'human_override' || check.kind === 'reviewer_approved'
+      )
+    ) {
+      throw new Error(
+        `Machine-only gate requires human or reviewer confirmation: ${upperId}/${gateId}`
+      );
+    }
+  };
+  if (dryRun) {
+    const issues: string[] = [];
+    try {
+      const { missionId: upperId, gateId } = parseMachineMissionGate({
+        missionId: missionId || '',
+        gateId: gateFile,
+      });
+      inspectStoredGate(upperId, gateId);
+    } catch (error) {
+      issues.push(error instanceof Error ? error.message : String(error));
+    }
+    printOutput(
+      JSON.stringify({
+        action: 'gate-pass',
+        mission_id: missionId,
+        gate_id: gateFile,
+        machine_only: machineOnly,
+        input: { preflight: { ready: issues.length === 0, issues } },
+      })
+    );
+    return;
+  }
+  if (machineOnly) {
     await runMachineOnlyMissionGate(
       { missionId: missionId || '', gateId: gateFile },
       {
-        evaluateStored: (args) => evaluateStoredMissionGate({ ...args, blocking: true }),
+        evaluateStored: (args) => {
+          inspectStoredGate(args.missionId, args.gateId);
+          return evaluateStoredMissionGate({ ...args, blocking: true });
+        },
         advance: advanceCurrentPhase,
         markCompleted: markPhaseTasksCompleted,
         activate: activateMissionOnGateProgress,
@@ -1231,6 +1421,7 @@ async function gatePass(missionId: string, gateFile?: string, note?: string): Pr
         },
       }
     );
+
     return;
   }
   if (!missionId) {
@@ -1243,6 +1434,7 @@ async function gatePass(missionId: string, gateFile?: string, note?: string): Pr
   // exists, machine-evaluate its checks instead of recording a bare override.
   // The operator command itself satisfies reviewer/human confirmation checks.
   if (gateFile && !gateFile.endsWith('.json')) {
+    inspectActivation(gateFile);
     const stored = await evaluateStoredMissionGate({
       missionId,
       gateId: gateFile,
@@ -1265,15 +1457,15 @@ async function gatePass(missionId: string, gateFile?: string, note?: string): Pr
         },
       });
       if (stored.evaluation.verdict === 'pass') {
+        if (await activateMissionOnGateProgress(upperId, stored.evaluation)) {
+          logger.info('   Mission status: planned → active (first gate passed).');
+        }
         if (stored.position === 'exit' && stored.phase) {
           await advanceCurrentPhase(upperId, stored.phase);
           const completed = markPhaseTasksCompleted(upperId, stored.phase);
           if (completed > 0) {
             logger.info(`   ${completed} task(s) in phase ${stored.phase} marked completed.`);
           }
-        }
-        if (await activateMissionOnGateProgress(upperId)) {
-          logger.info('   Mission status: planned → active (first gate passed).');
         }
         logger.success(`✅ [GATE] ${gateFile} → passed (mission: ${upperId})`);
       } else {
@@ -1286,6 +1478,7 @@ async function gatePass(missionId: string, gateFile?: string, note?: string): Pr
       return;
     }
   }
+  requireGateScope();
   const gatePath = await resolveGate(missionId, gateFile);
   const overridePath = recordMissionGateOverride({
     missionId: missionId.toUpperCase(),
@@ -1449,7 +1642,6 @@ async function mainImpl(
   args: string[] = currentProcessArgv(),
   print: Print = () => undefined
 ): Promise<void> {
-  activeMissionControllerArgs = [...args];
   const requestedAction = args[0];
   const isHelpFlag = args.includes('--help') || args.includes('-h');
   if (isHelpFlag && requestedAction !== 'help') {
@@ -1461,15 +1653,7 @@ async function mainImpl(
     args.filter((arg) => arg !== '--machine-only')
   );
   assertMissionIdArgument(earlyPositionalArgs[0], earlyPositionalArgs[1]);
-  if (earlyPositionalArgs[1]) {
-    setRegisteredEnv('MISSION_ID', earlyPositionalArgs[1].toUpperCase());
-  }
-
-  // Self-identify as mission_controller role for tier-guard resolution.
-  if (!getRegisteredEnvText('MISSION_ROLE')) {
-    setRegisteredEnv('MISSION_ROLE', 'mission_controller');
-  }
-  if (earlyPositionalArgs[0] === 'gate-pass') {
+  if (earlyPositionalArgs[0] === 'gate-pass' && !args.includes('--dry-run')) {
     const { installMissionDevelopmentProofVerifier } =
       await import('@agent/core/mission/mission-development-gates');
     const { verifyMissionDevelopmentPublication } =
@@ -1636,13 +1820,12 @@ export async function main(
   args: string[] = currentProcessArgv(),
   print: Print = () => undefined
 ): Promise<void> {
-  const previousPrint = activePrint;
-  activePrint = print;
-  try {
-    await withMissionPrerequisiteIdentityProbe(inspectMissionPrerequisiteIdentity, async () => {
-      const hash = getOptionValue('--expected-snapshot', args);
+  const invocationArgs = [...args];
+  await invocation.run({ args: invocationArgs, print }, () =>
+    withMissionPrerequisiteIdentityProbe(inspectMissionPrerequisiteIdentity, async () => {
+      const hash = getOptionValue('--expected-snapshot', invocationArgs);
       if (hash) {
-        const positional = extractMissionControllerPositionalArgs(args);
+        const positional = extractMissionControllerPositionalArgs(invocationArgs);
         const operations: Record<string, string> = {
           'record-evidence': 'record_evidence',
           'review-task': 'review_task',
@@ -1662,19 +1845,30 @@ export async function main(
               : undefined,
             hash,
           },
-          () => mainImpl(args, print)
+          () => mainImpl(invocationArgs, print)
         );
-      } else await mainImpl(args, print);
-    });
-  } finally {
-    activePrint = previousPrint;
-  }
+      } else await mainImpl(invocationArgs, print);
+    })
+  );
 }
 
 export const runMissionController = defineScript({
   name: 'mission:controller',
-  flags: [],
-  run: ({ argv, print }) => main(argv, print),
+  flags: ['json'],
+  run: ({ argv, print }) => {
+    // Only the dedicated CLI process owns its environment. In-process callers
+    // carry their identity in the execution scope and target in argv.
+    const [action, missionId] = extractMissionControllerPositionalArgs(
+      argv.filter((arg) => arg !== '--machine-only')
+    );
+    if (missionId && !argv.includes('--help') && !argv.includes('-h')) {
+      assertMissionIdArgument(action, missionId);
+      setRegisteredEnv('MISSION_ID', missionId.toUpperCase());
+    }
+    if (!getRegisteredEnvText('MISSION_ROLE'))
+      setRegisteredEnv('MISSION_ROLE', 'mission_controller');
+    return main(argv, print);
+  },
 });
 
 if (

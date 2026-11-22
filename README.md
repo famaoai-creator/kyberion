@@ -60,16 +60,19 @@ Most agent frameworks stop at "execute". Kyberion closes the loop:
 
 ### Core concepts in one minute
 
-| Concept            | What it is                                                                                                                                                                                                                              |
-| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Mission**        | One unit of work with its own git repo, state and evidence; survives 24h+ runs.                                                                                                                                                         |
-| **ADF / pipeline** | Declarative, schema-validated plan format (sub-pipelines, `on_error` recovery). Ready-made ones live in [`pipelines/`](./pipelines/README.md).                                                                                          |
-| **Actuator**       | A governed capability module (browser, file, voice, code, …). Full list: [catalog](./CAPABILITIES_GUIDE.md).                                                                                                                            |
-| **Surface**        | A human-facing entrance: Chronos, Concierge, Presence Studio, terminal HUD, chat bridges, capture pads.                                                                                                                                 |
-| **Tier & tenant**  | `personal/` → `confidential/` → `public/` knowledge, scoped per tenant; nothing leaks downward.                                                                                                                                         |
-| **Stance**         | `knowledge/personal/stances/{slug}/` overlay that swaps identity, connections and policy for the entity you act as — without forks. Not a tenant ([how they differ](./knowledge/product/architecture/stance-tenant-customer-model.md)). |
+| Concept            | What it is                                                                                                                                                                                                        |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **WorkItem**       | The Issue you track. A step that needs ownership is a child WorkItem with its own claim and lease.                                                                                                                |
+| **Mission**        | A governed way to execute an Issue with a bounded lifecycle, git history, state and evidence.                                                                                                                     |
+| **ADF / pipeline** | Declarative, schema-validated plan format (sub-pipelines, `on_error` recovery). Ready-made ones live in [`pipelines/`](./pipelines/README.md).                                                                    |
+| **Actuator**       | A governed capability module (browser, file, voice, code, …). Full list: [catalog](./CAPABILITIES_GUIDE.md).                                                                                                      |
+| **Surface**        | A human-facing entrance such as Concierge (including the operations console), Presence Studio, terminal HUD, chat bridges or capture pads.                                                                        |
+| **Tier & tenant**  | `personal/` → `confidential/` → `public/` knowledge, scoped per tenant; nothing leaks downward.                                                                                                                   |
+| **Stance**         | Selects which permitted tenant you act for, with the applicable organization and Org Role. Grants govern what you may do there. [Stance model](./knowledge/product/architecture/stance-tenant-customer-model.md). |
 
 New here? Read [`docs/CORE_CONCEPTS.md`](./docs/CORE_CONCEPTS.md) — the 5 concepts you need first. Concept map: [`kyberion-concept-map`](./knowledge/product/architecture/kyberion-concept-map.md) · Parent architecture: [`organization-work-loop`](./knowledge/product/architecture/organization-work-loop.md).
+
+WorkItem and Lease consolidation and the shared intent resolver are complete in the development plans. Scope, identity and Grant migration and the memory feedback loop are still in progress. See the [Concept Model v2 implementation status](./docs/developer/improvement-plans-2026-11/README.ja.md#概念モデル-v2-の移行).
 
 ---
 
@@ -108,9 +111,11 @@ pnpm pipeline --input pipelines/verify-session.json
 | Voice first-win | macOS only (native TTS; not available in Docker) | ~5min        | `pnpm pipeline --input pipelines/voice-hello.json` | Run after the browser smoke                                             |
 | Docker          | Docker Desktop                                   | ~10min build | `docker compose --profile deploy up`               | Headless services only — voice/GUI actuators need the native macOS path |
 
-**Not sure where to go next?** `pnpm kyberion setup report --persona first-time-user` is the entry guide: it tells you whether to start with Chronos, the concierge, the voice path, or a messaging surface, and whether auth/setup is still blocking that route. If a browser, voice, or media actuator is missing a local dependency, check it with `pnpm deps:check --actuator browser` (or `voice`, `media-generation`).
+**Not sure where to go next?** Use `pnpm kyberion setup report --persona first-time-user` to check which surfaces are ready and which authentication or setup steps are pending. If a browser, voice, or media actuator is missing a local dependency, check it with `pnpm deps:check --actuator browser` (or `voice`, `media-generation`).
 
 Already have onboarding JSON? Skip the wizard: `pnpm onboarding apply --identity knowledge/public/templates/onboarding/identity.example.json --dry-run` (copy and edit the template, then rerun without `--dry-run`).
+
+Before starting a Mission, use `pnpm mission start <ID> --dry-run --json` to preview its scope and prerequisites. Confidential work requires a registered tenant. See [Mission lifecycle](./docs/QUICKSTART.md#mission-lifecycle) for organization, project and Stance selection.
 
 To understand the structure in 15 minutes, read [`docs/QUICKSTART.md`](./docs/QUICKSTART.md) sections 4-10, then inspect [`pipelines/verify-session.json`](./pipelines/verify-session.json), [`CAPABILITIES_GUIDE.md`](./CAPABILITIES_GUIDE.md), and [`docs/developer/EXTENSION_POINTS.md`](./docs/developer/EXTENSION_POINTS.md). For a server / customer deployment: [`docs/operator/DEPLOYMENT.md`](./docs/operator/DEPLOYMENT.md).
 
@@ -157,21 +162,21 @@ PPTX and video are authored as semantic briefs; a single style cascade and text-
 
 Pick the entrance that fits the moment. All of them share the same missions, approvals and audit chain.
 
-| Entrance                        | Use it when                                                      | Start                                    |
-| ------------------------------- | ---------------------------------------------------------------- | ---------------------------------------- |
-| **Terminal home / HUD**         | You live in a shell and want the next action.                    | `pnpm kyberion` · `pnpm tui`             |
-| **Concierge / Presence Studio** | You want a front desk: ask, decide, follow progress.             | `pnpm surfaces reconcile`                |
-| **Chronos**                     | You supervise: intervene, review artifacts, audit.               | `pnpm chronos:dev`                       |
-| **Chat bridges & voice**        | You are in Slack / Telegram / Discord / iMessage, or hands-free. | [`docs/SURFACES.md`](./docs/SURFACES.md) |
-| **Capture pads**                | You have something on your desk: a sketch, notes, a file.        | `pnpm pads`                              |
+| Entrance                         | Use it when                                                         | Start                                    |
+| -------------------------------- | ------------------------------------------------------------------- | ---------------------------------------- |
+| **Terminal home / HUD**          | You live in a shell and want the next action.                       | `pnpm kyberion` · `pnpm tui`             |
+| **Concierge**                    | You want to ask, decide, follow work or review deliverables.        | `pnpm surfaces reconcile`                |
+| **Concierge operations console** | You need runtime status, diagnostics or an authorized intervention. | Open Concierge at `/ops`.                |
+| **Presence Studio**              | You want live collaboration by voice or text.                       | `pnpm surfaces reconcile`                |
+| **Chat bridges & voice**         | You are in Slack / Telegram / Discord / iMessage, or hands-free.    | [`docs/SURFACES.md`](./docs/SURFACES.md) |
+| **Capture pads**                 | You have something on your desk: a sketch, notes, a file.           | `pnpm pads`                              |
 
 ## Surfaces — one role per screen
 
-Each surface answers one question and shows its role in the header. The two human-facing surfaces (Concierge and Presence Studio) share one five-item rail — ホーム / 頼む / 決める / 進み具合 / 設定 — so they read as a single front desk. Full role map, ports and access rules: [`docs/SURFACES.md`](./docs/SURFACES.md).
+Concierge hosts the front desk and the operations console at `/ops`. Legacy Chronos URLs on port 3000 redirect to Concierge. Presence Studio is the live collaboration surface, and Operator Surface provides read-only audit views. See [the surface map](./docs/SURFACES.md) for navigation, ports and access rules. The screenshots illustrate earlier layouts.
 
 <table>
   <tr>
-    <td align="center" width="33%"><a href="./presence/displays/chronos-mirror-v2/"><img src="./docs/assets/surfaces/chronos.jpg" alt="Chronos Mirror — control tower home with tenant scope, view switcher, next action and per-mission agent status" width="100%" /></a><br /><strong>Chronos Mirror</strong> · <code>:3000</code><br /><sub>Control tower: what is the system doing, where should I intervene?</sub></td>
     <td align="center" width="33%"><a href="./presence/displays/concierge/"><img src="./docs/assets/surfaces/concierge.jpg" alt="Concierge — the ホーム (Home) page on the shared kyberion-base design system: next action, response status and the five-item rail" width="100%" /></a><br /><strong>Concierge</strong> · <code>:3050</code><br /><sub>CEO secretary: what do I need to decide right now? (決める · 設定)</sub></td>
     <td align="center" width="33%"><a href="./presence/displays/presence-studio/"><img src="./docs/assets/surfaces/presence-studio.jpg" alt="Presence Studio — the ホーム (Home) page: today's briefing, the ask box with request chips, what needs your decision and progress, behind the shared five-item rail" width="100%" /></a><br /><strong>Presence Studio</strong> · <code>:3031</code><br /><sub>Companion: what are we working on together, by voice or text? (ホーム · 頼む · 進み具合)</sub></td>
   </tr>

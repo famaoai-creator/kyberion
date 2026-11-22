@@ -13,11 +13,11 @@ import {
   reapExpiredWorkLeases,
 } from '@agent/core/workforce/work-coordination';
 import {
-  buildMissionAdmissionBrief,
   prepareMissionAdmissionBrief,
   readMissionAdmissionBrief,
-  resolveDotMissionAdmission,
-  resolveDotMissionAdmissionScope,
+  resolveDotMissionAdmissionBrief,
+  type buildMissionAdmissionBrief,
+  type resolveDotMissionAdmissionScope,
   withHumanMissionAdmissionApply,
 } from '@agent/core/mission/mission-admission';
 import { loadState } from '@agent/core/mission/mission-state';
@@ -48,19 +48,40 @@ export type AdmissionContinuationResult = {
 type Dependencies = {
   prepare?: boolean;
   expectedVersion?: number;
+  /** Claim any upstream authorization after the locked preparation preflight succeeds. */
+  authorizePreparation?: () => void;
   rootDir?: string;
   now?: () => Date;
-  runController?: (args: string[]) => Promise<unknown>;
+  runController?: AdmissionController;
 };
+type AdmissionController = (args: string[], print?: (value: unknown) => void) => Promise<unknown>;
+
+export async function checkMissionAdmissionPreflight(
+  invoke: AdmissionController,
+  args: string[]
+): Promise<string | undefined> {
+  let preflight: { ready?: boolean; issues?: string[] } | undefined;
+  try {
+    await invoke([...args, '--dry-run', '--json'], (value) => {
+      const report = typeof value === 'string' ? JSON.parse(value) : value;
+      preflight = report?.input?.preflight;
+    });
+  } catch (error) {
+    return error instanceof Error ? error.message : String(error);
+  }
+  if (preflight?.ready === true) return undefined;
+  return preflight?.issues?.join('; ') || 'mission preflight did not confirm readiness';
+}
 const ROLE = 'infrastructure_sentinel';
 const ACTOR = 'mission_controller';
 const PIN = 'mission_alignment_preparation';
 
-function proposal(item: WorkItem, deps: Dependencies) {
-  const admission = resolveDotMissionAdmission(item, deps);
-  const scope = resolveDotMissionAdmissionScope(item, deps);
+function proposalIdentity(
+  item: WorkItem,
+  scope: ReturnType<typeof resolveDotMissionAdmissionScope>,
+  brief: ReturnType<typeof buildMissionAdmissionBrief>
+) {
   const missionId = item.metadata!.mission_id as string;
-  const brief = buildMissionAdmissionBrief(item, admission, missionId);
   const payloadHash = computeApprovalPayloadHash(brief);
   const identity = {
     action: 'human_mission_alignment',
@@ -76,6 +97,10 @@ function proposal(item: WorkItem, deps: Dependencies) {
     context: item.context,
   });
   return { item, scope, missionId, brief, payloadHash, effectBinding, fingerprint };
+}
+function proposal(item: WorkItem, deps: Dependencies) {
+  const { scope, brief } = resolveDotMissionAdmissionBrief(item, deps);
+  return proposalIdentity(item, scope, brief);
 }
 type Proposal = ReturnType<typeof proposal>;
 
@@ -134,6 +159,85 @@ function assertBound(record: ApprovalRequestRecord, p: Proposal): void {
     throw new Error('mission admission approval binding changed');
 }
 
+function reconcileCommittedAdmission(
+  item: WorkItem,
+  deps: Dependencies
+): AdmissionContinuationResult | undefined {
+  const pin = item.metadata?.[PIN] as { fingerprint?: string } | undefined;
+  const attempt =
+    item.status === 'done'
+      ? item.attempts?.at(-1)
+      : item.attempts?.find((row) => row.run_id === item.current_attempt_id);
+  const requestId = attempt?.metadata?.approval_request_id;
+  const missionId = item.metadata?.mission_id;
+  if (!pin || typeof requestId !== 'string' || typeof missionId !== 'string') return undefined;
+  const approval = loadApprovalRequest('brief', requestId);
+  if (!approval?.applyClaim && approval?.applyResult?.result !== 'success') return undefined;
+  const result = (status: 'completed' | 'reconciliation_required', reason?: string) => ({
+    status,
+    missionId,
+    requestId,
+    ...(reason ? { reason } : {}),
+  });
+  const tenant = item.context?.tenant_slug;
+  if (
+    !tenant ||
+    approval.scope?.tenant_slug !== tenant ||
+    approval.scope.organization_id !== item.context?.organization_id
+  )
+    return result('reconciliation_required', 'claimed activation scope changed');
+  try {
+    const scope = {
+      tenant_slug: tenant,
+      ...(approval.scope.organization_id
+        ? { organization_id: approval.scope.organization_id }
+        : {}),
+      ...(approval.scope.project_id ? { project_id: approval.scope.project_id } : {}),
+    };
+    const committed = withExecutionContext(
+      ACTOR,
+      () => {
+        const state = loadState(missionId, deps);
+        const dir = findMissionPath(missionId);
+        if (!dir || state?.status !== 'active')
+          throw new Error('claimed activation outcome unknown');
+        return readMissionAdmissionBrief(path.join(dir, 'evidence', 'mission-brief.json'));
+      },
+      undefined,
+      tenant,
+      scope.organization_id
+    );
+    const p = proposalIdentity(item, scope, committed);
+    assertBound(approval, p);
+    if (
+      p.fingerprint !== pin.fingerprint ||
+      p.effectBinding !== attempt?.metadata?.effect_binding ||
+      receipt(p, deps) !== 'active' ||
+      (approval.applyResult && approval.applyResult.result !== 'success')
+    )
+      throw new Error('claimed activation receipt differs from prepared admission');
+    if (!approval.applyResult)
+      recordApprovalApplyResult(ROLE, {
+        channel: 'brief',
+        requestId,
+        claimId: approval.applyClaim!.claimId,
+        applyResult: {
+          result: 'success',
+          appliedBy: ACTOR,
+          appliedAt: nowIso(),
+          auditRef: 'mission:' + missionId,
+        },
+      });
+    settleWork(p, deps, requestId);
+    return result('completed');
+  } catch (error) {
+    return result(
+      'reconciliation_required',
+      error instanceof Error ? error.message : String(error)
+    );
+  }
+}
+
 /**
  * Same-work planned -> human alignment -> activation. Durable pins/claims live in
  * the existing WorkItem and approval record; a lease timeout never proves no effect.
@@ -147,12 +251,14 @@ export async function continueHumanMissionAdmission(
     return { status: 'held', reason: 'alternate admission roots are not supported' };
   return withExecutionContextAsync(ROLE, () =>
     withLock('human-mission-admission:' + itemId, async () => {
-      if (isOperationsHalted()) return { status: 'held', reason: 'operations halted' };
       const original = getWorkItem(itemId, deps);
       if (!original || !['blocked', 'ready', 'in_progress', 'done'].includes(original.status))
         return { status: 'held', reason: 'work item is missing or cancelled' };
       if (deps.expectedVersion !== undefined && original.version !== deps.expectedVersion)
         return { status: 'held', reason: 'work item changed since the request' };
+      const reconciliation = reconcileCommittedAdmission(original, deps);
+      if (reconciliation) return reconciliation;
+      if (isOperationsHalted()) return { status: 'held', reason: 'operations halted' };
       let p = proposal(original, deps);
       const result = (
         status: AdmissionContinuationResult['status'],
@@ -173,7 +279,7 @@ export async function continueHumanMissionAdmission(
           throw new Error('mission admission changed or halted');
         p = next;
       };
-      const run = async (verb: 'create' | 'start') => {
+      const run = async (verb: 'create' | 'start', preview = false) => {
         refresh();
         const invoke = deps.runController ?? (await import('../mission_controller.js')).main;
         refresh();
@@ -182,21 +288,25 @@ export async function continueHumanMissionAdmission(
           p.missionId,
           '--tier',
           'confidential',
-          '--persona',
+          '--org-role',
           'worker',
           '--tenant',
           p.scope.tenant_slug,
           '--tenant-slug',
           p.scope.tenant_slug,
           '--goal',
-          p.item.description,
+          p.brief.intent,
           ...(p.scope.organization_id ? ['--organization-id', p.scope.organization_id] : []),
           ...(p.scope.project_id ? ['--project-id', p.scope.project_id] : []),
           ...(verb === 'start' ? ['--admission-work-item', itemId] : []),
         ];
-        await withExecutionContextAsync(
+        return withExecutionContextAsync(
           ACTOR,
-          () => invoke(args),
+          async () => {
+            if (preview) return checkMissionAdmissionPreflight(invoke, args);
+            await invoke(args);
+            return undefined;
+          },
           undefined,
           p.scope.tenant_slug,
           p.scope.organization_id
@@ -216,6 +326,12 @@ export async function continueHumanMissionAdmission(
             matchingApproval(p)
           )
             return result('reconciliation_required', 'unowned existing admission evidence');
+          const blocked = await run('create', true);
+          if (blocked) return result('held', blocked);
+          refresh();
+          if (p.item.version !== original.version)
+            return result('held', 'work item changed during preflight');
+          deps.authorizePreparation?.();
           updateWorkItem({
             itemId,
             expectedVersion: p.item.version,
@@ -279,31 +395,12 @@ export async function continueHumanMissionAdmission(
         if (!approval) throw new Error('alignment approval missing');
         assertBound(approval, p);
         const requestId = approval.id;
-        if (approval.applyResult?.result === 'success' || approval.applyClaim) {
-          // Reconcile original application only. Never acquire another approval claim or re-run start.
-          if (stateReceipt !== 'active')
-            return result(
-              'reconciliation_required',
-              'claimed activation outcome unknown',
-              requestId
-            );
-          if (approval.applyResult && approval.applyResult.result !== 'success')
-            return result('reconciliation_required', 'failed application needs review', requestId);
-          if (!approval.applyResult)
-            recordApprovalApplyResult(ROLE, {
-              channel: 'brief',
-              requestId,
-              claimId: approval.applyClaim!.claimId,
-              applyResult: {
-                result: 'success',
-                appliedBy: ACTOR,
-                appliedAt: nowIso(),
-                auditRef: 'mission:' + p.missionId,
-              },
-            });
-          settleWork(p, deps, requestId);
-          return result('completed', undefined, requestId);
-        }
+        if (approval.applyResult || approval.applyClaim)
+          return result(
+            'reconciliation_required',
+            'claimed activation ownership differs',
+            requestId
+          );
         if (approval.revocation || !['pending', 'approved'].includes(approval.status))
           return result(
             'held',
@@ -325,8 +422,29 @@ export async function continueHumanMissionAdmission(
             'alignment approved; awaiting governed continuation',
             requestId
           );
+        const blocked = await run('start', true);
+        if (blocked) return result('held', blocked, requestId);
         refresh();
-        assertCurrentHumanDecision(approval, p);
+        const decision = loadApprovalRequest('brief', requestId);
+        if (!decision) return result('held', 'approval missing before activation', requestId);
+        assertBound(decision, p);
+        if (
+          decision.status !== 'approved' ||
+          decision.revocation ||
+          isApprovalRequestExpired(decision, (deps.now?.() ?? new Date()).getTime())
+        )
+          return result('held', 'approval no longer permits activation', requestId);
+        if (decision.applyClaim || decision.applyResult || receipt(p, deps) !== 'planned')
+          return result(
+            'reconciliation_required',
+            'activation evidence changed during preflight',
+            requestId
+          );
+        try {
+          assertCurrentHumanDecision(decision, p);
+        } catch (error) {
+          return result('held', error instanceof Error ? error.message : String(error), requestId);
+        }
         const claimed = claimWorkItem({
           itemId,
           actorPeerId: ACTOR,
@@ -361,22 +479,12 @@ export async function continueHumanMissionAdmission(
             },
             () => run('start')
           );
-          refresh();
-          if (receipt(p, deps) !== 'active') throw new Error('activation has no exact receipt');
-          const applied = loadApprovalRequest('brief', requestId)!;
-          recordApprovalApplyResult(ROLE, {
-            channel: 'brief',
-            requestId,
-            claimId: applied.applyClaim!.claimId,
-            applyResult: {
-              result: 'success',
-              appliedAt: nowIso(),
-              appliedBy: ACTOR,
-              auditRef: 'mission:' + p.missionId,
-            },
-          });
-          settleWork(p, deps, requestId);
-          return result('completed', undefined, requestId);
+          const activatedItem = getWorkItem(itemId, deps);
+          const reconciliation = activatedItem && reconcileCommittedAdmission(activatedItem, deps);
+          return (
+            reconciliation ??
+            result('reconciliation_required', 'missing activation attempt receipt', requestId)
+          );
         } catch (error) {
           if (!applyClaimed)
             releaseWorkItem({
@@ -387,7 +495,11 @@ export async function continueHumanMissionAdmission(
               effectDisposition: 'pre_effect',
               summary: 'activation refused before apply claim',
             });
-          return result('reconciliation_required', String(error), requestId);
+          return result(
+            applyClaimed ? 'reconciliation_required' : 'held',
+            String(error),
+            requestId
+          );
         }
       } catch (error) {
         return result(
@@ -427,7 +539,8 @@ function settleWork(p: Proposal, deps: Dependencies, requestId: string): void {
   reapExpiredWorkLeases({
     itemFilter: (row) => row.item_id === item.item_id,
     completedEvidence: (row) =>
-      proposal(row, deps).fingerprint === p.fingerprint && receipt(p, deps) === 'active',
+      proposalIdentity(row, p.scope, p.brief).fingerprint === p.fingerprint &&
+      receipt(p, deps) === 'active',
   });
   if (getWorkItem(item.item_id, deps)?.status !== 'done')
     throw new Error('activation verified; work ownership still requires reconciliation');

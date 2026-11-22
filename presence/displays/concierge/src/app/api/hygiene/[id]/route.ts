@@ -1,6 +1,7 @@
 import { withCompanyFanoutInvalidation } from '../../../../lib/company-fanout-cache';
 import { serverDelegatedChildEnv } from '../../../../lib/server-child-env';
 import { NextRequest, NextResponse } from 'next/server';
+import { isolatedScopeEnvPath } from '@agent/core/scope-context';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
   assertSafeRepositoryPath,
@@ -118,7 +119,15 @@ async function handlePost(req: NextRequest, context: { params: Promise<{ id: str
       : [];
     const args =
       decision === 'start'
-        ? [CONTROLLER_RELATIVE, 'start', missionId, ...decidedByArgs]
+        ? [
+            CONTROLLER_RELATIVE,
+            'start',
+            missionId,
+            ...(inquiry.tier ? ['--tier', inquiry.tier] : []),
+            ...(inquiry.tenant_slug ? ['--tenant-slug', inquiry.tenant_slug] : []),
+            ...(inquiry.organization_id ? ['--organization-id', inquiry.organization_id] : []),
+            ...decidedByArgs,
+          ]
         : [
             CONTROLLER_RELATIVE,
             'cancel',
@@ -127,7 +136,15 @@ async function handlePost(req: NextRequest, context: { params: Promise<{ id: str
             ...decidedByArgs,
           ];
     const result = safeExecResult(process.execPath, args, {
-      env: serverDelegatedChildEnv('mission_controller'),
+      env: {
+        ...serverDelegatedChildEnv('mission_controller'),
+        KYBERION_SCOPE_ENV_PATH: isolatedScopeEnvPath(),
+        KYBERION_TIER: inquiry.tier ?? '',
+        KYBERION_TENANT: inquiry.tenant_slug ?? '',
+        KYBERION_ORGANIZATION_ID: inquiry.organization_id ?? '',
+        KYBERION_STANCE: '',
+        KYBERION_CUSTOMER: '',
+      },
       cwd: rootDir,
       timeoutMs: CONTROLLER_TIMEOUT_MS,
       maxOutputMB: 5,

@@ -288,11 +288,14 @@ async function applyIntentTrackGate(
   if (executionShape && !['mission', 'project_bootstrap'].includes(executionShape)) {
     return { input, intentTrackGate: null };
   }
-  if (!input.relationships?.project?.project_id || !input.relationships.project.project_path) {
+  const project = input.relationships?.project;
+  if (!project?.project_id || (!project.project_path && input.preflight?.ready !== false)) {
     throw new Error(
       '--intent-id requires --project-id and --project-path so the generated track remains linked to a governed project'
     );
   }
+
+  if (input.preflight?.ready === false) return { input, intentTrackGate: null };
 
   const { resolveIntentTrackGate } = await import('@agent/core/intent/intent-track-resolver');
   const result = await resolveIntentTrackGate({
@@ -307,10 +310,13 @@ async function applyIntentTrackGate(
   });
 
   if (result.status === 'escalation_required') {
-    if (context.hasDryRun) return { input, intentTrackGate: result };
-    throw new Error(
-      `Intent-to-track gate requires confirmation: ${result.intent_id} confidence ${result.confidence} is below ${result.min_confidence_to_autostart}`
-    );
+    const issue = `Intent-to-track gate requires confirmation: ${result.intent_id} confidence ${result.confidence} is below ${result.min_confidence_to_autostart}`;
+    if (context.hasDryRun)
+      return {
+        input: { ...input, preflight: { ...input.preflight, ready: false, issues: [issue] } },
+        intentTrackGate: result,
+      };
+    throw new Error(issue);
   }
 
   return {
@@ -428,7 +434,7 @@ export async function runMissionControllerAction(
         );
         return;
       }
-      await context.startMission(
+      const started = await context.startMission(
         arg1!,
         (input?.tier || 'confidential') as 'personal' | 'confidential' | 'public',
         input?.persona,
@@ -460,6 +466,14 @@ export async function runMissionControllerAction(
             mission_id: arg1?.toUpperCase(),
             routing_decision: routingDecision,
           },
+        });
+      }
+      if (context.argv.includes('--json')) {
+        context.print?.({
+          ok: true,
+          action,
+          mission_id: arg1?.toUpperCase(),
+          knowledge: started ? started.knowledgeLines : [],
         });
       }
       return;
@@ -527,6 +541,9 @@ export async function runMissionControllerAction(
                 routing_decision: routingDecision,
               },
             });
+          }
+          if (context.argv.includes('--json')) {
+            context.print?.({ ok: true, action, mission_id: arg1?.toUpperCase() });
           }
           return;
         }
@@ -873,6 +890,28 @@ export async function runMissionControllerAction(
         return;
       },
       'record-evidence': async () => {
+        const knowledgeUsed = parseCsvOption('--knowledge-used', context.argv);
+        if (context.argv.includes('--knowledge-used') && !knowledgeUsed?.length) {
+          throw new Error(
+            '--knowledge-used requires a comma-separated list of delivered references.'
+          );
+        }
+        const knowledge = knowledgeUsed?.length
+          ? await import('@agent/core/mission/mission-operator-knowledge-surface')
+          : undefined;
+        const requirement = knowledge?.inspectOperatorKnowledgeUse(arg1!, arg2 || 'manual');
+        if (requirement && knowledgeUsed) {
+          context.print?.({
+            task_id: arg2 || 'manual',
+            evidence_recorded: false,
+            next_action: requirement.nextAction,
+            knowledge_usage: knowledgeUsed.map((reference) => ({
+              reference,
+              status: requirement.status,
+            })),
+          });
+          return;
+        }
         const recorded = await context.recordEvidence(
           arg1!,
           arg2 || 'manual',
@@ -889,9 +928,24 @@ export async function runMissionControllerAction(
             : undefined
         );
         // A task that stayed open says why (missing deliverable / pending dependencies).
-        const completion = (recorded as { task_completion?: { completed?: boolean } } | undefined)
-          ?.task_completion;
-        if (completion && !completion.completed) context.print?.(recorded);
+        const evidence = recorded as
+          { task_completion?: { completed?: boolean }; evidence_task_id?: string } | undefined;
+        if (recorded && knowledge && knowledgeUsed) {
+          const usage = evidence?.evidence_task_id
+            ? knowledge.recordOperatorKnowledgeUsage(
+                arg1!,
+                evidence.evidence_task_id,
+                knowledgeUsed
+              )
+            : knowledgeUsed.map((reference) => ({ reference, status: 'task_not_recorded' }));
+          context.print?.({ ...evidence, knowledge_usage: usage });
+        } else if (
+          recorded &&
+          (context.argv.includes('--json') ||
+            (evidence?.task_completion && !evidence.task_completion.completed))
+        ) {
+          context.print?.(recorded);
+        }
       },
       'review-task': async () => {
         const findingsRaw = getValue('--findings', context.argv);
@@ -1040,7 +1094,14 @@ export async function runMissionControllerAction(
         );
       },
       status: async () => {
-        await context.showMissionStatus(arg1!, context.argv.includes('--follow'));
+        const json = context.argv.includes('--json');
+        const follow = context.argv.includes('--follow');
+        if (json && follow) throw new Error('--follow is not available with --json.');
+        const tenantSlug = getValue('--tenant-slug', context.argv);
+        if (context.argv.includes('--tenant-slug') && !tenantSlug)
+          throw new Error('--tenant-slug requires a tenant.');
+        await context.showMissionStatus(arg1!, { follow, json, tenantSlug });
+        if (json) return;
         await context.showReasoningBackendStatus();
         await showTerminalOutboxHint();
       },

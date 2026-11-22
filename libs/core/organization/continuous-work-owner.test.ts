@@ -12,6 +12,7 @@ import { CONTINUOUS_MANAGED_WORK_PIPELINE } from './continuous-work-plan.js';
 import {
   runContinuousWorkOwner,
   readContinuousWorkOwnerProgress,
+  ContinuousOwnerPreEffectError,
   type ContinuousWorkOwnerDeps,
   type ContinuousWorkOwnerPorts,
 } from './continuous-work-owner.js';
@@ -293,6 +294,18 @@ describe('continuous managed owner', () => {
     expect(f.ports.ensureMission).toHaveBeenCalledTimes(1);
     expect(f.ports.advanceMission).not.toHaveBeenCalled();
   });
+  it('settles a deterministic refusal before the first managed change', async () => {
+    const f = fixture();
+    const reason = 'Linked project is missing from the approved continuous scope';
+    vi.mocked(f.ports.ensureMission).mockRejectedValue(new ContinuousOwnerPreEffectError(reason));
+    expect((await f.run())[0]).toMatchObject({ status: 'failed', reason });
+    expect(f.item().status).toBe('archived');
+    expect(f.deps.release).toHaveBeenCalledWith(
+      expect.objectContaining({ nextStatus: 'archived', effectDisposition: 'pre_effect' })
+    );
+    expect([...f.files.values()][0]).toMatchObject({ step: 0, error: reason, intent: undefined });
+    expect(f.ports.advanceMission).not.toHaveBeenCalled();
+  });
   it('continues an interrupted project creation only when its committed effect is verified', async () => {
     const f = fixture('project');
     vi.mocked(f.ports.ensureProject).mockRejectedValue(new Error('lost controller result'));
@@ -453,7 +466,7 @@ describe('continuous managed owner', () => {
       return { item: second, lease: { lease_id: 'lease-2' } };
     }) as ContinuousWorkOwnerDeps['claim'];
     expect((await f.run())[0]?.reason).toContain('approval expired');
-    expect(f.files.size).toBe(0);
+    expect([...f.files.keys()].map((file) => path.basename(file))).toEqual(['sweep-position.json']);
     expect(f.item().status).toBe('blocked');
     expect(f.item().effect_ownership?.state).toBe('held');
     expect(f.deps.release).toHaveBeenCalledWith(
@@ -465,4 +478,61 @@ describe('continuous managed owner', () => {
     );
     expect(f.ports.ensureMission).toHaveBeenCalledTimes(1);
   });
+  it.each(['approval', 'objective'] as const)(
+    'rotates a waiting %s without spending the next sweep on another scope or owner',
+    async (waiting) => {
+      const f = fixture(waiting === 'objective' ? 'project' : 'mission');
+      const other = (itemId: string): WorkItem => ({
+        ...structuredClone(f.item()),
+        item_id: itemId,
+        metadata: { ...structuredClone(f.item().metadata), action_ref: itemId },
+      });
+      const wrongProject = other('WI-A');
+      wrongProject.context = { ...wrongProject.context, project_id: 'PRJ-FOREIGN' };
+      const wrongOwner = other('WI-B');
+      Object.assign(wrongOwner, {
+        status: 'in_progress',
+        lease_id: 'foreign-lease',
+        claimed_by_peer_id: 'dot:foreign',
+      });
+      let next = other('WI-TWO');
+      f.deps.list = () => [wrongProject, wrongOwner, f.item(), next];
+      f.deps.get = (id) => f.deps.list!().find((item) => item.item_id === id) ?? null;
+      const claimFirst = f.deps.claim!;
+      f.deps.claim = ((input) => {
+        if (input.itemId !== 'WI-TWO') return claimFirst(input);
+        next = {
+          ...next,
+          status: 'in_progress',
+          lease_id: 'lease-2',
+          claimed_by_peer_id: 'dot:operator',
+        };
+        return { item: next, lease: { lease_id: 'lease-2' } };
+      }) as ContinuousWorkOwnerDeps['claim'];
+      if (waiting === 'objective') {
+        const plan = f.item().metadata!.continuous_work as {
+          project: { objective_ids?: string[] };
+        };
+        plan.project.objective_ids = ['unregistered'];
+      }
+      const validate = vi
+        .spyOn(projectObjectives, 'assertProjectObjectiveLinks')
+        .mockImplementation(() => {
+          throw new Error('Unknown objective: unregistered');
+        });
+      try {
+        expect((await f.run())[0]).toMatchObject({
+          work_item_id: 'WI-ONE',
+          status: waiting === 'objective' ? 'blocked' : 'pending_approval',
+        });
+        expect((await f.run())[0]).toMatchObject({
+          work_item_id: 'WI-TWO',
+          status: 'pending_approval',
+        });
+        expect((await f.run())[0]).toMatchObject({ work_item_id: 'WI-ONE' });
+      } finally {
+        validate.mockRestore();
+      }
+    }
+  );
 });

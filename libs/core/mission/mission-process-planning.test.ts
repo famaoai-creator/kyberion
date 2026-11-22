@@ -13,7 +13,6 @@ import {
 } from '../secure-io.js';
 import type { MissionState } from './mission-types.js';
 import {
-  activateMissionOnGateProgress,
   applyProcessTemplatePlan,
   evaluatePhaseEntryGate,
   evaluateStoredMissionGate,
@@ -22,7 +21,7 @@ import {
   markPhaseTasksForRework,
   planProcessTemplateTasks,
 } from './mission-process-planning.js';
-import { assertValidMissionId } from './mission-creation.js';
+import { activateMissionOnGateProgress, assertValidMissionId } from './mission-creation.js';
 import {
   buildPlannerRetryPrompt,
   packetRequiresIndependentReview,
@@ -33,6 +32,13 @@ import { loadProvisionedEntryRecords } from './mission-orchestration-journal.js'
 
 const missionId = 'MSN-PROCESS-PLAN-001';
 const missionPath = pathResolver.missionDir(missionId, 'public');
+const passedAudienceGate = {
+  gate_id: 'AUDIENCE_DEFINED',
+  verdict: 'pass' as const,
+  checked_at: '2026-11-22T00:00:00.000Z',
+  checks: [],
+  reasons: [],
+};
 
 function presentationDesign() {
   return resolveMissionWorkflowDesign({
@@ -423,13 +429,63 @@ describe('mission process planning', () => {
     ) as Array<Record<string, unknown>>;
     expect(tasks.find((task) => task.phase === 'audience_definition')?.status).toBe('completed');
 
-    expect(await activateMissionOnGateProgress(missionId)).toBe(true);
+    expect(await activateMissionOnGateProgress(missionId, passedAudienceGate)).toBe(true);
     const state = JSON.parse(
       safeReadFile(`${missionPath}/mission-state.json`, { encoding: 'utf8' }) as string
     ) as Record<string, any>;
     expect(state.status).toBe('active');
     // Second call is a no-op (already active).
-    expect(await activateMissionOnGateProgress(missionId)).toBe(false);
+    expect(await activateMissionOnGateProgress(missionId, passedAudienceGate)).toBe(false);
+  });
+
+  it('activates an alignment workflow only after its approval gate passes', async () => {
+    const state = makeMissionState();
+    state.process_template!.phase_specs = state.process_template!.phase_specs!.map(
+      (phase, index) =>
+        index === 0
+          ? { ...phase, exit_gate: { ...phase.exit_gate!, id: 'ALIGNMENT_APPROVED' } }
+          : phase
+    );
+    const statePath = `${missionPath}/mission-state.json`;
+    safeWriteFile(statePath, JSON.stringify(state));
+    await expect(activateMissionOnGateProgress(missionId, passedAudienceGate)).rejects.toThrow(
+      '[MISSION_ALIGNMENT_REQUIRED]'
+    );
+    const alignment = { ...passedAudienceGate, gate_id: 'ALIGNMENT_APPROVED' };
+    expect(await activateMissionOnGateProgress(missionId, { ...alignment, verdict: 'fail' })).toBe(
+      false
+    );
+    expect(JSON.parse(safeReadFile(statePath, 'utf8') as string).status).toBe('planned');
+    expect(await activateMissionOnGateProgress(missionId, alignment)).toBe(true);
+    expect(JSON.parse(safeReadFile(statePath, 'utf8') as string).status).toBe('active');
+  });
+
+  it('holds a planned Mission at a gate until its predecessors finish', async () => {
+    const state = makeMissionState();
+    state.relationships = { prerequisites: ['MSN-PROCESS-PREDECESSOR-MISSING'] };
+    safeWriteFile(`${missionPath}/mission-state.json`, JSON.stringify(state));
+    await expect(activateMissionOnGateProgress(missionId, passedAudienceGate)).rejects.toThrow(
+      '[MISSION_PREREQUISITES_UNMET]'
+    );
+    expect(
+      JSON.parse(safeReadFile(`${missionPath}/mission-state.json`, 'utf8') as string).status
+    ).toBe('planned');
+  });
+
+  it('keeps a prepared WorkItem Mission on its approval-bound activation path', async () => {
+    safeMkdir(`${missionPath}/evidence`, { recursive: true });
+    safeWriteFile(
+      `${missionPath}/evidence/mission-brief.json`,
+      JSON.stringify({
+        source: { kind: 'dot_work_item', ref: 'WI-MISSION-PREPARED' },
+      })
+    );
+    await expect(activateMissionOnGateProgress(missionId, passedAudienceGate)).rejects.toThrow(
+      '[MISSION_ADMISSION_REQUIRED]'
+    );
+    expect(
+      JSON.parse(safeReadFile(`${missionPath}/mission-state.json`, 'utf8') as string).status
+    ).toBe('planned');
   });
 
   it('rejects mission ids with whitespace or shell-split accidents', () => {

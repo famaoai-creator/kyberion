@@ -1,7 +1,7 @@
 import path from 'node:path';
 import AjvModule from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   compileSchemaFromPath,
   pathResolver,
@@ -18,6 +18,7 @@ import {
   dispatchNextQueuedMission,
   enqueueMission,
   pruneMissionQueue,
+  requireMissionQueueScope,
   type MissionQueueEntry,
 } from './mission-queue.js';
 import { DEFAULT_JSONL_CHUNK_BYTES } from '@agent/core/jsonl-read';
@@ -34,7 +35,10 @@ describe('mission-queue', () => {
   });
 
   it('appends queue entries that satisfy the schema', async () => {
-    await enqueueMission(QUEUE_PATH, 'MSN-TEST-SCHEMA', 'confidential', 7, ['MSN-DEP-1']);
+    await enqueueMission(QUEUE_PATH, 'MSN-TEST-SCHEMA', 'confidential', 7, ['MSN-DEP-1'], {
+      tier: 'confidential',
+      tenantSlug: 'tenant-a',
+    });
     const raw = safeReadFile(QUEUE_PATH, { encoding: 'utf8' }) as string;
     const entry = JSON.parse(raw.trim().split('\n')[0] || '{}');
     const ajv = new Ajv({ allErrors: true });
@@ -45,6 +49,34 @@ describe('mission-queue', () => {
     );
     const valid = validate(entry);
     expect(valid, JSON.stringify(validate.errors || [])).toBe(true);
+  });
+
+  it('holds a scoped entry for another dispatcher and keeps looking for ready work', async () => {
+    await enqueueMission(QUEUE_PATH, 'MSN-TENANT-A', 'confidential', 9, [], {
+      tier: 'confidential',
+      tenantSlug: 'tenant-a',
+    });
+    await enqueueMission(QUEUE_PATH, 'MSN-PUBLIC', 'public', 1, [], { tier: 'public' });
+    const dispatched: string[] = [];
+    const checkDependencies = vi.fn(() => ({ ok: true, missing: [] }));
+    await dispatchNextQueuedMission(
+      QUEUE_PATH,
+      checkDependencies,
+      async (id) => {
+        dispatched.push(id);
+      },
+      async (_id, tier, entry) => {
+        requireMissionQueueScope(entry, {
+          tier,
+          ...(tier === 'confidential' ? { tenantSlug: 'tenant-b' } : {}),
+        });
+        return undefined;
+      }
+    );
+    expect(dispatched).toEqual(['MSN-PUBLIC']);
+    expect(checkDependencies.mock.calls).toEqual([['MSN-PUBLIC', []]]);
+    expect(statuses()).toEqual({ 'MSN-TENANT-A': 'pending', 'MSN-PUBLIC': 'dispatched' });
+    expect(safeReadFile(QUEUE_PATH, { encoding: 'utf8' })).not.toContain('tenant-a');
   });
 
   it('skips malformed records when selecting the next mission', async () => {
@@ -150,12 +182,14 @@ describe('mission-queue', () => {
     const failing = async (missionId: string) => {
       if (missionId === 'MSN-BROKEN') throw new Error('start exploded');
     };
-    for (let attempt = 1; attempt <= MAX_DISPATCH_ATTEMPTS; attempt += 1) {
+    await dispatchNextQueuedMission(QUEUE_PATH, () => ({ ok: true, missing: [] }), failing);
+    expect(statuses()).toEqual({ 'MSN-BROKEN': 'pending', 'MSN-NEXT': 'dispatched' });
+    for (let attempt = 2; attempt <= MAX_DISPATCH_ATTEMPTS; attempt += 1) {
       await expect(
         dispatchNextQueuedMission(QUEUE_PATH, () => ({ ok: true, missing: [] }), failing)
       ).rejects.toThrow('start exploded');
     }
-    expect(statuses()).toEqual({ 'MSN-BROKEN': 'failed', 'MSN-NEXT': 'pending' });
+    expect(statuses()).toEqual({ 'MSN-BROKEN': 'failed', 'MSN-NEXT': 'dispatched' });
     const broken = (safeReadFile(QUEUE_PATH, { encoding: 'utf8' }) as string)
       .trim()
       .split('\n')
@@ -174,8 +208,33 @@ describe('mission-queue', () => {
         dispatched.push(missionId);
       }
     );
-    expect(dispatched).toEqual(['MSN-NEXT']);
+    expect(dispatched).toEqual([]);
   });
+
+  it.each(['reported', 'thrown'])(
+    'skips a %s preflight hold without charging an execution attempt',
+    async (kind) => {
+      safeWriteFile(QUEUE_PATH, [entry('MSN-HELD', 9), entry('MSN-READY', 1)].join('\n') + '\n');
+      const dispatch = vi.fn(async () => {});
+      await dispatchNextQueuedMission(
+        QUEUE_PATH,
+        () => ({ ok: true, missing: [] }),
+        dispatch,
+        async (id) => {
+          if (id !== 'MSN-HELD') return undefined;
+          if (kind === 'thrown') throw new Error('configuration missing');
+          return 'configuration missing';
+        }
+      );
+      expect(dispatch).toHaveBeenCalledExactlyOnceWith(
+        'MSN-READY',
+        'public',
+        expect.objectContaining({ mission_id: 'MSN-READY' })
+      );
+      expect(statuses()).toEqual({ 'MSN-HELD': 'pending', 'MSN-READY': 'dispatched' });
+      expect(safeReadFile(QUEUE_PATH, { encoding: 'utf8' })).not.toContain('dispatch_attempts');
+    }
+  );
 
   it('parks an unreadable legacy entry instead of throwing on every dispatch', async () => {
     safeWriteFile(QUEUE_PATH, [entry('ab', 9), entry('MSN-OK-2', 1)].join('\n') + '\n');

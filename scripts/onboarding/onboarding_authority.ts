@@ -6,7 +6,6 @@ import { assertSafeRepositoryPath, safeExistsSync } from '@agent/core/secure-io'
 import { writeJson } from '@agent/core/foundation/json';
 import { resolveActiveProfileRoot } from '@agent/core/profile-root';
 import { loadPersonalIdentityAtPath } from '@agent/core/personal-identity-state';
-import { ensureOwnerMember } from '@agent/core/organization/member-registry';
 import {
   resolveCliApprovalRequester,
   resolveCliOperatorIdentity,
@@ -47,6 +46,28 @@ export async function main(
     .option('json', { type: 'boolean', default: false })
     .strict()
     .parse();
+  const usesFile = args.action === 'preview' || args.action === 'request';
+  const usesRequestId = args.action === 'status' || args.action === 'apply';
+  if (args.out && args.action !== 'preview') throw new Error('--out is only valid for preview.');
+  if (usesFile !== Boolean(args.file)) {
+    throw new Error(
+      usesFile ? '--file is required.' : '--file is only valid for preview or request.'
+    );
+  }
+  if (usesRequestId !== Boolean(args.requestId)) {
+    throw new Error(
+      usesRequestId
+        ? '--request-id is required.'
+        : '--request-id is only valid for status or apply.'
+    );
+  }
+  const explicitScope = !usesFile || argv.some((arg) => /^--(?:scope|tenant)(?:=|$)/.test(arg));
+  const selectedScope = explicitScope
+    ? onboardingAuthorityScope({
+        scope_kind: args.scope,
+        ...(args.tenant ? { tenant_slug: args.tenant } : {}),
+      })
+    : undefined;
   const installed = inspectInstalledIdentity();
   if (installed.source === 'unavailable') throw new Error(installed.next);
   if (installed.source === 'installation') {
@@ -55,13 +76,12 @@ export async function main(
       `Onboarding authority is managed at ${installed.governance_root}. Run there with the same explicit scope and reviewed file: ${canonicalAuthorityCommand(installed.governance_root, argv)}. A file outside that checkout is rejected; create and review the plan in the installed checkout before requesting approval.`
     );
   }
-  if (args.out && args.action !== 'preview') throw new Error('--out is only valid for preview.');
   const result = withExecutionContext('sovereign_concierge', () => {
     if (!loadPersonalIdentityAtPath(path.join(resolveActiveProfileRoot(), 'my-identity.json')))
       throw new Error('Complete reviewed identity onboarding first.');
-    ensureOwnerMember();
     const owner = resolveCliOperatorIdentity();
-    if (!owner.principalId) throw new Error('Registered operator identity required.');
+    if (!owner.principalId)
+      throw new Error('Registered operator identity required. Complete identity onboarding first.');
     const requester = resolveCliApprovalRequester({ legacy: 'onboarding-authority' });
     const principal: OnboardingAuthorityPrincipal = {
       requesterId: requester.actorId,
@@ -69,21 +89,28 @@ export async function main(
       personalOwner: true,
       tenantSlugs: 'all',
     };
-    const scope = onboardingAuthorityScope({
-      scope_kind: args.scope,
-      ...(args.tenant ? { tenant_slug: args.tenant } : {}),
-    });
-    if (args.action === 'show') return readOnboardingAuthority(principal, scope);
+    if (args.action === 'show') return readOnboardingAuthority(principal, selectedScope!);
     if (args.action === 'status' || args.action === 'apply') {
       if (!args.requestId) throw new Error('--request-id is required.');
       return args.action === 'status'
-        ? onboardingAuthorityRequestStatus(principal, scope, args.requestId)
-        : applyOnboardingAuthority(principal, scope, args.requestId);
+        ? onboardingAuthorityRequestStatus(principal, selectedScope!, args.requestId)
+        : applyOnboardingAuthority(principal, selectedScope!, args.requestId);
     }
     if (!args.file) throw new Error('--file is required.');
     const file = assertSafeRepositoryPath(args.file, { allowMissingLeaf: false });
     const envelope = readSafeJsonFile<Record<string, unknown>>(file, 'Onboarding authority plan');
     const input = envelope.input ?? envelope;
+    const fileScope = onboardingAuthorityScope(input);
+    if (
+      selectedScope &&
+      (selectedScope.kind !== fileScope.kind ||
+        (selectedScope.kind === 'organization' &&
+          fileScope.kind === 'organization' &&
+          selectedScope.tenant_slug !== fileScope.tenant_slug))
+    )
+      throw new Error(
+        'The reviewed file scope does not match --scope/--tenant. Use the scope in the file or review a new plan.'
+      );
     if (args.action === 'preview') {
       const preview = { ...previewOnboardingAuthority(principal, input), input };
       if (!args.out) return preview;

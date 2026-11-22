@@ -17,30 +17,15 @@
       "params": {
         "service_id": "gh",
         "action": "issue",
-        "params": ["list", "--label", "mission", "--json", "number,title,body"]
+        "params": ["list", "--label", "mission", "--json", "number,title,url"]
       }
     },
     {
       "role": "transform",
       "op": "core:run_mission_start_from_issues",
       "consumes": "raw_issues",
-      "produces": { "channel": "parsed_issues", "type": "ParsedIssues" },
-      "params": {
-        "cmd": "echo '{{raw_issues.output}}' | jq -c '.'"
-      }
-    },
-    {
-      "role": "sink",
-      "op": "system:log",
-      "consumes": "parsed_issues",
-      "params": { "message": "📦 Found issues: {{parsed_issues}}" }
-    },
-    {
-      "role": "transform",
-      "op": "system:shell",
-      "consumes": "parsed_issues",
       "produces": { "channel": "ingest_summary", "type": "IngestSummary" },
-      "params": { "cmd": "echo '{{parsed_issues}}'" }
+      "params": {}
     },
     {
       "role": "sink",

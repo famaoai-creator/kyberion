@@ -9,7 +9,6 @@ import {
   saveTaskSession,
   validateTaskSession,
 } from '@agent/core/task/task-session';
-import { getRegisteredEnv } from '@agent/core/foundation/env';
 import { executeApprovedClaudeTaskSession } from '@agent/core/provider/claude-task-session-executor';
 import { formatClarificationPacket } from '@agent/core/intent/intent-clarification-format';
 import { installReasoningBackends } from '@agent/core/reasoning/reasoning-bootstrap';
@@ -215,8 +214,7 @@ export async function main(args: string[] = []): Promise<IntentGatewayResult> {
     (context as any)?.tenantId ||
     (context as any)?.tenant_slug ||
     (context as any)?.tenantSlug ||
-    (getRegisteredEnv<string>('KYBERION_TENANT') as string | undefined) ||
-    (getRegisteredEnv<string>('KYBERION_STANCE') as string | undefined);
+    resolveScopeContext().tenant_slug;
   // D7: the request is resolved once here; everything downstream reads the
   // carried packet and RoutingDecision instead of re-resolving the utterance.
   const { packet, decision: routingDecision } = resolveRoutingDecision(intent, {
@@ -414,6 +412,12 @@ export async function main(args: string[] = []): Promise<IntentGatewayResult> {
       compiled.workLoop?.work_scope_decision?.execution_shape ||
       compiled.workLoop?.resolution?.execution_shape;
     if (executionShape === 'mission') {
+      const scope = resolveScopeContext({
+        tier,
+        tenant_slug: typeof tenantId === 'string' ? tenantId : undefined,
+        organization_id: contextText('organization_id'),
+        project_id: contextText('project_id'),
+      });
       const issued = await issueMissionFromProposal({
         surface: 'terminal',
         channel: 'terminal',
@@ -422,12 +426,22 @@ export async function main(args: string[] = []): Promise<IntentGatewayResult> {
           intent: 'create_mission',
           summary: compiled.intentContract?.goal?.summary || intent,
           mission_type: 'development',
-          tier,
+          tier: scope.tier,
           why: 'CLI request classified as mission-shaped by the intent compiler.',
         },
         sourceText: intent,
         routingDecision: compiled.routingDecision,
         requestedBy: 'mission_controller',
+        ...(scope.tenant_slug || (scope.tier === 'public' && scope.project_id)
+          ? {
+              scope: {
+                ...(scope.tenant_slug ? { tenant_slug: scope.tenant_slug } : {}),
+                ...(scope.organization_id ? { organization_id: scope.organization_id } : {}),
+                ...(scope.project_id ? { project_id: scope.project_id } : {}),
+                ...(scope.tier ? { tier: scope.tier } : {}),
+              },
+            }
+          : {}),
       });
       return {
         status: 'mission_issued',

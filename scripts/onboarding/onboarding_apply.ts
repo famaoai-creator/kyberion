@@ -806,7 +806,7 @@ export async function main(argv: string[] = [], print: Print = () => undefined) 
     return;
   }
 
-  const result = await applyOnboardingInput(input, print, {
+  const result = await applyOnboardingInput(input, parsed.json ? undefined : print, {
     verifyRepositoryVisibility: parsed['verify-repository-visibility'],
   });
   if (parsed.json) {

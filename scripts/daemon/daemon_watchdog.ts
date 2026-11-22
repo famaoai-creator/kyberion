@@ -61,10 +61,14 @@ import {
 import { listTenantProfileSlugs } from '@agent/core/organization/tenant-registry';
 import { evaluateMissionStartMandate } from '@agent/core/governance/mandate-shadow';
 import {
+  inspectMissionAdmissionActivation,
   resolveDotMissionAdmission,
   resolveDotMissionAdmissionScope,
 } from '@agent/core/mission/mission-admission';
-import { continueHumanMissionAdmission } from '../mission/mission_admission_continuation.js';
+import {
+  checkMissionAdmissionPreflight,
+  continueHumanMissionAdmission,
+} from '../mission/mission_admission_continuation.js';
 import {
   applyApprovedMissionAdmissionConfirmation,
   openMissionAdmissionConfirmation,
@@ -778,9 +782,21 @@ export async function sweepMissionStartCandidates(deps: { rootDir?: string }): P
     try {
       // Unscoped proposals cannot be promoted into a guessed/default tenant.
       if (!item.context?.tenant_slug) continue;
+      // Once preparation began, only its exact durable continuation may activate
+      // it or settle a committed effect, even if its mandate was later revoked.
+      if (item.metadata?.mission_alignment_preparation) {
+        const continuation = await continueHumanMissionAdmission(item.item_id, deps);
+        if (continuation.status === 'reconciliation_required')
+          logger.warn(
+            '[WATCHDOG] mission admission held — ' +
+              continuation.reason +
+              ' | next: reconcile original admission | evidence: ' +
+              item.item_id
+          );
+        continue;
+      }
       const scopedDeps = { ...deps, tenantSlug: item.context.tenant_slug };
-      const admission = () => {
-        const typed = resolveDotMissionAdmission(item, deps);
+      const admission = (typed = resolveDotMissionAdmission(item, deps)) => {
         return evaluateMissionStartMandate({
           tenant_slug: item.context!.tenant_slug!,
           mandate_id: typed.mandate_ref,
@@ -798,18 +814,6 @@ export async function sweepMissionStartCandidates(deps: { rootDir?: string }): P
       // alone must never bootstrap promotion into authority.
       // Automatic admission requires explicit current gate permission; shadow remains held.
       // Human alignment is a separate controller workflow, not an override of shadow.
-      // Once preparation began, only its exact durable continuation may activate it.
-      if (item.metadata?.mission_alignment_preparation) {
-        const continuation = await continueHumanMissionAdmission(item.item_id, deps);
-        if (continuation.status === 'reconciliation_required')
-          logger.warn(
-            '[WATCHDOG] mission admission held — ' +
-              continuation.reason +
-              ' | next: reconcile original admission | evidence: ' +
-              item.item_id
-          );
-        continue;
-      }
       // R5: shadow holds autonomous start but may ask a human, once per item version,
       // whether to begin the existing admission. Accepting is not mandate learning.
       if (verdict.shadow) {
@@ -830,21 +834,12 @@ export async function sweepMissionStartCandidates(deps: { rootDir?: string }): P
           // and expiry must be checked at the actual admission boundary.
           if (!admission().covered) continue;
           const missionScope = resolveDotMissionAdmissionScope(item, deps);
-          claimed = claimWorkItem({
-            itemId: item.item_id,
-            actorPeerId: 'mission_controller',
-            purpose: 'internal mission admission',
-            requireNewLease: true,
-            expectedVersion: item.version,
-            idempotencyKey: `mission-admission:${missionId}`,
-            ttlMs: 300000,
-          });
           const argv = [
             'start',
             missionId,
             '--tier',
             'confidential',
-            '--persona',
+            '--org-role',
             'worker',
             '--tenant',
             item.context.tenant_slug,
@@ -859,6 +854,61 @@ export async function sweepMissionStartCandidates(deps: { rootDir?: string }): P
             '--tenant-slug',
             item.context.tenant_slug,
           ];
+          const blocked = await withExecutionContextAsync(
+            'mission_controller',
+            () => checkMissionAdmissionPreflight(missionMain, argv),
+            undefined,
+            missionScope.tenant_slug,
+            missionScope.organization_id
+          );
+          if (blocked) {
+            logger.warn(
+              `[WATCHDOG] mission admission held — ${blocked} | next: resolve preflight requirements | evidence: ${item.item_id}`
+            );
+            continue;
+          }
+          const currentGate = evaluateAutonomousOpsAction({
+            actionId: 'mission_start_mandate',
+            tenantSlug: missionScope.tenant_slug,
+          });
+          const currentAdmission = resolveDotMissionAdmission(item, deps);
+          if (
+            !admission(currentAdmission).covered ||
+            !currentGate.allowed ||
+            currentGate.decision !== 'auto' ||
+            currentGate.shadow
+          )
+            continue;
+          const inspectActivation = () =>
+            withExecutionContext(
+              'mission_controller',
+              () =>
+                inspectMissionAdmissionActivation(
+                  missionId,
+                  item,
+                  missionScope,
+                  currentAdmission,
+                  deps
+                ),
+              undefined,
+              missionScope.tenant_slug,
+              missionScope.organization_id
+            );
+          if (inspectActivation() === 'conflict') {
+            logger.warn(
+              `[WATCHDOG] active mission lacks matching admission evidence — ${missionId} | next: reconcile mission and WorkItem binding | evidence: ${item.item_id}`
+            );
+            continue;
+          }
+          claimed = claimWorkItem({
+            itemId: item.item_id,
+            actorPeerId: 'mission_controller',
+            purpose: 'internal mission admission',
+            requireNewLease: true,
+            expectedVersion: item.version,
+            idempotencyKey: `mission-admission:${missionId}`,
+            ttlMs: 300000,
+          });
           // Enter the governed controller only after the exact intake, current
           // mandate, autonomous gate and WorkItem claim have been verified.
           await withExecutionContextAsync(
@@ -868,16 +918,8 @@ export async function sweepMissionStartCandidates(deps: { rootDir?: string }): P
             missionScope.tenant_slug,
             missionScope.organization_id
           );
-          const { loadState } = await import('@agent/core/mission/mission-state');
-          const started = loadState(missionId, deps);
-          if (
-            !started ||
-            started.status !== 'active' ||
-            started.tenant_slug !== item.context.tenant_slug
-          ) {
-            throw new Error(
-              `mission start has no matching tenant-scoped state receipt: ${missionId}`
-            );
+          if (inspectActivation() !== 'matched') {
+            throw new Error(`mission start has no matching admission receipt: ${missionId}`);
           }
           releaseWorkItem({
             itemId: item.item_id,

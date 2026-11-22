@@ -12,12 +12,29 @@ export interface MachineMissionGatePorts {
   }) => Promise<StoredGateEvaluationResult>;
   advance: (missionId: string, phase: string) => Promise<void>;
   markCompleted: (missionId: string, phase: string) => number;
-  activate: (missionId: string) => Promise<boolean>;
+  activate: (
+    missionId: string,
+    evaluation: NonNullable<StoredGateEvaluationResult['evaluation']>
+  ) => Promise<boolean>;
   recordEvaluation?: (
     missionId: string,
     gateId: string,
     stored: StoredGateEvaluationResult
   ) => void;
+}
+
+export function parseMachineMissionGate(input: { missionId: string; gateId?: string }) {
+  const missionId = input.missionId.trim().toUpperCase();
+  const gateId = input.gateId;
+  if (
+    !/^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(missionId) ||
+    !gateId ||
+    !/^[A-Za-z][A-Za-z0-9_-]{0,127}$/.test(gateId)
+  )
+    throw new Error(
+      'This gate-pass mode requires a mission ID and a stored gate ID; evidence files and paths are forbidden'
+    );
+  return { missionId, gateId };
 }
 
 /** There is intentionally no evidence-file resolver or override port. */
@@ -31,16 +48,7 @@ export async function runMachineOnlyMissionGate(
   completed_tasks: number;
   activated: boolean;
 }> {
-  const missionId = input.missionId.trim().toUpperCase();
-  const gateId = input.gateId;
-  if (
-    !/^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(missionId) ||
-    !gateId ||
-    !/^[A-Za-z][A-Za-z0-9_-]{0,127}$/.test(gateId)
-  )
-    throw new Error(
-      'Machine-only gate-pass requires a mission ID and a stored gate ID; evidence files and paths are forbidden'
-    );
+  const { missionId, gateId } = parseMachineMissionGate(input);
   const stored = await ports.evaluateStored({ missionId, gateId, humanConfirmed: false });
   if (!stored.found || !stored.evaluation) {
     logger.warn(
@@ -76,12 +84,12 @@ export async function runMachineOnlyMissionGate(
       `${ciWaiting ? '[DEVELOPMENT_CI_WAITING] ' : ''}Machine-only gate checks failed: ${missionId}/${gateId}`
     );
   }
+  const activated = await ports.activate(missionId, stored.evaluation);
   let completed = 0;
   if (stored.position === 'exit' && stored.phase) {
     await ports.advance(missionId, stored.phase);
     completed = ports.markCompleted(missionId, stored.phase);
   }
-  const activated = await ports.activate(missionId);
   logger.info(
     `machine gate passed — stored checks verified | next: continue the governed process | evidence: ${missionId}/${gateId}`
   );

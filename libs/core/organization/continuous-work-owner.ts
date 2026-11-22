@@ -28,6 +28,8 @@ import {
   authorize,
   authorizeItem,
   continuousWorkCheckpoint,
+  continuousWorkRuntimePath,
+  ContinuousOwnerPreEffectError,
   digest,
   validateState,
   type OwnerState,
@@ -37,7 +39,22 @@ import {
   type ContinuousWorkOwnerDeps,
   type ContinuousWorkOwnerRow,
 } from './continuous-work-owner-state.js';
+import type { WorkItem } from '../workforce/work-coordination-types.js';
 export * from './continuous-work-owner-state.js';
+
+type SweepPosition = Pick<WorkItem, 'created_at' | 'item_id'>;
+
+function compareSweepPosition(a: SweepPosition, b: SweepPosition): number {
+  return a.created_at.localeCompare(b.created_at) || a.item_id.localeCompare(b.item_id);
+}
+
+function readSweepPosition(value: unknown): SweepPosition | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+  const position = value as Partial<SweepPosition>;
+  return typeof position.created_at === 'string' && typeof position.item_id === 'string'
+    ? { created_at: position.created_at, item_id: position.item_id }
+    : undefined;
+}
 
 /** One bounded sweep; checkpoints persist before every possible external effect. */
 export async function runContinuousWorkOwner(
@@ -96,37 +113,56 @@ export async function runContinuousWorkOwner(
   const cap = Math.max(
     0,
     Math.min(
-      options.limit ?? 1,
+      Math.floor(options.limit ?? 1),
       resolveDotDelegationLimit(charter.authority.max_concurrent_delegations)
     )
   );
-  const items = (
+  if (!(cap > 0)) return [];
+  const eligible = (item: WorkItem): boolean =>
+    (!options.itemId || item.item_id === options.itemId) &&
+    Boolean(item.metadata?.continuous_work) &&
+    item.metadata?.dot_id === charter.dot_id &&
+    item.metadata?.pipeline_ref === CONTINUOUS_MANAGED_WORK_PIPELINE &&
+    (item.context?.tenant_slug ?? '') === (scope.tenant_slug ?? '') &&
+    item.context?.organization_id === scope.organization_id &&
+    item.context?.project_id === expectedScope.project_id &&
+    (item.status === 'ready' ||
+      (item.status === 'in_progress' &&
+        item.claimed_by_peer_id === actor &&
+        Boolean(item.lease_id)));
+  const candidates = (
     deps.list ?? (() => listWorkItems({ status: ['ready', 'in_progress'] }, { rootDir }))
   )()
-    .filter(
-      (item) =>
-        (!options.itemId || item.item_id === options.itemId) &&
-        item.metadata?.continuous_work &&
-        item.metadata.dot_id === charter.dot_id &&
-        item.metadata.pipeline_ref === CONTINUOUS_MANAGED_WORK_PIPELINE &&
-        (item.context?.tenant_slug ?? '') === (scope.tenant_slug ?? '') &&
-        item.context?.organization_id === scope.organization_id &&
-        (item.status === 'ready' || item.status === 'in_progress')
-    )
-    .sort(
-      (a, b) =>
-        (a.status === 'in_progress' ? -1 : 1) - (b.status === 'in_progress' ? -1 : 1) ||
-        a.created_at.localeCompare(b.created_at)
-    )
-    .slice(0, cap);
+    .filter(eligible)
+    .sort(compareSweepPosition);
+  const cursorPath =
+    candidates.length > 1
+      ? continuousWorkRuntimePath(charter, 'sweep-position.json', rootDir)
+      : undefined;
+  const considered = new Set<string>();
   const rows: ContinuousWorkOwnerRow[] = [];
-  for (const selected of items) {
+  for (let index = 0; index < Math.min(cap, candidates.length); index += 1) {
+    if (halted() || Date.now() >= deadline) break;
+    // Advance only for the next attempted candidate, including approval and preflight waits.
+    // Admission and effect ownership are checked separately under the per-item lock.
+    const selected = cursorPath
+      ? await lock(`continuous-owner-sweep-${digest(cursorPath)}`, async () => {
+          const position = readSweepPosition(read(cursorPath));
+          const remaining = candidates.filter((item) => !considered.has(item.item_id));
+          const next =
+            (position && remaining.find((item) => compareSweepPosition(item, position) > 0)) ||
+            remaining[0];
+          if (next) write(cursorPath, { item_id: next.item_id, created_at: next.created_at });
+          return next;
+        })
+      : candidates[0];
+    if (!selected) break;
+    considered.add(selected.item_id);
     const row = await lock(
       `continuous-owner-${digest([rootDir, selected.item_id])}`,
       async (): Promise<ContinuousWorkOwnerRow> => {
         const item = (deps.get ?? ((id) => getWorkItem(id, { rootDir })))(selected.item_id);
-        if (!item || !['ready', 'in_progress'].includes(item.status))
-          return { work_item_id: selected.item_id, status: 'skipped' };
+        if (!item || !eligible(item)) return { work_item_id: selected.item_id, status: 'skipped' };
         const base = { work_item_id: item.item_id };
         let state: OwnerState | undefined;
         let statePath: string | undefined;
@@ -425,7 +461,10 @@ export async function runContinuousWorkOwner(
           };
         } catch (error) {
           const reason = error instanceof Error ? error.message : String(error);
+          const preEffect = error instanceof ContinuousOwnerPreEffectError;
+          const noManagedEffects = preEffect && state?.step === 0;
           if (state && statePath) {
+            if (preEffect) state.intent = undefined;
             state.error = reason;
             write(statePath, state);
           }
@@ -445,12 +484,17 @@ export async function runContinuousWorkOwner(
               digest([scope.tenant_slug ?? '', scope.organization_id, expectedScope.project_id])
           ) {
             try {
-              // Deliberately omit effectDisposition: the unresolved effect hold survives quarantine.
               (deps.release ?? releaseWorkItem)({
                 itemId: item.item_id,
                 leaseId: latest.lease_id!,
                 actorPeerId: actor,
-                nextStatus: 'blocked',
+                ...(noManagedEffects
+                  ? {
+                      nextStatus: 'archived' as const,
+                      effectDisposition: 'pre_effect' as const,
+                      metadata: { dot_executor: { reason_code: 'pre_effect_failure' } },
+                    }
+                  : { nextStatus: 'blocked' as const }),
                 summary: reason,
               });
             } catch {
@@ -466,7 +510,7 @@ export async function runContinuousWorkOwner(
             ...base,
             ...(state ? { project_id: state.project_id, missions: state.missions } : {}),
             ...(statePath ? { state_path: statePath } : {}),
-            status: 'blocked',
+            status: noManagedEffects ? 'failed' : 'blocked',
             reason,
           };
         }

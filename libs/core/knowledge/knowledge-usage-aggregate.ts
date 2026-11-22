@@ -21,6 +21,8 @@ export interface KnowledgeUsageAggregateEntry {
   last_delivered_at?: string;
   /** When a worker last reported the document as used. */
   last_used_at?: string;
+  /** Portion of used_count projected from explicit usage receipts. */
+  explicit_used_count?: number;
 }
 
 const KNOWLEDGE_USAGE_AGGREGATE_SCHEMA_PATH = pathResolver.knowledge(

@@ -32,7 +32,6 @@ import * as autonomyGate from '@agent/core/governance/autonomous-ops-gate';
 import * as autonomyState from '@agent/core/governance/autonomy-action-state';
 import * as mandates from '@agent/core/governance/mandate-shadow';
 import * as missionAdmission from '@agent/core/mission/mission-admission';
-import * as missionState from '@agent/core/mission/mission-state';
 import {
   resolveIdentityContext,
   resolveRole,
@@ -169,9 +168,12 @@ describe('daemon_watchdog', () => {
     { projectId: 'proj-1', fail: false },
     { projectId: undefined, fail: true },
     { projectId: undefined, fail: false, callerRole: 'daemon_watchdog' },
+    { projectId: undefined, fail: false, held: 'preflight' },
+    { projectId: undefined, fail: false, held: 'mandate' },
+    { projectId: undefined, fail: false, held: 'receipt' },
   ])(
-    'mediates the controller scope for project $projectId, failure $fail',
-    async ({ projectId, fail, callerRole = 'organization_operator' }) => {
+    'mediates the controller scope for project $projectId, failure $fail, held $held',
+    async ({ projectId, fail, held, callerRole = 'organization_operator' }) => {
       const item = {
         ...missionProposal,
         status: 'ready' as const,
@@ -208,18 +210,32 @@ describe('daemon_watchdog', () => {
         .spyOn(workCoordination, 'releaseWorkItem')
         .mockReturnValue({ item } as never);
       const state = vi
-        .spyOn(missionState, 'loadState')
-        .mockReturnValue({ status: 'active', tenant_slug: 'acme' } as never);
+        .spyOn(missionAdmission, 'inspectMissionAdmissionActivation')
+        .mockImplementation(() => {
+          expect(resolveRole()).toBe('mission_controller');
+          expect(resolveIdentityContext().tenantSlug).toBe('acme');
+          return held === 'receipt' ? 'conflict' : 'matched';
+        });
       const execution = vi
         .spyOn(autonomyState, 'recordAutonomyExecution')
         .mockImplementation(() => undefined);
       routing.missionMain.mockClear();
-      routing.missionMain.mockImplementation(async () => {
-        expect(resolveRole()).toBe('mission_controller');
-        expect(resolveIdentityContext().tenantSlug).toBe('acme');
-        expect(claim).toHaveBeenCalledTimes(1);
-        if (fail) throw new Error('controller rejected admission');
-      });
+      routing.missionMain.mockImplementation(
+        async (args: string[], print?: (value: unknown) => void) => {
+          expect(resolveRole()).toBe('mission_controller');
+          expect(resolveIdentityContext().tenantSlug).toBe('acme');
+          if (args.includes('--dry-run')) {
+            expect(claim).not.toHaveBeenCalled();
+            print?.({
+              input: { preflight: { ready: held !== 'preflight', issues: ['tenant incomplete'] } },
+            });
+            if (held === 'mandate') admission.mockReturnValue({ covered: false, reasons: [] });
+            return;
+          }
+          expect(claim).toHaveBeenCalledTimes(1);
+          if (fail) throw new Error('controller rejected admission');
+        }
+      );
       try {
         await withExecutionContextAsync(
           callerRole,
@@ -233,6 +249,12 @@ describe('daemon_watchdog', () => {
           'acme',
           'org-1'
         );
+        if (held) {
+          expect(claim).not.toHaveBeenCalled();
+          expect(execution).not.toHaveBeenCalled();
+          expect(routing.missionMain).toHaveBeenCalledTimes(1);
+          return;
+        }
         expect(claim).toHaveBeenCalledWith(
           expect.objectContaining({
             itemId: item.item_id,

@@ -828,6 +828,46 @@ Project -> Track -> Gate Readiness -> Next Required Artifact -> Template/Skeleto
 
 `chronos seed-track` remains permission-gated by Chronos localadmin access.
 
+### Mission startup preflight
+
+Operators and automation can preview Mission creation or start with
+`--dry-run --json`. Parse `input.preflight.ready`; diagnostic output is sent
+to stderr. Resolve any required onboarding, tenant, organization, project or
+predecessor before issuing the real command.
+
+For a planned Mission with a stored gate, run
+`pnpm mission gate-pass <MISSION_ID> <GATE_ID> --dry-run --json`. Add
+`--machine-only` when checking whether automation can run the gate.
+This checks the Mission's startup prerequisites and validates the stored gate
+definition. It does not evaluate the gate evidence. When the workflow declares
+alignment approval, the alignment gate is the first gate that can activate the
+Mission. The actual `gate-pass` evaluates evidence before activation and phase
+advancement. Admission prepared from a WorkItem uses its governed activation
+flow, which records the exact admission brief before marking the Mission
+active.
+
+Queued work with missing prerequisites stays pending while the same sweep looks
+for other ready entries. Dispatch from the scope used when enqueuing. Older
+scoped queue entries without a binding must be enqueued again from their original
+scope. The continuous owner rotates through eligible work so an item waiting for
+approval cannot monopolize a limited sweep. The admission worker checks readiness before consuming
+an approval. The continuous owner scaffolds the managed Project OS before
+creating a linked Mission and checks again on subsequent sweeps while a
+predecessor is unfinished. It also waits for operator or reviewer gates and
+resumes when the current gate has a matching passed evaluation. Scoped child controllers take the scope carried by
+the handoff, including when the operator has a saved Stance or tenant.
+
+Surface retries reuse the same Mission and issuance event for the same
+request and scope. When the first worker launch is uncertain, inspect the
+Mission journal and use the governed `resume` path to recover it.
+
+Use `pnpm mission status <ID> --json` to read an exact Mission status
+in automation. A Mission outside the selected scope returns a lookup failure.
+
+Use `pnpm kyberion scheduler reconcile` to inspect resident-service registration
+for the current checkout. Review the enabled schedule definitions before applying
+the plan, because registering the scheduler enables their configured execution.
+
 ## 9. The Smallest Teaching Version
 
 If you have to explain Kyberion quickly, explain it like this:

@@ -190,6 +190,28 @@ describe('mission_controller argument parsing', () => {
       expect(output.map(String).join('\n')).toContain('permission unverified');
       expect(output.map(String).join('\n')).toContain('not proof of model execution');
       expect(discover).not.toHaveBeenCalled();
+
+      output.length = 0;
+      peek.mockClear();
+      const scoped = ['status', 'MSN-READ-ONLY-EXISTING', '--json', '--tenant-slug'];
+      await main([...scoped, 'synthetic-status'], (value) => output.push(value));
+      expect(output).toEqual([
+        expect.objectContaining({
+          mission_id: 'MSN-READ-ONLY-EXISTING',
+          tenant_slug: 'synthetic-status',
+          status: 'active',
+          next_action: 'Inspect recorded outcomes',
+        }),
+      ]);
+      expect(peek).not.toHaveBeenCalled();
+      output.length = 0;
+      await expect(
+        main([...scoped, 'different-tenant'], (value) => output.push(value))
+      ).rejects.toMatchObject({
+        details: { code: 'MISSION_STATUS_NOT_FOUND', category: 'not_found' },
+      });
+      expect(output).toEqual([]);
+      expect(peek).not.toHaveBeenCalled();
     } finally {
       monitor.mockRestore();
       discover.mockRestore();
@@ -365,6 +387,8 @@ describe('mission_controller argument parsing', () => {
       'agent',
       '--evidence',
       'evidence/report.json,evidence/screenshot.png',
+      '--knowledge-used',
+      'knowledge/public/lesson.md',
     ]);
 
     expect(positionalArgs).toEqual(['record-evidence', 'MSN-2D', 'review', 'Evidence recorded']);
@@ -478,6 +502,15 @@ describe('mission_controller argument parsing', () => {
     expect(relationships).toEqual({});
   });
 
+  it('prefers the canonical Org Role flag and accepts the legacy alias', () => {
+    const base = ['node', 'dist/scripts/mission_controller.js', 'start', 'MSN-5'];
+    const legacy = [...base, '--persona', 'worker'];
+    expect(extractMissionStartCreateOptionsFromArgv(legacy).persona).toBe('worker');
+    expect(
+      extractMissionStartCreateOptionsFromArgv([...legacy, '--org-role', 'product_manager']).persona
+    ).toBe('product_manager');
+  });
+
   it('treats --relationships as a named option instead of a positional argument', () => {
     const positionalArgs = extractMissionControllerPositionalArgs([
       'node',
@@ -486,7 +519,7 @@ describe('mission_controller argument parsing', () => {
       'MSN-5',
       '--relationships',
       '{"project":{"project_id":"PRJ-1","project_path":"projects/sample","relationship_type":"belongs_to"}}',
-      '--persona',
+      '--org-role',
       'Ecosystem Architect',
     ]);
 
@@ -564,6 +597,179 @@ describe('mission_controller argument parsing', () => {
       startSpy.mockRestore();
       routerSpy.mockRestore();
     }
+  });
+
+  it.each([{ flags: [] }, { flags: ['--machine-only'] }])(
+    'previews a stored gate without evaluating it (%j)',
+    async ({ flags }) => {
+      const output: unknown[] = [];
+      await main(
+        [
+          'gate-pass',
+          'MSN-GATE-PREVIEW-MISSING',
+          'EXECUTION_DONE',
+          '--dry-run',
+          '--json',
+          ...flags,
+        ],
+        (value) => output.push(value)
+      );
+      expect(output).toHaveLength(1);
+      expect(JSON.parse(String(output[0]))).toMatchObject({
+        action: 'gate-pass',
+        machine_only: flags.length > 0,
+        input: { preflight: { ready: false, issues: [expect.stringContaining('not found')] } },
+      });
+    }
+  );
+
+  it('refuses to evaluate a later gate while alignment approval is pending', async () => {
+    const id = 'MSN-GATE-ALIGNMENT-REQUIRED';
+    await withProjectMissionControllerAsync(async () => {
+      const missionDir = pathResolver.missionDir(id, 'public');
+      const statePath = `${missionDir}/mission-state.json`;
+      const state = {
+        mission_id: id,
+        tier: 'public',
+        status: 'planned',
+        execution_mode: 'local',
+        priority: 1,
+        org_role: 'worker',
+        confidence_score: 1,
+        git: { branch: 'main', start_commit: 'abc1234', latest_commit: 'abc1234', checkpoints: [] },
+        history: [],
+        process_template: {
+          workflow_id: 'test-alignment',
+          pattern: 'waterfall',
+          phases: ['alignment', 'execution'],
+          phase_specs: [
+            {
+              id: 'alignment',
+              title: 'Alignment',
+              kind: 'judgment',
+              default_tasks: [],
+              exit_gate: {
+                id: 'ALIGNMENT_APPROVED',
+                checks: [{ kind: 'evidence_exists', params: { path: 'evidence/alignment.json' } }],
+              },
+            },
+          ],
+        },
+      };
+      safeMkdir(missionDir, { recursive: true });
+      safeWriteFile(statePath, JSON.stringify(state));
+      try {
+        const args = ['gate-pass', id, 'EXECUTION_DONE'];
+        const output: unknown[] = [];
+        await main([...args, '--dry-run', '--json'], (value) => output.push(value));
+        expect(JSON.parse(String(output[0]))).toMatchObject({
+          input: {
+            preflight: {
+              ready: false,
+              issues: [expect.stringContaining('[MISSION_ALIGNMENT_REQUIRED]')],
+            },
+          },
+        });
+        await expect(main(args)).rejects.toThrow('[MISSION_ALIGNMENT_REQUIRED]');
+        await expect(main([...args, '--machine-only'])).rejects.toThrow(
+          '[MISSION_ALIGNMENT_REQUIRED]'
+        );
+        expect(JSON.parse(safeReadFile(statePath, { encoding: 'utf8' }) as string)).toEqual(state);
+      } finally {
+        safeRmSync(missionDir, { recursive: true, force: true });
+      }
+    });
+  });
+
+  it('refuses an explicit tenant mismatch even on an active Mission gate', async () => {
+    const id = 'MSN-GATE-TENANT-MISMATCH';
+    const dir = pathResolver.missionDir(id, 'public');
+    await withExecutionContextAsync(
+      'mission_controller',
+      async () => {
+        safeMkdir(dir, { recursive: true });
+        try {
+          safeWriteFile(
+            `${dir}/mission-state.json`,
+            JSON.stringify({
+              mission_id: id,
+              tier: 'public',
+              status: 'active',
+              execution_mode: 'local',
+              priority: 5,
+              org_role: 'worker',
+              confidence_score: 1,
+              git: { branch: 'main', start_commit: 'abc', latest_commit: 'abc', checkpoints: [] },
+              history: [],
+            })
+          );
+          const args = ['gate-pass', id, 'EXECUTION_DONE', '--tenant-slug', 'tenant-other'];
+          const output: unknown[] = [];
+          await main([...args, '--dry-run', '--json'], (value) => output.push(value));
+          expect(JSON.parse(String(output[0])).input.preflight.issues[0]).toContain(
+            'MISSION_GATE_SCOPE_MISMATCH'
+          );
+          await expect(main(args)).rejects.toThrow('MISSION_GATE_SCOPE_MISMATCH');
+        } finally {
+          safeRmSync(dir, { recursive: true, force: true });
+        }
+      },
+      'ecosystem_architect'
+    );
+  });
+
+  it('keeps overlapping gate previews on their own output and flags', async () => {
+    const route = missionControllerRouter.runMissionControllerAction;
+    let enterFirst!: () => void;
+    let releaseFirst!: () => void;
+    const firstEntered = new Promise<void>((resolve) => {
+      enterFirst = resolve;
+    });
+    const firstReleased = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    const router = vi
+      .spyOn(missionControllerRouter, 'runMissionControllerAction')
+      .mockImplementation(async (context) => {
+        if (context.arg1 === 'MSN-GATE-FIRST-MISSING') {
+          enterFirst();
+          await firstReleased;
+        }
+        await route(context);
+      });
+    const previousMissionId = process.env.MISSION_ID;
+    const previousRole = process.env.MISSION_ROLE;
+    delete process.env.MISSION_ROLE;
+    const first: unknown[] = [];
+    const second: unknown[] = [];
+    const preview = ['EXECUTION_DONE', '--dry-run', '--json'];
+    const firstRun = main(['gate-pass', 'MSN-GATE-FIRST-MISSING', ...preview], (value) =>
+      first.push(value)
+    );
+    try {
+      await firstEntered;
+      await main(['gate-pass', 'MSN-GATE-SECOND-MISSING', ...preview, '--machine-only'], (value) =>
+        second.push(value)
+      );
+    } finally {
+      releaseFirst();
+      try {
+        await firstRun;
+      } finally {
+        router.mockRestore();
+        const resultingRole = process.env.MISSION_ROLE;
+        if (previousRole === undefined) delete process.env.MISSION_ROLE;
+        else process.env.MISSION_ROLE = previousRole;
+        expect(resultingRole).toBeUndefined();
+      }
+    }
+    expect(process.env.MISSION_ID).toBe(previousMissionId);
+    expect(first.map((row) => JSON.parse(String(row)))).toEqual([
+      expect.objectContaining({ mission_id: 'MSN-GATE-FIRST-MISSING', machine_only: false }),
+    ]);
+    expect(second.map((row) => JSON.parse(String(row)))).toEqual([
+      expect.objectContaining({ mission_id: 'MSN-GATE-SECOND-MISSING', machine_only: true }),
+    ]);
   });
 
   it('rejects a missing mission ID before provider and kill-switch bootstrap', async () => {
@@ -2187,6 +2393,33 @@ describe('mission controller router — runtime input boundaries', () => {
       '--actor-type must be one of: agent, human, service'
     );
     expect(evidence.recordEvidence).not.toHaveBeenCalled();
+  });
+
+  it('requires a value for --knowledge-used before recording evidence', async () => {
+    const context = makeContext(
+      'record-evidence',
+      ['MSN-BOUNDARY', 'task', 'note'],
+      ['--knowledge-used']
+    );
+    await expect(missionControllerRouter.runMissionControllerAction(context)).rejects.toThrow(
+      '--knowledge-used requires a comma-separated list'
+    );
+    expect(context.recordEvidence).not.toHaveBeenCalled();
+  });
+
+  it('reports when knowledge use cannot bind to a recorded mission task', async () => {
+    const context = makeContext(
+      'record-evidence',
+      ['MSN-BOUNDARY', 'typo', 'note'],
+      ['--knowledge-used', 'knowledge/doc.md']
+    );
+    context.recordEvidence.mockResolvedValue({ task_id: 'typo' });
+    context.print = vi.fn();
+    await missionControllerRouter.runMissionControllerAction(context);
+    expect(context.print).toHaveBeenCalledWith({
+      task_id: 'typo',
+      knowledge_usage: [{ reference: 'knowledge/doc.md', status: 'task_not_recorded' }],
+    });
   });
 
   it('rejects invalid memory and queue enum values before dispatch', async () => {

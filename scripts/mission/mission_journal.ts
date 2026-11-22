@@ -134,9 +134,11 @@ export function scanMissions(
     pathResolver.active('missions/confidential'),
     pathResolver.knowledge('personal/missions'),
     pathResolver.active('archive/missions'),
-  ]
+  ],
+  missionId?: string
 ) {
   const missions: Mission[] = [];
+  const selectedMission = missionId?.toUpperCase();
 
   for (const dir of searchDirs) {
     let safeDir: string;
@@ -165,9 +167,11 @@ export function scanMissions(
             allowMissingLeaf: true,
           });
           if (safeExistsSync(statePath)) {
+            if (selectedMission && path.basename(dir).toUpperCase() !== selectedMission) return;
             const mission = normalizeMission(loadStateAtPath(statePath));
             if (
               mission &&
+              (!selectedMission || mission.mission_id.toUpperCase() === selectedMission) &&
               (!tenantSlug || (mission.tenant_slug || mission.scope?.tenant_slug) === tenantSlug)
             ) {
               missions.push(mission);
@@ -200,11 +204,11 @@ export function scanMissions(
   });
 }
 
-function renderJournal(tenantSlug?: string) {
+function renderJournal(tenantSlug?: string, missionId?: string) {
   const policy = resolveMissionJournalPolicy();
   printOutput(chalk.bold.cyan(`\n📜 [KYBERION] ${policy.title}\n`));
 
-  const missions = scanMissions(tenantSlug);
+  const missions = scanMissions(tenantSlug, undefined, missionId);
 
   if (missions.length === 0) {
     printOutput(policy.empty_message);
@@ -248,6 +252,8 @@ function renderJournal(tenantSlug?: string) {
     printOutput('');
   });
 
+  if (missionId) return;
+
   // Summary
   const stats: Record<string, number> = {};
   for (const mission of missions) {
@@ -279,8 +285,14 @@ export function main(argv: string[] = [], print: Print = () => undefined): void 
   activePrint = print;
   const tenantFlag = argv.indexOf('--tenant-slug');
   const tenantSlug = tenantFlag >= 0 ? argv[tenantFlag + 1]?.trim() : undefined;
+  const missionFlag = argv.indexOf('--mission-id');
+  const missionId = missionFlag >= 0 ? argv[missionFlag + 1]?.trim() : undefined;
   try {
-    renderJournal(tenantSlug || undefined);
+    if (tenantFlag >= 0 && (!tenantSlug || tenantSlug.startsWith('--'))) {
+      throw new Error('--tenant-slug requires a tenant');
+    }
+    if (missionFlag >= 0) pathResolver.assertMissionIdArgument(missionId ?? '');
+    renderJournal(tenantSlug || undefined, missionId);
   } finally {
     activePrint = previousPrint;
   }

@@ -71,16 +71,16 @@ Purpose: prove Roadmap Phase D' acceptance: an external FDE or SI can complete o
 Collection protocol:
 
 1. Start from [`DEPLOYMENT.md`](./DEPLOYMENT.md) and choose macOS, Linux, or Docker.
-2. Create or reuse a customer overlay with `pnpm stance:create <slug>` and record the overlay paths used.
+2. Create or reuse a [Stance](../user/customer-overlay-use-cases.md). Use `pnpm stance:create <slug>` to create one, then set `acting_for` in `stance.json` for the tenant and applicable organization and Org Role. Record the selected scope and any policy overlay paths used for compatibility.
 3. Run `pnpm stance:switch <slug>`, source `active/shared/runtime/stance.env`, and complete `pnpm onboarding`.
 4. Run `pnpm run doctor`, the relevant runtime-specific doctor command, and the customer scenario mission or pipeline.
 5. Record every place where the FDE/SI needed code changes. The item cannot be verified if a fork or product patch was required for deployment.
-6. Write a deployment summary with environment, customer overlay, commands run, artifacts produced, unresolved gaps, and postmortem notes.
+6. Write a deployment summary with environment, selected Stance and tenant, commands run, artifacts produced, unresolved gaps, and postmortem notes.
 
 Minimum evidence refs:
 
 - Deployment summary or postmortem using [`templates/production-evidence-fde-deployment.md`](./templates/production-evidence-fde-deployment.md) or equivalent notes.
-- Customer overlay evidence with secrets excluded.
+- Evidence of the Stance and any policy overlays used, with secrets excluded.
 - Mission, pipeline, trace, or screenshot artifacts proving the deployment scenario ran.
 - Statement that no fork was required, or a rejected status explaining why verification is blocked.
 

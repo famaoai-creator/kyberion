@@ -1,6 +1,7 @@
 import type { StorageDataTier } from './storage-layout.js';
 import type { TierLevel } from './types.js';
 import path from 'node:path';
+import { randomUUID } from 'node:crypto';
 import { isScopeEnvOnly, transportedScopeLineage } from './foundation/scope-resolution-mode.js';
 export { withScopeEnvOnly } from './foundation/scope-resolution-mode.js';
 import { isValidTenantSlug } from './entity-scope.js';
@@ -74,6 +75,15 @@ const SCOPE_ENV_KEYS = [
   'MISSION_ID',
   'KYBERION_TASK_ID',
 ] as const;
+
+/**
+ * A child with an explicitly transported scope must not inherit the local
+ * operator's scope.env. Point the existing override at a fresh path without
+ * writing a file, so fields omitted by the transport stay omitted.
+ */
+export function isolatedScopeEnvPath(): string {
+  return pathResolver.toRepoRelative(pathResolver.sharedTmp(`scope-handoff-${randomUUID()}.env`));
+}
 
 function scopeEnvPath(env: NodeJS.ProcessEnv = process.env): string {
   const configured = envText(env, 'KYBERION_SCOPE_ENV_PATH')?.trim();

@@ -35,13 +35,14 @@ const h = vi.hoisted(() => ({
   dir: '',
   covered: true,
   memberActive: true,
+  memberChecksRemaining: Infinity,
   fail: '' as string,
   shadow: true,
 }));
 vi.mock('@agent/core/organization/member-registry', async (original) => ({
   ...(await original<typeof import('@agent/core/organization/member-registry')>()),
   resolveAccountableHuman: () => ({
-    status: h.memberActive ? 'active' : 'suspended',
+    status: h.memberActive && h.memberChecksRemaining-- > 0 ? 'active' : 'suspended',
     memberships: [{ tenant_slug: 'acme', role: 'approver' }],
   }),
 }));
@@ -58,6 +59,17 @@ vi.mock('@agent/core/mission/mission-admission', async (original) => {
     resolveDotMissionAdmission: (item: ReturnType<typeof createWorkItem>) => {
       if (!h.covered) throw new Error('mandate revoked');
       return item.metadata!.mission_admission;
+    },
+    resolveDotMissionAdmissionBrief: (item: ReturnType<typeof createWorkItem>) => {
+      if (!h.covered) throw new Error('mandate revoked');
+      return {
+        scope: { tenant_slug: 'acme', organization_id: 'org-1', project_id: 'proj-1' },
+        brief: real.buildMissionAdmissionBrief(
+          item,
+          item.metadata!.mission_admission as never,
+          String(item.metadata!.mission_id)
+        ),
+      };
     },
     resolveDotMissionAdmissionScope: () => ({
       tenant_slug: 'acme',
@@ -122,7 +134,7 @@ vi.mock('../mission-alignment-gate/alignment-approval.js', () => ({
   },
 }));
 // R5 watchdog sweeps reach the controller only through the governed continuation.
-vi.mock('../mission_controller.js', () => ({ main: (args: string[]) => run(args) }));
+vi.mock('../mission_controller.js', () => ({ main: controller }));
 // Human authentication is explicit; this test is not an agent pretending to be a decider.
 vi.mock('@agent/core/agent-execution-context', async (original) => ({
   ...(await original<typeof import('@agent/core/agent-execution-context')>()),
@@ -132,12 +144,26 @@ vi.mock('@agent/core/agent-execution-context', async (original) => ({
 let itemId: string;
 let missionId: string;
 let run: ReturnType<typeof vi.fn<(args: string[]) => Promise<void>>>;
+let preflightIssue: string | undefined;
+const controller = async (args: string[], print?: (value: unknown) => void) => {
+  if (args.includes('--dry-run')) {
+    print?.({
+      input: {
+        preflight: { ready: !preflightIssue, issues: preflightIssue ? [preflightIssue] : [] },
+      },
+    });
+    return;
+  }
+  await run(args);
+};
 beforeEach(() => {
+  preflightIssue = undefined;
   const id = randomUUID();
   setWorkCoordinationNamespace('human-admission-' + id);
   h.state = undefined;
   h.covered = true;
   h.memberActive = true;
+  h.memberChecksRemaining = Infinity;
   h.fail = '';
   h.dir = pathResolver.sharedTmp('human-admission-' + id);
   missionId = 'MSN-TEST-' + id.toUpperCase();
@@ -204,8 +230,9 @@ afterEach(() => {
   safeRmSync(h.dir, { recursive: true, force: true });
   vi.restoreAllMocks();
 });
-const tick = () => continueHumanMissionAdmission(itemId, { runController: run });
-const prepare = () => continueHumanMissionAdmission(itemId, { runController: run, prepare: true });
+const tick = () => continueHumanMissionAdmission(itemId, { runController: controller });
+const prepare = () =>
+  continueHumanMissionAdmission(itemId, { runController: controller, prepare: true });
 async function pending() {
   const result = await prepare();
   expect(result.status).toBe('pending_approval');
@@ -243,7 +270,7 @@ describe('same-work human mission admission', () => {
         await continueHumanMissionAdmission(itemId, {
           prepare: true,
           expectedVersion: -1,
-          runController: run,
+          runController: controller,
         })
       ).status
     ).toBe('held');
@@ -254,7 +281,7 @@ describe('same-work human mission admission', () => {
       await continueHumanMissionAdmission(itemId, {
         rootDir: h.dir,
         prepare: true,
-        runController: run,
+        runController: controller,
       })
     ).toMatchObject({ status: 'held' });
     expect(run).not.toHaveBeenCalled();
@@ -264,6 +291,22 @@ describe('same-work human mission admission', () => {
     expect(a.status).toBe('pending_approval');
     expect(b.requestId).toBe(a.requestId);
     expect(run).toHaveBeenCalledTimes(1);
+  });
+  it('retries create and activation preflight holds without pinning or claiming them', async () => {
+    preflightIssue = 'stance unavailable';
+    expect(await prepare()).toMatchObject({ status: 'held', reason: preflightIssue });
+    expect(getWorkItem(itemId)?.metadata?.mission_alignment_preparation).toBeUndefined();
+    expect(run).not.toHaveBeenCalled();
+    preflightIssue = undefined;
+    const record = await pending();
+    decide(record.id);
+    preflightIssue = 'stance unavailable';
+    expect(await tick()).toMatchObject({ status: 'held', reason: preflightIssue });
+    expect(loadApprovalRequest('brief', record.id)?.applyClaim).toBeUndefined();
+    expect(getWorkItem(itemId)?.lease_id).toBeFalsy();
+    preflightIssue = undefined;
+    expect(await tick()).toMatchObject({ status: 'completed' });
+    expect(run).toHaveBeenCalledTimes(2);
   });
   it('reconciles expired ownership only from an exact active receipt', async () => {
     const record = await pending();
@@ -356,6 +399,19 @@ describe('same-work human mission admission', () => {
     expect((await tick()).status).toBe('completed');
     expect(run).toHaveBeenCalledTimes(2);
   });
+  it('settles an exact committed start on the next sweep after authority is withdrawn', async () => {
+    const record = await pending();
+    decide(record.id);
+    h.fail = 'after_start';
+    expect((await tick()).status).toBe('reconciliation_required');
+    h.covered = false;
+    h.memberActive = false;
+    vi.spyOn(operationsHalt, 'isOperationsHalted').mockReturnValue(true);
+    await sweepMissionStartCandidates({});
+    expect(getWorkItem(itemId)?.status).toBe('done');
+    expect(loadApprovalRequest('brief', record.id)?.applyResult?.result).toBe('success');
+    expect(run).toHaveBeenCalledTimes(2);
+  });
   it('retains a claim for unknown activation outcomes', async () => {
     const record = await pending();
     decide(record.id);
@@ -376,9 +432,25 @@ describe('same-work human mission admission', () => {
     const record = await pending();
     decide(record.id);
     h.memberActive = false;
-    expect((await tick()).status).toBe('reconciliation_required');
+    expect((await tick()).status).toBe('held');
     expect(run).toHaveBeenCalledTimes(1);
     expect(loadApprovalRequest('brief', record.id)?.applyClaim).toBeUndefined();
+  });
+  it('releases a targeted lease when decider assurance fails before the apply claim', async () => {
+    const item = getWorkItem(itemId)!;
+    updateWorkItem({ itemId, metadata: { ...item.metadata, target: 'path:docs/test.md' } });
+    const record = await pending();
+    decide(record.id);
+    h.memberChecksRemaining = 1;
+    expect(await tick()).toMatchObject({ status: 'held' });
+    expect(getWorkItem(itemId)).toMatchObject({
+      status: 'blocked',
+      effect_ownership: { state: 'settled', settlement: 'pre_effect' },
+    });
+    expect(getWorkItem(itemId)?.lease_id).toBeFalsy();
+    expect(loadApprovalRequest('brief', record.id)?.applyClaim).toBeUndefined();
+    h.memberChecksRemaining = Infinity;
+    expect(await tick()).toMatchObject({ status: 'completed' });
   });
   it('does not act when the current mandate is revoked', async () => {
     const record = await pending();
@@ -487,6 +559,19 @@ describe('R5 shadow mission admission confirmation card', () => {
     await sweep();
     expect(run.mock.calls.map((c) => c[0][0])).toEqual(['create']);
     expect(cards()[0].applyResult?.result).toBe('success');
+  });
+
+  it('keeps an approved card unconsumed while create preflight is blocked', async () => {
+    await sweep();
+    decideCard(cards()[0].id, 'approved');
+    preflightIssue = 'tenant setup incomplete';
+    await sweep();
+    expect(cards()[0].applyClaim).toBeUndefined();
+    expect(run).not.toHaveBeenCalled();
+    preflightIssue = undefined;
+    await sweep();
+    expect(cards()[0].applyResult?.result).toBe('success');
+    expect(run).toHaveBeenCalledTimes(1);
   });
 
   it('applies an approved card once when sweeps overlap', async () => {

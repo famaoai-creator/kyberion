@@ -318,6 +318,18 @@ function gateDefinitionPath(missionDir: string, gateId: string): string {
   return safeMissionArtifactPath(missionDir, `gates/definitions/${gateId}.json`);
 }
 
+export function readStoredMissionGate(missionId: string, gateId: string) {
+  const upperId = missionId.toUpperCase();
+  const missionDir = findMissionPath(upperId);
+  if (!missionDir) return undefined;
+  const definitionPath = gateDefinitionPath(missionDir, gateId);
+  if (!safeExistsSync(definitionPath)) return undefined;
+  const definition = loadMissionPhaseGateDefinitionAtPath(definitionPath, upperId);
+  if (definition.gate.id !== gateId)
+    throw new Error(`[MISSION_GATE_ID_MISMATCH] Stored gate does not match ${upperId}/${gateId}`);
+  return { missionDir, definition };
+}
+
 /**
  * Machine-evaluates a stored process-template gate definition
  * (`gates/definitions/<GATE_ID>.json`). Returns found:false when the mission
@@ -331,12 +343,9 @@ export async function evaluateStoredMissionGate(args: {
   blocking?: boolean;
 }): Promise<StoredGateEvaluationResult> {
   const missionId = args.missionId.toUpperCase();
-  const missionDir = findMissionPath(missionId);
-  if (!missionDir) return { found: false };
-  const definitionPath = gateDefinitionPath(missionDir, args.gateId);
-  if (!safeExistsSync(definitionPath)) return { found: false };
-
-  const definition = loadMissionPhaseGateDefinitionAtPath(definitionPath, missionId);
+  const stored = readStoredMissionGate(missionId, args.gateId);
+  if (!stored) return { found: false };
+  const { missionDir, definition } = stored;
 
   const gate = normalizeMissionGateCheckPaths(
     definition.gate,
@@ -441,24 +450,27 @@ export function markPhaseTasksCompleted(missionId: string, phase: string): numbe
   return markPhaseTasksStatus(missionId, phase, 'completed');
 }
 
-/**
- * A passed gate means the mission is actually running: promote a still
- * `planned` mission to `active` so lifecycle status and gate progression
- * stay in sync.
- */
-export async function activateMissionOnGateProgress(missionId: string): Promise<boolean> {
-  const upperId = missionId.toUpperCase();
-  const state = loadState(upperId);
-  if (!state || state.status !== 'planned') return false;
-  state.status = 'active';
-  state.history = state.history || [];
-  state.history.push({
-    ts: nowIso(),
-    event: 'GATE_ACTIVATE',
-    note: 'Mission activated automatically on first passed process gate.',
-  });
-  await saveState(upperId, state);
-  return true;
+/** Locate the alignment gate declared by the current workflow or stored process definition. */
+export function getMissionAlignmentGate(
+  state: MissionState,
+  readGate = readStoredMissionGate
+): string | undefined {
+  const alignmentGate = 'ALIGNMENT_APPROVED';
+  const alignmentDeclared = state.process_template?.phase_specs?.some(
+    (phase) => phase.entry_gate?.id === alignmentGate || phase.exit_gate?.id === alignmentGate
+  );
+  return alignmentDeclared || readGate(state.mission_id, alignmentGate) ? alignmentGate : undefined;
+}
+
+/** Alignment workflows may only activate through their approval gate. */
+export function requireMissionGateActivation(state: MissionState, gateId: string): void {
+  if (state.status !== 'planned') return;
+  const alignmentGate = getMissionAlignmentGate(state);
+  if (alignmentGate && gateId !== alignmentGate) {
+    throw new Error(
+      `[MISSION_ALIGNMENT_REQUIRED] Mission ${state.mission_id} is planned; pass ${alignmentGate} before ${gateId}.`
+    );
+  }
 }
 
 /**

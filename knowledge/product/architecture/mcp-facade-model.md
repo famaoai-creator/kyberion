@@ -110,6 +110,11 @@ tool の実行主体（principal）・caller role・tenant は、MCP サーバ�
   separation of duties が ON のときは承認できない（[`approval-gate-design.md`](../governance/approval-gate-design.md)）。
 - `kyberion.audit.export` / `kyberion.audit.verify` の `requested_by` も同じ扱いで、監査の依頼者は
   サーバー束縛の principal、引数は `caller_label` になる。
+- `kyberion.mission.create` は承認済みの内容とサーバー側のスコープから Mission ID を決め、
+  `mission_id` とコントローラーの `output` を返す。同じ内容を同じスコープで再送すると同じ ID を使う。
+  `mission.status` と `mission.journal` は、サーバー束縛のテナント内で指定された Mission に絞る。
+  `mission.status` の構造化応答には、その Mission の状態と次の操作を含む。指定した Mission を
+  スコープ内で確認できない場合はエラーを返す。
 
 ## 8. 既知の乖離（2026-11-12 時点の事実）
 

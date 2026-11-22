@@ -15,6 +15,13 @@ import type { AlignmentDecisionReport } from '../mission/mission_alignment_decis
 import type { WorkItem } from '@agent/core/workforce/work-coordination-types';
 import { continuousDevelopmentAlignmentScope } from '@agent/core/organization/continuous-development-consent';
 import * as organizationModel from '@agent/core/organization/organization-operating-model';
+import { pathResolver } from '@agent/core/path-resolver';
+import { ContinuousOwnerPreEffectError } from '@agent/core/organization/continuous-work-owner';
+import { buildSafeExecEnv } from '@agent/core/secure-io';
+import {
+  fingerprintMissionGateInputs,
+  type MissionGateRecord,
+} from '@agent/core/mission/mission-orchestration-phase-gates';
 
 const managed = vi.hoisted(() => ({ run: vi.fn() }));
 vi.mock('./continuous_owner_process.js', () => ({ runContinuousOwnerProcess: managed.run }));
@@ -66,15 +73,29 @@ const developmentSpec = {
   body_file: 'evidence/pr-body.md',
 };
 
-function harness(options: { present?: boolean; status?: string; gated?: boolean } = {}) {
+function harness(
+  options: {
+    present?: boolean;
+    status?: string;
+    gated?: boolean;
+    scope?: EnsureContinuousProjectInput['scope'];
+  } = {}
+) {
   let present = options.present ?? true;
   let status = options.status ?? 'active';
   let projectPresent = true;
   const files = new Map<string, unknown>();
+  const selectedScope = options.scope ?? (scope as EnsureContinuousProjectInput['scope']);
+  const projectOs = pathResolver.projectOsDir(
+    projectInput.project_id,
+    selectedScope.tier,
+    selectedScope.tenant_slug,
+    root
+  );
+  files.set(projectOs, true);
   const projectRecord = {
     ...projectInput,
-    tier: scope.tier,
-    organization_id: scope.organization_id,
+    ...selectedScope,
     status: 'active',
     metadata: { continuous_operation_key: projectInput.operation_key },
   };
@@ -100,10 +121,13 @@ function harness(options: { present?: boolean; status?: string; gated?: boolean 
   ];
   const exec = vi.fn(
     async (_command: string, args: string[], _options: ContinuousOwnerProcessOptions) => {
+      if (args.includes('--dry-run'))
+        return { stdout: '{"input":{"preflight":{"ready":true}}}', stderr: '', status: 0 };
       if (args[1] === 'create') {
         present = true;
         projectPresent = true;
       }
+      if (args[1] === 'scaffold') files.set(projectOs, true);
       if (args[1] === 'start' || (args[1] === 'gate-pass' && args[3] === 'ALIGNMENT_APPROVED')) {
         status = 'active';
         currentState = state();
@@ -678,8 +702,10 @@ describe('continuous work production owner ports', () => {
   it('creates projects through the controller with scope and origin metadata', async () => {
     const h = harness();
     h.setProjectPresent(false);
+    h.files.delete(pathResolver.projectOsDir(projectInput.project_id, scope.tier, undefined, root));
     await h.ports.ensureProject(projectInput);
-    const [command, args, child] = h.exec.mock.calls[0];
+    const [command, args, child] = h.exec.mock.calls[1];
+    expect(h.exec.mock.calls[0][1]).toEqual([...args, '--dry-run']);
     expect(command).toBe(process.execPath);
     expect(args.slice(0, 2)).toEqual([
       path.join(root, 'dist/scripts/project_controller.js'),
@@ -700,6 +726,11 @@ describe('continuous work production owner ports', () => {
       ])
     );
     expect(child.env.KYBERION_ORGANIZATION_ID).toBe(scope.organization_id);
+    expect(h.exec.mock.calls[2][1].slice(1)).toEqual([
+      'scaffold',
+      projectInput.project_id,
+      '--json',
+    ]);
   });
   it('retains a classified project failure without recording child stderr', async () => {
     const h = harness();
@@ -714,6 +745,39 @@ describe('continuous work production owner ports', () => {
       'project references an unregistered organization objective'
     );
     await expect(result).rejects.not.toThrow('private-objective');
+    await expect(result).rejects.toBeInstanceOf(ContinuousOwnerPreEffectError);
+    expect(h.exec).toHaveBeenCalledOnce();
+  });
+  it('scaffolds a previously registered Project OS before checking Mission creation', async () => {
+    const h = harness({ present: false });
+    h.files.delete(pathResolver.projectOsDir(projectInput.project_id, scope.tier, undefined, root));
+    await h.ports.ensureMission(missionInput);
+    expect(h.exec.mock.calls.map(([, args]) => [args[1], args.includes('--dry-run')])).toEqual([
+      ['scaffold', false],
+      ['create', true],
+      ['create', false],
+    ]);
+  });
+  it('does not create a Mission when its read-only preflight reports a scope failure', async () => {
+    const h = harness({ present: false });
+    h.exec.mockResolvedValueOnce({
+      stdout: JSON.stringify({
+        input: {
+          preflight: {
+            ready: false,
+            issues: ['Organization is not configured for the selected tenant. private-org'],
+          },
+        },
+      }),
+      stderr: '',
+      status: 0,
+    });
+    const result = h.ports.ensureMission(missionInput);
+    await expect(result).rejects.toBeInstanceOf(ContinuousOwnerPreEffectError);
+    await expect(result).rejects.toThrow('organization is missing for the selected scope');
+    await expect(result).rejects.not.toThrow('private-org');
+    expect(h.exec).toHaveBeenCalledOnce();
+    expect(h.openApproval).not.toHaveBeenCalled();
   });
   it('creates a scoped mission, durable origin and hash-bound approval brief; changed replay is rejected', async () => {
     const h = harness({ present: false });
@@ -755,23 +819,25 @@ describe('continuous work production owner ports', () => {
       requestedBy: 'continuous-owner',
     });
     await h.ports.ensureMission(missionInput);
-    expect(h.exec).toHaveBeenCalledOnce();
+    expect(h.exec).toHaveBeenCalledTimes(2);
     await expect(
       h.ports.ensureMission({ ...missionInput, success_condition: 'Different result' })
     ).rejects.toThrow('specification drift');
     expect(h.openApproval).toHaveBeenCalledTimes(2);
   });
   it('passes the confidential tenant context to the child without inheriting the parent mission or customer stance', async () => {
-    const h = harness({ present: false });
     const tenantScope = {
       tier: 'confidential' as const,
       tenant_slug: 'kyberion-service-studio',
       organization_id: scope.organization_id,
     };
+    const h = harness({ present: false, scope: tenantScope });
     h.setState({ tier: tenantScope.tier, tenant_slug: tenantScope.tenant_slug });
     vi.stubEnv('MISSION_ID', 'MSN-PARENT');
     vi.stubEnv('KYBERION_STANCE', 'parent-customer');
+    vi.stubEnv('KYBERION_CUSTOMER', 'legacy-customer');
     vi.stubEnv('KYBERION_PROJECT_ID', 'parent-project');
+    vi.stubEnv('KYBERION_TASK_ID', 'parent-task');
     await h.ports.ensureMission({ ...missionInput, scope: tenantScope });
     const [, args, child] = h.exec.mock.calls[0];
     expect(args).toEqual(
@@ -790,9 +856,13 @@ describe('continuous work production owner ports', () => {
       KYBERION_TENANT: tenantScope.tenant_slug,
       KYBERION_ORGANIZATION_ID: scope.organization_id,
     });
-    expect(child.env.MISSION_ID).toBeUndefined();
-    expect(child.env.KYBERION_STANCE).toBeUndefined();
-    expect(child.env.KYBERION_PROJECT_ID).toBeUndefined();
+    expect(buildSafeExecEnv(child.env)).toMatchObject({
+      MISSION_ID: '',
+      KYBERION_STANCE: '',
+      KYBERION_CUSTOMER: '',
+      KYBERION_PROJECT_ID: '',
+      KYBERION_TASK_ID: '',
+    });
   });
   it.each(['pending', 'rejected'] as const)(
     'does not dispatch when alignment is %s',
@@ -817,7 +887,8 @@ describe('continuous work production owner ports', () => {
       const h = harness({ status: 'planned', gated });
       await h.ports.advanceMission(advanceInput);
       const commands = h.exec.mock.calls.map((call) => call[1].slice(1));
-      expect(commands[0]).toEqual(
+      expect(commands[0]).toEqual([...commands[1], '--json', '--dry-run']);
+      expect(commands[1]).toEqual(
         gated
           ? ['gate-pass', missionInput.mission_id, 'ALIGNMENT_APPROVED', '--machine-only']
           : [
@@ -829,13 +900,13 @@ describe('continuous work production owner ports', () => {
               missionInput.success_condition,
             ]
       );
-      expect(commands[1]).toEqual([
+      expect(commands[2]).toEqual([
         'dispatch-tickets',
         missionInput.mission_id,
         '--ticket-targets',
         'workitem',
       ]);
-      expect(commands[2]).toEqual([
+      expect(commands[3]).toEqual([
         'dispatch-workitems',
         missionInput.mission_id,
         '--dispatch-limit',
@@ -849,6 +920,30 @@ describe('continuous work production owner ports', () => {
       ]);
     }
   );
+  it('rechecks waiting prerequisites on the next sweep before activation or dispatch', async () => {
+    const h = harness({ status: 'planned', gated: true });
+    h.exec.mockResolvedValueOnce({
+      stdout: JSON.stringify({
+        input: {
+          preflight: {
+            ready: false,
+            issues: ['[MISSION_PREREQUISITES_UNMET] Private mission details'],
+          },
+        },
+      }),
+      stderr: '',
+      status: 0,
+    });
+    expect(await h.ports.advanceMission(advanceInput)).toMatchObject({
+      status: 'running',
+      reason: 'Mission activation is waiting for prerequisite missions to finish',
+    });
+    expect(h.exec.mock.calls[0][1]).toContain('--dry-run');
+    expect(h.exec).toHaveBeenCalledOnce();
+    await h.ports.advanceMission(advanceInput);
+    expect(h.exec.mock.calls[2][1]).not.toContain('--dry-run');
+    expect(h.exec.mock.calls[2][1]).toContain('ALIGNMENT_APPROVED');
+  });
   it('passes only gates whose own phase contracts have all completed', async () => {
     const h = harness({ gated: true });
     h.setTasks([
@@ -864,6 +959,65 @@ describe('continuous work production owner ports', () => {
     expect(gates).toEqual(['EXECUTION_DONE']);
     for (const [, args] of h.exec.mock.calls.filter((call) => call[1][1] === 'gate-pass'))
       expect(args).toContain('--machine-only');
+  });
+  it('waits for the current review gate and resumes from its governed pass record', async () => {
+    const h = harness();
+    const gate = {
+      id: 'OPS_REVIEW_PASSED',
+      checks: [{ kind: 'reviewer_approved' as const }],
+    };
+    const definition = {
+      mission_id: missionInput.mission_id,
+      workflow_id: 'organization-ops-report',
+      phase: 'review',
+      position: 'exit' as const,
+      gate,
+    };
+    h.setState({
+      process_template: {
+        phases: ['review'],
+        current_phase: 'review',
+        phase_specs: [{ id: 'review', exit_gate: gate }],
+      },
+    });
+    h.setTasks([{ task_id: 'review-contract', phase: 'review', status: 'pending' }]);
+    const exec = h.exec.getMockImplementation()!;
+    h.exec.mockImplementation(async (...args) => {
+      if (args[1][1] === 'dispatch-workitems')
+        h.setTasks([{ task_id: 'review-contract', phase: 'review', status: 'completed' }]);
+      return exec(...args);
+    });
+    const records: MissionGateRecord[] = [];
+    const ports = createContinuousOwnerPorts({
+      ...h.deps,
+      storedGate: () => ({ missionDir: directory, definition }),
+      gateRecords: () => records,
+    });
+    const expectWaiting = async () => {
+      expect(await ports.advanceMission(advanceInput)).toMatchObject({
+        status: 'pending_approval',
+        reason: expect.stringContaining('Gate OPS_REVIEW_PASSED requires a current'),
+      });
+      expect(h.exec.mock.calls.some(([, args]) => args[1] === 'verify')).toBe(false);
+    };
+    await expectWaiting();
+    const pass: MissionGateRecord = {
+      gate_id: gate.id,
+      verdict: 'pass',
+      sequence: 1,
+      input_digest: fingerprintMissionGateInputs(gate, directory),
+      checks: [{ kind: 'reviewer_approved', passed: true }],
+    };
+    records.push(pass, { ...pass, sequence: 2, verdict: 'fail' });
+    await expectWaiting();
+    records.push({ ...pass, sequence: 3, input_digest: 'stale' });
+    await expectWaiting();
+    records.push({ ...pass, sequence: 4, override: true });
+    await expectWaiting();
+    records.push({ ...pass, sequence: 5 });
+    await ports.advanceMission(advanceInput);
+    expect(h.exec.mock.calls.some(([, args]) => args[1] === 'verify')).toBe(true);
+    expect(h.exec.mock.calls.some(([, args]) => args[1] === 'gate-pass')).toBe(false);
   });
   it.each([2, 3, -1, 'invalid'])(
     'blocks exhausted or invalid rework %s with recovery evidence',

@@ -61,6 +61,7 @@ import {
 import { classifyTaskSessionIntent } from '../task/task-session.js';
 import { loadPendingIntent, savePendingIntent } from '../intent/pending-intent-store.js';
 import { currentScope } from '../scope-context.js';
+import { missionControllerHandoffEnv } from '../mission/mission-controller-start-input.js';
 import { recordClarificationSignal, recordFeedbackSignal } from './surface-conversation-signals.js';
 import {
   deriveSlackExecutionModeFromProviderPolicy,
@@ -157,10 +158,19 @@ async function handleGovernedExecutionHint(
   const routingDecisionArgs = context.compiledFlow?.routingDecision
     ? ['--routing-decision', JSON.stringify(context.compiledFlow.routingDecision)]
     : [];
+  const missionScope = context.input.scope;
+  const missionTier = missionScope?.tier ?? (missionScope?.tenant_slug ? 'confidential' : 'public');
+  const missionScopeArgs = [
+    '--tier',
+    missionTier,
+    ...(missionScope?.tenant_slug ? ['--tenant-slug', missionScope.tenant_slug] : []),
+    ...(missionScope?.organization_id ? ['--organization-id', missionScope.organization_id] : []),
+    ...(missionScope?.project_id ? ['--project-id', missionScope.project_id] : []),
+  ];
   const promoteToMission = async (): Promise<SurfaceConversationResult> => {
     const governancePayload = surfaceRuntimeData.buildWorkScopeGovernancePayload(context);
     const missionId = `MSN-${Date.now().toString(36).toUpperCase()}`;
-    const command = `node dist/scripts/mission_controller.js create ${missionId} public`;
+    const command = `node dist/scripts/mission_controller.js create ${missionId} --tier ${missionTier}`;
     let output = '';
     try {
       output = safeExec(
@@ -169,12 +179,13 @@ async function handleGovernedExecutionHint(
           'dist/scripts/mission_controller.js',
           'create',
           missionId,
-          'public',
+          ...missionScopeArgs,
           ...surfaceRuntimeData.buildIntentGoalHandoffArgs(context, missionId),
           ...(governancePayload ? ['--routing-decision', JSON.stringify(governancePayload)] : []),
         ],
         {
           cwd: pathResolver.rootDir(),
+          ...(missionScope ? { env: missionControllerHandoffEnv(missionTier, missionScope) } : {}),
         }
       );
       if (intentId) {
@@ -346,7 +357,7 @@ async function handleGovernedExecutionHint(
 
   if (resolved.missionAction === 'create') {
     const missionId = `MSN-${Date.now().toString(36).toUpperCase()}`;
-    const command = `node dist/scripts/mission_controller.js create ${missionId} public`;
+    const command = `node dist/scripts/mission_controller.js create ${missionId} --tier ${missionTier}`;
     let output = '';
     try {
       output = safeExec(
@@ -355,12 +366,13 @@ async function handleGovernedExecutionHint(
           'dist/scripts/mission_controller.js',
           'create',
           missionId,
-          'public',
+          ...missionScopeArgs,
           ...surfaceRuntimeData.buildIntentGoalHandoffArgs(context, missionId),
           ...routingDecisionArgs,
         ],
         {
           cwd: pathResolver.rootDir(),
+          ...(missionScope ? { env: missionControllerHandoffEnv(missionTier, missionScope) } : {}),
         }
       );
       if (intentId) {

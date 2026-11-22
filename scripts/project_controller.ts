@@ -1,7 +1,7 @@
 import {
   archiveManagedProject,
   bootstrapManagedProject,
-  buildManagedProjectRecord,
+  previewManagedProjectCreation,
   createManagedProject,
   createManagedProjectTrack,
   ensureProjectOsScaffold,
@@ -384,11 +384,10 @@ async function mainImpl(args: string[] = []): Promise<void> {
           ? { objective_ids: csvOption(argv, '--objective-ids') }
           : {}),
       };
-      const record = hasFlag(argv, '--dry-run')
-        ? buildManagedProjectRecord(input)
-        : createManagedProject(input);
+      const dryRun = hasFlag(argv, '--dry-run');
+      const record = dryRun ? previewManagedProjectCreation(input) : createManagedProject(input);
       if (json) jsonOutput(record);
-      else printOutput(`Created project ${record.project_id}`);
+      else printOutput(`${dryRun ? 'Would create' : 'Created'} project ${record.project_id}`);
       return;
     }
     case 'update':
@@ -538,6 +537,6 @@ if (
 )
   void defineScript({
     name: 'project',
-    flags: [],
+    flags: ['json'],
     run: ({ argv, print }) => main(argv, print),
   })();

@@ -13,6 +13,9 @@ import { activeTenantSlug } from '@agent/core/organization/tenant-registry';
 import { t as catalogT } from '@agent/core/t';
 import { findMissionPath } from '@agent/core/path-resolver';
 import { missionPathOrNull } from '@agent/core/mission-lookup';
+import { writeIntentGoalHandoff } from '@agent/core/intent/intent-handoff';
+import { withMissionPrerequisiteIdentityProbe } from '@agent/core/mission/mission-prerequisite-identity';
+import { inspectMissionPrerequisiteIdentity } from './installed-identity.js';
 
 export const MEETING_MISSION_TYPE = 'meeting_facilitation';
 
@@ -85,7 +88,25 @@ export async function resolveMeetingMission(
     (async (...args) => {
       const { missionLifecycleService } =
         await import('@agent/core/mission/mission-lifecycle-service');
-      return missionLifecycleService.start(...args);
+      const [id, tier, role, tenantId, missionType, visionRef, relationships, tenantSlug, options] =
+        args;
+      const goal = options.intentGoal;
+      const intentGoal = goal
+        ? writeIntentGoalHandoff(id, { source_text: goal, goal: { summary: goal } })
+        : undefined;
+      return withMissionPrerequisiteIdentityProbe(inspectMissionPrerequisiteIdentity, () =>
+        missionLifecycleService.start(
+          id,
+          tier,
+          role,
+          tenantId,
+          missionType,
+          visionRef,
+          relationships,
+          tenantSlug,
+          { intentGoal }
+        )
+      );
     });
   await start(
     missionId,

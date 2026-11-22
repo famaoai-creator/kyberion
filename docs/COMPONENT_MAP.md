@@ -121,6 +121,11 @@ This path establishes identity files under `knowledge/personal/` and prepares th
 - `scripts/mission/mission_journal.ts`
 - `scripts/run_mission_orchestration_event_worker.ts`
 - `scripts/run_agent_runtime_supervisor.ts`
+- `scripts/refactor/mission-controller-args.ts` resolves startup scope and projects before lifecycle commands.
+- `libs/core/mission/mission-creation.ts` and `mission-state.ts` enforce prerequisites at activation.
+- `libs/core/mission/mission-controller-start-input.ts` carries approved scope into child controllers.
+- `scripts/mission/mission_admission_continuation.ts` checks readiness before claiming a WorkItem approval.
+- `scripts/continuous/continuous_work_owner.ts` provisions Project OS before a linked Mission.
 - `libs/core/mission/mission-orchestration-events.ts`
 - `libs/core/mission/mission-orchestration-worker.ts`
 - `libs/core/agent/agent-runtime-supervisor.ts`
