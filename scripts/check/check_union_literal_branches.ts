@@ -195,7 +195,11 @@ export function checkUnionLiteralBranches(
     : { version: 1, violations: {} };
 
   if (options.writeBaseline) {
-    const next: Baseline = { version: 1, violations: {} };
+    const next: Baseline & { $schema?: string } = {
+      $schema: '../schemas/union-literal-branch-baseline.schema.json',
+      version: 1,
+      violations: {},
+    };
     for (const v of violations) {
       next.violations[v.file] = [
         ...new Set([...(next.violations[v.file] ?? []), v.literal]),

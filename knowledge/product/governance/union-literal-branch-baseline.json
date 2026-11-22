@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/union-literal-branch-baseline.schema.json",
   "version": 1,
   "violations": {
     "libs/core/agent/agent-collaboration-projection.ts": ["approval", "task"],
@@ -98,6 +99,7 @@
     ],
     "presence/displays/concierge/src/components/ops/OrganizationOperatingModel.tsx": ["operation"],
     "presence/displays/concierge/src/components/ops/organization-outcome.ts": ["project"],
+    "presence/displays/concierge/src/components/work-calendar/WorkCalendar.tsx": ["external_event"],
     "presence/displays/concierge/src/lib/management-server.ts": ["organization", "project"],
     "presence/displays/concierge/src/lib/onboarding-authority-server.ts": ["organization"],
     "presence/displays/concierge/src/lib/ops/discussion-readiness-state.ts": ["claude"],
