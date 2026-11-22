@@ -11,6 +11,10 @@ import {
   resolveCliOperatorIdentity,
 } from '@agent/core/governance/cli-operator-principal';
 import {
+  CHARTER_SCOPE_KINDS,
+  charterScopesEqual,
+} from '@agent/core/governance/accountability-charter';
+import {
   onboardingAuthorityScope,
   readOnboardingAuthority,
   previewOnboardingAuthority,
@@ -35,7 +39,7 @@ export async function main(
         default: 'show',
       })
     )
-    .option('scope', { choices: ['person', 'organization'] as const, default: 'person' })
+    .option('scope', { choices: CHARTER_SCOPE_KINDS, default: 'person' })
     .option('tenant', { type: 'string' })
     .option('file', { type: 'string' })
     .option('out', {
@@ -101,13 +105,7 @@ export async function main(
     const envelope = readSafeJsonFile<Record<string, unknown>>(file, 'Onboarding authority plan');
     const input = envelope.input ?? envelope;
     const fileScope = onboardingAuthorityScope(input);
-    if (
-      selectedScope &&
-      (selectedScope.kind !== fileScope.kind ||
-        (selectedScope.kind === 'organization' &&
-          fileScope.kind === 'organization' &&
-          selectedScope.tenant_slug !== fileScope.tenant_slug))
-    )
+    if (selectedScope && !charterScopesEqual(selectedScope, fileScope))
       throw new Error(
         'The reviewed file scope does not match --scope/--tenant. Use the scope in the file or review a new plan.'
       );
