@@ -1,0 +1,43 @@
+---
+record_id: mem-MSN-FACTORY-PILOT3-HARDENING-20261122-2026_11_22
+kind: knowledge_hint
+tier: public
+knowledge_domain: product
+owner_nhi: ''
+candidate_id: mem-MSN-FACTORY-PILOT3-HARDENING-20261122-2026_11_22
+supersedes: ''
+superseded_by: ''
+project_id: ''
+task_session_id: ''
+specialist_id: ''
+locale: ''
+created_at: 2026-11-22T12:11:42.294Z
+source_branch: agent/factory-pilot3-hardening
+source_commit: 49b9e2ba53a83cf07be554841a46743befd5c177
+---
+
+# Factory hardening: governed-write fallbacks, vocabulary subsets, advisory artifacts
+
+Three reusable rules from Pilot #3: (1) extend a governed-write fallback only for explicitly recoverable denial classes and let all other policy violations propagate fail-closed; (2) home a narrowed union vocabulary next to its superset (AccountOwnerKind ⊂ BindingOwnerKind), never in a sealed capability module; (3) document publication of advisory pipeline artifacts — uncommitted output is stale output until a chore PR lands it.
+
+## Hint Scope
+
+mission
+
+## Trigger Phrases
+
+- Fallback gates that discriminate on error classes must enumerate exactly the recoverable denials (RESOURCE_PATH_SCOPE, persona write-denial) and propagate everything else; discrimination on message strings is fail-closed but fragile — prefer typed outcome codes when a third class appears. A subset vocabulary (person|organization) belongs beside its superset definition with a satisfies constraint plus a runtime test pinning the exclusion (operator), not inside sealed trusted-import capability modules which exist to expose admission APIs only. Pipeline-generated advisory reports (CURATION_REPORT.md) must state their publication contract in both the steward procedure and the artifact header: land each run via a chore PR, never treat uncommitted output as a pending decision.
+
+## Recommended References
+
+- active/missions/public/MSN-FACTORY-PILOT3-HARDENING-20261122/evidence/implementation-report.md
+- active/missions/public/MSN-FACTORY-PILOT3-HARDENING-20261122/evidence/test-report.md
+- active/missions/public/MSN-FACTORY-PILOT3-HARDENING-20261122/evidence/retrospective.md
+
+## Evidence
+
+- active/missions/public/MSN-FACTORY-PILOT3-HARDENING-20261122/evidence/implementation-report.md
+- active/missions/public/MSN-FACTORY-PILOT3-HARDENING-20261122/evidence/test-report.md
+- active/missions/public/MSN-FACTORY-PILOT3-HARDENING-20261122/evidence/retrospective.md
+
+## Artifacts

@@ -717,6 +717,8 @@ export function renderCurationReportMarkdown(report: KnowledgeCurationReport): s
     '> phases can see pending curation without a full knowledge search.',
     '> **Candidates only** — no file is deleted, archived, or demoted automatically.',
     '> KM-03 guardrail: a knowledge_steward must review and approve any demotion by hand.',
+    '> **Publication**: the pipeline leaves this file uncommitted — land the weekly artifact',
+    '> via a `chore(knowledge)` PR so main stays current.',
     '',
     `generated_at: ${report.generated_at}`,
     `low_yield_delivery_threshold: ${report.config.low_yield_delivery_threshold}`,

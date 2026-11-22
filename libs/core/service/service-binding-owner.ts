@@ -16,6 +16,20 @@
 export const BINDING_OWNER_KINDS = ['person', 'organization', 'operator'] as const;
 export type BindingOwnerKind = (typeof BINDING_OWNER_KINDS)[number];
 
+/**
+ * Account-owner kinds are the non-operator subset: an account is introduced for
+ * a person or an organization — never the runtime. Kept beside the binding
+ * vocabulary so the two unions cannot drift apart silently.
+ */
+export const ACCOUNT_OWNER_KINDS = [
+  'person',
+  'organization',
+] as const satisfies readonly BindingOwnerKind[];
+export type AccountOwnerKind = (typeof ACCOUNT_OWNER_KINDS)[number];
+export const isAccountOwnerKind = (value: unknown): value is AccountOwnerKind =>
+  typeof value === 'string' && (ACCOUNT_OWNER_KINDS as readonly string[]).includes(value);
+export const isPersonAccountOwner = (kind: AccountOwnerKind): kind is 'person' => kind === 'person';
+
 export interface BindingOwnerFields {
   owner_kind?: BindingOwnerKind;
   owner_ref?: string;

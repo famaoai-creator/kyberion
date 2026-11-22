@@ -289,18 +289,29 @@ export function writeDocsImpactReport(
   outArg: string,
   missionRoot: string | undefined,
   markdown: string,
-  deps: { gitRunner?: PromotionGitRunner; worktreeWriter?: WorktreeFileWriter } = {}
+  deps: {
+    gitRunner?: PromotionGitRunner;
+    worktreeWriter?: WorktreeFileWriter;
+    writeFile?: (filePath: string, content: string) => void;
+  } = {}
 ): void {
   const resolvedOut = path.resolve(pathResolver.rootDir(), outArg);
   try {
-    safeWriteFile(assertSafeRepositoryPath(resolvedOut, { allowMissingLeaf: true }), markdown);
+    (deps.writeFile ?? safeWriteFile)(
+      assertSafeRepositoryPath(resolvedOut, { allowMissingLeaf: true }),
+      markdown
+    );
     return;
   } catch (error) {
-    if (
-      !missionRoot?.trim() ||
-      !(error instanceof Error) ||
-      !error.message.includes('RESOURCE_PATH_SCOPE')
-    ) {
+    // Fall back only for denials the governed writer legitimately covers:
+    // out-of-checkout paths (RESOURCE_PATH_SCOPE) or a persona that lacks
+    // active/missions/** write authority ('NOT authorized to write'). Tenant
+    // scope violations and fail-closed policy denials must still propagate.
+    const message = error instanceof Error ? error.message : '';
+    const recoverable =
+      message.includes('RESOURCE_PATH_SCOPE') ||
+      (message.includes('POLICY_VIOLATION') && message.includes('NOT authorized to write'));
+    if (!missionRoot?.trim() || !recoverable) {
       throw error;
     }
   }

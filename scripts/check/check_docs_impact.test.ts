@@ -217,4 +217,59 @@ describe('writeDocsImpactReport --mission-root', () => {
       },
     ]);
   });
+
+  it('routes a persona-denied same-checkout write through the governed writer', () => {
+    const written: { root: string; path: string; content: string }[] = [];
+    const sameCheckoutOut = `${pathResolver.rootDir()}/active/missions/public/MSN-X/evidence/docs-sync-report.md`;
+    const sameRootGitRunner: PromotionGitRunner = (args, cwd) => {
+      if (args.includes('--show-toplevel')) return { status: 0, stdout: `${cwd}\n`, stderr: '' };
+      if (args.includes('--show-prefix')) return { status: 0, stdout: '\n', stderr: '' };
+      if (args.includes('--git-common-dir'))
+        return { status: 0, stdout: `${pathResolver.rootDir()}/.git\n`, stderr: '' };
+      return { status: 1, stdout: '', stderr: 'unexpected git call' };
+    };
+    writeDocsImpactReport(sameCheckoutOut, pathResolver.rootDir(), 'report body', {
+      gitRunner: sameRootGitRunner,
+      writeFile: () => {
+        throw new Error(
+          "[POLICY_VIOLATION] Persona 'check_docs_impact' with authority role 'check_docs_impact' is NOT authorized to write to 'active/missions/public/MSN-X/evidence/docs-sync-report.md'."
+        );
+      },
+      worktreeWriter: ({ root, files }) => {
+        for (const file of files) written.push({ root, path: file.path, content: file.content });
+      },
+    });
+    expect(written).toEqual([
+      {
+        root: pathResolver.rootDir(),
+        path: 'active/missions/public/MSN-X/evidence/docs-sync-report.md',
+        content: 'report body',
+      },
+    ]);
+  });
+
+  it('propagates POLICY_VIOLATION denials that are not persona write-authority failures', () => {
+    const sameCheckoutOut = `${pathResolver.rootDir()}/active/missions/public/MSN-X/evidence/docs-sync-report.md`;
+    expect(() =>
+      writeDocsImpactReport(sameCheckoutOut, missionRoot, 'report body', {
+        gitRunner,
+        writeFile: () => {
+          throw new Error('[POLICY_VIOLATION] tenant.scope_violation: cross-tenant write denied');
+        },
+      })
+    ).toThrow(/tenant\.scope_violation/);
+  });
+
+  it('propagates persona denials when no --mission-root is given', () => {
+    const sameCheckoutOut = `${pathResolver.rootDir()}/active/missions/public/MSN-X/evidence/docs-sync-report.md`;
+    expect(() =>
+      writeDocsImpactReport(sameCheckoutOut, undefined, 'report body', {
+        writeFile: () => {
+          throw new Error(
+            "[POLICY_VIOLATION] Persona 'check_docs_impact' is NOT authorized to write to 'x'."
+          );
+        },
+      })
+    ).toThrow(/POLICY_VIOLATION/);
+  });
 });
