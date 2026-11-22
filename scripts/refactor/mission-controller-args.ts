@@ -1,4 +1,5 @@
 import * as path from 'node:path';
+import { hasCliFlag } from '@agent/core/cli-guard';
 import { loadProjectRecord } from '@agent/core/project/project-registry';
 import { isValidTenantSlug } from '@agent/core/entity-scope';
 import { loadProjectTrackRecord } from '@agent/core/project/project-track-registry';
@@ -197,6 +198,7 @@ export function validateMissionStartCreateInput(
 ): ResolvedMissionCliInput {
   const input = resolveMissionStartCreateInputFromArgv(argv);
   if (!missionId) return input;
+  const dryRun = hasCliFlag(argv, '--dry-run');
   try {
     const state = actionName === 'create' ? undefined : loadState(missionId.toUpperCase());
     if (
@@ -210,9 +212,16 @@ export function validateMissionStartCreateInput(
         project: { ...state.relationships.project },
       };
     }
-    return validateResolvedMissionStartCreateInput(actionName, missionId, input, argv, state);
+    return validateResolvedMissionStartCreateInput(
+      actionName,
+      missionId,
+      input,
+      argv,
+      dryRun,
+      state
+    );
   } catch (error) {
-    if (!argv.includes('--dry-run')) throw error;
+    if (!dryRun) throw error;
     return {
       ...input,
       preflight: {
@@ -228,6 +237,7 @@ function validateResolvedMissionStartCreateInput(
   missionId: string,
   input: ResolvedMissionCliInput,
   argv: string[],
+  dryRun: boolean,
   state?: MissionState | null
 ): ResolvedMissionCliInput {
   const project = input.relationships?.project;
@@ -272,7 +282,7 @@ function validateResolvedMissionStartCreateInput(
       const message =
         `[PROJECT_LINK_INVALID] ${actionName} ${missionId}: project not found: ${project.project_id}. ` +
         'Create it with `pnpm project create` or fix --project-id.';
-      if (!argv.includes('--dry-run')) throw new Error(message);
+      if (!dryRun) throw new Error(message);
       input.projectLinkWarning = `${message} (dry-run: the real run requires the project record)`;
     }
     if (projectRecord && track?.track_id) {
@@ -324,7 +334,7 @@ function validateResolvedMissionStartCreateInput(
       };
     }
   }
-  if (project?.project_id && !project.project_path && !argv.includes('--dry-run')) {
+  if (project?.project_id && !project.project_path && !dryRun) {
     throw new Error(`${actionName} ${missionId}: --project-id requires --project-path`);
   }
   if (
@@ -357,7 +367,7 @@ function validateResolvedMissionStartCreateInput(
       );
     }
   }
-  return preflightMissionScope(actionName, missionId, input, argv, state);
+  return preflightMissionScope(actionName, missionId, input, argv, dryRun, state);
 }
 
 function preflightMissionScope(
@@ -365,9 +375,9 @@ function preflightMissionScope(
   missionId: string,
   input: ResolvedMissionCliInput,
   argv: string[],
+  dryRun: boolean,
   state?: MissionState | null
 ): ResolvedMissionCliInput {
-  const dryRun = argv.includes('--dry-run');
   const issues = input.projectLinkWarning ? [input.projectLinkWarning] : [];
   const resolved = { ...input };
   let stance: string | null = null;
@@ -478,7 +488,7 @@ function preflightMissionScope(
         state,
         tenantSlug: resolved.tenantSlug,
         prerequisites: input.relationships?.prerequisites,
-        force: argv.includes('--force'),
+        force: hasCliFlag(argv, '--force'),
       });
       if (dryRun && state?.status !== 'active') issues.push(...inspectMissionPrerequisites());
     }

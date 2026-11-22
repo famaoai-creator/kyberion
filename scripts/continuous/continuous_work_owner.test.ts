@@ -21,7 +21,7 @@ import { buildSafeExecEnv } from '@agent/core/secure-io';
 import {
   fingerprintMissionGateInputs,
   type MissionGateRecord,
-} from '@agent/core/mission/mission-orchestration-phase-gates';
+} from '@agent/core/mission/mission-process-planning';
 
 const managed = vi.hoisted(() => ({ run: vi.fn() }));
 vi.mock('./continuous_owner_process.js', () => ({ runContinuousOwnerProcess: managed.run }));

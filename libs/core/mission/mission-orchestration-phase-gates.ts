@@ -22,7 +22,6 @@ import { evaluateMissionIntentDrift } from './mission-intent-delta.js';
 import { latestSnapshot } from '../intent/intent-snapshot-store.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { normalizeMissionGateCheckPaths } from './mission-gate-input-fingerprint.js';
-export { fingerprintMissionGateInputs } from './mission-gate-input-fingerprint.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeReaddir } from '../secure-io.js';
 import {
   loadMissionPhaseGateDefinitionAtPath,

@@ -1,4 +1,5 @@
 import * as path from 'node:path';
+import { cliOptionValue, hasCliFlag } from '@agent/core/cli-guard';
 import { logger } from '@agent/core/core';
 import { formatDateTime, resolveTimeZone } from '@agent/core/format';
 import { resolveMissionJournalPolicy } from '@agent/core/mission/mission-journal-policy';
@@ -283,15 +284,13 @@ function renderJournal(tenantSlug?: string, missionId?: string) {
 export function main(argv: string[] = [], print: Print = () => undefined): void {
   const previousPrint = activePrint;
   activePrint = print;
-  const tenantFlag = argv.indexOf('--tenant-slug');
-  const tenantSlug = tenantFlag >= 0 ? argv[tenantFlag + 1]?.trim() : undefined;
-  const missionFlag = argv.indexOf('--mission-id');
-  const missionId = missionFlag >= 0 ? argv[missionFlag + 1]?.trim() : undefined;
+  const tenantSlug = cliOptionValue(argv, '--tenant-slug')?.trim();
+  const missionId = cliOptionValue(argv, '--mission-id')?.trim();
   try {
-    if (tenantFlag >= 0 && (!tenantSlug || tenantSlug.startsWith('--'))) {
+    if (hasCliFlag(argv, '--tenant-slug') && !tenantSlug) {
       throw new Error('--tenant-slug requires a tenant');
     }
-    if (missionFlag >= 0) pathResolver.assertMissionIdArgument(missionId ?? '');
+    if (hasCliFlag(argv, '--mission-id')) pathResolver.assertMissionIdArgument(missionId ?? '');
     renderJournal(tenantSlug || undefined, missionId);
   } finally {
     activePrint = previousPrint;

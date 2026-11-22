@@ -26,12 +26,10 @@ import {
   configureMissionDevelopmentGates,
   getMissionAlignmentGate,
   readStoredMissionGate,
-} from '@agent/core/mission/mission-process-planning';
-import {
   loadMissionGateRecordAtPath,
   fingerprintMissionGateInputs,
   type MissionGateRecord,
-} from '@agent/core/mission/mission-orchestration-phase-gates';
+} from '@agent/core/mission/mission-process-planning';
 import { withContinuousMissionScope } from '@agent/core/organization/continuous-mission-scope';
 import { continuousDevelopmentAlignmentScope } from '@agent/core/organization/continuous-development-consent';
 import { listWorkItems, updateWorkItem } from '@agent/core/workforce/work-coordination';

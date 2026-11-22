@@ -37,7 +37,8 @@ import { sanitizeIdSegment } from '../foundation/text.js';
 import { WorkerStateJournal } from '../workforce/worker-state-journal.js';
 import { restoreJournalCompaction } from '../workforce/worker-compaction-snapshot.js';
 import { frameUntrustedInput } from '../governance/untrusted-input-framing.js';
-import { assertSafeRepositoryPath, safeExec, safeExistsSync, safeLstat } from '../secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '../secure-io.js';
+import { execMissionControllerChild } from './mission-controller-start-input.js';
 import { emitMissionTaskEvent } from './mission-task-events.js';
 import { createMissionProgressController } from './mission-orchestration-progress.js';
 import {
@@ -803,7 +804,7 @@ export function resolveMissionType(payload: SlackPayload): string {
 }
 
 export function runMissionController(env: NodeJS.ProcessEnv, args: string[]) {
-  return safeExec('node', ['dist/scripts/mission_controller.js', ...args], {
+  return execMissionControllerChild(args, {
     env,
     timeoutMs: MISSION_CONTROLLER_TIMEOUT_MS,
   });

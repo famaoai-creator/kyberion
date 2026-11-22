@@ -58,6 +58,7 @@ import {
 import { isolatedScopeEnvPath } from '@agent/core/scope-context';
 import { pathResolver } from '@agent/core/path-resolver';
 import { buildExecutionEnv } from '@agent/core/authority';
+import { execMissionControllerChild } from '@agent/core/mission/mission-controller-start-input';
 import { discoveryOpsByActuator, loadMcpActuatorOpDiscovery } from './mcp-actuator-discovery.js';
 import { spawnManagedProcess, stopManagedProcess } from '@agent/core/managed-process';
 import {
@@ -745,10 +746,8 @@ function createMission(brief: string, title: string, context: McpRequestContext)
     TASK_ID: '',
     MISSION_ID: missionId,
   });
-  const output = safeExec(
-    process.execPath,
+  const output = execMissionControllerChild(
     [
-      nodePath.join(REPO_ROOT, 'dist/scripts/mission_controller.js'),
       'create',
       missionId,
       '--tier',
@@ -763,7 +762,8 @@ function createMission(brief: string, title: string, context: McpRequestContext)
       env,
       timeoutMs: 30_000,
       maxOutputMB: 2,
-    }
+    },
+    process.execPath
   );
   return { mission_id: missionId, output };
 }

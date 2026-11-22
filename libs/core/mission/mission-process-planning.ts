@@ -39,6 +39,11 @@ import {
 } from '../secure-io.js';
 import { loadMissionPhaseGateDefinitionAtPath } from './mission-phase-gate-definition-reader.js';
 import { normalizeMissionGateCheckPaths } from './mission-gate-input-fingerprint.js';
+export { fingerprintMissionGateInputs } from './mission-gate-input-fingerprint.js';
+export {
+  loadMissionGateRecordAtPath,
+  type MissionGateRecord,
+} from './mission-gate-record-reader.js';
 import {
   type MissionClass,
   type MissionDeliveryShape,

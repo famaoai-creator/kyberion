@@ -2,6 +2,7 @@ import { buildExecutionEnv } from '../authority.js';
 import { currentExecutionScope } from '../foundation/execution-scope.js';
 import { isolatedScopeEnvPath } from '../scope-context.js';
 import { pathResolver } from '../path-resolver.js';
+import { safeExec, type SafeExecOptions } from '../secure-io.js';
 import { currentScopeEnvelope } from '../scope-envelope.js';
 import type { StorageDataTier } from '../storage-layout.js';
 
@@ -9,6 +10,15 @@ interface MissionStartScope {
   tenant_slug?: string;
   organization_id?: string;
   project_id?: string;
+}
+
+/** Run one governed Mission controller command with the caller's scoped child environment. */
+export function execMissionControllerChild(
+  args: string[],
+  options: SafeExecOptions,
+  nodeCommand = 'node'
+): string {
+  return safeExec(nodeCommand, ['dist/scripts/mission_controller.js', ...args], options);
 }
 
 export function missionControllerHandoffEnv(
