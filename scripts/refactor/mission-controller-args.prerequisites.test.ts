@@ -9,6 +9,7 @@ import {
 describe('mission CLI tenant binding', () => {
   it('keeps the named tenant bound across asynchronous lifecycle work', async () => {
     vi.stubEnv('KYBERION_TENANT', undefined);
+    vi.stubEnv('MISSION_ROLE', 'mission_controller');
     try {
       await withMissionCliTenant(
         'review-task',

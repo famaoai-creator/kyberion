@@ -19,7 +19,7 @@ import { transitionStatus } from '@agent/core/mission/mission-status';
 import { resolveScopeResolution } from '@agent/core/scope-context';
 import { currentExecutionScope } from '@agent/core/foundation';
 import { currentScopeEnvelope } from '@agent/core/scope-envelope';
-import { withExecutionContextAsync } from '@agent/core/authority';
+import { resolveIdentityContext, withExecutionContextAsync } from '@agent/core/authority';
 import {
   extractMissionControllerPositionalArgs,
   extractMissionStartCreateOptionsFromArgv,
@@ -86,13 +86,13 @@ export function withMissionCliTenant<T>(
       'Selected Stance is not configured. Run pnpm stance:list or clear the active Stance.'
     );
   const actingFor = stanceConfig ? parseStanceSelection(readJson<unknown>(stanceConfig)) : null;
-  const configuredTenant = getRegisteredEnvText('KYBERION_TENANT');
+  const identity = resolveIdentityContext();
   if (
     scope?.tenantCleared ||
     [
       scope?.tenantSlug,
       inherited?.tenant_slug,
-      configuredTenant,
+      identity.tenantSlug,
       ambient?.tenant_slug,
       actingFor?.tenantSlug,
     ].some((bound) => bound && bound !== tenant)
@@ -112,8 +112,13 @@ export function withMissionCliTenant<T>(
     throw new Error(
       '[SCOPE_CONTEXT_INVALID] Organization conflicts with the active execution scope'
     );
+  if (scope?.tenantBound) return run();
+  if (identity.role && identity.role !== 'mission_controller')
+    throw new Error(
+      '[ROLE_ASSUMPTION_DENIED] Tenant selection requires the Mission controller CLI role'
+    );
   return withExecutionContextAsync(
-    scope?.assumedRole ?? getRegisteredEnvText('MISSION_ROLE') ?? 'mission_controller',
+    'mission_controller',
     run,
     undefined,
     tenant,
