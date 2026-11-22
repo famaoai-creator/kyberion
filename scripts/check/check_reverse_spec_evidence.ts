@@ -1,6 +1,8 @@
 import { createStandardYargs } from '@agent/core/cli-utils';
 import {
   assertReverseSpecEvidence,
+  computeReverseSpecAuditSample,
+  resolveReverseSpecMissionDir,
   REVERSE_SPEC_EVIDENCE_STAGES,
   type ReverseSpecEvidenceStage,
 } from '@agent/core/mission';
@@ -17,12 +19,29 @@ export const runCheckReverseSpecEvidence = defineScript({
       .option('stage', {
         type: 'string',
         choices: [...REVERSE_SPEC_EVIDENCE_STAGES],
-        demandOption: true,
+      })
+      .option('print-sample', {
+        type: 'boolean',
+        describe: 'Print the derived audit sample (claim ids the verifier must check) and its seed',
+      })
+      .option('sample-size', { type: 'number', describe: 'Sample size above the minimum' })
+      .check((parsed) => {
+        if (!parsed.stage && !parsed['print-sample'])
+          throw new Error('pass --stage <stage> or --print-sample');
+        return true;
       })
       .option('json', { type: 'boolean' })
       .option('quiet', { type: 'boolean' })
       .parseSync();
     try {
+      if (args['print-sample']) {
+        const sample = computeReverseSpecAuditSample(
+          resolveReverseSpecMissionDir(args.mission),
+          args['sample-size'] ?? 0
+        );
+        context.print(sample);
+        return sample;
+      }
       const result = assertReverseSpecEvidence(
         args.mission,
         args.stage as ReverseSpecEvidenceStage

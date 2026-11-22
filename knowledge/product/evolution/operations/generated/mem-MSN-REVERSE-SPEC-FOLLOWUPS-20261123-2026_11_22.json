@@ -1,0 +1,29 @@
+{
+  "record_id": "mem-MSN-REVERSE-SPEC-FOLLOWUPS-20261123-2026_11_22",
+  "kind": "sop_candidate",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "Harden evidence gates against every way the producer can choose the outcome",
+  "summary": "An evidence gate that reads producer-written ledgers must not let the producer choose who verified, which items were sampled, or which input is current. Bind identities to the mission execution ledger, derive samples from a canonical hash of frozen content, freeze upstream inputs as a snapshot compared whole, and check every alternative option (e.g. 'full') for a bypass.",
+  "candidate_id": "mem-MSN-REVERSE-SPEC-FOLLOWUPS-20261123-2026_11_22",
+  "evidence_refs": [
+    "active/missions/public/MSN-REVERSE-SPEC-FOLLOWUPS-20261123/evidence/distillation.md",
+    "active/missions/public/MSN-REVERSE-SPEC-FOLLOWUPS-20261123/evidence/REVIEW-execution-implement.md",
+    "active/missions/public/MSN-REVERSE-SPEC-FOLLOWUPS-20261123/evidence/implementation-report.md"
+  ],
+  "created_at": "2026-11-22T22:07:46.632Z",
+  "procedure_steps": [
+    "## Applicability\nTyped checker gates (command_succeeds) over mission evidence ledgers, e.g. reverse_spec audit and legacy_migration brief.\n\n## Steps\n1. Identity: compare self-declared author/verifier fields with actor_id of evidence_recorded entries for the producing tasks in <mission>/execution-ledger.jsonl (stream it with streamJsonLines, not a whole-file read); require disjoint sets. Exit gates run after the phase tasks are recorded, so the entries exist. Actor ids are still self-declared at record-evidence: document that limit rather than claiming separation of persons.\n2. Sampling: derive the sample from sha256 of the canonical JSON (sorted keys) of the frozen ledger, rank items by sha256(seed\\0id), and require every sampled id verified. Hashing raw bytes lets reformatting re-roll the sample.\n3. Every sampling/coverage option needs its own rule: a 'full' method that only enforces the minimum count is a back door around the derived sample.\n4. Upstream inputs: freeze them into the consuming mission with a checker command (--write-source-snapshot) and compare the whole snapshot to a fresh build at the entry gate; comparing only hashes lets the read fields (spec ids) be edited.\n5. Held decisions referenced by path need a schema (fields, status equals the disposition, affected ids include the item).\n6. Have an independent reviewer try to make the gate pass with bad evidence before the PR; it found two bypasses here that the tests written alongside the implementation did not.\n\n## Evidence\nMSN-REVERSE-SPEC-FOLLOWUPS-20261123 implementation, test and review reports."
+  ],
+  "safety_notes": [
+    "Require approval before irreversible or high-risk actions.",
+    "Capture evidence before and after the action."
+  ],
+  "escalation_conditions": [
+    "Unexpected runtime failure",
+    "Policy or approval mismatch",
+    "Result does not match the expected state"
+  ],
+  "source_branch": "fix/reverse-spec-followups-20261123",
+  "source_commit": "91372b49856653c1e47e287709d092ab91b9724c"
+}

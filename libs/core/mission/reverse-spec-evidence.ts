@@ -7,11 +7,13 @@
  * independent verifier, and a source-intact fingerprint. Completion is decided
  * by these checks, never by an agent's own "done".
  */
+import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 import { parseSafeJsonObjectInput } from '../foundation/safe-json.js';
 import { isRecord } from '../foundation/primitives.js';
 import { findMissionPath } from '../path-resolver.js';
 import { safeExistsSync, safeReadFile, safeStat } from '../secure-io.js';
+import { streamJsonLines } from '../storage/jsonl-read.js';
 import {
   DEFAULT_SOURCE_TREE_MAX_FILES,
   computeSourceFingerprint,
@@ -57,6 +59,19 @@ export const REVERSE_SPEC_UNKNOWN_CLASSES = [
 export const REVERSE_SPEC_VERDICTS = ['supported', 'partial', 'unsupported', 'fabricated'] as const;
 /** Smallest random sample accepted for non-rebuild purposes (or the whole population if smaller). */
 export const REVERSE_SPEC_MIN_SAMPLE = 30;
+
+/** Ledger task-id suffixes whose recorded actors author and independently verify the specs. */
+export const REVERSE_SPEC_AUTHOR_TASK_SUFFIX = 'specify';
+export const REVERSE_SPEC_VERIFIER_TASK_SUFFIX = 'independent-verify';
+/** Decision record a denominator disposition must reference (schema: reverse-spec-decision-record). */
+export const REVERSE_SPEC_DECISION_RECORD_FIELDS = [
+  'decision_id',
+  'decision',
+  'reason',
+  'decided_by',
+  'decided_at',
+  'affected_node_ids',
+] as const;
 
 export const REVERSE_SPEC_EVIDENCE_FILES = {
   scope: 'evidence/reverse-spec-scope.json',
@@ -159,6 +174,96 @@ function duplicates(ids: string[]): string[] {
   const dup = new Set<string>();
   for (const id of ids) (seen.has(id) ? dup : seen).add(id);
   return [...dup];
+}
+
+const ISO_TIMESTAMP_PATTERN =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})$/u;
+
+/**
+ * Problem text if the decision record at `relative` does not justify disposing `nodeId`
+ * with `status`, else null. Shape: knowledge/product/schemas/reverse-spec-decision-record.schema.json.
+ */
+function checkDecisionRecord(
+  missionDir: string,
+  relative: string,
+  nodeId: string,
+  status: unknown
+): string | null {
+  if (!relative.endsWith('.json'))
+    return `decision_ref ${relative} must be a JSON decision record (${REVERSE_SPEC_DECISION_RECORD_FIELDS.join(', ')})`;
+  let record: Json;
+  try {
+    record = parseSafeJsonObjectInput(
+      String(safeReadFile(path.resolve(missionDir, relative), { encoding: 'utf8' })),
+      relative
+    );
+  } catch (error) {
+    return `decision_ref ${relative} is not valid JSON: ${error instanceof Error ? error.message : String(error)}`;
+  }
+  const missing = REVERSE_SPEC_DECISION_RECORD_FIELDS.filter((field) =>
+    field === 'affected_node_ids' ? !Array.isArray(record[field]) : !nonEmpty(record[field])
+  );
+  if (missing.length) return `decision record ${relative} missing ${missing.join(', ')}`;
+  if (record.decision !== status)
+    return `decision record ${relative} decides ${String(record.decision)}, but the disposition says ${String(status)}`;
+  if (!ISO_TIMESTAMP_PATTERN.test(String(record.decided_at)))
+    return `decision record ${relative} decided_at must be an ISO-8601 timestamp`;
+  if (!stringList(record.affected_node_ids).includes(nodeId))
+    return `decision record ${relative} does not list ${nodeId} in affected_node_ids`;
+  return null;
+}
+
+/** Actors recorded in the mission execution ledger for tasks whose id ends with `-<suffix>`. */
+function ledgerTaskActors(missionDir: string, suffix: string): Set<string> {
+  const actors = new Set<string>();
+  const abs = path.join(missionDir, 'execution-ledger.jsonl');
+  if (!safeExistsSync(abs)) return actors;
+  // Append-only ledger: stream it, and skip a malformed line rather than hide the rest.
+  for (const entry of streamJsonLines<unknown>(abs, { onMalformed: 'skip' })) {
+    if (!isRecord(entry) || entry.event_type !== 'evidence_recorded') continue;
+    const taskId = String(entry.task_id ?? '');
+    if ((taskId === suffix || taskId.endsWith(`-${suffix}`)) && nonEmpty(entry.actor_id))
+      actors.add(entry.actor_id.trim());
+  }
+  return actors;
+}
+
+function sha256Hex(text: string): string {
+  return createHash('sha256').update(text).digest('hex');
+}
+
+/** JSON with object keys sorted, so formatting and key order do not change a hash. */
+function canonicalJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
+  if (isRecord(value))
+    return `{${Object.keys(value)
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`)
+      .join(',')}}`;
+  return JSON.stringify(value) ?? 'null';
+}
+
+/**
+ * Sampling seed: the hash of the spec ledger's canonical JSON, so neither the author nor the
+ * verifier picks it and reformatting the file cannot re-roll it.
+ */
+function auditSamplingSeed(missionDir: string): string {
+  return sha256Hex(
+    canonicalJson(readJsonEvidence(missionDir, REVERSE_SPEC_EVIDENCE_FILES.specify))
+  );
+}
+
+/** Deterministic random sample of confirmed claims: ordered by sha256(seed \0 claim_id). */
+export function selectReverseSpecAuditSample(
+  confirmedClaimIds: readonly string[],
+  seed: string,
+  size: number
+): string[] {
+  return [...confirmedClaimIds]
+    .map((id) => ({ id, rank: sha256Hex(`${seed}\0${id}`) }))
+    .sort((a, b) => (a.rank < b.rank ? -1 : a.rank > b.rank ? 1 : 0))
+    .slice(0, Math.max(0, size))
+    .map((entry) => entry.id);
 }
 
 /** Reads source files once per validation; line counts are cached per path. */
@@ -520,6 +625,11 @@ function validateAnalysisDocument(missionDir: string, graph: CodeGraph): { itemI
       );
       continue;
     }
+    const recordProblem = checkDecisionRecord(missionDir, decision, nodeId, disposition.status);
+    if (recordProblem) {
+      problems.push(`disposition ${nodeId}: ${recordProblem}`);
+      continue;
+    }
     covered.add(nodeId);
   }
   if (dangling.length)
@@ -635,6 +745,63 @@ function validateSpecDocument(
   return { authorActorId: String(ledger.author_actor_id), claims, specCount: specs.length };
 }
 
+/**
+ * Binds the ledger's self-declared author/verifier to the actors that recorded the specify and
+ * independent-verify tasks in the mission execution ledger (record-evidence --actor-id).
+ */
+function identityProblems(missionDir: string, authorActorId: string, verifier: unknown): string[] {
+  const problems: string[] = [];
+  const authors = ledgerTaskActors(missionDir, REVERSE_SPEC_AUTHOR_TASK_SUFFIX);
+  const verifiers = ledgerTaskActors(missionDir, REVERSE_SPEC_VERIFIER_TASK_SUFFIX);
+  const next =
+    'record the task with mission_controller record-evidence <MISSION> <TASK> … --actor-id <who did it>';
+  if (authors.size === 0)
+    problems.push(
+      `no actor recorded for the *-${REVERSE_SPEC_AUTHOR_TASK_SUFFIX} task in execution-ledger.jsonl — ${next}`
+    );
+  else if (!authors.has(authorActorId.trim()))
+    problems.push(
+      `author_actor_id ${authorActorId} is not the actor that recorded the specify task (${[...authors].join(', ')})`
+    );
+  if (verifiers.size === 0)
+    problems.push(
+      `no actor recorded for the *-${REVERSE_SPEC_VERIFIER_TASK_SUFFIX} task in execution-ledger.jsonl — ${next}`
+    );
+  else if (nonEmpty(verifier) && !verifiers.has(verifier.trim()))
+    problems.push(
+      `verifier_actor_id ${verifier} is not the actor that recorded the independent-verify task (${[...verifiers].join(', ')})`
+    );
+  const both = [...verifiers].filter((actor) => authors.has(actor));
+  if (both.length)
+    problems.push(
+      `actor(s) ${both.join(', ')} recorded both the specify and the independent-verify task — verification must be independent`
+    );
+  return problems;
+}
+
+/** Ids of the confirmed claims an audit with `random` sampling must verify, and the seed used. */
+export function computeReverseSpecAuditSample(
+  missionDir: string,
+  requestedSize = 0
+): {
+  seed: string;
+  population: number;
+  sample: string[];
+} {
+  const ledger = readJsonEvidence(missionDir, REVERSE_SPEC_EVIDENCE_FILES.specify);
+  const confirmed = records(ledger.specs)
+    .flatMap((spec) => records(spec.claims))
+    .filter((claim) => claim.confidence === 'confirmed' && nonEmpty(claim.claim_id))
+    .map((claim) => String(claim.claim_id));
+  const seed = auditSamplingSeed(missionDir);
+  const size = Math.min(confirmed.length, Math.max(REVERSE_SPEC_MIN_SAMPLE, requestedSize));
+  return {
+    seed,
+    population: confirmed.length,
+    sample: selectReverseSpecAuditSample(confirmed, seed, size),
+  };
+}
+
 function validateAuditDocument(
   missionDir: string,
   purpose: ReverseSpecPurpose,
@@ -645,8 +812,9 @@ function validateAuditDocument(
   const ledger = readJsonEvidence(missionDir, REVERSE_SPEC_EVIDENCE_FILES.audit);
   const problems: string[] = [];
   if (!nonEmpty(ledger.verifier_actor_id)) problems.push('verifier_actor_id required');
-  else if (ledger.verifier_actor_id === specs.authorActorId)
+  else if (ledger.verifier_actor_id.trim() === specs.authorActorId.trim())
     problems.push('verifier_actor_id equals the spec author — verification must be independent');
+  problems.push(...identityProblems(missionDir, specs.authorActorId, ledger.verifier_actor_id));
   const latest = new Map<string, string>();
   const unknownClaims: string[] = [];
   for (const entry of records(ledger.entries)) {
@@ -682,6 +850,13 @@ function validateAuditDocument(
   } else {
     if (sampling.method !== 'full' && sampling.method !== 'random')
       problems.push('sampling.method must be full|random');
+    if (sampling.method === 'full') {
+      const unverified = confirmed.filter((id) => !latest.has(id));
+      if (unverified.length)
+        problems.push(
+          `sampling.method full verifies every confirmed claim; unverified: ${capList(unverified)} — use random for a derived sample`
+        );
+    }
     if (sampling.population !== confirmed.length)
       problems.push(
         `sampling.population must equal the confirmed-claim count (${confirmed.length})`
@@ -692,6 +867,28 @@ function validateAuditDocument(
       problems.push(
         `only ${verifiedConfirmed} confirmed claims verified; at least ${required} required`
       );
+    if (sampling.method === 'random') {
+      // The sample is derived, not chosen: a verifier cannot pick the easy claims.
+      const seed = auditSamplingSeed(missionDir);
+      if (sampling.seed !== seed)
+        problems.push(
+          `sampling.seed must be ${seed} (sha256 of the canonical spec-ledger.json) — print the sample with check_reverse_spec_evidence --print-sample`
+        );
+      const size = Math.min(
+        confirmed.length,
+        Math.max(
+          required,
+          Number.isInteger(sampling.sample_size) ? Number(sampling.sample_size) : 0
+        )
+      );
+      const unsampled = selectReverseSpecAuditSample(confirmed, seed, size).filter(
+        (id) => !latest.has(id)
+      );
+      if (unsampled.length)
+        problems.push(
+          `sampled claims not verified (sample derived from the spec ledger seed): ${capList(unsampled)}`
+        );
+    }
   }
   const open = [...latest].filter(
     ([, verdict]) => verdict === 'unsupported' || verdict === 'fabricated'

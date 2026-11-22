@@ -1,7 +1,10 @@
 import * as path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { computeSourceFingerprint } from '../analysis/source-fingerprint.js';
-import { validateReverseSpecEvidenceAt } from './reverse-spec-evidence.js';
+import {
+  computeReverseSpecAuditSample,
+  validateReverseSpecEvidenceAt,
+} from './reverse-spec-evidence.js';
 import {
   cleanupFixtures,
   reverseSpecFixture as fixture,
@@ -183,6 +186,32 @@ describe('reverse_spec evidence gates', () => {
       /decision_ref .* does not exist/u
     );
     write(path.join(mission, 'evidence/decisions/ADR-1.md'), '# ADR-1\n');
+    expect(() => validateReverseSpecEvidenceAt(mission, 'analysis')).toThrow(
+      /must be a JSON decision record/u
+    );
+    (docs.analysis.dispositions as Record<string, unknown>[])[0].decision_ref =
+      'evidence/decisions/DEC-001.json';
+    flush();
+    const record: Record<string, unknown> = {
+      decision_id: 'DEC-001',
+      decision: 'no_behavior',
+      reason: 'vendor code',
+      decided_by: 'product-owner',
+      decided_at: '2026-11-23T09:00:00Z',
+      affected_node_ids: ['MOD:src/orders.py'],
+    };
+    write(path.join(mission, 'evidence/decisions/DEC-001.json'), record);
+    const run = () => validateReverseSpecEvidenceAt(mission, 'analysis');
+    expect(run).toThrow(/decides no_behavior, but the disposition says out_of_scope/u);
+    record.decision = 'out_of_scope';
+    write(path.join(mission, 'evidence/decisions/DEC-001.json'), record);
+    expect(run).toThrow(/does not list MOD:src\/billing\.py/u);
+    record.affected_node_ids = ['MOD:src/billing.py'];
+    delete record.decided_by;
+    write(path.join(mission, 'evidence/decisions/DEC-001.json'), record);
+    expect(run).toThrow(/missing decided_by/u);
+    record.decided_by = 'product-owner';
+    write(path.join(mission, 'evidence/decisions/DEC-001.json'), record);
     expect(validateReverseSpecEvidenceAt(mission, 'analysis').ok).toBe(true);
     docs.analysis.dispositions = [];
     flush();
@@ -235,6 +264,83 @@ describe('reverse_spec evidence gates', () => {
     const run = () => validateReverseSpecEvidenceAt(mission, 'audit');
     expect(run).toThrow(/must be independent/u);
     expect(run).toThrow(/unsupported\/fabricated/u);
+  });
+
+  it('binds the author and verifier to the actors recorded in the execution ledger', () => {
+    const { mission, flush, ledgerActors } = fixture();
+    const run = () => validateReverseSpecEvidenceAt(mission, 'audit');
+    ledgerActors.verify = 'someone-else';
+    flush();
+    expect(run).toThrow(/verifier_actor_id verifier-agent is not the actor that recorded/u);
+    ledgerActors.verify = 'writer-agent';
+    flush();
+    expect(run).toThrow(/recorded both the specify and the independent-verify task/u);
+    ledgerActors.verify = 'verifier-agent';
+    ledgerActors.specify = 'ghost-writer';
+    flush();
+    expect(run).toThrow(
+      /author_actor_id writer-agent is not the actor that recorded the specify task/u
+    );
+    write(path.join(mission, 'execution-ledger.jsonl'), '');
+    expect(run).toThrow(/no actor recorded for the \*-specify task/u);
+  });
+
+  it('derives the random audit sample from the spec ledger so it cannot be chosen', () => {
+    const { mission, docs, flush } = fixture('maintenance');
+    const spec = (docs.specify.specs as Record<string, unknown>[])[0];
+    spec.claims = Array.from({ length: 40 }, (_, index) => ({
+      claim_id: `C-${String(index + 1).padStart(3, '0')}`,
+      confidence: 'confirmed',
+      citations: [{ path: 'src/orders.py', line: 3 }],
+    }));
+    const ids = (spec.claims as { claim_id: string }[]).map((claim) => claim.claim_id);
+    docs.audit.sampling = { method: 'random', population: 40, sample_size: 30, seed: 'mine' };
+    // Verifying the first 30 is a chosen sample, not the derived one.
+    docs.audit.entries = ids.slice(0, 30).map((id) => ({ claim_id: id, verdict: 'supported' }));
+    flush();
+    const run = () => validateReverseSpecEvidenceAt(mission, 'audit');
+    expect(run).toThrow(/sampling\.seed must be [0-9a-f]{64}/u);
+    const derived = computeReverseSpecAuditSample(mission);
+    expect(derived.population).toBe(40);
+    expect(derived.sample).toHaveLength(30);
+    expect(computeReverseSpecAuditSample(mission).sample).toEqual(derived.sample);
+    docs.audit.sampling = { ...(docs.audit.sampling as object), seed: derived.seed };
+    flush();
+    expect(derived.sample).not.toEqual(ids.slice(0, 30));
+    expect(run).toThrow(/sampled claims not verified/u);
+    docs.audit.entries = derived.sample.map((id) => ({ claim_id: id, verdict: 'supported' }));
+    flush();
+    expect(run().ok).toBe(true);
+  });
+
+  it('keeps the sampling seed stable across reformatting and requires full sampling to be full', () => {
+    const { mission, docs, flush } = fixture('maintenance');
+    const seed = computeReverseSpecAuditSample(mission).seed;
+    write(
+      path.join(mission, 'evidence/spec-ledger.json'),
+      JSON.stringify(Object.fromEntries(Object.entries(docs.specify).reverse()), null, 4)
+    );
+    expect(computeReverseSpecAuditSample(mission).seed).toBe(seed);
+    const spec = (docs.specify.specs as Record<string, unknown>[])[0];
+    spec.claims = [
+      {
+        claim_id: 'C-001',
+        confidence: 'confirmed',
+        citations: [{ path: 'src/orders.py', line: 3 }],
+      },
+      {
+        claim_id: 'C-003',
+        confidence: 'confirmed',
+        citations: [{ path: 'src/billing.py', line: 1 }],
+      },
+    ];
+    // "full" with only the easy claim verified is not full.
+    docs.audit.sampling = { method: 'full', population: 2 };
+    docs.audit.entries = [{ claim_id: 'C-001', verdict: 'supported' }];
+    flush();
+    expect(() => validateReverseSpecEvidenceAt(mission, 'audit')).toThrow(
+      /sampling\.method full verifies every confirmed claim; unverified: C-003/u
+    );
   });
 
   it('fails the audit when the analyzed source changed after the code graph froze', () => {
