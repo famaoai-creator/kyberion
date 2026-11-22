@@ -82,6 +82,7 @@ export const RESOLVE_GENERATED_GATE_IDS: readonly string[] = [
   'pseudo-locale',
   'vocabulary-types',
   'pii-rules',
+  'contract-types',
   'cli-reference',
   'capability-seams',
   'package-dependency-graph',
