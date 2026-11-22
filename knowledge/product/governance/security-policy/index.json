@@ -24,7 +24,7 @@
     "active/personal/"
   ],
   "volatile_face_policy": {
-    "description": "Volatile Knowledge Layer (working-memory) path governance. tier_restrictions apply — active/personal/ is personal tier only.",
+    "description": "Volatile Knowledge Layer (working-memory) path governance. tier_restrictions apply \u2014 active/personal/ is personal tier only.",
     "paths": {
       "session": "active/shared/runtime/session/<session_id>/",
       "mission": "active/missions/<TIER>/<MISSION_ID>/MEMORY.md",
@@ -228,7 +228,7 @@
       ]
     },
     "customer_decision_deal_note_writer": {
-      "description": "Tenant deal store (libs/core/organization/deal-store.ts asDealStore, S3): every read and write of a tenant's customer records — deals, deal documents, requirements captures, escalations and the deal log under knowledge/confidential/<tenant>/deals/ — runs as this role, bound to that tenant (tenant-bound: libs/core/authority.ts TENANT_BOUND_READER_ROLES), and scripts/customer/customer_decision.ts respond / confirm uses it for the best-effort deal note (CD-08), so neither the customer-triggered path nor a surface needs mission_controller or a confidential-tier grant. Only the deal file IO runs under it; callers keep their own role for notifications and the memory promotion queue. No other knowledge, decision ledger, agenda, receipt or invite authority.",
+      "description": "Tenant deal store (libs/core/organization/deal-store.ts asDealStore, S3): every read and write of a tenant's customer records \u2014 deals, deal documents, requirements captures, escalations and the deal log under knowledge/confidential/<tenant>/deals/ \u2014 runs as this role, bound to that tenant (tenant-bound: libs/core/authority.ts TENANT_BOUND_READER_ROLES), and scripts/customer/customer_decision.ts respond / confirm uses it for the best-effort deal note (CD-08), so neither the customer-triggered path nor a surface needs mission_controller or a confidential-tier grant. Only the deal file IO runs under it; callers keep their own role for notifications and the memory promotion queue. No other knowledge, decision ledger, agenda, receipt or invite authority.",
       "allow_read": ["knowledge/confidential/${KYBERION_TENANT}/deals/"],
       "allow_write": ["knowledge/confidential/${KYBERION_TENANT}/deals/"]
     },
@@ -248,7 +248,7 @@
       ]
     },
     "delegation_record_store": {
-      "description": "Tenant-bound store role of the delegated-task trace and record partitions (libs/core/workforce/delegated-task-observability.ts). The delegation store assumes it (withExecutionContext / withExecutionContextAsync) for every tenant partition read and write — trace append, record write/read/listing, child-inbox queue I/O, background-completion notification queue (libs/core/mission/delegation-notifications.ts: <partition>/notifications.jsonl) append, read and claim — always bound to the delegation's tenant, so the grants resolve through ${KYBERION_TENANT} to that one tenant's active/shared/runtime/delegation-records/confidential/<tenant>/ partition. Tenant-bound (TENANT_BOUND_READER_ROLES): a caller with another active tenant cannot bind it, so a process bound to one tenant never reads another tenant's delegation instructions or results. The inter-process locks stay under the caller's role. No knowledge, mission, system partition, legacy observability or customer/ grant.",
+      "description": "Tenant-bound store role of the delegated-task trace and record partitions (libs/core/workforce/delegated-task-observability.ts). The delegation store assumes it (withExecutionContext / withExecutionContextAsync) for every tenant partition read and write \u2014 trace append, record write/read/listing, child-inbox queue I/O, background-completion notification queue (libs/core/mission/delegation-notifications.ts: <partition>/notifications.jsonl) append, read and claim \u2014 always bound to the delegation's tenant, so the grants resolve through ${KYBERION_TENANT} to that one tenant's active/shared/runtime/delegation-records/confidential/<tenant>/ partition. Tenant-bound (TENANT_BOUND_READER_ROLES): a caller with another active tenant cannot bind it, so a process bound to one tenant never reads another tenant's delegation instructions or results. The inter-process locks stay under the caller's role. No knowledge, mission, system partition, legacy observability or customer/ grant.",
       "allow_read": ["active/shared/runtime/delegation-records/confidential/${KYBERION_TENANT}/"],
       "allow_write": ["active/shared/runtime/delegation-records/confidential/${KYBERION_TENANT}/"]
     },
@@ -411,7 +411,7 @@
       }
     },
     "dot_charter_store": {
-      "description": "Store role of dot charter documents (libs/core/dot/dot-lifecycle.ts): dots/ at repo root, knowledge/confidential/<tenant>/dots/ and knowledge/personal/dots/<owner-hash>/ — all three custodies. The lifecycle facade assumes it (withExecutionContext) at each charter read/write inside the dot_lifecycle_worker process, binding the charter's tenant for confidential custody and explicitly clearing the ambient tenant ('' tenantCleared) for personal and system custody. Its read scopes additionally carry the validation reads that ran under the former dot_lifecycle_writer (tenants/<t>.json, organization operational state, runtime projects). Deliberately not a role a dot may bind at runtime, so an active dot can never rewrite the contract it runs under. The lifecycle audit ledger, activation heartbeats, event-continuation state and inter-process locks live under other roles (dot_lifecycle_runtime_store / the worker's ambient locks grant).",
+      "description": "Store role of dot charter documents (libs/core/dot/dot-lifecycle.ts): dots/ at repo root, knowledge/confidential/<tenant>/dots/ and knowledge/personal/dots/<owner-hash>/ \u2014 all three custodies. The lifecycle facade assumes it (withExecutionContext) at each charter read/write inside the dot_lifecycle_worker process, binding the charter's tenant for confidential custody and explicitly clearing the ambient tenant ('' tenantCleared) for personal and system custody. Its read scopes additionally carry the validation reads that ran under the former dot_lifecycle_writer (tenants/<t>.json, organization operational state, runtime projects). Deliberately not a role a dot may bind at runtime, so an active dot can never rewrite the contract it runs under. The lifecycle audit ledger, activation heartbeats, event-continuation state and inter-process locks live under other roles (dot_lifecycle_runtime_store / the worker's ambient locks grant).",
       "allow_read": [
         "dots/",
         "knowledge/personal/dots/",
@@ -476,7 +476,7 @@
       }
     },
     "dot_lifecycle_runtime_store": {
-      "description": "Store role of the dot lifecycle runtime surfaces (libs/core/dot/dot-lifecycle.ts): the lifecycle audit ledger (active/shared/runtime/dot-lifecycle-audit.jsonl, append-only), activation heartbeats (active/shared/runtime/heartbeats/) and dot event-continuation state (active/shared/runtime/dot/.../event-continuations/ + events.jsonl). Assumed inside the lifecycle facade for these writes only — charter documents go through dot_charter_store and inter-process locks stay under the dot_lifecycle_worker ambient role. The narrow.only declaration restricts writes to exactly those artifacts and their mkdir ancestors. Tenant-confidential event-continuation partitions bind the charter's tenant; personal and system partitions run with the ambient tenant explicitly cleared. Protected runtime data also requires projected knowledge-tier grants; the raw read/metadata/write/mkdir purpose ceilings forbid using those virtual grants on actual knowledge files. Confidential projection grants expand only from the bound tenant; cleared custody does not admit confidential data.",
+      "description": "Store role of the dot lifecycle runtime surfaces (libs/core/dot/dot-lifecycle.ts): the lifecycle audit ledger (active/shared/runtime/dot-lifecycle-audit.jsonl, append-only), activation heartbeats (active/shared/runtime/heartbeats/) and dot event-continuation state (active/shared/runtime/dot/.../event-continuations/ + events.jsonl). Assumed inside the lifecycle facade for these writes only \u2014 charter documents go through dot_charter_store and inter-process locks stay under the dot_lifecycle_worker ambient role. The narrow.only declaration restricts writes to exactly those artifacts and their mkdir ancestors. Tenant-confidential event-continuation partitions bind the charter's tenant; personal and system partitions run with the ambient tenant explicitly cleared. Protected runtime data also requires projected knowledge-tier grants; the raw read/metadata/write/mkdir purpose ceilings forbid using those virtual grants on actual knowledge files. Confidential projection grants expand only from the bound tenant; cleared custody does not admit confidential data.",
       "allow_read": [
         "active/shared/runtime/dot-lifecycle-audit.jsonl",
         "active/shared/runtime/heartbeats/",
@@ -650,7 +650,9 @@
         "active/shared/coordination/identity/",
         "knowledge/personal/tenants/",
         "knowledge/personal/members/",
-        "knowledge/personal/missions/"
+        "knowledge/personal/missions/",
+        "active/shared/runtime/co-sessions/",
+        "active/shared/observability/co-sessions/"
       ],
       "allow_write": []
     },

@@ -1170,6 +1170,39 @@ export function ackCoSessionHandoff(input: {
   return acked;
 }
 
+export interface CoSessionActivity {
+  record: CoSessionRecord;
+  events: CoSessionEvent[];
+}
+
+/**
+ * Every session record under the store with its lifecycle event log (live
+ * `events.jsonl` plus rotated `events-<stamp>.jsonl` segments). Read model for
+ * the agent-session calendar — presence/handoffs are not part of the slice.
+ */
+export function listCoSessionActivity(): CoSessionActivity[] {
+  const root = runtimeRoot();
+  if (!safeExistsSync(root)) return [];
+  const out: CoSessionActivity[] = [];
+  for (const entry of safeReaddir(root)) {
+    const file = sessionFile(entry);
+    const record = readJsonIfPresent<CoSessionRecord>(file);
+    if (!record || typeof record.session_id !== 'string') continue;
+    const events: CoSessionEvent[] = [];
+    const obsDir = path.join(obsRoot(), record.session_id);
+    if (safeExistsSync(obsDir)) {
+      const segments = safeReaddir(obsDir)
+        .filter((name) => name === 'events.jsonl' || /^events-.+\.jsonl$/.test(name))
+        .sort();
+      for (const name of segments) {
+        events.push(...readCoSessionJsonl<CoSessionEvent>(path.join(obsDir, name)));
+      }
+    }
+    out.push({ record, events });
+  }
+  return out;
+}
+
 export function getCoSessionStatus(sessionId?: string): {
   session: CoSessionRecord;
   presence: CoSessionPresence[];

@@ -18,16 +18,20 @@ export type CalendarSource =
   | 'operation_deadline'
   | 'action_item'
   /** An event in the installation owner's own (Google / Microsoft 365) calendar. */
-  | 'external_event';
+  | 'external_event'
+  /** A provider/model working block (co-session participant or delegation). */
+  | 'agent_session';
 
 /** Toggle groups: an operation's runs and deadlines show or hide together. */
-export type CalendarSourceGroup = 'work_item' | 'operation' | 'action_item' | 'external';
+export type CalendarSourceGroup =
+  'work_item' | 'operation' | 'action_item' | 'external' | 'agent_session';
 
 export const CALENDAR_SOURCE_GROUPS: readonly CalendarSourceGroup[] = [
   'work_item',
   'operation',
   'action_item',
   'external',
+  'agent_session',
 ];
 
 export function sourceGroup(source: CalendarSource | undefined): CalendarSourceGroup {
@@ -37,12 +41,14 @@ export function sourceGroup(source: CalendarSource | undefined): CalendarSourceG
       ? 'action_item'
       : source === 'external_event'
         ? 'external'
-        : 'work_item';
+        : source === 'agent_session'
+          ? 'agent_session'
+          : 'work_item';
 }
 
-/** An appointment, not a task: it is never due, overdue or counted in the summary. */
+/** An appointment or history record, not a task: it is never due, overdue or counted in the summary. */
 export function isAppointment(item: Pick<CalendarItem, 'source'>): boolean {
-  return item.source === 'external_event';
+  return item.source === 'external_event' || item.source === 'agent_session';
 }
 
 /** One event from `/api/calendar/external`. */
@@ -100,6 +106,13 @@ export interface CalendarItem {
   source?: CalendarSource;
   /** A deadline that was missed. */
   missed?: boolean;
+  /** Agent sessions: the instants the provider was working. */
+  startAt?: string;
+  endAt?: string;
+  /** Agent sessions: provider id / delegation backend and the served model. */
+  provider?: string;
+  model?: string;
+  sessionKind?: 'co_session' | 'delegation';
 }
 
 /** One `workspace.calendar` entry, as the API returns it. */
@@ -115,8 +128,14 @@ export interface CalendarApiEntry {
   dueAt?: string;
   done: boolean;
   missed?: boolean;
-  link: { kind: 'work_item' | 'organization' | 'mission'; id: string };
+  link: { kind: 'work_item' | 'organization' | 'mission' | 'session'; id: string };
   tenantSlug?: string;
+  /** Agent sessions: the instants the provider was working (hour blocks). */
+  startAt?: string;
+  endAt?: string;
+  provider?: string;
+  model?: string;
+  sessionKind?: 'co_session' | 'delegation';
 }
 
 /** The viewer's local day of an instant, or undefined for an invalid one. */
@@ -151,8 +170,34 @@ export function fromCalendarEntries(
       ...(href ? { href } : {}),
       source: entry.source,
       ...(entry.missed ? { missed: true } : {}),
+      ...(entry.startAt ? { startAt: entry.startAt } : {}),
+      ...(entry.endAt ? { endAt: entry.endAt } : {}),
+      ...(entry.provider ? { provider: entry.provider } : {}),
+      ...(entry.model ? { model: entry.model } : {}),
+      ...(entry.sessionKind ? { sessionKind: entry.sessionKind } : {}),
     };
   });
+}
+
+/**
+ * The fraction of a calendar day a session block covers, in the viewer's
+ * local clock: 0–1 positions within the day for a week-view hour lane. A
+ * block that does not touch `date` returns undefined.
+ */
+export function sessionSpanForDay(
+  item: Pick<CalendarItem, 'startAt' | 'endAt'>,
+  date: string
+): { from: number; to: number; openEnded: boolean } | undefined {
+  if (!item.startAt) return undefined;
+  const start = new Date(item.startAt).getTime();
+  if (Number.isNaN(start)) return undefined;
+  const dayStart = new Date(`${date}T00:00:00`).getTime();
+  const dayEnd = dayStart + 24 * 60 * 60 * 1000;
+  const end = item.endAt ? new Date(item.endAt).getTime() : Date.now();
+  if (Number.isNaN(end) || end <= dayStart || start >= dayEnd) return undefined;
+  const from = Math.max(0, (start - dayStart) / (dayEnd - dayStart));
+  const to = Math.min(1, (end - dayStart) / (dayEnd - dayStart));
+  return { from, to: Math.max(to, from + 0.01), openEnded: !item.endAt };
 }
 
 export interface CalendarEntry<T extends CalendarItem = CalendarItem> {

@@ -19,6 +19,7 @@ import {
   providerReloginCommand,
   shiftAnchor,
   sourceGroup,
+  sessionSpanForDay,
   startOfWeek,
   summarizeCalendar,
   type CalendarApiEntry,
@@ -234,8 +235,13 @@ export function WorkCalendar({ t }: { t: Translate }) {
 
   const renderDay = (day: CalendarDay) => {
     const limit = view === 'month' ? MONTH_CELL_ENTRIES : Infinity;
-    const shown = day.entries.slice(0, limit);
-    const hidden = day.entries.length - shown.length;
+    // Week view: sessions live in the hour lane, not the flat entry list.
+    const listed =
+      view === 'week'
+        ? day.entries.filter((entry) => entry.item.source !== 'agent_session')
+        : day.entries;
+    const shown = listed.slice(0, limit);
+    const hidden = listed.length - shown.length;
     return (
       <li
         key={day.date}
@@ -253,6 +259,42 @@ export function WorkCalendar({ t }: { t: Translate }) {
           <span className="wc-day__weekday">{weekdayName.format(utcDate(day.date))}</span>
           <span className="wc-day__number">{day.day}</span>
         </p>
+        {view === 'week'
+          ? (() => {
+              const sessions = day.entries
+                .filter((entry) => entry.item.source === 'agent_session')
+                .map((entry) => ({ entry, span: sessionSpanForDay(entry.item, day.date) }))
+                .filter((row) => row.span);
+              return sessions.length ? (
+                <div
+                  className="wc-lane"
+                  aria-hidden="true"
+                  role="presentation"
+                  data-today={day.isToday ? 'true' : undefined}
+                >
+                  {sessions.map(({ entry, span }) => (
+                    <span
+                      key={`lane:${entry.item.id}`}
+                      className="wc-lane__block"
+                      data-provider={entry.item.provider}
+                      data-kind={entry.item.sessionKind}
+                      data-open={span!.openEnded ? 'true' : undefined}
+                      style={{
+                        top: `${span!.from * 100}%`,
+                        height: `${(span!.to - span!.from) * 100}%`,
+                      }}
+                      title={`${entry.item.provider}${entry.item.model ? ` · ${entry.item.model}` : ''} — ${entry.item.title}`}
+                    >
+                      <span className="wc-lane__label">
+                        {entry.item.provider}
+                        {entry.item.model ? ` ${entry.item.model}` : ''}
+                      </span>
+                    </span>
+                  ))}
+                </div>
+              ) : null;
+            })()
+          : null}
         {shown.length ? (
           <ul className="wc-day__entries">
             {shown.map((entry) => (

@@ -260,6 +260,7 @@ const operations = [
           range: parseWorkspaceCalendarRange(input.from, input.to),
           ...(ctx.calendarNow ? { now: ctx.calendarNow } : {}),
           viewerProjectIds: ctx.viewer.projectIds,
+          viewerTenants: ctx.viewer.tenantSlugs,
           filter: {
             tenantSlug: input.tenant,
             organizationId: input.organization_id,

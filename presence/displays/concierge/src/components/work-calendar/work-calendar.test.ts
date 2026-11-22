@@ -7,6 +7,7 @@ import {
   fromCalendarEntries,
   fromExternalEvents,
   sourceGroup,
+  sessionSpanForDay,
   localCalendarDate,
   providerReloginCommand,
   shiftAnchor,
@@ -250,5 +251,41 @@ describe('providerReloginCommand', () => {
     [null, null],
   ])('%s → %s', (provider, command) => {
     expect(providerReloginCommand(provider)).toBe(command);
+  });
+});
+
+describe('sessionSpanForDay', () => {
+  it('clips a block to the day it touches in local time', () => {
+    const span = sessionSpanForDay(
+      {
+        startAt: new Date('2026-11-17T09:00:00').toISOString(),
+        endAt: new Date('2026-11-17T12:00:00').toISOString(),
+      },
+      '2026-11-17'
+    );
+    expect(span).toBeTruthy();
+    expect(span!.from).toBeCloseTo(9 / 24, 2);
+    expect(span!.to).toBeCloseTo(12 / 24, 2);
+  });
+
+  it('returns undefined for a day the block does not touch', () => {
+    expect(
+      sessionSpanForDay(
+        {
+          startAt: new Date('2026-11-17T01:00:00').toISOString(),
+          endAt: new Date('2026-11-17T02:00:00').toISOString(),
+        },
+        '2026-11-19'
+      )
+    ).toBeUndefined();
+  });
+
+  it('marks a block without endAt as open-ended to now', () => {
+    const span = sessionSpanForDay(
+      { startAt: new Date(Date.now() - 60_000).toISOString() },
+      localCalendarDate()
+    );
+    expect(span?.openEnded).toBe(true);
+    expect(span!.to).toBeLessThanOrEqual(1);
   });
 });

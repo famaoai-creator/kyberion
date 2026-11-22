@@ -1182,7 +1182,7 @@ function readLegacyRecords(scope: { tenants: string[]; includeSystem: boolean })
 }
 
 /** Every record in the read scope (partitioned first, then unmigrated legacy copies). */
-function listDelegatedTaskRecords(read?: DelegationReadScope): DelegatedTaskRecord[] {
+export function listDelegatedTaskRecords(read?: DelegationReadScope): DelegatedTaskRecord[] {
   const scope = effectiveReadScope(read);
   const records = [
     ...(scope.includeSystem ? readPartitionRecords(undefined) : []),

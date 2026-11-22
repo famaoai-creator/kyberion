@@ -21143,6 +21143,11 @@
         "ja": "あなたのカレンダー",
         "qps-ploc": "⟦Ẏőůř ƈȧŀėñḓȧř ŀőřė⟧"
       },
+      "ia_shell_work_cal_source_agent_session": {
+        "en": "Agent sessions",
+        "ja": "エージェント稼働",
+        "qps-ploc": "⟦Ȧɠėñŧ şėşşïőñş ŀőřė⟧"
+      },
       "ia_shell_work_cal_event": {
         "en": "Event",
         "ja": "予定",
