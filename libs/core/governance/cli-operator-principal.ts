@@ -73,15 +73,22 @@ export function detectCliAgentPrincipal(env: Env = process.env): string | null {
 
 /** The local owner member as the CLI's operator principal (never throws). */
 export function resolveCliOperatorIdentity(
-  options: CliOperatorPrincipalOptions = {}
-): CliOperatorIdentity {
+  options: CliOperatorPrincipalOptions & { tenantSlug?: string } = {}
+): CliOperatorIdentity & { tenantRole?: string } {
   const displayName = resolveOperatorDisplayName();
   try {
     const owner = resolveMemberByPrincipal(
       { source: 'loopback' },
       options.rootDir ? { rootDir: options.rootDir } : {}
     );
-    return { principalId: owner ? `user:${owner.member_id}` : null, displayName };
+    const tenantRole = options.tenantSlug
+      ? owner?.memberships.find((entry) => entry.tenant_slug === options.tenantSlug)?.role
+      : undefined;
+    return {
+      principalId: owner ? `user:${owner.member_id}` : null,
+      displayName,
+      ...(tenantRole ? { tenantRole } : {}),
+    };
   } catch {
     return { principalId: null, displayName };
   }
@@ -137,6 +144,7 @@ export function resolveCliApprovalRequester(
 export interface CliApprovalDecider {
   decidedBy: string;
   decidedByDisplayName: string;
+  tenantRole?: string;
   /**
    * Set when the terminal is an agent session (separation of duties off):
    * the decision is recorded as `caller_supplied`, so it can never pass a later
@@ -159,7 +167,11 @@ export interface CliApprovalDecider {
  * separation-of-duties setting.
  */
 export function resolveCliApprovalDecider(
-  params: CliOperatorPrincipalOptions & { decision: 'approved' | 'rejected'; humanOnly?: boolean }
+  params: CliOperatorPrincipalOptions & {
+    decision: 'approved' | 'rejected';
+    humanOnly?: boolean;
+    tenantSlug?: string;
+  }
 ): CliApprovalDecider {
   const identity = resolveCliOperatorIdentity(params);
   const agent = detectCliAgentPrincipal(params.env);
@@ -190,6 +202,7 @@ export function resolveCliApprovalDecider(
   return {
     decidedBy: identity.principalId ?? identity.displayName,
     decidedByDisplayName: identity.displayName,
+    ...(identity.tenantRole ? { tenantRole: identity.tenantRole } : {}),
     ...(agent
       ? { deciderIdentitySource: 'caller_supplied' as const, decidedInAgentSession: agent }
       : {}),

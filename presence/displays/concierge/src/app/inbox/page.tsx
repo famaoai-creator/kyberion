@@ -178,7 +178,9 @@ function InboxView() {
       let message: string;
       switch (decision.kind) {
         case 'approval':
-          await postApprovalDecision(item.approval!, decision.decision);
+          await postApprovalDecision(item.approval!, decision.decision, {
+            ...(decision.primaryAction ? { primaryAction: decision.primaryAction } : {}),
+          });
           message = t(
             decision.decision === 'approved' ? 'home.approved_notice' : 'home.rejected_notice',
             { title }

@@ -14,9 +14,13 @@ import { writeGovernedArtifactJson } from '../workforce/artifact-store.js';
 import { auditChain } from './audit-chain.js';
 import {
   approvalEventLogicalPath,
+  approvalEventLogicalPathAt,
+  approvalPartitionForScope,
   approvalRequestLogicalPath,
+  approvalRequestLogicalPathAt,
   decideApprovalRequest,
   loadApprovalRequest,
+  removeApprovalFileAt,
   type ApprovalRequestRecord,
 } from './approval-store.js';
 import {
@@ -33,12 +37,14 @@ import {
   listGrants,
   loadGrant,
   normalizeMeetingUrl,
+  registerCredentialLendingPolicy,
   requestGrantApproval,
   revokeGrant,
   validateGrantRecord,
   type GrantDraft,
   type GrantRecord,
 } from './grant-store.js';
+import { buildCredentialRecord, lendingFromRecord } from '../secret/credential-custody.js';
 import {
   readGrantMissionBindings,
   recordGrantMissionBinding,
@@ -67,6 +73,7 @@ const MISSION_DIR = path.join(pathResolver.rootDir(), 'active/missions/confident
 const HUMAN = 'user:grant-test-owner';
 const HUMAN_ACTOR = { kind: 'human' as const, id: HUMAN };
 const approvalIds: string[] = [];
+const scopedApprovals: ApprovalRequestRecord[] = [];
 
 const draft: GrantDraft = {
   capability: 'meeting.recording',
@@ -132,6 +139,19 @@ afterEach(() => {
     safeRmSync(approvalRequestLogicalPath(GRANT_APPROVAL_CHANNEL, id), { force: true });
   }
   safeRmSync(approvalEventLogicalPath(GRANT_APPROVAL_CHANNEL), { force: true });
+  for (const record of scopedApprovals.splice(0)) {
+    const partition = approvalPartitionForScope(record.scope);
+    removeApprovalFileAt(
+      'mission_controller',
+      partition,
+      approvalRequestLogicalPathAt(partition, record.storageChannel, record.id)
+    );
+    removeApprovalFileAt(
+      'mission_controller',
+      partition,
+      approvalEventLogicalPathAt(partition, record.storageChannel)
+    );
+  }
   for (const [key, value] of Object.entries(savedEnv)) {
     if (value === undefined) delete process.env[key];
     else process.env[key] = value;
@@ -265,6 +285,46 @@ describe('grant store', () => {
 });
 
 describe('grant approval flow', () => {
+  it('resumes a same-tenant credential Grant from its scoped Owner decision', () => {
+    registerCredentialLendingPolicy({
+      ownsTenant: (member, tenant) => member === 'grant-test-owner' && tenant === 'acme',
+      installationPerson: () => undefined,
+      assertEligible: () => undefined,
+    });
+    try {
+      const credentialDraft: GrantDraft = {
+        capability: 'credential.use',
+        tenant_slug: 'acme',
+        credential_provider: 'anthropic',
+        credential_ref: 'anthropic/API_KEY',
+        credential_lending: lendingFromRecord(
+          buildCredentialRecord({
+            credentialRef: 'tenant:acme:anthropic',
+            value: 'synthetic-fixture',
+            registeredBy: HUMAN,
+          })
+        ),
+        purpose: 'Mission preparation',
+        ttl_days: 1,
+      };
+      const request = () =>
+        requestGrantApproval(credentialDraft, { requester: { requestedBy: 'agent:codex' } });
+      const pending = request();
+      scopedApprovals.push(pending);
+      expect(pending.scope).toMatchObject({ tier: 'confidential', tenant_slug: 'acme' });
+      expect(() => approve(pending, { decidedByRole: 'approver' })).toThrow(
+        'tenant Owner decision'
+      );
+      approve(pending, { decidedByRole: 'owner', authMethod: 'surface_session' });
+      expect(request()).toMatchObject({ id: pending.id, status: 'approved' });
+      expect(
+        grantStanding(credentialDraft, { approvalRequestId: pending.id }).basis?.approval_request_id
+      ).toBe(pending.id);
+      expect(() => grantStanding(credentialDraft, { approvalRequestId: pending.id })).toThrow();
+    } finally {
+      registerCredentialLendingPolicy(undefined);
+    }
+  });
   it('requires the personal owner before consuming a service allocation approval', () => {
     const serviceDraft: GrantDraft = {
       capability: 'credential.use',

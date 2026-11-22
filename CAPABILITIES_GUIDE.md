@@ -629,6 +629,16 @@ Several use cases map to more than one actuator by name alone. This table is the
 
 ## Governed Core Workloads
 
+The network actuator's `capture/fetch` step admits GET and HEAD as external
+reads. Other methods use the external mutation path, where an eligible Charter
+or exact approval can authorize the effect. Both paths remain subject to the
+active tenant and egress policy.
+
+In service resource-introduction enforcement mode, the service actuator binds
+direct API actions to the dispatch URL and GitHub repository presets to the
+repository resolved from execution arguments. The operation descriptor
+determines the required read or write permission.
+
 `@agent/core` also exposes the additive marketing workload contract for G0 intake, G1 data classification, G2 claims, G3 video/text/image validation, G4 independent review, G5 shared human approval binding, G6 publication verification, risk-policy resolution, and evidence-aware Mission completion.
 
 The workload composes the existing approval, artifact, media generation, video composition, browser, customer overlay, and Mission evidence capabilities. It does not register a marketing-specific Actuator or grant Strategy, Creative, or Review roles external publication authority.

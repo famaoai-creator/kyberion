@@ -287,6 +287,13 @@ export function readNeedsYouFailures(
           notification.tenant_slug ||
           ''
       );
+      const meta =
+        notification.scope && typeof notification.scope === 'object'
+          ? (notification.scope as Record<string, unknown>)
+          : (notification as Record<string, unknown>);
+      const raw = notification as Record<string, unknown>;
+      const workItemId = String(meta.work_item_id || meta.item_id || raw.work_item_id || '').trim();
+      const missionId = String(meta.mission_id || raw.mission_id || '').trim();
       return {
         id: String(notification.request_id || notification.id || failureFallbackId(notification)),
         title: String(notification.title || ''),
@@ -294,11 +301,9 @@ export function readNeedsYouFailures(
         surface: String(notification.surface || 'presence'),
         created_at: String(notification.created_at || ''),
         ...(tenant ? { tenant_slug: tenant } : {}),
-        ...personCustodyFields(
-          notification.scope && typeof notification.scope === 'object'
-            ? (notification.scope as Record<string, unknown>)
-            : notification
-        ),
+        ...(workItemId ? { work_item_id: workItemId } : {}),
+        ...(missionId ? { mission_id: missionId } : {}),
+        ...personCustodyFields(meta),
       };
     });
 }

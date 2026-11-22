@@ -17,6 +17,7 @@ import { wrapAdapterEffects } from '@agent/core/governance/adapter-effect-proxy'
 const admittedImageMethods = new WeakSet<object>();
 
 export const imageReferenceSnapshots = new WeakMap<ImageGenerationRequest, Map<string, Buffer>>();
+export const hostImageCollectionRequests = new WeakSet<ImageGenerationRequest>();
 
 export function imageNeedsAdmission(provider: ImageGenerationProvider): boolean {
   return (
@@ -49,17 +50,23 @@ export function governImageProvider<T extends ImageGenerationProvider>(provider:
       bytes: bytes.length,
     }));
     imageReferenceSnapshots.set(snapshot, references);
+    const collectingHostOutput = Boolean(
+      provider.requiresInteractiveHandoff &&
+      snapshot.targetPath &&
+      isHostImageHandoffOutput(snapshot.targetPath, snapshot.prompt)
+    );
+    if (collectingHostOutput) hostImageCollectionRequests.add(snapshot);
+    const requiresApproval = imageNeedsAdmission(provider) && !collectingHostOutput;
+    const operationId = requiresApproval
+      ? `media:image:${provider.id}:generate`
+      : collectingHostOutput
+        ? 'media:image-local:collect'
+        : 'media:image-local:render';
     return runExternalOperation(
       {
-        operationId: `media:image:${provider.id}:generate`,
+        operationId,
         effect: { provider: provider.id, params: snapshot, reference_content: referenceContent },
-        requiresApproval:
-          imageNeedsAdmission(provider) &&
-          !(
-            provider.requiresInteractiveHandoff &&
-            snapshot.targetPath &&
-            isHostImageHandoffOutput(snapshot.targetPath, snapshot.prompt)
-          ),
+        requiresApproval,
         delegable: false,
       },
       () => {

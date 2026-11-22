@@ -3,6 +3,7 @@ import { scopedLearningApprovalVisibleToViewer } from '../../../../../lib/scoped
 import { accountIntroductionApprovalMember } from '../../../../../lib/account-introduction-server';
 import { onboardingApprovalMember } from '../../../../../lib/onboarding-authority-server';
 import {
+  conciergeTenantOwnerApprovalDenied,
   loadConciergeApproval,
   withConciergeApproval,
 } from '../../../../../lib/personal-approval-server';
@@ -99,6 +100,8 @@ async function handlePost(req: NextRequest, context: { params: Promise<{ id: str
       : conciergeDecisionDenied(resolved.context, resourceTenant);
     if (decisionDenied) return decisionDenied;
     const member = onboardingMember ?? conciergePasskeyMember(resolved.context, resourceTenant);
+    const ownerDenied = conciergeTenantOwnerApprovalDenied(record, member?.role);
+    if (ownerDenied) return ownerDenied;
     if (!member) return passkeyUnavailable('member_required');
     const rp = conciergeRelyingParty(req);
     if (!rp) return passkeyUnavailable('origin_not_configured');

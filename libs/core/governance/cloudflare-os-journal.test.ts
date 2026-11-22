@@ -596,6 +596,7 @@ describe('review fixes: exactly-once apply across processes', () => {
 describe('review fixes: declassify grants are mission-scoped', () => {
   it('does not let one mission grant overwrite or satisfy another mission', async () => {
     const cp = new CloudflareOsControlPlane();
+    const destination = 'https://example.org/upload';
     const grant = async (missionId: string) => {
       const held = cp.requestDeclassify({
         missionId,
@@ -604,6 +605,7 @@ describe('review fixes: declassify grants are mission-scoped', () => {
         payloadHash: 'same-hash',
         targetAudience: 'public',
         targetTenant: 'tenant-a',
+        targetDestination: destination,
         requestedBy: 'agent:x',
       });
       cp.decideHeldAction(held.id, 'approved', {
@@ -616,12 +618,20 @@ describe('review fixes: declassify grants are mission-scoped', () => {
       await cp.applyHeldAction(held.id);
     };
     await grant('mission-a');
-    expect(cp.isDeclassified('mission-a', 'same-hash', 'public', 'tenant-a')).toBe(true);
-    expect(cp.isDeclassified('mission-b', 'same-hash', 'public', 'tenant-a')).toBe(false);
+    expect(cp.isDeclassified('mission-a', 'same-hash', 'public', 'tenant-a', destination)).toBe(
+      true
+    );
+    expect(cp.isDeclassified('mission-b', 'same-hash', 'public', 'tenant-a', destination)).toBe(
+      false
+    );
     await grant('mission-b');
     // B's grant must not erase A's.
-    expect(cp.isDeclassified('mission-a', 'same-hash', 'public', 'tenant-a')).toBe(true);
-    expect(cp.isDeclassified('mission-b', 'same-hash', 'public', 'tenant-a')).toBe(true);
+    expect(cp.isDeclassified('mission-a', 'same-hash', 'public', 'tenant-a', destination)).toBe(
+      true
+    );
+    expect(cp.isDeclassified('mission-b', 'same-hash', 'public', 'tenant-a', destination)).toBe(
+      true
+    );
   });
 });
 

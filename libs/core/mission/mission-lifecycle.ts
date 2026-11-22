@@ -60,6 +60,7 @@ import {
   reconcileCompletionStructurally,
 } from '../intent/intent-reconciliation.js';
 import { loadMissionStateIncludingArchive, loadState, saveState } from './mission-state.js';
+import type { MissionState } from './mission-types.js';
 import {
   buildMissionCompletionReconciliationInput,
   collectMissionEvidence,
@@ -445,6 +446,7 @@ function recordMissionIntentDriftGateFailure(input: {
 
 function maybeRunVolatileGc(
   upperId: string,
+  state: Pick<MissionState, 'tier' | 'tenant_slug'>,
   traceCtx: ReturnType<typeof createActuatorTrace>
 ): void {
   try {
@@ -460,6 +462,11 @@ function maybeRunVolatileGc(
     safeExec(process.execPath, [runnerPath, '--input', 'pipelines/volatile-gc.json'], {
       cwd: pathResolver.rootDir(),
       timeoutMs: 120000,
+      env: {
+        MISSION_ID: upperId,
+        KYBERION_TENANT: state.tenant_slug ?? '',
+        KYBERION_TIER: state.tier,
+      },
     });
     traceCtx.endSpan('ok');
   } catch (err: any) {
@@ -1286,7 +1293,7 @@ export async function finishMission(
     traceCtx.endSpan('error', err?.message || String(err));
   }
 
-  maybeRunVolatileGc(upperId, traceCtx);
+  maybeRunVolatileGc(upperId, state, traceCtx);
 
   // D9: a tenant mission's ledger events live in its tenant's ledger partition,
   // so its chain is verified with the system ledger's.

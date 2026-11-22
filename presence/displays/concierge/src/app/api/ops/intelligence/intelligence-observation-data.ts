@@ -23,7 +23,9 @@ import {
   parseNextTaskRecords,
   parseTaskBoard,
   summarizeNextTasks,
+  withMissionChangesTasks,
 } from '../../../../lib/ops/mission-progress';
+import type { MissionChangesTasksSummary } from '@agent/core/surface/mission-changes-tasks-summary';
 import { loadMissionNextTaskObjectsAtPath } from '@agent/core/mission/mission-next-task-reader';
 import type { ComputerSessionSummary } from '../../../../lib/ops/computer-sessions';
 import {
@@ -87,6 +89,8 @@ export interface MissionProgressSummary {
     sizeBytes: number;
     updatedAt: string;
   }>;
+  /** PB-05: Changes / Tasks projection for `/ops` mission detail. */
+  changesTasks?: MissionChangesTasksSummary;
 }
 
 export interface RuntimeLeaseSummary {
@@ -831,86 +835,117 @@ function loadMissionNextTasksForProjection(
 }
 
 export function collectActiveMissions(): MissionSummary[] {
-  const missionRoots = [
-    { dir: pathResolver.active('missions/public'), tier: 'public' },
-    { dir: pathResolver.active('missions/confidential'), tier: 'confidential' },
+  const directories = [
+    pathResolver.active('missions/public'),
+    pathResolver.active('missions/confidential'),
   ];
   const missions: MissionSummary[] = [];
 
-  for (const root of missionRoots) {
+  for (const { missionId: item, missionPath } of listMissionsInSearchDirs({ directories })) {
     try {
-      const safeRoot = safeMissionResourcePath(root.dir);
-      if (!safeRoot || !safeExistsSync(safeRoot) || !safeLstat(safeRoot).isDirectory()) continue;
-      for (const item of safeReaddir(safeRoot)) {
-        const missionPath = safeMissionResourcePath(path.join(safeRoot, item));
-        if (!missionPath || !safeExistsSync(missionPath) || !safeLstat(missionPath).isDirectory()) {
-          continue;
-        }
-        const statePath = safeMissionResourcePath(path.join(missionPath, 'mission-state.json'));
-        const state = statePath ? loadStateAtPath(statePath) : null;
-        const status = state?.status;
-        if (!status || !['active', 'planned', 'paused', 'failed'].includes(status)) continue;
-        const nextTaskRecords =
-          loadMissionNextTasksForProjection(path.join(missionPath, 'NEXT_TASKS.json'), item) || [];
-        const planPath = safeMissionResourcePath(path.join(missionPath, 'PLAN.md'));
-        const planReady = Boolean(
-          planPath && safeExistsSync(planPath) && safeLstat(planPath).isFile()
-        );
-        const nextTaskCount = nextTaskRecords.length;
-        const controlSummary =
-          status === 'paused' || status === 'failed'
-            ? `${status} mission`
-            : planReady
-              ? nextTaskCount > 0
-                ? 'execution ready'
-                : 'plan ready'
-              : 'planning pending';
-        const controlTone: MissionSummary['controlTone'] =
-          status === 'paused' || status === 'failed'
-            ? 'attention'
-            : planReady
-              ? nextTaskCount > 0
-                ? 'ready'
-                : 'planning'
-              : 'attention';
-        missions.push({
-          missionId: state.mission_id || item,
-          tenantSlug: state.tenant_slug || state.tenant_id,
-          status,
-          tier: state.tier || root.tier,
-          missionType: state.mission_type,
-          projectId: state.relationships?.project?.project_id,
-          projectPath: state.relationships?.project?.project_path,
-          trackId: state.relationships?.track?.track_id,
-          trackName: state.relationships?.track?.track_name,
-          planReady,
-          nextTaskCount,
-          controlSummary,
-          controlTone,
-        });
-      }
+      const statePath = safeMissionResourcePath(path.join(missionPath, 'mission-state.json'));
+      const state = statePath ? loadStateAtPath(statePath) : null;
+      const status = state?.status;
+      if (!status || !['active', 'planned', 'paused', 'failed'].includes(status)) continue;
+      const nextTaskRecords =
+        loadMissionNextTasksForProjection(path.join(missionPath, 'NEXT_TASKS.json'), item) || [];
+      const planPath = safeMissionResourcePath(path.join(missionPath, 'PLAN.md'));
+      const planReady = Boolean(
+        planPath && safeExistsSync(planPath) && safeLstat(planPath).isFile()
+      );
+      const nextTaskCount = nextTaskRecords.length;
+      const controlSummary =
+        status === 'paused' || status === 'failed'
+          ? `${status} mission`
+          : planReady
+            ? nextTaskCount > 0
+              ? 'execution ready'
+              : 'plan ready'
+            : 'planning pending';
+      const controlTone: MissionSummary['controlTone'] =
+        status === 'paused' || status === 'failed'
+          ? 'attention'
+          : planReady
+            ? nextTaskCount > 0
+              ? 'ready'
+              : 'planning'
+            : 'attention';
+      missions.push({
+        missionId: state.mission_id || item,
+        tenantSlug: state.tenant_slug || state.tenant_id,
+        status,
+        tier: state.tier,
+        missionType: state.mission_type,
+        projectId: state.relationships?.project?.project_id,
+        projectPath: state.relationships?.project?.project_path,
+        trackId: state.relationships?.track?.track_id,
+        trackName: state.relationships?.track?.track_name,
+        planReady,
+        nextTaskCount,
+        controlSummary,
+        controlTone,
+      });
     } catch {
-      // Skip roots that are unavailable to the current authority role.
+      // Skip missions that are unavailable to the current authority role.
     }
   }
 
   return missions.sort((a, b) => a.missionId.localeCompare(b.missionId));
 }
 
-export function collectMissionProgress(activeMissions: MissionSummary[]): MissionProgressSummary[] {
-  const missionRoots = [
-    pathResolver.active('missions/public'),
-    pathResolver.active('missions/confidential'),
-  ];
+export function collectMissionProgress(
+  activeMissions: MissionSummary[],
+  tenantSlugs: string[] | 'all' = 'all'
+): MissionProgressSummary[] {
   const summaries: MissionProgressSummary[] = [];
+  // Load once under the viewer tenant set — never scan every WorkItem per mission.
+  let scopedChildren: ReturnType<typeof listWorkItems> = [];
+  try {
+    const tenantFilter = Array.from(
+      new Set(
+        activeMissions
+          .map((mission) => mission.tenantSlug)
+          .filter((slug): slug is string => Boolean(slug))
+      )
+    );
+    scopedChildren = listWorkItems({
+      tenantSlugs:
+        tenantSlugs === 'all' ? (tenantFilter.length ? tenantFilter : undefined) : tenantSlugs,
+    });
+  } catch {
+    scopedChildren = [];
+  }
+
+  const childrenByMission = new Map<string, typeof scopedChildren>();
+  const missionKey = (tenant: string | undefined, mission: string) =>
+    JSON.stringify([tenant || '', mission]);
+  for (const item of scopedChildren) {
+    if (!item.context?.mission_id) continue;
+    const key = missionKey(item.context.tenant_slug, item.context.mission_id);
+    const items = childrenByMission.get(key) ?? [];
+    items.push(item);
+    childrenByMission.set(key, items);
+  }
 
   for (const mission of activeMissions) {
-    const missionPath = missionRoots
-      .map((root) => path.join(root, mission.missionId))
+    const root = pathResolver.active(
+      mission.tier === 'confidential' ? 'missions/confidential' : 'missions/public'
+    );
+    const candidates = mission.tenantSlug
+      ? [path.join(root, mission.tenantSlug, mission.missionId), path.join(root, mission.missionId)]
+      : [path.join(root, mission.missionId)];
+    const missionPath = candidates
       .map((candidate) => safeMissionResourcePath(candidate))
-      .find((candidate): candidate is string =>
-        Boolean(candidate && safeExistsSync(candidate) && safeLstat(candidate).isDirectory())
-      );
+      .find((candidate): candidate is string => {
+        if (!candidate) return false;
+        const state = loadStateAtPath(path.join(candidate, 'mission-state.json'));
+        return Boolean(
+          state &&
+          state.mission_id === mission.missionId &&
+          (state.tenant_slug || state.tenant_id) === mission.tenantSlug &&
+          state.tier === mission.tier
+        );
+      });
     if (!missionPath) continue;
 
     const taskBoardPath = safeMissionResourcePath(path.join(missionPath, 'TASK_BOARD.md'));
@@ -949,14 +984,47 @@ export function collectMissionProgress(activeMissions: MissionSummary[]): Missio
       }
     }
 
+    const assets = normalizeMissionAssets(generatedAssets);
+    const children = (
+      childrenByMission.get(missionKey(mission.tenantSlug, mission.missionId)) ?? []
+    )
+      .filter((item) => !mission.projectId || item.context?.project_id === mission.projectId)
+      .map((item) => ({
+        item_id: item.item_id,
+        title: item.title,
+        status: item.status,
+        ...(item.parent_item_id ? { parent_item_id: item.parent_item_id } : {}),
+        ...(item.context?.task_id ? { task_id: item.context.task_id } : {}),
+        context: item.context,
+      }));
+    const progress = withMissionChangesTasks(
+      {
+        missionId: mission.missionId,
+        ...board,
+        ...nextTaskSummary,
+        dependencies: extractMissionDependencies(
+          missionState?.relationships as Record<string, unknown> | undefined
+        ),
+        generatedAssets: assets,
+      },
+      { children }
+    );
     summaries.push({
-      missionId: mission.missionId,
-      ...board,
-      ...nextTaskSummary,
-      dependencies: extractMissionDependencies(
-        missionState?.relationships as Record<string, unknown> | undefined
-      ),
-      generatedAssets: normalizeMissionAssets(generatedAssets),
+      missionId: progress.missionId,
+      boardStatus: progress.boardStatus,
+      boardStepsTotal: progress.boardStepsTotal,
+      boardStepsDone: progress.boardStepsDone,
+      boardStepsActive: progress.boardStepsActive,
+      boardStepsPending: progress.boardStepsPending,
+      nextTasksTotal: progress.nextTasksTotal,
+      nextTasksPending: progress.nextTasksPending,
+      nextTasksCompleted: progress.nextTasksCompleted,
+      ...(progress.nextTasksSuperseded !== undefined
+        ? { nextTasksSuperseded: progress.nextTasksSuperseded }
+        : {}),
+      dependencies: progress.dependencies,
+      generatedAssets: progress.generatedAssets,
+      ...(progress.changesTasks ? { changesTasks: progress.changesTasks } : {}),
     });
   }
 

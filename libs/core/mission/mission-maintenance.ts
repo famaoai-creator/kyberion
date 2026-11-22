@@ -1405,6 +1405,7 @@ export async function recordArtifactReview(args: {
     );
   }
 
+  const tenantArg = state.tenant_slug ? ` --tenant-slug ${state.tenant_slug}` : '';
   return {
     status: evaluation.ready ? 'recorded' : 'blocked',
     taskCompleted,
@@ -1415,10 +1416,10 @@ export async function recordArtifactReview(args: {
       : {
           next_step:
             implementerAgentIds.length === 0
-              ? `Record the actual author's evidence for review target ${reviewTargetId}: pnpm mission record-evidence ${upperId} ${reviewTargetId} "<author evidence>" --actor-id <actual-author-id>; then retry review-task with an independent reviewer. Recording evidence on ${args.reviewTaskId} cannot establish target authorship.`
+              ? `Record the actual author's evidence for review target ${reviewTargetId}: pnpm mission record-evidence ${upperId} ${reviewTargetId} "<author evidence>" --actor-id <actual-author-id>${tenantArg}; then retry review-task with an independent reviewer. Recording evidence on ${args.reviewTaskId} cannot establish target authorship.`
               : implementerAgentIds.includes(args.reviewerAgentId)
-                ? `Retry pnpm mission review-task ${upperId} ${args.reviewTaskId} <independent-reviewer-id> with a reviewer who did not produce ${reviewTargetId}.`
-                : buildReviewCloseOutStep(args, task, missionPath),
+                ? `Retry pnpm mission review-task ${upperId} ${args.reviewTaskId} <independent-reviewer-id>${tenantArg} with a reviewer who did not produce ${reviewTargetId}.`
+                : buildReviewCloseOutStep(args, task, missionPath, state.tenant_slug),
         }),
   };
 }

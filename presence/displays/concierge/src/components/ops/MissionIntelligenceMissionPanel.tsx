@@ -295,6 +295,30 @@ export function MissionIntelligenceMissionPanel({ context }: { context: Record<s
                           : []),
                       ]}
                     />
+                    {progress?.changesTasks ? (
+                      <Disclosure summary={mt('chronos_changes_tasks', 'Changes / Tasks')}>
+                        <KeyValue
+                          items={[
+                            {
+                              label: mt('chronos_this_turn', 'This turn'),
+                              value: progress.changesTasks.this_turn_artifacts.length,
+                            },
+                            ...(progress.changesTasks.uncommitted_diff
+                              ? [
+                                  {
+                                    label: mt('chronos_uncommitted', 'Uncommitted'),
+                                    value: `${progress.changesTasks.uncommitted_diff.files_changed} files (+${progress.changesTasks.uncommitted_diff.insertions}/-${progress.changesTasks.uncommitted_diff.deletions})`,
+                                  },
+                                ]
+                              : []),
+                            {
+                              label: mt('chronos_child_work', 'Child work'),
+                              value: progress.changesTasks.child_work_items.length,
+                            },
+                          ]}
+                        />
+                      </Disclosure>
+                    ) : null}
                     {latestAction ? (
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="kb-text kb-text--caption">

@@ -138,7 +138,7 @@ Maintenance Commands:
                                  Append an execution-ledger evidence entry and commit it; a task it completes gets
                                  an estimated direct_cli usage entry (provider: --provider, else inferred from --actor-id)
                                  --knowledge-used <CSV> reports delivered paths or path@snapshot-hash for a recorded task.
-  review-task <ID> <review_task_id> <reviewer_agent_id> [--findings <JSON>] [--reviewer-team-role reviewer|qa] [--specialist-roles <CSV>] [--provider <ID>]
+  review-task <ID> <review_task_id> <reviewer_agent_id> [--tenant-slug <slug>] [--json] [--findings <JSON>] [--reviewer-team-role reviewer|qa] [--specialist-roles <CSV>] [--provider <ID>]
                                  Record a real ArtifactReviewReceipt for a review-kind task (required before it
                                  can complete — bare record-evidence is not enough for review tasks). Independence
                                  from the implementer is computed from the execution ledger, not self-declared.

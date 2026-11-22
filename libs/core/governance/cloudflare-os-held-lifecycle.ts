@@ -9,6 +9,7 @@ import type { HeldActionDecision, HeldActionRecord } from './cloudflare-os-contr
 import { isValidTenantSlug } from '../entity-scope.js';
 import { SHARED_TENANT, tryResolveOwnerScope } from './owner-scope.js';
 import {
+  canonicalDeclassificationDestination,
   declassificationKeyOf,
   type DeclassificationGrant,
 } from './cloudflare-os-control-plane-state.js';
@@ -293,19 +294,26 @@ export interface DeclassifyHost {
  */
 export function requestDeclassify(
   host: DeclassifyHost,
-  input: Omit<DeclassificationGrant, 'id' | 'grantedAt' | 'grantedBy'> & { requestedBy: string }
+  input: Omit<DeclassificationGrant, 'id' | 'grantedAt' | 'grantedBy'> & {
+    requestedBy: string;
+    targetDestination: string;
+  }
 ): HeldActionRecord {
+  const targetDestination = canonicalDeclassificationDestination(input.targetDestination);
+  if (!targetDestination)
+    throw new Error('[POLICY_VIOLATION] A valid disclosure destination is required');
+  const bound = { ...input, targetDestination };
   let record!: HeldActionRecord;
   record = host.submit({
     missionId: input.missionId,
     tenantSlug: input.tenantSlug,
     submittedBy: input.requestedBy,
     op: 'control_plane:declassify',
-    params: input,
+    params: bound,
     simulatable: false,
     apply: () => {
       const grant: DeclassificationGrant = {
-        ...input,
+        ...bound,
         id: randomUUID(),
         grantedBy: host.assertHuman(record.resolvedBy || ''),
         grantedAt: new Date().toISOString(),

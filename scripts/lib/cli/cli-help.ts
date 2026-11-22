@@ -207,7 +207,9 @@ export function suggestCommands(
 ): string[] {
   const needle = input.trim().toLowerCase().replace(/\s+/gu, ' ');
   if (!needle) return [];
-  const first = needle.split(' ')[0] as string;
+  const needleParts = needle.split(' ');
+  const first = needleParts[0] as string;
+  const rest = needleParts.slice(1).join(' ');
   const names = new Set(
     [
       ...manifest.commands,
@@ -220,12 +222,21 @@ export function suggestCommands(
   return [...names]
     .map((name) => {
       const head = name.split(' ')[0] as string;
+      const nameRest = name.split(' ').slice(1).join(' ');
       // Score = edits beyond the allowance; <= 0 is close enough to suggest.
       // Compare the full input ("pr crate") and its first word ("aks <payload>").
+      // Multi-word input vs multi-word command scores per word, so a typo'd
+      // subcommand ranks its true closest match above alphabetical siblings.
       const distance = Math.min(
         editDistance(needle, name) - allowance(needle),
-        editDistance(first, head) - allowance(first),
-        editDistance(first, name) - allowance(first)
+        ...(rest === ''
+          ? [
+              editDistance(first, head) - allowance(first),
+              editDistance(first, name) - allowance(first),
+            ]
+          : nameRest !== ''
+            ? [editDistance(first, head) + editDistance(rest, nameRest) - allowance(needle)]
+            : [editDistance(first, name) - allowance(first)])
       );
       return { name, distance };
     })

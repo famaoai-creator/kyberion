@@ -57,6 +57,11 @@ moves the branching into the CLI.
 | Video → timeline    | frames + transcript composition         | `pnpm kyberion watch`                                                 | unified                  |
 | Brief → video       | `video-composition:*`, `generate_video` | —                                                                     | **no verb, two engines** |
 
+`draw` routes local rendering and collection of an existing host output through
+local operations. Cloud generation and requests for new host-generated images
+require approval. If the host output changes before collection, retry through
+the image router to re-evaluate the required approval.
+
 `write` is the worked example of §1. `media:generate_document` already dispatched on
 `render_target` (pptx / docx / xlsx / pdf) and the per-format `pptx_render` /
 `docx_render` / `xlsx_render` / `pdf_render` ops were already compatibility adapters —

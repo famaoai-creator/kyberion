@@ -197,6 +197,27 @@ describe('reasoning-bootstrap', () => {
     expect(getVoiceBridge().name).toBe('codex-cli-text');
   });
 
+  it('logs an identical periodic re-install at debug instead of success', () => {
+    const successSpy = vi.spyOn(logger, 'success');
+    const debugSpy = vi.spyOn(logger, 'debug');
+
+    expect(installReasoningBackends({ mode: 'codex-cli', force: true })).toBe(true);
+    expect(successSpy).toHaveBeenCalledWith(
+      expect.stringContaining('reasoning failover chain installed')
+    );
+
+    successSpy.mockClear();
+    expect(
+      installReasoningBackends({ mode: 'codex-cli', force: true, refreshProviders: true })
+    ).toBe(true);
+    expect(successSpy).not.toHaveBeenCalledWith(
+      expect.stringContaining('reasoning failover chain installed')
+    );
+    expect(debugSpy).toHaveBeenCalledWith(
+      expect.stringContaining('reasoning failover chain installed')
+    );
+  });
+
   it('does not mutate the caller-supplied options when applying default-route limits', () => {
     // The unscoped chain backfills timeoutMs/toolsEnabled/allowedTools from the
     // resolved `default` role route; those defaults must not leak onto the

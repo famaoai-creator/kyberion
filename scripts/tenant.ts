@@ -7,18 +7,23 @@ import {
   type AttestTenantProviderInput,
   mutateTenant,
   type TenantLifecycleVerb,
-  listTenants,
   deleteTenant,
 } from '@agent/core/organization/tenant-governance';
 import { renameTenantWithPlan } from '@agent/core/organization/tenant-rename';
 import { captureCliAttestationInvoker } from './lib/cli/cli-attestation-invoker.js';
-import { readTenantProfile } from '@agent/core/organization/tenant-registry';
+import { readTenantProfile, tenantProfileDir } from '@agent/core/organization/tenant-registry';
+import { isValidTenantSlug } from '@agent/core/entity-scope';
+import { safeExistsSync, safeReaddir } from '@agent/core/secure-io';
 import {
   applyTenantPersonalOwner,
   requestTenantPersonalOwner,
 } from '@agent/core/organization/tenant-governance';
 import { resolveCliApprovalRequester } from '@agent/core/governance/cli-operator-principal';
-import { withExecutionContext } from '@agent/core/authority';
+import {
+  resolveIdentityContext,
+  withExecutionContext,
+  withStoreGrant,
+} from '@agent/core/authority';
 import { setRegisteredEnv } from '@agent/core/foundation/env';
 import { pathResolver } from '@agent/core/path-resolver';
 import { defineScript, isDirectScript } from './lib/harness.js';
@@ -204,8 +209,38 @@ export function main(
     print(usage());
     return;
   }
-  if (args.command === 'list') {
-    print(JSON.stringify(listTenants(), null, 2));
+  if (args.command === 'list' || args.command === 'show') {
+    const boundTenant = resolveIdentityContext().tenantSlug;
+    const readProfile = (slug: string) =>
+      withStoreGrant('workspace_tenant_registry_reader', () => readTenantProfile(slug, options), {
+        tenantSlug: slug,
+      });
+    if (args.command === 'show') {
+      if (!args.slug || !isValidTenantSlug(args.slug))
+        throw new Error('show requires a valid tenant slug');
+      if (boundTenant && boundTenant !== args.slug)
+        throw new Error(
+          '[ROLE_TENANT_SCOPE_MISMATCH] Tenant is outside the current execution scope'
+        );
+      const profile = readProfile(args.slug);
+      if (!profile) throw new Error(`Tenant '${args.slug}' does not exist.`);
+      print(
+        args.json ? JSON.stringify(profile, null, 2) : `${profile.tenant_slug}: ${profile.status}`
+      );
+      return;
+    }
+    const slugs = boundTenant
+      ? [boundTenant]
+      : withStoreGrant('workspace_tenant_registry_index_reader', () => {
+          const directory = tenantProfileDir(options);
+          if (!safeExistsSync(directory)) return [];
+          return safeReaddir(directory)
+            .filter((name) => name.endsWith('.json'))
+            .map((name) => name.slice(0, -5))
+            .filter(isValidTenantSlug)
+            .sort();
+        });
+    print(JSON.stringify(slugs.map(readProfile).filter(Boolean), null, 2));
     return;
   }
   if (!args.slug) throw new Error(`${args.command} requires a tenant slug`);
@@ -237,14 +272,6 @@ export function main(
       )
     );
     print(JSON.stringify(result, null, 2));
-    return;
-  }
-  if (args.command === 'show') {
-    const profile = readTenantProfile(args.slug);
-    if (!profile) throw new Error(`Tenant '${args.slug}' does not exist.`);
-    print(
-      args.json ? JSON.stringify(profile, null, 2) : `${profile.tenant_slug}: ${profile.status}`
-    );
     return;
   }
   if (args.command === 'personal-owner') {

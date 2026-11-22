@@ -19,7 +19,13 @@ import { OutcomeFiles } from '../outcome-files';
  */
 
 export type CardDecision =
-  | { kind: 'approval'; item: NeedsYouItem; decision: 'approved' | 'rejected' }
+  | {
+      kind: 'approval';
+      item: NeedsYouItem;
+      decision: 'approved' | 'rejected';
+      /** The browser's one-time approval actions settle the same request. */
+      primaryAction?: 'deny' | 'allow_once';
+    }
   | {
       kind: 'review';
       item: NeedsYouItem;
@@ -229,8 +235,11 @@ export function NeedsYouCard({
 
   if (item.approval) {
     const approval = item.approval;
-    const approveLabel =
-      approval.min_assurance === 'A3' ? f('decide_approve_passkey') : f('decide_approve');
+    const allowOnceLabel =
+      approval.min_assurance === 'A3' ? f('decide_approve_passkey') : f('decide_allow_once');
+    // Prefer the decision-brief why block; avoid a duplicate decide_why panel
+    // when brief.why is already rendered inside DecisionBriefBlock.
+    const whyLines = !brief?.why?.length && approval.reason ? [approval.reason] : [];
     body = (
       <>
         {brief ? (
@@ -238,9 +247,19 @@ export function NeedsYouCard({
             brief={brief}
             locale={locale}
             showAsk={false}
-            approveLabel={approveLabel}
-            rejectLabel={f('decide_reject')}
+            approveLabel={allowOnceLabel}
+            rejectLabel={f('decide_deny')}
           />
+        ) : null}
+        {whyLines.length ? (
+          <details className="approval-why">
+            <summary>{f('decide_why')}</summary>
+            <ul>
+              {whyLines.map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>
+          </details>
         ) : null}
         {approval.review_scope || approval.evidence?.length ? (
           <details className="approval-review-scope">
@@ -261,20 +280,34 @@ export function NeedsYouCard({
     );
     actions = (
       <>
-        {has('approve') ? (
+        {has('allow_once') || has('approve') ? (
           <Button
-            label={approveLabel}
+            label={allowOnceLabel}
             variant="primary"
             disabled={busy}
-            onClick={() => void onDecide({ kind: 'approval', item, decision: 'approved' })}
+            onClick={() =>
+              void onDecide({
+                kind: 'approval',
+                item,
+                decision: 'approved',
+                primaryAction: 'allow_once',
+              })
+            }
           />
         ) : null}
-        {has('reject') ? (
+        {has('deny') || has('reject') ? (
           <Button
-            label={f('decide_reject')}
+            label={f('decide_deny')}
             variant="danger"
             disabled={busy}
-            onClick={() => void onDecide({ kind: 'approval', item, decision: 'rejected' })}
+            onClick={() =>
+              void onDecide({
+                kind: 'approval',
+                item,
+                decision: 'rejected',
+                primaryAction: 'deny',
+              })
+            }
           />
         ) : null}
         {later}

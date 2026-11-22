@@ -57,6 +57,7 @@ import {
   resolveMissionTicketDispatchOptionsFromArgv,
   resolveMissionWorkItemDispatchOptionsFromArgv,
   validateMissionStartCreateInput,
+  withMissionCliTenant,
 } from './refactor/mission-controller-args.js';
 import {
   currentProcessArgv,
@@ -1555,7 +1556,9 @@ export const runMissionController = defineScript({
     }
     if (!getRegisteredEnvText('MISSION_ROLE'))
       setRegisteredEnv('MISSION_ROLE', 'mission_controller');
-    return main(argv, print);
+    return hasCliFlag(argv, '--help') || hasCliFlag(argv, '-h')
+      ? main(argv, print)
+      : withMissionCliTenant(action, argv, () => main(argv, print));
   },
 });
 

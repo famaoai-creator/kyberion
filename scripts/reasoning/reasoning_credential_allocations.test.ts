@@ -129,6 +129,25 @@ describe('credential allocation commands', () => {
     );
     expect(mocks.request).not.toHaveBeenCalled();
   });
+  it('resumes the same assignment after a browser decision without replaying approval options', async () => {
+    const print = vi.fn();
+    mocks.request.mockReturnValueOnce({
+      id: 'approval-inbox',
+      status: 'pending',
+      scope: { tier: 'confidential', tenant_slug: 'alpha' },
+    });
+    await runCredentialAllocationCommand(assign, print);
+    expect(JSON.parse(print.mock.calls[0]![0]).next[0]).toContain('/inbox?reason=approval');
+    expect(mocks.grant).not.toHaveBeenCalled();
+
+    mocks.request.mockReturnValueOnce({ id: 'approval-inbox', status: 'approved' });
+    mocks.grant.mockReturnValue({ grant_id: 'GRT-inbox', expires_at: 'future' });
+    await runCredentialAllocationCommand(assign, print);
+    expect(mocks.grant).toHaveBeenCalledWith(expect.objectContaining({ tenant_slug: 'alpha' }), {
+      approvalRequestId: 'approval-inbox',
+    });
+    expect(JSON.parse(print.mock.calls[1]![0])).toMatchObject({ status: 'allocated' });
+  });
   it('lends a credential_ref with terms from the registered record through the same approval path', async () => {
     const { buildCredentialRecord } = await import('@agent/core/secret/credential-allocations');
     mocks.readRecord.mockImplementation((_tenant: string, ref: string) =>
