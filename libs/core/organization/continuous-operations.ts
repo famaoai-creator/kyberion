@@ -237,6 +237,16 @@ export function runContinuousOperations(
     if (ownerNhi && currentCharter()?.scope.owner_nhi !== ownerNhi)
       throw new Error('Continuous operations personal owner changed');
   };
+  const assertAdmissionCharterCurrent = () => {
+    const current = currentCharter();
+    if (
+      !current ||
+      current.authority.authority_role !== charter.authority.authority_role ||
+      current.scope.owner_nhi !== charter.scope.owner_nhi
+    )
+      throw new Error('Continuous operations charter authority changed before admission');
+    return current;
+  };
   const identity = hash({
     loop: config.loop_id,
     dot: config.dot_id,
@@ -477,7 +487,7 @@ export function runContinuousOperations(
       admitted += 1;
       row.disposition = recovery ? 'recovered' : 'proposed';
       if (!apply) continue;
-      assertOwnerCurrent();
+      assertAdmissionCharterCurrent();
       options.assertExecutionCurrent?.();
       if (
         !deps.authorize &&
@@ -506,23 +516,29 @@ export function runContinuousOperations(
       delete next.error;
       state.rules[rule.rule_id] = next;
       write(statePath, state); // Persist immutable operation identity before the external admission.
-      assertOwnerCurrent();
-      options.assertExecutionCurrent?.();
-      if (
-        pipelineSources.has(rule.source_id) &&
-        sourceWithheld(rule.source_id, currentCharter()?.authority.allowed_pipelines)
-      ) {
+      const restoreBeforeDispatch = () => {
         if (old) state.rules[rule.rule_id] = old;
         else delete state.rules[rule.rule_id];
         write(statePath, state);
+      };
+      let current: DotCharter;
+      try {
+        options.assertExecutionCurrent?.();
+        current = assertAdmissionCharterCurrent();
+      } catch (error) {
+        restoreBeforeDispatch();
+        throw error;
+      }
+      if (sourceWithheld(rule.source_id, current.authority.allowed_pipelines)) {
+        restoreBeforeDispatch();
         inventory.pop();
         admitted -= 1;
         continue;
       }
       try {
         const result = deps.dispatch
-          ? deps.dispatch(charter, candidate, next.operation_key!)
-          : dispatchDotProposals(charter, [candidate.proposal], {
+          ? deps.dispatch(current, candidate, next.operation_key!)
+          : dispatchDotProposals(current, [candidate.proposal], {
               rootDir: root,
               operationKey: next.operation_key!,
               now: () => now,

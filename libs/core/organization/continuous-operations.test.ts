@@ -458,6 +458,20 @@ describe('continuous operations runtime', () => {
     const keys = (f.dispatch.mock.calls as unknown[][]).map((call) => call[2]);
     expect(new Set(keys).size).toBe(3);
   });
+  it('does not dispatch a snapshot rule when the charter pauses after admission intent', () => {
+    const f = fixture();
+    let status: DotCharter['status'] = 'active';
+    f.deps.charters = () => [{ ...charter, status }];
+    const write = f.deps.write!;
+    f.deps.write = (file, state) => {
+      status = 'paused';
+      write(file, state);
+    };
+    expect(() => f.run()).toThrow('charter authority changed');
+    expect(f.dispatch).not.toHaveBeenCalled();
+    expect([...f.files.values()][0]).toEqual(expect.objectContaining({ rules: {} }));
+  });
+
   it.each(['after collection', 'after admission intent'])(
     'withholds the revoked collector %s and continues independent rules',
     (when) => {
