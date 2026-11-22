@@ -1,0 +1,12 @@
+{
+  "allow_read": [
+    "active/shared/coordination/chronos/",
+    "active/shared/observability/chronos/",
+    "active/audit/"
+  ],
+  "allow_write": [
+    "active/shared/coordination/chronos/",
+    "active/shared/observability/chronos/",
+    "active/audit/"
+  ]
+}

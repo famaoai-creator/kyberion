@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/customer.env",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "Active customer/company overlay selector; rewritten in place by onboarding flows."
+}

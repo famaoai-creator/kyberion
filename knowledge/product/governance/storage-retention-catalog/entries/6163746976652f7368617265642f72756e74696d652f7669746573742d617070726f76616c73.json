@@ -1,0 +1,8 @@
+{
+  "path": "active/shared/runtime/vitest-approvals",
+  "artifact_class": "tmp",
+  "ttl_days": 1,
+  "action": "delete",
+  "backup": "exclude",
+  "note": "Approval requests and events written by test runs (approval-store.ts approvalStoreRoots under vitest). Isolated from the live approval store so fixtures never count as operator decisions."
+}

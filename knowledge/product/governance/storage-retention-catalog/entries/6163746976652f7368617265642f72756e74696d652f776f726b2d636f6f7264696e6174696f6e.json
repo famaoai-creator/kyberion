@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/work-coordination",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "Work-item claim/coordination state (work-coordination.ts) — deleting live claims breaks the write-exclusion contract."
+}

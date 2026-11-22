@@ -1,0 +1,7 @@
+{
+  "path": "active/shared/observability/channels",
+  "artifact_class": "log",
+  "ttl_days": 30,
+  "action": "delete",
+  "note": "EV-06: per-surface decision/why/policy_used streams written by emitChannelSurfaceEvent. Same 30d floor as active/shared/logs — conversational surface traffic, not governance evidence."
+}

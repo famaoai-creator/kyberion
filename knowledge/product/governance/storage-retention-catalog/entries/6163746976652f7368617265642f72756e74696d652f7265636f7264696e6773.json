@@ -1,0 +1,7 @@
+{
+  "path": "active/shared/runtime/recordings",
+  "artifact_class": "evidence",
+  "action": "review_required",
+  "audit": true,
+  "note": "G02: browser/desktop/service recordings (service-recording-session.ts, desktop-recording-compiler.ts). NOT TTL'd: procedure-catalog recording_ref entries dispatch from this store (knowledge/procedure-registry.ts resolveAllowlistedRecordingRef), so expiring a recording would break a promoted procedure."
+}

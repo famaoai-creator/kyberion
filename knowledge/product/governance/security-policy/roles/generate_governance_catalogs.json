@@ -1,0 +1,6 @@
+{
+  "allow_write": [
+    "knowledge/product/governance/security-policy.json",
+    "knowledge/product/governance/storage-retention-catalog.json"
+  ]
+}

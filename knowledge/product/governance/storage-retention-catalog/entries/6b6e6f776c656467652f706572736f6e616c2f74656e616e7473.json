@@ -1,0 +1,7 @@
+{
+  "path": "knowledge/personal/tenants",
+  "artifact_class": "evidence",
+  "action": "review_required",
+  "audit": true,
+  "note": "Tenant-bound personal knowledge overlay. Never TTL-delete; offboarding must export and remove only the matching tenant subtree."
+}

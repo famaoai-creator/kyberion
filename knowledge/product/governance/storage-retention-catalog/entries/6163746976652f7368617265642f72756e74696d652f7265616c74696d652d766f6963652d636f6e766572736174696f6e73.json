@@ -1,0 +1,7 @@
+{
+  "path": "active/shared/runtime/realtime-voice-conversations",
+  "artifact_class": "log",
+  "ttl_days": 30,
+  "action": "delete",
+  "note": "Realtime voice conversation sessions (libs/shared-voice/src/realtime-voice-conversation.ts) — conversation log, same 30d as peer-conversations / a2a-conversations."
+}

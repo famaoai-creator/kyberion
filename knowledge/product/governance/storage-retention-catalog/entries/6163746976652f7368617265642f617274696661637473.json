@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/artifacts",
+  "artifact_class": "report",
+  "action": "review_required",
+  "note": "Storage-layout artifact floor: system- and tenant-owned deliverables written by writeScopedArtifact (artifacts/system/<class>/, artifacts/<tier>/<tenant|shared>/<class>/). Deliverables are never silently expired; mission/project-owned artifacts live in their scope directories instead."
+}

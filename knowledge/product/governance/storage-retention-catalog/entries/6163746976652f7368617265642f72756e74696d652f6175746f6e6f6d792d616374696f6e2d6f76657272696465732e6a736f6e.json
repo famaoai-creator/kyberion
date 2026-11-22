@@ -1,0 +1,7 @@
+{
+  "path": "active/shared/runtime/autonomy-action-overrides.json",
+  "artifact_class": "state",
+  "action": "review_required",
+  "audit": true,
+  "note": "Evidence-derived per-action decision overrides (relaxed_to / demoted_until) written by sweepAutonomyActionStates — runtime state, not policy; the gate fails closed to the base decision when absent or malformed. Never delete while daemons consult it."
+}

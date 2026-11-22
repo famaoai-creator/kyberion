@@ -1,0 +1,16 @@
+{
+  "allow_read": [
+    "active/shared/coordination/autonomy/",
+    "active/shared/runtime/trigger-deliveries.jsonl",
+    "active/shared/runtime/heartbeats/",
+    "active/shared/observability/",
+    "active/audit/"
+  ],
+  "allow_write": [
+    "active/shared/coordination/autonomy/",
+    "active/shared/runtime/trigger-deliveries.jsonl",
+    "active/shared/runtime/heartbeats/",
+    "active/shared/observability/",
+    "active/audit/"
+  ]
+}

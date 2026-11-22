@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/external-service-registry.json",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "Mutable runtime external-service registry (libs/core/service/external-service-registry.ts)."
+}

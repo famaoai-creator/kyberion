@@ -1,0 +1,4 @@
+{
+  "allow_read": ["knowledge/personal/tenants/", "knowledge/confidential/${KYBERION_TENANT}/"],
+  "allow_write": []
+}

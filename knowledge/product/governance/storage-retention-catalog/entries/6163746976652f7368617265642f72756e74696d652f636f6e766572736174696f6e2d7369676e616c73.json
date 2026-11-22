@@ -1,0 +1,7 @@
+{
+  "path": "active/shared/runtime/conversation-signals",
+  "artifact_class": "log",
+  "ttl_days": 90,
+  "action": "delete",
+  "note": "Conversation signal ledger (libs/core/intent/conversation-signals.ts): one JSONL file per month of turn outcomes — metadata and a short excerpt, never a tenant turn. Read by the conversation report."
+}

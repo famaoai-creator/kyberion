@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/cloudflare-os",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "G02: Cloudflare OS control-plane state (libs/core/governance/cloudflare-os-control-plane.ts control-plane.json)."
+}

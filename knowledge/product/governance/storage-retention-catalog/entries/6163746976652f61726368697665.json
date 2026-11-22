@@ -1,0 +1,6 @@
+{
+  "path": "active/archive",
+  "artifact_class": "evidence",
+  "action": "review_required",
+  "note": "Archived missions and long-term retention tree — deletion is a human decision, never automatic. (.trash below is the one TTL-governed exception.)"
+}

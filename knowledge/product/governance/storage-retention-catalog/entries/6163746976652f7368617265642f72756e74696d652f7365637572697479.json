@@ -1,0 +1,7 @@
+{
+  "path": "active/shared/runtime/security",
+  "artifact_class": "evidence",
+  "action": "review_required",
+  "audit": true,
+  "note": "Security-screen quarantine records (libs/core/governance/security-screen.ts quarantineDir)."
+}

@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/discord-bridge",
+  "artifact_class": "log",
+  "action": "review_required",
+  "note": "G02: Discord bridge thread history (satellites/discord-bridge THREAD_HISTORY_ROOT), indexed by history-search-index.ts. User conversation records — human retention decision."
+}

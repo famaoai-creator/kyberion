@@ -467,6 +467,7 @@
     "first_job_tenant_status_reader",
     "generate_changelog",
     "generate_design_tokens",
+    "generate_governance_catalogs",
     "generate_provider_hook_configs",
     "generate_subagent_definitions",
     "generation_scheduler",

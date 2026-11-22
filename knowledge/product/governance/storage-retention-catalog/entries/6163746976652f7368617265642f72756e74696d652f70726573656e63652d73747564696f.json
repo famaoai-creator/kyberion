@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/presence-studio",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "Presence-studio workflow state (email-workflow.ts)."
+}

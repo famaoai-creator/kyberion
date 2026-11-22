@@ -1,0 +1,7 @@
+{
+  "path": "active/shared/runtime/distill-candidates",
+  "artifact_class": "cache",
+  "ttl_days": 30,
+  "action": "delete",
+  "note": "Distill candidate staging (distill-candidate-registry.ts) — candidates either promote into knowledge/ or expire; previously unbounded (~97 files)."
+}

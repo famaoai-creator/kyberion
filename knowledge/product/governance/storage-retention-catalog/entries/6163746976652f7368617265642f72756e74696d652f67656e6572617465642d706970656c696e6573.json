@@ -1,0 +1,8 @@
+{
+  "path": "active/shared/runtime/generated-pipelines",
+  "artifact_class": "cache",
+  "ttl_days": 30,
+  "action": "delete",
+  "backup": "exclude",
+  "note": "G02: pipeline ADF rendered from execution plan-set bundles (orchestrator-actuator orchestrator-helpers.ts / orchestrator-execution-brief-helpers.ts). Regenerable from the bundle; consumed in the same run."
+}

@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/stance.env",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "Active customer overlay selector written by scripts/stance/stance_switch.ts / company_onboarding.ts; rewritten in place."
+}

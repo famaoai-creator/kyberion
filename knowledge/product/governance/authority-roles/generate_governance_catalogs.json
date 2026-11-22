@@ -1,0 +1,10 @@
+{
+  "role": "generate_governance_catalogs",
+  "assignable": false,
+  "permissions": {
+    "allow_write": [
+      "knowledge/product/governance/security-policy.json",
+      "knowledge/product/governance/storage-retention-catalog.json"
+    ]
+  }
+}

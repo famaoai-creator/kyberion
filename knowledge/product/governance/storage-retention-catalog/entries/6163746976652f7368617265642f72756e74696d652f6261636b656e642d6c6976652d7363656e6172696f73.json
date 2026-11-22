@@ -1,0 +1,7 @@
+{
+  "path": "active/shared/runtime/backend-live-scenarios",
+  "artifact_class": "log",
+  "ttl_days": 90,
+  "action": "delete",
+  "note": "MSN-HARNESS-ADOPT R1: one JSON record per opt-in live backend scenario run (libs/core/reasoning/backend-live-scenarios.ts recordBackendLiveScenarioRun, written by scripts/check/check_backend_live_scenarios.ts --live). Read by backend-capability-honesty.ts as session_continuity/abort evidence; stores answer excerpts of nonce prompts only, no task content. Stale measurements age out so honesty never rests on an old run."
+}

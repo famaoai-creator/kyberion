@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/media-generation",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "Generation scheduler job queue (generation-scheduler.ts) — load-bearing while jobs are pending."
+}

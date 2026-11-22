@@ -1,0 +1,6 @@
+{
+  "allow_write": [
+    "knowledge/public/design-patterns/media-templates/themes.json",
+    "knowledge/public/design-patterns/media-templates/themes/themes.json"
+  ]
+}

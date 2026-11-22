@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/learning-signals",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "G02: learning-signal harvest cursor/cluster state (libs/core/knowledge/learning-signal-adapter.ts STATE_DOMAIN); the adapter prunes clusters itself (CLUSTER_RETENTION_DAYS)."
+}

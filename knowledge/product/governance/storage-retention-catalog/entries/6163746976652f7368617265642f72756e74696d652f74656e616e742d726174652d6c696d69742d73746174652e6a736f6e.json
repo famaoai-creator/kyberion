@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/tenant-rate-limit-state.json",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "Tenant rate-limiter window state (libs/core/organization/tenant-rate-limiter.ts), rewritten in place."
+}

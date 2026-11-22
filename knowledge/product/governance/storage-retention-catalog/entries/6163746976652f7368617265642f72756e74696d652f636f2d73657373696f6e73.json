@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/co-sessions",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "Same-checkout co-session presence/leases/handoffs (co-session.ts) — deleting live leases breaks multi-provider write exclusion. MSN-STORE-BOUNDS-2: <id>/presence.jsonl is compacted at write time to the latest row per provider:participant_id (1 MiB, no archive; staleness is judged at read time). handoffs.jsonl keeps its rewrite-on-ack under the co-session lock; readers skip a torn line. Event feeds observability/co-sessions/<id>/events.jsonl rotate at 8 MiB at write time; segments expire under the observability 90d sweep and the learning-signal reader scans live + segments back to its window."
+}

@@ -422,6 +422,7 @@ Repository build, test, generator and gate scripts for contributors.
 | `pnpm kyberion generate capability-seams`           |                                            | Regenerate the capability seam graph                                                              |
 | `pnpm kyberion generate cli-reference`              | `pnpm generate:cli-reference`              | Regenerate the CLI command reference page                                                         |
 | `pnpm kyberion generate env-registry`               | `pnpm generate:env-registry`               | Regenerate the environment variable registry                                                      |
+| `pnpm kyberion generate governance-catalogs`        | `pnpm generate:governance-catalogs`        | Rebuild governed catalogs from directory sources                                                  |
 | `pnpm kyberion generate governance-import-baseline` | `pnpm generate:governance-import-baseline` | Regenerate the governance import baseline fixture                                                 |
 | `pnpm kyberion generate knowledge-index`            | `pnpm generate:knowledge-index`            | Regenerate the knowledge index                                                                    |
 | `pnpm kyberion generate op-registry`                | `pnpm generate:op-registry`                | Regenerate the actuator op registry                                                               |

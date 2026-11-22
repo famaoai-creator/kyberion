@@ -1,0 +1,8 @@
+{
+  "path": "active/shared/logs/audit",
+  "artifact_class": "evidence",
+  "ttl_days": 90,
+  "action": "archive",
+  "audit": true,
+  "note": "Compliance audit stream (hash-chained daily audit-*.jsonl + storage-retention.jsonl). Previously inherited the logs-root 30d delete — audit evidence must not be unlinked; expired files move to active/archive/ (review_required there, never auto-deleted). rotateLogs resolves the longest-prefix entry per file, so this entry overrides the logs root for audit/ only."
+}

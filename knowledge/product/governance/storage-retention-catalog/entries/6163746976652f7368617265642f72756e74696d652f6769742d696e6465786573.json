@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/git-indexes",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "WS-01 private per-session git index files registered in the workspace ledger (kind git-index). Same contract as active/shared/runtime/workspaces: deleted only through the ledger sweep, never by TTL."
+}

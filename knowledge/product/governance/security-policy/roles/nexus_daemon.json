@@ -1,0 +1,17 @@
+{
+  "allow_read": [
+    "presence/bridge/runtime/",
+    "presence/bridge/channel-registry.json",
+    "active/shared/runtime/terminal/",
+    "active/shared/logs/",
+    "active/missions/MSN-SYSTEM-NERVE/",
+    "active/audit/"
+  ],
+  "allow_write": [
+    "presence/bridge/runtime/",
+    "active/shared/runtime/terminal/",
+    "active/shared/logs/",
+    "active/missions/MSN-SYSTEM-NERVE/",
+    "active/audit/"
+  ]
+}

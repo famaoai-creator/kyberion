@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/execution-feedback",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "Per-tier execution feedback store directory (libs/core/knowledge/execution-feedback-candidates.ts); entries self-bounded per file."
+}

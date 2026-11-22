@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/imessage-bridge",
+  "artifact_class": "log",
+  "action": "review_required",
+  "note": "iMessage bridge event log (libs/core/integrations/imessage-bridge.ts IMESSAGE_LOG_PATH). User conversation records — human retention decision."
+}

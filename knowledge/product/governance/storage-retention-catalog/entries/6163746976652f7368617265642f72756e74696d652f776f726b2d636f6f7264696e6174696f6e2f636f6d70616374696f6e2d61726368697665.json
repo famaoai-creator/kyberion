@@ -1,0 +1,7 @@
+{
+  "path": "active/shared/runtime/work-coordination/compaction-archive",
+  "artifact_class": "evidence",
+  "ttl_days": 90,
+  "action": "delete",
+  "note": "MSN-STORE-BOUNDS-2: raw-union archives from write-time compaction of items.jsonl / leases.jsonl (work-coordination-ledger.ts, writeTimeArchiveDir). The writer runs as infrastructure_sentinel, which cannot write active/archive/. Kept 90 days. Namespaced stores (work-coordination/<ns>/) archive to <ns>/compaction-archive/, which sits under the review_required parent and is not auto-expired; namespaces are used for isolated runs and are removed with them."
+}

@@ -1,0 +1,4 @@
+{
+  "allow_read": ["active/audit/security/", "knowledge/security/"],
+  "allow_write": ["active/audit/security/", "knowledge/security/"]
+}

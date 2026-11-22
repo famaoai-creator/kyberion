@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/scope.env",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "Active project scope selector (foundation/project-scope-env.ts, scope-context.ts); rewritten in place."
+}

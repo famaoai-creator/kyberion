@@ -1,0 +1,7 @@
+{
+  "path": "active/shared/runtime/media-generation/quota",
+  "artifact_class": "log",
+  "ttl_days": 30,
+  "action": "delete",
+  "note": "Per-tenant daily abstract generation-unit counters (generation-quota.ts); historical cost remains in the usage ledger, while only the current quota window is load-bearing."
+}

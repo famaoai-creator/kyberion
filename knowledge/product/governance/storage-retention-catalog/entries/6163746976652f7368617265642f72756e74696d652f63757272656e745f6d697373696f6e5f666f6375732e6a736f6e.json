@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/current_mission_focus.json",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "Single-file pointer to the operator's current mission focus (mission-system.ts / agent-dispatch.ts), rewritten in place."
+}

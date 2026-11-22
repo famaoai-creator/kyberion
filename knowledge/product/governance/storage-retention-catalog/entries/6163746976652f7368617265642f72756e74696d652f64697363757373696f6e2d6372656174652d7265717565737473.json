@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/discussion-create-requests",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "Permanent actor/source/canonical-scope-bound Discussion create reservations and terminal receipts. No TTL or status deletion: missing evidence cannot authorize duplicate provider execution. Confidential tenant partitions only; missing selected tenant fails closed. Human retention decisions must preserve no-replay tombstones."
+}

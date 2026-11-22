@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/workspaces",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "WS-05 per-session workspaces and their ledger (workspace-ledger.ts). The generic TTL janitor never deletes here; the janitor workspace sweep (sweepWorkspaces) removes only ledger-registered orphans past the workspace-budget-policy.json orphan TTL, and unregistered directories are reported, never deleted."
+}

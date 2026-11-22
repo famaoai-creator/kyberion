@@ -1,0 +1,10 @@
+{
+  "allow_read": [
+    "knowledge/confidential/${KYBERION_TENANT}/decisions/",
+    "knowledge/confidential/${KYBERION_TENANT}/customers/"
+  ],
+  "allow_write": [
+    "knowledge/confidential/${KYBERION_TENANT}/decisions/",
+    "knowledge/confidential/${KYBERION_TENANT}/customers/"
+  ]
+}

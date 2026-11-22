@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/provider-pins",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "Per-mission provider pins (libs/core/provider/provider-pins-store.ts)."
+}

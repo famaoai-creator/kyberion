@@ -76,6 +76,7 @@
     "generate:op-registry": "node --import ./scripts/ts-loader.mjs scripts/generate/generate_op_registry.ts",
     "generate:pii-rules": "node --import ./scripts/ts-loader.mjs scripts/generate/generate_pii_rules.ts",
     "generate:pseudo-locale": "node --import ./scripts/ts-loader.mjs scripts/generate/generate_pseudo_locale.ts",
+    "generate:governance-catalogs": "node --import ./scripts/ts-loader.mjs scripts/generate/generate_governance_catalogs.ts",
     "generate:provider-hooks": "node --import ./scripts/ts-loader.mjs scripts/generate/generate_provider_hook_configs.ts",
     "generate:types": "node scripts/run_built.mjs dist/scripts/generate/generate_types.js",
     "generate:vocabulary-types": "node --import ./scripts/ts-loader.mjs scripts/generate/generate_vocabulary_types.ts",

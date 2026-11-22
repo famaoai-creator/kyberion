@@ -1,0 +1,7 @@
+{
+  "path": "active/shared/runtime/dot-token-usage.jsonl",
+  "artifact_class": "log",
+  "action": "review_required",
+  "audit": true,
+  "note": "G01: append-only per-wake dot token usage (dot-runtime.ts recordDotTokenUsage), read by dotTokensUsedToday and org-budget-governor for the current UTC day only. MSN-STORE-BOUNDS-2: both readers scan backward to UTC midnight minus 6h (dot-token-usage.ts readDotTokenUsageForDay), so the file size never fails a read. The writer keeps a 3-day time window at write time (explicit policy, DOT_TOKEN_USAGE_* constants, min 8 MiB, re-run after each doubling) — 3 days can never drop a row of the day being enforced, so token_cap_per_day cannot be bypassed; dropped rows are archived (accounting evidence) to <store dir>/compaction-archive/, which expires with active/shared/runtime/compaction-archive. The janitor never rewrites it (review_required)."
+}

@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/dot-signal-ledger.jsonl",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "Dot signal ledger (dot-feedback.ts DOT_SIGNAL_LEDGER_PATH); load-bearing signal history for the feedback loop. MSN-STORE-BOUNDS-2: not compacted by key — KR signal_ratio (dot-key-results.ts) reads up to 720h of rows. The writer keeps a 37-day time window at write time (min 8 MiB, no archive: telemetry); readers stream with no size cap. The janitor never rewrites it."
+}

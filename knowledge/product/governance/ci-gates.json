@@ -167,6 +167,14 @@
       "rationale": "Keeps static foundation state/ledger/floor roots projected from validated catalog registrations without runtime catalog I/O."
     },
     {
+      "id": "governance-catalogs",
+      "scope": "pr",
+      "executable": "node",
+      "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check/check_governance_catalogs.ts"],
+      "owner": "governance",
+      "rationale": "Keeps security-policy.json and storage-retention-catalog.json semantically identical to their directory sources (roles/, entries/) so per-entry edits cannot drift from the committed runtime artifacts. Semantic (not byte) compare: every pull_request run merges with main, which still carries the pre-normalization format during the transition."
+    },
+    {
       "id": "org-role-grants",
       "scope": "pr",
       "executable": "node",
@@ -1073,7 +1081,8 @@
       "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check/check_orphans.ts"],
       "baseline": "knowledge/product/governance/orphan-baseline.json",
       "owner": "architecture",
-      "rationale": "OW-07: fails when a new orphan appears — an unimported libs/core module, an uninvoked script, an unreachable pipeline or an unreferenced actuator op; known exceptions are reasoned baseline entries that may only shrink."
+      "timeout_ms": 240000,
+      "rationale": "OW-07: fails when a new orphan appears — an unimported libs/core module, an uninvoked script, an unreachable pipeline or an unreferenced actuator op; known exceptions are reasoned baseline entries that may only shrink. Repo-wide import scan cost grows with file count; the ~260-file governance catalog split pushed it past the 120s default on loaded runners, so this gate carries an explicit 240s budget."
     },
     {
       "id": "dep-cycles",

@@ -1,0 +1,7 @@
+{
+  "path": "active/shared/observability/autonomy-outcomes.jsonl",
+  "artifact_class": "log",
+  "action": "review_required",
+  "audit": true,
+  "note": "Autonomy evidence ledger (autonomy-action-state.ts): one row per gate decision with execution outcome — the input to evidence-driven action promotion/demotion. MSN-STORE-BOUNDS-2: no longer rotated: rotation moved the live learning window into a segment no reader scans, resetting promote/demote evidence. Every reader needs only rows inside the learning window (stats via readJsonLinesSince; listAutonomyActionIds streams), so the writer keeps max(policy window, 30d) + 7d at write time (min 8 MiB) and archives dropped rows to active/shared/observability/compaction-archive/ (expires under the observability 90d sweep). Tenant partitions are not trimmed (their scope cannot stage a rewrite); they are never rotated, read without size limits, and watched by the ops-health directory probe."
+}

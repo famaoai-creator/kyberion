@@ -1,0 +1,7 @@
+{
+  "path": "active/shared/runtime/compaction-archive",
+  "artifact_class": "evidence",
+  "ttl_days": 90,
+  "action": "delete",
+  "note": "MSN-STORE-BOUNDS-2: raw-union archives written by write-time store maintenance (append-only-store.ts writeTimeArchiveDir: <store dir>/compaction-archive/) for top-level runtime stores such as dot-feedback.jsonl and dot-token-usage.jsonl. Store writers cannot write active/archive/, so the archive sits next to the store, keeping its tier/tenant partition. Kept 90 days, like other observability evidence."
+}

@@ -1,0 +1,8 @@
+{
+  "path": "active/shared/observability/mission-control",
+  "artifact_class": "evidence",
+  "ttl_days": 90,
+  "action": "delete",
+  "audit": true,
+  "note": "EV-06: cross-mission task-events.jsonl / orchestration-events.jsonl. Aligned with audit retention (90d) because agent-collaboration-projection reads these as the operator-visible history. The mission-local copy under active/missions/**/coordination/events/ is the durable record; this is the shared projection source."
+}

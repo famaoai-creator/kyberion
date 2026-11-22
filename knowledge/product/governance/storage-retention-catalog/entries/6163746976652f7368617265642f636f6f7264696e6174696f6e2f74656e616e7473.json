@@ -1,0 +1,7 @@
+{
+  "path": "active/shared/coordination/tenants",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "Tenant-sharded coordination state not covered by a surface-specific root. Removal is owned by audited offboarding.",
+  "audit": true
+}

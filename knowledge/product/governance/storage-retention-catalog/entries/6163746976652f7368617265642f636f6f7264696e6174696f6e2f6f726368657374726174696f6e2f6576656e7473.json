@@ -1,0 +1,7 @@
+{
+  "path": "active/shared/coordination/orchestration/events",
+  "artifact_class": "cache",
+  "ttl_days": 14,
+  "action": "delete",
+  "note": "EV-06: one JSON file per enqueued mission-orchestration event. The durable record is the orchestration journal (appendMissionOrchestrationJournalEntry), so the queue file is a work ticket, not evidence — 14d covers replay of a stalled worker without unbounded growth."
+}

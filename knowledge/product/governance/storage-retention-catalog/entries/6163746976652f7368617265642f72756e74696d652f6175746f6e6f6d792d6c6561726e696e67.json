@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/autonomy-learning",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "Tenant-partitioned execution receipts and learned autonomy overrides. Never delete automatically: removing incident or deduplication evidence could relax authority or replay execution credit. Retire through explicit retention review. MSN-STORE-BOUNDS-3: tenant autonomy-outcomes.jsonl is windowed at write time like the shared ledger (max(policy window, 30d) + 7d), dropped rows archived to <partition>/compaction-archive/; the tenant store capability admits only that store's rewrite siblings (namePrefixExact: .compacting-, .compact-out-, .compact-restore-) and archive files one level deep. The overrides file is never trimmed; the directory is never rotated."
+}

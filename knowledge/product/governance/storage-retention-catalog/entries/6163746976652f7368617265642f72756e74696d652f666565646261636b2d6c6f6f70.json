@@ -1,0 +1,7 @@
+{
+  "path": "active/shared/runtime/feedback-loop",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "Tenant-sharded knowledge delivery, usage aggregate, human feedback, gap, and promotion telemetry. Tenant subtrees are removed only through audited offboarding; the unscoped legacy lane remains review-only.",
+  "audit": true
+}

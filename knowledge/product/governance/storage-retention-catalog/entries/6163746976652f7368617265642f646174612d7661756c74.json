@@ -1,0 +1,7 @@
+{
+  "path": "active/shared/data-vault",
+  "artifact_class": "cache",
+  "action": "delete",
+  "backup": "exclude",
+  "note": "Self-expiring: each JSON entry carries its own expiresAt, honored per-file by the janitor. No directory-level TTL."
+}

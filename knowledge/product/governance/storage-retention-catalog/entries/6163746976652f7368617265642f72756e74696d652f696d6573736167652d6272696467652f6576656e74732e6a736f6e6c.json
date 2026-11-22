@@ -1,0 +1,9 @@
+{
+  "path": "active/shared/runtime/imessage-bridge/events.jsonl",
+  "artifact_class": "log",
+  "action": "rotate",
+  "ttl_days": 90,
+  "segment_action": "archive",
+  "audit": true,
+  "note": "MSN-STORE-BOUNDS-3: iMessage bridge event log (user conversation records). User decision 2026-11-02: keep 90 days, then archive, never auto-delete. The writer rotates at 8 MiB at write time (imessage-bridge.ts IMESSAGE_LOG_ROTATE_MIN_BYTES); the janitor moves events-YYYYMMDD-HHmmss segments older than 90 days into active/archive/active/shared/runtime/imessage-bridge/ (review_required, never auto-deleted). The bridge identity cannot write the retention audit log, so its RETENTION_ROTATE records go to the audit chain. The directory entry stays review_required for thread-history/."
+}

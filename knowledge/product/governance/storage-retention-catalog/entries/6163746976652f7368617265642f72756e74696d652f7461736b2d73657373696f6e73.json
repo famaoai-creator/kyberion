@@ -1,0 +1,6 @@
+{
+  "path": "active/shared/runtime/task-sessions",
+  "artifact_class": "state",
+  "action": "review_required",
+  "note": "Task-session records (task-session.ts). GC'd per mission by scope-linked mission-archive GC (AL-04), not by TTL."
+}
