@@ -164,6 +164,8 @@ export const RUNTIME_STATE_PATHS = {
   'desktopAx.agentDesktopHome': 'active/shared/runtime/system/agent-desktop',
   /** Operator layer of saved seam defaults (seam-selection-defaults.ts). */
   'seamSelection.operatorDefaults': 'active/shared/runtime/seam-selection/defaults.json',
+  /** Allowlisted browser-recording store consumed by promote-procedure (browser-control-recording.ts). */
+  'browser.recordingsStore': 'active/shared/runtime/recordings',
 } as const;
 
 export type RuntimeStateKey = keyof typeof RUNTIME_STATE_PATHS;

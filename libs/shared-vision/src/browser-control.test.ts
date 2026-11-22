@@ -14,6 +14,7 @@ import {
 import {
   BROWSER_CONTROL_SESSION_ROOT,
   admitControlStep,
+  appendBrowserControlJournal,
   hashControlStep,
   listBrowserControlSessions,
   loadBrowserControlSession,
@@ -21,6 +22,13 @@ import {
   recordApprovedControlStep,
   revokeBrowserControlSession,
 } from './browser-control-sessions.js';
+import {
+  exportBrowserControlRecording,
+  listExportedRecordings,
+  loadExportedRecording,
+  reviewExportedRecording,
+} from './browser-control-recording.js';
+import { loadBrowserExtensionRecordingAtPath } from '@agent/core/browser/browser-extension-bridge';
 
 const SESSION_ROOT = pathResolver.rootResolve(BROWSER_CONTROL_SESSION_ROOT);
 const SECRET_ROOT = pathResolver.rootResolve(BROWSER_CONTROL_SECRET_ROOT);
@@ -231,5 +239,152 @@ describe('control_step mailbox lifecycle', () => {
   it('rejects arbitrary ops at schema validation', () => {
     const session = mint();
     expect(() => enqueueStep(session, { op: 'evaluate' as never, text: 'alert(1)' })).toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Journal → browser-recording export (interactive → promote path)
+// ---------------------------------------------------------------------------
+
+const RECORDINGS_DIR = pathResolver.rootResolve('active/shared/runtime/recordings');
+const exportedIds: string[] = [];
+
+function journalEnqueuedStep(sessionId: string, step: Record<string, unknown>): void {
+  appendBrowserControlJournal(sessionId, {
+    event: 'step.enqueued',
+    step_id: step.step_id,
+    op: step.op,
+    ...(step.ref ? { ref: step.ref } : {}),
+    step,
+  });
+}
+
+afterEach(() => {
+  for (const id of exportedIds.splice(0)) {
+    const file = `${RECORDINGS_DIR}/${id}.json`;
+    if (safeExistsSync(file)) safeRmSync(file);
+  }
+});
+
+describe('browser control journal → recording export', () => {
+  it('compiles enqueued steps into a schema-valid browser-recording', () => {
+    const session = mint();
+    journalEnqueuedStep(session.session_id, {
+      step_id: 's-1',
+      op: 'navigate',
+      url: 'https://api.slack.com/apps/manage',
+    });
+    journalEnqueuedStep(session.session_id, {
+      step_id: 's-2',
+      op: 'snapshot',
+    });
+    journalEnqueuedStep(session.session_id, {
+      step_id: 's-3',
+      op: 'click_ref',
+      ref: '@button_a1b2_1',
+      role: 'button',
+      name: 'Create app',
+      label: 'open create dialog',
+    });
+    journalEnqueuedStep(session.session_id, {
+      step_id: 's-4',
+      op: 'fill_ref',
+      ref: '@textbox_c3d4_1',
+      role: 'textbox',
+      name: 'App name',
+      value: 'my-bot',
+    });
+    journalEnqueuedStep(session.session_id, {
+      step_id: 's-5',
+      op: 'delete',
+      ref: '@button_e5f6_1',
+      role: 'button',
+      name: 'Delete app',
+    });
+
+    const out = exportBrowserControlRecording({ session_id: session.session_id });
+    expect(out.status).toBe('exported');
+    if (out.status !== 'exported') return;
+    exportedIds.push(out.recording_id);
+
+    expect(out.action_count).toBe(4); // snapshot is observation-only → skipped
+    expect(out.skipped_steps).toBe(1);
+
+    const file = pathResolver.rootResolve(out.recording_ref);
+    const recording = loadBrowserExtensionRecordingAtPath(file);
+    expect(recording.schema_version).toBe('browser-recording.v1');
+    expect(recording.tab.origin).toBe('https://api.slack.com');
+    expect(recording.review?.status).toBe('pending');
+    expect(recording.review?.decisions).toHaveLength(4);
+
+    const [nav, click, fill, del] = recording.actions;
+    expect(nav.op).toBe('navigate');
+    expect(nav.risk).toBe('observe');
+    expect(nav.navigation).toEqual({
+      from_origin: 'https://api.slack.com',
+      to_origin: 'https://api.slack.com',
+    });
+    expect(click.target?.ref).toBe('@button_a1b2_1');
+    expect(click.risk).toBe('low');
+    expect(fill.variable).toEqual({ name: 'app_name', classification: 'user_input' });
+    expect(del.op).toBe('delete');
+    expect(del.risk).toBe('high');
+    expect(recording.risk_summary.approval_required_count).toBe(1);
+  });
+
+  it('fails cleanly when the session has no replayable steps', () => {
+    const session = mint();
+    journalEnqueuedStep(session.session_id, { step_id: 's-1', op: 'snapshot' });
+    const out = exportBrowserControlRecording({ session_id: session.session_id });
+    expect(out.status).toBe('error');
+    if (out.status === 'error') expect(out.reason).toMatch(/no replayable actions/);
+  });
+
+  it('rejects export for unknown sessions', () => {
+    const out = exportBrowserControlRecording({
+      session_id: 'BCS-00000000-0000-0000-0000-000000000000',
+    });
+    expect(out.status).toBe('error');
+  });
+
+  it('review decisions merge and gate promotion status', () => {
+    const session = mint();
+    journalEnqueuedStep(session.session_id, {
+      step_id: 's-1',
+      op: 'click_ref',
+      ref: '@button_a1b2_1',
+      role: 'button',
+      name: 'OK',
+    });
+    journalEnqueuedStep(session.session_id, {
+      step_id: 's-2',
+      op: 'click_ref',
+      ref: '@button_c3d4_2',
+      role: 'button',
+      name: 'Cancel',
+    });
+    const out = exportBrowserControlRecording({ session_id: session.session_id });
+    expect(out.status).toBe('exported');
+    if (out.status !== 'exported') return;
+    exportedIds.push(out.recording_id);
+
+    const partial = reviewExportedRecording({
+      recording_id: out.recording_id,
+      approve: ['act-001'],
+    });
+    expect(partial).toEqual({ status: 'reviewed', review_status: 'in_review' });
+
+    const second = reviewExportedRecording({
+      recording_id: out.recording_id,
+      approve: ['act-002'],
+    });
+    expect(second).toEqual({ status: 'reviewed', review_status: 'approved' });
+
+    const stored = loadExportedRecording(out.recording_id);
+    expect(stored?.review?.status).toBe('approved');
+    expect(stored?.review?.decisions.every((d) => d.status === 'approved')).toBe(true);
+
+    const listed = listExportedRecordings();
+    expect(listed.some((entry) => entry.recording_id === out.recording_id)).toBe(true);
   });
 });

@@ -228,7 +228,7 @@ function formatErrors(validate: ValidateFunction): string[] {
   );
 }
 
-function canonicalOrigin(value: string): string | null {
+export function canonicalOrigin(value: string): string | null {
   try {
     const parsed = new URL(value);
     return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? parsed.origin : null;

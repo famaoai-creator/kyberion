@@ -181,6 +181,22 @@ export function createCliCommandHandlers(deps: CliCommandDeps): Record<string, C
       await runCaptureCommand(commandArgs, printText);
       return;
     },
+    ops: async (ctx) => {
+      const { firstArg, restArgs, normalizedArgs } = ctx;
+      if (!normalizedArgs.includes('--verbose')) setRegisteredEnv('LOG_LEVEL', 'silent');
+      const { runOpsCommand } = await import('./cli-ops.js');
+      const commandArgs = firstArg === undefined ? restArgs : [firstArg, ...restArgs];
+      await runOpsCommand(commandArgs, printText);
+      return;
+    },
+    system: async (ctx) => {
+      const { firstArg, restArgs, normalizedArgs } = ctx;
+      if (!normalizedArgs.includes('--verbose')) setRegisteredEnv('LOG_LEVEL', 'silent');
+      const { runSystemCommand } = await import('./cli-system.js');
+      const commandArgs = firstArg === undefined ? restArgs : [firstArg, ...restArgs];
+      await runSystemCommand(commandArgs, printText);
+      return;
+    },
     record: async (ctx) => {
       const { firstArg, restArgs, normalizedArgs } = ctx;
       if (!normalizedArgs.includes('--verbose')) setRegisteredEnv('LOG_LEVEL', 'silent');

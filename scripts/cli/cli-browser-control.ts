@@ -35,8 +35,16 @@ import {
   requestBrowserControlSession,
 } from '@agent/shared-vision/browser-control-service';
 import { listBrowserControlSessions } from '@agent/shared-vision/browser-control-sessions';
+import {
+  exportBrowserControlRecording,
+  listExportedRecordings,
+  loadExportedRecording,
+  reviewExportedRecording,
+} from '@agent/shared-vision/browser-control-recording';
 import { withExecutionContext, withExecutionContextAsync } from '@agent/core/authority';
-import { safeReadFile } from '@agent/core/secure-io';
+import { safeExec, safeReadFile } from '@agent/core/secure-io';
+import { pathResolver } from '@agent/core/path-resolver';
+import { runtimeStatePath } from '@agent/core/foundation/runtime-state-roots';
 import { detectCliAgentPrincipal } from '@agent/core/governance/cli-operator-principal';
 import type { BrowserBridgeControlStep } from '@agent/shared-vision/browser-bridge-mailbox';
 import { ScriptExitError } from '../lib/harness.js';
@@ -53,6 +61,17 @@ export const BROWSER_CONTROL_USAGE = `Usage: pnpm kyberion browser control <verb
   submit <ref> | delete <ref> | purchase <ref>
   settings-change <ref> | credential-submit <ref>
   resume <approval_id>
+  export <session> [--title <t>]
+                        Compile the session journal into a browser-recording.v1
+                        (review: pending) under the recordings store
+  recordings | recordings show <BCR-…>
+                        List exported recordings / inspect one for review
+  review <BCR-…> (--approve-all|--approve <ids>|--reject <ids>)
+                        Record review decisions (operator judgment)
+  promote <session>|promote --recording <BCR-…> [--id <procedure_id>]
+          [--intent <csv>] [--approve-all]
+                        Export (if session) then run the governed
+                        promote-procedure path; needs an approved review
     common: [--session <BCS-…>] [--mission <id>] [--timeout-sec N] [--json]
 
   Page-touching ops (snapshot/screenshot/click/fill/extract/download/upload)
@@ -107,7 +126,7 @@ function parseArgs(args: string[]): ParsedArgs {
       continue;
     }
     const name = arg.slice(2);
-    if (['json', 'no-wait', 'checked', 'verbose'].includes(name)) {
+    if (['json', 'no-wait', 'checked', 'verbose', 'approve-all'].includes(name)) {
       options[name] = true;
     } else {
       const value = args[i + 1];
@@ -406,6 +425,151 @@ export async function runBrowserControlCommand(
     );
     if (queued.status !== 'queued') fail(`resume denied: ${JSON.stringify(queued)}`);
     await deliverResult(pending.session_id, queued.request_id, parsed, print);
+    return;
+  }
+
+  if (verb === 'export') {
+    const sessionId = parsed.positionals[1] ?? str(parsed.options, 'session');
+    if (!sessionId) fail('export needs <session>');
+    const out = exportBrowserControlRecording({
+      session_id: sessionId,
+      title: str(parsed.options, 'title'),
+    });
+    if (out.status === 'error') fail(out.reason);
+    printResult(
+      {
+        ...out,
+        next:
+          `review the actions (browser control recordings show ${out.recording_id}), ` +
+          `then: browser control review ${out.recording_id} --approve-all | --approve <ids>`,
+      },
+      json,
+      print
+    );
+    return;
+  }
+
+  if (verb === 'recordings') {
+    const sub = parsed.positionals[1];
+    if (sub === 'show') {
+      const id = parsed.positionals[2];
+      if (!id) fail('recordings show needs <BCR-…>');
+      const recording = loadExportedRecording(id);
+      if (!recording) fail(`recording ${id} not found in the recordings store`);
+      printResult(
+        {
+          recording_id: recording.recording_id,
+          origin: recording.tab.origin,
+          title: recording.tab.title,
+          review: recording.review,
+          actions: recording.actions,
+        },
+        true,
+        print
+      );
+      return;
+    }
+    printResult(listExportedRecordings(), true, print);
+    return;
+  }
+
+  if (verb === 'review') {
+    const id = parsed.positionals[1];
+    if (!id) fail('review needs <BCR-…>');
+    const csv = (key: string): string[] | undefined =>
+      str(parsed.options, key)
+        ?.split(',')
+        .map((value) => value.trim())
+        .filter(Boolean);
+    if (
+      parsed.options['approve-all'] !== true &&
+      !csv('approve')?.length &&
+      !csv('reject')?.length
+    ) {
+      fail('review needs --approve-all, --approve <ids>, or --reject <ids>');
+    }
+    const out = reviewExportedRecording({
+      recording_id: id,
+      approve_all: parsed.options['approve-all'] === true,
+      approve: csv('approve'),
+      reject: csv('reject'),
+    });
+    if (out.status === 'error') fail(out.reason);
+    printResult(
+      {
+        ...out,
+        recording_id: id,
+        ...(out.review_status === 'approved'
+          ? { next: `browser control promote --recording ${id}` }
+          : {}),
+      },
+      json,
+      print
+    );
+    return;
+  }
+
+  if (verb === 'promote') {
+    let recordingId = str(parsed.options, 'recording');
+    let recording = recordingId ? loadExportedRecording(recordingId) : null;
+    if (recordingId && !recording) {
+      fail(`recording ${recordingId} not found in the recordings store`);
+    }
+    const sessionId = parsed.positionals[1] ?? str(parsed.options, 'session');
+    if (!recording) {
+      if (!sessionId) fail('promote needs <session> or --recording <BCR-…>');
+      const exported = exportBrowserControlRecording({
+        session_id: sessionId,
+        title: str(parsed.options, 'title'),
+      });
+      if (exported.status === 'error') fail(exported.reason);
+      recordingId = exported.recording_id;
+      recording = loadExportedRecording(recordingId);
+      print(`exported ${recordingId} (${exported.action_count} actions) from ${sessionId}`);
+    }
+    if (parsed.options['approve-all'] === true) {
+      const reviewed = reviewExportedRecording({ recording_id: recordingId!, approve_all: true });
+      if (reviewed.status === 'error') fail(reviewed.reason);
+      recording = loadExportedRecording(recordingId!);
+    }
+    if (recording?.review?.status !== 'approved') {
+      fail(
+        `recording ${recordingId} review is "${recording?.review?.status ?? 'none'}" — ` +
+          `run \`browser control review ${recordingId} --approve-all\` (or --approve <ids>) first`
+      );
+    }
+    const host = new URL(recording.tab.origin).hostname;
+    const procedureId =
+      str(parsed.options, 'id') ??
+      host
+        .replace(/[^a-z0-9]+/gi, '-')
+        .replace(/^-+|-+$/g, '')
+        .toLowerCase();
+    const intents = str(parsed.options, 'intent')
+      ?.split(',')
+      .map((value) => value.trim())
+      .filter(Boolean) ?? [recording.tab.title];
+    const args = [
+      '--import',
+      './scripts/ts-loader.mjs',
+      'scripts/promote/promote_procedure.ts',
+      '--recording',
+      `${runtimeStatePath('browser.recordingsStore').physicalPath}/${recordingId}.json`,
+      '--procedure-id',
+      procedureId,
+      '--intent-phrases',
+      JSON.stringify(intents),
+    ];
+    // promote_procedure reads MISSION_ID itself — only forward an explicit flag.
+    const missionId = str(parsed.options, 'mission');
+    if (missionId) args.push('--mission-id', missionId);
+    const output = safeExec('node', args, { cwd: pathResolver.rootDir(), timeoutMs: 120_000 });
+    if (output.trim()) print(output.trim());
+    printResult(
+      { status: 'promoted', procedure_id: procedureId, recording_id: recordingId },
+      json,
+      print
+    );
     return;
   }
 

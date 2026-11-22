@@ -71,6 +71,27 @@ most recent active session is used. `--json` prints the raw response.
    `pnpm kyberion secret introduce --from-file` — never paste tokens in chat.
 5. `close` the session when done (it also dies on TTL).
 
+## Promoting a session to a procedure
+
+Interactive work is journaled, so a session that succeeded can become a
+replayable procedure — same review gate as side-panel recordings:
+
+```bash
+pnpm kyberion browser control export <BCS-…> [--title <t>]   # journal → BCR-… (pending)
+pnpm kyberion browser control recordings                     # list exported recordings
+pnpm kyberion browser control recordings show <BCR-…>        # inspect one
+pnpm kyberion browser control review <BCR-…> --approve-all   # or --approve/--reject <ids>
+pnpm kyberion browser control promote <BCS-…>                # export + governed promote
+pnpm kyberion browser control promote --recording <BCR-…> [--id <procedure_id>] [--intent a,b]
+```
+
+`export` preserves op, target ref/role/name, risk, navigation transitions and
+variables; the recording lands under the allowlisted recordings store with
+`review.status=pending`. `promote` derives a safe `procedure_id` and intent
+phrases from the session metadata, then calls the existing `promote-procedure`
+pipeline — the candidate still needs an approved review before it reaches the
+ProcedureCatalog and Pattern B replay.
+
 ## Vocabulary map
 
 Three layers share the browser surface — same targets, different verbs:

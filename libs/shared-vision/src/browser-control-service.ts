@@ -179,6 +179,19 @@ function journalStep(
     op: step.op,
     ...(step.ref ? { ref: step.ref } : {}),
     ...(step.label ? { label: step.label } : {}),
+    // Full step payload so a journal can be exported as a browser-recording.
+    // `file.data_b64` (up to ~1MB) is replaced by metadata — the binary lives
+    // only in the mailbox request payload it was shipped with.
+    step: step.file
+      ? {
+          ...step,
+          file: {
+            name: step.file.name,
+            mime: step.file.mime,
+            bytes: Math.floor(step.file.data_b64.length * 0.75),
+          },
+        }
+      : step,
     ...extra,
   });
 }

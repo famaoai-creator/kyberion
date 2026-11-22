@@ -991,6 +991,33 @@
       ]
     },
     {
+      "id": "operator-cli.system",
+      "command": "system",
+      "noun": "system",
+      "verb": "default",
+      "entry": "operator-cli",
+      "audience": "operator",
+      "description": "cli_cmd_operator_cli_system",
+      "group": "operate",
+      "effect": "state_change",
+      "prerequisites": [
+        {
+          "kind": "os_consent",
+          "via": "permissions"
+        }
+      ]
+    },
+    {
+      "id": "operator-cli.ops",
+      "command": "ops",
+      "noun": "ops",
+      "verb": "default",
+      "entry": "operator-cli",
+      "audience": "operator",
+      "description": "cli_cmd_operator_cli_ops",
+      "group": "inspect"
+    },
+    {
       "id": "operator-cli.record.audio",
       "command": "record audio",
       "noun": "record",
@@ -1439,7 +1466,9 @@
         "schedule register",
         "schedule remove",
         "project-trust",
-        "project-trust request"
+        "project-trust request",
+        "system",
+        "ops"
       ]
     },
     {
