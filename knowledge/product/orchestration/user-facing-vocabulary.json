@@ -8506,9 +8506,9 @@
         "qps-ploc": "⟦Ṗřėṽïėẇ őř ȧṗṗŀẏ ȧ řėṽïėẇėḓ Ḓőŧ ḓřȧƒŧ; ȧƈŧïṽȧŧė şėṗȧřȧŧėŀẏ ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
       },
       "cli_cmd_script_onboarding_authority": {
-        "en": "Review, request and apply human-approved scoped GitHub and browser authority",
-        "ja": "GitHub とブラウザの対象を限定した操作権限を確認し、人間の承認を要求して適用します",
-        "qps-ploc": "⟦Řėṽïėẇ, řėɋůėşŧ ȧñḓ ȧṗṗŀẏ ħůɱȧñ-ȧṗṗřőṽėḓ şƈőṗėḓ ƓïŧĦůƀ ȧñḓ ƀřőẇşėř ȧůŧħőřïŧẏ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+        "en": "Review, request and apply human-approved scoped authority (preview takes a plan file or --grant/--grant-field flags)",
+        "ja": "対象を限定した操作権限を確認し、人間の承認を要求して適用します(preview は計画ファイルか --grant/--grant-field フラグで指定)",
+        "qps-ploc": "⟦Řėṽïėẇ, řėɋůėşŧ ȧñḓ ȧṗṗŀẏ ħůɱȧñ-ȧṗṗřőṽėḓ şƈőṗėḓ ȧůŧħőřïŧẏ (ṗřėṽïėẇ ŧȧķėş ȧ ṗŀȧñ ƒïŀė őř --ɠřȧñŧ/--ɠřȧñŧ-ƒïėŀḓ ƒŀȧɠş) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧ⟧"
       },
       "cli_cmd_script_onboarding_nhi_session": {
         "en": "Request, apply, list and revoke human-approved NHI session admissions",
@@ -9061,9 +9061,9 @@
         "qps-ploc": "⟦Řėṽïėẇ ȧñḓ ȧƈƈėṗŧ ḓėŀïṽėřȧƀŀėş ïñ ŧħė ïñƀőẋ ŀőřėɱ ïṗşůɱ ḓő⟧"
       },
       "cli_cmd_operator_home_approvals": {
-        "en": "Review and decide approval requests (--approve/--deny <id>; add --new-window from an agent CLI without a TTY)",
-        "ja": "承認リクエストを確認して裁可(--approve/--deny <id>。TTY のないエージェント CLI からは --new-window を付ける)",
-        "qps-ploc": "⟦Řėṽïėẇ ȧñḓ ḓėƈïḓė ȧṗṗřőṽȧŀ řėɋůėşŧş (--ȧṗṗřőṽė/--ḓėñẏ <ïḓ>; ȧḓḓ --ñėẇ-ẇïñḓőẇ ƒřőɱ ȧñ ȧɠėñŧ ƇĿÏ ẇïŧħőůŧ ȧ ŦŦẎ) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧů⟧"
+        "en": "Review and decide approval requests (--approve/--deny <id>; --delegate <id> composes a charter grant plan for delegable ops; add --new-window from an agent CLI without a TTY)",
+        "ja": "承認リクエストを確認して裁可(--approve/--deny <id>。委任可能な操作は --delegate <id> で charter grant 計画を作成。TTY のないエージェント CLI からは --new-window を付ける)",
+        "qps-ploc": "⟦Řėṽïėẇ ȧñḓ ḓėƈïḓė ȧṗṗřőṽȧŀ řėɋůėşŧş (--ȧṗṗřőṽė/--ḓėñẏ <ïḓ>; --ḓėŀėɠȧŧė <ïḓ> ƈőɱṗőşėş ȧ ƈħȧřŧėř ɠřȧñŧ ṗŀȧñ ƒőř ḓėŀėɠȧƀŀė őṗş; ȧḓḓ --ñėẇ-ẇïñḓőẇ ƒřőɱ ȧñ ȧɠėñŧ ƇĿÏ ẇïŧħőůŧ ȧ ŦŦẎ) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşů⟧"
       },
       "cli_cmd_operator_home_notify": {
         "en": "Inspect or configure notification targets",

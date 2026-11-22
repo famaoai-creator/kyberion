@@ -83,24 +83,24 @@ Every governed `kyberion` command and `pnpm` script, generated from the command 
 
 ### Start
 
-| Command                                | pnpm script               | What it does                                                                                                           |
-| -------------------------------------- | ------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `pnpm kyberion agy sdk-setup`          | `pnpm agy:sdk-setup`      | Set up the agy SDK — **[state change]**                                                                                |
-| `pnpm kyberion env bootstrap`          | `pnpm env:bootstrap`      | Bootstrap the local environment                                                                                        |
-| `pnpm kyberion kyberion`               | `pnpm kyberion`           | The kyberion CLI itself                                                                                                |
-| `pnpm kyberion onboarding`             | `pnpm onboarding`         | Run the onboarding wizard (identity, services, tenant)                                                                 |
-| `pnpm kyberion onboarding authority`   |                           | Review, request and apply human-approved scoped authority (preview accepts a plan file or --grant/--grant-field flags) |
-| `pnpm kyberion onboarding context`     | `pnpm onboarding:context` | Resolve tenant and organization context for onboarding                                                                 |
-| `pnpm kyberion onboarding nhi-session` |                           | Request, apply, list and revoke human-approved NHI session admissions                                                  |
-| `pnpm kyberion provider-cli setup`     | `pnpm provider-cli:setup` | Install or inspect managed provider CLIs                                                                               |
-| `pnpm kyberion reasoning credentials`  |                           | Register, lend to tenants, extend, verify, meter and revoke reasoning credentials — **[state change]**                 |
-| `pnpm kyberion reasoning setup`        | `pnpm reasoning:setup`    | Set up a reasoning backend — **[state change]**                                                                        |
-| `pnpm kyberion service setup`          | `pnpm service:setup`      | Set up external service connections — **[state change]**                                                               |
-| `pnpm kyberion setup`                  |                           | Set up one area (onboarding, reasoning, env, services, tools, voice, ...) — **[state change]**                         |
-| `pnpm kyberion setup report`           |                           | Report setup status and missing steps                                                                                  |
-| `pnpm kyberion tool setup`             | `pnpm tool:setup`         | Install or inspect tool runtimes — **[state change]**                                                                  |
-| `pnpm kyberion vital`                  |                           | Check operator readiness (vital signs) — **[readiness]**                                                               |
-| `pnpm kyberion voice setup`            |                           | Check and set up voice readiness — **[state change]**                                                                  |
+| Command                                | pnpm script               | What it does                                                                                                         |
+| -------------------------------------- | ------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `pnpm kyberion agy sdk-setup`          | `pnpm agy:sdk-setup`      | Set up the agy SDK — **[state change]**                                                                              |
+| `pnpm kyberion env bootstrap`          | `pnpm env:bootstrap`      | Bootstrap the local environment                                                                                      |
+| `pnpm kyberion kyberion`               | `pnpm kyberion`           | The kyberion CLI itself                                                                                              |
+| `pnpm kyberion onboarding`             | `pnpm onboarding`         | Run the onboarding wizard (identity, services, tenant)                                                               |
+| `pnpm kyberion onboarding authority`   |                           | Review, request and apply human-approved scoped authority (preview takes a plan file or --grant/--grant-field flags) |
+| `pnpm kyberion onboarding context`     | `pnpm onboarding:context` | Resolve tenant and organization context for onboarding                                                               |
+| `pnpm kyberion onboarding nhi-session` |                           | Request, apply, list and revoke human-approved NHI session admissions                                                |
+| `pnpm kyberion provider-cli setup`     | `pnpm provider-cli:setup` | Install or inspect managed provider CLIs                                                                             |
+| `pnpm kyberion reasoning credentials`  |                           | Register, lend to tenants, extend, verify, meter and revoke reasoning credentials — **[state change]**               |
+| `pnpm kyberion reasoning setup`        | `pnpm reasoning:setup`    | Set up a reasoning backend — **[state change]**                                                                      |
+| `pnpm kyberion service setup`          | `pnpm service:setup`      | Set up external service connections — **[state change]**                                                             |
+| `pnpm kyberion setup`                  |                           | Set up one area (onboarding, reasoning, env, services, tools, voice, ...) — **[state change]**                       |
+| `pnpm kyberion setup report`           |                           | Report setup status and missing steps                                                                                |
+| `pnpm kyberion tool setup`             | `pnpm tool:setup`         | Install or inspect tool runtimes — **[state change]**                                                                |
+| `pnpm kyberion vital`                  |                           | Check operator readiness (vital signs) — **[readiness]**                                                             |
+| `pnpm kyberion voice setup`            |                           | Check and set up voice readiness — **[state change]**                                                                |
 
 ### Inspect
 
