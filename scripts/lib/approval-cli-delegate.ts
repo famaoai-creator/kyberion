@@ -6,24 +6,17 @@
  * the delegation registry parser before any charter grant is composed.
  * The human approve + apply ceremony is unchanged.
  */
-import path from 'node:path';
 import type { ApprovalRequestRecord } from '@agent/core/governance/approval-store';
 import { parseExternalOperationGrant } from '@agent/core/governance/external-operation-target';
 import {
   previewOnboardingAuthority,
   requestOnboardingAuthority,
-  type OnboardingAuthorityPrincipal,
 } from '@agent/core/organization/onboarding-authority';
-import {
-  resolveCliApprovalRequester,
-  resolveCliOperatorIdentity,
-} from '@agent/core/governance/cli-operator-principal';
-import { loadPersonalIdentityAtPath } from '@agent/core/personal-identity-state';
-import { resolveActiveProfileRoot } from '@agent/core/profile-root';
-import { withExecutionContext } from '@agent/core/authority';
-import { inspectInstalledIdentity, canonicalAuthorityCommand } from './installed-identity.js';
+import { withLocalAuthorityPrincipal } from './authority-principal.js';
+import { canonicalAuthorityCommand } from './installed-identity.js';
 
 const DEFAULT_DELEGATE_EXPIRY_MS = 90 * 86_400_000;
+const MAX_DELEGATE_EXPIRY_MS = 365 * 86_400_000;
 
 /** Returns a refusal reason, or runs preview+request and prints next steps. */
 export function delegateApprovalToCharter(
@@ -41,11 +34,14 @@ export function delegateApprovalToCharter(
     );
     return { ok: false };
   }
-  const expiresAtMs = expiresAtArg
-    ? Date.parse(expiresAtArg)
-    : Date.now() + DEFAULT_DELEGATE_EXPIRY_MS;
+  const now = Date.now();
+  const expiresAtMs = expiresAtArg ? Date.parse(expiresAtArg) : now + DEFAULT_DELEGATE_EXPIRY_MS;
   if (!Number.isFinite(expiresAtMs)) {
     printOutput(`Invalid --expires-at '${expiresAtArg}'; pass an ISO date.`);
+    return { ok: false };
+  }
+  if (expiresAtMs <= now || expiresAtMs > now + MAX_DELEGATE_EXPIRY_MS) {
+    printOutput('--expires-at must be within the next 365 days.');
     return { ok: false };
   }
   const tenantSlug = request.scope?.tenant_slug;
@@ -56,33 +52,19 @@ export function delegateApprovalToCharter(
     grants: [grant],
     expires_at: new Date(expiresAtMs).toISOString(),
   };
-  const installed = inspectInstalledIdentity();
-  if (installed.source === 'unavailable') throw new Error(installed.next);
-  if (installed.source === 'installation') {
-    throw new Error(
-      `Onboarding authority is managed at ${installed.governance_root}. Approve and delegate there: ${canonicalAuthorityCommand(installed.governance_root, ['onboarding', 'authority', 'show'])}`
-    );
-  }
-  const { preview, receipt } = withExecutionContext('sovereign_concierge', () => {
-    if (!loadPersonalIdentityAtPath(path.join(resolveActiveProfileRoot(), 'my-identity.json')))
-      throw new Error('Complete reviewed identity onboarding first.');
-    const owner = resolveCliOperatorIdentity();
-    if (!owner.principalId)
-      throw new Error('Registered operator identity required. Complete identity onboarding first.');
-    const requester = resolveCliApprovalRequester({ legacy: 'onboarding-authority' });
-    const principal: OnboardingAuthorityPrincipal = {
-      requesterId: requester.actorId,
-      accountableId: owner.principalId,
-      personalOwner: true,
-      tenantSlugs: 'all',
-    };
-    const preview = previewOnboardingAuthority(principal, input);
-    const receipt = requestOnboardingAuthority(principal, input, {
-      digest: preview.digest,
-      base_hash: preview.base_hash,
-    });
-    return { preview, receipt };
-  });
+  const { preview, receipt } = withLocalAuthorityPrincipal(
+    ['show'],
+    (principal) => {
+      const preview = previewOnboardingAuthority(principal, input);
+      const receipt = requestOnboardingAuthority(principal, input, {
+        digest: preview.digest,
+        base_hash: preview.base_hash,
+      });
+      return { preview, receipt };
+    },
+    (governanceRoot) =>
+      `Onboarding authority is managed at ${governanceRoot}. Approve and delegate there: ${canonicalAuthorityCommand(governanceRoot, ['show'])}`
+  );
   printOutput(`Delegation plan request created: ${receipt.request_id}`);
   printOutput('');
   for (const line of preview.statement.split('\n')) printOutput(`  ${line}`);

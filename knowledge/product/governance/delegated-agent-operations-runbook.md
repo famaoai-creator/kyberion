@@ -94,6 +94,9 @@ After the grant is installed, `pnpm onboarding llm attest --tenant <t>
 
 ### Simpler composition paths (no hand-written plan JSON)
 
+- **Discoverability**: `pnpm kyberion approvals` marks each pending request
+  carrying a delegation target with a `charter-delegable` hint line, and the
+  summary footer lists `--delegate <id>` alongside `--approve`/`--deny`.
 - **`pnpm kyberion approvals --delegate <request-id>`** converts a pending
   delegable external-operation request into an authority plan in one step:
   the request's stored, registry-derived `delegation_target` is re-validated,

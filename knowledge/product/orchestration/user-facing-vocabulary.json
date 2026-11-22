@@ -12008,9 +12008,14 @@
         "qps-ploc": "⟦Ṗėñḓïñɠ ȧṗṗřőṽȧŀş ({count}): ŀőřėɱ ïṗş⟧"
       },
       "recorder_approvals_summary": {
-        "en": "Decide: pnpm kyberion approvals --approve <id> / --deny <id> [--note \"...\"] / withdraw an approval: --revoke <id> [--reason \"...\"]",
-        "ja": "裁可: pnpm kyberion approvals --approve <id> / --deny <id> [--note \"...\"] / 承認の取り消し: --revoke <id> [--reason \"...\"]",
-        "qps-ploc": "⟦Ḓėƈïḓė: ṗñṗɱ ķẏƀėřïőñ ȧṗṗřőṽȧŀş --ȧṗṗřőṽė <ïḓ> / --ḓėñẏ <ïḓ> [--ñőŧė \"...\"] / ẇïŧħḓřȧẇ ȧñ ȧṗṗřőṽȧŀ: --řėṽőķė <ïḓ> [--řėȧşőñ \"...\"] ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïş⟧"
+        "en": "Decide: pnpm kyberion approvals --approve <id> / --deny <id> [--note \"...\"] / withdraw an approval: --revoke <id> [--reason \"...\"] / stand-delegate a delegable request: --delegate <id>",
+        "ja": "裁可: pnpm kyberion approvals --approve <id> / --deny <id> [--note \"...\"] / 承認の取り消し: --revoke <id> [--reason \"...\"] / 委任可能なリクエストを恒常委任: --delegate <id>",
+        "qps-ploc": "⟦Ḓėƈïḓė: ṗñṗɱ ķẏƀėřïőñ ȧṗṗřőṽȧŀş --ȧṗṗřőṽė <ïḓ> / --ḓėñẏ <ïḓ> [--ñőŧė \"...\"] / ẇïŧħḓřȧẇ ȧñ ȧṗṗřőṽȧŀ: --řėṽőķė <ïḓ> [--řėȧşőñ \"...\"] / şŧȧñḓ-ḓėŀėɠȧŧė ȧ ḓėŀėɠȧƀŀė řėɋůėşŧ: --ḓėŀėɠȧŧė <ïḓ> ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "recorder_approvals_delegable_hint": {
+        "en": "charter-delegable: approve once, or --delegate {id} to stand-delegate future calls to this target",
+        "ja": "委任可能: ここで裁可、または --delegate {id} で今後の同宛先の呼び出しを charter 委任",
+        "qps-ploc": "⟦ƈħȧřŧėř-ḓėŀėɠȧƀŀė: ȧṗṗřőṽė őñƈė, őř --ḓėŀėɠȧŧė {id} ŧő şŧȧñḓ-ḓėŀėɠȧŧė ƒůŧůřė ƈȧŀŀş ŧő ŧħïş ŧȧřɠėŧ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈ⟧"
       },
       "recorder_ask_usage": {
         "en": "Usage: pnpm kyberion ask \"<request>\"",

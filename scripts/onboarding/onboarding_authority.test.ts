@@ -44,6 +44,22 @@ vi.mock('../lib/installed-identity.js', () => ({
   }),
   canonicalAuthorityCommand: () => 'canonical-command',
 }));
+vi.mock('../lib/authority-principal.js', () => ({
+  withLocalAuthorityPrincipal: (
+    _argv: string[],
+    run: (principal: unknown) => unknown,
+    installationMessage?: (governanceRoot: string) => string
+  ) => {
+    if (state.installation)
+      throw new Error(installationMessage?.('/canonical') ?? 'managed at /canonical');
+    return run({
+      requesterId: 'agent',
+      accountableId: 'user:owner',
+      personalOwner: true,
+      tenantSlugs: 'all',
+    });
+  },
+}));
 vi.mock('@agent/core/organization/onboarding-authority', () => ({
   onboardingAuthorityScope: (value: Record<string, unknown>) => ({
     kind: value.scope_kind,
@@ -232,6 +248,16 @@ describe('onboarding authority flag-composed grants', () => {
     await expect(
       main(['request', '--grant', 'vcs:pr_create', '--expires-at', '2030-01-01'])
     ).rejects.toThrow('only valid for preview');
+    expect(previewOnboardingAuthority).not.toHaveBeenCalled();
+  });
+
+  it('rejects --mode/--expires-at outside flag mode instead of ignoring them', async () => {
+    await expect(
+      main(['preview', '--file', '/repo/input.json', '--mode', 'revoke'])
+    ).rejects.toThrow('only valid together with --grant');
+    await expect(
+      main(['preview', '--file', '/repo/input.json', '--expires-at', '2030-01-01'])
+    ).rejects.toThrow('only valid together with --grant');
     expect(previewOnboardingAuthority).not.toHaveBeenCalled();
   });
 });

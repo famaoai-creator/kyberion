@@ -106,6 +106,8 @@ export async function handleApprovalsSubcommand(
     printOutput(
       `      requested by ${request.requestedBy}${request.requestedByDisplayName ? ` (${request.requestedByDisplayName})` : ''} via ${request.channel} at ${request.requestedAt}`
     );
+    if (request.delegation_target)
+      printOutput(`      ${ui('recorder:recorder_approvals_delegable_hint', { id: request.id })}`);
   }
   printOutput('');
   printOutput(ui('recorder:recorder_approvals_summary'));
