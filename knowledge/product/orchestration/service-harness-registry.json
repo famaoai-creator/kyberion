@@ -281,19 +281,19 @@
       "operations": [
         {
           "action": "brave_web_search",
-          "kind": "apply",
-          "risk": "write",
-          "approval_required": true,
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
           "tenant_binding_required": false,
-          "idempotency": "recommended"
+          "idempotency": "not_applicable"
         },
         {
           "action": "brave_local_search",
-          "kind": "apply",
-          "risk": "write",
-          "approval_required": true,
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
           "tenant_binding_required": false,
-          "idempotency": "recommended"
+          "idempotency": "not_applicable"
         }
       ]
     },
@@ -1088,19 +1088,19 @@
       "operations": [
         {
           "action": "maps_search",
-          "kind": "apply",
-          "risk": "write",
-          "approval_required": true,
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
           "tenant_binding_required": false,
-          "idempotency": "recommended"
+          "idempotency": "not_applicable"
         },
         {
           "action": "maps_geocode",
-          "kind": "apply",
-          "risk": "write",
-          "approval_required": true,
+          "kind": "capture",
+          "risk": "read",
+          "approval_required": false,
           "tenant_binding_required": false,
-          "idempotency": "recommended"
+          "idempotency": "not_applicable"
         }
       ]
     },

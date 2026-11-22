@@ -5,20 +5,28 @@
   "operations": {
     "maps_search": {
       "type": "mcp",
+      "risk": "read",
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-google-maps"],
       "tool_name": "maps_search",
       "parameters": {
         "query": { "required": true, "type": "string" }
+      },
+      "payload_template": {
+        "query": "{{query}}"
       }
     },
     "maps_geocode": {
       "type": "mcp",
+      "risk": "read",
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-google-maps"],
       "tool_name": "maps_geocode",
       "parameters": {
         "address": { "required": true, "type": "string" }
+      },
+      "payload_template": {
+        "address": "{{address}}"
       }
     }
   }

@@ -210,9 +210,29 @@ describe('service harness contract', () => {
     expect(() => assertServiceCaptureOperation('google-workspace', 'gmail_send')).toThrow(
       /Capture-only surface rejected/
     );
-    // An undeclared MCP route is not a read either.
-    const brave = describeServiceHarness('brave-search', { detail: false }).operations;
-    expect(brave.find((op) => op.action === 'brave_web_search')).toMatchObject({ risk: 'write' });
+    // An undeclared MCP route is not a read either (sqlite: any SQL, any db_path).
+    const sqlite = describeServiceHarness('sqlite', { detail: false }).operations;
+    for (const action of ['query', 'list_tables']) {
+      expect(sqlite.find((op) => op.action === action)).toMatchObject({ risk: 'write' });
+    }
+  });
+
+  it('lets the declared search and map lookups through the capture surface (operator decision 2026-11-22)', () => {
+    for (const [service, action] of [
+      ['brave-search', 'brave_web_search'],
+      ['brave-search', 'brave_local_search'],
+      ['google-maps', 'maps_search'],
+      ['google-maps', 'maps_geocode'],
+    ] as const) {
+      expect(assertServiceCaptureOperation(service, action)).toMatchObject({
+        kind: 'capture',
+        risk: 'read',
+        approval_required: false,
+      });
+    }
+    expect(() => assertServiceCaptureOperation('sqlite', 'query')).toThrow(
+      /Capture-only surface rejected/
+    );
   });
 
   it('keeps the declared calendar reads as reads (operator decision 2026-11-22)', () => {

@@ -74,8 +74,10 @@ Check [`service-endpoints/README.md`](service-endpoints/README.md), existing
    template parameter (m365 `calendar_events_list` takes `{{calendarPath}}`,
    so `me/messages?x=` would read mail) stays gated, and a fixed-path variant
    carries the read (`calendar_view_primary`). The Google Workspace and
-   Microsoft 365 calendar reads are declared this way (operator decision,
-   2026-11-22). A declared read also lets a failed call report its own error
+   Microsoft 365 calendar reads, Brave search and Google Maps lookups are
+   declared this way (operator decisions, 2026-11-22). SQLite is not: `query`
+   runs any SQL and both operations open a caller-chosen `db_path`, which
+   creates a missing file. A declared read also lets a failed call report its own error
    instead of "service effect outcome is unknown".
    For a service whose operations always use tenant-owned connections, set
    top-level `tenant_binding_required: true` in the preset. For a mixed service,
