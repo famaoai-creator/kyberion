@@ -6,9 +6,11 @@
  * `due_date`), so every computation runs on UTC day numbers — no timezone can
  * move an item to a neighbouring day. "Today" is the viewer's local day.
  *
- * Client-safe: no imports beyond the board's due-state rules.
+ * Client-safe: runtime imports only the board's due-state rules; the
+ * concierge message-key type is erased at compile time.
  */
 import { dueState, type DueState } from '../work-board/work-item-board';
+import type { ConciergeMessageKey } from '../../lib/i18n';
 
 export type CalendarView = 'month' | 'week';
 
@@ -18,16 +20,20 @@ export type CalendarSource =
   | 'operation_deadline'
   | 'action_item'
   /** An event in the installation owner's own (Google / Microsoft 365) calendar. */
-  | 'external_event';
+  | 'external_event'
+  /** A provider/model working block (co-session participant or delegation). */
+  | 'agent_session';
 
 /** Toggle groups: an operation's runs and deadlines show or hide together. */
-export type CalendarSourceGroup = 'work_item' | 'operation' | 'action_item' | 'external';
+export type CalendarSourceGroup =
+  'work_item' | 'operation' | 'action_item' | 'external' | 'agent_session';
 
 export const CALENDAR_SOURCE_GROUPS: readonly CalendarSourceGroup[] = [
   'work_item',
   'operation',
   'action_item',
   'external',
+  'agent_session',
 ];
 
 export function sourceGroup(source: CalendarSource | undefined): CalendarSourceGroup {
@@ -37,12 +43,53 @@ export function sourceGroup(source: CalendarSource | undefined): CalendarSourceG
       ? 'action_item'
       : source === 'external_event'
         ? 'external'
-        : 'work_item';
+        : source === 'agent_session'
+          ? 'agent_session'
+          : 'work_item';
 }
 
-/** An appointment, not a task: it is never due, overdue or counted in the summary. */
-export function isAppointment(item: Pick<CalendarItem, 'source'>): boolean {
+/** A provider/model working block (co-session participant or delegation). */
+export function isAgentSession(item: Pick<CalendarItem, 'source'>): boolean {
+  return item.source === 'agent_session';
+}
+
+/** An event in the installation owner's own (Google / Microsoft 365) calendar. */
+export function isExternalEvent(item: Pick<CalendarItem, 'source'>): boolean {
   return item.source === 'external_event';
+}
+
+/** An appointment or history record, not a task: it is never due, overdue or counted in the summary. */
+export function isAppointment(item: Pick<CalendarItem, 'source'>): boolean {
+  return isExternalEvent(item) || isAgentSession(item);
+}
+
+/**
+ * The small role marker beside an entry: the concierge message key for
+ * dated work, or `undefined` for agent sessions — provider names are
+ * proper nouns, not vocabulary. Literal knowledge of every source lives
+ * here, in the module that owns the union; consumers never compare
+ * `source === 'x'`.
+ */
+export function entryRoleLabelKey(
+  entry: Pick<CalendarEntry, 'role'> & {
+    item: Pick<CalendarItem, 'source'>;
+  }
+): ConciergeMessageKey | undefined {
+  if (isAgentSession(entry.item)) return undefined;
+  if (entry.role === 'start') return 'ia_shell_work_cal_start';
+  if (entry.role === 'span') return 'ia_shell_work_cal_underway';
+  switch (entry.item.source) {
+    case 'operation_run':
+      return 'ia_shell_work_cal_run';
+    case 'operation_deadline':
+      return 'ia_shell_work_cal_deadline';
+    case 'action_item':
+      return 'ia_shell_work_cal_action';
+    case 'external_event':
+      return 'ia_shell_work_cal_event';
+    default:
+      return 'ia_shell_work_cal_due';
+  }
 }
 
 /** One event from `/api/calendar/external`. */
@@ -100,6 +147,15 @@ export interface CalendarItem {
   source?: CalendarSource;
   /** A deadline that was missed. */
   missed?: boolean;
+  /** Agent sessions: the instants the provider was working. */
+  startAt?: string;
+  endAt?: string;
+  /** Agent sessions: provider id / delegation backend and the served model. */
+  provider?: string;
+  model?: string;
+  sessionKind?: 'co_session' | 'delegation';
+  /** Agent sessions: the record's lifecycle status (open/completed/failed…). */
+  sessionStatus?: string;
 }
 
 /** One `workspace.calendar` entry, as the API returns it. */
@@ -115,8 +171,16 @@ export interface CalendarApiEntry {
   dueAt?: string;
   done: boolean;
   missed?: boolean;
-  link: { kind: 'work_item' | 'organization' | 'mission'; id: string };
+  /** Agent sessions: the record's lifecycle status. */
+  status?: string;
+  link: { kind: 'work_item' | 'organization' | 'mission' | 'session'; id: string };
   tenantSlug?: string;
+  /** Agent sessions: the instants the provider was working (hour blocks). */
+  startAt?: string;
+  endAt?: string;
+  provider?: string;
+  model?: string;
+  sessionKind?: 'co_session' | 'delegation';
 }
 
 /** The viewer's local day of an instant, or undefined for an invalid one. */
@@ -134,8 +198,35 @@ export function fromCalendarEntries(
   entries: readonly CalendarApiEntry[],
   hrefFor: (link: CalendarApiEntry['link'], tenantSlug?: string) => string | undefined
 ): CalendarItem[] {
-  return entries.map((entry) => {
+  return entries.flatMap((entry) => {
     const href = hrefFor(entry.link, entry.tenantSlug);
+    // Agent sessions carry instants, not calendar days: expand the span onto
+    // every local day it touches so a viewer's midnight never loses a block.
+    if (entry.source === 'agent_session' && entry.startAt) {
+      const first = localDayOf(entry.startAt);
+      const last = localDayOf(entry.endAt ?? new Date().toISOString());
+      if (!first || !last) return [];
+      const base = {
+        title: entry.title,
+        status: 'done',
+        startAt: entry.startAt,
+        ...(entry.endAt ? { endAt: entry.endAt } : {}),
+        ...(entry.provider ? { provider: entry.provider } : {}),
+        ...(entry.model ? { model: entry.model } : {}),
+        ...(entry.sessionKind ? { sessionKind: entry.sessionKind } : {}),
+        ...(entry.status ? { sessionStatus: entry.status } : {}),
+        source: 'agent_session' as const,
+      };
+      const items: CalendarItem[] = [];
+      for (let day = first; day <= last; day = addDays(day, 1)) {
+        items.push({
+          id: day === first ? entry.id : `${entry.id}@${day}`,
+          dueDate: day,
+          ...base,
+        });
+      }
+      return items;
+    }
     const dueDate =
       entry.source === 'work_item'
         ? entry.dueDate
@@ -151,8 +242,83 @@ export function fromCalendarEntries(
       ...(href ? { href } : {}),
       source: entry.source,
       ...(entry.missed ? { missed: true } : {}),
+      ...(entry.startAt ? { startAt: entry.startAt } : {}),
+      ...(entry.endAt ? { endAt: entry.endAt } : {}),
+      ...(entry.provider ? { provider: entry.provider } : {}),
+      ...(entry.model ? { model: entry.model } : {}),
+      ...(entry.sessionKind ? { sessionKind: entry.sessionKind } : {}),
     };
   });
+}
+
+/**
+ * The fraction of a calendar day a session block covers, in the viewer's
+ * local clock: 0–1 positions within the day for a week-view hour lane. A
+ * block that does not touch `date` returns undefined.
+ */
+export function sessionSpanForDay(
+  item: Pick<CalendarItem, 'startAt' | 'endAt'>,
+  date: string
+): { from: number; to: number; openEnded: boolean } | undefined {
+  if (!item.startAt) return undefined;
+  const start = new Date(item.startAt).getTime();
+  if (Number.isNaN(start)) return undefined;
+  const dayStart = new Date(`${date}T00:00:00`).getTime();
+  const dayEnd = dayStart + 24 * 60 * 60 * 1000;
+  const end = item.endAt ? new Date(item.endAt).getTime() : Date.now();
+  if (Number.isNaN(end) || end <= dayStart || start >= dayEnd) return undefined;
+  const from = Math.max(0, (start - dayStart) / (dayEnd - dayStart));
+  const to = Math.min(1, (end - dayStart) / (dayEnd - dayStart));
+  return { from, to: Math.max(to, from + 0.01), openEnded: !item.endAt };
+}
+
+/**
+ * Side-by-side columns for blocks that overlap in time: each row gets a
+ * `column` index and the `columns` count of its overlap cluster, so parallel
+ * providers never paint over each other.
+ */
+export function layoutSessionLanes<T extends { from: number; to: number }>(
+  spans: readonly T[]
+): { span: T; column: number; columns: number }[] {
+  const ordered = [...spans].sort((a, b) => a.from - b.from || a.to - b.to);
+  const out: { span: T; column: number; columns: number }[] = [];
+  let cluster: { span: T; column: number }[] = [];
+  let clusterEnd = -1;
+  let columnEnds: number[] = [];
+  const flush = () => {
+    const columns = Math.max(1, columnEnds.length);
+    for (const row of cluster) out.push({ ...row, columns });
+    cluster = [];
+    columnEnds = [];
+    clusterEnd = -1;
+  };
+  for (const span of ordered) {
+    if (cluster.length && span.from >= clusterEnd) flush();
+    let column = columnEnds.findIndex((end) => end <= span.from);
+    if (column === -1) {
+      column = columnEnds.length;
+      columnEnds.push(span.to);
+    } else {
+      columnEnds[column] = span.to;
+    }
+    cluster.push({ span, column });
+    clusterEnd = Math.max(clusterEnd, span.to);
+  }
+  flush();
+  return out;
+}
+
+/** `2h 15m` / `45m` — the block's covered length, open-ended to now. */
+export function sessionDurationLabel(startAt: string, endAt?: string): string {
+  const start = new Date(startAt).getTime();
+  const end = endAt ? new Date(endAt).getTime() : Date.now();
+  if (Number.isNaN(start) || Number.isNaN(end) || end <= start) return '';
+  const minutes = Math.round((end - start) / 60_000);
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  if (hours && rest) return `${hours}h ${rest}m`;
+  if (hours) return `${hours}h`;
+  return `${rest}m`;
 }
 
 export interface CalendarEntry<T extends CalendarItem = CalendarItem> {

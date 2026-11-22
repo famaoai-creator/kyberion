@@ -6,19 +6,30 @@ import { Button } from '@agent/shared-ui';
 import { localeToBcp47 } from '@agent/core/foundation/locale-normalize';
 import { useConciergeI18n } from '../../lib/use-concierge-i18n';
 import { useWorkspaceResource } from '../../lib/use-workspace-resource';
-import { entityHref, listQueryFromSearch, workspaceApiPath } from '../../lib/workspace-view';
+import {
+  entityHref,
+  isWorkspaceKind,
+  listQueryFromSearch,
+  workspaceApiPath,
+} from '../../lib/workspace-view';
 import { LoadErrorState, LoadingState, type Translate } from '../../app/w/workspace-parts';
 import {
   CALENDAR_SOURCE_GROUPS,
   addDays,
   buildCalendarGrid,
   calendarGridRange,
+  entryRoleLabelKey,
   fromCalendarEntries,
   fromExternalEvents,
+  isAgentSession,
+  isExternalEvent,
   localCalendarDate,
   providerReloginCommand,
   shiftAnchor,
   sourceGroup,
+  sessionSpanForDay,
+  layoutSessionLanes,
+  sessionDurationLabel,
   startOfWeek,
   summarizeCalendar,
   type CalendarApiEntry,
@@ -165,7 +176,9 @@ export function WorkCalendar({ t }: { t: Translate }) {
     () =>
       [
         ...fromCalendarEntries(data?.entries ?? [], (link, tenantSlug) =>
-          entityHref(link.kind, link.id, tenantSlug)
+          // Kinds outside GraphEntityKind (e.g. `session`) have no workspace
+          // route — the canonical kind guard decides, not a per-kind check.
+          isWorkspaceKind(link.kind) ? entityHref(link.kind, link.id, tenantSlug) : undefined
         ),
         ...(external.state === 'ready' ? fromExternalEvents(external.events) : []),
       ].filter((item) => shownGroups.has(sourceGroup(item.source))),
@@ -208,20 +221,8 @@ export function WorkCalendar({ t }: { t: Translate }) {
   );
 
   const roleLabel = (entry: CalendarEntry) => {
-    if (entry.role === 'start') return t('ia_shell_work_cal_start');
-    if (entry.role === 'span') return t('ia_shell_work_cal_underway');
-    switch (entry.item.source) {
-      case 'operation_run':
-        return t('ia_shell_work_cal_run');
-      case 'operation_deadline':
-        return t('ia_shell_work_cal_deadline');
-      case 'action_item':
-        return t('ia_shell_work_cal_action');
-      case 'external_event':
-        return t('ia_shell_work_cal_event');
-      default:
-        return t('ia_shell_work_cal_due');
-    }
+    const key = entryRoleLabelKey(entry);
+    return key ? t(key) : (entry.item.provider ?? 'session');
   };
 
   const toggleGroup = (group: CalendarSourceGroup) =>
@@ -234,8 +235,11 @@ export function WorkCalendar({ t }: { t: Translate }) {
 
   const renderDay = (day: CalendarDay) => {
     const limit = view === 'month' ? MONTH_CELL_ENTRIES : Infinity;
-    const shown = day.entries.slice(0, limit);
-    const hidden = day.entries.length - shown.length;
+    // Week view: sessions live in the hour lane, not the flat entry list.
+    const listed =
+      view === 'week' ? day.entries.filter((entry) => !isAgentSession(entry.item)) : day.entries;
+    const shown = listed.slice(0, limit);
+    const hidden = listed.length - shown.length;
     return (
       <li
         key={day.date}
@@ -253,6 +257,68 @@ export function WorkCalendar({ t }: { t: Translate }) {
           <span className="wc-day__weekday">{weekdayName.format(utcDate(day.date))}</span>
           <span className="wc-day__number">{day.day}</span>
         </p>
+        {view === 'week'
+          ? (() => {
+              const sessions = day.entries
+                .filter((entry) => isAgentSession(entry.item))
+                .map((entry) => ({ entry, span: sessionSpanForDay(entry.item, day.date) }))
+                .filter((row) => row.span);
+              if (!sessions.length) return null;
+              const lanes = layoutSessionLanes(sessions.map((row) => ({ row, ...row.span! })));
+              const totalHours = sessions.reduce(
+                (sum, row) => sum + (row.span!.to - row.span!.from) * 24,
+                0
+              );
+              const nowFraction = day.isToday
+                ? Math.min(
+                    1,
+                    Math.max(
+                      0,
+                      (Date.now() - new Date(`${day.date}T00:00:00`).getTime()) / 86_400_000
+                    )
+                  )
+                : null;
+              return (
+                <div
+                  className="wc-lane"
+                  aria-hidden="true"
+                  role="presentation"
+                  data-today={day.isToday ? 'true' : undefined}
+                >
+                  <span className="wc-lane__total">{totalHours.toFixed(1)}h</span>
+                  {lanes.map(({ span, column, columns }) => {
+                    const entry = span.row.entry;
+                    return (
+                      <span
+                        key={`lane:${entry.item.id}`}
+                        className="wc-lane__block"
+                        data-provider={entry.item.provider}
+                        data-kind={entry.item.sessionKind}
+                        data-status={entry.item.sessionStatus}
+                        data-open={span.openEnded ? 'true' : undefined}
+                        style={{
+                          top: `${span.from * 100}%`,
+                          height: `${(span.to - span.from) * 100}%`,
+                          left: `${(column / columns) * 100}%`,
+                          width: `${100 / columns}%`,
+                          right: 'auto',
+                        }}
+                        title={`${entry.item.provider}${entry.item.model ? ` · ${entry.item.model}` : ''} · ${sessionDurationLabel(entry.item.startAt!, entry.item.endAt)} — ${entry.item.title}`}
+                      >
+                        <span className="wc-lane__label">
+                          {entry.item.provider}
+                          {entry.item.model ? ` ${entry.item.model}` : ''}
+                        </span>
+                      </span>
+                    );
+                  })}
+                  {nowFraction !== null ? (
+                    <span className="wc-lane__now" style={{ top: `${nowFraction * 100}%` }} />
+                  ) : null}
+                </div>
+              );
+            })()
+          : null}
         {shown.length ? (
           <ul className="wc-day__entries">
             {shown.map((entry) => (
@@ -268,7 +334,7 @@ export function WorkCalendar({ t }: { t: Translate }) {
                   <a
                     href={entry.item.href}
                     title={entry.item.title}
-                    {...(entry.item.source === 'external_event'
+                    {...(isExternalEvent(entry.item)
                       ? { target: '_blank', rel: 'noreferrer' }
                       : {})}
                   >

@@ -7,6 +7,9 @@ import {
   fromCalendarEntries,
   fromExternalEvents,
   sourceGroup,
+  sessionSpanForDay,
+  layoutSessionLanes,
+  sessionDurationLabel,
   localCalendarDate,
   providerReloginCommand,
   shiftAnchor,
@@ -250,5 +253,91 @@ describe('providerReloginCommand', () => {
     [null, null],
   ])('%s → %s', (provider, command) => {
     expect(providerReloginCommand(provider)).toBe(command);
+  });
+});
+
+describe('sessionSpanForDay', () => {
+  it('clips a block to the day it touches in local time', () => {
+    const span = sessionSpanForDay(
+      {
+        startAt: new Date('2026-11-17T09:00:00').toISOString(),
+        endAt: new Date('2026-11-17T12:00:00').toISOString(),
+      },
+      '2026-11-17'
+    );
+    expect(span).toBeTruthy();
+    expect(span!.from).toBeCloseTo(9 / 24, 2);
+    expect(span!.to).toBeCloseTo(12 / 24, 2);
+  });
+
+  it('returns undefined for a day the block does not touch', () => {
+    expect(
+      sessionSpanForDay(
+        {
+          startAt: new Date('2026-11-17T01:00:00').toISOString(),
+          endAt: new Date('2026-11-17T02:00:00').toISOString(),
+        },
+        '2026-11-19'
+      )
+    ).toBeUndefined();
+  });
+
+  it('marks a block without endAt as open-ended to now', () => {
+    const span = sessionSpanForDay(
+      { startAt: new Date(Date.now() - 60_000).toISOString() },
+      localCalendarDate()
+    );
+    expect(span?.openEnded).toBe(true);
+    expect(span!.to).toBeLessThanOrEqual(1);
+  });
+});
+
+describe('agent_session local-day expansion', () => {
+  const entry = {
+    source: 'agent_session' as const,
+    id: 'as:1',
+    title: 'registry split',
+    date: '2026-11-17',
+    done: true,
+    status: 'open',
+    link: { kind: 'session' as const, id: 'cs-1' },
+    startAt: new Date('2026-11-17T22:00:00').toISOString(),
+    endAt: new Date('2026-11-18T02:00:00').toISOString(),
+    provider: 'claude',
+    model: 'opus',
+  };
+
+  it('emits one item per local day the span touches, with session status', () => {
+    const items = fromCalendarEntries([entry], () => undefined);
+    expect(items.map((i) => i.dueDate)).toEqual(['2026-11-17', '2026-11-18']);
+    expect(items[0].sessionStatus).toBe('open');
+    expect(items[0].provider).toBe('claude');
+  });
+
+  it('open-ended sessions expand through today', () => {
+    const open = { ...entry, id: 'as:2', endAt: undefined, startAt: new Date().toISOString() };
+    const items = fromCalendarEntries([open], () => undefined);
+    expect(items.map((i) => i.dueDate)).toEqual([localCalendarDate()]);
+  });
+});
+
+describe('layoutSessionLanes', () => {
+  it('splits overlapping spans into columns, keeps disjoint spans full width', () => {
+    const lanes = layoutSessionLanes([
+      { from: 0.1, to: 0.5 },
+      { from: 0.3, to: 0.7 },
+      { from: 0.8, to: 0.9 },
+    ]);
+    expect(lanes[0]).toMatchObject({ column: 0, columns: 2 });
+    expect(lanes[1]).toMatchObject({ column: 1, columns: 2 });
+    expect(lanes[2]).toMatchObject({ column: 0, columns: 1 });
+  });
+});
+
+describe('sessionDurationLabel', () => {
+  it('formats hours and minutes', () => {
+    expect(sessionDurationLabel('2026-11-17T00:00:00Z', '2026-11-17T02:15:00Z')).toBe('2h 15m');
+    expect(sessionDurationLabel('2026-11-17T00:00:00Z', '2026-11-17T00:45:00Z')).toBe('45m');
+    expect(sessionDurationLabel('bad', '2026-11-17T00:00:00Z')).toBe('');
   });
 });

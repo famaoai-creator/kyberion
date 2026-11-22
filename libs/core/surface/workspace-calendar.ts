@@ -53,12 +53,17 @@ import {
   type GraphNode,
   type WorkspaceGraph,
 } from './workspace-graph.js';
+import {
+  buildAgentSessionBlocks,
+  defaultAgentSessionSources,
+  type AgentSessionBlock,
+} from './workspace-agent-sessions.js';
 
 /** Longest range one read may cover (a month grid is 42 days). */
 export const WORKSPACE_CALENDAR_MAX_DAYS = 92;
 
 export type WorkspaceCalendarSource =
-  'work_item' | 'operation_run' | 'operation_deadline' | 'action_item';
+  'work_item' | 'operation_run' | 'operation_deadline' | 'action_item' | 'agent_session';
 
 export interface WorkspaceCalendarEntry {
   source: WorkspaceCalendarSource;
@@ -78,11 +83,19 @@ export interface WorkspaceCalendarEntry {
   /** A deadline that was missed (finished late or not at all). */
   missed?: boolean;
   /** Where the entry is managed. */
-  link: { kind: 'work_item' | 'organization' | 'mission'; id: string };
+  link: { kind: 'work_item' | 'organization' | 'mission' | 'session'; id: string };
   status?: string;
   tenantSlug?: string;
   organizationId?: string;
   missionId?: string;
+  /** Agent sessions: the instants the provider was working (hour blocks). */
+  startAt?: string;
+  endAt?: string;
+  /** Agent sessions: provider id / delegation backend, and the served model. */
+  provider?: string;
+  model?: string;
+  /** Agent sessions: `co_session` participant or `delegation` record. */
+  sessionKind?: 'co_session' | 'delegation';
 }
 
 export interface OrganizationScope {
@@ -100,6 +113,14 @@ export interface WorkspaceCalendarSources {
     runs: OrganizationOperationRun[];
   };
   actionItems(missionId: string): ActionItem[];
+  /**
+   * Provider-time session blocks (co-sessions + delegations) overlapping the
+   * range. Read inside `withReads`; failures degrade `agent_sessions` only.
+   */
+  agentSessions?(
+    range: WorkspaceCalendarRange,
+    viewerTenants: readonly string[] | 'all'
+  ): AgentSessionBlock[];
 }
 
 const MAX_CACHED_STORES = 2000;
@@ -141,6 +162,14 @@ export function defaultWorkspaceCalendarSources(): WorkspaceCalendarSources {
       };
     },
     actionItems: (missionId) => actionItemsFresh(missionId),
+    agentSessions: (range, viewerTenants) => {
+      const { blocks, degraded } = buildAgentSessionBlocks(defaultAgentSessionSources(), {
+        range,
+        viewerTenants,
+      });
+      if (degraded.length) throw new Error(`degraded: ${degraded.join(', ')}`);
+      return blocks;
+    },
   };
 }
 
@@ -353,6 +382,31 @@ function actionItemEntries(
   return entries;
 }
 
+/**
+ * One entry per block: `date` is the UTC start day (sort key only — the
+ * client expands the instant-span onto the viewer's local days, so blocks
+ * always land on the days they actually cover in the viewer's clock).
+ * `done` is always true — sessions are history, never due work.
+ */
+function agentSessionEntry(block: AgentSessionBlock): WorkspaceCalendarEntry {
+  return {
+    source: 'agent_session',
+    id: block.id,
+    title: block.title,
+    date: zoneDay(block.startAt, 'UTC') ?? block.startAt.slice(0, 10),
+    done: true,
+    status: block.status,
+    link: { kind: 'session', id: block.sessionId ?? block.delegationId ?? block.id },
+    startAt: block.startAt,
+    ...(block.endAt ? { endAt: block.endAt } : {}),
+    provider: block.provider,
+    ...(block.model ? { model: block.model } : {}),
+    sessionKind: block.kind,
+    ...(block.tenantSlug ? { tenantSlug: block.tenantSlug } : {}),
+    ...(block.missionId ? { missionId: block.missionId } : {}),
+  };
+}
+
 export interface WorkspaceCalendarFilter {
   tenantSlug?: string;
   organizationId?: string;
@@ -383,9 +437,17 @@ export function buildWorkspaceCalendar(
     now?: Date;
     /** The viewer's project ceiling; a project-scoped viewer reads project-bound records only. */
     viewerProjectIds?: SurfaceAuthorizationContext['projectIds'];
+    /** The viewer's admitted tenants; delegation reads never exceed this set. */
+    viewerTenants?: SurfaceAuthorizationContext['tenantSlugs'];
   }
 ): { entries: WorkspaceCalendarEntry[]; degraded: string[] } {
-  const { range, filter = {}, now = new Date(), viewerProjectIds = 'all' } = options;
+  const {
+    range,
+    filter = {},
+    now = new Date(),
+    viewerProjectIds = 'all',
+    viewerTenants = 'all',
+  } = options;
   const projectCeiling =
     viewerProjectIds !== 'all' && viewerProjectIds.length > 0 ? new Set(viewerProjectIds) : null;
   const nodes = graph.nodes.filter((node) => narrowed(node, filter));
@@ -419,10 +481,18 @@ export function buildWorkspaceCalendar(
           degraded.push('action_items');
         }
       }
+      if (sources.agentSessions) {
+        try {
+          const blocks = sources.agentSessions(range, viewerTenants);
+          for (const block of blocks) entries.push(agentSessionEntry(block));
+        } catch {
+          degraded.push('agent_sessions');
+        }
+      }
     });
   } catch {
     // The grant (or its disclosure record) failed: keep the work items, report the rest.
-    degraded.push('operations', 'action_items');
+    degraded.push('operations', 'action_items', 'agent_sessions');
   }
   entries.sort(
     (left, right) =>

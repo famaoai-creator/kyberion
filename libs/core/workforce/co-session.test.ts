@@ -12,6 +12,7 @@ import {
   heartbeatCoSession,
   joinCoSession,
   leaveCoSession,
+  listCoSessionActivity,
   listCoSessionHandoffs,
   listCoSessionLeases,
   listCoSessionPresence,
@@ -381,5 +382,37 @@ describe('co-session', () => {
     expect(hint.peer_lift).toMatch(/Mesh Hub/);
     expect(hint.mission_lift).toMatch(/mission_controller/);
     expect(hint.note).toMatch(/never writes \.git/);
+  });
+});
+
+describe('listCoSessionActivity', () => {
+  it('reads rotated events.<stamp>Z-<pid>.jsonl segments and bounds by window', () => {
+    const session = startCoSession({
+      goal: 'rotation reader',
+      provider: 'claude',
+      session_id: 'cos-activity',
+    });
+    const obsDir = sessionStorePath('observability', session.session_id);
+    // A rotated segment: every event inside predates the name's stamp.
+    const rotated = `${obsDir}/events.20200101T000000Z-4242.jsonl`;
+    withExecutionContext('infrastructure_sentinel', () => {
+      safeWriteFile(
+        rotated,
+        `${JSON.stringify({
+          event_id: 'old-1',
+          session_id: session.session_id,
+          type: 'session_started',
+          at: '2019-12-31T23:59:59.999Z',
+          actor_provider: 'claude',
+        })}\n`
+      );
+    });
+    const all = listCoSessionActivity();
+    const found = all.find((a) => a.record.session_id === session.session_id);
+    expect(found?.events.map((e) => e.event_id)).toContain('old-1');
+    // The segment sealed long before the window is skipped entirely.
+    const bounded = listCoSessionActivity({ from: '2026-01-01' });
+    const foundBounded = bounded.find((a) => a.record.session_id === session.session_id);
+    expect(foundBounded?.events.map((e) => e.event_id)).not.toContain('old-1');
   });
 });

@@ -354,3 +354,115 @@
     display: none;
   }
 }
+
+/* Agent-session hour lane (week view): provider work blocks over a 24h day. */
+.wc-lane {
+  position: relative;
+  height: 120px;
+  margin: var(--kb-ui-space-1, 4px) 0;
+  border: 1px solid var(--kb-ui-border-subtle, rgba(0, 0, 0, 0.08));
+  border-radius: 4px;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent calc(25% - 1px),
+    var(--kb-ui-border-subtle, rgba(0, 0, 0, 0.08)) 25%
+  );
+  overflow: hidden;
+}
+
+.wc-lane__block {
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  min-height: 6px;
+  border-radius: 3px;
+  background: var(--kb-accent-soft, rgba(80, 120, 220, 0.35));
+  border-left: 2px solid var(--kb-accent, rgb(80, 120, 220));
+  overflow: hidden;
+  font-size: 9px;
+  line-height: 1.2;
+}
+
+.wc-lane__block[data-kind='delegation'] {
+  background: var(--kb-warn-soft, rgba(200, 140, 40, 0.3));
+  border-left-color: var(--kb-warn, rgb(200, 140, 40));
+}
+
+.wc-lane__block[data-open='true'] {
+  border-right: 2px dashed currentColor;
+}
+
+.wc-lane__label {
+  display: block;
+  padding: 0 2px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  color: var(--kb-ui-fg-muted, #555);
+}
+
+.wc-entry[data-source='agent_session'] {
+  border-left-color: var(--kb-ui-accent);
+}
+
+/* Per-provider hues for session blocks (photo-style provider color coding). */
+.wc-lane__block[data-provider='claude'] {
+  background: rgba(217, 119, 87, 0.35);
+  border-left-color: rgb(217, 119, 87);
+}
+.wc-lane__block[data-provider='codex'],
+.wc-lane__block[data-provider='opencode'] {
+  background: rgba(90, 170, 110, 0.35);
+  border-left-color: rgb(90, 170, 110);
+}
+.wc-lane__block[data-provider='devin'],
+.wc-lane__block[data-provider='agy'] {
+  background: rgba(120, 140, 230, 0.35);
+  border-left-color: rgb(120, 140, 230);
+}
+.wc-lane__block[data-provider='gemini'] {
+  background: rgba(80, 160, 210, 0.35);
+  border-left-color: rgb(80, 160, 210);
+}
+.wc-lane__block[data-provider='grok'],
+.wc-lane__block[data-provider='copilot'] {
+  background: rgba(150, 110, 190, 0.35);
+  border-left-color: rgb(150, 110, 190);
+}
+.wc-lane__block[data-kind='delegation'] {
+  background: rgba(200, 140, 40, 0.3);
+  border-left-color: rgb(200, 140, 40);
+}
+
+/* Lane chrome: daily total, now-line, terminal-state tints. */
+.wc-lane__total {
+  position: absolute;
+  top: 1px;
+  right: 3px;
+  z-index: 2;
+  font-size: 9px;
+  color: var(--kb-ui-fg-muted, #555);
+  background: var(--kb-ui-bg, #fff);
+  padding: 0 2px;
+  border-radius: 2px;
+}
+
+.wc-lane__now {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0;
+  border-top: 1px solid var(--kb-ui-danger, #c0392b);
+  z-index: 1;
+  pointer-events: none;
+}
+
+.wc-lane__block[data-status='failed'] {
+  background: rgba(190, 60, 50, 0.35);
+  border-left-color: rgb(190, 60, 50);
+}
+
+.wc-lane__block[data-status='cancelled'] {
+  opacity: 0.45;
+}

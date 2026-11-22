@@ -270,7 +270,7 @@ describe('workspace.calendar', () => {
       }
     );
     if (!result.ok) throw new Error('calendar failed');
-    expect(result.data.degraded.sort()).toEqual(['action_items', 'operations']);
+    expect(result.data.degraded.sort()).toEqual(['action_items', 'agent_sessions', 'operations']);
     expect(result.data.entries.some((entry) => entry.source === 'work_item')).toBe(true);
   });
 
