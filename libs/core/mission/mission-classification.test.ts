@@ -113,6 +113,20 @@ describe('mission-classification', () => {
     }
   });
 
+  it('does not claim document authoring or forward development for reverse_spec / legacy_migration', () => {
+    for (const utterance of [
+      '提案書の仕様書を起こして',
+      '要件から仕様書を起こして実装して',
+      '仕様を抽出してドキュメントにまとめて',
+      'DX モダナイゼーションの提案資料を作って',
+      'add a database migration for the orders table',
+    ]) {
+      const ruleId = resolveMissionClassification({ utterance }).matched_rules
+        .mission_class_rule_id;
+      expect(ruleId ?? '', utterance).not.toMatch(/reverse-spec|legacy-migration/u);
+    }
+  });
+
   it('routes incident analysis hints and intents into operations_and_release (MO-01)', () => {
     const byHint = resolveMissionClassification({ missionTypeHint: 'incident_analysis' });
     const byIntent = resolveMissionClassification({ intentId: 'incident-analysis' });

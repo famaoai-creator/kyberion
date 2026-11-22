@@ -120,7 +120,11 @@ export interface LegacyMigrationValidationOptions {
   resolveMissionDir?: (missionId: string) => string;
 }
 
-function validateBrief(missionDir: string, options: LegacyMigrationValidationOptions): Brief {
+function validateBrief(
+  missionDir: string,
+  options: LegacyMigrationValidationOptions,
+  verifySourceAudit: boolean
+): Brief {
   const brief = readJsonEvidence(missionDir, LEGACY_MIGRATION_EVIDENCE_FILES.brief);
   const problems: string[] = [];
   if (!nonEmpty(brief.objective)) problems.push('objective required (why migrate)');
@@ -148,8 +152,10 @@ function validateBrief(missionDir: string, options: LegacyMigrationValidationOpt
     sourceMissionDir = (options.resolveMissionDir ?? resolveReverseSpecMissionDir)(
       brief.source_spec_mission_id
     );
-    // Re-run the source mission's audit gate: a spec that no longer passes cannot seed a rebuild.
-    validateReverseSpecEvidenceAt(sourceMissionDir, 'audit');
+    // The brief gate re-runs the source mission's audit: a spec that no longer passes cannot seed
+    // a rebuild. Later stages rely on that frozen result — a strangler-fig or in-place rebuild
+    // changes the legacy tree by design, so its fingerprint is not re-checked after the brief.
+    if (verifySourceAudit) validateReverseSpecEvidenceAt(sourceMissionDir, 'audit');
     const purpose = readReverseSpecPurpose(sourceMissionDir);
     if (purpose !== 'rebuild')
       problems.push(
@@ -195,6 +201,10 @@ function validateDecisions(
     const specId = String(entry.spec_id ?? '');
     if (!brief.allSpecIds.has(specId)) {
       unknownSpecs.push(specId);
+      continue;
+    }
+    if (dispositioned.has(specId)) {
+      problems.push(`${specId}: more than one disposition — keep exactly one decision per spec`);
       continue;
     }
     dispositioned.add(specId);
@@ -298,8 +308,12 @@ function validateEquivalence(
   const report = readJsonEvidence(missionDir, LEGACY_MIGRATION_EVIDENCE_FILES.equivalence);
   const problems: string[] = [];
   const results = new Map<string, Json>();
-  for (const result of records(report.results))
-    results.set(String(result.scenario_id ?? ''), result);
+  for (const result of records(report.results)) {
+    const id = String(result.scenario_id ?? '');
+    if (results.has(id))
+      problems.push(`${id}: more than one result — record one result per scenario`);
+    results.set(id, result);
+  }
   const missing: string[] = [];
   let deviations = 0;
   for (const scenarioId of scenarios.keys()) {
@@ -308,8 +322,9 @@ function validateEquivalence(
       missing.push(scenarioId);
       continue;
     }
-    if (result.target_result === 'pass') continue;
-    if (result.target_result !== 'deviation') {
+    // A legacy bug pinned as fail_recorded that now passes is a behavior change too.
+    if (result.target_result === 'pass' && scenarios.get(scenarioId) !== 'fail_recorded') continue;
+    if (result.target_result !== 'deviation' && result.target_result !== 'pass') {
       problems.push(`${scenarioId}: target_result must be pass|deviation`);
       continue;
     }
@@ -347,7 +362,7 @@ export function validateLegacyMigrationEvidenceAt(
     validateImplement(missionDir);
     return { stage, path: evidencePath, ok: true, summary: {} };
   }
-  const brief = validateBrief(missionDir, options);
+  const brief = validateBrief(missionDir, options, stage === 'brief');
   if (stage === 'brief')
     return {
       stage,

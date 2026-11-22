@@ -70,16 +70,17 @@
         "utterance_patterns": [
           "リバーススペック",
           "既存コードから仕様",
+          "既存のコードから仕様",
+          "既存のソースコードから仕様",
           "ソースコードから仕様",
-          "コードから仕様書",
-          "仕様書を起こ",
-          "仕様を抽出",
-          "仕様抽出",
+          "レガシーコードから仕様",
+          "レガシーの仕様を抽出",
           "reverse spec",
           "reverse-spec",
-          "spec extraction",
-          "extract specifications from",
-          "extract a spec from"
+          "specs from existing code",
+          "specification from existing code",
+          "specifications from legacy code",
+          "spec from the legacy code"
         ]
       },
       "mission_class": "code_change"
@@ -101,7 +102,7 @@
           "レガシーシステムを移行",
           "レガシーを移行",
           "レガシーの再構築",
-          "モダナイゼーション",
+          "レガシーシステムの再構築",
           "legacy migration",
           "legacy modernization",
           "migrate the legacy",

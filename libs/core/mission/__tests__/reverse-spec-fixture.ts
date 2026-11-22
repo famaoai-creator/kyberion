@@ -53,6 +53,7 @@ export function reverseSpecFixture(purpose: ReverseSpecPurpose = 'rebuild') {
           language: 'python',
           path: 'src/orders.py',
           line: 1,
+          routes: ['a', 'b'],
         },
         {
           id: 'MOD:src/billing.py',
@@ -60,6 +61,7 @@ export function reverseSpecFixture(purpose: ReverseSpecPurpose = 'rebuild') {
           language: 'python',
           path: 'src/billing.py',
           line: 1,
+          routes: ['a', 'b'],
         },
       ],
       edges: [
@@ -76,6 +78,22 @@ export function reverseSpecFixture(purpose: ReverseSpecPurpose = 'rebuild') {
           node_kind: 'module',
           route_a: { definition: 'tree-sitter program roots', count: 2 },
           route_b: { definition: 'file listing by extension', count: 2 },
+          only_in_a: [],
+          only_in_b: [],
+          resolution: '',
+        },
+        {
+          node_kind: 'entrypoint',
+          route_a: { definition: 'marker queries', count: 0 },
+          route_b: { definition: 'line patterns', count: 0 },
+          only_in_a: [],
+          only_in_b: [],
+          resolution: '',
+        },
+        {
+          node_kind: 'boundary',
+          route_a: { definition: 'marker queries', count: 0 },
+          route_b: { definition: 'line patterns', count: 0 },
           only_in_a: [],
           only_in_b: [],
           resolution: '',

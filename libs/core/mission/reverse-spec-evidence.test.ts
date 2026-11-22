@@ -33,11 +33,62 @@ describe('reverse_spec evidence gates', () => {
   });
 
   it('rejects a code graph whose reconciliation differs without a resolution', () => {
-    const { mission, docs, flush } = fixture();
-    (docs.code_graph.reconciliation as Record<string, unknown>[])[0].only_in_b = ['src/legacy.ts'];
+    const { mission, source, docs, flush } = fixture();
+    write(path.join(source, 'src/legacy.py'), 'def broken(:\n');
+    docs.code_graph.source_fingerprint = computeSourceFingerprint(source);
+    (docs.code_graph.nodes as Record<string, unknown>[]).push({
+      id: 'MOD:src/legacy.py',
+      kind: 'module',
+      path: 'src/legacy.py',
+      line: 1,
+      routes: ['b'],
+    });
+    const row = (docs.code_graph.reconciliation as Record<string, unknown>[])[0];
+    row.route_b = { definition: 'file listing by extension', count: 3 };
+    row.only_in_b = ['src/legacy.py'];
     flush();
     expect(() => validateReverseSpecEvidenceAt(mission, 'code_graph')).toThrow(
       /without a resolution/u
+    );
+    row.resolution = 'syntax error in legacy.py; kept in the denominator';
+    flush();
+    expect(validateReverseSpecEvidenceAt(mission, 'code_graph').ok).toBe(true);
+  });
+
+  it('recomputes the reconciliation from the nodes so deleting nodes cannot shrink the denominator', () => {
+    const { mission, docs, flush } = fixture();
+    (docs.code_graph.nodes as Record<string, unknown>[]).pop();
+    (docs.code_graph.edges as unknown[]).length = 0;
+    flush();
+    expect(() => validateReverseSpecEvidenceAt(mission, 'code_graph')).toThrow(
+      /route_a\.count 2 does not match the 1 module node/u
+    );
+    const rows = docs.code_graph.reconciliation as Record<string, unknown>[];
+    docs.code_graph.reconciliation = rows.slice(0, 1);
+    flush();
+    expect(() => validateReverseSpecEvidenceAt(mission, 'code_graph')).toThrow(
+      /exactly one entrypoint row/u
+    );
+  });
+
+  it('requires unanalyzed source extensions to be declared in the scope', () => {
+    const { mission, docs, flush } = fixture();
+    docs.code_graph.unanalyzed_extensions = { '.kt': 4 };
+    flush();
+    expect(() => validateReverseSpecEvidenceAt(mission, 'code_graph')).toThrow(
+      /uncovered_extensions: \.kt/u
+    );
+    docs.scope.uncovered_extensions = [{ extension: '.kt', reason: 'Kotlin build scripts only' }];
+    flush();
+    expect(validateReverseSpecEvidenceAt(mission, 'code_graph').ok).toBe(true);
+  });
+
+  it('keeps spec files inside the mission directory', () => {
+    const { mission, docs, flush } = fixture();
+    (docs.specify.specs as Record<string, unknown>[])[0].path = '../legacy/src/orders.py';
+    flush();
+    expect(() => validateReverseSpecEvidenceAt(mission, 'specify')).toThrow(
+      /not found in the mission/u
     );
   });
 
@@ -50,7 +101,11 @@ describe('reverse_spec evidence gates', () => {
       kind: 'module',
       path: 'src/__init__.py',
       line: 1,
+      routes: ['a', 'b'],
     });
+    const moduleRow = (docs.code_graph.reconciliation as Record<string, unknown>[])[0];
+    moduleRow.route_a = { definition: 'tree-sitter program roots', count: 3 };
+    moduleRow.route_b = { definition: 'file listing by extension', count: 3 };
     flush();
     expect(validateReverseSpecEvidenceAt(mission, 'code_graph').ok).toBe(true);
     const spec = (docs.specify.specs as Record<string, unknown>[])[0];
@@ -61,7 +116,9 @@ describe('reverse_spec evidence gates', () => {
         citations: [{ path: 'src/__init__.py', line: 1 }],
       },
     ];
-    (docs.code_graph.nodes as Record<string, unknown>[]).pop();
+    ((docs.analysis.items as Record<string, unknown>[])[0].node_ids as string[]).push(
+      'MOD:src/__init__.py'
+    );
     flush();
     expect(() => validateReverseSpecEvidenceAt(mission, 'specify')).toThrow(
       /beyond the end of the file \(0 lines\)/u

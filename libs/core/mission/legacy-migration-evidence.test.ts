@@ -93,6 +93,21 @@ describe('legacy_migration evidence gates', () => {
     ).toThrow(/does not pass its audit/u);
   });
 
+  it('freezes the source audit at the brief so an in-place rebuild of the legacy tree can proceed', () => {
+    const { mission, options, spec } = migrationFixture();
+    expect(validateLegacyMigrationEvidenceAt(mission, 'brief', options).ok).toBe(true);
+    write(
+      path.join(spec.source, 'src/billing.py'),
+      'def charge(amount):\n    return round(amount)\n'
+    );
+    expect(() => validateLegacyMigrationEvidenceAt(mission, 'brief', options)).toThrow(
+      /does not pass its audit/u
+    );
+    for (const stage of ['decisions', 'pin', 'equivalence'] as const) {
+      expect(validateLegacyMigrationEvidenceAt(mission, stage, options).ok).toBe(true);
+    }
+  });
+
   it('blocks open human decisions, undispositioned essence specs and a strategy without alternatives', () => {
     const { mission, docs, flush, options } = migrationFixture();
     docs.decisions.dispositions = [];
@@ -131,6 +146,20 @@ describe('legacy_migration evidence gates', () => {
     docs.equivalence.results = [
       { scenario_id: 'PAR-001', target_result: 'deviation', deviation: { reason: 'tax rounding' } },
     ];
+    flush();
+    expect(() => validateLegacyMigrationEvidenceAt(mission, 'equivalence', options)).toThrow(
+      /approved_by/u
+    );
+    docs.equivalence.results = [
+      { scenario_id: 'PAR-001', target_result: 'pass' },
+      { scenario_id: 'PAR-001', target_result: 'pass' },
+    ];
+    flush();
+    expect(() => validateLegacyMigrationEvidenceAt(mission, 'equivalence', options)).toThrow(
+      /more than one result/u
+    );
+    (docs.pin.scenarios as Record<string, unknown>[])[0].legacy_result = 'fail_recorded';
+    docs.equivalence.results = [{ scenario_id: 'PAR-001', target_result: 'pass' }];
     flush();
     expect(() => validateLegacyMigrationEvidenceAt(mission, 'equivalence', options)).toThrow(
       /approved_by/u

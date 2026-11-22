@@ -13,7 +13,9 @@ import { isRecord } from '../foundation/primitives.js';
 import { findMissionPath } from '../path-resolver.js';
 import { safeExistsSync, safeReadFile, safeStat } from '../secure-io.js';
 import {
+  DEFAULT_SOURCE_TREE_MAX_FILES,
   computeSourceFingerprint,
+  listSourceTreeFiles,
   resolveWorkspaceSourceRoot,
   type ResolvedSourceRoot,
 } from '../analysis/source-fingerprint.js';
@@ -101,6 +103,33 @@ function readJsonEvidence(missionDir: string, relative: string): Json {
   return parseSafeJsonObjectInput(String(safeReadFile(abs, { encoding: 'utf8' })), relative);
 }
 
+/** True when `relative` names a regular file inside the mission directory (no traversal out). */
+function missionFileExists(missionDir: string, relative: string): boolean {
+  const abs = path.resolve(missionDir, relative);
+  return (
+    abs.startsWith(path.resolve(missionDir) + path.sep) &&
+    safeExistsSync(abs) &&
+    safeStat(abs).isFile()
+  );
+}
+
+function graphFileCount(missionDir: string): number | undefined {
+  const abs = path.join(missionDir, REVERSE_SPEC_EVIDENCE_FILES.code_graph);
+  if (!safeExistsSync(abs)) return undefined;
+  try {
+    const graph = parseSafeJsonObjectInput(
+      String(safeReadFile(abs, { encoding: 'utf8' })),
+      'code-graph'
+    );
+    const count = isRecord(graph.source_fingerprint)
+      ? graph.source_fingerprint.file_count
+      : undefined;
+    return typeof count === 'number' && Number.isFinite(count) ? count : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function stringList(value: unknown): string[] {
   return Array.isArray(value)
     ? value.filter((entry): entry is string => typeof entry === 'string')
@@ -130,18 +159,24 @@ function duplicates(ids: string[]): string[] {
 /** Reads source files once per validation; line counts are cached per path. */
 class SourceView {
   private readonly lineCounts = new Map<string, number | null>();
-  constructor(readonly root: ResolvedSourceRoot) {}
+  private listed: Set<string> | undefined;
+  constructor(
+    readonly root: ResolvedSourceRoot,
+    private readonly maxFiles = DEFAULT_SOURCE_TREE_MAX_FILES
+  ) {}
+
+  /** Files the fingerprint covers; citations outside it (symlinks, skipped secrets) do not resolve. */
+  private files(): Set<string> {
+    this.listed ??= new Set(listSourceTreeFiles(this.root.absolute, { maxFiles: this.maxFiles }));
+    return this.listed;
+  }
 
   /** Line count of a source-relative file, or null if it is not a readable file inside the root. */
   lineCount(relative: string): number | null {
     if (this.lineCounts.has(relative)) return this.lineCounts.get(relative) ?? null;
     let count: number | null = null;
     const normalized = path.posix.normalize(relative.replaceAll('\\', '/'));
-    if (
-      !normalized.startsWith('../') &&
-      normalized !== '..' &&
-      !path.posix.isAbsolute(normalized)
-    ) {
+    if (this.files().has(normalized)) {
       const abs = path.join(this.root.absolute, normalized);
       try {
         if (safeExistsSync(abs) && safeStat(abs).isFile()) {
@@ -176,7 +211,10 @@ class SourceView {
   }
 }
 
-function loadScope(missionDir: string): {
+function loadScope(
+  missionDir: string,
+  maxFiles?: number
+): {
   scope: Json;
   purpose: ReverseSpecPurpose;
   source: SourceView;
@@ -189,7 +227,7 @@ function loadScope(missionDir: string): {
   return {
     scope,
     purpose: purpose as ReverseSpecPurpose,
-    source: new SourceView(resolveWorkspaceSourceRoot(scope.source_root)),
+    source: new SourceView(resolveWorkspaceSourceRoot(scope.source_root), maxFiles),
   };
 }
 
@@ -209,6 +247,12 @@ function validateScope(missionDir: string): Record<string, number | string> {
     if (!nonEmpty(exclusion.path) || !nonEmpty(exclusion.reason))
       problems.push('each exclusion needs path and reason');
   }
+  if (scope.uncovered_extensions !== undefined && !Array.isArray(scope.uncovered_extensions))
+    problems.push('uncovered_extensions must be an array of {extension, reason}');
+  for (const entry of records(scope.uncovered_extensions)) {
+    if (!nonEmpty(entry.extension) || !nonEmpty(entry.reason))
+      problems.push('each uncovered_extensions entry needs extension and reason');
+  }
   if (!Array.isArray(scope.references)) problems.push('references must be an array (may be empty)');
   for (const reference of records(scope.references)) {
     if (reference.status !== 'unverified_claim')
@@ -227,10 +271,21 @@ interface CodeGraph {
   fileCount: number;
 }
 
+/** Element key a reconciliation row lists for a node (modules by file; markers by subtype@path:line). */
+function reconciliationKey(node: Json): string {
+  return node.kind === 'module'
+    ? String(node.path ?? '')
+    : `${String(node.subtype ?? '')}@${String(node.path ?? '')}:${String(node.line ?? '')}`;
+}
+
+function sameSet(listed: string[], expected: Set<string>): boolean {
+  return listed.length === expected.size && listed.every((entry) => expected.has(entry));
+}
+
 function validateCodeGraphDocument(
   missionDir: string,
   source: SourceView,
-  declaredExclusions: string[]
+  declared: { exclusions: string[]; uncoveredExtensions: string[] }
 ): CodeGraph {
   const graph = readJsonEvidence(missionDir, REVERSE_SPEC_EVIDENCE_FILES.code_graph);
   const problems: string[] = [];
@@ -247,11 +302,19 @@ function validateCodeGraphDocument(
     );
   // Paths left out of the graph shrink the denominator: each must be a scope exclusion with a reason.
   const undeclared = stringList(graph.excluded_paths).filter(
-    (excluded) => !declaredExclusions.includes(path.posix.normalize(excluded).replace(/\/$/u, ''))
+    (excluded) => !declared.exclusions.includes(path.posix.normalize(excluded).replace(/\/$/u, ''))
   );
   if (undeclared.length)
     problems.push(
       `excluded_paths not declared in reverse-spec-scope.json exclusions: ${capList(undeclared)}`
+    );
+  // Source files no rule analyzed are a coverage gap: each extension must be declared with a reason.
+  const uncovered = Object.keys(
+    isRecord(graph.unanalyzed_extensions) ? graph.unanalyzed_extensions : {}
+  ).filter((ext) => !declared.uncoveredExtensions.includes(ext.toLowerCase()));
+  if (uncovered.length)
+    problems.push(
+      `unanalyzed_extensions not declared in reverse-spec-scope.json uncovered_extensions: ${capList(uncovered)}`
     );
   const nodes = records(graph.nodes);
   if (nodes.length === 0)
@@ -281,28 +344,60 @@ function validateCodeGraphDocument(
     .filter((edge) => !nodeIds.has(String(edge.from)) || !nodeIds.has(String(edge.to)))
     .map((edge) => `${String(edge.from)}->${String(edge.to)}`);
   if (dangling.length) problems.push(`edges referencing unknown nodes: ${capList(dangling)}`);
+  // The reconciliation must describe the nodes actually listed: counts and element differences are
+  // recomputed from each node's routes, so deleting nodes or editing counts cannot pass.
   const reconciliation = records(graph.reconciliation);
-  if (reconciliation.length === 0)
-    problems.push('reconciliation must have one row per node kind (two independent routes)');
   for (const row of reconciliation) {
-    const label = String(row.node_kind ?? '?');
+    if (!(REVERSE_SPEC_NODE_KINDS as readonly unknown[]).includes(row.node_kind))
+      problems.push(`reconciliation row for unknown node kind ${String(row.node_kind)}`);
+  }
+  const unrouted: string[] = [];
+  for (const kind of REVERSE_SPEC_NODE_KINDS) {
+    const rows = reconciliation.filter((row) => row.node_kind === kind);
+    if (rows.length !== 1) {
+      problems.push(`reconciliation needs exactly one ${kind} row (found ${rows.length})`);
+      continue;
+    }
+    const row = rows[0];
     const routeA = isRecord(row.route_a) ? row.route_a : {};
     const routeB = isRecord(row.route_b) ? row.route_b : {};
-    for (const [name, route] of [
-      ['route_a', routeA],
-      ['route_b', routeB],
-    ] as const) {
-      if (!nonEmpty(route.definition) || !Number.isInteger(route.count))
-        problems.push(`reconciliation ${label}: ${name} needs a definition and an integer count`);
+    const keysA = new Set<string>();
+    const keysB = new Set<string>();
+    for (const node of nodes.filter((entry) => entry.kind === kind)) {
+      const routes = stringList(node.routes);
+      if (!routes.includes('a') && !routes.includes('b')) unrouted.push(String(node.id));
+      if (routes.includes('a')) keysA.add(reconciliationKey(node));
+      if (routes.includes('b')) keysB.add(reconciliationKey(node));
     }
-    const diff = stringList(row.only_in_a).length + stringList(row.only_in_b).length;
-    if (!Array.isArray(row.only_in_a) || !Array.isArray(row.only_in_b))
+    for (const [name, route, keys] of [
+      ['route_a', routeA, keysA],
+      ['route_b', routeB, keysB],
+    ] as const) {
+      if (!nonEmpty(route.definition))
+        problems.push(`reconciliation ${kind}: ${name} needs a definition`);
+      if (route.count !== keys.size)
+        problems.push(
+          `reconciliation ${kind}: ${name}.count ${String(route.count)} does not match the ${keys.size} ${kind} node(s) found by that route`
+        );
+    }
+    const onlyA = new Set([...keysA].filter((key) => !keysB.has(key)));
+    const onlyB = new Set([...keysB].filter((key) => !keysA.has(key)));
+    if (!Array.isArray(row.only_in_a) || !Array.isArray(row.only_in_b)) {
       problems.push(
-        `reconciliation ${label}: only_in_a / only_in_b element lists required (equal counts do not prove equal sets)`
+        `reconciliation ${kind}: only_in_a / only_in_b element lists required (equal counts do not prove equal sets)`
       );
-    else if (diff > 0 && !nonEmpty(row.resolution))
-      problems.push(`reconciliation ${label}: ${diff} element difference(s) without a resolution`);
+      continue;
+    }
+    if (!sameSet(stringList(row.only_in_a), onlyA) || !sameSet(stringList(row.only_in_b), onlyB))
+      problems.push(
+        `reconciliation ${kind}: only_in_a/only_in_b do not match the nodes' routes (expected ${onlyA.size}/${onlyB.size} element(s))`
+      );
+    if (onlyA.size + onlyB.size > 0 && !nonEmpty(row.resolution))
+      problems.push(
+        `reconciliation ${kind}: ${onlyA.size + onlyB.size} element difference(s) without a resolution`
+      );
   }
+  if (unrouted.length) problems.push(`nodes without routes (a|b): ${capList(unrouted)}`);
   if (problems.length)
     throw new ReverseSpecEvidenceError(
       'code_graph',
@@ -332,6 +427,12 @@ function validateAnalysisDocument(missionDir: string, graph: CodeGraph): { itemI
   const covered = new Set<string>();
   const dangling: string[] = [];
   for (const item of items) {
+    if (
+      typeof item.id === 'string' &&
+      ANALYSIS_ID_PATTERN.test(item.id) &&
+      item.id.split('-')[1] !== item.category
+    )
+      problems.push(`${item.id}: id prefix does not match category ${String(item.category)}`);
     if (!(REVERSE_SPEC_ANALYSIS_CATEGORIES as readonly unknown[]).includes(item.category))
       problems.push(
         `${String(item.id)}: category must be one of ${REVERSE_SPEC_ANALYSIS_CATEGORIES.join('|')}`
@@ -359,11 +460,7 @@ function validateAnalysisDocument(missionDir: string, graph: CodeGraph): { itemI
       );
       continue;
     }
-    const decisionPath = path.join(missionDir, decision);
-    if (
-      !path.resolve(decisionPath).startsWith(path.resolve(missionDir) + path.sep) ||
-      !safeExistsSync(decisionPath)
-    ) {
+    if (!missionFileExists(missionDir, decision)) {
       problems.push(
         `disposition ${nodeId}: decision_ref ${decision} does not exist in the mission`
       );
@@ -421,7 +518,7 @@ function validateSpecDocument(
     else if (spec.layer !== 'implementation')
       problems.push(`${specId}: layer must be implementation|essence`);
     const specPath = spec.path;
-    if (!nonEmpty(specPath) || !safeExistsSync(path.join(missionDir, specPath)))
+    if (!nonEmpty(specPath) || !missionFileExists(missionDir, specPath))
       problems.push(`${specId}: spec file ${String(specPath)} not found in the mission`);
     for (const ref of stringList(spec.analysis_refs)) {
       if (analysisIds.has(ref)) referenced.add(ref);
@@ -546,7 +643,9 @@ function validateAuditDocument(
     problems.push(
       `${open.length} claim(s) still unsupported/fabricated — correct or downgrade them, then re-verify: ${capList(open.map(([id]) => id))}`
     );
-  const now = computeSourceFingerprint(source.root.absolute);
+  const now = computeSourceFingerprint(source.root.absolute, {
+    maxFiles: Math.max(DEFAULT_SOURCE_TREE_MAX_FILES, graph.fileCount),
+  });
   if (now.value !== graph.fingerprint)
     problems.push(
       `source changed since the code graph was frozen (fingerprint ${graph.fingerprint.slice(0, 12)}… → ${now.value.slice(0, 12)}…, files ${graph.fileCount} → ${now.file_count}) — the analysis target must stay read-only`
@@ -572,11 +671,21 @@ export function validateReverseSpecEvidenceAt(
   if (stage === 'scope')
     return { stage, path: evidencePath, ok: true, summary: validateScope(missionDir) };
   // Later stages build on the earlier ledgers: each gate re-checks what it depends on.
-  const { scope, purpose, source } = loadScope(missionDir);
-  const declaredExclusions = records(scope.exclusions)
-    .filter((exclusion) => nonEmpty(exclusion.reason))
-    .map((exclusion) => path.posix.normalize(String(exclusion.path ?? '')).replace(/\/$/u, ''));
-  const graph = validateCodeGraphDocument(missionDir, source, declaredExclusions);
+  // A graph extracted with a raised max_files must be re-listed with the same ceiling.
+  const recordedFiles = graphFileCount(missionDir);
+  const { scope, purpose, source } = loadScope(
+    missionDir,
+    Math.max(DEFAULT_SOURCE_TREE_MAX_FILES, recordedFiles ?? 0)
+  );
+  const declared = {
+    exclusions: records(scope.exclusions)
+      .filter((exclusion) => nonEmpty(exclusion.reason))
+      .map((exclusion) => path.posix.normalize(String(exclusion.path ?? '')).replace(/\/$/u, '')),
+    uncoveredExtensions: records(scope.uncovered_extensions)
+      .filter((entry) => nonEmpty(entry.reason))
+      .map((entry) => String(entry.extension ?? '').toLowerCase()),
+  };
+  const graph = validateCodeGraphDocument(missionDir, source, declared);
   if (stage === 'code_graph')
     return {
       stage,

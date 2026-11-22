@@ -42,7 +42,9 @@ checker exits 0, never when an agent says so.
 | `audit`      | `evidence/verification-ledger.json`             | `audit` (independent, source intact)           |
 
 1. **Ingest.** Copy or clone the target into `active/shared/staging/<job>/` and treat it as
-   read-only. Record `source_root`, `baseline_commit` (or `baseline_note` when there is no VCS),
+   read-only. The source root may not contain the workspace `active/`, `knowledge/` or `vault/`
+   trees (their writes would break the fingerprint and they hold higher-tier data). Record
+   `source_root`, `baseline_commit` (or `baseline_note` when there is no VCS),
    `purpose`, `in_scope`, `exclusions` and every existing document in `references` with
    `status: unverified_claim`. Documents are claims with a known source until code confirms
    them; when a document contradicts the code, the code wins and the conflict is recorded.
@@ -52,7 +54,10 @@ checker exits 0, never when an agent says so.
    difference** (`only_in_a`, `only_in_b`): equal counts do not prove equal sets. Every
    difference needs a `resolution`. Paths left out of the graph (`excluded_paths`, for example build
    output or vendored code) must each be a scope exclusion with a reason; the fingerprint still
-   covers the whole tree. The file also records `source_fingerprint`. Freezing the
+   covers the whole tree. Source files in a language no rule analyzes appear in
+   `unanalyzed_extensions`; declare each extension in the scope's `uncovered_extensions` with a
+   reason, or the gate fails. The gate recomputes the counts and differences from the nodes' routes,
+   so the reconciliation cannot be edited apart from the graph. The file also records `source_fingerprint`. Freezing the
    graph is a held decision; changing the denominator afterwards needs a new decision.
 3. **Analysis.** Read every node down to its implementation from the ARCH, REQ, API, DATA,
    BEHAVIOR and NFR viewpoints, and give each analysis item an id `ANA-<CAT>-<n>`. A node leaves
