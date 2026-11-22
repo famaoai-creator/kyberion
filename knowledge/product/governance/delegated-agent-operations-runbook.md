@@ -130,6 +130,14 @@ the KL-03 knowledge gate, then a **human external-publication approval**.
   body file in `active/shared/tmp/` resolves to `protected_or_unknown` and the
   grant is never consulted — the destination grant must never declassify
   source content.
+- Person-scope delegation requires an **installed personal agent runtime**:
+  an onboarding `agent-identity.json` plus a registered, active NHI whose
+  `accountable_human_id` is the operator (`inspectInstalledPersonalRuntime`).
+  Without it the resolver never attaches a charter and every publication
+  stays human-gated.
+- A charter `allow` does not skip the durable execution reservation — the
+  exactly-once layer runs after the gate, so a delegated operation still
+  cannot execute twice or run without reservable storage.
 
 ## 5a. NHI session admission (operator session → org NHI)
 
