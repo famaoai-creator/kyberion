@@ -3487,6 +3487,16 @@
       "group": "dev"
     },
     {
+      "id": "script.prepare.worktree",
+      "script": "prepare:worktree",
+      "command": "prepare worktree",
+      "noun": "prepare",
+      "verb": "worktree",
+      "audience": "dev",
+      "description": "cli_cmd_script_prepare_worktree",
+      "group": "dev"
+    },
+    {
       "id": "script.presence.stimuli",
       "module": "scripts/presence/presence-controller.ts",
       "command": "presence stimuli",
