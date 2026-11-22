@@ -59,6 +59,7 @@ import {
 } from '../provider/seam-provider-selection.js';
 import { savedSeamDefaultFor } from '../provider/seam-provider-selection.js';
 import { runExternalOperation } from '../governance/external-operation.js';
+import { isDelegableExternalOperation } from '../governance/external-operation-target.js';
 import {
   primaryLanguageSubtag,
   supportsSpeechLanguage,
@@ -219,7 +220,7 @@ export function registerSpeechToTextBridge(
           operationId: 'voice:transcribe_provider',
           effect: { provider: name, params: snapshot, audio_hash: audioHash },
           requiresApproval: true,
-          delegable: true,
+          delegable: isDelegableExternalOperation('voice:transcribe_provider'),
         },
         async () => {
           // Revalidate immediately before the provider call. Providers reopen the

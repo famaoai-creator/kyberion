@@ -1214,6 +1214,97 @@ describe('HOTL delegation surface (all external ops)', () => {
     ).toBe(false);
   });
 
+  it('email:send grants pin backend + exact recipient (+optional sender)', () => {
+    const effect = {
+      backend: 'smtp',
+      account: { host: 'mail.example.com', port: 587, user: 'ops' },
+      params: { from: 'ops@example.com', to: 'alice@example.com', subject: 'hi', body: 'x' },
+    };
+    expect(buildExternalOperationTarget('email:send', effect)).toEqual({
+      operation_id: 'email:send',
+      backend: 'smtp',
+      to: 'alice@example.com',
+      from: 'ops@example.com',
+    });
+    // backend and to are required — no bare or backend-only delegation.
+    expect(parseExternalOperationGrant({ operation_id: 'email:send' })).toBeUndefined();
+    expect(
+      parseExternalOperationGrant({ operation_id: 'email:send', backend: 'smtp' })
+    ).toBeUndefined();
+    // Exact recipient only: wildcards never parse.
+    expect(
+      parseExternalOperationGrant({
+        operation_id: 'email:send',
+        backend: 'smtp',
+        to: '*@example.com',
+      })
+    ).toBeUndefined();
+    const grant = parseExternalOperationGrant({
+      operation_id: 'email:send',
+      backend: 'smtp',
+      to: 'alice@example.com',
+    })!;
+    const target = buildExternalOperationTarget('email:send', effect) as never;
+    expect(externalOperationGrantMatches(grant, target)).toBe(true);
+    // A different recipient or backend is outside the grant.
+    expect(
+      externalOperationGrantMatches(
+        grant,
+        buildExternalOperationTarget('email:send', {
+          ...effect,
+          params: { ...effect.params, to: 'bob@example.com' },
+        }) as never
+      )
+    ).toBe(false);
+    // A grant that also pins 'from' narrows coverage to that sender.
+    const pinned = parseExternalOperationGrant({
+      operation_id: 'email:send',
+      backend: 'smtp',
+      to: 'alice@example.com',
+      from: 'other@example.com',
+    })!;
+    expect(externalOperationGrantMatches(pinned, target)).toBe(false);
+    // Missing backend/params in the effect can never build a target.
+    expect(buildExternalOperationTarget('email:send', { params: { to: 'a@b.c' } })).toBeUndefined();
+  });
+
+  it('voice:transcribe_provider grants pin the provider', () => {
+    const effect = {
+      provider: 'whisper-cloud',
+      params: { audioPath: '/tmp/a.wav' },
+      audio_hash: 'h',
+    };
+    expect(buildExternalOperationTarget('voice:transcribe_provider', effect)).toEqual({
+      operation_id: 'voice:transcribe_provider',
+      provider: 'whisper-cloud',
+    });
+    expect(
+      parseExternalOperationGrant({ operation_id: 'voice:transcribe_provider' })
+    ).toBeUndefined();
+    const grant = parseExternalOperationGrant({
+      operation_id: 'voice:transcribe_provider',
+      provider: 'whisper-cloud',
+    })!;
+    expect(
+      externalOperationGrantMatches(
+        grant,
+        buildExternalOperationTarget('voice:transcribe_provider', effect) as never
+      )
+    ).toBe(true);
+    expect(
+      externalOperationGrantMatches(
+        grant,
+        buildExternalOperationTarget('voice:transcribe_provider', {
+          ...effect,
+          provider: 'other-provider',
+        }) as never
+      )
+    ).toBe(false);
+    expect(
+      buildExternalOperationTarget('voice:transcribe_provider', { params: {} })
+    ).toBeUndefined();
+  });
+
   it('slack post_message grants pin the channel', () => {
     const effect = { params: { channel: '#alerts', text: 'hi' } };
     expect(buildExternalOperationTarget('service:slack:preset:post_message', effect)).toEqual({

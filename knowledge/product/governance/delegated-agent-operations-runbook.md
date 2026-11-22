@@ -124,12 +124,30 @@ the KL-03 knowledge gate, then a **human external-publication approval**.
   delegation is consumed only through an **admitted session** (below); a bare
   `agent:devin`/`pipeline:<hash>` actor or a `KYBERION_NHI_ID` env claim still
   hits the human gate by design.
+- The delegable registry (`EXTERNAL_OPERATION_DELEGATION` +
+  `delegable` specs in `authorization-registry.ts`, kept in sync by test)
+  currently covers: `vcs:*`, `browser:goto`/`open_tab`/`approval_queue_inspect`,
+  `tenant:attest_provider`, `service:slack:preset:post_message`, `email:send`
+  (grant pins `backend` + exact `to`, optional `from`), `meeting:*`,
+  `voice:playback`/`speak`/`transcribe_provider` (grant pins `provider`),
+  `network:fetch`/`exposure_check`/`shell`/`a2a_send`, `calendar:*`,
+  `deployment:deploy_release`, `media:generation:*`. Ops whose call sites mark
+  `delegable: false` — `mcp:connect`/`call_tool`, `voice:render_provider`,
+  `voice:camera_output`, non-send `email:*` — stay human-gated by design.
 - `vcs:pr_create` additionally requires the PR body to carry **public
   provenance**: an inline `--body` or a `--body-file` under `knowledge/public/`
   or a `public` storage floor (e.g. `active/shared/artifacts/public/…`). A
   body file in `active/shared/tmp/` resolves to `protected_or_unknown` and the
   grant is never consulted — the destination grant must never declassify
   source content.
+- Person-scope delegation requires an **installed personal agent runtime**:
+  an onboarding `agent-identity.json` plus a registered, active NHI whose
+  `accountable_human_id` is the operator (`inspectInstalledPersonalRuntime`).
+  Without it the resolver never attaches a charter and every publication
+  stays human-gated.
+- A charter `allow` does not skip the durable execution reservation — the
+  exactly-once layer runs after the gate, so a delegated operation still
+  cannot execute twice or run without reservable storage.
 
 ## 5a. NHI session admission (operator session → org NHI)
 
