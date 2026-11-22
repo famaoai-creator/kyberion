@@ -9,7 +9,10 @@ import type { ApprovalGateCharterInput } from './approval-gate-charter.js';
 import { computeApprovalPayloadHash } from './approval-presentation.js';
 import { auditChain } from './audit-chain.js';
 import { createLogger } from '../logger.js';
-import { operationAuthorization } from '../foundation/authorization-registry.js';
+import {
+  operationAuthorization,
+  requiresApprovalAdmission,
+} from '../foundation/authorization-registry.js';
 import './authorization-overlay.js';
 import {
   recordCharterExecutionOutcome,
@@ -528,12 +531,7 @@ export function admitExternalOperation(input: ExternalOperation): ApprovalGateRe
   const declaredAuth = operationAuthorization(input.operationId);
   if (
     !input.requiresApproval &&
-    (input.approvalPolicy ||
-      declaredAuth.authority.kind === 'approval' ||
-      (declaredAuth.declared &&
-        declaredAuth.source === 'code' &&
-        declaredAuth.effectClass === 'external_mutation' &&
-        !declaredAuth.approvalExemptCleanup))
+    (input.approvalPolicy || requiresApprovalAdmission(declaredAuth))
   ) {
     stopExternalGovernance(
       '[EXTERNAL_APPROVAL_CLASSIFICATION_MISMATCH] The operation requires an approval-capable admission'

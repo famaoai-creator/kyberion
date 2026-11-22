@@ -1988,10 +1988,6 @@
       "types": "./dist/governance/personal-credential-grant.d.ts",
       "default": "./dist/governance/personal-credential-grant.js"
     },
-    "./governance/policy-category": {
-      "types": "./dist/governance/policy-category.d.ts",
-      "default": "./dist/governance/policy-category.js"
-    },
     "./governance/policy-engine": {
       "types": "./dist/governance/policy-engine.d.ts",
       "default": "./dist/governance/policy-engine.js"
@@ -3739,10 +3735,6 @@
     "./mission/mission-types": {
       "types": "./dist/mission/mission-types.d.ts",
       "default": "./dist/mission/mission-types.js"
-    },
-    "./mission/mission-verdict-repair": {
-      "types": "./dist/mission/mission-verdict-repair.d.ts",
-      "default": "./dist/mission/mission-verdict-repair.js"
     },
     "./mission/mission-vision-ref": {
       "types": "./dist/mission/mission-vision-ref.d.ts",

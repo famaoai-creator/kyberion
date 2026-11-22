@@ -173,7 +173,12 @@ async function handlePost(req: NextRequest, context: { params: Promise<{ id: str
   } catch (error) {
     if (error instanceof ApprovalPrimaryActionUnavailable) {
       return NextResponse.json(
-        { ok: false, code: 'APPROVAL_PRIMARY_ACTION_UNAVAILABLE', error: error.message },
+        {
+          ok: false,
+          code: 'APPROVAL_PRIMARY_ACTION_UNAVAILABLE',
+          error:
+            'This request does not support the selected approval action. Review the available actions and try again.',
+        },
         { status: 403 }
       );
     }

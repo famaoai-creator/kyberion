@@ -170,6 +170,14 @@ export function onboardingAuthorityScope(raw: unknown): CharterScope {
     return { kind: 'organization', tenant_slug: value.tenant_slug };
   return deny('valid actual scope required; personal scope has no tenant');
 }
+export function sameOnboardingAuthorityScope(left: CharterScope, right: CharterScope): boolean {
+  if (left.kind !== right.kind) return false;
+  return (
+    left.kind === 'person' ||
+    (right.kind === 'organization' && left.tenant_slug === right.tenant_slug)
+  );
+}
+
 function parseInput(raw: unknown, now: Date): OnboardingAuthorityInput {
   const scope = onboardingAuthorityScope(raw);
   const value = raw as Record<string, unknown>;

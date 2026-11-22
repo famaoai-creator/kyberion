@@ -20,16 +20,16 @@ tags: [plan, pibot, adoption, approval, policy, workflow, ux, mission]
 
 採択は次を壊さない・重複実装しない。
 
-| 領域 | 現状（main） | 採択への含意 |
-| --- | --- | --- |
-| WorkItem / Mission | Concept Model v2: Mission は WorkItem の実行様式。子 WorkItem が lease | PiBot step = 子 WorkItem。群 UI は作らない |
-| Mission readiness | preview JSON、queue dispatch、Surface 再試行で同一 Mission / issuance | Plan card の Start は既存 admission / gate に載せる |
-| Alignment | `ALIGNMENT_APPROVED` + approval-store + brief hash | Plan card は Interaction Packet 投影。正本は store |
-| Approval UX | `decisionCard` / presented digest / needs-you / Concierge | Why + 3 ボタンは **既存カード契約の Concierge 収束**（新スタック禁止） |
-| Grant | Grant = principal × scope × operation（移行中） | Policy Category は Grant の前段分類。置き換えない |
-| Approval continuity ([#1563](https://github.com/famaoai-creator/kyberion/pull/1563)) | Owner が terminal / Concierge で同一承認；CLI が Grant resume；非 Owner は 403 | Always ≠ Grant resume。Owner カードは Allow once のみ |
-| Surfaces | Concierge 中心、Chronos は `/ops` へ集約 | CEO は要約、詳細は Concierge `/ops` |
-| Factory / calendar 等 | 同時期の別 PR | 本計画の範囲外 |
+| 領域                                                                                 | 現状（main）                                                                   | 採択への含意                                                           |
+| ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------ | ---------------------------------------------------------------------- |
+| WorkItem / Mission                                                                   | Concept Model v2: Mission は WorkItem の実行様式。子 WorkItem が lease         | PiBot step = 子 WorkItem。群 UI は作らない                             |
+| Mission readiness                                                                    | preview JSON、queue dispatch、Surface 再試行で同一 Mission / issuance          | Plan card の Start は既存 admission / gate に載せる                    |
+| Alignment                                                                            | `ALIGNMENT_APPROVED` + approval-store + brief hash                             | Plan card は Interaction Packet 投影。正本は store                     |
+| Approval UX                                                                          | `decisionCard` / presented digest / needs-you / Concierge                      | Why + 3 ボタンは **既存カード契約の Concierge 収束**（新スタック禁止） |
+| Grant                                                                                | Grant = principal × scope × operation（移行中）                                | Policy Category は Grant の前段分類。置き換えない                      |
+| Approval continuity ([#1563](https://github.com/famaoai-creator/kyberion/pull/1563)) | Owner が terminal / Concierge で同一承認；CLI が Grant resume；非 Owner は 403 | Always ≠ Grant resume。Owner カードは Allow once のみ                  |
+| Surfaces                                                                             | Concierge 中心、Chronos は `/ops` へ集約                                       | CEO は要約、詳細は Concierge `/ops`                                    |
+| Factory / calendar 等                                                                | 同時期の別 PR                                                                  | 本計画の範囲外                                                         |
 
 ### 0.1 P0 向け現状棚卸し（`1608c806e`）
 
@@ -37,36 +37,36 @@ tags: [plan, pibot, adoption, approval, policy, workflow, ux, mission]
 
 既にあるもの（再利用する）:
 
-| 部品 | 場所 |
-| --- | --- |
-| Presented digest 束縛 | `libs/core/governance/approval-presentation.ts` |
+| 部品                     | 場所                                                                                                                            |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
+| Presented digest 束縛    | `libs/core/governance/approval-presentation.ts`                                                                                 |
 | Decision card + Why 展開 | `decision-card.ts` / `approval-decision-card.ts`（`renderDecisionCardExplanation`、action `approve\|changes\|reject\|explain`） |
-| Chat/surface 4 ボタン | `libs/core/surface/surface-approval-ui.ts` `buildDecisionCardActions` |
-| Plain-language brief | `libs/core/surface/decision-brief.ts` + Concierge `decision-brief.tsx` |
-| Concierge Needs You | `needs-you-card.tsx` + `libs/core/surface/needs-you.ts`（現状 **approve / reject / later**） |
-| Store 決定 API | `approval-store.ts`（settle は **`approved\|rejected` のみ**；`changeRequest` は reject 付帯） |
-| Plan preview（ops） | `MissionPlanPanel.tsx` + `/api/ops/plan-preview`（会話内 Plan card ではない） |
-| Interaction packet | `libs/core/contracts/operator-interaction-packet.ts`（`execution-preview` 形あり） |
+| Chat/surface 4 ボタン    | `libs/core/surface/surface-approval-ui.ts` `buildDecisionCardActions`                                                           |
+| Plain-language brief     | `libs/core/surface/decision-brief.ts` + Concierge `decision-brief.tsx`                                                          |
+| Concierge Needs You      | `needs-you-card.tsx` + `libs/core/surface/needs-you.ts`（現状 **approve / reject / later**）                                    |
+| Store 決定 API           | `approval-store.ts`（settle は **`approved\|rejected` のみ**；`changeRequest` は reject 付帯）                                  |
+| Plan preview（ops）      | `MissionPlanPanel.tsx` + `/api/ops/plan-preview`（会話内 Plan card ではない）                                                   |
+| Interaction packet       | `libs/core/contracts/operator-interaction-packet.ts`（`execution-preview` 形あり）                                              |
 
 ギャップ（PB-01〜03 が埋める）:
 
-| P0 | ギャップ |
-| --- | --- |
+| P0               | ギャップ                                                                                                                          |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------- |
 | Approval Why + 3 | Why と chat 4 ボタンはある。Concierge は 2+later。Store settle は二値。**Allow once / Always(+scope)** が一次アクションとして無い |
-| Plan card | plan-preview は `/ops` パネル。**会話に束ねた Plan card**（Start/Modify）が無い |
-| Disposition 4 | **カードとして不在**。失敗 Needs You は `later` のみ。collaboration の retry は nav kind |
+| Plan card        | plan-preview は `/ops` パネル。**会話に束ねた Plan card**（Start/Modify）が無い                                                   |
+| Disposition 4    | **カードとして不在**。失敗 Needs You は `later` のみ。collaboration の retry は nav kind                                          |
 
 ## 1. 項目一覧
 
-| ID | 内容 | 優先度 | 規模 | 状況 |
-| --- | --- | --- | --- | --- |
-| PB-00 | 分析・吸収モデル・本計画・concept-registry / GLOSSARY 登録 | P0 | S | **本変更で完了** |
-| PB-01 | Approval card: Why（reason code）+ Deny / Allow once / Always（scope 明示）+ Inbox | P0 | M | **実装** |
-| PB-02 | Plan Interaction Card（依存レイヤ・担当・成果物・見積・Start/Modify） | P0 | M | **実装** |
-| PB-03 | Workflow Disposition 4 アクション（retry / skip / reassign / accept） | P0 | M | **実装** |
-| PB-04 | Policy Category 宣言 + evaluate + probe matrix ゲート | P1 | L | **実装（行列 + evaluator；manifest 全量は段階）** |
-| PB-05 | Changes / Tasks 要約パネル（Concierge `/ops`） | P1 | M | **実装（read-model + Disclosure）** |
-| PB-06 | Bounded verdict repair（fix/recheck append、replan ≤ 2） | P2 | M | **実装（API；dispatch フックはフォロー）** |
+| ID    | 内容                                                                               | 優先度 | 規模 | 状況                                              |
+| ----- | ---------------------------------------------------------------------------------- | ------ | ---- | ------------------------------------------------- |
+| PB-00 | 分析・吸収モデル・本計画・concept-registry / GLOSSARY 登録                         | P0     | S    | **本変更で完了**                                  |
+| PB-01 | Approval card: Why（reason code）+ Deny / Allow once / Always（scope 明示）+ Inbox | P0     | M    | **実装**                                          |
+| PB-02 | Plan Interaction Card（依存レイヤ・担当・成果物・見積・Start/Modify）              | P0     | M    | **実装**                                          |
+| PB-03 | Workflow Disposition 4 アクション（retry / skip / reassign / accept）              | P0     | M    | **実装**                                          |
+| PB-04 | Policy Category 宣言 + evaluate + probe matrix ゲート                              | P1     | L    | **実装（行列 + evaluator；manifest 全量は段階）** |
+| PB-05 | Changes / Tasks 要約パネル（Concierge `/ops`）                                     | P1     | M    | **実装（read-model + Disclosure）**               |
+| PB-06 | Bounded verdict repair（fix/recheck append、replan ≤ 2）                           | P2     | M    | **実装（API；dispatch フックはフォロー）**        |
 
 ## 2. 詳細
 
@@ -117,7 +117,7 @@ tags: [plan, pibot, adoption, approval, policy, workflow, ux, mission]
 
 ### PB-04: Policy Category 行列
 
-**PiBot**: `CategorySchema` × never/ask/always × 変体理由コード。`pnpm probe:policy` が expected.tsv と一致しなければ fail。
+**PiBot**: `CategorySchema` × never/ask/always × 理由コード。Kyberion では `pnpm exec vitest run libs/core/governance/policy-category-matrix.test.ts` が期待値の TSV と照合する。
 
 **Kyberion 実装方針**:
 

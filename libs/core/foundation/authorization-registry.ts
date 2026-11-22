@@ -595,6 +595,16 @@ export function operationAuthorization(operationId: string): OperationAuthorizat
   return { ...FAILSAFE_UNDECLARED, declared: false, source: 'code' };
 }
 
+export function requiresApprovalAdmission(authorization: OperationAuthorization): boolean {
+  return (
+    authorization.authority.kind === 'approval' ||
+    (authorization.declared &&
+      authorization.source === 'code' &&
+      authorization.effectClass === 'external_mutation' &&
+      !authorization.approvalExemptCleanup)
+  );
+}
+
 /** The code-owned declaration key space. Overlay loaders use this to reject
  * (and loudly warn about) data entries that collide with reviewed code —
  * the lookup already ignores them, the warning tells the author why. */

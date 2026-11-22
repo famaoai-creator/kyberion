@@ -12,6 +12,7 @@ import {
 } from '@agent/core/governance/cli-operator-principal';
 import {
   onboardingAuthorityScope,
+  sameOnboardingAuthorityScope,
   readOnboardingAuthority,
   previewOnboardingAuthority,
   requestOnboardingAuthority,
@@ -101,13 +102,7 @@ export async function main(
     const envelope = readSafeJsonFile<Record<string, unknown>>(file, 'Onboarding authority plan');
     const input = envelope.input ?? envelope;
     const fileScope = onboardingAuthorityScope(input);
-    if (
-      selectedScope &&
-      (selectedScope.kind !== fileScope.kind ||
-        (selectedScope.kind === 'organization' &&
-          fileScope.kind === 'organization' &&
-          selectedScope.tenant_slug !== fileScope.tenant_slug))
-    )
+    if (selectedScope && !sameOnboardingAuthorityScope(selectedScope, fileScope))
       throw new Error(
         'The reviewed file scope does not match --scope/--tenant. Use the scope in the file or review a new plan.'
       );

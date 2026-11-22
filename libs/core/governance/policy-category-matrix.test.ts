@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { safeReadFile } from '../secure-io.js';
 import { describe, expect, it } from 'vitest';
 import {
   evaluatePolicyCategory,
@@ -13,7 +13,11 @@ import {
 } from './policy-category.js';
 import { pathResolver } from '../path-resolver.js';
 
-function factsFor(caseId: string, platform: PolicyPlatform, level: PolicyLevel): PolicyCategoryFacts {
+function factsFor(
+  caseId: string,
+  platform: PolicyPlatform,
+  level: PolicyLevel
+): PolicyCategoryFacts {
   const [categoryRaw, variant] = caseId.split('/');
   if (!isPolicyCategory(categoryRaw)) {
     throw new Error(`unknown category in case ${caseId}`);
@@ -30,7 +34,7 @@ function factsFor(caseId: string, platform: PolicyPlatform, level: PolicyLevel):
 describe('policy category matrix (PB-04)', () => {
   it('matches expected.tsv for representative hermetic cells', () => {
     const tsvPath = pathResolver.rootResolve('tests/fixtures/policy-category-matrix/expected.tsv');
-    const lines = readFileSync(tsvPath, 'utf8')
+    const lines = String(safeReadFile(tsvPath, { encoding: 'utf8' }))
       .trim()
       .split(/\r?\n/)
       .filter(Boolean);
