@@ -29,6 +29,7 @@ import {
 import { createKnowledgeDeliverySnapshot } from '../knowledge/knowledge-delivery-snapshot.js';
 import { loadState } from './mission-state.js';
 import { findMissionPath } from '../path-resolver.js';
+import { missionPathOrNull } from './mission-lookup.js';
 import { readMissionNextTasks } from './mission-lifecycle.js';
 import { inspectInstalledPersonalRuntime } from '../organization/personal-runtime-identity.js';
 import { currentScopeEnvelope } from '../scope-envelope.js';
@@ -85,7 +86,7 @@ export function inspectOperatorKnowledgeUse(
       status: 'personal_owner_required',
       nextAction: 'Use the installed standalone operator terminal with an active personal NHI.',
     };
-  const missionPath = findMissionPath(id);
+  const missionPath = missionPathOrNull(findMissionPath, id);
   if (
     !missionPath ||
     !readMissionNextTasks(missionPath).some((task) => String(task.task_id || '') === taskId)

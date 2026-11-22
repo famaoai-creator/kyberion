@@ -3592,10 +3592,6 @@
       "types": "./dist/mission/mission-process-governance.d.ts",
       "default": "./dist/mission/mission-process-governance.js"
     },
-    "./mission/mission-controller-start-input": {
-      "types": "./dist/mission/mission-controller-start-input.d.ts",
-      "default": "./dist/mission/mission-controller-start-input.js"
-    },
     "./mission/mission-process-planning": {
       "types": "./dist/mission/mission-process-planning.d.ts",
       "default": "./dist/mission/mission-process-planning.js"

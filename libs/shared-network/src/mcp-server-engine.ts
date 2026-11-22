@@ -58,7 +58,7 @@ import {
 import { isolatedScopeEnvPath } from '@agent/core/scope-context';
 import { pathResolver } from '@agent/core/path-resolver';
 import { buildExecutionEnv } from '@agent/core/authority';
-import { execMissionControllerChild } from '@agent/core/mission/mission-controller-start-input';
+import { execMissionControllerChild } from '@agent/core/mission/mission-execution-surface';
 import { discoveryOpsByActuator, loadMcpActuatorOpDiscovery } from './mcp-actuator-discovery.js';
 import { spawnManagedProcess, stopManagedProcess } from '@agent/core/managed-process';
 import {
