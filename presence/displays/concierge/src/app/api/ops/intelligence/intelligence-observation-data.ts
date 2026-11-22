@@ -23,7 +23,9 @@ import {
   parseNextTaskRecords,
   parseTaskBoard,
   summarizeNextTasks,
+  withMissionChangesTasks,
 } from '../../../../lib/ops/mission-progress';
+import type { MissionChangesTasksSummary } from '@agent/core/surface/mission-changes-tasks-summary';
 import { loadMissionNextTaskObjectsAtPath } from '@agent/core/mission/mission-next-task-reader';
 import type { ComputerSessionSummary } from '../../../../lib/ops/computer-sessions';
 import {
@@ -87,6 +89,8 @@ export interface MissionProgressSummary {
     sizeBytes: number;
     updatedAt: string;
   }>;
+  /** PB-05: Changes / Tasks projection for `/ops` mission detail. */
+  changesTasks?: MissionChangesTasksSummary;
 }
 
 export interface RuntimeLeaseSummary {
@@ -949,14 +953,57 @@ export function collectMissionProgress(activeMissions: MissionSummary[]): Missio
       }
     }
 
+    const assets = normalizeMissionAssets(generatedAssets);
+    let children: Array<{
+      item_id: string;
+      title: string;
+      status: string;
+      parent_item_id?: string;
+      task_id?: string;
+      context?: { mission_id?: string; task_id?: string };
+    }> = [];
+    try {
+      children = listWorkItems({})
+        .filter((item) => item.context?.mission_id === mission.missionId)
+        .map((item) => ({
+          item_id: item.item_id,
+          title: item.title,
+          status: item.status,
+          ...(item.parent_item_id ? { parent_item_id: item.parent_item_id } : {}),
+          ...(item.context?.task_id ? { task_id: item.context.task_id } : {}),
+          context: item.context,
+        }));
+    } catch {
+      // Coordination store unavailable — Changes/Tasks still shows artifacts.
+    }
+    const progress = withMissionChangesTasks(
+      {
+        missionId: mission.missionId,
+        ...board,
+        ...nextTaskSummary,
+        dependencies: extractMissionDependencies(
+          missionState?.relationships as Record<string, unknown> | undefined
+        ),
+        generatedAssets: assets,
+      },
+      { children }
+    );
     summaries.push({
-      missionId: mission.missionId,
-      ...board,
-      ...nextTaskSummary,
-      dependencies: extractMissionDependencies(
-        missionState?.relationships as Record<string, unknown> | undefined
-      ),
-      generatedAssets: normalizeMissionAssets(generatedAssets),
+      missionId: progress.missionId,
+      boardStatus: progress.boardStatus,
+      boardStepsTotal: progress.boardStepsTotal,
+      boardStepsDone: progress.boardStepsDone,
+      boardStepsActive: progress.boardStepsActive,
+      boardStepsPending: progress.boardStepsPending,
+      nextTasksTotal: progress.nextTasksTotal,
+      nextTasksPending: progress.nextTasksPending,
+      nextTasksCompleted: progress.nextTasksCompleted,
+      ...(progress.nextTasksSuperseded !== undefined
+        ? { nextTasksSuperseded: progress.nextTasksSuperseded }
+        : {}),
+      dependencies: progress.dependencies,
+      generatedAssets: progress.generatedAssets,
+      ...(progress.changesTasks ? { changesTasks: progress.changesTasks } : {}),
     });
   }
 

@@ -155,6 +155,16 @@ A standing grant that itself needs human approval references the approval as its
 
 An authenticated human approves an external-I/O standing Grant. Kyberion consumes that decision once and records the human as grantor. The local Owner member can directly issue eligible standing Grants for capabilities without external I/O. Mission dispatch issues task-scoped Grants to the assigned NHI within the task's authority and lifetime. See the [operator checklist](./OPERATOR_UX_GUIDE.md#authorization-and-disclosure-checks).
 
+Same-tenant `credential.use` Grant approvals require the tenant Owner on both the terminal and Concierge (`APPROVAL_TENANT_OWNER_REQUIRED`). One stored approval is the continuity point; the CLI resumes Grant issuance from that decision.
+
+### Policy Category
+
+**(advanced)** The kind of effect an actuator operation may attempt; evaluated to allow, ask, or deny with a stable reason code before Grant and approval-store decisions. Also actuator policy category. Orthogonal to [Grant](#grant) (who may act in which scope) and to approval assurance (how strongly a human was verified). Ask always binds an approval-store request. → [pibot-absorption-model](../knowledge/product/architecture/pibot-absorption-model.md)
+
+### Workflow Disposition
+
+**(advanced)** The fixed human choice on a blocked child WorkItem after acceptance or execution failure: retry, skip, reassign, or accept. Also blocked-step disposition. Surfaces may render the four actions; the durable decision is not UI-only state. Not a [Grant](#grant) and not a [RoutingDecision](#routingdecision). → [pibot-absorption-model](../knowledge/product/architecture/pibot-absorption-model.md)
+
 ### Execution definitions
 
 | Term              | Meaning                                                                                                                                                                                                                       |

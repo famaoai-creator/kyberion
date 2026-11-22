@@ -26,6 +26,7 @@ import {
   inboxHref,
   parseInboxFilters,
   postApprovalDecision,
+  postWorkflowDisposition,
   postClarificationDecision,
   postKnowledgeDecision,
   postReviewVerdict,
@@ -178,7 +179,9 @@ function InboxView() {
       let message: string;
       switch (decision.kind) {
         case 'approval':
-          await postApprovalDecision(item.approval!, decision.decision);
+          await postApprovalDecision(item.approval!, decision.decision, {
+            ...(decision.primaryAction ? { primaryAction: decision.primaryAction } : {}),
+          });
           message = t(
             decision.decision === 'approved' ? 'home.approved_notice' : 'home.rejected_notice',
             { title }
@@ -205,6 +208,15 @@ function InboxView() {
             decision.note
           );
           break;
+        case 'disposition': {
+          const targetId = item.failure?.work_item_id || item.failure?.id;
+          if (!targetId) throw new Error('disposition_target_missing');
+          await postWorkflowDisposition(targetId, decision.disposition, {
+            ...(decision.newOwnerId ? { newOwnerId: decision.newOwnerId } : {}),
+          });
+          message = t('home.accepted_notice', { title });
+          break;
+        }
       }
       setNotice({ text: message });
       await refresh();
@@ -217,7 +229,9 @@ function InboxView() {
             ? formatApprovalFailure(error, locale)
             : error instanceof Error && error.message === 'note_required'
               ? c('ia_inbox_error_note_required')
-              : c(`ia_inbox_error_${decision.kind}`),
+              : decision.kind === 'disposition'
+                ? c('ia_inbox_error_failure')
+                : c(`ia_inbox_error_${decision.kind}`),
         error: true,
       });
     } finally {

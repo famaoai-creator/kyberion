@@ -4,6 +4,11 @@ import {
   composeMissionTeamPlan,
   type MissionTeamPlan,
 } from '@agent/core/mission/mission-team-plan-composer';
+import {
+  buildPlanInteractionPacket,
+  type PlanInteractionPacketExtras,
+} from '@agent/core/surface/plan-interaction-packet';
+import type { OperatorInteractionPacket } from '@agent/core/contracts/operator-interaction-packet';
 
 export interface PlanPreviewRequestContext {
   missionId: string;
@@ -59,6 +64,8 @@ export interface PlanPreviewResponse {
     output_refs?: string[];
   }>;
   team: MissionTeamPlan;
+  /** PB-02: conversation / Needs You Plan card over the same read-model. */
+  interactionPacket: OperatorInteractionPacket & { plan: PlanInteractionPacketExtras };
 }
 
 /**
@@ -108,7 +115,7 @@ export function buildPlanPreview(
     organizationProfile: input.organizationProfile || undefined,
   });
 
-  return {
+  const previewBase = {
     missionId: input.missionId,
     requestText: input.requestText,
     source: flow.source,
@@ -136,5 +143,9 @@ export function buildPlanPreview(
       ...step,
     })),
     team,
+  };
+  return {
+    ...previewBase,
+    interactionPacket: buildPlanInteractionPacket(previewBase),
   };
 }

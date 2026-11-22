@@ -19,7 +19,13 @@ import { OutcomeFiles } from '../outcome-files';
  */
 
 export type CardDecision =
-  | { kind: 'approval'; item: NeedsYouItem; decision: 'approved' | 'rejected' }
+  | {
+      kind: 'approval';
+      item: NeedsYouItem;
+      decision: 'approved' | 'rejected';
+      /** PB-01 primary action; maps onto binary store settle (+ session Always). */
+      primaryAction?: 'deny' | 'allow_once' | 'allow_always';
+    }
   | {
       kind: 'review';
       item: NeedsYouItem;
@@ -27,7 +33,13 @@ export type CardDecision =
       note?: string;
     }
   | { kind: 'knowledge'; item: NeedsYouItem; decision: 'approve' | 'reject' }
-  | { kind: 'clarification'; item: NeedsYouItem; decision: 'start' | 'cancel'; note?: string };
+  | { kind: 'clarification'; item: NeedsYouItem; decision: 'start' | 'cancel'; note?: string }
+  | {
+      kind: 'disposition';
+      item: NeedsYouItem;
+      disposition: 'retry' | 'skip' | 'reassign' | 'accept';
+      newOwnerId?: string;
+    };
 
 export interface OutcomePreviewState {
   id: string | null;
@@ -229,8 +241,13 @@ export function NeedsYouCard({
 
   if (item.approval) {
     const approval = item.approval;
-    const approveLabel =
-      approval.min_assurance === 'A3' ? f('decide_approve_passkey') : f('decide_approve');
+    const allowOnceLabel =
+      approval.min_assurance === 'A3' ? f('decide_approve_passkey') : f('decide_allow_once');
+    const alwaysScope =
+      approval.channel || approval.storage_channel || approval.title || 'this action';
+    const whyLines = brief?.why?.length
+      ? brief.why.map((line) => renderDisplayText(line, locale)).filter(Boolean)
+      : [];
     body = (
       <>
         {brief ? (
@@ -238,9 +255,19 @@ export function NeedsYouCard({
             brief={brief}
             locale={locale}
             showAsk={false}
-            approveLabel={approveLabel}
-            rejectLabel={f('decide_reject')}
+            approveLabel={allowOnceLabel}
+            rejectLabel={f('decide_deny')}
           />
+        ) : null}
+        {whyLines.length ? (
+          <details className="approval-why">
+            <summary>{f('decide_why')}</summary>
+            <ul>
+              {whyLines.map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>
+          </details>
         ) : null}
         {approval.review_scope || approval.evidence?.length ? (
           <details className="approval-review-scope">
@@ -261,20 +288,49 @@ export function NeedsYouCard({
     );
     actions = (
       <>
-        {has('approve') ? (
+        {has('allow_once') || has('approve') ? (
           <Button
-            label={approveLabel}
+            label={allowOnceLabel}
             variant="primary"
             disabled={busy}
-            onClick={() => void onDecide({ kind: 'approval', item, decision: 'approved' })}
+            onClick={() =>
+              void onDecide({
+                kind: 'approval',
+                item,
+                decision: 'approved',
+                primaryAction: 'allow_once',
+              })
+            }
           />
         ) : null}
-        {has('reject') ? (
+        {has('allow_always') ? (
           <Button
-            label={f('decide_reject')}
+            label={f('decide_allow_always', { scope: alwaysScope })}
+            variant="secondary"
+            disabled={busy}
+            onClick={() =>
+              void onDecide({
+                kind: 'approval',
+                item,
+                decision: 'approved',
+                primaryAction: 'allow_always',
+              })
+            }
+          />
+        ) : null}
+        {has('deny') || has('reject') ? (
+          <Button
+            label={f('decide_deny')}
             variant="danger"
             disabled={busy}
-            onClick={() => void onDecide({ kind: 'approval', item, decision: 'rejected' })}
+            onClick={() =>
+              void onDecide({
+                kind: 'approval',
+                item,
+                decision: 'rejected',
+                primaryAction: 'deny',
+              })
+            }
           />
         ) : null}
         {later}
@@ -407,7 +463,43 @@ export function NeedsYouCard({
     );
   } else {
     body = <KindBriefBlock brief={kindBrief('exception')} locale={locale} />;
-    actions = later;
+    actions = (
+      <>
+        {has('retry') ? (
+          <Button
+            label={f('decide_retry')}
+            variant="primary"
+            disabled={busy}
+            onClick={() => void onDecide({ kind: 'disposition', item, disposition: 'retry' })}
+          />
+        ) : null}
+        {has('skip') ? (
+          <Button
+            label={f('decide_skip')}
+            variant="secondary"
+            disabled={busy}
+            onClick={() => void onDecide({ kind: 'disposition', item, disposition: 'skip' })}
+          />
+        ) : null}
+        {has('reassign') ? (
+          <Button
+            label={f('decide_reassign')}
+            variant="secondary"
+            disabled={busy}
+            onClick={() => void onDecide({ kind: 'disposition', item, disposition: 'reassign' })}
+          />
+        ) : null}
+        {has('accept') ? (
+          <Button
+            label={f('decide_accept')}
+            variant="secondary"
+            disabled={busy}
+            onClick={() => void onDecide({ kind: 'disposition', item, disposition: 'accept' })}
+          />
+        ) : null}
+        {later}
+      </>
+    );
   }
 
   // Knowledge and stalled-request decisions go through one inline confirm step.

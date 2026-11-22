@@ -1282,3 +1282,5 @@
 
 ## 📁 public/voice-of-customer
 - [voice-of-customer/](./public/voice-of-customer/README.md) (public | Unknown)
+- [PiBot Selective Absorption Model](./product/architecture/pibot-absorption-model.md) (public | Ecosystem Architect)
+- [PiBot Architecture and Selective Absorption Analysis](./public/external-wisdom/pibot-analysis.md) (public | Ecosystem Architect)

@@ -240,6 +240,10 @@ export interface DecisionCardAction {
 /**
  * The four decision-card buttons. Requests without a card keep the
  * original approve / reject pair.
+ *
+ * Concierge Needs You uses {@link buildApprovalPrimaryActions} (Deny /
+ * Allow once / Always) instead; chat bridges keep this four-button set so
+ * secondary `changes` / `explain` tokens stay stable.
  */
 export function buildDecisionCardActions(record: ApprovalRequestRecord): DecisionCardAction[] {
   const kinds: DecisionCardActionKind[] = record.decisionCard
@@ -255,6 +259,13 @@ export function buildDecisionCardActions(record: ApprovalRequestRecord): Decisio
         : `appr:${record.id}:${kind}`,
   }));
 }
+
+export {
+  buildApprovalPrimaryActions,
+  applyApprovalPrimaryAction,
+  isApprovalPrimaryAction,
+  type ApprovalPrimaryAction,
+} from './approval-primary-actions.js';
 
 const SURFACE_ASK_WHY_LABEL_KEYS: Record<RejectionReasonCategory, VocabularyKey> = {
   incorrect_content: 'surface:ask_why_incorrect_content',

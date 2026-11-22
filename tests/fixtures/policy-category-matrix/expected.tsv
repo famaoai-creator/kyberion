@@ -1,0 +1,9 @@
+case	darwin/never	darwin/ask	darwin/always	linux/never	linux/ask	linux/always	win32/never	win32/ask	win32/always
+read_file	deny:permission_never	ask:permission_ask	allow:permission_always	deny:permission_never	ask:permission_ask	allow:permission_always	deny:permission_never	ask:permission_ask	allow:permission_always
+write_file	deny:permission_never	ask:permission_ask	allow:permission_always	deny:permission_never	ask:permission_ask	allow:permission_always	deny:permission_never	ask:permission_ask	allow:permission_always
+run_command	deny:permission_never	allow:readonly_command	allow:sandboxed_command	deny:permission_never	allow:readonly_command	allow:sandboxed_command	deny:permission_never	ask:windows_requires_approval	ask:windows_requires_approval
+web	deny:permission_never	ask:permission_ask	allow:permission_always	deny:permission_never	ask:permission_ask	allow:permission_always	deny:permission_never	ask:permission_ask	allow:permission_always
+send_out	deny:permission_never	ask:user_send_confirmation	ask:user_send_confirmation	deny:permission_never	ask:user_send_confirmation	ask:user_send_confirmation	deny:permission_never	ask:user_send_confirmation	ask:user_send_confirmation
+image_generation	deny:permission_never	ask:paid_generation_confirmation	ask:paid_generation_confirmation	deny:permission_never	ask:paid_generation_confirmation	ask:paid_generation_confirmation	deny:permission_never	ask:paid_generation_confirmation	ask:paid_generation_confirmation
+read_file/protected	deny:sensitive_path	deny:sensitive_path	deny:sensitive_path	deny:sensitive_path	deny:sensitive_path	deny:sensitive_path	deny:sensitive_path	deny:sensitive_path	deny:sensitive_path
+planning	allow:planning_metadata	allow:planning_metadata	allow:planning_metadata	allow:planning_metadata	allow:planning_metadata	allow:planning_metadata	allow:planning_metadata	allow:planning_metadata	allow:planning_metadata

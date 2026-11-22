@@ -30608,6 +30608,46 @@
         "ja": "あとで",
         "qps-ploc": "⟦Ŀȧŧėř ŀőř⟧"
       },
+      "decide_deny": {
+        "en": "Deny",
+        "ja": "拒否",
+        "qps-ploc": "⟦Ḓėñẏ ŀőř⟧"
+      },
+      "decide_allow_once": {
+        "en": "Allow once",
+        "ja": "今回だけ許可",
+        "qps-ploc": "⟦Ȧŀŀőẇ őñƈė ŀőřėɱ⟧"
+      },
+      "decide_allow_always": {
+        "en": "Always allow ({scope})",
+        "ja": "常に許可（{scope}）",
+        "qps-ploc": "⟦Ȧŀẇȧẏş ȧŀŀőẇ ({scope}) ŀőřėɱ⟧"
+      },
+      "decide_why": {
+        "en": "Why am I asked?",
+        "ja": "なぜ聞かれているか",
+        "qps-ploc": "⟦Ẇħẏ ȧɱ Ї ȧşķėḓ? ŀőřėɱ⟧"
+      },
+      "decide_retry": {
+        "en": "Retry",
+        "ja": "再試行",
+        "qps-ploc": "⟦Řėŧřẏ ŀőř⟧"
+      },
+      "decide_skip": {
+        "en": "Skip",
+        "ja": "スキップ",
+        "qps-ploc": "⟦Şķïṗ ŀőř⟧"
+      },
+      "decide_reassign": {
+        "en": "Reassign",
+        "ja": "担当変更",
+        "qps-ploc": "⟦Řėȧşşïĝñ ŀőřėɱ⟧"
+      },
+      "decide_accept": {
+        "en": "Accept as-is",
+        "ja": "このまま受理",
+        "qps-ploc": "⟦Ȧƈƈėṗŧ ȧş-ïş ŀőřėɱ⟧"
+      },
       "decide_continue": {
         "en": "Continue",
         "ja": "続ける",

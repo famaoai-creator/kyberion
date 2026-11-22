@@ -91,8 +91,14 @@ describe('FD-00c/FD-01c front-desk contract (concierge)', () => {
     // Per-kind action labels are the front_desk:decide_* keys, not hardcoded
     // strings or the old home.* pane labels.
     for (const key of [
-      'decide_approve',
-      'decide_reject',
+      'decide_allow_once',
+      'decide_allow_always',
+      'decide_deny',
+      'decide_why',
+      'decide_retry',
+      'decide_skip',
+      'decide_reassign',
+      'decide_accept',
       'decide_continue',
       'decide_stop',
       'decide_remember',
@@ -101,7 +107,8 @@ describe('FD-00c/FD-01c front-desk contract (concierge)', () => {
       'decide_return',
       'decide_later',
     ])
-      expect(page).toContain(`f('${key}')`);
+      // Always may pass `{ scope }` as a second arg; match the key call site.
+      expect(page).toContain(`f('${key}'`);
     expect(page).toContain("frontDeskText('decide_deferred', locale");
     expect(page).toContain("frontDeskText('decide_undefer', locale)");
 

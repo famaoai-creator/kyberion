@@ -94,6 +94,9 @@ export interface CeoExceptionItem {
   text: string;
   surface: string;
   created_at: string;
+  /** When present, Needs You disposition targets this WorkItem (PB-03 / #1563 stack). */
+  work_item_id?: string;
+  mission_id?: string;
 }
 
 export interface CeoDailyBriefing {

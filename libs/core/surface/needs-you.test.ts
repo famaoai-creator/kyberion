@@ -178,7 +178,7 @@ describe('needs-you count definition', () => {
     expect(folded.group_size).toBe(3);
     expect(folded.group?.map((other) => other.approval?.id)).toHaveLength(2);
     // Every folded record stays decidable on its own.
-    expect(folded.group?.every((other) => other.actions.includes('approve'))).toBe(true);
+    expect(folded.group?.every((other) => other.actions.includes('allow_once'))).toBe(true);
     const summary = summarizeNeedsYou(items);
     expect(summary.total).toBe(2);
     expect(summary.byReason.approval).toBe(2);
@@ -282,7 +282,7 @@ describe('needs-you count definition', () => {
     );
     const by = Object.fromEntries(items.map((item) => [item.reason, item.actions]));
     expect(by.review).toEqual(['approve', 'request_changes', 'reject', 'later']);
-    expect(by.failure).toEqual(['later']);
+    expect(by.failure).toEqual(['retry', 'skip', 'reassign', 'accept', 'later']);
     expect(by.knowledge).toEqual(['open', 'later']);
   });
 });

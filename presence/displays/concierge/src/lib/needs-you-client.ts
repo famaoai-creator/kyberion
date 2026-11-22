@@ -106,7 +106,8 @@ export type ApprovalDecisionItem = Pick<
  */
 export async function postApprovalDecision(
   item: ApprovalDecisionItem,
-  decision: 'approved' | 'rejected'
+  decision: 'approved' | 'rejected',
+  options: { primaryAction?: 'deny' | 'allow_once' | 'allow_always' } = {}
 ): Promise<void> {
   if (item.min_assurance === 'A3') {
     await decideWithPasskey({
@@ -126,9 +127,28 @@ export async function postApprovalDecision(
       channel: item.channel,
       storageChannel: item.storage_channel,
       presentedDigest: item.presented_digest,
+      ...(options.primaryAction ? { primaryAction: options.primaryAction } : {}),
     }),
   });
   if (!response.ok) throw await readApprovalResponseFailure(response);
+}
+
+/** PB-03: persist a workflow disposition for a blocked failure / WorkItem. */
+export async function postWorkflowDisposition(
+  itemId: string,
+  disposition: 'retry' | 'skip' | 'reassign' | 'accept',
+  options: { newOwnerId?: string; note?: string } = {}
+): Promise<void> {
+  const response = await fetch(`/api/ops/workitems/${encodeURIComponent(itemId)}/disposition`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      disposition,
+      ...(options.newOwnerId ? { newOwnerId: options.newOwnerId } : {}),
+      ...(options.note ? { note: options.note } : {}),
+    }),
+  });
+  if (!response.ok) throw new Error('disposition_failed');
 }
 
 /** Deliverable review → `/api/outcomes/[id]`. A change request needs a note. */

@@ -2,6 +2,10 @@ import {
   parseMissionNextTaskRecords,
   type MissionNextTaskRecord,
 } from '@agent/core/mission/mission-next-task-reader';
+import {
+  buildMissionChangesTasksSummary,
+  type MissionChangesTasksSummary,
+} from '@agent/core/surface/mission-changes-tasks-summary';
 import type { MissionAssetCategory } from './mission-progress-client';
 
 export { findLatestMissionHandoff } from './mission-progress-client';
@@ -30,6 +34,8 @@ export interface MissionProgressSnapshot {
   nextTasksSuperseded?: number;
   dependencies: string[];
   generatedAssets: MissionAssetSummary[];
+  /** PB-05: Changes / Tasks projection for `/ops` mission detail. */
+  changesTasks?: MissionChangesTasksSummary;
 }
 
 export function parseTaskBoard(
@@ -127,4 +133,27 @@ export function normalizeMissionAssets(assets: MissionAssetSummary[]): MissionAs
       return true;
     })
     .sort((a, b) => a.path.localeCompare(b.path));
+}
+
+/** PB-05: attach Changes / Tasks summary onto a progress snapshot (read-model only). */
+export function withMissionChangesTasks(
+  progress: MissionProgressSnapshot,
+  input: {
+    diff?: Parameters<typeof buildMissionChangesTasksSummary>[0]['diff'];
+    children?: Parameters<typeof buildMissionChangesTasksSummary>[0]['children'];
+  } = {}
+): MissionProgressSnapshot {
+  return {
+    ...progress,
+    changesTasks: buildMissionChangesTasksSummary({
+      missionId: progress.missionId,
+      artifacts: progress.generatedAssets.map((asset) => ({
+        path: asset.path,
+        kind: asset.category,
+        updated_at: asset.updatedAt,
+      })),
+      diff: input.diff,
+      children: input.children,
+    }),
+  };
 }
