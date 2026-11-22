@@ -1,0 +1,126 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Code graph enumeration rules",
+  "description": "Per-language rules for modeling:extract_code_graph: grammar, file extensions, import capture and resolution, and entrypoint/boundary markers counted by two independent routes (tree-sitter query and line pattern).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "languages"],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "languages": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/definitions/language"
+      }
+    }
+  },
+  "definitions": {
+    "language": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "grammar", "extensions", "markers"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "grammar": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["package", "wasm"],
+          "properties": {
+            "package": {
+              "type": "string",
+              "pattern": "^tree-sitter-[a-z0-9-]+$"
+            },
+            "wasm": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_.-]+\\.wasm$"
+            }
+          }
+        },
+        "extensions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "pattern": "^\\.[a-z0-9+]+$"
+          }
+        },
+        "exclude_suffixes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 2
+          }
+        },
+        "imports": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["resolver", "query"],
+          "properties": {
+            "resolver": {
+              "enum": [
+                "relative_path",
+                "python_module",
+                "qualified_name",
+                "namespace",
+                "go_package",
+                "rust_module"
+              ]
+            },
+            "query": {
+              "type": "string",
+              "minLength": 1
+            },
+            "bare_specifier": {
+              "enum": ["package", "path"]
+            },
+            "candidates": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "declarations": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "markers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["kind", "subtype", "query", "line_pattern"],
+            "properties": {
+              "kind": {
+                "enum": ["entrypoint", "boundary"]
+              },
+              "subtype": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]*$"
+              },
+              "query": {
+                "type": "string",
+                "minLength": 1
+              },
+              "line_pattern": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -59,6 +59,7 @@ import type { UIFlowADF } from '@agent/core/contracts/ui-flow-adf';
 import { terraformToArchitectureAdf } from './terraform-architecture.js';
 import { terraformToAssetInventory } from './terraform-asset-inventory.js';
 import { iacInventoryToLedgerDraft } from './asset-ledger.js';
+import { extractCodeGraph } from './code-graph/extract-code-graph.js';
 import { securityLedgerCheckPlan } from './security-check-plan.js';
 import type { IaCAssetInventory } from './terraform-asset-inventory.js';
 import { terraformToTopologyIr } from './terraform-topology.js';
@@ -368,6 +369,25 @@ export const MODELING_TRANSFORM_OP_HANDLERS: Readonly<Record<string, ModelingTra
         [params.export_as || 'source_analysis_ir']: analyzeSourceTree({
           sourceRoot,
           maxFiles: params.max_files,
+        }),
+      };
+    },
+    extract_code_graph: async ({ params, ctx, resolve, rootDir }) => {
+      const sourceRootPath = resolveModelingRepositoryPath(
+        rootDir,
+        resolve(params.source_root),
+        'extract_code_graph'
+      );
+      const sourceRoot = path.relative(rootDir, sourceRootPath).replaceAll(path.sep, '/') || '.';
+      const languages = resolve(params.languages);
+      const exclude = resolve(params.exclude);
+      return {
+        ...ctx,
+        [params.export_as || 'code_graph']: await extractCodeGraph({
+          sourceRoot,
+          ...(Array.isArray(languages) ? { languages: languages.map(String) } : {}),
+          ...(Array.isArray(exclude) ? { exclude: exclude.map(String) } : {}),
+          ...(params.max_files ? { maxFiles: Number(resolve(params.max_files)) } : {}),
         }),
       };
     },

@@ -551,6 +551,7 @@
         "compile_agentic_source_review_plan",
         "compile_agentic_source_review_verification",
         "compile_engineering_artifacts",
+        "extract_code_graph",
         "json_query",
         "mermaid_gen",
         "security_ledger_check_plan",

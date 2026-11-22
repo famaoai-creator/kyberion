@@ -1,0 +1,55 @@
+{
+  "action": "pipeline",
+  "name": "reverse-spec-code-graph",
+  "version": "1.0.0",
+  "description": "reverse_spec code_graph phase: extract the code-graph denominator (modules, entrypoints, boundaries, import edges) with two-route reconciliation from the frozen source named in the mission scope, and write evidence/code-graph.json. The analyzed source is only read. Resolve every reconciliation difference before the CODE_GRAPH_FROZEN gate.",
+  "context": {
+    "mission_evidence_dir": "",
+    "source_root": "",
+    "languages": [],
+    "exclude": []
+  },
+  "steps": [
+    {
+      "id": "preflight",
+      "role": "gate",
+      "op": "modeling:read_json",
+      "produces": { "channel": "preflight_result", "type": "ReverseSpecScope" },
+      "params": {
+        "path": "{{mission_evidence_dir}}/reverse-spec-scope.json",
+        "export_as": "reverse_spec_scope"
+      }
+    },
+    {
+      "id": "extract",
+      "role": "transform",
+      "op": "modeling:extract_code_graph",
+      "consumes": "preflight_result",
+      "produces": { "channel": "code_graph", "type": "CodeGraphRegistry" },
+      "params": {
+        "source_root": "{{source_root}}",
+        "languages": "{{languages}}",
+        "exclude": "{{exclude}}",
+        "export_as": "code_graph"
+      }
+    },
+    {
+      "id": "write",
+      "role": "sink",
+      "op": "modeling:write_artifact",
+      "consumes": "code_graph",
+      "params": {
+        "from": "code_graph",
+        "output_path": "{{mission_evidence_dir}}/code-graph.json"
+      }
+    },
+    {
+      "id": "handoff",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "Code graph written to {{mission_evidence_dir}}/code-graph.json. Fill reconciliation[].resolution for every difference, then run check_reverse_spec_evidence --stage code_graph."
+      }
+    }
+  ]
+}
