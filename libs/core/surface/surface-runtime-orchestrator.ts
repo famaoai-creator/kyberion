@@ -98,7 +98,7 @@ import {
   resolvedSurfaceIntent,
   structuredSurfaceQueryText,
 } from './surface-runtime-helpers.js';
-import { handleGovernedExecutionHint } from './surface-governed-execution.js';
+import { handleGovernedExecutionHint } from './surface-governed-execution-orchestration.js';
 import { runAcceptedSurfacePipelineRoute } from './surface-accepted-pipeline.js';
 
 export {
