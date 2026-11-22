@@ -168,7 +168,9 @@ export function WorkCalendar({ t }: { t: Translate }) {
     () =>
       [
         ...fromCalendarEntries(data?.entries ?? [], (link, tenantSlug) =>
-          entityHref(link.kind, link.id, tenantSlug)
+          // `session` links have no workspace route — the entry stays
+          // text-only until a session detail page exists.
+          link.kind === 'session' ? undefined : entityHref(link.kind, link.id, tenantSlug)
         ),
         ...(external.state === 'ready' ? fromExternalEvents(external.events) : []),
       ].filter((item) => shownGroups.has(sourceGroup(item.source))),
