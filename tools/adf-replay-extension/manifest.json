@@ -5,6 +5,7 @@
   "description": "Record and review governed Kyberion browser workflows in the active tab.",
   "permissions": [
     "activeTab",
+    "tabs",
     "scripting",
     "storage",
     "sidePanel",
@@ -13,6 +14,7 @@
     "contextMenus",
     "notifications"
   ],
+  "host_permissions": ["http://*/*", "https://*/*"],
   "optional_host_permissions": ["http://*/*", "https://*/*"],
   "action": {
     "default_title": "Open Kyberion Browser Bridge"

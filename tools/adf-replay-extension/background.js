@@ -2021,7 +2021,7 @@ async function pollMailbox() {
     .filter(
       (item) =>
         Inbox.isValidRequestId(item?.request_id) &&
-        ['observe_tab', 'local_infer', 'notify'].includes(item.request_kind) &&
+        ['observe_tab', 'local_infer', 'notify', 'control_step'].includes(item.request_kind) &&
         !Inbox.isExpired(item, now) &&
         !dismissed.has(item.request_id)
     )
@@ -2061,6 +2061,10 @@ async function pollMailbox() {
       approvalsChanged
     );
   }
+  // control_step requests execute under their session lease without a panel
+  // click — drain them after the inbox snapshot is saved (each response
+  // removes its own item via sendRequestResponse).
+  await drainControlSteps(requests);
   return { inbox: publicInbox(inbox) };
 }
 
@@ -2224,7 +2228,9 @@ async function sendRequestResponse(item, wire) {
     type: 'respond_request',
     request_id: item.request_id,
     status: wire.status,
-    ...(wire.result !== undefined ? { result: wire.result } : {}),
+    ...(wire.status === 'completed' && wire.result !== undefined
+      ? { result: wire.result }
+      : {}),
     ...(wire.error ? { error: scrubLine(wire.error, 1000) } : {}),
     ...(wire.origin ? { origin: wire.origin } : {}),
   };
@@ -2391,6 +2397,251 @@ async function buildObserveResponse(item) {
   };
   fitObservationToBudget(result, RESPONSE_BUDGET_BYTES);
   return { status: 'completed', origin, result };
+}
+
+// ---------------------------------------------------------------------------
+// control_step — interactive CLI control under a minted session lease (BCS-*).
+// The session is the consent object: the host already approved it and admits
+// each step; here we re-validate the same binding (origin + op vocabulary)
+// and execute against the session-bound tab. Steps auto-execute on arrival —
+// they never wait for a Side Panel click — because consent was granted at
+// session creation. High-risk ops only arrive pre-approved by the host.
+// ---------------------------------------------------------------------------
+
+const CONTROL_CONTENT_OPS = new Set([
+  'click_ref',
+  'click_if_present',
+  'fill_ref',
+  'select_ref',
+  'press_ref',
+  'wait_for_ref',
+  'extract_text_ref',
+  'submit_form',
+  'credential_submit',
+  'settings_change',
+  'delete',
+  'purchase',
+  'upload_file',
+  'download_file',
+]);
+
+function controlCanonicalOrigin(value) {
+  try {
+    const url = new URL(String(value || ''));
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return '';
+    return url.origin;
+  } catch {
+    return '';
+  }
+}
+
+async function controlBoundTab(sessionId, origin) {
+  const state = await loadState();
+  const entry = state.controlSessions?.[sessionId];
+  if (!entry || typeof entry.tabId !== 'number') return null;
+  let tab;
+  try {
+    tab = await chrome.tabs.get(entry.tabId);
+  } catch {
+    return null; // tab closed — caller may bind a new one via select_tab/open_tab
+  }
+  const tabOrigin = controlCanonicalOrigin(tab.pendingUrl || tab.url);
+  if (tabOrigin && tabOrigin !== origin) {
+    throw new Error(
+      `control tab navigated from ${origin} to ${tabOrigin}; the session refuses to follow`
+    );
+  }
+  return tab;
+}
+
+async function bindControlTab(sessionId, origin, tab) {
+  const tabOrigin = controlCanonicalOrigin(tab.url);
+  if (tabOrigin !== origin) {
+    throw new Error(`tab origin ${tabOrigin || '(none)'} does not match session origin ${origin}`);
+  }
+  const state = await loadState();
+  state.controlSessions = {
+    ...(state.controlSessions || {}),
+    [sessionId]: { tabId: tab.id, origin, bound_at: new Date().toISOString() },
+  };
+  await saveState(state);
+}
+
+async function requireControlTab(sessionId, origin) {
+  const tab = await controlBoundTab(sessionId, origin);
+  if (!tab) {
+    throw new Error(
+      'このセッションにはまだ操作タブが結び付いていません。open_tab/navigate か、対象オリジンのタブを select_tab してください。'
+    );
+  }
+  return tab;
+}
+
+async function executeControlStep(item) {
+  const payload = item.payload || {};
+  const step = payload.step || {};
+  const sessionId = String(payload.session_id || '');
+  const origin = controlCanonicalOrigin(payload.origin);
+  const leaseId = String(payload.lease_id || '');
+  const echo = { step_id: step.step_id, op: step.op };
+  const result = { step: echo };
+  try {
+    if (!origin || origin !== payload.origin) {
+      throw new Error('control_step の origin が正規 http(s) origin ではありません。');
+    }
+    if (!/^BCS-[0-9a-f-]{36}$/.test(sessionId) || !/^LCS-[0-9a-f-]{36}$/.test(leaseId)) {
+      throw new Error('control_step の session/lease 形式が不正です。');
+    }
+    if (step.url && controlCanonicalOrigin(step.url) !== origin) {
+      throw new Error(`step url はセッション origin ${origin} の外に出られません。`);
+    }
+
+    switch (step.op) {
+      case 'open_tab': {
+        const tab = await chrome.tabs.create({ url: step.url || origin, active: true });
+        await waitForTabComplete(tab.id);
+        await waitForOrigin(tab.id, origin, 20000);
+        const settled = await chrome.tabs.get(tab.id);
+        await bindControlTab(sessionId, origin, settled);
+        result.tab = { id: settled.id, url: settled.url, title: settled.title };
+        break;
+      }
+      case 'navigate': {
+        const bound = await requireControlTab(sessionId, origin);
+        await chrome.tabs.update(bound.id, { url: step.url });
+        await waitForTabComplete(bound.id);
+        await waitForOrigin(bound.id, origin, 20000);
+        const settled = await chrome.tabs.get(bound.id);
+        const settledOrigin = controlCanonicalOrigin(settled.url);
+        if (settledOrigin !== origin) {
+          throw new Error(`navigate は ${origin} 内に限定されます（遷移先: ${settledOrigin}）。`);
+        }
+        result.tab = { id: settled.id, url: settled.url, title: settled.title };
+        break;
+      }
+      case 'list_tabs': {
+        const tabs = await chrome.tabs.query({});
+        result.tabs = tabs
+          .slice(0, 50)
+          .map((tab) => ({
+            id: tab.id,
+            url: scrubLine(String(tab.url || ''), 300),
+            title: scrubLine(String(tab.title || ''), 200),
+            active: tab.active === true,
+          }));
+        break;
+      }
+      case 'select_tab': {
+        if (typeof step.tab_id !== 'number') {
+          throw new Error('select_tab には tab_id が必要です（list_tabs で確認）。');
+        }
+        const tab = await chrome.tabs.get(step.tab_id);
+        await chrome.tabs.update(tab.id, { active: true });
+        await waitForTabComplete(tab.id);
+        const settled = await chrome.tabs.get(tab.id);
+        await bindControlTab(sessionId, origin, settled);
+        result.tab = { id: settled.id, url: settled.url, title: settled.title };
+        break;
+      }
+      case 'snapshot': {
+        const bound = await requireControlTab(sessionId, origin);
+        await ensureContentScript(bound.id);
+        const candidates = await chrome.tabs.sendMessage(bound.id, {
+          type: 'bridge:get-ai-target-candidates',
+        });
+        const source = await chrome.tabs.sendMessage(bound.id, {
+          type: 'bridge:get-ai-page-source',
+        });
+        if (source?.ok === false) throw new Error(source.error || 'スナップショットに失敗しました。');
+        result.snapshot = {
+          title: scrubLine(String(source?.title || ''), 300),
+          url: scrubLine(String(source?.url || ''), 500),
+          elements: Array.isArray(candidates?.candidates)
+            ? candidates.candidates.slice(0, 80)
+            : [],
+          text: String(scrubber()(String(source?.text || ''))).slice(0, 12000),
+        };
+        break;
+      }
+      default: {
+        if (!CONTROL_CONTENT_OPS.has(step.op)) {
+          throw new Error(`control モードでは未対応の操作です: ${step.op}`);
+        }
+        const bound = await requireControlTab(sessionId, origin);
+        await ensureContentScript(bound.id);
+        const contentStep = {
+          op: step.op,
+          target: step.ref
+            ? {
+                ref: step.ref,
+                role: step.role || '',
+                name: step.name || '',
+                snapshot_hash: null,
+              }
+            : undefined,
+          key: step.key,
+          selection:
+            step.checked !== undefined
+              ? { kind: 'toggle', checked: step.checked }
+              : step.text
+                ? { kind: 'option', label: step.text }
+                : undefined,
+        };
+        const outcome = await chrome.tabs.sendMessage(bound.id, {
+          type: 'bridge:execute-step',
+          step: contentStep,
+          value: step.op === 'fill_ref' ? step.value ?? null : null,
+        });
+        result.outcome = {
+          status: outcome?.status || 'error',
+          detail: scrubLine(String(outcome?.detail || ''), 300),
+        };
+        if (step.op === 'extract_text_ref' && outcome?.status === 'done') {
+          const text = String(outcome.text || '').slice(0, 8000);
+          if (step.secret_name) {
+            // Token-shaped values never enter the persisted response; the host
+            // moves secret_values to the control secrets side-channel.
+            result.secret_values = [{ name: String(step.secret_name).slice(0, 60), value: text }];
+          } else {
+            result.text = scrubLine(text, 8000);
+          }
+        }
+        if (outcome?.status !== 'done' && outcome?.status !== 'skipped') {
+          return {
+            status: 'failed',
+            error: String(outcome?.detail || `step ${step.op} failed`),
+            origin,
+            result,
+          };
+        }
+        break;
+      }
+    }
+    return { status: 'completed', origin, result };
+  } catch (error) {
+    return { status: 'failed', error: errorText(error).slice(0, 500), origin, result };
+  }
+}
+
+// control_step items auto-execute: the session approval already happened on
+// the CLI side, so the inbox is informational (a live view of what ran).
+async function drainControlSteps(requests) {
+  const control = requests.filter((item) => item.request_kind === 'control_step');
+  for (const item of control) {
+    try {
+      const wire = await executeControlStep(item);
+      await sendRequestResponse(item, wire);
+    } catch (error) {
+      try {
+        await sendRequestResponse(item, {
+          status: 'failed',
+          error: errorText(error).slice(0, 500),
+        });
+      } catch {
+        /* the request may have expired mid-flight — nothing more to do */
+      }
+    }
+  }
 }
 
 async function observeTextFields(tabId) {

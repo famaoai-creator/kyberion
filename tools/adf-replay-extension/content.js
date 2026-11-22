@@ -577,7 +577,11 @@ async function performAction(element, step, value) {
     case 'extract_text_ref': {
       // Read-only observation. Redact before returning so no PII/secret leaves
       // the page (server re-redacts as well, browser-extension-bridge.ts).
-      const text = safeText(element.textContent || '');
+      const text = safeText(
+        element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement
+          ? element.value || ''
+          : element.textContent || ''
+      );
       return { status: 'done', detail: 'テキストを抽出しました', text };
     }
     default:
@@ -924,12 +928,20 @@ function getAiTargetCandidates() {
   const allElements = interactiveElements();
   const candidates = allElements
     .slice(0, 80)
-    .map((element, index) => ({
-      index,
-      role: roleOf(element),
-      name: safeText(accessibleName(element)),
-      text: safeText(element.textContent || ''),
-    }))
+    .map((element, index) => {
+      const role = roleOf(element);
+      const name = safeText(accessibleName(element));
+      const candidate = {
+        index,
+        ref: semanticRef(element, role, name),
+        role,
+        name,
+        text: safeText(element.textContent || ''),
+      };
+      const domPath = structuralPath(element);
+      if (domPath && domPath.length <= 600) candidate.dom_path = domPath;
+      return candidate;
+    })
     .filter((candidate) => candidate.name || candidate.text);
   return {
     ok: true,

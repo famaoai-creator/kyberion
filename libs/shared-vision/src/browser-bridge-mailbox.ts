@@ -55,6 +55,7 @@ import {
   safeExistsSync,
   safeMkdir,
   safeReaddir,
+  safeUnlink,
 } from '@agent/core/secure-io';
 import {
   PARTITIONED_RUNTIME_STATE_ROOTS,
@@ -88,7 +89,8 @@ const TENANT_OBSERVE_ORIGINS_ERROR =
 /** Schema maxLength of the free-text payload fields redaction may lengthen. */
 const PAYLOAD_TEXT_LIMITS = { purpose: 300, input: 30000, title: 120, body: 1000 } as const;
 
-export type BrowserBridgeRequestKind = 'observe_tab' | 'local_infer' | 'notify';
+export type BrowserBridgeRequestKind =
+  'observe_tab' | 'local_infer' | 'notify' | 'control_step';
 export type BrowserBridgeRequestStatus =
   'pending' | 'delivered' | 'completed' | 'declined' | 'failed' | 'expired';
 export type BrowserBridgeResponseStatus = 'completed' | 'declined' | 'failed';
@@ -123,8 +125,50 @@ export interface BrowserBridgeNotifyPayload {
   progress?: { done: number; total: number };
 }
 
+/**
+ * One schema-bounded step under a minted browser-control session
+ * (`browser-control-sessions.ts`). The session is the consent object: it
+ * pins this step to a canonical origin for a bounded lifetime; the host
+ * re-admits before enqueue and the extension re-validates the same fields
+ * before executing. `step.op` is a fixed vocabulary — no arbitrary script.
+ */
+export type BrowserBridgeControlStep = {
+  step_id: string;
+  op:
+    | 'snapshot' | 'screenshot' | 'extract_text_ref' | 'list_tabs'
+    | 'open_tab' | 'select_tab' | 'navigate'
+    | 'click_ref' | 'click_if_present' | 'fill_ref' | 'select_ref'
+    | 'press_ref' | 'wait_for_ref'
+    | 'submit_form' | 'upload_file' | 'download_file' | 'delete'
+    | 'purchase' | 'credential_submit' | 'settings_change';
+  ref?: string;
+  role?: string;
+  name?: string;
+  text?: string;
+  value?: string;
+  key?: string;
+  url?: string;
+  checked?: boolean;
+  wait_ms?: number;
+  timeout_ms?: number;
+  tab_id?: number;
+  label?: string;
+  /** extract_text_ref: return the text via secret_values, not the response. */
+  secret_name?: string;
+}
+
+export interface BrowserBridgeControlStepPayload {
+  session_id: string;
+  lease_id: string;
+  origin: string;
+  step: BrowserBridgeControlStep;
+}
+
 export type BrowserBridgePayload =
-  BrowserBridgeObservePayload | BrowserBridgeLocalInferPayload | BrowserBridgeNotifyPayload;
+  | BrowserBridgeObservePayload
+  | BrowserBridgeLocalInferPayload
+  | BrowserBridgeNotifyPayload
+  | BrowserBridgeControlStepPayload;
 
 export interface BrowserBridgeScope {
   tier: StorageDataTier;
@@ -233,7 +277,7 @@ function formatErrors(validate: ValidateFunction): string[] {
   );
 }
 
-function canonicalHttpOrigin(value: string): string | null {
+export function canonicalHttpOrigin(value: string): string | null {
   try {
     const url = new URL(value);
     if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
@@ -268,6 +312,12 @@ export function validateBrowserBridgeRequest(input: unknown): {
     }
     if (value.scope.tenant_slug && origins.length === 0) {
       errors.push(TENANT_OBSERVE_ORIGINS_ERROR);
+    }
+  }
+  if (value.request_kind === 'control_step') {
+    const payload = value.payload as BrowserBridgeControlStepPayload;
+    if (canonicalHttpOrigin(payload.origin) !== payload.origin) {
+      errors.push('payload.origin must be a canonical http(s) origin');
     }
   }
   if (value.request_kind === 'notify') {
@@ -504,6 +554,23 @@ function redactPayload(
     const observe = payload as BrowserBridgeObservePayload;
     return { ...observe, purpose: redactAndClamp(observe.purpose, PAYLOAD_TEXT_LIMITS.purpose) };
   }
+  if (kind === 'control_step') {
+    // Bounded vocabulary only — free-text fields are redacted, the step
+    // identity/binding fields pass through untouched.
+    const control = payload as BrowserBridgeControlStepPayload;
+    return {
+      ...control,
+      step: {
+        ...control.step,
+        ...(control.step.name
+          ? { name: redactAndClamp(control.step.name, 300) }
+          : {}),
+        ...(control.step.label
+          ? { label: redactAndClamp(control.step.label, 200) }
+          : {}),
+      },
+    };
+  }
   // notify: only the declared display fields survive (schema rejects extras);
   // it never carries page data, so redact its free text as well.
   const notify = payload as BrowserBridgeNotifyPayload;
@@ -512,6 +579,93 @@ function redactPayload(
     title: redactAndClamp(notify.title, PAYLOAD_TEXT_LIMITS.title),
     body: redactAndClamp(notify.body, PAYLOAD_TEXT_LIMITS.body),
   };
+}
+
+/** Where a step's captured secrets are moved before the response persists. */
+export const BROWSER_CONTROL_SECRET_ROOT =
+  'active/shared/runtime/browser-control/secrets';
+
+function controlSecretPath(requestId: string): string {
+  return assertSafeRepositoryPath(
+    pathResolver.rootResolve(path.posix.join(BROWSER_CONTROL_SECRET_ROOT, `${requestId}.json`)),
+    { rootDir: pathResolver.rootDir(), allowMissingLeaf: true }
+  );
+}
+
+/** Read (and optionally delete) a step's captured secrets after the response landed. */
+export function readBrowserControlSecrets(
+  requestId: string,
+  options: { delete?: boolean } = {}
+): Record<string, string> | null {
+  if (!REQUEST_ID_PATTERN.test(requestId)) return null;
+  const file = controlSecretPath(requestId);
+  if (!safeExistsSync(file)) return null;
+  const parsed = readJsonIfPresent<{ secrets?: Record<string, string> }>(file);
+  if (options.delete) {
+    try {
+      safeUnlink(file);
+    } catch {
+      /* best-effort scrub */
+    }
+  }
+  return parsed?.secrets ?? null;
+}
+
+/**
+ * A control_step result may carry `secret_values` — token-shaped strings the
+ * operator asked the page for (e.g. xapp-/xoxb- Slack tokens). They must not
+ * persist in the mailbox record, the journal, or the audit chain, so they are
+ * moved to a sibling secrets file and the record keeps only their names.
+ */
+function normalizeControlStepResult(
+  record: BrowserBridgeRequest,
+  result: Record<string, unknown>,
+  origin: string | undefined
+): { result: Record<string, unknown>; origin?: string } {
+  const payload = record.payload as BrowserBridgeControlStepPayload;
+  const step = result.step;
+  if (!step || typeof step !== 'object' || Array.isArray(step)) {
+    throw new BrowserBridgeMailboxError(
+      'invalid_response',
+      'control_step result needs a step echo'
+    );
+  }
+  const echo = step as Record<string, unknown>;
+  if (echo.step_id !== payload.step.step_id || echo.op !== payload.step.op) {
+    throw new BrowserBridgeMailboxError(
+      'invalid_response',
+      'control_step result step must echo the request step'
+    );
+  }
+  if (origin !== undefined && origin !== payload.origin) {
+    throw new BrowserBridgeMailboxError(
+      'invalid_response',
+      `control_step origin ${origin} does not match the session origin`
+    );
+  }
+  const secrets: Record<string, string> = {};
+  const captured: string[] = [];
+  const rawSecrets = result.secret_values;
+  if (Array.isArray(rawSecrets)) {
+    for (const entry of rawSecrets.slice(0, 8)) {
+      const name = cleanString((entry as Record<string, unknown>)?.name, 60);
+      const value = (entry as Record<string, unknown>)?.value;
+      if (name && typeof value === 'string' && value.length > 0 && value.length <= 4096) {
+        secrets[name] = value;
+        captured.push(name);
+      }
+    }
+  }
+  const rest = { ...result };
+  delete rest.secret_values;
+  const normalized = redactDeep(rest) as Record<string, unknown>;
+  if (captured.length > 0) {
+    const file = controlSecretPath(record.request_id);
+    safeMkdir(path.dirname(file));
+    writeJson(file, { request_id: record.request_id, secrets });
+    normalized.secret_capture = captured;
+  }
+  return { result: normalized, ...(origin ? { origin } : {}) };
 }
 
 /** Validate and store a new request; returns the stored record (status `pending`). */
@@ -888,6 +1042,18 @@ export function respondBrowserBridgeRequest(
             result: normalized.result,
             responded_at: now.toISOString(),
             origin: normalized.origin,
+          };
+        } else if (current.request_kind === 'control_step') {
+          const normalized = normalizeControlStepResult(
+            current,
+            raw as Record<string, unknown>,
+            origin ?? undefined
+          );
+          record = {
+            status: 'completed',
+            result: normalized.result,
+            responded_at: now.toISOString(),
+            ...(normalized.origin ? { origin: normalized.origin } : {}),
           };
         } else {
           record = {

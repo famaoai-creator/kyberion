@@ -9260,6 +9260,16 @@
         "ja": "Chrome 拡張の応答を待つ",
         "qps-ploc": "⟦Ẇȧïŧ ƒőř ŧħė Ƈħřőɱė ėẋŧėñşïőñ ŧő ȧñşẇėř ȧ řėɋůėşŧ ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
       },
+      "cli_cmd_operator_cli_browser": {
+        "en": "Drive Chrome through the extension bridge",
+        "ja": "拡張ブリッジ経由で Chrome を操作する",
+        "qps-ploc": "⟦Ɖřïṽė Ƈħřőɱė ŧħřőůɠħ ŧħė ėẋŧėñşïőñ ƀřïḓŕĕ ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "cli_cmd_operator_cli_browser_control": {
+        "en": "Interactive browser control under a session lease (open/snapshot/click/fill/press/extract)",
+        "ja": "セッションリース承認のもとでブラウザを対話操作(open/snapshot/click/fill/press/extract)",
+        "qps-ploc": "⟦Ïñŧėřȧƈŧïṽė ƀřőẇşėř ƈőñŧřőŀ ůñḓėř ȧ şėşşïőñ ŀėȧşė ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+      },
       "cli_cmd_operator_cli_grants": {
         "en": "Manage standing grants (consents decided ahead of time)",
         "ja": "常設の許可(事前に決める同意)を管理",
