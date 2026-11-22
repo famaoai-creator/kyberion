@@ -13,6 +13,7 @@ import {
 import {
   CHARTER_SCOPE_KINDS,
   charterScopesEqual,
+  charterScopeTenantSlug,
 } from '@agent/core/governance/accountability-charter';
 import {
   onboardingAuthorityScope,
@@ -23,9 +24,43 @@ import {
   applyOnboardingAuthority,
   type OnboardingAuthorityPrincipal,
 } from '@agent/core/organization/onboarding-authority';
+import { describeInvalidExternalOperationGrants } from '@agent/core/governance/external-operation-target';
 import { defineScript, isDirectScript } from '../lib/harness.js';
 import { readSafeJsonFile } from '../lib/json-input.js';
 import { inspectInstalledIdentity, canonicalAuthorityCommand } from '../lib/installed-identity.js';
+
+/** Sequential argv scan: each `--grant` opens a grant; `--grant-field k=v` attaches
+ * to the most recent one. The composed objects go through the delegation
+ * registry parser — unknown operations, fields and wildcards fail closed. */
+function grantsFromFlagArgv(argv: string[]): Record<string, unknown>[] {
+  const grants: Record<string, unknown>[] = [];
+  const attach = (kv: string | undefined) => {
+    const eq = kv?.indexOf('=') ?? -1;
+    if (!kv || eq <= 0) throw new Error('--grant-field expects key=value.');
+    if (!grants.length) throw new Error('--grant-field must follow a --grant.');
+    const last = grants[grants.length - 1];
+    if (kv.slice(0, eq) === 'operation_id')
+      throw new Error('operation_id comes from --grant, not --grant-field.');
+    last[kv.slice(0, eq)] = kv.slice(eq + 1);
+  };
+  for (let i = 0; i < argv.length; i++) {
+    const token = argv[i];
+    if (token === '--grant') {
+      const op = argv[++i];
+      if (!op || op.startsWith('--')) throw new Error('--grant expects an operation_id.');
+      grants.push({ operation_id: op });
+    } else if (token.startsWith('--grant=')) {
+      grants.push({ operation_id: token.slice('--grant='.length) });
+    } else if (token === '--grant-field') {
+      attach(argv[++i]);
+    } else if (token.startsWith('--grant-field=')) {
+      attach(token.slice('--grant-field='.length));
+    }
+  }
+  const problems = describeInvalidExternalOperationGrants(grants);
+  if (problems.length) throw new Error(`invalid delegation grant: ${problems.join('; ')}`);
+  return grants;
+}
 
 export async function main(
   argv: string[],
@@ -42,6 +77,27 @@ export async function main(
     .option('scope', { choices: CHARTER_SCOPE_KINDS, default: 'person' })
     .option('tenant', { type: 'string' })
     .option('file', { type: 'string' })
+    .option('grant', {
+      type: 'array',
+      string: true,
+      description:
+        'preview only: an operation_id to delegate; repeat for several grants. ' +
+        'Attach exact target fields with --grant-field key=value after each --grant.',
+    })
+    .option('grant-field', {
+      type: 'array',
+      string: true,
+      description:
+        'preview only: key=value target field for the most recent --grant (exact target fields only; validated by the delegation registry)',
+    })
+    .option('mode', {
+      choices: ['grant', 'revoke'] as const,
+      description: 'preview only with --grant: grant (default) or revoke the listed targets',
+    })
+    .option('expires-at', {
+      type: 'string',
+      description: 'preview only with --grant: charter expiry ISO date (required in flag mode)',
+    })
     .option('out', {
       type: 'string',
       description: 'Save the reviewed preview under the active personal profile',
@@ -50,14 +106,26 @@ export async function main(
     .option('json', { type: 'boolean', default: false })
     .strict()
     .parse();
-  const usesFile = args.action === 'preview' || args.action === 'request';
+  const flagMode = Boolean(args.grant?.length) || Boolean(args.grantField?.length);
+  const usesFile = args.action === 'request' || (args.action === 'preview' && !flagMode);
   const usesRequestId = args.action === 'status' || args.action === 'apply';
   if (args.out && args.action !== 'preview') throw new Error('--out is only valid for preview.');
+  if (flagMode && args.action !== 'preview')
+    throw new Error(
+      '--grant/--grant-field are only valid for preview; request takes the reviewed preview file.'
+    );
+  if (flagMode && args.file) throw new Error('--file and --grant are mutually exclusive.');
   if (usesFile !== Boolean(args.file)) {
     throw new Error(
-      usesFile ? '--file is required.' : '--file is only valid for preview or request.'
+      usesFile
+        ? args.action === 'preview'
+          ? '--file or --grant is required.'
+          : '--file is required.'
+        : '--file is only valid for preview or request.'
     );
   }
+  if (flagMode && !args.expiresAt)
+    throw new Error('--expires-at is required with --grant (an explicit charter expiry).');
   if (usesRequestId !== Boolean(args.requestId)) {
     throw new Error(
       usesRequestId
@@ -100,9 +168,19 @@ export async function main(
         ? onboardingAuthorityRequestStatus(principal, selectedScope!, args.requestId)
         : applyOnboardingAuthority(principal, selectedScope!, args.requestId);
     }
-    if (!args.file) throw new Error('--file is required.');
-    const file = assertSafeRepositoryPath(args.file, { allowMissingLeaf: false });
-    const envelope = readSafeJsonFile<Record<string, unknown>>(file, 'Onboarding authority plan');
+    const flagScopeTenant = flagMode ? charterScopeTenantSlug(selectedScope!) : undefined;
+    const envelope = flagMode
+      ? ({
+          scope_kind: selectedScope!.kind,
+          ...(flagScopeTenant ? { tenant_slug: flagScopeTenant } : {}),
+          mode: args.mode ?? 'grant',
+          grants: grantsFromFlagArgv(argv),
+          expires_at: args.expiresAt,
+        } as Record<string, unknown>)
+      : readSafeJsonFile<Record<string, unknown>>(
+          assertSafeRepositoryPath(args.file!, { allowMissingLeaf: false }),
+          'Onboarding authority plan'
+        );
     const input = envelope.input ?? envelope;
     const fileScope = onboardingAuthorityScope(input);
     if (selectedScope && !charterScopesEqual(selectedScope, fileScope))

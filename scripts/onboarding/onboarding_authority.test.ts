@@ -45,14 +45,22 @@ vi.mock('../lib/installed-identity.js', () => ({
   canonicalAuthorityCommand: () => 'canonical-command',
 }));
 vi.mock('@agent/core/organization/onboarding-authority', () => ({
-  onboardingAuthorityScope: (value: unknown) => value,
-  previewOnboardingAuthority: () => ({ digest: 'digest', base_hash: 'base', statement: 'review' }),
+  onboardingAuthorityScope: (value: Record<string, unknown>) => ({
+    kind: value.scope_kind,
+    ...(value.tenant_slug ? { tenant_slug: value.tenant_slug } : {}),
+  }),
+  previewOnboardingAuthority: vi.fn(() => ({
+    digest: 'digest',
+    base_hash: 'base',
+    statement: 'review',
+  })),
   readOnboardingAuthority: () => ({}),
   requestOnboardingAuthority: vi.fn(),
   onboardingAuthorityRequestStatus: vi.fn(),
   applyOnboardingAuthority: vi.fn(),
 }));
 import { main } from './onboarding_authority.js';
+import { previewOnboardingAuthority } from '@agent/core/organization/onboarding-authority';
 describe('onboarding authority reviewed preview output', () => {
   beforeEach(() => {
     state.exists = false;
@@ -130,5 +138,100 @@ describe('onboarding authority reviewed preview output', () => {
     state.installation = true;
     await expect(main(['show'])).rejects.toThrow('canonical-command');
     expect(state.writes).toEqual([]);
+  });
+});
+
+describe('onboarding authority flag-composed grants', () => {
+  beforeEach(() => {
+    state.exists = false;
+    state.installation = false;
+    state.writes = [];
+    state.concurrentPreview = '';
+    vi.mocked(previewOnboardingAuthority).mockClear();
+  });
+  it('composes exact-target grants from --grant/--grant-field without --file', async () => {
+    await main([
+      'preview',
+      '--scope',
+      'person',
+      '--grant',
+      'vcs:pr_create',
+      '--grant-field',
+      'repository=https://github.com/acme/widgets',
+      '--expires-at',
+      '2030-01-01',
+    ]);
+    expect(previewOnboardingAuthority).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        scope_kind: 'person',
+        mode: 'grant',
+        expires_at: '2030-01-01',
+        grants: [
+          {
+            operation_id: 'vcs:pr_create',
+            repository: 'https://github.com/acme/widgets',
+          },
+        ],
+      })
+    );
+  });
+  it('attaches each --grant-field to the most recent --grant', async () => {
+    await main([
+      'preview',
+      '--scope',
+      'person',
+      '--grant',
+      'vcs:pr_create',
+      '--grant-field',
+      'repository=https://github.com/acme/widgets',
+      '--grant',
+      'service:slack:preset:post_message',
+      '--grant-field',
+      'channel=#alerts',
+      '--expires-at',
+      '2030-01-01',
+    ]);
+    expect(vi.mocked(previewOnboardingAuthority).mock.calls[0]![1]).toEqual(
+      expect.objectContaining({
+        grants: [
+          { operation_id: 'vcs:pr_create', repository: 'https://github.com/acme/widgets' },
+          { operation_id: 'service:slack:preset:post_message', channel: '#alerts' },
+        ],
+      })
+    );
+  });
+  it('refuses unknown operations, undeclared fields and malformed flag input', async () => {
+    const base = ['preview', '--scope', 'person', '--expires-at', '2030-01-01'] as const;
+    await expect(main([...base, '--grant', 'mcp:call_tool'])).rejects.toThrow(
+      'invalid delegation grant'
+    );
+    await expect(
+      main([...base, '--grant', 'vcs:pr_create', '--grant-field', 'bogus=x'])
+    ).rejects.toThrow('invalid delegation grant');
+    await expect(
+      main([...base, '--grant-field', 'repository=x', '--grant', 'vcs:pr_create'])
+    ).rejects.toThrow('must follow a --grant');
+    expect(previewOnboardingAuthority).not.toHaveBeenCalled();
+  });
+  it('requires --expires-at and rejects --file/--grant mixing or non-preview actions', async () => {
+    await expect(
+      main(['preview', '--scope', 'person', '--grant', 'vcs:pr_create'])
+    ).rejects.toThrow('--expires-at is required');
+    await expect(
+      main([
+        'preview',
+        '--file',
+        '/repo/input.json',
+        '--grant',
+        'vcs:pr_create',
+        '--expires-at',
+        '2030-01-01',
+      ])
+    ).rejects.toThrow('mutually exclusive');
+    await expect(
+      main(['request', '--grant', 'vcs:pr_create', '--expires-at', '2030-01-01'])
+    ).rejects.toThrow('only valid for preview');
+    expect(previewOnboardingAuthority).not.toHaveBeenCalled();
   });
 });

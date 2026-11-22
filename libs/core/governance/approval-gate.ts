@@ -91,6 +91,12 @@ export interface ApprovalGateParams {
   hasHuman?: boolean;
   /** Trusted host explicitly requests a durable decision; this does not attest human presence. */
   enqueueRequest?: boolean;
+  /**
+   * Trusted registry-derived charter delegation target for a delegable
+   * external operation; persisted on the request so `approvals --delegate`
+   * can compose an exact-target charter grant from it.
+   */
+  delegationTarget?: import('./external-operation-target.js').CharterExternalOperationTarget;
   /** Trusted viewer/entity scope for the durable request, separate from payload.scope policy labels. */
   requestScope?: EventScopeInput;
   /** Optional UI capability signal used by callers that model a surface separately. */
@@ -737,6 +743,7 @@ export function enforceApprovalGate(
         : agentId,
     ...(params.kind ? { kind: params.kind } : {}),
     ...(params.requestedByContext ? { requestedByContext: params.requestedByContext } : {}),
+    ...(params.delegationTarget ? { delegationTarget: params.delegationTarget } : {}),
     draft,
     ...(params.requestScope ? { scope: params.requestScope } : {}),
     source: params.source,
