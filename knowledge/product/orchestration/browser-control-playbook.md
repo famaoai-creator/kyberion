@@ -13,13 +13,13 @@ op vocabulary, same ref resolution, different consent object.
 
 ## Consent model
 
-| Layer | What enforces it |
-|---|---|
-| Session approval | `open` creates an approval request; the session (`BCS-*`) is minted only after `pnpm kyberion approvals --approve <id>` |
-| Origin binding | Session pins one canonical origin; host re-checks on enqueue, extension re-checks before executing — navigation outside the origin fails the step |
-| Risk ceiling | `low` (default) admits the interactive vocabulary; `observe` admits reads only |
-| High-risk steps | `submit_form`, `credential_submit`, `settings_change`, `delete`, `purchase`, `upload_file`, `download_file` need a per-step approval each — `browser control resume <approval_id>` runs the exact approved step |
-| Expiry | Sessions live ≤ 60 min (default 30); `close` revokes |
+| Layer            | What enforces it                                                                                                                                                                                                |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Session approval | `open` creates an approval request; the session (`BCS-*`) is minted only after `pnpm kyberion approvals --approve <id>`                                                                                         |
+| Origin binding   | Session pins one canonical origin; host re-checks on enqueue, extension re-checks before executing — navigation outside the origin fails the step                                                               |
+| Risk ceiling     | `low` (default) admits the interactive vocabulary; `observe` admits reads only                                                                                                                                  |
+| High-risk steps  | `submit_form`, `credential_submit`, `settings_change`, `delete`, `purchase`, `upload_file`, `download_file` need a per-step approval each — `browser control resume <approval_id>` runs the exact approved step |
+| Expiry           | Sessions live ≤ 60 min (default 30); `close` revokes                                                                                                                                                            |
 
 The session **is** the consent: steps never ask in the side panel and never
 carry arbitrary JavaScript — the mailbox schema pins `step.op` to a fixed
@@ -40,9 +40,20 @@ pnpm kyberion browser control select <ref> --text <label> | --checked
 pnpm kyberion browser control press <ref> [--key Enter]
 pnpm kyberion browser control wait <ref>
 pnpm kyberion browser control extract <ref> [--secret <name>]
+pnpm kyberion browser control screenshot           # JPEG → artifact file
+pnpm kyberion browser control download <ref>       # link/media → artifact file
+pnpm kyberion browser control upload <ref> --file <path>
+pnpm kyberion browser control submit|delete|purchase <ref>
+pnpm kyberion browser control settings-change|credential-submit <ref>
 pnpm kyberion browser control resume <approval_id> # after approving a step
 pnpm kyberion browser control close [<session>]
 ```
+
+`screenshot` and `download` return an `artifacts[]` entry — the bytes land in
+`active/shared/runtime/browser-control/artifacts/<request_id>/` (same
+retention entry as the secrets side-channel) and the response carries only
+`{name, path, mime, bytes}` because the mailbox caps responses at 64 KiB.
+Downloads cap at ~650 KB, uploads at ~1 MB (transport limits, not policy).
 
 `--session <BCS-…>` picks a session when several are active; otherwise the
 most recent active session is used. `--json` prints the raw response.
@@ -67,8 +78,13 @@ most recent active session is used. `--json` prints the raw response.
 - `fill <ref> <value>` persists the value in the mailbox record — do not
   pass credentials as `value`; ask the operator to type them, or use an
   approved `credential_submit` step where the human completes the form.
-- `screenshot` is in the vocabulary but the response budget (64 KiB) makes it
-  unreliable; prefer `snapshot`/`extract`.
+- Page-touching ops (snapshot, clicks, fills, extract) need the per-origin
+  extension grant: connect the tab once in the side panel ("このタブを接続")
+  or the step fails with a permission hint. `tabs`/`tab`/`navigate` work
+  without it.
+- Mailbox delivery is pull-based: the alarm poll runs ~1/min; the 5 s fast
+  poll only lives while the side panel is open — keep it open during
+  interactive loops or expect up to a minute per step.
 - Sessions and the secrets side-channel are checkout-local — a step queued
   here is answered by the extension bound to this checkout's native host.
 

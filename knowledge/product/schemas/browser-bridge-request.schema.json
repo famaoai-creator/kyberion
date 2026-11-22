@@ -230,6 +230,17 @@
               "type": "string",
               "maxLength": 60,
               "description": "When set on extract_text_ref, the extracted text is returned in result.secret_values and moved to the control secrets side-channel instead of the persisted response."
+            },
+            "file": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["data_b64"],
+              "properties": {
+                "name": { "type": "string", "maxLength": 120 },
+                "mime": { "type": "string", "maxLength": 80 },
+                "data_b64": { "type": "string", "minLength": 1, "maxLength": 1400000 }
+              },
+              "description": "upload_file: file payload staged through the request (approx 1MB decoded)."
             }
           }
         }

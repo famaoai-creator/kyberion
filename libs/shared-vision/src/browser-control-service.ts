@@ -104,9 +104,10 @@ export function requestBrowserControlSession(input: {
   return { approval_request_id: record.id, origin };
 }
 
-export function approvalStatus(
-  approvalRequestId: string
-): { status: string; record?: ApprovalRequestRecord } {
+export function approvalStatus(approvalRequestId: string): {
+  status: string;
+  record?: ApprovalRequestRecord;
+} {
   const record = loadApprovalRequest(BROWSER_CONTROL_APPROVAL_CHANNEL, approvalRequestId);
   if (!record) return { status: 'missing' };
   if (record.status === 'pending' && isApprovalRequestExpired(record)) {
@@ -214,7 +215,23 @@ export function enqueueSessionStep(input: {
             `Session ${session_id} wants to run high-risk op ${step.op}` +
             (step.label ? ` (${step.label})` : '') +
             `. Approve to execute this one step.`,
-          details: JSON.stringify({ session_id, step }, null, 2),
+          details: JSON.stringify(
+            {
+              session_id,
+              step: step.file
+                ? {
+                    ...step,
+                    file: {
+                      name: step.file.name,
+                      mime: step.file.mime,
+                      bytes: Math.floor(step.file.data_b64.length * 0.75),
+                    },
+                  }
+                : step,
+            },
+            null,
+            2
+          ),
           severity: 'high',
         },
         requestedByContext: {

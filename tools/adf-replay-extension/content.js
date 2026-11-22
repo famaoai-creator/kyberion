@@ -540,6 +540,62 @@ async function waitForTarget(step) {
   };
 }
 
+// High-risk semantic ops are deliberately click-shaped so they share the
+// audited target-resolution path; the distinct op name is what the journal,
+// approval prompts and the recording keep as the operator's intent.
+// JS dialogs (confirm/alert/prompt) cannot be answered from a content
+// script — auto-accept them for the guarded click only, then restore.
+async function withAutoConfirm(fn) {
+  const original = {
+    confirm: window.confirm,
+    alert: window.alert,
+    prompt: window.prompt,
+  };
+  window.confirm = () => true;
+  window.alert = () => undefined;
+  window.prompt = () => '';
+  try {
+    return await fn();
+  } finally {
+    window.confirm = original.confirm;
+    window.alert = original.alert;
+    window.prompt = original.prompt;
+  }
+}
+
+// Payload bounds are transport-driven: upload rides in the mailbox request
+// (schema caps data_b64 at 1.4M chars ≈ 1MB decoded); download rides through
+// the host's store_artifact channel capped at 950K b64 chars ≈ 700KB decoded.
+const MAX_UPLOAD_FILE_BYTES = 1024 * 1024;
+const MAX_DOWNLOAD_FILE_BYTES = 650 * 1024;
+
+function b64ToBytes(b64) {
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+
+function bytesToB64(bytes) {
+  let bin = '';
+  const CHUNK = 0x8000;
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    bin += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
+  }
+  return btoa(bin);
+}
+
+function downloadNameFor(element, url) {
+  const named = element.getAttribute?.('download') || element.download;
+  if (named) return String(named).slice(0, 120);
+  try {
+    const base = new URL(url, location.href).pathname.split('/').pop();
+    return (base || 'download.bin').slice(0, 120);
+  } catch {
+    return 'download.bin';
+  }
+}
+
 async function performAction(element, step, value) {
   element.scrollIntoView({ block: 'center' });
   switch (step.op) {
@@ -547,6 +603,74 @@ async function performAction(element, step, value) {
     case 'click_if_present':
       element.click();
       return { status: 'done', detail: 'クリックしました' };
+    case 'delete':
+    case 'purchase':
+    case 'settings_change':
+    case 'credential_submit':
+      await withAutoConfirm(async () => element.click());
+      return { status: 'done', detail: `${step.op} を実行しました` };
+    case 'upload_file': {
+      const input =
+        element instanceof HTMLInputElement && element.type === 'file'
+          ? element
+          : element.querySelector?.('input[type="file"]');
+      if (!(input instanceof HTMLInputElement) || input.type !== 'file') {
+        return { status: 'error', detail: 'file input が見つかりません' };
+      }
+      const file = step.file;
+      if (!file || typeof file.data_b64 !== 'string' || !file.data_b64) {
+        return { status: 'error', detail: 'file {name, mime, data_b64} が必要です' };
+      }
+      const bytes = b64ToBytes(file.data_b64);
+      if (bytes.length > MAX_UPLOAD_FILE_BYTES) {
+        return {
+          status: 'error',
+          detail: `ファイルが大きすぎます（上限 ${MAX_UPLOAD_FILE_BYTES}B）`,
+        };
+      }
+      const upload = new File([bytes], String(file.name || 'upload.bin').slice(0, 120), {
+        type: String(file.mime || 'application/octet-stream').slice(0, 80),
+      });
+      const dt = new DataTransfer();
+      dt.items.add(upload);
+      input.files = dt.files;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+      return { status: 'done', detail: `ファイルをセットしました: ${upload.name}` };
+    }
+    case 'download_file': {
+      const anchor = element instanceof HTMLAnchorElement ? element : element.closest('a[href]');
+      const media = anchor
+        ? null
+        : element.querySelector?.('img[src], video[src], audio[src], source[src]');
+      const url = anchor?.href || media?.src || element.src;
+      if (!url || !/^https?:/i.test(url)) {
+        return { status: 'error', detail: 'ダウンロード可能な URL が見つかりません' };
+      }
+      const response = await fetch(url, { credentials: 'include' });
+      if (!response.ok) {
+        return { status: 'error', detail: `ダウンロード失敗: HTTP ${response.status}` };
+      }
+      const buffer = await response.arrayBuffer();
+      if (buffer.byteLength > MAX_DOWNLOAD_FILE_BYTES) {
+        return {
+          status: 'error',
+          detail: `ファイルが大きすぎます（上限 ${MAX_DOWNLOAD_FILE_BYTES}B）`,
+        };
+      }
+      const mime = (response.headers.get('content-type') || 'application/octet-stream').split(
+        ';'
+      )[0];
+      return {
+        status: 'done',
+        detail: 'ダウンロードしました',
+        artifact: {
+          name: downloadNameFor(element, url),
+          mime,
+          data_b64: bytesToB64(new Uint8Array(buffer)),
+        },
+      };
+    }
     case 'fill_ref':
       if (value == null || value === '')
         return { status: 'skipped', detail: '入力値が指定されていません' };

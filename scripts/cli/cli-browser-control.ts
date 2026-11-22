@@ -7,9 +7,11 @@
  *                       then open a bound tab (waits for the approval by default)
  *   sessions            List sessions and their status
  *   close <session>     Revoke a session
- *   tabs|tab <tab_id>|navigate <url>|snapshot|click <ref>|fill <ref> <value>|
- *   select <ref> (--text <t>|--checked)|press <ref> [--key <k>]|
- *   wait <ref>|extract <ref> [--secret <name>]
+ *   tabs|tab <tab_id>|navigate <url>|snapshot|screenshot|click <ref>|
+ *   fill <ref> <value>|select <ref> (--text <t>|--checked)|press <ref>|
+ *   wait <ref>|extract <ref> [--secret <name>]|download <ref>|
+ *   upload <ref> --file <path>|submit|delete|purchase|
+ *   settings-change|credential-submit <ref>
  *                       Run one step in the active (or --session) session
  *   resume <approval_id>
  *                       Run the step its per-step approval was granted for
@@ -34,6 +36,7 @@ import {
 } from '@agent/shared-vision/browser-control-service';
 import { listBrowserControlSessions } from '@agent/shared-vision/browser-control-sessions';
 import { withExecutionContext, withExecutionContextAsync } from '@agent/core/authority';
+import { safeReadFile } from '@agent/core/secure-io';
 import { detectCliAgentPrincipal } from '@agent/core/governance/cli-operator-principal';
 import type { BrowserBridgeControlStep } from '@agent/shared-vision/browser-bridge-mailbox';
 import { ScriptExitError } from '../lib/harness.js';
@@ -46,6 +49,9 @@ export const BROWSER_CONTROL_USAGE = `Usage: pnpm kyberion browser control <verb
   tabs | tab <tab_id> | navigate <url> | snapshot
   click <ref> | fill <ref> <value> | select <ref> (--text <t>|--checked)
   press <ref> [--key <key>] | wait <ref> | extract <ref> [--secret <name>]
+  screenshot | download <ref> | upload <ref> --file <path>
+  submit <ref> | delete <ref> | purchase <ref>
+  settings-change <ref> | credential-submit <ref>
   resume <approval_id>
     common: [--session <BCS-…>] [--mission <id>] [--timeout-sec N] [--json]`;
 
@@ -211,6 +217,31 @@ function buildStep(parsed: ParsedArgs): BrowserBridgeControlStep {
       step.op = 'credential_submit';
       step.ref = need(0, '<ref>');
       break;
+    case 'delete':
+      step.op = 'delete';
+      step.ref = need(0, '<ref>');
+      break;
+    case 'purchase':
+      step.op = 'purchase';
+      step.ref = need(0, '<ref>');
+      break;
+    case 'download':
+      step.op = 'download_file';
+      step.ref = need(0, '<ref>');
+      break;
+    case 'upload': {
+      step.op = 'upload_file';
+      step.ref = need(0, '<ref>');
+      const filePath = str(parsed.options, 'file') ?? need(1, '--file <path>');
+      const buffer = safeReadFile(filePath, { encoding: null, maxSizeMB: 1, label: 'upload' });
+      const name = filePath.split('/').pop() ?? 'upload.bin';
+      step.file = {
+        name: name.slice(0, 120),
+        mime: str(parsed.options, 'mime') ?? 'application/octet-stream',
+        data_b64: Buffer.isBuffer(buffer) ? buffer.toString('base64') : buffer,
+      };
+      break;
+    }
     default:
       fail(`unknown verb: ${verb}`);
   }

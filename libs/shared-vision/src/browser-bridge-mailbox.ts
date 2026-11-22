@@ -169,6 +169,8 @@ export type BrowserBridgeControlStep = {
   label?: string;
   /** extract_text_ref: return the text via secret_values, not the response. */
   secret_name?: string;
+  /** upload_file: file staged in the request (≈1MB decoded; see schema). */
+  file?: { name?: string; mime?: string; data_b64: string };
 };
 
 export interface BrowserBridgeControlStepPayload {

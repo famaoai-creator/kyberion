@@ -2228,9 +2228,7 @@ async function sendRequestResponse(item, wire) {
     type: 'respond_request',
     request_id: item.request_id,
     status: wire.status,
-    ...(wire.status === 'completed' && wire.result !== undefined
-      ? { result: wire.result }
-      : {}),
+    ...(wire.status === 'completed' && wire.result !== undefined ? { result: wire.result } : {}),
     ...(wire.error ? { error: scrubLine(wire.error, 1000) } : {}),
     ...(wire.origin ? { origin: wire.origin } : {}),
   };
@@ -2477,6 +2475,28 @@ async function requireControlTab(sessionId, origin) {
   return tab;
 }
 
+// Binary payloads (screenshots, downloads) do not fit the 64KB mailbox
+// response cap — they go to the host's artifact side-channel and the result
+// carries only a small {name, path, mime, bytes} reference.
+async function storeControlArtifact(requestId, name, mime, dataB64) {
+  const response = await callNativeHost({
+    type: 'store_artifact',
+    request_id: requestId,
+    name: String(name || 'artifact').slice(0, 48),
+    mime: String(mime || 'application/octet-stream').slice(0, 80),
+    data_b64: String(dataB64 || ''),
+  });
+  if (!response?.ok) {
+    throw new Error(`artifact の保存に失敗しました: ${response?.error || 'native host error'}`);
+  }
+  return {
+    name: String(response.name || name),
+    path: String(response.path || ''),
+    mime: String(response.mime || mime),
+    bytes: Number(response.bytes || 0),
+  };
+}
+
 async function executeControlStep(item) {
   const payload = item.payload || {};
   const step = payload.step || {};
@@ -2521,14 +2541,12 @@ async function executeControlStep(item) {
       }
       case 'list_tabs': {
         const tabs = await chrome.tabs.query({});
-        result.tabs = tabs
-          .slice(0, 50)
-          .map((tab) => ({
-            id: tab.id,
-            url: scrubLine(String(tab.url || ''), 300),
-            title: scrubLine(String(tab.title || ''), 200),
-            active: tab.active === true,
-          }));
+        result.tabs = tabs.slice(0, 50).map((tab) => ({
+          id: tab.id,
+          url: scrubLine(String(tab.url || ''), 300),
+          title: scrubLine(String(tab.title || ''), 200),
+          active: tab.active === true,
+        }));
         break;
       }
       case 'select_tab': {
@@ -2543,6 +2561,24 @@ async function executeControlStep(item) {
         result.tab = { id: settled.id, url: settled.url, title: settled.title };
         break;
       }
+      case 'screenshot': {
+        const bound = await requireControlTab(sessionId, origin);
+        await chrome.tabs.update(bound.id, { active: true });
+        const dataUrl = await chrome.tabs.captureVisibleTab(bound.windowId, {
+          format: 'jpeg',
+          quality: 70,
+        });
+        const dataB64 = String(dataUrl || '').split(',')[1] || '';
+        if (!dataB64) throw new Error('スクリーンショットの取得に失敗しました。');
+        const stored = await storeControlArtifact(
+          item.request_id,
+          'screenshot',
+          'image/jpeg',
+          dataB64
+        );
+        result.artifacts = [stored];
+        break;
+      }
       case 'snapshot': {
         const bound = await requireControlTab(sessionId, origin);
         await ensureContentScript(bound.id);
@@ -2552,13 +2588,12 @@ async function executeControlStep(item) {
         const source = await chrome.tabs.sendMessage(bound.id, {
           type: 'bridge:get-ai-page-source',
         });
-        if (source?.ok === false) throw new Error(source.error || 'スナップショットに失敗しました。');
+        if (source?.ok === false)
+          throw new Error(source.error || 'スナップショットに失敗しました。');
         result.snapshot = {
           title: scrubLine(String(source?.title || ''), 300),
           url: scrubLine(String(source?.url || ''), 500),
-          elements: Array.isArray(candidates?.candidates)
-            ? candidates.candidates.slice(0, 80)
-            : [],
+          elements: Array.isArray(candidates?.candidates) ? candidates.candidates.slice(0, 80) : [],
           text: String(scrubber()(String(source?.text || ''))).slice(0, 12000),
         };
         break;
@@ -2580,6 +2615,7 @@ async function executeControlStep(item) {
               }
             : undefined,
           key: step.key,
+          file: step.op === 'upload_file' ? step.file : undefined,
           selection:
             step.checked !== undefined
               ? { kind: 'toggle', checked: step.checked }
@@ -2590,12 +2626,21 @@ async function executeControlStep(item) {
         const outcome = await chrome.tabs.sendMessage(bound.id, {
           type: 'bridge:execute-step',
           step: contentStep,
-          value: step.op === 'fill_ref' ? step.value ?? null : null,
+          value: step.op === 'fill_ref' ? (step.value ?? null) : null,
         });
         result.outcome = {
           status: outcome?.status || 'error',
           detail: scrubLine(String(outcome?.detail || ''), 300),
         };
+        if (outcome?.artifact && outcome.status === 'done') {
+          const stored = await storeControlArtifact(
+            item.request_id,
+            outcome.artifact.name,
+            outcome.artifact.mime,
+            outcome.artifact.data_b64
+          );
+          result.artifacts = [stored];
+        }
         if (step.op === 'extract_text_ref' && outcome?.status === 'done') {
           const text = String(outcome.text || '').slice(0, 8000);
           if (step.secret_name) {
