@@ -383,18 +383,20 @@ function actionItemEntries(
 }
 
 /**
- * One calendar entry per block: `date` is the block's UTC start day (the week
- * view re-derives the hour position per day and clips multi-day blocks).
+ * One entry per block: `date` is the UTC start day (sort key only — the
+ * client expands the instant-span onto the viewer's local days, so blocks
+ * always land on the days they actually cover in the viewer's clock).
  * `done` is always true — sessions are history, never due work.
  */
-function agentSessionEntries(block: AgentSessionBlock): WorkspaceCalendarEntry[] {
-  const first = zoneDay(block.startAt, 'UTC') ?? block.startAt.slice(0, 10);
-  const last = block.endAt ? (zoneDay(block.endAt, 'UTC') ?? first) : first;
-  const base = {
+function agentSessionEntry(block: AgentSessionBlock): WorkspaceCalendarEntry {
+  return {
+    source: 'agent_session',
+    id: block.id,
     title: block.title,
+    date: zoneDay(block.startAt, 'UTC') ?? block.startAt.slice(0, 10),
     done: true,
     status: block.status,
-    link: { kind: 'session' as const, id: block.sessionId ?? block.delegationId ?? block.id },
+    link: { kind: 'session', id: block.sessionId ?? block.delegationId ?? block.id },
     startAt: block.startAt,
     ...(block.endAt ? { endAt: block.endAt } : {}),
     provider: block.provider,
@@ -403,15 +405,6 @@ function agentSessionEntries(block: AgentSessionBlock): WorkspaceCalendarEntry[]
     ...(block.tenantSlug ? { tenantSlug: block.tenantSlug } : {}),
     ...(block.missionId ? { missionId: block.missionId } : {}),
   };
-  // One entry per UTC day touched — the week lane clips instants to each day.
-  const days: string[] = [];
-  for (let day = first; day <= last; day = shiftDay(day, 1)) days.push(day);
-  return days.map((date, index) => ({
-    source: 'agent_session' as const,
-    id: index === 0 ? block.id : `${block.id}:${date}`,
-    date,
-    ...base,
-  }));
 }
 
 export interface WorkspaceCalendarFilter {
@@ -491,7 +484,7 @@ export function buildWorkspaceCalendar(
       if (sources.agentSessions) {
         try {
           const blocks = sources.agentSessions(range, viewerTenants);
-          for (const block of blocks) entries.push(...agentSessionEntries(block));
+          for (const block of blocks) entries.push(agentSessionEntry(block));
         } catch {
           degraded.push('agent_sessions');
         }

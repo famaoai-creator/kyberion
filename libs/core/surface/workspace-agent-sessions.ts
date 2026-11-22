@@ -160,7 +160,10 @@ function delegationBlocks(
   const blocks: AgentSessionBlock[] = [];
   for (const record of records) {
     const startAt = record.created_at;
-    const endAt = record.status === 'started' ? undefined : record.completed_at;
+    // A terminal record missing completed_at collapses to its start instant
+    // rather than pretending it is still running.
+    const endAt =
+      record.status === 'started' ? undefined : (record.completed_at ?? record.created_at);
     if (!overlaps(startAt, endAt ?? new Date().toISOString(), range.from, range.to)) continue;
     const model = record.outcome?.served_model;
     blocks.push({

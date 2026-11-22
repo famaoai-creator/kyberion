@@ -20,6 +20,8 @@ import {
   shiftAnchor,
   sourceGroup,
   sessionSpanForDay,
+  layoutSessionLanes,
+  sessionDurationLabel,
   startOfWeek,
   summarizeCalendar,
   type CalendarApiEntry,
@@ -266,34 +268,60 @@ export function WorkCalendar({ t }: { t: Translate }) {
                 .filter((entry) => entry.item.source === 'agent_session')
                 .map((entry) => ({ entry, span: sessionSpanForDay(entry.item, day.date) }))
                 .filter((row) => row.span);
-              return sessions.length ? (
+              if (!sessions.length) return null;
+              const lanes = layoutSessionLanes(sessions.map((row) => ({ row, ...row.span! })));
+              const totalHours = sessions.reduce(
+                (sum, row) => sum + (row.span!.to - row.span!.from) * 24,
+                0
+              );
+              const nowFraction = day.isToday
+                ? Math.min(
+                    1,
+                    Math.max(
+                      0,
+                      (Date.now() - new Date(`${day.date}T00:00:00`).getTime()) / 86_400_000
+                    )
+                  )
+                : null;
+              return (
                 <div
                   className="wc-lane"
                   aria-hidden="true"
                   role="presentation"
                   data-today={day.isToday ? 'true' : undefined}
                 >
-                  {sessions.map(({ entry, span }) => (
-                    <span
-                      key={`lane:${entry.item.id}`}
-                      className="wc-lane__block"
-                      data-provider={entry.item.provider}
-                      data-kind={entry.item.sessionKind}
-                      data-open={span!.openEnded ? 'true' : undefined}
-                      style={{
-                        top: `${span!.from * 100}%`,
-                        height: `${(span!.to - span!.from) * 100}%`,
-                      }}
-                      title={`${entry.item.provider}${entry.item.model ? ` · ${entry.item.model}` : ''} — ${entry.item.title}`}
-                    >
-                      <span className="wc-lane__label">
-                        {entry.item.provider}
-                        {entry.item.model ? ` ${entry.item.model}` : ''}
+                  <span className="wc-lane__total">{totalHours.toFixed(1)}h</span>
+                  {lanes.map(({ span, column, columns }) => {
+                    const entry = span.row.entry;
+                    return (
+                      <span
+                        key={`lane:${entry.item.id}`}
+                        className="wc-lane__block"
+                        data-provider={entry.item.provider}
+                        data-kind={entry.item.sessionKind}
+                        data-status={entry.item.sessionStatus}
+                        data-open={span.openEnded ? 'true' : undefined}
+                        style={{
+                          top: `${span.from * 100}%`,
+                          height: `${(span.to - span.from) * 100}%`,
+                          left: `${(column / columns) * 100}%`,
+                          width: `${100 / columns}%`,
+                          right: 'auto',
+                        }}
+                        title={`${entry.item.provider}${entry.item.model ? ` · ${entry.item.model}` : ''} · ${sessionDurationLabel(entry.item.startAt!, entry.item.endAt)} — ${entry.item.title}`}
+                      >
+                        <span className="wc-lane__label">
+                          {entry.item.provider}
+                          {entry.item.model ? ` ${entry.item.model}` : ''}
+                        </span>
                       </span>
-                    </span>
-                  ))}
+                    );
+                  })}
+                  {nowFraction !== null ? (
+                    <span className="wc-lane__now" style={{ top: `${nowFraction * 100}%` }} />
+                  ) : null}
                 </div>
-              ) : null;
+              );
             })()
           : null}
         {shown.length ? (

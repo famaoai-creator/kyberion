@@ -434,3 +434,35 @@
   background: rgba(200, 140, 40, 0.3);
   border-left-color: rgb(200, 140, 40);
 }
+
+/* Lane chrome: daily total, now-line, terminal-state tints. */
+.wc-lane__total {
+  position: absolute;
+  top: 1px;
+  right: 3px;
+  z-index: 2;
+  font-size: 9px;
+  color: var(--kb-ui-fg-muted, #555);
+  background: var(--kb-ui-bg, #fff);
+  padding: 0 2px;
+  border-radius: 2px;
+}
+
+.wc-lane__now {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0;
+  border-top: 1px solid var(--kb-ui-danger, #c0392b);
+  z-index: 1;
+  pointer-events: none;
+}
+
+.wc-lane__block[data-status='failed'] {
+  background: rgba(190, 60, 50, 0.35);
+  border-left-color: rgb(190, 60, 50);
+}
+
+.wc-lane__block[data-status='cancelled'] {
+  opacity: 0.45;
+}
