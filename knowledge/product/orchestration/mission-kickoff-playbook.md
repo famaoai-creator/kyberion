@@ -38,6 +38,21 @@ pnpm mission memory-promote <candidate_id> --target-root <feature worktree>
 pnpm mission finish <ID>   # ratifies pr_review candidates against origin/main
 ```
 
+### Fresh worktrees — build before you verify
+
+A dedicated worktree starts with no `node_modules/` and no `dist/`, and every
+verification command (`pnpm typecheck`, `pnpm check -- --changed`, `pnpm mission`,
+`pnpm kyberion pr create`) runs compiled output — so build once, up front:
+
+```bash
+pnpm prepare:worktree   # install + build:packages + build:repo (or `pnpm build` for the full build incl. UI)
+```
+
+Skipping this surfaces as three separate failures: `pnpm --filter @agent/core run build`
+fails because `@agent/kernel` is unbuilt, `pnpm typecheck` fails on missing
+`@agent/shared-*` package dist, and `pnpm check -- --changed` fails ~12/76 gates on
+absent `dist/scripts/` — all cleared by the single command above.
+
 Organization routine ops (weekly digest, moderation triage report) should prefer the
 short ops-report process instead of the code-change template:
 

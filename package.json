@@ -125,6 +125,7 @@
     "playground": "pnpm exec tsx scripts/actuator/actuator_playground.ts",
     "plugin:install": "node --import ./scripts/ts-loader.mjs scripts/plugin/plugin_install.ts",
     "prepare": "husky",
+    "prepare:worktree": "pnpm install --frozen-lockfile && pnpm run build:packages && pnpm run build:repo",
     "project": "node scripts/run_built.mjs dist/scripts/project_controller.js",
     "project-os:init": "node scripts/run_built.mjs dist/scripts/generate/generate_project_os.js",
     "provider-capabilities:scan": "node scripts/run_built.mjs dist/scripts/scan/scan_provider_cli_capabilities.js",

@@ -10650,6 +10650,11 @@
         "ja": "git フックをインストール",
         "qps-ploc": "⟦Ïñşŧȧŀŀ ɠïŧ ħőőķş ŀőřėɱ⟧"
       },
+      "cli_cmd_script_prepare_worktree": {
+        "en": "Bootstrap a fresh worktree (install, build packages and repo scripts)",
+        "ja": "新規 worktree をブートストラップ（install＋packages/repo ビルド）",
+        "qps-ploc": "⟦Ƀőőŧşŧřȧṗ ȧ ƒřėşħ ẇőřķŧřėė (ïñşŧȧŀŀ, ƀůïŀḓ ṗȧƈķȧɠėş ȧñḓ řėṗő şƈřïṗŧş) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
+      },
       "cli_cmd_script_skill_install": {
         "en": "Install a skill bundle",
         "ja": "スキルバンドルをインストール",

@@ -3,7 +3,6 @@ name: kyberion-researcher
 description: 'Collects source-indexed evidence, compares alternatives, records uncertainty, and publishes a bounded research handoff for planning; does not modify implementation code or mission-wide state.'
 tools:
   - view_file
-  - view_code_item
   - grep_search
   - find_by_name
   - list_dir

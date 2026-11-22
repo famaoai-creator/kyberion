@@ -11,7 +11,10 @@ import {
   onboardingAuthorityRequestStatus,
   type OnboardingAuthorityPrincipal,
 } from '@agent/core/organization/onboarding-authority';
-import type { CharterScope } from '@agent/core/governance/accountability-charter';
+import {
+  isPersonalCharterScope,
+  type CharterScope,
+} from '@agent/core/governance/accountability-charter';
 import type { ApprovalRequestRecord } from '@agent/core/governance/approval-store';
 import type { ConciergeViewerContext } from './viewer-context';
 import { resolveConciergeInstallationAccess } from './installation-access';
@@ -33,11 +36,11 @@ export function onboardingAuthorityPrincipal(
   const installation = resolveConciergeInstallationAccess(viewer, 'read');
   return asOnboardingOwner(() => {
     if (!viewer.principalId) throw new Error('owner_required');
-    if (scope.kind === 'person' && !installation.allowed) {
+    if (isPersonalCharterScope(scope) && !installation.allowed) {
       throw new Error(installation.code);
     }
     if (
-      scope.kind === 'organization' &&
+      !isPersonalCharterScope(scope) &&
       viewer.role !== 'localadmin' &&
       !opts?.admitRemoteTenantOwner
     ) {
@@ -52,9 +55,10 @@ export function onboardingAuthorityPrincipal(
     });
     if (!member || member.status !== 'active') throw new Error('active_owner_member_required');
     const personalOwner = installation.allowed && member.member_id === 'owner';
-    if (scope.kind === 'person' && !personalOwner) throw new Error('installation_owner_required');
+    if (isPersonalCharterScope(scope) && !personalOwner)
+      throw new Error('installation_owner_required');
     if (
-      scope.kind === 'organization' &&
+      !isPersonalCharterScope(scope) &&
       ((viewer.tenantSlugs !== 'all' && !viewer.tenantSlugs.includes(scope.tenant_slug)) ||
         !member.memberships.some((m) => m.tenant_slug === scope.tenant_slug && m.role === 'owner'))
     )
@@ -66,8 +70,9 @@ export function onboardingAuthorityPrincipal(
       // whose identity is kept in requesterId. This also keeps the approval
       // bound to the accountable human (decidedBy === accountable_id), so a
       // tenant owner can propose and apply but never self-approve.
-      accountableId:
-        scope.kind === 'organization' ? ownerAccountableHumanId() : `user:${member.member_id}`,
+      accountableId: !isPersonalCharterScope(scope)
+        ? ownerAccountableHumanId()
+        : `user:${member.member_id}`,
       personalOwner,
       tenantSlugs: viewer.tenantSlugs,
     };

@@ -29,6 +29,7 @@ import {
   RECIPIENT_CLASSES,
   type Charter,
   type CharterEnvelope,
+  type CharterScopeKind,
   type ExternalEffectClass,
   type InformationCategory,
   type RecipientClass,
@@ -61,7 +62,7 @@ const MAX_DEPUTIES = 5;
 const LIST_SEPARATOR: Record<'ja' | 'en', string> = { ja: '、', en: ', ' };
 
 export interface CharterForm {
-  scope_kind?: 'person' | 'organization';
+  scope_kind?: CharterScopeKind;
   external_operations?: ExternalOperationGrant[];
   tenant_slug: string;
   per_action: number;
@@ -578,7 +579,7 @@ export function acceptCharterFromForm(
 }
 
 export interface CharterView {
-  scope_kind?: 'person' | 'organization';
+  scope_kind?: CharterScopeKind;
   external_operations?: ExternalOperationGrant[];
   reputational_class_max: ReputationalClass;
   charter_id: string;
