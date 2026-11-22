@@ -871,8 +871,13 @@ function annotateApprovalRejectionReasonUnlocked(
 }
 
 export function requiresTenantOwnerApproval(record: ApprovalRequestRecord): boolean {
+  const tenant = record.scope?.tenant_slug;
+  if (!tenant) return false;
+  const binding = `grant-standing:credential.use:${tenant}`;
+  const effect = record.accountability?.effectBinding;
   return (
     record.storageChannel === 'grant-standing' &&
+    (effect === binding || effect?.startsWith(`${binding}:`) === true) &&
     record.workflow?.requiredRoles.includes('owner') === true
   );
 }
@@ -886,9 +891,7 @@ export function tenantOwnerApprovalDenied(
   record: ApprovalRequestRecord,
   memberRole?: string
 ): boolean {
-  return (
-    requiresTenantOwnerApproval(record) && (!record.scope?.tenant_slug || memberRole !== 'owner')
-  );
+  return requiresTenantOwnerApproval(record) && memberRole !== 'owner';
 }
 
 export function decideApprovalRequest(

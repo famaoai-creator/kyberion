@@ -126,6 +126,7 @@ describe('concierge approval passkey route (HA-07)', () => {
         storageChannel: 'grant-standing',
         scope: { tier: 'confidential', tenant_slug: 'acme' },
         workflow: { requiredRoles: ['owner'] },
+        accountability: { effectBinding: 'grant-standing:credential.use:acme' },
       });
       mocks.member.mockReturnValue({
         memberId: 'carol',
