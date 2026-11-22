@@ -54,6 +54,12 @@ describe the target and name today's behaviour as _transitioning_. They do not k
 the old meaning as current. [Concept Model v2](../architecture/decisions/2026-11-10-concept-model-v2.md)
 is the first such decision.
 
+When reconciling existing descriptions, check the registry entry, its canonical document and
+glossary entry, and any diagrams or operator procedures that depend on the definition. Record
+accepted exceptions in the decision and link to that decision from the migration plan. For
+example, the [WorkItem and Mission definitions](../../../docs/GLOSSARY.md#units-of-work) govern
+both the work hierarchy diagram and the mission lifecycle explanation.
+
 **Writing a new architecture doc.** Declare `concepts: [...]` with the ids it explains. If no id
 fits, that is the signal to register the concept first (or to put the doc elsewhere, e.g. a
 plan or an evaluation).

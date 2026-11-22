@@ -6,6 +6,7 @@
 import type { TaskEvidenceBinding } from '@agent/core/mission/mission-task-evidence-binding';
 import type { HumanDecidedBy } from '@agent/core/mission/mission-types';
 import type { getOptionValue, parseCsvOption } from './mission-cli-args.js';
+import type { ResolvedMissionCliInput } from './mission-controller-args.js';
 
 export type Awaitable<T> = T | Promise<T>;
 export type Print = (value: unknown) => void;
@@ -29,21 +30,7 @@ export interface MissionControllerRoutingContext {
     actionName: 'create' | 'start' | 'kickoff',
     missionId?: string,
     argv?: string[]
-  ) => {
-    tier?: 'personal' | 'confidential' | 'public';
-    tenantId?: string;
-    organizationId?: string;
-    tenantSlug?: string;
-    missionType?: string;
-    visionRef?: string;
-    persona?: string;
-    relationships?: any;
-    routingDecision?: string;
-    ledgerTargets?: {
-      markdown: string;
-      json: string;
-    };
-  };
+  ) => ResolvedMissionCliInput;
   createMission: (
     id: string,
     tier?: 'personal' | 'confidential' | 'public',
@@ -73,7 +60,7 @@ export interface MissionControllerRoutingContext {
       decidedBy?: HumanDecidedBy;
       admissionWorkItem?: string;
     }
-  ) => Awaitable<void>;
+  ) => Awaitable<{ knowledgeLines: string[] } | void>;
   pauseMission: (id: string, note?: string, decidedBy?: HumanDecidedBy) => Awaitable<void>;
   cancelMission: (id: string, note?: string, decidedBy?: HumanDecidedBy) => Awaitable<void>;
   repairLegacyMissionState: (id: string, note?: string) => Awaitable<void>;
@@ -284,7 +271,10 @@ export interface MissionControllerRoutingContext {
     summaryOnly?: boolean,
     print?: Print
   ) => Awaitable<void>;
-  showMissionStatus: (id: string, follow?: boolean) => Awaitable<void>;
+  showMissionStatus: (
+    id: string,
+    options?: { follow?: boolean; json?: boolean; tenantSlug?: string }
+  ) => Awaitable<void>;
   showReasoningBackendStatus: () => void | Promise<void>;
   syncProjectLedger: (missionId: string) => Awaitable<unknown>;
   reassignMissionProject: (

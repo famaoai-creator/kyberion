@@ -152,21 +152,29 @@ export function writeFocusedMissionId(missionFocusPath: string, missionId: strin
   safeWriteFile(safePath, JSON.stringify(validated, null, 2));
 }
 
-export function checkPrerequisites(): void {
-  logger.info('🛡️ Validating Sovereign Prerequisites...');
-
+export function inspectMissionPrerequisites(): string[] {
+  const issues: string[] = [];
   const profileRoot = resolveActiveProfileRoot();
   const requiredFiles = MISSION_IDENTITY_FILES.map((name) => path.join(profileRoot, name));
   const missingFiles = requiredFiles.filter((filePath) => !safeExistsSync(filePath));
   const installationIdentity = missingFiles.length ? probeMissionPrerequisiteIdentity() : undefined;
   if (missingFiles.length > 0 && !installationIdentity?.ready) {
-    throw new Error(
+    issues.push(
       `CRITICAL: Sovereign profile incomplete. Missing: ${(installationIdentity?.missing_files ?? missingFiles.map((filePath) => path.basename(filePath))).join(', ')}. ` +
         (installationIdentity?.next ??
           'Please run "pnpm onboarding" (or complete customer onboarding) before creating missions.')
     );
   }
+  if (!safeExistsSync(pathResolver.rootResolve('node_modules'))) {
+    issues.push("Missing dependencies. Run 'pnpm install' first.");
+  }
+  return issues;
+}
 
+export function checkPrerequisites(): void {
+  logger.info('🛡️ Validating Sovereign Prerequisites...');
+  const issues = inspectMissionPrerequisites();
+  if (issues.length) throw new Error(issues.join('\n'));
   // When KYBERION_TENANT is set, confidential mission dirs are tenant-scoped
   // (`active/missions/confidential/{tenant}/`). Creating the bare confidential
   // prefix fails the tenant-segment path policy and breaks `mission kickoff`
@@ -185,10 +193,6 @@ export function checkPrerequisites(): void {
       safeMkdir(fullPath, { recursive: true });
     }
   });
-
-  if (!safeExistsSync(pathResolver.rootResolve('node_modules'))) {
-    throw new Error("Missing dependencies. Run 'pnpm install' first.");
-  }
 
   logger.success('✅ Prerequisites satisfied.');
 }
@@ -565,6 +569,55 @@ export interface UnmetMissionPrerequisite {
   mission_id: string;
   reason: 'not_found' | 'not_finished' | 'invalid_id';
   status?: string;
+}
+
+/** Keep a prepared admission on its governed activation path. */
+export function requirePreparedMissionAdmission(
+  state: MissionState | null | undefined,
+  admissionWorkItem?: string
+): void {
+  if (state?.status !== 'planned') return;
+  const missionDir = findMissionPath(state.mission_id);
+  if (!missionDir) return;
+  const briefPath = path.join(missionDir, 'evidence', 'mission-brief.json');
+  if (!safeExistsSync(briefPath)) return;
+  const brief = readJson<{ source?: { kind?: string; ref?: string } }>(briefPath);
+  if (
+    brief?.source?.kind === 'dot_work_item' &&
+    (!admissionWorkItem || brief.source.ref !== admissionWorkItem)
+  ) {
+    throw new Error(
+      '[MISSION_ADMISSION_REQUIRED] Activate this prepared Mission through its governed WorkItem admission.'
+    );
+  }
+}
+
+export function requireMissionDependencies(args: {
+  id: string;
+  state?: MissionState | null;
+  tenantSlug?: string;
+  prerequisites?: string[];
+  force?: boolean;
+}): string[] {
+  const { state } = args;
+  if (state?.status === 'active') return [];
+  const prerequisites = normalizeMissionIdList([
+    ...normalizeMissionIdList(state?.relationships?.prerequisites),
+    ...normalizeMissionIdList(args.prerequisites),
+  ]);
+  if (!args.force && prerequisites.length > 0) {
+    const { ok, missing } = evaluateMissionPrerequisites(prerequisites, {
+      tenantSlug: state?.tenant_slug || args.tenantSlug,
+    });
+    if (!ok) {
+      throw new Error(
+        `[MISSION_PREREQUISITES_UNMET] Mission ${args.id.toUpperCase()} cannot start: ` +
+          `${describeUnmetPrerequisites(missing)}. Finish them first or rerun with --force.`
+      );
+    }
+  }
+
+  return prerequisites;
 }
 
 /**

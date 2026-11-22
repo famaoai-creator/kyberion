@@ -103,6 +103,39 @@ describe('mission journal resource boundary', () => {
     expect(loadTrustScores(ledger)).toEqual({});
   });
 
+  it('narrows a tenant journal to the exact requested mission', () => {
+    for (const mission_id of ['MSN-JOURNAL-ONE', 'MSN-JOURNAL-TWO']) {
+      const dir = path.join(root, mission_id);
+      safeMkdir(dir, { recursive: true });
+      safeWriteFile(
+        path.join(dir, 'mission-state.json'),
+        JSON.stringify({
+          mission_id,
+          tier: 'public',
+          tenant_slug: 'tenant-a',
+          status: 'active',
+          execution_mode: 'local',
+          priority: 1,
+          org_role: 'operator',
+          confidence_score: 1,
+          git: {
+            branch: 'main',
+            start_commit: 'abc1234',
+            latest_commit: 'abc1234',
+            checkpoints: [],
+          },
+          history: [],
+        })
+      );
+    }
+    expect(scanMissions('tenant-a', [root], 'msn-journal-two').map((m) => m.mission_id)).toEqual([
+      'MSN-JOURNAL-TWO',
+    ]);
+    expect(scanMissions('tenant-b', [root], 'MSN-JOURNAL-TWO')).toEqual([]);
+    expect(() => main(['--mission-id'])).toThrow('invalid mission id');
+    expect(() => main(['--tenant-slug'])).toThrow('requires a tenant');
+  });
+
   it('routes journal rendering through the injected script printer', () => {
     const output: unknown[] = [];
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});

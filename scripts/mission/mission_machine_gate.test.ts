@@ -58,7 +58,11 @@ describe('machine-only mission gate', () => {
       gateId: 'EXECUTION_DONE',
       humanConfirmed: false,
     });
-    expect(h.events).toEqual(['evaluate', 'record', 'advance', 'mark', 'activate']);
+    expect(h.events).toEqual(['evaluate', 'record', 'activate', 'advance', 'mark']);
+    expect(h.ports.activate).toHaveBeenCalledWith(
+      'MSN-MACHINE-TEST',
+      expect.objectContaining({ gate_id: 'EXECUTION_DONE', verdict: 'pass' })
+    );
     expect(h.ports.advance).toHaveBeenCalledWith('MSN-MACHINE-TEST', 'execution');
   });
   it.each(['ci', 'scope', 'mixed'] as const)(
@@ -191,6 +195,14 @@ describe('machine-only mission gate', () => {
     expect(h.ports.markCompleted).not.toHaveBeenCalled();
     expect(h.ports.activate).not.toHaveBeenCalled();
   });
+  it('leaves the phase and tasks untouched if activation fails', async () => {
+    const h = harness();
+    h.ports.activate.mockRejectedValue(new Error('Mission prerequisites unmet'));
+    await expect(runMachineOnlyMissionGate(input, h.ports)).rejects.toThrow('prerequisites unmet');
+    expect(h.ports.advance).not.toHaveBeenCalled();
+    expect(h.ports.markCompleted).not.toHaveBeenCalled();
+  });
+
   it('never marks contracts if phase advancement fails', async () => {
     const h = harness();
     h.ports.advance.mockRejectedValue(new Error('phase transition rejected'));
@@ -198,6 +210,6 @@ describe('machine-only mission gate', () => {
       'phase transition rejected'
     );
     expect(h.ports.markCompleted).not.toHaveBeenCalled();
-    expect(h.ports.activate).not.toHaveBeenCalled();
+    expect(h.ports.activate).toHaveBeenCalledOnce();
   });
 });

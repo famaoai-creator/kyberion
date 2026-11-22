@@ -12,6 +12,7 @@
  * never as library imports. `hearing-mission.ts` (pure) builds the brief and
  * the `create` argv.
  */
+import { isolatedScopeEnvPath } from '../scope-context.js';
 import { nowIso } from '../foundation/time.js';
 import { t as catalogT } from '../localization/t.js';
 import type { SupportedLocale } from '../foundation/locale-normalize.js';
@@ -65,10 +66,10 @@ const ALIGNMENT_REQUEST_RELATIVE = 'dist/scripts/mission/mission_alignment_reque
 
 export type HearingRecordWithMissionHandoff = HearingRecord & HearingMissionHandoffFields;
 
-/** A refusal of the mission hand-off with its own status (400/403/409/502/503). */
+/** A refusal of the mission hand-off with its own status (400/403/409/422/502/503). */
 export class HearingMissionRequestError extends Error {
   constructor(
-    public readonly status: 400 | 403 | 409 | 502 | 503,
+    public readonly status: 400 | 403 | 409 | 422 | 502 | 503,
     message: string
   ) {
     super(message);
@@ -182,11 +183,14 @@ function missionChildEnv(scope: HearingHandoffDestination, controller: boolean):
   const env = controller
     ? buildExecutionEnv(process.env, 'mission_controller')
     : { ...process.env };
+  env.KYBERION_SCOPE_ENV_PATH = isolatedScopeEnvPath();
   env.KYBERION_TENANT = scope.tenantSlug;
   if (scope.organizationId) env.KYBERION_ORGANIZATION_ID = scope.organizationId;
-  else delete env.KYBERION_ORGANIZATION_ID;
+  else env.KYBERION_ORGANIZATION_ID = '';
   if (scope.projectId) env.KYBERION_PROJECT_ID = scope.projectId;
-  else delete env.KYBERION_PROJECT_ID;
+  else env.KYBERION_PROJECT_ID = '';
+  env.KYBERION_STANCE = '';
+  env.KYBERION_CUSTOMER = '';
   return env;
 }
 
@@ -334,14 +338,38 @@ export function handOffHearingToMission(
       projectId: scope.projectId,
       decidedBy,
     });
-    const reserved = storage.reserve(record, 'mission', nowIso());
-    effectReserved = true;
-    const createResult = safeExecResult(process.execPath, [CONTROLLER_RELATIVE, ...createArgs], {
+    const createOptions = {
       env: missionChildEnv(scope, true),
       cwd: rootDir,
       timeoutMs: 60_000,
       maxOutputMB: 5,
-    });
+    };
+    const preview = safeExecResult(
+      process.execPath,
+      [CONTROLLER_RELATIVE, ...createArgs, '--dry-run', '--json'],
+      createOptions
+    );
+    let ready = false;
+    if (preview.status === 0) {
+      try {
+        ready = JSON.parse(preview.stdout)?.input?.preflight?.ready === true;
+      } catch {
+        // A missing or invalid receipt is a refusal before reservation.
+      }
+    }
+    if (!ready) {
+      throw new HearingMissionRequestError(
+        422,
+        'Mission preflight did not confirm readiness. Check the selected tenant, organization and Project OS before retrying.'
+      );
+    }
+    const reserved = storage.reserve(record, 'mission', nowIso());
+    effectReserved = true;
+    const createResult = safeExecResult(
+      process.execPath,
+      [CONTROLLER_RELATIVE, ...createArgs],
+      createOptions
+    );
     ctx.audit('info', 'hearing.handoff.create', {
       mission_id: missionId,
       exit: createResult.status,

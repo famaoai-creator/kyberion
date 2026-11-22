@@ -8,6 +8,7 @@ import {
   workEffectOwnership,
 } from './work-effect-ownership.js';
 import { assertWorkEffectReleaseApproval } from '../governance/work-effect-release.js';
+import { loadApprovalRequest } from '../governance/approval-store-reader.js';
 import type {
   WorkItem,
   WorkEffectOwnership,
@@ -62,6 +63,36 @@ export function prepareEffectSettlement(
   input: ReleaseWorkItemInput,
   now: string
 ): WorkEffectOwnership | undefined {
+  const attempt = current.attempts?.at(-1);
+  const approvalId = attempt?.metadata?.approval_request_id;
+  const effectBinding = attempt?.metadata?.effect_binding;
+  const admissionPreEffect =
+    input.effectDisposition === 'pre_effect' &&
+    input.nextStatus === 'blocked' &&
+    input.actorPeerId === 'mission_controller' &&
+    current.metadata?.admission_only === true &&
+    attempt?.run_id === current.current_attempt_id &&
+    attempt?.lease_id === input.leaseId &&
+    attempt?.actor_peer_id === input.actorPeerId &&
+    typeof current.context?.tenant_slug === 'string' &&
+    typeof approvalId === 'string' &&
+    typeof effectBinding === 'string';
+  if (admissionPreEffect) {
+    const approval = loadApprovalRequest('brief', approvalId, {
+      scope: { tenant_slug: current.context?.tenant_slug },
+    });
+    if (
+      approval?.source?.taskId === current.item_id &&
+      approval.source.missionId === current.metadata?.mission_id &&
+      approval.kind === 'mission_gate' &&
+      approval.scope?.tenant_slug === current.context?.tenant_slug &&
+      approval.accountability?.finalDecision === 'human_only' &&
+      approval.accountability?.effectBinding === effectBinding &&
+      !approval.applyClaim &&
+      !approval.applyResult
+    )
+      return settledWorkEffect(current, 'pre_effect', now);
+  }
   if (
     input.effectDisposition &&
     !(

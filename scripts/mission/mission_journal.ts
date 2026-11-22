@@ -1,4 +1,5 @@
 import * as path from 'node:path';
+import { cliOptionValue, hasCliFlag } from '@agent/core/cli-guard';
 import { logger } from '@agent/core/core';
 import { formatDateTime, resolveTimeZone } from '@agent/core/format';
 import { resolveMissionJournalPolicy } from '@agent/core/mission/mission-journal-policy';
@@ -134,9 +135,11 @@ export function scanMissions(
     pathResolver.active('missions/confidential'),
     pathResolver.knowledge('personal/missions'),
     pathResolver.active('archive/missions'),
-  ]
+  ],
+  missionId?: string
 ) {
   const missions: Mission[] = [];
+  const selectedMission = missionId?.toUpperCase();
 
   for (const dir of searchDirs) {
     let safeDir: string;
@@ -165,9 +168,11 @@ export function scanMissions(
             allowMissingLeaf: true,
           });
           if (safeExistsSync(statePath)) {
+            if (selectedMission && path.basename(dir).toUpperCase() !== selectedMission) return;
             const mission = normalizeMission(loadStateAtPath(statePath));
             if (
               mission &&
+              (!selectedMission || mission.mission_id.toUpperCase() === selectedMission) &&
               (!tenantSlug || (mission.tenant_slug || mission.scope?.tenant_slug) === tenantSlug)
             ) {
               missions.push(mission);
@@ -200,11 +205,11 @@ export function scanMissions(
   });
 }
 
-function renderJournal(tenantSlug?: string) {
+function renderJournal(tenantSlug?: string, missionId?: string) {
   const policy = resolveMissionJournalPolicy();
   printOutput(chalk.bold.cyan(`\n📜 [KYBERION] ${policy.title}\n`));
 
-  const missions = scanMissions(tenantSlug);
+  const missions = scanMissions(tenantSlug, undefined, missionId);
 
   if (missions.length === 0) {
     printOutput(policy.empty_message);
@@ -248,6 +253,8 @@ function renderJournal(tenantSlug?: string) {
     printOutput('');
   });
 
+  if (missionId) return;
+
   // Summary
   const stats: Record<string, number> = {};
   for (const mission of missions) {
@@ -277,10 +284,14 @@ function renderJournal(tenantSlug?: string) {
 export function main(argv: string[] = [], print: Print = () => undefined): void {
   const previousPrint = activePrint;
   activePrint = print;
-  const tenantFlag = argv.indexOf('--tenant-slug');
-  const tenantSlug = tenantFlag >= 0 ? argv[tenantFlag + 1]?.trim() : undefined;
+  const tenantSlug = cliOptionValue(argv, '--tenant-slug')?.trim();
+  const missionId = cliOptionValue(argv, '--mission-id')?.trim();
   try {
-    renderJournal(tenantSlug || undefined);
+    if (hasCliFlag(argv, '--tenant-slug') && !tenantSlug) {
+      throw new Error('--tenant-slug requires a tenant');
+    }
+    if (hasCliFlag(argv, '--mission-id')) pathResolver.assertMissionIdArgument(missionId ?? '');
+    renderJournal(tenantSlug || undefined, missionId);
   } finally {
     activePrint = previousPrint;
   }

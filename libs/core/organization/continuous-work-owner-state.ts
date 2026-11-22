@@ -93,6 +93,9 @@ export interface ContinuousWorkOwnerPorts {
   /** Must observe terminal states first, validate approval, and never retry uncertain dispatch. */
   advanceMission(input: AdvanceContinuousMissionInput): Promise<ContinuousMissionProgress>;
 }
+/** The current operation was rejected before its first managed mutation. */
+export class ContinuousOwnerPreEffectError extends Error {}
+
 export interface OwnerMission extends ContinuousMissionProgress {
   mission_id: string;
   created: boolean;
@@ -221,6 +224,26 @@ export function authorizeItem(
     throw new Error('Managed owner requires a current human approval');
   assertContinuousDevelopmentApprovalPresentation(charter, record, approval, rootDir);
 }
+export function continuousWorkRuntimePath(
+  charter: DotCharter,
+  file: string,
+  rootDir: string
+): string {
+  const { tier, tenant_slug, organization_id } = charter.scope;
+  if (!organization_id) throw new Error('Continuous owner requires organization scope');
+  return assertSafeRepositoryPath(
+    path.join(
+      rootDir,
+      'active/shared/runtime',
+      ...storagePartitionSegments({ kind: 'tier', tier, tenant: tenant_slug }),
+      'continuous-work',
+      digest([organization_id, charter.dot_id]),
+      file
+    ),
+    { rootDir, allowMissingLeaf: true }
+  );
+}
+
 export function continuousWorkCheckpoint(
   charter: DotCharter,
   actionRef: string,
@@ -235,17 +258,7 @@ export function continuousWorkCheckpoint(
   if (!scope.organization_id) throw new Error('Continuous owner requires organization scope');
   const ids = continuousWorkTargetIds(actionRef, plan, charter.scope.project_id);
   const identity = digest([charter.dot_id, scope, actionRef, plan, ids]);
-  const statePath = assertSafeRepositoryPath(
-    path.join(
-      rootDir,
-      'active/shared/runtime',
-      ...storagePartitionSegments({ kind: 'tier', tier: scope.tier, tenant: scope.tenant_slug }),
-      'continuous-work',
-      digest([scope.organization_id, charter.dot_id]),
-      `${digest(actionRef)}.json`
-    ),
-    { rootDir, allowMissingLeaf: true }
-  );
+  const statePath = continuousWorkRuntimePath(charter, `${digest(actionRef)}.json`, rootDir);
   return { ids, identity, statePath };
 }
 export function validateState(

@@ -4,8 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   safeExec: vi.fn(() => 'started'),
-  enqueue: vi.fn((input: Record<string, unknown>) => ({ ...input, event_id: 'ME-1' })),
-  startWorker: vi.fn(() => 'job-path'),
+  enqueue: vi.fn((_input: Record<string, unknown>) => 'job-path'),
   observe: vi.fn(),
 }));
 
@@ -15,8 +14,7 @@ vi.mock('../secure-io.js', async (importOriginal) => ({
 }));
 vi.mock('../mission/mission-orchestration-events.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../mission/mission-orchestration-events.js')>()),
-  enqueueMissionOrchestrationEvent: mocks.enqueue,
-  startMissionOrchestrationWorker: mocks.startWorker,
+  queueMissionIssuanceOnce: mocks.enqueue,
   emitMissionOrchestrationObservation: mocks.observe,
 }));
 vi.mock('../workforce/artifact-store.js', async (importOriginal) => ({
@@ -52,7 +50,7 @@ describe('mission issuance scope', () => {
     const args = (mocks.safeExec.mock.calls[0] as unknown[])[1] as string[];
     expect(args).toContain('confidential');
     expect(args).not.toContain('personal');
-    expect(args.slice(-2)).toEqual(['--tenant-slug', 'acme']);
+    expect(args.slice(-4)).toEqual(['--tenant-slug', 'acme', '--goal', 'Fix the release notes']);
     expect(mocks.enqueue).toHaveBeenCalledWith(
       expect.objectContaining({
         scope: { tenant_slug: 'acme', tier: 'confidential' },
@@ -78,6 +76,59 @@ describe('mission issuance scope', () => {
     const input = (mocks.enqueue.mock.calls[0] as unknown[])[0] as Record<string, unknown>;
     expect(input.scope).toBeUndefined();
   });
+
+  it('reuses the scoped Mission ID for nonnumeric thread retries after a failed enqueue', async () => {
+    const request = {
+      surface: 'slack',
+      channel: 'C-team',
+      thread: 'discussion-retry',
+      proposal: proposal as never,
+      scope: { tenant_slug: 'acme', tier: 'confidential' as const },
+    };
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(1700000000100);
+    try {
+      mocks.enqueue.mockImplementationOnce(() => {
+        throw new Error('Queue unavailable');
+      });
+      const failed = await issueMissionFromProposal(request);
+      expect(failed.orchestrationStatus).toBe('failed');
+      clock.mockReturnValue(1700000000200);
+      const retried = await issueMissionFromProposal(request);
+      expect(retried.orchestrationStatus).toBe('queued');
+      expect(retried.missionId).toBe(failed.missionId);
+      expect(retried.missionId).toMatch(/^MSN-SLACK-[A-Z0-9-]+-[A-F0-9]{20}$/);
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
+  it('separates scopes, channels, complete thread IDs and the original request text', async () => {
+    const request = {
+      surface: 'slack',
+      channel: 'C-team',
+      thread: '1712345678.123456',
+      proposal: proposal as never,
+      sourceText: 'First request',
+      scope: {
+        tenant_slug: 'acme',
+        organization_id: 'org-a',
+        project_id: 'prj-a',
+        tier: 'confidential' as const,
+      },
+    };
+    const ids = await Promise.all(
+      [
+        request,
+        { ...request, channel: 'C-other' },
+        { ...request, thread: '9912345678.123456' },
+        { ...request, sourceText: 'Different request with the same summary' },
+        { ...request, scope: { ...request.scope, tenant_slug: 'other' } },
+        { ...request, scope: { ...request.scope, organization_id: 'org-b' } },
+        { ...request, scope: { ...request.scope, project_id: 'prj-b' } },
+      ].map(async (input) => (await issueMissionFromProposal(input)).missionId)
+    );
+    expect(new Set(ids).size).toBe(ids.length);
+  });
 });
 
 const hierarchyScope = {
@@ -94,13 +145,15 @@ it('preserves Chronos hierarchy in named controller arguments and orchestration 
     scope: hierarchyScope,
   });
   const args = (mocks.safeExec.mock.calls[0] as unknown[])[1] as string[];
-  expect(args.slice(-6)).toEqual([
+  expect(args.slice(-8)).toEqual([
     '--tenant-slug',
     'acme',
     '--organization-id',
     'org-a',
     '--project-id',
     'prj-a',
+    '--goal',
+    'Fix the release notes',
   ]);
   expect(mocks.enqueue).toHaveBeenCalledWith(
     expect.objectContaining({
@@ -108,6 +161,19 @@ it('preserves Chronos hierarchy in named controller arguments and orchestration 
       payload: expect.objectContaining({ scope: hierarchyScope }),
     })
   );
+});
+it('passes flag-looking goal text as literal mission intent', async () => {
+  vi.clearAllMocks();
+  await issueMissionFromProposal({
+    surface: 'terminal',
+    channel: 'terminal',
+    thread: '1.0',
+    proposal: { ...proposal, summary: '--force' } as never,
+  });
+  const args = (mocks.safeExec.mock.calls[0] as unknown[])[1] as string[];
+  expect(args[1]).toBe('start');
+  expect(args.slice(-2)).toEqual(['--goal', 'Mission: --force']);
+  expect(args).not.toContain('--force');
 });
 it.each([
   { tenant_slug: 'acme', project_id: 'prj-a' },

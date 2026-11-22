@@ -10211,9 +10211,9 @@
         "qps-ploc": "⟦Řůñ ŧħė ėɱȧïŀ ẇőřķƒŀőẇ ŀőřėɱ ï⟧"
       },
       "cli_cmd_script_mission": {
-        "en": "Mission lifecycle: start, checkpoint, finish",
-        "ja": "ミッションのライフサイクル: 開始・チェックポイント・完了",
-        "qps-ploc": "⟦Ɱïşşïőñ ŀïƒėƈẏƈŀė: şŧȧřŧ, ƈħėƈķṗőïñŧ, ƒïñïşħ ŀőřėɱ ïṗşůɱ ḓő⟧"
+        "en": "Manage the Mission lifecycle. Preview startup with --dry-run --json.",
+        "ja": "ミッションのライフサイクルを管理します。起動前の確認には --dry-run --json を使います。",
+        "qps-ploc": "⟦Ɱȧñȧɠė ŧħė Ɱïşşïőñ ŀïƒėƈẏƈŀė. Ṗřėṽïėẇ şŧȧřŧůṗ ẇïŧħ --ḓřẏ-řůñ --ĵşőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
       },
       "cli_cmd_script_project": {
         "en": "Project controller (same target as kyberion project)",

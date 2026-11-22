@@ -15,12 +15,12 @@ importance: 9
 
 ## 結論
 
-| 決定             | 今                                                                                      | 移行後                                                                                                             |
-| ---------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| D3 Tenant と Org | NHI の ID が `kyberion://agent/<org>/<slug>`、tenant は任意、org がなければ `'default'` | `kyberion://agent/<tenant>/<org\|_>/<slug>`、`tenant_slug` は必須。Organization profile は Org ごと                |
-| D4 Stance        | identity / 設定 / customer overlay が混在。`KYBERION_CUSTOMER` を 14 か所が読む         | 「どのテナントの、どの Org と Org Role として動くか」を選んだ状態。口調や窓口は Tenant's Customers と Channel の側 |
-| D5 Role          | 6 種類。`assigned_persona` に Org Role が入り、Persona に変換されている                 | NHI / Member、Member Role、Authority Role → Grant、Org Role、Team Role。Execution Persona は廃止                   |
-| D6 Grant         | Authority Role が 2 つのレジストリ（55 件と 86 件）。保存先専用ロールが 40 件           | Grant = 誰 × スコープ × 操作。レジストリは 1 つ。保存先専用ロールは許可証に置き換え                                |
+| 決定             | 今                                                                                      | 移行後                                                                                                                                 |
+| ---------------- | --------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| D3 Tenant と Org | NHI の ID が `kyberion://agent/<org>/<slug>`、tenant は任意、org がなければ `'default'` | テナント所属は `kyberion://agent/<tenant>/<org\|_>/<slug>`、所属なしは `kyberion://agent/_/_/<slug>`。Organization profile は Org ごと |
+| D4 Stance        | identity / 設定 / customer overlay が混在。`KYBERION_CUSTOMER` を 14 か所が読む         | 「どのテナントの、どの Org と Org Role として動くか」を選んだ状態。口調や窓口は Tenant's Customers と Channel の側                     |
+| D5 Role          | 6 種類。`assigned_persona` に Org Role が入り、Persona に変換されている                 | NHI / Member、Member Role、Authority Role → Grant、Org Role、Team Role。Execution Persona は廃止                                       |
+| D6 Grant         | Authority Role が 2 つのレジストリ（55 件と 86 件）。保存先専用ロールが 40 件           | Grant = 誰 × スコープ × 操作。レジストリは 1 つ。保存先専用ロールは許可証に置き換え                                                    |
 
 ## 段階
 
@@ -48,7 +48,7 @@ importance: 9
 
 ### S3 — Tenant 1:N Org と NHI の ID
 
-- NHI の ID に tenant を入れ、`tenant_slug` を必須にする。既存の ID は移行スクリプトで書き換え、旧 ID は別名として 1 リリース解決する。
+- テナント所属の NHI は ID に有効な `tenant_slug` を含める。テナントに属さない NHI は `kyberion://agent/_/_/<slug>` を使う。既存の ID は移行スクリプトで移行し、旧 ID は別名として 1 リリース解決する。
 - `organization-profile.json` を Org ごとの置き場所に移す。Company を tenant の別名として扱う（`company.ts`）。
 
 **状況（2026-11-10、実装済み・統合待ち）**
@@ -157,6 +157,19 @@ concept-registry の `lifecycle` は、この変更でも外していない。`r
 - `tenant`、`organization`（D3、S3）と `stance`（D4、S2）：この変更の範囲外。旧 ID の別名、旧来の Organization profile の読み込み、`KYBERION_CUSTOMER` の読み替え（どれも 1 リリース）が残る。
 - `execution-persona`：`Persona` 型の別名と `KYBERION_PERSONA`、`allowed_personas` の読み替え（どれも 1 リリース）が残っている間は、レジストリと GLOSSARY に残す。保存されている記録の項目名と関数名は 2026-11-12 に移した。古い名前の読み替えと、公開の export の別名（`inferPersonaFromRole`、`resolveExecutionPersona`）も 1 リリース残る。
 
+### Mission 起動時の Org Role 指定（2026-11-22）
+
+`pnpm mission start` と `kickoff` で `--org-role <NAME>` を使えるようにしました。admission continuation と watchdog の Mission 起動もこの指定を使います。従来の `--persona` は互換のため受け付け、両方が指定されたときは `--org-role` を採用します。
+
 ## 完了の合図
 
 concept-registry から次の項目の `lifecycle` を外します：`tenant`、`organization`、`stance`、`org-role`、`team-role`、`member-role`、`authority-role`、`grant`。`execution-persona` はレジストリと GLOSSARY から削除します。同じ変更で、他の項目の `not_to_confuse_with` にある `execution-persona`（`nhi`、`conversational-persona`）も外します。
+
+### Mission 起動前のスコープ確認と自律ループ
+
+| 経路                                       | 起動前に確認すること                                                                                                   | 条件が揃わないとき                                                                                               |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| 人間・エージェント CLI、ゲート経由         | Tier、Tenant、Org、Project の整合と、起動時のインストール済みの実行主体・依存 Mission。Stance はスコープの候補に使う。 | `--dry-run --json` の `input.preflight` に理由を返す。ゲートは条件が揃ってから評価し、起動後にフェーズを進める。 |
+| Watchdog・WorkItem admission・シャドー承認 | 作成・起動の事前確認を行い、予約や承認処理の直前に適用条件を再確認する。                                               | 条件不足は保留する。適用済みか確定できない場合は、証跡から照合する。                                             |
+| キュー・継続実行オーナー                   | キューは各候補を検査する。継続実行は Project OS を用意してから Mission を作成する。                                    | キューは次の候補へ進む。継続実行は先行 Mission の完了を次回以降の巡回で確認する。                                |
+| Surface・外部入力・ADF                     | 信頼済みスコープを名前付き引数へ渡し、Mission ID を先に確定する。                                                      | 引数・スコープの不一致はコントローラーが作成前に拒否する。                                                       |

@@ -8,7 +8,7 @@
       "id": "mission",
       "term": "Mission",
       "category": "unit_of_work",
-      "definition": "A bounded unit of work with lifecycle state and evidence.",
+      "definition": "A governed execution mode for a WorkItem with a bounded lifecycle, evidence and history.",
       "glossary_anchor": "mission",
       "canonical_doc": "knowledge/product/architecture/agent-mission-control-model.md",
       "owner_modules": ["libs/core/mission/mission-status.ts", "scripts/mission_controller.ts"],

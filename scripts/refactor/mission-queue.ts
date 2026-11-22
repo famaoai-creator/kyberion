@@ -3,6 +3,7 @@
  * Queue persistence and dispatch selection for mission orchestration.
  */
 
+import { createHash } from 'node:crypto';
 import { logger } from '@agent/core/core';
 import {
   assertSafeRepositoryPath,
@@ -36,12 +37,41 @@ export interface MissionQueueEntry {
   status: 'pending' | 'dispatched' | 'failed';
   enqueued_at: string;
   dependencies: string[];
+  scope_digest?: string;
   metadata?: {
     dispatch_attempts?: number;
     last_error?: string;
     last_attempt_at?: string;
     dispatched_at?: string;
   };
+}
+
+interface MissionQueueScope {
+  tier: MissionQueueEntry['tier'];
+  tenantSlug?: string;
+  organizationId?: string;
+  projectId?: string;
+}
+
+export function missionQueueScopeDigest(scope: MissionQueueScope): string {
+  const { tier, tenantSlug, organizationId, projectId } = scope;
+  return createHash('sha256')
+    .update(JSON.stringify([tier, tenantSlug, organizationId, projectId]))
+    .digest('hex');
+}
+
+export function requireMissionQueueScope(entry: MissionQueueEntry, scope: MissionQueueScope): void {
+  if (!entry.scope_digest) {
+    if (entry.tier === 'public' && !scope.tenantSlug && !scope.organizationId && !scope.projectId)
+      return;
+    throw new Error(
+      'Legacy queue entry has no scope binding. Re-enqueue it from its original scope.'
+    );
+  }
+  if (entry.scope_digest !== missionQueueScopeDigest(scope))
+    throw new Error(
+      'Queue entry belongs to a different scope. Dispatch from the scope used at enqueue.'
+    );
 }
 
 function isTerminal(entry: MissionQueueEntry): boolean {
@@ -131,6 +161,7 @@ function parseMissionQueueEntry(value: unknown): MissionQueueEntry | null {
     status,
     enqueued_at: enqueuedAt,
     dependencies: normalizedDependencies,
+    ...(typeof value.scope_digest === 'string' ? { scope_digest: value.scope_digest } : {}),
     ...(isRecord(value.metadata)
       ? { metadata: value.metadata as MissionQueueEntry['metadata'] }
       : {}),
@@ -150,7 +181,8 @@ export async function enqueueMission(
   missionId: string,
   tier: MissionQueueEntry['tier'],
   priority = 5,
-  deps: string[] = []
+  deps: string[] = [],
+  scope?: MissionQueueScope
 ): Promise<void> {
   const entry: MissionQueueEntry = {
     mission_id: assertValidMissionIdList([missionId.trim().toUpperCase()], 'mission id')[0]!,
@@ -159,6 +191,7 @@ export async function enqueueMission(
     status: 'pending',
     enqueued_at: nowIso(),
     dependencies: assertValidMissionIdList(normalizeMissionIdList(deps), 'dependencies'),
+    ...(scope ? { scope_digest: missionQueueScopeDigest(scope) } : {}),
   };
 
   await withLock('mission-queue', async () => {
@@ -173,7 +206,16 @@ export async function dispatchNextQueuedMission(
     missionId: string,
     queueDependencies: string[]
   ) => { ok: boolean; missing: string[] },
-  onDispatch: (missionId: string, tier: MissionQueueEntry['tier']) => Promise<void>
+  onDispatch: (
+    missionId: string,
+    tier: MissionQueueEntry['tier'],
+    entry: MissionQueueEntry
+  ) => Promise<void>,
+  onPreflight?: (
+    missionId: string,
+    tier: MissionQueueEntry['tier'],
+    entry: MissionQueueEntry
+  ) => Promise<string | undefined>
 ): Promise<void> {
   await withLock('mission-queue', async () => {
     const resolvedQueuePath = resolveMissionQueuePath(queuePath);
@@ -196,7 +238,22 @@ export async function dispatchNextQueuedMission(
 
     pending.sort((a, b) => b.priority - a.priority || a.enqueued_at.localeCompare(b.enqueued_at));
 
+    let firstFailure: { error: unknown } | undefined;
     for (const mission of pending) {
+      // The preflight establishes scope before reading dependencies or changing the row.
+      let blocked: string | undefined;
+      try {
+        blocked = await onPreflight?.(mission.mission_id, mission.tier, mission);
+      } catch (error) {
+        blocked = error instanceof Error ? error.message : String(error);
+      }
+      if (blocked) {
+        logger.warn(
+          `Queue entry ${mission.mission_id} held — ${blocked} | next: resolve preflight requirements | evidence: ${resolvedQueuePath}`
+        );
+        continue;
+      }
+
       let readiness: { ok: boolean; missing: string[] };
       try {
         readiness = checkDependencies(mission.mission_id, mission.dependencies || []);
@@ -221,14 +278,13 @@ export async function dispatchNextQueuedMission(
         logger.info(`⏳ Skipping ${mission.mission_id}: waiting for ${missing.join(', ')}`);
         continue;
       }
-
       logger.info(`🚀 Dispatching Mission: ${mission.mission_id}...`);
       const persist = () => writeMissionQueue(resolvedQueuePath, queue);
       // Mark dispatched only after start succeeded. A failed start stays
       // pending for a retry, and is parked as failed after
       // MAX_DISPATCH_ATTEMPTS so it cannot block the rest of the queue.
       try {
-        await onDispatch(mission.mission_id, mission.tier);
+        await onDispatch(mission.mission_id, mission.tier, mission);
       } catch (error) {
         const attempts = (mission.metadata?.dispatch_attempts || 0) + 1;
         mission.metadata = {
@@ -244,7 +300,8 @@ export async function dispatchNextQueuedMission(
             (mission.status === 'failed' ? ' — parked as failed' : ' — kept pending') +
             ` | next: fix the cause, then dispatch again | evidence: ${resolvedQueuePath}`
         );
-        throw error;
+        firstFailure ??= { error };
+        continue;
       }
       mission.status = 'dispatched';
       mission.metadata = { ...(mission.metadata || {}), dispatched_at: nowIso() };
@@ -252,6 +309,7 @@ export async function dispatchNextQueuedMission(
       return;
     }
 
-    logger.info('No missions ready for dispatch (dependencies not met).');
+    if (firstFailure) throw firstFailure.error;
+    logger.info('No missions ready for dispatch.');
   });
 }

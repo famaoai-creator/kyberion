@@ -47,6 +47,8 @@ const DIRECT_CALLERS: Record<string, LookupCategory> = {
   'libs/core/mission/mission-runtime.ts': 'lifecycle',
   'libs/core/mission/mission-scope-approval.ts': 'lifecycle',
   'libs/core/mission/mission-seal.ts': 'lifecycle',
+  // A prepared admission must resolve its exact Mission before activation.
+  'libs/core/mission/mission-state.ts': 'lifecycle',
   'libs/core/mission/mission-task-supersede-proof.ts': 'lifecycle',
   'libs/core/mission/mission-task-supersede.ts': 'lifecycle',
   'libs/core/mission/mission-triage.ts': 'lifecycle',

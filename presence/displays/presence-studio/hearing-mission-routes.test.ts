@@ -698,9 +698,38 @@ describe('POST /api/hearing/:session/handoff', () => {
     expect(loadHearingRecord('zz-handoff-other', sessionId)).toEqual(before);
   });
 
+  it('leaves a hearing editable when Mission preflight refuses its scope', () => {
+    vi.mocked(resolveMemberByPrincipal).mockReturnValue(fixtureMember());
+    vi.mocked(safeExecResult).mockReturnValue({
+      stdout: JSON.stringify({ input: { preflight: { ready: false } } }),
+      stderr: '',
+      status: 0,
+    });
+    const sessionId = `sess-${randomUUID()}`;
+    saveHearingRecord(namespace, decidedRecord(sessionId));
+    const snapshot = displayedSnapshot(get, sessionId);
+    const res = fakeResponse();
+    handoff(
+      fakeRequest({ params: { session: sessionId }, body: { handoff_snapshot: snapshot } }),
+      res
+    );
+    expect(res.statusCode).toBe(422);
+    expect(vi.mocked(safeExecResult).mock.calls[0]?.[1]).toContain('--dry-run');
+    expect(safeExecResult).toHaveBeenCalledTimes(1);
+    expect(
+      (loadHearingRecord(namespace, sessionId) as HearingRecordWithMissionHandoff).handoff_pending
+    ).toBeUndefined();
+  });
+
   it('retains an unresolved reservation when controller success cannot be verified, without retrying effects', () => {
     vi.mocked(resolveMemberByPrincipal).mockReturnValue(fixtureMember());
-    vi.mocked(safeExecResult).mockReturnValue({ stdout: '', stderr: '', status: 0 });
+    vi.mocked(safeExecResult)
+      .mockReturnValueOnce({
+        stdout: JSON.stringify({ input: { preflight: { ready: true } } }),
+        stderr: '',
+        status: 0,
+      })
+      .mockReturnValue({ stdout: '', stderr: '', status: 0 });
     vi.mocked(findMissionPath).mockReturnValue(null);
     vi.mocked(loadState).mockReturnValue(null);
 
@@ -718,7 +747,7 @@ describe('POST /api/hearing/:session/handoff', () => {
     const persisted = loadHearingRecord(namespace, sessionId) as HearingRecordWithMissionHandoff;
     expect(persisted.mission_id).toBeUndefined();
     expect(persisted.handoff_pending?.kind).toBe('mission');
-    expect(safeExecResult).toHaveBeenCalledTimes(1);
+    expect(safeExecResult).toHaveBeenCalledTimes(2);
     const retry = fakeResponse();
     handoff(
       fakeRequest({ params: { session: sessionId }, body: { handoff_snapshot: snapshot } }),
@@ -726,7 +755,7 @@ describe('POST /api/hearing/:session/handoff', () => {
     );
     expect(retry.statusCode).toBe(409);
     expect(retry.body).toMatchObject({ hearing_conflict: 'handoff_unresolved' });
-    expect(safeExecResult).toHaveBeenCalledTimes(1);
+    expect(safeExecResult).toHaveBeenCalledTimes(2);
   });
 
   it('runs the controller child as mission_controller, delegated under SYSTEM_ROLE (DR-01)', () => {
@@ -734,7 +763,13 @@ describe('POST /api/hearing/:session/handoff', () => {
     process.env.SYSTEM_ROLE = 'presence_studio';
     try {
       vi.mocked(resolveMemberByPrincipal).mockReturnValue(fixtureMember());
-      vi.mocked(safeExecResult).mockReturnValue({ stdout: '', stderr: '', status: 0 });
+      vi.mocked(safeExecResult)
+        .mockReturnValueOnce({
+          stdout: JSON.stringify({ input: { preflight: { ready: true } } }),
+          stderr: '',
+          status: 0,
+        })
+        .mockReturnValue({ stdout: '', stderr: '', status: 0 });
       vi.mocked(findMissionPath).mockReturnValue(null);
       vi.mocked(loadState).mockReturnValue(null);
       const sessionId = `sess-${randomUUID()}`;
@@ -779,6 +814,12 @@ describe('POST /api/hearing/:session/handoff', () => {
       status: 'planned',
     } as MissionState);
     vi.mocked(safeExecResult).mockImplementation((_command: string, args: string[] = []) => {
+      if (args.includes('--dry-run'))
+        return {
+          stdout: JSON.stringify({ input: { preflight: { ready: true } } }),
+          stderr: '',
+          status: 0,
+        };
       if (args[0] === 'dist/scripts/mission_controller.js') {
         return { stdout: '', stderr: '', status: 0 };
       }
@@ -817,7 +858,7 @@ describe('POST /api/hearing/:session/handoff', () => {
     expect(body.next_action.href).toContain('/');
 
     // (a) create argv shape
-    const createCall = vi.mocked(safeExecResult).mock.calls[0];
+    const createCall = vi.mocked(safeExecResult).mock.calls[1];
     expect(createCall[1]).toEqual([
       'dist/scripts/mission_controller.js',
       'create',
@@ -839,7 +880,7 @@ describe('POST /api/hearing/:session/handoff', () => {
     ]);
 
     // (d) alignment request argv shape
-    const alignmentCall = vi.mocked(safeExecResult).mock.calls[1];
+    const alignmentCall = vi.mocked(safeExecResult).mock.calls[2];
     expect(alignmentCall[1]).toEqual([
       'dist/scripts/mission/mission_alignment_request.js',
       '--mission',
@@ -895,6 +936,12 @@ describe('POST /api/hearing/:session/handoff', () => {
       actualState.loadState(id, { directories: [missionRoot] })
     );
     vi.mocked(safeExecResult).mockImplementation((_command: string, args: string[] = []) => {
+      if (args.includes('--dry-run'))
+        return {
+          stdout: JSON.stringify({ input: { preflight: { ready: true } } }),
+          stderr: '',
+          status: 0,
+        };
       if (args[0] === 'dist/scripts/mission_controller.js') {
         withExecutionContext('ecosystem_architect', () =>
           writeMissionStateAtPath(missionDir + '/mission-state.json', {
@@ -1074,8 +1121,9 @@ describe('POST /api/hearing/:session/handoff', () => {
       } as MissionState;
     });
     vi.mocked(safeExecResult).mockImplementation((_command, args = []) => ({
-      stdout:
-        args[0] === 'dist/scripts/mission/mission_alignment_request.js'
+      stdout: args.includes('--dry-run')
+        ? JSON.stringify({ input: { preflight: { ready: true } } })
+        : args[0] === 'dist/scripts/mission/mission_alignment_request.js'
           ? JSON.stringify({ requestId: 'REQ-SELECTED' })
           : '',
       stderr: '',
@@ -1102,7 +1150,7 @@ describe('POST /api/hearing/:session/handoff', () => {
         'mission'
       );
       const calls = vi.mocked(safeExecResult).mock.calls;
-      expect(calls).toHaveLength(2);
+      expect(calls).toHaveLength(3);
       expect(calls[0][1]).toEqual(
         expect.arrayContaining([
           '--tenant-slug',
@@ -1189,7 +1237,13 @@ describe('POST /api/hearing/:session/handoff', () => {
           : {}),
         status: 'planned',
       } as MissionState);
-      vi.mocked(safeExecResult).mockReturnValue({ stdout: '', stderr: '', status: 0 });
+      vi.mocked(safeExecResult)
+        .mockReturnValueOnce({
+          stdout: JSON.stringify({ input: { preflight: { ready: true } } }),
+          stderr: '',
+          status: 0,
+        })
+        .mockReturnValue({ stdout: '', stderr: '', status: 0 });
       try {
         const snapshot = displayedSnapshot(get, sessionId, query);
         vi.mocked(safeWriteFile).mockClear();
@@ -1204,7 +1258,7 @@ describe('POST /api/hearing/:session/handoff', () => {
         );
         expect(response.statusCode).toBe(409);
         expect(response.body).toMatchObject({ hearing_conflict: 'handoff_unresolved' });
-        expect(safeExecResult).toHaveBeenCalledTimes(1);
+        expect(safeExecResult).toHaveBeenCalledTimes(2);
         expect(
           vi
             .mocked(safeWriteFile)

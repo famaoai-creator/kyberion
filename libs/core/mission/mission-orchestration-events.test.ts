@@ -98,6 +98,43 @@ describe('mission-orchestration-events', () => {
     );
   });
 
+  it('reuses the published issue after an uncertain worker launch', async () => {
+    const { queueMissionIssuanceOnce, loadMissionOrchestrationEvent } =
+      await import('./mission-orchestration-events.js');
+    const { loadMissionOrchestrationJournal } = await import('./mission-orchestration-journal.js');
+    const { safeRmSync } = await import('../secure-io.js');
+    const input = {
+      missionId: 'MSN-QUEUE',
+      requestedBy: 'test',
+      payload: { channel: 'slack', threadTs: 'stable', confirmedBy: 'user:first' },
+    };
+    let eventPath: string | undefined;
+    try {
+      mocks.spawnManagedProcess.mockImplementationOnce((spec) => {
+        eventPath = spec.args.at(-1);
+        throw new Error('worker launch outcome unknown');
+      });
+      expect(() => queueMissionIssuanceOnce(input)).toThrow('worker launch outcome unknown');
+      const reused = queueMissionIssuanceOnce({
+        ...input,
+        payload: { ...input.payload, confirmedBy: 'user:second' },
+      });
+      expect(reused).toBe(eventPath);
+      expect(queueMissionIssuanceOnce(input)).toBe(reused);
+      expect(mocks.spawnManagedProcess).toHaveBeenCalledTimes(1);
+      const event = loadMissionOrchestrationEvent<typeof input.payload>(reused);
+      expect(event.payload.confirmedBy).toBe('user:first');
+      expect(event.correlation_id).toBe(event.event_id);
+      expect(
+        loadMissionOrchestrationJournal(input.missionId).filter(
+          (row) => row.event_id === event.event_id
+        )
+      ).toHaveLength(1);
+    } finally {
+      if (eventPath) safeRmSync(eventPath, { force: true });
+    }
+  });
+
   it('emits mission orchestration events that satisfy the schema', async () => {
     const { enqueueMissionOrchestrationEvent } = await import('./mission-orchestration-events.js');
     const { safeReadFile } = await import('../secure-io.js');

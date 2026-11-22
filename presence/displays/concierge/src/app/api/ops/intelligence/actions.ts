@@ -1,4 +1,5 @@
 import { serverDelegatedChildEnv } from '../../../../lib/server-child-env';
+import { isolatedScopeEnvPath } from '@agent/core/scope-context';
 import { MEMORY_ACTION_HANDLERS } from './memory-actions';
 import { scopedLearningApprovalVisibleToViewer } from '../../../../lib/ops/scoped-learning-approval-visibility';
 import { isScopedLearningApprovalRequest } from '@agent/core/knowledge/scoped-learning-approval-visibility';
@@ -601,17 +602,25 @@ export const INTELLIGENCE_ACTION_HANDLERS: Record<string, IntelligenceActionHand
       typeof executionContract?.review_target === 'string' ? executionContract.review_target : '';
     const contractRepo =
       typeof executionContract?.repository_id === 'string' ? executionContract.repository_id : '';
-    const env = serverDelegatedChildEnv('mission_controller');
+    const env = {
+      ...serverDelegatedChildEnv('mission_controller'),
+      KYBERION_SCOPE_ENV_PATH: isolatedScopeEnvPath(),
+      KYBERION_TIER: project.tier,
+      KYBERION_TENANT: project.tenant_slug ?? '',
+      KYBERION_ORGANIZATION_ID: project.organization_id ?? '',
+      KYBERION_PROJECT_ID: project.project_id,
+      KYBERION_STANCE: '',
+      KYBERION_CUSTOMER: '',
+    };
     const startArgs = [
       'dist/scripts/mission_controller.js',
       'start',
       missionId,
       '--tier',
       project.tier,
-      '--persona',
+      '--org-role',
       persona,
-      '--tenant-id',
-      project.tenant_slug || 'default',
+      ...(project.tenant_slug ? ['--tenant-slug', project.tenant_slug] : []),
       '--mission-type',
       missionType,
       '--project-id',

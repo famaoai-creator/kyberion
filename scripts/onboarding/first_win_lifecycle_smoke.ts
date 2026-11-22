@@ -462,8 +462,6 @@ export function runFirstWinLifecycleDryRun(): FirstWinLifecycleReport {
         'Validate project attachment in the lifecycle path',
         '--tier',
         'public',
-        '--organization-id',
-        ORGANIZATION_ID,
         '--project-path',
         PROJECT_PATH,
         '--dry-run',
@@ -471,8 +469,10 @@ export function runFirstWinLifecycleDryRun(): FirstWinLifecycleReport {
       ],
       (payload) =>
         payload?.project_id === PROJECT_ID &&
-        payload.organization_id === ORGANIZATION_ID &&
-        payload.tier === 'public'
+        payload.organization_id === undefined &&
+        payload.tier === 'public',
+      safeExecResult,
+      'validated Project creation preview without attaching to an unsaved Organization'
     ),
     runCommand(
       'mission',
@@ -492,13 +492,26 @@ export function runFirstWinLifecycleDryRun(): FirstWinLifecycleReport {
         '--project-relationship',
         'belongs_to',
         '--dry-run',
+        '--json',
       ],
-      (payload, raw) =>
-        payload?.action === 'create' &&
-        payload.mission_id === MISSION_ID &&
-        raw.includes(ORGANIZATION_ID) &&
-        raw.includes(PROJECT_ID) &&
-        raw.includes(PROJECT_PATH)
+      (payload, raw) => {
+        const input = payload?.input as { preflight?: { ready?: boolean; issues?: unknown } };
+        const { ready, issues } = input?.preflight ?? {};
+        return (
+          payload?.action === 'create' &&
+          payload.mission_id === MISSION_ID &&
+          raw.includes(ORGANIZATION_ID) &&
+          raw.includes(PROJECT_ID) &&
+          raw.includes(PROJECT_PATH) &&
+          ready === false &&
+          Array.isArray(issues) &&
+          issues.length === 1 &&
+          typeof issues[0] === 'string' &&
+          issues[0].startsWith('[PROJECT_LINK_INVALID]')
+        );
+      },
+      safeExecResult,
+      'validated that linked Mission creation waits for a registered Project'
     ),
     runScheduleStage(),
   ];

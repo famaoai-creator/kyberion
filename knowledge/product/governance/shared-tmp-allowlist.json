@@ -6,6 +6,12 @@
   "plan": "docs/developer/improvement-plans-2026-07/ARTIFACT_AGENT_LIFECYCLE_NHI_PLAN_2026-07-26.ja.md",
   "entries": [
     {
+      "file": "libs/core/scope-context.ts",
+      "count": 1,
+      "classification": "legit-tmp",
+      "note": "Fresh absent scope.env override for a scoped child process. No artifact is written and the child must not inherit a local operator binding."
+    },
+    {
       "file": "scripts/lib/approval-terminal-window.ts",
       "count": 1,
       "classification": "legit-tmp",

@@ -64,7 +64,6 @@ import {
   projectArtifactRecords,
   projectScopeOf,
 } from './project-mission-index.js';
-import { resolveTenant } from '../organization/tenant-registry.js';
 import { assertProjectObjectiveLinks } from './project-objective-links.js';
 import {
   loadOrganizationOperationalState,
@@ -93,6 +92,19 @@ import {
   assertProjectLifecycleOwner,
 } from './project-lifecycle-guards.js';
 import { STORAGE_DATA_TIERS } from '../storage-layout.js';
+
+import {
+  assertManagedProjectId,
+  buildManagedProjectRecord,
+  normalizeId,
+  sortedUnique,
+  type ManagedProjectCreateInput,
+} from './project-managed-record.js';
+export {
+  assertManagedProjectId,
+  buildManagedProjectRecord,
+  type ManagedProjectCreateInput,
+} from './project-managed-record.js';
 
 export interface ProjectManagementView {
   project: ProjectRecord;
@@ -167,22 +179,6 @@ export interface ProjectReconciliationReport {
   repaired_paths: string[];
 }
 
-export interface ManagedProjectCreateInput {
-  project_id: string;
-  name: string;
-  summary: string;
-  tier: ProjectRecord['tier'];
-  organization_id?: string;
-  tenant_slug?: string;
-  status?: ProjectRecord['status'];
-  primary_locale?: string;
-  project_path?: string;
-  metadata?: Record<string, unknown>;
-  pipeline_refs?: string[];
-  objective_ids?: string[];
-  rootDir?: string;
-}
-
 export interface ProjectBootstrapInput extends ManagedProjectCreateInput {
   utterance?: string;
   track_id?: string;
@@ -203,12 +199,6 @@ export type { ManagedProjectTrackCreateInput } from './project-track-mutations.j
 
 const ACTIVE_MISSION_STATUSES = ACTIVE_PROJECT_MISSION_STATUSES;
 
-function normalizeId(value: string, label: string): string {
-  const normalized = String(value || '').trim();
-  if (!normalized) throw new Error(`${label} is required`);
-  return normalized;
-}
-
 export const { createManagedProjectTrack, updateManagedProjectTrack } = createProjectTrackMutations(
   {
     reconcile: (projectId) => {
@@ -216,16 +206,6 @@ export const { createManagedProjectTrack, updateManagedProjectTrack } = createPr
     },
   }
 );
-
-export function assertManagedProjectId(value: string): string {
-  const normalized = normalizeId(value, 'project_id');
-  if (!/^PRJ-[A-Z0-9][A-Z0-9._-]*$/.test(normalized)) {
-    throw new Error(
-      `Invalid project_id '${value}'. Managed projects must use PRJ-<UPPER_SNAKE_OR_DASH_ID>.`
-    );
-  }
-  return normalized;
-}
 
 export { assertManagedProjectTrackScope };
 
@@ -288,10 +268,6 @@ function expectedForScope(
       .filter((trackId, index, values) => values.indexOf(trackId) === index),
     sessions: sessions.map((session) => session.session_id).sort(),
   };
-}
-
-function sortedUnique(values: string[] | undefined): string[] {
-  return [...new Set((values || []).map((value) => String(value).trim()).filter(Boolean))].sort();
 }
 
 function sameIds(left: string[] | undefined, right: string[]): boolean {
@@ -404,51 +380,6 @@ export function ensureProjectOsScaffold(
   return targetDir;
 }
 
-export function buildManagedProjectRecord(input: ManagedProjectCreateInput): ProjectRecord {
-  const projectId = assertManagedProjectId(input.project_id);
-  if (input.tier === 'confidential' && !input.tenant_slug?.trim()) {
-    throw new Error(`tenant_slug is required for confidential project records (${projectId}).`);
-  }
-  if (input.tier === 'confidential' && input.tenant_slug === 'shared') {
-    throw new Error(
-      `tenant_slug 'shared' is not a tenant for confidential project records (${projectId}): ` +
-        `'shared' is a reserved partition name, not a tenant. ` +
-        `Run 'KYBERION_BASE_ROLE=sovereign pnpm tenant list' to see registered tenant slugs and pass one via --tenant-slug.`
-    );
-  }
-  if (
-    input.tier === 'confidential' &&
-    input.tenant_slug &&
-    (getRegisteredEnvText('KYBERION_ENTITY_GOVERNANCE') === 'enforce' || !isVitestProcess())
-  ) {
-    resolveTenant(input.tenant_slug, { rootDir: input.rootDir });
-  }
-  return {
-    project_id: projectId,
-    name: normalizeId(input.name, 'name'),
-    summary: normalizeId(input.summary, 'summary'),
-    status: input.status || 'draft',
-    tier: input.tier,
-    ...(input.organization_id ? { organization_id: input.organization_id } : {}),
-    ...(input.tenant_slug ? { tenant_slug: input.tenant_slug } : {}),
-    ...(input.primary_locale ? { primary_locale: input.primary_locale } : {}),
-    ...(input.project_path
-      ? {
-          repositories: [
-            {
-              repo_id: `REPO-${projectId.replace(/^PRJ-/, '')}`,
-              kind: 'project-root',
-              root_path: input.project_path,
-            },
-          ],
-        }
-      : {}),
-    ...(input.metadata ? { metadata: input.metadata } : {}),
-    ...(input.pipeline_refs ? { pipeline_refs: sortedUnique(input.pipeline_refs) } : {}),
-    ...(input.objective_ids?.length ? { objective_ids: sortedUnique(input.objective_ids) } : {}),
-  };
-}
-
 export function createManagedProject(input: ManagedProjectCreateInput): ProjectRecord {
   return createManagedProjectInternal(input, false);
 }
@@ -527,10 +458,7 @@ export function updateManagedProjectMetadata(
   return next;
 }
 
-function createManagedProjectInternal(
-  input: ManagedProjectCreateInput,
-  deferAudit: boolean
-): ProjectRecord {
+function prepareManagedProjectCreation(input: ManagedProjectCreateInput) {
   assertProjectLifecycleOwner();
   const projectId = assertManagedProjectId(input.project_id);
   if (loadProjectRecord(projectId, { rootDir: input.rootDir }))
@@ -565,6 +493,20 @@ function createManagedProjectInternal(
       `Project '${projectId}' and organization '${input.organization_id}' belong to different tenants.`
     );
   }
+  return { record, organizationState };
+}
+
+/** Exercise the normal create checks without registering a Project. */
+export function previewManagedProjectCreation(input: ManagedProjectCreateInput): ProjectRecord {
+  return prepareManagedProjectCreation(input).record;
+}
+
+function createManagedProjectInternal(
+  input: ManagedProjectCreateInput,
+  deferAudit: boolean
+): ProjectRecord {
+  const { record, organizationState } = prepareManagedProjectCreation(input);
+  const projectId = record.project_id;
   const projectPath = saveProjectRecord(record, { rootDir: input.rootDir });
   if (organizationState) {
     try {

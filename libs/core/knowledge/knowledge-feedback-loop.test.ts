@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import * as path from 'node:path';
-import { knowledgeTextSha256 } from './knowledge-delivery-snapshot.js';
+import {
+  createKnowledgeDeliverySnapshot,
+  knowledgeTextSha256,
+} from './knowledge-delivery-snapshot.js';
 import {
   safeExistsSync,
   safeMkdir,
@@ -15,6 +18,7 @@ import {
   loadKnowledgeFeedbackCap,
   loadKnowledgeUsageAggregate,
   recordKnowledgeDelivery,
+  recordExplicitKnowledgeUse,
   recordKnowledgeGap,
   recordKnowledgeUsageFeedback,
   recordHumanKnowledgeFeedback,
@@ -228,6 +232,96 @@ describe('personal feedback storage boundary', () => {
 });
 
 describe('recordKnowledgeDelivery', () => {
+  it('counts only explicitly reported operator references delivered in the same scope', () => {
+    const missionId = 'MSN-KP05-OPERATOR';
+    const scope = { tier: 'public' as const, mission_id: missionId };
+    const operatorPath = 'knowledge/product/architecture/operator-used.md';
+    const otherPath = 'knowledge/product/architecture/other-recipient.md';
+    recordKnowledgeDelivery({
+      missionId,
+      scope,
+      recipientKind: 'operator_cli',
+      refs: [{ path: operatorPath }],
+    });
+    recordKnowledgeDelivery({
+      missionId,
+      scope,
+      recipientKind: 'agent',
+      refs: [{ path: otherPath }],
+    });
+    expect(
+      loadKnowledgeUsageAggregate(scope).find((entry) => entry.document_path === operatorPath)
+        ?.used_count
+    ).toBe(0);
+    const report = {
+      missionId,
+      scope,
+      delivery: { recipientKind: 'operator_cli' },
+      reportTaskId: 'task-1',
+      references: [operatorPath, otherPath],
+    };
+    const feedbackLog = path.join(suiteRoot, 'feedback', 'knowledge-usage.jsonl');
+    safeMkdir(path.dirname(feedbackLog), { recursive: true });
+    safeWriteFile(feedbackLog, '{"interrupted"');
+    safeWriteFile(policyPathOverride, JSON.stringify({ defaults: { max_usage_bytes: 1 } }));
+    expect(recordExplicitKnowledgeUse(report)[0]?.status).toBe('retryable_error');
+    expect(
+      loadKnowledgeUsageAggregate(scope).find((entry) => entry.document_path === operatorPath)
+        ?.used_count
+    ).toBe(0);
+    safeRmSync(policyPathOverride);
+    safeRmSync(deliveryDirOverride, { recursive: true, force: true });
+    expect(recordExplicitKnowledgeUse(report)).toEqual([
+      { reference: operatorPath, status: 'recorded' },
+      { reference: otherPath, status: 'not_delivered' },
+    ]);
+    recordKnowledgeDelivery({
+      missionId,
+      scope,
+      recipientKind: 'operator_cli',
+      refs: [{ path: 'knowledge/product/architecture/new-delivery.md' }],
+    });
+    expect(recordExplicitKnowledgeUse(report)[0]?.status).toBe('already_recorded');
+    expect(
+      loadKnowledgeUsageAggregate(scope).find((entry) => entry.document_path === operatorPath)
+        ?.used_count
+    ).toBe(1);
+  });
+
+  it('requires an explicit snapshot when a path has multiple delivered versions', () => {
+    const missionId = 'MSN-KP05-VERSIONS';
+    const scope = { tier: 'public' as const, mission_id: missionId };
+    const documentPath = 'knowledge/product/architecture/versioned.md';
+    const snapshots = ['first', 'second'].map((text) =>
+      createKnowledgeDeliverySnapshot({ text, form: 'context_string' })
+    );
+    for (const snapshot of snapshots) {
+      recordKnowledgeDelivery({
+        missionId,
+        scope,
+        recipientKind: 'test_surface',
+        refs: [{ path: documentPath, snapshot }],
+      });
+    }
+    const report = {
+      missionId,
+      scope,
+      delivery: { recipientKind: 'test_surface' },
+      reportTaskId: 'task-1',
+    };
+    expect(recordExplicitKnowledgeUse({ ...report, references: [documentPath] })[0]).toEqual({
+      reference: documentPath,
+      status: 'version_required',
+      versions: snapshots.map((snapshot) => snapshot.sha256),
+    });
+    expect(
+      recordExplicitKnowledgeUse({
+        ...report,
+        references: [`${documentPath}@${snapshots[0]!.sha256}`],
+      })[0]?.status
+    ).toBe('recorded');
+  });
+
   it('writes a delivery record and returns the delivered refs when hints are delivered', () => {
     const result = recordKnowledgeDelivery({
       missionId: 'MSN-KP05-DELIVERY',

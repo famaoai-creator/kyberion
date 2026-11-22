@@ -6,7 +6,7 @@ your local environment, credentials, or host permissions.
 
 ## Short answer
 
-- You can use Kyberion for onboarding, customer overlays, mission work, and
+- You can use Kyberion for onboarding, selecting a Stance, mission work, and
   governance checks today.
 - You can also use external channels such as Slack, iMessage, Discord, and
   Telegram, but those depend on local setup and account access.
@@ -48,7 +48,7 @@ your local environment, credentials, or host permissions.
 2. Run `pnpm env:bootstrap --manifest kyberion-toolchain`.
 3. Run `pnpm kyberion setup report`.
 4. Run `pnpm kyberion doctor`.
-5. Run `pnpm stance:list` if you use customer overlays.
+5. Run `pnpm stance:list` to see the configured Stances.
 6. Activate the stance you want with `pnpm stance:switch <slug>`.
 7. For tenant-bound work, follow the activation gate in [`onboarding-flow.md`](../../knowledge/product/governance/onboarding-flow.md).
 8. Then work normally.

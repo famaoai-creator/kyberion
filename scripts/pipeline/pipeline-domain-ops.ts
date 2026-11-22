@@ -1,4 +1,5 @@
 import * as path from 'node:path';
+import { createHash } from 'node:crypto';
 import { grantVoiceConsent } from '@agent/core/voice/voice-consent';
 import { pathResolver } from '@agent/core/path-resolver';
 import { resolveVars } from '@agent/core/pipeline/logic-utils';
@@ -46,6 +47,8 @@ import {
 import { runDocExamplesCheck } from '../check/check_doc_examples.js';
 import { main as manageRegistry } from '../registry_manager.js';
 import { main as missionController } from '../mission_controller.js';
+import { withExecutionContextAsync } from '@agent/core/authority';
+import { currentExecutionScope } from '@agent/core/foundation';
 import { runCapturePhoto } from '../capture/capture_photo.js';
 import { runGenerateAvatar } from '../generate/generate_avatar.js';
 import { runRegisterAvatar } from '../register/register_avatar.js';
@@ -707,35 +710,89 @@ export async function runInlineRegistryManager(
   return exportValue(params, step, { status: 'succeeded', adapter, tier, type }, ctx);
 }
 
+function runPipelineMissionController(args: string[]): Promise<void> {
+  const execution = currentExecutionScope();
+  return withExecutionContextAsync(
+    'mission_controller',
+    () => missionController(args),
+    undefined,
+    execution?.tenantCleared ? '' : execution?.tenantSlug,
+    execution?.organizationId
+  );
+}
+
 export async function runInlineMissionCreate(
   step: PipelineAdfStep,
   params: Record<string, unknown>,
   ctx: Record<string, unknown>
 ): Promise<Record<string, unknown>> {
   const value = (key: string): string =>
-    String(resolveVars(params[key] ?? ctx[key] ?? '', ctx)).trim();
-  const missionId = value('mission_id');
-  const args = missionId
-    ? [
-        'create',
-        missionId,
-        value('tier'),
-        value('tenant_id'),
-        value('mission_type'),
-        value('vision_ref'),
-        value('persona'),
-        JSON.stringify({ prerequisites: params.prerequisites ?? [] }),
-      ]
-    : [
-        'create',
-        value('tier'),
-        value('tenant_id'),
-        value('mission_type'),
-        value('vision_ref'),
-        value('persona'),
-      ];
-  await missionController(args);
-  return exportValue(params, step, { status: 'succeeded' }, ctx);
+    valueOr(String(resolveVars(params[key] ?? ctx[key] ?? '', ctx)).trim(), '');
+  const missionId = value('mission_id').toUpperCase();
+  if (!missionId) throw new Error('core:run_mission_create requires mission_id');
+  pathResolver.assertMissionIdArgument(missionId);
+  const args = ['create', missionId];
+  const tenant = value('tenant_slug');
+  const legacyTenant = value('tenant_id');
+  for (const [flag, selected] of [
+    ['--tier', value('tier')],
+    ['--tenant-slug', tenant],
+    ['--tenant-id', legacyTenant === 'default' ? '' : legacyTenant],
+    ['--organization-id', value('organization_id')],
+    ['--project-id', value('project_id')],
+    ['--mission-type', value('mission_type')],
+    ['--vision-ref', value('vision_ref')],
+    ['--org-role', value('org_role') || value('persona')],
+  ]) {
+    if (selected.startsWith('--')) throw new Error(`${flag} requires a value, not a CLI option`);
+    if (selected) args.push(flag, selected);
+  }
+  if (params.prerequisites !== undefined) {
+    const prerequisites = resolveVars(params.prerequisites, ctx);
+    if (!Array.isArray(prerequisites) || !prerequisites.every((item) => typeof item === 'string')) {
+      throw new Error('core:run_mission_create prerequisites must be an array of mission IDs');
+    }
+    args.push('--relationships', JSON.stringify({ prerequisites }));
+  }
+  await runPipelineMissionController(args);
+  return exportValue(params, step, { status: 'succeeded', mission_id: missionId }, ctx);
+}
+
+/** Use issue identity, which remains stable across title and body edits. */
+function githubIssueMissionInput(
+  issue: unknown,
+  repository: string
+): { missionId: string; title: string } {
+  const row = issue as { number?: unknown; title?: unknown; url?: unknown } | null;
+  const number = row?.number;
+  const title = typeof row?.title === 'string' ? row.title.trim() : '';
+  if (typeof number !== 'number' || !Number.isSafeInteger(number) || number < 1 || !title) {
+    throw new Error('GitHub issue mission input requires a positive issue number and title');
+  }
+  const address =
+    typeof row?.url === 'string' && row.url.trim()
+      ? row.url.trim()
+      : /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository)
+        ? `https://github.com/${repository}/issues/${number}`
+        : undefined;
+  const url = address ? URL.parse(address) : null;
+  const match = /^\/([^/]+)\/([^/]+)\/issues\/(\d+)\/?$/.exec(url?.pathname ?? '');
+  if (
+    !url ||
+    url.protocol !== 'https:' ||
+    url.username ||
+    url.password ||
+    !match ||
+    Number(match[3]) !== number
+  ) {
+    throw new Error('GitHub issue mission input requires the issue URL or its repository');
+  }
+  const key = `${url.host.toLowerCase()}/${match[1]!.toLowerCase()}/${match[2]!.toLowerCase()}`;
+  const repositoryHash = createHash('sha256').update(key).digest('hex').slice(0, 16).toUpperCase();
+  return {
+    missionId: `MSN-GH-${repositoryHash}-${number}`,
+    title: `GitHub issue #${number}: ${title}`,
+  };
 }
 
 export async function runInlineMissionStartFromIssues(
@@ -743,7 +800,7 @@ export async function runInlineMissionStartFromIssues(
   params: Record<string, unknown>,
   ctx: Record<string, unknown>
 ): Promise<Record<string, unknown>> {
-  const raw = resolveVars(params.issues ?? ctx.parsed_issues ?? [], ctx);
+  const raw = resolveVars(params.issues ?? ctx.raw_issues ?? ctx.parsed_issues ?? [], ctx);
   const candidate =
     raw && typeof raw === 'object' && !Array.isArray(raw)
       ? ((raw as Record<string, unknown>).stdout ?? (raw as Record<string, unknown>).output ?? raw)
@@ -754,12 +811,13 @@ export async function runInlineMissionStartFromIssues(
   );
   if (!Array.isArray(issues))
     throw new Error('core:run_mission_start_from_issues requires an array');
+  const repository = String(resolveVars(params.repository ?? '', ctx)).trim();
+  const missions = issues.map((issue) => githubIssueMissionInput(issue, repository));
   const started: string[] = [];
-  for (const issue of issues) {
-    const title = String((issue as Record<string, unknown>)?.title ?? '').trim();
-    if (!title) continue;
-    await missionController(['start', title, 'personal']);
-    started.push(title);
+  for (const { missionId, title } of missions) {
+    if (started.includes(missionId)) continue;
+    await runPipelineMissionController(['start', missionId, '--tier', 'personal', '--goal', title]);
+    started.push(missionId);
   }
   return exportValue(params, step, { status: 'succeeded', started }, ctx);
 }

@@ -12,6 +12,7 @@
       "enum": ["pending", "dispatched", "running", "failed", "cancelled"]
     },
     "enqueued_at": { "type": "string", "format": "date-time" },
+    "scope_digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
     "dependencies": { "type": "array", "items": { "type": "string" } },
     "metadata": { "type": "object" }
   }

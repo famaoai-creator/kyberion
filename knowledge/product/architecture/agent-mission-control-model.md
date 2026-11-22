@@ -17,9 +17,9 @@ Define a control model where missions remain explainable, agents can collaborate
 
 ## 2. Core Principle
 
-Kyberion does not execute "free-floating agents." It executes **missions** through agents.
+The mission controller coordinates agents when a [WorkItem](../../../docs/GLOSSARY.md#workitem) runs as a Mission.
 
-- A **mission** is the durable contract.
+- A **Mission** defines the durable execution lifecycle and evidence for its Issue. A dispatched mission step is represented by a child WorkItem, and its Task Contract bounds the worker's assignment.
 - An **agent** is an actor that receives authority from a mission.
 - A **runtime resource** is the physical execution substrate.
 - A **lock** is only a short-lived mutex.

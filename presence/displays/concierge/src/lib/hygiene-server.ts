@@ -24,6 +24,7 @@ export interface HygieneInquiry {
   reason: PlannedMissionFinding['reason'];
   tier?: 'personal' | 'confidential' | 'public';
   tenant_slug?: string;
+  organization_id?: string;
   age_days: number | null;
   waiting_since?: string;
 }
@@ -57,6 +58,7 @@ function toInquiry(finding: PlannedMissionFinding): HygieneInquiry {
     reason: finding.reason,
     ...(tier ? { tier } : {}),
     ...(finding.tenant_slug ? { tenant_slug: finding.tenant_slug } : {}),
+    ...(finding.organization_id ? { organization_id: finding.organization_id } : {}),
     age_days: finding.age_days,
     ...(waitingSince ? { waiting_since: waitingSince } : {}),
   };

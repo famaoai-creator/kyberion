@@ -1,4 +1,5 @@
 import * as path from 'node:path';
+import { hasCliFlag } from '@agent/core/cli-guard';
 import { loadProjectRecord } from '@agent/core/project/project-registry';
 import { isValidTenantSlug } from '@agent/core/entity-scope';
 import { loadProjectTrackRecord } from '@agent/core/project/project-track-registry';
@@ -10,18 +11,33 @@ import {
 import { validateWritePermission } from '@agent/core/tier-guard';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync } from '@agent/core/secure-io';
+import { getRegisteredEnvText } from '@agent/core/foundation/env';
+import { activeStance, parseStanceSelection, stanceRoot } from '@agent/core/stance-resolver';
+import { readJson } from '@agent/core/foundation/json';
+import { requireMissionScopeRegistration } from '@agent/core/mission/mission-creation';
+import { transitionStatus } from '@agent/core/mission/mission-status';
+import { resolveScopeResolution } from '@agent/core/scope-context';
+import { currentExecutionScope } from '@agent/core/foundation';
+import { currentScopeEnvelope } from '@agent/core/scope-envelope';
 import {
   extractMissionControllerPositionalArgs,
   extractMissionStartCreateOptionsFromArgv,
   getOptionValue,
   parseCsvOption,
 } from './mission-cli-args.js';
-import { normalizeRelationships } from '@agent/core/mission/mission-state';
+import {
+  assertMissionNotArchived,
+  inspectMissionPrerequisites,
+  loadState,
+  normalizeRelationships,
+  requireMissionDependencies,
+  requirePreparedMissionAdmission,
+} from '@agent/core/mission/mission-state';
 import {
   resolveProjectLedgerJsonPath,
   resolveProjectLedgerPath,
 } from '@agent/core/mission/mission-project-ledger';
-import type { MissionRelationships } from '@agent/core/mission/mission-types';
+import type { MissionRelationships, MissionState } from '@agent/core/mission/mission-types';
 import { currentProcessArgv } from '../lib/harness.js';
 import {
   OwnerScopeError,
@@ -116,6 +132,7 @@ export interface ResolvedMissionCliInput {
    * closed with the same [PROJECT_LINK_INVALID] message.
    */
   projectLinkWarning?: string;
+  preflight?: { ready: boolean; issues: string[]; stance?: string };
 }
 
 export function resolveMissionStartCreateInputFromArgv(
@@ -181,6 +198,48 @@ export function validateMissionStartCreateInput(
 ): ResolvedMissionCliInput {
   const input = resolveMissionStartCreateInputFromArgv(argv);
   if (!missionId) return input;
+  const dryRun = hasCliFlag(argv, '--dry-run');
+  try {
+    const state = actionName === 'create' ? undefined : loadState(missionId.toUpperCase());
+    if (
+      state &&
+      state.status !== 'active' &&
+      state.relationships?.project &&
+      !input.relationships?.project
+    ) {
+      input.relationships = {
+        ...input.relationships,
+        project: { ...state.relationships.project },
+      };
+    }
+    return validateResolvedMissionStartCreateInput(
+      actionName,
+      missionId,
+      input,
+      argv,
+      dryRun,
+      state
+    );
+  } catch (error) {
+    if (!dryRun) throw error;
+    return {
+      ...input,
+      preflight: {
+        ready: false,
+        issues: [error instanceof Error ? error.message : String(error)],
+      },
+    };
+  }
+}
+
+function validateResolvedMissionStartCreateInput(
+  actionName: 'create' | 'start' | 'kickoff',
+  missionId: string,
+  input: ResolvedMissionCliInput,
+  argv: string[],
+  dryRun: boolean,
+  state?: MissionState | null
+): ResolvedMissionCliInput {
   const project = input.relationships?.project;
   const track = input.relationships?.track;
   if (project?.project_path && !project.project_id) {
@@ -223,7 +282,7 @@ export function validateMissionStartCreateInput(
       const message =
         `[PROJECT_LINK_INVALID] ${actionName} ${missionId}: project not found: ${project.project_id}. ` +
         'Create it with `pnpm project create` or fix --project-id.';
-      if (!argv.includes('--dry-run')) throw new Error(message);
+      if (!dryRun) throw new Error(message);
       input.projectLinkWarning = `${message} (dry-run: the real run requires the project record)`;
     }
     if (projectRecord && track?.track_id) {
@@ -275,8 +334,24 @@ export function validateMissionStartCreateInput(
       };
     }
   }
-  if (project?.project_id && !project.project_path && !argv.includes('--dry-run')) {
+  if (project?.project_id && !project.project_path && !dryRun) {
     throw new Error(`${actionName} ${missionId}: --project-id requires --project-path`);
+  }
+  if (
+    state &&
+    state.status !== 'active' &&
+    project?.project_path &&
+    !safeExistsSync(pathResolver.rootResolve(project.project_path))
+  ) {
+    throw new Error(
+      `[PROJECT_LINK_INVALID] ${actionName} ${missionId}: linked Project OS is missing; restore the registered path before starting.`
+    );
+  }
+  if (project?.project_path && !input.ledgerTargets) {
+    input.ledgerTargets = {
+      markdown: resolveProjectLedgerPath(project.project_path),
+      json: resolveProjectLedgerJsonPath(project.project_path),
+    };
   }
   if (project?.project_path && input.ledgerTargets) {
     const markdownGuard = validateWritePermission(input.ledgerTargets.markdown);
@@ -292,7 +367,139 @@ export function validateMissionStartCreateInput(
       );
     }
   }
-  return input;
+  return preflightMissionScope(actionName, missionId, input, argv, dryRun, state);
+}
+
+function preflightMissionScope(
+  action: 'create' | 'start' | 'kickoff',
+  missionId: string,
+  input: ResolvedMissionCliInput,
+  argv: string[],
+  dryRun: boolean,
+  state?: MissionState | null
+): ResolvedMissionCliInput {
+  const issues = input.projectLinkWarning ? [input.projectLinkWarning] : [];
+  const resolved = { ...input };
+  let stance: string | null = null;
+  try {
+    const alias = getOptionValue('--tenant', argv);
+    if (alias && !isValidTenantSlug(alias))
+      throw new Error('--tenant requires a registered tenant slug.');
+    if (alias && input.tenantSlug && alias !== input.tenantSlug)
+      throw new Error('--tenant and --tenant-slug must select the same tenant.');
+    const legacyTenant =
+      input.tenantId !== 'default' && input.tenantId && isValidTenantSlug(input.tenantId)
+        ? input.tenantId
+        : undefined;
+    const execution = currentExecutionScope();
+    const inherited = currentScopeEnvelope()?.identity;
+    const governed =
+      inherited ||
+      execution?.tenantBound ||
+      execution?.tenantCleared ||
+      execution?.executionIdentity?.projectId !== undefined;
+    stance = governed ? null : activeStance();
+    const stanceConfig = stance ? stanceRoot('stance.json') : null;
+    if (stanceConfig && !safeExistsSync(stanceConfig))
+      throw new Error(
+        'Selected Stance is not configured. Run pnpm stance:list or clear the active Stance.'
+      );
+    const actingFor = stanceConfig ? parseStanceSelection(readJson<unknown>(stanceConfig)) : null;
+    const ambient = governed
+      ? {
+          tenant_slug: execution?.tenantCleared
+            ? undefined
+            : execution?.tenantBound
+              ? execution.tenantSlug
+              : inherited?.tenant_slug,
+          organization_id: execution?.organizationId ?? inherited?.organization_id,
+        }
+      : resolveScopeResolution({}, undefined, { inferFromMission: false, inferFromCwd: false })
+          .scope;
+    const same = (label: string, values: Array<string | undefined | null>): string | undefined => {
+      const selected = [...new Set(values.filter((value): value is string => Boolean(value)))];
+      if (selected.length > 1)
+        throw new Error(
+          `${label} conflicts across the selected Mission, Project, Stance or CLI context. Align the selections before executing.`
+        );
+      return selected[0];
+    };
+    same('Tier', [state?.tier, input.tier]);
+    const explicitProject = input.relationships?.project?.project_id;
+    const executionProject = execution?.executionIdentity?.projectId;
+    const boundProject = executionProject === undefined ? inherited?.project_id : executionProject;
+    if (
+      boundProject &&
+      boundProject !== (explicitProject ?? state?.relationships?.project?.project_id)
+    )
+      throw new Error(
+        'Project conflicts with the governed execution scope. Select its bound Project.'
+      );
+
+    if (state && explicitProject && explicitProject !== state.relationships?.project?.project_id)
+      throw new Error(
+        'Project conflicts with the existing Mission. Use its registered project link.'
+      );
+    resolved.tier = state?.tier ?? input.tier ?? 'confidential';
+    resolved.tenantSlug = same('Tenant', [
+      state?.tenant_slug,
+      input.tenantSlug,
+      alias,
+      legacyTenant,
+      ambient.tenant_slug,
+      actingFor?.tenantSlug,
+    ]);
+    resolved.organizationId = same('Organization', [
+      state?.organization_id,
+      input.organizationId,
+      ambient.organization_id,
+      actingFor?.organizationId,
+    ]);
+    if (
+      state &&
+      ((resolved.tenantSlug && !state.tenant_slug) ||
+        (resolved.organizationId && !state.organization_id))
+    ) {
+      throw new Error(
+        'The existing Mission has no matching tenant or organization binding. Use its original scope.'
+      );
+    }
+    if (execution?.tenantCleared && resolved.tenantSlug)
+      throw new Error('Tenant conflicts with the tenant-free governed execution scope.');
+    if (resolved.tenantSlug && !isValidTenantSlug(resolved.tenantSlug))
+      throw new Error('Tenant must be a valid registered slug.');
+    if (
+      resolved.tier === 'confidential' &&
+      !resolved.tenantSlug &&
+      (getRegisteredEnvText('KYBERION_TENANT_SCOPE_REQUIRED') || 'strict') === 'strict'
+    ) {
+      throw new Error(
+        'Confidential Mission requires a tenant. Supply --tenant-slug, bind a tenant Stance, or choose --tier public for tenant-free work.'
+      );
+    }
+    requireMissionScopeRegistration(resolved);
+    if (!state)
+      assertMissionNotArchived(missionId.toUpperCase(), { tenantSlug: resolved.tenantSlug });
+    if (action !== 'create') {
+      if (state && state.status !== 'active') transitionStatus(state.status, 'active');
+      requirePreparedMissionAdmission(state, getOptionValue('--admission-work-item', argv));
+      requireMissionDependencies({
+        id: missionId,
+        state,
+        tenantSlug: resolved.tenantSlug,
+        prerequisites: input.relationships?.prerequisites,
+        force: hasCliFlag(argv, '--force'),
+      });
+      if (dryRun && state?.status !== 'active') issues.push(...inspectMissionPrerequisites());
+    }
+  } catch (error) {
+    if (!dryRun) throw error;
+    issues.push(error instanceof Error ? error.message : String(error));
+  }
+  return {
+    ...resolved,
+    preflight: { ready: issues.length === 0, issues, ...(stance ? { stance } : {}) },
+  };
 }
 
 export function resolveMissionTicketDispatchOptionsFromArgv(

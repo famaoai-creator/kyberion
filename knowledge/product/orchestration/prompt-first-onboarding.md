@@ -124,6 +124,11 @@ onboarding:context first-work の dry-run を確認する。包含順は常に
 tenant_slug → organization_id → project_id → mission_id → task_id。
 すべての仕事に project / mission を強制せず、work-scope policy で実行形を決める。
 
+個人 Mission の知識利用報告まで求められている場合は、`pnpm onboarding authority show --scope person --json`
+で個人 NHI の有効化を確認する。承認待ちは利用者に引き渡し、承認後に apply と状態確認から再開する。
+知識の配信と利用報告は単独の operator 端末で行う。エージェントセッションの終了や環境変数の変更によって
+利用者の権限を引き継いだと判断しない。[個人 NHI の確認手順](../../../docs/INITIALIZATION.md#stage-7-soul-infusion-identity)を参照。
+
 最後に「利用可能・保留・承認待ち・次の一手」を短く返す。
 環境が整っただけ、または binding ができただけで「組織の仕事が実行可能」と報告しない。
 vital-check と baseline の結果、組織なら activation / organization status、必要な接続の

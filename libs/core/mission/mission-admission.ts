@@ -68,7 +68,7 @@ export function assertMissionAdmissionActivation(
   workItemId: string,
   tenantSlug: string | undefined,
   deps: Deps & { organizationId?: string; projectId?: string } = {}
-): void {
+): { item: WorkItem; admission: MissionAdmissionRequest } {
   const item = getWorkItem(workItemId, deps);
   const scope = item ? resolveDotMissionAdmissionScope(item, deps) : undefined;
   if (
@@ -79,7 +79,7 @@ export function assertMissionAdmissionActivation(
     scope?.project_id !== deps.projectId
   )
     throw new Error('mission admission identity/scope mismatch');
-  resolveDotMissionAdmission(item, deps);
+  const { admission, body } = verifiedDotMissionAdmission(item, deps);
   const gate = evaluateAutonomousOpsAction({
     actionId: 'mission_start_mandate',
     tenantSlug,
@@ -120,6 +120,7 @@ export function assertMissionAdmissionActivation(
     )
       throw new Error('mission admission activation requires its current uncompleted apply claim');
   }
+  return { item: body, admission };
 }
 export function resolveDotMissionAdmission(
   item: WorkItem,
@@ -225,6 +226,14 @@ export function resolveDotMissionAdmissionScope(item: WorkItem, deps: Deps = {})
   return verifiedDotMissionAdmission(item, deps).scope;
 }
 
+export function resolveDotMissionAdmissionBrief(item: WorkItem, deps: Deps = {}) {
+  const { admission, scope, body } = verifiedDotMissionAdmission(item, deps);
+  return {
+    scope,
+    brief: buildMissionAdmissionBrief(body, admission, String(item.metadata?.mission_id)),
+  };
+}
+
 function verifiedDotMissionAdmission(item: WorkItem, deps: Deps) {
   if (item.metadata?.dot_private_body) {
     if (
@@ -317,6 +326,37 @@ export function readMissionAdmissionBrief(file: string): AdmissionBrief {
   }).load();
 }
 
+export function inspectMissionAdmissionActivation(
+  missionId: string,
+  item: WorkItem,
+  scope: ReturnType<typeof resolveDotMissionAdmissionScope>,
+  admission: MissionAdmissionRequest,
+  deps: Deps = {}
+): 'inactive' | 'matched' | 'conflict' {
+  const state = loadState(missionId, deps);
+  if (state?.status !== 'active') return 'inactive';
+  if (
+    state.tier !== 'confidential' ||
+    state.tenant_slug !== scope.tenant_slug ||
+    state.organization_id !== scope.organization_id ||
+    state.relationships?.project?.project_id !== scope.project_id
+  )
+    return 'conflict';
+  const missionDir = findMissionPath(missionId);
+  if (!missionDir) return 'conflict';
+  const file = path.join(missionDir, 'evidence', 'mission-brief.json');
+  if (!safeExistsSync(file)) return 'conflict';
+  const brief = readMissionAdmissionBrief(file);
+  return brief.missionId === missionId &&
+    brief.source?.kind === 'dot_work_item' &&
+    brief.source.ref === item.item_id &&
+    brief.source.tenantSlug === scope.tenant_slug &&
+    computeApprovalPayloadHash(brief.missionAdmission as unknown as Record<string, unknown>) ===
+      computeApprovalPayloadHash(admission as unknown as Record<string, unknown>)
+    ? 'matched'
+    : 'conflict';
+}
+
 /** Preparation is not activation: author the exact same brief on a planned mission. */
 export function prepareMissionAdmissionBrief(
   missionId: string,
@@ -326,7 +366,7 @@ export function prepareMissionAdmissionBrief(
   const item = getWorkItem(workItemId, deps);
   if (!item || item.metadata?.mission_id !== missionId)
     throw new Error('mission intake identity mismatch');
-  const { admission, scope, body } = verifiedDotMissionAdmission(item, deps);
+  const { scope, brief } = resolveDotMissionAdmissionBrief(item, deps);
   const state = loadState(missionId, deps);
   const dir = findMissionPath(missionId);
   if (
@@ -338,7 +378,27 @@ export function prepareMissionAdmissionBrief(
     state.relationships?.project?.project_id !== scope.project_id
   )
     throw new Error('planned mission preparation receipt missing');
-  const brief = buildMissionAdmissionBrief(body, admission, missionId);
+  writeBoundAdmissionBrief(dir, brief);
+}
+
+export function sealMissionAdmissionActivation(
+  missionId: string,
+  workItemId: string,
+  tenantSlug: string | undefined,
+  deps: Deps & { organizationId?: string; projectId?: string } = {}
+): void {
+  const { item, admission } = assertMissionAdmissionActivation(
+    missionId,
+    workItemId,
+    tenantSlug,
+    deps
+  );
+  const dir = findMissionPath(missionId);
+  if (!dir) throw new Error('mission directory missing before admission activation');
+  writeBoundAdmissionBrief(dir, buildMissionAdmissionBrief(item, admission, missionId));
+}
+
+function writeBoundAdmissionBrief(dir: string, brief: AdmissionBrief): void {
   withLockSync('mission-admission-brief:' + dir, () => {
     const file = path.join(dir, 'evidence', 'mission-brief.json');
     if (safeExistsSync(file)) {

@@ -6,6 +6,8 @@ import { stanceDirForSlug } from '@agent/core/stance-resolver';
 export type OrganizationContextOptions = {
   /** Override overlay detection (tests). Default: `knowledge/personal/stances/{slug}/` exists. */
   stanceOverlayExists?: (slug: string) => boolean;
+  /** Existing consumers may use the historical organization-named overlay. */
+  selectStanceFromOrganization?: boolean;
 };
 
 function defaultStanceOverlayExists(slug: string): boolean {
@@ -31,7 +33,7 @@ export function withOrganizationContext<T>(
   const slug = organizationId?.trim();
   if (slug) {
     setRegisteredEnv('KYBERION_ORGANIZATION_ID', slug);
-    if (stanceOverlayExists(slug)) {
+    if (options.selectStanceFromOrganization !== false && stanceOverlayExists(slug)) {
       setRegisteredEnv('KYBERION_STANCE', slug);
     }
   }

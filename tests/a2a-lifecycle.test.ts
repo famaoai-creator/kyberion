@@ -56,6 +56,14 @@ function ensurePersonalFixtures() {
     path.join(PROFILE_ROOT, 'agent-identity.json'),
     JSON.stringify({ agent_id: 'test-agent', version: '1.0.0', trust_tier: 'sovereign' }, null, 2)
   );
+  // The start preflight requires the selected stance's stance.json to exist
+  // and parse. This overlay carries profile files only: `acting_for: null`
+  // declares the stance acts for no tenant, so the scope merge does not pull
+  // the synthetic slug in as an (unregistered) tenant.
+  fs.writeFileSync(
+    path.join(PROFILE_ROOT, 'stance.json'),
+    JSON.stringify({ acting_for: null }, null, 2)
+  );
   if (!safeExistsSync(LEDGER_PATH)) fs.writeFileSync(LEDGER_PATH, JSON.stringify({}, null, 2));
 }
 

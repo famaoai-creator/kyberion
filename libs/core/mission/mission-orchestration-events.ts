@@ -1,9 +1,15 @@
 import { appendJsonLine } from '../foundation/json.js';
 import { nowIso } from '../foundation/time.js';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { pathResolver, rootDir } from '../path-resolver.js';
-import { assertSafeRepositoryPath, safeMkdir, safeWriteFile } from '../secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeMkdir,
+  safeWriteFile,
+} from '../secure-io.js';
+import { withLockSync } from '../foundation/lock-utils.js';
 import { resolveSharedObservabilityDir } from '../analysis/observability-gate.js';
 import { spawnManagedProcess } from '../tool/managed-process.js';
 import { appendMissionOrchestrationJournalEntry } from './mission-orchestration-journal.js';
@@ -16,6 +22,7 @@ import {
 } from '../event/event-scope.js';
 import { redactCollaborationMetadata } from '../agent/agent-collaboration-events.js';
 import {
+  loadMissionOrchestrationEvent,
   resolveMissionOrchestrationScope,
   validateMissionOrchestrationPayloadEnvelope,
 } from './mission-orchestration-event-loader.js';
@@ -97,7 +104,7 @@ function missionPayloadPath(
   });
 }
 
-export function enqueueMissionOrchestrationEvent<TPayload = Record<string, unknown>>(input: {
+interface MissionOrchestrationEnqueueInput<TPayload> {
   eventType: MissionOrchestrationEventType;
   missionId: string;
   requestedBy: string;
@@ -105,11 +112,22 @@ export function enqueueMissionOrchestrationEvent<TPayload = Record<string, unkno
   correlationId?: string;
   causationId?: string;
   scope?: EventScopeInput;
-}): MissionOrchestrationEvent<TPayload> {
+}
+
+export function enqueueMissionOrchestrationEvent<TPayload = Record<string, unknown>>(
+  input: MissionOrchestrationEnqueueInput<TPayload>
+): MissionOrchestrationEvent<TPayload> {
+  const eventId = `ME-${Date.now().toString(36).toUpperCase()}-${randomUUID().slice(0, 8).toUpperCase()}`;
+  return persistMissionOrchestrationEvent(input, eventId);
+}
+
+function persistMissionOrchestrationEvent<TPayload>(
+  input: MissionOrchestrationEnqueueInput<TPayload>,
+  eventId: string
+): MissionOrchestrationEvent<TPayload> {
   ensureDirs();
   pathResolver.assertMissionIdArgument(input.missionId);
   const scope = resolveMissionOrchestrationScope(input.missionId, input.scope);
-  const eventId = `ME-${Date.now().toString(36).toUpperCase()}-${randomUUID().slice(0, 8).toUpperCase()}`;
   const payloadPath = missionPayloadPath(input.missionId, scope.tier, eventId, scope.tenant_slug);
   const payloadRef = pathResolver.toRepoRelative(payloadPath);
   safeMkdir(path.dirname(payloadPath), { recursive: true });
@@ -159,6 +177,52 @@ export function enqueueMissionOrchestrationEvent<TPayload = Record<string, unkno
     scope: event.scope,
   });
   return event;
+}
+
+function missionIssuanceKey(missionId: string, scope: EventScope): string {
+  return JSON.stringify([
+    missionId,
+    scope.tier,
+    scope.tenant_slug,
+    scope.organization_id,
+    scope.project_id,
+  ]);
+}
+
+/** Publish and launch one issuance event for a Mission's resolved scope. */
+export function queueMissionIssuanceOnce<TPayload>(
+  input: Omit<MissionOrchestrationEnqueueInput<TPayload>, 'eventType' | 'correlationId'>
+): string {
+  pathResolver.assertMissionIdArgument(input.missionId);
+  const missionId = input.missionId.toUpperCase();
+  const scope = resolveMissionOrchestrationScope(missionId, input.scope);
+  const key = missionIssuanceKey(missionId, scope);
+  const digest = createHash('sha256').update(key).digest('hex').slice(0, 24).toUpperCase();
+  const eventId = `ME-ISSUE-${digest}`;
+  return withLockSync(`mission-issue:${digest}`, () => {
+    const eventPath = getMissionOrchestrationEventPath(eventId);
+    if (safeExistsSync(eventPath)) {
+      const existing = loadMissionOrchestrationEvent(eventPath);
+      if (
+        existing.event_id !== eventId ||
+        existing.event_type !== 'mission_issue_requested' ||
+        existing.mission_id !== missionId ||
+        !existing.scope ||
+        missionIssuanceKey(existing.mission_id, existing.scope) !== key
+      )
+        throw new Error(
+          '[MISSION_ISSUANCE_EVENT_CONFLICT] Existing event does not match this scope.'
+        );
+      // A published event may already be running, or the first launch may
+      // have stopped mid-ceremony. The Mission controller owns replay.
+      return eventPath;
+    }
+    const event = persistMissionOrchestrationEvent(
+      { ...input, missionId, scope, eventType: 'mission_issue_requested', correlationId: eventId },
+      eventId
+    );
+    return startMissionOrchestrationWorker(event);
+  });
 }
 
 export function startMissionOrchestrationWorker<TPayload = Record<string, unknown>>(

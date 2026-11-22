@@ -13,6 +13,10 @@ import {
   type MissionOrchestrationEvent,
 } from './mission-orchestration-events.js';
 import { buildExecutionEnv } from '../authority.js';
+import {
+  missionControllerHandoffEnv,
+  missionControllerStartInput,
+} from './mission-controller-start-input.js';
 import { logger } from '../core.js';
 import { resolveMissionPlanningPacket } from './mission-orchestration-planning.js';
 import { summarizeMissionGateState } from './mission-orchestration-phase-gates.js';
@@ -24,12 +28,7 @@ import {
 } from './mission-orchestration-phase-gates.js';
 import { summarizeHeuristics } from '../knowledge/heuristic-feedback.js';
 import { notifyOperator } from '../surface/operator-notifications.js';
-import {
-  loadMissionOrchestrationReplayPlan,
-  provisionMissionEntry,
-  writeProvisionedJson,
-} from './mission-orchestration-journal.js';
-import { recoverMissionRequestedTasks } from './mission-task-recovery.js';
+import { provisionMissionEntry, writeProvisionedJson } from './mission-orchestration-journal.js';
 import { emitMissionOrchestrationObservation } from './mission-orchestration-events.js';
 import { payloadSurface } from './mission-orchestration-worker-contracts.js';
 import {
@@ -85,12 +84,19 @@ export async function handleMissionIssueRequested(
 ) {
   const payload = event.payload;
   const missionId = event.mission_id;
-  const env = buildExecutionEnv(process.env, 'mission_controller');
-  const tier = payload.tier || 'public';
-  const persona = payload.persona || 'Ecosystem Architect';
+  const scope = event.scope ?? payload.scope;
+  const tier = scope?.tier ?? payload.tier ?? 'public';
+  const persona = payload.persona || 'ecosystem_architect';
   const missionType = deps.resolveMissionType(payload);
 
-  deps.runMissionController(env, ['start', missionId, tier, persona, 'default', missionType]);
+  const { args, env } = missionControllerStartInput({
+    missionId,
+    tier,
+    missionType,
+    orgRole: persona,
+    scope,
+  });
+  deps.runMissionController(env, args);
   deps.emitSlackMissionEvent(
     payload,
     missionId,
@@ -188,7 +194,7 @@ export async function handleMissionKickoffRequested(
   const payload = event.payload;
   const missionId = event.mission_id;
   await deps.emitWorkerKickoffSnapshot(missionId, payload);
-  const env = buildExecutionEnv(process.env, 'mission_controller');
+  const env = missionControllerHandoffEnv(event.scope?.tier, event.scope);
 
   deps.runMissionController(env, [
     'record-task',
@@ -385,7 +391,7 @@ export async function handleMissionDistillationRequested(
   }
 
   // Run distillation via mission controller CLI
-  const env = buildExecutionEnv(process.env, 'mission_controller');
+  const env = missionControllerHandoffEnv(event.scope?.tier, event.scope);
   try {
     deps.runMissionController(env, ['distill', missionId]);
     deps.emitSlackMissionEvent(
@@ -456,7 +462,7 @@ export async function handleMissionCompletionRequested(
     `Mission ${missionId} completing lifecycle`
   );
 
-  const env = buildExecutionEnv(process.env, 'mission_controller');
+  const env = missionControllerHandoffEnv(event.scope?.tier, event.scope);
   try {
     deps.runMissionController(env, ['finish', missionId]);
     deps.emitSlackMissionEvent(
@@ -547,34 +553,13 @@ export async function handleMissionControlRequested(
   event: MissionOrchestrationEvent<MissionControlPayload>,
   deps: MissionLifecycleHandlerDeps
 ) {
-  const env = buildExecutionEnv(process.env, 'mission_controller');
+  const env = missionControllerHandoffEnv(event.scope?.tier, event.scope);
   const missionId = event.mission_id;
   const operation = event.payload.operation;
 
   switch (operation) {
     case 'resume':
-      {
-        const replayPlan = loadMissionOrchestrationReplayPlan(missionId, event.scope);
-        const recovery = recoverMissionRequestedTasks(missionId);
-        if (replayPlan.next_event) {
-          startMissionOrchestrationWorker(replayPlan.next_event);
-        }
-        emitMissionOrchestrationObservation({
-          decision: 'mission_resume_replay_planned',
-          event_type: 'mission_control_requested',
-          requested_by: event.requested_by,
-          mission_id: missionId,
-          next_event_id: replayPlan.next_event?.event_id,
-          next_event_type: replayPlan.next_event?.event_type,
-          replay_count: replayPlan.replay_count,
-          recovery_required: replayPlan.recovery_required,
-          recovery_reason: replayPlan.recovery_reason,
-          unverified_provisioned_entry_count: replayPlan.unverified_provisioned_entries.length,
-          missing_provisioned_entry_count: replayPlan.missing_provisioned_entries.length,
-          recovered_task_count: recovery.reissued_count,
-          waiting_task_count: recovery.waiting_count,
-        });
-      }
+      // The controller owns recovery, replay, and resume in one ceremony.
       deps.runMissionController(env, ['resume', missionId]);
       break;
     case 'pause':

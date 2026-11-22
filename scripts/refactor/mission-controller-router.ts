@@ -5,6 +5,7 @@ import { formatMissionTeamPlanView } from '@agent/core/mission/mission-team-view
  */
 
 import { logger } from '@agent/core/core';
+import { hasCliFlag, hasHelpFlag } from '@agent/core/cli-guard';
 import { parseTaskEvidenceBinding } from '@agent/core/mission/mission-task-evidence-binding';
 import { auditChain } from '@agent/core/governance/audit-chain';
 import { executionAgentId } from '@agent/core/governance/execution-agent-id';
@@ -288,11 +289,14 @@ async function applyIntentTrackGate(
   if (executionShape && !['mission', 'project_bootstrap'].includes(executionShape)) {
     return { input, intentTrackGate: null };
   }
-  if (!input.relationships?.project?.project_id || !input.relationships.project.project_path) {
+  const project = input.relationships?.project;
+  if (!project?.project_id || (!project.project_path && input.preflight?.ready !== false)) {
     throw new Error(
       '--intent-id requires --project-id and --project-path so the generated track remains linked to a governed project'
     );
   }
+
+  if (input.preflight?.ready === false) return { input, intentTrackGate: null };
 
   const { resolveIntentTrackGate } = await import('@agent/core/intent/intent-track-resolver');
   const result = await resolveIntentTrackGate({
@@ -307,10 +311,13 @@ async function applyIntentTrackGate(
   });
 
   if (result.status === 'escalation_required') {
-    if (context.hasDryRun) return { input, intentTrackGate: result };
-    throw new Error(
-      `Intent-to-track gate requires confirmation: ${result.intent_id} confidence ${result.confidence} is below ${result.min_confidence_to_autostart}`
-    );
+    const issue = `Intent-to-track gate requires confirmation: ${result.intent_id} confidence ${result.confidence} is below ${result.min_confidence_to_autostart}`;
+    if (context.hasDryRun)
+      return {
+        input: { ...input, preflight: { ...input.preflight, ready: false, issues: [issue] } },
+        intentTrackGate: result,
+      };
+    throw new Error(issue);
   }
 
   return {
@@ -377,12 +384,13 @@ export async function runMissionControllerAction(
 ): Promise<void> {
   const { action, arg1, arg2, arg3, arg4, hasDryRun, getOptionValue: getValue } = context;
 
-  if (context.argv.includes('--help') || context.argv.includes('-h')) {
+  if (hasHelpFlag(context.argv)) {
     context.showHelp();
     return;
   }
 
   assertMissionIdArgument(action, arg1);
+  const json = hasCliFlag(context.argv, '--json');
 
   // FD-10 wave 1b: resolved once for the whole action dispatch and only
   // consumed by the human decision verbs below (start/kickoff/pause/cancel/
@@ -390,7 +398,7 @@ export async function runMissionControllerAction(
   const decidedBy = resolveDecidedByFromArgv(context.argv);
   // The approval-mediated verbs (scope-approve, triage, reconcile-work,
   // supersede-task, …) file a human approval request instead of applying.
-  const requestApproval = context.argv.includes('--request-approval');
+  const requestApproval = hasCliFlag(context.argv, '--request-approval');
 
   {
     // Action dispatch: governed handler map — one entry per verb; shared
@@ -428,7 +436,7 @@ export async function runMissionControllerAction(
         );
         return;
       }
-      await context.startMission(
+      const started = await context.startMission(
         arg1!,
         (input?.tier || 'confidential') as 'personal' | 'confidential' | 'public',
         input?.persona,
@@ -439,9 +447,9 @@ export async function runMissionControllerAction(
         input?.tenantSlug,
         input?.organizationId,
         {
-          ephemeral: context.argv.includes('--ephemeral'),
+          ephemeral: hasCliFlag(context.argv, '--ephemeral'),
           intentGoal: await resolveIntentGoalHandoffPath(context, arg1),
-          force: context.argv.includes('--force'),
+          force: hasCliFlag(context.argv, '--force'),
           decidedBy,
           ...(getValue('--admission-work-item', context.argv)
             ? { admissionWorkItem: getValue('--admission-work-item', context.argv) }
@@ -460,6 +468,14 @@ export async function runMissionControllerAction(
             mission_id: arg1?.toUpperCase(),
             routing_decision: routingDecision,
           },
+        });
+      }
+      if (json) {
+        context.print?.({
+          ok: true,
+          action,
+          mission_id: arg1?.toUpperCase(),
+          knowledge: started ? started.knowledgeLines : [],
         });
       }
       return;
@@ -510,7 +526,7 @@ export async function runMissionControllerAction(
             createInput?.tenantSlug,
             createInput?.organizationId,
             {
-              ephemeral: context.argv.includes('--ephemeral'),
+              ephemeral: hasCliFlag(context.argv, '--ephemeral'),
               intentGoal: await resolveIntentGoalHandoffPath(context, arg1),
             }
           );
@@ -527,6 +543,9 @@ export async function runMissionControllerAction(
                 routing_decision: routingDecision,
               },
             });
+          }
+          if (json) {
+            context.print?.({ ok: true, action, mission_id: arg1?.toUpperCase() });
           }
           return;
         }
@@ -577,7 +596,7 @@ export async function runMissionControllerAction(
       },
       triage: async () => {
         await context.triageMission(arg1!, {
-          json: context.argv.includes('--json'),
+          json,
           requestApproval,
           goal: getValue('--goal', context.argv),
           reason: getValue('--reason', context.argv),
@@ -621,9 +640,9 @@ export async function runMissionControllerAction(
         const { collectMissionReviewSuggestions } =
           await import('@agent/core/mission/mission-review-suggestions');
         const suggestions = collectMissionReviewSuggestions({
-          includeBlocking: context.argv.includes('--include-blocking'),
+          includeBlocking: hasCliFlag(context.argv, '--include-blocking'),
         });
-        if (context.argv.includes('--json')) {
+        if (json) {
           context.print?.(JSON.stringify(suggestions, null, 2));
           return;
         }
@@ -666,7 +685,7 @@ export async function runMissionControllerAction(
             `      → ${finding.recommendation.replaceAll('<ID>', finding.mission_id)}`
           );
         }
-        if (context.argv.includes('--notify')) {
+        if (hasCliFlag(context.argv, '--notify')) {
           const sent = await notifyMissionHygiene(report);
           // i18n-exempt: JA operator output
           context.print?.(sent ? '通知を送信しました。' : '要対応のミッションはありません。');
@@ -683,11 +702,13 @@ export async function runMissionControllerAction(
           listProcessImprovementProposals,
           migrateLegacyProcessImprovementProposals,
         } = await import('@agent/core/mission/mission-retrospective');
-        if (context.argv.includes('--migrate')) {
+        if (hasCliFlag(context.argv, '--migrate')) {
           // D8 one-release migration of the legacy shared proposal queue.
           context.print?.(
             JSON.stringify(
-              migrateLegacyProcessImprovementProposals({ apply: context.argv.includes('--write') }),
+              migrateLegacyProcessImprovementProposals({
+                apply: hasCliFlag(context.argv, '--write'),
+              }),
               null,
               2
             )
@@ -765,7 +786,7 @@ export async function runMissionControllerAction(
         await context.showMemoryReview(
           arg1!,
           getValue('--tenant-slug', context.argv),
-          context.argv.includes('--json'),
+          json,
           context.print
         );
       },
@@ -797,7 +818,7 @@ export async function runMissionControllerAction(
           arg1!,
           getValue('--note', context.argv),
           getValue('--tenant-slug', context.argv),
-          context.argv.includes('--all-duplicates'),
+          hasCliFlag(context.argv, '--all-duplicates'),
           decidedBy,
           context.print
         );
@@ -830,13 +851,13 @@ export async function runMissionControllerAction(
             supersedes: getValue('--supersedes', context.argv),
             targetRoot: getValue('--target-root', context.argv),
             missionId: getValue('--mission', context.argv),
-            dryRun: context.argv.includes('--dry-run'),
+            dryRun: hasDryRun,
           },
           context.print
         );
       },
       finish: async () => {
-        await context.finishMission(arg1!, context.argv.includes('--seal'));
+        await context.finishMission(arg1!, hasCliFlag(context.argv, '--seal'));
       },
       resume: async () => {
         await context.resumeMission(arg1);
@@ -873,6 +894,28 @@ export async function runMissionControllerAction(
         return;
       },
       'record-evidence': async () => {
+        const knowledgeUsed = parseCsvOption('--knowledge-used', context.argv);
+        if (hasCliFlag(context.argv, '--knowledge-used') && !knowledgeUsed?.length) {
+          throw new Error(
+            '--knowledge-used requires a comma-separated list of delivered references.'
+          );
+        }
+        const knowledge = knowledgeUsed?.length
+          ? await import('@agent/core/mission/mission-operator-knowledge-surface')
+          : undefined;
+        const requirement = knowledge?.inspectOperatorKnowledgeUse(arg1!, arg2 || 'manual');
+        if (requirement && knowledgeUsed) {
+          context.print?.({
+            task_id: arg2 || 'manual',
+            evidence_recorded: false,
+            next_action: requirement.nextAction,
+            knowledge_usage: knowledgeUsed.map((reference) => ({
+              reference,
+              status: requirement.status,
+            })),
+          });
+          return;
+        }
         const recorded = await context.recordEvidence(
           arg1!,
           arg2 || 'manual',
@@ -889,9 +932,23 @@ export async function runMissionControllerAction(
             : undefined
         );
         // A task that stayed open says why (missing deliverable / pending dependencies).
-        const completion = (recorded as { task_completion?: { completed?: boolean } } | undefined)
-          ?.task_completion;
-        if (completion && !completion.completed) context.print?.(recorded);
+        const evidence = recorded as
+          { task_completion?: { completed?: boolean }; evidence_task_id?: string } | undefined;
+        if (recorded && knowledge && knowledgeUsed) {
+          const usage = evidence?.evidence_task_id
+            ? knowledge.recordOperatorKnowledgeUsage(
+                arg1!,
+                evidence.evidence_task_id,
+                knowledgeUsed
+              )
+            : knowledgeUsed.map((reference) => ({ reference, status: 'task_not_recorded' }));
+          context.print?.({ ...evidence, knowledge_usage: usage });
+        } else if (
+          recorded &&
+          (json || (evidence?.task_completion && !evidence.task_completion.completed))
+        ) {
+          context.print?.(recorded);
+        }
       },
       'review-task': async () => {
         const findingsRaw = getValue('--findings', context.argv);
@@ -914,7 +971,7 @@ export async function runMissionControllerAction(
         return;
       },
       'reconcile-work': async () => {
-        if (context.argv.includes('--generate')) {
+        if (hasCliFlag(context.argv, '--generate')) {
           const { generateMissionWorkReconciliationScaffold } =
             await import('@agent/core/mission/mission-work-reconciliation');
           const scaffold = generateMissionWorkReconciliationScaffold({
@@ -938,7 +995,7 @@ export async function runMissionControllerAction(
         await context.reconcileExistingWork(
           arg1!,
           manifestPath,
-          context.hasDryRun,
+          hasDryRun,
           getValue('--approval-request-id', context.argv)
         );
         return;
@@ -981,7 +1038,7 @@ export async function runMissionControllerAction(
         // Ledger-free directory debris under active/missions/: removes only
         // dirs whose whole subtree holds no real file (dry-run by default).
         const { sweepEmptyMissionDirs } = await import('@agent/core/storage-janitor');
-        const execute = context.argv.includes('--execute');
+        const execute = hasCliFlag(context.argv, '--execute');
         const result = sweepEmptyMissionDirs({ dryRun: !execute });
         context.print?.(
           execute
@@ -997,7 +1054,7 @@ export async function runMissionControllerAction(
         return;
       },
       purge: async () => {
-        await context.purgeMissions(!context.argv.includes('--execute'));
+        await context.purgeMissions(!hasCliFlag(context.argv, '--execute'));
       },
       archive: async () => {
         // AL-03: governed archive verb. `purge` above keeps its exact argv
@@ -1005,16 +1062,16 @@ export async function runMissionControllerAction(
         // facade, optionally targeting one mission via --mission <ID>.
         await context.archiveMissions({
           missionId: getValue('--mission', context.argv),
-          execute: context.argv.includes('--execute'),
+          execute: hasCliFlag(context.argv, '--execute'),
         });
       },
       list: async () => {
-        await context.listMissions(arg1, context.argv.includes('--json'));
+        await context.listMissions(arg1, json);
       },
       'organization-catalogs': async () => {
         await context.listOrganizationCatalogs(
           getValue('--organization-id', context.argv) || getValue('--org', context.argv),
-          context.argv.includes('--json'),
+          json,
           context.print
         );
       },
@@ -1027,27 +1084,33 @@ export async function runMissionControllerAction(
       'organization-profile': async () => {
         await context.showOrganizationProfile(
           getValue('--organization-id', context.argv) || getValue('--org', context.argv),
-          context.argv.includes('--summary') || context.argv.includes('--compact'),
-          context.argv.includes('--json'),
+          hasCliFlag(context.argv, '--summary') || hasCliFlag(context.argv, '--compact'),
+          json,
           context.print
         );
       },
       'organization-discovery': async () => {
         await context.showOrganizationDiscovery(
-          context.argv.includes('--json'),
-          context.argv.includes('--summary') || context.argv.includes('--compact'),
+          json,
+          hasCliFlag(context.argv, '--summary') || hasCliFlag(context.argv, '--compact'),
           context.print
         );
       },
       status: async () => {
-        await context.showMissionStatus(arg1!, context.argv.includes('--follow'));
+        const follow = hasCliFlag(context.argv, '--follow');
+        if (json && follow) throw new Error('--follow is not available with --json.');
+        const tenantSlug = getValue('--tenant-slug', context.argv);
+        if (hasCliFlag(context.argv, '--tenant-slug') && !tenantSlug)
+          throw new Error('--tenant-slug requires a tenant.');
+        await context.showMissionStatus(arg1!, { follow, json, tenantSlug });
+        if (json) return;
         await context.showReasoningBackendStatus();
         await showTerminalOutboxHint();
       },
       outbox: async () => {
         await showTerminalOutbox(
           {
-            ack: context.argv.includes('--ack'),
+            ack: hasCliFlag(context.argv, '--ack'),
             missionId: arg1 && !arg1.startsWith('--') ? arg1 : undefined,
           },
           context.print ?? (() => undefined)
@@ -1067,8 +1130,8 @@ export async function runMissionControllerAction(
           relationshipType: getValue('--project-relationship', context.argv) as
             'belongs_to' | 'supports' | 'governs' | 'independent' | undefined,
           note: getValue('--project-note', context.argv) || getValue('--note', context.argv),
-          force: context.argv.includes('--force'),
-          dryRun: context.hasDryRun,
+          force: hasCliFlag(context.argv, '--force'),
+          dryRun: hasDryRun,
         });
       },
       team: async () => {
@@ -1094,7 +1157,7 @@ export async function runMissionControllerAction(
           // plan JSON. `--summary` reads it out; JSON stays the default so
           // existing consumers are untouched.
           context.print?.(
-            context.argv.includes('--summary')
+            hasCliFlag(context.argv, '--summary')
               ? formatMissionTeamPlanView(
                   teamPlan as Parameters<typeof formatMissionTeamPlanView>[0]
                 )
@@ -1174,7 +1237,7 @@ export async function runMissionControllerAction(
             ...(getValue('--context', context.argv)
               ? { missionContext: getValue('--context', context.argv)! }
               : {}),
-            ...(context.argv.includes('--force') ? { force: true } : {}),
+            ...(hasCliFlag(context.argv, '--force') ? { force: true } : {}),
           },
           getValue('--organization-id', context.argv) || getValue('--org', context.argv)
         );
@@ -1224,8 +1287,8 @@ export async function runMissionControllerAction(
       'plan-tasks': async () => {
         await context.planProcessTemplateTasks({
           id: arg1!,
-          force: context.argv.includes('--force'),
-          refreshCatalog: context.argv.includes('--refresh-catalog'),
+          force: hasCliFlag(context.argv, '--force'),
+          refreshCatalog: hasCliFlag(context.argv, '--refresh-catalog'),
         });
       },
       'review-worker-output': async () => {

@@ -236,15 +236,34 @@ export function extractFileRelationshipsOption(
 export function extractMissionStartCreateOptionsFromArgv(
   argv: string[] = currentProcessArgv()
 ): MissionStartCreateOptions {
+  for (const flag of [
+    '--tier',
+    '--tenant-slug',
+    '--tenant',
+    '--tenant-id',
+    '--organization-id',
+    '--org',
+    '--project-id',
+    '--track-id',
+  ]) {
+    if (argv.includes(flag) && !getOptionValue(flag, argv)?.trim()) {
+      throw new Error(`${flag} requires a value.`);
+    }
+  }
   const tenantSlug = getOptionValue('--tenant-slug', argv);
+  const organizationId = getOptionValue('--organization-id', argv);
+  const organizationAlias = getOptionValue('--org', argv);
+  if (organizationId && organizationAlias && organizationId !== organizationAlias) {
+    throw new Error('--organization-id and --org must select the same organization.');
+  }
   return {
     tier: getAllowedOption('--tier', argv, ['personal', 'confidential', 'public']),
     tenantId: getOptionValue('--tenant-id', argv) || getOptionValue('--tenant', argv),
-    organizationId: getOptionValue('--organization-id', argv) || getOptionValue('--org', argv),
+    organizationId: organizationId || organizationAlias,
     ...(tenantSlug ? { tenantSlug } : {}),
     missionType: getOptionValue('--mission-type', argv),
     visionRef: getOptionValue('--vision-ref', argv) || getOptionValue('--vision', argv),
-    persona: getOptionValue('--persona', argv),
+    persona: getOptionValue('--org-role', argv) ?? getOptionValue('--persona', argv),
     routingDecision: getOptionValue('--routing-decision', argv),
     relationships: mergeRelationshipSources([
       extractJsonRelationshipsOption(argv),

@@ -8,6 +8,7 @@ import { appendJsonLine, readJsonLines } from '../foundation/json.js';
 
 import * as path from 'node:path';
 import { getRegisteredEnvText } from '../foundation/env.js';
+import { requireMissionScopeRegistration } from './mission-creation.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { nowIso } from '../foundation/time.js';
 import * as pathResolver from '../path-resolver.js';
@@ -60,6 +61,7 @@ import {
   listActiveMissions,
   listMissionsInSearchDirs,
   loadState,
+  requireMissionDependencies,
   saveState,
 } from './mission-state.js';
 import {
@@ -646,6 +648,17 @@ export async function resumeMission(
   const preState = loadState(targetId);
   if (!preState) throw new Error(`Mission ${targetId} not found.`);
 
+  if (!['active', 'paused', 'failed', 'validating', 'distilling'].includes(preState.status)) {
+    throw new Error(
+      `[MISSION_RESUME_NOT_READY] Mission ${targetId} is ${preState.status}. Start a planned Mission before replaying work.`
+    );
+  }
+  requireMissionScopeRegistration({
+    tenantSlug: preState.tenant_slug,
+    organizationId: preState.organization_id,
+  });
+  requireMissionDependencies({ id: targetId, state: preState });
+
   logger.info(`🔄 Resuming Mission: ${targetId}...`);
   const missionPathCandidate = findMissionPath(targetId);
   if (!missionPathCandidate) throw new Error(`Mission ${targetId} path not found.`);
@@ -666,7 +679,16 @@ export async function resumeMission(
     logger.warn(
       `Journal recovery blocked: ${replayPlan.unverified_provisioned_entries.length} unverified and ${replayPlan.missing_provisioned_entries.length} missing provision receipt(s) detected; automatic replay is stopped. Complete reconcile-work using scaffold=${scaffoldPath}.`
     );
-  } else if (replayPlan.next_event) {
+    throw new Error(
+      `[MISSION_RECOVERY_REQUIRED] Complete reconcile-work using scaffold=${scaffoldPath} before resuming ${targetId}.`
+    );
+  }
+  const currentBranch = args.getCurrentBranch(missionPath);
+  if (currentBranch !== preState.git.branch) {
+    safeExec('git', ['checkout', preState.git.branch], { cwd: missionPath });
+  }
+
+  if (replayPlan.next_event) {
     logger.info(
       t('mission_ops:resume_journal_next_event', {
         eventType: replayPlan.next_event.event_type,
@@ -698,11 +720,6 @@ export async function resumeMission(
         taskIds: blockedRetry.reissued_task_ids.join(', '),
       })
     );
-  }
-
-  const currentBranch = args.getCurrentBranch(missionPath);
-  if (currentBranch !== preState.git.branch) {
-    safeExec('git', ['checkout', preState.git.branch], { cwd: missionPath });
   }
 
   const flightRecorderPath = safeMissionArtifactPath(missionPath, 'LATEST_TASK.json');
@@ -739,10 +756,8 @@ export async function resumeMission(
   // The provider runtime supervisor owns provider/agent process prewarm. A
   // paused goal is a mission-worker concern, so hand it to a dedicated,
   // journaled orchestration event after the explicit resume is recorded.
-  // Do not enqueue when artifact recovery is blocked or when this resume was
-  // coalesced with a recent one; both cases preserve at-most-once recovery
-  // intent without silently applying a reconcile manifest.
-  if (resumeEntryRecorded && !replayPlan.recovery_required) {
+  // A resume coalesced with a recent one already has a recovery event.
+  if (resumeEntryRecorded) {
     const recoveryEvent = enqueueMissionOrchestrationEvent({
       eventType: 'mission_worker_recovery_requested',
       missionId: targetId,
@@ -904,6 +919,7 @@ export async function recordEvidence(args: {
   if (!missionPathCandidate) throw new Error(`Mission ${upperId} not found.`);
   const missionPath = safeMissionRoot(missionPathCandidate);
   let taskCompletion: RecordEvidenceResult['task_completion'];
+  let evidenceTaskId: string | undefined;
 
   // Runtime claims carry a verified actor. Reuse it when the caller did not
   // redundantly pass --actor-id; the fence below still validates the claim.
@@ -1010,6 +1026,7 @@ export async function recordEvidence(args: {
             ...(decisionCheck.consumer ? { customer_decision_lock: decisionCheck } : {}),
           },
         });
+        evidenceTaskId = lockedTask ? args.taskId : undefined;
 
         // Close the NEXT_TASKS.json task out when its deliverable now exists and
         // its dependencies are already done — otherwise the documented
@@ -1091,12 +1108,18 @@ export async function recordEvidence(args: {
 
   await args.syncProjectLedgerIfLinked(upperId);
   logger.success(`✅ Recorded evidence for ${upperId}.`);
-  return { mission_id: upperId, task_id: args.taskId, task_completion: taskCompletion };
+  return {
+    mission_id: upperId,
+    task_id: args.taskId,
+    task_completion: taskCompletion,
+    ...(evidenceTaskId ? { evidence_task_id: evidenceTaskId } : {}),
+  };
 }
 
 export interface RecordEvidenceResult {
   mission_id: string;
   task_id: string;
+  evidence_task_id?: string;
   /** Auto-complete outcome for the task (absent when the fence skipped it). */
   task_completion?: {
     completed: boolean;

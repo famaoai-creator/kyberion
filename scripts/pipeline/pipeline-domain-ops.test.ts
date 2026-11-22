@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildProductivityTaskPlan } from '@agent/core/productivity-task-plan';
 import {
   parseInlineOnboardingInput,
@@ -6,9 +6,55 @@ import {
   runInlineCustomerDecisionLearning,
   runInlineCustomerDecisionReminders,
   runInlineDecisionDigest,
+  runInlineMissionCreate,
+  runInlineMissionStartFromIssues,
   runInlineProductivityDryRunValidation,
   runInlineProposalBriefParse,
 } from './pipeline-domain-ops.js';
+import { main as missionController } from '../mission_controller.js';
+
+vi.mock('../mission_controller.js', () => ({ main: vi.fn(async () => undefined) }));
+
+describe('mission pipeline ingress', () => {
+  beforeEach(() => vi.mocked(missionController).mockClear());
+
+  it('requires a mission ID and keeps optional named fields in their own positions', async () => {
+    const step = { id: 'create' } as never;
+    await expect(runInlineMissionCreate(step, { tier: 'public' }, {})).rejects.toThrow(
+      'requires mission_id'
+    );
+    expect(missionController).not.toHaveBeenCalled();
+    await runInlineMissionCreate(
+      step,
+      { mission_id: 'msn-public-test', tier: 'public', tenant_id: 'default', persona: 'worker' },
+      {}
+    );
+    expect(missionController).toHaveBeenCalledWith([
+      'create',
+      'MSN-PUBLIC-TEST',
+      '--tier',
+      'public',
+      '--org-role',
+      'worker',
+    ]);
+  });
+
+  it('uses the repository and issue number when a GitHub issue title changes', async () => {
+    const step = { id: 'ingest' } as never;
+    const issue = { number: 42, title: '--force', url: 'https://github.com/owner/repo/issues/42' };
+    await runInlineMissionStartFromIssues(
+      step,
+      {},
+      { raw_issues: { stdout: JSON.stringify([issue]) } }
+    );
+    await runInlineMissionStartFromIssues(step, { issues: [{ ...issue, title: 'Edited' }] }, {});
+    const first = vi.mocked(missionController).mock.calls[0]?.[0];
+    const second = vi.mocked(missionController).mock.calls[1]?.[0];
+    expect(first?.[1]).toMatch(/^MSN-GH-[A-F0-9]{16}-42$/);
+    expect(second?.[1]).toBe(first?.[1]);
+    expect(first?.slice(2)).toEqual(['--tier', 'personal', '--goal', 'GitHub issue #42: --force']);
+  });
+});
 
 describe('pipeline domain JSON input boundaries', () => {
   it('accepts object onboarding input from JSON text and values', () => {

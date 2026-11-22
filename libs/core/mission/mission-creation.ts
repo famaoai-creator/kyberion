@@ -20,7 +20,11 @@ import { getRegisteredEnvText, isVitestProcess } from '../foundation/env.js';
 import { readTextFile } from '../foundation/text.js';
 import { inferMissionOutcomeContract } from '../task/outcome-contract.js';
 import { ensureDefaultTenantProfile, resolveTenant } from '../organization/tenant-registry.js';
-import { loadOrganizationProfile } from '../organization/organization-profile.js';
+import {
+  loadOrganizationProfile,
+  loadOrganizationProfileAtPath,
+  resolveTenantOrganizationProfilePath,
+} from '../organization/organization-profile.js';
 import {
   resolveEffectiveMissionType,
   resolveMissionWorkflowDesign,
@@ -38,16 +42,19 @@ import {
 import { transitionStatus } from './mission-status.js';
 import { withExecutionContext } from '../authority.js';
 import { getCurrentBranch, getGitHash, initMissionRepo } from './mission-git.js';
-import { applyProcessTemplatePlan } from './mission-process-planning.js';
+import type { MissionGateEvaluation } from './mission-gate-engine.js';
+import {
+  applyProcessTemplatePlan,
+  requireMissionGateActivation,
+} from './mission-process-planning.js';
 import {
   calculateRequiredTier,
   assertMissionNotArchived,
   checkPrerequisites,
-  describeUnmetPrerequisites,
-  evaluateMissionPrerequisites,
   loadState,
-  normalizeMissionIdList,
   normalizeRelationships,
+  requireMissionDependencies,
+  requirePreparedMissionAdmission,
   saveState,
   type KnowledgeInjectionDeclaration,
 } from './mission-state.js';
@@ -130,6 +137,35 @@ export function normalizeMissionVisionRef(
   return `${structuredRef}?source=${encodeURIComponent(raw)}`;
 }
 
+export function requireMissionScopeRegistration(
+  scope: {
+    tenantSlug?: string;
+    organizationId?: string;
+  },
+  rootDir?: string
+): void {
+  if (
+    !scope.tenantSlug ||
+    (getRegisteredEnvText('KYBERION_ENTITY_GOVERNANCE') !== 'enforce' && isVitestProcess())
+  ) {
+    return;
+  }
+  resolveTenant(scope.tenantSlug, { rootDir });
+  if (!scope.organizationId) return;
+  const profile = resolveTenantOrganizationProfilePath(
+    scope.tenantSlug,
+    scope.organizationId,
+    rootDir
+  );
+  const profileId = profile?.legacy
+    ? loadOrganizationProfileAtPath(profile.path).organization_id
+    : profile?.organizationId;
+  if (profileId !== scope.organizationId)
+    throw new Error(
+      'Organization is not configured for the selected tenant. Check the organization profile or omit --organization-id.'
+    );
+}
+
 export async function createMission(args: {
   id: string;
   tier?: StorageDataTier;
@@ -188,12 +224,7 @@ export async function createMission(args: {
       `[mission-creation] invalid tenant slug '${rawTenantSlug}'; must match ^[a-z][a-z0-9-]{1,30}$`
     );
   }
-  if (
-    tenantSlug &&
-    (getRegisteredEnvText('KYBERION_ENTITY_GOVERNANCE') === 'enforce' || !isVitestProcess())
-  ) {
-    resolveTenant(tenantSlug, { rootDir });
-  }
+  requireMissionScopeRegistration({ tenantSlug, organizationId }, rootDir);
   // The default-tenant bootstrap writes the operator's gitignored personal
   // tier (knowledge/personal/tenants/default.json), which no Vitest sandbox
   // covers; like resolveTenant above, a test run skips it (G18).
@@ -590,6 +621,7 @@ export async function startMission(args: {
   /** FD-10 wave 1b: stamped on the ACTIVATE/RESUME history entry. */
   decidedBy?: HumanDecidedBy;
   admissionWorkItem?: string;
+  activationSource?: 'gate';
 }): Promise<void> {
   const {
     id,
@@ -619,12 +651,12 @@ export async function startMission(args: {
     return;
   }
 
-  checkPrerequisites();
   const upperId = id.toUpperCase();
   const normalizedRelationships = normalizeRelationships(relationships);
 
   let state = loadState(upperId);
   if (!state) assertMissionNotArchived(upperId, { tenantSlug });
+  requirePreparedMissionAdmission(state, admissionWorkItem);
   const finalTier = state ? state.tier : tier;
   if (finalTier === 'confidential' && !(state?.tenant_slug?.trim() || tenantSlug)) {
     const policy = getRegisteredEnvText('KYBERION_TENANT_SCOPE_REQUIRED') || 'strict';
@@ -636,26 +668,36 @@ export async function startMission(args: {
     if (policy === 'warn') logger.warn(message);
   }
 
+  if (
+    state &&
+    ((tenantSlug && tenantSlug !== state.tenant_slug) ||
+      (organizationId && organizationId !== state.organization_id))
+  ) {
+    throw new Error('[SCOPE_CONTEXT_INVALID] Startup scope differs from the saved Mission.');
+  }
+  requireMissionScopeRegistration(
+    {
+      tenantSlug: state?.tenant_slug ?? tenantSlug,
+      organizationId: state?.organization_id ?? organizationId,
+    },
+    rootDir
+  );
+
   if (state?.status === 'active') {
     logger.info(`Mission ${upperId} is already active.`);
     return;
   }
 
-  const prerequisites = normalizeMissionIdList([
-    ...normalizeMissionIdList(state?.relationships?.prerequisites),
-    ...normalizeMissionIdList(normalizedRelationships?.prerequisites),
-  ]);
-  if (!force && prerequisites.length > 0) {
-    const { ok, missing } = evaluateMissionPrerequisites(prerequisites, {
-      tenantSlug: state?.tenant_slug || tenantSlug,
-    });
-    if (!ok) {
-      throw new Error(
-        `[MISSION_PREREQUISITES_UNMET] Mission ${upperId} cannot start: ` +
-          `${describeUnmetPrerequisites(missing)}. Finish them first or rerun with --force.`
-      );
-    }
-  }
+  const prerequisites = requireMissionDependencies({
+    id: upperId,
+    state,
+    tenantSlug,
+    prerequisites: normalizedRelationships.prerequisites,
+    force,
+  });
+
+  if (state) transitionStatus(state.status, 'active');
+  checkPrerequisites();
 
   logger.info(`🚀 Activating Mission: ${upperId} (Tier: ${finalTier})...`);
 
@@ -683,8 +725,8 @@ export async function startMission(args: {
       state = loadState(upperId);
       if (state) {
         if (admissionWorkItem) {
-          const { assertMissionAdmissionActivation } = await import('./mission-admission.js');
-          assertMissionAdmissionActivation(upperId, admissionWorkItem, state.tenant_slug, {
+          const { sealMissionAdmissionActivation } = await import('./mission-admission.js');
+          sealMissionAdmissionActivation(upperId, admissionWorkItem, state.tenant_slug, {
             rootDir,
             organizationId: state.organization_id,
             projectId: state.relationships?.project?.project_id,
@@ -766,8 +808,8 @@ export async function startMission(args: {
         };
       }
       if (admissionWorkItem) {
-        const { assertMissionAdmissionActivation } = await import('./mission-admission.js');
-        assertMissionAdmissionActivation(upperId, admissionWorkItem, state.tenant_slug, {
+        const { sealMissionAdmissionActivation } = await import('./mission-admission.js');
+        sealMissionAdmissionActivation(upperId, admissionWorkItem, state.tenant_slug, {
           rootDir,
           organizationId: state.organization_id,
           projectId: state.relationships?.project?.project_id,
@@ -776,8 +818,11 @@ export async function startMission(args: {
       state.status = transitionStatus(state.status, 'active');
       state.history.push({
         ts: nowIso(),
-        event: 'RESUME',
-        note: 'Mission resumed.',
+        event: args.activationSource === 'gate' ? 'GATE_ACTIVATE' : 'RESUME',
+        note:
+          args.activationSource === 'gate'
+            ? 'Mission activated on first passed process gate.'
+            : 'Mission resumed.',
         ...(decidedBy ? { decided_by: decidedBy } : {}),
       });
       await saveState(upperId, state);
@@ -834,4 +879,23 @@ export async function startMission(args: {
     // Propagate: callers (CLI exit code, queue dispatch) must see the failure.
     throw err;
   }
+}
+
+/** Activate a still-planned mission after a successful eligible gate evaluation. */
+export async function activateMissionOnGateProgress(
+  missionId: string,
+  evaluation: MissionGateEvaluation
+): Promise<boolean> {
+  const upperId = missionId.toUpperCase();
+  const state = loadState(upperId);
+  if (!state || state.status !== 'planned') return false;
+  requireMissionGateActivation(state, evaluation.gate_id);
+  if (evaluation.verdict !== 'pass') return false;
+  await startMission({
+    id: upperId,
+    rootDir: pathResolver.rootDir(),
+    persona: state.org_role,
+    activationSource: 'gate',
+  });
+  return true;
 }

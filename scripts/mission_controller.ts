@@ -15,18 +15,17 @@
  *   - mission-seal.ts            → Cryptographic sealing (AES+RSA)
  */
 
+import { AsyncLocalStorage } from 'node:async_hooks';
 import * as path from 'node:path';
-import { baseRoleEnvText } from '@agent/core/foundation';
 import { withMissionPrerequisiteIdentityProbe } from '@agent/core/mission/mission-prerequisite-identity';
 import { inspectMissionPrerequisiteIdentity } from './lib/installed-identity.js';
-import { auditChain } from '@agent/core/governance/audit-chain';
-import { executionAgentId } from '@agent/core/governance/execution-agent-id';
 import { getRegisteredEnvText, setRegisteredEnv } from '@agent/core/foundation/env';
 import { nowIso } from '@agent/core/foundation/time';
 import { missionActionCredentialRequirement } from '@agent/core/foundation/command-credential-policy';
 import { logger } from '@agent/core/core';
-import { pathResolver, missionEvidenceDir } from '@agent/core/path-resolver';
-import { safeExec, safeExistsSync, safeReaddir } from '@agent/core/secure-io';
+import { hasCliFlag } from '@agent/core/cli-guard';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExec, safeExistsSync } from '@agent/core/secure-io';
 import { killSwitch } from '@agent/core/governance/kill-switch';
 import { buildHandoffPacket } from '@agent/core/mesh/handoff-packet';
 import type { ArtifactReviewFinding } from '@agent/core/workforce/artifact-review';
@@ -42,11 +41,14 @@ function registeredEnv(name: string): string | undefined {
   return getRegisteredEnvText(name);
 }
 
-let activeMissionControllerArgs: string[] = [];
-let activePrint: Print = () => undefined;
+const invocation = new AsyncLocalStorage<{ args: string[]; print: Print }>();
+
+function activeMissionControllerArgs(): string[] {
+  return invocation.getStore()?.args ?? [];
+}
 
 function printOutput(value: unknown): void {
-  activePrint(value);
+  invocation.getStore()?.print(value);
 }
 
 // --- Sub-module imports ---
@@ -56,10 +58,16 @@ import {
   resolveMissionWorkItemDispatchOptionsFromArgv,
   validateMissionStartCreateInput,
 } from './refactor/mission-controller-args.js';
-import { currentProcessArgv, defineScript, isDirectScript } from './lib/harness.js';
+import {
+  currentProcessArgv,
+  defineScript,
+  isDirectScript,
+  ScriptExitError,
+} from './lib/harness.js';
 import { DiagnosticError } from '@agent/core/logger';
 import { withMissionMutationExpectation } from '@agent/core/mission/mission-mutation-snapshot';
 import { buildHelpText } from './refactor/mission-controller-help.js';
+import { gateFail, gatePass } from './refactor/mission-controller-gates.js';
 export { buildHelpText } from './refactor/mission-controller-help.js';
 import {
   extractMissionControllerPositionalArgs,
@@ -202,14 +210,70 @@ async function enqueueMission(
   priority: number = 5,
   deps: string[] = []
 ) {
-  const { enqueueMission: _enqueueMission } = await import('./refactor/mission-queue.js');
-  await _enqueueMission(QUEUE_PATH, id, tier, priority, deps);
+  const { enqueueMission: persistEntry } = await import('./refactor/mission-queue.js');
+  const scope = queueScope(id, tier);
+  if (scope.tier !== tier) throw new Error('Queue tier must match the saved Mission tier.');
+  await persistEntry(QUEUE_PATH, id, tier, priority, deps, scope);
+}
+
+function queueScope(id: string, tier: 'personal' | 'confidential' | 'public') {
+  const state = loadState(id.toUpperCase());
+  const input = state
+    ? undefined
+    : validateMissionStartCreateInput('create', id, ['create', id, '--tier', tier]);
+  return {
+    tier: state?.tier ?? tier,
+    tenantSlug: state?.tenant_slug ?? input?.tenantSlug,
+    organizationId: state?.organization_id ?? input?.organizationId,
+    projectId: state?.relationships?.project?.project_id,
+  };
 }
 
 async function dispatchNextMission() {
-  const { dispatchNextQueuedMission } = await import('./refactor/mission-queue.js');
-  await dispatchNextQueuedMission(QUEUE_PATH, checkDependencies, async (missionId, tier) =>
-    startMission(missionId, tier)
+  const { dispatchNextQueuedMission, requireMissionQueueScope } =
+    await import('./refactor/mission-queue.js');
+  const resolveQueueStart = (
+    missionId: string,
+    tier: 'personal' | 'confidential' | 'public',
+    entry: import('./refactor/mission-queue.js').MissionQueueEntry
+  ) => {
+    requireMissionQueueScope(entry, queueScope(missionId, tier));
+    return validateMissionStartCreateInput('start', missionId, [
+      'start',
+      missionId,
+      '--tier',
+      tier,
+      '--dry-run',
+    ]);
+  };
+  await dispatchNextQueuedMission(
+    QUEUE_PATH,
+    checkDependencies,
+    async (missionId, tier, entry) => {
+      const input = resolveQueueStart(missionId, tier, entry);
+      if (!input.preflight?.ready) throw new Error(input.preflight?.issues.join(' | '));
+      await startMission(
+        missionId,
+        input.tier,
+        input.persona,
+        input.tenantId,
+        input.missionType,
+        input.visionRef,
+        input.relationships,
+        input.tenantSlug,
+        input.organizationId
+      );
+    },
+    async (missionId, tier, entry) => {
+      try {
+        const result = resolveQueueStart(missionId, tier, entry).preflight;
+        return result?.ready
+          ? undefined
+          : result?.issues.join(' | ') || 'Mission preflight unavailable';
+      } catch (error) {
+        return error instanceof Error ? error.message : String(error);
+      }
+    }
   );
 }
 
@@ -227,18 +291,21 @@ async function createMission(
 ) {
   const { missionLifecycleService } = await import('@agent/core/mission/mission-lifecycle-service');
   const { withOrganizationContext } = await import('./refactor/organization-context.js');
-  return withOrganizationContext(organizationId, () =>
-    missionLifecycleService.create(
-      id,
-      tier,
-      tenantId,
-      missionType,
-      visionRef,
-      persona,
-      relationships,
-      tenantSlug,
-      { ...options, organizationId }
-    )
+  return withOrganizationContext(
+    organizationId,
+    () =>
+      missionLifecycleService.create(
+        id,
+        tier,
+        tenantId,
+        missionType,
+        visionRef,
+        persona,
+        relationships,
+        tenantSlug,
+        { ...options, organizationId }
+      ),
+    { selectStanceFromOrganization: false }
   );
 }
 
@@ -308,18 +375,21 @@ async function startMission(
 ) {
   const { missionLifecycleService } = await import('@agent/core/mission/mission-lifecycle-service');
   const { withOrganizationContext } = await import('./refactor/organization-context.js');
-  await withOrganizationContext(organizationId, () =>
-    missionLifecycleService.start(
-      id,
-      tier,
-      persona,
-      tenantId,
-      missionType,
-      visionRef,
-      relationships,
-      tenantSlug,
-      { ...options, organizationId }
-    )
+  await withOrganizationContext(
+    organizationId,
+    () =>
+      missionLifecycleService.start(
+        id,
+        tier,
+        persona,
+        tenantId,
+        missionType,
+        visionRef,
+        relationships,
+        tenantSlug,
+        { ...options, organizationId }
+      ),
+    { selectStanceFromOrganization: false }
   );
   const targetId = id.toUpperCase();
   if (options?.admissionWorkItem) {
@@ -327,6 +397,7 @@ async function startMission(
     authorMissionAdmissionBrief(targetId, options.admissionWorkItem);
   }
   const state = loadState(targetId);
+  const knowledgeLines: string[] = [];
   if (state?.status === 'active') {
     writeFocusedMissionId(targetId);
     // Direct_cli delivery seam (MEMORY_LOOP_CLOSURE): dispatched workers get
@@ -334,8 +405,12 @@ async function startMission(
     // same lane at start so KP-05 telemetry sees direct_cli retrievals too.
     const { printPromotedKnowledgeForActiveMission } =
       await import('@agent/core/mission/mission-operator-knowledge-surface');
-    await printPromotedKnowledgeForActiveMission(targetId);
+    await printPromotedKnowledgeForActiveMission(targetId, (line) => {
+      knowledgeLines.push(line.trim());
+      logger.info(line);
+    });
   }
+  return { knowledgeLines };
 }
 
 // syncProjectLedger and syncProjectLedgerIfLinked are defined as wrappers
@@ -760,20 +835,51 @@ async function listMissions(filterStatus?: string, jsonOutput = false) {
   logger.info(`${missions.length} mission(s) found.`);
 }
 
-async function showMissionStatus(id: string, follow: boolean = false) {
+async function showMissionStatus(
+  id: string,
+  options: { follow?: boolean; json?: boolean; tenantSlug?: string } = {}
+) {
+  const { follow, json, tenantSlug } = options;
   const { missionLifecycleService } = await import('@agent/core/mission/mission-lifecycle-service');
-  const { renderStatus } = await import('@agent/core/ux-vocabulary');
-  const { buildMissionStatusView } = await import('@agent/core/mission/mission-read-model');
   if (!id) {
+    if (json) throw new Error('Usage: mission_controller status <MISSION_ID> --json');
     logger.error('Usage: mission_controller status <MISSION_ID>');
     return;
   }
   const view = missionLifecycleService.status(id);
-  if (!view) {
+  if (
+    !view ||
+    view.state.mission_id.toUpperCase() !== id.trim().toUpperCase() ||
+    (tenantSlug && view.state.tenant_slug !== tenantSlug)
+  ) {
+    if (json)
+      throw new ScriptExitError(1, 'Mission not visible in the selected scope.', false, undefined, {
+        code: 'MISSION_STATUS_NOT_FOUND',
+        category: 'not_found',
+        retryable: false,
+        next_action: 'check the Mission ID and its registered scope',
+      });
     logger.error(`Mission ${id.toUpperCase()} not found. Run "list" to see available missions.`);
     return;
   }
   const { state, missionPath, nextAction, recentHistory } = view;
+  if (json) {
+    printOutput({
+      mission_id: state.mission_id,
+      status: state.status,
+      tier: state.tier,
+      tenant_slug: state.tenant_slug,
+      organization_id: state.organization_id,
+      project_id: state.relationships?.project?.project_id,
+      org_role: state.org_role,
+      next_action: nextAction,
+      recent_history: recentHistory,
+    });
+    return;
+  }
+
+  const { renderStatus } = await import('@agent/core/ux-vocabulary');
+  const { buildMissionStatusView } = await import('@agent/core/mission/mission-read-model');
 
   printOutput('');
   printOutput(`  Mission:     ${state.mission_id}`);
@@ -886,7 +992,7 @@ async function showReasoningBackendStatus(): Promise<void> {
   ]);
   const selectedMode = getInstalledReasoningMode();
   const forceRefresh =
-    activeMissionControllerArgs.includes('--refresh-providers') ||
+    hasCliFlag(activeMissionControllerArgs(), '--refresh-providers') ||
     registeredEnv('KYBERION_PROVIDER_DISCOVERY_REFRESH') === '1';
   const observed = forceRefresh ? discoverProviders(true) : peekProviderDiscovery().providers;
   const providers = observed.filter((provider) =>
@@ -1154,231 +1260,6 @@ async function grantMissionAccess(missionId: string, serviceId: string, ttl: num
   return missionLifecycleService.grantMissionAccess(missionId, serviceId, ttl);
 }
 
-async function resolveGate(missionId: string, gateFile?: string): Promise<string> {
-  const evidDir = missionEvidenceDir(missionId.toUpperCase());
-  if (!evidDir) {
-    throw new DiagnosticError({
-      code: 'MISSION_NOT_FOUND',
-      what: `mission ${missionId} evidence directory not found`,
-      next: 'check the mission id — run `pnpm mission list` to see known missions',
-    });
-  }
-  if (gateFile) {
-    const abs = path.isAbsolute(gateFile) ? gateFile : path.resolve(evidDir, gateFile);
-    if (!safeExistsSync(abs)) {
-      throw new DiagnosticError({
-        code: 'GATE_NOT_FOUND',
-        what: 'gate file not found',
-        evidence: abs,
-        next: 'omit the gate file to auto-pick, or pass one under the mission evidence dir',
-      });
-    }
-    return abs;
-  }
-  const files = safeReaddir(evidDir) as string[];
-  const gates = files.filter((f) => f.endsWith('-gate.json'));
-  if (gates.length === 0) {
-    throw new DiagnosticError({
-      code: 'GATE_NOT_FOUND',
-      what: 'no gate files found in the mission evidence directory',
-      evidence: evidDir,
-      next: 'run the phase that emits the gate, then retry',
-    });
-  }
-  if (gates.length > 1) {
-    throw new DiagnosticError({
-      code: 'GATE_AMBIGUOUS',
-      what: 'multiple gates found — specify which one',
-      why: `candidates: ${gates.join(', ')}`,
-      next: 'pass the gate file name as an argument',
-    });
-  }
-  return path.join(evidDir, gates[0]);
-}
-
-async function gatePass(missionId: string, gateFile?: string, note?: string): Promise<void> {
-  const { recordMissionGateOverride } = await import('@agent/core/mission/mission-gate-engine');
-  const {
-    activateMissionOnGateProgress,
-    advanceCurrentPhase,
-    evaluateStoredMissionGate,
-    markPhaseTasksCompleted,
-  } = await import('@agent/core/mission/mission-process-planning');
-  if (activeMissionControllerArgs.includes('--machine-only')) {
-    const { runMachineOnlyMissionGate } = await import('./mission/mission_machine_gate.js');
-    await runMachineOnlyMissionGate(
-      { missionId: missionId || '', gateId: gateFile },
-      {
-        evaluateStored: (args) => evaluateStoredMissionGate({ ...args, blocking: true }),
-        advance: advanceCurrentPhase,
-        markCompleted: markPhaseTasksCompleted,
-        activate: activateMissionOnGateProgress,
-        recordEvaluation: (upperId, gateId, stored) => {
-          auditChain.record({
-            agentId: executionAgentId('mission_controller'),
-            action: stored.evaluation?.verdict === 'pass' ? 'gate.passed' : 'gate.rejected',
-            operation: `gate-pass:${gateId}`,
-            result: 'completed',
-            metadata: {
-              mission_id: upperId,
-              gate_id: gateId,
-              machine_only: true,
-              verdict: stored.evaluation?.verdict,
-              reasons: stored.evaluation?.reasons,
-              evidence_path: stored.evaluation?.evidence_path,
-            },
-          });
-        },
-      }
-    );
-    return;
-  }
-  if (!missionId) {
-    logger.error(
-      'Usage: mission_controller gate-pass <MISSION_ID> [gate-file.json|GATE_ID] [--note "..."]'
-    );
-    return;
-  }
-  // Process-template gates (MO-01/MO-02): when a stored gate definition
-  // exists, machine-evaluate its checks instead of recording a bare override.
-  // The operator command itself satisfies reviewer/human confirmation checks.
-  if (gateFile && !gateFile.endsWith('.json')) {
-    const stored = await evaluateStoredMissionGate({
-      missionId,
-      gateId: gateFile,
-      humanConfirmed: true,
-    });
-    if (stored.found && stored.evaluation) {
-      const upperId = missionId.toUpperCase();
-      auditChain.record({
-        agentId: executionAgentId('operator'),
-        action: stored.evaluation.verdict === 'pass' ? 'gate.passed' : 'gate.rejected',
-        operation: `gate-pass:${gateFile}`,
-        result: 'completed',
-        metadata: {
-          mission_id: upperId,
-          gate_id: gateFile,
-          verdict: stored.evaluation.verdict,
-          reasons: stored.evaluation.reasons,
-          evidence_path: stored.evaluation.evidence_path,
-          note,
-        },
-      });
-      if (stored.evaluation.verdict === 'pass') {
-        if (stored.position === 'exit' && stored.phase) {
-          await advanceCurrentPhase(upperId, stored.phase);
-          const completed = markPhaseTasksCompleted(upperId, stored.phase);
-          if (completed > 0) {
-            logger.info(`   ${completed} task(s) in phase ${stored.phase} marked completed.`);
-          }
-        }
-        if (await activateMissionOnGateProgress(upperId)) {
-          logger.info('   Mission status: planned → active (first gate passed).');
-        }
-        logger.success(`✅ [GATE] ${gateFile} → passed (mission: ${upperId})`);
-      } else {
-        logger.warn(`❌ [GATE] ${gateFile} checks failed (mission: ${upperId}):`);
-        for (const reason of stored.evaluation.reasons) logger.warn(`   - ${reason}`);
-        logger.info(
-          '   Resolve the failing checks, or record a legacy override via a gate evidence file.'
-        );
-      }
-      return;
-    }
-  }
-  const gatePath = await resolveGate(missionId, gateFile);
-  const overridePath = recordMissionGateOverride({
-    missionId: missionId.toUpperCase(),
-    gateId: path.basename(gatePath).replace(/-\w+\.json$/u, ''),
-    outcome: 'passed',
-    note,
-    actorId: baseRoleEnvText() || 'operator',
-    evidenceDir: path.dirname(gatePath),
-  });
-  auditChain.record({
-    agentId: executionAgentId('operator'),
-    action: 'gate.passed',
-    operation: `gate-pass:${path.basename(gatePath)}`,
-    result: 'completed',
-    metadata: {
-      mission_id: missionId.toUpperCase(),
-      gate_file: gatePath,
-      override_path: overridePath,
-      note,
-    },
-  });
-  logger.success(
-    `✅ [GATE] ${path.basename(gatePath)} → passed (mission: ${missionId.toUpperCase()})`
-  );
-  logger.info(`   Override record: ${overridePath}`);
-}
-
-async function gateFail(missionId: string, gateFile?: string, note?: string): Promise<void> {
-  const { recordMissionGateOverride } = await import('@agent/core/mission/mission-gate-engine');
-  const { evaluateStoredMissionGate, markPhaseTasksForRework } =
-    await import('@agent/core/mission/mission-process-planning');
-  if (!missionId) {
-    logger.error(
-      'Usage: mission_controller gate-fail <MISSION_ID> [gate-file.json|GATE_ID] [--note "..."]'
-    );
-    return;
-  }
-  // Process-template gates: record the failure and flip the phase's tasks to
-  // rework so dependency-first dispatch re-executes them.
-  if (gateFile && !gateFile.endsWith('.json')) {
-    const stored = await evaluateStoredMissionGate({ missionId, gateId: gateFile });
-    if (stored.found) {
-      const upperId = missionId.toUpperCase();
-      const reworked = stored.phase ? markPhaseTasksForRework(upperId, stored.phase) : 0;
-      auditChain.record({
-        agentId: executionAgentId('operator'),
-        action: 'gate.rejected',
-        operation: `gate-fail:${gateFile}`,
-        result: 'completed',
-        metadata: {
-          mission_id: upperId,
-          gate_id: gateFile,
-          phase: stored.phase,
-          reworked_tasks: reworked,
-          note,
-        },
-      });
-      logger.warn(`❌ [GATE] ${gateFile} → rejected (mission: ${upperId})`);
-      if (reworked > 0) {
-        logger.info(`   ${reworked} task(s) in phase ${stored.phase} flipped to rework.`);
-      }
-      if (note) logger.info(`   Reason: ${note}`);
-      return;
-    }
-  }
-  const gatePath = await resolveGate(missionId, gateFile);
-  const overridePath = recordMissionGateOverride({
-    missionId: missionId.toUpperCase(),
-    gateId: path.basename(gatePath).replace(/-\w+\.json$/u, ''),
-    outcome: 'rejected',
-    note,
-    actorId: baseRoleEnvText() || 'operator',
-    evidenceDir: path.dirname(gatePath),
-  });
-  auditChain.record({
-    agentId: executionAgentId('operator'),
-    action: 'gate.rejected',
-    operation: `gate-fail:${path.basename(gatePath)}`,
-    result: 'completed',
-    metadata: {
-      mission_id: missionId.toUpperCase(),
-      gate_file: gatePath,
-      override_path: overridePath,
-      note,
-    },
-  });
-  logger.warn(
-    `❌ [GATE] ${path.basename(gatePath)} → rejected (mission: ${missionId.toUpperCase()})`
-  );
-  logger.info(`   Override record: ${overridePath}`);
-  if (note) logger.info(`   Reason: ${note}`);
-}
-
 async function grantMissionSudo(missionId: string, on: boolean = true, ttl: number = 15) {
   const { missionLifecycleService } = await import('@agent/core/mission/mission-lifecycle-service');
   return missionLifecycleService.grantMissionSudo(missionId, on, ttl);
@@ -1449,9 +1330,8 @@ async function mainImpl(
   args: string[] = currentProcessArgv(),
   print: Print = () => undefined
 ): Promise<void> {
-  activeMissionControllerArgs = [...args];
   const requestedAction = args[0];
-  const isHelpFlag = args.includes('--help') || args.includes('-h');
+  const isHelpFlag = hasCliFlag(args, '--help') || hasCliFlag(args, '-h');
   if (isHelpFlag && requestedAction !== 'help') {
     showHelp();
     return;
@@ -1461,15 +1341,7 @@ async function mainImpl(
     args.filter((arg) => arg !== '--machine-only')
   );
   assertMissionIdArgument(earlyPositionalArgs[0], earlyPositionalArgs[1]);
-  if (earlyPositionalArgs[1]) {
-    setRegisteredEnv('MISSION_ID', earlyPositionalArgs[1].toUpperCase());
-  }
-
-  // Self-identify as mission_controller role for tier-guard resolution.
-  if (!getRegisteredEnvText('MISSION_ROLE')) {
-    setRegisteredEnv('MISSION_ROLE', 'mission_controller');
-  }
-  if (earlyPositionalArgs[0] === 'gate-pass') {
+  if (earlyPositionalArgs[0] === 'gate-pass' && !hasCliFlag(args, '--dry-run')) {
     const { installMissionDevelopmentProofVerifier } =
       await import('@agent/core/mission/mission-development-gates');
     const { verifyMissionDevelopmentPublication } =
@@ -1509,8 +1381,8 @@ async function mainImpl(
   const arg6 = positionalArgs[6];
   const arg7 = positionalArgs[7];
 
-  const hasRefresh = args.includes('--refresh');
-  const hasDryRun = args.includes('--dry-run');
+  const hasRefresh = hasCliFlag(args, '--refresh');
+  const hasDryRun = hasCliFlag(args, '--dry-run');
   await runMissionControllerAction({
     argv: args,
     print,
@@ -1626,7 +1498,7 @@ async function mainImpl(
     ) => (await processPlanning()).planProcessTemplateTasks(...input),
     reviewWorkerOutput,
     handoffMission,
-    gatePass,
+    gatePass: (missionId, gateFile, note) => gatePass(missionId, gateFile, note, args, print),
     gateFail,
     showHelp,
   });
@@ -1636,13 +1508,12 @@ export async function main(
   args: string[] = currentProcessArgv(),
   print: Print = () => undefined
 ): Promise<void> {
-  const previousPrint = activePrint;
-  activePrint = print;
-  try {
-    await withMissionPrerequisiteIdentityProbe(inspectMissionPrerequisiteIdentity, async () => {
-      const hash = getOptionValue('--expected-snapshot', args);
+  const invocationArgs = [...args];
+  await invocation.run({ args: invocationArgs, print }, () =>
+    withMissionPrerequisiteIdentityProbe(inspectMissionPrerequisiteIdentity, async () => {
+      const hash = getOptionValue('--expected-snapshot', invocationArgs);
       if (hash) {
-        const positional = extractMissionControllerPositionalArgs(args);
+        const positional = extractMissionControllerPositionalArgs(invocationArgs);
         const operations: Record<string, string> = {
           'record-evidence': 'record_evidence',
           'review-task': 'review_task',
@@ -1662,19 +1533,30 @@ export async function main(
               : undefined,
             hash,
           },
-          () => mainImpl(args, print)
+          () => mainImpl(invocationArgs, print)
         );
-      } else await mainImpl(args, print);
-    });
-  } finally {
-    activePrint = previousPrint;
-  }
+      } else await mainImpl(invocationArgs, print);
+    })
+  );
 }
 
 export const runMissionController = defineScript({
   name: 'mission:controller',
-  flags: [],
-  run: ({ argv, print }) => main(argv, print),
+  flags: ['json'],
+  run: ({ argv, print }) => {
+    // Only the dedicated CLI process owns its environment. In-process callers
+    // carry their identity in the execution scope and target in argv.
+    const [action, missionId] = extractMissionControllerPositionalArgs(
+      argv.filter((arg) => arg !== '--machine-only')
+    );
+    if (missionId && !hasCliFlag(argv, '--help') && !hasCliFlag(argv, '-h')) {
+      assertMissionIdArgument(action, missionId);
+      setRegisteredEnv('MISSION_ID', missionId.toUpperCase());
+    }
+    if (!getRegisteredEnvText('MISSION_ROLE'))
+      setRegisteredEnv('MISSION_ROLE', 'mission_controller');
+    return main(argv, print);
+  },
 });
 
 if (

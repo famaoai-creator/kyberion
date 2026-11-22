@@ -41,7 +41,7 @@ This route uses the same commands and gates below; the manual setup path remains
 
 > This document is the canonical first-win source. The full onboarding order after first-win — readiness, identity, getting the baseline to `all_clear`, and the optional tenant / organization / activation steps — is in the [onboarding standard flow](../knowledge/product/governance/onboarding-flow.md). Command-by-command detail is in [INITIALIZATION.md](./INITIALIZATION.md).
 >
-> Pick a route first: **personal only** (no tenant; stop after the baseline is `all_clear`), **AI company** (`pnpm onboarding company`, below), or **add an existing tenant** (standard flow Steps 5–8).
+> Pick a route first: **personal only** (no tenant), **AI company** (`pnpm onboarding company`, below), or **add an existing tenant** (standard flow Steps 5–8). For personal Mission knowledge reporting, also verify [personal NHI activation](./INITIALIZATION.md#stage-7-soul-infusion-identity).
 
 Prerequisites:
 
@@ -94,7 +94,7 @@ Several commands and pipelines carry "onboarding" in their name. They are not al
 | `pnpm kyberion setup <area>`                                 | One short route into each setup tool: `onboarding`, `context`, `reasoning`, `env`, `services`, `tools`, `provider-cli`, `agy-sdk`, `voice`, `config`.                          | You know which area needs work. `pnpm kyberion setup` lists the areas; the table is in the [CLI Reference](./CLI_REFERENCE.md#scopes-and-areas). |
 | `pnpm onboarding` (wizard)                                   | Interactive identity wizard: name, language, vision, Agent ID, service connection candidates. Flags: `--express`, `--menu`, `--reconfig`, `--services-only`, `--service <id>`. | Saving your identity (standard flow Step 3). Run `pnpm stance:switch <slug>` first when acting as a customer.                                    |
 | `pnpm onboarding apply --identity <json> [--dry-run]`        | The same identity written from a JSON file, without prompts.                                                                                                                   | Non-interactive hosts and CI. Copy the template under `knowledge/public/templates/onboarding/`.                                                  |
-| `pnpm onboarding company ...` (and `company bootstrap`)      | Starts an AI company in one governed step: customer overlay, accountable human, first AI worker, paused first-work plan. Always try `--dry-run` first.                         | You are a solo founder whose workforce is AI (route 2 of the standard flow).                                                                     |
+| `pnpm onboarding company ...` (and `company bootstrap`)      | Starts an AI company in one governed step: company context, accountable human, first AI worker, paused first-work plan. Always try `--dry-run` first.                          | You are a solo founder whose workforce is AI (route 2 of the standard flow).                                                                     |
 | `pnpm onboarding reset`                                      | Deletes onboarding state and the generated identity / vision / agent files of the active profile.                                                                              | You want to start the identity step over.                                                                                                        |
 | `pnpm onboarding:context` (`show`, `bind`, `first-work`)     | Binds a tenant to an organization context and prepares the first work item. Read-only unless `--apply`.                                                                        | You work with tenants (routes 2 and 3). Also reachable as `pnpm kyberion setup context`.                                                         |
 | `pipelines/launch-first-run-onboarding.json`                 | Writes a canned identity input under `active/shared/tmp/` and applies it through `onboarding apply`. Deterministic, no questions asked.                                        | Demos and automated first-run checks. Not for a real identity.                                                                                   |
@@ -257,6 +257,8 @@ Rule of thumb:
 
 Two questions are separate: **whose work is this?** and **how should it run?** For tenant work, scope references follow `tenant → organization → project → mission → task`, where those entities apply. Personal work needs no tenant; a Task Session or standalone mission does not require every level. See [scope references and execution choice](../knowledge/product/architecture/entity-scope-hierarchy.md#scope-references-and-execution-choice) for the optional references and authorization rules.
 
+Before creating or starting a Mission, run the same command with `--dry-run --json` and check `input.preflight.ready` and `input.preflight.issues`. Supply a registered tenant for confidential work. Organization and Project are optional for standalone work. A managed Project supplies its registered scope, and an active Stance with an acting-for selection must agree with it. Use `pnpm stance:switch` to select a Stance explicitly. The command checks scope again when it runs.
+
 A **WorkItem** tracks the work; a **Mission**, **Task Session**, or **Pipeline** is a way to execute it. A project can group missions and task sessions. A Task Session is not the parent of a mission task. Typed work-item `context` carries applicable scope references plus `work_shape` (the kind of work), so the same work can appear consistently across the views. Routine operations, incidents, and cadences are tracked by the organization operating model (`pnpm organization`).
 
 ## 6. The Smallest Mental Model
@@ -369,6 +371,14 @@ pnpm mission finish MSN-DEMO-20261012
 ```
 
 `kickoff` creates the mission if absent and activates it (IDs follow `MSN-<TOPIC>-<YYYYMMDD>`; repo-internal work uses `--tier public`, which needs no tenant). The full sequence (evidence, review, distill) is in the [mission kickoff playbook](../knowledge/product/orchestration/mission-kickoff-playbook.md).
+
+Use `pnpm mission start <ID> --dry-run --json` (or the same flags on `create` or
+`kickoff`) to inspect the resolved scope before running. Check
+`input.preflight.ready` and `input.preflight.issues`; a successful command exit
+can still describe a hold. Confidential Missions require a registered tenant.
+Pass `--organization-id` for organization work and `--project-id` for managed
+project work. A bound Stance can supply tenant and organization context. The
+selected entities must agree with the saved Mission and the current authority.
 
 These are operator tools.
 They are not the normal end-user interface.

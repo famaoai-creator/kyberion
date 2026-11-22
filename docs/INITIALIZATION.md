@@ -214,6 +214,36 @@ scope 内の未確認を本人設定の欠落と判断して onboarding をや�
 `preview --out <profile>/onboarding/activation-reviewed.json` で保存した同じファイルを
 `request --file <reviewed-file>` に渡す。
 
+個人 Mission で知識利用を記録する場合は `pnpm onboarding authority show --scope person --json`
+で NHI の状態を確認する。本人設定の適用直後は `provisioned` で、`activation_requires_approval`
+なら生成済みの個人用の有効化計画を preview → request の順に進める。人間がサインイン済みの
+Concierge で承認した後、`pnpm onboarding authority apply --request-id <ID> --json`
+を実行し、同じ show で実行準備ができたことを確認する。
+配信と `--knowledge-used` の報告は単独の operator 端末で行う。
+エージェントセッションで `personal_owner_required` が出た場合は、その端末に引き渡す。
+[利用報告の手順](../knowledge/product/governance/phases/execution.md#physical-enforcement)を参照。
+
+`authority show/status/apply` の個人スコープには tenant を渡さない。組織スコープでは
+`--scope organization --tenant <slug>` を指定する。この authority 契約では Org ID、Project、
+Stance を申請のスコープとして渡す必要はない。`preview/request` は計画ファイルのスコープを使い、
+CLI でも明示した場合は一致を検証する。本人承認の前に `apply` できるかは `status` の
+`can_apply` で確認する。自動化では `--json` の標準出力を読み、診断は標準エラーで受け取る。
+
+### CLI スコープの事前確認
+
+| 操作                           | 必須・条件付き                                                                                               | 省略できる指定                                                                                                            |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
+| 個人の `onboarding authority`  | 個人の本人設定。有効化は人間の承認後に適用する                                                               | Tenant、Org ID、Project、Stance                                                                                           |
+| 組織の `onboarding authority`  | `--scope organization --tenant <slug>`。preview/request で両方省略した場合は計画ファイルに従う               | Org ID、Project、Stance                                                                                                   |
+| `project create`               | Project ID・名前・概要・tier。confidential では登録済み Tenant。Org を指定した場合は同じ範囲にある有効な Org | 単独 Project の Org、Stance                                                                                               |
+| `mission create/start/kickoff` | Mission ID。confidential では Tenant。Project に紐づける場合は登録済み Project のスコープと一致              | tier の既定値は confidential。単独 Mission の Org・Project は省略可。Stance は明示選択で、Org ID の指定から切り替わらない |
+
+単独 CLI では `pnpm scope show --json` で選択中のスコープとその出所を確認できる。
+Mission は `--dry-run --json` で `input.preflight.ready` と `issues` を確認する。
+Project の `create --dry-run --json` は作成時と同じ登録・Org・権限の事前チェックを行う。
+委任の実行コンテキストがある場合は、その束縛済みスコープでチェックする。
+エージェントが本人承認や個人知識の所有者確認を求められた場合は、人間の端末に引き渡す。
+
 - **Command**: `pnpm onboarding` (needs `dist/`)
 - **Purpose**: make the system remember the sovereign's name, language, interaction style, specialty, and vision.
 - **To do it in the GUI**: open the concierge `/settings` (the old Concierge `/setup` and the Presence Studio `/onboarding` redirect there). Save the identity under "About you", and register members and approvers under "Organization and members". The approver is later given as `--owner-id` in tenant activation.

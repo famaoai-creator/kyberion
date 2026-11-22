@@ -1,7 +1,7 @@
 ---
 title: README
 tags: [improvement-plan, 2026-08]
-last_updated: 2026-10-21
+last_updated: 2026-11-22
 status: active
 ---
 
@@ -10,6 +10,8 @@ status: active
 ドキュメント構成の正本は[ドキュメント索引](../../documentation-source-map.json)です。
 
 8月に起案し、現在も継続している計画と実装記録の索引です。7月以前は[2026-07 索引](../improvement-plans-2026-07/README.ja.md)、9月以降に起案した文書は月別の索引([2026-09](../improvement-plans-2026-09/README.ja.md) / [2026-10](../improvement-plans-2026-10/README.ja.md) / [2026-11](../improvement-plans-2026-11/README.ja.md))、完了・終了した計画は[2026-08 アーカイブ](../improvement-plans-archive/2026-08/README.ja.md)を参照してください。実装状況の詳細は各計画文書を正本とします。
+
+概念の定義と移行状況は[11月索引の「概念モデル v2 の移行」](../improvement-plans-2026-11/README.ja.md#概念モデル-v2-の移行)を参照してください。WorkItem・Lease と意図解決器の統合は完了し、スコープ・ID・Grant と記憶ループは移行を継続しています。
 
 ## 継続中の計画
 

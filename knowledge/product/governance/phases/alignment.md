@@ -29,7 +29,7 @@ For a mission-shaped request with an alignment gate, the governed order is:
 2. Run `mission_controller create <MISSION_ID> ...` to create the governed mission micro-repository in `planned` state. This is setup, not approval and not execution. Use `start` only for the existing lifecycle operation that activates a mission outside this approval flow.
 3. Run `mission_controller plan-tasks <MISSION_ID> --refresh-catalog`, then create the brief and approval request with `mission_alignment_request.js`.
 4. Serve the brief with `mission-alignment-gate/serve-brief.ts`, or render it in another approved surface. The surface writes the decision to the shared approval store; it is not the decision authority.
-5. Run `mission_controller gate-pass <MISSION_ID> ALIGNMENT_APPROVED`. The strict command gate checks the approval-store decision and the unchanged brief hash. The first successful gate pass transitions the mission from `planned` to `active`.
+5. Run `mission_controller gate-pass <MISSION_ID> ALIGNMENT_APPROVED`. The strict command gate checks the approval-store decision and the unchanged brief hash. This gate activates a planned alignment workflow. A later process gate stays unavailable while the workflow is planned.
 6. Continue with the planned execution and verification steps.
 
 The browser must not invoke `mission_controller create` or `start`. Creation is an explicit, auditable session operation; approval remains required before activation.

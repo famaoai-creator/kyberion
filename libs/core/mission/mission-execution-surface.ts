@@ -8,6 +8,8 @@
  * escalation.
  */
 
+export { execMissionControllerChild } from './mission-controller-start-input.js';
+
 export const MISSION_EXECUTION_SURFACES = ['cli_subagent', 'agent_runtime', 'hybrid'] as const;
 
 export type MissionExecutionSurface = (typeof MISSION_EXECUTION_SURFACES)[number];

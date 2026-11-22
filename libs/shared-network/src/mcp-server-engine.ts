@@ -45,6 +45,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import { createHash } from 'node:crypto';
 import * as nodePath from 'node:path';
 import { z } from 'zod';
 import {
@@ -54,7 +55,10 @@ import {
   safeLstat,
   safeReaddir,
 } from '@agent/core/secure-io';
+import { isolatedScopeEnvPath } from '@agent/core/scope-context';
 import { pathResolver } from '@agent/core/path-resolver';
+import { buildExecutionEnv } from '@agent/core/authority';
+import { execMissionControllerChild } from '@agent/core/mission/mission-execution-surface';
 import { discoveryOpsByActuator, loadMcpActuatorOpDiscovery } from './mcp-actuator-discovery.js';
 import { spawnManagedProcess, stopManagedProcess } from '@agent/core/managed-process';
 import {
@@ -667,25 +671,41 @@ function searchCapabilities(
 }
 
 function getMissionStatus(missionId: string, tenant: string): string {
-  return safeExec(
+  pathResolver.assertMissionIdArgument(missionId);
+  const output = safeExec(
     'node',
     [
       nodePath.join(REPO_ROOT, 'dist/scripts/mission_controller.js'),
       'status',
-      '--mission-id',
       missionId,
       '--tenant-slug',
       tenant,
+      '--json',
     ],
     {
       cwd: REPO_ROOT,
+      env: {
+        KYBERION_SCOPE_ENV_PATH: isolatedScopeEnvPath(),
+        KYBERION_TENANT: tenant,
+        MISSION_ID: missionId,
+      },
       timeoutMs: 15_000,
       maxOutputMB: 2,
     }
   );
+  const status = parseSafeJsonObject(output);
+  if (
+    status?.mission_id !== missionId.trim().toUpperCase() ||
+    status.tenant_slug !== tenant ||
+    typeof status.status !== 'string'
+  ) {
+    throw new Error('[MCP_MISSION_STATUS_INVALID] Expected a status for the selected mission.');
+  }
+  return output;
 }
 
 function getMissionJournal(missionId: string, tenant: string): string {
+  pathResolver.assertMissionIdArgument(missionId);
   return safeExec(
     'node',
     [
@@ -697,31 +717,55 @@ function getMissionJournal(missionId: string, tenant: string): string {
     ],
     {
       cwd: REPO_ROOT,
+      env: { KYBERION_TENANT: tenant, MISSION_ID: missionId },
       timeoutMs: 15_000,
       maxOutputMB: 2,
     }
   );
 }
 
-function createMission(brief: string, title: string, tenant: string): string {
-  return safeExec(
-    'node',
+function createMission(brief: string, title: string, context: McpRequestContext) {
+  const tenant = context.scope.tenant_slug!;
+  const tier = context.scope.tier;
+  const digest = createHash('sha256')
+    .update(JSON.stringify([tenant, tier, title, brief]))
+    .digest('hex')
+    .slice(0, 24)
+    .toUpperCase();
+  const missionId = `MSN-MCP-${digest}`;
+  const env = buildExecutionEnv(process.env, 'mission_controller');
+  Object.assign(env, {
+    KYBERION_SCOPE_ENV_PATH: isolatedScopeEnvPath(),
+    KYBERION_TENANT: tenant,
+    KYBERION_TIER: tier,
+    KYBERION_STANCE: '',
+    KYBERION_CUSTOMER: '',
+    KYBERION_ORGANIZATION_ID: '',
+    KYBERION_PROJECT_ID: '',
+    KYBERION_TASK_ID: '',
+    TASK_ID: '',
+    MISSION_ID: missionId,
+  });
+  const output = execMissionControllerChild(
     [
-      nodePath.join(REPO_ROOT, 'dist/scripts/mission_controller.js'),
       'create',
-      '--brief',
-      brief,
-      '--title',
-      title,
+      missionId,
+      '--tier',
+      tier,
+      '--goal',
+      `MCP mission: ${title}\n\n${brief}`,
       '--tenant-slug',
       tenant,
     ],
     {
       cwd: REPO_ROOT,
+      env,
       timeoutMs: 30_000,
       maxOutputMB: 2,
-    }
+    },
+    process.execPath
   );
+  return { mission_id: missionId, output };
 }
 
 // ─── Server factory ───────────────────────────────────────────────────────────
@@ -1147,8 +1191,8 @@ export function createKyberionMcpServer(): McpServer {
             ],
           };
         }
-        const output = createMission(brief, title, context.scope.tenant_slug!);
-        return { content: [{ type: 'text' as const, text: output }] };
+        const result = createMission(brief, title, context);
+        return { content: [{ type: 'text' as const, text: JSON.stringify(result) }] };
       } catch (err) {
         return {
           content: [

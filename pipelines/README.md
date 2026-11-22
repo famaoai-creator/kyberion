@@ -310,6 +310,11 @@ Step-group building blocks consumed via `core:include`. Fragments contain no per
 
 See `pipelines/fragments/` for the full catalog and [`fragments/README.md`](./fragments/README.md) for composition rules.
 
+`fragments/mission-bootstrap.json` requires a caller-supplied `mission_id`.
+For confidential work, supply a registered `tenant_slug` or run in a bound
+tenant scope. Organization and managed project IDs can be supplied through the
+fragment's execution context.
+
 ---
 
 ## Pipeline Templates (`knowledge/product/pipeline-templates/`)

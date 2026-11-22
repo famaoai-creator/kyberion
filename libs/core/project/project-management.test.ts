@@ -15,6 +15,7 @@ import {
   bootstrapManagedProject,
   createManagedProjectTrack,
   createManagedProject,
+  previewManagedProjectCreation,
   ensureProjectOsScaffold,
   getProjectManagementView,
   listManagedProjects,
@@ -182,6 +183,20 @@ describe('project-management facade', () => {
     else process.env.MISSION_ID = ORIGINAL_MISSION_ID;
     if (ORIGINAL_SCOPE_ENV_PATH === undefined) delete process.env.KYBERION_SCOPE_ENV_PATH;
     else process.env.KYBERION_SCOPE_ENV_PATH = ORIGINAL_SCOPE_ENV_PATH;
+  });
+
+  it('checks creation prerequisites without registering the project', () => {
+    const input = {
+      project_id: PROJECT_ID,
+      name: 'Preview',
+      summary: 'Test preview',
+      tier: 'confidential' as const,
+      tenant_slug: 'tenant-pmc-test',
+    };
+    expect(previewManagedProjectCreation(input)).toMatchObject({ project_id: PROJECT_ID });
+    expect(loadProjectRecord(PROJECT_ID)).toBeNull();
+    createManagedProject(input);
+    expect(() => previewManagedProjectCreation(input)).toThrow('Project already exists');
   });
 
   it('uses the same archive guard for dedicated and generic updates', () => {
