@@ -152,6 +152,19 @@ export function createCliCommandHandlers(deps: CliCommandDeps): Record<string, C
       await runBrowserBridgeCommand(commandArgs, printText);
       return;
     },
+    browser: async (ctx) => {
+      const { firstArg, restArgs, normalizedArgs } = ctx;
+      if (!normalizedArgs.includes('--verbose')) setRegisteredEnv('LOG_LEVEL', 'silent');
+      if (firstArg !== 'control') {
+        throw new ScriptExitError(
+          1,
+          `unknown browser verb '${firstArg ?? ''}'. Usage: pnpm kyberion browser control <verb>`
+        );
+      }
+      const { runBrowserControlCommand } = await import('./cli-browser-control.js');
+      await runBrowserControlCommand(restArgs, printText);
+      return;
+    },
     grants: async (ctx) => {
       const { firstArg, restArgs, normalizedArgs } = ctx;
       if (!normalizedArgs.includes('--verbose')) setRegisteredEnv('LOG_LEVEL', 'silent');

@@ -38,7 +38,7 @@ const RECEIPT_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/browser-extension-receipt.schema.json'
 );
 
-const HIGH_RISK_OPERATIONS = new Set<BrowserExtensionOperation>([
+export const HIGH_RISK_OPERATIONS = new Set<BrowserExtensionOperation>([
   'submit_form',
   'upload_file',
   'download_file',

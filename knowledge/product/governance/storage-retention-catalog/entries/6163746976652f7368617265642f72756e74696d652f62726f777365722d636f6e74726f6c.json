@@ -1,0 +1,8 @@
+{
+  "path": "active/shared/runtime/browser-control",
+  "artifact_class": "tmp",
+  "ttl_days": 7,
+  "action": "delete",
+  "audit": true,
+  "note": "Interactive browser-control state (libs/shared-vision/src/browser-control-sessions.ts): BCS-*/LCS-* session leases, step journals, pending-step approvals under sessions/, and the extract_text_ref secret side-channel under secrets/. Sessions self-expire at 30 minutes; a 7d sweep bound removes abandoned leases and drained secret captures, audited to storage-retention.jsonl."
+}

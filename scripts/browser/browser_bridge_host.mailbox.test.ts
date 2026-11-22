@@ -10,6 +10,8 @@ import {
   enqueueBrowserBridgeRequest,
   loadBrowserBridgeRequest,
 } from '@agent/shared-vision/browser-bridge-mailbox';
+import { mintBrowserControlSession } from '@agent/shared-vision/browser-control-sessions';
+import { BROWSER_CONTROL_ROOT_PATH } from '@agent/core/foundation/runtime-state-roots';
 
 const ingestMain = vi.hoisted(() =>
   vi.fn(async (_argv: string[], print: (value: unknown) => void) => {
@@ -46,6 +48,7 @@ interface Reply {
   [key: string]: unknown;
 }
 const MAILBOX = pathResolver.rootResolve(BROWSER_BRIDGE_MAILBOX_ROOT);
+const CONTROL_ROOT = pathResolver.rootResolve(BROWSER_CONTROL_ROOT_PATH);
 const staged: string[] = [];
 
 beforeAll(async () => {
@@ -54,6 +57,7 @@ beforeAll(async () => {
 
 afterEach(() => {
   safeRmSync(MAILBOX, { recursive: true, force: true });
+  asConcierge(() => safeRmSync(CONTROL_ROOT, { recursive: true, force: true }));
   // Staged pages live in a tier partition; the host writes them as sovereign_concierge.
   const refs = staged.splice(0);
   asConcierge(() => {
@@ -243,5 +247,88 @@ describe('send_page', () => {
       substrate: undefined,
     });
     expect(result.page).toMatchObject({ url_origin: 'https://example.com', selection_only: false });
+  });
+});
+
+describe('store_artifact', () => {
+  function queueControlStep() {
+    const session = mintBrowserControlSession({
+      origin: 'https://api.slack.com',
+      requested_by: { actor_id: 'agent:test', mission_id: 'MSN-TEST-1' },
+      approval_request_id: 'APR-TEST-1',
+    });
+    return enqueueBrowserBridgeRequest(
+      {
+        request_kind: 'control_step',
+        payload: {
+          session_id: session.session_id,
+          lease_id: session.lease_id,
+          origin: session.origin,
+          step: { step_id: 's-1', op: 'screenshot' },
+        },
+        requested_by: { actor_id: 'agent:test' },
+        scope: { tier: 'personal' },
+      },
+      { assertTenant: () => undefined }
+    );
+  }
+
+  it('stores a binary artifact for a live control_step request', async () => {
+    const request = queueControlStep();
+    const stored = (await handle({
+      type: 'store_artifact',
+      request_id: request.request_id,
+      name: 'screenshot',
+      mime: 'image/jpeg',
+      data_b64: Buffer.from('fake-jpeg-bytes').toString('base64'),
+    })) as Reply;
+    expect(stored).toMatchObject({ ok: true, name: 'screenshot', mime: 'image/jpeg' });
+    expect(String(stored.path)).toContain('browser-control/artifacts/');
+    expect(String(stored.path)).toMatch(/screenshot\.jpg$/);
+    const abs = pathResolver.rootResolve(String(stored.path));
+    expect(safeExistsSync(abs)).toBe(true);
+    expect(String(safeReadFile(abs))).toBe('fake-jpeg-bytes');
+  });
+
+  it('rejects artifacts for non-control, terminal, or unknown requests', async () => {
+    const observe = queueObserve();
+    expect(
+      await handle({
+        type: 'store_artifact',
+        request_id: observe.request_id,
+        name: 'shot',
+        data_b64: 'QUJD',
+      })
+    ).toMatchObject({ ok: false, code: 'invalid_input' });
+    expect(
+      await handle({
+        type: 'store_artifact',
+        request_id: 'BBR-00000000-0000-4000-8000-000000000000',
+        name: 'shot',
+        data_b64: 'QUJD',
+      })
+    ).toMatchObject({ ok: false, code: 'invalid_input' });
+  });
+
+  it('rejects unsafe names and oversized payloads', async () => {
+    const request = queueControlStep();
+    for (const name of ['../evil', 'a/b', 'x;rm', '']) {
+      expect(
+        await handle({
+          type: 'store_artifact',
+          request_id: request.request_id,
+          name,
+          data_b64: 'QUJD',
+        })
+      ).toMatchObject({ ok: false, code: 'invalid_input' });
+    }
+    expect(
+      await handle({
+        type: 'store_artifact',
+        request_id: request.request_id,
+        name: 'big',
+        data_b64: 'A'.repeat(1_000_000),
+      })
+    ).toMatchObject({ ok: false, code: 'invalid_input' });
   });
 });
