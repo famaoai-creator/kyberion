@@ -596,13 +596,17 @@ export function operationAuthorization(operationId: string): OperationAuthorizat
 }
 
 export function requiresApprovalAdmission(authorization: OperationAuthorization): boolean {
-  return (
-    authorization.authority.kind === 'approval' ||
-    (authorization.declared &&
-      authorization.source === 'code' &&
-      authorization.effectClass === 'external_mutation' &&
-      !authorization.approvalExemptCleanup)
-  );
+  switch (authorization.authority.kind) {
+    case 'approval':
+      return true;
+    default:
+      return (
+        authorization.declared &&
+        authorization.source === 'code' &&
+        authorization.effectClass === 'external_mutation' &&
+        !authorization.approvalExemptCleanup
+      );
+  }
 }
 
 /** The code-owned declaration key space. Overlay loaders use this to reject
