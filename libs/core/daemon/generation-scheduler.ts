@@ -28,7 +28,7 @@ import {
   type EventScope,
   type EventScopeInput,
 } from '../event/event-scope.js';
-import { releaseGenerationQuota, reserveGenerationQuota } from '../finance/generation-quota.js';
+import { reserveGenerationQuota } from '../finance/generation-quota.js';
 import { resolveTenant } from '../organization/tenant-registry.js';
 import { physicalScopedPath } from '../storage/physical-namespace.js';
 import { settleGenerationProviderCost } from '../finance/generation-cost-settlement.js';
@@ -524,7 +524,6 @@ export interface GenerationScheduleTickDeps {
   leaderId?: string;
   quota?: {
     reserve?: typeof reserveGenerationQuota;
-    release?: typeof releaseGenerationQuota;
   };
   /** Test seam; production resolves the durable tenant registry. */
   resolveTenant?: (tenantSlug: string) => unknown;
@@ -770,47 +769,13 @@ async function tickGenerationSchedule(
       const runToken = claimed.run_lock.token;
       const claimedScope = (claimed as ScopedGenerationSchedule).scope;
       const quotaReserve = deps.quota?.reserve ?? reserveGenerationQuota;
-      const quotaRelease = deps.quota?.release ?? releaseGenerationQuota;
-      let quota: ReturnType<typeof reserveGenerationQuota>;
-      try {
-        quota = quotaReserve(claimedScope, claimed.job_template.action);
-      } catch (err) {
-        completeGenerationScheduleRun(schedule.schedule_id, runToken, 'failed', now, claimedScope);
-        throw err;
-      }
-      if (!quota.allowed) {
-        completeGenerationScheduleRun(schedule.schedule_id, runToken, 'failed', now, claimedScope);
-        outcome = {
-          schedule_id: schedule.schedule_id,
-          status: 'blocked',
-          reason: 'generation quota exceeded',
-          quota,
-          reconciliation: reconciliation.outcome || null,
-        };
-        return `quota-blocked:${schedule.schedule_id}:${minuteKey}`;
-      }
-      let quotaCommitted = false;
-      let quotaReleased = false;
-
       try {
         const handleAction = await resolveHandleAction(deps);
-        const submittedJob = await handleAction({
-          action: 'submit_generation',
-          params: {
-            action: claimed.job_template.action,
-            params: generationParamsForSchedule(claimed),
-            retry_policy: claimed.execution_policy?.retry_policy,
-            scope: claimedScope,
-          },
+        const params = generationParamsForSchedule(claimed);
+        const quota = quotaReserve(claimedScope, claimed.job_template.action, {
+          finalCharge: true,
         });
-
-        if (!submittedJob?.job_id) {
-          if (quota.tenant_slug) {
-            quotaRelease(claimedScope, claimed.job_template.action, {
-              reservation_units: quota.units,
-            });
-            quotaReleased = true;
-          }
+        if (!quota.allowed) {
           completeGenerationScheduleRun(
             schedule.schedule_id,
             runToken,
@@ -820,6 +785,26 @@ async function tickGenerationSchedule(
           );
           outcome = {
             schedule_id: schedule.schedule_id,
+            status: 'blocked',
+            reason: 'generation quota exceeded',
+            quota,
+            reconciliation: reconciliation.outcome || null,
+          };
+          return `quota-blocked:${schedule.schedule_id}:${minuteKey}`;
+        }
+        const submittedJob = await handleAction({
+          action: 'submit_generation',
+          params: {
+            action: claimed.job_template.action,
+            params,
+            retry_policy: claimed.execution_policy?.retry_policy,
+            scope: claimedScope,
+          },
+        });
+
+        if (!submittedJob?.job_id) {
+          outcome = {
+            schedule_id: schedule.schedule_id,
             status: 'failed',
             reason: 'job submission did not return a job_id',
             reconciliation: reconciliation.outcome || null,
@@ -827,7 +812,6 @@ async function tickGenerationSchedule(
           throw new Error('job submission did not return a job_id');
         }
 
-        quotaCommitted = true;
         markGenerationScheduleSubmitted(claimed, submittedJob.job_id);
         completeGenerationScheduleRun(
           schedule.schedule_id,
@@ -846,11 +830,6 @@ async function tickGenerationSchedule(
         };
         return `generation-run:${runToken}`;
       } catch (err) {
-        if (quota.tenant_slug && !quotaCommitted && !quotaReleased) {
-          quotaRelease(claimedScope, claimed.job_template.action, {
-            reservation_units: quota.units,
-          });
-        }
         completeGenerationScheduleRun(schedule.schedule_id, runToken, 'failed', now, claimedScope);
         throw err;
       }

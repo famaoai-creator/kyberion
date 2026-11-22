@@ -11,7 +11,7 @@ import {
   safeReaddir,
   safeWriteFile,
 } from '../secure-io.js';
-import { loadTaskSession, saveTaskSession, type TaskSession } from '../task/task-session.js';
+import { updateTaskSession, type TaskSession } from '../task/task-session.js';
 import type { OrganizationWorkLoopSummary } from './work-design.js';
 import {
   appendArtifactOwnershipRecord,
@@ -89,7 +89,10 @@ export function validateArtifactRecord(value: unknown): value is ArtifactRecord 
   return Boolean(ensureValidator()(value));
 }
 
-export function saveArtifactRecord(record: ArtifactRecord): string {
+export function saveArtifactRecord(
+  record: ArtifactRecord,
+  options: { skipUnchangedOwnership?: boolean } = {}
+): string {
   const filePath = artifactPath(record.artifact_id);
   let canonicalInput: ArtifactRecord;
   try {
@@ -128,7 +131,8 @@ export function saveArtifactRecord(record: ArtifactRecord): string {
     { ...canonicalInput, metadata },
     filePath
   );
-  safeWriteFile(filePath, `${JSON.stringify(canonicalRecord, null, 2)}\n`);
+  // The record is the surface-facing reference. Publish it only after the
+  // ownership ledger accepts the canonical scope and locator.
   appendArtifactOwnershipRecord(
     createArtifactOwnershipRecord({
       artifact_id: canonicalRecord.artifact_id,
@@ -145,8 +149,10 @@ export function saveArtifactRecord(record: ArtifactRecord): string {
       evidence_refs: Array.isArray((canonicalRecord.metadata as any)?.evidence_refs)
         ? ((canonicalRecord.metadata as any).evidence_refs as string[])
         : [],
-    })
+    }),
+    { skipUnchanged: options.skipUnchangedOwnership }
   );
+  safeWriteFile(filePath, `${JSON.stringify(canonicalRecord, null, 2)}\n`);
   return filePath;
 }
 
@@ -190,24 +196,20 @@ export function attachArtifactRecordToTaskSession(
     }),
     { for_delivery: true }
   );
-  const session = loadTaskSession(sessionId);
-  if (!session) return null;
-  session.artifact = {
-    ...(session.artifact || {}),
-    kind: record.kind,
-    output_path: record.path || session.artifact?.output_path,
-    preview_text: record.preview_text || session.artifact?.preview_text,
-    artifact_id: record.artifact_id,
-    project_id: record.project_id,
-    track_id: record.track_id,
-    track_name: record.track_name,
-    mission_id: record.mission_id,
-    storage_class: record.storage_class,
-    external_ref: record.external_ref,
-  };
-  if (record.work_loop) {
-    session.work_loop = record.work_loop;
-  }
-  saveTaskSession(session);
-  return session;
+  return updateTaskSession(sessionId, (session) => ({
+    artifact: {
+      ...(session.artifact || {}),
+      kind: record.kind,
+      output_path: record.path || session.artifact?.output_path,
+      preview_text: record.preview_text || session.artifact?.preview_text,
+      artifact_id: record.artifact_id,
+      project_id: record.project_id,
+      track_id: record.track_id,
+      track_name: record.track_name,
+      mission_id: record.mission_id,
+      storage_class: record.storage_class,
+      external_ref: record.external_ref,
+    },
+    ...(record.work_loop ? { work_loop: record.work_loop } : {}),
+  }));
 }

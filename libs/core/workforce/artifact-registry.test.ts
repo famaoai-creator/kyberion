@@ -113,6 +113,62 @@ describe('artifact-registry', () => {
     );
   });
 
+  it('preserves storage class across registration, delivery admission, and queries', () => {
+    const model = {
+      repo: { deliverable: true, path: 'docs/report.md' },
+      artifact_store: { deliverable: true, path: 'active/shared/artifacts/report.md' },
+      vault: { deliverable: true, path: 'vault/report.md' },
+      tmp: { deliverable: false, path: 'active/shared/tmp/report.md' },
+      external_ref: { deliverable: true, external_ref: 'https://example.invalid/report' },
+    } as const;
+    const entries = Object.entries(model) as [
+      keyof typeof model,
+      (typeof model)[keyof typeof model],
+    ][];
+    for (const [storage_class, { deliverable, ...locator }] of entries) {
+      for (const for_delivery of [false, true]) {
+        const artifact_id = `ART-${storage_class}-${for_delivery}`;
+        const record = createArtifactOwnershipRecord({
+          artifact_id,
+          storage_class,
+          kind: 'report',
+          project_id: 'PRJ-MODEL',
+          ...locator,
+        });
+        const append = () => appendArtifactOwnershipRecord(record, { for_delivery });
+        if (for_delivery && !deliverable) {
+          expect(append).toThrow(/tmp storage_class/);
+        } else {
+          append();
+        }
+        expect(
+          listArtifactOwnershipRecordsByQuery({
+            projectId: 'PRJ-MODEL',
+            storageClass: storage_class,
+          })
+        ).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({ artifact_id: `ART-${storage_class}-false`, storage_class }),
+          ])
+        );
+      }
+    }
+    const rows = listArtifactOwnershipRecords();
+    const expected = entries.flatMap(([storage_class, { deliverable, ...locator }]) =>
+      (deliverable ? [false, true] : [false]).map((forDelivery) =>
+        expect.objectContaining({
+          artifact_id: `ART-${storage_class}-${forDelivery}`,
+          storage_class,
+          ...locator,
+        })
+      )
+    );
+    expect(rows).toEqual(expected);
+    expect(
+      listArtifactOwnershipRecordsByQuery({ projectId: 'PRJ-MODEL', includeTmp: false })
+    ).toHaveLength(8);
+  });
+
   it('finds reusable project artifacts and keeps mission-local artifacts scoped by query', () => {
     appendArtifactOwnershipRecord(
       createArtifactOwnershipRecord({

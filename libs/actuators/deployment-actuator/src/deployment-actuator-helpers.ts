@@ -51,14 +51,18 @@ async function deployRelease(params: DeploymentParams) {
       // a charter grants 'deploy <project> to <env> via <adapter>'.
       delegable: true,
     },
-    () =>
+    (providerCorrelationId) =>
       adapter.deploy({
         environment: params.environment,
         projectName: params.project_name,
         version: params.version,
         releaseNotesPath: params.release_notes_path,
+        providerCorrelationId,
       }),
-    (result) => (result.status === 'triggered' ? 'succeeded' : 'unknown')
+    (result) => ({
+      outcome: result.status === 'triggered' ? 'succeeded' : 'unknown',
+      providerReceiptId: result.trigger_id,
+    })
   );
   if (result.status !== 'triggered') {
     throw Object.assign(

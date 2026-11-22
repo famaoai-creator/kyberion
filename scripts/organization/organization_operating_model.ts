@@ -6,6 +6,7 @@ import {
   buildOrganizationManagementView,
   buildOrganizationOperationRecord,
   buildOrganizationProjectLink,
+  applyOrganizationProjectLink,
   buildOrganizationCadence,
   buildOrganizationDecision,
   listOrganizationDecisions,
@@ -49,6 +50,7 @@ import {
   assertOrganizationParent,
   setOrganizationParent,
   transitionOrganizationLifecycle,
+  withEntityLifecycleLock,
 } from '@agent/core/organization/organization-operating-model-persistence';
 import {
   removeOrganizationEntity,
@@ -446,15 +448,22 @@ const handleProjectAttachProjectDetach: OrgCommandHandler = (ctx) => {
   if (!organizationId) throw new Error(`--organization-id is required for ${parsed.command}.`);
   requireFlags(parsed.command, { '--project-id': parsed.projectId });
   const mode = resolveWriteMode(parsed, parsed.command);
-  const record = buildOrganizationProjectLink({
+  const link = {
     organizationId,
     projectId: parsed.projectId!,
     tier: parsed.tier,
     tenantSlug: parsed.tenantSlug,
     detach: parsed.command === 'project detach',
-  });
-  const savedPaths = mode === 'apply' ? [saveOrganizationOperationalState(record)] : [];
-  emit({ mode, state: record, saved_paths: savedPaths }, parsed.json);
+  };
+  const applied = mode === 'apply' ? applyOrganizationProjectLink(link) : undefined;
+  emit(
+    {
+      mode,
+      state: applied?.record ?? buildOrganizationProjectLink(link),
+      saved_paths: applied ? [applied.savedPath] : [],
+    },
+    parsed.json
+  );
   return;
 };
 
@@ -930,25 +939,30 @@ const ORGANIZATION_COMMAND_HANDLERS: Record<string, OrgCommandHandler> = {
       '--owner-role': parsed.ownerRole,
     });
     const mode = resolveWriteMode(parsed, 'service add');
-    const addition = buildOrganizationServiceAddition({
-      organizationId,
-      serviceId: parsed.serviceId!,
-      domainId: parsed.domainId!,
-      name: parsed.name!,
-      outcome: parsed.outcome!,
-      ownerRole: parsed.ownerRole!,
-      consumers: parsed.consumers,
-      tier: parsed.tier!,
-      tenantSlug: parsed.tenantSlug,
-      sloTarget: parsed.sloTarget,
-      sloWindow: parsed.sloWindow,
-      runbookRefs: parsed.runbookRefs,
-      status: parsed.recordStatus as OrganizationServiceRecord['status'] | undefined,
-    });
-    const savedPaths =
-      mode === 'apply'
-        ? [saveOrganizationService(addition.service), saveOrganizationDomain(addition.domain)]
-        : [];
+    const prepare = () => {
+      const addition = buildOrganizationServiceAddition({
+        organizationId,
+        serviceId: parsed.serviceId!,
+        domainId: parsed.domainId!,
+        name: parsed.name!,
+        outcome: parsed.outcome!,
+        ownerRole: parsed.ownerRole!,
+        consumers: parsed.consumers,
+        tier: parsed.tier!,
+        tenantSlug: parsed.tenantSlug,
+        sloTarget: parsed.sloTarget,
+        sloWindow: parsed.sloWindow,
+        runbookRefs: parsed.runbookRefs,
+        status: parsed.recordStatus as OrganizationServiceRecord['status'] | undefined,
+      });
+      const savedPaths =
+        mode === 'apply'
+          ? [saveOrganizationService(addition.service), saveOrganizationDomain(addition.domain)]
+          : [];
+      return { addition, savedPaths };
+    };
+    const { addition, savedPaths } =
+      mode === 'apply' ? withEntityLifecycleLock(prepare) : prepare();
     emit({ mode, ...addition, saved_paths: savedPaths }, parsed.json);
     return;
   },

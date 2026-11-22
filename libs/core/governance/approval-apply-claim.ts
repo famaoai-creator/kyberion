@@ -54,6 +54,9 @@ export function claimApprovalApply(
     if (record.status !== 'approved' || isApprovalRequestExpired(record)) {
       throw new Error('[POLICY_VIOLATION] A current approved request is required before apply');
     }
+    if (record.consumption) {
+      throw new Error('[POLICY_VIOLATION] Approval was already consumed');
+    }
     if (record.applyClaim || record.applyResult) {
       throw new Error('[POLICY_VIOLATION] Approval apply already started; recovery required');
     }

@@ -11,6 +11,7 @@ export {
 import { appendJsonLine, readJsonLines } from '../foundation/json.js';
 import { isRecord, sanitizeIdSegment, readTextFile } from '../foundation/text.js';
 import { nowIso } from '../foundation/time.js';
+import { withLockSync } from '../foundation/lock-utils.js';
 import { createHash } from 'node:crypto';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import * as path from 'node:path';
@@ -43,11 +44,12 @@ import {
   SHARED_TENANT,
   type OwnerRef,
 } from '../governance/owner-scope.js';
-import type { ArtifactKind } from './artifact-registry.js';
+import { listArtifactOwnershipRecords, type ArtifactKind } from './artifact-registry.js';
 import {
   createArtifactRecord,
   loadArtifactRecord,
   saveArtifactRecord,
+  validateArtifactRecord,
   type ArtifactRecord,
 } from './artifact-record.js';
 
@@ -85,6 +87,32 @@ function withRole<T>(role: GovernedArtifactRole, fn: () => T): T {
   return withExecutionContext(role, fn);
 }
 
+function withScopedArtifactWriteLock<T>(fn: () => T): T {
+  return withLockSync('scoped-artifact-publication', fn, 30_000);
+}
+
+function refusePublishedArtifactMutation(repoRelative: string, indexed = false): void {
+  if (
+    indexed ||
+    listArtifactOwnershipRecords().some(
+      (row) => row.storage_class === 'artifact_store' && row.path === repoRelative
+    )
+  ) {
+    throw new Error(
+      `[SCOPED_ARTIFACT_PUBLISHED] cannot overwrite published artifact: ${repoRelative}`
+    );
+  }
+}
+
+function withGovernedArtifactMutation<T>(resolved: string, mutate: () => T): T {
+  const relative = pathResolver.toRepoRelative(resolved).split(path.sep).join('/');
+  if (!isScopedArtifactPath(relative)) return mutate();
+  return withScopedArtifactWriteLock(() => {
+    if (safeExistsSync(resolved)) refusePublishedArtifactMutation(relative);
+    return mutate();
+  });
+}
+
 export function ensureGovernedArtifactDir(role: GovernedArtifactRole, logicalDir: string): string {
   return withRole(role, () => {
     const resolved = resolveGovernedArtifactPath(logicalDir);
@@ -100,10 +128,12 @@ export function writeGovernedArtifactJson(
 ): string {
   return withRole(role, () => {
     const resolved = resolveGovernedArtifactPath(logicalPath);
-    const dir = path.dirname(resolved);
-    if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
-    ensureRegularGovernedArtifactFile(resolved);
-    safeWriteFile(logicalPath, JSON.stringify(value, null, 2));
+    withGovernedArtifactMutation(resolved, () => {
+      const dir = path.dirname(resolved);
+      if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
+      ensureRegularGovernedArtifactFile(resolved);
+      safeWriteFile(logicalPath, JSON.stringify(value, null, 2));
+    });
     return resolved;
   });
 }
@@ -115,10 +145,12 @@ export function appendGovernedArtifactJsonl(
 ): string {
   return withRole(role, () => {
     const resolved = resolveGovernedArtifactPath(logicalPath);
-    const dir = path.dirname(resolved);
-    if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
-    ensureRegularGovernedArtifactFile(resolved);
-    appendJsonLine(logicalPath, value);
+    withGovernedArtifactMutation(resolved, () => {
+      const dir = path.dirname(resolved);
+      if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
+      ensureRegularGovernedArtifactFile(resolved);
+      appendJsonLine(logicalPath, value);
+    });
     return resolved;
   });
 }
@@ -183,7 +215,7 @@ export interface ScopedArtifactPublication {
    */
   task_session_id?: string;
   /**
-   * Deterministic record id for a deliverable that is re-written in place
+   * Deterministic record id for a deliverable that is updated
    * (e.g. a daily digest): a re-run updates the same ArtifactRecord instead
    * of registering a new one.
    */
@@ -223,6 +255,7 @@ export interface ScopedArtifactIndexEntry {
   scope: ScopedArtifactScope;
   scope_kind: ScopedArtifactScopeKind;
   written_at: string;
+  content_sha256?: string;
 }
 
 export interface WriteScopedArtifactResult {
@@ -594,7 +627,11 @@ export function scopedArtifactDir(
 }
 
 export function writeScopedArtifact(input: WriteScopedArtifactInput): WriteScopedArtifactResult {
-  return writeScopedArtifactInternal(input);
+  return withScopedArtifactWriteLock(() => {
+    const { role, ...writeInput } = input;
+    const write = () => writeScopedArtifactInternal(writeInput);
+    return role ? withRole(role, write) : write();
+  });
 }
 
 function writeScopedArtifactInternal(
@@ -609,7 +646,7 @@ function writeScopedArtifactInternal(
   }
   const root = resolveScopeArtifactsRoot(input.scope, input.tier);
   const { artifactsRoot, kind } = root;
-  const name = sanitizeArtifactName(input.name);
+  let name = sanitizeArtifactName(input.name);
   const targetDir =
     kind === 'task'
       ? path.join(
@@ -618,12 +655,28 @@ function writeScopedArtifactInternal(
           scopedTaskArtifactDirName(input.scope.task as string)
         )
       : path.join(artifactsRoot, input.artifact_class);
-  const absolutePath = path.join(targetDir, ...name.split('/'));
+  const data = serializeScopedContent(input.content, input.format);
+  const digest = input.publish ? createHash('sha256').update(data).digest('hex') : undefined;
+  let absolutePath = path.join(targetDir, ...name.split('/'));
   const indexPath = path.join(artifactsRoot, SCOPED_ARTIFACT_INDEX_FILENAME);
 
   assertSafeRepositoryPath(artifactsRoot, { allowMissingLeaf: true });
   assertSafeRepositoryPath(targetDir, { allowMissingLeaf: true });
   assertSafeRepositoryPath(absolutePath, { allowMissingLeaf: true });
+  // A published reference can still point at the original path until commit.
+  // Preserve those bytes and use a deterministic, same-extension version path.
+  const hasBytes = (file: string): boolean =>
+    safeExistsSync(file) &&
+    (safeReadFile(file, { encoding: null }) as Buffer).equals(
+      typeof data === 'string' ? Buffer.from(data) : data
+    );
+  if (digest && !input.create_only && safeExistsSync(absolutePath) && !hasBytes(absolutePath)) {
+    const parsed = path.posix.parse(name);
+    const version = createHash('sha256').update(name).update('\0').update(digest).digest('hex');
+    name = path.posix.join(parsed.dir, `${parsed.name.slice(0, 80)}.${version}${parsed.ext}`);
+    absolutePath = path.join(targetDir, ...name.split('/'));
+    assertSafeRepositoryPath(absolutePath, { allowMissingLeaf: true });
+  }
   assertSafeRepositoryPath(indexPath, { allowMissingLeaf: true });
 
   // Fail closed: both the artifact and its index must be inside a recognized
@@ -648,7 +701,6 @@ function writeScopedArtifactInternal(
     );
   }
 
-  const data = serializeScopedContent(input.content, input.format);
   const entry: ScopedArtifactIndexEntry = {
     name,
     artifact_class: input.artifact_class,
@@ -656,18 +708,51 @@ function writeScopedArtifactInternal(
     scope: { ...input.scope },
     scope_kind: kind,
     written_at: writtenAt,
+    ...(digest ? { content_sha256: digest } : {}),
   };
   const catalog = scopedArtifactIndexCatalog(indexPath);
   const validatedEntry = catalog.validate(entry, indexPath);
 
-  let artifactId: string | undefined;
+  const publication = input.publish
+    ? prepareScopedArtifactPublication(input, repoRelative, root, data)
+    : undefined;
+  if (publication && !validateArtifactRecord(publication)) {
+    throw new Error('Invalid artifact record for scoped publication');
+  }
   const performWrite = (): void => {
-    if (!safeExistsSync(targetDir)) safeMkdir(targetDir, { recursive: true });
     ensureRegularScopedArtifactIndex(indexPath);
-    safeWriteFile(absolutePath, data, input.create_only ? { createOnly: true } : undefined);
-    appendJsonLine(indexPath, validatedEntry);
-    if (input.publish) {
-      artifactId = publishScopedArtifact(input, repoRelative, root);
+    const index =
+      digest || (!input.create_only && safeExistsSync(absolutePath))
+        ? readScopedArtifactIndex(input.scope, root.tier)
+        : [];
+    if (!digest && !input.create_only && safeExistsSync(absolutePath)) {
+      refusePublishedArtifactMutation(
+        repoRelative,
+        index.some((row) => row.path === repoRelative && row.content_sha256)
+      );
+    }
+    if (!safeExistsSync(targetDir)) safeMkdir(targetDir, { recursive: true });
+    if (input.create_only || !digest || !hasBytes(absolutePath)) {
+      safeWriteFile(
+        absolutePath,
+        data,
+        input.create_only || digest ? { createOnly: true } : undefined
+      );
+    }
+    const alreadyIndexed =
+      digest &&
+      index.some(
+        (row) =>
+          row.path === repoRelative &&
+          row.content_sha256 === digest &&
+          row.scope_kind === kind &&
+          ATTEMPT_SCOPE_KEYS.every((key) => row.scope[key] === input.scope[key])
+      );
+    if (!alreadyIndexed) appendJsonLine(indexPath, validatedEntry);
+    if (publication) {
+      saveArtifactRecord(publication, {
+        skipUnchangedOwnership: Boolean(input.publish?.artifact_id),
+      });
     }
   };
   if (input.role) withRole(input.role, performWrite);
@@ -678,7 +763,7 @@ function writeScopedArtifactInternal(
     repo_relative_path: repoRelative,
     index_path: indexPath,
     scope_kind: kind,
-    ...(artifactId ? { artifact_id: artifactId } : {}),
+    ...(publication ? { artifact_id: publication.artifact_id } : {}),
   };
 }
 
@@ -1203,11 +1288,12 @@ export function writeScopedArtifactAttempt<T>(
  * resolved server-side; the tier travels in metadata for scopes whose tier is
  * not implied by a mission state.
  */
-function publishScopedArtifact(
+function prepareScopedArtifactPublication(
   input: WriteScopedArtifactInput,
   repoRelativePath: string,
-  root: ResolvedScopeRoot
-): string {
+  root: ResolvedScopeRoot,
+  data: string | Buffer
+): ArtifactRecord {
   const { kind, tier } = root;
   const publication = input.publish as ScopedArtifactPublication;
   if (
@@ -1233,12 +1319,10 @@ function publishScopedArtifact(
     !Array.isArray(metadata.slides)
   ) {
     try {
-      const slides = countPptxSlides(
-        safeReadFile(pathResolver.rootResolve(repoRelativePath), { encoding: null }) as Buffer
-      );
+      const slides = countPptxSlides(typeof data === 'string' ? Buffer.from(data) : data);
       if (slides !== undefined) metadata.slides_count = slides;
     } catch {
-      // A missing/unreadable artifact body must not block publication.
+      // Unreadable slide metadata is handled by the quality gate.
     }
   }
   const record = createArtifactRecord({
@@ -1260,8 +1344,7 @@ function publishScopedArtifact(
       scope_kind: kind,
     },
   });
-  saveArtifactRecord(publication.artifact_id ? mergeIntoExistingRecord(record) : record);
-  return record.artifact_id;
+  return publication.artifact_id ? mergeIntoExistingRecord(record) : record;
 }
 
 /**
@@ -1272,8 +1355,24 @@ function publishScopedArtifact(
  */
 function mergeIntoExistingRecord(record: ArtifactRecord): ArtifactRecord {
   const existing = loadArtifactRecord(record.artifact_id);
-  if (!existing) return record;
-  const owner = (value: ArtifactRecord) => ({
+  // An interrupted first publication can have an owner before it has a
+  // surface-facing record. Preserve that owner on retries as well.
+  const bound =
+    existing ??
+    listArtifactOwnershipRecords()
+      .reverse()
+      .find((row) => row.artifact_id === record.artifact_id);
+  const owner = (
+    value: Pick<
+      ArtifactRecord,
+      | 'tenant_slug'
+      | 'organization_id'
+      | 'project_id'
+      | 'mission_id'
+      | 'task_session_id'
+      | 'metadata'
+    >
+  ) => ({
     tenant_slug: value.tenant_slug,
     organization_id: value.organization_id,
     project_id: value.project_id,
@@ -1281,11 +1380,12 @@ function mergeIntoExistingRecord(record: ArtifactRecord): ArtifactRecord {
     task_session_id: value.task_session_id,
     tier: (value.metadata as { tier?: unknown } | undefined)?.tier,
   });
-  if (JSON.stringify(owner(existing)) !== JSON.stringify(owner(record))) {
+  if (bound && JSON.stringify(owner(bound)) !== JSON.stringify(owner(record))) {
     throw new Error(
       `writeScopedArtifact: artifact_id ${record.artifact_id} belongs to another owner scope`
     );
   }
+  if (!existing) return record;
   return {
     ...existing,
     ...record,

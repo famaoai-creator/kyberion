@@ -6,6 +6,11 @@ import type { KeyResultSpec } from './key-result-spec.js';
 import { enqueueOrganizationLearningOnQueue } from './organization-learning-queue.js';
 
 import {
+  assertOrganizationEntityWrite,
+  assertReferenceAvailable,
+  organizationEntityWriteScope,
+  withEntityLifecycleLock,
+  type OrganizationEntitySaveOptions,
   validatorFor,
   validationErrors,
   assertOrganizationId,
@@ -30,6 +35,7 @@ import {
   loadOrganizationPurpose,
   loadOrganizationOperationalState,
   assertOrganizationParent,
+  loadOrganizationCapability,
   loadOrganizationDomain,
   loadOrganizationService,
   operationDirectory,
@@ -100,23 +106,45 @@ const LEARNING_FILE_NAME = 'candidate.json';
 
 export function saveOrganizationOperation(
   record: OrganizationOperationRecord,
-  options: { rootDir?: string } = {}
+  options: OrganizationEntitySaveOptions = {}
 ): string {
-  assertRecordIdentity(record, options.rootDir);
-  return saveValidated(
-    record,
-    OPERATION_SCHEMA_PATH,
-    recordPath(
-      'operations',
-      record.operation_id,
-      OPERATION_FILE_NAME,
-      record.organization_id,
-      record.tier,
-      recordTenant(record),
-      options.rootDir
-    ),
-    'organization operation'
-  );
+  return withEntityLifecycleLock(() => {
+    assertRecordIdentity(record, options.rootDir);
+    const query = organizationEntityWriteScope(record, options.rootDir);
+    assertOrganizationEntityWrite(
+      record,
+      loadOrganizationOperation(record.operation_id, query),
+      options
+    );
+    if (record.status !== 'retired') {
+      if (record.capability_id)
+        assertReferenceAvailable(
+          'capability',
+          record.capability_id,
+          loadOrganizationCapability(record.capability_id, query)
+        );
+      if (record.service_id)
+        assertReferenceAvailable(
+          'service',
+          record.service_id,
+          loadOrganizationService(record.service_id, query)
+        );
+    }
+    return saveValidated(
+      record,
+      OPERATION_SCHEMA_PATH,
+      recordPath(
+        'operations',
+        record.operation_id,
+        OPERATION_FILE_NAME,
+        record.organization_id,
+        record.tier,
+        recordTenant(record),
+        options.rootDir
+      ),
+      'organization operation'
+    );
+  });
 }
 
 export function saveOrganizationOperationState(

@@ -2,5 +2,5 @@
   "path": "active/shared/runtime/external-operations",
   "artifact_class": "state",
   "action": "review_required",
-  "note": "Immutable external-effect execution reservations, partitioned by tier and tenant; contains hashes only. Never auto-expire: deleting a reservation can replay a mutation after a crash or timeout. Retire only after all matching invocation retry paths are retired, through explicit retention or tenant offboarding review."
+  "note": "Immutable external-effect reservations and outcome receipts, partitioned by tier and tenant. Outcomes may contain an opaque provider receipt identifier. Never auto-expire: deleting a reservation can replay a mutation after a crash or timeout. Retire only after all matching invocation retry paths are retired, through explicit retention or tenant offboarding review."
 }

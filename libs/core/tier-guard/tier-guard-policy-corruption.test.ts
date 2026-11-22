@@ -3,8 +3,8 @@ import * as path from 'node:path';
 
 // IP-08 Task 2 finding (c): a corrupt security-policy.json used to fall
 // through to `{ allowed: true }`, silently disabling tier isolation. These
-// tests pin the repaired semantics: missing = bootstrap allow, corrupt =
-// protected tiers fail closed while the rest of the workspace stays usable.
+// tests pin the repaired semantics: protected tiers fail closed when policy
+// is missing or corrupt, while the rest of the workspace stays usable.
 
 const state = {
   policyExists: true,
@@ -151,10 +151,37 @@ describe('tier-guard policy corruption fail-closed (IP-08)', () => {
     expect(result.allowed).toBe(true);
   });
 
-  it('still allows bootstrap when the policy file is genuinely missing', () => {
+  it.each([
+    'knowledge/personal/notes.md',
+    'knowledge/confidential/acme/plan.md',
+    'active/organizations/confidential/acme/org/state.json',
+    'active/projects/confidential/acme/project/state.json',
+    'active/missions/personal/shared/mission/STATUS.json',
+    'active/archive/missions/confidential/acme/mission/STATUS.json',
+    'active/shared/runtime/tenant-ledger/confidential/acme/ledger.jsonl',
+    'active/shared/runtime/external-operations/confidential/acme/operation.json',
+    'active/shared/artifacts/confidential/acme/report.md',
+  ])('denies read, metadata and write on protected paths without policy: %s', (relativePath) => {
     state.policyExists = false;
-    const result = validateWritePermission(path.join(ROOT, 'knowledge/personal/notes.md'));
-    expect(result.allowed).toBe(true);
+    const target = path.join(ROOT, relativePath);
+    for (const decision of [
+      validateReadPermission(target),
+      validateReadPermission(target, 'metadata'),
+      validateWritePermission(target),
+    ]) {
+      expect(decision.allowed).toBe(false);
+      expect(decision.reason).toContain('security-policy.json is missing');
+    }
+  });
+
+  it('keeps scratch and public reads available for bootstrap without policy', () => {
+    state.policyExists = false;
+    expect(validateWritePermission(path.join(ROOT, 'active/shared/tmp/scratch.txt')).allowed).toBe(
+      true
+    );
+    expect(validateReadPermission(path.join(ROOT, 'knowledge/public/README.md')).allowed).toBe(
+      true
+    );
   });
 
   it('fails closed when the policy contains a dangerous JSON key', () => {

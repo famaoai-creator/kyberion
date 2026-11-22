@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   legacy: vi.fn(),
   gate: vi.fn(),
   audit: vi.fn(),
+  persistOutcome: vi.fn(),
 }));
 vi.mock('@agent/core/actuator/deployment-adapter', () => ({
   getDeploymentAdapter: () => ({ name: 'test', deploy: mocks.deploy }),
@@ -18,6 +19,7 @@ vi.mock('@agent/core/governance/approval-gate', () => ({ enforceApprovalGate: mo
 vi.mock('@agent/core/governance/audit-chain', () => ({ auditChain: { record: mocks.audit } }));
 vi.mock('@agent/core/governance/external-operation-store', () => ({
   reserveExternalOperation: vi.fn(),
+  persistExternalOperationOutcome: mocks.persistOutcome,
 }));
 vi.mock('@agent/core/pipeline/op-preflight-defaults', () => ({
   ensureDefaultOpPreflight: vi.fn(),
@@ -53,7 +55,12 @@ describe('deployment external governance', () => {
       status: 'approved',
       requestId: 'exact-fixture-approval',
     });
-    mocks.deploy.mockResolvedValue({ adapter: 'test', status: 'triggered', started_at: 'test' });
+    mocks.deploy.mockResolvedValue({
+      adapter: 'test',
+      status: 'triggered',
+      started_at: 'test',
+      trigger_id: 'deploy-42',
+    });
   });
 
   it('preserves the configuration policy floor inside one resumable decision', async () => {
@@ -67,6 +74,15 @@ describe('deployment external governance', () => {
       })
     );
     expect(mocks.legacy).not.toHaveBeenCalled();
+    expect(mocks.deploy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        providerCorrelationId: expect.stringMatching(/^[a-f0-9]{64}$/u),
+      })
+    );
+    expect(mocks.persistOutcome).toHaveBeenCalledWith(
+      expect.objectContaining({ operationId: 'deployment:deploy_release' }),
+      { outcome: 'succeeded', providerReceiptId: 'deploy-42' }
+    );
   });
 
   it('requires common approval before the adapter is invoked', async () => {

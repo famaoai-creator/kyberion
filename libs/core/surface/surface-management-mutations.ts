@@ -22,7 +22,7 @@ export {
 import * as path from 'node:path';
 import { withExecutionContextAsync, resolveRole } from '../authority.js';
 import { humanActor } from '../contracts/actor.js';
-import { acquireLock, releaseLock } from '../foundation/lock-utils.js';
+import { withEntityLifecycleLockAsync } from '../organization/entity-lifecycle-lock.js';
 import { withConciergeManagementAccessAsync } from './concierge-management-access.js';
 import { readJsonIfPresent, writeJson } from '../foundation/json.js';
 import { readTextFile } from '../foundation/text.js';
@@ -60,7 +60,6 @@ interface Receipt {
   result: SurfaceManagementResult;
   auditPending: boolean;
 }
-const LOCK = 'surface-management-mutations';
 const TIER = 'confidential' as const;
 function relative(file: string): string {
   const result = path.relative(pathResolver.rootDir(), file).split(path.sep).join('/');
@@ -267,16 +266,16 @@ export async function readSurfaceManagementResource(
   assertOrganizationId(target.organizationId);
   if (target.projectId) assertManagedProjectId(target.projectId);
   assertTargetGrants(auth, target);
-  if (!(await acquireLock(LOCK))) fail('busy', 409, 'Management is busy. Retry this request.');
-  try {
-    await verifySurfaceManagementAuthorization(auth);
-    return await scoped(auth, target, resourceFiles(auth, target), [], () => {
-      const resource = readResource(auth, target);
-      return { resource, version: version(resource) };
-    });
-  } finally {
-    releaseLock(LOCK);
-  }
+  return withEntityLifecycleLockAsync(
+    async () => {
+      await verifySurfaceManagementAuthorization(auth);
+      return scoped(auth, target, resourceFiles(auth, target), [], () => {
+        const resource = readResource(auth, target);
+        return { resource, version: version(resource) };
+      });
+    },
+    () => fail('busy', 409, 'Management is busy. Retry this request.')
+  );
 }
 async function audit(
   auth: SurfaceManagementAuthorization,
@@ -326,6 +325,17 @@ export async function executeSurfaceManagementMutation(
   assertProjectLifecycleOwner();
   const target = targetFor(auth, command);
   assertTargetGrants(auth, target, command.operation);
+  return withEntityLifecycleLockAsync(
+    () => executeSurfaceManagementMutationUnderLock(auth, command, target),
+    () => fail('busy', 409, 'Management is busy. Retry this request.')
+  );
+}
+
+async function executeSurfaceManagementMutationUnderLock(
+  auth: SurfaceManagementAuthorization,
+  command: SurfaceManagementCommand,
+  target: ReturnType<typeof targetFor>
+): Promise<SurfaceManagementResult> {
   const receiptPath = pathResolver.rootResolve(
     'active/shared/runtime/surface-management/confidential/' +
       auth.tenantSlug +
@@ -341,7 +351,6 @@ export async function executeSurfaceManagementMutation(
       : [files[2]!, files[3]!];
   const reads = [...files, tenantProfilePath(auth.tenantSlug), receiptPath];
   let admitted = false;
-  if (!(await acquireLock(LOCK))) fail('busy', 409, 'Management is busy. Retry this request.');
   try {
     await verifySurfaceManagementAuthorization(auth);
     const commandHash = digest(command);
@@ -395,7 +404,11 @@ export async function executeSurfaceManagementMutation(
             });
           else if (command.operation === 'organization.update')
             updateManagedOrganizationMetadata(
-              { organizationId: target.organizationId, tenantSlug: auth.tenantSlug, tier: TIER },
+              {
+                organizationId: target.organizationId,
+                tenantSlug: auth.tenantSlug,
+                tier: TIER,
+              },
               {
                 ...(command.name !== undefined ? { name: command.name } : {}),
                 ...(command.purpose !== undefined ? { purpose: command.purpose } : {}),
@@ -469,7 +482,5 @@ export async function executeSurfaceManagementMutation(
       }
     }
     throw error;
-  } finally {
-    releaseLock(LOCK);
   }
 }

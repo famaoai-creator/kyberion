@@ -153,8 +153,10 @@ function isProtectedTierPath(relativePath: string): boolean {
     pathStartsWith(relativePath, 'active/organizations/personal') ||
     pathStartsWith(relativePath, 'active/organizations/confidential') ||
     pathStartsWith(relativePath, 'active/projects/personal') ||
-    pathStartsWith(relativePath, 'active/missions/confidential') ||
+    /^active\/(?:archive\/)?missions\/(?:personal|confidential)(?:\/|$)/.test(relativePath) ||
     pathStartsWith(relativePath, 'active/projects/confidential') ||
+    (pathStartsWith(relativePath, 'active/shared/runtime') &&
+      isProtectedStorageFloorTier(partitionedRuntimeTierInPath(relativePath))) ||
     isProtectedStorageFloorTier(storageFloorTier(relativePath)) ||
     isProtectedRuntimeStatePath(relativePath)
   );
@@ -168,10 +170,10 @@ function isProtectedRuntimeStatePath(relativePath: string): boolean {
   );
 }
 
-const MISSING_RUNTIME_STATE_POLICY_DENIAL = {
+const MISSING_PROTECTED_POLICY_DENIAL = {
   allowed: false as const,
   reason:
-    '[POLICY_VIOLATION] security-policy.json is missing. Access to protected durable runtime state fails closed until the policy file is restored.',
+    '[POLICY_VIOLATION] security-policy.json is missing. Access to protected data fails closed until the policy file is restored.',
 };
 
 /** A stale but parseable policy must not turn a registered state store public.
@@ -1100,9 +1102,7 @@ export function validateWritePermission(
 
   const loaded = decided.getPolicy();
   if (loaded.status === 'missing') {
-    return isProtectedRuntimeStatePath(relativePath)
-      ? MISSING_RUNTIME_STATE_POLICY_DENIAL
-      : { allowed: true };
+    return isProtectedTierPath(relativePath) ? MISSING_PROTECTED_POLICY_DENIAL : { allowed: true };
   }
   if (loaded.status === 'corrupt') {
     return isProtectedTierPath(relativePath) ? CORRUPT_POLICY_DENIAL : { allowed: true };
@@ -1274,6 +1274,12 @@ export function inspectReadPermission(
     };
   }
 
+  if (isProtectedTierPath(relativePath)) {
+    const loaded = decided.getPolicy();
+    if (loaded.status === 'missing') return MISSING_PROTECTED_POLICY_DENIAL;
+    if (loaded.status === 'corrupt') return CORRUPT_POLICY_DENIAL;
+  }
+
   // Tier/tenant-partitioned runtime ledgers and durable state stores hold
   // tier data outside knowledge/: a tenant-bound reader never crosses tenants,
   // and a persona reads a partition only if it may read knowledge/<tier>/.
@@ -1283,9 +1289,6 @@ export function inspectReadPermission(
       isProtectedStorageFloorTier(partitionedRuntimeStateTierInPath(relativePath)))
   ) {
     const loaded = decided.getPolicy();
-    if (loaded.status === 'missing' && isProtectedRuntimeStatePath(relativePath)) {
-      return MISSING_RUNTIME_STATE_POLICY_DENIAL;
-    }
     if (loaded.status === 'loaded') {
       if (!runtimeStatePolicyDeclarationValid(loaded.policy, relativePath)) {
         return INVALID_RUNTIME_STATE_POLICY_DECLARATION_DENIAL;

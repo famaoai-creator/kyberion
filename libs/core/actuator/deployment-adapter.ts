@@ -35,6 +35,8 @@ import {
 } from '../seam.js';
 
 export interface DeployInput {
+  /** Stable correlation for adapter-supported read-only reconciliation. */
+  providerCorrelationId?: string;
   /** Semantic environment — prod / staging / canary / dr etc. */
   environment: string;
   /** Project identifier visible to the adapter. */

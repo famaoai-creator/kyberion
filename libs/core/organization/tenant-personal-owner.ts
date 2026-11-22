@@ -11,6 +11,7 @@
  * durable audit row.
  */
 import { auditChain } from '../governance/audit-chain.js';
+import { withEntityLifecycleLock } from './entity-lifecycle-lock.js';
 import type { ApprovalRequesterInput } from '../governance/approval-requester.js';
 import type { ApprovalRequestRecord } from '../governance/approval-store.js';
 import {
@@ -83,6 +84,12 @@ export function applyTenantPersonalOwner(input: {
   actor: string;
   options?: TenantRegistryPathOptions;
 }): TenantProfile {
+  return withEntityLifecycleLock(() => updateTenantPersonalOwner(input));
+}
+
+function updateTenantPersonalOwner(
+  input: Parameters<typeof applyTenantPersonalOwner>[0]
+): TenantProfile {
   const personalOwner = normalize(input.personalOwner);
   const options = input.options ?? {};
   const profile = load(input.slug, options);

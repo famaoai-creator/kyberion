@@ -32,6 +32,12 @@ output has a successful send. Delivery does not mean human readership or accepta
 
 ## Compatibility and consequences
 
+Task Session updates serialize per record across processes. Reopening writes
+the status and its history entry together. Saving a loaded snapshot checks
+that the record still matches the snapshot's original contents before
+rebuilding the outcome projection. If another writer changed it, the caller
+must reload and recompute its update.
+
 Legacy mission and Task Session completion gates remain unchanged. Their reference-presence
 checks and goal-matching `delivered` arrays are not reinterpreted as verification or transport
 receipts. Existing saved sessions remain valid without the new snapshot. Mission summary

@@ -51,6 +51,51 @@ describe('ingest:sync_source (DA-03)', () => {
       modified_at: modified,
     });
 
+    it('refuses to walk past a cursor whose referenced saved batch is missing', async () => {
+      const input = {
+        tenant_slug: 'missing-batch-sync',
+        source_system: 'box' as const,
+        source_params: { folder_id: '0' },
+        cursor_path_seam: cursorsDir,
+        auth: 'none' as const,
+      };
+      const transport = vi.fn<SyncSourceTransport>().mockResolvedValue({
+        entries: [file('saved', '2026-07-10T00:00:00.000Z')],
+      });
+      const result = await syncSource({ ...input, transport });
+      safeRmSync(
+        path.join(cursorsDir, input.tenant_slug, 'box-batches', `${result.batch_id}.json`)
+      );
+      await expect(syncSource({ ...input, transport })).rejects.toThrow();
+      expect(transport).toHaveBeenCalledTimes(1);
+    });
+
+    it('recovers the persisted batch without fetching even when the cursor write is interrupted', async () => {
+      const input = {
+        tenant_slug: 'interrupted-sync',
+        source_system: 'box' as const,
+        source_params: { folder_id: '0' },
+        cursor_path_seam: cursorsDir,
+        auth: 'none' as const,
+      };
+      const cursor = path.join(cursorsDir, input.tenant_slug, 'box.json');
+      const transport = vi.fn<SyncSourceTransport>().mockImplementation(async () => {
+        safeMkdir(cursor, { recursive: true });
+        return { entries: [file('saved', '2026-07-10T00:00:00.000Z')] };
+      });
+      await expect(syncSource({ ...input, transport })).rejects.toThrow(/cursor state/);
+      const listing = await syncSource({ ...input, transport, list_batches: true });
+      expect(listing.batch_ids).toHaveLength(1);
+      const recovered = await syncSource({
+        ...input,
+        transport,
+        recover_batch_id: listing.batch_ids![0],
+      });
+      expect(recovered.items.map((item) => item.source_id)).toEqual(['saved']);
+      expect(recovered.advanced).toBe(false);
+      expect(transport).toHaveBeenCalledTimes(1);
+    });
+
     it('first sync walks all marker pages and advances the watermark to the max modified_at', async () => {
       const transport = vi
         .fn<SyncSourceTransport>()

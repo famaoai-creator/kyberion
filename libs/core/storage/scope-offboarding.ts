@@ -54,6 +54,8 @@ import {
 } from './storage-janitor.js';
 import { RETENTION_CATALOG_REPO_PATH } from './storage-retention-catalog.js';
 import {
+  LIVE_STORAGE_MAINTENANCE_LOCK,
+  ingestSyncBatchRelativeRoot,
   PARTITIONED_RUNTIME_LEDGER_ROOTS,
   PARTITIONED_RUNTIME_STATE_ROOTS,
   STORAGE_DATA_TIERS,
@@ -1186,6 +1188,7 @@ export function collectScopeTargets(
     }
     for (const subtree of [
       `${INGEST_CURSORS_REPO_SUBPATH}/${id}`,
+      ...(isValidTenantSlug(id) ? [ingestSyncBatchRelativeRoot(id)] : []),
       `${INGEST_QUOTA_REPO_SUBPATH}/${id}`,
       `knowledge/personal/tenants/${id}`,
     ]) {
@@ -1476,6 +1479,23 @@ function copyTree(source: string, destination: string): void {
  * throws.
  */
 export function offboardScope(input: OffboardScopeInput): OffboardScopeResult {
+  if (input.mode !== 'execute') return performOffboarding(input);
+  try {
+    return withLockSync(LIVE_STORAGE_MAINTENANCE_LOCK, () => performOffboarding(input), 0);
+  } catch (error) {
+    return {
+      status: 'error',
+      scope_type: input.scopeType,
+      scope_id: String(input.scopeId || '').trim(),
+      dry_run: false,
+      targets: [],
+      soft_deleted: [],
+      reason: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+function performOffboarding(input: OffboardScopeInput): OffboardScopeResult {
   const scopeType = input.scopeType;
   const scopeId = String(input.scopeId || '').trim();
   const tenantSlug = input.tenantSlug?.trim() || undefined;

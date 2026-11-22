@@ -1,5 +1,6 @@
 import * as path from 'node:path';
 import { isRecord, parseSafeJsonInput, readTextFile } from '@agent/core/foundation';
+import { LOCK_ROOT_REPO_PATH } from '@agent/core/foundation/lock-utils';
 import { safeExistsSync, safeLstat, safeReaddir } from '@agent/core/secure-io';
 import {
   BACKUP_READABLE_CREDENTIAL_RULE_IDS,
@@ -286,7 +287,11 @@ export function resolveBackupExclusions(input: BackupExclusionInput): BackupExcl
   ].filter((root) => !coversPlannedEntry(root));
 
   const outputDir = repoRelativeOrNull(rootDir, input.outPath && path.dirname(input.outPath));
-  const excludedRoots = new Set<string>([...regenerable, DEFAULT_BACKUP_DIR_REPO_PATH]);
+  const excludedRoots = new Set<string>([
+    ...regenerable,
+    DEFAULT_BACKUP_DIR_REPO_PATH,
+    LOCK_ROOT_REPO_PATH,
+  ]);
   const tempRel = repoRelativeOrNull(rootDir, input.tempDir);
   if (tempRel) excludedRoots.add(tempRel);
   const credentialReadRoots: Array<{ ruleId: string; root: string }> = [];

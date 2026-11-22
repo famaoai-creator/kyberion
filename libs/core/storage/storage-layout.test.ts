@@ -22,6 +22,7 @@ import {
   storageFloorRelativePath,
   storageFloorTier,
   storageFloorTierInPath,
+  STORAGE_FLOORS,
   STORAGE_DATA_TIERS,
   TENANT_RUNTIME_PARTITION_ROOTS,
   TENANT_STORE_LEDGER_ROOTS,
@@ -30,6 +31,47 @@ import {
 } from '../storage-layout.js';
 
 describe('storage-layout floors', () => {
+  it('round-trips every purpose and custody combination without aliasing distinct placements', () => {
+    const floors = {
+      scratch: 'active/shared/tmp',
+      staging: 'active/shared/staging',
+      cache: 'active/shared/cache',
+      artifact: 'active/shared/artifacts',
+    } as const;
+    expect([...STORAGE_FLOORS].sort()).toEqual(Object.keys(floors).sort());
+    const tiers = ['personal', 'confidential', 'public'] as const;
+    expect([...STORAGE_DATA_TIERS].sort()).toEqual([...tiers].sort());
+    const placements = [];
+    for (const floor of Object.keys(floors) as (keyof typeof floors)[]) {
+      const cases = [
+        { segment: 'system', partition: SYSTEM_PARTITION },
+        ...tiers.flatMap((tier) =>
+          [undefined, 'tenant-a', 'tenant-b'].map((tenant) => ({
+            segment: `${tier}/${tenant ?? 'shared'}`,
+            partition: { kind: 'tier' as const, tier, tenant },
+          }))
+        ),
+      ];
+      for (const { segment, partition } of cases) {
+        const relative = storageFloorRelativePath(floor, partition, 'model', 'sub', 'data.json');
+        placements.push(relative);
+        expect(relative).toBe(`${floors[floor]}/${segment}/model/sub/data.json`);
+        const absolute = resolveStorageFloor(floor, partition, 'model', 'sub', 'data.json');
+        expect(absolute).toBe(path.join(rootDir(), relative));
+        for (const input of [relative, absolute]) {
+          expect(classifyStorageFloorPath(input)).toEqual({ floor, partition });
+          expect(storageFloorTier(input)).toBe(
+            partition.kind === 'tier' ? partition.tier : undefined
+          );
+          expect(storageFloorTierInPath(input)).toBe(
+            partition.kind === 'tier' ? partition.tier : undefined
+          );
+        }
+      }
+    }
+    expect(new Set(placements).size).toBe(40);
+  });
+
   it('re-exports the single foundation state-root registry used by secure I/O', () => {
     expect(PARTITIONED_RUNTIME_STATE_ROOTS).toBe(FOUNDATION_STATE_ROOTS);
   });

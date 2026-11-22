@@ -96,7 +96,7 @@ export function validateProjectRecord(value: unknown): value is ProjectRecord {
 
 export function saveProjectRecord(
   record: ProjectRecord,
-  options: { rootDir?: string } = {}
+  options: { rootDir?: string; createOnly?: boolean } = {}
 ): string {
   const filePath = projectRecordPath(record.project_id, options.rootDir);
   let validated: ProjectRecord;
@@ -109,7 +109,7 @@ export function saveProjectRecord(
   }
   const projectDir = path.dirname(filePath);
   if (!safeExistsSync(projectDir)) safeMkdir(projectDir, { recursive: true });
-  safeWriteFile(filePath, JSON.stringify(validated, null, 2));
+  safeWriteFile(filePath, JSON.stringify(validated, null, 2), { createOnly: options.createOnly });
   return filePath;
 }
 

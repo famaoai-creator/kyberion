@@ -4,13 +4,14 @@
  * restored-chain verification (D2) and the revocable-state quarantine (D1).
  * See knowledge/product/architecture/runtime-storage-layout.md.
  */
-import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 import { withStoreGrant } from '@agent/core/authority';
+import { approvalStoreRoots } from '@agent/core/governance/approval-store-paths';
 import { getAuditChainKeyId } from '@agent/core/chain-integrity';
 import { logger } from '@agent/core/core';
 import { pathResolver } from '@agent/core/path-resolver';
 import { isRecord, nowIso, parseSafeJsonInput, readTextFile } from '@agent/core/foundation';
+import { LOCK_ROOT_REPO_PATH } from '@agent/core/foundation/lock-utils';
 import { writeJson } from '@agent/core/foundation/json';
 import {
   isLedgerChainFileName,
@@ -24,13 +25,14 @@ import {
   safeRmSync,
   safeLstat,
   safeMkdir,
-  safeMoveSync,
   safeReadFile,
   safeReaddir,
   safeRealpath,
   safeWriteFile,
 } from '@agent/core/secure-io';
 import {
+  PARTITIONED_RUNTIME_STATE_ROOTS,
+  STORAGE_DATA_TIERS,
   TENANT_RUNTIME_PARTITION_ROOTS,
   tenantRuntimePartitionOf,
   tenantStoreLedgerPartitionOf,
@@ -38,8 +40,11 @@ import {
 } from '@agent/core/storage-layout';
 
 export function normalizeArchiveMember(member: string): string {
-  const normalized = member.replace(/^\.\//, '').replace(/\/+$/, '');
-  if (!normalized || normalized.startsWith('/') || normalized.split('/').includes('..')) {
+  const normalized = member
+    .split('/')
+    .filter((part) => part !== '.' && part !== '')
+    .join('/');
+  if (!normalized || member.startsWith('/') || member.split('/').includes('..')) {
     throw new Error(`Backup archive contains an unsafe member path: ${member}`);
   }
   return normalized;
@@ -252,11 +257,16 @@ function asPartitionStore<T>(absolutePath: string, fn: () => T): T {
   throw new Error(`[BACKUP_RESTORE_STORE_ROLE_UNKNOWN] ${store.storeRole}`);
 }
 
-/** Append-only runtime partitions (`<root>/<tier>/<tenant>`) the archive carries. */
+/** Append-only tenant runtime partitions and decision cases the archive carries. */
 function appendOnlyPartitionsIn(members: string[]): string[] {
   const partitions = new Set<string>();
   for (const member of members) {
-    const partition = tenantRuntimePartitionOf(member);
+    const normalized = normalizeArchiveMember(member);
+    const decisionCase = normalized.match(
+      /^(knowledge\/confidential\/[^/]+\/decisions\/[^/]+)(?:\/|$)/
+    );
+    if (decisionCase) partitions.add(decisionCase[1]);
+    const partition = tenantRuntimePartitionOf(normalized);
     if (partition && APPEND_ONLY_PARTITION_KEYS.has(partition.key)) {
       partitions.add(`${partition.root}/${partition.tier}/${partition.tenant}`);
     }
@@ -295,34 +305,56 @@ export function assertNoAppendOnlyConflict(target: string, members: string[]): v
 
 /**
  * Tenant runtime partitions a restore never extracts in place: every
- * append-only partition (trimmed and verified in staging first), and on a
- * tenant restore the revocable state (D1). Repo-relative `<root>/<tier>/<tenant>`.
+ * append-only partition (trimmed and verified in staging first) and revocable
+ * authority. Repo-relative paths.
  */
 export interface StagedRestorePartitions {
   appendOnly: string[];
   revocable: string[];
+  withheld: string[];
 }
 
-const REVOCABLE_RESTORE_KEYS: ReadonlySet<string> = new Set([
-  'customer_decision_invites',
-  'grants',
-]);
 export const RESTORE_QUARANTINE_DIR = '.restore-quarantine';
+const grantApprovalRoots = approvalStoreRoots({});
+const grantSystemApprovals = `${grantApprovalRoots.coordination}/grant-standing/approvals`;
 
 export function stagedRestorePartitions(
   members: string[],
   tenantRestore: boolean
 ): StagedRestorePartitions {
   const revocable = new Set<string>();
+  const withheld = new Set<string>();
   for (const member of members) {
     const partition = tenantRuntimePartitionOf(member);
-    if (tenantRestore && partition && REVOCABLE_RESTORE_KEYS.has(partition.key)) {
+    if (
+      partition &&
+      (partition.key === 'grants' ||
+        (tenantRestore && partition.key === 'customer_decision_invites'))
+    ) {
       revocable.add(`${partition.root}/${partition.tier}/${partition.tenant}`);
+    }
+    for (const tier of STORAGE_DATA_TIERS) {
+      const shared = `${PARTITIONED_RUNTIME_STATE_ROOTS.grants}/${tier}/shared`;
+      if (member === shared || member.startsWith(shared + '/')) revocable.add(shared);
+    }
+    if (member === grantSystemApprovals || member.startsWith(grantSystemApprovals + '/')) {
+      revocable.add(grantSystemApprovals);
+    }
+    if (member.startsWith(grantApprovalRoots.tenantApprovals + '/')) {
+      const segments = member.slice(grantApprovalRoots.tenantApprovals.length + 1).split('/');
+      const channelIndex = segments[1] === 'shared' && segments[2] === 'owners' ? 4 : 2;
+      if (segments[channelIndex] === 'grant-standing') {
+        const channel = `${grantApprovalRoots.tenantApprovals}/${segments.slice(0, channelIndex + 1).join('/')}`;
+        // The restore process cannot open another personal owner's IO window.
+        // Keep those approvals in the archive and outside the restore target.
+        (channelIndex === 4 ? withheld : revocable).add(channel);
+      }
     }
   }
   return {
     appendOnly: appendOnlyPartitionsIn(members),
     revocable: [...revocable].sort((a, b) => a.localeCompare(b)),
+    withheld: [...withheld].sort((a, b) => a.localeCompare(b)),
   };
 }
 
@@ -453,7 +485,14 @@ export function verifyRestoredTenantLedgers(
 }
 
 /** Move a staged tree file by file into `dest` (written as the partition's store role when live). */
-function placeStagedTree(source: string, dest: string, depth = 0): string[] {
+function placeStagedTree(
+  source: string,
+  dest: string,
+  createOnly: boolean,
+  depth = 0,
+  excluded: ReadonlySet<string> = new Set()
+): string[] {
+  if (excluded.has(source)) return [];
   if (depth > 12) throw new Error(`[BACKUP_RESTORE_TREE_TOO_DEEP] ${source}`);
   const stat = safeLstat(source);
   if (stat.isDirectory()) {
@@ -461,12 +500,18 @@ function placeStagedTree(source: string, dest: string, depth = 0): string[] {
       if (!safeExistsSync(dest)) safeMkdir(dest, { recursive: true });
     });
     return safeReaddir(source).flatMap((child) =>
-      placeStagedTree(path.join(source, child), path.join(dest, child), depth + 1)
+      placeStagedTree(
+        path.join(source, child),
+        path.join(dest, child),
+        createOnly,
+        depth + 1,
+        excluded
+      )
     );
   }
   if (!stat.isFile()) throw new Error(`[BACKUP_RESTORE_MEMBER_TYPE] ${source}`);
   const content = safeReadFile(source, { encoding: null }) as Buffer;
-  asPartitionStore(dest, () => safeWriteFile(dest, content));
+  asPartitionStore(dest, () => safeWriteFile(dest, content, { createOnly }));
   return [dest];
 }
 
@@ -474,11 +519,17 @@ function placeStagedTree(source: string, dest: string, depth = 0): string[] {
 export function placeStagedAppendOnlyPartitions(
   staging: string,
   target: string,
-  partitions: string[]
+  partitions: string[],
+  withheld: string[] = []
 ): void {
+  // Staging and main extraction run after the initial preflight. Recheck
+  // occupancy, then publish each file exclusively to close the overwrite window.
+  assertNoAppendOnlyConflict(target, partitions);
+  const excluded = new Set(withheld.map((partition) => path.join(staging, partition)));
   for (const partition of partitions) {
     const source = path.join(staging, partition);
-    if (safeExistsSync(source)) placeStagedTree(source, path.join(target, partition));
+    if (safeExistsSync(source))
+      placeStagedTree(source, path.join(target, partition), true, 0, excluded);
   }
 }
 
@@ -494,7 +545,7 @@ export function quarantineStagedRevocableState(
   staging: string,
   target: string,
   partitions: string[],
-  tenant: string,
+  tenant: string | undefined,
   stampId: string
 ): { quarantinePaths: string[]; moved: string[] } {
   const quarantinePaths: string[] = [];
@@ -507,90 +558,48 @@ export function quarantineStagedRevocableState(
     const partitionDir = path.join(target, partition);
     const quarantineRoot = path.join(partitionDir, RESTORE_QUARANTINE_DIR);
     const quarantineDir = path.join(quarantineRoot, stampId);
-    assertNotSymlinked(partitionDir, quarantineRoot, quarantineDir);
-    safeMkdir(quarantineDir, { recursive: true });
-    assertNotSymlinked(partitionDir, quarantineRoot, quarantineDir);
-    for (const child of children)
-      placeStagedTree(path.join(source, child), path.join(quarantineDir, child));
-    writeJson(path.join(quarantineDir, 'quarantine-manifest.json'), {
-      format: 'kyberion-restore-revocable-quarantine-v1',
-      tenant,
-      key: tenantRuntimePartitionOf(partition)?.key,
-      created_at: nowIso(),
-      reason: 'tenant_restore_must_not_revive_state_revoked_after_backup',
-      moved: children,
+    asPartitionStore(quarantineDir, () => {
+      assertNotSymlinked(partitionDir, quarantineRoot, quarantineDir);
+      safeMkdir(quarantineDir, { recursive: true });
+      assertNotSymlinked(partitionDir, quarantineRoot, quarantineDir);
     });
+    for (const child of children)
+      placeStagedTree(path.join(source, child), path.join(quarantineDir, child), false);
+    asPartitionStore(quarantineDir, () =>
+      writeJson(path.join(quarantineDir, 'quarantine-manifest.json'), {
+        format: 'kyberion-restore-revocable-quarantine-v1',
+        tenant: tenantRuntimePartitionOf(partition)?.tenant ?? tenant,
+        key: tenantRuntimePartitionOf(partition)?.key,
+        created_at: nowIso(),
+        reason: 'restore_must_not_revive_state_revoked_after_backup',
+        moved: children,
+      })
+    );
     quarantinePaths.push(path.relative(target, quarantineDir).split(path.sep).join('/'));
     moved.push(...children.map((child) => `${partition}/${child}`));
   }
   return { quarantinePaths, moved };
 }
 
-/** Archive file members that lie in one of the staged partitions. */
-function stagedMemberPaths(members: string[], partitions: string[]): string[] {
-  return members.filter((member) =>
-    partitions.some((partition) => member === partition || member.startsWith(`${partition}/`))
-  );
-}
-
 /**
- * sha256 of each staged member path as it is in `target` now (undefined when
- * absent, a directory, or a symlink, which is never followed).
+ * Select exact archive members. Listing a directory must not recurse into a
+ * withheld subtree, and the NUL list treats names as data rather than options.
  */
-function memberDigests(target: string, memberPaths: string[]): Map<string, string | undefined> {
-  const digests = new Map<string, string | undefined>();
-  for (const member of memberPaths) {
-    const file = path.join(target, member);
-    digests.set(
-      member,
-      asPartitionStore(file, () => {
-        if (!safeExistsSync(file) || !safeLstat(file).isFile()) return undefined;
-        const content = safeReadFile(file, { encoding: null }) as Buffer;
-        return createHash('sha256').update(content).digest('hex');
-      })
-    );
-  }
-  return digests;
-}
-
-/**
- * `--exclude` is fail-open, so prove it held: no ARCHIVE member of a staged
- * partition may have been written in place by the main extraction (absent or
- * unchanged since just before it). A breached member is moved aside into
- * `<partition>/.restore-quarantine/<stamp>/exclude-breach/` as the
- * partition's store role and the restore fails; nothing is rewritten or
- * deleted, and files that are not archive members (live writers) are never
- * touched.
- */
-export function assertExclusionsHeld(
+function extractAllowedMembers(
+  archive: string,
   target: string,
-  staged: StagedRestorePartitions,
-  memberPaths: string[],
-  before: Map<string, string | undefined>,
-  stampId: string
+  selectionFile: string,
+  allowed: (member: string) => boolean
 ): void {
-  const breached = [...memberDigests(target, memberPaths)]
-    .filter(([member, digest]) => digest !== undefined && digest !== before.get(member))
-    .map(([member]) => member);
-  if (breached.length === 0) return;
-  for (const member of breached) {
-    const partition = [...staged.appendOnly, ...staged.revocable].find((candidate) =>
-      member.startsWith(`${candidate}/`)
-    );
-    if (!partition) continue;
-    const quarantineRoot = path.join(target, partition, RESTORE_QUARANTINE_DIR);
-    const breachDir = path.join(quarantineRoot, stampId, 'exclude-breach');
-    const source = path.join(target, member);
-    const dest = path.join(breachDir, member.slice(partition.length + 1));
-    assertNotSymlinked(path.join(target, partition), quarantineRoot, path.dirname(breachDir));
-    asPartitionStore(source, () => {
-      safeMkdir(path.dirname(dest), { recursive: true });
-      assertNotSymlinked(breachDir);
-      safeMoveSync(source, dest);
-    });
-  }
-  throw new Error(
-    `[BACKUP_RESTORE_EXCLUDE_FAILED] the main extraction wrote archive members into staged partitions — they were moved aside into .restore-quarantine/${stampId}/exclude-breach/; other archive members are already in the target | next: stop services, roll the target back, then restore with a tar that honours --exclude | evidence: ${breached.slice(0, 10).join(', ')}${breached.length > 10 ? ', …' : ''}`
+  const selected = listArchive(archive, '-tzf').filter((member) => {
+    const normalized = normalizeArchiveMember(member.trim());
+    return allowed(normalized);
+  });
+  if (selected.length === 0) return;
+  safeWriteFile(selectionFile, Buffer.from(selected.join('\0') + '\0'));
+  runTar(
+    ['-xzf', archive, '-C', target, '--no-recursion', '--null', '-T', selectionFile],
+    'backup restore extraction failed'
   );
 }
 
@@ -644,33 +653,37 @@ export function extractWithStagedPartitions(input: {
   let ledgerVerification: RestoredLedgerVerification = 'not_applicable';
   if (stagedPaths.length > 0) {
     safeMkdir(staging, { recursive: true });
-    runTar(
-      ['-xzf', plainArchive, '-C', staging, '--', ...stagedPaths],
-      'backup restore staging failed'
+    extractAllowedMembers(
+      plainArchive,
+      staging,
+      path.join(path.dirname(staging), 'restore-members'),
+      (member) => stagedPaths.some((root) => member === root || member.startsWith(root + '/'))
     );
     trimmedTails = trimRestoredLedgerTails(staging, members);
     ledgerVerification = verifyRestoredTenantLedgers(staging, members, input.archiveChainKeyId);
   }
+  assertNoAppendOnlyConflict(target, staged.appendOnly);
   safeMkdir(target, { recursive: true });
-  const memberPaths = stagedMemberPaths(members, stagedPaths);
-  const before = memberDigests(target, memberPaths);
-  runTar(
-    [
-      ...stagedPaths.flatMap((partition) => ['--exclude', partition]),
-      ...(input.withheldRoots ?? []).flatMap((root) => ['--exclude', root]),
-      '-xzf',
-      plainArchive,
-      '-C',
-      target,
-    ],
-    'backup restore extraction failed'
+  const withheld = [
+    ...stagedPaths,
+    ...staged.withheld,
+    LOCK_ROOT_REPO_PATH,
+    ...(input.withheldRoots ?? []),
+  ];
+  extractAllowedMembers(
+    plainArchive,
+    target,
+    path.join(path.dirname(staging), 'restore-members'),
+    (member) => !withheld.some((root) => member === root || member.startsWith(root + '/'))
   );
-  assertExclusionsHeld(target, staged, memberPaths, before, input.stampId);
-  placeStagedAppendOnlyPartitions(staging, target, staged.appendOnly);
-  const quarantinePaths = input.tenant
-    ? quarantineStagedRevocableState(staging, target, staged.revocable, input.tenant, input.stampId)
-        .quarantinePaths
-    : [];
+  placeStagedAppendOnlyPartitions(staging, target, staged.appendOnly, staged.revocable);
+  const quarantinePaths = quarantineStagedRevocableState(
+    staging,
+    target,
+    staged.revocable,
+    input.tenant,
+    input.stampId
+  ).quarantinePaths;
   if (stagedPaths.length > 0) safeRmSync(staging, { recursive: true, force: true });
   return { trimmedTails, ledgerVerification, quarantinePaths };
 }

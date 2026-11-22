@@ -8,6 +8,7 @@ import { loadSurfaceManifest, loadSurfaceState } from '../surface/surface-runtim
 import { loadServicePidRegistryAtPath } from '../service/service-pid-registry.js';
 import { logger } from '../core.js';
 import { compileSchema } from '../foundation/ajv.js';
+import { withLockSync } from '../foundation/lock-utils.js';
 import { nowIso } from '../foundation/time.js';
 import {
   assertSafeRepositoryPath,
@@ -1180,8 +1181,25 @@ export function validateTaskSession(session: unknown): ValidationResult<TaskSess
   };
 }
 
+// A loaded snapshot can be saved only while the stored record still matches
+// its baseline. Fresh records use exclusive creation.
+const taskSessionBaselines = new WeakMap<TaskSession, { path: string; content: string }>();
+
 export function saveTaskSession(session: TaskSession, options: { rootDir?: string } = {}): string {
   const rootDir = options.rootDir || pathResolver.rootDir();
+  const filePath = taskSessionPath(session.session_id, rootDir);
+  return withLockSync(`task-session:${filePath}`, () => {
+    const baseline = taskSessionBaselines.get(session);
+    if (!baseline) return persistTaskSession(session, rootDir, true);
+    const current = loadTaskSession(session.session_id, { rootDir });
+    if (baseline.path !== filePath || JSON.stringify(current) !== baseline.content) {
+      throw new Error('[TASK_SESSION_CONFLICT] Task session changed before save');
+    }
+    return persistTaskSession(session, rootDir, false);
+  });
+}
+
+function persistTaskSession(session: TaskSession, rootDir: string, createOnly: boolean): string {
   const directory = taskSessionDir(rootDir);
   const filePath = taskSessionPath(session.session_id, rootDir);
   if (session.status === 'completed') {
@@ -1241,7 +1259,8 @@ export function saveTaskSession(session: TaskSession, options: { rootDir?: strin
     throw new Error(`Invalid task session: ${result.errors.join('; ')}`);
   }
   if (!safeExistsSync(directory)) safeMkdir(directory, { recursive: true });
-  safeWriteFile(filePath, `${JSON.stringify(canonicalSession, null, 2)}\n`);
+  safeWriteFile(filePath, `${JSON.stringify(canonicalSession, null, 2)}\n`, { createOnly });
+  taskSessionBaselines.set(session, { path: filePath, content: JSON.stringify(canonicalSession) });
   if (canonicalSession.status === 'completed') {
     recordTaskSessionCompletionLearning(canonicalSession);
   }
@@ -1275,6 +1294,7 @@ export function loadTaskSession(
     logger.warn(`[TASK_SESSION] Invalid session ${sessionId}: ${result.errors.join('; ')}`);
     return null;
   }
+  taskSessionBaselines.set(parsed, { path: filePath, content: JSON.stringify(parsed) });
   return parsed;
 }
 
@@ -1326,9 +1346,7 @@ export function reopenTaskSession(
     requirements?: TaskSession['requirements'];
   }
 ): TaskSession | null {
-  const session = loadTaskSession(sessionId);
-  if (!session) return null;
-  const reopened = updateTaskSession(sessionId, {
+  return updateTaskSession(sessionId, (session) => ({
     status:
       input.status ||
       (session.requirements?.missing?.length ? 'collecting_requirements' : 'planning'),
@@ -1340,40 +1358,47 @@ export function reopenTaskSession(
       reopened_at: nowIso(),
       reopen_reason: input.reason,
     },
-  });
-  if (!reopened) return null;
-  recordTaskSessionHistory(sessionId, {
-    ts: nowIso(),
-    type: 'control',
-    text: `Session reopened: ${input.reason}`,
-  });
-  return loadTaskSession(sessionId);
+    history: [
+      ...session.history,
+      {
+        ts: nowIso(),
+        type: 'control' as const,
+        text: `Session reopened: ${input.reason}`,
+      },
+    ].slice(-50),
+  }));
 }
 
 export function updateTaskSession(
   sessionId: string,
-  patch: Partial<TaskSession>
+  patch: Partial<TaskSession> | ((session: TaskSession) => Partial<TaskSession>)
 ): TaskSession | null {
-  const session = loadTaskSession(sessionId);
-  if (!session) return null;
-  const next: TaskSession = {
-    ...session,
-    ...patch,
-    session_id: session.session_id,
-    updated_at: nowIso(),
-  };
-  saveTaskSession(next);
-  return next;
+  const rootDir = pathResolver.rootDir();
+  let filePath: string;
+  try {
+    filePath = taskSessionPath(sessionId, rootDir);
+  } catch {
+    return null;
+  }
+  return withLockSync(`task-session:${filePath}`, () => {
+    const session = loadTaskSession(sessionId, { rootDir });
+    if (!session) return null;
+    const next: TaskSession = {
+      ...session,
+      ...(typeof patch === 'function' ? patch(session) : patch),
+      session_id: session.session_id,
+      updated_at: nowIso(),
+    };
+    persistTaskSession(next, rootDir, false);
+    return next;
+  });
 }
 
 export function recordTaskSessionHistory(
   sessionId: string,
   entry: TaskSessionHistoryEntry
 ): TaskSession | null {
-  const session = loadTaskSession(sessionId);
-  if (!session) return null;
-  session.history = [...session.history, entry].slice(-50);
-  session.updated_at = nowIso();
-  saveTaskSession(session);
-  return session;
+  return updateTaskSession(sessionId, (session) => ({
+    history: [...session.history, entry].slice(-50),
+  }));
 }

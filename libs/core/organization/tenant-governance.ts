@@ -1,4 +1,5 @@
 import * as path from 'node:path';
+import { withEntityLifecycleLock } from './entity-lifecycle-lock.js';
 import { baseRoleEnvText } from '../foundation/base-role-env.js';
 import { executionAgentId } from '../governance/execution-agent-id.js';
 import { auditChain } from '../governance/audit-chain.js';
@@ -132,6 +133,12 @@ function buildProfile(input: TenantMutationInput, current: TenantProfile | null)
 }
 
 export function mutateTenant(input: TenantMutationInput): TenantMutationResult {
+  return input.apply
+    ? withEntityLifecycleLock(() => applyTenantMutation(input))
+    : applyTenantMutation(input);
+}
+
+function applyTenantMutation(input: TenantMutationInput): TenantMutationResult {
   const options: TenantRegistryPathOptions = { rootDir: input.rootDir, env: input.env };
   const current = readTenantProfile(input.slug, options);
   if (input.verb === 'create' && current) {
@@ -223,6 +230,12 @@ export interface TenantRenameResult {
  * custom root beneath it keeps its suffix.
  */
 export function renameTenant(input: TenantRenameInput): TenantRenameResult {
+  return input.apply
+    ? withEntityLifecycleLock(() => renameTenantProfile(input))
+    : renameTenantProfile(input);
+}
+
+function renameTenantProfile(input: TenantRenameInput): TenantRenameResult {
   const options: TenantRegistryPathOptions = { rootDir: input.rootDir, env: input.env };
   const slug = input.slug.trim();
   const to = input.to?.trim() ?? '';
@@ -339,6 +352,12 @@ export interface TenantDeleteResult {
  * purgeData is set: deleting the name is not deleting the data.
  */
 export function deleteTenant(input: TenantDeleteInput): TenantDeleteResult {
+  return input.apply
+    ? withEntityLifecycleLock(() => deleteTenantProfile(input))
+    : deleteTenantProfile(input);
+}
+
+function deleteTenantProfile(input: TenantDeleteInput): TenantDeleteResult {
   const options: TenantRegistryPathOptions = { rootDir: input.rootDir, env: input.env };
   const slug = input.slug.trim();
   const current = readTenantProfile(slug, options);
@@ -949,6 +968,12 @@ export function findProviderAttestationGrantAuthority(
  * or delegated, the human approver or the charter id.
  */
 export function attestTenantProvider(
+  input: AttestTenantProviderInput
+): TenantProviderAttestationResult {
+  return withEntityLifecycleLock(() => attestTenantProviderUnderLock(input));
+}
+
+function attestTenantProviderUnderLock(
   input: AttestTenantProviderInput
 ): TenantProviderAttestationResult {
   const { slug, provider } = validateAttestationInput(input);

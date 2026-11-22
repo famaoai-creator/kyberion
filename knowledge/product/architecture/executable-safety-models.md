@@ -123,6 +123,208 @@ fencing-token verification, crash recovery, arbitrary runtime scheduling or a
 liveness proof. Callbacks that await a new lock on their own namespace are not
 supported. Synchronous callbacks must return synchronously.
 
+## WorkItem completion after lease recovery
+
+`libs/core/workforce/work-item-completion.model.test.ts` models one ordinary
+WorkItem with up to two lease generations. It checks six reachable states and
+ten transitions covering claim, expiry with reaping, reacquisition, completion,
+and rejected stale or duplicate completion. A mutation accepting the first
+ticket after reacquisition must produce the counterexample
+`claim 1 → reap → claim 2 → complete 1`.
+
+The test replays ten operation sequences through the public coordination APIs
+for each of two configurations: two different holders and one holder acquiring
+both lease generations. It checks item status and the active lease after each
+operation. A rejected completion must preserve the item snapshot and its
+coordination events. The clock advances deterministically to drive recovery.
+Expiry and reaping form one model action. The explored sequences use one
+process, one reaping step, and ordinary completion through `releaseWorkItem`.
+
+```bash
+pnpm exec vitest run libs/core/workforce/work-item-completion.model.test.ts
+```
+
+### Interrupted completion, competing processes, and effect ownership
+
+The atomic coordination suite injects an interruption before each of the lease,
+item, and event appends needed by completion. With attempt-bound completion
+evidence supplied to the reaper, the item converges to `done` and reaping again
+preserves the terminal snapshot. The suite also exits a child process before the
+item append and recovers in a new process against the same store. A separate
+two-process race starts a stale release and current release together and
+requires exactly one durable `done` snapshot. It accepts either rejection code
+for the stale release, depending on which process obtains the lock first.
+
+The external-effect recovery model explores six reachable states and six
+transitions for a single held target. It checks that reaping an interruption
+without completion evidence cannot grant a replacement claim. Allowing that
+claim produces a counterexample. The ownership integration suite checks the
+two evidence outcomes through production APIs using a synthetic shared target
+and an attempt-bound evidence callback. It checks that the old lease cannot
+settle the effect. With evidence, reaping settles ownership and a different
+WorkItem can claim the target. Without evidence, both the original and a
+competing WorkItem remain fenced.
+
+The subprocess tests use a shared local filesystem, and the interruptions are
+at append boundaries. The effect test verifies Kyberion's admission and
+settlement decisions with supplied evidence. Remote execution, provider-side
+deduplication, filesystem durability after power loss, and progress guarantees
+are outside this scope.
+
+```bash
+pnpm exec vitest run libs/core/workforce/work-item-completion.model.test.ts libs/core/workforce/work-coordination.atomic.test.ts libs/core/workforce/work-effect-ownership.integration.test.ts
+```
+
+## Event scope lineage
+
+`libs/core/event/event-scope.lineage-model.test.ts` enumerates request
+combinations for two authoritative scopes: a confidential session with a full
+entity chain and a public standalone project. Each lineage field and the tier
+can be omitted, repeat the authoritative value where present, or supply a
+conflicting value. The independent expectation is that only inputs whose
+supplied values agree with authority can resolve.
+
+The suite compares 2,475 combinations against the scope APIs. For all 132
+accepted inputs, it also checks that shared redaction, serialization, and
+record parsing preserve the exact authorized scope and remove all three
+identity and stance fields. Nine additional cases cover the compatibility
+alias `tenant_id` and its agreement with `tenant_slug`. The model treats the
+authority as already resolved and covers these representative values and
+transforms. Authority lookup, trusted overrides, and storage or HTTP
+authorization are separate boundaries.
+
+```bash
+pnpm exec vitest run libs/core/event/event-scope.lineage-model.test.ts
+```
+
+## Storage layout and artifact storage classes
+
+`libs/core/storage/storage-layout.test.ts` models every registered floor
+against ten representative custody partitions: system, and each of the
+three data tiers combined with shared storage or either of two tenants. It
+checks 40 distinct placements, relative and absolute classification, and
+agreement of the tier resolvers. This is a lexical layout check. The existing
+storage-layout and tier-path tests cover malformed segments, compatibility
+paths, and runtime partition enumeration.
+
+`libs/core/workforce/artifact-registry.test.ts` models the five artifact
+`storage_class` values against ordinary registration and delivery
+registration. The ten cases check the persisted class and locator, the class
+query, and exclusion of temporary records. The registry rejects temporary
+delivery without leaving a row. The matrix checks metadata and does not dereference
+the locator or establish publication authority.
+
+## Data-model coverage inventory
+
+The store inventory starts at [store-catalog.json](../governance/store-catalog.json).
+The domain tests below exercise distinct contracts within and across those
+stores. Coverage is per named invariant.
+
+| Model                                | Current executable coverage                                                                  | Open model boundary                                                                    |
+| ------------------------------------ | -------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| Placement and storage class          | Floor/custody matrix, artifact registry admission, tenant partition enumeration              | Cross-store publication and physical locator resolution                                |
+| Tier and custody                     | Checkout tier-path and viewer tier-subset models, resource access and custody contract tests | Agreement across route, projection, storage and egress for a single request            |
+| Entity lineage                       | Event scope lifecycle model, scope and mission ledger tests                                  | Historical scope migration followed by reparenting or offboarding                      |
+| Work and execution authority         | ADF, lease, WorkItem completion and external effect models, process interruption tests       | Provider-side effect idempotency and distributed storage semantics                     |
+| Retention, restore and offboarding   | Storage floor and event retention, scope offboarding, backup/restore integration tests       | Interleavings of restore, append, cleanup and offboarding across stores                |
+| Durable decisions and audit evidence | Decision ledger conformance, approval partition, audit-chain tenant tests                    | Approval consumption, ledger append and replay as one protocol                         |
+| Artifact provenance and delivery     | Artifact records, bundles and asset derivation tests                                         | Record, ownership, derivation and published reference consistency after partial writes |
+| Delegation and replay                | Delegation idempotency and lease tests                                                       | Reservation, outcome persistence and retry after restart across executors              |
+
+## Restore and first-publication interruption checks
+
+The backup suite exercises a live append after the restore's initial check
+using both a colliding filename and a separate file in the same partition.
+The late check rejects installation and preserves the live files. Exclusive
+creation also protects each ledger file between the late check and its write.
+Live restore, executed offboarding, and the destructive janitor acquire the
+same checkout maintenance lock without waiting. Their contention tests
+verify that a competing invocation fails before it mutates the target.
+Ordinary writers still require quiescence for multi-file installation.
+
+The scoped artifact suite injects a failure at the scope index, ownership
+append, and surface-record write. It checks that no new surface record exists
+at each interruption boundary, and that a normal retry with the same artifact
+ID publishes the body and its ownership locator. The test models first
+publication. Replacement and retry also have independent integration checks.
+Recovery of derivation receipts is outside that claim.
+
+### Replacement and deletion counterexamples
+
+`libs/core/storage/storage-lifecycle.model.test.ts` explores two bounded
+protocols. The restore model represents one file in one partition. A file
+created by a live writer blocks installation. A completed offboarding between
+preflight and placement leaves the path empty and allows the restore to bring
+back archived bytes. Comparing a deletion generation at the installation
+boundary prevents this trace in the model. The implementation prevents the
+overlapping commands from running together through the shared maintenance
+lock. An explicitly started later restore has its own admission decision.
+
+The publication model starts with a visible version, permits one interruption
+and retry, and checks the version reached through the visible reference and
+the number of appends for the new version. Replacing bytes at the same path
+breaks the reference invariant before the new record is published. A distinct
+path preserves the current version. The artifact-store integration suite
+uses the same logical name across an ownership-write failure and retry and
+verifies the old bytes remain readable. The model reports duplicate appends
+after interruption without idempotent replay. Production indexes a path
+and digest once and avoids repeating the latest unchanged ownership
+snapshot when the caller supplies a stable artifact ID.
+
+Further conformance tests exercise the write boundaries around those
+protocols. A foreign publication ID and contradictory organization are
+rejected before any scoped body or index is created, including after a
+first publication stops with only an ownership row. Scoped and governed
+rewrite and append calls preserve the bytes of a published session artifact.
+The backup suite restores an allowed directory with a withheld descendant
+and verifies the existing live file at that descendant remains untouched.
+
+## External data transfer and reconciliation
+
+Ingest tests interrupt a cursor update after a source listing and recover
+its persisted batch without invoking the transport. Cursor commits compare
+the watermark used for the walk, and a cursor pointing at missing batch data
+fails closed. The persisted batch is a work list, with downstream landing
+and its own deduplication remaining a separate operation.
+
+External mutation reservations remain immutable and block reuse of the same
+invocation. A separate scoped outcome record carries the classified result
+and an optional provider receipt identifier. A trusted connector can use
+`reconcileExternalOperation` with a read-only lookup and an opaque
+correlation reference. Deployment passes the reference to its adapter and
+records the returned trigger id when available. Lost responses require a
+provider that supports lookup by that reference. A lookup grants no replay.
+
+The search reader handles redirects explicitly. It validates network and
+egress policy before sending the initial request and every redirected
+request. The regression test verifies that a denied second destination
+receives no request.
+
+## Tenant and organization lifecycle interleavings
+
+Tenant lifecycle, provider attestation, personal-owner updates and the
+governed rename/delete paths take a common inter-process entity lock before
+reading mutable state. Tenant creation prepares the knowledge root before
+publishing the profile. The contention test verifies that neither a
+lifecycle operation nor an attestation can write while the lock is held
+and that suspended profiles reject attestation.
+
+Managed project creation establishes the organization link before
+publishing the project record. A surviving link blocks organization
+archive and is reused by a subsequent create for that project ID. The
+archive guard also scans canonical projects owned by the organization,
+including a live project whose link is missing. The attachment facade,
+organization archive, and project lifecycle mutations share the lock.
+The surface acquires it before opening its exact record access grant.
+
+Domain, capability, service and operation writes and retirement use the
+same critical section for reads and writes. Retirement checks both stored
+links and scoped dependent records. Normal updates refuse known retired
+references and cannot reactivate a retired record. The tests exercise
+dependent-first and retirement-first orders as well as a direct service
+retirement attempt. Existing missing-reference drift remains visible to
+the reconciliation checks.
+
 ## Assurance boundary
 
 This is exhaustive safety checking **of the supplied finite abstraction**, plus

@@ -5,6 +5,7 @@ import { executionBaseRoleText } from '../foundation/execution-scope.js';
 import { currentResourceAccessScope } from '../foundation/resource-access-scope.js';
 import { conciergeManagementGrantKind } from '../foundation/concierge-management-capability.js';
 import { listTenantProfileSlugs } from '../organization/tenant-registry.js';
+import { withEntityLifecycleLock } from '../organization/entity-lifecycle-lock.js';
 import { readTextFile } from '../foundation/text.js';
 import {
   buildProjectBootstrapWorkItems,
@@ -381,7 +382,7 @@ export function ensureProjectOsScaffold(
 }
 
 export function createManagedProject(input: ManagedProjectCreateInput): ProjectRecord {
-  return createManagedProjectInternal(input, false);
+  return withEntityLifecycleLock(() => createManagedProjectInternal(input, false));
 }
 
 /**
@@ -390,7 +391,7 @@ export function createManagedProject(input: ManagedProjectCreateInput): ProjectR
  */
 export function createManagedProjectForSurface(input: ManagedProjectCreateInput): ProjectRecord {
   assertSurfaceProjectMutationScope(input.project_id, input.tenant_slug, input.organization_id);
-  return createManagedProjectInternal(input, true);
+  return withEntityLifecycleLock(() => createManagedProjectInternal(input, true));
 }
 
 function assertSurfaceProjectMutationScope(
@@ -413,6 +414,13 @@ function assertSurfaceProjectMutationScope(
 export function updateManagedProjectMetadata(
   scope: { projectId: string; tenantSlug: string; organizationId: string },
   patch: { name?: string; summary?: string }
+): ProjectRecord {
+  return withEntityLifecycleLock(() => updateManagedProjectMetadataUnderLock(scope, patch));
+}
+
+function updateManagedProjectMetadataUnderLock(
+  scope: Parameters<typeof updateManagedProjectMetadata>[0],
+  patch: Parameters<typeof updateManagedProjectMetadata>[1]
 ): ProjectRecord {
   assertProjectLifecycleOwner();
   assertSurfaceProjectMutationScope(scope.projectId, scope.tenantSlug, scope.organizationId);
@@ -507,23 +515,39 @@ function createManagedProjectInternal(
 ): ProjectRecord {
   const { record, organizationState } = prepareManagedProjectCreation(input);
   const projectId = record.project_id;
-  const projectPath = saveProjectRecord(record, { rootDir: input.rootDir });
-  if (organizationState) {
-    try {
-      saveOrganizationOperationalState(
-        {
-          ...organizationState,
-          active_project_ids: [
-            ...new Set([...(organizationState.active_project_ids || []), projectId]),
-          ].sort(),
-          updated_at: nowIso(),
-        },
-        { rootDir: input.rootDir }
-      );
-    } catch (error) {
-      safeUnlinkSync(projectPath);
-      throw error;
+  const attach =
+    organizationState &&
+    record.status !== 'archived' &&
+    !organizationState.active_project_ids?.includes(projectId);
+  // Publish the association before the project. An interrupted creation
+  // leaves a blocking reference that an identical project create can finish.
+  if (attach && organizationState) {
+    saveOrganizationOperationalState(
+      {
+        ...organizationState,
+        active_project_ids: [
+          ...new Set([...(organizationState.active_project_ids || []), projectId]),
+        ].sort(),
+        updated_at: nowIso(),
+      },
+      { rootDir: input.rootDir }
+    );
+  }
+  try {
+    saveProjectRecord(record, { rootDir: input.rootDir, createOnly: true });
+  } catch (error) {
+    if (attach && organizationState) {
+      try {
+        // A late I/O error can surface after the exclusive file is visible.
+        // Keep the association whenever publication cannot be ruled out.
+        if (!safeExistsSync(projectRecordPath(projectId, input.rootDir))) {
+          saveOrganizationOperationalState(organizationState, { rootDir: input.rootDir });
+        }
+      } catch {
+        // A retained association remains fail-closed and can be reconciled.
+      }
     }
+    throw error;
   }
   if (!deferAudit) {
     auditChain.record({
@@ -556,7 +580,7 @@ export function updateManagedProject(
     >
   >
 ): ProjectRecord {
-  return updateManagedProjectInternal(projectId, patch);
+  return withEntityLifecycleLock(() => updateManagedProjectInternal(projectId, patch));
 }
 
 function updateManagedProjectInternal(
@@ -654,6 +678,10 @@ export function restoreManagedProject(
   projectId: string,
   reason = 'Project restored'
 ): ProjectRecord {
+  return withEntityLifecycleLock(() => restoreManagedProjectUnderLock(projectId, reason));
+}
+
+function restoreManagedProjectUnderLock(projectId: string, reason: string): ProjectRecord {
   const current = loadProjectRecord(normalizeId(projectId, 'project_id'));
   if (!current) throw new Error(`Project not found: ${projectId}`);
   if (current.status !== 'archived') throw new Error(`Project is not archived: ${projectId}`);
@@ -1251,6 +1279,10 @@ export async function reassignMissionToProject(input: {
 }
 
 export function bootstrapManagedProject(input: ProjectBootstrapInput): ProjectBootstrapResult {
+  return withEntityLifecycleLock(() => bootstrapManagedProjectUnderLock(input));
+}
+
+function bootstrapManagedProjectUnderLock(input: ProjectBootstrapInput): ProjectBootstrapResult {
   assertProjectLifecycleOwner();
   const projectId = normalizeId(input.project_id, 'project_id');
   const rootDir = input.rootDir || pathResolver.rootDir();
@@ -1285,6 +1317,7 @@ export function bootstrapManagedProject(input: ProjectBootstrapInput): ProjectBo
   let committedResult: ProjectBootstrapResult | undefined;
   let commitCallbackStarted = false;
   let commitCompleted = false;
+  let projectPublished = false;
   try {
     projectOsPath = ensureProjectOsScaffold(
       projectId,
@@ -1347,6 +1380,7 @@ export function bootstrapManagedProject(input: ProjectBootstrapInput): ProjectBo
       },
       true
     );
+    projectPublished = true;
     const nextProject: ProjectRecord = {
       ...project,
       ...(input.track_id
@@ -1455,7 +1489,7 @@ export function bootstrapManagedProject(input: ProjectBootstrapInput): ProjectBo
     });
     return result;
   } catch (error) {
-    safeUnlinkSync(projectRecordPath(projectId, rootDir));
+    if (projectPublished) safeUnlinkSync(projectRecordPath(projectId, rootDir));
     if (kickoffId && !kickoffExisted) safeUnlinkSync(taskSessionPath(kickoffId, rootDir));
     for (const seedId of missionSeedIds) {
       const seedPath = missionSeedRecordPath(seedId, rootDir);
@@ -1464,7 +1498,10 @@ export function bootstrapManagedProject(input: ProjectBootstrapInput): ProjectBo
     if (!projectStateExisted) safeUnlinkSync(projectStatePath);
     if (projectOsPath && !projectOsExisted)
       safeRmSync(projectOsPath, { recursive: true, force: true });
-    if (previousOrganizationState) {
+    if (
+      previousOrganizationState &&
+      (projectPublished || !safeExistsSync(projectRecordPath(projectId, rootDir)))
+    ) {
       saveOrganizationOperationalState(previousOrganizationState, { rootDir });
     }
     if (commitCallbackStarted || commitCompleted) {

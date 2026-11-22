@@ -9,6 +9,9 @@ import {
   advanceSyncCursor,
   readSyncCursor,
   recordSyncFailure,
+  persistSyncBatch,
+  readSyncBatch,
+  listSyncBatchIds,
   type SyncCursorKind,
 } from './ingest-sync-cursors.js';
 import { executeServicePreset } from '@agent/core/service/service-engine';
@@ -43,6 +46,8 @@ export interface SyncSourceInput {
   dry_run?: boolean;
   now?: string;
   cursor_path_seam?: string;
+  list_batches?: boolean;
+  recover_batch_id?: string;
   transport?: SyncSourceTransport;
 }
 
@@ -55,6 +60,8 @@ export interface SyncSourceResult {
   truncated: boolean;
   pages_fetched: number;
   dry_run: boolean;
+  batch_id?: string;
+  batch_ids?: string[];
 }
 
 const DEFAULT_MAX_ITEMS = 500;
@@ -67,7 +74,6 @@ async function syncSingleSource(
   options: { deferCursorAdvance?: boolean } = {}
 ): Promise<{ result: SyncSourceResult; commitCursor?: () => void }> {
   const tenantSlug = String(input.tenant_slug ?? '').trim();
-  const walker = getSourceWalker(system);
 
   const transport = input.transport ?? (executeServicePreset as SyncSourceTransport);
   const auth = input.auth ?? 'secret-guard';
@@ -76,12 +82,42 @@ async function syncSingleSource(
     input.page_limit && input.page_limit > 0 ? input.page_limit : DEFAULT_PAGE_LIMIT;
   const dryRun = input.dry_run === true;
   const cursorOptions = input.cursor_path_seam ? { cursorsDir: input.cursor_path_seam } : {};
+  if (input.list_batches || input.recover_batch_id !== undefined) {
+    if (input.list_batches && input.recover_batch_id !== undefined)
+      throw new Error('ingest:sync_source — select either list_batches or recover_batch_id');
+    const batch =
+      input.recover_batch_id === undefined
+        ? undefined
+        : readSyncBatch(tenantSlug, system, input.recover_batch_id, cursorOptions);
+    return {
+      result: {
+        tenant_slug: tenantSlug,
+        source_system: system,
+        items: batch?.items ?? [],
+        new_cursor: { cursor_kind: 'updated_since', cursor_value: batch?.to_cursor ?? '' },
+        advanced: false,
+        truncated: false,
+        pages_fetched: 0,
+        dry_run: true,
+        ...(batch
+          ? { batch_id: input.recover_batch_id }
+          : { batch_ids: listSyncBatchIds(tenantSlug, system, cursorOptions) }),
+      },
+    };
+  }
+  const walker = getSourceWalker(system);
 
   const state = readSyncCursor(tenantSlug, system, cursorOptions);
   const watermark =
     state && state.cursor_kind === 'updated_since' && typeof state.cursor_value === 'string'
       ? state.cursor_value
       : '';
+  if (
+    state?.batch_id &&
+    readSyncBatch(tenantSlug, system, state.batch_id, cursorOptions).to_cursor !== watermark
+  ) {
+    throw new Error('[INGEST_BATCH_INVALID] cursor does not match its durable batch');
+  }
 
   let walk: PageWalkResult;
   try {
@@ -107,10 +143,23 @@ async function syncSingleSource(
   }
 
   let advanced = false;
+  let batchId: string | undefined;
   let commitCursor: (() => void) | undefined;
 
   if (!dryRun && !walk.truncated) {
     const nextWatermark = walk.highWater || watermark;
+    if (walk.items.length > 0 || nextWatermark !== watermark) {
+      batchId = persistSyncBatch(
+        {
+          tenant_slug: tenantSlug,
+          source_system: system,
+          from_cursor: watermark,
+          to_cursor: nextWatermark,
+          items: walk.items,
+        },
+        cursorOptions
+      );
+    }
     if (nextWatermark) {
       advanced = true;
       const doAdvance = (): void => {
@@ -120,6 +169,8 @@ async function syncSingleSource(
           {
             cursor_kind: 'updated_since',
             cursor_value: nextWatermark,
+            expected_updated_since: watermark,
+            batch_id: batchId,
             ...(input.now ? { now: input.now } : {}),
           },
           cursorOptions
@@ -147,6 +198,7 @@ async function syncSingleSource(
       truncated: walk.truncated,
       pages_fetched: walk.pages,
       dry_run: dryRun,
+      ...(batchId ? { batch_id: batchId } : {}),
     },
     commitCursor,
   };
@@ -175,6 +227,8 @@ export async function syncSource(
 
   // Multi-source sync mode: atomic execution across all specified sources
   if (Array.isArray(input.source_systems) && input.source_systems.length > 0) {
+    if (input.list_batches || input.recover_batch_id !== undefined)
+      throw new Error('ingest:sync_source — batch recovery requires a single source_system');
     const results: SyncSourceResult[] = [];
     const aggregatedItems: SyncSourceItem[] = [];
     const deferredCommits: Array<() => void> = [];
@@ -211,10 +265,14 @@ export async function syncSource(
   if (!sourceSystem) {
     throw new Error('ingest:sync_source — source_system or source_systems is required');
   }
-  if (!input.source_params || typeof input.source_params !== 'object') {
+  if (
+    !input.list_batches &&
+    input.recover_batch_id === undefined &&
+    (!input.source_params || typeof input.source_params !== 'object')
+  ) {
     throw new Error('ingest:sync_source — source_params is required');
   }
 
-  const { result } = await syncSingleSource(sourceSystem, input, input.source_params);
+  const { result } = await syncSingleSource(sourceSystem, input, input.source_params ?? {});
   return result;
 }
