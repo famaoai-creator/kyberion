@@ -44,7 +44,7 @@
         "scripts/check/check_ci_workflow_contract.ts"
       ],
       "owner": "release",
-      "rationale": "Keeps every workflow job time-boxed, pull_request workflows cancel superseded runs, actions on Node24 majors, and no redundant core build (operations-hygiene runbook §CI)."
+      "rationale": "Keeps every workflow job time-boxed, pull_request workflows cancel superseded runs, actions on Node24 majors, and no redundant core build (operations-hygiene runbook \u00a7CI)."
     },
     {
       "id": "golden",
@@ -1082,7 +1082,7 @@
       "baseline": "knowledge/product/governance/orphan-baseline.json",
       "owner": "architecture",
       "timeout_ms": 240000,
-      "rationale": "OW-07: fails when a new orphan appears — an unimported libs/core module, an uninvoked script, an unreachable pipeline or an unreferenced actuator op; known exceptions are reasoned baseline entries that may only shrink. Repo-wide import scan cost grows with file count; the ~260-file governance catalog split pushed it past the 120s default on loaded runners, so this gate carries an explicit 240s budget."
+      "rationale": "OW-07: fails when a new orphan appears \u2014 an unimported libs/core module, an uninvoked script, an unreachable pipeline or an unreferenced actuator op; known exceptions are reasoned baseline entries that may only shrink. Repo-wide import scan cost grows with file count; the ~260-file governance catalog split pushed it past the 120s default on loaded runners, so this gate carries an explicit 240s budget."
     },
     {
       "id": "dep-cycles",
@@ -1323,6 +1323,19 @@
       ],
       "owner": "architecture",
       "rationale": "CX-08 per-file AST adoption budget; prevent new duplicate mechanisms while preserving domain contracts."
+    },
+    {
+      "id": "union-literal-branches",
+      "scope": "pr",
+      "executable": "node",
+      "args": [
+        "--import",
+        "./scripts/ts-loader.mjs",
+        "scripts/check/check_union_literal_branches.ts"
+      ],
+      "baseline": "knowledge/product/governance/union-literal-branch-baseline.json",
+      "owner": "architecture",
+      "rationale": "Branching on a registry-backed union literal outside its owning module bypasses the canonical guard; projections and type guards must decide, not per-consumer literals."
     }
   ],
   "workflow_exceptions": [
