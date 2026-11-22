@@ -1,0 +1,26 @@
+{
+  "record_id": "mem-MSN-CALENDAR-RISK-M365-20261122-2026_11_22",
+  "kind": "knowledge_hint",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "Declaring a service read is a governance change: only for fixed-path operations, and undeclared CLI/MCP routes are never reads",
+  "summary": "risk: read makes an agent call approval-free, so declare it only when no parameter can change the resource read (split a fixed-path variant from a templated-path one). The service harness must never infer read for a CLI/MCP route: the old GET default labelled gmail_send and outlook_send as approval-free reads and let them through the capture-only surface.",
+  "candidate_id": "mem-MSN-CALENDAR-RISK-M365-20261122-2026_11_22",
+  "evidence_refs": [
+    "active/missions/public/MSN-CALENDAR-RISK-M365-20261122/evidence/implementation-report.md",
+    "active/missions/public/MSN-CALENDAR-RISK-M365-20261122/evidence/REVIEW-execution-implement.md",
+    "active/missions/public/MSN-CALENDAR-RISK-M365-20261122/evidence/test-report.md"
+  ],
+  "created_at": "2026-11-22T00:06:56.678Z",
+  "hint_scope": "mission",
+  "hint_triggers": [
+    "- Declaring `risk: read` on a preset operation removes the agent approval requirement (service-actuator `describeServiceExternalEffect`, tenant-binding contract) and makes failures retry-safe, so they report their real cause. It is an operator decision; record it in the mission and the PR.\n- Only declare read when the parameters cannot change what resource is read. m365 `calendar_events_list` builds its Graph URL from `{{calendarPath}}` (`me/messages?x=` reads mail), so it stays gated. A fixed-path `calendar_view_primary` (`@graph/me/calendarView?...`) carries the read, and the bridge routes the primary calendar there. Parameters substituted after `?` in a single argv element can only add query options to that resource.\n- The service harness inferred risk from `method || 'GET'`. CLI and MCP routes have no method, so every undeclared CLI operation (gmail_send, outlook_send, calendar insert and delete) was labelled read/approval-free in service-harness-registry.json and passed `assertServiceCaptureOperation` (`kyberion.service.capture`). Now any non-api route infers write. After changing inference, regenerate the registry and diff the risk and approval transitions: none may go from approval-required to approval-free.\n- Fail-closed side effect: undeclared MCP reads (brave-search, google-maps, sqlite) are now refused by the capture surface until someone deliberately declares them read.\n- A status probe cannot see an m365 refresh-token expiry (`connectedAs` stays). Classify the read failure instead: invalid_grant, interaction_required, AADSTS refresh/session/MFA codes, HTTP 401. Exclude unauthorized_client and a stray 401, and never send the text over the wire."
+  ],
+  "recommended_refs": [
+    "active/missions/public/MSN-CALENDAR-RISK-M365-20261122/evidence/implementation-report.md",
+    "active/missions/public/MSN-CALENDAR-RISK-M365-20261122/evidence/REVIEW-execution-implement.md",
+    "active/missions/public/MSN-CALENDAR-RISK-M365-20261122/evidence/test-report.md"
+  ],
+  "source_branch": "fix/calendar-risk-m365-20261122",
+  "source_commit": "3893b67f32862871b3b23ad953bd343df24e43f3"
+}

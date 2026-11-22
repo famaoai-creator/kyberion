@@ -108,6 +108,10 @@ function inferRisk(
 ): ServiceOperationRisk {
   const declared = operation.risk;
   if (declared === 'read' || declared === 'write' || declared === 'destructive') return declared;
+  // Only an HTTP method says what an `api` route does. A CLI / MCP route says
+  // nothing about its effect (`gws calendar events insert`), even with a
+  // `method` inherited from the operation: an undeclared one is not a read.
+  if (alternatives.some((alternative) => alternative.type !== 'api')) return 'write';
   const method = String(operation.method || alternatives[0]?.method || 'GET').toUpperCase();
   if (method === 'GET' || method === 'HEAD') return 'read';
   if (method === 'DELETE') return 'destructive';

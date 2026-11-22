@@ -210,12 +210,14 @@
     },
     "calendar_agenda": {
       "type": "cli",
+      "risk": "read",
       "command": "gws",
       "args": ["calendar", "+agenda"],
       "description": "Show the upcoming Google Calendar agenda."
     },
     "calendar_calendarList_list": {
       "type": "cli",
+      "risk": "read",
       "command": "gws",
       "args": ["calendar", "calendarList", "list", "--params", "{{params}}"],
       "description": "List the authenticated user's calendars.",
@@ -228,6 +230,7 @@
     },
     "calendar_events_list": {
       "type": "cli",
+      "risk": "read",
       "command": "gws",
       "args": ["calendar", "events", "list", "--params", "{{params}}"],
       "description": "List Google Calendar events for a calendar.",
@@ -240,6 +243,7 @@
     },
     "calendar_freebusy_query": {
       "type": "cli",
+      "risk": "read",
       "command": "gws",
       "args": ["calendar", "freebusy", "query", "--json", "{{body}}"],
       "description": "Query free/busy windows for one or more calendars.",

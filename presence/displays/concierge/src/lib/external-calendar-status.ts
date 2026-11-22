@@ -13,8 +13,12 @@ import { readCalendarProviderAuthStatus } from '@agent/core/meeting/calendar-wor
  */
 export type ProviderLoginState = 'signed_in' | 'signed_out' | 'expired';
 
-export function classifyProviderLogin(status: { ok?: boolean; raw?: unknown }): ProviderLoginState {
-  if (status.ok !== true) return 'signed_out';
+export function classifyProviderLogin(status: {
+  ok?: boolean;
+  logged_in?: boolean;
+  raw?: unknown;
+}): ProviderLoginState {
+  if (status.ok !== true || status.logged_in === false) return 'signed_out';
   const raw = status.raw;
   if (!raw || typeof raw !== 'object') return 'signed_in';
   const fields = raw as Record<string, unknown>;
@@ -26,6 +30,21 @@ export function classifyProviderLogin(status: { ok?: boolean; raw?: unknown }): 
   if (known.length > 0 && !known.some((key) => fields[key] === true)) return 'signed_out';
   if (fields.token_refresh_failed === true) return 'expired';
   return 'signed_in';
+}
+
+/**
+ * A read failure that is the provider refusing the stored login: an OAuth
+ * refusal (`invalid_grant`), an Entra ID sign-in error that needs the person
+ * (expired or revoked refresh token, interaction or MFA required), or a 401.
+ * Used only to choose `login_expired` over `degraded`; the text itself never
+ * leaves the server.
+ */
+const TOKEN_REFUSAL =
+  /invalid_grant|interaction_required|AADSTS(?:70000|700082|700084|70008|70043|50173|50076|50078|50079|50089|50132|50133|65001)\b|refresh token has expired|(?:HTTP|status|code)\W{0,3}401\b|\b401 unauthori[sz]ed|\bunauthori[sz]ed\b(?!_)/iu;
+
+export function isProviderTokenRefusal(error: unknown): boolean {
+  const text = error instanceof Error ? error.message : String(error ?? '');
+  return TOKEN_REFUSAL.test(text);
 }
 
 /** The status probe runs a CLI synchronously; reuse it briefly instead of on every navigation. */

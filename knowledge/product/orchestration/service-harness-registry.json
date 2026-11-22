@@ -281,19 +281,19 @@
       "operations": [
         {
           "action": "brave_web_search",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
           "tenant_binding_required": false,
-          "idempotency": "not_applicable"
+          "idempotency": "recommended"
         },
         {
           "action": "brave_local_search",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
           "tenant_binding_required": false,
-          "idempotency": "not_applicable"
+          "idempotency": "recommended"
         }
       ]
     },
@@ -477,29 +477,29 @@
         {
           "action": "list_outputs",
           "description": "List generated artifacts in the ComfyUI output directory",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
           "tenant_binding_required": false,
-          "idempotency": "not_applicable"
+          "idempotency": "recommended"
         },
         {
           "action": "inspect_config",
           "description": "Inspect ComfyUI startup configuration",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
           "tenant_binding_required": false,
-          "idempotency": "not_applicable"
+          "idempotency": "recommended"
         },
         {
           "action": "list_custom_nodes",
           "description": "List installed ComfyUI custom nodes",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
           "tenant_binding_required": false,
-          "idempotency": "not_applicable"
+          "idempotency": "recommended"
         }
       ]
     },
@@ -1088,19 +1088,19 @@
       "operations": [
         {
           "action": "maps_search",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
           "tenant_binding_required": false,
-          "idempotency": "not_applicable"
+          "idempotency": "recommended"
         },
         {
           "action": "maps_geocode",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
           "tenant_binding_required": false,
-          "idempotency": "not_applicable"
+          "idempotency": "recommended"
         }
       ]
     },
@@ -1114,47 +1114,47 @@
         {
           "action": "auth_status",
           "description": "Check whether Google Workspace CLI authentication is available.",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
           "tenant_binding_required": false,
-          "idempotency": "not_applicable"
+          "idempotency": "recommended"
         },
         {
           "action": "schema_method",
           "description": "Inspect the request/response schema for a Google Workspace discovery method.",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
           "tenant_binding_required": false,
-          "idempotency": "not_applicable"
+          "idempotency": "recommended"
         },
         {
           "action": "drive_files_list",
           "description": "List Google Drive files using the discovery-backed CLI.",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
           "tenant_binding_required": false,
-          "idempotency": "not_applicable"
+          "idempotency": "recommended"
         },
         {
           "action": "drive_file_download",
           "description": "Download Google Drive file content via the discovery method drive.files.get; pass params like {\"fileId\": \"...\", \"alt\": \"media\"}.",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
           "tenant_binding_required": false,
-          "idempotency": "not_applicable"
+          "idempotency": "recommended"
         },
         {
           "action": "drive_file_export",
           "description": "Export a Google-native document (Docs/Sheets/Slides) via the discovery method drive.files.export; pass params like {\"fileId\": \"...\", \"mimeType\": \"text/plain\"}.",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
           "tenant_binding_required": false,
-          "idempotency": "not_applicable"
+          "idempotency": "recommended"
         },
         {
           "action": "gmail_triage",
@@ -1204,38 +1204,38 @@
         {
           "action": "gmail_filters_create",
           "description": "Create a Gmail filter.",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
           "tenant_binding_required": false,
-          "idempotency": "not_applicable"
+          "idempotency": "recommended"
         },
         {
           "action": "gmail_messages_batch_modify",
           "description": "Batch modify Gmail messages, including archiving by removing the INBOX label.",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
           "tenant_binding_required": false,
-          "idempotency": "not_applicable"
+          "idempotency": "recommended"
         },
         {
           "action": "gmail_send",
           "description": "Send a Gmail message.",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
           "tenant_binding_required": false,
-          "idempotency": "not_applicable"
+          "idempotency": "recommended"
         },
         {
           "action": "gmail_send_draft",
           "description": "Create a Gmail draft instead of sending.",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
           "tenant_binding_required": false,
-          "idempotency": "not_applicable"
+          "idempotency": "recommended"
         },
         {
           "action": "gmail_reply",
@@ -1249,29 +1249,29 @@
         {
           "action": "gmail_reply_draft",
           "description": "Create a Gmail reply draft.",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
           "tenant_binding_required": false,
-          "idempotency": "not_applicable"
+          "idempotency": "recommended"
         },
         {
           "action": "gmail_reply_all",
           "description": "Reply-all to a Gmail message.",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
           "tenant_binding_required": false,
-          "idempotency": "not_applicable"
+          "idempotency": "recommended"
         },
         {
           "action": "gmail_reply_all_draft",
           "description": "Create a Gmail reply-all draft.",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
           "tenant_binding_required": false,
-          "idempotency": "not_applicable"
+          "idempotency": "recommended"
         },
         {
           "action": "calendar_agenda",
@@ -1312,83 +1312,83 @@
         {
           "action": "calendar_events_insert",
           "description": "Create a Google Calendar event, optionally with Google Meet.",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
           "tenant_binding_required": false,
-          "idempotency": "not_applicable"
+          "idempotency": "recommended"
         },
         {
           "action": "calendar_events_patch",
           "description": "Update a Google Calendar event.",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
           "tenant_binding_required": false,
-          "idempotency": "not_applicable"
+          "idempotency": "recommended"
         },
         {
           "action": "calendar_events_delete",
           "description": "Delete a Google Calendar event.",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
           "tenant_binding_required": false,
-          "idempotency": "not_applicable"
+          "idempotency": "recommended"
         },
         {
           "action": "meet_spaces_create",
           "description": "Create a Google Meet space using the authenticated Google account.",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
           "tenant_binding_required": false,
-          "idempotency": "not_applicable"
+          "idempotency": "recommended"
         },
         {
           "action": "meet_spaces_get",
           "description": "Fetch a Google Meet space by name or resource identifier.",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
           "tenant_binding_required": false,
-          "idempotency": "not_applicable"
+          "idempotency": "recommended"
         },
         {
           "action": "meet_spaces_patch",
           "description": "Update a Google Meet space using the authenticated Google account.",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
           "tenant_binding_required": false,
-          "idempotency": "not_applicable"
+          "idempotency": "recommended"
         },
         {
           "action": "meet_spaces_end_active_conference",
           "description": "End the active conference attached to a Google Meet space.",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
           "tenant_binding_required": false,
-          "idempotency": "not_applicable"
+          "idempotency": "recommended"
         },
         {
           "action": "meet_conference_records_list",
           "description": "List Google Meet conference records.",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
           "tenant_binding_required": false,
-          "idempotency": "not_applicable"
+          "idempotency": "recommended"
         },
         {
           "action": "meet_conference_records_get",
           "description": "Fetch a Google Meet conference record by name.",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
           "tenant_binding_required": false,
-          "idempotency": "not_applicable"
+          "idempotency": "recommended"
         },
         {
           "action": "gmail_history_list",
@@ -1603,17 +1603,17 @@
       "service_id": "m365",
       "display_name": "Microsoft 365 CLI Presets",
       "auth_strategy": "none",
-      "operation_count": 19,
+      "operation_count": 20,
       "detail_ref": "knowledge/product/orchestration/service-presets/m365.json",
       "operations": [
         {
           "action": "auth_status",
           "description": "Check whether the Microsoft 365 CLI is authenticated.",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
           "tenant_binding_required": false,
-          "idempotency": "not_applicable"
+          "idempotency": "recommended"
         },
         {
           "action": "calendar_list",
@@ -1626,7 +1626,16 @@
         },
         {
           "action": "calendar_events_list",
-          "description": "List calendar events for the requested window.",
+          "description": "List calendar events for the requested window. The Graph path is a parameter, so this stays approval-gated; the primary calendar uses calendar_view_primary.",
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
+          "tenant_binding_required": false,
+          "idempotency": "recommended"
+        },
+        {
+          "action": "calendar_view_primary",
+          "description": "List the signed-in user's primary calendar events for the requested window (fixed Graph path; parameters only fill the query).",
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
@@ -1645,137 +1654,137 @@
         {
           "action": "calendar_events_insert",
           "description": "Create a Microsoft 365 calendar event.",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
           "tenant_binding_required": false,
-          "idempotency": "not_applicable"
+          "idempotency": "recommended"
         },
         {
           "action": "calendar_events_update",
           "description": "Update a Microsoft 365 calendar event.",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
           "tenant_binding_required": false,
-          "idempotency": "not_applicable"
+          "idempotency": "recommended"
         },
         {
           "action": "calendar_events_delete",
           "description": "Delete a Microsoft 365 calendar event.",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
           "tenant_binding_required": false,
-          "idempotency": "not_applicable"
+          "idempotency": "recommended"
         },
         {
           "action": "outlook_messages_list",
           "description": "List messages from the signed-in user's Outlook inbox.",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
           "tenant_binding_required": false,
-          "idempotency": "not_applicable"
+          "idempotency": "recommended"
         },
         {
           "action": "outlook_message_get",
           "description": "Get one Outlook message by ID.",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
           "tenant_binding_required": false,
-          "idempotency": "not_applicable"
+          "idempotency": "recommended"
         },
         {
           "action": "outlook_attachments_list",
           "description": "List attachments on an Outlook message (read-only).",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
           "tenant_binding_required": false,
-          "idempotency": "not_applicable"
+          "idempotency": "recommended"
         },
         {
           "action": "outlook_attachment_get",
           "description": "Fetch one Outlook message attachment; fileAttachment responses include contentBytes (read-only).",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
           "tenant_binding_required": false,
-          "idempotency": "not_applicable"
+          "idempotency": "recommended"
         },
         {
           "action": "outlook_send",
           "description": "Send a new Outlook message.",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
           "tenant_binding_required": false,
-          "idempotency": "not_applicable"
+          "idempotency": "recommended"
         },
         {
           "action": "outlook_message_draft",
           "description": "Create an Outlook message draft.",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
           "tenant_binding_required": false,
-          "idempotency": "not_applicable"
+          "idempotency": "recommended"
         },
         {
           "action": "outlook_reply",
           "description": "Reply to an Outlook message.",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
           "tenant_binding_required": false,
-          "idempotency": "not_applicable"
+          "idempotency": "recommended"
         },
         {
           "action": "outlook_reply_all",
           "description": "Reply to all recipients of an Outlook message.",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
           "tenant_binding_required": false,
-          "idempotency": "not_applicable"
+          "idempotency": "recommended"
         },
         {
           "action": "outlook_create_reply",
           "description": "Create an Outlook reply draft.",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
           "tenant_binding_required": false,
-          "idempotency": "not_applicable"
+          "idempotency": "recommended"
         },
         {
           "action": "outlook_create_reply_all",
           "description": "Create an Outlook reply-all draft.",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
           "tenant_binding_required": false,
-          "idempotency": "not_applicable"
+          "idempotency": "recommended"
         },
         {
           "action": "outlook_message_update",
           "description": "Update an Outlook draft message.",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
           "tenant_binding_required": false,
-          "idempotency": "not_applicable"
+          "idempotency": "recommended"
         },
         {
           "action": "outlook_message_move",
           "description": "Move an Outlook message to another mail folder.",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
           "tenant_binding_required": false,
-          "idempotency": "not_applicable"
+          "idempotency": "recommended"
         }
       ]
     },
@@ -1828,56 +1837,56 @@
         {
           "action": "join",
           "description": "Join an online meeting (Zoom/Teams/Meet) via Bridge",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
           "tenant_binding_required": false,
-          "idempotency": "not_applicable"
+          "idempotency": "recommended"
         },
         {
           "action": "join_meeting",
           "description": "Intent-aligned meeting join via Bridge",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
           "tenant_binding_required": false,
-          "idempotency": "not_applicable"
+          "idempotency": "recommended"
         },
         {
           "action": "status",
           "description": "Get current meeting status",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
           "tenant_binding_required": false,
-          "idempotency": "not_applicable"
+          "idempotency": "recommended"
         },
         {
           "action": "meeting_status",
           "description": "Intent-aligned meeting status check",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
           "tenant_binding_required": false,
-          "idempotency": "not_applicable"
+          "idempotency": "recommended"
         },
         {
           "action": "leave",
           "description": "Leave the current meeting",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
           "tenant_binding_required": false,
-          "idempotency": "not_applicable"
+          "idempotency": "recommended"
         },
         {
           "action": "leave_meeting",
           "description": "Intent-aligned meeting leave",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
           "tenant_binding_required": false,
-          "idempotency": "not_applicable"
+          "idempotency": "recommended"
         }
       ]
     },
@@ -2142,11 +2151,11 @@
       "operations": [
         {
           "action": "test_fallback",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
           "tenant_binding_required": false,
-          "idempotency": "not_applicable"
+          "idempotency": "recommended"
         }
       ]
     },
@@ -2195,19 +2204,19 @@
       "operations": [
         {
           "action": "query",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
           "tenant_binding_required": false,
-          "idempotency": "not_applicable"
+          "idempotency": "recommended"
         },
         {
           "action": "list_tables",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
           "tenant_binding_required": false,
-          "idempotency": "not_applicable"
+          "idempotency": "recommended"
         }
       ]
     },
@@ -2310,11 +2319,11 @@
         {
           "action": "analyze_video",
           "description": "Run local video analysis using the claude-real-video (crv) package via uv run",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
           "tenant_binding_required": false,
-          "idempotency": "not_applicable"
+          "idempotency": "recommended"
         }
       ]
     },
@@ -2342,19 +2351,19 @@
       "operations": [
         {
           "action": "speak_local",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
           "tenant_binding_required": false,
-          "idempotency": "not_applicable"
+          "idempotency": "recommended"
         },
         {
           "action": "generate_voice",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
           "tenant_binding_required": false,
-          "idempotency": "not_applicable"
+          "idempotency": "recommended"
         }
       ]
     },
@@ -2367,20 +2376,20 @@
         {
           "action": "speak_jp",
           "description": "Speaks Japanese using local engine.",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
           "tenant_binding_required": false,
-          "idempotency": "not_applicable"
+          "idempotency": "recommended"
         },
         {
           "action": "speak_en",
           "description": "Speaks English using local engine.",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
           "tenant_binding_required": false,
-          "idempotency": "not_applicable"
+          "idempotency": "recommended"
         }
       ]
     },
@@ -2409,20 +2418,20 @@
         {
           "action": "stream",
           "description": "Real-time Whisper streaming",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
           "tenant_binding_required": false,
-          "idempotency": "not_applicable"
+          "idempotency": "recommended"
         },
         {
           "action": "stream_transcribe",
           "description": "Intent-aligned real-time transcription stream",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
           "tenant_binding_required": false,
-          "idempotency": "not_applicable"
+          "idempotency": "recommended"
         }
       ]
     },
@@ -2437,29 +2446,29 @@
         {
           "action": "list_tools",
           "description": "List the X documentation MCP tools.",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
           "tenant_binding_required": false,
-          "idempotency": "not_applicable"
+          "idempotency": "recommended"
         },
         {
           "action": "list_resources",
           "description": "List X documentation MCP resources.",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
           "tenant_binding_required": false,
-          "idempotency": "not_applicable"
+          "idempotency": "recommended"
         },
         {
           "action": "call_tool",
           "description": "Invoke an X documentation MCP tool by name with structured arguments.",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
           "tenant_binding_required": false,
-          "idempotency": "not_applicable"
+          "idempotency": "recommended"
         }
       ]
     },
@@ -2474,38 +2483,38 @@
         {
           "action": "auth_status",
           "description": "Check whether xurl has a usable X OAuth session cached for MCP use.",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
           "tenant_binding_required": false,
-          "idempotency": "not_applicable"
+          "idempotency": "recommended"
         },
         {
           "action": "auth_oauth2_headless",
           "description": "Bootstrap the xurl OAuth session on a headless machine using X's out-of-band login flow.",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
           "tenant_binding_required": false,
-          "idempotency": "not_applicable"
+          "idempotency": "recommended"
         },
         {
           "action": "list_tools",
           "description": "List the official X MCP tools currently exposed through the hosted xapi bridge.",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
           "tenant_binding_required": false,
-          "idempotency": "not_applicable"
+          "idempotency": "recommended"
         },
         {
           "action": "call_tool",
           "description": "Invoke any official X MCP tool by name with a structured arguments object.",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
           "tenant_binding_required": false,
-          "idempotency": "not_applicable"
+          "idempotency": "recommended"
         }
       ]
     },
@@ -2518,11 +2527,11 @@
         {
           "action": "prepare_upload_package",
           "description": "Stages a narrated video upload package for browser-driven or manual YouTube upload.",
-          "kind": "capture",
-          "risk": "read",
-          "approval_required": false,
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
           "tenant_binding_required": false,
-          "idempotency": "not_applicable"
+          "idempotency": "recommended"
         }
       ]
     },

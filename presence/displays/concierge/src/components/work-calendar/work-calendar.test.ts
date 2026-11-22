@@ -245,7 +245,7 @@ describe('external calendar events', () => {
 describe('providerReloginCommand', () => {
   it.each([
     ['google-workspace', 'gws auth login'],
-    ['m365', null],
+    ['m365', 'm365 login'],
     ['other', null],
     [null, null],
   ])('%s → %s', (provider, command) => {
