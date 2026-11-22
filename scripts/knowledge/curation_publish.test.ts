@@ -74,4 +74,12 @@ describe('renderBody', () => {
     expect(body).toContain('2026-11-21');
     expect(body).toContain('KM-03');
   });
+  it('emits a bare `none` Mission ID — KL-03 placeholder pattern is exact-match', () => {
+    // Regression: 'none — <reason>' parses as a real mission id and fails
+    // pr create with no_mission_candidates.
+    const line = renderBody('2026-11-21', 'r.md')
+      .split('\n')
+      .find((l) => l.startsWith('- Mission ID:'));
+    expect(line).toBe('- Mission ID: none');
+  });
 });

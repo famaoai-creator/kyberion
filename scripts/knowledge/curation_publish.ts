@@ -91,7 +91,7 @@ Weekly knowledge-curation scan artifact (\`${reportPath}\`, generated ${date}). 
 
 ## Coordination
 
-- Mission ID: none — pipeline-generated advisory artifact
+- Mission ID: none
 - Workitem IDs:
 - Evidence paths: ${reportPath}
 - Trace IDs:
