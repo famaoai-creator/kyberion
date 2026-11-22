@@ -103,6 +103,8 @@ const MEETING_SESSION_DELEGATION: DelegationSpec = {
 
 /** Exact-match declarations. */
 const OPERATIONS: Readonly<Record<string, RegistryEntry>> = {
+  'media:image-local:render': { effectClass: 'local_only', authority: { kind: 'free' } },
+  'media:image-local:collect': { effectClass: 'local_only', authority: { kind: 'free' } },
   // Information asset metadata surfaces retain owner/viewer/scope checks in their detail layers.
   'information-asset:catalog:read': { effectClass: 'local_only', authority: { kind: 'free' } },
   'information-asset:coverage:read': { effectClass: 'local_only', authority: { kind: 'free' } },
@@ -506,7 +508,7 @@ const OPERATION_PREFIXES: Readonly<Record<string, RegistryEntry>> = {
     effectClass: 'external_mutation',
     authority: { kind: 'admission', boundary: 'external' },
   },
-  // media:image:${provider.id}:generate — paid external generation.
+  // media:image:${provider.id}:generate — external generation.
   'media:image:': {
     effectClass: 'external_mutation',
     authority: { kind: 'admission', boundary: 'external' },

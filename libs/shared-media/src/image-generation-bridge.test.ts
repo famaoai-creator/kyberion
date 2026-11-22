@@ -17,6 +17,7 @@ import {
 } from './image-generation-bridge.js';
 import { resolveLocalFluxGenerationPolicy } from './image-generation-policy.js';
 import { ImageGenerationProvider } from './image-generation-types.js';
+import { governImageProvider } from './image-generation/admission.js';
 // Transport/routing tests; real admission is covered separately.
 vi.mock('@agent/core/governance/external-operation', () => ({
   runExternalOperation: vi.fn(async (_input, execute) => execute()),
@@ -929,6 +930,16 @@ describe('HostAgentImageGenerationProvider', () => {
       targetPath: 'stale.png',
       prompt: 'test prompt',
     });
+  });
+
+  it('does not request external generation if the collected output disappears', async () => {
+    mocks.isHostOutput.mockReturnValueOnce(true).mockReturnValueOnce(false);
+    const provider = governImageProvider(new HostAgentImageGenerationProvider());
+
+    await expect(
+      provider.generate({ prompt: 'test prompt', targetPath: 'removed.png' })
+    ).rejects.toThrow('HOST_IMAGE_OUTPUT_CHANGED');
+    expect(mocks.recordHostRequest).not.toHaveBeenCalled();
   });
 
   it('writes request metadata and throws exception if file does not exist', async () => {

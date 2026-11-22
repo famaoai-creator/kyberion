@@ -26,6 +26,7 @@ import {
 } from '../../host-image-handoff.js';
 import { isInsideProviderHarness } from '@agent/core/agent-execution-context';
 import { getFallbackTargetPath } from '../provider-support.js';
+import { hostImageCollectionRequests } from '../admission.js';
 
 type HostBridgeVariant =
   'host_agent' | 'codex_host_bridge' | 'agy_host_bridge' | 'cursor_host_bridge';
@@ -143,6 +144,11 @@ abstract class BaseHostBridgeImageGenerationProvider implements ImageGenerationP
       };
     }
 
+    if (hostImageCollectionRequests.has(request)) {
+      throw new Error(
+        '[HOST_IMAGE_OUTPUT_CHANGED] Host output changed before collection. Retry through the image router.'
+      );
+    }
     if (safeExistsSync(targetPath)) {
       logger.info(
         `[image_generation_bridge] ${targetPath} exists but was not produced for a hand-off request with this prompt; requesting a new image.`
