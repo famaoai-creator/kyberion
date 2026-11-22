@@ -156,8 +156,12 @@ class SourceView {
     return count;
   }
 
-  /** Problem text if `path:line` does not resolve, else null. */
-  checkCitation(citation: Json): string | null {
+  /**
+   * Problem text if `path:line` does not resolve, else null. `allowEmptyFile`
+   * accepts line 1 of an empty file — a node location (a module is its file),
+   * never a claim citation, which must point at real content.
+   */
+  checkCitation(citation: Json, options: { allowEmptyFile?: boolean } = {}): string | null {
     const file = citation.path;
     const line = citation.line;
     if (!nonEmpty(file)) return 'citation without path';
@@ -166,7 +170,7 @@ class SourceView {
     const count = this.lineCount(file);
     if (count === null)
       return `citation ${file}:${line} does not resolve to a file in the source root`;
-    if (line > count)
+    if (line > count && !(options.allowEmptyFile && count === 0 && line === 1))
       return `citation ${file}:${line} is beyond the end of the file (${count} lines)`;
     return null;
   }
@@ -249,7 +253,10 @@ function validateCodeGraphDocument(missionDir: string, source: SourceView): Code
     if (!(REVERSE_SPEC_NODE_KINDS as readonly unknown[]).includes(node.kind))
       badKind.push(String(node.id));
     if (node.path !== undefined) {
-      const problem = source.checkCitation({ path: node.path, line: node.line ?? 1 });
+      const problem = source.checkCitation(
+        { path: node.path, line: node.line ?? 1 },
+        { allowEmptyFile: true }
+      );
       if (problem) badCitation.push(`${String(node.id)} (${problem})`);
     }
   }

@@ -1,5 +1,6 @@
 import * as path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import { computeSourceFingerprint } from '../analysis/source-fingerprint.js';
 import { validateReverseSpecEvidenceAt } from './reverse-spec-evidence.js';
 import {
   cleanupFixtures,
@@ -37,6 +38,33 @@ describe('reverse_spec evidence gates', () => {
     flush();
     expect(() => validateReverseSpecEvidenceAt(mission, 'code_graph')).toThrow(
       /without a resolution/u
+    );
+  });
+
+  it('accepts an empty file as a module location but not as a claim citation', () => {
+    const { mission, source, docs, flush } = fixture();
+    write(path.join(source, 'src/__init__.py'), '');
+    docs.code_graph.source_fingerprint = computeSourceFingerprint(source);
+    (docs.code_graph.nodes as Record<string, unknown>[]).push({
+      id: 'MOD:src/__init__.py',
+      kind: 'module',
+      path: 'src/__init__.py',
+      line: 1,
+    });
+    flush();
+    expect(validateReverseSpecEvidenceAt(mission, 'code_graph').ok).toBe(true);
+    const spec = (docs.specify.specs as Record<string, unknown>[])[0];
+    spec.claims = [
+      {
+        claim_id: 'C-001',
+        confidence: 'confirmed',
+        citations: [{ path: 'src/__init__.py', line: 1 }],
+      },
+    ];
+    (docs.code_graph.nodes as Record<string, unknown>[]).pop();
+    flush();
+    expect(() => validateReverseSpecEvidenceAt(mission, 'specify')).toThrow(
+      /beyond the end of the file \(0 lines\)/u
     );
   });
 
