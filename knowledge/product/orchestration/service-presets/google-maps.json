@@ -1,32 +1,44 @@
 {
   "service_id": "google-maps",
-  "name": "Google Maps MCP Server",
-  "description": "MCP-based Google Maps interactions",
+  "name": "Google Maps Platform API",
+  "description": "Direct Google Maps Platform calls: Geocoding API and Places API (New) text search. API key from secret-guard (`pnpm kyberion secret introduce google-maps API_KEY`), sent as the `key` query parameter.",
+  "setup_hint": "Create an API key with the Geocoding API and Places API (New) enabled, then run pnpm kyberion secret introduce google-maps API_KEY.",
+  "auth_strategy": "api_key_query",
+  "auth_params": {
+    "key": "key",
+    "value": "{{accessToken}}"
+  },
   "operations": {
     "maps_search": {
-      "type": "mcp",
+      "type": "api",
+      "kind": "capture",
       "risk": "read",
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-google-maps"],
-      "tool_name": "maps_search",
+      "approval_required": false,
+      "method": "POST",
+      "base_url": "https://places.googleapis.com/v1",
+      "path": "places:searchText",
+      "headers": {
+        "Content-Type": "application/json",
+        "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.location,places.googleMapsUri"
+      },
+      "description": "Search places by free text (Places API New, places:searchText). Read-only: the request is a query.",
       "parameters": {
         "query": { "required": true, "type": "string" }
       },
       "payload_template": {
-        "query": "{{query}}"
+        "textQuery": "{{query}}"
       }
     },
     "maps_geocode": {
-      "type": "mcp",
+      "type": "api",
+      "kind": "capture",
       "risk": "read",
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-google-maps"],
-      "tool_name": "maps_geocode",
+      "approval_required": false,
+      "method": "GET",
+      "path": "geocode/json",
+      "description": "Geocode an address to coordinates (Geocoding API).",
       "parameters": {
         "address": { "required": true, "type": "string" }
-      },
-      "payload_template": {
-        "address": "{{address}}"
       }
     }
   }

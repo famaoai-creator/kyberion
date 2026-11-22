@@ -372,15 +372,21 @@ function resolveGuardedSecret(
     return upstream;
   }
 
-  let value = getRegisteredEnvText(key);
-  if (!value) value = _cachedPersonalSecrets.get(key);
+  // A hyphenated service id keeps its reference name (`GOOGLE-MAPS_API_KEY`:
+  // bindings, probes and setup all use it), but the secret is stored under
+  // the env-safe name (`GOOGLE_MAPS_API_KEY`, secret-identity
+  // serviceIdToEnvPrefix) by `secret introduce` and in the environment.
+  const storedKey = key.includes('-') ? key.replace(/-/g, '_') : key;
+  let value =
+    getRegisteredEnvText(key) || (storedKey !== key ? getRegisteredEnvText(storedKey) : undefined);
+  if (!value) value = _cachedPersonalSecrets.get(key) ?? _cachedPersonalSecrets.get(storedKey);
   if (!value) {
     try {
       const secrets = parseSecretRecord(
         readSensitiveJson<unknown>(safeSecretPath(SECRETS_FILE)),
         'vault secrets'
       );
-      const candidate = secrets?.[key];
+      const candidate = secrets?.[key] ?? secrets?.[storedKey];
       if (typeof candidate === 'string') value = candidate;
     } catch (_) {
       /* secrets file absent or corrupt: fall back to env-only resolution */
@@ -403,7 +409,7 @@ function resolveGuardedSecret(
       const { parseEnvSecretName } = requireSecretModules(
         './secret-identity.js'
       ) as typeof import('./secret-identity.js');
-      identity = parseEnvSecretName(key, scope) ?? undefined;
+      identity = parseEnvSecretName(storedKey, scope) ?? undefined;
     } catch {
       return null;
     }
