@@ -22,6 +22,7 @@ import {
   planProcessTemplateTasks,
 } from './mission-process-planning.js';
 import { activateMissionOnGateProgress, assertValidMissionId } from './mission-creation.js';
+import { withMissionPrerequisiteIdentityProbe } from './mission-prerequisite-identity.js';
 import {
   buildPlannerRetryPrompt,
   packetRequiresIndependentReview,
@@ -39,6 +40,18 @@ const passedAudienceGate = {
   checks: [],
   reasons: [],
 };
+
+// Gate activation runs the governed startMission path, which gates on the
+// sovereign profile. These tests exercise gate progression, not onboarding
+// readiness, so they inject a ready identity through the composition port.
+const activateReady = (
+  id: string,
+  evaluation: Parameters<typeof activateMissionOnGateProgress>[1]
+) =>
+  withMissionPrerequisiteIdentityProbe(
+    () => ({ ready: true, missing_files: [] }),
+    () => activateMissionOnGateProgress(id, evaluation)
+  );
 
 function presentationDesign() {
   return resolveMissionWorkflowDesign({
@@ -429,13 +442,13 @@ describe('mission process planning', () => {
     ) as Array<Record<string, unknown>>;
     expect(tasks.find((task) => task.phase === 'audience_definition')?.status).toBe('completed');
 
-    expect(await activateMissionOnGateProgress(missionId, passedAudienceGate)).toBe(true);
+    expect(await activateReady(missionId, passedAudienceGate)).toBe(true);
     const state = JSON.parse(
       safeReadFile(`${missionPath}/mission-state.json`, { encoding: 'utf8' }) as string
     ) as Record<string, any>;
     expect(state.status).toBe('active');
     // Second call is a no-op (already active).
-    expect(await activateMissionOnGateProgress(missionId, passedAudienceGate)).toBe(false);
+    expect(await activateReady(missionId, passedAudienceGate)).toBe(false);
   });
 
   it('activates an alignment workflow only after its approval gate passes', async () => {
@@ -456,7 +469,7 @@ describe('mission process planning', () => {
       false
     );
     expect(JSON.parse(safeReadFile(statePath, 'utf8') as string).status).toBe('planned');
-    expect(await activateMissionOnGateProgress(missionId, alignment)).toBe(true);
+    expect(await activateReady(missionId, alignment)).toBe(true);
     expect(JSON.parse(safeReadFile(statePath, 'utf8') as string).status).toBe('active');
   });
 
