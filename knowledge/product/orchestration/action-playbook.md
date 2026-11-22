@@ -70,6 +70,11 @@ They are **not duplicates**; their action sets do not overlap.
   construction). Reachable as `pnpm kyberion capture [--screen|--window|--camera]`
   and `pnpm kyberion record screen|audio|camera`. Mobile stays still-image only
   (`capture_screen`); mobile video has no device bridge yet.
+- **One-off system ops** run without authoring a pipeline: `pnpm kyberion system <op>`
+  (vocabulary: `pnpm kyberion system ops` or cross-actuator `pnpm kyberion ops`)
+  wraps one op in a one-step ADF; `system interact <type>` reaches
+  `computer_interaction` through the same preflight/approval boundary.
+  Raw-command ops (`exec`/`shell`/`run_js`) stay pipeline-only.
 - Browser operations follow the canonical [operating checklist](./browser-automation-best-practices.md):
   define success, observe a unique target, act with approval, verify the result, and
   reconcile uncertain effects before retry/resume. A receipt alone is not outcome proof.

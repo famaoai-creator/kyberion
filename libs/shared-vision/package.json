@@ -26,6 +26,10 @@
       "types": "./dist/browser-bridge-mailbox.d.ts",
       "default": "./dist/browser-bridge-mailbox.js"
     },
+    "./browser-control-recording": {
+      "types": "./dist/browser-control-recording.d.ts",
+      "default": "./dist/browser-control-recording.js"
+    },
     "./browser-control-service": {
       "types": "./dist/browser-control-service.d.ts",
       "default": "./dist/browser-control-service.js"

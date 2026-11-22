@@ -664,6 +664,12 @@
       "count": 1,
       "classification": "legit-tmp",
       "note": "Stable per-(platform,device) mirror state file shared across short-lived actuator invocations; regenerated whenever a stream restarts."
+    },
+    {
+      "file": "scripts/cli/cli-system.ts",
+      "count": 1,
+      "classification": "legit-tmp",
+      "note": "One-shot actuator input envelope passed to the system-actuator child process; consumed by that invocation and superseded on the next run. Re-generable by definition."
     }
   ],
   "pipeline_literals": [

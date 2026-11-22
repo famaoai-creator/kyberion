@@ -71,6 +71,36 @@ most recent active session is used. `--json` prints the raw response.
    `pnpm kyberion secret introduce --from-file` — never paste tokens in chat.
 5. `close` the session when done (it also dies on TTL).
 
+## Promoting a session to a procedure
+
+Interactive work is journaled, so a session that succeeded can become a
+replayable procedure — same review gate as side-panel recordings:
+
+```bash
+pnpm kyberion browser control export <BCS-…> [--title <t>]   # journal → BCR-… (pending)
+pnpm kyberion browser control recordings                     # list exported recordings
+pnpm kyberion browser control recordings show <BCR-…>        # inspect one
+pnpm kyberion browser control review <BCR-…> --approve-all   # or --approve/--reject <ids>
+pnpm kyberion browser control promote <BCS-…>                # export + governed promote
+pnpm kyberion browser control promote --recording <BCR-…> [--id <procedure_id>] [--intent a,b]
+```
+
+`export` preserves op, target ref/role/name, risk, navigation transitions and
+variables; the recording lands under the allowlisted recordings store with
+`review.status=pending`. Only steps that actually **completed** are exported —
+failed, declined or still-pending steps are dropped (the export reports the
+count), and a `press` with a non-default key is skipped because the recording
+schema cannot express it (replay defaults to Enter). `fill` values never reach
+the journal — they are scrubbed at write time — and export always emits the
+`user_input` variable placeholder instead.
+
+`promote` derives a safe `procedure_id` and intent phrases from the session
+metadata, then calls the existing `promote-procedure` pipeline — the candidate
+still needs an approved review before it reaches the ProcedureCatalog and
+Pattern B replay. `--approve-all` on `promote`/`review` compresses
+export → review → promote into **one explicit operator judgment** — it is the
+human decision recorded, not a bypass.
+
 ## Vocabulary map
 
 Three layers share the browser surface — same targets, different verbs:

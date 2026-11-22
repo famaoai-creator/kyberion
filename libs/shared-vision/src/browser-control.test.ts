@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeExistsSync, safeRmSync } from '@agent/core/secure-io';
+import { safeExistsSync, safeReadFile, safeRmSync } from '@agent/core/secure-io';
 import {
   BROWSER_BRIDGE_MAILBOX_ROOT,
   BROWSER_CONTROL_SECRET_ROOT,
@@ -14,6 +14,7 @@ import {
 import {
   BROWSER_CONTROL_SESSION_ROOT,
   admitControlStep,
+  appendBrowserControlJournal,
   hashControlStep,
   listBrowserControlSessions,
   loadBrowserControlSession,
@@ -21,6 +22,14 @@ import {
   recordApprovedControlStep,
   revokeBrowserControlSession,
 } from './browser-control-sessions.js';
+import {
+  exportBrowserControlRecording,
+  listExportedRecordings,
+  loadExportedRecording,
+  reviewExportedRecording,
+} from './browser-control-recording.js';
+import { enqueueSessionStep } from './browser-control-service.js';
+import { loadBrowserExtensionRecordingAtPath } from '@agent/core/browser/browser-extension-bridge';
 
 const SESSION_ROOT = pathResolver.rootResolve(BROWSER_CONTROL_SESSION_ROOT);
 const SECRET_ROOT = pathResolver.rootResolve(BROWSER_CONTROL_SECRET_ROOT);
@@ -231,5 +240,261 @@ describe('control_step mailbox lifecycle', () => {
   it('rejects arbitrary ops at schema validation', () => {
     const session = mint();
     expect(() => enqueueStep(session, { op: 'evaluate' as never, text: 'alert(1)' })).toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Journal → browser-recording export (interactive → promote path)
+// ---------------------------------------------------------------------------
+
+const RECORDINGS_DIR = pathResolver.rootResolve('active/shared/runtime/recordings');
+const exportedIds: string[] = [];
+
+function journalEnqueuedStep(
+  sessionId: string,
+  step: Record<string, unknown>,
+  outcome: 'completed' | 'failed' | 'none' = 'completed'
+): void {
+  const requestId = `req-${String(step.step_id)}`;
+  appendBrowserControlJournal(sessionId, {
+    event: 'step.enqueued',
+    step_id: step.step_id,
+    op: step.op,
+    request_id: requestId,
+    ...(step.ref ? { ref: step.ref } : {}),
+    step,
+  });
+  if (outcome !== 'none') {
+    appendBrowserControlJournal(sessionId, {
+      event: `step.${outcome}`,
+      step_id: step.step_id,
+      request_id: requestId,
+    });
+  }
+}
+
+afterEach(() => {
+  for (const id of exportedIds.splice(0)) {
+    const file = `${RECORDINGS_DIR}/${id}.json`;
+    if (safeExistsSync(file)) safeRmSync(file);
+  }
+});
+
+describe('browser control journal → recording export', () => {
+  it('compiles enqueued steps into a schema-valid browser-recording', () => {
+    const session = mint();
+    journalEnqueuedStep(session.session_id, {
+      step_id: 's-1',
+      op: 'navigate',
+      url: 'https://api.slack.com/apps/manage',
+    });
+    journalEnqueuedStep(session.session_id, {
+      step_id: 's-2',
+      op: 'snapshot',
+    });
+    journalEnqueuedStep(session.session_id, {
+      step_id: 's-3',
+      op: 'click_ref',
+      ref: '@button_a1b2_1',
+      role: 'button',
+      name: 'Create app',
+      label: 'open create dialog',
+    });
+    journalEnqueuedStep(session.session_id, {
+      step_id: 's-4',
+      op: 'fill_ref',
+      ref: '@textbox_c3d4_1',
+      role: 'textbox',
+      name: 'App name',
+      value: 'my-bot',
+    });
+    journalEnqueuedStep(session.session_id, {
+      step_id: 's-5',
+      op: 'delete',
+      ref: '@button_e5f6_1',
+      role: 'button',
+      name: 'Delete app',
+    });
+
+    const out = exportBrowserControlRecording({ session_id: session.session_id });
+    expect(out.status).toBe('exported');
+    if (out.status !== 'exported') return;
+    exportedIds.push(out.recording_id);
+
+    expect(out.action_count).toBe(4); // snapshot is observation-only → skipped
+    expect(out.skipped_steps).toBe(1);
+
+    const file = pathResolver.rootResolve(out.recording_ref);
+    const recording = loadBrowserExtensionRecordingAtPath(file);
+    expect(recording.schema_version).toBe('browser-recording.v1');
+    expect(recording.tab.origin).toBe('https://api.slack.com');
+    expect(recording.review?.status).toBe('pending');
+    expect(recording.review?.decisions).toHaveLength(4);
+
+    const [nav, click, fill, del] = recording.actions;
+    expect(nav.op).toBe('navigate');
+    expect(nav.risk).toBe('observe');
+    expect(nav.navigation).toEqual({
+      from_origin: 'https://api.slack.com',
+      to_origin: 'https://api.slack.com',
+    });
+    expect(click.target?.ref).toBe('@button_a1b2_1');
+    expect(click.risk).toBe('low');
+    expect(fill.variable).toEqual({ name: 'app_name', classification: 'user_input' });
+    expect(del.op).toBe('delete');
+    expect(del.risk).toBe('high');
+    expect(recording.risk_summary.approval_required_count).toBe(1);
+  });
+
+  it('fails cleanly when the session has no replayable steps', () => {
+    const session = mint();
+    journalEnqueuedStep(session.session_id, { step_id: 's-1', op: 'snapshot' });
+    const out = exportBrowserControlRecording({ session_id: session.session_id });
+    expect(out.status).toBe('error');
+    if (out.status === 'error') expect(out.reason).toMatch(/no replayable actions/);
+  });
+
+  it('rejects export for unknown sessions', () => {
+    const out = exportBrowserControlRecording({
+      session_id: 'BCS-00000000-0000-0000-0000-000000000000',
+    });
+    expect(out.status).toBe('error');
+  });
+
+  it('review decisions merge and gate promotion status', () => {
+    const session = mint();
+    journalEnqueuedStep(session.session_id, {
+      step_id: 's-1',
+      op: 'click_ref',
+      ref: '@button_a1b2_1',
+      role: 'button',
+      name: 'OK',
+    });
+    journalEnqueuedStep(session.session_id, {
+      step_id: 's-2',
+      op: 'click_ref',
+      ref: '@button_c3d4_2',
+      role: 'button',
+      name: 'Cancel',
+    });
+    const out = exportBrowserControlRecording({ session_id: session.session_id });
+    expect(out.status).toBe('exported');
+    if (out.status !== 'exported') return;
+    exportedIds.push(out.recording_id);
+
+    const partial = reviewExportedRecording({
+      recording_id: out.recording_id,
+      approve: ['act-001'],
+    });
+    expect(partial).toEqual({ status: 'reviewed', review_status: 'in_review' });
+
+    const second = reviewExportedRecording({
+      recording_id: out.recording_id,
+      approve: ['act-002'],
+    });
+    expect(second).toEqual({ status: 'reviewed', review_status: 'approved' });
+
+    const stored = loadExportedRecording(out.recording_id);
+    expect(stored?.review?.status).toBe('approved');
+    expect(stored?.review?.decisions.every((d) => d.status === 'approved')).toBe(true);
+
+    const listed = listExportedRecordings();
+    expect(listed.some((entry) => entry.recording_id === out.recording_id)).toBe(true);
+  });
+
+  it('exports only steps that reported a completed outcome', () => {
+    const session = mint();
+    journalEnqueuedStep(session.session_id, {
+      step_id: 's-ok',
+      op: 'click_ref',
+      ref: '@button_a1_1',
+      role: 'button',
+      name: 'Save',
+    });
+    journalEnqueuedStep(
+      session.session_id,
+      { step_id: 's-fail', op: 'click_ref', ref: '@button_b2_2', role: 'button' },
+      'failed'
+    );
+    journalEnqueuedStep(
+      session.session_id,
+      { step_id: 's-pending', op: 'navigate', url: 'https://api.slack.com/x' },
+      'none'
+    );
+
+    const out = exportBrowserControlRecording({ session_id: session.session_id });
+    expect(out.status).toBe('exported');
+    if (out.status !== 'exported') return;
+    exportedIds.push(out.recording_id);
+    expect(out.action_count).toBe(1);
+    expect(out.dropped_unexecuted).toBe(2);
+  });
+
+  it('errors with an unexecuted count when nothing completed', () => {
+    const session = mint();
+    journalEnqueuedStep(
+      session.session_id,
+      { step_id: 's-1', op: 'click_ref', ref: '@b1' },
+      'failed'
+    );
+    const out = exportBrowserControlRecording({ session_id: session.session_id });
+    expect(out.status).toBe('error');
+    if (out.status === 'error') expect(out.reason).toMatch(/no completed steps.*1 enqueued/);
+  });
+
+  it('skips a press_ref whose non-default key the replay cannot express', () => {
+    const session = mint();
+    journalEnqueuedStep(session.session_id, {
+      step_id: 's-1',
+      op: 'press_ref',
+      ref: '@input_1',
+      key: 'Tab',
+    });
+    journalEnqueuedStep(session.session_id, {
+      step_id: 's-2',
+      op: 'click_ref',
+      ref: '@button_2',
+      role: 'button',
+      name: 'Go',
+    });
+    const out = exportBrowserControlRecording({ session_id: session.session_id });
+    expect(out.status).toBe('exported');
+    if (out.status !== 'exported') return;
+    exportedIds.push(out.recording_id);
+    expect(out.action_count).toBe(1);
+    expect(out.skipped_steps).toBe(1);
+  });
+
+  it('tolerates malformed ids and stray files in the recordings store', () => {
+    expect(loadExportedRecording('.hidden')).toBeNull();
+    expect(loadExportedRecording('nope/../x')).toBeNull();
+  });
+
+  it('scrubs fill_ref values from the journal at write time', () => {
+    // enqueueSessionStep admits against the real clock — anchor at now.
+    const session = mint({ now: new Date() });
+    const enqueued = enqueueSessionStep({
+      session_id: session.session_id,
+      step: {
+        step_id: 's-fill',
+        op: 'fill_ref',
+        ref: '@textbox_1',
+        value: 'hunter2-super-secret',
+      },
+      actor: { actor_id: 'agent:test', mission_id: 'MSN-TEST-1' },
+    });
+    expect(enqueued.status).toBe('queued');
+
+    const journal = pathResolver.rootResolve(
+      `${BROWSER_CONTROL_SESSION_ROOT}/${session.session_id}.journal.jsonl`
+    );
+    const raw = String(safeReadFile(journal, { encoding: 'utf8' }));
+    expect(raw).not.toContain('hunter2-super-secret');
+    const entry = raw
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line) as Record<string, unknown>)
+      .find((line) => line.event === 'step.enqueued');
+    expect((entry?.step as Record<string, unknown>).value_redacted).toBe(true);
   });
 });

@@ -51,6 +51,7 @@ phase_affinity: [alignment, execution]
 
 - **画面キャプチャ**は `system:screenshot` / `system:record_screen`（画面の伏せ字処理を通る）。`media-generation` / `vision` のキャプチャ op はそこへ転送するだけ。ページのキャプチャは `browser:screenshot`（ページ動画は `record_video` セッションフラグのまま。明示の `browser:record` op は意図的に未作: 録画は open→navigate→close のセッション生命定数が必要で、薄いキャプチャラッパの範囲を超えるため）。
 - **マイクとカメラ**は `system:record_audio` / `system:capture_photo` / `system:record_camera`（カメラ動画は写真つなぎのため低 fps が前提）。`pnpm kyberion capture [--screen|--window|--camera]` と `pnpm kyberion record screen|audio|camera` で届く。モバイルは静止画のみ（`capture_screen`）。モバイル動画のデバイスブリッジは未着手。
+- **単発の system op** はパイプライン作成なしで `pnpm kyberion system <op>`（語彙は `pnpm kyberion system ops`、全 actuator は `pnpm kyberion ops`）— 1ステップの ADF に包んで実行する。`system interact <type>` は同じ preflight/approval 境界を通して `computer_interaction` に届く。生コマンド系 op（`exec`/`shell`/`run_js`）はパイプライン専用のまま。
 - 詳細: [browser-automation-best-practices.md](./browser-automation-best-practices.md)、[computer-use-runtime-model.md](../architecture/computer-use-runtime-model.md)、[os-automation-bridge-model.md](../architecture/os-automation-bridge-model.md)。
 
 ## 3. 移動する — 手の一部

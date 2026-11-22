@@ -9380,6 +9380,16 @@
         "ja": "アクチュエータを実行",
         "qps-ploc": "⟦Ėẋėƈůŧė ȧñ ȧƈŧůȧŧőř ŀőřėɱ ⟧"
       },
+      "cli_cmd_operator_cli_ops": {
+        "en": "List actuator op vocabulary by domain and step kind",
+        "ja": "アクチュエータの op vocabulary をドメイン・ステップ種別ごとに一覧",
+        "qps-ploc": "⟦Ŀïşŧ ȧƈŧůȧŧőř őṗ ṽőƈȧƀůŀȧřẏ ƀẏ ḓőɱȧïñ ȧñḓ şŧėṗ ķïñḓ ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "cli_cmd_operator_cli_system": {
+        "en": "Run one system-actuator op or computer_interaction without authoring a pipeline",
+        "ja": "パイプラインを作らずに system アクチュエータの op / computer_interaction を実行",
+        "qps-ploc": "⟦Řůñ őñė şẏşŧėɱ-ȧƈŧůȧŧőř őṗ őř ƈőɱṗůŧėř_ïñŧėřȧƈŧïőñ ẇïŧħőůŧ ȧůŧħőřïñɠ ȧ ṗïṗėŀïñė ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
+      },
       "cli_cmd_operator_cli_preview": {
         "en": "Validate a pipeline JSON and show its step tree",
         "ja": "パイプライン JSON を検証しステップツリーを表示",

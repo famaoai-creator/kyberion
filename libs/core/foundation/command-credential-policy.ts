@@ -93,9 +93,12 @@ export function missionActionCredentialRequirement(
 const CLI_READINESS_SUBCOMMANDS: Readonly<Record<string, ReadonlySet<string>>> = {
   calendar: new Set(['status']),
   email: new Set(['status', 'latest-draft']),
+  // `system ops` is a vocabulary listing; real ops run in the actuator
+  // subprocess with its own bootstrap, so `system <op>` stays 'required'.
+  system: new Set(['ops']),
 };
 
-const CLI_NONE_COMMANDS: ReadonlySet<string> = new Set(['list']);
+const CLI_NONE_COMMANDS: ReadonlySet<string> = new Set(['list', 'ops']);
 
 export function cliCommandCredentialRequirement(input: {
   command: string;
