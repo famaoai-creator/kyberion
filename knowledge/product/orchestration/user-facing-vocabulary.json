@@ -21031,12 +21031,12 @@
       "ia_inbox_error_failure": {
         "en": "The disposition could not be recorded. Nothing was changed; try again.",
         "ja": "対応を記録できませんでした。変更はされていません。もう一度お試しください。",
-        "qps-ploc": "⟦Ŧħė ḓïşṗőşïŧïőñ ƈőůŀḓ ñőŧ ƀė řėƈőřḓėḓ. Ñőŧħïñɠ ẇȧş ƈħȧñɠėḓ; ŧřẏ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+        "qps-ploc": "⟦Ŧħė ḓïşṗőşïŧïőñ ƈőůŀḓ ñőŧ ƀė řėƈőřḓėḓ. Ñőŧħïñɠ ẇȧş ƈħȧñɠėḓ; ŧřẏ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
       },
       "ia_inbox_error_reassign_owner": {
         "en": "Choose who should take over before reassigning.",
         "ja": "担当を変えるには、引き継ぐ相手を指定してください。",
-        "qps-ploc": "⟦Ƈħőőşė ẇħő şħőůŀḓ ŧȧķė őṽėř ƀėƒőřė řėȧşşïɠñïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+        "qps-ploc": "⟦Ƈħőőşė ẇħő şħőůŀḓ ŧȧķė őṽėř ƀėƒőřė řėȧşşïɠñïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
       },
       "ia_shell_tabs_label": {
         "en": "Sections of this page",
@@ -30626,17 +30626,17 @@
       "decide_allow_once": {
         "en": "Allow once",
         "ja": "今回だけ許可",
-        "qps-ploc": "⟦Ȧŀŀőẇ őñƈė ŀőřėɱ⟧"
+        "qps-ploc": "⟦Ȧŀŀőẇ őñƈė ŀőř⟧"
       },
       "decide_allow_always": {
         "en": "Always allow ({scope})",
         "ja": "常に許可（{scope}）",
-        "qps-ploc": "⟦Ȧŀẇȧẏş ȧŀŀőẇ ({scope}) ŀőřėɱ⟧"
+        "qps-ploc": "⟦Ȧŀẇȧẏş ȧŀŀőẇ ({scope}) ŀőřėɱ ï⟧"
       },
       "decide_allow_always_unavailable": {
         "en": "Always allow is not available for this request",
         "ja": "この依頼では常に許可は使えません",
-        "qps-ploc": "⟦Ȧŀẇȧẏş ȧŀŀőẇ ïş ñőŧ ȧṽȧïŀȧƀŀė ƒőř ŧħïş řėɋůėşŧ ŀőřėɱ⟧"
+        "qps-ploc": "⟦Ȧŀẇȧẏş ȧŀŀőẇ ïş ñőŧ ȧṽȧïŀȧƀŀė ƒőř ŧħïş řėɋůėşŧ ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
       },
       "decide_retry": {
         "en": "Retry",
@@ -30651,17 +30651,17 @@
       "decide_reassign": {
         "en": "Reassign",
         "ja": "担当変更",
-        "qps-ploc": "⟦Řėȧşşïĝñ ŀőřėɱ⟧"
+        "qps-ploc": "⟦Řėȧşşïɠñ ŀőř⟧"
       },
       "decide_reassign_prompt": {
         "en": "Peer id of the new owner",
         "ja": "新しい担当のピア ID",
-        "qps-ploc": "⟦Ṗėėř ïḓ őƒ ŧħė ñėẇ őẇñėř ŀőřėɱ⟧"
+        "qps-ploc": "⟦Ṗėėř ïḓ őƒ ŧħė ñėẇ őẇñėř ŀőřėɱ ï⟧"
       },
       "decide_accept": {
         "en": "Accept as-is",
         "ja": "このまま受理",
-        "qps-ploc": "⟦Ȧƈƈėṗŧ ȧş-ïş ŀőřėɱ⟧"
+        "qps-ploc": "⟦Ȧƈƈėṗŧ ȧş-ïş ŀőř⟧"
       },
       "decide_continue": {
         "en": "Continue",
