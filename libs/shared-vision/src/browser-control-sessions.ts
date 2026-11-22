@@ -17,6 +17,7 @@ import { randomUUID, createHash } from 'node:crypto';
 import * as path from 'node:path';
 import { appendJsonLine, readJsonIfPresent, writeJson } from '@agent/core/foundation/json';
 import { withLockSync } from '@agent/core/foundation/lock-utils';
+import { BROWSER_CONTROL_ROOT_PATH } from '@agent/core/foundation/runtime-state-roots';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
   assertSafeRepositoryPath,
@@ -27,7 +28,7 @@ import {
 } from '@agent/core/secure-io';
 import { HIGH_RISK_OPERATIONS } from '@agent/core/browser/browser-extension-bridge';
 
-export const BROWSER_CONTROL_SESSION_ROOT = 'active/shared/runtime/browser-control/sessions';
+export const BROWSER_CONTROL_SESSION_ROOT = `${BROWSER_CONTROL_ROOT_PATH}/sessions`;
 export const BROWSER_CONTROL_SESSION_TTL_MS = 30 * 60_000;
 export const BROWSER_CONTROL_MAX_TTL_MS = 60 * 60_000;
 
@@ -147,7 +148,9 @@ export function revokeBrowserControlSession(sessionId: string): BrowserControlSe
 
 /** Hash a step payload the same way the lease-side approval records it. */
 export function hashControlStep(step: unknown): string {
-  return createHash('sha256').update(JSON.stringify(step ?? null)).digest('hex');
+  return createHash('sha256')
+    .update(JSON.stringify(step ?? null))
+    .digest('hex');
 }
 
 export type SessionAdmission =

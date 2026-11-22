@@ -57,6 +57,7 @@ import {
   safeReaddir,
   safeUnlink,
 } from '@agent/core/secure-io';
+import { BROWSER_CONTROL_ROOT_PATH } from '@agent/core/foundation/runtime-state-roots';
 import {
   PARTITIONED_RUNTIME_STATE_ROOTS,
   STORAGE_DATA_TIERS,
@@ -89,8 +90,7 @@ const TENANT_OBSERVE_ORIGINS_ERROR =
 /** Schema maxLength of the free-text payload fields redaction may lengthen. */
 const PAYLOAD_TEXT_LIMITS = { purpose: 300, input: 30000, title: 120, body: 1000 } as const;
 
-export type BrowserBridgeRequestKind =
-  'observe_tab' | 'local_infer' | 'notify' | 'control_step';
+export type BrowserBridgeRequestKind = 'observe_tab' | 'local_infer' | 'notify' | 'control_step';
 export type BrowserBridgeRequestStatus =
   'pending' | 'delivered' | 'completed' | 'declined' | 'failed' | 'expired';
 export type BrowserBridgeResponseStatus = 'completed' | 'declined' | 'failed';
@@ -135,12 +135,26 @@ export interface BrowserBridgeNotifyPayload {
 export type BrowserBridgeControlStep = {
   step_id: string;
   op:
-    | 'snapshot' | 'screenshot' | 'extract_text_ref' | 'list_tabs'
-    | 'open_tab' | 'select_tab' | 'navigate'
-    | 'click_ref' | 'click_if_present' | 'fill_ref' | 'select_ref'
-    | 'press_ref' | 'wait_for_ref'
-    | 'submit_form' | 'upload_file' | 'download_file' | 'delete'
-    | 'purchase' | 'credential_submit' | 'settings_change';
+    | 'snapshot'
+    | 'screenshot'
+    | 'extract_text_ref'
+    | 'list_tabs'
+    | 'open_tab'
+    | 'select_tab'
+    | 'navigate'
+    | 'click_ref'
+    | 'click_if_present'
+    | 'fill_ref'
+    | 'select_ref'
+    | 'press_ref'
+    | 'wait_for_ref'
+    | 'submit_form'
+    | 'upload_file'
+    | 'download_file'
+    | 'delete'
+    | 'purchase'
+    | 'credential_submit'
+    | 'settings_change';
   ref?: string;
   role?: string;
   name?: string;
@@ -155,7 +169,7 @@ export type BrowserBridgeControlStep = {
   label?: string;
   /** extract_text_ref: return the text via secret_values, not the response. */
   secret_name?: string;
-}
+};
 
 export interface BrowserBridgeControlStepPayload {
   session_id: string;
@@ -562,12 +576,8 @@ function redactPayload(
       ...control,
       step: {
         ...control.step,
-        ...(control.step.name
-          ? { name: redactAndClamp(control.step.name, 300) }
-          : {}),
-        ...(control.step.label
-          ? { label: redactAndClamp(control.step.label, 200) }
-          : {}),
+        ...(control.step.name ? { name: redactAndClamp(control.step.name, 300) } : {}),
+        ...(control.step.label ? { label: redactAndClamp(control.step.label, 200) } : {}),
       },
     };
   }
@@ -582,8 +592,7 @@ function redactPayload(
 }
 
 /** Where a step's captured secrets are moved before the response persists. */
-export const BROWSER_CONTROL_SECRET_ROOT =
-  'active/shared/runtime/browser-control/secrets';
+export const BROWSER_CONTROL_SECRET_ROOT = `${BROWSER_CONTROL_ROOT_PATH}/secrets`;
 
 function controlSecretPath(requestId: string): string {
   return assertSafeRepositoryPath(
