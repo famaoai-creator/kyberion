@@ -53,8 +53,7 @@
       "executable": "node",
       "args": ["dist/scripts/check/check_golden_output.js"],
       "owner": "quality",
-      "timeout_ms": 240000,
-      "rationale": "Keeps deterministic pipeline output snapshots stable in every validation scope. Resource isolation avoids overlapping baseline compiler/input scans with other CPU-heavy gates. Whole-repo scan cost grows with file count; the ~260-file governance catalog split (security-policy roles + storage-retention entries) pushed the scan past the 120s default on loaded runners, so this gate carries an explicit 240s budget."
+      "rationale": "Keeps deterministic pipeline output snapshots stable in every validation scope. Resource isolation avoids overlapping baseline compiler/input scans with other CPU-heavy gates; an isolated diagnostic completed in 62s with natural exit and no retained handle. The exact failed-runner exit delay remains unattributed. Selection and the 120s timeout are unchanged."
     },
     {
       "id": "scenario-pr-deterministic",
