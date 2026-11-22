@@ -50,7 +50,9 @@ checker exits 0, never when an agent says so.
    (nodes) and their dependencies (edges) by a mechanical full scan, never by targeted grep.
    Count each node kind by two independent routes and record both counts **and the element
    difference** (`only_in_a`, `only_in_b`): equal counts do not prove equal sets. Every
-   difference needs a `resolution`. The file also records `source_fingerprint`. Freezing the
+   difference needs a `resolution`. Paths left out of the graph (`excluded_paths`, for example build
+   output or vendored code) must each be a scope exclusion with a reason; the fingerprint still
+   covers the whole tree. The file also records `source_fingerprint`. Freezing the
    graph is a held decision; changing the denominator afterwards needs a new decision.
 3. **Analysis.** Read every node down to its implementation from the ARCH, REQ, API, DATA,
    BEHAVIOR and NFR viewpoints, and give each analysis item an id `ANA-<CAT>-<n>`. A node leaves

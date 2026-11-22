@@ -227,7 +227,11 @@ interface CodeGraph {
   fileCount: number;
 }
 
-function validateCodeGraphDocument(missionDir: string, source: SourceView): CodeGraph {
+function validateCodeGraphDocument(
+  missionDir: string,
+  source: SourceView,
+  declaredExclusions: string[]
+): CodeGraph {
   const graph = readJsonEvidence(missionDir, REVERSE_SPEC_EVIDENCE_FILES.code_graph);
   const problems: string[] = [];
   if (graph.kind !== 'code-graph-registry') problems.push("kind must be 'code-graph-registry'");
@@ -240,6 +244,14 @@ function validateCodeGraphDocument(missionDir: string, source: SourceView): Code
   )
     problems.push(
       `source_root ${graph.source_root} differs from the scope's ${source.root.relative}`
+    );
+  // Paths left out of the graph shrink the denominator: each must be a scope exclusion with a reason.
+  const undeclared = stringList(graph.excluded_paths).filter(
+    (excluded) => !declaredExclusions.includes(path.posix.normalize(excluded).replace(/\/$/u, ''))
+  );
+  if (undeclared.length)
+    problems.push(
+      `excluded_paths not declared in reverse-spec-scope.json exclusions: ${capList(undeclared)}`
     );
   const nodes = records(graph.nodes);
   if (nodes.length === 0)
@@ -560,8 +572,11 @@ export function validateReverseSpecEvidenceAt(
   if (stage === 'scope')
     return { stage, path: evidencePath, ok: true, summary: validateScope(missionDir) };
   // Later stages build on the earlier ledgers: each gate re-checks what it depends on.
-  const { purpose, source } = loadScope(missionDir);
-  const graph = validateCodeGraphDocument(missionDir, source);
+  const { scope, purpose, source } = loadScope(missionDir);
+  const declaredExclusions = records(scope.exclusions)
+    .filter((exclusion) => nonEmpty(exclusion.reason))
+    .map((exclusion) => path.posix.normalize(String(exclusion.path ?? '')).replace(/\/$/u, ''));
+  const graph = validateCodeGraphDocument(missionDir, source, declaredExclusions);
   if (stage === 'code_graph')
     return {
       stage,

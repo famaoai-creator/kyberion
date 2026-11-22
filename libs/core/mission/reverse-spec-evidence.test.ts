@@ -68,6 +68,18 @@ describe('reverse_spec evidence gates', () => {
     );
   });
 
+  it('requires every path left out of the code graph to be a declared scope exclusion', () => {
+    const { mission, docs, flush } = fixture();
+    docs.code_graph.excluded_paths = ['vendor/'];
+    flush();
+    expect(() => validateReverseSpecEvidenceAt(mission, 'code_graph')).toThrow(
+      /excluded_paths not declared .*vendor/u
+    );
+    docs.scope.exclusions = [{ path: 'vendor', reason: 'third-party code, not maintained here' }];
+    flush();
+    expect(validateReverseSpecEvidenceAt(mission, 'code_graph').ok).toBe(true);
+  });
+
   it('requires every denominator node to be analyzed or dispositioned with a decision record', () => {
     const { mission, docs, flush } = fixture();
     docs.analysis.items = [
