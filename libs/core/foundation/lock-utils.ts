@@ -68,7 +68,8 @@ function requireLockIo(): LockIo {
  * Provides file-based mutex/locking with retry support.
  */
 
-const LOCK_ROOT = path.join(pathResolver.rootDir(), 'active/shared/runtime/locks');
+export const LOCK_ROOT_REPO_PATH = 'active/shared/runtime/locks';
+const LOCK_ROOT = path.join(pathResolver.rootDir(), LOCK_ROOT_REPO_PATH);
 
 /**
  * Age after which an unverifiable lock record (empty, partial, malformed or
@@ -621,7 +622,8 @@ export function withLockSync<T>(resourceId: string, fn: () => T, timeoutMs = 500
   const io = requireLockIo();
   if (!io.exists(LOCK_ROOT)) io.mkdir(LOCK_ROOT);
 
-  while (Date.now() - startTime < timeoutMs) {
+  // A zero timeout attempts acquisition once and never waits on a live owner.
+  do {
     try {
       publish(io, lockFile, ownerRecord(resourceId));
     } catch (err: any) {
@@ -629,6 +631,7 @@ export function withLockSync<T>(resourceId: string, fn: () => T, timeoutMs = 500
       const recovery = reclaimStaleLock(lockFile);
       pending = recovery.pending;
       if (recovery.retry) continue;
+      if (timeoutMs === 0) break;
       const waitBuffer = new Int32Array(new SharedArrayBuffer(4));
       Atomics.wait(waitBuffer, 0, 0, 50);
       continue;
@@ -638,7 +641,7 @@ export function withLockSync<T>(resourceId: string, fn: () => T, timeoutMs = 500
     } finally {
       releaseLock(resourceId);
     }
-  }
+  } while (Date.now() - startTime < timeoutMs);
 
   throw new Error(
     `[LOCK_TIMEOUT] Failed to acquire lock for resource: ${resourceId} within ${timeoutMs}ms` +

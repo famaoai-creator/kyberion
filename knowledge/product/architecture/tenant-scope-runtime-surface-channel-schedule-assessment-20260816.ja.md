@@ -315,7 +315,7 @@ customer mode で binding がない channel は tenant request として扱わ�
 - token usage、cost、runtime health、delivery result も同じ scope を持たせる。token usage と cost report は今回 scope 化したため、tenant 別のコスト・品質・失敗率の改善ループを正しく分けるための最小観測線ができた。
 - `CostLedgerEntry.scope` は authorization の代替ではない。HTTP / operator API は server-side の viewer scope を解決したうえで、許可された filter だけを渡す。
 - legacy record は reader-side migration で authority-backed scope を補える場合だけ projection に入れ、補えない record は tenant view から除外する。
-- media generation quota は `generation-quota.ts` の日次 abstract units として記録し、reasoning token rate limit や provider の実ドルコストとは別の制御面にする。quota の reservation は provider submission 前、失敗時の release は job ID 未取得時だけ行う。
+- media generation quota は `generation-quota.ts` の日次 abstract units として記録し、reasoning token rate limit や provider の実ドルコストとは別の制御面にする。スケジューラーは送信の準備を終えてから、送信直前に消費単位を確定する。この消費には返却用の予約 ID を発行しない。確定直後のクラッシュや、送信後に応答や job ID を確認できない場合も消費を維持する。
 
 ## 5. 段階的な実装順序
 

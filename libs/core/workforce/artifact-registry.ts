@@ -1,4 +1,5 @@
 import * as path from 'node:path';
+import { isDeepStrictEqual } from 'node:util';
 import { appendJsonLine, readJsonLines } from '../foundation/json.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { nowIso } from '../foundation/time.js';
@@ -146,7 +147,7 @@ export function validateArtifactOwnershipRecord(record: ArtifactOwnershipRecord)
 
 export function appendArtifactOwnershipRecord(
   record: ArtifactOwnershipRecord,
-  options: { for_delivery?: boolean } = {}
+  options: { for_delivery?: boolean; skipUnchanged?: boolean } = {}
 ): string {
   if (!hasOwnership(record)) {
     throw new Error(
@@ -176,6 +177,16 @@ export function appendArtifactOwnershipRecord(
     ARTIFACT_REGISTRY_LOCK,
     () => {
       ensureArtifactRegistryFile(registryPath);
+      if (options.skipUnchanged) {
+        const latest = listArtifactOwnershipRecords()
+          .reverse()
+          .find((row) => row.artifact_id === validated.artifact_id);
+        // Compare the persisted JSON shape, including omission of undefined
+        // values, and ignore the timestamp generated on each retry.
+        const withoutTime = (row: ArtifactOwnershipRecord): unknown =>
+          JSON.parse(JSON.stringify({ ...row, created_at: '' }));
+        if (latest && isDeepStrictEqual(withoutTime(latest), withoutTime(validated))) return;
+      }
       appendJsonLine(registryPath, validated);
     },
     APPEND_LOCK_TIMEOUT_MS

@@ -1,5 +1,6 @@
 import type { StorageDataTier } from '../storage-layout.js';
 import { executionAgentId } from '../governance/execution-agent-id.js';
+import { withEntityLifecycleLock } from './entity-lifecycle-lock.js';
 import { type OrganizationProfile } from './organization-profile.js';
 import type { SupportedLocale } from '../localization/locale.js';
 import { auditChain } from '../governance/audit-chain.js';
@@ -729,7 +730,7 @@ type RetirableOrganizationEntity = {
 
 interface OrganizationEntityKindHandler {
   load(recordId: string, query: OrganizationEntityQuery): unknown;
-  save(record: RetirableOrganizationEntity, options: { rootDir?: string }): unknown;
+  save(record: RetirableOrganizationEntity, options: { rootDir?: string; retire: true }): unknown;
   fileName: string;
   directory: OrganizationRecordKind;
   /** Throw to veto the lifecycle verb while blocking relations remain. */
@@ -737,7 +738,8 @@ interface OrganizationEntityKindHandler {
     record: { capability_ids?: string[]; service_ids?: string[] },
     catalog: ReturnType<typeof loadOrganizationCatalog>,
     recordId: string,
-    verb: 'retire' | 'remove'
+    verb: 'retire' | 'remove',
+    query: OrganizationEntityQuery
   ): void;
 }
 
@@ -750,8 +752,15 @@ const ORGANIZATION_ENTITY_KIND_HANDLERS: Record<
     save: (record, options) => saveOrganizationDomain(record as OrganizationDomainRecord, options),
     fileName: 'domain.json',
     directory: 'domains',
-    assertNoBlockingRelations(record, _catalog, recordId, verb) {
-      if ((record.capability_ids || []).length || (record.service_ids || []).length) {
+    assertNoBlockingRelations(record, catalog, recordId, verb) {
+      if (
+        (record.capability_ids || []).length ||
+        (record.service_ids || []).length ||
+        catalog.capabilities.some(
+          (child) => child.domain_id === recordId && child.status !== 'retired'
+        ) ||
+        catalog.services.some((child) => child.domain_id === recordId && child.status !== 'retired')
+      ) {
         throw new Error(`Cannot ${verb} domain '${recordId}' while child records remain.`);
       }
     },
@@ -762,9 +771,17 @@ const ORGANIZATION_ENTITY_KIND_HANDLERS: Record<
       saveOrganizationCapability(record as OrganizationCapabilityRecord, options),
     fileName: 'capability.json',
     directory: 'capabilities',
-    assertNoBlockingRelations(record, _catalog, recordId, verb) {
-      if ((record.service_ids || []).length) {
-        throw new Error(`Cannot ${verb} capability '${recordId}' while service references remain.`);
+    assertNoBlockingRelations(record, catalog, recordId, verb, query) {
+      if (
+        (record.service_ids || []).length ||
+        catalog.domains.some(
+          (domain) => domain.status !== 'retired' && domain.capability_ids.includes(recordId)
+        ) ||
+        listOrganizationOperations(query).some(
+          (op) => op.status !== 'retired' && op.capability_id === recordId
+        )
+      ) {
+        throw new Error(`Cannot ${verb} capability '${recordId}' while references remain.`);
       }
     },
   },
@@ -774,9 +791,21 @@ const ORGANIZATION_ENTITY_KIND_HANDLERS: Record<
       saveOrganizationService(record as OrganizationServiceRecord, options),
     fileName: 'service.json',
     directory: 'services',
-    assertNoBlockingRelations(_record, catalog, recordId, verb) {
+    assertNoBlockingRelations(_record, catalog, recordId, verb, query) {
       if (catalog.domains.some((domain) => domain.service_ids.includes(recordId))) {
         throw new Error(`Cannot ${verb} service '${recordId}' while a domain references it.`);
+      }
+      if (
+        catalog.capabilities.some(
+          (entry) => entry.status !== 'retired' && entry.service_ids.includes(recordId)
+        ) ||
+        listOrganizationOperations(query).some(
+          (op) => op.status !== 'retired' && op.service_id === recordId
+        )
+      ) {
+        throw new Error(
+          `Cannot ${verb} service '${recordId}' while operational references remain.`
+        );
       }
     },
   },
@@ -806,6 +835,12 @@ export function retireOrganizationEntity(input: {
   recordId: string;
   reason?: string;
 }): Record<string, unknown> {
+  return withEntityLifecycleLock(() => retireOrganizationEntityUnderLock(input));
+}
+
+function retireOrganizationEntityUnderLock(
+  input: Parameters<typeof retireOrganizationEntity>[0]
+): Record<string, unknown> {
   const query = {
     organizationId: input.organizationId,
     tier: input.tier,
@@ -816,7 +851,7 @@ export function retireOrganizationEntity(input: {
   const record = handler.load(input.recordId, query) as RetirableOrganizationEntity | undefined;
   if (!record) throw new Error(`${input.kind} not found: ${input.recordId}`);
   const catalog = loadOrganizationCatalog(query);
-  handler.assertNoBlockingRelations?.(record, catalog, input.recordId, 'retire');
+  handler.assertNoBlockingRelations?.(record, catalog, input.recordId, 'retire', query);
   const next = {
     ...record,
     status: 'retired',
@@ -826,7 +861,7 @@ export function retireOrganizationEntity(input: {
       ...(input.reason ? { retire_reason: input.reason } : {}),
     },
   };
-  handler.save(next, { rootDir: input.rootDir });
+  handler.save(next, { rootDir: input.rootDir, retire: true });
   auditChain.record({
     agentId: executionAgentId('organization_controller'),
     action: `organization.${input.kind}.retire`,
@@ -851,6 +886,12 @@ export function removeOrganizationEntity(input: {
   recordId: string;
   reason?: string;
 }): { status: 'removed'; kind: OrganizationRetireKind; record_id: string } {
+  return withEntityLifecycleLock(() => removeOrganizationEntityUnderLock(input));
+}
+
+function removeOrganizationEntityUnderLock(
+  input: Parameters<typeof removeOrganizationEntity>[0]
+): ReturnType<typeof removeOrganizationEntity> {
   const query = {
     organizationId: input.organizationId,
     tier: input.tier,
@@ -862,7 +903,7 @@ export function removeOrganizationEntity(input: {
   if (!record) throw new Error(`${input.kind} not found: ${input.recordId}`);
 
   const catalog = loadOrganizationCatalog(query);
-  handler.assertNoBlockingRelations?.(record, catalog, input.recordId, 'remove');
+  handler.assertNoBlockingRelations?.(record, catalog, input.recordId, 'remove', query);
 
   safeRmSync(
     recordPath(

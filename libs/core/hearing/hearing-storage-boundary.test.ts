@@ -239,12 +239,16 @@ describe('durable hearing storage uses real secureIO tier and tenant boundaries'
   it('preserves role-less missing-policy bootstrap while denying protected hearing state', () => {
     policyState.missing = true;
     try {
-      for (const file of [session(), personal]) {
+      for (const file of [
+        session(),
+        personal,
+        path.join(ROOT, 'knowledge/personal/bootstrap.md'),
+      ]) {
         expect(guard.validateReadPermission(file).allowed).toBe(false);
         expect(guard.validateWritePermission(file).allowed).toBe(false);
       }
       for (const relative of [
-        'knowledge/personal/bootstrap.md',
+        'active/shared/tmp/bootstrap.md',
         'active/shared/runtime/usage-ledger/personal/shared/bootstrap.json',
         'active/shared/runtime/execution-metrics/confidential/acme/bootstrap.json',
       ]) {

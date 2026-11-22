@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import * as pathResolver from '../path-resolver.js';
 import { isValidTenantSlug } from '../entity-scope.js';
@@ -53,10 +54,13 @@ const GENERATION_QUOTA_COUNTER_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/media-generation-quota-counter.schema.json'
 );
 
+type QuotaReservations = Record<string, { action: string; units: number }>;
+
 interface GenerationQuotaCounterRecord {
   tenant_slug: string;
   date: string;
   units: number;
+  reservations?: QuotaReservations;
   updated_at: string;
 }
 
@@ -84,14 +88,17 @@ export interface GenerationQuotaUsage {
 interface ReadGenerationQuotaUsage {
   usage: GenerationQuotaUsage;
   invalid: boolean;
+  reservations?: QuotaReservations;
 }
 
 export interface GenerationQuotaOptions {
   rootDir?: string;
   now?: string | Date;
   policy?: GenerationQuotaPolicy;
-  /** Exact units reserved earlier; used when releasing after a policy change. */
-  reservation_units?: number;
+  /** Charge at the dispatch boundary without issuing a refundable reservation. */
+  finalCharge?: boolean;
+  /** Reservation to release, using its original UTC date as now. */
+  reservation_id?: string;
 }
 
 export interface GenerationQuotaDecision {
@@ -100,6 +107,7 @@ export interface GenerationQuotaDecision {
   tenant_slug?: string;
   date?: string;
   action: string;
+  reservation_id?: string;
   units: number;
   usage: GenerationQuotaUsage;
   projected: GenerationQuotaUsage;
@@ -234,7 +242,7 @@ function readUsage(
       return { usage: { units: 0 }, invalid: true };
     }
     if (parsed.units === 0 || positive(parsed.units)) {
-      return { usage: { units: parsed.units }, invalid: false };
+      return { usage: { units: parsed.units }, invalid: false, reservations: parsed.reservations };
     }
     return { usage: { units: 0 }, invalid: true };
   } catch {
@@ -247,6 +255,7 @@ function writeUsage(
   tenantSlug: string,
   date: string,
   usage: GenerationQuotaUsage,
+  reservations: QuotaReservations,
   options: GenerationQuotaOptions
 ): void {
   counterPath = assertSafeRepositoryPath(counterPath, {
@@ -263,6 +272,7 @@ function writeUsage(
       tenant_slug: tenantSlug,
       date,
       units: usage.units,
+      reservations,
       updated_at: options.now === undefined ? nowIso() : nowIso(new Date(options.now)),
     },
     counterPath
@@ -307,7 +317,7 @@ function decide(
   return mutate({
     tenant,
     date,
-    units: positive(options.reservation_units) ? options.reservation_units : effective.units,
+    units: effective.units,
     limit: effective.limit,
     warnRatio: effective.warnRatio,
     counterPath: generationQuotaCounterPath(tenant, options),
@@ -377,13 +387,27 @@ export function reserveGenerationQuota(
       const projected = { units: usage.units + input.units };
       const warned = projected.units >= input.warnRatio * input.limit;
       const allowed = !counter.invalid && projected.units <= input.limit;
-      if (allowed) writeUsage(input.counterPath, input.tenant, input.date, projected, options);
+      const reservationId = allowed && !options.finalCharge ? randomUUID() : undefined;
+      if (allowed) {
+        writeUsage(
+          input.counterPath,
+          input.tenant,
+          input.date,
+          projected,
+          {
+            ...counter.reservations,
+            ...(reservationId ? { [reservationId]: { action, units: input.units } } : {}),
+          },
+          options
+        );
+      }
       return {
         allowed,
         level: allowed ? (warned ? 'warn' : 'ok') : 'block',
         tenant_slug: input.tenant,
         date: input.date,
         action,
+        ...(reservationId ? { reservation_id: reservationId } : {}),
         units: input.units,
         usage,
         projected,
@@ -401,7 +425,7 @@ export function reserveGenerationQuota(
   );
 }
 
-/** Refund a reservation when provider submission fails before a job exists. */
+/** Refund a specific reservation after confirming submission never started. */
 export function releaseGenerationQuota(
   scope: EventScopeInput,
   action: string,
@@ -411,35 +435,33 @@ export function releaseGenerationQuota(
     withLockSync(`generation-quota-${input.tenant}-${input.date}`, () => {
       const counter = readUsage(input.counterPath, input.tenant, input.date);
       const usage = counter.usage;
-      if (counter.invalid) {
-        return {
-          allowed: false,
-          level: 'block',
-          tenant_slug: input.tenant,
-          date: input.date,
-          action,
-          units: input.units,
-          usage,
-          projected: usage,
-          limit: input.limit,
-          warned: false,
-          reason: `tenant '${input.tenant}' generation quota counter is invalid`,
-        };
+      const reservations = { ...counter.reservations };
+      const id = options.reservation_id;
+      const reservation = id && Object.hasOwn(reservations, id) ? reservations[id] : undefined;
+      const allowed =
+        !counter.invalid && reservation?.action === action && reservation.units <= usage.units;
+      const units = allowed ? reservation.units : 0;
+      const projected = { units: usage.units - units };
+      if (allowed && id) {
+        delete reservations[id];
+        writeUsage(input.counterPath, input.tenant, input.date, projected, reservations, options);
       }
-      const next = { units: Math.max(0, usage.units - input.units) };
-      writeUsage(input.counterPath, input.tenant, input.date, next, options);
       return {
-        allowed: true,
-        level: 'ok',
+        allowed,
+        level: allowed ? 'ok' : 'block',
         tenant_slug: input.tenant,
         date: input.date,
         action,
-        units: input.units,
+        units,
         usage,
-        projected: next,
+        projected,
         limit: input.limit,
         warned: false,
-        reason: 'generation quota reservation released',
+        reason: allowed
+          ? 'generation quota reservation released'
+          : counter.invalid
+            ? `tenant '${input.tenant}' generation quota counter is invalid`
+            : 'generation quota reservation does not match an outstanding charge',
       };
     })
   );

@@ -113,6 +113,11 @@ async function executeOp(
 ): Promise<Record<string, unknown>> {
   const handlers: Record<string, () => Promise<any>> = {
     sync_source: async () => {
+      if (params.cursor_path_seam !== undefined || params.transport !== undefined) {
+        throw new Error(
+          'ingest:sync_source — runtime parameters cannot override storage or transport'
+        );
+      }
       logger.info(
         `[INGEST] Sync source ${String(params.source_system)} for tenant ${String(params.tenant_slug)} (DA-03)`
       );

@@ -41,6 +41,7 @@ import {
   setOrganizationParent,
   organizationRecordFiles,
   organizationOperationalStatePath,
+  transitionOrganizationLifecycle,
 } from './organization-operating-model-persistence.js';
 import {
   listOrganizationOperationRuns,
@@ -48,8 +49,10 @@ import {
   listOrganizationOperations,
 } from './organization-operating-model-operations.js';
 import { saveProjectRecord, projectRecordPath } from '../project/project-registry.js';
+import { createManagedProject } from '../project/project-management.js';
 import { saveProjectOperationalState } from '../project/project-operational-state-registry.js';
 import {
+  retireOrganizationEntity,
   type OrganizationCapabilityRecord,
   type OrganizationDomainRecord,
   type OrganizationOperationalState,
@@ -85,6 +88,130 @@ describe('organization operating model', () => {
     process.env.KYBERION_SUDO = 'true';
     safeRmSync(workspace);
     process.env = { ...originalEnv };
+  });
+
+  it('blocks archive during interrupted project attachment and completes the association on retry', () => {
+    const rootDir = pathResolver.sharedTmp('organization-project-attachment-recovery-test');
+    const id = 'PRJ-PENDING-ATTACHMENT';
+    const scope = { organizationId: 'pending-org', tier: 'public' as const, rootDir };
+    process.env.KYBERION_ENTITY_GOVERNANCE = 'enforce';
+    try {
+      const state: OrganizationOperationalState = {
+        organization_id: scope.organizationId,
+        name: 'Pending organization',
+        tier: scope.tier,
+        status: 'active',
+        active_project_ids: [id],
+        updated_at: nowIso(),
+      };
+      saveOrganizationOperationalState(state, { rootDir });
+      const archive = () => transitionOrganizationLifecycle({ ...scope, verb: 'archive' });
+      expect(archive).toThrow(/active projects: PRJ-PENDING-ATTACHMENT/);
+      expect(
+        createManagedProject({
+          rootDir,
+          project_id: id,
+          name: 'Pending project',
+          summary: 'Retry after association write',
+          organization_id: scope.organizationId,
+          tier: scope.tier,
+        }).project_id
+      ).toBe(id);
+      expect(
+        loadOrganizationOperationalState(scope.organizationId, scope)?.active_project_ids
+      ).toEqual([id]);
+      // A canonical owned project still blocks archive if a legacy reference is missing.
+      saveOrganizationOperationalState({ ...state, active_project_ids: [] }, { rootDir });
+      expect(archive).toThrow(/active projects: PRJ-PENDING-ATTACHMENT/);
+    } finally {
+      safeRmSync(rootDir, { recursive: true, force: true });
+    }
+  });
+
+  it.each([false, true])(
+    'keeps domain retirement and child attachment consistent (child first=%s)',
+    (childFirst) => {
+      const scope = { organizationId, tenantSlug, tier: 'confidential' as const };
+      const domain = buildOrganizationDomainRecord({
+        ...scope,
+        domainId: 'dom-lifecycle',
+        name: 'Lifecycle domain',
+        ownerRole: 'organization_owner',
+      });
+      saveOrganizationDomain(domain);
+      const child: OrganizationCapabilityRecord = {
+        version: '1.0.0',
+        capability_id: 'cap-lifecycle',
+        organization_id: organizationId,
+        domain_id: domain.domain_id,
+        name: 'Lifecycle capability',
+        owner_role: 'organization_owner',
+        tier: 'confidential',
+        tenant_slug: tenantSlug,
+        service_ids: [],
+        status: 'active',
+        updated_at: nowIso(),
+      };
+      const retire = () =>
+        retireOrganizationEntity({
+          ...scope,
+          kind: 'domain',
+          recordId: domain.domain_id,
+        });
+      if (childFirst) {
+        saveOrganizationCapability(child);
+        expect(retire).toThrow(/child records remain/);
+      } else {
+        retire();
+        expect(() => saveOrganizationCapability(child)).toThrow('[ORGANIZATION_REFERENCE_RETIRED]');
+        expect(() => saveOrganizationDomain(domain)).toThrow('[ORGANIZATION_ENTITY_RETIRED]');
+      }
+    }
+  );
+
+  it('protects a service from direct retirement and rejects operations that name a retired service', () => {
+    const scope = { organizationId, tenantSlug, tier: 'confidential' as const };
+    const domain = buildOrganizationDomainRecord({
+      ...scope,
+      domainId: 'dom-retire-service',
+      name: 'Lifecycle domain',
+      ownerRole: 'organization_owner',
+    });
+    saveOrganizationDomain(domain);
+    const { service } = buildOrganizationServiceAddition({
+      ...scope,
+      domainId: domain.domain_id,
+      serviceId: 'svc-retire-target',
+      name: 'Lifecycle service',
+      outcome: 'Verified dependencies',
+      ownerRole: 'organization_owner',
+      consumers: ['operator'],
+    });
+    saveOrganizationService(service);
+    const operation = buildOrganizationOperationRecord({
+      ...scope,
+      operationId: 'op-retire-dependent',
+      serviceId: service.service_id,
+      name: 'Dependent operation',
+      operationType: 'governance',
+      ownerRole: 'organization_owner',
+    });
+    saveOrganizationOperation(operation);
+    const retire = () =>
+      retireOrganizationEntity({
+        ...scope,
+        kind: 'service',
+        recordId: service.service_id,
+      });
+    expect(() => saveOrganizationService({ ...service, status: 'retired' })).toThrow(
+      '[ORGANIZATION_RETIRE_REQUIRED]'
+    );
+    expect(retire).toThrow(/operational references remain/);
+    retireOrganizationEntity({ ...scope, kind: 'operation', recordId: operation.operation_id });
+    retire();
+    expect(() => saveOrganizationOperation({ ...operation, operation_id: 'op-too-late' })).toThrow(
+      '[ORGANIZATION_REFERENCE_RETIRED]'
+    );
   });
 
   it('loads the six organization work shapes and representative scenarios', () => {

@@ -50,6 +50,8 @@ import { collectOperatorHomeSummary } from '../surface/operator-home-summary.js'
 import { composeCeoSurfaceSummary } from '../surface/ceo-surface-summary.js';
 import { readTenantProfile, recordTenantProviderAttestation } from './tenant-registry.js';
 import { pathResolver } from '../path-resolver.js';
+import { withLockSync } from '../foundation/lock-utils.js';
+import { ENTITY_LIFECYCLE_LOCK } from './entity-lifecycle-lock.js';
 import {
   safeExistsSync,
   safeMkdir,
@@ -88,6 +90,32 @@ describe('tenant lifecycle preserves provider policy state', () => {
 
   afterEach(() => {
     safeRmSync(rootDir, { recursive: true, force: true });
+  });
+
+  it('serializes lifecycle and attestation writers and refuses attestation after suspension', () => {
+    const attest = () =>
+      recordTenantProviderAttestation({
+        slug: 'acme',
+        provider: 'other',
+        training_use: 'unknown',
+        rootDir,
+      });
+    const suspend = () => mutateTenant({ verb: 'suspend', slug: 'acme', rootDir, apply: true });
+    withExecutionContext('sovereign_concierge', () => {
+      withLockSync(ENTITY_LIFECYCLE_LOCK, () => {
+        let now = Date.now();
+        const clock = vi.spyOn(Date, 'now').mockImplementation(() => (now += 6_000));
+        try {
+          expect(suspend).toThrow(/LOCK_TIMEOUT/);
+          expect(attest).toThrow(/LOCK_TIMEOUT/);
+        } finally {
+          clock.mockRestore();
+        }
+      });
+      expect(suspend().profile.status).toBe('suspended');
+      expect(attest).toThrow(/suspended/);
+      expect(readTenantProfile('acme', { rootDir })?.status).toBe('suspended');
+    });
   });
 
   it('keeps the allowlist and attestations when the governed tenant facade updates metadata', () => {

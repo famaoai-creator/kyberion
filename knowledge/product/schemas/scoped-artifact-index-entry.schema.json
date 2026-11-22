@@ -32,7 +32,8 @@
     "scope_kind": {
       "enum": ["task", "mission", "project", "session", "organization", "tenant", "system"]
     },
-    "written_at": { "type": "string", "format": "date-time" }
+    "written_at": { "type": "string", "format": "date-time" },
+    "content_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
   },
   "required": ["name", "artifact_class", "path", "scope", "scope_kind", "written_at"]
 }

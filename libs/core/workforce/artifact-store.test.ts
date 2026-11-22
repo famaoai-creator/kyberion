@@ -222,6 +222,34 @@ describe('writeScopedArtifact (AL-02)', () => {
     fs.rmSync(tmpRoot, { recursive: true, force: true });
   });
 
+  it('locks before opening the exact PR review grant and reuses the recorded bytes', async () => {
+    const { withPrPublicationRuntime, withPrPublicationStoreAccess } =
+      await import('../governance/pr-publication-runtime.js');
+    const invocation = 'c'.repeat(64);
+    const name = `pr-publication/${invocation}/${'d'.repeat(64)}.json`;
+    const root = 'active/shared/artifacts/personal/shared';
+    const files = [`${root}/evidence/${name}`, `${root}/artifacts-index.jsonl`];
+    const save = (content: { decision: string }) =>
+      withPrPublicationRuntime({ kind: 'person' }, invocation, () =>
+        store.writeScopedArtifact(
+          {
+            scope: { tenant: 'shared' },
+            tier: 'personal',
+            artifact_class: 'evidence',
+            name,
+            create_only: true,
+            reuse_identical: true,
+            content,
+          },
+          (write) => withPrPublicationStoreAccess('review-write', files, files, write)
+        )
+      );
+    const first = save({ decision: 'review' });
+    expect(save({ decision: 'review' })).toEqual(first);
+    expect(() => save({ decision: 'other' })).toThrow(/EEXIST/);
+    expect(readIndex(first.index_path).filter((entry) => entry.name === name)).toHaveLength(1);
+  });
+
   it('mission scope: places under <missionDir>/artifacts/<class>/ and records the index', () => {
     const result = store.writeScopedArtifact({
       scope: { mission: 'M-AL02-A' },
@@ -351,7 +379,11 @@ describe('writeScopedArtifact (AL-02)', () => {
     // Same owner: a re-run updates the record.
     expect(publish('org-x', 'acme', 'v2').artifact_id).toBe('ART-FIXED-ID-1');
     // Another tenant cannot take over the record by choosing its id.
+    const rejectedScope = { organization: 'org-x', tenant: 'globex' };
+    const rejectedDir = store.scopedArtifactDir(rejectedScope, 'report').dir;
     expect(() => publish('org-x', 'globex', 'evil')).toThrow(/belongs to another owner scope/);
+    expect(fs.existsSync(path.join(rejectedDir, 'digest.json'))).toBe(false);
+    expect(store.readScopedArtifactIndex(rejectedScope)).toEqual([]);
   });
 
   it("attributes a published record to the owner's organization, never the caller's", async () => {
@@ -387,6 +419,8 @@ describe('writeScopedArtifact (AL-02)', () => {
     expect(() => write({ publish: { kind: 'report', organization_id: 'org-other' } })).toThrow(
       /\[SCOPE_CONTRADICTS_OWNER\] publish.organization_id 'org-other'/u
     );
+    expect(fs.existsSync(path.join(dir, 'artifacts/report/org.md'))).toBe(false);
+    expect(store.readScopedArtifactIndex({ mission: 'M-AL02-ORG' })).toEqual([]);
     const { loadArtifactRecord } = await import('./artifact-record.js');
     expect(loadArtifactRecord(write({}).artifact_id as string)?.organization_id).toBe('org-ops');
   });
@@ -633,6 +667,148 @@ describe('writeScopedArtifact (AL-02)', () => {
         scope_kind: 'tenant',
       }),
     });
+  });
+
+  it.each(['index', 'ownership', 'reference'] as const)(
+    'publish: withholds a new reference until recovery after interruption at %s',
+    async (boundary) => {
+      const { getFoundationIo } = await import('../foundation/io.js');
+      const { loadArtifactRecord } = await import('./artifact-record.js');
+      const { listArtifactOwnershipRecords } = await import('./artifact-registry.js');
+      const artifact_id = `ART-PUBLISH-FAULT-${boundary}`;
+      const input = {
+        scope: { tenant: 'acme' },
+        artifact_class: 'report' as const,
+        name: `publication-fault-${boundary}.md`,
+        content: '# publication recovery',
+        publish: { kind: 'report' as const, task_session_id: 'TS-PUBLISH-FAULT', artifact_id },
+      };
+      const io = getFoundationIo();
+      const append = io.appendFile.bind(io);
+      const rename = fs.renameSync;
+      const interruption = new Error('simulated publication interruption');
+      const appendSpy = vi.spyOn(io, 'appendFile').mockImplementation((file, content, options) => {
+        if (
+          (boundary === 'index' && file.endsWith('/artifacts-index.jsonl')) ||
+          (boundary === 'ownership' && file.endsWith('/registry.jsonl'))
+        )
+          throw interruption;
+        append(file, content, options);
+      });
+      const renameSpy = vi.spyOn(fs, 'renameSync').mockImplementation((source, dest) => {
+        if (boundary === 'reference' && String(dest).endsWith(`/${artifact_id}.json`))
+          throw interruption;
+        return rename(source, dest);
+      });
+      try {
+        expect(() => store.writeScopedArtifact(input)).toThrow(
+          'simulated publication interruption'
+        );
+      } finally {
+        renameSpy.mockRestore();
+        appendSpy.mockRestore();
+      }
+
+      const owns = () =>
+        listArtifactOwnershipRecords().filter((row) => row.artifact_id === artifact_id);
+      const { dir } = store.scopedArtifactDir(input.scope, input.artifact_class);
+      expect(fs.readFileSync(path.join(dir, input.name), 'utf8')).toBe(input.content);
+      expect(loadArtifactRecord(artifact_id)).toBeNull();
+      expect(owns()).toHaveLength(boundary === 'reference' ? 1 : 0);
+      if (boundary === 'reference') {
+        const foreignScope = { tenant: 'globex' };
+        expect(() => store.writeScopedArtifact({ ...input, scope: foreignScope })).toThrow(
+          /belongs to another owner scope/
+        );
+        expect(
+          fs.existsSync(
+            path.join(store.scopedArtifactDir(foreignScope, input.artifact_class).dir, input.name)
+          )
+        ).toBe(false);
+      }
+
+      const saved = store.writeScopedArtifact(input);
+      expect(saved.artifact_id).toBe(artifact_id);
+      expect(loadArtifactRecord(artifact_id)?.path).toBe(saved.repo_relative_path);
+      expect(owns()).toEqual([expect.objectContaining({ path: saved.repo_relative_path })]);
+      expect(
+        store
+          .readScopedArtifactIndex(input.scope)
+          .filter((row) => row.path === saved.repo_relative_path)
+      ).toHaveLength(1);
+    }
+  );
+
+  it('keeps an existing publication readable when rewriting the same logical name is interrupted', async () => {
+    const { getFoundationIo } = await import('../foundation/io.js');
+    const { loadArtifactRecord } = await import('./artifact-record.js');
+    const artifact_id = 'ART-PUBLISH-VERSIONED-REPLACE';
+    const input = {
+      scope: { tenant: 'acme' },
+      artifact_class: 'report' as const,
+      name: 'replace-version-1.md',
+      content: '# version one',
+      publish: { kind: 'report' as const, task_session_id: 'TS-PUBLISH-VERSIONS', artifact_id },
+    };
+    const first = store.writeScopedArtifact(input);
+    const replacement = { ...input, content: '# version two' };
+    const io = getFoundationIo();
+    const append = io.appendFile.bind(io);
+    const spy = vi.spyOn(io, 'appendFile').mockImplementation((file, content, options) => {
+      if (file.endsWith('/registry.jsonl')) throw new Error('simulated ownership interruption');
+      append(file, content, options);
+    });
+    try {
+      expect(() => store.writeScopedArtifact(replacement)).toThrow(
+        'simulated ownership interruption'
+      );
+    } finally {
+      spy.mockRestore();
+    }
+    expect(loadArtifactRecord(artifact_id)?.path).toBe(first.repo_relative_path);
+    expect(fs.readFileSync(first.absolute_path, 'utf8')).toBe(input.content);
+
+    const second = store.writeScopedArtifact(replacement);
+    expect(second.repo_relative_path).not.toBe(first.repo_relative_path);
+    expect(loadArtifactRecord(artifact_id)?.path).toBe(second.repo_relative_path);
+    expect(fs.readFileSync(second.absolute_path, 'utf8')).toBe(replacement.content);
+    expect(fs.readFileSync(first.absolute_path, 'utf8')).toBe(input.content);
+    expect(store.writeScopedArtifact(replacement)).toEqual(second);
+    expect(
+      store
+        .readScopedArtifactIndex(input.scope)
+        .filter((row) => row.path === second.repo_relative_path)
+    ).toHaveLength(1);
+  });
+
+  it('rejects ordinary rewrites and appends to a published session artifact', () => {
+    const input = {
+      scope: { session: 'sess-immutable' },
+      artifact_class: 'report' as const,
+      name: 'published.json',
+      content: { value: 'published version' },
+    };
+    const result = store.writeScopedArtifact({
+      ...input,
+      publish: { kind: 'report', task_session_id: 'sess-immutable' },
+    });
+    const initialIndex = readIndex(result.index_path);
+    const replacement = { value: 'unpublished version' };
+    expect(() => store.writeScopedArtifact({ ...input, content: replacement })).toThrow(
+      '[SCOPED_ARTIFACT_PUBLISHED]'
+    );
+    expect(() =>
+      store.writeGovernedArtifactJson('mission_controller', result.repo_relative_path, replacement)
+    ).toThrow('[SCOPED_ARTIFACT_PUBLISHED]');
+    expect(() =>
+      store.appendGovernedArtifactJsonl(
+        'mission_controller',
+        result.repo_relative_path,
+        replacement
+      )
+    ).toThrow('[SCOPED_ARTIFACT_PUBLISHED]');
+    expect(JSON.parse(fs.readFileSync(result.absolute_path, 'utf8'))).toEqual(input.content);
+    expect(readIndex(result.index_path)).toEqual(initialIndex);
   });
 
   it('publish: requires an owning project, mission, or task session', () => {

@@ -171,6 +171,8 @@ human_only の依頼は `accountability.min_assurance`（A0〜A3）を持ち、�
     `service_recording_promotion`（procedure の登録）、`organization_decision`（承認済み決定の保存）と
     `grant_standing`（常設許可の付与）。
     消費済みの承認は 2 回目の利用も revoke も拒否される（revoke は「すでに消費済み」と報告する）。
+    apply claim と消費記録は同じ承認レコードのロックで直列化する。どちらかを記録した承認は、
+    もう一方の経路でも使用済みとして拒否する。
     それ以外の claim を取らない consumer は、効果のたびに利用可否を確かめ直す（例: `pipeline_bound_approval`
     は run の再開のたびに確かめる）ので、revoke 以降の利用が拒否される。それ以前の利用は取り消せない。
   - 取り消せないもの: pending（cancel を使う）、rejected などの承認以外、claim 済み・適用済み・消費済み

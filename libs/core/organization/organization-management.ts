@@ -1,6 +1,7 @@
 /** Governed, create-only organization initialization and bounded metadata edits. */
 import { nowIso } from '../foundation/time.js';
 import { readTextFile } from '../foundation/text.js';
+import { withEntityLifecycleLock } from './entity-lifecycle-lock.js';
 import {
   safeCreateExclusiveFileSync,
   safeExistsSync,
@@ -24,6 +25,12 @@ import {
 import type { OrganizationTier } from './organization-operating-model.js';
 
 export function createManagedOrganization(
+  input: BuildOrganizationScaffoldInput
+): OrganizationScaffold & { saved_paths: string[] } {
+  return withEntityLifecycleLock(() => createManagedOrganizationUnderLock(input));
+}
+
+function createManagedOrganizationUnderLock(
   input: BuildOrganizationScaffoldInput
 ): OrganizationScaffold & { saved_paths: string[] } {
   const statePath = organizationOperationalStatePath(
@@ -68,6 +75,13 @@ export interface OrganizationMetadataScope {
 export function updateManagedOrganizationMetadata(
   scope: OrganizationMetadataScope,
   patch: { name?: string; purpose?: string }
+): OrganizationScaffold {
+  return withEntityLifecycleLock(() => updateManagedOrganizationMetadataUnderLock(scope, patch));
+}
+
+function updateManagedOrganizationMetadataUnderLock(
+  scope: OrganizationMetadataScope,
+  patch: Parameters<typeof updateManagedOrganizationMetadata>[1]
 ): OrganizationScaffold {
   if (
     !Object.keys(patch).length ||

@@ -44,10 +44,17 @@ import {
   GENESIS_HASH,
   getAuditChainKeyId,
 } from '@agent/core/chain-integrity';
-import { TENANT_RUNTIME_PARTITION_ROOTS } from '@agent/core/storage-layout';
-import { createHash } from 'node:crypto';
 import {
-  assertExclusionsHeld,
+  LIVE_STORAGE_MAINTENANCE_LOCK,
+  TENANT_RUNTIME_PARTITION_ROOTS,
+} from '@agent/core/storage-layout';
+import { withLockSync } from '@agent/core/foundation/lock-utils';
+import {
+  archiveMembers,
+  extractWithStagedPartitions,
+  assertNoAppendOnlyConflict,
+  placeStagedAppendOnlyPartitions,
+  stagedRestorePartitions,
   PLAINTEXT_TEMP_DIR_STALE_MS,
   sweepStalePlaintextTempDirs,
 } from './lib/backup/backup-tenant-partitions.js';
@@ -515,6 +522,39 @@ describe('tenant runtime partitions in backup and restore', () => {
     safeRmSync(FIXTURE_DIR, { recursive: true, force: true });
   });
 
+  it('refuses a live restore while scope offboarding holds the lock', () => {
+    safeMkdir(FIXTURE_DIR, { recursive: true });
+    const archive = `${FIXTURE_DIR}/maintenance-fixture.tar.gz`;
+    safeWriteFile(archive, 'archive must never be read');
+    expect(() =>
+      withLockSync(LIVE_STORAGE_MAINTENANCE_LOCK, () =>
+        restoreBackup(restoreOptions(archive, pathResolver.rootDir(), true))
+      )
+    ).toThrow('[LOCK_TIMEOUT]');
+  });
+
+  it.each(['resource-usage.jsonl', 'new-segment.jsonl'])(
+    'preserves a live append to %s after restore preflight',
+    (liveName) => {
+      const partition = 'active/shared/runtime/usage-ledger/confidential/acme';
+      const staged = `${FIXTURE_DIR}/staged`;
+      const target = `${FIXTURE_DIR}/target`;
+      const restoredFile = `${partition}/resource-usage.jsonl`;
+      const liveFile = `${target}/${partition}/${liveName}`;
+      safeMkdir(`${staged}/${partition}`, { recursive: true });
+      safeWriteFile(`${staged}/${restoredFile}`, '{"archived":true}\n');
+      assertNoAppendOnlyConflict(target, [restoredFile]);
+
+      safeMkdir(`${target}/${partition}`, { recursive: true });
+      safeWriteFile(liveFile, '{"newer":true}\n');
+      expect(() => placeStagedAppendOnlyPartitions(staged, target, [partition])).toThrow(
+        '[BACKUP_RESTORE_APPEND_ONLY_CONFLICT]'
+      );
+      expect(safeReadFile(liveFile, { encoding: 'utf8' })).toBe('{"newer":true}\n');
+      expect(safeReaddir(`${target}/${partition}`)).toEqual([liveName]);
+    }
+  );
+
   /** A tenant archive of `files` (repo-relative → content) with a manifest naming `entries`. */
   function tenantArchive(
     name: string,
@@ -575,7 +615,11 @@ describe('tenant runtime partitions in backup and restore', () => {
   }
 
   it('plans every registered partition root for the tenant, never another tenant or system', () => {
-    const existing = new Set<string>();
+    const worklists = 'active/shared/artifacts/confidential';
+    const existing = new Set<string>([
+      `${worklists}/acme/ingest-sync`,
+      `${worklists}/other/ingest-sync`,
+    ]);
     for (const { root } of TENANT_RUNTIME_PARTITION_ROOTS) {
       for (const partition of [
         'personal/acme',
@@ -599,6 +643,7 @@ describe('tenant runtime partitions in backup and restore', () => {
       expect(plan.entries).toContain(`${root}/confidential/acme`);
     }
     expect(plan.entries.filter((entry) => /\/(other|system)(\/|$)/u.test(entry))).toEqual([]);
+    expect(plan.entries).toContain(`${worklists}/acme/ingest-sync`);
     expect(plan.tenantRuntimePartitions).toHaveLength(
       TENANT_RUNTIME_PARTITION_ROOTS.reduce(
         (count, root) => count + (root.tenantTiers?.length ?? 2),
@@ -645,6 +690,24 @@ describe('tenant runtime partitions in backup and restore', () => {
       'BACKUP_RESTORE_APPEND_ONLY_CONFLICT'
     );
     expect(safeReadFile(`${target}/${LEDGER}`, { encoding: 'utf8' })).toBe(live);
+  });
+
+  it('protects decision cases on force restore and restores files into a clean target', () => {
+    const ledger = 'knowledge/confidential/acme/decisions/case-1/decisions.jsonl';
+    const old = '{"old":true}\n';
+    const archive = tenantArchive('decision-case', [ledger], { [ledger]: old });
+    const target = `${FIXTURE_DIR}/decision-target`;
+    const live = old + '{"newer":true}\n';
+    safeWriteFile(`${target}/${ledger}`, live);
+
+    expect(() => restoreBackup(restoreOptions(archive, target, true))).toThrow(
+      'BACKUP_RESTORE_APPEND_ONLY_CONFLICT'
+    );
+    expect(safeReadFile(`${target}/${ledger}`, { encoding: 'utf8' })).toBe(live);
+
+    const clean = `${FIXTURE_DIR}/decision-clean`;
+    restoreBackup(restoreOptions(archive, clean));
+    expect(safeReadFile(`${clean}/${ledger}`, { encoding: 'utf8' })).toBe(old);
   });
 
   it('trims a torn last ledger line and verifies the restored chain with the same key', () => {
@@ -975,41 +1038,69 @@ describe('tenant runtime partitions in backup and restore', () => {
     expect(safeExistsSync(`${target}/${grantQuarantine}/grant-b.json`)).toBe(false);
   });
 
-  it('on an exclusion breach moves only tar-written archive members aside, never live files', () => {
-    const target = `${FIXTURE_DIR}/breach-target`;
-    const partition = 'active/shared/runtime/grants/confidential/acme';
-    const written = `${partition}/grant-a.json`;
-    const unchanged = `${partition}/grant-b.json`;
-    const liveOnly = `${partition}/grant-live.json`;
-    safeWriteFile(`${target}/${written}`, '{"grant_id":"grant-a","status":"active"}\n');
-    safeWriteFile(`${target}/${unchanged}`, '{"grant_id":"grant-b"}\n');
-    safeWriteFile(`${target}/${liveOnly}`, '{"grant_id":"grant-live"}\n');
-    const digest = (text: string) => createHash('sha256').update(text).digest('hex');
-    const before = new Map<string, string | undefined>([
-      [written, undefined],
-      [unchanged, digest('{"grant_id":"grant-b"}\n')],
+  it('selects exact restore members even when an allowed parent contains withheld files', () => {
+    const base = `${FIXTURE_DIR}/allowlist`;
+    const source = `${base}/source`;
+    const target = `${base}/target`;
+    const allowed = 'active/shared/runtime/state.json';
+    const withheld = 'active/shared/runtime/locks/live-storage-maintenance.lock';
+    safeWriteFile(`${source}/${allowed}`, 'archived state');
+    safeWriteFile(`${source}/${withheld}`, 'archived lock');
+    safeWriteFile(`${target}/${withheld}`, 'live lock');
+    const archive = `${base}/archive.tar.gz`;
+    expect(safeExecResult('tar', ['-czf', archive, '-C', source, './active']).status).toBe(0);
+    extractWithStagedPartitions({
+      plainArchive: archive,
+      target,
+      staging: `${base}/staging`,
+      members: archiveMembers(archive),
+      archiveChainKeyId: undefined,
+      tenant: undefined,
+      stampId: 'allowlist',
+    });
+    expect(safeReadFile(`${target}/${allowed}`, { encoding: 'utf8' })).toBe('archived state');
+    expect(safeReadFile(`${target}/${withheld}`, { encoding: 'utf8' })).toBe('live lock');
+  });
+
+  it('keeps grants, pending effects, and grant approvals inactive on full restore', () => {
+    const grant = 'active/shared/runtime/grants/confidential/acme/grant-a.json';
+    const pending = 'active/shared/runtime/grants/confidential/acme/.pending-example.json';
+    const personal = 'active/shared/runtime/grants/personal/shared/grant-p.json';
+    const legacy = 'active/shared/coordination/channels/grant-standing/approvals/requests/a.json';
+    const tenantApproval =
+      'active/shared/runtime/tenant-approvals/confidential/acme/grant-standing/requests/b.json';
+    const personalApproval = `active/shared/runtime/tenant-approvals/personal/shared/owners/${'a'.repeat(64)}/grant-standing/requests/d.json`;
+    const otherApproval =
+      'active/shared/runtime/tenant-approvals/confidential/acme/other/requests/c.json';
+    const archive = tenantArchive(
+      'grant-full-restore',
+      ['active/shared/runtime', 'active/shared/coordination'],
+      {
+        [grant]: '{"active":true}',
+        [pending]: '{"effect_ref":"archived"}',
+        [personal]: '{"active":true}',
+        [legacy]: '{"status":"approved"}',
+        [tenantApproval]: '{"status":"approved"}',
+        [otherApproval]: '{"status":"pending"}',
+      },
+      { scope: 'all', tenant: undefined }
+    );
+    const target = `${FIXTURE_DIR}/grant-full-target`;
+    safeWriteFile(`${target}/${grant}`, '{"revoked":true}');
+    const result = restoreBackup({
+      ...restoreOptions(archive, target, true),
+      scope: 'all',
+      tenant: undefined,
+    });
+    expect(safeReadFile(`${target}/${grant}`, { encoding: 'utf8' })).toBe('{"revoked":true}');
+    for (const file of [pending, personal, legacy, tenantApproval, personalApproval]) {
+      expect(safeExistsSync(`${target}/${file}`)).toBe(false);
+    }
+    expect(safeExistsSync(`${target}/${otherApproval}`)).toBe(true);
+    expect(result.quarantinePaths).toHaveLength(4);
+    expect(stagedRestorePartitions([personalApproval], false).withheld).toEqual([
+      personalApproval.split('/requests/')[0],
     ]);
-    expect(() =>
-      assertExclusionsHeld(
-        target,
-        { appendOnly: [], revocable: [partition] },
-        [written, unchanged],
-        before,
-        'stamp-1'
-      )
-    ).toThrow(/BACKUP_RESTORE_EXCLUDE_FAILED.*grant-a\.json/u);
-    expect(safeExistsSync(`${target}/${written}`)).toBe(false);
-    expect(
-      safeExistsSync(
-        `${target}/${partition}/.restore-quarantine/stamp-1/exclude-breach/grant-a.json`
-      )
-    ).toBe(true);
-    expect(safeReadFile(`${target}/${unchanged}`, { encoding: 'utf8' })).toBe(
-      '{"grant_id":"grant-b"}\n'
-    );
-    expect(safeReadFile(`${target}/${liveOnly}`, { encoding: 'utf8' })).toBe(
-      '{"grant_id":"grant-live"}\n'
-    );
   });
 
   it('quarantines restored customer decision invites and standing grants (D1)', () => {
@@ -1269,6 +1360,7 @@ describe('backup file selection', () => {
       'active/shared/staging/inbound.pdf',
       'active/shared/exports/backups/kyberion-all-old.tar.gz.enc',
       'active/shared/runtime/vitest-live/run.json',
+      'active/shared/runtime/locks/live-storage-maintenance.lock',
       'active/archive/.trash/active/old/removed.json',
       'active/shared/data-vault/entry.json',
       'active/out/kyberion-all-previous.tar.gz.enc',

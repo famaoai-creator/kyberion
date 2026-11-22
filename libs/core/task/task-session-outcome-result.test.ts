@@ -4,6 +4,7 @@ import {
   saveTaskSession,
   loadTaskSession,
   reopenTaskSession,
+  recordTaskSessionHistory,
 } from './task-session.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeRmSync } from '../secure-io.js';
@@ -39,7 +40,17 @@ describe('Task Session Outcome Result integration', () => {
         artifacts: [{ ref: 'revised.docx' }],
         delivery: { status: 'unknown' },
       });
+      const stale = loadTaskSession(sessionId)!;
+      recordTaskSessionHistory(sessionId, {
+        ts: new Date().toISOString(),
+        type: 'control',
+        text: 'Concurrent process update',
+      });
+      stale.artifact!.output_path = 'stale.docx';
+      expect(() => saveTaskSession(stale)).toThrow('TASK_SESSION_CONFLICT');
+      expect(loadTaskSession(sessionId)?.history.at(-1)?.text).toBe('Concurrent process update');
       const reopened = reopenTaskSession(sessionId, { reason: 'Revise the totals' });
+      expect(reopened?.history.at(-1)?.text).toBe('Session reopened: Revise the totals');
       expect(reopened?.completion_summary?.outcome_result).toBeUndefined();
       expect(loadTaskSession(sessionId)?.completion_summary?.outcome_result).toBeUndefined();
     } finally {

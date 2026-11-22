@@ -16,7 +16,11 @@ vi.mock('../scope-envelope.js', () => ({
 vi.mock('./accountability-charter-registry.js', () => ({ findActiveCharter: vi.fn() }));
 vi.mock('./approval-gate.js', () => ({ enforceApprovalGate: vi.fn() }));
 vi.mock('./audit-chain.js', () => ({ auditChain: { record: vi.fn() } }));
-vi.mock('./external-operation-store.js', () => ({ reserveExternalOperation: vi.fn() }));
+vi.mock('./external-operation-store.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./external-operation-store.js')>()),
+  reserveExternalOperation: vi.fn(),
+  persistExternalOperationOutcome: vi.fn(),
+}));
 vi.mock('../pipeline/op-preflight.js', async (original) => ({
   ...(await original<typeof import('../pipeline/op-preflight.js')>()),
   runOpPreflight: vi.fn(async ({ params }) => ({

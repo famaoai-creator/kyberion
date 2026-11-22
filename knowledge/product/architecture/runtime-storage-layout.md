@@ -63,6 +63,9 @@ The floors (`tmp`, `staging`, `cache`, `artifacts`) share one partition rule
   a grant that names `<floor>/<tier>/` (the Chronos roles hold
   `active/shared/artifacts/{personal,confidential}/`) or a deliberately broad
   `active/`-level grant; tenant scope then narrows it to the viewer's tenant.
+- If `security-policy.json` is missing or unreadable, tier-guard refuses
+  reads, metadata probes and writes on protected personal and confidential
+  paths. Public reads and unpartitioned scratch remain available for bootstrap.
 - Unpartitioned files at a floor root keep their owner's lifecycle (for
   example knowledge-index `cache/ki-*.json`, evicted by its own LRU).
 - Scope-owned artifacts inherit the tier and tenant of their owner directory
@@ -511,6 +514,16 @@ includeSystem }` narrows for an unbound reader (the Concierge response
 
 ### Tenant runtime partitions (backup, restore, offboarding)
 
+An ingest sync saves the changed-item work list under
+`active/shared/artifacts/confidential/<tenant>/ingest-sync/<source>/` before
+advancing its cursor. The cursor names the content-addressed batch and a
+later sync refuses a missing or mismatched referenced batch. Tenant backup,
+restore and offboarding include the work lists alongside the cursor tree.
+`ingest:sync_source` accepts `list_batches: true` or `recover_batch_id` for a
+single `source_system`. Recovery reads the saved list without advancing the
+cursor or contacting the source. Knowledge landing still uses the explicit
+ingest commit.
+
 - `TENANT_RUNTIME_PARTITION_ROOTS` (`storage-layout.ts`) derives one list
   from `PARTITIONED_RUNTIME_LEDGER_ROOTS` and `PARTITIONED_RUNTIME_STATE_ROOTS`
   (`family`, `appendOnly` for every ledger root, `hashChained` for the tenant
@@ -528,16 +541,33 @@ includeSystem }` narrows for an unbound reader (the Concierge response
   compile until its disposition is decided. Null-disposition partitions are
   never listed or counted as post-offboard leftovers.
 - A restore refuses (`[BACKUP_RESTORE_APPEND_ONLY_CONFLICT]`) to lay an
-  append-only partition over a target that already holds one (the only
-  rollback guard: a chain has no head anchor). Append-only partitions and, on
-  a tenant restore, invites and grants are extracted into staging, never in
+  append-only partition or customer decision case over a target that already
+  holds files. A chain has no head anchor, so the restore relies on this guard. The target is checked again
+  after staging and immediately before placing the staged ledgers. Every
+  staged ledger file uses exclusive creation, so a live file created after
+  the final check keeps its bytes. A restore into the live checkout,
+  offboarding execution, and the destructive janitor run share one
+  non-waiting maintenance lock. A competing invocation fails before work
+  starts. Lock files are excluded from backup and restore. Quiesce ordinary
+  writers before restoring a multi-file partition. Append-only partitions and, on
+  a tenant restore, invites are extracted into staging, never in
   place: a torn (unparseable) last `.jsonl` line is trimmed there, restored
   tenant-ledger chains are verified there when the target's audit chain key id
   equals the archive's `chain_key_id` (every entry HMAC-chained under that id;
   else `deferred_key_mismatch`; the key never rides in a tenant archive), and
-  the archive's invites and grants move straight into
+  the archive's invites move straight into
   `<partition>/.restore-quarantine/<restore-id>/`, leaving live records as
   they are.
+- Every restore stages and quarantines standing Grant records, pending
+  Grant recovery intents, and the `grant-standing` approval channel. This
+  includes tenant and shared Grant storage and tenant and legacy system
+  approval paths. Personal-owner approvals remain in the archive because
+  restore has no personal-owner I/O authority. Archived authorities stay
+  outside active lookup paths. Existing Grant and approval records are preserved.
+- The main restore extracts an exact list of allowed archive members without
+  directory recursion. It never moves target files based on a change observed
+  during extraction. Staged partitions, lock files, and any credential roots
+  withheld by a drill are outside the main member list.
 
 ## 3. Surface visibility
 
@@ -563,6 +593,18 @@ session); tenant- or system-scoped artifacts name it with
 `organization_id`. Chronos `mission-asset` serves files under the artifact
 floor, mission, project and organization trees, and derives tier / tenant from
 the partition (system → public) or the `<tier>/<tenant>/` path segments.
+The surface-facing record is written after the scoped artifact bytes, scope
+index, and ownership append. A failed first publication can leave local
+bytes and prior index writes. When a public-facing write reuses a logical
+name with different bytes, the new body has a content-versioned path and
+the old reference remains readable until publication. The scope index
+records the content digest. Retrying the same publication with an explicit
+artifact ID reuses its indexed version and unchanged ownership.
+Publication validates its scope and existing owner before writing the body
+or appending the index, including when an interrupted publication has an
+ownership row but no surface record yet. Scoped and governed artifact writes
+share the publication lock when they can reach a scoped path. They reject
+ordinary overwrites and appends to previously published bodies.
 
 ### Mission → project promotion
 

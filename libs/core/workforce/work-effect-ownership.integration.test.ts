@@ -17,6 +17,7 @@ import {
   quarantineWorkItemExecution,
   releaseWorkItemEffectOwnership,
   expireWorkItemLeases,
+  reapExpiredWorkLeases,
 } from './work-coordination.js';
 import { workEffectOwnership } from './work-effect-ownership.js';
 import type { WorkItem } from './work-coordination-types.js';
@@ -47,6 +48,42 @@ const claim = (id: string) =>
     requireNewLease: true,
   });
 describe('durable effect ownership mutations', () => {
+  it.each([false, true])(
+    'keeps an uncertain external target fenced through reaping unless completion evidence is present (%s)',
+    (hasEvidence) => {
+      create('a');
+      create('b');
+      const owned = claim('a');
+      const recovery = reapExpiredWorkLeases({
+        now: new Date(Date.parse(owned.lease.expires_at) + 1).toISOString(),
+        completedEvidence: (item) =>
+          hasEvidence &&
+          item.item_id === 'a' &&
+          item.current_attempt_id === owned.item.current_attempt_id,
+      });
+      const item = getWorkItem('a');
+      expect(item?.lease_id).toBeUndefined();
+      expect(() =>
+        releaseWorkItem({
+          itemId: 'a',
+          leaseId: owned.lease.lease_id,
+          actorPeerId: 'dot:a',
+          nextStatus: 'done',
+          effectDisposition: 'completed',
+        })
+      ).toThrow(/lease/i);
+      if (hasEvidence) {
+        expect(recovery.replayed).toHaveLength(1);
+        expect(item).toMatchObject({ status: 'done', effect_ownership: { state: 'settled' } });
+        expect(claim('b').item.status).toBe('in_progress');
+      } else {
+        expect(recovery.replayed).toEqual([]);
+        expect(item?.effect_ownership).toMatchObject({ state: 'held', target: 'service:shared' });
+        expect(() => claim('a')).toThrow(/ownership/);
+        expect(() => claim('b')).toThrow(/ownership/);
+      }
+    }
+  );
   it.each(['active', 'expired'] as const)(
     'settles a generic uncertain %s attempt only with exact authenticated human recovery proof',
     (leaseState) => {

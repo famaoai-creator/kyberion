@@ -22,6 +22,7 @@ import {
   listActiveWorkLeases,
   listCoordinationEvents,
   reapExpiredWorkLeases,
+  releaseWorkItem,
   setWorkCoordinationNamespace,
   updateWorkItem,
 } from './work-coordination.js';
@@ -202,6 +203,48 @@ describe('atomic WorkItem ownership', () => {
       claimWorkItem({ itemId: initial.itemId, actorPeerId: 'peer', purpose: 'execute' })
     ).toThrow(/terminal/);
   });
+
+  it.each([
+    { append: 'leases', persisted: 'in_progress', recovery: 'replayed' },
+    { append: 'items', persisted: 'in_progress', recovery: 'replayed' },
+    { append: 'events', persisted: 'done', recovery: 'already_done' },
+  ])(
+    'recovers durable completion evidence after interruption at $append',
+    ({ append, persisted, recovery }) => {
+      createWorkItemIfAbsent(initial);
+      const { lease, item } = claimWorkItem({
+        itemId: initial.itemId,
+        actorPeerId: 'peer',
+        purpose: 'execute',
+      });
+      const complete = () =>
+        releaseWorkItem({
+          itemId: item.item_id,
+          actorPeerId: 'peer',
+          leaseId: lease.lease_id,
+          nextStatus: 'done',
+        });
+      failAppend('/' + append + '.jsonl');
+      expect(complete).toThrow(/simulated process interruption/);
+      vi.restoreAllMocks();
+      expect(getWorkItem(item.item_id)?.status).toBe(persisted);
+
+      const recoveryInput = {
+        now: new Date(Date.parse(lease.expires_at) + 1).toISOString(),
+        completedEvidence: (candidate: typeof item) =>
+          candidate.item_id === item.item_id &&
+          candidate.current_attempt_id === item.current_attempt_id,
+      };
+      const recovered = reapExpiredWorkLeases(recoveryInput);
+      expect(recovered.replayed).toHaveLength(recovery === 'replayed' ? 1 : 0);
+      const terminal = getWorkItem(item.item_id);
+      expect(terminal?.status).toBe('done');
+      expect(listActiveWorkLeases()).toHaveLength(0);
+      expect(reapExpiredWorkLeases(recoveryInput).replayed).toEqual([]);
+      expect(getWorkItem(item.item_id)).toEqual(terminal);
+      expect(complete).toThrow(/lease/i);
+    }
+  );
 });
 
 interface ChildResult {
@@ -232,10 +275,11 @@ function seedChildRoot(): void {
   });
 }
 
-async function race(actions: string[]): Promise<ChildResult[]> {
+async function race(actions: string[], expectedExit = 0): Promise<ChildResult[]> {
   const pending = actions.map((action) => {
     const code = [
       "import * as work from '@agent/core/workforce/work-coordination';",
+      "import { getFoundationIo } from '@agent/core/foundation/io';",
       'work.setWorkCoordinationNamespace(' + JSON.stringify(namespace) + ');',
       'const initial = ' + JSON.stringify(initial) + ';',
       "process.stdin.once('data', () => {",
@@ -289,10 +333,14 @@ async function race(actions: string[]): Promise<ChildResult[]> {
       });
       handle.child.once('close', (code) => {
         clearTimeout(timer);
-        if (code !== 0) {
+        if (code !== expectedExit) {
           const error = new Error('child failed: ' + stderr + stdout);
           failReady(error);
           reject(error);
+          return;
+        }
+        if (expectedExit !== 0) {
+          resolve({ ok: true });
           return;
         }
         const line = stdout
@@ -317,6 +365,90 @@ async function race(actions: string[]): Promise<ChildResult[]> {
 }
 
 describe('real inter-process WorkItem races', () => {
+  it('recovers a completion after the writer exits between durable appends', async () => {
+    seedChildRoot();
+    const [setup] = await race([
+      `
+      work.createWorkItemIfAbsent(initial);
+      return work.claimWorkItem({ itemId: initial.itemId, actorPeerId: 'peer', purpose: 'execute' }).item;
+    `,
+    ]);
+    expect(setup.ok, setup.error).toBe(true);
+    expect(setup.value?.current_attempt_id).toEqual(expect.any(String));
+    const [interrupted] = await race(
+      [
+        `
+        const io = getFoundationIo();
+        const append = io.appendFile.bind(io);
+        io.appendFile = (file, content) => {
+          if (file.endsWith('/items.jsonl')) process.exit(42);
+          return append(file, content);
+        };
+        return work.releaseWorkItem({
+          itemId: initial.itemId, actorPeerId: 'peer', leaseId: ${JSON.stringify(setup.value?.lease_id)}, nextStatus: 'done'
+        });
+      `,
+      ],
+      42
+    );
+    expect(interrupted.ok).toBe(true);
+    const [restarted] = await race([
+      `
+      const before = work.getWorkItem(initial.itemId);
+      const completedEvidence = (item) => item.item_id === initial.itemId &&
+        item.current_attempt_id === ${JSON.stringify(setup.value?.current_attempt_id)};
+      const first = work.reapExpiredWorkLeases({ completedEvidence });
+      const second = work.reapExpiredWorkLeases({ completedEvidence });
+      return { before: before.status, first: first.replayed.length, second: second.replayed.length,
+        after: work.getWorkItem(initial.itemId).status, liveLeases: work.listActiveWorkLeases().length };
+    `,
+    ]);
+    expect(restarted.ok, restarted.error).toBe(true);
+    expect(restarted.value).toEqual({
+      before: 'in_progress',
+      first: 1,
+      second: 0,
+      after: 'done',
+      liveLeases: 0,
+    });
+  }, 60_000);
+
+  it('rejects stale completion regardless of ordering against current completion', async () => {
+    seedChildRoot();
+    const [setup] = await race([
+      `
+      work.createWorkItemIfAbsent(initial);
+      const claim = (actorPeerId) => work.claimWorkItem({
+        itemId: initial.itemId, actorPeerId, purpose: 'execute'
+      }).lease;
+      const previous = claim('peer-a');
+      work.reapExpiredWorkLeases({ now: new Date(Date.parse(previous.expires_at) + 1).toISOString() });
+      return { previous: previous.lease_id, current: claim('peer-b').lease_id };
+    `,
+    ]);
+    expect(setup.ok, setup.error).toBe(true);
+    const complete = (actor: string, lease: unknown) => `
+      return work.releaseWorkItem({
+        itemId: initial.itemId, actorPeerId: ${JSON.stringify(actor)},
+        leaseId: ${JSON.stringify(lease)}, nextStatus: 'done'
+      });
+    `;
+    const [stale, current] = await race([
+      complete('peer-a', setup.value?.previous),
+      complete('peer-b', setup.value?.current),
+    ]);
+    expect(stale.ok).toBe(false);
+    expect(['lease_conflict', 'lease_not_found']).toContain(stale.code);
+    expect(current.ok, current.error).toBe(true);
+    expect(current.value?.item).toMatchObject({ status: 'done', version: 5 });
+    const snapshots = readJsonLines<{ status: string; version: number }>(
+      path.join(fixtureRoot, 'active/shared/runtime/work-coordination', namespace, 'items.jsonl')
+    );
+    expect(snapshots.filter((item) => item.status === 'done').map((item) => item.version)).toEqual([
+      5,
+    ]);
+  }, 60_000);
+
   it('creates one original snapshot under simultaneous equivalent creates', async () => {
     seedChildRoot();
     const results = await race(

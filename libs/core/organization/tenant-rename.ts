@@ -1,4 +1,5 @@
 import * as path from 'node:path';
+import { withEntityLifecycleLock } from './entity-lifecycle-lock.js';
 import { readConfiguredActorIdentity } from '../identity-context-bridge.js';
 import { auditChain, withAuditChainLock } from '../governance/audit-chain.js';
 import { readJson, writeJson } from '../foundation/json.js';
@@ -230,6 +231,12 @@ export function previousSlugs(
 }
 
 export function renameTenantWithPlan(input: TenantRenameInput): TenantRenameResult {
+  return input.apply
+    ? withEntityLifecycleLock(() => executeRenameTenantPlan(input))
+    : executeRenameTenantPlan(input);
+}
+
+function executeRenameTenantPlan(input: TenantRenameInput): TenantRenameResult {
   const rootDir = input.rootDir ?? pathResolver.rootDir();
   const options: TenantRegistryPathOptions = { rootDir: input.rootDir, env: input.env };
   const { fromSlug, toSlug } = input;

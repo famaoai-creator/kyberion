@@ -58,7 +58,8 @@ describe('generation quota', () => {
       allowed: true,
       projected: { units: 1 },
     });
-    expect(reserveGenerationQuota(SCOPE, 'generate_video', options)).toMatchObject({
+    const video = reserveGenerationQuota(SCOPE, 'generate_video', options);
+    expect(video).toMatchObject({
       allowed: true,
       level: 'warn',
       projected: { units: 3 },
@@ -69,9 +70,28 @@ describe('generation quota', () => {
       usage: { units: 3 },
     });
     expect(checkGenerationQuota(SCOPE, 'generate_image', options).projected.units).toBe(4);
-    expect(releaseGenerationQuota(SCOPE, 'generate_video', options).projected.units).toBe(1);
+    const release = { ...options, reservation_id: video.reservation_id };
+    expect(releaseGenerationQuota(SCOPE, 'generate_image', release).allowed).toBe(false);
+    expect(releaseGenerationQuota(SCOPE, 'generate_video', release).projected.units).toBe(1);
+    expect(releaseGenerationQuota(SCOPE, 'generate_video', release)).toMatchObject({
+      allowed: false,
+      projected: { units: 1 },
+    });
     expect(checkGenerationQuota(SCOPE, 'generate_video', options).allowed).toBe(true);
     expect(generationQuotaCounterPath('client-a', options)).toContain('2026-08-16.json');
+    safeRmSync(ROOT, { recursive: true, force: true });
+  });
+
+  it('persists final charges without a refundable reservation', () => {
+    const options = { rootDir: ROOT, policy: POLICY, now: '2026-08-17T00:00:00.000Z' };
+    const charge = reserveGenerationQuota(SCOPE, 'generate_image', {
+      ...options,
+      finalCharge: true,
+    });
+    expect(charge.allowed).toBe(true);
+    expect(charge.reservation_id).toBeUndefined();
+    expect(releaseGenerationQuota(SCOPE, 'generate_image', options).allowed).toBe(false);
+    expect(checkGenerationQuota(SCOPE, 'generate_image', options).usage.units).toBe(1);
     safeRmSync(ROOT, { recursive: true, force: true });
   });
 
