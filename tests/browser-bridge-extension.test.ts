@@ -906,6 +906,50 @@ describe('Browser Bridge mailbox inbox (受信)', () => {
     expect(pollCalls(harness)).toHaveLength(4);
   });
 
+  it('keeps fast-polling for a bounded window after control_step activity, no side panel', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'Date'] });
+    const harness = await createHarness();
+    // A well-formed control_step with an unbound session: it executes, fails,
+    // responds — and still arms the fast-poll window for follow-up steps.
+    // Once answered it leaves the mailbox, like the real host.
+    const step = mailboxRequest('control_step', {
+      session_id: 'BCS-32345678-1234-4234-8234-123456789abc',
+      lease_id: 'LCS-32345678-1234-4234-8234-123456789abc',
+      origin: 'https://example.com',
+      step: { step_id: 's1', op: 'list_tabs' },
+    });
+    let delivered = true;
+    harness.hooks.native = (payload: { type: string; request_id?: string; status?: string }) => {
+      if (payload.type === 'poll_requests') {
+        return { ok: true, requests: delivered ? [step] : [], approvals: [] };
+      }
+      if (payload.type === 'respond_request') {
+        delivered = false;
+        return { ok: true, request_id: payload.request_id, status: payload.status };
+      }
+      return defaultNative(payload);
+    };
+    harness.fireAlarm('kyberion-bridge-mailbox');
+    await flush();
+    expect(pollCalls(harness)).toHaveLength(1);
+
+    // No side panel: the control window alone keeps the 5 s poll alive.
+    vi.advanceTimersByTime(5_000);
+    await flush();
+    expect(pollCalls(harness)).toHaveLength(2);
+    vi.advanceTimersByTime(5_000);
+    await flush();
+    expect(pollCalls(harness)).toHaveLength(3);
+
+    // Once the activity window lapses the fast poll stops on its own.
+    vi.advanceTimersByTime(5 * 60_000 + 5_000);
+    await flush();
+    const settled = pollCalls(harness).length;
+    vi.advanceTimersByTime(30_000);
+    await flush();
+    expect(pollCalls(harness)).toHaveLength(settled);
+  });
+
   it('stores the inbox, badges actionable items, and toasts new observe / approval items once', async () => {
     const harness = await createHarness();
     mailboxHost(
