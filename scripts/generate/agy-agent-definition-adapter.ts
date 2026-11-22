@@ -12,22 +12,28 @@ export type AgyAgentProfile = 'implementer' | 'explorer' | 'planner';
 export const AGY_AGENT_NAME_PREFIX = 'kyberion-';
 
 /**
- * AGY CLI tool names verified against the agy 1.4.11 binary and the vendor
+ * AGY CLI tool names verified against the agy binary and the vendor
  * custom-subagent docs. This list is the validation boundary: vendor docs
  * warn that an unmapped or misspelled tool name can hang a subagent, so
  * {@link AGY_PROFILE_TOOLS} entries are checked against this set in tests
  * rather than trusted to be right.
+ *
+ * Verified on agy 1.4.11, re-verified against agy 1.5.14 by invoking a
+ * single-tool probe agent per name (`failed to resolve components` = absent
+ * from the registry). Dropped on 1.5.x: `view_code_item` (observed failing
+ * 2026-11-22, MSN-OPS-ALERT-WINDOW-20261122), `view_file_outline`,
+ * `view_content_chunk`, `search_in_file`, `read_terminal`, `notify_user`,
+ * `memory`, `trajectory_search`. `read_terminal`'s role (inspecting a
+ * running/finished command) is covered by `command_status` + `run_command`;
+ * symbol-level viewing is covered by `view_file` + `grep_search`. The
+ * `read_file`/`edit_file`/`write_file` internal vocabulary also resolves on
+ * 1.5.x but stays out of profiles: the documented names above are preferred.
  */
 export const AGY_KNOWN_TOOLS: readonly string[] = [
   'view_file',
-  'view_code_item',
-  'view_file_outline',
-  'view_content_chunk',
   'grep_search',
-  'search_in_file',
   'find_by_name',
   'list_dir',
-  'read_terminal',
   'write_to_file',
   'replace_file_content',
   'multi_replace_file_content',
@@ -37,9 +43,6 @@ export const AGY_KNOWN_TOOLS: readonly string[] = [
   'read_url_content',
   'invoke_subagent',
   'define_subagent',
-  'notify_user',
-  'memory',
-  'trajectory_search',
 ];
 
 /**
@@ -51,11 +54,10 @@ export const AGY_KNOWN_TOOLS: readonly string[] = [
 export const AGY_PROFILE_TOOLS: Readonly<Record<AgyAgentProfile, readonly string[]>> = {
   implementer: [
     'view_file',
-    'view_code_item',
     'grep_search',
     'find_by_name',
     'list_dir',
-    'read_terminal',
+    'command_status',
     'write_to_file',
     'replace_file_content',
     'multi_replace_file_content',
@@ -63,7 +65,6 @@ export const AGY_PROFILE_TOOLS: Readonly<Record<AgyAgentProfile, readonly string
   ],
   explorer: [
     'view_file',
-    'view_code_item',
     'grep_search',
     'find_by_name',
     'list_dir',

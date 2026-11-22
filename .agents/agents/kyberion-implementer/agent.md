@@ -3,11 +3,10 @@ name: kyberion-implementer
 description: 'Produces the main code and configuration changes.'
 tools:
   - view_file
-  - view_code_item
   - grep_search
   - find_by_name
   - list_dir
-  - read_terminal
+  - command_status
   - write_to_file
   - replace_file_content
   - multi_replace_file_content

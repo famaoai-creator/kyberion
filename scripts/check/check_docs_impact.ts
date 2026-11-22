@@ -20,6 +20,12 @@ import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
 import { assertSafeRepositoryPath, safeWriteFile } from '@agent/core/secure-io';
 import { cliOptionValue, hasCliFlag, hasHelpFlag } from '@agent/core/cli-guard';
+import {
+  resolvePromotionTargetRoot,
+  writePromotedFilesToWorktree,
+  type GitRunner as PromotionGitRunner,
+  type WorktreeFileWriter,
+} from '@agent/core/knowledge/memory-promotion-git';
 import { defineScript, isDirectScript } from '../lib/harness.js';
 import { readSafeJsonFile } from '../lib/json-input.js';
 import { collectChangedFiles, type GitRunner } from '../run_checks.js';
@@ -239,6 +245,7 @@ interface ParsedArgs {
   files?: string[];
   out?: string;
   map?: string;
+  missionRoot?: string;
   strict: boolean;
   help: boolean;
 }
@@ -250,6 +257,7 @@ function parseArgs(argv: string[]): ParsedArgs {
     files: filesRaw ? filesRaw.split(',').map(normalizePath).filter(Boolean) : undefined,
     out: cliOptionValue(argv, '--out'),
     map: cliOptionValue(argv, '--map'),
+    missionRoot: cliOptionValue(argv, '--mission-root'),
     strict: hasCliFlag(argv, '--strict'),
     help: hasHelpFlag(argv),
   };
@@ -262,10 +270,52 @@ export function docsImpactUsage(): string {
     '  --base <ref>       Diff against merge-base with <ref> (default: origin/main, then main)',
     '  --files <a,b>      Explicit changed-path list (skips git)',
     '  --out <path>       Also write the markdown report to a repo-local file',
+    '  --mission-root <p> Checkout root hosting the mission; lets --out target <p>/active/missions/** (e.g. from a worktree)',
     '  --map <path>       Alternate docs-impact-map.json',
     '  --strict           Exit 1 when any mapped doc surface is not_updated',
     '  --json             Print the report as JSON',
   ].join('\n');
+}
+
+/**
+ * Writes the report to --out. Repo-local targets go through the normal
+ * guarded write; when --out resolves outside this root (e.g. a mission's
+ * evidence dir in another worktree), --mission-root names the sibling
+ * checkout hosting the mission and the write is confined to
+ * <mission-root>/active/missions/** via the governed sibling-worktree writer
+ * (same mechanism as memory-promote --target-root).
+ */
+export function writeDocsImpactReport(
+  outArg: string,
+  missionRoot: string | undefined,
+  markdown: string,
+  deps: { gitRunner?: PromotionGitRunner; worktreeWriter?: WorktreeFileWriter } = {}
+): void {
+  const resolvedOut = path.resolve(pathResolver.rootDir(), outArg);
+  try {
+    safeWriteFile(assertSafeRepositoryPath(resolvedOut, { allowMissingLeaf: true }), markdown);
+    return;
+  } catch (error) {
+    if (
+      !missionRoot?.trim() ||
+      !(error instanceof Error) ||
+      !error.message.includes('RESOURCE_PATH_SCOPE')
+    ) {
+      throw error;
+    }
+  }
+  const target = resolvePromotionTargetRoot(missionRoot.trim(), { gitRunner: deps.gitRunner });
+  const checked = assertSafeRepositoryPath(resolvedOut, {
+    allowMissingLeaf: true,
+    rootDir: path.join(target.root, 'active', 'missions'),
+  });
+  (deps.worktreeWriter ?? writePromotedFilesToWorktree)({
+    root: target.root,
+    files: [
+      { path: path.relative(target.root, checked).split(path.sep).join('/'), content: markdown },
+    ],
+    executionRole: 'mission_controller',
+  });
 }
 
 export async function main(
@@ -297,10 +347,7 @@ export async function main(
 
   const markdown = renderDocsImpactMarkdown(report);
   if (args.out) {
-    const outPath = assertSafeRepositoryPath(path.resolve(pathResolver.rootDir(), args.out), {
-      allowMissingLeaf: true,
-    });
-    safeWriteFile(outPath, markdown);
+    writeDocsImpactReport(args.out, args.missionRoot, markdown);
   }
   print(json ? report : markdown);
   if (args.strict && report.counts.not_updated > 0) {

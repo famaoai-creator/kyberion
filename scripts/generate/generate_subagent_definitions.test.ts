@@ -5,7 +5,10 @@ import {
   SUBAGENT_CAPABILITY_PROFILES,
   SUBAGENT_PROFILE_CLI_TOOLS,
   pathResolver,
+  safeExistsSync,
   safeReadFile,
+  safeReaddir,
+  safeStat,
   safeRmSync,
   safeWriteFile,
 } from '@agent/core';
@@ -159,11 +162,10 @@ describe('generate_subagent_definitions', () => {
   it('keeps AGY tool vocabulary provider-specific and least-privileged', () => {
     expect(AGY_PROFILE_TOOLS.implementer).toEqual([
       'view_file',
-      'view_code_item',
       'grep_search',
       'find_by_name',
       'list_dir',
-      'read_terminal',
+      'command_status',
       'write_to_file',
       'replace_file_content',
       'multi_replace_file_content',
@@ -171,7 +173,6 @@ describe('generate_subagent_definitions', () => {
     ]);
     expect(AGY_PROFILE_TOOLS.explorer).toEqual([
       'view_file',
-      'view_code_item',
       'grep_search',
       'find_by_name',
       'list_dir',
@@ -195,6 +196,28 @@ describe('generate_subagent_definitions', () => {
     }
     // The create-file capability the implementer tier relies on.
     expect(known.has('write_to_file')).toBe(true);
+  });
+
+  it('keeps .agents/agents/ exclusively owned by the AGY projection', () => {
+    // `.agents/agents/` is AGY's only custom-agent discovery path; other
+    // providers' projections live in their vendor dirs (.claude/, .cursor/,
+    // .codex/, .devin/). A foreign or hand-written definition there would be
+    // resolved against the AGY tool registry and can hang or fail agents.
+    const dir = pathResolver.rootResolve('.agents/agents');
+    const expected = new Set(GENERATED_ROLES.map((role) => agyAgentName(role)));
+    const entries = (safeExistsSync(dir) ? safeReaddir(dir) : []).filter((entry) =>
+      safeStat(path.join(dir, entry)).isDirectory()
+    );
+    expect(entries.length).toBeGreaterThan(0);
+    for (const entry of entries) {
+      expect(
+        expected.has(entry),
+        `.agents/agents/${entry} is not an AGY-projected role (${[...expected].join(', ')})`
+      ).toBe(true);
+      const agentFile = path.join(dir, entry, 'agent.md');
+      expect(safeExistsSync(agentFile), `${entry}/agent.md missing`).toBe(true);
+      expect(safeReadFile(agentFile)).toContain('GENERATED FILE — DO NOT EDIT BY HAND');
+    }
   });
 
   it('skips the Codex projection for tiers Codex cannot express', () => {

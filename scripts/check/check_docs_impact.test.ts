@@ -7,8 +7,10 @@ import {
   evaluateDocsImpact,
   main,
   renderDocsImpactMarkdown,
+  writeDocsImpactReport,
   type DocsImpactMap,
 } from './check_docs_impact.js';
+import type { GitRunner as PromotionGitRunner } from '@agent/core/knowledge/memory-promotion-git';
 
 const map: DocsImpactMap = {
   rules: [
@@ -169,5 +171,50 @@ describe('main', () => {
     const outPath = pathResolver.rootResolve(tmpOut);
     expect(safeExistsSync(outPath)).toBe(true);
     safeRmSync(outPath);
+  });
+});
+
+describe('writeDocsImpactReport --mission-root', () => {
+  const missionRoot = '/fake/primary';
+  const evidenceOut = `${missionRoot}/active/missions/public/MSN-X/evidence/docs-sync-report.md`;
+  const gitRunner: PromotionGitRunner = (args, cwd) => {
+    if (args.includes('--show-toplevel'))
+      return {
+        status: 0,
+        stdout: `${cwd === missionRoot ? missionRoot : pathResolver.rootDir()}\n`,
+        stderr: '',
+      };
+    if (args.includes('--show-prefix')) return { status: 0, stdout: '\n', stderr: '' };
+    if (args.includes('--git-common-dir')) return { status: 0, stdout: '/repo/.git\n', stderr: '' };
+    return { status: 1, stdout: '', stderr: 'unexpected git call' };
+  };
+
+  it('denies an outside-root --out when no --mission-root is given', () => {
+    expect(() => writeDocsImpactReport(evidenceOut, undefined, 'report')).toThrow(
+      /RESOURCE_PATH_SCOPE/
+    );
+  });
+
+  it('denies an --out outside <mission-root>/active/missions/**', () => {
+    expect(() =>
+      writeDocsImpactReport(`${missionRoot}/etc/escape.md`, missionRoot, 'report', { gitRunner })
+    ).toThrow(/RESOURCE_PATH_SCOPE/);
+  });
+
+  it('routes a mission-evidence --out through the sibling-worktree writer', () => {
+    const written: { root: string; path: string; content: string }[] = [];
+    writeDocsImpactReport(evidenceOut, missionRoot, 'report body', {
+      gitRunner,
+      worktreeWriter: ({ root, files }) => {
+        for (const file of files) written.push({ root, path: file.path, content: file.content });
+      },
+    });
+    expect(written).toEqual([
+      {
+        root: missionRoot,
+        path: 'active/missions/public/MSN-X/evidence/docs-sync-report.md',
+        content: 'report body',
+      },
+    ]);
   });
 });
