@@ -98,7 +98,10 @@ export function requestBrowserControlSession(input: {
       reason:
         'The CLI asked for an interactive browser-control session; a human grants the lease once.',
       impactSummary: `Drives the operator's Chrome on ${origin} with the schema-bounded step vocabulary.`,
-      requestedEffects: [`browser-control:${origin}`],
+      requestedEffects: [
+        `browser-control:${origin}`,
+        `browser-control-ceiling:${input.risk_ceiling ?? 'low'}`,
+      ],
     },
   });
   return { approval_request_id: record.id, origin };

@@ -2,9 +2,11 @@
  * `pnpm kyberion browser control` — interactive, session-leased browser
  * control over the Chrome extension bridge (Claude-for-Chrome style).
  *
- *   open <url> [--label <t>] [--ceiling low|observe] [--no-wait]
+ *   open <url> [--label <t>] [--ceiling low|observe] [--no-wait] [--approval <id>]
  *                       Ask the operator for a session on the URL's origin,
- *                       then open a bound tab (waits for the approval by default)
+ *                       then open a bound tab (waits for the approval by default).
+ *                       `--approval <id>` resumes an existing session approval
+ *                       — minting stays bound to the approved origin+ceiling
  *   sessions            List sessions and their status
  *   close <session>     Revoke a session
  *   tabs|tab <tab_id>|navigate <url>|snapshot|screenshot|click <ref>|
@@ -55,7 +57,7 @@ import { resolveBrowserBridgeActor } from './cli-browser-bridge.js';
 
 export const BROWSER_CONTROL_USAGE = `Usage: pnpm kyberion browser control <verb> [options]
 
-  open <url> [--label <text>] [--ceiling low|observe] [--no-wait]
+  open <url> [--label <text>] [--ceiling low|observe] [--no-wait] [--approval <id>]
   sessions | close <session>
   tabs | tab <tab_id> | navigate <url> | snapshot
   click <ref> | fill <ref> <value> | select <ref> (--text <t>|--checked)
@@ -352,22 +354,61 @@ export async function runBrowserControlCommand(
 
     let approval_request_id: string;
     let origin: string;
+    let mintCeiling: 'observe' | 'low' = ceiling;
     const resumeApprovalId = str(parsed.options, 'approval');
     if (resumeApprovalId) {
-      // Resume: the request already exists — recover the origin it was granted
-      // for and verify the URL stays on it. Minting against a different origin
-      // than the approved one would be a consent bypass.
+      // Resume: the request already exists — recover the origin AND ceiling it
+      // was granted for and verify the URL stays on it. Minting against a
+      // different origin or a wider ceiling than approved is a consent bypass.
       const { status, record } = approvalStatus(resumeApprovalId);
       if (!record) fail(`approval ${resumeApprovalId} is ${status}`);
-      const effect = record.justification?.requestedEffects?.find((entry) =>
-        entry.startsWith('browser-control:')
-      );
+      const effects = record.justification?.requestedEffects ?? [];
+      const effect = effects.find((entry) => entry.startsWith('browser-control:'));
       if (!effect) fail(`approval ${resumeApprovalId} is not a browser-control session request`);
       origin = effect.slice('browser-control:'.length);
       if (url && canonicalHttpOrigin(url) !== origin) {
         fail(`url origin does not match approval ${resumeApprovalId} (${origin})`);
       }
+      // Ceiling marker is encoded for new requests; older records carry it in
+      // the draft details text the approver saw. Unresolvable → refuse, never
+      // guess-wider.
+      const approvedCeiling =
+        (effects
+          .find((entry) => entry.startsWith('browser-control-ceiling:'))
+          ?.slice('browser-control-ceiling:'.length) as 'observe' | 'low' | undefined) ??
+        ((/Risk ceiling:\s*(observe|low)/.exec(record.details ?? '')?.[1] ?? null) as
+          'observe' | 'low' | null);
+      const RANK: Record<'observe' | 'low', number> = { observe: 0, low: 1 };
+      if (!approvedCeiling || !(approvedCeiling in RANK)) {
+        fail(
+          `approval ${resumeApprovalId} does not record a valid ceiling — ` +
+            `re-request with \`browser control open <url>\``
+        );
+      }
+      if (str(parsed.options, 'ceiling') && RANK[ceiling] > RANK[approvedCeiling]) {
+        fail(
+          `--ceiling ${ceiling} exceeds the approved ceiling ${approvedCeiling} ` +
+            `— re-request approval for a wider lease`
+        );
+      }
+      // Narrower-than-approved is a legitimate self-restriction; default to the
+      // approved ceiling so resuming never widens the granted lease.
+      mintCeiling = RANK[ceiling] < RANK[approvedCeiling] ? ceiling : approvedCeiling;
       approval_request_id = resumeApprovalId;
+      if (parsed.options['no-wait'] === true) {
+        printResult(
+          {
+            status: 'approval_pending',
+            approval_request_id,
+            origin,
+            approve: `pnpm kyberion approvals --approve ${approval_request_id}`,
+            then: `pnpm kyberion browser control open ${url ?? origin} --approval ${approval_request_id}`,
+          },
+          json,
+          print
+        );
+        return;
+      }
     } else {
       if (!url) fail('open needs <url>');
       const requested = requestBrowserControlSession({
@@ -399,7 +440,7 @@ export async function runBrowserControlCommand(
     await waitForApproval(approval_request_id, timeoutMs(parsed));
     const minted = mintSessionIfApproved(approval_request_id, {
       origin,
-      risk_ceiling: ceiling,
+      risk_ceiling: mintCeiling,
       label: str(parsed.options, 'label'),
       actor,
     });
@@ -432,7 +473,12 @@ export async function runBrowserControlCommand(
   if (verb === 'close') {
     const sessionId = parsed.positionals[1] ?? str(parsed.options, 'session');
     if (!sessionId) fail('close needs <session>');
-    const session = endBrowserControlSession(sessionId);
+    let session: ReturnType<typeof endBrowserControlSession> = null;
+    try {
+      session = endBrowserControlSession(sessionId);
+    } catch {
+      session = null;
+    }
     if (!session) fail(`session ${sessionId} not found`);
     printResult({ status: 'revoked', session_id: session.session_id }, json, print);
     return;
@@ -441,7 +487,12 @@ export async function runBrowserControlCommand(
   if (verb === 'resume') {
     const approvalId = parsed.positionals[1];
     if (!approvalId) fail('resume needs <approval_id>');
-    const pending = loadPendingStep(approvalId);
+    let pending: ReturnType<typeof loadPendingStep> = null;
+    try {
+      pending = loadPendingStep(approvalId);
+    } catch {
+      pending = null;
+    }
     if (!pending) fail(`no pending step for approval ${approvalId}`);
     const actor = actorOf(parsed);
     const queued = withExecutionContext(

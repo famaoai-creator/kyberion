@@ -81,7 +81,9 @@ describe('browser control open --approval resume', () => {
     service.approvalStatus.mockReturnValue({
       status: 'approved',
       record: {
-        justification: { requestedEffects: ['browser-control:https://example.com'] },
+        justification: {
+          requestedEffects: ['browser-control:https://example.com', 'browser-control-ceiling:low'],
+        },
       },
     });
     service.mintSessionIfApproved.mockReturnValue({
@@ -111,7 +113,9 @@ describe('browser control open --approval resume', () => {
     service.approvalStatus.mockReturnValue({
       status: 'approved',
       record: {
-        justification: { requestedEffects: ['browser-control:https://example.com'] },
+        justification: {
+          requestedEffects: ['browser-control:https://example.com', 'browser-control-ceiling:low'],
+        },
       },
     });
     service.mintSessionIfApproved.mockReturnValue({
@@ -131,7 +135,9 @@ describe('browser control open --approval resume', () => {
     service.approvalStatus.mockReturnValue({
       status: 'approved',
       record: {
-        justification: { requestedEffects: ['browser-control:https://example.com'] },
+        justification: {
+          requestedEffects: ['browser-control:https://example.com', 'browser-control-ceiling:low'],
+        },
       },
     });
     await expect(
@@ -141,6 +147,66 @@ describe('browser control open --approval resume', () => {
       )
     ).rejects.toThrow(/url origin does not match approval/);
     expect(service.mintSessionIfApproved).not.toHaveBeenCalled();
+  });
+
+  it('recovers the approved ceiling instead of minting a wider lease', async () => {
+    service.approvalStatus.mockReturnValue({
+      status: 'approved',
+      record: {
+        justification: {
+          requestedEffects: [
+            'browser-control:https://example.com',
+            'browser-control-ceiling:observe',
+          ],
+        },
+      },
+    });
+    service.mintSessionIfApproved.mockReturnValue({
+      status: 'minted',
+      session: { ...mintedSession },
+    });
+    await runBrowserControlCommand(['open', '--approval', 'APR-obs'], capture().print);
+    expect(service.mintSessionIfApproved).toHaveBeenCalledWith(
+      'APR-obs',
+      expect.objectContaining({ risk_ceiling: 'observe' })
+    );
+  });
+
+  it('refuses a --ceiling wider than the approval granted', async () => {
+    service.approvalStatus.mockReturnValue({
+      status: 'approved',
+      record: {
+        justification: {
+          requestedEffects: [
+            'browser-control:https://example.com',
+            'browser-control-ceiling:observe',
+          ],
+        },
+      },
+    });
+    await expect(
+      runBrowserControlCommand(['open', '--approval', 'APR-obs', '--ceiling', 'low'], () => {})
+    ).rejects.toThrow(/exceeds the approved ceiling observe/);
+    expect(service.mintSessionIfApproved).not.toHaveBeenCalled();
+  });
+
+  it('falls back to the draft text for approvals created before the marker', async () => {
+    service.approvalStatus.mockReturnValue({
+      status: 'approved',
+      record: {
+        details: 'Origin: https://example.com\nRisk ceiling: observe',
+        justification: { requestedEffects: ['browser-control:https://example.com'] },
+      },
+    });
+    service.mintSessionIfApproved.mockReturnValue({
+      status: 'minted',
+      session: { ...mintedSession },
+    });
+    await runBrowserControlCommand(['open', '--approval', 'APR-old'], capture().print);
+    expect(service.mintSessionIfApproved).toHaveBeenCalledWith(
+      'APR-old',
+      expect.objectContaining({ risk_ceiling: 'observe' })
+    );
   });
 
   it('refuses a non-browser-control approval id', async () => {
