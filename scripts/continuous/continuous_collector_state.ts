@@ -2,6 +2,7 @@ import * as path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { dotStatePath } from '@agent/core/dot/dot-state-paths';
 import type { DotCharter } from '@agent/core/dot/dot-charter';
+import { nowIso } from '@agent/core/foundation/time';
 import { withLock } from '@agent/core/foundation/lock-utils';
 import { readJson, writeJson } from '@agent/core/foundation/json';
 import { safeExistsSync, safeRealpath } from '@agent/core/secure-io';
@@ -117,7 +118,7 @@ export async function withCollectorAttempt(
         attempt_id: id,
         pipeline_run_id: id,
         pipeline_ref: ref,
-        started_at: new Date().toISOString(),
+        started_at: nowIso(),
         status: 'unconfirmed',
         containment_required: true,
       };
@@ -181,7 +182,7 @@ function assertCollectorProcessStopped(attempt: Attempt): void {
 function confirmCollectorStop(attempt: Attempt): Attempt {
   if (attempt.stop_confirmed_at) return attempt;
   assertCollectorProcessStopped(attempt);
-  return { ...attempt, stop_confirmed_at: new Date().toISOString() };
+  return { ...attempt, stop_confirmed_at: nowIso() };
 }
 
 async function withUnconfirmedCollectorAttempt(
@@ -233,7 +234,7 @@ export async function reconcileCollectorAttempt(
         reconciliation: {
           evidence,
           approval_id: approvalId,
-          reconciled_at: new Date().toISOString(),
+          reconciled_at: nowIso(),
         },
       })
     );
