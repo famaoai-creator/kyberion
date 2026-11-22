@@ -23,7 +23,6 @@ import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js
 import { resolveCiGateBaselinePath } from '../lib/ci/ci-gate-baseline.js';
 
 export const GATE_ID = 'union-literal-branches';
-const BASELINE_REPO_PATH = 'knowledge/product/governance/union-literal-branch-baseline.json';
 
 /** Where each literal set is declared and how to extract it. */
 interface LiteralSource {
@@ -192,7 +191,7 @@ export function checkUnionLiteralBranches(
     }
   }
 
-  const baselinePath = resolveCiGateBaselinePath(GATE_ID, BASELINE_REPO_PATH, root);
+  const baselinePath = resolveCiGateBaselinePath(GATE_ID);
   const baseline: Baseline = safeExistsSync(baselinePath)
     ? JSON.parse(String(readTextFile(baselinePath)))
     : { version: 1, violations: {} };
@@ -219,14 +218,14 @@ export function checkUnionLiteralBranches(
 
 export const runUnionLiteralBranches = defineScript({
   name: 'check-union-literal-branches',
-  description: GATE_ID,
-  run() {
-    const writeBaseline = process.argv.includes('--write-baseline');
+  flags: [],
+  run(context) {
+    const writeBaseline = context.argv.includes('--write-baseline');
     const { violations, unexpected, shrunk } = checkUnionLiteralBranches(undefined, {
       writeBaseline,
     });
     if (writeBaseline) {
-      process.stdout.write(`baseline written (${violations.length} known violations)\n`);
+      context.print(`baseline written (${violations.length} known violations)`);
       return;
     }
     if (unexpected.length) {
@@ -241,8 +240,8 @@ export const runUnionLiteralBranches = defineScript({
         ].join('\n')
       );
     }
-    process.stdout.write(
-      `union-literal-branches: ok (${violations.length} baselined, ${shrunk.length} shrunk)\n`
+    context.print(
+      `union-literal-branches: ok (${violations.length} baselined, ${shrunk.length} shrunk)`
     );
   },
 });
