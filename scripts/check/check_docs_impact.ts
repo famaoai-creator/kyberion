@@ -26,6 +26,7 @@ import {
   type GitRunner as PromotionGitRunner,
   type WorktreeFileWriter,
 } from '@agent/core/knowledge/memory-promotion-git';
+import { explainPolicyViolation } from '@agent/core/error-classifier';
 import { defineScript, isDirectScript } from '../lib/harness.js';
 import { readSafeJsonFile } from '../lib/json-input.js';
 import { collectChangedFiles, type GitRunner } from '../run_checks.js';
@@ -305,12 +306,13 @@ export function writeDocsImpactReport(
   } catch (error) {
     // Fall back only for denials the governed writer legitimately covers:
     // out-of-checkout paths (RESOURCE_PATH_SCOPE) or a persona that lacks
-    // active/missions/** write authority ('NOT authorized to write'). Tenant
-    // scope violations and fail-closed policy denials must still propagate.
+    // write authority for the target path ('persona_write_denied' per the
+    // governed error-classifier catalog). Tenant scope violations and other
+    // fail-closed policy denials must still propagate.
     const message = error instanceof Error ? error.message : '';
     const recoverable =
       message.includes('RESOURCE_PATH_SCOPE') ||
-      (message.includes('POLICY_VIOLATION') && message.includes('NOT authorized to write'));
+      explainPolicyViolation(message).violationType === 'persona_write_denied';
     if (!missionRoot?.trim() || !recoverable) {
       throw error;
     }

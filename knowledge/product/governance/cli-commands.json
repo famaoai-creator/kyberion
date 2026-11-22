@@ -3682,6 +3682,18 @@
       "native_help": true
     },
     {
+      "id": "script.knowledge.curation-publish",
+      "module": "scripts/knowledge/curation_publish.ts",
+      "command": "knowledge curation-publish",
+      "noun": "knowledge",
+      "verb": "curation-publish",
+      "audience": "operator",
+      "description": "cli_cmd_script_knowledge_curation_publish",
+      "group": "operate",
+      "long_running": true,
+      "native_help": true
+    },
+    {
       "id": "script.pr.preflight",
       "module": "scripts/pr/pr_preflight.ts",
       "command": "pr preflight",

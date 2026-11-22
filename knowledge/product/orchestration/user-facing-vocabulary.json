@@ -11434,6 +11434,11 @@
         "en": "Withdraw personal account use permission",
         "ja": "個人アカウント利用許可を撤回",
         "qps-ploc": "⟦Ẇïŧħḓřȧẇ ṗėřşőñȧŀ ȧƈƈőůñŧ ůşė ṗėřɱïşşïőñ ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "cli_cmd_script_knowledge_curation_publish": {
+        "en": "Publish the generated weekly curation report as a chore(knowledge) PR via the governed pr create path",
+        "ja": "生成済みの週次キュレーションレポートを governed pr create 経路で chore(knowledge) PR として公開",
+        "qps-ploc": "⟦Ṗůƀŀïşħ ŧħė ɠėñėřȧŧėḓ ẇėėķŀẏ ƈůřȧŧïőñ řėṗőřŧ ȧş ȧ ƈħőřė(ķñőẇŀėḓɠė) ṖŘ ṽïȧ ŧħė ɠőṽėřñėḓ ṗř ƈřėȧŧė ṗȧŧħ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧ⟧"
       }
     },
     "recorder": {
