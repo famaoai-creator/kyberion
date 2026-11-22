@@ -282,7 +282,7 @@ describe('needs-you count definition', () => {
     );
     const by = Object.fromEntries(items.map((item) => [item.reason, item.actions]));
     expect(by.review).toEqual(['approve', 'request_changes', 'reject', 'later']);
-    expect(by.failure).toEqual(['retry', 'skip', 'reassign', 'accept', 'later']);
+    expect(by.failure).toEqual(['later']);
     expect(by.knowledge).toEqual(['open', 'later']);
   });
 });

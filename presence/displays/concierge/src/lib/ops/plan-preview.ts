@@ -146,6 +146,12 @@ export function buildPlanPreview(
   };
   return {
     ...previewBase,
-    interactionPacket: buildPlanInteractionPacket(previewBase),
+    interactionPacket: buildPlanInteractionPacket({
+      ...previewBase,
+      team: {
+        orgRole: team.org_role,
+        members: team.assignments.map((assignment) => ({ role: assignment.team_role })),
+      },
+    }),
   };
 }

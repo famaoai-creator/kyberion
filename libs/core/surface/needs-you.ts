@@ -238,8 +238,7 @@ function fromApproval(item: CeoApprovalItem, now: number): NeedsYouItem {
     ...(item.requested_at ? { waiting_since: item.requested_at } : {}),
     ...(deadline ? { deadline } : {}),
     overdue: isOverdue(deadline, item.requested_at, now),
-    // PB-01: Deny / Allow once / Always(+scope); later remains deferral-only.
-    actions: ['deny', 'allow_once', 'allow_always', 'later'],
+    actions: ['deny', 'allow_once', 'later'],
     group_size: 1,
     approval: item,
   };
@@ -316,7 +315,6 @@ function fromClarification(item: NeedsYouClarificationInput, now: number): Needs
 }
 
 function fromFailure(item: NeedsYouFailureInput, now: number): NeedsYouItem {
-  const hasWorkItem = Boolean(String(item.work_item_id ?? '').trim());
   return {
     id: `failure:${item.id}`,
     reason: 'failure',
@@ -327,11 +325,8 @@ function fromFailure(item: NeedsYouFailureInput, now: number): NeedsYouItem {
     ...(item.mission_id ? { mission_id: item.mission_id } : {}),
     ...(item.created_at ? { waiting_since: item.created_at } : {}),
     overdue: isOverdue(undefined, item.created_at, now),
-    // PB-03: disposition only when a durable WorkItem id is present — never
-    // fall back to the notification id (that would hit the wrong store).
-    actions: hasWorkItem
-      ? ['retry', 'skip', 'reassign', 'accept', 'later']
-      : ['later'],
+    // A notification alone cannot attest the current WorkItem state or who can change it.
+    actions: ['later'],
     group_size: 1,
     failure: item,
   };

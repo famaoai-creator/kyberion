@@ -3,7 +3,7 @@ import {
   applyWorkflowDisposition,
   isWorkflowDisposition,
 } from '@agent/core/workforce/workflow-disposition';
-import { getWorkItem } from '@agent/core/workforce/work-coordination';
+import { getWorkItem, WorkCoordinationError } from '@agent/core/workforce/work-coordination';
 import { workItemVisibleToViewer } from '@agent/core/workforce/work-visibility';
 import { guardOpsRequest, requireOpsAccess } from '../../../../../../lib/ops/ops-request-guard';
 import {
@@ -14,7 +14,10 @@ import {
   withViewerExecutionContext,
 } from '../../../../../../lib/ops/ops-viewer';
 import { readChronosJsonObject } from '../../../../../../lib/ops/request-input';
-import { conciergeDecisionDenied } from '../../../../../../lib/front-desk-member';
+import {
+  conciergeDecisionDenied,
+  resolveConciergeDecidedBy,
+} from '../../../../../../lib/front-desk-member';
 
 export const dynamic = 'force-dynamic';
 
@@ -66,6 +69,17 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
     const resourceTenant = current.context?.tenant_slug;
     const decisionDenied = conciergeDecisionDenied(viewer, resourceTenant);
     if (decisionDenied) return decisionDenied;
+    const decider = resolveConciergeDecidedBy(viewer, resourceTenant);
+    if (!decider?.role || viewer.principal?.actor.kind !== 'human') {
+      return NextResponse.json(
+        {
+          ok: false,
+          code: 'WORKFLOW_DECIDER_REQUIRED',
+          error: 'An authenticated decision-capable member is required.',
+        },
+        { status: 403 }
+      );
+    }
 
     const newOwnerId =
       typeof parsed.body?.newOwnerId === 'string' ? parsed.body.newOwnerId.trim() : '';
@@ -77,21 +91,28 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
     }
 
     const note = typeof parsed.body?.note === 'string' ? parsed.body.note : undefined;
-    // Derive verification step from durable metadata — never trust the client flag.
-    const verificationStep = current.metadata?.verification_step === true;
-
     const result = withViewerExecutionContext(viewer, () =>
       applyWorkflowDisposition({
         itemId: id,
         disposition,
-        actorId: viewer.principalId ?? 'ops',
+        actorId: decider.id,
         ...(newOwnerId ? { newOwnerId } : {}),
         ...(note ? { note } : {}),
-        verificationStep,
+        expectedVersion: current.version,
       })
     );
     return NextResponse.json({ ok: true, result });
   } catch (error) {
+    if (error instanceof WorkCoordinationError) {
+      const statuses: Partial<Record<WorkCoordinationError['code'], number>> = {
+        version_conflict: 409,
+        lease_conflict: 409,
+        validation_error: 400,
+      };
+      const status = statuses[error.code];
+      if (status)
+        return NextResponse.json({ ok: false, code: error.code, error: error.message }, { status });
+    }
     const message = error instanceof Error ? error.message : String(error);
     if (message.startsWith('[POLICY_VIOLATION]')) {
       return NextResponse.json({ ok: false, error: message }, { status: 400 });

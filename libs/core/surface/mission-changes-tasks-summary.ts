@@ -32,7 +32,7 @@ export interface MissionChildWorkItemSummary {
 export interface MissionChangesTasksSummary {
   mission_id: string;
   this_turn_artifacts: MissionArtifactSummary[];
-  uncommitted_diff: MissionUncommittedDiffSummary;
+  uncommitted_diff?: MissionUncommittedDiffSummary;
   child_work_items: MissionChildWorkItemSummary[];
 }
 
@@ -76,21 +76,21 @@ export function buildMissionChangesTasksSummary(
   const pathCap = input.pathCap ?? DEFAULT_PATH_CAP;
   const artifactCap = input.artifactCap ?? DEFAULT_ARTIFACT_CAP;
 
-  const this_turn_artifacts = (input.artifacts ?? [])
-    .slice(0, artifactCap)
-    .map((artifact) => ({
-      path: artifact.path,
-      kind: artifact.kind || artifact.category || 'artifact',
-      updated_at: artifact.updated_at || artifact.updatedAt || '',
-    }));
+  const this_turn_artifacts = (input.artifacts ?? []).slice(0, artifactCap).map((artifact) => ({
+    path: artifact.path,
+    kind: artifact.kind || artifact.category || 'artifact',
+    updated_at: artifact.updated_at || artifact.updatedAt || '',
+  }));
 
   const paths = [...(input.diff?.paths ?? [])].slice(0, pathCap);
-  const uncommitted_diff: MissionUncommittedDiffSummary = {
-    files_changed: input.diff?.files_changed ?? paths.length,
-    insertions: input.diff?.insertions ?? 0,
-    deletions: input.diff?.deletions ?? 0,
-    paths,
-  };
+  const uncommitted_diff = input.diff
+    ? {
+        files_changed: input.diff.files_changed ?? input.diff.paths?.length ?? 0,
+        insertions: input.diff.insertions ?? 0,
+        deletions: input.diff.deletions ?? 0,
+        paths,
+      }
+    : undefined;
 
   const child_work_items = (input.children ?? [])
     .filter((child) => !child.context?.mission_id || child.context.mission_id === input.missionId)
@@ -107,7 +107,7 @@ export function buildMissionChangesTasksSummary(
   return {
     mission_id: input.missionId,
     this_turn_artifacts,
-    uncommitted_diff,
+    ...(uncommitted_diff ? { uncommitted_diff } : {}),
     child_work_items,
   };
 }

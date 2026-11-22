@@ -23,8 +23,8 @@ export type CardDecision =
       kind: 'approval';
       item: NeedsYouItem;
       decision: 'approved' | 'rejected';
-      /** PB-01 primary action; maps onto binary store settle (+ session Always). */
-      primaryAction?: 'deny' | 'allow_once' | 'allow_always';
+      /** The browser's one-time approval actions settle the same request. */
+      primaryAction?: 'deny' | 'allow_once';
     }
   | {
       kind: 'review';
@@ -33,13 +33,7 @@ export type CardDecision =
       note?: string;
     }
   | { kind: 'knowledge'; item: NeedsYouItem; decision: 'approve' | 'reject' }
-  | { kind: 'clarification'; item: NeedsYouItem; decision: 'start' | 'cancel'; note?: string }
-  | {
-      kind: 'disposition';
-      item: NeedsYouItem;
-      disposition: 'retry' | 'skip' | 'reassign' | 'accept';
-      newOwnerId?: string;
-    };
+  | { kind: 'clarification'; item: NeedsYouItem; decision: 'start' | 'cancel'; note?: string };
 
 export interface OutcomePreviewState {
   id: string | null;
@@ -243,22 +237,9 @@ export function NeedsYouCard({
     const approval = item.approval;
     const allowOnceLabel =
       approval.min_assurance === 'A3' ? f('decide_approve_passkey') : f('decide_allow_once');
-    // A3 passkey path does not thread primaryAction — hide Always there.
-    const alwaysAvailable =
-      approval.min_assurance !== 'A3' && has('allow_always');
-    const alwaysEnabled = alwaysAvailable && approval.always_enabled === true;
-    const alwaysScope =
-      approval.always_scope ||
-      approval.channel ||
-      approval.storage_channel ||
-      approval.title ||
-      'this action';
     // Prefer the decision-brief why block; avoid a duplicate decide_why panel
     // when brief.why is already rendered inside DecisionBriefBlock.
-    const whyLines =
-      !brief?.why?.length && approval.reason
-        ? [approval.reason]
-        : [];
+    const whyLines = !brief?.why?.length && approval.reason ? [approval.reason] : [];
     body = (
       <>
         {brief ? (
@@ -310,26 +291,6 @@ export function NeedsYouCard({
                 item,
                 decision: 'approved',
                 primaryAction: 'allow_once',
-              })
-            }
-          />
-        ) : null}
-        {alwaysAvailable ? (
-          <Button
-            label={f('decide_allow_always', { scope: alwaysScope })}
-            variant="secondary"
-            disabled={busy || !alwaysEnabled}
-            title={
-              !alwaysEnabled
-                ? approval.always_disabled_reason || f('decide_allow_always_unavailable')
-                : undefined
-            }
-            onClick={() =>
-              void onDecide({
-                kind: 'approval',
-                item,
-                decision: 'approved',
-                primaryAction: 'allow_always',
               })
             }
           />
@@ -479,55 +440,7 @@ export function NeedsYouCard({
     );
   } else {
     body = <KindBriefBlock brief={kindBrief('exception')} locale={locale} />;
-    actions = (
-      <>
-        {has('retry') ? (
-          <Button
-            label={f('decide_retry')}
-            variant="primary"
-            disabled={busy}
-            onClick={() => void onDecide({ kind: 'disposition', item, disposition: 'retry' })}
-          />
-        ) : null}
-        {has('skip') ? (
-          <Button
-            label={f('decide_skip')}
-            variant="secondary"
-            disabled={busy}
-            onClick={() => void onDecide({ kind: 'disposition', item, disposition: 'skip' })}
-          />
-        ) : null}
-        {has('reassign') ? (
-          <Button
-            label={f('decide_reassign')}
-            variant="secondary"
-            disabled={busy}
-            onClick={() => {
-              const newOwnerId =
-                typeof window !== 'undefined'
-                  ? window.prompt(f('decide_reassign_prompt'))?.trim()
-                  : '';
-              if (!newOwnerId) return;
-              void onDecide({
-                kind: 'disposition',
-                item,
-                disposition: 'reassign',
-                newOwnerId,
-              });
-            }}
-          />
-        ) : null}
-        {has('accept') ? (
-          <Button
-            label={f('decide_accept')}
-            variant="secondary"
-            disabled={busy}
-            onClick={() => void onDecide({ kind: 'disposition', item, disposition: 'accept' })}
-          />
-        ) : null}
-        {later}
-      </>
-    );
+    actions = later;
   }
 
   // Knowledge and stalled-request decisions go through one inline confirm step.

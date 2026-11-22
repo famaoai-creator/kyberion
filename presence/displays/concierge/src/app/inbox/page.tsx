@@ -26,7 +26,6 @@ import {
   inboxHref,
   parseInboxFilters,
   postApprovalDecision,
-  postWorkflowDisposition,
   postClarificationDecision,
   postKnowledgeDecision,
   postReviewVerdict,
@@ -208,18 +207,6 @@ function InboxView() {
             decision.note
           );
           break;
-        case 'disposition': {
-          const targetId = String(item.failure?.work_item_id ?? '').trim();
-          if (!targetId) throw new Error('disposition_target_missing');
-          if (decision.disposition === 'reassign' && !String(decision.newOwnerId ?? '').trim()) {
-            throw new Error('reassign_owner_required');
-          }
-          await postWorkflowDisposition(targetId, decision.disposition, {
-            ...(decision.newOwnerId ? { newOwnerId: decision.newOwnerId } : {}),
-          });
-          message = t('home.accepted_notice', { title });
-          break;
-        }
       }
       setNotice({ text: message });
       await refresh();
@@ -232,11 +219,7 @@ function InboxView() {
             ? formatApprovalFailure(error, locale)
             : error instanceof Error && error.message === 'note_required'
               ? c('ia_inbox_error_note_required')
-              : decision.kind === 'disposition'
-                ? error instanceof Error && error.message === 'reassign_owner_required'
-                  ? c('ia_inbox_error_reassign_owner')
-                  : c('ia_inbox_error_failure')
-                : c(`ia_inbox_error_${decision.kind}`),
+              : c(`ia_inbox_error_${decision.kind}`),
         error: true,
       });
     } finally {

@@ -16,7 +16,9 @@ import {
 } from '@agent/core/governance/approval-store';
 import {
   applyApprovalPrimaryAction,
+  ApprovalPrimaryActionUnavailable,
   isApprovalPrimaryAction,
+  primaryActionToStoreDecision,
 } from '@agent/core/surface/approval-primary-actions';
 import { requireConciergeMutationAccess } from '../../../../lib/api-guard';
 import { conciergeText, resolveConciergeLocale } from '../../../../lib/i18n';
@@ -51,17 +53,21 @@ async function handlePost(req: NextRequest, context: { params: Promise<{ id: str
       return NextResponse.json({ ok: false, error: parsedBody.error }, { status: 400 });
     const { body } = parsedBody;
     // PiBot PB-01: Deny / Allow once / Always — still settles through binary store.
-    const primaryAction = isApprovalPrimaryAction(body?.primaryAction)
-      ? body.primaryAction
-      : null;
-    const decision =
-      body?.decision === 'approved' || body?.decision === 'rejected'
-        ? body.decision
-        : primaryAction === 'deny'
-          ? 'rejected'
-          : primaryAction === 'allow_once' || primaryAction === 'allow_always'
-            ? 'approved'
-            : null;
+    const primaryAction = isApprovalPrimaryAction(body?.primaryAction) ? body.primaryAction : null;
+    const explicitDecision =
+      body?.decision === 'approved' || body?.decision === 'rejected' ? body.decision : null;
+    const actionDecision = primaryAction ? primaryActionToStoreDecision(primaryAction) : null;
+    if (
+      (body?.primaryAction !== undefined && !primaryAction) ||
+      (body?.decision !== undefined && !explicitDecision) ||
+      (explicitDecision && actionDecision && explicitDecision !== actionDecision)
+    ) {
+      return NextResponse.json(
+        { ok: false, error: 'Invalid or conflicting approval decision and primary action' },
+        { status: 400 }
+      );
+    }
+    const decision = explicitDecision ?? actionDecision;
     const channel = typeof body?.channel === 'string' && body.channel ? body.channel : 'chronos';
     const storageChannel =
       typeof body?.storageChannel === 'string' && body.storageChannel
@@ -133,7 +139,6 @@ async function handlePost(req: NextRequest, context: { params: Promise<{ id: str
     const decidedByRole = decidedBy?.role ?? 'sovereign';
     const updated = withConciergeApproval(resolved.context, record, () => {
       if (primaryAction) {
-        const binding = surfaceDecisionBinding(record, body?.presentedDigest);
         return applyApprovalPrimaryAction({
           role: 'sovereign_concierge',
           record,
@@ -141,7 +146,9 @@ async function handlePost(req: NextRequest, context: { params: Promise<{ id: str
           decidedBy: decidedBy?.id ?? 'concierge',
           decidedByRole,
           authMethod: surfaceDecisionAuthMethod(resolved.context.principal, Boolean(decidedBy)),
-          ...('presentedDigest' in binding ? { presentedDigest: binding.presentedDigest } : {}),
+          deciderPrincipal: resolved.context.principal,
+          presentedDigest:
+            typeof body?.presentedDigest === 'string' ? body.presentedDigest : undefined,
           note,
         });
       }
@@ -164,6 +171,12 @@ async function handlePost(req: NextRequest, context: { params: Promise<{ id: str
       return NextResponse.json({ ok: false, error: 'approval request not found' }, { status: 404 });
     return NextResponse.json({ ok: true, approval: updated });
   } catch (error) {
+    if (error instanceof ApprovalPrimaryActionUnavailable) {
+      return NextResponse.json(
+        { ok: false, code: 'APPROVAL_PRIMARY_ACTION_UNAVAILABLE', error: error.message },
+        { status: 403 }
+      );
+    }
     return conciergeErrorResponse(error, 500);
   }
 }

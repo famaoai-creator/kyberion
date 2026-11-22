@@ -28,7 +28,10 @@ describe('buildMissionChangesTasksSummary', () => {
 
     expect(summary.mission_id).toBe('m-1');
     expect(summary.this_turn_artifacts).toHaveLength(1);
-    expect(summary.uncommitted_diff.paths).toEqual(['a.ts', 'b.ts']);
+    expect(summary.uncommitted_diff?.paths).toEqual(['a.ts', 'b.ts']);
+    expect(
+      buildMissionChangesTasksSummary({ missionId: 'mission' }).uncommitted_diff
+    ).toBeUndefined();
     expect(summary.child_work_items.map((c) => c.item_id)).toEqual(['wi-1']);
   });
 });

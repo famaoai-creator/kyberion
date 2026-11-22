@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  applyApprovalPrimaryAction,
+  ApprovalPrimaryActionUnavailable,
   buildApprovalPrimaryActions,
   inferPolicyCategoryFromApproval,
   isApprovalPrimaryAction,
@@ -39,11 +41,33 @@ describe('approval primary actions', () => {
   });
 
   it('binds Why + three primary buttons to the presented digest', () => {
-    const set = buildApprovalPrimaryActions(record());
+    const set = buildApprovalPrimaryActions(record(), {
+      sessionCache: { action: 'file:write', targetClass: 'deliverable' },
+      policyCategory: 'write_file',
+    });
     expect(set.why.length).toBeGreaterThan(0);
     expect(set.buttons.map((b) => b.kind)).toEqual(['deny', 'allow_once', 'allow_always']);
     expect(set.buttons.every((b) => b.presentedDigestCompact.length === 12)).toBe(true);
     expect(set.buttons.find((b) => b.kind === 'allow_always')?.enabled).toBe(true);
+  });
+
+  it('refuses Always without an executing runtime descriptor', () => {
+    const approval = record();
+    const always = buildApprovalPrimaryActions(approval).buttons.find(
+      (button) => button.kind === 'allow_always'
+    );
+    expect(always).toMatchObject({
+      enabled: false,
+      disabledReason: 'always_requires_session_descriptor',
+    });
+    expect(() =>
+      applyApprovalPrimaryAction({
+        action: 'allow_always',
+        role: 'sovereign_concierge',
+        record: approval,
+        decidedBy: 'user:owner',
+      })
+    ).toThrow(ApprovalPrimaryActionUnavailable);
   });
 
   it('disables Always for send_out category', () => {

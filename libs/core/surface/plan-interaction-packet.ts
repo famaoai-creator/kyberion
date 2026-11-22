@@ -61,34 +61,41 @@ export interface PlanLayer {
 
 /**
  * Deterministic DAG layers from `depends_on` (PiBot GroupPlanCard shape).
- * Steps with unknown deps land in layer 0 after roots.
+ * An incomplete or cyclic dependency graph has no valid layers.
  */
 export function computePlanLayers(
   steps: ReadonlyArray<{ id: string; depends_on?: string[] }>
 ): PlanLayer[] {
-  const byId = new Map(steps.map((step) => [step.id, step]));
-  const depth = new Map<string, number>();
-
-  function depthOf(id: string, stack: Set<string>): number {
-    const cached = depth.get(id);
-    if (cached !== undefined) return cached;
-    if (stack.has(id)) return 0;
-    stack.add(id);
-    const step = byId.get(id);
-    const deps = (step?.depends_on ?? []).filter((dep) => byId.has(dep));
-    const value = deps.length === 0 ? 0 : Math.max(...deps.map((dep) => depthOf(dep, stack))) + 1;
-    stack.delete(id);
-    depth.set(id, value);
-    return value;
+  const remaining = new Map(steps.map((step) => [step.id, 0]));
+  if (remaining.size !== steps.length) return [];
+  const dependents = new Map<string, string[]>();
+  const queue: string[] = [];
+  for (const { id, depends_on } of steps) {
+    const dependencies = new Set(depends_on ?? []);
+    remaining.set(id, dependencies.size);
+    if (!dependencies.size) queue.push(id);
+    for (const dependency of dependencies) {
+      if (!remaining.has(dependency)) return [];
+      const linked = dependents.get(dependency) ?? [];
+      linked.push(id);
+      dependents.set(dependency, linked);
+    }
   }
-
-  for (const step of steps) depthOf(step.id, new Set());
-
-  const max = steps.reduce((acc, step) => Math.max(acc, depth.get(step.id) ?? 0), 0);
+  const depth = new Map<string, number>();
+  for (let cursor = 0; cursor < queue.length; cursor++) {
+    const id = queue[cursor]!;
+    for (const dependent of dependents.get(id) ?? []) {
+      depth.set(dependent, Math.max(depth.get(dependent) ?? 0, (depth.get(id) ?? 0) + 1));
+      const count = remaining.get(dependent)! - 1;
+      remaining.set(dependent, count);
+      if (count === 0) queue.push(dependent);
+    }
+  }
+  if (queue.length !== steps.length) return [];
   const layers: PlanLayer[] = [];
-  for (let index = 0; index <= max; index += 1) {
-    const stepIds = steps.filter((step) => (depth.get(step.id) ?? 0) === index).map((s) => s.id);
-    if (stepIds.length) layers.push({ index, stepIds });
+  for (const step of steps) {
+    const index = depth.get(step.id) ?? 0;
+    (layers[index] ??= { index, stepIds: [] }).stepIds.push(step.id);
   }
   return layers;
 }
@@ -116,34 +123,36 @@ export function buildPlanInteractionPacket(
   }
   const deliverables = preview.workflow.flatMap((step) => step.output_refs ?? []);
   const missing = preview.execution.missingInputs ?? [];
-  const clarify = Boolean(
-    preview.delivery.clarificationNeeded || preview.delivery.askHumanToConfirm || missing.length
-  );
+  const invalidGraph = preview.workflow.length > 0 && layers.length === 0;
+  const clarify = preview.delivery.clarificationNeeded || missing.length > 0 || invalidGraph;
 
   const next_actions: NonNullable<OperatorInteractionPacket['next_actions']> = [
-    {
-      id: 'plan-start',
-      action: 'Start',
-      next_action_type: 'start_mission',
-      priority: 'now',
-      reason: preview.delivery.rationale || preview.goal.successCondition,
-    },
     {
       id: 'plan-modify',
       action: 'Modify',
       next_action_type: 'clarify',
       priority: 'next',
-      reason: 'Request changes; previous approval must not be reused after brief rehash',
+      reason: 'Request changes and review the revised plan',
     },
   ];
 
   if (clarify) {
     next_actions.unshift({
       id: 'plan-inspect',
-      action: 'Inspect missing inputs',
+      action: invalidGraph ? 'Inspect plan dependencies' : 'Inspect missing inputs',
       next_action_type: 'inspect',
       priority: 'now',
-      reason: missing.join(', ') || 'clarification needed',
+      reason: invalidGraph
+        ? 'The workflow has invalid dependencies'
+        : missing.join(', ') || 'Clarification needed',
+    });
+  } else {
+    next_actions.unshift({
+      id: 'plan-start',
+      action: preview.delivery.askHumanToConfirm ? 'Review and start' : 'Start',
+      next_action_type: 'start_mission',
+      priority: 'now',
+      reason: preview.delivery.rationale || preview.goal.successCondition,
     });
   }
 

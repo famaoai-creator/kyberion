@@ -148,6 +148,7 @@
 - [PDF CID Font Unicode Fallback (ROS→UCS2 CMap Resolution)](./product/architecture/pdf-cid-font-unicode-fallback.md) (public | Devin)
 - [Pane Agent Prompt Handling](./product/architecture/agent-prompt-handling.md) (public | Unknown)
 - [Personal Voice Narrated Video Delivery Plan](./product/architecture/personal-voice-narrated-video-delivery-plan.md) (public | Ecosystem Architect)
+- [PiBot Selective Absorption Model](./product/architecture/pibot-absorption-model.md) (public | Ecosystem Architect)
 - [Plugin Permissions, Lifecycle and Views](./product/architecture/plugin-permissions-and-views.md) (public | Unknown)
 - [Presence Layer: Sensors, Displays, and Intervention](./product/architecture/presence-layer.md) (public | Ecosystem Architect)
 - [Project Mission Artifact Service Model](./product/architecture/project-mission-artifact-service-model.md) (public | Ecosystem Architect)
@@ -874,6 +875,7 @@
 - [Hermes Agent Absorption Plan 2026-06](./public/external-wisdom/hermes-agent-absorption-plan-2026-06.md) (public | Codex)
 - [Intelligence: Insights from the Agent Internet (2026-03)](./public/external-wisdom/agent-internet-insights-2026-03.md) (public | Unknown)
 - [OpenClaw Architecture and Conceptual Analysis](./public/external-wisdom/openclaw-analysis.md) (public | Sovereign Concierge)
+- [PiBot Architecture and Selective Absorption Analysis](./public/external-wisdom/pibot-analysis.md) (public | Ecosystem Architect)
 
 ## 📁 public/external-wisdom/everything-claude/agents
 - [architect](./public/external-wisdom/everything-claude/agents/architect.md) (public | Unknown)
@@ -1282,5 +1284,3 @@
 
 ## 📁 public/voice-of-customer
 - [voice-of-customer/](./public/voice-of-customer/README.md) (public | Unknown)
-- [PiBot Selective Absorption Model](./product/architecture/pibot-absorption-model.md) (public | Ecosystem Architect)
-- [PiBot Architecture and Selective Absorption Analysis](./public/external-wisdom/pibot-analysis.md) (public | Ecosystem Architect)

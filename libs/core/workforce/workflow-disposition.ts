@@ -7,15 +7,19 @@
  * @see knowledge/product/architecture/pibot-absorption-model.md
  */
 
-import { getWorkItem, updateWorkItem, type WorkItem } from './work-coordination.js';
+import {
+  getWorkItem,
+  updateWorkItem,
+  WorkCoordinationError,
+  type WorkItem,
+} from './work-coordination.js';
+import { workEffectOwnership } from './work-effect-ownership.js';
 
 export const WORKFLOW_DISPOSITIONS = ['retry', 'skip', 'reassign', 'accept'] as const;
 export type WorkflowDisposition = (typeof WORKFLOW_DISPOSITIONS)[number];
 
 export function isWorkflowDisposition(value: unknown): value is WorkflowDisposition {
-  return (
-    typeof value === 'string' && (WORKFLOW_DISPOSITIONS as readonly string[]).includes(value)
-  );
+  return typeof value === 'string' && (WORKFLOW_DISPOSITIONS as readonly string[]).includes(value);
 }
 
 export interface WorkflowDispositionResult {
@@ -32,18 +36,14 @@ export interface ApplyWorkflowDispositionInput {
   /** Required for reassign — written as assigneePeerId. */
   newOwnerId?: string;
   note?: string;
-  /**
-   * When true, this WorkItem is a verification / recheck step. Skipping it
-   * stops the repair chain (PiBot verdict_recheck_skipped).
-   */
-  verificationStep?: boolean;
+  /** Version of the scoped WorkItem snapshot authorized by the caller. */
+  expectedVersion?: number;
   rootDir?: string;
 }
 
 /**
  * Apply a durable disposition via WorkItem status / assignee updates.
- * Unknown actions are refused. Skip on a verification step returns
- * dependents_blocked=true so callers stop repair appends.
+ * Active attempts and held effects require governed recovery.
  */
 export function applyWorkflowDisposition(
   input: ApplyWorkflowDispositionInput
@@ -58,6 +58,15 @@ export function applyWorkflowDisposition(
   if (!current) {
     throw new Error(`[POLICY_VIOLATION] WorkItem not found: ${input.itemId}`);
   }
+  if (input.expectedVersion !== undefined && input.expectedVersion !== current.version)
+    throw new WorkCoordinationError(
+      'version_conflict',
+      'WorkItem changed. Refresh before retrying.'
+    );
+  if (current.lease_id || workEffectOwnership(current)?.state === 'held')
+    throw new WorkCoordinationError('lease_conflict', 'Use governed recovery for this WorkItem.');
+  if (input.disposition === 'skip' && current.metadata?.verification_step === true)
+    throw new WorkCoordinationError('validation_error', 'Verification steps cannot be skipped.');
   if (current.status !== 'blocked' && current.status !== 'review') {
     throw new Error(
       `[POLICY_VIOLATION] Workflow disposition requires a blocked or review WorkItem (got ${current.status})`
@@ -77,6 +86,7 @@ export function applyWorkflowDisposition(
     case 'retry': {
       const item = updateWorkItem({
         itemId: input.itemId,
+        expectedVersion: current.version,
         status: 'ready',
         metadata: meta,
         ...(input.rootDir ? { rootDir: input.rootDir } : {}),
@@ -86,18 +96,18 @@ export function applyWorkflowDisposition(
     case 'skip': {
       const item = updateWorkItem({
         itemId: input.itemId,
+        expectedVersion: current.version,
         status: 'done',
         metadata: {
           ...meta,
           skipped: true,
-          ...(input.verificationStep ? { verification_skipped: true } : {}),
         },
         ...(input.rootDir ? { rootDir: input.rootDir } : {}),
       });
       return {
         item,
         disposition: 'skip',
-        dependents_blocked: Boolean(input.verificationStep),
+        dependents_blocked: false,
       };
     }
     case 'reassign': {
@@ -107,6 +117,7 @@ export function applyWorkflowDisposition(
       }
       const item = updateWorkItem({
         itemId: input.itemId,
+        expectedVersion: current.version,
         status: 'ready',
         assigneePeerId: newOwnerId,
         metadata: meta,
@@ -117,6 +128,7 @@ export function applyWorkflowDisposition(
     case 'accept': {
       const item = updateWorkItem({
         itemId: input.itemId,
+        expectedVersion: current.version,
         status: 'done',
         metadata: {
           ...meta,

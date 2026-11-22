@@ -92,13 +92,8 @@ describe('FD-00c/FD-01c front-desk contract (concierge)', () => {
     // strings or the old home.* pane labels.
     for (const key of [
       'decide_allow_once',
-      'decide_allow_always',
       'decide_deny',
       'decide_why',
-      'decide_retry',
-      'decide_skip',
-      'decide_reassign',
-      'decide_accept',
       'decide_continue',
       'decide_stop',
       'decide_remember',
@@ -107,8 +102,9 @@ describe('FD-00c/FD-01c front-desk contract (concierge)', () => {
       'decide_return',
       'decide_later',
     ])
-      // Always may pass `{ scope }` as a second arg; match the key call site.
       expect(page).toContain(`f('${key}'`);
+    expect(page).not.toContain("f('decide_allow_always'");
+    expect(page).not.toContain("f('decide_reassign'");
     expect(page).toContain("frontDeskText('decide_deferred', locale");
     expect(page).toContain("frontDeskText('decide_undefer', locale)");
 

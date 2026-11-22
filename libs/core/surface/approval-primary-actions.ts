@@ -14,6 +14,7 @@ import {
   compactApprovalPresentedDigest,
   decideApprovalRequest,
   requiresTenantOwnerApproval,
+  surfaceDecisionBinding,
   type ApprovalActionDescriptor,
   type ApprovalRequestRecord,
 } from '../governance/approval-store.js';
@@ -52,6 +53,11 @@ export interface ApprovalPrimaryActionSet {
   buttons: ApprovalPrimaryActionButton[];
   policyCategory?: PolicyCategory;
   scopeLabel: string;
+}
+
+interface RuntimeSessionApproval {
+  sessionCache?: ApprovalActionDescriptor;
+  policyCategory?: PolicyCategory;
 }
 
 export function isApprovalPrimaryAction(value: unknown): value is ApprovalPrimaryAction {
@@ -108,30 +114,33 @@ export function approvalAlwaysScopeLabel(
  */
 export function buildApprovalPrimaryActions(
   record: ApprovalRequestRecord,
-  options: { locale?: SupportedLocale } = {}
+  options: { locale?: SupportedLocale } & RuntimeSessionApproval = {}
 ): ApprovalPrimaryActionSet {
   const why = explainWhy(record, options.locale);
   const digest = compactApprovalPresentedDigest(record);
-  const policyCategory = inferPolicyCategoryFromApproval(record);
+  const policyCategory = options.policyCategory ?? inferPolicyCategoryFromApproval(record);
   const scopeLabel = approvalAlwaysScopeLabel(record);
   const alwaysOk = allowsAlwaysPrimaryAction(policyCategory);
   const hasBinding = Boolean(
     record.accountability?.finalDecision === 'human_only' &&
-      record.accountability.payloadHash &&
-      record.accountability.effectBinding
+    record.accountability.payloadHash &&
+    record.accountability.effectBinding
   );
   // PR #1563: Owner Allow once + CLI Grant resume — not process-session Always.
   const ownerGrant = requiresTenantOwnerApproval(record);
-  const alwaysEnabled = alwaysOk && hasBinding && !ownerGrant;
-  const alwaysDisabledReason = !policyCategory
-    ? 'always_requires_known_category'
-    : !alwaysOk
-      ? 'always_forbidden_for_category'
-      : ownerGrant
-        ? 'grant_resume_not_session_always'
+  const runtimeBound = Boolean(options.sessionCache && options.policyCategory);
+  const alwaysEnabled = alwaysOk && hasBinding && !ownerGrant && runtimeBound;
+  const alwaysDisabledReason = ownerGrant
+    ? 'grant_resume_not_session_always'
+    : !policyCategory
+      ? 'always_requires_known_category'
+      : !alwaysOk
+        ? 'always_forbidden_for_category'
         : !hasBinding
           ? 'always_requires_effect_binding'
-          : undefined;
+          : !runtimeBound
+            ? 'always_requires_session_descriptor'
+            : undefined;
 
   const buttons: ApprovalPrimaryActionButton[] = [
     {
@@ -161,7 +170,7 @@ export function buildApprovalPrimaryActions(
   };
 }
 
-export interface ApplyApprovalPrimaryActionParams {
+export interface ApplyApprovalPrimaryActionParams extends RuntimeSessionApproval {
   role: Parameters<typeof decideApprovalRequest>[0];
   record: ApprovalRequestRecord;
   action: ApprovalPrimaryAction;
@@ -169,10 +178,18 @@ export interface ApplyApprovalPrimaryActionParams {
   /** PR #1563: Owner role must travel with credential Grant decisions. */
   decidedByRole?: string;
   presentedDigest?: string;
-  /** Required for allow_always — seeds the process-session standing grant. */
-  sessionCache?: ApprovalActionDescriptor;
   authMethod?: Parameters<typeof decideApprovalRequest>[1]['authMethod'];
+  deciderPrincipal?: Parameters<typeof decideApprovalRequest>[1]['deciderPrincipal'];
   note?: string;
+}
+
+export class ApprovalPrimaryActionUnavailable extends Error {
+  constructor(action: ApprovalPrimaryAction, reason?: string) {
+    super(
+      `[POLICY_VIOLATION] Primary action ${action} is not available` +
+        (reason ? ` (${reason})` : '')
+    );
+  }
 }
 
 /**
@@ -187,28 +204,17 @@ export function applyApprovalPrimaryAction(
     throw new Error(`[POLICY_VIOLATION] Unknown approval primary action: ${String(action)}`);
   }
 
-  const set = buildApprovalPrimaryActions(record);
+  const set = buildApprovalPrimaryActions(record, {
+    sessionCache: params.sessionCache,
+    policyCategory: params.policyCategory,
+  });
   const button = set.buttons.find((item) => item.kind === action);
   if (!button?.enabled) {
-    throw new Error(
-      `[POLICY_VIOLATION] Primary action ${action} is not available` +
-        `${button?.disabledReason ? ` (${button.disabledReason})` : ''}`
-    );
+    throw new ApprovalPrimaryActionUnavailable(action, button?.disabledReason);
   }
 
   const decision = primaryActionToStoreDecision(action);
-  const sessionCache =
-    action === 'allow_always'
-      ? (params.sessionCache ??
-        ({
-          action: set.scopeLabel,
-          targetClass: set.policyCategory ? `policy:${set.policyCategory}` : 'approval:primary',
-        } satisfies ApprovalActionDescriptor))
-      : undefined;
-
-  if (action === 'allow_always' && !sessionCache) {
-    throw new Error('[POLICY_VIOLATION] Always require a session cache descriptor');
-  }
+  const sessionCache = action === 'allow_always' ? params.sessionCache : undefined;
 
   return decideApprovalRequest(params.role, {
     channel: record.channel,
@@ -220,7 +226,8 @@ export function applyApprovalPrimaryAction(
     authenticated: true,
     ...(params.decidedByRole ? { decidedByRole: params.decidedByRole } : {}),
     ...(params.authMethod ? { authMethod: params.authMethod } : {}),
-    ...(params.presentedDigest ? { presentedDigest: params.presentedDigest } : {}),
+    deciderPrincipal: params.deciderPrincipal,
+    ...surfaceDecisionBinding(record, params.presentedDigest),
     ...(params.note ? { note: params.note } : {}),
     ...(sessionCache ? { sessionCache } : {}),
   });

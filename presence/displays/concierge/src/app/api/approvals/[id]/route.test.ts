@@ -131,6 +131,50 @@ describe('concierge approval decision tenant binding', () => {
     );
   });
 
+  it.each([
+    { decision: 'approved', primaryAction: 'deny' },
+    { decision: 'rejected', primaryAction: 'allow_once' },
+    { decision: 'approved', primaryAction: 'typo' },
+    { decision: 'typo', primaryAction: 'allow_once' },
+  ])('rejects invalid or conflicting decision input before lookup: %j', async (overrides) => {
+    expect((await POST(request(overrides), params)).status).toBe(400);
+    expect(mocks.loadApprovalRequest).not.toHaveBeenCalled();
+    expect(mocks.decideApprovalRequest).not.toHaveBeenCalled();
+  });
+
+  it('passes the resolved principal and legacy binding to the primary action decision', async () => {
+    const principal = {
+      provider: 'browser-session',
+      actor: { kind: 'human' },
+      principalId: 'member:carol',
+    };
+    mocks.resolveViewer.mockReturnValue({ context: { ...viewer, principal } });
+    mocks.loadApprovalRequest.mockReturnValue({
+      id: 'req-1',
+      channel: 'tenant-provider-attestation',
+      storageChannel: 'tenant-provider-attestation',
+      scope: { tier: 'confidential', tenant_slug: 'beta' },
+      accountability: {
+        finalDecision: 'human_only',
+        payloadHash: 'claim-hash',
+        effectBinding: 'claim-effect',
+      },
+    });
+    const response = await POST(
+      request({ primaryAction: 'allow_once', presentedDigest: undefined }),
+      params
+    );
+    expect(response.status).toBe(200);
+    expect(mocks.decideApprovalRequest).toHaveBeenCalledWith(
+      'sovereign_concierge',
+      expect.objectContaining({
+        deciderPrincipal: principal,
+        payloadHash: 'claim-hash',
+        effectBinding: 'claim-effect',
+      })
+    );
+  });
+
   it('denies a viewer membership on the canonical tenant despite legacy owner context', async () => {
     mocks.resolveMember.mockReturnValue({
       member_id: 'carol',
@@ -252,74 +296,78 @@ describe('provider attestation through the real decision store', () => {
     return POST(request({ presentedDigest }), { params: Promise.resolve({ id: requestId }) });
   }
 
-  it('records a credential Grant Owner decision on the original grant-standing request', async () => {
-    const channel = 'grant-standing';
-    const grant = store.createApprovalRequest('mission_controller', {
-      channel,
-      storageChannel: channel,
-      threadTs: 'credential-owner',
-      correlationId: 'credential-owner',
-      requestedBy: 'agent:fixture',
-      scope: { tier: 'confidential', tenant_slug: 'beta' },
-      draft: {
-        title: 'Credential Grant',
-        summary: 'Scoped credential use',
-        details: 'Synthetic fixture',
-        severity: 'high',
-      },
-      workflow: {
-        workflowId: 'grant-owner',
-        mode: 'all_required',
-        requiredRoles: ['owner'],
-        stages: [],
-        approvals: [{ role: 'owner', status: 'pending' }],
-      },
-      accountability: {
-        finalDecision: 'human_only',
-        payloadHash: 'b'.repeat(64),
-        effectBinding: 'grant-standing:credential.use:beta',
-      },
-    });
-    const decide = () =>
-      POST(
-        request({
-          channel,
-          storageChannel: channel,
-          presentedDigest: store.computeApprovalPresentedDigest(grant),
-        }),
-        { params: Promise.resolve({ id: grant.id }) }
-      );
-    const current = () => store.loadApprovalRequest(channel, grant.id);
-    mocks.resolveMember.mockReturnValue({
-      member_id: 'carol',
-      display_name: 'Carol',
-      memberships: [
-        { tenant_slug: 'acme', role: 'owner' },
-        { tenant_slug: 'beta', role: 'approver' },
-      ],
-    });
-    const denied = await decide();
-    expect(denied.status).toBe(403);
-    expect(await denied.json()).toMatchObject({
-      ok: false,
-      code: 'APPROVAL_TENANT_OWNER_REQUIRED',
-    });
-    expect(current()?.status).toBe('pending');
-    mocks.resolveMember.mockReturnValue({
-      member_id: 'carol',
-      display_name: 'Carol',
-      memberships: [{ tenant_slug: 'beta', role: 'owner' }],
-    });
-    expect((await decide()).status).toBe(200);
-    expect(current()).toMatchObject({
-      id: grant.id,
-      storageChannel: channel,
-      status: 'approved',
-      workflow: {
-        approvals: [{ role: 'owner', approvedBy: 'user:carol', authMethod: 'surface_session' }],
-      },
-    });
-  });
+  it.each([undefined, 'allow_once'])(
+    'records a credential Grant Owner decision on the original grant-standing request (%s)',
+    async (primaryAction) => {
+      const channel = 'grant-standing';
+      const grant = store.createApprovalRequest('mission_controller', {
+        channel,
+        storageChannel: channel,
+        threadTs: 'credential-owner',
+        correlationId: 'credential-owner',
+        requestedBy: 'agent:fixture',
+        scope: { tier: 'confidential', tenant_slug: 'beta' },
+        draft: {
+          title: 'Credential Grant',
+          summary: 'Scoped credential use',
+          details: 'Synthetic fixture',
+          severity: 'high',
+        },
+        workflow: {
+          workflowId: 'grant-owner',
+          mode: 'all_required',
+          requiredRoles: ['owner'],
+          stages: [],
+          approvals: [{ role: 'owner', status: 'pending' }],
+        },
+        accountability: {
+          finalDecision: 'human_only',
+          payloadHash: 'b'.repeat(64),
+          effectBinding: 'grant-standing:credential.use:beta',
+        },
+      });
+      const decide = () =>
+        POST(
+          request({
+            channel,
+            storageChannel: channel,
+            primaryAction,
+            presentedDigest: store.computeApprovalPresentedDigest(grant),
+          }),
+          { params: Promise.resolve({ id: grant.id }) }
+        );
+      const current = () => store.loadApprovalRequest(channel, grant.id);
+      mocks.resolveMember.mockReturnValue({
+        member_id: 'carol',
+        display_name: 'Carol',
+        memberships: [
+          { tenant_slug: 'acme', role: 'owner' },
+          { tenant_slug: 'beta', role: 'approver' },
+        ],
+      });
+      const denied = await decide();
+      expect(denied.status).toBe(403);
+      expect(await denied.json()).toMatchObject({
+        ok: false,
+        code: 'APPROVAL_TENANT_OWNER_REQUIRED',
+      });
+      expect(current()?.status).toBe('pending');
+      mocks.resolveMember.mockReturnValue({
+        member_id: 'carol',
+        display_name: 'Carol',
+        memberships: [{ tenant_slug: 'beta', role: 'owner' }],
+      });
+      expect((await decide()).status).toBe(200);
+      expect(current()).toMatchObject({
+        id: grant.id,
+        storageChannel: channel,
+        status: 'approved',
+        workflow: {
+          approvals: [{ role: 'owner', approvedBy: 'user:carol', authMethod: 'surface_session' }],
+        },
+      });
+    }
+  );
 
   it.each(['owner', 'approver'])(
     'records the %s member decision and applies only the exact claim once',
