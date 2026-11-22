@@ -21,7 +21,12 @@
       "audience": "user",
       "description": "cli_cmd_operator_home_ask",
       "group": "start",
-      "prerequisites": [{ "kind": "local_backend", "via": "reasoning setup" }]
+      "prerequisites": [
+        {
+          "kind": "local_backend",
+          "via": "reasoning setup"
+        }
+      ]
     },
     {
       "id": "operator-home.procedure",
@@ -63,7 +68,12 @@
       "description": "cli_cmd_operator_home_record",
       "group": "operate",
       "effect": "state_change",
-      "prerequisites": [{ "kind": "os_consent", "via": "permissions" }]
+      "prerequisites": [
+        {
+          "kind": "os_consent",
+          "via": "permissions"
+        }
+      ]
     },
     {
       "id": "operator-home.recording",
@@ -180,7 +190,13 @@
       "description": "cli_cmd_operator_cli_list",
       "group": "inspect",
       "effect": "readiness",
-      "prerequisites": [{ "kind": "trusted_claim", "via": "task", "when": "live_ops" }]
+      "prerequisites": [
+        {
+          "kind": "trusted_claim",
+          "via": "task",
+          "when": "live_ops"
+        }
+      ]
     },
     {
       "id": "operator-cli.search",
@@ -305,7 +321,13 @@
       "description": "cli_cmd_operator_cli_email",
       "group": "operate",
       "effect": "readiness",
-      "prerequisites": [{ "kind": "trusted_claim", "via": "task", "when": "live_ops" }]
+      "prerequisites": [
+        {
+          "kind": "trusted_claim",
+          "via": "task",
+          "when": "live_ops"
+        }
+      ]
     },
     {
       "id": "operator-cli.email.status",
@@ -317,7 +339,13 @@
       "description": "cli_cmd_operator_cli_email_status",
       "group": "inspect",
       "effect": "readiness",
-      "prerequisites": [{ "kind": "trusted_claim", "via": "task", "when": "live_ops" }]
+      "prerequisites": [
+        {
+          "kind": "trusted_claim",
+          "via": "task",
+          "when": "live_ops"
+        }
+      ]
     },
     {
       "id": "operator-cli.email.latest-draft",
@@ -329,7 +357,13 @@
       "description": "cli_cmd_operator_cli_email_latest_draft",
       "group": "inspect",
       "effect": "readiness",
-      "prerequisites": [{ "kind": "trusted_claim", "via": "task", "when": "live_ops" }]
+      "prerequisites": [
+        {
+          "kind": "trusted_claim",
+          "via": "task",
+          "when": "live_ops"
+        }
+      ]
     },
     {
       "id": "operator-cli.email.draft",
@@ -342,8 +376,14 @@
       "group": "operate",
       "effect": "state_change",
       "prerequisites": [
-        { "kind": "trusted_claim", "via": "task" },
-        { "kind": "task_credentials", "via": "service setup" }
+        {
+          "kind": "trusted_claim",
+          "via": "task"
+        },
+        {
+          "kind": "task_credentials",
+          "via": "service setup"
+        }
       ]
     },
     {
@@ -357,8 +397,14 @@
       "group": "operate",
       "effect": "state_change",
       "prerequisites": [
-        { "kind": "trusted_claim", "via": "task" },
-        { "kind": "task_credentials", "via": "service setup" }
+        {
+          "kind": "trusted_claim",
+          "via": "task"
+        },
+        {
+          "kind": "task_credentials",
+          "via": "service setup"
+        }
       ]
     },
     {
@@ -372,8 +418,14 @@
       "group": "operate",
       "effect": "state_change",
       "prerequisites": [
-        { "kind": "trusted_claim", "via": "task" },
-        { "kind": "task_credentials", "via": "service setup" }
+        {
+          "kind": "trusted_claim",
+          "via": "task"
+        },
+        {
+          "kind": "task_credentials",
+          "via": "service setup"
+        }
       ]
     },
     {
@@ -386,7 +438,13 @@
       "description": "cli_cmd_operator_cli_calendar",
       "group": "operate",
       "effect": "readiness",
-      "prerequisites": [{ "kind": "trusted_claim", "via": "task", "when": "live_ops" }]
+      "prerequisites": [
+        {
+          "kind": "trusted_claim",
+          "via": "task",
+          "when": "live_ops"
+        }
+      ]
     },
     {
       "id": "operator-cli.calendar.status",
@@ -398,7 +456,13 @@
       "description": "cli_cmd_operator_cli_calendar_status",
       "group": "inspect",
       "effect": "readiness",
-      "prerequisites": [{ "kind": "trusted_claim", "via": "task", "when": "live_ops" }]
+      "prerequisites": [
+        {
+          "kind": "trusted_claim",
+          "via": "task",
+          "when": "live_ops"
+        }
+      ]
     },
     {
       "id": "operator-cli.calendar.list-calendars",
@@ -411,8 +475,14 @@
       "group": "inspect",
       "effect": "connection",
       "prerequisites": [
-        { "kind": "trusted_claim", "via": "task" },
-        { "kind": "task_credentials", "via": "service setup" }
+        {
+          "kind": "trusted_claim",
+          "via": "task"
+        },
+        {
+          "kind": "task_credentials",
+          "via": "service setup"
+        }
       ]
     },
     {
@@ -426,8 +496,14 @@
       "group": "inspect",
       "effect": "connection",
       "prerequisites": [
-        { "kind": "trusted_claim", "via": "task" },
-        { "kind": "task_credentials", "via": "service setup" }
+        {
+          "kind": "trusted_claim",
+          "via": "task"
+        },
+        {
+          "kind": "task_credentials",
+          "via": "service setup"
+        }
       ]
     },
     {
@@ -441,8 +517,14 @@
       "group": "inspect",
       "effect": "connection",
       "prerequisites": [
-        { "kind": "trusted_claim", "via": "task" },
-        { "kind": "task_credentials", "via": "service setup" }
+        {
+          "kind": "trusted_claim",
+          "via": "task"
+        },
+        {
+          "kind": "task_credentials",
+          "via": "service setup"
+        }
       ]
     },
     {
@@ -456,8 +538,14 @@
       "group": "operate",
       "effect": "state_change",
       "prerequisites": [
-        { "kind": "trusted_claim", "via": "task" },
-        { "kind": "task_credentials", "via": "service setup" }
+        {
+          "kind": "trusted_claim",
+          "via": "task"
+        },
+        {
+          "kind": "task_credentials",
+          "via": "service setup"
+        }
       ]
     },
     {
@@ -480,7 +568,12 @@
       "description": "cli_cmd_operator_cli_task",
       "group": "operate",
       "effect": "state_change",
-      "prerequisites": [{ "kind": "local_backend", "via": "reasoning setup" }]
+      "prerequisites": [
+        {
+          "kind": "local_backend",
+          "via": "reasoning setup"
+        }
+      ]
     },
     {
       "id": "operator-cli.task.plan",
@@ -492,7 +585,12 @@
       "description": "cli_cmd_operator_cli_task_plan",
       "group": "inspect",
       "effect": "readiness",
-      "prerequisites": [{ "kind": "local_backend", "via": "reasoning setup" }]
+      "prerequisites": [
+        {
+          "kind": "local_backend",
+          "via": "reasoning setup"
+        }
+      ]
     },
     {
       "id": "operator-cli.task.start",
@@ -504,7 +602,12 @@
       "description": "cli_cmd_operator_cli_task_start",
       "group": "operate",
       "effect": "state_change",
-      "prerequisites": [{ "kind": "local_backend", "via": "reasoning setup" }]
+      "prerequisites": [
+        {
+          "kind": "local_backend",
+          "via": "reasoning setup"
+        }
+      ]
     },
     {
       "id": "operator-cli.task.scenario",
@@ -568,7 +671,12 @@
       "audience": "user",
       "description": "cli_cmd_operator_cli_see",
       "group": "inspect",
-      "prerequisites": [{ "kind": "local_backend", "via": "tool setup" }]
+      "prerequisites": [
+        {
+          "kind": "local_backend",
+          "via": "tool setup"
+        }
+      ]
     },
     {
       "id": "operator-cli.listen",
@@ -579,7 +687,12 @@
       "audience": "user",
       "description": "cli_cmd_operator_cli_listen",
       "group": "inspect",
-      "prerequisites": [{ "kind": "local_backend", "via": "voice setup" }]
+      "prerequisites": [
+        {
+          "kind": "local_backend",
+          "via": "voice setup"
+        }
+      ]
     },
     {
       "id": "operator-cli.browser-bridge",
@@ -591,7 +704,12 @@
       "description": "cli_cmd_operator_cli_browser_bridge",
       "group": "operate",
       "effect": "connection",
-      "prerequisites": [{ "kind": "service_setup", "via": "browser profiles" }]
+      "prerequisites": [
+        {
+          "kind": "service_setup",
+          "via": "browser profiles"
+        }
+      ]
     },
     {
       "id": "operator-cli.browser-bridge.request",
@@ -603,7 +721,12 @@
       "description": "cli_cmd_operator_cli_browser_bridge_request",
       "group": "operate",
       "effect": "connection",
-      "prerequisites": [{ "kind": "service_setup", "via": "browser profiles" }]
+      "prerequisites": [
+        {
+          "kind": "service_setup",
+          "via": "browser profiles"
+        }
+      ]
     },
     {
       "id": "operator-cli.browser-bridge.status",
@@ -615,7 +738,13 @@
       "description": "cli_cmd_operator_cli_browser_bridge_status",
       "group": "operate",
       "effect": "readiness",
-      "prerequisites": [{ "kind": "service_setup", "via": "browser profiles", "when": "live_ops" }]
+      "prerequisites": [
+        {
+          "kind": "service_setup",
+          "via": "browser profiles",
+          "when": "live_ops"
+        }
+      ]
     },
     {
       "id": "operator-cli.browser-bridge.wait",
@@ -625,6 +754,35 @@
       "entry": "operator-cli",
       "audience": "operator",
       "description": "cli_cmd_operator_cli_browser_bridge_wait",
+      "group": "operate",
+      "effect": "connection",
+      "prerequisites": [
+        {
+          "kind": "service_setup",
+          "via": "browser profiles"
+        }
+      ]
+    },
+    {
+      "id": "operator-cli.browser",
+      "command": "browser",
+      "noun": "browser",
+      "verb": "default",
+      "entry": "operator-cli",
+      "audience": "operator",
+      "description": "cli_cmd_operator_cli_browser",
+      "group": "operate",
+      "effect": "connection",
+      "prerequisites": [{ "kind": "service_setup", "via": "browser profiles" }]
+    },
+    {
+      "id": "operator-cli.browser.control",
+      "command": "browser control",
+      "noun": "browser",
+      "verb": "control",
+      "entry": "operator-cli",
+      "audience": "operator",
+      "description": "cli_cmd_operator_cli_browser_control",
       "group": "operate",
       "effect": "connection",
       "prerequisites": [{ "kind": "service_setup", "via": "browser profiles" }]
@@ -694,7 +852,12 @@
       "description": "cli_cmd_operator_cli_grants_grant",
       "group": "operate",
       "effect": "state_change",
-      "prerequisites": [{ "kind": "os_consent", "via": "permissions" }]
+      "prerequisites": [
+        {
+          "kind": "os_consent",
+          "via": "permissions"
+        }
+      ]
     },
     {
       "id": "operator-cli.grants.revoke",
@@ -706,7 +869,12 @@
       "description": "cli_cmd_operator_cli_grants_revoke",
       "group": "operate",
       "effect": "state_change",
-      "prerequisites": [{ "kind": "os_consent", "via": "permissions" }]
+      "prerequisites": [
+        {
+          "kind": "os_consent",
+          "via": "permissions"
+        }
+      ]
     },
     {
       "id": "operator-cli.permissions",
@@ -748,7 +916,12 @@
       "audience": "user",
       "description": "cli_cmd_operator_cli_watch",
       "group": "inspect",
-      "prerequisites": [{ "kind": "local_backend", "via": "tool setup" }]
+      "prerequisites": [
+        {
+          "kind": "local_backend",
+          "via": "tool setup"
+        }
+      ]
     },
     {
       "id": "operator-cli.speak",
@@ -759,7 +932,12 @@
       "audience": "user",
       "description": "cli_cmd_operator_cli_speak",
       "group": "operate",
-      "prerequisites": [{ "kind": "local_backend", "via": "voice setup" }]
+      "prerequisites": [
+        {
+          "kind": "local_backend",
+          "via": "voice setup"
+        }
+      ]
     },
     {
       "id": "operator-cli.draw",
@@ -771,7 +949,12 @@
       "description": "cli_cmd_operator_cli_draw",
       "group": "operate",
       "effect": "state_change",
-      "prerequisites": [{ "kind": "local_backend", "via": "tool setup" }]
+      "prerequisites": [
+        {
+          "kind": "local_backend",
+          "via": "tool setup"
+        }
+      ]
     },
     {
       "id": "operator-cli.capture",
@@ -783,7 +966,12 @@
       "description": "cli_cmd_operator_cli_capture",
       "group": "operate",
       "effect": "state_change",
-      "prerequisites": [{ "kind": "os_consent", "via": "permissions" }]
+      "prerequisites": [
+        {
+          "kind": "os_consent",
+          "via": "permissions"
+        }
+      ]
     },
     {
       "id": "operator-cli.record.screen",
@@ -795,7 +983,12 @@
       "description": "cli_cmd_operator_cli_record_screen",
       "group": "operate",
       "effect": "state_change",
-      "prerequisites": [{ "kind": "os_consent", "via": "permissions" }]
+      "prerequisites": [
+        {
+          "kind": "os_consent",
+          "via": "permissions"
+        }
+      ]
     },
     {
       "id": "operator-cli.record.audio",
@@ -807,7 +1000,12 @@
       "description": "cli_cmd_operator_cli_record_audio",
       "group": "operate",
       "effect": "state_change",
-      "prerequisites": [{ "kind": "os_consent", "via": "permissions" }]
+      "prerequisites": [
+        {
+          "kind": "os_consent",
+          "via": "permissions"
+        }
+      ]
     },
     {
       "id": "operator-cli.record.camera",
@@ -819,7 +1017,12 @@
       "description": "cli_cmd_operator_cli_record_camera",
       "group": "operate",
       "effect": "state_change",
-      "prerequisites": [{ "kind": "os_consent", "via": "permissions" }]
+      "prerequisites": [
+        {
+          "kind": "os_consent",
+          "via": "permissions"
+        }
+      ]
     },
     {
       "id": "operator-cli.run",
@@ -831,7 +1034,12 @@
       "description": "cli_cmd_operator_cli_run",
       "group": "operate",
       "effect": "state_change",
-      "prerequisites": [{ "kind": "local_backend", "via": "reasoning setup" }]
+      "prerequisites": [
+        {
+          "kind": "local_backend",
+          "via": "reasoning setup"
+        }
+      ]
     },
     {
       "id": "operator-cli.preview",
@@ -852,7 +1060,12 @@
       "audience": "user",
       "description": "cli_cmd_operator_cli_intent",
       "group": "start",
-      "prerequisites": [{ "kind": "local_backend", "via": "reasoning setup" }]
+      "prerequisites": [
+        {
+          "kind": "local_backend",
+          "via": "reasoning setup"
+        }
+      ]
     },
     {
       "id": "operator-cli.schedule",
@@ -885,7 +1098,12 @@
       "description": "cli_cmd_operator_cli_schedule_register",
       "group": "operate",
       "effect": "state_change",
-      "prerequisites": [{ "kind": "service_setup", "via": "setup" }]
+      "prerequisites": [
+        {
+          "kind": "service_setup",
+          "via": "setup"
+        }
+      ]
     },
     {
       "id": "operator-cli.schedule.remove",
@@ -897,7 +1115,12 @@
       "description": "cli_cmd_operator_cli_schedule_remove",
       "group": "operate",
       "effect": "state_change",
-      "prerequisites": [{ "kind": "service_setup", "via": "setup" }]
+      "prerequisites": [
+        {
+          "kind": "service_setup",
+          "via": "setup"
+        }
+      ]
     },
     {
       "id": "operator-cli.project-trust",
@@ -931,7 +1154,12 @@
       "description": "cli_cmd_pipeline_runner_default",
       "group": "operate",
       "effect": "state_change",
-      "prerequisites": [{ "kind": "local_backend", "via": "reasoning setup" }]
+      "prerequisites": [
+        {
+          "kind": "local_backend",
+          "via": "reasoning setup"
+        }
+      ]
     },
     {
       "id": "operator-readiness.vital",
@@ -1184,6 +1412,8 @@
         "browser-bridge request",
         "browser-bridge status",
         "browser-bridge wait",
+        "browser",
+        "browser control",
         "grants",
         "grants list",
         "grants check",
@@ -2319,8 +2549,14 @@
       "native_help": true,
       "effect": "connection",
       "prerequisites": [
-        { "kind": "trusted_claim", "via": "task" },
-        { "kind": "task_credentials", "via": "service setup" }
+        {
+          "kind": "trusted_claim",
+          "via": "task"
+        },
+        {
+          "kind": "task_credentials",
+          "via": "service setup"
+        }
       ]
     },
     {
@@ -3100,7 +3336,12 @@
       "group": "operate",
       "native_help": true,
       "effect": "state_change",
-      "prerequisites": [{ "kind": "local_backend", "via": "reasoning setup" }]
+      "prerequisites": [
+        {
+          "kind": "local_backend",
+          "via": "reasoning setup"
+        }
+      ]
     },
     {
       "id": "script.mission.journal",
@@ -3449,6 +3690,29 @@
       "description": "cli_cmd_script_pr_create",
       "group": "operate",
       "caution": "cli_caution_pr_create",
+      "long_running": true,
+      "native_help": true
+    },
+    {
+      "id": "script.pr.body",
+      "module": "scripts/pr/pr_body.ts",
+      "command": "pr body",
+      "noun": "pr",
+      "verb": "body",
+      "audience": "operator",
+      "description": "cli_cmd_script_pr_body",
+      "group": "operate",
+      "native_help": true
+    },
+    {
+      "id": "script.knowledge.curation-publish",
+      "module": "scripts/knowledge/curation_publish.ts",
+      "command": "knowledge curation-publish",
+      "noun": "knowledge",
+      "verb": "curation-publish",
+      "audience": "operator",
+      "description": "cli_cmd_script_knowledge_curation_publish",
+      "group": "operate",
       "long_running": true,
       "native_help": true
     },
@@ -4402,7 +4666,12 @@
       "long_running": true,
       "native_help": true,
       "effect": "state_change",
-      "prerequisites": [{ "kind": "local_backend", "via": "reasoning setup" }]
+      "prerequisites": [
+        {
+          "kind": "local_backend",
+          "via": "reasoning setup"
+        }
+      ]
     },
     {
       "id": "script.task.smoke",

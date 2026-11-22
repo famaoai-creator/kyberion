@@ -33,7 +33,10 @@ pnpm mission distill <ID>
 pnpm mission memory-approve <candidate_id> --knowledge-domain product \
   --approval-channel pr_review --curation-json '<json>'
 pnpm mission memory-promote <candidate_id> --target-root <feature worktree>
-# commit it, declare every candidate in the PR body's "## Knowledge", then pnpm kyberion pr create
+# commit it, then scaffold the PR body instead of hand-authoring the contract:
+#   pnpm kyberion pr body --out .github/pr-body.md   # fills Mission ID + Knowledge lines
+# edit the scaffold (Summary/Test plan/pending candidates), then
+#   pnpm kyberion pr create --body-file .github/pr-body.md
 # after merge: record delivery + retrospective, git fetch origin main, then
 pnpm mission finish <ID>   # ratifies pr_review candidates against origin/main
 ```

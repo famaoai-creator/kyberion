@@ -36,6 +36,7 @@
     observe_tab: 'ページ観測の依頼',
     local_infer: 'ローカル推論の依頼',
     notify: 'お知らせ',
+    control_step: 'ブラウザ操作ステップ',
   };
   // Level/risk are always spelled out in text — never conveyed by colour alone.
   const LEVEL_LABELS = {
@@ -170,6 +171,17 @@
       } else {
         base.controls = ['acknowledge'];
       }
+    } else if (kind === 'control_step') {
+      const step = payload.step || {};
+      base.title = `操作: ${String(step.op || '')}` +
+        (step.label ? `（${String(step.label)}）` : '');
+      base.lines.push(
+        `セッション: ${String(payload.session_id || '')}`,
+        `対象オリジン: ${String(payload.origin || '')}`
+      );
+      // Executes automatically under the session lease — informational only,
+      // no buttons (it is usually already answered by the time it is shown).
+      base.controls = ['dismiss'];
     } else {
       base.title = '未対応の依頼';
       base.controls = ['decline'];

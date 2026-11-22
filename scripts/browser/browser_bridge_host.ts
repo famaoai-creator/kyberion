@@ -72,6 +72,7 @@ import {
   BrowserBridgeMailboxError,
   listDeliverableBrowserBridgeRequests,
   listPendingApprovalsForBridge,
+  loadBrowserBridgeRequest,
   normalizeBrowserBridgeScope,
   respondBrowserBridgeRequest,
   toBrowserBridgeRequestView,
@@ -80,6 +81,7 @@ import {
 } from '@agent/shared-vision/browser-bridge-mailbox';
 import { redactObservationText } from '@agent/core/browser/browser-extension-bridge';
 import { resolveStorageFloor } from '@agent/core/storage-layout';
+import { BROWSER_CONTROL_ROOT_PATH } from '@agent/core/foundation/runtime-state-roots';
 import {
   getReasoningBackend,
   delegateTaskWithUntrustedData,
@@ -1109,6 +1111,110 @@ function handleRespondRequest(message: any): HostResponse {
   }
 }
 
+/**
+ * store_artifact: binary control-step output (screenshots, downloaded files).
+ * The mailbox response is capped at 64KB, so the extension stores the payload
+ * through this one-message channel and reports only a {name,path,mime,bytes}
+ * reference in the request result. Payloads land under the browser-control
+ * runtime root alongside the secrets side-channel (same retention entry).
+ * Only a live control_step request may carry artifacts.
+ */
+const STORE_ARTIFACT_MAX_B64_CHARS = 950_000;
+const STORE_ARTIFACT_NAME_PATTERN = /^[A-Za-z0-9._-]{1,48}$/;
+const STORE_ARTIFACT_EXT_BY_MIME: Record<string, string> = {
+  'image/png': 'png',
+  'image/jpeg': 'jpg',
+  'image/webp': 'webp',
+  'application/pdf': 'pdf',
+  'application/zip': 'zip',
+  'text/plain': 'txt',
+  'text/csv': 'csv',
+  'application/json': 'json',
+};
+const STORE_ARTIFACT_SAFE_EXTS = new Set([
+  'png',
+  'jpg',
+  'jpeg',
+  'webp',
+  'gif',
+  'pdf',
+  'zip',
+  'txt',
+  'csv',
+  'json',
+  'log',
+  'bin',
+]);
+
+function artifactExtension(name: string, mime: string): string {
+  const dot = name.lastIndexOf('.');
+  if (dot > 0) {
+    const ext = name.slice(dot + 1).toLowerCase();
+    if (STORE_ARTIFACT_SAFE_EXTS.has(ext)) return ext;
+  }
+  return STORE_ARTIFACT_EXT_BY_MIME[mime] ?? 'bin';
+}
+
+function handleStoreArtifact(message: any): HostResponse {
+  const requestId = typeof message.request_id === 'string' ? message.request_id.trim() : '';
+  const name = typeof message.name === 'string' ? message.name.trim() : '';
+  const mime = typeof message.mime === 'string' ? message.mime.trim() : 'application/octet-stream';
+  const dataB64 = typeof message.data_b64 === 'string' ? message.data_b64 : '';
+  if (!requestId || !STORE_ARTIFACT_NAME_PATTERN.test(name)) {
+    return {
+      ok: false,
+      code: 'invalid_input',
+      error: 'store_artifact requires request_id and a file-safe name',
+    };
+  }
+  if (dataB64.length === 0 || dataB64.length > STORE_ARTIFACT_MAX_B64_CHARS) {
+    return {
+      ok: false,
+      code: 'invalid_input',
+      error: `data_b64 must be 1..${STORE_ARTIFACT_MAX_B64_CHARS} chars`,
+    };
+  }
+  const request = loadBrowserBridgeRequest(requestId);
+  if (!request || request.request_kind !== 'control_step') {
+    return {
+      ok: false,
+      code: 'invalid_input',
+      error: 'store_artifact requires a live control_step request',
+    };
+  }
+  if (request.status !== 'delivered' && request.status !== 'pending') {
+    return {
+      ok: false,
+      code: 'invalid_input',
+      error: `control_step request is ${request.status}; artifacts only store while in-flight`,
+    };
+  }
+  const ext = artifactExtension(name, mime);
+  const dir = `${BROWSER_CONTROL_ROOT_PATH}/artifacts/${requestId}`;
+  const file = `${dir}/${name.replace(/\.[^.]+$/, '')}.${ext}`;
+  try {
+    const buffer = Buffer.from(dataB64, 'base64');
+    withExecutionContext(
+      'sovereign_concierge',
+      () => {
+        safeMkdir(pathResolver.rootResolve(dir), { recursive: true });
+        safeWriteFile(pathResolver.rootResolve(file), buffer);
+      },
+      'sovereign'
+    );
+    recordBridgeAudit({
+      action: 'browser_bridge_store_artifact',
+      operation: 'browser:bridge:store-artifact',
+      result: 'completed',
+      reason: 'Extension stored a control-step artifact',
+      metadata: { request_id: requestId, name, mime, bytes: buffer.length },
+    });
+    return { ok: true, name, path: file, mime, bytes: buffer.length };
+  } catch (err) {
+    return mailboxFailure(err, 'store_artifact failed');
+  }
+}
+
 const SEND_PAGE_MAX_TEXT = 30_000;
 
 function canonicalPageOrigin(value: unknown): string | null {
@@ -1421,6 +1527,7 @@ export function handle(message: any): HostResponse | Promise<HostResponse> {
     submit_golden_evidence: () => handleSubmitGoldenEvidence(message),
     poll_requests: () => handlePollRequests(),
     respond_request: () => handleRespondRequest(message),
+    store_artifact: () => handleStoreArtifact(message),
     send_page: () => handleSendPage(message),
     submit_inspection: () => handleSubmitInspection(message),
   };

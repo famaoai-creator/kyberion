@@ -26,6 +26,7 @@ import {
   type GitRunner as PromotionGitRunner,
   type WorktreeFileWriter,
 } from '@agent/core/knowledge/memory-promotion-git';
+import { explainPolicyViolation } from '@agent/core/error-classifier';
 import { defineScript, isDirectScript } from '../lib/harness.js';
 import { readSafeJsonFile } from '../lib/json-input.js';
 import { collectChangedFiles, type GitRunner } from '../run_checks.js';
@@ -289,18 +290,30 @@ export function writeDocsImpactReport(
   outArg: string,
   missionRoot: string | undefined,
   markdown: string,
-  deps: { gitRunner?: PromotionGitRunner; worktreeWriter?: WorktreeFileWriter } = {}
+  deps: {
+    gitRunner?: PromotionGitRunner;
+    worktreeWriter?: WorktreeFileWriter;
+    writeFile?: (filePath: string, content: string) => void;
+  } = {}
 ): void {
   const resolvedOut = path.resolve(pathResolver.rootDir(), outArg);
   try {
-    safeWriteFile(assertSafeRepositoryPath(resolvedOut, { allowMissingLeaf: true }), markdown);
+    (deps.writeFile ?? safeWriteFile)(
+      assertSafeRepositoryPath(resolvedOut, { allowMissingLeaf: true }),
+      markdown
+    );
     return;
   } catch (error) {
-    if (
-      !missionRoot?.trim() ||
-      !(error instanceof Error) ||
-      !error.message.includes('RESOURCE_PATH_SCOPE')
-    ) {
+    // Fall back only for denials the governed writer legitimately covers:
+    // out-of-checkout paths (RESOURCE_PATH_SCOPE) or a persona that lacks
+    // write authority for the target path ('persona_write_denied' per the
+    // governed error-classifier catalog). Tenant scope violations and other
+    // fail-closed policy denials must still propagate.
+    const message = error instanceof Error ? error.message : '';
+    const recoverable =
+      message.includes('RESOURCE_PATH_SCOPE') ||
+      explainPolicyViolation(message).violationType === 'persona_write_denied';
+    if (!missionRoot?.trim() || !recoverable) {
       throw error;
     }
   }

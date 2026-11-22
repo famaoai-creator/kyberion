@@ -309,6 +309,17 @@
   ],
   "policy_violation_patterns": [
     {
+      "pattern": "POLICY_VIOLATION.*NOT authorized to write|is NOT authorized to write to",
+      "violation_type": "persona_write_denied",
+      "explanation": "The current persona's authority role is not permitted to write to this path — distinct from tenant-scope and tier denials: the path itself is outside the persona's write allowlist.",
+      "required_authority": "a persona whose allow_write policy covers the target path (e.g. mission_controller for active/missions/**)",
+      "repair_steps": [
+        "Check KYBERION_BASE_ROLE / MISSION_ROLE — the active persona lacks write authority for this path.",
+        "For governed mission evidence writes, route through the worktree writer (--mission-root or the sibling-worktree promotion path) instead of writing in-process.",
+        "Do not broaden the persona's allow_write policy to silence this denial — choose the governed write path."
+      ]
+    },
+    {
       "pattern": "POLICY_VIOLATION.*not authorized for project|not authorized.*project",
       "violation_type": "project_scope_denied",
       "explanation": "The current persona is not authorized to access this project.",

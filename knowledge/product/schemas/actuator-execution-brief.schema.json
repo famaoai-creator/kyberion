@@ -39,6 +39,7 @@
       "items": { "type": "string" }
     },
     "support_components": {
+      "description": "Non-actuator runtime components the brief relies on (RS-07).",
       "type": "array",
       "items": { "type": "string" }
     },

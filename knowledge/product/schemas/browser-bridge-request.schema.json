@@ -22,7 +22,7 @@
       "type": "string",
       "pattern": "^BBR-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
     },
-    "request_kind": { "enum": ["observe_tab", "local_infer", "notify"] },
+    "request_kind": { "enum": ["observe_tab", "local_infer", "notify", "control_step"] },
     "created_at": { "type": "string", "format": "date-time" },
     "expires_at": { "type": "string", "format": "date-time" },
     "requested_by": {
@@ -98,6 +98,11 @@
     {
       "if": { "properties": { "request_kind": { "const": "notify" } } },
       "then": { "properties": { "payload": { "$ref": "#/definitions/notify_payload" } } }
+    },
+    {
+      "description": "control_step carries one schema-bounded operation under a minted browser-control session (libs/shared-vision/src/browser-control-sessions.ts). The session binds the canonical origin; the host re-admits every step and the extension re-validates before executing. Steps never contain arbitrary JavaScript — op names are fixed vocabulary.",
+      "if": { "properties": { "request_kind": { "const": "control_step" } } },
+      "then": { "properties": { "payload": { "$ref": "#/definitions/control_step_payload" } } }
     }
   ],
   "definitions": {
@@ -157,6 +162,86 @@
           "properties": {
             "done": { "type": "integer", "minimum": 0 },
             "total": { "type": "integer", "minimum": 1 }
+          }
+        }
+      }
+    },
+    "control_step_payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["session_id", "lease_id", "origin", "step"],
+      "properties": {
+        "session_id": {
+          "type": "string",
+          "pattern": "^BCS-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        "lease_id": {
+          "type": "string",
+          "pattern": "^LCS-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        "origin": {
+          "type": "string",
+          "pattern": "^https?://[^/\\s]+$",
+          "maxLength": 300
+        },
+        "step": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["step_id", "op"],
+          "properties": {
+            "step_id": { "type": "string", "minLength": 1, "maxLength": 80 },
+            "op": {
+              "enum": [
+                "snapshot",
+                "screenshot",
+                "extract_text_ref",
+                "list_tabs",
+                "open_tab",
+                "select_tab",
+                "navigate",
+                "click_ref",
+                "click_if_present",
+                "fill_ref",
+                "select_ref",
+                "press_ref",
+                "wait_for_ref",
+                "submit_form",
+                "upload_file",
+                "download_file",
+                "delete",
+                "purchase",
+                "credential_submit",
+                "settings_change"
+              ]
+            },
+            "ref": { "type": "string", "maxLength": 80 },
+            "role": { "type": "string", "maxLength": 80 },
+            "name": { "type": "string", "maxLength": 300 },
+            "text": { "type": "string", "maxLength": 4000 },
+            "value": { "type": "string", "maxLength": 4000 },
+            "key": { "type": "string", "maxLength": 80 },
+            "url": { "type": "string", "maxLength": 2048 },
+            "checked": { "type": "boolean" },
+            "wait_ms": { "type": "integer", "minimum": 0, "maximum": 60000 },
+            "timeout_ms": { "type": "integer", "minimum": 0, "maximum": 120000 },
+            "tab_id": { "type": "integer" },
+            "label": { "type": "string", "maxLength": 200 },
+            "secret_name": {
+              "type": "string",
+              "maxLength": 60,
+              "description": "When set on extract_text_ref, the extracted text is returned in result.secret_values and moved to the control secrets side-channel instead of the persisted response."
+            },
+            "file": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["data_b64"],
+              "properties": {
+                "name": { "type": "string", "maxLength": 120 },
+                "mime": { "type": "string", "maxLength": 80 },
+                "data_b64": { "type": "string", "minLength": 1, "maxLength": 1400000 }
+              },
+              "description": "upload_file: file payload staged through the request (approx 1MB decoded)."
+            }
           }
         }
       }

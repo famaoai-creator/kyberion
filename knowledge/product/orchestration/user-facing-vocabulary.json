@@ -9280,6 +9280,16 @@
         "ja": "Chrome 拡張の応答を待つ",
         "qps-ploc": "⟦Ẇȧïŧ ƒőř ŧħė Ƈħřőɱė ėẋŧėñşïőñ ŧő ȧñşẇėř ȧ řėɋůėşŧ ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
       },
+      "cli_cmd_operator_cli_browser": {
+        "en": "Drive Chrome through the extension bridge",
+        "ja": "拡張ブリッジ経由で Chrome を操作する",
+        "qps-ploc": "⟦Ḓřïṽė Ƈħřőɱė ŧħřőůɠħ ŧħė ėẋŧėñşïőñ ƀřïḓɠė ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "cli_cmd_operator_cli_browser_control": {
+        "en": "Interactive browser control under a session lease (open/snapshot/click/fill/press/extract)",
+        "ja": "セッションリース承認のもとでブラウザを対話操作(open/snapshot/click/fill/press/extract)",
+        "qps-ploc": "⟦Ïñŧėřȧƈŧïṽė ƀřőẇşėř ƈőñŧřőŀ ůñḓėř ȧ şėşşïőñ ŀėȧşė (őṗėñ/şñȧṗşħőŧ/ƈŀïƈķ/ƒïŀŀ/ṗřėşş/ėẋŧřȧƈŧ) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñ⟧"
+      },
       "cli_cmd_operator_cli_grants": {
         "en": "Manage standing grants (consents decided ahead of time)",
         "ja": "常設の許可(事前に決める同意)を管理",
@@ -9438,7 +9448,7 @@
       "cli_cmd_organization_continuous_reconcile_collector": {
         "en": "Release an unconfirmed collector attempt with human approval",
         "ja": "人間の承認を得て結果未確認の collector 試行を解除",
-        "qps-ploc": "⟦Řėŀėȧşė ȧñ ůñƈőñƒïřɱėḓ ƈőŀŀėƈŧőř ȧŧŧėɱṗŧ ẇïŧħ ħůɱȧñ ȧṗṗřőṽȧŀ⟧"
+        "qps-ploc": "⟦Řėŀėȧşė ȧñ ůñƈőñƒïřɱėḓ ƈőŀŀėƈŧőř ȧŧŧėɱṗŧ ẇïŧħ ħůɱȧñ ȧṗṗřőṽȧŀ ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
       },
       "cli_cmd_organization_role_migrate_publication_store": {
         "en": "Review and install publication role catalog updates",
@@ -9794,6 +9804,11 @@
         "en": "Run the pull-request readiness gates and affected tests for changed paths without creating a PR",
         "ja": "PR を作成せずに、変更パスに応じた PR 準備ゲートと影響テストを実行",
         "qps-ploc": "⟦Řůñ ŧħė ṗůŀŀ-řėɋůėşŧ řėȧḓïñėşş ɠȧŧėş ȧñḓ ȧƒƒėƈŧėḓ ŧėşŧş ƒőř ƈħȧñɠėḓ ṗȧŧħş ẇïŧħőůŧ ƈřėȧŧïñɠ ȧ ṖŘ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşė⟧"
+      },
+      "cli_cmd_script_pr_body": {
+        "en": "Render a compliant PR body scaffold (Coordination/Knowledge pre-filled) for pr create --body-file",
+        "ja": "pr create --body-file 用に Coordination/Knowledge を事前入力した PR 本文スキャフォールドを生成",
+        "qps-ploc": "⟦Řėñḓėř ȧ ƈőɱṗŀïȧñŧ ṖŘ ƀőḓẏ şƈȧƒƒőŀḓ (Ƈőőřḓïñȧŧïőñ/Ķñőẇŀėḓɠė ṗřė-ƒïŀŀėḓ) ƒőř ṗř ƈřėȧŧė --ƀőḓẏ-ƒïŀė ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈ⟧"
       },
       "cli_cmd_script_check_commit_subject": {
         "en": "Check the HEAD commit subject",
@@ -11429,6 +11444,11 @@
         "en": "Withdraw personal account use permission",
         "ja": "個人アカウント利用許可を撤回",
         "qps-ploc": "⟦Ẇïŧħḓřȧẇ ṗėřşőñȧŀ ȧƈƈőůñŧ ůşė ṗėřɱïşşïőñ ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "cli_cmd_script_knowledge_curation_publish": {
+        "en": "Publish the generated weekly curation report as a chore(knowledge) PR via the governed pr create path",
+        "ja": "生成済みの週次キュレーションレポートを governed pr create 経路で chore(knowledge) PR として公開",
+        "qps-ploc": "⟦Ṗůƀŀïşħ ŧħė ɠėñėřȧŧėḓ ẇėėķŀẏ ƈůřȧŧïőñ řėṗőřŧ ȧş ȧ ƈħőřė(ķñőẇŀėḓɠė) ṖŘ ṽïȧ ŧħė ɠőṽėřñėḓ ṗř ƈřėȧŧė ṗȧŧħ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧ⟧"
       }
     },
     "recorder": {

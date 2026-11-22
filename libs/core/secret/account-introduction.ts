@@ -34,7 +34,12 @@ import { readMemberProfile, isValidMemberId } from '../organization/member-regis
 import { inspectInstalledOnboardingRuntime } from '../organization/onboarding-runtime-identity.js';
 import type { OnboardingAuthorityPrincipal } from '../organization/onboarding-authority.js';
 import { loadServiceBindingRecord } from '../service/service-binding-reader.js';
-import { validateBindingOwner } from '../service/service-binding-owner.js';
+import {
+  isAccountOwnerKind,
+  isPersonAccountOwner,
+  validateBindingOwner,
+  type AccountOwnerKind,
+} from '../service/service-binding-owner.js';
 import { getServiceEndpointRecord } from '../service/service-endpoint-registry.js';
 import { withLock } from '../foundation/lock-utils.js';
 import { getPluginExecutionContext } from '../shell/sandbox-policy.js';
@@ -60,7 +65,7 @@ interface Plan {
   runtimeAvailable?: false;
   binding_id: string;
   service_id: string;
-  owner_kind: 'person' | 'organization';
+  owner_kind: AccountOwnerKind;
   owner_ref: string;
   tenant_slug?: string;
   secret_refs: string[];
@@ -121,7 +126,7 @@ function selected(principal: OnboardingAuthorityPrincipal, bindingId: string) {
     !member ||
     member.status !== 'active' ||
     !binding.owner_ref ||
-    !['person', 'organization'].includes(binding.owner_kind ?? '') ||
+    !isAccountOwnerKind(binding.owner_kind) ||
     !binding.service_id ||
     !(
       binding.auth_mode === 'secret-guard' ||
@@ -167,7 +172,7 @@ function selected(principal: OnboardingAuthorityPrincipal, bindingId: string) {
   return { binding, installed };
 }
 function approvalScope<T>(principal: OnboardingAuthorityPrincipal, plan: Plan, run: () => T): T {
-  if (plan.owner_kind !== 'person') return run();
+  if (!isPersonAccountOwner(plan.owner_kind)) return run();
   const result = withAuthenticatedPersonalApprovals(principal, () => ({ value: run() }));
   if (!result) return denied('personal approval scope unavailable');
   return result.value;
@@ -198,7 +203,7 @@ function prepare(principal: OnboardingAuthorityPrincipal, bindingId: string): Pl
     agent_id: installed.agentId,
     statement: '',
   };
-  if (plan.owner_kind === 'organization' && !plan.broker_id)
+  if (!isPersonAccountOwner(plan.owner_kind) && !plan.broker_id)
     denied('configured account broker writer required');
   const state = registration(plan);
   const incomplete = approvalScope(principal, plan, () =>
@@ -278,10 +283,9 @@ export function proposeAccountIntroduction(
         sourceText: JSON.stringify(plan),
         expiresAt: new Date(now.getTime() + 3600_000).toISOString(),
         accountability: { finalDecision: 'human_only', payloadHash: digest, effectBinding: digest },
-        scope:
-          plan.owner_kind === 'person'
-            ? { tier: 'personal', scope_kind: 'system', nhi_id: plan.agent_id }
-            : { tier: 'confidential', tenant_slug: plan.tenant_slug },
+        scope: isPersonAccountOwner(plan.owner_kind)
+          ? { tier: 'personal', scope_kind: 'system', nhi_id: plan.agent_id }
+          : { tier: 'confidential', tenant_slug: plan.tenant_slug },
       })
     )
   );
@@ -348,7 +352,7 @@ function readPlan(
     record.accountability?.finalDecision !== 'human_only' ||
     record.accountability.payloadHash !== hash(plan) ||
     record.accountability.effectBinding !== hash(plan) ||
-    (plan.owner_kind === 'person'
+    (isPersonAccountOwner(plan.owner_kind)
       ? record.scope?.tier !== 'personal' ||
         record.scope.tenant_slug !== undefined ||
         record.scope.nhi_id !== plan.agent_id
@@ -406,7 +410,7 @@ function unchanged(principal: OnboardingAuthorityPrincipal, plan: Plan) {
     hash(binding) !== plan.binding_hash ||
     installed.agentId !== plan.agent_id ||
     hash([...binding.secret_refs].sort()) !== hash(plan.secret_refs) ||
-    (plan.owner_kind === 'organization' &&
+    (!isPersonAccountOwner(plan.owner_kind) &&
       (isGws(plan) ? gwsBrokerDigest : describeAccountBroker()?.brokerId) !== plan.broker_id)
   )
     denied('review changed');
@@ -495,7 +499,7 @@ export async function applyAccountIntroduction(
     try {
       storeLocalAccountRegistration(address, { ...state, pendingApprovalId: record.id });
       const reference = storeLocalAccountMaterial(address, values);
-      if (plan.owner_kind === 'organization') {
+      if (!isPersonAccountOwner(plan.owner_kind)) {
         const provisionInput = Object.freeze({
           brokerId: plan.broker_id!,
           reference: Object.freeze(reference),

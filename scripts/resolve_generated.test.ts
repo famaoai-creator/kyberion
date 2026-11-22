@@ -84,6 +84,15 @@ describe('resolve_generated catalog', () => {
     }
   });
 
+  it('tracks every contract output the types generator emits', async () => {
+    const { targets } = await import('./generate/generate_types.js');
+    const step = GENERATED_ARTIFACT_STEPS.find((item) => item.id === 'contract-types');
+    expect(step).toBeDefined();
+    expect(targets.map((target) => target.outputPath).sort()).toEqual(
+      [...(step?.tracked ?? [])].sort()
+    );
+  });
+
   it('matches the merge-driver paths in .gitattributes exactly', () => {
     const driverPaths = readRepoText('.gitattributes')
       .split('\n')

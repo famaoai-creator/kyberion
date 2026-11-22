@@ -141,6 +141,15 @@ export const RUNTIME_LOCK_ROOT_PATH = 'active/shared/runtime/locks';
  */
 export const WORK_COORDINATION_ROOT_PATH = 'active/shared/runtime/work-coordination';
 
+/**
+ * Root of the interactive browser-control store: BCS-/LCS- session leases,
+ * step journals, pending-step approvals under sessions/ and the
+ * extract_text_ref secret side-channel under secrets/
+ * (libs/shared-vision/src/browser-control-sessions.ts). Operator-local
+ * coordination state — not tenant-partitioned.
+ */
+export const BROWSER_CONTROL_ROOT_PATH = 'active/shared/runtime/browser-control';
+
 /** Logical names preserve existing layouts; registration never grants access. */
 export const RUNTIME_STATE_PATHS = {
   'pipeline.scheduleRegistry': 'active/shared/runtime/pipeline-schedules.json',

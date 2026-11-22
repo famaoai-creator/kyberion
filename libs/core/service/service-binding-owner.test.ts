@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ACCOUNT_OWNER_KINDS,
+  isAccountOwnerKind,
   isBindingVisibleTo,
+  isPersonAccountOwner,
   resolveBindingOwner,
   validateBindingOwner,
 } from './service-binding-owner.js';
@@ -94,5 +97,16 @@ describe('isBindingVisibleTo', () => {
   });
   it('operator connections are never on day-to-day surfaces', () => {
     expect(isBindingVisibleTo({ owner_kind: 'operator' }, { tenantSlugs: 'all' })).toBe(false);
+  });
+});
+
+describe('ACCOUNT_OWNER_KINDS', () => {
+  it('is exactly the non-operator subset of BindingOwnerKind', () => {
+    expect([...ACCOUNT_OWNER_KINDS].sort()).toEqual(['organization', 'person']);
+    expect(ACCOUNT_OWNER_KINDS).not.toContain('operator');
+    expect(isAccountOwnerKind('operator')).toBe(false);
+    expect(isAccountOwnerKind('person')).toBe(true);
+    expect(isPersonAccountOwner('person')).toBe(true);
+    expect(isPersonAccountOwner('organization')).toBe(false);
   });
 });
