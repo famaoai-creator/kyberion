@@ -628,6 +628,24 @@ describe('external operation common admission', () => {
     expect(() => admitExternalOperation(operation())).toThrow('tripwire stopped');
   });
 
+  it('requests a human decision for a delegation miss and never converts a stop into a request', () => {
+    const input = operation();
+    input.authority = { ...input.authority!, hasHuman: true };
+    vi.mocked(runCharterGate).mockReturnValue({
+      kind: 'require_approval',
+      reason: 'external operation target not delegated',
+    });
+    expect(() => admitExternalOperation(input)).toThrow(ExternalOperationApprovalRequired);
+    expect(createApprovalRequest).toHaveBeenCalledOnce();
+    expect(reserveExternalOperation).not.toHaveBeenCalled();
+
+    vi.mocked(createApprovalRequest).mockClear();
+    vi.mocked(runCharterGate).mockReturnValue({ kind: 'stop', message: 'tripwire stopped' });
+    expect(() => admitExternalOperation(input)).toThrow('tripwire stopped');
+    expect(createApprovalRequest).not.toHaveBeenCalled();
+    expect(reserveExternalOperation).not.toHaveBeenCalled();
+  });
+
   it('rejects tenant mismatch before invoking the gate', () => {
     const input = operation();
     input.authority = { ...input.authority!, tenantSlug: 'other' };
@@ -751,7 +769,7 @@ describe('external operation common admission', () => {
   });
 
   it('records only hashed evidence and does not throw after telemetry failure', () => {
-    const input = operation({ requiresApproval: false });
+    const input = operation({ operationId: 'vcs:github:read', requiresApproval: false });
     admitExternalOperation(input);
     recordExternalOperationOutcome(input, 'unknown');
     expect(auditChain.record).toHaveBeenCalledWith(
@@ -883,6 +901,57 @@ describe('external operation common admission', () => {
       )
     ).toThrow('EXTERNAL_SCOPE_MISMATCH');
     expect(runCharterGate).not.toHaveBeenCalled();
+  });
+
+  it('rejects a cross-tenant read with only a boundary tenant binding', () => {
+    vi.mocked(currentScopeEnvelope).mockReturnValue({
+      identity: { tenant_slug: 'other' },
+      policy: { external_egress: 'allow' },
+    } as never);
+    const execute = vi.fn();
+    expect(() =>
+      runExternalOperationSync(
+        operation({
+          operationId: 'vcs:github:read',
+          tenantSlug: 'acme',
+          authority: undefined,
+          requiresApproval: false,
+        }),
+        execute,
+        () => 'succeeded'
+      )
+    ).toThrow('EXTERNAL_SCOPE_MISMATCH');
+    expect(execute).not.toHaveBeenCalled();
+    expect(createApprovalRequest).not.toHaveBeenCalled();
+  });
+
+  it('rechecks the active tenant immediately before committing an admitted read', () => {
+    const input = operation({
+      operationId: 'vcs:github:read',
+      tenantSlug: 'acme',
+      authority: undefined,
+      requiresApproval: false,
+    });
+    expect(admitExternalOperation(input).allowed).toBe(true);
+    vi.mocked(currentScopeEnvelope).mockReturnValue({
+      identity: { tenant_slug: 'other' },
+      policy: { external_egress: 'allow' },
+    } as never);
+    expect(() => assertExternalOperationCommit(input)).toThrow('EXTERNAL_SCOPE_MISMATCH');
+  });
+
+  it('stops registry mutations classified as reads before any execution or approval request', () => {
+    const execute = vi.fn();
+    expect(() =>
+      runExternalOperationSync(
+        operation({ operationId: 'vcs:pr_create', requiresApproval: false }),
+        execute,
+        () => 'succeeded'
+      )
+    ).toThrow('EXTERNAL_APPROVAL_CLASSIFICATION_MISMATCH');
+    expect(execute).not.toHaveBeenCalled();
+    expect(createApprovalRequest).not.toHaveBeenCalled();
+    expect(reserveExternalOperation).not.toHaveBeenCalled();
   });
 
   it('fails closed before execution if durable reservation or start evidence fails', () => {
@@ -1039,7 +1108,7 @@ describe('external operation common admission', () => {
     await withExternalOperationApprovalObserver(observer, () =>
       expect(
         runExternalOperation(
-          operation({ requiresApproval: false }),
+          operation({ operationId: 'vcs:github:read', requiresApproval: false }),
           async () => {
             throw failure;
           },

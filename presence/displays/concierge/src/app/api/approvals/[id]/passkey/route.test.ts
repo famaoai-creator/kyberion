@@ -118,6 +118,33 @@ describe('concierge approval passkey route (HA-07)', () => {
     );
   });
 
+  it.each(['options', 'verify'])(
+    'returns 403 before passkey %s for a non-Owner Grant decider',
+    async (action) => {
+      mocks.loadApprovalRequest.mockReturnValue({
+        id: 'req-1',
+        storageChannel: 'grant-standing',
+        scope: { tier: 'confidential', tenant_slug: 'acme' },
+        workflow: { requiredRoles: ['owner'] },
+        accountability: { effectBinding: 'grant-standing:credential.use:acme' },
+      });
+      mocks.member.mockReturnValue({
+        memberId: 'carol',
+        decidedBy: 'user:carol',
+        role: 'approver',
+      });
+      const response = await POST(request({ action, decision: 'approved' }), params);
+      expect(response.status).toBe(403);
+      expect(await response.json()).toMatchObject({
+        ok: false,
+        code: 'APPROVAL_TENANT_OWNER_REQUIRED',
+      });
+      expect(mocks.createApprovalPasskeyOptions).not.toHaveBeenCalled();
+      expect(mocks.verifyApprovalPasskeyAssertion).not.toHaveBeenCalled();
+      expect(mocks.decideApprovalRequest).not.toHaveBeenCalled();
+    }
+  );
+
   it('requires the digest the card showed and refuses a stale one', async () => {
     const missing = await POST(request({ action: 'options', decision: 'approved' }), params);
     expect(missing.status).toBe(400);

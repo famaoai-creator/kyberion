@@ -4,6 +4,7 @@ import { scopedLearningApprovalVisibleToViewer } from '../../../../lib/scoped-le
 import { accountIntroductionApprovalMember } from '../../../../lib/account-introduction-server';
 import { onboardingApprovalMember } from '../../../../lib/onboarding-authority-server';
 import {
+  conciergeTenantOwnerApprovalDenied,
   loadConciergeApproval,
   withConciergeApproval,
 } from '../../../../lib/personal-approval-server';
@@ -13,6 +14,12 @@ import {
   surfaceDecisionAuthMethod,
   surfaceDecisionBinding,
 } from '@agent/core/governance/approval-store';
+import {
+  applyApprovalPrimaryAction,
+  ApprovalPrimaryActionUnavailable,
+  isApprovalPrimaryAction,
+  primaryActionToStoreDecision,
+} from '@agent/core/surface/approval-primary-actions';
 import { requireConciergeMutationAccess } from '../../../../lib/api-guard';
 import { conciergeText, resolveConciergeLocale } from '../../../../lib/i18n';
 import { readRequestObject } from '../../../../lib/request-input';
@@ -40,12 +47,27 @@ async function handlePost(req: NextRequest, context: { params: Promise<{ id: str
       'storageChannel',
       'reason',
       'presentedDigest',
+      'primaryAction',
     ]);
     if (!parsedBody.ok)
       return NextResponse.json({ ok: false, error: parsedBody.error }, { status: 400 });
     const { body } = parsedBody;
-    const decision =
+    // PiBot PB-01: Deny / Allow once / Always — still settles through binary store.
+    const primaryAction = isApprovalPrimaryAction(body?.primaryAction) ? body.primaryAction : null;
+    const explicitDecision =
       body?.decision === 'approved' || body?.decision === 'rejected' ? body.decision : null;
+    const actionDecision = primaryAction ? primaryActionToStoreDecision(primaryAction) : null;
+    if (
+      (body?.primaryAction !== undefined && !primaryAction) ||
+      (body?.decision !== undefined && !explicitDecision) ||
+      (explicitDecision && actionDecision && explicitDecision !== actionDecision)
+    ) {
+      return NextResponse.json(
+        { ok: false, error: 'Invalid or conflicting approval decision and primary action' },
+        { status: 400 }
+      );
+    }
+    const decision = explicitDecision ?? actionDecision;
     const channel = typeof body?.channel === 'string' && body.channel ? body.channel : 'chronos';
     const storageChannel =
       typeof body?.storageChannel === 'string' && body.storageChannel
@@ -107,29 +129,59 @@ async function handlePost(req: NextRequest, context: { params: Promise<{ id: str
     if (decisionDenied) return decisionDenied;
     const decidedBy =
       onboardingMember ?? resolveConciergeDecidedBy(resolved.context, resourceTenant);
-    const updated = withConciergeApproval(resolved.context, record, () =>
-      decideApprovalRequest('sovereign_concierge', {
+    // PR #1563 Owner gate runs before settle — including PiBot primaryAction.
+    const ownerDenied = conciergeTenantOwnerApprovalDenied(record, decidedBy?.role);
+    if (ownerDenied) return ownerDenied;
+    const note =
+      typeof body?.reason === 'string' && body.reason.trim()
+        ? body.reason.trim()
+        : 'Decision captured from the concierge (秘書室) approval queue.';
+    const decidedByRole = decidedBy?.role ?? 'sovereign';
+    const updated = withConciergeApproval(resolved.context, record, () => {
+      if (primaryAction) {
+        return applyApprovalPrimaryAction({
+          role: 'sovereign_concierge',
+          record,
+          action: primaryAction,
+          decidedBy: decidedBy?.id ?? 'concierge',
+          decidedByRole,
+          authMethod: surfaceDecisionAuthMethod(resolved.context.principal, Boolean(decidedBy)),
+          deciderPrincipal: resolved.context.principal,
+          presentedDigest:
+            typeof body?.presentedDigest === 'string' ? body.presentedDigest : undefined,
+          note,
+        });
+      }
+      return decideApprovalRequest('sovereign_concierge', {
         channel,
         storageChannel,
         requestId: id,
         decision,
         decidedBy: decidedBy?.id ?? 'concierge',
-        decidedByRole: decidedBy?.role ?? 'sovereign',
+        decidedByRole,
         authMethod: surfaceDecisionAuthMethod(resolved.context.principal, Boolean(decidedBy)),
         decidedByType: 'human',
         authenticated: true,
         deciderPrincipal: resolved.context.principal,
         ...surfaceDecisionBinding(record, body?.presentedDigest),
-        note:
-          typeof body?.reason === 'string' && body.reason.trim()
-            ? body.reason.trim()
-            : 'Decision captured from the concierge (秘書室) approval queue.',
-      })
-    );
+        note,
+      });
+    });
     if (!updated)
       return NextResponse.json({ ok: false, error: 'approval request not found' }, { status: 404 });
     return NextResponse.json({ ok: true, approval: updated });
   } catch (error) {
+    if (error instanceof ApprovalPrimaryActionUnavailable) {
+      return NextResponse.json(
+        {
+          ok: false,
+          code: 'APPROVAL_PRIMARY_ACTION_UNAVAILABLE',
+          error:
+            'This request does not support the selected approval action. Review the available actions and try again.',
+        },
+        { status: 403 }
+      );
+    }
     return conciergeErrorResponse(error, 500);
   }
 }

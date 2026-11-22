@@ -64,6 +64,37 @@ allowlisted = `public`, anything else = `external`), takes the tenant from the
 mission, and hashes the content actually sent (`egressPayloadHash`). A tainted
 mission whose destination is undeclared is denied.
 
+In enforcement mode, an artifact disclosure exception binds the mission,
+payload hash, audience, tenant and canonical HTTP(S) destination, including
+the endpoint path and query. A historical exception without a destination
+requires new approval. An explicit envelope egress denial applies before
+rollout and before any disclosure exception.
+
+Service introductions use the same read/write classification as service
+admission. Direct API operations use their dispatch URL and GitHub repository
+presets resolve the repository from the execution arguments and preset route.
+Enforced mode refuses an unresolved resource or a conflicting resource
+reference. A task binding comes from the active envelope.
+
+### 外部操作1件の認可
+
+| 確認すること               | 判定に使う情報                                                                                                                                                                                                   |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 所属と対象を確定する       | 実行主体（Member / NHI）の信頼済みコンテキストから Tenant・Project などを確定し、操作の実引数から外部リソースを特定する。                                                                                        |
+| 操作と情報の扱いを確認する | 操作の権限、サービス側の資格情報、Tier・開示先・委任時の Scope Envelope をそれぞれ確認する。Scope Envelope の外部送信禁止や有効な停止条件はここで操作を止める。                                                  |
+| 個別承認を省けるか確認する | ポリシーが委任を認め、有効な Accountability Charter が対象と操作に一致し、必要な証跡と上限の条件を満たせば、責任者に帰属させて実行できる。                                                                       |
+| 個別承認へ進むか決める     | Charter による委任が成立しなくても、操作のポリシーと呼び出し経路が個別承認を認める場合は、確定した操作内容の承認に進む。停止条件に該当する場合や、必要な人間の判断を取得できない場合は実行を保留または拒否する。 |
+
+たとえば GitHub の Draft PR なら、`vcs:pr_create` と対象リポジトリを確認する。
+Charter の `external_operations` は事前委任する対象の指定であり、主体に
+操作権限を付与する Grant とは責務が異なる。コード上の型名は
+`CharterExternalOperationTarget`（互換名 `ExternalOperationGrant`）。
+実行境界は読み取り時にも、操作に結び付いたテナントと実行中のスコープを
+照合する。登録済みの書き込みが読み取りとして渡された場合は、個別承認を
+発行する前に構成エラーとして停止する。会議からの退出など、承認を待たずに
+実行すべき後処理はコード側の認可レジストリに明示する。
+個別承認を使う場合、PR 公開の証跡はリポジトリ、参照、コミット、本文に結び付く。
+
 **Exactly-once apply.** An approved held effect is executed by the one process
 that wins `applyClaim` under the journal lock. A claim with no recorded outcome
 is never retried; an authenticated human releases it with

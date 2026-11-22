@@ -44,6 +44,9 @@ import {
   decideApprovalRequest,
   isSeparationOfDutiesEnabled,
   listApprovalRequests,
+  requiresTenantOwnerApproval,
+  tenantOwnerApprovalDenied,
+  TENANT_OWNER_APPROVAL_REQUIRED,
   type ApprovalRequestRecord,
 } from '@agent/core/governance/approval-store';
 import { providerHarnessInProcessLineage } from '@agent/core/agent-execution-context';
@@ -271,7 +274,12 @@ export async function decideApprovalFromCli(
   }
 ): Promise<ApprovalRequestRecord> {
   const humanOnly = request.accountability?.finalDecision === 'human_only';
-  const decider = resolveCliApprovalDecider({ ...params, humanOnly });
+  const ownerRequired = requiresTenantOwnerApproval(request);
+  const tenantSlug = ownerRequired ? request.scope?.tenant_slug : undefined;
+  const decider = resolveCliApprovalDecider({ ...params, humanOnly, tenantSlug });
+  if (tenantOwnerApprovalDenied(request, decider.tenantRole)) {
+    throw new Error(`[POLICY_VIOLATION] ${TENANT_OWNER_APPROVAL_REQUIRED.message}`);
+  }
   const challenged = humanOnly || (params.decision === 'approved' && isSeparationOfDutiesEnabled());
   const terminal = challenged ? resolveCliTtyChallengeTerminal() : undefined;
   let evidence: CliTerminalEvidence | undefined;
@@ -301,7 +309,7 @@ export async function decideApprovalFromCli(
       ? { decidedInAgentSession: decider.decidedInAgentSession }
       : {}),
     ...(challenged ? { decidedVia: 'cli_tty_challenge' as const } : {}),
-    decidedByRole: 'sovereign',
+    decidedByRole: ownerRequired ? 'owner' : 'sovereign',
     authMethod: humanOnly ? 'terminal_attested' : 'manual',
     decidedByType: 'human',
     authenticated: true,

@@ -870,6 +870,30 @@ function annotateApprovalRejectionReasonUnlocked(
   return updated;
 }
 
+export function requiresTenantOwnerApproval(record: ApprovalRequestRecord): boolean {
+  const tenant = record.scope?.tenant_slug;
+  if (!tenant) return false;
+  const binding = `grant-standing:credential.use:${tenant}`;
+  const effect = record.accountability?.effectBinding;
+  return (
+    record.storageChannel === 'grant-standing' &&
+    (effect === binding || effect?.startsWith(`${binding}:`) === true) &&
+    record.workflow?.requiredRoles.includes('owner') === true
+  );
+}
+
+export const TENANT_OWNER_APPROVAL_REQUIRED = {
+  code: 'APPROVAL_TENANT_OWNER_REQUIRED',
+  message: 'This credential Grant requires the tenant Owner decision',
+} as const;
+
+export function tenantOwnerApprovalDenied(
+  record: ApprovalRequestRecord,
+  memberRole?: string
+): boolean {
+  return requiresTenantOwnerApproval(record) && memberRole !== 'owner';
+}
+
 export function decideApprovalRequest(
   role: ApprovalStoreRole,
   params: Parameters<typeof decideApprovalRequestUnlocked>[1]
@@ -1047,6 +1071,9 @@ function decideApprovalRequestUnlocked(
     if (assuranceShortfall || cacheShortfall) cacheDescriptor = undefined;
   }
 
+  if (tenantOwnerApprovalDenied(record, params.decidedByRole)) {
+    throw new Error(`[POLICY_VIOLATION] ${TENANT_OWNER_APPROVAL_REQUIRED.message}`);
+  }
   const decidedAt = nowIso();
   const workflow = record.workflow
     ? {

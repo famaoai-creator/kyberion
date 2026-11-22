@@ -320,12 +320,12 @@ describe('service-actuator handleAction', () => {
         service_id: 'github',
         mode: 'PRESET',
         action: 'create_issue',
-        params: { title: 'blocked' },
+        params: { owner: 'famaoai', repo: 'kyberion', title: 'blocked' },
         context: {
           mission_id: 'mission-introduction-test',
           resource_ref: 'repo:famaoai/kyberion',
           introduction_mode: 'enforce',
-          resource_scope: 'write',
+          resource_scope: 'read',
           security_scope: {
             tenant_id: 'tenant-a',
             mission_id: 'mission-introduction-test',
@@ -336,6 +336,9 @@ describe('service-actuator handleAction', () => {
         },
       })
     ).rejects.toThrow('Resource introduction required');
+    expect(mocks.controlPlane.enforceIntroduction).toHaveBeenCalledWith(
+      expect.objectContaining({ resourceRef: 'repo:famaoai/kyberion', scope: 'write' })
+    );
     expect(mocks.executeServicePreset).not.toHaveBeenCalled();
   });
 

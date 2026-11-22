@@ -44,6 +44,8 @@ verb → task binding. Empty axis-local ids never match a declaration.
 - `delegable` — DelegationSpec; serializes as `requires_lineage` in the policy
   document (`authorization-policy-document.ts`).
 - `actionClass`, `detail` — carried through serialization unchanged.
+- `approvalExemptCleanup` — code-reviewed cleanup such as leaving a meeting
+  remains available without an approval request and still enters external admission.
 
 ## Invariants
 
@@ -55,6 +57,12 @@ verb → task binding. Empty axis-local ids never match a declaration.
 - **Boundary ops must be code-declared**: a source-scanning gate requires
   every `operationId` at external-admission call sites to resolve with
   `source === 'code'` — declarations ship in the same PR as the code.
+- **External admission checks the approval classification**: a code-declared
+  external mutation requires an approval-capable path unless declared as
+  cleanup. An explicit approval policy also requires that path. Dynamic
+  service operations still derive their effect from the reviewed service
+  descriptor and credential policy. The HTTP actuator gives GET/HEAD a
+  separate read operation id and keeps the existing mutation id for other methods.
 - **exact > prefix** across all data sources regardless of order; longest
   prefix wins; ties go to the earlier source.
 - **Provenance**: resolutions carry `source: code | overlay | plugin:<id>`.

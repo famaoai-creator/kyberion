@@ -160,10 +160,15 @@ export function introductionResult(
   const mode = stageMode('introduction', opFamily(call.op));
   if (mode === 'off') return;
   const resourceRef = typeof input._resource_ref === 'string' ? input._resource_ref : undefined;
-  if (!resourceRef) return;
   const identity = stageIdentity(call);
   if (!identity.missionId) {
     noteStage('introduction', 'skipped');
+    return;
+  }
+  if (!resourceRef) {
+    noteStage('introduction', 'denied');
+    if (mode === 'enforce')
+      throw new Error('[POLICY_VIOLATION] Cannot resolve the operation resource for introduction');
     return;
   }
   const service =
@@ -241,6 +246,13 @@ export function provenanceEgressResult(
   input: Record<string, unknown>
 ): OpPreflightListenerResult | void {
   if (input._effect !== 'egress') return;
+  if (currentScopeEnvelope()?.policy.external_egress === 'deny') {
+    return {
+      decision: 'block',
+      reason: '[OP_EGRESS_DENIED] Scope envelope prohibits external egress',
+      terminate: true,
+    };
+  }
   const mode = stageMode('egress', opFamily(call.op));
   if (mode === 'off') return;
   const identity = stageIdentity(call);
@@ -259,12 +271,14 @@ export function provenanceEgressResult(
     : undefined;
   const controlPlane = sharedControlPlane();
   if (
+    destination &&
     targetAudience &&
     controlPlane.isDeclassified(
       identity.missionId,
       egressPayloadHash(input),
       targetAudience,
-      targetTenant
+      targetTenant,
+      destination
     )
   ) {
     return;

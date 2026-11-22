@@ -10,7 +10,8 @@ import { assertSafeRepositoryPath, safeExistsSync } from '../secure-io.js';
 export function buildReviewCloseOutStep(
   review: { missionId: string; reviewTaskId: string; reviewerAgentId: string },
   task: { deliverable?: unknown },
-  missionPath: string
+  missionPath: string,
+  tenantSlug?: string
 ): string {
   const missionId = review.missionId.toUpperCase();
   const deliverable = typeof task.deliverable === 'string' ? task.deliverable : '';
@@ -25,6 +26,8 @@ export function buildReviewCloseOutStep(
   return (
     `Write ${deliverable || '<REVIEW deliverable>'} with the review verdict` +
     (missing ? ' (missing)' : '') +
-    `, then close the task: pnpm mission record-evidence ${missionId} ${review.reviewTaskId} "<note>" --actor-id ${review.reviewerAgentId}.`
+    `, then close the task: pnpm mission record-evidence ${missionId} ${review.reviewTaskId} "<note>" --actor-id ${review.reviewerAgentId}` +
+    (tenantSlug ? ` --tenant-slug ${tenantSlug}` : '') +
+    '.'
   );
 }

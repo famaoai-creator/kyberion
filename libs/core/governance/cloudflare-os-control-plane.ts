@@ -34,6 +34,7 @@ import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import {
   applyControlPlaneJournalEvent,
   foldPersistedState,
+  canonicalDeclassificationDestination,
   declassificationKeyOf,
   deserializeGadgetOperation,
   gadgetSchemaToJsonSchema,
@@ -781,6 +782,7 @@ export class CloudflareOsControlPlane {
   requestDeclassify(
     input: Omit<DeclassificationGrant, 'id' | 'grantedAt' | 'grantedBy'> & {
       requestedBy: string;
+      targetDestination: string;
     }
   ): HeldActionRecord {
     return requestDeclassifyGrant(
@@ -804,10 +806,19 @@ export class CloudflareOsControlPlane {
     missionId: string,
     payloadHash: string,
     targetAudience: string,
-    targetTenant?: string
+    targetTenant: string | undefined,
+    destination: string
   ): boolean {
+    const targetDestination = canonicalDeclassificationDestination(destination);
+    if (!targetDestination) return false;
     return this.declassifications.has(
-      declassificationKeyOf({ missionId, payloadHash, targetAudience, targetTenant })
+      declassificationKeyOf({
+        missionId,
+        payloadHash,
+        targetAudience,
+        targetTenant,
+        targetDestination,
+      })
     );
   }
 

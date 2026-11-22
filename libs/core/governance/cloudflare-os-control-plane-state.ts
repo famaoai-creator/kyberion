@@ -711,19 +711,39 @@ export interface DeclassificationGrant {
   payloadHash: string;
   targetAudience: string;
   targetTenant?: string;
+  /** Missing only in historical journal entries. */
+  targetDestination?: string;
   grantedBy: string;
   grantedAt: string;
+}
+
+export function canonicalDeclassificationDestination(value: string): string | undefined {
+  if (typeof value !== 'string' || !value.trim()) return undefined;
+  try {
+    const url = new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(value) ? value : `https://${value}`);
+    if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password || url.hash)
+      return undefined;
+    return url.href;
+  } catch {
+    return undefined;
+  }
 }
 
 export function declassificationKeyOf(
   grant: Pick<
     DeclassificationGrant,
-    'missionId' | 'payloadHash' | 'targetAudience' | 'targetTenant'
+    'missionId' | 'payloadHash' | 'targetAudience' | 'targetTenant' | 'targetDestination'
   >
 ): string {
   // The mission is part of the key: two missions granting the same artifact
   // to the same audience must not overwrite each other's grant.
-  return `${grant.missionId}|${grant.payloadHash}|${grant.targetAudience}|${grant.targetTenant ?? ''}`;
+  return JSON.stringify([
+    grant.missionId,
+    grant.payloadHash,
+    grant.targetAudience,
+    grant.targetTenant,
+    grant.targetDestination,
+  ]);
 }
 
 export interface ControlPlaneJournalCollections {

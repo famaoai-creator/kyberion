@@ -153,6 +153,18 @@ When the question is "what may be done with this information asset", use the **i
 
 A standing grant that itself needs human approval references the approval as its basis (`basis.approval_request_id`).
 
+An authenticated human approves an external-I/O standing Grant. Kyberion consumes that decision once and records the human as grantor. The local Owner member can directly issue eligible standing Grants for capabilities without external I/O. Mission dispatch issues task-scoped Grants to the assigned NHI within the task's authority and lifetime. See the [operator checklist](./OPERATOR_UX_GUIDE.md#authorization-and-disclosure-checks).
+
+Same-tenant `credential.use` Grant approvals require the tenant Owner on both the terminal and Concierge (`APPROVAL_TENANT_OWNER_REQUIRED`). One stored approval is the continuity point; the CLI resumes Grant issuance from that decision.
+
+### Policy Category
+
+**(advanced)** The kind of effect an actuator operation may attempt; evaluated to allow, ask, or deny with a stable reason code before Grant and approval-store decisions. Also actuator policy category. Orthogonal to [Grant](#grant) (who may act in which scope) and to approval assurance (how strongly a human was verified). Ask always binds an approval-store request. → [pibot-absorption-model](../knowledge/product/architecture/pibot-absorption-model.md)
+
+### Workflow Disposition
+
+**(advanced)** The fixed human choice on a blocked child WorkItem after acceptance or execution failure: retry, skip, reassign, or accept. Also blocked-step disposition. Surfaces may render the four actions; the durable decision is not UI-only state. Not a [Grant](#grant) and not a [RoutingDecision](#routingdecision). → [pibot-absorption-model](../knowledge/product/architecture/pibot-absorption-model.md)
+
 ### Execution definitions
 
 | Term              | Meaning                                                                                                                                                                                                                       |
@@ -674,7 +686,7 @@ An always-on resident agent holding a standing responsibility across sessions, d
 
 ### Accountability Charter
 
-A tenant-scoped standing declaration of the accountable human, authority envelope (spend limits, deputies, validity) and loss appetite (`libs/core/governance/accountability-charter*.ts`). Inside an active charter the approval gate lets an action run without a per-action approval, audited against the responsible human; outside it a human decides, and hardened policies are never delegable. Owners sign it in Concierge Settings › Organization and members; `approval_inbox charter` reports what ran under it. Distinct from a dot charter and from the Charter (`AGENTS.md`).
+A tenant-scoped standing declaration of the accountable human, authority envelope (spend limits, deputies, validity) and loss appetite (`libs/core/governance/accountability-charter*.ts`). The charter bounds delegation of existing authority. An eligible action within an active charter may run with accountable-human attribution and no per-action approval. A delegation miss can fall back to individual approval when the policy and execution boundary allow it. A hard stop blocks execution. See the [external-operation decision table](../knowledge/product/architecture/scope-governance-plane.md#外部操作1件の認可). Owners sign it in Concierge Settings › Organization and members; `approval_inbox charter` reports what ran under it. Distinct from a dot charter and from the Charter (`AGENTS.md`).
 
 ### Scope Envelope
 

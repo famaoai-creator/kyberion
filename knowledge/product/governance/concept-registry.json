@@ -636,6 +636,43 @@
         "presence/displays/concierge/src/lib/viewer-context.ts"
       ],
       "not_to_confuse_with": ["member-role", "authority-role", "entity-scope"]
-    }
+    },
+  {
+    "id": "policy-category",
+    "term": "Policy Category",
+    "aliases": [
+      "actuator policy category"
+    ],
+    "category": "governance",
+    "definition": "The kind of effect an actuator operation may attempt; evaluated to allow, ask, or deny with a stable reason code before Grant and approval-store decisions.",
+    "glossary_anchor": "policy-category",
+    "canonical_doc": "knowledge/product/architecture/pibot-absorption-model.md",
+    "owner_modules": [
+      "knowledge/product/architecture/pibot-absorption-model.md"
+    ],
+    "not_to_confuse_with": [
+      "grant",
+      "routing-decision"
+    ]
+  },
+  {
+    "id": "workflow-disposition",
+    "term": "Workflow Disposition",
+    "aliases": [
+      "blocked-step disposition"
+    ],
+    "category": "governance",
+    "definition": "The fixed human choice on a blocked child WorkItem after acceptance or execution failure: retry, skip, reassign, or accept.",
+    "glossary_anchor": "workflow-disposition",
+    "canonical_doc": "knowledge/product/architecture/pibot-absorption-model.md",
+    "owner_modules": [
+      "knowledge/product/architecture/pibot-absorption-model.md"
+    ],
+    "not_to_confuse_with": [
+      "grant",
+      "work-item",
+      "routing-decision"
+    ]
+  }
   ]
 }

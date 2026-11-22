@@ -868,6 +868,25 @@ Use `pnpm kyberion scheduler reconcile` to inspect resident-service registration
 for the current checkout. Review the enabled schedule definitions before applying
 the plan, because registering the scheduler enables their configured execution.
 
+### Authorization and disclosure checks
+
+Before executing governed work or issuing a standing Grant, check each applicable boundary.
+
+| Check             | What to verify                                                                                                                                                                                                                                                                                                      |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Target resource   | In enforced service introductions, direct API actions use the dispatch URL and supported GitHub presets use `repo:<owner>/<repo>`. An unresolved or conflicting target blocks execution.                                                                                                                            |
+| Allowed operation | Confirm that the capability and the resource's read/write permission cover the operation. Service introductions use the operation's own classification. A caller-supplied `resource_scope` cannot lower it.                                                                                                         |
+| Credential use    | Check the active tenant or personal owner and the task's service credential binding. Resource access and data disclosure have their own checks.                                                                                                                                                                     |
+| Data recipient    | Review the content and exact HTTP(S) endpoint when approving a disclosure exception. Changing the endpoint requires an exception for that endpoint. Older exceptions without an endpoint require fresh approval. A Scope Envelope that denies external egress blocks the operation before exceptions are evaluated. |
+
+An external-I/O standing Grant requires a human decision on the grant terms. A Charter can cover an eligible operation within existing authority. When an operation requires individual approval, review the exact action and target.
+
+For an existing tenant-owned reasoning credential used by that same tenant, Codex can run `kyberion reasoning credentials assign` and give the Owner the approval ID. The Owner can decide in Concierge → Needs you → Approvals or run `pnpm kyberion approvals --approve <id>` from their own interactive terminal in the request scope. Both routes update the same request. After that human decision, Codex runs the same assignment again to consume the matching approval and issue the Grant. This flow uses the registered credential reference. Registering or replacing the credential value follows the credential custody workflow.
+
+Common introduction and provenance checks still default to warning mode. Confirm the effective mode for the operation before relying on a block. See the [scope governance design](../knowledge/product/architecture/scope-governance-plane.md).
+
+Concierge returns HTTP `403` with `APPROVAL_TENANT_OWNER_REQUIRED` when the signed-in member lacks the tenant Owner role for a credential Grant. The request stays pending for the Owner.
+
 ## 9. The Smallest Teaching Version
 
 If you have to explain Kyberion quickly, explain it like this:

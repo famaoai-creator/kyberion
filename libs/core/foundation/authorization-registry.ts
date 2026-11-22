@@ -67,6 +67,8 @@ export interface DelegationSpec {
 
 export interface OperationAuthorization {
   readonly effectClass: EffectClass;
+  /** Reviewed cleanup that must remain available without acquiring approval. */
+  readonly approvalExemptCleanup?: true;
   readonly authority: AuthorityRequirement;
   readonly delegable?: DelegationSpec;
   /** Optional charter decision-vocabulary class (payment, sign_contract, …)
@@ -101,6 +103,8 @@ const MEETING_SESSION_DELEGATION: DelegationSpec = {
 
 /** Exact-match declarations. */
 const OPERATIONS: Readonly<Record<string, RegistryEntry>> = {
+  'media:image-local:render': { effectClass: 'local_only', authority: { kind: 'free' } },
+  'media:image-local:collect': { effectClass: 'local_only', authority: { kind: 'free' } },
   // Information asset metadata surfaces retain owner/viewer/scope checks in their detail layers.
   'information-asset:catalog:read': { effectClass: 'local_only', authority: { kind: 'free' } },
   'information-asset:coverage:read': { effectClass: 'local_only', authority: { kind: 'free' } },
@@ -244,14 +248,15 @@ const OPERATIONS: Readonly<Record<string, RegistryEntry>> = {
   'meeting:leave': {
     effectClass: 'external_mutation',
     authority: { kind: 'admission', boundary: 'external' },
+    approvalExemptCleanup: true,
   },
   'meeting:status': {
-    effectClass: 'external_mutation',
+    effectClass: 'external_read',
     authority: { kind: 'admission', boundary: 'external' },
   },
   'meeting:check_consent': {
-    effectClass: 'external_mutation',
-    authority: { kind: 'admission', boundary: 'external' },
+    effectClass: 'local_only',
+    authority: { kind: 'free' },
   },
   // --- Email ops with reviewed protected paths (narrower than the email: prefix union) ---
   'email:send': {
@@ -360,6 +365,11 @@ const OPERATIONS: Readonly<Record<string, RegistryEntry>> = {
       optionalFields: ['method', 'origin'],
       reputational_class: 'A',
     },
+    protectedPaths: [['params', 'url']],
+  },
+  'network:fetch_read': {
+    effectClass: 'external_read',
+    authority: { kind: 'admission', boundary: 'external' },
     protectedPaths: [['params', 'url']],
   },
   'network:exposure_check': {
@@ -498,7 +508,7 @@ const OPERATION_PREFIXES: Readonly<Record<string, RegistryEntry>> = {
     effectClass: 'external_mutation',
     authority: { kind: 'admission', boundary: 'external' },
   },
-  // media:image:${provider.id}:generate — paid external generation.
+  // media:image:${provider.id}:generate — external generation.
   'media:image:': {
     effectClass: 'external_mutation',
     authority: { kind: 'admission', boundary: 'external' },
@@ -585,6 +595,20 @@ export function operationAuthorization(operationId: string): OperationAuthorizat
   const overlaid = lookupOverlay(operationId);
   if (overlaid) return { ...overlaid.entry, declared: true, source: overlaid.source };
   return { ...FAILSAFE_UNDECLARED, declared: false, source: 'code' };
+}
+
+export function requiresApprovalAdmission(authorization: OperationAuthorization): boolean {
+  switch (authorization.authority.kind) {
+    case 'approval':
+      return true;
+    default:
+      return (
+        authorization.declared &&
+        authorization.source === 'code' &&
+        authorization.effectClass === 'external_mutation' &&
+        !authorization.approvalExemptCleanup
+      );
+  }
 }
 
 /** The code-owned declaration key space. Overlay loaders use this to reject

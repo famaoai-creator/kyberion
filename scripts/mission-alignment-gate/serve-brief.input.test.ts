@@ -101,6 +101,7 @@ describe('mission brief decider identity (separation of duties)', () => {
 
     it('with SoD off, records a decision made by a server in an agent session as caller_supplied', () => {
       fixture.owner = true;
+      separationOfDuties(false);
       expect(resolveBriefDecider({ decision: 'approved' }, { CLAUDECODE: '1' })).toEqual({
         decidedBy: 'user:owner',
         deciderIdentitySource: 'caller_supplied',

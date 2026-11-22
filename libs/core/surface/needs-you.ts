@@ -58,8 +58,22 @@ export type NeedsYouReason = (typeof NEEDS_YOU_REASONS)[number];
 
 /** The actions a card may offer; each item lists only those that apply. */
 /** `mark_handled` closes a customer-decision hand-off the operator has dealt with. */
+/** PB-01: `deny` / `allow_once` / `allow_always` are the Concierge primary set. */
+/** PB-03: `retry` / `skip` / `reassign` / `accept` are workflow disposition. */
 export type NeedsYouAction =
-  'approve' | 'reject' | 'request_changes' | 'mark_handled' | 'later' | 'open';
+  | 'approve'
+  | 'reject'
+  | 'request_changes'
+  | 'mark_handled'
+  | 'later'
+  | 'open'
+  | 'deny'
+  | 'allow_once'
+  | 'allow_always'
+  | 'retry'
+  | 'skip'
+  | 'reassign'
+  | 'accept';
 
 /** An item without a deadline becomes overdue after waiting this long. */
 export const NEEDS_YOU_OVERDUE_AFTER_MS = 3 * 24 * 60 * 60 * 1000;
@@ -224,7 +238,7 @@ function fromApproval(item: CeoApprovalItem, now: number): NeedsYouItem {
     ...(item.requested_at ? { waiting_since: item.requested_at } : {}),
     ...(deadline ? { deadline } : {}),
     overdue: isOverdue(deadline, item.requested_at, now),
-    actions: ['approve', 'reject', 'later'],
+    actions: ['deny', 'allow_once', 'later'],
     group_size: 1,
     approval: item,
   };
@@ -308,8 +322,10 @@ function fromFailure(item: NeedsYouFailureInput, now: number): NeedsYouItem {
     requester: AGENT,
     ...(item.tenant_slug ? { tenant_slug: item.tenant_slug } : {}),
     ...(item.owner_nhi ? { owner_nhi: item.owner_nhi } : {}),
+    ...(item.mission_id ? { mission_id: item.mission_id } : {}),
     ...(item.created_at ? { waiting_since: item.created_at } : {}),
     overdue: isOverdue(undefined, item.created_at, now),
+    // A notification alone cannot attest the current WorkItem state or who can change it.
     actions: ['later'],
     group_size: 1,
     failure: item,

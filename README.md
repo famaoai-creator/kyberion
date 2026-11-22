@@ -74,6 +74,8 @@ New here? Read [`docs/CORE_CONCEPTS.md`](./docs/CORE_CONCEPTS.md) — the 5 conc
 
 WorkItem and Lease consolidation and the shared intent resolver are complete in the development plans. Scope, identity and Grant migration and the memory feedback loop are still in progress. See the [Concept Model v2 implementation status](./docs/developer/improvement-plans-2026-11/README.ja.md#概念モデル-v2-の移行).
 
+The [operator checklist](./docs/OPERATOR_UX_GUIDE.md#authorization-and-disclosure-checks) covers target resources, allowed operations, credential use, and disclosure recipients, including where enforcement is still staged.
+
 ---
 
 ## Quick Start

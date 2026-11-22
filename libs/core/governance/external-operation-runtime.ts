@@ -19,9 +19,8 @@ export { operationInterfaceResolver } from './operation-protection.js';
 import type { CharterScope } from './accountability-charter.js';
 import {
   EXTERNAL_OPERATION_DELEGATION,
-  buildExternalOperationTarget,
   isDelegableExternalOperation,
-  parseExternalOperationGrant,
+  resolveCharterExternalOperationTarget,
   externalOperationGrantMatches,
 } from './external-operation-target.js';
 export {
@@ -97,8 +96,7 @@ export function createOnboardingExternalOperationAuthority(options: {
         '[EXTERNAL_AGENT_IDENTITY_MISMATCH] Installed NHI differs from actual execution actor'
       );
     const effect = facts.effect as Record<string, unknown>;
-    const raw = buildExternalOperationTarget(facts.operationId, effect);
-    const target = parseExternalOperationGrant(raw);
+    const target = resolveCharterExternalOperationTarget(facts.operationId, effect);
     const charter = findActiveCharter(scope, new Date());
     if (!charter || !facts.delegable) return authority;
     const ranks = { public: 1, confidential: 2, personal: 3 } as const;

@@ -5103,6 +5103,26 @@
         "ja": "最重要",
         "qps-ploc": "⟦Ƈřïŧïƈȧŀ ŀőř⟧"
       },
+      "chronos_changes_tasks": {
+        "en": "Changes and tasks",
+        "ja": "変更とタスク",
+        "qps-ploc": "⟦Ƈħȧñɠėş ȧñḓ ŧȧşķş ŀőřėɱ⟧"
+      },
+      "chronos_this_turn": {
+        "en": "Artifacts from this turn",
+        "ja": "今回の成果物",
+        "qps-ploc": "⟦Ȧřŧïƒȧƈŧş ƒřőɱ ŧħïş ŧůřñ ŀőřėɱ ï⟧"
+      },
+      "chronos_uncommitted": {
+        "en": "Uncommitted changes",
+        "ja": "未コミットの変更",
+        "qps-ploc": "⟦Ůñƈőɱɱïŧŧėḓ ƈħȧñɠėş ŀőřėɱ ⟧"
+      },
+      "chronos_child_work": {
+        "en": "Child work items",
+        "ja": "子作業項目",
+        "qps-ploc": "⟦Ƈħïŀḓ ẇőřķ ïŧėɱş ŀőřėɱ⟧"
+      },
       "chronos_change_create": {
         "en": "Create",
         "ja": "作成",
@@ -21033,6 +21053,16 @@
         "ja": "依頼を更新できませんでした。変更はされていません。もう一度お試しください。",
         "qps-ploc": "⟦Ŧħė řėɋůėşŧ ƈőůŀḓ ñőŧ ƀė ůṗḓȧŧėḓ. Ñőŧħïñɠ ẇȧş ƈħȧñɠėḓ; ŧřẏ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
       },
+      "ia_inbox_error_failure": {
+        "en": "The disposition could not be recorded. Nothing was changed; try again.",
+        "ja": "対応を記録できませんでした。変更はされていません。もう一度お試しください。",
+        "qps-ploc": "⟦Ŧħė ḓïşṗőşïŧïőñ ƈőůŀḓ ñőŧ ƀė řėƈőřḓėḓ. Ñőŧħïñɠ ẇȧş ƈħȧñɠėḓ; ŧřẏ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "ia_inbox_error_reassign_owner": {
+        "en": "Choose who should take over before reassigning.",
+        "ja": "担当を変えるには、引き継ぐ相手を指定してください。",
+        "qps-ploc": "⟦Ƈħőőşė ẇħő şħőůŀḓ ŧȧķė őṽėř ƀėƒőřė řėȧşşïɠñïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
       "ia_shell_tabs_label": {
         "en": "Sections of this page",
         "ja": "このページの表示",
@@ -30612,6 +30642,51 @@
         "en": "Later",
         "ja": "あとで",
         "qps-ploc": "⟦Ŀȧŧėř ŀőř⟧"
+      },
+      "decide_deny": {
+        "en": "Deny",
+        "ja": "拒否",
+        "qps-ploc": "⟦Ḓėñẏ ŀőř⟧"
+      },
+      "decide_allow_once": {
+        "en": "Allow once",
+        "ja": "今回だけ許可",
+        "qps-ploc": "⟦Ȧŀŀőẇ őñƈė ŀőř⟧"
+      },
+      "decide_allow_always": {
+        "en": "Always allow ({scope})",
+        "ja": "常に許可（{scope}）",
+        "qps-ploc": "⟦Ȧŀẇȧẏş ȧŀŀőẇ ({scope}) ŀőřėɱ ï⟧"
+      },
+      "decide_allow_always_unavailable": {
+        "en": "Always allow is not available for this request",
+        "ja": "この依頼では常に許可は使えません",
+        "qps-ploc": "⟦Ȧŀẇȧẏş ȧŀŀőẇ ïş ñőŧ ȧṽȧïŀȧƀŀė ƒőř ŧħïş řėɋůėşŧ ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "decide_retry": {
+        "en": "Retry",
+        "ja": "再試行",
+        "qps-ploc": "⟦Řėŧřẏ ŀőř⟧"
+      },
+      "decide_skip": {
+        "en": "Skip",
+        "ja": "スキップ",
+        "qps-ploc": "⟦Şķïṗ ŀőř⟧"
+      },
+      "decide_reassign": {
+        "en": "Reassign",
+        "ja": "担当変更",
+        "qps-ploc": "⟦Řėȧşşïɠñ ŀőř⟧"
+      },
+      "decide_reassign_prompt": {
+        "en": "Peer id of the new owner",
+        "ja": "新しい担当のピア ID",
+        "qps-ploc": "⟦Ṗėėř ïḓ őƒ ŧħė ñėẇ őẇñėř ŀőřėɱ ï⟧"
+      },
+      "decide_accept": {
+        "en": "Accept as-is",
+        "ja": "このまま受理",
+        "qps-ploc": "⟦Ȧƈƈėṗŧ ȧş-ïş ŀőř⟧"
       },
       "decide_continue": {
         "en": "Continue",

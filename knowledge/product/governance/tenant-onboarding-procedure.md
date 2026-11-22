@@ -52,6 +52,11 @@ first-work の開始までを含む標準順序は [オンボーディング標�
 
 ## registry の保守(rename / delete)
 
+`pnpm kyberion tenant list` と `tenant show <slug>` は、専用の読み取り権限で
+テナント登録簿を参照します。テナントに束縛された実行では、そのテナントだけが
+照会対象です。対象が表示されない場合は、Mission を開始する前に、同じチェックアウト
+で `tenant show <slug>` を実行して登録とスコープを確認してください。
+
 スラッグの typo 修正や撤収は lifecycle verb ではなく保守 verb で行う(archived にも可)。
 
 ```bash

@@ -19,6 +19,7 @@ import { transitionStatus } from '@agent/core/mission/mission-status';
 import { resolveScopeResolution } from '@agent/core/scope-context';
 import { currentExecutionScope } from '@agent/core/foundation';
 import { currentScopeEnvelope } from '@agent/core/scope-envelope';
+import { resolveIdentityContext, withExecutionContextAsync } from '@agent/core/authority';
 import {
   extractMissionControllerPositionalArgs,
   extractMissionStartCreateOptionsFromArgv,
@@ -48,6 +49,82 @@ import {
 import { parseSafeJsonObjectInput } from '../lib/json-input.js';
 
 const MISSION_TIERS = ['personal', 'confidential', 'public'] as const;
+
+const TENANT_BOUND_MISSION_VERBS = new Set([
+  'create',
+  'kickoff',
+  'start',
+  'status',
+  'record-evidence',
+  'review-task',
+  'verify',
+  'distill',
+  'finish',
+]);
+
+/** Bind the CLI selection for the entire invocation, including post-action reads. */
+export function withMissionCliTenant<T>(
+  action: string | undefined,
+  argv: string[],
+  run: () => Promise<T>
+): Promise<T> {
+  const tenant = getOptionValue('--tenant-slug', argv);
+  if (!action || !TENANT_BOUND_MISSION_VERBS.has(action) || !hasCliFlag(argv, '--tenant-slug'))
+    return run();
+  if (!tenant || !isValidTenantSlug(tenant))
+    throw new Error('--tenant-slug requires a valid tenant slug.');
+  const scope = currentExecutionScope();
+  const inherited = currentScopeEnvelope()?.identity;
+  const ambient =
+    scope?.tenantBound || scope?.tenantCleared || inherited
+      ? undefined
+      : resolveScopeResolution({}, undefined, { inferFromMission: false, inferFromCwd: false })
+          .scope;
+  const stanceConfig = ambient && activeStance() ? stanceRoot('stance.json') : null;
+  if (stanceConfig && !safeExistsSync(stanceConfig))
+    throw new Error(
+      'Selected Stance is not configured. Run pnpm stance:list or clear the active Stance.'
+    );
+  const actingFor = stanceConfig ? parseStanceSelection(readJson<unknown>(stanceConfig)) : null;
+  const identity = resolveIdentityContext();
+  if (
+    scope?.tenantCleared ||
+    [
+      scope?.tenantSlug,
+      inherited?.tenant_slug,
+      identity.tenantSlug,
+      ambient?.tenant_slug,
+      actingFor?.tenantSlug,
+    ].some((bound) => bound && bound !== tenant)
+  )
+    throw new Error(
+      '[ROLE_TENANT_SCOPE_MISMATCH] Mission tenant conflicts with the active execution scope'
+    );
+  const organizations = new Set(
+    [
+      scope?.organizationId,
+      inherited?.organization_id,
+      ambient?.organization_id,
+      actingFor?.organizationId,
+    ].filter(Boolean)
+  );
+  if (organizations.size > 1)
+    throw new Error(
+      '[SCOPE_CONTEXT_INVALID] Organization conflicts with the active execution scope'
+    );
+  if (scope?.tenantBound) return run();
+  if (identity.role && identity.role !== 'mission_controller')
+    throw new Error(
+      '[ROLE_ASSUMPTION_DENIED] Tenant selection requires the Mission controller CLI role'
+    );
+  return withExecutionContextAsync(
+    'mission_controller',
+    run,
+    undefined,
+    tenant,
+    organizations.values().next().value ?? undefined
+  );
+}
 
 const TICKET_TARGETS = ['workitem', 'github', 'jira'] as const;
 const DISPATCH_MODES = ['auto', 'agent', 'subagent'] as const;

@@ -6356,6 +6356,10 @@
       "types": "./dist/surface/a2ui-catalog.d.ts",
       "default": "./dist/surface/a2ui-catalog.js"
     },
+    "./surface/approval-primary-actions": {
+      "types": "./dist/surface/approval-primary-actions.d.ts",
+      "default": "./dist/surface/approval-primary-actions.js"
+    },
     "./surface/approval-publication-preview": {
       "types": "./dist/surface/approval-publication-preview.d.ts",
       "default": "./dist/surface/approval-publication-preview.js"
@@ -6544,6 +6548,10 @@
       "types": "./dist/surface/installation-owner-access.d.ts",
       "default": "./dist/surface/installation-owner-access.js"
     },
+    "./surface/mission-changes-tasks-summary": {
+      "types": "./dist/surface/mission-changes-tasks-summary.d.ts",
+      "default": "./dist/surface/mission-changes-tasks-summary.js"
+    },
     "./surface/needs-you": {
       "types": "./dist/surface/needs-you.d.ts",
       "default": "./dist/surface/needs-you.js"
@@ -6575,6 +6583,10 @@
     "./surface/operator-provider-preferences": {
       "types": "./dist/surface/operator-provider-preferences.d.ts",
       "default": "./dist/surface/operator-provider-preferences.js"
+    },
+    "./surface/plan-interaction-packet": {
+      "types": "./dist/surface/plan-interaction-packet.d.ts",
+      "default": "./dist/surface/plan-interaction-packet.js"
     },
     "./surface/scoped-workspace-ingest": {
       "types": "./dist/surface/scoped-workspace-ingest.d.ts",
@@ -7743,6 +7755,10 @@
     "./workforce/worker-state-journal": {
       "types": "./dist/workforce/worker-state-journal.d.ts",
       "default": "./dist/workforce/worker-state-journal.js"
+    },
+    "./workforce/workflow-disposition": {
+      "types": "./dist/workforce/workflow-disposition.d.ts",
+      "default": "./dist/workforce/workflow-disposition.js"
     },
     "./workforce/workforce-load": {
       "types": "./dist/workforce/workforce-load.d.ts",
