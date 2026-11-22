@@ -53,7 +53,11 @@ export const BROWSER_CONTROL_USAGE = `Usage: pnpm kyberion browser control <verb
   submit <ref> | delete <ref> | purchase <ref>
   settings-change <ref> | credential-submit <ref>
   resume <approval_id>
-    common: [--session <BCS-…>] [--mission <id>] [--timeout-sec N] [--json]`;
+    common: [--session <BCS-…>] [--mission <id>] [--timeout-sec N] [--json]
+
+  Page-touching ops (snapshot/screenshot/click/fill/extract/download/upload)
+  need the per-origin grant once: Side Panel "connect this tab" on a tab of
+  that origin. tabs|tab|navigate work without it.`;
 
 const STEP_OPS = new Set([
   'snapshot',

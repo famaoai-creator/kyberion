@@ -71,6 +71,20 @@ most recent active session is used. `--json` prints the raw response.
    `pnpm kyberion secret introduce --from-file` — never paste tokens in chat.
 5. `close` the session when done (it also dies on TTL).
 
+## Vocabulary map
+
+Three layers share the browser surface — same targets, different verbs:
+
+| Layer                  | Opens a tab                                    | Reads the page                             | Acts                                                                                                                                                      | File in/out                   |
+| ---------------------- | ---------------------------------------------- | ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- |
+| CLI verb               | `open` / `navigate` / `tab`                    | `snapshot` `screenshot` `extract`          | `click` `fill` `select` `press` `submit` `delete` `purchase` `settings-change` `credential-submit`                                                        | `download` `upload`           |
+| Control `step.op`      | `open_tab` `navigate` `select_tab` `list_tabs` | `snapshot` `screenshot` `extract_text_ref` | `click_ref` `click_if_present` `fill_ref` `select_ref` `press_ref` `wait_for_ref` `submit_form` `delete` `purchase` `settings_change` `credential_submit` | `download_file` `upload_file` |
+| Mailbox `request_kind` | —                                              | `observe_tab` (panel-approved)             | `control_step`                                                                                                                                            | —                             |
+
+ADF replay (`pnpm kyberion browser run`) is a different surface: it replays a
+recorded procedure (`goto`/`click`/`fill` in `replay_steps`) against its own
+runtime, not the live operator tab.
+
 ## Limits
 
 - Single-operator channel: one allowlisted extension, one bound tab per
